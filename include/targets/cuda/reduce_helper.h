@@ -59,10 +59,13 @@ namespace quda
      memory
    */
   template <typename T, bool use_kernel_arg = true> struct ReduceArg : kernel_param<use_kernel_arg> {
+    using reduce_t = T;
 
     template <int, int, typename Reducer, typename Arg, typename I>
     friend __device__ void reduce(Arg &, const Reducer &, const I &, const int);
     qudaError_t launch_error; /** only do complete if no launch error to avoid hang */
+    static constexpr unsigned int max_n_batch_block
+      = 1; /** by default reductions do not support batching withing the block */
 
   private:
     const int n_reduce; /** number of reductions of length n_item */
@@ -74,6 +77,7 @@ namespace quda
     cuda::atomic<system_atomic_t, cuda::thread_scope_system> *result_h; /** host atomic buffer */
     count_t *count; /** count array that is used to track the number of completed thread blocks at a given batch index */
     bool consumed; // check to ensure that we don't complete more than once unless we explicitly reset
+    T *device_output_async_buffer = nullptr; // Optional device output buffer for the reduction result
 
   public:
     /**
@@ -89,18 +93,14 @@ namespace quda
       launch_error(QUDA_ERROR_UNINITIALIZED),
       n_reduce(n_reduce),
       reset(reset),
-      partial(static_cast<decltype(partial)>(reducer::get_device_buffer())),
-      result_d(static_cast<decltype(result_d)>(reducer::get_mapped_buffer())),
-      result_h(static_cast<decltype(result_h)>(reducer::get_host_buffer())),
-      count {reducer::get_count<count_t>()},
       consumed(false)
     {
-      // check reduction buffers are large enough if requested
-      auto max_reduce_blocks = 2 * device::processor_count();
-      auto reduce_size = max_reduce_blocks * n_reduce * sizeof(*partial);
-      if (reduce_size > reducer::buffer_size())
-        errorQuda("Requested reduction requires a larger buffer %lu than allocated %lu", reduce_size,
-                  reducer::buffer_size());
+      reducer::init(n_reduce, sizeof(*partial));
+      // these buffers may be allocated in init, so we can't set the local copies until now
+      partial = static_cast<decltype(partial)>(reducer::get_device_buffer());
+      result_d = static_cast<decltype(result_d)>(reducer::get_mapped_buffer());
+      result_h = static_cast<decltype(result_h)>(reducer::get_host_buffer());
+      count = reducer::get_count<count_t>();
 
       if (!commAsyncReduction()) {
         // initialize the result buffer so we can test for completion
@@ -113,6 +113,22 @@ namespace quda
         result_d = nullptr;
       }
     }
+
+    /**
+      @brief Set device_output_async_buffer
+    */
+    void set_output_async_buffer(T *ptr)
+    {
+      if (!commAsyncReduction()) {
+        errorQuda("When setting the asynchronous buffer the commAsyncReduction option must be set.");
+      }
+      device_output_async_buffer = ptr;
+    }
+
+    /**
+      @brief Get device_output_async_buffer
+    */
+    __device__ __host__ T *get_output_async_buffer() const { return device_output_async_buffer; }
 
     /**
        @brief Finalize the reduction, returning the computed reduction
@@ -167,10 +183,12 @@ namespace quda
   template <int block_size_x, int block_size_y, typename Reducer, typename Arg, typename T>
   __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx)
   {
-    using BlockReduce = BlockReduce<T, block_size_x, block_size_y>;
-    __shared__ bool isLastBlockDone;
+    constexpr auto n_batch_block
+      = std::min(Arg::max_n_batch_block, device::max_block_size() / (block_size_x * block_size_y));
+    using BlockReduce = BlockReduce<T, block_size_x, block_size_y, n_batch_block, true>;
+    __shared__ bool isLastBlockDone[n_batch_block];
 
-    T aggregate = BlockReduce().Reduce(in, r);
+    T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
 
     if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
       // need to call placement new constructor since partial is not necessarily constructed
@@ -180,21 +198,21 @@ namespace quda
       auto value = arg.count[idx].fetch_add(1, cuda::std::memory_order_release);
 
       // determine if last block
-      isLastBlockDone = (value == (target::grid_dim().x - 1));
+      isLastBlockDone[target::thread_idx().z] = (value == (target::grid_dim().x - 1));
     }
 
     __syncthreads();
 
     // finish the reduction if last block
-    if (isLastBlockDone) {
+    if (isLastBlockDone[target::thread_idx().z]) {
       auto i = target::thread_idx().y * block_size_x + target::thread_idx().x;
-      T sum = arg.init();
+      T sum = r.init();
       while (i < target::grid_dim().x) {
         sum = r(sum, arg.partial[idx * target::grid_dim().x + i].load(cuda::std::memory_order_relaxed));
         i += block_size_x * block_size_y;
       }
 
-      sum = BlockReduce().template Reduce<true>(sum, r);
+      sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
 
       // write out the final reduced value
       if (target::thread_idx().y * block_size_x + target::thread_idx().x == 0) {
@@ -209,6 +227,8 @@ namespace quda
             sum_tmp[i] = sum_tmp[i] == init_value<atomic_t>() ? terminate_value<atomic_t>() : sum_tmp[i];
             arg.result_d[n * idx + i].store(sum_tmp[i], cuda::std::memory_order_relaxed);
           }
+        } else if (arg.get_output_async_buffer()) {
+          arg.get_output_async_buffer()[idx] = sum;
         } else { // write to device memory
           arg.partial[idx].store(sum, cuda::std::memory_order_relaxed);
         }

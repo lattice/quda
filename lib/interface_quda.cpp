@@ -70,32 +70,6 @@ static bool redundant_comms = false;
 
 #include <blas_lapack.h>
 
-//for MAGMA lib:
-#include <blas_magma.h>
-
-static bool InitMagma = false;
-
-void openMagma() {
-
-  if (!InitMagma) {
-    OpenMagma();
-    InitMagma = true;
-  } else {
-    printfQuda("\nMAGMA library was already initialized..\n");
-  }
-
-}
-
-void closeMagma(){
-
-  if (InitMagma) {
-    CloseMagma();
-    InitMagma = false;
-  } else {
-    printfQuda("\nMAGMA library was not initialized..\n");
-  }
-
-}
 
 cudaGaugeField *gaugePrecise = nullptr;
 cudaGaugeField *gaugeSloppy = nullptr;
@@ -129,7 +103,7 @@ CloverField *cloverEigensolver = nullptr;
 cudaGaugeField *momResident = nullptr;
 cudaGaugeField *extendedGaugeResident = nullptr;
 
-std::vector<cudaColorSpinorField*> solutionResident;
+std::vector<ColorSpinorField *> solutionResident;
 
 // vector of spinors used for forecasting solutions in HMC
 #define QUDA_MAX_CHRONO 12
@@ -171,6 +145,9 @@ static TimeProfile profileFatLink("computeKSLinkQuda");
 
 //!< Profiler for computeGaugeForceQuda
 static TimeProfile profileGaugeForce("computeGaugeForceQuda");
+
+//!< Profiler for computeGaugePathQuda
+static TimeProfile profileGaugePath("computeGaugePathQuda");
 
 //!<Profiler for updateGaugeFieldQuda
 static TimeProfile profileGaugeUpdate("updateGaugeFieldQuda");
@@ -516,7 +493,6 @@ void initQudaMemory()
   createDslashEvents();
 
   blas_lapack::native::init();
-  blas::init();
 
   num_failures_h = static_cast<int *>(mapped_malloc(sizeof(int)));
   num_failures_d = static_cast<int *>(get_mapped_device_pointer(num_failures_h));
@@ -1422,11 +1398,11 @@ void endQuda(void)
   if(momResident) delete momResident;
 
   LatticeField::freeGhostBuffer();
-  cpuColorSpinorField::freeGhostBuffer();
+  ColorSpinorField::freeGhostBuffer();
 
   blas_lapack::generic::destroy();
   blas_lapack::native::destroy();
-  blas::destroy();
+  reducer::destroy();
 
   pool::flush_pinned();
   pool::flush_device();
@@ -1612,6 +1588,7 @@ namespace quda {
     diracParam.mass = inv_param->mass;
     diracParam.m5 = inv_param->m5;
     diracParam.mu = inv_param->mu;
+    diracParam.tm_rho = inv_param->tm_rho;
 
     for (int i=0; i<4; i++) diracParam.commDim[i] = 1;   // comms are always on
 
@@ -1730,8 +1707,8 @@ namespace quda {
     setDiracParam(diracParam, &param, pc_solve);
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
     // eigCG and deflation need 2 sloppy precisions and do not use Schwarz
-    bool comms_flag = (param.schwarz_type != QUDA_INVALID_SCHWARZ) ? false : true;
-    setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
+    bool pre_comms_flag = (param.schwarz_type != QUDA_INVALID_SCHWARZ) ? false : true;
+    setDiracPreParam(diracPreParam, &param, pc_solve, pre_comms_flag);
 
     d = Dirac::create(diracParam); // create the Dirac operator
     dSloppy = Dirac::create(diracSloppyParam);
@@ -1750,8 +1727,8 @@ namespace quda {
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
     setDiracRefineParam(diracRefParam, &param, pc_solve);
     // eigCG and deflation need 2 sloppy precisions and do not use Schwarz
-    bool comms_flag = (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.eig_param) ? true : false;
-    setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
+    bool pre_comms_flag = (param.schwarz_type != QUDA_INVALID_SCHWARZ) ? false : true;
+    setDiracPreParam(diracPreParam, &param, pc_solve, pre_comms_flag);
 
     d = Dirac::create(diracParam); // create the Dirac operator
     dSloppy = Dirac::create(diracSloppyParam);
@@ -1770,9 +1747,10 @@ namespace quda {
     setDiracParam(diracParam, &param, pc_solve);
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
     // eigCG and deflation need 2 sloppy precisions and do not use Schwarz
-    bool comms_flag = (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.eig_param) ? true : false;
-    setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
-    setDiracEigParam(diracEigParam, &param, pc_solve, comms_flag);
+    bool pre_comms_flag = (param.schwarz_type != QUDA_INVALID_SCHWARZ) ? false : true;
+    setDiracPreParam(diracPreParam, &param, pc_solve, pre_comms_flag);
+    bool eig_comms_flag = (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.eig_param) ? true : false;
+    setDiracEigParam(diracEigParam, &param, pc_solve, eig_comms_flag);
 
     d = Dirac::create(diracParam); // create the Dirac operator
     dSloppy = Dirac::create(diracSloppyParam);
@@ -1780,9 +1758,8 @@ namespace quda {
     dEig = Dirac::create(diracEigParam);
   }
 
-  void massRescale(cudaColorSpinorField &b, QudaInvertParam &param, bool for_multishift)
+  void massRescale(ColorSpinorField &b, QudaInvertParam &param, bool for_multishift)
   {
-
     double kappa5 = (0.5/(5.0 + param.m5));
     double kappa = (param.dslash_type == QUDA_DOMAIN_WALL_DSLASH || param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
                     || param.dslash_type == QUDA_MOBIUS_DWF_DSLASH || param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) ?
@@ -1885,16 +1862,15 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   ColorSpinorParam cpuParam(h_in, *inv_param, gauge.X(), true, inv_param->input_location);
-  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
-  ColorSpinorParam cudaParam(cpuParam, *inv_param);
+  ColorSpinorField in_h(cpuParam);
+  ColorSpinorParam cudaParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
 
   cpuParam.v = h_out;
   cpuParam.location = inv_param->output_location;
-  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField out_h(cpuParam);
 
-  cudaParam.create = QUDA_NULL_FIELD_CREATE;
-  cudaColorSpinorField in(*in_h, cudaParam);
-  cudaColorSpinorField out(in, cudaParam);
+  ColorSpinorField in(cudaParam);
+  ColorSpinorField out(cudaParam);
 
   bool pc = true;
   DiracParam diracParam;
@@ -1903,16 +1879,12 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   profileDslash.TPSTOP(QUDA_PROFILE_INIT);
 
   profileDslash.TPSTART(QUDA_PROFILE_H2D);
-  in = *in_h;
+  in = in_h;
   profileDslash.TPSTOP(QUDA_PROFILE_H2D);
 
   profileDslash.TPSTART(QUDA_PROFILE_COMPUTE);
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*in_h);
-    double gpu = blas::norm2(in);
-    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
-  }
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
 
   if (inv_param->mass_normalization == QUDA_KAPPA_NORMALIZATION &&
       (inv_param->dslash_type == QUDA_STAGGERED_DSLASH ||
@@ -1931,7 +1903,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
   if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH && inv_param->dagger) {
     cudaParam.create = QUDA_NULL_FIELD_CREATE;
-    cudaColorSpinorField tmp1(in, cudaParam);
+    ColorSpinorField tmp1(cudaParam);
     ((DiracTwistedCloverPC*) dirac)->TwistCloverInv(tmp1, in, (parity+1)%2); // apply the clover-twist
     dirac->Dslash(out, tmp1, parity); // apply the operator
   } else if (inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH
@@ -1943,20 +1915,14 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   profileDslash.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileDslash.TPSTART(QUDA_PROFILE_D2H);
-  *out_h = out;
+  out_h = out;
   profileDslash.TPSTOP(QUDA_PROFILE_D2H);
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*out_h);
-    double gpu = blas::norm2(out);
-    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
-  }
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
 
   profileDslash.TPSTART(QUDA_PROFILE_FREE);
   delete dirac; // clean up
 
-  delete out_h;
-  delete in_h;
   profileDslash.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
@@ -1980,19 +1946,17 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
       inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 
   ColorSpinorParam cpuParam(h_in, *inv_param, gauge.X(), pc, inv_param->input_location);
-  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField in_h(cpuParam);
 
-  ColorSpinorParam cudaParam(cpuParam, *inv_param);
-  cudaColorSpinorField in(*in_h, cudaParam);
+  ColorSpinorParam cudaParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+  ColorSpinorField in(cudaParam);
+  in = in_h;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*in_h);
-    double gpu = blas::norm2(in);
-    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
-  }
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
-  cudaColorSpinorField out(in, cudaParam);
+  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+  ColorSpinorField out(cudaParam);
 
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc);
@@ -2017,17 +1981,10 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 
   cpuParam.v = h_out;
   cpuParam.location = inv_param->output_location;
-  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
-  *out_h = out;
+  ColorSpinorField out_h(cpuParam);
+  out_h = out;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*out_h);
-    double gpu = blas::norm2(out);
-    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
-  }
-
-  delete out_h;
-  delete in_h;
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
 
   popVerbosity();
 }
@@ -2050,19 +2007,16 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
       inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 
   ColorSpinorParam cpuParam(h_in, *inv_param, gauge.X(), pc, inv_param->input_location);
-  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField in_h(cpuParam);
 
-  ColorSpinorParam cudaParam(cpuParam, *inv_param);
-  cudaColorSpinorField in(*in_h, cudaParam);
+  ColorSpinorParam cudaParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+  ColorSpinorField in(cudaParam);
+  in = in_h;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE){
-    double cpu = blas::norm2(*in_h);
-    double gpu = blas::norm2(in);
-    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
-  }
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
-  cudaColorSpinorField out(in, cudaParam);
+  ColorSpinorField out(cudaParam);
 
   //  double kappa = inv_param->kappa;
   //  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) kappa *= gaugePrecise->anisotropy;
@@ -2090,17 +2044,10 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 
   cpuParam.v = h_out;
   cpuParam.location = inv_param->output_location;
-  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
-  *out_h = out;
+  ColorSpinorField out_h(cpuParam);
+  out_h = out;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE){
-    double cpu = blas::norm2(*out_h);
-    double gpu = blas::norm2(out);
-    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
-  }
-
-  delete out_h;
-  delete in_h;
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
 
   popVerbosity();
 }
@@ -2241,21 +2188,16 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
   ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), true);
 
-  ColorSpinorField *in_h = (inv_param->input_location == QUDA_CPU_FIELD_LOCATION) ?
-    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) :
-    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+  ColorSpinorField in_h(cpuParam);
 
-  ColorSpinorParam cudaParam(cpuParam, *inv_param);
-  cudaColorSpinorField in(*in_h, cudaParam);
+  ColorSpinorParam cudaParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+  ColorSpinorField in(cudaParam);
+  in = in_h;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*in_h);
-    double gpu = blas::norm2(in);
-    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
-  }
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
-  cudaColorSpinorField out(in, cudaParam);
+  ColorSpinorField out(cudaParam);
 
   if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
     if (parity == QUDA_EVEN_PARITY) {
@@ -2276,21 +2218,10 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
   cpuParam.v = h_out;
   cpuParam.location = inv_param->output_location;
-  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
-  *out_h = out;
+  ColorSpinorField out_h(cpuParam);
+  out_h = out;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*out_h);
-    double gpu = blas::norm2(out);
-    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
-  }
-
-  /*for (int i=0; i<in_h->Volume(); i++) {
-    ((cpuColorSpinorField*)out_h)->PrintVector(i);
-    }*/
-
-  delete out_h;
-  delete in_h;
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
 
   popVerbosity();
 }
@@ -2516,13 +2447,10 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   csParam.mem_type = mg_param.setup_minimize_memory == QUDA_BOOLEAN_TRUE ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
   B.resize(mg_param.n_vec[0]);
 
-  if (mg_param.transfer_type[0] == QUDA_TRANSFER_COARSE_KD || mg_param.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD) {
+  if (mg_param.transfer_type[0] == QUDA_TRANSFER_COARSE_KD || mg_param.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD
+      || mg_param.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
     // Create the ColorSpinorField as a "container" for metadata.
     csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-
-    // These never get accessed, `nullptr` on its own leads to an error in texture binding
-    csParam.v = (void *)std::numeric_limits<uint64_t>::max();
-    csParam.norm = (void *)std::numeric_limits<uint64_t>::max();
   }
 
   for (int i = 0; i < mg_param.n_vec[0]; i++) { B[i] = ColorSpinorField::Create(csParam); }
@@ -2603,6 +2531,15 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
     }
     // The above changes are propagated internally by use of references, pointers, etc, so
     // no further updates are needed.
+
+    // If we're doing a staggered or asqtad KD op, a thin update needs to update the
+    // fields for the KD op as well.
+    if (mg_param->transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD
+        || mg_param->transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
+      if (param->overlap) errorQuda("Updating the staggered/asqtad KD field with param->overlap set is not supported");
+
+      mg->mg->resetStaggeredKD(gaugeSloppy, gaugeFatSloppy, gaugeLongSloppy, param->mass);
+    }
 
   } else {
 
@@ -2749,9 +2686,6 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
 
 void* newDeflationQuda(QudaEigParam *eig_param) {
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
-#ifdef MAGMA_LIB
-  openMagma();
-#endif
   auto *defl = new deflated_solver(*eig_param, profileInvert);
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
@@ -2762,9 +2696,6 @@ void* newDeflationQuda(QudaEigParam *eig_param) {
 }
 
 void destroyDeflationQuda(void *df) {
-#ifdef MAGMA_LIB
-  closeMagma();
-#endif
   delete static_cast<deflated_solver*>(df);
 }
 
@@ -2819,7 +2750,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   profileInvert.TPSTART(QUDA_PROFILE_H2D);
 
-  ColorSpinorField *b = nullptr;
   ColorSpinorField *x = nullptr;
   ColorSpinorField *in = nullptr;
   ColorSpinorField *out = nullptr;
@@ -2828,22 +2758,26 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   // wrap CPU host side pointers
   ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution, param->input_location);
-  ColorSpinorField *h_b = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField h_b(cpuParam);
 
   cpuParam.v = hp_x;
   cpuParam.location = param->output_location;
-  ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField h_x(cpuParam);
 
   // download source
-  ColorSpinorParam cudaParam(cpuParam, *param);
+  ColorSpinorParam cudaParam(cpuParam, *param, QUDA_CUDA_FIELD_LOCATION);
   cudaParam.create = QUDA_COPY_FIELD_CREATE;
-  b = new cudaColorSpinorField(*h_b, cudaParam);
+  cudaParam.field = &h_b;
+  ColorSpinorField b(cudaParam);
 
   // now check if we need to invalidate the solutionResident vectors
   bool invalidate = false;
   if (param->use_resident_solution == 1) {
     for (auto v : solutionResident)
-      if (b->Precision() != v->Precision() || b->SiteSubset() != v->SiteSubset()) { invalidate = true; break; }
+      if (b.Precision() != v->Precision() || b.SiteSubset() != v->SiteSubset()) {
+        invalidate = true;
+        break;
+      }
 
     if (invalidate) {
       for (auto v : solutionResident) if (v) delete v;
@@ -2852,12 +2786,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
     if (!solutionResident.size()) {
       cudaParam.create = QUDA_NULL_FIELD_CREATE;
-      solutionResident.push_back(new cudaColorSpinorField(cudaParam)); // solution
+      solutionResident.push_back(new ColorSpinorField(cudaParam)); // solution
     }
     x = solutionResident[0];
   } else {
     cudaParam.create = QUDA_NULL_FIELD_CREATE;
-    x = new cudaColorSpinorField(cudaParam);
+    x = new ColorSpinorField(cudaParam);
   }
 
   if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
@@ -2867,7 +2801,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       errorQuda("Initial guess not supported for two-pass solver");
     }
 
-    *x = *h_x; // solution
+    *x = h_x; // solution
   } else { // zero initial guess
     blas::zero(*x);
   }
@@ -2884,28 +2818,28 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profileInvert.TPSTOP(QUDA_PROFILE_H2D);
   profileInvert.TPSTART(QUDA_PROFILE_PREAMBLE);
 
-  double nb = blas::norm2(*b);
+  double nb = blas::norm2(b);
   if (nb==0.0) errorQuda("Source has zero norm");
 
-  if (getVerbosity() >= QUDA_VERBOSE) {
-    double nh_b = blas::norm2(*h_b);
-    printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    printfQuda("Source: CPU = %g, CUDA copy = %g\n", blas::norm2(h_b), nb);
     if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      double nh_x = blas::norm2(*h_x);
-      double nx = blas::norm2(*x);
-      printfQuda("Solution: CPU = %g, CUDA copy = %g\n", nh_x, nx);
+      printfQuda("Initial guess: CPU = %g, CUDA copy = %g\n", blas::norm2(h_x), blas::norm2(*x));
     }
+  } else if (getVerbosity() >= QUDA_VERBOSE) {
+    printfQuda("Source: %g\n", nb);
+    if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { printfQuda("Initial guess: %g\n", blas::norm2(*x)); }
   }
 
   // rescale the source and solution vectors to help prevent the onset of underflow
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
-    blas::ax(1.0/sqrt(nb), *b);
+    blas::ax(1.0 / sqrt(nb), b);
     blas::ax(1.0/sqrt(nb), *x);
   }
 
-  massRescale(*static_cast<cudaColorSpinorField *>(b), *param, false);
+  massRescale(b, *param, false);
 
-  dirac.prepare(in, out, *x, *b, param->solution_type);
+  dirac.prepare(in, out, *x, b, param->solution_type);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = blas::norm2(*in);
@@ -2963,7 +2897,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profileInvert.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
   if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
-    cudaColorSpinorField tmp(*in);
+    ColorSpinorField tmp(*in);
     dirac.Mdag(*in, tmp);
   } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
     DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
@@ -3081,7 +3015,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     }
   } else { // norm_error_solve
     DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
-    cudaColorSpinorField tmp(*out);
+    ColorSpinorField tmp(*out);
     SolverParam solverParam(*param);
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, mEig, profileInvert);
     (*solve)(tmp, *in); // y = (M M^\dag) b
@@ -3090,10 +3024,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     solverParam.updateInvertParam(*param);
   }
 
-  if (getVerbosity() >= QUDA_VERBOSE){
-    double nx = blas::norm2(*x);
-    printfQuda("Solution = %g\n",nx);
-  }
+  if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Solution = %g\n", blas::norm2(*x)); }
 
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
   if (param->chrono_make_resident) {
@@ -3126,7 +3057,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     }
     *(basis[0]) = *out; // set first entry to new solution
   }
-  dirac.reconstruct(*x, *b, param->solution_type);
+  dirac.reconstruct(*x, b, param->solution_type);
 
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
     // rescale the solution
@@ -3136,30 +3067,26 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   if (!param->make_resident_solution) {
     profileInvert.TPSTART(QUDA_PROFILE_D2H);
-    *h_x = *x;
+    h_x = *x;
     profileInvert.TPSTOP(QUDA_PROFILE_D2H);
   }
 
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
 
   if (param->compute_action) {
-    Complex action = blas::cDotProduct(*b, *x);
+    Complex action = blas::cDotProduct(b, *x);
     param->action[0] = action.real();
     param->action[1] = action.imag();
   }
 
-  if (getVerbosity() >= QUDA_VERBOSE){
-    double nx = blas::norm2(*x);
-    double nh_x = blas::norm2(*h_x);
-    printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    printfQuda("Reconstructed solution: CUDA = %g, CPU copy = %g\n", blas::norm2(*x), blas::norm2(h_x));
+  } else if (getVerbosity() >= QUDA_VERBOSE) {
+    printfQuda("Reconstructed solution: %g\n", blas::norm2(*x));
   }
   profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
   profileInvert.TPSTART(QUDA_PROFILE_FREE);
-
-  delete h_b;
-  delete h_x;
-  delete b;
 
   if (param->use_resident_solution && !param->make_resident_solution) {
     for (auto v: solutionResident) if (v) delete v;
@@ -3427,12 +3354,13 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
 
     // Split input fermion field
     quda::ColorSpinorParam cpu_cs_param_split(*_h_x[0]);
+    cpu_cs_param_split.location = QUDA_CPU_FIELD_LOCATION;
     for (int d = 0; d < CommKey::n_dim; d++) { cpu_cs_param_split.x[d] *= split_key[d]; }
     std::vector<quda::ColorSpinorField *> _collect_b(param->num_src_per_sub_partition, nullptr);
     std::vector<quda::ColorSpinorField *> _collect_x(param->num_src_per_sub_partition, nullptr);
     for (int n = 0; n < param->num_src_per_sub_partition; n++) {
-      _collect_b[n] = new quda::cpuColorSpinorField(cpu_cs_param_split);
-      _collect_x[n] = new quda::cpuColorSpinorField(cpu_cs_param_split);
+      _collect_b[n] = new quda::ColorSpinorField(cpu_cs_param_split);
+      _collect_x[n] = new quda::ColorSpinorField(cpu_cs_param_split);
       auto first = _h_b.begin() + n * num_sub_partition;
       auto last = _h_b.begin() + (n + 1) * num_sub_partition;
       std::vector<ColorSpinorField *> _v_b(first, last);
@@ -3678,9 +3606,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   createDiracWithRefine(d, dSloppy, dPre, dRefine, *param, pc_solve);
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;
+  dirac.prefetch(QUDA_CUDA_FIELD_LOCATION);
+  diracSloppy.prefetch(QUDA_CUDA_FIELD_LOCATION);
 
-
-  cudaColorSpinorField *b = nullptr;   // Cuda RHS
   std::vector<ColorSpinorField*> x;  // Cuda Solutions
   x.resize(param->num_offset);
   std::vector<ColorSpinorField*> p;
@@ -3696,25 +3624,26 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   // then be used as 'instructions' to create the actual
   // ColorSpinorField
   ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution, param->input_location);
-  ColorSpinorField *h_b = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField h_b(cpuParam);
 
-  std::vector<ColorSpinorField*> h_x;
+  std::vector<std::unique_ptr<ColorSpinorField>> h_x;
   h_x.resize(param->num_offset);
 
   cpuParam.location = param->output_location;
   for(int i=0; i < param->num_offset; i++) {
     cpuParam.v = hp_x[i];
-    h_x[i] = ColorSpinorField::Create(cpuParam);
+    h_x[i] = std::make_unique<ColorSpinorField>(cpuParam);
   }
 
   profileMulti.TPSTOP(QUDA_PROFILE_INIT);
   profileMulti.TPSTART(QUDA_PROFILE_H2D);
   // Now I need a colorSpinorParam for the device
-  ColorSpinorParam cudaParam(cpuParam, *param);
+  ColorSpinorParam cudaParam(cpuParam, *param, QUDA_CUDA_FIELD_LOCATION);
   // This setting will download a host vector
   cudaParam.create = QUDA_COPY_FIELD_CREATE;
-  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
-  b = new cudaColorSpinorField(*h_b, cudaParam); // Creates b and downloads h_b to it
+  cudaParam.field = &h_b;
+  ColorSpinorField b(cudaParam); // Creates b and downloads h_b to it
+
   profileMulti.TPSTOP(QUDA_PROFILE_H2D);
 
   profileMulti.TPSTART(QUDA_PROFILE_INIT);
@@ -3738,7 +3667,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   // grow resident solutions to be big enough
   for (int i=solutionResident.size(); i < param->num_offset; i++) {
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Adding vector %d to solutionsResident\n", i);
-    solutionResident.push_back(new cudaColorSpinorField(cudaParam));
+    solutionResident.push_back(new ColorSpinorField(cudaParam));
   }
   for (int i=0; i < param->num_offset; i++) x[i] = solutionResident[i];
   profileMulti.TPSTOP(QUDA_PROFILE_INIT);
@@ -3746,25 +3675,23 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   profileMulti.TPSTART(QUDA_PROFILE_PREAMBLE);
 
   // Check source norms
-  double nb = blas::norm2(*b);
+  double nb = blas::norm2(b);
   if (nb==0.0) errorQuda("Source has zero norm");
 
   if(getVerbosity() >= QUDA_VERBOSE ) {
-    double nh_b = blas::norm2(*h_b);
+    double nh_b = blas::norm2(h_b);
     printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
   }
 
   // rescale the source vector to help prevent the onset of underflow
-  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
-    blas::ax(1.0/sqrt(nb), *b);
-  }
+  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) { blas::ax(1.0 / sqrt(nb), b); }
 
   // backup shifts
   double unscaled_shifts[QUDA_MAX_MULTI_SHIFT];
   for (int i = 0; i < param->num_offset; i++) { unscaled_shifts[i] = param->offset[i]; }
 
   // rescale
-  massRescale(*b, *param, true);
+  massRescale(b, *param, true);
   profileMulti.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
   DiracMatrix *m, *mSloppy;
@@ -3781,7 +3708,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   SolverParam solverParam(*param);
   {
     MultiShiftCG cg_m(*m, *mSloppy, solverParam, profileMulti);
-    cg_m(x, *b, p, r2_old.get());
+    cg_m(x, b, p, r2_old.get());
   }
   solverParam.updateInvertParam(*param);
 
@@ -3792,12 +3719,13 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     // check each shift has the desired tolerance and use sequential CG to refine
     profileMulti.TPSTART(QUDA_PROFILE_INIT);
     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-    cudaColorSpinorField r(*b, cudaParam);
+    ColorSpinorField r(cudaParam);
     profileMulti.TPSTOP(QUDA_PROFILE_INIT);
     QudaInvertParam refineparam = *param;
     refineparam.cuda_prec_sloppy = param->cuda_prec_refinement_sloppy;
     Dirac &dirac = *d;
     Dirac &diracSloppy = *dRefine;
+    diracSloppy.prefetch(QUDA_CUDA_FIELD_LOCATION);
 
 #define REFINE_INCREASING_MASS
 #ifdef REFINE_INCREASING_MASS
@@ -3863,11 +3791,11 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
           std::vector<ColorSpinorField *> z;
           z.resize(nRefine);
           cudaParam.create = QUDA_NULL_FIELD_CREATE;
-          cudaColorSpinorField tmp(cudaParam);
+          ColorSpinorField tmp(cudaParam);
 
           for (int j = 0; j < nRefine; j++) {
-            q[j] = new cudaColorSpinorField(cudaParam);
-            z[j] = new cudaColorSpinorField(cudaParam);
+            q[j] = new ColorSpinorField(cudaParam);
+            z[j] = new ColorSpinorField(cudaParam);
           }
 
           *z[0] = *x[0]; // zero solution already solved
@@ -3881,8 +3809,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
           bool apply_mat = true;
           bool hermitian = true;
 	  MinResExt mre(*m, orthogonal, apply_mat, hermitian, profileMulti);
-	  blas::copy(tmp, *b);
-	  mre(*x[i], tmp, z, q);
+          blas::copy(tmp, b);
+          mre(*x[i], tmp, z, q);
 
 	  for(int j=0; j < nRefine; j++) {
 	    delete q[j];
@@ -3900,9 +3828,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
         {
           CG cg(*m, *mSloppy, *mSloppy, *mSloppy, solverParam, profileMulti);
           if (i==0)
-            cg(*x[i], *b, p[i], r2_old[i]);
+            cg(*x[i], b, p[i], r2_old[i]);
           else
-            cg(*x[i], *b);
+            cg(*x[i], b);
         }
 
         solverParam.true_res_offset[i] = solverParam.true_res;
@@ -3930,7 +3858,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   if (param->compute_action) {
     Complex action(0);
-    for (int i=0; i<param->num_offset; i++) action += param->residue[i] * blas::cDotProduct(*b, *x[i]);
+    for (int i = 0; i < param->num_offset; i++) action += param->residue[i] * blas::cDotProduct(b, *x[i]);
     param->action[0] = action.real();
     param->action[1] = action.imag();
   }
@@ -3960,12 +3888,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   profileMulti.TPSTART(QUDA_PROFILE_FREE);
   for(int i=0; i < param->num_offset; i++){
-    delete h_x[i];
     //if (!param->make_resident_solution) delete x[i];
   }
-
-  delete h_b;
-  delete b;
 
   delete [] hp_x;
 
@@ -4203,6 +4127,88 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   profileGaugeForce.TPSTOP(QUDA_PROFILE_FREE);
 
   profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
+  return 0;
+}
+
+int computeGaugePathQuda(void *out, void *siteLink, int ***input_path_buf, int *path_length, double *loop_coeff,
+                         int num_paths, int max_length, double eb3, QudaGaugeParam *qudaGaugeParam)
+{
+  profileGaugePath.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGaugePath.TPSTART(QUDA_PROFILE_INIT);
+
+  checkGaugeParam(qudaGaugeParam);
+
+  GaugeFieldParam gParam(*qudaGaugeParam, siteLink);
+  gParam.site_offset = qudaGaugeParam->gauge_offset;
+  gParam.site_size = qudaGaugeParam->site_size;
+  cpuGaugeField *cpuSiteLink = (!qudaGaugeParam->use_resident_gauge) ? new cpuGaugeField(gParam) : nullptr;
+
+  cudaGaugeField *cudaSiteLink = nullptr;
+
+  if (qudaGaugeParam->use_resident_gauge) {
+    if (!gaugePrecise) errorQuda("No resident gauge field to use");
+    cudaSiteLink = gaugePrecise;
+  } else {
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    gParam.reconstruct = qudaGaugeParam->reconstruct;
+    gParam.setPrecision(qudaGaugeParam->cuda_prec, true);
+
+    cudaSiteLink = new cudaGaugeField(gParam);
+    profileGaugePath.TPSTOP(QUDA_PROFILE_INIT);
+
+    profileGaugePath.TPSTART(QUDA_PROFILE_H2D);
+    cudaSiteLink->loadCPUField(*cpuSiteLink);
+    profileGaugePath.TPSTOP(QUDA_PROFILE_H2D);
+
+    profileGaugePath.TPSTART(QUDA_PROFILE_INIT);
+  }
+
+  GaugeFieldParam gParamOut(*qudaGaugeParam, out);
+  gParamOut.site_offset = qudaGaugeParam->gauge_offset;
+  gParamOut.site_size = qudaGaugeParam->site_size;
+  cpuGaugeField *cpuOut = new cpuGaugeField(gParamOut);
+  gParamOut.create = qudaGaugeParam->overwrite_gauge ? QUDA_ZERO_FIELD_CREATE : QUDA_NULL_FIELD_CREATE;
+  gParamOut.reconstruct = qudaGaugeParam->reconstruct;
+  gParamOut.setPrecision(qudaGaugeParam->cuda_prec, true);
+  cudaGaugeField *cudaOut = new cudaGaugeField(gParamOut);
+  profileGaugePath.TPSTOP(QUDA_PROFILE_INIT);
+  if (!qudaGaugeParam->overwrite_gauge) {
+    profileGaugePath.TPSTART(QUDA_PROFILE_H2D);
+    cudaOut->loadCPUField(*cpuOut);
+    profileGaugePath.TPSTOP(QUDA_PROFILE_H2D);
+  }
+
+  cudaGaugeField *cudaGauge = createExtendedGauge(*cudaSiteLink, R, profileGaugePath);
+  // apply / remove phase as appropriate
+  if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
+
+  // actually do the computation
+  profileGaugePath.TPSTART(QUDA_PROFILE_COMPUTE);
+  gaugePath(*cudaOut, *cudaGauge, eb3, input_path_buf, path_length, loop_coeff, num_paths, max_length);
+  profileGaugePath.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileGaugePath.TPSTART(QUDA_PROFILE_D2H);
+  cudaOut->saveCPUField(*cpuOut);
+  profileGaugePath.TPSTOP(QUDA_PROFILE_D2H);
+
+  profileGaugePath.TPSTART(QUDA_PROFILE_FREE);
+  if (qudaGaugeParam->make_resident_gauge) {
+    if (gaugePrecise && gaugePrecise != cudaSiteLink) delete gaugePrecise;
+    gaugePrecise = cudaSiteLink;
+    if (extendedGaugeResident) delete extendedGaugeResident;
+    extendedGaugeResident = cudaGauge;
+  } else {
+    delete cudaSiteLink;
+    delete cudaGauge;
+  }
+
+  delete cudaOut;
+
+  if (cpuSiteLink) delete cpuSiteLink;
+  if (cpuOut) delete cpuOut;
+  profileGaugePath.TPSTOP(QUDA_PROFILE_FREE);
+
+  profileGaugePath.TPSTOP(QUDA_PROFILE_TOTAL);
   return 0;
 }
 
@@ -4599,9 +4605,11 @@ void computeHISQForceQuda(void* const milc_momentum,
     // create the device quark field
     qParam.create = QUDA_NULL_FIELD_CREATE;
     qParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-    cudaColorSpinorField cudaQuark(qParam);
+    qParam.location = QUDA_CUDA_FIELD_LOCATION;
+    ColorSpinorField cudaQuark(qParam);
 
     // create the host quark field
+    qParam.location = QUDA_CPU_FIELD_LOCATION;
     qParam.create = QUDA_REFERENCE_FIELD_CREATE;
     qParam.fieldOrder = QUDA_SPACE_COLOR_SPIN_FIELD_ORDER;
     qParam.v = fermion[0];
@@ -4615,7 +4623,7 @@ void computeHISQForceQuda(void* const milc_momentum,
         // Wrap the MILC quark field
         profileHISQForce.TPSTART(QUDA_PROFILE_INIT);
         qParam.v = fermion[i];
-        cpuColorSpinorField cpuQuark(qParam); // create host quark field
+        ColorSpinorField cpuQuark(qParam); // create host quark field
         profileHISQForce.TPSTOP(QUDA_PROFILE_INIT);
 
         profileHISQForce.TPSTART(QUDA_PROFILE_H2D);
@@ -4639,7 +4647,7 @@ void computeHISQForceQuda(void* const milc_momentum,
         // Wrap the MILC quark field
         profileHISQForce.TPSTART(QUDA_PROFILE_INIT);
         qParam.v = fermion[i + num_terms - num_naik_terms];
-        cpuColorSpinorField cpuQuark(qParam); // create host quark field
+        ColorSpinorField cpuQuark(qParam); // create host quark field
         profileHISQForce.TPSTOP(QUDA_PROFILE_INIT);
 
         profileHISQForce.TPSTART(QUDA_PROFILE_H2D);
@@ -4797,9 +4805,10 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
 
   qParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
   qParam.x[0] /= 2;
-  cudaColorSpinorField tmp(qParam);
+  ColorSpinorField tmp(qParam);
 
   // create the host quark field
+  qParam.location = QUDA_CPU_FIELD_LOCATION;
   qParam.create = QUDA_REFERENCE_FIELD_CREATE;
   qParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   qParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // need expose this to interface
@@ -4841,7 +4850,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
       profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
       profileCloverForce.TPSTART(QUDA_PROFILE_INIT);
       qParam.v = h_x[i];
-      cpuColorSpinorField cpuQuarkX(qParam); // create host quark field
+      ColorSpinorField cpuQuarkX(qParam); // create host quark field
       profileCloverForce.TPSTOP(QUDA_PROFILE_INIT);
 
       profileCloverForce.TPSTART(QUDA_PROFILE_H2D);
@@ -5282,19 +5291,20 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
   }
 
   ColorSpinorParam cpuParam(h_in, *inv_param, precise->X(), false, inv_param->input_location);
-  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField in_h(cpuParam);
 
-  ColorSpinorParam cudaParam(cpuParam, *inv_param);
-  cudaColorSpinorField in(*in_h, cudaParam);
+  ColorSpinorParam cudaParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+  ColorSpinorField in(cudaParam);
+  in = in_h;
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*in_h);
+    double cpu = blas::norm2(in_h);
     double gpu = blas::norm2(in);
     printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
   }
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
-  cudaColorSpinorField out(in, cudaParam);
+  ColorSpinorField out(cudaParam);
   int parity = 0;
 
   // Computes out(x) = 1/(1+6*alpha)*(in(x) + alpha*\sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)))
@@ -5312,20 +5322,17 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
 
   cpuParam.v = h_out;
   cpuParam.location = inv_param->output_location;
-  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
-  *out_h = out;
+  ColorSpinorField out_h(cpuParam);
+  out_h = out;
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(*out_h);
+    double cpu = blas::norm2(out_h);
     double gpu = blas::norm2(out);
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
   }
 
   if (gaugeSmeared != nullptr)
     delete precise;
-
-  delete out_h;
-  delete in_h;
 
   popVerbosity();
 

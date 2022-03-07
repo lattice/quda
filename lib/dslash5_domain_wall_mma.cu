@@ -11,7 +11,7 @@ namespace quda
 
 #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
 
-  template <class store_t, int nColor> class Dslash5Mma : public TunableGridStrideKernel2D
+  template <class store_t, int nColor, int Ls> class Dslash5Mma : public TunableGridStrideKernel2D
   {
     ColorSpinorField &out;
     const ColorSpinorField &in;
@@ -24,7 +24,6 @@ namespace quda
     int parity;
     int dagger;
     int volume_4d_cb;
-    const int Ls;
 
     using real = typename mapper<store_t>::type; // the compute type for the in kernel computation
 
@@ -33,7 +32,6 @@ namespace quda
 
     long long flops() const
     {
-      long long Ls = in.X(4);
       long long n = in.Ncolor() * in.Nspin();
       return (2 + 8 * n) * Ls * in.Volume();
     }
@@ -102,37 +100,24 @@ namespace quda
       parity(parity),
       dagger(dagger),
       volume_4d_cb(in.VolumeCB() / in.X(4)),
-      Ls(in.X(4))
     {
+      if (Ls != out.X(4) || Ls != in.X(4)) {
+        errorQuda("Ls (=%d) mismatch: out.X(4) = %d, in.X(4) = %d", Ls, out.X(4), in.X(4));
+      }
       resizeStep(in.X(4)); // Ls must be contained in the block
       if (dagger) strcat(aux, ",Dagger");
       char config[512];
       apply(device::get_default_stream());
     }
 
-    template <int Ls, int block_dim_x, bool dagger, int min_blocks, bool reload> using Arg =
+    template <int block_dim_x, bool dagger, int min_blocks, bool reload> using Arg =
       Dslash5MmaArg<store_t, nColor, Ls, block_dim_x, dagger, min_blocks, reload>;
 
     template <int block_dim_x, int min_blocks, bool reload, bool dagger>
       void apply(const TuneParam &tp, const qudaStream_t &stream)
       {
-        switch (Ls) {
-#if 0
-          case 4: launch_cuda<Dslash5MmaKernel>(tp, stream, Arg<4, block_dim_x, dagger, min_blocks, reload>
-                      (out, in, x, m_f, m_5, b_5, c_5, a)); break;
-          case 8: launch_cuda<Dslash5MmaKernel>(tp, stream, Arg<8, block_dim_x, dagger, min_blocks, reload>
-                      (out, in, x, m_f, m_5, b_5, c_5, a)); break;
-#endif
-          case 12: launch_cuda<Dslash5MmaKernel>(tp, stream, Arg<12, block_dim_x, dagger, min_blocks, reload>
-                       (out, in, x, m_f, m_5, b_5, c_5, a, parity)); break;
-#if 0
-          case 16: launch_cuda<Dslash5MmaKernel>(tp, stream, Arg<16, block_dim_x, dagger, min_blocks, reload>
-                       (out, in, x, m_f, m_5, b_5, c_5, a)); break;
-          case 20: launch_cuda<Dslash5MmaKernel>(tp, stream, Arg<20, block_dim_x, dagger, min_blocks, reload>
-                       (out, in, x, m_f, m_5, b_5, c_5, a)); break;
-#endif
-          default: errorQuda("Ls = %d not instantiated\n", Ls);
-        }          
+        launch_cuda<Dslash5MmaKernel>(tp, stream, Arg<Ls, block_dim_x, dagger, min_blocks, reload>
+        (out, in, x, m_f, m_5, b_5, c_5, a, parity));
       }
 
     template <int block_dim_x, bool reload, bool dagger>

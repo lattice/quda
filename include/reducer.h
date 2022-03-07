@@ -3,6 +3,8 @@
 #include "complex_quda.h"
 #include "quda_constants.h"
 #include "quda_api.h"
+#include <math_helper.cuh>
+#include <float_vector.h>
 
 /**
    @file reducer.h
@@ -22,9 +24,18 @@ namespace quda
   namespace reducer
   {
     /**
-       @return the reduce buffer size allocated
+       @brief Inititalizes any persistent buffers required for performing global
+       reductions.  If necessary, any previously allocated buffers will be resized.
+       @param n_reduce The number of reductions to perform
+       @param reduce_size Size in bytes of each value
     */
-    size_t buffer_size();
+    void init(int n_reduce, size_t reduce_size);
+
+    /**
+       @brief Free any persistent buffers associated with global
+       reductions.
+    */
+    void destroy();
 
     /**
        @return pointer to device reduction buffer
@@ -57,14 +68,16 @@ namespace quda
     qudaEvent_t &get_event();
   } // namespace reducer
 
-  constexpr int max_n_reduce() { return QUDA_MAX_MULTI_REDUCE; }
-
   /**
      plus reducer, used for conventional sum reductions
    */
   template <typename T> struct plus {
     static constexpr bool do_sum = true;
-    __device__ __host__ inline T operator()(T a, T b) const { return a + b; }
+    using reduce_t = T;
+    using reducer_t = plus<T>;
+    __device__ __host__ static inline T init() { return zero<T>(); }
+    __device__ __host__ static inline T apply(T a, T b) { return a + b; }
+    __device__ __host__ inline T operator()(T a, T b) const { return apply(a, b); }
   };
 
   /**
@@ -72,7 +85,11 @@ namespace quda
    */
   template <typename T> struct maximum {
     static constexpr bool do_sum = false;
-    __device__ __host__ inline T operator()(T a, T b) const { return a > b ? a : b; }
+    using reduce_t = T;
+    using reducer_t = maximum<T>;
+    __device__ __host__ static inline T init() { return low<T>::value(); }
+    __device__ __host__ static inline T apply(T a, T b) { return max(a, b); }
+    __device__ __host__ inline T operator()(T a, T b) const { return apply(a, b); }
   };
 
   /**
@@ -80,14 +97,17 @@ namespace quda
    */
   template <typename T> struct minimum {
     static constexpr bool do_sum = false;
-    __device__ __host__ inline T operator()(T a, T b) const { return a < b ? a : b; }
+    using reduce_t = T;
+    using reducer_t = minimum<T>;
+    __device__ __host__ static inline T init() { return high<T>::value(); }
+    __device__ __host__ static inline T apply(T a, T b) { return min(a, b); }
+    __device__ __host__ inline T operator()(T a, T b) const { return apply(a, b); }
   };
 
   /**
      identity transformer, preserves input
    */
   template <typename T> struct identity {
-    static constexpr bool do_sum = false;
     __device__ __host__ inline T operator()(T a) const { return a; }
   };
 
@@ -196,7 +216,7 @@ namespace quda
     abs_max_(const Float = 1.0) { }
     __host__ __device__ inline Float operator()(const quda::complex<storeFloat> &x) const
     {
-      return maximum<Float>()(abs(x.real()), abs(x.imag()));
+      return maximum<Float>::apply(abs(x.real()), abs(x.imag()));
     }
   };
 
@@ -209,7 +229,7 @@ namespace quda
     abs_max_(const Float scale) : scale(scale) { }
     __host__ __device__ inline Float operator()(const quda::complex<int8_t> &x) const
     {
-      return maximum<Float>()(abs(scale * x.real()), abs(scale * x.imag()));
+      return maximum<Float>::apply(abs(scale * x.real()), abs(scale * x.imag()));
     }
   };
 
@@ -222,7 +242,7 @@ namespace quda
     abs_max_(const Float scale) : scale(scale) { }
     __host__ __device__ inline Float operator()(const quda::complex<short> &x) const
     {
-      return maximum<Float>()(abs(scale * x.real()), abs(scale * x.imag()));
+      return maximum<Float>::apply(abs(scale * x.real()), abs(scale * x.imag()));
     }
   };
 
@@ -235,7 +255,7 @@ namespace quda
     abs_max_(const Float scale) : scale(scale) { }
     __host__ __device__ inline Float operator()(const quda::complex<int> &x) const
     {
-      return maximum<Float>()(abs(scale * x.real()), abs(scale * x.imag()));
+      return maximum<Float>::apply(abs(scale * x.real()), abs(scale * x.imag()));
     }
   };
 
@@ -247,7 +267,7 @@ namespace quda
     abs_min_(const Float = 1.0) { }
     __host__ __device__ inline Float operator()(const quda::complex<storeFloat> &x) const
     {
-      return minimum<Float>()(abs(x.real()), abs(x.imag()));
+      return minimum<Float>::apply(abs(x.real()), abs(x.imag()));
     }
   };
 
@@ -260,7 +280,7 @@ namespace quda
     abs_min_(const Float scale) : scale(scale) { }
     __host__ __device__ inline Float operator()(const quda::complex<int8_t> &x) const
     {
-      return minimum<Float>()(abs(scale * x.real()), abs(scale * x.imag()));
+      return minimum<Float>::apply(abs(scale * x.real()), abs(scale * x.imag()));
     }
   };
 
@@ -273,7 +293,7 @@ namespace quda
     abs_min_(const Float scale) : scale(scale) { }
     __host__ __device__ inline Float operator()(const quda::complex<short> &x) const
     {
-      return minimum<Float>()(abs(scale * x.real()), abs(scale * x.imag()));
+      return minimum<Float>::apply(abs(scale * x.real()), abs(scale * x.imag()));
     }
   };
 
@@ -286,7 +306,7 @@ namespace quda
     abs_min_(const Float scale) : scale(scale) { }
     __host__ __device__ inline Float operator()(const quda::complex<int> &x) const
     {
-      return minimum<Float>()(abs(scale * x.real()), abs(scale * x.imag()));
+      return minimum<Float>::apply(abs(scale * x.real()), abs(scale * x.imag()));
     }
   };
 

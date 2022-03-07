@@ -1,6 +1,7 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
 #include <eigen_helper.h>
+#include <solver.hpp>
 
 namespace quda {
 
@@ -11,6 +12,7 @@ namespace quda {
     init(false),
     use_source(param.preserve_source == QUDA_PRESERVE_SOURCE_NO && param.precision == param.precision_sloppy
                && param.use_init_guess == QUDA_USE_INIT_GUESS_NO && !param.deflate),
+    lambda_init(false),
     basis(param.ca_basis),
     alpha(nullptr),
     rp(nullptr),
@@ -62,11 +64,6 @@ namespace quda {
       // now allocate sloppy fields
       csParam.setPrecision(param.precision_sloppy);
 
-      if (basis != QUDA_POWER_BASIS) {
-        warningQuda("CA-GCR does not support any basis besides QUDA_POWER_BASIS. Switching to QUDA_POWER_BASIS...\n");
-        basis = QUDA_POWER_BASIS;
-      }
-
       if (basis == QUDA_POWER_BASIS) {
         // in power basis q[k] = p[k+1], so we don't need a separate q array
         p.resize(param.Nkrylov+1);
@@ -105,9 +102,9 @@ namespace quda {
 #if 1
     // only a single reduction but requires using the full dot product 
     // compute rhs vector phi = Q* b = (q_i, b)
-    std::vector<ColorSpinorField*> Q;
-    for (int i=0; i<N; i++) Q.push_back(q[i]);
-    Q.push_back(&b);
+    std::vector<ColorSpinorField *> Q(N + 1);
+    for (int i = 0; i < N; i++) Q[i] = q[i];
+    Q[N] = &b;
 
     // Construct the matrix Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
     Complex *A_ = new Complex[N*(N+1)];
@@ -122,8 +119,7 @@ namespace quda {
 #else
     // two reductions but uses the Hermitian block dot product
     // compute rhs vector phi = Q* b = (q_i, b)
-    std::vector<ColorSpinorField*> B;
-    B.push_back(&b);
+    std::vector<ColorSpinorField *> B = {&b};
     Complex *phi_ = new Complex[N];
     blas::cDotProduct(phi_,q, B);
     for (int i=0; i<N; i++) phi(i) = phi_[i];
@@ -249,6 +245,34 @@ namespace quda {
       }
     }
 
+    // Use power iterations to approx lambda_max
+    auto &lambda_min = param.ca_lambda_min;
+    auto &lambda_max = param.ca_lambda_max;
+
+    if (basis == QUDA_CHEBYSHEV_BASIS && n_krylov > 1 && lambda_max < lambda_min && !lambda_init) {
+      if (!param.is_preconditioner) {
+        profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        profile.TPSTART(QUDA_PROFILE_INIT);
+      }
+
+      // Perform 100 power iterations, normalizing every 10 mat-vecs, using r_ as an initial seed
+      // and q[0]/q[1] as temporaries for the power iterations. tmpSloppy get passed in a temporary
+      // for matSloppy. Technically illegal if n_krylov == 1, but in that case lambda_max isn't used anyway.
+      lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r, q[0], q[1], 100, 10, tmpSloppy);
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("CA-GCR Approximate lambda max = 1.1 x %e\n", lambda_max / 1.1);
+
+      lambda_init = true;
+
+      if (!param.is_preconditioner) {
+        profile.TPSTOP(QUDA_PROFILE_INIT);
+        profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+      }
+    }
+
+    // Factors which map linear operator onto [-1,1]
+    double m_map = 2. / (lambda_max - lambda_min);
+    double b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
+
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
       if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
@@ -295,27 +319,22 @@ namespace quda {
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
       // build up a space of size n_krylov
-      for (int k = 0; k < n_krylov; k++) {
-        matSloppy(*q[k], *p[k], tmpSloppy);
-        if (k < n_krylov - 1 && basis != QUDA_POWER_BASIS) blas::copy(*p[k + 1], *q[k]);
-      }
+      computeCAKrylovSpace(matSloppy, q, p, n_krylov, basis, m_map, b_map, tmpSloppy);
 
       solve(alpha, q, *p[0]);
 
       // update the solution vector
-      std::vector<ColorSpinorField*> X;
-      X.push_back(&x);
+      std::vector<ColorSpinorField *> X = {&x};
       // need to make sure P is only length n_krylov
-      std::vector<ColorSpinorField*> P;
-      for (int i = 0; i < n_krylov; i++) P.push_back(p[i]);
+      std::vector<ColorSpinorField *> P(n_krylov);
+      for (int i = 0; i < n_krylov; i++) P[i] = p[i];
       blas::caxpy(alpha, P, X);
 
       // no need to compute residual vector if not returning
       // residual vector and only doing a single fixed iteration
       if (!fixed_iteration || param.return_residual) {
         // update the residual vector
-        std::vector<ColorSpinorField*> R;
-        R.push_back(&r);
+        std::vector<ColorSpinorField *> R = {&r};
         for (int i = 0; i < n_krylov; i++) alpha[i] = -alpha[i];
         blas::caxpy(alpha, q, R);
       }

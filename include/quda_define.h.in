@@ -9,7 +9,7 @@
  * @brief This macro sets the target GPU architecture, which is
  * defined on both host and device.
  */
-#define __COMPUTE_CAPABILITY__ @COMP_CAP@
+#define __COMPUTE_CAPABILITY__ @COMP_CAP@0
 
 /**
  * @def   MAX_MULTI_BLAS_N
@@ -49,6 +49,17 @@
  */
 #define RECONSTRUCT_CLOVER
 #undef QUDA_CLOVER_RECONSTRUCT
+#endif
+
+#cmakedefine QUDA_CLOVER_CHOLESKY_PROMOTE
+#ifdef QUDA_CLOVER_CHOLESKY_PROMOTE
+/**
+ * @def   CLOVER_PROMOTE_CHOLESKY
+ * @brief This macro sets whether we promote the internal precision of
+ * Cholesky decomposition used to invert the clover term
+ */
+#define CLOVER_PROMOTE_CHOLESKY
+#undef QUDA_CLOVER_CHOLESKY_PROMOTE
 #endif
 
 #cmakedefine QUDA_FLOAT8

@@ -859,8 +859,9 @@ void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qud
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.create = QUDA_REFERENCE_FIELD_CREATE;
   csParam.pc_type = QUDA_5D_PC;
+  csParam.location = QUDA_CPU_FIELD_LOCATION;
 
-  cpuColorSpinorField inField(csParam);
+  ColorSpinorField inField(csParam);
 
   { // Now do the exchange
     QudaParity otherParity = QUDA_INVALID_PARITY;
@@ -925,8 +926,9 @@ void dslash_4_4d(void *out, void **gauge, void *in, int oddBit, int daggerBit, Q
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.create = QUDA_REFERENCE_FIELD_CREATE;
   csParam.pc_type = QUDA_4D_PC;
+  csParam.location = QUDA_CPU_FIELD_LOCATION;
 
-  cpuColorSpinorField inField(csParam);
+  ColorSpinorField inField(csParam);
 
   { // Now do the exchange
     QudaParity otherParity = QUDA_INVALID_PARITY;

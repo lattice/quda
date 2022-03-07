@@ -69,18 +69,6 @@ if(TARGET_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid QUDA_TARGET_TYPE type! Valid target types are:" "${VALID_TARGET_TYPES}")
 endif()
 
-if( ${CHECK_TARGET_TYPE} STREQUAL "CUDA")
-  set(QUDA_TARGET_CUDA ON)
-  set(QUDA_TARGET_LIBRARY quda_cuda_target)
-endif()
-
-if( ${CHECK_TARGET_TYPE} STREQUAL "HIP")
-  set(QUDA_TARGET_HIP ON)
-  set(QUDA_TARGET_LIBRARY quda_hip_target)
-endif()
-#
-# PROJECT is QUDA
-#
 if(GIT_FOUND)
   execute_process(
     COMMAND ${GIT_EXECUTABLE} show
@@ -91,18 +79,21 @@ if(GIT_FOUND)
     execute_process(
       COMMAND ${GIT_EXECUTABLE} describe --abbrev=0
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-      OUTPUT_VARIABLE GITTAG OUTPUT_STRIP_TRAILING_WHITESPACE)
+      OUTPUT_VARIABLE GITTAG
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
     # we use git rev-list and pipe that through wc here. Newer git versions support --count as option to rev-list but
     # that might not always be available
     execute_process(
       COMMAND ${GIT_EXECUTABLE} rev-list ${GITTAG}..HEAD
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
       COMMAND wc -l
-      OUTPUT_VARIABLE GITCOUNT OUTPUT_STRIP_TRAILING_WHITESPACE)
+      OUTPUT_VARIABLE GITCOUNT
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
     execute_process(
       COMMAND ${GIT_EXECUTABLE} describe --match 1 --always  --long --dirty
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-      OUTPUT_VARIABLE GITVERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+      OUTPUT_VARIABLE GITVERSION
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
   endif()
 endif(GIT_FOUND)
 
@@ -122,22 +113,7 @@ message(STATUS "QUDA target: ${QUDA_TARGET_TYPE}")
 # ######################################################################################################################
 # QUDA OPTIONS likely to be changed by users
 # ######################################################################################################################
-if(DEFINED ENV{QUDA_GPU_ARCH})
-  set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
-else()
-  set(QUDA_DEFAULT_GPU_ARCH sm_70)
-endif()
-if(NOT QUDA_GPU_ARCH)
-  message(STATUS "Building QUDA for GPU ARCH " "${QUDA_DEFAULT_GPU_ARCH}")
-endif()
 
-set(QUDA_GPU_ARCH
-    ${QUDA_DEFAULT_GPU_ARCH}
-    CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80)")
-set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80)
-set(QUDA_GPU_ARCH_SUFFIX "" CACHE STRING "set the GPU architecture suffix (virtual, real). Leave empty for no suffix.")
-set_property(CACHE QUDA_GPU_ARCH_SUFFIX PROPERTY STRINGS "real" "virtual" " ")
-mark_as_advanced(QUDA_GPU_ARCH_SUFFIX)
 # build options
 option(QUDA_DIRAC_DEFAULT_OFF "default value for QUDA_DIRAC_<TYPE> setting" $ENV{QUDA_DIRAC_DEFAULT_OFF})
 mark_as_advanced(QUDA_DIRAC_DEFAULT_OFF)
@@ -155,6 +131,7 @@ option(QUDA_DIRAC_TWISTED_MASS "build twisted mass Dirac operators" ${QUDA_DIRAC
 option(QUDA_DIRAC_TWISTED_CLOVER "build twisted clover Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_CLOVER_HASENBUSCH "build clover Hasenbusch twist operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_NDEG_TWISTED_MASS "build non-degenerate twisted mass Dirac operators" ${QUDA_DIRAC_DEFAULT})
+option(QUDA_DIRAC_NDEG_TWISTED_CLOVER "build non-degenerate twisted clover Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_FORCE_GAUGE "build code for (1-loop Symanzik) gauge force" OFF)
 option(QUDA_FORCE_HISQ "build code for hisq fermion force" OFF)
 option(QUDA_GAUGE_TOOLS "build auxiliary gauge-field tools" OFF)
@@ -167,9 +144,6 @@ option(QUDA_QIO "build QIO code for binary I/O" OFF)
 # Multi-GPU options
 option(QUDA_QMP "build the QMP multi-GPU code" OFF)
 option(QUDA_MPI "build the MPI multi-GPU code" OFF)
-
-# Magma library
-option(QUDA_MAGMA "build magma interface" OFF)
 
 # ARPACK
 option(QUDA_ARPACK "build arpack interface" OFF)
@@ -203,12 +177,6 @@ set(QUDA_ARPACK_HOME
 set(QUDA_OPENBLAS_HOME
     ""
     CACHE PATH "path to OpenBLAS")
-set(QUDA_MAGMAHOME
-    ""
-    CACHE PATH "path to MAGMA, if not set, pkg-config will be attempted")
-set(QUDA_MAGMA_LIBS
-    ""
-    CACHE STRING "additional linker flags required to link against magma")
 
 # ######################################################################################################################
 # QUDA ADVANCED OPTIONS that usually should not be changed by users
@@ -216,11 +184,9 @@ set(QUDA_MAGMA_LIBS
 option(QUDA_BUILD_ALL_TESTS "build tests by default" ON)
 option(QUDA_INSTALL_ALL_TESTS "install tests by default" ON)
 option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ON)
-option(QUDA_PROPAGATE_CXX_FLAGS "propagate CXX_FLAGS to CUDA host compiler (for cmake >= 3.8)" ON)
+
 option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" ON)
-option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
-option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
-option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
+
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
 
 set(QUDA_MAX_MULTI_BLAS_N
@@ -239,9 +205,7 @@ set(QUDA_RECONSTRUCT
 
 option(QUDA_CLOVER_DYNAMIC "Dynamically invert the clover term" ON)
 option(QUDA_CLOVER_RECONSTRUCT "set to ON to enable compressed clover storage (requires QUDA_CLOVER_DYNAMIC)" ON)
-
-set(QUDA_NVSHMEM OFF CACHE BOOL "set to 'yes' to build the NVSHMEM multi-GPU code")
-set(QUDA_NVSHMEM_HOME $ENV{NVSHMEM_HOME} CACHE PATH "path to NVSHMEM")
+option(QUDA_CLOVER_CHOLESKY_PROMOTE "Whether to promote the internal precision when inverting the clover term" ON)
 
 # Set CTest options
 option(QUDA_CTEST_SEP_DSLASH_POLICIES "Test Dslash policies separately in ctest instead of only autotuning them." OFF)
@@ -258,9 +222,6 @@ set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
-# NVTX options
-option(QUDA_INTERFACE_NVTX "add NVTC markup to interface calls" OFF)
-
 # features in development
 option(QUDA_SSTEP "build s-step linear solvers" OFF)
 option(QUDA_MULTIGRID "build multigrid solvers" OFF)
@@ -270,29 +231,21 @@ option(QUDA_DOWNLOAD_EIGEN "Download Eigen" ON)
 option(QUDA_DOWNLOAD_USQCD "Download USQCD software as requested by QUDA_QMP / QUDA_QIO" OFF)
 option(QUDA_DOWNLOAD_ARPACK "Download ARPACK-NG software as requested by QUDA_ARPACK" OFF)
 option(QUDA_DOWNLOAD_OPENBLAS "Download OpenBLAS software as requested by QUDA_OPENBLAS" OFF)
-option(QUDA_JITIFY "build QUDA using Jitify" OFF)
-option(QUDA_DOWNLOAD_NVSHMEM "Download NVSHMEM" OFF)
-
-set(QUDA_GDRCOPY_HOME "/usr/local/gdrcopy" CACHE STRING "path to gdrcopy used when QUDA_DOWNLOAD_NVSHMEM is enabled")
-
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
 # mark as advanced
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
-mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
-mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC)
+
 mark_as_advanced(QUDA_FLOAT8)
 mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
 mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
-mark_as_advanced(QUDA_NVML)
-mark_as_advanced(QUDA_NUMA_NVML)
-mark_as_advanced(QUDA_VERBOSE_BUILD)
+
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_PRECISION)
 mark_as_advanced(QUDA_RECONSTRUCT)
-mark_as_advanced(QUDA_CLOVER_RECONSTRUCT)
+mark_as_advanced(QUDA_CLOVER_CHOLESKY_PROMOTE)
 mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
 mark_as_advanced(QUDA_CTEST_LAUNCH)
 mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
@@ -300,19 +253,12 @@ mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_BACKWARDS)
 
-mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM)
-mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM_TAR)
-mark_as_advanced(QUDA_GDRCOPY_HOME)
-mark_as_advanced(QUDA_MPI_NVTX)
-mark_as_advanced(QUDA_INTERFACE_NVTX)
 mark_as_advanced(QUDA_INTERFACE_ALL)
 
 mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_USE_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOLVER)
 mark_as_advanced(QUDA_CXX_STANDARD)
-
-mark_as_advanced(QUDA_JITIFY)
 
 mark_as_advanced(QUDA_ARPACK_LOGGING)
 
@@ -325,9 +271,7 @@ if(QUDA_MPI AND QUDA_QMP)
 endif()
 
 if(QUDA_NVSHMEM AND NOT (QUDA_QMP OR QUDA_MPI))
-message(
-  SEND_ERROR
-    "Specifying QUDA_NVSHMEM requires either QUDA_QMP or QUDA_MPI.")
+  message(SEND_ERROR "Specifying QUDA_NVSHMEM requires either QUDA_QMP or QUDA_MPI.")
 endif()
 
 # COMPILER FLAGS Linux: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Mac: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Power:
@@ -403,109 +347,40 @@ set(CMAKE_EXE_LINKER_FLAGS_SANITIZE
     "-fsanitize=address,undefined"
     CACHE STRING "Flags used by the linker during sanitizer debug builds.")
 
-# define CUDA flags
-set(CMAKE_CUDA_HOST_COMPILER
-    "${CMAKE_CXX_COMPILER}"
-    CACHE FILEPATH "Host compiler to be used by nvcc")
-set(CMAKE_CUDA_STANDARD ${QUDA_CXX_STANDARD})
-set(CMAKE_CUDA_STANDARD_REQUIRED True)
-mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
-
-include(CheckLanguage)
-check_language(CUDA)
-
-if(${CMAKE_CUDA_COMPILER} MATCHES "nvcc")
-  set(QUDA_CUDA_BUILD_TYPE "NVCC")
-  message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
-elseif(${CMAKE_CUDA_COMPILER} MATCHES "clang")
-  set(QUDA_CUDA_BUILD_TYPE "Clang")
-  message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
-endif()
-
-set(CMAKE_CUDA_FLAGS_DEVEL
-    "-g -O3 "
-    CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
-set(CMAKE_CUDA_FLAGS_STRICT
-    "-g -O3"
-    CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
-set(CMAKE_CUDA_FLAGS_RELEASE
-    "-O3 -w"
-    CACHE STRING "Flags used by the CUDA compiler during release builds.")
-set(CMAKE_CUDA_FLAGS_HOSTDEBUG
-    "-g"
-    CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
-set(CMAKE_CUDA_FLAGS_DEBUG
-    "-g -G"
-    CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
-set(CMAKE_CUDA_FLAGS_SANITIZE
-    "-g "
-    CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
-
-# This is needed now GPU ARCH
-string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
-
-if(${CMAKE_BUILD_TYPE} STREQUAL "RELEASE")
-  set(QUDA_GPU_ARCH_SUFFIX real)
-endif()
-if(QUDA_GPU_ARCH_SUFFIX)
-  set(CMAKE_CUDA_ARCHITECTURES "${COMP_CAP}-${QUDA_GPU_ARCH_SUFFIX}")
-else()
-  set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
-endif()
-set(COMP_CAP ${COMP_CAP}0)
-
-enable_language(CUDA)
-message(STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
-message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
-
-# CUDA Wrapper for finding libs etc
-find_package(CUDAToolkit REQUIRED)
-
-
-if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA" OR CMAKE_CUDA_COMPILER_ID MATCHES "NVHPC" OR CMAKE_CUDA_COMPILER_ID MATCHES "Clang")
-  set(QUDA_HETEROGENEOUS_ATOMIC_SUPPORT ON)
-  message(STATUS "Heterogeneous atomics supported: ${QUDA_HETEROGENEOUS_ATOMIC_SUPPORT}")
-endif()
-include(CMakeDependentOption)
-CMAKE_DEPENDENT_OPTION(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support?" ON "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
-
-if((QUDA_HETEROGENEOUS_ATOMIC OR QUDA_NVSHMEM) AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
-  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON AND/OR QUDA_NVSHMEM=ON do not support SANITIZE build)")
-endif()
-
 if(QUDA_CLOVER_RECONSTRUCT AND NOT QUDA_CLOVER_DYNAMIC)
   message(SEND_ERROR "QUDA_CLOVER_RECONSTRUCT requires QUDA_CLOVER_DYNAMIC)")
-endif()
-
-if(QUDA_NVSHMEM AND (${COMP_CAP} LESS "700"))
-  message(SEND_ERROR "QUDA_NVSHMEM=ON requires at least QUDA_GPU_ARCH=sm_70")
 endif()
 
 if(QUDA_OPENMP)
   find_package(OpenMP REQUIRED)
 endif()
 
-#####################################################################
+# ######################################################################################################################
 # Handle dependencies
-#####################################################################
+# ######################################################################################################################
 if(QUDA_BUILD_SHAREDLIB)
   set(BUILD_SHARED_LIBS ON)
 endif()
 
-####################################
+# ######################################################################################################################
 # Eigen
-####################################
+# ######################################################################################################################
 add_library(Eigen INTERFACE IMPORTED)
 # set(CPM_USE_LOCAL_PACKAGES TRUE)
 if(QUDA_DOWNLOAD_EIGEN)
-  set(QUDA_EIGEN_VERSION "3.4.0" CACHE STRING "Eigen use for QUDA_DOWNLOAD_EIGEN")
+  set(QUDA_EIGEN_VERSION
+      "3.4.0"
+      CACHE STRING "Eigen use for QUDA_DOWNLOAD_EIGEN")
   mark_as_advanced(QUDA_EIGEN_VERSION)
   CPMAddPackage(
-    NAME Eigen
-    VERSION ${QUDA_EIGEN_VERSION}
-    URL https://gitlab.com/libeigen/eigen/-/archive/${QUDA_EIGEN_VERSION}/eigen-${QUDA_EIGEN_VERSION}.tar.bz2
-    DOWNLOAD_ONLY YES 
-    )
+    NAME
+    Eigen
+    VERSION
+    ${QUDA_EIGEN_VERSION}
+    URL
+    https://gitlab.com/libeigen/eigen/-/archive/${QUDA_EIGEN_VERSION}/eigen-${QUDA_EIGEN_VERSION}.tar.bz2
+    DOWNLOAD_ONLY
+    YES)
   target_include_directories(Eigen SYSTEM INTERFACE ${Eigen_SOURCE_DIR})
 else()
   # fall back to using find_package
@@ -519,9 +394,9 @@ else()
   target_include_directories(Eigen SYSTEM INTERFACE ${EIGEN_INCLUDE_DIRS})
 endif()
 
-####################################
+# ######################################################################################################################
 # MPI
-####################################
+# ######################################################################################################################
 # we need to enable Fortran if we want to detect MPI_Fortran_COMPILER
 if(QUDA_ARPACK OR QUDA_OPENBLAS)
   enable_language(Fortran)
@@ -554,114 +429,73 @@ if(QUDA_MPI OR QUDA_QMP)
   find_package(MPI REQUIRED)
 endif()
 
-####################################
-# NVSHMEM
-####################################
-if(QUDA_NVSHMEM)
-  if(QUDA_DOWNLOAD_NVSHMEM)
-  # workaround potential UCX interaction issue with CUDA 11.3+ and UCX in NVSHMEM 2.1.2
-  if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "11.3")
-    set(QUDA_DOWNLOAD_NVSHMEM_TAR "https://developer.download.nvidia.com/compute/redist/nvshmem/2.1.2/source/nvshmem_src_2.1.2-0.txz" CACHE STRING "location of NVSHMEM tarball")
-  else()
-    set(QUDA_DOWNLOAD_NVSHMEM_TAR "https://developer.download.nvidia.com/compute/redist/nvshmem/2.2.1/source/nvshmem_src_2.2.1-0.txz" CACHE STRING "location of NVSHMEM tarball")
-  endif()
-    get_filename_component(NVSHMEM_CUDA_HOME ${CUDAToolkit_INCLUDE_DIRS} DIRECTORY)
-    find_path(GDRCOPY_HOME NAME gdrapi.h PATHS "/usr/local/gdrcopy" ${QUDA_GDRCOPY_HOME} PATH_SUFFIXES "include")
-    mark_as_advanced(GDRCOPY_HOME)
-    if(NOT GDRCOPY_HOME)
-      message(SEND_ERROR "QUDA_DOWNLOAD_NVSHMEM requires gdrcopy to be installed. Please set QUDA_GDRCOPY_HOME to the location of your gdrcopy installation.")
-    endif()
-    get_filename_component(NVSHMEM_GDRCOPY_HOME ${GDRCOPY_HOME} DIRECTORY)
-    ExternalProject_Add(NVSHMEM
-                        URL ${QUDA_DOWNLOAD_NVSHMEM_TAR}
-                        PREFIX nvshmem
-                        CONFIGURE_COMMAND ""
-                        BUILD_IN_SOURCE ON
-                        BUILD_COMMAND  make -j8 MPICC=${MPI_C_COMPILER} CUDA_HOME=${NVSHMEM_CUDA_HOME} NVSHMEM_PREFIX=<INSTALL_DIR> NVSHMEM_MPI_SUPPORT=1 GDRCOPY_HOME=${NVSHMEM_GDRCOPY_HOME} install
-                        INSTALL_COMMAND ""
-                        LOG_INSTALL ON
-                        LOG_BUILD ON
-                        LOG_DOWNLOAD ON
-                        )
-    ExternalProject_Get_Property(NVSHMEM INSTALL_DIR)
-    set(QUDA_NVSHMEM_HOME ${INSTALL_DIR} CACHE PATH "path to NVSHMEM" FORCE)
-    set(NVSHMEM_LIBS  ${INSTALL_DIR}/lib/libnvshmem.a)
-    set(NVSHMEM_INCLUDE ${INSTALL_DIR}/include/)   
-  else()
-    if("${QUDA_NVSHMEM_HOME}" STREQUAL "")
-      message( FATAL_ERROR "QUDA_NVSHMEM_HOME must be defined if QUDA_NVSHMEM is set" )
-    endif()
-      find_library(NVSHMEM_LIBS NAMES nvshmem PATHS "${QUDA_NVSHMEM_HOME}/lib/"  )
-      find_path(NVSHMEM_INCLUDE NAMES nvshmem.h PATHS "${QUDA_NVSHMEM_HOME}/include/" )
-  endif()
-    
-  mark_as_advanced(NVSHMEM_LIBS)
-  mark_as_advanced(NVSHMEM_INCLUDE)
-  add_library(nvshmem_lib STATIC IMPORTED)
-  set_target_properties(nvshmem_lib PROPERTIES IMPORTED_LOCATION ${NVSHMEM_LIBS})
-  set_target_properties(nvshmem_lib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-  set_target_properties(nvshmem_lib PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS OFF)
-  set_target_properties(nvshmem_lib PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES CUDA)
-endif()
-
-
-####################################
+# ######################################################################################################################
 # USQCD 
-####################################
+# ######################################################################################################################
 # We might only want to do that if using QUDA_DOWNLOAD_USQCD, but this does not work if not set on the initial run
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/usqcd CACHE PATH "..." FORCE)
+  set(CMAKE_INSTALL_PREFIX
+      ${CMAKE_BINARY_DIR}/usqcd
+      CACHE PATH "..." FORCE)
 endif()
 
-####################################
+# ######################################################################################################################
 # QMP
-####################################
+# ######################################################################################################################
 if(QUDA_QMP)
   if(QUDA_DOWNLOAD_USQCD)
-    set(QUDA_QMP_TAG "3010fef" CACHE STRING "Git tag to use for QMP when using QUDA_DOWNLOAD_USQCD")
+    set(QUDA_QMP_TAG
+        "3010fef"
+        CACHE STRING "Git tag to use for QMP when using QUDA_DOWNLOAD_USQCD")
     mark_as_advanced(QUDA_QMP_TAG)  
     CPMAddPackage(
-      NAME QMP
-      GITHUB_REPOSITORY usqcd-software/qmp
-      GIT_TAG ${QUDA_QMP_TAG}
+      NAME
+      QMP
+      GITHUB_REPOSITORY
+      usqcd-software/qmp
+      GIT_TAG
+      ${QUDA_QMP_TAG}
       OPTIONS
       "QMP_MPI ON"
       "QMP_TESTING OFF"
-      "QMP_BUILD_DOCS OFF"
-    )
+      "QMP_BUILD_DOCS OFF")
   else()
     find_package(QMP REQUIRED) 
   endif()
 endif()
 
-####################################
+# ######################################################################################################################
 # QIO
-####################################
+# ######################################################################################################################
 if(QUDA_QIO)
   if(NOT QUDA_QMP)
     message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
   endif()
   if(QUDA_DOWNLOAD_USQCD)
-    set(QUDA_QIO_TAG "a5c3ae580b846130c06dc060ab822f17d6fe2171" CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
+    set(QUDA_QIO_TAG
+        "a5c3ae580b846130c06dc060ab822f17d6fe2171"
+        CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
     mark_as_advanced(QUDA_QIO_TAG)
     CPMAddPackage(
-      NAME QIO
-      GITHUB_REPOSITORY usqcd-software/qio
-      GIT_TAG ${QUDA_QIO_TAG}
+      NAME
+      QIO
+      GITHUB_REPOSITORY
+      usqcd-software/qio
+      GIT_TAG
+      ${QUDA_QIO_TAG}
       OPTIONS 
         "QIO_ENABLE_PARALLEL_BUILD ON"
         "QIO_ENABLE_QMP_ROUTE OFF" 
         "QIO_ENABLE_OUTPUT_BUFFERING ON" 
-        "QIO_DML_BUF_BYTES 33554432"
-    )
+      "QIO_DML_BUF_BYTES 33554432")
   else()
     find_package(QIO REQUIRED)
   endif()
 endif()
 
-####################################
+# ######################################################################################################################
  # USQCD QDPJIT
- ####################################
+# ######################################################################################################################
  if(QUDA_QDPJIT)
    if(NOT QUDA_QMP)
      message(SEND_ERROR "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
@@ -672,36 +506,10 @@ endif()
    endif()
    set(QUDA_INTERFACE_QDPJIT ON)
  endif()
-####################################
-# MAGMA
-####################################
-if(QUDA_MAGMA)
-  add_library(MAGMA::MAGMA INTERFACE IMPORTED)
-  target_compile_definitions(MAGMA::MAGMA INTERFACE MAGMA_LIB ADD_ MAGMA_SETAFFINITY GPUSHMEM=300 HAVE_CUBLAS)
-  if("${QUDA_MAGMAHOME}" STREQUAL "")
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(MAGMA magma)
-    target_include_directories(MAGMA::MAGMA SYSTEM INTERFACE ${MAGMA_INCLUDEDIR})
-    message("${MAGMA_INCLUDEDIR}")
-    find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
-  else()
-    # prefer static library
-    find_library(MAGMA libmagma.a magma ${QUDA_MAGMAHOME}/lib/)
-    # append additional libraries required by magma
-    target_link_libraries(MAGMA::MAGMA INTERFACE ${CUDA_cublas_LIBRARY})
-    target_link_libraries(MAGMA::MAGMA INTERFACE ${CUDA_cusparse_LIBRARY})
-    target_link_libraries(MAGMA::MAGMA INTERFACE ${QUDA_MAGMA_LIBS})
-    # and any additional OpenMP linker flags
-    target_include_directories(MAGMA::MAGMA SYSTEM INTERFACE ${QUDA_MAGMAHOME}/include)
-  endif()
-  target_link_libraries(MAGMA::MAGMA INTERFACE ${MAGMA})
-  find_package(OpenMP)
-  target_link_libraries(MAGMA::MAGMA INTERFACE OpenMP::OpenMP_CXX)
-endif(QUDA_MAGMA)
 
 ####################################
 # ARPACK
-####################################
+# ######################################################################################################################
 if(QUDA_ARPACK)
   enable_language(Fortran)
 
@@ -761,9 +569,9 @@ if(QUDA_ARPACK)
   endif(QUDA_DOWNLOAD_ARPACK)
 endif(QUDA_ARPACK)
 
-####################################
+# ######################################################################################################################
 # OPENBLAS
-####################################
+# ######################################################################################################################
 if(QUDA_OPENBLAS)
   enable_language(Fortran)
 
@@ -796,9 +604,9 @@ if(QUDA_OPENBLAS)
   endif(QUDA_DOWNLOAD_OPENBLAS)
 endif(QUDA_OPENBLAS)
 
-####################################
+# ######################################################################################################################
 # BACKWARDS
-####################################
+# ######################################################################################################################
 if(QUDA_BACKWARDS)
   include(FetchContent)
   FetchContent_Declare(
@@ -813,10 +621,9 @@ if(QUDA_BACKWARDS)
   include(${backward-cpp_SOURCE_DIR}/BackwardConfig.cmake)
 endif()
 
-
-#####################################################################
+# ######################################################################################################################
 # ADVANCED setup 
-#####################################################################
+# ######################################################################################################################
 
 # this allows simplified running of clang-tidy
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
@@ -825,13 +632,6 @@ endif()
 
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by
 # default )
-mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
-mark_as_advanced(CMAKE_CUDA_FLAGS_STRICT)
-mark_as_advanced(CMAKE_CUDA_FLAGS_RELEASE)
-mark_as_advanced(CMAKE_CUDA_FLAGS_DEBUG)
-mark_as_advanced(CMAKE_CUDA_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_CUDA_FLAGS_SANITIZE)
-
 mark_as_advanced(CMAKE_CXX_FLAGS_DEVEL)
 mark_as_advanced(CMAKE_CXX_FLAGS_STRICT)
 mark_as_advanced(CMAKE_CXX_FLAGS_RELEASE)
@@ -858,14 +658,12 @@ add_subdirectory(tests)
 add_subdirectory(doc)
 
 include(CMakePackageConfigHelpers)
-configure_package_config_file(QUDAConfig.cmake.in QUDAConfig.cmake 
-	INSTALL_DESTINATION lib/cmake/QUDA)
+configure_package_config_file(QUDAConfig.cmake.in QUDAConfig.cmake INSTALL_DESTINATION lib/cmake/QUDA)
 
 write_basic_package_version_file(
-	QUDAVersion.cmake
+	QUDAConfigVersion.cmake
 	VERSION ${PACKAGE_VERSION}
 	COMPATIBILITY AnyNewerVersion)
 
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/QUDAVersion.cmake
-	${CMAKE_CURRENT_BINARY_DIR}/QUDAConfig.cmake
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/QUDAConfigVersion.cmake ${CMAKE_CURRENT_BINARY_DIR}/QUDAConfig.cmake
 	DESTINATION lib/cmake/QUDA)

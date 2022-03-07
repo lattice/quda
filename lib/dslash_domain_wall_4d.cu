@@ -47,15 +47,13 @@ namespace quda
                                                       comm_override);
       DomainWall4D<decltype(arg)> dwf(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(dwf)> policy(
-        dwf, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
-        in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+      dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
     }
   };
 
   // Apply the 4-d preconditioned domain-wall Dslash operator
   // out(x) = M*in = in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
-#ifdef GPU_DOMAIN_WALL_DIRAC
+#if defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_NDEG_TWISTED_CLOVER_DIRAC)
   void ApplyDomainWall4D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
                          const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
                          const int *comm_override, TimeProfile &profile)

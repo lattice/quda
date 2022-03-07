@@ -8,7 +8,6 @@ namespace quda
 {
 
   template <typename store_t_, bool twist_> struct CloverInvertArg : public ReduceArg<array<double, 2>> {
-    using reduce_t = array<double, 2>;
     using store_t = store_t_;
     using real = typename mapper<store_t>::type;
     static constexpr bool twist = twist_;
@@ -21,22 +20,24 @@ namespace quda
     const Clover clover;
     bool compute_tr_log;
     real mu2;
+    real epsilon2;
+    real mu2_minus_epsilon2;
 
     CloverInvertArg(CloverField &field, bool compute_tr_log) :
       ReduceArg<reduce_t>(dim3(field.VolumeCB(), 2, 1)),
       inverse(field, clover::dynamic_inverse() ? false : true), // if dynamic_inverse, then alias to direct term
       clover(field, false),
       compute_tr_log(compute_tr_log),
-      mu2(field.Mu2())
+      mu2(field.Mu2()),
+      epsilon2(field.Epsilon2()),
+      mu2_minus_epsilon2(field.Mu2()-field.Epsilon2())
     {
       if (!field.isNative()) errorQuda("Clover field %d order not supported", field.Order());
     }
-
-    __device__ __host__ auto init() const { return reduce_t{0, 0}; }
   };
 
-  template <typename Arg> struct InvertClover : plus<array<double, 2>> {
-    using reduce_t = array<double, 2>;
+  template <typename Arg> struct InvertClover : plus<typename Arg::reduce_t> {
+    using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
     const Arg &arg;
     constexpr InvertClover(const Arg &arg) : arg(arg) {}
@@ -57,9 +58,9 @@ namespace quda
         Mat A = arg.clover(x_cb, parity, ch);
         A *= static_cast<real>(2.0); // factor of two is inherent to QUDA clover storage
 
-        if (Arg::twist) { // Compute (T^2 + mu2) first, then invert
+        if (Arg::twist) { // Compute (T^2 + mu2 - epsilon2) first, then invert
           A = A.square();
-          A += arg.mu2;
+          A += arg.mu2_minus_epsilon2;
         }
 
         // compute the Cholesky decomposition

@@ -46,7 +46,7 @@ namespace quda
     auto idx = threadIdx.x + blockIdx.x * blockDim.x;
     auto j = threadIdx.y;
 
-    reduce_t value = arg.init();
+    reduce_t value = t.init();
 
     while (idx < arg.threads.x) {
       value = t(value, idx, j);
@@ -99,10 +99,10 @@ namespace quda
   /**
      @brief MultiReduction_impl is the implementation of the generic
      multi-reduction kernel.  Functors that utilize this kernel have
-     three parallelization dimensions.  The y thread dimenion is a
-     batch dimension that is not contracted in the reduction.  The z
-     thread dimension is constrained to remain inside the thread block
-     and this dimension is contracted in the reduction.
+     three parallelization dimensions.  The y thread dimension is
+     constrained to remain inside the thread block and this dimension
+     is contracted in the reduction.  The z thread dimension is a
+     batch dimension that is not contracted in the reduction.
 
      @tparam Functor Kernel functor that defines the kernel
      @tparam Arg Kernel argument struct that set any required meta
@@ -118,15 +118,15 @@ namespace quda
     Functor<Arg> t(arg);
 
     auto idx = threadIdx.x + blockIdx.x * blockDim.x;
-    auto j = threadIdx.y + blockIdx.y * blockDim.y;
-    auto k = threadIdx.z;
+    auto k = threadIdx.y;
+    auto j = threadIdx.z + blockIdx.z * blockDim.z;
 
-    if (j >= arg.threads.y) return;
+    if (j >= arg.threads.z) return;
 
-    reduce_t value = arg.init();
+    reduce_t value = t.init();
 
     while (idx < arg.threads.x) {
-      value = t(value, idx, j, k);
+      value = t(value, idx, k, j);
       if (grid_stride)
         idx += blockDim.x * gridDim.x;
       else
