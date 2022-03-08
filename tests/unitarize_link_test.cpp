@@ -23,8 +23,6 @@
 
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
-using namespace quda;
-
 static double unitarize_eps  = 1e-6;
 static bool reunit_allow_svd = true;
 static bool reunit_svd_only  = false;
@@ -34,8 +32,8 @@ static double max_allowed_error = 1e-11;
 
 static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
-cpuGaugeField *cpuFatLink, *cpuULink, *cudaResult;
-cudaGaugeField *cudaFatLink, *cudaULink;
+quda::cpuGaugeField *cpuFatLink, *cpuULink, *cudaResult;
+quda::cudaGaugeField *cudaFatLink, *cudaULink;
 
 const double unittol = (prec == QUDA_DOUBLE_PRECISION) ? 1e-10 : 1e-6;
 
@@ -47,8 +45,8 @@ TEST(unitarization, verify) {
                            unittol, cpu_prec);
 
 #ifdef MULTI_GPU
-  comm_allreduce_int(res);
-  res /= comm_size();
+  quda::comm_allreduce_int(res);
+  res /= quda::comm_size();
 #endif
 
   ASSERT_EQ(res,1) << "CPU and CUDA implementations do not agree";
@@ -88,12 +86,10 @@ static int unitarize_link_test(int &test_rc)
 
   qudaGaugeParam.llfat_ga_pad = qudaGaugeParam.site_ga_pad = qudaGaugeParam.ga_pad = qudaGaugeParam.staple_pad = 0;
 
-  GaugeFieldParam gParam(qudaGaugeParam);
+  quda::GaugeFieldParam gParam(qudaGaugeParam);
   gParam.link_type   = QUDA_GENERAL_LINKS;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.order = gauge_order;
-
-  TimeProfile profile("dummy");
 
   void *inlink = (void *)safe_malloc(4 * V * gauge_site_size * cpu_prec);
   void *fatlink = (void *)safe_malloc(4 * V * gauge_site_size * cpu_prec);
@@ -127,20 +123,20 @@ static int unitarize_link_test(int &test_rc)
 
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
   gParam.gauge  = fatlink;
-  cpuFatLink  = new cpuGaugeField(gParam);
+  cpuFatLink  = new quda::cpuGaugeField(gParam);
 
   gParam.create = QUDA_ZERO_FIELD_CREATE;
-  cpuULink  = new cpuGaugeField(gParam);
+  cpuULink  = new quda::cpuGaugeField(gParam);
 
   gParam.create = QUDA_ZERO_FIELD_CREATE;
-  cudaResult  = new cpuGaugeField(gParam);
+  cudaResult  = new quda::cpuGaugeField(gParam);
 
   gParam.pad         = 0;
   gParam.create      = QUDA_NULL_FIELD_CREATE;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.setPrecision(prec, true);
-  cudaFatLink = new cudaGaugeField(gParam);
-  cudaULink   = new cudaGaugeField(gParam);
+  cudaFatLink = new quda::cudaGaugeField(gParam);
+  cudaULink   = new quda::cudaGaugeField(gParam);
 
   { // create fat links
     double act_path_coeff[6];
@@ -156,12 +152,12 @@ static int unitarize_link_test(int &test_rc)
     cudaFatLink->loadCPUField(*cpuFatLink);
   }
 
-  setUnitarizeLinksConstants(unitarize_eps,
-			     max_allowed_error,
-			     reunit_allow_svd,
-			     reunit_svd_only,
-			     svd_rel_error,
-			     svd_abs_error);
+  quda::setUnitarizeLinksConstants(unitarize_eps,
+                                   max_allowed_error,
+                                   reunit_allow_svd,
+                                   reunit_svd_only,
+                                   svd_rel_error,
+                                   svd_abs_error);
 
   int *num_failures_h = static_cast<int *>(mapped_malloc(sizeof(int)));
   int *num_failures_d = static_cast<int *>(get_mapped_device_pointer(num_failures_h));
@@ -241,14 +237,14 @@ int main(int argc, char **argv)
 
   // Ensure gtest prints only from rank 0
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
-  if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+  if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
   display_test_info();
   int num_failures = unitarize_link_test(test_rc);
   int num_procs = 1;
 #ifdef MULTI_GPU
-  comm_allreduce_int(num_failures);
-  num_procs = comm_size();
+  quda::comm_allreduce_int(num_failures);
+  num_procs = quda::comm_size();
 #endif
 
   printfQuda("Number of failures = %d\n", num_failures);
