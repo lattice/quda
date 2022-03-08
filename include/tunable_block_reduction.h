@@ -30,63 +30,92 @@ namespace quda
     static constexpr bool grid_stride = false;
 
     /**
-       Block reduction kernels do not use grid-size tuning, so disable this, and
-       we mark as final to prevent a derived class from accidentally
-       switching it on.
+       @brief Block reduction kernels do not use grid-size tuning, so
+       disable this, and we mark as final to prevent a derived class
+       from accidentally switching it on.
     */
     bool tuneGridDim() const final { return grid_stride; }
 
-    template <int idx, typename Block, template <typename> class Functor, typename FunctorArg>
-    void launch_device(const FunctorArg &arg, const TuneParam &tp, const qudaStream_t &stream)
-    {
-      if (tp.block.x == Block::block[idx]) {
-        using Arg = BlockKernelArg<Block::block[idx], FunctorArg>;
-        TunableKernel::launch_device<Functor, grid_stride>(KERNEL(BlockKernel2D), tp, stream, Arg(arg));
-      } else if constexpr(idx != 0) {
-        launch_device<idx - 1, Block, Functor>(arg, tp, stream);
-      } else {
-        errorQuda("Unexpected block size %d", tp.block.x);
-      }
-    }
-
-    template <template <typename> class Functor, typename Block, typename Arg>
-    void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
-    {
-      const_cast<Arg &>(arg).grid_dim = tp.grid;
-      const_cast<Arg &>(arg).block_dim = tp.block;
-      launch_device<Block::block.size() - 1, Block, Functor>(arg, tp, stream);
-    }
-
-    template <int idx, typename Block, template <typename> class Functor, typename Arg>
-    void launch_host(const TuneParam &tp, const Arg &arg)
-    {
-      if (tp.block.x == Block::block[idx]) {
-        BlockKernel2D_host<Functor>(BlockKernelArg<Block::block[idx], Arg>(arg));
-      } else if constexpr(idx != 0) {
-        launch_host<idx - 1, Block, Functor>(tp, arg);
-      } else {
-        errorQuda("Unexpected block size %d", tp.block.x);
-      }
-    }
-
-    template <template <typename> class Functor, typename Block, typename Arg>
-    void launch_host(const TuneParam &tp, const qudaStream_t &, const Arg &arg)
-    {
-      const_cast<Arg &>(arg).grid_dim = tp.grid;
-      const_cast<Arg &>(arg).block_dim = tp.block;
-      launch_host<Block::block.size() - 1, Block, Functor>(tp, arg);
-    }
-
     /**
-       @brief Launch function for BlockReductionKernel2D.
+       @brief Launch the block reduction kernel with a given block
+       size on the device performing the block reduction defined in
+       the functor.  We recursively iterate over the length of
+       instantiated block sizes until we succeed, or error out.
        @tparam Functor Class which performs any pre-reduction
        transformation (defined as ternary operator) as well as a store
        method for writing out the result.
-       @tparam Block Class that must contain a static std::array of
-       block sizes "block" we wish to instantiate
-       @param[in] tp Kernel launch parameters
-       @param[in] stream Stream in which to execute
-       @param[in,out] arg Algorithm meta data
+       @tparam Block Class that must contain a static array of block
+       sizes "block" we wish to instantiate
+       @tparam idx Index of the block-size array we are instantiating
+       (default = -1 which initiates a recursion over the length of
+       the array)
+       @param[in] arg Kernel argument struct
+       @param[in] tp The launch parameters
+       @param[in] stream The stream on which the execution is done
+     */
+    template <template <typename> class Functor, typename Block, int idx = -1, typename Arg>
+    void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    {
+      constexpr int block_idx = idx == -1 ? Block::block.size() - 1 : idx;
+      if (tp.block.x == Block::block[block_idx]) {
+        const_cast<Arg &>(arg).grid_dim = tp.grid;
+        const_cast<Arg &>(arg).block_dim = tp.block;
+        // derive a BlockKernelArg from the kernel argument to allow for block-size knowledge in the kernel
+        using BlockArg = BlockKernelArg<Block::block[block_idx], Arg>;
+        TunableKernel::launch_device<Functor, grid_stride>(KERNEL(BlockKernel2D), tp, stream, BlockArg(arg));
+      } else if constexpr(block_idx != 0) {
+        launch_device<block_idx - 1, Block, Functor>(arg, tp, stream);
+      } else {
+        errorQuda("Unexpected block size %d", tp.block.x);
+      }
+    }
+
+    /**
+       @brief Launch the block reduction kernel with a given block
+       size on the host performing the block reduction defined in the
+       functor.  We recursively iterate over the length of
+       instantiated block sizes until we succeed, or error out.
+       @tparam Functor Class which performs any pre-reduction
+       transformation (defined as ternary operator) as well as a store
+       method for writing out the result.
+       @tparam Block Class that must contain a static array of block
+       sizes "block" we wish to instantiate
+       @tparam idx Index of the block-size array we are instantiating
+       (default = -1 which initiates a recursion over the length of
+       the array)
+       @param[in] arg Kernel argument struct
+       @param[in] tp The launch parameters
+     */
+    template <template <typename> class Functor, typename Block, int idx = -1, typename Arg>
+    void launch_host(const TuneParam &tp, const qudaStream_t &, const Arg &arg)
+    {
+      constexpr int block_idx = idx == -1 ? Block::block.size() - 1 : idx;
+      if (tp.block.x == Block::block[block_idx]) {
+        const_cast<Arg &>(arg).grid_dim = tp.grid;
+        const_cast<Arg &>(arg).block_dim = tp.block;
+        BlockKernel2D_host<Functor>(BlockKernelArg<Block::block[block_idx], Arg>(arg));
+      } else if constexpr(block_idx != 0) {
+        launch_host<block_idx - 1, Block, Functor>(tp, arg);
+      } else {
+        errorQuda("Unexpected block size %d", tp.block.x);
+      }
+    }
+
+    /**
+       @brief Launch the block reduction kernel on the set loation
+       with a given block size on the device performing the block
+       reduction defined in the functor.  We recursively iterate over
+       the length of instantiated block sizes until we succeed, or
+       error out.
+       @tparam Functor Class which performs any pre-reduction
+       transformation (defined as ternary operator) as well as a store
+       method for writing out the result.
+       @tparam Block Class that must contain a static array of block
+       sizes "block" we wish to instantiate
+       @tparam enable_host Whether to enable host compilation (default is not to)
+       @param[in] arg Kernel argument struct
+       @param[in] tp The launch parameters
+       @param[in] stream The stream on which the execution is done
      */
     template <template <typename> class Functor, typename Block, bool enable_host = false, typename Arg>
     void launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
@@ -101,6 +130,13 @@ namespace quda
     }
 
   public:
+    /**
+       @brief Constructor for kernels that use a lattice field
+       @param[in] field A lattice field instance used for metadata
+       @param[in] vector_length_y Batch size for the block-reduction in the y-dimension
+       @param[in] max_block_y Maximum batch size per block (maximum y-dimension block size)
+       @param[in] location Optional overload for the location where the calculation will take place
+     */
     TunableBlock2D(const LatticeField &field, unsigned int vector_length_y, unsigned int max_block_y = 0,
                    QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableKernel(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location()),
@@ -119,6 +155,11 @@ namespace quda
 #endif
     }
 
+    /**
+       @brief Derived specialization for autotuning the batch size
+       dimension
+       @param[in,out] param TuneParam object passed during autotuning
+     */
     bool advanceBlockDim(TuneParam &param) const
     {
       dim3 block = param.block;
@@ -146,6 +187,10 @@ namespace quda
       }
     }
 
+    /**
+       @brief Overload that sets ensures the y-dimension block size is set appropriately
+       @param[in,out] param TuneParam object passed during autotuning
+     */
     void initTuneParam(TuneParam &param) const
     {
       Tunable::initTuneParam(param);
@@ -153,7 +198,10 @@ namespace quda
       param.grid.y = (vector_length_y + step_y - 1) / step_y;
     }
 
-    /** sets default values for when tuning is disabled */
+    /**
+       @brief Overload that sets ensures the y-dimension block size is set appropriately
+       @param[in,out] param TuneParam object passed during autotuning
+     */
     void defaultTuneParam(TuneParam &param) const
     {
       Tunable::defaultTuneParam(param);
@@ -161,7 +209,16 @@ namespace quda
       param.grid.y = (vector_length_y + step_y - 1) / step_y;
     }
 
+    /**
+       @brief Resize the problem size in the y dimension
+       @brief[in] y New problem size
+    */
     void resizeVector(int y) const { vector_length_y = y; }
+
+    /**
+       @brief Resize the autotuning step size in the y dimension
+       @brief[in] y New step size
+    */
     void resizeStep(int y) const { step_y = y; }
   };
 
