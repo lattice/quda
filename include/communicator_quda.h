@@ -30,6 +30,8 @@ namespace backward
 } // namespace backward
 #endif
 
+namespace quda {
+
 struct Topology_s {
   int ndim;
   int dims[QUDA_MAX_DIM];
@@ -325,7 +327,7 @@ struct Communicator {
       for (int dim = 0; dim < 4; dim++)
         for (int dir = 0; dir < 2; dir++) p2p += (int)comm_peer2peer_enabled(dir, dim);
 
-      comm_allreduce_int(&p2p);
+      comm_allreduce_int(p2p);
       init = true;
       p2p_global = p2p > 0 ? true : false;
     }
@@ -474,7 +476,7 @@ struct Communicator {
         int excluded_device;
         while (blacklist_list >> excluded_device) {
           // check this is a valid device
-          if (excluded_device < 0 || excluded_device >= quda::device::get_device_count()) {
+          if (excluded_device < 0 || excluded_device >= device::get_device_count()) {
             errorQuda("Cannot blacklist invalid GPU device ordinal %d", excluded_device);
           }
 
@@ -520,7 +522,7 @@ struct Communicator {
     comm_gather_hostname(hostname_recv_buf);
 
     if (gpuid < 0) {
-      int device_count = quda::device::get_device_count();
+      int device_count = device::get_device_count();
       if (device_count == 0) { errorQuda("No devices found"); }
 
       // We initialize gpuid if it's still negative.
@@ -646,21 +648,6 @@ struct Communicator {
 
   void commGlobalReductionPop() { globalReduce.pop(); }
 
-  void reduceMaxDouble(double &max)
-  {
-    if (commGlobalReduction()) comm_allreduce_max(&max);
-  }
-
-  void reduceDouble(double &sum)
-  {
-    if (commGlobalReduction()) comm_allreduce(&sum);
-  }
-
-  void reduceDoubleArray(double *sum, const int len)
-  {
-    if (commGlobalReduction()) comm_allreduce_array(sum, len);
-  }
-
   bool commAsyncReduction() { return asyncReduce; }
 
   void commAsyncReductionSet(bool async_reduction) { asyncReduce = async_reduction; }
@@ -704,7 +691,7 @@ struct Communicator {
   int comm_rank_from_coords(const int *coords)
   {
     Topology *topo = comm_default_topology();
-    return ::comm_rank_from_coords(topo, coords);
+    return ::quda::comm_rank_from_coords(topo, coords);
   }
 
   /**
@@ -753,21 +740,15 @@ struct Communicator {
     return std::accumulate(array, array + n, 0.0);
   }
 
-  void comm_allreduce(double *data);
-
-  void comm_allreduce_max(double *data);
-
-  void comm_allreduce_min(double *data);
-
-  void comm_allreduce_array(double *data, size_t size);
+  void comm_allreduce_sum_array(double *data, size_t size);
 
   void comm_allreduce_max_array(double *data, size_t size);
 
   void comm_allreduce_min_array(double *data, size_t size);
 
-  void comm_allreduce_int(int *data);
+  void comm_allreduce_int(int &data);
 
-  void comm_allreduce_xor(uint64_t *data);
+  void comm_allreduce_xor(uint64_t &data);
 
   /**  broadcast from rank 0 */
   void comm_broadcast(void *data, size_t nbytes);
@@ -779,9 +760,11 @@ struct Communicator {
   static int comm_rank_global();
 };
 
-constexpr quda::CommKey default_comm_key = {1, 1, 1, 1};
+constexpr CommKey default_comm_key = {1, 1, 1, 1};
 
-void push_communicator(const quda::CommKey &split_key);
+void push_communicator(const CommKey &split_key);
 
 /** @brief These routine broadcast the data according to the default communicator */
 void comm_broadcast_global(void *data, size_t nbytes);
+
+}

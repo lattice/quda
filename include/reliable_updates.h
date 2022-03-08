@@ -4,6 +4,8 @@
 #include <blas_quda.h>
 #include <util_quda.h>
 
+namespace quda {
+
 /**
   @brief a struct that includes the parameters that determines how reliable updates (aka defect correction, etc)
     should be performed. There are two variants:
@@ -275,3 +277,5 @@ struct ReliableUpdates {
     rUpdate++;
   }
 };
+
+}

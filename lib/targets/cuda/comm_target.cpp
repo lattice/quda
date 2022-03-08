@@ -4,8 +4,10 @@
 #include <algorithm>
 #include <shmem_helper.cuh>
 
-#define CHECK_CUDA_ERROR(func)                                                                                         \
-  quda::target::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
+namespace quda {
+
+#define CHECK_CUDA_ERROR(func)                                          \
+  target::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
 
 bool comm_peer2peer_possible(int local_gpuid, int neighbor_gpuid)
 {
@@ -169,4 +171,6 @@ void comm_destroy_neighbor_event(qudaEvent_t[2][QUDA_MAX_DIM], qudaEvent_t local
       if (comm_peer2peer_enabled(dir, dim)) CHECK_CUDA_ERROR(cudaEventDestroy(event));
     }
   } // iterate over dim
+}
+
 }

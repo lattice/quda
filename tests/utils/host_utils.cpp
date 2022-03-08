@@ -1689,7 +1689,7 @@ double mom_action(void *mom, QudaPrecision prec, int len)
   } else if (prec == QUDA_SINGLE_PRECISION) {
     action = mom_action<float>((float *)mom, len);
   }
-  comm_allreduce(&action);
+  comm_allreduce_sum(action);
   return action;
 }
 

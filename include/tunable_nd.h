@@ -31,22 +31,14 @@ namespace quda
     }
 
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
-    std::enable_if_t<!enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    void launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg);
+      } else if constexpr (enable_host) {
+        launch_host<Functor, Arg>(tp, stream, arg);
       } else {
         errorQuda("CPU not supported yet");
-      }
-    }
-
-    template <template <typename> class Functor, bool enable_host = false, typename Arg>
-    std::enable_if_t<enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
-    {
-      if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Functor, Arg>(tp, stream, arg);
-      } else {
-        launch_host<Functor, Arg>(tp, stream, arg);
       }
     }
 
@@ -135,22 +127,14 @@ namespace quda
     }
 
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
-    std::enable_if_t<!enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    void launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
       if (TunableKernel1D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg);
+      } else if constexpr (enable_host) {
+        launch_host<Functor, Arg>(tp, stream, arg);
       } else {
         errorQuda("CPU not supported yet");
-      }
-    }
-
-    template <template <typename> class Functor, bool enable_host = false, typename Arg>
-    std::enable_if_t<enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
-    {
-      if (TunableKernel1D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Functor, Arg>(tp, stream, arg);
-      } else {
-        launch_host<Functor, Arg>(tp, stream, arg);
       }
     }
 
@@ -300,22 +284,14 @@ namespace quda
     }
 
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
-    std::enable_if_t<!enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    void launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
       if (TunableKernel2D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg);
+      } else if constexpr (enable_host) {
+        launch_host<Functor, Arg>(tp, stream, arg);
       } else {
         errorQuda("CPU not supported yet");
-      }
-    }
-
-    template <template <typename> class Functor, bool enable_host = false, typename Arg>
-    std::enable_if_t<enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
-    {
-      if (TunableKernel2D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Functor, Arg>(tp, stream, arg);
-      } else {
-        launch_host<Functor, Arg>(tp, stream, arg);
       }
     }
 

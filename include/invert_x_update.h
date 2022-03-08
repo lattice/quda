@@ -2,6 +2,8 @@
 
 #include <color_spinor_field.h>
 
+namespace quda {
+
 /**
   @brief A struct that contains multiple p-vectors which are to be added to an output vector:
     x += alpha[i] * p[i], i = 0, 1, ..., Np - 1
@@ -116,3 +118,5 @@ struct XUpdateBatch {
    */
   void reset_next() { _next = 0; }
 };
+
+}

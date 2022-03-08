@@ -68,6 +68,9 @@ namespace quda
       constexpr Tensor5DReduce(const Arg &arg) : arg(arg) { }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
+      // overload comm_reduce to prevent any global reduction
+      static inline void comm_reduce(std::vector<reduce_t> &a) { }
+
       __device__ __host__ inline reduce_t operator()(reduce_t &sum, int x_cb, int parity, int batch_idx)
       {
         int y_s = batch_idx % arg.Ls_y;

@@ -5,9 +5,12 @@
 #include <quda_internal.h>
 #include <quda_matrix.h>
 
-using FFTPlanHandle = cufftHandle;
 #define FFT_FORWARD CUFFT_FORWARD
 #define FFT_INVERSE CUFFT_INVERSE
+
+namespace quda {
+
+using FFTPlanHandle = cufftHandle;
 
 #ifndef GPU_GAUGE_ALG
 
@@ -148,3 +151,5 @@ inline void SetPlanFFT2DMany(cufftHandle &plan, int4 size, int dim, QudaPrecisio
 inline void FFTDestroyPlan(FFTPlanHandle &plan) { CUFFT_SAFE_CALL(cufftDestroy(plan)); }
 
 #endif
+
+}

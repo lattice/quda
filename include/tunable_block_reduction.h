@@ -37,22 +37,13 @@ namespace quda
     bool tuneGridDim() const final { return grid_stride; }
 
     template <int idx, typename Block, template <typename> class Functor, typename FunctorArg>
-    std::enable_if_t<idx != 0, void> launch_device(const FunctorArg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    void launch_device(const FunctorArg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       if (tp.block.x == Block::block[idx]) {
         using Arg = BlockKernelArg<Block::block[idx], FunctorArg>;
         TunableKernel::launch_device<Functor, grid_stride>(KERNEL(BlockKernel2D), tp, stream, Arg(arg));
-      } else {
+      } else if constexpr(idx != 0) {
         launch_device<idx - 1, Block, Functor>(arg, tp, stream);
-      }
-    }
-
-    template <int idx, typename Block, template <typename> class Functor, typename FunctorArg>
-    std::enable_if_t<idx == 0, void> launch_device(const FunctorArg &arg, const TuneParam &tp, const qudaStream_t &stream)
-    {
-      if (tp.block.x == Block::block[idx]) {
-        using Arg = BlockKernelArg<Block::block[idx], FunctorArg>;
-        TunableKernel::launch_device<Functor, grid_stride>(KERNEL(BlockKernel2D), tp, stream, Arg(arg));
       } else {
         errorQuda("Unexpected block size %d", tp.block.x);
       }
@@ -67,21 +58,15 @@ namespace quda
     }
 
     template <int idx, typename Block, template <typename> class Functor, typename Arg>
-    std::enable_if_t<idx != 0, void> launch_host(const TuneParam &tp, const Arg &arg)
+    void launch_host(const TuneParam &tp, const Arg &arg)
     {
-      if (tp.block.x == Block::block[idx])
+      if (tp.block.x == Block::block[idx]) {
         BlockKernel2D_host<Functor>(BlockKernelArg<Block::block[idx], Arg>(arg));
-      else
+      } else if constexpr(idx != 0) {
         launch_host<idx - 1, Block, Functor>(tp, arg);
-    }
-
-    template <int idx, typename Block, template <typename> class Functor, typename Arg>
-    std::enable_if_t<idx == 0, void> launch_host(const TuneParam &tp, const Arg &arg)
-    {
-      if (tp.block.x == Block::block[idx])
-        BlockKernel2D_host<Functor>(BlockKernelArg<Block::block[idx], Arg>(arg));
-      else
+      } else {
         errorQuda("Unexpected block size %d", tp.block.x);
+      }
     }
 
     template <template <typename> class Functor, typename Block, typename Arg>
@@ -104,22 +89,14 @@ namespace quda
        @param[in,out] arg Algorithm meta data
      */
     template <template <typename> class Functor, typename Block, bool enable_host = false, typename Arg>
-    std::enable_if_t<!enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    void launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Block>(tp, stream, arg);
+      } else if constexpr (enable_host) {
+        launch_host<Functor, Block>(tp, stream, arg);
       } else {
         errorQuda("CPU not supported yet");
-      }
-    }
-
-    template <template <typename> class Functor, typename Block, bool enable_host = false, typename Arg>
-    std::enable_if_t<enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
-    {
-      if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Functor, Block>(tp, stream, arg);
-      } else {
-        launch_host<Functor, Block>(tp, stream, arg);
       }
     }
 

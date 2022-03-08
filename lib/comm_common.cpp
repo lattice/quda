@@ -6,6 +6,8 @@
 #include <communicator_quda.h>
 #include <comm_quda.h>
 
+namespace quda {
+
 char *comm_hostname(void)
 {
   static bool cached = false;
@@ -140,4 +142,6 @@ void comm_abort(int status)
   p.print(st, getOutputFile());
 #endif
   comm_abort_(status);
+}
+
 }
