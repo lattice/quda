@@ -31,7 +31,7 @@ set(CMAKE_CUDA_EXTENSIONS OFF)
 # cmake will otherwise overwrite the existing makefiles.
 set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
-# #dd a directory for cmake modules
+# add a directory for cmake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 include(cmake/CPM.cmake)
 
