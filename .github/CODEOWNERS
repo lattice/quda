@@ -2,7 +2,7 @@
 # Each line is a file pattern followed by one or more owners.
 
 # global catch call if not 
-*       @lattice/quda_core
+*       lattice/quda_core
 
 # CMake Maintainers
 CMakeLists.txt @lattice/cmake_maintainers
