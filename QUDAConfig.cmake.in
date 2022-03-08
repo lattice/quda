@@ -29,7 +29,7 @@ if( QUDA_MPI )
 endif()
 
 if( QUDA_QIO )
-	find_dependency(QIO REQUIRED)
+  find_dependency(QIO REQUIRED)
 endif()
 
 if( QUDA_OPENMP )
