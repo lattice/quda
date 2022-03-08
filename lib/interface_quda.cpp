@@ -5686,10 +5686,12 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
     blas::xpay(*temp1, -1.0, *out);
     blas::zero(*temp1);
   }
-  
+
+#if 0
   // Normalise the source
   double nout = blas::norm2(*out);
   blas::ax(1.0 / sqrt(nout), *out);
+#endif
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // Copy device data to host.
