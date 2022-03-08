@@ -47,24 +47,23 @@ namespace quda
        @tparam Block Class that must contain a static array of block
        sizes "block" we wish to instantiate
        @tparam idx Index of the block-size array we are instantiating
-       (default = -1 which initiates a recursion over the length of
+       (default = 0 which initiates a recursion over the length of
        the array)
        @param[in] arg Kernel argument struct
        @param[in] tp The launch parameters
        @param[in] stream The stream on which the execution is done
      */
-    template <template <typename> class Functor, typename Block, int idx = -1, typename Arg>
-    void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    template <template <typename> class Functor, typename Block, unsigned int idx = 0, typename FunctorArg>
+    void launch_device(const TuneParam &tp, const qudaStream_t &stream, const FunctorArg &arg)
     {
-      constexpr int block_idx = idx == -1 ? Block::block.size() - 1 : idx;
-      if (tp.block.x == Block::block[block_idx]) {
-        const_cast<Arg &>(arg).grid_dim = tp.grid;
-        const_cast<Arg &>(arg).block_dim = tp.block;
+      if (tp.block.x == Block::block[idx]) {
+        const_cast<FunctorArg &>(arg).grid_dim = tp.grid;
+        const_cast<FunctorArg &>(arg).block_dim = tp.block;
         // derive a BlockKernelArg from the kernel argument to allow for block-size knowledge in the kernel
-        using BlockArg = BlockKernelArg<Block::block[block_idx], Arg>;
-        TunableKernel::launch_device<Functor, grid_stride>(KERNEL(BlockKernel2D), tp, stream, BlockArg(arg));
-      } else if constexpr(block_idx != 0) {
-        launch_device<block_idx - 1, Block, Functor>(arg, tp, stream);
+        using Arg = BlockKernelArg<Block::block[idx], FunctorArg>;
+        TunableKernel::launch_device<Functor, grid_stride>(KERNEL(BlockKernel2D), tp, stream, Arg(arg));
+      } else if constexpr(idx < Block::block.size() - 1) {
+        launch_device<Functor, Block, idx + 1>(tp, stream, arg);
       } else {
         errorQuda("Unexpected block size %d", tp.block.x);
       }
@@ -81,21 +80,21 @@ namespace quda
        @tparam Block Class that must contain a static array of block
        sizes "block" we wish to instantiate
        @tparam idx Index of the block-size array we are instantiating
-       (default = -1 which initiates a recursion over the length of
+       (default = 0 which initiates a recursion over the length of
        the array)
-       @param[in] arg Kernel argument struct
        @param[in] tp The launch parameters
+       @param[in] stream The stream on which the execution is done (unused on the host)
+       @param[in] arg Kernel argument struct
      */
-    template <template <typename> class Functor, typename Block, int idx = -1, typename Arg>
-    void launch_host(const TuneParam &tp, const qudaStream_t &, const Arg &arg)
+    template <template <typename> class Functor, typename Block, unsigned int idx = 0, typename Arg>
+      void launch_host(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      constexpr int block_idx = idx == -1 ? Block::block.size() - 1 : idx;
-      if (tp.block.x == Block::block[block_idx]) {
+      if (tp.block.x == Block::block[idx]) {
         const_cast<Arg &>(arg).grid_dim = tp.grid;
         const_cast<Arg &>(arg).block_dim = tp.block;
-        BlockKernel2D_host<Functor>(BlockKernelArg<Block::block[block_idx], Arg>(arg));
-      } else if constexpr(block_idx != 0) {
-        launch_host<block_idx - 1, Block, Functor>(tp, arg);
+        BlockKernel2D_host<Functor>(BlockKernelArg<Block::block[idx], Arg>(arg));
+      } else if constexpr(idx < Block::block.size() - 1) {
+        launch_host<Functor, Block, idx + 1>(tp, stream, arg);
       } else {
         errorQuda("Unexpected block size %d", tp.block.x);
       }
@@ -123,7 +122,7 @@ namespace quda
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Block>(tp, stream, arg);
       } else if constexpr (enable_host) {
-        launch_host<Functor, Block>(tp, stream, arg);
+        launch_host<Functor, Block>(tp, arg);
       } else {
         errorQuda("CPU not supported yet");
       }
