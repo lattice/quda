@@ -712,6 +712,10 @@ foreach(pol IN LISTS DSLASH_POLICIES)
 
     # MdagM local operator
     # This requires tensor cores so only enable NVIDIA targets
+    # FIXME: Ideally we should have a more sensitive guard -- e.g. QUDA_TENSOR_CORE_AVAILABLE 
+    # or some such so that this would not be an architecture specific guard, but a feature
+    # specific guard
+    # 
     if( QUDA_TARGET_CUDA )
 	    add_test(NAME dslash_mobius_local-policy${pol2}
 		     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}

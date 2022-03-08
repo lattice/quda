@@ -3,6 +3,8 @@
 include(CheckLanguage)
 check_language(HIP)
 
+set(QUDA_TARGET_HIP ON)
+
 if(DEFINED ENV{QUDA_GPU_ARCH})
   set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
 else()
@@ -112,3 +114,5 @@ if(QUDA_GAUGE_ALG)
 endif(QUDA_GAUGE_ALG)
 
 add_subdirectory(targets/hip)
+
+install(FILES ${CMAKE_SOURCE_DIR}/cmake/find_hip_deps.cmake DESTINATION lib/cmake/QUDA)

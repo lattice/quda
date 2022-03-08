@@ -86,14 +86,6 @@ if(TARGET_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid QUDA_TARGET_TYPE type! Valid target types are:" "${VALID_TARGET_TYPES}")
 endif()
 
-### Dependent option 
-if( QUDA_TARGET_TYPE STREQUAL "CUDA" )
-  set(QUDA_TARGET_CUDA ON)
-elseif( QUDA_TARGET_TYPE STREQUAL "HIP" )
-  set(QUDA_TARGET_HIP ON)
-endif()
-
-
 if(GIT_FOUND)
   execute_process(
     COMMAND ${GIT_EXECUTABLE} show
@@ -706,15 +698,3 @@ include(CTest)
 add_subdirectory(lib)
 add_subdirectory(tests)
 add_subdirectory(doc)
-
-include(CMakePackageConfigHelpers)
-configure_package_config_file(QUDAConfig.cmake.in QUDAConfig.cmake INSTALL_DESTINATION lib/cmake/QUDA)
-
-write_basic_package_version_file(
-	QUDAConfigVersion.cmake
-	VERSION ${PACKAGE_VERSION}
-	COMPATIBILITY AnyNewerVersion)
-
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/QUDAConfigVersion.cmake ${CMAKE_CURRENT_BINARY_DIR}/QUDAConfig.cmake
-	DESTINATION lib/cmake/QUDA)
-

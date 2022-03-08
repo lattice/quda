@@ -5,6 +5,8 @@ find_package(CUDAToolkit REQUIRED)
 include(CheckLanguage)
 check_language(CUDA)
 
+set(QUDA_TARGET_CUDA ON)
+
 if(DEFINED ENV{QUDA_GPU_ARCH})
   set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
 else()
@@ -369,3 +371,5 @@ if(QUDA_NVML)
 endif()
 
 add_subdirectory(targets/cuda)
+
+install(FILES ${CMAKE_SOURCE_DIR}/cmake/find_cuda_deps.cmake DESTINATION lib/cmake/QUDA)
