@@ -145,7 +145,6 @@ endif()
 option(QUDA_DIRAC_WILSON "build Wilson Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_CLOVER "build clover Dirac operators" ${QUDA_DIRAC_DEFAULT})
 # Dynamic inversion saves memory but decreases the flops
-option(QUDA_DYNAMIC_CLOVER "Dynamically invert the clover term for twisted-clover" OFF)
 option(QUDA_DIRAC_DOMAIN_WALL "build domain wall Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_STAGGERED "build staggered Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_TWISTED_MASS "build twisted mass Dirac operators" ${QUDA_DIRAC_DEFAULT})
@@ -173,11 +172,9 @@ option(QUDA_MPI "build the MPI multi-GPU code" OFF)
 # ARPACK
 option(QUDA_ARPACK "build arpack interface" OFF)
 option(QUDA_ARPACK_LOGGING "enable ARPACK logging (not availible for NG)" OFF)
-option(QUDA_DOWNLOAD_ARPACK "Download ARPACK-NG software as requested by QUDA_ARPACK" OFF)
 
 # OpenBLAS
 option(QUDA_OPENBLAS "enable OpenBLAS" OFF)
-option(QUDA_DOWNLOAD_OPENBLAS "Download OpenBLAS software as requested by QUDA_OPENBLAS" OFF)
 
 # Interface options
 option(QUDA_INTERFACE_QDP "build qdp interface" ON)
@@ -324,13 +321,6 @@ endif()
 
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 
-# define CXX FLAGS
-if(QUDA_TARGET_CUDA)
-  set(QUDA_DEF_OPT_LEVEL "-O3")
-elseif( QUDA_TARGET_HIP )
-  set(QUDA_DEF_OPT_LEVEL "-O3")
-endif()
-
 set(CMAKE_CXX_FLAGS_DEVEL
   "-g -O3 -Wall -Wextra"
   CACHE STRING "Flags used by the C++ compiler during regular development builds.")
@@ -351,7 +341,7 @@ set(CMAKE_CXX_FLAGS_SANITIZE
     CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
 
 enable_language(CXX)
-find_package(Threads REQUIRED)
+
 # define C FLAGS
 set(CMAKE_C_FLAGS_DEVEL
   "-g -O3 -Wall -Wextra"
@@ -392,6 +382,7 @@ if(QUDA_CLOVER_RECONSTRUCT AND NOT QUDA_CLOVER_DYNAMIC)
   message(SEND_ERROR "QUDA_CLOVER_RECONSTRUCT requires QUDA_CLOVER_DYNAMIC)")
 endif()
 
+find_package(Threads REQUIRED)
 if(QUDA_OPENMP)
   find_package(OpenMP REQUIRED)
 endif()
