@@ -8,9 +8,10 @@
 #define FFT_FORWARD CUFFT_FORWARD
 #define FFT_INVERSE CUFFT_INVERSE
 
-namespace quda {
+namespace quda
+{
 
-using FFTPlanHandle = cufftHandle;
+  using FFTPlanHandle = cufftHandle;
 
 #ifndef GPU_GAUGE_ALG
 
@@ -152,4 +153,4 @@ inline void FFTDestroyPlan(FFTPlanHandle &plan) { CUFFT_SAFE_CALL(cufftDestroy(p
 
 #endif
 
-}
+} // namespace quda

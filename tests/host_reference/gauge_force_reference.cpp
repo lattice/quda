@@ -262,7 +262,9 @@ int gf_neighborIndexFullLattice(size_t i, int dx[], const lattice_t &lat)
   auto x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
   x[0] = 2 * x0h + x1odd;
 
-  for (int d = 0; d < 4; d++) { x[d] = quda::comm_dim_partitioned(d) ? x[d] + dx[d] : (x[d] + dx[d] + lat.x[d]) % lat.x[d]; }
+  for (int d = 0; d < 4; d++) {
+    x[d] = quda::comm_dim_partitioned(d) ? x[d] + dx[d] : (x[d] + dx[d] + lat.x[d]) % lat.x[d];
+  }
   size_t nbr_half_idx = ((x[3] + lat.r[3]) * (lat.e[2] * lat.e[1] * lat.e[0]) + (x[2] + lat.r[2]) * (lat.e[1] * lat.e[0])
                          + (x[1] + lat.r[1]) * (lat.e[0]) + (x[0] + lat.r[0]))
     / 2;

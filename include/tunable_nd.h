@@ -92,8 +92,7 @@ namespace quda
        @param[in] field A lattice field instance used for metadata
        @param[in] location Location where the calculation will take place
      */
-    TunableKernel1D_base(size_t n_items, QudaFieldLocation location) :
-      TunableKernel(location)
+    TunableKernel1D_base(size_t n_items, QudaFieldLocation location) : TunableKernel(location)
     {
       u64toa(vol, n_items);
       strcpy(aux, compile_type_str(location));
@@ -131,10 +130,7 @@ namespace quda
        @param[in] field A lattice field instance used for metadata
        @param[in] location Location where the calculation will take place
      */
-    TunableKernel1D(size_t n_items, QudaFieldLocation location) :
-      TunableKernel1D_base<false>(n_items, location)
-    {
-    }
+    TunableKernel1D(size_t n_items, QudaFieldLocation location) : TunableKernel1D_base<false>(n_items, location) { }
   };
 
   /**

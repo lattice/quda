@@ -62,7 +62,7 @@ namespace quda
         // derive a BlockKernelArg from the kernel argument to allow for block-size knowledge in the kernel
         using Arg = BlockKernelArg<Block::block[idx], FunctorArg>;
         TunableKernel::launch_device<Functor, grid_stride>(KERNEL(BlockKernel2D), tp, stream, Arg(arg));
-      } else if constexpr(idx < Block::block.size() - 1) {
+      } else if constexpr (idx < Block::block.size() - 1) {
         launch_device<Functor, Block, idx + 1>(tp, stream, arg);
       } else {
         errorQuda("Unexpected block size %d", tp.block.x);
@@ -87,13 +87,13 @@ namespace quda
        @param[in] arg Kernel argument struct
      */
     template <template <typename> class Functor, typename Block, unsigned int idx = 0, typename Arg>
-      void launch_host(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    void launch_host(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
       if (tp.block.x == Block::block[idx]) {
         const_cast<Arg &>(arg).grid_dim = tp.grid;
         const_cast<Arg &>(arg).block_dim = tp.block;
         BlockKernel2D_host<Functor>(BlockKernelArg<Block::block[idx], Arg>(arg));
-      } else if constexpr(idx < Block::block.size() - 1) {
+      } else if constexpr (idx < Block::block.size() - 1) {
         launch_host<Functor, Block, idx + 1>(tp, stream, arg);
       } else {
         errorQuda("Unexpected block size %d", tp.block.x);

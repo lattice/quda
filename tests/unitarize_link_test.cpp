@@ -123,20 +123,20 @@ static int unitarize_link_test(int &test_rc)
 
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
   gParam.gauge  = fatlink;
-  cpuFatLink  = new quda::cpuGaugeField(gParam);
+  cpuFatLink = new quda::cpuGaugeField(gParam);
 
   gParam.create = QUDA_ZERO_FIELD_CREATE;
-  cpuULink  = new quda::cpuGaugeField(gParam);
+  cpuULink = new quda::cpuGaugeField(gParam);
 
   gParam.create = QUDA_ZERO_FIELD_CREATE;
-  cudaResult  = new quda::cpuGaugeField(gParam);
+  cudaResult = new quda::cpuGaugeField(gParam);
 
   gParam.pad         = 0;
   gParam.create      = QUDA_NULL_FIELD_CREATE;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.setPrecision(prec, true);
   cudaFatLink = new quda::cudaGaugeField(gParam);
-  cudaULink   = new quda::cudaGaugeField(gParam);
+  cudaULink = new quda::cudaGaugeField(gParam);
 
   { // create fat links
     double act_path_coeff[6];
@@ -152,11 +152,7 @@ static int unitarize_link_test(int &test_rc)
     cudaFatLink->loadCPUField(*cpuFatLink);
   }
 
-  quda::setUnitarizeLinksConstants(unitarize_eps,
-                                   max_allowed_error,
-                                   reunit_allow_svd,
-                                   reunit_svd_only,
-                                   svd_rel_error,
+  quda::setUnitarizeLinksConstants(unitarize_eps, max_allowed_error, reunit_allow_svd, reunit_svd_only, svd_rel_error,
                                    svd_abs_error);
 
   int *num_failures_h = static_cast<int *>(mapped_malloc(sizeof(int)));
