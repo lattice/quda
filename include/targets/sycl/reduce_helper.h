@@ -20,8 +20,8 @@ using device_reduce_t = doubledouble;
 using device_reduce_t = double;
 #endif
 
-//using count_t = unsigned int;
-using count_t = int;
+using count_t = unsigned int;
+//using count_t = int;
 
 namespace quda
 {

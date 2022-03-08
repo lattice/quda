@@ -123,6 +123,7 @@ namespace quda
     alloc[type].erase(ptr);
   }
 
+#if 0
   /**
    * Under CUDA 4.0, cudaHostRegister seems to require that both the
    * beginning and end of the buffer be aligned on page boundaries.
@@ -151,6 +152,7 @@ namespace quda
     }
     return ptr;
   }
+#endif
 
   bool use_managed_memory()
   {
@@ -523,7 +525,7 @@ namespace quda
     return QUDA_CUDA_FIELD_LOCATION;
   }
 
-  void *get_mapped_device_pointer_(const char *func, const char *file, int line, const void *host)
+  void *get_mapped_device_pointer_(const char *, const char *, int, const void *host)
   {
     void *device = const_cast<void *>(host);
     return device;

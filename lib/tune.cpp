@@ -676,7 +676,9 @@ namespace quda
   int Tunable::blockStep() const { return device::warp_size(); }
   int Tunable::blockMin() const { return device::warp_size(); }
 
+#ifdef LAUNCH_TIMER
   static TimeProfile launchTimer("tuneLaunch");
+#endif
 
   /**
    * Return the optimal launch parameters for a given kernel, either

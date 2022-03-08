@@ -67,10 +67,10 @@ namespace quda
       printfQuda("  Version: %s\n", p.get_info<sycl::info::platform::version>().c_str());
 
       auto ds = p.get_devices();
-      auto ndev = ds.size();
-      printfQuda("  Number of devices: %lu\n", ndev);
+      int ndev = ds.size();
+      printfQuda("  Number of devices: %d\n", ndev);
       if(dev >= ndev) {
-	errorQuda("Requested device(%i) out of range(%lu)", dev, ndev);
+	errorQuda("Requested device(%d) out of range(%d)", dev, ndev);
       }
 
       printfQuda("Selected device number: %i\n", dev);
@@ -130,7 +130,7 @@ namespace quda
     {
       auto p = sycl::platform(mySelector);
       auto ds = p.get_devices();
-      auto dev_count = ds.size();
+      int dev_count = ds.size();
       for (int device = 0; device < dev_count; device++) {
 	using id = sycl::info::device;
 	auto d = ds[device];
@@ -206,11 +206,11 @@ namespace quda
       printfQuda("Testing submit...");
       auto q = streams[Nstream-1];
       q.submit([&](sycl::handler& h) {
-		 h.parallel_for<class test>(sycl::range<3>{1,1,1},
-					    [=](sycl::item<3> i) {
-					      int j = i[0];
-					    });
-	       });
+	h.parallel_for<class test>(sycl::range<3>{1,1,1},
+				   [=](sycl::item<3> i) {
+				     (void) i[0];
+				   });
+      });
       printfQuda(" done\n");
     }
 
@@ -317,7 +317,8 @@ namespace quda
       return val[i];
     }
 
-    unsigned int max_grid_size(int i) { // not in portable SYCL?
+  //unsigned int max_grid_size(int i) { // not in portable SYCL?
+    unsigned int max_grid_size(int) { // not in portable SYCL?
       //auto val = myDevice.get_info<sycl::info::device::max_work_item_sizes>();
       //return val[i];
       // FIXME: address_bits / mwgs(i) ?

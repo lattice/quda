@@ -41,6 +41,13 @@ static inline int atomicAdd(int *address, int val)
   return old;
 }
 
+static inline unsigned int atomicAdd(unsigned int *address, unsigned int val)
+{
+  auto ar = makeAtomicRef(address);
+  auto old = ar.fetch_add(val);
+  return old;
+}
+
 static inline float atomicAdd(float *address, float val)
 {
   auto ar = makeAtomicRef(address);
