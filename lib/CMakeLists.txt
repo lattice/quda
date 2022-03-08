@@ -149,13 +149,7 @@ if(BUILD_FORTRAN_INTERFACE)
 endif()
 
 
-if(QUDA_TARGET_HIP) 
-  # Workaround for exorbitant build times
-  set_source_files_properties(block_orthogonalize.cu PROPERTIES COMPILE_OPTIONS "-mllvm;-pragma-unroll-threshold=4096")
-endif()
-
 # QUDA_CU_OBJS should contain all cuda files now QUDA_OBJS all c, cpp, fortran sources
-
 # if we have a git version make version.cpp depend on git head so that it is rebuild if the git sha changed
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
   if(GITVERSION)

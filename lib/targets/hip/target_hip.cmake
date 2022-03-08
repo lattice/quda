@@ -84,12 +84,17 @@ set_target_properties(quda PROPERTIES HIP_ARCHITECTURES ${CMAKE_HIP_ARCHITECTURE
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},hip_version=${CMAKE_HIP_COMPILER_VERSION})
 set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH}")
 
+
+
 # ######################################################################################################################
 # cuda specific compile options
 
 target_include_directories(quda PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/hip)
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/targets/hip>
                                        $<INSTALL_INTERFACE:include/targets/hip>)
+
+
+set_source_files_properties(block_orthogonalize.cu PROPERTIES COMPILE_OPTIONS "-mllvm;-pragma-unroll-threshold=4096")
 
 target_compile_options(
   quda
