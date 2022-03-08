@@ -347,8 +347,8 @@ namespace quda
     template <typename reduce_t, typename InputType>
     __device__ __host__ void cdotNormA_(reduce_t &sum, const InputType &a, const InputType &b)
     {
-      using real = typename scalar<InputType>::type;
-      using scalar = typename scalar<reduce_t>::type;
+      using real = typename InputType::value_type;
+      using scalar = typename reduce_t::value_type;
       cdot_<reduce_t, real>(sum, a, b);
       norm2_<scalar, real>(sum[2], a);
     }
@@ -360,8 +360,8 @@ namespace quda
     template <typename reduce_t, typename InputType>
     __device__ __host__ void cdotNormB_(reduce_t &sum, const InputType &a, const InputType &b)
     {
-      using real = typename scalar<InputType>::type;
-      using scalar = typename scalar<reduce_t>::type;
+      using real = typename InputType::value_type;
+      using scalar = typename reduce_t::value_type;
       cdot_<reduce_t, real>(sum, a, b);
       norm2_<scalar, real>(sum[2], b);
     }

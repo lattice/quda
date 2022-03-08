@@ -55,9 +55,4 @@ namespace quda
     return result;
   }
 
-  template <typename T> struct scalar;
-  template<> struct scalar<array<double,2>> { using type = double; };
-  template<> struct scalar<array<double,3>> { using type = double; };
-  template<> struct scalar<array<double,4>> { using type = double; };
-
 } // namespace quda
