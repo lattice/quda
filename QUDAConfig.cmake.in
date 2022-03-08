@@ -37,9 +37,9 @@ if( QUDA_OPENMP )
 endif()
 
 if( QUDA_TARGET_CUDA )
-  include(${CMAKE_CURRENT_LIST_DIR}/find_cuda_deps.cmake)
+  include(${CMAKE_CURRENT_LIST_DIR}/find_target_cuda_dependencies.cmake)
 elseif(QUDA_TARGET_HIP )
-  include(${CMAKE_CURRENT_LIST_DIR}/find_hip_deps.cmake )
+  include(${CMAKE_CURRENT_LIST_DIR}/find_target_hip_dependencies.cmake )
 endif()
 
 if( QUDA_QDPJIT )

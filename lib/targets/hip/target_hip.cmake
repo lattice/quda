@@ -120,4 +120,4 @@ endif(QUDA_GAUGE_ALG)
 
 add_subdirectory(targets/hip)
 
-install(FILES ${CMAKE_SOURCE_DIR}/cmake/find_hip_deps.cmake DESTINATION lib/cmake/QUDA)
+install(FILES ${CMAKE_SOURCE_DIR}/cmake/find_target_hip_dependencies.cmake DESTINATION lib/cmake/QUDA)

@@ -372,4 +372,4 @@ endif()
 
 add_subdirectory(targets/cuda)
 
-install(FILES ${CMAKE_SOURCE_DIR}/cmake/find_cuda_deps.cmake DESTINATION lib/cmake/QUDA)
+install(FILES ${CMAKE_SOURCE_DIR}/cmake/find_target_cuda_dependencies.cmake DESTINATION lib/cmake/QUDA)
