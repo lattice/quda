@@ -5,14 +5,14 @@
 template <class T>
 static void __device__ inline get_big_small(float &big, float &small, const float &f){
   constexpr unsigned big_mask = std::is_same<T, bfloat16>::value ? 0xffff0000 : 0xffffe000;
-  constexpr unsigned small_mask = std::is_same<T, bfloat16>::value ? 0x8000 : 0x1000;
+  // constexpr unsigned small_mask = std::is_same<T, bfloat16>::value ? 0x8000 : 0x1000;
 
   const unsigned &u32 = reinterpret_cast<const unsigned &>(f);
   unsigned big_u32 = u32 & big_mask;
   big = reinterpret_cast<float &>(big_u32);
 
   small = f - big;
-  unsigned &small_u32 = reinterpret_cast<unsigned &>(small);
+  // unsigned &small_u32 = reinterpret_cast<unsigned &>(small);
   // small_u32 += small_mask;
 }
 

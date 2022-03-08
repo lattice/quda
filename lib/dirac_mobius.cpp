@@ -2,8 +2,8 @@
 #include <dirac_quda.h>
 #include <dslash_quda.h>
 #include <blas_quda.h>
-
 #include <dslash_mdw_fused.hpp>
+#include <dslash5_domain_wall_mma.hpp>
 
 namespace quda {
 

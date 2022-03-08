@@ -83,7 +83,6 @@ set (QUDA_OBJS
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
   deflation.cpp checksum.cu transform_reduce.cu
   dslash5_mobius_eofa.cu
-  dslash5_domain_wall_mma.cu
   madwf_ml.cpp
   instantiate.cpp version.cpp )
 # cmake-format: on
@@ -132,6 +131,7 @@ mark_as_advanced(QUDA_MDW_FUSED_LS_LIST)
 
 message(STATUS "QUDA_mdw_fused_Ls=${QUDA_MDW_FUSED_LS_LIST}")
 configure_file(dslash_mdw_fused.in.hpp dslash_mdw_fused.hpp @ONLY)
+configure_file(dslash5_domain_wall_mma.in.hpp dslash5_domain_wall_mma.hpp @ONLY)
 
 set(QUDA_MDW_FUSED_ALLOWED_LS_LIST 4 8 12 16 20)
 if(QUDA_DIRAC_DOMAIN_WALL)
@@ -142,7 +142,9 @@ if(QUDA_DIRAC_DOMAIN_WALL)
       message(FATAL_ERROR "'${QUDA_MDW_FUSED_LS}' is not a valid Ls: allowed ones are '${QUDA_MDW_FUSED_ALLOWED_LS_LIST_COMMA}'")
     endif()
     configure_file(dslash_mdw_fused.in.cu "dslash_mdw_fused_ls${QUDA_MDW_FUSED_LS}.cu" @ONLY)
+    configure_file(dslash5_domain_wall_mma.in.cu "dslash5_domain_wall_mma_ls${QUDA_MDW_FUSED_LS}.cu" @ONLY)
     list(APPEND QUDA_CU_OBJS "dslash_mdw_fused_ls${QUDA_MDW_FUSED_LS}.cu")
+    list(APPEND QUDA_CU_OBJS "dslash5_domain_wall_mma_ls${QUDA_MDW_FUSED_LS}.cu")
   endforeach()
 endif()
 
