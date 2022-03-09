@@ -345,13 +345,28 @@ namespace quda
        Returns the norm of x
     */
     template <typename reduce_t, typename InputType>
-    __device__ __host__ void cdotNormA_(reduce_t &sum, const InputType &a, const InputType &b)
+    __device__ __host__ void cdotNormAB_(reduce_t &sum, const InputType &a, const InputType &b)
     {
       using real = typename scalar<InputType>::type;
       using scalar = typename scalar<reduce_t>::type;
       cdot_<reduce_t, real>(sum, a, b);
       norm2_<scalar, real>(sum.z, a);
+      norm2_<scalar, real>(sum.w, b);
     }
+
+    template <typename real_reduce_t, typename real>
+    struct CdotNormAB : public ReduceFunctor<typename VectorType<real_reduce_t, 4>::type> {
+      using reduce_t = typename VectorType<real_reduce_t, 4>::type;
+      static constexpr memory_access<1, 1> read{ };
+      static constexpr memory_access<> write{ };
+      CdotNormAB(const real &, const real &) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
+      {
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) cdotNormAB_<reduce_t>(sum, x[i], y[i]);
+      }
+      constexpr int flops() const { return 8; }   //! flops per element
+    };
 
     /**
        First returns the dot product (x,y)
@@ -365,20 +380,6 @@ namespace quda
       cdot_<reduce_t, real>(sum, a, b);
       norm2_<scalar, real>(sum.z, b);
     }
-
-    template <typename real_reduce_t, typename real>
-    struct CdotNormA : public ReduceFunctor<typename VectorType<real_reduce_t, 3>::type> {
-      using reduce_t = typename VectorType<real_reduce_t, 3>::type;
-      static constexpr memory_access<1, 1> read{ };
-      static constexpr memory_access<> write{ };
-      CdotNormA(const real &, const real &) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
-      {
-#pragma unroll
-        for (int i = 0; i < x.size(); i++) cdotNormA_<reduce_t>(sum, x[i], y[i]);
-      }
-      constexpr int flops() const { return 6; }   //! flops per element
-    };
 
     /**
        This convoluted kernel does the following:

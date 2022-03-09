@@ -96,7 +96,7 @@ enum class Kernel {
   cabxpyzAxNorm,
   cDotProduct,
   caxpyDotzy,
-  cDotProductNormA,
+  cDotProductNormAB,
   caxpbypzYmbwcDotProductUYNormY,
   HeavyQuarkResidualNorm,
   xpyHeavyQuarkResidualNorm,
@@ -142,7 +142,7 @@ const std::map<Kernel, std::string> kernel_map
      {Kernel::cabxpyzAxNorm, "cabxpyzAxNorm"},
      {Kernel::cDotProduct, "cDotProduct"},
      {Kernel::caxpyDotzy, "caxpyDotzy"},
-     {Kernel::cDotProductNormA, "cDotProductNormA"},
+     {Kernel::cDotProductNormAB, "cDotProductNormAB"},
      {Kernel::caxpbypzYmbwcDotProductUYNormY, "caxpbypzYmbwcDotProductUYNormY"},
      {Kernel::HeavyQuarkResidualNorm, "HeavyQuarkResidualNorm"},
      {Kernel::xpyHeavyQuarkResidualNorm, "xpyHeavyQuarkResidualNorm"},
@@ -475,8 +475,8 @@ double benchmark(Kernel kernel, const int niter)
       for (int i = 0; i < niter; ++i) blas::caxpyDotzy(a2, xD, yD, zD);
       break;
 
-    case Kernel::cDotProductNormA:
-      for (int i = 0; i < niter; ++i) blas::cDotProductNormA(xD, yD);
+    case Kernel::cDotProductNormAB:
+      for (int i = 0; i < niter; ++i) blas::cDotProductNormAB(xD, yD);
       break;
 
     case Kernel::caxpbypzYmbwcDotProductUYNormY:
@@ -794,13 +794,16 @@ double test(Kernel kernel)
     }
     break;
 
-  case Kernel::cDotProductNormA:
+  case Kernel::cDotProductNormAB:
     xD = xH;
     yD = yH;
     {
-      double3 d = blas::cDotProductNormA(xD, yD);
-      double3 h = blas::cDotProductNormA(xH, yH);
-      error = abs(Complex(d.x - h.x, d.y - h.y)) / abs(Complex(h.x, h.y)) + fabs(d.z - h.z) / fabs(h.z);
+      auto d = blas::cDotProductNormAB(xD, yD);
+      auto dot = blas::cDotProduct(xH, yH);
+      auto x2 = blas::norm2(xH);
+      auto y2 = blas::norm2(yH);
+      error = abs(Complex(d.x - dot.real(), d.y - dot.imag())) / abs(dot) +
+        fabs(d.z - x2) / fabs(x2) + fabs(d.w - y2) / fabs(y2);
     }
     break;
 

@@ -79,14 +79,26 @@ namespace quda {
     inline double xmyNorm(ColorSpinorField &x, ColorSpinorField &y) { return axpbyzNorm(1.0, x, -1.0, y, y); }
 
     Complex cDotProduct(ColorSpinorField &, ColorSpinorField &);
-    double3 cDotProductNormA(ColorSpinorField &a, ColorSpinorField &b);
 
     /**
-       @brief Return (a,b) and ||b||^2 - implemented using cDotProductNormA
+       @brief Return (a,b), ||a||^2 and ||b||^2
+    */
+    double4 cDotProductNormAB(ColorSpinorField &a, ColorSpinorField &b);
+
+    /**
+       @brief Return (a,b) and ||a||^2 - implemented using cDotProductNormAB
+     */
+    inline double3 cDotProductNormA(ColorSpinorField &a, ColorSpinorField &b) {
+      auto a4 = cDotProductNormAB(a, b);
+      return make_double3(a4.x, a4.y, a4.z);
+    }
+
+    /**
+       @brief Return (a,b) and ||b||^2 - implemented using cDotProductNormAB
      */
     inline double3 cDotProductNormB(ColorSpinorField &a, ColorSpinorField &b) {
-      double3 a3 = cDotProductNormA(b, a);
-      return make_double3(a3.x, -a3.y, a3.z);
+      auto a4 = cDotProductNormAB(a, b);
+      return make_double3(a4.x, a4.y, a4.w);
     }
 
     double3 caxpbypzYmbwcDotProductUYNormY(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y,

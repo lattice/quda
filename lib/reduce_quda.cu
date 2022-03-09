@@ -209,9 +209,9 @@ namespace quda {
       return Complex(cdot.x, cdot.y);
     }
 
-    double3 cDotProductNormA(ColorSpinorField &x, ColorSpinorField &y)
+    double4 cDotProductNormAB(ColorSpinorField &x, ColorSpinorField &y)
     {
-      return instantiateReduce<CdotNormA, false>(0.0, 0.0, 0.0, x, y, x, x, x);
+      return instantiateReduce<CdotNormAB, false>(0.0, 0.0, 0.0, x, y, x, x, x);
     }
 
     double3 caxpbypzYmbwcDotProductUYNormY(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y,
