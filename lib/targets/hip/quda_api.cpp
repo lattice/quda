@@ -126,8 +126,7 @@ namespace quda
   {
     // no driver API variant here since we have C++ functions
     void *args[] = {const_cast<void *>(arg)};
-    PROFILE(hipError_t error
-            = hipLaunchKernel(func, tp.grid, tp.block, args, tp.shared_bytes, get_stream(stream)),
+    PROFILE(hipError_t error = hipLaunchKernel(func, tp.grid, tp.block, args, tp.shared_bytes, get_stream(stream)),
             QUDA_PROFILE_LAUNCH_KERNEL);
     set_runtime_error(error, __func__, __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
     return error == hipSuccess ? QUDA_SUCCESS : QUDA_ERROR;
@@ -238,8 +237,7 @@ namespace quda
           set_runtime_error(error, "hipMemcpy", func, file, line, active_tuning);
         }
       } else {
-        hipError_t error
-          = async ? hipMemsetAsync(dst, value, count, get_stream(stream)) : hipMemset(dst, value, count);
+        hipError_t error = async ? hipMemsetAsync(dst, value, count, get_stream(stream)) : hipMemset(dst, value, count);
         set_runtime_error(error, " hipMemset", func, file, line, active_tuning);
       }
     }
@@ -383,8 +381,7 @@ namespace quda
       hiperr = hipEventQuery(hip_event);
     } while (hiperr != hipSuccess);
 
-    PROFILE(hipError_t error = hipStreamWaitEvent(get_stream(stream), hip_event, flags),
-            QUDA_PROFILE_STREAM_WAIT_EVENT);
+    PROFILE(hipError_t error = hipStreamWaitEvent(get_stream(stream), hip_event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
     set_runtime_error(error, __func__, func, file, line);
   }
 
