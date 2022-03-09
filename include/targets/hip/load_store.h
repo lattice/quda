@@ -40,37 +40,10 @@ namespace quda
       reinterpret_cast<T *>(ptr)[idx] = value;
     }
 
-#if 0
-    __device__ inline void operator()(void *ptr, int idx, const double2 &value)
-    {
-      store_streaming_double2(reinterpret_cast<double2 *>(ptr) + idx, value.x, value.y);
-    }
-
-    __device__ inline void operator()(void *ptr, int idx, const float4 &value)
-    {
-      store_streaming_float4(reinterpret_cast<float4 *>(ptr) + idx, value.x, value.y, value.z, value.w);
-    }
-
-    __device__ inline void operator()(void *ptr, int idx, const float2 &value)
-    {
-      store_streaming_float2(reinterpret_cast<float2 *>(ptr) + idx, value.x, value.y);
-    }
-
-    __device__ inline void operator()(void *ptr, int idx, const short4 &value)
-    {
-      store_streaming_short4(reinterpret_cast<short4 *>(ptr) + idx, value.x, value.y, value.z, value.w);
-    }
-#endif
     __device__ inline void operator()(void *ptr, int idx, const short8 &value)
     {
       this->operator()(ptr, idx, *reinterpret_cast<const float4 *>(&value));
     }
-#if 0
-    __device__ inline void operator()(void *ptr, int idx, const short2 &value)
-    {
-      store_streaming_short2(reinterpret_cast<short2 *>(ptr) + idx, value.x, value.y);
-    }
-#endif
 
     __device__ inline void operator()(void *ptr, int idx, const char8 &value)
     {
