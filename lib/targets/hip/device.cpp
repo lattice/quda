@@ -160,5 +160,17 @@ namespace quda
     } // namespace profile
 
   } // namespace device
+  
+  namespace target
+  {
+
+    namespace hip
+    {
+
+      hipStream_t get_stream(const qudaStream_t &stream) { return streams[stream.idx]; }
+
+    } // namespace cuda
+
+  } // namespace target
 
 } // namespace quda
