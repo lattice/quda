@@ -84,8 +84,6 @@ namespace quda
       }
     }
 
-    hipStream_t get_cuda_stream(const qudaStream_t &stream) { return streams[stream.idx]; }
-
     qudaStream_t get_stream(unsigned int i)
     {
       if (i > Nstream) errorQuda("Invalid stream index %u", i);
@@ -163,11 +161,4 @@ namespace quda
 
   } // namespace device
 
-  namespace target
-  {
-    namespace hip
-    {
-      hipStream_t get_cuda_stream(const qudaStream_t &stream) { return streams[stream.idx]; }
-    } // namespace hip
-  }   // namespace target
 } // namespace quda
