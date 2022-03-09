@@ -59,8 +59,6 @@ namespace quda {
 
   void MR::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
-    pushOutputPrefix("MR: ");
-
     if (param.maxiter == 0 || param.Nsteps == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
       return;
@@ -86,14 +84,16 @@ namespace quda {
     blas::copy(r_sloppy, r);
 
     // if invalid residual then convergence is set by iteration count only
-    double stop = param.residual_type == QUDA_INVALID_RESIDUAL ? 0.0 : b2*param.tol*param.tol;
+    double stop = param.residual_type == QUDA_INVALID_RESIDUAL ? 0.0 : b2 * param.tol * param.tol;
+
+    int iter = 0;
     int step = 0;
-
-    logQuda(QUDA_VERBOSE, "Initial residual = %e\n", sqrt(r2));
-
     bool converged = false;
+
+    PrintStats("MR", iter, r2, b2, 0.0);
     while (!converged) {
 
+      int k = 0;
       double scale = 1.0;
       if ((node_parity+step)%2 == 0 && param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ) {
 	// for multiplicative Schwarz we alternate updates depending on node parity
@@ -111,42 +111,36 @@ namespace quda {
 	  r2 = 1.0; // by definition by this is now true
 	}
 
-	int k = 0;
-	logQuda(QUDA_VERBOSE, "%d cycle, %d iterations, r2 = %e\n", step, k, r2);
-
-	double3 Ar3;
-	while (k < param.maxiter && r2 > 0.0) {
+	while (k < param.maxiter && r2 > param.delta * param.delta) {
     
 	  matSloppy(Ar, r_sloppy, tmp_sloppy);
 
 	  if (param.global_reduction) {
-	    Ar3 = blas::cDotProductNormA(Ar, r_sloppy);
-	    Complex alpha = Complex(Ar3.x, Ar3.y) / Ar3.z;
+	    auto Ar4 = blas::cDotProductNormAB(Ar, r_sloppy);
+	    Complex alpha = Complex(Ar4.x, Ar4.y) / Ar4.z;
+            r2 = Ar4.w;
+            PrintStats("MR (inner)", iter, r2, b2, 0.0);
 
 	    // x += omega*alpha*r, r -= omega*alpha*Ar, r2 = blas::norm2(r)
-	    //r2 = blas::caxpyXmazNormX(omega*alpha, r, x, Ar);
 	    blas::caxpyXmaz(param.omega*alpha, r_sloppy, x_sloppy, Ar);
-
-            logQuda(QUDA_VERBOSE, "%d cycle, %d iterations, <r|A|r> = (%e, %e)\n", step, k+1, Ar3.x, Ar3.y);
 	  } else {
 	    // doing local reductions so can make it asynchronous
 	    commAsyncReductionSet(true);
-	    Ar3 = blas::cDotProductNormA(Ar, r_sloppy);
+	    blas::cDotProductNormA(Ar, r_sloppy);
 
 	    // omega*alpha is done in the kernel
 	    blas::caxpyXmazMR(param.omega, r_sloppy, x_sloppy, Ar);
 	    commAsyncReductionSet(false);
 	  }
-	  k++;
 
+	  k++;
+          iter++;
 	}
 
-	// Scale and sum to accumulator
-	blas::axpy(scale, x_sloppy, x);
+	blas::axpy(scale, x_sloppy, x);	// Scale and sum to accumulator
 
         commGlobalReductionPop(); // renable global reductions for outer solver
       }
-      step++;
 
       // FIXME - add over/under relaxation in outer loop
       bool compute_true_res = param.compute_true_res || param.Nsteps > 1;
@@ -156,16 +150,17 @@ namespace quda {
 	param.true_res = sqrt(r2 / b2);
 	converged = (step < param.Nsteps && r2 > stop) ? false : true;
         if (!converged) blas::copy(r_sloppy, r);
+        PrintStats("MR (restart)", iter, r2, b2, 0.0);
       } else {
 	blas::ax(scale, r_sloppy);
 	r2 = blas::norm2(r_sloppy);
-	converged = (step < param.Nsteps) ? false : true;
+	converged = (step < param.Nsteps && r2 > stop) ? false : true;
         if (!converged) blas::copy(r, r_sloppy);
       }
-      logQuda(QUDA_SUMMARIZE, "%d cycle, Converged after %d iterations, relative residual: %s = %e\n",
-              step, param.maxiter, compute_true_res ? "true" : "iterated", sqrt(r2));
-
+      step++;
     }
+
+    PrintSummary("MR", iter, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
 
     if (!param.is_preconditioner) {
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -176,13 +171,11 @@ namespace quda {
       double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
 
       param.gflops += gflops;
-      param.iter += param.Nsteps * param.maxiter;
+      param.iter += iter;
       blas::flops = 0;
 
       profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
-
-    popOutputPrefix();
   }
 
 } // namespace quda
