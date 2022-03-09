@@ -118,6 +118,7 @@ namespace quda
   protected:
     mutable unsigned int vector_length_y;
     mutable unsigned int step_y;
+    mutable unsigned int block_y;
     bool tune_block_x;
 
     template <template <typename> class Functor, typename Arg>
@@ -157,13 +158,13 @@ namespace quda
   public:
     TunableKernel2D_base(const LatticeField &field, unsigned int vector_length_y,
                          QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableKernel1D_base<grid_stride>(field, location), vector_length_y(vector_length_y), step_y(1), tune_block_x(true)
+      TunableKernel1D_base<grid_stride>(field, location), vector_length_y(vector_length_y), step_y(1), block_y(vector_length_y), tune_block_x(true)
     {
     }
 
     TunableKernel2D_base(size_t n_items, unsigned int vector_length_y,
                          QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableKernel1D_base<grid_stride>(n_items, location), vector_length_y(vector_length_y), step_y(1), tune_block_x(true)
+      TunableKernel1D_base<grid_stride>(n_items, location), vector_length_y(vector_length_y), step_y(1), block_y(vector_length_y), tune_block_x(true)
     {
     }
 
@@ -185,7 +186,7 @@ namespace quda
                                      this->sharedBytesPerBlock(next));
 
         // we can advance spin/block-color since this is valid
-        if (param.block.y < vector_length_y && param.block.y < device::max_threads_per_block_dim(1)
+        if (param.block.y < block_y && param.block.y < device::max_threads_per_block_dim(1)
             && param.block.x * (param.block.y + step_y) * param.block.z <= device::max_threads_per_block()
             && shared_bytes <= this->maxSharedBytesPerBlock()) {
           param.block.y += step_y;
@@ -222,6 +223,7 @@ namespace quda
 
     void resizeVector(int y) const { vector_length_y = y; }
     void resizeStep(int y) const { step_y = y; }
+    void resizeBlock(int y) const { block_y = y; }
   };
 
   class TunableKernel2D : public TunableKernel2D_base<false>
@@ -281,6 +283,7 @@ namespace quda
     using TunableKernel2D_base<grid_stride>::vector_length_y;
     mutable unsigned vector_length_z;
     mutable unsigned step_z;
+    mutable unsigned block_z;
     bool tune_block_y;
 
     template <template <typename> class Functor, typename Arg>
@@ -325,6 +328,7 @@ namespace quda
       TunableKernel2D_base<grid_stride>(field, vector_length_y, location),
       vector_length_z(vector_length_z),
       step_z(1),
+      block_z(vector_length_z),
       tune_block_y(true)
     {
     }
@@ -334,6 +338,7 @@ namespace quda
       TunableKernel2D_base<grid_stride>(n_items, vector_length_y, location),
       vector_length_z(vector_length_z),
       step_z(1),
+      block_z(vector_length_z),
       tune_block_y(true)
     {
     }
@@ -359,7 +364,7 @@ namespace quda
                                      this->sharedBytesPerBlock(next));
 
         // we can advance spin/block-color since this is valid
-        if (param.block.z < vector_length_z && param.block.z < device::max_threads_per_block_dim(2)
+        if (param.block.z < block_z && param.block.z < device::max_threads_per_block_dim(2)
             && param.block.x * param.block.y * (param.block.z + step_z) <= device::max_threads_per_block()
             && shared_bytes <= this->maxSharedBytesPerBlock()) {
           param.block.z += step_z;
@@ -398,10 +403,17 @@ namespace quda
       vector_length_z = z;
       TunableKernel2D_base<grid_stride>::resizeVector(y);
     }
+
     void resizeStep(int y, int z) const
     {
       step_z = z;
       TunableKernel2D_base<grid_stride>::resizeStep(y);
+    }
+
+    virtual void resizeBlock(int y, int z) const
+    {
+      block_z = z;
+      TunableKernel2D_base<grid_stride>::resizeBlock(y);
     }
   };
 

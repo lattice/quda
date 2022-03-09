@@ -110,6 +110,8 @@ namespace quda
 
     coeff_5<real> coeff; // constant buffer used for Mobius coefficients for CPU kernel
 
+    static constexpr bool use_mma = false;
+
     void compute_coeff_mobius_pre(const Complex *b_5, const Complex *c_5)
     {
       // out = (b + c * D5) * in

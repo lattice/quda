@@ -22,6 +22,7 @@ namespace quda
     const Complex *c_5;
     double a; // for xpay
     int dagger;
+    int xpay;
     int volume_4d_cb;
 
     using real = typename mapper<store_t>::type; // the compute type for the in kernel computation
@@ -92,7 +93,7 @@ namespace quda
     public:
     Dslash5Mma(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
         double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger) :
-      TunableKernel3D(in, x.X(4), 1),
+      TunableKernel3D(in, x.X(4), in.SiteSubset()),
       out(out),
       in(in),
       x(x),
@@ -102,48 +103,47 @@ namespace quda
       c_5(c_5),
       a(a),
       dagger(dagger),
+      xpay(a == 0.0 ? false : true),
       volume_4d_cb(in.VolumeCB() / in.X(4))
     {
       if (Ls != out.X(4) || Ls != in.X(4)) {
         errorQuda("Ls (=%d) mismatch: out.X(4) = %d, in.X(4) = %d", Ls, out.X(4), in.X(4));
       }
-      resizeStep(in.X(4), 1); // Ls must be contained in the block
+      resizeBlock(in.X(4), 1); // Ls must be contained in the block
+      resizeStep(in.X(4), 1);
       if (dagger) strcat(aux, ",Dagger");
+      if (xpay) strcat(aux, ",xpay");
       apply(device::get_default_stream());
     }
 
-    template <int block_dim_x, bool dagger, int min_blocks, bool reload> using Arg =
-      Dslash5MmaArg<store_t, nColor, Ls, block_dim_x, dagger, min_blocks, reload>;
+    template <int block_dim_x, bool dagger, bool xpay> using Arg =
+      Dslash5MmaArg<store_t, nColor, Ls, block_dim_x, dagger, xpay>;
 
-    template <int block_dim_x, int min_blocks, bool reload, bool dagger>
+    template <int block_dim_x, bool dagger, bool xpay>
       void apply(const TuneParam &tp, const qudaStream_t &stream)
       {
-        launch<Dslash5MmaKernel>(tp, stream, Arg<block_dim_x, dagger, min_blocks, reload>
-        (out, in, x, m_f, m_5, b_5, c_5, a));
+        Arg<block_dim_x, dagger, xpay> arg(out, in, x, m_f, m_5, b_5, c_5, a);
+        arg.round_up_threads_x(tp.block.x);
+        launch<Dslash5MmaKernel>(tp, stream, arg);
       }
 
-    template <int block_dim_x, bool reload, bool dagger>
+    template <int block_dim_x, bool dagger>
       void apply(const TuneParam &tp, const qudaStream_t &stream)
       {
-#if 0
-        switch (tp.aux.y) {
-          case 1: apply<block_dim_x, 1, reload, dagger>(tp, stream); break;
-          case 2: apply<block_dim_x, 2, reload, dagger>(tp, stream); break;
-          case 3: apply<block_dim_x, 3, reload, dagger>(tp, stream); break;
-          default: errorQuda("NOT valid tp.aux.y(=%d)\n", tp.aux.y);
+        if (xpay) {
+          apply<block_dim_x, dagger, true>(tp, stream);
+        } else {
+          apply<block_dim_x, dagger, false>(tp, stream);
         }
-#else
-        apply<block_dim_x, 1, reload, dagger>(tp, stream);
-#endif
       }
 
-    template <int block_dim_x, bool reload>
+    template <int block_dim_x>
       void apply(const TuneParam &tp, const qudaStream_t &stream)
       {
         if (dagger) {
-          apply<block_dim_x, reload, true>(tp, stream);
+          apply<block_dim_x, true>(tp, stream);
         } else {
-          apply<block_dim_x, reload, false>(tp, stream);
+          apply<block_dim_x, false>(tp, stream);
         }
       }
 
@@ -152,8 +152,8 @@ namespace quda
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       tp.set_max_shared_bytes = true;
       switch (tp.block.x) {
-        case 16: tp.aux.x ? apply<16, true>(tp, stream) : apply<16, false>(tp, stream); break;
-        case 32: tp.aux.x ? apply<32, true>(tp, stream) : apply<32, false>(tp, stream); break;
+        case 16: apply<16>(tp, stream); break;
+        case 32: apply<32>(tp, stream); break;
         default: errorQuda("Invalid tp.block.x(=%d)\n", tp.block.x);
       }
     }
@@ -162,9 +162,6 @@ namespace quda
     {
       TunableKernel3D::initTuneParam(param);
       param.aux.x = 0;
-#if 0
-      param.aux.y = 1;
-#endif
     }
 
     void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
