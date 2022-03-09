@@ -139,7 +139,11 @@ namespace quda
       errorQuda("Fused Mobius/DWF-4D kernels do not currently work with NVSHMEM.");
 #else
       constexpr int nDim = 4;
-      using Arg = DomainWall4DFusedM5Arg<Float, nColor, nDim, recon, dslash5_type_impl>;
+      using D4Arg = DomainWall4DArg<Float, nColor, nDim, recon>;
+      using D5Arg = Dslash5Arg<Float, nColor, false, false, dslash5_type_impl>;
+      // ^^^ Note that for Dslash5Arg we have xpay == dagger == false. This is because the xpay and dagger are determined
+      // by fused kernel, not the dslash5, so the `false, false` here are simply dummy instantiations.
+      using Arg = DomainWall4DFusedM5Arg<D4Arg, D5Arg>;
       Arg arg(out, in, U, a, m_5, b_5, c_5, a != 0.0, x, y, parity, dagger, comm_override, m_f);
       DomainWall4DFusedM5<Arg> dwf(arg, out, in);
 

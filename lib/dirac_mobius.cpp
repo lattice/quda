@@ -303,6 +303,11 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
+#if (CUDA_VERSION >= 11000 && __COMPUTE_CAPABILITY__ >= 800)
+    if (use_mma) {
+      ApplyDomainWall4DM5invMma(out, in, *gauge, a, m5, b_5, c_5, x, out, parity, dagger, commDim, mass, profile);
+    } else
+#endif
     ApplyDomainWall4DM5inv(out, in, *gauge, a, m5, b_5, c_5, x, out, parity, dagger, commDim, mass, profile);
 
     // D4

@@ -11,7 +11,7 @@ namespace quda
 
 #if (CUDA_VERSION >= 11000 && __COMPUTE_CAPABILITY__ >= 800)
 
-  template <class store_t, int nColor, int Ls> class Dslash5Mma : public TunableGridStrideKernel2D
+  template <class store_t, int nColor, int Ls> class Dslash5Mma : public TunableKernel3D
   {
     ColorSpinorField &out;
     const ColorSpinorField &in;
@@ -21,7 +21,6 @@ namespace quda
     const Complex *b_5;
     const Complex *c_5;
     double a; // for xpay
-    int parity;
     int dagger;
     int volume_4d_cb;
 
@@ -42,6 +41,7 @@ namespace quda
     }
 
     bool tuneAuxDim() const { return true; }
+    bool tuneGridDim() const { return true; }
 
     int blockStep() const { return 16; }
     int blockMin() const { return 16; }
@@ -71,16 +71,20 @@ namespace quda
         param.aux.x++;
         aux_advanced = true;
       } else {
+#if 0
         if (param.aux.y < 3) { // second see if aux.y
           param.aux.y++;
           aux_advanced = true;
           param.aux.x = 1;
         }
+#endif
       }
       // shared bytes depends on aux, so update if changed
       if (aux_advanced) param.shared_bytes = sharedBytesPerBlock(param);
       return aux_advanced;
     }
+
+    unsigned int minThreads() const { return 1; } // We are actually doing grid dim tuning
 
     // overloaded to return max dynamic shared memory if doing shared-memory inverse
     unsigned int maxSharedBytesPerBlock() const { return maxDynamicSharedBytesPerBlock(); }
@@ -88,7 +92,7 @@ namespace quda
     public:
     Dslash5Mma(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
         double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger) :
-      TunableGridStrideKernel2D(in, x.X(4)),
+      TunableKernel3D(in, x.X(4), 1),
       out(out),
       in(in),
       x(x),
@@ -97,14 +101,13 @@ namespace quda
       b_5(b_5),
       c_5(c_5),
       a(a),
-      parity(parity),
       dagger(dagger),
       volume_4d_cb(in.VolumeCB() / in.X(4))
     {
       if (Ls != out.X(4) || Ls != in.X(4)) {
         errorQuda("Ls (=%d) mismatch: out.X(4) = %d, in.X(4) = %d", Ls, out.X(4), in.X(4));
       }
-      resizeStep(in.X(4)); // Ls must be contained in the block
+      resizeStep(in.X(4), 1); // Ls must be contained in the block
       if (dagger) strcat(aux, ",Dagger");
       apply(device::get_default_stream());
     }
@@ -115,19 +118,23 @@ namespace quda
     template <int block_dim_x, int min_blocks, bool reload, bool dagger>
       void apply(const TuneParam &tp, const qudaStream_t &stream)
       {
-        launch_cuda<Dslash5MmaKernel>(tp, stream, Arg<block_dim_x, dagger, min_blocks, reload>
-        (out, in, x, m_f, m_5, b_5, c_5, a, parity));
+        launch<Dslash5MmaKernel>(tp, stream, Arg<block_dim_x, dagger, min_blocks, reload>
+        (out, in, x, m_f, m_5, b_5, c_5, a));
       }
 
     template <int block_dim_x, bool reload, bool dagger>
       void apply(const TuneParam &tp, const qudaStream_t &stream)
       {
+#if 0
         switch (tp.aux.y) {
           case 1: apply<block_dim_x, 1, reload, dagger>(tp, stream); break;
           case 2: apply<block_dim_x, 2, reload, dagger>(tp, stream); break;
           case 3: apply<block_dim_x, 3, reload, dagger>(tp, stream); break;
           default: errorQuda("NOT valid tp.aux.y(=%d)\n", tp.aux.y);
         }
+#else
+        apply<block_dim_x, 1, reload, dagger>(tp, stream);
+#endif
       }
 
     template <int block_dim_x, bool reload>
@@ -153,9 +160,11 @@ namespace quda
 
     void initTuneParam(TuneParam &param) const
     {
-      TunableGridStrideKernel2D::initTuneParam(param);
+      TunableKernel3D::initTuneParam(param);
       param.aux.x = 0;
+#if 0
       param.aux.y = 1;
+#endif
     }
 
     void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }

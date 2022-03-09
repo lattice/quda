@@ -4,6 +4,7 @@
 #include <kernel.h>
 
 #include <mma_tensor_op/smma.cuh>
+#include <mdw_dslash5_tensor_core.cuh>
 
 namespace quda
 {
@@ -30,6 +31,8 @@ namespace quda
     static constexpr int m = 4 * Ls;
     static constexpr int n = 6 * block_dim_x;
     static constexpr int k = m;
+
+    static constexpr Dslash5Type type = Dslash5Type::M5_INV_MOBIUS;
 
     using Mma = typename mma_mapper<store_t>::type;
     static constexpr int smem_ld_a = m + Mma::t_pad;
@@ -65,12 +68,13 @@ namespace quda
     real inv;
 
     Dslash5MmaArg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f_,
-                  double m_5_, const Complex *b_5, const Complex *c_5, double a, int parity) :
+                  double m_5_, const Complex *b_5, const Complex *c_5, double a) :
+      kernel_param({(static_cast<unsigned int>(volume_cb / Ls + block_dim_x - 1) / block_dim_x * block_dim_x), static_cast<unsigned int>(Ls), 1}),
       out(out),
       in(in),
       x(x),
       nParity(in.SiteSubset()),
-      parity(parity),
+      parity(0),
       volume_cb(in.VolumeCB()),
       volume_4d_cb(volume_cb / Ls),
       m_f(m_f_),
@@ -92,12 +96,12 @@ namespace quda
     T data[size];
   };
 
-  template <class Arg> __device__ void smem_construct_m5inv(Arg &arg)
+  template <bool dagger, class Arg> __device__ void smem_construct_m5inv(Arg &arg)
   {
     SharedMemoryCache<typename Arg::real> shared_memory_data;
     auto *smem_a = shared_memory_data.data();
 
-    smem_construct_m5inv<Arg::smem_ld_a, Arg::dagger>(arg, smem_a);
+    smem_construct_m5inv<Arg::smem_ld_a, dagger>(arg, smem_a);
   }
 
   template <class Arg> __device__ auto construct_m5inv_op(Arg &arg)
@@ -149,11 +153,11 @@ namespace quda
     constexpr Dslash5MmaKernel(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __forceinline__ void operator()()
+    __device__ __forceinline__ void operator()(unsigned int, unsigned int, unsigned int)
     {
       const int parity = arg.nParity == 2 ? arg.parity : 0;
 
-      smem_construct_m5inv(arg);
+      smem_construct_m5inv<Arg::dagger>(arg);
       __syncthreads();
 
       bool idle = false;
