@@ -6,6 +6,8 @@
 #include <random_quda.h>
 #include <color_spinor_field.h>
 
+using namespace quda;
+
 #define gauge_site_size 18      // real numbers per link
 #define spinor_site_size 24     // real numbers per wilson spinor
 #define stag_spinor_site_size 6 // real numbers per staggered 'spinor'
@@ -68,7 +70,7 @@ template <typename Float> void applyStaggeredScaling(Float **res, QudaGaugeParam
 
 // Spinor utils
 //------------------------------------------------------
-void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *csParam, const QudaInvertParam *inv_param,
+void constructStaggeredTestSpinorParam(ColorSpinorParam *csParam, const QudaInvertParam *inv_param,
                                        const QudaGaugeParam *gauge_param);
 //------------------------------------------------------
 
@@ -90,7 +92,7 @@ void setQudaDefaultMgTestParams();
 void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param);
 void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv);
 void saveHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, QudaLinkType link_type);
-void saveDeviceGaugeField(quda::cudaGaugeField *gaugeEx, quda::cudaGaugeField *gauge);
+void saveDeviceGaugeField(cudaGaugeField *gaugeEx, cudaGaugeField *gauge);
 void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param);
 void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision);
 template <typename Float> void constructCloverField(Float *res, double norm, double diag);

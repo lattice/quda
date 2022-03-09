@@ -12,6 +12,8 @@
 #include <math.h>
 #include <string.h>
 
+using namespace quda;
+
 // Local Enum type for IO
 typedef enum CorrelatorFlavors_s {
   CORRELATOR_QQ,
