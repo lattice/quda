@@ -215,7 +215,7 @@ int main(int argc, char **argv)
 {
   // initalize google test, includes command line options
   ::testing::InitGoogleTest(&argc, argv);
-  int test_rc;
+  int test_rc = 0;
 
   //default to 18 reconstruct, 8^3 x 8
   link_recon = QUDA_RECONSTRUCT_NO;
@@ -256,5 +256,3 @@ int main(int argc, char **argv)
 
   return test_rc;
 }
-
-
