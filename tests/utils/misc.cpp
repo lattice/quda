@@ -45,7 +45,7 @@ const char *get_unitarization_str(bool svd_only)
   if (svd_only) {
     ret = "SVD";
   } else {
-    ret = "Cayley-Hamilton/SVD";
+    ret = "CayleyHamilton_SVD";
   }
 
   return ret;
@@ -122,15 +122,15 @@ const char *get_dslash_str(QudaDslashType type)
   switch (type) {
   case QUDA_WILSON_DSLASH: ret = "wilson"; break;
   case QUDA_CLOVER_WILSON_DSLASH: ret = "clover"; break;
-  case QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH: ret = "clover-hasenbusch-twist"; break;
-  case QUDA_TWISTED_MASS_DSLASH: ret = "twisted-mass"; break;
-  case QUDA_TWISTED_CLOVER_DSLASH: ret = "twisted-clover"; break;
+  case QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH: ret = "clover_hasenbusch_twist"; break;
+  case QUDA_TWISTED_MASS_DSLASH: ret = "twisted_mass"; break;
+  case QUDA_TWISTED_CLOVER_DSLASH: ret = "twisted_clover"; break;
   case QUDA_STAGGERED_DSLASH: ret = "staggered"; break;
   case QUDA_ASQTAD_DSLASH: ret = "asqtad"; break;
-  case QUDA_DOMAIN_WALL_DSLASH: ret = "domain-wall"; break;
+  case QUDA_DOMAIN_WALL_DSLASH: ret = "domain_wall"; break;
   case QUDA_DOMAIN_WALL_4D_DSLASH: ret = "domain_wall_4d"; break;
   case QUDA_MOBIUS_DWF_DSLASH: ret = "mobius"; break;
-  case QUDA_MOBIUS_DWF_EOFA_DSLASH: ret = "mobius-eofa"; break;
+  case QUDA_MOBIUS_DWF_EOFA_DSLASH: ret = "mobius_eofa"; break;
   case QUDA_LAPLACE_DSLASH: ret = "laplace"; break;
   default: ret = "unknown"; break;
   }
@@ -144,7 +144,7 @@ const char *get_contract_str(QudaContractType type)
 
   switch (type) {
   case QUDA_CONTRACT_TYPE_OPEN: ret = "open"; break;
-  case QUDA_CONTRACT_TYPE_DR: ret = "Degrand-Rossi"; break;
+  case QUDA_CONTRACT_TYPE_DR: ret = "Degrand_Rossi"; break;
   default: ret = "unknown"; break;
   }
 
@@ -190,7 +190,7 @@ const char *get_mass_normalization_str(QudaMassNormalization type)
   switch (type) {
   case QUDA_KAPPA_NORMALIZATION: s = "kappa"; break;
   case QUDA_MASS_NORMALIZATION: s = "mass"; break;
-  case QUDA_ASYMMETRIC_MASS_NORMALIZATION: s = "asym-mass"; break;
+  case QUDA_ASYMMETRIC_MASS_NORMALIZATION: s = "asym_mass"; break;
   default: fprintf(stderr, "Error: invalid mass normalization\n"); exit(1);
   }
 
@@ -202,10 +202,10 @@ const char *get_matpc_str(QudaMatPCType type)
   const char *ret;
 
   switch (type) {
-  case QUDA_MATPC_EVEN_EVEN: ret = "even-even"; break;
-  case QUDA_MATPC_ODD_ODD: ret = "odd-odd"; break;
-  case QUDA_MATPC_EVEN_EVEN_ASYMMETRIC: ret = "even-even-asym"; break;
-  case QUDA_MATPC_ODD_ODD_ASYMMETRIC: ret = "odd-odd-asym"; break;
+  case QUDA_MATPC_EVEN_EVEN: ret = "even_even"; break;
+  case QUDA_MATPC_ODD_ODD: ret = "odd_odd"; break;
+  case QUDA_MATPC_EVEN_EVEN_ASYMMETRIC: ret = "even_even_asym"; break;
+  case QUDA_MATPC_ODD_ODD_ASYMMETRIC: ret = "odd_odd_asym"; break;
   default: fprintf(stderr, "Error: invalid matpc type %d\n", type); exit(1);
   }
 
@@ -218,10 +218,10 @@ const char *get_solution_str(QudaSolutionType type)
 
   switch (type) {
   case QUDA_MAT_SOLUTION: ret = "mat"; break;
-  case QUDA_MATDAG_MAT_SOLUTION: ret = "mat-dag-mat"; break;
-  case QUDA_MATPC_SOLUTION: ret = "mat-pc"; break;
-  case QUDA_MATPCDAG_MATPC_SOLUTION: ret = "mat-pc-dag-mat-pc"; break;
-  case QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION: ret = "mat-pc-dag-mat-pc-shift"; break;
+  case QUDA_MATDAG_MAT_SOLUTION: ret = "mat_dag_mat"; break;
+  case QUDA_MATPC_SOLUTION: ret = "mat_pc"; break;
+  case QUDA_MATPCDAG_MATPC_SOLUTION: ret = "mat_pc_dag_mat_pc"; break;
+  case QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION: ret = "mat_pc_dag_mat_pc_shift"; break;
   default: fprintf(stderr, "Error: invalid solution type %d\n", type); exit(1);
   }
 
@@ -234,11 +234,11 @@ const char *get_solve_str(QudaSolveType type)
 
   switch (type) {
   case QUDA_DIRECT_SOLVE: ret = "direct"; break;
-  case QUDA_DIRECT_PC_SOLVE: ret = "direct-pc"; break;
+  case QUDA_DIRECT_PC_SOLVE: ret = "direct_pc"; break;
   case QUDA_NORMOP_SOLVE: ret = "normop"; break;
-  case QUDA_NORMOP_PC_SOLVE: ret = "normop-pc"; break;
+  case QUDA_NORMOP_PC_SOLVE: ret = "normop_pc"; break;
   case QUDA_NORMERR_SOLVE: ret = "normerr"; break;
-  case QUDA_NORMERR_PC_SOLVE: ret = "normerr-pc"; break;
+  case QUDA_NORMERR_PC_SOLVE: ret = "normerr_pc"; break;
   default: fprintf(stderr, "Error: invalid solve type %d\n", type); exit(1);
   }
 
@@ -251,7 +251,7 @@ const char *get_flavor_str(QudaTwistFlavorType type)
 
   switch (type) {
   case QUDA_TWIST_SINGLET: ret = "singlet"; break;
-  case QUDA_TWIST_NONDEG_DOUBLET: ret = "nondeg-doublet"; break;
+  case QUDA_TWIST_NONDEG_DOUBLET: ret = "nondeg_doublet"; break;
   case QUDA_TWIST_NO: ret = "no"; break;
   default: ret = "unknown"; break;
   }
@@ -273,22 +273,22 @@ const char *get_solver_str(QudaInverterType type)
   case QUDA_MR_INVERTER: ret = "mr"; break;
   case QUDA_SD_INVERTER: ret = "sd"; break;
   case QUDA_EIGCG_INVERTER: ret = "eigcg"; break;
-  case QUDA_INC_EIGCG_INVERTER: ret = "inc-eigcg"; break;
+  case QUDA_INC_EIGCG_INVERTER: ret = "inc_eigcg"; break;
   case QUDA_GMRESDR_INVERTER: ret = "gmresdr"; break;
-  case QUDA_GMRESDR_PROJ_INVERTER: ret = "gmresdr-proj"; break;
-  case QUDA_GMRESDR_SH_INVERTER: ret = "gmresdr-sh"; break;
+  case QUDA_GMRESDR_PROJ_INVERTER: ret = "gmresdr_proj"; break;
+  case QUDA_GMRESDR_SH_INVERTER: ret = "gmresdr_sh"; break;
   case QUDA_FGMRESDR_INVERTER: ret = "fgmresdr"; break;
   case QUDA_MG_INVERTER: ret = "mg"; break;
-  case QUDA_BICGSTABL_INVERTER: ret = "bicgstab-l"; break;
+  case QUDA_BICGSTABL_INVERTER: ret = "bicgstab_l"; break;
   case QUDA_CGNE_INVERTER: ret = "cgne"; break;
   case QUDA_CGNR_INVERTER: ret = "cgnr"; break;
   case QUDA_CG3_INVERTER: ret = "cg3"; break;
   case QUDA_CG3NE_INVERTER: ret = "cg3ne"; break;
   case QUDA_CG3NR_INVERTER: ret = "cg3nr"; break;
-  case QUDA_CA_CG_INVERTER: ret = "ca-cg"; break;
-  case QUDA_CA_CGNE_INVERTER: ret = "ca-cgne"; break;
-  case QUDA_CA_CGNR_INVERTER: ret = "ca-cgnr"; break;
-  case QUDA_CA_GCR_INVERTER: ret = "ca-gcr"; break;
+  case QUDA_CA_CG_INVERTER: ret = "ca_cg"; break;
+  case QUDA_CA_CGNE_INVERTER: ret = "ca_cgne"; break;
+  case QUDA_CA_CGNR_INVERTER: ret = "ca_cgnr"; break;
+  case QUDA_CA_GCR_INVERTER: ret = "ca_gcr"; break;
   default:
     ret = "unknown";
     errorQuda("Error: invalid solver type %d\n", type);
