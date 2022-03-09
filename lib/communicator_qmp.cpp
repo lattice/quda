@@ -28,93 +28,94 @@
     }                                                                                                                  \
   } while (0)
 
-namespace quda {
-
-struct MsgHandle_s {
-  QMP_msgmem_t mem;
-  QMP_msghandle_t handle;
-};
-
-Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from_coords, void *map_data,
-                           bool user_set_comm_handle_, void *user_comm)
+namespace quda
 {
-  user_set_comm_handle = user_set_comm_handle_;
 
-  int initialized;
-  MPI_CHECK(MPI_Initialized(&initialized));
+  struct MsgHandle_s {
+    QMP_msgmem_t mem;
+    QMP_msghandle_t handle;
+  };
 
-  if (!initialized) { assert(false); }
+  Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from_coords, void *map_data,
+                             bool user_set_comm_handle_, void *user_comm)
+  {
+    user_set_comm_handle = user_set_comm_handle_;
 
-  if (user_set_comm_handle) {
-    // The logic here being: previouly all QMP calls are based on QMP_comm_get_default(), and user can
-    // feed in their own MPI_COMM_HANDLE. Now with the following this behavior should remain the same.
-    QMP_COMM_HANDLE = QMP_comm_get_default();
-    MPI_COMM_HANDLE = *((MPI_Comm *)user_comm);
-  } else {
-    QMP_COMM_HANDLE = QMP_comm_get_default();
+    int initialized;
+    MPI_CHECK(MPI_Initialized(&initialized));
+
+    if (!initialized) { assert(false); }
+
+    if (user_set_comm_handle) {
+      // The logic here being: previouly all QMP calls are based on QMP_comm_get_default(), and user can
+      // feed in their own MPI_COMM_HANDLE. Now with the following this behavior should remain the same.
+      QMP_COMM_HANDLE = QMP_comm_get_default();
+      MPI_COMM_HANDLE = *((MPI_Comm *)user_comm);
+    } else {
+      QMP_COMM_HANDLE = QMP_comm_get_default();
+      void *my_comm;
+      QMP_get_mpi_comm(QMP_COMM_HANDLE, &my_comm);
+      MPI_COMM_HANDLE = *((MPI_Comm *)my_comm);
+    }
+
+    is_qmp_handle_default = true; // the QMP handle is the default one.
+
+    comm_init(nDim, commDims, rank_from_coords, map_data);
+    globalReduce.push(true);
+  }
+
+  Communicator::Communicator(Communicator &other, const int *comm_split) : globalReduce(other.globalReduce)
+  {
+    user_set_comm_handle = false;
+
+    constexpr int nDim = 4;
+
+    CommKey comm_dims_split;
+    CommKey comm_key_split;
+    CommKey comm_color_split;
+
+    for (int d = 0; d < nDim; d++) {
+      assert(other.comm_dim(d) % comm_split[d] == 0);
+      comm_dims_split[d] = other.comm_dim(d) / comm_split[d];
+      comm_key_split[d] = other.comm_coord(d) % comm_dims_split[d];
+      comm_color_split[d] = other.comm_coord(d) / comm_dims_split[d];
+    }
+
+    int key = index(nDim, comm_dims_split.data(), comm_key_split.data());
+    int color = index(nDim, comm_split, comm_color_split.data());
+
+    QMP_comm_split(other.QMP_COMM_HANDLE, color, key, &QMP_COMM_HANDLE);
     void *my_comm;
     QMP_get_mpi_comm(QMP_COMM_HANDLE, &my_comm);
     MPI_COMM_HANDLE = *((MPI_Comm *)my_comm);
+
+    is_qmp_handle_default = false; // the QMP handle is not the default one.
+
+    int my_rank_ = QMP_get_node_number();
+
+    QudaCommsMap func = lex_rank_from_coords_dim_t;
+    comm_init(nDim, comm_dims_split.data(), func, comm_dims_split.data());
+
+    printf("Creating split communicator, base_rank = %5d, key = %5d, color = %5d, split_rank = %5d, gpuid = %d\n",
+           other.comm_rank(), key, color, my_rank_, comm_gpuid());
   }
 
-  is_qmp_handle_default = true; // the QMP handle is the default one.
-
-  comm_init(nDim, commDims, rank_from_coords, map_data);
-  globalReduce.push(true);
-}
-
-Communicator::Communicator(Communicator &other, const int *comm_split) : globalReduce(other.globalReduce)
-{
-  user_set_comm_handle = false;
-
-  constexpr int nDim = 4;
-
-  CommKey comm_dims_split;
-  CommKey comm_key_split;
-  CommKey comm_color_split;
-
-  for (int d = 0; d < nDim; d++) {
-    assert(other.comm_dim(d) % comm_split[d] == 0);
-    comm_dims_split[d] = other.comm_dim(d) / comm_split[d];
-    comm_key_split[d] = other.comm_coord(d) % comm_dims_split[d];
-    comm_color_split[d] = other.comm_coord(d) / comm_dims_split[d];
+  Communicator::~Communicator()
+  {
+    comm_finalize();
+    if (!(user_set_comm_handle || is_qmp_handle_default)) {
+      // - if it's a user set handle, or if it's the default QMP handle, we don't free it.
+      QMP_comm_free(QMP_COMM_HANDLE);
+    }
   }
 
-  int key = index(nDim, comm_dims_split.data(), comm_key_split.data());
-  int color = index(nDim, comm_split, comm_color_split.data());
-
-  QMP_comm_split(other.QMP_COMM_HANDLE, color, key, &QMP_COMM_HANDLE);
-  void *my_comm;
-  QMP_get_mpi_comm(QMP_COMM_HANDLE, &my_comm);
-  MPI_COMM_HANDLE = *((MPI_Comm *)my_comm);
-
-  is_qmp_handle_default = false; // the QMP handle is not the default one.
-
-  int my_rank_ = QMP_get_node_number();
-
-  QudaCommsMap func = lex_rank_from_coords_dim_t;
-  comm_init(nDim, comm_dims_split.data(), func, comm_dims_split.data());
-
-  printf("Creating split communicator, base_rank = %5d, key = %5d, color = %5d, split_rank = %5d, gpuid = %d\n",
-         other.comm_rank(), key, color, my_rank_, comm_gpuid());
-}
-
-Communicator::~Communicator()
-{
-  comm_finalize();
-  if (!(user_set_comm_handle || is_qmp_handle_default)) {
-    // - if it's a user set handle, or if it's the default QMP handle, we don't free it.
-    QMP_comm_free(QMP_COMM_HANDLE);
-  }
-}
-
-// There are more efficient ways to do the following,
-// but it doesn't really matter since this function should be
-// called just once.
-void Communicator::comm_gather_hostname(char *hostname_recv_buf)
-{
-  // determine which GPU this rank will use
-  char *hostname = comm_hostname();
+  // There are more efficient ways to do the following,
+  // but it doesn't really matter since this function should be
+  // called just once.
+  void Communicator::comm_gather_hostname(char *hostname_recv_buf)
+  {
+    // determine which GPU this rank will use
+    char *hostname = comm_hostname();
 
 #ifdef USE_MPI_GATHER
   MPI_CHECK(MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_HANDLE));
@@ -346,4 +347,4 @@ void Communicator::comm_abort_(int status) { QMP_abort(status); }
 
 int Communicator::comm_rank_global() { return QMP_get_node_number(); }
 
-}
+} // namespace quda

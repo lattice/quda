@@ -4,39 +4,40 @@
 #include <algorithm>
 #include <shmem_helper.cuh>
 
-namespace quda {
+namespace quda
+{
 
-#define CHECK_CUDA_ERROR(func)                                          \
+#define CHECK_CUDA_ERROR(func)                                                                                         \
   target::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
 
-bool comm_peer2peer_possible(int local_gpuid, int neighbor_gpuid)
-{
-  int canAccessPeer[2];
-  CHECK_CUDA_ERROR(cudaDeviceCanAccessPeer(&canAccessPeer[0], local_gpuid, neighbor_gpuid));
-  CHECK_CUDA_ERROR(cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, local_gpuid));
+  bool comm_peer2peer_possible(int local_gpuid, int neighbor_gpuid)
+  {
+    int canAccessPeer[2];
+    CHECK_CUDA_ERROR(cudaDeviceCanAccessPeer(&canAccessPeer[0], local_gpuid, neighbor_gpuid));
+    CHECK_CUDA_ERROR(cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, local_gpuid));
 
-  // require symmetric peer-to-peer access to enable peer-to-peer
-  return canAccessPeer[0] && canAccessPeer[1];
-}
-
-int comm_peer2peer_performance(int local_gpuid, int neighbor_gpuid)
-{
-  int accessRank[2] = {};
-  if (comm_peer2peer_possible(local_gpuid, neighbor_gpuid)) {
-    CHECK_CUDA_ERROR(
-      cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, local_gpuid, neighbor_gpuid));
-    CHECK_CUDA_ERROR(
-      cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, local_gpuid));
+    // require symmetric peer-to-peer access to enable peer-to-peer
+    return canAccessPeer[0] && canAccessPeer[1];
   }
 
-  // return the slowest direction of access (lower is faster)
-  return std::max(accessRank[0], accessRank[1]);
-}
+  int comm_peer2peer_performance(int local_gpuid, int neighbor_gpuid)
+  {
+    int accessRank[2] = {};
+    if (comm_peer2peer_possible(local_gpuid, neighbor_gpuid)) {
+      CHECK_CUDA_ERROR(
+        cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, local_gpuid, neighbor_gpuid));
+      CHECK_CUDA_ERROR(
+        cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, local_gpuid));
+    }
 
-void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
-{
-  // handles for obtained ghost pointers
-  cudaIpcMemHandle_t remote_handle[2][QUDA_MAX_DIM];
+    // return the slowest direction of access (lower is faster)
+    return std::max(accessRank[0], accessRank[1]);
+  }
+
+  void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
+  {
+    // handles for obtained ghost pointers
+    cudaIpcMemHandle_t remote_handle[2][QUDA_MAX_DIM];
 
 #ifndef NVSHMEM_COMMS
   for (int dim = 0; dim < 4; ++dim) {
@@ -173,4 +174,4 @@ void comm_destroy_neighbor_event(qudaEvent_t[2][QUDA_MAX_DIM], qudaEvent_t local
   } // iterate over dim
 }
 
-}
+} // namespace quda
