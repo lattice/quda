@@ -63,10 +63,10 @@ namespace quda {
       // Pass the integer value of the reduction dim as a template arg
       if (cType == QUDA_CONTRACT_TYPE_DR_FT_T) {
 	ContractionSummedArg<Float, nColor, 3> arg(x, y, source_position, mom_mode, s1, b1);
-	launch<DegrandRossiContractFT, double, comm_reduce_null<double>>(result_local, tp, stream, arg);
+	launch<DegrandRossiContractFT>(result_local, tp, stream, arg);
       } else if(cType == QUDA_CONTRACT_TYPE_DR_FT_Z) {
 	ContractionSummedArg<Float, nColor, 2> arg(x, y, source_position, mom_mode, s1, b1);
-	launch<DegrandRossiContractFT, double, comm_reduce_null<double>>(result_local, tp, stream, arg);
+	launch<DegrandRossiContractFT>(result_local, tp, stream, arg);
       } else {
 	errorQuda("Unexpected contraction type %d", cType);
       }

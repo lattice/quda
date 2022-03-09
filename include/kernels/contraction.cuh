@@ -10,8 +10,9 @@
 namespace quda
 {
 
-  using spinor_array = array<double2, 16>;
-  
+  //using spinor_array = array<double2, 16>;
+  using spinor_array = array<array<double, 2>, 16>;
+    
   template <typename real> class DRGammaMatrix {
   public:
     // Stores gamma matrix column index for non-zero complex value.
@@ -286,7 +287,6 @@ namespace quda
         NxNyNzNt[i] = comm_dim(i) * x.X()[i];
       }
     }
-    __device__ __host__ spinor_array init() const { return spinor_array(); }
   };
   
   template <typename Arg> struct DegrandRossiContractFT : plus<spinor_array> {
@@ -295,6 +295,9 @@ namespace quda
     const Arg &arg;
     constexpr DegrandRossiContractFT(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
+
+    // overload comm_reduce to defer until the entire "tile" is complete
+    template <typename U> static inline void comm_reduce(U &) { }
     
     // Final param is unused in the MultiReduce functor in this use case.
     __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int t, int)
@@ -304,7 +307,7 @@ namespace quda
       using real = typename Arg::real;
       using Vector = ColorSpinor<real, nColor, nSpin>;
 
-      reduce_t result_all_channels = spinor_array();
+      reduce_t result_all_channels = zero<reduce_t>();
       int s1 = arg.s1;
       int b1 = arg.b1;
       int mom_mode[4];
@@ -359,8 +362,8 @@ namespace quda
 	    // use tr[ Gamma * Prop * Gamma * g5 * conj(Prop) * g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
 	    // gamma_5 * gamma_i <phi | phi > gamma_5 * gamma_idx 
 	    propagator_product = arg.Gamma.g5gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.g5gm_z[G_idx][b1];
-	    result_all_channels[G_idx].x += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
-	    result_all_channels[G_idx].y += propagator_product.imag()*phase_real+propagator_product.real()*phase_imag;
+	    result_all_channels[G_idx][0] += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
+	    result_all_channels[G_idx][1] += propagator_product.imag()*phase_real+propagator_product.real()*phase_imag;
 	  }
 	}
       }
@@ -405,7 +408,7 @@ namespace quda
     const Arg &arg;
     constexpr ColorContract(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
-
+    
     __device__ __host__ inline void operator()(int x_cb, int parity)
     {
       constexpr int nSpin = Arg::nSpin;

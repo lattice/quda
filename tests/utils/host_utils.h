@@ -90,7 +90,7 @@ void setQudaDefaultMgTestParams();
 void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param);
 void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv);
 void saveHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, QudaLinkType link_type);
-void saveDeviceGaugeField(cudaGaugeField *gaugeEx, cudaGaugeField *gauge);
+void saveDeviceGaugeField(quda::cudaGaugeField *gaugeEx, quda::cudaGaugeField *gauge);
 void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param);
 void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision);
 template <typename Float> void constructCloverField(Float *res, double norm, double diag);

@@ -5806,8 +5806,9 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 				   *d_prop2[b1 * nColor + c1],
 				   result_global, cType, source_position, mom_mode, s1, b1);
 		
-		comm_allreduce_array((double *)&result_global[0], 2*elems_per_slice * global_decay_dim_slices);
-		for (size_t G_idx = 0; G_idx < nSpin * nSpin; G_idx++) {
+		//comm_allreduce_sum((double *)&result_global[0], 2*elems_per_slice * global_decay_dim_slices);
+		comm_allreduce_sum(result_global);
+		for (size_t G_idx = 0; G_idx < elems_per_slice; G_idx++) {
 		  for (size_t t = 0; t < global_decay_dim_slices; t++) {
 		    int index = ((mom_idx) * 2*elems_per_slice * global_decay_dim_slices + 2*elems_per_slice * t + 2*G_idx);
 		    
