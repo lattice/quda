@@ -1,4 +1,4 @@
-# HIP Speific CMake
+# HIP Specific CMake
 enable_language(HIP)
 
 if (NOT DEFINED ROCM_PATH )
