@@ -374,8 +374,8 @@ namespace quda
 	result_all_channels[G_idx][1] += (G_idx+t) + idx;
       }
       
-      return result_all_channels;
-      //return plus::operator()(result_all_channels, result);
+      //return result_all_channels;
+      return plus::operator()(result_all_channels, result);
     }
   };
   
