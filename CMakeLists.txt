@@ -144,7 +144,6 @@ endif()
 
 option(QUDA_DIRAC_WILSON "build Wilson Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_CLOVER "build clover Dirac operators" ${QUDA_DIRAC_DEFAULT})
-# Dynamic inversion saves memory but decreases the flops
 option(QUDA_DIRAC_DOMAIN_WALL "build domain wall Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_STAGGERED "build staggered Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_TWISTED_MASS "build twisted mass Dirac operators" ${QUDA_DIRAC_DEFAULT})
