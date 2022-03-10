@@ -1347,8 +1347,8 @@ void computeLongLinkField(const int dim[4], const Real *const oprod, const Real 
   }
 }
 
-void hisqLongLinkForceCPU(double coeff, const QudaGaugeParam &param, quda::cpuGaugeField &oprod, quda::cpuGaugeField &link,
-                          quda::cpuGaugeField *newOprod)
+void hisqLongLinkForceCPU(double coeff, const QudaGaugeParam &param, quda::cpuGaugeField &oprod,
+                          quda::cpuGaugeField &link, quda::cpuGaugeField *newOprod)
 {
   for (int sig = 0; sig < 4; ++sig) {
     if (param.cpu_prec == QUDA_SINGLE_PRECISION) {
@@ -1402,7 +1402,8 @@ void completeForceField(const int dim[4], const Real *const oprod, const Real *c
   for (int site = 0; site < half_volume; ++site) { completeForceSite<Real, 1>(site, dim, oprod, link, sig, ls, mom); }
 }
 
-void hisqCompleteForceCPU(const QudaGaugeParam &param, quda::cpuGaugeField &oprod, quda::cpuGaugeField &link, quda::cpuGaugeField *mom)
+void hisqCompleteForceCPU(const QudaGaugeParam &param, quda::cpuGaugeField &oprod, quda::cpuGaugeField &link,
+                          quda::cpuGaugeField *mom)
 {
   for (int sig = 0; sig < 4; ++sig) {
     if (param.cpu_prec == QUDA_SINGLE_PRECISION) {

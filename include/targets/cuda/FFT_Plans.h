@@ -1,16 +1,16 @@
 #pragma once
 
 #include <quda_cuda_api.h>
-#include <cufft.h>
 #include <quda_internal.h>
-#include <quda_matrix.h>
+#include <cufft.h>
 
 #define FFT_FORWARD CUFFT_FORWARD
 #define FFT_INVERSE CUFFT_INVERSE
 
-namespace quda {
+namespace quda
+{
 
-using FFTPlanHandle = cufftHandle;
+  using FFTPlanHandle = cufftHandle;
 
 #ifndef GPU_GAUGE_ALG
 
@@ -152,4 +152,4 @@ inline void FFTDestroyPlan(FFTPlanHandle &plan) { CUFFT_SAFE_CALL(cufftDestroy(p
 
 #endif
 
-}
+} // namespace quda

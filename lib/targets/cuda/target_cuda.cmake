@@ -1,13 +1,11 @@
 # ######################################################################################################################
-# CUDA target
-set(QUDA_TARGET_CUDA ON)
-
-# ######################################################################################################################
 # CUDA specific part of CMakeLists
 
 find_package(CUDAToolkit REQUIRED)
 include(CheckLanguage)
 check_language(CUDA)
+
+set(QUDA_TARGET_CUDA ON)
 
 if(DEFINED ENV{QUDA_GPU_ARCH})
   set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
@@ -373,3 +371,5 @@ if(QUDA_NVML)
 endif()
 
 add_subdirectory(targets/cuda)
+
+install(FILES ${CMAKE_SOURCE_DIR}/cmake/find_target_cuda_dependencies.cmake DESTINATION lib/cmake/QUDA)

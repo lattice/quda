@@ -156,8 +156,7 @@ namespace quda
        @param[in] n_items Number of items being reduced
        @param[in] location Location where the calculation will take place
      */
-    TunableReduction2D(size_t n_items, QudaFieldLocation location) :
-      TunableKernel(location)
+    TunableReduction2D(size_t n_items, QudaFieldLocation location) : TunableKernel(location)
     {
       u64toa(vol, n_items);
       strcpy(aux, compile_type_str(location));

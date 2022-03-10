@@ -22,9 +22,9 @@ namespace quda
   {
   protected:
     const LatticeField &field;
-    mutable unsigned int vector_length_y;
-    mutable unsigned int step_y;
-    const unsigned int max_block_y;
+    mutable unsigned int vector_length_z;
+    mutable unsigned int step_z;
+    const unsigned int max_block_z;
     bool tune_block_x;
 
     static constexpr bool grid_stride = false;
@@ -62,7 +62,7 @@ namespace quda
         // derive a BlockKernelArg from the kernel argument to allow for block-size knowledge in the kernel
         using Arg = BlockKernelArg<Block::block[idx], FunctorArg>;
         TunableKernel::launch_device<Functor, grid_stride>(KERNEL(BlockKernel2D), tp, stream, Arg(arg));
-      } else if constexpr(idx < Block::block.size() - 1) {
+      } else if constexpr (idx < Block::block.size() - 1) {
         launch_device<Functor, Block, idx + 1>(tp, stream, arg);
       } else {
         errorQuda("Unexpected block size %d", tp.block.x);
@@ -87,13 +87,13 @@ namespace quda
        @param[in] arg Kernel argument struct
      */
     template <template <typename> class Functor, typename Block, unsigned int idx = 0, typename Arg>
-      void launch_host(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    void launch_host(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
       if (tp.block.x == Block::block[idx]) {
         const_cast<Arg &>(arg).grid_dim = tp.grid;
         const_cast<Arg &>(arg).block_dim = tp.block;
         BlockKernel2D_host<Functor>(BlockKernelArg<Block::block[idx], Arg>(arg));
-      } else if constexpr(idx < Block::block.size() - 1) {
+      } else if constexpr (idx < Block::block.size() - 1) {
         launch_host<Functor, Block, idx + 1>(tp, stream, arg);
       } else {
         errorQuda("Unexpected block size %d", tp.block.x);
@@ -132,17 +132,17 @@ namespace quda
     /**
        @brief Constructor for kernels that use a lattice field
        @param[in] field A lattice field instance used for metadata
-       @param[in] vector_length_y Batch size for the block-reduction in the y-dimension
-       @param[in] max_block_y Maximum batch size per block (maximum y-dimension block size)
+       @param[in] vector_length_z Batch size for the block-reduction in the z-dimension
+       @param[in] max_block_z Maximum batch size per block (maximum z-dimension block size)
        @param[in] location Optional overload for the location where the calculation will take place
      */
-    TunableBlock2D(const LatticeField &field, unsigned int vector_length_y, unsigned int max_block_y = 0,
+    TunableBlock2D(const LatticeField &field, unsigned int vector_length_z, unsigned int max_block_z = 0,
                    QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableKernel(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location()),
       field(field),
-      vector_length_y(vector_length_y),
-      step_y(1),
-      max_block_y(max_block_y == 0 ? vector_length_y : max_block_y),
+      vector_length_z(vector_length_z),
+      step_z(1),
+      max_block_z(max_block_z == 0 ? vector_length_z : max_block_z),
       tune_block_x(false)
     {
       strcpy(vol, field.VolString());
@@ -164,23 +164,23 @@ namespace quda
       dim3 block = param.block;
       dim3 grid = param.grid;
       bool ret = tune_block_x ? Tunable::advanceBlockDim(param) : false;
-      param.block.y = block.y;
-      param.grid.y = grid.y;
+      param.block.z = block.z;
+      param.grid.z = grid.z;
 
       if (ret) {
         return true;
       } else { // block.x (spacetime) was reset
 
         // we can advance spin/block-color since this is valid
-        if (param.block.y < vector_length_y && param.block.y < device::max_threads_per_block_dim(1)
-            && param.block.x * (param.block.y + step_y) * param.block.z <= device::max_threads_per_block()
-            && ((param.block.y + step_y) <= max_block_y)) {
-          param.block.y += step_y;
-          param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
+        if (param.block.z < vector_length_z && param.block.z < device::max_threads_per_block_dim(2)
+            && param.block.x * param.block.y * (param.block.z + step_z) <= device::max_threads_per_block()
+            && ((param.block.z + step_z) <= max_block_z)) {
+          param.block.z += step_z;
+          param.grid.z = (vector_length_z + param.block.z - 1) / param.block.z;
           return true;
         } else { // we have run off the end so let's reset
-          param.block.y = step_y;
-          param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
+          param.block.z = step_z;
+          param.grid.z = (vector_length_z + param.block.z - 1) / param.block.z;
           return false;
         }
       }
@@ -193,8 +193,8 @@ namespace quda
     void initTuneParam(TuneParam &param) const
     {
       Tunable::initTuneParam(param);
-      param.block.y = step_y;
-      param.grid.y = (vector_length_y + step_y - 1) / step_y;
+      param.block.z = step_z;
+      param.grid.z = (vector_length_z + step_z - 1) / step_z;
     }
 
     /**
@@ -204,21 +204,21 @@ namespace quda
     void defaultTuneParam(TuneParam &param) const
     {
       Tunable::defaultTuneParam(param);
-      param.block.y = step_y;
-      param.grid.y = (vector_length_y + step_y - 1) / step_y;
+      param.block.z = step_z;
+      param.grid.z = (vector_length_z + step_z - 1) / step_z;
     }
 
     /**
        @brief Resize the problem size in the y dimension
        @brief[in] y New problem size
     */
-    void resizeVector(int y) const { vector_length_y = y; }
+    void resizeVector(int z) const { vector_length_z = z; }
 
     /**
-       @brief Resize the autotuning step size in the y dimension
-       @brief[in] y New step size
+       @brief Resize the autotuning step size in the z dimension
+       @brief[in] z New step size
     */
-    void resizeStep(int y) const { step_y = y; }
+    void resizeStep(int z) const { step_z = z; }
   };
 
 } // namespace quda
