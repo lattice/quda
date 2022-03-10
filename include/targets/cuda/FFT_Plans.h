@@ -1,9 +1,8 @@
 #pragma once
 
 #include <quda_cuda_api.h>
-#include <cufft.h>
 #include <quda_internal.h>
-#include <quda_matrix.h>
+#include <cufft.h>
 
 #define FFT_FORWARD CUFFT_FORWARD
 #define FFT_INVERSE CUFFT_INVERSE
