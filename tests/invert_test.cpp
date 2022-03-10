@@ -176,7 +176,7 @@ void init(int argc, char **argv)
   }
 }
 
-using test_t = ::testing::tuple<QudaInverterType, QudaSolutionType, QudaSolveType, QudaPrecision>;
+using test_t = ::testing::tuple<QudaInverterType, QudaSolutionType, QudaSolveType, QudaPrecision, int>;
 
 class InvertTest : public ::testing::TestWithParam<test_t>
 {
@@ -194,6 +194,7 @@ auto solve(test_t param)
   inv_param.solve_type = ::testing::get<2>(param);
   inv_param.cuda_prec_sloppy = ::testing::get<3>(param);
   inv_param.clover_cuda_prec_sloppy = ::testing::get<3>(param);
+  multishift = ::testing::get<4>(param);
 
   // reset lambda_max if we're doing a testing loop to ensure correct lambma_max
   if (enable_testing) inv_param.ca_lambda_max = -1.0;
@@ -435,7 +436,7 @@ int main(int argc, char **argv)
     if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
     result = RUN_ALL_TESTS();
   } else {
-    solve(test_t{inv_type, solution_type, solve_type, prec_sloppy});
+    solve(test_t{inv_type, solution_type, solve_type, prec_sloppy, multishift});
   }
 
   // finalize the QUDA library
@@ -453,8 +454,8 @@ std::string gettestname(::testing::TestParamInfo<test_t> param)
   name += get_solver_str(::testing::get<0>(param.param)) + std::string("_");
   name += get_solution_str(::testing::get<1>(param.param)) + std::string("_");
   name += get_solve_str(::testing::get<2>(param.param)) + std::string("_");
-  name += get_prec_str(prec) + std::string("_");
   name += get_prec_str(::testing::get<3>(param.param));
+  if (::testing::get<4>(param.param) > 1) name += std::string("_shift_") + std::to_string(::testing::get<4>(param.param));
   return name;
 }
 
@@ -476,7 +477,8 @@ INSTANTIATE_TEST_SUITE_P(NormalEvenOdd, InvertTest,
                          ::testing::Combine(normal_solvers,
                                             Values(QUDA_MATPCDAG_MATPC_SOLUTION, QUDA_MAT_SOLUTION),
                                             Values(QUDA_NORMOP_PC_SOLVE),
-                                            sloppy_precisions),
+                                            sloppy_precisions,
+                                            Values(1)),
                          gettestname);
 
 // full system normal solve
@@ -484,7 +486,8 @@ INSTANTIATE_TEST_SUITE_P(NormalFull, InvertTest,
                          ::testing::Combine(normal_solvers,
                                             Values(QUDA_MATDAG_MAT_SOLUTION),
                                             Values(QUDA_NORMOP_SOLVE),
-                                            sloppy_precisions),
+                                            sloppy_precisions,
+                                            Values(1)),
                          gettestname);
 
 // preconditioned direct solves
@@ -492,7 +495,8 @@ INSTANTIATE_TEST_SUITE_P(EvenOdd, InvertTest,
                          ::testing::Combine(direct_solvers,
                                             Values(QUDA_MATPC_SOLUTION, QUDA_MAT_SOLUTION),
                                             Values(QUDA_DIRECT_PC_SOLVE),
-                                            sloppy_precisions),
+                                            sloppy_precisions,
+                                            Values(1)),
                          gettestname);
 
 // full system direct solve
@@ -500,5 +504,15 @@ INSTANTIATE_TEST_SUITE_P(Full, InvertTest,
                          ::testing::Combine(direct_solvers,
                                             Values(QUDA_MAT_SOLUTION),
                                             Values(QUDA_DIRECT_SOLVE),
-                                            sloppy_precisions),
+                                            sloppy_precisions,
+                                            Values(1)),
+                         gettestname);
+
+// preconditioned multi-shift solves
+INSTANTIATE_TEST_SUITE_P(MultiShiftEvenOdd, InvertTest,
+                         ::testing::Combine(Values(QUDA_CG_INVERTER),
+                                            Values(QUDA_MATPCDAG_MATPC_SOLUTION),
+                                            Values(QUDA_NORMOP_PC_SOLVE),
+                                            sloppy_precisions,
+                                            Values(10)),
                          gettestname);
