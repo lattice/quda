@@ -271,6 +271,8 @@ QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
 std::array<int, 4> grid_partition = {1, 1, 1, 1};
 
+bool enable_testing = false;
+
 namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
@@ -1009,4 +1011,11 @@ void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)
   auto opgroup
     = quda_app->add_option_group("Communication", "Options controlling communication (split grid) parameteres");
   opgroup->add_option("--grid-partition", grid_partition, "Set the grid partition (default 1 1 1 1)")->expected(4);
+}
+
+void add_testing_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup
+    = quda_app->add_option_group("Testing", "Options controlling automated testing");
+  opgroup->add_option("--enable-testing", enable_testing, "Enable automated testing (default false)");
 }
