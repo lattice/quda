@@ -66,7 +66,7 @@ namespace quda
     const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, blockIdx.z);
     const dim3 thread_idx(threadIdx.x, threadIdx.y, threadIdx.z);
     auto j = blockDim.y * blockIdx.y + threadIdx.y;
-    auto k = blockDim.k * blockIdx.k + threadIdx.k;
+    auto k = blockDim.z * blockIdx.z + threadIdx.z;
     if (j >= arg.threads.y) return;
     if (k >= arg.threads.z) return;
 
