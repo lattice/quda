@@ -6,14 +6,22 @@ set(QUDA_QMP @QUDA_QMP@)
 set(QUDA_MPI @QUDA_MPI@)
 set(QUDA_QIO @QUDA_QIO@)
 set(QUDA_OPENMP @QUDA_OPENMP@)
+set(QUDA_QDPJIT @QUDA_QDPJIT@)
+
+set(QUDA_TARGET_CUDA @QUDA_TARGET_CUDA@)
+set(QUDA_TARGET_HIP  @QUDA_TARGET_HIP@)
+
+set(QUDA_NVSHMEM  @QUDA_NVSHMEM@)
 
 if( QUDA_QMP AND QUDA_MPI )
   message(FATAL_ERROR "Cannot have both QMP and MPI configured")  
 endif()
 
+# Everyone needs this
+find_dependency(Threads REQUIRED)
 
 if( QUDA_QMP )
-	find_dependency(QMP REQUIRED)
+  find_dependency(QMP REQUIRED)
 endif()
 
 if( QUDA_MPI )
@@ -21,16 +29,22 @@ if( QUDA_MPI )
 endif()
 
 if( QUDA_QIO )
-	find_dependency(QIO REQUIRED)
+  find_dependency(QIO REQUIRED)
 endif()
 
 if( QUDA_OPENMP )
-	find_dependency(OpenMP REQUIRED)
+  find_dependency(OpenMP REQUIRED)
 endif()
 
+if( QUDA_TARGET_CUDA )
+  include(${CMAKE_CURRENT_LIST_DIR}/find_target_cuda_dependencies.cmake)
+elseif(QUDA_TARGET_HIP )
+  include(${CMAKE_CURRENT_LIST_DIR}/find_target_hip_dependencies.cmake )
+endif()
 
-enable_language(CUDA)
-find_package(CUDAToolkit REQUIRED)
+if( QUDA_QDPJIT )
+  find_dependency( QDPXX REQUIRED )
+endif()
 
 include(${CMAKE_CURRENT_LIST_DIR}/QUDATargets.cmake)
 
