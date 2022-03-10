@@ -64,7 +64,7 @@ namespace quda
   __forceinline__ __device__ void BlockKernel2D_impl(const Arg &arg)
   {
     const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, blockIdx.z);
-    const dim3 thread_idx(threadIdx.x, threadIdx.y, threadIx.z);
+    const dim3 thread_idx(threadIdx.x, threadIdx.y, threadIdx.z);
     auto j = blockDim.y * blockIdx.y + threadIdx.y;
     auto k = blockDim.k * blockIdx.k + threadIdx.k;
     if (j >= arg.threads.y) return;
