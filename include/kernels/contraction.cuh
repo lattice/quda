@@ -349,9 +349,9 @@ namespace quda
       Vector y = arg.y(idx_cb, parity);
       
       // loop over channels
-      for (int G_idx = 0; G_idx < 16; G_idx++) {
+      for (int G_idx = 0; G_idx < nSpin*nSpin; G_idx++) {
 	for (int s2 = 0; s2 < nSpin; s2++) {
-
+	  
 	  // We compute the contribution from s1,b1 and s2,b2 from props x and y respectively.
 	  int b2 = arg.Gamma.gm_i[G_idx][s2];	  
 	  // get non-zero column index for current s1
@@ -362,19 +362,20 @@ namespace quda
 	    // use tr[ Gamma * Prop * Gamma * g5 * conj(Prop) * g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
 	    // gamma_5 * gamma_i <phi | phi > gamma_5 * gamma_idx 
 	    propagator_product = arg.Gamma.g5gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.g5gm_z[G_idx][b1];
-	    result_all_channels[G_idx][0] += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
-	    result_all_channels[G_idx][1] += propagator_product.imag()*phase_real+propagator_product.real()*phase_imag;
+	    //result_all_channels[0][G_idx][0] += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
+	    //result_all_channels[0][G_idx][1] += propagator_product.imag()*phase_real+propagator_product.real()*phase_imag;
 	  }
 	}
       }
 
       // Debug
-      //for (int G_idx = 0; G_idx < arg.nSpin*arg.nSpin; G_idx++) {
-      //result_all_channels[G_idx].x += (G_idx+t) + idx;
-      //result_all_channels[G_idx].y += (G_idx+t) + idx;
-      //}
+      for (int G_idx = 0; G_idx < nSpin*nSpin; G_idx++) {
+	result_all_channels[G_idx][0] += (G_idx+t) + idx;
+	result_all_channels[G_idx][1] += (G_idx+t) + idx;
+      }
       
-      return plus::operator()(result_all_channels, result);
+      return result_all_channels;
+      //return plus::operator()(result_all_channels, result);
     }
   };
   

@@ -145,9 +145,11 @@ namespace quda
       if (consumed) errorQuda("Cannot call complete more than once for each construction");
 
       for (int i = 0; i < n_reduce * n_item; i++) {
+	printfQuda("Here %d of %d x %d = %d\n", i, n_reduce, n_item, n_reduce * n_item);
+	printfQuda("Data %e : %e\n", result_h[i].load(cuda::std::memory_order_relaxed), init_value<system_atomic_t>());
         while (result_h[i].load(cuda::std::memory_order_relaxed) == init_value<system_atomic_t>()) { }
       }
-
+      
       // copy back result element by element and convert if necessary to host reduce type
       // unit size here may differ from system_atomic_t size, e.g., if doing double-double
       const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
