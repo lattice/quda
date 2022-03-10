@@ -893,20 +893,6 @@ namespace quda {
     virtual bool hermitian() { return false; } /** CG3NR is for any system */
   };
 
-  class MPCG : public Solver {
-    private:
-      void computeMatrixPowers(ColorSpinorField out[], ColorSpinorField &in, int nvec);
-      void computeMatrixPowers(std::vector<ColorSpinorField> &out, std::vector<ColorSpinorField> &in, int nsteps);
-
-    public:
-      MPCG(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
-      virtual ~MPCG();
-
-      void operator()(ColorSpinorField &out, ColorSpinorField &in);
-      virtual bool hermitian() { return true; } /** MPCG is only Hermitian system */
-  };
-
-
   class PreconCG : public Solver {
     private:
       std::shared_ptr<Solver> K;
@@ -935,7 +921,7 @@ namespace quda {
       virtual void solve_and_collect(ColorSpinorField &out, ColorSpinorField &in, std::vector<ColorSpinorField *> &v_r,
                                      int collect_miniter, double collect_tol);
 
-      virtual bool hermitian() { return true; } /** MPCG is only Hermitian system */
+      virtual bool hermitian() { return true; } /** PCG is only Hermitian system */
   };
 
 
@@ -950,37 +936,6 @@ namespace quda {
     BiCGstab(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
              const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
     virtual ~BiCGstab();
-
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
-
-    virtual bool hermitian() { return false; } /** BiCGStab is for any linear system */
-  };
-
-  class SimpleBiCGstab : public Solver {
-
-  private:
-
-    // pointers to fields to avoid multiple creation overhead
-    ColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
-    bool init;
-
-  public:
-    SimpleBiCGstab(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
-    virtual ~SimpleBiCGstab();
-
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
-
-    virtual bool hermitian() { return false; } /** BiCGStab is for any linear system */
-  };
-
-  class MPBiCGstab : public Solver {
-
-  private:
-    void computeMatrixPowers(std::vector<ColorSpinorField> &pr, ColorSpinorField &p, ColorSpinorField &r, int nsteps);
-
-  public:
-    MPBiCGstab(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
-    virtual ~MPBiCGstab();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 

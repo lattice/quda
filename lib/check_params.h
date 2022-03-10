@@ -522,10 +522,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 #if defined INIT_PARAM
   P(Nsteps, INVALID_INT);
-#else
-  if(param->inv_type == QUDA_MPCG_INVERTER || param->inv_type == QUDA_MPBICGSTAB_INVERTER){
-    P(Nsteps, INVALID_INT);
-  }
 #endif
 
 #if defined INIT_PARAM
