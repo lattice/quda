@@ -76,12 +76,12 @@ target_compile_options(quda PRIVATE -fsycl)
 target_compile_options(quda PRIVATE -mllvm -pragma-unroll-threshold=16)
 target_compile_options(quda INTERFACE -fhonor-nan-compares)
 
-target_compile_options(quda PRIVATE -Wno-error)
 target_compile_options(quda PRIVATE -Wno-tautological-constant-compare)
 target_compile_options(quda PRIVATE -Wno-division-by-zero)
-#target_compile_options(quda PRIVATE -Wno-unused-but-set-variable)
-#target_compile_options(quda PRIVATE -Wno-sign-compare)
+target_compile_options(quda PRIVATE -Wno-sign-compare)
 target_compile_options(quda PRIVATE -Wno-pass-failed)
+#target_compile_options(quda PRIVATE -Wno-unused-but-set-variable)
+#target_compile_options(quda PRIVATE -Wno-error)
 
 target_link_options(quda INTERFACE -fsycl-device-code-split=per_kernel)
 

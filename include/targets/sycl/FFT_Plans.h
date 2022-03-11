@@ -102,7 +102,8 @@ inline void ApplyFFT(FFTPlanHandle &plan, double2 *data_in, double2 *data_out, i
  * @param[in] precision The precision of the computation
  */
 
-inline void SetPlanFFTMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecision precision)
+//inline void SetPlanFFTMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecision precision)
+inline void SetPlanFFTMany(FFTPlanHandle &, int4 , int dim, QudaPrecision precision)
 {
   warningQuda("SetPlanFFTMany %i %i", dim, precision);
 #if 0
@@ -134,7 +135,7 @@ inline void SetPlanFFT2DMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecis
   if(precision == QUDA_SINGLE_PRECISION) {
     plan.isDouble = false;
     if(dim == 0) {
-      auto q = device::defaultQueue();
+      auto q = quda::device::defaultQueue();
       MKL_LONG distance = size.w * size.z;
       plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.w, size.z});
       //plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.z, size.w});
@@ -144,7 +145,7 @@ inline void SetPlanFFT2DMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecis
       plan.s->set_value(config_param::BACKWARD_SCALE, (1.0/distance));
       plan.s->commit(q);
     } else {
-      auto q = device::defaultQueue();
+      auto q = quda::device::defaultQueue();
       MKL_LONG distance = size.x * size.y;
       //plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.x, size.y});
       plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.y, size.x});

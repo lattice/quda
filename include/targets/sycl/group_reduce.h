@@ -2,6 +2,7 @@
 
 #include <quda_sycl_api.h>
 #include <array.h>
+using quda::array;
 
 template <typename T>
 inline void blockReduceSum(sycl::group<3> grp, T &out, const T &in)
@@ -38,6 +39,16 @@ blockReduceSum(sycl::group<3> grp, array<T,N> &out, const array<T,N> &in)
     auto outx = reinterpret_cast<array<T,16>*>(&out[16*i]);
     blockReduceSum(grp, *outx, *inx);
   }
+}
+
+template <typename T, int M, int N>
+inline void blockReduceSum(sycl::group<3> grp, array<array<T,M>,N> &out,
+			   const array<array<T,M>,N> &in)
+{
+  const int N2 = M * N;
+  auto inx = reinterpret_cast<const array<T,N2>*>(&in);
+  auto outx = reinterpret_cast<array<T,N2>*>(&out);
+  blockReduceSum(grp, *outx, *inx);
 }
 
 template <typename T, int N>

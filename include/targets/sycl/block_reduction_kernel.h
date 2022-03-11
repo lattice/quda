@@ -2,19 +2,8 @@
 #include <tune_quda.h>
 #include <reduce_helper.h>
 
-namespace quda {
-
-  /**
-     @brief This class is derived from the arg class that the functor
-     creates and curries in the block size.  This allows the block
-     size to be set statically at launch time in the actual argument
-     class that is passed to the kernel.
-   */
-  template <unsigned int block_size_, typename Arg_> struct BlockKernelArg : Arg_ {
-    using Arg = Arg_;
-    static constexpr unsigned int block_size = block_size_;
-    BlockKernelArg(const Arg &arg) : Arg(arg) { }
-  };
+namespace quda
+{
 
   /**
      @brief This helper function swizzles the block index through
@@ -24,11 +13,46 @@ namespace quda {
      determines if we are swizzling and a parameter "swizzle_factor"
      which is the effective matrix dimension that we are tranposing in
      this mapping.
+
+     Specifically, the thread block id is remapped by
+     transposing its coordinates: if the original order can be
+     parameterized by
+
+     blockIdx.x = j * swizzle + i,
+
+     then the new order is
+
+     block_idx = i * (gridDim.x / swizzle) + j
+
+     We need to factor out any remainder and leave this in original
+     ordering.
+
+     @param arg Kernel argument struct
+     @return Swizzled block index
    */
+#if 0
+  template <typename Arg> __device__ constexpr int virtual_block_idx(const Arg &arg)
+  {
+    auto block_idx = blockIdx.x;
+    if (arg.swizzle) {
+      // the portion of the grid that is exactly divisible by the number of SMs
+      const auto gridp = gridDim.x - gridDim.x % arg.swizzle_factor;
+
+      if (block_idx < gridp) {
+        // this is the portion of the block that we are going to transpose
+        const int i = blockIdx.x % arg.swizzle_factor;
+        const int j = blockIdx.x / arg.swizzle_factor;
+
+        // transpose the coordinates
+        block_idx = i * (gridp / arg.swizzle_factor) + j;
+      }
+    }
+    return block_idx;
+  }
+#else
   template <typename Arg>
   int virtual_block_idx(const Arg &arg, const sycl::nd_item<3> &ndi)
   {
-    //int block_idx = blockIdx.x;
     int block_idx = ndi.get_group(0);
     if (arg.swizzle) {
       // the portion of the grid that is exactly divisible by the number of SMs
@@ -51,26 +75,64 @@ namespace quda {
     }
     return block_idx;
   }
+#endif
 
   /**
-     @brief Generic block kernel.  Here, we split the block and thread
-     indices in the x and y dimension and pass these indices
-     separately to the transform functor.  The x thread dimension is
-     templated, e.g., for efficient reductions, and typically the y
-     thread dimension is a trivial vectorizable dimension.
+     @brief This class is derived from the arg class that the functor
+     creates and curries in the block size.  This allows the block
+     size to be set statically at launch time in the actual argument
+     class that is passed to the kernel.
+
+     @tparam block_size x-dimension block-size
+     @param[in] arg Kernel argument
+   */
+  template <unsigned int block_size_, typename Arg_> struct BlockKernelArg : Arg_ {
+    using Arg = Arg_;
+    static constexpr unsigned int block_size = block_size_;
+    BlockKernelArg(const Arg &arg) : Arg(arg) { }
+  };
+
+  /**
+     @brief BlockKernel2D_impl is the implementation of the Generic
+     block kernel.  Here, we split the block (CTA) and thread indices
+     and pass them separately to the transform functor.  The x thread
+     dimension is templated (Arg::block_size), e.g., for efficient
+     reductions.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @param[in] arg Kernel argument
   */
   template <template <typename> class Transformer, typename Arg>
   void BlockKernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi)
   {
-    const dim3 block_idx(virtual_block_idx(arg,ndi), ndi.get_group(1), 0);
-    const dim3 thread_idx(ndi.get_local_id(0), ndi.get_local_id(1), 0);
+    const dim3 block_idx(virtual_block_idx(arg,ndi), ndi.get_group(1), ndi.get_group(2));
+    const dim3 thread_idx(ndi.get_local_id(0), ndi.get_local_id(1), ndi.get_local_id(2));
     //const int j = blockDim.y*blockIdx.y + threadIdx.y;
     const unsigned int j = ndi.get_global_id(1);
     if (j >= arg.threads.y) return;
+    const unsigned int k = ndi.get_global_id(2);
+    if (k >= arg.threads.z) return;
 
     Transformer<Arg> t(arg);
     t(block_idx, thread_idx);
   }
+#if 0
+  template <template <typename> class Functor, typename Arg>
+  __forceinline__ __device__ void BlockKernel2D_impl(const Arg &arg)
+  {
+    const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, blockIdx.z);
+    const dim3 thread_idx(threadIdx.x, threadIdx.y, threadIdx.z);
+    auto j = blockDim.y * blockIdx.y + threadIdx.y;
+    auto k = blockDim.z * blockIdx.z + threadIdx.z;
+    if (j >= arg.threads.y) return;
+    if (k >= arg.threads.z) return;
+
+    Functor<Arg> t(arg);
+    t(block_idx, thread_idx);
+  }
+#endif
 
   template <template <typename> class Transformer, typename Arg, bool grid_stride=false>
   qudaError_t
@@ -78,8 +140,8 @@ namespace quda {
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
     auto err = QUDA_SUCCESS;
-    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, 1};
-    sycl::range<3> localSize{tp.block.x, tp.block.y, 1};
+    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, tp.grid.z*tp.block.z};
+    sycl::range<3> localSize{tp.block.x, tp.block.y, tp.block.z};
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {

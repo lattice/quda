@@ -173,6 +173,6 @@ namespace quda {
       return (sizeof(Arg) <= device::max_kernel_arg_size() && Arg::use_kernel_arg);
     }
 
-  }
+  } // namespace device
 
-}
+} // namespace quda
