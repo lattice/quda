@@ -33,6 +33,7 @@ namespace quda
     static constexpr Dslash5Type dslash5_type = D5Arg::type;
 
     using D5Arg::Ls;
+    using D5Arg::use_mma;
     using real = typename D5Arg::real;
 
     // DomainWall4DArg

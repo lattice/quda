@@ -300,6 +300,8 @@ namespace quda
     dslash::shmem_retcount_inter_t *retcount_inter;
 #endif
 
+    static constexpr bool use_mma = false;
+
     // constructor needed for staggered to set xpay from derived class
     DslashArg(const ColorSpinorField &in, const GaugeField &U, int parity, bool dagger, bool xpay, int nFace,
               int spin_project, const int *comm_override,
@@ -683,7 +685,7 @@ namespace quda
         const int dslash_block_offset
           = ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) ? arg.pack_blocks : 0);
         int x_cb = (target::block_idx().x - dslash_block_offset) * target::block_dim().x + target::thread_idx().x;
-        if (x_cb >= arg.threads) return;
+        if (!Arg::Arg::use_mma) if (x_cb >= arg.threads) return;
 
 #ifdef QUDA_DSLASH_FAST_COMPILE
         dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, parity);

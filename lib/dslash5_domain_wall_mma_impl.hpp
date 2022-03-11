@@ -11,6 +11,10 @@ namespace quda
 
 #if (CUDA_VERSION >= 11000 && __COMPUTE_CAPABILITY__ >= 800)
 
+  constexpr int m5_mma_reload() {
+    return true;
+  }
+
   template <class store_t, int nColor, int Ls> class Dslash5Mma : public TunableKernel3D
   {
     ColorSpinorField &out;
@@ -54,35 +58,7 @@ namespace quda
 
     unsigned int sharedBytesPerBlock(const TuneParam &param) const
     {
-      using Mma = typename mma_mapper<store_t>::type;
-      const int a_size = (param.block.y * 4) * (param.block.y * 4 + Mma::t_pad);
-      const int b_size = (param.block.y * 4) * (param.block.x * 6 + Mma::t_pad);
-      const int c_size = (param.block.y * 4) * (param.block.x * 6 + Mma::acc_pad);
-      if (param.aux.x == 1) { // aux.x == 1 --> reload == true
-        return (a_size + b_size + c_size) * sizeof(real);
-      } else {
-        return (a_size > b_size + c_size ? a_size : b_size + c_size) * sizeof(real);
-      }
-    }
-
-    bool advanceAux(TuneParam &param) const
-    {
-      bool aux_advanced = false;
-      if (param.aux.x == 0) { // first see if aux.x (reload 0 (false) or 1 (true))
-        param.aux.x++;
-        aux_advanced = true;
-      } else {
-#if 0
-        if (param.aux.y < 3) { // second see if aux.y
-          param.aux.y++;
-          aux_advanced = true;
-          param.aux.x = 1;
-        }
-#endif
-      }
-      // shared bytes depends on aux, so update if changed
-      if (aux_advanced) param.shared_bytes = sharedBytesPerBlock(param);
-      return aux_advanced;
+      return mma_shared_bytes<store_t, m5_mma_reload()>(param.block.x, param.block.y);
     }
 
     unsigned int minThreads() const { return 1; } // We are actually doing grid dim tuning
@@ -117,7 +93,7 @@ namespace quda
     }
 
     template <int block_dim_x, bool dagger, bool xpay> using Arg =
-      Dslash5MmaArg<store_t, nColor, Ls, block_dim_x, dagger, xpay>;
+      Dslash5MmaArg<store_t, nColor, Ls, block_dim_x, dagger, xpay, m5_mma_reload()>;
 
     template <int block_dim_x, bool dagger, bool xpay>
       void apply(const TuneParam &tp, const qudaStream_t &stream)
@@ -156,12 +132,6 @@ namespace quda
         case 32: apply<32>(tp, stream); break;
         default: errorQuda("Invalid tp.block.x(=%d)\n", tp.block.x);
       }
-    }
-
-    void initTuneParam(TuneParam &param) const
-    {
-      TunableKernel3D::initTuneParam(param);
-      param.aux.x = 0;
     }
 
     void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }

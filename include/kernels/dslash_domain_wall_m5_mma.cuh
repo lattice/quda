@@ -13,13 +13,47 @@ namespace quda
 
 #if (CUDA_VERSION >= 11000 && __COMPUTE_CAPABILITY__ >= 800)
 
+
+  /** Whether to reuse the operator B shared memory buffer with operator C */
+  constexpr bool mma_c_reuse_b() { return true; }
+
   /**
-    @brief Parameter structure for applying the Dslash
+    @brief return how much shared memory is needed for given the block size and reuse/reload options
+    @param x block dimension in x
+    @param y block dimension in y
    */
-  template <class store_t_, int nColor_, int Ls_, int block_dim_x_, bool dagger, bool xpay>
+  template <class store_t, bool reload>
+  unsigned int mma_shared_bytes(unsigned int x, unsigned int y)
+  {
+    using real = typename mapper<store_t>::type;
+    using Mma = typename mma_mapper<store_t>::type;
+    const int a_size = (y * 4) * (y * 4 + Mma::t_pad);
+    const int b_size = (y * 4) * (x * 6 + Mma::t_pad);
+    const int c_size = (y * 4) * (x * 6 + Mma::acc_pad);
+    if (mma_c_reuse_b()) {
+      if (reload) {
+        return (a_size + std::max(b_size, c_size)) * sizeof(real);
+      } else {
+        return (std::max(std::max(a_size, b_size), c_size)) * sizeof(real);
+      }
+    } else {
+      if (reload) {
+        return (a_size + b_size + c_size) * sizeof(real);
+      } else {
+        return (std::max(a_size, b_size + c_size)) * sizeof(real);
+      }
+    }
+  }
+
+  /**
+    @brief Dslash5MmaArg inherits from Dslash5Arg. Compile time constants are added for MMA, and
+    for now Dslash5Type is always M5_INV_MOBIUS.
+   */
+  template <class store_t_, int nColor_, int Ls_, int block_dim_x_, bool dagger, bool xpay, bool reload_>
   struct Dslash5MmaArg : Dslash5Arg<store_t_, nColor_, dagger, xpay, Dslash5Type::M5_INV_MOBIUS> {
     using D5Arg = Dslash5Arg<store_t_, nColor_, dagger, xpay, Dslash5Type::M5_INV_MOBIUS>;
     using store_t = store_t_;
+    static constexpr bool reload = reload_;
     using real = typename D5Arg::real;
 
     using D5Arg::nColor;
@@ -40,7 +74,7 @@ namespace quda
     using Mma = typename mma_mapper<store_t>::type;
     static constexpr int smem_ld_a = m + Mma::t_pad;
     static constexpr int smem_ld_b = n + Mma::t_pad;
-    static constexpr int smem_ld_c = n + Mma::acc_pad;
+    static constexpr int smem_ld_c = n + (mma_c_reuse_b() ? Mma::t_pad : Mma::acc_pad);
 
     static constexpr int tk_dim = k / Mma::mma_k;
 
@@ -74,34 +108,38 @@ namespace quda
 
   };
 
-  template <class T, int size> struct RegisterArray {
-    T data[size];
-  };
+  template <class Arg> __device__ auto construct_m5inv_op(Arg &arg)
+  {
+    typename Arg::Mma::WarpRegisterMapping wrm(threadIdx.y * blockDim.x + threadIdx.x);
+    array<typename Arg::Mma::OperandA, Arg::tk_dim> op_a;
 
-  template <bool dagger, class Arg> __device__ void smem_construct_m5inv(Arg &arg)
+    if (!Arg::reload) {
+      SharedMemoryCache<typename Arg::real> shared_memory_data;
+      typename Arg::real *smem_a = shared_memory_data.data();
+
+      const int this_warp = (threadIdx.y * Arg::block_dim_x + threadIdx.x) / 32;
+      const int warp_m = this_warp * Arg::warp_cycle / Arg::tn_dim;
+#pragma unroll
+      for (int tile_k = 0; tile_k < Arg::tk_dim; tile_k++) {
+        op_a[tile_k].template load<Arg::smem_ld_a>(smem_a, tile_k, warp_m, wrm);
+      }
+      // Sync here since we just loaded from smem, and later writes to smem need to happen after this for all threads
+      __syncthreads();
+    }
+
+    return op_a;
+  }
+
+  template <bool dagger, class Arg> __device__ auto construct_m5inv(Arg &arg)
   {
     SharedMemoryCache<typename Arg::real> shared_memory_data;
     auto *smem_a = shared_memory_data.data();
 
     smem_construct_m5inv<Arg::smem_ld_a, dagger>(arg, smem_a);
-  }
+    // Sync here since we just wrote to smem, and later reads from smem need to happen after this for all threads
+    __syncthreads();
 
-  template <class Arg> __device__ auto construct_m5inv_op(Arg &arg)
-  {
-    typename Arg::Mma::WarpRegisterMapping wrm(threadIdx.y * blockDim.x + threadIdx.x);
-    RegisterArray<typename Arg::Mma::OperandA, Arg::tk_dim> op_a;
-
-    SharedMemoryCache<typename Arg::real> shared_memory_data;
-    typename Arg::real *smem_a = shared_memory_data.data();
-
-    const int this_warp = (threadIdx.y * Arg::block_dim_x + threadIdx.x) / 32;
-    const int warp_m = this_warp * Arg::warp_cycle / Arg::tn_dim;
-#pragma unroll
-    for (int tile_k = 0; tile_k < Arg::tk_dim; tile_k++) {
-      op_a.data[tile_k].template load<Arg::smem_ld_a>(smem_a, tile_k, warp_m, wrm);
-    }
-
-    return op_a;
+    return construct_m5inv_op(arg);
   }
 
   template <class OpA, class Vector, class Arg> __device__ Vector m5inv_mma(OpA &op_a, Vector in, Arg &arg)
@@ -110,17 +148,21 @@ namespace quda
 
     SharedMemoryCache<typename Arg::real> shared_memory_data;
     auto *smem_a = shared_memory_data.data();
-    auto *smem_b = smem_a;
-    auto *smem_c = smem_b + Arg::smem_ld_b * Arg::k;
+    auto *smem_b = Arg::reload ? smem_a + Arg::smem_ld_a * Arg::k : smem_a;
+    auto *smem_c = mma_c_reuse_b() ? smem_b : smem_b + Arg::smem_ld_b * Arg::k;
+
+    // If reuse c for b, some warps may still be loading from smem
+    if (mma_c_reuse_b()) __syncthreads();
 
     smem_take_vector<Arg::smem_ld_b>(in, smem_b);
 
     __syncthreads();
-    mma_sync_gemm<typename Arg::Mma, Arg::block_dim_x, Arg::Ls, Arg::m, Arg::n, Arg::smem_ld_a, Arg::smem_ld_b, Arg::smem_ld_c, false>(
-      op_a.data, smem_a, smem_b, smem_c, wrm);
+    mma_sync_gemm<typename Arg::Mma, Arg::block_dim_x, Arg::Ls, Arg::m, Arg::n, Arg::smem_ld_a, Arg::smem_ld_b, Arg::smem_ld_c, Arg::reload, mma_c_reuse_b()>(
+      op_a, smem_a, smem_b, smem_c, wrm);
     __syncthreads();
 
     Vector out = smem_give_vector<Arg::smem_ld_c, Vector>(smem_c);
+
     return out;
   }
 
@@ -135,13 +177,11 @@ namespace quda
 
     __device__ __forceinline__ void operator()(unsigned int, int s, int parity)
     {
-      smem_construct_m5inv<Arg::dagger>(arg);
-      __syncthreads();
 
       bool idle = false;
       int x_cb_base = blockIdx.x * blockDim.x; // base.
 
-      auto op_a = construct_m5inv_op(arg);
+      auto op_a = construct_m5inv<Arg::dagger>(arg);
 
       while (x_cb_base < arg.volume_4d_cb) {
         int x_cb = x_cb_base + threadIdx.x;

@@ -5,8 +5,8 @@
 namespace quda
 {
 
-  template <class Mma, int block_dim_x, int Ls, int m, int n, int smem_ld_a, int smem_ld_b, int smem_ld_c, bool reload, class T, class real, class S>
-  __device__ inline void mma_sync_gemm(T op_a[], real *smem_a, real *smem_b, real *smem_c, const S &wrm)
+  template <class Mma, int block_dim_x, int Ls, int m, int n, int smem_ld_a, int smem_ld_b, int smem_ld_c, bool reload, bool reuse_c_for_b, class T, class real, class S>
+  __device__ inline void mma_sync_gemm(T &op_a, real *smem_a, real *smem_b, real *smem_c, const S &wrm)
   {
 
     constexpr int tile_row_dim = m / Mma::mma_m; // number of tiles in the column dimension
@@ -57,7 +57,7 @@ namespace quda
         }
       }
 
-      // __syncthreads();
+      if (reuse_c_for_b) __syncthreads();
 
       op_c.template store<smem_ld_c>(smem_c, warp_row * Mma::mma_m, warp_col * Mma::mma_n, wrm);
     }
