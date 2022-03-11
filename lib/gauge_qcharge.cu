@@ -27,16 +27,18 @@ namespace quda
       apply(device::get_default_stream());
     }
 
+    template <bool compute_density = false> using Arg = QChargeArg<Float, nColor, recon, compute_density>;
+
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-      std::vector<double> result(3);
-      if (density) {
-        QChargeArg<Float, nColor, recon, true> arg(Fmunu, (Float*)qdensity);
+      typename Arg<>::reduce_t result;
+      if (!density) {
+        Arg<false> arg(Fmunu, static_cast<Float*>(qdensity));
         launch<qCharge>(result, tp, stream, arg);
       } else {
-        QChargeArg<Float, nColor, recon, false> arg(Fmunu, (Float*)qdensity);
+        Arg<true> arg(Fmunu, static_cast<Float*>(qdensity));
         launch<qCharge>(result, tp, stream, arg);
       }
 
@@ -61,7 +63,7 @@ namespace quda
 #ifdef GPU_GAUGE_TOOLS
   void computeQCharge(double energy[3], double &qcharge, const GaugeField &Fmunu)
   {
-    instantiate<QCharge,ReconstructNone>(Fmunu, energy, qcharge, nullptr, false);
+    instantiate<QCharge, ReconstructNone>(Fmunu, energy, qcharge, nullptr, false);
   }
 #else
   void computeQCharge(double [3], double &, const GaugeField &)
@@ -73,7 +75,7 @@ namespace quda
 #ifdef GPU_GAUGE_TOOLS
   void computeQChargeDensity(double energy[3], double &qcharge, void *qdensity, const GaugeField &Fmunu)
   {
-    instantiate<QCharge,ReconstructNone>(Fmunu, energy, qcharge, qdensity, true);
+    instantiate<QCharge, ReconstructNone>(Fmunu, energy, qcharge, qdensity, true);
   }
 #else
   void computeQChargeDensity(double [3], double &, void *, const GaugeField &)

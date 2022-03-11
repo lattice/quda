@@ -41,7 +41,7 @@ template <typename Float>
 inline double norm2(Float *v, int len) {
   double sum=0.0;
   for (int i=0; i<len; i++) sum += v[i]*v[i];
-  comm_allreduce(&sum);
+  quda::comm_allreduce_sum(sum);
   return sum;
 }
 
