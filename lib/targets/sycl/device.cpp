@@ -223,13 +223,6 @@ namespace quda
       }
     }
 
-#if 0
-    cudaStream_t get_cuda_stream(const qudaStream_t &stream)
-    {
-      return streams[stream.idx];
-    }
-#endif
-
     sycl::queue get_target_stream(const qudaStream_t &stream)
     {
       //printfQuda("Getting stream %i\n", stream.idx);

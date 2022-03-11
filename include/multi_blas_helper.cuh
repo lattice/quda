@@ -16,15 +16,19 @@ namespace quda
     /**
        @brief Returns the maximum size of a coefficient array for 2-d multi-blas
     */
-    constexpr int max_array_size() { return 8192; }
+    constexpr size_t max_array_size() { return 8192; }
 
     /**
        @brief Returns the maximum size of the kernel argument
        @tparam Functor reducer and multi_1d blas kernels use kernel arg, others use constant
     */
     template <typename Functor>
-    //constexpr int max_arg_size() { return (Functor::multi_1d || Functor::reducer) ? device::max_kernel_arg_size() : device::max_constant_size(); }
-    constexpr int max_arg_size() { return device::max_constant_size(); }
+    constexpr size_t max_arg_size() { return (Functor::multi_1d || Functor::reducer) ? device::max_kernel_arg_size() : device::max_constant_size(); }
+
+    /**
+       @brief Returns the minimim size of YW array, will use constant buffer if arg size isn't large enough
+    */
+    constexpr size_t min_YW_size() { return 4; }
 
     /**
        @brief set_param sets the matrix coefficient parameters for the
@@ -67,7 +71,7 @@ namespace quda
     {
       using coeff_t = typename decltype(arg.f)::coeff_t;
       if (arg.NXZ * arg.NYW * sizeof(coeff_t) > max_array_size())
-        printfQuda("Requested parameter size %lu larger than max %d", arg.NXZ * arg.NYW * sizeof(coeff_t), max_array_size());
+        printfQuda("Requested parameter size %lu larger than max %lu", arg.NXZ * arg.NYW * sizeof(coeff_t), max_array_size());
 
       coeff_t *host = nullptr;
       switch (select) {
@@ -207,21 +211,25 @@ namespace quda
       using SpinorW = SpinorX;
 
       constexpr auto arg_known_size = (sizeof(kernel_param<>)                                        // kernel_param parent
-                                       + sizeof(int)                                                 // NYW parameter
-                                       + sizeof(SpinorX[NXZ])                                        // SpinorX array
-                                       + (Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ *)) // SpinorZ array
-                                       + sizeof(Functor)                                             // functor
-                                       + sizeof(dim3)                                                // threads parameter
-                                       + (!Functor::use_w ? sizeof(SpinorW *) : 0)                   // subtract pointer if not using W
-                                       + (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
-                                       );
+				       + sizeof(int)                                                 // NYW parameter
+				       + sizeof(SpinorX[NXZ])                                        // SpinorX array
+				       + (Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ *)) // SpinorZ array
+				       + sizeof(Functor)                                             // functor
+				       + sizeof(dim3)                                                // threads parameter
+				       + (!Functor::use_w ? sizeof(SpinorW *) : 0)                   // subtract pointer if not using W
+				       + (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
+				       );
+
+      constexpr auto yw_size = (sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0));
+      constexpr auto min_size = arg_known_size + min_YW_size() * yw_size;
+      constexpr auto max_arg = (max_arg_size<Functor>() >= min_size) ? max_arg_size<Functor>() : device::max_constant_size();
 
       // size remaining for the Y and W accessors
-      constexpr auto arg_remainder_size = max_arg_size<Functor>() - arg_known_size;
-      static_assert(static_cast<int64_t>(max_arg_size<Functor>()) - static_cast<int64_t>(arg_known_size) > 0, "Remainder size not positive");
+      constexpr auto arg_remainder_size = max_arg - arg_known_size;
+      static_assert(static_cast<int64_t>(max_arg) - static_cast<int64_t>(arg_known_size) > 0, "Remainder size not positive");
 
       // maximum NYW size based on max arg size
-      constexpr auto arg_nyw = arg_remainder_size / (sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0));
+      constexpr auto arg_nyw = arg_remainder_size / yw_size;
       static_assert(arg_nyw != 0, "arg_nyw size is zero");
 
       // maximum NYW imposed by the coefficients
@@ -257,23 +265,30 @@ namespace quda
       size_t spinor_z_size = spinor_x_size;
       size_t spinor_w_size = spinor_x_size;
 
-      // compute the size remaining for the Y and W accessors
-      const auto arg_size = ((int)max_arg_size<Functor>()
-                             - (int)sizeof(kernel_param<>)                                      // kernel_param parent
-                             - (int)sizeof(int)                                                 // NYW parameter
-                             - (int)(NXZ * spinor_x_size)                                         // SpinorX array
-                             - (int)(Functor::use_z ? NXZ * spinor_z_size : sizeof(void *))     // SpinorZ array (else dummy pointer)
-                             - (int)sizeof(Functor)                                             // functor
-                             - (int)sizeof(dim3)                                                // threads parameter
-                             - (int)(!Functor::use_w ? sizeof(void *) : 0)                      // subtract dummy pointer if not using W
-                             - (int)(Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
-                             )
-        / (int)(spinor_y_size + (Functor::use_w ? spinor_w_size : 0));
+      const auto arg_known_size = (sizeof(kernel_param<>)                                      // kernel_param parent
+				   + sizeof(int)                                                 // NYW parameter
+				   + (NXZ * spinor_x_size)                                         // SpinorX array
+				   + (Functor::use_z ? NXZ * spinor_z_size : sizeof(void *))     // SpinorZ array (else dummy pointer)
+				   + sizeof(Functor)                                             // functor
+				   + sizeof(dim3)                                                // threads parameter
+				   + (!Functor::use_w ? sizeof(void *) : 0)                      // subtract dummy pointer if not using W
+				   + (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
+				   );
 
-      // this is the maximum size limit imposed by the coefficient arrays
-      const int coeff_size = Functor::coeff_mul ? max_array_size() / (NXZ * sizeof(typename Functor::coeff_t)) : arg_size;
+      const auto yw_size = (spinor_y_size + (Functor::use_w ? spinor_w_size : 0));
+      const auto min_size = arg_known_size + min_YW_size() * yw_size;
+      const auto max_arg = (max_arg_size<Functor>() >= min_size) ? max_arg_size<Functor>() : device::max_constant_size();
 
-      return std::min(arg_size, coeff_size);
+      // size remaining for the Y and W accessors
+      const auto arg_remainder_size = max_arg - arg_known_size;
+
+      // maximum NYW size based on max arg size
+      const auto arg_nyw = arg_remainder_size / yw_size;
+
+      // maximum NYW imposed by the coefficients
+      const auto coeff_nyw = Functor::coeff_mul ? max_array_size() / (NXZ * sizeof(typename Functor::coeff_t)) : arg_nyw;
+
+      return std::min(arg_nyw, coeff_nyw);
     }
 
     /**
@@ -291,7 +306,7 @@ namespace quda
       if (NYW_max != NYW_max_check) errorQuda("Compile-time %d and run-time %d limits disagree", NYW_max, NYW_max_check);
       if (f.NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", f.NYW, NYW_max);
       if ( !(f.reducer || f.multi_1d) && NXZ * f.NYW * sizeof(typename Functor::coeff_t) > max_array_size())
-        errorQuda("Coefficient matrix exceeds max size (%lu > %d)", NXZ * f.NYW * sizeof(typename Functor::coeff_t), max_array_size());
+        errorQuda("Coefficient matrix exceeds max size (%lu > %lu)", NXZ * f.NYW * sizeof(typename Functor::coeff_t), max_array_size());
       if (Functor::multi_1d && std::min(NXZ, f.NYW) != 1)
         errorQuda("Expected 1-d multi-blas but appears 2-d (NXZ = %d, NYW = %d)", NXZ, f.NYW);
       if (Functor::multi_1d && std::max(NXZ, f.NYW) > max_N_multi_1d())

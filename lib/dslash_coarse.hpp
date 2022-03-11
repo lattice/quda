@@ -43,6 +43,7 @@ namespace quda {
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions
     unsigned int minThreads() const { return color_col_stride * X.VolumeCB(); }
 
+#if 0
     bool advanceBlockDim(TuneParam &param) const
     {
       bool ret = true;
@@ -56,6 +57,7 @@ namespace quda {
       }
       return ret;
     }
+#endif
 
     /**
        @param Helper function to check that the present launch parameters are valid
@@ -121,7 +123,7 @@ namespace quda {
 
     void initTuneParam(TuneParam &param) const
     {
-#if 1
+#if 0
       param.aux = make_int4(1,1,1,1);
       color_col_stride = param.aux.x;
       while(minThreads()%blockMin()!=0) {
