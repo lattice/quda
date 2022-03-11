@@ -264,20 +264,18 @@ namespace quda
     int t_offset;
     int offsets[4];
     
-    dim3 threads;     // number of active threads required
     int_fastdiv X[4]; // grid dimensions
     
     ContractionSummedArg(const ColorSpinorField &x, const ColorSpinorField &y,
 			 const int source_position_in[4], const int mom_mode_in[4],
 			 const int s1, const int b1) :
-      ReduceArg<spinor_array>(dim3(x.X()[reduction_dim], 1, 1), x.X()[reduction_dim]),
+      // Launch xyz threads per t, t times.
+      ReduceArg<spinor_array>(dim3(x.Volume()/x.X()[reduction_dim], 1, x.X()[reduction_dim]), x.X()[reduction_dim]),
       x(x),
       y(y),
       s1(s1),
       b1(b1),
-      Gamma(),
-      // Launch xyz threads per t, t times.
-      threads(x.Volume()/x.X()[reduction_dim], x.X()[reduction_dim])  
+      Gamma()
     {
       for(int i=0; i<4; i++) {
 	X[i] = x.X()[i];
@@ -299,8 +297,8 @@ namespace quda
     // overload comm_reduce to defer until the entire "tile" is complete
     template <typename U> static inline void comm_reduce(U &) { }
     
-    // Final param is unused in the MultiReduce functor in this use case.
-    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int t, int)
+    // Third param is unused in the MultiReduce functor in this use case.
+    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int, int t)
     {
       constexpr int nSpin = Arg::nSpin;
       constexpr int nColor = Arg::nColor;
@@ -337,6 +335,8 @@ namespace quda
 				(source_position[1]-sink[1]-offsets[1])*mom_mode[1]*1./NxNyNzNt[1]+
 				(source_position[2]-sink[2]-offsets[2])*mom_mode[2]*1./NxNyNzNt[2]+
 				(source_position[3]-sink[3]-offsets[3])*mom_mode[3]*1./NxNyNzNt[3]);
+
+      quda::SinCos
       
       phase_real =  cos(Sum_dXi_dot_Pi*2.*M_PI);
       phase_imag = -sin(Sum_dXi_dot_Pi*2.*M_PI);
@@ -362,16 +362,16 @@ namespace quda
 	    // use tr[ Gamma * Prop * Gamma * g5 * conj(Prop) * g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
 	    // gamma_5 * gamma_i <phi | phi > gamma_5 * gamma_idx 
 	    propagator_product = arg.Gamma.g5gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.g5gm_z[G_idx][b1];
-	    //result_all_channels[0][G_idx][0] += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
-	    //result_all_channels[0][G_idx][1] += propagator_product.imag()*phase_real+propagator_product.real()*phase_imag;
+	    result_all_channels[G_idx][0] += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
+	    result_all_channels[G_idx][1] += propagator_product.imag()*phase_real+propagator_product.real()*phase_imag;
 	  }
 	}
       }
 
       // Debug
       for (int G_idx = 0; G_idx < nSpin*nSpin; G_idx++) {
-	result_all_channels[G_idx][0] += (G_idx+t) + idx;
-	result_all_channels[G_idx][1] += (G_idx+t) + idx;
+	//result_all_channels[G_idx][0] += (G_idx+t) + idx;
+	//result_all_channels[G_idx][1] += (G_idx+t) + idx;
       }
       
       //return result_all_channels;
