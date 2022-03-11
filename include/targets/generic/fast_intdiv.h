@@ -125,7 +125,7 @@ template <bool is_device> struct mul_hi {
 __host__ __device__ __forceinline__
 int operator/(const int n, const int_fastdiv& divisor)
 {
-  int q = target::dispatch<mul_hi>(n, divisor.M);
+  int q = quda::target::dispatch<mul_hi>(n, divisor.M);
   q += n * divisor.n_add_sign;
   if (divisor.s >= 0)
     {

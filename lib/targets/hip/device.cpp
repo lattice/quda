@@ -1,18 +1,14 @@
-#include <cuda_runtime.h>
-#include <cuda_profiler_api.h>
+#include <hip/hip_runtime.h>
 #include <util_quda.h>
 #include <quda_internal.h>
+#include <quda_hip_api.h>
+#include <target_device.h>
 
-#ifdef QUDA_NVML
-#include <nvml.h>
-#endif
+static hipDeviceProp_t deviceProp;
+static hipStream_t *streams;
+static const int Nstream = 9;
 
-#ifdef NUMA_NVML
-#include <numa_affinity.h>
-#endif
-
-cudaDeviceProp deviceProp;
-qudaStream_t *streams;
+#define CHECK_HIP_ERROR(func) target::hip::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
 
 namespace quda
 {
@@ -27,136 +23,154 @@ namespace quda
       if (initialized) return;
       initialized = true;
       printfQuda("*** HIP BACKEND ***\n");
-      int driver_version;
-      cudaDriverGetVersion(&driver_version);
-      printfQuda("CUDA Driver version = %d\n", driver_version);
 
-      int runtime_version;
-      cudaRuntimeGetVersion(&runtime_version);
-      printfQuda("CUDA Runtime version = %d\n", runtime_version);
+      int driver_version = 0;
+      CHECK_HIP_ERROR(hipDriverGetVersion(&driver_version));
+      printfQuda("HIP Driver version = %d\n", driver_version);
 
-#ifdef QUDA_NVML
-      nvmlReturn_t result = nvmlInit();
-      if (NVML_SUCCESS != result) errorQuda("NVML Init failed with error %d", result);
-      const int length = 80;
-      char graphics_version[length];
-      result = nvmlSystemGetDriverVersion(graphics_version, length);
-      if (NVML_SUCCESS != result) errorQuda("nvmlSystemGetDriverVersion failed with error %d", result);
-      printfQuda("Graphic driver version = %s\n", graphics_version);
-      result = nvmlShutdown();
-      if (NVML_SUCCESS != result) errorQuda("NVML Shutdown failed with error %d", result);
-#endif
+      int runtime_version = 0;
+      CHECK_HIP_ERROR(hipRuntimeGetVersion(&runtime_version));
+      printfQuda("HIP Runtime version = %d\n", runtime_version);
 
-      int deviceCount;
-      cudaGetDeviceCount(&deviceCount);
-      if (deviceCount == 0) { errorQuda("No CUDA devices found"); }
-
-      for (int i = 0; i < deviceCount; i++) {
-        cudaGetDeviceProperties(&deviceProp, i);
-        checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
+      for (int i = 0; i < get_device_count(); i++) {
+        CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProp, i));
         if (getVerbosity() >= QUDA_SUMMARIZE) { printfQuda("Found device %d: %s\n", i, deviceProp.name); }
       }
 
-      cudaGetDeviceProperties(&deviceProp, dev);
-      checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
-      if (deviceProp.major < 1) { errorQuda("Device %d does not support CUDA", dev); }
-
-      // Check GPU and QUDA build compatibiliy
-      // 4 cases:
-      // a) QUDA and GPU match: great
-      // b) QUDA built for higher compute capability: error
-      // c) QUDA built for lower major compute capability: warn if QUDA_ALLOW_JIT, else error
-      // d) QUDA built for same major compute capability but lower minor: warn
-
-      const int my_major = __COMPUTE_CAPABILITY__ / 100;
-      const int my_minor = (__COMPUTE_CAPABILITY__ - my_major * 100) / 10;
-      // b) UDA was compiled for a higher compute capability
-      if (deviceProp.major * 100 + deviceProp.minor * 10 < __COMPUTE_CAPABILITY__)
-        errorQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. ** \n --- "
-                  "Please set the correct QUDA_GPU_ARCH when running cmake.\n",
-                  deviceProp.major, deviceProp.minor, my_major, my_minor);
-
-      // c) QUDA was compiled for a lower compute capability
-      if (deviceProp.major < my_major) {
-        char *allow_jit_env = getenv("QUDA_ALLOW_JIT");
-        if (allow_jit_env && strcmp(allow_jit_env, "1") == 0) {
-          if (getVerbosity() > QUDA_SILENT)
-            warningQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n -- "
-                        "Jitting the PTX since QUDA_ALLOW_JIT=1 was set. Note that this will take some time.\n",
-                        deviceProp.major, deviceProp.minor, my_major, my_minor);
-        } else {
-          errorQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n --- "
-                    "Please set the correct QUDA_GPU_ARCH when running cmake.\n If you want the PTX to be jitted for "
-                    "your current GPU arch please set the enviroment variable QUDA_ALLOW_JIT=1.",
-                    deviceProp.major, deviceProp.minor, my_major, my_minor);
-        }
-      }
-      // d) QUDA built for same major compute capability but lower minor
-      if (deviceProp.major == my_major and deviceProp.minor > my_minor) {
-        warningQuda(
-          "** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n -- This might "
-          "result in a lower performance. Please consider adjusting QUDA_GPU_ARCH when running cmake.\n",
-          deviceProp.major, deviceProp.minor, my_major, my_minor);
-      }
-
       if (getVerbosity() >= QUDA_SUMMARIZE) { printfQuda("Using device %d: %s\n", dev, deviceProp.name); }
-#ifndef USE_QDPJIT
-      cudaSetDevice(dev);
-      checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
-#endif
 
-#ifdef NUMA_NVML
-      char *enable_numa_env = getenv("QUDA_ENABLE_NUMA");
-      if (enable_numa_env && strcmp(enable_numa_env, "0") == 0) {
-        if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling numa_affinity\n");
-      } else {
-        setNumaAffinityNVML(dev);
+      CHECK_HIP_ERROR(hipSetDevice(dev));
+
+      CHECK_HIP_ERROR(hipDeviceSetCacheConfig(hipFuncCachePreferL1));
+      // hipDeviceSetSharedMemConfig(hipSharedMemBankSizeEightByte);
+      CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProp, dev));
+    }
+
+    int get_device_count()
+    {
+      static int device_count = 0;
+      if (device_count == 0) {
+        CHECK_HIP_ERROR(hipGetDeviceCount(&device_count));
+        if (device_count == 0) errorQuda("No HIP devices found");
       }
-#endif
-
-      cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
-      // cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
-      // cudaGetDeviceProperties(&deviceProp, dev);
+      return device_count;
     }
 
     void create_context()
     {
-      streams = new qudaStream_t[Nstream];
+      streams = new hipStream_t[Nstream];
 
       int greatestPriority;
       int leastPriority;
-      cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
+      CHECK_HIP_ERROR(hipDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority));
       for (int i = 0; i < Nstream - 1; i++) {
-        cudaStreamCreateWithPriority(&streams[i], cudaStreamDefault, greatestPriority);
+        CHECK_HIP_ERROR(hipStreamCreateWithPriority(&streams[i], hipStreamDefault, greatestPriority));
       }
-      cudaStreamCreateWithPriority(&streams[Nstream - 1], cudaStreamDefault, leastPriority);
-
-      checkCudaError();
+      CHECK_HIP_ERROR(hipStreamCreateWithPriority(&streams[Nstream - 1], hipStreamDefault, leastPriority));
     }
 
     void destroy()
     {
       if (streams) {
-        for (int i = 0; i < Nstream; i++) cudaStreamDestroy(streams[i]);
+        for (int i = 0; i < Nstream; i++) CHECK_HIP_ERROR(hipStreamDestroy(streams[i]));
         delete[] streams;
         streams = nullptr;
       }
 
       char *device_reset_env = getenv("QUDA_DEVICE_RESET");
       if (device_reset_env && strcmp(device_reset_env, "1") == 0) {
-        // end this CUDA context
-        cudaDeviceReset();
+        // end this HIP context
+        CHECK_HIP_ERROR(hipDeviceReset());
       }
     }
+
+    qudaStream_t get_stream(unsigned int i)
+    {
+      if (i > Nstream) errorQuda("Invalid stream index %u", i);
+      qudaStream_t stream;
+      stream.idx = i;
+      return stream;
+      // return qudaStream_t(i);
+      // return streams[i];
+    }
+
+    qudaStream_t get_default_stream()
+    {
+      qudaStream_t stream;
+      stream.idx = Nstream - 1;
+      return stream;
+      // return qudaStream_t(Nstream - 1);
+      // return streams[Nstream - 1];
+    }
+
+    unsigned int get_default_stream_idx() { return Nstream - 1; }
+
+    bool managed_memory_supported()
+    {
+      // managed memory is not supported
+      return false;
+    }
+
+    bool shared_memory_atomic_supported()
+    {
+      // shared memory atomics are supported  in the HIP API
+      return true;
+    }
+
+#if 0
+    size_t max_default_shared_memory() { return deviceProp.sharedMemPerBlock-1; } 
+
+    size_t max_dynamic_shared_memory()
+    {
+      static int max_shared_bytes = 0;
+      if (!max_shared_bytes) hipDeviceGetAttribute(&max_shared_bytes,  hipDeviceAttributeMaxSharedMemoryPerBlock, comm_gpuid());
+      return max_shared_bytes-1;
+    }
+#else
+    size_t max_default_shared_memory() { return 32000; }
+
+    size_t max_dynamic_shared_memory() { return 32000; }
+#endif
+
+    unsigned int max_threads_per_block() { return deviceProp.maxThreadsPerBlock; }
+
+    unsigned int max_threads_per_processor() { return deviceProp.maxThreadsPerMultiProcessor; }
+
+    unsigned int max_threads_per_block_dim(int i) { return deviceProp.maxThreadsDim[i]; }
+
+    unsigned int max_grid_size(int i) { return deviceProp.maxGridSize[i]; }
+
+    unsigned int processor_count() { return deviceProp.multiProcessorCount; }
+
+    unsigned int max_blocks_per_processor() { return 32; }
 
     namespace profile
     {
 
-      void start() { cudaProfilerStart(); }
+      void start()
+      {
+        // FIXME: HIP PROFILER DEPRECATED
+      }
 
-      void stop() { cudaProfilerStop(); }
+      void stop()
+      {
+        // FIXME: HIP PROFILER DEPRECARED
+      }
 
     } // namespace profile
 
   } // namespace device
+
+  namespace target
+  {
+
+    namespace hip
+    {
+
+      hipStream_t get_stream(const qudaStream_t &stream) { return streams[stream.idx]; }
+
+    } // namespace hip
+
+  } // namespace target
+
 } // namespace quda
