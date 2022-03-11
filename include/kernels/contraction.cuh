@@ -336,10 +336,9 @@ namespace quda
 				(source_position[2]-sink[2]-offsets[2])*mom_mode[2]*1./NxNyNzNt[2]+
 				(source_position[3]-sink[3]-offsets[3])*mom_mode[3]*1./NxNyNzNt[3]);
 
-      quda::SinCos
       
-      phase_real =  cos(Sum_dXi_dot_Pi*2.*M_PI);
-      phase_imag = -sin(Sum_dXi_dot_Pi*2.*M_PI);
+      quda::sincos(Sum_dXi_dot_Pi*2.*M_PI, &phase_imag, &phase_real);
+      phase_imag *= -1.0;
       
       // Collect vector data
       int parity = 0;
@@ -369,12 +368,11 @@ namespace quda
       }
 
       // Debug
-      for (int G_idx = 0; G_idx < nSpin*nSpin; G_idx++) {
-	//result_all_channels[G_idx][0] += (G_idx+t) + idx;
-	//result_all_channels[G_idx][1] += (G_idx+t) + idx;
-      }
+      //for (int G_idx = 0; G_idx < nSpin*nSpin; G_idx++) {
+      //result_all_channels[G_idx][0] += (G_idx+t) + idx;
+      //result_all_channels[G_idx][1] += (G_idx+t) + idx;
+      //}
       
-      //return result_all_channels;
       return plus::operator()(result_all_channels, result);
     }
   };
