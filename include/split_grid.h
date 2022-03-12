@@ -8,10 +8,10 @@
 #include <color_spinor_field.h>
 #include <clover_field.h>
 
-int comm_rank_from_coords(const int *coords);
-
 namespace quda
 {
+
+  int comm_rank_from_coords(const int *coords);
 
   template <class Field>
   void inline split_field(Field &collect_field, std::vector<Field *> &v_base_field, const CommKey &comm_key,
@@ -56,7 +56,7 @@ namespace quda
 
       auto dst_idx = partition_idx * processor_dim + processor_idx;
 
-      int dst_rank = comm_rank_from_coords(dst_idx.data());
+      int dst_rank = ::quda::comm_rank_from_coords(dst_idx.data());
       int tag = rank * total_rank + dst_rank; // tag = src_rank * total_rank + dst_rank
 
       size_t bytes = meta->TotalBytes();

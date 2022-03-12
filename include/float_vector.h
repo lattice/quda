@@ -74,10 +74,37 @@ namespace quda {
     return v;
   }
 
+  // array of arithmetic types specialization
   template <typename T>
-  __device__ __host__ inline std::enable_if_t<std::is_same_v<T, array<typename T::value_type, T::N>>, T> zero()
+  __device__ __host__ inline std::enable_if_t<
+    std::is_same_v<T, array<typename T::value_type, T::N>> && std::is_arithmetic_v<typename T::value_type>, T>
+  zero()
   {
     return zero<typename T::value_type, T::N>();
+  }
+
+  // array of array specialization
+  template <typename T>
+  __device__ __host__ inline std::enable_if_t<
+    std::is_same_v<T, array<array<typename T::value_type::value_type, T::value_type::N>, T::N>>, T>
+  zero()
+  {
+    T v;
+#pragma unroll
+    for (int i = 0; i < v.size(); i++) v[i] = zero<typename T::value_type>();
+    return v;
+  }
+
+  // array of complex specialization
+  template <typename T>
+  __device__
+    __host__ inline std::enable_if_t<std::is_same_v<T, array<complex<typename T::value_type::value_type>, T::N>>, T>
+    zero()
+  {
+    T v;
+#pragma unroll
+    for (int i = 0; i < v.size(); i++) v[i] = zero<typename T::value_type>();
+    return v;
   }
 
   template <typename T> struct low {
