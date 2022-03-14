@@ -1,3 +1,17 @@
+# This file is divided into 5 sections:
+# 1. Basic setup for cmake 
+# 2. QUDA Physics options 
+# 3. QUDA Dependency options
+# 4. QUDA Advanced options
+# 5. QUDA CMake configuration set up
+#
+# Each section is delineated by START and END. If you make additions to this file,
+# please add an appropriate comment and, if necessary, document the addition
+# in the QUDA Wiki page: https://github.com/lattice/quda/wiki/QUDA-Build-With-CMake
+
+####################################################################################
+# START 1. Basic setup for cmake
+####################################################################################
 # basic setup for cmake
 cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 
@@ -9,12 +23,12 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)
 set(CMAKE_COLOR_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-# disable gnu exentions
+# Disable gnu exentions
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CUDA_EXTENSIONS OFF)
 
-# disable in source builds this is only a temporary fix, but for now we need it as cmake will otherwise overwrite the
-# existing makefiles
+# Disable in source builds this is only a temporary fix, but for now we need it as
+# cmake will otherwise overwrite the existing makefiles.
 set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 # add a directory for cmake modules
@@ -23,7 +37,9 @@ include(cmake/CPM.cmake)
 
 find_package(Git)
 
-# by default we will build DEVEL
+# By default we will build DEVEL. The different build types will pass different
+# flags to the compiler which may be strict or permissive on warnings, or
+# very verbose at run time and/or compile time.
 if(DEFINED ENV{QUDA_BUILD_TYPE})
   set(DEFBUILD $ENV{QUDA_BUILD_TYPE})
 else()
@@ -38,8 +54,8 @@ set(VALID_BUILD_TYPES
     HOSTDEBUG
     SANITIZE)
 set(CMAKE_BUILD_TYPE
-    "${DEFBUILD}"
-    CACHE STRING "Choose the type of build, options are: ${VALID_BUILD_TYPES}")
+  "${DEFBUILD}"
+  CACHE STRING "Choose the type of build, options are: ${VALID_BUILD_TYPES}")
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${VALID_BUILD_TYPES})
 
 string(TOUPPER ${CMAKE_BUILD_TYPE} CHECK_BUILD_TYPE)
@@ -49,7 +65,8 @@ if(BUILD_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid CMAKE_BUILD_TYPE type! Valid build types are:" "${VALID_BUILD_TYPES}")
 endif()
 
-# Target type
+# QUDA may be built to run using HIP or CUDA, which we call the
+# Target type. By default, the target is CUDA.
 if(DEFINED ENV{QUDA_TARGET})
   set(DEFTARGET $ENV{QUDA_TARGET})
 else()
@@ -58,8 +75,8 @@ endif()
 
 set(VALID_TARGET_TYPES CUDA HIP OMPTARGET)
 set(QUDA_TARGET_TYPE
-    "${DEFTARGET}"
-    CACHE STRING "Choose the type of target, options are: ${VALID_TARGET_TYPES}")
+  "${DEFTARGET}"
+  CACHE STRING "Choose the type of target, options are: ${VALID_TARGET_TYPES}")
 set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP OMPTARGET)
 
 string(TOUPPER ${QUDA_TARGET_TYPE} CHECK_TARGET_TYPE)
@@ -97,11 +114,13 @@ if(GIT_FOUND)
   endif()
 endif(GIT_FOUND)
 
+# Define the project
 project(
   "QUDA"
   VERSION 1.1.0
   LANGUAGES)
 
+# Print the configuration details to stdout
 message(STATUS "")
 message(STATUS "${PROJECT_NAME} ${PROJECT_VERSION} (${GITVERSION}) **")
 message(STATUS "cmake version: ${CMAKE_VERSION}")
@@ -132,12 +151,16 @@ option(QUDA_DIRAC_TWISTED_CLOVER "build twisted clover Dirac operators" ${QUDA_D
 option(QUDA_DIRAC_CLOVER_HASENBUSCH "build clover Hasenbusch twist operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_NDEG_TWISTED_MASS "build non-degenerate twisted mass Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_NDEG_TWISTED_CLOVER "build non-degenerate twisted clover Dirac operators" ${QUDA_DIRAC_DEFAULT})
+
+# HMC gauge force routines
 option(QUDA_FORCE_GAUGE "build code for (1-loop Symanzik) gauge force" OFF)
 option(QUDA_FORCE_HISQ "build code for hisq fermion force" OFF)
 option(QUDA_GAUGE_TOOLS "build auxiliary gauge-field tools" OFF)
+
 option(QUDA_GAUGE_ALG "build gauge-fixing and pure-gauge algorithms" OFF)
 option(QUDA_CONTRACT "build code for bilinear contraction" OFF)
 option(QUDA_COVDEV "build code for covariant derivative" OFF)
+
 option(QUDA_LAPLACE "build laplace operator" OFF)
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
 
@@ -164,16 +187,9 @@ option(QUDA_INTERFACE_ALL "enable all data-orders triggered by the various inter
 # QDPJIT
 option(QUDA_QDPJIT "build QDP-JIT support?" OFF)
 
-# Locations for some libraries
-set(QUDA_LIMEHOME
-    ""
-    CACHE PATH "path to LIME")
-set(QUDA_QDPJITHOME
-    ""
-    CACHE PATH "path to QDPJIT installation")
 set(QUDA_ARPACK_HOME
-    ""
-    CACHE PATH "path to arpack / parpack")
+  ""
+  CACHE PATH "path to arpack / parpack")
 set(QUDA_OPENBLAS_HOME
     ""
     CACHE PATH "path to OpenBLAS")
@@ -189,19 +205,22 @@ option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" ON)
 
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
 
+# QUDA uses tiling routines to compute certain BLAS routines. The maximum allowable
+# tile size is governed by this number. The larger the number, the faster the routines
+# will compute, but it will take longer to compile.
 set(QUDA_MAX_MULTI_BLAS_N
-    "4"
-    CACHE STRING "maximum value to initialize template for multi-blas /-reduce")
+  "4"
+  CACHE STRING "maximum value to initialize template for multi-blas /-reduce")
 if(QUDA_MAX_MULTI_BLAS_N GREATER 32)
   message(SEND_ERROR "Maximum QUDA_MAX_MULTI_BLAS_N is 32.")
 endif()
 
 set(QUDA_PRECISION
-    "14"
-    CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, quarter)")
+  "14"
+  CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, quarter)")
 set(QUDA_RECONSTRUCT
-    "7"
-    CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
+  "7"
+  CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
 
 option(QUDA_CLOVER_DYNAMIC "Dynamically invert the clover term" ON)
 option(QUDA_CLOVER_RECONSTRUCT "set to ON to enable compressed clover storage (requires QUDA_CLOVER_DYNAMIC)" ON)
@@ -218,6 +237,7 @@ option(QUDA_OPENMP "enable OpenMP" OFF)
 set(QUDA_CXX_STANDARD
     17
     CACHE STRING "set the CXX Standard (14 or 17)")
+
 set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
@@ -261,14 +281,23 @@ mark_as_advanced(QUDA_BLOCKSOLVER)
 mark_as_advanced(QUDA_CXX_STANDARD)
 
 mark_as_advanced(QUDA_ARPACK_LOGGING)
+####################################################################################
+# END 4. QUDA advanced options that usually should not be changed by users
+####################################################################################
 
-# some checks for invalid combinations
+####################################################################################
+# START 5. QUDA CMake configuration set up
+####################################################################################
+# All the CMake code from here and below is not exposed to the user. Its purpose
+# is to configure the build given the options above
 
+# Some checks for invalid combinations
 if(QUDA_MPI AND QUDA_QMP)
   message(
     SEND_ERROR
-      "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
+    "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
 endif()
+
 
 if(QUDA_NVSHMEM AND NOT (QUDA_QMP OR QUDA_MPI))
   message(SEND_ERROR "Specifying QUDA_NVSHMEM requires either QUDA_QMP or QUDA_MPI.")
@@ -277,8 +306,9 @@ endif()
 # COMPILER FLAGS Linux: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Mac: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Power:
 # CMAKE_HOST_SYSTEM_PROCESSOR "ppc64le"
 
-# We need to use different optimization flags depending on whether we are on x86 or power Note: This only applies to the
-# RELEASE build type this is just a quick fix and we should probably use
+# We need to use different optimization flags depending on whether we are on x86 or
+# power Note: This only applies to the RELEASE build type this is just a quick fix
+# and we should probably use
 # https://cmake.org/cmake/help/latest/module/CheckCXXCompilerFlag.html
 
 set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
@@ -290,16 +320,15 @@ endif()
 
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 
-# define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL
-    "-g -O3 -Wall -Wextra"
-    CACHE STRING "Flags used by the C++ compiler during regular development builds.")
+  "-g -O3 -Wall -Wextra"
+  CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
-    "-O3 -Werror -Wall -Wextra"
-    CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
+  "-O3 -Werror -Wall -Wextra"
+  CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE
-    "-O3 -w ${CXX_OPT} "
-    CACHE STRING "Flags used by the C++ compiler during release builds.")
+  "-O3 -w ${CXX_OPT} "
+  CACHE STRING "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG
     "-Wall -Wextra -g"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
@@ -314,30 +343,31 @@ enable_language(CXX)
 
 # define C FLAGS
 set(CMAKE_C_FLAGS_DEVEL
-    "-g -O3 -Wall -Wextra"
-    CACHE STRING "Flags used by the C compiler during regular development builds.")
+  "-g -O3 -Wall -Wextra"
+  CACHE STRING "Flags used by the C compiler during regular development builds.")
 set(CMAKE_C_FLAGS_STRICT
-    "-O3 -Werror -Wall -Wextra"
-    CACHE STRING "Flags used by the C compiler during strict jenkins builds.")
+  "-O3 -Werror -Wall -Wextra"
+  CACHE STRING "Flags used by the C compiler during strict jenkins builds.")
 set(CMAKE_C_FLAGS_RELEASE
-    "-O3 -w"
-    CACHE STRING "Flags used by the C compiler during release builds.")
+  "-O3 -w"
+  CACHE STRING "Flags used by the C compiler during release builds.")
 set(CMAKE_C_FLAGS_HOSTDEBUG
     "-Wall -Wextra -g"
     CACHE STRING "Flags used by the C compiler during host-debug builds.")
 set(CMAKE_C_FLAGS_DEBUG
-    "-Wall -Wextra -g -fno-inline"
-    CACHE STRING "Flags used by the C compiler during full (host+device) debug builds.")
+  "-Wall -Wextra -g -fno-inline"
+  CACHE STRING "Flags used by the C compiler during full (host+device) debug builds.")
 set(CMAKE_C_FLAGS_SANITIZE
     "-Wall -Wextra -g -fno-inline \"-fsanitize=address,undefined\""
     CACHE STRING "Flags used by the C compiler during sanitizer debug builds.")
 
+
 enable_language(C)
 
 if(QUDA_INTERFACE_TIFR
-   OR QUDA_INTERFACE_BQCD
-   OR QUDA_ARPACK
-   OR QUDA_OPENBLAS)
+    OR QUDA_INTERFACE_BQCD
+    OR QUDA_ARPACK
+    OR QUDA_OPENBLAS)
   set(BUILD_FORTRAN_INTERFACE ON)
   enable_language(Fortran)
 endif()
@@ -351,6 +381,7 @@ if(QUDA_CLOVER_RECONSTRUCT AND NOT QUDA_CLOVER_DYNAMIC)
   message(SEND_ERROR "QUDA_CLOVER_RECONSTRUCT requires QUDA_CLOVER_DYNAMIC)")
 endif()
 
+find_package(Threads REQUIRED)
 if(QUDA_OPENMP)
   find_package(OpenMP REQUIRED)
 endif()
@@ -388,8 +419,8 @@ else()
   if(NOT EIGEN_FOUND)
     message(
       FATAL_ERROR
-        "QUDA requires Eigen (http://eigen.tuxfamily.org). Please either set EIGEN_INCLUDE_DIRS to path to eigen3 include directory, e.g. /usr/local/include/eigen3 or set QUDA_DOWNLOAD_EIGEN to ON to enable automatic download of the necessary components."
-    )
+      "QUDA requires Eigen (http://eigen.tuxfamily.org). Please either set EIGEN_INCLUDE_DIRS to path to eigen3 include directory, e.g. /usr/local/include/eigen3 or set QUDA_DOWNLOAD_EIGEN to ON to enable automatic download of the necessary components."
+      )
   endif()
   target_include_directories(Eigen SYSTEM INTERFACE ${EIGEN_INCLUDE_DIRS})
 endif()
@@ -403,8 +434,8 @@ if(QUDA_ARPACK OR QUDA_OPENBLAS)
 endif()
 
 if(QUDA_MPI OR QUDA_QMP)
-  # if we are using MPI and no MPI_<LANG>_COMPILER was specified on the command line check for MPICXX and MPICC
-  # environment variables
+  # if we are using MPI and no MPI_<LANG>_COMPILER was specified on the command line
+  # check for MPICXX and MPICC environment variables
   if((NOT MPI_CXX_COMPILER) AND DEFINED ENV{MPICXX})
     set(MPI_CXX_COMPILER $ENV{MPICXX})
     set(mpimessage True)
@@ -424,7 +455,7 @@ if(QUDA_MPI OR QUDA_QMP)
   if(mpimessage)
     message(
       "Found MPIFORT/MPICC/MPICXX environment variables. If this is not what you want please use -DMPI_<LANG>_COMPILER and consult the cmake FindMPI documentation."
-    )
+      )
   endif()
   find_package(MPI REQUIRED)
 endif()
@@ -539,13 +570,13 @@ if(QUDA_ARPACK)
     target_link_libraries(arpack-ng INTERFACE ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
     set_target_properties(arpack-ng PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
     set_target_properties(arpack-ng PROPERTIES IMPORTED_LOCATION
-                                               ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libarpack.a)
+      ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libarpack.a)
     if(QUDA_MPI OR QUDA_QMP)
       add_library(parpack-ng STATIC IMPORTED)
       target_link_libraries(parpack-ng INTERFACE arpack-ng MPI::MPI_Fortran)
       set_target_properties(parpack-ng PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
       set_target_properties(parpack-ng PROPERTIES IMPORTED_LOCATION
-                                                  ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libparpack.a)
+        ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libparpack.a)
     endif()
 
   else(QUDA_DOWNLOAD_ARPACK)
@@ -630,6 +661,7 @@ if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 endif()
 
+
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by
 # default )
 mark_as_advanced(CMAKE_CXX_FLAGS_DEVEL)
@@ -656,14 +688,3 @@ include(CTest)
 add_subdirectory(lib)
 add_subdirectory(tests)
 add_subdirectory(doc)
-
-include(CMakePackageConfigHelpers)
-configure_package_config_file(QUDAConfig.cmake.in QUDAConfig.cmake INSTALL_DESTINATION lib/cmake/QUDA)
-
-write_basic_package_version_file(
-	QUDAConfigVersion.cmake
-	VERSION ${PACKAGE_VERSION}
-	COMPATIBILITY AnyNewerVersion)
-
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/QUDAConfigVersion.cmake ${CMAKE_CURRENT_BINARY_DIR}/QUDAConfig.cmake
-	DESTINATION lib/cmake/QUDA)

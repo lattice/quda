@@ -196,7 +196,7 @@ namespace quda {
       TunableBlock2D::initTuneParam(param);
       int active_x_threads = (aggregate_size / 2) * (nSpin == 1 ? 1 : V.SiteSubset());
       param.block = dim3(OrthoAggregates::block_mapper(active_x_threads), 1, 1);
-      param.grid = dim3((nSpin == 1 ? V.VolumeCB() : V.Volume()) / active_x_threads, chiral_blocks, 1);
+      param.grid = dim3((nSpin == 1 ? V.VolumeCB() : V.Volume()) / active_x_threads, 1, chiral_blocks);
       param.aux.x = 1; // swizzle factor
     }
 

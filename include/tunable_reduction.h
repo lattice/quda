@@ -10,66 +10,6 @@ namespace quda
 {
 
   /**
-     Dummy comm reducer where no inter-process reduction is done
-  */
-  template <typename T> struct comm_reduce_null {
-    void operator()(std::vector<T> &) { }
-  };
-
-  /**
-     comm reducer for doing summation inter-process reduction
-  */
-  template <typename T> struct comm_reduce_sum {
-    // FIXME - this will break when we have non-double reduction types, e.g., double-double on the host
-    void operator()(std::vector<T> &v)
-    {
-      comm_allreduce_array(reinterpret_cast<double *>(v.data()), v.size() * sizeof(T) / sizeof(double));
-    }
-  };
-
-  /**
-     comm reducer for doing max inter-process reduction
-  */
-  template <typename T> struct comm_reduce_max {
-    // FIXME - this will break when we have non-double reduction types, e.g., double-double on the host
-    void operator()(std::vector<T> &v)
-    {
-      comm_allreduce_max_array(reinterpret_cast<double *>(v.data()), v.size() * sizeof(T) / sizeof(double));
-    }
-  };
-
-  template <> struct comm_reduce_max<float> {
-    void operator()(std::vector<float> &v)
-    {
-      std::vector<double> v_(v.size());
-      for (unsigned int i = 0; i < v.size(); i++) v_[i] = v[i];
-      comm_allreduce_max_array(v_.data(), v.size());
-      for (unsigned int i = 0; i < v.size(); i++) v[i] = v_[i];
-    }
-  };
-  
-  /**
-     comm reducer for doing min inter-process reduction
-  */
-  template <typename T> struct comm_reduce_min {
-    // FIXME - this will break when we have non-double reduction types, e.g., double-double on the host
-    void operator()(std::vector<T> &v)
-    {
-      comm_allreduce_min_array(reinterpret_cast<double *>(v.data()), v.size() * sizeof(T) / sizeof(double));
-    }
-  };
-
-  template <> struct comm_reduce_min<float> {
-    void operator()(std::vector<float> &v)
-    {
-      std::vector<double> v_(v.size());
-      for (unsigned int i = 0; i < v.size(); i++) v_[i] = v[i];
-      comm_allreduce_min_array(v_.data(), v.size());
-      for (unsigned int i = 0; i < v.size(); i++) v[i] = v_[i];
-    }
-  };
-  
-  /**
      @brief This derived tunable class is for reduction kernels, and
      partners the Reduction2D kernel.  The x threads will
      typically correspond to the checkerboarded volume.  Each thread
@@ -82,7 +22,7 @@ namespace quda
     static constexpr bool grid_stride = true;
 
     /**
-       Reduction kernels require grid-size tuning, so enable this, and
+       @brief Reduction kernels require grid-size tuning, so enable this, and
        we mark as final to prevent a derived class from accidentally
        switching it off.
     */
@@ -92,125 +32,112 @@ namespace quda
     virtual int gridStep() const { return minGridSize(); }
 
     /**
-       The maximum block size in the x dimension is the total number
+       @brief The maximum block size in the x dimension is the total number
        of threads divided by the size of the y dimension.  Since
        parity is local to the thread block in the y dimension, half
        the max threads in the x dimension.
+       @return Maximum block size
      */
     virtual unsigned int maxBlockSize(const TuneParam &) const { return device::max_reduce_block_size<block_size_y>(); }
 
+    /**
+       @brief Launch reduction kernel with a given block size on the
+       device performing the reduction defined in the functor.  We
+       recursively iterate over the length of instantiated block sizes
+       until we succeed, or error out.
+       @tparam block_size_x The x-dimension block size being instantiated
+       @tparam Functor The functor that defined the reduction operation
+       @param[in] arg Kernel argument struct
+       @param[in] tp The launch parameters
+       @param[in] stream The stream on which the execution is done
+     */
     template <int block_size_x, template <typename> class Functor, typename FunctorArg>
-    std::enable_if_t<block_size_x != device::warp_size(), qudaError_t> launch(FunctorArg &arg, const TuneParam &tp,
-                                                                              const qudaStream_t &stream)
+    qudaError_t launch_device(FunctorArg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       if (tp.block.x == block_size_x) {
         using Arg = ReduceKernelArg<block_size_x, block_size_y, FunctorArg>;
         return TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Reduction2D), tp, stream, Arg(arg));
-      } else {
-        return launch<block_size_x - device::warp_size(), Functor>(arg, tp, stream);
-      }
-    }
-
-    template <int block_size_x, template <typename> class Functor, typename FunctorArg>
-    std::enable_if_t<block_size_x == device::warp_size(), qudaError_t> launch(FunctorArg &arg, const TuneParam &tp,
-                                                                              const qudaStream_t &stream)
-    {
-      if (tp.block.x == block_size_x) {
-        using Arg = ReduceKernelArg<block_size_x, block_size_y, FunctorArg>;
-        return TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Reduction2D), tp, stream, Arg(arg));
+      } else if constexpr (block_size_x != device::warp_size()) {
+        return launch_device<block_size_x - device::warp_size(), Functor>(arg, tp, stream);
       } else {
         errorQuda("Unexpected block size %d", tp.block.x);
-        return QUDA_ERROR;
       }
+      return QUDA_ERROR;
     }
 
-    template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>, typename Arg>
-    void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
-    {
-      arg.launch_error = launch<device::max_reduce_block_size<block_size_y>(), Functor>(arg, tp, stream);
-
-      if (!commAsyncReduction()) {
-        arg.complete(result, stream);
-        if (!activeTuning() && commGlobalReduction()) CommReducer()(result);
-      }
-    }
-
-    template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>, typename Arg>
+    /**
+       @brief Launch reduction kernel on the device performing the
+       reduction defined in the functor.  After the local computation
+       has completed, the comm_reduce function that is defined in the
+       functor class will be used to perform the inter-comm reduction.
+       @tparam Functor The functor that defined the reduction operation
+       @param[out] result The reduction result is copied here
+       @param[in] tp The launch parameters
+       @param[in] stream The stream on which we the reduction is being done
+       @param[in] arg Kernel argument struct
+     */
+    template <template <typename> class Functor, typename T, typename Arg>
     void launch_device(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
-      std::vector<T> result_(1);
-      launch_device<Functor, T, CommReducer>(result_, tp, stream, arg);
-      result = result_[0];
-    }
+      arg.launch_error = launch_device<device::max_reduce_block_size<block_size_y>(), Functor>(arg, tp, stream);
 
-    template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>, typename Arg>
-    void launch_host(std::vector<T> &result, const TuneParam &, const qudaStream_t &, Arg &arg)
-    {
-      using reduce_t = typename Functor<Arg>::reduce_t;
-      reduce_t value = Reduction2D_host<Functor, Arg>(arg);
-
-      int input_size = vec_length<reduce_t>::value;
-      int output_size = result.size() * vec_length<T>::value;
-      if (output_size != input_size) errorQuda("Input %d and output %d length do not match", input_size, output_size);
-
-      // copy element by element to output vector
-      for (int i = 0; i < output_size; i++) {
-        reinterpret_cast<typename scalar<T>::type *>(result.data())[i]
-          = reinterpret_cast<typename scalar<reduce_t>::type *>(&value)[i];
+      if (!commAsyncReduction()) {
+        std::vector<T> result_(1);
+        arg.complete(result_, stream);
+        if (!activeTuning() && commGlobalReduction()) Functor<Arg>::comm_reduce(result_);
+        result = result_[0];
       }
-
-      if (!activeTuning() && commGlobalReduction()) CommReducer()(result);
     }
 
-    template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>, typename Arg>
-    void launch_host(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
+    /**
+       @brief Launch reduction kernel on the host performing the reduction defined
+       in the functor.  After the local computation has completed, the
+       comm_reduce function that is defined in the functor class will
+       be used to perform the inter-comm reduction.
+       @tparam Functor The functor that defined the reduction operation
+       @param[out] result The reduction result is copied here
+       @param[in] arg Kernel argument struct
+     */
+    template <template <typename> class Functor, typename T, typename Arg>
+    void launch_host(T &result, const TuneParam &, const qudaStream_t &, Arg &arg)
     {
       std::vector<T> result_(1);
-      launch_host<Functor, T, CommReducer>(result_, tp, stream, arg);
+      result_[0] = Reduction2D_host<Functor, Arg>(arg);
+      if (!activeTuning() && commGlobalReduction()) Functor<Arg>::comm_reduce(result_);
       result = result_[0];
     }
 
-    template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>,
-              bool enable_host = false, typename Arg>
-    std::enable_if_t<!enable_host, void> launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream,
-                                                Arg &arg)
+    /**
+       @brief Launch reduction kernel on the set location performing
+       the reduction defined in the functor.  After the local
+       computation has completed, the comm_reduce function that is
+       defined in the functor class will be used to perform the
+       inter-comm reduction.
+       @tparam Functor The functor that defined the reduction operation
+       @tparam enable_host Whether to enable host compilation (default is not to)
+       @param[out] result The reduction result is copied here
+       @param[in] tp The launch parameters
+       @param[in] stream The stream on which the execution is done
+       @param[in] arg Kernel argument struct
+     */
+    template <template <typename> class Functor, bool enable_host = false, typename T, typename Arg>
+    void launch(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Functor, T, CommReducer>(result, tp, stream, arg);
+        launch_device<Functor>(result, tp, stream, arg);
+      } else if constexpr (enable_host) {
+        launch_host<Functor>(result, tp, stream, arg);
       } else {
         errorQuda("CPU not supported yet");
       }
     }
 
-    template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>,
-              bool enable_host = false, typename Arg>
-    std::enable_if_t<enable_host, void> launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream,
-                                               Arg &arg)
-    {
-      if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Functor, T, CommReducer>(result, tp, stream, arg);
-      } else {
-        launch_host<Functor, T, CommReducer>(result, tp, stream, arg);
-      }
-    }
-
-    /**
-       @brief Overload providing a simple reference interface
-       @param[out] result The reduction result is copied here
-       @param[in] tp The launch parameters
-       @param[in] stream The stream on which we the reduction is being done
-       @param[in] arg Kernel argument struct
-       @param[in] param Constant kernel meta data
-     */
-    template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>, typename Arg>
-    void launch(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
-    {
-      std::vector<T> result_(1);
-      launch<Functor, T, CommReducer>(result_, tp, stream, arg);
-      result = result_[0];
-    }
-
   public:
+    /**
+       @brief Constructor for kernels that use a lattice field
+       @param[in] field A lattice field instance used for metadata
+       @param[in] location Optional overload for the location where the calculation will take place
+     */
     TunableReduction2D(const LatticeField &field, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableKernel(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location())
     {
@@ -224,8 +151,12 @@ namespace quda
       strcat(aux, field.AuxString());
     }
 
-    TunableReduction2D(size_t n_items, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableKernel(location)
+    /**
+       @brief Constructor for kernels that have a problem size only
+       @param[in] n_items Number of items being reduced
+       @param[in] location Location where the calculation will take place
+     */
+    TunableReduction2D(size_t n_items, QudaFieldLocation location) : TunableKernel(location)
     {
       u64toa(vol, n_items);
       strcpy(aux, compile_type_str(location));
@@ -235,6 +166,10 @@ namespace quda
       if (commAsyncReduction()) strcat(aux, "async,");
     }
 
+    /**
+       @brief Overload that ensures the tune param y block size is set appropriately
+       @param[in,out] param TuneParam object passed during autotuning
+     */
     virtual bool advanceBlockDim(TuneParam &param) const
     {
       param.block.y = block_size_y;
@@ -242,12 +177,20 @@ namespace quda
       return rtn;
     }
 
+    /**
+       @brief Overload that ensures the y-dimension block size is set appropriately
+       @param[in,out] param TuneParam object passed during autotuning
+     */
     virtual void initTuneParam(TuneParam &param) const
     {
       Tunable::initTuneParam(param);
       param.block.y = block_size_y;
     }
 
+    /**
+       @brief Overload that sets ensures the y-dimension block size is set appropriately
+       @param[in,out] param TuneParam object passed during autotuning
+     */
     virtual void defaultTuneParam(TuneParam &param) const
     {
       Tunable::defaultTuneParam(param);
@@ -289,39 +232,41 @@ namespace quda
     virtual int gridStep() const { return Tunable::gridStep(); }
 
     /**
-       The maximum block size in the x dimension is the total number
+       @brief The maximum block size in the x dimension is the total number
        of threads divided by the size of the y dimension.  Since
        parity is local to the thread block in the y dimension, half
        the max threads in the x dimension.
+       @return Maximum block size
      */
     unsigned int maxBlockSize(const TuneParam &) const { return device::max_multi_reduce_block_size<block_size_y>(); }
 
     template <int block_size_x, template <typename> class Functor, typename FunctorArg>
-    std::enable_if_t<block_size_x != device::warp_size(), qudaError_t> launch(FunctorArg &arg, const TuneParam &tp,
-                                                                              const qudaStream_t &stream)
+    qudaError_t launch(FunctorArg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       if (tp.block.x == block_size_x) {
         using Arg = ReduceKernelArg<block_size_x, block_size_y, FunctorArg>;
         return TunableKernel::launch_device<Functor, grid_stride>(KERNEL(MultiReduction), tp, stream, Arg(arg));
-      } else {
+      } else if constexpr (block_size_x != device::warp_size()) {
         return launch<block_size_x / 2, Functor>(arg, tp, stream);
-      }
-    }
-
-    template <int block_size_x, template <typename> class Functor, typename FunctorArg>
-    std::enable_if_t<block_size_x == device::warp_size(), qudaError_t> launch(FunctorArg &arg, const TuneParam &tp,
-                                                                              const qudaStream_t &stream)
-    {
-      if (tp.block.x == block_size_x) {
-        using Arg = ReduceKernelArg<block_size_x, block_size_y, FunctorArg>;
-        return TunableKernel::launch_device<Functor, grid_stride>(KERNEL(MultiReduction), tp, stream, Arg(arg));
       } else {
         errorQuda("Unexpected block size %d", tp.block.x);
-        return QUDA_ERROR;
       }
+      return QUDA_ERROR;
     }
 
-    template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>, typename Arg>
+    /**
+       @brief Launch multi-reduction kernel on the device performing
+       the reduction defined in the functor.  After the local
+       computation has completed, the comm_reduce function that is
+       defined in the functor class will be used to perform the
+       inter-comm reduction.
+       @tparam Functor The functor that defined the reduction operation
+       @param[out] result The reduction result is copied here
+       @param[in] tp The launch parameters
+       @param[in] stream The stream on which we the reduction is being done
+       @param[in] arg Kernel argument struct
+     */
+    template <template <typename> class Functor, typename T, typename Arg>
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (n_batch_block_max > Arg::max_n_batch_block)
@@ -330,66 +275,78 @@ namespace quda
 
       if (!commAsyncReduction()) {
         arg.complete(result, stream);
-        if (!activeTuning() && commGlobalReduction()) CommReducer()(result);
+        if (!activeTuning() && commGlobalReduction()) Functor<Arg>::comm_reduce(result);
       }
     }
 
-    template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>, typename Arg>
+    /**
+       @brief Launch multi-reduction kernel on the host performing the
+       reduction defined in the functor.  After the local computation
+       has completed, the comm_reduce function that is defined in the
+       functor class will be used to perform the inter-comm reduction.
+       @tparam Functor The functor that defined the reduction operation
+       @param[out] result The reduction result is copied here
+       @param[in] arg Kernel argument struct
+     */
+    template <template <typename> class Functor, typename T, typename Arg>
     void launch_host(std::vector<T> &result, const TuneParam &, const qudaStream_t &, Arg &arg)
     {
       if (n_batch_block_max > Arg::max_n_batch_block)
         errorQuda("n_batch_block_max = %u greater than maximum supported %u", n_batch_block_max, Arg::max_n_batch_block);
-      using reduce_t = typename Functor<Arg>::reduce_t;
-
-      int input_size = vec_length<reduce_t>::value;
-      int output_size = vec_length<T>::value;
-      if (output_size != input_size) errorQuda("Input %d and output %d length do not match", input_size, output_size);
 
       auto value = MultiReduction_host<Functor, Arg>(arg);
-      for (int j = 0; j < (int)arg.threads.z; j++) {
-        // copy element by element to output vector
-        for (int i = 0; i < output_size; i++) {
-          reinterpret_cast<typename scalar<T>::type *>(&result[j])[i]
-            = reinterpret_cast<typename scalar<reduce_t>::type *>(&value[j])[i];
-        }
-      }
-
-      if (!activeTuning() && commGlobalReduction()) CommReducer()(result);
+      for (int j = 0; j < (int)arg.threads.z; j++) result[j] = value[j];
+      if (!activeTuning() && commGlobalReduction()) Functor<Arg>::comm_reduce(result);
     }
 
-    template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>,
-              bool enable_host = false, typename Arg>
-    std::enable_if_t<!enable_host, void> launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream,
-                                                Arg &arg)
+    /**
+       @brief Launch multi-reduction kernel on the set location
+       performing the reduction defined in the functor.  After the
+       local computation has completed, the comm_reduce function that
+       is defined in the functor class will be used to perform the
+       inter-comm reduction.
+       @tparam Functor The functor that defined the reduction operation
+       @tparam enable_host Whether to enable host compilation (default is not to)
+       @param[out] result The reduction result is copied here
+       @param[in] tp The launch parameters
+       @param[in] stream The stream on which we the reduction is being done
+       @param[in] arg Kernel argument struct
+     */
+    template <template <typename> class Functor, bool enable_host = false, typename T, typename Arg>
+    void launch(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Functor, T, CommReducer>(result, tp, stream, arg);
+        launch_device<Functor>(result, tp, stream, arg);
+      } else if constexpr (enable_host) {
+        launch_host<Functor>(result, tp, stream, arg);
       } else {
         errorQuda("CPU not supported yet");
       }
     }
 
-    template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>,
-              bool enable_host, typename Arg>
-    std::enable_if_t<enable_host, void> launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream,
-                                               Arg &arg)
-    {
-      if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Functor, T, CommReducer>(result, tp, stream, arg);
-      } else {
-        launch_host<Functor, T, CommReducer>(result, tp, stream, arg);
-      }
-    }
-
   public:
+    /**
+       @brief Constructor for kernels that use a lattice field
+       @param[in] n_batch The batch size for the multi-reduction (number of reductions we are performing)
+       @param[in] n_batch_block_max Maximum batch size per block (maximum z-dimension block size)
+       @param[in] field A lattice field instance used for metadata
+       @param[in] location Optional overload for the location where the calculation will take place
+     */
     TunableMultiReduction(const LatticeField &field, unsigned int n_batch, unsigned int n_batch_block_max = 1u,
                           QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableReduction2D<block_size_y>(field, location), n_batch(n_batch), n_batch_block_max(n_batch_block_max)
     {
     }
 
-    TunableMultiReduction(size_t n_items, unsigned int n_batch, unsigned int n_batch_block_max = 1u,
-                          QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+    /**
+       @brief Constructor for kernels that have a problem size only
+       @param[in] n_items Number of items being reduced
+       @param[in] n_batch The batch size for the multi-reduction (number of reductions we are performing)
+       @param[in] n_batch_block_max Maximum batch size per block (maximum z-dimension block size)
+       @param[in] location Location where the calculation will take place
+     */
+    TunableMultiReduction(size_t n_items, unsigned int n_batch, unsigned int n_batch_block_max,
+                          QudaFieldLocation location) :
       TunableReduction2D<block_size_y>(n_items, location), n_batch(n_batch), n_batch_block_max(n_batch_block_max)
     {
     }
@@ -397,8 +354,9 @@ namespace quda
     template <typename T> bool is_power2(T x) const { return (x != 0) && ((x & (x - 1)) == 0); }
 
     /**
-       @brief Custom variant that only selects power of two block
+       @brief Overload that only selects power of two block
        sizes.  We restrict in this way to limit instantiations.
+       @param[in,out] param TuneParam object passed during autotuning
      */
     bool advanceBlockDim(TuneParam &param) const
     {
@@ -424,6 +382,10 @@ namespace quda
       }
     }
 
+    /**
+       @brief Overload that sets ensures the z-dimension block size is set appropriately
+       @param[in,out] param TuneParam object passed during autotuning
+     */
     void initTuneParam(TuneParam &param) const
     {
       Tunable::initTuneParam(param);
@@ -431,6 +393,10 @@ namespace quda
       param.grid = {param.grid.x, 1, (n_batch + param.block.z - 1) / param.block.z};
     }
 
+    /**
+       @brief Overload that sets ensures the z-dimension block size is set appropriately
+       @param[in,out] param TuneParam object passed during autotuning
+     */
     void defaultTuneParam(TuneParam &param) const
     {
       Tunable::defaultTuneParam(param);

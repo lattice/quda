@@ -375,11 +375,7 @@ namespace quda {
         errorQuda("Undefined compute type %d", type);
       }
 
-      if (compute_max) {
-        double max = *arg.max_h;
-        comm_allreduce_max(&max);
-        *arg.max_h = max;
-      }
+      if (compute_max) comm_allreduce_max(*arg.max_h);
     }
 
     /**
@@ -562,9 +558,7 @@ namespace quda {
       if (compute_max && !activeTuning()) {
         qudaMemcpyAsync(arg.max_h, arg.max_d, sizeof(typename Arg::Float), qudaMemcpyDeviceToHost, stream);
         qudaStreamSynchronize(const_cast<qudaStream_t&>(stream));
-        double max = *arg.max_h;
-        comm_allreduce_max(&max);
-        *arg.max_h = max;
+        comm_allreduce_max(*arg.max_h);
       }
     }
 

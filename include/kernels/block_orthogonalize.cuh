@@ -63,7 +63,7 @@ namespace quda {
     template <typename... T>
     BlockOrthoArg(ColorSpinorField &V, const int *fine_to_coarse, const int *coarse_to_fine, int parity,
                   const int *geo_bs, const int n_block_ortho, const ColorSpinorField &meta, T... B) :
-      kernel_param(dim3(meta.VolumeCB() * (fineSpin > 1 ? meta.SiteSubset() : 1), chiral_blocks, 1)),
+      kernel_param(dim3(meta.VolumeCB() * (fineSpin > 1 ? meta.SiteSubset() : 1), 1, chiral_blocks)),
       V(V),
       fine_to_coarse(fine_to_coarse),
       coarse_to_fine(coarse_to_fine),
@@ -131,7 +131,7 @@ QUDA_UNROLL
     {
       int x_coarse = block.x;
       int x_fine_offset = thread.x;
-      int chirality = block.y;
+      int chirality = block.z;
 
       int parity[n_sites_per_thread];
       int x_offset_cb[n_sites_per_thread];
