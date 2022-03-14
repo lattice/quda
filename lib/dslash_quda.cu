@@ -121,7 +121,7 @@ namespace quda {
     unsigned int minThreads() const { return 8; }
 
     dslash_shmem_signal_wait():
-	   TunableKernel1D(8) 
+	   TunableKernel1D(8, QUDA_CUDA_FIELD_LOCATION)
   
     {  }
 
