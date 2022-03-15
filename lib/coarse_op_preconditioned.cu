@@ -82,7 +82,7 @@ namespace quda
       }
 
       IF_CONSTEXPR (location_template == QUDA_CUDA_FIELD_LOCATION) {
-        IF_CONSTEXPR (use_mma) mma::launch_yhat_kernel(tp, stream, arg, *this);
+        IF_CONSTEXPR (use_mma) hmma::launch_yhat_kernel(tp, stream, arg, *this);
         else launch_device<ComputeYhat>(tp, stream, arg);
       } else {
         launch_host<ComputeYhat>(tp, stream, arg);
@@ -100,7 +100,7 @@ namespace quda
     {
       if (use_mma) {
         constexpr bool query_max = true;
-        int max = mma::launch_yhat_kernel<query_max>(param, device::get_default_stream(), arg, *this);
+        int max = hmma::launch_yhat_kernel<query_max>(param, device::get_default_stream(), arg, *this);
         if (param.aux.x < max) {
           param.aux.x++;
           return true;

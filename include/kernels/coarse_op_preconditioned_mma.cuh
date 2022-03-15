@@ -12,7 +12,7 @@
 namespace quda
 {
 
-  namespace mma
+  namespace hmma
   {
 
     template <typename Arg, int bM_, int bN_, int bK_, int block_y_, int block_z_, int min_blocks_>
@@ -122,6 +122,6 @@ namespace quda
       }
     };
 
-  } // namespace mma
+  } // namespace hmma
 
 } // namespace quda

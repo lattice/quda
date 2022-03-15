@@ -15,7 +15,7 @@
 namespace quda
 {
 
-  namespace mma
+  namespace hmma
   {
 
 #ifdef QUDA_MMA_AVAILABLE
@@ -159,6 +159,6 @@ namespace quda
 
 #endif // QUDA_MMA_AVAILABLE
 
-  } // namespace mma
+  } // namespace hmma
 
 } // namespace quda

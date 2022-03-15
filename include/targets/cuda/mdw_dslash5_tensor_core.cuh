@@ -460,7 +460,7 @@ namespace quda
   }
 
   template <int BlockDimX, int Ls, int M, int N, int M_PAD, int N_PAD, bool reload, class T>
-  __device__ inline void mma_sync_gemm(T op_a[], half *sm_a, half *sm_b, half *sm_c, const mma::WarpRegisterMapping &wrm)
+  __device__ inline void mma_sync_gemm(T op_a[], half *sm_a, half *sm_b, half *sm_c, const hmma::WarpRegisterMapping &wrm)
   {
 
 #ifdef USE_FP16_HMMA_ACCUMULATE
@@ -469,9 +469,9 @@ namespace quda
     using accumuate_reg_type = float;
 #endif
 
-    constexpr int tile_row_dim = M / mma::MMA_M; // number of tiles in the column dimension
-    constexpr int tile_col_dim = N / mma::MMA_N; // number of tiles in the row dimension
-    constexpr int tile_acc_dim = M / mma::MMA_K; // number of tiles in the row dimension
+    constexpr int tile_row_dim = M / hmma::MMA_M; // number of tiles in the column dimension
+    constexpr int tile_col_dim = N / hmma::MMA_N; // number of tiles in the row dimension
+    constexpr int tile_acc_dim = M / hmma::MMA_K; // number of tiles in the row dimension
 
     constexpr int total_warp = BlockDimX * Ls / 32;
 
@@ -490,7 +490,7 @@ namespace quda
 #pragma unroll
     for (int c = 0; c < warp_cycle; c++) {
 
-      mma::MmaOperandC<accumuate_reg_type> op_c;
+      hmma::MmaOperandC<accumuate_reg_type> op_c;
 
       // The logical warp assigned to each part of the matrix.
       const int logical_warp_index = warp_id * warp_cycle + c;
@@ -507,13 +507,13 @@ namespace quda
           op_a[0].template load<M_PAD>(sm_a, tile_k, warp_row, wrm);
         }
 
-        mma::MmaOperandB op_b;
+        hmma::MmaOperandB op_b;
         op_b.load<N_PAD>(sm_b, tile_k, warp_col, wrm);
 
         if (reload) {
-          mma::gemm(op_a[0], op_b, op_c);
+          hmma::gemm(op_a[0], op_b, op_c);
         } else {
-          mma::gemm(op_a[tile_k], op_b, op_c);
+          hmma::gemm(op_a[tile_k], op_b, op_c);
         }
       }
 

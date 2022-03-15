@@ -5,6 +5,9 @@
 namespace quda
 {
 
+namespace smma
+{
+
   template <class Mma, int block_dim_x, int Ls, int m, int n, int smem_ld_a, int smem_ld_b, int smem_ld_c, bool reload, bool reuse_c_for_b, class T, class real, class S>
   __device__ inline void mma_sync_gemm(T &op_a, real *smem_a, real *smem_b, real *smem_c, const S &wrm)
   {
@@ -69,6 +72,8 @@ namespace quda
   template <> struct mma_mapper <float> { using type = Smma<tfloat32, 8, 1, 1>; };
   template <> struct mma_mapper <short> { using type = Smma<bfloat16, 16, 1, 1>; };
   template <> struct mma_mapper <int8_t> { using type = Smma<bfloat16, 16, 1, 1>; };
+
+} // namespace smma
 
 } // namespace quda
 

@@ -26,7 +26,7 @@ namespace quda
   unsigned int mma_shared_bytes(unsigned int x, unsigned int y)
   {
     using real = typename mapper<store_t>::type;
-    using Mma = typename mma_mapper<store_t>::type;
+    using Mma = typename smma::mma_mapper<store_t>::type;
     const int a_size = (y * 4) * (y * 4 + Mma::t_pad);
     const int b_size = (y * 4) * (x * 6 + Mma::t_pad);
     const int c_size = (y * 4) * (x * 6 + Mma::acc_pad);
@@ -71,7 +71,7 @@ namespace quda
     static constexpr int n = 6 * block_dim_x;
     static constexpr int k = m;
 
-    using Mma = typename mma_mapper<store_t>::type;
+    using Mma = typename smma::mma_mapper<store_t>::type;
     static constexpr int smem_ld_a = m + Mma::t_pad;
     static constexpr int smem_ld_b = n + Mma::t_pad;
     static constexpr int smem_ld_c = n + (mma_c_reuse_b() ? Mma::t_pad : Mma::acc_pad);
@@ -157,7 +157,7 @@ namespace quda
     smem_take_vector<Arg::smem_ld_b>(in, smem_b);
 
     __syncthreads();
-    mma_sync_gemm<typename Arg::Mma, Arg::block_dim_x, Arg::Ls, Arg::m, Arg::n, Arg::smem_ld_a, Arg::smem_ld_b, Arg::smem_ld_c, Arg::reload, mma_c_reuse_b()>(
+    smma::mma_sync_gemm<typename Arg::Mma, Arg::block_dim_x, Arg::Ls, Arg::m, Arg::n, Arg::smem_ld_a, Arg::smem_ld_b, Arg::smem_ld_c, Arg::reload, mma_c_reuse_b()>(
       op_a, smem_a, smem_b, smem_c, wrm);
     __syncthreads();
 

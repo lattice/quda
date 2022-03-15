@@ -15,7 +15,7 @@
 
 namespace quda
 {
-  namespace mma
+  namespace hmma
   {
     // return the size of the shared memory needed for MMA with block shape bM, bN, bK.
     constexpr int shared_memory_bytes(int bM, int bN, int bK)
@@ -591,6 +591,6 @@ namespace quda
       }
     };
 
-  } // namespace mma
+  } // namespace hmma
 
 } // namespace quda

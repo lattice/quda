@@ -2,6 +2,10 @@
 
 #include <cuda_bf16.h>
 
+namespace quda {
+
+namespace smma {
+
 using bfloat162 = __nv_bfloat162;
 using bfloat16 = __nv_bfloat16;
 
@@ -41,4 +45,8 @@ struct MmaInst <16, 8, 4, tfloat32, float> {
         : "+f"(c[0]), "+f"(c[1]), "+f"(c[2]), "+f"(c[3]) : "r"(a[0]), "r"(a[1]), "r"(b[0]));
   }
 };
+
+} // namespace smma
+
+} // namespace quda
 

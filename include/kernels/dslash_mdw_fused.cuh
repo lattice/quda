@@ -14,12 +14,12 @@ namespace quda {
 
     constexpr int sm_m_pad_size(int m)
     {
-      return quda::mma::pad_size(m);
+      return quda::hmma::pad_size(m);
     }
 
     constexpr int sm_n_pad_size(int n)
     {
-      return quda::mma::pad_size(n);
+      return quda::hmma::pad_size(n);
     }
 
     /**
@@ -338,9 +338,9 @@ namespace quda {
         int s4_shift_base = blockIdx.x * blockDim.x; // base.
         int s4_shift, sid;
 
-        constexpr int tm_dim = M / mma::MMA_M;
-        constexpr int tn_dim = N / mma::MMA_N;
-        constexpr int tk_dim = M / mma::MMA_K;
+        constexpr int tm_dim = M / hmma::MMA_M;
+        constexpr int tn_dim = N / hmma::MMA_N;
+        constexpr int tk_dim = M / hmma::MMA_K;
 
         constexpr int total_warp = Arg::block_dim_x * Ls >> 5;
         const int this_warp = (threadIdx.y * Arg::block_dim_x + threadIdx.x) >> 5;
@@ -350,9 +350,9 @@ namespace quda {
         constexpr int warp_cycle = total_tile / total_warp;
         const int warp_m = this_warp * warp_cycle / tn_dim;
 
-        mma::WarpRegisterMapping wrm(threadIdx.y * blockDim.x + threadIdx.x);
-        mma::MmaOperandA op_a[Arg::reload ? 1 : tk_dim];
-        mma::MmaOperandA op_a_aux[Arg::reload ? 1 : tk_dim];
+        hmma::WarpRegisterMapping wrm(threadIdx.y * blockDim.x + threadIdx.x);
+        hmma::MmaOperandA op_a[Arg::reload ? 1 : tk_dim];
+        hmma::MmaOperandA op_a_aux[Arg::reload ? 1 : tk_dim];
         if (!Arg::reload) { // the data in registers can be resued.
 #pragma unroll
           for (int tile_k = 0; tile_k < tk_dim; tile_k++) { op_a[tile_k].template load<M_sm>(sm_a, tile_k, warp_m, wrm); }

@@ -1,6 +1,10 @@
 #pragma once
 
-#include "mma_inst.cuh"
+#include <mma_tensor_op/smma_inst.cuh>
+
+namespace quda {
+
+namespace smma {
 
 template <class T>
 static void __device__ inline get_big_small(float &big, float &small, const float &f){
@@ -249,3 +253,6 @@ struct Smma {
 
 };
 
+} // smma
+
+} // namespace quda

@@ -20,7 +20,7 @@ constexpr QudaPrecision accumulate_precision()
 
 namespace quda
 {
-  namespace mma
+  namespace hmma
   {
     __device__ __host__ constexpr int inline pad_size(int m) { return m == 192 ? 0 : 8; }
 
@@ -386,5 +386,5 @@ namespace quda
       }
     }
 
-  } // namespace mma
+  } // namespace hmma
 } // namespace quda
