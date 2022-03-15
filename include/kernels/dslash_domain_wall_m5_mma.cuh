@@ -15,7 +15,7 @@ namespace quda
 
 
   /** Whether to reuse the operator B shared memory buffer with operator C */
-  constexpr bool mma_c_reuse_b() { return true; }
+  constexpr bool mma_c_reuse_b() { return false; }
 
   /**
     @brief return how much shared memory is needed for given the block size and reuse/reload options

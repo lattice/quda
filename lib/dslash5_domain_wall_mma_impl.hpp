@@ -12,7 +12,7 @@ namespace quda
 #if (CUDA_VERSION >= 11000 && __COMPUTE_CAPABILITY__ >= 800)
 
   constexpr int m5_mma_reload() {
-    return true;
+    return false;
   }
 
   template <class store_t, int nColor, int Ls> class Dslash5Mma : public TunableKernel3D
@@ -45,7 +45,6 @@ namespace quda
       return in.Bytes() + out.Bytes();
     }
 
-    bool tuneAuxDim() const { return true; }
     bool tuneGridDim() const { return true; }
 
     int blockStep() const { return 16; }

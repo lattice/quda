@@ -15,7 +15,7 @@ namespace quda
   }
 
   constexpr int domain_wall_4d_fused_m5_mma_reload() {
-    return true;
+    return false;
   }
 
   template <template <int, bool, bool, KernelType, typename> class D, class Arg> class DomainWall4DFusedM5Mma : public Dslash<D, Arg>
