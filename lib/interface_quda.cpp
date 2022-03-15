@@ -3622,7 +3622,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   }
   if (invalidate) solutionResident.clear();
 
-  // grow/shirnk resident solutions to be correct size
+  // grow/shrink resident solutions to be correct size
   size_t old_size = solutionResident.size();
   solutionResident.resize(param->num_offset);
   for (int i = old_size; i < param->num_offset; i++) solutionResident[i] = ColorSpinorField(cudaParam);
