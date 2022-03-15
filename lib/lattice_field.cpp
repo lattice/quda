@@ -298,6 +298,7 @@ namespace quda {
     if (param.location == QUDA_INVALID_FIELD_LOCATION) errorQuda("Invalid field location");
     location = param.location;
     precision = param.Precision();
+    ghost_precision = param.ghost_precision;
     precisionCheck();
 
     if (param.nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions nDim = %d too great", param.nDim);

@@ -101,7 +101,7 @@ namespace quda
     init(std::exchange(field.init, false)),
     alloc(std::exchange(field.alloc, false)),
     reference(std::exchange(field.reference, false)),
-    ghost_precision_allocated(QUDA_INVALID_PRECISION),
+    ghost_precision_allocated(std::exchange(field.ghost_precision_allocated, QUDA_INVALID_PRECISION)),
     nColor(std::exchange(field.nColor, 0)),
     nSpin(std::exchange(field.nSpin, 0)),
     nVec(std::exchange(field.nVec, 0)),
@@ -183,7 +183,7 @@ namespace quda
         init = std::exchange(src.init, false);
         alloc = std::exchange(src.alloc, false);
         reference = std::exchange(src.reference, false);
-        ghost_precision_allocated = QUDA_INVALID_PRECISION;
+        ghost_precision_allocated = std::exchange(src.ghost_precision_allocated, QUDA_INVALID_PRECISION);
         nColor = std::exchange(src.nColor, 0);
         nSpin = std::exchange(src.nSpin, 0);
         nVec = std::exchange(src.nVec, 0);
@@ -251,8 +251,6 @@ namespace quda
       bytes = siteSubset * ALIGNMENT_ADJUST(bytes_raw / siteSubset);
     else
       bytes = bytes_raw;
-
-    init = true;
 
     //! stuff for deflated solvers (eigenvector sets):
     if (composite_descr.is_composite) {
@@ -340,6 +338,7 @@ namespace quda
     }
 
     dslash_constant = static_cast<DslashConstant *>(safe_malloc(sizeof(DslashConstant)));
+    init = true;
     setTuningString();
   }
 
@@ -407,17 +406,20 @@ namespace quda
   void ColorSpinorField::setTuningString()
   {
     LatticeField::setTuningString();
-    std::stringstream aux_ss;
-    aux_ss << "vol=" << volume << ",precision=" << precision << ",order=" << fieldOrder <<
-      ",Ns=" << nSpin << ",Nc=" << nColor;
-    if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID)
-      aux_ss << ",TwistFlavor=" << twistFlavor;
-    aux_string = aux_ss.str();
-    if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
+    if (init) {
+      std::stringstream aux_ss;
+      aux_ss << "vol=" << volume << ",precision=" << precision << ",order=" << fieldOrder <<
+        ",Ns=" << nSpin << ",Nc=" << nColor;
+      if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID)
+        aux_ss << ",TwistFlavor=" << twistFlavor;
+      aux_string = aux_ss.str();
+      if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
+    }
   }
 
   void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const
   {
+    if (ghost_precision == QUDA_INVALID_PRECISION) errorQuda("Invalid requested ghost precision");
     if (ghost_precision_allocated == ghost_precision) return;
 
     bool is_fixed = (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION);
