@@ -1760,12 +1760,9 @@ namespace quda {
       kappa5 :
       param.kappa;
 
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("Mass rescale: Kappa is: %g\n", kappa);
-      printfQuda("Mass rescale: mass normalization: %d\n", param.mass_normalization);
-      double nin = blas::norm2(b);
-      printfQuda("Mass rescale: norm of source in = %g\n", nin);
-    }
+    logQuda(QUDA_DEBUG_VERBOSE, "Mass rescale: Kappa is: %g\n", kappa);
+    logQuda(QUDA_DEBUG_VERBOSE, "Mass rescale: mass normalization: %d\n", param.mass_normalization);
+    logQuda(QUDA_DEBUG_VERBOSE, "Mass rescale: norm of source in = %g\n", blas::norm2(b));
 
     // staggered dslash uses mass normalization internally
     if (param.dslash_type == QUDA_ASQTAD_DSLASH || param.dslash_type == QUDA_STAGGERED_DSLASH) {
@@ -1829,14 +1826,9 @@ namespace quda {
         errorQuda("Solution type %d not supported", param.solution_type);
     }
 
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Mass rescale done\n");
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("Mass rescale: Kappa is: %g\n", kappa);
-      printfQuda("Mass rescale: mass normalization: %d\n", param.mass_normalization);
-      double nin = blas::norm2(b);
-      printfQuda("Mass rescale: norm of source out = %g\n", nin);
-    }
+    logQuda(QUDA_DEBUG_VERBOSE, "Mass rescale: norm of source out = %g\n", blas::norm2(b));
   }
+
 }
 
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
@@ -3477,7 +3469,7 @@ void dslashMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param
  * solve type must be DIRECT_PC. This difference in convention is because
  * preconditioned staggered operator is normal, unlike with Wilson-type fermions.
  */
-void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
+void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
 {
   profilerStart(__func__);
 
@@ -3486,7 +3478,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   if (!initialized) errorQuda("QUDA not initialized");
 
-  checkInvertParam(param, _hp_x[0], _hp_b);
+  checkInvertParam(param, hp_x[0], hp_b);
 
   // check the gauge fields have been created
   checkGauge(param);
@@ -3539,15 +3531,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
       if (param->offset[i] > param->offset[j])
         errorQuda("Offsets must be ordered from smallest to largest");
     }
-  }
-
-  // Host pointers for x, take a copy of the input host pointers
-  void** hp_x;
-  hp_x = new void* [ param->num_offset ];
-
-  void* hp_b = _hp_b;
-  for(int i=0;i < param->num_offset;i++){
-    hp_x[i] = _hp_x[i];
   }
 
   // Create the matrix.
@@ -3799,9 +3782,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   }
 
   // restore shifts
-  for(int i=0; i < param->num_offset; i++) {
-    param->offset[i] = unscaled_shifts[i];
-  }
+  for(int i=0; i < param->num_offset; i++) param->offset[i] = unscaled_shifts[i];
 
   profileMulti.TPSTART(QUDA_PROFILE_D2H);
 
@@ -3830,17 +3811,10 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   profileMulti.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
   profileMulti.TPSTART(QUDA_PROFILE_FREE);
-  for(int i=0; i < param->num_offset; i++){
-    //if (!param->make_resident_solution) delete x[i];
-  }
-
-  delete [] hp_x;
-
   delete d;
   delete dSloppy;
   delete dPre;
   delete dRefine;
-
   profileMulti.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
