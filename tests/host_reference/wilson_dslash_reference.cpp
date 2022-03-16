@@ -492,7 +492,6 @@ void tm_ndeg_dslash(void *out, void **gauge, void *in, double kappa, double mu, 
 void tm_ndeg_matpc(void *outEven, void **gauge, void *inEven, double kappa, double mu, double epsilon,
                    QudaMatPCType matpc_type, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param)
 {
-
   void *outEven1 = outEven;
   void *outEven2 = (char *)outEven1 + Vh * spinor_site_size * precision;
 
@@ -502,65 +501,63 @@ void tm_ndeg_matpc(void *outEven, void **gauge, void *inEven, double kappa, doub
   void *tmp1 = safe_malloc(Vh * spinor_site_size * precision);
   void *tmp2 = safe_malloc(Vh * spinor_site_size * precision);
 
-  if (!daggerBit) {
-    if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
-      wil_dslash(tmp1, gauge, inEven1, 1, daggerBit, precision, gauge_param);
-      wil_dslash(tmp2, gauge, inEven2, 1, daggerBit, precision, gauge_param);
-      ndeg_twist_gamma5(tmp1, tmp2,  tmp1, tmp2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
-      wil_dslash(outEven1, gauge, tmp1, 0, daggerBit, precision, gauge_param);
-      wil_dslash(outEven2, gauge, tmp2, 0, daggerBit, precision, gauge_param);
-      ndeg_twist_gamma5(outEven1, outEven2, outEven1, outEven2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
-    } else if (matpc_type == QUDA_MATPC_ODD_ODD) {
-      wil_dslash(tmp1, gauge, inEven1, 0, daggerBit, precision, gauge_param);
-      wil_dslash(tmp2, gauge, inEven2, 0, daggerBit, precision, gauge_param);
-      ndeg_twist_gamma5(tmp1, tmp2, tmp1, tmp2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
-      wil_dslash(outEven1, gauge, tmp1, 1, daggerBit, precision, gauge_param);
-      wil_dslash(outEven2, gauge, tmp2, 1, daggerBit, precision, gauge_param);
-      ndeg_twist_gamma5(outEven1, outEven2, outEven1, outEven2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
-    }
-  } else {
-    if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
-      ndeg_twist_gamma5(
-          tmp1, tmp2, inEven1, inEven2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
-      wil_dslash(outEven1, gauge, tmp1, 1, daggerBit, precision, gauge_param);
-      wil_dslash(outEven2, gauge, tmp2, 1, daggerBit, precision, gauge_param);
-      ndeg_twist_gamma5(tmp1, tmp2, outEven1, outEven2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
-      wil_dslash(outEven1, gauge, tmp1, 0, daggerBit, precision, gauge_param);
-      wil_dslash(outEven2, gauge, tmp2, 0, daggerBit, precision, gauge_param);
-    } else if (matpc_type == QUDA_MATPC_ODD_ODD) {
-      ndeg_twist_gamma5(
-          tmp1, tmp2, inEven1, inEven2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
-      wil_dslash(outEven1, gauge, tmp1, 0, daggerBit, precision, gauge_param);
-      wil_dslash(outEven2, gauge, tmp2, 0, daggerBit, precision, gauge_param);
-      ndeg_twist_gamma5(tmp1, tmp2, outEven1, outEven2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
-      wil_dslash(outEven1, gauge, tmp1, 1, daggerBit, precision, gauge_param);
-      wil_dslash(outEven2, gauge, tmp2, 1, daggerBit, precision, gauge_param);
-    }
-  }
-  
-  if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-      wil_dslash(tmp1, gauge, inEven1, 1, daggerBit, precision, gauge_param);
-      wil_dslash(tmp2, gauge, inEven2, 1, daggerBit, precision, gauge_param);
-      ndeg_twist_gamma5(tmp1, tmp2,  tmp1, tmp2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
-      wil_dslash(outEven1, gauge, tmp1, 0, daggerBit, precision, gauge_param);
-      wil_dslash(outEven2, gauge, tmp2, 0, daggerBit, precision, gauge_param);
-  } else if (matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-      wil_dslash(tmp1, gauge, inEven1, 0, daggerBit, precision, gauge_param);
-      wil_dslash(tmp2, gauge, inEven2, 0, daggerBit, precision, gauge_param);
-      ndeg_twist_gamma5(tmp1, tmp2, tmp1, tmp2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
-      wil_dslash(outEven1, gauge, tmp1, 1, daggerBit, precision, gauge_param);
-      wil_dslash(outEven2, gauge, tmp2, 1, daggerBit, precision, gauge_param);
-  }  
-  
-  // lastly apply the kappa term
   double kappa2 = -kappa*kappa;
-  if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-    ndeg_twist_gamma5(inEven1, inEven2, inEven1, inEven2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_DIRECT, precision);
+
+  if (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_ODD_ODD) {
+    if (!daggerBit) {
+      if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
+        wil_dslash(tmp1, gauge, inEven1, 1, daggerBit, precision, gauge_param);
+        wil_dslash(tmp2, gauge, inEven2, 1, daggerBit, precision, gauge_param);
+        ndeg_twist_gamma5(tmp1, tmp2,  tmp1, tmp2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
+        wil_dslash(outEven1, gauge, tmp1, 0, daggerBit, precision, gauge_param);
+        wil_dslash(outEven2, gauge, tmp2, 0, daggerBit, precision, gauge_param);
+        ndeg_twist_gamma5(outEven1, outEven2, outEven1, outEven2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
+      } else if (matpc_type == QUDA_MATPC_ODD_ODD) {
+        wil_dslash(tmp1, gauge, inEven1, 0, daggerBit, precision, gauge_param);
+        wil_dslash(tmp2, gauge, inEven2, 0, daggerBit, precision, gauge_param);
+        ndeg_twist_gamma5(tmp1, tmp2, tmp1, tmp2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
+        wil_dslash(outEven1, gauge, tmp1, 1, daggerBit, precision, gauge_param);
+        wil_dslash(outEven2, gauge, tmp2, 1, daggerBit, precision, gauge_param);
+        ndeg_twist_gamma5(outEven1, outEven2, outEven1, outEven2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
+      }
+    } else {
+      if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
+        ndeg_twist_gamma5(tmp1, tmp2, inEven1, inEven2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
+        wil_dslash(outEven1, gauge, tmp1, 1, daggerBit, precision, gauge_param);
+        wil_dslash(outEven2, gauge, tmp2, 1, daggerBit, precision, gauge_param);
+        ndeg_twist_gamma5(tmp1, tmp2, outEven1, outEven2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
+        wil_dslash(outEven1, gauge, tmp1, 0, daggerBit, precision, gauge_param);
+        wil_dslash(outEven2, gauge, tmp2, 0, daggerBit, precision, gauge_param);
+      } else if (matpc_type == QUDA_MATPC_ODD_ODD) {
+        ndeg_twist_gamma5(tmp1, tmp2, inEven1, inEven2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
+        wil_dslash(outEven1, gauge, tmp1, 0, daggerBit, precision, gauge_param);
+        wil_dslash(outEven2, gauge, tmp2, 0, daggerBit, precision, gauge_param);
+        ndeg_twist_gamma5(tmp1, tmp2, outEven1, outEven2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
+        wil_dslash(outEven1, gauge, tmp1, 1, daggerBit, precision, gauge_param);
+        wil_dslash(outEven2, gauge, tmp2, 1, daggerBit, precision, gauge_param);
+      }
+    }
+    xpay(inEven1, kappa2, outEven1, Vh * spinor_site_size, precision);
+    xpay(inEven2, kappa2, outEven2, Vh * spinor_site_size, precision);
+  } else if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+    if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+      wil_dslash(tmp1, gauge, inEven1, 1, daggerBit, precision, gauge_param);
+      wil_dslash(tmp2, gauge, inEven2, 1, daggerBit, precision, gauge_param);
+      ndeg_twist_gamma5(tmp1, tmp2,  tmp1, tmp2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
+      wil_dslash(outEven1, gauge, tmp1, 0, daggerBit, precision, gauge_param);
+      wil_dslash(outEven2, gauge, tmp2, 0, daggerBit, precision, gauge_param);
+    } else if (matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+      wil_dslash(tmp1, gauge, inEven1, 0, daggerBit, precision, gauge_param);
+      wil_dslash(tmp2, gauge, inEven2, 0, daggerBit, precision, gauge_param);
+      ndeg_twist_gamma5(tmp1, tmp2, tmp1, tmp2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
+      wil_dslash(outEven1, gauge, tmp1, 1, daggerBit, precision, gauge_param);
+      wil_dslash(outEven2, gauge, tmp2, 1, daggerBit, precision, gauge_param);
+    }
+    ndeg_twist_gamma5(tmp1, tmp2, inEven1, inEven2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_DIRECT, precision);
+    xpay(tmp1, kappa2, outEven1, Vh * spinor_site_size, precision);
+    xpay(tmp2, kappa2, outEven2, Vh * spinor_site_size, precision);
   }
-
-  xpay(inEven1, kappa2, outEven1, Vh * spinor_site_size, precision);
-  xpay(inEven2, kappa2, outEven2, Vh * spinor_site_size, precision);
-
+  
   host_free(tmp1);
   host_free(tmp2);
 }

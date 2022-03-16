@@ -40,6 +40,8 @@ double verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, v
 double verifyDomainWallTypeInversion(void *spinorOut, void **, void *spinorIn, void *spinorCheck,
                                      QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *, void *)
 {
+  if (multishift > 1) errorQuda("Multishift not supported");
+
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
     if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
       dw_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
@@ -179,7 +181,7 @@ double verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *s
       errorQuda("Mass normalization %s not implemented", get_mass_normalization_str(inv_param.mass_normalization));
     }
 
-    void *spinorTmp = safe_malloc(Vh * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+    void *spinorTmp = safe_malloc(vol * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
     printfQuda("Host residuum checks: \n");
     for (int i = 0; i < inv_param.num_offset; i++) {
       ax(0, spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
