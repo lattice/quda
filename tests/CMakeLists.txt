@@ -730,7 +730,7 @@ endif()
                      --test MatPCDagMatPCLocal
                      --matpc even-even
                      --dim 2 4 6 8
-                     --Lsdim 8
+                     --Lsdim 4
                      --gtest_output=xml:dslash_${DIRAC_NAME}_local{pol2}.xml)
 
     # Mobius-EOFA fermions
@@ -950,7 +950,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_domain_wall_${prec}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
                      --dslash-type domain-wall --ca-basis-type chebyshev
-                     --dim 2 4 6 8 --Lsdim 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+                     --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
                      --matpc even-even
                      --enable-testing true
                      --gtest_output=xml:invert_test_domain_wall_${prec}.xml)
@@ -958,7 +958,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_domain_wall_4d_sym_${prec}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
                      --dslash-type domain-wall-4d --ca-basis-type chebyshev
-                     --dim 2 4 6 8 --Lsdim 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+                     --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
                      --matpc even-even
                      --enable-testing true
                      --gtest_output=xml:invert_test_domain_wall_4d_sym_${prec}.xml)
@@ -966,7 +966,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_domain_wall_4d_asym_${prec}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
                      --dslash-type domain-wall-4d --ca-basis-type chebyshev
-                     --dim 2 4 6 8 --Lsdim 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+                     --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
                      --matpc even-even-asym
                      --enable-testing true
                      --gtest_output=xml:invert_test_domain_wall_4d_asym_${prec}.xml)
@@ -974,7 +974,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_mobius_sym_${prec}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
                      --dslash-type mobius --ca-basis-type chebyshev
-                     --dim 2 4 6 8 --Lsdim 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+                     --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
                      --matpc even-even
                      --enable-testing true
                      --gtest_output=xml:invert_test_mobius_sym_${prec}.xml)
@@ -982,7 +982,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_mobius_asym_${prec}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
                      --dslash-type mobius --ca-basis-type chebyshev
-                     --dim 2 4 6 8 --Lsdim 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+                     --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
                      --matpc even-even-asym
                      --enable-testing true
                      --gtest_output=xml:invert_test_mobius_asym_${prec}.xml)
@@ -990,7 +990,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_mobius_eofa_sym_${prec}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
                      --dslash-type mobius-eofa --ca-basis-type chebyshev
-                     --dim 2 4 6 8 --Lsdim 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+                     --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
                      --matpc even-even
                      --enable-testing true
                      --gtest_output=xml:invert_test_mobius_eofa_sym_${prec}.xml)
@@ -998,7 +998,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_mobius_eofa_asym_${prec}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
                      --dslash-type mobius-eofa --ca-basis-type chebyshev
-                     --dim 2 4 6 8 --Lsdim 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+                     --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
                      --matpc even-even-asym
                      --enable-testing true
                      --gtest_output=xml:invert_test_mobius_eofa_asym_${prec}.xml)
