@@ -462,7 +462,7 @@ namespace quda {
   {
     bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     bool reset = newTmp(&tmp2, in);
-    if (symmetric && this->use_mobius_fused_kernel && !dagger) {
+    if (symmetric && this->use_mobius_fused_kernel) {
       int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
       QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
       bool reset1 = newTmp(&tmp1, in);
@@ -482,6 +482,14 @@ namespace quda {
       M(*tmp2, in);
       Mdag(out, *tmp2);
     }
+    deleteTmp(&tmp2, reset);
+  }
+
+  void DiracMobiusPC::MMdag(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    bool reset = newTmp(&tmp2, in);
+    Mdag(*tmp2, in);
+    M(out, *tmp2);
     deleteTmp(&tmp2, reset);
   }
 
