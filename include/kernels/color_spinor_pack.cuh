@@ -104,10 +104,9 @@ namespace quda {
       dagger(dagger),
       pc_type(a.PCType()),
       dc(a.getDslashConstant()),
-      threadDimMapLower{},
-      threadDimMapUpper{},
+      threadDimMapLower {},
+      threadDimMapUpper {},
 #ifdef NVSHMEM_COMMS
-
       counter((activeTuning() && !policyTuning()) ? 2 : dslash::inc_shmem_sync_counter2()),
       waitcounter(counter),
       retcount_intra(dslash::get_shmem_retcount_intra()),
@@ -125,7 +124,7 @@ namespace quda {
         threadDimMapUpper[i] = threadDimMapLower[i] + 2 * dc.ghostFaceCB[i];
         prev = i;
       }
-      #ifdef NVSHMEM_COMMS
+#ifdef NVSHMEM_COMMS
       for (int i = 0; i < 4 * QUDA_MAX_DIM; i++) { packBuffer[i] = static_cast<char *>(ghost[i]); }
       for (int dim = 0; dim < 4; dim++) {
         for (int dir = 0; dir < 2; dir++) {
@@ -133,7 +132,7 @@ namespace quda {
           bytes[2 * dim + dir] = a.GhostFaceBytes(dim);
         }
       }
-      #endif
+#endif
     }
   };
 
@@ -270,9 +269,9 @@ namespace quda {
           arg.field.Ghost(dim, dir, spinor_parity, ghost_idx, s, c, 0, max) = arg.field(spinor_parity, x_cb, s, c);
         }
       }
-      #ifdef NVSHMEM_COMMS
-      if (arg.shmem &1) shmem_signalwait(0, 0, (arg.shmem & 4), arg);
-      #endif
+#ifdef NVSHMEM_COMMS
+      if (arg.shmem & 1) shmem_signalwait(0, 0, (arg.shmem & 4), arg);
+#endif
     }
   };
 

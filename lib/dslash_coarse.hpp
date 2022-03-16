@@ -259,19 +259,19 @@ namespace quda {
           DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, true, dagger, DSLASH_FULL> dslash(
             out, inA, inB, Y, X, kappa, parity, halo_location);
           break;
-          }
+        }
         case DSLASH_EXTERIOR: {
           DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, true, dagger, DSLASH_EXTERIOR> dslash(
             out, inA, inB, Y, X, kappa, parity, halo_location);
           break;
-          }
+        }
         case DSLASH_INTERIOR: {
           DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, true, dagger, DSLASH_INTERIOR> dslash(
             out, inA, inB, Y, X, kappa, parity, halo_location);
           break;
-          }
+        }
         default: errorQuda("Dslash type %d not instantiated", type);
-          }
+        }
 
       } else { // plain dslash
 
@@ -280,19 +280,19 @@ namespace quda {
           DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, false, dagger, DSLASH_FULL> dslash(
             out, inA, inB, Y, X, kappa, parity, halo_location);
           break;
-          }
+        }
         case DSLASH_EXTERIOR: {
           DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, false, dagger, DSLASH_EXTERIOR> dslash(
             out, inA, inB, Y, X, kappa, parity, halo_location);
           break;
-          }
+        }
         case DSLASH_INTERIOR: {
           DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, false, dagger, DSLASH_INTERIOR> dslash(
             out, inA, inB, Y, X, kappa, parity, halo_location);
           break;
-          }
+        }
         default: errorQuda("Dslash type %d not instantiated", type);
-          }
+        }
       }
     } else {
 

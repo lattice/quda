@@ -52,25 +52,25 @@ namespace quda {
   };
 
 #ifdef NVSHMEM_COMMS
-/**
-     @brief Parameter structure for driving init_dslash_arr
-  */
+  /**
+       @brief Parameter structure for driving init_dslash_arr
+    */
   template <typename T_> struct shmem_signal_wait_arg : kernel_param<> {
     using T = T_;
     T *sync_arr;
     T counter;
-    int commDim[8];  
+    int commDim[8];
 
     shmem_signal_wait_arg() :
       kernel_param(dim3(8, 1, 1)),
       sync_arr(dslash::get_shmem_sync_arr()),
-      counter((activeTuning() && !policyTuning()) ? 2 :dslash::get_shmem_sync_counter2())
-        { 
-        for (int d = 0; d < 4; d++) {
-          commDim[2*d] = comm_dim_partitioned(d);
-          commDim[2*d+1] = comm_dim_partitioned(d);
-        }
+      counter((activeTuning() && !policyTuning()) ? 2 : dslash::get_shmem_sync_counter2())
+    {
+      for (int d = 0; d < 4; d++) {
+        commDim[2 * d] = comm_dim_partitioned(d);
+        commDim[2 * d + 1] = comm_dim_partitioned(d);
       }
+    }
   };
 
   /**
@@ -80,9 +80,10 @@ namespace quda {
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr shmem_signal_wait(const Arg &arg) : arg(arg) { }
-    __device__ void operator()(int i) {
+    __device__ void operator()(int i)
+    {
       if (arg.commDim[i]) {
-	      nvshmem_signal_wait_until((arg.sync_arr + 2*QUDA_MAX_DIM + i), NVSHMEM_CMP_GE, arg.counter);
+        nvshmem_signal_wait_until((arg.sync_arr + 2 * QUDA_MAX_DIM + i), NVSHMEM_CMP_GE, arg.counter);
       }
     }
   };
