@@ -234,17 +234,17 @@ namespace quda
       // always instantiate double precision
       Apply<double>(field, args...);
     } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
-      if constexpr (QUDA_PRECISION & 4)
+      if constexpr (is_enabled<QUDA_SINGLE_PRECISION>())
         Apply<float>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
     } else if (field.Precision() == QUDA_HALF_PRECISION) {
-      if constexpr (QUDA_PRECISION & 2)
+      if constexpr (is_enabled<QUDA_HALF_PRECISION>())
         Apply<short>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
     } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
-      if constexpr (QUDA_PRECISION & 1)
+      if constexpr (is_enabled<QUDA_QUARTER_PRECISION>())
         Apply<int8_t>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
