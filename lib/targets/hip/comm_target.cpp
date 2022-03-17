@@ -31,7 +31,7 @@ namespace quda
     return std::max(accessRank[0], accessRank[1]);
   }
 
-  void comm_create_neighbor_memory(array_2d<void8, QUDA_MAX_DIM, 2> &remote, void *local)
+  void comm_create_neighbor_memory(array_2d<void*, QUDA_MAX_DIM, 2> &remote, void *local)
   {
     // handles for obtained ghost pointers
     hipIpcMemHandle_t remote_handle[QUDA_MAX_DIM][2];
