@@ -137,6 +137,10 @@ void setQudaDefaultMgTestParams()
     coarse_solver_ca_basis_size[i] = 4;
     coarse_solver_ca_lambda_min[i] = 0.0;
     coarse_solver_ca_lambda_max[i] = -1.0;
+
+    smoother_solver_ca_basis[i] = QUDA_POWER_BASIS;
+    smoother_solver_ca_lambda_min[i] = 0.0;
+    smoother_solver_ca_lambda_max[i] = -1.0; // use power iterations
   }
 }
 
@@ -298,7 +302,7 @@ void initComms(int, char **, int *const commDims)
 
 void finalizeComms()
 {
-  comm_finalize();
+  quda::comm_finalize();
 #if defined(QMP_COMMS)
   QMP_finalize_msg_passing();
 #elif defined(MPI_COMMS)
@@ -480,7 +484,7 @@ int neighborIndex_mg(int i, int oddBit, int dx4, int dx3, int dx2, int dx1)
   x2 = (x2 + dx2 + Z[1]) % Z[1];
   x1 = (x1 + dx1 + Z[0]) % Z[0];
 
-  if ((ghost_x4 >= 0 && ghost_x4 < Z[3]) || !comm_dim_partitioned(3)) {
+  if ((ghost_x4 >= 0 && ghost_x4 < Z[3]) || !quda::comm_dim_partitioned(3)) {
     ret = (x4 * (Z[2] * Z[1] * Z[0]) + x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
   } else {
     ret = (x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
@@ -1608,7 +1612,7 @@ double mom_action(void *mom, QudaPrecision prec, int len)
   } else if (prec == QUDA_SINGLE_PRECISION) {
     action = mom_action<float>((float *)mom, len);
   }
-  comm_allreduce(&action);
+  quda::comm_allreduce_sum(action);
   return action;
 }
 

@@ -78,8 +78,6 @@ namespace quda
           if (Reducer::use_w) this->W[i] = *w[i];
         }
       }
-
-      __device__ __host__ auto init() const { return ::quda::zero<typename Reducer_::reduce_t, NXZ>(); }
     };
 
     // strictly required pre-C++17 and can cause link errors otherwise
@@ -92,13 +90,16 @@ namespace quda
     /**
        Generic multi-reduction functor with up to four loads and saves
     */
-    template <typename Arg> struct MultiReduce_ : plus<array<typename Arg::Reducer::reduce_t, Arg::NXZ>> {
-      using vec = array<complex<typename Arg::real>, Arg::n/2>;
-      using reduce_t = array<typename Arg::Reducer::reduce_t, Arg::NXZ>;
+    template <typename Arg> struct MultiReduce_ : plus<typename Arg::reduce_t> {
+      using reduce_t = typename Arg::reduce_t;
       using plus<reduce_t>::operator();
+      using vec = array<complex<typename Arg::real>, Arg::n/2>;
       const Arg &arg;
       constexpr MultiReduce_(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
+
+      // overload comm_reduce to defer until the entire "tile" is complete
+      template <typename U> static inline void comm_reduce(U &) { }
 
       __device__ __host__ inline reduce_t operator()(reduce_t &sum, int tid, int, int k) const
       {
@@ -149,10 +150,10 @@ namespace quda
        Return the real dot product of x and y
     */
     template <typename reduce_t, typename T>
-    __device__ __host__ void dot_(reduce_t &sum, const typename VectorType<T, 2>::type &a, const typename VectorType<T, 2>::type &b)
+    __device__ __host__ void dot_(reduce_t &sum, const complex<T> &a, const complex<T> &b)
     {
-      sum += static_cast<reduce_t>(a.x) * static_cast<reduce_t>(b.x);
-      sum += static_cast<reduce_t>(a.y) * static_cast<reduce_t>(b.y);
+      sum += static_cast<reduce_t>(a.real()) * static_cast<reduce_t>(b.real());
+      sum += static_cast<reduce_t>(a.imag()) * static_cast<reduce_t>(b.imag());
     }
 
     template <typename reduce_t, typename real>
@@ -176,18 +177,18 @@ namespace quda
        Returns complex-valued dot product of x and y
     */
     template <typename reduce_t, typename T>
-    __device__ __host__ void cdot_(reduce_t &sum, const typename VectorType<T, 2>::type &a, const typename VectorType<T, 2>::type &b)
+    __device__ __host__ void cdot_(reduce_t &sum, const complex<T> &a, const complex<T> &b)
     {
-      using scalar = typename scalar<reduce_t>::type;
-      sum.x += static_cast<scalar>(a.x) * static_cast<scalar>(b.x);
-      sum.x += static_cast<scalar>(a.y) * static_cast<scalar>(b.y);
-      sum.y += static_cast<scalar>(a.x) * static_cast<scalar>(b.y);
-      sum.y -= static_cast<scalar>(a.y) * static_cast<scalar>(b.x);
+      using scalar = typename reduce_t::value_type;
+      sum[0] += static_cast<scalar>(a.real()) * static_cast<scalar>(b.real());
+      sum[0] += static_cast<scalar>(a.imag()) * static_cast<scalar>(b.imag());
+      sum[1] += static_cast<scalar>(a.real()) * static_cast<scalar>(b.imag());
+      sum[1] -= static_cast<scalar>(a.imag()) * static_cast<scalar>(b.real());
     }
 
     template <typename real_reduce_t, typename real>
-    struct multiCdot : public MultiReduceFunctor<typename VectorType<real_reduce_t, 2>::type, complex<real>> {
-      using reduce_t = typename VectorType<real_reduce_t, 2>::type;
+    struct multiCdot : public MultiReduceFunctor<array<real_reduce_t, 2>, complex<real>> {
+      using reduce_t = array<real_reduce_t, 2>;
       static constexpr memory_access<1, 1> read { };
       static constexpr memory_access< > write { };
       static constexpr bool use_z = false;

@@ -189,7 +189,7 @@ int main(int argc, char **argv)
   host_free(qDensity);
 
   // Q charge Reduction and normalisation
-  comm_allreduce(&q_charge_check);
+  quda::comm_allreduce_sum(q_charge_check);
 
   printfQuda("GPU value %e and host density sum %e. Q charge deviation: %e\n", param.qcharge, q_charge_check,
              param.qcharge - q_charge_check);
