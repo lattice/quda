@@ -108,9 +108,8 @@ namespace quda
      *
      * @return shmem_sync_t*
      */
-    shmem_sync_t *get_shmem_sync_arr();
     shmem_sync_t *get_dslash_shmem_sync_arr();
-    shmem_sync_t *get_exchangeghost_sync_arr();
+    shmem_sync_t *get_exchangeghost_shmem_sync_arr();
     /**
      * @brief Get the array[2*QUDA_MAX_DIM] of atomic to count which intra node packing blocks have finished per dim/dir
      *

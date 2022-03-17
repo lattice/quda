@@ -111,7 +111,7 @@ namespace quda {
       waitcounter(counter),
       retcount_intra(dslash::get_shmem_retcount_intra()),
       retcount_inter(dslash::get_shmem_retcount_inter()),
-      sync_arr(dslash::get_shmem_sync_arr()),
+      sync_arr(dslash::get_exchangeghost_shmem_sync_arr()),
 #endif
       shmem(shmem_)
     {

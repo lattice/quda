@@ -64,37 +64,6 @@ namespace cg = cooperative_groups;
     }
   }
 
-  template <typename Arg> __device__ inline void shmem_putbuffer_signal(int shmemindex, Arg &arg)
-  {
-    switch (shmemindex) {
-    case 0:
-      nvshmem_putmem_signal_nbi(getShmemBuffer<1>(0, arg), getShmemBuffer<0>(0, arg), arg.bytes[0], arg.sync_arr + 2 * QUDA_MAX_DIM +1, arg.counter, NVSHMEM_SIGNAL_SET, arg.neighbor_ranks[0]);
-      return;
-    case 1:
-      nvshmem_putmem_signal_nbi(getShmemBuffer<1>(1, arg), getShmemBuffer<0>(1, arg), arg.bytes[1], arg.sync_arr + 2 * QUDA_MAX_DIM +0, arg.counter, NVSHMEM_SIGNAL_SET, arg.neighbor_ranks[1]);
-      return;
-    case 2:
-      nvshmem_putmem_signal_nbi(getShmemBuffer<1>(2, arg), getShmemBuffer<0>(2, arg), arg.bytes[2], arg.sync_arr + 2 * QUDA_MAX_DIM +3, arg.counter, NVSHMEM_SIGNAL_SET, arg.neighbor_ranks[2]);
-      return;
-    case 3:
-      nvshmem_putmem_signal_nbi(getShmemBuffer<1>(3, arg), getShmemBuffer<0>(3, arg), arg.bytes[3], arg.sync_arr + 2 * QUDA_MAX_DIM +2, arg.counter, NVSHMEM_SIGNAL_SET, arg.neighbor_ranks[3]);
-      return;
-    case 4:
-      nvshmem_putmem_signal_nbi(getShmemBuffer<1>(4, arg), getShmemBuffer<0>(4, arg), arg.bytes[4], arg.sync_arr + 2 * QUDA_MAX_DIM +5, arg.counter, NVSHMEM_SIGNAL_SET, arg.neighbor_ranks[4]);
-      return;
-    case 5:
-      nvshmem_putmem_signal_nbi(getShmemBuffer<1>(5, arg), getShmemBuffer<0>(5, arg), arg.bytes[5], arg.sync_arr + 2 * QUDA_MAX_DIM +4, arg.counter, NVSHMEM_SIGNAL_SET, arg.neighbor_ranks[5]);
-      return;
-    case 6:
-      nvshmem_putmem_signal_nbi(getShmemBuffer<1>(6, arg), getShmemBuffer<0>(6, arg), arg.bytes[6], arg.sync_arr + 2 * QUDA_MAX_DIM +7, arg.counter, NVSHMEM_SIGNAL_SET, arg.neighbor_ranks[6]);
-      return;
-    case 7:
-      nvshmem_putmem_signal_nbi(getShmemBuffer<1>(7, arg), getShmemBuffer<0>(7, arg), arg.bytes[7], arg.sync_arr + 2 * QUDA_MAX_DIM +6, arg.counter, NVSHMEM_SIGNAL_SET, arg.neighbor_ranks[7]);
-      return;
-    default: return;
-    }
-  }
-
   template <typename Arg> __device__ inline bool do_shmempack(int dim, int dir, const Arg &arg)
   {
     const int shmemidx = 2 * dim + dir;
@@ -104,6 +73,7 @@ namespace cg = cooperative_groups;
     return (arg.shmem == 0 || (intranode && pack_intranode) || (!intranode && pack_internode));
   }
 
+// this currently operates on arg.sync_arr, i.e. is used for dslash
   template <typename Arg> __device__ inline void shmem_signal(int dim, int dir, const Arg &arg)
   {
     const int shmemidx = 2 * dim + dir;
@@ -166,38 +136,39 @@ namespace cg = cooperative_groups;
     }
   }
 
-  template <typename Arg> __device__ inline void shmem_signal2(int dim, int dir, const Arg &arg)
-  {
-    bool amLast = false;
-
-    __syncthreads(); // make sure all threads in this block arrived here
-    if (quda::target::thread_idx().x == 0 && quda::target::thread_idx().y == 0 && quda::target::thread_idx().z == 0) {
-      int ticket = arg.retcount_intra[0].fetch_add(1);
-      // currently CST order -- want to make sure all stores are done before and for the last block we need that
-      // all uses of that data are visible
-      amLast = (ticket == gridDim.x * gridDim.y * gridDim.z - 1);
-    }
-    auto my_tile = cg::tiled_partition<8>(cg::this_thread_block());
-
-    if (my_tile.meta_group_rank() == 0) { amLast = my_tile.shfl(amLast, 0); }
-    if (my_tile.meta_group_rank() == 0) {
-      int shmemidx = my_tile.thread_rank();
-      dim = shmemidx / 2;
-      dir = shmemidx % 2;
-
-      if (!(getNeighborRank(2 * dim + dir, arg) < 0)) {
-        // send data over IB if necessary
-        if (getShmemBuffer<1, decltype(arg)>(shmemidx, arg) != nullptr) {
-          shmem_putbuffer_signal(shmemidx, arg);
-        } else {
-          nvshmemx_signal_op(arg.sync_arr + 2 * QUDA_MAX_DIM + 2 * dim + (1 - dir), arg.counter, NVSHMEM_SIGNAL_SET,
-                             getNeighborRank(2 * dim + dir, arg));
-        }
-      }
-      if (my_tile.thread_rank() == 0) arg.retcount_intra[0].store(0); // this could probably be relaxed
-    }
+// this currently operates on arg.sync_arr, i.e. is used for exchange ghost
+template <typename Arg> __device__ inline void shmem_putbuffer_signal(int shmemindex, Arg &arg)
+{
+  switch (shmemindex) {
+  case 0:
+    nvshmem_putmem_signal_nbi(getShmemBuffer<1>(0, arg), getShmemBuffer<0>(0, arg), arg.bytes[0], arg.sync_arr +1, arg.counter, NVSHMEM_SIGNAL_SET, arg.neighbor_ranks[0]);
+    return;
+  case 1:
+    nvshmem_putmem_signal_nbi(getShmemBuffer<1>(1, arg), getShmemBuffer<0>(1, arg), arg.bytes[1], arg.sync_arr +0, arg.counter, NVSHMEM_SIGNAL_SET, arg.neighbor_ranks[1]);
+    return;
+  case 2:
+    nvshmem_putmem_signal_nbi(getShmemBuffer<1>(2, arg), getShmemBuffer<0>(2, arg), arg.bytes[2], arg.sync_arr +3, arg.counter, NVSHMEM_SIGNAL_SET, arg.neighbor_ranks[2]);
+    return;
+  case 3:
+    nvshmem_putmem_signal_nbi(getShmemBuffer<1>(3, arg), getShmemBuffer<0>(3, arg), arg.bytes[3], arg.sync_arr +2, arg.counter, NVSHMEM_SIGNAL_SET, arg.neighbor_ranks[3]);
+    return;
+  case 4:
+    nvshmem_putmem_signal_nbi(getShmemBuffer<1>(4, arg), getShmemBuffer<0>(4, arg), arg.bytes[4], arg.sync_arr +5, arg.counter, NVSHMEM_SIGNAL_SET, arg.neighbor_ranks[4]);
+    return;
+  case 5:
+    nvshmem_putmem_signal_nbi(getShmemBuffer<1>(5, arg), getShmemBuffer<0>(5, arg), arg.bytes[5], arg.sync_arr +4, arg.counter, NVSHMEM_SIGNAL_SET, arg.neighbor_ranks[5]);
+    return;
+  case 6:
+    nvshmem_putmem_signal_nbi(getShmemBuffer<1>(6, arg), getShmemBuffer<0>(6, arg), arg.bytes[6], arg.sync_arr +7, arg.counter, NVSHMEM_SIGNAL_SET, arg.neighbor_ranks[6]);
+    return;
+  case 7:
+    nvshmem_putmem_signal_nbi(getShmemBuffer<1>(7, arg), getShmemBuffer<0>(7, arg), arg.bytes[7], arg.sync_arr +6, arg.counter, NVSHMEM_SIGNAL_SET, arg.neighbor_ranks[7]);
+    return;
+  default: return;
   }
+}
 
+// this currently operates on arg.sync_arr + 2 * QUDA_MAX_DIM, i.e. is used for exchange ghost
   template <typename Arg> __device__ inline void shmem_signalwait(int dim, int dir, bool wait, const Arg &arg)
   {
    
@@ -229,7 +200,7 @@ namespace cg = cooperative_groups;
           if (getShmemBuffer<1, decltype(arg)>(shmemidx, arg) != nullptr) {
             shmem_putbuffer_signal(shmemidx, arg);
           } else {
-            nvshmemx_signal_op(arg.sync_arr + 2 * QUDA_MAX_DIM + 2 * dim + (1 - dir), arg.counter, NVSHMEM_SIGNAL_SET,
+            nvshmemx_signal_op(arg.sync_arr + 2 * dim + (1 - dir), arg.counter, NVSHMEM_SIGNAL_SET,
                                getNeighborRank(2 * dim + dir, arg));
           }
         }
@@ -240,7 +211,7 @@ namespace cg = cooperative_groups;
         dim = shmemidx / 2;
         dir = shmemidx % 2;
         if (wait && !(getNeighborRank(2 * dim + dir, arg) < 0)) {
-          nvshmem_signal_wait_until((arg.sync_arr + 2 * QUDA_MAX_DIM + shmemidx), NVSHMEM_CMP_GE, arg.waitcounter);
+          nvshmem_signal_wait_until((arg.sync_arr + shmemidx), NVSHMEM_CMP_GE, arg.waitcounter);
         }
       }
     }
