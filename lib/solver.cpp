@@ -108,7 +108,7 @@ namespace quda {
       break;
     case QUDA_BICGSTABL_INVERTER:
       report("BICGSTABL");
-      solver = new BiCGstabL(mat, matSloppy, param, profile);
+      solver = new BiCGstabL(mat, matSloppy, matEig, param, profile);
       break;
     case QUDA_EIGCG_INVERTER:
       report("EIGCG");
@@ -429,6 +429,21 @@ namespace quda {
     }
 
     return true;
+  }
+
+  /**
+    @brief Returns if a solver is CA or not
+    @return true if CA, false otherwise
+  */
+  bool is_ca_solver(QudaInverterType type)
+  {
+    switch (type) {
+    case QUDA_CA_GCR_INVERTER:
+    case QUDA_CA_CG_INVERTER:
+    case QUDA_CA_CGNR_INVERTER:
+    case QUDA_CA_CGNE_INVERTER: return true;
+    default: return false;
+    }
   }
 
 } // namespace quda

@@ -374,8 +374,8 @@ namespace quda {
       madwf_param.madwf_train_maxiter = param.madwf_train_maxiter;
       madwf_param.madwf_param_load = param.madwf_param_load == QUDA_BOOLEAN_TRUE;
       madwf_param.madwf_param_save = param.madwf_param_save == QUDA_BOOLEAN_TRUE;
-      strcpy(madwf_param.madwf_param_infile, param.madwf_param_infile);
-      strcpy(madwf_param.madwf_param_outfile, param.madwf_param_outfile);
+      if (madwf_param.madwf_param_load) madwf_param.madwf_param_infile = std::string(param.madwf_param_infile);
+      if (madwf_param.madwf_param_save) madwf_param.madwf_param_outfile = std::string(param.madwf_param_outfile);
     }
 
     SolverParam(const SolverParam &param) :
@@ -471,7 +471,7 @@ namespace quda {
       param.true_res = true_res;
       param.true_res_hq = true_res_hq;
       param.iter += iter;
-      reduceDouble(gflops);
+      comm_allreduce_sum(gflops);
       param.gflops += gflops;
       param.secs += secs;
       if (offset >= 0) {
@@ -695,6 +695,39 @@ namespace quda {
     void setRecomputeEvals(bool flag) { recompute_evals = flag; };
 
     /**
+       @brief Compute power iterations on a Dirac matrix
+       @param[in] diracm Dirac matrix used for power iterations
+       @param[in] start Starting rhs for power iterations; value preserved unless it aliases tempvec1 or tempvec2
+       @param[in,out] tempvec1 Temporary vector used for power iterations (FIXME: can become a reference when std::swap
+       can be used on ColorSpinorField)
+       @param[in,out] tempvec2 Temporary vector used for power iterations (FIXME: can become a reference when std::swap
+       can be used on ColorSpinorField)
+       @param[in] niter Total number of power iteration iterations
+       @param[in] normalize_freq Frequency with which intermediate vector gets normalized
+       @param[in] args Parameter pack of ColorSpinorFields used as temporary passed to Dirac
+       @return Norm of final power iteration result
+    */
+    template <typename... Args>
+    static double performPowerIterations(const DiracMatrix &diracm, ColorSpinorField &start, ColorSpinorField *tempvec1,
+                                         ColorSpinorField *tempvec2, int niter, int normalize_freq, Args &&...args);
+
+    /**
+       @brief Generate a Krylov space in a given basis
+       @param[in] diracm Dirac matrix used to generate the Krylov space
+       @param[out] Ap dirac matrix times the Krylov basis vectors
+       @param[in,out] p Krylov basis vectors; assumes p[0] is in place
+       @param[in] n_krylov Size of krylov space
+       @param[in] basis Basis type
+       @param[in] m_map Slope mapping for Chebyshev basis; ignored for power basis
+       @param[in] b_map Intercept mapping for Chebyshev basis; ignored for power basis
+       @param[in] args Parameter pack of ColorSpinorFields used as temporary passed to Dirac
+    */
+    template <typename... Args>
+    static void computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<ColorSpinorField *> Ap,
+                                     std::vector<ColorSpinorField *> p, int n_krylov, QudaCABasis basis, double m_map,
+                                     double b_map, Args &&...args);
+
+    /**
      * @brief Return flops
      * @return flops expended by this operator
      */
@@ -709,7 +742,6 @@ namespace quda {
   private:
     // pointers to fields to avoid multiple creation overhead
     ColorSpinorField *yp, *rp, *rnewp, *pp, *App, *tmpp, *tmp2p, *tmp3p, *rSloppyp, *xSloppyp;
-    std::vector<ColorSpinorField*> p;
     bool init;
 
   public:
@@ -936,26 +968,33 @@ namespace quda {
     virtual bool hermitian() { return false; } /** BiCGStab is for any linear system */
   };
 
+  /**
+   * @brief Optimized version of the BiCGstabL solver described in
+   * https://etna.math.kent.edu/vol.1.1993/pp11-32.dir/pp11-32.pdf
+   */
   class BiCGstabL : public Solver {
 
   private:
+    const DiracMdagM matMdagM; // used by the eigensolver
+
     /**
        The size of the Krylov space that BiCGstabL uses.
      */
     int n_krylov; // in the language of BiCGstabL, this is L.
+    int pipeline; // pipelining factor for legacyGramSchmidt
 
     // Various coefficients and params needed on each iteration.
     Complex rho0, rho1, alpha, omega, beta;           // Various coefficients for the BiCG part of BiCGstab-L.
-    Complex *gamma, *gamma_prime, *gamma_prime_prime; // Parameters for MR part of BiCGstab-L. (L+1) length.
-    Complex **tau; // Parameters for MR part of BiCGstab-L. Tech. modified Gram-Schmidt coeffs. (L+1)x(L+1) length.
-    double *sigma; // Parameters for MR part of BiCGstab-L. Tech. the normalization part of Gram-Scmidt. (L+1) length.
+    std::vector<Complex> gamma, gamma_prime, gamma_prime_prime; // Parameters for MR part of BiCGstab-L. (L+1) length.
+    std::vector<Complex> tau; // Parameters for MR part of BiCGstab-L. Tech. modified Gram-Schmidt coeffs. (L+1)x(L+1) length.
+    std::vector<double> sigma; // Parameters for MR part of BiCGstab-L. Tech. the normalization part of Gram-Scmidt. (L+1) length.
 
     // pointers to fields to avoid multiple creation overhead
     // full precision fields
-    ColorSpinorField *r_fullp;   //! Full precision residual.
-    ColorSpinorField *yp;        //! Full precision temporary.
+    std::unique_ptr<ColorSpinorField> r_fullp; //! Full precision residual.
+    std::unique_ptr<ColorSpinorField> yp;      //! Full precision temporary.
     // sloppy precision fields
-    ColorSpinorField *tempp;          //! Sloppy temporary vector.
+    std::unique_ptr<ColorSpinorField> tempp; //! Sloppy temporary vector.
     std::vector<ColorSpinorField*> r; // Current residual + intermediate residual values, along the MR.
     std::vector<ColorSpinorField*> u; // Search directions.
 
@@ -965,20 +1004,53 @@ namespace quda {
     ColorSpinorField *r_sloppy_saved_p; //! Current residual, in BiCG language.
 
     /**
-       Internal routine for reliable updates. Made to not conflict with BiCGstab's implementation.
+     @brief Internal routine for reliable updates. Made to not conflict with BiCGstab's implementation.
      */
     int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
 
     /**
-       Internal routines for pipelined Gram-Schmidt. Made to not conflict with GCR's implementation.
+     * @brief Internal routine for performing the MR part of BiCGstab-L
+     *
+     * @param x_sloppy [out] sloppy accumulator for x
+     * @param fixed_iteration [in] whether or not this is for a fixed iteration solver
      */
-    void computeTau(Complex **tau, double *sigma, std::vector<ColorSpinorField*> r, int begin, int size, int j);
-    void updateR(Complex **tau, std::vector<ColorSpinorField*> r, int begin, int size, int j);
-    void orthoDir(Complex **tau, double* sigma, std::vector<ColorSpinorField*> r, int j, int pipeline);
+    void computeMR(ColorSpinorField &x_sloppy, bool fixed_iteration);
 
-    void updateUend(Complex *gamma, std::vector<ColorSpinorField *> u, int n_krylov);
-    void updateXRend(Complex *gamma, Complex *gamma_prime, Complex *gamma_prime_prime,
-                     std::vector<ColorSpinorField *> r, ColorSpinorField &x, int n_krylov);
+    /**
+       Legacy routines that encapsulate the original pipelined Gram-Schmit.
+       In theory these should be a bit more numerically stable than the
+       fully fused version in computeMR, but in practice that seems to be
+       lost in the noise, and the fused nature of computeMR wins in terms of
+       time to solution.
+     */
+
+    /**
+     * @brief Internal routine that comptues the "tau" matrix as described in
+     *        the original BiCGstab-L paper, supporting pipelining
+     *
+     * @param begin [in] begin offset for pipelining
+     * @param size [in] length of pipelining
+     * @param j [in] row of tau being computed
+     */
+    void computeTau(int begin, int size, int j);
+
+    /**
+     * @brief Internal routine that updates R as described in
+     *        the original BiCGstab-L paper, supporting pipelining.
+     *
+     * @param begin [in] begin offset for pipelining
+     * @param size [in] length of pipelining
+     * @param j [in] row of tau being computed
+     */
+    void updateR(int begin, int size, int j);
+
+    /**
+     * @brief Internal legacy routine for performing the MR part of BiCGstab-L
+     *        which more closely matches the paper
+     *
+     * @param x_sloppy [out] sloppy accumulator for x
+     */
+    void legacyComputeMR(ColorSpinorField &x_sloppy);
 
     /**
        Solver uses lazy allocation: this flag determines whether we have allocated or not.
@@ -988,7 +1060,8 @@ namespace quda {
     std::string solver_name; // holds BiCGstab-l, where 'l' literally equals n_krylov.
 
   public:
-    BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matEig, SolverParam &param,
+              TimeProfile &profile);
     virtual ~BiCGstabL();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -1083,11 +1156,11 @@ namespace quda {
     std::vector<double> alpha;    // QAQ^{-1} g
     std::vector<double> beta;     // QAQ^{-1} QpolyS
 
-    ColorSpinorField *rp;
-    ColorSpinorField *tmpp;
-    ColorSpinorField *tmpp2;
-    ColorSpinorField *tmp_sloppy;
-    ColorSpinorField *tmp_sloppy2;
+    std::unique_ptr<ColorSpinorField> rp;
+    std::unique_ptr<ColorSpinorField> tmpp;
+    std::unique_ptr<ColorSpinorField> tmpp2;
+    std::unique_ptr<ColorSpinorField> tmp_sloppy;
+    std::unique_ptr<ColorSpinorField> tmp_sloppy2;
 
     std::vector<ColorSpinorField*> S;  // residual vectors
     std::vector<ColorSpinorField*> AS; // mat * residual vectors. Can be replaced by a single temporary.
@@ -1187,9 +1260,8 @@ namespace quda {
     bool init;
     const bool use_source; // whether we can reuse the source vector
 
-    // Basis. Currently anything except POWER_BASIS causes a warning
-    // then swap to POWER_BASIS.
-    QudaCABasis basis;
+    bool lambda_init;  // whether or not lambda_max has been initialized
+    QudaCABasis basis; // CA basis
 
     Complex *alpha; // Solution coefficient vectors
 
@@ -1540,5 +1612,11 @@ public:
    std::vector<ColorSpinorField *> evecs; /** Container for the eigenvectors */
    std::vector<Complex> evals;            /** The eigenvalues */
  };
+
+ /**
+   @brief Returns if a solver is CA or not
+   @return true if CA, false otherwise
+ */
+ bool is_ca_solver(QudaInverterType type);
 
 } // namespace quda

@@ -47,7 +47,7 @@ namespace quda
         Arg arg(x, y);
         arg.set_output_async_buffer(reinterpret_cast<reduce_t *>(wm_p));
         std::vector<reduce_t> v; // dummy vector
-        launch<Tensor5DReduce, reduce_t, comm_reduce_null<reduce_t>>(v, tp, stream, arg);
+        launch<Tensor5DReduce>(v, tp, stream, arg);
       }
 
       long long flops() const { return (18ll + 2ll + 2ll) * x.X(4) * 4ll * y.VolumeCB() * 4ll; }

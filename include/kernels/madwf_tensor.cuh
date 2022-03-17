@@ -58,28 +58,18 @@ namespace quda
 
         checkNative(y, x);
       }
-
-      __device__ __host__ reduce_t init() const
-      {
-        reduce_t rst;
-#pragma unroll
-        for (int w_spin = 0; w_spin < nSpin; w_spin++) {
-#pragma unroll
-          for (int v_spin = 0; v_spin < nSpin; v_spin++) { rst[v_spin * nSpin + w_spin] = {0, 0}; }
-        }
-        return rst;
-      }
     };
 
-    template <class Arg> struct Tensor5DReduce {
+    template <class Arg> struct Tensor5DReduce : plus<typename Arg::reduce_t> {
+      using reduce_t = typename Arg::reduce_t;
+      using plus<reduce_t>::operator();
 
       const Arg &arg;
       constexpr Tensor5DReduce(const Arg &arg) : arg(arg) { }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      using reduce_t = typename Arg::reduce_t;
-
-      static constexpr bool do_sum = true;
+      // overload comm_reduce to prevent any global reduction
+      static inline void comm_reduce(std::vector<reduce_t> &) { }
 
       __device__ __host__ inline reduce_t operator()(reduce_t &sum, int x_cb, int parity, int batch_idx)
       {
@@ -101,8 +91,6 @@ namespace quda
 
         return sum;
       }
-
-      __device__ __host__ inline reduce_t operator()(reduce_t a, reduce_t b) const { return a + b; }
     };
 
   } // namespace madwf_ml

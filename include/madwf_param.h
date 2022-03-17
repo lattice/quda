@@ -29,10 +29,10 @@ namespace quda
     bool madwf_param_save;
 
     /** Path to load from the file system */
-    char madwf_param_infile[256];
+    std::string madwf_param_infile;
 
     /** Path to save to the file system */
-    char madwf_param_outfile[256];
+    std::string madwf_param_outfile;
   };
 
 } // namespace quda

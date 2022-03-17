@@ -1,0 +1,20 @@
+# HIP Specific CMake
+enable_language(HIP)
+
+if (NOT DEFINED ROCM_PATH )
+  if (NOT DEFINED ENV{ROCM_PATH} )
+    set(ROCM_PATH "/opt/rocm" CACHE PATH "ROCm path")
+  else()
+    set(ROCM_PATH $ENV{ROCM_PATH} CACHE PATH "ROCm path")
+  endif()
+endif()
+
+set(CMAKE_MODULE_PATH "${ROCM_PATH}/lib/cmake" ${CMAKE_MODULE_PATH})
+find_dependency(HIP REQUIRED)
+find_dependency(hipfft REQUIRED)
+find_dependency(hiprand REQUIRED)
+find_dependency(rocrand REQUIRED)
+find_dependency(hipblas REQUIRED)
+find_dependency(rocblas REQUIRED)
+find_dependency(hipcub REQUIRED)
+find_dependency(rocprim REQUIRED)
