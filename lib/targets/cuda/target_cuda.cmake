@@ -1,13 +1,11 @@
 # ######################################################################################################################
-# CUDA target
-set(QUDA_TARGET_CUDA ON)
-
-# ######################################################################################################################
 # CUDA specific part of CMakeLists
 
 find_package(CUDAToolkit REQUIRED)
 include(CheckLanguage)
 check_language(CUDA)
+
+set(QUDA_TARGET_CUDA ON)
 
 if(DEFINED ENV{QUDA_GPU_ARCH})
   set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
@@ -111,9 +109,6 @@ cmake_dependent_option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic su
 
 if((QUDA_HETEROGENEOUS_ATOMIC OR QUDA_NVSHMEM) AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
   message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON AND/OR QUDA_NVSHMEM=ON do not support SANITIZE build)")
-endif()
-if(QUDA_HETEROGENEOUS_ATOMIC AND QUDA_JITIFY)
-  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support JITIFY)")
 endif()
 
 mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC)
@@ -376,3 +371,5 @@ if(QUDA_NVML)
 endif()
 
 add_subdirectory(targets/cuda)
+
+install(FILES ${CMAKE_SOURCE_DIR}/cmake/find_target_cuda_dependencies.cmake DESTINATION lib/cmake/QUDA)

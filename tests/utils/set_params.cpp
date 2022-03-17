@@ -241,8 +241,8 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.madwf_param_load = madwf_param_load ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   inv_param.madwf_param_save = madwf_param_save ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
-  strcpy(inv_param.madwf_param_infile, madwf_param_infile);
-  strcpy(inv_param.madwf_param_outfile, madwf_param_outfile);
+  safe_strcpy(inv_param.madwf_param_infile, madwf_param_infile, 256, "madwf_param_infile");
+  safe_strcpy(inv_param.madwf_param_outfile, madwf_param_outfile, 256, "madwf_param_outfile");
 
   inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = tol_precondition;
@@ -333,10 +333,10 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.a_max = eig_amax;
 
   eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
+  safe_strcpy(eig_param.arpack_logfile, eig_arpack_logfile, 512, "eig_arpack_logfile");
 
-  strcpy(eig_param.vec_infile, eig_vec_infile);
-  strcpy(eig_param.vec_outfile, eig_vec_outfile);
+  safe_strcpy(eig_param.vec_infile, eig_vec_infile, 256, "eig_vec_infile");
+  safe_strcpy(eig_param.vec_outfile, eig_vec_outfile, 256, "eig_vec_outfile");
   eig_param.save_prec = eig_save_prec;
   eig_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
@@ -428,10 +428,10 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_maxiter[i] = setup_maxiter[i];
     mg_param.setup_maxiter_refresh[i] = setup_maxiter_refresh[i];
 
-    // Basis to use for CA-CGN(E/R) setup
+    // Basis to use for CA solver setups
     mg_param.setup_ca_basis[i] = setup_ca_basis[i];
 
-    // Basis size for CACG setup
+    // Basis size for CA solver setup
     mg_param.setup_ca_basis_size[i] = setup_ca_basis_size[i];
 
     // Minimum and maximum eigenvalue for Chebyshev CA basis setup
@@ -459,10 +459,10 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.coarse_solver_tol[i] = coarse_solver_tol[i];
     mg_param.coarse_solver_maxiter[i] = coarse_solver_maxiter[i];
 
-    // Basis to use for CA-CGN(E/R) coarse solver
+    // Basis to use for CA coarse solvers
     mg_param.coarse_solver_ca_basis[i] = coarse_solver_ca_basis[i];
 
-    // Basis size for CACG coarse solver/
+    // Basis size for CA coarse solvers
     mg_param.coarse_solver_ca_basis_size[i] = coarse_solver_ca_basis_size[i];
 
     // Minimum and maximum eigenvalue for Chebyshev CA basis
@@ -486,6 +486,13 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
     // set number of Schwarz cycles to apply
     mg_param.smoother_schwarz_cycle[i] = mg_schwarz_cycle[i];
+
+    // Basis to use for CA smoothers
+    mg_param.smoother_solver_ca_basis[i] = smoother_solver_ca_basis[i];
+
+    // Minimum and maximum eigenvalue for Chebyshev CA basis smoothers
+    mg_param.smoother_solver_ca_lambda_min[i] = smoother_solver_ca_lambda_min[i];
+    mg_param.smoother_solver_ca_lambda_max[i] = smoother_solver_ca_lambda_max[i];
 
     // Set set coarse_grid_solution_type: this defines which linear
     // system we are solving on a given level
@@ -593,10 +600,10 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
-    strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
-    strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i]);
-    if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
-    if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
+    safe_strcpy(mg_param.vec_infile[i], mg_vec_infile[i], 256, "mg_vec_infile[" + std::to_string(i) + "]");
+    safe_strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i], 256, "mg_vec_outfile[" + std::to_string(i) + "]");
+    if (mg_vec_infile[i].size() > 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
+    if (mg_vec_outfile[i].size() > 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
   }
 
   mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -935,7 +942,7 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   // Specify Krylov sub-size for GCR, BICGSTAB(L), basis size for CA-CG, CA-GCR
   inv_param.gcrNkrylov = gcrNkrylov;
 
-  // Specify basis for CA-CG, lambda min/max for Chebyshev basis
+  // Specify basis for CA-CG, CA-GCR, lambda min/max for Chebyshev basis
   //   lambda_max < lambda_max . use power iters to generate
   inv_param.ca_basis = ca_basis;
   inv_param.ca_lambda_min = ca_lambda_min;
@@ -1023,10 +1030,10 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_tol[i] = setup_tol[i];
     mg_param.setup_maxiter[i] = setup_maxiter[i];
 
-    // Basis to use for CA-CGN(E/R) setup
+    // Basis to use for CA solver setups
     mg_param.setup_ca_basis[i] = setup_ca_basis[i];
 
-    // Basis size for CACG setup
+    // Basis size for CA solver setups
     mg_param.setup_ca_basis_size[i] = setup_ca_basis_size[i];
 
     // Minimum and maximum eigenvalue for Chebyshev CA basis setup
@@ -1053,10 +1060,10 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.coarse_solver_tol[i] = coarse_solver_tol[i];
     mg_param.coarse_solver_maxiter[i] = coarse_solver_maxiter[i];
 
-    // Basis to use for CA-CGN(E/R) coarse solver
+    // Basis to use for CA coarse solvers
     mg_param.coarse_solver_ca_basis[i] = coarse_solver_ca_basis[i];
 
-    // Basis size for CACG coarse solver/
+    // Basis size for CA coarse solvers
     mg_param.coarse_solver_ca_basis_size[i] = coarse_solver_ca_basis_size[i];
 
     // Minimum and maximum eigenvalue for Chebyshev CA basis
@@ -1080,6 +1087,13 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
     // set number of Schwarz cycles to apply
     mg_param.smoother_schwarz_cycle[i] = mg_schwarz_cycle[i];
+
+    // Basis to use for CA smoothers
+    mg_param.smoother_solver_ca_basis[i] = smoother_solver_ca_basis[i];
+
+    // Minimum and maximum eigenvalue for Chebyshev CA basis smoothers
+    mg_param.smoother_solver_ca_lambda_min[i] = smoother_solver_ca_lambda_min[i];
+    mg_param.smoother_solver_ca_lambda_max[i] = smoother_solver_ca_lambda_max[i];
 
     // Set set coarse_grid_solution_type: this defines which linear
     // system we are solving on a given level
@@ -1182,10 +1196,10 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
-    strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
-    strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i]);
-    if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
-    if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
+    safe_strcpy(mg_param.vec_infile[i], mg_vec_infile[i], 256, "mg_vec_infile[" + std::to_string(i) + "]");
+    safe_strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i], 256, "mg_vec_outfile[" + std::to_string(i) + "]");
+    if (mg_vec_infile[i].size() > 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
+    if (mg_vec_outfile[i].size() > 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
   }
 
   mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -1349,8 +1363,8 @@ void setDeflationParam(QudaEigParam &df_param)
   df_param.mem_type_ritz = mem_type_ritz;
 
   // set file i/o parameters
-  strcpy(df_param.vec_infile, eig_vec_infile);
-  strcpy(df_param.vec_outfile, eig_vec_outfile);
+  safe_strcpy(df_param.vec_infile, eig_vec_infile, 256, "eig_vec_infile");
+  safe_strcpy(df_param.vec_outfile, eig_vec_outfile, 256, "eig_vec_outfile");
   df_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 }
 
