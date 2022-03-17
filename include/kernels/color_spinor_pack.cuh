@@ -90,7 +90,7 @@ namespace quda {
     dslash::shmem_retcount_intra_t *retcount_intra;
     dslash::shmem_retcount_inter_t *retcount_inter;
     dslash::shmem_sync_t *sync_arr;
-    #endif
+#endif
     int shmem=0;
 
     PackGhostArg(const ColorSpinorField &a, int work_items, void **ghost, int parity, int nFace, int dagger, int shmem_) :
@@ -107,7 +107,7 @@ namespace quda {
       threadDimMapLower {},
       threadDimMapUpper {},
 #ifdef NVSHMEM_COMMS
-      counter((activeTuning() && !policyTuning()) ? 2 : dslash::inc_shmem_sync_counter2()),
+      counter((activeTuning() && !policyTuning()) ? 2 : dslash::inc_exchangeghost_shmem_sync_counter()),
       waitcounter(counter),
       retcount_intra(dslash::get_shmem_retcount_intra()),
       retcount_inter(dslash::get_shmem_retcount_inter()),

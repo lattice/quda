@@ -338,7 +338,7 @@ namespace quda
       counter(0)
 #else
       shmem(shmem_),
-      counter(dslash::get_shmem_sync_counter()),
+      counter(dslash::get_dslash_shmem_sync_counter()),
       sync_arr(dslash::get_shmem_sync_arr()),
       interior_done(*dslash::get_shmem_interior_done()),
       interior_count(*dslash::get_shmem_interior_count()),

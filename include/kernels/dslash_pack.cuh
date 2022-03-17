@@ -93,9 +93,9 @@ namespace quda
       sites_per_block((work_items + grid - 1) / grid)
 #ifdef NVSHMEM_COMMS
       ,
-      counter(dslash::get_shmem_sync_counter()),
+      counter(dslash::get_dslash_shmem_sync_counter()),
       shmem(shmem_),
-      sync_arr(dslash::get_shmem_sync_arr()),
+      sync_arr(dslash::get_dslash_shmem_sync_arr()),
       retcount_intra(dslash::get_shmem_retcount_intra()),
       retcount_inter(dslash::get_shmem_retcount_inter())
 #endif

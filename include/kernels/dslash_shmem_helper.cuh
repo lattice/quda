@@ -64,7 +64,7 @@ namespace quda {
     shmem_signal_wait_arg() :
       kernel_param(dim3(8, 1, 1)),
       sync_arr(dslash::get_shmem_sync_arr()),
-      counter((activeTuning() && !policyTuning()) ? 2 : dslash::get_shmem_sync_counter2())
+      counter((activeTuning() && !policyTuning()) ? 2 : dslash::get_exchangeghost_shmem_sync_counter())
     {
       for (int d = 0; d < 4; d++) {
         commDim[2 * d] = comm_dim_partitioned(d);

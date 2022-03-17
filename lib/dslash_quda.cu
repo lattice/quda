@@ -23,12 +23,12 @@ namespace quda {
     // for shmem lightweight sync
     shmem_sync_t sync_counter = 10;
     shmem_sync_t sync_counter2 = 10;
-    shmem_sync_t get_shmem_sync_counter() { return sync_counter; }
-    shmem_sync_t set_shmem_sync_counter(shmem_sync_t count) { return sync_counter = count; }
-    shmem_sync_t inc_shmem_sync_counter() { return ++sync_counter;}
-    shmem_sync_t get_shmem_sync_counter2() { return sync_counter2; }
-    shmem_sync_t set_shmem_sync_counter2(shmem_sync_t count) { return sync_counter2 = count; }
-    shmem_sync_t inc_shmem_sync_counter2() { return ++sync_counter2;}
+    shmem_sync_t get_dslash_shmem_sync_counter() { return sync_counter; }
+    shmem_sync_t set_dslash_shmem_sync_counter(shmem_sync_t count) { return sync_counter = count; }
+    shmem_sync_t inc_dslash_shmem_sync_counter() { return ++sync_counter;}
+    shmem_sync_t get_exchangeghost_shmem_sync_counter() { return sync_counter2; }
+    shmem_sync_t set_exchangeghost_shmem_sync_counter(shmem_sync_t count) { return sync_counter2 = count; }
+    shmem_sync_t inc_exchangeghost_shmem_sync_counter() { return ++sync_counter2;}
 
 #ifdef NVSHMEM_COMMS
     shmem_sync_t *sync_arr = nullptr;
@@ -36,7 +36,8 @@ namespace quda {
     shmem_retcount_inter_t *_retcount_inter = nullptr;
     shmem_interior_done_t *_interior_done = nullptr;
     shmem_interior_count_t *_interior_count = nullptr;
-    shmem_sync_t *get_shmem_sync_arr() { return sync_arr; }
+    shmem_sync_t *get_dslash_shmem_sync_arr() { return sync_arr; }
+    shmem_sync_t *get_exchangeghost_shmem_sync_arr() { return sync_arr + 8; }
     shmem_retcount_intra_t *get_shmem_retcount_intra() { return _retcount_intra; }
     shmem_retcount_inter_t *get_shmem_retcount_inter() { return _retcount_inter; }
     shmem_interior_done_t *get_shmem_interior_done() { return _interior_done; }
