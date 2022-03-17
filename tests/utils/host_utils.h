@@ -187,16 +187,12 @@ int fullLatticeIndex_5d_4dpc(int i, int oddBit);
 int process_command_line_option(int argc, char **argv, int *idx);
 int process_options(int argc, char **argv);
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 // Implemented in face_gauge.cpp
-void exchange_cpu_sitelink(lat_dim_t &X, void **sitelink, void **ghost_sitelink, void **ghost_sitelink_diag,
+void exchange_cpu_sitelink(quda::lat_dim_t &X, void **sitelink, void **ghost_sitelink, void **ghost_sitelink_diag,
                            QudaPrecision gPrecision, QudaGaugeParam *param, int optflag);
-void exchange_cpu_sitelink_ex(lat_dim_t &X, lat_dim_t &R, void **sitelink, QudaGaugeFieldOrder cpu_order, QudaPrecision gPrecision,
+  void exchange_cpu_sitelink_ex(quda::lat_dim_t &X, quda::lat_dim_t &R, void **sitelink, QudaGaugeFieldOrder cpu_order, QudaPrecision gPrecision,
                               int optflag, int geometry);
-void exchange_cpu_staple(lat_dim_t &X, void *staple, void **ghost_staple, QudaPrecision gPrecision);
+void exchange_cpu_staple(quda::lat_dim_t &X, void *staple, void **ghost_staple, QudaPrecision gPrecision);
 void exchange_llfat_init(QudaPrecision prec);
 void exchange_llfat_cleanup(void);
 
@@ -209,10 +205,6 @@ void xpay(void *x, double a, void *y, int len, QudaPrecision precision);
 void cxpay(void *x, double _Complex a, void *y, int len, QudaPrecision precision);
 void cpu_axy(QudaPrecision prec, double a, void *x, void *y, int size);
 void cpu_xpy(QudaPrecision prec, void *x, void *y, int size);
-
-#ifdef __cplusplus
-}
-#endif
 
 inline QudaPrecision getPrecision(int i)
 {

@@ -78,7 +78,7 @@ namespace quda {
     default: errorQuda("Unsupported precision = %d", u.Precision());
     }
 
-    comm_allreduce_xor(&checksum);
+    comm_allreduce_xor(checksum);
 
     return checksum;
   }

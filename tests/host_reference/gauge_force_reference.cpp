@@ -97,7 +97,7 @@ struct lattice_t {
   int r[4];
   int e[4];
 
-  lattice_t(const GaugeField &lat) : n_color(lat.Ncolor()), volume(1), volume_ex(lat.Volume())
+  lattice_t(const quda::GaugeField &lat) : n_color(lat.Ncolor()), volume(1), volume_ex(lat.Volume())
   {
     for (int d = 0; d < 4; d++) {
       x[d] = lat.X()[d] - 2 * lat.R()[d];
@@ -262,7 +262,9 @@ int gf_neighborIndexFullLattice(size_t i, int dx[], const lattice_t &lat)
   auto x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
   x[0] = 2 * x0h + x1odd;
 
-  for (int d = 0; d < 4; d++) { x[d] = comm_dim_partitioned(d) ? x[d] + dx[d] : (x[d] + dx[d] + lat.x[d]) % lat.x[d]; }
+  for (int d = 0; d < 4; d++) {
+    x[d] = quda::comm_dim_partitioned(d) ? x[d] + dx[d] : (x[d] + dx[d] + lat.x[d]) % lat.x[d];
+  }
   size_t nbr_half_idx = ((x[3] + lat.r[3]) * (lat.e[2] * lat.e[1] * lat.e[0]) + (x[2] + lat.r[2]) * (lat.e[1] * lat.e[0])
                          + (x[1] + lat.r[1]) * (lat.e[0]) + (x[0] + lat.r[0]))
     / 2;
@@ -407,8 +409,8 @@ void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecis
                            void *loop_coeff, int num_paths, bool compute_force)
 {
   // created extended field
-  lat_dim_t R;
-  for (int d = 0; d < 4; d++) R[d] = 2 * comm_dim_partitioned(d);
+  quda::lat_dim_t R;
+  for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
   QudaGaugeParam param = newQudaGaugeParam();
   setGaugeParam(param);
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;

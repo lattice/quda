@@ -214,7 +214,7 @@ std::vector<double> solve(test_t param)
   quda::ColorSpinorField check;
   quda::ColorSpinorParam cs_param;
   constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
-  check = ColorSpinorField(cs_param);
+  check = quda::ColorSpinorField(cs_param);
   std::vector<std::vector<void *>> _hp_multi_x(Nsrc, std::vector<void *>(multishift));
 
   // QUDA host array for internal checks and malloc
@@ -294,11 +294,12 @@ std::vector<double> solve(test_t param)
     } else {
       invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, gauge.data(), &gauge_param);
     }
-    comm_allreduce_int(&inv_param.iter);
-    inv_param.iter /= comm_size() / num_sub_partition;
-    comm_allreduce(&inv_param.gflops);
-    inv_param.gflops /= comm_size() / num_sub_partition;
-    comm_allreduce_max(&inv_param.secs);
+
+    quda::comm_allreduce_int(inv_param.iter);
+    inv_param.iter /= quda::comm_size() / num_sub_partition;
+    quda::comm_allreduce_sum(inv_param.gflops);
+    inv_param.gflops /= quda::comm_size() / num_sub_partition;
+    quda::comm_allreduce_max(inv_param.secs);
     printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops\n", num_sub_partition, inv_param.iter,
                inv_param.secs, inv_param.gflops / inv_param.secs);
   }
@@ -395,7 +396,7 @@ int main(int argc, char **argv)
   int result = 0;
   if (enable_testing) { // tests are defined in invert_test_gtest.hpp
     ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
-    if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+    if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
     result = RUN_ALL_TESTS();
   } else {
     solve(test_t{inv_type, solution_type, solve_type, prec_sloppy, multishift});

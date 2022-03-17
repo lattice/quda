@@ -30,379 +30,383 @@ namespace backward
 } // namespace backward
 #endif
 
-struct Topology_s {
-  int ndim;
-  int dims[QUDA_MAX_DIM];
-  int *ranks;
-  int (*coords)[QUDA_MAX_DIM];
-  int my_rank;
-  int my_coords[QUDA_MAX_DIM];
-  // It might be worth adding communicators to allow for efficient reductions:
-  //   #if defined(MPI_COMMS)
-  //     MPI_Comm comm;
-  //   #elif defined(QMP_COMMS)
-  //     QMP_communicator_t comm; // currently only supported by qmp-2.4.0-alpha
-  //   #endif
-};
-
-static const int max_displacement = 4;
-
-inline int lex_rank_from_coords_dim_t(const int *coords, void *fdata)
+namespace quda
 {
-  int *dims = reinterpret_cast<int *>(fdata);
-  int rank = coords[0];
-  for (int i = 1; i < 4; i++) { rank = dims[i] * rank + coords[i]; }
-  return rank;
-}
 
-inline int lex_rank_from_coords_dim_x(const int *coords, void *fdata)
-{
-  int *dims = reinterpret_cast<int *>(fdata);
-  int rank = coords[3];
-  for (int i = 2; i >= 0; i--) { rank = dims[i] * rank + coords[i]; }
-  return rank;
-}
+  struct Topology_s {
+    int ndim;
+    int dims[QUDA_MAX_DIM];
+    int *ranks;
+    int (*coords)[QUDA_MAX_DIM];
+    int my_rank;
+    int my_coords[QUDA_MAX_DIM];
+    // It might be worth adding communicators to allow for efficient reductions:
+    //   #if defined(MPI_COMMS)
+    //     MPI_Comm comm;
+    //   #elif defined(QMP_COMMS)
+    //     QMP_communicator_t comm; // currently only supported by qmp-2.4.0-alpha
+    //   #endif
+  };
 
-/**
- * Utility function for indexing into Topology::ranks[]
- *
- * @param ndim  Number of grid dimensions in the network topology
- * @param dims  Array of grid dimensions
- * @param x     Node coordinates
- * @return      Linearized index cooresponding to the node coordinates
- */
-static inline int index(int ndim, const int *dims, const int *x)
-{
-  int idx = x[0];
-  for (int i = 1; i < ndim; i++) { idx = dims[i] * idx + x[i]; }
-  return idx;
-}
+  static const int max_displacement = 4;
 
-static inline bool advance_coords(int ndim, const int *dims, int *x)
-{
-  bool valid = false;
-  for (int i = ndim - 1; i >= 0; i--) {
-    if (x[i] < dims[i] - 1) {
-      x[i]++;
-      valid = true;
-      break;
-    } else {
-      x[i] = 0;
-    }
-  }
-  return valid;
-}
-
-// QudaCommsMap is declared in quda.h:
-//   typedef int (*QudaCommsMap)(const int *coords, void *fdata);
-Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data, int my_rank);
-
-inline void comm_destroy_topology(Topology *topo)
-{
-  delete[] topo->ranks;
-  delete[] topo->coords;
-  delete topo;
-}
-
-inline int comm_ndim(const Topology *topo) { return topo->ndim; }
-
-inline const int *comm_dims(const Topology *topo) { return topo->dims; }
-
-inline const int *comm_coords(const Topology *topo) { return topo->my_coords; }
-
-inline const int *comm_coords_from_rank(const Topology *topo, int rank) { return topo->coords[rank]; }
-
-inline int comm_rank_from_coords(const Topology *topo, const int *coords)
-{
-  return topo->ranks[index(topo->ndim, topo->dims, coords)];
-}
-
-static inline int mod(int a, int b) { return ((a % b) + b) % b; }
-
-inline int comm_rank_displaced(const Topology *topo, const int displacement[])
-{
-  int coords[QUDA_MAX_DIM];
-
-  for (int i = 0; i < QUDA_MAX_DIM; i++) {
-    coords[i] = (i < topo->ndim) ? mod(comm_coords(topo)[i] + displacement[i], comm_dims(topo)[i]) : 0;
-  }
-
-  return comm_rank_from_coords(topo, coords);
-}
-
-inline void check_displacement(const int displacement[], int ndim)
-{
-  for (int i = 0; i < ndim; i++) {
-    if (abs(displacement[i]) > max_displacement) {
-      errorQuda("Requested displacement[%d] = %d is greater than maximum allowed", i, displacement[i]);
-    }
-  }
-}
-
-struct Communicator {
-
-  /**
-    The gpuid is static, and it's set when the default communicator is initialized.
-  */
-  static int gpuid;
-  static int comm_gpuid() { return gpuid; }
-
-  /**
-    Whether or not the MPI_COMM_HANDLE is created by user, in which case we should not free it.
-  */
-  bool user_set_comm_handle;
-
-  bool peer2peer_enabled[2][4] = {{false, false, false, false}, {false, false, false, false}};
-  bool peer2peer_init = false;
-
-  bool intranode_enabled[2][4] = {{false, false, false, false}, {false, false, false, false}};
-
-  /** this records whether there is any peer-2-peer capability
-      (regardless whether it is enabled or not) */
-  bool peer2peer_present = false;
-
-  /** by default enable both copy engines and load/store access */
-  int enable_peer_to_peer = 3;
-
-  /** sets whether we cap which peers can use peer-to-peer */
-  int enable_p2p_max_access_rank = std::numeric_limits<int>::max();
-
-  void comm_peer2peer_init(const char *hostname_recv_buf)
+  inline int lex_rank_from_coords_dim_t(const int *coords, void *fdata)
   {
-    if (peer2peer_init) return;
+    int *dims = reinterpret_cast<int *>(fdata);
+    int rank = coords[0];
+    for (int i = 1; i < 4; i++) { rank = dims[i] * rank + coords[i]; }
+    return rank;
+  }
 
-    // set gdr enablement
-    if (comm_gdr_enabled()) {
-      if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Enabling GPU-Direct RDMA access\n");
-      comm_gdr_blacklist(); // set GDR blacklist
-      // by default, if GDR is enabled we disable non-p2p policies to
-      // prevent possible conflict between MPI and QUDA opening the same
-      // IPC memory handles when using CUDA-aware MPI
-      enable_peer_to_peer += 4;
-    } else {
-      if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling GPU-Direct RDMA access\n");
+  inline int lex_rank_from_coords_dim_x(const int *coords, void *fdata)
+  {
+    int *dims = reinterpret_cast<int *>(fdata);
+    int rank = coords[3];
+    for (int i = 2; i >= 0; i--) { rank = dims[i] * rank + coords[i]; }
+    return rank;
+  }
+
+  /**
+   * Utility function for indexing into Topology::ranks[]
+   *
+   * @param ndim  Number of grid dimensions in the network topology
+   * @param dims  Array of grid dimensions
+   * @param x     Node coordinates
+   * @return      Linearized index cooresponding to the node coordinates
+   */
+  static inline int index(int ndim, const int *dims, const int *x)
+  {
+    int idx = x[0];
+    for (int i = 1; i < ndim; i++) { idx = dims[i] * idx + x[i]; }
+    return idx;
+  }
+
+  static inline bool advance_coords(int ndim, const int *dims, int *x)
+  {
+    bool valid = false;
+    for (int i = ndim - 1; i >= 0; i--) {
+      if (x[i] < dims[i] - 1) {
+        x[i]++;
+        valid = true;
+        break;
+      } else {
+        x[i] = 0;
+      }
+    }
+    return valid;
+  }
+
+  // QudaCommsMap is declared in quda.h:
+  //   typedef int (*QudaCommsMap)(const int *coords, void *fdata);
+  Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data, int my_rank);
+
+  inline void comm_destroy_topology(Topology *topo)
+  {
+    delete[] topo->ranks;
+    delete[] topo->coords;
+    delete topo;
+  }
+
+  inline int comm_ndim(const Topology *topo) { return topo->ndim; }
+
+  inline const int *comm_dims(const Topology *topo) { return topo->dims; }
+
+  inline const int *comm_coords(const Topology *topo) { return topo->my_coords; }
+
+  inline const int *comm_coords_from_rank(const Topology *topo, int rank) { return topo->coords[rank]; }
+
+  inline int comm_rank_from_coords(const Topology *topo, const int *coords)
+  {
+    return topo->ranks[index(topo->ndim, topo->dims, coords)];
+  }
+
+  static inline int mod(int a, int b) { return ((a % b) + b) % b; }
+
+  inline int comm_rank_displaced(const Topology *topo, const int displacement[])
+  {
+    int coords[QUDA_MAX_DIM];
+
+    for (int i = 0; i < QUDA_MAX_DIM; i++) {
+      coords[i] = (i < topo->ndim) ? mod(comm_coords(topo)[i] + displacement[i], comm_dims(topo)[i]) : 0;
     }
 
-    char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
+    return comm_rank_from_coords(topo, coords);
+  }
 
-    // disable peer-to-peer comms in one direction if QUDA_ENABLE_P2P=-1
-    // and comm_dim(dim) == 2 (used for perf benchmarking)
-    bool disable_peer_to_peer_bidir = false;
+  inline void check_displacement(const int displacement[], int ndim)
+  {
+    for (int i = 0; i < ndim; i++) {
+      if (abs(displacement[i]) > max_displacement) {
+        errorQuda("Requested displacement[%d] = %d is greater than maximum allowed", i, displacement[i]);
+      }
+    }
+  }
 
-    if (enable_peer_to_peer_env) {
-      enable_peer_to_peer = atoi(enable_peer_to_peer_env);
+  struct Communicator {
 
-      switch (std::abs(enable_peer_to_peer)) {
-      case 0:
-        if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling peer-to-peer access\n");
-        break;
-      case 1:
-        if (getVerbosity() > QUDA_SILENT && rank == 0)
-          printf("Enabling peer-to-peer copy engine access (disabling direct load/store)\n");
-        break;
-      case 2:
-        if (getVerbosity() > QUDA_SILENT && rank == 0)
-          printf("Enabling peer-to-peer direct load/store access (disabling copy engines)\n");
-        break;
-      case 3:
+    /**
+      The gpuid is static, and it's set when the default communicator is initialized.
+    */
+    static int gpuid;
+    static int comm_gpuid() { return gpuid; }
+
+    /**
+      Whether or not the MPI_COMM_HANDLE is created by user, in which case we should not free it.
+    */
+    bool user_set_comm_handle;
+
+    bool peer2peer_enabled[2][4] = {{false, false, false, false}, {false, false, false, false}};
+    bool peer2peer_init = false;
+
+    bool intranode_enabled[2][4] = {{false, false, false, false}, {false, false, false, false}};
+
+    /** this records whether there is any peer-2-peer capability
+        (regardless whether it is enabled or not) */
+    bool peer2peer_present = false;
+
+    /** by default enable both copy engines and load/store access */
+    int enable_peer_to_peer = 3;
+
+    /** sets whether we cap which peers can use peer-to-peer */
+    int enable_p2p_max_access_rank = std::numeric_limits<int>::max();
+
+    void comm_peer2peer_init(const char *hostname_recv_buf)
+    {
+      if (peer2peer_init) return;
+
+      // set gdr enablement
+      if (comm_gdr_enabled()) {
+        if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Enabling GPU-Direct RDMA access\n");
+        comm_gdr_blacklist(); // set GDR blacklist
+        // by default, if GDR is enabled we disable non-p2p policies to
+        // prevent possible conflict between MPI and QUDA opening the same
+        // IPC memory handles when using CUDA-aware MPI
+        enable_peer_to_peer += 4;
+      } else {
+        if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling GPU-Direct RDMA access\n");
+      }
+
+      char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
+
+      // disable peer-to-peer comms in one direction if QUDA_ENABLE_P2P=-1
+      // and comm_dim(dim) == 2 (used for perf benchmarking)
+      bool disable_peer_to_peer_bidir = false;
+
+      if (enable_peer_to_peer_env) {
+        enable_peer_to_peer = atoi(enable_peer_to_peer_env);
+
+        switch (std::abs(enable_peer_to_peer)) {
+        case 0:
+          if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling peer-to-peer access\n");
+          break;
+        case 1:
+          if (getVerbosity() > QUDA_SILENT && rank == 0)
+            printf("Enabling peer-to-peer copy engine access (disabling direct load/store)\n");
+          break;
+        case 2:
+          if (getVerbosity() > QUDA_SILENT && rank == 0)
+            printf("Enabling peer-to-peer direct load/store access (disabling copy engines)\n");
+          break;
+        case 3:
+          if (getVerbosity() > QUDA_SILENT && rank == 0)
+            printf("Enabling peer-to-peer copy engine and direct load/store access\n");
+          break;
+        case 5:
+          if (getVerbosity() > QUDA_SILENT && rank == 0)
+            printf("Enabling peer-to-peer copy engine access (disabling direct load/store and non-p2p policies)\n");
+          break;
+        case 6:
+          if (getVerbosity() > QUDA_SILENT && rank == 0)
+            printf("Enabling peer-to-peer direct load/store access (disabling copy engines and non-p2p policies)\n");
+          break;
+        case 7:
+          if (getVerbosity() > QUDA_SILENT && rank == 0)
+            printf("Enabling peer-to-peer copy engine and direct load/store access (disabling non-p2p policies)\n");
+          break;
+        default: errorQuda("Unexpected value QUDA_ENABLE_P2P=%d\n", enable_peer_to_peer);
+        }
+
+        if (enable_peer_to_peer < 0) { // only values -1, -2, -3 can make it here
+          if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling bi-directional peer-to-peer access\n");
+          disable_peer_to_peer_bidir = true;
+        }
+
+        enable_peer_to_peer = abs(enable_peer_to_peer);
+
+      } else { // !enable_peer_to_peer_env
         if (getVerbosity() > QUDA_SILENT && rank == 0)
           printf("Enabling peer-to-peer copy engine and direct load/store access\n");
-        break;
-      case 5:
-        if (getVerbosity() > QUDA_SILENT && rank == 0)
-          printf("Enabling peer-to-peer copy engine access (disabling direct load/store and non-p2p policies)\n");
-        break;
-      case 6:
-        if (getVerbosity() > QUDA_SILENT && rank == 0)
-          printf("Enabling peer-to-peer direct load/store access (disabling copy engines and non-p2p policies)\n");
-        break;
-      case 7:
-        if (getVerbosity() > QUDA_SILENT && rank == 0)
-          printf("Enabling peer-to-peer copy engine and direct load/store access (disabling non-p2p policies)\n");
-        break;
-      default: errorQuda("Unexpected value QUDA_ENABLE_P2P=%d\n", enable_peer_to_peer);
       }
 
-      if (enable_peer_to_peer < 0) { // only values -1, -2, -3 can make it here
-        if (getVerbosity() > QUDA_SILENT && rank == 0) printf("Disabling bi-directional peer-to-peer access\n");
-        disable_peer_to_peer_bidir = true;
-      }
+      if (!peer2peer_init && enable_peer_to_peer) {
 
-      enable_peer_to_peer = abs(enable_peer_to_peer);
+        // set whether we are limiting p2p enablement
+        char *enable_p2p_max_access_rank_env = getenv("QUDA_ENABLE_P2P_MAX_ACCESS_RANK");
+        if (enable_p2p_max_access_rank_env) {
+          enable_p2p_max_access_rank = atoi(enable_p2p_max_access_rank_env);
+          if (enable_p2p_max_access_rank < 0)
+            errorQuda("Invalid QUDA_ENABLE_P2P_MAX_ACCESS_RANK=%d\n", enable_p2p_max_access_rank);
+          if (getVerbosity() > QUDA_SILENT)
+            printfQuda("Limiting peer-to-peer communication to a maximum access rank of %d (lower ranks have higher "
+                       "bandwidth)\n",
+                       enable_p2p_max_access_rank);
+        }
 
-    } else { // !enable_peer_to_peer_env
-      if (getVerbosity() > QUDA_SILENT && rank == 0)
-        printf("Enabling peer-to-peer copy engine and direct load/store access\n");
-    }
+        const int gpuid = comm_gpuid();
 
-    if (!peer2peer_init && enable_peer_to_peer) {
+        comm_set_neighbor_ranks();
 
-      // set whether we are limiting p2p enablement
-      char *enable_p2p_max_access_rank_env = getenv("QUDA_ENABLE_P2P_MAX_ACCESS_RANK");
-      if (enable_p2p_max_access_rank_env) {
-        enable_p2p_max_access_rank = atoi(enable_p2p_max_access_rank_env);
-        if (enable_p2p_max_access_rank < 0)
-          errorQuda("Invalid QUDA_ENABLE_P2P_MAX_ACCESS_RANK=%d\n", enable_p2p_max_access_rank);
-        if (getVerbosity() > QUDA_SILENT)
-          printfQuda(
-            "Limiting peer-to-peer communication to a maximum access rank of %d (lower ranks have higher bandwidth)\n",
-            enable_p2p_max_access_rank);
-      }
+        char *hostname = comm_hostname();
+        int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int) * comm_size());
 
-      const int gpuid = comm_gpuid();
+        comm_gather_gpuid(gpuid_recv_buf);
 
-      comm_set_neighbor_ranks();
+        for (int dir = 0; dir < 2; ++dir) { // forward/backward directions
+          for (int dim = 0; dim < 4; ++dim) {
+            int neighbor_rank = comm_neighbor_rank(dir, dim);
+            if (neighbor_rank == comm_rank()) continue;
 
-      char *hostname = comm_hostname();
-      int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int) * comm_size());
+            // disable peer-to-peer comms in one direction
+            if (((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1))
+                && disable_peer_to_peer_bidir && comm_dim(dim) == 2)
+              continue;
 
-      comm_gather_gpuid(gpuid_recv_buf);
+            // if the neighbors are on the same
+            if (!strncmp(hostname, &hostname_recv_buf[128 * neighbor_rank], 128)) {
+              int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
 
-      for (int dir = 0; dir < 2; ++dir) { // forward/backward directions
-        for (int dim = 0; dim < 4; ++dim) {
-          int neighbor_rank = comm_neighbor_rank(dir, dim);
-          if (neighbor_rank == comm_rank()) continue;
+              bool can_access_peer = comm_peer2peer_possible(gpuid, neighbor_gpuid);
+              int access_rank = comm_peer2peer_performance(gpuid, neighbor_gpuid);
 
-          // disable peer-to-peer comms in one direction
-          if (((comm_rank() > neighbor_rank && dir == 0) || (comm_rank() < neighbor_rank && dir == 1))
-              && disable_peer_to_peer_bidir && comm_dim(dim) == 2)
-            continue;
-
-          // if the neighbors are on the same
-          if (!strncmp(hostname, &hostname_recv_buf[128 * neighbor_rank], 128)) {
-            int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
-
-            bool can_access_peer = comm_peer2peer_possible(gpuid, neighbor_gpuid);
-            int access_rank = comm_peer2peer_performance(gpuid, neighbor_gpuid);
-
-            // enable P2P if we can access the peer or if peer is self
-            // if (canAccessPeer[0] * canAccessPeer[1] != 0 || gpuid == neighbor_gpuid) {
-            if ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid) {
-              peer2peer_enabled[dir][dim] = true;
-              if (getVerbosity() > QUDA_SILENT) {
-                printf("Peer-to-peer enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d, "
-                       "access rank = (%3d)\n",
-                       comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, access_rank);
+              // enable P2P if we can access the peer or if peer is self
+              // if (canAccessPeer[0] * canAccessPeer[1] != 0 || gpuid == neighbor_gpuid) {
+              if ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid) {
+                peer2peer_enabled[dir][dim] = true;
+                if (getVerbosity() > QUDA_SILENT) {
+                  printf("Peer-to-peer enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d, "
+                         "access rank = (%3d)\n",
+                         comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, access_rank);
+                }
+              } else {
+                intranode_enabled[dir][dim] = true;
+                if (getVerbosity() > QUDA_SILENT) {
+                  printf(
+                    "Intra-node (non peer-to-peer) enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, "
+                    "dim=%d\n",
+                    comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
+                }
               }
-            } else {
-              intranode_enabled[dir][dim] = true;
-              if (getVerbosity() > QUDA_SILENT) {
-                printf("Intra-node (non peer-to-peer) enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, "
-                       "dim=%d\n",
-                       comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
-              }
-            }
 
-          } // on the same node
-        }   // different dimensions - x, y, z, t
-      }     // different directions - forward/backward
+            } // on the same node
+          }   // different dimensions - x, y, z, t
+        }     // different directions - forward/backward
 
-      host_free(gpuid_recv_buf);
+        host_free(gpuid_recv_buf);
+      }
+
+      peer2peer_init = true;
+
+      comm_barrier();
+
+      peer2peer_present = comm_peer2peer_enabled_global();
     }
 
-    peer2peer_init = true;
+    bool comm_peer2peer_present() { return peer2peer_present; }
 
-    comm_barrier();
+    bool enable_p2p = true;
 
-    peer2peer_present = comm_peer2peer_enabled_global();
-  }
+    bool comm_peer2peer_enabled(int dir, int dim) { return enable_p2p ? peer2peer_enabled[dir][dim] : false; }
 
-  bool comm_peer2peer_present() { return peer2peer_present; }
+    bool init = false;
+    bool p2p_global = false;
 
-  bool enable_p2p = true;
+    int comm_peer2peer_enabled_global()
+    {
+      if (!enable_p2p) return false;
 
-  bool comm_peer2peer_enabled(int dir, int dim) { return enable_p2p ? peer2peer_enabled[dir][dim] : false; }
+      if (!init) {
+        int p2p = 0;
+        for (int dim = 0; dim < 4; dim++)
+          for (int dir = 0; dir < 2; dir++) p2p += (int)comm_peer2peer_enabled(dir, dim);
 
-  bool init = false;
-  bool p2p_global = false;
-
-  int comm_peer2peer_enabled_global()
-  {
-    if (!enable_p2p) return false;
-
-    if (!init) {
-      int p2p = 0;
-      for (int dim = 0; dim < 4; dim++)
-        for (int dir = 0; dir < 2; dir++) p2p += (int)comm_peer2peer_enabled(dir, dim);
-
-      comm_allreduce_int(&p2p);
-      init = true;
-      p2p_global = p2p > 0 ? true : false;
+        comm_allreduce_int(p2p);
+        init = true;
+        p2p_global = p2p > 0 ? true : false;
+      }
+      return p2p_global * enable_peer_to_peer;
     }
-    return p2p_global * enable_peer_to_peer;
-  }
 
-  void comm_enable_peer2peer(bool enable) { enable_p2p = enable; }
+    void comm_enable_peer2peer(bool enable) { enable_p2p = enable; }
 
-  bool enable_intranode = true;
+    bool enable_intranode = true;
 
-  bool comm_intranode_enabled(int dir, int dim) { return enable_intranode ? intranode_enabled[dir][dim] : false; }
+    bool comm_intranode_enabled(int dir, int dim) { return enable_intranode ? intranode_enabled[dir][dim] : false; }
 
-  void comm_enable_intranode(bool enable) { enable_intranode = enable; }
+    void comm_enable_intranode(bool enable) { enable_intranode = enable; }
 
-  Topology *default_topo = nullptr;
+    Topology *default_topo = nullptr;
 
-  void comm_set_default_topology(Topology *topo) { default_topo = topo; }
+    void comm_set_default_topology(Topology *topo) { default_topo = topo; }
 
-  Topology *comm_default_topology(void)
-  {
-    if (!default_topo) { errorQuda("Default topology has not been declared"); }
-    return default_topo;
-  }
-
-  int neighbor_rank[2][4] = {{-1, -1, -1, -1}, {-1, -1, -1, -1}};
-
-  bool neighbors_cached = false;
-
-  void comm_set_neighbor_ranks(Topology *topo = nullptr)
-  {
-
-    if (neighbors_cached) return;
-
-    Topology *topology = topo ? topo : default_topo; // use default topology if topo is NULL
-    if (!topology) { errorQuda("Topology not specified"); }
-
-    for (int d = 0; d < 4; ++d) {
-      int pos_displacement[QUDA_MAX_DIM] = {};
-      int neg_displacement[QUDA_MAX_DIM] = {};
-      pos_displacement[d] = +1;
-      neg_displacement[d] = -1;
-      neighbor_rank[0][d] = comm_rank_displaced(topology, neg_displacement);
-      neighbor_rank[1][d] = comm_rank_displaced(topology, pos_displacement);
+    Topology *comm_default_topology(void)
+    {
+      if (!default_topo) { errorQuda("Default topology has not been declared"); }
+      return default_topo;
     }
-    neighbors_cached = true;
-  }
 
-  int comm_neighbor_rank(int dir, int dim)
-  {
-    if (!neighbors_cached) { comm_set_neighbor_ranks(); }
-    return neighbor_rank[dir][dim];
-  }
+    int neighbor_rank[2][4] = {{-1, -1, -1, -1}, {-1, -1, -1, -1}};
 
-  int comm_dim(int dim)
-  {
-    Topology *topo = comm_default_topology();
-    return comm_dims(topo)[dim];
-  }
+    bool neighbors_cached = false;
 
-  int comm_coord(int dim)
-  {
-    Topology *topo = comm_default_topology();
-    return comm_coords(topo)[dim];
-  }
+    void comm_set_neighbor_ranks(Topology *topo = nullptr)
+    {
 
-  void comm_finalize(void)
-  {
-    Topology *topo = comm_default_topology();
-    comm_destroy_topology(topo);
-    comm_set_default_topology(NULL);
-  }
+      if (neighbors_cached) return;
 
-  char partition_string[16];          /** string that contains the job partitioning */
-  char topology_string[128];          /** string that contains the job topology */
-  char partition_override_string[16]; /** string that contains any overridden partitioning */
+      Topology *topology = topo ? topo : default_topo; // use default topology if topo is NULL
+      if (!topology) { errorQuda("Topology not specified"); }
 
-  int manual_set_partition[QUDA_MAX_DIM] = {0};
+      for (int d = 0; d < 4; ++d) {
+        int pos_displacement[QUDA_MAX_DIM] = {};
+        int neg_displacement[QUDA_MAX_DIM] = {};
+        pos_displacement[d] = +1;
+        neg_displacement[d] = -1;
+        neighbor_rank[0][d] = comm_rank_displaced(topology, neg_displacement);
+        neighbor_rank[1][d] = comm_rank_displaced(topology, pos_displacement);
+      }
+      neighbors_cached = true;
+    }
+
+    int comm_neighbor_rank(int dir, int dim)
+    {
+      if (!neighbors_cached) { comm_set_neighbor_ranks(); }
+      return neighbor_rank[dir][dim];
+    }
+
+    int comm_dim(int dim)
+    {
+      Topology *topo = comm_default_topology();
+      return comm_dims(topo)[dim];
+    }
+
+    int comm_coord(int dim)
+    {
+      Topology *topo = comm_default_topology();
+      return comm_coords(topo)[dim];
+    }
+
+    void comm_finalize(void)
+    {
+      Topology *topo = comm_default_topology();
+      comm_destroy_topology(topo);
+      comm_set_default_topology(NULL);
+    }
+
+    char partition_string[16];          /** string that contains the job partitioning */
+    char topology_string[128];          /** string that contains the job topology */
+    char partition_override_string[16]; /** string that contains any overridden partitioning */
+
+    int manual_set_partition[QUDA_MAX_DIM] = {0};
 
 #ifdef MULTI_GPU
   void comm_dim_partitioned_set(int dim)
@@ -474,7 +478,7 @@ struct Communicator {
         int excluded_device;
         while (blacklist_list >> excluded_device) {
           // check this is a valid device
-          if (excluded_device < 0 || excluded_device >= quda::device::get_device_count()) {
+          if (excluded_device < 0 || excluded_device >= device::get_device_count()) {
             errorQuda("Cannot blacklist invalid GPU device ordinal %d", excluded_device);
           }
 
@@ -520,7 +524,7 @@ struct Communicator {
     comm_gather_hostname(hostname_recv_buf);
 
     if (gpuid < 0) {
-      int device_count = quda::device::get_device_count();
+      int device_count = device::get_device_count();
       if (device_count == 0) { errorQuda("No devices found"); }
 
       // We initialize gpuid if it's still negative.
@@ -646,21 +650,6 @@ struct Communicator {
 
   void commGlobalReductionPop() { globalReduce.pop(); }
 
-  void reduceMaxDouble(double &max)
-  {
-    if (commGlobalReduction()) comm_allreduce_max(&max);
-  }
-
-  void reduceDouble(double &sum)
-  {
-    if (commGlobalReduction()) comm_allreduce(&sum);
-  }
-
-  void reduceDoubleArray(double *sum, const int len)
-  {
-    if (commGlobalReduction()) comm_allreduce_array(sum, len);
-  }
-
   bool commAsyncReduction() { return asyncReduce; }
 
   void commAsyncReductionSet(bool async_reduction) { asyncReduce = async_reduction; }
@@ -704,7 +693,7 @@ struct Communicator {
   int comm_rank_from_coords(const int *coords)
   {
     Topology *topo = comm_default_topology();
-    return ::comm_rank_from_coords(topo, coords);
+    return ::quda::comm_rank_from_coords(topo, coords);
   }
 
   /**
@@ -753,21 +742,15 @@ struct Communicator {
     return std::accumulate(array, array + n, 0.0);
   }
 
-  void comm_allreduce(double *data);
-
-  void comm_allreduce_max(double *data);
-
-  void comm_allreduce_min(double *data);
-
-  void comm_allreduce_array(double *data, size_t size);
+  void comm_allreduce_sum_array(double *data, size_t size);
 
   void comm_allreduce_max_array(double *data, size_t size);
 
   void comm_allreduce_min_array(double *data, size_t size);
 
-  void comm_allreduce_int(int *data);
+  void comm_allreduce_int(int &data);
 
-  void comm_allreduce_xor(uint64_t *data);
+  void comm_allreduce_xor(uint64_t &data);
 
   /**  broadcast from rank 0 */
   void comm_broadcast(void *data, size_t nbytes);
@@ -779,9 +762,11 @@ struct Communicator {
   static int comm_rank_global();
 };
 
-constexpr quda::CommKey default_comm_key = {1, 1, 1, 1};
+constexpr CommKey default_comm_key = {1, 1, 1, 1};
 
-void push_communicator(const quda::CommKey &split_key);
+void push_communicator(const CommKey &split_key);
 
 /** @brief These routine broadcast the data according to the default communicator */
 void comm_broadcast_global(void *data, size_t nbytes);
+
+} // namespace quda

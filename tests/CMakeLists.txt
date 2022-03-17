@@ -724,14 +724,21 @@ endif()
     endif()
 
     # MdagM local operator
-    add_test(NAME dslash_${DIRAC_NAME}_local_policy${pol2}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type ${DIRAC_NAME}
-                     --test MatPCDagMatPCLocal
-                     --matpc even-even
-                     --dim 2 4 6 8
-                     --Lsdim 4
-                     --gtest_output=xml:dslash_${DIRAC_NAME}_local{pol2}.xml)
+    # This requires tensor cores so only enable NVIDIA targets
+    # FIXME: Ideally we should have a more sensitive guard -- e.g. QUDA_TENSOR_CORE_AVAILABLE 
+    # or some such so that this would not be an architecture specific guard, but a feature
+    # specific guard
+    # 
+    if( QUDA_TARGET_CUDA )
+      add_test(NAME dslash_${DIRAC_NAME}_local_policy${pol2}
+               COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                       --dslash-type ${DIRAC_NAME}
+                       --test MatPCDagMatPCLocal
+                       --matpc even-even
+                       --dim 2 4 6 8
+                       --Lsdim 4
+                       --gtest_output=xml:dslash_${DIRAC_NAME}_local{pol2}.xml)
+    endif()
 
     # Mobius-EOFA fermions
     set(DIRAC_NAME mobius-eofa)
@@ -755,7 +762,8 @@ endif()
                      --matpc even-even-asym
                      --dim 2 4 6 8
                      --Lsdim 4
-        --gtest_output=xml:dslash_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_asym_test_pol${pol2}.xml)
+ 
     if(polenv)
       set_tests_properties(dslash_${DIRAC_NAME}_asym_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()

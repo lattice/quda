@@ -140,8 +140,7 @@ namespace quda {
           if (b.size()) { set_param<multi_1d>(arg, 'b', b); }
           if (c.size()) { set_param<multi_1d>(arg, 'c', c); }
 #endif
-          // we intentionally do not do a global reduction in the launch, and defer until the entire "tile" is complete
-          launch<MultiReduce_, host_reduce_t, comm_reduce_null<host_reduce_t>>(result_, tp, stream, arg);
+          launch<MultiReduce_>(result_, tp, stream, arg);
 
           // need to transpose for same order with vector thread reduction
           for (int i = 0; i < NXZ; i++) {
@@ -645,8 +644,7 @@ namespace quda {
       }
 
       // do a single multi-node reduction only once we have computed all local dot products
-      const int Nreduce = x.size() * y.size();
-      reduceDoubleArray(result_tmp.data(), Nreduce);
+      comm_allreduce_sum(result_tmp);
 
       // multiReduce_recurse returns a column-major matrix.
       // To be consistent with the multi-blas functions, we should
@@ -696,8 +694,7 @@ namespace quda {
       }
 
       // do a single multi-node reduction only once we have computed all local dot products
-      const int Nreduce = 2*x.size()*y.size();
-      reduceDoubleArray(reinterpret_cast<double*>(result_tmp.data()), Nreduce);
+      comm_allreduce_sum(result_tmp);
 
       // multiReduce_recurse returns a column-major matrix.
       // To be consistent with the multi-blas functions, we should
@@ -714,8 +711,7 @@ namespace quda {
       TileSizeTune<multiCdot, multiCdot, Complex>(result_tmp, x, y, x, x, true, false); // last false is b/c L2 norm
 
       // do a single multi-node reduction only once we have computed all local dot products
-      const int Nreduce = 2*x.size()*y.size();
-      reduceDoubleArray(reinterpret_cast<double*>(result_tmp.data()), Nreduce); // FIXME - optimize this for Hermiticity?
+      comm_allreduce_sum(result_tmp); // FIXME - could optimize this for Hermiticity as well
 
       // Switch from col-major to row-major
       const unsigned int xlen = x.size();
@@ -738,8 +734,7 @@ namespace quda {
       TileSizeTune<multiCdot, multiCdot, Complex>(result_tmp, x, y, x, x, true, true); // last true is b/c A norm
 
       // do a single multi-node reduction only once we have computed all local dot products
-      const int Nreduce = 2*x.size()*y.size();
-      reduceDoubleArray(reinterpret_cast<double*>(result_tmp.data()), Nreduce); // FIXME - optimize this for Hermiticity?
+      comm_allreduce_sum(result_tmp);
 
       // Switch from col-major to row-major
       const unsigned int xlen = x.size();

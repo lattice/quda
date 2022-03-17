@@ -471,7 +471,7 @@ namespace quda {
       param.true_res = true_res;
       param.true_res_hq = true_res_hq;
       param.iter += iter;
-      reduceDouble(gflops);
+      comm_allreduce_sum(gflops);
       param.gflops += gflops;
       param.secs += secs;
       if (offset >= 0) {
