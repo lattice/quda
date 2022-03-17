@@ -138,8 +138,9 @@ void setQudaDefaultMgTestParams()
     coarse_solver_ca_lambda_min[i] = 0.0;
     coarse_solver_ca_lambda_max[i] = -1.0;
 
-    strcpy(mg_vec_infile[i], "");
-    strcpy(mg_vec_outfile[i], "");
+    smoother_solver_ca_basis[i] = QUDA_POWER_BASIS;
+    smoother_solver_ca_lambda_min[i] = 0.0;
+    smoother_solver_ca_lambda_max[i] = -1.0; // use power iterations
   }
 }
 
@@ -169,10 +170,10 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
   // 1 = random SU(3)
   // 2 = supplied field
   int construct_type = 0;
-  if (strcmp(latfile, "")) {
+  if (latfile.size() > 0) {
     // load in the command line supplied gauge field using QIO and LIME
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Loading the gauge field in %s\n", latfile);
-    read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Loading the gauge field in %s\n", latfile.c_str());
+    read_gauge_field(latfile.c_str(), gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_type = 2;
   } else {
     if (unit_gauge)
@@ -246,8 +247,7 @@ void constructWilsonSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInve
     cs_param->nDim = 5;
     cs_param->x[4] = inv_param->Ls;
   } else if ((inv_param->dslash_type == QUDA_TWISTED_MASS_DSLASH || inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
-             && (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET
-                 || inv_param->twist_flavor == QUDA_TWIST_DEG_DOUBLET)) {
+             && (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET)) {
     cs_param->nDim = 5;
     cs_param->x[4] = 2;
   } else {
@@ -270,7 +270,7 @@ void constructWilsonSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInve
 }
 
 void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, QudaSolutionType sol_type,
-                                 const int *const x, quda::RNG &rng)
+                                 const int *const x, int nDim, quda::RNG &rng)
 {
   quda::ColorSpinorParam param;
   param.v = v;
@@ -279,14 +279,14 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
   param.setPrecision(precision);
   param.create = QUDA_REFERENCE_FIELD_CREATE;
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  param.nDim = 4;
+  param.nDim = nDim;
   param.pc_type = QUDA_4D_PC;
   param.siteSubset = isPCSolution(sol_type) ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   param.location = QUDA_CPU_FIELD_LOCATION; // DMH FIXME so one can construct device noise
-  for (int d = 0; d < 4; d++) param.x[d] = x[d];
+  for (int d = 0; d < nDim; d++) param.x[d] = x[d];
   if (isPCSolution(sol_type)) param.x[0] /= 2;
-  quda::cpuColorSpinorField spinor_in(param);
+  quda::ColorSpinorField spinor_in(param);
   quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
 }
 
@@ -379,7 +379,7 @@ void initComms(int, char **, int *const commDims)
 
 void finalizeComms()
 {
-  comm_finalize();
+  quda::comm_finalize();
 #if defined(QMP_COMMS)
   QMP_finalize_msg_passing();
 #elif defined(MPI_COMMS)
@@ -561,7 +561,7 @@ int neighborIndex_mg(int i, int oddBit, int dx4, int dx3, int dx2, int dx1)
   x2 = (x2 + dx2 + Z[1]) % Z[1];
   x1 = (x1 + dx1 + Z[0]) % Z[0];
 
-  if ((ghost_x4 >= 0 && ghost_x4 < Z[3]) || !comm_dim_partitioned(3)) {
+  if ((ghost_x4 >= 0 && ghost_x4 < Z[3]) || !quda::comm_dim_partitioned(3)) {
     ret = (x4 * (Z[2] * Z[1] * Z[0]) + x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
   } else {
     ret = (x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
@@ -1689,7 +1689,7 @@ double mom_action(void *mom, QudaPrecision prec, int len)
   } else if (prec == QUDA_SINGLE_PRECISION) {
     action = mom_action<float>((float *)mom, len);
   }
-  comm_allreduce(&action);
+  quda::comm_allreduce_sum(action);
   return action;
 }
 

@@ -36,7 +36,7 @@ namespace quda
   void computeFmunu(GaugeField &f, const GaugeField &u)
   {
     checkPrecision(f, u);
-    instantiate<Fmunu,ReconstructWilson>(u, f); // u must be first here for correct template instantiation
+    instantiate2<Fmunu,ReconstructWilson>(u, f); // u must be first here for correct template instantiation
   }
 #else
   void computeFmunu(GaugeField &, const GaugeField &)

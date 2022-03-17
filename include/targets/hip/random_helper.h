@@ -7,7 +7,7 @@ namespace quda
 
 #if defined(XORWOW)
   using rng_state_t = hiprandStateXORWOW;
-#elif defined(MRG32k3a)
+#elif defined(MRG32K3a)
   using rng_state_t = hiprandStateMRG32k3a;
 #else
   using rng_state_t = hiprandStateMRG32k3a;

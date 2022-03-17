@@ -1,7 +1,6 @@
 #pragma once
 
-#include <limits.h>
-#define QUDA_INVALID_ENUM INT_MIN
+#define QUDA_INVALID_ENUM (-0x7fffffff - 1)
 
 #ifdef __cplusplus
 extern "C" {
@@ -183,10 +182,15 @@ typedef enum QudaMultigridCycleType_s {
 } QudaMultigridCycleType;
 
 typedef enum QudaSchwarzType_s {
-  QUDA_ADDITIVE_SCHWARZ,
-  QUDA_MULTIPLICATIVE_SCHWARZ,
+  QUDA_ADDITIVE_SCHWARZ = 0,
+  QUDA_MULTIPLICATIVE_SCHWARZ = 1,
   QUDA_INVALID_SCHWARZ = QUDA_INVALID_ENUM
 } QudaSchwarzType;
+
+typedef enum QudaAcceleratorType_s {
+  QUDA_MADWF_ACCELERATOR = 0, // Use the MADWF accelerator
+  QUDA_INVALID_ACCELERATOR = QUDA_INVALID_ENUM
+} QudaAcceleratorType;
 
 typedef enum QudaResidualType_s {
   QUDA_L2_RELATIVE_RESIDUAL = 1, // L2 relative residual (default)
@@ -254,6 +258,7 @@ typedef enum QudaCloverFieldOrder_s {
   QUDA_FLOAT_CLOVER_ORDER = 1,  // even-odd float ordering
   QUDA_FLOAT2_CLOVER_ORDER = 2, // even-odd float2 ordering
   QUDA_FLOAT4_CLOVER_ORDER = 4, // even-odd float4 ordering
+  QUDA_FLOAT8_CLOVER_ORDER = 8, // even-odd float8 ordering
   QUDA_PACKED_CLOVER_ORDER,     // even-odd, QDP packed
   QUDA_QDPJIT_CLOVER_ORDER,     // (diagonal / off-diagonal)-chirality-spacetime
   QUDA_BQCD_CLOVER_ORDER,       // even-odd, super-diagonal packed and reordered
@@ -398,7 +403,6 @@ typedef enum QudaPCType_s { QUDA_4D_PC = 4, QUDA_5D_PC = 5, QUDA_PC_INVALID = QU
 typedef enum QudaTwistFlavorType_s {
   QUDA_TWIST_SINGLET = 1,
   QUDA_TWIST_NONDEG_DOUBLET = +2,
-  QUDA_TWIST_DEG_DOUBLET = -2,
   QUDA_TWIST_NO = 0,
   QUDA_TWIST_INVALID = QUDA_INVALID_ENUM
 } QudaTwistFlavorType;
@@ -452,6 +456,7 @@ typedef enum QudaTransferType_s {
   QUDA_TRANSFER_AGGREGATE,
   QUDA_TRANSFER_COARSE_KD,
   QUDA_TRANSFER_OPTIMIZED_KD,
+  QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG,
   QUDA_TRANSFER_INVALID = QUDA_INVALID_ENUM
 } QudaTransferType;
 
@@ -500,6 +505,7 @@ typedef enum QudaFieldGeometry_s {
   QUDA_VECTOR_GEOMETRY = 4,
   QUDA_TENSOR_GEOMETRY = 6,
   QUDA_COARSE_GEOMETRY = 8,
+  QUDA_KDINVERSE_GEOMETRY = 16, // Decomposition of Kahler-Dirac block
   QUDA_INVALID_GEOMETRY = QUDA_INVALID_ENUM
 } QudaFieldGeometry;
 
@@ -580,7 +586,6 @@ typedef enum QudaGaugeActionType_s {
 typedef enum QudaExtLibType_s {
   QUDA_CUSOLVE_EXTLIB,
   QUDA_EIGEN_EXTLIB,
-  QUDA_MAGMA_EXTLIB,
   QUDA_EXTLIB_INVALID = QUDA_INVALID_ENUM
 } QudaExtLibType;
 

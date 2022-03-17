@@ -322,7 +322,6 @@ void printQudaCloverParam(QudaInvertParam *param)
   P(clover_csw, INVALID_DOUBLE);
 #endif
     P(clover_order, QUDA_INVALID_CLOVER_ORDER);
-    P(cl_pad, INVALID_INT);
 
 #ifndef INIT_PARAM
   }
@@ -359,6 +358,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(m5, INVALID_DOUBLE);
   P(Ls, INVALID_INT);
   P(mu, INVALID_DOUBLE);
+  P(epsilon, INVALID_DOUBLE);
+  P(tm_rho, 0.0);
   P(twist_flavor, QUDA_TWIST_INVALID);
   P(laplace3D, INVALID_INT);
 #else
@@ -376,10 +377,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(m5, INVALID_DOUBLE);
     P(Ls, INVALID_INT);
   }
-  if (param->dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+  if (param->dslash_type == QUDA_TWISTED_MASS_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     P(mu, INVALID_DOUBLE);
     P(twist_flavor, QUDA_TWIST_INVALID);
   }
+  if (param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) { P(tm_rho, INVALID_DOUBLE); }
+  if (param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) { P(epsilon, INVALID_DOUBLE); }
 #endif
 
   P(tol, INVALID_DOUBLE);
@@ -516,7 +519,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
   P(gamma_basis, QUDA_INVALID_GAMMA_BASIS);
   P(dirac_order, QUDA_INVALID_DIRAC_ORDER);
-  P(sp_pad, INVALID_INT);
 
 #if defined INIT_PARAM
   P(Nsteps, INVALID_INT);
@@ -529,11 +531,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #if defined INIT_PARAM
   P(gcrNkrylov, INVALID_INT);
 #else
-  if (param->inv_type == QUDA_GCR_INVERTER ||
-      param->inv_type == QUDA_CA_GCR_INVERTER ||
-      param->inv_type == QUDA_CA_CG_INVERTER ||
-      param->inv_type == QUDA_CA_CGNE_INVERTER ||
-      param->inv_type == QUDA_CA_CGNR_INVERTER) {
+  if (param->inv_type == QUDA_GCR_INVERTER || param->inv_type == QUDA_BICGSTABL_INVERTER
+      || quda::is_ca_solver(param->inv_type)) {
     P(gcrNkrylov, INVALID_INT);
   }
 #endif
@@ -547,15 +546,41 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(maxiter_precondition, INVALID_INT);
   P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
   P(schwarz_type, QUDA_INVALID_SCHWARZ);
+  P(accelerator_type_precondition, QUDA_INVALID_ACCELERATOR);
   P(precondition_cycle, 1);               // defaults match previous interface behaviour
 #else
   if (param->inv_type_precondition == QUDA_BICGSTAB_INVERTER || param->inv_type_precondition == QUDA_CG_INVERTER
-      || param->inv_type_precondition == QUDA_MR_INVERTER) {
+      || param->inv_type_precondition == QUDA_CA_CG_INVERTER || param->inv_type_precondition == QUDA_MR_INVERTER) {
     P(tol_precondition, INVALID_DOUBLE);
     P(maxiter_precondition, INVALID_INT);
     P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
     P(precondition_cycle, 0);
   }
+#endif
+
+#ifndef INIT_PARAM
+  if (param->accelerator_type_precondition == QUDA_MADWF_ACCELERATOR) {
+#endif
+    P(madwf_diagonal_suppressor, INVALID_DOUBLE);
+    P(madwf_ls, INVALID_INT);
+    P(madwf_null_miniter, INVALID_INT);
+    P(madwf_null_tol, INVALID_DOUBLE);
+    P(madwf_train_maxiter, INVALID_INT);
+#ifndef INIT_PARAM
+  }
+#endif
+
+#ifdef INIT_PARAM
+  P(madwf_param_infile[0], '\0');
+  P(madwf_param_outfile[0], '\0');
+#endif
+
+#ifdef INIT_PARAM
+  P(madwf_param_load, QUDA_BOOLEAN_FALSE);
+  P(madwf_param_save, QUDA_BOOLEAN_FALSE);
+#else
+  P(madwf_param_load, QUDA_BOOLEAN_INVALID);
+  P(madwf_param_save, QUDA_BOOLEAN_INVALID);
 #endif
 
 #if defined(INIT_PARAM)
@@ -583,13 +608,25 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(ca_lambda_min, 0.0);
   P(ca_lambda_max, -1.0);
 #else
-  if (param->inv_type == QUDA_CA_CG_INVERTER ||
-      param->inv_type == QUDA_CA_CGNE_INVERTER ||
-      param->inv_type == QUDA_CA_CGNR_INVERTER) {
+  if (quda::is_ca_solver(param->inv_type)) {
     P(ca_basis, QUDA_INVALID_BASIS);
     if (param->ca_basis == QUDA_CHEBYSHEV_BASIS) {
       P(ca_lambda_min, INVALID_DOUBLE);
       P(ca_lambda_max, INVALID_DOUBLE);
+    }
+  }
+#endif
+
+#ifdef INIT_PARAM
+  P(ca_basis_precondition, QUDA_POWER_BASIS);
+  P(ca_lambda_min_precondition, 0.0);
+  P(ca_lambda_max_precondition, -1.0);
+#else
+  if (quda::is_ca_solver(param->inv_type)) {
+    P(ca_basis_precondition, QUDA_INVALID_BASIS);
+    if (param->ca_basis_precondition == QUDA_CHEBYSHEV_BASIS) {
+      P(ca_lambda_min_precondition, INVALID_DOUBLE);
+      P(ca_lambda_max_precondition, INVALID_DOUBLE);
     }
   }
 #endif
@@ -672,6 +709,16 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(native_blas_lapack, QUDA_BOOLEAN_TRUE);
 #else
   P(native_blas_lapack, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+#ifdef NVSHMEM_COMMS
+  P(use_mobius_fused_kernel, QUDA_BOOLEAN_FALSE);
+#else
+  P(use_mobius_fused_kernel, QUDA_BOOLEAN_TRUE);
+#endif
+#else
+  P(use_mobius_fused_kernel, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM
@@ -823,6 +870,16 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     }
 
 #ifdef INIT_PARAM
+    P(smoother_solver_ca_basis[i], QUDA_POWER_BASIS);
+    P(smoother_solver_ca_lambda_min[i], 0.0);
+    P(smoother_solver_ca_lambda_max[i], -1.0);
+#else
+    P(smoother_solver_ca_basis[i], QUDA_INVALID_BASIS);
+    P(smoother_solver_ca_lambda_min[i], INVALID_DOUBLE);
+    P(smoother_solver_ca_lambda_max[i], INVALID_DOUBLE);
+#endif
+
+#ifdef INIT_PARAM
     if (i<QUDA_MAX_MG_LEVEL) {
           P(n_vec[i], INVALID_INT);
     }
@@ -914,13 +971,25 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+#ifdef QUDA_MMA_AVAILABLE
   P(use_mma, QUDA_BOOLEAN_TRUE);
 #else
   P(use_mma, QUDA_BOOLEAN_FALSE);
 #endif
 #else
   P(use_mma, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  P(allow_truncation, QUDA_BOOLEAN_FALSE);
+#else
+  P(allow_truncation, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  P(staggered_kd_dagger_approximation, QUDA_BOOLEAN_FALSE);
+#else
+  P(staggered_kd_dagger_approximation, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM

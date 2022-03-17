@@ -1,6 +1,7 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
+#include <array.h>
 #include <reduction_kernel.h>
 
 namespace quda {
@@ -8,8 +9,7 @@ namespace quda {
   enum struct compute_type { determinant, trace };
 
   template <typename Float, int nColor_, QudaReconstructType recon_, compute_type type_>
-  struct KernelArg : public ReduceArg<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  struct KernelArg : public ReduceArg<array<double, 2>> {
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
     static constexpr compute_type type = type_;
@@ -28,12 +28,10 @@ namespace quda {
         X[dir] = u.X()[dir] - border[dir]*2;
       }
     }
-
-    __device__ __host__ auto init() const { return reduce_t(); }
   };
 
-  template <typename Arg> struct DetTrace : plus<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  template <typename Arg> struct DetTrace : plus<typename Arg::reduce_t> {
+    using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
     const Arg &arg;
     constexpr DetTrace(const Arg &arg) : arg(arg) {}
@@ -57,7 +55,7 @@ namespace quda {
       for (int mu = 0; mu < 4; mu++) {
         Matrix<complex<typename Arg::real>, Arg::nColor> U = arg.u(mu, linkIndex(x, X), parity);
         auto local = Arg::type == compute_type::determinant ? getDeterminant(U) : getTrace(U);
-        value = plus::operator()(value, reduce_t(local.real(), local.imag()));
+        value = operator()(value, reduce_t{local.real(), local.imag()});
       }
 
       return value;

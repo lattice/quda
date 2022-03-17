@@ -17,7 +17,7 @@
 #include <quda_matrix.h>
 #include <index_helper.cuh>
 #include <fast_intdiv.h>
-#include <atomic.cuh>
+#include <atomic_helper.h>
 #include <gauge_field.h>
 #include <index_helper.cuh>
 #include <load_store.h>
@@ -380,28 +380,28 @@ namespace quda {
       __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col,
                                                  const complex<theirFloat> &val) const
       {
-        using vec2 = vector_type<storeFloat, 2>;
+        using vec2 = array<storeFloat, 2>;
         vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
-          vec2(static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))) :
-          vec2(static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag()));
+          vec2{static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))} :
+          vec2{static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag())};
 
         atomic_fetch_add(u2, val_);
       }
 
-      template <typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, double init, reducer r) const
+      template <typename reducer, typename helper>
+      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {
         if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
         int lower = (dim == -1) ? 0 : dim;
         int ndim = (dim == -1 ? geometry : 1);
-        std::vector<double> result(ndim);
+        std::vector<typename reducer::reduce_t> result(ndim);
         std::vector<complex<storeFloat> *> v(ndim);
         for (int d = 0; d < ndim; d++) v[d] = u[d + lower];
-        ::quda::transform_reduce(location, result, v, 2 * volumeCB * nColor * nColor, h, init, r);
-        double total = init;
-        for (auto &res : result) total = r(total, res);
+        ::quda::transform_reduce<reducer>(location, result, v, 2 * volumeCB * nColor * nColor, h);
+        auto total = reducer::init();
+        for (auto &res : result) total = reducer::apply(total, res);
         return total;
       }
     };
@@ -487,27 +487,28 @@ namespace quda {
       __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col,
                                                  const complex<theirFloat> &val) const
       {
-        using vec2 = vector_type<storeFloat, 2>;
+        using vec2 = array<storeFloat, 2>;
         vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
-          vec2(static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))) :
-          vec2(static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag()));
+          vec2{static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))} :
+          vec2{static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag())};
 
         atomic_fetch_add(u2, val_);
       }
 
-      template <typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, double init, reducer r) const
+      template <typename reducer, typename helper>
+      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {
         if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
         auto start = dim == -1 ? 0 : dim;
         auto count = (dim == -1 ? geometry : 1) * volumeCB * nColor * nColor; // items per parity
-        std::vector<double> result = {init, init};
+        auto init = reducer::init();
+        std::vector<decltype(init)> result = {init, init};
         std::vector<decltype(u)> v = {u + (0 * geometry + start) * volumeCB * nColor * nColor,
                                       u + (1 * geometry + start) * volumeCB * nColor * nColor};
-        ::quda::transform_reduce(location, result, v, count, h, init, r);
-        return r(result[0], result[1]);
+        ::quda::transform_reduce<reducer>(location, result, v, count, h);
+        return reducer::apply(result[0], result[1]);
       }
     };
 
@@ -610,26 +611,27 @@ namespace quda {
       __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col,
                                           const complex<theirFloat> &val) const
       {
-        using vec2 = vector_type<storeFloat, 2>;
+        using vec2 = array<storeFloat, 2>;
         vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
-          vec2(static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))) :
-          vec2(static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag()));
+          vec2{static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))} :
+          vec2{static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag())};
 
         atomic_fetch_add(u2, val_);
       }
 
-      template <typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, double init, reducer r) const
+      template <typename reducer, typename helper>
+      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {
         if (dim >= geometry) errorQuda("Requested dimension %d exceeds dimensionality of the field %d", dim, geometry);
         auto start = (dim == -1) ? 0 : dim;
         auto count = (dim == -1 ? geometry : 1) * stride * nColor * nColor;
-        std::vector<double> result = {init, init};
+        auto init = reducer::init();
+        std::vector<decltype(init)> result = {init, init};
         std::vector<decltype(u)> v = {u + 0 * offset_cb + start * count, u + 1 * offset_cb + start * count};
-        ::quda::transform_reduce(location, result, v, count, h, init, r);
-        return r(result[0], result[1]);
+        ::quda::transform_reduce<reducer>(location, result, v, count, h);
+        return reducer::apply(result[0], result[1]);
       }
     };
 
@@ -843,8 +845,8 @@ namespace quda {
 	 */
 	__host__ double norm1(int dim=-1, bool global=true) const {
           commGlobalReductionPush(global);
-          double nrm1 = accessor.transform_reduce(location, dim, abs_<double, storeFloat>(accessor.scale_inv), 0.0,
-                                                  plus<double>());
+          double nrm1 = accessor.template transform_reduce<plus<double>>(location, dim,
+                                                                         abs_<double, storeFloat>(accessor.scale_inv));
           commGlobalReductionPop();
           return nrm1;
         }
@@ -857,8 +859,8 @@ namespace quda {
         __host__ double norm2(int dim = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double nrm2 = accessor.transform_reduce(location, dim, square_<double, storeFloat>(accessor.scale_inv), 0.0,
-                                                  plus<double>());
+          double nrm2 = accessor.template transform_reduce<plus<double>>(
+            location, dim, square_<double, storeFloat>(accessor.scale_inv));
           commGlobalReductionPop();
           return nrm2;
         }
@@ -871,8 +873,8 @@ namespace quda {
         __host__ double abs_max(int dim = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double absmax = accessor.transform_reduce(location, dim, abs_max_<Float, storeFloat>(accessor.scale_inv), 0.0,
-                                                    maximum<Float>());
+          double absmax = accessor.template transform_reduce<maximum<Float>>(
+            location, dim, abs_max_<Float, storeFloat>(accessor.scale_inv));
           commGlobalReductionPop();
           return absmax;
         }
@@ -885,8 +887,8 @@ namespace quda {
         __host__ double abs_min(int dim = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double absmin = accessor.transform_reduce(location, dim, abs_min_<Float, storeFloat>(accessor.scale_inv),
-                                                    std::numeric_limits<double>::max(), minimum<Float>());
+          double absmin = accessor.template transform_reduce<minimum<Float>>(
+            location, dim, abs_min_<Float, storeFloat>(accessor.scale_inv));
           commGlobalReductionPop();
           return absmin;
         }
@@ -2350,9 +2352,9 @@ namespace quda {
   };
 
 #ifdef FLOAT8
-#define N8 8
+#define FLOATN 8
 #else
-#define N8 4
+#define FLOATN 4
 #endif
 
   // half precision
@@ -2374,11 +2376,11 @@ namespace quda {
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<short, N, N8, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<short, N, FLOATN, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<short, N, N8, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<short, N, FLOATN, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
   // quarter precision
@@ -2400,12 +2402,14 @@ namespace quda {
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<int8_t, N, N8, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<int8_t, N, FLOATN, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<int8_t, N, N8, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<int8_t, N, FLOATN, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
+
+#undef FLOATN
 
   template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc,
             QudaGhostExchange ghostExchange, bool use_inphase>

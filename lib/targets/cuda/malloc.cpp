@@ -9,8 +9,7 @@
 #include <shmem_helper.cuh>
 
 #ifdef USE_QDPJIT
-#include "qdp_quda.h"
-#include "qdp_config.h"
+#include "qdp_cache.h"
 #endif
 
 #ifdef QUDA_BACKWARDSCPP
@@ -187,13 +186,22 @@ namespace quda
     return managed;
   }
 
+  bool use_qdp_managed()
+  {
+#if defined(QDP_USE_CUDA_MANAGED_MEMORY) || defined(QDP_ENABLE_MANAGED_MEMORY)
+    return true;
+#else
+    return false;
+#endif
+  }
+
   bool is_prefetch_enabled()
   {
     static bool prefetch = false;
     static bool init = false;
 
     if (!init) {
-      if (use_managed_memory()) {
+      if (use_managed_memory() || use_qdp_managed()) {
         char *enable_managed_prefetch = getenv("QUDA_ENABLE_MANAGED_PREFETCH");
         if (enable_managed_prefetch && strcmp(enable_managed_prefetch, "1") == 0) {
           warningQuda("Enabling prefetch support for managed memory");
@@ -216,25 +224,27 @@ namespace quda
   {
     if (use_managed_memory()) return managed_malloc_(func, file, line, size);
 
-#ifndef QDP_USE_CUDA_MANAGED_MEMORY
     MemAlloc a(func, file, line);
     void *ptr;
 
     a.size = a.base_size = size;
 
+#ifndef USE_QDPJIT
     cudaError_t err = cudaMalloc(&ptr, size);
     if (err != cudaSuccess) {
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
+#else
+    // QDPJIT version -- barfs internally if it fails
+    QDP::QDP_get_global_cache().addDeviceStatic(&ptr, size, true);
+#endif
+
+    if (is_prefetch_enabled()) qudaMemPrefetchAsync(ptr, size, QUDA_CUDA_FIELD_LOCATION, device::get_default_stream());
     track_malloc(DEVICE, a, ptr);
 #ifdef HOST_DEBUG
     cudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
-#else
-    // when QDO uses managed memory we can bypass the QDP memory manager
-    return device_pinned_malloc_(func, file, line, size);
-#endif
   }
 
   /**
@@ -411,17 +421,20 @@ namespace quda
       return;
     }
 
-#ifndef QDP_USE_CUDA_MANAGED_MEMORY
     if (!ptr) { errorQuda("Attempt to free NULL device pointer (%s:%d in %s())\n", file, line, func); }
     if (!alloc[DEVICE].count(ptr)) {
       errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
     }
+
+#ifndef USE_QDPJIT
     cudaError_t err = cudaFree(ptr);
     if (err != cudaSuccess) { errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
-    track_free(DEVICE, ptr);
 #else
-    device_pinned_free_(func, file, line, ptr);
+    // QDPJIT: Barfs if it fails internally
+    QDP::QDP_get_global_cache().signoffViaPtr(ptr);
 #endif
+
+    track_free(DEVICE, ptr);
   }
 
   /**

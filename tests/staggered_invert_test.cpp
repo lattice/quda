@@ -353,18 +353,18 @@ int main(int argc, char **argv)
       inv_param.num_src_per_sub_partition = Nsrc / num_sub_partition;
       invertMultiSrcStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)milc_fatlink, (void *)milc_longlink,
                                   &gauge_param);
-      comm_allreduce_int(&inv_param.iter);
+      quda::comm_allreduce_int(inv_param.iter);
       inv_param.iter /= comm_size() / num_sub_partition;
-      comm_allreduce(&inv_param.gflops);
+      quda::comm_allreduce_sum(inv_param.gflops);
       inv_param.gflops /= comm_size() / num_sub_partition;
-      comm_allreduce_max(&inv_param.secs);
+      quda::comm_allreduce_max(inv_param.secs);
       printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops\n\n", num_sub_partition, inv_param.iter,
                  inv_param.secs, inv_param.gflops / inv_param.secs);
     }
 
     for (int k = 0; k < Nsrc; k++) {
       if (verify_results)
-        verifyStaggeredInversion(tmp, ref, in[k], out[k], mass, qdp_fatlink, qdp_longlink, (void **)cpuFat->Ghost(),
+        verifyStaggeredInversion(*tmp, *ref, *in[k], *out[k], mass, qdp_fatlink, qdp_longlink, (void **)cpuFat->Ghost(),
                                  (void **)cpuLong->Ghost(), gauge_param, inv_param, 0);
     }
     break;
@@ -405,7 +405,7 @@ int main(int argc, char **argv)
 
       for (int i = 0; i < multishift; i++) {
         printfQuda("%dth solution: mass=%f, ", i, masses[i]);
-        verifyStaggeredInversion(tmp, ref, in[k], qudaOutArray[i], masses[i], qdp_fatlink, qdp_longlink,
+        verifyStaggeredInversion(*tmp, *ref, *in[k], *qudaOutArray[i], masses[i], qdp_fatlink, qdp_longlink,
                                  (void **)cpuFat->Ghost(), (void **)cpuLong->Ghost(), gauge_param, inv_param, i);
       }
     }

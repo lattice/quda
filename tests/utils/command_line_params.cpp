@@ -40,29 +40,45 @@ int Lsdim = 16;
 bool dagger = false;
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 int laplace3D = 4;
-char latfile[256] = "";
+std::string latfile;
 bool unit_gauge = false;
 double gaussian_sigma = 0.2;
-char gauge_outfile[256] = "";
+std::string gauge_outfile;
 int Nsrc = 1;
 int Msrc = 1;
 int niter = 100;
 int maxiter_precondition = 10;
+QudaVerbosity verbosity_precondition = QUDA_SUMMARIZE;
 int gcrNkrylov = 10;
 QudaCABasis ca_basis = QUDA_POWER_BASIS;
 double ca_lambda_min = 0.0;
 double ca_lambda_max = -1.0;
+QudaCABasis ca_basis_precondition = QUDA_POWER_BASIS;
+double ca_lambda_min_precondition = 0.0;
+double ca_lambda_max_precondition = -1.0;
 int pipeline = 0;
 int solution_accumulator_pipeline = 0;
 int test_type = 0;
 quda::mgarray<int> nvec = {};
-quda::mgarray<char[256]> mg_vec_infile;
-quda::mgarray<char[256]> mg_vec_outfile;
+quda::mgarray<std::string> mg_vec_infile;
+quda::mgarray<std::string> mg_vec_outfile;
 QudaInverterType inv_type;
 bool inv_deflate = false;
 bool inv_multigrid = false;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 QudaSchwarzType precon_schwarz_type = QUDA_INVALID_SCHWARZ;
+QudaAcceleratorType precon_accelerator_type = QUDA_INVALID_ACCELERATOR;
+
+double madwf_diagonal_suppressor = 0.0;
+int madwf_ls = 4;
+int madwf_null_miniter = niter;
+double madwf_null_tol = tol;
+int madwf_train_maxiter = niter;
+bool madwf_param_load = false;
+bool madwf_param_save = false;
+std::string madwf_param_infile;
+std::string madwf_param_outfile;
+
 int precon_schwarz_cycle = 1;
 int multishift = 1;
 bool verify_results = true;
@@ -101,6 +117,9 @@ bool gauge_smear = false;
 
 int mg_levels = 2;
 
+int max_res_increase = 1;
+int max_res_increase_total = 10;
+
 quda::mgarray<QudaFieldLocation> solver_location = {};
 quda::mgarray<QudaFieldLocation> setup_location = {};
 
@@ -128,6 +147,9 @@ double omega = 0.85;
 quda::mgarray<QudaInverterType> coarse_solver = {};
 quda::mgarray<double> coarse_solver_tol = {};
 quda::mgarray<QudaInverterType> smoother_type = {};
+quda::mgarray<QudaCABasis> smoother_solver_ca_basis = {};
+quda::mgarray<double> smoother_solver_ca_lambda_min = {};
+quda::mgarray<double> smoother_solver_ca_lambda_max = {};
 QudaPrecision smoother_halo_prec = QUDA_INVALID_PRECISION;
 quda::mgarray<double> smoother_tol = {};
 quda::mgarray<int> coarse_solver_maxiter = {};
@@ -142,16 +164,24 @@ quda::mgarray<int> mg_schwarz_cycle = {};
 bool mg_evolve_thin_updates = false;
 
 // Aggregation type for the top level of staggered
-// FIXME: replace with QUDA_TRANSFER_OPTIMIZED_KD when ready
-QudaTransferType staggered_transfer_type = QUDA_TRANSFER_COARSE_KD;
+QudaTransferType staggered_transfer_type = QUDA_TRANSFER_OPTIMIZED_KD;
 
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
 
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+#ifdef QUDA_MMA_AVAILABLE
 bool mg_use_mma = true;
 #else
 bool mg_use_mma = false;
+#endif
+
+bool mg_allow_truncation = false;
+bool mg_staggered_kd_dagger_approximation = false;
+
+#ifdef NVSHMEM_COMMS
+bool use_mobius_fused_kernel = false;
+#else
+bool use_mobius_fused_kernel = true;
 #endif
 
 int n_ev = 8;
@@ -193,9 +223,9 @@ bool eig_compute_gamma5 = false;
 QudaEigSpectrumType eig_spectrum = QUDA_SPECTRUM_LR_EIG;
 QudaEigType eig_type = QUDA_EIG_TR_LANCZOS;
 bool eig_arpack_check = false;
-char eig_arpack_logfile[256] = "arpack_logfile.log";
-char eig_vec_infile[256] = "";
-char eig_vec_outfile[256] = "";
+std::string eig_arpack_logfile = "arpack_logfile.log";
+std::string eig_vec_infile;
+std::string eig_vec_outfile;
 bool eig_io_parity_inflate = false;
 QudaPrecision eig_save_prec = QUDA_DOUBLE_PRECISION;
 
@@ -316,7 +346,6 @@ namespace
                                                        {"laplace", QUDA_LAPLACE_DSLASH}};
 
   CLI::TransformPairs<QudaTwistFlavorType> twist_flavor_type_map {{"singlet", QUDA_TWIST_SINGLET},
-                                                                  {"deg-doublet", QUDA_TWIST_DEG_DOUBLET},
                                                                   {"nondeg-doublet", QUDA_TWIST_NONDEG_DOUBLET},
                                                                   {"no", QUDA_TWIST_NO}};
 
@@ -356,6 +385,9 @@ namespace
                                                          {"additive", QUDA_ADDITIVE_SCHWARZ},
                                                          {"multiplicative", QUDA_MULTIPLICATIVE_SCHWARZ}};
 
+  CLI::TransformPairs<QudaAcceleratorType> accelerator_type_map {{"invalid", QUDA_INVALID_ACCELERATOR},
+                                                                 {"madwf", QUDA_MADWF_ACCELERATOR}};
+
   CLI::TransformPairs<QudaSolutionType> solution_type_map {{"mat", QUDA_MAT_SOLUTION},
                                                            {"mat-dag-mat", QUDA_MATDAG_MAT_SOLUTION},
                                                            {"mat-pc", QUDA_MATPC_SOLUTION},
@@ -367,9 +399,11 @@ namespace
                                                  {"iram", QUDA_EIG_IR_ARNOLDI},
                                                  {"blkiram", QUDA_EIG_BLK_IR_ARNOLDI}};
 
-  CLI::TransformPairs<QudaTransferType> transfer_type_map {{"aggregate", QUDA_TRANSFER_AGGREGATE},
-                                                           {"kd-coarse", QUDA_TRANSFER_COARSE_KD},
-                                                           {"kd-optimized", QUDA_TRANSFER_OPTIMIZED_KD}};
+  CLI::TransformPairs<QudaTransferType> transfer_type_map {
+    {"aggregate", QUDA_TRANSFER_AGGREGATE},
+    {"kd-coarse", QUDA_TRANSFER_COARSE_KD},
+    {"kd-optimized", QUDA_TRANSFER_OPTIMIZED_KD},
+    {"kd-optimized-drop-long", QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG}};
 
   CLI::TransformPairs<QudaTboundary> fermion_t_boundary_map {{"periodic", QUDA_PERIODIC_T},
                                                              {"anti-periodic", QUDA_ANTI_PERIODIC_T}};
@@ -407,7 +441,7 @@ namespace
 
   CLI::TransformPairs<QudaSetupType> setup_type_map {{"test", QUDA_TEST_VECTOR_SETUP}, {"null", QUDA_TEST_VECTOR_SETUP}};
 
-  CLI::TransformPairs<QudaExtLibType> extlib_map {{"eigen", QUDA_EIGEN_EXTLIB}, {"magma", QUDA_MAGMA_EXTLIB}};
+  CLI::TransformPairs<QudaExtLibType> extlib_map {{"eigen", QUDA_EIGEN_EXTLIB}};
 
   CLI::TransformPairs<QudaGaugeActionType> gauge_action_type_map {{"wilson", QUDA_GAUGE_ACTION_TYPE_WILSON},
                                                                   {"symanzik", QUDA_GAUGE_ACTION_TYPE_SYMANZIK},
@@ -426,13 +460,25 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--alternative-reliable", alternative_reliable, "use alternative reliable updates");
   quda_app->add_option("--anisotropy", anisotropy, "Temporal anisotropy factor (default 1.0)");
 
-  quda_app->add_option("--ca-basis-type", ca_basis, "The basis to use for CA-CG (default power)")
+  quda_app->add_option("--ca-basis-type", ca_basis, "The basis to use for CA solvers (default power)")
     ->transform(CLI::QUDACheckedTransformer(ca_basis_map));
   quda_app->add_option(
     "--cheby-basis-eig-max",
-    ca_lambda_max, "Conservative estimate of largest eigenvalue for Chebyshev basis CA-CG (default is to guess with power iterations)");
+    ca_lambda_max, "Conservative estimate of largest eigenvalue for Chebyshev basis CA solvers (default is to guess with power iterations)");
   quda_app->add_option("--cheby-basis-eig-min", ca_lambda_min,
-                       "Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG (default 0)");
+                       "Conservative estimate of smallest eigenvalue for Chebyshev basis CA solvers (default 0)");
+
+  quda_app
+    ->add_option("--ca-basis-type-precondition", ca_basis_precondition,
+                 "The basis to use for CA solvers when used as a preconditioner (default power)")
+    ->transform(CLI::QUDACheckedTransformer(ca_basis_map));
+  quda_app->add_option("--cheby-basis-eig-max-precondition", ca_lambda_max_precondition,
+                       "Conservative estimate of largest eigenvalue for Chebyshev basis CA solvers when used as a "
+                       "preconditioner (default is to guess with power iterations)");
+  quda_app->add_option("--cheby-basis-eig-min-precondition", ca_lambda_min_precondition,
+                       "Conservative estimate of smallest eigenvalue for Chebyshev basis CA solvers when used as a "
+                       "preconditioner (default 0)");
+
   quda_app->add_option("--clover-csw", clover_csw, "Clover Csw coefficient 1.0")->capture_default_str();
   quda_app
     ->add_option("--clover-coeff", clover_coeff,
@@ -464,9 +510,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--epsilon", epsilon, "Twisted-Mass flavor twist of Dirac operator (default 0.01)");
   quda_app->add_option("--epsilon-naik", eps_naik, "Epsilon factor on Naik term (default 0.0, suggested non-zero -0.1)");
 
-  quda_app
-    ->add_option("--flavor", twist_flavor,
-                 "Set the twisted mass flavor type (singlet (default), deg-doublet, nondeg-doublet)")
+  quda_app->add_option("--flavor", twist_flavor, "Set the twisted mass flavor type (singlet (default), nondeg-doublet)")
     ->transform(CLI::QUDACheckedTransformer(twist_flavor_type_map));
   ;
   quda_app->add_option("--gaussian-sigma", gaussian_sigma,
@@ -501,12 +545,20 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     "Whether to do a multi-shift solver test or not. Default is 1 (single mass)"
     "If a value N > 1 is passed, heavier masses will be constructed and the multi-shift solver will be called");
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
-                       "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)");
+                       "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG, CA-GCR (default 10)");
   quda_app->add_option("--niter", niter, "The number of iterations to perform (default 100)");
+  quda_app->add_option("--max-res-increase", max_res_increase,
+                       "The number of consecutive true residual incrases allowed (default 1)");
+  quda_app->add_option("--max-res-increase-total", max_res_increase_total,
+                       "The total number of true residual incrases allowed (default 10)");
   quda_app->add_option("--native-blas-lapack", native_blas_lapack,
                        "Use the native or generic BLAS LAPACK implementation (default true)");
   quda_app->add_option("--maxiter-precondition", maxiter_precondition,
                        "The number of iterations to perform for any preconditioner (default 10)");
+  quda_app
+    ->add_option("--verbosity-precondition", verbosity_precondition,
+                 "The the verbosity of the preconditioner (default summarize)")
+    ->transform(CLI::QUDACheckedTransformer(verbosity_map));
   quda_app->add_option("--nsrc", Nsrc,
                        "How many spinors to apply the dslash to simultaneusly (experimental for staggered only)");
 
@@ -536,6 +588,11 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->add_option("--precon-schwarz-type", precon_schwarz_type,
                  "The type of Schwarz preconditioning to use (default=invalid)")
     ->transform(CLI::QUDACheckedTransformer(schwarz_type_map));
+  quda_app
+    ->add_option("--precon-accelerator-type", precon_accelerator_type,
+                 "The type of Schwarz preconditioning to use (default=invalid)")
+    ->transform(CLI::QUDACheckedTransformer(accelerator_type_map));
+
   quda_app->add_option("--precon-schwarz-cycle", precon_schwarz_cycle,
                        "The number of Schwarz cycles to apply per smoother application (default=1)");
 
@@ -644,6 +701,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--zgridsize", grid_z, "Set grid size in Z dimension (default 1)")->excludes(gridsizeopt);
   quda_app->add_option("--tgridsize", grid_t, "Set grid size in T dimension (default 1)")->excludes(gridsizeopt);
 
+  quda_app->add_option("--mobius-fused-kernel", use_mobius_fused_kernel, "Use fused kernels for Mobius, default true");
   return quda_app;
 }
 
@@ -752,7 +810,11 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   auto solve_type_transform = CLI::QUDACheckedTransformer(solve_type_map);
 
   CLI::QUDACheckedTransformer prec_transform(precision_map);
-  // TODO
+
+  opgroup->add_option("--mg-allow-truncation", mg_allow_truncation,
+                      "Let multigrid coarsening trucate improvement terms in operators, e.g. dropping asqtad long "
+                      "links in a dimension with an aggreation length smaller than 3 (default false)");
+
   quda_app->add_mgoption(
     opgroup, "--mg-block-size", geo_block_size, CLI::Validator(),
     "Set the geometric block size for the each multigrid levels transfer operator (default 4 4 4 4)");
@@ -764,18 +826,18 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "The solver to wrap the V cycle on each level (default gcr, only for levels 1+)");
 
   quda_app->add_mgoption(opgroup, "--mg-coarse-solver-ca-basis-size", coarse_solver_ca_basis_size, CLI::PositiveNumber,
-                         "The basis size to use for CA-CG setup of multigrid (default 4)");
+                         "The basis size to use for CA solver setup of multigrid (default 4)");
 
   quda_app->add_mgoption(opgroup, "--mg-coarse-solver-ca-basis-type", coarse_solver_ca_basis,
                          CLI::QUDACheckedTransformer(ca_basis_map),
-                         "The basis to use for CA-CG setup of multigrid(default power)");
-  quda_app->add_mgoption(opgroup, "--mg-coarse-solver-cheby-basis-eig-max", coarse_solver_ca_lambda_max,
-                         CLI::PositiveNumber,
-                         "Conservative estimate of largest eigenvalue for Chebyshev basis CA-CG in setup of multigrid "
-                         "(default is to guess with power iterations)");
+                         "The basis to use for CA solver setup of multigrid(default power)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-coarse-solver-cheby-basis-eig-max", coarse_solver_ca_lambda_max, CLI::PositiveNumber,
+    "Conservative estimate of largest eigenvalue for Chebyshev basis CA solvers in setup of multigrid "
+    "(default is to guess with power iterations)");
   quda_app->add_mgoption(
     opgroup, "--mg-coarse-solver-cheby-basis-eig-min", coarse_solver_ca_lambda_min, CLI::PositiveNumber,
-    "Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG in setup of multigrid (default 0)");
+    "Conservative estimate of smallest eigenvalue for Chebyshev basis CA solvers in setup of multigrid (default 0)");
   quda_app->add_mgoption(opgroup, "--mg-coarse-solver-maxiter", coarse_solver_maxiter, CLI::PositiveNumber,
                          "The coarse solver maxiter for each level (default 100)");
   quda_app->add_mgoption(opgroup, "--mg-coarse-solver-tol", coarse_solver_tol, CLI::PositiveNumber,
@@ -885,15 +947,16 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(opgroup, "--mg-schwarz-cycle", mg_schwarz_cycle, CLI::PositiveNumber,
                          "The number of Schwarz cycles to apply per smoother application (default=1)");
   quda_app->add_mgoption(opgroup, "--mg-setup-ca-basis-size", setup_ca_basis_size, CLI::PositiveNumber,
-                         "The basis size to use for CA-CG setup of multigrid (default 4)");
+                         "The basis size to use for CA solver setup of multigrid (default 4)");
   quda_app->add_mgoption(opgroup, "--mg-setup-ca-basis-type", setup_ca_basis, CLI::QUDACheckedTransformer(ca_basis_map),
-                         "The basis to use for CA-CG setup of multigrid(default power)");
-  quda_app->add_mgoption(opgroup, "--mg-setup-cheby-basis-eig-max", setup_ca_lambda_max, CLI::PositiveNumber,
-                         "Conservative estimate of largest eigenvalue for Chebyshev basis CA-CG in setup of multigrid "
-                         "(default is to guess with power iterations)");
+                         "The basis to use for CA solver setup of multigrid(default power)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-setup-cheby-basis-eig-max", setup_ca_lambda_max, CLI::PositiveNumber,
+    "Conservative estimate of largest eigenvalue for Chebyshev basis CA solvers in setup of multigrid "
+    "(default is to guess with power iterations)");
   quda_app->add_mgoption(
     opgroup, "--mg-setup-cheby-basis-eig-min", setup_ca_lambda_min, CLI::PositiveNumber,
-    "Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG in setup of multigrid (default 0)");
+    "Conservative estimate of smallest eigenvalue for Chebyshev basis CA solvers in setup of multigrid (default 0)");
   quda_app->add_mgoption(opgroup, "--mg-setup-inv", setup_inv, solver_trans,
                          "The inverter to use for the setup of multigrid (default bicgstab)");
   quda_app->add_mgoption(opgroup, "--mg-setup-iters", num_setup_iter, CLI::PositiveNumber,
@@ -913,16 +976,26 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--mg-setup-type", setup_type, "The type of setup to use for the multigrid (default null)")
     ->transform(CLI::QUDACheckedTransformer(setup_type_map));
 
-  // FIXME: default should become kd-optimized
   opgroup
     ->add_option(
       "--mg-staggered-coarsen-type",
-      staggered_transfer_type, "The type of coarsening to use for the top level staggered operator (aggregate, kd-coarse (default), kd-optimized)")
+      staggered_transfer_type, "The type of coarsening to use for the top level staggered operator (aggregate, kd-coarse, kd-optimized (default))")
     ->transform(CLI::QUDACheckedTransformer(transfer_type_map));
+
+  opgroup->add_option("--mg-staggered-kd-dagger-approximation", mg_staggered_kd_dagger_approximation,
+                      "Use the dagger approximation to Xinv, which is X^dagger (default = false)");
 
   quda_app->add_mgoption(opgroup, "--mg-smoother", smoother_type, solver_trans,
                          "The smoother to use for multigrid (default mr)");
-
+  quda_app->add_mgoption(opgroup, "--mg-smoother-ca-basis-type", smoother_solver_ca_basis,
+                         CLI::QUDACheckedTransformer(ca_basis_map),
+                         "The basis to use for CA solver smoothers in multigrid (default power)");
+  quda_app->add_mgoption(opgroup, "--mg-smoother-cheby-basis-eig-max", smoother_solver_ca_lambda_max, CLI::PositiveNumber,
+                         "Conservative estimate of largest eigenvalue for CA solvers used as a multigrid smoother "
+                         "(default is to guess with power iterations)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-smoother-cheby-basis-eig-min", smoother_solver_ca_lambda_min, CLI::PositiveNumber,
+    "Conservative estimate of smallest eigenvalue for CA solvers used as a multigrid smoother (default 0)");
   opgroup
     ->add_option("--mg-smoother-halo-prec", smoother_halo_prec,
                  "The smoother halo precision (applies to all levels - defaults to null_precision)")
@@ -954,6 +1027,26 @@ void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eofa-mq1", eofa_mq1, "Set mq1 for EOFA operator (default 1.0)");
   opgroup->add_option("--eofa-mq2", eofa_mq1, "Set mq2 for EOFA operator (default 0.085)");
   opgroup->add_option("--eofa-mq3", eofa_mq1, "Set mq3 for EOFA operator (default 1.0)");
+}
+
+void add_madwf_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup = quda_app->add_option_group("MADWF", "Options controlling MADWF parameteres");
+
+  opgroup->add_option("--madwf-diagonal-suppressor", madwf_diagonal_suppressor,
+                      "Set the digonal suppressor for MADWF (default 0)");
+  opgroup->add_option("--madwf-ls", madwf_ls, "Set the reduced Ls for MADWF (default 4)");
+
+  opgroup->add_option("--madwf-null-miniter", madwf_null_miniter,
+                      "Min iteration after which to generate null vectors for MADWF");
+  opgroup->add_option("--madwf-null-tol", madwf_null_tol, "Stopping condition for null vector generation for MADWF");
+  opgroup->add_option("--madwf-train-maxiter", madwf_train_maxiter, "Max iteration for parameter training for MADWF");
+
+  opgroup->add_option("--madwf-param-load", madwf_param_load, "Whether or not load trained parameters for MADWF");
+  opgroup->add_option("--madwf-param-save", madwf_param_save, "Whether or not save trained parameters for MADWF");
+
+  opgroup->add_option("--madwf-param-infile", madwf_param_infile, "Where to load trained parameters for MADWF from");
+  opgroup->add_option("--madwf-param-outfile", madwf_param_outfile, "Where to save trained parameters for MADWF to");
 }
 
 void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)

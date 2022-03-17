@@ -4,6 +4,7 @@
 #include <reduce_helper.h>
 #include <blas_helper.cuh>
 #include <multi_blas_helper.cuh>
+#include <array.h>
 #include <reduction_kernel.h>
 
 namespace quda
@@ -11,6 +12,19 @@ namespace quda
 
   namespace blas
   {
+
+    /**
+       @brief Return the batch block size used for multi reductions.
+       For now, we leave this at 1 unless fast-compilation is enabled,
+       since it provides negligible benefit (but substantially longer
+       tuning).  When fast-compilation is enabled, the increased batch
+       count can dramatically improve performance.
+     */
+#ifndef QUDA_FAST_COMPILE_REDUCE
+    constexpr unsigned int max_n_batch_block_multi_reduce() { return 1; }
+#else
+    constexpr unsigned int max_n_batch_block_multi_reduce() { return 8; }
+#endif
 
     /**
        @brief Parameter struct for generic multi-reduce blas kernel.
@@ -25,16 +39,17 @@ namespace quda
     */
     template <typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
     struct MultiReduceArg :
-      public ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ_>>,
+      public ReduceArg<array<typename Reducer_::reduce_t, NXZ_>>,
       SpinorXZ<NXZ_, store_t, N, Reducer_::use_z>,
       SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Reducer_>(), store_t, N, y_store_t, Ny, Reducer_::use_w>
     {
       using real = real_;
       using Reducer = Reducer_;
-      using reduce_t = vector_type<typename Reducer_::reduce_t, NXZ_>;
+      using reduce_t = array<typename Reducer_::reduce_t, NXZ_>;
       static constexpr int n = n_;
       static constexpr int NXZ = NXZ_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Reducer>();
+      static constexpr unsigned int max_n_batch_block = max_n_batch_block_multi_reduce();
       const int NYW;
       Reducer f;
 
@@ -45,7 +60,7 @@ namespace quda
                      std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
                      Reducer f, int NYW, int length, int nParity) :
         // we have NYW * nParity reductions each of length NXZ
-        ReduceArg<reduce_t>(dim3(length, NYW, 1), NYW),
+        ReduceArg<reduce_t>(dim3(length, 1, NYW), NYW),
         NYW(NYW),
         f(f),
         length_cb(length / nParity),
@@ -63,8 +78,6 @@ namespace quda
           if (Reducer::use_w) this->W[i] = *w[i];
         }
       }
-
-      __device__ __host__ auto init() const { return ::quda::zero<typename Reducer_::reduce_t, NXZ>(); }
     };
 
     // strictly required pre-C++17 and can cause link errors otherwise
@@ -77,15 +90,18 @@ namespace quda
     /**
        Generic multi-reduction functor with up to four loads and saves
     */
-    template <typename Arg> struct MultiReduce_ : plus<vector_type<typename Arg::Reducer::reduce_t, Arg::NXZ>> {
-      using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
-      using reduce_t = vector_type<typename Arg::Reducer::reduce_t, Arg::NXZ>;
+    template <typename Arg> struct MultiReduce_ : plus<typename Arg::reduce_t> {
+      using reduce_t = typename Arg::reduce_t;
       using plus<reduce_t>::operator();
+      using vec = array<complex<typename Arg::real>, Arg::n/2>;
       const Arg &arg;
       constexpr MultiReduce_(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ inline reduce_t operator()(reduce_t &sum, int tid, int k, int) const
+      // overload comm_reduce to defer until the entire "tile" is complete
+      template <typename U> static inline void comm_reduce(U &) { }
+
+      __device__ __host__ inline reduce_t operator()(reduce_t &sum, int tid, int, int k) const
       {
         unsigned int parity = tid >= arg.length_cb ? 1 : 0;
         unsigned int i = tid - parity * arg.length_cb;
@@ -134,10 +150,10 @@ namespace quda
        Return the real dot product of x and y
     */
     template <typename reduce_t, typename T>
-    __device__ __host__ void dot_(reduce_t &sum, const typename VectorType<T, 2>::type &a, const typename VectorType<T, 2>::type &b)
+    __device__ __host__ void dot_(reduce_t &sum, const complex<T> &a, const complex<T> &b)
     {
-      sum += static_cast<reduce_t>(a.x) * static_cast<reduce_t>(b.x);
-      sum += static_cast<reduce_t>(a.y) * static_cast<reduce_t>(b.y);
+      sum += static_cast<reduce_t>(a.real()) * static_cast<reduce_t>(b.real());
+      sum += static_cast<reduce_t>(a.imag()) * static_cast<reduce_t>(b.imag());
     }
 
     template <typename reduce_t, typename real>
@@ -161,18 +177,18 @@ namespace quda
        Returns complex-valued dot product of x and y
     */
     template <typename reduce_t, typename T>
-    __device__ __host__ void cdot_(reduce_t &sum, const typename VectorType<T, 2>::type &a, const typename VectorType<T, 2>::type &b)
+    __device__ __host__ void cdot_(reduce_t &sum, const complex<T> &a, const complex<T> &b)
     {
-      using scalar = typename scalar<reduce_t>::type;
-      sum.x += static_cast<scalar>(a.x) * static_cast<scalar>(b.x);
-      sum.x += static_cast<scalar>(a.y) * static_cast<scalar>(b.y);
-      sum.y += static_cast<scalar>(a.x) * static_cast<scalar>(b.y);
-      sum.y -= static_cast<scalar>(a.y) * static_cast<scalar>(b.x);
+      using scalar = typename reduce_t::value_type;
+      sum[0] += static_cast<scalar>(a.real()) * static_cast<scalar>(b.real());
+      sum[0] += static_cast<scalar>(a.imag()) * static_cast<scalar>(b.imag());
+      sum[1] += static_cast<scalar>(a.real()) * static_cast<scalar>(b.imag());
+      sum[1] -= static_cast<scalar>(a.imag()) * static_cast<scalar>(b.real());
     }
 
     template <typename real_reduce_t, typename real>
-    struct multiCdot : public MultiReduceFunctor<typename VectorType<real_reduce_t, 2>::type, complex<real>> {
-      using reduce_t = typename VectorType<real_reduce_t, 2>::type;
+    struct multiCdot : public MultiReduceFunctor<array<real_reduce_t, 2>, complex<real>> {
+      using reduce_t = array<real_reduce_t, 2>;
       static constexpr memory_access<1, 1> read { };
       static constexpr memory_access< > write { };
       static constexpr bool use_z = false;

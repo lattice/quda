@@ -9,6 +9,7 @@
 #include <unitarization_links.h>
 #include <ks_improved_force.h>
 #include <dslash_quda.h>
+#include <invert_quda.h>
 
 #include <vector>
 #include <fstream>
@@ -724,7 +725,6 @@ static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, Qud
   }
 
   invertParam->dagger = QUDA_DAG_NO;
-  invertParam->sp_pad = 0;
   invertParam->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
   // for the preconditioner
@@ -1285,21 +1285,45 @@ struct mgInputStruct {
   int mg_levels;
   bool verify_results;
   QudaPrecision preconditioner_precision; // precision for near-nulls, coarse links
+  QudaTransferType
+    optimized_kd; // use the optimized KD operator (true), naive coarsened operator (false), or optimized dropped links (drop)
+  bool use_mma;              // accelerate setup using MMA routines
+  bool allow_truncation;     // allow dropping the long links for small (less than three) aggregate directions
+  bool dagger_approximation; // use the dagger approximation to Xinv, which is X^dagger
 
-  // Setup
-  int nvec[QUDA_MAX_MG_LEVEL];                   // ignored on first level, if non-zero on last level we deflate
+  /**
+   * Setup:
+   * There is no near-null vector generation on the first and last (coarsest) level.
+   * - The second level is the KD preconditioned staggered/HISQ operator, which is not a coarsening of the fine operator
+   * - By definition there is no coarsening of the coarsest level
+   * For this reason most of these variables are ignored on the first and last level.
+   * We do reuse `nvec` on the coarsest level to specify the size of coarsest-level deflation basis
+   * For reference: geo_block_size[0] does get defined internally (1 1 1 1 for optimized, 2 2 2 2 for coarse KD)
+   */
+  int nvec[QUDA_MAX_MG_LEVEL];                   // ignored on first level, reused for deflation size on last level
   QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL]; // ignored on first and last level
   double setup_tol[QUDA_MAX_MG_LEVEL];           // ignored on first and last level
   double setup_maxiter[QUDA_MAX_MG_LEVEL];       // ignored on first and last level
+  int setup_ca_basis_size[QUDA_MAX_MG_LEVEL];    // ignored on first and last level
   char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];    // ignored on first and last level
   char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];   // ignored on first and last level
-  int geo_block_size[QUDA_MAX_MG_LEVEL][4];      // ignored on first and last level (first is 2 2 2 2)
+  int geo_block_size[QUDA_MAX_MG_LEVEL][4]; // ignored on first and last level (values on first level are prescribed)
 
-  // Solve
+  /**
+   * Solve:
+   * The coarse solver parameters are ignored on the first level because it is
+   * the outer solver, and as such we reuse values specified in MILC (tolerance, max iterations)
+   * Some of these are fixed (for now) and will be exposed in the future:
+   * - Solve type (for now fixed to full operator, will eventually expose Schur operator)
+   * - Solver (for now fixed to GCR, will eventually expose PCG for Schur operator)
+   * The smoother types are ignored for the coarsest level because, by definition, there is no
+   * still coarser operator to smooth
+   */
   QudaSolveType coarse_solve_type[QUDA_MAX_MG_LEVEL]; // ignored on first and second level
   QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];  // ignored on first level
   double coarse_solver_tol[QUDA_MAX_MG_LEVEL];        // ignored on first level
   int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];       // ignored on first level
+  int coarse_solver_ca_basis_size[QUDA_MAX_MG_LEVEL]; // only used last level
   QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL];  // all but last level
   int nu_pre[QUDA_MAX_MG_LEVEL];                      // all but last level
   int nu_post[QUDA_MAX_MG_LEVEL];                     // all but last level
@@ -1327,6 +1351,7 @@ struct mgInputStruct {
       setup_inv[i] = QUDA_CGNR_INVERTER;
       setup_tol[i] = 1e-5;
       setup_maxiter[i] = 500;
+      setup_ca_basis_size[i] = 4;
       mg_vec_infile[i][0] = 0;
       mg_vec_outfile[i][0] = 0;
       for (int d = 0; d < 4; d++) { geo_block_size[i][d] = 2; }
@@ -1335,6 +1360,7 @@ struct mgInputStruct {
       coarse_solver[i] = QUDA_GCR_INVERTER;
       coarse_solver_tol[i] = 0.25;
       coarse_solver_maxiter[i] = 16;
+      coarse_solver_ca_basis_size[i] = 16;
       smoother_type[i] = QUDA_CA_GCR_INVERTER;
       nu_pre[i] = 0;
       nu_post[i] = 2;
@@ -1348,6 +1374,10 @@ struct mgInputStruct {
     mg_levels(4),
     verify_results(true),
     preconditioner_precision(QUDA_HALF_PRECISION),
+    optimized_kd(QUDA_TRANSFER_OPTIMIZED_KD),
+    use_mma(true),
+    allow_truncation(false),
+    dagger_approximation(false),
     deflate_n_ev(66),
     deflate_n_kr(128),
     deflate_max_restarts(50),
@@ -1360,11 +1390,11 @@ struct mgInputStruct {
     setArrayDefaults();
 
     /* required or best-practice values for typical solves */
-    nvec[0] = 24;             // must be this
-    geo_block_size[0][0] = 2; // must be this...
-    geo_block_size[0][1] = 2; // "
-    geo_block_size[0][2] = 2; // "
-    geo_block_size[0][3] = 2; // "
+    nvec[0] = 3;              // must be this
+    geo_block_size[0][0] = 1; // must be this...
+    geo_block_size[0][1] = 1; // "
+    geo_block_size[0][2] = 1; // "
+    geo_block_size[0][3] = 1; // "
 
     nvec[1] = 64;
     geo_block_size[1][0] = 2;
@@ -1386,6 +1416,7 @@ struct mgInputStruct {
     setup_inv[1] = QUDA_CGNR_INVERTER;
     setup_tol[1] = 1e-5;
     setup_maxiter[1] = 500;
+    setup_ca_basis_size[1] = 4;
     mg_vec_infile[1][0] = 0;
     mg_vec_outfile[1][0] = 0;
 
@@ -1393,6 +1424,7 @@ struct mgInputStruct {
     setup_inv[2] = QUDA_CGNR_INVERTER;
     setup_tol[2] = 1e-5;
     setup_maxiter[2] = 500;
+    setup_ca_basis_size[2] = 4;
     mg_vec_infile[2][0] = 0;
     mg_vec_outfile[2][0] = 0;
 
@@ -1407,6 +1439,7 @@ struct mgInputStruct {
     coarse_solver[1] = QUDA_GCR_INVERTER;
     coarse_solver_tol[1] = 5e-2;
     coarse_solver_maxiter[1] = 4;
+    coarse_solver_ca_basis_size[1] = 4; // generally unused b/c not coarsest level
     smoother_type[1] = QUDA_CA_GCR_INVERTER;
     nu_pre[1] = 0;
     nu_post[1] = 2;
@@ -1416,6 +1449,7 @@ struct mgInputStruct {
     coarse_solver[2] = QUDA_GCR_INVERTER;
     coarse_solver_tol[2] = 0.25;
     coarse_solver_maxiter[2] = 4;
+    coarse_solver_ca_basis_size[2] = 4; // generally unused b/c not coarsest level
     smoother_type[2] = QUDA_CA_GCR_INVERTER;
     nu_pre[2] = 0;
     nu_post[2] = 2;
@@ -1425,6 +1459,7 @@ struct mgInputStruct {
     coarse_solver[3] = QUDA_CA_GCR_INVERTER; // use CGNR for non-deflated... sometimes
     coarse_solver_tol[3] = 0.25;
     coarse_solver_maxiter[3] = 16; // use larger for non-deflated
+    coarse_solver_ca_basis_size[3] = 16; // ignored for non-CA solvers
 
     /* Misc */
     mg_verbosity[0] = QUDA_SUMMARIZE;
@@ -1453,8 +1488,14 @@ struct mgInputStruct {
       return QUDA_CGNR_INVERTER;
     } else if (strcmp(name, "cgne") == 0) {
       return QUDA_CGNE_INVERTER;
+    } else if (strcmp(name, "ca-cgnr") == 0) {
+      return QUDA_CA_CGNR_INVERTER;
+    } else if (strcmp(name, "ca-cgne") == 0) {
+      return QUDA_CA_CGNE_INVERTER;
     } else if (strcmp(name, "bicgstab") == 0) {
       return QUDA_BICGSTAB_INVERTER;
+    } else if (strcmp(name, "bicgstab-l") == 0) {
+      return QUDA_BICGSTABL_INVERTER;
     } else if (strcmp(name, "ca-gcr") == 0) {
       return QUDA_CA_GCR_INVERTER;
     } else {
@@ -1481,6 +1522,19 @@ struct mgInputStruct {
       return QUDA_DIRECT_PC_SOLVE;
     } else {
       return QUDA_INVALID_SOLVE;
+    }
+  }
+
+  QudaTransferType getQudaTransferType(const char *name)
+  {
+    if (strcmp(name, "true") == 0) {
+      return QUDA_TRANSFER_OPTIMIZED_KD;
+    } else if (strcmp(name, "false") == 0) {
+      return QUDA_TRANSFER_COARSE_KD;
+    } else if (strcmp(name, "drop") == 0) {
+      return QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG;
+    } else {
+      return QUDA_TRANSFER_INVALID;
     }
   }
 
@@ -1529,6 +1583,31 @@ struct mgInputStruct {
         preconditioner_precision = getQudaPrecision(input_line[1].c_str());
       }
 
+    } else if (strcmp(input_line[0].c_str(), "optimized_kd") == 0) {
+      if (input_line.size() < 2) {
+        error_code = 1;
+      } else {
+        optimized_kd = getQudaTransferType(input_line[1].c_str());
+      }
+
+    } else if (strcmp(input_line[0].c_str(), "use_mma") == 0) {
+      if (input_line.size() < 2) {
+        error_code = 1;
+      } else {
+        use_mma = input_line[1][0] == 't' ? true : false;
+      }
+    } else if (strcmp(input_line[0].c_str(), "allow_truncation") == 0) {
+      if (input_line.size() < 2) {
+        error_code = 1;
+      } else {
+        allow_truncation = input_line[1][0] == 't' ? true : false;
+      }
+    } else if (strcmp(input_line[0].c_str(), "dagger_approximation") == 0) {
+      if (input_line.size() < 2) {
+        error_code = 1;
+      } else {
+        dagger_approximation = input_line[1][0] == 't' ? true : false;
+      }
     } else if (strcmp(input_line[0].c_str(), "mg_verbosity") == 0) {
       if (input_line.size() < 3) {
         error_code = 1;
@@ -1572,6 +1651,13 @@ struct mgInputStruct {
         setup_maxiter[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
       }
 
+    } else if (strcmp(input_line[0].c_str(), "setup_ca_basis_size") == 0) {
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        setup_ca_basis_size[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
+      }
+
     } else if (strcmp(input_line[0].c_str(), "mg_vec_infile") == 0) {
       if (input_line.size() < 3) {
         error_code = 1;
@@ -1613,6 +1699,13 @@ struct mgInputStruct {
         error_code = 1;
       } else {
         coarse_solver_maxiter[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
+      }
+
+    } else if (strcmp(input_line[0].c_str(), "coarse_solver_ca_basis_size") == 0) {
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        coarse_solver_ca_basis_size[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
       }
 
     } else if (strcmp(input_line[0].c_str(), "smoother_type") == 0) {
@@ -1821,9 +1914,6 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
 
   inv_param.Ls = 1;
 
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
-
   inv_param.cpu_prec = host_precision;
   inv_param.cuda_prec = device_precision;
   inv_param.cuda_prec_sloppy = device_precision_sloppy;
@@ -1855,13 +1945,20 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels; // set from file
 
-  mg_param.use_mma = QUDA_BOOLEAN_FALSE; // TODO: set to false, for now.
+  mg_param.use_mma = input_struct.use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  // whether or not we allow dropping a long link when an aggregation size is smaller than 3
+  mg_param.allow_truncation = input_struct.allow_truncation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  // whether or not we use the dagger approximation
+  mg_param.staggered_kd_dagger_approximation = input_struct.dagger_approximation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   for (int i = 0; i < mg_param.n_level; i++) {
 
     if (i == 0) {
       for (int j = 0; j < 4; j++) {
-        mg_param.geo_block_size[i][j] = 2; // Kahler-Dirac blocking
+        mg_param.geo_block_size[i][j]
+          = (input_struct.optimized_kd == QUDA_TRANSFER_COARSE_KD) ? 2 : 1; // Kahler-Dirac blocking
       }
     } else {
       for (int j = 0; j < 4; j++) { mg_param.geo_block_size[i][j] = input_struct.geo_block_size[i][j]; }
@@ -1880,11 +1977,18 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     mg_param.setup_tol[i] = input_struct.setup_tol[i];
     mg_param.setup_maxiter[i] = input_struct.setup_maxiter[i];
 
-    // Basis to use for CA-CGN(E/R) setup
-    mg_param.setup_ca_basis[i] = QUDA_POWER_BASIS; // setup_ca_basis[i];
+    // Basis to use for CA solver setup --- heuristic for CA-GCR is empirical
+    if (is_ca_solver(input_struct.setup_inv[i])) {
+      if (input_struct.setup_inv[i] == QUDA_CA_GCR_INVERTER && input_struct.setup_ca_basis_size[i] <= 8)
+        mg_param.setup_ca_basis[i] = QUDA_POWER_BASIS;
+      else
+        mg_param.setup_ca_basis[i] = QUDA_CHEBYSHEV_BASIS; // setup_ca_basis[i];
+    } else {
+      mg_param.setup_ca_basis[i] = QUDA_POWER_BASIS; // setup_ca_basis[i];
+    }
 
-    // Basis size for CACG setup
-    mg_param.setup_ca_basis_size[i] = 4; // setup_ca_basis_size[i];
+    // Basis size for CA solver setup
+    mg_param.setup_ca_basis_size[i] = input_struct.setup_ca_basis_size[i];
 
     // Minimum and maximum eigenvalue for Chebyshev CA basis setup
     mg_param.setup_ca_lambda_min[i] = 0.0;  // setup_ca_lambda_min[i];
@@ -1893,7 +1997,8 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     mg_param.spin_block_size[i] = 1;
     // change this to refresh fields when mass or links change
     mg_param.setup_maxiter_refresh[i] = 0; // setup_maxiter_refresh[i];
-    mg_param.n_vec[i] = (i == 0) ? 24 : input_struct.nvec[i];
+    mg_param.n_vec[i]
+      = (i == 0) ? ((input_struct.optimized_kd == QUDA_TRANSFER_COARSE_KD) ? 24 : 3) : input_struct.nvec[i];
     mg_param.n_block_ortho[i] = 2; // n_block_ortho[i];                          // number of times to Gram-Schmidt
     mg_param.precision_null[i] = input_struct.preconditioner_precision; // precision to store the null-space basis
     mg_param.smoother_halo_precision[i]
@@ -1904,20 +2009,34 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
 
-    // top level: coarse vs optimized KD, otherwise standard
-    // aggregation. FIXME optimized
-    mg_param.transfer_type[i] = (i == 0) ? QUDA_TRANSFER_COARSE_KD : QUDA_TRANSFER_AGGREGATE;
+    // top level: coarse vs optimized KD, otherwise standard aggregation.
+    if (i == 0) {
+      mg_param.transfer_type[i] = input_struct.optimized_kd;
+    } else {
+      mg_param.transfer_type[i] = QUDA_TRANSFER_AGGREGATE;
+    }
 
     // set the coarse solver wrappers including bottom solver
     mg_param.coarse_solver[i] = input_struct.coarse_solver[i];
     mg_param.coarse_solver_tol[i] = input_struct.coarse_solver_tol[i];
     mg_param.coarse_solver_maxiter[i] = input_struct.coarse_solver_maxiter[i];
 
-    // Basis to use for CA-CGN(E/R) coarse solver
-    mg_param.coarse_solver_ca_basis[i] = QUDA_POWER_BASIS; // coarse_solver_ca_basis[i];
+    // Basis size for CA coarse solvers
+    if (input_struct.coarse_solver_ca_basis_size[i] > input_struct.coarse_solver_maxiter[i]) {
+      mg_param.coarse_solver_ca_basis_size[i] = input_struct.coarse_solver_maxiter[i];
+    } else {
+      mg_param.coarse_solver_ca_basis_size[i] = input_struct.coarse_solver_ca_basis_size[i];
+    }
 
-    // Basis size for CACG coarse solver/
-    mg_param.coarse_solver_ca_basis_size[i] = 16; // coarse_solver_ca_basis_size[i];
+    // Basis to use for CA basis coarse solvers --- heuristic for CA-GCR is empirical
+    if (is_ca_solver(input_struct.coarse_solver[i])) {
+      if (input_struct.coarse_solver[i] == QUDA_CA_GCR_INVERTER && mg_param.coarse_solver_ca_basis_size[i] <= 8)
+        mg_param.coarse_solver_ca_basis[i] = QUDA_POWER_BASIS;
+      else
+        mg_param.coarse_solver_ca_basis[i] = QUDA_CHEBYSHEV_BASIS; // coarse_solver_ca_basis[i];
+    } else {
+      mg_param.coarse_solver_ca_basis[i] = QUDA_POWER_BASIS; // coarse_solver_ca_basis[i];
+    }
 
     // Minimum and maximum eigenvalue for Chebyshev CA basis
     mg_param.coarse_solver_ca_lambda_min[i] = 0.0;  // coarse_solver_ca_lambda_min[i];
@@ -1928,12 +2047,29 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     // set the smoother / bottom solver tolerance (for MR smoothing this will be ignored)
     mg_param.smoother_tol[i] = 1e-10; // smoother_tol[i];
 
+    // Basis to use for CA basis smoothers --- heuristic for CA-GCR is empirical
+    if (is_ca_solver(input_struct.smoother_type[i])) {
+      if (input_struct.smoother_type[i] == QUDA_CA_GCR_INVERTER && mg_param.nu_pre[i] <= 8 && mg_param.nu_post[i] <= 8)
+        mg_param.smoother_solver_ca_basis[i] = QUDA_POWER_BASIS;
+      else
+        mg_param.smoother_solver_ca_basis[i] = QUDA_CHEBYSHEV_BASIS; // smoother_solver_ca_basis[i];
+    } else {
+      mg_param.smoother_solver_ca_basis[i] = QUDA_POWER_BASIS; // smoother_solver_ca_basis[i];
+    }
+
+    // Minimum and maximum eigenvalue for Chebyshev CA basis smoothers
+    mg_param.smoother_solver_ca_lambda_min[i] = 0.0;  // smoother_solver_ca_lambda_min[i];
+    mg_param.smoother_solver_ca_lambda_max[i] = -1.0; // smoother_solver_ca_lambda_max[i];
+
     // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
     // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
     // from test routines: // smoother_solve_type[i];
     switch (i) {
     case 0: mg_param.smoother_solve_type[0] = QUDA_DIRECT_SOLVE; break;
-    case 1: mg_param.smoother_solve_type[1] = QUDA_DIRECT_PC_SOLVE; break;
+    case 1:
+      mg_param.smoother_solve_type[1]
+        = (input_struct.optimized_kd == QUDA_TRANSFER_COARSE_KD) ? QUDA_DIRECT_PC_SOLVE : QUDA_DIRECT_SOLVE;
+      break;
     default: mg_param.smoother_solve_type[i] = input_struct.coarse_solve_type[i]; break;
     }
 
@@ -2005,7 +2141,8 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     } else if (i == 1) {
 
       // Always this for now.
-      mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
+      mg_param.coarse_grid_solution_type[i]
+        = (input_struct.optimized_kd == QUDA_TRANSFER_COARSE_KD) ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
     } else {
 
       if (input_struct.coarse_solve_type[i] == QUDA_DIRECT_SOLVE) {
@@ -2028,6 +2165,9 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
 
   // coarsening the spin on the first restriction is undefined for staggered fields.
   mg_param.spin_block_size[0] = 0;
+  if (input_struct.optimized_kd == QUDA_TRANSFER_OPTIMIZED_KD
+      || input_struct.optimized_kd == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
+    mg_param.spin_block_size[1] = 0;
 
   mg_param.setup_type = QUDA_NULL_VECTOR_SETUP;     // setup_type;
   mg_param.pre_orthonormalize = QUDA_BOOLEAN_FALSE; // pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -2406,8 +2546,6 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
   invertParam.preserve_source               = QUDA_PRESERVE_SOURCE_NO;
   invertParam.gamma_basis                   = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   invertParam.dirac_order                   = QUDA_DIRAC_ORDER;
-  invertParam.sp_pad                        = 0;
-  invertParam.cl_pad                        = 0;
   invertParam.clover_cpu_prec               = host_precision;
   invertParam.clover_cuda_prec              = device_precision;
   invertParam.clover_cuda_prec_sloppy       = device_precision_sloppy;

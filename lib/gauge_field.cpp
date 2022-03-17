@@ -75,6 +75,9 @@ namespace quda {
     } else if (geometry == QUDA_COARSE_GEOMETRY) {
       real_length = 2*nDim*volume*nInternal;
       length = 2*2*nDim*stride*nInternal;  //two comes from being full lattice
+    } else if (geometry == QUDA_KDINVERSE_GEOMETRY) {
+      real_length = (1 << nDim) * volume * nInternal;
+      length = 2 * (1 << nDim) * nDim * stride * nInternal; // two comes from being full lattice
     }
 
     if ((reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_8) &&
@@ -379,6 +382,7 @@ namespace quda {
       gParamEx.r[d] = R[d];
     }
     if (recon != QUDA_RECONSTRUCT_INVALID) gParamEx.reconstruct = recon;
+    gParamEx.setPrecision(gParamEx.Precision(), true);
 
     auto *out = new cudaGaugeField(gParamEx);
 

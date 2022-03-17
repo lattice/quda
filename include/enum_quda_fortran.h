@@ -9,8 +9,7 @@
 #   gfortran).
 #*/
 
-#/* can't include limits.h in a Fortran program */
-#define QUDA_INVALID_ENUM (-2147483647 - 1) 
+#define QUDA_INVALID_ENUM (-Z'7fffffff' - 1)
 
 #define QudaLinkType integer(4)
 
@@ -174,6 +173,10 @@
 #define QUDA_MULTIPLICATIVE_SCHWARZ 1
 #define QUDA_INVALID_SCHWARZ QUDA_INVALID_ENUM
 
+#define QudaAcceleratorType interger(4)
+#define QUDA_MADWF_ACCELERATOR 0
+#define QUDA_INVALID_ACCELERATOR QUDA_INVALID_ENUM
+
 #define QudaResidualType integer(4)
 #define QUDA_L2_RELATIVE_RESIDUAL 1
 #define QUDA_L2_ABSOLUTE_RESIDUAL 2
@@ -237,9 +240,10 @@
 #define QUDA_FLOAT_CLOVER_ORDER 1   // even-odd float ordering 
 #define QUDA_FLOAT2_CLOVER_ORDER 2   // even-odd float2 ordering
 #define QUDA_FLOAT4_CLOVER_ORDER 4   // even-odd float4 ordering
-#define QUDA_PACKED_CLOVER_ORDER 5    // even-odd packed
-#define QUDA_QDPJIT_CLOVER_ORDER 6 // lexicographical order packed
-#define QUDA_BQCD_CLOVER_ORDER 7 // BQCD order which is a packed super-diagonal form
+#define QUDA_FLOAT8_CLOVER_ORDER 8   // even-odd float8 ordering
+#define QUDA_PACKED_CLOVER_ORDER 9   // even-odd packed
+#define QUDA_QDPJIT_CLOVER_ORDER 10  // lexicographical order packed
+#define QUDA_BQCD_CLOVER_ORDER 11    // BQCD order which is a packed super-diagonal form
 #define QUDA_INVALID_CLOVER_ORDER QUDA_INVALID_ENUM
 
 #define QudaVerbosity integer(4)
@@ -371,7 +375,6 @@
 #define QudaTwistFlavorType integer(4)
 #define QUDA_TWIST_SINGLET 1
 #define QUDA_TWIST_NONDEG_DOUBLET +2
-#define QUDA_TWIST_DEG_DOUBLET -2
 #define QUDA_TWIST_NO  0
 #define QUDA_TWIST_INVALID QUDA_INVALID_ENUM
 
@@ -412,6 +415,7 @@
 #define QUDA_TRANSFER_AGGREGATE 0
 #define QUDA_TRANSFER_COARSE_KD 1
 #define QUDA_TRANSFER_OPTIMIZED_KD 2
+#define QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG 3
 #define QUDA_TRANSFER_INVALID QUDA_INVALID_ENUM
 
 #define QudaBoolean integer(4)
@@ -454,6 +458,7 @@
 #define QUDA_VECTOR_GEOMETRY 4
 #define QUDA_TENSOR_GEOMETRY 6
 #define QUDA_COARSE_GEOMETRY 8
+#define QUDA_KDINVERSE_GEOMETRY 16 // Decomposition of the Kahler-Dirac block
 #define QUDA_INVALID_GEOMETRY QUDA_INVALID_ENUM
 
 #define QudaGhostExchange integer(4)
@@ -502,5 +507,4 @@
 #define QudaExtLibType integer(4)
 #define QUDA_CUSOLVE_EXTLIB 0
 #define QUDA_EIGEN_EXTLIB 1
-#define QUDA_MAGMA_EXTLIB 2
 #define QUDA_EXTLIB_INVALID QUDA_INVALID_ENUM

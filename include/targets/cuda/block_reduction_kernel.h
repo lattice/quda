@@ -1,7 +1,8 @@
 #pragma once
 
 #include <target_device.h>
-#include <reduce_helper.h>
+#include <kernel_helper.h>
+#include <block_reduce_helper.h>
 
 namespace quda
 {
@@ -15,7 +16,21 @@ namespace quda
      which is the effective matrix dimension that we are tranposing in
      this mapping.
 
-     @taram Arg Kernel argument struct
+     Specifically, the thread block id is remapped by
+     transposing its coordinates: if the original order can be
+     parameterized by
+
+     blockIdx.x = j * swizzle + i,
+
+     then the new order is
+
+     block_idx = i * (gridDim.x / swizzle) + j
+
+     We need to factor out any remainder and leave this in original
+     ordering.
+
+     @param arg Kernel argument struct
+     @return Swizzled block index
    */
   template <typename Arg> __device__ constexpr int virtual_block_idx(const Arg &arg)
   {
@@ -24,7 +39,6 @@ namespace quda
       // the portion of the grid that is exactly divisible by the number of SMs
       const auto gridp = gridDim.x - gridDim.x % arg.swizzle_factor;
 
-      block_idx = blockIdx.x;
       if (block_idx < gridp) {
         // this is the portion of the block that we are going to transpose
         const int i = blockIdx.x % arg.swizzle_factor;
@@ -55,10 +69,9 @@ namespace quda
   /**
      @brief BlockKernel2D_impl is the implementation of the Generic
      block kernel.  Here, we split the block (CTA) and thread indices
-     in the x and y dimension and pass these indices separately to the
-     transform functor.  The x thread dimension is templated
-     (Arg::block_size), e.g., for efficient reductions, and typically
-     the y thread dimension is a trivial vectorizable dimension.
+     and pass them separately to the transform functor.  The x thread
+     dimension is templated (Arg::block_size), e.g., for efficient
+     reductions.
 
      @tparam Functor Kernel functor that defines the kernel
      @tparam Arg Kernel argument struct that set any required meta
@@ -68,10 +81,12 @@ namespace quda
   template <template <typename> class Functor, typename Arg>
   __forceinline__ __device__ void BlockKernel2D_impl(const Arg &arg)
   {
-    const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, 0);
-    const dim3 thread_idx(threadIdx.x, threadIdx.y, 0);
+    const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, blockIdx.z);
+    const dim3 thread_idx(threadIdx.x, threadIdx.y, threadIdx.z);
     auto j = blockDim.y * blockIdx.y + threadIdx.y;
+    auto k = blockDim.z * blockIdx.z + threadIdx.z;
     if (j >= arg.threads.y) return;
+    if (k >= arg.threads.z) return;
 
     Functor<Arg> t(arg);
     t(block_idx, thread_idx);

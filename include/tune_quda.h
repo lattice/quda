@@ -146,7 +146,8 @@ namespace quda {
       int nthreads = param.block.x * param.block.y * param.block.z;
       param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
 
-      if (param.block.x > max_threads || param.shared_bytes > max_shared) {
+      if (param.block.x > max_threads || param.shared_bytes > max_shared
+          || param.block.x * param.block.y * param.block.z > device::max_threads_per_block()) {
         resetBlockDim(param);
         int nthreads = param.block.x * param.block.y * param.block.z;
         param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
@@ -215,15 +216,6 @@ namespace quda {
     char vol[TuneKey::volume_n];
     char aux[TuneKey::aux_n];
 
-    int writeAuxString(const char *format, ...) {
-      int n = 0;
-      va_list arguments;
-      va_start(arguments, format);
-      n = vsnprintf(aux, TuneKey::aux_n, format, arguments);
-      if (n < 0 || n >= TuneKey::aux_n) errorQuda("Error writing auxiliary string");
-      return n;
-    }
-
     /** This is the return result from kernels launched using jitify,
         and can also be used to allow user invalidation of a tuning
         configuration */
@@ -269,6 +261,8 @@ namespace quda {
       ss << gbytes << " GB/s";
       return ss.str();
     }
+
+    virtual std::string miscString(const TuneParam &) const { return std::string(); }
 
     virtual void initTuneParam(TuneParam &param) const
     {

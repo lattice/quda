@@ -97,7 +97,7 @@ struct lattice_t {
   int r[4];
   int e[4];
 
-  lattice_t(const GaugeField &lat) : n_color(lat.Ncolor()), volume(1), volume_ex(lat.Volume())
+  lattice_t(const quda::GaugeField &lat) : n_color(lat.Ncolor()), volume(1), volume_ex(lat.Volume())
   {
     for (int d = 0; d < 4; d++) {
       x[d] = lat.X()[d] - 2 * lat.R()[d];
@@ -225,6 +225,16 @@ template <typename su3_matrix> static void mult_su3_na(su3_matrix *a, su3_matrix
   }
 }
 
+template <typename su3_matrix, typename Float> static void add_su3(su3_matrix *a, su3_matrix *b, Float eb3)
+{
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      b->e[i][j].real += eb3 * a->e[i][j].real;
+      b->e[i][j].imag += eb3 * a->e[i][j].imag;
+    }
+  }
+}
+
 template <typename su3_matrix> void print_su3_matrix(su3_matrix *a)
 {
   for (int i = 0; i < 3; i++) {
@@ -252,7 +262,9 @@ int gf_neighborIndexFullLattice(size_t i, int dx[], const lattice_t &lat)
   auto x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
   x[0] = 2 * x0h + x1odd;
 
-  for (int d = 0; d < 4; d++) { x[d] = comm_dim_partitioned(d) ? x[d] + dx[d] : (x[d] + dx[d] + lat.x[d]) % lat.x[d]; }
+  for (int d = 0; d < 4; d++) {
+    x[d] = quda::comm_dim_partitioned(d) ? x[d] + dx[d] : (x[d] + dx[d] + lat.x[d]) % lat.x[d];
+  }
   size_t nbr_half_idx = ((x[3] + lat.r[3]) * (lat.e[2] * lat.e[1] * lat.e[0]) + (x[2] + lat.r[2]) * (lat.e[1] * lat.e[0])
                          + (x[1] + lat.r[1]) * (lat.e[0]) + (x[0] + lat.r[0]))
     / 2;
@@ -337,11 +349,29 @@ static void update_mom(anti_hermitmat *momentum, int dir, su3_matrix **sitelink,
   }
 }
 
+template <typename su3_matrix, typename Float>
+static void update_gauge(su3_matrix *gauge, int dir, su3_matrix **sitelink, su3_matrix *staple, Float eb3,
+                         const lattice_t &lat)
+{
+  for (size_t i = 0; i < lat.volume; i++) {
+    su3_matrix tmat;
+
+    su3_matrix *lnk = sitelink[dir] + i;
+    su3_matrix *stp = staple + i;
+    su3_matrix *out = gauge + 4 * i + dir;
+
+    mult_su3_na(lnk, stp, &tmat);
+
+    add_su3(&tmat, out, eb3);
+  }
+}
+
 /* This function only computes one direction @dir
  *
  */
-void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelink, void **sitelink_ex, QudaPrecision prec,
-                               int **path_dir, int *length, void *loop_coeff, int num_paths, const lattice_t &lat)
+void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelink, void **sitelink_ex,
+                               QudaPrecision prec, int **path_dir, int *length, void *loop_coeff, int num_paths,
+                               const lattice_t &lat, bool compute_force)
 {
   size_t size = V * 2 * lat.n_color * lat.n_color * prec;
   void *staple = safe_malloc(size);
@@ -359,21 +389,28 @@ void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelin
     }
   }
 
-  if (prec == QUDA_DOUBLE_PRECISION) {
-    update_mom((danti_hermitmat *)refMom, dir, (dsu3_matrix **)sitelink, (dsu3_matrix *)staple, (double)eb3, lat);
+  if (compute_force) {
+    if (prec == QUDA_DOUBLE_PRECISION) {
+      update_mom((danti_hermitmat *)refMom, dir, (dsu3_matrix **)sitelink, (dsu3_matrix *)staple, (double)eb3, lat);
+    } else {
+      update_mom((fanti_hermitmat *)refMom, dir, (fsu3_matrix **)sitelink, (fsu3_matrix *)staple, (float)eb3, lat);
+    }
   } else {
-    update_mom((fanti_hermitmat *)refMom, dir, (fsu3_matrix **)sitelink, (fsu3_matrix *)staple, (float)eb3, lat);
+    if (prec == QUDA_DOUBLE_PRECISION) {
+      update_gauge((dsu3_matrix *)refMom, dir, (dsu3_matrix **)sitelink, (dsu3_matrix *)staple, (double)eb3, lat);
+    } else {
+      update_gauge((fsu3_matrix *)refMom, dir, (fsu3_matrix **)sitelink, (fsu3_matrix *)staple, (float)eb3, lat);
+    }
   }
-
   host_free(staple);
 }
 
 void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecision prec, int ***path_dir, int *length,
-                           void *loop_coeff, int num_paths)
+                           void *loop_coeff, int num_paths, bool compute_force)
 {
   // created extended field
   int R[4];
-  for (int d = 0; d < 4; d++) R[d] = 2 * comm_dim_partitioned(d);
+  for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
   QudaGaugeParam param = newQudaGaugeParam();
   setGaugeParam(param);
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -384,7 +421,7 @@ void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecis
 
   for (int dir = 0; dir < 4; dir++) {
     gauge_force_reference_dir(refMom, dir, eb3, sitelink, (void **)qdp_ex->Gauge_p(), prec, path_dir[dir], length,
-                              loop_coeff, num_paths, lat);
+                              loop_coeff, num_paths, lat, compute_force);
   }
 
   delete qdp_ex;

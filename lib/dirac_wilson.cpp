@@ -82,13 +82,13 @@ namespace quda {
   }
 
   void DiracWilson::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
-                                   double mu_factor) const
+                                   double mu_factor, bool) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Wilson-type operators only support aggregation coarsening");
 
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    cudaCloverField *c = NULL;
+    CloverField *c = nullptr;
     CoarseOp(Y, X, T, *gauge, c, kappa, mass, a, mu_factor, QUDA_WILSON_DIRAC, QUDA_MATPC_INVALID);
   }
 

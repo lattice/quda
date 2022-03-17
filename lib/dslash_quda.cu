@@ -77,7 +77,7 @@ namespace quda {
     unsigned int minThreads() const { return size; }
 
     init_dslash(T *counter, unsigned int size) :
-      TunableKernel1D(size),
+      TunableKernel1D(size, QUDA_CUDA_FIELD_LOCATION),
       counter(counter),
       size(size)
     { apply(device::get_default_stream()); }
@@ -98,7 +98,7 @@ namespace quda {
     unsigned int minThreads() const { return size; }
 
     init_arr(T *counter, T val, unsigned int size) :
-      TunableKernel1D(size),
+      TunableKernel1D(size, QUDA_CUDA_FIELD_LOCATION),
       counter(counter),
       val(val),
       size(size)

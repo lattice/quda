@@ -71,9 +71,7 @@ namespace quda
       WilsonCloverArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, 0.0, x, parity, dagger, comm_override);
       WilsonClover<decltype(arg)> wilson(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson,
-          const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-          in.GhostFaceCB(), profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
     }
   };
 
@@ -87,9 +85,7 @@ namespace quda
       WilsonCloverArg<Float, nColor, nDim, recon, true> arg(out, in, U, A, a, b, x, parity, dagger, comm_override);
       WilsonClover<decltype(arg)> wilson(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(wilson)> policy(
-        wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-        in.GhostFaceCB(), profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
     }
   };
 

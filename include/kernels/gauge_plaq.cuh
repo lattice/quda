@@ -3,13 +3,13 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
+#include <array.h>
 #include <reduction_kernel.h>
 
 namespace quda {
 
   template <typename Float_, int nColor_, QudaReconstructType recon_>
-  struct GaugePlaqArg : public ReduceArg<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  struct GaugePlaqArg : public ReduceArg<array<double, 2>> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -33,8 +33,6 @@ namespace quda {
 	R += border[dir];
       }
     }
-
-    __device__ __host__ reduce_t init() const { return reduce_t(); }
   };
 
   template<typename Arg>
@@ -55,8 +53,8 @@ namespace quda {
     return getTrace( U1 * U2 * conj(U3) * conj(U4) ).real();
   }
 
-  template <typename Arg> struct Plaquette : plus<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  template <typename Arg> struct Plaquette : plus<typename Arg::reduce_t> {
+    using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
     const Arg &arg;
     constexpr Plaquette(const Arg &arg) : arg(arg) {}
@@ -65,7 +63,7 @@ namespace quda {
     // return the plaquette at site (x_cb, parity)
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t plaq;
+      reduce_t plaq{0, 0};
 
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
@@ -82,7 +80,7 @@ namespace quda {
         plaq[1] += plaquette(arg, x, parity, mu, 3);
       }
 
-      return plus::operator()(plaq, value);
+      return operator()(plaq, value);
     }
 
   };

@@ -2,7 +2,7 @@
 
 #include <blas_helper.cuh>
 #include <multi_blas_helper.cuh>
-#include <float_vector.h>
+#include <array.h>
 #include <constant_kernel_arg.h>
 #include <kernel.h>
 #include <warp_collective.h>
@@ -80,7 +80,7 @@ namespace quda
 
       __device__ __host__ inline void operator()(int i, int k, int parity)
       {
-        using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
+        using vec = array<complex<typename Arg::real>, Arg::n/2>;
 
         // partition the warp between grid points and the NXZ update
         constexpr int warp_size = device::warp_size();
@@ -177,11 +177,36 @@ namespace quda
     };
 
     /**
+       Functor to perform the operation w = a * x + y
+    */
+    template <typename real>
+    struct multiaxpyz_ : public MultiBlasFunctor<real> {
+      static constexpr memory_access<1, 1, 0, 0> read{ };
+      static constexpr memory_access<0, 0, 0, 1> write{ };
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = true;
+      static constexpr int NXZ_max = 0;
+      using MultiBlasFunctor<real>::a;
+      multiaxpyz_(int NXZ, int NYW) : MultiBlasFunctor<real>(NXZ, NYW) {}
+
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int i, int j) const
+      {
+#pragma unroll
+        for (int k = 0; k < x.size(); k++) {
+          if (j == 0) w[k] = y[k];
+          w[k] = a(j, i) * x[k] + w[k];
+        }
+      }
+
+      constexpr int flops() const { return 2; }         //! flops per real element
+    };
+
+    /**
        Functor to perform the operation w = a * x + y  (complex-valued)
     */
     template <typename real>
     struct multicaxpyz_ : public MultiBlasFunctor<complex<real>> {
-      static constexpr memory_access<1, 0, 0, 1> read{ };
+      static constexpr memory_access<1, 1, 0, 0> read{ };
       static constexpr memory_access<0, 0, 0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;

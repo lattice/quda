@@ -12,18 +12,16 @@
 #include <sys/time.h>
 #include <gtest/gtest.h>
 
-using namespace quda;
+quda::cudaGaugeField *cudaFatLink = NULL;
+quda::cpuGaugeField *cpuFatLink = NULL;
 
-cudaGaugeField *cudaFatLink = NULL;
-cpuGaugeField  *cpuFatLink  = NULL;
+quda::cudaGaugeField *cudaOprod = NULL;
+quda::cpuGaugeField *cpuOprod = NULL;
 
-cudaGaugeField *cudaOprod = NULL;
-cpuGaugeField  *cpuOprod = NULL;
+quda::cudaGaugeField *cudaResult = NULL;
+quda::cpuGaugeField *cpuResult = NULL;
 
-cudaGaugeField *cudaResult = NULL;
-cpuGaugeField *cpuResult = NULL;
-
-cpuGaugeField *cpuReference = NULL;
+quda::cpuGaugeField *cpuReference = NULL;
 
 static QudaGaugeParam gaugeParam;
 
@@ -61,21 +59,21 @@ static void hisq_force_init()
   gaugeParam.cuda_prec = prec;
   gaugeParam.reconstruct = link_recon;
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  GaugeFieldParam gParam(gaugeParam);
+  quda::GaugeFieldParam gParam(gaugeParam);
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.anisotropy = 1;
-  
-  cpuFatLink   = new cpuGaugeField(gParam);
-  cpuOprod     = new cpuGaugeField(gParam);
-  cpuResult    = new cpuGaugeField(gParam); 
-  cpuReference = new cpuGaugeField(gParam);
- 
+
+  cpuFatLink = new quda::cpuGaugeField(gParam);
+  cpuOprod = new quda::cpuGaugeField(gParam);
+  cpuResult = new quda::cpuGaugeField(gParam);
+  cpuReference = new quda::cpuGaugeField(gParam);
+
   // create "gauge fields"
   int seed=0;
 #ifdef MULTI_GPU
-  seed += comm_rank();
+  seed += quda::comm_rank();
 #endif
 
   createNoisyLinkCPU((void**)cpuFatLink->Gauge_p(), gaugeParam.cpu_prec, seed);
@@ -83,9 +81,9 @@ static void hisq_force_init()
 
   gParam.setPrecision(gaugeParam.cuda_prec, true);
 
-  cudaFatLink = new cudaGaugeField(gParam);
-  cudaOprod   = new cudaGaugeField(gParam); 
-  cudaResult  = new cudaGaugeField(gParam);
+  cudaFatLink = new quda::cudaGaugeField(gParam);
+  cudaOprod = new quda::cudaGaugeField(gParam);
+  cudaResult = new quda::cudaGaugeField(gParam);
 
   gParam.order = QUDA_QDP_GAUGE_ORDER;
 
@@ -108,6 +106,7 @@ static void hisq_force_end()
 
 TEST(hisq_force_unitarize, verify)
 {
+  setVerbosity(verbosity);
   hisq_force_init();
 
   double unitarize_eps = 1e-5;
@@ -118,19 +117,20 @@ TEST(hisq_force_unitarize, verify)
   const double svd_rel_err = 1e-8;
   const double svd_abs_err = 1e-8;
 
-  fermion_force::setUnitarizeForceConstants(unitarize_eps, hisq_force_filter, max_det_error, allow_svd, svd_only, svd_rel_err, svd_abs_err);
+  quda::fermion_force::setUnitarizeForceConstants(unitarize_eps, hisq_force_filter, max_det_error, allow_svd, svd_only,
+                                                  svd_rel_err, svd_abs_err);
 
   int *num_failures_dev = (int *)device_malloc(sizeof(int));
   qudaMemset(num_failures_dev, 0, sizeof(int));
 
   printfQuda("Calling unitarizeForce\n");
-  fermion_force::unitarizeForce(*cudaResult, *cudaOprod, *cudaFatLink, num_failures_dev);
+  quda::fermion_force::unitarizeForce(*cudaResult, *cudaOprod, *cudaFatLink, num_failures_dev);
 
   device_free(num_failures_dev);
 
   if (verify_results) {
     printfQuda("Calling unitarizeForceCPU\n");
-    fermion_force::unitarizeForceCPU(*cpuResult, *cpuOprod, *cpuFatLink);
+    quda::fermion_force::unitarizeForceCPU(*cpuResult, *cpuOprod, *cpuFatLink);
   }
 
   cudaResult->saveCPUField(*cpuReference);
@@ -143,8 +143,8 @@ TEST(hisq_force_unitarize, verify)
     res[dir] = compare_floats(((char **)cpuReference->Gauge_p())[dir], ((char **)cpuResult->Gauge_p())[dir],
                               cpuReference->Volume() * gauge_site_size, accuracy, gaugeParam.cpu_prec);
 
-    comm_allreduce_int(&res[dir]);
-    res[dir] /= comm_size();
+    quda::comm_allreduce_int(res[dir]);
+    res[dir] /= quda::comm_size();
   }
 
   hisq_force_end();
