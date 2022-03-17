@@ -63,7 +63,7 @@ namespace quda {
 
     shmem_signal_wait_arg() :
       kernel_param(dim3(8, 1, 1)),
-      sync_arr(dslash::get_dslash_shmem_sync_arr()),
+      sync_arr(dslash::get_exchangeghost_shmem_sync_arr()),
       counter((activeTuning() && !policyTuning()) ? 2 : dslash::get_exchangeghost_shmem_sync_counter())
     {
       for (int d = 0; d < 4; d++) {
@@ -83,7 +83,7 @@ namespace quda {
     __device__ void operator()(int i)
     {
       if (arg.commDim[i]) {
-        nvshmem_signal_wait_until((arg.sync_arr + 2 * QUDA_MAX_DIM + i), NVSHMEM_CMP_GE, arg.counter);
+        nvshmem_signal_wait_until((arg.sync_arr + i), NVSHMEM_CMP_GE, arg.counter);
       }
     }
   };

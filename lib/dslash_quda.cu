@@ -37,7 +37,7 @@ namespace quda {
     shmem_interior_done_t *_interior_done = nullptr;
     shmem_interior_count_t *_interior_count = nullptr;
     shmem_sync_t *get_dslash_shmem_sync_arr() { return sync_arr; }
-    shmem_sync_t *get_exchangeghost_shmem_sync_arr() { return sync_arr + 8; }
+    shmem_sync_t *get_exchangeghost_shmem_sync_arr() { return sync_arr +  2 * QUDA_MAX_DIM; }
     shmem_retcount_intra_t *get_shmem_retcount_intra() { return _retcount_intra; }
     shmem_retcount_inter_t *get_shmem_retcount_inter() { return _retcount_inter; }
     shmem_interior_done_t *get_shmem_interior_done() { return _interior_done; }
