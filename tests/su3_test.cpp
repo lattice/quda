@@ -69,7 +69,10 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
   // Option group for SU(3) related options
   auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
 
-  opgroup->add_option("--su3-smear-type", gauge_smear_type, "The type of action to use in the smearing. Options: APE, Stout, Over Improved Stout, Wilson Flow, Symanzik Flow (default stout)")
+  opgroup
+    ->add_option(
+      "--su3-smear-type",
+      gauge_smear_type, "The type of action to use in the smearing. Options: APE, Stout, Over Improved Stout, Wilson Flow, Symanzik Flow (default stout)")
     ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
   ;
   opgroup->add_option("--su3-smear-alpha", gauge_smear_alpha, "alpha coefficient for APE smearing (default 0.6)");
@@ -150,7 +153,7 @@ int main(int argc, char **argv)
   // start the timer
   quda::host_timer_t host_timer;
   host_timer.start();
-  
+
   QudaGaugeObservableParam param = newQudaGaugeObservableParam();
   param.compute_qcharge = QUDA_BOOLEAN_TRUE;
   param.compute_qcharge_density = QUDA_BOOLEAN_TRUE;
