@@ -17,15 +17,15 @@
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
-double stout_smear_rho = 0.1;
-double stout_smear_epsilon = -0.25;
-double ape_smear_rho = 0.6;
-int smear_steps = 50;
-double wflow_epsilon = 0.01;
-int wflow_steps = 100;
-QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
-bool su_project = true;
+// Smearing variables
+double gauge_smear_rho = 0.1;
+double gauge_smear_epsilon = 0.1;
+double gauge_smear_alpha = 0.6;
+int gauge_smear_steps = 50;
+QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
 int measurement_interval = 5;
+bool su_project = true;
+
 
 void display_test_info()
 {
@@ -35,35 +35,25 @@ void display_test_info()
   printfQuda("%s   %s             %s            %s            %d/%d/%d          %d\n", get_prec_str(prec),
              get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
              tdim);
-  switch (test_type) {
-  case 0:
-    printfQuda("\nAPE smearing\n");
-    printfQuda(" - rho %f\n", ape_smear_rho);
-    printfQuda(" - smearing steps %d\n", smear_steps);
-    printfQuda(" - Measurement interval %d\n", measurement_interval);
+
+  // Specific test
+  printfQuda("\n%s smearing\n", get_gauge_smear_str(gauge_smear_type));
+  switch (gauge_smear_type) {
+  case QUDA_GAUGE_SMEAR_APE:
+    printfQuda(" - alpha %f\n", gauge_smear_alpha); break;
+  case QUDA_GAUGE_SMEAR_STOUT:
+    printfQuda(" - rho %f\n", gauge_smear_rho); break;
+  case QUDA_GAUGE_SMEAR_OVRIMP_STOUT:
+    printfQuda(" - rho %f\n", gauge_smear_rho);
+    printfQuda(" - epsilon %f\n", gauge_smear_epsilon);
     break;
-  case 1:
-    printfQuda("\nStout smearing\n");
-    printfQuda(" - rho %f\n", stout_smear_rho);
-    printfQuda(" - smearing steps %d\n", smear_steps);
-    printfQuda(" - Measurement interval %d\n", measurement_interval);
-    break;
-  case 2:
-    printfQuda("\nOver-Improved Stout smearing\n");
-    printfQuda(" - rho %f\n", stout_smear_rho);
-    printfQuda(" - epsilon %f\n", stout_smear_epsilon);
-    printfQuda(" - smearing steps %d\n", smear_steps);
-    printfQuda(" - Measurement interval %d\n", measurement_interval);
-    break;
-  case 3:
-    printfQuda("\nWilson Flow\n");
-    printfQuda(" - epsilon %f\n", wflow_epsilon);
-    printfQuda(" - Wilson flow steps %d\n", wflow_steps);
-    printfQuda(" - Wilson flow type %s\n", wflow_type == QUDA_WFLOW_TYPE_WILSON ? "Wilson" : "Symanzik");
-    printfQuda(" - Measurement interval %d\n", measurement_interval);
-    break;
+  case QUDA_GAUGE_SMEAR_WILSON_FLOW:
+  case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW:
+    printfQuda(" - epsilon %f\n", gauge_smear_epsilon); break;
   default: errorQuda("Undefined test type %d given", test_type);
   }
+  printfQuda(" - smearing steps %d\n", gauge_smear_steps);
+  printfQuda(" - Measurement interval %d\n", measurement_interval);
 
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
@@ -73,34 +63,31 @@ void display_test_info()
 
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-  CLI::TransformPairs<QudaWFlowType> wflow_type_map {{"wilson", QUDA_WFLOW_TYPE_WILSON},
-                                                     {"symanzik", QUDA_WFLOW_TYPE_SYMANZIK}};
-
+  CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map { {"ape", QUDA_GAUGE_SMEAR_APE},
+      {"stout", QUDA_GAUGE_SMEAR_STOUT}, {"ovrimp_stout", QUDA_GAUGE_SMEAR_OVRIMP_STOUT},
+					   {"wilson", QUDA_GAUGE_SMEAR_WILSON_FLOW}, {"symanzik", QUDA_GAUGE_SMEAR_SYMANZIK_FLOW}};
+  
   // Option group for SU(3) related options
   auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
-  opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
 
-  opgroup->add_option("--su3-stout-rho", stout_smear_rho,
-                      "rho coefficient for Stout and Over-Improved Stout smearing (default 0.08)");
-
-  opgroup->add_option("--su3-stout-epsilon", stout_smear_epsilon,
-                      "epsilon coefficient for Over-Improved Stout smearing (default -0.25)");
-
-  opgroup->add_option("--su3-smear-steps", smear_steps, "The number of smearing steps to perform (default 50)");
-
-  opgroup->add_option("--su3-wflow-epsilon", wflow_epsilon, "The step size in the Runge-Kutta integrator (default 0.01)");
-
-  opgroup->add_option("--su3-wflow-steps", wflow_steps,
-                      "The number of steps in the Runge-Kutta integrator (default 100)");
-
-  opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
-    ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
+  opgroup->add_option("--su3-smear-type", gauge_smear_type, "The type of action to use in the smearing (default stout)")
+    ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
   ;
+  opgroup->add_option("--su3-smear-alpha", gauge_smear_alpha, "alpha coefficient for APE smearing (default 0.6)");
+
+  opgroup->add_option("--su3-smear-rho", gauge_smear_rho,
+                      "rho coefficient for Stout and Over-Improved Stout smearing (default 0.1)");
+
+  opgroup->add_option("--su3-smear-epsilon", gauge_smear_epsilon,
+                      "epsilon coefficient for Over-Improved Stout smearing or Wilson flow (default 0.1)");
+
+  opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 50)");
 
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
-                      "Measure the field energy and topological charge every Nth step (default 5) ");
+                      "Measure the field energy and/or topological charge every Nth step (default 5) ");
 
-  opgroup->add_option("--su3-project", su_project, "Project smeared gauge onto su3 manifold at measurement interval (default true)");
+  opgroup->add_option("--su3-project", su_project,
+                      "Project smeared gauge onto su3 manifold at measurement interval (default true)");
 }
 
 int main(int argc, char **argv)
@@ -108,8 +95,6 @@ int main(int argc, char **argv)
 
   auto app = make_app();
   add_su3_option_group(app);
-  CLI::TransformPairs<int> test_type_map {{"APE", 0}, {"Stout", 1}, {"Over-Improved Stout", 2}, {"Wilson Flow", 3}};
-  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
 
   try {
     app->parse(argc, argv);
@@ -153,7 +138,7 @@ int main(int argc, char **argv)
              plaq[2]);
 
 #ifdef GPU_GAUGE_TOOLS
-
+  
   // All user inputs now defined
   display_test_info();
 
@@ -199,91 +184,67 @@ int main(int argc, char **argv)
   // perform suN projection at each measurement step. We recommend that
   // users perfrom suN projection.
   // A unique observable param struct is constructed for each measurement.
-  
+
   // Gauge Smearing Routines
   //---------------------------------------------------------------------------
   // Stout smearing should be equivalent to APE smearing
   // on D dimensional lattices for rho = alpha/2*(D-1).
-  // Typical APE values are aplha=0.6, rho=0.1 for Stout.  
-  switch (test_type) {
-  case 0: {
-    // APE
-    QudaGaugeObservableParam *ape_obs_param = new QudaGaugeObservableParam[wflow_steps/measurement_interval+1];
-    for (int i=0; i<smear_steps/measurement_interval+1; i++) {
-      ape_obs_param[i] = newQudaGaugeObservableParam();
-      ape_obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
-      ape_obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
-      ape_obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-    }
-    
-    time0 = -((double)clock()); // start the timer
-    performAPEnStep(smear_steps, ape_smear_rho, measurement_interval, ape_obs_param);  
-    time0 += clock();           // stop the timer
-    time0 /= CLOCKS_PER_SEC;
-    printfQuda("Total time for APE = %g secs\n", time0);
-    break;
-  }
-  case 1: {
-    // STOUT
-    QudaGaugeObservableParam *stout_obs_param = new QudaGaugeObservableParam[wflow_steps/measurement_interval+1];
-    for (int i=0; i<smear_steps/measurement_interval+1; i++) {
-      stout_obs_param[i] = newQudaGaugeObservableParam();
-      stout_obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
-      stout_obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
-      stout_obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-    }
-    
-    time0 = -((double)clock()); // start the timer
-    performSTOUTnStep(smear_steps, stout_smear_rho, measurement_interval, stout_obs_param);
-    time0 += clock();           // stop the timer
-    time0 /= CLOCKS_PER_SEC;
-    printfQuda("Total time for STOUT = %g secs\n", time0);
-    break;
+  // Typical values for
+  // APE: alpha=0.6
+  // Stout: rho=0.1
+  // Over Improved Stout: rho=0.08, epsilon=-0.25
+  //
+  // Typically, the user will use smearing for Q charge data only, so
+  // we hardcode to compute Q only and not the plaquette. Users may
+  // of course set these as they wish.  SU(N) projection su_project=true is recommended.
+  QudaGaugeObservableParam *obs_param = new QudaGaugeObservableParam[gauge_smear_steps / measurement_interval + 1];
+  for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
+    obs_param[i] = newQudaGaugeObservableParam();
+    obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
+    obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
+    obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   }
 
-    // Topological charge routines
-    //---------------------------------------------------------------------------
-  case 2: {
-    // Over-Improved STOUT
-    QudaGaugeObservableParam *oi_stout_obs_param = new QudaGaugeObservableParam[wflow_steps/measurement_interval+1];
-    for (int i=0; i<smear_steps/measurement_interval+1; i++) {
-      oi_stout_obs_param[i] = newQudaGaugeObservableParam();
-      oi_stout_obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
-      oi_stout_obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
-      oi_stout_obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-    }
+  // We here set all the problem parameters for all possible smearing types.
+  QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
+  smear_param.smear_type = gauge_smear_type;
+  smear_param.n_steps = gauge_smear_steps;
+  smear_param.meas_interval = measurement_interval;
+  smear_param.alpha = gauge_smear_alpha;
+  smear_param.rho = gauge_smear_rho;
+  smear_param.epsilon = gauge_smear_epsilon;
 
-    time0 = -((double)clock()); // start the timer
-    performOvrImpSTOUTnStep(smear_steps, stout_smear_rho, stout_smear_epsilon, measurement_interval, oi_stout_obs_param);
-    time0 += clock();           // stop the timer
-    time0 /= CLOCKS_PER_SEC;
-    printfQuda("Total time for Over Improved STOUT = %g secs\n", time0);
-    break;
+  
+  time0 = -((double)clock()); // start the timer  
+  switch (smear_param.smear_type) {
+  case QUDA_GAUGE_SMEAR_APE:
+  case QUDA_GAUGE_SMEAR_STOUT:
+  case QUDA_GAUGE_SMEAR_OVRIMP_STOUT: {    
+    performGaugeSmearQuda(&smear_param, obs_param);
+    break;    
   }
-  case 3: {
-    // Wilson Flow
-    QudaGaugeObservableParam *wf_obs_param = new QudaGaugeObservableParam[wflow_steps/measurement_interval+1];
-    for (int i=0; i<wflow_steps/measurement_interval+1; i++) {
-      wf_obs_param[i] = newQudaGaugeObservableParam();
-      wf_obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
-      wf_obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
-      wf_obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-    }
     
-    time0 = -((double)clock()); // start the timer
-    performWFlownStep(wflow_steps, wflow_epsilon, measurement_interval, wflow_type, wf_obs_param);
-    time0 += clock();           // stop the timer
-    time0 /= CLOCKS_PER_SEC;
-    printfQuda("Total time for Wilson Flow = %g secs\n", time0);
+    // Here we use a typical use case which is different from simple smearing in that
+    // the user will want to compute the plaquette values to compute the gauge energy.
+  case QUDA_GAUGE_SMEAR_WILSON_FLOW:
+  case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW:{
+    for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
+      obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
+    }
+    performWFlowQuda(&smear_param, obs_param);
     break;
   }
-  default: errorQuda("Undefined test type %d given", test_type);
+  default: errorQuda("Undefined gauge smear type %d given", smear_param.smear_type);
   }
-
+  
+  time0 += clock(); // stop the timer
+  time0 /= CLOCKS_PER_SEC;
+  printfQuda("Total time for gauge smearing = %g secs\n", time0);
+  
 #else
   printfQuda("Skipping other gauge tests since gauge tools have not been compiled\n");
 #endif
-
+  
   if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
 
   for (int dir = 0; dir < 4; dir++) {

@@ -183,6 +183,23 @@ const char *get_eig_type_str(QudaEigType type)
   return ret;
 }
 
+const char *get_gauge_smear_str(QudaGaugeSmearType type)
+{
+  const char *ret;
+
+  switch (type) {
+  case QUDA_GAUGE_SMEAR_APE: ret = "APE"; break;
+  case QUDA_GAUGE_SMEAR_STOUT: ret = "Stout"; break;
+  case QUDA_GAUGE_SMEAR_OVRIMP_STOUT: ret = "Over Improved"; break;
+  case QUDA_GAUGE_SMEAR_WILSON_FLOW: ret = "Wilson Flow"; break;
+  case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: ret = "Symanzik Flow"; break;
+  default: ret = "unknown"; break;
+  }
+
+  return ret;
+}
+
+
 const char *get_mass_normalization_str(QudaMassNormalization type)
 {
   const char *s;

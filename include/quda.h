@@ -800,16 +800,26 @@ extern "C" {
 
   typedef struct QudaGaugeObservableParam_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
-    QudaBoolean su_project;              /**< Whether to porject onto the manifold prior to measurement */
+    QudaBoolean su_project;              /**< Whether to project onto the manifold prior to measurement */
     QudaBoolean compute_plaquette;       /**< Whether to compute the plaquette */
     double plaquette[3];                 /**< Total, spatial and temporal field energies, respectively */
     QudaBoolean compute_qcharge;         /**< Whether to compute the topological charge and field energy */
     double qcharge;                      /**< Computed topological charge */
     double energy[3];                    /**< Total, spatial and temporal field energies, respectively */
     QudaBoolean compute_qcharge_density; /**< Whether to compute the topological charge density */
-    void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */
+    void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */    
   } QudaGaugeObservableParam;
-
+  
+  typedef struct QudaGaugeSmearParam_s {
+    size_t struct_size;   /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
+    unsigned int n_steps; /**< The total number of smearing steps to perform. */
+    double epsilon;       /**< Serves as one of the coefficients in Over Improved Stout smearing, or as the step size in Wilson/Symanzik flow */
+    double alpha;         /**< The single coefficient used in APE smearing */
+    double rho;           /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
+    unsigned int meas_interval; /**< Perform the requested measurements on the gauge field at this interval */
+    QudaGaugeSmearType smear_type; /**< The smearing type to perform */
+  } QudaGaugeSmearParam;
+  
   typedef struct QudaBLASParam_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
 
@@ -1000,10 +1010,19 @@ extern "C" {
    * immediately after it's defined (and prior to explicitly setting
    * its members) using this function.  Typical usage is as follows:
    *
-   *   QudaGaugeParam obs_param = newQudaGaugeObservableParam();
+   *   QudaGaugeObservalbeParam obs_param = newQudaGaugeObservableParam();
    */
   QudaGaugeObservableParam newQudaGaugeObservableParam(void);
 
+  /**
+   * A new QudaGaugeSmearParam should always be initialized
+   * immediately after it's defined (and prior to explicitly setting
+   * its members) using this function.  Typical usage is as follows:
+   *
+   *   QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
+   */
+  QudaGaugeSmearParam newQudaGaugeSmearParam(void);
+  
   /**
    * A new QudaBLASParam should always be initialized immediately
    * after it's defined (and prior to explicitly setting its members)
@@ -1522,49 +1541,21 @@ extern "C" {
   void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int n_steps, double alpha);
 
   /**
-   * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param n_steps Number of steps to apply.
-   * @param alpha   Alpha coefficient for APE smearing.
-   * @param meas_interval Measure the Q charge every Nth step
-   */
-  void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval,
-		       QudaGaugeObservableParam *param);
-
-  /**
-   * Performs STOUT smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param n_steps Number of steps to apply.
-   * @param rho     Rho coefficient for STOUT smearing.
-   * @param meas_interval Measure the Q charge every Nth step
-   * @param[in,out] param Parameter struct that defines which
+   * Performs APE, Stout, or Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
+   * @param[in] smear_param Parameter struct that defines the computation parameters
+   * @param[in,out] obs_param Parameter struct that defines which
    * observables we are making and the resulting observables.
    */
-  void performSTOUTnStep(unsigned int n_steps, double rho, int meas_interval,
-			 QudaGaugeObservableParam *param);
+  void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam *obs_param);
 
-  /**
-   * Performs Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param n_steps Number of steps to apply.
-   * @param rho     Rho coefficient for STOUT smearing.
-   * @param epsilon Epsilon coefficient for Over Improved STOUT smearing.
-   * @param meas_interval Measure the Q charge every Nth step
-   * @param[in,out] param Parameter struct that defines which
-   * observables we are making and the resulting observables.
-   */
-  void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, int meas_interval,
-			       QudaGaugeObservableParam *param);
-  
   /**
    * Performs Wilson Flow on gaugePrecise and stores it in gaugeSmeared
-   * @param n_steps Number of steps to apply.
-   * @param step_size Size of Wilson Flow step
-   * @param meas_interval Measure the Q charge and field energy every Nth step
-   * @param wflow_type 1x1 Wilson or 2x1 Symanzik flow type
-   * @param[in,out] param Parameter struct that defines which
+   * @param[in] smear_param Parameter struct that defines the computation parameters
+   * @param[in,out] obs_param Parameter struct that defines which
    * observables we are making and the resulting observables.
    */
-  void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type,
-			 QudaGaugeObservableParam *param);
-  
+  void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam *obs_param);
+
   /**
    * @brief Calculates a variety of gauge-field observables.  If a
    * smeared gauge field is presently loaded (in gaugeSmeared) the
