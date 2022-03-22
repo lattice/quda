@@ -103,6 +103,9 @@ void qudaInit(QudaInitArgs_t input)
   qudaSetLayout(input.layout);
   initialized = true;
   qudamilc_called<false>(__func__);
+  papachurro = 0;
+  partial = 0;
+  printf("\n\nTotal initial %.3lf s\nPartial initial %.3lf s\n", ((double)papachurro), ((double)partial));
 }
 
 void qudaFinalize()
@@ -110,6 +113,7 @@ void qudaFinalize()
   qudamilc_called<true>(__func__);
   endQuda();
   qudamilc_called<false>(__func__);
+  printf("\n\nTotal time spinTasteQuda %.3lf s\nPartial time QUDA call %.3lf s\n", 1.e-9*((double)papachurro), 1.e-9*((double)partial));
 }
 #if defined(MULTI_GPU) && !defined(QMP_COMMS)
 /**
@@ -1145,6 +1149,7 @@ void qudaShift(int external_precision, int quda_precision, const void *const lin
   if (!canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
 
   if (invalidate_quda_gauge || !create_quda_gauge) {
+    printf("\n\n\n\n\nReloading gauge field\n\n\n\n\n"); fflush(stdout);
     loadGaugeQuda(const_cast<void *>(links), &gparam);
     invalidate_quda_gauge = false;
   }
