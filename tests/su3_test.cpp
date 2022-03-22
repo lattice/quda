@@ -4,6 +4,7 @@
 #include <math.h>
 #include <string.h>
 
+#include <timer.h>
 #include <util_quda.h>
 #include <host_utils.h>
 #include <command_line_params.h>
@@ -61,14 +62,14 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map {{"ape", QUDA_GAUGE_SMEAR_APE},
                                                                 {"stout", QUDA_GAUGE_SMEAR_STOUT},
-                                                                {"ovrimp_stout", QUDA_GAUGE_SMEAR_OVRIMP_STOUT},
+                                                                {"ovrimp-stout", QUDA_GAUGE_SMEAR_OVRIMP_STOUT},
                                                                 {"wilson", QUDA_GAUGE_SMEAR_WILSON_FLOW},
                                                                 {"symanzik", QUDA_GAUGE_SMEAR_SYMANZIK_FLOW}};
 
   // Option group for SU(3) related options
   auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
 
-  opgroup->add_option("--su3-smear-type", gauge_smear_type, "The type of action to use in the smearing (default stout)")
+  opgroup->add_option("--su3-smear-type", gauge_smear_type, "The type of action to use in the smearing. Options: APE, Stout, Over Improved Stout, Wilson Flow, Symanzik Flow (default stout)")
     ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
   ;
   opgroup->add_option("--su3-smear-alpha", gauge_smear_alpha, "alpha coefficient for APE smearing (default 0.6)");
@@ -147,7 +148,9 @@ int main(int argc, char **argv)
   size_t array_size = V * data_size;
   void *qDensity = safe_malloc(array_size);
   // start the timer
-  double time0 = -((double)clock());
+  quda::host_timer_t host_timer;
+  host_timer.start();
+  
   QudaGaugeObservableParam param = newQudaGaugeObservableParam();
   param.compute_qcharge = QUDA_BOOLEAN_TRUE;
   param.compute_qcharge_density = QUDA_BOOLEAN_TRUE;
@@ -156,10 +159,9 @@ int main(int argc, char **argv)
   gaugeObservablesQuda(&param);
 
   // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
+  host_timer.stop();
   printfQuda("Computed Etot, Es, Et, Q is\n%.16e %.16e, %.16e %.16e\nDone in %g secs\n", param.energy[0],
-             param.energy[1], param.energy[2], param.qcharge, time0);
+             param.energy[1], param.energy[2], param.qcharge, host_timer.last());
 
   // Ensure host array sums to return value
   if (prec == QUDA_DOUBLE_PRECISION) {
@@ -212,7 +214,7 @@ int main(int argc, char **argv)
   smear_param.rho = gauge_smear_rho;
   smear_param.epsilon = gauge_smear_epsilon;
 
-  time0 = -((double)clock()); // start the timer
+  host_timer.start(); // start the timer
   switch (smear_param.smear_type) {
   case QUDA_GAUGE_SMEAR_APE:
   case QUDA_GAUGE_SMEAR_STOUT:
@@ -234,9 +236,8 @@ int main(int argc, char **argv)
   default: errorQuda("Undefined gauge smear type %d given", smear_param.smear_type);
   }
 
-  time0 += clock(); // stop the timer
-  time0 /= CLOCKS_PER_SEC;
-  printfQuda("Total time for gauge smearing = %g secs\n", time0);
+  host_timer.stop(); // stop the timer
+  printfQuda("Total time for gauge smearing = %g secs\n", host_timer.last());
 
 #else
   printfQuda("Skipping other gauge tests since gauge tools have not been compiled\n");
