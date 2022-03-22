@@ -26,7 +26,6 @@ QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
 int measurement_interval = 5;
 bool su_project = true;
 
-
 void display_test_info()
 {
   printfQuda("running the following test:\n");
@@ -39,17 +38,14 @@ void display_test_info()
   // Specific test
   printfQuda("\n%s smearing\n", get_gauge_smear_str(gauge_smear_type));
   switch (gauge_smear_type) {
-  case QUDA_GAUGE_SMEAR_APE:
-    printfQuda(" - alpha %f\n", gauge_smear_alpha); break;
-  case QUDA_GAUGE_SMEAR_STOUT:
-    printfQuda(" - rho %f\n", gauge_smear_rho); break;
+  case QUDA_GAUGE_SMEAR_APE: printfQuda(" - alpha %f\n", gauge_smear_alpha); break;
+  case QUDA_GAUGE_SMEAR_STOUT: printfQuda(" - rho %f\n", gauge_smear_rho); break;
   case QUDA_GAUGE_SMEAR_OVRIMP_STOUT:
     printfQuda(" - rho %f\n", gauge_smear_rho);
     printfQuda(" - epsilon %f\n", gauge_smear_epsilon);
     break;
   case QUDA_GAUGE_SMEAR_WILSON_FLOW:
-  case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW:
-    printfQuda(" - epsilon %f\n", gauge_smear_epsilon); break;
+  case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: printfQuda(" - epsilon %f\n", gauge_smear_epsilon); break;
   default: errorQuda("Undefined test type %d given", test_type);
   }
   printfQuda(" - smearing steps %d\n", gauge_smear_steps);
@@ -63,10 +59,12 @@ void display_test_info()
 
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-  CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map { {"ape", QUDA_GAUGE_SMEAR_APE},
-      {"stout", QUDA_GAUGE_SMEAR_STOUT}, {"ovrimp_stout", QUDA_GAUGE_SMEAR_OVRIMP_STOUT},
-					   {"wilson", QUDA_GAUGE_SMEAR_WILSON_FLOW}, {"symanzik", QUDA_GAUGE_SMEAR_SYMANZIK_FLOW}};
-  
+  CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map {{"ape", QUDA_GAUGE_SMEAR_APE},
+                                                                {"stout", QUDA_GAUGE_SMEAR_STOUT},
+                                                                {"ovrimp_stout", QUDA_GAUGE_SMEAR_OVRIMP_STOUT},
+                                                                {"wilson", QUDA_GAUGE_SMEAR_WILSON_FLOW},
+                                                                {"symanzik", QUDA_GAUGE_SMEAR_SYMANZIK_FLOW}};
+
   // Option group for SU(3) related options
   auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
 
@@ -138,7 +136,7 @@ int main(int argc, char **argv)
              plaq[2]);
 
 #ifdef GPU_GAUGE_TOOLS
-  
+
   // All user inputs now defined
   display_test_info();
 
@@ -214,20 +212,19 @@ int main(int argc, char **argv)
   smear_param.rho = gauge_smear_rho;
   smear_param.epsilon = gauge_smear_epsilon;
 
-  
-  time0 = -((double)clock()); // start the timer  
+  time0 = -((double)clock()); // start the timer
   switch (smear_param.smear_type) {
   case QUDA_GAUGE_SMEAR_APE:
   case QUDA_GAUGE_SMEAR_STOUT:
-  case QUDA_GAUGE_SMEAR_OVRIMP_STOUT: {    
+  case QUDA_GAUGE_SMEAR_OVRIMP_STOUT: {
     performGaugeSmearQuda(&smear_param, obs_param);
-    break;    
+    break;
   }
-    
+
     // Here we use a typical use case which is different from simple smearing in that
     // the user will want to compute the plaquette values to compute the gauge energy.
   case QUDA_GAUGE_SMEAR_WILSON_FLOW:
-  case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW:{
+  case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW: {
     for (int i = 0; i < gauge_smear_steps / measurement_interval + 1; i++) {
       obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
     }
@@ -236,15 +233,15 @@ int main(int argc, char **argv)
   }
   default: errorQuda("Undefined gauge smear type %d given", smear_param.smear_type);
   }
-  
+
   time0 += clock(); // stop the timer
   time0 /= CLOCKS_PER_SEC;
   printfQuda("Total time for gauge smearing = %g secs\n", time0);
-  
+
 #else
   printfQuda("Skipping other gauge tests since gauge tools have not been compiled\n");
 #endif
-  
+
   if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
 
   for (int dir = 0; dir < 4; dir++) {

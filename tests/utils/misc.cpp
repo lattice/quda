@@ -199,7 +199,6 @@ const char *get_gauge_smear_str(QudaGaugeSmearType type)
   return ret;
 }
 
-
 const char *get_mass_normalization_str(QudaMassNormalization type)
 {
   const char *s;

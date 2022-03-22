@@ -807,19 +807,20 @@ extern "C" {
     double qcharge;                      /**< Computed topological charge */
     double energy[3];                    /**< Total, spatial and temporal field energies, respectively */
     QudaBoolean compute_qcharge_density; /**< Whether to compute the topological charge density */
-    void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */    
+    void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */
   } QudaGaugeObservableParam;
-  
+
   typedef struct QudaGaugeSmearParam_s {
-    size_t struct_size;   /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
     unsigned int n_steps; /**< The total number of smearing steps to perform. */
-    double epsilon;       /**< Serves as one of the coefficients in Over Improved Stout smearing, or as the step size in Wilson/Symanzik flow */
+    double epsilon;       /**< Serves as one of the coefficients in Over Improved Stout smearing, or as the step size in
+                             Wilson/Symanzik flow */
     double alpha;         /**< The single coefficient used in APE smearing */
-    double rho;           /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
-    unsigned int meas_interval; /**< Perform the requested measurements on the gauge field at this interval */
+    double rho; /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
+    unsigned int meas_interval;    /**< Perform the requested measurements on the gauge field at this interval */
     QudaGaugeSmearType smear_type; /**< The smearing type to perform */
   } QudaGaugeSmearParam;
-  
+
   typedef struct QudaBLASParam_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
 
@@ -1022,7 +1023,7 @@ extern "C" {
    *   QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
    */
   QudaGaugeSmearParam newQudaGaugeSmearParam(void);
-  
+
   /**
    * A new QudaBLASParam should always be initialized immediately
    * after it's defined (and prior to explicitly setting its members)

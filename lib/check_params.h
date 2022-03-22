@@ -1062,13 +1062,13 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
 #endif
 
   P(smear_type, QUDA_GAUGE_SMEAR_INVALID);
-  
+
 #ifdef INIT_PARAM
   P(n_steps, 0);
   P(meas_interval, 0);
   P(alpha, 0.0);
   P(rho, 0.0);
-  P(epsilon, 0.0);  
+  P(epsilon, 0.0);
 #else
   P(n_steps, (unsigned int)INVALID_INT);
   P(meas_interval, (unsigned int)INVALID_INT);
@@ -1076,12 +1076,12 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(rho, INVALID_DOUBLE);
   P(epsilon, INVALID_DOUBLE);
 #endif
-  
+
 #ifdef INIT_PARAM
   return ret;
 #endif
 }
- 
+
 #if defined INIT_PARAM
 QudaBLASParam newQudaBLASParam(void)
 {

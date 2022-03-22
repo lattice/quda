@@ -5335,7 +5335,7 @@ void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservable
   pushOutputPrefix("performGaugeSmearQuda: ");
   profileGaugeSmear.TPSTART(QUDA_PROFILE_TOTAL);
   checkGaugeSmearParam(smear_param);
-  
+
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
   if (gaugeSmeared != nullptr) delete gaugeSmeared;
   gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileGaugeSmear);
@@ -5343,7 +5343,7 @@ void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservable
   GaugeFieldParam gParam(*gaugeSmeared);
   auto *cudaGaugeTemp = new cudaGaugeField(gParam);
 
-  int measurement_n = 0; // The nth measurement to take  
+  int measurement_n = 0; // The nth measurement to take
   gaugeObservablesQuda(&obs_param[measurement_n]);
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     printfQuda("Q charge at step %03d = %+.16e\n", 0, obs_param[measurement_n].qcharge);
@@ -5351,14 +5351,16 @@ void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservable
 
   for (unsigned int i = 0; i < smear_param->n_steps; i++) {
     profileGaugeSmear.TPSTART(QUDA_PROFILE_COMPUTE);
-    
-    switch(smear_param->smear_type) {
-    case QUDA_GAUGE_SMEAR_APE : APEStep(*gaugeSmeared, *cudaGaugeTemp, smear_param->alpha); break;
-    case QUDA_GAUGE_SMEAR_STOUT : STOUTStep(*gaugeSmeared, *cudaGaugeTemp, smear_param->rho); break;
-    case QUDA_GAUGE_SMEAR_OVRIMP_STOUT : OvrImpSTOUTStep(*gaugeSmeared, *cudaGaugeTemp, smear_param->rho, smear_param->epsilon); break;
-    default : errorQuda("Unkown gauge smear type %d", smear_param->smear_type);
+
+    switch (smear_param->smear_type) {
+    case QUDA_GAUGE_SMEAR_APE: APEStep(*gaugeSmeared, *cudaGaugeTemp, smear_param->alpha); break;
+    case QUDA_GAUGE_SMEAR_STOUT: STOUTStep(*gaugeSmeared, *cudaGaugeTemp, smear_param->rho); break;
+    case QUDA_GAUGE_SMEAR_OVRIMP_STOUT:
+      OvrImpSTOUTStep(*gaugeSmeared, *cudaGaugeTemp, smear_param->rho, smear_param->epsilon);
+      break;
+    default: errorQuda("Unkown gauge smear type %d", smear_param->smear_type);
     }
-    
+
     profileGaugeSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
     if ((i + 1) % smear_param->meas_interval == 0) {
       measurement_n++;
@@ -5379,7 +5381,7 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
   pushOutputPrefix("performWFlowQuda: ");
   profileWFlow.TPSTART(QUDA_PROFILE_TOTAL);
   checkGaugeSmearParam(smear_param);
-  
+
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
   if (gaugeSmeared != nullptr) delete gaugeSmeared;
   gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileWFlow);
@@ -5394,7 +5396,7 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
   GaugeField *in = gaugeSmeared;
   GaugeField *out = gaugeAux;
 
-  int measurement_n = 0;   // The nth measurement to take
+  int measurement_n = 0; // The nth measurement to take
 
   gaugeObservables(*in, obs_param[measurement_n], profileWFlow);
 
@@ -5416,8 +5418,9 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
       measurement_n++; // increment measurements.
       gaugeObservables(*out, obs_param[measurement_n], profileWFlow);
       if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", smear_param->epsilon * (i + 1), obs_param[measurement_n].plaquette[0],
-                   obs_param[measurement_n].energy[0], obs_param[measurement_n].energy[1], obs_param[measurement_n].energy[2],
+        printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", smear_param->epsilon * (i + 1),
+                   obs_param[measurement_n].plaquette[0], obs_param[measurement_n].energy[0],
+                   obs_param[measurement_n].energy[1], obs_param[measurement_n].energy[2],
                    obs_param[measurement_n].qcharge);
       }
     }
