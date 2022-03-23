@@ -103,9 +103,6 @@ void qudaInit(QudaInitArgs_t input)
   qudaSetLayout(input.layout);
   initialized = true;
   qudamilc_called<false>(__func__);
-  papachurro = 0;
-  partial = 0;
-  printf("\n\nTotal initial %.3lf s\nPartial initial %.3lf s\n", ((double)papachurro), ((double)partial));
 }
 
 void qudaFinalize()
@@ -113,7 +110,6 @@ void qudaFinalize()
   qudamilc_called<true>(__func__);
   endQuda();
   qudamilc_called<false>(__func__);
-  printf("\n\nTotal time spinTasteQuda %.3lf s\nPartial time QUDA call %.3lf s\n", 1.e-9*((double)papachurro), 1.e-9*((double)partial));
 }
 #if defined(MULTI_GPU) && !defined(QMP_COMMS)
 /**
@@ -1117,7 +1113,7 @@ void qudaDslash(int external_precision, int quda_precision, QudaInvertArgs_t inv
 } // qudaDslash
 
 void qudaShift(int external_precision, int quda_precision, const void *const links,
-               void* src, void* dst, int dir, int sym)
+               void* src, void* dst, int dir, int sym, int reloadGaugeField)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
@@ -1148,8 +1144,7 @@ void qudaShift(int external_precision, int quda_precision, const void *const lin
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
   if (!canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
 
-  if (invalidate_quda_gauge || !create_quda_gauge) {
-    printf("\n\n\n\n\nReloading gauge field\n\n\n\n\n"); fflush(stdout);
+  if (invalidate_quda_gauge || !create_quda_gauge || reloadGaugeField) {
     loadGaugeQuda(const_cast<void *>(links), &gparam);
     invalidate_quda_gauge = false;
   }
@@ -1165,7 +1160,7 @@ void qudaShift(int external_precision, int quda_precision, const void *const lin
 } // qudaShift
 
 void qudaSpinTaste(int external_precision, int quda_precision, const void *const links,
-               void* src, void* dst, int spin, int taste)
+               void* src, void* dst, int spin, int taste, int reloadGaugeField)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
@@ -1196,7 +1191,7 @@ void qudaSpinTaste(int external_precision, int quda_precision, const void *const
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
   if (!canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
 
-  if (invalidate_quda_gauge || !create_quda_gauge) {
+  if (invalidate_quda_gauge || !create_quda_gauge || reloadGaugeField) {
     loadGaugeQuda(const_cast<void *>(links), &gparam);
     invalidate_quda_gauge = false;
   }

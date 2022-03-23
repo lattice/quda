@@ -238,6 +238,7 @@ extern "C" {
    * @param dst                Output spinor field
    * @param dir                Direction of application of the spin-taste operator 
    * @param sym                Kind of spin-taste operator (1 forward, 2 backward, 3 symmetric)
+   * @param reloadGaugeField   Should we transfer again the gauge field from the CPU to the GPU? (0 = false, anything else = true)
    */
   void qudaShift (int external_precision,
 		  int quda_precision,
@@ -245,7 +246,8 @@ extern "C" {
 		  void* source,
 		  void* solution,
 		  int dir,
-		  int sym);
+		  int sym,
+                  int reloadGaugeField);
 
   /**
    * Apply the forward/backward/symmetric shift for the spin-taste opeartor. All fields
@@ -258,6 +260,7 @@ extern "C" {
    * @param dst                Output spinor field
    * @param spin               Spin gamma structure using MILC numbering
    * @param taste              Taste gamma structure using MILC numbering
+   * @param reloadGaugeField   Should we transfer again the gauge field from the CPU to the GPU? (0 = false, anything else = true)
    */
   void qudaSpinTaste (int external_precision,
                       int quda_precision,
@@ -265,7 +268,8 @@ extern "C" {
                       void* src,
                       void* dst,
                       int spin,
-                      int taste);
+                      int taste,
+                      int reloadGaugeField);
   /**
    * Apply the improved staggered operator to a field. All fields
    * passed and returned are host (CPU) field in MILC order.
