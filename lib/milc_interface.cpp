@@ -1144,7 +1144,7 @@ void qudaShift(int external_precision, int quda_precision, const void *const lin
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
   if (!canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
 
-  if (invalidate_quda_gauge || !create_quda_gauge || reloadGaugeField) {
+  if (invalidate_quda_gauge || !create_quda_gauge || (reloadGaugeField && links != nullptr)) {
     loadGaugeQuda(const_cast<void *>(links), &gparam);
     invalidate_quda_gauge = false;
   }
@@ -1191,7 +1191,7 @@ void qudaSpinTaste(int external_precision, int quda_precision, const void *const
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
   if (!canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
 
-  if (invalidate_quda_gauge || !create_quda_gauge || reloadGaugeField) {
+  if (invalidate_quda_gauge || !create_quda_gauge || (reloadGaugeField && links != nullptr)) {
     loadGaugeQuda(const_cast<void *>(links), &gparam);
     invalidate_quda_gauge = false;
   }
