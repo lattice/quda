@@ -101,7 +101,8 @@ namespace quda {
       constexpr unsigned int max_block_size()
       {
         //return std::max(warp_size(), 1024 / (block_size_y * block_size_z));
-        return QUDA_MAX_BLOCK_SIZE / (block_size_y * block_size_z);
+        //return QUDA_MAX_BLOCK_SIZE / (block_size_y * block_size_z);
+        return std::max(warp_size(), QUDA_MAX_BLOCK_SIZE / (block_size_y * block_size_z));
       }
 
     /**

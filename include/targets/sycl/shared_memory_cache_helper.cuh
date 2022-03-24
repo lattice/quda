@@ -42,8 +42,8 @@ namespace quda
       ((max_block_size_x + device::shared_memory_bank_width() - 1) /
        device::shared_memory_bank_width()) * device::shared_memory_bank_width();
 
-    //using atom_t = sizeof(T) % 16 == 0 ? int4 : sizeof(T) % 8 == 0 ? int2 : int;
-    using atom_t = int;
+    using atom_t = std::conditional_t<sizeof(T) % 16 == 0, int4, std::conditional_t<sizeof(T) % 8 == 0, int2, int>>;
+    //using atom_t = int;
     static_assert(sizeof(T) % 4 == 0, "Shared memory cache does not support sub-word size types");
 
     // The number of elements of type atom_t that we break T into for optimal shared-memory access
@@ -118,12 +118,54 @@ namespace quda
 
     /**
        @brief Save the value into the 3-d shared memory cache.
-       Implicitly store at coordinates given by thread_idx().
        @param[in] a The value to store in the shared memory cache
+       @param[in] x The x index to use
+       @param[in] y The y index to use
+       @param[in] z The z index to use
      */
-    __device__ __host__ inline void save(const T &a)
+    __device__ __host__ inline void save(const T &a, int x = -1, int y = -1, int z = -1)
     {
-      save_detail(a, target::thread_idx().x, target::thread_idx().y, target::thread_idx().z);
+      auto tid = target::thread_idx();
+      x = (x == -1) ? tid.x : x;
+      y = (y == -1) ? tid.y : y;
+      z = (z == -1) ? tid.z : z;
+      save_detail(a, x, y, z);
+    }
+
+    /**
+       @brief Save the value into the 3-d shared memory cache.
+       @param[in] a The value to store in the shared memory cache
+       @param[in] x The x index to use
+     */
+    __device__ __host__ inline void save_x(const T &a, int x = -1)
+    {
+      auto tid = target::thread_idx();
+      x = (x == -1) ? tid.x : x;
+      save_detail(a, x, tid.y, tid.z);
+    }
+
+    /**
+       @brief Save the value into the 3-d shared memory cache.
+       @param[in] a The value to store in the shared memory cache
+       @param[in] y The y index to use
+     */
+    __device__ __host__ inline void save_y(const T &a, int y = -1)
+    {
+      auto tid = target::thread_idx();
+      y = (y == -1) ? tid.y : y;
+      save_detail(a, tid.x, y, tid.z);
+    }
+
+    /**
+       @brief Save the value into the 3-d shared memory cache.
+       @param[in] a The value to store in the shared memory cache
+       @param[in] z The z index to use
+     */
+    __device__ __host__ inline void save_z(const T &a, int z = -1)
+    {
+      auto tid = target::thread_idx();
+      z = (z == -1) ? tid.z : z;
+      save_detail(a, tid.x, tid.y, z);
     }
 
     /**

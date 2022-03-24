@@ -105,7 +105,7 @@ inline void ApplyFFT(FFTPlanHandle &plan, double2 *data_in, double2 *data_out, i
 //inline void SetPlanFFTMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecision precision)
 inline void SetPlanFFTMany(FFTPlanHandle &, int4 , int dim, QudaPrecision precision)
 {
-  warningQuda("SetPlanFFTMany %i %i", dim, precision);
+  warningQuda("SetPlanFFTMany %i %i : unimplemented", dim, precision);
 #if 0
   auto type = precision == QUDA_DOUBLE_PRECISION ? CUFFT_Z2Z : CUFFT_C2C;
   switch (dim) {
@@ -131,7 +131,7 @@ inline void SetPlanFFTMany(FFTPlanHandle &, int4 , int dim, QudaPrecision precis
  */
 inline void SetPlanFFT2DMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecision precision)
 {
-  warningQuda("SetPlanFFT2DMany %i %i", dim, precision);
+  //warningQuda("SetPlanFFT2DMany %i %i", dim, precision);
   if(precision == QUDA_SINGLE_PRECISION) {
     plan.isDouble = false;
     if(dim == 0) {
@@ -157,6 +157,27 @@ inline void SetPlanFFT2DMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecis
     }
   } else {
     plan.isDouble = true;
+    if(dim == 0) {
+      auto q = quda::device::defaultQueue();
+      MKL_LONG distance = size.w * size.z;
+      plan.d = new std::remove_pointer_t<decltype(plan.d)>({size.w, size.z});
+      //plan.d = new std::remove_pointer_t<decltype(plan.d)>({size.z, size.w});
+      plan.d->set_value(config_param::NUMBER_OF_TRANSFORMS, size.x * size.y);
+      plan.d->set_value(config_param::FWD_DISTANCE, distance);
+      plan.d->set_value(config_param::BWD_DISTANCE, distance);
+      plan.d->set_value(config_param::BACKWARD_SCALE, (1.0/distance));
+      plan.d->commit(q);
+    } else {
+      auto q = quda::device::defaultQueue();
+      MKL_LONG distance = size.x * size.y;
+      //plan.d = new std::remove_pointer_t<decltype(plan.d)>({size.x, size.y});
+      plan.d = new std::remove_pointer_t<decltype(plan.d)>({size.y, size.x});
+      plan.d->set_value(config_param::NUMBER_OF_TRANSFORMS, size.w * size.z);
+      plan.d->set_value(config_param::FWD_DISTANCE, distance);
+      plan.d->set_value(config_param::BWD_DISTANCE, distance);
+      plan.d->set_value(config_param::BACKWARD_SCALE, (1.0/distance));
+      plan.d->commit(q);
+    }
   }
 #if 0
   auto type = precision == QUDA_DOUBLE_PRECISION ? CUFFT_Z2Z : CUFFT_C2C;
