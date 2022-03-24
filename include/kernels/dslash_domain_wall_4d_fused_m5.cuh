@@ -24,6 +24,7 @@ namespace quda
     using DomainWall4DArg::threads;
     using DomainWall4DArg::x;
     using DomainWall4DArg::xpay;
+    using DomainWall4DArg:: use_graph;
 
     using F = typename DomainWall4DArg::F;
 
@@ -35,8 +36,6 @@ namespace quda
     using Dslash5Arg::Ls;
 
     using real = typename mapper<Float>::type;
-    complex<real> alpha;
-    complex<real> beta;
 
     bool fuse_m5inv_m5pre;
 

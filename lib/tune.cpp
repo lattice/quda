@@ -408,6 +408,8 @@ namespace quda
         cache_file.close();
         initial_cache_size = tunecache.size();
 
+        for (auto &it : tunecache) it.second.compute_hash();
+
         if (getVerbosity() >= QUDA_SUMMARIZE) {
           printfQuda("Loaded %d sets of cached parameters from %s\n", static_cast<int>(initial_cache_size),
                      cache_path.c_str());
@@ -666,11 +668,10 @@ namespace quda
     grid(1, 1, 1),
     shared_bytes(0),
     set_max_shared_bytes(false),
-    aux(),
+    aux{1, 1, 1, 1},
     time(FLT_MAX),
     n_calls(0)
   {
-    aux = make_int4(1, 1, 1, 1);
   }
 
   int Tunable::blockStep() const { return device::warp_size(); }
@@ -850,6 +851,7 @@ namespace quda
         tuning = true;
         tunable.postTune();
         tuning = false;
+        best_param.compute_hash();
         param = best_param;
         tunecache[key] = best_param;
       }

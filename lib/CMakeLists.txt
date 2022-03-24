@@ -17,6 +17,7 @@ endif()
 
 set (QUDA_OBJS
   # cmake-format: sortable
+  targets/cuda/copy_arg.cu
   dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
   coarse_op.cu coarsecoarse_op.cu coarsecoarse_op_mma.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu

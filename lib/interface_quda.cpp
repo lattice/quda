@@ -69,7 +69,7 @@ static int R[4] = {0, 0, 0, 0};
 static bool redundant_comms = false;
 
 #include <blas_lapack.h>
-
+#include <task_graph.h>
 
 cudaGaugeField *gaugePrecise = nullptr;
 cudaGaugeField *gaugeSloppy = nullptr;
@@ -484,8 +484,6 @@ void initQudaMemory()
   loadTuneCache();
 
   device::create_context();
-
-  loadTuneCache();
 
   // initalize the memory pool allocators
   pool::init();
@@ -1397,12 +1395,17 @@ void endQuda(void)
 
   if(momResident) delete momResident;
 
+  saveTuneCache();
+  saveProfile();
+
   LatticeField::freeGhostBuffer();
   ColorSpinorField::freeGhostBuffer();
 
   blas_lapack::generic::destroy();
   blas_lapack::native::destroy();
   reducer::destroy();
+
+  task_graph::destroy();
 
   pool::flush_pinned();
   pool::flush_device();
@@ -1412,9 +1415,6 @@ void endQuda(void)
   num_failures_d = nullptr;
 
   destroyDslashEvents();
-
-  saveTuneCache();
-  saveProfile();
 
   // flush any outstanding force monitoring (if enabled)
   flushForceMonitor();

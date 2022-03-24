@@ -35,6 +35,7 @@ namespace quda
     complex<real> beta[QUDA_MAX_DWF_LS];
     complex<real> kappa[QUDA_MAX_DWF_LS];
     complex<real> inv;
+    coeff_5() = default;
   };
 
   // helper trait for determining if we are using variable coefficients
@@ -176,7 +177,12 @@ namespace quda
       Ls(in.X(4)),
       m_f(m_f),
       m_5(m_5),
-      a(a_)
+      a(a_),
+      alpha(0),
+      beta(0),
+      kappa(0),
+      inv(0),
+      coeff()
     {
       if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
       if (!in.isNative() || !out.isNative())

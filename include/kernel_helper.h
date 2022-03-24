@@ -10,6 +10,26 @@ namespace quda
     const std::string name;
 
     kernel_t(const void *func, const char *name) : func(func), name(name) { }
+
+    bool operator<(const kernel_t &other) const
+    {
+#ifndef JITIFY
+      if (name < other.name) return true;
+#else
+      if (func < other.func) return true;
+#endif
+      return false;
+    }
+
+    bool operator==(const kernel_t &other) const
+    {
+#ifndef JITIFY
+      if (name == other.name) return true;
+#else
+      if (func == other.func) return true;
+#endif
+      return false;
+    }
   };
 
   template <bool use_kernel_arg_ = true> struct kernel_param {
@@ -18,7 +38,8 @@ namespace quda
     int comms_rank;        /** per process value of comm_rank() */
     int comms_rank_global; /** per process value comm_rank_global() */
     int comms_coord[4];    /** array storing {comm_coord(0), ..., comm_coord(3)} */
-    int comms_dim[4];      /**  array storing {comm_dim(0), ..., comm_dim(3)} */
+    int comms_dim[4];      /** array storing {comm_dim(0), ..., comm_dim(3)} */
+    bool use_graph;        /** whether to use a graph for this kernel */
 
     constexpr kernel_param() = default;
 
@@ -27,7 +48,8 @@ namespace quda
       comms_rank(comm_rank()),
       comms_rank_global(comm_rank_global()),
       comms_coord {comm_coord(0), comm_coord(1), comm_coord(2), comm_coord(3)},
-      comms_dim {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)}
+      comms_dim {comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3)},
+      use_graph(false)
     {
     }
   };

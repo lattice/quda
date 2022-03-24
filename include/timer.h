@@ -156,6 +156,12 @@ namespace quda {
     QUDA_PROFILE_STREAM_WAIT_EVENT,  /**< stream waiting for event completion */
     QUDA_PROFILE_FUNC_SET_ATTRIBUTE, /**< set function attribute */
 
+    QUDA_PROFILE_GRAPH_KEY,          /**< create graph cache key */
+    QUDA_PROFILE_GRAPH_FIND,         /**< lookup cached graph */
+    QUDA_PROFILE_GRAPH_CAPTURE,      /**< stream CUDA graph capture */
+    QUDA_PROFILE_GRAPH_INSTANTIATE,  /**< cudaGraphInstantiate */
+    QUDA_PROFILE_GRAPH_LAUNCH,       /**< cudaGraphLaunch */
+
     QUDA_PROFILE_EVENT_SYNCHRONIZE,  /**< event synchronization */
     QUDA_PROFILE_STREAM_SYNCHRONIZE, /**< stream synchronization */
     QUDA_PROFILE_DEVICE_SYNCHRONIZE, /**< device synchronization */
@@ -180,7 +186,7 @@ namespace quda {
 #define PUSH_RANGE(name,cid) { \
     int color_id = cid; \
     color_id = color_id%nvtx_num_colors;\
-    nvtxEventAttributes_t eventAttrib = {0}; \
+    nvtxEventAttributes_t eventAttrib = { }; \
     eventAttrib.version = NVTX_VERSION; \
     eventAttrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE; \
     eventAttrib.colorType = NVTX_COLOR_ARGB; \
@@ -255,8 +261,9 @@ namespace quda {
       }
 
       profile[idx].start(func, file, line);
-      PUSH_RANGE(fname.c_str(),idx)
-	if (use_global) StartGlobal(func,file,line,idx);
+      std::string fname_func = fname + "_" + pname[idx];
+      PUSH_RANGE(fname_func.c_str(), idx);
+      if (use_global) StartGlobal(func,file,line,idx);
     }
 
     void Stop_(const char *func, const char *file, int line, QudaProfileType idx) {

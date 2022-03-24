@@ -282,6 +282,8 @@ namespace quda
     int exterior_dims; // dimension to run in the exterior Dslash
     int exterior_blocks;
 
+    bool use_graph; // whether to use a graph launch
+
     // for shmem ...
     static constexpr bool packkernel = false;
     void *packBuffer[4 * QUDA_MAX_DIM];
@@ -333,6 +335,10 @@ namespace quda
       pack_blocks(0),
       exterior_dims(0),
       exterior_blocks(0),
+      use_graph(false),
+      packBuffer{ },
+      neighbor_ranks{ },
+      bytes{ },
 #ifndef NVSHMEM_COMMS
       counter(0)
 #else
@@ -440,6 +446,7 @@ namespace quda
     out << "pack_blocks = " << arg.pack_blocks << std::endl;
     out << "exterior_threads = " << arg.exterior_threads << std::endl;
     out << "exterior_blocks = " << arg.exterior_blocks << std::endl;
+    out << "use_graph = " << arg.use_graph << std::endl;
     return out;
   }
 
@@ -639,7 +646,10 @@ namespace quda
 
     dslash_functor_arg(const Arg &arg, unsigned int threads_x) :
       kernel_param(dim3(threads_x, arg.dc.Ls, arg.nParity)),
-      arg(arg) { }
+      arg(arg)
+    {
+      use_graph = arg.use_graph;
+    }
   };
 
   /**

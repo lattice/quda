@@ -40,6 +40,7 @@ namespace quda
     DomainWall4DFusedM5(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
       Dslash(arg, out, in, get_app_base())
     {
+      arg.use_graph = true;
       TunableKernel3D::resizeVector(in.X(4), arg.nParity);
       TunableKernel3D::resizeStep(in.X(4), 1);
     }

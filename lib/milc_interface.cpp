@@ -33,7 +33,7 @@ static const int num_colors = sizeof(colors)/sizeof(uint32_t);
 #define PUSH_RANGE(name,cid) { \
   int color_id = cid; \
   color_id = color_id%num_colors;\
-  nvtxEventAttributes_t eventAttrib = {0}; \
+  nvtxEventAttributes_t eventAttrib = { }; \
   eventAttrib.version = NVTX_VERSION; \
   eventAttrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE; \
   eventAttrib.colorType = NVTX_COLOR_ARGB; \

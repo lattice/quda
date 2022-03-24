@@ -17,6 +17,8 @@
 
 namespace quda {
 
+  uint64_t fasthash64(const uint64_t* data, size_t size, uint64_t seed = 0);
+
   class TuneParam {
 
   public:
@@ -29,6 +31,7 @@ namespace quda {
     std::string comment;
     float time;
     long long n_calls;
+    uint64_t hash = 0;
 
     TuneParam();
     TuneParam(const TuneParam &) = default;
@@ -36,11 +39,21 @@ namespace quda {
     TuneParam &operator=(const TuneParam &) = default;
     TuneParam &operator=(TuneParam &&) = default;
 
+    void compute_hash()
+    {
+      // only include block / grid / shared_bytes / set_max_shared in the hash
+      auto hash_size = reinterpret_cast<const char*>(&comment) - reinterpret_cast<const char*>(this);
+      hash = fasthash64(reinterpret_cast<const uint64_t*>(this), hash_size / sizeof(uint64_t));
+    }
+
+    bool operator<(const TuneParam &other) const { return hash < other.hash ? true : false; }
+
     friend std::ostream& operator<<(std::ostream& output, const TuneParam& param) {
       output << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
       output << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
       output << "shared_bytes=" << param.shared_bytes;
       output << ", aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
+      output << ", hash=" << param.hash;
       return output;
     }
   };

@@ -9,6 +9,8 @@
 #include <jitify_helper.h>
 #endif
 
+#include <task_graph.h>
+
 namespace quda
 {
 
@@ -23,7 +25,6 @@ namespace quda
 
   class TunableKernel : public Tunable
   {
-
   protected:
     QudaFieldLocation location;
 
@@ -31,28 +32,22 @@ namespace quda
     virtual unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
     template <template <typename> class Functor, bool grid_stride, typename Arg>
-    std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
-    launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    qudaError_t launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
 #ifdef JITIFY
+      // note we do the copy to constant memory after the kernel has been compiled in launch_jitify (if needed)
       launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg);
 #else
-      launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(&arg));
-#endif
-      return launch_error;
-    }
-
-    template <template <typename> class Functor, bool grid_stride, typename Arg>
-    std::enable_if_t<!device::use_kernel_arg<Arg>(), qudaError_t>
-    launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
-    {
-#ifdef JITIFY
-      // note we do the copy to constant memory after the kernel has been compiled in launch_jitify
-      launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg);
-#else
-      static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
-      qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);
-      launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(&arg));
+      // only use graph launch if we're not tuning
+      if (arg.use_graph && use_task_graph() && !activeTuning()) {
+        launch_error = task_graph::launch_kernel(kernel, tp, stream, &arg, sizeof(Arg), device::use_kernel_arg<Arg>(), device::get_constant_buffer<Arg>());
+      } else {
+        if constexpr (!device::use_kernel_arg<Arg>()) {
+          static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
+          qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);
+        }
+        launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(&arg));
+      }
 #endif
       return launch_error;
     }
@@ -71,7 +66,10 @@ namespace quda
       const_cast<TunableKernel *>(this)->launch_device<Functor, grid_stride>(KERNEL(raw_kernel), tp, stream, arg);
     }
 
-    TunableKernel(QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) : location(location) { }
+    TunableKernel(QudaFieldLocation location) : location(location)
+    {
+      if (location == QUDA_INVALID_FIELD_LOCATION) errorQuda("Location invalid");
+    }
 
     virtual bool advanceTuneParam(TuneParam &param) const
     {
