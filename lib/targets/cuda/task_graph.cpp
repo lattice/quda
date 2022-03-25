@@ -94,21 +94,25 @@ namespace quda {
 
         profile.TPSTART(QUDA_PROFILE_GRAPH_CAPTURE);
 
+        // arg buffer aligned to simplify the copy kernel
+        constexpr size_t alignment = sizeof(int4);
+        size_t arg_bytes_aligned = ((arg_bytes + alignment - 1) / alignment) * alignment;
+
         void *arg_buffer = nullptr;
         if (!use_kernel_arg) {
           auto it = arg_cache.find(arg_hash);
           if (it == arg_cache.end()) {
-            arg_buffer = pool_pinned_malloc(arg_bytes);
+            arg_buffer = pool_pinned_malloc(arg_bytes_aligned);
             arg_cache.insert(std::make_pair(arg_hash, arg_buffer));
+            memcpy(arg_buffer, arg, arg_bytes);
           } else {
             arg_buffer = it->second;
           }
-          memcpy(arg_buffer, arg, arg_bytes);
         }
 
         CHECK_CUDA_ERROR(cudaStreamBeginCapture(cuda_stream, cudaStreamCaptureModeGlobal));
 #if 1
-        if (!use_kernel_arg) copy_arg(constant_buffer, arg_buffer, arg_bytes, cuda_stream);
+        if (!use_kernel_arg) copy_arg(constant_buffer, arg_buffer, arg_bytes_aligned, cuda_stream);
 #else
         if (!use_kernel_arg) qudaMemcpyAsync(constant_buffer, arg_buffer, arg_bytes, qudaMemcpyHostToDevice, stream);
 #endif
