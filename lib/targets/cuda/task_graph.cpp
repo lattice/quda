@@ -35,28 +35,47 @@ namespace quda {
     return enabled;
   }
 
-    // From fast-hash. See https://github.com/ztanml/fast-hash
-    inline uint64_t fasthash64(uint64_t h)
-    {
-      h ^= h >> 23;
-      h *= 0x2127599bf4325c37ull;
-      h ^= h >> 47;
-      return h;
-    }
+  bool use_copy_arg_kernel()
+  {
+    static bool enabled = false;
+    static bool init = false;
 
-    uint64_t fasthash64(const uint64_t* data, size_t size, uint64_t seed)
-    {
-      //auto start = data;
-      const uint64_t m = 0x880355f21e6d1965ull;
-      const uint64_t* end = data + size;
-      uint64_t h = seed ^ (size * m);
-      while (data != end) {
-        h ^= fasthash64(*data++);
-        h *= m;
-        //std::cout << "offset = " << (char*)data - (char*)start << " hash = "  << h << std::endl;
+    if (!init) {
+      char *enable_copy_arg_kernel = getenv("QUDA_ENABLE_COPY_ARG_KERNEL");
+      if (enable_copy_arg_kernel && strcmp(enable_copy_arg_kernel, "1") == 0) {
+        warningQuda("Using kernel for kernel argument copy");
+        enabled = true;
+      } else {
+        warningQuda("Using copy engine for kernel argument copy");
       }
-      return fasthash64(h);
+
+      init = true;
     }
+    return enabled;
+  }
+
+  // From fast-hash. See https://github.com/ztanml/fast-hash
+  inline uint64_t fasthash64(uint64_t h)
+  {
+    h ^= h >> 23;
+    h *= 0x2127599bf4325c37ull;
+    h ^= h >> 47;
+    return h;
+  }
+
+  uint64_t fasthash64(const uint64_t* data, size_t size, uint64_t seed)
+  {
+    //auto start = data;
+    const uint64_t m = 0x880355f21e6d1965ull;
+    const uint64_t* end = data + size;
+    uint64_t h = seed ^ (size * m);
+    while (data != end) {
+      h ^= fasthash64(*data++);
+      h *= m;
+      //std::cout << "offset = " << (char*)data - (char*)start << " hash = "  << h << std::endl;
+    }
+    return fasthash64(h);
+  }
 
   void copy_arg(void *, void *, size_t, cudaStream_t stream);
 
@@ -111,11 +130,15 @@ namespace quda {
         }
 
         CHECK_CUDA_ERROR(cudaStreamBeginCapture(cuda_stream, cudaStreamCaptureModeGlobal));
-#if 1
-        if (!use_kernel_arg) copy_arg(constant_buffer, arg_buffer, arg_bytes_aligned, cuda_stream);
-#else
-        if (!use_kernel_arg) qudaMemcpyAsync(constant_buffer, arg_buffer, arg_bytes, qudaMemcpyHostToDevice, stream);
-#endif
+
+        if (!use_kernel_arg) {
+          if (use_copy_arg_kernel()) { // use copy kernel
+            copy_arg(constant_buffer, arg_buffer, arg_bytes_aligned, cuda_stream);
+          } else {                     // use copy engine
+            qudaMemcpyAsync(constant_buffer, arg_buffer, arg_bytes, qudaMemcpyHostToDevice, stream);
+          }
+        }
+
         launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(arg));
         CHECK_CUDA_ERROR(cudaStreamEndCapture(cuda_stream, &graph));
 
