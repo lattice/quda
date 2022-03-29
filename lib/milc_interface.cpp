@@ -1112,7 +1112,7 @@ void qudaDslash(int external_precision, int quda_precision, QudaInvertArgs_t inv
 } // qudaDslash
 
 void qudaShift(int external_precision, int quda_precision, const void *const links,
-               void* src, void* dst, int dir, int sym)
+               void* src, void* dst, int dir, int sym, int reloadGaugeField)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
@@ -1143,7 +1143,7 @@ void qudaShift(int external_precision, int quda_precision, const void *const lin
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
   if (!canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
 
-  if (invalidate_quda_gauge || !create_quda_gauge) {
+  if (invalidate_quda_gauge || !create_quda_gauge || (reloadGaugeField && links != nullptr)) {
     loadGaugeQuda(const_cast<void *>(links), &gparam);
     invalidate_quda_gauge = false;
   }
@@ -1159,7 +1159,7 @@ void qudaShift(int external_precision, int quda_precision, const void *const lin
 } // qudaShift
 
 void qudaSpinTaste(int external_precision, int quda_precision, const void *const links,
-               void* src, void* dst, int spin, int taste)
+               void* src, void* dst, int spin, int taste, int reloadGaugeField)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
@@ -1190,7 +1190,7 @@ void qudaSpinTaste(int external_precision, int quda_precision, const void *const
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
   if (!canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
 
-  if (invalidate_quda_gauge || !create_quda_gauge) {
+  if (invalidate_quda_gauge || !create_quda_gauge || (reloadGaugeField && links != nullptr)) {
     loadGaugeQuda(const_cast<void *>(links), &gparam);
     invalidate_quda_gauge = false;
   }
