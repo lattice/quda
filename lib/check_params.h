@@ -1042,6 +1042,47 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
 }
 
 #if defined INIT_PARAM
+QudaGaugeSmearParam newQudaGaugeSmearParam(void)
+{
+  QudaGaugeSmearParam ret;
+#elif defined CHECK_PARAM
+static void checkGaugeSmearParam(QudaGaugeSmearParam *param)
+{
+#else
+void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
+{
+  printfQuda("QUDA Gauge Smear Parameters:\n");
+#endif
+
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected QudaGaugeSmearParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
+  P(smear_type, QUDA_GAUGE_SMEAR_INVALID);
+
+#ifdef INIT_PARAM
+  P(n_steps, 0);
+  P(meas_interval, 0);
+  P(alpha, 0.0);
+  P(rho, 0.0);
+  P(epsilon, 0.0);
+#else
+  P(n_steps, (unsigned int)INVALID_INT);
+  P(meas_interval, (unsigned int)INVALID_INT);
+  P(alpha, INVALID_DOUBLE);
+  P(rho, INVALID_DOUBLE);
+  P(epsilon, INVALID_DOUBLE);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
+
+#if defined INIT_PARAM
 QudaBLASParam newQudaBLASParam(void)
 {
   QudaBLASParam ret;
