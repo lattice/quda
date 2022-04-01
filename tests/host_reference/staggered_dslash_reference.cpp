@@ -42,7 +42,7 @@ void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, 
                               sFloat **, sFloat **, int oddBit, int daggerBit, int nSrc, QudaDslashType dslash_type)
 #endif
 {
-  for (int i = 0; i < Vh * stag_spinor_site_size * nSrc; i++) res[i] = 0.0;
+  for (size_t i = 0; i < Vh * stag_spinor_site_size * nSrc; i++) res[i] = 0.0;
 
   gFloat *fatlinkEven[4], *fatlinkOdd[4];
   gFloat *longlinkEven[4], *longlinkOdd[4];

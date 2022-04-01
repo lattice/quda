@@ -102,7 +102,7 @@ template <typename Float> void multiplySpinorByDiracProjector(Float *res, int pr
 template <typename sFloat, typename gFloat>
 void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int oddBit, int daggerBit)
 {
-  for (int i = 0; i < Vh * spinor_site_size; i++) res[i] = 0.0;
+  for (size_t i = 0; i < Vh * spinor_site_size; i++) res[i] = 0.0;
 
   gFloat *gaugeEven[4], *gaugeOdd[4];
   for (int dir = 0; dir < 4; dir++) {  
@@ -135,7 +135,7 @@ template <typename sFloat, typename gFloat>
 void dslashReference(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloat *spinorField, sFloat **fwdSpinor,
                      sFloat **backSpinor, int oddBit, int daggerBit)
 {
-  for (int i = 0; i < Vh * spinor_site_size; i++) res[i] = 0.0;
+  for (size_t i = 0; i < Vh * spinor_site_size; i++) res[i] = 0.0;
 
   gFloat *gaugeEven[4], *gaugeOdd[4];
   gFloat *ghostGaugeEven[4], *ghostGaugeOdd[4];
