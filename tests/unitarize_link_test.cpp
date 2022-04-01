@@ -104,7 +104,7 @@ static int unitarize_link_test(int &test_rc)
     for(int dir=0; dir<4; ++dir){
       double* slink = reinterpret_cast<double*>(sitelink[dir]);
       for(int i=0; i<V; ++i){
-        for (unsigned int j = 0; j < gauge_site_size; j++) {
+        for (auto j = 0lu; j < gauge_site_size; j++) {
           link[(i * 4 + dir) * gauge_site_size + j] = slink[i * gauge_site_size + j];
         }
       }
@@ -114,7 +114,7 @@ static int unitarize_link_test(int &test_rc)
     for(int dir=0; dir<4; ++dir){
       float* slink = reinterpret_cast<float*>(sitelink[dir]);
       for(int i=0; i<V; ++i){
-        for (unsigned int j = 0; j < gauge_site_size; j++) {
+        for (auto j = 0lu; j < gauge_site_size; j++) {
           link[(i * 4 + dir) * gauge_site_size + j] = slink[i * gauge_site_size + j];
         }
       }

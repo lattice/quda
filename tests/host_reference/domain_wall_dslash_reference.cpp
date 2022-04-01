@@ -329,7 +329,7 @@ template <QudaPCType type, typename sFloat, typename gFloat>
 void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloat *spinorField,
                              sFloat **fwdSpinor, sFloat **backSpinor, int oddBit, int daggerBit)
 {
-  for (size_t i = 0; i < V5h * spinor_site_size; i++) res[i] = 0.0;
+  for (auto i = 0lu; i < V5h * spinor_site_size; i++) res[i] = 0.0;
 
   gFloat *gaugeEven[4], *gaugeOdd[4];
   gFloat *ghostGaugeEven[4], *ghostGaugeOdd[4];
@@ -1173,7 +1173,7 @@ void dw_4d_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType 
   void *tmp = safe_malloc(V5h * spinor_site_size * precision);
   //------------------------------------------
   double *output = (double*)out;
-  for (size_t k = 0; k < V5h * spinor_site_size; k++) output[k] = 0.0;
+  for (auto k = 0lu; k < V5h * spinor_site_size; k++) output[k] = 0.0;
   //------------------------------------------
 
   int odd_bit = (matpc_type == QUDA_MATPC_ODD_ODD || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;

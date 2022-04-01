@@ -120,12 +120,12 @@ int test(int contractionType, QudaPrecision test_prec)
   void *d_result = safe_malloc(2 * V * 16 * data_size);
 
   if (test_prec == QUDA_SINGLE_PRECISION) {
-    for (size_t i = 0; i < V * spinor_site_size; i++) {
+    for (auto i = 0lu; i < V * spinor_site_size; i++) {
       ((float *)spinorX)[i] = rand() / (float)RAND_MAX;
       ((float *)spinorY)[i] = rand() / (float)RAND_MAX;
     }
   } else {
-    for (size_t i = 0; i < V * spinor_site_size; i++) {
+    for (auto i = 0lu; i < V * spinor_site_size; i++) {
       ((double *)spinorX)[i] = rand() / (double)RAND_MAX;
       ((double *)spinorY)[i] = rand() / (double)RAND_MAX;
     }
