@@ -347,7 +347,13 @@ namespace quda
 
     param_presmooth->Nkrylov = param_presmooth->maxiter;
     param_presmooth->pipeline = param_presmooth->maxiter;
-    //if (param_presmooth->inv_type == QUDA_CA_CG_INVERTER) param_presmooth->ca_basis = QUDA_CHEBYSHEV_BASIS;
+
+    if (is_ca_solver(param_presmooth->inv_type)) {
+      param_presmooth->ca_basis = param.mg_global.smoother_solver_ca_basis[param.level];
+      param_presmooth->ca_lambda_min = param.mg_global.smoother_solver_ca_lambda_min[param.level];
+      param_presmooth->ca_lambda_max = param.mg_global.smoother_solver_ca_lambda_max[param.level];
+    }
+
     param_presmooth->tol = param.smoother_tol;
     param_presmooth->global_reduction = param.global_reduction;
 
@@ -648,10 +654,7 @@ namespace quda
       param_coarse_solver->Nkrylov = param_coarse_solver->maxiter < param_coarse_solver->Nkrylov ?
         param_coarse_solver->maxiter :
         param_coarse_solver->Nkrylov;
-      if (param_coarse_solver->inv_type == QUDA_CA_CG_INVERTER ||
-          param_coarse_solver->inv_type == QUDA_CA_CGNE_INVERTER ||
-          param_coarse_solver->inv_type == QUDA_CA_CGNR_INVERTER ||
-          param_coarse_solver->inv_type == QUDA_CA_GCR_INVERTER) {
+      if (is_ca_solver(param_coarse_solver->inv_type)) {
         param_coarse_solver->ca_basis = param.mg_global.coarse_solver_ca_basis[param.level+1];
         param_coarse_solver->ca_lambda_min = param.mg_global.coarse_solver_ca_lambda_min[param.level+1];
         param_coarse_solver->ca_lambda_max = param.mg_global.coarse_solver_ca_lambda_max[param.level+1];
@@ -1369,8 +1372,7 @@ namespace quda
     solverParam.delta = 1e-1;
     solverParam.inv_type = param.mg_global.setup_inv_type[param.level];
     // Hard coded for now...
-    if (solverParam.inv_type == QUDA_CA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CGNE_INVERTER
-        || solverParam.inv_type == QUDA_CA_CGNR_INVERTER || solverParam.inv_type == QUDA_CA_GCR_INVERTER) {
+    if (is_ca_solver(solverParam.inv_type)) {
       solverParam.ca_basis = param.mg_global.setup_ca_basis[param.level];
       solverParam.ca_lambda_min = param.mg_global.setup_ca_lambda_min[param.level];
       solverParam.ca_lambda_max = param.mg_global.setup_ca_lambda_max[param.level];

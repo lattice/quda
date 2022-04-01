@@ -349,11 +349,11 @@ int main(int argc, char **argv)
     } else {
       invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param);
     }
-    comm_allreduce_int(&inv_param.iter);
-    inv_param.iter /= comm_size() / num_sub_partition;
-    comm_allreduce(&inv_param.gflops);
-    inv_param.gflops /= comm_size() / num_sub_partition;
-    comm_allreduce_max(&inv_param.secs);
+    quda::comm_allreduce_int(inv_param.iter);
+    inv_param.iter /= quda::comm_size() / num_sub_partition;
+    quda::comm_allreduce_sum(inv_param.gflops);
+    inv_param.gflops /= quda::comm_size() / num_sub_partition;
+    quda::comm_allreduce_max(inv_param.secs);
     printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops\n\n", num_sub_partition, inv_param.iter,
                inv_param.secs, inv_param.gflops / inv_param.secs);
   }

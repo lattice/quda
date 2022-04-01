@@ -10,6 +10,8 @@
 #include <malloc_quda.h>
 #include <tune_quda.h>
 
+using namespace quda;
+
 static const size_t MAX_PREFIX_SIZE = 100;
 
 static QudaVerbosity verbosity_ = QUDA_SUMMARIZE;

@@ -638,10 +638,10 @@ extern "C" {
     /** Maximum number of iterations for refreshing the null-space vectors */
     int setup_maxiter_refresh[QUDA_MAX_MG_LEVEL];
 
-    /** Basis to use for CA-CGN(E/R) setup */
+    /** Basis to use for CA solver setup */
     QudaCABasis setup_ca_basis[QUDA_MAX_MG_LEVEL];
 
-    /** Basis size for CACG setup */
+    /** Basis size for CA solver setup */
     int setup_ca_basis_size[QUDA_MAX_MG_LEVEL];
 
     /** Minimum eigenvalue for Chebyshev CA basis */
@@ -668,10 +668,10 @@ extern "C" {
     /** Maximum number of iterations for the solver that wraps around the coarse grid correction and smoother */
     int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
 
-    /** Basis to use for CA-CGN(E/R) coarse solver */
+    /** Basis to use for CA coarse solvers */
     QudaCABasis coarse_solver_ca_basis[QUDA_MAX_MG_LEVEL];
 
-    /** Basis size for CACG coarse solver */
+    /** Basis size for CA coarse solvers */
     int coarse_solver_ca_basis_size[QUDA_MAX_MG_LEVEL];
 
     /** Minimum eigenvalue for Chebyshev CA basis */
@@ -691,6 +691,15 @@ extern "C" {
 
     /** Number of post-smoother applications on each level */
     int nu_post[QUDA_MAX_MG_LEVEL];
+
+    /** Basis to use for CA smoother solvers */
+    QudaCABasis smoother_solver_ca_basis[QUDA_MAX_MG_LEVEL];
+
+    /** Minimum eigenvalue for Chebyshev CA smoother basis */
+    double smoother_solver_ca_lambda_min[QUDA_MAX_MG_LEVEL];
+
+    /** Maximum eigenvalue for Chebyshev CA smoother basis */
+    double smoother_solver_ca_lambda_max[QUDA_MAX_MG_LEVEL];
 
     /** Over/under relaxation factor for the smoother at each level */
     double omega[QUDA_MAX_MG_LEVEL];
@@ -791,7 +800,7 @@ extern "C" {
 
   typedef struct QudaGaugeObservableParam_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
-    QudaBoolean su_project;              /**< Whether to porject onto the manifold prior to measurement */
+    QudaBoolean su_project;              /**< Whether to project onto the manifold prior to measurement */
     QudaBoolean compute_plaquette;       /**< Whether to compute the plaquette */
     double plaquette[3];                 /**< Total, spatial and temporal field energies, respectively */
     QudaBoolean compute_qcharge;         /**< Whether to compute the topological charge and field energy */
@@ -800,6 +809,17 @@ extern "C" {
     QudaBoolean compute_qcharge_density; /**< Whether to compute the topological charge density */
     void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */
   } QudaGaugeObservableParam;
+
+  typedef struct QudaGaugeSmearParam_s {
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
+    unsigned int n_steps; /**< The total number of smearing steps to perform. */
+    double epsilon;       /**< Serves as one of the coefficients in Over Improved Stout smearing, or as the step size in
+                             Wilson/Symanzik flow */
+    double alpha;         /**< The single coefficient used in APE smearing */
+    double rho; /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
+    unsigned int meas_interval;    /**< Perform the requested measurements on the gauge field at this interval */
+    QudaGaugeSmearType smear_type; /**< The smearing type to perform */
+  } QudaGaugeSmearParam;
 
   typedef struct QudaBLASParam_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
@@ -991,9 +1011,18 @@ extern "C" {
    * immediately after it's defined (and prior to explicitly setting
    * its members) using this function.  Typical usage is as follows:
    *
-   *   QudaGaugeParam obs_param = newQudaGaugeObservableParam();
+   *   QudaGaugeObservalbeParam obs_param = newQudaGaugeObservableParam();
    */
   QudaGaugeObservableParam newQudaGaugeObservableParam(void);
+
+  /**
+   * A new QudaGaugeSmearParam should always be initialized
+   * immediately after it's defined (and prior to explicitly setting
+   * its members) using this function.  Typical usage is as follows:
+   *
+   *   QudaGaugeSmearParam smear_param = newQudaGaugeSmearParam();
+   */
+  QudaGaugeSmearParam newQudaGaugeSmearParam(void);
 
   /**
    * A new QudaBLASParam should always be initialized immediately
@@ -1513,38 +1542,20 @@ extern "C" {
   void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int n_steps, double alpha);
 
   /**
-   * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param n_steps Number of steps to apply.
-   * @param alpha  Alpha coefficient for APE smearing.
-   * @param meas_interval Measure the Q charge every Nth step
+   * Performs APE, Stout, or Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
+   * @param[in] smear_param Parameter struct that defines the computation parameters
+   * @param[in,out] obs_param Parameter struct that defines which
+   * observables we are making and the resulting observables.
    */
-  void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval);
-
-  /**
-   * Performs STOUT smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param n_steps Number of steps to apply.
-   * @param rho    Rho coefficient for STOUT smearing.
-   * @param meas_interval Measure the Q charge every Nth step
-   */
-  void performSTOUTnStep(unsigned int n_steps, double rho, int meas_interval);
-
-  /**
-   * Performs Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param n_steps Number of steps to apply.
-   * @param rho    Rho coefficient for STOUT smearing.
-   * @param epsilon Epsilon coefficient for Over Improved STOUT smearing.
-   * @param meas_interval Measure the Q charge every Nth step
-   */
-  void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, int meas_interval);
+  void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam *obs_param);
 
   /**
    * Performs Wilson Flow on gaugePrecise and stores it in gaugeSmeared
-   * @param n_steps Number of steps to apply.
-   * @param step_size Size of Wilson Flow step
-   * @param meas_interval Measure the Q charge and field energy every Nth step
-   * @param wflow_type 1x1 Wilson or 2x1 Symanzik flow type
+   * @param[in] smear_param Parameter struct that defines the computation parameters
+   * @param[in,out] obs_param Parameter struct that defines which
+   * observables we are making and the resulting observables.
    */
-  void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type);
+  void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam *obs_param);
 
   /**
    * @brief Calculates a variety of gauge-field observables.  If a
