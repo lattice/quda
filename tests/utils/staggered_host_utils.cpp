@@ -166,7 +166,7 @@ void constructFatLongGaugeField(void **fatlink, void **longlink, int type, QudaP
       const complex<double> z = std::polar(1.0, phase);
       for (int dir = 0; dir < 4; ++dir) {
         for (int i = 0; i < V; ++i) {
-          for (int j = 0; j < gauge_site_size; j += 2) {
+          for (auto j = 0lu; j < gauge_site_size; j += 2) {
             if (precision == QUDA_DOUBLE_PRECISION) {
               complex<double> *l = (complex<double> *)(&(((double *)longlink[dir])[i * gauge_site_size + j]));
               *l *= z;
@@ -187,7 +187,7 @@ void constructFatLongGaugeField(void **fatlink, void **longlink, int type, QudaP
   if (dslash_type == QUDA_STAGGERED_DSLASH) {
     for (int dir = 0; dir < 4; ++dir) {
       for (int i = 0; i < V; ++i) {
-        for (int j = 0; j < gauge_site_size; j += 2) {
+        for (auto j = 0lu; j < gauge_site_size; j += 2) {
           if (precision == QUDA_DOUBLE_PRECISION) {
             ((double *)longlink[dir])[i * gauge_site_size + j] = 0.0;
             ((double *)longlink[dir])[i * gauge_site_size + j + 1] = 0.0;
@@ -762,7 +762,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
   // rescale long links by the appropriate coefficient
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     for (int d = 0; d < 4; d++) {
-      for (int i = 0; i < V * gauge_site_size; i++) {
+      for (size_t i = 0; i < V * gauge_site_size; i++) {
         gauge[d][i] /= (-24 * param->tadpole_coeff * param->tadpole_coeff);
       }
     }
