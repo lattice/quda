@@ -529,7 +529,7 @@ endif()
 # ######################################################################################################################
  if(QUDA_QDPJIT)
    if(NOT QUDA_QMP)
-     message(SEND_ERROR "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
+     message(SEND_ERROR "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QMP_DIR to the location of  the QMPConfig.cmake file ( usually <qmp-install-dir>/lib/cmake/QMP ) or add the QMP installation directory to your CMAKE_PREFIX_PATH")
    endif()
    find_package(QDPXX REQUIRED)
    if( NOT ${QDP_IS_QDPJIT} EQUAL 1 )

@@ -15,14 +15,14 @@ namespace quda
   };
 
   template <typename Float, int nColor_, QudaReconstructType recon_, int wflow_dim_,
-            QudaWFlowType wflow_type_, WFlowStepType step_type_>
+            QudaGaugeSmearType wflow_type_, WFlowStepType step_type_>
   struct GaugeWFlowArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int wflow_dim = wflow_dim_;
-    static constexpr QudaWFlowType wflow_type = wflow_type_;
+    static constexpr QudaGaugeSmearType wflow_type = wflow_type_;
     static constexpr WFlowStepType step_type = step_type_;
     typedef typename gauge_mapper<Float,recon>::type Gauge;
     typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Matrix; // temp field not on the manifold
@@ -63,12 +63,12 @@ namespace quda
     Link Stap, Rect, Z;
     // Compute staples and Z factor
     switch (arg.wflow_type) {
-    case QUDA_WFLOW_TYPE_WILSON :
+    case QUDA_GAUGE_SMEAR_WILSON_FLOW :
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       computeStaple(arg, x, arg.E, parity, dir, Stap, Arg::wflow_dim);
       Z = Stap;
       break;
-    case QUDA_WFLOW_TYPE_SYMANZIK :
+    case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW :
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
