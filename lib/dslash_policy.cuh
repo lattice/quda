@@ -1733,7 +1733,12 @@ namespace quda
     }
   };
 
-  inline void enable_policy(QudaDslashPolicy p) { policies[static_cast<std::size_t>(p)] = p; }
+  inline void enable_policy(QudaDslashPolicy p)
+  {
+    size_t p_idx = static_cast<std::size_t>(p);
+    if (p >= QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED) errorQuda("Invalid policy %lu", p_idx);
+    policies[p_idx] = p;
+  }
 
   inline void disable_policy(QudaDslashPolicy p)
   {
