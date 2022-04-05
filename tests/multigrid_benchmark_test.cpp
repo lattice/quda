@@ -78,6 +78,7 @@ void initFields(QudaPrecision prec)
   param.create = QUDA_ZERO_FIELD_CREATE;
   param.setPrecision(prec);
   param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  param.location = QUDA_CUDA_FIELD_LOCATION;
 
   xD = std::make_unique<ColorSpinorField>(param);
   yD = std::make_unique<ColorSpinorField>(param);
