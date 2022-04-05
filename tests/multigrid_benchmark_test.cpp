@@ -220,7 +220,8 @@ int main(int argc, char** argv)
 
   Nspin = 2;
 
-  printfQuda("\nBenchmarking %s precision with %d iterations...\n\n", get_prec_str(prec), niter);
+  printfQuda("\nBenchmarking %s precision colorspinor, %s precision gauge with %d iterations...\n\n",
+             get_prec_str(prec), get_prec_str(prec_sloppy), niter);
   for (int c=24; c<=32; c+=8) {
     Ncolor = c;
 
