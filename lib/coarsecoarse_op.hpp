@@ -177,7 +177,7 @@ namespace quda
       } else {
         errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
       }
-    } else {
+    } else
 #endif // NSPIN 4
     if (fineColor == 32) {
 
