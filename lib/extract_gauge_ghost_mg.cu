@@ -53,10 +53,12 @@ namespace quda {
 #ifdef NSPIN4
       } else if (u.Ncolor() == 12) { // free field Wilson
         extractGhostMG<Float, 12>(u, Ghost, extract, offset);
+#endif // NSPIN4
       } else if (u.Ncolor() == 64) {
         extractGhostMG<Float, 64>(u, Ghost, extract, offset);
-#endif // NSPIN4
 #ifdef NSPIN1
+      } else if (u.Ncolor() == 96) {
+        extractGhostMG<Float, 96>(u, Ghost, extract, offset);
       } else if (u.Ncolor() == 128) {
         extractGhostMG<Float, 128>(u, Ghost, extract, offset);
       } else if (u.Ncolor() == 192) {

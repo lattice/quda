@@ -260,6 +260,10 @@ namespace quda {
         // free field aggregation
         aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, T, g, l, XinvKD, mass, allow_truncation, dirac, matpc);
       }
+    } else if (coarseColor == 32) {
+      aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,32,coarseSpin>(Y, X, T, g, l, XinvKD, mass, allow_truncation, dirac, matpc);
+    } else if (coarseColor == 48) {
+      aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,48,coarseSpin>(Y, X, T, g, l, XinvKD, mass, allow_truncation, dirac, matpc);
     } else if (coarseColor == 64) {
       aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,64,coarseSpin>(Y, X, T, g, l, XinvKD, mass, allow_truncation, dirac, matpc);
     } else if (coarseColor == 96) {

@@ -102,6 +102,27 @@ namespace quda
     }
 
     template <bool query_max = false, class Arg, typename Tunable>
+    typename std::enable_if<Arg::N == 96, int>::type launch_yhat_kernel(TuneParam &tp, const qudaStream_t &stream,
+                                                                        Arg &arg, Tunable &tunable)
+    {
+      if (query_max) return 0;
+      // clang-format off
+      switch (tp.aux.x) {
+      case 0: launch_kernel<96, 96, 48, 24, 12>(tp, stream, arg, tunable); break;
+      //case 1: launch_kernel<64, 64, 16, 16, 16>(tp, stream, arg, tunable); break;
+      //case 2: launch_kernel<64, 64, 16, 32, 16>(tp, stream, arg, tunable); break;
+      //case 3: launch_kernel<64, 64, 32, 32, 16>(tp, stream, arg, tunable); break;
+      //case 4: launch_kernel<64, 64, 64,  8, 64>(tp, stream, arg, tunable); break;
+      //case 5: launch_kernel<64, 64, 64, 16, 32>(tp, stream, arg, tunable); break;
+      //case 6: launch_kernel<64, 64, 64, 32, 16>(tp, stream, arg, tunable); break;
+      default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 64", tp.aux.x);
+        }
+      // clang-format on
+      return -1;
+    }
+
+
+    template <bool query_max = false, class Arg, typename Tunable>
     typename std::enable_if<Arg::N == 128, int>::type launch_yhat_kernel(TuneParam &tp, const qudaStream_t &stream,
                                                                          Arg &arg, Tunable &tunable)
     {

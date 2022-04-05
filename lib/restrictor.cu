@@ -177,6 +177,10 @@ namespace quda {
 
         if (nVec == 24) { // free field staggered
           Restrict<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        } else if (nVec == 32) {
+          Restrict<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        } else if (nVec == 48) {
+          Restrict<Float,fineSpin,fineColor,coarseSpin,48>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
         } else if (nVec == 64) {
           Restrict<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
         } else if (nVec == 96) {
@@ -228,16 +232,29 @@ namespace quda {
         } else {
           errorQuda("Unsupported nVec %d", nVec);
         }
-#ifdef NSPIN4
       } else if (in.Ncolor() == 32) {
         const int fineColor = 32;
+#ifdef NSPIN4
         if (nVec == 32) {
           Restrict<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        } else
+#endif // NSPIN4
+#ifdef NSPIN1
+        if (nVec == 48) {
+          Restrict<Float,fineSpin,fineColor,coarseSpin,48>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        } else
+#endif // NSPIN1
+        {
+          errorQuda("Unsupported nVec %d", nVec);
+        }
+#ifdef NSPIN1
+      } else if (in.Ncolor() == 48) {
+        const int fineColor = 48;
+        if (nVec == 64) {
+          Restrict<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
         } else {
           errorQuda("Unsupported nVec %d", nVec);
         }
-#endif // NSPIN4
-#ifdef NSPIN1
       } else if (in.Ncolor() == 64) {
         const int fineColor = 64;
         if (nVec == 64) {

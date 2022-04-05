@@ -300,11 +300,11 @@ namespace quda {
 #endif // NSPIN4
     if (inA.Ncolor() == 24) {
       ApplyCoarse<Float,yFloat,ghostFloat,dagger,24,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location);
-#ifdef NSPIN4
     } else if (inA.Ncolor() == 32) {
       ApplyCoarse<Float,yFloat,ghostFloat,dagger,32,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location);
-#endif // NSPIN4
 #ifdef NSPIN1
+    } else if (inA.Ncolor() == 48) {
+      ApplyCoarse<Float,yFloat,ghostFloat,dagger,48,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location);
     } else if (inA.Ncolor() == 64) {
       ApplyCoarse<Float,yFloat,ghostFloat,dagger,64,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location);
     } else if (inA.Ncolor() == 96) {

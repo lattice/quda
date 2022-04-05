@@ -277,6 +277,12 @@ namespace quda {
         if (Nvec == 24) {
           BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 24>(V, B, fine_to_coarse, coarse_to_fine,
                                                                                geo_bs, n_block_ortho, two_pass);
+        } else if (Nvec == 32) {
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 32>(V, B, fine_to_coarse, coarse_to_fine,
+                                                                               geo_bs, n_block_ortho, two_pass);
+        } else if (Nvec == 48) {
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 48>(V, B, fine_to_coarse, coarse_to_fine,
+                                                                               geo_bs, n_block_ortho, two_pass);
         } else if (Nvec == 64) {
           BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 64>(V, B, fine_to_coarse, coarse_to_fine,
                                                                                geo_bs, n_block_ortho, two_pass);
@@ -327,16 +333,30 @@ namespace quda {
         } else {
           errorQuda("Unsupported nVec %d\n", Nvec);
         }
-#ifdef NSPIN4
       } else if (V.Ncolor()/Nvec == 32) {
         constexpr int nColor = 32;
+#ifdef NSPIN4
         if (Nvec == 32) {
           BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,32>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho, two_pass);
+        } else
+#endif // NSPIN4
+#ifdef NSPIN1
+        if (Nvec == 48)
+        {
+          BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,48>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho, two_pass);
+        } else
+#endif // NSPIN1
+        {
+          errorQuda("Unsupported nVec %d\n", Nvec);
+        }
+#ifdef NSPIN1
+      } else if (V.Ncolor()/Nvec == 48) {
+        constexpr int nColor = 48;
+        if (Nvec == 64) {
+          BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,64>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho, two_pass);
         } else {
           errorQuda("Unsupported nVec %d\n", Nvec);
         }
-#endif // NSPIN4
-#ifdef NSPIN1
       } else if (V.Ncolor()/Nvec == 64) {
         constexpr int nColor = 64;
         if (Nvec == 64) {

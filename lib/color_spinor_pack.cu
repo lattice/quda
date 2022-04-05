@@ -202,21 +202,25 @@ namespace quda {
       GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,18>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 24) { // Needed for K-D staggered Wilson
       GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,24>::nColor>(ghost, a, parity, nFace, dagger, destination);
-#ifdef NSPIN4
     } else if (a.Ncolor() == 32) { // Needed for Wilson
       GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,32>::nColor>(ghost, a, parity, nFace, dagger, destination);
+#ifdef NSPIN4
     } else if (a.Ncolor() == 36) { // Needed for three level free field Wilson
       GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,36>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #endif // NSPIN4
 #ifdef NSPIN1
+    } else if (a.Ncolor() == 48) { // staggered 3 -> 48 nvec
+      GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,48>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 64) { // Needed for staggered Nc = 64
       GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,64>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #endif // NSPIN1
     } else if (a.Ncolor() == 72) { // wilson 3 -> 24 nvec, or staggered 3 -> 24 nvec, which could end up getting used for Laplace...
       GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,72>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 96) { // wilson 3 -> 32 nvec, or staggered Nc = 96
+    } else if (a.Ncolor() == 96) { // wilson/staggered 3 -> 32 nvec, or staggered Nc = 96
       GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,96>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #ifdef NSPIN1
+    } else if (a.Ncolor() == 144) { // staggered 3 -> 48 Nvec
+      GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,144>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 192) { // staggered 3 -> 64 Nvec
       GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,192>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 288) { // staggered 3 -> 96 Nvec
@@ -235,6 +239,8 @@ namespace quda {
       GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,1536>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 2304) { // staggered KD 24 -> 96 nvec
       GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,2304>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 3072) { // staggered 48 -> 64 nvec
+      GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,3072>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 4096) { // staggered 64 -> 64
       GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,4096>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 6144) { // staggered 64 -> 96 nvec

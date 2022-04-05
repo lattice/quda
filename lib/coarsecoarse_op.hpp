@@ -164,48 +164,50 @@ namespace quda
       } else {
         errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
       }
-    } else
-#endif
-      if (fineColor == 24) { // coarsened Wilson or free field staggered
+    } else if (fineColor == 24) { // coarsened Wilson or free field staggered
       if (coarseColor == 24) {
         calculateYcoarse<use_mma, Float, vFloat, 24, fineSpin, 24, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
                                                                                cloverInv, kappa, mass, mu, mu_factor,
                                                                                dirac, matpc, need_bidirectional);
       } else
-#ifdef NSPIN4
         if (coarseColor == 32) {
         calculateYcoarse<use_mma, Float, vFloat, 24, fineSpin, 32, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-                                                                               cloverInv, kappa, mass, mu, mu_factor,
-                                                                               dirac, matpc, need_bidirectional);
-      } else
-#endif // NSPIN4
-#ifdef NSPIN1
-        if (coarseColor == 64) {
-        calculateYcoarse<use_mma, Float, vFloat, 24, fineSpin, 64, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-                                                                               cloverInv, kappa, mass, mu, mu_factor,
-                                                                               dirac, matpc, need_bidirectional);
-      } else // --- note, coarsening Nc == 24 -> Nc == 96 for staggered is worth revisiting in the future
-#endif
-      {
-        errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
-      }
-#ifdef NSPIN4
-    } else if (fineColor == 32) {
-      if (coarseColor == 32) {
-        calculateYcoarse<use_mma, Float, vFloat, 32, fineSpin, 32, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
                                                                                cloverInv, kappa, mass, mu, mu_factor,
                                                                                dirac, matpc, need_bidirectional);
       } else {
         errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
       }
-#endif // NSPIN4
+    } else {
+#endif // NSPIN 4
+    if (fineColor == 32) {
+
+#ifdef NSPIN4
+      if (coarseColor == 32) {
+        calculateYcoarse<use_mma, Float, vFloat, 32, fineSpin, 32, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+                                                                               cloverInv, kappa, mass, mu, mu_factor,
+                                                                               dirac, matpc, need_bidirectional);
+      } else 
+#endif
 #ifdef NSPIN1
+      if (coarseColor == 48) {
+        calculateYcoarse<use_mma, Float, vFloat, 32, fineSpin, 48, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+                                                                               cloverInv, kappa, mass, mu, mu_factor,
+                                                                               dirac, matpc, need_bidirectional);
+      } else
+#endif
+      {
+        errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
+      }
+#ifdef NSPIN1
+    } else if (fineColor == 48) {
+      if (coarseColor == 64) {
+        calculateYcoarse<use_mma, Float, vFloat, 48, fineSpin, 64, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+                                                                               cloverInv, kappa, mass, mu, mu_factor,
+                                                                               dirac, matpc, need_bidirectional);
+      } else {
+        errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
+      }
     } else if (fineColor == 64) {
-      // if (coarseColor == 64) {
-      //  calculateYcoarse<use_mma, Float, vFloat, 64, fineSpin, 64, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-      //                                                                         cloverInv, kappa, mass, mu, mu_factor,
-      //                                                                         dirac, matpc, need_bidirectional);
-      //} else
       if (coarseColor == 96) {
         calculateYcoarse<use_mma, Float, vFloat, 64, fineSpin, 96, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
                                                                                cloverInv, kappa, mass, mu, mu_factor,
