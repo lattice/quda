@@ -679,10 +679,10 @@ namespace quda {
 	  enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK);
 	  enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_READ);
 	  enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY);
-#ifdef NVSHMEM_COMMS
-    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_SHMEM);
-    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_SHMEM_OVERLAP);
-#endif
+          if (comm_nvshmem_enabled()) {
+            enable_policy(DslashCoarsePolicy::DSLASH_COARSE_SHMEM);
+            enable_policy(DslashCoarsePolicy::DSLASH_COARSE_SHMEM_OVERLAP);
+          }
 	  if (comm_gdr_enabled()) {
 	    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND);
 	    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_RECV);
