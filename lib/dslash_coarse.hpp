@@ -439,6 +439,7 @@ namespace quda {
           false;
       }
       // disable peer-to-peer if doing a zero-copy policy (temporary)
+      bool p2p_enabled = comm_peer2peer_enabled_global();
       if (policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK
           || policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_READ
           || policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY
@@ -616,7 +617,8 @@ namespace quda {
         #endif
         }
       if (dslash && comm_partitioned() && comms) inA.bufferIndex = (1 - inA.bufferIndex);
-      comm_enable_peer2peer(true);
+
+      comm_enable_peer2peer(p2p_enabled); // restore the p2p state
     }
   };
 
