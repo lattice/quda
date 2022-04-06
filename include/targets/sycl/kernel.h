@@ -105,10 +105,17 @@ namespace quda {
       f(i, j);
     }
   }
+
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   qudaError_t
   Kernel2D(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
+    if(arg.threads.x % tp.block.x != 0) {
+      return QUDA_ERROR;
+    }
+    if(arg.threads.y % tp.block.y != 0) {
+      return QUDA_ERROR;
+    }
     auto err = QUDA_SUCCESS;
     sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, 1};
     sycl::range<3> localSize{tp.block.x, tp.block.y, 1};

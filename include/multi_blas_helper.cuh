@@ -28,7 +28,7 @@ namespace quda
     /**
        @brief Returns the minimim size of YW array, will use constant buffer if arg size isn't large enough
     */
-    constexpr size_t min_YW_size() { return 4; }
+    constexpr size_t min_YW_size() { return 8; }
 
     /**
        @brief set_param sets the matrix coefficient parameters for the

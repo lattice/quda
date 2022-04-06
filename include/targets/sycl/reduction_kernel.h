@@ -159,10 +159,17 @@ namespace quda {
     sum.combine(value);
   }
 #endif
+
   template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
   qudaError_t
   MultiReduction(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
+    if(arg.threads.x % tp.block.x != 0) {
+      return QUDA_ERROR;
+    }
+    if(arg.threads.z % tp.block.z != 0) {
+      return QUDA_ERROR;
+    }
     auto err = QUDA_SUCCESS;
     sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y,
       tp.grid.z*tp.block.z};
