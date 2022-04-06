@@ -110,7 +110,7 @@ namespace quda {
       strcat(aux, ",colors_per_thread=");
       u32toa(label, colors_per_thread(a));
       strcat(aux, label);
-      strcat(aux, "shmem=");
+      strcat(aux, ",shmem=");
       u32toa(label, shmem);
       strcat(aux, label);
 
