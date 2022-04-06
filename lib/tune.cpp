@@ -685,22 +685,26 @@ namespace quda
     bool operator()(const tunepair &left, const tunepair &right) const { return (left.first) < (right.first); }
   };
 
-  class TuneCandidates : public std::priority_queue<tunepair, std::vector<tunepair>, tunepaircomp>
+  struct TuneParamComp {
+    bool operator()(const TuneParam &left, const TuneParam &right) const { return (left.time) < (right.time); }
+  };
+
+  class TuneCandidates : public std::priority_queue<TuneParam, std::vector<TuneParam>, TuneParamComp>
   {
   private:
-    static constexpr size_t maxSize = 5;
+    static constexpr size_t max_size = 5;
     float besttime = FLT_MAX;
 
   public:
-    void pushCandidate(tunepair candidate)
+    void pushCandidate(TuneParam candidate)
     {
-      if (candidate.first < besttime) besttime = candidate.first;
+      if (candidate.time < besttime) besttime = candidate.time;
 
-      if (size() < maxSize) {
+      if (size() < max_size) {
         push(candidate);
         return;
       }
-      if (candidate.first < top().first) {
+      if (candidate.time < top().time) {
         pop();
         push(candidate);
       }
@@ -848,8 +852,8 @@ namespace quda
           }
 
           float elapsed_time = timer.last() / candiate_iterations;
-          if ((error == QUDA_SUCCESS) && (tunable.launchError() == QUDA_SUCCESS))
-            tc.pushCandidate(std::make_pair(elapsed_time, param));
+          param.time = elapsed_time;
+          if ((error == QUDA_SUCCESS) && (tunable.launchError() == QUDA_SUCCESS)) tc.pushCandidate(param);
 
           if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
             if (error == QUDA_SUCCESS && tunable.launchError() == QUDA_SUCCESS) {
@@ -866,7 +870,9 @@ namespace quda
         if (tc.empty()) { errorQuda("Auto-tuning failed for %s with %s at vol=%s", key.name, key.aux, key.volume); }
 
         constexpr float min_tune_time = 1e-5f;
-        const int tuneiterations = std::max(static_cast<int>(std::ceil(min_tune_time / tc.getBestTime())), 3);
+        constexpr int min_tune_iterations = 3;
+        const int tuneiterations
+          = std::max(static_cast<int>(std::ceil(min_tune_time / tc.getBestTime())), min_tune_iterations);
         if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
           printfQuda("Candidate tuning finished. Best time %f and now continuing with %i iterations.\n",
                      tc.getBestTime(), tuneiterations);
@@ -874,7 +880,7 @@ namespace quda
 
         // we now have the candidates, now need to loop over candidates
         while (!tc.empty()) {
-          param = tc.top().second;
+          param = tc.top();
           qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);
           if (verbosity >= QUDA_DEBUG_VERBOSE) {
