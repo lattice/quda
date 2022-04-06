@@ -8,6 +8,46 @@ namespace quda
 {
 
   /**
+     @brief Helper function for returning if a given gauge field order is enabled
+     @tparam order The order requested
+   */
+  template <QudaGaugeFieldOrder order> constexpr bool is_enabled();
+#ifdef BUILD_QDP_INTERFACE
+  template <> constexpr bool is_enabled<QUDA_QDP_GAUGE_ORDER>() { return true; }
+#else
+  template <> constexpr bool is_enabled<QUDA_QDP_GAUGE_ORDER>() { return false; }
+#endif
+#ifdef BUILD_QDPJIT_INTERFACE
+  template <> constexpr bool is_enabled<QUDA_QDPJIT_GAUGE_ORDER>() { return true; }
+#else
+  template <> constexpr bool is_enabled<QUDA_QDPJIT_GAUGE_ORDER>() { return false; }
+#endif
+#ifdef BUILD_CPS_INTERFACE
+  template <> constexpr bool is_enabled<QUDA_CPS_WILSON_GAUGE_ORDER>() { return true; }
+#else
+  template <> constexpr bool is_enabled<QUDA_CPS_WILSON_GAUGE_ORDER>() { return false; }
+#endif
+#ifdef BUILD_MILC_INTERFACE
+  template <> constexpr bool is_enabled<QUDA_MILC_GAUGE_ORDER>() { return true; }
+  template <> constexpr bool is_enabled<QUDA_MILC_SITE_GAUGE_ORDER>() { return true; }
+#else
+  template <> constexpr bool is_enabled<QUDA_MILC_GAUGE_ORDER>() { return false; }
+  template <> constexpr bool is_enabled<QUDA_MILC_SITE_GAUGE_ORDER>() { return false; }
+#endif
+#ifdef BUILD_BQCD_INTERFACE
+  template <> constexpr bool is_enabled<QUDA_BQCD_GAUGE_ORDER>() { return true; }
+#else
+  template <> constexpr bool is_enabled<QUDA_BQCD_GAUGE_ORDER>() { return false; }
+#endif
+#ifdef BUILD_TIFR_INTERFACE
+  template <> constexpr bool is_enabled<QUDA_TIFR_GAUGE_ORDER>() { return true; }
+  template <> constexpr bool is_enabled<QUDA_TIFR_PADDED_GAUGE_ORDER>() { return true; }
+#else
+  template <> constexpr bool is_enabled<QUDA_TIFR_GAUGE_ORDER>() { return false; }
+  template <> constexpr bool is_enabled<QUDA_TIFR_PADDED_GAUGE_ORDER>() { return false; }
+#endif
+
+  /**
      @brief Helper function for returning if a given precision is enabled
      @tparam precision The precision requested
      @return True if enabled, false if not
@@ -68,7 +108,7 @@ namespace quda
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor, typename Recon,
             int i, typename G, typename... Args>
-  void instantiateReconstruct(G &U, Args &&... args)
+  void instantiateReconstruct(G &U, Args &&...args)
   {
     if (U.Reconstruct() == Recon::recon[i]) {
       if constexpr (is_enabled<Recon::recon[i]>())

@@ -66,81 +66,81 @@ namespace quda {
           using G = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
           ExtractGhostEx<G>(u, dim, R, ghost, extract);
         } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-#if QUDA_RECONSTRUCT & 2
-          using G = typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type;
-          ExtractGhostEx<G>(u, dim, R, ghost, extract);
-#else
-          errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_12", QUDA_RECONSTRUCT);
-#endif
+          if constexpr (is_enabled<QUDA_RECONSTRUCT_12>()) {
+            using G = typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type;
+            ExtractGhostEx<G>(u, dim, R, ghost, extract);
+          } else {
+            errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_12", QUDA_RECONSTRUCT);
+          }
         } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
-#if QUDA_RECONSTRUCT & 1
-          using G = typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type;
-          ExtractGhostEx<G>(u, dim, R, ghost, extract);
-#else
-          errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_8", QUDA_RECONSTRUCT);
-#endif
+          if constexpr (is_enabled<QUDA_RECONSTRUCT_8>()) {
+            using G = typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type;
+            ExtractGhostEx<G>(u, dim, R, ghost, extract);
+          } else {
+            errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_8", QUDA_RECONSTRUCT);
+          }
         } else if (u.Reconstruct() == QUDA_RECONSTRUCT_13) {
-#if QUDA_RECONSTRUCT & 2
-          using G = typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type;
-          ExtractGhostEx<G>(u, dim, R, ghost, extract);
-#else
-          errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_13", QUDA_RECONSTRUCT);
-#endif
+          if constexpr (is_enabled<QUDA_RECONSTRUCT_13>()) {
+            using G = typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type;
+            ExtractGhostEx<G>(u, dim, R, ghost, extract);
+          } else {
+            errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_13", QUDA_RECONSTRUCT);
+          }
         } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
-#if QUDA_RECONSTRUCT & 1
-          using G = typename gauge_mapper<Float,QUDA_RECONSTRUCT_9>::type;
-          ExtractGhostEx<G>(u, dim, R, ghost, extract);
-#else
-          errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_9", QUDA_RECONSTRUCT);
-#endif
+          if constexpr (is_enabled<QUDA_RECONSTRUCT_9>()) {
+            using G = typename gauge_mapper<Float,QUDA_RECONSTRUCT_9>::type;
+            ExtractGhostEx<G>(u, dim, R, ghost, extract);
+          } else {
+            errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_9", QUDA_RECONSTRUCT);
+          }
         }
       } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
 
-#ifdef BUILD_QDP_INTERFACE
-        ExtractGhostEx<QDPOrder<Float,length>>(u, dim, R, ghost, extract);
-#else
-        errorQuda("QDP interface has not been built\n");
-#endif
+        if constexpr (is_enabled<QUDA_QDP_GAUGE_ORDER>()) {
+          ExtractGhostEx<QDPOrder<Float,length>>(u, dim, R, ghost, extract);
+        } else {
+          errorQuda("QDP interface has not been built");
+        }
 
       } else if (u.Order() == QUDA_QDPJIT_GAUGE_ORDER) {
 
-#ifdef BUILD_QDPJIT_INTERFACE
-        ExtractGhostEx<QDPJITOrder<Float,length>>(u, dim, R, ghost, extract);
-#else
-        errorQuda("QDPJIT interface has not been built\n");
-#endif
+        if constexpr (is_enabled<QUDA_QDPJIT_GAUGE_ORDER>()) {
+          ExtractGhostEx<QDPJITOrder<Float,length>>(u, dim, R, ghost, extract);
+        } else {
+          errorQuda("QDPJIT interface has not been built");
+        }
 
       } else if (u.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
 
-#ifdef BUILD_CPS_INTERFACE
-        ExtractGhostEx<CPSOrder<Float,length>>(u, dim, R, ghost, extract);
-#else
-        errorQuda("CPS interface has not been built\n");
-#endif
+        if constexpr (is_enabled<QUDA_CPS_WILSON_GAUGE_ORDER>()) {
+          ExtractGhostEx<CPSOrder<Float,length>>(u, dim, R, ghost, extract);
+        } else {
+          errorQuda("CPS interface has not been built");
+        }
 
       } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
 
-#ifdef BUILD_MILC_INTERFACE
-        ExtractGhostEx<MILCOrder<Float,length>>(u, dim, R, ghost, extract);
-#else
-        errorQuda("MILC interface has not been built\n");
-#endif
+        if constexpr (is_enabled<QUDA_MILC_GAUGE_ORDER>()) {
+          ExtractGhostEx<MILCOrder<Float,length>>(u, dim, R, ghost, extract);
+        } else {
+          errorQuda("MILC interface has not been built");
+        }
 
       } else if (u.Order() == QUDA_BQCD_GAUGE_ORDER) {
 
-#ifdef BUILD_BQCD_INTERFACE
-        ExtractGhostEx<BQCDOrder<Float,length>>(u, dim, R, ghost, extract);
-#else
-        errorQuda("BQCD interface has not been built\n");
-#endif
+        if constexpr (is_enabled<QUDA_BQCD_GAUGE_ORDER>()) {
+          ExtractGhostEx<BQCDOrder<Float,length>>(u, dim, R, ghost, extract);
+        } else {
+          errorQuda("BQCD interface has not been built");
+        }
 
       } else if (u.Order() == QUDA_TIFR_GAUGE_ORDER) {
 
-#ifdef BUILD_TIFR_INTERFACE
-        ExtractGhostEx<TIFROrder<Float,length>>(u, dim, R, ghost, extract);
-#else
-        errorQuda("TIFR interface has not been built\n");
-#endif
+        if constexpr (is_enabled<QUDA_TIFR_GAUGE_ORDER>()) {
+          ExtractGhostEx<TIFROrder<Float,length>>(u, dim, R, ghost, extract);
+        } else {
+          errorQuda("TIFR interface has not been built");
+        }
 
       } else {
         errorQuda("Gauge field %d order not supported", u.Order());
