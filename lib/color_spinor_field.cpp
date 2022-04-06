@@ -1355,7 +1355,7 @@ namespace quda
       // first set default values to device if needed
       MemoryLocation pack_destination[2 * QUDA_MAX_DIM], halo_location[2 * QUDA_MAX_DIM];
       for (int i = 0; i < 2 * nDimComms; i++) {
-        pack_destination[i] = pack_destination_ ? pack_destination_[i] : Shmem;
+        pack_destination[i] = pack_destination_ ? pack_destination_[i] : (comm_nvshmem_enabled() ? Shmem: Device);
         halo_location[i] = halo_location_ ? halo_location_[i] : Device;
       }
       // we are overriding the ghost precision, and it doesn't match what has already been allocated
