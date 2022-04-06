@@ -227,7 +227,7 @@ int main(int argc, char **argv)
 
     int pad = 0;
     lat_dim_t y;
-    int R[4]={0,0,0,0};
+    lat_dim_t R;
     for(int dir=0; dir<4; ++dir) if(comm_dim_partitioned(dir)) R[dir] = 2;
     for(int dir=0; dir<4; ++dir) y[dir] = gauge_param.X[dir] + 2 * R[dir];
     GaugeFieldParam gParamEx(y, prec, link_recon, pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
@@ -290,9 +290,9 @@ int main(int argc, char **argv)
     memset(spinorOut, 0, inv_param.Ls * V * spinor_site_size * host_spinor_data_type_size);
 
     if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-      for (int i = 0; i < inv_param.Ls * V * spinor_site_size; i++) ((float *)spinorIn)[i] = rand() / (float)RAND_MAX;
+      for (auto i = 0lu; i < inv_param.Ls * V * spinor_site_size; i++) ((float *)spinorIn)[i] = rand() / (float)RAND_MAX;
     } else {
-      for (int i = 0; i < inv_param.Ls * V * spinor_site_size; i++) ((double *)spinorIn)[i] = rand() / (double)RAND_MAX;
+      for (auto i = 0lu; i < inv_param.Ls * V * spinor_site_size; i++) ((double *)spinorIn)[i] = rand() / (double)RAND_MAX;
     }
 
     // Setup the multigrid solver
