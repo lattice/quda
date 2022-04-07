@@ -8,8 +8,6 @@
 #include <shmem_helper.cuh>
 #include <dslash_quda.h>
 
-
-
 namespace quda {
 
   template <typename Float, typename yFloat, typename ghostFloat, int Ns, int Nc, bool dslash, bool clover, bool dagger,
@@ -350,12 +348,12 @@ namespace quda {
   }
 
   enum class DslashCoarsePolicy {
-    DSLASH_COARSE_BASIC,          // stage both sends and recvs in host memory using memcpys
-    DSLASH_COARSE_ZERO_COPY_PACK, // zero copy write pack buffers
-    DSLASH_COARSE_ZERO_COPY_READ, // zero copy read halos in dslash kernel
-    DSLASH_COARSE_ZERO_COPY,      // full zero copy
-    DSLASH_COARSE_SHMEM,          // non overlapping shmem exchange
-    DSLASH_COARSE_SHMEM_OVERLAP,  // overlapping shmem exchange
+    DSLASH_COARSE_BASIC,                   // stage both sends and recvs in host memory using memcpys
+    DSLASH_COARSE_ZERO_COPY_PACK,          // zero copy write pack buffers
+    DSLASH_COARSE_ZERO_COPY_READ,          // zero copy read halos in dslash kernel
+    DSLASH_COARSE_ZERO_COPY,               // full zero copy
+    DSLASH_COARSE_SHMEM,                   // non overlapping shmem exchange
+    DSLASH_COARSE_SHMEM_OVERLAP,           // overlapping shmem exchange
     DSLASH_COARSE_GDR_SEND,                // GDR send
     DSLASH_COARSE_GDR_RECV,                // GDR recv
     DSLASH_COARSE_GDR,                     // full GDR
@@ -378,7 +376,7 @@ namespace quda {
     bool clover;
     const int *commDim;
     const QudaPrecision halo_precision;
-    static constexpr bool enable_coarse_shmem_overlap(){ return false;}
+    static constexpr bool enable_coarse_shmem_overlap() { return false; }
 
     inline DslashCoarseLaunch(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
 			      const GaugeField &Y, const GaugeField &X, double kappa, int parity,
@@ -449,9 +447,9 @@ namespace quda {
         comm_enable_peer2peer(false);
 
       if (policy != DslashCoarsePolicy::DSLASH_COARSE_SHMEM_OVERLAP) {
-      ////////////////
-      /// NO OVERLAP
-        
+        ////////////////
+        /// NO OVERLAP
+
         if (dslash && comm_partitioned() && comms) {
           const int nFace = 1;
           inA.exchangeGhost((QudaParity)(inA.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace, dagger,
@@ -506,15 +504,66 @@ namespace quda {
           errorQuda("Unsupported precision %d\n", Y.Precision());
         }
       } else if constexpr (DslashCoarseLaunch<dagger>::enable_coarse_shmem_overlap()) {
-        // OVERLAP
-        #ifdef NVSHMEM_COMMS
+// OVERLAP
+#ifdef NVSHMEM_COMMS
         if (dslash && comm_partitioned() && comms) {
           const int nFace = 1;
           shmem += 2;
           inA.exchangeGhost((QudaParity)(inA.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace, dagger,
                             pack_destination, halo_location, gdr_send, gdr_recv, halo_precision, shmem);
         }
-          // INTERIOR
+        // INTERIOR
+        if (precision == QUDA_DOUBLE_PRECISION) {
+#ifdef GPU_MULTIGRID_DOUBLE
+          if (Y.Precision() != QUDA_DOUBLE_PRECISION) errorQuda("Y Precision %d not supported", Y.Precision());
+          if (halo_precision != QUDA_DOUBLE_PRECISION)
+            errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
+                      precision, Y.Precision());
+          ApplyCoarse<double, double, double, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                      comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location);
+#else
+          errorQuda("Double precision multigrid has not been enabled");
+#endif
+        } else if (precision == QUDA_SINGLE_PRECISION) {
+          if (Y.Precision() == QUDA_SINGLE_PRECISION) {
+            if (halo_precision == QUDA_SINGLE_PRECISION) {
+              ApplyCoarse<float, float, float, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                       comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location);
+            } else {
+              errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
+                        precision, Y.Precision());
+            }
+          } else if (Y.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
+            if (halo_precision == QUDA_HALF_PRECISION) {
+              ApplyCoarse<float, short, short, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                       comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location);
+            } else if (halo_precision == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
+              ApplyCoarse<float, short, int8_t, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                        comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location);
+#else
+              errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+#endif
+            } else {
+              errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
+                        precision, Y.Precision());
+            }
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
+          } else {
+            errorQuda("Unsupported precision %d\n", Y.Precision());
+          }
+        } else {
+          errorQuda("Unsupported precision %d\n", Y.Precision());
+        }
+        if (dslash::aux_worker) dslash::aux_worker->apply(device::get_default_stream());
+
+        if (dslash && comm_partitioned() && comms) {
+          quda::dslash::shmem_signal_wait_all();
+
+          // exterior
           if (precision == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
             if (Y.Precision() != QUDA_DOUBLE_PRECISION) errorQuda("Y Precision %d not supported", Y.Precision());
@@ -522,57 +571,6 @@ namespace quda {
               errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
                         precision, Y.Precision());
             ApplyCoarse<double, double, double, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                        comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location);
-#else
-            errorQuda("Double precision multigrid has not been enabled");
-#endif
-          } else if (precision == QUDA_SINGLE_PRECISION) {
-            if (Y.Precision() == QUDA_SINGLE_PRECISION) {
-              if (halo_precision == QUDA_SINGLE_PRECISION) {
-                ApplyCoarse<float, float, float, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                         comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location);
-              } else {
-                errorQuda("Halo precision %d not supported with field precision %d and link precision %d",
-                          halo_precision, precision, Y.Precision());
-              }
-            } else if (Y.Precision() == QUDA_HALF_PRECISION) {
-#if QUDA_PRECISION & 2
-              if (halo_precision == QUDA_HALF_PRECISION) {
-                ApplyCoarse<float, short, short, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                         comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location);
-              } else if (halo_precision == QUDA_QUARTER_PRECISION) {
-#if QUDA_PRECISION & 1
-                ApplyCoarse<float, short, int8_t, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                          comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location);
-#else
-                errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
-#endif
-              } else {
-                errorQuda("Halo precision %d not supported with field precision %d and link precision %d",
-                          halo_precision, precision, Y.Precision());
-              }
-#else
-              errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-#endif
-            } else {
-              errorQuda("Unsupported precision %d\n", Y.Precision());
-            }
-          } else {
-            errorQuda("Unsupported precision %d\n", Y.Precision());
-          }
-          if (dslash::aux_worker) dslash::aux_worker->apply(device::get_default_stream());
-
-      if (dslash && comm_partitioned() && comms) {
-          quda::dslash::shmem_signal_wait_all();
-
-          // exterior
-      if (precision == QUDA_DOUBLE_PRECISION) {
-#ifdef GPU_MULTIGRID_DOUBLE
-            if (Y.Precision() != QUDA_DOUBLE_PRECISION) errorQuda("Y Precision %d not supported", Y.Precision());
-	if (halo_precision != QUDA_DOUBLE_PRECISION)
-              errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
-                        precision, Y.Precision());
-	ApplyCoarse<double,double,double,dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
                                                         comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location);
 #else
 	errorQuda("Double precision multigrid has not been enabled");
@@ -580,27 +578,27 @@ namespace quda {
       } else if (precision == QUDA_SINGLE_PRECISION) {
         if (Y.Precision() == QUDA_SINGLE_PRECISION) {
           if (halo_precision == QUDA_SINGLE_PRECISION) {
-            ApplyCoarse<float,float,float,dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                         comms ? DSLASH_EXTERIOR : DSLASH_INTERIOR, halo_location);
+            ApplyCoarse<float, float, float, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                     comms ? DSLASH_EXTERIOR : DSLASH_INTERIOR, halo_location);
           } else {
-                errorQuda("Halo precision %d not supported with field precision %d and link precision %d",
-                          halo_precision, precision, Y.Precision());
+            errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
+                      precision, Y.Precision());
           }
         } else if (Y.Precision() == QUDA_HALF_PRECISION) {
 #if QUDA_PRECISION & 2
           if (halo_precision == QUDA_HALF_PRECISION) {
-            ApplyCoarse<float,short,short,dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                         comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location);
+            ApplyCoarse<float, short, short, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                     comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location);
           } else if (halo_precision == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
             ApplyCoarse<float, short, int8_t, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                          comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location);
+                                                      comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location);
 #else
             errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif
           } else {
-                errorQuda("Halo precision %d not supported with field precision %d and link precision %d",
-                          halo_precision, precision, Y.Precision());
+            errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
+                      precision, Y.Precision());
           }
 #else
           errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
@@ -611,10 +609,10 @@ namespace quda {
       } else {
 	errorQuda("Unsupported precision %d\n", Y.Precision());
       }
-        } 
-        #else
+        }
+#else
         errorQuda("NVSHMEM policy called but NVSHMEM not enabled.");
-        #endif
+#endif
       }
       if (dslash && comm_partitioned() && comms) inA.bufferIndex = (1 - inA.bufferIndex);
 
@@ -629,11 +627,10 @@ namespace quda {
   // string used as a tunekey to ensure we retune if the dslash policy env changes
   static char policy_string[TuneKey::aux_n];
 
-  static inline void enable_policy(DslashCoarsePolicy p) {
-    policies[static_cast<std::size_t>(p)] = p;
-  }
+  static inline void enable_policy(DslashCoarsePolicy p) { policies[static_cast<std::size_t>(p)] = p; }
 
-  static inline void disable_policy(DslashCoarsePolicy p) {
+  static inline void disable_policy(DslashCoarsePolicy p)
+  {
     policies[static_cast<std::size_t>(p)] = DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED;
   }
 
@@ -677,23 +674,23 @@ namespace quda {
 	  }
 	  if(first_active_policy == static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED)) errorQuda("No valid policy found in QUDA_ENABLE_DSLASH_COARSE_POLICY");
 	} else {
-      first_active_policy = 0;
-      enable_policy(DslashCoarsePolicy::DSLASH_COARSE_BASIC);
-      enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK);
-      enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_READ);
-      enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY);
-        if (comm_nvshmem_enabled()) {
-          enable_policy(DslashCoarsePolicy::DSLASH_COARSE_SHMEM);
-          if constexpr (enable_coarse_shmem_overlap) enable_policy(DslashCoarsePolicy::DSLASH_COARSE_SHMEM_OVERLAP);
+          first_active_policy = 0;
+          enable_policy(DslashCoarsePolicy::DSLASH_COARSE_BASIC);
+          enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK);
+          enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_READ);
+          enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY);
+          if (comm_nvshmem_enabled()) {
+            enable_policy(DslashCoarsePolicy::DSLASH_COARSE_SHMEM);
+            if constexpr (enable_coarse_shmem_overlap) enable_policy(DslashCoarsePolicy::DSLASH_COARSE_SHMEM_OVERLAP);
+          }
+          if (comm_gdr_enabled()) {
+            enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND);
+            enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_RECV);
+            enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR);
+            enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV);
+            enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ);
+          }
         }
-        if (comm_gdr_enabled()) {
-        enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND);
-        enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_RECV);
-        enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR);
-        enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV);
-        enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ);
-      }
-	}
 
         // construct string specifying which policies have been enabled
         strcat(policy_string, ",pol=");

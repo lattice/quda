@@ -95,7 +95,7 @@ namespace quda
     shmem_sync_t inc_exchangeghost_shmem_sync_counter();
 
 #ifdef NVSHMEM_COMMS
-    
+
     void shmem_signal_wait_all();
 
     using shmem_retcount_intra_t = cuda::atomic<int, cuda::thread_scope_system>;

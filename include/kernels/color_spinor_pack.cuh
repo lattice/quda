@@ -91,7 +91,7 @@ namespace quda {
     dslash::shmem_retcount_inter_t *retcount_inter;
     dslash::shmem_sync_t *sync_arr;
 #endif
-    int shmem=0;
+    int shmem = 0;
 
     PackGhostArg(const ColorSpinorField &a, int work_items, void **ghost, int parity, int nFace, int dagger, int shmem_) :
       kernel_param(

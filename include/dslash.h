@@ -144,9 +144,9 @@ namespace quda
         arg.counter = (activeTuning() && !policyTuning()) ? 2 : dslash::get_dslash_shmem_sync_counter();
       }
       if (arg.shmem > 0 && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL)) {
-        arg.counter = activeTuning() ?
-          (uberTuning() && !policyTuning() ? dslash::inc_dslash_shmem_sync_counter() : dslash::get_dslash_shmem_sync_counter()) :
-          dslash::get_dslash_shmem_sync_counter();
+        arg.counter = activeTuning() ? (uberTuning() && !policyTuning() ? dslash::inc_dslash_shmem_sync_counter() :
+                                                                          dslash::get_dslash_shmem_sync_counter()) :
+                                       dslash::get_dslash_shmem_sync_counter();
         arg.exterior_blocks = ((arg.shmem & 64) && arg.exterior_dims > 0) ?
           (device::processor_count() / (2 * arg.exterior_dims)) * (2 * arg.exterior_dims * tp.aux.y) :
           0;

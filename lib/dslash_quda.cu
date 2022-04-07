@@ -25,10 +25,10 @@ namespace quda {
     shmem_sync_t sync_counter2 = 10;
     shmem_sync_t get_dslash_shmem_sync_counter() { return sync_counter; }
     shmem_sync_t set_dslash_shmem_sync_counter(shmem_sync_t count) { return sync_counter = count; }
-    shmem_sync_t inc_dslash_shmem_sync_counter() { return ++sync_counter;}
+    shmem_sync_t inc_dslash_shmem_sync_counter() { return ++sync_counter; }
     shmem_sync_t get_exchangeghost_shmem_sync_counter() { return sync_counter2; }
     shmem_sync_t set_exchangeghost_shmem_sync_counter(shmem_sync_t count) { return sync_counter2 = count; }
-    shmem_sync_t inc_exchangeghost_shmem_sync_counter() { return ++sync_counter2;}
+    shmem_sync_t inc_exchangeghost_shmem_sync_counter() { return ++sync_counter2; }
 
 #ifdef NVSHMEM_COMMS
     shmem_sync_t *sync_arr = nullptr;
@@ -37,7 +37,7 @@ namespace quda {
     shmem_interior_done_t *_interior_done = nullptr;
     shmem_interior_count_t *_interior_count = nullptr;
     shmem_sync_t *get_dslash_shmem_sync_arr() { return sync_arr; }
-    shmem_sync_t *get_exchangeghost_shmem_sync_arr() { return sync_arr +  2 * QUDA_MAX_DIM; }
+    shmem_sync_t *get_exchangeghost_shmem_sync_arr() { return sync_arr + 2 * QUDA_MAX_DIM; }
     shmem_retcount_intra_t *get_shmem_retcount_intra() { return _retcount_intra; }
     shmem_retcount_inter_t *get_shmem_retcount_inter() { return _retcount_inter; }
     shmem_interior_done_t *get_shmem_interior_done() { return _interior_done; }
@@ -115,16 +115,12 @@ namespace quda {
   };
 
 #ifdef NVSHMEM_COMMS
-  template <typename T>
-  struct dslash_shmem_signal_wait : public TunableKernel1D {
+  template <typename T> struct dslash_shmem_signal_wait : public TunableKernel1D {
 
     long long bytes() const { return 0; }
     unsigned int minThreads() const { return 8; }
 
-    dslash_shmem_signal_wait():
-	   TunableKernel1D(8, QUDA_CUDA_FIELD_LOCATION)
-  
-    {  }
+    dslash_shmem_signal_wait() : TunableKernel1D(8, QUDA_CUDA_FIELD_LOCATION) { }
 
     void apply(const qudaStream_t &stream)
     {
@@ -133,12 +129,14 @@ namespace quda {
     }
   };
 
-namespace dslash{
-  void shmem_signal_wait_all(){
-    dslash_shmem_signal_wait<quda::dslash::shmem_sync_t> d;
-    d.apply(device::get_default_stream());
+  namespace dslash
+  {
+    void shmem_signal_wait_all()
+    {
+      dslash_shmem_signal_wait<quda::dslash::shmem_sync_t> d;
+      d.apply(device::get_default_stream());
     }
-  }
+  } // namespace dslash
 #endif
 
   void createDslashEvents()

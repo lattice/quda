@@ -82,9 +82,7 @@ namespace quda {
     constexpr shmem_signal_wait(const Arg &arg) : arg(arg) { }
     __device__ void operator()(int i)
     {
-      if (arg.commDim[i]) {
-        nvshmem_signal_wait_until((arg.sync_arr + i), NVSHMEM_CMP_GE, arg.counter);
-      }
+      if (arg.commDim[i]) { nvshmem_signal_wait_until((arg.sync_arr + i), NVSHMEM_CMP_GE, arg.counter); }
     }
   };
 #endif

@@ -71,8 +71,8 @@ namespace quda
 #else
     static constexpr int shmem = 0;
 #endif
-    PackArg(void **ghost, const ColorSpinorField &in, int nFace, int parity, int work_items, double a,
-            double b, double c, unsigned int block, unsigned int grid,
+    PackArg(void **ghost, const ColorSpinorField &in, int nFace, int parity, int work_items, double a, double b,
+            double c, unsigned int block, unsigned int grid,
 #ifdef NVSHMEM_COMMS
             int shmem_) :
 #else
@@ -88,8 +88,8 @@ namespace quda
       twist_b(b),
       twist_c(c),
       work_items(work_items),
-      threadDimMapLower{ },
-      threadDimMapUpper{ },
+      threadDimMapLower {},
+      threadDimMapUpper {},
       sites_per_block((work_items + grid - 1) / grid)
 #ifdef NVSHMEM_COMMS
       ,
@@ -254,8 +254,6 @@ namespace quda
       } // while tid
     }
   };
-
-
 
   // shmem bitfield encodes
   // 0 - no shmem
