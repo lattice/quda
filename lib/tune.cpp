@@ -688,14 +688,25 @@ namespace quda
   struct TuneParamComp {
     bool operator()(const TuneParam &left, const TuneParam &right) const { return (left.time) < (right.time); }
   };
-
+  /**
+   * @brief Queue that stores the best tune parameters identified
+   * in the 1st tuning phase which will be further tuned in the 2nd phase.
+   *
+   */
   class TuneCandidates : public std::priority_queue<TuneParam, std::vector<TuneParam>, TuneParamComp>
   {
   private:
-    static constexpr size_t max_size = 5;
+    const size_t max_size = 5;
     float besttime = FLT_MAX;
 
   public:
+    /**
+     * @brief Construct a new Tune Candidates object with specifiwd size
+     *
+     * @param size number of candidates that will be kept for 2nd phase.
+     */
+    TuneCandidates(size_t size) : max_size(size) { }
+
     void pushCandidate(TuneParam candidate)
     {
       if (candidate.time < besttime) besttime = candidate.time;
@@ -709,7 +720,11 @@ namespace quda
         push(candidate);
       }
     }
-
+    /**
+     * @brief Return the best time found in tuning.
+     *
+     * @return float time in s
+     */
     float getBestTime() const { return besttime; }
   };
 
@@ -799,7 +814,7 @@ namespace quda
          can't guarantee that all nodes are partaking */
       if (comm_rank_global() == 0 || !commGlobalReduction() || policyTuning() || uberTuning()) {
         TuneParam best_param;
-        TuneCandidates tc;
+        TuneCandidates tc(tunable.num_candidates());
         float best_time;
         time_t now;
 
@@ -823,7 +838,7 @@ namespace quda
         param.aux = make_int4(-1, -1, -1, -1);
         tunable.initTuneParam(param);
 
-        constexpr int candiate_iterations = 2;
+        const int candiate_iterations = tunable.candiate_iter();
         while (tuning && candidatetuning) {
           qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);
@@ -869,8 +884,8 @@ namespace quda
 
         if (tc.empty()) { errorQuda("Auto-tuning failed for %s with %s at vol=%s", key.name, key.aux, key.volume); }
 
-        constexpr float min_tune_time = 1e-5f;
-        constexpr int min_tune_iterations = 3;
+        const float min_tune_time = tunable.min_tune_time();
+        const int min_tune_iterations = tunable.min_tune_iter();
         const int tuneiterations
           = std::max(static_cast<int>(std::ceil(min_tune_time / tc.getBestTime())), min_tune_iterations);
         if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
