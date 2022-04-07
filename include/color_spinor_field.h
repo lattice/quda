@@ -92,8 +92,10 @@ namespace quda
     CompositeColorSpinorFieldDescriptor(bool is_composite, int dim, bool is_component = false, int id = 0) :
       is_composite(is_composite), is_component(is_component), dim(dim), id(id), volume(0), volumeCB(0), length(0), bytes(0)
     {
-      if (is_composite && is_component) errorQuda("Composite type is not implemented");
-      else if (is_composite && dim == 0) is_composite = false;
+      if (is_composite && is_component)
+        errorQuda("Composite type is not implemented");
+      else if (is_composite && dim == 0)
+        is_composite = false;
     }
 
     CompositeColorSpinorFieldDescriptor(const CompositeColorSpinorFieldDescriptor &descr) = default;
@@ -338,10 +340,10 @@ namespace quda
     size_t norm_offset; /** offset to the norm (if applicable) */
 
     // multi-GPU parameters
-    array_2d<void*, 2, QUDA_MAX_DIM> ghost; // pointers to the ghost regions - NULL by default
-    mutable lat_dim_t ghostFace;   // the size of each face
-    mutable lat_dim_t ghostFaceCB; // the size of each checkboarded face
-    mutable array<void*, 2 * QUDA_MAX_DIM> ghost_buf; // wrapper that points to current ghost zone
+    array_2d<void *, 2, QUDA_MAX_DIM> ghost;           // pointers to the ghost regions - NULL by default
+    mutable lat_dim_t ghostFace;                       // the size of each face
+    mutable lat_dim_t ghostFaceCB;                     // the size of each checkboarded face
+    mutable array<void *, 2 * QUDA_MAX_DIM> ghost_buf; // wrapper that points to current ghost zone
 
     mutable DslashConstant *dslash_constant; // constants used by dslash and packing kernels
 
@@ -383,12 +385,12 @@ namespace quda
     void setTuningString();
 
   public:
-    inline static void *fwdGhostFaceBuffer[QUDA_MAX_DIM] = { };      // cpu memory
-    inline static void *backGhostFaceBuffer[QUDA_MAX_DIM] = { };     // cpu memory
-    inline static void *fwdGhostFaceSendBuffer[QUDA_MAX_DIM] = { };  // cpu memory
-    inline static void *backGhostFaceSendBuffer[QUDA_MAX_DIM] = { }; // cpu memory
+    inline static void *fwdGhostFaceBuffer[QUDA_MAX_DIM] = {};      // cpu memory
+    inline static void *backGhostFaceBuffer[QUDA_MAX_DIM] = {};     // cpu memory
+    inline static void *fwdGhostFaceSendBuffer[QUDA_MAX_DIM] = {};  // cpu memory
+    inline static void *backGhostFaceSendBuffer[QUDA_MAX_DIM] = {}; // cpu memory
     inline static int initGhostFaceBuffer = 0;
-    inline static size_t ghostFaceBytes[QUDA_MAX_DIM] = { };
+    inline static size_t ghostFaceBytes[QUDA_MAX_DIM] = {};
     static void freeGhostBuffer(void);
 
     /**
@@ -870,88 +872,9 @@ namespace quda
   using ColorSpinorField_ref = std::reference_wrapper<ColorSpinorField>;
 
   /**
-     @brief Create a std::vector containing of subset to an input set.
-     The subset view is of type std::vector<std::reference_wrapper<T>>
-     over the range [offset, offset + count).
-     @param[in] v Input vector
-     @param[in] offset Initial index of the subset
-     @param[in] upper Size of the subset
-     @return Subset vector
-  */
-  template <typename T> inline auto make_subset(T &&v, size_t offset, size_t count)
-  {
-    using V = typename std::remove_reference_t<unwrap_t<T>>::value_type;
-    return std::vector<std::reference_wrapper<V>>{v.begin() + offset, v.begin() + offset + count};
-  }
-
-  /**
-     @brief Create a std::vector containing of subset to an input set.
-     The subset view is of type std::vector<std::reference_wrapper<T>>
-     over the range [begin, end).
-     @param[in] begin Input vector start iterator
-     @param[in] end Input vector end iterator
-     @return Subset vector
-  */
-  template <typename iterator_t> inline auto make_range(iterator_t &&begin, iterator_t &&end)
-  {
-    using V = unwrap_t<typename std::iterator_traits<iterator_t>::value_type>;
-    return std::vector<std::reference_wrapper<V>>{begin, end};
-  }
-
-  /**
-     @brief Create a std::vector<std::reference_wrapper<T>> from input
-     std::vector<T>
-     @param[in] v Input vector whose elements we will wrap
-     @return Reference wrapped vector
-  */
-  template <typename T> inline auto make_set_impl(std::vector<T> &v)
-  {
-    using V = unwrap_t<typename std::vector<T>::value_type>;
-    return std::vector<std::reference_wrapper<V>>(v.begin(), v.end());
-  }
-
-  /**
-     @brief Create a
-     std::vector<std::reference_wrapper<ColorSpinorField>> from an
-     input ColorSpinorField
-     @param[in] v Input field that we will wrap
-     @return Reference wrapped vector
-  */
-  inline auto make_set_impl(ColorSpinorField &v)
-  {
-    return std::vector<std::reference_wrapper<ColorSpinorField>>{v};
-  }
-
-  /**
-     @brief Create a std::vector of std::reference_wrappers the input argument
-
-     @param[in] v Input to be wrapped in a vector
-     @return Vector of input
-  */
-  template <typename T> inline auto make_set(T &&v)
-  {
-    auto v_set = make_set_impl(v);
-    return v_set;
-  }
-
-  /**
-     @brief Create a std::vector of std::reference_wrappers containing
-     both arguments
-
-     @param[in] v1 First input to be wrapped in a vector
-     @param[in] v2 Second input to be wrapped in a vector
-     @return Superset vector containing v1 and v2
-  */
-  template <typename T1, typename T2> inline auto make_set(T1 &&v1, T2 &&v2)
-  {
-    auto v1_set = make_set_impl(v1);
-    auto v2_set = make_set_impl(v2);
-
-    v1_set.reserve(v1_set.size() + v2_set.size());
-    v1_set.insert(v1_set.end(), v2_set.begin(), v2_set.end());
-
-    return v1_set;
-  }
+     @brief Specialization of is_field to allow us to make sets of ColorSpinorField
+   */
+  template <> struct is_field<ColorSpinorField> : std::true_type { };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, QudaFieldLocation location,
                               void *Dst = nullptr, const void *Src = nullptr);

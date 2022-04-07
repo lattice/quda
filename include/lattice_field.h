@@ -1,12 +1,12 @@
 #pragma once
 
 #include <iostream>
-#include <functional>
 #include <quda_internal.h>
 #include <comm_quda.h>
 #include <util_quda.h>
 #include <object.h>
 #include <quda_api.h>
+#include <reference_wrapper_helper.h>
 
 /**
  * @file lattice_field.h
@@ -111,8 +111,8 @@ namespace quda {
        @param[in] precision Field Precision
        @param[in] ghostExchange Type of ghost exchange
     */
-    LatticeFieldParam(int nDim, const lat_dim_t &x, int pad, QudaFieldLocation location,
-                      QudaPrecision precision, QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_PAD) :
+    LatticeFieldParam(int nDim, const lat_dim_t &x, int pad, QudaFieldLocation location, QudaPrecision precision,
+                      QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_PAD) :
       location(location),
       precision(precision),
       ghost_precision(precision),
@@ -240,32 +240,32 @@ namespace quda {
     /**
        Double buffered static GPU halo send buffer
     */
-    inline static array<void *, 2> ghost_send_buffer_d = { };
+    inline static array<void *, 2> ghost_send_buffer_d = {};
 
     /**
        Double buffered static GPU halo receive buffer
      */
-    inline static array<void *, 2> ghost_recv_buffer_d = { };
+    inline static array<void *, 2> ghost_recv_buffer_d = {};
 
     /**
        Double buffered static pinned send buffers
     */
-    inline static array<void *, 2> ghost_pinned_send_buffer_h = { };
+    inline static array<void *, 2> ghost_pinned_send_buffer_h = {};
 
     /**
        Double buffered static pinned recv buffers
     */
-    inline static array<void *, 2> ghost_pinned_recv_buffer_h = { };
+    inline static array<void *, 2> ghost_pinned_recv_buffer_h = {};
 
     /**
        Mapped version of pinned send buffers
     */
-    inline static array<void *, 2> ghost_pinned_send_buffer_hd = { };
+    inline static array<void *, 2> ghost_pinned_send_buffer_hd = {};
 
     /**
        Mapped version of pinned recv buffers
     */
-    inline static array<void *, 2> ghost_pinned_recv_buffer_hd = { };
+    inline static array<void *, 2> ghost_pinned_recv_buffer_hd = {};
 
     /**
        Remove ghost pointer for sending to
@@ -390,32 +390,32 @@ namespace quda {
     /**
        Message handles for receiving
     */
-    inline static array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_recv_p2p = { };
+    inline static array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_recv_p2p = {};
 
     /**
        Message handles for sending
     */
-    inline static array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send_p2p = { };
+    inline static array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send_p2p = {};
 
     /**
        Buffer used by peer-to-peer message handler
     */
-    inline static array_3d<int, 2, QUDA_MAX_DIM, 2> buffer_send_p2p = { };
+    inline static array_3d<int, 2, QUDA_MAX_DIM, 2> buffer_send_p2p = {};
 
     /**
        Buffer used by peer-to-peer message handler
     */
-    inline static array_3d<int, 2, QUDA_MAX_DIM, 2> buffer_recv_p2p = { };
+    inline static array_3d<int, 2, QUDA_MAX_DIM, 2> buffer_recv_p2p = {};
 
     /**
        Local copy of event used for peer-to-peer synchronization
     */
-    inline static array_3d<qudaEvent_t, 2, QUDA_MAX_DIM, 2> ipcCopyEvent = { };
+    inline static array_3d<qudaEvent_t, 2, QUDA_MAX_DIM, 2> ipcCopyEvent = {};
 
     /**
        Remote copy of event used for peer-to-peer synchronization
     */
-    inline static array_3d<qudaEvent_t, 2, QUDA_MAX_DIM, 2> ipcRemoteCopyEvent = { };
+    inline static array_3d<qudaEvent_t, 2, QUDA_MAX_DIM, 2> ipcRemoteCopyEvent = {};
 
     /**
        Whether we have initialized communication for this field
@@ -468,7 +468,6 @@ namespace quda {
     mutable bool backed_up;
 
   public:
-
     /**
        Static variable that is determined which ghost buffer we are using
      */
@@ -501,7 +500,7 @@ namespace quda {
        @brief Destructor for LatticeField
     */
     virtual ~LatticeField();
-    
+
     /**
        @brief Copy assignment operator
        @param[in] field Instance from which we are copying
@@ -596,17 +595,17 @@ namespace quda {
     /**
        @return The pointer to the lattice-dimension array
     */
-    const auto& X() const { return x; }
+    const auto &X() const { return x; }
 
     /**
        @return Extended field radius
     */
-    const auto& R() const { return r; }
+    const auto &R() const { return r; }
 
     /**
        @return Local checkboarded lattice dimensions
     */
-    const auto& LocalX() const { return local_x; }
+    const auto &LocalX() const { return local_x; }
 
     /**
       @return The pointer to the **full** lattice-dimension array
@@ -637,8 +636,8 @@ namespace quda {
        @param i The dimension of the requested surface 
        @return The single-parity surface of dimension i
     */
-    const auto& SurfaceCB() const { return surfaceCB; }
-    
+    const auto &SurfaceCB() const { return surfaceCB; }
+
     /**
        @param i The dimension of the requested surface 
        @return The single-parity surface of dimension i
@@ -648,7 +647,7 @@ namespace quda {
     /**
        @return The single-parity local surface array
     */
-    const auto& LocalSurfaceCB() const { return local_surfaceCB; }
+    const auto &LocalSurfaceCB() const { return local_surfaceCB; }
 
     /**
        @param i The dimension of the requested local surface
@@ -840,10 +839,6 @@ namespace quda {
     */
     virtual void copy_from_buffer(void *buffer) = 0;
   };
-  
-  template <typename T, class U> struct unwrap_impl { using type = U; };
-  template <typename T, class U> struct unwrap_impl<std::reference_wrapper<T>, U> { using type = T; };
-  template <typename T> using unwrap_t = typename unwrap_impl<std::decay_t<T>, T>::type;
 
   /**
      @brief Helper function for determining if the location of the fields is the same.
@@ -852,13 +847,15 @@ namespace quda {
      @return If location is unique return the location
    */
   template <typename T1, typename T2>
-  inline QudaFieldLocation Location_(const char *func, const char *file, int line, const T1 &a_, const T2 &b_) {
+  inline QudaFieldLocation Location_(const char *func, const char *file, int line, const T1 &a_, const T2 &b_)
+  {
     const unwrap_t<T1> &a(a_);
     const unwrap_t<T2> &b(b_);
 
     QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
     if (a.Location() == b.Location()) location = a.Location();
-    else errorQuda("Locations %d %d do not match  (%s:%d in %s())", a.Location(), b.Location(), file, line, func);
+    else
+      errorQuda("Locations %d %d do not match  (%s:%d in %s())", a.Location(), b.Location(), file, line, func);
     return location;
   }
 
@@ -870,8 +867,8 @@ namespace quda {
      @return If location is unique return the location
    */
   template <typename T1, typename T2, typename... Args>
-  inline QudaFieldLocation Location_(const char *func, const char *file, int line,
-                                     const T1 &a, const T2 &b, const Args &... args)
+  inline QudaFieldLocation Location_(const char *func, const char *file, int line, const T1 &a, const T2 &b,
+                                     const Args &...args)
   {
     return static_cast<QudaFieldLocation>(Location_(func,file,line,a,b) & Location_(func,file,line,a,args...));
   }
@@ -891,7 +888,8 @@ namespace quda {
     const unwrap_t<T2> &b(b_);
     QudaPrecision precision = QUDA_INVALID_PRECISION;
     if (a.Precision() == b.Precision()) precision = a.Precision();
-    else errorQuda("Precisions %d %d do not match (%s:%d in %s())", a.Precision(), b.Precision(), file, line, func);
+    else
+      errorQuda("Precisions %d %d do not match (%s:%d in %s())", a.Precision(), b.Precision(), file, line, func);
     return precision;
   }
 
@@ -903,7 +901,8 @@ namespace quda {
      @return If precision is unique return the precision
    */
   template <typename T1, typename T2, typename... Args>
-  inline QudaPrecision Precision_(const char *func, const char *file, int line, const T1 &a, const T2 &b, const Args &... args)
+  inline QudaPrecision Precision_(const char *func, const char *file, int line, const T1 &a, const T2 &b,
+                                  const Args &...args)
   {
     return static_cast<QudaPrecision>(Precision_(func,file,line,a,b) & Precision_(func,file,line,a,args...));
   }
@@ -915,8 +914,7 @@ namespace quda {
      @param[in] a Input field
      @return true if field is in native order
    */
-  template <typename T>
-  inline bool Native_(const char *func, const char *file, int line, const T &a_)
+  template <typename T> inline bool Native_(const char *func, const char *file, int line, const T &a_)
   {
     const unwrap_t<T> &a(a_);
     if (!a.isNative()) errorQuda("Non-native field detected (%s:%d in %s())", file, line, func);
@@ -930,7 +928,7 @@ namespace quda {
      @return true if all fields are in native order
    */
   template <typename T, typename... Args>
-  inline bool Native_(const char *func, const char *file, int line, const T &a, const Args &... args)
+  inline bool Native_(const char *func, const char *file, int line, const T &a, const Args &...args)
   {
     return (Native_(func, file, line, a) & Native_(func, file, line, args...));
   }
