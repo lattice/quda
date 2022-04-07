@@ -378,6 +378,7 @@ namespace quda {
     bool clover;
     const int *commDim;
     const QudaPrecision halo_precision;
+    static constexpr bool enable_coarse_shmem_overlap(){ return false;}
 
     inline DslashCoarseLaunch(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
 			      const GaugeField &Y, const GaugeField &X, double kappa, int parity,
@@ -504,8 +505,7 @@ namespace quda {
         } else {
           errorQuda("Unsupported precision %d\n", Y.Precision());
         }
-      }
-      else {
+      } else if constexpr (DslashCoarseLaunch<dagger>::enable_coarse_shmem_overlap()) {
         // OVERLAP
         #ifdef NVSHMEM_COMMS
         if (dslash && comm_partitioned() && comms) {
@@ -615,7 +615,7 @@ namespace quda {
         #else
         errorQuda("NVSHMEM policy called but NVSHMEM not enabled.");
         #endif
-        }
+      }
       if (dslash && comm_partitioned() && comms) inA.bufferIndex = (1 - inA.bufferIndex);
 
       comm_enable_peer2peer(p2p_enabled); // restore the p2p state
@@ -646,6 +646,7 @@ namespace quda {
    bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
    unsigned int sharedBytesPerThread() const { return 0; }
    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+   static constexpr bool enable_coarse_shmem_overlap = Launch::enable_coarse_shmem_overlap();
 
  public:
    inline DslashCoarsePolicyTune(Launch &dslash) : dslash(dslash)
@@ -676,22 +677,22 @@ namespace quda {
 	  }
 	  if(first_active_policy == static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED)) errorQuda("No valid policy found in QUDA_ENABLE_DSLASH_COARSE_POLICY");
 	} else {
-	  first_active_policy = 0;
-	  enable_policy(DslashCoarsePolicy::DSLASH_COARSE_BASIC);
-	  enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK);
-	  enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_READ);
-	  enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY);
-          if (comm_nvshmem_enabled()) {
-            enable_policy(DslashCoarsePolicy::DSLASH_COARSE_SHMEM);
-            enable_policy(DslashCoarsePolicy::DSLASH_COARSE_SHMEM_OVERLAP);
-          }
-	  if (comm_gdr_enabled()) {
-	    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND);
-	    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_RECV);
-	    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR);
-	    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV);
-	    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ);
-	  }
+      first_active_policy = 0;
+      enable_policy(DslashCoarsePolicy::DSLASH_COARSE_BASIC);
+      enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK);
+      enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_READ);
+      enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY);
+        if (comm_nvshmem_enabled()) {
+          enable_policy(DslashCoarsePolicy::DSLASH_COARSE_SHMEM);
+          if constexpr (enable_coarse_shmem_overlap) enable_policy(DslashCoarsePolicy::DSLASH_COARSE_SHMEM_OVERLAP);
+        }
+        if (comm_gdr_enabled()) {
+        enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND);
+        enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_RECV);
+        enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR);
+        enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV);
+        enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ);
+      }
 	}
 
         // construct string specifying which policies have been enabled
