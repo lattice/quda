@@ -243,7 +243,6 @@ namespace quda {
     virtual void apply(const qudaStream_t &stream) = 0;
     virtual void preTune() { }
     virtual void postTune() { }
-    virtual int tuningIter() const { return 1; }
 
     /**
      * @brief Parameter to control the number of iteration used in the 2nd phase of tuning, i.e. for the candidates.
