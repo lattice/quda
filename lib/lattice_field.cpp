@@ -116,59 +116,9 @@ namespace quda {
     create(param);
   }
 
-  LatticeField::LatticeField(LatticeField &&field) :
-    volume(std::exchange(field.volume, 0)),
-    volumeCB(std::exchange(field.volumeCB, 0)),
-    localVolume(std::exchange(field.localVolume, 0)),
-    localVolumeCB(std::exchange(field.localVolumeCB, 0)),
-    stride(std::exchange(field.stride, 0)),
-    pad(std::exchange(field.pad, 0)),
-    total_bytes(std::exchange(field.total_bytes, 0)),
-    nDim(std::exchange(field.nDim, 0)),
-    x(std::exchange(field.x, {})),
-    r(std::exchange(field.r, {})),
-    local_x(std::exchange(field.local_x, {})),
-    surface(std::exchange(field.surface, {})),
-    surfaceCB(std::exchange(field.surfaceCB, {})),
-    local_surface(std::exchange(field.local_surface, {})),
-    local_surfaceCB(std::exchange(field.local_surfaceCB, {})),
-    location(std::exchange(field.location, QUDA_INVALID_FIELD_LOCATION)),
-    precision(std::exchange(field.precision, QUDA_INVALID_PRECISION)),
-    ghost_precision(std::exchange(field.ghost_precision, QUDA_INVALID_PRECISION)),
-    ghost_precision_reset(false),
-    scale(std::exchange(field.scale, 0.0)),
-    siteSubset(std::exchange(field.siteSubset, QUDA_INVALID_SITE_SUBSET)),
-    ghostExchange(std::exchange(field.ghostExchange, QUDA_GHOST_EXCHANGE_INVALID)),
-    nDimComms(std::exchange(field.nDimComms, 0)),
-    ghost_bytes(std::exchange(field.ghost_bytes, 0)),
-    ghost_bytes_old(std::exchange(field.ghost_bytes_old, 0)),
-    ghost_face_bytes(std::exchange(field.ghost_face_bytes, {})),
-    ghost_face_bytes_aligned(std::exchange(field.ghost_face_bytes_aligned, {})),
-    ghost_offset(std::exchange(field.ghost_offset, {})),
-    my_face_h(std::exchange(field.my_face_h, {})),
-    my_face_hd(std::exchange(field.my_face_hd, {})),
-    my_face_d(std::exchange(field.my_face_d, {})),
-    my_face_dim_dir_h(std::exchange(field.my_face_dim_dir_h, {})),
-    my_face_dim_dir_hd(std::exchange(field.my_face_dim_dir_hd, {})),
-    my_face_dim_dir_d(std::exchange(field.my_face_dim_dir_d, {})),
-    from_face_h(std::exchange(field.from_face_h, {})),
-    from_face_hd(std::exchange(field.from_face_hd, {})),
-    from_face_d(std::exchange(field.from_face_d, {})),
-    from_face_dim_dir_h(std::exchange(field.from_face_dim_dir_h, {})),
-    from_face_dim_dir_hd(std::exchange(field.from_face_dim_dir_hd, {})),
-    from_face_dim_dir_d(std::exchange(field.from_face_dim_dir_d, {})),
-    mh_recv(std::exchange(field.mh_recv, {})),
-    mh_send(std::exchange(field.mh_send, {})),
-    mh_recv_rdma(std::exchange(field.mh_recv_rdma, {})),
-    mh_send_rdma(std::exchange(field.mh_send_rdma, {})),
-    initComms(std::exchange(field.initComms, false)),
-    vol_string(std::exchange(field.vol_string, {})),
-    aux_string(std::exchange(field.aux_string, {})),
-    mem_type(std::exchange(field.mem_type, QUDA_MEMORY_INVALID)),
-    backup_h(std::exchange(field.backup_h, nullptr)),
-    backup_norm_h(std::exchange(field.backup_norm_h, nullptr)),
-    backed_up(std::exchange(field.backed_up, false))
+  LatticeField::LatticeField(LatticeField &&field)
   {
+    move(std::move(field));
   }
 
   LatticeField::~LatticeField() { destroyComms(); }
@@ -188,57 +138,7 @@ namespace quda {
   {
     if (&src != this) {
       destroyComms();
-      volume = std::exchange(src.volume, 0);
-      volumeCB = std::exchange(src.volumeCB, 0);
-      localVolume = std::exchange(src.localVolume, 0);
-      localVolumeCB = std::exchange(src.localVolumeCB, 0);
-      stride = std::exchange(src.stride, 0);
-      pad = std::exchange(src.pad, 0);
-      total_bytes = std::exchange(src.total_bytes, 0);
-      nDim = std::exchange(src.nDim, 0);
-      x = std::exchange(src.x, {});
-      r = std::exchange(src.r, {});
-      local_x = std::exchange(src.local_x, {});
-      surface = std::exchange(src.surface, {});
-      surfaceCB = std::exchange(src.surfaceCB, {});
-      local_surface = std::exchange(src.local_surface, {});
-      local_surfaceCB = std::exchange(src.local_surfaceCB, {});
-      location = std::exchange(src.location, QUDA_INVALID_FIELD_LOCATION);
-      precision = std::exchange(src.precision, QUDA_INVALID_PRECISION);
-      ghost_precision = std::exchange(src.ghost_precision, QUDA_INVALID_PRECISION);
-      ghost_precision_reset = std::exchange(src.ghost_precision_reset, false);
-      scale = std::exchange(src.scale, 0.0);
-      siteSubset = std::exchange(src.siteSubset, QUDA_INVALID_SITE_SUBSET);
-      ghostExchange = std::exchange(src.ghostExchange, QUDA_GHOST_EXCHANGE_INVALID);
-      nDimComms = std::exchange(src.nDimComms, 0);
-      ghost_bytes = std::exchange(src.ghost_bytes, 0);
-      ghost_bytes_old = std::exchange(src.ghost_bytes_old, {});
-      ghost_face_bytes = std::exchange(src.ghost_face_bytes, {});
-      ghost_face_bytes_aligned = std::exchange(src.ghost_face_bytes_aligned, {});
-      ghost_offset = std::exchange(src.ghost_offset, {});
-      my_face_h = std::exchange(src.my_face_h, {});
-      my_face_hd = std::exchange(src.my_face_hd, {});
-      my_face_d = std::exchange(src.my_face_d, {});
-      my_face_dim_dir_h = std::exchange(src.my_face_dim_dir_h, {});
-      my_face_dim_dir_hd = std::exchange(src.my_face_dim_dir_hd, {});
-      my_face_dim_dir_d = std::exchange(src.my_face_dim_dir_d, {});
-      from_face_h = std::exchange(src.from_face_h, {});
-      from_face_hd = std::exchange(src.from_face_hd, {});
-      from_face_d = std::exchange(src.from_face_d, {});
-      from_face_dim_dir_h = std::exchange(src.from_face_dim_dir_h, {});
-      from_face_dim_dir_hd = std::exchange(src.from_face_dim_dir_hd, {});
-      from_face_dim_dir_d = std::exchange(src.from_face_dim_dir_d, {});
-      mh_recv = std::exchange(src.mh_recv, {});
-      mh_send = std::exchange(src.mh_send, {});
-      mh_recv_rdma = std::exchange(src.mh_recv_rdma, {});
-      mh_send_rdma = std::exchange(src.mh_send_rdma, {});
-      initComms = std::exchange(src.initComms, false);
-      vol_string = std::exchange(src.vol_string, {});
-      aux_string = std::exchange(src.aux_string, {});
-      mem_type = std::exchange(src.mem_type, QUDA_MEMORY_INVALID);
-      backup_h = std::exchange(src.backup_h, nullptr);
-      backup_norm_h = std::exchange(src.backup_norm_h, nullptr);
-      backed_up = std::exchange(src.backed_up, false);
+      move(std::move(src));
     }
     return *this;
   }
@@ -291,6 +191,61 @@ namespace quda {
     mem_type = param.mem_type;
 
     setTuningString();
+  }
+
+  void LatticeField::move(LatticeField &&src)
+  {
+    volume = std::exchange(src.volume, 0);
+    volumeCB = std::exchange(src.volumeCB, 0);
+    localVolume = std::exchange(src.localVolume, 0);
+    localVolumeCB = std::exchange(src.localVolumeCB, 0);
+    stride = std::exchange(src.stride, 0);
+    pad = std::exchange(src.pad, 0);
+    total_bytes = std::exchange(src.total_bytes, 0);
+    nDim = std::exchange(src.nDim, 0);
+    x = std::exchange(src.x, {});
+    r = std::exchange(src.r, {});
+    local_x = std::exchange(src.local_x, {});
+    surface = std::exchange(src.surface, {});
+    surfaceCB = std::exchange(src.surfaceCB, {});
+    local_surface = std::exchange(src.local_surface, {});
+    local_surfaceCB = std::exchange(src.local_surfaceCB, {});
+    location = std::exchange(src.location, QUDA_INVALID_FIELD_LOCATION);
+    precision = std::exchange(src.precision, QUDA_INVALID_PRECISION);
+    ghost_precision = std::exchange(src.ghost_precision, QUDA_INVALID_PRECISION);
+    ghost_precision_reset = std::exchange(src.ghost_precision_reset, false);
+    scale = std::exchange(src.scale, 0.0);
+    siteSubset = std::exchange(src.siteSubset, QUDA_INVALID_SITE_SUBSET);
+    ghostExchange = std::exchange(src.ghostExchange, QUDA_GHOST_EXCHANGE_INVALID);
+    nDimComms = std::exchange(src.nDimComms, 0);
+    ghost_bytes = std::exchange(src.ghost_bytes, 0);
+    ghost_bytes_old = std::exchange(src.ghost_bytes_old, {});
+    ghost_face_bytes = std::exchange(src.ghost_face_bytes, {});
+    ghost_face_bytes_aligned = std::exchange(src.ghost_face_bytes_aligned, {});
+    ghost_offset = std::exchange(src.ghost_offset, {});
+    my_face_h = std::exchange(src.my_face_h, {});
+    my_face_hd = std::exchange(src.my_face_hd, {});
+    my_face_d = std::exchange(src.my_face_d, {});
+    my_face_dim_dir_h = std::exchange(src.my_face_dim_dir_h, {});
+    my_face_dim_dir_hd = std::exchange(src.my_face_dim_dir_hd, {});
+    my_face_dim_dir_d = std::exchange(src.my_face_dim_dir_d, {});
+    from_face_h = std::exchange(src.from_face_h, {});
+    from_face_hd = std::exchange(src.from_face_hd, {});
+    from_face_d = std::exchange(src.from_face_d, {});
+    from_face_dim_dir_h = std::exchange(src.from_face_dim_dir_h, {});
+    from_face_dim_dir_hd = std::exchange(src.from_face_dim_dir_hd, {});
+    from_face_dim_dir_d = std::exchange(src.from_face_dim_dir_d, {});
+    mh_recv = std::exchange(src.mh_recv, {});
+    mh_send = std::exchange(src.mh_send, {});
+    mh_recv_rdma = std::exchange(src.mh_recv_rdma, {});
+    mh_send_rdma = std::exchange(src.mh_send_rdma, {});
+    initComms = std::exchange(src.initComms, false);
+    vol_string = std::exchange(src.vol_string, {});
+    aux_string = std::exchange(src.aux_string, {});
+    mem_type = std::exchange(src.mem_type, QUDA_MEMORY_INVALID);
+    backup_h = std::exchange(src.backup_h, nullptr);
+    backup_norm_h = std::exchange(src.backup_norm_h, nullptr);
+    backed_up = std::exchange(src.backed_up, false);
   }
 
   void LatticeField::fill(LatticeFieldParam &param) const

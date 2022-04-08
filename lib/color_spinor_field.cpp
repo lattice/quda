@@ -76,36 +76,9 @@ namespace quda
   }
 
   ColorSpinorField::ColorSpinorField(ColorSpinorField &&field) :
-    LatticeField(std::move(field)),
-    init(std::exchange(field.init, false)),
-    alloc(std::exchange(field.alloc, false)),
-    reference(std::exchange(field.reference, false)),
-    ghost_precision_allocated(std::exchange(field.ghost_precision_allocated, QUDA_INVALID_PRECISION)),
-    nColor(std::exchange(field.nColor, 0)),
-    nSpin(std::exchange(field.nSpin, 0)),
-    nVec(std::exchange(field.nVec, 0)),
-    twistFlavor(std::exchange(field.twistFlavor, QUDA_TWIST_INVALID)),
-    pc_type(std::exchange(field.pc_type, QUDA_PC_INVALID)),
-    suggested_parity(std::exchange(field.suggested_parity, QUDA_INVALID_PARITY)),
-    length(std::exchange(field.length, 0)),
-    v(std::exchange(field.v, nullptr)),
-    v_h(std::exchange(field.v_h, nullptr)),
-    norm_offset(std::exchange(field.norm_offset, 0)),
-    ghost(std::exchange(field.ghost, {})),
-    ghostFace(std::exchange(field.ghostFace, {})),
-    ghostFaceCB(std::exchange(field.ghostFaceCB, {})),
-    ghost_buf(std::exchange(field.ghost_buf, {})),
-    dslash_constant(std::exchange(field.dslash_constant, nullptr)),
-    bytes(std::exchange(field.bytes, 0)),
-    bytes_raw(std::exchange(field.bytes_raw, 0)),
-    siteOrder(std::exchange(field.siteOrder, QUDA_INVALID_SITE_ORDER)),
-    fieldOrder(std::exchange(field.fieldOrder, QUDA_INVALID_FIELD_ORDER)),
-    gammaBasis(std::exchange(field.gammaBasis, QUDA_INVALID_GAMMA_BASIS)),
-    even(std::exchange(field.even, nullptr)),
-    odd(std::exchange(field.odd, nullptr)),
-    composite_descr(std::exchange(field.composite_descr, CompositeColorSpinorFieldDescriptor())),
-    components(std::move(field.components))
+    LatticeField(std::move(field))
   {
+    move(std::move(field));
   }
 
   ColorSpinorField::~ColorSpinorField() { destroy(); }
@@ -151,35 +124,7 @@ namespace quda
       if (!init || are_compatible(*this, src)) {
         if (init) destroy();
         LatticeField::operator=(std::move(src));
-
-        init = std::exchange(src.init, false);
-        alloc = std::exchange(src.alloc, false);
-        reference = std::exchange(src.reference, false);
-        ghost_precision_allocated = std::exchange(src.ghost_precision_allocated, QUDA_INVALID_PRECISION);
-        nColor = std::exchange(src.nColor, 0);
-        nSpin = std::exchange(src.nSpin, 0);
-        nVec = std::exchange(src.nVec, 0);
-        twistFlavor = std::exchange(src.twistFlavor, QUDA_TWIST_INVALID);
-        pc_type = std::exchange(src.pc_type, QUDA_PC_INVALID);
-        suggested_parity = std::exchange(src.suggested_parity, QUDA_INVALID_PARITY);
-        length = std::exchange(src.length, 0);
-        v = std::exchange(src.v, nullptr);
-        v_h = std::exchange(src.v_h, nullptr);
-        norm_offset = std::exchange(src.norm_offset, 0);
-        ghost = std::exchange(src.ghost, {});
-        ghostFace = std::exchange(src.ghostFace, {});
-        ghostFaceCB = std::exchange(src.ghostFaceCB, {});
-        ghost_buf = std::exchange(src.ghost_buf, {});
-        dslash_constant = std::exchange(src.dslash_constant, nullptr);
-        bytes = std::exchange(src.bytes, 0);
-        bytes_raw = std::exchange(src.bytes_raw, 0);
-        siteOrder = std::exchange(src.siteOrder, QUDA_INVALID_SITE_ORDER);
-        fieldOrder = std::exchange(src.fieldOrder, QUDA_INVALID_FIELD_ORDER);
-        gammaBasis = std::exchange(src.gammaBasis, QUDA_INVALID_GAMMA_BASIS);
-        even = std::exchange(src.even, nullptr);
-        odd = std::exchange(src.odd, nullptr);
-        composite_descr = std::exchange(src.composite_descr, CompositeColorSpinorFieldDescriptor());
-        components = std::move(src.components);
+        move(std::move(src));
       } else {
         // we error if the field is not compatible with this
         errorQuda("Moving to already created field");
@@ -328,6 +273,38 @@ namespace quda
           memset(static_cast<char *>(v) + subset_bytes_raw + subset_bytes * subset, 0, subset_bytes - subset_bytes_raw);
       }
     }
+  }
+
+  void ColorSpinorField::move(ColorSpinorField &&src)
+  {
+    init = std::exchange(src.init, false);
+    alloc = std::exchange(src.alloc, false);
+    reference = std::exchange(src.reference, false);
+    ghost_precision_allocated = std::exchange(src.ghost_precision_allocated, QUDA_INVALID_PRECISION);
+    nColor = std::exchange(src.nColor, 0);
+    nSpin = std::exchange(src.nSpin, 0);
+    nVec = std::exchange(src.nVec, 0);
+    twistFlavor = std::exchange(src.twistFlavor, QUDA_TWIST_INVALID);
+    pc_type = std::exchange(src.pc_type, QUDA_PC_INVALID);
+    suggested_parity = std::exchange(src.suggested_parity, QUDA_INVALID_PARITY);
+    length = std::exchange(src.length, 0);
+    v = std::exchange(src.v, nullptr);
+    v_h = std::exchange(src.v_h, nullptr);
+    norm_offset = std::exchange(src.norm_offset, 0);
+    ghost = std::exchange(src.ghost, {});
+    ghostFace = std::exchange(src.ghostFace, {});
+    ghostFaceCB = std::exchange(src.ghostFaceCB, {});
+    ghost_buf = std::exchange(src.ghost_buf, {});
+    dslash_constant = std::exchange(src.dslash_constant, nullptr);
+    bytes = std::exchange(src.bytes, 0);
+    bytes_raw = std::exchange(src.bytes_raw, 0);
+    siteOrder = std::exchange(src.siteOrder, QUDA_INVALID_SITE_ORDER);
+    fieldOrder = std::exchange(src.fieldOrder, QUDA_INVALID_FIELD_ORDER);
+    gammaBasis = std::exchange(src.gammaBasis, QUDA_INVALID_GAMMA_BASIS);
+    even = std::exchange(src.even, nullptr);
+    odd = std::exchange(src.odd, nullptr);
+    composite_descr = std::exchange(src.composite_descr, CompositeColorSpinorFieldDescriptor());
+    components = std::move(src.components);
   }
 
   void ColorSpinorField::destroy()

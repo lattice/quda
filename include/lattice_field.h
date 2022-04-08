@@ -154,6 +154,12 @@ namespace quda {
     */
     void create(const LatticeFieldParam &param);
 
+    /**
+       @brief Move the contents of a field to this
+       @param[in,out] other Field we are moving from
+    */
+    void move(LatticeField &&other);
+
   protected:
     /** Lattice volume */
     size_t volume = 0;

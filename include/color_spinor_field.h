@@ -288,7 +288,21 @@ namespace quda
   class ColorSpinorField : public LatticeField
   {
   private:
+    /**
+       @brief Create the field as specified by the param
+       @param[in] Parameter struct
+    */
     void create(const ColorSpinorParam &param);
+
+    /**
+       @brief Move the contents of a field to this
+       @param[in,out] other Field we are moving from
+    */
+    void move(ColorSpinorField &&other);
+
+    /**
+       @brief Destroy the field
+    */
     void destroy();
 
   protected:
