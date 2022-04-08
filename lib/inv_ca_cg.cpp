@@ -11,18 +11,17 @@
    http://research.nvidia.com/sites/default/files/pubs/2016-04_S-Step-and-Communication-Avoiding/nvr-2016-003.pdf
 */
 
-namespace quda {
+namespace quda
+{
 
   CACG::CACG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
              const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
-    init(false),
-    lambda_init(false),
-    basis(param.ca_basis)
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile), init(false), lambda_init(false), basis(param.ca_basis)
   {
   }
 
-  CACG::~CACG() {
+  CACG::~CACG()
+  {
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
     destroyDeflationSpace();
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
@@ -52,12 +51,12 @@ namespace quda {
     }
   }
 
-  ColorSpinorField& CACGNE::get_residual()
+  ColorSpinorField &CACGNE::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
     if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
     // CG residual will match the CGNE residual (FIXME: but only with zero initial guess?)
-    return param.use_init_guess? xp : CACG::get_residual();
+    return param.use_init_guess ? xp : CACG::get_residual();
   }
 
   // CACGNE: M Mdag y = b is solved; x = Mdag y is returned as solution.
@@ -76,8 +75,10 @@ namespace quda {
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       // compute initial residual
       mmdag.Expose()->M(xp, x);
-      if (param.compute_true_res && b2 == 0.0) b2 = blas::xmyNorm(b, xp);
-      else blas::xpay(b, -1.0, xp);
+      if (param.compute_true_res && b2 == 0.0)
+        b2 = blas::xmyNorm(b, xp);
+      else
+        blas::xpay(b, -1.0, xp);
 
       // compute solution to residual equation
       CACG::operator()(yp, xp);
@@ -131,7 +132,7 @@ namespace quda {
     }
   }
 
-  ColorSpinorField& CACGNR::get_residual()
+  ColorSpinorField &CACGNR::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
     if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
@@ -215,7 +216,7 @@ namespace quda {
       S.resize(param.Nkrylov);
       for (int i = 0; i < param.Nkrylov; i++) {
         // in the power basis we can alias AS[k] to S[k+1]
-        S[i] = (basis == QUDA_POWER_BASIS && i > 0) ? AS[i-1] : ColorSpinorField(csParam);
+        S[i] = (basis == QUDA_POWER_BASIS && i > 0) ? AS[i - 1] : ColorSpinorField(csParam);
       }
 
       if (!mixed()) r = S[0].create_alias(csParam);
@@ -227,25 +228,23 @@ namespace quda {
   }
 
   // template!
-  template <int N> void compute_alpha_N(const std::vector<double>& Q_AQandg, std::vector<double>& alpha)
+  template <int N> void compute_alpha_N(const std::vector<double> &Q_AQandg, std::vector<double> &alpha)
   {
     typedef Matrix<double, N, N, RowMajor> matrix;
     typedef Matrix<double, N, 1> vector;
 
-    matrix matQ_AQ(N,N);
+    matrix matQ_AQ(N, N);
     vector vecg(N);
-    for (int i=0; i<N; i++) {
-      vecg(i) = Q_AQandg[i*(N+1)+N];
-      for (int j=0; j<N; j++) {
-        matQ_AQ(i,j) = Q_AQandg[i*(N+1)+j];
-      }
+    for (int i = 0; i < N; i++) {
+      vecg(i) = Q_AQandg[i * (N + 1) + N];
+      for (int j = 0; j < N; j++) { matQ_AQ(i, j) = Q_AQandg[i * (N + 1) + j]; }
     }
-    Map<vector> vecalpha(alpha.data(),N);
+    Map<vector> vecalpha(alpha.data(), N);
 
     vecalpha = matQ_AQ.fullPivLu().solve(vecg);
 
-    //JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
-    //psi = svd.solve(phi);
+    // JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
+    // psi = svd.solve(phi);
   }
 
   void CACG::compute_alpha()
@@ -300,23 +299,22 @@ namespace quda {
   }
 
   // template!
-  template <int N> void compute_beta_N(const std::vector<double>& Q_AQandg, std::vector<double>& Q_AS, std::vector<double>& beta)
+  template <int N>
+  void compute_beta_N(const std::vector<double> &Q_AQandg, std::vector<double> &Q_AS, std::vector<double> &beta)
   {
     typedef Matrix<double, N, N, RowMajor> matrix;
 
-    matrix matQ_AQ(N,N);
-    for (int i=0; i<N; i++) {
-      for (int j=0; j<N; j++) {
-        matQ_AQ(i,j) = Q_AQandg[i*(N+1)+j];
-      }
+    matrix matQ_AQ(N, N);
+    for (int i = 0; i < N; i++) {
+      for (int j = 0; j < N; j++) { matQ_AQ(i, j) = Q_AQandg[i * (N + 1) + j]; }
     }
-    Map<matrix> matQ_AS(Q_AS.data(),N,N), matbeta(beta.data(),N,N);
+    Map<matrix> matQ_AS(Q_AS.data(), N, N), matbeta(beta.data(), N, N);
 
     matQ_AQ = -matQ_AQ;
     matbeta = matQ_AQ.fullPivLu().solve(matQ_AS);
 
-    //JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
-    //psi = svd.solve(phi);
+    // JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
+    // psi = svd.solve(phi);
   }
 
   void CACG::compute_beta()
@@ -368,12 +366,13 @@ namespace quda {
   }
 
   // Code to check for reliable updates
-  int CACG::reliable(double &rNorm,  double &maxrr, int &rUpdate, const double &r2, const double &delta) {
+  int CACG::reliable(double &rNorm, double &maxrr, int &rUpdate, const double &r2, const double &delta)
+  {
     // reliable updates
     rNorm = sqrt(r2);
     if (rNorm > maxrr) maxrr = rNorm;
 
-    int updateR = (rNorm < delta*maxrr) ? 1 : 0;
+    int updateR = (rNorm < delta * maxrr) ? 1 : 0;
 
     if (updateR) {
       rUpdate++;
@@ -384,7 +383,7 @@ namespace quda {
     return updateR;
   }
 
-  ColorSpinorField& CACG::get_residual()
+  ColorSpinorField &CACG::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
     if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
@@ -447,7 +446,7 @@ namespace quda {
     // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x, tmp, tmp2);
-      //r = b - Ax0
+      // r = b - Ax0
       if (!fixed_iteration) {
         r2 = blas::xmyNorm(b, r);
       } else {
@@ -478,17 +477,23 @@ namespace quda {
     auto &lambda_max = param.ca_lambda_max;
 
     if (basis == QUDA_CHEBYSHEV_BASIS && lambda_max < lambda_min && !lambda_init) {
-      if (!param.is_preconditioner) { profile.TPSTOP(QUDA_PROFILE_PREAMBLE); profile.TPSTART(QUDA_PROFILE_INIT); }
+      if (!param.is_preconditioner) {
+        profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        profile.TPSTART(QUDA_PROFILE_INIT);
+      }
 
       // Perform 100 power iterations, normalizing every 10 mat-vecs, using r as an initial seed
       // and Q[0]/AQ[0] as temporaries for the power iterations. tmp_sloppy/tmp2_sloppy get passed in as temporaries
       // for matSloppy.
       lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r, Q[0], AQ[0], 100, 10, tmp_sloppy, tmp2_sloppy);
-      logQuda(QUDA_SUMMARIZE, "CA-CG Approximate lambda max = 1.1 x %e\n", lambda_max/1.1);
+      logQuda(QUDA_SUMMARIZE, "CA-CG Approximate lambda max = 1.1 x %e\n", lambda_max / 1.1);
 
       lambda_init = true;
 
-      if (!param.is_preconditioner) { profile.TPSTOP(QUDA_PROFILE_INIT); profile.TPSTART(QUDA_PROFILE_PREAMBLE); }
+      if (!param.is_preconditioner) {
+        profile.TPSTOP(QUDA_PROFILE_INIT);
+        profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+      }
     }
 
     // Check to see that we're not trying to invert on a zero-field source
@@ -515,7 +520,7 @@ namespace quda {
     const int maxResIncreaseTotal = param.max_res_increase_total;
 
     double heavy_quark_res = 0.0; // heavy quark residual
-    if(use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+    if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
     int resIncrease = 0;
     int resIncreaseTotal = 0;
@@ -530,20 +535,20 @@ namespace quda {
     bool l2_converge = false;
 
     // Various variables related to reliable updates.
-    int rUpdate = 0; // count reliable updates.
-    double delta = param.delta; // delta for reliable updates.
-    double rNorm = sqrt(r2); // The current residual norm.
-    double maxrr = rNorm; // The maximum residual norm since the last reliable update.
+    int rUpdate = 0;             // count reliable updates.
+    double delta = param.delta;  // delta for reliable updates.
+    double rNorm = sqrt(r2);     // The current residual norm.
+    double maxrr = rNorm;        // The maximum residual norm since the last reliable update.
     double maxr_deflate = rNorm; // The maximum residual since the last deflation
 
     // Factors which map linear operator onto [-1,1]
-    double m_map = 2./(lambda_max-lambda_min);
-    double b_map = -(lambda_max+lambda_min)/(lambda_max-lambda_min);
+    double m_map = 2. / (lambda_max - lambda_min);
+    double b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
 
     blas::copy(S[0], r); // no op if uni-precision
 
     PrintStats("CA-CG", total_iter, r2, b2, heavy_quark_res);
-    while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
+    while (!convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
       // build up a space of size n_krylov, assumes S[0] is in place
       computeCAKrylovSpace(matSloppy, AS, S, n_krylov, basis, m_map, b_map, tmp_sloppy, tmp2_sloppy);
@@ -611,18 +616,16 @@ namespace quda {
       // NOTE: Because we always carry around the residual from an iteration before, we
       // "lie" about which iteration we're on so the printed residual matches with the
       // printed iteration number.
-      if (total_iter > 0) {
-        PrintStats("CA-CG", total_iter, r2, b2, heavy_quark_res);
-      }
+      if (total_iter > 0) { PrintStats("CA-CG", total_iter, r2, b2, heavy_quark_res); }
 
       total_iter += n_krylov;
 
       // update since n_krylov or maxiter reached, converged or reliable update required
       // note that the heavy quark residual will by definition only be checked every n_krylov steps
       // Note: this won't reliable update when the norm _increases_.
-      if (total_iter>=param.maxiter || (r2 < stop && !l2_converge) || reliable(rNorm, maxrr, rUpdate, r2, delta)) {
+      if (total_iter >= param.maxiter || (r2 < stop && !l2_converge) || reliable(rNorm, maxrr, rUpdate, r2, delta)) {
 
-        if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
+        if ((r2 < stop || total_iter >= param.maxiter) && param.sloppy_converge) break;
         mat(r, x, tmp, tmp2);
         r2 = blas::xmyNorm(b, r);
 
@@ -645,8 +648,9 @@ namespace quda {
         if (r2 > r2_old) {
           resIncrease++;
           resIncreaseTotal++;
-          warningQuda("CA-CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-                      sqrt(r2), sqrt(r2_old), resIncreaseTotal);
+          warningQuda(
+            "CA-CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+            sqrt(r2), sqrt(r2_old), resIncreaseTotal);
           if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
             warningQuda("CA-CG: solver exiting due to too many true residual norm increases");
             break;
@@ -657,10 +661,9 @@ namespace quda {
 
         r2_old = r2;
       }
-
     }
 
-    if (total_iter>param.maxiter && getVerbosity() >= QUDA_SUMMARIZE)
+    if (total_iter > param.maxiter && getVerbosity() >= QUDA_SUMMARIZE)
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     // Print number of reliable updates.
@@ -671,7 +674,8 @@ namespace quda {
       mat(r, x, tmp, tmp2);
       double true_res = blas::xmyNorm(b, r);
       param.true_res = sqrt(true_res / b2);
-      param.true_res_hq = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
+      param.true_res_hq
+        = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? sqrt(blas::HeavyQuarkResidualNorm(x, r).z) : 0.0;
     }
 
     if (!param.is_preconditioner) {

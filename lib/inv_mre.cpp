@@ -2,7 +2,8 @@
 #include <blas_quda.h>
 #include <eigen_helper.h>
 
-namespace quda {
+namespace quda
+{
 
   MinResExt::MinResExt(const DiracMatrix &mat, bool orthogonal, bool apply_mat, bool hermitian, TimeProfile &profile) :
     mat(mat), orthogonal(orthogonal), apply_mat(apply_mat), hermitian(hermitian), profile(profile)
@@ -11,15 +12,15 @@ namespace quda {
 
   /* Solve the equation A p_k psi_k = b by minimizing the residual and
      using Eigen's SVD algorithm for numerical stability */
-  void MinResExt::solve(std::vector<Complex> &psi_, std::vector<ColorSpinorField> &p,
-                        std::vector<ColorSpinorField> &q, ColorSpinorField &b, bool hermitian)
+  void MinResExt::solve(std::vector<Complex> &psi_, std::vector<ColorSpinorField> &p, std::vector<ColorSpinorField> &q,
+                        ColorSpinorField &b, bool hermitian)
   {
     typedef Matrix<Complex, Dynamic, Dynamic> matrix;
     typedef Matrix<Complex, Dynamic, 1> vector;
 
     const int N = q.size();
     vector phi(N), psi(N);
-    matrix A(N,N);
+    matrix A(N, N);
 
     // form the a Nx(N+1) matrix using only a single reduction - this
     // presently requires forgoing the matrix symmetry, but the improvement is well worth it
@@ -38,11 +39,9 @@ namespace quda {
       blas::cDotProduct(A_, q, make_set(q, b));
     }
 
-    for (int i=0; i<N; i++) {
-      phi(i) = A_[i*(N+1)+N];
-      for (int j=0; j<N; j++) {
-        A(i,j) = A_[i*(N+1)+j];
-      }
+    for (int i = 0; i < N; i++) {
+      phi(i) = A_[i * (N + 1) + N];
+      for (int j = 0; j < N; j++) { A(i, j) = A_[i * (N + 1) + j]; }
     }
 
     profile.TPSTOP(QUDA_PROFILE_CHRONO);
@@ -54,22 +53,22 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_EIGEN);
     profile.TPSTART(QUDA_PROFILE_CHRONO);
 
-    for (int i=0; i<N; i++) psi_[i] = psi(i);
+    for (int i = 0; i < N; i++) psi_[i] = psi(i);
   }
 
   /*
     We want to find the best initial guess of the solution of
     A x = b, and we have N previous solutions x_i.
     The method goes something like this:
-    
+
     1. Orthonormalise the p_i and q_i
     2. Form the matrix G_ij = x_i^dagger A x_j
     3. Form the vector B_i = x_i^dagger b
     4. solve A_ij a_j  = B_i
     5. x = a_i p_i
   */
-  void MinResExt::operator()(ColorSpinorField &x, ColorSpinorField &b, 
-			     std::vector<ColorSpinorField> &p, std::vector<ColorSpinorField> &q)
+  void MinResExt::operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField> &p,
+                             std::vector<ColorSpinorField> &q)
   {
     bool running = profile.isRunning(QUDA_PROFILE_CHRONO);
     if (!running) profile.TPSTART(QUDA_PROFILE_CHRONO);
@@ -78,8 +77,10 @@ namespace quda {
     logQuda(QUDA_VERBOSE, "Constructing minimum residual extrapolation with basis size %d\n", N);
 
     if (N <= 1) {
-      if (N == 0) blas::zero(x);
-      else blas::copy(x, p[0]);
+      if (N == 0)
+        blas::zero(x);
+      else
+        blas::copy(x, p[0]);
       if (!running) profile.TPSTOP(QUDA_PROFILE_CHRONO);
       return;
     }
@@ -108,7 +109,8 @@ namespace quda {
     }
 
     // if operator hasn't already been applied then apply
-    if (apply_mat) for (int i = 0; i < N; i++) mat(q[i], p[i]);
+    if (apply_mat)
+      for (int i = 0; i < N; i++) mat(q[i], p[i]);
 
     // Solution coefficient vectors
     std::vector<Complex> alpha(N);

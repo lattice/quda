@@ -93,19 +93,16 @@ namespace quda {
     void apply(const qudaStream_t = device::get_default_stream())
     {
       static int count = 0;
-      auto n_upper = std::min(((count + 1) * n_shift ) / n_update + 1, n_shift);
+      auto n_upper = std::min(((count + 1) * n_shift) / n_update + 1, n_shift);
       auto n_lower = (count * n_shift) / n_update + 1;
 
       for (int j = n_lower; j < n_upper; j++) {
-        beta[j] = beta[j_low] * zeta[j] * alpha[j] /  ( zeta_old[j] * alpha[j_low] );
+        beta[j] = beta[j_low] * zeta[j] * alpha[j] / (zeta_old[j] * alpha[j_low]);
       }
 
       if (n_upper > n_lower)
-        blas::axpyBzpcx({alpha.begin() + n_lower, alpha.begin() + n_upper},
-                        {p.begin() + n_lower, p.begin() + n_upper},
-                        {x.begin() + n_lower, x.begin() + n_upper},
-                        {zeta.begin() + n_lower, zeta.begin() + n_upper},
-                        r,
+        blas::axpyBzpcx({alpha.begin() + n_lower, alpha.begin() + n_upper}, {p.begin() + n_lower, p.begin() + n_upper},
+                        {x.begin() + n_lower, x.begin() + n_upper}, {zeta.begin() + n_lower, zeta.begin() + n_upper}, r,
                         {beta.begin() + n_lower, beta.begin() + n_upper});
 
       if (++count == n_update) count = 0;
@@ -119,13 +116,11 @@ namespace quda {
 
   MultiShiftCG::MultiShiftCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param,
                              TimeProfile &profile) :
-    MultiShiftSolver(mat, matSloppy, param, profile),
-    init(false)
+    MultiShiftSolver(mat, matSloppy, param, profile), init(false)
   {
   }
 
-  void MultiShiftCG::create(std::vector<ColorSpinorField> &x, const ColorSpinorField &b,
-                            std::vector<ColorSpinorField> &p)
+  void MultiShiftCG::create(std::vector<ColorSpinorField> &x, const ColorSpinorField &b, std::vector<ColorSpinorField> &p)
   {
     if (!init) {
       profile.TPSTART(QUDA_PROFILE_INIT);
@@ -184,8 +179,8 @@ namespace quda {
      Compute the new values of alpha and zeta
    */
   void updateAlphaZeta(std::vector<double> &alpha, std::vector<double> &zeta, std::vector<double> &zeta_old,
-                       const std::vector<double> &r2, const std::vector<double> &beta, double pAp,
-                       const double *offset, const int nShift, const int j_low)
+                       const std::vector<double> &r2, const std::vector<double> &beta, double pAp, const double *offset,
+                       const int nShift, const int j_low)
   {
     std::vector<double> alpha_old(alpha);
 
@@ -218,7 +213,7 @@ namespace quda {
       warningQuda("inverting on zero-field source");
       for (int i = 0; i < num_offset; i++) {
         x[i] = b;
-	param.true_res_offset[i] = 0.0;
+        param.true_res_offset[i] = 0.0;
 	param.true_res_hq_offset[i] = 0.0;
       }
       return;
@@ -252,16 +247,16 @@ namespace quda {
     // stopping condition of each shift
     std::vector<double> r2(num_offset, b2);
     std::vector<double> stop(num_offset);
-    for (int i=0; i<num_offset; i++) stop[i] = Solver::stopping(param.tol_offset[i], b2, param.residual_type);
+    for (int i = 0; i < num_offset; i++) stop[i] = Solver::stopping(param.tol_offset[i], b2, param.residual_type);
 
-    std::vector<int> iter(num_offset + 1, 0);     // record how many iterations for each shift
-    iter[num_offset] = 1; // this initial condition ensures that the heaviest shift can be removed
+    std::vector<int> iter(num_offset + 1, 0); // record how many iterations for each shift
+    iter[num_offset] = 1;                     // this initial condition ensures that the heaviest shift can be removed
 
     double r2_old;
     double pAp;
 
     std::vector<double> rNorm(num_offset);
-    for (int i=0; i<num_offset; i++) rNorm[i] = sqrt(r2[i]);
+    for (int i = 0; i < num_offset; i++) rNorm[i] = sqrt(r2[i]);
     std::vector<double> r0Norm(rNorm);
     std::vector<double> maxrx(rNorm);
     std::vector<double> maxrr(rNorm);
@@ -287,7 +282,7 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
-    logQuda(QUDA_VERBOSE, "%d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
+    logQuda(QUDA_VERBOSE, "%d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0] / b2));
 
     while ( !convergence(r2, stop, num_offset_now) &&  !exit_early && k < param.maxiter) {
 
@@ -341,28 +336,31 @@ namespace quda {
 
         // this should trigger the shift update in the subsequent sloppy dslash
 	aux_update = true;
-	/*
-	  for (int j=1; j<num_offset_now; j++) {
-	  beta[j] = beta[j_low] * zeta[j] * alpha[j] / (zeta_old[j] * alpha[j_low]);
-	  // update p[i] and x[i]
-	  blas::axpyBzpcx(alpha[j], p[j], x_sloppy[j], zeta[j], r_sloppy, beta[j]);
-	  }
-	*/
+        /*
+          for (int j=1; j<num_offset_now; j++) {
+          beta[j] = beta[j_low] * zeta[j] * alpha[j] / (zeta_old[j] * alpha[j_low]);
+          // update p[i] and x[i]
+          blas::axpyBzpcx(alpha[j], p[j], x_sloppy[j], zeta[j], r_sloppy, beta[j]);
+          }
+        */
       } else {
 	for (int j=0; j<num_offset_now; j++) {
-	  blas::axpy(alpha[j], p[j], x_sloppy[j]);
+          blas::axpy(alpha[j], p[j], x_sloppy[j]);
           if (group_update) {
-            if (rUpdate == 0) x[j] = x_sloppy[j];
-            else blas::xpy(x_sloppy[j], x[j]);
+            if (rUpdate == 0)
+              x[j] = x_sloppy[j];
+            else
+              blas::xpy(x_sloppy[j], x[j]);
           }
         }
 
-	mat(r, x[0], tmp1, tmp2);
-	if (r.Nspin()==4) blas::axpy(offset[0], x[0], r);
+        mat(r, x[0], tmp1, tmp2);
+        if (r.Nspin() == 4) blas::axpy(offset[0], x[0], r);
 
-	r2[0] = blas::xmyNorm(b, r);
-	for (int j=1; j<num_offset_now; j++) r2[j] = zeta[j] * zeta[j] * r2[0];
-	for (int j=0; j<num_offset_now; j++) if (group_update) blas::zero(x_sloppy[j]);
+        r2[0] = blas::xmyNorm(b, r);
+        for (int j=1; j<num_offset_now; j++) r2[j] = zeta[j] * zeta[j] * r2[0];
+        for (int j = 0; j < num_offset_now; j++)
+          if (group_update) blas::zero(x_sloppy[j]);
 
         blas::copy(r_sloppy, r);
 
@@ -370,13 +368,12 @@ namespace quda {
 	if (sqrt(r2[reliable_shift]) > r0Norm[reliable_shift]) { // reuse r0Norm for this
 	  resIncrease++;
 	  resIncreaseTotal[reliable_shift]++;
-          warningQuda(
-            "Shift %d, updated residual %e is greater than previous residual %e (total #inc %i)",
-            reliable_shift, sqrt(r2[reliable_shift]), r0Norm[reliable_shift], resIncreaseTotal[reliable_shift]);
+          warningQuda("Shift %d, updated residual %e is greater than previous residual %e (total #inc %i)",
+                      reliable_shift, sqrt(r2[reliable_shift]), r0Norm[reliable_shift], resIncreaseTotal[reliable_shift]);
 
           if (resIncrease > maxResIncrease or resIncreaseTotal[reliable_shift] > maxResIncreaseTotal) {
-	    warningQuda("solver exiting due to too many true residual norm increases");
-	    break;
+            warningQuda("solver exiting due to too many true residual norm increases");
+            break;
 	  }
 	} else {
 	  resIncrease = 0;
@@ -384,16 +381,16 @@ namespace quda {
 
 	// explicitly restore the orthogonality of the gradient vector
 	for (int j=0; j<num_offset_now; j++) {
-	  Complex rp = blas::cDotProduct(r_sloppy, p[j]) / (r2[0]);
-	  blas::caxpy(-rp, r_sloppy, p[j]);
-	}
+          Complex rp = blas::cDotProduct(r_sloppy, p[j]) / (r2[0]);
+          blas::caxpy(-rp, r_sloppy, p[j]);
+        }
 
 	// update beta and p
         beta[0] = r2[0] / r2_old;
         blas::xpay(r_sloppy, beta[0], p[0]);
-	for (int j=1; j<num_offset_now; j++) {
+        for (int j=1; j<num_offset_now; j++) {
 	  beta[j] = beta[j_low] * zeta[j] * alpha[j] / (zeta_old[j] * alpha[j_low]);
-	  blas::axpby(zeta[j], r_sloppy, beta[j], p[j]);
+          blas::axpby(zeta[j], r_sloppy, beta[j], p[j]);
         }
 
         // update reliable update parameters for the system that triggered the update
@@ -410,14 +407,14 @@ namespace quda {
       for (int j=num_offset_now-1; j>=1; j--) {
         if (zeta[j] == 0.0 && r2[j+1] < stop[j+1]) {
           converged++;
-          logQuda(QUDA_VERBOSE, "Shift %d converged after %d iterations\n", j, k+1);
+          logQuda(QUDA_VERBOSE, "Shift %d converged after %d iterations\n", j, k + 1);
         } else {
 	  r2[j] = zeta[j] * zeta[j] * r2[0];
 	  // only remove if shift above has converged
 	  if ((r2[j] < stop[j] || sqrt(r2[j] / b2) < prec_tol[j]) && iter[j+1] ) {
 	    converged++;
 	    iter[j] = k+1;
-            logQuda(QUDA_VERBOSE, "Shift %d converged after %d iterations\n", j, k+1);
+            logQuda(QUDA_VERBOSE, "Shift %d converged after %d iterations\n", j, k + 1);
           }
 	}
       }
@@ -440,10 +437,10 @@ namespace quda {
 	shift_update.updateNupdate(1);
         shift_update.apply();
 
-        for (int j=0; j<num_offset_now; j++) iter[j] = k;
+        for (int j = 0; j < num_offset_now; j++) iter[j] = k;
       }
 
-      logQuda(QUDA_VERBOSE, "%d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
+      logQuda(QUDA_VERBOSE, "%d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0] / b2));
     }
 
     for (int i=0; i<num_offset; i++) {
@@ -487,11 +484,11 @@ namespace quda {
       logQuda(QUDA_SUMMARIZE, "Converged after %d iterations\n", k);
       for (int i = 0; i < num_offset; i++) {
         if (std::isinf(param.true_res_offset[i])) {
-          logQuda(QUDA_SUMMARIZE, " shift=%d, %d iterations, relative residual: iterated = %e\n",
-                     i, iter[i], param.iter_res_offset[i]);
+          logQuda(QUDA_SUMMARIZE, " shift=%d, %d iterations, relative residual: iterated = %e\n", i, iter[i],
+                  param.iter_res_offset[i]);
         } else {
-          logQuda(QUDA_SUMMARIZE, " shift=%d, %d iterations, relative residual: iterated = %e, true = %e\n",
-                  i, iter[i], param.iter_res_offset[i], param.true_res_offset[i]);
+          logQuda(QUDA_SUMMARIZE, " shift=%d, %d iterations, relative residual: iterated = %e, true = %e\n", i, iter[i],
+                  param.iter_res_offset[i], param.true_res_offset[i]);
         }
       }
 
@@ -499,8 +496,8 @@ namespace quda {
       logQuda(QUDA_SUMMARIZE, "Converged after %d iterations\n", k);
       for (int i = 0; i < num_offset; i++) {
         param.iter_res_offset[i] = sqrt(r2[i] / b2);
-        logQuda(QUDA_SUMMARIZE, " shift=%d, %d iterations, relative residual: iterated = %e\n",
-                i, iter[i], param.iter_res_offset[i]);
+        logQuda(QUDA_SUMMARIZE, " shift=%d, %d iterations, relative residual: iterated = %e\n", i, iter[i],
+                param.iter_res_offset[i]);
       }
     }
 
