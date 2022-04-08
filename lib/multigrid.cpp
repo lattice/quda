@@ -253,6 +253,7 @@ namespace quda
   }
 
   void MG::resetStaggeredKD(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                            cudaGaugeField *gauge_sloppy_in, cudaGaugeField *fat_gauge_sloppy_in, cudaGaugeField *long_gauge_sloppy_in,
                             double mass)
   {
     if (param.level != 0) errorQuda("The staggered KD operator can only be updated from level 0");
@@ -269,12 +270,12 @@ namespace quda
       // last nullptr is for the clover field
       diracCoarseResidual->updateFields(fat_gauge_in, fat_gauge_in, long_gauge_in, nullptr);
       diracCoarseSmoother->updateFields(fat_gauge_in, fat_gauge_in, long_gauge_in, nullptr);
-      diracCoarseSmootherSloppy->updateFields(fat_gauge_in, fat_gauge_in, long_gauge_in, nullptr);
+      diracCoarseSmootherSloppy->updateFields(fat_gauge_sloppy_in, fat_gauge_sloppy_in, long_gauge_sloppy_in, nullptr);
     } else {
       // last nullptr is for the clover field
       diracCoarseResidual->updateFields(gauge_in, fat_gauge_in, long_gauge_in, nullptr);
       diracCoarseSmoother->updateFields(gauge_in, fat_gauge_in, long_gauge_in, nullptr);
-      diracCoarseSmootherSloppy->updateFields(gauge_in, fat_gauge_in, long_gauge_in, nullptr);
+      diracCoarseSmootherSloppy->updateFields(gauge_sloppy_in, fat_gauge_sloppy_in, long_gauge_sloppy_in, nullptr);
     }
 
     diracCoarseResidual->setMass(mass);
@@ -516,6 +517,9 @@ namespace quda
   }
 
   void MG::createOptimizedKdDirac() {
+
+    pushLevel(param.level);
+
     auto dirac_type = diracSmoother->getDiracType();
 
     auto smoother_solve_type = param.mg_global.smoother_solve_type[param.level + 1];
@@ -617,6 +621,8 @@ namespace quda
     } else {
       errorQuda("Invalid dirac_type %d", dirac_type);
     }
+
+    popLevel();
   }
 
   void MG::destroyCoarseSolver() {

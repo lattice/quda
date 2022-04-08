@@ -334,6 +334,7 @@ namespace quda {
               the KD inverse
      */
     void resetStaggeredKD(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                          cudaGaugeField *gauge_sloppy_in, cudaGaugeField *fat_gauge_sloppy_in, cudaGaugeField *long_gauge_sloppy_in,
                           double mass);
 
     /**
