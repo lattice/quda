@@ -2747,15 +2747,13 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   // now check if we need to invalidate the solutionResident vectors
   ColorSpinorField x;
-  bool invalidate = false;
   if (param->use_resident_solution == 1) {
-    for (auto &v : solutionResident)
+    for (auto &v : solutionResident) {
       if (b.Precision() != v.Precision() || b.SiteSubset() != v.SiteSubset()) {
-        invalidate = true;
+        solutionResident.clear();
         break;
       }
-
-    if (invalidate) solutionResident.clear();
+    }
 
     if (!solutionResident.size()) {
       cudaParam.create = QUDA_NULL_FIELD_CREATE;
@@ -3589,14 +3587,12 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
 
   // now check if we need to invalidate the solution vectors
-  bool invalidate = false;
   for (auto &v : solutionResident) {
     if (cudaParam.Precision() != v.Precision()) {
-      invalidate = true;
+      solutionResident.clear();
       break;
     }
   }
-  if (invalidate) solutionResident.clear();
 
   // grow/shrink resident solutions to be correct size
   solutionResident.resize(param->num_offset, cudaParam);
