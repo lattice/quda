@@ -64,7 +64,7 @@ void checkBLASParam(QudaBLASParam &param) { checkBLASParam(&param); }
 
 using namespace quda;
 
-static lat_dim_t R = { };
+static lat_dim_t R = {};
 // setting this to false prevents redundant halo exchange but isn't yet compatible with HISQ / ASQTAD kernels
 static bool redundant_comms = false;
 
@@ -108,7 +108,7 @@ std::vector<ColorSpinorField> solutionResident;
 // vector of spinors used for forecasting solutions in HMC
 #define QUDA_MAX_CHRONO 12
 // each entry is one p
-std::vector< std::vector<ColorSpinorField> > chronoResident(QUDA_MAX_CHRONO);
+std::vector<std::vector<ColorSpinorField>> chronoResident(QUDA_MAX_CHRONO);
 
 // Mapped memory buffer used to hold unitarization failures
 static int *num_failures_h = nullptr;
@@ -1820,7 +1820,6 @@ namespace quda {
 
     logQuda(QUDA_DEBUG_VERBOSE, "Mass rescale: norm of source out = %g\n", blas::norm2(b));
   }
-
 }
 
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
@@ -2808,7 +2807,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // rescale the source and solution vectors to help prevent the onset of underflow
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
     blas::ax(1.0 / sqrt(nb), b);
-    blas::ax(1.0/sqrt(nb), x);
+    blas::ax(1.0 / sqrt(nb), x);
   }
 
   massRescale(b, *param, false);
@@ -2898,9 +2897,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       std::vector<ColorSpinorField> Ap(basis.size(), cs_param);
 
       if (param->chrono_precision == param->cuda_prec) {
-        for (unsigned int j=0; j<basis.size(); j++) m(Ap[j], basis[j], tmp, tmp2);
+        for (unsigned int j = 0; j < basis.size(); j++) m(Ap[j], basis[j], tmp, tmp2);
       } else if (param->chrono_precision == param->cuda_prec_sloppy) {
-        for (unsigned int j=0; j<basis.size(); j++) mSloppy(Ap[j], basis[j], tmp, tmp2);
+        for (unsigned int j = 0; j < basis.size(); j++) mSloppy(Ap[j], basis[j], tmp, tmp2);
       } else {
         errorQuda("Unexpected precision %d for chrono vectors (doesn't match outer %d or sloppy precision %d)",
                   param->chrono_precision, param->cuda_prec, param->cuda_prec_sloppy);
@@ -2937,9 +2936,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       ColorSpinorField tmp2 = out->create_alias(cs_param);
 
       if (param->chrono_precision == param->cuda_prec) {
-        for (unsigned int j=0; j<basis.size(); j++) m(Ap[j], basis[j], tmp, tmp2);
+        for (unsigned int j = 0; j < basis.size(); j++) m(Ap[j], basis[j], tmp, tmp2);
       } else if (param->chrono_precision == param->cuda_prec_sloppy) {
-        for (unsigned int j=0; j<basis.size(); j++) mSloppy(Ap[j], basis[j], tmp, tmp2);
+        for (unsigned int j = 0; j < basis.size(); j++) mSloppy(Ap[j], basis[j], tmp, tmp2);
       } else {
         errorQuda("Unexpected precision %d for chrono vectors (doesn't match outer %d or sloppy precision %d)",
                   param->chrono_precision, param->cuda_prec, param->cuda_prec_sloppy);
@@ -3238,14 +3237,17 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
 
     // Deal with clover field. For Multi source computatons, clover field construction is done
     // exclusively on the GPU.
-    if (param->clover_coeff == 0.0 && param->clover_csw == 0.0)
-      errorQuda("called with neither clover term nor inverse and clover coefficient nor Csw not set");
-    if (gaugePrecise->Anisotropy() != 1.0) errorQuda("cannot compute anisotropic clover field");
-
     quda::CloverField *input_clover = nullptr;
     quda::CloverField *collected_clover = nullptr;
-    if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH
-        || param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
+    bool is_clover = param->dslash_type == QUDA_CLOVER_WILSON_DSLASH ||
+                     param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH ||
+                     param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH;
+
+    if (is_clover) {
+      if (param->clover_coeff == 0.0 && param->clover_csw == 0.0)
+        errorQuda("called with neither clover term nor inverse and clover coefficient nor Csw not set");
+      if (gaugePrecise->Anisotropy() != 1.0) errorQuda("cannot compute anisotropic clover field");
+
       if (h_clover || h_clovinv) {
         CloverFieldParam clover_param(*param, X);
         clover_param.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -3552,8 +3554,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   std::vector<double> r2_old(param->num_offset);
 
   // Grab the dimension array of the input gauge field.
-  const auto X = ( param->dslash_type == QUDA_ASQTAD_DSLASH ) ?
-    gaugeFatPrecise->X() : gaugePrecise->X();
+  const auto X = (param->dslash_type == QUDA_ASQTAD_DSLASH) ? gaugeFatPrecise->X() : gaugePrecise->X();
 
   // This creates a ColorSpinorParam struct, from the host data
   // pointer, the definitions in param, the dimensions X, and whether
@@ -3598,9 +3599,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   if (invalidate) solutionResident.clear();
 
   // grow/shrink resident solutions to be correct size
-  size_t old_size = solutionResident.size();
-  solutionResident.resize(param->num_offset);
-  for (int i = old_size; i < param->num_offset; i++) solutionResident[i] = ColorSpinorField(cudaParam);
+  solutionResident.resize(param->num_offset, cudaParam);
 
   std::vector<ColorSpinorField> &x = solutionResident;
   std::vector<ColorSpinorField> p;
@@ -3729,9 +3728,9 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
 
           z[0] = x[0]; // zero solution already solved
 #ifdef REFINE_INCREASING_MASS
-	  for (int j=1; j<nRefine; j++) z[j] = x[j];
+          for (int j = 1; j < nRefine; j++) z[j] = x[j];
 #else
-	  for (int j=1; j<nRefine; j++) z[j] = x[param->num_offset-j];
+          for (int j = 1; j < nRefine; j++) z[j] = x[param->num_offset - j];
 #endif
 
           bool orthogonal = true;
@@ -3774,7 +3773,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   }
 
   // restore shifts
-  for(int i=0; i < param->num_offset; i++) param->offset[i] = unscaled_shifts[i];
+  for (int i = 0; i < param->num_offset; i++) param->offset[i] = unscaled_shifts[i];
 
   profileMulti.TPSTART(QUDA_PROFILE_D2H);
 
@@ -4365,7 +4364,8 @@ void computeStaggeredForceQuda(void *h_mom, double dt, double delta, void *, voi
   for (int i=0; i<nvector; i++) {
     ColorSpinorField &x = *(X[i]);
 
-    if (inv_param->use_resident_solution) x.Even() = solutionResident[i];
+    if (inv_param->use_resident_solution)
+      x.Even() = solutionResident[i];
     else errorQuda("%s requires resident solution", __func__);
 
     // set the odd solution component
@@ -4498,8 +4498,8 @@ void computeHISQForceQuda(void* const milc_momentum,
   param.link_type = QUDA_GENERAL_LINKS;
   param.setPrecision(gParam->cpu_prec, true);
 
-  lat_dim_t R = {2*comm_dim_partitioned(0), 2*comm_dim_partitioned(1),
-                 2*comm_dim_partitioned(2), 2*comm_dim_partitioned(3)};
+  lat_dim_t R = {2 * comm_dim_partitioned(0), 2 * comm_dim_partitioned(1), 2 * comm_dim_partitioned(2),
+                 2 * comm_dim_partitioned(3)};
   for (int dir=0; dir<4; ++dir) {
     param.x[dir] += 2*R[dir];
     param.r[dir] = R[dir];
@@ -4633,7 +4633,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   // read in u-link
   cudaGauge->loadCPUField(cpuULink, profileHISQForce);
-  cudaGauge->exchangeExtendedGhost(R, profileHISQForce,true);
+  cudaGauge->exchangeExtendedGhost(R, profileHISQForce, true);
 
   // Compute Fat7-staple term
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -5538,8 +5538,8 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   cudaParam.setPrecision(cpuParam.Precision(), cpuParam.Precision(), true);
 
-  std::vector<ColorSpinorField> x = { ColorSpinorField(cudaParam) };
-  std::vector<ColorSpinorField> y = { ColorSpinorField(cudaParam) };
+  std::vector<ColorSpinorField> x = {ColorSpinorField(cudaParam)};
+  std::vector<ColorSpinorField> y = {ColorSpinorField(cudaParam)};
 
   size_t data_bytes = x[0].Volume() * x[0].Nspin() * x[0].Nspin() * 2 * x[0].Precision();
   void *d_result = pool_device_malloc(data_bytes);
