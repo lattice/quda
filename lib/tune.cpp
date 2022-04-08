@@ -706,7 +706,7 @@ namespace quda
     /**
      * @brief Serialize tune candidates to json string.
      *
-     * @return std::string
+     * @return serialized json string
      */
     std::string serialize() const
     {
@@ -785,7 +785,7 @@ namespace quda
     /**
      * @brief Return the best time found in tuning.
      *
-     * @return float time in s
+     * @return time in s
      */
     float getBestTime() const { return besttime; }
   };

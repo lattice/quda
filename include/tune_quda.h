@@ -245,31 +245,33 @@ namespace quda {
     virtual void postTune() { }
 
     /**
-     * @brief Parameter to control the number of iteration used in the 2nd phase of tuning, i.e. for the candidates.
-     *
-     * @return int minimum number of iterations
-     */
-    virtual int min_tune_iter() const { return 3; }
-    /**
-     * @brief Parameter to control the number of iteration used in the 2nd phase of tuning, i.e. for the candidates.
-     *
-     * @return float
-     */
-    virtual float min_tune_time() const { return 1e-3; }
-
-    /**
      * @brief Number of iterations used in the 1st phase of tuning, i.e. finding the candidates for the 2nd phase/
      *
-     * @return int number of iterations
+     * @return number of iterations
      */
     virtual int candiate_iter() const { return 2; }
 
     /**
-     * @brief Number of candidates to use for the 2dn tuning phase
+     * @brief Number of candidates to be identified in the 1st phase for the 2nd tuning phase
      *
-     * @return size_t number of candidates
+     * @return number of candidates
      */
     virtual size_t num_candidates() const { return 10; }
+
+    /**
+     * @brief Parameter to control the number of iteration used in the 2nd phase of tuning, i.e. for the candidates.
+     *
+     * @return minimum number of iterations
+     */
+    virtual int min_tune_iter() const { return 3; }
+
+    /**
+     * @brief Time parameter to control the number of iteration used in the 2nd phase of tuning, i.e. for the candidates.
+     * This controls that the measured time for the number of iterations is at least this long based on the time from phase 1.
+     *
+     * @return minimum time that should be measured
+     */
+    virtual float min_tune_time() const { return 1e-3; }
 
     virtual std::string paramString(const TuneParam &param) const
     {
