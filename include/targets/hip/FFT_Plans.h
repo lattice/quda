@@ -117,7 +117,8 @@ namespace quda
       HIPFFT_SAFE_CALL(hipfftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, type, size.x * size.y));
     } break;
     case 1: {
-      int n[2] = {size.x, size.y};
+      //int n[2] = {size.x, size.y};
+      int n[2] = {size.y, size.x};
       HIPFFT_SAFE_CALL(hipfftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, type, size.z * size.w));
     } break;
     }
