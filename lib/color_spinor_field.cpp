@@ -12,27 +12,6 @@ namespace quda
 
   ColorSpinorParam::ColorSpinorParam(const ColorSpinorField &field) : LatticeFieldParam() { field.fill(*this); }
 
-  ColorSpinorField::ColorSpinorField() :
-    LatticeField(),
-    init(false),
-    alloc(false),
-    reference(false),
-    ghost_precision_allocated(QUDA_INVALID_PRECISION),
-    v(nullptr),
-    norm_offset(0),
-    ghost(),
-    ghostFace(),
-    ghost_buf{ },
-    dslash_constant(nullptr),
-    bytes(0),
-    bytes_raw(0),
-    even(nullptr),
-    odd(nullptr),
-    composite_descr(),
-    components(0)
-  {
-  }
-
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) :
     LatticeField(param),
     init(false),
@@ -43,7 +22,7 @@ namespace quda
     norm_offset(0),
     ghost(),
     ghostFace(),
-    ghost_buf{ },
+    ghost_buf {},
     dslash_constant(nullptr),
     bytes(0),
     bytes_raw(0),
@@ -80,7 +59,7 @@ namespace quda
     norm_offset(0),
     ghost(),
     ghostFace(),
-    ghost_buf{ },
+    ghost_buf {},
     dslash_constant(nullptr),
     bytes(0),
     bytes_raw(0),
@@ -112,10 +91,10 @@ namespace quda
     v(std::exchange(field.v, nullptr)),
     v_h(std::exchange(field.v_h, nullptr)),
     norm_offset(std::exchange(field.norm_offset, 0)),
-    ghost(std::exchange(field.ghost, { })),
-    ghostFace(std::exchange(field.ghostFace, { })),
-    ghostFaceCB(std::exchange(field.ghostFaceCB, { })),
-    ghost_buf(std::exchange(field.ghost_buf, { })),
+    ghost(std::exchange(field.ghost, {})),
+    ghostFace(std::exchange(field.ghostFace, {})),
+    ghostFaceCB(std::exchange(field.ghostFaceCB, {})),
+    ghost_buf(std::exchange(field.ghost_buf, {})),
     dslash_constant(std::exchange(field.dslash_constant, nullptr)),
     bytes(std::exchange(field.bytes, 0)),
     bytes_raw(std::exchange(field.bytes_raw, 0)),
@@ -126,12 +105,10 @@ namespace quda
     odd(std::exchange(field.odd, nullptr)),
     composite_descr(std::exchange(field.composite_descr, CompositeColorSpinorFieldDescriptor())),
     components(std::move(field.components))
-  { }
-
-  ColorSpinorField::~ColorSpinorField()
   {
-    destroy();
   }
+
+  ColorSpinorField::~ColorSpinorField() { destroy(); }
 
   void ColorSpinorField::clear()
   {
@@ -159,14 +136,9 @@ namespace quda
   static bool are_compatible(ColorSpinorField &a, ColorSpinorField &b)
   {
     bool rtn = true;
-    if (a.Precision() != b.Precision()   ||
-        a.FieldOrder() != b.FieldOrder() ||
-        a.SiteSubset() != b.SiteSubset() ||
-        a.VolumeCB() != b.VolumeCB()     ||
-        a.Ncolor() != b.Ncolor()         ||
-        a.Nspin() != b.Nspin()           ||
-        a.Nvec() != b.Nvec()             ||
-        a.TwistFlavor() != b.TwistFlavor())
+    if (a.Precision() != b.Precision() || a.FieldOrder() != b.FieldOrder() || a.SiteSubset() != b.SiteSubset()
+        || a.VolumeCB() != b.VolumeCB() || a.Ncolor() != b.Ncolor() || a.Nspin() != b.Nspin() || a.Nvec() != b.Nvec()
+        || a.TwistFlavor() != b.TwistFlavor())
       rtn = false;
 
     return rtn;
@@ -194,10 +166,10 @@ namespace quda
         v = std::exchange(src.v, nullptr);
         v_h = std::exchange(src.v_h, nullptr);
         norm_offset = std::exchange(src.norm_offset, 0);
-        ghost = std::exchange(src.ghost, { });
-        ghostFace = std::exchange(src.ghostFace, { });
-        ghostFaceCB = std::exchange(src.ghostFaceCB, { });
-        ghost_buf = std::exchange(src.ghost_buf, { });
+        ghost = std::exchange(src.ghost, {});
+        ghostFace = std::exchange(src.ghostFace, {});
+        ghostFaceCB = std::exchange(src.ghostFaceCB, {});
+        ghost_buf = std::exchange(src.ghost_buf, {});
         dslash_constant = std::exchange(src.dslash_constant, nullptr);
         bytes = std::exchange(src.bytes, 0);
         bytes_raw = std::exchange(src.bytes_raw, 0);
@@ -408,10 +380,9 @@ namespace quda
     LatticeField::setTuningString();
     if (init) {
       std::stringstream aux_ss;
-      aux_ss << "vol=" << volume << ",precision=" << precision << ",order=" << fieldOrder <<
-        ",Ns=" << nSpin << ",Nc=" << nColor;
-      if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID)
-        aux_ss << ",TwistFlavor=" << twistFlavor;
+      aux_ss << "vol=" << volume << ",precision=" << precision << ",order=" << fieldOrder << ",Ns=" << nSpin
+             << ",Nc=" << nColor;
+      if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) aux_ss << ",TwistFlavor=" << twistFlavor;
       aux_string = aux_ss.str();
       if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
     }
@@ -1218,8 +1189,10 @@ namespace quda
     if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
     if (!comm_peer2peer_enabled(dir, dim)) {
-      if (gdr) comm_start(mh_send_rdma[bufferIndex][dim][dir]);
-      else     comm_start(mh_send[bufferIndex][dim][dir]);
+      if (gdr)
+        comm_start(mh_send_rdma[bufferIndex][dim][dir]);
+      else
+        comm_start(mh_send[bufferIndex][dim][dir]);
     } else { // doing peer-to-peer
 
       // if not using copy engine then the packing kernel will remotely write the halos
@@ -1270,9 +1243,11 @@ namespace quda
 
     // second query receive from forwards
     if (comm_peer2peer_enabled(1 - dir, dim)) {
-      if (!complete_recv[dim][1 - dir]) complete_recv[dim][1 - dir] = comm_query(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+      if (!complete_recv[dim][1 - dir])
+        complete_recv[dim][1 - dir] = comm_query(mh_recv_p2p[bufferIndex][dim][1 - dir]);
     } else if (gdr_recv) {
-      if (!complete_recv[dim][1 - dir]) complete_recv[dim][1 - dir] = comm_query(mh_recv_rdma[bufferIndex][dim][1 - dir]);
+      if (!complete_recv[dim][1 - dir])
+        complete_recv[dim][1 - dir] = comm_query(mh_recv_rdma[bufferIndex][dim][1 - dir]);
     } else {
       if (!complete_recv[dim][1 - dir]) complete_recv[dim][1 - dir] = comm_query(mh_recv[bufferIndex][dim][1 - dir]);
     }

@@ -73,21 +73,19 @@ namespace quda
   */
   struct CompositeColorSpinorFieldDescriptor {
 
-    bool is_composite; // set to 'false' for a regular spinor field
-    bool is_component; // set to 'true' if we want to work with an individual component (otherwise will work with the whole set)
+    bool is_composite = false; // set to 'false' for a regular spinor field
+    bool is_component
+      = false; // set to 'true' if we want to work with an individual component (otherwise will work with the whole set)
 
-    int dim; // individual component has dim = 0
-    int id;
+    int dim = 0; // individual component has dim = 0
+    int id = 0;
 
-    size_t volume;   // volume of a single eigenvector
-    size_t volumeCB; // CB volume of a single eigenvector
-    size_t length;   // length (excluding norm))
-    size_t bytes;    // size in bytes of spinor field
+    size_t volume = 0;   // volume of a single eigenvector
+    size_t volumeCB = 0; // CB volume of a single eigenvector
+    size_t length = 0;   // length (excluding norm))
+    size_t bytes = 0;    // size in bytes of spinor field
 
-    CompositeColorSpinorFieldDescriptor() :
-      is_composite(false), is_component(false), dim(0), id(0), volume(0), volumeCB(0), length(0), bytes(0)
-    {
-    }
+    CompositeColorSpinorFieldDescriptor() = default;
 
     CompositeColorSpinorFieldDescriptor(bool is_composite, int dim, bool is_component = false, int id = 0) :
       is_composite(is_composite), is_component(is_component), dim(dim), id(id), volume(0), volumeCB(0), length(0), bytes(0)
@@ -105,35 +103,35 @@ namespace quda
   {
 
   public:
-    int nColor; // Number of colors of the field
-    int nSpin;  // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
-    int nVec;   // number of packed vectors (for multigrid transfer operator)
+    int nColor = 0; // Number of colors of the field
+    int nSpin = 0;  // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
+    int nVec = 1;   // number of packed vectors (for multigrid transfer operator)
 
-    QudaTwistFlavorType twistFlavor; // used by twisted mass
+    QudaTwistFlavorType twistFlavor = QUDA_TWIST_INVALID; // used by twisted mass
 
-    QudaSiteOrder siteOrder; // defined for full fields
+    QudaSiteOrder siteOrder = QUDA_INVALID_SITE_ORDER; // defined for full fields
 
-    QudaFieldOrder fieldOrder; // Float, Float2, Float4 etc.
-    QudaGammaBasis gammaBasis;
-    QudaFieldCreate create; //
+    QudaFieldOrder fieldOrder = QUDA_INVALID_FIELD_ORDER; // Float, Float2, Float4 etc.
+    QudaGammaBasis gammaBasis = QUDA_INVALID_GAMMA_BASIS;
+    QudaFieldCreate create = QUDA_INVALID_FIELD_CREATE;
 
-    QudaPCType pc_type; // used to select preconditioning method in DWF
+    QudaPCType pc_type = QUDA_PC_INVALID; // used to select preconditioning method in DWF
 
     /** Used to specify whether a single parity field is even/odd
      * By construction not enforced, this is more of an optional
      * metadata to specify, for ex, if an eigensolver is for an
      * even or odd parity. */
-    QudaParity suggested_parity;
+    QudaParity suggested_parity = QUDA_INVALID_PARITY;
 
-    ColorSpinorField *field;
-    void *v; // pointer to field
-    size_t norm_offset;
+    ColorSpinorField *field = nullptr;
+    void *v = nullptr; // pointer to field
+    size_t norm_offset = 0;
 
     //! for deflation solvers:
-    bool is_composite;
-    int composite_dim; // e.g., number of eigenvectors in the set
-    bool is_component;
-    int component_id; // eigenvector index
+    bool is_composite = false;
+    int composite_dim = 0; // e.g., number of eigenvectors in the set
+    bool is_component = false;
+    int component_id = 0; // eigenvector index
 
     /**
        If using CUDA native fields, this function will ensure that the
@@ -162,25 +160,7 @@ namespace quda
 
     ColorSpinorParam(const ColorSpinorField &a);
 
-    ColorSpinorParam() :
-      LatticeFieldParam(),
-      nColor(0),
-      nSpin(0),
-      nVec(1),
-      twistFlavor(QUDA_TWIST_INVALID),
-      siteOrder(QUDA_INVALID_SITE_ORDER),
-      fieldOrder(QUDA_INVALID_FIELD_ORDER),
-      gammaBasis(QUDA_INVALID_GAMMA_BASIS),
-      create(QUDA_INVALID_FIELD_CREATE),
-      pc_type(QUDA_PC_INVALID),
-      suggested_parity(QUDA_INVALID_PARITY),
-      is_composite(false),
-      composite_dim(0),
-      is_component(false),
-      component_id(0)
-    {
-      ;
-    }
+    ColorSpinorParam() = default;
 
     // used to create cpu params
 
@@ -312,54 +292,54 @@ namespace quda
     void destroy();
 
   protected:
-    bool init;
-    bool alloc;     // whether we allocated memory
-    bool reference; // whether the field is a reference or not
+    bool init = false;
+    bool alloc = false;     // whether we allocated memory
+    bool reference = false; // whether the field is a reference or not
 
     /** Used to keep local track of allocated ghost_precision in createGhostZone */
-    mutable QudaPrecision ghost_precision_allocated;
+    mutable QudaPrecision ghost_precision_allocated = QUDA_INVALID_PRECISION;
 
-    int nColor;
-    int nSpin;
-    int nVec;
+    int nColor = 0;
+    int nSpin = 0;
+    int nVec = 0;
 
-    QudaTwistFlavorType twistFlavor;
+    QudaTwistFlavorType twistFlavor = QUDA_TWIST_INVALID;
 
-    QudaPCType pc_type; // used to select preconditioning method in DWF
+    QudaPCType pc_type = QUDA_PC_INVALID; // used to select preconditioning method in DWF
 
     /** Used to specify whether a single parity field is even/odd
      * By construction not enforced, this is more of an optional
      * metadata to specify, for ex, if an eigensolver is for an
      * even or odd parity. */
-    QudaParity suggested_parity;
+    QudaParity suggested_parity = QUDA_INVALID_PARITY;
 
-    size_t length; // length including pads, but not norm zone
+    size_t length = 0; // length including pads, but not norm zone
 
-    void *v;            // the field elements
-    void *v_h;          // the field elements
-    size_t norm_offset; /** offset to the norm (if applicable) */
+    void *v = nullptr;      // the field elements
+    void *v_h = nullptr;    // the field elements
+    size_t norm_offset = 0; /** offset to the norm (if applicable) */
 
     // multi-GPU parameters
-    array_2d<void *, 2, QUDA_MAX_DIM> ghost;           // pointers to the ghost regions - NULL by default
-    mutable lat_dim_t ghostFace;                       // the size of each face
-    mutable lat_dim_t ghostFaceCB;                     // the size of each checkboarded face
-    mutable array<void *, 2 * QUDA_MAX_DIM> ghost_buf; // wrapper that points to current ghost zone
+    array_2d<void *, 2, QUDA_MAX_DIM> ghost = {};          // pointers to the ghost regions - NULL by default
+    mutable lat_dim_t ghostFace = {};                      // the size of each face
+    mutable lat_dim_t ghostFaceCB = {};                    // the size of each checkboarded face
+    mutable array<void *, 2 *QUDA_MAX_DIM> ghost_buf = {}; // wrapper that points to current ghost zone
 
-    mutable DslashConstant *dslash_constant; // constants used by dslash and packing kernels
+    mutable DslashConstant *dslash_constant = nullptr; // constants used by dslash and packing kernels
 
-    size_t bytes;     // size in bytes of spinor field
-    size_t bytes_raw; // actual data size neglecting alignment
+    size_t bytes = 0;     // size in bytes of spinor field
+    size_t bytes_raw = 0; // actual data size neglecting alignment
 
-    QudaSiteOrder siteOrder;
-    QudaFieldOrder fieldOrder;
-    QudaGammaBasis gammaBasis;
+    QudaSiteOrder siteOrder = QUDA_INVALID_SITE_ORDER;
+    QudaFieldOrder fieldOrder = QUDA_INVALID_FIELD_ORDER;
+    QudaGammaBasis gammaBasis = QUDA_INVALID_GAMMA_BASIS;
 
     // in the case of full fields, these are references to the even / odd sublattices
-    ColorSpinorField *even;
-    ColorSpinorField *odd;
+    ColorSpinorField *even = nullptr;
+    ColorSpinorField *odd = nullptr;
 
     //! used for deflation eigenvector sets etc.:
-    CompositeColorSpinorFieldDescriptor composite_descr; // containes info about the set
+    CompositeColorSpinorFieldDescriptor composite_descr; // contains info about the set
     //
     CompositeColorSpinorField components;
 
@@ -396,7 +376,7 @@ namespace quda
     /**
        @brief Default constructor
     */
-    ColorSpinorField();
+    ColorSpinorField() = default;
 
     /**
        @brief Copy constructor for creating a ColorSpinorField from another ColorSpinorField

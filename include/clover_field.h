@@ -88,20 +88,21 @@ namespace quda {
   };
 
   struct CloverFieldParam : public LatticeFieldParam {
-    bool reconstruct; /** Whether to create a compressed clover field that requires reconstruction */
-    bool inverse;     /** Whether to create the inverse clover field */
-    void *clover;     /** Pointer to the clover field */
-    void *cloverInv;  /** Pointer to the clover inverse field */
-    double csw;       /** C_sw clover coefficient */
-    double coeff;     /** Overall clover coefficient */
-    QudaTwistFlavorType twist_flavor; /** Twisted-mass flavor type */
-    bool twisted;     /** Whether to create twisted mass clover */
-    double mu2;       /** Chiral twisted mass term */
-    double epsilon2;  /** Flavor twisted mass term */
-    double rho;       /** Hasenbusch rho term */
+    bool reconstruct
+      = clover::reconstruct(); /** Whether to create a compressed clover field that requires reconstruction */
+    bool inverse = true;       /** Whether to create the inverse clover field */
+    void *clover = nullptr;    /** Pointer to the clover field */
+    void *cloverInv = nullptr; /** Pointer to the clover inverse field */
+    double csw = 0.0;          /** C_sw clover coefficient */
+    double coeff = 0.0;        /** Overall clover coefficient */
+    QudaTwistFlavorType twist_flavor = QUDA_TWIST_INVALID; /** Twisted-mass flavor type */
+    bool twisted = false;                                  /** Whether to create twisted mass clover */
+    double mu2 = 0.0;                                      /** Chiral twisted mass term */
+    double epsilon2 = 0.0;                                 /** Flavor twisted mass term */
+    double rho = 0.0;                                      /** Hasenbusch rho term */
 
-    QudaCloverFieldOrder order; /** Field order */
-    QudaFieldCreate create;     /** Creation type */
+    QudaCloverFieldOrder order = QUDA_INVALID_CLOVER_ORDER; /** Field order */
+    QudaFieldCreate create = QUDA_INVALID_FIELD_CREATE;     /** Creation type */
 
     /**
        @brief Helper function for setting the precision and corresponding
@@ -131,18 +132,7 @@ namespace quda {
       }
     }
 
-    CloverFieldParam() :
-      LatticeFieldParam(),
-      reconstruct(clover::reconstruct()),
-      inverse(true),
-      clover(nullptr),
-      cloverInv(nullptr),
-      twist_flavor(QUDA_TWIST_NO),
-      mu2(0.0),
-      epsilon2(0.0),
-      rho(0.0)
-    {
-    }
+    CloverFieldParam() = default;
 
     CloverFieldParam(const CloverFieldParam &param) :
       LatticeFieldParam(param),
@@ -169,7 +159,9 @@ namespace quda {
       coeff(inv_param.clover_coeff == 0.0 ? inv_param.kappa * inv_param.clover_csw : inv_param.clover_coeff),
       twist_flavor(inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH ? inv_param.twist_flavor : QUDA_TWIST_NO),
       mu2(twist_flavor != QUDA_TWIST_NO ? 4. * inv_param.kappa * inv_param.kappa * inv_param.mu * inv_param.mu : 0.0),
-      epsilon2(twist_flavor == QUDA_TWIST_NONDEG_DOUBLET ? 4.0 * inv_param.kappa * inv_param.kappa * inv_param.epsilon * inv_param.epsilon : 0.0),
+      epsilon2(twist_flavor == QUDA_TWIST_NONDEG_DOUBLET ?
+                 4.0 * inv_param.kappa * inv_param.kappa * inv_param.epsilon * inv_param.epsilon :
+                 0.0),
       rho(inv_param.clover_rho)
     {
       siteSubset = QUDA_FULL_SITE_SUBSET;
@@ -184,32 +176,32 @@ namespace quda {
   class CloverField : public LatticeField {
 
   protected:
-    const bool reconstruct; /** Whether this field is compressed and requires reconstruction */
+    const bool reconstruct = clover::reconstruct(); /** Whether this field is compressed and requires reconstruction */
 
-    size_t bytes; // bytes allocated per clover full field
-    size_t length;
-    size_t real_length;
-    size_t compressed_block; /** Length of compressed chiral block */
-    int nColor;
-    int nSpin;
+    size_t bytes = 0; // bytes allocated per clover full field
+    size_t length = 0;
+    size_t real_length = 0;
+    size_t compressed_block = 0; /** Length of compressed chiral block */
+    int nColor = 0;
+    int nSpin = 0;
 
-    void *clover;
-    void *cloverInv;
+    void *clover = nullptr;
+    void *cloverInv = nullptr;
 
-    double diagonal;
-    double max[2];
+    double diagonal = 0.0;
+    array<double, 2> max = {};
 
-    double csw;
-    double coeff;
-    QudaTwistFlavorType twist_flavor;
-    double mu2;      // chiral twisted mass squared
-    double epsilon2; // flavour twisted mass squared
-    double rho;
+    double csw = 0.0;
+    double coeff = 0.0;
+    QudaTwistFlavorType twist_flavor = QUDA_TWIST_INVALID;
+    double mu2 = 0.0;      // chiral twisted mass squared
+    double epsilon2 = 0.0; // flavour twisted mass squared
+    double rho = 0.0;
 
-    QudaCloverFieldOrder order;
-    QudaFieldCreate create;
+    QudaCloverFieldOrder order = QUDA_INVALID_CLOVER_ORDER;
+    QudaFieldCreate create = QUDA_INVALID_FIELD_CREATE;
 
-    mutable array<double, 2> trlog;
+    mutable array<double, 2> trlog = {};
 
     /**
        @brief Set the vol_string and aux_string for use in tuning

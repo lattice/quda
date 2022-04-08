@@ -46,14 +46,14 @@ namespace quda {
     friend class LatticeField;
 
     /** Location of the field */
-    QudaFieldLocation location;
+    QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
 
   protected:
     /** Field precision */
-    QudaPrecision precision;
+    QudaPrecision precision = QUDA_INVALID_PRECISION;
 
     /** Ghost precision */
-    QudaPrecision ghost_precision;
+    QudaPrecision ghost_precision = QUDA_INVALID_PRECISION;
 
   public:
     /** Field precision */
@@ -63,45 +63,30 @@ namespace quda {
     QudaPrecision GhostPrecision() const { return ghost_precision; }
 
     /** Number of field dimensions */
-    int nDim;
+    int nDim = 4;
 
     /** Array storing the length of dimension */
-    lat_dim_t x;
+    lat_dim_t x = {};
 
-    int pad;
+    int pad = 0;
 
-    QudaSiteSubset siteSubset;
+    QudaSiteSubset siteSubset = QUDA_INVALID_SITE_SUBSET;
 
-    QudaMemoryType mem_type; 
- 
+    QudaMemoryType mem_type = QUDA_MEMORY_DEVICE;
+
     /** The type of ghost exchange to be done with this field */
-    QudaGhostExchange ghostExchange;
+    QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
 
     /** The extended field radius (if applicable) */
-    lat_dim_t r;
+    lat_dim_t r = {};
 
     /** For fixed-point fields that need a global scaling factor */
-    double scale;
+    double scale = 1.0;
 
     /**
        @brief Default constructor for LatticeFieldParam
     */
-    LatticeFieldParam() :
-      location(QUDA_INVALID_FIELD_LOCATION),
-      precision(QUDA_INVALID_PRECISION),
-      ghost_precision(QUDA_INVALID_PRECISION),
-      nDim(4),
-      pad(0),
-      siteSubset(QUDA_INVALID_SITE_SUBSET),
-      mem_type(QUDA_MEMORY_DEVICE),
-      ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
-      scale(1.0)
-    {
-      for (int i = 0; i < QUDA_MAX_DIM; i++) {
-        x[i] = 0;
-	r[i] = 0;
-      }
-    }
+    LatticeFieldParam() = default;
 
     /**
        @brief Constructor for creating a LatticeFieldParam from a set of parameters
@@ -165,71 +150,69 @@ namespace quda {
 
   protected:
     /** Lattice volume */
-    size_t volume;
+    size_t volume = 0;
 
     /** Checkerboarded volume */
-    size_t volumeCB;
+    size_t volumeCB = 0;
 
     /** Local lattice volume */
-    size_t localVolume;
+    size_t localVolume = 0;
 
     /** Checkerboarded local volume */
-    size_t localVolumeCB;
+    size_t localVolumeCB = 0;
 
-    size_t stride;
-    int pad;
+    size_t stride = 0;
+    int pad = 0;
 
-    size_t total_bytes;
+    size_t total_bytes = 0;
 
     /** Number of field dimensions */
-    int nDim;
+    int nDim = 0;
 
     /** Array storing the length of dimension */
-    lat_dim_t x;
+    lat_dim_t x = {};
 
     /** The extended lattice radius (if applicable) */
-    lat_dim_t r;
+    lat_dim_t r = {};
 
     /** Array storing the local dimensions (x - 2 * r) */
-    lat_dim_t local_x;
+    lat_dim_t local_x = {};
 
     /** Array storing the surface size in each dimension */
-    lat_dim_t surface;
+    lat_dim_t surface = {};
 
     /** Array storing the checkerboarded surface size in each dimension */
-    lat_dim_t surfaceCB;
+    lat_dim_t surfaceCB = {};
 
     /** Array storing the local surface size in each dimension */
-    lat_dim_t local_surface;
+    lat_dim_t local_surface = {};
 
     /** Array storing the local surface size in each dimension */
-    lat_dim_t local_surfaceCB;
+    lat_dim_t local_surfaceCB = {};
 
     /** Location of the field */
-    QudaFieldLocation location;
+    QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
 
     /** Precision of the field */
-    QudaPrecision precision;
+    QudaPrecision precision = QUDA_INVALID_PRECISION;
 
     /** Precision of the ghost */
-    mutable QudaPrecision ghost_precision;
+    mutable QudaPrecision ghost_precision = QUDA_INVALID_PRECISION;
 
     /** Bool which is triggered if the ghost precision is reset */
-    mutable bool ghost_precision_reset;
+    mutable bool ghost_precision_reset = false;
 
     /** For fixed-point fields that need a global scaling factor */
-    double scale;
+    double scale = 0.0;
 
     /** Whether the field is full or single parity */
-    QudaSiteSubset siteSubset;
+    QudaSiteSubset siteSubset = QUDA_INVALID_SITE_SUBSET;
 
     /** Type of ghost exchange to perform */
-    QudaGhostExchange ghostExchange;
-
-    // The below are additions for inter-GPU communication (merging FaceBuffer functionality)
+    QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_INVALID;
 
     /** The number of dimensions we partition for communication */
-    int nDimComms;
+    int nDimComms = 0;
 
     /*
        The need for persistent message handlers (for GPUDirect support)
@@ -285,107 +268,107 @@ namespace quda {
     /**
        Size in bytes of this ghost field
     */
-    mutable size_t ghost_bytes;
+    mutable size_t ghost_bytes = 0;
 
     /**
        Size in bytes of prior ghost allocation
     */
-    mutable size_t ghost_bytes_old;
+    mutable size_t ghost_bytes_old = 0;
 
     /**
        Size in bytes of the ghost in each dimension
     */
-    mutable array<size_t, QUDA_MAX_DIM> ghost_face_bytes;
+    mutable array<size_t, QUDA_MAX_DIM> ghost_face_bytes = {};
 
     /**
        Actual allocated size in bytes of the ghost in each dimension
     */
-    mutable array<size_t, QUDA_MAX_DIM> ghost_face_bytes_aligned;
+    mutable array<size_t, QUDA_MAX_DIM> ghost_face_bytes_aligned = {};
 
     /**
        Byte offsets to each ghost zone
     */
-    mutable array_2d<size_t, QUDA_MAX_DIM, 2> ghost_offset;
+    mutable array_2d<size_t, QUDA_MAX_DIM, 2> ghost_offset = {};
 
     /**
        Pinned memory buffer used for sending messages
     */
-    array<void *, 2> my_face_h;
+    array<void *, 2> my_face_h = {};
 
     /**
        Mapped version of my_face_h
     */
-    array<void *, 2> my_face_hd;
+    array<void *, 2> my_face_hd = {};
 
     /**
        Device memory buffer for sending messages
      */
-    array<void *, 2> my_face_d;
+    array<void *, 2> my_face_d = {};
 
     /**
        Local pointers to the pinned my_face buffer
     */
-    array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_h;
+    array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_h = {};
 
     /**
        Local pointers to the mapped my_face buffer
     */
-    array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_hd;
+    array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_hd = {};
 
     /**
        Local pointers to the device ghost_send buffer
     */
-    array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_d;
+    array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_d = {};
 
     /**
        Memory buffer used for receiving all messages
     */
-    array<void *, 2> from_face_h;
+    array<void *, 2> from_face_h = {};
 
     /**
        Mapped version of from_face_h
     */
-    array<void *, 2> from_face_hd;
+    array<void *, 2> from_face_hd = {};
 
     /**
        Device memory buffer for receiving messages
      */
-    array<void *, 2> from_face_d;
+    array<void *, 2> from_face_d = {};
 
     /**
        Local pointers to the pinned from_face buffer
     */
-    array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_h;
+    array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_h = {};
 
     /**
        Local pointers to the mapped from_face buffer
     */
-    array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_hd;
+    array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_hd = {};
 
     /**
        Local pointers to the device ghost_recv buffer
     */
-    array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_d;
+    array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_d = {};
 
     /**
        Message handles for receiving
     */
-    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_recv;
+    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_recv = {};
 
     /**
        Message handles for sending
     */
-    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send;
+    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send = {};
 
     /**
        Message handles for receiving
     */
-    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_recv_rdma;
+    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_recv_rdma = {};
 
     /**
        Message handles for sending
     */
-    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send_rdma;
+    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send_rdma = {};
 
     /**
        Message handles for receiving
@@ -420,7 +403,7 @@ namespace quda {
     /**
        Whether we have initialized communication for this field
     */
-    bool initComms;
+    bool initComms = false;
 
     /**
        Whether we have initialized peer-to-peer communication
@@ -450,7 +433,7 @@ namespace quda {
     /**
        The type of allocation we are going to do for this field
     */
-    QudaMemoryType mem_type;
+    QudaMemoryType mem_type = QUDA_MEMORY_INVALID;
 
     void precisionCheck()
     {
@@ -463,9 +446,9 @@ namespace quda {
       }
     }
 
-    mutable char *backup_h;
-    mutable char *backup_norm_h;
-    mutable bool backed_up;
+    mutable char *backup_h = nullptr;
+    mutable char *backup_norm_h = nullptr;
+    mutable bool backed_up = false;
 
   public:
     /**
@@ -476,7 +459,7 @@ namespace quda {
     /**
        @brief Default constructor
     */
-    LatticeField();
+    LatticeField() = default;
 
     /**
        @brief Copy constructor for creating a LatticeField from another LatticeField
