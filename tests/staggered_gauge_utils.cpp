@@ -266,11 +266,10 @@ void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, vo
   delete[] act_paths;
 }
 
-
 // Routine that takes in a QDP-ordered field and outputs the plaquette.
 // Assumes the gauge fields already have phases on them (unless it's the Laplace op),
 // so it corrects the sign as appropriate.
-void computeStaggeredPlaquetteQDPOrder(void** qdp_link, double plaq[3], const QudaGaugeParam& gauge_param_in,
+void computeStaggeredPlaquetteQDPOrder(void **qdp_link, double plaq[3], const QudaGaugeParam &gauge_param_in,
                                        const QudaDslashType dslash_type)
 {
   if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
@@ -279,9 +278,7 @@ void computeStaggeredPlaquetteQDPOrder(void** qdp_link, double plaq[3], const Qu
 
   // Make no assumptions about any part of gauge_param_in beyond what we need to grab.
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  for (int d = 0; d < 4; d++) {
-    gauge_param.X[d] = gauge_param_in.X[d];
-  }
+  for (int d = 0; d < 4; d++) { gauge_param.X[d] = gauge_param_in.X[d]; }
 
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -301,12 +298,12 @@ void computeStaggeredPlaquetteQDPOrder(void** qdp_link, double plaq[3], const Qu
   gauge_param.ga_pad = 0;
   // For multi-GPU, ga_pad must be large enough to store a time-slice
 #ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
-  int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
+  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
+  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
+  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
+  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
   int pad_size = x_face_size > y_face_size ? x_face_size : y_face_size;
-  pad_size = pad_size > z_face_size ? pad_size : z_face_size; 
+  pad_size = pad_size > z_face_size ? pad_size : z_face_size;
   pad_size = pad_size > t_face_size ? pad_size : t_face_size;
   gauge_param.ga_pad = pad_size;
 #endif
@@ -319,6 +316,4 @@ void computeStaggeredPlaquetteQDPOrder(void** qdp_link, double plaq[3], const Qu
     plaq[1] = -plaq[1];
     plaq[2] = -plaq[2];
   }
-
 }
-

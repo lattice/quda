@@ -293,9 +293,8 @@ namespace
                                                        {"mobius-eofa", QUDA_MOBIUS_DWF_EOFA_DSLASH},
                                                        {"laplace", QUDA_LAPLACE_DSLASH}};
 
-  CLI::TransformPairs<QudaTwistFlavorType> twist_flavor_type_map {{"singlet", QUDA_TWIST_SINGLET},
-                                                                  {"nondeg-doublet", QUDA_TWIST_NONDEG_DOUBLET},
-                                                                  {"no", QUDA_TWIST_NO}};
+  CLI::TransformPairs<QudaTwistFlavorType> twist_flavor_type_map {
+    {"singlet", QUDA_TWIST_SINGLET}, {"nondeg-doublet", QUDA_TWIST_NONDEG_DOUBLET}, {"no", QUDA_TWIST_NO}};
 
   CLI::TransformPairs<QudaInverterType> inverter_type_map {{"invalid", QUDA_INVALID_INVERTER},
                                                            {"cg", QUDA_CG_INVERTER},
@@ -1015,7 +1014,6 @@ void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)
 
 void add_testing_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-  auto opgroup
-    = quda_app->add_option_group("Testing", "Options controlling automated testing");
+  auto opgroup = quda_app->add_option_group("Testing", "Options controlling automated testing");
   opgroup->add_option("--enable-testing", enable_testing, "Enable automated testing (default false)");
 }

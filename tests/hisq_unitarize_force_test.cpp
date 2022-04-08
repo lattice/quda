@@ -26,20 +26,20 @@ quda::cpuGaugeField *cpuReference = NULL;
 static QudaGaugeParam gaugeParam;
 
 // Create a field of links that are not su3_matrices
-void createNoisyLinkCPU(void** field, QudaPrecision prec, int seed)
+void createNoisyLinkCPU(void **field, QudaPrecision prec, int seed)
 {
   createSiteLinkCPU(field, prec, 0);
 
   srand(seed);
-  for(int dir=0; dir<4; ++dir){
-    for(int i=0; i<V*18; ++i){
-      if(prec == QUDA_DOUBLE_PRECISION){
-       double* ptr = ((double**)field)[dir] + i; 
-       *ptr += (rand() - RAND_MAX/2.0)/(20.0*RAND_MAX);
-      }else if(prec == QUDA_SINGLE_PRECISION){
-     	  float* ptr = ((float**)field)[dir]+i;
-        *ptr += (rand() - RAND_MAX/2.0)/(20.0*RAND_MAX);
-      }  
+  for (int dir = 0; dir < 4; ++dir) {
+    for (int i = 0; i < V * 18; ++i) {
+      if (prec == QUDA_DOUBLE_PRECISION) {
+        double *ptr = ((double **)field)[dir] + i;
+        *ptr += (rand() - RAND_MAX / 2.0) / (20.0 * RAND_MAX);
+      } else if (prec == QUDA_SINGLE_PRECISION) {
+        float *ptr = ((float **)field)[dir] + i;
+        *ptr += (rand() - RAND_MAX / 2.0) / (20.0 * RAND_MAX);
+      }
     }
   }
 }
@@ -72,13 +72,13 @@ static void hisq_force_init()
   cpuReference = new quda::cpuGaugeField(gParam);
 
   // create "gauge fields"
-  int seed=0;
+  int seed = 0;
 #ifdef MULTI_GPU
   seed += quda::comm_rank();
 #endif
 
-  createNoisyLinkCPU((void**)cpuFatLink->Gauge_p(), gaugeParam.cpu_prec, seed);
-  createNoisyLinkCPU((void**)cpuOprod->Gauge_p(), gaugeParam.cpu_prec, seed+1);
+  createNoisyLinkCPU((void **)cpuFatLink->Gauge_p(), gaugeParam.cpu_prec, seed);
+  createNoisyLinkCPU((void **)cpuOprod->Gauge_p(), gaugeParam.cpu_prec, seed + 1);
 
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.setPrecision(gaugeParam.cuda_prec, true);
@@ -136,7 +136,7 @@ TEST(hisq_force_unitarize, verify)
   }
 
   cudaResult->saveCPUField(*cpuReference);
-  
+
   printfQuda("Comparing CPU and GPU results\n");
   int res[4];
 
@@ -157,7 +157,7 @@ TEST(hisq_force_unitarize, verify)
 static void display_test_info()
 {
   printfQuda("running the following fermion force computation test:\n");
-    
+
   printfQuda("link_precision           link_reconstruct           space_dim(x/y/z)         T_dimension\n");
   printfQuda("%s                       %s                         %d/%d/%d                  %d \n", get_prec_str(prec),
              get_recon_str(link_recon), xdim, ydim, zdim, tdim);
@@ -187,4 +187,3 @@ int main(int argc, char **argv)
 
   return test_rc;
 }
-

@@ -583,8 +583,7 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
 #ifdef MULTI_GPU
 
     lat_dim_t X = {qudaGaugeParam.X[0], qudaGaugeParam.X[1], qudaGaugeParam.X[2], qudaGaugeParam.X[3]};
-    exchange_cpu_sitelink(X, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec,
-                          &qudaGaugeParam, optflag);
+    exchange_cpu_sitelink(X, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, &qudaGaugeParam, optflag);
     llfat_reference_mg(fatlink, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, coeff);
 
     {
@@ -616,8 +615,7 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
 
   // We've already built the extended W fields.
   lat_dim_t X = {qudaGaugeParam.X[0], qudaGaugeParam.X[1], qudaGaugeParam.X[2], qudaGaugeParam.X[3]};
-  exchange_cpu_sitelink(X, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec,
-                        &qudaGaugeParam, optflag);
+  exchange_cpu_sitelink(X, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, &qudaGaugeParam, optflag);
   llfat_reference_mg(fatlink, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, coeff);
 
   {

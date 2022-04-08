@@ -107,7 +107,7 @@ void display_test_info()
 }
 
 std::vector<char> gauge_;
-std::array<void*, 4> gauge;
+std::array<void *, 4> gauge;
 std::vector<char> clover;
 std::vector<char> clover_inv;
 
@@ -190,7 +190,7 @@ std::vector<double> solve(test_t param)
   if (enable_testing) inv_param.ca_lambda_max = -1.0;
 
   logQuda(QUDA_SUMMARIZE, "Solution = %s, Solve = %s, Solver = %s, Sloppy precision = %s\n",
-          get_solution_str(inv_param.solution_type),  get_solve_str(inv_param.solve_type),
+          get_solution_str(inv_param.solution_type), get_solve_str(inv_param.solve_type),
           get_solver_str(inv_param.inv_type), get_prec_str(inv_param.cuda_prec_sloppy));
 
   // params corresponds to split grid
@@ -290,7 +290,8 @@ std::vector<double> solve(test_t param)
     // Run split grid
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
         || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
-      invertMultiSrcCloverQuda(_hp_x.data(), _hp_b.data(), &inv_param, gauge.data(), &gauge_param, clover.data(), clover_inv.data());
+      invertMultiSrcCloverQuda(_hp_x.data(), _hp_b.data(), &inv_param, gauge.data(), &gauge_param, clover.data(),
+                               clover_inv.data());
     } else {
       invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, gauge.data(), &gauge_param);
     }
@@ -317,8 +318,8 @@ std::vector<double> solve(test_t param)
   // Perform host side verification of inversion if requested
   if (verify_results) {
     for (int i = 0; i < Nsrc; i++) {
-      res[i] = verifyInversion(out[i].V(), _hp_multi_x[i].data(), in[i].V(), check.V(), gauge_param,
-                               inv_param, gauge.data(), clover.data(), clover_inv.data());
+      res[i] = verifyInversion(out[i].V(), _hp_multi_x[i].data(), in[i].V(), check.V(), gauge_param, inv_param,
+                               gauge.data(), clover.data(), clover_inv.data());
     }
   }
   return res;
@@ -399,7 +400,7 @@ int main(int argc, char **argv)
     if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
     result = RUN_ALL_TESTS();
   } else {
-    solve(test_t{inv_type, solution_type, solve_type, prec_sloppy, multishift});
+    solve(test_t {inv_type, solution_type, solve_type, prec_sloppy, multishift});
   }
 
   // finalize the QUDA library

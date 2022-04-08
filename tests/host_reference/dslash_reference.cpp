@@ -15,12 +15,13 @@ double verifyInversion(void *spinorOut, void *spinorIn, void *spinorCheck, QudaG
                        QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv)
 {
   void **spinorOutMulti = nullptr;
-  return verifyInversion(spinorOut, spinorOutMulti, spinorIn, spinorCheck, gauge_param, inv_param, gauge, clover, clover_inv);
+  return verifyInversion(spinorOut, spinorOutMulti, spinorIn, spinorCheck, gauge_param, inv_param, gauge, clover,
+                         clover_inv);
 }
 
 double verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck,
-                     QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover,
-                     void *clover_inv)
+                       QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover,
+                       void *clover_inv)
 {
   double res = std::numeric_limits<double>::max();
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
@@ -29,8 +30,8 @@ double verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, v
                                         clover, clover_inv);
   } else if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH
              || dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    res = verifyWilsonTypeInversion(spinorOut, spinorOutMulti, spinorIn, spinorCheck, gauge_param, inv_param, gauge, clover,
-                                    clover_inv);
+    res = verifyWilsonTypeInversion(spinorOut, spinorOutMulti, spinorIn, spinorCheck, gauge_param, inv_param, gauge,
+                                    clover, clover_inv);
   } else {
     errorQuda("Unsupported dslash_type=%s", get_dslash_str(dslash_type));
   }
@@ -38,7 +39,8 @@ double verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, v
 }
 
 double verifyDomainWallTypeInversion(void *spinorOut, void **, void *spinorIn, void *spinorCheck,
-                                     QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *, void *)
+                                     QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *,
+                                     void *)
 {
   if (multishift > 1) errorQuda("Multishift not supported");
 

@@ -38,7 +38,7 @@ void **ghostLink;
 
 QudaParity parity = QUDA_EVEN_PARITY;
 
-GaugeCovDev* dirac;
+GaugeCovDev *dirac;
 
 const int nColor = 3;
 
@@ -61,9 +61,9 @@ void init(int argc, char **argv)
   inv_param.dslash_type = QUDA_COVDEV_DSLASH; // ensure we use the correct dslash
 
   ColorSpinorParam csParam;
-  csParam.nColor=nColor;
-  csParam.nSpin=4;
-  csParam.nDim=4;
+  csParam.nColor = nColor;
+  csParam.nSpin = 4;
+  csParam.nDim = 4;
   for (int d = 0; d < 4; d++) { csParam.x[d] = gauge_param.X[d]; }
   //  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
 
@@ -73,7 +73,7 @@ void init(int argc, char **argv)
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   csParam.pc_type = QUDA_4D_PC;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = inv_param.gamma_basis; // this parameter is meaningless for staggered
   csParam.create = QUDA_ZERO_FIELD_CREATE;
   csParam.location = QUDA_CPU_FIELD_LOCATION;
@@ -96,7 +96,7 @@ void init(int argc, char **argv)
   // cpuLink is only used for ghost allocation
   GaugeFieldParam cpuParam(gauge_param, links);
   cpuParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  cpuLink   = new cpuGaugeField(cpuParam);
+  cpuLink = new cpuGaugeField(cpuParam);
   ghostLink = cpuLink->Ghost();
 
   printfQuda("Links sending...");
@@ -133,7 +133,7 @@ void init(int argc, char **argv)
   dirac = new GaugeCovDev(diracParam);
 }
 
-void end(void) 
+void end(void)
 {
   for (int dir = 0; dir < 4; dir++) { host_free(links[dir]); }
 
@@ -169,15 +169,16 @@ void covdevRef(int mu)
   mat_mg4dir(*spinorRef, links, ghostLink, *spinor, dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
 #else
   mat(spinorRef->V(), links, spinor->V(), dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
-#endif    
+#endif
   printfQuda("done.\n");
 }
 
 TEST(dslash, verify)
 {
   double deviation = pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *spinorOut)));
-  double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
-		(inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
+  double tol
+    = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
+                                                      (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
 
@@ -186,18 +187,14 @@ void display_test_info()
   printfQuda("running the following test:\n");
 
   printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
-  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d \n", 
-      get_prec_str(prec), get_recon_str(link_recon), 
-      test_type, dagger, xdim, ydim, zdim, tdim);
-  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
-  printfQuda("                         %d  %d  %d  %d\n", 
-      dimPartitioned(0),
-      dimPartitioned(1),
-      dimPartitioned(2),
-      dimPartitioned(3));
+  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d \n", get_prec_str(prec), get_recon_str(link_recon),
+             test_type, dagger, xdim, ydim, zdim, tdim);
+  printfQuda("Grid partition info:     X  Y  Z  T\n");
+  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
+             dimPartitioned(3));
 }
 
-int main(int argc, char **argv) 
+int main(int argc, char **argv)
 {
   // initalize google test
   ::testing::InitGoogleTest(&argc, argv);
@@ -274,4 +271,3 @@ int main(int argc, char **argv)
   finalizeComms();
   return test_rc;
 }
-

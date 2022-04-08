@@ -802,8 +802,8 @@ double test(Kernel kernel)
       auto dot = blas::cDotProduct(xH, yH);
       auto x2 = blas::norm2(xH);
       auto y2 = blas::norm2(yH);
-      error = abs(Complex(d.x - dot.real(), d.y - dot.imag())) / abs(dot) +
-        fabs(d.z - x2) / fabs(x2) + fabs(d.w - y2) / fabs(y2);
+      error = abs(Complex(d.x - dot.real(), d.y - dot.imag())) / abs(dot) + fabs(d.z - x2) / fabs(x2)
+        + fabs(d.w - y2) / fabs(y2);
     }
     break;
 
@@ -1005,8 +1005,8 @@ double test(Kernel kernel)
     for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Msrc; j++) {
         ((double *)B.data())[i * Msrc + j] = blas::reDotProduct(xmD.Component(i), ymD.Component(j));
-        error
-          += std::abs(((double *)A.data())[i * Msrc + j] - ((double *)B.data())[i * Msrc + j]) / std::abs(((double *)B.data())[i * Msrc + j]);
+        error += std::abs(((double *)A.data())[i * Msrc + j] - ((double *)B.data())[i * Msrc + j])
+          / std::abs(((double *)B.data())[i * Msrc + j]);
       }
     }
     error /= Nsrc * Msrc;
@@ -1159,7 +1159,8 @@ protected:
   const int &kernel;
 
 public:
-  BlasTest() : param(GetParam()), prec_pair(prec_idx_map(::testing::get<0>(param))), kernel(::testing::get<1>(param)) {}
+  BlasTest() :
+    param(GetParam()), prec_pair(prec_idx_map(::testing::get<0>(param))), kernel(::testing::get<1>(param)) { }
   virtual void SetUp()
   {
     if (!skip_kernel(prec_pair, (Kernel)kernel)) initFields(prec_pair);

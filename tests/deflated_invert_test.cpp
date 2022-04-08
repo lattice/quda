@@ -156,12 +156,13 @@ int main(int argc, char **argv)
   double time0 = -((double)clock());
 
   // this line ensure that if we need to construct the clover inverse (in either the smoother or the solver) we do so
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
+    loadCloverQuda(clover, clover_inv, &inv_param);
 
-  void *df_preconditioner  = newDeflationQuda(&df_param);
-  inv_param.deflation_op   = df_preconditioner;
+  void *df_preconditioner = newDeflationQuda(&df_param);
+  inv_param.deflation_op = df_preconditioner;
 
-  for (int i=0; i<Nsrc; i++) {
+  for (int i = 0; i < Nsrc; i++) {
     // create a point source at 0 (in each subvolume...  FIXME)
     memset(spinorIn, 0, inv_param.Ls * V * spinor_site_size * host_spinor_data_type_size);
     memset(spinorCheck, 0, inv_param.Ls * V * spinor_site_size * host_spinor_data_type_size);
@@ -169,10 +170,12 @@ int main(int argc, char **argv)
 
     if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
       //((float*)spinorIn)[i] = 1.0;
-      for (auto i = 0lu; i < inv_param.Ls * V * spinor_site_size; i++) ((float *)spinorIn)[i] = rand() / (float)RAND_MAX;
+      for (auto i = 0lu; i < inv_param.Ls * V * spinor_site_size; i++)
+        ((float *)spinorIn)[i] = rand() / (float)RAND_MAX;
     } else {
       //((double*)spinorIn)[i] = 1.0;
-      for (auto i = 0lu; i < inv_param.Ls * V * spinor_site_size; i++) ((double *)spinorIn)[i] = rand() / (double)RAND_MAX;
+      for (auto i = 0lu; i < inv_param.Ls * V * spinor_site_size; i++)
+        ((double *)spinorIn)[i] = rand() / (double)RAND_MAX;
     }
 
     invertQuda(spinorOut, spinorIn, &inv_param);
@@ -212,8 +215,9 @@ int main(int argc, char **argv)
       host_free(kappa_c);
     } else {
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-        if(inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
-          tm_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 0, inv_param.cpu_prec, gauge_param);
+        if (inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
+          tm_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 0,
+                 inv_param.cpu_prec, gauge_param);
         } else {
           printfQuda("Unsupported dslash_type\n");
           exit(-1);
@@ -232,7 +236,7 @@ int main(int argc, char **argv)
       }
     }
 
-  } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {
+  } else if (inv_param.solution_type == QUDA_MATPC_SOLUTION) {
 
     if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
       wil_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
@@ -281,9 +285,8 @@ int main(int argc, char **argv)
   double src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
   double l2r = sqrt(nrm2 / src2);
 
-  printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n",
-	     inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
-
+  printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n", inv_param.tol,
+             inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
 
   freeGaugeQuda();
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) freeCloverQuda();

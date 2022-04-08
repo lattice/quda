@@ -24,23 +24,24 @@ ColorSpinorParam csParam;
 
 int ODD_BIT = 0;
 int DAGGER_BIT = 0;
-    
+
 QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
 
-void init() {
+void init()
+{
 
   param.cpu_prec = prec_cpu;
   param.cuda_prec = prec;
   param.reconstruct = link_recon;
   param.cuda_prec_sloppy = param.cuda_prec;
   param.reconstruct_sloppy = param.reconstruct;
-  
+
   param.X[0] = xdim;
   param.X[1] = ydim;
   param.X[2] = zdim;
   param.X[3] = tdim;
 #ifdef MULTI_GPU
-  param.ga_pad = xdim*ydim*zdim/2;
+  param.ga_pad = xdim * ydim * zdim / 2;
 #else
   param.ga_pad = 0;
 #endif
@@ -58,7 +59,7 @@ void init() {
   csParam.nSpin = 4;
   csParam.nDim = 4;
   csParam.pc_type = QUDA_4D_PC;
-  for (int d=0; d<4; d++) csParam.x[d] = param.X[d];
+  for (int d = 0; d < 4; d++) csParam.x[d] = param.X[d];
   csParam.setPrecision(prec_cpu);
   csParam.pad = 0;
   csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
@@ -84,7 +85,8 @@ void init() {
   cudaSpinor = std::make_unique<ColorSpinorField>(csParam);
 }
 
-void end() {
+void end()
+{
   // release memory
   cudaSpinor.reset();
   spinor2.reset();
@@ -168,7 +170,8 @@ void packTest()
   ColorSpinorField::Compare(*spinor, *spinor2, 1);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
   // command line options
   auto app = make_app();
   try {
@@ -185,4 +188,3 @@ int main(int argc, char **argv) {
 
   finalizeComms();
 }
-

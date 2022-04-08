@@ -1056,15 +1056,15 @@ struct DslashTestWrapper {
       for (int n = 0; n < num_src; n++) {
         double norm_cpu = blas::norm2(spinorRef);
         double norm_cpu_quda = blas::norm2(vp_spinorOut[n]);
-        printfQuda("Results: CPU = %f, QUDA = %f, L2 relative deviation = %e\n",
-                   norm_cpu, norm_cpu_quda, 1.0 - sqrt(norm_cpu_quda / norm_cpu));
+        printfQuda("Results: CPU = %f, QUDA = %f, L2 relative deviation = %e\n", norm_cpu, norm_cpu_quda,
+                   1.0 - sqrt(norm_cpu_quda / norm_cpu));
         deviation = std::max(deviation, std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef, vp_spinorOut[n]))));
       }
     } else {
       double norm_cpu = blas::norm2(spinorRef);
       double norm_cpu_quda = blas::norm2(spinorOut);
-      printfQuda("Results: CPU = %f, QUDA = %f, L2 relative deviation = %e\n",
-                 norm_cpu, norm_cpu_quda, 1.0  -sqrt(norm_cpu_quda / norm_cpu));
+      printfQuda("Results: CPU = %f, QUDA = %f, L2 relative deviation = %e\n", norm_cpu, norm_cpu_quda,
+                 1.0 - sqrt(norm_cpu_quda / norm_cpu));
       deviation = std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef, spinorOut)));
     }
     return deviation;
