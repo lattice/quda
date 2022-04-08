@@ -148,6 +148,12 @@ namespace quda {
 
   class LatticeField : public Object {
 
+    /**
+       @brief Create the field as specified by the param
+       @param[in] Parameter struct
+    */
+    void create(const LatticeFieldParam &param);
+
   protected:
     /** Lattice volume */
     size_t volume = 0;
@@ -497,12 +503,6 @@ namespace quda {
        @return Reference to this field
      */
     LatticeField &operator=(LatticeField &&);
-
-    /**
-       @brief Create the field as specified by the param
-       @param[in] Parameter struct
-    */
-    void create(const LatticeFieldParam &param);
 
     /**
        @brief Clears any allocations in the field and returns the

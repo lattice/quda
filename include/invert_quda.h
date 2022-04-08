@@ -521,7 +521,7 @@ namespace quda {
     bool recompute_evals;   /** If true, instruct the solver to recompute evals from an existing deflation space. */
     std::vector<ColorSpinorField *> evecs; /** Holds the eigenvectors. */
     std::vector<Complex> evals;            /** Holds the eigenvalues. */
-    ColorSpinorField dummy; /** dummy addition for now */
+    ColorSpinorField dummy;                /** dummy addition for now */
 
     bool mixed() { return param.precision != param.precision_sloppy; }
 
@@ -537,7 +537,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    virtual ColorSpinorField& get_residual()
+    virtual ColorSpinorField &get_residual()
     {
       errorQuda("Not implemented");
       return dummy;
@@ -727,8 +727,9 @@ namespace quda {
        @return Norm of final power iteration result
     */
     template <typename... Args>
-    static double performPowerIterations(const DiracMatrix &diracm, const ColorSpinorField &start, ColorSpinorField &tempvec1,
-                                         ColorSpinorField &tempvec2, int niter, int normalize_freq, Args &&...args);
+    static double performPowerIterations(const DiracMatrix &diracm, const ColorSpinorField &start,
+                                         ColorSpinorField &tempvec1, ColorSpinorField &tempvec2, int niter,
+                                         int normalize_freq, Args &&...args);
 
     /**
        @brief Generate a Krylov space in a given basis
@@ -1073,13 +1074,14 @@ namespace quda {
     std::vector<ColorSpinorField*> p;  // GCR direction vectors
     std::vector<ColorSpinorField*> Ap; // mat * direction vectors
 
-    void computeBeta(std::vector<Complex> &beta, std::vector<ColorSpinorField*> Ap, int i, int N, int k);
-    void updateAp(std::vector<Complex> &beta, std::vector<ColorSpinorField*> Ap, int begin, int size, int k);
-    void orthoDir(std::vector<Complex> &beta, std::vector<ColorSpinorField*> Ap, int k, int pipeline);
-    void backSubs(const std::vector<Complex> &alpha, const std::vector<Complex> &beta,
-                  const std::vector<double> &gamma, std::vector<Complex> &delta, int n);
+    void computeBeta(std::vector<Complex> &beta, std::vector<ColorSpinorField *> Ap, int i, int N, int k);
+    void updateAp(std::vector<Complex> &beta, std::vector<ColorSpinorField *> Ap, int begin, int size, int k);
+    void orthoDir(std::vector<Complex> &beta, std::vector<ColorSpinorField *> Ap, int k, int pipeline);
+    void backSubs(const std::vector<Complex> &alpha, const std::vector<Complex> &beta, const std::vector<double> &gamma,
+                  std::vector<Complex> &delta, int n);
     void updateSolution(ColorSpinorField &x, const std::vector<Complex> &alpha, const std::vector<Complex> &beta,
                         std::vector<double> &gamma, int k, std::vector<ColorSpinorField *> p);
+
   public:
     GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
         SolverParam &param, TimeProfile &profile);
@@ -1098,6 +1100,7 @@ namespace quda {
 
   class MR : public Solver {
 
+  private:
     ColorSpinorField r;
     ColorSpinorField r_sloppy;
     ColorSpinorField Ar;
@@ -1121,7 +1124,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField& get_residual();
+    ColorSpinorField &get_residual();
 
     bool hermitian() { return false; } /** MR is for any linear system */
   };
@@ -1153,15 +1156,15 @@ namespace quda {
     ColorSpinorField tmp2;
     ColorSpinorField tmp2_sloppy;
 
-    std::vector<ColorSpinorField> S;  // residual vectors
-    std::vector<ColorSpinorField> AS; // mat * residual vectors. Can be replaced by a single temporary.
-    std::vector<ColorSpinorField> Q;  // CG direction vectors
+    std::vector<ColorSpinorField> S;    // residual vectors
+    std::vector<ColorSpinorField> AS;   // mat * residual vectors. Can be replaced by a single temporary.
+    std::vector<ColorSpinorField> Q;    // CG direction vectors
     std::vector<ColorSpinorField> Qtmp; // CG direction vectors for pointer swap
-    std::vector<ColorSpinorField> AQ; // mat * CG direction vectors.
-                                       // it's possible to avoid carrying these
-                                       // around, but there's a stability penalty,
-                                       // and computing QAQ becomes a pain (though
-                                       // it does let you fuse the reductions...)
+    std::vector<ColorSpinorField> AQ;   // mat * CG direction vectors.
+                                        // it's possible to avoid carrying these
+                                        // around, but there's a stability penalty,
+                                        // and computing QAQ becomes a pain (though
+                                        // it does let you fuse the reductions...)
 
     /**
        @brief Initiate the fields needed by the solver
@@ -1195,7 +1198,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField& get_residual();
+    ColorSpinorField &get_residual();
 
     virtual bool hermitian() { return true; } /** CG is only for Hermitian systems */
   };
@@ -1227,7 +1230,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField& get_residual();
+    ColorSpinorField &get_residual();
 
     virtual bool hermitian() { return false; } /** CGNE is for any linear system */
   };
@@ -1258,7 +1261,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField& get_residual();
+    ColorSpinorField &get_residual();
 
     virtual bool hermitian() { return false; } /** CGNE is for any linear system */
   };
@@ -1285,8 +1288,8 @@ namespace quda {
     ColorSpinorField tmp;
     ColorSpinorField tmp_sloppy;
 
-    std::vector<ColorSpinorField> p;  // GCR direction vectors
-    std::vector<ColorSpinorField> q;  // mat * direction vectors
+    std::vector<ColorSpinorField> p; // GCR direction vectors
+    std::vector<ColorSpinorField> q; // mat * direction vectors
 
     /**
        @brief Initiate the fields needed by the solver
@@ -1304,9 +1307,9 @@ namespace quda {
     */
     void solve(std::vector<Complex> &psi, std::vector<ColorSpinorField> &q, ColorSpinorField &b);
 
-public:
-    CAGCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-          const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
+  public:
+    CAGCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
+          SolverParam &param, TimeProfile &profile);
     virtual ~CAGCR();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -1314,7 +1317,7 @@ public:
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField& get_residual();
+    ColorSpinorField &get_residual();
 
     virtual bool hermitian() { return false; } /** GCR is for any linear system */
   };
@@ -1422,7 +1425,9 @@ public:
 
   public:
     MultiShiftSolver(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-      mat(mat), matSloppy(matSloppy), param(param), profile(profile) { }
+      mat(mat), matSloppy(matSloppy), param(param), profile(profile)
+    {
+    }
 
     virtual void operator()(std::vector<ColorSpinorField> &out, ColorSpinorField &in) = 0;
     bool convergence(const std::vector<double> &r2, const std::vector<double> &r2_tol, int n) const;
@@ -1434,8 +1439,8 @@ public:
   class MultiShiftCG : public MultiShiftSolver {
 
     bool init;
-    bool mixed; // whether we will be using mixed precision
-    bool reliable; // whether we will be using reliable updates or not
+    bool mixed;        // whether we will be using mixed precision
+    bool reliable;     // whether we will be using reliable updates or not
     bool group_update; // whether we will be using solution group updates
     int num_offset;
     ColorSpinorField r;
@@ -1443,9 +1448,9 @@ public:
     ColorSpinorField Ap;
     std::vector<ColorSpinorField> x_sloppy;
 
-    ColorSpinorField tmp1; // high precision temporary
+    ColorSpinorField tmp1;        // high precision temporary
     ColorSpinorField tmp1_sloppy; // sloppy precision alias
-    ColorSpinorField tmp2; // high precision temporary for Wilson-like kernels
+    ColorSpinorField tmp2;        // high precision temporary for Wilson-like kernels
     ColorSpinorField tmp2_sloppy; // sloppy precision alias
 
     void create(std::vector<ColorSpinorField> &x, const ColorSpinorField &b, std::vector<ColorSpinorField> &p);
@@ -1461,8 +1466,8 @@ public:
      * @param p std::vector of pointers to hold search directions. Note this will be resized as necessary.
      * @param r2_old_array pointer to last values of r2_old for old shifts. Needs to be large enough to hold r2_old for all shifts.
      */
-    void operator()(std::vector<ColorSpinorField> &x, ColorSpinorField &b,
-                    std::vector<ColorSpinorField> &p, std::vector<double> &r2_old_array);
+    void operator()(std::vector<ColorSpinorField> &x, ColorSpinorField &b, std::vector<ColorSpinorField> &p,
+                    std::vector<double> &r2_old_array);
 
     /**
      * @brief Run multi-shift and return Krylov-space at the end of the solve in p and r2_old_arry.
@@ -1477,7 +1482,6 @@ public:
 
       (*this)(out, in, p, r2_old);
     }
-
   };
 
 
@@ -1510,8 +1514,8 @@ public:
        @param[in] q Search direction vectors with the operator applied
        @param[in] hermitian Whether the linear system is Hermitian or not
     */
-    void solve(std::vector<Complex> &psi_, std::vector<ColorSpinorField> &p,
-               std::vector<ColorSpinorField> &q, ColorSpinorField &b, bool hermitian);
+    void solve(std::vector<Complex> &psi_, std::vector<ColorSpinorField> &p, std::vector<ColorSpinorField> &q,
+               ColorSpinorField &b, bool hermitian);
 
   public:
     /**
@@ -1528,9 +1532,8 @@ public:
        @param p The basis vectors in which we are building the guess
        @param q The basis vectors multiplied by A
     */
-    void operator()(ColorSpinorField &x, ColorSpinorField &b,
-		    std::vector<ColorSpinorField> &p,
-		    std::vector<ColorSpinorField> &q);
+    void operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField> &p,
+                    std::vector<ColorSpinorField> &q);
   };
 
   using ColorSpinorFieldSet = ColorSpinorField;
