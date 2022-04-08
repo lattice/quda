@@ -521,7 +521,6 @@ namespace quda {
     bool recompute_evals;   /** If true, instruct the solver to recompute evals from an existing deflation space. */
     std::vector<ColorSpinorField *> evecs; /** Holds the eigenvectors. */
     std::vector<Complex> evals;            /** Holds the eigenvalues. */
-    ColorSpinorField dummy;                /** dummy addition for now */
 
     bool mixed() { return param.precision != param.precision_sloppy; }
 
@@ -540,6 +539,7 @@ namespace quda {
     virtual ColorSpinorField &get_residual()
     {
       errorQuda("Not implemented");
+      static ColorSpinorField dummy;
       return dummy;
     }
 
