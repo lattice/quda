@@ -303,7 +303,7 @@ namespace quda
     size_t site_size = nSpinGhost * nColor * 2 * ghost_precision + (is_fixed ? sizeof(float) : 0);
 
     // calculate size of ghost zone required
-    int ghost_volume = 0;
+    //int ghost_volume = 0;
     int dims = nDim == 5 ? (nDim - 1) : nDim;
     int x5 = nDim == 5 ? x[4] : 1; /// includes DW and non-degenerate TM ghosts
     const int ghost_align
@@ -320,7 +320,7 @@ namespace quda
         }
         ghostFace[i] *= x5; // temporary hack : extra dimension for DW ghosts
         if (i == 0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
-        ghost_volume += 2 * nFace * ghostFace[i];
+        //ghost_volume += 2 * nFace * ghostFace[i];
       }
 
       ghost_face_bytes[i] = nFace * ghostFace[i] * site_size;

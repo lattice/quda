@@ -226,8 +226,8 @@ namespace quda {
 	  const Float gprod = g[0]*g[1]*g[2];
 	  // Check the svd result for errors
 	  if (fabs(gprod - determinant) > arg.max_det_error) {
-	    printf("Warning: Error in determinant computed by SVD : %g > %g\n", fabs(gprod-determinant), arg.max_det_error);
-	    printLink(q);
+	    //printf("Warning: Error in determinant computed by SVD : %g > %g\n", fabs(gprod-determinant), arg.max_det_error);
+	    //printLink(q);
 
             atomic_fetch_add(arg.fails, 1);
 	  }

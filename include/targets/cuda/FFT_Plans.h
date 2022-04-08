@@ -141,7 +141,8 @@ inline void SetPlanFFT2DMany(cufftHandle &plan, int4 size, int dim, QudaPrecisio
     CUFFT_SAFE_CALL(cufftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, type, size.x * size.y));
   } break;
   case 1: {
-    int n[2] = {size.x, size.y};
+    //int n[2] = {size.x, size.y};
+    int n[2] = {size.y, size.x};
     CUFFT_SAFE_CALL(cufftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, type, size.z * size.w));
   } break;
   }

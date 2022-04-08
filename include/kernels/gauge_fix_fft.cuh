@@ -9,7 +9,7 @@
 
 namespace quda {
 
-//UNCOMMENT THIS IF YOU WAN'T TO USE LESS MEMORY
+//UNCOMMENT THIS IF YOU WANT TO USE LESS MEMORY
 #define GAUGEFIXING_DONT_USE_GX
 //Without using the precalculation of g(x),
 //we loose some performance, because Delta(x) is written in normal lattice coordinates need for the FFTs
