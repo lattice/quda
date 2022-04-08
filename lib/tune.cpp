@@ -680,11 +680,6 @@ namespace quda
 
   static TimeProfile launchTimer("tuneLaunch");
 
-  using tunepair = std::pair<float, TuneParam>;
-  struct tunepaircomp {
-    bool operator()(const tunepair &left, const tunepair &right) const { return (left.first) < (right.first); }
-  };
-
   struct TuneParamComp {
     bool operator()(const TuneParam &left, const TuneParam &right) const { return (left.time) < (right.time); }
   };
