@@ -18,6 +18,7 @@
 #include <queue>
 #include <functional>
 #include <utility>
+#include <json_helper.h>
 
 #include <communicator_quda.h>
 
@@ -680,6 +681,10 @@ namespace quda
 
   static TimeProfile launchTimer("tuneLaunch");
 
+  /**
+   * @brief Compare two TuneParams with respect to which has the lower time.
+   *
+   */
   struct TuneParamComp {
     bool operator()(const TuneParam &left, const TuneParam &right) const { return (left.time) < (right.time); }
   };
@@ -688,11 +693,36 @@ namespace quda
    * in the 1st tuning phase which will be further tuned in the 2nd phase.
    *
    */
+
+  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TuneParam, block, grid, shared_bytes, set_max_shared_bytes, aux, comment, time,
+                                     n_calls)
+
   class TuneCandidates : public std::priority_queue<TuneParam, std::vector<TuneParam>, TuneParamComp>
   {
   private:
     const size_t max_size = 5;
     float besttime = FLT_MAX;
+
+    /**
+     * @brief Serialize tune candidates to json string.
+     *
+     * @return std::string
+     */
+    std::string serialize() const
+    {
+      json j = this->c;
+      return j.dump();
+    }
+    /**
+     * @brief Deserialize tune candiates from json string.
+     *
+     * @param s
+     */
+    void deserialize(const std::string_view s)
+    {
+      auto j = json::parse(s);
+      this->c = j;
+    }
 
   public:
     /**
@@ -702,6 +732,12 @@ namespace quda
      */
     TuneCandidates(size_t size) : max_size(size) { }
 
+    /**
+     * @brief Push a new tuning candiate to the queue. Will be ignored if there are
+     * already size faster ones.
+     *
+     * @param candidate
+     */
     void pushCandidate(TuneParam candidate)
     {
       if (candidate.time < besttime) besttime = candidate.time;
@@ -715,6 +751,37 @@ namespace quda
         push(candidate);
       }
     }
+    /**
+     * @brief Broadcast candidates among ranks to make sure policy tuning does not break.
+     *
+     */
+    void broadcast()
+    {
+#ifdef MULTI_GPU
+
+      size_t size;
+      std::string serialized;
+      if (comm_rank_global() == 0) {
+        serialized = serialize();
+        size = serialized.length();
+      }
+      comm_broadcast_global(&size, sizeof(size_t));
+
+      if (size > 0) {
+        if (comm_rank_global() == 0) {
+          comm_broadcast_global(const_cast<char *>(serialized.c_str()), size);
+        } else {
+          char *serstr = new char[size + 1];
+          comm_broadcast_global(serstr, size);
+          serstr[size] = '\0'; // null-terminate
+          std::string_view deserialized(serstr);
+          deserialize(deserialized);
+          delete[] serstr;
+        }
+      }
+#endif
+    }
+
     /**
      * @brief Return the best time found in tuning.
      *
@@ -887,6 +954,7 @@ namespace quda
           printfQuda("Candidate tuning finished. Best time %f and now continuing with %i iterations.\n",
                      tc.getBestTime(), tuneiterations);
         }
+        if (policyTuning() || uberTuning()) { tc.broadcast(); }
 
         // we now have the candidates, now need to loop over candidates
         while (!tc.empty()) {
