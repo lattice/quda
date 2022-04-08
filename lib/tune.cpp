@@ -726,7 +726,7 @@ namespace quda
 
   public:
     /**
-     * @brief Construct a new Tune Candidates object with specifiwd size
+     * @brief Construct a new Tune Candidates object with specified size
      *
      * @param size number of candidates that will be kept for 2nd phase.
      */
