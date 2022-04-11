@@ -11,13 +11,17 @@
 
 namespace quda {
 
-  // defined in ../../../lib/targets/omptarget/quda_api.cpp:/qudaSetupLaunchParameter
-  void qudaSetupLaunchParameter(const TuneParam &);
+  namespace target {
+    namespace omptarget {
+      // defined in ../../../lib/targets/omptarget/quda_api.cpp:/qudaSetupLaunchParameter
+      void qudaSetupLaunchParameter(const TuneParam &);
+    }
+  }
 
   template <typename... Arg>
   qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, qudaStream_t stream, const Arg &... arg)
   {
-    qudaSetupLaunchParameter(tp);
+    target::omptarget::qudaSetupLaunchParameter(tp);
     reinterpret_cast<void(*)(Arg...)>(const_cast<void*>(func))(arg...);
     return QUDA_SUCCESS;
   }

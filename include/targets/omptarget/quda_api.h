@@ -18,10 +18,10 @@
 
 #define QUDA_RT_CONSTS \
   const dim3\
-    blockDim=launch_param.block,\
-    gridDim=launch_param.grid,\
-    threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y)),\
-    blockIdx(omp_get_team_num()%launch_param.grid.x, (omp_get_team_num()/launch_param.grid.x)%launch_param.grid.y, omp_get_team_num()/(launch_param.grid.x*launch_param.grid.y))
+    blockDim=target::omptarget::launch_param.block,\
+    gridDim=target::omptarget::launch_param.grid,\
+    threadIdx(omp_get_thread_num()%target::omptarget::launch_param.block.x, (omp_get_thread_num()/target::omptarget::launch_param.block.x)%target::omptarget::launch_param.block.y, omp_get_thread_num()/(target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y)),\
+    blockIdx(omp_get_team_num()%target::omptarget::launch_param.grid.x, (omp_get_team_num()/target::omptarget::launch_param.grid.x)%target::omptarget::launch_param.grid.y, omp_get_team_num()/(target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y))
 
 #include <functional>
 #include <iostream>
@@ -89,15 +89,21 @@ ompwip_(const char * const file, const size_t line, const char * const func, std
 using cudaStream_t = int;  // device.h:/cudaStream_t
 using CUresult = int;  // ../lib/coarse_op.cuh:/CUresult
 
-struct SharedCache{
-  int *addr;
-};
-extern SharedCache shared_cache;
+namespace quda {
+  namespace target {
+    namespace omptarget {
+      struct SharedCache{
+        int *addr;
+      };
+      extern SharedCache shared_cache;
 
-struct LaunchParam{
-  dim3 block;
-  dim3 grid;
-};
-extern LaunchParam launch_param;
+      struct LaunchParam{
+        dim3 block;
+        dim3 grid;
+      };
+      extern LaunchParam launch_param;
+    }
+  }
+}
 
 #include "../../quda_api.h"

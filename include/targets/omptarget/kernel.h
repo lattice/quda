@@ -22,19 +22,19 @@ namespace quda {
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
     __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Kernel1D(Arg arg)
     {
-      const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
-      const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
-      const int tx = arg.threads.x;
-      const int ty = arg.threads.y;
-      const int tz = arg.threads.z;
-      // printf("Kernel1D: launch parameter: gd %d ld %d tx %d ty %d tz %d\n", gd, ld, tx, ty, tz);
+      const int gd = target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y*target::omptarget::launch_param.grid.z;
+      const int ld = target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y*target::omptarget::launch_param.block.z;
       Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
       // printf("dparg %p\n", dparg);
       omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
+      // const int tx = arg.threads.x;
+      // const int ty = arg.threads.y;
+      // const int tz = arg.threads.z;
+      // printf("Kernel1D: launch parameter: gd %d ld %d tx %d ty %d tz %d\n", gd, ld, tx, ty, tz);
       #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
       {
         int cache[device::max_shared_memory_size()/sizeof(int)];
-        shared_cache.addr = cache;
+        target::omptarget::shared_cache.addr = cache;
       #pragma omp parallel num_threads(ld)
       {
         // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
@@ -47,19 +47,20 @@ namespace quda {
         Kernel1D_impl<Functor, Arg, grid_stride>(*(Arg *)buffer);
       }
       }
+      // printf("Kernel1D: exited\n");
       omp_target_free(dparg, omp_get_default_device());
     }
 
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
     __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel1D()
     {
-      const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
-      const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
+      const int gd = target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y*target::omptarget::launch_param.grid.z;
+      const int ld = target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y*target::omptarget::launch_param.block.z;
       // printf("Kernel1D: launch parameter: gd %d ld %d\n", gd, ld);
       #pragma omp target teams num_teams(gd) thread_limit(ld)
       {
         int cache[device::max_shared_memory_size()/sizeof(int)];
-        shared_cache.addr = cache;
+        target::omptarget::shared_cache.addr = cache;
       #pragma omp parallel num_threads(ld)
       {
         // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
@@ -92,8 +93,8 @@ namespace quda {
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
     __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Kernel2D(Arg arg)
     {
-      const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
-      const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
+      const int gd = target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y*target::omptarget::launch_param.grid.z;
+      const int ld = target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y*target::omptarget::launch_param.block.z;
       const int tx = arg.threads.x;
       const int ty = arg.threads.y;
       const int tz = arg.threads.z;
@@ -104,7 +105,7 @@ namespace quda {
       #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
       {
         int cache[device::max_shared_memory_size()/sizeof(int)];
-        shared_cache.addr = cache;
+        target::omptarget::shared_cache.addr = cache;
       #pragma omp parallel num_threads(ld)
       {
         // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
@@ -123,13 +124,13 @@ namespace quda {
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
     __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel2D()
     {
-      const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
-      const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
+      const int gd = target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y*target::omptarget::launch_param.grid.z;
+      const int ld = target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y*target::omptarget::launch_param.block.z;
       // printf("Kernel2D: launch parameter: gd %d ld %d\n", gd, ld);
       #pragma omp target teams num_teams(gd) thread_limit(ld)
       {
         int cache[device::max_shared_memory_size()/sizeof(int)];
-        shared_cache.addr = cache;
+        target::omptarget::shared_cache.addr = cache;
       #pragma omp parallel num_threads(ld)
       {
         // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
@@ -164,8 +165,8 @@ namespace quda {
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
     __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Kernel3D(Arg arg)
     {
-      const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
-      const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
+      const int gd = target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y*target::omptarget::launch_param.grid.z;
+      const int ld = target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y*target::omptarget::launch_param.block.z;
       const int tx = arg.threads.x;
       const int ty = arg.threads.y;
       const int tz = arg.threads.z;
@@ -176,7 +177,7 @@ namespace quda {
       #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
       {
         int cache[device::max_shared_memory_size()/sizeof(int)];
-        shared_cache.addr = cache;
+        target::omptarget::shared_cache.addr = cache;
       #pragma omp parallel num_threads(ld)
       {
         // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
@@ -195,13 +196,13 @@ namespace quda {
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
     __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel3D()
     {
-      const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
-      const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
+      const int gd = target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y*target::omptarget::launch_param.grid.z;
+      const int ld = target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y*target::omptarget::launch_param.block.z;
       // printf("Kernel3D: launch parameter: gd %d ld %d\n", gd, ld);
       #pragma omp target teams num_teams(gd) thread_limit(ld)
       {
         int cache[device::max_shared_memory_size()/sizeof(int)];
-        shared_cache.addr = cache;
+        target::omptarget::shared_cache.addr = cache;
       #pragma omp parallel num_threads(ld)
       {
         // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
@@ -217,8 +218,8 @@ namespace quda {
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __launch_bounds__(Arg::block_dim, Arg::min_blocks) __global__ void raw_kernel(Arg arg)
   {
-    const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
-    const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
+    const int gd = target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y*target::omptarget::launch_param.grid.z;
+    const int ld = target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y*target::omptarget::launch_param.block.z;
     const int tx = arg.threads.x;
     const int ty = arg.threads.y;
     const int tz = arg.threads.z;
@@ -229,7 +230,7 @@ namespace quda {
     #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
       {
         int cache[device::max_shared_memory_size()/sizeof(int)];
-        shared_cache.addr = cache;
+        target::omptarget::shared_cache.addr = cache;
     #pragma omp parallel num_threads(ld)
     {
       // if(omp_get_team_num()==0 && omp_get_thread_num()==0)

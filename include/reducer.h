@@ -91,7 +91,7 @@ namespace quda
     using reducer_t = maximum<T>;
     template <typename U> static inline void comm_reduce(std::vector<U> &a) { comm_allreduce_max(a); }
     __device__ __host__ static inline T init() { return low<T>::value(); }
-    __device__ __host__ static inline T apply(T a, T b) { return max(a, b); }
+    __device__ __host__ static inline T apply(T a, T b) { return std::max(a, b); }
     __device__ __host__ inline T operator()(T a, T b) const { return apply(a, b); }
   };
 
@@ -104,7 +104,7 @@ namespace quda
     using reducer_t = minimum<T>;
     template <typename U> static inline void comm_reduce(std::vector<U> &a) { comm_allreduce_min(a); }
     __device__ __host__ static inline T init() { return high<T>::value(); }
-    __device__ __host__ static inline T apply(T a, T b) { return min(a, b); }
+    __device__ __host__ static inline T apply(T a, T b) { return std::min(a, b); }
     __device__ __host__ inline T operator()(T a, T b) const { return apply(a, b); }
   };
 

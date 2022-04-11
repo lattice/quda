@@ -76,7 +76,7 @@ namespace quda
         extern __shared__ int cache_[];
         return reinterpret_cast<atom_t*>(cache_);
 #else
-        return reinterpret_cast<atom_t*>(shared_cache.addr);
+        return reinterpret_cast<atom_t*>(target::omptarget::shared_cache.addr);
 #endif
       }
     };
@@ -92,7 +92,7 @@ namespace quda
         static __shared__ atom_t cache_[n_element * block_size_x * block_size_y * block_size_z];
         return reinterpret_cast<atom_t*>(cache_);
 #else
-        return reinterpret_cast<atom_t*>(shared_cache.addr);
+        return reinterpret_cast<atom_t*>(target::omptarget::shared_cache.addr);
 #endif
       }
     };

@@ -111,8 +111,8 @@ namespace quda {
                       0) __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> BlockKernel2D(Arg arg)
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
-    const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
-    const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
+    const int gd = target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y*target::omptarget::launch_param.grid.z;
+    const int ld = target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y*target::omptarget::launch_param.block.z;
     // const int tx = arg.threads.x;
     // const int ty = arg.threads.y;
     // const int tz = arg.threads.z;
@@ -123,7 +123,7 @@ namespace quda {
     #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
     {
       int cache[device::max_shared_memory_size()/sizeof(int)];
-      shared_cache.addr = cache;
+      target::omptarget::shared_cache.addr = cache;
     #pragma omp parallel num_threads(ld)
     {
       // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
@@ -157,13 +157,13 @@ namespace quda {
                       0) __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> BlockKernel2D()
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
-    const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
-    const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
+    const int gd = target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y*target::omptarget::launch_param.grid.z;
+    const int ld = target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y*target::omptarget::launch_param.block.z;
     // printf("Kernel2D: launch parameter: gd %d ld %d\n", gd, ld);
     #pragma omp target teams num_teams(gd) thread_limit(ld)
     {
       int cache[device::max_shared_memory_size()/sizeof(int)];
-      shared_cache.addr = cache;
+      target::omptarget::shared_cache.addr = cache;
     #pragma omp parallel num_threads(ld)
     {
       // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
