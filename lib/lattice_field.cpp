@@ -558,10 +558,7 @@ namespace quda {
 
   void LatticeField::setTuningString()
   {
-    std::stringstream vol_ss;
-    vol_ss << x[0];
-    for (int d = 1; d < nDim; d++) vol_ss << "x" << x[d];
-    vol_string = vol_ss.str();
+    vol_string = fmt::format("{}", fmt::join(x.begin(), x.begin() + nDim, "x"));
     if (vol_string.size() >= TuneKey::volume_n) errorQuda("Vol string too large %lu", vol_string.size());
   }
 

@@ -356,11 +356,10 @@ namespace quda
   {
     LatticeField::setTuningString();
     if (init) {
-      std::stringstream aux_ss;
-      aux_ss << "vol=" << volume << ",precision=" << precision << ",order=" << fieldOrder << ",Ns=" << nSpin
-             << ",Nc=" << nColor;
-      if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) aux_ss << ",TwistFlavor=" << twistFlavor;
-      aux_string = aux_ss.str();
+      aux_string = fmt::format("vol={},precision={},order={},Ns={},Nc={}", volume, precision, fieldOrder, nSpin, nColor);
+      if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) {
+        aux_string = fmt::format("{},TwistFlavor={}", aux_string, twistFlavor);
+      }
       if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
     }
   }

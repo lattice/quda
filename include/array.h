@@ -24,6 +24,9 @@ namespace quda
 
     array<T, n> &operator=(const array<T, n> &) = default;
     array<T, n> &operator=(array<T, n> &&) = default;
+
+    auto begin() -> decltype(std::begin(data)) { return std::begin(data); }
+    auto end() -> decltype(std::end(data)) { return std::end(data); }
   };
 
   template <typename T, int n> std::ostream &operator<<(std::ostream &output, const array<T, n> &a)

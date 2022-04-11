@@ -6,6 +6,8 @@
 #include <comm_quda.h>
 #include <tune_key.h>
 #include <malloc_quda.h>
+#define FMT_HEADER_ONLY
+#include <fmt/format.h>
 
 namespace quda
 {
