@@ -137,6 +137,7 @@ namespace quda {
       GaugeFieldParam gParam;
       gParam.x = xc;
       gParam.nColor = Nc_c*Ns_c;
+      gParam.location = location;
       gParam.reconstruct = QUDA_RECONSTRUCT_NO;
       gParam.order = QUDA_MILC_GAUGE_ORDER;
       gParam.link_type = QUDA_COARSE_LINKS;
@@ -174,6 +175,7 @@ namespace quda {
         //First make a cpu gauge field from the cuda gauge field
         int pad = 0;
         GaugeFieldParam gf_param(gauge.X(), QUDA_SINGLE_PRECISION, QUDA_RECONSTRUCT_NO, pad, gauge.Geometry());
+        gf_param.location = location;
         gf_param.order = QUDA_QDP_GAUGE_ORDER;
         gf_param.fixed = gauge.GaugeFixed();
         gf_param.link_type = gauge.LinkType();
