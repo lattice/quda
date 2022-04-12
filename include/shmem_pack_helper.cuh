@@ -5,7 +5,14 @@ namespace cg = cooperative_groups;
 
 namespace quda
 {
-  
+  /**
+   * @brief Helper to avoid dynamic indexing into the packBuffer
+   * 
+   * @tparam dest 
+   * @tparam Arg kernelArguments
+   * @param shmemindex 
+   * @param arg kernelArguments
+   */
   template <int dest, typename Arg> __device__ inline void *getShmemBuffer(int shmemindex, const Arg &arg)
   {
     switch (shmemindex) {
@@ -21,6 +28,14 @@ namespace quda
     }
   }
 
+  /**
+   * @brief Get the rank of your neighbor in idx dimdir, avoids dynamic indexing in kernel
+   * 
+   * @tparam Arg 
+   * @param idx 
+   * @param arg 
+   * @return rank of the neighbor
+   */
   template <typename Arg> __device__ inline int getNeighborRank(int idx, const Arg &arg)
   {
     switch (idx) {
@@ -36,6 +51,13 @@ namespace quda
     }
   }
 
+  /**
+   * @brief 
+   * 
+   * @tparam Arg 
+   * @param shmemindex 
+   * @param arg 
+   */
   template <typename Arg> __device__ inline void shmem_putbuffer(int shmemindex, const Arg &arg)
   {
     switch (shmemindex) {
@@ -67,6 +89,16 @@ namespace quda
     }
   }
 
+  /**
+   * @brief Check if for the given arg.shmem (deciding on which policy we use) and whether we 
+   * are in the fused pack+interior kernel or in a separate packing kernel do
+   * intra-node packing (and/or) inter-node packing
+   * @tparam Arg kernel arguments 
+   * @param dim communication dimension which we are working on
+   * @param dir communication dimension which we are working on
+   * @param arg kernel argument structure
+   * @return whether to pack for that dim/dir
+   */
   template <typename Arg> __device__ inline bool do_shmempack(int dim, int dir, const Arg &arg)
   {
     const int shmemidx = 2 * dim + dir;
@@ -77,15 +109,29 @@ namespace quda
   }
 
   // this currently operates on arg.sync_arr, i.e. is used for dslash
+  /**
+   * @brief 
+   * 
+   * @tparam Arg kernel arguments 
+   * @param dim communication dimension which we are working on
+   * @param dir communication dimension which we are working on
+   * @param arg kernel argument structure 
+   * @return __device__ 
+   */
   template <typename Arg> __device__ inline void shmem_signal(int dim, int dir, const Arg &arg)
   {
     const int shmemidx = 2 * dim + dir;
     const bool intranode = getShmemBuffer<1, decltype(arg)>(shmemidx, arg) == nullptr;
+    
+    // depending on the chosen policy (arg.shmem value) decide and whether we
+    // are in the pack kernel or in the fused interior+pack we use these to
+    // figure whether we do intra-node / inter-node packing
     const bool pack_intranode = (!arg.packkernel) != (!(arg.shmem & 1));
     const bool pack_internode = (!arg.packkernel) != (!(arg.shmem & 2));
 
     bool amLast;
     if (!intranode && pack_internode) {
+
       __syncthreads(); // make sure all threads in this block arrived here
 
       if (quda::target::thread_idx().x == 0 && quda::target::thread_idx().y == 0 && quda::target::thread_idx().z == 0) {
@@ -98,7 +144,7 @@ namespace quda
         if (amLast) {
           // send data over IB if necessary
           if (getShmemBuffer<1, decltype(arg)>(shmemidx, arg) != nullptr) shmem_putbuffer(shmemidx, arg);
-          // is we are in the uber kernel signal here
+          // if we fused the inter-node packing in the interior+pack kernel we can signal here
           if (!arg.packkernel) {
             if (!(getNeighborRank(2 * dim + dir, arg) < 0))
               nvshmemx_signal_op(arg.sync_arr + 2 * dim + (1 - dir), arg.counter, NVSHMEM_SIGNAL_SET,
@@ -108,7 +154,9 @@ namespace quda
         }
       }
     }
-    // if we are not in the uber kernel
+    // if we are using a separate packing kernel for inter-node traffic we
+    // anyway issue the signal in the fused packing+interior part to avoid
+    // potential hangs in the tune process of the dully fused kernel 
     if (!intranode && !arg.packkernel && (!(arg.shmem & 2))) {
       if (quda::target::thread_idx().x == 0 && quda::target::thread_idx().y == 0 && quda::target::thread_idx().z == 0
           && quda::target::block_idx().x % arg.blocks_per_dir == 0) {
@@ -117,7 +165,9 @@ namespace quda
                              getNeighborRank(2 * dim + dir, arg));
       }
     }
-
+    
+    // this part is handling the intranode traffic using direct load store, data
+    // is already packed to the remote memory and we just need to signal
     if (intranode && pack_intranode) {
       __syncthreads(); // make sure all threads in this block arrived here
       if (quda::target::thread_idx().x == 0 && quda::target::thread_idx().y == 0 && quda::target::thread_idx().z == 0) {
@@ -141,7 +191,15 @@ namespace quda
   }
 
   // this currently operates on arg.sync_arr, i.e. is used for exchange ghost
-  template <typename Arg> __device__ inline void shmem_putbuffer_signal(int shmemindex, Arg &arg)
+  /**
+   * @brief 
+   * 
+   * @tparam Arg kernel arguments 
+   * @param shmemindex  communication dimension/dir which we are working on
+   * @param arg kernel argument structure
+   * @return 
+   */
+   template <typename Arg> __device__ inline void shmem_putbuffer_signal(int shmemindex, Arg &arg)
   {
     switch (shmemindex) {
     case 0:
@@ -181,6 +239,16 @@ namespace quda
   }
 
   // this currently operates on arg.sync_arr + 2 * QUDA_MAX_DIM, i.e. is used for exchange ghost
+ /**
+  * @brief 
+  * 
+  * @tparam Arg kernel arguments 
+  * @param dim communication dimension which we are working on
+  * @param dir communication dimension which we are working on
+  * @param wait 
+  * @param arg kernel argument structure 
+  * @return __device__ 
+  */
   template <typename Arg> __device__ inline void shmem_signalwait(int dim, int dir, bool wait, const Arg &arg)
   {
 
