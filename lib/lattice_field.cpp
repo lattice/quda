@@ -143,8 +143,6 @@ namespace quda {
     return *this;
   }
 
-  void LatticeField::clear() { destroyComms(); }
-
   void LatticeField::create(const LatticeFieldParam &param)
   {
     if (param.location == QUDA_INVALID_FIELD_LOCATION) errorQuda("Invalid field location");

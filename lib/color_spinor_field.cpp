@@ -83,12 +83,6 @@ namespace quda
 
   ColorSpinorField::~ColorSpinorField() { destroy(); }
 
-  void ColorSpinorField::clear()
-  {
-    LatticeField::clear();
-    destroy();
-  }
-
   ColorSpinorField &ColorSpinorField::operator=(const ColorSpinorField &src)
   {
     if (&src != this) {

@@ -511,12 +511,6 @@ namespace quda {
     LatticeField &operator=(LatticeField &&);
 
     /**
-       @brief Clears any allocations in the field and returns the
-       field to being uninitialized.
-     */
-    virtual void clear();
-
-    /**
        @brief Fills the param with this field's meta data (used for
        creating a cloned field)
        @param[in] param The parameter we are filling
