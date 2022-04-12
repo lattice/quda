@@ -348,7 +348,7 @@ struct DslashTestWrapper {
 
   void dslashRef()
   {
-    not_dagger = dagger ? QUDA_DAG_NO : QUDA_DAG_YES;
+    const QudaDagType not_dagger = dagger ? QUDA_DAG_NO : QUDA_DAG_YES;
     // compare to dslash reference implementation
     printfQuda("Calculating reference implementation...");
 
