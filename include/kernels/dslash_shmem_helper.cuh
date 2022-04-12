@@ -59,14 +59,15 @@ namespace quda {
     using T = T_;
     T *sync_arr;
     T counter;
-    int commDim[8];
+    static constexpr int nDim = 4;
+    int commDim[2 * nDim];
 
     shmem_signal_wait_arg() :
-      kernel_param(dim3(8, 1, 1)),
+      kernel_param(dim3(2 * nDim, 1, 1)),
       sync_arr(dslash::get_exchangeghost_shmem_sync_arr()),
       counter((activeTuning() && !policyTuning()) ? 2 : dslash::get_exchangeghost_shmem_sync_counter())
     {
-      for (int d = 0; d < 4; d++) {
+      for (int d = 0; d < nDim; d++) {
         commDim[2 * d] = comm_dim_partitioned(d);
         commDim[2 * d + 1] = comm_dim_partitioned(d);
       }
@@ -74,7 +75,7 @@ namespace quda {
   };
 
   /**
-     @brief Functor to initialize the arrive signal
+     @brief Wait for the arrive signal
   */
   template <typename Arg> struct shmem_signal_wait {
     const Arg &arg;
