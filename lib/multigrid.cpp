@@ -1412,137 +1412,193 @@ namespace quda
   {
     pushLevel(param.level);
 
-    SolverParam solverParam(param); // Set solver field parameters:
-    // set null-space generation options - need to expose these
-    solverParam.maxiter
-      = refresh ? param.mg_global.setup_maxiter_refresh[param.level] : param.mg_global.setup_maxiter[param.level];
-    solverParam.tol = param.mg_global.setup_tol[param.level];
-    solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-    solverParam.delta = 1e-1;
-    solverParam.inv_type = param.mg_global.setup_inv_type[param.level];
-    // Hard coded for now...
-    if (is_ca_solver(solverParam.inv_type)) {
-      solverParam.ca_basis = param.mg_global.setup_ca_basis[param.level];
-      solverParam.ca_lambda_min = param.mg_global.setup_ca_lambda_min[param.level];
-      solverParam.ca_lambda_max = param.mg_global.setup_ca_lambda_max[param.level];
-      solverParam.Nkrylov = param.mg_global.setup_ca_basis_size[param.level];
-    } else if (solverParam.inv_type == QUDA_GCR_INVERTER || solverParam.inv_type == QUDA_BICGSTABL_INVERTER) {
-      solverParam.Nkrylov = param.mg_global.setup_ca_basis_size[param.level];
-    } else {
-      solverParam.Nkrylov = 4;
-    }
-    solverParam.pipeline
-      = (solverParam.inv_type == QUDA_BICGSTAB_INVERTER ? 0 : 4); // FIXME: pipeline != 0 breaks BICGSTAB
-    solverParam.precision = r->Precision();
+    static bool envset = false;
 
-    if (is_fine_grid()) {
-      solverParam.precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
-      solverParam.precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
-    } else {
-      solverParam.precision_precondition = solverParam.precision;
-    }
+    // use chebyshev filter or not
+    static bool use_cheby;
 
-    solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
-    solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
-    ColorSpinorParam csParam(*B[0]);                            // Create spinor field parameters:
-    csParam.setPrecision(r->Precision(), r->Precision(), true); // ensure native ordering
-    csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
-    csParam.gammaBasis = B[0]->Nspin() == 1 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS :
-                                              QUDA_UKQCD_GAMMA_BASIS; // degrand-rossi required for staggered
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    ColorSpinorField b(csParam);
-    ColorSpinorField x(csParam);
+    // bottom of window for filtering stage, eigenvalues smaller than lamda_min enhanced
+    static double lambda_min;
 
-    csParam.create = QUDA_NULL_FIELD_CREATE;
+    // how many filtering iterations should we do
+    static int filter_iterations;
 
-    // if we not using GCR/MG smoother then we need to switch off Schwarz since regular Krylov solvers do not support it
-    bool schwarz_reset = solverParam.inv_type != QUDA_MG_INVERTER
-      && param.mg_global.smoother_schwarz_type[param.level] != QUDA_INVALID_SCHWARZ;
-    if (schwarz_reset) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Disabling Schwarz for null-space finding");
-      int commDim[QUDA_MAX_DIM];
-      for (int i = 0; i < QUDA_MAX_DIM; i++) commDim[i] = 1;
-      diracSmootherSloppy->setCommDim(commDim);
-    }
+    // how many near-nulls to generate from each base vector
+    static int vectors_per_set;
 
-    // if quarter precision halo, promote for null-space finding to half precision
-    QudaPrecision halo_precision = diracSmootherSloppy->HaloPrecision();
-    if (halo_precision == QUDA_QUARTER_PRECISION) diracSmootherSloppy->setHaloPrecision(QUDA_HALF_PRECISION);
+    // how many chebyshev iterations between each vector in the set
+    static int iterations_for_next;
 
-    Solver *solve;
-    DiracMdagM *mdagm = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) ? new DiracMdagM(*diracSmoother) : nullptr;
-    DiracMdagM *mdagmSloppy = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) ? new DiracMdagM(*diracSmootherSloppy) : nullptr;
-    if (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) {
-      solve = Solver::create(solverParam, *mdagm, *mdagmSloppy, *mdagmSloppy, *mdagmSloppy, profile);
-    } else if (solverParam.inv_type == QUDA_MG_INVERTER) {
-      // in case MG has not been created, we create the Smoother
-      if (!transfer) createSmoother();
+    if (!envset) {
 
-      // run GCR with the MG as a preconditioner
-      solverParam.inv_type_precondition = QUDA_MG_INVERTER;
-      solverParam.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
-      solverParam.precondition_cycle = 1;
-      solverParam.tol_precondition = 1e-1;
-      solverParam.maxiter_precondition = 1;
-      solverParam.omega = 1.0;
-      solverParam.verbosity_precondition = param.mg_global.verbosity[param.level+1];
-      solverParam.precision_sloppy = solverParam.precision;
-      solverParam.compute_true_res = 0;
-      solverParam.preconditioner = this;
+      char *cheby = getenv("QUDA_USE_CHEBY");
+      if (cheby) { use_cheby = (atoi(cheby) == 1) ? true : false; }
 
-      solverParam.inv_type = QUDA_GCR_INVERTER;
-      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmooth, *param.matSmoothSloppy,
-                             *param.matSmoothSloppy, profile);
-      solverParam.inv_type = QUDA_MG_INVERTER;
-    } else {
-      solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy,
-                             *param.matSmoothSloppy, profile);
+      if (use_cheby) {
+        char *tmp_string;
+
+        tmp_string = getenv("QUDA_CHEBY_LMIN");
+        if (tmp_string) {
+          lambda_min = atof(tmp_string);
+        } else {
+          errorQuda("QUDA_CHEBY_LMIN unset");
+        }
+
+        tmp_string = getenv("QUDA_VEC_FILTER_ITER");
+        if (tmp_string) {
+          filter_iterations = atoi(tmp_string);
+        } else {
+          errorQuda("QUDA_VEC_FILTER_ITER unset");
+        }
+
+        tmp_string = getenv("QUDA_VEC_PER_SET");
+        if (tmp_string) {
+          vectors_per_set = atoi(tmp_string);
+        } else {
+          errorQuda("QUDA_VEC_PER_SET unset");
+        }
+
+        tmp_string = getenv("QUDA_VEC_ITER_FOR_NEXT");
+        if (tmp_string) {
+          iterations_for_next = atoi(tmp_string);
+        } else {
+          errorQuda("QUDA_VEC_ITER_FOR_NEXT unset");
+        }
+      }
+
+      envset = true;
     }
 
-    for (int si = 0; si < param.mg_global.num_setup_iter[param.level]; si++) {
-      if (getVerbosity() >= QUDA_VERBOSE)
-        printfQuda("Running vectors setup on level %d iter %d of %d\n", param.level, si + 1,
-                   param.mg_global.num_setup_iter[param.level]);
+    // Just constraining to level 2 for now
+    if (param.level == 2 && use_cheby) {
 
-      // global orthonormalization of the initial null-space vectors
-      if(param.mg_global.pre_orthonormalize) {
-        for(int i=0; i<(int)B.size(); i++) {
-          for (int j=0; j<i; j++) {
+      // Filtering approach based on arXiv:2103.05034, P. Boyle and A. Yamaguchi.
+
+      // use the right space; diracResidual is guaranteed to be full-parity
+      DiracMdagM dirac_mdm(diracResidual);
+
+      // temporaries for Dirac applications
+      ColorSpinorField tmp1(*B[0]);
+      ColorSpinorField tmp2(*B[0]);
+
+      // temporaries needed for Chebyshev filter
+      ColorSpinorField pk(*B[0]);
+      ColorSpinorField pkm1(*B[0]);
+      ColorSpinorField pkm2(*B[0]);
+      ColorSpinorField Apkm1(*B[0]);
+
+      // approximate lambda_max
+      double lambda_max = 1.1 * Solver::performPowerIterations(dirac_mdm, *B[0], pk, pkm1,
+        100, 10, tmp1, tmp2);
+
+      // create filter interpolators
+      double m_map_filter = 2. / (lambda_max - lambda_min);
+      double b_map_filter = - (lambda_max + lambda_min) / (lambda_max - lambda_min);
+
+      // create interpolators for generating more near-nulls
+      double m_map_generate = 2. / lambda_max;
+      double b_map_generate = -1.;
+
+      // we create batches of near-nulls from `B.size() / vectors_per_set` starting
+      // random vectors
+      int num_vec = static_cast<int>(B.size());
+
+      int num_starting_vectors = (num_vec + vectors_per_set - 1) / vectors_per_set;
+
+      // orthonormalize
+      if (param.mg_global.pre_orthonormalize) {
+        for (int i = 0; i < num_starting_vectors; i++) {
+          for (int j = 0; j < i; j++) {
             Complex alpha = cDotProduct(*B[j], *B[i]);// <j,i>
             caxpy(-alpha, *B[j], *B[i]); // i-<j,i>j
           }
           double nrm2 = norm2(*B[i]);
-          if (nrm2 > 1e-16) ax(1.0 /sqrt(nrm2), *B[i]);// i/<i,i>
+          if (nrm2 > 1e-16) ax(1.0 / sqrt(nrm2), *B[i]);// i/<i,i>
           else errorQuda("\nCannot normalize %u vector\n", i);
         }
       }
 
-      // launch solver for each source
-      for (int i=0; i<(int)B.size(); i++) {
-        if (param.mg_global.setup_type == QUDA_TEST_VECTOR_SETUP) { // DDalphaAMG test vector idea
-          b = *B[i];                                                // inverting against the vector
-          zero(x);                                                  // with zero initial guess
-        } else {
-          x = *B[i];
-          zero(b);
+      for (int s = 0; s < num_starting_vectors; s++) {
+
+        // filter
+        {
+          // P0
+          blas::copy(pk, *B[s]);
+
+          if (filter_iterations > 0) {
+            // P1 = m Ap_0 + b p_0
+            std::swap(pkm1, pk); // p_k -> p_{k - 1}
+            dirac_mdm(Apkm1, pkm1, tmp1, tmp2);
+            blas::axpbyz(m_map_filter, Apkm1, b_map_filter, pkm1, pk);
+
+            if (filter_iterations > 1) {
+              // Enter recursion relation
+              for (int k = 2; k <= filter_iterations; k++) {
+                std::swap(pkm2, pkm1); // p_{k - 1} -> p_{k-2}
+                std::swap(pkm1, pk); // p_k -> p_{k-1}
+                dirac_mdm(Apkm1, pkm1, tmp1, tmp2); // compute A p_{k-1}
+                blas::axpbypczw(2. * m_map_filter, Apkm1, 2. * b_map_filter, pkm1, -1., pkm2, pk);
+
+                // heuristic rescale to keep norms in check...
+                if (k % 50 == 0) {
+                  double tmp_nrm2 = blas::norm2(pk);
+                  printf("Starting vector %d heuristic rescale at %d old norm2 %e\n", s, k, tmp_nrm2);
+                  double tmp_inv_nrm = 1. / sqrt(tmp_nrm2);
+                  ax(tmp_inv_nrm, pk);
+                  ax(tmp_inv_nrm, pkm1);
+                  ax(tmp_inv_nrm, pkm2);
+                  ax(tmp_inv_nrm, Apkm1);
+                }
+              }
+            }
+          }
+
+          // print the norm (to check for enhancement, normalize)
+          double nrm2 = blas::norm2(pk);
+          printfQuda("Enhanced norm2 for start %d is %e\n", s, nrm2);
+          ax(1.0 / sqrt(nrm2), pk);
+
+          // This is the first filtered vector
+          blas::copy(*B[s], pk);
         }
 
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", norm2(x));
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial rhs = %g\n", norm2(b));
+        // Now we generate further vectors by another Chebyshev filter from 0 -> lambda_max
+        // P0 is trivially in place
 
-        ColorSpinorField *out=nullptr, *in=nullptr;
-        diracSmoother->prepare(in, out, x, b, QUDA_MAT_SOLUTION);
-        (*solve)(*out, *in);
-        diracSmoother->reconstruct(x, b, QUDA_MAT_SOLUTION);
+        // P1
+        std::swap(pkm1, pk); // p_k -> p_{k - 1}
+        dirac_mdm(Apkm1, pkm1, tmp1, tmp2);
+        blas::axpbyz(m_map_generate, Apkm1, b_map_generate, pkm1, pk);
 
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution = %g\n", norm2(x));
-        *B[i] = x;
+        bool first = true;
+
+        for (int i = s + num_starting_vectors; i < num_vec; i += num_starting_vectors) {
+
+          for (int k = first ? 2 : 0; k < iterations_for_next; k++) {
+            std::swap(pkm2, pkm1); // p_{k - 1} -> p_{k-2}
+            std::swap(pkm1, pk); // p_k -> p_{k-1}
+            dirac_mdm(Apkm1, pkm1, tmp1, tmp2); // compute A p_{k-1}
+            blas::axpbypczw(2. * m_map_generate, Apkm1, 2. * b_map_generate, pkm1, -1., pkm2, pk);
+          }
+
+          blas::copy(*B[i], pk);
+
+          if (first) first = false;
+
+        }
+
+      }
+
+      // print norms
+      printfQuda("Norms of Chebyshev filtered near-null vectors:\n");
+      for (int i = 0; i < num_vec; i++) {
+        printfQuda("Vector %d = %e\n", i, sqrt(blas::norm2(*B[i])));
       }
 
       // global orthonormalization of the generated null-space vectors
       if (param.mg_global.post_orthonormalize) {
-        for(int i=0; i<(int)B.size(); i++) {
-          for (int j=0; j<i; j++) {
+        for (int i = 0; i < num_vec; i++) {
+          for (int j = 0; j < i ; j++) {
             Complex alpha = cDotProduct(*B[j], *B[i]);// <j,i>
             caxpy(-alpha, *B[j], *B[i]); // i-<j,i>j
           }
@@ -1552,43 +1608,191 @@ namespace quda
         }
       }
 
-      if (solverParam.inv_type == QUDA_MG_INVERTER) {
+      //errorQuda("Quit out...");
 
-        if (transfer) {
-          resetTransfer = true;
-          reset();
-          if ( param.level < param.Nlevel-2 ) {
-            if ( param.mg_global.generate_all_levels == QUDA_BOOLEAN_TRUE ) {
-              coarse->generateNullVectors(*B_coarse, refresh);
-            } else {
-              if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Restricting null space vectors\n");
-              for (int i=0; i<param.Nvec; i++) {
-                zero(*(*B_coarse)[i]);
-                transfer->R(*(*B_coarse)[i], *(param.B[i]));
-              }
-              // rebuild the transfer operator in the coarse level
-              coarse->resetTransfer = true;
-              coarse->reset();
+    } else {
+
+      // Traditional inverse iterations setup
+
+      SolverParam solverParam(param); // Set solver field parameters:
+      // set null-space generation options - need to expose these
+      solverParam.maxiter
+        = refresh ? param.mg_global.setup_maxiter_refresh[param.level] : param.mg_global.setup_maxiter[param.level];
+      solverParam.tol = param.mg_global.setup_tol[param.level];
+      solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      solverParam.delta = 1e-1;
+      solverParam.inv_type = param.mg_global.setup_inv_type[param.level];
+      // Hard coded for now...
+      if (is_ca_solver(solverParam.inv_type)) {
+        solverParam.ca_basis = param.mg_global.setup_ca_basis[param.level];
+        solverParam.ca_lambda_min = param.mg_global.setup_ca_lambda_min[param.level];
+        solverParam.ca_lambda_max = param.mg_global.setup_ca_lambda_max[param.level];
+        solverParam.Nkrylov = param.mg_global.setup_ca_basis_size[param.level];
+      } else if (solverParam.inv_type == QUDA_GCR_INVERTER || solverParam.inv_type == QUDA_BICGSTABL_INVERTER) {
+        solverParam.Nkrylov = param.mg_global.setup_ca_basis_size[param.level];
+      } else {
+        solverParam.Nkrylov = 4;
+      }
+      solverParam.pipeline
+        = (solverParam.inv_type == QUDA_BICGSTAB_INVERTER ? 0 : 4); // FIXME: pipeline != 0 breaks BICGSTAB
+      solverParam.precision = r->Precision();
+
+      if (is_fine_grid()) {
+        solverParam.precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
+        solverParam.precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
+      } else {
+        solverParam.precision_precondition = solverParam.precision;
+      }
+
+      solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
+      solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
+      ColorSpinorParam csParam(*B[0]);                            // Create spinor field parameters:
+      csParam.setPrecision(r->Precision(), r->Precision(), true); // ensure native ordering
+      csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
+      csParam.gammaBasis = B[0]->Nspin() == 1 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS :
+                                                QUDA_UKQCD_GAMMA_BASIS; // degrand-rossi required for staggered
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      ColorSpinorField b(csParam);
+      ColorSpinorField x(csParam);
+
+      csParam.create = QUDA_NULL_FIELD_CREATE;
+
+      // if we not using GCR/MG smoother then we need to switch off Schwarz since regular Krylov solvers do not support it
+      bool schwarz_reset = solverParam.inv_type != QUDA_MG_INVERTER
+        && param.mg_global.smoother_schwarz_type[param.level] != QUDA_INVALID_SCHWARZ;
+      if (schwarz_reset) {
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Disabling Schwarz for null-space finding");
+        int commDim[QUDA_MAX_DIM];
+        for (int i = 0; i < QUDA_MAX_DIM; i++) commDim[i] = 1;
+        diracSmootherSloppy->setCommDim(commDim);
+      }
+
+      // if quarter precision halo, promote for null-space finding to half precision
+      QudaPrecision halo_precision = diracSmootherSloppy->HaloPrecision();
+      if (halo_precision == QUDA_QUARTER_PRECISION) diracSmootherSloppy->setHaloPrecision(QUDA_HALF_PRECISION);
+
+      Solver *solve;
+      DiracMdagM *mdagm = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) ? new DiracMdagM(*diracSmoother) : nullptr;
+      DiracMdagM *mdagmSloppy = (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) ? new DiracMdagM(*diracSmootherSloppy) : nullptr;
+      if (solverParam.inv_type == QUDA_CG_INVERTER || solverParam.inv_type == QUDA_CA_CG_INVERTER) {
+        solve = Solver::create(solverParam, *mdagm, *mdagmSloppy, *mdagmSloppy, *mdagmSloppy, profile);
+      } else if (solverParam.inv_type == QUDA_MG_INVERTER) {
+        // in case MG has not been created, we create the Smoother
+        if (!transfer) createSmoother();
+
+        // run GCR with the MG as a preconditioner
+        solverParam.inv_type_precondition = QUDA_MG_INVERTER;
+        solverParam.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
+        solverParam.precondition_cycle = 1;
+        solverParam.tol_precondition = 1e-1;
+        solverParam.maxiter_precondition = 1;
+        solverParam.omega = 1.0;
+        solverParam.verbosity_precondition = param.mg_global.verbosity[param.level+1];
+        solverParam.precision_sloppy = solverParam.precision;
+        solverParam.compute_true_res = 0;
+        solverParam.preconditioner = this;
+
+        solverParam.inv_type = QUDA_GCR_INVERTER;
+        solve = Solver::create(solverParam, *param.matSmooth, *param.matSmooth, *param.matSmoothSloppy,
+                               *param.matSmoothSloppy, profile);
+        solverParam.inv_type = QUDA_MG_INVERTER;
+      } else {
+        solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy,
+                               *param.matSmoothSloppy, profile);
+      }
+
+      for (int si = 0; si < param.mg_global.num_setup_iter[param.level]; si++) {
+        if (getVerbosity() >= QUDA_VERBOSE)
+          printfQuda("Running vectors setup on level %d iter %d of %d\n", param.level, si + 1,
+                     param.mg_global.num_setup_iter[param.level]);
+
+        // global orthonormalization of the initial null-space vectors
+        if(param.mg_global.pre_orthonormalize) {
+          for(int i=0; i<(int)B.size(); i++) {
+            for (int j=0; j<i; j++) {
+              Complex alpha = cDotProduct(*B[j], *B[i]);// <j,i>
+              caxpy(-alpha, *B[j], *B[i]); // i-<j,i>j
             }
+            double nrm2 = norm2(*B[i]);
+            if (nrm2 > 1e-16) ax(1.0 /sqrt(nrm2), *B[i]);// i/<i,i>
+            else errorQuda("\nCannot normalize %u vector\n", i);
           }
-        } else {
-          reset();
+        }
+
+        // launch solver for each source
+        for (int i=0; i<(int)B.size(); i++) {
+          if (param.mg_global.setup_type == QUDA_TEST_VECTOR_SETUP) { // DDalphaAMG test vector idea
+            b = *B[i];                                                // inverting against the vector
+            zero(x);                                                  // with zero initial guess
+          } else {
+            x = *B[i];
+            zero(b);
+          }
+
+          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", norm2(x));
+          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial rhs = %g\n", norm2(b));
+
+          ColorSpinorField *out=nullptr, *in=nullptr;
+          diracSmoother->prepare(in, out, x, b, QUDA_MAT_SOLUTION);
+          (*solve)(*out, *in);
+          diracSmoother->reconstruct(x, b, QUDA_MAT_SOLUTION);
+
+          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution = %g\n", norm2(x));
+          *B[i] = x;
+        }
+
+        // global orthonormalization of the generated null-space vectors
+        if (param.mg_global.post_orthonormalize) {
+          for(int i=0; i<(int)B.size(); i++) {
+            for (int j=0; j<i; j++) {
+              Complex alpha = cDotProduct(*B[j], *B[i]);// <j,i>
+              caxpy(-alpha, *B[j], *B[i]); // i-<j,i>j
+            }
+            double nrm2 = norm2(*B[i]);
+            if (sqrt(nrm2) > 1e-16) ax(1.0/sqrt(nrm2), *B[i]);// i/<i,i>
+            else errorQuda("\nCannot normalize %u vector (nrm=%e)\n", i, sqrt(nrm2));
+          }
+        }
+
+        if (solverParam.inv_type == QUDA_MG_INVERTER) {
+
+          if (transfer) {
+            resetTransfer = true;
+            reset();
+            if ( param.level < param.Nlevel-2 ) {
+              if ( param.mg_global.generate_all_levels == QUDA_BOOLEAN_TRUE ) {
+                coarse->generateNullVectors(*B_coarse, refresh);
+              } else {
+                if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Restricting null space vectors\n");
+                for (int i=0; i<param.Nvec; i++) {
+                  zero(*(*B_coarse)[i]);
+                  transfer->R(*(*B_coarse)[i], *(param.B[i]));
+                }
+                // rebuild the transfer operator in the coarse level
+                coarse->resetTransfer = true;
+                coarse->reset();
+              }
+            }
+          } else {
+            reset();
+          }
         }
       }
-    }
 
-    delete solve;
-    if (mdagm) delete mdagm;
-    if (mdagmSloppy) delete mdagmSloppy;
+      delete solve;
+      if (mdagm) delete mdagm;
+      if (mdagmSloppy) delete mdagmSloppy;
 
-    diracSmootherSloppy->setHaloPrecision(halo_precision); // restore halo precision
+      diracSmootherSloppy->setHaloPrecision(halo_precision); // restore halo precision
 
-    // reenable Schwarz
-    if (schwarz_reset) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Reenabling Schwarz for null-space finding");
-      int commDim[QUDA_MAX_DIM];
-      for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 0;
-      diracSmootherSloppy->setCommDim(commDim);
+      // reenable Schwarz
+      if (schwarz_reset) {
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Reenabling Schwarz for null-space finding");
+        int commDim[QUDA_MAX_DIM];
+        for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 0;
+        diracSmootherSloppy->setCommDim(commDim);
+      }
+
     }
 
     if (param.mg_global.vec_store[param.level] == QUDA_BOOLEAN_TRUE) { // conditional store of null vectors
