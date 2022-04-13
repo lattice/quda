@@ -52,8 +52,6 @@ namespace quda {
       inner.Nsteps = outer.precondition_cycle;
     }
 
-    inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
-
     inner.verbosity_precondition = outer.verbosity_precondition;
 
     inner.compute_true_res = false;
@@ -490,10 +488,10 @@ namespace quda {
 	param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
       else
 	param.true_res_hq = 0.0;
-
-      if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b, r);
+      //if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b, r);
     } else {
-      if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b, K ? rSloppy : *p[k_break]);
+      // reuse this when we add the get_residual method to GCR
+      if (0) blas::copy(b, K ? rSloppy : *p[k_break]);
     }
 
     param.gflops += gflops;
@@ -512,8 +510,6 @@ namespace quda {
     PrintSummary("GCR", total_iter, r2, b2, stop, param.tol_hq);
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
-
-    return;
   }
 
 } // namespace quda

@@ -42,9 +42,6 @@ namespace quda {
   {
     if (checkPrecision(x, b) != param.precision)
       errorQuda("Precision mismatch %d %d", checkPrecision(x, b), param.precision);
-
-    if (param.return_residual && param.preserve_source == QUDA_PRESERVE_SOURCE_YES)
-      errorQuda("Cannot preserve source and return the residual");
   }
 
   // solver factory
