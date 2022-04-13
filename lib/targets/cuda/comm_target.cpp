@@ -109,7 +109,7 @@ void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
   } // iterate over dim
 }
 #else
-void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
+void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote) {}
 #endif
 
 void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
