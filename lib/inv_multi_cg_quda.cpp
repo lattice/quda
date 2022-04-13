@@ -214,7 +214,7 @@ namespace quda {
       for (int i = 0; i < num_offset; i++) {
         x[i] = b;
         param.true_res_offset[i] = 0.0;
-	param.true_res_hq_offset[i] = 0.0;
+        param.true_res_hq_offset[i] = 0.0;
       }
       return;
     }
@@ -358,7 +358,7 @@ namespace quda {
         if (r.Nspin() == 4) blas::axpy(offset[0], x[0], r);
 
         r2[0] = blas::xmyNorm(b, r);
-        for (int j=1; j<num_offset_now; j++) r2[j] = zeta[j] * zeta[j] * r2[0];
+        for (int j = 1; j < num_offset_now; j++) r2[j] = zeta[j] * zeta[j] * r2[0];
         for (int j = 0; j < num_offset_now; j++)
           if (group_update) blas::zero(x_sloppy[j]);
 
@@ -374,7 +374,7 @@ namespace quda {
           if (resIncrease > maxResIncrease or resIncreaseTotal[reliable_shift] > maxResIncreaseTotal) {
             warningQuda("solver exiting due to too many true residual norm increases");
             break;
-	  }
+          }
 	} else {
 	  resIncrease = 0;
 	}
@@ -385,11 +385,11 @@ namespace quda {
           blas::caxpy(-rp, r_sloppy, p[j]);
         }
 
-	// update beta and p
+        // update beta and p
         beta[0] = r2[0] / r2_old;
         blas::xpay(r_sloppy, beta[0], p[0]);
-        for (int j=1; j<num_offset_now; j++) {
-	  beta[j] = beta[j_low] * zeta[j] * alpha[j] / (zeta_old[j] * alpha[j_low]);
+        for (int j = 1; j < num_offset_now; j++) {
+          beta[j] = beta[j_low] * zeta[j] * alpha[j] / (zeta_old[j] * alpha[j_low]);
           blas::axpby(zeta[j], r_sloppy, beta[j], p[j]);
         }
 

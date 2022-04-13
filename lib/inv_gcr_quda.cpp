@@ -60,11 +60,11 @@ namespace quda {
     inner.sloppy_converge = true;
   }
 
-  void GCR::computeBeta(std::vector<Complex> &beta, std::vector<ColorSpinorField*> Ap, int i, int N, int k)
+  void GCR::computeBeta(std::vector<Complex> &beta, std::vector<ColorSpinorField *> Ap, int i, int N, int k)
   {
     std::vector<Complex> Beta(N, 0.0);
-    std::vector<ColorSpinorField*> a{Ap.begin() + i, Ap.begin() + i + N};
-    std::vector<ColorSpinorField*> b{Ap[k]};
+    std::vector<ColorSpinorField *> a {Ap.begin() + i, Ap.begin() + i + N};
+    std::vector<ColorSpinorField *> b {Ap[k]};
     blas::cDotProduct(Beta.data(), a, b); // vectorized dot product
 
 #if 0
@@ -74,13 +74,13 @@ namespace quda {
       }
 #endif
 
-    for (int j=0; j<N; j++) beta[(i + j) * n_krylov + k] = Beta[j];
+    for (int j = 0; j < N; j++) beta[(i + j) * n_krylov + k] = Beta[j];
   }
 
-  void GCR::updateAp(std::vector<Complex> &beta, std::vector<ColorSpinorField*> Ap, int begin, int size, int k)
+  void GCR::updateAp(std::vector<Complex> &beta, std::vector<ColorSpinorField *> Ap, int begin, int size, int k)
   {
     std::vector<Complex> beta_(size);
-    for (int i=0; i<size; i++) beta_[i] = -beta[(i + begin) * n_krylov + k];
+    for (int i = 0; i < size; i++) beta_[i] = -beta[(i + begin) * n_krylov + k];
 
     std::vector<ColorSpinorField*> Ap_(Ap.begin() + begin, Ap.begin() + begin + size);
     std::vector<ColorSpinorField*> Apk(Ap.begin() + k, Ap.begin() + k + 1);
@@ -88,22 +88,22 @@ namespace quda {
     blas::caxpy(beta_.data(), Ap_, Apk);
   }
 
-  void GCR::orthoDir(std::vector<Complex> &beta, std::vector<ColorSpinorField*> Ap, int k, int pipeline)
+  void GCR::orthoDir(std::vector<Complex> &beta, std::vector<ColorSpinorField *> Ap, int k, int pipeline)
   {
     switch (pipeline) {
     case 0: // no kernel fusion
       for (int i=0; i<k; i++) { // 5 (k-1) memory transactions here
-	beta[i * n_krylov + k] = blas::cDotProduct(*(Ap[i]), *(Ap[k]));
-	blas::caxpy(-beta[i * n_krylov + k], *Ap[i], *Ap[k]);
+        beta[i * n_krylov + k] = blas::cDotProduct(*(Ap[i]), *(Ap[k]));
+        blas::caxpy(-beta[i * n_krylov + k], *Ap[i], *Ap[k]);
       }
       break;
     case 1: // basic kernel fusion
       if (k==0) break;
       beta[0 * n_krylov + k] = blas::cDotProduct(*Ap[0], *Ap[k]);
       for (int i=0; i<k-1; i++) { // 4 (k-1) memory transactions here
-	beta[(i + 1) * n_krylov + k] = blas::caxpyDotzy(-beta[i * n_krylov + k], *Ap[i], *Ap[k], *Ap[i+1]);
+        beta[(i + 1) * n_krylov + k] = blas::caxpyDotzy(-beta[i * n_krylov + k], *Ap[i], *Ap[k], *Ap[i + 1]);
       }
-      blas::caxpy(-beta[(k - 1) * n_krylov + k], *Ap[k-1], *Ap[k]);
+      blas::caxpy(-beta[(k - 1) * n_krylov + k], *Ap[k - 1], *Ap[k]);
       break;
     default:
       {
@@ -125,16 +125,14 @@ namespace quda {
       }
       break;
     }
-  }   
+  }
 
   void GCR::backSubs(const std::vector<Complex> &alpha, const std::vector<Complex> &beta,
                      const std::vector<double> &gamma, std::vector<Complex> &delta, int n)
   {
     for (int k=n-1; k>=0;k--) {
       delta[k] = alpha[k];
-      for (int j=k+1;j<n; j++) {
-	delta[k] -= beta[k * n_krylov + j]*delta[j];
-      }
+      for (int j = k + 1; j < n; j++) { delta[k] -= beta[k * n_krylov + j] * delta[j]; }
       delta[k] /= gamma[k];
     }
   }
@@ -146,9 +144,9 @@ namespace quda {
 
     // Update the solution vector
     backSubs(alpha, beta, gamma, delta, k);
-  
-    std::vector<ColorSpinorField*> X{&x};
-    std::vector<ColorSpinorField*> P{p.begin(), p.begin() + k};
+
+    std::vector<ColorSpinorField *> X {&x};
+    std::vector<ColorSpinorField *> P {p.begin(), p.begin() + k};
     blas::caxpy(delta.data(), P, X);
   }
 

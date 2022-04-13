@@ -251,7 +251,7 @@ namespace quda
      @param[in] local The process-local memory pointer to be exchanged
      from this process
   */
-  void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void * local);
+  void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local);
 
   /**
      @brief Deallocate the remote addresses to logically neighboring

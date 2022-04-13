@@ -41,7 +41,7 @@ namespace quda {
   void Solver::create(ColorSpinorField &x, const ColorSpinorField &b)
   {
     if (checkPrecision(x, b) != param.precision)
-      errorQuda("Precision mismatch %d %d", checkPrecision(x,b), param.precision);
+      errorQuda("Precision mismatch %d %d", checkPrecision(x, b), param.precision);
 
     if (param.return_residual && param.preserve_source == QUDA_PRESERVE_SOURCE_YES)
       errorQuda("Cannot preserve source and return the residual");
@@ -420,7 +420,7 @@ namespace quda {
   void MultiShiftSolver::create(const std::vector<ColorSpinorField> &x, const ColorSpinorField &b)
   {
     if (checkPrecision(x[0], b) != param.precision)
-      errorQuda("Precision mismatch %d %d", checkPrecision(x[0],b), param.precision);
+      errorQuda("Precision mismatch %d %d", checkPrecision(x[0], b), param.precision);
   }
 
   bool MultiShiftSolver::convergence(const std::vector<double> &r2, const std::vector<double> &r2_tol, int n) const

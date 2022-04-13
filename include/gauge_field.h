@@ -482,7 +482,7 @@ namespace quda {
        allow for simultaneous bi-directional exchange.  If false, then
        the forwards and backwards buffers will alias (saving memory).
     */
-    void createComms(const lat_dim_t &R, bool no_comms_fill, bool bidir=true);
+    void createComms(const lat_dim_t &R, bool no_comms_fill, bool bidir = true);
 
     /**
        @brief Allocate the ghost buffers
@@ -492,7 +492,7 @@ namespace quda {
        then we alias the fowards and backwards offsetss
        region in non-partitioned dimensions
     */
-    void allocateGhostBuffer(const lat_dim_t &R, bool no_comms_fill, bool bidir=true) const;
+    void allocateGhostBuffer(const lat_dim_t &R, bool no_comms_fill, bool bidir = true) const;
 
     /**
        @brief Start the receive communicators
@@ -524,7 +524,7 @@ namespace quda {
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimensions
     */
-    void exchangeExtendedGhost(const lat_dim_t &R, bool no_comms_fill=false);
+    void exchangeExtendedGhost(const lat_dim_t &R, bool no_comms_fill = false);
 
     /**
        @brief This does routine will populate the border / halo region
@@ -535,7 +535,7 @@ namespace quda {
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimensions
     */
-    void exchangeExtendedGhost(const lat_dim_t &R, TimeProfile &profile, bool no_comms_fill=false);
+    void exchangeExtendedGhost(const lat_dim_t &R, TimeProfile &profile, bool no_comms_fill = false);
 
     /**
      * Generic gauge field copy
@@ -661,7 +661,7 @@ namespace quda {
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimenions
     */
-    void exchangeExtendedGhost(const lat_dim_t &R, bool no_comms_fill=false);
+    void exchangeExtendedGhost(const lat_dim_t &R, bool no_comms_fill = false);
 
     /**
        @brief This does routine will populate the border / halo region
@@ -672,7 +672,7 @@ namespace quda {
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimensions
     */
-    void exchangeExtendedGhost(const lat_dim_t &R, TimeProfile &profile, bool no_comms_fill=false);
+    void exchangeExtendedGhost(const lat_dim_t &R, TimeProfile &profile, bool no_comms_fill = false);
 
     /**
      * Generic gauge field copy

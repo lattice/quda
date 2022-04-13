@@ -31,7 +31,7 @@ namespace quda
     return std::max(accessRank[0], accessRank[1]);
   }
 
-  void comm_create_neighbor_memory(array_2d<void*, QUDA_MAX_DIM, 2> &remote, void *local)
+  void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local)
   {
     // handles for obtained ghost pointers
     hipIpcMemHandle_t remote_handle[QUDA_MAX_DIM][2];
@@ -81,7 +81,7 @@ namespace quda
     }
   }
 
-  void comm_destroy_neighbor_memory(array_2d<void*, QUDA_MAX_DIM, 2> &remote)
+  void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
   {
     for (int dim = 0; dim < 4; ++dim) {
 
@@ -152,8 +152,7 @@ namespace quda
     }
   }
 
-  void comm_destroy_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &,
-                                 array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
+  void comm_destroy_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &, array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
   {
     for (int dim = 0; dim < 4; ++dim) {
       if (comm_dim(dim) == 1) continue;

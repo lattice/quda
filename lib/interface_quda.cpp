@@ -3237,9 +3237,8 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     // exclusively on the GPU.
     quda::CloverField *input_clover = nullptr;
     quda::CloverField *collected_clover = nullptr;
-    bool is_clover = param->dslash_type == QUDA_CLOVER_WILSON_DSLASH ||
-                     param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH ||
-                     param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH;
+    bool is_clover = param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+      || param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH;
 
     if (is_clover) {
       if (param->clover_coeff == 0.0 && param->clover_csw == 0.0)

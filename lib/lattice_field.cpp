@@ -116,10 +116,7 @@ namespace quda {
     create(param);
   }
 
-  LatticeField::LatticeField(LatticeField &&field)
-  {
-    move(std::move(field));
-  }
+  LatticeField::LatticeField(LatticeField &&field) { move(std::move(field)); }
 
   LatticeField::~LatticeField() { destroyComms(); }
 
