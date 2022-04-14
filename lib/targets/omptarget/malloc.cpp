@@ -119,6 +119,7 @@ namespace quda
 
   static void track_malloc(const AllocType &type, const MemAlloc &a, void *ptr)
   {
+    // ompwip("track malloc %d %p %d\n", ptr, type, a.base_size);
     total_bytes[type] += a.base_size;
     if (total_bytes[type] > max_total_bytes[type]) { max_total_bytes[type] = total_bytes[type]; }
     if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM) {
@@ -631,18 +632,32 @@ namespace quda
   QudaFieldLocation get_pointer_location(const void *ptr)
   {
     static std::set<void *> other_ptr;  // OMP TARGET TODO: unknown pointers, assume on CPU
+    static std::set<void *> other_target_ptr;  // OMP TARGET TODO: unknown pointers, assume on TARGET
     void *p = const_cast<void*>(ptr);
     QudaFieldLocation fl = QUDA_INVALID_FIELD_LOCATION;
-    if(alloc[DEVICE].count(p) || alloc[DEVICE_PINNED].count(p)){
+    if(alloc[DEVICE].count(p) || alloc[DEVICE_PINNED].count(p) || other_target_ptr.count(p)){
       // ompwip("get_pointer_location %p returns QUDA_CUDA_FIELD_LOCATION",ptr);
       fl = QUDA_CUDA_FIELD_LOCATION;
-    }else if(alloc[HOST].count(p) || alloc[PINNED].count(p) || alloc[MAPPED].count(p) || other_ptr.count(p)){
+    }else if(alloc[HOST].count(p) || alloc[PINNED].count(p) || other_ptr.count(p)){
       // ompwip("get_pointer_location %p returns QUDA_CPU_FIELD_LOCATION",ptr);
       fl = QUDA_CPU_FIELD_LOCATION;
-    }else{
-      ompwip("WARNING: get_pointer_location assumes %p to be QUDA_CPU_FIELD_LOCATION",ptr);
-      other_ptr.insert(p);
+    }else if(alloc[MAPPED].count(p)){
+#ifdef OMPTARGET_MAPPED_USE_ASSOCIATE_PTR
       fl = QUDA_CPU_FIELD_LOCATION;
+#else
+      fl = QUDA_CUDA_FIELD_LOCATION;
+#endif
+    }else{
+      // OMP TARGET ARCHITECTURE SPECIFIC HACK
+      if(((uintptr_t)ptr)>>48){
+        ompwip("WARNING: get_pointer_location assumes %p to be QUDA_CUDA_FIELD_LOCATION",ptr);
+        other_target_ptr.insert(p);
+        fl = QUDA_CUDA_FIELD_LOCATION;
+      }else{
+        ompwip("WARNING: get_pointer_location assumes %p to be QUDA_CPU_FIELD_LOCATION",ptr);
+        other_ptr.insert(p);
+        fl = QUDA_CPU_FIELD_LOCATION;
+      }
     }
     return fl;
 /*

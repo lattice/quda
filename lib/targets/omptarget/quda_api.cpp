@@ -76,6 +76,7 @@ namespace quda
       static inline int
       ompMemcpy(void *d, void *s, std::size_t c, qudaMemcpyKind k)
       {
+        // ompwip("memcpy 0x%p <- 0x%p %d %d\n", d, s, c, k);
         int r = 0;  // return value from omp_target_memcpy, note that no return value is reserved for memcpy.
         switch(k){
         case qudaMemcpyHostToHost:
