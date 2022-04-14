@@ -710,7 +710,8 @@ namespace quda
      */
     std::string serialize() const
     {
-      json j = this->c;
+      auto p = std::make_pair(besttime, this->c);
+      json j = p;
       return j.dump();
     }
     /**
@@ -721,7 +722,9 @@ namespace quda
     void deserialize(const std::string_view s)
     {
       auto j = json::parse(s);
-      this->c = j;
+      std::pair<float, decltype(this->c)> p = j;
+      besttime = p.first;
+      this->c = p.second;
     }
 
   public:
@@ -948,13 +951,14 @@ namespace quda
 
         const float min_tune_time = tunable.min_tune_time();
         const int min_tune_iterations = tunable.min_tune_iter();
+
+        if (policyTuning() || uberTuning()) { tc.broadcast(); }
         const int tuneiterations
           = std::max(static_cast<int>(std::ceil(min_tune_time / tc.getBestTime())), min_tune_iterations);
         if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
-          printfQuda("Candidate tuning finished. Best time %f and now continuing with %i iterations.\n",
-                     tc.getBestTime(), tuneiterations);
+          printfQuda("Candidate tuning finished for %s with %s. Best time %f and now continuing with %i iterations.\n",
+                     key.name, key.aux, tc.getBestTime(), tuneiterations);
         }
-        if (policyTuning() || uberTuning()) { tc.broadcast(); }
 
         // we now have the candidates, now need to loop over candidates
         while (!tc.empty()) {
