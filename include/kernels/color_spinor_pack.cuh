@@ -270,7 +270,7 @@ namespace quda {
         }
       }
 #ifdef NVSHMEM_COMMS
-      if (arg.shmem & 1) shmem_signalwait(0, 0, (arg.shmem & 4), arg);
+      if (arg.shmem) shmem_signalwait(0, 0, (arg.shmem & 4), arg);
 #endif
     }
   };

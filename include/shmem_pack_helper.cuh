@@ -7,10 +7,10 @@ namespace quda
 {
   /**
    * @brief Helper to avoid dynamic indexing into the packBuffer
-   * 
-   * @tparam dest 
+   *
+   * @tparam dest 1 for local pack buffer for staging IB packing, 0 for remote buffer used over NVLink
    * @tparam Arg kernelArguments
-   * @param shmemindex 
+   * @param shmemindex  dimension / direction we want to get the buffer for
    * @param arg kernelArguments
    */
   template <int dest, typename Arg> __device__ inline void *getShmemBuffer(int shmemindex, const Arg &arg)
@@ -30,15 +30,15 @@ namespace quda
 
   /**
    * @brief Get the rank of your neighbor in idx dimdir, avoids dynamic indexing in kernel
-   * 
-   * @tparam Arg 
-   * @param idx 
-   * @param arg 
+   *
+   * @tparam Arg kernelArguments
+   * @param shmemindex dimension / direction we want to get the rank for
+   * @param arg kernelArguments
    * @return rank of the neighbor
    */
-  template <typename Arg> __device__ inline int getNeighborRank(int idx, const Arg &arg)
+  template <typename Arg> __device__ inline int getNeighborRank(int shmemindex, const Arg &arg)
   {
-    switch (idx) {
+    switch (shmemindex) {
     case 0: return arg.neighbor_ranks[0];
     case 1: return arg.neighbor_ranks[1];
     case 2: return arg.neighbor_ranks[2];
@@ -52,11 +52,11 @@ namespace quda
   }
 
   /**
-   * @brief 
-   * 
-   * @tparam Arg 
-   * @param shmemindex 
-   * @param arg 
+   * @brief helper to send the data (nvshmem_putmem) from packing to remote buffer used fer IB
+   *
+   * @tparam Arg kernelArguments
+   * @param shmemindex dimension / direction we want to get the rank for
+   * @param arg kernelArguments
    */
   template <typename Arg> __device__ inline void shmem_putbuffer(int shmemindex, const Arg &arg)
   {
@@ -90,12 +90,12 @@ namespace quda
   }
 
   /**
-   * @brief Check if for the given arg.shmem (deciding on which policy we use) and whether we 
+   * @brief Check if for the given arg.shmem (deciding on which policy we use) and whether we
    * are in the fused pack+interior kernel or in a separate packing kernel do
    * intra-node packing (and/or) inter-node packing
-   * @tparam Arg kernel arguments 
+   * @tparam Arg kernel arguments
    * @param dim communication dimension which we are working on
-   * @param dir communication dimension which we are working on
+   * @param dir communication direction which we are working on
    * @param arg kernel argument structure
    * @return whether to pack for that dim/dir
    */
@@ -108,15 +108,14 @@ namespace quda
     return (arg.shmem == 0 || (intranode && pack_intranode) || (!intranode && pack_internode));
   }
 
-  // this currently operates on arg.sync_arr, i.e. is used for dslash
   /**
-   * @brief 
-   * 
-   * @tparam Arg kernel arguments 
+   * @brief this function ensures all packing is done, then sends the signal and
+   * also the data over IB when using nvshmem
+   * this currently operates on arg.sync_arr, i.e. is used for dslash
+   * @tparam Arg kernel arguments
    * @param dim communication dimension which we are working on
-   * @param dir communication dimension which we are working on
-   * @param arg kernel argument structure 
-   * @return __device__ 
+   * @param dir communication direction which we are working on
+   * @param arg kernel argument structure
    */
   template <typename Arg> __device__ inline void shmem_signal(int dim, int dir, const Arg &arg)
   {
@@ -190,16 +189,15 @@ namespace quda
     }
   }
 
-  // this currently operates on arg.sync_arr, i.e. is used for exchange ghost
   /**
-   * @brief 
-   * 
-   * @tparam Arg kernel arguments 
+   * @brief helper to send the data from packing to remote buffer used fer IB and put the signal in one call
+   * this currently operates on arg.sync_arr, i.e. is used for exchange ghost
+   *
+   * @tparam Arg kernel arguments
    * @param shmemindex  communication dimension/dir which we are working on
    * @param arg kernel argument structure
-   * @return 
    */
-   template <typename Arg> __device__ inline void shmem_putbuffer_signal(int shmemindex, Arg &arg)
+  template <typename Arg> __device__ inline void shmem_putbuffer_signal(int shmemindex, Arg &arg)
   {
     switch (shmemindex) {
     case 0:
@@ -238,17 +236,17 @@ namespace quda
     }
   }
 
-  // this currently operates on arg.sync_arr + 2 * QUDA_MAX_DIM, i.e. is used for exchange ghost
- /**
-  * @brief 
-  * 
-  * @tparam Arg kernel arguments 
-  * @param dim communication dimension which we are working on
-  * @param dir communication dimension which we are working on
-  * @param wait 
-  * @param arg kernel argument structure 
-  * @return __device__ 
-  */
+  /**
+   * @brief this function ensures all packing is done, then sends the signal and
+   * also the data over IB when using nvshmem
+   * this currently operates on arg.sync_arr + 2 * QUDA_MAX_DIM, i.e. is used for
+   * exchange ghost
+   * @tparam Arg kernel arguments
+   * @param dim communication dimension which we are working on
+   * @param dir communication direction which we are working on
+   * @param wait whether to also wait on the signal (immediately after sending it)
+   * @param arg kernel argument structure
+   */
   template <typename Arg> __device__ inline void shmem_signalwait(int dim, int dir, bool wait, const Arg &arg)
   {
 
@@ -257,8 +255,6 @@ namespace quda
     __syncthreads(); // make sure all threads in this block arrived here
     if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && target::thread_idx().z == 0) {
       int ticket = arg.retcount_intra[0].fetch_add(1);
-      // currently CST order -- want to make sure all stores are done before and for the last block we need that
-      // all uses of that data are visible
       amLast = (ticket == target::grid_dim().x * target::grid_dim().y * target::grid_dim().z - 1);
     }
     auto my_tile = cg::coalesced_threads();
@@ -276,10 +272,11 @@ namespace quda
         dir = shmemidx % 2;
 
         if (!(getNeighborRank(2 * dim + dir, arg) < 0)) {
-          // send data over IB if necessary
           if (getShmemBuffer<1, decltype(arg)>(shmemidx, arg) != nullptr) {
+            // for IB transfers we packed to a local buffer so send data over IB and put the signal
             shmem_putbuffer_signal(shmemidx, arg);
           } else {
+            // for direct remote store we already packed to remote memory, no need to send, just do a signal
             nvshmemx_signal_op(arg.sync_arr + 2 * dim + (1 - dir), arg.counter, NVSHMEM_SIGNAL_SET,
                                getNeighborRank(2 * dim + dir, arg));
           }
@@ -287,6 +284,7 @@ namespace quda
       }
       if (my_tile.thread_rank() == 0) arg.retcount_intra[0].store(0); // this could probably be relaxed
       my_tile.sync();
+
       for (int shmemidx = my_tile.thread_rank(); shmemidx < 8; shmemidx += my_tile.size()) {
         dim = shmemidx / 2;
         dir = shmemidx % 2;
