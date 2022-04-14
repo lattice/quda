@@ -97,7 +97,7 @@ namespace quda
         if (i + 1 < N) {
           std::vector<Complex> alpha(N - (i + 1));
           blas::cDotProduct(alpha, {p[i]}, {p.begin() + i + 1, p.end()});
-          for (int j = i + 1; j < N; j++) alpha[j] = -alpha[j];
+          for (auto &alpha_ : alpha) alpha_ = -alpha_;
           blas::caxpy(alpha, {p[i]}, {p.begin() + i + 1, p.end()});
 
           if (!apply_mat) {
