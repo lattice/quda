@@ -1416,54 +1416,108 @@ namespace quda
     static bool envset = false;
 
     // use chebyshev filter or not
-    static bool use_cheby;
+    static bool use_cheby[QUDA_MAX_MG_LEVEL];
 
     // bottom of window for filtering stage, eigenvalues smaller than lamda_min enhanced
-    static double lambda_min;
+    static double lambda_min[QUDA_MAX_MG_LEVEL];
 
     // how many filtering iterations should we do
-    static int filter_iterations;
+    static int filter_iterations[QUDA_MAX_MG_LEVEL];
+
+    // how frequently we rescale while we filter
+    static int filter_rescale_freq[QUDA_MAX_MG_LEVEL];
 
     // how many near-nulls to generate from each base vector
-    static int vectors_per_set;
+    static int vectors_per_set[QUDA_MAX_MG_LEVEL];
 
     // how many chebyshev iterations between each vector in the set
-    static int iterations_for_next;
+    static int iterations_for_next[QUDA_MAX_MG_LEVEL];
 
     if (!envset) {
 
-      char *cheby = getenv("QUDA_USE_CHEBY");
-      if (cheby) { use_cheby = (atoi(cheby) == 1) ? true : false; }
+      // level 1
+      char *cheby = getenv("QUDA_USE_CHEBY_L1");
+      if (cheby) { use_cheby[1] = (atoi(cheby) == 1) ? true : false; }
 
-      if (use_cheby) {
+      if (use_cheby[1]) {
         char *tmp_string;
 
-        tmp_string = getenv("QUDA_CHEBY_LMIN");
+        tmp_string = getenv("QUDA_CHEBY_LMIN_L1");
         if (tmp_string) {
-          lambda_min = atof(tmp_string);
+          lambda_min[1] = atof(tmp_string);
         } else {
-          errorQuda("QUDA_CHEBY_LMIN unset");
+          errorQuda("QUDA_CHEBY_LMIN_L1 unset");
         }
 
-        tmp_string = getenv("QUDA_VEC_FILTER_ITER");
+        tmp_string = getenv("QUDA_VEC_FILTER_ITER_L1");
         if (tmp_string) {
-          filter_iterations = atoi(tmp_string);
+          filter_iterations[1] = atoi(tmp_string);
         } else {
-          errorQuda("QUDA_VEC_FILTER_ITER unset");
+          errorQuda("QUDA_VEC_FILTER_ITER_L1 unset");
         }
 
-        tmp_string = getenv("QUDA_VEC_PER_SET");
+        tmp_string = getenv("QUDA_VEC_FILTER_RESCALE_FREQ_L1");
         if (tmp_string) {
-          vectors_per_set = atoi(tmp_string);
+          filter_rescale_freq[1] = atoi(tmp_string);
         } else {
-          errorQuda("QUDA_VEC_PER_SET unset");
+          errorQuda("QUDA_VEC_FILTER_RESCALE_FREQ_L1 unset");
         }
 
-        tmp_string = getenv("QUDA_VEC_ITER_FOR_NEXT");
+        tmp_string = getenv("QUDA_VEC_PER_SET_L1");
         if (tmp_string) {
-          iterations_for_next = atoi(tmp_string);
+          vectors_per_set[1] = atoi(tmp_string);
         } else {
-          errorQuda("QUDA_VEC_ITER_FOR_NEXT unset");
+          errorQuda("QUDA_VEC_PER_SET_L1 unset_L1");
+        }
+
+        tmp_string = getenv("QUDA_VEC_ITER_FOR_NEXT_L1");
+        if (tmp_string) {
+          iterations_for_next[1] = atoi(tmp_string);
+        } else {
+          errorQuda("QUDA_VEC_ITER_FOR_NEXT_L1 unset");
+        }
+      }
+
+      // level 2
+      cheby = getenv("QUDA_USE_CHEBY_L1");
+      if (cheby) { use_cheby[2] = (atoi(cheby) == 1) ? true : false; }
+
+      if (use_cheby[2]) {
+        char *tmp_string;
+
+        tmp_string = getenv("QUDA_CHEBY_LMIN_L2");
+        if (tmp_string) {
+          lambda_min[2] = atof(tmp_string);
+        } else {
+          errorQuda("QUDA_CHEBY_LMIN_L2 unset");
+        }
+
+        tmp_string = getenv("QUDA_VEC_FILTER_ITER_L2");
+        if (tmp_string) {
+          filter_iterations[2] = atoi(tmp_string);
+        } else {
+          errorQuda("QUDA_VEC_FILTER_ITER_L2 unset");
+        }
+
+        tmp_string = getenv("QUDA_VEC_FILTER_RESCALE_FREQ_L2");
+        if (tmp_string) {
+          filter_rescale_freq[2] = atoi(tmp_string);
+        } else {
+          errorQuda("QUDA_VEC_FILTER_RESCALE_FREQ_L2 unset");
+        }
+
+        tmp_string = getenv("QUDA_VEC_PER_SET_L2");
+        if (tmp_string) {
+          vectors_per_set[2] = atoi(tmp_string);
+        } else {
+          errorQuda("QUDA_VEC_PER_SET_L2 unset_L1");
+        }
+
+        tmp_string = getenv("QUDA_VEC_ITER_FOR_NEXT_L2");
+        if (tmp_string) {
+          iterations_for_next[2] = atoi(tmp_string);
+        } else {
+          errorQuda("QUDA_VEC_ITER_FOR_NEXT_L2 unset");
         }
       }
 
@@ -1471,7 +1525,7 @@ namespace quda
     }
 
     // Just constraining to level 2 for now
-    if (param.level == 2 && use_cheby) {
+    if ((param.level == 1 || param.level == 2) && use_cheby) {
 
       // Filtering approach based on arXiv:2103.05034, P. Boyle and A. Yamaguchi.
 
@@ -1493,8 +1547,8 @@ namespace quda
         100, 10, tmp1, tmp2);
 
       // create filter interpolators
-      double m_map_filter = 2. / (lambda_max - lambda_min);
-      double b_map_filter = - (lambda_max + lambda_min) / (lambda_max - lambda_min);
+      double m_map_filter = 2. / (lambda_max - lambda_min[param.level]);
+      double b_map_filter = - (lambda_max + lambda_min[param.level]) / (lambda_max - lambda_min[param.level]);
 
       // create interpolators for generating more near-nulls
       double m_map_generate = 2. / lambda_max;
@@ -1504,7 +1558,7 @@ namespace quda
       // random vectors
       int num_vec = static_cast<int>(B.size());
 
-      int num_starting_vectors = (num_vec + vectors_per_set - 1) / vectors_per_set;
+      int num_starting_vectors = (num_vec + vectors_per_set[param.level] - 1) / vectors_per_set[param.level];
 
       // orthonormalize
       if (param.mg_global.pre_orthonormalize) {
@@ -1526,22 +1580,22 @@ namespace quda
           // P0
           blas::copy(pk, *B[s]);
 
-          if (filter_iterations > 0) {
+          if (filter_iterations[param.level] > 0) {
             // P1 = m Ap_0 + b p_0
             std::swap(pkm1, pk); // p_k -> p_{k - 1}
             dirac_mdm(Apkm1, pkm1, tmp1, tmp2);
             blas::axpbyz(m_map_filter, Apkm1, b_map_filter, pkm1, pk);
 
-            if (filter_iterations > 1) {
+            if (filter_iterations[param.level] > 1) {
               // Enter recursion relation
-              for (int k = 2; k <= filter_iterations; k++) {
+              for (int k = 2; k <= filter_iterations[param.level]; k++) {
                 std::swap(pkm2, pkm1); // p_{k - 1} -> p_{k-2}
                 std::swap(pkm1, pk); // p_k -> p_{k-1}
                 dirac_mdm(Apkm1, pkm1, tmp1, tmp2); // compute A p_{k-1}
                 blas::axpbypczw(2. * m_map_filter, Apkm1, 2. * b_map_filter, pkm1, -1., pkm2, pk);
 
                 // heuristic rescale to keep norms in check...
-                if (k % 50 == 0) {
+                if (k % filter_rescale_freq[param.level] == 0) {
                   double tmp_nrm2 = blas::norm2(pk);
                   printf("Starting vector %d heuristic rescale at %d old norm2 %e\n", s, k, tmp_nrm2);
                   double tmp_inv_nrm = 1. / sqrt(tmp_nrm2);
@@ -1575,7 +1629,7 @@ namespace quda
 
         for (int i = s + num_starting_vectors; i < num_vec; i += num_starting_vectors) {
 
-          for (int k = first ? 2 : 0; k < iterations_for_next; k++) {
+          for (int k = first ? 2 : 0; k < iterations_for_next[param.level]; k++) {
             std::swap(pkm2, pkm1); // p_{k - 1} -> p_{k-2}
             std::swap(pkm1, pk); // p_k -> p_{k-1}
             dirac_mdm(Apkm1, pkm1, tmp1, tmp2); // compute A p_{k-1}
