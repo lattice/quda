@@ -249,7 +249,7 @@ namespace quda {
      *
      * @return number of iterations
      */
-    virtual int candiate_iter() const { return 2; }
+    virtual int candidate_iter() const { return 2; }
 
     /**
      * @brief Number of candidates to be identified in the 1st phase for the 2nd tuning phase

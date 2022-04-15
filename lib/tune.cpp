@@ -715,7 +715,7 @@ namespace quda
       return j.dump();
     }
     /**
-     * @brief Deserialize tune candiates from json string.
+     * @brief Deserialize tune candidates from json string.
      *
      * @param s
      */
@@ -736,7 +736,7 @@ namespace quda
     TuneCandidates(size_t size) : max_size(size) { }
 
     /**
-     * @brief Push a new tuning candiate to the queue. Will be ignored if there are
+     * @brief Push a new tuning candidate to the queue. Will be ignored if there are
      * already size faster ones.
      *
      * @param candidate
@@ -903,7 +903,7 @@ namespace quda
         param.aux = make_int4(-1, -1, -1, -1);
         tunable.initTuneParam(param);
 
-        const int candiate_iterations = tunable.candiate_iter();
+        const int candidate_iterations = tunable.candidate_iter();
         while (tuning && candidatetuning) {
           qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);
@@ -918,7 +918,7 @@ namespace quda
           tunable.apply(stream); // do initial call in case we need to jit compile for these parameters or if policy tuning
 
           timer.start();
-          for (int i = 0; i < candiate_iterations; i++) {
+          for (int i = 0; i < candidate_iterations; i++) {
             tunable.apply(stream); // calls tuneLaunch() again, which simply returns the currently active param
           }
           timer.stop();
@@ -931,7 +931,7 @@ namespace quda
               errorQuda("Failed to clear error state %s\n", qudaGetLastErrorString().c_str());
           }
 
-          float elapsed_time = timer.last() / candiate_iterations;
+          float elapsed_time = timer.last() / candidate_iterations;
           param.time = elapsed_time;
           if ((error == QUDA_SUCCESS) && (tunable.launchError() == QUDA_SUCCESS)) tc.pushCandidate(param);
 
