@@ -217,7 +217,8 @@ namespace quda
       using block_reduce_t = cub::BlockReduce<T, param_t::block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS,
                                               param_t::block_size_y, param_t::block_size_z, __COMPUTE_CAPABILITY__>;
       using tempStorage = typename block_reduce_t::TempStorage;
-      tempStorage *storage = (tempStorage*)&target::omptarget::shared_cache.addr[1024];  // FIXME arbitrary
+      static_assert(param_t::batch_size*sizeof(tempStorage) <= sizeof(target::omptarget::shared_cache.addr[0])*(8192+4096+2048), "Shared cache not large enough for tempStorage");  // FIXME arbitrary, the number is arbitrary, do we have that many?
+      tempStorage *storage = (tempStorage*)&target::omptarget::shared_cache.addr[128];  // FIXME arbitrary
       // typename block_reduce_t::TempStorage storage[param_t::batch_size];
       block_reduce_t block_reduce(storage[batch]);
       if (!async){
@@ -225,8 +226,8 @@ namespace quda
         // __syncthreads(); // only synchronize if we are not pipelining
       }
       T value = reducer_t::do_sum ? block_reduce.Sum(value_) : block_reduce.Reduce(value_, r);
-      QUDA_RT_CONSTS;
       if (all) {
+        QUDA_RT_CONSTS;
         T &value_shared = reinterpret_cast<T &>(storage[batch]);
         if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) value_shared = value;
         #pragma omp barrier

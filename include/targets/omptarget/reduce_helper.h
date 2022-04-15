@@ -125,15 +125,17 @@ namespace quda
       = std::min(Arg::max_n_batch_block, device::max_block_size() / (block_size_x * block_size_y));
     using BlockReduce = BlockReduce<T, block_size_x, block_size_y, n_batch_block, true>;
     // bool isLastBlockDone[n_batch_block];
-    static_assert(sizeof(bool)*n_batch_block <= sizeof(target::omptarget::shared_cache.addr[0])*1024, "Shared cache not large enough for isLastBlockDone");  // FIXME arbitrary, 1024 is used in block_reduce_helper.h:/dummy_storage/
+    static_assert(sizeof(bool)*n_batch_block <= sizeof(target::omptarget::shared_cache.addr[0])*128, "Shared cache not large enough for isLastBlockDone");  // FIXME arbitrary, 128 is used in block_reduce_helper.h:/tempStorage/
     bool *isLastBlockDone = (bool*)target::omptarget::shared_cache.addr;
+    // printf("team %d thread %d isLastBlockDone %p\n", omp_get_team_num(), omp_get_thread_num(), isLastBlockDone);
 
     T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
     // printf("team %d thread %d  r %g  aggregate %g\n", omp_get_team_num(), omp_get_thread_num(), *(double*)(&in), *(double*)(&aggregate));
 
     if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
       arg.partial[idx * target::grid_dim().x + target::block_idx().x] = aggregate;
-      __threadfence(); // flush result
+      // __threadfence(); // flush result
+      #pragma omp flush
 
       // increment global block counter
       // auto value = atomicInc(&arg.count[idx], target::grid_dim().x);
@@ -150,6 +152,7 @@ namespace quda
 
     // finish the reduction if last block
     if (isLastBlockDone[target::thread_idx().z]) {
+      #pragma omp flush
       auto i = target::thread_idx().y * block_size_x + target::thread_idx().x;
       T sum = r.init();
       while (i < target::grid_dim().x) {
