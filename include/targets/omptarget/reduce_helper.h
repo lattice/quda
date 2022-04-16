@@ -125,9 +125,12 @@ namespace quda
       = std::min(Arg::max_n_batch_block, device::max_block_size() / (block_size_x * block_size_y));
     using BlockReduce = BlockReduce<T, block_size_x, block_size_y, n_batch_block, true>;
     // bool isLastBlockDone[n_batch_block];
-    static_assert(sizeof(bool)*n_batch_block <= sizeof(target::omptarget::shared_cache.addr[0])*128, "Shared cache not large enough for isLastBlockDone");  // FIXME arbitrary, 128 is used in block_reduce_helper.h:/tempStorage/
+    static_assert(sizeof(bool)*n_batch_block <= sizeof(target::omptarget::shared_cache.addr[0])*64, "Shared cache not large enough for isLastBlockDone");  // FIXME arbitrary, 128 is used in block_reduce_helper.h:/tempStorage/
     bool *isLastBlockDone = (bool*)target::omptarget::shared_cache.addr;
+    bool *hasLastBlockDone = (bool*)&target::omptarget::shared_cache.addr[64];
     // printf("team %d thread %d isLastBlockDone %p\n", omp_get_team_num(), omp_get_thread_num(), isLastBlockDone);
+    if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && target::thread_idx().z == 0)
+      *hasLastBlockDone = 0;
 
     T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
     // printf("team %d thread %d  r %g  aggregate %g\n", omp_get_team_num(), omp_get_thread_num(), *(double*)(&in), *(double*)(&aggregate));
@@ -146,11 +149,14 @@ namespace quda
 
       // determine if last block
       isLastBlockDone[target::thread_idx().z] = (value == (target::grid_dim().x - 1));
+      if(value == (target::grid_dim().x - 1))
+        *hasLastBlockDone = 1;
     }
 
     __syncthreads();
 
     // finish the reduction if last block
+    if (*hasLastBlockDone) {
     if (isLastBlockDone[target::thread_idx().z]) {
       #pragma omp flush
       auto i = target::thread_idx().y * block_size_x + target::thread_idx().x;
@@ -173,7 +179,10 @@ namespace quda
         }
         arg.count[idx] = 0; // set to zero for next time
       }
+    }else{
+      BlockReduce(target::thread_idx().z).Reduce(r.init(), r);
     }
+    }  // hasLastBlockDone
   }
 
 } // namespace quda
