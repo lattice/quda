@@ -138,7 +138,6 @@ namespace quda
     if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
       arg.partial[idx * target::grid_dim().x + target::block_idx().x] = aggregate;
       // __threadfence(); // flush result
-      #pragma omp flush
 
       // increment global block counter
       // auto value = atomicInc(&arg.count[idx], target::grid_dim().x);
@@ -157,31 +156,31 @@ namespace quda
 
     // finish the reduction if last block
     if (*hasLastBlockDone) {
-    if (isLastBlockDone[target::thread_idx().z]) {
-      #pragma omp flush
-      auto i = target::thread_idx().y * block_size_x + target::thread_idx().x;
+      bool thisSubBlock = isLastBlockDone[target::thread_idx().z];
       T sum = r.init();
-      while (i < target::grid_dim().x) {
-        sum = r(sum, const_cast<T &>(static_cast<volatile T *>(arg.partial)[idx * target::grid_dim().x + i]));
-        // printf("team %d thread %d  sum %g\n", omp_get_team_num(), omp_get_thread_num(), *(double*)(&sum));
-        i += block_size_x * block_size_y;
+      if (thisSubBlock) {
+        auto i = target::thread_idx().y * block_size_x + target::thread_idx().x;
+        while (i < target::grid_dim().x) {
+          sum = r(sum, const_cast<T &>(static_cast<volatile T *>(arg.partial)[idx * target::grid_dim().x + i]));
+          // printf("team %d thread %d  sum %g\n", omp_get_team_num(), omp_get_thread_num(), *(double*)(&sum));
+          i += block_size_x * block_size_y;
+        }
       }
 
       sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
 
       // write out the final reduced value
-      if (target::thread_idx().y * block_size_x + target::thread_idx().x == 0) {
-        // printf("team %d thread %d  final sum %g\n", omp_get_team_num(), omp_get_thread_num(), *(double*)(&sum));
-        if (arg.get_output_async_buffer()) {
-          arg.get_output_async_buffer()[idx] = sum;
-        } else {
-          arg.result_d[idx] = sum;
+      if (thisSubBlock) {
+        if (target::thread_idx().y * block_size_x + target::thread_idx().x == 0) {
+          // printf("team %d thread %d  final sum %g\n", omp_get_team_num(), omp_get_thread_num(), *(double*)(&sum));
+          if (arg.get_output_async_buffer()) {
+            arg.get_output_async_buffer()[idx] = sum;
+          } else {
+            arg.result_d[idx] = sum;
+          }
+          arg.count[idx] = 0; // set to zero for next time
         }
-        arg.count[idx] = 0; // set to zero for next time
       }
-    }else{
-      BlockReduce(target::thread_idx().z).Reduce(r.init(), r);
-    }
     }  // hasLastBlockDone
   }
 

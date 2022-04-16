@@ -214,6 +214,7 @@ namespace quda
     __device__ inline T operator()(const T &value_, bool async, int batch, bool all, const reducer_t &r,
                                    const param_t &)
     {
+#if 1
       using block_reduce_t = cub::BlockReduce<T, param_t::block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS,
                                               param_t::block_size_y, param_t::block_size_z, __COMPUTE_CAPABILITY__>;
       using tempStorage = typename block_reduce_t::TempStorage;
@@ -233,6 +234,38 @@ namespace quda
         #pragma omp barrier
         value = value_shared;
       }
+#else
+      // this block of code only works for a single batch the size of the thread block
+      // test with QUDA/BlasTest.verify/reDotProduct_block_double_double --nsrc 2 --msrc 2
+      constexpr int nthr = param_t::block_size_x*param_t::block_size_y*param_t::block_size_z;
+      int tid = omp_get_thread_num();
+      static_assert(nthr*sizeof(T) <= sizeof(target::omptarget::shared_cache.addr[0])*8192, "Shared cache not large enough for tempStorage");  // FIXME arbitrary, the number is arbitrary, do we have that many?
+      T *storage = (T*)&target::omptarget::shared_cache.addr[128];  // FIXME arbitrary
+      storage[tid] = value_;
+      int offset = 1;
+      constexpr int bs = param_t::batch_size;
+      static_assert(nthr%bs==0, "Block size not divisible by batch_size");
+      constexpr int subblock = nthr/bs;
+      do{
+        #pragma omp for collapse(2)
+        for(int b=0;b<nthr;b+=subblock)
+          for(int i=0;i<subblock-offset;i+=2*offset)
+            storage[b+i] = r(storage[b+i], storage[b+i+offset]);
+        offset *= 2;
+      }while(offset<subblock);
+/*
+      int b = subblock*batch;
+      do{
+        #pragma omp for
+        for(int i=0;i<subblock-offset;i+=2*offset)
+          storage[b+i] = r(storage[b+i], storage[b+i+offset]);
+        offset *= 2;
+      }while(offset<subblock);
+*/
+      T value = storage[tid];
+      if(all)
+        value = storage[subblock*(tid/subblock)];
+#endif
       return value;
     }
   };
