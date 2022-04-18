@@ -214,58 +214,32 @@ namespace quda
     __device__ inline T operator()(const T &value_, bool async, int batch, bool all, const reducer_t &r,
                                    const param_t &)
     {
-#if 1
-      using block_reduce_t = cub::BlockReduce<T, param_t::block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS,
-                                              param_t::block_size_y, param_t::block_size_z, __COMPUTE_CAPABILITY__>;
-      using tempStorage = typename block_reduce_t::TempStorage;
-      static_assert(param_t::batch_size*sizeof(tempStorage) <= sizeof(target::omptarget::shared_cache.addr[0])*(8192+4096+2048), "Shared cache not large enough for tempStorage");  // FIXME arbitrary, the number is arbitrary, do we have that many?
-      tempStorage *storage = (tempStorage*)&target::omptarget::shared_cache.addr[128];  // FIXME arbitrary
-      // typename block_reduce_t::TempStorage storage[param_t::batch_size];
-      block_reduce_t block_reduce(storage[batch]);
-      if (!async){
-        #pragma omp barrier
-        // __syncthreads(); // only synchronize if we are not pipelining
-      }
-      T value = reducer_t::do_sum ? block_reduce.Sum(value_) : block_reduce.Reduce(value_, r);
-      if (all) {
-        QUDA_RT_CONSTS;
-        T &value_shared = reinterpret_cast<T &>(storage[batch]);
-        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) value_shared = value;
-        #pragma omp barrier
-        value = value_shared;
-      }
-#else
-      // this block of code only works for a single batch the size of the thread block
-      // test with QUDA/BlasTest.verify/reDotProduct_block_double_double --nsrc 2 --msrc 2
-      constexpr int nthr = param_t::block_size_x*param_t::block_size_y*param_t::block_size_z;
+      constexpr int nthr = param_t::block_size_x*param_t::block_size_y*(param_t::batch_size>param_t::block_size_z?param_t::batch_size:param_t::block_size_z);
       int tid = omp_get_thread_num();
       static_assert(nthr*sizeof(T) <= sizeof(target::omptarget::shared_cache.addr[0])*8192, "Shared cache not large enough for tempStorage");  // FIXME arbitrary, the number is arbitrary, do we have that many?
       T *storage = (T*)&target::omptarget::shared_cache.addr[128];  // FIXME arbitrary
+      // #pragma omp barrier
       storage[tid] = value_;
+      // #pragma omp barrier
       int offset = 1;
       constexpr int bs = param_t::batch_size;
       static_assert(nthr%bs==0, "Block size not divisible by batch_size");
       constexpr int subblock = nthr/bs;
-      do{
-        #pragma omp for collapse(2)
-        for(int b=0;b<nthr;b+=subblock)
-          for(int i=0;i<subblock-offset;i+=2*offset)
-            storage[b+i] = r(storage[b+i], storage[b+i+offset]);
-        offset *= 2;
-      }while(offset<subblock);
-/*
-      int b = subblock*batch;
+      auto t0 = r.init();
       do{
         #pragma omp for
-        for(int i=0;i<subblock-offset;i+=2*offset)
-          storage[b+i] = r(storage[b+i], storage[b+i+offset]);
+        for(int i=0;i<nthr;++i){
+          auto j = i+offset;
+          auto t = i/subblock==j/subblock ? storage[j] : t0;
+          storage[i] = r(storage[i], t);
+        }
+        // #pragma omp barrier
         offset *= 2;
       }while(offset<subblock);
-*/
+      // #pragma omp barrier
       T value = storage[tid];
       if(all)
         value = storage[subblock*(tid/subblock)];
-#endif
       return value;
     }
   };
