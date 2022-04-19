@@ -1,12 +1,19 @@
 #pragma once
 
-#ifndef QUDA_UNROLL
-#define QUDA_UNROLL _Pragma("unroll")
-#endif
-
 #include <quda_define.h>
 #include <string>
 #include <enum_quda.h>
+
+/* We have to overwrite some cuda-ism here even for public interface,
+   other wise we can't compile tests.
+ */
+#ifdef QUDA_TARGET_OMPTARGET
+#include "targets/omptarget/quda_api.h"
+#endif
+
+#ifndef QUDA_UNROLL
+#define QUDA_UNROLL _Pragma("unroll")
+#endif
 
 /**
    @file quda_api.h

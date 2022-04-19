@@ -192,6 +192,9 @@ endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
 	include(targets/hip/target_hip.cmake)
 endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "OMPTARGET")
+	include(targets/omptarget/target_omptarget.cmake)
+endif()
 
 # make one library
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pack>:$<TARGET_OBJECTS:quda_pack>>
