@@ -134,7 +134,9 @@ namespace quda
       //          "omp reports: teams %d threads %d\n",
       //          launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
       //          omp_get_num_teams(), omp_get_num_threads());
-      BlockKernel2D_impl<Functor, Arg>(arg);
+      char buffer[sizeof(Arg)];
+      memcpy(buffer, (void *)dparg, sizeof(Arg));
+      BlockKernel2D_impl<Functor, Arg>(*(Arg *)buffer);
     }
     }
     omp_target_free(dparg, omp_get_default_device());
