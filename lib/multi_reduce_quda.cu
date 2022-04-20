@@ -216,8 +216,6 @@ namespace quda {
           NYW * NXZ * (r.read.Z + r.write.Z) * z[0]->Bytes() +
           NYW * (r.read.W + r.write.W) * w[0]->Bytes();
       }
-
-      int tuningIter() const { return 3; }
     };
 
     template <template <typename ...> class ReducerDiagonal, template <typename ...> class ReducerOffDiagonal, typename T>
