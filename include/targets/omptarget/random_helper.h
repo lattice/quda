@@ -1,15 +1,16 @@
 #pragma once
 
 #include <random_quda.h>
+#include <mrg32k3a.h>
 
-// We don't use the internal Box-Muller state.
-#define ROCRAND_DETAIL_MRG32K3A_BM_NOT_IN_STATE
-#include <externals/rocrand/rocrand_mrg32k3a.h>
-
-namespace quda {
+namespace quda
+{
 
   struct RNGState {
-    rocrand_state_mrg32k3a state;
+    target::rng::MRG32k3a state;
+    bool has_extf, has_extd;
+    float extf;
+    double extd;
   };
 
   /**
@@ -22,14 +23,18 @@ namespace quda {
   inline void random_init(unsigned long long seed, unsigned long long sequence,
 			  unsigned long long offset, RNGState &state)
   {
-    //curand_init(seed, sequence, offset, &state.state);
-    state.state.seed(seed, sequence, offset);
+    target::rng::seed(state.state, seed, sequence);
+    target::rng::skip(state.state, offset);
+    state.has_extf = 0;
+    state.has_extd = 0;
+    state.extf = 0.0f;
+    state.extd = 0.0;
   }
 
-  template<class Real>
-    struct uniform { };
-  template<>
-    struct uniform<float> {
+  template <class Real> struct uniform {
+  };
+
+  template <> struct uniform<float> {
 
     /**
      * \brief Return a uniform deviate between 0 and 1
@@ -37,8 +42,7 @@ namespace quda {
      */
     static inline float rand(RNGState &state)
     {
-      //curand_uniform(&state.state);
-      return ROCRAND_2POW32_INV + (rocrand(&state.state) * ROCRAND_2POW32_INV);
+      return (float)target::rng::uniform(state.state);
     }
 
     /**
@@ -49,22 +53,19 @@ namespace quda {
      */
     static inline float rand(RNGState &state, float a, float b)
     {
-      //return a + (b - a) * rand(state);
-      return a + (b - a) * (ROCRAND_2POW32_INV + (rocrand(&state.state) * ROCRAND_2POW32_INV));
+      return a + (b - a) * (float)target::rng::uniform(state.state);
     }
 
   };
 
-  template<>
-    struct uniform<double> {
+  template <> struct uniform<double> {
     /**
      * \brief Return a uniform deviate between 0 and 1
      * @param [in,out] the RNG State
      */
     static inline double rand(RNGState &state)
     {
-      //curand_uniform_double(&state.state);
-      return ROCRAND_2POW32_INV_DOUBLE + (rocrand(&state.state) * ROCRAND_2POW32_INV_DOUBLE);
+      return target::rng::uniform(state.state);
     }
 
     /**
@@ -75,44 +76,51 @@ namespace quda {
      */
     static inline double rand(RNGState &state, double a, double b)
     {
-      //return a + (b - a) * rand(state);
-      return a + (b - a) * (ROCRAND_2POW32_INV_DOUBLE + (rocrand(&state.state) * ROCRAND_2POW32_INV_DOUBLE));
+      return a + (b - a) * target::rng::uniform(state.state);
     }
   };
 
-  template<class Real>
-    struct normal { };
+  template <class Real> struct normal {
+  };
 
-  template<>
-    struct normal<float> {
+  template <> struct normal<float> {
     /**
      * \brief return a gaussian normal deviate with mean of 0
      * @param [in,out] state
      */
     static inline float rand(RNGState &state)
     {
-      //curand_normal(&state.state);
-      float u = ROCRAND_2POW32_INV + (rocrand(&state.state) * ROCRAND_2POW32_INV);
-      float v = (ROCRAND_2POW32_INV + (rocrand(&state.state) * ROCRAND_2POW32_INV)) * ROCRAND_2PI;
-      float s = sqrtf(-2.0f * logf(u));
-      return sinf(v) * s;
+      if(state.has_extf){
+        state.has_extf = 0;
+        return state.extf;
+      }else{
+        float x,y;
+        target::rng::gaussian(state.state, x, y);
+        state.has_extf = 1;
+        state.extf = y;
+        return x;
+      }
     }
   };
 
-  template<>
-    struct normal<double> {
+  template <> struct normal<double> {
     /**
      * \brief return a gaussian (normal) deviate with a mean of 0
      * @param [in,out] state
      */
     static inline double rand(RNGState &state)
     {
-      //curand_normal_double(&state.state);
-      double u = ROCRAND_2POW32_INV_DOUBLE + (rocrand(&state.state) * ROCRAND_2POW32_INV_DOUBLE);
-      double v = (ROCRAND_2POW32_INV_DOUBLE + (rocrand(&state.state) * ROCRAND_2POW32_INV_DOUBLE)) * ROCRAND_PI_DOUBLE * 2.;
-      double s = sqrt(-2. * log(u));
-      return sin(v) * s;
+      if(state.has_extd){
+        state.has_extd = 0;
+        return state.extd;
+      }else{
+        double x,y;
+        target::rng::gaussian(state.state, x, y);
+        state.has_extd = 1;
+        state.extd = y;
+        return x;
+      }
     }
   };
 
-}
+} // namespace quda
