@@ -154,8 +154,6 @@ namespace quda
       }
     }
 
-    virtual int tuningIter() const override { return 10; }
-
     virtual int blockStep() const override { return 16; }
     virtual int blockMin() const override { return 16; }
 

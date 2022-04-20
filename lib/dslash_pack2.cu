@@ -353,8 +353,6 @@ public:
 #endif
     }
 
-    int tuningIter() const { return 3; }
-
     long long flops() const
     {
       // unless we are spin projecting (nSpin = 4), there are no flops to do

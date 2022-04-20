@@ -575,8 +575,6 @@ namespace quda {
      dslash(policies[tp.aux.x]);
    }
 
-   int tuningIter() const { return 10; }
-
    bool advanceAux(TuneParam &param) const
    {
     while ((unsigned)param.aux.x < policies.size()-1) {
