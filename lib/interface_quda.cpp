@@ -2903,13 +2903,11 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
                   param->chrono_precision, param->cuda_prec, param->cuda_prec_sloppy);
       }
 
-      bool orthogonal = true;
+      bool orthogonal = false;
       bool apply_mat = false;
       bool hermitian = false;
       MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
-
-      blas::copy(tmp, *in);
-      mre(*out, tmp, basis, Ap);
+      mre(*out, *in, basis, Ap);
 
       profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
     }
@@ -2942,13 +2940,11 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
                   param->chrono_precision, param->cuda_prec, param->cuda_prec_sloppy);
       }
 
-      bool orthogonal = true;
+      bool orthogonal = false;
       bool apply_mat = false;
       bool hermitian = true;
       MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
-
-      blas::copy(tmp, *in);
-      mre(*out, tmp, basis, Ap);
+      mre(*out, *in, basis, Ap);
 
       profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
     }
@@ -2982,7 +2978,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
   if (param->chrono_make_resident) {
     if(param->chrono_max_dim < 1){
-      errorQuda("Cannot chrono_make_resident with chrono_max_dim %i",param->chrono_max_dim);
+      errorQuda("Cannot chrono_make_resident with chrono_max_dim %i", param->chrono_max_dim);
     }
 
     const int i = param->chrono_index;
@@ -2991,8 +2987,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
     auto &basis = chronoResident[i];
 
-    if(param->chrono_max_dim < (int)basis.size()){
-      errorQuda("Requested chrono_max_dim %i is smaller than already existing chroology %i",param->chrono_max_dim,(int)basis.size());
+    if (param->chrono_max_dim < (int)basis.size()) {
+      errorQuda("Requested chrono_max_dim %i is smaller than already existing chronology %lu", param->chrono_max_dim, basis.size());
     }
 
     if(not param->chrono_replace_last){
@@ -3719,7 +3715,6 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
           cudaParam.create = QUDA_NULL_FIELD_CREATE;
           std::vector<ColorSpinorField> q(nRefine, cudaParam);
           std::vector<ColorSpinorField> z(nRefine, cudaParam);
-          ColorSpinorField tmp(cudaParam);
 
           z[0] = x[0]; // zero solution already solved
 #ifdef REFINE_INCREASING_MASS
@@ -3728,12 +3723,11 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
           for (int j = 1; j < nRefine; j++) z[j] = x[param->num_offset - j];
 #endif
 
-          bool orthogonal = true;
+          bool orthogonal = false;
           bool apply_mat = true;
           bool hermitian = true;
 	  MinResExt mre(*m, orthogonal, apply_mat, hermitian, profileMulti);
-          blas::copy(tmp, b);
-          mre(x[i], tmp, z, q);
+          mre(x[i], b, z, q);
         }
 
         SolverParam solverParam(refineparam);

@@ -1555,7 +1555,7 @@ public:
        @param[in] hermitian Whether the linear system is Hermitian or not
     */
     void solve(std::vector<Complex> &psi_, std::vector<ColorSpinorField> &p, std::vector<ColorSpinorField> &q,
-               ColorSpinorField &b, bool hermitian);
+               const ColorSpinorField &b, bool hermitian);
 
   public:
     /**
@@ -1564,7 +1564,7 @@ public:
        @param apply_mat Whether to apply the operator in place or assume q already contains this
        @profile Timing profile to use
     */
-    MinResExt(const DiracMatrix &mat, bool orthogonal, bool apply_mat, bool hermitian, TimeProfile &profile);
+    MinResExt(const DiracMatrix &mat, bool orthogonal, bool apply_mat, bool hermitian, TimeProfile &profile = dummy);
 
     /**
        @param x The optimum for the solution vector.
@@ -1572,7 +1572,7 @@ public:
        @param p The basis vectors in which we are building the guess
        @param q The basis vectors multiplied by A
     */
-    void operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField> &p,
+    void operator()(ColorSpinorField &x, const ColorSpinorField &b, std::vector<ColorSpinorField> &p,
                     std::vector<ColorSpinorField> &q);
   };
 
