@@ -171,7 +171,7 @@
 #define QUDA_MULTIPLICATIVE_SCHWARZ 1
 #define QUDA_INVALID_SCHWARZ QUDA_INVALID_ENUM
 
-#define QudaAcceleratorType interger(4)
+#define QudaAcceleratorType integer(4)
 #define QUDA_MADWF_ACCELERATOR 0
 #define QUDA_INVALID_ACCELERATOR QUDA_INVALID_ENUM
 
