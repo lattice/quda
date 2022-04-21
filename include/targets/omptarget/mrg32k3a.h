@@ -11,6 +11,7 @@
 #include<cmath>
 #include<cstdint>
 #include<iostream>
+#include<limits>
 
 namespace quda
 {
@@ -193,7 +194,7 @@ namespace quda
       template <typename R>
       inline void gaussian(MRG32k3a& prn, R& x, R& y)
       {
-        constexpr R TINY = 9.999999999999999e-308;
+        constexpr R TINY = std::numeric_limits<R>::min();
         R v,p,r;
         v = (R)uniform(prn);
         p = (R)uniform(prn) * (R)2.0 * (R)3.141592653589793238462643383279502884;
