@@ -1543,7 +1543,8 @@ public:
     const DiracMatrix &mat;
     bool orthogonal; //! Whether to construct an orthogonal basis or not
     bool apply_mat; //! Whether to compute q = Ap or assume it is provided
-    bool hermitian; //! whether A is hermitian ot not
+    bool hermitian; //! Whether A is hermitian or not
+
     TimeProfile &profile;
 
     /**

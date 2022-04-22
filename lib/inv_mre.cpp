@@ -85,8 +85,6 @@ namespace quda
       return;
     }
 
-    double b2 = getVerbosity() >= QUDA_SUMMARIZE ? blas::norm2(b) : 0.0;
-
     // Orthonormalise the vector basis
     if (orthogonal) {
       for (int i = 0; i < N; i++) {
@@ -114,7 +112,15 @@ namespace quda
 
     // Solution coefficient vectors
     std::vector<Complex> alpha(N);
-    solve(alpha, p, q, b, hermitian);
+
+    if (b.Precision() != p[0].Precision()) { // need to make a sloppy copy of b
+      ColorSpinorParam param(b);
+      param.setPrecision(p[0].Precision(), p[0].Precision(), true);
+      param.create = QUDA_COPY_FIELD_CREATE;
+      solve(alpha, p, q, ColorSpinorField(param), hermitian);
+    } else {
+      solve(alpha, p, q, b, hermitian);
+    }
 
     blas::zero(x);
     blas::caxpy(alpha, p, x);
@@ -124,7 +130,7 @@ namespace quda
       ColorSpinorField r(b);
       for (auto &a : alpha) a = -a;
       blas::caxpy(alpha, q, r);
-      printfQuda("MinResExt: N = %d, |res| / |src| = %e\n", N, sqrt(blas::norm2(r) / b2));
+      printfQuda("MinResExt: N = %d, |res| / |src| = %e\n", N, sqrt(blas::norm2(r) / blas::norm2(b)));
     }
 
     if (!running) profile.TPSTOP(QUDA_PROFILE_CHRONO);

@@ -2903,7 +2903,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
                   param->chrono_precision, param->cuda_prec, param->cuda_prec_sloppy);
       }
 
-      bool orthogonal = false;
+      bool orthogonal = true;
       bool apply_mat = false;
       bool hermitian = false;
       MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
@@ -2940,7 +2940,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
                   param->chrono_precision, param->cuda_prec, param->cuda_prec_sloppy);
       }
 
-      bool orthogonal = false;
+      bool orthogonal = true;
       bool apply_mat = false;
       bool hermitian = true;
       MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
