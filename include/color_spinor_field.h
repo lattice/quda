@@ -95,8 +95,6 @@ namespace quda
       else if (is_composite && dim == 0)
         is_composite = false;
     }
-
-    CompositeColorSpinorFieldDescriptor(const CompositeColorSpinorFieldDescriptor &descr) = default;
   };
 
   class ColorSpinorParam : public LatticeFieldParam

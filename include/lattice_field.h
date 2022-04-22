@@ -919,7 +919,7 @@ namespace quda {
   template <typename T, typename... Args>
   inline bool Native_(const char *func, const char *file, int line, const T &a, const Args &...args)
   {
-    return (Native_(func, file, line, a) & Native_(func, file, line, args...));
+    return (Native_(func, file, line, a) && Native_(func, file, line, args...));
   }
 
 #define checkNative(...) Native_(__func__, __FILE__, __LINE__, __VA_ARGS__)
