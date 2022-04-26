@@ -2765,7 +2765,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     x = ColorSpinorField(cudaParam);
   }
 
-  if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
+  if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES && !param->chrono_use_resident) { // download initial guess
     // initial guess only supported for single-pass solvers
     if ((param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) &&
         (param->solve_type == QUDA_DIRECT_SOLVE || param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
