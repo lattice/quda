@@ -29,8 +29,7 @@ namespace quda {
     inner.precision = outer.precision_sloppy;
     inner.precision_sloppy = outer.precision_precondition;
 
-    // this sets a fixed iteration count if we're using the MR solver
-    inner.residual_type = (outer.inv_type_precondition == QUDA_MR_INVERTER) ? QUDA_INVALID_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
+    inner.residual_type = QUDA_L2_RELATIVE_RESIDUAL;
   
     inner.iter = 0;
     inner.gflops = 0;
