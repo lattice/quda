@@ -798,9 +798,6 @@ namespace quda {
     blas::flops = 0;
     mat.flops();
     
-    // copy the residual to b so we can use it outside of the solver.
-    if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) { blas::copy(b, r_full); }
-
     // Done with epilogue, begin free.
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);

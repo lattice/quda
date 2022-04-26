@@ -207,10 +207,10 @@ namespace quda {
       return Complex(cdot[0], cdot[1]);
     }
 
-    double3 cDotProductNormA(ColorSpinorField &x, ColorSpinorField &y)
+    double4 cDotProductNormAB(ColorSpinorField &x, ColorSpinorField &y)
     {
-      auto rtn = instantiateReduce<CdotNormA, false>(0.0, 0.0, 0.0, x, y, x, x, x);
-      return make_double3(rtn[0], rtn[1], rtn[2]);
+      auto ab = instantiateReduce<CdotNormAB, false>(0.0, 0.0, 0.0, x, y, x, x, x);
+      return make_double4(ab[0], ab[1], ab[2], ab[3]);
     }
 
     double3 caxpbypzYmbwcDotProductUYNormY(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y,

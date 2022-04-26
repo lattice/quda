@@ -29,21 +29,20 @@ using namespace quda;
    "other precision" > "this precision".
 */
 
-// these are pointers to the host fields
-std::unique_ptr<ColorSpinorField> xH, yH, zH, wH, vH;
-ColorSpinorField *xoH, *yoH, *zoH;
+// these are the host fields
+ColorSpinorField xH, yH, zH, wH, vH;
 
-// these are pointers to the device fields that have "this precision"
-std::unique_ptr<ColorSpinorField> xD, yD, zD, wD, vD;
+// these are the device fields that have "this precision"
+ColorSpinorField xD, yD, zD, wD, vD;
 
-// these are pointers to the device multi-fields that have "this precision"
-std::unique_ptr<ColorSpinorField> xmD, ymD, zmD, wmD;
+// these are the device multi-fields that have "this precision"
+ColorSpinorField xmD, ymD, zmD, wmD;
 
-// these are pointers to the device fields that have "this precision"
-std::unique_ptr<ColorSpinorField> xoD, yoD, zoD, woD, voD;
+// these are the device fields that have "this precision"
+ColorSpinorField xoD, yoD, zoD, woD, voD;
 
-// these are pointers to the device multi-fields that have "other precision"
-std::unique_ptr<ColorSpinorField> xmoD, ymoD, zmoD;
+// these are the device multi-fields that have "other precision"
+ColorSpinorField xmoD, ymoD, zmoD;
 
 // these are pointers to the host multi-fields that have "this precision"
 std::vector<ColorSpinorField *> xmH;
@@ -97,7 +96,7 @@ enum class Kernel {
   cabxpyzAxNorm,
   cDotProduct,
   caxpyDotzy,
-  cDotProductNormA,
+  cDotProductNormAB,
   caxpbypzYmbwcDotProductUYNormY,
   HeavyQuarkResidualNorm,
   xpyHeavyQuarkResidualNorm,
@@ -143,7 +142,7 @@ const std::map<Kernel, std::string> kernel_map
      {Kernel::cabxpyzAxNorm, "cabxpyzAxNorm"},
      {Kernel::cDotProduct, "cDotProduct"},
      {Kernel::caxpyDotzy, "caxpyDotzy"},
-     {Kernel::cDotProductNormA, "cDotProductNormA"},
+     {Kernel::cDotProductNormAB, "cDotProductNormAB"},
      {Kernel::caxpbypzYmbwcDotProductUYNormY, "caxpbypzYmbwcDotProductUYNormY"},
      {Kernel::HeavyQuarkResidualNorm, "HeavyQuarkResidualNorm"},
      {Kernel::xpyHeavyQuarkResidualNorm, "xpyHeavyQuarkResidualNorm"},
@@ -251,16 +250,11 @@ void initFields(prec_pair_t prec_pair)
   param.pc_type = QUDA_4D_PC;
   param.location = QUDA_CPU_FIELD_LOCATION;
 
-  vH = std::make_unique<ColorSpinorField>(param);
-  wH = std::make_unique<ColorSpinorField>(param);
-  xH = std::make_unique<ColorSpinorField>(param);
-  yH = std::make_unique<ColorSpinorField>(param);
-  zH = std::make_unique<ColorSpinorField>(param);
-
-  // all host fields are double precision, so the "other" fields just alias the regular fields
-  xoH = xH.get();
-  yoH = yH.get();
-  zoH = zH.get();
+  vH = ColorSpinorField(param);
+  wH = ColorSpinorField(param);
+  xH = ColorSpinorField(param);
+  yH = ColorSpinorField(param);
+  zH = ColorSpinorField(param);
 
   xmH.reserve(Nsrc);
   for (int cid = 0; cid < Nsrc; cid++) xmH.push_back(new ColorSpinorField(param));
@@ -271,11 +265,11 @@ void initFields(prec_pair_t prec_pair)
   wmH.reserve(Nsrc);
   for (int cid = 0; cid < Msrc; cid++) wmH.push_back(new ColorSpinorField(param));
 
-  vH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  wH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  xH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  yH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  zH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  vH.Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  wH.Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  xH.Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  yH.Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  zH.Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
   for (int i = 0; i < Nsrc; i++) { xmH[i]->Source(QUDA_RANDOM_SOURCE, 0, 0, 0); }
   for (int i = 0; i < Msrc; i++) { ymH[i]->Source(QUDA_RANDOM_SOURCE, 0, 0, 0); }
   // Now set the parameters for the cuda fields
@@ -288,18 +282,18 @@ void initFields(prec_pair_t prec_pair)
 
   param.setPrecision(prec, prec, true);
   param.location = QUDA_CUDA_FIELD_LOCATION;
-  vD = std::make_unique<ColorSpinorField>(param);
-  wD = std::make_unique<ColorSpinorField>(param);
-  xD = std::make_unique<ColorSpinorField>(param);
-  yD = std::make_unique<ColorSpinorField>(param);
-  zD = std::make_unique<ColorSpinorField>(param);
+  vD = ColorSpinorField(param);
+  wD = ColorSpinorField(param);
+  xD = ColorSpinorField(param);
+  yD = ColorSpinorField(param);
+  zD = ColorSpinorField(param);
 
   param.setPrecision(prec_other, prec_other, true);
-  voD = std::make_unique<ColorSpinorField>(param);
-  woD = std::make_unique<ColorSpinorField>(param);
-  xoD = std::make_unique<ColorSpinorField>(param);
-  yoD = std::make_unique<ColorSpinorField>(param);
-  zoD = std::make_unique<ColorSpinorField>(param);
+  voD = ColorSpinorField(param);
+  woD = ColorSpinorField(param);
+  xoD = ColorSpinorField(param);
+  yoD = ColorSpinorField(param);
+  zoD = ColorSpinorField(param);
 
   // create composite fields
   param.is_composite = true;
@@ -307,66 +301,66 @@ void initFields(prec_pair_t prec_pair)
 
   param.setPrecision(prec, prec, true);
   param.composite_dim = Nsrc;
-  xmD = std::make_unique<ColorSpinorField>(param);
+  xmD = ColorSpinorField(param);
 
   param.composite_dim = Msrc;
-  ymD = std::make_unique<ColorSpinorField>(param);
+  ymD = ColorSpinorField(param);
 
   param.composite_dim = Nsrc;
-  zmD = std::make_unique<ColorSpinorField>(param);
+  zmD = ColorSpinorField(param);
 
   param.composite_dim = Msrc;
-  wmD = std::make_unique<ColorSpinorField>(param);
+  wmD = ColorSpinorField(param);
 
   param.setPrecision(prec_other, prec_other, true);
   param.composite_dim = Nsrc;
-  xmoD = std::make_unique<ColorSpinorField>(param);
+  xmoD = ColorSpinorField(param);
 
   param.composite_dim = Msrc;
-  ymoD = std::make_unique<ColorSpinorField>(param);
+  ymoD = ColorSpinorField(param);
 
   param.composite_dim = Nsrc;
-  zmoD = std::make_unique<ColorSpinorField>(param);
+  zmoD = ColorSpinorField(param);
 
   // only do copy if not doing half precision with mg
   bool flag = !(param.nSpin == 2 && (prec < QUDA_SINGLE_PRECISION || prec_other < QUDA_HALF_PRECISION));
 
   if (flag) {
-    *vD = *vH;
-    *wD = *wH;
-    *xD = *xH;
-    *yD = *yH;
-    *zD = *zH;
+    vD = vH;
+    wD = wH;
+    xD = xH;
+    yD = yH;
+    zD = zH;
   }
 }
 
 void freeFields()
 {
   // release memory
-  vD.reset();
-  wD.reset();
-  xD.reset();
-  yD.reset();
-  zD.reset();
-  voD.reset();
-  woD.reset();
-  xoD.reset();
-  yoD.reset();
-  zoD.reset();
-  xmD.reset();
-  ymD.reset();
-  zmD.reset();
-  wmD.reset();
-  xmoD.reset();
-  ymoD.reset();
-  zmoD.reset();
+  vD.clear();
+  wD.clear();
+  xD.clear();
+  yD.clear();
+  zD.clear();
+  voD.clear();
+  woD.clear();
+  xoD.clear();
+  yoD.clear();
+  zoD.clear();
+  xmD.clear();
+  ymD.clear();
+  zmD.clear();
+  wmD.clear();
+  xmoD.clear();
+  ymoD.clear();
+  zmoD.clear();
 
   // release memory
-  vH.reset();
-  wH.reset();
-  xH.reset();
-  yH.reset();
-  zH.reset();
+  vH.clear();
+  wH.clear();
+  xH.clear();
+  yH.clear();
+  zH.clear();
   for (int i = 0; i < Nsrc; i++) delete xmH[i];
   for (int i = 0; i < Msrc; i++) delete ymH[i];
   for (int i = 0; i < Nsrc; i++) delete zmH[i];
@@ -394,169 +388,169 @@ double benchmark(Kernel kernel, const int niter)
     switch (kernel) {
 
     case Kernel::copyHS:
-      for (int i = 0; i < niter; ++i) blas::copy(*yD, *xoD);
+      for (int i = 0; i < niter; ++i) blas::copy(yD, xoD);
       break;
 
     case Kernel::copyLS:
-      for (int i = 0; i < niter; ++i) blas::copy(*yoD, *xD);
+      for (int i = 0; i < niter; ++i) blas::copy(yoD, xD);
       break;
 
     case Kernel::axpbyz:
-      for (int i = 0; i < niter; ++i) blas::axpbyz(a, *xD, b, *yoD, *zoD);
+      for (int i = 0; i < niter; ++i) blas::axpbyz(a, xD, b, yoD, zoD);
       break;
 
     case Kernel::axpbypczw:
-      for (int i = 0; i < niter; ++i) blas::axpbypczw(a, *xD, b, *yD, c, *zD, *wD);
+      for (int i = 0; i < niter; ++i) blas::axpbypczw(a, xD, b, yD, c, zD, wD);
       break;
 
     case Kernel::ax:
-      for (int i = 0; i < niter; ++i) blas::ax(a, *xD);
+      for (int i = 0; i < niter; ++i) blas::ax(a, xD);
       break;
 
     case Kernel::caxpy:
-      for (int i = 0; i < niter; ++i) blas::caxpy(a2, *xD, *yoD);
+      for (int i = 0; i < niter; ++i) blas::caxpy(a2, xD, yoD);
       break;
 
     case Kernel::caxpby:
-      for (int i = 0; i < niter; ++i) blas::caxpby(a2, *xD, b2, *yD);
+      for (int i = 0; i < niter; ++i) blas::caxpby(a2, xD, b2, yD);
       break;
 
     case Kernel::cxpaypbz:
-      for (int i = 0; i < niter; ++i) blas::cxpaypbz(*xD, a2, *yD, b2, *zD);
+      for (int i = 0; i < niter; ++i) blas::cxpaypbz(xD, a2, yD, b2, zD);
       break;
 
     case Kernel::axpyBzpcx:
-      for (int i = 0; i < niter; ++i) blas::axpyBzpcx(a, *xD, *yoD, b, *zD, c);
+      for (int i = 0; i < niter; ++i) blas::axpyBzpcx(a, xD, yoD, b, zD, c);
       break;
 
     case Kernel::axpyZpbx:
-      for (int i = 0; i < niter; ++i) blas::axpyZpbx(a, *xD, *yoD, *zD, b);
+      for (int i = 0; i < niter; ++i) blas::axpyZpbx(a, xD, yoD, zD, b);
       break;
 
     case Kernel::caxpbypzYmbw:
-      for (int i = 0; i < niter; ++i) blas::caxpbypzYmbw(a2, *xD, b2, *yD, *zD, *wD);
+      for (int i = 0; i < niter; ++i) blas::caxpbypzYmbw(a2, xD, b2, yD, zD, wD);
       break;
 
     case Kernel::cabxpyAx:
-      for (int i = 0; i < niter; ++i) blas::cabxpyAx(a, b2, *xD, *yD);
+      for (int i = 0; i < niter; ++i) blas::cabxpyAx(a, b2, xD, yD);
       break;
 
     case Kernel::caxpyXmaz:
-      for (int i = 0; i < niter; ++i) blas::caxpyXmaz(a2, *xD, *yD, *zD);
+      for (int i = 0; i < niter; ++i) blas::caxpyXmaz(a2, xD, yD, zD);
       break;
 
     case Kernel::norm2:
-      for (int i = 0; i < niter; ++i) blas::norm2(*xD);
+      for (int i = 0; i < niter; ++i) blas::norm2(xD);
       break;
 
     case Kernel::reDotProduct:
-      for (int i = 0; i < niter; ++i) blas::reDotProduct(*xD, *yD);
+      for (int i = 0; i < niter; ++i) blas::reDotProduct(xD, yD);
       break;
 
     case Kernel::axpbyzNorm:
-      for (int i = 0; i < niter; ++i) blas::axpbyzNorm(a, *xD, b, *yD, *zD);
+      for (int i = 0; i < niter; ++i) blas::axpbyzNorm(a, xD, b, yD, zD);
       break;
 
     case Kernel::axpyCGNorm:
-      for (int i = 0; i < niter; ++i) blas::axpyCGNorm(a, *xD, *yoD);
+      for (int i = 0; i < niter; ++i) blas::axpyCGNorm(a, xD, yoD);
       break;
 
     case Kernel::caxpyNorm:
-      for (int i = 0; i < niter; ++i) blas::caxpyNorm(a2, *xD, *yD);
+      for (int i = 0; i < niter; ++i) blas::caxpyNorm(a2, xD, yD);
       break;
 
     case Kernel::caxpyXmazNormX:
-      for (int i = 0; i < niter; ++i) blas::caxpyXmazNormX(a2, *xD, *yD, *zD);
+      for (int i = 0; i < niter; ++i) blas::caxpyXmazNormX(a2, xD, yD, zD);
       break;
 
     case Kernel::cabxpyzAxNorm:
-      for (int i = 0; i < niter; ++i) blas::cabxpyzAxNorm(a, b2, *xD, *yD, *yD);
+      for (int i = 0; i < niter; ++i) blas::cabxpyzAxNorm(a, b2, xD, yD, yD);
       break;
 
     case Kernel::cDotProduct:
-      for (int i = 0; i < niter; ++i) blas::cDotProduct(*xD, *yD);
+      for (int i = 0; i < niter; ++i) blas::cDotProduct(xD, yD);
       break;
 
     case Kernel::caxpyDotzy:
-      for (int i = 0; i < niter; ++i) blas::caxpyDotzy(a2, *xD, *yD, *zD);
+      for (int i = 0; i < niter; ++i) blas::caxpyDotzy(a2, xD, yD, zD);
       break;
 
-    case Kernel::cDotProductNormA:
-      for (int i = 0; i < niter; ++i) blas::cDotProductNormA(*xD, *yD);
+    case Kernel::cDotProductNormAB:
+      for (int i = 0; i < niter; ++i) blas::cDotProductNormAB(xD, yD);
       break;
 
     case Kernel::caxpbypzYmbwcDotProductUYNormY:
-      for (int i = 0; i < niter; ++i) blas::caxpbypzYmbwcDotProductUYNormY(a2, *xD, b2, *yD, *zoD, *wD, *vD);
+      for (int i = 0; i < niter; ++i) blas::caxpbypzYmbwcDotProductUYNormY(a2, xD, b2, yD, zoD, wD, vD);
       break;
 
     case Kernel::HeavyQuarkResidualNorm:
-      for (int i = 0; i < niter; ++i) blas::HeavyQuarkResidualNorm(*xD, *yD);
+      for (int i = 0; i < niter; ++i) blas::HeavyQuarkResidualNorm(xD, yD);
       break;
 
     case Kernel::xpyHeavyQuarkResidualNorm:
-      for (int i = 0; i < niter; ++i) blas::xpyHeavyQuarkResidualNorm(*xD, *yD, *zD);
+      for (int i = 0; i < niter; ++i) blas::xpyHeavyQuarkResidualNorm(xD, yD, zD);
       break;
 
     case Kernel::tripleCGReduction:
-      for (int i = 0; i < niter; ++i) blas::tripleCGReduction(*xD, *yD, *zD);
+      for (int i = 0; i < niter; ++i) blas::tripleCGReduction(xD, yD, zD);
       break;
 
     case Kernel::tripleCGUpdate:
-      for (int i = 0; i < niter; ++i) blas::tripleCGUpdate(a, b, *xD, *yD, *zD, *wD);
+      for (int i = 0; i < niter; ++i) blas::tripleCGUpdate(a, b, xD, yD, zD, wD);
       break;
 
     case Kernel::axpyReDot:
-      for (int i = 0; i < niter; ++i) blas::axpyReDot(a, *xD, *yD);
+      for (int i = 0; i < niter; ++i) blas::axpyReDot(a, xD, yD);
       break;
 
     case Kernel::caxpyBxpz:
-      for (int i = 0; i < niter; ++i) blas::caxpyBxpz(a2, *xD, *yD, b2, *zD);
+      for (int i = 0; i < niter; ++i) blas::caxpyBxpz(a2, xD, yD, b2, zD);
       break;
 
     case Kernel::caxpyBzpx:
-      for (int i = 0; i < niter; ++i) blas::caxpyBzpx(a2, *xD, *yD, b2, *zD);
+      for (int i = 0; i < niter; ++i) blas::caxpyBzpx(a2, xD, yD, b2, zD);
       break;
 
     case Kernel::axpy_block:
-      for (int i = 0; i < niter; ++i) blas::axpy(Ar, xmD->Components(), ymoD->Components());
+      for (int i = 0; i < niter; ++i) blas::axpy(Ar, xmD.Components(), ymoD.Components());
       break;
 
     case Kernel::caxpy_block:
-      for (int i = 0; i < niter; ++i) blas::caxpy(A, *xmD, *ymoD);
+      for (int i = 0; i < niter; ++i) blas::caxpy(A, xmD, ymoD);
       break;
 
     case Kernel::axpyz_block:
-      for (int i = 0; i < niter; ++i) blas::axpyz(Ar, *xmD, *ymD, *wmD);
+      for (int i = 0; i < niter; ++i) blas::axpyz(Ar, xmD, ymD, wmD);
       break;
 
     case Kernel::caxpyz_block:
-      for (int i = 0; i < niter; ++i) blas::caxpyz(A, *xmD, *ymD, *wmD);
+      for (int i = 0; i < niter; ++i) blas::caxpyz(A, xmD, ymD, wmD);
       break;
 
     case Kernel::axpyBzpcx_block:
       for (int i = 0; i < niter; ++i)
-        blas::axpyBzpcx((double *)A, xmD->Components(), zmoD->Components(), (double *)B, *yD, (double *)C);
+        blas::axpyBzpcx((double *)A, xmD.Components(), zmoD.Components(), (double *)B, yD, (double *)C);
       break;
 
     case Kernel::reDotProductNorm_block:
-      for (int i = 0; i < niter; ++i) blas::reDotProduct((double *)A2, xmD->Components(), xmD->Components());
+      for (int i = 0; i < niter; ++i) blas::reDotProduct((double *)A2, xmD.Components(), xmD.Components());
       break;
 
     case Kernel::reDotProduct_block:
-      for (int i = 0; i < niter; ++i) blas::reDotProduct((double *)A, xmD->Components(), ymoD->Components());
+      for (int i = 0; i < niter; ++i) blas::reDotProduct((double *)A, xmD.Components(), ymoD.Components());
       break;
 
     case Kernel::cDotProductNorm_block:
-      for (int i = 0; i < niter; ++i) blas::cDotProduct(A2, xmD->Components(), xmD->Components());
+      for (int i = 0; i < niter; ++i) blas::cDotProduct(A2, xmD.Components(), xmD.Components());
       break;
 
     case Kernel::cDotProduct_block:
-      for (int i = 0; i < niter; ++i) blas::cDotProduct(A, xmD->Components(), ymoD->Components());
+      for (int i = 0; i < niter; ++i) blas::cDotProduct(A, xmD.Components(), ymoD.Components());
       break;
 
     case Kernel::caxpyXmazMR:
       commAsyncReductionSet(true);
-      for (int i = 0; i < niter; ++i) blas::caxpyXmazMR(a, *xD, *yD, *zD);
+      for (int i = 0; i < niter; ++i) blas::caxpyXmazMR(a, xD, yD, zD);
       commAsyncReductionSet(false);
       break;
 
@@ -575,19 +569,23 @@ double benchmark(Kernel kernel, const int niter)
   return timer.last();
 }
 
-#define ERROR(a) fabs(blas::norm2(*a##D) - blas::norm2(*a##H)) / blas::norm2(*a##H)
+#define ERROR(a) fabs(blas::norm2(a##D) - blas::norm2(a##H)) / blas::norm2(a##H)
 
 double test(Kernel kernel)
 {
+  // all host fields are double precision, so the "other" fields just alias the regular fields
+  ColorSpinorField &yoH = yH;
+  ColorSpinorField &zoH = zH;
+
   double a = M_PI, b = M_PI * exp(1.0), c = sqrt(M_PI);
   quda::Complex a2(a, b), b2(b, -c), c2(a + b, c * a);
   double error = 0;
-  quda::Complex *A = new quda::Complex[Nsrc * Msrc];
-  quda::Complex *B = new quda::Complex[Nsrc * Msrc];
-  quda::Complex *C = new quda::Complex[Nsrc * Msrc];
-  quda::Complex *A2 = new quda::Complex[Nsrc * Nsrc]; // for the block cDotProductNorm test
-  quda::Complex *B2 = new quda::Complex[Nsrc * Nsrc]; // for the block cDotProductNorm test
-  double *Ar = new double[Nsrc * Msrc];
+  std::vector<quda::Complex> A(Nsrc * Msrc);
+  std::vector<quda::Complex> B(Nsrc * Msrc);
+  std::vector<quda::Complex> C(Nsrc * Msrc);
+  std::vector<quda::Complex> A2(Nsrc * Nsrc); // for the block cDotProductNorm test
+  std::vector<quda::Complex> B2(Nsrc * Nsrc); // for the block cDotProductNorm test
+  std::vector<double> Ar(Nsrc * Msrc);
 
   for (int i = 0; i < Nsrc * Msrc; i++) {
     A[i] = a2 * (1.0 * ((i / (double)Nsrc) + i)) + b2 * (1.0 * i) + c2 * (1.0 * (0.5 * Nsrc * Msrc - i));
@@ -607,416 +605,420 @@ double test(Kernel kernel)
   switch (kernel) {
 
   case Kernel::copyHS:
-    *xoD = *xH;
-    blas::copy(*yD, *xoD);
-    blas::copy(*yH, *xH);
+    xoD = xH;
+    blas::copy(yD, xoD);
+    blas::copy(yH, xH);
     error = ERROR(y);
     break;
 
   case Kernel::copyLS:
-    *xD = *xH;
-    blas::copy(*yoD, *xD);
-    blas::copy(*yH, *xH);
+    xD = xH;
+    blas::copy(yoD, xD);
+    blas::copy(yH, xH);
     error = ERROR(yo);
     break;
 
   case Kernel::axpbyz:
-    *xD = *xH;
-    *yoD = *yH;
-    blas::axpbyz(a, *xD, b, *yoD, *zoD);
-    blas::axpbyz(a, *xH, b, *yH, *zH);
+    xD = xH;
+    yoD = yH;
+    blas::axpbyz(a, xD, b, yoD, zoD);
+    blas::axpbyz(a, xH, b, yH, zH);
     error = ERROR(zo);
     break;
 
   case Kernel::axpbypczw:
-    *xD = *xH;
-    *yD = *yH;
-    *zD = *zH;
-    *wD = *wH;
-    blas::axpbypczw(a, *xD, b, *yD, c, *zD, *wD);
-    blas::axpbypczw(a, *xH, b, *yH, c, *zH, *wH);
+    xD = xH;
+    yD = yH;
+    zD = zH;
+    wD = wH;
+    blas::axpbypczw(a, xD, b, yD, c, zD, wD);
+    blas::axpbypczw(a, xH, b, yH, c, zH, wH);
     error = ERROR(w);
     break;
 
   case Kernel::ax:
-    *xD = *xH;
-    blas::ax(a, *xD);
-    blas::ax(a, *xH);
+    xD = xH;
+    blas::ax(a, xD);
+    blas::ax(a, xH);
     error = ERROR(x);
     break;
 
   case Kernel::caxpy:
-    *xD = *xH;
-    *yoD = *yH;
-    blas::caxpy(a2, *xD, *yoD);
-    blas::caxpy(a2, *xH, *yH);
+    xD = xH;
+    yoD = yH;
+    blas::caxpy(a2, xD, yoD);
+    blas::caxpy(a2, xH, yH);
     error = ERROR(yo);
     break;
 
   case Kernel::caxpby:
-    *xD = *xH;
-    *yD = *yH;
-    blas::caxpby(a2, *xD, b2, *yD);
-    blas::caxpby(a2, *xH, b2, *yH);
+    xD = xH;
+    yD = yH;
+    blas::caxpby(a2, xD, b2, yD);
+    blas::caxpby(a2, xH, b2, yH);
     error = ERROR(y);
     break;
 
   case Kernel::cxpaypbz:
-    *xD = *xH;
-    *yD = *yH;
-    *zD = *zH;
-    blas::cxpaypbz(*xD, a2, *yD, b2, *zD);
-    blas::cxpaypbz(*xH, a2, *yH, b2, *zH);
+    xD = xH;
+    yD = yH;
+    zD = zH;
+    blas::cxpaypbz(xD, a2, yD, b2, zD);
+    blas::cxpaypbz(xH, a2, yH, b2, zH);
     error = ERROR(z);
     break;
 
   case Kernel::axpyBzpcx:
-    *xD = *xH;
-    *yoD = *yH;
-    *zD = *zH;
-    blas::axpyBzpcx(a, *xD, *yoD, b, *zD, c);
-    blas::axpyBzpcx(a, *xH, *yH, b, *zH, c);
+    xD = xH;
+    yoD = yH;
+    zD = zH;
+    blas::axpyBzpcx(a, xD, yoD, b, zD, c);
+    blas::axpyBzpcx(a, xH, yH, b, zH, c);
     error = ERROR(x) + ERROR(yo);
     break;
 
   case Kernel::axpyZpbx:
-    *xD = *xH;
-    *yoD = *yH;
-    *zD = *zH;
-    blas::axpyZpbx(a, *xD, *yoD, *zD, b);
-    blas::axpyZpbx(a, *xH, *yH, *zH, b);
+    xD = xH;
+    yoD = yH;
+    zD = zH;
+    blas::axpyZpbx(a, xD, yoD, zD, b);
+    blas::axpyZpbx(a, xH, yH, zH, b);
     error = ERROR(x) + ERROR(yo);
     break;
 
   case Kernel::caxpbypzYmbw:
-    *xD = *xH;
-    *yD = *yH;
-    *zD = *zH;
-    *wD = *wH;
-    blas::caxpbypzYmbw(a2, *xD, b2, *yD, *zD, *wD);
-    blas::caxpbypzYmbw(a2, *xH, b2, *yH, *zH, *wH);
+    xD = xH;
+    yD = yH;
+    zD = zH;
+    wD = wH;
+    blas::caxpbypzYmbw(a2, xD, b2, yD, zD, wD);
+    blas::caxpbypzYmbw(a2, xH, b2, yH, zH, wH);
     error = ERROR(z) + ERROR(y);
     break;
 
   case Kernel::cabxpyAx:
-    *xD = *xH;
-    *yD = *yH;
-    blas::cabxpyAx(a, b2, *xD, *yD);
-    blas::cabxpyAx(a, b2, *xH, *yH);
+    xD = xH;
+    yD = yH;
+    blas::cabxpyAx(a, b2, xD, yD);
+    blas::cabxpyAx(a, b2, xH, yH);
     error = ERROR(y) + ERROR(x);
     break;
 
   case Kernel::caxpyXmaz:
-    *xD = *xH;
-    *yD = *yH;
-    *zD = *zH;
+    xD = xH;
+    yD = yH;
+    zD = zH;
     {
-      blas::caxpyXmaz(a, *xD, *yD, *zD);
-      blas::caxpyXmaz(a, *xH, *yH, *zH);
+      blas::caxpyXmaz(a, xD, yD, zD);
+      blas::caxpyXmaz(a, xH, yH, zH);
       error = ERROR(y) + ERROR(x);
     }
     break;
 
   case Kernel::norm2:
-    *xD = *xH;
-    error = fabs(blas::norm2(*xD) - blas::norm2(*xH)) / blas::norm2(*xH);
+    xD = xH;
+    error = fabs(blas::norm2(xD) - blas::norm2(xH)) / blas::norm2(xH);
     break;
 
   case Kernel::reDotProduct:
-    *xD = *xH;
-    *yD = *yH;
-    error = fabs(blas::reDotProduct(*xD, *yD) - blas::reDotProduct(*xH, *yH)) / fabs(blas::reDotProduct(*xH, *yH));
+    xD = xH;
+    yD = yH;
+    error = fabs(blas::reDotProduct(xD, yD) - blas::reDotProduct(xH, yH)) / fabs(blas::reDotProduct(xH, yH));
     break;
 
   case Kernel::axpbyzNorm:
-    *xD = *xH;
-    *yD = *yH;
+    xD = xH;
+    yD = yH;
     {
-      double d = blas::axpbyzNorm(a, *xD, b, *yD, *zD);
-      double h = blas::axpbyzNorm(a, *xH, b, *yH, *zH);
+      double d = blas::axpbyzNorm(a, xD, b, yD, zD);
+      double h = blas::axpbyzNorm(a, xH, b, yH, zH);
       error = ERROR(z) + fabs(d - h) / fabs(h);
     }
     break;
 
   case Kernel::axpyCGNorm:
-    *xD = *xH;
-    *yoD = *yH;
+    xD = xH;
+    yoD = yH;
     {
-      quda::Complex d = blas::axpyCGNorm(a, *xD, *yoD);
-      quda::Complex h = blas::axpyCGNorm(a, *xH, *yH);
+      quda::Complex d = blas::axpyCGNorm(a, xD, yoD);
+      quda::Complex h = blas::axpyCGNorm(a, xH, yH);
       error = ERROR(yo) + fabs(d.real() - h.real()) / fabs(h.real()) + fabs(d.imag() - h.imag()) / fabs(h.imag());
     }
     break;
 
   case Kernel::caxpyNorm:
-    *xD = *xH;
-    *yD = *yH;
+    xD = xH;
+    yD = yH;
     {
-      double d = blas::caxpyNorm(a, *xD, *yD);
-      double h = blas::caxpyNorm(a, *xH, *yH);
+      double d = blas::caxpyNorm(a, xD, yD);
+      double h = blas::caxpyNorm(a, xH, yH);
       error = ERROR(y) + fabs(d - h) / fabs(h);
     }
     break;
 
   case Kernel::caxpyXmazNormX:
-    *xD = *xH;
-    *yD = *yH;
-    *zD = *zH;
+    xD = xH;
+    yD = yH;
+    zD = zH;
     {
-      double d = blas::caxpyXmazNormX(a, *xD, *yD, *zD);
-      double h = blas::caxpyXmazNormX(a, *xH, *yH, *zH);
+      double d = blas::caxpyXmazNormX(a, xD, yD, zD);
+      double h = blas::caxpyXmazNormX(a, xH, yH, zH);
       error = ERROR(y) + ERROR(x) + fabs(d - h) / fabs(h);
     }
     break;
 
   case Kernel::cabxpyzAxNorm:
-    *xD = *xH;
-    *yD = *yH;
+    xD = xH;
+    yD = yH;
     {
-      double d = blas::cabxpyzAxNorm(a, b2, *xD, *yD, *yD);
-      double h = blas::cabxpyzAxNorm(a, b2, *xH, *yH, *yH);
+      double d = blas::cabxpyzAxNorm(a, b2, xD, yD, yD);
+      double h = blas::cabxpyzAxNorm(a, b2, xH, yH, yH);
       error = ERROR(x) + ERROR(y) + fabs(d - h) / fabs(h);
     }
     break;
 
   case Kernel::cDotProduct:
-    *xD = *xH;
-    *yD = *yH;
-    error = abs(blas::cDotProduct(*xD, *yD) - blas::cDotProduct(*xH, *yH)) / abs(blas::cDotProduct(*xH, *yH));
+    xD = xH;
+    yD = yH;
+    error = abs(blas::cDotProduct(xD, yD) - blas::cDotProduct(xH, yH)) / abs(blas::cDotProduct(xH, yH));
     break;
 
   case Kernel::caxpyDotzy:
-    *xD = *xH;
-    *yD = *yH;
-    *zD = *zH;
+    xD = xH;
+    yD = yH;
+    zD = zH;
     {
-      quda::Complex d = blas::caxpyDotzy(a, *xD, *yD, *zD);
-      quda::Complex h = blas::caxpyDotzy(a, *xH, *yH, *zH);
+      quda::Complex d = blas::caxpyDotzy(a, xD, yD, zD);
+      quda::Complex h = blas::caxpyDotzy(a, xH, yH, zH);
       error = ERROR(y) + abs(d - h) / abs(h);
     }
     break;
 
-  case Kernel::cDotProductNormA:
-    *xD = *xH;
-    *yD = *yH;
+  case Kernel::cDotProductNormAB:
+    xD = xH;
+    yD = yH;
     {
-      double3 d = blas::cDotProductNormA(*xD, *yD);
-      double3 h = blas::cDotProductNormA(*xH, *yH);
-      error = abs(Complex(d.x - h.x, d.y - h.y)) / abs(Complex(h.x, h.y)) + fabs(d.z - h.z) / fabs(h.z);
+      auto d = blas::cDotProductNormAB(xD, yD);
+      auto dot = blas::cDotProduct(xH, yH);
+      auto x2 = blas::norm2(xH);
+      auto y2 = blas::norm2(yH);
+      error = abs(Complex(d.x - dot.real(), d.y - dot.imag())) / abs(dot) + fabs(d.z - x2) / fabs(x2)
+        + fabs(d.w - y2) / fabs(y2);
     }
     break;
 
   case Kernel::caxpbypzYmbwcDotProductUYNormY:
-    *xD = *xH;
-    *yD = *yH;
-    *zD = *zH;
-    *wD = *wH;
-    *vD = *vH;
+    xD = xH;
+    yD = yH;
+    zD = zH;
+    wD = wH;
+    vD = vH;
     {
-      double3 d = blas::caxpbypzYmbwcDotProductUYNormY(a2, *xD, b2, *yD, *zD, *wD, *vD);
-      double3 h = blas::caxpbypzYmbwcDotProductUYNormY(a2, *xH, b2, *yH, *zH, *wH, *vH);
+      double3 d = blas::caxpbypzYmbwcDotProductUYNormY(a2, xD, b2, yD, zD, wD, vD);
+      double3 h = blas::caxpbypzYmbwcDotProductUYNormY(a2, xH, b2, yH, zH, wH, vH);
       error = ERROR(z) + ERROR(y) + abs(Complex(d.x - h.x, d.y - h.y)) / abs(Complex(h.x, h.y))
         + fabs(d.z - h.z) / fabs(h.z);
     }
     break;
 
   case Kernel::HeavyQuarkResidualNorm:
-    *xD = *xH;
-    *yD = *yH;
+    xD = xH;
+    yD = yH;
     {
-      double3 d = blas::HeavyQuarkResidualNorm(*xD, *yD);
-      double3 h = blas::HeavyQuarkResidualNorm(*xH, *yH);
+      double3 d = blas::HeavyQuarkResidualNorm(xD, yD);
+      double3 h = blas::HeavyQuarkResidualNorm(xH, yH);
       error = fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z);
     }
     break;
 
   case Kernel::xpyHeavyQuarkResidualNorm:
-    *xD = *xH;
-    *yD = *yH;
-    *zD = *zH;
+    xD = xH;
+    yD = yH;
+    zD = zH;
     {
-      double3 d = blas::xpyHeavyQuarkResidualNorm(*xD, *yD, *zD);
-      double3 h = blas::xpyHeavyQuarkResidualNorm(*xH, *yH, *zH);
+      double3 d = blas::xpyHeavyQuarkResidualNorm(xD, yD, zD);
+      double3 h = blas::xpyHeavyQuarkResidualNorm(xH, yH, zH);
       error = ERROR(y) + fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z);
     }
     break;
 
   case Kernel::tripleCGReduction:
-    *xD = *xH;
-    *yD = *yH;
-    *zD = *zH;
+    xD = xH;
+    yD = yH;
+    zD = zH;
     {
-      double3 d = blas::tripleCGReduction(*xD, *yD, *zD);
-      double3 h = make_double3(blas::norm2(*xH), blas::norm2(*yH), blas::reDotProduct(*yH, *zH));
+      double3 d = blas::tripleCGReduction(xD, yD, zD);
+      double3 h = make_double3(blas::norm2(xH), blas::norm2(yH), blas::reDotProduct(yH, zH));
       error = fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z);
     }
     break;
 
   case Kernel::tripleCGUpdate:
-    *xD = *xH;
-    *yD = *yH;
-    *zD = *zH;
-    *wD = *wH;
+    xD = xH;
+    yD = yH;
+    zD = zH;
+    wD = wH;
     {
-      blas::tripleCGUpdate(a, b, *xD, *yD, *zD, *wD);
-      blas::tripleCGUpdate(a, b, *xH, *yH, *zH, *wH);
+      blas::tripleCGUpdate(a, b, xD, yD, zD, wD);
+      blas::tripleCGUpdate(a, b, xH, yH, zH, wH);
       error = ERROR(y) + ERROR(z) + ERROR(w);
     }
     break;
 
   case Kernel::axpyReDot:
-    *xD = *xH;
-    *yD = *yH;
+    xD = xH;
+    yD = yH;
     {
-      double d = blas::axpyReDot(a, *xD, *yD);
-      double h = blas::axpyReDot(a, *xH, *yH);
+      double d = blas::axpyReDot(a, xD, yD);
+      double h = blas::axpyReDot(a, xH, yH);
       error = ERROR(y) + fabs(d - h) / fabs(h);
     }
     break;
 
   case Kernel::caxpyBxpz:
-    *xD = *xH;
-    *yD = *yH;
-    *zD = *zH;
+    xD = xH;
+    yD = yH;
+    zD = zH;
     {
-      blas::caxpyBxpz(a, *xD, *yD, b2, *zD);
-      blas::caxpyBxpz(a, *xH, *yH, b2, *zH);
+      blas::caxpyBxpz(a, xD, yD, b2, zD);
+      blas::caxpyBxpz(a, xH, yH, b2, zH);
       error = ERROR(x) + ERROR(z);
     }
     break;
 
   case Kernel::caxpyBzpx:
-    *xD = *xH;
-    *yD = *yH;
-    *zD = *zH;
+    xD = xH;
+    yD = yH;
+    zD = zH;
     {
-      blas::caxpyBzpx(a, *xD, *yD, b2, *zD);
-      blas::caxpyBzpx(a, *xH, *yH, b2, *zH);
+      blas::caxpyBzpx(a, xD, yD, b2, zD);
+      blas::caxpyBzpx(a, xH, yH, b2, zH);
       error = ERROR(x) + ERROR(z);
     }
     break;
 
   case Kernel::axpy_block:
-    for (int i = 0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
-    for (int i = 0; i < Msrc; i++) ymoD->Component(i) = *(ymH[i]);
+    for (int i = 0; i < Nsrc; i++) xmD.Component(i) = *(xmH[i]);
+    for (int i = 0; i < Msrc; i++) ymoD.Component(i) = *(ymH[i]);
 
-    blas::axpy(Ar, *xmD, *ymoD);
+    blas::axpy(Ar.data(), xmD, ymoD);
     for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Msrc; j++) { blas::axpy(Ar[Msrc * i + j], *(xmH[i]), *(ymH[j])); }
     }
 
     error = 0;
     for (int i = 0; i < Msrc; i++) {
-      error += fabs(blas::norm2((ymoD->Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
+      error += fabs(blas::norm2((ymoD.Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
     }
     error /= Msrc;
     break;
 
   case Kernel::caxpy_block:
-    for (int i = 0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
-    for (int i = 0; i < Msrc; i++) ymoD->Component(i) = *(ymH[i]);
+    for (int i = 0; i < Nsrc; i++) xmD.Component(i) = *(xmH[i]);
+    for (int i = 0; i < Msrc; i++) ymoD.Component(i) = *(ymH[i]);
 
-    blas::caxpy(A, *xmD, *ymoD);
+    blas::caxpy(A.data(), xmD, ymoD);
     for (int j = 0; j < Msrc; j++) {
       for (int i = 0; i < Nsrc; i++) { blas::caxpy(A[Msrc * i + j], *(xmH[i]), *(ymH[j])); }
     }
     error = 0;
     for (int i = 0; i < Msrc; i++) {
-      error += fabs(blas::norm2((ymoD->Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
+      error += fabs(blas::norm2((ymoD.Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
     }
     error /= Msrc;
     break;
 
   case Kernel::axpyz_block:
-    for (int i = 0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
-    for (int i = 0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
+    for (int i = 0; i < Nsrc; i++) xmD.Component(i) = *(xmH[i]);
+    for (int i = 0; i < Msrc; i++) ymD.Component(i) = *(ymH[i]);
 
-    blas::axpyz(Ar, *xmD, *ymD, *wmD);
+    blas::axpyz(Ar.data(), xmD, ymD, wmD);
     for (int j = 0; j < Msrc; j++) {
       *wmH[j] = *ymH[j];
       for (int i = 0; i < Nsrc; i++) { blas::axpy(Ar[Msrc * i + j], *(xmH[i]), *(wmH[j])); }
     }
     error = 0;
     for (int i = 0; i < Msrc; i++) {
-      error += fabs(blas::norm2((wmD->Component(i))) - blas::norm2(*(wmH[i]))) / blas::norm2(*(wmH[i]));
+      error += fabs(blas::norm2((wmD.Component(i))) - blas::norm2(*(wmH[i]))) / blas::norm2(*(wmH[i]));
     }
     error /= Msrc;
     break;
 
   case Kernel::caxpyz_block:
-    for (int i = 0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
-    for (int i = 0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
+    for (int i = 0; i < Nsrc; i++) xmD.Component(i) = *(xmH[i]);
+    for (int i = 0; i < Msrc; i++) ymD.Component(i) = *(ymH[i]);
 
-    blas::caxpyz(A, *xmD, *ymD, *wmD);
+    blas::caxpyz(A.data(), xmD, ymD, wmD);
     for (int j = 0; j < Msrc; j++) {
       *wmH[j] = *ymH[j];
       for (int i = 0; i < Nsrc; i++) { blas::caxpy(A[Msrc * i + j], *(xmH[i]), *(wmH[j])); }
     }
     error = 0;
     for (int i = 0; i < Msrc; i++) {
-      error += fabs(blas::norm2((wmD->Component(i))) - blas::norm2(*(wmH[i]))) / blas::norm2(*(wmH[i]));
+      error += fabs(blas::norm2((wmD.Component(i))) - blas::norm2(*(wmH[i]))) / blas::norm2(*(wmH[i]));
     }
     error /= Msrc;
     break;
 
   case Kernel::axpyBzpcx_block:
     for (int i = 0; i < Nsrc; i++) {
-      xmD->Component(i) = *(xmH[i]);
-      zmoD->Component(i) = *(zmH[i]);
+      xmD.Component(i) = *(xmH[i]);
+      zmoD.Component(i) = *(zmH[i]);
     }
-    *yD = *yH;
+    yD = yH;
 
-    blas::axpyBzpcx((double *)A, xmD->Components(), zmoD->Components(), (double *)B, *yD, (const double *)C);
+    blas::axpyBzpcx((double *)A.data(), xmD.Components(), zmoD.Components(), (double *)B.data(), yD,
+                    (const double *)C.data());
 
     for (int i = 0; i < Nsrc; i++) {
-      blas::axpyBzpcx(((double *)A)[i], *xmH[i], *zmH[i], ((double *)B)[i], *yH, ((double *)C)[i]);
+      blas::axpyBzpcx(((double *)A.data())[i], *xmH[i], *zmH[i], ((double *)B.data())[i], yH, ((double *)C.data())[i]);
     }
 
     error = 0;
     for (int i = 0; i < Nsrc; i++) {
-      error += fabs(blas::norm2((xmD->Component(i))) - blas::norm2(*(xmH[i]))) / blas::norm2(*(xmH[i]));
-      error += fabs(blas::norm2((zmoD->Component(i))) - blas::norm2(*(zmH[i]))) / blas::norm2(*(zmH[i]));
+      error += fabs(blas::norm2((xmD.Component(i))) - blas::norm2(*(xmH[i]))) / blas::norm2(*(xmH[i]));
+      error += fabs(blas::norm2((zmoD.Component(i))) - blas::norm2(*(zmH[i]))) / blas::norm2(*(zmH[i]));
     }
     error /= Nsrc;
     break;
 
   case Kernel::reDotProductNorm_block:
-    for (int i = 0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
-    blas::reDotProduct((double *)A2, xmD->Components(), xmD->Components());
+    for (int i = 0; i < Nsrc; i++) xmD.Component(i) = *(xmH[i]);
+    blas::reDotProduct((double *)A2.data(), xmD.Components(), xmD.Components());
     error = 0.0;
     for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Nsrc; j++) {
-        ((double *)B2)[i * Nsrc + j] = blas::reDotProduct(xmD->Component(i), xmD->Component(j));
-        error += std::abs(((double *)A2)[i * Nsrc + j] - ((double *)B2)[i * Nsrc + j])
-          / std::abs(((double *)B2)[i * Nsrc + j]);
+        ((double *)B2.data())[i * Nsrc + j] = blas::reDotProduct(xmD.Component(i), xmD.Component(j));
+        error += std::abs(((double *)A2.data())[i * Nsrc + j] - ((double *)B2.data())[i * Nsrc + j])
+          / std::abs(((double *)B2.data())[i * Nsrc + j]);
       }
     }
     error /= Nsrc * Nsrc;
     break;
 
   case Kernel::reDotProduct_block:
-    for (int i = 0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
-    for (int i = 0; i < Msrc; i++) ymoD->Component(i) = *(ymH[i]);
-    for (int i = 0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
-    blas::reDotProduct((double *)A, xmD->Components(), ymoD->Components());
+    for (int i = 0; i < Nsrc; i++) xmD.Component(i) = *(xmH[i]);
+    for (int i = 0; i < Msrc; i++) ymoD.Component(i) = *(ymH[i]);
+    for (int i = 0; i < Msrc; i++) ymD.Component(i) = *(ymH[i]);
+    blas::reDotProduct((double *)A.data(), xmD.Components(), ymoD.Components());
     error = 0.0;
     for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Msrc; j++) {
-        ((double *)B)[i * Msrc + j] = blas::reDotProduct(xmD->Component(i), ymD->Component(j));
-        error
-          += std::abs(((double *)A)[i * Msrc + j] - ((double *)B)[i * Msrc + j]) / std::abs(((double *)B)[i * Msrc + j]);
+        ((double *)B.data())[i * Msrc + j] = blas::reDotProduct(xmD.Component(i), ymD.Component(j));
+        error += std::abs(((double *)A.data())[i * Msrc + j] - ((double *)B.data())[i * Msrc + j])
+          / std::abs(((double *)B.data())[i * Msrc + j]);
       }
     }
     error /= Nsrc * Msrc;
     break;
 
   case Kernel::cDotProductNorm_block:
-    for (int i = 0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
-    blas::cDotProduct(A2, xmD->Components(), xmD->Components());
+    for (int i = 0; i < Nsrc; i++) xmD.Component(i) = *(xmH[i]);
+    blas::cDotProduct(A2.data(), xmD.Components(), xmD.Components());
     error = 0.0;
     for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Nsrc; j++) {
-        B2[i * Nsrc + j] = blas::cDotProduct(xmD->Component(i), xmD->Component(j));
+        B2[i * Nsrc + j] = blas::cDotProduct(xmD.Component(i), xmD.Component(j));
         error += std::abs(A2[i * Nsrc + j] - B2[i * Nsrc + j]) / std::abs(B2[i * Nsrc + j]);
       }
     }
@@ -1024,14 +1026,14 @@ double test(Kernel kernel)
     break;
 
   case Kernel::cDotProduct_block:
-    for (int i = 0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
-    for (int i = 0; i < Msrc; i++) ymoD->Component(i) = *(ymH[i]);
-    for (int i = 0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
-    blas::cDotProduct(A, xmD->Components(), ymoD->Components());
+    for (int i = 0; i < Nsrc; i++) xmD.Component(i) = *(xmH[i]);
+    for (int i = 0; i < Msrc; i++) ymoD.Component(i) = *(ymH[i]);
+    for (int i = 0; i < Msrc; i++) ymD.Component(i) = *(ymH[i]);
+    blas::cDotProduct(A.data(), xmD.Components(), ymoD.Components());
     error = 0.0;
     for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Msrc; j++) {
-        B[i * Msrc + j] = blas::cDotProduct(xmD->Component(i), ymD->Component(j));
+        B[i * Msrc + j] = blas::cDotProduct(xmD.Component(i), ymD.Component(j));
         error += std::abs(A[i * Msrc + j] - B[i * Msrc + j]) / std::abs(B[i * Msrc + j]);
       }
     }
@@ -1039,27 +1041,27 @@ double test(Kernel kernel)
     break;
 
   case Kernel::caxpyXmazMR:
-    *xD = *xH;
-    *yD = *yH;
-    *zD = *zH;
+    xD = xH;
+    yD = yH;
+    zD = zH;
 
     commGlobalReductionPush(false); // switch off global reductions for this test
 
     commAsyncReductionSet(true);
-    blas::cDotProductNormA(*zD, *xD);
-    blas::caxpyXmazMR(a, *xD, *yD, *zD);
+    blas::cDotProductNormA(zD, xD);
+    blas::caxpyXmazMR(a, xD, yD, zD);
     commAsyncReductionSet(false);
 
-    *vD = *xH;
-    *wD = *yH;
-    *zD = *zH;
+    vD = xH;
+    wD = yH;
+    zD = zH;
     {
-      double3 Ar3 = blas::cDotProductNormA(*zD, *vD);
+      double3 Ar3 = blas::cDotProductNormA(zD, vD);
       auto alpha = Complex(Ar3.x, Ar3.y) / Ar3.z;
-      blas::caxpyXmaz(a * alpha, *vD, *wD, *zD);
+      blas::caxpyXmaz(a * alpha, vD, wD, zD);
     }
-    *xH = *vD;
-    *yH = *wD;
+    xH = vD;
+    yH = wD;
 
     commGlobalReductionPop(); // restore global reductions
 
@@ -1068,12 +1070,7 @@ double test(Kernel kernel)
 
   default: errorQuda("Undefined blas kernel %s\n", kernel_map.at(kernel).c_str());
   }
-  delete[] A;
-  delete[] B;
-  delete[] C;
-  delete[] A2;
-  delete[] B2;
-  delete[] Ar;
+
   return error;
 }
 
@@ -1162,7 +1159,8 @@ protected:
   const int &kernel;
 
 public:
-  BlasTest() : param(GetParam()), prec_pair(prec_idx_map(::testing::get<0>(param))), kernel(::testing::get<1>(param)) {}
+  BlasTest() :
+    param(GetParam()), prec_pair(prec_idx_map(::testing::get<0>(param))), kernel(::testing::get<1>(param)) { }
   virtual void SetUp()
   {
     if (!skip_kernel(prec_pair, (Kernel)kernel)) initFields(prec_pair);

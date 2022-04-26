@@ -113,14 +113,15 @@ namespace quda {
     int ndim = transfer->Vectors().Ndim();
     // FIXME MRHS NDIM hack
     if (ndim == 5 && transfer->Vectors().Nspin() != 4) ndim = 4; // forced case for staggered, coarsened staggered
-    int x[QUDA_MAX_DIM];
+    lat_dim_t x;
     const int *geo_bs = transfer->Geo_bs(); // Number of coarse sites.
     for (int i = 0; i < ndim; i++) x[i] = transfer->Vectors().X(i)/geo_bs[i];
     int Nc_c = transfer->nvec(); // Coarse Color
     // Coarse Spin
     int Ns_c = (transfer->Spin_bs() == 0) ? 2 : transfer->Vectors().Nspin() / transfer->Spin_bs();
     GaugeFieldParam gParam;
-    memcpy(gParam.x, x, QUDA_MAX_DIM*sizeof(int));
+    gParam.x = x;
+    gParam.location = gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
     gParam.nColor = Nc_c*Ns_c;
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
     gParam.order = gpu ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
@@ -155,14 +156,15 @@ namespace quda {
   {
     int ndim = transfer->Vectors().Ndim();
     if (ndim == 5 && transfer->Vectors().Nspin() != 4) ndim = 4; // forced case for staggered, coarsened staggered
-    int x[QUDA_MAX_DIM];
+    lat_dim_t x;
     const int *geo_bs = transfer->Geo_bs(); // Number of coarse sites.
     for (int i = 0; i < ndim; i++) x[i] = transfer->Vectors().X(i)/geo_bs[i];
     int Nc_c = transfer->nvec();     // Coarse Color
     int Ns_c = (transfer->Spin_bs() == 0) ? 2 : transfer->Vectors().Nspin() / transfer->Spin_bs();
 
     GaugeFieldParam gParam;
-    memcpy(gParam.x, x, QUDA_MAX_DIM*sizeof(int));
+    gParam.x = x;
+    gParam.location = gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
     gParam.nColor = Nc_c*Ns_c;
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
     gParam.order = gpu ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;

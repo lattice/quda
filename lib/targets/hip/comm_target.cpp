@@ -31,10 +31,10 @@ namespace quda
     return std::max(accessRank[0], accessRank[1]);
   }
 
-  void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
+  void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local)
   {
     // handles for obtained ghost pointers
-    hipIpcMemHandle_t remote_handle[2][QUDA_MAX_DIM];
+    hipIpcMemHandle_t remote_handle[QUDA_MAX_DIM][2];
 
     for (int dim = 0; dim < 4; ++dim) {
       if (comm_dim(dim) == 1) continue;
@@ -45,7 +45,7 @@ namespace quda
 
         // first set up receive
         if (comm_peer2peer_enabled(1 - dir, dim)) {
-          receiveHandle = comm_declare_receive_relative(&remote_handle[1 - dir][dim], dim, -disp, sizeof(remote_handle));
+          receiveHandle = comm_declare_receive_relative(&remote_handle[dim][1 - dir], dim, -disp, sizeof(remote_handle));
         }
 
         // now send
@@ -75,13 +75,13 @@ namespace quda
       for (int dir = 0; dir < num_dir; ++dir) {
         remote[dim][dir] = nullptr;
         if (!comm_peer2peer_enabled(dir, dim)) continue;
-        CHECK_HIP_ERROR(hipIpcOpenMemHandle(&remote[dim][dir], remote_handle[dir][dim], hipIpcMemLazyEnablePeerAccess));
+        CHECK_HIP_ERROR(hipIpcOpenMemHandle(&remote[dim][dir], remote_handle[dim][dir], hipIpcMemLazyEnablePeerAccess));
       }
       if (num_dir == 1) remote[dim][1] = remote[dim][0];
     }
   }
 
-  void comm_destroy_neighbor_memory(void *remote[QUDA_MAX_DIM][2])
+  void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
   {
     for (int dim = 0; dim < 4; ++dim) {
 
@@ -100,10 +100,11 @@ namespace quda
     } // iterate over dim
   }
 
-  void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM])
+  void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
+                                  array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
   {
     // handles for obtained events
-    hipIpcEventHandle_t ipcRemoteEventHandle[2][QUDA_MAX_DIM];
+    hipIpcEventHandle_t ipcRemoteEventHandle[QUDA_MAX_DIM][2];
 
     for (int dim = 0; dim < 4; ++dim) {
       if (comm_dim(dim) == 1) continue;
@@ -114,8 +115,8 @@ namespace quda
 
         // first set up receive
         if (comm_peer2peer_enabled(1 - dir, dim)) {
-          receiveHandle = comm_declare_receive_relative(&ipcRemoteEventHandle[1 - dir][dim], dim, -disp,
-                                                        sizeof(ipcRemoteEventHandle[1 - dir][dim]));
+          receiveHandle = comm_declare_receive_relative(&ipcRemoteEventHandle[dim][1 - dir], dim, -disp,
+                                                        sizeof(ipcRemoteEventHandle[dim][1 - dir]));
         }
 
         hipIpcEventHandle_t handle;
@@ -124,7 +125,7 @@ namespace quda
         if (comm_peer2peer_enabled(dir, dim)) {
           hipEvent_t event;
           CHECK_HIP_ERROR(hipEventCreateWithFlags(&event, hipEventDisableTiming | hipEventInterprocess));
-          local[dir][dim].event = event;
+          local[dim][dir].event = event;
           CHECK_HIP_ERROR(hipIpcGetEventHandle(&handle, event));
           sendHandle = comm_declare_send_relative(&handle, dim, disp, sizeof(handle));
         }
@@ -145,18 +146,18 @@ namespace quda
       for (int dir = 0; dir < 2; ++dir) {
         if (!comm_peer2peer_enabled(dir, dim)) continue;
         hipEvent_t event = nullptr;
-        CHECK_HIP_ERROR(hipIpcOpenEventHandle(&event, ipcRemoteEventHandle[dir][dim]));
-        remote[dir][dim].event = reinterpret_cast<void *>(event);
+        CHECK_HIP_ERROR(hipIpcOpenEventHandle(&event, ipcRemoteEventHandle[dim][dir]));
+        remote[dim][dir].event = reinterpret_cast<void *>(event);
       }
     }
   }
 
-  void comm_destroy_neighbor_event(qudaEvent_t[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM])
+  void comm_destroy_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &, array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
   {
     for (int dim = 0; dim < 4; ++dim) {
       if (comm_dim(dim) == 1) continue;
       for (int dir = 0; dir < 2; dir++) {
-        hipEvent_t &event = reinterpret_cast<hipEvent_t &>(local[dir][dim].event);
+        hipEvent_t &event = reinterpret_cast<hipEvent_t &>(local[dim][dir].event);
         if (comm_peer2peer_enabled(dir, dim)) CHECK_HIP_ERROR(hipEventDestroy(event));
       }
     } // iterate over dim
