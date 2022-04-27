@@ -1,11 +1,13 @@
 #include <functional>
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief Helper function to statically determine if a type is a QUDA field.  Specialized as needed.
    */
-  template <typename T> struct is_field : std::false_type { };
+  template <typename T> struct is_field : std::false_type {
+  };
 
   template <typename T> constexpr bool is_field_v = is_field<T>::value;
 
@@ -29,8 +31,7 @@ namespace quda {
      @param[in] v Input vector whose elements we will wrap
      @return Reference wrapped vector
   */
-  template <typename T,
-    typename std::enable_if_t<std::is_same_v<T, std::vector<typename T::value_type>>>* = nullptr>
+  template <typename T, typename std::enable_if_t<std::is_same_v<T, std::vector<typename T::value_type>>> * = nullptr>
   auto make_set_impl(T &v)
   {
     using V = unwrap_t<typename T::value_type>;
@@ -43,8 +44,7 @@ namespace quda {
      @param[in] v Input T that we will wrap
      @return Reference wrapped vector
   */
-  template <typename T, typename std::enable_if_t<is_field_v<T>>* = nullptr>
-  auto make_set_impl(T &v)
+  template <typename T, typename std::enable_if_t<is_field_v<T>> * = nullptr> auto make_set_impl(T &v)
   {
     return std::vector<std::reference_wrapper<T>> {v};
   }
@@ -80,5 +80,4 @@ namespace quda {
     return v1_set;
   }
 
-}
-
+} // namespace quda

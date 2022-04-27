@@ -602,22 +602,24 @@ namespace quda {
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
     if (out.Precision() == QUDA_HALF_PRECISION || out.Precision() == QUDA_QUARTER_PRECISION) {
       mobius_tensor_core::apply_fused_dslash(*unextended_tmp2, in, *extended_gauge, *unextended_tmp2, in, mass, m5, b_5,
-                                             c_5, dagger, parity[1], shift0.data, shift0.data, MdwfFusedDslashType::D5PRE);
+                                             c_5, dagger, parity[1], shift0.data, shift0.data,
+                                             MdwfFusedDslashType::D5PRE);
 
       mobius_tensor_core::apply_fused_dslash(*extended_tmp2, *unextended_tmp2, *extended_gauge, *extended_tmp2,
-                                             *unextended_tmp2, mass, m5, b_5, c_5, dagger, parity[0], shift1.data, shift2.data,
-                                             MdwfFusedDslashType::D4_D5INV_D5PRE);
+                                             *unextended_tmp2, mass, m5, b_5, c_5, dagger, parity[0], shift1.data,
+                                             shift2.data, MdwfFusedDslashType::D4_D5INV_D5PRE);
 
       mobius_tensor_core::apply_fused_dslash(*extended_tmp1, *extended_tmp2, *extended_gauge, *unextended_tmp1, in,
                                              mass, m5, b_5, c_5, dagger, parity[1], shift0.data, shift1.data,
                                              MdwfFusedDslashType::D4_D5INV_D5INVDAG);
 
       mobius_tensor_core::apply_fused_dslash(*extended_tmp2, *extended_tmp1, *extended_gauge, *extended_tmp2,
-                                             *extended_tmp1, mass, m5, b_5, c_5, dagger, parity[0], shift1.data, shift1.data,
-                                             MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG);
+                                             *extended_tmp1, mass, m5, b_5, c_5, dagger, parity[0], shift1.data,
+                                             shift1.data, MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG);
 
       mobius_tensor_core::apply_fused_dslash(out, *extended_tmp2, *extended_gauge, out, *unextended_tmp1, mass, m5, b_5,
-                                             c_5, dagger, parity[1], shift2.data, shift2.data, MdwfFusedDslashType::D4DAG_D5PREDAG);
+                                             c_5, dagger, parity[1], shift2.data, shift2.data,
+                                             MdwfFusedDslashType::D4DAG_D5PREDAG);
 
       const long long Ls = in.X(4);
       const long long mat = 2ll * 4ll * Ls - 1ll; // (multiplicaiton-add) * (spin) * Ls - 1

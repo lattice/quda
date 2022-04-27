@@ -2765,7 +2765,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     x = ColorSpinorField(cudaParam);
   }
 
-  if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
+  if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES && !param->chrono_use_resident) { // download initial guess
     // initial guess only supported for single-pass solvers
     if ((param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) &&
         (param->solve_type == QUDA_DIRECT_SOLVE || param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
@@ -2907,9 +2907,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       bool apply_mat = false;
       bool hermitian = false;
       MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
-
-      blas::copy(tmp, *in);
-      mre(*out, tmp, basis, Ap);
+      mre(*out, *in, basis, Ap);
 
       profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
     }
@@ -2946,9 +2944,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       bool apply_mat = false;
       bool hermitian = true;
       MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
-
-      blas::copy(tmp, *in);
-      mre(*out, tmp, basis, Ap);
+      mre(*out, *in, basis, Ap);
 
       profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
     }
@@ -2982,7 +2978,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
   if (param->chrono_make_resident) {
     if(param->chrono_max_dim < 1){
-      errorQuda("Cannot chrono_make_resident with chrono_max_dim %i",param->chrono_max_dim);
+      errorQuda("Cannot chrono_make_resident with chrono_max_dim %i", param->chrono_max_dim);
     }
 
     const int i = param->chrono_index;
@@ -2991,8 +2987,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
     auto &basis = chronoResident[i];
 
-    if(param->chrono_max_dim < (int)basis.size()){
-      errorQuda("Requested chrono_max_dim %i is smaller than already existing chroology %i",param->chrono_max_dim,(int)basis.size());
+    if (param->chrono_max_dim < (int)basis.size()) {
+      errorQuda("Requested chrono_max_dim %i is smaller than already existing chronology %lu", param->chrono_max_dim, basis.size());
     }
 
     if(not param->chrono_replace_last){
@@ -3237,9 +3233,8 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     // exclusively on the GPU.
     quda::CloverField *input_clover = nullptr;
     quda::CloverField *collected_clover = nullptr;
-    bool is_clover = param->dslash_type == QUDA_CLOVER_WILSON_DSLASH ||
-                     param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH ||
-                     param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH;
+    bool is_clover = param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+      || param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH;
 
     if (is_clover) {
       if (param->clover_coeff == 0.0 && param->clover_csw == 0.0)
@@ -3720,7 +3715,6 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
           cudaParam.create = QUDA_NULL_FIELD_CREATE;
           std::vector<ColorSpinorField> q(nRefine, cudaParam);
           std::vector<ColorSpinorField> z(nRefine, cudaParam);
-          ColorSpinorField tmp(cudaParam);
 
           z[0] = x[0]; // zero solution already solved
 #ifdef REFINE_INCREASING_MASS
@@ -3729,12 +3723,11 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
           for (int j = 1; j < nRefine; j++) z[j] = x[param->num_offset - j];
 #endif
 
-          bool orthogonal = true;
+          bool orthogonal = false;
           bool apply_mat = true;
           bool hermitian = true;
 	  MinResExt mre(*m, orthogonal, apply_mat, hermitian, profileMulti);
-          blas::copy(tmp, b);
-          mre(x[i], tmp, z, q);
+          mre(x[i], b, z, q);
         }
 
         SolverParam solverParam(refineparam);

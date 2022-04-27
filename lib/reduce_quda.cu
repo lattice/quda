@@ -142,8 +142,6 @@ namespace quda {
         return (r.read.X + r.write.X) * x.Bytes() + (r.read.Y + r.write.Y) * y.Bytes() +
           (r.read.Z + r.write.Z) * z.Bytes() + (r.read.W + r.write.W) * w.Bytes() + (r.read.V + r.write.V) * v.Bytes();
       }
-
-      int tuningIter() const { return 3; }
     };
 
     template <template <typename reduce_t, typename real> class Functor, bool mixed, typename... Args>

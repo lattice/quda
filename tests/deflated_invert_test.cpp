@@ -152,9 +152,6 @@ int main(int argc, char **argv)
   void *spinorCheck = safe_malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
   void *spinorOut = safe_malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
 
-  // start the timer
-  double time0 = -((double)clock());
-
   // this line ensure that if we need to construct the clover inverse (in either the smoother or the solver) we do so
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
     loadCloverQuda(clover, clover_inv, &inv_param);
@@ -184,12 +181,6 @@ int main(int argc, char **argv)
 
   destroyDeflationQuda(df_preconditioner);
 
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
-
-  // printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
-  // inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
   printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", inv_param.iter, inv_param.secs,
              inv_param.gflops / inv_param.secs, 0.0);
 

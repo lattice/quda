@@ -475,7 +475,11 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #ifndef CHECK_PARAM
   P(solver_normalization, QUDA_DEFAULT_NORMALIZATION);
 #endif
-  P(preserve_source, QUDA_PRESERVE_SOURCE_INVALID);
+
+#ifndef CHECK_PARAM
+  P(preserve_source, QUDA_PRESERVE_SOURCE_INVALID); // deprecated
+#endif
+
   P(cpu_prec, QUDA_INVALID_PRECISION);
   P(cuda_prec, QUDA_INVALID_PRECISION);
 

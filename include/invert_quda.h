@@ -150,9 +150,6 @@ namespace quda {
     /**< The precision used by the QUDA eigensolver */
     QudaPrecision precision_eigensolver;
 
-    /**< Preserve the source or not in the linear solver (deprecated?) */
-    QudaPreserveSource preserve_source;
-
     /**< Whether the source vector should contain the residual vector
        when the solver returns */
     bool return_residual;
@@ -319,8 +316,7 @@ namespace quda {
       precision_refinement_sloppy(param.cuda_prec_refinement_sloppy),
       precision_precondition(param.cuda_prec_precondition),
       precision_eigensolver(param.cuda_prec_eigensolver),
-      preserve_source(param.preserve_source),
-      return_residual(preserve_source == QUDA_PRESERVE_SOURCE_NO ? true : false),
+      return_residual(false),
       num_src(param.num_src),
       num_offset(param.num_offset),
       Nsteps(param.Nsteps),
@@ -410,7 +406,6 @@ namespace quda {
       precision_refinement_sloppy(param.precision_refinement_sloppy),
       precision_precondition(param.precision_precondition),
       precision_eigensolver(param.precision_eigensolver),
-      preserve_source(param.preserve_source),
       return_residual(param.return_residual),
       num_offset(param.num_offset),
       Nsteps(param.Nsteps),
@@ -800,16 +795,27 @@ namespace quda {
     DiracMMdag mmdagSloppy;
     DiracMMdag mmdagPrecon;
     DiracMMdag mmdagEig;
-    ColorSpinorField *xp;
-    ColorSpinorField *yp;
+    ColorSpinorField xp;
+    ColorSpinorField yp;
     bool init;
+
+    /**
+       @brief Initiate the fields needed by the solver
+       @param[in] x Solution vector
+       @param[in] b Source vector
+    */
+    void create(ColorSpinorField &x, const ColorSpinorField &b);
 
   public:
     CGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
          SolverParam &param, TimeProfile &profile);
-    virtual ~CGNE();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
+
+    /**
+       @return Return the residual vector from the prior solve
+    */
+    ColorSpinorField &get_residual();
 
     virtual bool hermitian() { return false; } /** CGNE is for any system */
   };
@@ -822,15 +828,26 @@ namespace quda {
     DiracMdagM mdagmSloppy;
     DiracMdagM mdagmPrecon;
     DiracMdagM mdagmEig;
-    ColorSpinorField *bp;
+    ColorSpinorField br;
     bool init;
+
+    /**
+       @brief Initiate the fields needed by the solver
+       @param[in] x Solution vector
+       @param[in] b Source vector
+    */
+    void create(ColorSpinorField &x, const ColorSpinorField &b);
 
   public:
     CGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
          SolverParam &param, TimeProfile &profile);
-    virtual ~CGNR();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
+
+    /**
+       @return Return the residual vector from the prior solve
+    */
+    ColorSpinorField &get_residual();
 
     virtual bool hermitian() { return false; } /** CGNR is for any system */
   };
@@ -860,16 +877,27 @@ namespace quda {
     DiracMMdag mmdag;
     DiracMMdag mmdagSloppy;
     DiracMMdag mmdagPrecon;
-    ColorSpinorField *xp;
-    ColorSpinorField *yp;
+    ColorSpinorField xp;
+    ColorSpinorField yp;
     bool init;
+
+    /**
+       @brief Initiate the fields needed by the solver
+       @param[in] x Solution vector
+       @param[in] b Source vector
+    */
+    void create(ColorSpinorField &x, const ColorSpinorField &b);
 
   public:
     CG3NE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
           TimeProfile &profile);
-    virtual ~CG3NE();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
+
+    /**
+       @return Return the residual vector from the prior solve
+    */
+    ColorSpinorField &get_residual();
 
     virtual bool hermitian() { return false; } /** CG3NE is for any system */
   };
@@ -881,15 +909,26 @@ namespace quda {
     DiracMdagM mdagm;
     DiracMdagM mdagmSloppy;
     DiracMdagM mdagmPrecon;
-    ColorSpinorField *bp;
+    ColorSpinorField br;
     bool init;
+
+    /**
+       @brief Initiate the fields needed by the solver
+       @param[in] x Solution vector
+       @param[in] b Source vector
+    */
+    void create(ColorSpinorField &x, const ColorSpinorField &b);
 
   public:
     CG3NR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
           TimeProfile &profile);
-    virtual ~CG3NR();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
+
+    /**
+       @return Return the residual vector from the prior solve
+    */
+    ColorSpinorField &get_residual();
 
     virtual bool hermitian() { return false; } /** CG3NR is for any system */
   };
@@ -1235,7 +1274,8 @@ namespace quda {
     virtual bool hermitian() { return false; } /** CGNE is for any linear system */
   };
 
-  class CACGNR : public CACG {
+  class CACGNR : public CACG
+  {
 
   private:
     DiracMdagM mdagm;
@@ -1503,7 +1543,8 @@ public:
     const DiracMatrix &mat;
     bool orthogonal; //! Whether to construct an orthogonal basis or not
     bool apply_mat; //! Whether to compute q = Ap or assume it is provided
-    bool hermitian; //! whether A is hermitian ot not
+    bool hermitian; //! Whether A is hermitian or not
+
     TimeProfile &profile;
 
     /**
@@ -1515,7 +1556,7 @@ public:
        @param[in] hermitian Whether the linear system is Hermitian or not
     */
     void solve(std::vector<Complex> &psi_, std::vector<ColorSpinorField> &p, std::vector<ColorSpinorField> &q,
-               ColorSpinorField &b, bool hermitian);
+               const ColorSpinorField &b, bool hermitian);
 
   public:
     /**
@@ -1524,7 +1565,7 @@ public:
        @param apply_mat Whether to apply the operator in place or assume q already contains this
        @profile Timing profile to use
     */
-    MinResExt(const DiracMatrix &mat, bool orthogonal, bool apply_mat, bool hermitian, TimeProfile &profile);
+    MinResExt(const DiracMatrix &mat, bool orthogonal, bool apply_mat, bool hermitian, TimeProfile &profile = dummy);
 
     /**
        @param x The optimum for the solution vector.
@@ -1532,7 +1573,7 @@ public:
        @param p The basis vectors in which we are building the guess
        @param q The basis vectors multiplied by A
     */
-    void operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField> &p,
+    void operator()(ColorSpinorField &x, const ColorSpinorField &b, std::vector<ColorSpinorField> &p,
                     std::vector<ColorSpinorField> &q);
   };
 

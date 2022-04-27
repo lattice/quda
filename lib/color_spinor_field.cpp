@@ -75,8 +75,7 @@ namespace quda
     copy(field);
   }
 
-  ColorSpinorField::ColorSpinorField(ColorSpinorField &&field) :
-    LatticeField(std::move(field))
+  ColorSpinorField::ColorSpinorField(ColorSpinorField &&field) : LatticeField(std::move(field))
   {
     move(std::move(field));
   }
@@ -351,8 +350,8 @@ namespace quda
     LatticeField::setTuningString();
     if (init) {
       std::stringstream aux_ss;
-      aux_ss << "vol=" << volume << ",precision=" << precision << ",order=" << fieldOrder << ",Ns=" << nSpin
-             << ",Nc=" << nColor;
+      aux_ss << "vol=" << volume << ",parity=" << siteSubset << ",precision=" << precision << ",order=" << fieldOrder
+             << ",Ns=" << nSpin << ",Nc=" << nColor;
       if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) aux_ss << ",TwistFlavor=" << twistFlavor;
       aux_string = aux_ss.str();
       if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
@@ -369,7 +368,6 @@ namespace quda
     size_t site_size = nSpinGhost * nColor * 2 * ghost_precision + (is_fixed ? sizeof(float) : 0);
 
     // calculate size of ghost zone required
-    int ghost_volume = 0;
     int dims = nDim == 5 ? (nDim - 1) : nDim;
     int x5 = nDim == 5 ? x[4] : 1; /// includes DW and non-degenerate TM ghosts
     const int ghost_align
@@ -386,7 +384,6 @@ namespace quda
         }
         ghostFace[i] *= x5; // temporary hack : extra dimension for DW ghosts
         if (i == 0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
-        ghost_volume += 2 * nFace * ghostFace[i];
       }
 
       ghost_face_bytes[i] = nFace * ghostFace[i] * site_size;

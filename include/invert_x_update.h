@@ -11,30 +11,30 @@ namespace quda
   */
   struct XUpdateBatch {
 
-    int _Np; /**< the number of underlying vectors */
-    int _j;  /**< the current index */
-    int _next; /**< the next index */
+    int _Np;                           /**< the number of underlying vectors */
+    int _j;                            /**< the current index */
+    int _next;                         /**< the next index */
     std::vector<ColorSpinorField> _ps; /**< the container for the p-vectors */
-    std::vector<double> _alphas; /**< @param _alphas the alpha's */
+    std::vector<double> _alphas;       /**< @param _alphas the alpha's */
 
-  /**
-    @brief A struct that contains multiple p-vectors which are to be added to an output vector:
-      x += alpha[i] * p[i], i = 0, 1, ..., Np - 1
-    @param _Np the number of underlying vectors
-    @param _j the current index
-    @param _next the next index
-    @param _ps the container for the p-vectors
-    @param _alphas the alpha's
-   */
+    /**
+      @brief A struct that contains multiple p-vectors which are to be added to an output vector:
+        x += alpha[i] * p[i], i = 0, 1, ..., Np - 1
+      @param _Np the number of underlying vectors
+      @param _j the current index
+      @param _next the next index
+      @param _ps the container for the p-vectors
+      @param _alphas the alpha's
+     */
     XUpdateBatch(int Np_, const ColorSpinorField &init, ColorSpinorParam csParam) :
-    _Np(Np_), _j(0), _next((_j + 1) % _Np), _ps(_Np), _alphas(_Np)
+      _Np(Np_), _j(0), _next((_j + 1) % _Np), _ps(_Np), _alphas(_Np)
     {
       for (int j = 1; j < _Np; j++) { _ps[j] = ColorSpinorField(csParam); }
 
       // need to make sure init field is copied in the correct precision
       if (init.Precision() != csParam.Precision()) {
         csParam.create = QUDA_COPY_FIELD_CREATE;
-        csParam.field = const_cast<ColorSpinorField*>(&init);
+        csParam.field = const_cast<ColorSpinorField *>(&init);
         _ps[0] = ColorSpinorField(csParam);
       } else {
         _ps[0] = ColorSpinorField(init);

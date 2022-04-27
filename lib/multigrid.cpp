@@ -1217,14 +1217,18 @@ namespace quda
 
       // if using preconditioned smoother then need to reconstruct full residual
       // FIXME extend this check for precision, Schwarz, etc.
-      bool use_solver_residual = (presmoother &&
-        ((param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE && inner_solution_type == QUDA_MATPC_SOLUTION)
-         || (param.smoother_solve_type == QUDA_DIRECT_SOLVE && inner_solution_type == QUDA_MAT_SOLUTION))) ?
+      bool use_solver_residual
+        = (presmoother
+           && ((param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE && inner_solution_type == QUDA_MATPC_SOLUTION)
+               || (param.smoother_solve_type == QUDA_DIRECT_SOLVE && inner_solution_type == QUDA_MAT_SOLUTION))) ?
         true :
         false;
 
       // FIXME this is currently borked if inner solver is preconditioned
-      ColorSpinorField &residual = !presmoother ? b : use_solver_residual ? presmoother->get_residual() : b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? *r : r->Even();
+      ColorSpinorField &residual = !presmoother ? b :
+        use_solver_residual                     ? presmoother->get_residual() :
+        b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? *r :
+                                                  r->Even();
 
       if (!use_solver_residual && presmoother) {
         (*param.matResidual)(residual, x);

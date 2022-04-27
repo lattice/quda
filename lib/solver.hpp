@@ -19,8 +19,9 @@ namespace quda
      @return Norm of final power iteration result
   */
   template <typename... Args>
-  double Solver::performPowerIterations(const DiracMatrix &diracm, const ColorSpinorField &start, ColorSpinorField &tempvec1,
-                                        ColorSpinorField &tempvec2, int niter, int normalize_freq, Args &&...args)
+  double Solver::performPowerIterations(const DiracMatrix &diracm, const ColorSpinorField &start,
+                                        ColorSpinorField &tempvec1, ColorSpinorField &tempvec2, int niter,
+                                        int normalize_freq, Args &&...args)
   {
     checkPrecision(tempvec1, tempvec2);
     blas::copy(tempvec1, start); // no-op if fields alias

@@ -13,7 +13,7 @@ namespace quda
   /* Solve the equation A p_k psi_k = b by minimizing the residual and
      using Eigen's SVD algorithm for numerical stability */
   void MinResExt::solve(std::vector<Complex> &psi_, std::vector<ColorSpinorField> &p, std::vector<ColorSpinorField> &q,
-                        ColorSpinorField &b, bool hermitian)
+                        const ColorSpinorField &b, bool hermitian)
   {
     typedef Matrix<Complex, Dynamic, Dynamic> matrix;
     typedef Matrix<Complex, Dynamic, 1> vector;
@@ -31,12 +31,12 @@ namespace quda
       // linear system is Hermitian, solve directly
       // compute rhs vector phi = P* b = (q_i, b) and construct the matrix
       // P* Q = P* A P = (p_i, q_j) = (p_i, A p_j)
-      blas::cDotProduct(A_, p, make_set(q, b));
+      blas::cDotProduct(A_, p, make_set(q, const_cast<ColorSpinorField &>(b)));
     } else {
       // linear system is not Hermitian, solve the normal system
       // compute rhs vector phi = Q* b = (q_i, b) and construct the matrix
       // Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
-      blas::cDotProduct(A_, q, make_set(q, b));
+      blas::cDotProduct(A_, q, make_set(q, const_cast<ColorSpinorField &>(b)));
     }
 
     for (int i = 0; i < N; i++) {
@@ -67,7 +67,7 @@ namespace quda
     4. solve A_ij a_j  = B_i
     5. x = a_i p_i
   */
-  void MinResExt::operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField> &p,
+  void MinResExt::operator()(ColorSpinorField &x, const ColorSpinorField &b, std::vector<ColorSpinorField> &p,
                              std::vector<ColorSpinorField> &q)
   {
     bool running = profile.isRunning(QUDA_PROFILE_CHRONO);
@@ -85,8 +85,6 @@ namespace quda
       return;
     }
 
-    double b2 = getVerbosity() >= QUDA_SUMMARIZE ? blas::norm2(b) : 0.0;
-
     // Orthonormalise the vector basis
     if (orthogonal) {
       for (int i = 0; i < N; i++) {
@@ -97,7 +95,7 @@ namespace quda
         if (i + 1 < N) {
           std::vector<Complex> alpha(N - (i + 1));
           blas::cDotProduct(alpha, {p[i]}, {p.begin() + i + 1, p.end()});
-          for (int j = i + 1; j < N; j++) alpha[j] = -alpha[j];
+          for (auto &a : alpha) a = -a;
           blas::caxpy(alpha, {p[i]}, {p.begin() + i + 1, p.end()});
 
           if (!apply_mat) {
@@ -114,16 +112,25 @@ namespace quda
 
     // Solution coefficient vectors
     std::vector<Complex> alpha(N);
-    solve(alpha, p, q, b, hermitian);
+
+    if (b.Precision() != p[0].Precision()) { // need to make a sloppy copy of b
+      ColorSpinorParam param(b);
+      param.setPrecision(p[0].Precision(), p[0].Precision(), true);
+      param.create = QUDA_COPY_FIELD_CREATE;
+      solve(alpha, p, q, ColorSpinorField(param), hermitian);
+    } else {
+      solve(alpha, p, q, b, hermitian);
+    }
 
     blas::zero(x);
     blas::caxpy(alpha, p, x);
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       // compute the residual only if we're going to print it
-      for (int i = 0; i < N; i++) alpha[i] = -alpha[i];
-      blas::caxpy(alpha, q, b);
-      printfQuda("MinResExt: N = %d, |res| / |src| = %e\n", N, sqrt(blas::norm2(b) / b2));
+      ColorSpinorField r(b);
+      for (auto &a : alpha) a = -a;
+      blas::caxpy(alpha, q, r);
+      printfQuda("MinResExt: N = %d, |res| / |src| = %e\n", N, sqrt(blas::norm2(r) / blas::norm2(b)));
     }
 
     if (!running) profile.TPSTOP(QUDA_PROFILE_CHRONO);

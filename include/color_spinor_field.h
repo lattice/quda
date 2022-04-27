@@ -95,8 +95,6 @@ namespace quda
       else if (is_composite && dim == 0)
         is_composite = false;
     }
-
-    CompositeColorSpinorFieldDescriptor(const CompositeColorSpinorFieldDescriptor &descr) = default;
   };
 
   class ColorSpinorParam : public LatticeFieldParam
@@ -862,7 +860,8 @@ namespace quda
   /**
      @brief Specialization of is_field to allow us to make sets of ColorSpinorField
    */
-  template <> struct is_field<ColorSpinorField> : std::true_type { };
+  template <> struct is_field<ColorSpinorField> : std::true_type {
+  };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, QudaFieldLocation location,
                               void *Dst = nullptr, const void *Src = nullptr);

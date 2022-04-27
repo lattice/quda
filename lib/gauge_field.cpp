@@ -113,10 +113,11 @@ namespace quda {
   void GaugeField::setTuningString() {
     LatticeField::setTuningString();
     std::stringstream aux_ss;
-    aux_ss << "vol=" << volume << "stride=" << stride << "precision=" << precision << "geometry=" << geometry << "Nc=" << nColor;
+    aux_ss << "vol=" << volume << "stride=" << stride << "precision=" << precision << "geometry=" << geometry
+           << "Nc=" << nColor;
     if (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) aux_ss << "r=" << r[0] << r[1] << r[2] << r[3];
     aux_string = aux_ss.str();
-      if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
+    if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
   }
 
   void GaugeField::createGhostZone(const lat_dim_t &R, bool no_comms_fill, bool bidir) const

@@ -263,8 +263,6 @@ namespace quda {
           NYW * NXZ * (f.read.Z + f.write.Z) * z[0].get().Bytes() +
           NYW * (f.read.W + f.write.W) * w[0].get().Bytes();
       }
-
-      int tuningIter() const { return 3; }
     };
 
     using range = std::pair<size_t,size_t>;

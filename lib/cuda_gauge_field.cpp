@@ -317,7 +317,7 @@ namespace quda {
     // receive from neighboring the processor
     if (comm_peer2peer_enabled(1 - dir, dim)) {
       comm_start(mh_recv_p2p[bufferIndex][dim][1 - dir]);
-      } else if (comm_gdr_enabled()) {
+    } else if (comm_gdr_enabled()) {
       comm_start(mh_recv_rdma[bufferIndex][dim][1 - dir]);
     } else {
       comm_start(mh_recv[bufferIndex][dim][1 - dir]);
@@ -352,7 +352,7 @@ namespace quda {
   {
     if (!comm_dim_partitioned(dim)) return;
 
-    if (comm_peer2peer_enabled(1 - dir,dim)) {
+    if (comm_peer2peer_enabled(1 - dir, dim)) {
       comm_wait(mh_recv_p2p[bufferIndex][dim][1 - dir]);
       qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][dim][1 - dir]);
     } else if (comm_gdr_enabled()) {
@@ -440,7 +440,8 @@ namespace quda {
     qudaDeviceSynchronize();
   }
 
-  void cudaGaugeField::exchangeExtendedGhost(const lat_dim_t &R, TimeProfile &profile, bool no_comms_fill) {
+  void cudaGaugeField::exchangeExtendedGhost(const lat_dim_t &R, TimeProfile &profile, bool no_comms_fill)
+  {
     profile.TPSTART(QUDA_PROFILE_COMMS);
     exchangeExtendedGhost(R, no_comms_fill);
     profile.TPSTOP(QUDA_PROFILE_COMMS);
