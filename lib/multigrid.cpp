@@ -331,7 +331,6 @@ namespace quda
     param_presmooth = new SolverParam(param);
 
     param_presmooth->is_preconditioner = false;
-    param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
     param_presmooth->return_residual = true; // pre-smoother returns the residual vector for subsequent coarsening
     param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
 
@@ -597,8 +596,6 @@ namespace quda
       param_coarse_solver->inv_type = param.mg_global.coarse_solver[param.level + 1];
       param_coarse_solver->is_preconditioner = false;
       param_coarse_solver->sloppy_converge = true; // this means we don't check the true residual before declaring convergence
-
-      param_coarse_solver->preserve_source = QUDA_PRESERVE_SOURCE_NO;  // or can this be no
       param_coarse_solver->return_residual = false; // coarse solver does need to return residual vector
 
       param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_NO;
@@ -1169,7 +1166,8 @@ namespace quda
     popLevel();
   }
 
-  void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
+  void MG::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  {
     pushOutputPrefix(prefix);
 
     if (param.level < param.Nlevel - 1) { // set parity for the solver in the transfer operator
@@ -1206,12 +1204,7 @@ namespace quda
 
       ColorSpinorField *out=nullptr, *in=nullptr;
 
-      ColorSpinorField &residual = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? *r : r->Even();
-
-      // FIXME only need to make a copy if not preconditioning
-      residual = b; // copy source vector since we will overwrite source with iterated residual
-
-      diracSmoother->prepare(in, out, x, residual, outer_solution_type);
+      diracSmoother->prepare(in, out, x, b, outer_solution_type);
 
       // b_tilde holds either a copy of preconditioned source or a pointer to original source
       if (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) *b_tilde = *in;
@@ -1225,22 +1218,23 @@ namespace quda
       // if using preconditioned smoother then need to reconstruct full residual
       // FIXME extend this check for precision, Schwarz, etc.
       bool use_solver_residual
-        = ((param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE && inner_solution_type == QUDA_MATPC_SOLUTION)
-           || (param.smoother_solve_type == QUDA_DIRECT_SOLVE && inner_solution_type == QUDA_MAT_SOLUTION)) ?
+        = (presmoother
+           && ((param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE && inner_solution_type == QUDA_MATPC_SOLUTION)
+               || (param.smoother_solve_type == QUDA_DIRECT_SOLVE && inner_solution_type == QUDA_MAT_SOLUTION))) ?
         true :
         false;
 
       // FIXME this is currently borked if inner solver is preconditioned
-      double r2 = 0.0;
-      if (use_solver_residual) {
-        if (debug) r2 = norm2(*r);
-      } else {
-        (*param.matResidual)(*r, x);
-        if (debug)
-          r2 = xmyNorm(b, *r);
-        else
-          axpby(1.0, b, -1.0, *r);
+      ColorSpinorField &residual = !presmoother ? b :
+        use_solver_residual                     ? presmoother->get_residual() :
+        b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? *r :
+                                                  r->Even();
+
+      if (!use_solver_residual && presmoother) {
+        (*param.matResidual)(residual, x);
+        axpby(1.0, b, -1.0, residual);
       }
+      double r2 = debug ? norm2(residual) : 0.0;
 
       // We need this to ensure that the coarse level has been created.
       // e.g. in case of iterative setup with MG we use just pre- and post-smoothing at the first iteration.

@@ -243,7 +243,35 @@ namespace quda {
     virtual void apply(const qudaStream_t &stream) = 0;
     virtual void preTune() { }
     virtual void postTune() { }
-    virtual int tuningIter() const { return 1; }
+
+    /**
+     * @brief Number of iterations used in the 1st phase of tuning, i.e. finding the candidates for the 2nd phase/
+     *
+     * @return number of iterations
+     */
+    virtual int candidate_iter() const { return 2; }
+
+    /**
+     * @brief Number of candidates to be identified in the 1st phase for the 2nd tuning phase
+     *
+     * @return number of candidates
+     */
+    virtual size_t num_candidates() const { return 10; }
+
+    /**
+     * @brief Parameter to control the number of iteration used in the 2nd phase of tuning, i.e. for the candidates.
+     *
+     * @return minimum number of iterations
+     */
+    virtual int min_tune_iter() const { return 3; }
+
+    /**
+     * @brief Time parameter to control the number of iteration used in the 2nd phase of tuning, i.e. for the candidates.
+     * This controls that the measured time for the number of iterations is at least this long based on the time from phase 1.
+     *
+     * @return minimum time that should be measured
+     */
+    virtual float min_tune_time() const { return 1e-3; }
 
     virtual std::string paramString(const TuneParam &param) const
     {

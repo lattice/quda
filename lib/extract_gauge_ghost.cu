@@ -19,96 +19,96 @@ namespace quda {
           using G = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
           ExtractGhost<Float, nColor, G>(u, Ghost, extract, offset);
         } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-#if QUDA_RECONSTRUCT & 2
-          using G = typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type;
-          ExtractGhost<Float, nColor, G>(u, Ghost, extract, offset);
-#else
-          errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_12", QUDA_RECONSTRUCT);
-#endif
-        } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
-#if QUDA_RECONSTRUCT & 1
-          using G = typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type;
-          ExtractGhost<Float, nColor, G>(u, Ghost, extract, offset);
-#else
-          errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_8", QUDA_RECONSTRUCT);
-#endif
-        } else if (u.Reconstruct() == QUDA_RECONSTRUCT_13) {
-#if QUDA_RECONSTRUCT & 2
-          using G = typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type;
-          ExtractGhost<Float, nColor, G>(u, Ghost, extract, offset);
-#else
-          errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_13", QUDA_RECONSTRUCT);
-#endif
-        } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
-#if QUDA_RECONSTRUCT & 1
-          if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
-            using G = typename gauge_mapper<Float, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_MILC>::type;
-            ExtractGhost<Float, nColor, G>(u, Ghost, extract, offset);
-          } else if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO) {
-            using G = typename gauge_mapper<Float, QUDA_RECONSTRUCT_9>::type;
+          if constexpr (is_enabled<QUDA_RECONSTRUCT_12>()) {
+            using G = typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type;
             ExtractGhost<Float, nColor, G>(u, Ghost, extract, offset);
           } else {
-            errorQuda("Staggered phase type %d not supported", u.StaggeredPhase());
+            errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_12", QUDA_RECONSTRUCT);
           }
-#else
-          errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_9", QUDA_RECONSTRUCT);
-#endif
+        } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
+          if constexpr (is_enabled<QUDA_RECONSTRUCT_8>()) {
+            using G = typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type;
+            ExtractGhost<Float, nColor, G>(u, Ghost, extract, offset);
+          } else {
+            errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_8", QUDA_RECONSTRUCT);
+          }
+        } else if (u.Reconstruct() == QUDA_RECONSTRUCT_13) {
+          if constexpr (is_enabled<QUDA_RECONSTRUCT_13>()) {
+            using G = typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type;
+            ExtractGhost<Float, nColor, G>(u, Ghost, extract, offset);
+          } else {
+            errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_13", QUDA_RECONSTRUCT);
+          }
+        } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
+          if constexpr (is_enabled<QUDA_RECONSTRUCT_9>()) {
+            if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
+              using G = typename gauge_mapper<Float, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_MILC>::type;
+              ExtractGhost<Float, nColor, G>(u, Ghost, extract, offset);
+            } else if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO) {
+              using G = typename gauge_mapper<Float, QUDA_RECONSTRUCT_9>::type;
+              ExtractGhost<Float, nColor, G>(u, Ghost, extract, offset);
+            } else {
+              errorQuda("Staggered phase type %d not supported", u.StaggeredPhase());
+            }
+          } else {
+            errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_9", QUDA_RECONSTRUCT);
+          }
         }
       } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
 
-#ifdef BUILD_QDP_INTERFACE
-        ExtractGhost<Float, nColor, QDPOrder<Float,length>>(u, Ghost, extract, offset);
-#else
-        errorQuda("QDP interface has not been built\n");
-#endif
+        if constexpr (is_enabled<QUDA_QDP_GAUGE_ORDER>()) {
+          ExtractGhost<Float, nColor, QDPOrder<Float,length>>(u, Ghost, extract, offset);
+        } else {
+          errorQuda("QDP interface has not been built");
+        }
 
       } else if (u.Order() == QUDA_QDPJIT_GAUGE_ORDER) {
 
-#ifdef BUILD_QDPJIT_INTERFACE
-        ExtractGhost<Float, nColor, QDPJITOrder<Float,length>>(u, Ghost, extract, offset);
-#else
-        errorQuda("QDPJIT interface has not been built\n");
-#endif
+        if constexpr (is_enabled<QUDA_QDPJIT_GAUGE_ORDER>()) {
+          ExtractGhost<Float, nColor, QDPJITOrder<Float,length>>(u, Ghost, extract, offset);
+        } else {
+          errorQuda("QDPJIT interface has not been built");
+        }
 
       } else if (u.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
 
-#ifdef BUILD_CPS_INTERFACE
-        ExtractGhost<Float, nColor, CPSOrder<Float,length>>(u, Ghost, extract, offset);
-#else
-        errorQuda("CPS interface has not been built\n");
-#endif
+        if constexpr (is_enabled<QUDA_CPS_WILSON_GAUGE_ORDER>()) {
+          ExtractGhost<Float, nColor, CPSOrder<Float,length>>(u, Ghost, extract, offset);
+        } else {
+          errorQuda("CPS interface has not been built");
+        }
 
       } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
 
-#ifdef BUILD_MILC_INTERFACE
-        ExtractGhost<Float, nColor, MILCOrder<Float,length>>(u, Ghost, extract, offset);
-#else
-        errorQuda("MILC interface has not been built\n");
-#endif
+        if constexpr (is_enabled<QUDA_MILC_GAUGE_ORDER>()) {
+          ExtractGhost<Float, nColor, MILCOrder<Float,length>>(u, Ghost, extract, offset);
+        } else {
+          errorQuda("MILC interface has not been built");
+        }
 
       } else if (u.Order() == QUDA_BQCD_GAUGE_ORDER) {
 
-#ifdef BUILD_BQCD_INTERFACE
-        ExtractGhost<Float, nColor, BQCDOrder<Float,length>>(u, Ghost, extract, offset);
-#else
-        errorQuda("BQCD interface has not been built\n");
-#endif
+        if constexpr (is_enabled<QUDA_BQCD_GAUGE_ORDER>()) {
+          ExtractGhost<Float, nColor, BQCDOrder<Float,length>>(u, Ghost, extract, offset);
+        } else {
+          errorQuda("BQCD interface has not been built");
+        }
 
       } else if (u.Order() == QUDA_TIFR_GAUGE_ORDER) {
 
-#ifdef BUILD_TIFR_INTERFACE
-        ExtractGhost<Float, nColor, TIFROrder<Float,length>>(u, Ghost, extract, offset);
-#else
-        errorQuda("TIFR interface has not been built\n");
-#endif
+        if constexpr (is_enabled<QUDA_TIFR_GAUGE_ORDER>()) {
+          ExtractGhost<Float, nColor, TIFROrder<Float,length>>(u, Ghost, extract, offset);
+        } else {
+          errorQuda("TIFR interface has not been built");
+        }
 
       } else if (u.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 
-#ifdef BUILD_TIFR_INTERFACE
-        ExtractGhost<Float, nColor, TIFRPaddedOrder<Float,length>>(u, Ghost, extract, offset);
-#else
-        errorQuda("TIFR interface has not been built\n");
-#endif
+        if constexpr (is_enabled<QUDA_TIFR_GAUGE_ORDER>()) {
+          ExtractGhost<Float, nColor, TIFRPaddedOrder<Float,length>>(u, Ghost, extract, offset);
+        } else {
+          errorQuda("TIFR interface has not been built");
+        }
 
       } else {
         errorQuda("Gauge field %d order not supported", u.Order());

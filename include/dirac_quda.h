@@ -267,7 +267,7 @@ namespace quda {
     /**
        @brief Apply Normal Operator
     */
-    void MMdag(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MMdag(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     // required methods to use e-o preconditioning for solving full system
     virtual void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
@@ -918,6 +918,8 @@ namespace quda {
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+    // this needs to be specialized for Mobius since we have a fused MdagM kernel
+    void MMdag(ColorSpinorField &out, const ColorSpinorField &in) const;
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, 
 		 ColorSpinorField &b, const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;

@@ -58,11 +58,6 @@ namespace quda
       inner.Nsteps = outer.precondition_cycle;
     }
 
-    if (outer.inv_type == QUDA_PCG_INVERTER && outer.precision_sloppy != outer.precision_precondition)
-      inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
-    else
-      inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
-
     inner.verbosity_precondition = outer.verbosity_precondition;
 
     inner.compute_true_res = false;

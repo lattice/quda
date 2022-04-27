@@ -461,6 +461,8 @@ void llfat_cpu_mg(void **fatlink, su3_matrix **sitelink, su3_matrix **ghost_site
     }
   }
 
+  lat_dim_t Z_ = {Z[0], Z[1], Z[2], Z[3]};
+
   for (int dir = XUP; dir <= TUP; dir++) {
     for (int nu = XUP; nu <= TUP; nu++) {
       if (nu != dir) {
@@ -469,7 +471,7 @@ void llfat_cpu_mg(void **fatlink, su3_matrix **sitelink, su3_matrix **ghost_site
         // The Lepage term */
         // Note this also involves modifying c_1 (above)
 
-        exchange_cpu_staple(Z, staple, (void **)ghost_staple, prec);
+        exchange_cpu_staple(Z_, staple, (void **)ghost_staple, prec);
 
         llfat_compute_gen_staple_field_mg((su3_matrix *)NULL, dir, nu, staple, ghost_staple, sitelink, ghost_sitelink,
                                           ghost_sitelink_diag, fatlink, act_path_coeff[5], 1);
@@ -479,7 +481,7 @@ void llfat_cpu_mg(void **fatlink, su3_matrix **sitelink, su3_matrix **ghost_site
             llfat_compute_gen_staple_field_mg(tempmat1, dir, rho, staple, ghost_staple, sitelink, ghost_sitelink,
                                               ghost_sitelink_diag, fatlink, act_path_coeff[3], 1);
 
-            exchange_cpu_staple(Z, tempmat1, (void **)ghost_staple1, prec);
+            exchange_cpu_staple(Z_, tempmat1, (void **)ghost_staple1, prec);
 
             for (int sig = XUP; sig <= TUP; sig++) {
               if ((sig != dir) && (sig != nu) && (sig != rho)) {

@@ -242,6 +242,8 @@ namespace quda {
     bool tuneGridDim() const { return false; } // don't tune the grid dimension
     bool tuneAuxDim() const { return (type != COMPUTE_VUV && type != COMPUTE_VLV) ? false : true; }
 
+	int candidate_iter() const override { return 1; }
+
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
       if (type == COMPUTE_VUV || type == COMPUTE_VLV)
         return 4*sizeof(storeType)*arg.max_color_height_per_block*arg.max_color_width_per_block*4*coarseSpin*coarseSpin;
