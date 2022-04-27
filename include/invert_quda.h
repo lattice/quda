@@ -60,8 +60,8 @@ namespace quda {
     /**< Whether to use an initial guess in the solver or not */
     QudaUseInitGuess use_init_guess;
 
-    /**< Whether to solve linear system with zero RHS */
-    QudaComputeNullVector compute_null_vector;
+    /**< Whether or not to allow a zero RHS solve for near-null vector generation */
+    bool compute_null_vector;
 
     /**< Reliable update tolerance */
     double delta;
@@ -269,7 +269,7 @@ namespace quda {
        Default constructor
      */
     SolverParam() :
-      compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO),
+      compute_null_vector(false),
       compute_true_res(true),
       sloppy_converge(false),
       verbosity_precondition(QUDA_SILENT),
@@ -291,7 +291,7 @@ namespace quda {
       residual_type(param.residual_type),
       deflate(param.eig_param != 0),
       use_init_guess(param.use_init_guess),
-      compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO),
+      compute_null_vector(false),
       delta(param.reliable_delta),
       use_alternative_reliable(param.use_alternative_reliable),
       use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),

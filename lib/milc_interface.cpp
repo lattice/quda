@@ -1985,6 +1985,9 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
       mg_param.setup_ca_basis[i] = QUDA_POWER_BASIS; // setup_ca_basis[i];
     }
 
+    // Setup type to use (inverse iterations, chebyshev filter, eigenvectors, restriction, free field)
+    mg_param.setup_type[i] = QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS; // setup_type[i];
+
     // Basis size for CA solver setup
     mg_param.setup_ca_basis_size[i] = input_struct.setup_ca_basis_size[i];
 
@@ -2167,14 +2170,8 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
       || input_struct.optimized_kd == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
     mg_param.spin_block_size[1] = 0;
 
-  mg_param.setup_type = QUDA_NULL_VECTOR_SETUP;     // setup_type;
   mg_param.pre_orthonormalize = QUDA_BOOLEAN_FALSE; // pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.post_orthonormalize = QUDA_BOOLEAN_TRUE; // post_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-  mg_param.compute_null_vector
-    = QUDA_COMPUTE_NULL_VECTOR_YES; // generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_NULL_VECTOR_NO;
-
-  mg_param.generate_all_levels = QUDA_BOOLEAN_TRUE; // generate_all_levels ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_param.run_verify = input_struct.verify_results ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.run_low_mode_check = QUDA_BOOLEAN_FALSE;     // low_mode_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;

@@ -231,7 +231,7 @@ namespace quda {
     SolverParam *param_coarse_solver;
 
     /** The coarse-grid representation of the null space vectors */
-    std::vector<ColorSpinorField*> *B_coarse;
+    std::vector<ColorSpinorField*> B_coarse;
 
     /** Residual vector */
     ColorSpinorField *r;
@@ -394,9 +394,8 @@ namespace quda {
 
     /**
        @brief Load the null space vectors in from file
-       @param B Loaded null-space vectors (pre-allocated)
     */
-    void loadVectors(std::vector<ColorSpinorField *> &B);
+    void loadVectors();
 
     /**
        @brief Save the null space vectors in from file
@@ -404,23 +403,40 @@ namespace quda {
     */
     void saveVectors(const std::vector<ColorSpinorField *> &B) const;
 
+
     /**
-       @brief Generate the null-space vectors
+       @brief Wrapping function that manages logic for constructing near-null vectors
+    */
+    void constructNearNulls(bool refresh = false);
+
+    /**
+       @brief Generate the null-space vectors via inverse iterations
        @param B Generated null-space vectors
        @param refresh Whether we refreshing pre-exising vectors or starting afresh
     */
-    void generateNullVectors(std::vector<ColorSpinorField*> &B, bool refresh=false);
+    void generateInverseIterations(std::vector<ColorSpinorField*> &B, bool refresh = false);
+
+    /**
+       @brief Generate the null-space vectors via a Chebyshev filter
+       @param B Generated null-space vectors
+       @param refresh Whether we refreshing pre-exising vectors or starting afresh
+    */
+    void generateChebyshevFilter(std::vector<ColorSpinorField*> &B, bool refresh = false);
 
     /**
        @brief Generate lowest eigenvectors
     */
-    void generateEigenVectors();
+    void generateEigenvectors();
+
+    /**
+       @brief Generate near-null vectors via restricting finer near-nulls
+    */
+    void generateRestrictedVectors();
 
     /**
        @brief Build free-field null-space vectors
-       @param B Free-field null-space vectors
     */
-    void buildFreeVectors(std::vector<ColorSpinorField*> &B);
+    void generateFreeVectors();
 
     /**
        @brief Return the total flops done on this and all coarser levels.

@@ -128,7 +128,7 @@ void init(int argc, char **argv)
     // Set sub structures
     mg_param.invert_param = &mg_inv_param;
     for (int i = 0; i < mg_levels; i++) {
-      if (mg_eig[i]) {
+      if (mg_eig[i] || setup_type[i] == QUDA_SETUP_NULL_VECTOR_EIGENVECTORS) {
         mg_eig_param[i] = newQudaEigParam();
         setMultigridEigParam(mg_eig_param[i], i);
         mg_param.eig_param[i] = &mg_eig_param[i];

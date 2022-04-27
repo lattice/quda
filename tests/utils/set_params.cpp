@@ -428,6 +428,9 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_maxiter[i] = setup_maxiter[i];
     mg_param.setup_maxiter_refresh[i] = setup_maxiter_refresh[i];
 
+    // Setup type to use (inverse iterations, chebyshev filter, eigenvectors, restriction, free field)
+    mg_param.setup_type[i] = setup_type[i];
+
     // Basis to use for CA solver setups
     mg_param.setup_ca_basis[i] = setup_ca_basis[i];
 
@@ -574,13 +577,8 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   // only coarsen the spin on the first restriction
   mg_param.spin_block_size[0] = 2;
 
-  mg_param.setup_type = setup_type;
   mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-  mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_NULL_VECTOR_NO;
-
-  mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_param.run_verify = verify_results ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -1026,6 +1024,9 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_tol[i] = setup_tol[i];
     mg_param.setup_maxiter[i] = setup_maxiter[i];
 
+    // Setup type to use (inverse iterations, chebyshev filter, eigenvectors, restriction, free field)
+    mg_param.setup_type[i] = setup_type[i];
+
     // Basis to use for CA solver setups
     mg_param.setup_ca_basis[i] = setup_ca_basis[i];
 
@@ -1178,13 +1179,8 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.spin_block_size[1] = 0; // we're coarsening the optimized KD op
   }
 
-  mg_param.setup_type = setup_type;
   mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-  mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_NULL_VECTOR_NO;
-
-  mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_param.run_verify = verify_results ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;

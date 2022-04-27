@@ -455,7 +455,7 @@ namespace quda {
 
       if (use_gpu) {
         if (out.Location() == QUDA_CPU_FIELD_LOCATION) output = coarse_tmp_d;
-        if (in.Location() == QUDA_CPU_FIELD_LOCATION || in.GammaBasis() != V->GammaBasis())
+        if (in.Location() == QUDA_CPU_FIELD_LOCATION || in.GammaBasis() != V->GammaBasis() || in.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER)
           input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
         if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
       } else {

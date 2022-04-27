@@ -761,12 +761,6 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-  P(setup_type, QUDA_NULL_VECTOR_SETUP);
-#else
-  P(setup_type, QUDA_INVALID_SETUP_TYPE);
-#endif
-
-#ifdef INIT_PARAM
   P(pre_orthonormalize, QUDA_BOOLEAN_FALSE);
 #else
   P(pre_orthonormalize, QUDA_BOOLEAN_INVALID);
@@ -779,6 +773,12 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
   for (int i=0; i<n_level; i++) {
+#ifdef INIT_PARAM
+    P(setup_type[i], QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS);
+#else
+    P(setup_type[i], QUDA_SETUP_NULL_VECTOR_INVALID);
+#endif
+
 #ifdef INIT_PARAM
     P(verbosity[i], QUDA_SILENT);
 #else
@@ -922,20 +922,6 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   P(setup_minimize_memory, QUDA_BOOLEAN_FALSE);
 #else
   P(setup_minimize_memory, QUDA_BOOLEAN_INVALID);
-#endif
-
-  P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_INVALID);
-  P(generate_all_levels, QUDA_BOOLEAN_INVALID);
-
-#ifdef CHECK_PARAM
-  // if only doing top-level null-space generation, check that n_vec
-  // is equal on all levels
-  if (param->generate_all_levels == QUDA_BOOLEAN_FALSE && param->compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
-    for (int i=1; i<n_level-1; i++)
-      if (param->n_vec[0] != param->n_vec[i])
-	errorQuda("n_vec %d != %d must be equal on all levels if generate_all_levels == false",
-		  param->n_vec[0], param->n_vec[i]);
-  }
 #endif
 
   P(run_verify, QUDA_BOOLEAN_INVALID);

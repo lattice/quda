@@ -651,7 +651,7 @@ extern "C" {
     double setup_ca_lambda_max[QUDA_MAX_MG_LEVEL];
 
     /** Null-space type to use in the setup phase */
-    QudaSetupType setup_type;
+    QudaNullVectorSetupType setup_type[QUDA_MAX_MG_LEVEL];
 
     /** Pre orthonormalize vectors in the setup phase */
     QudaBoolean pre_orthonormalize;
@@ -714,7 +714,7 @@ extern "C" {
     int smoother_schwarz_cycle[QUDA_MAX_MG_LEVEL];
 
     /** The type of residual to send to the next coarse grid, and thus the
-	type of solution to receive back from this coarse grid */
+        type of solution to receive back from this coarse grid */
     QudaSolutionType coarse_grid_solution_type[QUDA_MAX_MG_LEVEL];
 
     /** The type of smoother solve to do on each grid (e/o preconditioning or not)*/
@@ -739,12 +739,6 @@ extern "C" {
         placing temporary fields in mapped memory instad of device
         memory */
     QudaBoolean setup_minimize_memory;
-
-    /** Whether to compute the null vectors or reload them */
-    QudaComputeNullVector compute_null_vector;
-
-    /** Whether to generate on all levels or just on level 0 */
-    QudaBoolean generate_all_levels;
 
     /** Whether to run the verification checks once set up is complete */
     QudaBoolean run_verify;
