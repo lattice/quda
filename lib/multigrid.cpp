@@ -491,31 +491,6 @@ namespace quda
     popLevel();
   }
 
-  // get "one link" gauge field
-  cudaGaugeField* getStaggeredShortGaugeField(const Dirac& dirac, QudaDiracType dirac_type) {
-    switch (dirac_type) {
-      case QUDA_STAGGERED_DIRAC: return const_cast<cudaGaugeField *>(reinterpret_cast<const DiracStaggered&>(dirac).getGaugeField());
-      case QUDA_STAGGEREDPC_DIRAC: return const_cast<cudaGaugeField *>(reinterpret_cast<const DiracStaggeredPC&>(dirac).getGaugeField());
-      case QUDA_STAGGEREDKD_DIRAC: return const_cast<cudaGaugeField *>(reinterpret_cast<const DiracStaggeredKD&>(dirac).getGaugeField());
-      case QUDA_ASQTAD_DIRAC: return const_cast<cudaGaugeField *>(reinterpret_cast<const DiracImprovedStaggered&>(dirac).getFatLinkField());
-      case QUDA_ASQTADPC_DIRAC: return const_cast<cudaGaugeField *>(reinterpret_cast<const DiracImprovedStaggeredPC&>(dirac).getFatLinkField());
-      case QUDA_ASQTADKD_DIRAC: return const_cast<cudaGaugeField *>(reinterpret_cast<const DiracImprovedStaggeredKD&>(dirac).getFatLinkField());
-      default: errorQuda("Invalid dirac type %d", dirac_type);
-    }
-    return nullptr;
-  }
-
-  // get "long link" gauge field
-  cudaGaugeField* getStaggeredLongGaugeField(const Dirac& dirac, QudaDiracType dirac_type) {
-    switch (dirac_type) {
-      case QUDA_ASQTAD_DIRAC: return const_cast<cudaGaugeField *>(reinterpret_cast<const DiracImprovedStaggered&>(dirac).getLongLinkField());
-      case QUDA_ASQTADPC_DIRAC: return const_cast<cudaGaugeField *>(reinterpret_cast<const DiracImprovedStaggeredPC&>(dirac).getLongLinkField());
-      case QUDA_ASQTADKD_DIRAC: return const_cast<cudaGaugeField *>(reinterpret_cast<const DiracImprovedStaggeredKD&>(dirac).getLongLinkField());
-      default: errorQuda("Invalid dirac type %d", dirac_type);
-    }
-    return nullptr;
-  }
-
   void MG::createOptimizedKdDirac() {
 
     pushLevel(param.level);
@@ -541,8 +516,8 @@ namespace quda
 
     bool is_coarse_naive_staggered = is_naive_staggered || (is_improved_staggered && param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG);
 
-    cudaGaugeField *fine_gauge = getStaggeredShortGaugeField(*diracSmoother, dirac_type);
-    cudaGaugeField *sloppy_gauge = getStaggeredShortGaugeField(mixed_precision_setup ? *diracSmootherSloppy : *diracSmoother, dirac_type);
+    cudaGaugeField *fine_gauge = diracSmoother->getStaggeredShortLinkField();
+    cudaGaugeField *sloppy_gauge = mixed_precision_setup ? diracSmootherSloppy->getStaggeredShortLinkField() : fine_gauge;
 
     xInvKD = AllocateAndBuildStaggeredKahlerDiracInverse(
       *fine_gauge, diracSmoother->Mass(), param.mg_global.staggered_kd_dagger_approximation == QUDA_BOOLEAN_TRUE);
@@ -603,14 +578,14 @@ namespace quda
       diracParamKD.type = QUDA_ASQTADKD_DIRAC;
 
       diracParamKD.fatGauge = fine_gauge;
-      diracParamKD.longGauge = getStaggeredLongGaugeField(*diracSmoother, dirac_type);
+      diracParamKD.longGauge = diracSmoother->getStaggeredLongLinkField();
 
       diracCoarseResidual = new DiracImprovedStaggeredKD(diracParamKD);
       diracCoarseSmoother = new DiracImprovedStaggeredKD(diracParamKD);
 
       if (mixed_precision_setup) {
         diracParamKD.fatGauge = sloppy_gauge;
-        diracParamKD.longGauge = getStaggeredLongGaugeField(*diracSmootherSloppy, dirac_type);
+        diracParamKD.longGauge = diracSmootherSloppy->getStaggeredLongLinkField();
         diracParamKD.xInvKD = xInvKD_sloppy.get();
         diracParamKD.dirac = nullptr;
         diracParamKD.tmp1 = tmp_coarse_sloppy;

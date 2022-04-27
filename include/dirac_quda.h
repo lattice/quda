@@ -367,6 +367,24 @@ namespace quda {
      */
     virtual QudaDiracType getDiracType() const = 0;
 
+    /** @brief Return the one-hop field for staggered operators for MG setup
+
+        @return Error for non-staggered operators
+    */
+    virtual cudaGaugeField* getStaggeredShortLinkField() const {
+      errorQuda("Invalid dirac type %d", getDiracType());
+      return nullptr;
+    }
+
+    /** @brief return the long link field for staggered operators for MG setup, if it exists
+
+        @return Error for non-improved staggered operators
+    */
+    virtual cudaGaugeField* getStaggeredLongLinkField() const {
+      errorQuda("Invalid dirac type %d", getDiracType());
+      return nullptr;
+    }
+
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
      *  These are pointers as opposed to references to support passing in `nullptr`.
@@ -1274,12 +1292,13 @@ public:
 
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGERED_DIRAC; }
 
-    /**
-     * @brief Get the fine gauge field for MG setup.
-     *
-     * @return gauge field
-     */
-    virtual const cudaGaugeField *getGaugeField() const { return gauge; }
+     /** @brief Return the one-hop field for staggered operators for MG setup
+
+        @return Gauge field
+    */
+    virtual cudaGaugeField* getStaggeredShortLinkField() const override {
+      return gauge;
+    }
 
     /**
      * @brief Create the coarse staggered operator.
@@ -1471,19 +1490,21 @@ public:
 
     virtual QudaDiracType getDiracType() const { return QUDA_ASQTAD_DIRAC; }
 
-    /**
-     * @brief Get the fat link field for MG setup.
-     *
-     * @return fat link field
-     */
-    virtual const cudaGaugeField *getFatLinkField() const { return fatGauge; }
+    /** @brief Return the one-hop field for staggered operators for MG setup
 
-    /**
-     * @brief Get the long link field for MG setup.
-     *
-     * @return long link field
-     */
-    virtual const cudaGaugeField *getLongLinkField() const { return longGauge; }
+        @return fat link field
+    */
+    virtual cudaGaugeField* getStaggeredShortLinkField() const override {
+      return fatGauge;
+    }
+
+    /** @brief return the long link field for staggered operators for MG setup
+
+        @return long link field
+    */
+    virtual cudaGaugeField* getStaggeredLongLinkField() const override {
+      return longGauge;
+    }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
