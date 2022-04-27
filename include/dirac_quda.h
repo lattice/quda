@@ -1296,7 +1296,7 @@ public:
 
         @return Gauge field
     */
-    virtual cudaGaugeField* getStaggeredShortLinkField() const override {
+    virtual cudaGaugeField* getStaggeredShortLinkField() const  {
       return gauge;
     }
 
@@ -1494,7 +1494,7 @@ public:
 
         @return fat link field
     */
-    virtual cudaGaugeField* getStaggeredShortLinkField() const override {
+    virtual cudaGaugeField* getStaggeredShortLinkField() const {
       return fatGauge;
     }
 
@@ -1502,7 +1502,7 @@ public:
 
         @return long link field
     */
-    virtual cudaGaugeField* getStaggeredLongLinkField() const override {
+    virtual cudaGaugeField* getStaggeredLongLinkField() const {
       return longGauge;
     }
 
