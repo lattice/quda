@@ -428,12 +428,6 @@ namespace quda
     ColorSpinorField &operator=(ColorSpinorField &&field);
 
     /**
-       @brief Clears any allocations in the field and returns the
-       field to being uninitialized.
-     */
-    void clear();
-
-    /**
        @brief Copy the source field contents into this
        @param[in] src Source from which we are copying
      */
