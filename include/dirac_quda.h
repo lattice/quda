@@ -367,7 +367,8 @@ namespace quda {
      */
     virtual QudaDiracType getDiracType() const = 0;
 
-    /** @brief Return the one-hop field for staggered operators for MG setup
+    /**
+        @brief Return the one-hop field for staggered operators for MG setup
 
         @return Error for non-staggered operators
     */
@@ -376,7 +377,8 @@ namespace quda {
       return nullptr;
     }
 
-    /** @brief return the long link field for staggered operators for MG setup, if it exists
+    /**
+        @brief return the long link field for staggered operators for MG setup, if it exists
 
         @return Error for non-improved staggered operators
     */
@@ -1292,7 +1294,8 @@ public:
 
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGERED_DIRAC; }
 
-     /** @brief Return the one-hop field for staggered operators for MG setup
+     /**
+        @brief Return the one-hop field for staggered operators for MG setup
 
         @return Gauge field
     */
@@ -1490,7 +1493,8 @@ public:
 
     virtual QudaDiracType getDiracType() const { return QUDA_ASQTAD_DIRAC; }
 
-    /** @brief Return the one-hop field for staggered operators for MG setup
+    /**
+        @brief Return the one-hop field for staggered operators for MG setup
 
         @return fat link field
     */
@@ -1498,7 +1502,8 @@ public:
       return fatGauge;
     }
 
-    /** @brief return the long link field for staggered operators for MG setup
+    /**
+        @brief return the long link field for staggered operators for MG setup
 
         @return long link field
     */
