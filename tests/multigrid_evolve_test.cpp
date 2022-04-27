@@ -18,7 +18,8 @@
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
 
-namespace quda {
+namespace quda
+{
   extern void setTransferGPU(bool);
 }
 
@@ -58,10 +59,10 @@ void display_test_info()
 
   printfQuda("MG parameters\n");
   printfQuda(" - number of levels %d\n", mg_levels);
-  for (int i=0; i<mg_levels-1; i++) {
-    printfQuda(" - level %d number of null-space vectors %d\n", i+1, nvec[i]);
-    printfQuda(" - level %d number of pre-smoother applications %d\n", i+1, nu_pre[i]);
-    printfQuda(" - level %d number of post-smoother applications %d\n", i+1, nu_post[i]);
+  for (int i = 0; i < mg_levels - 1; i++) {
+    printfQuda(" - level %d number of null-space vectors %d\n", i + 1, nvec[i]);
+    printfQuda(" - level %d number of pre-smoother applications %d\n", i + 1, nu_pre[i]);
+    printfQuda(" - level %d number of post-smoother applications %d\n", i + 1, nu_post[i]);
   }
 
   printfQuda("Outer solver paramers\n");
@@ -219,25 +220,25 @@ int main(int argc, char **argv)
     using namespace quda;
     GaugeFieldParam gParam(gauge_param);
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-    gParam.create      = QUDA_NULL_FIELD_CREATE;
-    gParam.link_type   = gauge_param.type;
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    gParam.link_type = gauge_param.type;
     gParam.reconstruct = gauge_param.reconstruct;
     gParam.setPrecision(gParam.Precision(), true);
     cudaGaugeField *gauge = new cudaGaugeField(gParam);
 
     int pad = 0;
-    int y[4];
-    int R[4] = {0,0,0,0};
-    for(int dir=0; dir<4; ++dir) if(comm_dim_partitioned(dir)) R[dir] = 2;
-    for(int dir=0; dir<4; ++dir) y[dir] = gauge_param.X[dir] + 2 * R[dir];
-    GaugeFieldParam gParamEx(y, prec, link_recon,
-			     pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
+    lat_dim_t y;
+    lat_dim_t R;
+    for (int dir = 0; dir < 4; ++dir)
+      if (comm_dim_partitioned(dir)) R[dir] = 2;
+    for (int dir = 0; dir < 4; ++dir) y[dir] = gauge_param.X[dir] + 2 * R[dir];
+    GaugeFieldParam gParamEx(y, prec, link_recon, pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
     gParamEx.create = QUDA_ZERO_FIELD_CREATE;
     gParamEx.order = gParam.order;
     gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParamEx.t_boundary = gParam.t_boundary;
     gParamEx.nFace = 1;
-    for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
+    for (int dir = 0; dir < 4; ++dir) gParamEx.r[dir] = R[dir];
     cudaGaugeField *gaugeEx = new cudaGaugeField(gParamEx);
 
     QudaGaugeObservableParam obs_param = newQudaGaugeObservableParam();
@@ -252,7 +253,8 @@ int main(int argc, char **argv)
     bool coldstart = false;
     double beta_value = 6.2;
 
-    if(link_recon != QUDA_RECONSTRUCT_8 && coldstart) InitGaugeField( *gaugeEx);
+    if (link_recon != QUDA_RECONSTRUCT_8 && coldstart)
+      InitGaugeField(*gaugeEx);
     else
       InitGaugeField(*gaugeEx, *randstates);
     // Reunitarization setup
@@ -291,9 +293,11 @@ int main(int argc, char **argv)
     memset(spinorOut, 0, inv_param.Ls * V * spinor_site_size * host_spinor_data_type_size);
 
     if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-      for (int i = 0; i < inv_param.Ls * V * spinor_site_size; i++) ((float *)spinorIn)[i] = rand() / (float)RAND_MAX;
+      for (auto i = 0lu; i < inv_param.Ls * V * spinor_site_size; i++)
+        ((float *)spinorIn)[i] = rand() / (float)RAND_MAX;
     } else {
-      for (int i = 0; i < inv_param.Ls * V * spinor_site_size; i++) ((double *)spinorIn)[i] = rand() / (double)RAND_MAX;
+      for (auto i = 0lu; i < inv_param.Ls * V * spinor_site_size; i++)
+        ((double *)spinorIn)[i] = rand() / (double)RAND_MAX;
     }
 
     // Setup the multigrid solver
@@ -306,7 +310,7 @@ int main(int argc, char **argv)
 
     for (int step = 1; step < nsteps; ++step) {
       freeGaugeQuda();
-      Monte( *gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
+      Monte(*gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
 
       // Reunitarize gauge links
       CallUnitarizeLinks(gaugeEx);
@@ -337,17 +341,17 @@ int main(int argc, char **argv)
       invertQuda(spinorOut, spinorIn, &inv_param);
 
       if (inv_multigrid && inv_param.iter == inv_param.maxiter) {
-        char vec_outfile[QUDA_MAX_MG_LEVEL][256];
-        for (int i=0; i<mg_param.n_level; i++) {
-          strcpy(vec_outfile[i], mg_param.vec_outfile[i]);
+        std::string vec_outfile[QUDA_MAX_MG_LEVEL];
+        for (int i = 0; i < mg_param.n_level; i++) {
+          vec_outfile[i] = std::string(mg_param.vec_outfile[i]);
           sprintf(mg_param.vec_outfile[i], "dump_step_evolve_%d", step);
         }
         warningQuda("Solver failed to converge within max iteration count - dumping null vectors to %s",
                     mg_param.vec_outfile[0]);
 
         dumpMultigridQuda(mg_preconditioner, &mg_param);
-        for (int i=0; i<mg_param.n_level; i++) {
-          strcpy(mg_param.vec_outfile[i], vec_outfile[i]); // restore output file name
+        for (int i = 0; i < mg_param.n_level; i++) {
+          safe_strcpy(mg_param.vec_outfile[i], vec_outfile[i], 256, "mg_vec_outfile"); // restore output file name
         }
       }
     }
@@ -424,9 +428,9 @@ int main(int argc, char **argv)
       invertQuda(spinorOut, spinorIn, &inv_param);
 
       if (inv_multigrid && inv_param.iter == inv_param.maxiter) {
-        char vec_outfile[QUDA_MAX_MG_LEVEL][256];
+        std::string vec_outfile[QUDA_MAX_MG_LEVEL];
         for (int i = 0; i < mg_param.n_level; i++) {
-          strcpy(vec_outfile[i], mg_param.vec_outfile[i]);
+          vec_outfile[i] = std::string(mg_param.vec_outfile[i]);
           sprintf(mg_param.vec_outfile[i], "dump_step_shift_%d", step);
         }
         warningQuda("Solver failed to converge within max iteration count - dumping null vectors to %s",
@@ -434,7 +438,7 @@ int main(int argc, char **argv)
 
         dumpMultigridQuda(mg_preconditioner, &mg_param);
         for (int i = 0; i < mg_param.n_level; i++) {
-          strcpy(mg_param.vec_outfile[i], vec_outfile[i]); // restore output file name
+          safe_strcpy(mg_param.vec_outfile[i], vec_outfile[i], 256, "mg_vec_outfile"); // restore output file name
         }
       }
     }
@@ -444,7 +448,7 @@ int main(int argc, char **argv)
 
     delete gauge;
     delete gaugeEx;
-    //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
+    // Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
 
     delete randstates;

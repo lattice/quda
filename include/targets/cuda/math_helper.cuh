@@ -21,6 +21,24 @@ namespace quda {
   template<typename T>
   inline __host__ __device__ T min(const T &a, const T &b) { return a < b ? a : b; }
 
+
+  template <bool is_device> struct sincos_impl {
+    template <typename T> inline void operator()(const T& a, T *s, T *c) { ::sincos(a, s, c); }
+  };
+
+  template <> struct sincos_impl<true> {
+    template <typename T> __device__ inline void operator()(const T& a, T *s, T *c)
+    {
+#if CUDA_VERSION >= 11070
+      constexpr T bound = 2.0 * M_PI;
+      bool p = (fabs(a) <= bound);
+      __builtin_assume(p);
+#endif
+
+      sincos(a, s, c);
+    }
+  };
+
   /**
    * @brief Combined sin and cos calculation in QUDA NAMESPACE
    * @param a the angle
@@ -28,14 +46,14 @@ namespace quda {
    * @param c pointer to the storage for the result of the cos
    */
   template<typename T>
-  inline __host__ __device__ void sincos(const T& a, T* s, T* c) { ::sincos(a,s,c); }
+  inline __host__ __device__ void sincos(const T& a, T *s, T *c) { target::dispatch<sincos_impl>(a, s, c); }
 
   template <bool is_device> struct sincosf_impl {
-    inline void operator()(const float& a, float * s, float *c) { ::sincosf(a, s, c); }
+    inline void operator()(const float& a, float *s, float *c) { ::sincosf(a, s, c); }
   };
 
   template <> struct sincosf_impl<true> {
-    __device__ inline void operator()(const float& a, float * s, float *c) { __sincosf(a, s, c); }
+    __device__ inline void operator()(const float& a, float *s, float *c) { __sincosf(a, s, c); }
   };
 
   /**
@@ -47,7 +65,7 @@ namespace quda {
    * Specialization to float arguments. Device function calls CUDA intrinsic
    */
   template<>
-  inline __host__ __device__ void sincos(const float& a, float * s, float *c) { target::dispatch<sincosf_impl>(a, s, c); }
+  inline __host__ __device__ void sincos(const float& a, float *s, float *c) { target::dispatch<sincosf_impl>(a, s, c); }
 
 
   template <bool is_device> struct rsqrt_impl {
@@ -67,15 +85,42 @@ namespace quda {
    */
   template<typename T> inline __host__ __device__ T rsqrt(T a) { return target::dispatch<rsqrt_impl>(a); }
 
+
+  template <bool is_device> struct sin_impl { template <typename T> inline T operator()(const T& a) { return ::sin(a); } };
+  template <> struct sin_impl<true> {
+    template <typename T> __device__ inline T operator()(const T& a)
+    {
+#if CUDA_VERSION >= 11070
+      constexpr T bound = 2.0 * M_PI;
+      bool p = (fabs(a) <= bound);
+      __builtin_assume(p);
+#endif
+      return sin(a);
+    }
+  };
+
+  template <bool is_device> struct cos_impl { template <typename T> inline T operator()(const T& a) { return ::cos(a); } };
+  template <> struct cos_impl<true> {
+    template <typename T> __device__ inline T operator()(const T& a)
+    {
+#if CUDA_VERSION >= 11070
+      constexpr T bound = 2.0 * M_PI;
+      bool p = (fabs(a) <= bound);
+      __builtin_assume(p);
+#endif
+      return cos(a);
+    }
+  };
+
   /**
      Generic wrapper for Trig functions -- used in gauge field order
   */
   template <bool isFixed, typename T>
   struct Trig {
     __device__ __host__ static T Atan2( const T &a, const T &b) { return ::atan2(a,b); }
-    __device__ __host__ static T Sin( const T &a ) { return ::sin(a); }
-    __device__ __host__ static T Cos( const T &a ) { return ::cos(a); }
-    __device__ __host__ static void SinCos(const T &a, T *s, T *c) { sincos(a, s, c); }
+    __device__ __host__ static T Sin( const T &a ) { return target::dispatch<sin_impl>(a); }
+    __device__ __host__ static T Cos( const T &a ) { return target::dispatch<cos_impl>(a); }
+    __device__ __host__ static void SinCos(const T &a, T *s, T *c) { target::dispatch<sincos_impl>(a, s, c); }
   };
 
   template <bool is_device> struct sinf_impl { inline float operator()(const float& a) { return ::sinf(a); } };

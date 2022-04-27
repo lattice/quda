@@ -37,6 +37,19 @@ namespace quda {
     if (zMobius) { errorQuda("zMobius has NOT been fully tested in QUDA.\n"); }
   }
 
+  void DiracMobius::checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    if (zMobius) {
+      if (in.X(4) != Ls) errorQuda("Expected Ls = %d, not %d\n", Ls, in.X(4));
+      if (out.X(4) != Ls) errorQuda("Expected Ls = %d, not %d\n", Ls, out.X(4));
+    } else {
+      if (in.X(4) != out.X(4)) {
+        errorQuda("5th dimension size mismatch: in.X(4) = %d, out.X(4) = %d", in.X(4), out.X(4));
+      }
+    }
+  }
+
   // Modification for the 4D preconditioned Mobius domain wall operator
   void DiracMobius::Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
@@ -472,6 +485,14 @@ namespace quda {
     deleteTmp(&tmp2, reset);
   }
 
+  void DiracMobiusPC::MMdag(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    bool reset = newTmp(&tmp2, in);
+    Mdag(*tmp2, in);
+    M(out, *tmp2);
+    deleteTmp(&tmp2, reset);
+  }
+
   void DiracMobiusPC::prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
                               const QudaSolutionType solType) const
   {
@@ -552,9 +573,9 @@ namespace quda {
   {
     if (zMobius) { errorQuda("DiracMobiusPC::MdagMLocal doesn't currently support zMobius.\n"); }
 
-    int shift0[4] = {0, 0, 0, 0};
-    int shift1[4];
-    int shift2[4];
+    lat_dim_t shift0 = {0, 0, 0, 0};
+    lat_dim_t shift1;
+    lat_dim_t shift2;
 
     for (int d = 0; d < 4; d++) {
       shift1[d] = comm_dim_partitioned(d) ? 1 : 0;
@@ -564,7 +585,6 @@ namespace quda {
     if (extended_gauge == nullptr) { extended_gauge = createExtendedGauge(*gauge, shift2, profile, true); }
 
     checkDWF(in, out);
-    // checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
     ColorSpinorParam csParam(out);
@@ -582,22 +602,24 @@ namespace quda {
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
     if (out.Precision() == QUDA_HALF_PRECISION || out.Precision() == QUDA_QUARTER_PRECISION) {
       mobius_tensor_core::apply_fused_dslash(*unextended_tmp2, in, *extended_gauge, *unextended_tmp2, in, mass, m5, b_5,
-                                             c_5, dagger, parity[1], shift0, shift0, MdwfFusedDslashType::D5PRE);
+                                             c_5, dagger, parity[1], shift0.data, shift0.data,
+                                             MdwfFusedDslashType::D5PRE);
 
       mobius_tensor_core::apply_fused_dslash(*extended_tmp2, *unextended_tmp2, *extended_gauge, *extended_tmp2,
-                                             *unextended_tmp2, mass, m5, b_5, c_5, dagger, parity[0], shift1, shift2,
-                                             MdwfFusedDslashType::D4_D5INV_D5PRE);
+                                             *unextended_tmp2, mass, m5, b_5, c_5, dagger, parity[0], shift1.data,
+                                             shift2.data, MdwfFusedDslashType::D4_D5INV_D5PRE);
 
       mobius_tensor_core::apply_fused_dslash(*extended_tmp1, *extended_tmp2, *extended_gauge, *unextended_tmp1, in,
-                                             mass, m5, b_5, c_5, dagger, parity[1], shift0, shift1,
+                                             mass, m5, b_5, c_5, dagger, parity[1], shift0.data, shift1.data,
                                              MdwfFusedDslashType::D4_D5INV_D5INVDAG);
 
       mobius_tensor_core::apply_fused_dslash(*extended_tmp2, *extended_tmp1, *extended_gauge, *extended_tmp2,
-                                             *extended_tmp1, mass, m5, b_5, c_5, dagger, parity[0], shift1, shift1,
-                                             MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG);
+                                             *extended_tmp1, mass, m5, b_5, c_5, dagger, parity[0], shift1.data,
+                                             shift1.data, MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG);
 
       mobius_tensor_core::apply_fused_dslash(out, *extended_tmp2, *extended_gauge, out, *unextended_tmp1, mass, m5, b_5,
-                                             c_5, dagger, parity[1], shift2, shift2, MdwfFusedDslashType::D4DAG_D5PREDAG);
+                                             c_5, dagger, parity[1], shift2.data, shift2.data,
+                                             MdwfFusedDslashType::D4DAG_D5PREDAG);
 
       const long long Ls = in.X(4);
       const long long mat = 2ll * 4ll * Ls - 1ll; // (multiplicaiton-add) * (spin) * Ls - 1
@@ -694,6 +716,13 @@ namespace quda {
     }
     m5inv_fac = 0.5 / (1. + factor);                           // 0.5 for the spin project factor
     sherman_morrison_fac = -0.5 / (1. + sherman_morrison_fac); // 0.5 for the spin project factor
+  }
+
+  void DiracMobiusEofa::checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    if (in.X(4) != Ls) errorQuda("Expected Ls = %d, not %d\n", Ls, in.X(4));
+    if (out.X(4) != Ls) errorQuda("Expected Ls = %d, not %d\n", Ls, out.X(4));
   }
 
   void DiracMobiusEofa::m5_eofa(ColorSpinorField &out, const ColorSpinorField &in) const

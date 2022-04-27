@@ -58,9 +58,7 @@ namespace quda
       apply(device::get_default_stream());
 
       if (Arg::compute_max) {
-        double max_h_double = *arg.max_h;
-        comm_allreduce_max(&max_h_double);
-        *arg.max_h = static_cast<Float>(max_h_double);
+        comm_allreduce_max(*arg.max_h);
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Yhat Max = %e\n", *arg.max_h);
         Yhat.Scale(*arg.max_h);
       }

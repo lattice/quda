@@ -16,7 +16,8 @@ void display_test_info(int precision, QudaReconstructType link_recon)
   auto prec = getPrecision(precision);
   // printfQuda("running the following test:\n");
 
-  printfQuda("prec    recon   test_type     matpc_type   dagger   S_dim         T_dimension   Ls_dimension dslash_type    niter\n");
+  printfQuda("prec    recon   test_type     matpc_type   dagger   S_dim         T_dimension   Ls_dimension dslash_type "
+             "   niter\n");
   printfQuda("%6s   %2s       %s           %12s    %d    %3d/%3d/%3d        %3d             %2d   %14s   %d\n",
              get_prec_str(prec), get_recon_str(link_recon),
              get_string(dtest_type_map, dslash_test_wrapper.dtest_type).c_str(), get_matpc_str(matpc_type), dagger,
@@ -33,15 +34,14 @@ void display_test_info(int precision, QudaReconstructType link_recon)
                grid_partition[3]);
   }
 
-  return ;
-
+  return;
 }
 
-using ::testing::TestWithParam;
 using ::testing::Bool;
-using ::testing::Values;
-using ::testing::Range;
 using ::testing::Combine;
+using ::testing::Range;
+using ::testing::TestWithParam;
+using ::testing::Values;
 
 class DslashTest : public ::testing::TestWithParam<::testing::tuple<int, int, int>>
 {
@@ -70,17 +70,16 @@ protected:
 
 public:
   virtual ~DslashTest() { }
-  virtual void SetUp() {
+  virtual void SetUp()
+  {
     int prec = ::testing::get<0>(GetParam());
     QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
 
     if (skip()) GTEST_SKIP();
 
     int value = ::testing::get<2>(GetParam());
-    for(int j=0; j < 4;j++){
-      if (value &  (1 << j)){
-        commDimPartitionedSet(j);
-      }
+    for (int j = 0; j < 4; j++) {
+      if (value & (1 << j)) { commDimPartitionedSet(j); }
     }
     updateR();
 
@@ -100,9 +99,7 @@ public:
   // Per-test-case tear-down.
   // Called after the last test in this test case.
   // Can be omitted if not needed.
-  static void TearDownTestCase() {
-    endQuda();
-  }
+  static void TearDownTestCase() { endQuda(); }
 };
 
 TEST_P(DslashTest, verify)

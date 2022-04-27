@@ -21,28 +21,22 @@ namespace quda
     v(nullptr),
     norm_offset(0),
     ghost(),
-    ghostNorm(),
     ghostFace(),
-    dslash_constant(static_cast<DslashConstant *>(safe_malloc(sizeof(DslashConstant)))),
+    ghost_buf {},
+    dslash_constant(nullptr),
     bytes(0),
     bytes_raw(0),
-    location(param.location),
     even(nullptr),
     odd(nullptr),
     composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
     components(0)
   {
-    if (param.location == QUDA_INVALID_FIELD_LOCATION) errorQuda("Location not set");
-
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
       v = param.v;
       norm_offset = param.norm_offset;
       reference = true;
     }
-
-    if (param.create == QUDA_INVALID_FIELD_CREATE) errorQuda("Invalid create type");
-    for (int i = 0; i < 2 * QUDA_MAX_DIM; i++) ghost_buf[i] = nullptr;
 
     create(param);
 
@@ -64,18 +58,16 @@ namespace quda
     v(nullptr),
     norm_offset(0),
     ghost(),
-    ghostNorm(),
     ghostFace(),
-    dslash_constant(static_cast<DslashConstant *>(safe_malloc(sizeof(DslashConstant)))),
+    ghost_buf {},
+    dslash_constant(nullptr),
     bytes(0),
     bytes_raw(0),
-    location(field.Location()),
     even(nullptr),
     odd(nullptr),
     composite_descr(field.composite_descr),
     components(0)
   {
-    for (int i = 0; i < 2 * QUDA_MAX_DIM; i++) ghost_buf[i] = nullptr;
     ColorSpinorParam param;
     field.fill(param);
     param.create = QUDA_COPY_FIELD_CREATE;
@@ -83,22 +75,70 @@ namespace quda
     copy(field);
   }
 
-  ColorSpinorField::~ColorSpinorField()
+  ColorSpinorField::ColorSpinorField(ColorSpinorField &&field) : LatticeField(std::move(field))
   {
-    if (dslash_constant) host_free(dslash_constant);
+    move(std::move(field));
+  }
+
+  ColorSpinorField::~ColorSpinorField() { destroy(); }
+
+  void ColorSpinorField::clear()
+  {
+    LatticeField::clear();
     destroy();
-    if (Location() == QUDA_CUDA_FIELD_LOCATION) destroyComms();
+  }
+
+  ColorSpinorField &ColorSpinorField::operator=(const ColorSpinorField &src)
+  {
+    if (&src != this) {
+      if (!init) { // keep current attributes unless unset
+        LatticeField::operator=(src);
+        composite_descr = src.composite_descr;
+        ColorSpinorParam param;
+        src.fill(param);
+        param.create = QUDA_COPY_FIELD_CREATE;
+        create(param);
+      }
+
+      copy(src);
+    }
+    return *this;
+  }
+
+  static bool are_compatible(ColorSpinorField &a, ColorSpinorField &b)
+  {
+    bool rtn = true;
+    if (a.Precision() != b.Precision() || a.FieldOrder() != b.FieldOrder() || a.SiteSubset() != b.SiteSubset()
+        || a.VolumeCB() != b.VolumeCB() || a.Ncolor() != b.Ncolor() || a.Nspin() != b.Nspin() || a.Nvec() != b.Nvec()
+        || a.TwistFlavor() != b.TwistFlavor())
+      rtn = false;
+
+    return rtn;
+  }
+
+  ColorSpinorField &ColorSpinorField::operator=(ColorSpinorField &&src)
+  {
+    if (&src != this) {
+      // if field not already initialized then move the field
+      if (!init || are_compatible(*this, src)) {
+        if (init) destroy();
+        LatticeField::operator=(std::move(src));
+        move(std::move(src));
+      } else {
+        // we error if the field is not compatible with this
+        errorQuda("Moving to already created field");
+      }
+    }
+    return *this;
   }
 
   void ColorSpinorField::create(const ColorSpinorParam &param)
   {
-    siteSubset = param.siteSubset;
+    if (param.create == QUDA_INVALID_FIELD_CREATE) errorQuda("Invalid create type");
+
     siteOrder = param.siteOrder;
     fieldOrder = param.fieldOrder;
     gammaBasis = param.gammaBasis;
-
-    if (param.nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions nDim = %d too great", param.nDim);
-    nDim = param.nDim;
     nColor = param.nColor;
     nSpin = param.nSpin;
     nVec = param.nVec;
@@ -109,11 +149,6 @@ namespace quda
     suggested_parity = param.suggested_parity;
 
     precision = param.Precision();
-    // Copy all data in X
-    for (int d = 0; d < QUDA_MAX_DIM; d++) x[d] = param.x[d];
-    volume = 1;
-    for (int d = 0; d < nDim; d++) volume *= x[d];
-    volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume / 2;
 
     if (twistFlavor == QUDA_TWIST_NONDEG_DOUBLET && x[4] != 2) // two flavors
       errorQuda(
@@ -125,16 +160,13 @@ namespace quda
     bytes_raw = length * precision;
     if (precision < QUDA_SINGLE_PRECISION) bytes_raw += siteSubset * volumeCB * sizeof(float);
 
-    norm_offset
-      = volumeCB * nColor * nSpin * 2 * precision; // this is the offset in bytes to start of the norm components
+    norm_offset = volumeCB * nColor * nSpin * 2 * precision; // this is the offset in bytes to start of the norm
 
     // alignment must be done on parity boundaries
     if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER)
       bytes = siteSubset * ALIGNMENT_ADJUST(bytes_raw / siteSubset);
     else
       bytes = bytes_raw;
-
-    init = true;
 
     //! stuff for deflated solvers (eigenvector sets):
     if (composite_descr.is_composite) {
@@ -163,7 +195,7 @@ namespace quda
     if (param.create != QUDA_REFERENCE_FIELD_CREATE) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
         v = safe_malloc(bytes);
-      } else {
+      } else if (location == QUDA_CUDA_FIELD_LOCATION) {
         switch (mem_type) {
         case QUDA_MEMORY_DEVICE: v = pool_device_malloc(bytes); break;
         case QUDA_MEMORY_MAPPED:
@@ -172,6 +204,8 @@ namespace quda
           break;
         default: errorQuda("Unsupported memory type %d", mem_type);
         }
+      } else {
+        errorQuda("Unexpected field location %d", location);
       }
       alloc = true;
     }
@@ -219,6 +253,8 @@ namespace quda
       }
     }
 
+    dslash_constant = static_cast<DslashConstant *>(safe_malloc(sizeof(DslashConstant)));
+    init = true;
     setTuningString();
   }
 
@@ -238,6 +274,38 @@ namespace quda
     }
   }
 
+  void ColorSpinorField::move(ColorSpinorField &&src)
+  {
+    init = std::exchange(src.init, false);
+    alloc = std::exchange(src.alloc, false);
+    reference = std::exchange(src.reference, false);
+    ghost_precision_allocated = std::exchange(src.ghost_precision_allocated, QUDA_INVALID_PRECISION);
+    nColor = std::exchange(src.nColor, 0);
+    nSpin = std::exchange(src.nSpin, 0);
+    nVec = std::exchange(src.nVec, 0);
+    twistFlavor = std::exchange(src.twistFlavor, QUDA_TWIST_INVALID);
+    pc_type = std::exchange(src.pc_type, QUDA_PC_INVALID);
+    suggested_parity = std::exchange(src.suggested_parity, QUDA_INVALID_PARITY);
+    length = std::exchange(src.length, 0);
+    v = std::exchange(src.v, nullptr);
+    v_h = std::exchange(src.v_h, nullptr);
+    norm_offset = std::exchange(src.norm_offset, 0);
+    ghost = std::exchange(src.ghost, {});
+    ghostFace = std::exchange(src.ghostFace, {});
+    ghostFaceCB = std::exchange(src.ghostFaceCB, {});
+    ghost_buf = std::exchange(src.ghost_buf, {});
+    dslash_constant = std::exchange(src.dslash_constant, nullptr);
+    bytes = std::exchange(src.bytes, 0);
+    bytes_raw = std::exchange(src.bytes_raw, 0);
+    siteOrder = std::exchange(src.siteOrder, QUDA_INVALID_SITE_ORDER);
+    fieldOrder = std::exchange(src.fieldOrder, QUDA_INVALID_FIELD_ORDER);
+    gammaBasis = std::exchange(src.gammaBasis, QUDA_INVALID_GAMMA_BASIS);
+    even = std::exchange(src.even, nullptr);
+    odd = std::exchange(src.odd, nullptr);
+    composite_descr = std::exchange(src.composite_descr, CompositeColorSpinorFieldDescriptor());
+    components = std::move(src.components);
+  }
+
   void ColorSpinorField::destroy()
   {
     if (alloc) {
@@ -251,16 +319,33 @@ namespace quda
         }
       }
       alloc = false;
+      v = nullptr;
+      v_h = nullptr;
 
       if (composite_descr.is_composite) {
         CompositeColorSpinorField::iterator vec;
-        for (vec = components.begin(); vec != components.end(); vec++) delete *vec;
+        for (vec = components.begin(); vec != components.end(); vec++) {
+          delete *vec;
+          *vec = nullptr;
+        }
+        components.resize(0);
       }
     }
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET && !composite_descr.is_composite) {
-      if (even) delete even;
-      if (odd) delete odd;
+      if (even) {
+        delete even;
+        even = nullptr;
+      }
+      if (odd) {
+        delete odd;
+        odd = nullptr;
+      }
+    }
+
+    if (dslash_constant) {
+      host_free(dslash_constant);
+      dslash_constant = nullptr;
     }
 
     init = false;
@@ -268,34 +353,20 @@ namespace quda
 
   void ColorSpinorField::setTuningString()
   {
-    {
-      // LatticeField::setTuningString(); // FIXME - LatticeField needs correct dims for single-parity
-      char vol_tmp[TuneKey::volume_n];
-      int check = snprintf(vol_string, TuneKey::volume_n, "%d", x[0]);
-      if (check < 0 || check >= TuneKey::volume_n) errorQuda("Error writing volume string");
-      for (int d = 1; d < nDim; d++) {
-        strcpy(vol_tmp, vol_string);
-        check = snprintf(vol_string, TuneKey::volume_n, "%sx%d", vol_tmp, x[d]);
-        if (check < 0 || check >= TuneKey::volume_n) errorQuda("Error writing volume string");
-      }
-    }
-
-    {
-      constexpr int aux_string_n = TuneKey::aux_n / 2;
-      char aux_tmp[aux_string_n];
-      int check = snprintf(aux_string, aux_string_n, "vol=%lu,precision=%d,order=%d,Ns=%d,Nc=%d", volume, precision,
-                           fieldOrder, nSpin, nColor);
-      if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
-      if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) {
-        strcpy(aux_tmp, aux_string);
-        check = snprintf(aux_string, aux_string_n, "%s,TwistFlavour=%d", aux_tmp, twistFlavor);
-        if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
-      }
+    LatticeField::setTuningString();
+    if (init) {
+      std::stringstream aux_ss;
+      aux_ss << "vol=" << volume << ",parity=" << siteSubset << ",precision=" << precision << ",order=" << fieldOrder
+             << ",Ns=" << nSpin << ",Nc=" << nColor;
+      if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) aux_ss << ",TwistFlavor=" << twistFlavor;
+      aux_string = aux_ss.str();
+      if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
     }
   }
 
   void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const
   {
+    if (ghost_precision == QUDA_INVALID_PRECISION) errorQuda("Invalid requested ghost precision");
     if (ghost_precision_allocated == ghost_precision) return;
 
     bool is_fixed = (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION);
@@ -303,7 +374,6 @@ namespace quda
     size_t site_size = nSpinGhost * nColor * 2 * ghost_precision + (is_fixed ? sizeof(float) : 0);
 
     // calculate size of ghost zone required
-    int ghost_volume = 0;
     int dims = nDim == 5 ? (nDim - 1) : nDim;
     int x5 = nDim == 5 ? x[4] : 1; /// includes DW and non-degenerate TM ghosts
     const int ghost_align
@@ -320,7 +390,6 @@ namespace quda
         }
         ghostFace[i] *= x5; // temporary hack : extra dimension for DW ghosts
         if (i == 0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
-        ghost_volume += 2 * nFace * ghostFace[i];
       }
 
       ghost_face_bytes[i] = nFace * ghostFace[i] * site_size;
@@ -403,33 +472,6 @@ namespace quda
     } else {
       memset(v, '\0', bytes);
     }
-  }
-
-  ColorSpinorField &ColorSpinorField::operator=(const ColorSpinorField &src)
-  {
-    if (&src != this) {
-      if (!init) { // keep current attributes unless unset
-        if (src.composite_descr.is_composite) {
-          composite_descr.is_composite = true;
-          composite_descr.dim = src.composite_descr.dim;
-          composite_descr.is_component = false;
-          composite_descr.id = 0;
-        } else if (src.composite_descr.is_component) {
-          composite_descr.is_composite = false;
-          composite_descr.dim = 0;
-          // composite_descr.is_component = false;
-          // composite_descr.id           = 0;
-        }
-
-        ColorSpinorParam param;
-        src.fill(param);
-        param.create = QUDA_COPY_FIELD_CREATE;
-        create(param);
-      }
-
-      copy(src);
-    }
-    return *this;
   }
 
   void ColorSpinorField::copy(const ColorSpinorField &src)
@@ -524,37 +566,28 @@ namespace quda
   // Fills the param with the contents of this field
   void ColorSpinorField::fill(ColorSpinorParam &param) const
   {
+    LatticeField::fill(param);
     param.field = const_cast<ColorSpinorField *>(this);
     param.v = v;
-
-    param.location = location;
     param.nColor = nColor;
     param.nSpin = nSpin;
     param.nVec = nVec;
     param.twistFlavor = twistFlavor;
     param.fieldOrder = fieldOrder;
-    param.setPrecision(precision, ghost_precision);
-    param.nDim = nDim;
-
+    param.setPrecision(precision, ghost_precision); // intentionally called here and not in LatticeField
     param.is_composite = composite_descr.is_composite;
     param.composite_dim = composite_descr.dim;
     param.is_component = false; // always either a regular spinor or a composite object
     param.component_id = 0;
-
-    memcpy(param.x, x, QUDA_MAX_DIM * sizeof(int));
-    param.siteSubset = siteSubset;
     param.siteOrder = siteOrder;
     param.gammaBasis = gammaBasis;
     param.pc_type = pc_type;
     param.suggested_parity = suggested_parity;
     param.create = QUDA_NULL_FIELD_CREATE;
-
-    param.mem_type = mem_type;
   }
 
   void ColorSpinorField::exchange(void **ghost, void **sendbuf, int nFace) const
   {
-
     // FIXME: use LatticeField MsgHandles
     MsgHandle *mh_send_fwd[4];
     MsgHandle *mh_from_back[4];
@@ -694,12 +727,11 @@ namespace quda
     }
   }
 
-  // For kernels with precision conversion built in
   void ColorSpinorField::checkField(const ColorSpinorField &a, const ColorSpinorField &b)
   {
     if (a.SiteSubset() != b.SiteSubset())
       errorQuda("siteSubsets do not match: %d %d\n", a.SiteSubset(), b.SiteSubset());
-    if (a.VolumeCB() != b.VolumeCB()) errorQuda("lengths do not match: %lu %lu", a.VolumeCB(), b.VolumeCB());
+    if (a.VolumeCB() != b.VolumeCB()) errorQuda("volumes do not match: %lu %lu", a.VolumeCB(), b.VolumeCB());
     if (a.Ncolor() != b.Ncolor()) errorQuda("colors do not match: %d %d", a.Ncolor(), b.Ncolor());
     if (a.Nspin() != b.Nspin()) errorQuda("spins do not match: %d %d", a.Nspin(), b.Nspin());
     if (a.Nvec() != b.Nvec()) errorQuda("nVec does not match: %d %d", a.Nvec(), b.Nvec());
@@ -749,7 +781,7 @@ namespace quda
     return *(components[idx]);
   }
 
-  void *const *ColorSpinorField::Ghost() const { return ghost_buf; }
+  void *const *ColorSpinorField::Ghost() const { return ghost_buf.data; }
 
   const void *ColorSpinorField::Ghost2() const
   {
@@ -772,8 +804,7 @@ namespace quda
   */
   void ColorSpinorField::LatticeIndex(int *y, int i) const
   {
-    int z[QUDA_MAX_DIM];
-    memcpy(z, x, QUDA_MAX_DIM * sizeof(int));
+    auto z = x;
 
     // parity is the slowest running dimension
     int parity = 0;
@@ -803,8 +834,7 @@ namespace quda
   void ColorSpinorField::OffsetIndex(int &i, int *y) const
   {
     int parity = 0;
-    int z[QUDA_MAX_DIM];
-    memcpy(z, x, QUDA_MAX_DIM * sizeof(int));
+    auto z = x;
     int savey0 = y[0];
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
@@ -822,6 +852,17 @@ namespace quda
     // printf("\nparity = %d\n", parity);
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] = savey0;
+  }
+
+  ColorSpinorField ColorSpinorField::create_alias(const ColorSpinorParam &param_)
+  {
+    if (param_.Precision() > precision)
+      errorQuda("Cannot create an alias to source with lower precision than the alias");
+    ColorSpinorParam param(param_);
+    param.create = QUDA_REFERENCE_FIELD_CREATE;
+    param.v = V();
+
+    return ColorSpinorField(param);
   }
 
   ColorSpinorField *ColorSpinorField::CreateAlias(const ColorSpinorParam &param_)
@@ -984,9 +1025,6 @@ namespace quda
         if (commDimPartitioned(i)) {
           for (int b = 0; b < 2; b++) {
             ghost[b][i] = static_cast<char *>(ghost_recv_buffer_d[b]) + ghost_offset[i][0];
-            if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION)
-              ghostNorm[b][i] = static_cast<char *>(ghost[b][i])
-                + nFace * surface[i] * (nSpin / (spin_project ? 2 : 1)) * nColor * 2 * ghost_precision;
           }
         }
       }
@@ -1104,24 +1142,12 @@ namespace quda
     if (!commDimPartitioned(dim)) return;
     if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
-    if (dir == 0) { // receive from forwards
-      // receive from the processor in the +1 direction
-      if (comm_peer2peer_enabled(1, dim)) {
-        comm_start(mh_recv_p2p_fwd[bufferIndex][dim]);
-      } else if (gdr) {
-        comm_start(mh_recv_rdma_fwd[bufferIndex][dim]);
-      } else {
-        comm_start(mh_recv_fwd[bufferIndex][dim]);
-      }
-    } else { // receive from backwards
-      // receive from the processor in the -1 direction
-      if (comm_peer2peer_enabled(0, dim)) {
-        comm_start(mh_recv_p2p_back[bufferIndex][dim]);
-      } else if (gdr) {
-        comm_start(mh_recv_rdma_back[bufferIndex][dim]);
-      } else {
-        comm_start(mh_recv_back[bufferIndex][dim]);
-      }
+    if (comm_peer2peer_enabled(1 - dir, dim)) {
+      comm_start(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+    } else if (gdr) {
+      comm_start(mh_recv_rdma[bufferIndex][dim][1 - dir]);
+    } else {
+      comm_start(mh_recv[bufferIndex][dim][1 - dir]);
     }
   }
 
@@ -1137,15 +1163,10 @@ namespace quda
     if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
     if (!comm_peer2peer_enabled(dir, dim)) {
-      if (dir == 0)
-        if (gdr)
-          comm_start(mh_send_rdma_back[bufferIndex][dim]);
-        else
-          comm_start(mh_send_back[bufferIndex][dim]);
-      else if (gdr)
-        comm_start(mh_send_rdma_fwd[bufferIndex][dim]);
+      if (gdr)
+        comm_start(mh_send_rdma[bufferIndex][dim][dir]);
       else
-        comm_start(mh_send_fwd[bufferIndex][dim]);
+        comm_start(mh_send[bufferIndex][dim][dir]);
     } else { // doing peer-to-peer
 
       // if not using copy engine then the packing kernel will remotely write the halos
@@ -1157,16 +1178,10 @@ namespace quda
         qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
       } // remote_write
 
-      if (dir == 0) {
         // record the event
-        qudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], stream);
-        // send to the processor in the -1 direction
-        comm_start(mh_send_p2p_back[bufferIndex][dim]);
-      } else {
-        qudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], stream);
-        // send to the processor in the +1 direction
-        comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
-      }
+      qudaEventRecord(ipcCopyEvent[bufferIndex][dim][dir], stream);
+      // send to the processor in the -1 direction
+      comm_start(mh_send_p2p[bufferIndex][dim][dir]);
     }
   }
 
@@ -1176,10 +1191,8 @@ namespace quda
     sendStart(dir, stream, gdr_send);
   }
 
-  static bool complete_recv_fwd[QUDA_MAX_DIM] = {};
-  static bool complete_recv_back[QUDA_MAX_DIM] = {};
-  static bool complete_send_fwd[QUDA_MAX_DIM] = {};
-  static bool complete_send_back[QUDA_MAX_DIM] = {};
+  static bool complete_recv[QUDA_MAX_DIM][2] = {};
+  static bool complete_send[QUDA_MAX_DIM][2] = {};
 
   int ColorSpinorField::commsQuery(int d, const qudaStream_t &, bool gdr_send, bool gdr_recv)
   {
@@ -1193,60 +1206,33 @@ namespace quda
     if (!commDimPartitioned(dim)) return 1;
     if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
-    if (dir == 0) {
-
-      // first query send to backwards
-      if (comm_peer2peer_enabled(0, dim)) {
-        if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_p2p_back[bufferIndex][dim]);
-      } else if (gdr_send) {
-        if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_rdma_back[bufferIndex][dim]);
-      } else {
-        if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_back[bufferIndex][dim]);
-      }
-
-      // second query receive from forwards
-      if (comm_peer2peer_enabled(1, dim)) {
-        if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_p2p_fwd[bufferIndex][dim]);
-      } else if (gdr_recv) {
-        if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_rdma_fwd[bufferIndex][dim]);
-      } else {
-        if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_fwd[bufferIndex][dim]);
-      }
-
-      if (complete_recv_fwd[dim] && complete_send_back[dim]) {
-        complete_send_back[dim] = false;
-        complete_recv_fwd[dim] = false;
-        return 1;
-      }
-
-    } else { // dir == 1
-
-      // first query send to forwards
-      if (comm_peer2peer_enabled(1, dim)) {
-        if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_p2p_fwd[bufferIndex][dim]);
-      } else if (gdr_send) {
-        if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_rdma_fwd[bufferIndex][dim]);
-      } else {
-        if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_fwd[bufferIndex][dim]);
-      }
-
-      // second query receive from backwards
-      if (comm_peer2peer_enabled(0, dim)) {
-        if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_p2p_back[bufferIndex][dim]);
-      } else if (gdr_recv) {
-        if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_rdma_back[bufferIndex][dim]);
-      } else {
-        if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_back[bufferIndex][dim]);
-      }
-
-      if (complete_recv_back[dim] && complete_send_fwd[dim]) {
-        complete_send_fwd[dim] = false;
-        complete_recv_back[dim] = false;
-        return 1;
-      }
+    // first query send to backwards
+    if (comm_peer2peer_enabled(dir, dim)) {
+      if (!complete_send[dim][dir]) complete_send[dim][dir] = comm_query(mh_send_p2p[bufferIndex][dim][dir]);
+    } else if (gdr_send) {
+      if (!complete_send[dim][dir]) complete_send[dim][dir] = comm_query(mh_send_rdma[bufferIndex][dim][dir]);
+    } else {
+      if (!complete_send[dim][dir]) complete_send[dim][dir] = comm_query(mh_send[bufferIndex][dim][dir]);
     }
 
-    return 0;
+    // second query receive from forwards
+    if (comm_peer2peer_enabled(1 - dir, dim)) {
+      if (!complete_recv[dim][1 - dir])
+        complete_recv[dim][1 - dir] = comm_query(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+    } else if (gdr_recv) {
+      if (!complete_recv[dim][1 - dir])
+        complete_recv[dim][1 - dir] = comm_query(mh_recv_rdma[bufferIndex][dim][1 - dir]);
+    } else {
+      if (!complete_recv[dim][1 - dir]) complete_recv[dim][1 - dir] = comm_query(mh_recv[bufferIndex][dim][1 - dir]);
+    }
+
+    if (complete_recv[dim][1 - dir] && complete_send[dim][dir]) {
+      complete_send[dim][dir] = false;
+      complete_recv[dim][1 - dir] = false;
+      return 1;
+    } else {
+      return 0;
+    }
   }
 
   void ColorSpinorField::commsWait(int d, const qudaStream_t &, bool gdr_send, bool gdr_recv)
@@ -1261,49 +1247,24 @@ namespace quda
     if (!commDimPartitioned(dim)) return;
     if ((gdr_send && gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
-    if (dir == 0) {
-
-      // first wait on send to backwards
-      if (comm_peer2peer_enabled(0, dim)) {
-        comm_wait(mh_send_p2p_back[bufferIndex][dim]);
-        qudaEventSynchronize(ipcCopyEvent[bufferIndex][0][dim]);
-      } else if (gdr_send) {
-        comm_wait(mh_send_rdma_back[bufferIndex][dim]);
-      } else {
-        comm_wait(mh_send_back[bufferIndex][dim]);
-      }
-
-      // second wait on receive from forwards
-      if (comm_peer2peer_enabled(1, dim)) {
-        comm_wait(mh_recv_p2p_fwd[bufferIndex][dim]);
-        qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][1][dim]);
-      } else if (gdr_recv) {
-        comm_wait(mh_recv_rdma_fwd[bufferIndex][dim]);
-      } else {
-        comm_wait(mh_recv_fwd[bufferIndex][dim]);
-      }
-
+    // first wait on send to "dir"
+    if (comm_peer2peer_enabled(dir, dim)) {
+      comm_wait(mh_send_p2p[bufferIndex][dim][dir]);
+      qudaEventSynchronize(ipcCopyEvent[bufferIndex][dim][dir]);
+    } else if (gdr_send) {
+      comm_wait(mh_send_rdma[bufferIndex][dim][dir]);
     } else {
+      comm_wait(mh_send[bufferIndex][dim][dir]);
+    }
 
-      // first wait on send to forwards
-      if (comm_peer2peer_enabled(1, dim)) {
-        comm_wait(mh_send_p2p_fwd[bufferIndex][dim]);
-        qudaEventSynchronize(ipcCopyEvent[bufferIndex][1][dim]);
-      } else if (gdr_send) {
-        comm_wait(mh_send_rdma_fwd[bufferIndex][dim]);
-      } else {
-        comm_wait(mh_send_fwd[bufferIndex][dim]);
-      }
-
-      // second wait on receive from backwards
-      if (comm_peer2peer_enabled(0, dim)) {
-        comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
-        qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
-      } else if (gdr_recv) {
-        comm_wait(mh_recv_rdma_back[bufferIndex][dim]);
-      } else {
-        comm_wait(mh_recv_back[bufferIndex][dim]);
-      }
+    // second wait on receive from "1 - dir"
+    if (comm_peer2peer_enabled(1 - dir, dim)) {
+      comm_wait(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+      qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][dim][1 - dir]);
+    } else if (gdr_recv) {
+      comm_wait(mh_recv_rdma[bufferIndex][dim][1 - dir]);
+    } else {
+      comm_wait(mh_recv[bufferIndex][dim][1 - dir]);
     }
   }
 
@@ -1320,13 +1281,6 @@ namespace quda
 
     unpackGhost(from_face_dim_dir_h[bufferIndex][dim][dir], dim, dir == 0 ? QUDA_BACKWARDS : QUDA_FORWARDS, stream);
   }
-
-  void *ColorSpinorField::fwdGhostFaceBuffer[QUDA_MAX_DIM];
-  void *ColorSpinorField::backGhostFaceBuffer[QUDA_MAX_DIM];
-  void *ColorSpinorField::fwdGhostFaceSendBuffer[QUDA_MAX_DIM];
-  void *ColorSpinorField::backGhostFaceSendBuffer[QUDA_MAX_DIM];
-  int ColorSpinorField::initGhostFaceBuffer = 0;
-  size_t ColorSpinorField::ghostFaceBytes[QUDA_MAX_DIM] = {};
 
   void ColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger,
                                        const MemoryLocation *pack_destination_, const MemoryLocation *halo_location_,
@@ -1347,7 +1301,7 @@ namespace quda
 
       packGhostHost(sendbuf, parity, nFace, dagger);
 
-      exchange(ghost_buf, sendbuf, nFace);
+      exchange(ghost_buf.data, sendbuf, nFace);
 
       host_free(sendbuf);
     } else {
@@ -1480,7 +1434,7 @@ namespace quda
               if (comms_complete[2 * dim + dir]) {
                 comms_done++;
                 if (comm_peer2peer_enabled(1 - dir, dim))
-                  qudaStreamWaitEvent(device::get_default_stream(), ipcRemoteCopyEvent[bufferIndex][1 - dir][dim], 0);
+                  qudaStreamWaitEvent(device::get_default_stream(), ipcRemoteCopyEvent[bufferIndex][dim][1 - dir], 0);
               }
             }
           }
@@ -1517,7 +1471,7 @@ namespace quda
         if (!comm_dim_partitioned(dim)) continue;
         for (int dir = 0; dir < 2; dir++) {
           if (comm_peer2peer_enabled(dir, dim))
-            qudaStreamWaitEvent(device::get_default_stream(), ipcCopyEvent[bufferIndex][dir][dim], 0);
+            qudaStreamWaitEvent(device::get_default_stream(), ipcCopyEvent[bufferIndex][dim][dir], 0);
         }
       }
     }

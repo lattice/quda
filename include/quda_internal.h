@@ -22,7 +22,7 @@
 // these are helper macros used to enable spin-1, spin-2 and spin-4 building blocks as needed
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_CLOVER_DIRAC)                           \
   || defined(GPU_TWISTED_MASS_DIRAC) || defined(GPU_TWISTED_CLOVER_DIRAC) || defined(GPU_NDEG_TWISTED_MASS_DIRAC)      \
-  || defined(GPU_CLOVER_HASENBUSCH_TWIST) || defined(GPU_COVDEV)
+  || defined(GPU_CLOVER_HASENBUSCH_TWIST) || defined(GPU_COVDEV) || defined(GPU_CONTRACT)
 #define NSPIN4
 #endif
 
@@ -48,10 +48,16 @@
 #include <malloc_quda.h>
 #include <object.h>
 #include <device.h>
+#include <array.h>
 
 namespace quda {
 
   using Complex = std::complex<double>;
+
+  /**
+     Array object type used to storing lattice dimensions
+   */
+  using lat_dim_t = array<int, QUDA_MAX_DIM>;
 
   /**
    * Check that the resident gauge field is compatible with the requested inv_param

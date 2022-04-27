@@ -249,7 +249,6 @@ namespace quda {
      inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
 
      inner.verbosity_precondition = outer.verbosity_precondition;
-
      inner.compute_true_res = false;
      inner.sloppy_converge = true;
    }
@@ -397,6 +396,7 @@ namespace quda {
  int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = false)
  {
    int j = start_idx;
+
 
    GMResDRArgs &args = *gmresdr_args;
 

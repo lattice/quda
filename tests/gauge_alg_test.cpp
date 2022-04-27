@@ -135,6 +135,7 @@ protected:
       // If no field is loaded, create a physical quenched field on the device
       if (!gauge_load) {
         GaugeFieldParam gParam(param);
+        gParam.location = QUDA_CUDA_FIELD_LOCATION;
         gParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
         gParam.create = QUDA_NULL_FIELD_CREATE;
         gParam.reconstruct = link_recon;
@@ -185,12 +186,13 @@ protected:
         GaugeField *host = GaugeField::Create(gauge_field_param);
 
         // switch the parameters for creating the mirror precise cuda gauge field
+        gauge_field_param.location = QUDA_CUDA_FIELD_LOCATION;
         gauge_field_param.create = QUDA_NULL_FIELD_CREATE;
         gauge_field_param.reconstruct = param.reconstruct;
         gauge_field_param.setPrecision(param.cuda_prec, true);
 
         if (comm_partitioned()) {
-          int R[4] = {0, 0, 0, 0};
+          lat_dim_t R = {0, 0, 0, 0};
           for (int d = 0; d < 4; d++)
             if (comm_dim_partitioned(d)) R[d] = 2;
           static TimeProfile GaugeFix("GaugeFix");
@@ -287,7 +289,7 @@ protected:
 
   virtual void save_gauge()
   {
-    printfQuda("Saving the gauge field to file %s\n", gauge_outfile);
+    printfQuda("Saving the gauge field to file %s\n", gauge_outfile.c_str());
 
     QudaGaugeParam gauge_param = newQudaGaugeParam();
     setWilsonGaugeParam(gauge_param);
@@ -296,6 +298,7 @@ protected:
     for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = safe_malloc(V * gauge_site_size * gauge_param.cpu_prec); }
 
     GaugeFieldParam gParam(param);
+    gParam.location = QUDA_CUDA_FIELD_LOCATION;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     gParam.create = QUDA_NULL_FIELD_CREATE;
     gParam.link_type = param.type;
@@ -309,7 +312,7 @@ protected:
     saveGaugeFieldQuda((void *)cpu_gauge, (void *)gauge, &gauge_param);
 
     // Write to disk
-    write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char **)0);
+    write_gauge_field(gauge_outfile.c_str(), cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char **)0);
 
     for (int dir = 0; dir < 4; dir++) host_free(cpu_gauge[dir]);
     delete gauge;
@@ -439,8 +442,8 @@ int main(int argc, char **argv)
 
   display_test_info();
 
-  gauge_load = strcmp(latfile, "");
-  gauge_store = strcmp(gauge_outfile, "");
+  gauge_load = (latfile.size() > 0);
+  gauge_store = (gauge_outfile.size() > 0);
 
   // If we are passing a gauge field to the test, we must allocate host memory.
   // If no gauge is passed, we generate a quenched field on the device.
