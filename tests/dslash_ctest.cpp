@@ -2,40 +2,13 @@
 
 using namespace quda;
 
-DslashTestWrapper dslash_test_wrapper;
-
 // For loading the gauge fields
 int argc_copy;
 char **argv_copy;
+dslash_test_type dtest_type = dslash_test_type::Dslash;
 
 // For googletest names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore
-
-void display_test_info(int precision, QudaReconstructType link_recon)
-{
-  auto prec = getPrecision(precision);
-  // printfQuda("running the following test:\n");
-
-  printfQuda("prec    recon   test_type     matpc_type   dagger   S_dim         T_dimension   Ls_dimension dslash_type "
-             "   niter\n");
-  printfQuda("%6s   %2s       %s           %12s    %d    %3d/%3d/%3d        %3d             %2d   %14s   %d\n",
-             get_prec_str(prec), get_recon_str(link_recon),
-             get_string(dtest_type_map, dslash_test_wrapper.dtest_type).c_str(), get_matpc_str(matpc_type), dagger,
-             xdim, ydim, zdim, tdim, Lsdim, get_dslash_str(dslash_type), niter);
-  // printfQuda("Grid partition info:     X  Y  Z  T\n");
-  // printfQuda("                         %d  %d  %d  %d\n",
-  //   dimPartitioned(0),
-  //   dimPartitioned(1),
-  //   dimPartitioned(2),
-  //   dimPartitioned(3));
-
-  if (dslash_test_wrapper.test_split_grid) {
-    printfQuda("Testing with split grid: %d  %d  %d  %d\n", grid_partition[0], grid_partition[1], grid_partition[2],
-               grid_partition[3]);
-  }
-
-  return;
-}
 
 using ::testing::Bool;
 using ::testing::Combine;
@@ -68,8 +41,30 @@ protected:
     return false;
   }
 
+  DslashTestWrapper dslash_test_wrapper;
+  void display_test_info(int precision, QudaReconstructType link_recon)
+  {
+    auto prec = getPrecision(precision);
+    // printfQuda("running the following test:\n");
+
+    printfQuda("prec    recon   test_type     matpc_type   dagger   S_dim         T_dimension   Ls_dimension "
+               "dslash_type    niter\n");
+    printfQuda("%6s   %2s       %s           %12s    %d    %3d/%3d/%3d        %3d             %2d   %14s   %d\n",
+               get_prec_str(prec), get_recon_str(link_recon),
+               get_string(dtest_type_map, dslash_test_wrapper.dtest_type).c_str(), get_matpc_str(matpc_type), dagger,
+               xdim, ydim, zdim, tdim, Lsdim, get_dslash_str(dslash_type), niter);
+
+    if (dslash_test_wrapper.test_split_grid) {
+      printfQuda("Testing with split grid: %d  %d  %d  %d\n", grid_partition[0], grid_partition[1], grid_partition[2],
+                 grid_partition[3]);
+    }
+
+    return;
+  }
+
 public:
-  virtual ~DslashTest() { }
+  DslashTest() : dslash_test_wrapper(dtest_type) { }
+
   virtual void SetUp()
   {
     int prec = ::testing::get<0>(GetParam());
@@ -129,8 +124,7 @@ int main(int argc, char **argv)
   int test_rc = 0;
   // command line options
   auto app = make_app();
-  app->add_option("--test", dslash_test_wrapper.dtest_type, "Test method")
-    ->transform(CLI::CheckedTransformer(dtest_type_map));
+  app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
   add_comms_option_group(app);
   try {
     app->parse(argc, argv);
@@ -139,9 +133,6 @@ int main(int argc, char **argv)
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
-
-  dslash_test_wrapper.num_src = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
-  dslash_test_wrapper.test_split_grid = dslash_test_wrapper.num_src > 1;
 
   // The 'SetUp()' method of the Google Test class from which DslashTest
   // in derived has no arguments, but QUDA's implementation requires the
