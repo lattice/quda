@@ -1,6 +1,5 @@
-#define DISABLE_GHOST true
-
 #include <color_spinor_field_order.h>
+#include <constant_kernel_arg.h>
 #include <kernel.h>
 
 namespace quda {
@@ -23,15 +22,14 @@ namespace quda {
     }
   }
 
-  template <typename real_, int nSpin_, int nColor_, QudaFieldOrder order, QudaDilutionType type_>
+  template <typename store_t, int nSpin_, int nColor_, QudaDilutionType type_>
   struct SpinorDiluteArg : kernel_param<> {
-    using real = real_;
+    using real = typename mapper<store_t>::type;
     static constexpr int nSpin = nSpin_;
     static constexpr int nColor = nColor_;
     static constexpr QudaDilutionType type = type_;
     static constexpr int dilution_size = get_size<nSpin, nColor>(type);
-    // FIXME: might be better to use the coarse-grained acessor to allow half precision
-    using V = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, order, real, real, DISABLE_GHOST>;
+    using V = typename colorspinor_mapper<store_t, nSpin, nColor>::type;
     V v[dilution_size];
     V src;
 
@@ -77,13 +75,19 @@ namespace quda {
 
     __device__ __host__ void operator()(int x_cb, int parity)
     {
-      for (int s = 0; s < Arg::nSpin; s++) {
-        for (int c = 0; c < Arg::nColor; c++) {
-          for (int i = 0; i < Arg::dilution_size; i++) {
-            arg.v[i](parity, x_cb, s, c) = write_source(i, s, c, parity) ?
-              arg.src(parity, x_cb, s, c) : complex<typename Arg::real>(0.0, 0.0);
+      using vector = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
+      vector src = arg.src(x_cb, parity);
+
+      for (int i = 0; i < Arg::dilution_size; i++) {
+        vector v;
+
+        for (int s = 0; s < Arg::nSpin; s++) {
+          for (int c = 0; c < Arg::nColor; c++) {
+            v(s, c) = write_source(i, s, c, parity) ? src(s, c) : complex<typename Arg::real>(0.0, 0.0);
           }
         }
+
+        arg.v[i](x_cb, parity) = v;
       }
     }
 
