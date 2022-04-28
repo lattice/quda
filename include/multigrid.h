@@ -334,8 +334,8 @@ namespace quda {
               the KD inverse
      */
     void resetStaggeredKD(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                          cudaGaugeField *gauge_sloppy_in, cudaGaugeField *fat_gauge_sloppy_in, cudaGaugeField *long_gauge_sloppy_in,
-                          double mass);
+                          cudaGaugeField *gauge_sloppy_in, cudaGaugeField *fat_gauge_sloppy_in,
+                          cudaGaugeField *long_gauge_sloppy_in, double mass);
 
     /**
        @brief Dump the null-space vectors to disk.  Will recurse dumping all levels.
@@ -430,15 +430,16 @@ namespace quda {
     /**
       @brief Return if we're on a fine grid right now
     */
-    bool is_fine_grid() const {
-      
+    bool is_fine_grid() const
+    {
+
       // Check if we're on a KD fine grid
-      bool kd_nearnull_gen = ((param.level == 1) && (param.mg_global.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD
-            || param.mg_global.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG));
+      bool kd_nearnull_gen = ((param.level == 1)
+                              && (param.mg_global.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD
+                                  || param.mg_global.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG));
 
       return (param.level == 0 || kd_nearnull_gen);
     }
-
   };
 
   /**

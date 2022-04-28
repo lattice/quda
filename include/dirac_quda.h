@@ -372,7 +372,8 @@ namespace quda {
 
         @return Error for non-staggered operators
     */
-    virtual cudaGaugeField* getStaggeredShortLinkField() const {
+    virtual cudaGaugeField *getStaggeredShortLinkField() const
+    {
       errorQuda("Invalid dirac type %d", getDiracType());
       return nullptr;
     }
@@ -382,7 +383,8 @@ namespace quda {
 
         @return Error for non-improved staggered operators
     */
-    virtual cudaGaugeField* getStaggeredLongLinkField() const {
+    virtual cudaGaugeField *getStaggeredLongLinkField() const
+    {
       errorQuda("Invalid dirac type %d", getDiracType());
       return nullptr;
     }
@@ -1294,14 +1296,12 @@ public:
 
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGERED_DIRAC; }
 
-     /**
-        @brief Return the one-hop field for staggered operators for MG setup
+    /**
+       @brief Return the one-hop field for staggered operators for MG setup
 
-        @return Gauge field
-    */
-    virtual cudaGaugeField* getStaggeredShortLinkField() const  {
-      return gauge;
-    }
+       @return Gauge field
+   */
+    virtual cudaGaugeField *getStaggeredShortLinkField() const { return gauge; }
 
     /**
      * @brief Create the coarse staggered operator.
@@ -1498,18 +1498,14 @@ public:
 
         @return fat link field
     */
-    virtual cudaGaugeField* getStaggeredShortLinkField() const {
-      return fatGauge;
-    }
+    virtual cudaGaugeField *getStaggeredShortLinkField() const { return fatGauge; }
 
     /**
         @brief return the long link field for staggered operators for MG setup
 
         @return long link field
     */
-    virtual cudaGaugeField* getStaggeredLongLinkField() const {
-      return longGauge;
-    }
+    virtual cudaGaugeField *getStaggeredLongLinkField() const { return longGauge; }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.

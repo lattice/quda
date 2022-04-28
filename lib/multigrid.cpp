@@ -253,8 +253,8 @@ namespace quda
   }
 
   void MG::resetStaggeredKD(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                            cudaGaugeField *gauge_sloppy_in, cudaGaugeField *fat_gauge_sloppy_in, cudaGaugeField *long_gauge_sloppy_in,
-                            double mass)
+                            cudaGaugeField *gauge_sloppy_in, cudaGaugeField *fat_gauge_sloppy_in,
+                            cudaGaugeField *long_gauge_sloppy_in, double mass)
   {
     if (param.level != 0) errorQuda("The staggered KD operator can only be updated from level 0");
 
@@ -339,8 +339,10 @@ namespace quda
     param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
 
     param_presmooth->precision = param.mg_global.invert_param->cuda_prec_sloppy;
-    param_presmooth->precision_sloppy = (is_fine_grid()) ? param.mg_global.invert_param->cuda_prec_precondition : param.mg_global.invert_param->cuda_prec_sloppy;
-    param_presmooth->precision_precondition = (is_fine_grid()) ? param.mg_global.invert_param->cuda_prec_precondition : param.mg_global.invert_param->cuda_prec_sloppy;
+    param_presmooth->precision_sloppy = (is_fine_grid()) ? param.mg_global.invert_param->cuda_prec_precondition :
+                                                           param.mg_global.invert_param->cuda_prec_sloppy;
+    param_presmooth->precision_precondition = (is_fine_grid()) ? param.mg_global.invert_param->cuda_prec_precondition :
+                                                                 param.mg_global.invert_param->cuda_prec_sloppy;
 
     param_presmooth->inv_type = param.smoother;
     param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
@@ -411,7 +413,7 @@ namespace quda
     if (param.level == 0
         && (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD
             || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)) {
-      
+
       createOptimizedKdDirac();
 
     } else {
@@ -491,7 +493,8 @@ namespace quda
     popLevel();
   }
 
-  void MG::createOptimizedKdDirac() {
+  void MG::createOptimizedKdDirac()
+  {
 
     pushLevel(param.level);
 
@@ -503,7 +506,8 @@ namespace quda
     }
 
     // Determine if we're doing a mixed precision solve for setup or not
-    bool mixed_precision_setup = (param.mg_global.invert_param->cuda_prec_precondition != param.mg_global.invert_param->cuda_prec_sloppy);
+    bool mixed_precision_setup
+      = (param.mg_global.invert_param->cuda_prec_precondition != param.mg_global.invert_param->cuda_prec_sloppy);
 
     // Allocate and build the KD inverse block (inverse coarse clover)
     auto fine_dirac_type = diracSmoother->getDiracType();
@@ -514,7 +518,8 @@ namespace quda
     bool is_naive_staggered = (dirac_type == QUDA_STAGGERED_DIRAC || dirac_type == QUDA_STAGGEREDPC_DIRAC);
     bool is_improved_staggered = (dirac_type == QUDA_ASQTAD_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC);
 
-    bool is_coarse_naive_staggered = is_naive_staggered || (is_improved_staggered && param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG);
+    bool is_coarse_naive_staggered = is_naive_staggered
+      || (is_improved_staggered && param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG);
 
     cudaGaugeField *fine_gauge = diracSmoother->getStaggeredShortLinkField();
     cudaGaugeField *sloppy_gauge = mixed_precision_setup ? diracSmootherSloppy->getStaggeredShortLinkField() : fine_gauge;
@@ -530,7 +535,7 @@ namespace quda
       // true is to force FLOAT2
       xinv_param.setPrecision(param.mg_global.invert_param->cuda_prec_precondition, true);
 
-      xInvKD_sloppy = std::shared_ptr<GaugeField>(reinterpret_cast<GaugeField*>(new cudaGaugeField(xinv_param)));
+      xInvKD_sloppy = std::shared_ptr<GaugeField>(reinterpret_cast<GaugeField *>(new cudaGaugeField(xinv_param)));
       xInvKD_sloppy->copy(*xInvKD);
 
       ColorSpinorParam sloppy_tmp_param(*tmp_coarse);

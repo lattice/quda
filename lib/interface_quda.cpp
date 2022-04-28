@@ -2514,8 +2514,8 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
         || mg_param->transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
       if (param->overlap) errorQuda("Updating the staggered/asqtad KD field with param->overlap set is not supported");
 
-      mg->mg->resetStaggeredKD(gaugeSloppy, gaugeFatSloppy, gaugeLongSloppy,
-                               gaugePrecondition, gaugeFatPrecondition, gaugeLongPrecondition, param->mass);
+      mg->mg->resetStaggeredKD(gaugeSloppy, gaugeFatSloppy, gaugeLongSloppy, gaugePrecondition, gaugeFatPrecondition,
+                               gaugeLongPrecondition, param->mass);
     }
 
   } else {
