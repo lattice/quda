@@ -140,6 +140,8 @@ void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
         local[dim][dir].event = reinterpret_cast<void *>(event);
         CHECK_CUDA_ERROR(cudaIpcGetEventHandle(&handle, event));
         sendHandle = comm_declare_send_relative(&handle, dim, disp, sizeof(handle));
+      } else {
+        local[dim][dir].event = nullptr;
       }
 
       if (receiveHandle) comm_start(receiveHandle);
