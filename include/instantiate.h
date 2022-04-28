@@ -3,9 +3,25 @@
 #include <array>
 #include <enum_quda.h>
 #include <util_quda.h>
+#include <quda_internal.h>
 
 namespace quda
 {
+
+  /**
+     @brief Helper function for returning if a given spin value is enabled
+     @tparam nSpin Spin value
+   */
+  template <int nSpin> constexpr bool is_enabled_spin() { return false; }
+#ifdef NSPIN1
+  template <> constexpr bool is_enabled_spin<1>() { return true; }
+#endif
+#ifdef NSPIN2
+  template <> constexpr bool is_enabled_spin<2>() { return true; }
+#endif
+#ifdef NSPIN4
+  template <> constexpr bool is_enabled_spin<4>() { return true; }
+#endif
 
   /**
      @brief Helper function for returning if a given gauge field order is enabled
