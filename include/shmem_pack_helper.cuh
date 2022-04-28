@@ -121,7 +121,7 @@ namespace quda
   {
     const int shmemidx = 2 * dim + dir;
     const bool intranode = getShmemBuffer<1, decltype(arg)>(shmemidx, arg) == nullptr;
-    
+
     // depending on the chosen policy (arg.shmem value) decide and whether we
     // are in the pack kernel or in the fused interior+pack we use these to
     // figure whether we do intra-node / inter-node packing
@@ -155,7 +155,7 @@ namespace quda
     }
     // if we are using a separate packing kernel for inter-node traffic we
     // anyway issue the signal in the fused packing+interior part to avoid
-    // potential hangs in the tune process of the dully fused kernel 
+    // potential hangs in the tune process of the dully fused kernel
     if (!intranode && !arg.packkernel && (!(arg.shmem & 2))) {
       if (quda::target::thread_idx().x == 0 && quda::target::thread_idx().y == 0 && quda::target::thread_idx().z == 0
           && quda::target::block_idx().x % arg.blocks_per_dir == 0) {
@@ -164,7 +164,7 @@ namespace quda
                              getNeighborRank(2 * dim + dir, arg));
       }
     }
-    
+
     // this part is handling the intranode traffic using direct load store, data
     // is already packed to the remote memory and we just need to signal
     if (intranode && pack_intranode) {

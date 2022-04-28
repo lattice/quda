@@ -73,21 +73,19 @@ namespace quda
   */
   struct CompositeColorSpinorFieldDescriptor {
 
-    bool is_composite; // set to 'false' for a regular spinor field
-    bool is_component; // set to 'true' if we want to work with an individual component (otherwise will work with the whole set)
+    bool is_composite = false; // set to 'false' for a regular spinor field
+    bool is_component
+      = false; // set to 'true' if we want to work with an individual component (otherwise will work with the whole set)
 
-    int dim; // individual component has dim = 0
-    int id;
+    int dim = 0; // individual component has dim = 0
+    int id = 0;
 
-    size_t volume;   // volume of a single eigenvector
-    size_t volumeCB; // CB volume of a single eigenvector
-    size_t length;   // length (excluding norm))
-    size_t bytes;    // size in bytes of spinor field
+    size_t volume = 0;   // volume of a single eigenvector
+    size_t volumeCB = 0; // CB volume of a single eigenvector
+    size_t length = 0;   // length (excluding norm))
+    size_t bytes = 0;    // size in bytes of spinor field
 
-    CompositeColorSpinorFieldDescriptor() :
-      is_composite(false), is_component(false), dim(0), id(0), volume(0), volumeCB(0), length(0), bytes(0)
-    {
-    }
+    CompositeColorSpinorFieldDescriptor() = default;
 
     CompositeColorSpinorFieldDescriptor(bool is_composite, int dim, bool is_component = false, int id = 0) :
       is_composite(is_composite), is_component(is_component), dim(dim), id(id), volume(0), volumeCB(0), length(0), bytes(0)
@@ -97,45 +95,41 @@ namespace quda
       else if (is_composite && dim == 0)
         is_composite = false;
     }
-
-    CompositeColorSpinorFieldDescriptor(const CompositeColorSpinorFieldDescriptor &descr) = default;
   };
 
   class ColorSpinorParam : public LatticeFieldParam
   {
 
   public:
-    QudaFieldLocation location; // where are we storing the field (CUDA or CPU)?
+    int nColor = 0; // Number of colors of the field
+    int nSpin = 0;  // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
+    int nVec = 1;   // number of packed vectors (for multigrid transfer operator)
 
-    int nColor; // Number of colors of the field
-    int nSpin;  // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
-    int nVec;   // number of packed vectors (for multigrid transfer operator)
+    QudaTwistFlavorType twistFlavor = QUDA_TWIST_INVALID; // used by twisted mass
 
-    QudaTwistFlavorType twistFlavor; // used by twisted mass
+    QudaSiteOrder siteOrder = QUDA_INVALID_SITE_ORDER; // defined for full fields
 
-    QudaSiteOrder siteOrder; // defined for full fields
+    QudaFieldOrder fieldOrder = QUDA_INVALID_FIELD_ORDER; // Float, Float2, Float4 etc.
+    QudaGammaBasis gammaBasis = QUDA_INVALID_GAMMA_BASIS;
+    QudaFieldCreate create = QUDA_INVALID_FIELD_CREATE;
 
-    QudaFieldOrder fieldOrder; // Float, Float2, Float4 etc.
-    QudaGammaBasis gammaBasis;
-    QudaFieldCreate create; //
-
-    QudaPCType pc_type; // used to select preconditioning method in DWF
+    QudaPCType pc_type = QUDA_PC_INVALID; // used to select preconditioning method in DWF
 
     /** Used to specify whether a single parity field is even/odd
      * By construction not enforced, this is more of an optional
      * metadata to specify, for ex, if an eigensolver is for an
      * even or odd parity. */
-    QudaParity suggested_parity;
+    QudaParity suggested_parity = QUDA_INVALID_PARITY;
 
-    ColorSpinorField *field;
-    void *v; // pointer to field
-    size_t norm_offset;
+    ColorSpinorField *field = nullptr;
+    void *v = nullptr; // pointer to field
+    size_t norm_offset = 0;
 
     //! for deflation solvers:
-    bool is_composite;
-    int composite_dim; // e.g., number of eigenvectors in the set
-    bool is_component;
-    int component_id; // eigenvector index
+    bool is_composite = false;
+    int composite_dim = 0; // e.g., number of eigenvectors in the set
+    bool is_component = false;
+    int component_id = 0; // eigenvector index
 
     /**
        If using CUDA native fields, this function will ensure that the
@@ -164,33 +158,13 @@ namespace quda
 
     ColorSpinorParam(const ColorSpinorField &a);
 
-    ColorSpinorParam() :
-      LatticeFieldParam(),
-      location(QUDA_INVALID_FIELD_LOCATION),
-      nColor(0),
-      nSpin(0),
-      nVec(1),
-      twistFlavor(QUDA_TWIST_INVALID),
-      siteOrder(QUDA_INVALID_SITE_ORDER),
-      fieldOrder(QUDA_INVALID_FIELD_ORDER),
-      gammaBasis(QUDA_INVALID_GAMMA_BASIS),
-      create(QUDA_INVALID_FIELD_CREATE),
-      pc_type(QUDA_PC_INVALID),
-      suggested_parity(QUDA_INVALID_PARITY),
-      is_composite(false),
-      composite_dim(0),
-      is_component(false),
-      component_id(0)
-    {
-      ;
-    }
+    ColorSpinorParam() = default;
 
     // used to create cpu params
 
-    ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution,
+    ColorSpinorParam(void *V, QudaInvertParam &inv_param, const lat_dim_t &X, const bool pc_solution,
                      QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION) :
-      LatticeFieldParam(4, X, 0, inv_param.cpu_prec),
-      location(location),
+      LatticeFieldParam(4, X, 0, location, inv_param.cpu_prec),
       nColor(3),
       nSpin((inv_param.dslash_type == QUDA_ASQTAD_DSLASH || inv_param.dslash_type == QUDA_STAGGERED_DSLASH
              || inv_param.dslash_type == QUDA_LAPLACE_DSLASH) ?
@@ -262,8 +236,7 @@ namespace quda
 
     // normally used to create cuda param from a cpu param
     ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param, QudaFieldLocation location) :
-      LatticeFieldParam(cpuParam.nDim, cpuParam.x, 0, inv_param.cuda_prec),
-      location(location),
+      LatticeFieldParam(cpuParam.nDim, cpuParam.x, 0, location, inv_param.cuda_prec),
       nColor(cpuParam.nColor),
       nSpin(cpuParam.nSpin),
       nVec(cpuParam.nVec),
@@ -312,72 +285,73 @@ namespace quda
 
   class ColorSpinorField : public LatticeField
   {
-
   private:
+    /**
+       @brief Create the field as specified by the param
+       @param[in] Parameter struct
+    */
     void create(const ColorSpinorParam &param);
+
+    /**
+       @brief Move the contents of a field to this
+       @param[in,out] other Field we are moving from
+    */
+    void move(ColorSpinorField &&other);
+
+    /**
+       @brief Destroy the field
+    */
     void destroy();
 
   protected:
-    bool init;
-    bool alloc;     // whether we allocated memory
-    bool reference; // whether the field is a reference or not
+    bool init = false;
+    bool alloc = false;     // whether we allocated memory
+    bool reference = false; // whether the field is a reference or not
 
     /** Used to keep local track of allocated ghost_precision in createGhostZone */
-    mutable QudaPrecision ghost_precision_allocated;
+    mutable QudaPrecision ghost_precision_allocated = QUDA_INVALID_PRECISION;
 
-    int nColor;
-    int nSpin;
-    int nVec;
+    int nColor = 0;
+    int nSpin = 0;
+    int nVec = 0;
 
-    int nDim;
-    int x[QUDA_MAX_DIM];
+    QudaTwistFlavorType twistFlavor = QUDA_TWIST_INVALID;
 
-    size_t volume;
-    size_t volumeCB;
-
-    QudaTwistFlavorType twistFlavor;
-
-    QudaPCType pc_type; // used to select preconditioning method in DWF
+    QudaPCType pc_type = QUDA_PC_INVALID; // used to select preconditioning method in DWF
 
     /** Used to specify whether a single parity field is even/odd
      * By construction not enforced, this is more of an optional
      * metadata to specify, for ex, if an eigensolver is for an
      * even or odd parity. */
-    QudaParity suggested_parity;
+    QudaParity suggested_parity = QUDA_INVALID_PARITY;
 
-    size_t length; // length including pads, but not norm zone
+    size_t length = 0; // length including pads, but not norm zone
 
-    void *v;            // the field elements
-    void *v_h;          // the field elements
-    size_t norm_offset; /** offset to the norm (if applicable) */
+    void *v = nullptr;      // the field elements
+    void *v_h = nullptr;    // the field elements
+    size_t norm_offset = 0; /** offset to the norm (if applicable) */
 
     // multi-GPU parameters
+    array_2d<void *, 2, QUDA_MAX_DIM> ghost = {};          // pointers to the ghost regions - NULL by default
+    mutable lat_dim_t ghostFace = {};                      // the size of each face
+    mutable lat_dim_t ghostFaceCB = {};                    // the size of each checkboarded face
+    mutable array<void *, 2 *QUDA_MAX_DIM> ghost_buf = {}; // wrapper that points to current ghost zone
 
-    void *ghost[2][QUDA_MAX_DIM];     // pointers to the ghost regions - NULL by default
-    void *ghostNorm[2][QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
+    mutable DslashConstant *dslash_constant = nullptr; // constants used by dslash and packing kernels
 
-    mutable int ghostFace[QUDA_MAX_DIM];   // the size of each face
-    mutable int ghostFaceCB[QUDA_MAX_DIM]; // the size of each checkboarded face
+    size_t bytes = 0;     // size in bytes of spinor field
+    size_t bytes_raw = 0; // actual data size neglecting alignment
 
-    mutable void *ghost_buf[2 * QUDA_MAX_DIM]; // wrapper that points to current ghost zone
-
-    mutable DslashConstant *dslash_constant; // constants used by dslash and packing kernels
-
-    size_t bytes;     // size in bytes of spinor field
-    size_t bytes_raw; // actual data size neglecting alignment
-
-    QudaSiteSubset siteSubset;
-    QudaSiteOrder siteOrder;
-    QudaFieldOrder fieldOrder;
-    QudaFieldLocation location;
-    QudaGammaBasis gammaBasis;
+    QudaSiteOrder siteOrder = QUDA_INVALID_SITE_ORDER;
+    QudaFieldOrder fieldOrder = QUDA_INVALID_FIELD_ORDER;
+    QudaGammaBasis gammaBasis = QUDA_INVALID_GAMMA_BASIS;
 
     // in the case of full fields, these are references to the even / odd sublattices
-    ColorSpinorField *even;
-    ColorSpinorField *odd;
+    ColorSpinorField *even = nullptr;
+    ColorSpinorField *odd = nullptr;
 
     //! used for deflation eigenvector sets etc.:
-    CompositeColorSpinorFieldDescriptor composite_descr; // containes info about the set
+    CompositeColorSpinorFieldDescriptor composite_descr; // contains info about the set
     //
     CompositeColorSpinorField components;
 
@@ -388,7 +362,13 @@ namespace quda
     */
     void createGhostZone(int nFace, bool spin_project = true) const;
 
+    /**
+       @brief Fills the param with this field's meta data (used for
+       creating a cloned field)
+       @param[in] param The parameter we are filling
+    */
     void fill(ColorSpinorParam &) const;
+
     static void checkField(const ColorSpinorField &, const ColorSpinorField &);
 
     /**
@@ -397,24 +377,65 @@ namespace quda
     void setTuningString();
 
   public:
-    static void *fwdGhostFaceBuffer[QUDA_MAX_DIM];      // cpu memory
-    static void *backGhostFaceBuffer[QUDA_MAX_DIM];     // cpu memory
-    static void *fwdGhostFaceSendBuffer[QUDA_MAX_DIM];  // cpu memory
-    static void *backGhostFaceSendBuffer[QUDA_MAX_DIM]; // cpu memory
-    static int initGhostFaceBuffer;
-    static size_t ghostFaceBytes[QUDA_MAX_DIM];
+    inline static void *fwdGhostFaceBuffer[QUDA_MAX_DIM] = {};      // cpu memory
+    inline static void *backGhostFaceBuffer[QUDA_MAX_DIM] = {};     // cpu memory
+    inline static void *fwdGhostFaceSendBuffer[QUDA_MAX_DIM] = {};  // cpu memory
+    inline static void *backGhostFaceSendBuffer[QUDA_MAX_DIM] = {}; // cpu memory
+    inline static int initGhostFaceBuffer = 0;
+    inline static size_t ghostFaceBytes[QUDA_MAX_DIM] = {};
     static void freeGhostBuffer(void);
 
-    // ColorSpinorField();
-    ColorSpinorField(const ColorSpinorField &);
-    ColorSpinorField(const ColorSpinorParam &);
+    /**
+       @brief Default constructor
+    */
+    ColorSpinorField() = default;
 
+    /**
+       @brief Copy constructor for creating a ColorSpinorField from another ColorSpinorField
+       @param[in] field Instance of ColorSpinorField from which we are cloning
+    */
+    ColorSpinorField(const ColorSpinorField &field);
+
+    /**
+       @brief Move constructor for creating a ColorSpinorField from another ColorSpinorField
+       @param[in] field Instance of ColorSpinorField from which we are moving
+    */
+    ColorSpinorField(ColorSpinorField &&field);
+
+    /**
+       @brief Constructor for creating a ColorSpinorField from a ColorSpinorParam
+       @param param Contains the metadata for creating the field
+    */
+    ColorSpinorField(const ColorSpinorParam &param);
+
+    /**
+       @brief Destructor for ColorSpinorField
+    */
     virtual ~ColorSpinorField();
 
-    ColorSpinorField &operator=(const ColorSpinorField &);
+    /**
+       @brief Copy assignment operator
+       @param[in] field Instance from which we are copying
+       @return Reference to this field
+     */
+    ColorSpinorField &operator=(const ColorSpinorField &field);
 
-    void copy(const ColorSpinorField &);
+    /**
+       @brief Move assignment operator
+       @param[in] field Instance from which we are moving
+       @return Reference to this field
+     */
+    ColorSpinorField &operator=(ColorSpinorField &&field);
 
+    /**
+       @brief Copy the source field contents into this
+       @param[in] src Source from which we are copying
+     */
+    void copy(const ColorSpinorField &src);
+
+    /**
+       @brief Zero all elements of this field
+     */
     void zero();
 
     /**
@@ -429,11 +450,9 @@ namespace quda
     int Nvec() const { return nVec; }
     QudaTwistFlavorType TwistFlavor() const { return twistFlavor; }
     int Ndim() const { return nDim; }
-    const int *X() const { return x; }
+    const int *X() const { return x.data; }
     int X(int d) const { return x[d]; }
     size_t Length() const { return length; }
-    size_t Volume() const { return volume; }
-    size_t VolumeCB() const { return siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume / 2; }
     size_t Bytes() const { return bytes; }
     size_t TotalBytes() const { return bytes; }
     size_t GhostBytes() const { return ghost_bytes; }
@@ -637,11 +656,6 @@ namespace quda
       */
     bool isNative() const { return colorspinor::isNative(fieldOrder, precision, nSpin, nColor); }
 
-    /**
-       @return The location of the field
-    */
-    QudaFieldLocation Location() const { return location; }
-
     bool IsComposite() const { return composite_descr.is_composite; }
     bool IsComponent() const { return composite_descr.is_component; }
 
@@ -662,8 +676,8 @@ namespace quda
     QudaFieldOrder FieldOrder() const { return fieldOrder; }
     QudaGammaBasis GammaBasis() const { return gammaBasis; }
 
-    const int *GhostFace() const { return ghostFace; }
-    const int *GhostFaceCB() const { return ghostFaceCB; }
+    const int *GhostFace() const { return ghostFace.data; }
+    const int *GhostFaceCB() const { return ghostFaceCB.data; }
 
     /**
        Return the offset in bytes to the start of the ghost zone in a
@@ -674,6 +688,7 @@ namespace quda
     size_t GhostOffset(const int dim, const int dir) const { return ghost_offset[dim][dir]; }
 
     const void *Ghost2() const;
+
     /**
        Return array of pointers to the ghost zones (ordering dim*2+dir)
      */
@@ -725,6 +740,16 @@ namespace quda
     void OffsetIndex(int &i, int *y) const;
 
     static ColorSpinorField *Create(const ColorSpinorParam &param) { return new ColorSpinorField(param); }
+
+    /**
+       @brief Create a field that aliases this field's storage.  The
+       alias field can use a different precision than this field,
+       though it cannot be greater.  This functionality is useful for
+       the case where we have multiple temporaries in different
+       precisions, but do not need them simultaneously.  Use this functionality with caution.
+       @param[in] param Parameters for the alias field
+    */
+    ColorSpinorField create_alias(const ColorSpinorParam &param);
 
     /**
        @brief Create a field that aliases this field's storage.  The
@@ -827,6 +852,14 @@ namespace quda
 
     friend std::ostream &operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
+  };
+
+  using ColorSpinorField_ref = std::reference_wrapper<ColorSpinorField>;
+
+  /**
+     @brief Specialization of is_field to allow us to make sets of ColorSpinorField
+   */
+  template <> struct is_field<ColorSpinorField> : std::true_type {
   };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, QudaFieldLocation location,

@@ -16,7 +16,7 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 // Smearing variables
 double gauge_smear_rho = 0.1;

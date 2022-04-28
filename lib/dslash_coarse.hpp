@@ -575,16 +575,16 @@ namespace quda {
 #else
 	errorQuda("Double precision multigrid has not been enabled");
 #endif
-      } else if (precision == QUDA_SINGLE_PRECISION) {
-        if (Y.Precision() == QUDA_SINGLE_PRECISION) {
-          if (halo_precision == QUDA_SINGLE_PRECISION) {
-            ApplyCoarse<float, float, float, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                     comms ? DSLASH_EXTERIOR : DSLASH_INTERIOR, halo_location);
-          } else {
-            errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
-                      precision, Y.Precision());
-          }
-        } else if (Y.Precision() == QUDA_HALF_PRECISION) {
+          } else if (precision == QUDA_SINGLE_PRECISION) {
+            if (Y.Precision() == QUDA_SINGLE_PRECISION) {
+              if (halo_precision == QUDA_SINGLE_PRECISION) {
+                ApplyCoarse<float, float, float, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                         comms ? DSLASH_EXTERIOR : DSLASH_INTERIOR, halo_location);
+              } else {
+                errorQuda("Halo precision %d not supported with field precision %d and link precision %d",
+                          halo_precision, precision, Y.Precision());
+              }
+            } else if (Y.Precision() == QUDA_HALF_PRECISION) {
 #if QUDA_PRECISION & 2
           if (halo_precision == QUDA_HALF_PRECISION) {
             ApplyCoarse<float, short, short, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
@@ -606,9 +606,9 @@ namespace quda {
         } else {
           errorQuda("Unsupported precision %d\n", Y.Precision());
         }
-      } else {
-	errorQuda("Unsupported precision %d\n", Y.Precision());
-      }
+          } else {
+            errorQuda("Unsupported precision %d\n", Y.Precision());
+          }
         }
 #else
         errorQuda("NVSHMEM policy called but NVSHMEM not enabled.");
@@ -747,8 +747,6 @@ namespace quda {
      if (policies[tp.aux.x] == DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED ) errorQuda("Requested policy is disabled");
      dslash(policies[tp.aux.x]);
    }
-
-   int tuningIter() const { return 10; }
 
    bool advanceAux(TuneParam &param) const
    {

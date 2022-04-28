@@ -326,9 +326,6 @@ namespace quda {
     matSloppy.flops();
     matPrecon.flops();
 
-    // copy the residual to b so we can use it outside of the solver
-    if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b,r);
-
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
     profile.TPSTART(QUDA_PROFILE_FREE);

@@ -1985,8 +1985,6 @@ namespace quda
      comm_enable_peer2peer(p2p_enabled);
    }
 
-   int tuningIter() const { return 20; }
-
    // Find the best dslash policy
    bool advanceAux(TuneParam &param) const
    {

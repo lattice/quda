@@ -138,7 +138,6 @@ namespace quda {
         return (f.read.X + f.write.X) * x.Bytes() + (f.read.Y + f.write.Y) * y.Bytes() +
           (f.read.Z + f.write.Z) * z.Bytes() + (f.read.W + f.write.W) * w.Bytes() + (f.read.V + f.write.V) * v.Bytes();
       }
-      int tuningIter() const { return 3; }
     };
 
     void zero(ColorSpinorField &a)

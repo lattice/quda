@@ -34,7 +34,7 @@ namespace quda
      @param dagger_approximation[in] Whether or not to use the dagger approximation, using the dagger of X instead of Xinv
      @return constructed Xinv
   */
-  std::unique_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass,
+  std::shared_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass,
                                                                           const bool dagger_approximation);
 
 } // namespace quda

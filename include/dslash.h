@@ -65,6 +65,7 @@ namespace quda
 
       if (arg.xpay) strcat(aux_base, ",xpay");
       if (arg.dagger) strcat(aux_base, ",dagger");
+      strcat(aux_base, arg.nParity == 2 ? ",parity=2" : ",parity=1");
     }
 
     /**
@@ -153,8 +154,6 @@ namespace quda
         tp.grid.x += arg.exterior_blocks;
       }
     }
-
-    virtual int tuningIter() const override { return 10; }
 
     virtual int blockStep() const override { return 16; }
     virtual int blockMin() const override { return 16; }
