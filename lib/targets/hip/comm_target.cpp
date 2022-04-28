@@ -128,8 +128,6 @@ namespace quda
           local[dim][dir].event = event;
           CHECK_HIP_ERROR(hipIpcGetEventHandle(&handle, event));
           sendHandle = comm_declare_send_relative(&handle, dim, disp, sizeof(handle));
-        } else {
-          local[dir][dim].event = nullptr;
         }
 
         if (receiveHandle) comm_start(receiveHandle);
