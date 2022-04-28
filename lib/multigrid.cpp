@@ -1407,8 +1407,9 @@ namespace quda
         errorQuda("Multiple setup iterations can only be used with test vector setup");
 
         // Initializing to random vectors
-        // FIXME: only need to initialize a subset for the chebyshev filter
-        for (int i = 0; i < (int)param.B.size(); i++) {
+        // FIXME: do not do if in the *middle* of test vector setup
+        int num_initialize = (setup_type == QUDA_SETUP_NULL_VECTOR_CHEBYSHEV_FILTER) ? param.mg_global.filter_startup_vectors[param.level] : (int)param.B.size();
+        for (int i = 0; i < num_initialize; i++) {
           spinorNoise(*r, *rng, QUDA_NOISE_UNIFORM);
           *param.B[i] = *r;
         }
@@ -1418,7 +1419,7 @@ namespace quda
           generateInverseIterations(param.B, refresh);
         } else {
           // Chebyshev filter
-          generateChebyshevFilter(param.B, refresh);
+          generateChebyshevFilter(param.B);
         }
       } else {
         errorQuda("Invalid setup type %d", setup_type);
@@ -1440,6 +1441,7 @@ namespace quda
     solverParam.tol = param.mg_global.setup_tol[param.level];
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
     solverParam.delta = 1e-1;
+    solverParam.tol_hq = 0;
     solverParam.inv_type = param.mg_global.setup_inv_type[param.level];
     // Hard coded for now...
     if (is_ca_solver(solverParam.inv_type)) {
@@ -1604,156 +1606,11 @@ namespace quda
     popLevel();
   }
 
-  void MG::generateChebyshevFilter(std::vector<ColorSpinorField *> &B, bool refresh)
+  void MG::generateChebyshevFilter(std::vector<ColorSpinorField *> &B)
   {
     pushLevel(param.level);
 
-    static bool envset[QUDA_MAX_MG_LEVEL];
-
-    // bottom of window for filtering stage, eigenvalues smaller than lamda_min enhanced
-    static double lambda_min[QUDA_MAX_MG_LEVEL];
-
-    // how many filtering iterations should we do
-    static int filter_iterations[QUDA_MAX_MG_LEVEL];
-
-    // how frequently we rescale while we filter
-    static int filter_rescale_freq[QUDA_MAX_MG_LEVEL];
-
-    // how many near-nulls to generate from each base vector
-    static int vectors_per_set[QUDA_MAX_MG_LEVEL];
-
-    // how many chebyshev iterations between each vector in the set
-    static int iterations_for_next[QUDA_MAX_MG_LEVEL];
-
-    if (!envset[param.level]) {
-
-      char *tmp_string;
-
-      // level 0
-      if (param.level == 0) {
-
-        tmp_string = getenv("QUDA_CHEBY_LMIN_L0");
-        if (tmp_string) {
-          lambda_min[0] = atof(tmp_string);
-        } else {
-          errorQuda("QUDA_CHEBY_LMIN_L0 unset");
-        }
-
-        tmp_string = getenv("QUDA_VEC_FILTER_ITER_L0");
-        if (tmp_string) {
-          filter_iterations[0] = atoi(tmp_string);
-        } else {
-          errorQuda("QUDA_VEC_FILTER_ITER_L0 unset");
-        }
-
-        tmp_string = getenv("QUDA_VEC_FILTER_RESCALE_FREQ_L0");
-        if (tmp_string) {
-          filter_rescale_freq[0] = atoi(tmp_string);
-        } else {
-          errorQuda("QUDA_VEC_FILTER_RESCALE_FREQ_L0 unset");
-        }
-
-        tmp_string = getenv("QUDA_VEC_PER_SET_L0");
-        if (tmp_string) {
-          vectors_per_set[0] = atoi(tmp_string);
-        } else {
-          errorQuda("QUDA_VEC_PER_SET_L0 unset");
-        }
-
-        tmp_string = getenv("QUDA_VEC_ITER_FOR_NEXT_L0");
-        if (tmp_string) {
-          iterations_for_next[0] = atoi(tmp_string);
-        } else {
-          errorQuda("QUDA_VEC_ITER_FOR_NEXT_L0 unset");
-        }
-
-      }
-
-      // level 1
-      if (param.level == 1) {
-
-        tmp_string = getenv("QUDA_CHEBY_LMIN_L1");
-        if (tmp_string) {
-          lambda_min[1] = atof(tmp_string);
-        } else {
-          errorQuda("QUDA_CHEBY_LMIN_L1 unset");
-        }
-
-        tmp_string = getenv("QUDA_VEC_FILTER_ITER_L1");
-        if (tmp_string) {
-          filter_iterations[1] = atoi(tmp_string);
-        } else {
-          errorQuda("QUDA_VEC_FILTER_ITER_L1 unset");
-        }
-
-        tmp_string = getenv("QUDA_VEC_FILTER_RESCALE_FREQ_L1");
-        if (tmp_string) {
-          filter_rescale_freq[1] = atoi(tmp_string);
-        } else {
-          errorQuda("QUDA_VEC_FILTER_RESCALE_FREQ_L1 unset");
-        }
-
-        tmp_string = getenv("QUDA_VEC_PER_SET_L1");
-        if (tmp_string) {
-          vectors_per_set[1] = atoi(tmp_string);
-        } else {
-          errorQuda("QUDA_VEC_PER_SET_L1 unset");
-        }
-
-        tmp_string = getenv("QUDA_VEC_ITER_FOR_NEXT_L1");
-        if (tmp_string) {
-          iterations_for_next[1] = atoi(tmp_string);
-        } else {
-          errorQuda("QUDA_VEC_ITER_FOR_NEXT_L1 unset");
-        }
-
-      }
-
-      // level 2
-      if (param.level == 2) {
-
-        tmp_string = getenv("QUDA_CHEBY_LMIN_L2");
-        if (tmp_string) {
-          lambda_min[2] = atof(tmp_string);
-        } else {
-          errorQuda("QUDA_CHEBY_LMIN_L2 unset");
-        }
-
-        tmp_string = getenv("QUDA_VEC_FILTER_ITER_L2");
-        if (tmp_string) {
-          filter_iterations[2] = atoi(tmp_string);
-        } else {
-          errorQuda("QUDA_VEC_FILTER_ITER_L2 unset");
-        }
-
-        tmp_string = getenv("QUDA_VEC_FILTER_RESCALE_FREQ_L2");
-        if (tmp_string) {
-          filter_rescale_freq[2] = atoi(tmp_string);
-        } else {
-          errorQuda("QUDA_VEC_FILTER_RESCALE_FREQ_L2 unset");
-        }
-
-        tmp_string = getenv("QUDA_VEC_PER_SET_L2");
-        if (tmp_string) {
-          vectors_per_set[2] = atoi(tmp_string);
-        } else {
-          errorQuda("QUDA_VEC_PER_SET_L2 unset");
-        }
-
-        tmp_string = getenv("QUDA_VEC_ITER_FOR_NEXT_L2");
-        if (tmp_string) {
-          iterations_for_next[2] = atoi(tmp_string);
-        } else {
-          errorQuda("QUDA_VEC_ITER_FOR_NEXT_L2 unset");
-        }
-      }
-
-      envset[param.level] = true;
-    }
-
-    if (!envset[param.level]) errorQuda("Chebyshev filter setup params unset");
-
-    // Filtering approach based on arXiv:2103.05034, P. Boyle and A. Yamaguchi.
+    // TBD: implement a refresh
 
     // use the right space; diracResidual is guaranteed to be full-parity
     DiracMdagM dirac_mdm(diracResidual);
@@ -1768,13 +1625,24 @@ namespace quda
     ColorSpinorField pkm2(*B[0]);
     ColorSpinorField Apkm1(*B[0]);
 
-    // approximate lambda_max
-    double lambda_max = 1.1 * Solver::performPowerIterations(dirac_mdm, *B[0], pk, pkm1,
-      100, 10, tmp1, tmp2);
+    const int num_starting_vectors = param.mg_global.filter_startup_vectors[param.level];
+    const int filter_iterations = param.mg_global.filter_startup_iterations[param.level];
+    const int filter_rescale_freq = param.mg_global.filter_startup_rescale_frequency[param.level];
+    const int iterations_for_next = param.mg_global.filter_iterations_between_vectors[param.level];
+    const double lambda_min = param.mg_global.filter_lambda_min[param.level];
+    double lambda_max = param.mg_global.filter_lambda_max[param.level];
+    if (lambda_max < lambda_min) {
+      // approximate lambda_max
+      lambda_max = 1.1 * Solver::performPowerIterations(dirac_mdm, *B[0], pk, pkm1,
+        100, 10, tmp1, tmp2);
+    }
+
+    logQuda(getVerbosity(), "Nums starting %d Filter iter %d Filter rescale %d Filter next %d Lambda min %e lambda max %e\n",
+      num_starting_vectors, filter_iterations, filter_rescale_freq, iterations_for_next, lambda_min, lambda_max);
 
     // create filter interpolators
-    double m_map_filter = 2. / (lambda_max - lambda_min[param.level]);
-    double b_map_filter = - (lambda_max + lambda_min[param.level]) / (lambda_max - lambda_min[param.level]);
+    double m_map_filter = 2. / (lambda_max - lambda_min);
+    double b_map_filter = - (lambda_max + lambda_min) / (lambda_max - lambda_min);
 
     // create interpolators for generating more near-nulls
     double m_map_generate = 2. / lambda_max;
@@ -1783,8 +1651,6 @@ namespace quda
     // we create batches of near-nulls from `B.size() / vectors_per_set` starting
     // random vectors
     int num_vec = static_cast<int>(B.size());
-
-    int num_starting_vectors = (num_vec + vectors_per_set[param.level] - 1) / vectors_per_set[param.level];
 
     // orthonormalize
     if (param.mg_global.pre_orthonormalize) {
@@ -1806,24 +1672,24 @@ namespace quda
         // P0
         blas::copy(pk, *B[s]);
 
-        if (filter_iterations[param.level] > 0) {
+        if (filter_iterations > 0) {
           // P1 = m Ap_0 + b p_0
           std::swap(pkm1, pk); // p_k -> p_{k - 1}
           dirac_mdm(Apkm1, pkm1, tmp1, tmp2);
           blas::axpbyz(m_map_filter, Apkm1, b_map_filter, pkm1, pk);
 
-          if (filter_iterations[param.level] > 1) {
+          if (filter_iterations > 1) {
             // Enter recursion relation
-            for (int k = 2; k <= filter_iterations[param.level]; k++) {
+            for (int k = 2; k <= filter_iterations; k++) {
               std::swap(pkm2, pkm1); // p_{k - 1} -> p_{k-2}
               std::swap(pkm1, pk); // p_k -> p_{k-1}
               dirac_mdm(Apkm1, pkm1, tmp1, tmp2); // compute A p_{k-1}
               blas::axpbypczw(2. * m_map_filter, Apkm1, 2. * b_map_filter, pkm1, -1., pkm2, pk);
 
               // heuristic rescale to keep norms in check...
-              if (k % filter_rescale_freq[param.level] == 0) {
+              if (k % filter_rescale_freq == 0) {
                 double tmp_nrm2 = blas::norm2(pk);
-                printf("Starting vector %d heuristic rescale at %d old norm2 %e\n", s, k, tmp_nrm2);
+                logQuda(getVerbosity(), "Starting vector %d heuristic rescale at %d old norm2 %e\n", s, k, tmp_nrm2);
                 double tmp_inv_nrm = 1. / sqrt(tmp_nrm2);
                 ax(tmp_inv_nrm, pk);
                 ax(tmp_inv_nrm, pkm1);
@@ -1836,7 +1702,7 @@ namespace quda
 
         // print the norm (to check for enhancement, normalize)
         double nrm2 = blas::norm2(pk);
-        printfQuda("Enhanced norm2 for start %d is %e\n", s, nrm2);
+        logQuda(getVerbosity(), "Enhanced norm2 for start %d is %e\n", s, nrm2);
         ax(1.0 / sqrt(nrm2), pk);
 
         // This is the first filtered vector
@@ -1855,7 +1721,7 @@ namespace quda
 
       for (int i = s + num_starting_vectors; i < num_vec; i += num_starting_vectors) {
 
-        for (int k = first ? 2 : 0; k < iterations_for_next[param.level]; k++) {
+        for (int k = first ? 2 : 0; k < iterations_for_next; k++) {
           std::swap(pkm2, pkm1); // p_{k - 1} -> p_{k-2}
           std::swap(pkm1, pk); // p_k -> p_{k-1}
           dirac_mdm(Apkm1, pkm1, tmp1, tmp2); // compute A p_{k-1}
@@ -1871,9 +1737,11 @@ namespace quda
     }
 
     // print norms
-    printfQuda("Norms of Chebyshev filtered near-null vectors:\n");
-    for (int i = 0; i < num_vec; i++) {
-      printfQuda("Vector %d = %e\n", i, sqrt(blas::norm2(*B[i])));
+    if (getVerbosity() >= QUDA_VERBOSE) {
+      printfQuda("Norms of Chebyshev filtered near-null vectors:\n");
+      for (int i = 0; i < num_vec; i++) {
+        printfQuda("Vector %d = %e\n", i, sqrt(blas::norm2(*B[i])));
+      }
     }
 
     // global orthonormalization of the generated null-space vectors

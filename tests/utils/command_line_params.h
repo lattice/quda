@@ -267,6 +267,10 @@ extern quda::mgarray<QudaVerbosity> mg_verbosity;
 extern quda::mgarray<QudaInverterType> setup_inv;
 extern quda::mgarray<QudaSolveType> coarse_solve_type;
 extern quda::mgarray<QudaSolveType> smoother_solve_type;
+
+extern quda::mgarray<QudaNullVectorSetupType> setup_type;
+
+// Parameters for inverse iterations setup
 extern quda::mgarray<int> num_setup_iter;
 extern quda::mgarray<double> setup_tol;
 extern quda::mgarray<int> setup_maxiter;
@@ -275,7 +279,16 @@ extern quda::mgarray<QudaCABasis> setup_ca_basis;
 extern quda::mgarray<int> setup_ca_basis_size;
 extern quda::mgarray<double> setup_ca_lambda_min;
 extern quda::mgarray<double> setup_ca_lambda_max;
-extern quda::mgarray<QudaNullVectorSetupType> setup_type;
+
+// Parameters for Chebyshev filter setup
+extern quda::mgarray<int> filter_startup_vectors;
+extern quda::mgarray<int> filter_startup_iterations;
+extern quda::mgarray<int> filter_startup_rescale_frequency;
+extern quda::mgarray<int> filter_iterations_between_vectors;
+extern quda::mgarray<double> filter_lambda_min;
+extern quda::mgarray<double> filter_lambda_max;
+
+
 extern bool pre_orthonormalize;
 extern bool post_orthonormalize;
 extern double omega;

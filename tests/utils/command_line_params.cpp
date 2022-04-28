@@ -130,6 +130,10 @@ quda::mgarray<QudaVerbosity> mg_verbosity = {};
 quda::mgarray<QudaInverterType> setup_inv = {};
 quda::mgarray<QudaSolveType> coarse_solve_type = {};
 quda::mgarray<QudaSolveType> smoother_solve_type = {};
+
+quda::mgarray<QudaNullVectorSetupType> setup_type = {};
+
+// Parameters for inverse iterations setup
 quda::mgarray<int> num_setup_iter = {};
 quda::mgarray<double> setup_tol = {};
 quda::mgarray<int> setup_maxiter = {};
@@ -138,7 +142,15 @@ quda::mgarray<QudaCABasis> setup_ca_basis = {};
 quda::mgarray<int> setup_ca_basis_size = {};
 quda::mgarray<double> setup_ca_lambda_min = {};
 quda::mgarray<double> setup_ca_lambda_max = {};
-quda::mgarray<QudaNullVectorSetupType> setup_type = {};
+
+// Parameters for Chebyshev filter setup
+quda::mgarray<int> filter_startup_vectors = {};
+quda::mgarray<int> filter_startup_iterations = {};
+quda::mgarray<int> filter_startup_rescale_frequency = {};
+quda::mgarray<int> filter_iterations_between_vectors = {};
+quda::mgarray<double> filter_lambda_min = {};
+quda::mgarray<double> filter_lambda_max = {};
+
 bool pre_orthonormalize = false;
 bool post_orthonormalize = true;
 double omega = 0.85;
@@ -883,6 +895,10 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->transform(CLI::QUDACheckedTransformer(schwarz_type_map));
   quda_app->add_mgoption(opgroup, "--mg-schwarz-cycle", mg_schwarz_cycle, CLI::PositiveNumber,
                          "The number of Schwarz cycles to apply per smoother application (default=1)");
+
+  quda_app->add_mgoption(opgroup, "--mg-setup-type", setup_type, CLI::QUDACheckedTransformer(setup_type_map),
+    "The type of setup to use for the multigrid; ignored if --mg-load-vec is set (inverse-iterations (default), chebyshev-filter, eigenvectors, test-vectors, restrict-fine, free-field)");
+
   quda_app->add_mgoption(opgroup, "--mg-setup-ca-basis-size", setup_ca_basis_size, CLI::PositiveNumber,
                          "The basis size to use for CA solver setup of multigrid (default 4)");
   quda_app->add_mgoption(opgroup, "--mg-setup-ca-basis-type", setup_ca_basis, CLI::QUDACheckedTransformer(ca_basis_map),
@@ -910,8 +926,20 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(opgroup, "--mg-setup-tol", setup_tol, CLI::Validator(),
                          "The tolerance to use for the setup of multigrid (default 5e-6)");
 
-  quda_app->add_mgoption(opgroup, "--mg-setup-type", setup_type, CLI::QUDACheckedTransformer(setup_type_map),
-    "The type of setup to use for the multigrid; ignored if --mg-load-vec is set (inverse-iterations (default), chebyshev-filter, eigenvectors, test-vectors, restrict-fine, free-field)");
+  quda_app->add_mgoption(opgroup, "--mg-setup-filter-startup-vectors", filter_startup_vectors, CLI::PositiveNumber,
+                         "Number of random starting vectors for Chebyshev filter null space generation (default 1)");
+  quda_app->add_mgoption(opgroup, "--mg-setup-filter-startup-iterations", filter_startup_iterations, CLI::PositiveNumber,
+                         "Number of iterations for initial Chebyshev filter (default 1000)");
+  quda_app->add_mgoption(opgroup, "--mg-setup-filter-startup-rescale-frequency", filter_startup_rescale_frequency, CLI::PositiveNumber,
+                         "Frequency of rescales during initial filtering which helps avoid overflow (default 50)");
+  quda_app->add_mgoption(opgroup, "--mg-setup-filter-iterations-between-vectors", filter_iterations_between_vectors, CLI::PositiveNumber,
+                         "Number of iterations between null vectors generated from each starting vector (default 150)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-setup-filter-lambda-max", filter_lambda_max, CLI::Validator(),
+    "Conservative estimate of largest eigenvalue of operator used for Chebyshev filter setup (default is to guess with power iterations)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-setup-filter-lambda-min", filter_lambda_min, CLI::PositiveNumber,
+    "Lower bound of eigenvalues that are not enhanced by the initial Chebyshev filter (default 1)");
 
   opgroup
     ->add_option(

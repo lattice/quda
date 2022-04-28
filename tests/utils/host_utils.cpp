@@ -128,6 +128,14 @@ void setQudaDefaultMgTestParams()
     mg_eig_amax[i] = -1.0; // use power iterations
     mg_eig_save_prec[i] = QUDA_DOUBLE_PRECISION;
 
+    setup_type[i] = QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS;
+    filter_startup_vectors[i] = 1;
+    filter_startup_iterations[i] = 1000;
+    filter_startup_rescale_frequency[i] = 50;
+    filter_iterations_between_vectors[i] = 150;
+    filter_lambda_min[i] = 1.0;
+    filter_lambda_max[i] = -1.0;
+
     setup_ca_basis[i] = QUDA_POWER_BASIS;
     setup_ca_basis_size[i] = 4;
     setup_ca_lambda_min[i] = 0.0;

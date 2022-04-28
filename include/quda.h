@@ -650,6 +650,24 @@ extern "C" {
     /** Maximum eigenvalue for Chebyshev CA basis */
     double setup_ca_lambda_max[QUDA_MAX_MG_LEVEL];
 
+    /** Number of random starting vectors for Chebyshev filter null space generation */
+    int filter_startup_vectors[QUDA_MAX_MG_LEVEL];
+
+    /** Number of iterations for initial Chebyshev filter */
+    int filter_startup_iterations[QUDA_MAX_MG_LEVEL];
+
+    /** Frequency of rescales during initial filtering which helps avoid overflow */
+    int filter_startup_rescale_frequency[QUDA_MAX_MG_LEVEL];
+
+    /** Number of iterations between null vectors generated from each starting vector */
+    int filter_iterations_between_vectors[QUDA_MAX_MG_LEVEL];
+
+    /** Conservative estimate of largest eigenvalue of operator used for Chebyshev filter setup */
+    int filter_lambda_min[QUDA_MAX_MG_LEVEL];
+
+    /** Lower bound of eigenvalues that are not enhanced by the initial Chebyshev filter */
+    int filter_lambda_max[QUDA_MAX_MG_LEVEL];
+
     /** Null-space type to use in the setup phase */
     QudaNullVectorSetupType setup_type[QUDA_MAX_MG_LEVEL];
 

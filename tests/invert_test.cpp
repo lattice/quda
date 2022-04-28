@@ -137,7 +137,7 @@ void init(int argc, char **argv)
       }
     }
     // Set MG
-    setMultigridParam(mg_param);
+    setWilsonMultigridParam(mg_param);
   } else {
     setInvertParam(inv_param);
   }

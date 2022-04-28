@@ -417,11 +417,11 @@ namespace quda {
     void generateInverseIterations(std::vector<ColorSpinorField*> &B, bool refresh = false);
 
     /**
-       @brief Generate the null-space vectors via a Chebyshev filter
+       @brief Generate the null-space vectors via a Chebyshev filter; this approach is
+              based on arXiv:2103.05034, P. Boyle and A. Yamaguchi.
        @param B Generated null-space vectors
-       @param refresh Whether we refreshing pre-exising vectors or starting afresh
     */
-    void generateChebyshevFilter(std::vector<ColorSpinorField*> &B, bool refresh = false);
+    void generateChebyshevFilter(std::vector<ColorSpinorField*> &B);
 
     /**
        @brief Generate lowest eigenvectors

@@ -1296,22 +1296,12 @@ public:
 
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGERED_DIRAC; }
 
-<<<<<<< HEAD
     /**
        @brief Return the one-hop field for staggered operators for MG setup
 
        @return Gauge field
-   */
-    virtual cudaGaugeField *getStaggeredShortLinkField() const { return gauge; }
-=======
-    /** @brief Return the one-hop field for staggered operators for MG setup
-
-        @return Gauge field
     */
-    virtual cudaGaugeField* getStaggeredShortLinkField() const {
-      return gauge;
-    }
->>>>>>> 19643384c (Big commit refactoring near-null setup, exposing multiple types on a per-level basis; chebyshev filter parameters are still only setable via the command line)
+    virtual cudaGaugeField *getStaggeredShortLinkField() const { return gauge; }
 
     /**
      * @brief Create the coarse staggered operator.

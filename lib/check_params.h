@@ -822,6 +822,23 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
+    P(filter_startup_vectors[i], 1);
+    P(filter_startup_iterations[i], 1000);
+    P(filter_startup_rescale_frequency[i], 50);
+    P(filter_iterations_between_vectors[i], 150);
+    P(filter_lambda_min[i], 1.0);
+    P(filter_lambda_max[i], -1.0);
+#else
+    P(filter_startup_vectors[i], INVALID_INT);
+    P(filter_startup_iterations[i], INVALID_INT);
+    P(filter_startup_rescale_frequency[i], INVALID_INT);
+    P(filter_iterations_between_vectors[i], INVALID_INT);
+    P(filter_lambda_min[i], INVALID_DOUBLE);
+    P(filter_lambda_max[i], INVALID_DOUBLE);
+#endif
+
+
+#ifdef INIT_PARAM
     P(n_block_ortho[i], 1);
     P(block_ortho_two_pass[i], QUDA_BOOLEAN_TRUE);
 #else
