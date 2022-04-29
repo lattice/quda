@@ -4,7 +4,9 @@
 #include <target_device.h>
 
 #if (CUDA_VERSION >= 11070) && !defined(_NVHPC_CUDA)
-#define BUILTIN_ASSUME(x) __builtin_assume(x)
+#define BUILTIN_ASSUME(x) \
+  bool p = x;             \
+  __builtin_assume(p);
 #else
 #define BUILTIN_ASSUME(x)
 #endif
@@ -35,10 +37,7 @@ namespace quda {
   template <> struct sincos_impl<true> {
     template <typename T> __device__ inline void operator()(const T& a, T *s, T *c)
     {
-      constexpr T bound = 2.0 * M_PI;
-      bool p = (fabs(a) <= bound);
-      BUILTIN_ASSUME(p);
-
+      BUILTIN_ASSUME(fabs(a) <= 2.0 * M_PI);
       sincos(a, s, c);
     }
   };
@@ -94,10 +93,7 @@ namespace quda {
   template <> struct sin_impl<true> {
     template <typename T> __device__ inline T operator()(const T& a)
     {
-      constexpr T bound = 2.0 * M_PI;
-      bool p = (fabs(a) <= bound);
-      BUILTIN_ASSUME(p);
-
+      BUILTIN_ASSUME(fabs(a) <= 2.8 * M_PI);
       return sin(a);
     }
   };
@@ -106,10 +102,7 @@ namespace quda {
   template <> struct cos_impl<true> {
     template <typename T> __device__ inline T operator()(const T& a)
     {
-      constexpr T bound = 2.0 * M_PI;
-      bool p = (fabs(a) <= bound);
-      BUILTIN_ASSUME(p);
-
+      BUILTIN_ASSUME(fabs(a) <= 2.0 * M_PI);
       return cos(a);
     }
   };
