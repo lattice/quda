@@ -25,8 +25,7 @@ void display_test_info()
   printfQuda("running the following test:\n");
   printfQuda("prec    prec_sloppy   matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension "
              "Ls_dimension   dslash_type  normalization\n");
-  printfQuda(
-             "%6s   %6s          %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
+  printfQuda("%6s   %6s          %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
              get_prec_str(prec), get_prec_str(prec_sloppy), get_matpc_str(matpc_type), get_recon_str(link_recon),
              get_recon_str(link_recon_sloppy), get_solve_str(solve_type), xdim, ydim, zdim, tdim, Lsdim,
              get_dslash_str(dslash_type), get_mass_normalization_str(normalization));
@@ -44,9 +43,7 @@ protected:
   QudaDilutionType dilution_type;
 
 public:
-  DilutionTest() :
-    site_subset(::testing::get<0>(GetParam())),
-    dilution_type(testing::get<1>(GetParam())) { }
+  DilutionTest() : site_subset(::testing::get<0>(GetParam())), dilution_type(testing::get<1>(GetParam())) { }
 };
 
 TEST_P(DilutionTest, verify)
@@ -59,7 +56,7 @@ TEST_P(DilutionTest, verify)
   param.setPrecision(param.Precision(), param.Precision(), true); // change order to native order
   param.location = QUDA_CUDA_FIELD_LOCATION;
   param.create = QUDA_NULL_FIELD_CREATE;
-  ColorSpinorField src(param);  
+  ColorSpinorField src(param);
 
   RNG rng(src, 1234);
 
@@ -68,9 +65,9 @@ TEST_P(DilutionTest, verify)
 
     size_t size = 0;
     switch (dilution_type) {
-    case QUDA_DILUTION_SPIN:                size = src.Nspin(); break;
-    case QUDA_DILUTION_COLOR:               size = src.Ncolor(); break;
-    case QUDA_DILUTION_SPIN_COLOR:          size = src.Nspin() * src.Ncolor(); break;
+    case QUDA_DILUTION_SPIN: size = src.Nspin(); break;
+    case QUDA_DILUTION_COLOR: size = src.Ncolor(); break;
+    case QUDA_DILUTION_SPIN_COLOR: size = src.Nspin() * src.Ncolor(); break;
     case QUDA_DILUTION_SPIN_COLOR_EVEN_ODD: size = src.Nspin() * src.Ncolor() * src.SiteSubset(); break;
     default: errorQuda("Invalid dilution type %d", dilution_type);
     }
@@ -98,16 +95,18 @@ TEST_P(DilutionTest, verify)
 using ::testing::Combine;
 using ::testing::Values;
 
-INSTANTIATE_TEST_SUITE_P(Full, DilutionTest,
-                         Combine(Values(QUDA_FULL_SITE_SUBSET),
-                                 Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR,
-                                        QUDA_DILUTION_SPIN_COLOR_EVEN_ODD)),
-                         [](testing::TestParamInfo<test_t> param) { return get_dilution_type_str(::testing::get<1>(param.param)); });
+INSTANTIATE_TEST_SUITE_P(
+  Full, DilutionTest,
+  Combine(Values(QUDA_FULL_SITE_SUBSET),
+          Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR, QUDA_DILUTION_SPIN_COLOR_EVEN_ODD)),
+  [](testing::TestParamInfo<test_t> param) { return get_dilution_type_str(::testing::get<1>(param.param)); });
 
 INSTANTIATE_TEST_SUITE_P(Parity, DilutionTest,
                          Combine(Values(QUDA_PARITY_SITE_SUBSET),
                                  Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR)),
-                         [](testing::TestParamInfo<test_t> param) { return get_dilution_type_str(::testing::get<1>(param.param)); });
+                         [](testing::TestParamInfo<test_t> param) {
+                           return get_dilution_type_str(::testing::get<1>(param.param));
+                         });
 
 int main(int argc, char **argv)
 {
