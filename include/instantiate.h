@@ -12,16 +12,21 @@ namespace quda
      @brief Helper function for returning if a given spin value is enabled
      @tparam nSpin Spin value
    */
-  template <int nSpin> constexpr bool is_enabled_spin() { return false; }
+  constexpr bool is_enabled_spin(int spin)
+  {
+    switch (spin) {
 #ifdef NSPIN1
-  template <> constexpr bool is_enabled_spin<1>() { return true; }
+    case 1: return true;
 #endif
 #ifdef NSPIN2
-  template <> constexpr bool is_enabled_spin<2>() { return true; }
+    case 2: return true;
 #endif
 #ifdef NSPIN4
-  template <> constexpr bool is_enabled_spin<4>() { return true; }
+    case 4: return true;
 #endif
+    default: return false;
+    }
+  }
 
   /**
      @brief Helper function for returning if a given gauge field order is enabled
@@ -296,17 +301,17 @@ namespace quda
   constexpr void instantiateSpinor(F &field, Args &&...args)
   {
     if (field.Nspin() == 4) {
-      if constexpr (is_enabled_spin<4>())
+      if constexpr (is_enabled_spin(4))
         instantiateSpinor<Apply, store_t, 4>(field, args...);
       else
         errorQuda("nSpin=%d support has not been built", field.Nspin());
     } else if (field.Nspin() == 2) {
-      if constexpr (is_enabled_spin<2>())
+      if constexpr (is_enabled_spin(2))
         instantiateSpinor<Apply, store_t, 2>(field, args...);
       else
         errorQuda("nSpin=%d support has not been built", field.Nspin());
     } else if (field.Nspin() == 1) {
-      if constexpr (is_enabled_spin<1>())
+      if constexpr (is_enabled_spin(1))
         instantiateSpinor<Apply, store_t, 1>(field, args...);
       else
         errorQuda("nSpin=%d support has not been built", field.Nspin());

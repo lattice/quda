@@ -1,13 +1,8 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <time.h>
-#include <math.h>
-#include <string.h>
-
 // QUDA headers
 #include <quda.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
+#include <instantiate.h>
 
 // External headers
 #include <misc.h>
@@ -34,21 +29,29 @@ void display_test_info()
              dimPartitioned(3));
 }
 
-using test_t = ::testing::tuple<QudaSiteSubset, QudaDilutionType>;
+using test_t = ::testing::tuple<QudaSiteSubset, QudaDilutionType, int>;
 
 class DilutionTest : public ::testing::TestWithParam<test_t>
 {
 protected:
   QudaSiteSubset site_subset;
   QudaDilutionType dilution_type;
+  int nSpin;
 
 public:
-  DilutionTest() : site_subset(::testing::get<0>(GetParam())), dilution_type(testing::get<1>(GetParam())) { }
+  DilutionTest() :
+    site_subset(::testing::get<0>(GetParam())),
+    dilution_type(testing::get<1>(GetParam())),
+    nSpin(testing::get<2>(GetParam()))
+  {
+  }
 };
 
 TEST_P(DilutionTest, verify)
 {
   using namespace quda;
+
+  if (!is_enabled_spin(nSpin)) GTEST_SKIP();
 
   ColorSpinorParam param;
   constructWilsonTestSpinorParam(&param, &inv_param, &gauge_param);
@@ -56,6 +59,7 @@ TEST_P(DilutionTest, verify)
   param.setPrecision(param.Precision(), param.Precision(), true); // change order to native order
   param.location = QUDA_CUDA_FIELD_LOCATION;
   param.create = QUDA_NULL_FIELD_CREATE;
+  param.nSpin = nSpin;
   ColorSpinorField src(param);
 
   RNG rng(src, 1234);
@@ -96,14 +100,29 @@ using ::testing::Combine;
 using ::testing::Values;
 
 INSTANTIATE_TEST_SUITE_P(
-  Full, DilutionTest,
+  WilsonFull, DilutionTest,
   Combine(Values(QUDA_FULL_SITE_SUBSET),
-          Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR, QUDA_DILUTION_SPIN_COLOR_EVEN_ODD)),
+          Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR, QUDA_DILUTION_SPIN_COLOR_EVEN_ODD),
+          Values(4)),
   [](testing::TestParamInfo<test_t> param) { return get_dilution_type_str(::testing::get<1>(param.param)); });
 
-INSTANTIATE_TEST_SUITE_P(Parity, DilutionTest,
+INSTANTIATE_TEST_SUITE_P(WilsonParity, DilutionTest,
                          Combine(Values(QUDA_PARITY_SITE_SUBSET),
-                                 Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR)),
+                                 Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR), Values(4)),
+                         [](testing::TestParamInfo<test_t> param) {
+                           return get_dilution_type_str(::testing::get<1>(param.param));
+                         });
+
+INSTANTIATE_TEST_SUITE_P(
+  StaggeredFull, DilutionTest,
+  Combine(Values(QUDA_FULL_SITE_SUBSET),
+          Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR, QUDA_DILUTION_SPIN_COLOR_EVEN_ODD),
+          Values(1)),
+  [](testing::TestParamInfo<test_t> param) { return get_dilution_type_str(::testing::get<1>(param.param)); });
+
+INSTANTIATE_TEST_SUITE_P(StaggeredParity, DilutionTest,
+                         Combine(Values(QUDA_PARITY_SITE_SUBSET),
+                                 Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR), Values(1)),
                          [](testing::TestParamInfo<test_t> param) {
                            return get_dilution_type_str(::testing::get<1>(param.param));
                          });
