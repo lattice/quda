@@ -147,7 +147,7 @@ namespace quda {
         }
       }
 
-      reduced = BlockReduce<vector, block_size, 1, Arg::n_vector_z, true>(thread.z).Sum(reduced);
+      reduced = BlockReduce<vector, 1, Arg::n_vector_z, true>(thread.z).Sum(reduced);
 
       if (x_fine_offset == 0) {
         const int parity_coarse = x_coarse >= arg.out.VolumeCB() ? 1 : 0;

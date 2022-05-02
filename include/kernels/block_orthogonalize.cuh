@@ -149,8 +149,8 @@ namespace quda {
       }
       if (fineSpin == 1) chirality = 0; // when using staggered chirality is mapped to parity
 
-      BlockReduce<dot_t, block_size> dot_reducer{0};
-      BlockReduce<sum_t, block_size> norm_reducer{0};
+      BlockReduce<dot_t> dot_reducer{0};
+      BlockReduce<sum_t> norm_reducer{0};
 
       // loop over number of block orthos
       for (int n = 0; n < arg.nBlockOrtho; n++) {

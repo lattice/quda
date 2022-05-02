@@ -15,16 +15,10 @@ namespace quda
 
     /**
        @brief Return the batch block size used for multi reductions.
-       For now, we leave this at 1 unless fast-compilation is enabled,
-       since it provides negligible benefit (but substantially longer
-       tuning).  When fast-compilation is enabled, the increased batch
-       count can dramatically improve performance.
+       For now, we leave this at 1, but this is something that will be
+       returned to as a future optimization.
      */
-#ifndef QUDA_FAST_COMPILE_REDUCE
     constexpr unsigned int max_n_batch_block_multi_reduce() { return 1; }
-#else
-    constexpr unsigned int max_n_batch_block_multi_reduce() { return 8; }
-#endif
 
     /**
        @brief Parameter struct for generic multi-reduce blas kernel.

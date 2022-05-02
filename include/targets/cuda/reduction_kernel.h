@@ -12,13 +12,11 @@ namespace quda
      size to be set statically at launch time in the actual argument
      class that is passed to the kernel.
 
-     @tparam block_size_x x-dimension block-size
      @tparam block_size_y y-dimension block-size
      @tparam Arg Kernel argument struct
   */
-  template <int block_size_x_, int block_size_y_, typename Arg_> struct ReduceKernelArg : Arg_ {
+  template <int block_size_y_, typename Arg_> struct ReduceKernelArg : Arg_ {
     using Arg = Arg_;
-    static constexpr int block_size_x = block_size_x_;
     static constexpr int block_size_y = block_size_y_;
     ReduceKernelArg(const Arg &arg) : Arg(arg) { }
   };
@@ -57,7 +55,7 @@ namespace quda
     }
 
     // perform final inter-block reduction and write out result
-    reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value);
+    reduce<Arg::block_size_y>(arg, t, value);
   }
 
   /**
@@ -134,7 +132,7 @@ namespace quda
     }
 
     // perform final inter-block reduction and write out result
-    reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value, j);
+    reduce<Arg::block_size_y>(arg, t, value, j);
   }
 
   /**

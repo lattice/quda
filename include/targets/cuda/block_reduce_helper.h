@@ -67,6 +67,10 @@ namespace quda
   */
   template <> struct block_reduce<true> {
 
+    template <int width_>  struct warp_reduce_param {
+      static constexpr int width = width_;
+    };
+
     /**
        @brief Perform a block-wide reduction
        @param[in] value_ thread-local value to be reduced
@@ -83,19 +87,38 @@ namespace quda
     __device__ inline T operator()(const T &value_, bool async, int batch, bool all, const reducer_t &r,
                                    const param_t &)
     {
-      using block_reduce_t = cub::BlockReduce<T, param_t::block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS,
-                                              param_t::block_size_y, param_t::block_size_z, __COMPUTE_CAPABILITY__>;
-      __shared__ typename block_reduce_t::TempStorage storage[param_t::batch_size];
-      block_reduce_t block_reduce(storage[batch]);
+      constexpr auto max_block_size_x = device::max_reduce_block_size<param_t::block_size_y, param_t::block_size_z>(); 
+      constexpr auto max_items = (max_block_size_x  / device::warp_size()) * param_t::block_size_y * param_t::block_size_z;
+      const auto warp_items = blockDim.x * param_t::block_size_y * param_t::block_size_z / device::warp_size();
+      __shared__ T storage[param_t::batch_size][max_items];
+
+      // first do warp reduce
+      T value = warp_reduce<true>()(value_, false, r, warp_reduce_param<device::warp_size()>());
+
+      // now do reduction between warps
+      auto warp_idx = threadIdx.x / device::warp_size();
+      auto n_warp = blockDim.x / device::warp_size();
+      auto item_idx = ((param_t::batch_size == 1 ? threadIdx.z * blockDim.y : 0) + threadIdx.y) * n_warp + warp_idx;
+
       if (!async) __syncthreads(); // only synchronize if we are not pipelining
-      T value = reducer_t::do_sum ? block_reduce.Sum(value_) : block_reduce.Reduce(value_, r);
+
+      if (threadIdx.x % device::warp_size() == 0) {
+        storage[batch][item_idx] = value;
+      }
+      __syncthreads();
+
+      bool thread_zero = (threadIdx.x && threadIdx.y == 0 && (param_t::batch_size == 1 ? threadIdx.z == 0 : true));
+      if (thread_zero == 0) {
+        for (int i = 1; i < warp_items; i++) // start from 1 to avoid rereading
+          value = r(storage[batch][i], value);
+      }
 
       if (all) {
-        T &value_shared = reinterpret_cast<T &>(storage[batch]);
-        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) value_shared = value;
+        if (item_idx == 0) storage[batch][0] = value;
         __syncthreads();
-        value = value_shared;
+        value = storage[batch][0];
       }
+
       return value;
     }
   };
