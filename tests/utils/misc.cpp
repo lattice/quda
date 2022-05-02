@@ -348,3 +348,18 @@ const char *get_memory_type_str(QudaMemoryType type)
 
   return s;
 }
+
+std::string get_dilution_type_str(QudaDilutionType type)
+{
+  std::string s;
+
+  switch (type) {
+  case QUDA_DILUTION_SPIN: s = std::string("spin"); break;
+  case QUDA_DILUTION_COLOR: s = std::string("color"); break;
+  case QUDA_DILUTION_SPIN_COLOR: s = std::string("spin_color"); break;
+  case QUDA_DILUTION_SPIN_COLOR_EVEN_ODD: s = std::string("spin_color_even_odd"); break;
+  default: fprintf(stderr, "Error: invalid dilution type\n"); exit(1);
+  }
+
+  return s;
+}

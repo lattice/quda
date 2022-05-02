@@ -388,6 +388,14 @@ typedef enum QudaNoiseType_s {
   QUDA_NOISE_INVALID = QUDA_INVALID_ENUM
 } QudaNoiseType;
 
+typedef enum QudaDilutionType_s {
+  QUDA_DILUTION_SPIN,
+  QUDA_DILUTION_COLOR,
+  QUDA_DILUTION_SPIN_COLOR,
+  QUDA_DILUTION_SPIN_COLOR_EVEN_ODD,
+  QUDA_DILUTION_INVALID = QUDA_INVALID_ENUM
+} QudaDilutionType;
+
 // used to select projection method for deflated solvers
 typedef enum QudaProjectionType_s {
   QUDA_MINRES_PROJECTION,
