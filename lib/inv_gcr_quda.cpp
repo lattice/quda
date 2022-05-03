@@ -29,8 +29,7 @@ namespace quda {
     inner.precision = outer.precision_sloppy;
     inner.precision_sloppy = outer.precision_precondition;
 
-    // this sets a fixed iteration count if we're using the MR solver
-    inner.residual_type = (outer.inv_type_precondition == QUDA_MR_INVERTER) ? QUDA_INVALID_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
+    inner.residual_type = QUDA_L2_RELATIVE_RESIDUAL;
   
     inner.iter = 0;
     inner.gflops = 0;
@@ -52,23 +51,19 @@ namespace quda {
       inner.Nsteps = outer.precondition_cycle;
     }
 
-    inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
-
     inner.verbosity_precondition = outer.verbosity_precondition;
 
     inner.compute_true_res = false;
     inner.sloppy_converge = true;
   }
 
-  void computeBeta(Complex **beta, std::vector<ColorSpinorField*> Ap, int i, int N, int k) {
-    Complex *Beta = new Complex[N];
-    std::vector<ColorSpinorField*> a(N), b(1);
-    for (int j=0; j<N; j++) {
-      a[j] = Ap[i+j];
-      Beta[j] = 0;
-    }
-    b[0] = Ap[k];
-    blas::cDotProduct(Beta, a, b); // vectorized dot product
+  void GCR::computeBeta(std::vector<Complex> &beta, std::vector<ColorSpinorField *> Ap, int i, int N, int k)
+  {
+    std::vector<Complex> Beta(N, 0.0);
+    std::vector<ColorSpinorField *> a {Ap.begin() + i, Ap.begin() + i + N};
+    std::vector<ColorSpinorField *> b {Ap[k]};
+    blas::cDotProduct(Beta.data(), a, b); // vectorized dot product
+
 #if 0
     for (int j=0; j<N; j++) {
       printfQuda("%d/%d vectorized %e %e, regular %e %e\n", j+1, N, Beta[j].real(), Beta[j].imag(),
@@ -76,39 +71,36 @@ namespace quda {
       }
 #endif
 
-    for (int j=0; j<N; j++) beta[i+j][k] = Beta[j];
-    delete [] Beta;
+    for (int j = 0; j < N; j++) beta[(i + j) * n_krylov + k] = Beta[j];
   }
 
-  void updateAp(Complex **beta, std::vector<ColorSpinorField*> Ap, int begin, int size, int k) {
-
-    Complex *beta_ = new Complex[size];
-    for (int i=0; i<size; i++) beta_[i] = -beta[i+begin][k];
+  void GCR::updateAp(std::vector<Complex> &beta, std::vector<ColorSpinorField *> Ap, int begin, int size, int k)
+  {
+    std::vector<Complex> beta_(size);
+    for (int i = 0; i < size; i++) beta_[i] = -beta[(i + begin) * n_krylov + k];
 
     std::vector<ColorSpinorField*> Ap_(Ap.begin() + begin, Ap.begin() + begin + size);
     std::vector<ColorSpinorField*> Apk(Ap.begin() + k, Ap.begin() + k + 1);
 
-    blas::caxpy(beta_, Ap_, Apk);
-
-    delete []beta_;
+    blas::caxpy(beta_.data(), Ap_, Apk);
   }
 
-  void orthoDir(Complex **beta, std::vector<ColorSpinorField*> Ap, int k, int pipeline) {
-
+  void GCR::orthoDir(std::vector<Complex> &beta, std::vector<ColorSpinorField *> Ap, int k, int pipeline)
+  {
     switch (pipeline) {
     case 0: // no kernel fusion
       for (int i=0; i<k; i++) { // 5 (k-1) memory transactions here
-	beta[i][k] = blas::cDotProduct(*(Ap[i]), *(Ap[k]));
-	blas::caxpy(-beta[i][k], *Ap[i], *Ap[k]);
+        beta[i * n_krylov + k] = blas::cDotProduct(*(Ap[i]), *(Ap[k]));
+        blas::caxpy(-beta[i * n_krylov + k], *Ap[i], *Ap[k]);
       }
       break;
     case 1: // basic kernel fusion
       if (k==0) break;
-      beta[0][k] = blas::cDotProduct(*Ap[0], *Ap[k]);
+      beta[0 * n_krylov + k] = blas::cDotProduct(*Ap[0], *Ap[k]);
       for (int i=0; i<k-1; i++) { // 4 (k-1) memory transactions here
-	beta[i+1][k] = blas::caxpyDotzy(-beta[i][k], *Ap[i], *Ap[k], *Ap[i+1]);
+        beta[(i + 1) * n_krylov + k] = blas::caxpyDotzy(-beta[i * n_krylov + k], *Ap[i], *Ap[k], *Ap[i + 1]);
       }
-      blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
+      blas::caxpy(-beta[(k - 1) * n_krylov + k], *Ap[k - 1], *Ap[k]);
       break;
     default:
       {
@@ -130,35 +122,29 @@ namespace quda {
       }
       break;
     }
+  }
 
-  }   
-
-  void backSubs(const Complex *alpha, Complex** const beta, const double *gamma, Complex *delta, int n) {
+  void GCR::backSubs(const std::vector<Complex> &alpha, const std::vector<Complex> &beta,
+                     const std::vector<double> &gamma, std::vector<Complex> &delta, int n)
+  {
     for (int k=n-1; k>=0;k--) {
       delta[k] = alpha[k];
-      for (int j=k+1;j<n; j++) {
-	delta[k] -= beta[k][j]*delta[j];
-      }
+      for (int j = k + 1; j < n; j++) { delta[k] -= beta[k * n_krylov + j] * delta[j]; }
       delta[k] /= gamma[k];
     }
   }
 
-  void updateSolution(ColorSpinorField &x, const Complex *alpha, Complex **const beta, double *gamma, int k,
-                      std::vector<ColorSpinorField *> p)
+  void GCR::updateSolution(ColorSpinorField &x, const std::vector<Complex> &alpha, const std::vector<Complex> &beta,
+                           std::vector<double> &gamma, int k, std::vector<ColorSpinorField *> p)
   {
-    Complex *delta = new Complex[k];
+    std::vector<Complex> delta(k);
 
     // Update the solution vector
     backSubs(alpha, beta, gamma, delta, k);
-  
-    std::vector<ColorSpinorField*> X;
-    X.push_back(&x);
 
-    std::vector<ColorSpinorField*> P;
-    for (int i=0; i<k; i++) P.push_back(p[i]);
-    blas::caxpy(delta, P, X);
-
-    delete []delta;
+    std::vector<ColorSpinorField *> X {&x};
+    std::vector<ColorSpinorField *> P {p.begin(), p.begin() + k};
+    blas::caxpy(delta.data(), P, X);
   }
 
   GCR::GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
@@ -168,6 +154,9 @@ namespace quda {
     K(0),
     Kparam(param),
     n_krylov(param.Nkrylov),
+    alpha(n_krylov),
+    beta(n_krylov * n_krylov),
+    gamma(n_krylov),
     init(false),
     rp(nullptr),
     tmpp(nullptr),
@@ -193,11 +182,6 @@ namespace quda {
 
     p.resize(n_krylov + 1);
     Ap.resize(n_krylov);
-
-    alpha = new Complex[n_krylov];
-    beta = new Complex *[n_krylov];
-    for (int i = 0; i < n_krylov; i++) beta[i] = new Complex[n_krylov];
-    gamma = new double[n_krylov];
   }
 
   GCR::GCR(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
@@ -207,6 +191,9 @@ namespace quda {
     K(&K),
     Kparam(param),
     n_krylov(param.Nkrylov),
+    alpha(n_krylov),
+    beta(n_krylov * n_krylov),
+    gamma(n_krylov),
     init(false),
     rp(nullptr),
     tmpp(nullptr),
@@ -215,20 +202,10 @@ namespace quda {
   {
     p.resize(n_krylov + 1);
     Ap.resize(n_krylov);
-
-    alpha = new Complex[n_krylov];
-    beta = new Complex *[n_krylov];
-    for (int i = 0; i < n_krylov; i++) beta[i] = new Complex[n_krylov];
-    gamma = new double[n_krylov];
   }
 
   GCR::~GCR() {
     profile.TPSTART(QUDA_PROFILE_FREE);
-
-    delete []alpha;
-    for (int i = 0; i < n_krylov; i++) delete[] beta[i];
-    delete []beta;
-    delete []gamma;
 
     if (K && param.inv_type_precondition != QUDA_MG_INVERTER) delete K;
 
@@ -416,24 +393,12 @@ namespace quda {
 
       matSloppy(*Ap[k], *p[k], tmpSloppy);
 
-      if (getVerbosity()>= QUDA_DEBUG_VERBOSE)
-	printfQuda("GCR debug iter=%d: Ap2=%e, p2=%e, r2=%e\n",
-		   total_iter, blas::norm2(*Ap[k]), blas::norm2(*p[k]), blas::norm2(rSloppy));
-
       orthoDir(beta, Ap, k, pipeline);
 
       double3 Apr = blas::cDotProductNormA(*Ap[k], K ? rSloppy : *p[k]);
 
-      if (getVerbosity()>= QUDA_DEBUG_VERBOSE) {
-	printfQuda("GCR debug iter=%d: Apr=(%e,%e,%e)\n", total_iter, Apr.x, Apr.y, Apr.z);
-	for (int i=0; i<k; i++)
-	  for (int j=0; j<=k; j++)
-	    printfQuda("GCR debug iter=%d: beta[%d][%d] = (%e,%e)\n", 
-		       total_iter, i, j, real(beta[i][j]), imag(beta[i][j]));
-      }
-
       gamma[k] = sqrt(Apr.z); // gamma[k] = Ap[k]
-      if (gamma[k] == 0.0) errorQuda("GCR breakdown\n");
+      if (gamma[k] == 0.0) errorQuda("GCR breakdown");
       alpha[k] = Complex(Apr.x, Apr.y) / gamma[k]; // alpha = (1/|Ap|) * (Ap, r)
 
       // r -= (1/|Ap|^2) * (Ap, r) r, Ap *= 1/|Ap|
@@ -509,10 +474,9 @@ namespace quda {
     double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matMdagM.flops()) * 1e-9;
     if (K) gflops += K->flops()*1e-9;
 
-    if (k>=param.maxiter && getVerbosity() >= QUDA_SUMMARIZE) 
-      warningQuda("Exceeded maximum iterations %d", param.maxiter);
+    if (k >= param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("GCR: number of restarts = %d\n", restart);
+    logQuda(QUDA_VERBOSE, "GCR: number of restarts = %d\n", restart);
 
     if (param.compute_true_res) {
       // Calculate the true residual
@@ -523,10 +487,10 @@ namespace quda {
 	param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
       else
 	param.true_res_hq = 0.0;
-
-      if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b, r);
+      //if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b, r);
     } else {
-      if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b, K ? rSloppy : *p[k_break]);
+      // reuse this when we add the get_residual method to GCR
+      if (0) blas::copy(b, K ? rSloppy : *p[k_break]);
     }
 
     param.gflops += gflops;
@@ -545,8 +509,6 @@ namespace quda {
     PrintSummary("GCR", total_iter, r2, b2, stop, param.tol_hq);
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
-
-    return;
   }
 
 } // namespace quda

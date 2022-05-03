@@ -72,8 +72,6 @@ namespace quda {
       }
     }
 
-    int tuningIter() const { return 3; }
-
     bool advanceAux(TuneParam &param) const
     {
       if (Arg<>::swizzle) {

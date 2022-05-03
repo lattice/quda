@@ -112,8 +112,8 @@ module quda_fortran
      real(8) :: mq3; ! EOFA parameter
 
      real(8) :: mu    ! Chiral twisted mass parameter
-     real(8) :: epsilon ! Flavor twisted mass parameter
      real(8) :: tm_rho ! Chiral twisted mass shift used for Hasenbusch mass preconditioning for twisted clover
+     real(8) :: epsilon ! Flavor twisted mass parameter
      QudaTwistFlavorType :: twist_flavor  ! Twisted mass flavor
 
      integer(4) :: laplace3D    ! direction to omit in Laplace
@@ -283,6 +283,9 @@ module quda_fortran
 
      ! Whether to use additive or multiplicative Schwarz preconditioning
      QudaSchwarzType :: schwarz_type
+
+     ! The type of accelerator type to use for preconditioner
+     QudaAcceleratorType :: accelerator_type_precondition
 
      ! The diagonal constant to suppress the low modes when performing 5D transfer
      real(8):: madwf_diagonal_suppressor

@@ -2,6 +2,7 @@
 #include <random_quda.h>
 #include <tunable_nd.h>
 #include <kernels/spinor_noise.cuh>
+#include <instantiate.h>
 
 namespace quda {
 
@@ -36,7 +37,6 @@ namespace quda {
       }
     }
 
-    long long flops() const { return 0; }
     long long bytes() const { return v.Bytes(); }
     void preTune() { rng.backup(); }
     void postTune(){ rng.restore(); }
@@ -76,30 +76,23 @@ namespace quda {
   }
 
   template <typename real>
-#if defined(NSPIN1) || defined(NSPIN2) || defined(NSPIN4)
   void spinorNoise(ColorSpinorField &src, RNG& randstates, QudaNoiseType type)
-#else
-  void spinorNoise(ColorSpinorField &src, RNG &, QudaNoiseType)
-#endif
   {
     if (src.Nspin() == 4) {
-#ifdef NSPIN4
-      spinorNoise<real,4>(src, randstates, type);
-#else
-      errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
-#endif
+      if constexpr (is_enabled_spin(4))
+        spinorNoise<real, 4>(src, randstates, type);
+      else
+        errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
     } else if (src.Nspin() == 2) {
-#ifdef NSPIN2
-      spinorNoise<real,2>(src, randstates, type);
-#else
-      errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
-#endif
+      if constexpr (is_enabled_spin(2))
+        spinorNoise<real, 2>(src, randstates, type);
+      else
+        errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
     } else if (src.Nspin() == 1) {
-#ifdef NSPIN1
-      spinorNoise<real,1>(src, randstates, type);
-#else
-      errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
-#endif
+      if constexpr (is_enabled_spin(1))
+        spinorNoise<real, 1>(src, randstates, type);
+      else
+        errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
     } else {
       errorQuda("Nspin = %d not implemented", src.Nspin());
     }
@@ -108,26 +101,27 @@ namespace quda {
   void spinorNoise(ColorSpinorField &src_, RNG &randstates, QudaNoiseType type)
   {
     // if src is a CPU field then create GPU field
-    ColorSpinorField *src = &src_;
+    ColorSpinorField src;
+    ColorSpinorParam param(src_);
+    bool copy_back = false;
     if (src_.Location() == QUDA_CPU_FIELD_LOCATION || src_.Precision() < QUDA_SINGLE_PRECISION) {
-      ColorSpinorParam param(src_);
       QudaPrecision prec = std::max(src_.Precision(), QUDA_SINGLE_PRECISION);
       param.setPrecision(prec, prec, true); // change to native field order
       param.create = QUDA_NULL_FIELD_CREATE;
       param.location = QUDA_CUDA_FIELD_LOCATION;
-      src = ColorSpinorField::Create(param);
+      src = ColorSpinorField(param);
+      copy_back = true;
+    } else {
+      src = src_.create_alias(param);
     }
 
-    switch (src->Precision()) {
-    case QUDA_DOUBLE_PRECISION: spinorNoise<double>(*src, randstates, type); break;
-    case QUDA_SINGLE_PRECISION: spinorNoise<float>(*src, randstates, type); break;
-    default: errorQuda("Precision %d not implemented", src->Precision());
+    switch (src.Precision()) {
+    case QUDA_DOUBLE_PRECISION: spinorNoise<double>(src, randstates, type); break;
+    case QUDA_SINGLE_PRECISION: spinorNoise<float>(src, randstates, type); break;
+    default: errorQuda("Precision %d not implemented", src.Precision());
     }
 
-    if (src != &src_) {
-      src_ = *src; // upload result
-      delete src;
-    }
+    if (copy_back) src_ = src; // copy back if needed
   }
 
   void spinorNoise(ColorSpinorField &src, unsigned long long seed, QudaNoiseType type)

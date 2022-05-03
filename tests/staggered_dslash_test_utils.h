@@ -489,8 +489,8 @@ struct StaggeredDslashTestWrapper {
         if (std::isnan(spinor_ref_norm)) { failed = true; }
         if (std::isnan(spinor_out_norm)) { failed = true; }
 
-	printfQuda("Results: CPU = %f, QUDA = %f, L2 relative deviation = %e\n",
-                   spinor_ref_norm, spinor_out_norm, 1.0 - sqrt(spinor_out_norm / spinor_ref_norm));
+        printfQuda("Results: CPU = %f, QUDA = %f, L2 relative deviation = %e\n", spinor_ref_norm, spinor_out_norm,
+                   1.0 - sqrt(spinor_out_norm / spinor_ref_norm));
         deviation = std::max(deviation, pow(10.0, -(double)(ColorSpinorField::Compare(*spinorRef, *vp_spinor_out[n]))));
         if (failed) { deviation = 1.0; }
       }
@@ -503,8 +503,8 @@ struct StaggeredDslashTestWrapper {
       if (std::isnan(spinor_ref_norm)) { failed = true; }
       if (std::isnan(spinor_out_norm)) { failed = true; }
 
-      printfQuda("Results: CPU = %f, QUDA = %f, L2 relative deviation = %e\n",
-                 spinor_ref_norm, spinor_out_norm, 1.0 - sqrt(spinor_out_norm / spinor_ref_norm));
+      printfQuda("Results: CPU = %f, QUDA = %f, L2 relative deviation = %e\n", spinor_ref_norm, spinor_out_norm,
+                 1.0 - sqrt(spinor_out_norm / spinor_ref_norm));
       deviation = pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *spinorOut)));
       if (failed) { deviation = 1.0; }
     }

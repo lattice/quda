@@ -175,11 +175,11 @@ using ::testing::Values;
 
 class ContractionTest : public ::testing::TestWithParam<::testing::tuple<int, int>>
 {
-  protected:
+protected:
   ::testing::tuple<int, int> param;
 
-  public:
-  virtual ~ContractionTest() {}
+public:
+  virtual ~ContractionTest() { }
   virtual void SetUp() { param = GetParam(); }
 };
 

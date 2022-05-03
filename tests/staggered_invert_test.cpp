@@ -215,9 +215,9 @@ int main(int argc, char **argv)
   // Staggered Gauge construct START
   //-----------------------------------------------------------------------------------
   // Allocate host staggered gauge fields
-  void* qdp_inlink[4] = {nullptr,nullptr,nullptr,nullptr};
-  void* qdp_fatlink[4] = {nullptr,nullptr,nullptr,nullptr};
-  void* qdp_longlink[4] = {nullptr,nullptr,nullptr,nullptr};
+  void *qdp_inlink[4] = {nullptr, nullptr, nullptr, nullptr};
+  void *qdp_fatlink[4] = {nullptr, nullptr, nullptr, nullptr};
+  void *qdp_longlink[4] = {nullptr, nullptr, nullptr, nullptr};
   void *milc_fatlink = nullptr;
   void *milc_longlink = nullptr;
   GaugeField *cpuFat = nullptr;
@@ -437,8 +437,14 @@ int main(int argc, char **argv)
   host_free(milc_fatlink);
   host_free(milc_longlink);
 
-  if (cpuFat != nullptr) { delete cpuFat; cpuFat = nullptr; }
-  if (cpuLong != nullptr) { delete cpuLong; cpuLong = nullptr; }
+  if (cpuFat != nullptr) {
+    delete cpuFat;
+    cpuFat = nullptr;
+  }
+  if (cpuLong != nullptr) {
+    delete cpuLong;
+    cpuLong = nullptr;
+  }
 
   for (auto in_vec : in) { delete in_vec; }
   for (auto out_vec : out) { delete out_vec; }

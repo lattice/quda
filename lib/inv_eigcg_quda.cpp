@@ -188,10 +188,6 @@ namespace quda {
     inner.is_preconditioner = true; // used to tell the inner solver it is an inner solver
 
     inner.use_sloppy_partial_accumulator= use_sloppy_partial_accumulator;
-
-    if(outer.inv_type == QUDA_EIGCG_INVERTER && outer.precision_sloppy != outer.precision_precondition)
-      inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
-    else inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   }
 
   // set the required parameters for the initCG solver

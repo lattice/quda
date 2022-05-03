@@ -283,6 +283,8 @@ namespace quda {
 
   };
 
+  static TimeProfile dummy("dummy");
+
 } // namespace quda
 
 #undef PUSH_RANGE

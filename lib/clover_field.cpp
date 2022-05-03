@@ -25,8 +25,7 @@ namespace quda {
     epsilon2(a.Epsilon2()),
     rho(a.Rho()),
     order(a.Order()),
-    create(QUDA_NULL_FIELD_CREATE),
-    location(a.Location())
+    create(QUDA_NULL_FIELD_CREATE)
   {
     precision = a.Precision();
     nDim = a.Ndim();
@@ -51,9 +50,9 @@ namespace quda {
     rho(param.rho),
     order(param.order),
     create(param.create),
-    location(param.location),
     trlog {0, 0}
   {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Unexpected siteSubset %d", siteSubset);
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
     if (!isNative() && precision < QUDA_SINGLE_PRECISION)
       errorQuda("Fixed-point precision only supported on native field");
@@ -134,9 +133,10 @@ namespace quda {
   void CloverField::setTuningString()
   {
     LatticeField::setTuningString();
-    int aux_string_n = TuneKey::aux_n / 2;
-    int check = snprintf(aux_string, aux_string_n, "vol=%lu,precision=%d,Nc=%d", volume, precision, nColor);
-    if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
+    std::stringstream aux_ss;
+    aux_ss << "vol=" << volume << "precision=" << precision << "Nc=" << nColor;
+    aux_string = aux_ss.str();
+    if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
   }
 
   void CloverField::backup(bool which) const

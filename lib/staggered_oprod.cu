@@ -67,7 +67,8 @@ namespace quda {
       } // i=3,..,0
     }
 
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (kernel == INTERIOR) {
@@ -85,8 +86,8 @@ namespace quda {
       }
     } // apply
 
-    void preTune() { U.backup(); L.backup(); }
-    void postTune() { U.restore(); L.restore(); }
+    void preTune() { U.backup(); if (U.Gauge_p() != L.Gauge_p()) L.backup(); }
+    void postTune() { U.restore(); if (U.Gauge_p() != L.Gauge_p()) L.restore(); }
 
     long long flops() const { return 0; } // FIXME
     long long bytes() const { return 0; } // FIXME

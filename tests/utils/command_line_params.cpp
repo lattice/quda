@@ -49,8 +49,8 @@ int Msrc = 1;
 int niter = 100;
 int maxiter_precondition = 10;
 QudaVerbosity verbosity_precondition = QUDA_SUMMARIZE;
-int gcrNkrylov = 10;
-QudaCABasis ca_basis = QUDA_POWER_BASIS;
+int gcrNkrylov = 8;
+QudaCABasis ca_basis = QUDA_CHEBYSHEV_BASIS;
 double ca_lambda_min = 0.0;
 double ca_lambda_max = -1.0;
 QudaCABasis ca_basis_precondition = QUDA_POWER_BASIS;
@@ -100,7 +100,8 @@ double clover_coeff = 0.0;
 bool compute_clover = false;
 bool compute_clover_trlog = true;
 bool compute_fatlong = false;
-double tol = 1e-7;
+// set default to the limit of what we can expect from single precision
+double tol = 2 * std::numeric_limits<float>::epsilon();
 double tol_precondition = 1e-1;
 double tol_hq = 0.;
 double reliable_delta = 0.1;
@@ -271,6 +272,8 @@ QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
 std::array<int, 4> grid_partition = {1, 1, 1, 1};
 
+bool enable_testing = false;
+
 namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
@@ -291,17 +294,14 @@ namespace
                                                        {"mobius-eofa", QUDA_MOBIUS_DWF_EOFA_DSLASH},
                                                        {"laplace", QUDA_LAPLACE_DSLASH}};
 
-  CLI::TransformPairs<QudaTwistFlavorType> twist_flavor_type_map {{"singlet", QUDA_TWIST_SINGLET},
-                                                                  {"nondeg-doublet", QUDA_TWIST_NONDEG_DOUBLET},
-                                                                  {"no", QUDA_TWIST_NO}};
+  CLI::TransformPairs<QudaTwistFlavorType> twist_flavor_type_map {
+    {"singlet", QUDA_TWIST_SINGLET}, {"nondeg-doublet", QUDA_TWIST_NONDEG_DOUBLET}, {"no", QUDA_TWIST_NO}};
 
   CLI::TransformPairs<QudaInverterType> inverter_type_map {{"invalid", QUDA_INVALID_INVERTER},
                                                            {"cg", QUDA_CG_INVERTER},
                                                            {"bicgstab", QUDA_BICGSTAB_INVERTER},
                                                            {"gcr", QUDA_GCR_INVERTER},
                                                            {"pcg", QUDA_PCG_INVERTER},
-                                                           {"mpcg", QUDA_MPCG_INVERTER},
-                                                           {"mpbicgstab", QUDA_MPBICGSTAB_INVERTER},
                                                            {"mr", QUDA_MR_INVERTER},
                                                            {"sd", QUDA_SD_INVERTER},
                                                            {"eigcg", QUDA_EIGCG_INVERTER},
@@ -399,7 +399,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--alternative-reliable", alternative_reliable, "use alternative reliable updates");
   quda_app->add_option("--anisotropy", anisotropy, "Temporal anisotropy factor (default 1.0)");
 
-  quda_app->add_option("--ca-basis-type", ca_basis, "The basis to use for CA solvers (default power)")
+  quda_app->add_option("--ca-basis-type", ca_basis, "The basis to use for CA solvers (default chebyshev)")
     ->transform(CLI::QUDACheckedTransformer(ca_basis_map));
   quda_app->add_option(
     "--cheby-basis-eig-max",
@@ -485,7 +485,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     "Whether to do a multi-shift solver test or not. Default is 1 (single mass)"
     "If a value N > 1 is passed, heavier masses will be constructed and the multi-shift solver will be called");
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
-                       "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG, CA-GCR (default 10)");
+                       "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG, CA-GCR (default 8)");
   quda_app->add_option("--niter", niter, "The number of iterations to perform (default 100)");
   quda_app->add_option("--max-res-increase", max_res_increase,
                        "The number of consecutive true residual incrases allowed (default 1)");
@@ -1011,4 +1011,10 @@ void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)
   auto opgroup
     = quda_app->add_option_group("Communication", "Options controlling communication (split grid) parameteres");
   opgroup->add_option("--grid-partition", grid_partition, "Set the grid partition (default 1 1 1 1)")->expected(4);
+}
+
+void add_testing_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup = quda_app->add_option_group("Testing", "Options controlling automated testing");
+  opgroup->add_option("--enable-testing", enable_testing, "Enable automated testing (default false)");
 }

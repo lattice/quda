@@ -43,6 +43,8 @@ namespace quda
     template <bool multi_1d = false, typename Arg, typename T> std::enable_if_t<multi_1d, void>
     set_param(Arg &arg, char select, const T &h)
     {
+      const auto N = std::max(arg.NXZ, arg.NYW);
+      if (h.size() != (size_t)N) errorQuda("coefficient size %lu does not match expected %lu", h.size(), (size_t)N);
       using coeff_t = typename decltype(arg.f)::coeff_t;
       coeff_t *buf_arg = nullptr;
       switch (select) {
@@ -51,8 +53,7 @@ namespace quda
       case 'c': buf_arg = arg.f.c; break;
       default: errorQuda("Unknown buffer %c", select);
       }
-      const auto N = std::max(arg.NXZ, arg.NYW);
-      for (int i = 0; i < N; i++) buf_arg[i] = coeff_t(h.data[i]);
+      for (int i = 0; i < N; i++) buf_arg[i] = coeff_t(h[i]);
     }
 
     /**
@@ -71,7 +72,9 @@ namespace quda
     {
       using coeff_t = typename decltype(arg.f)::coeff_t;
       if (arg.NXZ * arg.NYW * sizeof(coeff_t) > max_array_size())
-        printfQuda("Requested parameter size %lu larger than max %lu", arg.NXZ * arg.NYW * sizeof(coeff_t), max_array_size());
+        errorQuda("Requested parameter size %lu larger than max %lu", arg.NXZ * arg.NYW * sizeof(coeff_t), max_array_size());
+      if (h.size() != (size_t)(arg.NXZ * arg.NYW))
+        errorQuda("coefficient size %lu does not match expected %lu * %lu", h.size(), (size_t)arg.NXZ, (size_t)arg.NYW);
 
       coeff_t *host = nullptr;
       switch (select) {
@@ -82,7 +85,7 @@ namespace quda
       }
 
       for (int i = 0; i < arg.NXZ; i++)
-        for (int j = 0; j < arg.NYW; j++) host[arg.NYW * i + j] = coeff_t(h.data[arg.NYW * i + j]);
+        for (int j = 0; j < arg.NYW; j++) host[arg.NYW * i + j] = coeff_t(h[arg.NYW * i + j]);
     }
 
     /**
@@ -295,13 +298,14 @@ namespace quda
        @brief Helper function we use to ensure that the instantiated
        sizes are valid, prior to launching the kernel.
      */
-    template <int NXZ, typename store_t, typename y_store_t, typename Functor>
-    void staticCheck(const Functor &f, const std::vector<ColorSpinorField*> &x, const std::vector<ColorSpinorField*> &y)
+    template <int NXZ, typename store_t, typename y_store_t, typename Functor, typename V>
+    void staticCheck(const Functor &f, const std::vector<V> &x, const std::vector<V> &y)
     {
       constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Functor>();
-      const int NYW_max_check = max_YW_size<Functor>(x.size(), x[0]->Precision(), y[0]->Precision());
+      const int NYW_max_check = max_YW_size<Functor>(x.size(), static_cast<ColorSpinorField&>(x[0]).Precision(),
+                                                     static_cast<ColorSpinorField&>(y[0]).Precision());
 
-      if (!is_valid_NXZ(NXZ, f.reducer)) errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
+      if (!is_valid_NXZ(NXZ, f.reducer)) errorQuda("NXZ=%d is not a valid size (MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
       if (NXZ != (int)x.size()) errorQuda("Compile-time %d and run-time %lu NXZ do not match", NXZ, x.size());
       if (NYW_max != NYW_max_check) errorQuda("Compile-time %d and run-time %d limits disagree", NYW_max, NYW_max_check);
       if (f.NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", f.NYW, NYW_max);
@@ -340,12 +344,105 @@ namespace quda
       Spinor<x_store_t, Nx> W[NYW];
     };
 
-    template <typename T> struct coeff_array {
-      using type = T;
-      const T *data;
-      coeff_array() : data(nullptr) {}
-      coeff_array(const T *data) : data(data) {}
-    };
+    // the below are helpers used in the recursion
+
+    /**
+       @brief Split the set into two.  The optional parameter split is
+       used to specify the split point (needed for 2-d splitting).
+       @param[in] x The input set to split
+       @param[in] split The split point
+       @return Resulting split set
+    */
+    template <typename T> inline auto bisect(T &x, size_t split = 0)
+    {
+      if (!split) split = x.size() / 2 ;
+      return std::make_pair( T{x.begin(), x.begin() + split}, T{x.begin() + split, x.end()} );
+    }
+
+    /**
+       @brief Split the set into two, cutting across the columns
+       (assuming a row-major 2-d data set).  The optional parameter
+       split is used to specify the split point (needed for 2-d
+       splitting).
+       @param[in] x The input set to split
+       @param[in] width The width of the 2-d data set
+       @param[in] height0 The height of the resulting first set
+       @param[in] height1 The height of the resulting second set
+       @return Resulting split set
+    */
+    template <typename T> inline auto bisect_col(T &x, size_t width, size_t height0, size_t height1)
+    {
+      auto x_ = std::make_pair( T(width * height0), T(width * height1) );
+
+      unsigned int count = 0;
+      unsigned count0 = 0;
+      unsigned count1 = 0;
+      for (unsigned int i = 0; i < width; i++)
+      {
+        for (unsigned int j = 0; j < height0; j++)
+          x_.first[count0++] = x[count++];
+        for (unsigned int j = 0; j < height1; j++)
+          x_.second[count1++] = x[count++];
+      }
+
+      return x_;
+    }
+
+    /**
+       @brief Join a pair of sets into a single set
+       @param[in] pair The pair of sets to join
+       @return The newly joined set
+     */
+    template <typename T> inline auto join(std::pair<T,T> &pair)
+    {
+      T x;
+      x.reserve(pair.first.size() + pair.second.size());
+      x.insert(x.end(), pair.first.begin(), pair.first.end());
+      x.insert(x.end(), pair.second.begin(), pair.second.end());
+      return x;
+    }
+
+    /**
+       @brief Join a pair of 2-d sets into a single set, joining
+       across rows.
+       @param[in] width0 The width of the first set
+       @param[in] width1 The width of the second set
+       @param[in] height The height of the sets
+       @return The newly joined set
+     */
+    template <typename T> inline auto join_row(std::pair<T,T> &pair, size_t width0, size_t width1, size_t height)
+    {
+      T x((width0 + width1) * height);
+
+      unsigned int count = 0;
+      unsigned count0 = 0;
+      unsigned count1 = 0;
+      for (unsigned int j = 0; j < height; j++)
+      {
+        for (unsigned int i = 0; i < width0; i++)
+          x[count++] = pair.first[count0++];
+        for (unsigned int i = 0; i < width1; i++)
+          x[count++] = pair.second[count1++];
+      }
+
+      return x;
+    }
+
+    /**
+       @brief Return the 2-d transpose of a set
+       @param[in] x Row-major set of size (M x N)
+       @param[in] width Width of
+       @param[in] height Height of
+       @return Transposed set of size (N x M)
+    */
+    template <typename T> inline auto transpose(const T &x, size_t M, size_t N)
+    {
+      T x_t(x.size());
+      for (unsigned int j = 0; j < N; j++)
+        for (unsigned int i = 0; i < M; i++)
+          x_t[j * M + i] = x[i * N + j];
+      return x_t;
+    }
 
   } // namespace blas
 

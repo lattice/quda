@@ -25,12 +25,10 @@ namespace quda {
       ReduceArg<reduce_t>(dim3(U_.LocalVolumeCB(), 1, 1)),
       U(U_)
     {
-      //int R = 0;
       for (int dir=0; dir<4; ++dir){
 	border[dir] = U_.R()[dir];
 	E[dir] = U_.X()[dir];
 	X[dir] = U_.X()[dir] - border[dir]*2;
-	//R += border[dir];
       }
     }
   };

@@ -17,6 +17,8 @@
 #include <deque>
 #include <queue>
 #include <functional>
+#include <utility>
+#include <json_helper.h>
 
 #include <communicator_quda.h>
 
@@ -113,6 +115,7 @@ namespace quda
 
   /** tuning in progress? */
   static bool tuning = false;
+  static bool candidatetuning = true;
 
   bool activeTuning() { return tuning; }
 
@@ -681,6 +684,118 @@ namespace quda
 #endif
 
   /**
+   * @brief Compare two TuneParams with respect to which has the lower time.
+   *
+   */
+  struct TuneParamComp {
+    bool operator()(const TuneParam &left, const TuneParam &right) const { return (left.time) < (right.time); }
+  };
+  /**
+   * @brief Queue that stores the best tune parameters identified
+   * in the 1st tuning phase which will be further tuned in the 2nd phase.
+   *
+   */
+
+  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TuneParam, block, grid, shared_bytes, set_max_shared_bytes, aux, comment, time,
+                                     n_calls)
+
+  class TuneCandidates : public std::priority_queue<TuneParam, std::vector<TuneParam>, TuneParamComp>
+  {
+  private:
+    const size_t max_size = 5;
+    float besttime = FLT_MAX;
+
+    /**
+     * @brief Serialize tune candidates to json string.
+     *
+     * @return serialized json string
+     */
+    std::string serialize() const
+    {
+      auto p = std::make_pair(besttime, this->c);
+      json j = p;
+      return j.dump();
+    }
+    /**
+     * @brief Deserialize tune candidates from json string.
+     *
+     * @param s
+     */
+    void deserialize(const std::string_view s)
+    {
+      auto j = json::parse(s);
+      std::pair<float, decltype(this->c)> p = j;
+      besttime = p.first;
+      this->c = p.second;
+    }
+
+  public:
+    /**
+     * @brief Construct a new Tune Candidates object with specified size
+     *
+     * @param size number of candidates that will be kept for 2nd phase.
+     */
+    TuneCandidates(size_t size) : max_size(size) { }
+
+    /**
+     * @brief Push a new tuning candidate to the queue. Will be ignored if there are
+     * already size faster ones.
+     *
+     * @param candidate
+     */
+    void pushCandidate(TuneParam candidate)
+    {
+      if (candidate.time < besttime) besttime = candidate.time;
+
+      if (size() < max_size) {
+        push(candidate);
+        return;
+      }
+      if (candidate.time < top().time) {
+        pop();
+        push(candidate);
+      }
+    }
+    /**
+     * @brief Broadcast candidates among ranks to make sure policy tuning does not break.
+     *
+     */
+    void broadcast()
+    {
+#ifdef MULTI_GPU
+
+      size_t size;
+      std::string serialized;
+      if (comm_rank_global() == 0) {
+        serialized = serialize();
+        size = serialized.length();
+      }
+      comm_broadcast_global(&size, sizeof(size_t));
+
+      if (size > 0) {
+        if (comm_rank_global() == 0) {
+          comm_broadcast_global(const_cast<char *>(serialized.c_str()), size);
+        } else {
+          char *serstr = new char[size + 1];
+          comm_broadcast_global(serstr, size);
+          serstr[size] = '\0'; // null-terminate
+          std::string_view deserialized(serstr);
+          deserialize(deserialized);
+          delete[] serstr;
+        }
+      }
+#endif
+    }
+
+    /**
+     * @brief Return the best time found in tuning.
+     *
+     * @return time in s
+     */
+    float getBestTime() const { return besttime; }
+  };
+
+  /**
    * Return the optimal launch parameters for a given kernel, either
    * by retrieving them from tunecache or autotuning on the spot.
    */
@@ -775,6 +890,7 @@ namespace quda
          can't guarantee that all nodes are partaking */
       if (comm_rank_global() == 0 || !commGlobalReduction() || policyTuning() || uberTuning()) {
         TuneParam best_param;
+        TuneCandidates tc(tunable.num_candidates());
         float best_time;
         time_t now;
 
@@ -798,10 +914,8 @@ namespace quda
         param.aux = make_int4(-1, -1, -1, -1);
         tunable.initTuneParam(param);
 
-        while (tuning) {
-	  //if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	  //printfQuda("qudaDeviceSynchronize\n");
-	  //}
+        const int candidate_iterations = tunable.candidate_iter();
+        while (tuning && candidatetuning) {
           qudaDeviceSynchronize();
 	  //if (verbosity >= QUDA_DEBUG_VERBOSE) {
 	  //printfQuda("tunable.checkLaunchParam\n");
@@ -821,13 +935,7 @@ namespace quda
 	  //printfQuda("timer.start\n");
 	  //}
           timer.start();
-	  //if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	  //printfQuda("tunable.tuningIter\n");
-	  //}
-          for (int i = 0; i < tunable.tuningIter(); i++) {
-	    //if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	    //printfQuda("tunable.apply\n");
-	    //}
+          for (int i = 0; i < candidate_iterations; i++) {
             tunable.apply(stream); // calls tuneLaunch() again, which simply returns the currently active param
           }
           timer.stop();
@@ -843,35 +951,85 @@ namespace quda
               errorQuda("Failed to clear error state %s\n", qudaGetLastErrorString().c_str());
           }
 
-          float elapsed_time = timer.last() / tunable.tuningIter();
-	  //if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	  //warningQuda("timer.last(): %g", timer.last());
-	  //warningQuda("tunable.tuningIter(): %i", tunable.tuningIter());
-	  //warningQuda("tune elapsed_time: %g", elapsed_time);
-	  //warningQuda("error: %i", error);
-	  //warningQuda("tunable.launchError(): %i", tunable.launchError());
-	  //}
+          float elapsed_time = timer.last() / candidate_iterations;
+          param.time = elapsed_time;
+          if ((error == QUDA_SUCCESS) && (tunable.launchError() == QUDA_SUCCESS)) tc.pushCandidate(param);
+
+          if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
+            if (error == QUDA_SUCCESS && tunable.launchError() == QUDA_SUCCESS) {
+              printfQuda("C   %s gives %s\n", tunable.paramString(param).c_str(),
+                         tunable.perfString(elapsed_time).c_str());
+            } else {
+              printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), qudaGetLastErrorString().c_str());
+            }
+          }
+          candidatetuning = tunable.advanceTuneParam(param);
+          tunable.launchError() = QUDA_SUCCESS;
+        }
+
+        if (tc.empty()) { errorQuda("Auto-tuning failed for %s with %s at vol=%s", key.name, key.aux, key.volume); }
+
+        const float min_tune_time = tunable.min_tune_time();
+        const int min_tune_iterations = tunable.min_tune_iter();
+
+        if (policyTuning() || uberTuning()) { tc.broadcast(); }
+        const int tuneiterations
+          = std::max(static_cast<int>(std::ceil(min_tune_time / tc.getBestTime())), min_tune_iterations);
+        if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
+          printfQuda("Candidate tuning finished for %s with %s. Best time %f and now continuing with %i iterations.\n",
+                     key.name, key.aux, tc.getBestTime(), tuneiterations);
+        }
+
+        // we now have the candidates, now need to loop over candidates
+        while (!tc.empty()) {
+          param = tc.top();
+          qudaDeviceSynchronize();
+          tunable.checkLaunchParam(param);
+          if (verbosity >= QUDA_DEBUG_VERBOSE) {
+            printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
+                       static_cast<int>(param.block.x), static_cast<int>(param.block.y),
+                       static_cast<int>(param.block.z), static_cast<int>(param.grid.x), static_cast<int>(param.grid.y),
+                       static_cast<int>(param.grid.z), static_cast<int>(param.shared_bytes),
+                       static_cast<int>(param.aux.x), static_cast<int>(param.aux.y), static_cast<int>(param.aux.z));
+          }
+
+          timer.start();
+          for (int i = 0; i < tuneiterations; i++) {
+            tunable.apply(stream); // calls tuneLaunch() again, which simply returns the currently active param
+          }
+          timer.stop();
+          qudaDeviceSynchronize();
+          auto error = qudaGetLastError();
+
+          if (error != QUDA_SUCCESS) { // check we don't have a sticky error
+            qudaDeviceSynchronize();
+            if (qudaGetLastError() != QUDA_SUCCESS)
+              errorQuda("Failed to clear error state %s\n", qudaGetLastErrorString().c_str());
+          }
+
+          float elapsed_time = timer.last() / tuneiterations;
+
           if ((elapsed_time < best_time) && (error == QUDA_SUCCESS) && (tunable.launchError() == QUDA_SUCCESS)) {
             best_time = elapsed_time;
             best_param = param;
           }
           if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
             if (error == QUDA_SUCCESS && tunable.launchError() == QUDA_SUCCESS) {
-              printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(),
+              printfQuda("T   %s gives %s\n", tunable.paramString(param).c_str(),
                          tunable.perfString(elapsed_time).c_str());
             } else {
               printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), qudaGetLastErrorString().c_str());
             }
           }
-          tuning = tunable.advanceTuneParam(param);
+
           tunable.launchError() = QUDA_SUCCESS;
+          tc.pop();
         }
 
+        tuning = false;
+        candidatetuning = true;
         tune_timer.stop(__func__, __FILE__, __LINE__);
 
-        if (best_time == FLT_MAX) {
-          errorQuda("Auto-tuning failed for %s with %s at vol=%s", key.name, key.aux, key.volume);
-        }
         if (verbosity >= QUDA_VERBOSE) {
           printfQuda("Tuned %s giving %s for %s with %s\n", tunable.paramString(best_param).c_str(),
                      tunable.perfString(best_time).c_str(), key.name, key.aux);
