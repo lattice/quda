@@ -40,6 +40,15 @@ namespace quda {
     sycl::range<3> localSize{tp.block.x, 1, 1};
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
+    //if (globalSize[0] > arg.threads.x) {
+    //  globalSize[0] = arg.threads.x;
+    //  if (localSize[0] > globalSize[0]) localSize[0] = globalSize[0];
+    //} else {
+    //  if (arg.threads.x%tp.block.x) {
+    //warningQuda("K1D %s nondiv %s %s %s", grid_stride?"true":"false",
+    //	    str(arg.threads).c_str(), str(tp.block).c_str(), typeid(Arg).name());
+    //}
+    //}
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Kernel1D grid_stride: %s  sizeof(arg): %lu\n",
 		 grid_stride?"true":"false", sizeof(arg));
@@ -110,14 +119,9 @@ namespace quda {
   qudaError_t
   Kernel2D(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
-    if(arg.threads.x % tp.block.x != 0) {
-      return QUDA_ERROR;
-    }
-    if(arg.threads.y % tp.block.y != 0) {
-      return QUDA_ERROR;
-    }
     auto err = QUDA_SUCCESS;
     sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, 1};
+    //sycl::range<3> globalSize{arg.threads.x, arg.threads.y, 1};
     sycl::range<3> localSize{tp.block.x, tp.block.y, 1};
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
@@ -129,6 +133,13 @@ namespace quda {
       printfQuda("  Functor: %s\n", typeid(Functor<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
     }
+    //if (arg.threads.x%tp.block.x+arg.threads.y%tp.block.y) {
+    //  if (Arg::hasBlockOps()) {
+    //warningQuda("BlockOps");
+    //}
+    //warningQuda("K2D %s nondiv %s %s %s", grid_stride?"true":"false",
+    //	  str(arg.threads).c_str(), str(tp.block).c_str(), typeid(Arg).name());
+    //}
     //auto t0 = __rdtsc();
     try {
       q.submit([&](sycl::handler &h) {
@@ -140,6 +151,7 @@ namespace quda {
 	     quda::Kernel2DImplB<Functor, Arg, grid_stride>(arg, ndi);
 #else
 	     quda::Kernel2DImpl<Functor, Arg, grid_stride>(arg, ndi);
+	     //quda::Kernel2DImpl<Functor, Arg, false>(arg, ndi);
 #endif
 	   });
       });
@@ -264,6 +276,10 @@ namespace quda {
       printfQuda("  Arg: %s\n", typeid(Arg).name());
       //fflush(stdout);
     }
+    //if (arg.threads.x%tp.block.x+arg.threads.y%tp.block.y+arg.threads.z%tp.block.z) {
+    //warningQuda("K3Da %s nondiv %s %s %s", grid_stride?"true":"false",
+    //	  str(arg.threads).c_str(), str(tp.block).c_str(), typeid(Arg).name());
+    //}
     //if (localSize[0]>arg.threads.x) {
     //  localSize[0] = arg.threads.x;
     //  printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
@@ -315,6 +331,10 @@ namespace quda {
       printfQuda("  Functor: %s\n", typeid(Functor<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
     }
+    //if (arg.threads.x%tp.block.x+arg.threads.y%tp.block.y+arg.threads.z%tp.block.z) {
+    //warningQuda("K3Dc %s nondiv %s %s %s", grid_stride?"true":"false",
+    //	  str(arg.threads).c_str(), str(tp.block).c_str(), typeid(Arg).name());
+    //}
     //if (localSize[0]>arg.threads.x) {
     //  localSize[0] = arg.threads.x;
     //  printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),

@@ -29,6 +29,7 @@ namespace quda {
     mutable int color_col_stride;
     mutable int dim_threads;
 
+    constexpr bool hasBlockOps() { return true; }
     long long flops() const
     {
       return ((dslash*2*nDim+clover*1)*(8*Ns*Nc*Ns*Nc)-2*Ns*Nc)*nParity*(long long)out.VolumeCB();

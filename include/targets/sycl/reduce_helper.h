@@ -145,13 +145,15 @@ namespace quda
       = std::min(Arg::max_n_batch_block, device::max_block_size() / (block_size_x * block_size_y));
     using BlockReduce = BlockReduce<T, block_size_x, block_size_y, n_batch_block, true>;
     //__shared__ bool isLastBlockDone[n_batch_block];
-    auto glmem = sycl::ext::oneapi::group_local_memory_for_overwrite<bool[n_batch_block]>(getGroup());
+    //auto glmem = sycl::ext::oneapi::group_local_memory_for_overwrite<bool[n_batch_block]>(getGroup());
     //bool *isLastBlockDone = *glmem.get();
-    auto &isLastBlockDone = *glmem;
+    //auto &isLastBlockDone = *glmem;
+    auto isLastBlockDone = false; // all valid values of idx should finish at the same time
 
-    T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
+    //T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
+    T aggregate = BlockReduce(idx).Reduce(in, r);
 
-    if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
+    if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && idx < arg.threads.z) {
       arg.partial[idx * target::grid_dim().x + target::block_idx().x] = aggregate;
       //__threadfence(); // flush result
       sycl::atomic_fence(sycl::memory_order::release,sycl::memory_scope::device);
@@ -161,25 +163,36 @@ namespace quda
       auto value = atomicAdd(&arg.count[idx], 1);
 
       // determine if last block
-      isLastBlockDone[target::thread_idx().z] = (value == (target::grid_dim().x - 1));
+      //isLastBlockDone[target::thread_idx().z] = (value == (target::grid_dim().x - 1));
+      //isLastBlockDone[idx] = (value == (target::grid_dim().x - 1));
+      isLastBlockDone = (value == (target::grid_dim().x - 1));
     }
 
-    __syncthreads();
+    //__syncthreads();
+    //isLastBlockDone = sycl::group_broadcast(getGroup(), isLastBlockDone);
+    isLastBlockDone = sycl::any_of_group(getGroup(), isLastBlockDone);
 
     // finish the reduction if last block
-    if (isLastBlockDone[target::thread_idx().z]) {
-      auto i = target::thread_idx().y * block_size_x + target::thread_idx().x;
+    //if (isLastBlockDone[target::thread_idx().z]) {
+    //if (idx < arg.threads.z && isLastBlockDone[idx]) {
+    if (isLastBlockDone) {
       T sum = Reducer::init();
-      sycl::atomic_fence(sycl::memory_order::acquire,sycl::memory_scope::device);
-      while (i < target::grid_dim().x) {
-        sum = r(sum, const_cast<T &>(static_cast<volatile T *>(arg.partial)[idx * target::grid_dim().x + i]));
-        i += block_size_x * block_size_y;
+      if (idx < arg.threads.z) {
+	auto i = target::thread_idx().y * block_size_x + target::thread_idx().x;
+	sycl::atomic_fence(sycl::memory_order::acquire,sycl::memory_scope::device);
+	while (i < target::grid_dim().x) {
+	  sum = r(sum, const_cast<T &>(static_cast<volatile T *>(arg.partial)[idx * target::grid_dim().x + i]));
+	  i += block_size_x * block_size_y;
+	}
       }
 
-      sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
+      //sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
+      sum = BlockReduce(idx).Reduce(sum, r);
 
       // write out the final reduced value
-      if (target::thread_idx().y * block_size_x + target::thread_idx().x == 0) {
+      //if (target::thread_idx().y * block_size_x + target::thread_idx().x == 0) {
+      //if (target::thread_idx().y * block_size_x + target::thread_idx().x == 0 && idx < arg.threads.z) {
+      if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && idx < arg.threads.z) {
         arg.result_d[idx] = sum;
         arg.count[idx] = 0; // set to zero for next time
       }

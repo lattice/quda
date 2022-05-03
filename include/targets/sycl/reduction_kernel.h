@@ -57,6 +57,7 @@ namespace quda {
   {
     auto err = QUDA_SUCCESS;
     sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, 1};
+    //sycl::range<3> globalSize{arg.threads.x, arg.threads.y, 1};
     sycl::range<3> localSize{tp.block.x, tp.block.y, 1};
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
@@ -69,6 +70,13 @@ namespace quda {
       printfQuda("  Arg: %s\n", typeid(Arg).name());
       timer.start();
     }
+    //if (arg.threads.x%tp.block.x+arg.threads.y%tp.block.y) {
+    //  if (Arg::hasBlockOps()) {
+    //warningQuda("BlockOps");
+    //}
+    //warningQuda("R2D %s nondiv %s %s %s", grid_stride?"true":"false",
+    //	  str(arg.threads).c_str(), str(tp.block).c_str(), typeid(Arg).name());
+    //}
 #ifndef HIGH_LEVEL_REDUCTIONS
     q.submit([&](sycl::handler& h) {
       //h.parallel_for<class Reduction2D>
@@ -76,6 +84,7 @@ namespace quda {
 	(ndRange,
 	 [=](sycl::nd_item<3> ndi) {
 	   quda::Reduction2DImpl<Transformer, Arg, grid_stride>(arg, ndi);
+	   //quda::Reduction2DImpl<Transformer, Arg, false>(arg, ndi);
 	 });
     });
 #else
@@ -128,13 +137,15 @@ namespace quda {
     auto k = ndi.get_local_id(1);
     auto j = ndi.get_global_id(2);
 
-    if (j >= arg.threads.z) return;
+    //if (j >= arg.threads.z) return;
 
     reduce_t value = t.init();
 
-    while (idx < arg.threads.x) {
-      value = t(value, idx, k, j);
-      if (grid_stride) idx += ndi.get_global_range(0); else break;
+    if (j < arg.threads.z) {
+      while (idx < arg.threads.x) {
+	value = t(value, idx, k, j);
+	if (grid_stride) idx += ndi.get_global_range(0); else break;
+      }
     }
 
     // perform final inter-block reduction and write out result
@@ -164,15 +175,10 @@ namespace quda {
   qudaError_t
   MultiReduction(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
-    if(arg.threads.x % tp.block.x != 0) {
-      return QUDA_ERROR;
-    }
-    if(arg.threads.z % tp.block.z != 0) {
-      return QUDA_ERROR;
-    }
+    //if(tp.block.z>1) return QUDA_ERROR;
     auto err = QUDA_SUCCESS;
-    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y,
-      tp.grid.z*tp.block.z};
+    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, tp.grid.z*tp.block.z};
+    //sycl::range<3> globalSize{arg.threads.x, arg.threads.y, arg.threads.z};
     sycl::range<3> localSize{tp.block.x, tp.block.y, tp.block.z};
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
@@ -184,6 +190,13 @@ namespace quda {
 		 str(localSize).c_str(), str(arg.threads).c_str());
       printfQuda("  reduce_t: %s\n", typeid(reduce_t).name());
     }
+    //if (arg.threads.x%tp.block.x+arg.threads.y%tp.block.y+arg.threads.z%tp.block.z) {
+    //if (Arg::hasBlockOps()) {
+    //warningQuda("BlockOps");
+    //}
+    //warningQuda("MR %s nondiv %s %s %s", grid_stride?"true":"false",
+    //	  str(arg.threads).c_str(), str(tp.block).c_str(), typeid(Arg).name());
+    //}
 #if 1
     sycl::buffer<const char,1>
       buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
@@ -199,6 +212,7 @@ namespace quda {
 	    const char *p = a.get_pointer();
 	    const Arg *arg2 = reinterpret_cast<const Arg*>(p);
 	    MultiReductionImpl<Transformer,Arg,grid_stride>(*arg2,ndi);
+	    //MultiReductionImpl<Transformer,Arg,false>(*arg2,ndi);
 	  });
 	});
     } catch (sycl::exception const& e) {

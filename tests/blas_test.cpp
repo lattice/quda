@@ -989,6 +989,7 @@ double test(Kernel kernel)
         ((double *)B2)[i * Nsrc + j] = blas::reDotProduct(xmD->Component(i), xmD->Component(j));
         error += std::abs(((double *)A2)[i * Nsrc + j] - ((double *)B2)[i * Nsrc + j])
           / std::abs(((double *)B2)[i * Nsrc + j]);
+	printfQuda("%g %g\n", ((double *)A2)[i * Nsrc + j], ((double *)B2)[i * Nsrc + j]);
       }
     }
     error /= Nsrc * Nsrc;

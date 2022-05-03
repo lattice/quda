@@ -190,6 +190,7 @@ namespace quda
      */
     template <bool async = true> inline T Sum(const T &value)
     {
+      if (!async) __syncthreads(); // only synchronize if we are not pipelining
       auto grp = getGroup();
       T result;
       for(int i=0; i<batch_size; i++) {
@@ -197,7 +198,7 @@ namespace quda
 	  blockReduceSum(grp, result, value);
 	} else {
 	  T dum;
-	  T zero{};
+	  auto zero = quda::zero<T>();
 	  blockReduceSum(grp, dum, zero);
 	}
       }
@@ -212,6 +213,7 @@ namespace quda
     template <bool async = true> __device__ __host__ inline T AllSum(const T &value)
     {
       static_assert(batch_size == 1, "Cannot do AllSum with batch_size > 1");
+      if (!async) __syncthreads(); // only synchronize if we are not pipelining
       auto grp = getGroup();
       T result;
       blockReduceSum(grp, result, value);
@@ -226,6 +228,7 @@ namespace quda
     template <bool async = true> __device__ __host__ inline T Max(const T &value)
     {
       static_assert(batch_size == 1, "Cannot do Max with batch_size > 1");
+      if (!async) __syncthreads(); // only synchronize if we are not pipelining
       auto grp = getGroup();
       T result;
       blockReduceMax(grp, result, value);
@@ -240,6 +243,7 @@ namespace quda
     template <bool async = true> __device__ __host__ inline T AllMax(const T &value)
     {
       static_assert(batch_size == 1, "Cannot do AllMax with batch_size > 1");
+      if (!async) __syncthreads(); // only synchronize if we are not pipelining
       auto grp = getGroup();
       T result;
       blockReduceMax(grp, result, value);
@@ -254,6 +258,7 @@ namespace quda
     template <bool async = true> __device__ __host__ inline T Min(const T &value)
     {
       static_assert(batch_size == 1, "Cannot do Min with batch_size > 1");
+      if (!async) __syncthreads(); // only synchronize if we are not pipelining
       auto grp = getGroup();
       T result;
       blockReduceMin(grp, result, value);
@@ -268,6 +273,7 @@ namespace quda
     template <bool async = true> __device__ __host__ inline T AllMin(const T &value)
     {
       static_assert(batch_size == 1, "Cannot do AllMin with batch_size > 1");
+      if (!async) __syncthreads(); // only synchronize if we are not pipelining
       auto grp = getGroup();
       T result;
       blockReduceMin(grp, result, value);
@@ -331,6 +337,7 @@ namespace quda
       return Min<async>(value);
     }
 
+#if 0
     /**
        @brief Perform a block-wide custom reduction
        @param[in] value Thread-local value to be reduced
@@ -346,6 +353,7 @@ namespace quda
       blockReduce(grp, result, value, r);  // FIXME: not used
       return result;
     }
+#endif
   };
 
 } // namespace quda

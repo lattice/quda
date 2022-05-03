@@ -74,7 +74,9 @@ set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-Sycl")
 
 target_compile_options(quda PRIVATE -fsycl)
 target_compile_options(quda PRIVATE -mllvm -pragma-unroll-threshold=16)
-target_compile_options(quda INTERFACE -fhonor-nan-compares)
+if(${CXX_COMPILER_ID} MATCHES "IntelLLVM")
+  target_compile_options(quda INTERFACE -fhonor-nan-compares)
+endif()
 
 target_compile_options(quda PRIVATE -Wno-tautological-constant-compare)
 target_compile_options(quda PRIVATE -Wno-division-by-zero)

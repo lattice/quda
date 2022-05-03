@@ -20,6 +20,7 @@ namespace quda {
       const T &a, &b, &c;
       std::vector<ColorSpinorField *> &x, &y, &z, &w;
 
+      constexpr bool hasBlockOps() { return true; }
       bool tuneSharedBytes() const { return false; }
 
       // for these streaming kernels, there is no need to tune the grid size, just use max

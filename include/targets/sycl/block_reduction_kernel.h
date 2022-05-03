@@ -151,6 +151,13 @@ namespace quda
       printfQuda("  Transformer: %s\n", typeid(Transformer<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
     }
+    //if (arg.threads.x%tp.block.x+arg.threads.y%tp.block.y+arg.threads.z%tp.block.z) {
+    //  if (Arg::hasBlockOps()) {
+    //warningQuda("BlockOps");
+    //}
+    //warningQuda("BK2D %s nondiv %s %s %s", grid_stride?"true":"false",
+    //	  str(arg.threads).c_str(), str(tp.block).c_str(), typeid(Arg).name());
+    //}
     sycl::buffer<const char,1>
       buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
     try {
