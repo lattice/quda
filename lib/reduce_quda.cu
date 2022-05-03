@@ -9,7 +9,7 @@ namespace quda {
 
     template <template <typename ReducerType, typename real> class Reducer,
               typename store_t, typename y_store_t, int nSpin, typename coeff_t>
-    class Reduce : public TunableReduction2D<1>
+    class Reduce : public TunableReduction2D
     {
       using real = typename mapper<y_store_t>::type;
       using host_reduce_t = typename Reducer<double, real>::reduce_t;

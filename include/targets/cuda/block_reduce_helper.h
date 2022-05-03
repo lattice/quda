@@ -87,9 +87,8 @@ namespace quda
     __device__ inline T operator()(const T &value_, bool async, int batch, bool all, const reducer_t &r,
                                    const param_t &)
     {
-      constexpr auto max_block_size_x = device::max_reduce_block_size<param_t::block_size_y, param_t::block_size_z>(); 
-      constexpr auto max_items = (max_block_size_x  / device::warp_size()) * param_t::block_size_y * param_t::block_size_z;
-      const auto warp_items = blockDim.x * param_t::block_size_y * param_t::block_size_z / device::warp_size();
+      constexpr auto max_items = device::max_reduce_block_size() / (device::warp_size() * param_t::batch_size);
+      const auto warp_items = blockDim.x * blockDim.y * blockDim.z / device::warp_size();
       __shared__ T storage[param_t::batch_size][max_items];
 
       // first do warp reduce

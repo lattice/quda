@@ -11,7 +11,7 @@ namespace quda {
 
     template <template <typename ...> class Reducer, typename store_t, typename y_store_t, int nSpin,
               typename T>
-    class MultiReduce : public TunableMultiReduction<1>
+    class MultiReduce : public TunableMultiReduction
     {
       using real = typename mapper<y_store_t>::type;
       using host_reduce_t = typename Reducer<double, real>::reduce_t;

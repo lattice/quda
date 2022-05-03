@@ -12,7 +12,7 @@ namespace quda
   namespace madwf_ml
   {
 
-    template <class storage_t> class tensor_5D_wrapper : public TunableMultiReduction<1>
+    template <class storage_t> class tensor_5D_wrapper : public TunableMultiReduction
     {
       const ColorSpinorField &x;
       const ColorSpinorField &y;

@@ -17,7 +17,7 @@ namespace quda
 {
 
   // declaration of reduce function
-  template <int block_size_y = 1, typename Reducer, typename Arg, typename T>
+  template <typename Reducer, typename Arg, typename T>
   __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0);
 
   /**
@@ -31,7 +31,7 @@ namespace quda
   template <typename T, bool use_kernel_arg = true> struct ReduceArg : kernel_param<use_kernel_arg> {
     using reduce_t = T;
 
-    template <int, typename Reducer, typename Arg, typename I>
+    template <typename Reducer, typename Arg, typename I>
     friend __device__ void reduce(Arg &, const Reducer &, const I &, const int);
     qudaError_t launch_error; /** only do complete if no launch error to avoid hang */
     static constexpr unsigned int max_n_batch_block
@@ -118,11 +118,11 @@ namespace quda
      which reduction this thread block corresponds to.  Typically idx
      will be constant along constant block_idx().y and block_idx().z.
   */
-  template <int block_size_y, typename Reducer, typename Arg, typename T>
+  template <typename Reducer, typename Arg, typename T>
   __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx)
   {
-    constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size<block_size_y>());
-    using BlockReduce = BlockReduce<T, block_size_y, n_batch_block, true>;
+    constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
+    using BlockReduce = BlockReduce<T, n_batch_block>;
     __shared__ bool isLastBlockDone[n_batch_block];
 
     T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
@@ -146,7 +146,7 @@ namespace quda
       T sum = r.init();
       while (i < target::grid_dim().x) {
         sum = r(sum, const_cast<T &>(static_cast<volatile T *>(arg.partial)[idx * target::grid_dim().x + i]));
-        i += target::block_dim().x * block_size_y;
+        i += target::block_dim().x * target::block_dim().y;
       }
 
       sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);

@@ -30,16 +30,11 @@ namespace quda
      @brief block_reduce_param is used as a container for passing
      non-type parameters to specialize block_reduce through the
      target::dispatch
-     @tparam block_size_y_ The number of threads in the y dimension
-     @tparam block_size_z_ The number of threads in the z dimension
-     @tparam batched Whether this is a batched reduction or not.  If
-     batched, then the block_size_z_ parameter is set equal to the
-     batch size.
+     @tparam batch_size Batch size of the reduction.  Threads will be
+     ordered such that batch size is the slowest running index.
    */
-  template <int block_size_y_, int block_size_z_, bool batched> struct block_reduce_param {
-    static constexpr int block_size_y = block_size_y_;
-    static constexpr int block_size_z = !batched ? block_size_z_ : 1;
-    static constexpr int batch_size = !batched ? 1 : block_size_z_;
+  template <int batch_size_ = 1> struct block_reduce_param {
+    static constexpr int batch_size = batch_size_;
   };
 
   /**
@@ -141,16 +136,13 @@ namespace quda
      @brief BlockReduce provides a generic interface for performing
      perform reductions at the block level
      @tparam T The type of the value that we are reducing
-     @tparam block_size_y The number of threads in the y dimension
-     @tparam block_size_z The number of threads in the z dimension
-     @tparam batched Whether this is a batched reduction or not.  If
-     batched, then the block_size_z_ parameter is set equal to the
-     batch size.
+     @tparam batch_size Batch size of the reduction.  Threads will be
+     ordered such that batch size is the slowest running index.
   */
-  template <typename T, int block_size_y = 1, int block_size_z = 1, bool batched = false>
+  template <typename T, int batch_size = 1>
   class BlockReduce
   {
-    using param_t = block_reduce_param<block_size_y, block_size_z, batched>;
+    using param_t = block_reduce_param<batch_size>;
     const int batch;
 
   public:
