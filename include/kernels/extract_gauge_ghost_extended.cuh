@@ -27,7 +27,7 @@ namespace quda {
     int fBody[nDim][nDim];
     int fBuf[nDim][nDim];
     int localParity[nDim];
-    ExtractGhostExArg(const GaugeField &u, const int *R_, void **ghost) :
+    ExtractGhostExArg(const GaugeField &u, const lat_dim_t &R_, void **ghost) :
       kernel_param(dim3(0, 2, 2)),
       u(u, 0, reinterpret_cast<typename Gauge::store_t**>(ghost))
     {

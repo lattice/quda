@@ -11,9 +11,6 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 
-#ifdef MAGMA_LIB
-#include <blas_magma.h>
-#endif
 
 #include <algorithm>
 #include <memory>
@@ -49,7 +46,7 @@ namespace quda {
     static bool SelectSmall(SortedEvals v1, SortedEvals v2) { return (v1._val < v2._val); }
   };
 
-  enum class libtype { eigen_lib, magma_lib, lapack_lib, mkl_lib };
+  enum class libtype { eigen_lib, lapack_lib, mkl_lib };
 
   class GMResDRArgs
   {
@@ -153,11 +150,6 @@ namespace quda {
     inner.is_preconditioner = true;
     inner.global_reduction = false;
     if (inner.global_reduction) warningQuda("Set global reduction flag for preconditioner to true.\n");
-
-    if (outer.precision_sloppy != outer.precision_precondition)
-      inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
-    else
-      inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   }
 
   GMResDR::GMResDR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
@@ -235,9 +227,7 @@ namespace quda {
     GMResDRArgs &args = *gmresdr_args;
 
     if (do_gels) {
-      if (param.extlib_type == QUDA_MAGMA_EXTLIB) {
-        ComputeEta<libtype::magma_lib>(args);
-      } else if (param.extlib_type == QUDA_EIGEN_EXTLIB) {
+      if (param.extlib_type == QUDA_EIGEN_EXTLIB) {
         ComputeEta<libtype::eigen_lib>(args);
       } else {
         errorQuda("Library type %d is currently not supported.\n", param.extlib_type);
@@ -264,9 +254,7 @@ namespace quda {
   {
     GMResDRArgs &args = *gmresdr_args;
 
-    if (param.extlib_type == QUDA_MAGMA_EXTLIB) {
-      ComputeHarmonicRitz<libtype::magma_lib>(args);
-    } else if (param.extlib_type == QUDA_EIGEN_EXTLIB) {
+    if (param.extlib_type == QUDA_EIGEN_EXTLIB) {
       ComputeHarmonicRitz<libtype::eigen_lib>(args);
     } else {
       errorQuda("Library type %d is currently not supported.\n", param.extlib_type);

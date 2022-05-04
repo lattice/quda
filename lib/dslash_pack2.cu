@@ -16,14 +16,14 @@
 namespace quda
 {
 
-  static int commDim[QUDA_MAX_DIM];
+  static int comm_dim_pack[QUDA_MAX_DIM];
 
-  int* getPackComms() { return commDim; }
+  int* getPackComms() { return comm_dim_pack; }
 
   void setPackComms(const int *comm_dim)
   {
-    for (int i = 0; i < 4; i++) commDim[i] = comm_dim[i];
-    for (int i = 4; i < QUDA_MAX_DIM; i++) commDim[i] = 0;
+    for (int i = 0; i < 4; i++) comm_dim_pack[i] = comm_dim[i];
+    for (int i = 4; i < QUDA_MAX_DIM; i++) comm_dim_pack[i] = 0;
   }
 
   template <typename Float, int nSpin, int nColor, bool spin_project>
@@ -88,7 +88,7 @@ protected:
         int max = 2 * 4;
 #endif
         int nDimComms = 0;
-        for (int d = 0; d < in.Ndim(); d++) nDimComms += commDim[d];
+        for (int d = 0; d < in.Ndim(); d++) nDimComms += comm_dim_pack[d];
         return max * nDimComms;
       } else {
         return TunableKernel3D::maxGridSize();
@@ -108,7 +108,7 @@ protected:
         int min = 2;
 #endif
         int nDimComms = 0;
-        for (int d = 0; d < in.Ndim(); d++) nDimComms += commDim[d];
+        for (int d = 0; d < in.Ndim(); d++) nDimComms += comm_dim_pack[d];
         return min * nDimComms;
       } else {
         return TunableKernel3D::minGridSize();
@@ -125,7 +125,7 @@ protected:
         // increments in steps of 2 * number partitioned dimensions
         // for equal division of blocks to each direction/dimension
         int nDimComms = 0;
-        for (int d = 0; d < in.Ndim(); d++) nDimComms += commDim[d];
+        for (int d = 0; d < in.Ndim(); d++) nDimComms += comm_dim_pack[d];
         return 2 * nDimComms;
       } else {
         return TunableKernel3D::gridStep();
@@ -140,7 +140,7 @@ protected:
       strcpy(aux, "policy_kernel,");
       strcat(aux, in.AuxString());
       char comm[5];
-      for (int i = 0; i < 4; i++) comm[i] = (commDim[i] ? '1' : '0');
+      for (int i = 0; i < 4; i++) comm[i] = (comm_dim_pack[i] ? '1' : '0');
       comm[4] = '\0';
       strcat(aux, ",comm=");
       strcat(aux, comm);
@@ -198,7 +198,7 @@ public:
 
     // compute number of number of work items we have to do
     for (int i = 0; i < 4; i++) {
-      if (!commDim[i]) continue;
+      if (!comm_dim_pack[i]) continue;
       work_items += 2 * nFace * in.getDslashConstant().ghostFaceCB[i]; // 2 for forwards and backwards faces
     }
   }
@@ -353,8 +353,6 @@ public:
 #endif
     }
 
-    int tuningIter() const { return 3; }
-
     long long flops() const
     {
       // unless we are spin projecting (nSpin = 4), there are no flops to do
@@ -392,7 +390,7 @@ public:
   {
     int nDimPack = 0;
     for (int d = 0; d < 4; d++) {
-      if (!commDim[d]) continue;
+      if (!comm_dim_pack[d]) continue;
       nDimPack++;
     }
     if (!nDimPack) return; // if zero then we have nothing to pack

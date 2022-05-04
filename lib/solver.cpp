@@ -38,6 +38,12 @@ namespace quda {
     }
   }
 
+  void Solver::create(ColorSpinorField &x, const ColorSpinorField &b)
+  {
+    if (checkPrecision(x, b) != param.precision)
+      errorQuda("Precision mismatch %d %d", checkPrecision(x, b), param.precision);
+  }
+
   // solver factory
   Solver *Solver::create(SolverParam &param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
                          const DiracMatrix &matPrecon, const DiracMatrix &matEig, TimeProfile &profile)
@@ -98,17 +104,9 @@ namespace quda {
       report("PCG");
       solver = new PreconCG(mat, matSloppy, matPrecon, matEig, param, profile);
       break;
-    case QUDA_MPCG_INVERTER:
-      report("MPCG");
-      solver = new MPCG(mat, param, profile);
-      break;
-    case QUDA_MPBICGSTAB_INVERTER:
-      report("MPBICGSTAB");
-      solver = new MPBiCGstab(mat, param, profile);
-      break;
     case QUDA_BICGSTABL_INVERTER:
       report("BICGSTABL");
-      solver = new BiCGstabL(mat, matSloppy, param, profile);
+      solver = new BiCGstabL(mat, matSloppy, matEig, param, profile);
       break;
     case QUDA_EIGCG_INVERTER:
       report("EIGCG");
@@ -416,8 +414,14 @@ namespace quda {
     return eps;
   }
 
-  bool MultiShiftSolver::convergence(const double *r2, const double *r2_tol, int n) const {
+  void MultiShiftSolver::create(const std::vector<ColorSpinorField> &x, const ColorSpinorField &b)
+  {
+    if (checkPrecision(x[0], b) != param.precision)
+      errorQuda("Precision mismatch %d %d", checkPrecision(x[0], b), param.precision);
+  }
 
+  bool MultiShiftSolver::convergence(const std::vector<double> &r2, const std::vector<double> &r2_tol, int n) const
+  {
     // check the L2 relative residual norm if necessary
     if ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) || (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) {
       for (int i = 0; i < n; i++) {
@@ -429,6 +433,21 @@ namespace quda {
     }
 
     return true;
+  }
+
+  /**
+    @brief Returns if a solver is CA or not
+    @return true if CA, false otherwise
+  */
+  bool is_ca_solver(QudaInverterType type)
+  {
+    switch (type) {
+    case QUDA_CA_GCR_INVERTER:
+    case QUDA_CA_CG_INVERTER:
+    case QUDA_CA_CGNR_INVERTER:
+    case QUDA_CA_CGNE_INVERTER: return true;
+    default: return false;
+    }
   }
 
 } // namespace quda

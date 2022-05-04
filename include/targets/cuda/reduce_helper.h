@@ -59,6 +59,7 @@ namespace quda
      memory
    */
   template <typename T, bool use_kernel_arg = true> struct ReduceArg : kernel_param<use_kernel_arg> {
+    using reduce_t = T;
 
     template <int, int, typename Reducer, typename Arg, typename I>
     friend __device__ void reduce(Arg &, const Reducer &, const I &, const int);
@@ -76,6 +77,7 @@ namespace quda
     cuda::atomic<system_atomic_t, cuda::thread_scope_system> *result_h; /** host atomic buffer */
     count_t *count; /** count array that is used to track the number of completed thread blocks at a given batch index */
     bool consumed; // check to ensure that we don't complete more than once unless we explicitly reset
+    T *device_output_async_buffer = nullptr; // Optional device output buffer for the reduction result
 
   public:
     /**
@@ -111,6 +113,22 @@ namespace quda
         result_d = nullptr;
       }
     }
+
+    /**
+      @brief Set device_output_async_buffer
+    */
+    void set_output_async_buffer(T *ptr)
+    {
+      if (!commAsyncReduction()) {
+        errorQuda("When setting the asynchronous buffer the commAsyncReduction option must be set.");
+      }
+      device_output_async_buffer = ptr;
+    }
+
+    /**
+      @brief Get device_output_async_buffer
+    */
+    __device__ __host__ T *get_output_async_buffer() const { return device_output_async_buffer; }
 
     /**
        @brief Finalize the reduction, returning the computed reduction
@@ -188,7 +206,7 @@ namespace quda
     // finish the reduction if last block
     if (isLastBlockDone[target::thread_idx().z]) {
       auto i = target::thread_idx().y * block_size_x + target::thread_idx().x;
-      T sum = arg.init();
+      T sum = r.init();
       while (i < target::grid_dim().x) {
         sum = r(sum, arg.partial[idx * target::grid_dim().x + i].load(cuda::std::memory_order_relaxed));
         i += block_size_x * block_size_y;
@@ -209,6 +227,8 @@ namespace quda
             sum_tmp[i] = sum_tmp[i] == init_value<atomic_t>() ? terminate_value<atomic_t>() : sum_tmp[i];
             arg.result_d[n * idx + i].store(sum_tmp[i], cuda::std::memory_order_relaxed);
           }
+        } else if (arg.get_output_async_buffer()) {
+          arg.get_output_async_buffer()[idx] = sum;
         } else { // write to device memory
           arg.partial[idx].store(sum, cuda::std::memory_order_relaxed);
         }

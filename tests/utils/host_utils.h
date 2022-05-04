@@ -6,12 +6,12 @@
 #include <random_quda.h>
 #include <color_spinor_field.h>
 
-#define gauge_site_size 18      // real numbers per link
-#define spinor_site_size 24     // real numbers per wilson spinor
-#define stag_spinor_site_size 6 // real numbers per staggered 'spinor'
-#define clover_site_size 72     // real numbers per block-diagonal clover matrix
-#define mom_site_size 10        // real numbers per momentum
-#define hw_site_size 12         // real numbers per half wilson
+constexpr size_t gauge_site_size = 18;      // real numbers per link
+constexpr size_t spinor_site_size = 24;     // real numbers per wilson spinor
+constexpr size_t stag_spinor_site_size = 6; // real numbers per staggered 'spinor'
+constexpr size_t clover_site_size = 72;     // real numbers per block-diagonal clover matrix
+constexpr size_t mom_site_size = 10;        // real numbers per momentum
+constexpr size_t hw_site_size = 12;         // real numbers per half wilson
 
 extern int Z[4];
 extern int V;
@@ -108,7 +108,7 @@ void constructPointSpinorSource(void *v, QudaPrecision precision, const int *con
                                 const int dil, const int *const src);
 void constructWallSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int dil);
 void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, QudaSolutionType sol_type,
-                                 const int *const x, quda::RNG &rng);
+                                 const int *const x, int nDim, quda::RNG &rng);
 //------------------------------------------------------
 
 // Helper functions
@@ -192,16 +192,12 @@ int fullLatticeIndex_5d_4dpc(int i, int oddBit);
 int process_command_line_option(int argc, char **argv, int *idx);
 int process_options(int argc, char **argv);
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 // Implemented in face_gauge.cpp
-void exchange_cpu_sitelink(int *X, void **sitelink, void **ghost_sitelink, void **ghost_sitelink_diag,
+void exchange_cpu_sitelink(quda::lat_dim_t &X, void **sitelink, void **ghost_sitelink, void **ghost_sitelink_diag,
                            QudaPrecision gPrecision, QudaGaugeParam *param, int optflag);
-void exchange_cpu_sitelink_ex(int *X, int *R, void **sitelink, QudaGaugeFieldOrder cpu_order, QudaPrecision gPrecision,
-                              int optflag, int geometry);
-void exchange_cpu_staple(int *X, void *staple, void **ghost_staple, QudaPrecision gPrecision);
+void exchange_cpu_sitelink_ex(quda::lat_dim_t &X, quda::lat_dim_t &R, void **sitelink, QudaGaugeFieldOrder cpu_order,
+                              QudaPrecision gPrecision, int optflag, int geometry);
+void exchange_cpu_staple(quda::lat_dim_t &X, void *staple, void **ghost_staple, QudaPrecision gPrecision);
 void exchange_llfat_init(QudaPrecision prec);
 void exchange_llfat_cleanup(void);
 
@@ -214,10 +210,6 @@ void xpay(void *x, double a, void *y, int len, QudaPrecision precision);
 void cxpay(void *x, double _Complex a, void *y, int len, QudaPrecision precision);
 void cpu_axy(QudaPrecision prec, double a, void *x, void *y, int size);
 void cpu_xpy(QudaPrecision prec, void *x, void *y, int size);
-
-#ifdef __cplusplus
-}
-#endif
 
 inline QudaPrecision getPrecision(int i)
 {
@@ -252,6 +244,24 @@ inline double getTolerance(QudaPrecision prec)
   case QUDA_INVALID_PRECISION: return 1.0;
   }
   return 1.0;
+}
+
+/**
+  @brief Check if the std::string has a size smaller than the limit: if yes, copy it to a C-string;
+    if no, give an error based on the given name. The 256 is the C-string length for parameters in
+    QUDA's C interface.
+  @param cstr the destination C-string
+  @param str the input std::string
+  @param limit the limit for the size check
+  @param name the name used for the error message
+ */
+inline void safe_strcpy(char *cstr, const std::string &str, size_t limit, const std::string &name)
+{
+  if (str.size() < limit) {
+    strcpy(cstr, str.c_str());
+  } else {
+    errorQuda("%s is longer (%lu) than the %lu limit.", name.c_str(), str.size(), limit);
+  }
 }
 
 // MG param types

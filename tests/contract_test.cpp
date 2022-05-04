@@ -132,12 +132,12 @@ int test(int contractionType, QudaPrecision test_prec)
   void *d_result = safe_malloc(V * nSpin*nSpin*2 * data_size);
 
   if (test_prec == QUDA_SINGLE_PRECISION) {
-    for (int i = 0; i < V * my_spinor_site_size; i++) {
+    for (auto i = 0lu; i < V * spinor_site_size; i++) {
       ((float *)spinorX)[i] = rand() / (float)RAND_MAX;
       ((float *)spinorY)[i] = rand() / (float)RAND_MAX;
     }
   } else {
-    for (int i = 0; i < V * my_spinor_site_size; i++) {
+    for (auto i = 0lu; i < V * spinor_site_size; i++) {
       ((double *)spinorX)[i] = rand() / (double)RAND_MAX;
       ((double *)spinorY)[i] = rand() / (double)RAND_MAX;
     }
@@ -180,11 +180,11 @@ using ::testing::Values;
 
 class ContractionTest : public ::testing::TestWithParam<::testing::tuple<int, int>>
 {
-  protected:
+protected:
   ::testing::tuple<int, int> param;
 
-  public:
-  virtual ~ContractionTest() {}
+public:
+  virtual ~ContractionTest() { }
   virtual void SetUp() { param = GetParam(); }
 };
 

@@ -300,10 +300,22 @@ namespace quda {
         // momentum only currently supported on MILC (10), TIFR (18) and Float2 (10) fields currently
 	if (out.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-	    typedef FloatNOrder<FloatOut,10,2,10> momOut;
-	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
-	    CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In, 0), in);
-	    copyMom<decltype(arg)>(arg,out,in,location);
+	    if (in.Reconstruct() == QUDA_RECONSTRUCT_10 and out.Reconstruct() == QUDA_RECONSTRUCT_10) {
+	      typedef FloatNOrder<FloatIn,10,2,10> momIn;
+	      typedef FloatNOrder<FloatOut,10,2,10> momOut;
+	      CopyGaugeArg<FloatOut, FloatIn, 10, momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In, 0), in);
+	      copyMom<decltype(arg)>(arg,out,in,location);
+	    } else if (in.Reconstruct() == QUDA_RECONSTRUCT_10) {
+	      typedef FloatNOrder<FloatIn,18,2,11> momIn;
+	      typedef FloatNOrder<FloatOut,18,2,18> momOut;
+	      CopyGaugeArg<FloatOut, FloatIn, 18, momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In, 0), in);
+	      copyMom<decltype(arg)>(arg,out,in,location);
+	    } else {
+	      typedef FloatNOrder<FloatIn,18,2,18> momIn;
+	      typedef FloatNOrder<FloatOut,18,2,11> momOut;
+	      CopyGaugeArg<FloatOut, FloatIn, 18, momOut, momIn> arg(momOut(out, Out, 0), momIn(in, In, 0), in);
+	      copyMom<decltype(arg)>(arg,out,in,location);
+	    }
 	  } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
 #ifdef BUILD_QDP_INTERFACE
 	    typedef FloatNOrder<FloatOut,10,2,10> momOut;

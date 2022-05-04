@@ -107,10 +107,8 @@ typedef enum QudaInverterType_s {
   QUDA_BICGSTAB_INVERTER,
   QUDA_GCR_INVERTER,
   QUDA_MR_INVERTER,
-  QUDA_MPBICGSTAB_INVERTER,
   QUDA_SD_INVERTER,
   QUDA_PCG_INVERTER,
-  QUDA_MPCG_INVERTER,
   QUDA_EIGCG_INVERTER,
   QUDA_INC_EIGCG_INVERTER,
   QUDA_GMRESDR_INVERTER,
@@ -182,10 +180,15 @@ typedef enum QudaMultigridCycleType_s {
 } QudaMultigridCycleType;
 
 typedef enum QudaSchwarzType_s {
-  QUDA_ADDITIVE_SCHWARZ,
-  QUDA_MULTIPLICATIVE_SCHWARZ,
+  QUDA_ADDITIVE_SCHWARZ = 0,
+  QUDA_MULTIPLICATIVE_SCHWARZ = 1,
   QUDA_INVALID_SCHWARZ = QUDA_INVALID_ENUM
 } QudaSchwarzType;
+
+typedef enum QudaAcceleratorType_s {
+  QUDA_MADWF_ACCELERATOR = 0, // Use the MADWF accelerator
+  QUDA_INVALID_ACCELERATOR = QUDA_INVALID_ENUM
+} QudaAcceleratorType;
 
 typedef enum QudaResidualType_s {
   QUDA_L2_RELATIVE_RESIDUAL = 1, // L2 relative residual (default)
@@ -385,6 +388,14 @@ typedef enum QudaNoiseType_s {
   QUDA_NOISE_INVALID = QUDA_INVALID_ENUM
 } QudaNoiseType;
 
+typedef enum QudaDilutionType_s {
+  QUDA_DILUTION_SPIN,
+  QUDA_DILUTION_COLOR,
+  QUDA_DILUTION_SPIN_COLOR,
+  QUDA_DILUTION_SPIN_COLOR_EVEN_ODD,
+  QUDA_DILUTION_INVALID = QUDA_INVALID_ENUM
+} QudaDilutionType;
+
 // used to select projection method for deflated solvers
 typedef enum QudaProjectionType_s {
   QUDA_MINRES_PROJECTION,
@@ -579,19 +590,21 @@ typedef enum QudaContractGamma_s {
   QUDA_CONTRACT_GAMMA_S34 = 15,
   QUDA_CONTRACT_GAMMA_INVALID = QUDA_INVALID_ENUM
 } QudaContractGamma;
-    
-typedef enum QudaGaugeSmearType_s {
-  QUDA_GAUGE_SMEAR_TYPE_APE,
-  QUDA_GAUGE_SMEAR_TYPE_STOUT,
-  QUDA_GAUGE_SMEAR_TYPE_OVR_IMP_STOUT,
-  QUDA_GAUGE_SMEAR_TYPE_INVALID = QUDA_INVALID_ENUM
-} QudaGaugeSmearType;
 
 typedef enum QudaFermionSmearType_s {
   QUDA_FERMION_SMEAR_TYPE_GAUSSIAN,
   QUDA_FERMION_SMEAR_TYPE_WUPPERTAL,
   QUDA_FERMION_SMEAR_TYPE_INVALID = QUDA_INVALID_ENUM
 } QudaFermionSmearType;
+
+typedef enum QudaGaugeSmearType_s {
+  QUDA_GAUGE_SMEAR_APE,
+  QUDA_GAUGE_SMEAR_STOUT,
+  QUDA_GAUGE_SMEAR_OVRIMP_STOUT,
+  QUDA_GAUGE_SMEAR_WILSON_FLOW,
+  QUDA_GAUGE_SMEAR_SYMANZIK_FLOW,
+  QUDA_GAUGE_SMEAR_INVALID = QUDA_INVALID_ENUM
+} QudaGaugeSmearType;
 
 typedef enum QudaWFlowType_s {
   QUDA_WFLOW_TYPE_WILSON,
@@ -603,7 +616,6 @@ typedef enum QudaWFlowType_s {
 typedef enum QudaExtLibType_s {
   QUDA_CUSOLVE_EXTLIB,
   QUDA_EIGEN_EXTLIB,
-  QUDA_MAGMA_EXTLIB,
   QUDA_EXTLIB_INVALID = QUDA_INVALID_ENUM
 } QudaExtLibType;
 

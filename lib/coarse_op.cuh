@@ -242,6 +242,8 @@ namespace quda {
     bool tuneGridDim() const { return false; } // don't tune the grid dimension
     bool tuneAuxDim() const { return (type != COMPUTE_VUV && type != COMPUTE_VLV) ? false : true; }
 
+	int candidate_iter() const override { return 1; }
+
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
       if (type == COMPUTE_VUV || type == COMPUTE_VLV)
         return 4*sizeof(storeType)*arg.max_color_height_per_block*arg.max_color_width_per_block*4*coarseSpin*coarseSpin;
@@ -375,11 +377,7 @@ namespace quda {
         errorQuda("Undefined compute type %d", type);
       }
 
-      if (compute_max) {
-        double max = *arg.max_h;
-        comm_allreduce_max(&max);
-        *arg.max_h = max;
-      }
+      if (compute_max) comm_allreduce_max(*arg.max_h);
     }
 
     /**
@@ -562,9 +560,7 @@ namespace quda {
       if (compute_max && !activeTuning()) {
         qudaMemcpyAsync(arg.max_h, arg.max_d, sizeof(typename Arg::Float), qudaMemcpyDeviceToHost, stream);
         qudaStreamSynchronize(const_cast<qudaStream_t&>(stream));
-        double max = *arg.max_h;
-        comm_allreduce_max(&max);
-        *arg.max_h = max;
+        comm_allreduce_max(*arg.max_h);
       }
     }
 

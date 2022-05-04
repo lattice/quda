@@ -48,7 +48,7 @@ namespace quda {
   public:
     RestrictLaunch(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
                    const int *fine_to_coarse, const int *coarse_to_fine, int parity) :
-      TunableBlock2D(in, coarseColor / coarse_colors_per_thread<fineColor, coarseColor>(), max_y_block()),
+      TunableBlock2D(in, coarseColor / coarse_colors_per_thread<fineColor, coarseColor>(), max_z_block()),
       out(out), in(in), v(v), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
       parity(parity)
     {
@@ -71,8 +71,6 @@ namespace quda {
         errorQuda("Unsupported field order %d", out.FieldOrder());
       }
     }
-
-    int tuningIter() const { return 3; }
 
     bool advanceAux(TuneParam &param) const
     {

@@ -7,6 +7,8 @@
 
 #include <string>
 
+using namespace quda;
+
 static QIO_Layout layout;
 static int lattice_size[4];
 int quda_this_node;

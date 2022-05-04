@@ -45,19 +45,29 @@ namespace quda {
     mmdag(mat.Expose()),
     mmdagSloppy(matSloppy.Expose()),
     mmdagPrecon(matPrecon.Expose()),
-    xp(nullptr),
-    yp(nullptr),
     init(false)
   {
   }
 
-  CG3NE::~CG3NE()
+  void CG3NE::create(ColorSpinorField &x, const ColorSpinorField &b)
   {
-    if (init) {
-      if (xp) delete xp;
-      if (yp) delete yp;
-      init = false;
+    Solver::create(x, b);
+    if (!init) {
+      ColorSpinorParam csParam(x);
+      csParam.create = QUDA_NULL_FIELD_CREATE;
+      xp = ColorSpinorField(csParam);
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      yp = ColorSpinorField(csParam);
+      init = true;
     }
+  }
+
+  ColorSpinorField &CG3NE::get_residual()
+  {
+    if (!init) errorQuda("No residual vector present");
+    if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
+    // CG3 residual will match the CG3NE residual (FIXME: but only with zero initial guess?)
+    return param.use_init_guess ? xp : CG3::get_residual();
   }
 
   // CG3NE: M Mdag y = b is solved; x = Mdag y is returned as solution.
@@ -68,83 +78,75 @@ namespace quda {
       return;
     }
 
+    create(x, b);
+
     const int iter0 = param.iter;
-
-    if (!init) {
-      ColorSpinorParam csParam(x);
-      csParam.create = QUDA_NULL_FIELD_CREATE;
-      xp = ColorSpinorField::Create(csParam);
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      yp = ColorSpinorField::Create(csParam);
-      init = true;
-    }
-
-    double b2 = blas::norm2(b);
+    double b2 = param.compute_true_res ? blas::norm2(b) : 0.0;
 
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-
       // compute initial residual
-      mmdag.Expose()->M(*xp, x);
-      double r2 = blas::xmyNorm(b, *xp);
-      if (b2 == 0.0) b2 = r2;
+      mmdag.Expose()->M(xp, x);
+      if (param.compute_true_res && b2 == 0.0)
+        b2 = blas::xmyNorm(b, xp);
+      else
+        blas::xpay(b, -1.0, xp);
 
       // compute solution to residual equation
-      CG3::operator()(*yp, *xp);
+      CG3::operator()(yp, xp);
 
-      mmdag.Expose()->Mdag(*xp, *yp);
+      mmdag.Expose()->Mdag(xp, yp);
 
       // compute full solution
-      blas::xpy(*xp, x);
-
+      blas::xpy(xp, x);
     } else {
-
-      CG3::operator()(*yp, b);
-      mmdag.Expose()->Mdag(x, *yp);
+      CG3::operator()(yp, b);
+      mmdag.Expose()->Mdag(x, yp);
     }
 
-    // future optimization: with preserve_source == QUDA_PRESERVE_SOURCE_NO; b is already
-    // expected to be the CG residual which matches the CG3NE residual
-    // (but only with zero initial guess).  at the moment, CG does not respect this convention
-    if (param.compute_true_res || param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
-
+    if (param.compute_true_res || (param.use_init_guess && param.return_residual)) {
       // compute the true residual
-      mmdag.Expose()->M(*xp, x);
-
-      ColorSpinorField &A = param.preserve_source == QUDA_PRESERVE_SOURCE_YES ? b : *xp;
-      ColorSpinorField &B = param.preserve_source == QUDA_PRESERVE_SOURCE_YES ? *xp : b;
-      blas::axpby(-1.0, A, 1.0, B);
+      mmdag.Expose()->M(xp, x);
+      blas::xpay(b, -1.0, xp); // xp now holds the residual
 
       double r2;
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-        double3 h3 = blas::HeavyQuarkResidualNorm(x, B);
+        double3 h3 = blas::HeavyQuarkResidualNorm(x, xp);
         r2 = h3.y;
         param.true_res_hq = sqrt(h3.z);
       } else {
-        r2 = blas::norm2(B);
+        r2 = blas::norm2(xp);
       }
       param.true_res = sqrt(r2 / b2);
-
       PrintSummary("CG3NE", param.iter - iter0, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
     }
   }
 
-  CG3NR::CG3NR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
-               TimeProfile &profile) :
+  CG3NR::CG3NR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+               SolverParam &param, TimeProfile &profile) :
     CG3(mdagm, mdagmSloppy, mdagmPrecon, param, profile),
     mdagm(mat.Expose()),
     mdagmSloppy(matSloppy.Expose()),
     mdagmPrecon(matPrecon.Expose()),
-    bp(nullptr),
     init(false)
   {
   }
 
-  CG3NR::~CG3NR()
+  void CG3NR::create(ColorSpinorField &x, const ColorSpinorField &b)
   {
-    if (init) {
-      if (bp) delete bp;
-      init = false;
+    Solver::create(x, b);
+    if (!init) {
+      ColorSpinorParam csParam(b);
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      br = ColorSpinorField(csParam);
+      init = true;
     }
+  }
+
+  ColorSpinorField &CG3NR::get_residual()
+  {
+    if (!init) errorQuda("No residual vector present");
+    if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
+    return br;
   }
 
   // CG3NR: Mdag M x = Mdag b is solved.
@@ -155,47 +157,38 @@ namespace quda {
       return;
     }
 
+    create(x, b);
+
     const int iter0 = param.iter;
-
-    if (!init) {
-      ColorSpinorParam csParam(b);
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      bp = ColorSpinorField::Create(csParam);
-      init = true;
-    }
-
-    double b2 = blas::norm2(b);
-    if (b2 == 0.0) { // compute initial residual vector
-      mdagm.Expose()->M(*bp, x);
-      b2 = blas::norm2(*bp);
-    }
-
-    mdagm.Expose()->Mdag(*bp, b);
-    CG3::operator()(x, *bp);
-
-    if (param.compute_true_res || param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
-
-      // compute the true residual
-      mdagm.Expose()->M(*bp, x);
-
-      ColorSpinorField &A = param.preserve_source == QUDA_PRESERVE_SOURCE_YES ? b : *bp;
-      ColorSpinorField &B = param.preserve_source == QUDA_PRESERVE_SOURCE_YES ? *bp : b;
-      blas::axpby(-1.0, A, 1.0, B);
-
-      double r2;
-      if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-        double3 h3 = blas::HeavyQuarkResidualNorm(x, B);
-        r2 = h3.y;
-        param.true_res_hq = sqrt(h3.z);
-      } else {
-        r2 = blas::norm2(B);
+    double b2 = 0.0;
+    if (param.compute_true_res) {
+      b2 = blas::norm2(b);
+      if (b2 == 0.0) { // compute initial residual vector
+        mdagm.Expose()->M(br, x);
+        b2 = blas::norm2(br);
       }
-      param.true_res = sqrt(r2 / b2);
-      PrintSummary("CG3NR", param.iter - iter0, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
+    }
 
-    } else if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
-      mdagm.Expose()->M(*bp, x);
-      blas::axpby(-1.0, *bp, 1.0, b);
+    mdagm.Expose()->Mdag(br, b);
+    CG3::operator()(x, br);
+
+    if (param.compute_true_res || param.return_residual) {
+      // compute the true residual
+      mdagm.Expose()->M(br, x);
+      blas::xpay(b, -1.0, br); // br now holds the residual
+
+      if (param.compute_true_res) {
+        double r2;
+        if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
+          double3 h3 = blas::HeavyQuarkResidualNorm(x, br);
+          r2 = h3.y;
+          param.true_res_hq = sqrt(h3.z);
+        } else {
+          r2 = blas::norm2(br);
+        }
+        param.true_res = sqrt(r2 / b2);
+        PrintSummary("CG3NR", param.iter - iter0, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
+      }
     }
   }
 
@@ -316,12 +309,7 @@ namespace quda {
     }
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    if(convergence(r2, heavy_quark_res, stop, param.tol_hq)) {
-      if(param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
-        blas::copy(b, r);
-      }
-      return;
-    }
+    if (convergence(r2, heavy_quark_res, stop, param.tol_hq)) return;
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     double r2_old = r2;
@@ -513,10 +501,6 @@ namespace quda {
       mat(r, x, y, tmp);
       param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
       if (use_heavy_quark_res) param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
-    }
-
-    if(param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
-      blas::copy(b, r);
     }
 
     PrintSummary("CG3", k, r2, b2, stop, param.tol_hq);

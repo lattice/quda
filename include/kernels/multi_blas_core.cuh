@@ -41,22 +41,23 @@ namespace quda
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Functor>();
       const int NYW;
       Functor f;
-      MultiBlasArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
-                   std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
+
+      template <typename V>
+      MultiBlasArg(std::vector<V> &x, std::vector<V> &y, std::vector<V> &z, std::vector<V> &w,
                    Functor f, int NYW, int length) :
-        kernel_param(dim3(length * warp_split, NYW, x[0]->SiteSubset())),
+        kernel_param(dim3(length * warp_split, NYW, x[0].get().SiteSubset())),
         NYW(NYW),
         f(f)
       {
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
         for (int i = 0; i < NXZ; ++i) {
-          this->X[i] = *x[i];
-          if (Functor::use_z) this->Z[i] = *z[i];
+          this->X[i] = static_cast<ColorSpinorField&>(x[i]);
+          if (Functor::use_z) this->Z[i] = static_cast<ColorSpinorField&>(z[i]);
         }
         for (int i = 0; i < NYW; ++i) {
-          this->Y[i] = *y[i];
-          if (Functor::use_w) this->W[i] = *w[i];
+          this->Y[i] = static_cast<ColorSpinorField&>(y[i]);
+          if (Functor::use_w) this->W[i] = static_cast<ColorSpinorField&>(w[i]);
         }
       }
     };
@@ -174,6 +175,31 @@ namespace quda
       }
 
       constexpr int flops() const { return 4; }         //! flops per real element
+    };
+
+    /**
+       Functor to perform the operation w = a * x + y
+    */
+    template <typename real>
+    struct multiaxpyz_ : public MultiBlasFunctor<real> {
+      static constexpr memory_access<1, 1, 0, 0> read{ };
+      static constexpr memory_access<0, 0, 0, 1> write{ };
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = true;
+      static constexpr int NXZ_max = 0;
+      using MultiBlasFunctor<real>::a;
+      multiaxpyz_(int NXZ, int NYW) : MultiBlasFunctor<real>(NXZ, NYW) {}
+
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int i, int j) const
+      {
+#pragma unroll
+        for (int k = 0; k < x.size(); k++) {
+          if (j == 0) w[k] = y[k];
+          w[k] = a(j, i) * x[k] + w[k];
+        }
+      }
+
+      constexpr int flops() const { return 2; }         //! flops per real element
     };
 
     /**

@@ -252,12 +252,14 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_madwf_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_testing_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
 {
@@ -298,29 +300,45 @@ extern int Lsdim;
 extern bool dagger;
 extern QudaDslashType dslash_type;
 extern int laplace3D;
-extern char latfile[256];
+extern std::string latfile;
 extern bool unit_gauge;
 extern double gaussian_sigma;
-extern char gauge_outfile[256];
+extern std::string gauge_outfile;
 extern int Nsrc;
 extern int Msrc;
 extern int niter;
 extern int maxiter_precondition;
+extern QudaVerbosity verbosity_precondition;
 extern int gcrNkrylov;
 extern QudaCABasis ca_basis;
 extern double ca_lambda_min;
 extern double ca_lambda_max;
+extern QudaCABasis ca_basis_precondition;
+extern double ca_lambda_min_precondition;
+extern double ca_lambda_max_precondition;
 extern int pipeline;
 extern int solution_accumulator_pipeline;
 extern int test_type;
 extern quda::mgarray<int> nvec;
-extern quda::mgarray<char[256]> mg_vec_infile;
-extern quda::mgarray<char[256]> mg_vec_outfile;
+extern quda::mgarray<std::string> mg_vec_infile;
+extern quda::mgarray<std::string> mg_vec_outfile;
 extern QudaInverterType inv_type;
 extern bool inv_deflate;
 extern bool inv_multigrid;
 extern QudaInverterType precon_type;
 extern QudaSchwarzType precon_schwarz_type;
+extern QudaAcceleratorType precon_accelerator_type;
+
+extern double madwf_diagonal_suppressor;
+extern int madwf_ls;
+extern int madwf_null_miniter;
+extern double madwf_null_tol;
+extern int madwf_train_maxiter;
+extern bool madwf_param_load;
+extern bool madwf_param_save;
+extern std::string madwf_param_infile;
+extern std::string madwf_param_outfile;
+
 extern int precon_schwarz_cycle;
 extern int multishift;
 extern bool verify_results;
@@ -363,6 +381,9 @@ extern QudaGaugeSmearType gauge_smear_type;
 
 extern int mg_levels;
 
+extern int max_res_increase;
+extern int max_res_increase_total;
+
 extern quda::mgarray<QudaFieldLocation> solver_location;
 extern quda::mgarray<QudaFieldLocation> setup_location;
 extern quda::mgarray<int> nu_pre;
@@ -389,6 +410,9 @@ extern double omega;
 extern quda::mgarray<QudaInverterType> coarse_solver;
 extern quda::mgarray<double> coarse_solver_tol;
 extern quda::mgarray<QudaInverterType> smoother_type;
+extern quda::mgarray<QudaCABasis> smoother_solver_ca_basis;
+extern quda::mgarray<double> smoother_solver_ca_lambda_min;
+extern quda::mgarray<double> smoother_solver_ca_lambda_max;
 extern QudaPrecision smoother_halo_prec;
 extern quda::mgarray<double> smoother_tol;
 extern quda::mgarray<int> coarse_solver_maxiter;
@@ -449,10 +473,9 @@ extern bool eig_compute_gamma5;
 extern QudaEigSpectrumType eig_spectrum;
 extern QudaEigType eig_type;
 extern bool eig_arpack_check;
-extern char eig_arpack_logfile[256];
-extern char eig_QUDA_logfile[256];
-extern char eig_vec_infile[256];
-extern char eig_vec_outfile[256];
+extern std::string eig_arpack_logfile;
+extern std::string eig_vec_infile;
+extern std::string eig_vec_outfile;
 extern bool eig_io_parity_inflate;
 extern QudaPrecision eig_save_prec;
 
@@ -542,3 +565,5 @@ extern std::array<int,4> momentum;
 extern bool open_flavor;
 
 extern std::array<int, 4> grid_partition;
+
+extern bool enable_testing;

@@ -106,9 +106,9 @@ namespace quda
      @param[in] dataTemp Temp space
      @param[in] dataOr Input gauge field
      @param[in] epsilon Step size
-     @param[in] wflow_type Wilson (1x1) or Symanzik improved (2x1) staples
+     @param[in] smear_type Wilson (1x1) or Symanzik improved (2x1) staples, else error
   */
-  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaWFlowType wflow_type);
+  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaWFlowType smear_type);
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
