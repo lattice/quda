@@ -105,9 +105,22 @@ namespace quda
       if (thread_idx % device::warp_size() == 0) storage[batch][warp_idx] = value;
       __syncthreads();
 
-      if (thread_idx == 0) {
-        for (int i = 1; i < warp_items; i++) // start from 1 to avoid rereading
-          value = r(storage[batch][i], value);
+      constexpr bool final_warp_reduction = true;
+
+      if constexpr (final_warp_reduction) { // first warp completes the reduction
+        if (warp_idx == 0) {
+          if constexpr (max_items > device::warp_size()) { // never true for max block size 1024, warp = 32
+            value = r.init();
+            for (int i = threadIdx.x; i < warp_items; i += device::warp_size()) value = r(storage[batch][i], value);
+          } else { // optimized path where we know the final reduction will fit in a warp
+            value = threadIdx.x < warp_items ? storage[batch][threadIdx.x] : r.init();
+            value = warp_reduce<true>()(value, false, r, warp_reduce_param<device::warp_size()>());
+          }
+        }
+      } else { // first thread completes the reduction
+        if (thread_idx == 0) {
+          for (int i = 1; i < warp_items; i++) value = r(storage[batch][i], value);
+        }
       }
 
       if (all) {
