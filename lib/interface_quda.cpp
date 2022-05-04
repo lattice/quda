@@ -5271,6 +5271,7 @@ void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservable
   gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileGaugeSmear);
 
   GaugeFieldParam gParam(*gaugeSmeared);
+  gParam.location = QUDA_CUDA_FIELD_LOCATION;
   auto *cudaGaugeTemp = new cudaGaugeField(gParam);
 
   int measurement_n = 0; // The nth measurement to take
