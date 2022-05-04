@@ -29,6 +29,7 @@ namespace quda
     bool tuneGridDim() const final { return grid_stride; }
 
     virtual unsigned int minGridSize() const { return Tunable::minGridSize(); }
+
     virtual int gridStep() const { return minGridSize(); }
 
     /**

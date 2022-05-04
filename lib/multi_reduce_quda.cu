@@ -34,6 +34,9 @@ namespace quda {
         return false;
       }
 
+      unsigned int maxGridSize() const { return std::min((x[0].get().Volume() + device::warp_size() - 1) / device::warp_size(),
+                                                         static_cast<uint64_t>(TunableMultiReduction::maxGridSize())); }
+
     public:
       MultiReduce(const T &a, const T &b, const T &c, const ColorSpinorField &x0, const ColorSpinorField &y0,
                   csfield_ref_vec &x, csfield_ref_vec &y, csfield_ref_vec &z, csfield_ref_vec &w, T &result) :
