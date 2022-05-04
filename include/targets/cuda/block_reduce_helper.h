@@ -88,32 +88,30 @@ namespace quda
                                    const param_t &)
     {
       constexpr auto max_items = device::max_reduce_block_size() / (device::warp_size() * param_t::batch_size);
-      const auto warp_items = blockDim.x * blockDim.y * blockDim.z / device::warp_size();
+      const auto thread_idx = ((param_t::batch_size == 1 ? threadIdx.z * blockDim.y : 0) + threadIdx.y) * blockDim.x + threadIdx.x;
+      const auto warp_idx = thread_idx / device::warp_size();
+      const auto warp_items = blockDim.x * blockDim.y * (param_t::batch_size == 1 ? blockDim.z : 1) / device::warp_size();
+
       __shared__ T storage[param_t::batch_size][max_items];
 
       // first do warp reduce
       T value = warp_reduce<true>()(value_, false, r, warp_reduce_param<device::warp_size()>());
 
       // now do reduction between warps
-      auto warp_idx = threadIdx.x / device::warp_size();
-      auto n_warp = blockDim.x / device::warp_size();
-      auto item_idx = ((param_t::batch_size == 1 ? threadIdx.z * blockDim.y : 0) + threadIdx.y) * n_warp + warp_idx;
 
       if (!async) __syncthreads(); // only synchronize if we are not pipelining
 
-      if (threadIdx.x % device::warp_size() == 0) {
-        storage[batch][item_idx] = value;
-      }
+      // if first thread in warp, write result to shared memory
+      if (thread_idx % device::warp_size() == 0) storage[batch][warp_idx] = value;
       __syncthreads();
 
-      bool thread_zero = (threadIdx.x && threadIdx.y == 0 && (param_t::batch_size == 1 ? threadIdx.z == 0 : true));
-      if (thread_zero == 0) {
+      if (thread_idx == 0) {
         for (int i = 1; i < warp_items; i++) // start from 1 to avoid rereading
           value = r(storage[batch][i], value);
       }
 
       if (all) {
-        if (item_idx == 0) storage[batch][0] = value;
+        if (thread_idx == 0) storage[batch][0] = value;
         __syncthreads();
         value = storage[batch][0];
       }
