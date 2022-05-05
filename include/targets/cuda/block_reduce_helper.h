@@ -10,6 +10,9 @@
    warp- and block-level reductions, using the CUB library
  */
 
+#define USE_CG
+#ifndef USE_CG
+
 // ensures we use shfl_sync and not shfl when compiling with clang
 #if defined(__clang__) && defined(__CUDA__)
 #define CUB_USE_COOPERATIVE_GROUPS
@@ -20,11 +23,22 @@ using namespace quda;
 #include <cub/block/block_reduce.cuh>
 #include <cub/block/block_scan.cuh>
 
+#else
+
+#include <cooperative_groups/reduce.h>
+#include <cooperative_groups/scan.h>
+namespace cg = cooperative_groups;
+
+#endif
+
 namespace quda
 {
 
   // pre-declaration of warp_reduce that we wish to specialize
   template <bool> struct warp_reduce;
+
+
+#ifndef USE_CG
 
   /**
      @brief CUDA specialization of warp_reduce, utilizing cub::WarpReduce
@@ -59,6 +73,83 @@ namespace quda
     }
   };
 
+#else
+
+  template <typename T> struct atomic_type;
+
+  template <typename T, typename U> constexpr auto get_reducer(const plus<U> &r) { return plus<T>(); }
+  template <typename T, typename U> constexpr auto get_reducer(const maximum<U> &r) { return maximum<T>(); }
+  template <typename T, typename U> constexpr auto get_reducer(const minimum<U> &r) { return minimum<T>(); }
+
+  template <typename T, typename U> constexpr auto get_cg_reducer(const plus<U> &r) { return cg::plus<T>(); }
+  template <typename T, typename U> constexpr auto get_cg_reducer(const maximum<U> &r) { return cg::greater<T>(); }
+  template <typename T, typename U> constexpr auto get_cg_reducer(const minimum<U> &r) { return cg::less<T>(); }
+
+  /**
+     @brief CUDA specialization of warp_reduce, utilizing cooperative groups
+  */
+  template <> struct warp_reduce<true> {
+
+    /**
+       @brief Perform a warp-wide reduction using cooperative groups
+       @param[in] value_ thread-local value to be reduced
+       @param[in] all Whether we want all threads to have visibility
+       to the result (all = true) or just the first thread in the
+       warp (all = false).
+       @param[in] r The reduction operation we want to apply
+       @return The warp-wide reduced value
+     */
+    template <typename T, typename reducer_t, typename param_t>
+    std::enable_if_t<sizeof(T) <= 32, T> __device__ inline operator()(const T &value_, bool all, const reducer_t &r, const param_t &)
+    {
+      cg::thread_block cta = cg::this_thread_block();
+      cg::thread_block_tile<device::warp_size()> tile = cg::tiled_partition<device::warp_size()>(cta);
+
+      constexpr bool use_cg_reduce = false;
+
+      if constexpr (!use_cg_reduce) {
+        T value = value_;
+#pragma unroll
+        for (int offset = device::warp_size() / 2; offset >= 1; offset /= 2) value = get_reducer<T>(r)(value, tile.shfl_down(value, offset));
+        if (all) value = tile.shfl(value, 0);
+        return value;
+      } else {
+        return cg::reduce(tile, value_, get_cg_reducer<T>(r));
+      }
+    }
+
+    /**
+       @brief Perform a warp-wide reduction using cooperative groups.
+       This is a wrapper that split up large values into atomic-size
+       pieces, since cg doens't support > 32 byte types.
+       @param[in] value_ thread-local value to be reduced
+       @param[in] all Whether we want all threads to have visibility
+       to the result (all = true) or just the first thread in the
+       warp (all = false).  Unused since cg alway assumes all = true.
+       @param[in] r The reduction operation we want to apply
+       @return The warp-wide reduced value
+     */
+    template <typename T, typename reducer_t, typename param_t>
+    std::enable_if_t<(sizeof(T) > 32), T> __device__ inline operator()(const T &value_, bool all, const reducer_t &r, const param_t &)
+    {
+      using atomic_t = typename atomic_type<T>::type;
+      constexpr size_t n = sizeof(T) / sizeof(atomic_t);
+      static_assert(sizeof(T) == n * sizeof(atomic_t));
+      atomic_t sum_tmp[n];
+      memcpy(sum_tmp, &value_, sizeof(T));
+#pragma unroll
+      for (int i = 0; i < n; i++) sum_tmp[i] = operator()(sum_tmp[i], all, r, param_t());
+      T value;
+      memcpy(&value, sum_tmp, sizeof(T));
+      return value;
+    }
+
+  };
+
+
+#endif
+
+
   // pre-declaration of block_reduce that we wish to specialize
   template <bool> struct block_reduce;
 
@@ -88,18 +179,19 @@ namespace quda
                                    const param_t &)
     {
       constexpr auto max_items = device::max_reduce_block_size() / (device::warp_size() * param_t::batch_size);
-      const auto thread_idx = ((param_t::batch_size == 1 ? threadIdx.z * blockDim.y : 0) + threadIdx.y) * blockDim.x + threadIdx.x;
+      const auto thread_idx = threadIdx.y * blockDim.x + threadIdx.x;
       const auto warp_idx = thread_idx / device::warp_size();
-      const auto warp_items = blockDim.x * blockDim.y * (param_t::batch_size == 1 ? blockDim.z : 1) / device::warp_size();
-
-      __shared__ T storage[param_t::batch_size][max_items];
+      const auto warp_items = blockDim.x * blockDim.y / device::warp_size();
 
       // first do warp reduce
       T value = warp_reduce<true>()(value_, false, r, warp_reduce_param<device::warp_size()>());
 
-      // now do reduction between warps
+      if (!all && warp_items == 1) return value; // short circuit for single warp CTA
 
+      // now do reduction between warps
       if (!async) __syncthreads(); // only synchronize if we are not pipelining
+
+      __shared__ T storage[param_t::batch_size][max_items];
 
       // if first thread in warp, write result to shared memory
       if (thread_idx % device::warp_size() == 0) storage[batch][warp_idx] = value;
