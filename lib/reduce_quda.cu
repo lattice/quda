@@ -38,7 +38,7 @@ namespace quda {
     public:
       Reduce(const coeff_t &a, const coeff_t &b, const coeff_t &, ColorSpinorField &x, ColorSpinorField &y,
              ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, host_reduce_t &result) :
-        TunableReduction2D(x),
+        TunableReduction2D(x, 1u),
         r(a, b),
         nParity((x.IsComposite() ? x.CompositeDim() : 1) * (x.SiteSubset())),
         a(a),

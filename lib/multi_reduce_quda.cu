@@ -40,7 +40,7 @@ namespace quda {
     public:
       MultiReduce(const T &a, const T &b, const T &c, const ColorSpinorField &x0, const ColorSpinorField &y0,
                   csfield_ref_vec &x, csfield_ref_vec &y, csfield_ref_vec &z, csfield_ref_vec &w, T &result) :
-        TunableMultiReduction(x[0], y.size(), max_n_batch_block_multi_reduce()),
+        TunableMultiReduction(x[0], 1u, y.size(), max_n_batch_block_multi_reduce()),
         NXZ(x.size()),
         NYW(y.size()),
         r(NXZ, NYW),

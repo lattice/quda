@@ -24,7 +24,7 @@ namespace quda
 
     public:
       tensor_5D_wrapper(const ColorSpinorField &x, const ColorSpinorField &y, MadwfAcc::transfer_float *wm_p) :
-        TunableMultiReduction(x, x.X(4) * y.X(4)), x(x), y(y), wm_p(reinterpret_cast<reduce_t *>(wm_p))
+        TunableMultiReduction(x, 1u, x.X(4) * y.X(4)), x(x), y(y), wm_p(reinterpret_cast<reduce_t *>(wm_p))
       {
         char x_str[16];
         char y_str[16];

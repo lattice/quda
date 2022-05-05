@@ -21,6 +21,8 @@ namespace quda
   protected:
     static constexpr bool grid_stride = true;
 
+    const unsigned int block_size_y;
+
     /**
        @brief Reduction kernels require grid-size tuning, so enable this, and
        we mark as final to prevent a derived class from accidentally
@@ -55,6 +57,7 @@ namespace quda
     template <template <typename> class Functor, typename T, typename FunctorArg>
     void launch_device(T &result, const TuneParam &tp, const qudaStream_t &stream, FunctorArg &arg)
     {
+      if (arg.threads.y != block_size_y) errorQuda("Unexected y threads: received %d, expected %d", arg.threads.y, block_size_y);
       using Arg = ReduceKernelArg<FunctorArg>;
       arg.launch_error = TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Reduction2D), tp, stream, Arg(arg));
 
@@ -78,6 +81,7 @@ namespace quda
     template <template <typename> class Functor, typename T, typename Arg>
     void launch_host(T &result, const TuneParam &, const qudaStream_t &, Arg &arg)
     {
+      if (arg.threads.y != block_size_y) errorQuda("Unexected y threads: received %d, expected %d", arg.threads.y, block_size_y);
       std::vector<T> result_(1);
       result_[0] = Reduction2D_host<Functor, Arg>(arg);
       if (!activeTuning() && commGlobalReduction()) Functor<Arg>::comm_reduce(result_);
@@ -113,10 +117,12 @@ namespace quda
     /**
        @brief Constructor for kernels that use a lattice field
        @param[in] field A lattice field instance used for metadata
+       @param[in] block_size_y Number of y threads in the block
        @param[in] location Optional overload for the location where the calculation will take place
      */
-    TunableReduction2D(const LatticeField &field, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableKernel(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location())
+    TunableReduction2D(const LatticeField &field, unsigned int block_size_y = 2, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+      TunableKernel(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location()),
+      block_size_y(block_size_y)
     {
       strcpy(vol, field.VolString());
       strcpy(aux, compile_type_str(field, location));
@@ -130,11 +136,31 @@ namespace quda
        @param[in] n_items Number of items being reduced
        @param[in] location Location where the calculation will take place
      */
-    TunableReduction2D(size_t n_items, QudaFieldLocation location) : TunableKernel(location)
+    TunableReduction2D(size_t n_items, QudaFieldLocation location) : TunableKernel(location), block_size_y(1)
     {
       u64toa(vol, n_items);
       strcpy(aux, compile_type_str(location));
       if (commAsyncReduction()) strcat(aux, "async,");
+    }
+
+    /**
+       @brief Overload that sets ensures the z-dimension block size is set appropriately
+       @param[in,out] param TuneParam object passed during autotuning
+     */
+    virtual void initTuneParam(TuneParam &param) const
+    {
+      TunableKernel::initTuneParam(param);
+      param.block.y = block_size_y;
+    }
+
+    /**
+       @brief Overload that sets ensures the z-dimension block size is set appropriately
+       @param[in,out] param TuneParam object passed during autotuning
+     */
+    virtual void defaultTuneParam(TuneParam &param) const
+    {
+      TunableKernel::defaultTuneParam(param);
+      param.block.y = block_size_y;
     }
   };
 
@@ -252,14 +278,15 @@ namespace quda
   public:
     /**
        @brief Constructor for kernels that use a lattice field
+       @param[in] block_size_y Number of y threads in the block
        @param[in] n_batch The batch size for the multi-reduction (number of reductions we are performing)
        @param[in] n_batch_block_max Maximum batch size per block (maximum z-dimension block size)
        @param[in] field A lattice field instance used for metadata
        @param[in] location Optional overload for the location where the calculation will take place
      */
-    TunableMultiReduction(const LatticeField &field, unsigned int n_batch, unsigned int n_batch_block_max = 1u,
+    TunableMultiReduction(const LatticeField &field, unsigned int block_size_y, unsigned int n_batch, unsigned int n_batch_block_max = 1u,
                           QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableReduction2D(field, location), n_batch(n_batch), n_batch_block_max(n_batch_block_max)
+      TunableReduction2D(field, block_size_y, location), n_batch(n_batch), n_batch_block_max(n_batch_block_max)
     {
     }
 
@@ -314,8 +341,8 @@ namespace quda
     void initTuneParam(TuneParam &param) const
     {
       Tunable::initTuneParam(param);
-      param.block = {param.block.x, 1, 1};
-      param.grid = {param.grid.x, 1, (n_batch + param.block.z - 1) / param.block.z};
+      param.block = {param.block.x, param.block.y, 1};
+      param.grid = {param.grid.x, param.grid.y, (n_batch + param.block.z - 1) / param.block.z};
     }
 
     /**
@@ -325,8 +352,8 @@ namespace quda
     void defaultTuneParam(TuneParam &param) const
     {
       Tunable::defaultTuneParam(param);
-      param.block = {param.block.x, 1, 1};
-      param.grid = {param.grid.x, 1, (n_batch + param.block.z - 1) / param.block.z};
+      param.block = {param.block.x, param.block.y, 1};
+      param.grid = {param.grid.x, param.grid.y, (n_batch + param.block.z - 1) / param.block.z};
     }
   };
 
