@@ -116,7 +116,7 @@ namespace quda
   void MG::reset(bool refresh) {
     pushLevel(param.level);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%s level %d\n", transfer ? "Resetting" : "Creating", param.level);
+    logQuda(QUDA_VERBOSE, "%s level %d\n", transfer ? "Resetting" : "Creating", param.level);
 
     destroySmoother();
     destroyCoarseSolver();
@@ -1174,7 +1174,7 @@ namespace quda
   {
     pushOutputPrefix(prefix);
 
-    if (param.level < param.Nlevel - 1) { // set parity for the solver in the transfer operator
+    if (!is_coarsest_grid()) { // set parity for the solver in the transfer operator
       QudaSiteSubset site_subset
         = param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
       QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
@@ -1372,8 +1372,8 @@ namespace quda
     auto setup_type = param.mg_global.setup_type[param.level];
 
     // if a near-null vector input file is specified, always load it and
-    // ignore other setup information
-    if (strcmp(param.mg_global.vec_infile[param.level], "") != 0) {
+    // ignore other setup information, UNLESS we're refreshing
+    if (strcmp(param.mg_global.vec_infile[param.level], "") != 0 && !refresh) {
       loadVectors();
     } else {
 
@@ -1389,16 +1389,13 @@ namespace quda
         // Run the eigensolver
         generateEigenvectors();
       } else if (setup_type == QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS ||
-                 setup_type == QUDA_SETUP_NULL_VECTOR_CHEBYSHEV_FILTER ||
-                 setup_type == QUDA_SETUP_NULL_VECTOR_TEST_VECTORS) {
+                 setup_type == QUDA_SETUP_NULL_VECTOR_CHEBYSHEV_FILTER) {
         
         // multiple setup iterations only matters for test vector setup
-        if (param.mg_global.num_setup_iter[param.level] > 1 &&
-          setup_type == QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS)
+        if (param.mg_global.num_setup_iter[param.level] > 1)
           errorQuda("Multiple setup iterations can only be used with test vector setup");
 
         // Initializing to random vectors 
-        // FIXME: do not do if in the *middle* of test vector setup
         if (!refresh) {
           int num_initialize = (setup_type == QUDA_SETUP_NULL_VECTOR_CHEBYSHEV_FILTER) ? param.mg_global.filter_startup_vectors[param.level] : (int)param.B.size();
           for (int i = 0; i < num_initialize; i++) {
@@ -1407,21 +1404,27 @@ namespace quda
           }
         }
 
+        logQuda(QUDA_VERBOSE, "Running vectors setup on level %d\n", param.level);
+
+        if (setup_type == QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS) {
+          generateInverseIterations(param.B, refresh);
+        } else {
+          // Chebyshev filter
+          generateChebyshevFilter(param.B);
+        }
+
+      } else if (setup_type == QUDA_SETUP_NULL_VECTOR_TEST_VECTORS) {
+        errorQuda("Test vector setup is currently not enabled.");
+
         for (int si = 0; si < param.mg_global.num_setup_iter[param.level]; si++) {
           logQuda(QUDA_VERBOSE, "Running vectors setup on level %d iter %d of %d\n", param.level, si + 1,
                   param.mg_global.num_setup_iter[param.level]);
 
-          if (setup_type == QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS ||
-            setup_type == QUDA_SETUP_NULL_VECTOR_TEST_VECTORS) {
-            generateInverseIterations(param.B, refresh);
-          } else {
-            // Chebyshev filter
-            generateChebyshevFilter(param.B);
-          }
-
-          // recurse when doing test setups
-          if (setup_type == QUDA_SETUP_NULL_VECTOR_TEST_VECTORS &&
-              param.mg_global.setup_inv_type[param.level] == QUDA_MG_INVERTER) {
+          // can we do test vectors + chebyshev filter setup?
+          generateInverseIterations(param.B, refresh);
+          
+          // recurse when doing test setups, currently buggy
+          if (param.mg_global.setup_inv_type[param.level] == QUDA_MG_INVERTER) {
             if (transfer) {
               resetTransfer = true;
               reset();
@@ -1434,6 +1437,7 @@ namespace quda
           }
 
         }
+
       } else {
         errorQuda("Invalid setup type %d", setup_type);
       }
