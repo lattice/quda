@@ -22,7 +22,7 @@ namespace quda {
     Gauge U;
 
     GaugePlaqArg(const GaugeField &U_) :
-      ReduceArg<reduce_t>(dim3(U_.LocalVolumeCB(), 1, 1)),
+      ReduceArg<reduce_t>(dim3(U_.LocalVolumeCB(), 2, 1)),
       U(U_)
     {
       for (int dir=0; dir<4; ++dir){
