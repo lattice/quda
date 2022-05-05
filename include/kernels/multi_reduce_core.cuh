@@ -18,7 +18,7 @@ namespace quda
        For now, we leave this at 1, but this is something that will be
        returned to as a future optimization.
      */
-    constexpr unsigned int max_n_batch_block_multi_reduce() { return 1; }
+    constexpr unsigned int max_n_batch_block_multi_reduce() { return 8; }
 
     /**
        @brief Parameter struct for generic multi-reduce blas kernel.

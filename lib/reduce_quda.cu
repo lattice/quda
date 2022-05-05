@@ -32,8 +32,6 @@ namespace quda {
       }
 
       unsigned int maxBlockSize(const TuneParam &) const { return device::max_reduce_block_size(); }
-      unsigned int maxGridSize() const { return std::min((x.Volume() + device::warp_size() - 1) / device::warp_size(),
-                                                         static_cast<uint64_t>(TunableReduction2D::maxGridSize())); }
 
     public:
       Reduce(const coeff_t &a, const coeff_t &b, const coeff_t &, ColorSpinorField &x, ColorSpinorField &y,

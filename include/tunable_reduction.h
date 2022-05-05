@@ -21,6 +21,14 @@ namespace quda
   protected:
     static constexpr bool grid_stride = true;
 
+    /**
+       Number of items being reduced in x dimension: used as a heuristic for setting tuning parameters
+    */
+    const size_t n_items;
+
+    /**
+       Number of threads in y thread block
+     */
     const unsigned int block_size_y;
 
     /**
@@ -30,7 +38,10 @@ namespace quda
     */
     bool tuneGridDim() const final { return grid_stride; }
 
-    virtual unsigned int minGridSize() const { return Tunable::minGridSize(); }
+    virtual unsigned int minGridSize() const { return std::max(maxGridSize() / 32, 1u); }
+
+    virtual unsigned int maxGridSize() const { return std::min((n_items + device::warp_size() - 1) / device::warp_size(),
+                                                               static_cast<uint64_t>(TunableKernel::maxGridSize())); }
 
     virtual int gridStep() const { return minGridSize(); }
 
@@ -122,6 +133,7 @@ namespace quda
      */
     TunableReduction2D(const LatticeField &field, unsigned int block_size_y = 2, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableKernel(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location()),
+      n_items(field.Volume()),
       block_size_y(block_size_y)
     {
       strcpy(vol, field.VolString());
@@ -136,7 +148,10 @@ namespace quda
        @param[in] n_items Number of items being reduced
        @param[in] location Location where the calculation will take place
      */
-    TunableReduction2D(size_t n_items, QudaFieldLocation location) : TunableKernel(location), block_size_y(1)
+    TunableReduction2D(size_t n_items, QudaFieldLocation location) :
+      TunableKernel(location),
+      n_items(n_items),
+      block_size_y(1)
     {
       u64toa(vol, n_items);
       strcpy(aux, compile_type_str(location));
@@ -180,20 +195,6 @@ namespace quda
   protected:
     const unsigned int n_batch;           /** Reduction batch size */
     const unsigned int n_batch_block_max; /** Maximum reduction batch per thread block */
-
-    /**
-       @brief we don't want to inherit TunableReduction2D behaviour
-       here which is catered for non-block / non-batch reductions, so
-       inherit from the "grandfather"
-    */
-    virtual unsigned int minGridSize() const { return Tunable::minGridSize(); }
-
-    /**
-       @brief we don't want to inherit TunableReduction2D behaviour
-       here which is catered for non-block / non-batch reductions, so
-       inherit from the "grandfather"
-    */
-    virtual int gridStep() const { return Tunable::gridStep(); }
 
     /**
        @brief The maximum block size in the x dimension is the total number
