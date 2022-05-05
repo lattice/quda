@@ -567,7 +567,7 @@ namespace quda {
         }
 
         // if L2 broke down already we turn off reliable updates and restart the CG
-        if (ru.reliable_heavy_quark_break(L2breakdown, heavy_quark_res, heavy_quark_res_old, heavy_quark_restart)) {
+        if (use_heavy_quark_res && ru.reliable_heavy_quark_break(L2breakdown, heavy_quark_res, heavy_quark_res_old, heavy_quark_restart)) {
           break;
         }
 

@@ -450,4 +450,24 @@ namespace quda {
     }
   }
 
+  /**
+    @brief Returns if a solver supports deflation or not
+    @return true if solver supports deflation, false otherwise
+  */
+  bool is_deflatable_solver(QudaInverterType type) {
+    switch (type) {
+    case QUDA_CG_INVERTER:
+    case QUDA_CGNR_INVERTER:
+    case QUDA_CGNE_INVERTER:
+    case QUDA_PCG_INVERTER:
+    case QUDA_CA_CG_INVERTER:
+    case QUDA_CA_CGNR_INVERTER:
+    case QUDA_CA_CGNE_INVERTER:
+    case QUDA_GCR_INVERTER:
+    case QUDA_CA_GCR_INVERTER:
+    case QUDA_BICGSTABL_INVERTER: return true;
+    default: return false;
+    }
+  }
+
 } // namespace quda

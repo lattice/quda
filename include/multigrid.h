@@ -439,6 +439,14 @@ namespace quda {
     void generateFreeVectors();
 
     /**
+      @brief Orthonormalize a vector of ColorSpinorField, erroring out if
+             the fields are not sufficiently linearly independent
+      @param vecs vector of ColorSpinorFields to normalize
+      @param count number of near-null vectors to orthonormalize, default all
+    */
+    void orthonormalize_vectors(std::vector<ColorSpinorField*>& vecs, int count = -1) const;
+
+    /**
        @brief Return the total flops done on this and all coarser levels.
      */
     double flops() const;
@@ -456,6 +464,14 @@ namespace quda {
 
       return (param.level == 0 || kd_nearnull_gen);
     }
+
+    /**
+      @brief Return if we're on the coarsest grid right now
+    */
+    bool is_coarsest_grid() const {
+      return (param.level == (param.Nlevel - 1));
+    }
+
   };
 
   /**

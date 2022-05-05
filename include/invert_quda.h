@@ -1694,4 +1694,10 @@ public:
  */
  bool is_ca_solver(QudaInverterType type);
 
+ /**
+   @brief Returns if a solver supports deflation or not
+   @return true if solver supports deflation, false otherwise
+ */
+ bool is_deflatable_solver(QudaInverterType type);
+
 } // namespace quda
