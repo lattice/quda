@@ -185,36 +185,68 @@ namespace quda
   {
     constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
     using BlockReduce = BlockReduce<T, n_batch_block>;
-    __shared__ bool isLastBlockDone[n_batch_block];
 
     T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
 
-    if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
-      // need to call placement new constructor since partial is not necessarily constructed
-      new (arg.partial + idx * target::grid_dim().x + target::block_idx().x) cuda::atomic<T, cuda::thread_scope_device> {aggregate};
+    if (target::block_dim().x > 1) {
 
-      // increment global block counter for this reduction
-      auto value = arg.count[idx].fetch_add(1, cuda::std::memory_order_release);
+      __shared__ bool isLastBlockDone[n_batch_block];
 
-      // determine if last block
-      isLastBlockDone[target::thread_idx().z] = (value == (target::grid_dim().x - 1));
-    }
+      if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
+        // need to call placement new constructor since partial is not necessarily constructed
+        new (arg.partial + idx * target::grid_dim().x + target::block_idx().x) cuda::atomic<T, cuda::thread_scope_device> {aggregate};
 
-    __syncthreads();
+        // increment global block counter for this reduction
+        auto value = arg.count[idx].fetch_add(1, cuda::std::memory_order_release);
 
-    // finish the reduction if last block
-    if (isLastBlockDone[target::thread_idx().z]) {
-      auto i = target::thread_idx().y * target::block_dim().x + target::thread_idx().x;
-      T sum = r.init();
-      while (i < target::grid_dim().x) {
-        sum = r(sum, arg.partial[idx * target::grid_dim().x + i].load(cuda::std::memory_order_relaxed));
-        i += target::block_dim().x * target::block_dim().y;
+        // determine if last block
+        isLastBlockDone[target::thread_idx().z] = (value == (target::grid_dim().x - 1));
       }
 
-      sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
+      __syncthreads();
+
+      // finish the reduction if last block
+      if (isLastBlockDone[target::thread_idx().z]) {
+        auto i = target::thread_idx().y * target::block_dim().x + target::thread_idx().x;
+        T sum = r.init();
+        while (i < target::grid_dim().x) {
+          sum = r(sum, arg.partial[idx * target::grid_dim().x + i].load(cuda::std::memory_order_relaxed));
+          i += target::block_dim().x * target::block_dim().y;
+        }
+
+        sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
+
+        // write out the final reduced value
+        if (target::thread_idx().y * target::block_dim().x + target::thread_idx().x == 0) {
+          if (arg.result_d) { // write to host mapped memory
+            using atomic_t = typename atomic_type<T>::type;
+            constexpr size_t n = sizeof(T) / sizeof(atomic_t);
+            atomic_t sum_tmp[n];
+            memcpy(sum_tmp, &sum, sizeof(sum));
+#pragma unroll
+            for (unsigned int i = 0; i < n; i++) {
+              // catch the case where the computed value is equal to the init_value
+              sum_tmp[i] = sum_tmp[i] == init_value<atomic_t>() ? terminate_value<atomic_t>() : sum_tmp[i];
+              arg.result_d[n * idx + i].store(sum_tmp[i], cuda::std::memory_order_relaxed);
+            }
+          } else if (arg.get_output_async_buffer()) {
+            arg.get_output_async_buffer()[idx] = sum;
+          } else { // write to device memory
+            arg.partial[idx].store(sum, cuda::std::memory_order_relaxed);
+          }
+          // TODO in principle we could remove this final atomic store
+          // if we use a sense reversal barrier, avoiding the need to
+          // reset the count at the end
+          arg.count[idx].store(0, cuda::std::memory_order_relaxed); // set to zero for next time
+        }
+      }
+
+    } else { // specialization when we have a single block per reduced value
 
       // write out the final reduced value
-      if (target::thread_idx().y * target::block_dim().x + target::thread_idx().x == 0) {
+      if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
+        T sum = aggregate;
+
         if (arg.result_d) { // write to host mapped memory
           using atomic_t = typename atomic_type<T>::type;
           constexpr size_t n = sizeof(T) / sizeof(atomic_t);
@@ -237,6 +269,7 @@ namespace quda
         arg.count[idx].store(0, cuda::std::memory_order_relaxed); // set to zero for next time
       }
     }
+
   }
 
 } // namespace quda
