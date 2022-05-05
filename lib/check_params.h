@@ -775,8 +775,10 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   for (int i=0; i<n_level; i++) {
 #ifdef INIT_PARAM
     P(setup_type[i], QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS);
+    P(setup_restrict_remaining_type[i], QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS);
 #else
     P(setup_type[i], QUDA_SETUP_NULL_VECTOR_INVALID);
+    P(setup_restrict_remaining_type[i], QUDA_SETUP_NULL_VECTOR_INVALID);
 #endif
 
 #ifdef INIT_PARAM
@@ -803,10 +805,12 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(setup_tol[i], 5e-6);
     P(setup_maxiter[i], 500);
     P(setup_maxiter_refresh[i], 0);
+    P(setup_maxiter_inverse_iterations_polish[i], 0);
 #else
     P(setup_tol[i], INVALID_DOUBLE);
     P(setup_maxiter[i], INVALID_INT);
     P(setup_maxiter_refresh[i], INVALID_INT);
+    P(setup_maxiter_inverse_iterations_polish[i], INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM

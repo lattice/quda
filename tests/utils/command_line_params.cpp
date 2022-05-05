@@ -132,12 +132,14 @@ quda::mgarray<QudaSolveType> coarse_solve_type = {};
 quda::mgarray<QudaSolveType> smoother_solve_type = {};
 
 quda::mgarray<QudaNullVectorSetupType> setup_type = {};
+quda::mgarray<QudaNullVectorSetupType> setup_restrict_remaining_type = {};
 
 // Parameters for inverse iterations setup
 quda::mgarray<int> num_setup_iter = {};
 quda::mgarray<double> setup_tol = {};
 quda::mgarray<int> setup_maxiter = {};
 quda::mgarray<int> setup_maxiter_refresh = {};
+quda::mgarray<int> setup_maxiter_inverse_iterations_polish = {};
 quda::mgarray<QudaCABasis> setup_ca_basis = {};
 quda::mgarray<int> setup_ca_basis_size = {};
 quda::mgarray<double> setup_ca_lambda_min = {};
@@ -899,6 +901,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(opgroup, "--mg-setup-type", setup_type, CLI::QUDACheckedTransformer(setup_type_map),
     "The type of setup to use for the multigrid; ignored if --mg-load-vec is set (inverse-iterations (default), chebyshev-filter, eigenvectors, test-vectors, restrict-fine, free-field)");
 
+  quda_app->add_mgoption(opgroup, "--mg-setup-restrict-remaining-type", setup_restrict_remaining_type, CLI::QUDACheckedTransformer(setup_type_map),
+    "The type of setup to use for remaining vectors if restricting all fine null vectors (inverse-iterations (default), chebyshev-filter)");
+
   quda_app->add_mgoption(opgroup, "--mg-setup-ca-basis-size", setup_ca_basis_size, CLI::PositiveNumber,
                          "The basis size to use for CA solver setup of multigrid (default 4)");
   quda_app->add_mgoption(opgroup, "--mg-setup-ca-basis-type", setup_ca_basis, CLI::QUDACheckedTransformer(ca_basis_map),
@@ -923,6 +928,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(
     opgroup, "--mg-setup-maxiter-refresh", setup_maxiter_refresh, CLI::Validator(),
     "The maximum number of solver iterations to use when refreshing the pre-existing null space vectors (default 100)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-setup-maxiter-inverse-iterations-polish", setup_maxiter_inverse_iterations_polish, CLI::Validator(),
+    "The maximum number of solver iterations to use when polishing pre-existing null space vectors after a non-inverse-iteration setup (default 0, no polishing)");
   quda_app->add_mgoption(opgroup, "--mg-setup-tol", setup_tol, CLI::Validator(),
                          "The tolerance to use for the setup of multigrid (default 5e-6)");
 

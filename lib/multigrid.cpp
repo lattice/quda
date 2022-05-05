@@ -779,7 +779,7 @@ namespace quda
     popLevel();
   }
 
-  void MG::orthonormalize_vectors(std::vector<ColorSpinorField*>& vecs, int count) const {
+  void MG::orthonormalize_vectors(const std::vector<ColorSpinorField*>& vecs, int count) const {
     int num_vec = (count == -1) ? static_cast<int>(vecs.size()) : count;
 
     if (num_vec > (int)vecs.size())
@@ -1359,6 +1359,13 @@ namespace quda
     }
   }
 
+  void MG::initializeRandomVectors(const std::vector<ColorSpinorField*> &B) const {
+    for (auto b : B) {
+      spinorNoise(*r, *rng, QUDA_NOISE_UNIFORM);
+      *b = *r;
+    }
+  }
+
   void MG::constructNearNulls(bool refresh) {
 
     pushLevel(param.level);
@@ -1369,6 +1376,8 @@ namespace quda
       return;
     }
 
+    logQuda(QUDA_VERBOSE, "Running vectors setup on level %d\n", param.level);
+
     auto setup_type = param.mg_global.setup_type[param.level];
 
     // if a near-null vector input file is specified, always load it and
@@ -1377,69 +1386,77 @@ namespace quda
       loadVectors();
     } else {
 
-      if (setup_type == QUDA_SETUP_NULL_VECTOR_FREE_FIELD) {
-        // Generate free field near-null vectors. Consistency checks on the number of
-        // generated vectors are done within this function.
-        generateFreeVectors();
-      } else if (setup_type == QUDA_SETUP_NULL_VECTOR_RESTRICT_FINE) {
-        // Restrict near-null vectors from the finer level
-        generateRestrictedVectors();
-      } else if (setup_type == QUDA_SETUP_NULL_VECTOR_EIGENVECTORS) {
+      // multiple setup iterations only matters for test vector setup
+      if (setup_type != QUDA_SETUP_NULL_VECTOR_TEST_VECTORS &&
+          param.mg_global.num_setup_iter[param.level] > 1)
+        errorQuda("Multiple setup iterations can only be used with test vector setup");
 
-        // Run the eigensolver
-        generateEigenvectors();
-      } else if (setup_type == QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS ||
-                 setup_type == QUDA_SETUP_NULL_VECTOR_CHEBYSHEV_FILTER) {
-        
-        // multiple setup iterations only matters for test vector setup
-        if (param.mg_global.num_setup_iter[param.level] > 1)
-          errorQuda("Multiple setup iterations can only be used with test vector setup");
-
+      if (setup_type == QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS) {
         // Initializing to random vectors 
         if (!refresh) {
-          int num_initialize = (setup_type == QUDA_SETUP_NULL_VECTOR_CHEBYSHEV_FILTER) ? param.mg_global.filter_startup_vectors[param.level] : (int)param.B.size();
-          for (int i = 0; i < num_initialize; i++) {
-            spinorNoise(*r, *rng, QUDA_NOISE_UNIFORM);
-            *param.B[i] = *r;
-          }
+          initializeRandomVectors(param.B);
         }
 
-        logQuda(QUDA_VERBOSE, "Running vectors setup on level %d\n", param.level);
+        generateInverseIterations(param.B, refresh ? param.mg_global.setup_maxiter_refresh[param.level] : param.mg_global.setup_maxiter[param.level]);
+      } else {
+        // Other types support an inverse iterations "polish"
 
-        if (setup_type == QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS) {
-          generateInverseIterations(param.B, refresh);
-        } else {
+        if (setup_type == QUDA_SETUP_NULL_VECTOR_FREE_FIELD) {
+          // Generate free field near-null vectors. Consistency checks on the number of
+          // generated vectors are done within this function.
+          generateFreeVectors();
+        } else if (setup_type == QUDA_SETUP_NULL_VECTOR_RESTRICT_FINE) {
+          // Restrict near-null vectors from the finer level, generating extra if coarse Nvec > fine Nvec
+          generateRestrictedVectors(refresh);
+        } else if (setup_type == QUDA_SETUP_NULL_VECTOR_EIGENVECTORS) {
+
+          // Run the eigensolver
+          generateEigenvectors();
+        } else if (setup_type == QUDA_SETUP_NULL_VECTOR_CHEBYSHEV_FILTER) {
+
+          // Initializing to random vectors 
+          if (!refresh) {
+            int num_initialize = param.mg_global.filter_startup_vectors[param.level];
+            if (num_initialize > (int)param.B.size())
+              errorQuda("Chebyshev filter num_initialize %d is greater than vectors to setup %d", num_initialize, (int)param.B.size());
+            initializeRandomVectors(std::vector<ColorSpinorField*>(param.B.begin(), param.B.begin() + num_initialize));
+          }
+
           // Chebyshev filter
           generateChebyshevFilter(param.B);
-        }
 
-      } else if (setup_type == QUDA_SETUP_NULL_VECTOR_TEST_VECTORS) {
-        errorQuda("Test vector setup is currently not enabled.");
+        } else if (setup_type == QUDA_SETUP_NULL_VECTOR_TEST_VECTORS) {
+          errorQuda("Test vector setup is currently not enabled.");
 
-        for (int si = 0; si < param.mg_global.num_setup_iter[param.level]; si++) {
-          logQuda(QUDA_VERBOSE, "Running vectors setup on level %d iter %d of %d\n", param.level, si + 1,
-                  param.mg_global.num_setup_iter[param.level]);
+          for (int si = 0; si < param.mg_global.num_setup_iter[param.level]; si++) {
+            logQuda(QUDA_VERBOSE, "Running vectors setup on level %d iter %d of %d\n", param.level, si + 1,
+                    param.mg_global.num_setup_iter[param.level]);
 
-          // can we do test vectors + chebyshev filter setup?
-          generateInverseIterations(param.B, refresh);
-          
-          // recurse when doing test setups, currently buggy
-          if (param.mg_global.setup_inv_type[param.level] == QUDA_MG_INVERTER) {
-            if (transfer) {
-              resetTransfer = true;
-              reset();
-              if ( param.level < param.Nlevel - 2) {
-                coarse->constructNearNulls();
+            // can we do test vectors + chebyshev filter setup?
+            generateInverseIterations(param.B, refresh ? param.mg_global.setup_maxiter_refresh[param.level] : param.mg_global.setup_maxiter[param.level]);
+            
+            // recurse when doing test setups, currently buggy
+            if (param.mg_global.setup_inv_type[param.level] == QUDA_MG_INVERTER) {
+              if (transfer) {
+                resetTransfer = true;
+                reset();
+                if ( param.level < param.Nlevel - 2) {
+                  coarse->constructNearNulls();
+                }
+              } else {
+                reset();
               }
-            } else {
-              reset();
             }
+
           }
 
+        } else {
+          errorQuda("Invalid setup type %d", setup_type);
         }
 
-      } else {
-        errorQuda("Invalid setup type %d", setup_type);
+        if (param.mg_global.setup_maxiter_inverse_iterations_polish[param.level] > 0) {
+          generateInverseIterations(param.B, param.mg_global.setup_maxiter_inverse_iterations_polish[param.level]);
+        }
       }
 
     }
@@ -1447,14 +1464,13 @@ namespace quda
     popLevel();
   }
 
-  void MG::generateInverseIterations(std::vector<ColorSpinorField *> &B, bool refresh)
+  void MG::generateInverseIterations(std::vector<ColorSpinorField *> &B, int iterations)
   {
     pushLevel(param.level);
 
     SolverParam solverParam(param); // Set solver field parameters:
     // set null-space generation options - need to expose these
-    solverParam.maxiter
-      = refresh ? param.mg_global.setup_maxiter_refresh[param.level] : param.mg_global.setup_maxiter[param.level];
+    solverParam.maxiter = (iterations == 0) ? param.mg_global.setup_maxiter_refresh[param.level] : iterations;
     solverParam.tol = param.mg_global.setup_tol[param.level];
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
     solverParam.delta = 1e-1;
@@ -1962,18 +1978,60 @@ namespace quda
     popLevel();
   }
 
-  void MG::generateRestrictedVectors()
+  void MG::generateRestrictedVectors(bool refresh)
   {
     pushLevel(param.level);
 
     if (is_fine_grid()) errorQuda("There are no fine near-null vectors to restrict on level 0");
-    if (param.Nvec != param.fine->param.Nvec) errorQuda("The number of near-null vectors on the fine level (%d) and coarse level (%d) do not match", param.fine->param.Nvec, param.Nvec);
+    if (param.Nvec != param.fine->param.Nvec)
+      logQuda(QUDA_VERBOSE, "The number of near-null vectors on the fine level (%d) and coarse level (%d) do not match, restricting as many as possible", param.fine->param.Nvec, param.Nvec);
 
     logQuda(QUDA_VERBOSE, "Restricting null space vectors\n");
 
-    for (int i = 0; i < param.Nvec; i++) {
+    for (int i = 0; i < param.fine->param.Nvec; i++) {
       zero(*(param.B[i]));
       param.fine->transfer->R(*(param.B[i]), *(param.fine->param.B[i]));
+    }
+
+    // generate more if need be
+    if (param.Nvec != param.fine->param.Nvec) {
+      auto setup_remaining_type = param.mg_global.setup_restrict_remaining_type[param.level];
+
+      // TBD eigenvectors
+      if (setup_remaining_type != QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS &&
+          setup_remaining_type != QUDA_SETUP_NULL_VECTOR_CHEBYSHEV_FILTER)
+        errorQuda("Unsupported remaining near-null vector type %d", setup_remaining_type);
+
+      auto B_remaining = std::vector<ColorSpinorField*>(param.B.begin() + param.fine->param.Nvec, param.B.end());
+
+      if (setup_remaining_type == QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS) {
+        if (!refresh) {
+          initializeRandomVectors(B_remaining);
+        }
+        if (param.mg_global.pre_orthonormalize) {
+          orthonormalize_vectors(param.B);
+        }
+
+        generateInverseIterations(B_remaining, refresh ? param.mg_global.setup_maxiter_refresh[param.level] : param.mg_global.setup_maxiter[param.level]);
+      } else if (setup_remaining_type == QUDA_SETUP_NULL_VECTOR_CHEBYSHEV_FILTER) {
+        int num_initialize = param.mg_global.filter_startup_vectors[param.level];
+        if (!refresh) {
+          if (num_initialize > (int)B_remaining.size())
+            errorQuda("Chebyshev filter num_initialize %d is greater than vectors to setup %d", num_initialize, (int)B_remaining.size());
+
+          initializeRandomVectors(std::vector<ColorSpinorField*>(B_remaining.begin(), B_remaining.begin() + num_initialize));
+        }
+
+        if (param.mg_global.pre_orthonormalize) {
+          orthonormalize_vectors(std::vector<ColorSpinorField*>(param.B.begin(), param.B.begin() + param.fine->param.Nvec + num_initialize));
+        }
+
+        generateChebyshevFilter(B_remaining);
+      }
+    }
+
+    if (param.mg_global.post_orthonormalize) {
+      orthonormalize_vectors(param.B);
     }
 
     popLevel();

@@ -1975,6 +1975,10 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     mg_param.setup_tol[i] = input_struct.setup_tol[i];
     mg_param.setup_maxiter[i] = input_struct.setup_maxiter[i];
 
+    // change this to refresh fields when mass or links change
+    mg_param.setup_maxiter_refresh[i] = 0; // setup_maxiter_refresh[i];
+    mg_param.setup_maxiter_inverse_iterations_polish[i] = 0; // setup_maxiter_inverse_iterations_polish[i];
+
     // Basis to use for CA solver setup --- heuristic for CA-GCR is empirical
     if (is_ca_solver(input_struct.setup_inv[i])) {
       if (input_struct.setup_inv[i] == QUDA_CA_GCR_INVERTER && input_struct.setup_ca_basis_size[i] <= 8)
@@ -1988,6 +1992,9 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     // Setup type to use (inverse iterations, chebyshev filter, eigenvectors, restriction, free field)
     mg_param.setup_type[i] = QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS; // setup_type[i];
 
+    // Setup type to use to generate remaining near-null vectors when some are restricted
+    mg_param.setup_restrict_remaining_type[i] = QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS; // setup_restrict_remaining_type[i];
+
     // Basis size for CA solver setup
     mg_param.setup_ca_basis_size[i] = input_struct.setup_ca_basis_size[i];
 
@@ -1996,8 +2003,7 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     mg_param.setup_ca_lambda_max[i] = -1.0; // use power iterations // setup_ca_lambda_max[i];
 
     mg_param.spin_block_size[i] = 1;
-    // change this to refresh fields when mass or links change
-    mg_param.setup_maxiter_refresh[i] = 0; // setup_maxiter_refresh[i];
+
     mg_param.n_vec[i]
       = (i == 0) ? ((input_struct.optimized_kd == QUDA_TRANSFER_COARSE_KD) ? 24 : 3) : input_struct.nvec[i];
     mg_param.n_block_ortho[i] = 2; // n_block_ortho[i];                          // number of times to Gram-Schmidt

@@ -403,18 +403,24 @@ namespace quda {
     */
     void saveVectors(const std::vector<ColorSpinorField *> &B) const;
 
+    /**
+       @brief Initialize a set of vectors to random noise
+       @param B set of vectors
+    */
+    void initializeRandomVectors(const std::vector<ColorSpinorField*> &B) const;
 
     /**
        @brief Wrapping function that manages logic for constructing near-null vectors
+       @param refresh whether or not we're only refreshing near null vectors
     */
     void constructNearNulls(bool refresh = false);
 
     /**
        @brief Generate the null-space vectors via inverse iterations
        @param B Generated null-space vectors
-       @param refresh Whether we refreshing pre-exising vectors or starting afresh
+       @param iterations if non-zero, override the max number of iterations
     */
-    void generateInverseIterations(std::vector<ColorSpinorField*> &B, bool refresh = false);
+    void generateInverseIterations(std::vector<ColorSpinorField*> &B, int iterations = 0);
 
     /**
        @brief Generate the null-space vectors via a Chebyshev filter; this approach is
@@ -429,9 +435,10 @@ namespace quda {
     void generateEigenvectors();
 
     /**
-       @brief Generate near-null vectors via restricting finer near-nulls
+       @brief Generate near-null vectors via restricting finer near-nulls, generating extras if need be
+       @param refresh Whether or not we're only refreshing extra near nulls
     */
-    void generateRestrictedVectors();
+    void generateRestrictedVectors(bool refresh = false);
 
     /**
        @brief Build free-field null-space vectors
@@ -444,7 +451,7 @@ namespace quda {
       @param vecs vector of ColorSpinorFields to normalize
       @param count number of near-null vectors to orthonormalize, default all
     */
-    void orthonormalize_vectors(std::vector<ColorSpinorField*>& vecs, int count = -1) const;
+    void orthonormalize_vectors(const std::vector<ColorSpinorField*>& vecs, int count = -1) const;
 
     /**
        @brief Return the total flops done on this and all coarser levels.

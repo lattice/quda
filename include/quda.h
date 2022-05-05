@@ -638,6 +638,9 @@ extern "C" {
     /** Maximum number of iterations for refreshing the null-space vectors */
     int setup_maxiter_refresh[QUDA_MAX_MG_LEVEL];
 
+    /** Maximum number of iterations for inverse iteration polishing of null-space vectors */
+    int setup_maxiter_inverse_iterations_polish[QUDA_MAX_MG_LEVEL];
+
     /** Basis to use for CA solver setup */
     QudaCABasis setup_ca_basis[QUDA_MAX_MG_LEVEL];
 
@@ -670,6 +673,9 @@ extern "C" {
 
     /** Null-space type to use in the setup phase */
     QudaNullVectorSetupType setup_type[QUDA_MAX_MG_LEVEL];
+
+    /** Null-space type to use to "fill in" extra vectors after restricting some */
+    QudaNullVectorSetupType setup_restrict_remaining_type[QUDA_MAX_MG_LEVEL];
 
     /** Pre orthonormalize vectors in the setup phase */
     QudaBoolean pre_orthonormalize;

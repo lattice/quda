@@ -210,6 +210,7 @@ namespace quda {
     // Step 3: Create the X field based on Xinv, but switch to a native ordering for a GPU setup.
     std::unique_ptr<GaugeField> tmp_X(nullptr);
     GaugeFieldParam x_param(*xInvMilcOrder);
+    x_param.create = QUDA_ZERO_FIELD_CREATE;
     if (location == QUDA_CUDA_FIELD_LOCATION) {
       x_param.order = QUDA_FLOAT2_GAUGE_ORDER;
       x_param.setPrecision(x_param.Precision());
@@ -221,6 +222,8 @@ namespace quda {
 
     // Step 4: Calculate X from U
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing the KD block on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
+
+    printfQuda("U pre-compute %e, mass %e\n", U.norm2(), mass);
 
     calculateStaggeredKDBlock(X, U, mass);
 
@@ -268,6 +271,7 @@ namespace quda {
   std::shared_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass, const bool dagger_approximation)
   {
     GaugeFieldParam gParam(gauge);
+    gParam.location = QUDA_CUDA_FIELD_LOCATION;
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
     gParam.create = QUDA_NULL_FIELD_CREATE;
     gParam.geometry = QUDA_KDINVERSE_GEOMETRY;

@@ -93,6 +93,7 @@ void setQudaDefaultMgTestParams()
     setup_tol[i] = 5e-6;
     setup_maxiter[i] = 500;
     setup_maxiter_refresh[i] = 20;
+    setup_maxiter_inverse_iterations_polish[i] = 0;
     mu_factor[i] = 1.;
     coarse_solve_type[i] = QUDA_INVALID_SOLVE;
     smoother_solve_type[i] = QUDA_INVALID_SOLVE;
@@ -129,6 +130,7 @@ void setQudaDefaultMgTestParams()
     mg_eig_save_prec[i] = QUDA_DOUBLE_PRECISION;
 
     setup_type[i] = QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS;
+    setup_restrict_remaining_type[i] = QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS;
     filter_startup_vectors[i] = 1;
     filter_startup_iterations[i] = 1000;
     filter_startup_rescale_frequency[i] = 50;
