@@ -186,13 +186,13 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
 
 void saveHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, QudaLinkType link_type)
 {
-  if (strcmp(gauge_outfile, "")) {
+  if (gauge_outfile.size() > 0) {
     // save gauge field using QIO and LIME
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Saving the gauge field in %s\n", gauge_outfile);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Saving the gauge field in %s\n", gauge_outfile.c_str());
     QudaLinkType temp = gauge_param.type;
     gauge_param.type = link_type;
     saveGaugeQuda(gauge, &gauge_param);
-    write_gauge_field(gauge_outfile, gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
+    write_gauge_field(gauge_outfile.c_str(), gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
     gauge_param.type = temp;
   } else {
     printfQuda("No output file specified.\n");
@@ -210,7 +210,7 @@ void saveDeviceGaugeField(cudaGaugeField *gaugeEx, cudaGaugeField *gauge)
   // copy into regular field
   copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
   saveGaugeFieldQuda((void*)cpu_gauge, (void*)gauge, &gauge_param);
-  write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
+  write_gauge_field(gauge_outfile.c_str(), cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
   for (int dir = 0; dir<4; dir++) free(cpu_gauge[dir]);
 }
 

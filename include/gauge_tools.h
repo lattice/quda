@@ -108,7 +108,7 @@ namespace quda
      @param[in] epsilon Step size
      @param[in] smear_type Wilson (1x1) or Symanzik improved (2x1) staples, else error
   */
-  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaWFlowType smear_type);
+  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type);
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.

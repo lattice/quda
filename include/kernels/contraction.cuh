@@ -10,9 +10,9 @@
 namespace quda
 {
   static constexpr int max_contract_results = 16; // sized for nSpin**2 = 16
-  
-  using contract_array           = array<double2, max_contract_results>;
-  using staggered_contract_array = array<double2, 1>;
+ 
+  using spinor_array = array<array<double, 2>, max_contract_results>;
+  using staggered_spinor_array = array<double, 2>; 
 
   template <typename real, int nSpin = 4> class DRGammaMatrix {
   public:
@@ -244,7 +244,7 @@ namespace quda
     return (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]);
   }
    
-  template <typename Float, int nColor_,  int nSpin_ = 4, int reduction_dim_ = 3, typename contract_t = contract_array>
+  template <typename Float, int nColor_,  int nSpin_ = 4, int reduction_dim_ = 3, typename contract_t = spinor_array>
   struct ContractionSummedArg :  public ReduceArg<contract_t>
   {
     // This the direction we are performing reduction on. default to 3.
@@ -291,15 +291,17 @@ namespace quda
         NxNyNzNt[i] = comm_dim(i) * x.X()[i];
       }
     }
-    __device__ __host__ contract_t init() const { return contract_t(); }
   };
   
-  template <typename Arg> struct DegrandRossiContractFT : plus<contract_array> {
-    using reduce_t = contract_array;
+  template <typename Arg> struct DegrandRossiContractFT : plus<spinor_array> {
+    using reduce_t = spinor_array;
     using plus<reduce_t>::operator();    
     const Arg &arg;
     constexpr DegrandRossiContractFT(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
+
+    // overload comm_reduce to defer until the entire "tile" is complete
+    template <typename U> static inline void comm_reduce(U &) { }
     
     // Final param is unused in the MultiReduce functor in this use case.
     __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int, int t)
@@ -309,7 +311,7 @@ namespace quda
       using real = typename Arg::real;
       using Vector = ColorSpinor<real, nColor, nSpin>;
 
-      reduce_t result_all_channels = contract_array();
+      reduce_t result_all_channels = zero<reduce_t>();
       int s1 = arg.s1;
       int b1 = arg.b1;
       int mom_mode[4];
@@ -366,8 +368,8 @@ namespace quda
 	    // use tr[ Gamma * Prop * Gamma * g5 * conj(Prop) * g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
 	    // gamma_5 * gamma_i <phi | phi > gamma_5 * gamma_idx 
 	    propagator_product = arg.Gamma.g5gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.g5gm_z[G_idx][b1];
-	    result_all_channels[G_idx].x += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
-	    result_all_channels[G_idx].y += propagator_product.imag()*phase_real+propagator_product.real()*phase_imag;
+	    result_all_channels[G_idx][0] += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
+	    result_all_channels[G_idx][1] += propagator_product.imag()*phase_real+propagator_product.real()*phase_imag;
 	  }
 	}
       }
@@ -382,13 +384,16 @@ namespace quda
     }
   };
 
-  template <typename Arg> struct StaggeredContractFT : plus<staggered_contract_array> {
-    using reduce_t = staggered_contract_array;
+  template <typename Arg> struct StaggeredContractFT : plus<staggered_spinor_array> {
+    using reduce_t = staggered_spinor_array;
     using plus<reduce_t>::operator();    
     const Arg &arg;
     constexpr StaggeredContractFT(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
-    
+
+    // overload comm_reduce to defer until the entire "tile" is complete
+    template <typename U> static inline void comm_reduce(U &) { }
+
     // Final param is unused in the MultiReduce functor in this use case.
     __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int, int t)
     {
@@ -396,8 +401,9 @@ namespace quda
       constexpr int nColor = Arg::nColor;
       using real   = typename Arg::real;
       using Vector = ColorSpinor<real, nColor, nSpin>;
-      reduce_t result_all_channels = staggered_contract_array();
-      
+      //reduce_t result_all_channels = staggered_spinor_array();
+      reduce_t result_all_channels = zero<reduce_t>();
+
       int mom_mode[4];
       QudaFFTSymmType fft_type[4];
       int source_position[4];
@@ -462,8 +468,8 @@ namespace quda
 	}
       
       // Staggered uses only the first element of result_all_channels
-      result_all_channels[0].x += prop_prod.real()*phase_real - prop_prod.imag()*phase_imag;
-      result_all_channels[0].y += prop_prod.imag()*phase_real + prop_prod.real()*phase_imag;
+      result_all_channels[0] += prop_prod.real()*phase_real - prop_prod.imag()*phase_imag;
+      result_all_channels[1] += prop_prod.imag()*phase_real + prop_prod.real()*phase_imag;
 
       return plus::operator()(result_all_channels, result);
     }
@@ -499,7 +505,7 @@ namespace quda
     const Arg &arg;
     constexpr ColorContract(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
-
+    
     __device__ __host__ inline void operator()(int x_cb, int parity)
     {
       constexpr int nSpin = Arg::nSpin;

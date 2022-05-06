@@ -73,11 +73,11 @@ else()
 endif()
 
 if(USE_QIO)
-  find_library(QIO qio ${QUDA_BUILD_HOME}/usqcd/lib)
-  find_library(LIME lime ${QUDA_BUILD_HOME}/usqcd/lib)
+  find_library(QIO qio ${QUDA_BUILD_HOME}/_deps/qio-build/lib)
+  find_library(LIME lime ${QUDA_BUILD_HOME}/_deps/qio-build/other_libs/c-lime/lib/)
 endif()
 if(USE_QMP)
-  find_library(QMP qmp ${QUDA_BUILD_HOME}/usqcd/lib)
+  find_library(QMP qmp ${QUDA_BUILD_HOME}/_deps/qmp-build/lib/)
 endif()
 
 # Create library dependency

@@ -12,6 +12,8 @@
 #include <math.h>
 #include <string.h>
 
+using namespace quda;
+
 // Local Enum type for IO
 typedef enum CorrelatorFlavors_s {
   CORRELATOR_QQ,
@@ -226,7 +228,8 @@ void invert_and_contract(void **prop_array_ptr_1, void **prop_array_ptr_2,
 
       //! when using DWF: convert to 5D
       if ( dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
-        convert4Dto5DpointSource(source, source5D, &inv_param, &inv_param4D, gauge_param.X, spinor4D_size_in_floats);
+	// DMH: WIP
+        //convert4Dto5DpointSource(source, source5D, &inv_param, &inv_param4D, gauge_param.X, spinor4D_size_in_floats);
       }
       //! Gaussian smear the source. The default setting is to not smear.
       performGaussianSmearNStep(source, &source_smear_param, prop_source_smear_steps, prop_source_smear_coeff);
@@ -238,14 +241,14 @@ void invert_and_contract(void **prop_array_ptr_1, void **prop_array_ptr_2,
 
       //TODO convert back to 4D
       //TODO what is the difference between inv_param4d and inv_param5d?
-//      if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-//        make4DChiralProp(prop_array_ptr_2[i], invert_output, *inv_param5D, inv_param, gauge_param.X);
-//      }
-
+      //      if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+      //        make4DChiralProp(prop_array_ptr_2[i], invert_output, *inv_param5D, inv_param, gauge_param.X);
+      //      }
+      
       //! Gaussian smear the sink.
       performGaussianSmearNStep(prop_array_ptr_2[i], &sink_smear_param, prop_sink_smear_steps, prop_sink_smear_coeff);
     }
-
+    
     memset(correlation_function_sum, 0, corr_param.corr_size_in_bytes); // zero out the result array
     //contractFTQuda(prop_array_ptr_1, prop_array_ptr_2, &correlation_function_sum, contract_type,
     //               (void *)&cs_param, gauge_param.X, source_pos, momentum.begin());

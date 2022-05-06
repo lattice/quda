@@ -5994,60 +5994,6 @@ void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, i
   profileOvrImpSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type)
-{
-  pushOutputPrefix("performWFlownStep: ");
-  profileWFlow.TPSTART(QUDA_PROFILE_TOTAL);
-
-  if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
-
-  if (gaugeSmeared != nullptr) delete gaugeSmeared;
-  gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileWFlow);
-
-  GaugeFieldParam gParamEx(*gaugeSmeared);
-  auto *gaugeAux = GaugeField::Create(gParamEx);
-
-  GaugeFieldParam gParam(*gaugePrecise);
-  gParam.reconstruct = QUDA_RECONSTRUCT_NO; // temporary field is not on manifold so cannot use reconstruct
-  auto *gaugeTemp = GaugeField::Create(gParam);
-
-  GaugeField *in = gaugeSmeared;
-  GaugeField *out = gaugeAux;
-
-  QudaGaugeObservableParam param = newQudaGaugeObservableParam();
-  param.compute_plaquette = QUDA_BOOLEAN_TRUE;
-  param.compute_qcharge = QUDA_BOOLEAN_TRUE;
-
-  if (getVerbosity() >= QUDA_SUMMARIZE) {
-    gaugeObservables(*in, param, profileWFlow);
-    printfQuda("flow t \t plaquette \t E_tot \t E_spatial \t E_temporal \t Q charge\n");
-    printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", 0.0, param.plaquette[0], param.energy[0],
-	       param.energy[1], param.energy[2], param.qcharge);
-  }
-
-  for (unsigned int i = 0; i < n_steps; i++) {
-    // Perform W1, W2, and Vt Wilson Flow steps as defined in
-    // https://arxiv.org/abs/1006.4518v3
-    profileWFlow.TPSTART(QUDA_PROFILE_COMPUTE);
-    if (i > 0) std::swap(in, out); // output from prior step becomes input for next step
-
-    WFlowStep(*out, *gaugeTemp, *in, step_size, wflow_type);
-    profileWFlow.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-    if ((i + 1) % meas_interval == 0 && getVerbosity() >= QUDA_SUMMARIZE) {
-      gaugeObservables(*out, param, profileWFlow);
-      printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", step_size * (i + 1), param.plaquette[0], param.energy[0],
-                 param.energy[1], param.energy[2], param.qcharge);
-    }
-  }
-
-  delete gaugeTemp;
-  delete gaugeAux;
-  profileWFlow.TPSTOP(QUDA_PROFILE_TOTAL);
-  popOutputPrefix();
-}
-
-
 void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam *obs_param)
 {
   pushOutputPrefix("performGaugeSmearQuda: ");
@@ -6130,7 +6076,8 @@ void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam
     // https://arxiv.org/abs/1006.4518v3
     profileWFlow.TPSTART(QUDA_PROFILE_COMPUTE);
     if (i > 0) std::swap(in, out); // output from prior step becomes input for next step
-    WFlowStep(*out, *gaugeTemp, *in, smear_param->epsilon, smear_param->smear_type);
+    //FIXME
+    //WFlowStep(*out, *gaugeTemp, *in, smear_param->epsilon, smear_param->smear_type);
     profileWFlow.TPSTOP(QUDA_PROFILE_COMPUTE);
 
     if ((i + 1) % smear_param->meas_interval == 0) {
@@ -6378,15 +6325,18 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 			     source_position, &mom_modes[4*mom_idx], &fft_type[4*mom_idx],
 			     s1, b1);
 		
-	  comm_allreduce_array((double *)&result_global[0], 2*max_contract_results * global_decay_dim_slices);
-
-	  for (size_t t = 0; t < global_decay_dim_slices; t++) {
-	    for (size_t G_idx = 0; G_idx < nSpin * nSpin; G_idx++) {
-	      int index = 2*(mom_idx *num_out_results * global_decay_dim_slices + num_out_results * t + G_idx);
-	      ((double *)*result)[index  ] += result_global[max_contract_results * t + G_idx].real();
-	      ((double *)*result)[index+1] += result_global[max_contract_results * t + G_idx].imag();
-	    }
-	  }
+		//comm_allreduce_sum((double *)&result_global[0], 2*elems_per_slice * global_decay_dim_slices);
+		comm_allreduce_sum(result_global);
+		for (size_t G_idx = 0; G_idx < num_out_results; G_idx++) {
+		  for (size_t t = 0; t < global_decay_dim_slices; t++) {
+		    int index = ((mom_idx) * 2*num_out_results * global_decay_dim_slices + 2*num_out_results * t + 2*G_idx);
+		    
+		    ((double *)*result)[index]
+		      += result_global[(2*num_out_results * t) / 2 + G_idx].real();
+		    ((double *)*result)[index+1]
+		      += result_global[(2*num_out_results * t) / 2 + G_idx].imag();
+		  }
+		}
 	  profileContractFT.TPSTOP(QUDA_PROFILE_COMPUTE);
 	}
       }
@@ -6470,6 +6420,7 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+#if 0
 void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *inv_param, QudaInvertParam *inv_param4D, const int *X, const size_t spinor4D_size_in_floats){ //, QudaInvertParam *inv_param5D,
 
   //! zero out memory reserved for 5D source
@@ -6492,8 +6443,7 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
 
   //d_4Dpointsource
   ColorSpinorParam cudaParam(cpuParam4D, *inv_param4D, QUDA_CUDA_FIELD_LOCATION);
-  d_4D_point_source = ColorSpinorField::Create(cudaParam);
-  *d_4D_point_source = *h_4D_point_source; // JNS: is copy needed?
+  d_4D_point_source = ColorSpinorField::Create(*h_4D_point_source, cudaParam);
 
   //d_4Dprojsource & d_4Dentryin5Dsource & d_4D_temp
   cudaParam.create = QUDA_ZERO_FIELD_CREATE; //! we want new memory which is zeroed out here
@@ -6653,3 +6603,4 @@ void make4DChiralProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_para
   profileMake4DProp.TPSTOP(QUDA_PROFILE_FREE);
   profileMake4DProp.TPSTOP(QUDA_PROFILE_TOTAL);
 }
+#endif

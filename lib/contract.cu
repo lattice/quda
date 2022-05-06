@@ -1,5 +1,6 @@
 #include <color_spinor_field.h>
 #include <contract_quda.h>
+
 #include <tunable_nd.h>
 #include <tunable_reduction.h>
 #include <instantiate.h>
@@ -55,22 +56,12 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-      int reduction_dim = cType == QUDA_CONTRACT_TYPE_DR_FT_Z ? 2 : 3; // only z-dir type is QUDA_CONTRACT_TYPE_DR_FT_Z
-      
+      int reduction_dim = 3;
       const int nSpinSq = x.Nspin()*x.Nspin();
       
-      const int max_contract_results_ = cType == QUDA_CONTRACT_TYPE_STAGGERED_FT_T ? 1 : max_contract_results;
-           
-      std::vector<double> result_local(2*max_contract_results_ * x.X()[reduction_dim]);
+      if (cType == QUDA_CONTRACT_TYPE_DR_FT_Z) reduction_dim = 2;      
+      std::vector<double> result_local(2*nSpinSq * x.X()[reduction_dim], 0.0);      
       
-      // Zero out the local results.
-      if(!activeTuning()) {
-	for(int i = 0; i < max_contract_results_ * x.X()[reduction_dim]; i++) {
-	  result_local[2*i] = 0.0;
-	  result_local[2*i+1] = 0.0;
-	}
-      }
-
       // Pass the integer value of the redection dim as a template arg
       switch(cType) {
       case QUDA_CONTRACT_TYPE_DR_FT_T:
@@ -78,7 +69,7 @@ namespace quda {
 	  constexpr int nSpin  = 4;
 	  constexpr int ft_dir = 3;
 	  ContractionSummedArg<Float, nColor, nSpin, ft_dir> arg(x, y, source_position, mom_mode, fft_type, s1, b1);
-	  launch<DegrandRossiContractFT, double, comm_reduce_null<double>>(result_local, tp, stream, arg);
+	  launch<DegrandRossiContractFT>(result_local, tp, stream, arg);
 	}
 	break;
       case QUDA_CONTRACT_TYPE_DR_FT_Z:
@@ -86,15 +77,15 @@ namespace quda {
 	  constexpr int nSpin  = 4;
 	  constexpr int ft_dir = 2;
 	  ContractionSummedArg<Float, nColor, nSpin, ft_dir> arg(x, y, source_position, mom_mode, fft_type, s1, b1);
-	  launch<DegrandRossiContractFT, double, comm_reduce_null<double>>(result_local, tp, stream, arg);
+	  launch<DegrandRossiContractFT>(result_local, tp, stream, arg);
 	}
 	break;
       case QUDA_CONTRACT_TYPE_STAGGERED_FT_T:
 	{
 	  constexpr int nSpin  = 1;
 	  constexpr int ft_dir = 3;
-	  ContractionSummedArg<Float, nColor, nSpin, ft_dir, staggered_contract_array> arg(x, y, source_position, mom_mode, fft_type, s1, b1);
-	  launch<StaggeredContractFT, double, comm_reduce_null<double>>(result_local, tp, stream, arg);
+	  ContractionSummedArg<Float, nColor, nSpin, ft_dir, staggered_spinor_array> arg(x, y, source_position, mom_mode, fft_type, s1, b1);
+	  launch<StaggeredContractFT>(result_local, tp, stream, arg);
 	}
 	break;
       default:
@@ -103,9 +94,9 @@ namespace quda {
 
       // Copy results back to host array
       if(!activeTuning()) {
-	for(int i = 0; i < max_contract_results_ * x.X()[reduction_dim]; i++) {
-	  result_global[max_contract_results_ * comm_coord(reduction_dim) * x.X()[reduction_dim] + i].real(result_local[2*i]);
-	  result_global[max_contract_results_ * comm_coord(reduction_dim) * x.X()[reduction_dim] + i].imag(result_local[2*i+1]);
+	for(int i=0; i<nSpinSq * x.X()[reduction_dim]; i++) {
+	  result_global[nSpinSq * x.X()[reduction_dim] * comm_coord(reduction_dim) + i].real(result_local[2*i]);
+	  result_global[nSpinSq * x.X()[reduction_dim] * comm_coord(reduction_dim) + i].imag(result_local[2*i+1]);
 	}
       }
     }

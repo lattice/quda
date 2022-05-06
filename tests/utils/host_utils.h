@@ -13,6 +13,9 @@ constexpr size_t clover_site_size = 72;     // real numbers per block-diagonal c
 constexpr size_t mom_site_size = 10;        // real numbers per momentum
 constexpr size_t hw_site_size = 12;         // real numbers per half wilson
 
+using namespace quda;
+
+
 extern int Z[4];
 extern int V;
 extern int Vh;
@@ -68,7 +71,7 @@ template <typename Float> void applyStaggeredScaling(Float **res, QudaGaugeParam
 
 // Spinor utils
 //------------------------------------------------------
-void constructStaggeredSpinorParam(quda::ColorSpinorParam *csParam, const QudaInvertParam *inv_param,
+void constructStaggeredTestSpinorParam(ColorSpinorParam *csParam, const QudaInvertParam *inv_param,
                                        const QudaGaugeParam *gauge_param);
 //------------------------------------------------------
 
