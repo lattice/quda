@@ -178,7 +178,7 @@ namespace quda
     __device__ inline T operator()(const T &value_, bool async, int batch, bool all, const reducer_t &r,
                                    const param_t &)
     {
-      constexpr auto max_items = device::max_reduce_block_size() / (device::warp_size() * param_t::batch_size);
+      constexpr auto max_items = device::max_reduce_block_size() / device::warp_size();
       const auto thread_idx = threadIdx.y * blockDim.x + threadIdx.x;
       const auto warp_idx = thread_idx / device::warp_size();
       const auto warp_items = blockDim.x * blockDim.y / device::warp_size();
@@ -191,10 +191,10 @@ namespace quda
       // now do reduction between warps
       if (!async) __syncthreads(); // only synchronize if we are not pipelining
 
-      __shared__ T storage[param_t::batch_size][max_items];
+      __shared__ T storage[max_items];
 
       // if first thread in warp, write result to shared memory
-      if (thread_idx % device::warp_size() == 0) storage[batch][warp_idx] = value;
+      if (thread_idx % device::warp_size() == 0) storage[batch * warp_items + warp_idx] = value;
       __syncthreads();
 
       constexpr bool final_warp_reduction = true;
@@ -203,22 +203,22 @@ namespace quda
         if (warp_idx == 0) {
           if constexpr (max_items > device::warp_size()) { // never true for max block size 1024, warp = 32
             value = r.init();
-            for (int i = threadIdx.x; i < warp_items; i += device::warp_size()) value = r(storage[batch][i], value);
+            for (int i = threadIdx.x; i < warp_items; i += device::warp_size()) value = r(storage[batch * warp_items + i], value);
           } else { // optimized path where we know the final reduction will fit in a warp
-            value = threadIdx.x < warp_items ? storage[batch][threadIdx.x] : r.init();
+            value = threadIdx.x < warp_items ? storage[batch * warp_items + threadIdx.x] : r.init();
             value = warp_reduce<true>()(value, false, r, warp_reduce_param<device::warp_size()>());
           }
         }
       } else { // first thread completes the reduction
         if (thread_idx == 0) {
-          for (int i = 1; i < warp_items; i++) value = r(storage[batch][i], value);
+          for (int i = 1; i < warp_items; i++) value = r(storage[batch * warp_items + i], value);
         }
       }
 
       if (all) {
-        if (thread_idx == 0) storage[batch][0] = value;
+        if (thread_idx == 0) storage[batch * warp_items + 0] = value;
         __syncthreads();
-        value = storage[batch][0];
+        value = storage[batch * warp_items + 0];
       }
 
       return value;
