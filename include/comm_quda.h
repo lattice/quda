@@ -4,6 +4,7 @@
 #include <vector>
 #include <quda_constants.h>
 #include <quda_api.h>
+#include <array.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -251,7 +252,7 @@ namespace quda
      @param[in] local The process-local memory pointer to be exchanged
      from this process
   */
-  void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local);
+  void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local);
 
   /**
      @brief Deallocate the remote addresses to logically neighboring
@@ -259,26 +260,28 @@ namespace quda
      @param[in] remote Array of remote memory pointers to neighboring
      pointers
   */
-  void comm_destroy_neighbor_memory(void *remote[QUDA_MAX_DIM][2]);
+  void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote);
 
   /**
-       @brief Create unique events shared between each logical pair of
-       neighboring processes, e.g., the event in the forwards direction
-       in a given dimension on a given process aliases the event in the
-       backward direction in the same dimension, and is unique
-       between that process pair. This exchange is only defined between
-       devices that are peer-to-peer enabled.
-       @param[out] remote Array of remote events to neighboring processes
-       @param[in] local Array of local event to neighboring processes
-     */
-  void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM]);
+     @brief Create unique events shared between each logical pair of
+     neighboring processes, e.g., the event in the forwards direction
+     in a given dimension on a given process aliases the event in the
+     backward direction in the same dimension, and is unique
+     between that process pair. This exchange is only defined between
+     devices that are peer-to-peer enabled.
+     @param[out] remote Array of remote events to neighboring processes
+     @param[in] local Array of local event to neighboring processes
+   */
+  void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
+                                  array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
 
   /**
      @brief Destroy the coupled events
      @param[out] remote Array of remote events to neighboring processes
      @param[in] local Array of local event to neighboring processes
    */
-  void comm_destroy_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM]);
+  void comm_destroy_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
+                                   array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
 
   /**
      @brief Returns true if any peer-to-peer capability is present on

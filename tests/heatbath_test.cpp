@@ -17,10 +17,11 @@
 
 #include <qio_field.h>
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
-#define DABS(a) ((a)<(0.)?(-(a)):(a))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define DABS(a) ((a) < (0.) ? (-(a)) : (a))
 
-namespace quda {
+namespace quda
+{
   extern void setTransferGPU(bool);
 }
 
@@ -103,26 +104,28 @@ int main(int argc, char **argv)
   {
     using namespace quda;
     GaugeFieldParam gParam(gauge_param);
+    gParam.location = QUDA_CUDA_FIELD_LOCATION;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-    gParam.create      = QUDA_NULL_FIELD_CREATE;
-    gParam.link_type   = gauge_param.type;
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    gParam.link_type = gauge_param.type;
     gParam.reconstruct = gauge_param.reconstruct;
     gParam.setPrecision(gParam.Precision(), true);
     cudaGaugeField *gauge = new cudaGaugeField(gParam);
 
     int pad = 0;
-    int y[4];
-    int R[4] = {0,0,0,0};
-    for(int dir=0; dir<4; ++dir) if(comm_dim_partitioned(dir)) R[dir] = 2;
-    for(int dir=0; dir<4; ++dir) y[dir] = gauge_param.X[dir] + 2 * R[dir];
-    GaugeFieldParam gParamEx(y, prec, link_recon,
-			     pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
+    lat_dim_t y;
+    lat_dim_t R = {0, 0, 0, 0};
+    for (int dir = 0; dir < 4; ++dir)
+      if (comm_dim_partitioned(dir)) R[dir] = 2;
+    for (int dir = 0; dir < 4; ++dir) y[dir] = gauge_param.X[dir] + 2 * R[dir];
+    GaugeFieldParam gParamEx(y, prec, link_recon, pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
     gParamEx.create = QUDA_ZERO_FIELD_CREATE;
+    gParamEx.location = QUDA_CUDA_FIELD_LOCATION;
     gParamEx.order = gParam.order;
     gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParamEx.t_boundary = gParam.t_boundary;
     gParamEx.nFace = 1;
-    for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
+    for (int dir = 0; dir < 4; ++dir) gParamEx.r[dir] = R[dir];
     cudaGaugeField *gaugeEx = new cudaGaugeField(gParamEx);
     // CURAND random generator initialization
     RNG *randstates = new RNG(*gauge, 1234);
@@ -131,7 +134,7 @@ int main(int argc, char **argv)
     int nwarm = heatbath_warmup_steps;
     int nhbsteps = heatbath_num_heatbath_per_step;
     int novrsteps = heatbath_num_overrelax_per_step;
-    bool  coldstart = heatbath_coldstart;
+    bool coldstart = heatbath_coldstart;
     double beta_value = heatbath_beta_value;
 
     printfQuda("Starting heatbath for beta = %f from a %s start\n", beta_value,
@@ -192,10 +195,10 @@ int main(int argc, char **argv)
 
     freeGaugeQuda();
 
-    for(int step=1; step<=nsteps; ++step){
-      Monte( *gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
+    for (int step = 1; step <= nsteps; ++step) {
+      Monte(*gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
 
-      //Reunitarize gauge links...
+      // Reunitarize gauge links...
       quda::unitarizeLinks(*gaugeEx, num_failures_d);
       if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
 
@@ -223,7 +226,7 @@ int main(int argc, char **argv)
       // copy into regular field
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
-      saveGaugeFieldQuda((void*)cpu_gauge, (void*)gauge, &gauge_param);
+      saveGaugeFieldQuda((void *)cpu_gauge, (void *)gauge, &gauge_param);
 
       write_gauge_field(gauge_outfile.c_str(), cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char **)0);
 
@@ -234,7 +237,7 @@ int main(int argc, char **argv)
 
     delete gauge;
     delete gaugeEx;
-    //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
+    // Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
 
     delete randstates;

@@ -22,7 +22,7 @@ set (QUDA_OBJS
   coarse_op_preconditioned.cu staggered_coarse_op.cu
   eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
   eigensolve_quda.cpp quda_arpack_interface.cpp
-  multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
+  multigrid.cpp transfer.cpp block_orthogonalize.cu
   prolongator.cu restrictor.cu staggered_prolong_restrict.cu
   gauge_phase.cu timer.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
@@ -51,7 +51,8 @@ set (QUDA_OBJS
   multi_reduce_quda.cu reduce_helper.cu
   contract.cu comm_common.cpp communicator_stack.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
-  extract_gauge_ghost_extended.cu copy_color_spinor.cpp spinor_noise.cu
+  extract_gauge_ghost_extended.cu copy_color_spinor.cpp
+  spinor_noise.cu spinor_dilute.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_dq.cu
   copy_color_spinor_ss.cu copy_color_spinor_sd.cu
@@ -75,7 +76,7 @@ set (QUDA_OBJS
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
   tune.cpp
   device_vector.cu
-  inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
+  inv_gmresdr_quda.cpp
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
   gauge_fix_fft.cu gauge_fix_ovr.cu pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
@@ -440,6 +441,10 @@ endif()
 
 if(QUDA_FAST_COMPILE_DSLASH)
   target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_DSLASH)
+endif()
+
+if(QUDA_ALTERNATIVE_I_TO_F)
+  target_compile_definitions(quda PRIVATE QUDA_ALTERNATIVE_I_TO_F)
 endif()
 
 if(QUDA_BACKWARDS)

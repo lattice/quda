@@ -52,6 +52,9 @@ namespace quda {
 
       strcat(aux,",computeStaggeredKDBlock");
 
+      // X is relatively sparse; the kernel assumes the rest of X is already zero
+      X.zero();
+
       // reset scales as appropriate
       if constexpr (sizeof(Float) < QUDA_SINGLE_PRECISION) {
         double max_scale = g.abs_max();
@@ -130,13 +133,14 @@ namespace quda {
     std::unique_ptr<GaugeField> xInvMilcOrder(nullptr);
     {
       const int ndim = 4;
-      int xc[QUDA_MAX_DIM];
+      lat_dim_t xc;
       for (int i = 0; i < ndim; i++) { xc[i] = gauge.X()[i]/2; }
       const int Nc_c = gauge.Ncolor() * 8; // 24
       const int Ns_c = 2; // staggered parity
       GaugeFieldParam gParam;
-      memcpy(gParam.x, xc, QUDA_MAX_DIM*sizeof(int));
+      gParam.x = xc;
       gParam.nColor = Nc_c*Ns_c;
+      gParam.location = location;
       gParam.reconstruct = QUDA_RECONSTRUCT_NO;
       gParam.order = QUDA_MILC_GAUGE_ORDER;
       gParam.link_type = QUDA_COARSE_LINKS;
@@ -174,6 +178,7 @@ namespace quda {
         //First make a cpu gauge field from the cuda gauge field
         int pad = 0;
         GaugeFieldParam gf_param(gauge.X(), QUDA_SINGLE_PRECISION, QUDA_RECONSTRUCT_NO, pad, gauge.Geometry());
+        gf_param.location = location;
         gf_param.order = QUDA_QDP_GAUGE_ORDER;
         gf_param.fixed = gauge.GaugeFixed();
         gf_param.link_type = gauge.LinkType();
@@ -263,7 +268,7 @@ namespace quda {
 
 
   // Allocates and calculates the inverse KD block, returning Xinv
-  std::unique_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass, const bool dagger_approximation)
+  std::shared_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass, const bool dagger_approximation)
   {
     GaugeFieldParam gParam(gauge);
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -277,7 +282,7 @@ namespace quda {
     // latter true is to force FLOAT2
     gParam.setPrecision(gauge.Precision(), true);
 
-    std::unique_ptr<GaugeField> Xinv(reinterpret_cast<GaugeField*>(new cudaGaugeField(gParam)));
+    std::shared_ptr<GaugeField> Xinv(reinterpret_cast<GaugeField*>(new cudaGaugeField(gParam)));
 
     BuildStaggeredKahlerDiracInverse(*Xinv, gauge, mass, dagger_approximation);
 

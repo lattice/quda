@@ -345,13 +345,28 @@ QUDA_UNROLL
        Returns the norm of x
     */
     template <typename reduce_t, typename InputType>
-    __device__ __host__ void cdotNormA_(reduce_t &sum, const InputType &a, const InputType &b)
+    __device__ __host__ void cdotNormAB_(reduce_t &sum, const InputType &a, const InputType &b)
     {
       using real = typename InputType::value_type;
       using scalar = typename reduce_t::value_type;
       cdot_<reduce_t, real>(sum, a, b);
       norm2_<scalar, real>(sum[2], a);
+      norm2_<scalar, real>(sum[3], b);
     }
+
+    template <typename real_reduce_t, typename real>
+    struct CdotNormAB : public ReduceFunctor<array<real_reduce_t, 4>> {
+      using reduce_t = array<real_reduce_t, 4>;
+      static constexpr memory_access<1, 1> read{ };
+      static constexpr memory_access<> write{ };
+      CdotNormAB(const real &, const real &) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
+      {
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) cdotNormAB_<reduce_t>(sum, x[i], y[i]);
+      }
+      constexpr int flops() const { return 8; }   //! flops per element
+    };
 
     /**
        First returns the dot product (x,y)
@@ -365,20 +380,6 @@ QUDA_UNROLL
       cdot_<reduce_t, real>(sum, a, b);
       norm2_<scalar, real>(sum[2], b);
     }
-
-    template <typename real_reduce_t, typename real>
-    struct CdotNormA : public ReduceFunctor<array<real_reduce_t, 3>> {
-      using reduce_t = array<real_reduce_t, 3>;
-      static constexpr memory_access<1, 1> read{ };
-      static constexpr memory_access<> write{ };
-      CdotNormA(const real &, const real &) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
-      {
-QUDA_UNROLL
-        for (int i = 0; i < x.size(); i++) cdotNormA_<reduce_t>(sum, x[i], y[i]);
-      }
-      constexpr int flops() const { return 6; }   //! flops per element
-    };
 
     /**
        This convoluted kernel does the following:
@@ -436,8 +437,8 @@ QUDA_UNROLL
        so-called heavy quark norm as used by MILC: 1 / N * \sum_i (r,
        r)_i / (x, x)_i, where i is site index and N is the number of
        sites.  We must enforce that each thread updates an entire
-       lattice hence the site_unroll template parameter must be set
-       true.
+       lattice site hence the site_unroll template parameter must be
+       set true.
     */
     template <typename real_reduce_t, typename real>
     struct HeavyQuarkResidualNorm_ {
@@ -481,8 +482,8 @@ QUDA_UNROLL
       solution, with the third being the residual vector.  This
       removes the need an additional xpy call in the solvers,
       improving performance.  We must enforce that each thread updates
-      an entire lattice hence the site_unroll template parameter must
-      be set true.
+      an entire lattice site hence the site_unroll template parameter
+      must be set true.
     */
     template <typename real_reduce_t, typename real>
     struct xpyHeavyQuarkResidualNorm_ {

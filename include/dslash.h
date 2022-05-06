@@ -65,6 +65,7 @@ namespace quda
 
       if (arg.xpay) strcat(aux_base, ",xpay");
       if (arg.dagger) strcat(aux_base, ",dagger");
+      strcat(aux_base, arg.nParity == 2 ? ",parity=2" : ",parity=1");
     }
 
     /**

@@ -157,7 +157,8 @@ void setInvertParam(QudaInvertParam &inv_param)
   }
 
   // Set clover specific parameters
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+      || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
@@ -184,7 +185,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.mass_normalization = normalization;
   inv_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
   inv_param.pipeline = pipeline;
-  inv_param.Nsteps = 2;
+  inv_param.Nsteps = 10;
   inv_param.gcrNkrylov = gcrNkrylov;
   inv_param.ca_basis = ca_basis;
   inv_param.ca_lambda_min = ca_lambda_min;
@@ -259,7 +260,6 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
   inv_param.cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
@@ -357,7 +357,6 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
@@ -369,7 +368,8 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     inv_param.mass = 0.5 / kappa - (1 + 3 / anisotropy);
   }
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+      || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
@@ -439,11 +439,11 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_ca_lambda_max[i] = setup_ca_lambda_max[i];
 
     mg_param.spin_block_size[i] = 1;
-    mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i];          // default to 24 vectors if not set
-    mg_param.n_block_ortho[i] = n_block_ortho[i];             // number of times to Gram-Schmidt
+    mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
+    mg_param.n_block_ortho[i] = n_block_ortho[i];    // number of times to Gram-Schmidt
     mg_param.block_ortho_two_pass[i]
       = block_ortho_two_pass[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE; // whether to use a two-pass block ortho
-    mg_param.precision_null[i] = prec_null;                   // precision to store the null-space basis
+    mg_param.precision_null[i] = prec_null;                               // precision to store the null-space basis
     mg_param.smoother_halo_precision[i] = smoother_halo_prec; // precision of the halo exchange in the smoother
     mg_param.nu_pre[i] = nu_pre[i];
     mg_param.nu_post[i] = nu_post[i];
@@ -640,7 +640,6 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
 
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
@@ -652,7 +651,8 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
     inv_param.mass = 0.5 / kappa - (1 + 3 / anisotropy);
   }
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+      || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
@@ -806,7 +806,6 @@ void setContractInvertParam(QudaInvertParam &inv_param)
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
 
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
   // Quda performs contractions in Degrand-Rossi gamma basis,
   // but the user may suppy vectors in any supported order.
@@ -863,7 +862,6 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
@@ -929,7 +927,7 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
 
   inv_param.tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
 
-  inv_param.Nsteps = 2;
+  inv_param.Nsteps = 10;
 
   // domain decomposition preconditioner parameters
   inv_param.inv_type_precondition = precon_type;
@@ -958,7 +956,6 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.cuda_prec = prec;
   inv_param.cuda_prec_sloppy = prec_sloppy;
   inv_param.cuda_prec_refinement_sloppy = prec_refinement_sloppy;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // this is meaningless, but must be thus set
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
@@ -987,7 +984,6 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
@@ -1229,11 +1225,11 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
 
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+      || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;

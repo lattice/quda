@@ -150,11 +150,6 @@ namespace quda {
     inner.is_preconditioner = true;
     inner.global_reduction = false;
     if (inner.global_reduction) warningQuda("Set global reduction flag for preconditioner to true.\n");
-
-    if (outer.precision_sloppy != outer.precision_precondition)
-      inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
-    else
-      inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   }
 
   GMResDR::GMResDR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
