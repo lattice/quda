@@ -69,7 +69,6 @@ if(QUDA_DIRAC_WILSON
   target_link_libraries(eigensolve_test ${TEST_LIBS})
   quda_checkbuildtest(eigensolve_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-
 endif()
 
 if(QUDA_DIRAC_WILSON
@@ -119,6 +118,11 @@ if(QUDA_DIRAC_WILSON
 
   quda_checkbuildtest(blas_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS blas_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+  add_executable(dilution_test dilution_test.cpp)
+  target_link_libraries(dilution_test ${TEST_LIBS})
+  quda_checkbuildtest(dilution_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS dilution_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_MULTIGRID)
@@ -1047,6 +1051,13 @@ foreach(prec IN LISTS TEST_PRECS)
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg_test> ${MPIEXEC_POSTFLAGS}
                      --dim 4 6 8 10 --prec ${prec}
                      --gtest_output=xml:gauge_arg_test_${prec}.xml)
+  endif()
+
+  if (TARGET dilution_test)
+    add_test(NAME dilution_test_${prec}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dilution_test> ${MPIEXEC_POSTFLAGS}
+                     --dim 4 6 8 10 --prec ${prec}
+                     --gtest_output=xml:dilution_test_${prec}.xml)
   endif()
 
 endforeach(prec)

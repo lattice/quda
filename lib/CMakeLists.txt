@@ -51,7 +51,8 @@ set (QUDA_OBJS
   multi_reduce_quda.cu reduce_helper.cu
   contract.cu comm_common.cpp communicator_stack.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
-  extract_gauge_ghost_extended.cu copy_color_spinor.cpp spinor_noise.cu
+  extract_gauge_ghost_extended.cu copy_color_spinor.cpp
+  spinor_noise.cu spinor_dilute.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_dq.cu
   copy_color_spinor_ss.cu copy_color_spinor_sd.cu
@@ -437,6 +438,10 @@ endif()
 
 if(QUDA_FAST_COMPILE_DSLASH)
   target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_DSLASH)
+endif()
+
+if(QUDA_ALTERNATIVE_I_TO_F)
+  target_compile_definitions(quda PRIVATE QUDA_ALTERNATIVE_I_TO_F)
 endif()
 
 if(QUDA_BACKWARDS)
