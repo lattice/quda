@@ -5,12 +5,6 @@
 #include <block_reduce_helper.h>
 #include <kernel_helper.h>
 
-#ifdef QUAD_SUM
-using device_reduce_t = doubledouble;
-#else
-using device_reduce_t = double;
-#endif
-
 using count_t = unsigned int;
 
 namespace quda

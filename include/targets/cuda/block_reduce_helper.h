@@ -34,9 +34,21 @@ namespace cg = cooperative_groups;
 namespace quda
 {
 
+  /**
+     @brief The atomic word size we use for a given reduction type.
+     This type should be lock-free to guarantee correct behaviour on
+     platforms that are not coherent with respect to the host
+   */
+  template <typename T> struct atomic_type {
+    using type = device_reduce_t;
+  };
+  template <> struct atomic_type<float> {
+    using type = float;
+  };
+
+
   // pre-declaration of warp_reduce that we wish to specialize
   template <bool> struct warp_reduce;
-
 
 #ifndef USE_CG
 
@@ -74,8 +86,6 @@ namespace quda
   };
 
 #else
-
-  template <typename T> struct atomic_type;
 
   template <typename T, typename U> constexpr auto get_reducer(const plus<U> &r) { return plus<T>(); }
   template <typename T, typename U> constexpr auto get_reducer(const maximum<U> &r) { return maximum<T>(); }
