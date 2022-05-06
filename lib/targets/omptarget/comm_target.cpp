@@ -17,24 +17,27 @@ namespace quda
     return 0;
   }
 
-  void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
+  void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local)
   {
     ompwip("unimplemented");
   }
 
-  void comm_destroy_neighbor_memory(void *remote[QUDA_MAX_DIM][2])
+  void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
   {
     ompwip("unimplemented");
   }
 
-  void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM])
+  void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
+                                  array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
   {
     ompwip("unimplemented");
   }
 
-  void comm_destroy_neighbor_event(qudaEvent_t [2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM])
+  void comm_destroy_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &,
+                                   array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
   {
     ompwip("unimplemented");
   }
 
 } // namespace quda
+
