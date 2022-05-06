@@ -431,8 +431,9 @@ namespace quda {
 
     /**
        @brief Generate lowest eigenvectors
+       @param B Generated null-space vectors
     */
-    void generateEigenvectors();
+    void generateEigenvectors(std::vector<ColorSpinorField*> &B);
 
     /**
        @brief Generate near-null vectors via restricting finer near-nulls, generating extras if need be
@@ -442,8 +443,9 @@ namespace quda {
 
     /**
        @brief Build free-field null-space vectors
+       @param B Generated null-space vectors
     */
-    void generateFreeVectors();
+    void generateFreeVectors(std::vector<ColorSpinorField*> &B);
 
     /**
       @brief Orthonormalize a vector of ColorSpinorField, erroring out if
