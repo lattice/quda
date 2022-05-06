@@ -1988,9 +1988,22 @@ namespace quda
 
     logQuda(QUDA_VERBOSE, "Restricting null space vectors\n");
 
+    // B vectors can be in half precession on the fine level, need to convert to single
+    ColorSpinorField Btmp;
+    bool need_tmp_single = param.fine->param.B[0]->Precision() != QUDA_SINGLE_PRECISION;
+    if (need_tmp_single) {
+      ColorSpinorParam b_tmp_param(*param.fine->param.B[0]);
+      b_tmp_param.create = QUDA_NULL_FIELD_CREATE;
+      b_tmp_param.setPrecision(QUDA_SINGLE_PRECISION, QUDA_INVALID_PRECISION,
+                           b_tmp_param.location == QUDA_CUDA_FIELD_LOCATION ? true : false);
+       Btmp = ColorSpinorField(b_tmp_param);
+    }
+
     for (int i = 0; i < param.fine->param.Nvec; i++) {
       zero(*(param.B[i]));
-      param.fine->transfer->R(*(param.B[i]), *(param.fine->param.B[i]));
+      if (need_tmp_single) Btmp = *(param.fine->param.B[i]);
+      ColorSpinorField& Bfine = need_tmp_single ? Btmp : *(param.fine->param.B[i]);
+      param.fine->transfer->R(*(param.B[i]), Bfine);
     }
 
     // generate more if need be
