@@ -10,6 +10,7 @@
    warp- and block-level reductions, using the CUB library
  */
 
+// whether to use cooperative groups (or cub)
 #define USE_CG
 #ifndef USE_CG
 
@@ -39,13 +40,35 @@ namespace quda
      This type should be lock-free to guarantee correct behaviour on
      platforms that are not coherent with respect to the host
    */
-  template <typename T> struct atomic_type {
+  template <typename T, typename Enable = void> struct atomic_type;
+
+  template <> struct atomic_type<device_reduce_t> {
     using type = device_reduce_t;
   };
+
   template <> struct atomic_type<float> {
     using type = float;
   };
 
+  template <typename T>
+    struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<device_reduce_t, T::N>>>> {
+    using type = device_reduce_t;
+  };
+
+  template <typename T>
+    struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<array<device_reduce_t, T::value_type::N>, T::N>>>> {
+    using type = device_reduce_t;
+  };
+
+  template <typename T>
+  struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<complex<double>, T::N>>>>  {
+    using type = double;
+  };
+
+  template <typename T>
+  struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<complex<float>, T::N>>>>  {
+    using type = float;
+  };
 
   // pre-declaration of warp_reduce that we wish to specialize
   template <bool> struct warp_reduce;
@@ -189,9 +212,9 @@ namespace quda
                                    const param_t &)
     {
       constexpr auto max_items = device::max_reduce_block_size() / device::warp_size();
-      const auto thread_idx = threadIdx.y * blockDim.x + threadIdx.x;
+      const auto thread_idx = target::thread_idx().y * target::block_dim().x + target::thread_idx().x;
       const auto warp_idx = thread_idx / device::warp_size();
-      const auto warp_items = blockDim.x * blockDim.y / device::warp_size();
+      const auto warp_items = target::block_dim().x * target::block_dim().y / device::warp_size();
 
       // first do warp reduce
       T value = warp_reduce<true>()(value_, false, r, warp_reduce_param<device::warp_size()>());
@@ -207,17 +230,18 @@ namespace quda
       if (thread_idx % device::warp_size() == 0) storage[batch * warp_items + warp_idx] = value;
       __syncthreads();
 
-      constexpr bool final_warp_reduction = true;
+      // whether to use the first warp or first thread for the final reduction
+      constexpr bool final_warp_reduction = false;
 
       if constexpr (final_warp_reduction) { // first warp completes the reduction
         if (warp_idx == 0) {
           if constexpr (max_items > device::warp_size()) { // never true for max block size 1024, warp = 32
             value = r.init();
-            for (int i = threadIdx.x; i < warp_items; i += device::warp_size()) value = r(storage[batch * warp_items + i], value);
+            for (int i = target::thread_idx().x; i < warp_items; i += device::warp_size()) value = r(storage[batch * warp_items + i], value);
           } else { // optimized path where we know the final reduction will fit in a warp
-            value = threadIdx.x < warp_items ? storage[batch * warp_items + threadIdx.x] : r.init();
-            value = warp_reduce<true>()(value, false, r, warp_reduce_param<device::warp_size()>());
+            value = target::thread_idx().x < warp_items ? storage[batch * warp_items + target::thread_idx().x] : r.init();
           }
+          value = warp_reduce<true>()(value, false, r, warp_reduce_param<device::warp_size()>());
         }
       } else { // first thread completes the reduction
         if (thread_idx == 0) {
