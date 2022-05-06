@@ -61,6 +61,8 @@ namespace quda
   template <typename T, bool use_kernel_arg = true> struct ReduceArg : kernel_param<use_kernel_arg> {
     using reduce_t = T;
 
+    template <typename Arg, typename I>
+    friend __device__ void write_result(Arg &, const I &, const int);
     template <typename Reducer, typename Arg, typename I>
     friend __device__ void reduce(Arg &, const Reducer &, const I &, const int);
     qudaError_t launch_error; /** only do complete if no launch error to avoid hang */
@@ -168,6 +170,75 @@ namespace quda
   };
 
   /**
+     @brief Write the reduced result out.  Three different destinations are supported:
+       * If arg.result_d is non-null we atomically write out the
+         result (to host-mapped memory)
+       * Else if arg.get_output_async_buffer returns non-zero we
+         non-atomically write out the result to device memory
+       * Else we atomically write out the result to device memory
+     @param[in,out] arg Kernel argument
+     @param[in] sum Reduced value to be written out
+     @param[in] idx Memory index we are writing to
+   */
+  template <typename Arg, typename T>
+  __device__ inline void write_result(Arg &arg, const T &sum, const int idx)
+  {
+    using atomic_t = typename atomic_type<T>::type;
+    constexpr size_t n = sizeof(T) / sizeof(atomic_t);
+
+    if (arg.result_d) { // write to host mapped memory
+      constexpr bool coalesced_write = true;
+      if constexpr (coalesced_write) {
+        static_assert(n <= device::warp_size(), "reduction array is greater than warp size");
+        auto mask = __ballot_sync(0xffffffff, target::thread_idx().x < n);
+        if (target::thread_idx().x < n && target::thread_idx().y == 0) {
+          atomic_t sum_tmp[n];
+          memcpy(sum_tmp, &sum, sizeof(sum));
+
+          atomic_t s = sum_tmp[0];
+#pragma unroll
+          for (int i = 1; i < n; i++) {
+            auto si = __shfl_sync(mask, sum_tmp[i], 0);
+            if (i == threadIdx.x) s = si;
+          }
+
+          s = (s == init_value<atomic_t>()) ? terminate_value<atomic_t>() : s;
+          arg.result_d[n * idx + target::thread_idx().x].store(s, cuda::std::memory_order_relaxed);
+        }
+      } else {
+        // write out the final reduced value
+        if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
+          atomic_t sum_tmp[n];
+          memcpy(sum_tmp, &sum, sizeof(sum));
+#pragma unroll
+          for (unsigned int i = 0; i < n; i++) {
+            // catch the case where the computed value is equal to the init_value
+            sum_tmp[i] = sum_tmp[i] == init_value<atomic_t>() ? terminate_value<atomic_t>() : sum_tmp[i];
+            arg.result_d[n * idx + i].store(sum_tmp[i], cuda::std::memory_order_relaxed);
+          }
+        }
+      }
+    } else {
+
+      if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
+        if (arg.get_output_async_buffer()) {
+          arg.get_output_async_buffer()[idx] = sum;
+        } else { // write to device memory
+          arg.partial[idx].store(sum, cuda::std::memory_order_relaxed);
+        }
+      }
+    }
+
+    if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
+      // TODO in principle we could remove this final atomic store
+      // if we use a sense reversal barrier, avoiding the need to
+      // reset the count at the end
+      arg.count[idx].store(0, cuda::std::memory_order_relaxed); // set to zero for next time
+    }
+  }
+
+
+  /**
      @brief Generic reduction function that reduces block-distributed
      data "in" per thread to a single value.  This is the
      heterogeneous-atomic version which uses std::atomic to signal the
@@ -188,8 +259,9 @@ namespace quda
 
     T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
 
-    if (target::block_dim().x > 1) {
-
+    if (target::block_dim().x == 1) { // short circuit where we have a single CTA - no need to do final reduction
+      write_result(arg, aggregate, idx);
+    } else {
       __shared__ bool isLastBlockDone[n_batch_block];
 
       if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
@@ -216,60 +288,10 @@ namespace quda
 
         sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
 
-        // write out the final reduced value
-        if (target::thread_idx().y * target::block_dim().x + target::thread_idx().x == 0) {
-          if (arg.result_d) { // write to host mapped memory
-            using atomic_t = typename atomic_type<T>::type;
-            constexpr size_t n = sizeof(T) / sizeof(atomic_t);
-            atomic_t sum_tmp[n];
-            memcpy(sum_tmp, &sum, sizeof(sum));
-#pragma unroll
-            for (unsigned int i = 0; i < n; i++) {
-              // catch the case where the computed value is equal to the init_value
-              sum_tmp[i] = sum_tmp[i] == init_value<atomic_t>() ? terminate_value<atomic_t>() : sum_tmp[i];
-              arg.result_d[n * idx + i].store(sum_tmp[i], cuda::std::memory_order_relaxed);
-            }
-          } else if (arg.get_output_async_buffer()) {
-            arg.get_output_async_buffer()[idx] = sum;
-          } else { // write to device memory
-            arg.partial[idx].store(sum, cuda::std::memory_order_relaxed);
-          }
-          // TODO in principle we could remove this final atomic store
-          // if we use a sense reversal barrier, avoiding the need to
-          // reset the count at the end
-          arg.count[idx].store(0, cuda::std::memory_order_relaxed); // set to zero for next time
-        }
+        write_result(arg, sum, idx);
       }
 
-    } else { // specialization when we have a single block per reduced value
-
-      // write out the final reduced value
-      if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
-        T sum = aggregate;
-
-        if (arg.result_d) { // write to host mapped memory
-          using atomic_t = typename atomic_type<T>::type;
-          constexpr size_t n = sizeof(T) / sizeof(atomic_t);
-          atomic_t sum_tmp[n];
-          memcpy(sum_tmp, &sum, sizeof(sum));
-#pragma unroll
-          for (unsigned int i = 0; i < n; i++) {
-            // catch the case where the computed value is equal to the init_value
-            sum_tmp[i] = sum_tmp[i] == init_value<atomic_t>() ? terminate_value<atomic_t>() : sum_tmp[i];
-            arg.result_d[n * idx + i].store(sum_tmp[i], cuda::std::memory_order_relaxed);
-          }
-        } else if (arg.get_output_async_buffer()) {
-          arg.get_output_async_buffer()[idx] = sum;
-        } else { // write to device memory
-          arg.partial[idx].store(sum, cuda::std::memory_order_relaxed);
-        }
-        // TODO in principle we could remove this final atomic store
-        // if we use a sense reversal barrier, avoiding the need to
-        // reset the count at the end
-        arg.count[idx].store(0, cuda::std::memory_order_relaxed); // set to zero for next time
-      }
     }
-
   }
 
 } // namespace quda
