@@ -52,6 +52,9 @@ namespace quda {
 
       strcat(aux,",computeStaggeredKDBlock");
 
+      // X is relatively sparse; the kernel assumes the rest of X is already zero
+      X.zero();
+
       // reset scales as appropriate
       if constexpr (sizeof(Float) < QUDA_SINGLE_PRECISION) {
         double max_scale = g.abs_max();
