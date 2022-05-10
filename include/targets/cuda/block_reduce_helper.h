@@ -11,7 +11,9 @@
  */
 
 // whether to use cooperative groups (or cub)
+#ifndef _NVHPC_CUDA // nvc++ doesn't yet support CG
 #define USE_CG
+#endif
 #ifndef USE_CG
 
 // ensures we use shfl_sync and not shfl when compiling with clang
@@ -231,7 +233,7 @@ namespace quda
       __syncthreads();
 
       // whether to use the first warp or first thread for the final reduction
-      constexpr bool final_warp_reduction = false;
+      constexpr bool final_warp_reduction = true;
 
       if constexpr (final_warp_reduction) { // first warp completes the reduction
         if (warp_idx == 0) {

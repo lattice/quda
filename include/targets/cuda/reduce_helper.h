@@ -169,7 +169,11 @@ namespace quda
     constexpr size_t n = sizeof(T) / sizeof(atomic_t);
 
     if (arg.result_d) { // write to host mapped memory
+#ifdef _NVHPC_CUDA // WAR for nvc++
+      constexpr bool coalesced_write = false;
+#else
       constexpr bool coalesced_write = true;
+#endif
       if constexpr (coalesced_write) {
         static_assert(n <= device::warp_size(), "reduction array is greater than warp size");
         auto mask = __ballot_sync(0xffffffff, target::thread_idx().x < n);
@@ -181,7 +185,7 @@ namespace quda
 #pragma unroll
           for (int i = 1; i < n; i++) {
             auto si = __shfl_sync(mask, sum_tmp[i], 0);
-            if (i == threadIdx.x) s = si;
+            if (i == target::thread_idx().x) s = si;
           }
 
           s = (s == init_value<atomic_t>()) ? terminate_value<atomic_t>() : s;
@@ -241,7 +245,7 @@ namespace quda
 
     T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
 
-    if (target::block_dim().x == 1) { // short circuit where we have a single CTA - no need to do final reduction
+    if (target::grid_dim().x == 1) { // short circuit where we have a single CTA - no need to do final reduction
       write_result(arg, aggregate, idx);
     } else {
       __shared__ bool isLastBlockDone[n_batch_block];
