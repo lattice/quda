@@ -396,7 +396,7 @@ int main(int argc, char **argv)
   //! from the parameter structs used for inverter and gauge above, as the class has a default constructor.
   //! We use the inverter and gauge parameter structs to deduce the parameters we need for the ColorSpinorFields.
   quda::ColorSpinorParam cs_param;
-  constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param); //! Only reads from inv_param and gauge_param.
+  constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param); //! Only reads from inv_param and gauge_param.
   int spinor_dim = cs_param.nColor * cs_param.nSpin;
 
   //! Allocate memory on host for the propagators for all of the 12x12 color+spinor combinations
@@ -449,14 +449,14 @@ int main(int argc, char **argv)
 
     //! first we calculate heavy-light correlators
     construct_operator(kappa_array[0], inv_param, mg_param, mg_inv_param, mg_preconditioner);
-    constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
+    constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
     corr_param.corr_flavors = CORRELATOR_QL;
     invert_and_contract(prop_array_ptr, prop_array_ptr_open, correlation_function_sum, corr_param,
                         cs_param, gauge_param, inv_param, inv_param4D);
 
     //! then we calculate heavy-strange correlators
     construct_operator(kappa_array[1], inv_param, mg_param, mg_inv_param, mg_preconditioner);
-    constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
+    constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
     corr_param.corr_flavors = CORRELATOR_QS;
     invert_and_contract(prop_array_ptr, prop_array_ptr_open, correlation_function_sum, corr_param,
                         cs_param, gauge_param, inv_param, inv_param4D);

@@ -22,9 +22,9 @@
 double gauge_smear_rho = 0.1;
 double gauge_smear_epsilon = 0.1;
 double gauge_smear_alpha = 0.6;
-int gauge_smear_steps = 50;
-QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
-int measurement_interval = 5;
+//int gauge_smear_steps = 50;
+//QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
+//int measurement_interval = 5;
 bool su_project = true;
 
 void display_test_info()
@@ -58,6 +58,7 @@ void display_test_info()
   return;
 }
 
+#if 0
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map {{"ape", QUDA_GAUGE_SMEAR_APE},
@@ -91,6 +92,7 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--su3-project", su_project,
                       "Project smeared gauge onto su3 manifold at measurement interval (default true)");
 }
+#endif
 
 int main(int argc, char **argv)
 {

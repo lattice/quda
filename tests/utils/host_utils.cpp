@@ -236,8 +236,8 @@ void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecis
     constructCloverField((float *)clover, norm, diag);
 }
 
-void constructWilsonSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
-                                const QudaGaugeParam *gauge_param)
+void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
+                                    const QudaGaugeParam *gauge_param)
 {
   // Lattice vector spacetime/colour/spin/parity properties
   cs_param->nColor = 3;
@@ -268,6 +268,7 @@ void constructWilsonSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInve
   cs_param->create = QUDA_ZERO_FIELD_CREATE;
   cs_param->location = QUDA_CPU_FIELD_LOCATION;
 }
+
 
 void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, QudaSolutionType sol_type,
                                  const int *const x, int nDim, quda::RNG &rng)

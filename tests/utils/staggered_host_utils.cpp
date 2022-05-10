@@ -661,13 +661,13 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
 #endif
 }
 
-void constructStaggeredSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
+void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
                                        const QudaGaugeParam *gauge_param)
 {
   // Lattice vector spacetime/colour/spin/parity properties
   cs_param->nColor = 3;
   cs_param->nSpin = 1;
-  cs_param->nDim = 4;
+  cs_param->nDim = 5;
   for (int d = 0; d < 4; d++) cs_param->x[d] = gauge_param->X[d];
   bool pc = isPCSolution(inv_param->solution_type);
   if (pc) cs_param->x[0] /= 2;
