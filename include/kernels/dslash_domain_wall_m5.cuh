@@ -208,7 +208,7 @@ namespace quda
   };
 
   template <bool sync, bool dagger, bool shared, class Vector, class Arg, Dslash5Type type = Arg::type>
-  __device__ __host__ inline Vector d5(const Arg &arg, const Vector &in, int parity, int x_cb, int s)
+  __device__ __host__ inline Vector d5(const Arg &arg, const Vector &in, int parity, int x_cb, int s, bool active = true)
   {
 
     using real = typename Arg::real;
@@ -222,13 +222,15 @@ namespace quda
       typedef ColorSpinor<real, Arg::nColor, 4 / 2> HalfVector;
       SharedMemoryCache<HalfVector> cache(target::block_dim());
 
-      { // forwards direction
+      if (shared) {
         constexpr int proj_dir = dagger ? +1 : -1;
-        if (shared) {
-          if (sync) { cache.sync(); }
-          cache.save(in.project(4, proj_dir));
-          cache.sync();
-        }
+        if (sync) { cache.sync(); }
+        if (active) { cache.save(in.project(4, proj_dir)); }
+        cache.sync();
+      }
+
+      if (active) { // forwards direction
+        constexpr int proj_dir = dagger ? +1 : -1;
         const int fwd_s = (s + 1) % arg.Ls;
         const int fwd_idx = fwd_s * arg.volume_4d_cb + x_cb;
         HalfVector half_in;
@@ -245,13 +247,15 @@ namespace quda
         }
       }
 
-      { // backwards direction
+      if (shared) {
         constexpr int proj_dir = dagger ? -1 : +1;
-        if (shared) {
-          cache.sync();
-          cache.save(in.project(4, proj_dir));
-          cache.sync();
-        }
+        cache.sync();
+        if (active) { cache.save(in.project(4, proj_dir)); }
+        cache.sync();
+      }
+
+      if (active) { // backwards direction
+        constexpr int proj_dir = dagger ? -1 : +1;
         const int back_s = (s + arg.Ls - 1) % arg.Ls;
         const int back_idx = back_s * arg.volume_4d_cb + x_cb;
         HalfVector half_in;
@@ -274,11 +278,11 @@ namespace quda
       SharedMemoryCache<Vector> cache(target::block_dim());
       if (shared) {
         if (sync) { cache.sync(); }
-        cache.save(in);
+        if (active) { cache.save(in); }
         cache.sync();
       }
 
-      { // forwards direction
+      if (active) { // forwards direction
         const int fwd_s = (s + 1) % arg.Ls;
         const int fwd_idx = fwd_s * arg.volume_4d_cb + x_cb;
         const Vector in = shared ? cache.load(threadIdx.x, fwd_s, parity) : arg.in(fwd_idx, parity);
@@ -290,7 +294,7 @@ namespace quda
         }
       }
 
-      { // backwards direction
+      if (active) { // backwards direction
         const int back_s = (s + arg.Ls - 1) % arg.Ls;
         const int back_idx = back_s * arg.volume_4d_cb + x_cb;
         const Vector in = shared ? cache.load(threadIdx.x, back_s, parity) : arg.in(back_idx, parity);
@@ -303,13 +307,17 @@ namespace quda
       }
     } // use_half_vector
 
-    if (type == Dslash5Type::DSLASH5_MOBIUS_PRE || type == Dslash5Type::M5_INV_MOBIUS_M5_PRE
-        || type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
-      Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
-      out = coeff.alpha(s) * out + coeff.beta(s) * diagonal;
-    } else if (type == Dslash5Type::DSLASH5_MOBIUS) {
-      Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
-      out = coeff.kappa(s) * out + diagonal;
+    if (active) {
+      if (type == Dslash5Type::DSLASH5_MOBIUS_PRE || type == Dslash5Type::M5_INV_MOBIUS_M5_PRE
+          || type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
+        Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
+        out = coeff.alpha(s) * out + coeff.beta(s) * diagonal;
+      } else if (type == Dslash5Type::DSLASH5_MOBIUS) {
+        Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
+        out = coeff.kappa(s) * out + diagonal;
+      }
+    } else {
+      out = in;
     }
 
     return out;
@@ -427,7 +435,7 @@ namespace quda
      @param[in] s_ Ls dimension coordinate
   */
   template <bool sync, bool dagger, bool shared, typename Vector, typename Arg>
-  __device__ __host__ inline Vector variableInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_)
+  __device__ __host__ inline Vector variableInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_, bool active = true)
   {
     constexpr int nSpin = 4;
     using real = typename Arg::real;
@@ -438,14 +446,15 @@ namespace quda
     if (mobius_m5::use_half_vector()) {
       SharedMemoryCache<HalfVector> cache(target::block_dim());
 
-      { // first do R
+      if (shared) {
         constexpr int proj_dir = dagger ? -1 : +1;
+        if (sync) { cache.sync(); }
+        if (active) { cache.save(in.project(4, proj_dir)); }
+        cache.sync();
+      }
 
-        if (shared) {
-          if (sync) { cache.sync(); }
-          cache.save(in.project(4, proj_dir));
-          cache.sync();
-        }
+      if (active) { // first do R
+        constexpr int proj_dir = dagger ? -1 : +1;
 
         int s = s_;
         auto R = coeff.inv();
@@ -467,13 +476,15 @@ namespace quda
         out += r.reconstruct(4, proj_dir);
       }
 
-      { // second do L
+      if (shared) {
         constexpr int proj_dir = dagger ? +1 : -1;
-        if (shared) {
-          cache.sync(); // ensure we finish R before overwriting cache
-          cache.save(in.project(4, proj_dir));
-          cache.sync();
-        }
+        cache.sync(); // ensure we finish R before overwriting cache
+        if (active) { cache.save(in.project(4, proj_dir)); }
+        cache.sync();
+      }
+
+      if (active) { // second do L
+        constexpr int proj_dir = dagger ? +1 : -1;
 
         int s = s_;
         auto L = coeff.inv();
@@ -494,15 +505,17 @@ namespace quda
 
         out += l.reconstruct(4, proj_dir);
       }
+
     } else { // use_half_vector
+
       SharedMemoryCache<Vector> cache(target::block_dim());
       if (shared) {
         if (sync) { cache.sync(); }
-        cache.save(in);
+        if (active) { cache.save(in); }
         cache.sync();
       }
 
-      { // first do R
+      if (active) { // first do R
         constexpr int proj_dir = dagger ? -1 : +1;
 
         int s = s_;
@@ -521,7 +534,7 @@ namespace quda
         out += r.reconstruct(4, proj_dir);
       }
 
-      { // second do L
+      if (active) { // second do L
         constexpr int proj_dir = dagger ? +1 : -1;
 
         int s = s_;
@@ -541,7 +554,11 @@ namespace quda
       }
     } // use_half_vector
 
-    return out;
+    if (active) {
+      return out;
+    } else {
+      return in;
+    }
   }
 
   /**
