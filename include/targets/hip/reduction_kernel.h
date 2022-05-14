@@ -6,21 +6,6 @@ namespace quda
 {
 
   /**
-     @brief This class is derived from the arg class that the functor
-     creates and curries in the block size.  This allows the block
-     size to be set statically at launch time in the actual argument
-     class that is passed to the kernel.
-
-     @tparam block_size_x x-dimension block-size
-     @tparam block_size_y y-dimension block-size
-     @tparam Arg Kernel argument struct
-  */
-  template <typename Arg_> struct ReduceKernelArg : Arg_ {
-    using Arg = Arg_;
-    ReduceKernelArg(const Arg &arg) : Arg(arg) { }
-  };
-
-  /**
      @brief Reduction2D_impl is the implementation of the generic 2-d
      reduction kernel.  Functors that utilize this kernel have two
      parallelization dimensions.  The y thread dimenion is constrained

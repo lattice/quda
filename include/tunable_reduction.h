@@ -65,12 +65,11 @@ namespace quda
        @param[in] stream The stream on which we the reduction is being done
        @param[in] arg Kernel argument struct
      */
-    template <template <typename> class Functor, typename T, typename FunctorArg>
-    void launch_device(T &result, const TuneParam &tp, const qudaStream_t &stream, FunctorArg &arg)
+    template <template <typename> class Functor, typename T, typename Arg>
+    void launch_device(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (arg.threads.y != block_size_y) errorQuda("Unexected y threads: received %d, expected %d", arg.threads.y, block_size_y);
-      using Arg = ReduceKernelArg<FunctorArg>;
-      arg.launch_error = TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Reduction2D), tp, stream, Arg(arg));
+      arg.launch_error = TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Reduction2D), tp, stream, arg);
 
       if (!commAsyncReduction()) {
         std::vector<T> result_(1);
@@ -217,13 +216,12 @@ namespace quda
        @param[in] stream The stream on which we the reduction is being done
        @param[in] arg Kernel argument struct
      */
-    template <template <typename> class Functor, typename T, typename FunctorArg>
-    void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, FunctorArg &arg)
+    template <template <typename> class Functor, typename T, typename Arg>
+    void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
-      if (n_batch_block_max > FunctorArg::max_n_batch_block)
-        errorQuda("n_batch_block_max = %u greater than maximum supported %u", n_batch_block_max, FunctorArg::max_n_batch_block);
-      using Arg = ReduceKernelArg<FunctorArg>;
-      arg.launch_error = TunableKernel::launch_device<Functor, grid_stride>(KERNEL(MultiReduction), tp, stream, Arg(arg));
+      if (n_batch_block_max > Arg::max_n_batch_block)
+        errorQuda("n_batch_block_max = %u greater than maximum supported %u", n_batch_block_max, Arg::max_n_batch_block);
+      arg.launch_error = TunableKernel::launch_device<Functor, grid_stride>(KERNEL(MultiReduction), tp, stream, arg);
 
       if (!commAsyncReduction()) {
         arg.complete(result, stream);
