@@ -151,22 +151,16 @@ namespace quda
        multi-blas.  We set a lower limit for multi-reductions, since
        we can just transpose the inner product for free, and a high
        NXZ unroll for multi-reductions lead to poor performance due to
-       register spilling.
-       @tparam reducer Whether we using a reducer
-       @return Max power of two
-     */
-    template <bool reducer> constexpr int max_NXZ_power2() { return reducer ? 16 : 128; }
-
-    /**
-       @brief Return the maximum power of two enabled by default for
-       multi-blas.  We set a lower limit for multi-reductions, since
-       we can just transpose the inner product for free, and a high
-       NXZ unroll for multi-reductions lead to poor performance due to
-       register spilling.
+       register spilling.  We also set a lower limit if using double
+       precision to avoid register spilling.
        @param[in] reducer Whether we using a reducer
+       @param[in] precision What precision we are using
        @return Max power of two
     */
-    inline int max_NXZ_power2(bool reducer) { return reducer ? 16 : 128; }
+    constexpr int max_NXZ_power2(bool reducer, QudaPrecision precision = QUDA_DOUBLE_PRECISION)
+    {
+      return reducer ? 16 : precision == QUDA_DOUBLE_PRECISION ? 32 : 64;
+    }
 
     /**
        @brief Return if the requested nxz parameter is valid or
@@ -175,10 +169,10 @@ namespace quda
        @param[in] nxz Requested nxz parameter
        @return True if valid, false if not
      */
-    inline bool is_valid_NXZ(int nxz, bool reducer)
+    inline bool is_valid_NXZ(int nxz, bool reducer, QudaPrecision precision = QUDA_DOUBLE_PRECISION)
     {
       if (nxz <= MAX_MULTI_BLAS_N || // all values below MAX_MULTI_BLAS_N are valid
-          (is_power2(nxz) && nxz <= max_NXZ_power2(reducer))) {
+          (is_power2(nxz) && nxz <= max_NXZ_power2(reducer, precision))) {
         return true;
       } else {
         return false;
@@ -253,7 +247,7 @@ namespace quda
     {
       bool x_fixed = x_prec < QUDA_SINGLE_PRECISION;
       bool y_fixed = y_prec < QUDA_SINGLE_PRECISION;
-      NXZ = is_valid_NXZ(NXZ, Functor::reducer) ? NXZ : MAX_MULTI_BLAS_N; // ensure NXZ is a valid size
+      NXZ = is_valid_NXZ(NXZ, Functor::reducer, y_prec) ? NXZ : MAX_MULTI_BLAS_N; // ensure NXZ is a valid size
       size_t spinor_x_size = x_fixed ? sizeof(Spinor<short, 4>) : sizeof(Spinor<float, 4>);
       size_t spinor_y_size = y_fixed ? sizeof(Spinor<short, 4>) : sizeof(Spinor<float, 4>);
       size_t spinor_z_size = spinor_x_size;
@@ -289,7 +283,7 @@ namespace quda
       const int NYW_max_check = max_YW_size<Functor>(x.size(), static_cast<ColorSpinorField&>(x[0]).Precision(),
                                                      static_cast<ColorSpinorField&>(y[0]).Precision());
 
-      if (!is_valid_NXZ(NXZ, f.reducer)) errorQuda("NXZ=%d is not a valid size (MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
+      if (!is_valid_NXZ(NXZ, f.reducer, static_cast<QudaPrecision>(sizeof(y_store_t)))) errorQuda("NXZ=%d is not a valid size (MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
       if (NXZ != (int)x.size()) errorQuda("Compile-time %d and run-time %lu NXZ do not match", NXZ, x.size());
       if (NYW_max != NYW_max_check) errorQuda("Compile-time %d and run-time %d limits disagree", NYW_max, NYW_max_check);
       if (f.NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", f.NYW, NYW_max);
