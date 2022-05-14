@@ -189,7 +189,7 @@ namespace quda
   template <bool> struct block_reduce;
 
   /**
-     @brief CUDA specialization of block_reduce, utilizing cub::BlockReduce
+     @brief CUDA specialization of block_reduce, building on the warp_reduce
   */
   template <> struct block_reduce<true> {
 
@@ -239,7 +239,7 @@ namespace quda
         if (warp_idx == 0) {
           if constexpr (max_items > device::warp_size()) { // never true for max block size 1024, warp = 32
             value = r.init();
-            for (int i = target::thread_idx().x; i < warp_items; i += device::warp_size()) value = r(storage[batch * warp_items + i], value);
+            for (unsigned int i = target::thread_idx().x; i < warp_items; i += device::warp_size()) value = r(storage[batch * warp_items + i], value);
           } else { // optimized path where we know the final reduction will fit in a warp
             value = target::thread_idx().x < warp_items ? storage[batch * warp_items + target::thread_idx().x] : r.init();
           }
@@ -247,7 +247,7 @@ namespace quda
         }
       } else { // first thread completes the reduction
         if (thread_idx == 0) {
-          for (int i = 1; i < warp_items; i++) value = r(storage[batch * warp_items + i], value);
+          for (unsigned int i = 1; i < warp_items; i++) value = r(storage[batch * warp_items + i], value);
         }
       }
 

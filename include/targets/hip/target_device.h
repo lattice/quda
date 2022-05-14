@@ -241,13 +241,31 @@ namespace quda
     template <typename Tag> constexpr int get_default_kernel2D_launch_bounds() { return 256; }
 
     /**
-     @brief Return the default launch bonds for a 3D Kernel for HIP
-      implementations where it is useful to explicitly set launch bounds>
+      @brief Return the default launch bounds for a 3D Kernel for HIP
+      implementations where it is useful to explicitly set launch bounds.
       Right now based on experience we will leave this constrained
       to 256 threads to prevent spilling. However templating on a tag
       type will allow further specialization
     */
     template <typename Tag> constexpr int get_default_kernel3D_launch_bounds() { return 256; }
+
+    /**
+      @brief Return the default launch bounds for Reduction kernel for HIP
+      implementations where it is useful to explicitly set launch bounds.
+      Right now based on experience we will leave this constrained
+      to 256 threads to prevent spilling. However templating on a tag
+      type will allow further specialization
+    */
+    template <typename Tag> constexpr int get_default_reduction_launch_bounds() { return 256; }
+
+    /**
+      @brief Return the default launch bounds for MultiReduction kernel for HIP
+      implementations where it is useful to explicitly set launch bounds.
+      Right now based on experience we will leave this constrained
+      to 256 threads to prevent spilling. However templating on a tag
+      type will allow further specialization
+    */
+    template <typename Tag> constexpr int get_default_multireduction_launch_bounds() { return 256; }
 
     /**
      @brief Return the maximum number of threads per block for block
