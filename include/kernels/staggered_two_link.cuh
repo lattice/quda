@@ -16,21 +16,15 @@ namespace quda {
       typedef typename gauge_mapper<real,reconstruct>::type G;
       const G link;
       int X[4]; // regular grid dims
-      int D[4]; // working set grid dims
       int E[4]; // extended grid dims
 
       int commDim[4];
       int border[4];
-      int base_idx[4]; // the offset into the extended field
-      int oddness_change;
-      int mu;
-      int sig;
 
       /**
          @param[in] link Gauge field
-         @param[in] overlap Radius of additional redundant computation to do
        */
-      BaseArg(const GaugeField &link, int overlap) :
+      BaseArg(const GaugeField &link) :
         kernel_param(dim3(1, 2, 1)),
         link(link),
         commDim{ comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3) }
@@ -39,12 +33,9 @@ namespace quda {
           E[d] = link.X()[d];
           border[d] = link.R()[d];
           X[d] = E[d] - 2*border[d];
-          D[d] = comm_dim_partitioned(d) ? X[d]+overlap*2 : X[d];
-          base_idx[d] = comm_dim_partitioned(d) ? border[d]-overlap : 0;
-          this->threads.x *= D[d];
+          this->threads.x *= X[d];
         }
         this->threads.x /= 2;
-        oddness_change = (base_idx[0] + base_idx[1] + base_idx[2] + base_idx[3])&1;
       }
     };
 
@@ -52,12 +43,11 @@ namespace quda {
     template <typename real, int nColor, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
     struct TwoLinkArg : public BaseArg<real, nColor, reconstruct> {
 
-      typedef typename gauge::FloatNOrder<real,18,2,11> M;
       typedef typename gauge_mapper<real,QUDA_RECONSTRUCT_NO>::type F;
       F outA;
 
       TwoLinkArg(GaugeField &twoLink, const GaugeField &link)
-        : BaseArg<real, nColor, reconstruct>(link,0), outA(twoLink)
+        : BaseArg<real, nColor, reconstruct>(link), outA(twoLink)
       { }
 
     };
@@ -70,8 +60,8 @@ namespace quda {
       constexpr static const char *filename() { return KERNEL_FILE; }
 
       // Flops count, in two-number pair (matrix_mult, matrix_add)
-      // 				   (24, 12)
-      // 4968 Flops per site in total
+      // 				   (4, 0)
+      // 300 Flops per site in total (75 per multiplication over two SU(3) matrices)
       __device__ __host__ void operator()(int x_cb, int parity, int)
       {
         int x[4];

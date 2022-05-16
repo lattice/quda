@@ -42,9 +42,9 @@ using namespace staggered_quark_smearing;
         outA.restore();
       }
 
-      long long flops() const { return 2*4*arg.threads.x*36ll;}
+      long long flops() const { return 2*4*arg.threads.x*300ll;}
 
-      long long bytes() const { return 2*4*arg.threads.x*( 2*arg.outA.Bytes() );}
+      long long bytes() const { return 2*4*arg.threads.x*( 2*arg.link.Bytes() + arg.outA.Bytes() );}
     };
 
     template <typename real, int nColor, QudaReconstructType recon>
@@ -56,12 +56,12 @@ using namespace staggered_quark_smearing;
       }
     };
 
-#ifdef GPU_HISQ_FORCE//must be changed
+#ifdef GPU_FATLINK // need to be changed
     void computeTwoLink(GaugeField &newTwoLink, const GaugeField &link)
     {
-      checkNative(link, newTwoLink, newTwoLink);
-      checkLocation(newTwoLink, newTwoLink, link);
-      checkPrecision(newTwoLink, link, newTwoLink);
+      checkNative(newTwoLink, link);
+      checkLocation(newTwoLink, link);
+      checkPrecision(newTwoLink, link);
 
       instantiate<ComputeTwoLink, ReconstructNone>(newTwoLink, link);
       return;

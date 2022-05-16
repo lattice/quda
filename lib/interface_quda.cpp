@@ -5433,7 +5433,7 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
     gParam.setPrecision(inv_param->cuda_prec, true);
     gParam.link_type     = QUDA_ASQTAD_LONG_LINKS;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-    gParam.nFace = 3;
+    gParam.nFace = 3; // FIXME: need a QudaLinkType with nFace=2.
     gParam.pad = gParam.pad*gParam.nFace;
     //
     gaugeSmeared = new cudaGaugeField(gParam);
@@ -5472,12 +5472,10 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   ColorSpinorField *in    = ColorSpinorField::Create(cudaParam);
   ColorSpinorField *out   = ColorSpinorField::Create(cudaParam);
   ColorSpinorField *temp1 = ColorSpinorField::Create(cudaParam);
-  ColorSpinorField *temp2 = ColorSpinorField::Create(cudaParam);
  
 
   // Create the smearing operator
   //------------------------------------------------------
-  //bool pc_solve  = false;//staggered field
   Dirac *d       = nullptr;
   DiracParam diracParam;
   //
@@ -5515,13 +5513,13 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
   
   const double msq     = 1. / ftmp;  
-  const double a       = 6.0 + msq;
-  const double b       = 0.0;
+  const double a       = inv_param->laplace3D * 2.0 + msq;
+  const double b       = 0.0; // not used
   
   for (int i = 0; i < n_steps; i++) {
     if (i > 0) std::swap(in, out);
-    blas::ax(ftmp, *in); //
-    blas::axpy(a, *in, *temp1); //
+    blas::ax(ftmp, *in);
+    blas::axpy(a, *in, *temp1);
     
     qsmear_op.Expose()->SmearOp(*out, *in, a, 0.0, t0);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -5549,7 +5547,6 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished 2link Gaussian smearing.\n");
 
   delete temp1;
-  delete temp2;
   delete out;
   delete in;
   delete in_h;

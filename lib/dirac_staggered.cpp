@@ -162,7 +162,7 @@ namespace quda {
     }
 
     ApplyStaggeredQSmear(out, in, *gauge, t0_local, is_time_slice, QUDA_INVALID_PARITY, laplace3D, dagger, comm_dim, profile); // parity is not used
-    flops += 1368ll*in.Volume(); // FIXME
+    flops += ( laplace3D > 3 ? 570ll : 426ll ) * ( in.VolumeCB() / ( is_time_slice ? in.X(3) : 1 ) );
   }  
   
 
