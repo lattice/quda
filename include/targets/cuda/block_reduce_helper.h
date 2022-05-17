@@ -29,7 +29,6 @@ using namespace quda;
 #else
 
 #include <cooperative_groups/reduce.h>
-#include <cooperative_groups/scan.h>
 namespace cg = cooperative_groups;
 
 #endif
