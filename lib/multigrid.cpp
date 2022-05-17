@@ -1861,63 +1861,80 @@ namespace quda
     popLevel();
   }
 
-  void MG::generateEigenvectors(std::vector<ColorSpinorField*>& B)
+  void MG::generateEigenvectors(std::vector<ColorSpinorField*>& B, bool post_restrict)
   {
     pushLevel(param.level);
 
     if (param.mg_global.eig_param[param.level] == nullptr)
       errorQuda("eig_param for level %d has not been populated", param.level);
 
-    // Extract eigensolver params
-    // HACK FOR NOW for restrict then eigenvectors to patch up
-    param.mg_global.eig_param[param.level]->n_conv = (int)B.size();
-    param.mg_global.eig_param[param.level]->n_ev_deflate = (int)B.size();
-    int n_conv = param.mg_global.eig_param[param.level]->n_conv;
-    bool dagger = param.mg_global.eig_param[param.level]->use_dagger;
-    bool normop = param.mg_global.eig_param[param.level]->use_norm_op;
+    // Extract eigensolver params; we create a copy by value because we may override
+    // some values when we restrict first
+    auto eig_param = *param.mg_global.eig_param[param.level];
+
+    // We need to compute fewer eigenvectors if we've restricted some fine
+    // near-nulls first.
+    if (post_restrict) {
+      eig_param.n_conv = static_cast<int>(B.size());
+      eig_param.n_ev_deflate = static_cast<int>(B.size());
+    }
+
+    int n_conv = eig_param.n_conv;
+    bool dagger = eig_param.use_dagger;
+    bool normop = eig_param.use_norm_op;
 
     // Dummy array to keep the eigensolver happy.
     std::vector<Complex> evals(n_conv, 0.0);
-
     std::vector<ColorSpinorField *> B_evecs;
     ColorSpinorParam csParam(*B[0]);
-    csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS; // FIXME: check for staggered
+    if (csParam.siteSubset == QUDA_PARITY_SITE_SUBSET) {
+      csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+      csParam.x[0] *= 2;
+    }
+    if (B[0]->Nspin() == 4) csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     // This is the vector precision used by matResidual
     csParam.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION, true);
 
     for (int i = 0; i < n_conv; i++) B_evecs.push_back(new ColorSpinorField(csParam));
 
+    // before entering the eigen solver, let's free the B vectors to save some memory
+    //ColorSpinorParam bParam(*B[0]);
+    //for (int i = 0; i < (int)B.size(); i++) delete B[i];
+
     EigenSolver *eig_solve;
     if (!normop && !dagger) {
       DiracM *mat = new DiracM(*diracResidual);
-      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
+      eig_solve = EigenSolver::create(&eig_param, *mat, profile);
       (*eig_solve)(B_evecs, evals);
       delete eig_solve;
       delete mat;
     } else if (!normop && dagger) {
       DiracMdag *mat = new DiracMdag(*diracResidual);
-      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
+      eig_solve = EigenSolver::create(&eig_param, *mat, profile);
       (*eig_solve)(B_evecs, evals);
       delete eig_solve;
       delete mat;
     } else if (normop && !dagger) {
       DiracMdagM *mat = new DiracMdagM(*diracResidual);
-      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
+      eig_solve = EigenSolver::create(&eig_param, *mat, profile);
       (*eig_solve)(B_evecs, evals);
       delete eig_solve;
       delete mat;
     } else if (normop && dagger) {
       DiracMMdag *mat = new DiracMMdag(*diracResidual);
-      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
+      eig_solve = EigenSolver::create(&eig_param, *mat, profile);
       (*eig_solve)(B_evecs, evals);
       delete eig_solve;
       delete mat;
     }
 
     // now reallocate the B vectors copy in e-vectors
-    for (int i = 0; i < (int)param.B.size(); i++) {
-      *B[i] = *B_evecs[i];
+    for (int i = 0; i < (int)B.size(); i++) {
+      if (B[0]->SiteSubset() == QUDA_PARITY_SITE_SUBSET)
+        *B[i] = B_evecs[i]->Even();
+      else
+        *B[i] = *B_evecs[i];
     }
 
     // Local clean-up
@@ -1944,7 +1961,7 @@ namespace quda
       b_tmp_param.create = QUDA_NULL_FIELD_CREATE;
       b_tmp_param.setPrecision(QUDA_SINGLE_PRECISION, QUDA_INVALID_PRECISION,
                            b_tmp_param.location == QUDA_CUDA_FIELD_LOCATION ? true : false);
-       Btmp = ColorSpinorField(b_tmp_param);
+      Btmp = ColorSpinorField(b_tmp_param);
     }
 
     for (int i = 0; i < param.fine->param.Nvec; i++) {
@@ -1986,7 +2003,7 @@ namespace quda
       } else if (setup_remaining_type == QUDA_SETUP_NULL_VECTOR_EIGENVECTORS) {
         // nothing to initialize, though there may be scope to reuse with Block Lanczos
         // once it's performant
-        generateEigenvectors(B_remaining);
+        generateEigenvectors(B_remaining, true);
       } else {
         errorQuda("Unsupported remaining near-null vector type %d", setup_remaining_type);
       }

@@ -432,8 +432,11 @@ namespace quda {
     /**
        @brief Generate lowest eigenvectors
        @param B Generated null-space vectors
+       @param post_restrict whether or not we're generating extra eigenvectors after restricting
+              some fine eigenvectors; if true we override the requested n_conv in the multigrid
+              eigenvalue struct
     */
-    void generateEigenvectors(std::vector<ColorSpinorField*> &B);
+    void generateEigenvectors(std::vector<ColorSpinorField*> &B, bool post_restrict = false);
 
     /**
        @brief Generate near-null vectors via restricting finer near-nulls, generating extras if need be
