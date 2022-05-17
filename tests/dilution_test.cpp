@@ -56,7 +56,7 @@ TEST_P(DilutionTest, verify)
   ColorSpinorParam param;
   constructWilsonTestSpinorParam(&param, &inv_param, &gauge_param);
   param.siteSubset = site_subset;
-  param.setPrecision(param.Precision(), param.Precision(), true); // change order to native order
+  param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true); // change order to native order
   param.location = QUDA_CUDA_FIELD_LOCATION;
   param.create = QUDA_NULL_FIELD_CREATE;
   param.nSpin = nSpin;
