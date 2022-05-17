@@ -6,14 +6,15 @@
 /**
    @file block_reduce_helper.h
 
-   @section This files contains the CUDA device specialziations for
+   @section This files contains the CUDA device specializations for
    warp- and block-level reductions, using the CUB library
  */
 
 // whether to use cooperative groups (or cub)
-#ifndef _NVHPC_CUDA // nvc++ doesn't yet support CG
+#if !(_NVHPC_CUDA || (defined(__clang__) && defined(__CUDA__))) // neither nvc++ or clang-cuda yet support CG
 #define USE_CG
 #endif
+
 #ifndef USE_CG
 
 // ensures we use shfl_sync and not shfl when compiling with clang
@@ -111,13 +112,13 @@ namespace quda
 
 #else
 
-  template <typename T, typename U> constexpr auto get_reducer(const plus<U> &r) { return plus<T>(); }
-  template <typename T, typename U> constexpr auto get_reducer(const maximum<U> &r) { return maximum<T>(); }
-  template <typename T, typename U> constexpr auto get_reducer(const minimum<U> &r) { return minimum<T>(); }
+  template <typename T, typename U> constexpr auto get_reducer(const plus<U> &) { return plus<T>(); }
+  template <typename T, typename U> constexpr auto get_reducer(const maximum<U> &) { return maximum<T>(); }
+  template <typename T, typename U> constexpr auto get_reducer(const minimum<U> &) { return minimum<T>(); }
 
-  template <typename T, typename U> constexpr auto get_cg_reducer(const plus<U> &r) { return cg::plus<T>(); }
-  template <typename T, typename U> constexpr auto get_cg_reducer(const maximum<U> &r) { return cg::greater<T>(); }
-  template <typename T, typename U> constexpr auto get_cg_reducer(const minimum<U> &r) { return cg::less<T>(); }
+  template <typename T, typename U> constexpr auto get_cg_reducer(const plus<U> &) { return cg::plus<T>(); }
+  template <typename T, typename U> constexpr auto get_cg_reducer(const maximum<U> &) { return cg::greater<T>(); }
+  template <typename T, typename U> constexpr auto get_cg_reducer(const minimum<U> &) { return cg::less<T>(); }
 
   /**
      @brief CUDA specialization of warp_reduce, utilizing cooperative groups
@@ -172,7 +173,7 @@ namespace quda
       atomic_t sum_tmp[n];
       memcpy(sum_tmp, &value_, sizeof(T));
 #pragma unroll
-      for (int i = 0; i < n; i++) sum_tmp[i] = operator()(sum_tmp[i], all, r, param_t());
+      for (size_t i = 0; i < n; i++) sum_tmp[i] = operator()(sum_tmp[i], all, r, param_t());
       T value;
       memcpy(&value, sum_tmp, sizeof(T));
       return value;
