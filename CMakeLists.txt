@@ -233,6 +233,8 @@ option(QUDA_CTEST_DISABLE_BENCHMARKS "Disable benchmark test" ON)
 option(QUDA_FAST_COMPILE_REDUCE "enable fast compilation in blas and reduction kernels (single warp per reduction)" OFF)
 option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in dslash kernels (~20% perf impact)" OFF)
 
+option(QUDA_ALTERNATIVE_I_TO_F "enable using alternative integer-to-float conversion" OFF)
+
 option(QUDA_OPENMP "enable OpenMP" OFF)
 set(QUDA_CXX_STANDARD
     17
@@ -261,6 +263,8 @@ mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 mark_as_advanced(QUDA_FLOAT8)
 mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
 mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
+
+mark_as_advanced(QUDA_ALTERNATIVE_I_TO_F)
 
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_PRECISION)

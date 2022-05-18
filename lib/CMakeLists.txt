@@ -443,6 +443,10 @@ if(QUDA_FAST_COMPILE_DSLASH)
   target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_DSLASH)
 endif()
 
+if(QUDA_ALTERNATIVE_I_TO_F)
+  target_compile_definitions(quda PRIVATE QUDA_ALTERNATIVE_I_TO_F)
+endif()
+
 if(QUDA_BACKWARDS)
   target_include_directories(quda_cpp SYSTEM PRIVATE ${backward-cpp_SOURCE_DIR})
 

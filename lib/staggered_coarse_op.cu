@@ -61,6 +61,11 @@ namespace quda {
       strcat(aux,comm_dim_partitioned_string());
       strcat(aux,",computeStaggeredVUV");
 
+      // X and Y are relatively sparse; the kernel assumes the rest of X and Y
+      // are already zero
+      X.zero();
+      Y.zero();
+
       // reset scales as appropriate
       if constexpr (sizeof(Float) < QUDA_SINGLE_PRECISION) {
         double max_scale = g.abs_max();
@@ -388,6 +393,7 @@ namespace quda {
       //First make a cpu gauge field from the cuda gauge field
       int pad = 0;
       GaugeFieldParam gf_param(gauge.X(), precision, QUDA_RECONSTRUCT_NO, pad, gauge.Geometry());
+      gf_param.location = location;
       gf_param.order = QUDA_QDP_GAUGE_ORDER;
       gf_param.fixed = gauge.GaugeFixed();
       gf_param.link_type = gauge.LinkType();
@@ -409,6 +415,7 @@ namespace quda {
       GaugeFieldParam lgf_param(longGauge.X(), precision, QUDA_RECONSTRUCT_NO, pad, longGauge.Geometry());
       if (!(dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC))
         for (int i = 0; i < lgf_param.nDim; i++) lgf_param.x[i] = 0;
+      lgf_param.location = location;
       lgf_param.order = QUDA_QDP_GAUGE_ORDER;
       lgf_param.fixed = longGauge.GaugeFixed();
       lgf_param.link_type = longGauge.LinkType();
@@ -431,6 +438,7 @@ namespace quda {
       GaugeFieldParam xgf_param(XinvKD.X(), precision, QUDA_RECONSTRUCT_NO, pad, XinvKD.Geometry());
       if (!(dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC))
         for (int i = 0; i < xgf_param.nDim; i++) xgf_param.x[i] = 0;
+      xgf_param.location = location;
       xgf_param.order = QUDA_QDP_GAUGE_ORDER;
       xgf_param.fixed = XinvKD.GaugeFixed();
       xgf_param.link_type = XinvKD.LinkType();
@@ -470,7 +478,6 @@ namespace quda {
       } else if ((dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) && longGauge.Reconstruct() != QUDA_RECONSTRUCT_NO) {
         // create a copy of the gauge field with no reconstruction
         GaugeFieldParam lgf_param(longGauge);
-
         lgf_param.reconstruct = QUDA_RECONSTRUCT_NO;
         lgf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
         lgf_param.setPrecision(lgf_param.Precision());
@@ -485,6 +492,7 @@ namespace quda {
         // Create a dummy field
         GaugeFieldParam xgf_param(XinvKD.X(), precision, QUDA_RECONSTRUCT_NO, pad, XinvKD.Geometry());
         for (int i = 0; i < xgf_param.nDim; i++) xgf_param.x[i] = 0;
+        xgf_param.location = location;
         xgf_param.reconstruct = QUDA_RECONSTRUCT_NO;
         xgf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
         xgf_param.setPrecision(xgf_param.Precision());

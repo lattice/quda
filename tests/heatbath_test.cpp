@@ -104,6 +104,7 @@ int main(int argc, char **argv)
   {
     using namespace quda;
     GaugeFieldParam gParam(gauge_param);
+    gParam.location = QUDA_CUDA_FIELD_LOCATION;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     gParam.create = QUDA_NULL_FIELD_CREATE;
     gParam.link_type = gauge_param.type;
@@ -119,6 +120,7 @@ int main(int argc, char **argv)
     for (int dir = 0; dir < 4; ++dir) y[dir] = gauge_param.X[dir] + 2 * R[dir];
     GaugeFieldParam gParamEx(y, prec, link_recon, pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
     gParamEx.create = QUDA_ZERO_FIELD_CREATE;
+    gParamEx.location = QUDA_CUDA_FIELD_LOCATION;
     gParamEx.order = gParam.order;
     gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParamEx.t_boundary = gParam.t_boundary;
