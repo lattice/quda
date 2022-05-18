@@ -93,9 +93,36 @@ namespace quda {
   namespace target {
     namespace omptarget {
       struct SharedCache{
-        int *addr;
+        int **addr;
+        int num_teams;
       };
-      extern SharedCache shared_cache;
+      inline void prepare_shared_cache(int num_teams)
+      {
+        extern SharedCache shared_cache;
+        static int init = 0;
+        if(!init){
+          init = 1;
+          shared_cache.addr = (int**)omp_target_alloc(num_teams*sizeof(void*), omp_get_default_device());
+          shared_cache.num_teams = num_teams;
+        }
+        if(shared_cache.num_teams<num_teams){
+          omp_target_free(shared_cache.addr, omp_get_default_device());
+          shared_cache.addr = (int**)omp_target_alloc(num_teams*sizeof(void*), omp_get_default_device());
+          shared_cache.num_teams = num_teams;
+        }
+        #pragma omp target update to(shared_cache)
+      }
+      inline void save_shared_cache(int ptr[])
+      {
+        extern SharedCache shared_cache;
+        shared_cache.addr[omp_get_team_num()] = ptr;
+      }
+      inline int *get_shared_cache(void)
+      {
+        extern SharedCache shared_cache;
+        #pragma omp barrier
+        return shared_cache.addr[omp_get_team_num()];
+      }
 
       struct LaunchParam{
         dim3 block;

@@ -171,16 +171,16 @@ namespace quda
     {
       using warp_reduce_t = cub::WarpReduce<T, param_t::width, __COMPUTE_CAPABILITY__>;
       using tempStorage = typename warp_reduce_t::TempStorage;
-      static_assert(sizeof(tempStorage) <= sizeof(target::omptarget::shared_cache.addr[0])*1024, "Shared cache not large enough for tempStorage");  // FIXME arbitrary, 1024 is used below
-      tempStorage *dummy_storage = (tempStorage*)&target::omptarget::shared_cache.addr[1024];
+      static_assert(sizeof(tempStorage) <= sizeof(target::omptarget::get_shared_cache()[0])*1024, "Shared cache not large enough for tempStorage");  // FIXME arbitrary, 1024 is used below
+      tempStorage *dummy_storage = (tempStorage*)&target::omptarget::get_shared_cache()[1024];
       warp_reduce_t warp_reduce(*dummy_storage);
       T value = reducer_t::do_sum ? warp_reduce.Sum(value_) : warp_reduce.Reduce(value_, r);
 
       if (all) {
         using warp_scan_t = cub::WarpScan<T, param_t::width, __COMPUTE_CAPABILITY__>;
         using tempStorage = typename warp_scan_t::TempStorage;
-        static_assert(sizeof(tempStorage) <= sizeof(target::omptarget::shared_cache.addr[0])*1024, "Shared cache not large enough for tempStorage");  // FIXME arbitrary, 1024 is arbitrary
-        tempStorage *dummy_storage = (tempStorage*)&target::omptarget::shared_cache.addr[2048];
+        static_assert(sizeof(tempStorage) <= sizeof(target::omptarget::get_shared_cache()[0])*1024, "Shared cache not large enough for tempStorage");  // FIXME arbitrary, 1024 is arbitrary
+        tempStorage *dummy_storage = (tempStorage*)&target::omptarget::get_shared_cache()[2048];
         // typename warp_scan_t::TempStorage dummy_storage;
         warp_scan_t warp_scan(*dummy_storage);
         value = warp_scan.Broadcast(value, 0);
@@ -216,11 +216,11 @@ namespace quda
     {
       constexpr int nthr = param_t::block_size_x*param_t::block_size_y*(param_t::batch_size>param_t::block_size_z?param_t::batch_size:param_t::block_size_z);
       int tid = omp_get_thread_num();
-      static_assert(nthr*sizeof(T) <= sizeof(target::omptarget::shared_cache.addr[0])*8192, "Shared cache not large enough for tempStorage");  // FIXME arbitrary, the number is arbitrary, do we have that many?
-      T *storage = (T*)&target::omptarget::shared_cache.addr[128];  // FIXME arbitrary
-      // #pragma omp barrier
+      static_assert(nthr*sizeof(T) <= device::max_shared_memory_size()-sizeof(target::omptarget::get_shared_cache()[0])*128, "Shared cache not large enough for tempStorage");  // FIXME arbitrary, the number is arbitrary, offset 128 below
+      T *storage = (T*)&target::omptarget::get_shared_cache()[128];  // FIXME arbitrary
+      #pragma omp barrier
       storage[tid] = value_;
-      // #pragma omp barrier
+      #pragma omp barrier
       int offset = 1;
       constexpr int bs = param_t::batch_size;
       static_assert(nthr%bs==0, "Block size not divisible by batch_size");

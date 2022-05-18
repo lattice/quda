@@ -9,7 +9,7 @@
 #endif
 
 #ifndef QUDA_MAX_SHARED_MEMORY_SIZE
-#define QUDA_MAX_SHARED_MEMORY_SIZE 32*1024
+#define QUDA_MAX_SHARED_MEMORY_SIZE 40*1024
 #endif
 
 namespace quda {

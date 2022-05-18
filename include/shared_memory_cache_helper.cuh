@@ -76,7 +76,7 @@ namespace quda
         extern __shared__ int cache_[];
         return reinterpret_cast<atom_t*>(cache_);
 #else
-        return reinterpret_cast<atom_t*>(target::omptarget::shared_cache.addr);
+        return reinterpret_cast<atom_t*>(target::omptarget::get_shared_cache());
 #endif
       }
     };
@@ -92,7 +92,8 @@ namespace quda
         static __shared__ atom_t cache_[n_element * block_size_x * block_size_y * block_size_z];
         return reinterpret_cast<atom_t*>(cache_);
 #else
-        return reinterpret_cast<atom_t*>(target::omptarget::shared_cache.addr);
+        static_assert(n_element * block_size_x * block_size_y * block_size_z * sizeof(atom_t) <= device::max_shared_memory_size(), "not enough shared memory");
+        return reinterpret_cast<atom_t*>(target::omptarget::get_shared_cache());
 #endif
       }
     };
