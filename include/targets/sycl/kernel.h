@@ -122,6 +122,9 @@ namespace quda {
     auto err = QUDA_SUCCESS;
     sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, 1};
     //sycl::range<3> globalSize{arg.threads.x, arg.threads.y, 1};
+    if(grid_stride==false) {
+      globalSize = sycl::range<3>{arg.threads.x, arg.threads.y, 1};
+    }
     sycl::range<3> localSize{tp.block.x, tp.block.y, 1};
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
