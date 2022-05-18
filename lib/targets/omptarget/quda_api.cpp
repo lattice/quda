@@ -4,6 +4,7 @@
 #include <quda_internal.h>
 #include <timer.h>
 #include <device.h>
+#include <target_device.h>
 
 namespace quda
 {
@@ -39,6 +40,22 @@ namespace quda
         launch_param.grid = tp.grid;
         launch_param.block = tp.block;
         #pragma omp target update to(launch_param)
+
+        static int init = 0;
+        int num_teams = tp.grid.x*tp.grid.y*tp.grid.z;
+        if(!init){
+          init = 1;
+          shared_cache.addr = (int*)omp_target_alloc(num_teams*device::max_shared_memory_size(), omp_get_default_device());
+          shared_cache.num_teams = num_teams;
+          shared_cache.cache_length = device::max_shared_memory_size()/sizeof(shared_cache.addr[0]);
+        }
+        if(shared_cache.num_teams<num_teams){
+          omp_target_free(shared_cache.addr, omp_get_default_device());
+          shared_cache.addr = (int*)omp_target_alloc(num_teams*device::max_shared_memory_size(), omp_get_default_device());
+          shared_cache.num_teams = num_teams;
+          shared_cache.cache_length = device::max_shared_memory_size()/sizeof(shared_cache.addr[0]);
+        }
+        #pragma omp target update to(shared_cache)
       }
 
       static inline int

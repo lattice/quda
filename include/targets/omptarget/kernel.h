@@ -59,11 +59,8 @@ namespace quda
     // const int ty = arg.threads.y;
     // const int tz = arg.threads.z;
     // printf("Kernel1D: launch parameter: gd %d ld %d tx %d ty %d tz %d\n", gd, ld, tx, ty, tz);
-    target::omptarget::prepare_shared_cache(gd);
     #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
     {
-      int cache[device::max_shared_memory_size()/sizeof(int)];
-      target::omptarget::save_shared_cache(cache);
       #pragma omp parallel num_threads(ld)
       {
         // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
@@ -98,11 +95,8 @@ namespace quda
     const int gd = target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y*target::omptarget::launch_param.grid.z;
     const int ld = target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y*target::omptarget::launch_param.block.z;
     // printf("Kernel1D: launch parameter: gd %d ld %d\n", gd, ld);
-    target::omptarget::prepare_shared_cache(gd);
     #pragma omp target teams num_teams(gd) thread_limit(ld)
     {
-      int cache[device::max_shared_memory_size()/sizeof(int)];
-      target::omptarget::save_shared_cache(cache);
       #pragma omp parallel num_threads(ld)
       {
         // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
@@ -170,11 +164,8 @@ namespace quda
     Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
     // printf("dparg %p\n", dparg);
     omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
-    target::omptarget::prepare_shared_cache(gd);
     #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
     {
-      int cache[device::max_shared_memory_size()/sizeof(int)];
-      target::omptarget::save_shared_cache(cache);
       #pragma omp parallel num_threads(ld)
       {
         // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
@@ -208,11 +199,8 @@ namespace quda
     const int gd = target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y*target::omptarget::launch_param.grid.z;
     const int ld = target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y*target::omptarget::launch_param.block.z;
     // printf("Kernel2D: launch parameter: gd %d ld %d\n", gd, ld);
-    target::omptarget::prepare_shared_cache(gd);
     #pragma omp target teams num_teams(gd) thread_limit(ld)
     {
-        int cache[device::max_shared_memory_size()/sizeof(int)];
-        target::omptarget::save_shared_cache(cache);
       #pragma omp parallel num_threads(ld)
       {
         // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
@@ -282,11 +270,8 @@ namespace quda
     Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
     // printf("dparg %p\n", dparg);
     omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
-    target::omptarget::prepare_shared_cache(gd);
     #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
     {
-      int cache[device::max_shared_memory_size()/sizeof(int)];
-      target::omptarget::save_shared_cache(cache);
       #pragma omp parallel num_threads(ld)
       {
         // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
@@ -320,11 +305,8 @@ namespace quda
     const int gd = target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y*target::omptarget::launch_param.grid.z;
     const int ld = target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y*target::omptarget::launch_param.block.z;
     // printf("Kernel3D: launch parameter: gd %d ld %d\n", gd, ld);
-    target::omptarget::prepare_shared_cache(gd);
     #pragma omp target teams num_teams(gd) thread_limit(ld)
     {
-      int cache[device::max_shared_memory_size()/sizeof(int)];
-      target::omptarget::save_shared_cache(cache);
       #pragma omp parallel num_threads(ld)
       {
         // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
@@ -363,11 +345,8 @@ namespace quda
     Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
     // printf("dparg %p\n", dparg);
     omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
-    target::omptarget::prepare_shared_cache(gd);
     #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
     {
-      int cache[device::max_shared_memory_size()/sizeof(int)];
-      target::omptarget::save_shared_cache(cache);
       #pragma omp parallel num_threads(ld)
       {
         // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
