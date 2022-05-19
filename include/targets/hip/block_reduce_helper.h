@@ -82,10 +82,10 @@ namespace quda
     template <typename T, typename reducer_t, typename param_t>
     __device__ inline T operator()(const T &value_, bool async, int batch, bool all, const reducer_t &r, const param_t &)
     {
-      constexpr auto max_items = device::max_reduce_block_size() / device::warp_size();
+      constexpr auto max_items = device::max_block_size() / device::warp_size();
       const auto thread_idx = target::thread_idx().y * target::block_dim().x + target::thread_idx().x;
       const auto warp_idx = thread_idx / device::warp_size();
-      const auto warp_items = target::block_dim().x * target::block_dim().y / device::warp_size();
+      const auto warp_items = (target::block_dim().x * target::block_dim().y + device::warp_size() - 1) / device::warp_size();
 
       // first do warp reduce
       T value = warp_reduce<true>()(value_, false, r, warp_reduce_param<device::warp_size()>());

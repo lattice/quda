@@ -31,8 +31,6 @@ namespace quda {
         return false;
       }
 
-      unsigned int maxBlockSize(const TuneParam &) const { return device::max_reduce_block_size(); }
-
     public:
       Reduce(const coeff_t &a, const coeff_t &b, const coeff_t &, ColorSpinorField &x, ColorSpinorField &y,
              ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, host_reduce_t &result) :

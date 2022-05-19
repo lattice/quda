@@ -158,24 +158,6 @@ namespace quda
     }
 
     /**
-       @brief Helper function that returns the maximum number of threads
-       in a block in the x dimension for reduction kernels.
-    */
-    template <int block_size_y = 1, int block_size_z = 1> constexpr unsigned int max_reduce_block_size()
-    {
-      return max_block_size<block_size_y, block_size_z>();
-    }
-
-    /**
-       @brief Helper function that returns the maximum number of threads
-       in a block in the x dimension for reduction kernels.
-    */
-    template <int block_size_y = 1, int block_size_z = 1> constexpr unsigned int max_multi_reduce_block_size()
-    {
-      return max_block_size<block_size_y, block_size_z>();
-    }
-
-    /**
        @brief Helper function that returns the maximum size of a
        __constant__ buffer on the target architecture.  For CUDA,
        this is set to the somewhat arbitrary limit of 32 KiB for now.
