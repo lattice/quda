@@ -68,6 +68,8 @@ namespace quda
     template <template <typename> class Functor, typename T, typename Arg>
     void launch_device(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
+      if (tp.block.x * tp.block.y < device::warp_size())
+        errorQuda("Reduction kernels must use at least a warp of threads per block (%u %u < %u)", tp.block.x, tp.block.y, device::warp_size());
       if (arg.threads.y != block_size_y) errorQuda("Unexected y threads: received %d, expected %d", arg.threads.y, block_size_y);
       arg.launch_error = TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Reduction2D), tp, stream, arg);
 
@@ -219,6 +221,8 @@ namespace quda
     template <template <typename> class Functor, typename T, typename Arg>
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
+      if (tp.block.x * tp.block.y < device::warp_size())
+        errorQuda("Reduction kernels must use at least a warp of threads per block (%u %u < %u)", tp.block.x, tp.block.y, device::warp_size());
       if (n_batch_block_max > Arg::max_n_batch_block)
         errorQuda("n_batch_block_max = %u greater than maximum supported %u", n_batch_block_max, Arg::max_n_batch_block);
       arg.launch_error = TunableKernel::launch_device<Functor, grid_stride>(KERNEL(MultiReduction), tp, stream, arg);
