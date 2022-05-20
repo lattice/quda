@@ -74,6 +74,7 @@ void initFields(QudaPrecision prec)
   param.create = QUDA_ZERO_FIELD_CREATE;
   param.setPrecision(prec);
   param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  param.location = QUDA_CUDA_FIELD_LOCATION;
 
   xD = std::make_unique<ColorSpinorField>(param);
   yD = std::make_unique<ColorSpinorField>(param);
@@ -99,6 +100,7 @@ void initFields(QudaPrecision prec)
   gParam.nFace = 1;
 
   gParam.geometry = QUDA_COARSE_GEOMETRY;
+  gParam.location = QUDA_CPU_FIELD_LOCATION;
   Y_h = new cpuGaugeField(gParam);
   Yhat_h = new cpuGaugeField(gParam);
 
@@ -121,6 +123,7 @@ void initFields(QudaPrecision prec)
   gParam.pad = gParam.nFace * pad * 2;
 
   gParam.setPrecision(prec_sloppy);
+  gParam.location = QUDA_CUDA_FIELD_LOCATION;
 
   Y_d = new cudaGaugeField(gParam);
   Yhat_d = new cudaGaugeField(gParam);
