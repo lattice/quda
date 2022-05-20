@@ -5,6 +5,7 @@ using namespace quda;
 StaggeredDslashTestWrapper dslash_test_wrapper;
 
 bool gauge_loaded = false;
+bool ctest_all_partitions = false;
 
 void display_test_info(int precision, QudaReconstructType link_recon)
 {
@@ -50,6 +51,10 @@ protected:
       warningQuda("Fixed precision unsupported for Laplace operator, skipping...");
       return true;
     }
+
+    const std::array<bool, 16> partition_enabled {true, true,  true,  true,  true,  false, false, true,
+                                                  true, false, false, false, false, false, false, true};
+    if (!ctest_all_partitions && !partition_enabled[::testing::get<2>(GetParam())]) return true;
 
     if (::testing::get<2>(GetParam()) > 0 && dslash_test_wrapper.test_split_grid) { return true; }
     return false;
@@ -115,6 +120,7 @@ int main(int argc, char **argv)
   ::testing::InitGoogleTest(&argc, argv);
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
+  app->add_option("--all-partitions", ctest_all_partitions, "Test all instead of reduced combination of partitions");
   add_comms_option_group(app);
   try {
     app->parse(argc, argv);
