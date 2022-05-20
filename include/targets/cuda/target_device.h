@@ -132,6 +132,32 @@ namespace quda
     */
     __device__ __host__ inline dim3 thread_idx() { return dispatch<thread_idx_impl>(); }
 
+    /**
+       @brief Helper function that returns a linear thread index within a thread block.
+    */
+    template <int dim>
+    __device__ __host__ inline auto thread_idx_linear()
+    {
+      switch (dim) {
+      case 1: return thread_idx().x;
+      case 2: return thread_idx().y * block_dim().x + thread_idx().x;
+      case 3: return (thread_idx().z * block_dim().y + thread_idx().y) * block_dim().x + thread_idx().x;
+      }
+    }
+
+    /**
+       @brief Helper function that returns the total number thread in a thread block
+    */
+    template <int dim>
+    __device__ __host__ inline auto block_size()
+    {
+      switch (dim) {
+      case 1: return block_dim().x;
+      case 2: return block_dim().y * block_dim().x;
+      case 3: return block_dim().z * block_dim().y * block_dim().x;
+      }
+    }
+
   } // namespace target
 
   namespace device

@@ -83,9 +83,10 @@ namespace quda
     __device__ inline T operator()(const T &value_, bool async, int batch, bool all, const reducer_t &r, const param_t &)
     {
       constexpr auto max_items = device::max_block_size() / device::warp_size();
-      const auto thread_idx = target::thread_idx().y * target::block_dim().x + target::thread_idx().x;
+      const auto thread_idx = (param_t::batch_size == 1) ? target::thread_idx_linear<3>() : target::thread_idx_linear<2>();
+      const auto block_size = (param_t::batch_size == 1) ? target::block_size<3>() : target::block_size<2>();
       const auto warp_idx = thread_idx / device::warp_size();
-      const auto warp_items = (target::block_dim().x * target::block_dim().y + device::warp_size() - 1) / device::warp_size();
+      const auto warp_items = (block_size + device::warp_size() - 1) / device::warp_size();
 
       // first do warp reduce
       T value = warp_reduce<true>()(value_, false, r, warp_reduce_param<device::warp_size()>());
@@ -102,13 +103,13 @@ namespace quda
       // whether to use the first warp or first thread for the final reduction
       constexpr bool final_warp_reduction = true;
 
-      if constexpr (final_warp_reduction) { // first warp completes the reduction
+      if constexpr (final_warp_reduction) { // first warp completes the reduction (requires first warp is full)
         if (warp_idx == 0) {
           if constexpr (max_items > device::warp_size()) { // never true for max block size 1024, warp = 32
             value = r.init();
-            for (unsigned int i = target::thread_idx().x; i < warp_items; i += device::warp_size()) value = r(storage[batch * warp_items + i], value);
+            for (auto i = thread_idx; i < warp_items; i += device::warp_size()) value = r(storage[batch * warp_items + i], value);
           } else { // optimized path where we know the final reduction will fit in a warp
-            value = target::thread_idx().x < warp_items ? storage[batch * warp_items + target::thread_idx().x] : r.init();
+            value = thread_idx < warp_items ? storage[batch * warp_items + thread_idx] : r.init();
           }
           value = warp_reduce<true>()(value, false, r, warp_reduce_param<device::warp_size()>());
         }
