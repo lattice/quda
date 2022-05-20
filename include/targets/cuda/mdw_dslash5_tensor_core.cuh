@@ -260,7 +260,8 @@ namespace quda
     }
     warp_max[0] = fmaxf(warp_max[0], warp_max[1]);
 
-    return BlockReduce<float>().AllMax(warp_max[0]) / target_scale;
+    constexpr int block_dim = 2;
+    return BlockReduce<float, block_dim>().AllMax(warp_max[0]) / target_scale;
   }
 
   // Actually does more than the function name suggests.

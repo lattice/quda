@@ -179,6 +179,7 @@ namespace quda {
   template <typename Arg> struct FixQualityFFT : plus<typename Arg::reduce_t> {
     using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
+    static constexpr int reduce_block_dim = 2; // x_cb in x, parity in y
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr FixQualityFFT(const Arg &arg) : arg(arg) {}

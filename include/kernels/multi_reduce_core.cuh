@@ -87,6 +87,7 @@ namespace quda
     template <typename Arg> struct MultiReduce_ : plus<typename Arg::reduce_t> {
       using reduce_t = typename Arg::reduce_t;
       using plus<reduce_t>::operator();
+      static constexpr int reduce_block_dim = 1; // x_cb and parity are mapped to x dim
       using vec = array<complex<typename Arg::real>, Arg::n/2>;
       const Arg &arg;
       constexpr MultiReduce_(const Arg &arg) : arg(arg) {}

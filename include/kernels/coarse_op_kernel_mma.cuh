@@ -138,7 +138,8 @@ namespace quda
           max = impl::computeUV(arg, arg.AV, parity, x_cb);
 
         if (Arg::compute_max) {
-          unsigned aggregate = BlockReduce<unsigned>().Max(__float_as_uint(max));
+          constexpr int block_dim = 3;
+          unsigned aggregate = BlockReduce<unsigned, block_dim>().Max(__float_as_uint(max));
           if (threadIdx.y == 0 && threadIdx.z == 0) atomic_fetch_abs_max(arg.max_d, __uint_as_float(aggregate));
         }
       }

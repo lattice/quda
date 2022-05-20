@@ -246,7 +246,7 @@ namespace quda
   __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx)
   {
     constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
-    using BlockReduce = BlockReduce<T, n_batch_block>;
+    using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
 
     T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
 
