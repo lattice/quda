@@ -230,12 +230,17 @@ namespace quda
      heterogeneous-atomic version which uses std::atomic to signal the
      completion of the reduction to the host.
 
-     @param arg The kernel argument, this must derive from ReduceArg
-     @param r Instance of the reducer to be used in this reduction
-     @param in The input per-thread data to be reduced
-     @param idx In the case of multiple reductions, idx identifies
-     which reduction this thread block corresponds to.  Typically idx
-     will be constant along constant block_idx().y and block_idx().z.
+     The reduce function supports:
+     - a global reduction across the x thread dimension
+     - a local block reduction across the y thread dimension
+     - the z thread dimension is a batching dimension in the case of independent reductions
+
+     @param[in,out] arg The kernel argument, this must derive from ReduceArg
+     @param[in] r Instance of the reducer to be used in this reduction
+     @param[in] in The input per-thread data to be reduced
+     @param[in] idx In the case of multiple reductions, idx identifies
+     which reduction this thread block corresponds to and should be
+     constant along the x and y thread dimensions.
   */
   template <typename Reducer, typename Arg, typename T>
   __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx)
