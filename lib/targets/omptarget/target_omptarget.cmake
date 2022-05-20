@@ -16,7 +16,7 @@ set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS xehp)
 message(STATUS "Building for GPU Architectures: ${QUDA_GPU_ARCH}")
 
 set(QUDA_WARP_SIZE 16 CACHE STRING "OpenMP target logical warp size")
-set_property(CACHE QUDA_WARP_SIZE PROPERTY STRINGS 8 16 32)
+set_property(CACHE QUDA_WARP_SIZE PROPERTY STRINGS 8 16 32 64)
 target_compile_definitions(quda PUBLIC QUDA_WARP_SIZE=${QUDA_WARP_SIZE})
 message(STATUS "Using logical warp size: ${QUDA_WARP_SIZE}")
 
@@ -26,7 +26,7 @@ target_compile_definitions(quda PUBLIC QUDA_MAX_BLOCK_SIZE=${QUDA_MAX_BLOCK_SIZE
 message(STATUS "Using maximum team size: ${QUDA_MAX_BLOCK_SIZE}")
 
 set(QUDA_MAX_SHARED_MEMORY_SIZE 40960 CACHE STRING "OpenMP target maximum shared memory size (among threads in a team)")
-set_property(CACHE QUDA_MAX_SHARED_MEMORY_SIZE PROPERTY STRINGS 36864 40960 45056 49152)
+set_property(CACHE QUDA_MAX_SHARED_MEMORY_SIZE PROPERTY STRINGS 36864 40960 45056 49152 65536 98304 131072 196608 262144)
 target_compile_definitions(quda PUBLIC QUDA_MAX_SHARED_MEMORY_SIZE=${QUDA_MAX_SHARED_MEMORY_SIZE})
 message(STATUS "Using maximum shared memory size: ${QUDA_MAX_SHARED_MEMORY_SIZE}")
 
