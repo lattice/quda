@@ -141,7 +141,9 @@ namespace quda
       switch (dim) {
       case 1: return thread_idx().x;
       case 2: return thread_idx().y * block_dim().x + thread_idx().x;
-      case 3: return (thread_idx().z * block_dim().y + thread_idx().y) * block_dim().x + thread_idx().x;
+      case 3:
+      default:
+        return (thread_idx().z * block_dim().y + thread_idx().y) * block_dim().x + thread_idx().x;
       }
     }
 
@@ -154,7 +156,9 @@ namespace quda
       switch (dim) {
       case 1: return block_dim().x;
       case 2: return block_dim().y * block_dim().x;
-      case 3: return block_dim().z * block_dim().y * block_dim().x;
+      case 3:
+      default:
+        return block_dim().z * block_dim().y * block_dim().x;
       }
     }
 
