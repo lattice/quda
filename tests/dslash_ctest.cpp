@@ -39,8 +39,8 @@ protected:
 
     if (::testing::get<2>(GetParam()) > 0 && dslash_test_wrapper.test_split_grid) { return true; }
 
-    const std::array<bool, 16> partition_enabled {true, true,  true,  true,  true,  false, false, true,
-                                                  true, false, false, false, false, false, false, true};
+    const std::array<bool, 16> partition_enabled {true, true, true,  false,  true,  false, false, false,
+                                                  true, false, false, false, true, false, true, true};
     if (!ctest_all_partitions && !partition_enabled[::testing::get<2>(GetParam())]) return true;
 
     return false;
