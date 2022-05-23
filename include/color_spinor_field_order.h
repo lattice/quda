@@ -876,6 +876,16 @@ namespace quda
 
 #endif
 
+      /**
+         @brief Wrapper to transform_reduce which is called by the
+         reducer functions, e.g., norm2 and abs_max
+         @tparam reducer The reduction operation we which to apply
+         @param[in] location The location of execution
+         @param[in] nParity Number of parities of the field
+         @param[in] volumeCB Checkerboard volume
+         @param[in] h The helper functor which acts as the transformer
+         in transform_reduce
+       */
       template <typename reducer, typename helper>
       auto transform_reduce(QudaFieldLocation location, int nParity, unsigned int volumeCB, helper h) const
       {
