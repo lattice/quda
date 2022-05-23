@@ -923,6 +923,14 @@ namespace quda
   void spinorNoise(ColorSpinorField &src, unsigned long long seed, QudaNoiseType type);
 
   /**
+     @brief Generate a set of diluted color spinors from a single source.
+     @param v Diluted vector set
+     @param src The input source
+     @param type The type of dilution to apply (QUDA_DILUTION_SPIN_COLOR, etc.)
+  */
+  void spinorDilute(std::vector<ColorSpinorField> &v, const ColorSpinorField &src, QudaDilutionType type);
+
+  /**
      @brief Helper function for determining if the preconditioning
      type of the fields is the same.
      @param[in] a Input field

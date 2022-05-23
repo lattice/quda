@@ -36,7 +36,10 @@ namespace quda
     x_coarse(nullptr),
     tmp_coarse(nullptr),
     tmp2_coarse(nullptr),
+    tmp_coarse_sloppy(nullptr),
+    tmp2_coarse_sloppy(nullptr),
     xInvKD(nullptr),
+    xInvKD_sloppy(nullptr),
     diracResidual(param.matResidual->Expose()),
     diracSmoother(param.matSmooth->Expose()),
     diracSmootherSloppy(param.matSmoothSloppy->Expose()),
@@ -250,7 +253,8 @@ namespace quda
   }
 
   void MG::resetStaggeredKD(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                            double mass)
+                            cudaGaugeField *gauge_sloppy_in, cudaGaugeField *fat_gauge_sloppy_in,
+                            cudaGaugeField *long_gauge_sloppy_in, double mass)
   {
     if (param.level != 0) errorQuda("The staggered KD operator can only be updated from level 0");
 
@@ -266,12 +270,12 @@ namespace quda
       // last nullptr is for the clover field
       diracCoarseResidual->updateFields(fat_gauge_in, fat_gauge_in, long_gauge_in, nullptr);
       diracCoarseSmoother->updateFields(fat_gauge_in, fat_gauge_in, long_gauge_in, nullptr);
-      diracCoarseSmootherSloppy->updateFields(fat_gauge_in, fat_gauge_in, long_gauge_in, nullptr);
+      diracCoarseSmootherSloppy->updateFields(fat_gauge_sloppy_in, fat_gauge_sloppy_in, long_gauge_sloppy_in, nullptr);
     } else {
       // last nullptr is for the clover field
       diracCoarseResidual->updateFields(gauge_in, fat_gauge_in, long_gauge_in, nullptr);
       diracCoarseSmoother->updateFields(gauge_in, fat_gauge_in, long_gauge_in, nullptr);
-      diracCoarseSmootherSloppy->updateFields(gauge_in, fat_gauge_in, long_gauge_in, nullptr);
+      diracCoarseSmootherSloppy->updateFields(gauge_sloppy_in, fat_gauge_sloppy_in, long_gauge_sloppy_in, nullptr);
     }
 
     diracCoarseResidual->setMass(mass);
@@ -335,8 +339,10 @@ namespace quda
     param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
 
     param_presmooth->precision = param.mg_global.invert_param->cuda_prec_sloppy;
-    param_presmooth->precision_sloppy = (param.level == 0) ? param.mg_global.invert_param->cuda_prec_precondition : param.mg_global.invert_param->cuda_prec_sloppy;
-    param_presmooth->precision_precondition = (param.level == 0) ? param.mg_global.invert_param->cuda_prec_precondition : param.mg_global.invert_param->cuda_prec_sloppy;
+    param_presmooth->precision_sloppy = (is_fine_grid()) ? param.mg_global.invert_param->cuda_prec_precondition :
+                                                           param.mg_global.invert_param->cuda_prec_sloppy;
+    param_presmooth->precision_precondition = (is_fine_grid()) ? param.mg_global.invert_param->cuda_prec_precondition :
+                                                                 param.mg_global.invert_param->cuda_prec_sloppy;
 
     param_presmooth->inv_type = param.smoother;
     param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
@@ -407,73 +413,8 @@ namespace quda
     if (param.level == 0
         && (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD
             || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)) {
-      auto dirac_type = diracSmoother->getDiracType();
 
-      auto smoother_solve_type = param.mg_global.smoother_solve_type[param.level + 1];
-      if (smoother_solve_type != QUDA_DIRECT_SOLVE) {
-        errorQuda("Invalid solve type %d for optimized KD operator", smoother_solve_type);
-      }
-
-      // Allocate and build the KD inverse block (inverse coarse clover)
-      auto fine_dirac_type = diracSmoother->getDiracType();
-      if (fine_dirac_type != dirac_type)
-        errorQuda("Input dirac type %d does not match smoother type %d\n", dirac_type, fine_dirac_type);
-
-      cudaGaugeField *fine_gauge = nullptr;
-      if (dirac_type == QUDA_STAGGERED_DIRAC || dirac_type == QUDA_STAGGEREDPC_DIRAC)
-        fine_gauge
-          = const_cast<cudaGaugeField *>(reinterpret_cast<const DiracStaggered *>(diracSmoother)->getGaugeField());
-      if (dirac_type == QUDA_ASQTAD_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC)
-        fine_gauge = const_cast<cudaGaugeField *>(
-          reinterpret_cast<const DiracImprovedStaggered *>(diracSmoother)->getFatLinkField());
-
-      xInvKD = AllocateAndBuildStaggeredKahlerDiracInverse(
-        *fine_gauge, diracSmoother->Mass(), param.mg_global.staggered_kd_dagger_approximation == QUDA_BOOLEAN_TRUE);
-
-      DiracParam diracParamKD;
-      diracParamKD.kappa
-        = -1.0; // Cancels automatic kappa in Y field application, which may be relevant if it propagates down
-      diracParamKD.mass = diracSmoother->Mass();
-      diracParamKD.mu = diracSmoother->Mu(); // doesn't matter
-      diracParamKD.mu_factor = 1.0;          // doesn't matter
-      diracParamKD.dagger = QUDA_DAG_NO;
-      diracParamKD.matpcType = QUDA_MATPC_EVEN_EVEN; // We can use this to track left vs right block jacobi in the future
-      diracParamKD.gauge = const_cast<cudaGaugeField *>(fine_gauge);
-      diracParamKD.xInvKD = xInvKD.get(); // FIXME: pulling a raw unmanaged pointer out of a unique_ptr...
-      diracParamKD.dirac
-        = const_cast<Dirac *>(diracSmoother); // used to determine if the outer solve is preconditioned or not
-
-      diracParamKD.tmp1 = tmp_coarse;
-      diracParamKD.tmp2 = tmp2_coarse;
-
-      if (dirac_type == QUDA_STAGGERED_DIRAC || dirac_type == QUDA_STAGGEREDPC_DIRAC) {
-        diracParamKD.type = QUDA_STAGGEREDKD_DIRAC;
-
-        diracCoarseResidual = new DiracStaggeredKD(diracParamKD);
-        diracCoarseSmoother = new DiracStaggeredKD(diracParamKD);
-        diracCoarseSmootherSloppy = new DiracStaggeredKD(diracParamKD);
-      } else if (dirac_type == QUDA_ASQTAD_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC) {
-        if (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD) {
-          diracParamKD.type = QUDA_ASQTADKD_DIRAC;
-
-          diracParamKD.fatGauge = fine_gauge;
-          diracParamKD.longGauge = const_cast<cudaGaugeField *>(
-            reinterpret_cast<const DiracImprovedStaggered *>(diracSmoother)->getLongLinkField());
-
-          diracCoarseResidual = new DiracImprovedStaggeredKD(diracParamKD);
-          diracCoarseSmoother = new DiracImprovedStaggeredKD(diracParamKD);
-          diracCoarseSmootherSloppy = new DiracImprovedStaggeredKD(diracParamKD);
-        } else {
-          // param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG
-          diracParamKD.type = QUDA_STAGGEREDKD_DIRAC;
-
-          diracCoarseResidual = new DiracStaggeredKD(diracParamKD);
-          diracCoarseSmoother = new DiracStaggeredKD(diracParamKD);
-          diracCoarseSmootherSloppy = new DiracStaggeredKD(diracParamKD);
-        }
-      } else {
-        errorQuda("Invalid dirac_type %d", dirac_type);
-      }
+      createOptimizedKdDirac();
 
     } else {
 
@@ -548,6 +489,118 @@ namespace quda
     matCoarseSmootherSloppy = new DiracM(*diracCoarseSmootherSloppy);
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Coarse Dirac operator done\n");
+
+    popLevel();
+  }
+
+  void MG::createOptimizedKdDirac()
+  {
+
+    pushLevel(param.level);
+
+    auto dirac_type = diracSmoother->getDiracType();
+
+    auto smoother_solve_type = param.mg_global.smoother_solve_type[param.level + 1];
+    if (smoother_solve_type != QUDA_DIRECT_SOLVE) {
+      errorQuda("Invalid solve type %d for optimized KD operator", smoother_solve_type);
+    }
+
+    // Determine if we're doing a mixed precision solve for setup or not
+    bool mixed_precision_setup
+      = (param.mg_global.invert_param->cuda_prec_precondition != param.mg_global.invert_param->cuda_prec_sloppy);
+
+    // Allocate and build the KD inverse block (inverse coarse clover)
+    auto fine_dirac_type = diracSmoother->getDiracType();
+    if (fine_dirac_type != dirac_type)
+      errorQuda("Input dirac type %d does not match smoother type %d\n", dirac_type, fine_dirac_type);
+
+    // Determine if the dirac_type is naive staggered
+    bool is_naive_staggered = (dirac_type == QUDA_STAGGERED_DIRAC || dirac_type == QUDA_STAGGEREDPC_DIRAC);
+    bool is_improved_staggered = (dirac_type == QUDA_ASQTAD_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC);
+
+    bool is_coarse_naive_staggered = is_naive_staggered
+      || (is_improved_staggered && param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG);
+
+    cudaGaugeField *fine_gauge = diracSmoother->getStaggeredShortLinkField();
+    cudaGaugeField *sloppy_gauge = mixed_precision_setup ? diracSmootherSloppy->getStaggeredShortLinkField() : fine_gauge;
+
+    xInvKD = AllocateAndBuildStaggeredKahlerDiracInverse(
+      *fine_gauge, diracSmoother->Mass(), param.mg_global.staggered_kd_dagger_approximation == QUDA_BOOLEAN_TRUE);
+
+    // Unique to the KD operator as a "coarse level", we can do a mixed-precision
+    // near null generation.
+    if (mixed_precision_setup) {
+      GaugeFieldParam xinv_param(*xInvKD);
+
+      // true is to force FLOAT2
+      xinv_param.setPrecision(param.mg_global.invert_param->cuda_prec_precondition, true);
+
+      xInvKD_sloppy = std::shared_ptr<GaugeField>(reinterpret_cast<GaugeField *>(new cudaGaugeField(xinv_param)));
+      xInvKD_sloppy->copy(*xInvKD);
+
+      ColorSpinorParam sloppy_tmp_param(*tmp_coarse);
+      sloppy_tmp_param.setPrecision(param.mg_global.invert_param->cuda_prec_precondition);
+
+      tmp_coarse_sloppy = new ColorSpinorField(sloppy_tmp_param);
+      tmp2_coarse_sloppy = new ColorSpinorField(sloppy_tmp_param);
+
+    } else {
+      // We can just alias fields
+      xInvKD_sloppy = xInvKD;
+    }
+
+    DiracParam diracParamKD;
+    diracParamKD.kappa
+      = -1.0; // Cancels automatic kappa in Y field application, which may be relevant if it propagates down
+    diracParamKD.mass = diracSmoother->Mass();
+    diracParamKD.mu = diracSmoother->Mu(); // doesn't matter
+    diracParamKD.mu_factor = 1.0;          // doesn't matter
+    diracParamKD.dagger = QUDA_DAG_NO;
+    diracParamKD.matpcType = QUDA_MATPC_EVEN_EVEN; // We can use this to track left vs right block jacobi in the future
+    diracParamKD.gauge = const_cast<cudaGaugeField *>(fine_gauge);
+    diracParamKD.xInvKD = xInvKD.get(); // FIXME: pulling a raw unmanaged pointer out of a unique_ptr...
+    diracParamKD.dirac
+      = const_cast<Dirac *>(diracSmoother); // used to determine if the outer solve is preconditioned or not
+
+    diracParamKD.tmp1 = tmp_coarse;
+    diracParamKD.tmp2 = tmp2_coarse;
+
+    if (is_coarse_naive_staggered) {
+      diracParamKD.type = QUDA_STAGGEREDKD_DIRAC;
+
+      diracCoarseResidual = new DiracStaggeredKD(diracParamKD);
+      diracCoarseSmoother = new DiracStaggeredKD(diracParamKD);
+      if (mixed_precision_setup) {
+        diracParamKD.gauge = sloppy_gauge;
+        diracParamKD.xInvKD = xInvKD_sloppy.get();
+        diracParamKD.dirac = nullptr;
+        diracParamKD.tmp1 = tmp_coarse_sloppy;
+        diracParamKD.tmp2 = tmp2_coarse_sloppy;
+      }
+      diracCoarseSmootherSloppy = new DiracStaggeredKD(diracParamKD);
+
+    } else if (is_improved_staggered) {
+      diracParamKD.type = QUDA_ASQTADKD_DIRAC;
+
+      diracParamKD.fatGauge = fine_gauge;
+      diracParamKD.longGauge = diracSmoother->getStaggeredLongLinkField();
+
+      diracCoarseResidual = new DiracImprovedStaggeredKD(diracParamKD);
+      diracCoarseSmoother = new DiracImprovedStaggeredKD(diracParamKD);
+
+      if (mixed_precision_setup) {
+        diracParamKD.fatGauge = sloppy_gauge;
+        diracParamKD.longGauge = diracSmootherSloppy->getStaggeredLongLinkField();
+        diracParamKD.xInvKD = xInvKD_sloppy.get();
+        diracParamKD.dirac = nullptr;
+        diracParamKD.tmp1 = tmp_coarse_sloppy;
+        diracParamKD.tmp2 = tmp2_coarse_sloppy;
+      }
+
+      diracCoarseSmootherSloppy = new DiracImprovedStaggeredKD(diracParamKD);
+    } else {
+      errorQuda("Invalid dirac_type %d", dirac_type);
+    }
 
     popLevel();
   }
@@ -761,6 +814,8 @@ namespace quda
     if (x_coarse) delete x_coarse;
     if (tmp_coarse) delete tmp_coarse;
     if (tmp2_coarse) delete tmp2_coarse;
+    if (tmp_coarse_sloppy) delete tmp_coarse_sloppy;
+    if (tmp2_coarse_sloppy) delete tmp2_coarse_sloppy;
 
     if (param_coarse) delete param_coarse;
 
@@ -1380,12 +1435,13 @@ namespace quda
       = (solverParam.inv_type == QUDA_BICGSTAB_INVERTER ? 0 : 4); // FIXME: pipeline != 0 breaks BICGSTAB
     solverParam.precision = r->Precision();
 
-    if (param.level == 0) { // this enables half precision on the fine grid only if set
+    if (is_fine_grid()) {
       solverParam.precision_sloppy = param.mg_global.invert_param->cuda_prec_precondition;
       solverParam.precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
     } else {
       solverParam.precision_precondition = solverParam.precision;
     }
+
     solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
     solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
     ColorSpinorParam csParam(*B[0]);                            // Create spinor field parameters:

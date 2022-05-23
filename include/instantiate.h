@@ -3,9 +3,30 @@
 #include <array>
 #include <enum_quda.h>
 #include <util_quda.h>
+#include <quda_internal.h>
 
 namespace quda
 {
+
+  /**
+     @brief Helper function for returning if a given spin value is enabled
+     @tparam nSpin Spin value
+   */
+  constexpr bool is_enabled_spin(int spin)
+  {
+    switch (spin) {
+#ifdef NSPIN1
+    case 1: return true;
+#endif
+#ifdef NSPIN2
+    case 2: return true;
+#endif
+#ifdef NSPIN4
+    case 4: return true;
+#endif
+    default: return false;
+    }
+  }
 
   /**
      @brief Helper function for returning if a given gauge field order is enabled
@@ -249,6 +270,83 @@ namespace quda
     } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
       if constexpr (is_enabled<QUDA_QUARTER_PRECISION>())
         instantiate<Apply, int8_t>(field, args...);
+      else
+        errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+    } else {
+      errorQuda("Unsupported precision %d\n", field.Precision());
+    }
+  }
+
+  /**
+     @brief This instantiate function is used to instantiate the colors
+     @param[in] field LatticeField we wish to instantiate
+     @param[in,out] args Additional arguments for kernels
+  */
+  template <template <typename, int, int> class Apply, typename store_t, int nSpin, typename F, typename... Args>
+  constexpr void instantiateSpinor(F &field, Args &&...args)
+  {
+    if (field.Ncolor() == 3) {
+      Apply<store_t, nSpin, 3>(field, args...);
+    } else {
+      errorQuda("Unsupported number of colors %d\n", field.Ncolor());
+    }
+  }
+
+  /**
+     @brief This instantiate function is used to instantiate the spins
+     @param[in] field LatticeField we wish to instantiate
+     @param[in,out] args Additional arguments for kernels
+  */
+  template <template <typename, int, int> class Apply, typename store_t, typename F, typename... Args>
+  constexpr void instantiateSpinor(F &field, Args &&...args)
+  {
+    if (field.Nspin() == 4) {
+      if constexpr (is_enabled_spin(4))
+        instantiateSpinor<Apply, store_t, 4>(field, args...);
+      else
+        errorQuda("nSpin=%d support has not been built", field.Nspin());
+    } else if (field.Nspin() == 2) {
+      if constexpr (is_enabled_spin(2))
+        instantiateSpinor<Apply, store_t, 2>(field, args...);
+      else
+        errorQuda("nSpin=%d support has not been built", field.Nspin());
+    } else if (field.Nspin() == 1) {
+      if constexpr (is_enabled_spin(1))
+        instantiateSpinor<Apply, store_t, 1>(field, args...);
+      else
+        errorQuda("nSpin=%d support has not been built", field.Nspin());
+    } else {
+      errorQuda("Unsupported number of spins %d\n", field.Nspin());
+    }
+  }
+
+  /**
+     @brief This instantiate function is used to instantiate the
+     precision, number of spins and number of colors
+     @param[in] field LatticeField we wish to instantiate
+     @param[in,out] args Any additional arguments required for the computation at hand
+  */
+  template <template <typename, int, int> class Apply, typename F, typename... Args>
+  constexpr void instantiateSpinor(F &field, Args &&...args)
+  {
+    if (field.Precision() == QUDA_DOUBLE_PRECISION) {
+      if constexpr (is_enabled<QUDA_DOUBLE_PRECISION>())
+        instantiateSpinor<Apply, double>(field, args...);
+      else
+        errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
+    } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
+      if constexpr (is_enabled<QUDA_SINGLE_PRECISION>())
+        instantiateSpinor<Apply, float>(field, args...);
+      else
+        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+    } else if (field.Precision() == QUDA_HALF_PRECISION) {
+      if constexpr (is_enabled<QUDA_HALF_PRECISION>())
+        instantiateSpinor<Apply, short>(field, args...);
+      else
+        errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+    } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
+      if constexpr (is_enabled<QUDA_QUARTER_PRECISION>())
+        instantiateSpinor<Apply, int8_t>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
     } else {

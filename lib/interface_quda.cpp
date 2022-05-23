@@ -2514,7 +2514,8 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
         || mg_param->transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
       if (param->overlap) errorQuda("Updating the staggered/asqtad KD field with param->overlap set is not supported");
 
-      mg->mg->resetStaggeredKD(gaugeSloppy, gaugeFatSloppy, gaugeLongSloppy, param->mass);
+      mg->mg->resetStaggeredKD(gaugeSloppy, gaugeFatSloppy, gaugeLongSloppy, gaugePrecondition, gaugeFatPrecondition,
+                               gaugeLongPrecondition, param->mass);
     }
 
   } else {
@@ -5270,6 +5271,7 @@ void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservable
   gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileGaugeSmear);
 
   GaugeFieldParam gParam(*gaugeSmeared);
+  gParam.location = QUDA_CUDA_FIELD_LOCATION;
   auto *cudaGaugeTemp = new cudaGaugeField(gParam);
 
   int measurement_n = 0; // The nth measurement to take

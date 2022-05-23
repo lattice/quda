@@ -52,6 +52,9 @@ namespace quda {
 
       strcat(aux,",computeStaggeredKDBlock");
 
+      // X is relatively sparse; the kernel assumes the rest of X is already zero
+      X.zero();
+
       // reset scales as appropriate
       if constexpr (sizeof(Float) < QUDA_SINGLE_PRECISION) {
         double max_scale = g.abs_max();
@@ -265,7 +268,7 @@ namespace quda {
 
 
   // Allocates and calculates the inverse KD block, returning Xinv
-  std::unique_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass, const bool dagger_approximation)
+  std::shared_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass, const bool dagger_approximation)
   {
     GaugeFieldParam gParam(gauge);
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -279,7 +282,7 @@ namespace quda {
     // latter true is to force FLOAT2
     gParam.setPrecision(gauge.Precision(), true);
 
-    std::unique_ptr<GaugeField> Xinv(reinterpret_cast<GaugeField*>(new cudaGaugeField(gParam)));
+    std::shared_ptr<GaugeField> Xinv(reinterpret_cast<GaugeField*>(new cudaGaugeField(gParam)));
 
     BuildStaggeredKahlerDiracInverse(*Xinv, gauge, mass, dagger_approximation);
 
