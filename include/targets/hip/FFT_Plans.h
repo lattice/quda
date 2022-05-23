@@ -113,12 +113,11 @@ namespace quda
     auto type = precision == QUDA_DOUBLE_PRECISION ? HIPFFT_Z2Z : HIPFFT_C2C;
     switch (dim) {
     case 0: {
-      int n[2] = {size.w, size.z};
+      int n[2] = {size.w, size.z}; // outer-most dimension is first
       HIPFFT_SAFE_CALL(hipfftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, type, size.x * size.y));
     } break;
     case 1: {
-      // int n[2] = {size.x, size.y};
-      int n[2] = {size.y, size.x};
+      int n[2] = {size.y, size.x}; // outer-most dimension is first
       HIPFFT_SAFE_CALL(hipfftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, type, size.z * size.w));
     } break;
     }
