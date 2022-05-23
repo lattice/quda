@@ -167,6 +167,7 @@ namespace quda
   {
     using atomic_t = typename atomic_type<T>::type;
     constexpr size_t n = sizeof(T) / sizeof(atomic_t);
+    auto tid = target::thread_idx_linear<2>();
 
     if (arg.result_d) { // write to host mapped memory
 #ifdef _NVHPC_CUDA // WAR for nvc++
@@ -176,8 +177,8 @@ namespace quda
 #endif
       if constexpr (coalesced_write) {
         static_assert(n <= device::warp_size(), "reduction array is greater than warp size");
-        auto mask = __ballot_sync(0xffffffff, target::thread_idx().x < n);
-        if (target::thread_idx().x < n && target::thread_idx().y == 0) {
+        auto mask = __ballot_sync(0xffffffff, tid < n);
+        if (tid < n) {
           atomic_t sum_tmp[n];
           memcpy(sum_tmp, &sum, sizeof(sum));
 
@@ -185,15 +186,15 @@ namespace quda
 #pragma unroll
           for (int i = 1; i < n; i++) {
             auto si = __shfl_sync(mask, sum_tmp[i], 0);
-            if (i == target::thread_idx().x) s = si;
+            if (i == tid) s = si;
           }
 
           s = (s == init_value<atomic_t>()) ? terminate_value<atomic_t>() : s;
-          arg.result_d[n * idx + target::thread_idx().x].store(s, cuda::std::memory_order_relaxed);
+          arg.result_d[n * idx + tid].store(s, cuda::std::memory_order_relaxed);
         }
       } else {
         // write out the final reduced value
-        if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
+        if (tid == 0) {
           atomic_t sum_tmp[n];
           memcpy(sum_tmp, &sum, sizeof(sum));
 #pragma unroll
@@ -206,7 +207,7 @@ namespace quda
       }
     } else {
 
-      if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
+      if (tid == 0) {
         if (arg.get_output_async_buffer()) {
           arg.get_output_async_buffer()[idx] = sum;
         } else { // write to device memory
@@ -215,7 +216,7 @@ namespace quda
       }
     }
 
-    if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
+    if (tid == 0) {
       // TODO in principle we could remove this final atomic store
       // if we use a sense reversal barrier, avoiding the need to
       // reset the count at the end
@@ -274,7 +275,7 @@ namespace quda
         T sum = r.init();
         while (i < target::grid_dim().x) {
           sum = r(sum, arg.partial[idx * target::grid_dim().x + i].load(cuda::std::memory_order_relaxed));
-          i += target::block_dim().x * target::block_dim().y;
+          i += target::block_size<2>();
         }
 
         sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);

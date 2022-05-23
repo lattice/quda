@@ -126,7 +126,7 @@ namespace quda
 
     T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
 
-    if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
+    if (target::thread_idx_linear<2>() == 0) {
       arg.partial[idx * target::grid_dim().x + target::block_idx().x] = aggregate;
       __threadfence(); // flush result
 
@@ -141,17 +141,17 @@ namespace quda
 
     // finish the reduction if last block
     if (isLastBlockDone[target::thread_idx().z]) {
-      auto i = target::thread_idx().y * target::block_dim().x + target::thread_idx().x;
+      auto i = target::thread_idx_linear<2>();
       T sum = r.init();
       while (i < target::grid_dim().x) {
         sum = r(sum, const_cast<T &>(static_cast<volatile T *>(arg.partial)[idx * target::grid_dim().x + i]));
-        i += target::block_dim().x * target::block_dim().y;
+        i += target::block_size<2>();
       }
 
       sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
 
       // write out the final reduced value
-      if (target::thread_idx().y * target::block_dim().x + target::thread_idx().x == 0) {
+      if (target::thread_idx_linear<2>() == 0) {
         if (arg.get_output_async_buffer()) {
           arg.get_output_async_buffer()[idx] = sum;
         } else {
