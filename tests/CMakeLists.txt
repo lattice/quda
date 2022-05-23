@@ -328,9 +328,10 @@ foreach(pol IN LISTS DSLASH_POLICIES)
 
   if(QUDA_DIRAC_WILSON)
     set(DIRAC_NAME wilson)
-    add_test(NAME dslash_wilson_policy${pol2}
+    add_test(NAME dslash_${DIRAC_NAME}_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type ${DIRAC_NAME}
+                     --all-partitions 1
                      --test MatPCDagMatPC
                      --dim 2 4 6 8
                      --gtest_output=xml:dslash_${DIRAC_NAME}_test_pol${pol2}.xml)
@@ -341,6 +342,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type ${DIRAC_NAME}
+                     --all-partitions 1
                      --test 0
                      --dim 20 20 20 20
                      --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
@@ -798,6 +800,7 @@ endif()
     add_test(NAME dslash_${DIRAC_NAME}_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type ${DIRAC_NAME}
+                     --all-partitions 1
                      --test MatPC
                      --dim 6 8 10 12
                      --gtest_output=xml:dslash_${DIRAC_NAME}_test_pol${pol2}.xml)
@@ -808,6 +811,7 @@ endif()
     add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
             --dslash-type ${DIRAC_NAME}
+            --all-partitions 1
             --test 0
             --dim 20 20 20 20
             --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
