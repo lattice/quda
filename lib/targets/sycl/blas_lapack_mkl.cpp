@@ -92,7 +92,7 @@ namespace quda
 
 	  C *A_d = static_cast<C *>(A);
 	  C *Ainv_d = static_cast<C *>(Ainv);
-	  if(location == QUDA_CUDA_FIELD_LOCATION) {
+	  if(location == QUDA_CPU_FIELD_LOCATION) {
 	    A_d = static_cast<C *>(pool_device_malloc(size));
 	    Ainv_d = static_cast<C *>(pool_device_malloc(size));
 	    qudaMemcpy(A_d, A, size, qudaMemcpyHostToDevice);
