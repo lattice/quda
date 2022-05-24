@@ -204,8 +204,8 @@ namespace quda {
     FFTPlanHandle plan_zt;
 
     GaugeFixArg<Float, recon> arg(data, alpha0);
-    SetPlanFFT2DMany(plan_zt, size, 0, data.Precision());     //for space and time ZT
-    SetPlanFFT2DMany(plan_xy, size, 1, data.Precision());    //with space only XY
+    SetPlanFFT2DMany(plan_zt, size, 0, data.Precision()); // for space and time ZT
+    SetPlanFFT2DMany(plan_xy, size, 1, data.Precision()); // with space only XY
 
     GaugeFixFFTRotate<Float> GFRotate(data);
 
@@ -300,8 +300,8 @@ namespace quda {
 
       action0 = action;
     }
-    if ((iter % verbose_interval) != 0 && getVerbosity() >= QUDA_SUMMARIZE)
-      printf("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter, argQ.getAction(), argQ.getTheta(), diff);
+    if ((iter % verbose_interval) != (verbose_interval - 1) && getVerbosity() >= QUDA_SUMMARIZE)
+      printf("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
     
     // Reunitarize at end
     const double unitarize_eps = 1e-14;
