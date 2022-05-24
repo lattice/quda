@@ -1236,8 +1236,8 @@ namespace quda {
 
         __device__ __host__ inline void Pack(real out[8], const complex in[9]) const
         {
-          out[0] = Trig<isFixed<Float>::value, real>::Atan2(in[3].imag(), in[3].real());   // a1 -> b1
-          out[1] = Trig<isFixed<Float>::value, real>::Atan2(-in[6].imag(), -in[6].real()); // c1 -> -c1
+          out[0] = atan2(in[3].imag(), in[3].real()) / static_cast<real>(M_PI);   // a1 -> b1
+          out[1] = atan2(-in[6].imag(), -in[6].real()) / static_cast<real>(M_PI); // c1 -> -c1
 
           out[2] = in[4].real();
           out[3] = in[4].imag(); // a2 -> b2
@@ -1259,10 +1259,10 @@ namespace quda {
             out[i] = complex(in[2 * i + 0], in[2 * i + 1]); // these elements are copied directly
 
           real tmp[2];
-          Trig<isFixed<Float>::value, real>::SinCos(in[0], &tmp[1], &tmp[0]);
+          quda::sincospi(in[0], &tmp[1], &tmp[0]);
           out[0] = complex(tmp[0], tmp[1]);
 
-          Trig<isFixed<Float>::value, real>::SinCos(in[1], &tmp[1], &tmp[0]);
+          quda::sincospi(in[1], &tmp[1], &tmp[0]);
           out[6] = complex(tmp[0], tmp[1]);
 
           // First, reconstruct first row
