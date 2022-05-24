@@ -71,6 +71,36 @@ namespace quda {
   inline __host__ __device__ void sincos(const float& a, float *s, float *c) { target::dispatch<sincosf_impl>(a, s, c); }
 
 
+  template <bool is_device> struct sincospi_impl {
+    template <typename T> inline void operator()(const T& a, T *s, T *c) { ::sincos(a * static_cast<double>(M_PI), s, c); }
+  };
+
+  template <> struct sincospi_impl<true> {
+    template <typename T> __device__ inline void operator()(const T& a, T *s, T *c) { sincospi(a, s, c); }
+  };
+
+
+  /**
+   * @brief Combined sinpi and cospi calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @param s pointer to the storage for the result of the sin
+   * @param c pointer to the storage for the result of the cos
+   */
+  template<typename T>
+  inline __host__ __device__ void sincospi(const T& a, T *s, T *c) { target::dispatch<sincospi_impl>(a, s, c); }
+
+  /**
+   * @brief Combined sinpi and cospi calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @param s pointer to the storage for the result of the sin
+   * @param c pointer to the storage for the result of the cos
+   *
+   * Specialization to float arguments.  Use sincos so that Device function calls CUDA intrinsic.
+   */
+  template<>
+  inline __host__ __device__ void sincospi(const float& a, float *s, float *c) { quda::sincos(a * static_cast<float>(M_PI), s, c); }
+
+
   template <bool is_device> struct rsqrt_impl {
     template <typename T> inline T operator()(T a) { return static_cast<T>(1.0) / sqrt(a); }
   };

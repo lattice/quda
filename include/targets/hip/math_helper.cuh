@@ -83,6 +83,14 @@ namespace quda
   }
 
   /**
+   * @brief Combined sinpi and cospi calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @param s pointer to the storage for the result of the sin
+   * @param c pointer to the storage for the result of the cos
+   */
+  template <typename T> void sincospi(const T& a, T *s, T *c) { quda::sincos(a * static_cast<T>(M_PI), s, c) };
+
+  /**
    * @brief Reciprocal square root function (rsqrt)
    * @param a the argument  (In|out)
    *
