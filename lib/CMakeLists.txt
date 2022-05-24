@@ -51,7 +51,8 @@ set (QUDA_OBJS
   multi_reduce_quda.cu reduce_helper.cu
   contract.cu comm_common.cpp communicator_stack.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
-  extract_gauge_ghost_extended.cu copy_color_spinor.cpp spinor_noise.cu
+  extract_gauge_ghost_extended.cu copy_color_spinor.cpp
+  spinor_noise.cu spinor_dilute.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_dq.cu
   copy_color_spinor_ss.cu copy_color_spinor_sd.cu
@@ -440,6 +441,10 @@ if(QUDA_FAST_COMPILE_DSLASH)
   target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_DSLASH)
 endif()
 
+if(QUDA_ALTERNATIVE_I_TO_F)
+  target_compile_definitions(quda PRIVATE QUDA_ALTERNATIVE_I_TO_F)
+endif()
+
 if(QUDA_BACKWARDS)
   target_include_directories(quda_cpp SYSTEM PRIVATE ${backward-cpp_SOURCE_DIR})
 
@@ -468,8 +473,6 @@ add_custom_command(
   TARGET quda
   PRE_LINK
   COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
-
-set_target_properties(quda PROPERTIES INSTALL_RPATH_USE_LINK_PATH ON)
 
 install(
   TARGETS quda

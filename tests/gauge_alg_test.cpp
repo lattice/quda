@@ -118,7 +118,7 @@ protected:
   virtual void SetUp()
   {
     if (execute) {
-      setVerbosity(QUDA_VERBOSE);
+      setVerbosity(verbosity);
       param = newQudaGaugeParam();
 
       // Setup gauge container.

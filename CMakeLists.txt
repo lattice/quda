@@ -233,6 +233,8 @@ option(QUDA_CTEST_DISABLE_BENCHMARKS "Disable benchmark test" ON)
 option(QUDA_FAST_COMPILE_REDUCE "enable fast compilation in blas and reduction kernels (single warp per reduction)" OFF)
 option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in dslash kernels (~20% perf impact)" OFF)
 
+option(QUDA_ALTERNATIVE_I_TO_F "enable using alternative integer-to-float conversion" OFF)
+
 option(QUDA_OPENMP "enable OpenMP" OFF)
 set(QUDA_CXX_STANDARD
     17
@@ -261,6 +263,8 @@ mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 mark_as_advanced(QUDA_FLOAT8)
 mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
 mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
+
+mark_as_advanced(QUDA_ALTERNATIVE_I_TO_F)
 
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_PRECISION)
@@ -469,6 +473,19 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
       ${CMAKE_BINARY_DIR}/usqcd
       CACHE PATH "..." FORCE)
 endif()
+
+# ######################################################################################################################
+# rpath handling before adding dependencies
+# ######################################################################################################################
+
+set(CMAKE_SKIP_BUILD_RPATH FALSE)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+message(${CMAKE_INSTALL_PREFIX})
+list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
+if("${isSystemDir}" STREQUAL "-1")
+    set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+endif("${isSystemDir}" STREQUAL "-1")
 
 # ######################################################################################################################
 # QMP

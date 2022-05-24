@@ -78,15 +78,12 @@ namespace quda
 
   template <typename T> constexpr float i2f(T a)
   {
-#if 1
+#ifndef QUDA_ALTERNATIVE_I_TO_F
     return static_cast<float>(a);
 #else
     // will work for up to 23-bit int
-    union {
-      int32_t i;
-      float f;
-    };
-    i = a + 0x4B400000;
+    int32_t i = a + 0x4B400000;
+    float &f = reinterpret_cast<float &>(i);
     return f - 12582912.0f;
 #endif
   }
