@@ -1,6 +1,3 @@
-include(GNUInstallDirs)
-set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
-
 # enable tests build a common library for all test utilities
 add_library(quda_test STATIC googletest/src/gtest-all.cc)
 target_include_directories(quda_test SYSTEM PUBLIC  googletest/include googletest)
