@@ -72,7 +72,7 @@ namespace quda {
 
 
   template <bool is_device> struct sincospi_impl {
-    template <typename T> inline void operator()(const T& a, T *s, T *c) { ::sincos(a * static_cast<double>(M_PI), s, c); }
+    template <typename T> inline void operator()(const T& a, T *s, T *c) { ::sincos(a * static_cast<T>(M_PI), s, c); }
   };
 
   template <> struct sincospi_impl<true> {
