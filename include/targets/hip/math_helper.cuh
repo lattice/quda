@@ -91,6 +91,24 @@ namespace quda
   template <typename T> void sincospi(const T& a, T *s, T *c) { quda::sincos(a * static_cast<T>(M_PI), s, c) };
 
   /**
+   * @brief Sine pi calculation in QUDA NAMESPACE.
+   * @param a the angle
+   * @return result of the sin(a * pi)
+   *
+   * Specialization to float.  Device function will call CUDA intrinsic.
+   */
+  template <typename T> void sinpi(const T& a, T *s, T *c) { return sin(a * static_cast<T>(M_PI)) };
+
+  /**
+   * @brief Cosine pi calculation in QUDA NAMESPACE.
+   * @param a the angle
+   * @return result of the cos(a * pi)
+   *
+   * Specialization to float.  Device function will call CUDA intrinsic.
+   */
+  template <typename T> void cospi(const T& a, T *s, T *c) { return cos(a * static_cast<T>(M_PI)) };
+
+  /**
    * @brief Reciprocal square root function (rsqrt)
    * @param a the argument  (In|out)
    *
@@ -121,33 +139,6 @@ namespace quda
   template <> inline __host__ __device__ float rsqrt(const float &a) { return target::dispatch<rsqrtf_impl>(a); }
   template <> inline __host__ __device__ double rsqrt(const double &a) { return target::dispatch<rsqrt_impl>(a); }
 
-  template <bool is_device> struct sinf_impl {
-    inline float operator()(const float &a) { return ::sinf(a); }
-  };
-  template <> struct sinf_impl<true> {
-    __device__ inline float operator()(const float &a) { return ::sinf(a); }
-  };
-
-  template <bool is_device> struct cosf_impl {
-    inline float operator()(const float &a) { return ::cosf(a); }
-  };
-  template <> struct cosf_impl<true> {
-    __device__ inline float operator()(const float &a) { return ::cosf(a); }
-  };
-
-  template <bool is_device> struct sin_impl {
-    inline double operator()(const double &a) { return ::sin(a); }
-  };
-  template <> struct sin_impl<true> {
-    __device__ inline double operator()(const double &a) { return ::sin(a); }
-  };
-
-  template <bool is_device> struct cos_impl {
-    inline double operator()(const double &a) { return ::cos(a); }
-  };
-  template <> struct cos_impl<true> {
-    __device__ inline double operator()(const double &a) { return ::cos(a); }
-  };
 
   template <bool is_device> struct fpow_impl {
     template <typename real> inline real operator()(real a, int b) { return ::pow(a, b); }

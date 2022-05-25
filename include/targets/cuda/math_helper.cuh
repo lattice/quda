@@ -101,6 +101,52 @@ namespace quda {
   inline __host__ __device__ void sincospi(const float& a, float *s, float *c) { quda::sincos(a * static_cast<float>(M_PI), s, c); }
 
 
+  template <bool is_device> struct sinpi_impl { template <typename T> inline T operator()(T a) { return ::sin(a * static_cast<T>(M_PI)); } };
+  template <> struct sinpi_impl<true> { template <typename T> __device__ inline T operator()(T a) { return sinpi(a); } };
+
+  /**
+   * @brief Sine pi calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @return result of the sin(a * pi)
+   */
+  template<typename T> inline __host__ __device__ T sinpi(T a) { return sinpi(a); }
+
+  template <bool is_device> struct sinpif_impl { inline float operator()(float a) { return sinpif(a); } };
+  template <> struct sinpif_impl<true> { __device__ inline float operator()(float a) { return __sinf(a * static_cast<float>(M_PI)); } };
+
+  /**
+   * @brief Sine pi calculation in QUDA NAMESPACE.
+   * @param a the angle
+   * @return result of the sin(a * pi)
+   *
+   * Specialization to float.  Device function will call CUDA intrinsic.
+   */
+  template<> inline __host__ __device__ float sinpi(float a) { return target::dispatch<sinpif_impl>(a); }
+
+
+  template <bool is_device> struct cospi_impl { template <typename T> inline T operator()(T a) { return ::cos(a * static_cast<T>(M_PI)); } };
+  template <> struct cospi_impl<true> { template <typename T> __device__ inline T operator()(T a) { return cospi(a); } };
+
+  /**
+   * @brief Cosine pi calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @return result of the cos(a * pi)
+   */
+  template<typename T> inline __host__ __device__ T cospi(T a) { return cospi(a); }
+
+  template <bool is_device> struct cospif_impl { inline float operator()(float a) { return cospif(a); } };
+  template <> struct cospif_impl<true> { __device__ inline float operator()(float a) { return __cosf(a * static_cast<float>(M_PI)); } };
+
+  /**
+   * @brief Cosine pi calculation in QUDA NAMESPACE.
+   * @param a the angle
+   * @return result of the cos(a * pi)
+   *
+   * Specialization to float.  Device function will call CUDA intrinsic.
+   */
+  template<> inline __host__ __device__ float cospi(float a) { return target::dispatch<cospif_impl>(a); }
+
+
   template <bool is_device> struct rsqrt_impl {
     template <typename T> inline T operator()(T a) { return static_cast<T>(1.0) / sqrt(a); }
   };
@@ -118,30 +164,6 @@ namespace quda {
    */
   template<typename T> inline __host__ __device__ T rsqrt(T a) { return target::dispatch<rsqrt_impl>(a); }
 
-
-  template <bool is_device> struct sin_impl { template <typename T> inline T operator()(const T& a) { return ::sin(a); } };
-  template <> struct sin_impl<true> {
-    template <typename T> __device__ inline T operator()(const T& a)
-    {
-      BUILTIN_ASSUME(fabs(a) <= 2.8 * M_PI);
-      return sin(a);
-    }
-  };
-
-  template <bool is_device> struct cos_impl { template <typename T> inline T operator()(const T& a) { return ::cos(a); } };
-  template <> struct cos_impl<true> {
-    template <typename T> __device__ inline T operator()(const T& a)
-    {
-      BUILTIN_ASSUME(fabs(a) <= 2.0 * M_PI);
-      return cos(a);
-    }
-  };
-
-  template <bool is_device> struct sinf_impl { inline float operator()(const float& a) { return ::sinf(a); } };
-  template <> struct sinf_impl<true> { __device__ inline float operator()(const float& a) { return __sinf(a); } };
-
-  template <bool is_device> struct cosf_impl { inline float operator()(const float& a) { return ::cosf(a); } };
-  template <> struct cosf_impl<true> { __device__ inline float operator()(const float& a) { return __cosf(a); } };
 
   template <bool is_device> struct fpow_impl { template <typename real> inline real operator()(real a, int b) { return std::pow(a, b); } };
 
