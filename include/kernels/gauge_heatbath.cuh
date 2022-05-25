@@ -85,7 +85,7 @@ namespace quda {
     xr2 = (log((xr2 + static_cast<T>(1.e-10))));
     xr3 = uniform<T>::rand(localState);
     xr4 = uniform<T>::rand(localState);
-    xr3 = cos(static_cast<T>(2.0 * M_PI) * xr3);
+    xr3 = cospi(static_cast<T>(2.0) * xr3);
     d = -(xr2 + xr1 * xr3 * xr3 ) / al;
     //now  beat each  site into submission
     int nacd = 0;
@@ -99,7 +99,7 @@ namespace quda {
         xr2 = (log((xr2 + 1.e-10)));
         xr3 = uniform<T>::rand(localState);
         xr4 = uniform<T>::rand(localState);
-        xr3 = cos(static_cast<T>(2.0 * M_PI) * xr3);
+        xr3 = cospi(static_cast<T>(2.0) * xr3);
         d = -(xr2 + xr1 * xr3 * xr3) / al;
         if ((1.00 - 0.5 * d) > xr4 * xr4 ) break;
       }
