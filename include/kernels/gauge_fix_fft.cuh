@@ -122,10 +122,10 @@ namespace quda {
       int x3 = (id / arg.X[2]) % arg.X[3];
       int x2 = id % arg.X[2];
       //id  =  x2 + (x3 +  (x0 + x1 * arg.X[0]) * arg.X[3]) * arg.X[2];
-      Float sx = sin( (Float)x0 * M_PI / (Float)arg.X[0]);
-      Float sy = sin( (Float)x1 * M_PI / (Float)arg.X[1]);
-      Float sz = sin( (Float)x2 * M_PI / (Float)arg.X[2]);
-      Float st = sin( (Float)x3 * M_PI / (Float)arg.X[3]);
+      Float sx = quda::sinpi( (Float)x0 / (Float)arg.X[0]);
+      Float sy = quda::sinpi( (Float)x1 / (Float)arg.X[1]);
+      Float sz = quda::sinpi( (Float)x2 / (Float)arg.X[2]);
+      Float st = quda::sinpi( (Float)x3 / (Float)arg.X[3]);
       Float sinsq = sx * sx + sy * sy + sz * sz + st * st;
       Float prcfact = 0.0;
       //The FFT normalization is done here
