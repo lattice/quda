@@ -13,7 +13,8 @@ namespace quda {
     @return Returns two index's in int2 type, accessed by .x and .y.
  */
   template <int nColor>
-  __host__ __device__ static inline int2 IndexBlock(int block){
+  __host__ __device__ static inline int2 IndexBlock(int block)
+  {
     int2 id;
     int i1;
     int found = 0;
@@ -41,7 +42,8 @@ namespace quda {
     @param q store the second index
  */
   template<int nColor>
-  __host__ __device__ static inline void IndexBlock(int block, int &p, int &q){
+  __host__ __device__ static inline void IndexBlock(int block, int &p, int &q)
+  {
     if ( nColor == 3 ) {
       if ( block == 0 ) { p = 0; q = 1; }
       else if ( block == 1 ) { p = 1; q = 2; }
@@ -73,7 +75,8 @@ namespace quda {
     @param localstate CURAND rng state
  */
   template <class T>
-  __device__ static inline Matrix<T,2> generate_su2_matrix_milc(T al, RNGState& localState){
+  __device__ static inline Matrix<T,2> generate_su2_matrix_milc(T al, RNGState& localState)
+  {
     T xr1, xr2, xr3, xr4, d, r;
     int k;
     xr1 = uniform<T>::rand(localState);
@@ -83,7 +86,7 @@ namespace quda {
     xr3 = uniform<T>::rand(localState);
     xr4 = uniform<T>::rand(localState);
     xr3 = cos(static_cast<T>(2.0 * M_PI) * xr3);
-    d = -(xr2  + xr1 * xr3 * xr3 ) / al;
+    d = -(xr2 + xr1 * xr3 * xr3 ) / al;
     //now  beat each  site into submission
     int nacd = 0;
     if ((1.00 - 0.5 * d) > xr4 * xr4 ) nacd = 1;
@@ -111,7 +114,7 @@ namespace quda {
         xr2 = uniform<T>::rand(localState);
         r = xr3 + xr4 * xr1;
         a(0,0) = 1.00 + log(r) / al;
-        if ((1.0 - a(0,0) * a(0,0)) > xr2 * xr2 ) break;
+        if ((1.0 - a(0,0) * a(0,0)) > xr2 * xr2) break;
       }
       d = 1.0 - a(0,0);
     } //endif nacd
@@ -129,9 +132,11 @@ namespace quda {
     xr1 = abs(xr1);
     xr1 = sqrt(xr1);
     //xr2 is a random number between 0 and 2*pi
-    xr2 = static_cast<T>(2.0 * M_PI) * uniform<T>::rand(localState);
-    a(0,1) = xr1 * cos(xr2);
-    a(1,0) = xr1 * sin(xr2);
+    xr2 = static_cast<T>(2.0) * uniform<T>::rand(localState);
+    T tmp[2];
+    sincospi(xr2, &tmp[1], &tmp[0]);
+    a(0,1) = xr1 * tmp[0];
+    a(1,0) = xr1 * tmp[1];
     return a;
   }
 
@@ -142,7 +147,8 @@ namespace quda {
     @return 4 real numbers
  */
   template < class T>
-  __host__ __device__ static inline Matrix<T,2> get_block_su2( Matrix<complex<T>,3> tmp1, int block ){
+  __host__ __device__ static inline Matrix<T,2> get_block_su2( Matrix<complex<T>,3> tmp1, int block )
+  {
     Matrix<T,2> r;
     switch ( block ) {
     case 0:
@@ -174,7 +180,8 @@ namespace quda {
     @return 4 real numbers
  */
   template <class T, int nColor>
-  __host__ __device__ static inline Matrix<T,2> get_block_su2( Matrix<complex<T>,nColor> tmp1, int2 id ){
+  __host__ __device__ static inline Matrix<T,2> get_block_su2( Matrix<complex<T>,nColor> tmp1, int2 id )
+  {
     Matrix<T,2> r;
     r(0,0) = tmp1(id.x,id.x).x + tmp1(id.y,id.y).x;
     r(0,1) = tmp1(id.x,id.y).y + tmp1(id.y,id.x).y;
@@ -190,7 +197,8 @@ namespace quda {
     @return SU(Nc) matrix
  */
   template <class T, int nColor>
-  __host__ __device__ static inline Matrix<complex<T>,nColor> block_su2_to_sun( Matrix<T,2> rr, int2 id ){
+  __host__ __device__ static inline Matrix<complex<T>,nColor> block_su2_to_sun( Matrix<T,2> rr, int2 id )
+  {
     Matrix<complex<T>,nColor> tmp1;
     setIdentity(&tmp1);
     tmp1(id.x,id.x) = complex<T>( rr(0,0), rr(1,1) );
@@ -207,7 +215,8 @@ namespace quda {
     @param id indices
  */
   template <class T, int nColor>
-  __host__ __device__ static inline void mul_block_sun( Matrix<T,2> u, Matrix<complex<T>,nColor> &link, int2 id ){
+  __host__ __device__ static inline void mul_block_sun( Matrix<T,2> u, Matrix<complex<T>,nColor> &link, int2 id )
+  {
     for ( int j = 0; j < nColor; j++ ) {
       complex<T> tmp = complex<T>( u(0,0), u(1,1) ) * link(id.x, j) + complex<T>( u(1,0), u(0,1) ) * link(id.y, j);
       link(id.y, j) = complex<T>(-u(1,0), u(0,1) ) * link(id.x, j) + complex<T>( u(0,0),-u(1,1) ) * link(id.y, j);
@@ -225,7 +234,8 @@ namespace quda {
     @param block of the SU(3) matrix, 0,1 or 2
  */
   template <class Cmplx>
-  __host__ __device__ static inline void block_su2_to_su3( Matrix<Cmplx,3> &U, Cmplx a00, Cmplx a01, Cmplx a10, Cmplx a11, int block ){
+  __host__ __device__ static inline void block_su2_to_su3( Matrix<Cmplx,3> &U, Cmplx a00, Cmplx a01, Cmplx a10, Cmplx a11, int block )
+  {
     Cmplx tmp;
     switch ( block ) {
     case 0:
@@ -266,7 +276,8 @@ namespace quda {
 
   // v * u^dagger
   template <class Float>
-  __host__ __device__ static inline Matrix<Float,2> mulsu2UVDagger(Matrix<Float,2> v, Matrix<Float,2> u){
+  __host__ __device__ static inline Matrix<Float,2> mulsu2UVDagger(Matrix<Float,2> v, Matrix<Float,2> u)
+  {
     Matrix<Float,2> b;
     b(0,0) = v(0,0) * u(0,0) + v(0,1) * u(0,1) + v(1,0) * u(1,0) + v(1,1) * u(1,1);
     b(0,1) = v(0,1) * u(0,0) - v(0,0) * u(0,1) + v(1,0) * u(1,1) - v(1,1) * u(1,0);
@@ -283,9 +294,9 @@ namespace quda {
   */
   template <class Float, int nColor>
   __device__ inline void heatBathSUN( Matrix<complex<Float>,nColor>& U, Matrix<complex<Float>,nColor> F,
-                                      RNGState& localState, Float BetaOverNc ){
-
-    if ( nColor == 3 ) {
+                                      RNGState& localState, Float BetaOverNc )
+  {
+    if (nColor == 3) {
       //////////////////////////////////////////////////////////////////
       /*
          for( int block = 0; block < nColor; block++ ) {
@@ -304,7 +315,8 @@ namespace quda {
          }*/
       //////////////////////////////////////////////////////////////////
 
-      for ( int block = 0; block < nColor; block++ ) {
+#pragma unroll
+      for (int block = 0; block < nColor; block++) {
         int p,q;
         IndexBlock<nColor>(block, p, q);
         complex<Float> a0((Float)0.0, (Float)0.0);
@@ -348,7 +360,9 @@ namespace quda {
       //////////////////////////////////////////////////////////////////
       //TESTED IN SU(4) SP THIS IS WORST
       Matrix<complex<Float>,nColor> M = U * F;
-      for ( int block = 0; block < nColor * ( nColor - 1) / 2; block++ ) {
+
+#pragma unroll
+      for (int block = 0; block < nColor * ( nColor - 1) / 2; block++) {
         int2 id = IndexBlock<nColor>( block );
         Matrix<Float,2> r = get_block_su2<Float>(M, id);
         Float k = sqrt(r(0,0) * r(0,0) + r(0,1) * r(0,1) + r(1,0) * r(1,0) + r(1,1) * r(1,1));
@@ -414,8 +428,8 @@ namespace quda {
      @param F staple
    */
   template <class Float, int nColor>
-  __device__ inline void overrelaxationSUN( Matrix<complex<Float>,nColor>& U, Matrix<complex<Float>,nColor> F ){
-
+  __device__ inline void overrelaxationSUN( Matrix<complex<Float>,nColor>& U, Matrix<complex<Float>,nColor> F )
+  {
     if ( nColor == 3 ) {
       //////////////////////////////////////////////////////////////////
       /*
@@ -602,12 +616,13 @@ namespace quda {
         x[dr] += arg.border[dr];
         X[dr] += 2 * arg.border[dr];
       }
-      int e_cb = linkIndex(x,X);
+      int e_cb = linkIndex(x, X);
 
       Link staple;
       setZero(&staple);
 
       Link U;
+#pragma unroll
       for (int nu = 0; nu < 4; nu++) if (mu != nu) {
           int dx[4] = { 0, 0, 0, 0 };
           Link link = arg.dataOr(nu, e_cb, parity);
