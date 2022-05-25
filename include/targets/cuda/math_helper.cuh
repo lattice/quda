@@ -106,9 +106,9 @@ namespace quda {
    * @param a the angle
    * @return result of the sin(a * pi)
    */
-  template<typename T> inline __host__ __device__ T sinpi(T a) { return sinpi(a); }
+  template<typename T> inline __host__ __device__ T sinpi(T a) { return ::sinpi(a); }
 
-  template <bool is_device> struct sinpif_impl { inline float operator()(float a) { return sinpif(a); } };
+  template <bool is_device> struct sinpif_impl { inline float operator()(float a) { return ::sinpif(a); } };
   template <> struct sinpif_impl<true> { __device__ inline float operator()(float a) { return __sinf(a * static_cast<float>(M_PI)); } };
 
   /**
@@ -126,9 +126,9 @@ namespace quda {
    * @param a the angle
    * @return result of the cos(a * pi)
    */
-  template<typename T> inline __host__ __device__ T cospi(T a) { return cospi(a); }
+  template<typename T> inline __host__ __device__ T cospi(T a) { return ::cospi(a); }
 
-  template <bool is_device> struct cospif_impl { inline float operator()(float a) { return cospif(a); } };
+  template <bool is_device> struct cospif_impl { inline float operator()(float a) { return ::cospif(a); } };
   template <> struct cospif_impl<true> { __device__ inline float operator()(float a) { return __cosf(a * static_cast<float>(M_PI)); } };
 
   /**
