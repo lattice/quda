@@ -18,7 +18,7 @@ using namespace staggered_quark_smearing;
 
     public:
       TwoLink_(Arg &arg, const GaugeField &link, const GaugeField &outA) :
-        TunableKernel3D(link, 2, 4),
+        TunableKernel3D(link, 2, 1),
         arg(arg),
         outA(outA)
       {
@@ -42,9 +42,9 @@ using namespace staggered_quark_smearing;
         outA.restore();
       }
 
-      long long flops() const { return 2*4*arg.threads.x*300ll;}
+      long long flops() const { return 2*arg.threads.x*792ll;}
 
-      long long bytes() const { return 2*4*arg.threads.x*( 2*arg.link.Bytes() + arg.outA.Bytes() );}
+      long long bytes() const { return 2*arg.threads.x*( 2*arg.link.Bytes() + arg.outA.Bytes() );}
     };
 
     template <typename real, int nColor, QudaReconstructType recon>
@@ -56,7 +56,7 @@ using namespace staggered_quark_smearing;
       }
     };
 
-#ifdef GPU_FATLINK // need to be changed
+#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_TWOLINK_GSMEAR)
     void computeTwoLink(GaugeField &newTwoLink, const GaugeField &link)
     {
       checkNative(newTwoLink, link);
@@ -66,10 +66,15 @@ using namespace staggered_quark_smearing;
       instantiate<ComputeTwoLink, ReconstructNone>(newTwoLink, link);
       return;
     }
-#else
+#elif !defined(GPU_STAGGERED_DIRAC)
     void computeTwoLink(GaugeField &newTwoLink, const GaugeField &link)
     {
-      errorQuda("HISQ force not enabled");
+      errorQuda("Staggered dslash has not been built");
+    }
+#elif !defined(GPU_TWOLINK_GSMEAR)
+    void computeTwoLink(GaugeField &newTwoLink, const GaugeField &link)
+    {
+      errorQuda("Two-link Gaussian quark smearing is not enabled");
     }
 #endif
 } // namespace quda

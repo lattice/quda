@@ -77,17 +77,17 @@ namespace quda
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
-        flops_ = ghost_flops * 2 * ( in.GhostFaceCB()[arg.kernel_type] / ( arg.is_t0_kernel ? in.X(3) : 1 ) );
+        flops_ = ghost_flops * 2 * ( in.GhostFace()[arg.kernel_type] / ( arg.is_t0_kernel ? in.X(3) : 1 ) );
         break;
       case EXTERIOR_KERNEL_ALL: {
-        long long ghost_sites = 2 * ( (in.GhostFaceCB()[0] + in.GhostFaceCB()[1] + in.GhostFaceCB()[2] + in.GhostFaceCB()[3]) / ( arg.is_t0_kernel ? in.X(3) : 1 ) );
+        long long ghost_sites = 2 * ( (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]) / ( arg.is_t0_kernel ? in.X(3) : 1 ) );
         flops_ = ghost_flops * ghost_sites;
         break;
       }
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
       case KERNEL_POLICY: {
-        long long sites = in.VolumeCB() / ( arg.is_t0_kernel ? in.X(3) : 1 );
+        long long sites = in.Volume() / ( arg.is_t0_kernel ? in.X(3) : 1 );
         flops_ = (num_dir * (in.Nspin() / 4) * in.Ncolor() * in.Nspin() + // spin project (=0 for staggered)
                   num_dir * num_mv_multiply * mv_flops +                  // SU(3) matrix-vector multiplies
                   ((num_dir - 1) * 2 * in.Ncolor() * in.Nspin()))
@@ -97,7 +97,7 @@ namespace quda
         // now correct for flops done by exterior kernel
         long long ghost_sites = 0;
         for (int d = 0; d < 4; d++)
-          if (arg.commDim[d]) ghost_sites += 2 * ( in.GhostFaceCB()[d] / ( arg.is_t0_kernel ? in.X(3) : 1 ) );
+          if (arg.commDim[d]) ghost_sites += 2 * ( in.GhostFace()[d] / ( arg.is_t0_kernel ? in.X(3) : 1 ) );
         flops_ -= ghost_flops * ghost_sites;
 
         break;
@@ -122,24 +122,24 @@ namespace quda
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
-        bytes_ = ghost_bytes * 2 * ( in.GhostFaceCB()[arg.kernel_type]  / ( arg.is_t0_kernel ? in.X(3) : 1 ) );
+        bytes_ = ghost_bytes * 2 * ( in.GhostFace()[arg.kernel_type]  / ( arg.is_t0_kernel ? in.X(3) : 1 ) );
         break;
       case EXTERIOR_KERNEL_ALL: {
-        long long ghost_sites = 2 * ( (in.GhostFaceCB()[0] + in.GhostFaceCB()[1] + in.GhostFaceCB()[2] + in.GhostFaceCB()[3]) / ( arg.is_t0_kernel ? in.X(3) : 1 ) );
+        long long ghost_sites = 2 * ( (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]) / ( arg.is_t0_kernel ? in.X(3) : 1 ) );
         bytes_ = ghost_bytes * ghost_sites;
         break;
       }
       case INTERIOR_KERNEL:
       case UBER_KERNEL:
       case KERNEL_POLICY: {
-        long long sites = in.VolumeCB() / ( arg.is_t0_kernel ? in.X(3) : 1 );
+        long long sites = in.Volume() / ( arg.is_t0_kernel ? in.X(3) : 1 );
         bytes_ = (num_dir * gauge_bytes + ((num_dir - 2) * spinor_bytes + 2 * proj_spinor_bytes) + spinor_bytes) * sites;
 	
         if (arg.kernel_type == KERNEL_POLICY) break;
         // now correct for bytes done by exterior kernel
         long long ghost_sites = 0;
         for (int d = 0; d < 4; d++)
-          if (arg.commDim[d]) ghost_sites += 2 * ( in.GhostFaceCB()[d] / ( arg.is_t0_kernel ? in.X(3) : 1 ) );
+          if (arg.commDim[d]) ghost_sites += 2 * ( in.GhostFace()[d] / ( arg.is_t0_kernel ? in.X(3) : 1 ) );
         bytes_ -= ghost_bytes * ghost_sites;
 	
         break;

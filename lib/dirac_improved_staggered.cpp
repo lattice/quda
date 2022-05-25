@@ -160,7 +160,7 @@ namespace quda {
     //   ApplyStaggeredQSmear(out.Odd(), in.Odd(), *gauge, QUDA_ODD_PARITY, laplace3D, dagger, comm_dim, profile);    
     // }
     ApplyStaggeredQSmear(out, in, *gauge, t0_local, is_time_slice, QUDA_INVALID_PARITY, laplace3D, dagger, comm_dim, profile); // parity is not used
-    flops += ( laplace3D > 3 ? 570ll : 426ll ) * ( in.VolumeCB() / ( is_time_slice ? in.X(3) : 1 ) );
+    flops += ( laplace3D > 3 ? 570ll : 426ll ) * ( in.Volume() / ( is_time_slice ? in.X(3) : 1 ) );
   }  
 
   void DiracImprovedStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass,

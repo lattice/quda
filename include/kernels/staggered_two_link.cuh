@@ -60,8 +60,9 @@ namespace quda {
       constexpr static const char *filename() { return KERNEL_FILE; }
 
       // Flops count, in two-number pair (matrix_mult, matrix_add)
-      // 				   (4, 0)
-      // 300 Flops per site in total (75 per multiplication over two SU(3) matrices)
+      // 				   (4, 4)
+      // 198 Flops per direction
+      // 792 Flops per site in total
       __device__ __host__ void operator()(int x_cb, int parity, int)
       {
         int x[4];
