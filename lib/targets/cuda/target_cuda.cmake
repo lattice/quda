@@ -43,7 +43,7 @@ set(CMAKE_CUDA_FLAGS_DEVEL
     "-g -O3 "
     CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
 set(CMAKE_CUDA_FLAGS_STRICT
-    "-g -O3"
+    "-O3"
     CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
 set(CMAKE_CUDA_FLAGS_RELEASE
     "-O3 -w"

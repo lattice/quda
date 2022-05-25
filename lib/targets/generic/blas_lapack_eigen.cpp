@@ -335,6 +335,7 @@ namespace quda
           const Z alpha = reinterpret_cast<std::complex<double>&>(blas_param.alpha);
           const Z beta = reinterpret_cast<std::complex<double>&>(blas_param.beta);
           GEMM<MatrixXcd, Z>(A_h, B_h, C_h, alpha, beta, max_stride, blas_param);
+          flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
 
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_C) {
 
@@ -342,6 +343,7 @@ namespace quda
           const C alpha(reinterpret_cast<std::complex<double>&>(blas_param.alpha).real(),reinterpret_cast<std::complex<double>&>(blas_param.alpha).imag());
           const C beta(reinterpret_cast<std::complex<double>&>(blas_param.beta).real(),reinterpret_cast<std::complex<double>&>(blas_param.beta).imag());
           GEMM<MatrixXcf, C>(A_h, B_h, C_h, alpha, beta, max_stride, blas_param);
+          flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
 
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_D) {
 
@@ -349,6 +351,7 @@ namespace quda
           const D alpha = (D)(static_cast<std::complex<double>>(reinterpret_cast<std::complex<double>&>(blas_param.alpha)).real());
           const D beta = (D)(static_cast<std::complex<double>>(reinterpret_cast<std::complex<double>&>(blas_param.beta)).real());
           GEMM<MatrixXd, D>(A_h, B_h, C_h, alpha, beta, max_stride, blas_param);
+          flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
 
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_S) {
 
@@ -356,6 +359,7 @@ namespace quda
           const S alpha = (S)(static_cast<std::complex<float>>(reinterpret_cast<std::complex<double>&>(blas_param.alpha)).real());
           const S beta = (S)(static_cast<std::complex<float>>(reinterpret_cast<std::complex<double>&>(blas_param.beta)).real());
           GEMM<MatrixXf, S>(A_h, B_h, C_h, alpha, beta, max_stride, blas_param);
+          flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
 
         } else {
           errorQuda("blasGEMM type %d not implemented\n", blas_param.data_type);

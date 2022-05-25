@@ -476,8 +476,6 @@ add_custom_command(
   PRE_LINK
   COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
 
-set_target_properties(quda PROPERTIES INSTALL_RPATH_USE_LINK_PATH ON)
-
 install(
   TARGETS quda
   EXPORT QUDATargets

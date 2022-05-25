@@ -9,7 +9,7 @@
 
 namespace quda {
 
-//UNCOMMENT THIS IF YOU WAN'T TO USE LESS MEMORY
+//UNCOMMENT THIS IF YOU WANT TO USE LESS MEMORY
 #define GAUGEFIXING_DONT_USE_GX
 //Without using the precalculation of g(x),
 //we loose some performance, because Delta(x) is written in normal lattice coordinates need for the FFTs
@@ -52,8 +52,8 @@ namespace quda {
         int x1 = (id / arg.X[0]) % arg.X[1];
         int x0 = id % arg.X[0];
 
-        int id  =  x0 + (x1 + (x2 + x3 * arg.X[2]) * arg.X[1]) * arg.X[0];
-        int id_out =  x2 + (x3 +  (x0 + x1 * arg.X[0]) * arg.X[3]) * arg.X[2];
+        int id = x0 + (x1 + (x2 + x3 * arg.X[2]) * arg.X[1]) * arg.X[0];
+        int id_out = x2 + (x3 + (x0 + x1 * arg.X[0]) * arg.X[3]) * arg.X[2];
         arg.tmp1[id_out] = arg.tmp0[id];
       }
 
@@ -63,8 +63,8 @@ namespace quda {
         int x3 = (id / arg.X[2]) % arg.X[3];
         int x2 = id % arg.X[2];
 
-        int id  =  x2 + (x3 +  (x0 + x1 * arg.X[0]) * arg.X[3]) * arg.X[2];
-        int id_out =  x0 + (x1 + (x2 + x3 * arg.X[2]) * arg.X[1]) * arg.X[0];
+        int id = x2 + (x3 + (x0 + x1 * arg.X[0]) * arg.X[3]) * arg.X[2];
+        int id_out = x0 + (x1 + (x2 + x3 * arg.X[2]) * arg.X[1]) * arg.X[0];
         arg.tmp1[id_out] = arg.tmp0[id];
       }
     }
