@@ -28,6 +28,12 @@ namespace quda
     }
   }
 
+#ifdef GPU_GAUGE_TOOLS
+  constexpr bool is_enabled_gauge_tools() { return true; }
+#else
+  constexpr bool is_enabled_gauge_tools() { return false; }
+#endif
+
   /**
      @brief Helper function for returning if a given gauge field order is enabled
      @tparam order The order requested
