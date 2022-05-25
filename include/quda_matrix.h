@@ -1055,7 +1055,7 @@ namespace quda {
     /**
        Direct port of the TIFR expsu3 algorithm
     */
-    template <typename Float> __device__ __host__ void expsu3(Matrix<complex<Float>, 3> &q)
+    template <typename Float> __device__ __host__ inline void expsu3(Matrix<complex<Float>, 3> &q)
     {
       typedef complex<Float> Complex;
 
