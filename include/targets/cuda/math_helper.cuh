@@ -101,9 +101,6 @@ namespace quda {
   inline __host__ __device__ void sincospi(const float& a, float *s, float *c) { quda::sincos(a * static_cast<float>(M_PI), s, c); }
 
 
-  template <bool is_device> struct sinpi_impl { template <typename T> inline T operator()(T a) { return ::sin(a * static_cast<T>(M_PI)); } };
-  template <> struct sinpi_impl<true> { template <typename T> __device__ inline T operator()(T a) { return sinpi(a); } };
-
   /**
    * @brief Sine pi calculation in QUDA NAMESPACE
    * @param a the angle
@@ -123,9 +120,6 @@ namespace quda {
    */
   template<> inline __host__ __device__ float sinpi(float a) { return target::dispatch<sinpif_impl>(a); }
 
-
-  template <bool is_device> struct cospi_impl { template <typename T> inline T operator()(T a) { return ::cos(a * static_cast<T>(M_PI)); } };
-  template <> struct cospi_impl<true> { template <typename T> __device__ inline T operator()(T a) { return cospi(a); } };
 
   /**
    * @brief Cosine pi calculation in QUDA NAMESPACE
