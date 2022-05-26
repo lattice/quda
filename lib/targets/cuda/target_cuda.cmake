@@ -43,7 +43,7 @@ set(CMAKE_CUDA_FLAGS_DEVEL
     "-g -O3 "
     CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
 set(CMAKE_CUDA_FLAGS_STRICT
-    "-g -O3"
+    "-O3"
     CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
 set(CMAKE_CUDA_FLAGS_RELEASE
     "-O3 -w"
@@ -319,6 +319,7 @@ if(QUDA_NVSHMEM)
   get_filename_component(NVSHMEM_LIBPATH ${NVSHMEM_LIBS} DIRECTORY)
   target_link_libraries(quda PUBLIC -L${NVSHMEM_LIBPATH} -lnvshmem)
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${NVSHMEM_INCLUDE}>)
+  target_link_libraries(quda PUBLIC CUDA::nvml)
 endif()
 
 if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")

@@ -76,23 +76,28 @@ namespace quda
      *
      * @return shmem_sync_t
      */
-    shmem_sync_t get_shmem_sync_counter();
-
+    shmem_sync_t get_dslash_shmem_sync_counter();
+    shmem_sync_t get_exchangeghost_shmem_sync_counter();
     /**
      * @brief Set the shmem sync counter to count
      *
      * @param count
      * @return shmem_sync_t
      */
-    shmem_sync_t set_shmem_sync_counter(shmem_sync_t count);
-
+    shmem_sync_t set_dslash_shmem_sync_counter(shmem_sync_t count);
+    shmem_sync_t set_exchangeghost_shmem_sync_counter(shmem_sync_t count);
     /**
      * @brief increase the shmem sync counter for the next dslash application
      *
      * @return shmem_sync_t
      */
-    shmem_sync_t inc_shmem_sync_counter();
+    shmem_sync_t inc_dslash_shmem_sync_counter();
+    shmem_sync_t inc_exchangeghost_shmem_sync_counter();
+
 #ifdef NVSHMEM_COMMS
+
+    void shmem_signal_wait_all();
+
     using shmem_retcount_intra_t = cuda::atomic<int, cuda::thread_scope_system>;
     using shmem_retcount_inter_t = cuda::atomic<int, cuda::thread_scope_device>;
     using shmem_interior_done_t = cuda::atomic<shmem_sync_t, cuda::thread_scope_device>;
@@ -103,8 +108,8 @@ namespace quda
      *
      * @return shmem_sync_t*
      */
-    shmem_sync_t *get_shmem_sync_arr();
-
+    shmem_sync_t *get_dslash_shmem_sync_arr();
+    shmem_sync_t *get_exchangeghost_shmem_sync_arr();
     /**
      * @brief Get the array[2*QUDA_MAX_DIM] of atomic to count which intra node packing blocks have finished per dim/dir
      *
