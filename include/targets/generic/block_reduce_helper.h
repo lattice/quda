@@ -144,8 +144,7 @@ namespace quda
      @tparam batch_size Batch size of the reduction.  Threads will be
      ordered such that batch size is the slowest running index.
   */
-  template <typename T, int block_dim, int batch_size = 1>
-  class BlockReduce
+  template <typename T, int block_dim, int batch_size = 1> class BlockReduce
   {
     using param_t = block_reduce_param<block_dim, batch_size>;
     const int batch;

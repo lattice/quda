@@ -43,8 +43,7 @@ namespace quda
   template <typename T, bool use_kernel_arg = true> struct ReduceArg : kernel_param<use_kernel_arg> {
     using reduce_t = T;
 
-    template <typename Arg, typename I>
-    friend __device__ void write_result(Arg &, const I &, const int);
+    template <typename Arg, typename I> friend __device__ void write_result(Arg &, const I &, const int);
     template <typename Reducer, typename Arg, typename I>
     friend __device__ void reduce(Arg &, const Reducer &, const I &, const int);
     qudaError_t launch_error; /** only do complete if no launch error to avoid hang */
@@ -162,15 +161,14 @@ namespace quda
      @param[in] sum Reduced value to be written out
      @param[in] idx Memory index we are writing to
    */
-  template <typename Arg, typename T>
-  __device__ inline void write_result(Arg &arg, const T &sum, const int idx)
+  template <typename Arg, typename T> __device__ inline void write_result(Arg &arg, const T &sum, const int idx)
   {
     using atomic_t = typename atomic_type<T>::type;
     constexpr size_t n = sizeof(T) / sizeof(atomic_t);
     auto tid = target::thread_idx_linear<2>();
 
     if (arg.result_d) { // write to host mapped memory
-#ifdef _NVHPC_CUDA // WAR for nvc++
+#ifdef _NVHPC_CUDA      // WAR for nvc++
       constexpr bool coalesced_write = false;
 #else
       constexpr bool coalesced_write = true;
@@ -224,7 +222,6 @@ namespace quda
     }
   }
 
-
   /**
      @brief Generic reduction function that reduces block-distributed
      data "in" per thread to a single value.  This is the
@@ -258,7 +255,8 @@ namespace quda
 
       if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
         // need to call placement new constructor since partial is not necessarily constructed
-        new (arg.partial + idx * target::grid_dim().x + target::block_idx().x) cuda::atomic<T, cuda::thread_scope_device> {aggregate};
+        new (arg.partial + idx * target::grid_dim().x + target::block_idx().x)
+          cuda::atomic<T, cuda::thread_scope_device> {aggregate};
 
         // increment global block counter for this reduction
         auto value = arg.count[idx].fetch_add(1, cuda::std::memory_order_release);
@@ -282,7 +280,6 @@ namespace quda
 
         write_result(arg, sum, idx);
       }
-
     }
   }
 

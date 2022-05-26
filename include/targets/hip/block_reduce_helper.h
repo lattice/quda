@@ -63,7 +63,7 @@ namespace quda
   */
   template <> struct block_reduce<true> {
 
-    template <int width_>  struct warp_reduce_param {
+    template <int width_> struct warp_reduce_param {
       static constexpr int width = width_;
     };
 
@@ -107,7 +107,8 @@ namespace quda
         if (warp_idx == 0) {
           if constexpr (max_items > device::warp_size()) { // never true for max block size 1024, warp = 32
             value = r.init();
-            for (auto i = thread_idx; i < warp_items; i += device::warp_size()) value = r(storage[batch * warp_items + i], value);
+            for (auto i = thread_idx; i < warp_items; i += device::warp_size())
+              value = r(storage[batch * warp_items + i], value);
           } else { // optimized path where we know the final reduction will fit in a warp
             value = thread_idx < warp_items ? storage[batch * warp_items + thread_idx] : r.init();
           }

@@ -52,23 +52,20 @@ namespace quda
     using type = float;
   };
 
-  template <typename T>
-    struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<device_reduce_t, T::N>>>> {
+  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<device_reduce_t, T::N>>>> {
     using type = device_reduce_t;
   };
 
   template <typename T>
-    struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<array<device_reduce_t, T::value_type::N>, T::N>>>> {
+  struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<array<device_reduce_t, T::value_type::N>, T::N>>>> {
     using type = device_reduce_t;
   };
 
-  template <typename T>
-  struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<complex<double>, T::N>>>>  {
+  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<complex<double>, T::N>>>> {
     using type = double;
   };
 
-  template <typename T>
-  struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<complex<float>, T::N>>>>  {
+  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<complex<float>, T::N>>>> {
     using type = float;
   };
 
@@ -135,7 +132,8 @@ namespace quda
        @return The warp-wide reduced value
      */
     template <typename T, typename reducer_t, typename param_t>
-    std::enable_if_t<sizeof(T) <= 32, T> __device__ inline operator()(const T &value_, bool all, const reducer_t &r, const param_t &)
+    std::enable_if_t<sizeof(T) <= 32, T> __device__ inline operator()(const T &value_, bool all, const reducer_t &r,
+                                                                      const param_t &)
     {
       cg::thread_block cta = cg::this_thread_block();
       cg::thread_block_tile<device::warp_size()> tile = cg::tiled_partition<device::warp_size()>(cta);
@@ -145,7 +143,8 @@ namespace quda
       if constexpr (!use_cg_reduce) {
         T value = value_;
 #pragma unroll
-        for (int offset = device::warp_size() / 2; offset >= 1; offset /= 2) value = get_reducer<T>(r)(value, tile.shfl_down(value, offset));
+        for (int offset = device::warp_size() / 2; offset >= 1; offset /= 2)
+          value = get_reducer<T>(r)(value, tile.shfl_down(value, offset));
         if (all) value = tile.shfl(value, 0);
         return value;
       } else {
@@ -165,7 +164,8 @@ namespace quda
        @return The warp-wide reduced value
      */
     template <typename T, typename reducer_t, typename param_t>
-    std::enable_if_t<(sizeof(T) > 32), T> __device__ inline operator()(const T &value_, bool all, const reducer_t &r, const param_t &)
+    std::enable_if_t<(sizeof(T) > 32), T> __device__ inline operator()(const T &value_, bool all, const reducer_t &r,
+                                                                       const param_t &)
     {
       using atomic_t = typename atomic_type<T>::type;
       constexpr size_t n = sizeof(T) / sizeof(atomic_t);
@@ -178,12 +178,9 @@ namespace quda
       memcpy(&value, sum_tmp, sizeof(T));
       return value;
     }
-
   };
 
-
 #endif
-
 
   // pre-declaration of block_reduce that we wish to specialize
   template <bool> struct block_reduce;
@@ -193,7 +190,7 @@ namespace quda
   */
   template <> struct block_reduce<true> {
 
-    template <int width_>  struct warp_reduce_param {
+    template <int width_> struct warp_reduce_param {
       static constexpr int width = width_;
     };
 
@@ -240,7 +237,8 @@ namespace quda
         if (warp_idx == 0) {
           if constexpr (max_items > device::warp_size()) { // never true for max block size 1024, warp = 32
             value = r.init();
-            for (auto i = thread_idx; i < warp_items; i += device::warp_size()) value = r(storage[batch * warp_items + i], value);
+            for (auto i = thread_idx; i < warp_items; i += device::warp_size())
+              value = r(storage[batch * warp_items + i], value);
           } else { // optimized path where we know the final reduction will fit in a warp
             value = thread_idx < warp_items ? storage[batch * warp_items + thread_idx] : r.init();
           }

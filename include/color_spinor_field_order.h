@@ -908,7 +908,8 @@ namespace quda
       __host__ double norm2(const ColorSpinorField &v, bool global = true) const
       {
         commGlobalReductionPush(global);
-        auto nrm2 = transform_reduce<plus<double>>(v.Location(), v.SiteSubset(), v.VolumeCB(), square_<double, storeFloat>(scale_inv));
+        auto nrm2 = transform_reduce<plus<double>>(v.Location(), v.SiteSubset(), v.VolumeCB(),
+                                                   square_<double, storeFloat>(scale_inv));
         commGlobalReductionPop();
         return nrm2;
       }
@@ -921,7 +922,8 @@ namespace quda
       __host__ double abs_max(const ColorSpinorField &v, bool global = true) const
       {
         commGlobalReductionPush(global);
-        auto absmax = transform_reduce<maximum<Float>>(v.Location(), v.SiteSubset(), v.VolumeCB(), abs_max_<Float, storeFloat>(scale_inv));
+        auto absmax = transform_reduce<maximum<Float>>(v.Location(), v.SiteSubset(), v.VolumeCB(),
+                                                       abs_max_<Float, storeFloat>(scale_inv));
         commGlobalReductionPop();
         return absmax;
       }
@@ -948,7 +950,8 @@ namespace quda
       __host__ double abs_max(bool global = true) const
       {
         commGlobalReductionPush(global);
-        auto absmax = transform_reduce<maximum<Float>>(location, nParity, volumeCB, abs_max_<Float, storeFloat>(scale_inv));
+        auto absmax
+          = transform_reduce<maximum<Float>>(location, nParity, volumeCB, abs_max_<Float, storeFloat>(scale_inv));
         commGlobalReductionPop();
         return absmax;
       }

@@ -37,10 +37,10 @@ namespace quda
   constexpr bool is_enabled_multigrid() { return false; };
 #endif
 
-  /**
-     @brief Helper function for returning if double-precision
-     multigrid is enabled
-  */
+    /**
+       @brief Helper function for returning if double-precision
+       multigrid is enabled
+    */
 #ifdef GPU_MULTIGRID_DOUBLE
   constexpr bool is_enabled_multigrid_double() { return true; }
 #else

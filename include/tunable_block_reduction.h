@@ -136,8 +136,8 @@ namespace quda
        @param[in] max_block_z Maximum batch size per block (maximum z-dimension block size)
        @param[in] location Optional overload for the location where the calculation will take place
      */
-    TunableBlock2D(const LatticeField &field, bool tune_block_x, unsigned int vector_length_z, unsigned int max_block_z = 0,
-                   QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+    TunableBlock2D(const LatticeField &field, bool tune_block_x, unsigned int vector_length_z,
+                   unsigned int max_block_z = 0, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableKernel(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location()),
       field(field),
       tune_block_x(tune_block_x),
