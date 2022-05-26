@@ -1,6 +1,7 @@
 #include <shmem_helper.cuh>
 
-namespace quda {
+namespace quda
+{
 
   namespace dslash
   {
@@ -79,4 +80,4 @@ namespace quda {
 
   } // namespace dslash
 
-}
+} // namespace quda
