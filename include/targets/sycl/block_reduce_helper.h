@@ -193,7 +193,10 @@ namespace quda
       if (!async) __syncthreads(); // only synchronize if we are not pipelining
       auto grp = getGroup();
       T result;
+      //auto bat = max(batch_size,batch+1);
+      //for(int i=0; i<bat; i++) {
       for(int i=0; i<batch_size; i++) {
+	//__syncthreads();
 	if(i==batch) {
 	  blockReduceSum(grp, result, value);
 	} else {
@@ -201,6 +204,7 @@ namespace quda
 	  auto zero = quda::zero<T>();
 	  blockReduceSum(grp, dum, zero);
 	}
+	//__syncthreads();
       }
       return result;
     }

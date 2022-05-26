@@ -126,6 +126,7 @@ namespace quda {
     return err;
   }
 
+  // MultiReduction
 
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
   void MultiReductionImpl(const Arg &arg, const sycl::nd_item<3> &ndi)
@@ -151,25 +152,6 @@ namespace quda {
     // perform final inter-block reduction and write out result
     reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value, j);
   }
-#if 0
-  template <template <typename> class Transformer, typename Arg,
-	    typename S, bool grid_stride = true>
-  void MultiReductionImpl1(const Arg &arg, sycl::nd_item<3> &ndi, S &sum)
-  {
-    using reduce_t = typename Transformer<Arg>::reduce_t;
-    Transformer<Arg> t(const_cast<Arg&>(arg));
-    auto idx = ndi.get_global_id(0);
-    auto j = ndi.get_global_id(1);
-    auto k = ndi.get_local_id(2);
-    if (j >= arg.threads.y) return;
-    reduce_t value = t.init();
-    while (idx < arg.threads.x) {
-      value = t(value, idx, j, k);
-      if (grid_stride) idx += ndi.get_global_range(0); else break;
-    }
-    sum.combine(value);
-  }
-#endif
 
   template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
   qudaError_t
@@ -197,7 +179,6 @@ namespace quda {
     //warningQuda("MR %s nondiv %s %s %s", grid_stride?"true":"false",
     //	  str(arg.threads).c_str(), str(tp.block).c_str(), typeid(Arg).name());
     //}
-#if 1
     sycl::buffer<const char,1>
       buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
     try {
@@ -221,33 +202,6 @@ namespace quda {
       }
       err = QUDA_ERROR;
     }
-#else
-    if(arg.threads.y==1) {
-      using reduce_t = typename Transformer<Arg>::reduce_t;
-      auto result_h = reinterpret_cast<reduce_t *>(quda::reducer::get_host_buffer());
-      *result_h = t.init();
-      auto result = reinterpret_cast<reduce_t *>(quda::reducer::get_mapped_buffer());
-      auto red = sycl::reduction(result, t.init(), typename Transformer<Arg>::reducer_t());
-      sycl::buffer<const char,1>
-	buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
-      q.submit([&](sycl::handler& h) {
-	auto a = buf.get_access<sycl::access::mode::read,
-				sycl::access::target::constant_buffer>(h);
-	//h.parallel_for<class MultiReduction1x>
-	h.parallel_for<>
-	  (ndRange, red,
-	   [=](sycl::nd_item<3> ndi, auto &sum) {
-	     using Sum = decltype(sum);
-	     //MultiReductionImpl1<Transformer, Arg, Sum, grid_stride>(arg, ndi, sum);
-	     const char *p = a.get_pointer();
-	     const Arg *arg2 = reinterpret_cast<const Arg*>(p);
-	     MultiReductionImpl1<Transformer, Arg, Sum, grid_stride>(*arg2, ndi, sum);
-	   });
-      });
-    } else {
-      errorQuda("multireduce %i\n", arg.threads.y);
-    }
-#endif
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("end MultiReduction\n");
     }

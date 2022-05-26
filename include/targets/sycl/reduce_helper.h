@@ -6,14 +6,6 @@
 #include <kernel_helper.h>
 #include <atomic_helper.h>
 
-//#include <quda_sycl_api.h>
-//#include <float_vector.h>
-//#include <target_device.h>
-//#include <reducer.h>
-//#include <kernel_helper.h>
-//#include <block_reduce_helper.h>
-//#include <type_traits>
-
 #ifdef QUAD_SUM
 using device_reduce_t = doubledouble;
 #else
@@ -139,7 +131,7 @@ namespace quda
      will be constant along constant block_idx().y and block_idx().z.
   */
   template <int block_size_x, int block_size_y, typename Reducer, typename Arg, typename T>
-  __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx)
+  inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx)
   {
     constexpr auto n_batch_block
       = std::min(Arg::max_n_batch_block, device::max_block_size() / (block_size_x * block_size_y));
@@ -150,8 +142,8 @@ namespace quda
     //auto &isLastBlockDone = *glmem;
     auto isLastBlockDone = false; // all valid values of idx should finish at the same time
 
-    //T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
-    T aggregate = BlockReduce(idx).Reduce(in, r);
+    T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
+    //T aggregate = BlockReduce(idx).Reduce(in, r);
 
     if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && idx < arg.threads.z) {
       arg.partial[idx * target::grid_dim().x + target::block_idx().x] = aggregate;
@@ -186,15 +178,33 @@ namespace quda
 	}
       }
 
-      //sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
-      sum = BlockReduce(idx).Reduce(sum, r);
+      sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
+      //sum = BlockReduce(idx).Reduce(sum, r);
 
       // write out the final reduced value
       //if (target::thread_idx().y * block_size_x + target::thread_idx().x == 0) {
       //if (target::thread_idx().y * block_size_x + target::thread_idx().x == 0 && idx < arg.threads.z) {
       if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && idx < arg.threads.z) {
-        arg.result_d[idx] = sum;
-        arg.count[idx] = 0; // set to zero for next time
+	if (arg.result_d) { // write to host mapped memory
+	  //using atomic_t = typename atomic_type<T>::type;
+          //constexpr size_t n = sizeof(T) / sizeof(atomic_t);
+          //atomic_t sum_tmp[n];
+          //memcpy(sum_tmp, &sum, sizeof(sum));
+	  //#pragma unroll
+          //for (unsigned int i = 0; i < n; i++) {
+            // catch the case where the computed value is equal to the init_value
+            //sum_tmp[i] = sum_tmp[i] == init_value<atomic_t>() ? terminate_value<atomic_t>() : sum_tmp[i];
+            //arg.result_d[n * idx + i].store(sum_tmp[i], cuda::std::memory_order_relaxed);
+            //arg.result_d[n * idx + i] = sum_tmp[i];
+          //}
+	  arg.result_d[idx] = sum;
+        } else if (arg.get_output_async_buffer()) {
+          arg.get_output_async_buffer()[idx] = sum;
+        } else { // write to device memory
+          //arg.partial[idx].store(sum, cuda::std::memory_order_relaxed);
+          arg.partial[idx] = sum;
+        }
+	arg.count[idx] = 0; // set to zero for next time
       }
     }
   }
