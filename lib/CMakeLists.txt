@@ -32,7 +32,7 @@ set (QUDA_OBJS
   inv_cg3_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
-  color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
+  color_spinor_field.cpp color_spinor_util.cu
   gauge_covdev.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
@@ -43,7 +43,7 @@ set (QUDA_OBJS
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp 
   llfat_quda.cu gauge_force.cu gauge_random.cu
-  gauge_field_strength_tensor.cu clover_quda.cu dslash_quda.cu
+  gauge_field_strength_tensor.cu clover_quda.cu 
   dslash_gamma_helper.cu dslash_clover_helper.cu
   staggered_kd_build_xinv.cu staggered_kd_reorder_xinv.cu staggered_kd_apply_xinv.cu
   madwf_transfer.cu madwf_tensor.cu
@@ -88,6 +88,7 @@ set (QUDA_OBJS
 
 # current workaround for nvshmem
 set(QUDA_DSLASH_OBJS 
+  dslash_quda.cu color_spinor_pack.cu
   dslash_staggered.cu dslash_improved_staggered.cu
   dslash_wilson.cu dslash_wilson_clover.cu dslash5_domain_wall.cu
   dslash_wilson_clover_preconditioned.cu 
@@ -475,8 +476,6 @@ add_custom_command(
   TARGET quda
   PRE_LINK
   COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
-
-set_target_properties(quda PROPERTIES INSTALL_RPATH_USE_LINK_PATH ON)
 
 install(
   TARGETS quda

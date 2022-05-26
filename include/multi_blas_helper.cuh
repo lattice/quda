@@ -268,9 +268,9 @@ namespace quda
       size_t spinor_z_size = spinor_x_size;
       size_t spinor_w_size = spinor_x_size;
 
-      const auto arg_known_size = (sizeof(kernel_param<>)                                      // kernel_param parent
+      const auto arg_known_size = (sizeof(kernel_param<>)                                        // kernel_param parent
 				   + sizeof(int)                                                 // NYW parameter
-				   + (NXZ * spinor_x_size)                                         // SpinorX array
+				   + (NXZ * spinor_x_size)                                       // SpinorX array
 				   + (Functor::use_z ? NXZ * spinor_z_size : sizeof(void *))     // SpinorZ array (else dummy pointer)
 				   + sizeof(Functor)                                             // functor
 				   + sizeof(dim3)                                                // threads parameter

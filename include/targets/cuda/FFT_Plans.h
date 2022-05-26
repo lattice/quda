@@ -137,12 +137,11 @@ inline void SetPlanFFT2DMany(cufftHandle &plan, int4 size, int dim, QudaPrecisio
   auto type = precision == QUDA_DOUBLE_PRECISION ? CUFFT_Z2Z : CUFFT_C2C;
   switch (dim) {
   case 0: {
-    int n[2] = {size.w, size.z};
+    int n[2] = {size.w, size.z}; // outer-most dimension is first
     CUFFT_SAFE_CALL(cufftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, type, size.x * size.y));
   } break;
   case 1: {
-    //int n[2] = {size.x, size.y};
-    int n[2] = {size.y, size.x};
+    int n[2] = {size.y, size.x}; // outer-most dimension is first
     CUFFT_SAFE_CALL(cufftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, type, size.z * size.w));
   } break;
   }

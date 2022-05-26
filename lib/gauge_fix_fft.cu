@@ -204,8 +204,8 @@ namespace quda {
     FFTPlanHandle plan_zt;
 
     GaugeFixArg<Float, recon> arg(data, alpha0);
-    SetPlanFFT2DMany(plan_zt, size, 0, data.Precision());     //for space and time ZT
-    SetPlanFFT2DMany(plan_xy, size, 1, data.Precision());    //with space only XY
+    SetPlanFFT2DMany(plan_zt, size, 0, data.Precision()); // for space and time ZT
+    SetPlanFFT2DMany(plan_xy, size, 1, data.Precision()); // with space only XY
 
     GaugeFixFFTRotate<Float> GFRotate(data);
 
