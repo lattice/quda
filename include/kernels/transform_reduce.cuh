@@ -33,6 +33,7 @@ namespace quda {
   template <typename Arg> struct transform_reducer : Arg::reducer {
     using reduce_t = typename Arg::reduce_t;
     using Arg::reducer::operator();
+    static constexpr int reduce_block_dim = 1;
     using count_t = decltype(Arg::n_items);
 
     const Arg &arg;

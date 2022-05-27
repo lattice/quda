@@ -7,6 +7,7 @@
 #include <kernels/dslash_coarse.cuh>
 #include <shmem_helper.cuh>
 #include <dslash_quda.h>
+#include <dslash_shmem.h>
 
 namespace quda {
 

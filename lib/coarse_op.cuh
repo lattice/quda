@@ -57,7 +57,7 @@ namespace quda {
     bool compute_max;
     int nFace; /** for staggered vs asqtad UV, VUV */
 
-    long long flops() const
+    long long flops() const override
     {
       long long flops_ = 0;
       switch (type) {
@@ -147,7 +147,8 @@ namespace quda {
       // 2 from parity, 8 from complex
       return flops_;
     }
-    long long bytes() const
+
+    long long bytes() const override
     {
       long long bytes_ = 0;
       switch (type) {
@@ -210,7 +211,8 @@ namespace quda {
       return bytes_;
     }
 
-    unsigned int minThreads() const {
+    unsigned int minThreads() const override
+    {
       unsigned int threads = 0;
       switch (type) {
       case COMPUTE_UV:
@@ -239,12 +241,13 @@ namespace quda {
       return threads;
     }
 
-    bool tuneGridDim() const { return false; } // don't tune the grid dimension
-    bool tuneAuxDim() const { return (type != COMPUTE_VUV && type != COMPUTE_VLV) ? false : true; }
+    bool tuneGridDim() const override { return false; } // don't tune the grid dimension
+    bool tuneAuxDim() const override { return (type != COMPUTE_VUV && type != COMPUTE_VLV) ? false : true; }
 
-	int candidate_iter() const override { return 1; }
+    int candidate_iter() const override { return 1; }
 
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const {
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const override
+    {
       if (type == COMPUTE_VUV || type == COMPUTE_VLV)
         return 4*sizeof(storeType)*arg.max_color_height_per_block*arg.max_color_width_per_block*4*coarseSpin*coarseSpin;
       return TunableKernel3D::sharedBytesPerBlock(param);
@@ -564,7 +567,7 @@ namespace quda {
       }
     }
 
-    void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       arg.threads.x = minThreads();
@@ -706,16 +709,17 @@ namespace quda {
       }
     }
 
-    bool advanceAux(TuneParam &param) const
+    bool advanceAux(TuneParam &param) const override
     {
       return ((type == COMPUTE_VUV || type == COMPUTE_VLV) ? (advanceAtomic(param) || advanceParityFlip(param) || advanceSwizzle(param)) : false);
     }
 
-    bool advanceSharedBytes(TuneParam &param) const {
+    bool advanceSharedBytes(TuneParam &param) const override
+    {
       return ( (!arg.shared_atomic && !from_coarse && (type == COMPUTE_VUV || type == COMPUTE_VLV)) || type == COMPUTE_COARSE_CLOVER) ? false : Tunable::advanceSharedBytes(param);
     }
 
-    bool advanceTuneParam(TuneParam &param) const
+    bool advanceTuneParam(TuneParam &param) const override
     {
       // note: for now there aren't MMA versions of COMPUTE_LV or COMPUTE_VLV, this is just forward thinking if we find it makes sense one day
       if (use_mma && (type == COMPUTE_UV || type == COMPUTE_LV || type == COMPUTE_VUV || type == COMPUTE_VLV)) {
@@ -740,7 +744,7 @@ namespace quda {
       else return false;
     }
 
-    void initTuneParam(TuneParam &param) const
+    void initTuneParam(TuneParam &param) const override
     {
       TunableKernel3D::initTuneParam(param);
       // note: for now there aren't MMA versions of COMPUTE_LV or COMPUTE_VLV, this is just forward thinking if we find it makes sense one day
@@ -757,7 +761,7 @@ namespace quda {
     }
 
     /** sets default values for when tuning is disabled */
-    void defaultTuneParam(TuneParam &param) const
+    void defaultTuneParam(TuneParam &param) const override
     {
       TunableKernel3D::defaultTuneParam(param);
       param.aux.x = ((type == COMPUTE_VUV || type == COMPUTE_VLV || type == COMPUTE_UV || type == COMPUTE_LV) && use_mma) ? 0 : 1; // aggregates per block
@@ -772,7 +776,8 @@ namespace quda {
       }
     }
 
-    TuneKey tuneKey() const {
+    TuneKey tuneKey() const override
+    {
       char Aux[TuneKey::aux_n];
       strcpy(Aux,aux);
 
@@ -856,7 +861,8 @@ namespace quda {
       return TuneKey(vol_str, typeid(*this).name(), Aux);
     }
 
-    void preTune() {
+    void preTune() override
+    {
       switch (type) {
       case COMPUTE_VUV:
       case COMPUTE_VLV:
@@ -889,7 +895,8 @@ namespace quda {
       }
     }
 
-    void postTune() {
+    void postTune() override
+    {
       switch (type) {
       case COMPUTE_VUV:
       case COMPUTE_VLV:

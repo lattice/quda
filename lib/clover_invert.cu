@@ -6,7 +6,7 @@
 namespace quda {
 
   template <typename store_t>
-  class CloverInvert : TunableReduction2D<> {
+  class CloverInvert : TunableReduction2D {
     CloverField &clover;
     bool compute_tr_log;
 

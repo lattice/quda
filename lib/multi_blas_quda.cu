@@ -180,9 +180,9 @@ namespace quda {
       template <int NXZ_max> std::enable_if_t<NXZ_max!=1, void> instantiate(const qudaStream_t &stream)
       {
         // if multi-1d then constrain the templates to no larger than max-1d size
-        constexpr int pow2_max = !decltype(f)::multi_1d ? max_NXZ_power2<false>() :
-          std::min(max_N_multi_1d_pow2(), max_NXZ_power2<false>());
-        constexpr int linear_max = !decltype(f)::multi_1d ? MAX_MULTI_BLAS_N : std::min(max_N_multi_1d(), MAX_MULTI_BLAS_N);
+        constexpr auto max_nxz_pow2 = max_NXZ_power2(false, static_cast<QudaPrecision>(sizeof(y_store_t)));
+        constexpr auto pow2_max = !decltype(f)::multi_1d ? max_nxz_pow2 : std::min(max_N_multi_1d_pow2(), max_nxz_pow2);
+        constexpr auto linear_max = !decltype(f)::multi_1d ? MAX_MULTI_BLAS_N : std::min(max_N_multi_1d(), MAX_MULTI_BLAS_N);
 
         if (NXZ <= pow2_max && is_power2(NXZ)) instantiatePow2<pow2_max>(stream);
         else if (NXZ <= linear_max) instantiateLinear<linear_max>(stream);
@@ -289,7 +289,7 @@ namespace quda {
         axpy_recurse<Functor>(a_.second, x, y_.second, range_x, range(range_y.first + y_.first.size(), range_y.second), upper);
       } else {
         // if at the bottom of recursion,
-        if (is_valid_NXZ(x.size(), false)) {
+        if (is_valid_NXZ(x.size(), false, y[0].get().Precision())) {
           // since tile range is [first,second), e.g., [first,second-1], we need >= here
           // if upper triangular and upper-right tile corner is below diagonal return
           if (upper == 1 && range_y.first >= range_x.second) { return; }
@@ -407,7 +407,7 @@ namespace quda {
         axpyz_recurse<Functor>(a_.second, x, y_.second, z_.second, range_x, range(range_y.first + y_.first.size(), range_y.second), pass, upper);
       } else {
         // if at bottom of recursion check where we are
-        if (is_valid_NXZ(x.size(), false)) {
+        if (is_valid_NXZ(x.size(), false, y[0].get().Precision())) {
           // check if tile straddles diagonal for L/U variants
           bool is_diagonal = (upper != 0) && (range_x.first < range_y.second) && (range_y.first < range_x.second);
           // check if tile is first to be updated for full matrices
@@ -529,7 +529,7 @@ namespace quda {
     void caxpyBxpz(const std::vector<Complex> &a, csfield_ref_vec &&x_, ColorSpinorField &y_,
                         const std::vector<Complex> &b, ColorSpinorField &z_)
     {
-      if (x_.size() <= (size_t)max_N_multi_1d() && is_valid_NXZ(x_.size(), false)) // only split if we have to.
+      if (x_.size() <= (size_t)max_N_multi_1d() && is_valid_NXZ(x_.size(), false, y_.Precision())) // only split if we have to.
       {
         // swizzle order since we are writing to y_ and z_, but the
         // multi-blas only allow writing to y and w, and moreover the
