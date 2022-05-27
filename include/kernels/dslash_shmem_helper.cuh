@@ -1,6 +1,7 @@
 #pragma once
 
 #include "kernel.h"
+#include "dslash_shmem.h"
 
 namespace quda {
 

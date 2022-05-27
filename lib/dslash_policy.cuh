@@ -3,6 +3,7 @@
 #include <index_helper.cuh>
 #include <timer.h>
 #include <dslash_quda.h>
+#include <dslash_shmem.h>
 
 namespace quda
 {
