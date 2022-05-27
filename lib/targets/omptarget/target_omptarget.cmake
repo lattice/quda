@@ -32,7 +32,7 @@ message(STATUS "Using maximum shared memory size: ${QUDA_MAX_SHARED_MEMORY_SIZE}
 
 # ######################################################################################################################
 # define omptarget flags
-set(QUDA_OMPTARGET_FLAGS -fiopenmp -fopenmp-targets=spir64_gen -fopenmp-version=51)
+set(QUDA_OMPTARGET_FLAGS -fiopenmp -fopenmp-targets=spir64_gen -fopenmp-version=51 -mllvm -vpo-paropt-simulate-get-num-threads-in-target=false)
 message(STATUS "Using OpenMP target flags: ${QUDA_OMPTARGET_FLAGS}")
 
 # QUDA_HASH for tunecache
