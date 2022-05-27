@@ -52,14 +52,14 @@ namespace quda
   {
     const int gd = target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y*target::omptarget::launch_param.grid.z;
     const int ld = target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y*target::omptarget::launch_param.block.z;
-    Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
+    // Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
     // printf("dparg %p\n", dparg);
-    omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
+    // omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
     // const int tx = arg.threads.x;
     // const int ty = arg.threads.y;
     // const int tz = arg.threads.z;
     // printf("Kernel1D: launch parameter: gd %d ld %d tx %d ty %d tz %d\n", gd, ld, tx, ty, tz);
-    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
+    #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg)
     {
       #pragma omp parallel num_threads(ld)
       {
@@ -68,13 +68,13 @@ namespace quda
         //          "omp reports: teams %d threads %d\n",
         //          launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
         //          omp_get_num_teams(), omp_get_num_threads());
-        char buffer[sizeof(Arg)];
-        memcpy(buffer, (void *)dparg, sizeof(Arg));
-        Kernel1D_impl<Functor, Arg, grid_stride>(*(Arg *)buffer);
+        // char buffer[sizeof(Arg)];
+        // memcpy(buffer, (void *)dparg, sizeof(Arg));
+        Kernel1D_impl<Functor, Arg, grid_stride>(arg);
       }
     }
     // printf("Kernel1D: exited\n");
-    omp_target_free(dparg, omp_get_default_device());
+    // omp_target_free(dparg, omp_get_default_device());
   }
 
   /**
@@ -161,10 +161,10 @@ namespace quda
     const int ty = arg.threads.y;
     const int tz = arg.threads.z;
     // printf("Kernel2D: launch parameter: gd %d ld %d tx %d ty %d tz %d\n", gd, ld, tx, ty, tz);
-    Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
+    // Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
     // printf("dparg %p\n", dparg);
-    omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
-    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
+    // omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
+    #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg)
     {
       #pragma omp parallel num_threads(ld)
       {
@@ -173,12 +173,12 @@ namespace quda
         //          "omp reports: teams %d threads %d\n",
         //          launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
         //          omp_get_num_teams(), omp_get_num_threads());
-        char buffer[sizeof(Arg)];
-        memcpy(buffer, (void *)dparg, sizeof(Arg));
-        Kernel2D_impl<Functor, Arg, grid_stride>(*(Arg *)buffer);
+        // char buffer[sizeof(Arg)];
+        // memcpy(buffer, (void *)dparg, sizeof(Arg));
+        Kernel2D_impl<Functor, Arg, grid_stride>(arg);
       }
     }
-    omp_target_free(dparg, omp_get_default_device());
+    // omp_target_free(dparg, omp_get_default_device());
   }
 
   /**
@@ -267,10 +267,10 @@ namespace quda
     const int ty = arg.threads.y;
     const int tz = arg.threads.z;
     // printf("Kernel3D: launch parameter: gd %d ld %d tx %d ty %d tz %d\n", gd, ld, tx, ty, tz);
-    Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
+    // Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
     // printf("dparg %p\n", dparg);
-    omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
-    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
+    // omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
+    #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg)
     {
       #pragma omp parallel num_threads(ld)
       {
@@ -279,12 +279,12 @@ namespace quda
         //          "omp reports: teams %d threads %d\n",
         //          launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
         //          omp_get_num_teams(), omp_get_num_threads());
-        char buffer[sizeof(Arg)];
-        memcpy(buffer, (void *)dparg, sizeof(Arg));
-        Kernel3D_impl<Functor, Arg, grid_stride>(*(Arg *)buffer);
+        // char buffer[sizeof(Arg)];
+        // memcpy(buffer, (void *)dparg, sizeof(Arg));
+        Kernel3D_impl<Functor, Arg, grid_stride>(arg);
       }
     }
-    omp_target_free(dparg, omp_get_default_device());
+    // omp_target_free(dparg, omp_get_default_device());
   }
 
   /**
@@ -342,10 +342,10 @@ namespace quda
     const int ty = arg.threads.y;
     const int tz = arg.threads.z;
     // printf("raw_kernel: launch parameter: gd %d ld %d tx %d ty %d tz %d\n", gd, ld, tx, ty, tz);
-    Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
+    // Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
     // printf("dparg %p\n", dparg);
-    omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
-    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
+    // omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
+    #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg)
     {
       #pragma omp parallel num_threads(ld)
       {
@@ -354,11 +354,11 @@ namespace quda
         //          "omp reports: teams %d threads %d\n",
         //          launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
         //          omp_get_num_teams(), omp_get_num_threads());
-        Functor<Arg> f(*dparg);
+        Functor<Arg> f(&arg);
         f();
       }
     }
-    omp_target_free(dparg, omp_get_default_device());
+    // omp_target_free(dparg, omp_get_default_device());
   }
 
 }

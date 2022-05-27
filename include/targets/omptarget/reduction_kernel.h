@@ -78,18 +78,18 @@ namespace quda
   {
     const int gd = target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y*target::omptarget::launch_param.grid.z;
     const int ld = target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y*target::omptarget::launch_param.block.z;
-    Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
-    omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
-    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
+    // Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
+    // omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
+    #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg)
     {
     #pragma omp parallel num_threads(ld)
     {
-      char buffer[sizeof(Arg)];
-      memcpy(buffer, (void *)dparg, sizeof(Arg));
-      Reduction2D_impl<Functor, Arg, grid_stride>(*(Arg *)buffer);
+      // char buffer[sizeof(Arg)];
+      // memcpy(buffer, (void *)dparg, sizeof(Arg));
+      Reduction2D_impl<Functor, Arg, grid_stride>(arg);
     }
     }
-    omp_target_free(dparg, omp_get_default_device());
+    // omp_target_free(dparg, omp_get_default_device());
   }
 
   /**
@@ -177,18 +177,18 @@ namespace quda
   {
     const int gd = target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y*target::omptarget::launch_param.grid.z;
     const int ld = target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y*target::omptarget::launch_param.block.z;
-    Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
-    omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
-    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
+    // Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
+    // omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
+    #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg)
     {
     #pragma omp parallel num_threads(ld)
     {
-      char buffer[sizeof(Arg)];
-      memcpy(buffer, (void *)dparg, sizeof(Arg));
-      MultiReduction_impl<Functor, Arg, grid_stride>(*(Arg *)buffer);
+      // char buffer[sizeof(Arg)];
+      // memcpy(buffer, (void *)dparg, sizeof(Arg));
+      MultiReduction_impl<Functor, Arg, grid_stride>(arg);
     }
     }
-    omp_target_free(dparg, omp_get_default_device());
+    // omp_target_free(dparg, omp_get_default_device());
   }
 
   /**
