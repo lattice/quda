@@ -21,6 +21,7 @@ namespace quda {
   template <typename Arg> struct MomAction : plus<typename Arg::reduce_t> {
     using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
+    static constexpr int reduce_block_dim = 2; // x_cb in x, parity in y
     const Arg &arg;
     constexpr MomAction(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -84,6 +85,7 @@ namespace quda {
   template <typename Arg> struct MomUpdate : maximum<typename Arg::reduce_t> {
     using reduce_t = typename Arg::reduce_t;
     using maximum<reduce_t>::operator();
+    static constexpr int reduce_block_dim = 2; // x_cb in x, parity in y
     const Arg &arg;
     constexpr MomUpdate(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }

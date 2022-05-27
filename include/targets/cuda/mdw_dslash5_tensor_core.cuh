@@ -245,7 +245,7 @@ namespace quda
 
   constexpr float target_scale = 2e3;
 
-  template <int block_x, int block_y, class Vector>
+  template <class Vector>
   __device__ inline float block_wise_reduce_vector(const Vector &v)
   {
     // Find the maximum absolute value in a lane
@@ -260,13 +260,14 @@ namespace quda
     }
     warp_max[0] = fmaxf(warp_max[0], warp_max[1]);
 
-    return BlockReduce<float, block_x, block_y>().AllMax(warp_max[0]) / target_scale;
+    constexpr int block_dim = 2;
+    return BlockReduce<float, block_dim>().AllMax(warp_max[0]) / target_scale;
   }
 
   // Actually does more than the function name suggests.
   // will find the maximum absolute value among the vector, scale that, and store
   // to sm_b
-  template <int block_x, int block_y, int N_sm_d2, bool accumulate, bool store = true, class Vector>
+  template <int N_sm_d2, bool accumulate, bool store = true, class Vector>
   __device__ inline void load_matrix_b_vector(Vector &v, half2 *sm_b, float &scale, float m_scale = 1.0f)
   {
     if (accumulate) {
@@ -282,7 +283,7 @@ namespace quda
       }
     }
     if (store) {
-      scale = block_wise_reduce_vector<block_x, block_y>(v);
+      scale = block_wise_reduce_vector(v);
 #pragma unroll
       for (int spin = 0; spin < 4; spin++) {
 #pragma unroll

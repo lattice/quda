@@ -401,7 +401,7 @@ namespace quda
     std::enable_if_t<Arg::fineColor == 6 && Arg::coarseColor == 6 && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>
     launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream, Tunable &tunable)
     {
-      if (query_max) return 2;
+      if (query_max) return 1;
       switch (tp.aux.x) {
       // clang-format off
       case 0: launch_compute_vuv_kernel< 16,  16,   8,   8,   4>(tp, arg, min_threads, stream, tunable); break;

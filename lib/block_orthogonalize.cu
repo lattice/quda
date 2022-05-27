@@ -74,7 +74,7 @@ namespace quda {
   public:
     BlockOrtho(ColorSpinorField &V, const std::vector<ColorSpinorField *> B, const int *fine_to_coarse,
                const int *coarse_to_fine, const int *geo_bs, int n_block_ortho, bool two_pass) :
-      TunableBlock2D(V, chiral_blocks),
+      TunableBlock2D(V, false, chiral_blocks),
       V(V),
       B(B),
       fine_to_coarse(fine_to_coarse),
@@ -88,6 +88,9 @@ namespace quda {
       if (nColor_ != nColor)
         errorQuda("Number of colors %d not supported with this precision %lu\n", nColor_, sizeof(bFloat));
 
+#ifdef QUDA_FAST_COMPILE_REDUCE
+      strcat(aux, ",fast_compile");
+#endif
       strcat(aux,",block_size=");
 
       aggregate_size = 1;
@@ -117,9 +120,11 @@ namespace quda {
 
       V.Scale(max); // by definition this is true
       apply(device::get_default_stream());
-      if (two_pass && V.Precision() < QUDA_SINGLE_PRECISION) {  // recompute for more precision
+
+      auto margin = 1.05; // the 1.05 gives us some margin
+      if (two_pass && V.Precision() < QUDA_SINGLE_PRECISION && (margin * max < 1.0)) {  // recompute for more precision
         iter++;
-        V.Scale(1.05 * max); // the 1.05 gives us some margin
+        V.Scale(margin * max);
         apply(device::get_default_stream());
       }
     }

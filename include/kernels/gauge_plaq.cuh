@@ -22,7 +22,7 @@ namespace quda {
     Gauge U;
 
     GaugePlaqArg(const GaugeField &U_) :
-      ReduceArg<reduce_t>(dim3(U_.LocalVolumeCB(), 1, 1)),
+      ReduceArg<reduce_t>(dim3(U_.LocalVolumeCB(), 2, 1)),
       U(U_)
     {
       for (int dir=0; dir<4; ++dir){
@@ -54,6 +54,7 @@ namespace quda {
   template <typename Arg> struct Plaquette : plus<typename Arg::reduce_t> {
     using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
+    static constexpr int reduce_block_dim = 2; // x_cb in x, parity in y
     const Arg &arg;
     constexpr Plaquette(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }

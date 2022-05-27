@@ -11,7 +11,7 @@
 namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  class CalcFunc : TunableReduction2D<> {
+  class CalcFunc : TunableReduction2D {
     const GaugeField &u;
     array<double, 2> &result;
     const compute_type type;
