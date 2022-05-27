@@ -35,6 +35,25 @@ namespace quda
 #endif
 
   /**
+     @brief Helper function for returning if multigrid is enabled
+  */
+#ifdef GPU_MULTIGRID
+  constexpr bool is_enabled_multigrid() { return true; };
+#else
+  constexpr bool is_enabled_multigrid() { return false; };
+#endif
+
+    /**
+       @brief Helper function for returning if double-precision
+       multigrid is enabled
+    */
+#ifdef GPU_MULTIGRID_DOUBLE
+  constexpr bool is_enabled_multigrid_double() { return true; }
+#else
+  constexpr bool is_enabled_multigrid_double() { return false; }
+#endif
+
+  /**
      @brief Helper function for returning if a given gauge field order is enabled
      @tparam order The order requested
    */
@@ -450,11 +469,10 @@ namespace quda
   constexpr void instantiatePrecisionMG(F &field, Args &&... args)
   {
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
-#ifdef GPU_MULTIGRID_DOUBLE
-      Apply<double>(field, args...);
-#else
-      errorQuda("Multigrid not supported in double precision");
-#endif
+      if constexpr (is_enabled_multigrid_double())
+        Apply<double>(field, args...);
+      else
+        errorQuda("Multigrid not supported in double precision");
     } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
       if constexpr (is_enabled<QUDA_SINGLE_PRECISION>())
         Apply<float>(field, args...);

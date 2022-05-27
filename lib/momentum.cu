@@ -67,7 +67,7 @@ namespace quda {
   }
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  class ActionMom : TunableReduction2D<> {
+  class ActionMom : TunableReduction2D {
     const GaugeField &mom;
     double &action;
 
@@ -103,7 +103,7 @@ namespace quda {
   }
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  class UpdateMom : TunableReduction2D<> {
+  class UpdateMom : TunableReduction2D {
     using Arg = UpdateMomArg<Float, nColor, recon>;
     const GaugeField &force;
     GaugeField &mom;

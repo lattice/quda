@@ -8,12 +8,6 @@
 #include <block_reduce_helper.h>
 #include <kernel_helper.h>
 
-#ifdef QUAD_SUM
-using device_reduce_t = doubledouble;
-#else
-using device_reduce_t = double;
-#endif
-
 #include <cuda/std/climits>
 #include <cuda/std/type_traits>
 #include <cuda/std/limits>
@@ -34,20 +28,8 @@ namespace quda
   */
   template <typename T> constexpr T terminate_value() { return cuda::std::numeric_limits<T>::infinity(); }
 
-  /**
-     @brief The atomic word size we use for a given reduction type.
-     This type should be lock-free to guarantee correct behaviour on
-     platforms that are not coherent with respect to the host
-   */
-  template <typename T> struct atomic_type {
-    using type = device_reduce_t;
-  };
-  template <> struct atomic_type<float> {
-    using type = float;
-  };
-
   // declaration of reduce function
-  template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
+  template <typename Reducer, typename Arg, typename T>
   __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0);
 
   /**
@@ -61,7 +43,8 @@ namespace quda
   template <typename T, bool use_kernel_arg = true> struct ReduceArg : kernel_param<use_kernel_arg> {
     using reduce_t = T;
 
-    template <int, int, typename Reducer, typename Arg, typename I>
+    template <typename Arg, typename I> friend __device__ void write_result(Arg &, const I &, const int);
+    template <typename Reducer, typename Arg, typename I>
     friend __device__ void reduce(Arg &, const Reducer &, const I &, const int);
     qudaError_t launch_error; /** only do complete if no launch error to avoid hang */
     static constexpr unsigned int max_n_batch_block
@@ -168,57 +151,48 @@ namespace quda
   };
 
   /**
-     @brief Generic reduction function that reduces block-distributed
-     data "in" per thread to a single value.  This is the
-     heterogeneous-atomic version which uses std::atomic to signal the
-     completion of the reduction to the host.
-
-     @param arg The kernel argument, this must derive from ReduceArg
-     @param r Instance of the reducer to be used in this reduction
-     @param in The input per-thread data to be reduced
-     @param idx In the case of multiple reductions, idx identifies
-     which reduction this thread block corresponds to.  Typically idx
-     will be constant along constant block_idx().y and block_idx().z.
-  */
-  template <int block_size_x, int block_size_y, typename Reducer, typename Arg, typename T>
-  __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx)
+     @brief Write the reduced result out.  Three different destinations are supported:
+       * If arg.result_d is non-null we atomically write out the
+         result (to host-mapped memory)
+       * Else if arg.get_output_async_buffer returns non-zero we
+         non-atomically write out the result to device memory
+       * Else we atomically write out the result to device memory
+     @param[in,out] arg Kernel argument
+     @param[in] sum Reduced value to be written out
+     @param[in] idx Memory index we are writing to
+   */
+  template <typename Arg, typename T> __device__ inline void write_result(Arg &arg, const T &sum, const int idx)
   {
-    constexpr auto n_batch_block
-      = std::min(Arg::max_n_batch_block, device::max_block_size() / (block_size_x * block_size_y));
-    using BlockReduce = BlockReduce<T, block_size_x, block_size_y, n_batch_block, true>;
-    __shared__ bool isLastBlockDone[n_batch_block];
+    using atomic_t = typename atomic_type<T>::type;
+    constexpr size_t n = sizeof(T) / sizeof(atomic_t);
+    auto tid = target::thread_idx_linear<2>();
 
-    T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
+    if (arg.result_d) { // write to host mapped memory
+#ifdef _NVHPC_CUDA      // WAR for nvc++
+      constexpr bool coalesced_write = false;
+#else
+      constexpr bool coalesced_write = true;
+#endif
+      if constexpr (coalesced_write) {
+        static_assert(n <= device::warp_size(), "reduction array is greater than warp size");
+        auto mask = __ballot_sync(0xffffffff, tid < n);
+        if (tid < n) {
+          atomic_t sum_tmp[n];
+          memcpy(sum_tmp, &sum, sizeof(sum));
 
-    if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
-      // need to call placement new constructor since partial is not necessarily constructed
-      new (arg.partial + idx * target::grid_dim().x + target::block_idx().x) cuda::atomic<T, cuda::thread_scope_device> {aggregate};
+          atomic_t s = sum_tmp[0];
+#pragma unroll
+          for (int i = 1; i < n; i++) {
+            auto si = __shfl_sync(mask, sum_tmp[i], 0);
+            if (i == tid) s = si;
+          }
 
-      // increment global block counter for this reduction
-      auto value = arg.count[idx].fetch_add(1, cuda::std::memory_order_release);
-
-      // determine if last block
-      isLastBlockDone[target::thread_idx().z] = (value == (target::grid_dim().x - 1));
-    }
-
-    __syncthreads();
-
-    // finish the reduction if last block
-    if (isLastBlockDone[target::thread_idx().z]) {
-      auto i = target::thread_idx().y * block_size_x + target::thread_idx().x;
-      T sum = r.init();
-      while (i < target::grid_dim().x) {
-        sum = r(sum, arg.partial[idx * target::grid_dim().x + i].load(cuda::std::memory_order_relaxed));
-        i += block_size_x * block_size_y;
-      }
-
-      sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
-
-      // write out the final reduced value
-      if (target::thread_idx().y * block_size_x + target::thread_idx().x == 0) {
-        if (arg.result_d) { // write to host mapped memory
-          using atomic_t = typename atomic_type<T>::type;
-          constexpr size_t n = sizeof(T) / sizeof(atomic_t);
+          s = (s == init_value<atomic_t>()) ? terminate_value<atomic_t>() : s;
+          arg.result_d[n * idx + tid].store(s, cuda::std::memory_order_relaxed);
+        }
+      } else {
+        // write out the final reduced value
+        if (tid == 0) {
           atomic_t sum_tmp[n];
           memcpy(sum_tmp, &sum, sizeof(sum));
 #pragma unroll
@@ -227,15 +201,84 @@ namespace quda
             sum_tmp[i] = sum_tmp[i] == init_value<atomic_t>() ? terminate_value<atomic_t>() : sum_tmp[i];
             arg.result_d[n * idx + i].store(sum_tmp[i], cuda::std::memory_order_relaxed);
           }
-        } else if (arg.get_output_async_buffer()) {
+        }
+      }
+    } else {
+
+      if (tid == 0) {
+        if (arg.get_output_async_buffer()) {
           arg.get_output_async_buffer()[idx] = sum;
         } else { // write to device memory
           arg.partial[idx].store(sum, cuda::std::memory_order_relaxed);
         }
-        // TODO in principle we could remove this final atomic store
-        // if we use a sense reversal barrier, avoiding the need to
-        // reset the count at the end
-        arg.count[idx].store(0, cuda::std::memory_order_relaxed); // set to zero for next time
+      }
+    }
+
+    if (tid == 0) {
+      // TODO in principle we could remove this final atomic store
+      // if we use a sense reversal barrier, avoiding the need to
+      // reset the count at the end
+      arg.count[idx].store(0, cuda::std::memory_order_relaxed); // set to zero for next time
+    }
+  }
+
+  /**
+     @brief Generic reduction function that reduces block-distributed
+     data "in" per thread to a single value.  This is the
+     heterogeneous-atomic version which uses std::atomic to signal the
+     completion of the reduction to the host.
+
+     The reduce function supports:
+     - a global reduction across the x thread dimension
+     - a local block reduction across the y thread dimension
+     - the z thread dimension is a batching dimension in the case of independent reductions
+
+     @param[in,out] arg The kernel argument, this must derive from ReduceArg
+     @param[in] r Instance of the reducer to be used in this reduction
+     @param[in] in The input per-thread data to be reduced
+     @param[in] idx In the case of multiple reductions, idx identifies
+     which reduction this thread block corresponds to and should be
+     constant along the x and y thread dimensions.
+  */
+  template <typename Reducer, typename Arg, typename T>
+  __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx)
+  {
+    constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
+    using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
+
+    T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
+
+    if (target::grid_dim().x == 1) { // short circuit where we have a single CTA - no need to do final reduction
+      write_result(arg, aggregate, idx);
+    } else {
+      __shared__ bool isLastBlockDone[n_batch_block];
+
+      if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
+        // need to call placement new constructor since partial is not necessarily constructed
+        new (arg.partial + idx * target::grid_dim().x + target::block_idx().x)
+          cuda::atomic<T, cuda::thread_scope_device> {aggregate};
+
+        // increment global block counter for this reduction
+        auto value = arg.count[idx].fetch_add(1, cuda::std::memory_order_release);
+
+        // determine if last block
+        isLastBlockDone[target::thread_idx().z] = (value == (target::grid_dim().x - 1));
+      }
+
+      __syncthreads();
+
+      // finish the reduction if last block
+      if (isLastBlockDone[target::thread_idx().z]) {
+        auto i = target::thread_idx().y * target::block_dim().x + target::thread_idx().x;
+        T sum = r.init();
+        while (i < target::grid_dim().x) {
+          sum = r(sum, arg.partial[idx * target::grid_dim().x + i].load(cuda::std::memory_order_relaxed));
+          i += target::block_size<2>();
+        }
+
+        sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
+
+        write_result(arg, sum, idx);
       }
     }
   }

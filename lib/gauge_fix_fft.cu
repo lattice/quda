@@ -52,7 +52,7 @@ namespace quda {
   };
 
   template <typename Arg>
-  class GaugeFixQuality : TunableReduction2D<> {
+  class GaugeFixQuality : TunableReduction2D {
     Arg &arg;
     const GaugeField &meta;
 

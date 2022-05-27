@@ -11,7 +11,7 @@ namespace quda {
 
     template <template <typename ...> class Reducer, typename store_t, typename y_store_t, int nSpin,
               typename T>
-    class MultiReduce : public TunableMultiReduction<1>
+    class MultiReduce : public TunableMultiReduction
     {
       using real = typename mapper<y_store_t>::type;
       using host_reduce_t = typename Reducer<double, real>::reduce_t;
@@ -37,7 +37,7 @@ namespace quda {
     public:
       MultiReduce(const T &a, const T &b, const T &c, const ColorSpinorField &x0, const ColorSpinorField &y0,
                   csfield_ref_vec &x, csfield_ref_vec &y, csfield_ref_vec &z, csfield_ref_vec &w, T &result) :
-        TunableMultiReduction(x[0], y.size(), max_n_batch_block_multi_reduce()),
+        TunableMultiReduction(x[0], 1u, y.size(), max_n_batch_block_multi_reduce()),
         NXZ(x.size()),
         NYW(y.size()),
         r(NXZ, NYW),
@@ -178,7 +178,7 @@ namespace quda {
 
       void apply(const qudaStream_t &stream)
       {
-        constexpr int pow2_max = max_NXZ_power2<true>();
+        constexpr int pow2_max = max_NXZ_power2(true);
         if (NXZ <= pow2_max && is_power2(NXZ)) instantiatePow2<pow2_max>(stream);
         else if (NXZ <= MAX_MULTI_BLAS_N) instantiateLinear<MAX_MULTI_BLAS_N>(stream);
         else errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);

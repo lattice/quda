@@ -36,10 +36,10 @@ namespace quda
 
   void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local)
   {
+#ifndef NVSHMEM_COMMS
     // handles for obtained ghost pointers
     cudaIpcMemHandle_t remote_handle[QUDA_MAX_DIM][2];
 
-#ifndef NVSHMEM_COMMS
   for (int dim = 0; dim < 4; ++dim) {
     if (comm_dim(dim) == 1) continue;
     for (int dir = 0; dir < 2; ++dir) {
@@ -109,7 +109,7 @@ void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
   } // iterate over dim
 }
 #else
-void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote) {}
+void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &) { }
 #endif
 
 void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
@@ -140,6 +140,8 @@ void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
         local[dim][dir].event = reinterpret_cast<void *>(event);
         CHECK_CUDA_ERROR(cudaIpcGetEventHandle(&handle, event));
         sendHandle = comm_declare_send_relative(&handle, dim, disp, sizeof(handle));
+      } else {
+        local[dim][dir].event = nullptr;
       }
 
       if (receiveHandle) comm_start(receiveHandle);

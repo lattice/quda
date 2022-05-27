@@ -6,7 +6,7 @@
 namespace quda {
 
   template<typename Float, int nColor, QudaReconstructType recon>
-  class GaugePlaq : public TunableReduction2D<> {
+  class GaugePlaq : public TunableReduction2D {
     const GaugeField &u;
     array<double, 2> &plq;
 

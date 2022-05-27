@@ -63,6 +63,7 @@ namespace quda
     template <class Arg> struct Tensor5DReduce : plus<typename Arg::reduce_t> {
       using reduce_t = typename Arg::reduce_t;
       using plus<reduce_t>::operator();
+      static constexpr int reduce_block_dim = 2; // x_cb in x, parity in y
 
       const Arg &arg;
       constexpr Tensor5DReduce(const Arg &arg) : arg(arg) { }

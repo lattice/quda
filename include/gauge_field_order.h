@@ -391,6 +391,16 @@ namespace quda {
         atomic_fetch_add(u2, val_);
       }
 
+      /**
+         @brief Wrapper to transform_reduce which is called by the
+         reducer functions, e.g., norm2 and abs_max
+         @tparam reducer The reduction operation we which to apply
+         @param[in] location The location of execution
+         @param[in] dim The dimension of of the field we wish to
+         reduce.  If dim = -1, then we reduce over all dimensions.
+         @param[in] h The helper functor which acts as the transformer
+         in transform_reduce
+       */
       template <typename reducer, typename helper>
       __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {
@@ -500,6 +510,16 @@ namespace quda {
         atomic_fetch_add(u2, val_);
       }
 
+      /**
+         @brief Wrapper to transform_reduce which is called by the
+         reducer functions, e.g., norm2 and abs_max
+         @tparam reducer The reduction operation we which to apply
+         @param[in] location The location of execution
+         @param[in] dim The dimension of of the field we wish to
+         reduce.  If dim = -1, then we reduce over all dimensions.
+         @param[in] h The helper functor which acts as the transformer
+         in transform_reduce
+       */
       template <typename reducer, typename helper>
       __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {
@@ -626,6 +646,16 @@ namespace quda {
         atomic_fetch_add(u2, val_);
       }
 
+      /**
+         @brief Wrapper to transform_reduce which is called by the
+         reducer functions, e.g., norm2 and abs_max
+         @tparam reducer The reduction operation we which to apply
+         @param[in] location The location of execution
+         @param[in] dim The dimension of of the field we wish to
+         reduce.  If dim = -1, then we reduce over all dimensions.
+         @param[in] h The helper functor which acts as the transformer
+         in transform_reduce
+       */
       template <typename reducer, typename helper>
       __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {

@@ -170,7 +170,7 @@ namespace quda {
    * @brief Tunable object for the gauge fixing quality kernel
    */
   template <typename Arg>
-  class GaugeFixQuality : TunableReduction2D<> {
+  class GaugeFixQuality : TunableReduction2D {
     Arg &arg;
     const GaugeField &meta;
 

@@ -283,6 +283,14 @@ namespace quda {
       Accessor(const CloverField &, bool = false) { errorQuda("Not implemented for order %d", order); }
       constexpr complex<Float> &operator()(int, int, int, int, int, int) const { return complex<Float>(0.0); }
 
+      /**
+         @brief Wrapper to transform_reduce which is called by the
+         reducer functions, e.g., norm2 and abs_max.  This is the
+         dummy implementation in the non-specialized Accessor class.
+         @tparam reducer The reduction operation we which to apply
+         @tparam helper The helper functor which acts as the transformer
+         in transform_reduce
+      */
       template <typename reducer, typename helper> constexpr double transform_reduce(QudaFieldLocation, helper) const
       {
         return 0.0;
@@ -344,6 +352,14 @@ namespace quda {
         }
       }
 
+      /**
+         @brief Wrapper to transform_reduce which is called by the
+         reducer functions, e.g., norm2 and abs_max
+         @tparam reducer The reduction operation we which to apply
+         @param[in] location The location of execution
+         @param[in] h The helper functor which acts as the transformer
+         in transform_reduce
+       */
       template <typename reducer, typename helper>
       __host__ double transform_reduce(QudaFieldLocation location, helper h) const
       {
@@ -415,6 +431,14 @@ namespace quda {
         }
       }
 
+      /**
+         @brief Wrapper to transform_reduce which is called by the
+         reducer functions, e.g., norm2 and abs_max
+         @tparam reducer The reduction operation we which to apply
+         @param[in] location The location of execution
+         @param[in] h The helper functor which acts as the transformer
+         in transform_reduce
+       */
       template <typename reducer, typename helper>
       __host__ double transform_reduce(QudaFieldLocation location, helper h) const
       {
