@@ -171,6 +171,9 @@ namespace quda {
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
 		 str(localSize).c_str(), str(arg.threads).c_str());
       printfQuda("  reduce_t: %s\n", typeid(reduce_t).name());
+      printfQuda("  Arg::max_n_batch_block: %d\n", Arg::max_n_batch_block);
+      printfQuda("  max_block_z: %d\n",
+		 device::max_block_size()/ (tp.block.x * tp.block.y));
     }
     //if (arg.threads.x%tp.block.x+arg.threads.y%tp.block.y+arg.threads.z%tp.block.z) {
     //if (Arg::hasBlockOps()) {

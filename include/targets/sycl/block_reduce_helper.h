@@ -177,7 +177,9 @@ namespace quda
   template <typename T, int block_size_x, int block_size_y = 1, int block_size_z = 1, bool batched = false>
   class BlockReduce
   {
-    static constexpr int batch_size = !batched ? 1 : block_size_z;
+    static constexpr int batch_size_ = !batched ? 1 : block_size_z;
+    static constexpr int batch_size = std::max(batch_size_, 1);
+    const int nbatch = batch_size_ != 0 ? batch_size_ : getGroup().get_local_range(2);
     const int batch;
 
   public:
@@ -193,18 +195,12 @@ namespace quda
       if (!async) __syncthreads(); // only synchronize if we are not pipelining
       auto grp = getGroup();
       T result;
-      //auto bat = max(batch_size,batch+1);
-      //for(int i=0; i<bat; i++) {
-      for(int i=0; i<batch_size; i++) {
-	//__syncthreads();
-	if(i==batch) {
-	  blockReduceSum(grp, result, value);
-	} else {
-	  T dum;
-	  auto zero = quda::zero<T>();
-	  blockReduceSum(grp, dum, zero);
-	}
-	//__syncthreads();
+      //for(int i=0; i<batch_size; i++) {
+      for(int i=0; i<nbatch; i++) {
+	T in = (i==batch) ? value : quda::zero<T>();
+	T out;
+	blockReduceSum(grp, out, in);
+	if(i==batch) result = out;
       }
       return result;
     }

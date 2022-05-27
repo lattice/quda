@@ -135,7 +135,8 @@ namespace quda
   {
     constexpr auto n_batch_block
       = std::min(Arg::max_n_batch_block, device::max_block_size() / (block_size_x * block_size_y));
-    using BlockReduce = BlockReduce<T, block_size_x, block_size_y, n_batch_block, true>;
+    constexpr int n_batch_block_ = n_batch_block == 1;
+    using BlockReduce = BlockReduce<T, block_size_x, block_size_y, n_batch_block_, true>;
     //__shared__ bool isLastBlockDone[n_batch_block];
     //auto glmem = sycl::ext::oneapi::group_local_memory_for_overwrite<bool[n_batch_block]>(getGroup());
     //bool *isLastBlockDone = *glmem.get();
@@ -143,7 +144,6 @@ namespace quda
     auto isLastBlockDone = false; // all valid values of idx should finish at the same time
 
     T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
-    //T aggregate = BlockReduce(idx).Reduce(in, r);
 
     if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && idx < arg.threads.z) {
       arg.partial[idx * target::grid_dim().x + target::block_idx().x] = aggregate;
@@ -179,7 +179,6 @@ namespace quda
       }
 
       sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
-      //sum = BlockReduce(idx).Reduce(sum, r);
 
       // write out the final reduced value
       //if (target::thread_idx().y * block_size_x + target::thread_idx().x == 0) {
