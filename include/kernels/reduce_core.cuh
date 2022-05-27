@@ -57,6 +57,7 @@ namespace quda
     template <typename Arg> struct Reduce_ : plus<typename Arg::reduce_t> {
       using reduce_t = typename Arg::reduce_t;
       using plus<reduce_t>::operator();
+      static constexpr int reduce_block_dim = 1; // x_cb and parity are mapped to x dim
       Arg &arg;
       constexpr Reduce_(const Arg &arg) : arg(const_cast<Arg&>(arg))
       {

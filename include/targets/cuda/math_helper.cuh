@@ -93,7 +93,7 @@ namespace quda {
   template <> struct sin_impl<true> {
     template <typename T> __device__ inline T operator()(const T& a)
     {
-      BUILTIN_ASSUME(fabs(a) <= 2.8 * M_PI);
+      BUILTIN_ASSUME(fabs(a) <= 2.0 * M_PI);
       return sin(a);
     }
   };

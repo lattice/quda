@@ -1247,13 +1247,11 @@ void doHisqStaplesForceCPU(const int dim[4], PathCoefficients<double> staple_coe
 void hisqStaplesForceCPU(const double *path_coeff, const QudaGaugeParam &param, quda::cpuGaugeField &oprod,
                          quda::cpuGaugeField &link, quda::cpuGaugeField *newOprod)
 {
-  int volume = 1;
-  for (int dir = 0; dir < 4; ++dir) volume *= param.X[dir];
-
 #ifdef MULTI_GPU
   int len = Vh_ex * 2;
 #else
-  int len = volume;
+  int len = 1;
+  for (int dir = 0; dir < 4; ++dir) len *= param.X[dir];
 #endif
   // allocate memory for temporary fields
   void *tempmat[6];
