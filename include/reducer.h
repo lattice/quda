@@ -22,6 +22,12 @@
 namespace quda
 {
 
+#ifdef QUAD_SUM
+  using device_reduce_t = doubledouble;
+#else
+  using device_reduce_t = double;
+#endif
+
   namespace reducer
   {
     /**

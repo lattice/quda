@@ -1,5 +1,6 @@
 #include "color_spinor_field.h"
 #include "dslash_quda.h"
+#include "dslash_shmem.h"
 #include <dslash_policy.cuh>
 #include "tunable_nd.h"
 #include "instantiate.h"

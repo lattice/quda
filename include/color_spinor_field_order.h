@@ -877,6 +877,30 @@ namespace quda
 #endif
 
       /**
+         @brief Wrapper to transform_reduce which is called by the
+         reducer functions, e.g., norm2 and abs_max
+         @tparam reducer The reduction operation we which to apply
+         @param[in] location The location of execution
+         @param[in] nParity Number of parities of the field
+         @param[in] volumeCB Checkerboard volume
+         @param[in] h The helper functor which acts as the transformer
+         in transform_reduce
+       */
+      template <typename reducer, typename helper>
+      auto transform_reduce(QudaFieldLocation location, int nParity, unsigned int volumeCB, helper h) const
+      {
+        std::vector<decltype(v)> v_eo(nParity);
+        for (auto i = 0u; i < v_eo.size(); i++) v_eo[i] = v + i * accessor.offset_cb;
+        std::vector<typename reducer::reduce_t> result(nParity);
+
+        ::quda::transform_reduce<reducer>(location, result, v_eo, volumeCB * nSpin * nColor * nVec, h);
+
+        auto total = reducer::init();
+        for (auto &res : result) total = reducer::apply(total, res);
+        return total;
+      }
+
+      /**
        * Returns the L2 norm squared of the field in a given dimension
        * @param[in] global Whether to do a global or process local norm2 reduction
        * @return L2 norm squared
@@ -884,9 +908,8 @@ namespace quda
       __host__ double norm2(const ColorSpinorField &v, bool global = true) const
       {
         commGlobalReductionPush(global);
-        double nrm2 = ::quda::transform_reduce<plus<double>>(
-          v.Location(), this->v, v.SiteSubset() * (unsigned int)v.VolumeCB() * nSpin * nColor * nVec,
-          square_<double, storeFloat>(scale_inv));
+        auto nrm2 = transform_reduce<plus<double>>(v.Location(), v.SiteSubset(), v.VolumeCB(),
+                                                   square_<double, storeFloat>(scale_inv));
         commGlobalReductionPop();
         return nrm2;
       }
@@ -899,9 +922,8 @@ namespace quda
       __host__ double abs_max(const ColorSpinorField &v, bool global = true) const
       {
         commGlobalReductionPush(global);
-        double absmax = ::quda::transform_reduce<maximum<Float>>(
-          v.Location(), this->v, v.SiteSubset() * (unsigned int)v.VolumeCB() * nSpin * nColor * nVec,
-          abs_max_<Float, storeFloat>(scale_inv));
+        auto absmax = transform_reduce<maximum<Float>>(v.Location(), v.SiteSubset(), v.VolumeCB(),
+                                                       abs_max_<Float, storeFloat>(scale_inv));
         commGlobalReductionPop();
         return absmax;
       }
@@ -915,8 +937,7 @@ namespace quda
       __host__ double norm2(bool global = true) const
       {
         commGlobalReductionPush(global);
-        double nrm2 = ::quda::transform_reduce<plus<double>>(location, v, nParity * volumeCB * nSpin * nColor * nVec,
-                                                             square_<double, storeFloat>(scale_inv));
+        auto nrm2 = transform_reduce<plus<double>>(location, nParity, volumeCB, square_<double, storeFloat>(scale_inv));
         commGlobalReductionPop();
         return nrm2;
       }
@@ -929,8 +950,8 @@ namespace quda
       __host__ double abs_max(bool global = true) const
       {
         commGlobalReductionPush(global);
-        double absmax = ::quda::transform_reduce<maximum<Float>>(location, v, nParity * volumeCB * nSpin * nColor * nVec,
-                                                                 abs_max_<Float, storeFloat>(scale_inv));
+        auto absmax
+          = transform_reduce<maximum<Float>>(location, nParity, volumeCB, abs_max_<Float, storeFloat>(scale_inv));
         commGlobalReductionPop();
         return absmax;
       }

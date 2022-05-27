@@ -284,7 +284,7 @@ namespace quda {
   inline void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity, int nFace, int dagger,
                                MemoryLocation *destination, int shmem)
 #else
-  inline void genericPackGhost(void **, const ColorSpinorField &a, QudaParity, int, int, MemoryLocation *)
+  inline void genericPackGhost(void **, const ColorSpinorField &a, QudaParity, int, int, MemoryLocation *, int)
 #endif
   {
     if (a.Nspin() == 4) {

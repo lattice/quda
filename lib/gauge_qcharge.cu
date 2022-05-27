@@ -7,7 +7,7 @@ namespace quda
 {
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  class QCharge : TunableReduction2D<> {
+  class QCharge : TunableReduction2D {
     const GaugeField &Fmunu;
     double *energy;
     double &qcharge;
