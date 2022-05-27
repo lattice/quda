@@ -318,20 +318,17 @@ namespace quda
     }
 
     template <int NXZ, typename store_t, int N, bool> struct SpinorXZ {
-      static_assert(NXZ>0);
       Spinor<store_t, N> X[NXZ];
       Spinor<store_t, N> *Z;
       SpinorXZ() : Z(X) {}
     };
 
     template <int NXZ, typename store_t, int N> struct SpinorXZ<NXZ, store_t, N, true> {
-      static_assert(NXZ>0);
       Spinor<store_t, N> X[NXZ];
       Spinor<store_t, N> Z[NXZ];
     };
 
     template <int NYW, typename x_store_t, int Nx, typename y_store_t, int Ny, bool> struct SpinorYW {
-      static_assert(NYW>0);
       Spinor<y_store_t, Ny> Y[NYW];
       Spinor<y_store_t, Ny> *W;
       SpinorYW() : W(Y) {}
@@ -339,7 +336,6 @@ namespace quda
 
     template <int NYW, typename x_store_t, int Nx, typename y_store_t, int Ny>
     struct SpinorYW<NYW, x_store_t, Nx, y_store_t, Ny, true> {
-      static_assert(NYW>0);
       Spinor<y_store_t, Ny> Y[NYW];
       Spinor<x_store_t, Nx> W[NYW];
     };
