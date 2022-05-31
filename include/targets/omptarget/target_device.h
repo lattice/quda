@@ -77,7 +77,7 @@ namespace quda {
     */
     __device__ __host__ inline dim3 block_idx()
     {
-      const int n = omp_get_team_num();
+      const auto n = (unsigned int)omp_get_team_num();
       return dim3(n%target::omptarget::launch_param.grid.x, (n/target::omptarget::launch_param.grid.x)%target::omptarget::launch_param.grid.y, n/(target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y));
     }
 
@@ -88,7 +88,7 @@ namespace quda {
     */
     __device__ __host__ inline dim3 thread_idx()
     {
-      const int n = omp_get_thread_num();
+      const auto n = (unsigned int)omp_get_thread_num();
       return dim3(n%target::omptarget::launch_param.block.x, (n/target::omptarget::launch_param.block.x)%target::omptarget::launch_param.block.y, n/(target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y));
     }
 
