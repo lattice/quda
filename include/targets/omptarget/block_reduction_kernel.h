@@ -109,7 +109,7 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __launch_bounds__(Arg::launch_bounds || Arg::block_size > 512 ?
+  __launch_bounds__(Arg::launch_bounds ?
                       Arg::block_size :
                       0) __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> BlockKernel2D(Arg arg)
   {
@@ -155,7 +155,7 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __launch_bounds__(Arg::launch_bounds || Arg::block_size > 512 ?
+  __launch_bounds__(Arg::launch_bounds ?
                       Arg::block_size :
                       0) __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> BlockKernel2D()
   {

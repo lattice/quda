@@ -22,7 +22,7 @@ namespace quda
     ompwip("unimplemented");
   }
 
-  void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
+  void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &)
   {
     ompwip("unimplemented");
   }

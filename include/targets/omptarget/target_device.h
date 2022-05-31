@@ -92,7 +92,34 @@ namespace quda {
       return dim3(n%target::omptarget::launch_param.block.x, (n/target::omptarget::launch_param.block.x)%target::omptarget::launch_param.block.y, n/(target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y));
     }
 
-  }
+    /**
+       @brief Helper function that returns a linear thread index within a thread block.
+    */
+    template <int dim> __device__ __host__ inline auto thread_idx_linear()
+    {
+      const auto n = (unsigned int)omp_get_thread_num();
+      switch (dim) {
+      case 1: return n%target::omptarget::launch_param.block.x;
+      case 2: return n%(target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y);
+      case 3:
+      default: return n;
+      }
+    }
+
+    /**
+       @brief Helper function that returns the total number thread in a thread block
+    */
+    template <int dim> __device__ __host__ inline auto block_size()
+    {
+      switch (dim) {
+      case 1: return target::omptarget::launch_param.block.x;
+      case 2: return target::omptarget::launch_param.block.y * target::omptarget::launch_param.block.x;
+      case 3:
+      default: return target::omptarget::launch_param.block.z * target::omptarget::launch_param.block.y * target::omptarget::launch_param.block.x;
+      }
+    }
+
+  } // namespace target
 
   namespace device {
 
@@ -114,38 +141,8 @@ namespace quda {
     template <int block_size_y = 1, int block_size_z = 1>
       constexpr unsigned int max_block_size()
       {
-        return QUDA_MAX_BLOCK_SIZE / (block_size_y * block_size_z);
+        return std::max(warp_size(), QUDA_MAX_BLOCK_SIZE / (block_size_y * block_size_z));
       }
-
-    /**
-       @brief Helper function that returns the maximum number of threads
-       in a block in the x dimension for reduction kernels.
-    */
-    template <int block_size_y = 1, int block_size_z = 1>
-    constexpr unsigned int max_reduce_block_size()
-      {
-#ifdef QUDA_FAST_COMPILE_REDUCE
-        // This is the specialized variant used when we have fast-compilation mode enabled
-        return warp_size();
-#else
-        return max_block_size<block_size_y, block_size_z>();
-#endif
-      }
-
-    /**
-       @brief Helper function that returns the maximum number of threads
-       in a block in the x dimension for reduction kernels.
-    */
-    template <int block_size_y = 1, int block_size_z = 1>
-    constexpr unsigned int max_multi_reduce_block_size()
-    {
-#ifdef QUDA_FAST_COMPILE_REDUCE
-      // This is the specialized variant used when we have fast-compilation mode enabled
-      return warp_size();
-#else
-      return max_block_size<block_size_y, block_size_z>();
-#endif
-    }
 
     /**
        @brief Helper function that returns the maximum size of a
