@@ -19,8 +19,8 @@ namespace quda
 {
 
   // declaration of reduce function
-  template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
-  __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0);
+  template <typename Reducer, typename Arg, typename T>
+  inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0);
 
   /**
      @brief ReduceArg is the argument type that all kernel arguments
@@ -33,8 +33,8 @@ namespace quda
   template <typename T, bool use_kernel_arg = true> struct ReduceArg : kernel_param<use_kernel_arg> {
     using reduce_t = T;
 
-    template <int, int, typename Reducer, typename Arg, typename I>
-    friend __device__ void reduce(Arg &, const Reducer &, const I &, const int);
+    template <typename Reducer, typename Arg, typename I>
+    friend void reduce(Arg &, const Reducer &, const I &, const int);
     qudaError_t launch_error; /** only do complete if no launch error to avoid hang */
     static constexpr unsigned int max_n_batch_block
       = 1; /** by default reductions do not support batching withing the block */
@@ -63,7 +63,10 @@ namespace quda
       result_h = static_cast<decltype(result_h)>(reducer::get_host_buffer());
       count = reducer::get_count<count_t>();
 
-      if (commAsyncReduction()) result_d = partial;
+      if (commAsyncReduction()) {
+	//result_d = partial;
+	result_d = nullptr;
+      }
     }
 
     /**
@@ -130,13 +133,12 @@ namespace quda
      which reduction this thread block corresponds to.  Typically idx
      will be constant along constant block_idx().y and block_idx().z.
   */
-  template <int block_size_x, int block_size_y, typename Reducer, typename Arg, typename T>
+  template <typename Reducer, typename Arg, typename T>
   inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx)
   {
-    constexpr auto n_batch_block
-      = std::min(Arg::max_n_batch_block, device::max_block_size() / (block_size_x * block_size_y));
+    constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
     constexpr int n_batch_block_ = n_batch_block == 1;
-    using BlockReduce = BlockReduce<T, block_size_x, block_size_y, n_batch_block_, true>;
+    using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block_>;
     //__shared__ bool isLastBlockDone[n_batch_block];
     //auto glmem = sycl::ext::oneapi::group_local_memory_for_overwrite<bool[n_batch_block]>(getGroup());
     //bool *isLastBlockDone = *glmem.get();
@@ -170,11 +172,11 @@ namespace quda
     if (isLastBlockDone) {
       T sum = Reducer::init();
       if (idx < arg.threads.z) {
-	auto i = target::thread_idx().y * block_size_x + target::thread_idx().x;
+	auto i = target::thread_idx().y * target::block_dim().x + target::thread_idx().x;
 	sycl::atomic_fence(sycl::memory_order::acquire,sycl::memory_scope::device);
 	while (i < target::grid_dim().x) {
 	  sum = r(sum, const_cast<T &>(static_cast<volatile T *>(arg.partial)[idx * target::grid_dim().x + i]));
-	  i += block_size_x * block_size_y;
+	  i += target::block_dim().x * target::block_dim().y;
 	}
       }
 

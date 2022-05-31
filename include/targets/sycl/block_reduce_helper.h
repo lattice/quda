@@ -165,19 +165,15 @@ namespace quda
 
   /**
      @brief BlockReduce provides a generic interface for performing
-     perform reductions at the block level
+     reductions at the block level
      @tparam T The type of the value that we are reducing
-     @tparam block_size_x The number of threads in the x dimension
-     @tparam block_size_y The number of threads in the y dimension
-     @tparam block_size_z The number of threads in the z dimension
-     @tparam batched Whether this is a batched reduction or not.  If
-     batched, then the block_size_z_ parameter is set equal to the
-     batch size.
+     @tparam block_dim The number of thread block dimensions we are reducing
+     @tparam batch_size Batch size of the reduction.  Threads will be
+     ordered such that batch size is the slowest running index.
   */
-  template <typename T, int block_size_x, int block_size_y = 1, int block_size_z = 1, bool batched = false>
+  template <typename T, int block_dim, int batch_size_ = 1>
   class BlockReduce
   {
-    static constexpr int batch_size_ = !batched ? 1 : block_size_z;
     static constexpr int batch_size = std::max(batch_size_, 1);
     const int nbatch = batch_size_ != 0 ? batch_size_ : getGroup().get_local_range(2);
     const int batch;
@@ -194,6 +190,7 @@ namespace quda
     {
       if (!async) __syncthreads(); // only synchronize if we are not pipelining
       auto grp = getGroup();
+#if 1
       T result;
       //for(int i=0; i<batch_size; i++) {
       for(int i=0; i<nbatch; i++) {
@@ -203,6 +200,34 @@ namespace quda
 	if(i==batch) result = out;
       }
       return result;
+#else
+      using atype = T[512]; // FIXME
+      auto mem0 = sycl::ext::oneapi::group_local_memory_for_overwrite<atype>(grp);
+      auto mem = *mem0.get();
+      auto r0 = grp.get_local_range(0);
+      auto r1 = grp.get_local_range(1);
+      auto r2 = grp.get_local_range(2);
+      auto i0 = grp.get_local_id()[0];
+      auto i1 = grp.get_local_id()[1];
+      auto i2 = grp.get_local_id()[2];
+      auto r = r0*r1;
+      auto i = i1*r0+i0;
+      if(i2*r+i < 512) {
+	mem[i2*r+i] = value;
+      }
+      group_barrier(grp);
+      for(int s=1; s<r; s*=2) {
+	int a = 2*s*i;
+	int as = a + s;
+	if(as<r) {
+	  if(i2*r+as < 512) {
+	    mem[i2*r+a] = mem[i2*r+a] + mem[i2*r+as];
+	  }
+	}
+	group_barrier(grp);
+      }
+      return mem[0];
+#endif
     }
 
     /**

@@ -33,7 +33,7 @@ namespace quda {
       if (grid_stride) idx += ndi.get_global_range(0); else break;
     }
     // perform final inter-block reduction and write out result
-    reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value);
+    reduce(arg, t, value);
   }
 #else
   template <template <typename> class Transformer, bool grid_stride,
@@ -150,7 +150,7 @@ namespace quda {
     }
 
     // perform final inter-block reduction and write out result
-    reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value, j);
+    reduce(arg, t, value, j);
   }
 
   template <template <typename> class Transformer, typename Arg, bool grid_stride = true>

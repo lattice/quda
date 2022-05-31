@@ -49,7 +49,7 @@ namespace quda {
     template <> struct block_dim_impl<true> { dim3 operator()() { return getBlockDim(); } };
 
     /**
-       @brief Helper function that returns the grid dimensions.  On
+       @brief Helper function that returns the block dimensions.  On
        CUDA this returns the intrinsic blockDim, whereas on the host
        this returns (1, 1, 1).
     */
