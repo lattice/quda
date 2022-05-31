@@ -49,7 +49,6 @@ namespace quda {
 
   }; // GaugeAPE
 
-#ifdef GPU_GAUGE_TOOLS
   void APEStep(GaugeField &out, GaugeField& in, double alpha)
   {
     checkPrecision(out, in);
@@ -61,11 +60,5 @@ namespace quda {
     instantiate<GaugeAPE>(out, in, alpha);
     out.exchangeExtendedGhost(out.R(), false);
   }
-#else
-  void APEStep(GaugeField &, GaugeField &, double)
-  {
-    errorQuda("Gauge tools are not built");
-  }
-#endif
 
 }

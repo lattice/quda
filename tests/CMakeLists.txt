@@ -129,12 +129,10 @@ if(QUDA_MULTIGRID)
   quda_checkbuildtest(multigrid_benchmark_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS multigrid_benchmark_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-  if(${QUDA_GAUGE_ALG})
-    add_executable(multigrid_evolve_test multigrid_evolve_test.cpp)
-    target_link_libraries(multigrid_evolve_test ${TEST_LIBS})
-    quda_checkbuildtest(multigrid_evolve_test QUDA_BUILD_ALL_TESTS)
-    install(TARGETS multigrid_evolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-  endif()
+  add_executable(multigrid_evolve_test multigrid_evolve_test.cpp)
+  target_link_libraries(multigrid_evolve_test ${TEST_LIBS})
+  quda_checkbuildtest(multigrid_evolve_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS multigrid_evolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 endif()
 
@@ -191,24 +189,20 @@ if(QUDA_DIRAC_STAGGERED)
   install(TARGETS hisq_stencil_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
-if(QUDA_FORCE_GAUGE)
-  add_executable(gauge_force_test gauge_force_test.cpp)
-  target_link_libraries(gauge_force_test ${TEST_LIBS})
-  quda_checkbuildtest(gauge_force_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS gauge_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-endif()
+add_executable(gauge_force_test gauge_force_test.cpp)
+target_link_libraries(gauge_force_test ${TEST_LIBS})
+quda_checkbuildtest(gauge_force_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS gauge_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-if(QUDA_GAUGE_ALG)
-  add_executable(gauge_alg_test gauge_alg_test.cpp)
-  target_link_libraries(gauge_alg_test ${TEST_LIBS})
-  quda_checkbuildtest(gauge_alg_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS gauge_alg_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+add_executable(gauge_alg_test gauge_alg_test.cpp)
+target_link_libraries(gauge_alg_test ${TEST_LIBS})
+quda_checkbuildtest(gauge_alg_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS gauge_alg_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-  add_executable(heatbath_test heatbath_test.cpp)
-  target_link_libraries(heatbath_test ${TEST_LIBS})
-  quda_checkbuildtest(heatbath_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS heatbath_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-endif()
+add_executable(heatbath_test heatbath_test.cpp)
+target_link_libraries(heatbath_test ${TEST_LIBS})
+quda_checkbuildtest(heatbath_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS heatbath_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 if(QUDA_FORCE_HISQ)
   add_executable(hisq_paths_force_test hisq_paths_force_test.cpp)
@@ -1021,12 +1015,10 @@ endforeach(prec)
 
 foreach(prec IN LISTS TEST_PRECS)
 
-  if(QUDA_FORCE_GAUGE)
-    add_test(NAME gauge_force_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_force_test> ${MPIEXEC_POSTFLAGS}
-                     --dim 2 4 6 8 --prec ${prec}
-                     --gtest_output=xml:gauge_force_test_${prec}.xml)
-  endif()
+  add_test(NAME gauge_force_${prec}
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_force_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 2 4 6 8 --prec ${prec}
+                   --gtest_output=xml:gauge_force_test_${prec}.xml)
 
   if(QUDA_DIRAC_STAGGERED)
     add_test(NAME unitarize_link_${prec}
@@ -1047,12 +1039,10 @@ foreach(prec IN LISTS TEST_PRECS)
                      --gtest_output=xml:hisq_unitarize_force_test_${prec}.xml)
   endif()
 
-  if(QUDA_GAUGE_ALG)
-    add_test(NAME gauge_alg_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg_test> ${MPIEXEC_POSTFLAGS}
-                     --dim 4 6 8 10 --prec ${prec}
-                     --gtest_output=xml:gauge_arg_test_${prec}.xml)
-  endif()
+  add_test(NAME gauge_alg_${prec}
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 4 6 8 10 --prec ${prec}
+                   --gtest_output=xml:gauge_arg_test_${prec}.xml)
 
   if (TARGET dilution_test)
     add_test(NAME dilution_test_${prec}

@@ -59,7 +59,6 @@ namespace quda {
     long long bytes() const { return in.Bytes() + out.Bytes() + mom.Bytes(); }
   };
 
-#ifdef GPU_GAUGE_TOOLS
   void updateGaugeField(GaugeField &out, double dt, const GaugeField& in, const GaugeField& mom, bool conj_mom, bool exact)
   {
     checkPrecision(out, in, mom);
@@ -68,11 +67,5 @@ namespace quda {
     if (mom.Reconstruct() != QUDA_RECONSTRUCT_10) errorQuda("Reconstruction type %d not supported", mom.Reconstruct());
     instantiate<UpdateGaugeField,ReconstructNo12>(out, in, mom, dt, conj_mom, exact);
   }
-#else
-  void updateGaugeField(GaugeField &, double, const GaugeField &, const GaugeField &, bool, bool)
-  {
-    errorQuda("Gauge tools are not build");
-  }
-#endif
 
 } // namespace quda

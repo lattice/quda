@@ -117,33 +117,27 @@ namespace quda {
     }
   }; // GaugeWFlowStep
 
-#ifdef GPU_GAUGE_TOOLS
   void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, const double epsilon, const QudaGaugeSmearType smear_type)
   {
     checkPrecision(out, temp, in);
     checkReconstruct(out, in);
     checkNative(out, in);
     if (temp.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Temporary vector must not use reconstruct");
-    if(!(smear_type == QUDA_GAUGE_SMEAR_WILSON_FLOW || smear_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW)) errorQuda("Gauge smear type %d not supported for flow kernels", smear_type);
+    if (!(smear_type == QUDA_GAUGE_SMEAR_WILSON_FLOW || smear_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW))
+      errorQuda("Gauge smear type %d not supported for flow kernels", smear_type);
     
     // Set each step type as an arg parameter, update halos if needed
     // Step W1
-    instantiate<GaugeWFlowStep,WilsonReconstruct>(out, temp, in, epsilon, smear_type, WFLOW_STEP_W1);
+    instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_type, WFLOW_STEP_W1);
     out.exchangeExtendedGhost(out.R(), false);
 
     // Step W2
-    instantiate<GaugeWFlowStep,WilsonReconstruct>(in, temp, out, epsilon, smear_type, WFLOW_STEP_W2);
+    instantiate<GaugeWFlowStep>(in, temp, out, epsilon, smear_type, WFLOW_STEP_W2);
     in.exchangeExtendedGhost(in.R(), false);
 
     // Step Vt
-    instantiate<GaugeWFlowStep,WilsonReconstruct>(out, temp, in, epsilon, smear_type, WFLOW_STEP_VT);
+    instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_type, WFLOW_STEP_VT);
     out.exchangeExtendedGhost(out.R(), false);
   }
-#else
-  void WFlowStep(GaugeField &, GaugeField &, GaugeField &, const double, const QudaGaugeSmearType)
-  {
-    errorQuda("Gauge tools are not built");
-  }
-#endif
 
 }

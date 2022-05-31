@@ -152,12 +152,6 @@ option(QUDA_DIRAC_CLOVER_HASENBUSCH "build clover Hasenbusch twist operators" ${
 option(QUDA_DIRAC_NDEG_TWISTED_MASS "build non-degenerate twisted mass Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_NDEG_TWISTED_CLOVER "build non-degenerate twisted clover Dirac operators" ${QUDA_DIRAC_DEFAULT})
 
-# HMC gauge force routines
-option(QUDA_FORCE_GAUGE "build code for (1-loop Symanzik) gauge force" OFF)
-option(QUDA_FORCE_HISQ "build code for hisq fermion force" OFF)
-option(QUDA_GAUGE_TOOLS "build auxiliary gauge-field tools" OFF)
-
-option(QUDA_GAUGE_ALG "build gauge-fixing and pure-gauge algorithms" OFF)
 option(QUDA_CONTRACT "build code for bilinear contraction" OFF)
 option(QUDA_COVDEV "build code for covariant derivative" OFF)
 

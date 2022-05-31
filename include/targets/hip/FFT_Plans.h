@@ -12,33 +12,6 @@ namespace quda
 
   using FFTPlanHandle = hipfftHandle;
 
-#ifndef GPU_GAUGE_ALG
-#define HIPFFT_SAFE_CALL(call)
-
-  inline void ApplyFFT(FFTPlanHandle &, float2 *, float2 *, int)
-  {
-    errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
-  }
-
-  inline void ApplyFFT(FFTPlanHandle &, double2 *, double2 *, int)
-  {
-    errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
-  }
-
-  inline void SetPlanFFTMany(FFTPlanHandle &, int4, int, QudaPrecision)
-  {
-    errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
-  }
-
-  inline void SetPlanFFT2DMany(FFTPlanHandle &, int4, int, QudaPrecision)
-  {
-    errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
-  }
-
-  inline void FFTDestroyPlan(FFTPlanHandle &) { errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled"); }
-
-#else
-
 /*-------------------------------------------------------------------------------*/
 #define HIPFFT_SAFE_CALL(call)                                                                                         \
   {                                                                                                                    \
@@ -124,7 +97,5 @@ namespace quda
   }
 
   inline void FFTDestroyPlan(FFTPlanHandle &plan) { HIPFFT_SAFE_CALL(hipfftDestroy(plan)); }
-
-#endif
 
 } // namespace quda

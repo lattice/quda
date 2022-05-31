@@ -28,12 +28,6 @@ namespace quda
     }
   }
 
-#ifdef GPU_GAUGE_TOOLS
-  constexpr bool is_enabled_gauge_tools() { return true; }
-#else
-  constexpr bool is_enabled_gauge_tools() { return false; }
-#endif
-
   /**
      @brief Helper function for returning if multigrid is enabled
   */
@@ -122,6 +116,11 @@ namespace quda
       = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_9, QUDA_RECONSTRUCT_8, QUDA_RECONSTRUCT_10};
   };
 
+  struct ReconstructGauge {
+    static constexpr std::array<QudaReconstructType, 5> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_9, QUDA_RECONSTRUCT_8};
+  };
+
   struct ReconstructWilson {
     static constexpr std::array<QudaReconstructType, 3> recon
       = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
@@ -170,7 +169,7 @@ namespace quda
 
   /**
      @brief This instantiate function is used to instantiate the colors
-     @param[in] U Gauge field
+     @param[in] U Gauge fieldOB
      @param[in,out] args Additional arguments for kernels
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, typename G,
@@ -190,7 +189,7 @@ namespace quda
      @param[in] U Gauge field
      @param[in,out] args Any additional arguments required for the computation at hand
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructFull, typename G,
+  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructNo12, typename G,
             typename... Args>
   constexpr void instantiate(G &U, Args &&...args)
   {
@@ -217,7 +216,7 @@ namespace quda
      @param[in] U Gauge field
      @param[in,out] args Any additional arguments required for the computation at hand
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructFull, typename G,
+  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructNo12, typename G,
             typename... Args>
   constexpr void instantiate2(G &U, Args &&...args)
   {
