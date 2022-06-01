@@ -98,7 +98,7 @@ namespace quda {
 
           // generate Gaussian distributed su(n) fiueld
           Link u = arg.sigma * gauss_su3<real, Link>(localState);
-          if constexpr (arg.group) {
+          if constexpr (Arg::group) {
             expsu3<real>(u);
           }
           arg.U(mu, linkIndex(x, arg.E), parity) = u;
