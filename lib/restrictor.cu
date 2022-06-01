@@ -128,7 +128,9 @@ namespace quda {
   template <> struct enabled<2, 24, 2, 96> : std::true_type { };
   template <> struct enabled<2, 64, 2, 64> : std::true_type { };
   template <> struct enabled<2, 64, 2, 96> : std::true_type { };
-#elif defined(NSPIN1) || defined(NSPIN4)
+  template <> struct enabled<2, 96, 2, 96> : std::true_type { };
+#endif
+#if defined(NSPIN1) || defined(NSPIN4)
   template <> struct enabled<2, 24, 2, 24> : std::true_type { };
 #endif
 
