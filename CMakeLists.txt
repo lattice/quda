@@ -514,7 +514,7 @@ if(QUDA_QIO)
   endif()
   if(QUDA_DOWNLOAD_USQCD)
     set(QUDA_QIO_TAG
-        "a5c3ae580b846130c06dc060ab822f17d6fe2171"
+        "qio3-0-0"
         CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
     mark_as_advanced(QUDA_QIO_TAG)
     CPMAddPackage(
