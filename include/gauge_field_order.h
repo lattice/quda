@@ -232,11 +232,8 @@ namespace quda {
       __device__ __host__ inline operator complex<Float>() const
       {
         complex<storeFloat> tmp = v[idx];
-        if constexpr (fixed) {
-          return scale_inv * complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
-        } else {
-          return complex<Float>(tmp.x, tmp.y);
-        }
+        if constexpr (fixed) return scale_inv * complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+        return complex<Float>(tmp.x, tmp.y);
       }
 
       /**
@@ -708,10 +705,8 @@ namespace quda {
 
       __device__ __host__ inline wrapper operator()(int d, int parity, int x_cb, int row, int col) const
       {
-        if constexpr (native_ghost)
-          return accessor(d%4, parity, x_cb+(d/4)*ghostVolumeCB[d]+volumeCB, row, col);
-	else
-          return wrapper(ghost[d], ((parity * nColor + row) * nColor + col) * ghostVolumeCB[d] + x_cb, scale, scale_inv);
+        if constexpr (native_ghost) return accessor(d%4, parity, x_cb+(d/4)*ghostVolumeCB[d]+volumeCB, row, col);
+        return wrapper(ghost[d], ((parity * nColor + row) * nColor + col) * ghostVolumeCB[d] + x_cb, scale, scale_inv);
       }
     };
 
@@ -1220,11 +1215,10 @@ namespace quda {
           complex denom = conj(in[0] * in[4] - in[1] * in[3]) * scale_inv;
           complex expI3Phase = in[8] / denom; // numerator = U[2][2]
 
-          if constexpr (stag_phase == QUDA_STAGGERED_PHASE_NO) { // dynamic phasing
-            return arg(expI3Phase) / static_cast<real>(3.0 * M_PI);
-          } else {
-            return expI3Phase.real() > 0 ? 1 : -1;
-          }
+          // dynamic phasing
+          if constexpr (stag_phase == QUDA_STAGGERED_PHASE_NO) return arg(expI3Phase) / static_cast<real>(3.0 * M_PI);
+          // static phasing
+          return expI3Phase.real() > 0 ? 1 : -1;
 #else // phase from determinant
           Matrix<complex, 3> a;
 #pragma unroll
@@ -1405,11 +1399,10 @@ namespace quda {
           // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
           complex denom = conj(in[0] * in[4] - in[1] * in[3]) * scale_inv;
           complex expI3Phase = in[8] / denom; // numerator = U[2][2]
-          if constexpr (stag_phase == QUDA_STAGGERED_PHASE_NO) {
-            return arg(expI3Phase) / static_cast<real>(3.0 * M_PI);
-          } else {
-            return expI3Phase.real() > 0 ? 1 : -1;
-          }
+          // dynamic phasing
+          if constexpr (stag_phase == QUDA_STAGGERED_PHASE_NO) return arg(expI3Phase) / static_cast<real>(3.0 * M_PI);
+          // static phasing
+          return expI3Phase.real() > 0 ? 1 : -1;
 #else // phase from determinant
           Matrix<complex, 3> a;
 #pragma unroll
