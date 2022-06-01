@@ -79,7 +79,7 @@ namespace quda {
   {
     if constexpr (enabled<fineSpin, fineColor, coarseSpin, coarseColor>::value) {
       if (v.Precision() == QUDA_HALF_PRECISION) {
-        if constexpr(is_enabled<QUDA_HALF_PRECISION>) {
+        if constexpr(is_enabled<QUDA_HALF_PRECISION>()) {
             ProlongateLaunch<Float, short, fineSpin, fineColor, coarseSpin, coarseColor>
               prolongator(out, in, v, fine_to_coarse, parity);
           } else {
