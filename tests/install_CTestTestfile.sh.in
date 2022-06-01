@@ -1,0 +1,4 @@
+#! /bin/sh
+
+sed  s+"${CMAKE_CURRENT_BINARY_DIR}"+"${CMAKE_INSTALL_PREFIX}/bin/"+  ${CMAKE_CURRENT_BINARY_DIR}/CTestTestfile.cmake > ${CMAKE_INSTALL_PREFIX}/bin/CTestTestfile.cmake
+

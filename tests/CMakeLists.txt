@@ -1062,3 +1062,13 @@ foreach(prec IN LISTS TEST_PRECS)
   endif()
 
 endforeach(prec)
+
+# This generates a little helper script that copies a modified CTestTestfile to the installation directory
+# in order to run ctest after installation. Note that this is not called by default.
+option(QUDA_CTEST_INSTALL "Configure helper script for copying CTestTestfile to install directory" OFF)
+mark_as_advanced(QUDA_CTEST_INSTALL)
+
+if(QUDA_CTEST_INSTALL)
+  configure_file(install_CTestTestfile.sh.in install_CTestTestfile.sh)
+endif()
+
