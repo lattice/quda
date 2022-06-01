@@ -150,7 +150,7 @@ namespace quda
 
   /**
      @brief This instantiate function is used to instantiate the colors
-     @param[in] U Gauge fieldOB
+     @param[in] U Gauge field
      @param[in,out] args Additional arguments for kernels
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, typename G,
