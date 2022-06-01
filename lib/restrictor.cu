@@ -1,8 +1,8 @@
 #include <color_spinor_field.h>
+#include <multigrid.h>
 #include <power_of_two_array.h>
 #include <tunable_block_reduction.h>
 #include <kernels/restrictor.cuh>
-#include <instantiate.h>
 
 namespace quda {
 
