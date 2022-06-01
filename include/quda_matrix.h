@@ -997,8 +997,9 @@ namespace quda {
       if (w_p < 0.05 && w_p > -0.05) {
 	//1 - 1/6 x^2 (1 - 1/20 x^2 (1 - 1/42 x^2(1 - 1/72*x^2)))
 	sinc_w = 1.0 - (w_sq/6.0)*(1 - (w_sq*0.05)*(1 - (w_sq/42.0)*(1 - (w_sq/72.0))));
+      } else {
+        sinc_w = sinpi(w_p * inv_pi) / w_p;
       }
-      else sinc_w = sinpi(w_p * inv_pi)/w_p;
 
       //[34] Test for c0 < 0.
       int parity = 0;

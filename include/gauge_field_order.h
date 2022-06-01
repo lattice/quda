@@ -365,7 +365,7 @@ namespace quda {
       {
         if constexpr (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
-	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
+          scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
         }
       }
 
@@ -444,7 +444,7 @@ namespace quda {
       {
         if constexpr (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
-	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
+          scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
         }
       }
 
@@ -480,7 +480,7 @@ namespace quda {
       {
         if constexpr (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
-	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
+          scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
         }
       }
 
@@ -562,7 +562,7 @@ namespace quda {
       {
         if constexpr (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
-	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
+          scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
         }
       }
 
@@ -618,7 +618,7 @@ namespace quda {
       {
         if constexpr (fixed) {
           max = max_;
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+          scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
 	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
         }
       }
@@ -685,27 +685,28 @@ namespace quda {
         accessor(U, gauge_, ghost_)
       {
         if constexpr (!native_ghost) assert(ghost_ != nullptr);
-        for (int d=0; d<4; d++) {
-	  ghost[d] = !native_ghost ? static_cast<complex<storeFloat>*>(ghost_[d]) : nullptr;
+        for (int d = 0; d < 4; d++) {
+          ghost[d] = !native_ghost ? static_cast<complex<storeFloat>*>(ghost_[d]) : nullptr;
 	  ghostVolumeCB[d] = U.Nface()*U.SurfaceCB(d);
 	  ghost[d+4] = !native_ghost && U.Geometry() == QUDA_COARSE_GEOMETRY? static_cast<complex<storeFloat>*>(ghost_[d+4]) : nullptr;
 	  ghostVolumeCB[d+4] = U.Nface()*U.SurfaceCB(d);
-	}
-	resetScale(U.Scale());
+        }
+        resetScale(U.Scale());
       }
 
       void resetScale(Float max)
       {
-	accessor.resetScale(max);
+        accessor.resetScale(max);
         if constexpr (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
-	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
+          scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
         }
       }
 
       __device__ __host__ inline wrapper operator()(int d, int parity, int x_cb, int row, int col) const
       {
-        if constexpr (native_ghost) return accessor(d%4, parity, x_cb+(d/4)*ghostVolumeCB[d]+volumeCB, row, col);
+        if constexpr (native_ghost)
+          return accessor(d % 4, parity, x_cb + (d / 4) * ghostVolumeCB[d] + volumeCB, row, col);
         return wrapper(ghost[d], ((parity * nColor + row) * nColor + col) * ghostVolumeCB[d] + x_cb, scale, scale_inv);
       }
     };
