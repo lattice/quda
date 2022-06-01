@@ -1,6 +1,6 @@
 #pragma once
 #include <device.h>
-#include <tune_quda.h>
+#include <tunable_kernel.h>
 #include <kernel_helper.h>
 #include <target_device.h>
 #include <utility>
@@ -12,18 +12,18 @@ namespace quda {
   void Kernel1DImpl(const Arg &arg, const sycl::nd_item<3> &ndi)
   {
     Functor<Arg> f(const_cast<Arg&>(arg));
-    auto i = ndi.get_global_id(0);
+    auto i = globalIdX;
     while (i < arg.threads.x) {
       f(i);
-      if (grid_stride) i += ndi.get_global_range(0); else break;
+      if (grid_stride) i += globalRangeX; else break;
     }
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   void Kernel1DImplB(const Arg &arg, const sycl::nd_item<3> &ndi)
   {
     Functor<Arg> f(const_cast<Arg&>(arg));
-    auto tid = ndi.get_global_id(0);
-    auto nid = ndi.get_global_range(0);
+    auto tid = globalIdX;
+    auto nid = globalRangeX;
     auto n = arg.threads.x;
     auto i0 = (tid*n)/nid;
     auto i1 = ((tid+1)*n)/nid;
@@ -36,8 +36,8 @@ namespace quda {
   Kernel1D(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
     auto err = QUDA_SUCCESS;
-    sycl::range<3> globalSize{tp.grid.x*tp.block.x, 1, 1};
-    sycl::range<3> localSize{tp.block.x, 1, 1};
+    auto globalSize = globalRange(tp);
+    auto localSize = localRange(tp);
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
     //if (globalSize[0] > arg.threads.x) {
@@ -90,12 +90,12 @@ namespace quda {
   {
     //Functor<Arg> f(const_cast<Arg&>(arg));
     Functor<Arg> f(arg);
-    auto i = ndi.get_global_id(0);
-    auto j = ndi.get_global_id(1);
+    auto i = globalIdX;
+    auto j = globalIdY;
     if (j >= arg.threads.y) return;
     while (i < arg.threads.x) {
       f(i, j);
-      if (grid_stride) i += ndi.get_global_range(0); else break;
+      if (grid_stride) i += globalRangeX; else break;
     }
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
@@ -103,10 +103,10 @@ namespace quda {
   {
     //Functor<Arg> f(const_cast<Arg&>(arg));
     Functor<Arg> f(arg);
-    auto j = ndi.get_global_id(1);
+    auto j = globalIdY;
     if (j >= arg.threads.y) return;
-    auto tid = ndi.get_global_id(0);
-    auto nid = ndi.get_global_range(0);
+    auto tid = globalIdX;
+    auto nid = globalRangeX;
     auto n = arg.threads.x;
     auto i0 = (tid*n)/nid;
     auto i1 = ((tid+1)*n)/nid;
@@ -120,12 +120,12 @@ namespace quda {
   Kernel2D(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
     auto err = QUDA_SUCCESS;
-    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, 1};
-    //sycl::range<3> globalSize{arg.threads.x, arg.threads.y, 1};
-    if(grid_stride==false) {
-      globalSize = sycl::range<3>{arg.threads.x, arg.threads.y, 1};
-    }
-    sycl::range<3> localSize{tp.block.x, tp.block.y, 1};
+    auto globalSize = globalRange(tp);
+    auto localSize = localRange(tp);
+    //if(grid_stride==false) {
+    //  globalSize[RANGE_X] = arg.threads.x;
+    //  globalSize[RANGE_Y] = arg.threads.y;
+    //}
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -175,10 +175,10 @@ namespace quda {
   template <typename F>
   void Kernel2DImplBx(const F &f, const dim3 &threads, const sycl::nd_item<3> &ndi)
   {
-    auto j = ndi.get_global_id(1);
+    auto j = globalIdY;
     if (j >= threads.y) return;
-    auto tid = ndi.get_global_id(0);
-    auto nid = ndi.get_global_range(0);
+    auto tid = globalIdX;
+    auto nid = globalRangeX;
     auto n = threads.x;
     auto i0 = (tid*n)/nid;
     auto i1 = ((tid+1)*n)/nid;
@@ -190,8 +190,8 @@ namespace quda {
   qudaError_t
   Kernel2Dx(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
-    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, 1};
-    sycl::range<3> localSize{tp.block.x, tp.block.y, 1};
+    auto globalSize = globalRange(tp);
+    auto localSize = localRange(tp);
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -229,14 +229,14 @@ namespace quda {
   {
     Functor<Arg> f(arg);
 
-    auto j = ndi.get_global_id(1);
+    auto j = globalIdY;
     if (j >= arg.threads.y) return;
-    auto k = ndi.get_global_id(2);
+    auto k = globalIdZ;
     if (k >= arg.threads.z) return;
-    auto i = ndi.get_global_id(0);
+    auto i = globalIdX;
     while (i < arg.threads.x) {
       f(i, j, k);
-      if (grid_stride) i += ndi.get_global_range(0); else break;
+      if (grid_stride) i += globalRangeX; else break;
     }
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride>
@@ -244,12 +244,12 @@ namespace quda {
   {
     Functor<Arg> f(arg);
 
-    auto j = ndi.get_global_id(1);
+    auto j = globalIdY;
     if (j >= arg.threads.y) return;
-    auto k = ndi.get_global_id(2);
+    auto k = globalIdZ;
     if (k >= arg.threads.z) return;
-    auto tid = ndi.get_global_id(0);
-    auto nid = ndi.get_global_range(0);
+    auto tid = globalIdX;
+    auto nid = globalRangeX;
     auto n = arg.threads.x;
     auto i0 = (tid*n)/nid;
     auto i1 = ((tid+1)*n)/nid;
@@ -265,9 +265,8 @@ namespace quda {
   Kernel3D(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
     auto err = QUDA_SUCCESS;
-    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y,
-      tp.grid.z*tp.block.z};
-    sycl::range<3> localSize{tp.block.x, tp.block.y, tp.block.z};
+    auto globalSize = globalRange(tp);
+    auto localSize = localRange(tp);
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -321,9 +320,8 @@ namespace quda {
   Kernel3D(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
     auto err = QUDA_SUCCESS;
-    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y,
-      tp.grid.z*tp.block.z};
-    sycl::range<3> localSize{tp.block.x, tp.block.y, tp.block.z};
+    auto globalSize = globalRange(tp);
+    auto localSize = localRange(tp);
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {

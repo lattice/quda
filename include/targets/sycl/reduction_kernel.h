@@ -1,5 +1,5 @@
 #pragma once
-#include <tune_quda.h>
+#include <tunable_kernel.h>
 #include <reduce_helper.h>
 #include <timer.h>
 
@@ -7,6 +7,7 @@
 
 namespace quda {
 
+#if 0
   /**
      @brief This class is derived from the arg class that the functor
      creates and curries in the block size.  This allows the block
@@ -19,18 +20,20 @@ namespace quda {
     static constexpr int block_size_y = block_size_y_;
     ReduceKernelArg(const Arg &arg) : Arg(arg) { }
   };
+#endif
+
 
 #ifndef HIGH_LEVEL_REDUCTIONS
   template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
   void Reduction2DImpl(const Arg &arg, sycl::nd_item<3> &ndi)
   {
     Transformer<Arg> t(arg);
-    auto idx = ndi.get_global_id(0);
-    auto j = ndi.get_local_id(1);
+    auto idx = globalIdX;
+    auto j = localIdY;
     auto value = t.init();
     while (idx < arg.threads.x) {
       value = t(value, idx, j);
-      if (grid_stride) idx += ndi.get_global_range(0); else break;
+      if (grid_stride) idx += globalRangeX; else break;
     }
     // perform final inter-block reduction and write out result
     reduce(arg, t, value);
@@ -41,12 +44,12 @@ namespace quda {
   void Reduction2DImplN(const Arg &arg, sycl::nd_item<3> &ndi, R &reducer)
   {
     Transformer<Arg> t(const_cast<Arg&>(arg));
-    auto idx = ndi.get_global_id(0);
-    auto j = ndi.get_local_id(1);
+    auto idx = globalIdX;
+    auto j = localIdY;
     auto value = t.init();
     while (idx < arg.threads.x) {
       value = t(value, idx, j);
-      if (grid_stride) idx += ndi.get_global_range(0); else break;
+      if (grid_stride) idx += globalRangeX; else break;
     }
     reducer.combine(value);
   }
@@ -56,9 +59,8 @@ namespace quda {
 			  const qudaStream_t &stream, const Arg &arg)
   {
     auto err = QUDA_SUCCESS;
-    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, 1};
-    //sycl::range<3> globalSize{arg.threads.x, arg.threads.y, 1};
-    sycl::range<3> localSize{tp.block.x, tp.block.y, 1};
+    auto globalSize = globalRange(tp);
+    auto localSize = localRange(tp);
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
     host_timer_t timer;
@@ -134,9 +136,9 @@ namespace quda {
     using reduce_t = typename Functor<Arg>::reduce_t;
     Functor<Arg> t(arg);
 
-    auto idx = ndi.get_global_id(0);
-    auto k = ndi.get_local_id(1);
-    auto j = ndi.get_global_id(2);
+    auto idx = globalIdX;
+    auto k = localIdY;
+    auto j = globalIdZ;
 
     //if (j >= arg.threads.z) return;
 
@@ -145,7 +147,7 @@ namespace quda {
     if (j < arg.threads.z) {
       while (idx < arg.threads.x) {
 	value = t(value, idx, k, j);
-	if (grid_stride) idx += ndi.get_global_range(0); else break;
+	if (grid_stride) idx += globalRangeX; else break;
       }
     }
 
@@ -159,9 +161,8 @@ namespace quda {
   {
     //if(tp.block.z>1) return QUDA_ERROR;
     auto err = QUDA_SUCCESS;
-    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, tp.grid.z*tp.block.z};
-    //sycl::range<3> globalSize{arg.threads.x, arg.threads.y, arg.threads.z};
-    sycl::range<3> localSize{tp.block.x, tp.block.y, tp.block.z};
+    auto globalSize = globalRange(tp);
+    auto localSize = localRange(tp);
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {

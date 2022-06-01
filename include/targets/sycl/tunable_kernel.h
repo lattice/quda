@@ -3,7 +3,8 @@
 #include <tune_quda.h>
 #include <target_device.h>
 #include <kernel_helper.h>
-#include <kernel.h>
+//#include <kernel.h>
+#include <quda_sycl.h>
 
 namespace quda {
 
@@ -38,5 +39,21 @@ namespace quda {
 
     TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
   };
+
+  // kernel helpers
+  inline sycl::range<3> globalRange(const TuneParam &tp) {
+    sycl::range<3> r(1,1,1);
+    r[RANGE_X] = tp.grid.x*tp.block.x;
+    r[RANGE_Y] = tp.grid.y*tp.block.y;
+    r[RANGE_Z] = tp.grid.z*tp.block.z;
+    return r;
+  }
+  inline sycl::range<3> localRange(const TuneParam &tp) {
+    sycl::range<3> r(1,1,1);
+    r[RANGE_X] = tp.block.x;
+    r[RANGE_Y] = tp.block.y;
+    r[RANGE_Z] = tp.block.z;
+    return r;
+  }
 
 }

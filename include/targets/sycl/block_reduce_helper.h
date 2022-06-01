@@ -175,7 +175,7 @@ namespace quda
   class BlockReduce
   {
     static constexpr int batch_size = std::max(batch_size_, 1);
-    const int nbatch = batch_size_ != 0 ? batch_size_ : getGroup().get_local_range(2);
+    const int nbatch = batch_size_ != 0 ? batch_size_ : localRangeZ;
     const int batch;
 
   public:
@@ -204,12 +204,12 @@ namespace quda
       using atype = T[512]; // FIXME
       auto mem0 = sycl::ext::oneapi::group_local_memory_for_overwrite<atype>(grp);
       auto mem = *mem0.get();
-      auto r0 = grp.get_local_range(0);
-      auto r1 = grp.get_local_range(1);
-      auto r2 = grp.get_local_range(2);
-      auto i0 = grp.get_local_id()[0];
-      auto i1 = grp.get_local_id()[1];
-      auto i2 = grp.get_local_id()[2];
+      auto r0 = localRangeX;
+      auto r1 = localRangeY;
+      auto r2 = localRangeZ;
+      auto i0 = localIdX;
+      auto i1 = localIdY;
+      auto i2 = localIdZ;
       auto r = r0*r1;
       auto i = i1*r0+i0;
       if(i2*r+i < 512) {

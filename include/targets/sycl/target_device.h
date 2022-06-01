@@ -76,7 +76,7 @@ namespace quda {
     */
     inline dim3 thread_idx() { return getThreadIdx(); }
 
-    inline uint local_linear_id() { return getLocalLinearId(); }
+    //inline uint local_linear_id() { return getLocalLinearId(); }
 
   } // namespace target
 

@@ -29,6 +29,10 @@ using cudaStream_t = int;
 #define __shared__
 //#define __shfl_down_sync(m, x, o) x
 
+#define RANGE_X 2
+#define RANGE_Y 1
+#define RANGE_Z 0
+
 inline std::string str(dim3 x)
 {
   std::ostringstream ss;
@@ -39,14 +43,14 @@ inline std::string str(dim3 x)
 inline std::string str(sycl::id<3> x)
 {
   std::ostringstream ss;
-  ss << "(" << x[0] << "," << x[1] << "," << x[2] << ")";
+  ss << "(" << x[RANGE_X] << "," << x[RANGE_Y] << "," << x[RANGE_Z] << ")";
   return ss.str();
 }
 
 inline std::string str(sycl::range<3> x)
 {
   std::ostringstream ss;
-  ss << "(" << x[0] << "," << x[1] << "," << x[2] << ")";
+  ss << "(" << x[RANGE_X] << "," << x[RANGE_Y] << "," << x[RANGE_Z] << ")";
   return ss.str();
 }
 
@@ -69,14 +73,42 @@ static inline auto getNdItem()
   return sycl::ext::oneapi::experimental::this_nd_item<3>();
 }
 
+static inline int globalRange(int d) { return getNdItem().get_global_range(d); }
+static inline int globalId(int d) { return getNdItem().get_global_id(d); }
+static inline int groupRange(int d) { return getNdItem().get_group_range(d); }
+static inline int groupId(int d) { return getNdItem().get_group(d); }
+static inline int localRange(int d) { return getNdItem().get_local_range(d); }
+static inline int localId(int d) { return getNdItem().get_local_id(d); }
+
+#define globalRangeX ::globalRange(RANGE_X)
+#define globalRangeY ::globalRange(RANGE_Y)
+#define globalRangeZ ::globalRange(RANGE_Z)
+#define globalIdX ::globalId(RANGE_X)
+#define globalIdY ::globalId(RANGE_Y)
+#define globalIdZ ::globalId(RANGE_Z)
+
+#define localRangeX ::localRange(RANGE_X)
+#define localRangeY ::localRange(RANGE_Y)
+#define localRangeZ ::localRange(RANGE_Z)
+#define localIdX ::localId(RANGE_X)
+#define localIdY ::localId(RANGE_Y)
+#define localIdZ ::localId(RANGE_Z)
+
+#define groupRangeX ::groupRange(RANGE_X)
+#define groupRangeY ::groupRange(RANGE_Y)
+#define groupRangeZ ::groupRange(RANGE_Z)
+#define groupIdX ::groupId(RANGE_X)
+#define groupIdY ::groupId(RANGE_Y)
+#define groupIdZ ::groupId(RANGE_Z)
+
 inline dim3 getGridDim()
 {
   dim3 r;
   //#ifdef __SYCL_DEVICE_ONLY__
   auto ndi = getNdItem();
-  r.x = ndi.get_group_range(0);
-  r.y = ndi.get_group_range(1);
-  r.z = ndi.get_group_range(2);
+  r.x = ndi.get_group_range(RANGE_X);
+  r.y = ndi.get_group_range(RANGE_Y);
+  r.z = ndi.get_group_range(RANGE_Z);
   //#endif
   return r;
 }
@@ -86,9 +118,9 @@ inline dim3 getBlockIdx()
   dim3 r;
   //#ifdef __SYCL_DEVICE_ONLY__
   auto ndi = getNdItem();
-  r.x = ndi.get_group(0);
-  r.y = ndi.get_group(1);
-  r.z = ndi.get_group(2);
+  r.x = ndi.get_group(RANGE_X);
+  r.y = ndi.get_group(RANGE_Y);
+  r.z = ndi.get_group(RANGE_Z);
   //#endif
   return r;
 }
@@ -98,9 +130,9 @@ inline dim3 getBlockDim()
   dim3 r;
   //#ifdef __SYCL_DEVICE_ONLY__
   auto ndi = getNdItem();
-  r.x = ndi.get_local_range(0);
-  r.y = ndi.get_local_range(1);
-  r.z = ndi.get_local_range(2);
+  r.x = ndi.get_local_range(RANGE_X);
+  r.y = ndi.get_local_range(RANGE_Y);
+  r.z = ndi.get_local_range(RANGE_Z);
   //#endif
   return r;
 }
@@ -108,16 +140,17 @@ inline dim3 getBlockDim()
 inline dim3 getThreadIdx()
 {
   dim3 r;
-#ifdef __SYCL_DEVICE_ONLY__
+  //#ifdef __SYCL_DEVICE_ONLY__
   //auto ndi = cl::sycl::detail::Builder::getNDItem<3>();
   auto ndi = getNdItem();
-  r.x = ndi.get_local_id(0);
-  r.y = ndi.get_local_id(1);
-  r.z = ndi.get_local_id(2);
-#endif
+  r.x = ndi.get_local_id(RANGE_X);
+  r.y = ndi.get_local_id(RANGE_Y);
+  r.z = ndi.get_local_id(RANGE_Z);
+  //#endif
   return r;
 }
 
+#if 0
 inline uint getLocalLinearId()
 {
   int id = 0;
@@ -129,6 +162,7 @@ inline uint getLocalLinearId()
 #endif
   return id;
 }
+#endif
 
 inline void __syncthreads(void)
 {

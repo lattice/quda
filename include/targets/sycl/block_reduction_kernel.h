@@ -1,5 +1,5 @@
 #pragma once
-#include <tune_quda.h>
+#include <tunable_kernel.h>
 #include <reduce_helper.h>
 
 namespace quda
@@ -53,11 +53,11 @@ namespace quda
   template <typename Arg>
   int virtual_block_idx(const Arg &arg, const sycl::nd_item<3> &ndi)
   {
-    int block_idx = ndi.get_group(0);
+    int block_idx = groupIdX;
     if (arg.swizzle) {
       // the portion of the grid that is exactly divisible by the number of SMs
       //const int gridp = gridDim.x - gridDim.x % arg.swizzle_factor;
-      const int ngrp = ndi.get_group_range(0);
+      const int ngrp = groupRangeX;
       const int gridp = ngrp - ngrp % arg.swizzle_factor;
 
       //block_idx = blockIdx.x;
@@ -107,32 +107,16 @@ namespace quda
   template <template <typename> class Transformer, typename Arg>
   void BlockKernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi)
   {
-    const dim3 block_idx(virtual_block_idx(arg,ndi), ndi.get_group(1), ndi.get_group(2));
-    const dim3 thread_idx(ndi.get_local_id(0), ndi.get_local_id(1), ndi.get_local_id(2));
-    //const int j = blockDim.y*blockIdx.y + threadIdx.y;
-    const unsigned int j = ndi.get_global_id(1);
+    const dim3 block_idx(virtual_block_idx(arg,ndi), groupIdY, groupIdZ);
+    const dim3 thread_idx(localIdX, localIdY, localIdZ);
+    const unsigned int j = globalIdY;
     if (j >= arg.threads.y) return;
-    const unsigned int k = ndi.get_global_id(2);
+    const unsigned int k = globalIdZ;
     if (k >= arg.threads.z) return;
 
     Transformer<Arg> t(arg);
     t(block_idx, thread_idx);
   }
-#if 0
-  template <template <typename> class Functor, typename Arg>
-  __forceinline__ __device__ void BlockKernel2D_impl(const Arg &arg)
-  {
-    const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, blockIdx.z);
-    const dim3 thread_idx(threadIdx.x, threadIdx.y, threadIdx.z);
-    auto j = blockDim.y * blockIdx.y + threadIdx.y;
-    auto k = blockDim.z * blockIdx.z + threadIdx.z;
-    if (j >= arg.threads.y) return;
-    if (k >= arg.threads.z) return;
-
-    Functor<Arg> t(arg);
-    t(block_idx, thread_idx);
-  }
-#endif
 
   template <template <typename> class Transformer, typename Arg, bool grid_stride=false>
   qudaError_t
@@ -140,8 +124,8 @@ namespace quda
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
     auto err = QUDA_SUCCESS;
-    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, tp.grid.z*tp.block.z};
-    sycl::range<3> localSize{tp.block.x, tp.block.y, tp.block.z};
+    auto globalSize = globalRange(tp);
+    auto localSize = localRange(tp);
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
