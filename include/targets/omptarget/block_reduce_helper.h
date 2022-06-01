@@ -21,30 +21,56 @@ namespace quda
        @brief OpenMP reduction over a group of consecutive threads smaller than omp_num_threads()
      */
     template <typename T, typename reducer_t>
-    inline T any_reduce(const reducer_t &r, const T &value, const int batch, const int block_size, const bool all, const bool async)
+    inline T any_reduce(const reducer_t &r, const T &value_, const int batch, const int block_size, const bool all, const bool async)
     {
       constexpr max_nthr = device::max_block_size();
       static_assert(max_nthr*sizeof(T) <= device::max_shared_memory_size()-sizeof(target::omptarget::get_shared_cache()[0])*128, "Shared cache not large enough for tempStorage");  // FIXME arbitrary, the number is arbitrary, offset 128 below
       T *storage = (T*)&target::omptarget::get_shared_cache()[128];  // FIXME arbitrary
-      const int nthr = omp_get_num_threads();
       const int tid = omp_get_thread_num();
+      const auto v0 = r.init();
+#if 1
+      const auto batch_boundary = block_size*(batch+1);
+      auto value = value_;
+      for(int offset=1;offset<block_size;offset*=2){
+        if(offset>1 || !async){ // only synchronize if we are not pipelining
+          #pragma omp barrier
+        }
+        storage[tid] = value;
+        const auto j = tid+offset;
+        #pragma omp barrier
+        const auto& v = j<batch_boundary ? storage[j] : v0;
+        value = r(value, v);
+      }
+      if(all){
+        if(tid==block_size*batch)
+          storage[tid] = value;
+        #pragma omp barrier
+        value = storage[block_size*batch];
+        if(!async){
+          #pragma omp barrier
+        }
+      }
+#else
+      const int nthr = omp_get_num_threads();
       if(!async){ // only synchronize if we are not pipelining
         #pragma omp barrier
       }
-      storage[tid] = value;
+      storage[tid] = value_;
       #pragma omp barrier
-      int offset = 1;
-      const auto t0 = r.init();
-      do{
+      for(int offset=1;offset<block_size;offset*=2){
         #pragma omp for
-        for(int i=0;i<nthr;++i){  // TODO: benchmark against i+=offset+1
+        for(int i=0;i<nthr;i+=2*offset){
           const auto j = i+offset;
-          const auto t = i/block_size==j/block_size ? storage[j] : t0;
-          storage[i] = r(storage[i], t);
+          const auto batch_boundary = block_size*(1+i/block_size);
+          const auto& u = storage[i];
+          const auto& v = j<batch_boundary ? storage[j] : v0;
+          const auto& z = r(u, v);
+          storage[i] = z;
         }
-        offset *= 2;
-      }while(offset<block_size);
-      return all ? storage[block_size*batch] : storage[tid];
+      }
+      const auto& value = storage[block_size*batch];
+#endif
+      return value;
     }
   }
 
