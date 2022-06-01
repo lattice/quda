@@ -27,9 +27,10 @@ namespace quda
       static_assert(max_nthr*sizeof(T) <= device::max_shared_memory_size()-sizeof(target::omptarget::get_shared_cache()[0])*128, "Shared cache not large enough for tempStorage");  // FIXME arbitrary, the number is arbitrary, offset 128 below
       T *storage = (T*)&target::omptarget::get_shared_cache()[128];  // FIXME arbitrary
       const int tid = omp_get_thread_num();
-      const auto v0 = r.init();
+      const auto& v0 = r.init();
 #if 1
-      const auto batch_boundary = block_size*(batch+1);
+      const auto batch_begin = block_size*batch;
+      const auto batch_end = batch_begin+block_size;
       auto value = value_;
       for(int offset=1;offset<block_size;offset*=2){
         if(offset>1 || !async){ // only synchronize if we are not pipelining
@@ -38,8 +39,17 @@ namespace quda
         storage[tid] = value;
         const auto j = tid+offset;
         #pragma omp barrier
-        const auto& v = j<batch_boundary ? storage[j] : v0;
+        const auto& v = j<batch_end ? storage[j] : v0;
         value = r(value, v);
+/*
+        const auto oid = (tid-batch_begin)%(offset*2);
+        if(oid==offset)
+          storage[tid] = value;
+        const auto j = tid+offset;
+        #pragma omp barrier
+        if(oid==0 && j<batch_end)
+          value = r(value, storage[j]);
+*/
       }
       if(all){
         if(tid==block_size*batch)
@@ -61,9 +71,9 @@ namespace quda
         #pragma omp for
         for(int i=0;i<nthr;i+=2*offset){
           const auto j = i+offset;
-          const auto batch_boundary = block_size*(1+i/block_size);
+          const auto batch_end = block_size*(1+i/block_size);
           const auto& u = storage[i];
-          const auto& v = j<batch_boundary ? storage[j] : v0;
+          const auto& v = j<batch_end ? storage[j] : v0;
           const auto& z = r(u, v);
           storage[i] = z;
         }
