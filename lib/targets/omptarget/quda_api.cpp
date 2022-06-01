@@ -45,13 +45,17 @@ namespace quda
         int num_teams = tp.grid.x*tp.grid.y*tp.grid.z;
         if(!init){
           init = 1;
-          shared_cache.addr = (int*)omp_target_alloc(num_teams*device::max_shared_memory_size(), omp_get_default_device());
+          shared_cache.addr = (int*)omp_target_alloc(num_teams*(size_t)device::max_shared_memory_size(), omp_get_default_device());
+          if(!shared_cache.addr)
+            errorQuda("failed to allocate %lu bytes device memory for shared cache among %d teams.", num_teams*(size_t)device::max_shared_memory_size(), num_teams);
           shared_cache.num_teams = num_teams;
           shared_cache.cache_length = device::max_shared_memory_size()/sizeof(shared_cache.addr[0]);
         }
         if(shared_cache.num_teams<num_teams){
           omp_target_free(shared_cache.addr, omp_get_default_device());
-          shared_cache.addr = (int*)omp_target_alloc(num_teams*device::max_shared_memory_size(), omp_get_default_device());
+          shared_cache.addr = (int*)omp_target_alloc(num_teams*(size_t)device::max_shared_memory_size(), omp_get_default_device());
+          if(!shared_cache.addr)
+            errorQuda("failed to allocate %lu bytes device memory for shared cache among %d teams.", num_teams*(size_t)device::max_shared_memory_size(), num_teams);
           shared_cache.num_teams = num_teams;
           shared_cache.cache_length = device::max_shared_memory_size()/sizeof(shared_cache.addr[0]);
         }
