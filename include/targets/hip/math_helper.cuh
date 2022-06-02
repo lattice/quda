@@ -70,7 +70,7 @@ namespace quda
    * @param s pointer to the storage for the result of the sin
    * @param c pointer to the storage for the result of the cos
    *
-   * Specialization to float arguments. Device function calls CUDA intrinsic
+   * Specialization to float arguments.
    */
   template <> inline __host__ __device__ void sincos(const float &a, float *s, float *c)
   {
@@ -88,25 +88,25 @@ namespace quda
    * @param s pointer to the storage for the result of the sin
    * @param c pointer to the storage for the result of the cos
    */
-  template <typename T> void sincospi(const T& a, T *s, T *c) { quda::sincos(a * static_cast<T>(M_PI), s, c); }
+  template <typename T> inline __host__ __device__ void sincospi(const T& a, T *s, T *c) { quda::sincos(a * static_cast<T>(M_PI), s, c); }
 
   /**
    * @brief Sine pi calculation in QUDA NAMESPACE.
    * @param a the angle
    * @return result of the sin(a * pi)
    *
-   * Specialization to float.  Device function will call CUDA intrinsic.
+   * Specialization to float.
    */
-  template <typename T> void sinpi(const T& a, T *s, T *c) { return sin(a * static_cast<T>(M_PI)); }
+  template <typename T> inline __host__ __device__ T sinpi(T a) { return sin(a * static_cast<T>(M_PI)); }
 
   /**
    * @brief Cosine pi calculation in QUDA NAMESPACE.
    * @param a the angle
    * @return result of the cos(a * pi)
    *
-   * Specialization to float.  Device function will call CUDA intrinsic.
+   * Specialization to float.
    */
-  template <typename T> void cospi(const T& a, T *s, T *c) { return cos(a * static_cast<T>(M_PI)); }
+  template <typename T> inline __host__ __device__ T cospi(T a) { return cos(a * static_cast<T>(M_PI)); }
 
   /**
    * @brief Reciprocal square root function (rsqrt)
