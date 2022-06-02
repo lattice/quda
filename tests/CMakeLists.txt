@@ -1063,6 +1063,10 @@ foreach(prec IN LISTS TEST_PRECS)
 
 endforeach(prec)
 
+# For CUDA >= 11.7 lazy module loading can speed up testing quite a bit
+get_directory_property(QUDA_ALL_TESTS  TESTS)
+set_property(TEST ${QUDA_ALL_TESTS} APPEND PROPERTY ENVIRONMENT CUDA_MODULE_LOADING=LAZY)
+
 # This generates a little helper script that copies a modified CTestTestfile to the installation directory
 # in order to run ctest after installation. Note that this is not called by default.
 option(QUDA_CTEST_INSTALL "Configure helper script for copying CTestTestfile to install directory" OFF)
