@@ -182,16 +182,9 @@ namespace quda {
     long long bytes() const { return 2 * U.SurfaceCB(arg.face) * U.Reconstruct() * U.Precision(); }
   };
 
-#ifdef GPU_GAUGE_ALG
   void PGaugeExchange(GaugeField& U, const int dir, const int parity)
   {
     if (comm_partitioned()) instantiate<PGaugeExchanger>(U, dir, parity);
   }
-#else
-  void PGaugeExchange(GaugeField&, const int, const int)
-  {
-    errorQuda("Pure gauge code has not been built");
-  }
-#endif
 
 }

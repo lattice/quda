@@ -168,25 +168,18 @@ void *qudaAllocateManaged(size_t bytes) { return managed_malloc(bytes); }
 
 void qudaFreeManaged(void *ptr) { managed_free(ptr); }
 
-#if defined(GPU_HISQ_FORCE) || defined(GPU_UNITARIZE)
 void qudaHisqParamsInit(QudaHisqParams_t params)
-#else
-void qudaHisqParamsInit(QudaHisqParams_t)
-#endif
 {
   static bool initialized = false;
 
   if (initialized) return;
   qudamilc_called<true>(__func__);
 
-#if defined(GPU_HISQ_FORCE) || defined(GPU_UNITARIZE)
   const bool reunit_allow_svd = (params.reunit_allow_svd) ? true : false;
   const bool reunit_svd_only  = (params.reunit_svd_only) ? true : false;
   const double unitarize_eps = 1e-14;
   const double max_error = 1e-10;
-#endif
 
-#ifdef GPU_HISQ_FORCE
   quda::fermion_force::setUnitarizeForceConstants(unitarize_eps,
       params.force_filter,
       max_error,
@@ -194,16 +187,13 @@ void qudaHisqParamsInit(QudaHisqParams_t)
       reunit_svd_only,
       params.reunit_svd_rel_error,
       params.reunit_svd_abs_error);
-#endif
 
-#ifdef GPU_UNITARIZE
   setUnitarizeLinksConstants(unitarize_eps,
       max_error,
       reunit_allow_svd,
       reunit_svd_only,
       params.reunit_svd_rel_error,
       params.reunit_svd_abs_error);
-#endif // UNITARIZE_GPU
 
   initialized = true;
   qudamilc_called<false>(__func__);
