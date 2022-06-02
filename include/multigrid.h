@@ -449,8 +449,9 @@ namespace quda {
 
     /**
        @brief Load the null space vectors in from file
+       @param B Load null-space vectors to here
     */
-    void loadVectors();
+    void loadVectors(std::vector<ColorSpinorField *> &B);
 
     /**
        @brief Save the null space vectors in from file
@@ -511,7 +512,7 @@ namespace quda {
       @param vecs vector of ColorSpinorFields to normalize
       @param count number of near-null vectors to orthonormalize, default all
     */
-    void orthonormalize_vectors(const std::vector<ColorSpinorField*>& vecs, int count = -1) const;
+    void orthonormalizeVectors(const std::vector<ColorSpinorField*>& vecs, int count = -1) const;
 
     /**
        @brief Return the total flops done on this and all coarser levels.

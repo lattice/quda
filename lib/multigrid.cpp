@@ -4,6 +4,7 @@
 #include <tune_quda.h>
 #include <random_quda.h>
 #include <vector_io.h>
+#include <eigen_helper.h>
 #include <solver.hpp>
 
 // for building the KD inverse op
@@ -779,21 +780,61 @@ namespace quda
     popLevel();
   }
 
-  void MG::orthonormalize_vectors(const std::vector<ColorSpinorField*>& vecs, int count) const {
+  void MG::orthonormalizeVectors(const std::vector<ColorSpinorField*>& vecs, int count) const {
+
     int num_vec = (count == -1) ? static_cast<int>(vecs.size()) : count;
 
     if (num_vec > (int)vecs.size())
       errorQuda("Trying to orthonormalize %d vectors which is larger than std::vector size %ld", num_vec, vecs.size());
 
-    for (int i = 0; i < num_vec; i++) {
-      for (int j = 0; j < i ; j++) {
-        Complex alpha = cDotProduct(*vecs[j], *vecs[i]);// <j,i>
-        caxpy(-alpha, *vecs[j], *vecs[i]); // i-<j,i>j
-      }
-      double nrm2 = norm2(*vecs[i]);
-      if (nrm2 > 1e-16) ax(1.0 / sqrt(nrm2), *vecs[i]);// i/<i,i>
-      else errorQuda("Cannot normalize %u vector", i);
+    typedef Matrix<Complex, Dynamic, Dynamic> matrix;
+
+    // Create std::vector of references to ColorSpinorFields we're orthonormalizing
+    std::vector<std::reference_wrapper<ColorSpinorField>> ortho_vecs;
+    for (int i = 0; i < num_vec; i++)
+      ortho_vecs.emplace_back(std::ref(*vecs[i]));
+
+    // Prepare to do the Cholesky decomposition for a thin-QR
+    std::vector<Complex> Vdagv_(num_vec * num_vec);
+
+    // outstanding bugfix
+    //hDotProduct(Vdagv_, ortho_vecs, ortho_vecs);
+    cDotProduct(Vdagv_, ortho_vecs, ortho_vecs);
+
+    // perform Cholesky
+    matrix Vdagv(num_vec, num_vec);
+    for (int i = 0; i < num_vec; i++)
+      for (int j = 0; j < num_vec; j++)
+        Vdagv(i, j) = Vdagv_[i * num_vec + j];
+    matrix sigma = Vdagv.llt().matrixL();
+
+    // perform tall-skinny QR to get Q
+    matrix R_inv = sigma.adjoint().inverse();
+
+#if 0
+    // Given a working cax_U...
+    // Tracked at https://github.com/lattice/quda/issues/1286
+    std::vector<Complex> R_inv_(num_vec * num_vec);
+    for (int i = 0; i < num_vec; i++)
+      for (int j = 0; j < num_vec; j++)
+        R_inv_[i * num_vec + j] = R_inv(i, j);
+    cax_U(R_inv_, ortho_vecs);
+
+#else
+    ColorSpinorParam csParam(*vecs[0]);
+    csParam.create = QUDA_NULL_FIELD_CREATE;
+    ColorSpinorField tmp_field(csParam);
+    for (int i = num_vec - 1; i >= 0; i--) {
+      blas::zero(tmp_field);
+      std::vector<Complex> coeff(i + 1);
+      for (int j = 0; j < i + 1; j++)
+        coeff[j] = R_inv(j, i);
+      std::vector<std::reference_wrapper<ColorSpinorField> > vecs_subset(ortho_vecs.begin(), ortho_vecs.begin() + i + 1);
+      caxpy(coeff, vecs_subset, tmp_field);
+      blas::copy(ortho_vecs[i], tmp_field);
     }
+#endif
+
   }
 
   // FIXME need to make this more robust (implement Solver::flops() for all solvers)
@@ -1309,7 +1350,7 @@ namespace quda
   }
 
   // supports separate reading or single file read
-  void MG::loadVectors()
+  void MG::loadVectors(std::vector<ColorSpinorField *> &B)
   {
     if (param.transfer_type != QUDA_TRANSFER_AGGREGATE) {
       warningQuda("Cannot load near-null vectors for top level of staggered MG solve.");
@@ -1324,7 +1365,7 @@ namespace quda
       vec_infile += "_nvec_";
       vec_infile += std::to_string(param.mg_global.n_vec[param.level]);
       VectorIO io(vec_infile);
-      io.load(param.B);
+      io.load(B);
       popLevel();
       profile_global.TPSTOP(QUDA_PROFILE_IO);
       if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);
@@ -1389,7 +1430,7 @@ namespace quda
     // if a near-null vector input file is specified, always load it and
     // ignore other setup information, UNLESS we're refreshing
     if (strcmp(param.mg_global.vec_infile[param.level], "") != 0 && !refresh) {
-      loadVectors();
+      loadVectors(param.B);
     } else {
 
       // multiple setup iterations only matters for test vector setup
@@ -1460,8 +1501,8 @@ namespace quda
           errorQuda("Invalid setup type %d", setup_type);
         }
 
-        if (param.mg_global.setup_maxiter_inverse_iterations_polish[param.level] > 0) {
-          generateInverseIterations(param.B, param.mg_global.setup_maxiter_inverse_iterations_polish[param.level]);
+        if (param.mg_global.setup_maxiter_inverse_iterations_refinement[param.level] > 0) {
+          generateInverseIterations(param.B, param.mg_global.setup_maxiter_inverse_iterations_refinement[param.level]);
         }
       }
 
@@ -1562,7 +1603,7 @@ namespace quda
 
     // global orthonormalization of the initial null-space vectors
     if(param.mg_global.pre_orthonormalize) {
-      orthonormalize_vectors(B);
+      orthonormalizeVectors(B);
     }
 
     // launch solver for each source
@@ -1591,7 +1632,7 @@ namespace quda
 
     // global orthonormalization of the generated null-space vectors
     if (param.mg_global.post_orthonormalize) {
-      orthonormalize_vectors(B);
+      orthonormalizeVectors(B);
     }
 
     delete solve;
@@ -1659,7 +1700,7 @@ namespace quda
 
     // orthonormalize
     if (param.mg_global.pre_orthonormalize) {
-      orthonormalize_vectors(B, num_starting_vectors);
+      orthonormalizeVectors(B, num_starting_vectors);
     }
 
     for (int s = 0; s < num_starting_vectors; s++) {
@@ -1734,16 +1775,14 @@ namespace quda
     }
 
     // print norms
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      printfQuda("Norms of Chebyshev filtered near-null vectors:\n");
-      for (int i = 0; i < num_vec; i++) {
-        printfQuda("Vector %d = %e\n", i, sqrt(blas::norm2(*B[i])));
-      }
+    logQuda(QUDA_VERBOSE, "Norms of Chebyshev filtered near-null vectors:\n");
+    for (int i = 0; i < num_vec; i++) {
+      logQuda(QUDA_VERBOSE, "Vector %d = %e\n", i, sqrt(blas::norm2(*B[i])));
     }
 
     // global orthonormalization of the generated null-space vectors
     if (param.mg_global.post_orthonormalize) {
-      orthonormalize_vectors(B);
+      orthonormalizeVectors(B);
     }
 
     popLevel();
@@ -1859,7 +1898,7 @@ namespace quda
 
     // global orthonormalization of the generated null-space vectors
     if(param.mg_global.post_orthonormalize) {
-      orthonormalize_vectors(B);
+      orthonormalizeVectors(B);
     }
 
     logQuda(QUDA_VERBOSE, "Done building free vectors\n");
@@ -1904,10 +1943,6 @@ namespace quda
 
     for (int i = 0; i < n_conv; i++) B_evecs.push_back(new ColorSpinorField(csParam));
 
-    // before entering the eigen solver, let's free the B vectors to save some memory
-    //ColorSpinorParam bParam(*B[0]);
-    //for (int i = 0; i < (int)B.size(); i++) delete B[i];
-
     EigenSolver *eig_solve;
     if (!normop && !dagger) {
       DiracM *mat = new DiracM(*diracResidual);
@@ -1935,7 +1970,7 @@ namespace quda
       delete mat;
     }
 
-    // now reallocate the B vectors copy in e-vectors
+    // copy e-vectors back in
     for (int i = 0; i < (int)B.size(); i++) {
       if (B[0]->SiteSubset() == QUDA_PARITY_SITE_SUBSET)
         *B[i] = B_evecs[i]->Even();
@@ -1961,7 +1996,7 @@ namespace quda
 
     // B vectors can be in half precession on the fine level, need to convert to single
     ColorSpinorField Btmp;
-    bool need_tmp_single = param.fine->param.B[0]->Precision() != QUDA_SINGLE_PRECISION;
+    bool need_tmp_single = param.fine->param.B[0]->Precision() < QUDA_SINGLE_PRECISION;
     if (need_tmp_single) {
       ColorSpinorParam b_tmp_param(*param.fine->param.B[0]);
       b_tmp_param.create = QUDA_NULL_FIELD_CREATE;
@@ -1988,7 +2023,7 @@ namespace quda
           initializeRandomVectors(B_remaining);
         }
         if (param.mg_global.pre_orthonormalize) {
-          orthonormalize_vectors(param.B);
+          orthonormalizeVectors(param.B);
         }
 
         generateInverseIterations(B_remaining, refresh ? param.mg_global.setup_maxiter_refresh[param.level] : param.mg_global.setup_maxiter[param.level]);
@@ -2002,7 +2037,7 @@ namespace quda
         }
 
         if (param.mg_global.pre_orthonormalize) {
-          orthonormalize_vectors(std::vector<ColorSpinorField*>(param.B.begin(), param.B.begin() + param.fine->param.Nvec + num_initialize));
+          orthonormalizeVectors(std::vector<ColorSpinorField*>(param.B.begin(), param.B.begin() + param.fine->param.Nvec + num_initialize));
         }
 
         generateChebyshevFilter(B_remaining);
@@ -2016,7 +2051,7 @@ namespace quda
     }
 
     if (param.mg_global.post_orthonormalize) {
-      orthonormalize_vectors(param.B);
+      orthonormalizeVectors(param.B);
     }
 
     popLevel();

@@ -93,7 +93,7 @@ void setQudaDefaultMgTestParams()
     setup_tol[i] = 5e-6;
     setup_maxiter[i] = 500;
     setup_maxiter_refresh[i] = 20;
-    setup_maxiter_inverse_iterations_polish[i] = 0;
+    setup_maxiter_inverse_iterations_refinement[i] = 0;
     mu_factor[i] = 1.;
     coarse_solve_type[i] = QUDA_INVALID_SOLVE;
     smoother_solve_type[i] = QUDA_INVALID_SOLVE;

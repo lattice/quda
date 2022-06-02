@@ -1967,7 +1967,7 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
 
     // change this to refresh fields when mass or links change
     mg_param.setup_maxiter_refresh[i] = 0; // setup_maxiter_refresh[i];
-    mg_param.setup_maxiter_inverse_iterations_polish[i] = 0; // setup_maxiter_inverse_iterations_polish[i];
+    mg_param.setup_maxiter_inverse_iterations_refinement[i] = 0; // setup_maxiter_inverse_iterations_refinement[i];
 
     // Basis to use for CA solver setup --- heuristic for CA-GCR is empirical
     if (is_ca_solver(input_struct.setup_inv[i])) {

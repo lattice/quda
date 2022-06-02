@@ -337,8 +337,8 @@ namespace quda
     // C_1 is the current 'out' vector.
 
     // Clone 'in' to two temporary vectors.
-    auto tmp_1 = std::make_unique<ColorSpinorField>(in);
-    auto tmp_2 = std::make_unique<ColorSpinorField>(out);
+    ColorSpinorField tmp_1(in);
+    ColorSpinorField tmp_2(out);
 
     // Using Chebyshev polynomial recursion relation,
     // C_{m+1}(x) = 2*x*C_{m} - C_{m-1}
@@ -355,14 +355,14 @@ namespace quda
 
       // FIXME - we could introduce a fused matVec + blas kernel here, eliminating one temporary
       // mat*C_{m}(x)
-      matVec(mat, out, *tmp_2);
+      matVec(mat, out, tmp_2);
 
-      blas::axpbypczw(d3, *tmp_1, d2, *tmp_2, d1, out, *tmp_1);
+      blas::axpbypczw(d3, tmp_1, d2, tmp_2, d1, out, tmp_1);
       std::swap(tmp_1, tmp_2);
 
       sigma_old = sigma;
     }
-    blas::copy(out, *tmp_2);
+    blas::copy(out, tmp_2);
 
     // Save Chebyshev tuning
     saveTuneCache();

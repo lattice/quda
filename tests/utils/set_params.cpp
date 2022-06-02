@@ -389,7 +389,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_tol[i] = setup_tol[i];
     mg_param.setup_maxiter[i] = setup_maxiter[i];
     mg_param.setup_maxiter_refresh[i] = setup_maxiter_refresh[i];
-    mg_param.setup_maxiter_inverse_iterations_polish[i] = setup_maxiter_inverse_iterations_polish[i];
+    mg_param.setup_maxiter_inverse_iterations_refinement[i] = setup_maxiter_inverse_iterations_refinement[i];
 
     // Setup type to use (inverse iterations, chebyshev filter, eigenvectors, restriction, free field)
     mg_param.setup_type[i] = setup_type[i];

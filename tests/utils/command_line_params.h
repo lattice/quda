@@ -276,7 +276,7 @@ extern quda::mgarray<int> num_setup_iter;
 extern quda::mgarray<double> setup_tol;
 extern quda::mgarray<int> setup_maxiter;
 extern quda::mgarray<int> setup_maxiter_refresh;
-extern quda::mgarray<int> setup_maxiter_inverse_iterations_polish;
+extern quda::mgarray<int> setup_maxiter_inverse_iterations_refinement;
 extern quda::mgarray<QudaCABasis> setup_ca_basis;
 extern quda::mgarray<int> setup_ca_basis_size;
 extern quda::mgarray<double> setup_ca_lambda_min;

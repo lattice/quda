@@ -805,12 +805,12 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(setup_tol[i], 5e-6);
     P(setup_maxiter[i], 500);
     P(setup_maxiter_refresh[i], 0);
-    P(setup_maxiter_inverse_iterations_polish[i], 0);
+    P(setup_maxiter_inverse_iterations_refinement[i], 0);
 #else
     P(setup_tol[i], INVALID_DOUBLE);
     P(setup_maxiter[i], INVALID_INT);
     P(setup_maxiter_refresh[i], INVALID_INT);
-    P(setup_maxiter_inverse_iterations_polish[i], INVALID_INT);
+    P(setup_maxiter_inverse_iterations_refinement[i], INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
