@@ -313,7 +313,7 @@ namespace quda {
       }
     };
 
-#ifdef GPU_HISQ_FORCE
+#ifdef GPU_STAGGERED_DIRAC
     void hisqStaplesForce(GaugeField &newOprod, const GaugeField &oprod, const GaugeField &link, const double path_coeff_array[6])
     {
       checkNative(link, oprod, newOprod);
@@ -437,7 +437,7 @@ namespace quda {
       }
     };
 
-#ifdef GPU_HISQ_FORCE
+#ifdef GPU_STAGGERED_DIRAC
     void hisqLongLinkForce(GaugeField &newOprod, const GaugeField &oldOprod, const GaugeField &link, double coeff)
     {
       checkNative(link, oldOprod, newOprod);
@@ -461,7 +461,7 @@ namespace quda {
       }
     };
 
-#ifdef GPU_HISQ_FORCE
+#ifdef GPU_STAGGERED_DIRAC
     void hisqCompleteForce(GaugeField &force, const GaugeField &link)
     {
       checkNative(link, force);

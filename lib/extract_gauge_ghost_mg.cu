@@ -2,7 +2,7 @@
 
 #include <gauge_field_order.h>
 #include <extract_gauge_ghost_helper.cuh>
-#include <instantiate.h>
+#include <multigrid.h>
 
 namespace quda {
 
