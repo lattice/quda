@@ -14,30 +14,35 @@ namespace quda {
   namespace target {
     namespace omptarget {
       // defined in ../../../lib/targets/omptarget/quda_api.cpp:/qudaSetupLaunchParameter
-      void qudaSetupLaunchParameter(const TuneParam &);
+      int qudaSetupLaunchParameter(const TuneParam &);
       void set_runtime_error(int error, const char *api_func, const char *func, const char *file,
                              const char *line, bool allow_error = false);
     }
   }
 
   template <typename Arg>
-  static bool acceptThreads(const TuneParam &tp, const Arg &arg)
+  inline bool acceptThreads(const TuneParam &tp, const Arg &arg)
   {
-    bool r = arg.threads.x<tp.block.x ||    // trivial cases where arg.threads.x == 1 or few
-       arg.threads.y<tp.block.y ||
-       arg.threads.z<tp.block.z ||
-      (arg.threads.x%(tp.grid.x*tp.block.x)==0 &&
-       arg.threads.y%(tp.grid.y*tp.block.y)==0 &&
-       arg.threads.z%(tp.grid.z*tp.block.z)==0);
+    bool r = tp.block.x*tp.block.y*tp.block.z<=device::max_block_size() &&
+       (arg.threads.x<tp.block.x ||    // trivial cases where arg.threads.x == 1 or few
+        arg.threads.y<tp.block.y ||
+        arg.threads.z<tp.block.z ||
+        (arg.threads.x%tp.block.x==0 &&
+         arg.threads.y%tp.block.y==0 &&
+         arg.threads.z%tp.block.z==0));
     if(!r && getVerbosity() >= QUDA_VERBOSE)
       ompwip("WARNING: rejecting threads setup arg %d %d %d tp (%d %d %d)x(%d %d %d)",arg.threads.x,arg.threads.y,arg.threads.z,tp.grid.x,tp.grid.y,tp.grid.z,tp.block.x,tp.block.y,tp.block.z);
     return r;
   }
+  inline bool acceptTeams(const TuneParam &tp)
+  {
+    const auto nt = tp.grid.x*tp.grid.y*tp.grid.z;
+    return nt <= device::max_grid_size(0);
+  }
   template <typename... Arg>
   qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, qudaStream_t stream, const Arg &... arg)
   {
-    if(acceptThreads(tp, arg...)){
-      target::omptarget::qudaSetupLaunchParameter(tp);
+    if(acceptThreads(tp, arg...) && acceptTeams(tp) && 0==target::omptarget::qudaSetupLaunchParameter(tp)){
       reinterpret_cast<void(*)(Arg...)>(const_cast<void*>(func))(arg...);
       return QUDA_SUCCESS;
     }else
