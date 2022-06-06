@@ -6,20 +6,43 @@ set(QUDA_TARGET_SYCL ON)
 # SYCL specific part of CMakeLists
 
 if(DEFINED ENV{QUDA_WARP_SIZE})
-  set(QUDA_DEFAULT_WARP_SIZE $ENV{QUDA_WARP_SIZE})
+  set(QUDA_WARP_SIZE_DEFAULT $ENV{QUDA_WARP_SIZE})
 else()
-  set(QUDA_DEFAULT_WARP_SIZE 16)
+  set(QUDA_WARP_SIZE_DEFAULT 16)
 endif()
 set(QUDA_WARP_SIZE
-    ${QUDA_DEFAULT_WARP_SIZE}
-    CACHE STRING "Sycl subgroup size (warp size)")
+    ${QUDA_WARP_SIZE_DEFAULT}
+    CACHE STRING "SYCL subgroup size (warp size)")
 set_property(CACHE QUDA_WARP_SIZE PROPERTY STRINGS 8 16 32)
 target_compile_definitions(quda PUBLIC QUDA_WARP_SIZE=${QUDA_WARP_SIZE})
 message(STATUS "Using subgroup (warp) size " "${QUDA_WARP_SIZE}")
 mark_as_advanced(QUDA_WARP_SIZE)
 
+if(DEFINED ENV{QUDA_MAX_BLOCK_SIZE})
+  set(QUDA_MAX_BLOCK_SIZE_DEFAULT $ENV{QUDA_MAX_BLOCK_SIZE})
+else()
+  set(QUDA_MAX_BLOCK_SIZE_DEFAULT 512)
+endif()
+set(QUDA_MAX_BLOCK_SIZE
+    ${QUDA_MAX_BLOCK_SIZE_DEFAULT}
+    CACHE STRING "SYCL max group size (max block size)")
+#set_property(CACHE QUDA_MAX_BLOCK_SIZE PROPERTY STRINGS 8 16 32)
+target_compile_definitions(quda PUBLIC QUDA_MAX_BLOCK_SIZE=${QUDA_MAX_BLOCK_SIZE})
+message(STATUS "Using max group (block) size " "${QUDA_MAX_BLOCK_SIZE}")
+mark_as_advanced(QUDA_MAX_BLOCK_SIZE)
 
-
+if(DEFINED ENV{QUDA_MAX_ARGUMENT_SIZE})
+  set(QUDA_MAX_ARGUMENT_SIZE_DEFAULT $ENV{QUDA_MAX_ARGUMENT_SIZE})
+else()
+  set(QUDA_MAX_ARGUMENT_SIZE_DEFAULT 2048)
+endif()
+set(QUDA_MAX_ARGUMENT_SIZE
+    ${QUDA_MAX_ARGUMENT_SIZE_DEFAULT}
+    CACHE STRING "SYCL max argument size")
+#set_property(CACHE QUDA_MAX_ARGUMENT_SIZE PROPERTY STRINGS 8 16 32)
+target_compile_definitions(quda PUBLIC QUDA_MAX_ARGUMENT_SIZE=${QUDA_MAX_ARGUMENT_SIZE})
+message(STATUS "Using max argument size " "${QUDA_MAX_ARGUMENT_SIZE}")
+mark_as_advanced(QUDA_MAX_ARGUMENT_SIZE)
 
 # ######################################################################################################################
 # define SYCL flags
