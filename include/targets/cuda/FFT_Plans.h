@@ -12,34 +12,6 @@ namespace quda
 
   using FFTPlanHandle = cufftHandle;
 
-#ifndef GPU_GAUGE_ALG
-
-#define CUFFT_SAFE_CALL(call)
-
-inline void ApplyFFT(FFTPlanHandle &, float2 *, float2 *, int)
-{
-  errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
-}
-
-inline void ApplyFFT(FFTPlanHandle &, double2 *, double2 *, int)
-{
-  errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
-}
-
-inline void SetPlanFFTMany(FFTPlanHandle &, int4, int, QudaPrecision)
-{
-  errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
-}
-
-inline void SetPlanFFT2DMany(FFTPlanHandle &, int4, int, QudaPrecision)
-{
-  errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
-}
-
-inline void FFTDestroyPlan(FFTPlanHandle &) { errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled"); }
-
-#else
-
 /**
    @brief Helper function for decoding cuFFT return codes
 */
@@ -149,7 +121,5 @@ inline void SetPlanFFT2DMany(cufftHandle &plan, int4 size, int dim, QudaPrecisio
 }
 
 inline void FFTDestroyPlan(FFTPlanHandle &plan) { CUFFT_SAFE_CALL(cufftDestroy(plan)); }
-
-#endif
 
 } // namespace quda

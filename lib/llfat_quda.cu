@@ -165,7 +165,7 @@ namespace quda {
     instantiate<Staple, ReconstructNo12>(u, fat, staple, mulink, nu, dir1, dir2, coeff, save_staple);
   }
 
-#ifdef GPU_FATLINK
+#ifdef GPU_STAGGERED_DIRAC
   void longKSLink(GaugeField *lng, const GaugeField &u, const double *coeff)
   {
     computeLongLink(*lng, u, coeff[1]);

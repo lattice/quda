@@ -5,6 +5,7 @@
 #include <vector>
 #include <complex_quda.h>
 #include <memory>
+#include <instantiate.h>
 
 // at the moment double-precision multigrid is only enabled when debugging
 #ifdef HOST_DEBUG
@@ -12,6 +13,60 @@
 #endif
 
 namespace quda {
+
+  /**
+     @brief Helper function for returning if multigrid is enabled
+  */
+#ifdef GPU_MULTIGRID
+  constexpr bool is_enabled_multigrid() { return true; };
+#else
+  constexpr bool is_enabled_multigrid() { return false; };
+#endif
+
+  /**
+     @brief Helper function for returning if double-precision
+     multigrid is enabled
+  */
+#ifdef GPU_MULTIGRID_DOUBLE
+  constexpr bool is_enabled_multigrid_double() { return true; }
+#else
+  constexpr bool is_enabled_multigrid_double() { return false; }
+#endif
+
+  /**
+     @brief The instantiatePrecision function is used to instantiate
+     the precision
+     @param[in] field LatticeField we wish to instantiate
+     @param[in,out] args Any additional arguments required for the
+     computation at hand
+  */
+  template <template <typename> class Apply, typename F, typename... Args>
+  constexpr void instantiatePrecisionMG(F &field, Args &&... args)
+  {
+    if (field.Precision() == QUDA_DOUBLE_PRECISION) {
+      if constexpr (is_enabled_multigrid_double())
+        Apply<double>(field, args...);
+      else
+        errorQuda("Multigrid not supported in double precision");
+    } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
+      if constexpr (is_enabled<QUDA_SINGLE_PRECISION>())
+        Apply<float>(field, args...);
+      else
+        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+    } else if (field.Precision() == QUDA_HALF_PRECISION) {
+      if constexpr (is_enabled<QUDA_HALF_PRECISION>())
+        Apply<short>(field, args...);
+      else
+        errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+    } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
+      if constexpr (is_enabled<QUDA_QUARTER_PRECISION>())
+        Apply<int8_t>(field, args...);
+      else
+        errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+    } else {
+      errorQuda("Unsupported precision %d\n", field.Precision());
+    }
+  }
 
   // forward declarations
   class MG;

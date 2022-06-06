@@ -43,7 +43,6 @@ namespace quda {
 
   template<typename Float, int nColor, QudaReconstructType recon_u> using GaugePath = ForceGauge<Float,nColor,recon_u,false>;
 
-#ifdef GPU_GAUGE_FORCE
   void gaugeForce(GaugeField& mom, const GaugeField& u, double epsilon, int ***input_path,
                   int *length_h, double *path_coeff_h, int num_paths, int path_max_length)
   {
@@ -54,7 +53,7 @@ namespace quda {
     paths p(input_path, length_h, path_coeff_h, num_paths, path_max_length);
 
     // gauge field must be passed as first argument so we peel off its reconstruct type
-    instantiate<GaugeForce_,ReconstructNo12>(u, mom, epsilon, p);
+    instantiate<GaugeForce_>(u, mom, epsilon, p);
     p.free();
   }
   
@@ -71,15 +70,5 @@ namespace quda {
     instantiate<GaugePath>(u, out, coeff, p);
     p.free();
   }
-#else
-  void gaugeForce(GaugeField&, const GaugeField&, double, int ***, int *, double *, int, int)
-  {
-    errorQuda("Gauge force has not been built");
-  }
-  void gaugePath(GaugeField&, const GaugeField&, double, int ***, int *, double *, int, int)
-  {
-    errorQuda("Gauge force has not been built");
-  }
-#endif
 
 } // namespace quda
