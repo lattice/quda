@@ -243,17 +243,16 @@ namespace quda {
         auto result_ = std::make_pair( std::vector<T>((y.size() / 2) * x.size()),
                                        std::vector<T>(result.size() - (y.size() / 2) * x.size()) );
         auto y_ = bisect(y);
-        multiReduce_recurse<reducer_diag, reducer_off>(result_.first, x, y_.first, z, w, i_idx, 2*j_idx+0, hermitian, tile_size);
-        multiReduce_recurse<reducer_diag, reducer_off>(result_.second, x, y_.second, z, w, i_idx, 2*j_idx+1, hermitian, tile_size);
+        multiReduce_recurse<reducer_diag, reducer_off>(result_.first, x, y_.first, z, w, i_idx, j_idx, hermitian, tile_size);
+        multiReduce_recurse<reducer_diag, reducer_off>(result_.second, x, y_.second, z, w, i_idx, j_idx + y_.first.size(), hermitian, tile_size);
 
         result = join(result_);
       } else {
-	// if at bottom of recursion, return if on lower left
-        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true) && hermitian) {
-          if (j_idx < i_idx) { return; }
-        }
 
         if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true)) { // problem fits, so do the computation
+          // if at bottom of recursion, return if on strict sub-diagonal
+          if (hermitian && (j_idx + y.size() < i_idx + x.size())) return;
+
           std::vector<T> tmp_dot(x.size()*y.size());
           std::vector<T> a, b, c;
 
@@ -271,8 +270,8 @@ namespace quda {
           auto z_ = bisect(z);
           auto w_ = bisect(w);
 
-          multiReduce_recurse<reducer_diag, reducer_off>(result_.first, x_.first, y, z_.first, w_.first, 2*i_idx+0, j_idx, hermitian, tile_size);
-          multiReduce_recurse<reducer_diag, reducer_off>(result_.second, x_.second, y, z_.second, w_.second, 2*i_idx+1, j_idx, hermitian, tile_size);
+          multiReduce_recurse<reducer_diag, reducer_off>(result_.first, x_.first, y, z_.first, w_.first, i_idx, j_idx, hermitian, tile_size);
+          multiReduce_recurse<reducer_diag, reducer_off>(result_.second, x_.second, y, z_.second, w_.second, i_idx + x_.first.size(), j_idx, hermitian, tile_size);
 
           result = join_row(result_, x.size() / 2, x.size() - x.size() / 2, y.size());
         }
@@ -705,21 +704,22 @@ namespace quda {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block dot product on non-square inputs");
 
-      std::vector<Complex> result_tmp(x.size()*y.size(), 0.0);
+      std::vector<Complex> result_tmp(x.size() * y.size(), 0.0);
       TileSizeTune<multiCdot, multiCdot, Complex>(result_tmp, x, y, x, x, true, false); // last false is b/c L2 norm
 
       // do a single multi-node reduction only once we have computed all local dot products
       comm_allreduce_sum(result_tmp); // FIXME - could optimize this for Hermiticity as well
 
-      // Switch from col-major to row-major
-      const unsigned int xlen = x.size();
-      const unsigned int ylen = y.size();
-      for (unsigned int j = 0; j < xlen; j++) {
-        for (unsigned int i = j; i < ylen; i++) {
-          result[j*ylen+i] = result_tmp[i*xlen + j];
-          result[i*ylen+j] = conj(result_tmp[i*xlen + j]);
-	}
-      }
+      // multiReduce_recurse returns a column-major matrix.
+      // To be consistent with the multi-blas functions, we should
+      // switch this to row-major.
+      result = transpose(result_tmp, y.size(), x.size());
+
+      // we have only computed result on upper block trinagular part
+      // so copy over to lower block tringaular
+      for (auto i = 0u; i < x.size(); i++)
+        for (auto j = 0u; j < i; j++)
+          result[i * y.size() + j] = conj(result[j * x.size() + i]);
     }
 
     // for (p, Ap) norms in CG which are Hermitian.
@@ -728,21 +728,22 @@ namespace quda {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block A-norm dot product on non-square inputs");
 
-      std::vector<Complex> result_tmp(x.size()*y.size(), 0.0);
+      std::vector<Complex> result_tmp(x.size() * y.size(), 0.0);
       TileSizeTune<multiCdot, multiCdot, Complex>(result_tmp, x, y, x, x, true, true); // last true is b/c A norm
 
       // do a single multi-node reduction only once we have computed all local dot products
       comm_allreduce_sum(result_tmp);
 
-      // Switch from col-major to row-major
-      const unsigned int xlen = x.size();
-      const unsigned int ylen = y.size();
-      for (unsigned int j = 0; j < xlen; j++) {
-        for (unsigned int i = j; i < ylen; i++) {
-          result[j*ylen+i] = result_tmp[i*xlen + j];
-          result[i*ylen+j] = conj(result_tmp[i*xlen + j]);
-        }
-      }
+      // multiReduce_recurse returns a column-major matrix.
+      // To be consistent with the multi-blas functions, we should
+      // switch this to row-major.
+      result = transpose(result_tmp, y.size(), x.size());
+
+      // we have only computed result on upper block trinagular part
+      // so copy over to lower block tringaular
+      for (auto i = 0u; i < x.size(); i++)
+        for (auto j = 0u; j < i; j++)
+          result[i * y.size() + j] = conj(result[j * x.size() + i]);
     }
 
     void reDotProduct(double *result, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y)

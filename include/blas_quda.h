@@ -586,7 +586,7 @@ namespace quda {
     /**
        @brief Computes the matrix of inner products between the vector
        set a and the vector set b.  This routine is specifically for
-       the case where the result matrix is guarantted to be Hermitian.
+       the case where the result matrix is guaranteed to be Hermitian.
        Requires a.size()==b.size().
 
        @param result[out] Matrix of inner product result[i][j] = (a[j],b[i])
@@ -612,7 +612,7 @@ namespace quda {
     /**
         @brief Computes the matrix of inner products between the vector
         set a and the vector set b.  This routine is specifically for
-        the case where the result matrix is guarantted to be Hermitian.
+        the case where the result matrix is guaranteed to be Hermitian.
         Uniquely defined for cases like (p, Ap) where the output is Hermitian,
         but there's an A-norm instead of an L2 norm.
         Requires a.size()==b.size().
