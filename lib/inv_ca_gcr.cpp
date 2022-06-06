@@ -241,9 +241,13 @@ namespace quda
       }
     }
 
-    // Factors which map linear operator onto [-1,1]
-    double m_map = 2. / (lambda_max - lambda_min);
-    double b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
+    // Parameters for the basis polynomial
+    PolynomialBasisParams ca_params;
+    ca_params.basis = basis;
+    ca_params.n_order = n_krylov;
+    ca_params.normalize_freq = 0;
+    ca_params.m_map = PolynomialBasisParams::compute_m_map(lambda_min, lambda_max);
+    ca_params.b_map = PolynomialBasisParams::compute_b_map(lambda_min, lambda_max);
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
@@ -291,7 +295,7 @@ namespace quda
     while (!convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
       // build up a space of size n_krylov
-      computeCAKrylovSpace(matSloppy, q, p, n_krylov, basis, m_map, b_map, tmp_sloppy);
+      computeCAKrylovSpace(matSloppy, q, p, ca_params, tmp_sloppy);
 
       solve(alpha, q, p[0]);
 

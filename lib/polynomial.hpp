@@ -38,19 +38,22 @@ namespace quda
     static double compute_m_map(double lambda_min, double lambda_max) { return 2. / (lambda_max - lambda_min); }
     static double compute_b_map(double lambda_min, double lambda_max) { return - (lambda_max + lambda_min) / (lambda_max - lambda_min); }
 
-    static void check_params(const PolynomialBasisParams& params) {
+    static void check_params(const PolynomialBasisParams& params, bool skip_temporaries_check = false) {
       if (params.n_order < 0) errorQuda("Invalid polynomial order %d", params.n_order);
       if (params.normalize_freq < 0) errorQuda("Invalid rescale frequency %d", params.normalize_freq);
 
-      switch (params.basis) {
-        case QUDA_POWER_BASIS:
-          if (params.tmp_vectors.size() < 2) errorQuda("Invalid temporary vector count %lu for power basis, expected 2", params.tmp_vectors.size());
-          break;
-        case QUDA_CHEBYSHEV_BASIS:
-          if (params.m_map < 0) errorQuda("Invalid m_map %e, implies lambda_min >= lambda_max", params.m_map);
-          if (params.tmp_vectors.size() < 4) errorQuda("Invalid temporary vector count %lu for Chebyshev basis, expected 4", params.tmp_vectors.size());
-          break;
-        default: errorQuda("Polynomial basis is unspecified");
+      // the temporary check does not need to be done for CA basis generation
+      if (!skip_temporaries_check) {
+        switch (params.basis) {
+          case QUDA_POWER_BASIS:
+            if (params.tmp_vectors.size() < 2) errorQuda("Invalid temporary vector count %lu for power basis, expected 2", params.tmp_vectors.size());
+            break;
+          case QUDA_CHEBYSHEV_BASIS:
+            if (params.m_map < 0) errorQuda("Invalid m_map %e, implies lambda_min >= lambda_max", params.m_map);
+            if (params.tmp_vectors.size() < 4) errorQuda("Invalid temporary vector count %lu for Chebyshev basis, expected 4", params.tmp_vectors.size());
+            break;
+          default: errorQuda("Polynomial basis is unspecified");
+        }
       }
     }
   };
@@ -208,47 +211,49 @@ namespace quda
   }
 
   /**
-     @brief Generate a Krylov space in a given basis
-     @param[in] diracm Dirac matrix used to generate the Krylov space
-     @param[out] Ap dirac matrix times the Krylov basis vectors
-     @param[in,out] p Krylov basis vectors; assumes p[0] is in place
-     @param[in] n_krylov Size of krylov space
-     @param[in] basis Basis type
-     @param[in] m_map Slope mapping for Chebyshev basis; ignored for power basis
-     @param[in] b_map Intercept mapping for Chebyshev basis; ignored for power basis
-     @param[in] args Parameter pack of ColorSpinorFields used as temporary passed to Dirac
+    @brief Apply a polynomial basis to a starting vector, optionally saving with some frequency
+    @param[in] diracm Dirac matrix used for the polynomial
+    @param[out] Ap dirac matrix times the Krylov basis vectors
+    @param[in,out] p Krylov basis vectors; assumes p[0] is in place
+    @param[in] poly_params Parameters for the polynomial application
+    @param[in] args Parameter pack of ColorSpinorFields used as temporaries passed to Dirac
   */
   template <typename... Args>
   void computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<ColorSpinorField> &Ap,
-                                    std::vector<ColorSpinorField> &p, int n_krylov, QudaPolynomialBasis basis, double m_map,
-                                    double b_map, Args &&...args)
+                                    std::vector<ColorSpinorField> &p, PolynomialBasisParams poly_params, Args &&...args)
   {
+    PolynomialBasisParams::check_params(poly_params, true);
+
+    auto n_krylov = poly_params.n_order;
+
     // in some cases p or Ap may be larger
     if (static_cast<int>(p.size()) < n_krylov) errorQuda("Invalid p.size() %lu < n_krylov %d", p.size(), n_krylov);
     if (static_cast<int>(Ap.size()) < n_krylov) errorQuda("Invalid Ap.size() %lu < n_krylov %d", Ap.size(), n_krylov);
 
-    if (basis == QUDA_POWER_BASIS) {
+    if (poly_params.basis == QUDA_POWER_BASIS) {
       for (int k = 0; k < n_krylov; k++) {
         diracm(Ap[k], p[k], args...);
         if (k < (n_krylov - 1)) blas::copy(p[k + 1], Ap[k]); // no op if fields alias, which is often the case
       }
-    } else { // chebyshev basis
+    } else if (poly_params.basis == QUDA_CHEBYSHEV_BASIS) {
       diracm(Ap[0], p[0], args...);
 
       if (n_krylov > 1) {
         // p_1 = m Ap_0 + b p_0
-        blas::axpbyz(m_map, Ap[0], b_map, p[0], p[1]);
+        blas::axpbyz(poly_params.m_map, Ap[0], poly_params.b_map, p[0], p[1]);
         diracm(Ap[1], p[1], args...);
 
         // Enter recursion relation
         if (n_krylov > 2) {
           // p_k = 2 m A[_{k-1} + 2 b p_{k-1} - p_{k-2}
           for (int k = 2; k < n_krylov; k++) {
-            blas::axpbypczw(2. * m_map, Ap[k - 1], 2. * b_map, p[k - 1], -1., p[k - 2], p[k]);
+            blas::axpbypczw(2. * poly_params.m_map, Ap[k - 1], 2. * poly_params.b_map, p[k - 1], -1., p[k - 2], p[k]);
             diracm(Ap[k], p[k], args...);
           }
         }
       }
+    } else {
+      errorQuda("Invalid basis %d", poly_params.basis);
     }
   }
 

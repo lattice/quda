@@ -548,9 +548,13 @@ namespace quda
     double maxrr = rNorm;        // The maximum residual norm since the last reliable update.
     double maxr_deflate = rNorm; // The maximum residual since the last deflation
 
-    // Factors which map linear operator onto [-1,1]
-    double m_map = 2. / (lambda_max - lambda_min);
-    double b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
+    // Parameters for the basis polynomial
+    PolynomialBasisParams ca_params;
+    ca_params.basis = basis;
+    ca_params.n_order = n_krylov;
+    ca_params.normalize_freq = 0;
+    ca_params.m_map = PolynomialBasisParams::compute_m_map(lambda_min, lambda_max);
+    ca_params.b_map = PolynomialBasisParams::compute_b_map(lambda_min, lambda_max);
 
     blas::copy(S[0], r); // no op if uni-precision
 
@@ -558,7 +562,7 @@ namespace quda
     while (!convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
       // build up a space of size n_krylov, assumes S[0] is in place
-      computeCAKrylovSpace(matSloppy, AS, S, n_krylov, basis, m_map, b_map, tmp_sloppy, tmp2_sloppy);
+      computeCAKrylovSpace(matSloppy, AS, S, ca_params, tmp_sloppy, tmp2_sloppy);
 
       // we can greatly simplify the workflow for fixed iterations
       if (!fixed_iteration) {
