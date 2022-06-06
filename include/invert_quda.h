@@ -202,7 +202,7 @@ namespace quda {
     double omega;
 
     /** Basis for CA algorithms */
-    QudaCABasis ca_basis;
+    QudaPolynomialBasis ca_basis;
 
     /** Minimum eigenvalue for Chebyshev CA basis */
     double ca_lambda_min;
@@ -211,7 +211,7 @@ namespace quda {
     double ca_lambda_max; // -1 -> power iter generate
 
     /** Basis for CA algorithms in a preconditioner */
-    QudaCABasis ca_basis_precondition;
+    QudaPolynomialBasis ca_basis_precondition;
 
     /** Minimum eigenvalue for Chebyshev CA basis in a preconditioner */
     double ca_lambda_min_precondition;
@@ -709,40 +709,6 @@ namespace quda {
     void setRecomputeEvals(bool flag) { recompute_evals = flag; };
 
     /**
-       @brief Compute power iterations on a Dirac matrix
-       @param[in] diracm Dirac matrix used for power iterations
-       @param[in] start Starting rhs for power iterations; value preserved unless it aliases tempvec1 or tempvec2
-       @param[in,out] tempvec1 Temporary vector used for power iterations (FIXME: can become a reference when std::swap
-       can be used on ColorSpinorField)
-       @param[in,out] tempvec2 Temporary vector used for power iterations (FIXME: can become a reference when std::swap
-       can be used on ColorSpinorField)
-       @param[in] niter Total number of power iteration iterations
-       @param[in] normalize_freq Frequency with which intermediate vector gets normalized
-       @param[in] args Parameter pack of ColorSpinorFields used as temporary passed to Dirac
-       @return Norm of final power iteration result
-    */
-    template <typename... Args>
-    static double performPowerIterations(const DiracMatrix &diracm, const ColorSpinorField &start,
-                                         ColorSpinorField &tempvec1, ColorSpinorField &tempvec2, int niter,
-                                         int normalize_freq, Args &&...args);
-
-    /**
-       @brief Generate a Krylov space in a given basis
-       @param[in] diracm Dirac matrix used to generate the Krylov space
-       @param[out] Ap dirac matrix times the Krylov basis vectors
-       @param[in,out] p Krylov basis vectors; assumes p[0] is in place
-       @param[in] n_krylov Size of krylov space
-       @param[in] basis Basis type
-       @param[in] m_map Slope mapping for Chebyshev basis; ignored for power basis
-       @param[in] b_map Intercept mapping for Chebyshev basis; ignored for power basis
-       @param[in] args Parameter pack of ColorSpinorFields used as temporary passed to Dirac
-    */
-    template <typename... Args>
-    static void computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<ColorSpinorField> &Ap,
-                                     std::vector<ColorSpinorField> &p, int n_krylov, QudaCABasis basis, double m_map,
-                                     double b_map, Args &&...args);
-
-    /**
      * @brief Return flops
      * @return flops expended by this operator
      */
@@ -1182,7 +1148,7 @@ namespace quda {
     bool init;
 
     bool lambda_init;
-    QudaCABasis basis;
+    QudaPolynomialBasis basis;
 
     std::vector<double> Q_AQandg; // Fused inner product matrix
     std::vector<double> Q_AS;     // inner product matrix
@@ -1320,7 +1286,7 @@ namespace quda {
     bool init;
 
     bool lambda_init;  // whether or not lambda_max has been initialized
-    QudaCABasis basis; // CA basis
+    QudaPolynomialBasis basis; // CA basis
 
     std::vector<Complex> alpha; // Solution coefficient vectors
 

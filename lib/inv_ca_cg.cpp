@@ -1,7 +1,7 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
 #include <eigen_helper.h>
-#include <solver.hpp>
+#include <polynomial.hpp>
 
 /**
    @file inv_ca_cg.cpp
@@ -485,7 +485,14 @@ namespace quda
       // Perform 100 power iterations, normalizing every 10 mat-vecs, using r as an initial seed
       // and Q[0]/AQ[0] as temporaries for the power iterations. tmp_sloppy/tmp2_sloppy get passed in as temporaries
       // for matSloppy.
-      lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r, Q[0], AQ[0], 100, 10, tmp_sloppy, tmp2_sloppy);
+      PolynomialBasisParams basis_params;
+      basis_params.basis = QUDA_POWER_BASIS;
+      basis_params.n_order = 100;
+      basis_params.normalize_freq = 10;
+      basis_params.tmp_vectors.emplace_back(std::ref(Q[0]));
+      basis_params.tmp_vectors.emplace_back(std::ref(AQ[1]));
+      lambda_max = 1.1 * performPowerIterations(matSloppy, r, basis_params, tmp_sloppy, tmp2_sloppy);
+
       logQuda(QUDA_SUMMARIZE, "CA-CG Approximate lambda max = 1.1 x %e\n", lambda_max / 1.1);
 
       lambda_init = true;

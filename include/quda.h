@@ -322,7 +322,7 @@ extern "C" {
     double omega;
 
     /** Basis for CA algorithms */
-    QudaCABasis ca_basis;
+    QudaPolynomialBasis ca_basis;
 
     /** Minimum eigenvalue for Chebyshev CA basis */
     double ca_lambda_min;
@@ -331,7 +331,7 @@ extern "C" {
     double ca_lambda_max;
 
     /** Basis for CA algorithms in a preconditioned solver */
-    QudaCABasis ca_basis_precondition;
+    QudaPolynomialBasis ca_basis_precondition;
 
     /** Minimum eigenvalue for Chebyshev CA basis in a preconditioner solver */
     double ca_lambda_min_precondition;
@@ -642,7 +642,7 @@ extern "C" {
     int setup_maxiter_inverse_iterations_refinement[QUDA_MAX_MG_LEVEL];
 
     /** Basis to use for CA solver setup */
-    QudaCABasis setup_ca_basis[QUDA_MAX_MG_LEVEL];
+    QudaPolynomialBasis setup_ca_basis[QUDA_MAX_MG_LEVEL];
 
     /** Basis size for CA solver setup */
     int setup_ca_basis_size[QUDA_MAX_MG_LEVEL];
@@ -693,7 +693,7 @@ extern "C" {
     int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
 
     /** Basis to use for CA coarse solvers */
-    QudaCABasis coarse_solver_ca_basis[QUDA_MAX_MG_LEVEL];
+    QudaPolynomialBasis coarse_solver_ca_basis[QUDA_MAX_MG_LEVEL];
 
     /** Basis size for CA coarse solvers */
     int coarse_solver_ca_basis_size[QUDA_MAX_MG_LEVEL];
@@ -717,7 +717,7 @@ extern "C" {
     int nu_post[QUDA_MAX_MG_LEVEL];
 
     /** Basis to use for CA smoother solvers */
-    QudaCABasis smoother_solver_ca_basis[QUDA_MAX_MG_LEVEL];
+    QudaPolynomialBasis smoother_solver_ca_basis[QUDA_MAX_MG_LEVEL];
 
     /** Minimum eigenvalue for Chebyshev CA smoother basis */
     double smoother_solver_ca_lambda_min[QUDA_MAX_MG_LEVEL];

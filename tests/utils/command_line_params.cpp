@@ -50,10 +50,10 @@ int niter = 100;
 int maxiter_precondition = 10;
 QudaVerbosity verbosity_precondition = QUDA_SUMMARIZE;
 int gcrNkrylov = 8;
-QudaCABasis ca_basis = QUDA_CHEBYSHEV_BASIS;
+QudaPolynomialBasis ca_basis = QUDA_CHEBYSHEV_BASIS;
 double ca_lambda_min = 0.0;
 double ca_lambda_max = -1.0;
-QudaCABasis ca_basis_precondition = QUDA_POWER_BASIS;
+QudaPolynomialBasis ca_basis_precondition = QUDA_POWER_BASIS;
 double ca_lambda_min_precondition = 0.0;
 double ca_lambda_max_precondition = -1.0;
 int pipeline = 0;
@@ -140,7 +140,7 @@ quda::mgarray<double> setup_tol = {};
 quda::mgarray<int> setup_maxiter = {};
 quda::mgarray<int> setup_maxiter_refresh = {};
 quda::mgarray<int> setup_maxiter_inverse_iterations_refinement = {};
-quda::mgarray<QudaCABasis> setup_ca_basis = {};
+quda::mgarray<QudaPolynomialBasis> setup_ca_basis = {};
 quda::mgarray<int> setup_ca_basis_size = {};
 quda::mgarray<double> setup_ca_lambda_min = {};
 quda::mgarray<double> setup_ca_lambda_max = {};
@@ -159,13 +159,13 @@ double omega = 0.85;
 quda::mgarray<QudaInverterType> coarse_solver = {};
 quda::mgarray<double> coarse_solver_tol = {};
 quda::mgarray<QudaInverterType> smoother_type = {};
-quda::mgarray<QudaCABasis> smoother_solver_ca_basis = {};
+quda::mgarray<QudaPolynomialBasis> smoother_solver_ca_basis = {};
 quda::mgarray<double> smoother_solver_ca_lambda_min = {};
 quda::mgarray<double> smoother_solver_ca_lambda_max = {};
 QudaPrecision smoother_halo_prec = QUDA_INVALID_PRECISION;
 quda::mgarray<double> smoother_tol = {};
 quda::mgarray<int> coarse_solver_maxiter = {};
-quda::mgarray<QudaCABasis> coarse_solver_ca_basis = {};
+quda::mgarray<QudaPolynomialBasis> coarse_solver_ca_basis = {};
 quda::mgarray<int> coarse_solver_ca_basis_size = {};
 quda::mgarray<double> coarse_solver_ca_lambda_min = {};
 quda::mgarray<double> coarse_solver_ca_lambda_max = {};
@@ -288,7 +288,7 @@ bool enable_testing = false;
 
 namespace
 {
-  CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
+  CLI::TransformPairs<QudaPolynomialBasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
 
   CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
                                                            {"dr", QUDA_CONTRACT_TYPE_DR}};

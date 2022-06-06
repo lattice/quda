@@ -1,7 +1,7 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
 #include <eigen_helper.h>
-#include <solver.hpp>
+#include <polynomial.hpp>
 
 namespace quda
 {
@@ -223,7 +223,14 @@ namespace quda
       // Perform 100 power iterations, normalizing every 10 mat-vecs, using r_ as an initial seed
       // and q[0]/q[1] as temporaries for the power iterations. tmpSloppy get passed in a temporary
       // for matSloppy. Technically illegal if n_krylov == 1, but in that case lambda_max isn't used anyway.
-      lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r, q[0], q[1], 100, 10, tmp_sloppy);
+      PolynomialBasisParams basis_params;
+      basis_params.basis = QUDA_POWER_BASIS;
+      basis_params.n_order = 100;
+      basis_params.normalize_freq = 10;
+      basis_params.tmp_vectors.emplace_back(std::ref(q[0]));
+      basis_params.tmp_vectors.emplace_back(std::ref(q[1]));
+      lambda_max = 1.1 * performPowerIterations(matSloppy, r, basis_params, tmp_sloppy);
+
       logQuda(QUDA_SUMMARIZE, "CA-GCR Approximate lambda max = 1.1 x %e\n", lambda_max / 1.1);
 
       lambda_init = true;

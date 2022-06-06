@@ -197,12 +197,12 @@ typedef enum QudaResidualType_s {
   QUDA_INVALID_RESIDUAL = QUDA_INVALID_ENUM
 } QudaResidualType;
 
-// Which basis to use for CA algorithms
-typedef enum QudaCABasis_s {
+// Which basis to use for polynomials, CA solver basis
+typedef enum QudaPolynomialBasis_s {
   QUDA_POWER_BASIS,
   QUDA_CHEBYSHEV_BASIS,
   QUDA_INVALID_BASIS = QUDA_INVALID_ENUM
-} QudaCABasis;
+} QudaPolynomialBasis;
 
 // Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
 //

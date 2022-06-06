@@ -5,7 +5,7 @@
 #include <random_quda.h>
 #include <vector_io.h>
 #include <eigen_helper.h>
-#include <solver.hpp>
+#include <polynomial.hpp>
 
 // for building the KD inverse op
 #include <staggered_kd_build_xinv.h>
@@ -790,7 +790,7 @@ namespace quda
     typedef Matrix<Complex, Dynamic, Dynamic> matrix;
 
     // Create std::vector of references to ColorSpinorFields we're orthonormalizing
-    std::vector<std::reference_wrapper<ColorSpinorField>> ortho_vecs;
+    std::vector<ColorSpinorField_ref> ortho_vecs;
     for (int i = 0; i < num_vec; i++)
       ortho_vecs.emplace_back(std::ref(*vecs[i]));
 
@@ -829,7 +829,7 @@ namespace quda
       std::vector<Complex> coeff(i + 1);
       for (int j = 0; j < i + 1; j++)
         coeff[j] = R_inv(j, i);
-      std::vector<std::reference_wrapper<ColorSpinorField> > vecs_subset(ortho_vecs.begin(), ortho_vecs.begin() + i + 1);
+      std::vector<ColorSpinorField_ref> vecs_subset(ortho_vecs.begin(), ortho_vecs.begin() + i + 1);
       caxpy(coeff, vecs_subset, tmp_field);
       blas::copy(ortho_vecs[i], tmp_field);
     }
@@ -1679,20 +1679,43 @@ namespace quda
     double lambda_max = param.mg_global.filter_lambda_max[param.level];
     if (lambda_max < lambda_min) {
       // approximate lambda_max
-      lambda_max = 1.1 * Solver::performPowerIterations(dirac_mdm, *B[0], pk, pkm1,
-        100, 10, tmp1, tmp2);
+      PolynomialBasisParams basis_params;
+      basis_params.basis = QUDA_POWER_BASIS;
+      basis_params.n_order = 100;
+      basis_params.normalize_freq = 10;
+      basis_params.tmp_vectors.emplace_back(std::ref(pk));
+      basis_params.tmp_vectors.emplace_back(std::ref(pkm1));
+      lambda_max = 1.1 * performPowerIterations(dirac_mdm, *B[0], basis_params, tmp1, tmp2);
     }
 
     logQuda(QUDA_VERBOSE, "Nums starting %d Filter iter %d Filter rescale %d Filter next %d Lambda min %e lambda max %e\n",
       num_starting_vectors, filter_iterations, filter_rescale_freq, iterations_for_next, lambda_min, lambda_max);
 
-    // create filter interpolators
-    double m_map_filter = 2. / (lambda_max - lambda_min);
-    double b_map_filter = - (lambda_max + lambda_min) / (lambda_max - lambda_min);
+    // create filter basis info
+    PolynomialBasisParams filter_basis_params;
+    filter_basis_params.basis = QUDA_CHEBYSHEV_BASIS;
+    filter_basis_params.n_order = filter_iterations;
+    filter_basis_params.normalize_freq = filter_rescale_freq;
+    filter_basis_params.tmp_vectors.emplace_back(std::ref(pk));
+    filter_basis_params.tmp_vectors.emplace_back(std::ref(pkm1));
+    filter_basis_params.tmp_vectors.emplace_back(std::ref(pkm2));
+    filter_basis_params.tmp_vectors.emplace_back(std::ref(Apkm1));
+    filter_basis_params.m_map = PolynomialBasisParams::compute_m_map(lambda_min, lambda_max);
+    filter_basis_params.b_map = PolynomialBasisParams::compute_b_map(lambda_min, lambda_max);
 
-    // create interpolators for generating more near-nulls
-    double m_map_generate = 2. / lambda_max;
-    double b_map_generate = -1.;
+    // create basis info for polynomial that generates more near-nulls
+    // note that n_order is intentionally left empty, since that can
+    // vary if the number of starting vectors does not divide evenly
+    // into the total number of near-nulls
+    PolynomialBasisParams generation_basis_params;
+    generation_basis_params.basis = QUDA_CHEBYSHEV_BASIS;
+    generation_basis_params.normalize_freq = 0;
+    generation_basis_params.tmp_vectors.emplace_back(std::ref(pk));
+    generation_basis_params.tmp_vectors.emplace_back(std::ref(pkm1));
+    generation_basis_params.tmp_vectors.emplace_back(std::ref(pkm2));
+    generation_basis_params.tmp_vectors.emplace_back(std::ref(Apkm1));
+    generation_basis_params.m_map = PolynomialBasisParams::compute_m_map(0., lambda_max);
+    generation_basis_params.b_map = PolynomialBasisParams::compute_b_map(0., lambda_max);
 
     // we create batches of near-nulls from `B.size() / vectors_per_set` starting
     // random vectors
@@ -1705,72 +1728,21 @@ namespace quda
 
     for (int s = 0; s < num_starting_vectors; s++) {
 
-      // filter
-      {
-        // P0
-        blas::copy(pk, *B[s]);
-
-        if (filter_iterations > 0) {
-          // P1 = m Ap_0 + b p_0
-          std::swap(pkm1, pk); // p_k -> p_{k - 1}
-          dirac_mdm(Apkm1, pkm1, tmp1, tmp2);
-          blas::axpbyz(m_map_filter, Apkm1, b_map_filter, pkm1, pk);
-
-          if (filter_iterations > 1) {
-            // Enter recursion relation
-            for (int k = 2; k <= filter_iterations; k++) {
-              std::swap(pkm2, pkm1); // p_{k - 1} -> p_{k-2}
-              std::swap(pkm1, pk); // p_k -> p_{k-1}
-              dirac_mdm(Apkm1, pkm1, tmp1, tmp2); // compute A p_{k-1}
-              blas::axpbypczw(2. * m_map_filter, Apkm1, 2. * b_map_filter, pkm1, -1., pkm2, pk);
-
-              // heuristic rescale to keep norms in check...
-              if (k % filter_rescale_freq == 0) {
-                double tmp_nrm2 = blas::norm2(pk);
-                logQuda(QUDA_VERBOSE, "Starting vector %d heuristic rescale at %d old norm2 %e\n", s, k, tmp_nrm2);
-                double tmp_inv_nrm = 1. / sqrt(tmp_nrm2);
-                ax(tmp_inv_nrm, pk);
-                ax(tmp_inv_nrm, pkm1);
-                ax(tmp_inv_nrm, pkm2);
-                ax(tmp_inv_nrm, Apkm1);
-              }
-            }
-          }
-        }
-
-        // print the norm (to check for enhancement, normalize)
-        double nrm2 = blas::norm2(pk);
-        logQuda(QUDA_VERBOSE, "Enhanced norm2 for start %d is %e\n", s, nrm2);
-        ax(1.0 / sqrt(nrm2), pk);
-
-        // This is the first filtered vector
-        blas::copy(*B[s], pk);
-      }
+      // Apply the initial Chebyshev filter
+      applyMatrixPolynomial(dirac_mdm, *B[s], *B[s], filter_basis_params, tmp1, tmp2);
 
       // Now we generate further vectors by another Chebyshev filter from 0 -> lambda_max
-      // P0 is trivially in place
+      // Populate the array of outputs
+      std::vector<ColorSpinorField_ref> output_vecs;
+      for (int i = s + num_starting_vectors; i < num_vec; i += num_starting_vectors)
+        output_vecs.emplace_back(std::ref(*B[i]));
+      
+      // the number we need to save is the size of output_vecs; the order of the polynomial is
+      // iterations_for_next times the size
+      generation_basis_params.n_order = output_vecs.size() * iterations_for_next;
 
-      // P1
-      std::swap(pkm1, pk); // p_k -> p_{k - 1}
-      dirac_mdm(Apkm1, pkm1, tmp1, tmp2);
-      blas::axpbyz(m_map_generate, Apkm1, b_map_generate, pkm1, pk);
-
-      bool first = true;
-
-      for (int i = s + num_starting_vectors; i < num_vec; i += num_starting_vectors) {
-
-        for (int k = first ? 2 : 0; k < iterations_for_next; k++) {
-          std::swap(pkm2, pkm1); // p_{k - 1} -> p_{k-2}
-          std::swap(pkm1, pk); // p_k -> p_{k-1}
-          dirac_mdm(Apkm1, pkm1, tmp1, tmp2); // compute A p_{k-1}
-          blas::axpbypczw(2. * m_map_generate, Apkm1, 2. * b_map_generate, pkm1, -1., pkm2, pk);
-        }
-
-        blas::copy(*B[i], pk);
-
-        if (first) first = false;
-
-      }
+      // Generate additional near-null vectors
+      applyMatrixPolynomial(dirac_mdm, output_vecs, *B[s], generation_basis_params, iterations_for_next, tmp1, tmp2);
 
     }
 

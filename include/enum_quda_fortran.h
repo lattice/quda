@@ -181,7 +181,7 @@
 #define QUDA_HEAVY_QUARK_RESIDUAL 4
 #define QUDA_INVALID_RESIDUAL QUDA_INVALID_ENUM
 
-#define QudaCABasis integer(4)
+#define QudaPolynomialBasis integer(4)
 #define QUDA_POWER_BASIS 0
 #define QUDA_CHEBYSHEV_BASIS 1
 #define QUDA_INVALID_BASIS QUDA_INVALID_ENUM

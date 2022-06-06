@@ -261,7 +261,7 @@ module quda_fortran
      real(8) :: omega
 
      ! Basis for CA algorithms
-     QudaCABasis :: ca_basis
+     QudaPolynomialBasis :: ca_basis
 
      ! Minimum eigenvalue for Chebyshev CA basis
      real(8) :: ca_lambda_min
@@ -270,7 +270,7 @@ module quda_fortran
      real(8) :: ca_lambda_max
 
      ! Basis for CA algorithms in preconditioner solvers
-     QudaCABasis :: ca_basis_precondition
+     QudaPolynomialBasis :: ca_basis_precondition
 
      ! Minimum eigenvalue for Chebyshev CA basis in preconditioner solvers
      real(8) :: ca_lambda_min_precondition
