@@ -142,18 +142,21 @@ namespace quda
     //warningQuda("BK2D %s nondiv %s %s %s", grid_stride?"true":"false",
     //	  str(arg.threads).c_str(), str(tp.block).c_str(), typeid(Arg).name());
     //}
-    sycl::buffer<const char,1>
-      buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
+    //sycl::buffer<const char,1>
+    //  buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
+    auto size = sizeof(arg);
+    auto p = get_arg_buf(size);
+    auto evnt = q.memcpy(p, &arg, size);
     try {
       q.submit([&](sycl::handler& h) {
-	auto a = buf.get_access<sycl::access::mode::read,
-				sycl::access::target::constant_buffer>(h);
+	//auto a = buf.get_access<sycl::access::mode::read,
+	//			sycl::access::target::constant_buffer>(h);
 	//h.parallel_for<class BlockKernel2D>
 	h.parallel_for<>
 	  (ndRange,
 	   [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
 	     //quda::BlockKernel2DImpl<Transformer, Arg>(arg, ndi);
-	     const char *p = a.get_pointer();
+	     //const char *p = a.get_pointer();
 	     const Arg *arg2 = reinterpret_cast<const Arg*>(p);
 	     quda::BlockKernel2DImpl<Transformer, Arg>(*arg2, ndi);
 	   });
@@ -164,6 +167,7 @@ namespace quda
       }
       err = QUDA_ERROR;
     }
+    evnt.wait();
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("end BlockKernel2D\n");
     }

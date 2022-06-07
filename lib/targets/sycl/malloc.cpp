@@ -16,7 +16,7 @@ namespace quda
 
   // buffer for kernel argument
   extern void *arg_buf = nullptr;
-  extern int arg_buf_size = 0;
+  extern size_t arg_buf_size = 0;
 
   enum AllocType { DEVICE, DEVICE_PINNED, HOST, PINNED, MAPPED, MANAGED, N_ALLOC_TYPE };
 

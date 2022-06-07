@@ -351,13 +351,8 @@ namespace quda {
     //sycl::buffer<const Arg,1> buf{&arg, sycl::range(sizeof(arg))};
     //sycl::buffer<const char,1>
     //  buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
-    int size = sizeof(arg);
-    if(size > arg_buf_size) {
-      if(arg_buf!=nullptr) device_free(arg_buf);
-      arg_buf = device_malloc(size);
-      arg_buf_size = size;
-    }
-    auto p = arg_buf;
+    auto size = sizeof(arg);
+    auto p = get_arg_buf(size);
     auto evnt = q.memcpy(p, &arg, size);
     try {
       q.submit([&](sycl::handler& h) {

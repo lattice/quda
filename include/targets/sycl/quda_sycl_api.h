@@ -4,6 +4,18 @@
 
 namespace quda
 {
+  extern void *arg_buf;
+  extern size_t arg_buf_size;
+  static inline void *get_arg_buf(size_t size)
+  {
+    if(size > arg_buf_size) {
+      if(arg_buf!=nullptr) device_free(arg_buf);
+      arg_buf = device_malloc(size);
+      arg_buf_size = size;
+    }
+    return arg_buf;
+  }
+
   namespace device
   {
     sycl::queue get_target_stream(const qudaStream_t &stream);
