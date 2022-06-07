@@ -12,6 +12,9 @@
 
 namespace quda {
 
+  extern void *arg_buf;
+  extern int arg_buf_size;
+
   namespace target {
 
     // compile-time dispatch

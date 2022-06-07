@@ -349,21 +349,29 @@ namespace quda {
     //auto p = device_malloc(sizeof(arg));
     //q.memcpy(p, &arg, sizeof(arg));
     //sycl::buffer<const Arg,1> buf{&arg, sycl::range(sizeof(arg))};
-    sycl::buffer<const char,1>
-      buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
+    //sycl::buffer<const char,1>
+    //  buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
+    int size = sizeof(arg);
+    if(size > arg_buf_size) {
+      if(arg_buf!=nullptr) device_free(arg_buf);
+      arg_buf = device_malloc(size);
+      arg_buf_size = size;
+    }
+    auto p = arg_buf;
+    auto evnt = q.memcpy(p, &arg, size);
     try {
       q.submit([&](sycl::handler& h) {
 	//auto a = buf.get_access(h);
 	//auto a = buf.get_access<sycl::access_mode::read>(h);
-	auto a = buf.get_access<sycl::access::mode::read,
-				sycl::access::target::constant_buffer>(h);
+	//auto a = buf.get_access<sycl::access::mode::read,
+	//			sycl::access::target::constant_buffer>(h);
 	//h.parallel_for<class Kernel3Dc>
 	h.parallel_for<>
 	  (ndRange,
 	   [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
 	     //Arg *arg2 = static_cast<Arg *>(p);
 	     //const Arg *arg2 = a.get_pointer();
-	     const char *p = a.get_pointer();
+	     //const char *p = a.get_pointer();
 	     const Arg *arg2 = reinterpret_cast<const Arg*>(p);
 #ifdef QUDA_THREADS_BLOCKED
 	     quda::Kernel3DImplB<Functor, Arg, grid_stride>(*arg2, ndi);
@@ -378,6 +386,7 @@ namespace quda {
       }
       err = QUDA_ERROR;
     }
+    evnt.wait();
     //q.wait();
     //device_free(p);   //  FIXME: host task
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
