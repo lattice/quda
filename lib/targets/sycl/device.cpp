@@ -373,38 +373,55 @@ namespace quda
     } ArgBufT;
     std::vector<ArgBufT> argBuf{};
 
-    void *get_arg_buf(qudaStream_t stream, size_t size)
+    void *try_get_arg_buf(qudaStream_t stream, size_t size)
     {
-      //printfQuda("Adding buf stream %i size %i\n", stream.idx, size);
       for (auto &b: argBuf) {
 	//printfQuda("  Arg buf stream %i size %i\n", b.stream.idx, b.size);
 	if (syncStamp[b.stream.idx] > b.sync) {
 	  b.stream = stream;
 	  b.sync = eventCount[stream.idx];
 	  if(size > b.size) {
-	    if(b.buf!=nullptr) device_free(b.buf);
-	    b.buf = device_malloc(size);
+	    //if(b.buf!=nullptr) device_free(b.buf);
+	    //b.buf = device_malloc(size);
+	    if(b.buf!=nullptr) host_free(b.buf);
+	    b.buf = pinned_malloc(size);
 	    b.size = size;
 	  }
 	  return b.buf;
 	}
       }
-      ArgBufT a;
-      a.stream = stream;
-      a.sync = eventCount[stream.idx];
-      a.size = size;
-      a.buf = device_malloc(size);
-      argBuf.push_back(a);
-      //printfQuda("Added buf stream %i size %i\n", a.stream.idx, a.size);
-      return a.buf;
+      return nullptr;
+    }
+
+    void *get_arg_buf(qudaStream_t stream, size_t size)
+    {
+      //printfQuda("Adding buf stream %i size %i\n", stream.idx, size);
+      auto buf = try_get_arg_buf(stream, size);
+      if (buf == nullptr && argBuf.size() >= 10) {  // arbitrary max
+	qudaStreamSynchronize(stream);
+	buf = try_get_arg_buf(stream, size);
+      }
+      if (buf == nullptr) {
+	ArgBufT a;
+	a.stream = stream;
+	a.sync = eventCount[stream.idx];
+	a.size = size;
+	//buf = device_malloc(size);
+	buf = pinned_malloc(size);
+	a.buf = buf;
+	argBuf.push_back(a);
+	//printfQuda("Added buf stream %i size %i\n", a.stream.idx, a.size);
+      }
+      return buf;
     }
 
     void free_arg_buf()
     {
-      printfQuda("Arg buf size %i\n", argBuf.size());
+      printfQuda("Arg buf count %i\n", argBuf.size());
       for (const auto &b: argBuf) {
 	printfQuda("  stream %i size %i\n", b.stream.idx, b.size);
-	if(b.buf!=nullptr) device_free(b.buf);
+	//if(b.buf!=nullptr) device_free(b.buf);
+	if(b.buf!=nullptr) host_free(b.buf);
       }
     }
 

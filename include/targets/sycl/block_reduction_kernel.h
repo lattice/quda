@@ -146,7 +146,8 @@ namespace quda
     //  buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
     auto size = sizeof(arg);
     auto p = device::get_arg_buf(stream, size);
-    auto evnt = q.memcpy(p, &arg, size);
+    memcpy(p, &arg, size);
+    //auto evnt = q.memcpy(p, &arg, size);
     try {
       q.submit([&](sycl::handler& h) {
 	//auto a = buf.get_access<sycl::access::mode::read,
@@ -167,8 +168,8 @@ namespace quda
       }
       err = QUDA_ERROR;
     }
-    device::wasSynced(stream);
-    evnt.wait();
+    //device::wasSynced(stream);
+    //evnt.wait();
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("end BlockKernel2D\n");
     }
