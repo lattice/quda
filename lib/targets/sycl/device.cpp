@@ -401,8 +401,9 @@ namespace quda
 
     void free_arg_buf()
     {
+      printfQuda("Arg buf size %i\n", argBuf.size());
       for (const auto &b: argBuf) {
-	printfQuda("Arg buf stream %i size %i\n", b.stream.idx, b.size);
+	printfQuda("  stream %i size %i\n", b.stream.idx, b.size);
 	if(b.buf!=nullptr) device_free(b.buf);
       }
     }

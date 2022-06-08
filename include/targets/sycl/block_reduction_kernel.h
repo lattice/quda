@@ -167,6 +167,7 @@ namespace quda
       }
       err = QUDA_ERROR;
     }
+    device::wasSynced(stream);
     evnt.wait();
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("end BlockKernel2D\n");

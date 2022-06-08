@@ -381,6 +381,7 @@ namespace quda {
       }
       err = QUDA_ERROR;
     }
+    device::wasSynced(stream);
     evnt.wait();
     //q.wait();
     //device_free(p);   //  FIXME: host task
