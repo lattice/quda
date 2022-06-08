@@ -172,6 +172,7 @@ namespace quda
           //qudaMemcpy(dst, src, count, kind);
 	  auto q = device::get_target_stream(stream);
 	  q.memcpy(dst, src, count);
+	  device::wasSynced(stream);
 	  q.wait_and_throw();
         }
       } else {
@@ -183,6 +184,7 @@ namespace quda
           //qudaMemset(dst, value, count);
 	  auto q = device::get_target_stream(stream);
 	  q.memset(dst, value, count);
+	  device::wasSynced(stream);
 	  q.wait_and_throw();
 	}
       }
@@ -248,6 +250,7 @@ namespace quda
       d += dpitch;
       s += spitch;
     }
+    device::wasSynced(device::get_default_stream());
     q.wait_and_throw();
   }
 
@@ -316,6 +319,7 @@ namespace quda
       q.memset(p, value, width);
       p += pitch;
     }
+    device::wasSynced(device::get_default_stream());
     q.wait_and_throw();
   }
 
@@ -341,11 +345,17 @@ namespace quda
     q.prefetch(ptr, count);
   }
 
+  typedef struct {
+    qudaStream_t stream;
+    size_t eventIdx;
+    sycl::event event;
+  } EventImpl;
+
   //bool qudaEventQuery_(qudaEvent_t &quda_event, const char *func, const char *file, const char *line)
   bool qudaEventQuery_(qudaEvent_t &quda_event, const char *, const char *, const char *)
   {
-    auto pe = reinterpret_cast<sycl::event *>(quda_event.event);
-    auto status = (*pe).get_info<sycl::info::event::command_execution_status>();
+    auto pe = reinterpret_cast<EventImpl *>(quda_event.event);
+    auto status = pe->event.get_info<sycl::info::event::command_execution_status>();
     auto val = false;
     if(status==sycl::info::event_command_status::complete) val=true;
     return val;
@@ -354,9 +364,11 @@ namespace quda
   //void qudaEventRecord_(qudaEvent_t &quda_event, qudaStream_t stream, const char *func, const char *file, const char *line)
   void qudaEventRecord_(qudaEvent_t &quda_event, qudaStream_t stream, const char *, const char *, const char *)
   {
-    auto pe = reinterpret_cast<sycl::event *>(quda_event.event);
+    auto pe = reinterpret_cast<EventImpl *>(quda_event.event);
     auto q = device::get_target_stream(stream);
-    *pe = q.submit([&](sycl::handler& cgh) {
+    pe->stream = stream;
+    pe->eventIdx = device::getEventIdx(stream);
+    pe->event = q.submit([&](sycl::handler& cgh) {
       cgh.single_task<class EventRecord>([=](){});
       //cgh.host_task([=](){});
     });
@@ -368,16 +380,17 @@ namespace quda
   void qudaStreamWaitEvent_(qudaStream_t, qudaEvent_t quda_event, unsigned int,
 			    const char *, const char *, const char *)
   {
-    auto pe = reinterpret_cast<sycl::event *>(quda_event.event);
-    (*pe).wait_and_throw();
+    auto pe = reinterpret_cast<EventImpl *>(quda_event.event);
+    device::wasSynced(pe->stream, pe->eventIdx);
+    pe->event.wait_and_throw();
   }
 
   //qudaEvent_t qudaEventCreate_(const char *func, const char *file, const char *line)
   qudaEvent_t qudaEventCreate_(const char *, const char *, const char *)
   {
     qudaEvent_t quda_event;
-    auto sycl_event = new sycl::event;
-    quda_event.event = sycl_event;
+    auto e = new EventImpl;
+    quda_event.event = e;
     return quda_event;
   }
 
@@ -385,8 +398,8 @@ namespace quda
   qudaEvent_t qudaChronoEventCreate_(const char *, const char *, const char *)
   {
     qudaEvent_t quda_event;
-    auto sycl_event = new sycl::event;
-    quda_event.event = sycl_event;
+    auto e = new EventImpl;
+    quda_event.event = e;
     return quda_event;
   }
 
@@ -394,12 +407,14 @@ namespace quda
                               const char *, const char *, const char *)
   //const char *func, const char *file, const char *line)
   {
-    auto pe0 = reinterpret_cast<sycl::event *>(start.event);
-    auto pe1 = reinterpret_cast<sycl::event *>(stop.event);
-    (*pe1).wait_and_throw();
-    (*pe0).wait_and_throw();
-    auto t0 = (*pe0).get_profiling_info<sycl::info::event_profiling::command_end>();
-    auto t1 = (*pe1).get_profiling_info<sycl::info::event_profiling::command_start>();
+    auto pe0 = reinterpret_cast<EventImpl *>(start.event);
+    auto pe1 = reinterpret_cast<EventImpl *>(stop.event);
+    device::wasSynced(pe0->stream, pe0->eventIdx);
+    pe0->event.wait_and_throw();
+    auto t0 = pe0->event.get_profiling_info<sycl::info::event_profiling::command_end>();
+    device::wasSynced(pe1->stream, pe1->eventIdx);
+    pe1->event.wait_and_throw();
+    auto t1 = pe1->event.get_profiling_info<sycl::info::event_profiling::command_start>();
     auto elapsed_time = 1e-9*(t1-t0);
     //printfQuda("qudaEventElapsedTime: %lu %lu %g\n", t0, t1, elapsed_time);
     return elapsed_time;
@@ -408,21 +423,23 @@ namespace quda
   //void qudaEventDestroy_(qudaEvent_t &event, const char *func, const char *file, const char *line)
   void qudaEventDestroy_(qudaEvent_t &event, const char *, const char *, const char *)
   {
-    auto pe = reinterpret_cast<sycl::event *>(event.event);
+    auto pe = reinterpret_cast<EventImpl *>(event.event);
     delete pe;
   }
 
   //void qudaEventSynchronize_(const qudaEvent_t &quda_event, const char *func, const char *file, const char *line)
   void qudaEventSynchronize_(const qudaEvent_t &quda_event, const char *, const char *, const char *)
   {
-    auto pe = reinterpret_cast<sycl::event *>(quda_event.event);
-    (*pe).wait_and_throw();
+    auto pe = reinterpret_cast<EventImpl *>(quda_event.event);
+    device::wasSynced(pe->stream, pe->eventIdx);
+    pe->event.wait_and_throw();
   }
 
   //void qudaStreamSynchronize_(const qudaStream_t &stream, const char *func, const char *file, const char *line)
   void qudaStreamSynchronize_(const qudaStream_t &stream, const char *, const char *, const char *)
   {
     auto q = device::get_target_stream(stream);
+    device::wasSynced(stream);
     q.wait_and_throw();
   }
 

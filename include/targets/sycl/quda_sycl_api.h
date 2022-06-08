@@ -4,23 +4,17 @@
 
 namespace quda
 {
-  extern void *arg_buf;
-  extern size_t arg_buf_size;
-  static inline void *get_arg_buf(size_t size)
-  {
-    if(size > arg_buf_size) {
-      if(arg_buf!=nullptr) device_free(arg_buf);
-      arg_buf = device_malloc(size);
-      arg_buf_size = size;
-    }
-    return arg_buf;
-  }
-
   namespace device
   {
     sycl::queue get_target_stream(const qudaStream_t &stream);
     sycl::queue defaultQueue(void);
+    size_t getEventIdx(const qudaStream_t &stream);
+    void wasSynced(const qudaStream_t &stream);
+    void wasSynced(const qudaStream_t &stream, size_t eventIdx);
+    void *get_arg_buf(qudaStream_t stream, size_t size);
+    void free_arg_buf();
   }
+
   namespace target {
     namespace sycl {
       void set_error(std::string error_str, const char *api_func, const char *func,

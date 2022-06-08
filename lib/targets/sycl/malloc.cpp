@@ -14,10 +14,6 @@
 namespace quda
 {
 
-  // buffer for kernel argument
-  extern void *arg_buf = nullptr;
-  extern size_t arg_buf_size = 0;
-
   enum AllocType { DEVICE, DEVICE_PINNED, HOST, PINNED, MAPPED, MANAGED, N_ALLOC_TYPE };
 
   class MemAlloc
@@ -686,7 +682,7 @@ namespace quda
 
     void flush_device()
     {
-      if (arg_buf != nullptr) device_free(arg_buf); // free kernel arg buffer
+      device::free_arg_buf(); // free kernel arg buffer
       if (device_memory_pool) {
         std::multimap<size_t, void *>::iterator it;
         for (it = deviceCache.begin(); it != deviceCache.end(); it++) {

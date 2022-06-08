@@ -352,7 +352,7 @@ namespace quda {
     //sycl::buffer<const char,1>
     //  buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
     auto size = sizeof(arg);
-    auto p = get_arg_buf(size);
+    auto p = device::get_arg_buf(stream, size);
     auto evnt = q.memcpy(p, &arg, size);
     try {
       q.submit([&](sycl::handler& h) {

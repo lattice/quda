@@ -5,6 +5,8 @@
 static sycl::device myDevice;
 static sycl::queue *streams;
 static const int Nstream = 9;
+static size_t eventCount[Nstream];  // counts event recording and stream syncs
+static size_t syncStamp[Nstream];   // eventCount of last sync
 
 class mySelectorT : public sycl::device_selector {
   int operator()(const sycl::device& device) const override {
@@ -137,56 +139,54 @@ namespace quda
         printfQuda("%d - name:                    %s\n", device, d.get_info<id::name>().c_str());
       }
 #if 0
-        printfQuda("%d - totalGlobalMem:          %lu bytes ( %.2f Gbytes)\n", device, deviceProp.totalGlobalMem,
-                   deviceProp.totalGlobalMem / (float)(1024 * 1024 * 1024));
-        printfQuda("%d - sharedMemPerBlock:       %lu bytes ( %.2f Kbytes)\n", device, deviceProp.sharedMemPerBlock,
-                   deviceProp.sharedMemPerBlock / (float)1024);
-        printfQuda("%d - regsPerBlock:            %d\n", device, deviceProp.regsPerBlock);
-        printfQuda("%d - warpSize:                %d\n", device, deviceProp.warpSize);
-        printfQuda("%d - memPitch:                %lu\n", device, deviceProp.memPitch);
-        printfQuda("%d - maxThreadsPerBlock:      %d\n", device, deviceProp.maxThreadsPerBlock);
-        printfQuda("%d - maxThreadsDim[0]:        %d\n", device, deviceProp.maxThreadsDim[0]);
-        printfQuda("%d - maxThreadsDim[1]:        %d\n", device, deviceProp.maxThreadsDim[1]);
-        printfQuda("%d - maxThreadsDim[2]:        %d\n", device, deviceProp.maxThreadsDim[2]);
-        printfQuda("%d - maxGridSize[0]:          %d\n", device, deviceProp.maxGridSize[0]);
-        printfQuda("%d - maxGridSize[1]:          %d\n", device, deviceProp.maxGridSize[1]);
-        printfQuda("%d - maxGridSize[2]:          %d\n", device, deviceProp.maxGridSize[2]);
-        printfQuda("%d - totalConstMem:           %lu bytes ( %.2f Kbytes)\n", device, deviceProp.totalConstMem,
-                   deviceProp.totalConstMem / (float)1024);
-        printfQuda("%d - compute capability:      %d.%d\n", device, deviceProp.major, deviceProp.minor);
-        printfQuda("%d - deviceOverlap            %s\n", device, (deviceProp.deviceOverlap ? "true" : "false"));
-        printfQuda("%d - multiProcessorCount      %d\n", device, deviceProp.multiProcessorCount);
-        printfQuda("%d - kernelExecTimeoutEnabled %s\n", device,
-                   (deviceProp.kernelExecTimeoutEnabled ? "true" : "false"));
-        printfQuda("%d - integrated               %s\n", device, (deviceProp.integrated ? "true" : "false"));
-        printfQuda("%d - canMapHostMemory         %s\n", device, (deviceProp.canMapHostMemory ? "true" : "false"));
-        switch (deviceProp.computeMode) {
-        case 0: printfQuda("%d - computeMode              0: cudaComputeModeDefault\n", device); break;
-        case 1: printfQuda("%d - computeMode              1: cudaComputeModeExclusive\n", device); break;
-        case 2: printfQuda("%d - computeMode              2: cudaComputeModeProhibited\n", device); break;
-        case 3: printfQuda("%d - computeMode              3: cudaComputeModeExclusiveProcess\n", device); break;
-        default: errorQuda("Unknown deviceProp.computeMode.");
-        }
-
-        printfQuda("%d - surfaceAlignment         %lu\n", device, deviceProp.surfaceAlignment);
-        printfQuda("%d - concurrentKernels        %s\n", device, (deviceProp.concurrentKernels ? "true" : "false"));
-        printfQuda("%d - ECCEnabled               %s\n", device, (deviceProp.ECCEnabled ? "true" : "false"));
-        printfQuda("%d - pciBusID                 %d\n", device, deviceProp.pciBusID);
-        printfQuda("%d - pciDeviceID              %d\n", device, deviceProp.pciDeviceID);
-        printfQuda("%d - pciDomainID              %d\n", device, deviceProp.pciDomainID);
-        printfQuda("%d - tccDriver                %s\n", device, (deviceProp.tccDriver ? "true" : "false"));
-        switch (deviceProp.asyncEngineCount) {
-        case 0: printfQuda("%d - asyncEngineCount         1: host -> device only\n", device); break;
-        case 1: printfQuda("%d - asyncEngineCount         2: host <-> device\n", device); break;
-        case 2: printfQuda("%d - asyncEngineCount         0: not supported\n", device); break;
-        default: errorQuda("Unknown deviceProp.asyncEngineCount.");
-        }
-        printfQuda("%d - unifiedAddressing        %s\n", device, (deviceProp.unifiedAddressing ? "true" : "false"));
-        printfQuda("%d - memoryClockRate          %d kilohertz\n", device, deviceProp.memoryClockRate);
-        printfQuda("%d - memoryBusWidth           %d bits\n", device, deviceProp.memoryBusWidth);
-        printfQuda("%d - l2CacheSize              %d bytes\n", device, deviceProp.l2CacheSize);
-        printfQuda("%d - maxThreadsPerMultiProcessor          %d\n\n", device, deviceProp.maxThreadsPerMultiProcessor);
+      printfQuda("%d - totalGlobalMem:          %lu bytes ( %.2f Gbytes)\n", device, deviceProp.totalGlobalMem,
+		 deviceProp.totalGlobalMem / (float)(1024 * 1024 * 1024));
+      printfQuda("%d - sharedMemPerBlock:       %lu bytes ( %.2f Kbytes)\n", device, deviceProp.sharedMemPerBlock,
+		 deviceProp.sharedMemPerBlock / (float)1024);
+      printfQuda("%d - regsPerBlock:            %d\n", device, deviceProp.regsPerBlock);
+      printfQuda("%d - warpSize:                %d\n", device, deviceProp.warpSize);
+      printfQuda("%d - memPitch:                %lu\n", device, deviceProp.memPitch);
+      printfQuda("%d - maxThreadsPerBlock:      %d\n", device, deviceProp.maxThreadsPerBlock);
+      printfQuda("%d - maxThreadsDim[0]:        %d\n", device, deviceProp.maxThreadsDim[0]);
+      printfQuda("%d - maxThreadsDim[1]:        %d\n", device, deviceProp.maxThreadsDim[1]);
+      printfQuda("%d - maxThreadsDim[2]:        %d\n", device, deviceProp.maxThreadsDim[2]);
+      printfQuda("%d - maxGridSize[0]:          %d\n", device, deviceProp.maxGridSize[0]);
+      printfQuda("%d - maxGridSize[1]:          %d\n", device, deviceProp.maxGridSize[1]);
+      printfQuda("%d - maxGridSize[2]:          %d\n", device, deviceProp.maxGridSize[2]);
+      printfQuda("%d - totalConstMem:           %lu bytes ( %.2f Kbytes)\n", device, deviceProp.totalConstMem,
+		 deviceProp.totalConstMem / (float)1024);
+      printfQuda("%d - compute capability:      %d.%d\n", device, deviceProp.major, deviceProp.minor);
+      printfQuda("%d - deviceOverlap            %s\n", device, (deviceProp.deviceOverlap ? "true" : "false"));
+      printfQuda("%d - multiProcessorCount      %d\n", device, deviceProp.multiProcessorCount);
+      printfQuda("%d - kernelExecTimeoutEnabled %s\n", device,
+		 (deviceProp.kernelExecTimeoutEnabled ? "true" : "false"));
+      printfQuda("%d - integrated               %s\n", device, (deviceProp.integrated ? "true" : "false"));
+      printfQuda("%d - canMapHostMemory         %s\n", device, (deviceProp.canMapHostMemory ? "true" : "false"));
+      switch (deviceProp.computeMode) {
+      case 0: printfQuda("%d - computeMode              0: cudaComputeModeDefault\n", device); break;
+      case 1: printfQuda("%d - computeMode              1: cudaComputeModeExclusive\n", device); break;
+      case 2: printfQuda("%d - computeMode              2: cudaComputeModeProhibited\n", device); break;
+      case 3: printfQuda("%d - computeMode              3: cudaComputeModeExclusiveProcess\n", device); break;
+      default: errorQuda("Unknown deviceProp.computeMode.");
       }
+      printfQuda("%d - surfaceAlignment         %lu\n", device, deviceProp.surfaceAlignment);
+      printfQuda("%d - concurrentKernels        %s\n", device, (deviceProp.concurrentKernels ? "true" : "false"));
+      printfQuda("%d - ECCEnabled               %s\n", device, (deviceProp.ECCEnabled ? "true" : "false"));
+      printfQuda("%d - pciBusID                 %d\n", device, deviceProp.pciBusID);
+      printfQuda("%d - pciDeviceID              %d\n", device, deviceProp.pciDeviceID);
+      printfQuda("%d - pciDomainID              %d\n", device, deviceProp.pciDomainID);
+      printfQuda("%d - tccDriver                %s\n", device, (deviceProp.tccDriver ? "true" : "false"));
+      switch (deviceProp.asyncEngineCount) {
+      case 0: printfQuda("%d - asyncEngineCount         1: host -> device only\n", device); break;
+      case 1: printfQuda("%d - asyncEngineCount         2: host <-> device\n", device); break;
+      case 2: printfQuda("%d - asyncEngineCount         0: not supported\n", device); break;
+      default: errorQuda("Unknown deviceProp.asyncEngineCount.");
+      }
+      printfQuda("%d - unifiedAddressing        %s\n", device, (deviceProp.unifiedAddressing ? "true" : "false"));
+      printfQuda("%d - memoryClockRate          %d kilohertz\n", device, deviceProp.memoryClockRate);
+      printfQuda("%d - memoryBusWidth           %d bits\n", device, deviceProp.memoryBusWidth);
+      printfQuda("%d - l2CacheSize              %d bytes\n", device, deviceProp.l2CacheSize);
+      printfQuda("%d - maxThreadsPerMultiProcessor          %d\n\n", device, deviceProp.maxThreadsPerMultiProcessor);
 #endif
     }
 
@@ -203,6 +203,10 @@ namespace quda
       }
       streams[Nstream-1] = sycl::queue(ctx, myDevice, exception_handler, props);
       printfQuda(" done\n");
+      for (int i=0; i<Nstream; i++) {
+	eventCount[i] = 0;
+	syncStamp[i] = 0;
+      }
       printfQuda("Testing submit...");
       auto q = streams[Nstream-1];
       q.submit([&](sycl::handler& h) {
@@ -257,6 +261,23 @@ namespace quda
     {
       //printfQuda("Getting default queue\n");
       return streams[Nstream-1];
+    }
+
+    size_t getEventIdx(const qudaStream_t &stream)
+    {
+      eventCount[stream.idx]++;
+      return eventCount[stream.idx];
+    }
+
+    void wasSynced(const qudaStream_t &stream)
+    {
+      eventCount[stream.idx]++;
+      syncStamp[stream.idx] = eventCount[stream.idx];
+    }
+
+    void wasSynced(const qudaStream_t &stream, size_t eventIdx)
+    {
+      syncStamp[stream.idx] = std::max(syncStamp[stream.idx], eventIdx);
     }
 
     bool managed_memory_supported()
@@ -343,5 +364,48 @@ namespace quda
 
     }
 
-  }
-}
+    // buffer for kernel argument
+    typedef struct {
+      void *buf;
+      size_t size;
+      size_t sync;
+      qudaStream_t stream;
+    } ArgBufT;
+    std::vector<ArgBufT> argBuf{};
+
+    void *get_arg_buf(qudaStream_t stream, size_t size)
+    {
+      //printfQuda("Adding buf stream %i size %i\n", stream.idx, size);
+      for (auto &b: argBuf) {
+	//printfQuda("  Arg buf stream %i size %i\n", b.stream.idx, b.size);
+	if (syncStamp[b.stream.idx] > b.sync) {
+	  b.stream = stream;
+	  b.sync = eventCount[stream.idx];
+	  if(size > b.size) {
+	    if(b.buf!=nullptr) device_free(b.buf);
+	    b.buf = device_malloc(size);
+	    b.size = size;
+	  }
+	  return b.buf;
+	}
+      }
+      ArgBufT a;
+      a.stream = stream;
+      a.sync = eventCount[stream.idx];
+      a.size = size;
+      a.buf = device_malloc(size);
+      argBuf.push_back(a);
+      //printfQuda("Added buf stream %i size %i\n", a.stream.idx, a.size);
+      return a.buf;
+    }
+
+    void free_arg_buf()
+    {
+      for (const auto &b: argBuf) {
+	printfQuda("Arg buf stream %i size %i\n", b.stream.idx, b.size);
+	if(b.buf!=nullptr) device_free(b.buf);
+      }
+    }
+
+  } // device
+} // quda
