@@ -1026,11 +1026,11 @@ protected:
       blas::cDotProduct(B2, xmD, xmD);
       error = 0.0;
       for (int i = 0; i < Nsrc; i++) {
-        for (int j = 0; j < Msrc; j++) {
-          error += std::abs(A2[i * Msrc + j] - B2[i * Msrc + j]) / std::abs(B2[i * Msrc + j]);
+        for (int j = 0; j < Nsrc; j++) {
+          error += std::abs(A2[i * Nsrc + j] - B2[i * Nsrc + j]) / std::abs(B2[i * Nsrc + j]);
         }
       }
-      error /= Nsrc * Msrc;
+      error /= Nsrc * Nsrc;
       break;
 
     case Kernel::caxpyXmazMR:
