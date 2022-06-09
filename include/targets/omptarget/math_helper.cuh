@@ -11,7 +11,7 @@ namespace quda {
    * @param b second number
    */
   template<typename T>
-  inline __host__ __device__ T max(const T &a, const T &b) { return a > b ? a : b; }
+  inline T max(const T &a, const T &b) { return a > b ? a : b; }
 
   /**
    * @brief Minimum of two numbers
@@ -19,7 +19,7 @@ namespace quda {
    * @param b second number
    */
   template<typename T>
-  inline __host__ __device__ T min(const T &a, const T &b) { return a < b ? a : b; }
+  inline T min(const T &a, const T &b) { return a < b ? a : b; }
 
 
   /**
@@ -29,38 +29,35 @@ namespace quda {
    * @param c pointer to the storage for the result of the cos
    */
   template<typename T>
-  inline __host__ __device__ void sincos(const T& a, T* s, T* c) { *s = std::sin(a); *c = std::cos(a); }
+  inline void sincos(const T& a, T* s, T* c) { *s = std::sin(a); *c = std::cos(a); }
+
+  /**
+   * @brief Combined sinpi and cospi calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @param s pointer to the storage for the result of the sin
+   * @param c pointer to the storage for the result of the cos
+   */
+  template <typename T> inline void sincospi(const T& a, T *s, T *c) { quda::sincos(a * static_cast<T>(M_PI), s, c); }
+
+  /**
+   * @brief Sine pi calculation in QUDA NAMESPACE.
+   * @param a the angle
+   * @return result of the sin(a * pi)
+   */
+  template <typename T> inline T sinpi(T a) { return sin(a * static_cast<T>(M_PI)); }
+
+  /**
+   * @brief Cosine pi calculation in QUDA NAMESPACE.
+   * @param a the angle
+   * @return result of the cos(a * pi)
+   */
+  template <typename T> inline T cospi(T a) { return cos(a * static_cast<T>(M_PI)); }
 
   /**
    * @brief Reciprocal square root function (rsqrt)
    * @param a the argument  (In|out)
-   *
-   * some math libraries provide a fast inverse sqrt() function.
-   * this implementation trusts the compiler.
    */
-  template<typename T> inline __host__ __device__ T rsqrt(T a) { return static_cast<T>(1.0) / std::sqrt(a); }
-
-    /**
-     Generic wrapper for Trig functions -- used in gauge field order 
-    */
-  template <bool isFixed, typename T>
-  struct Trig {
-    __device__ __host__ static T Atan2( const T &a, const T &b) { return std::atan2(a,b); }
-    __device__ __host__ static T Sin( const T &a ) { return std::sin(a); }
-    __device__ __host__ static T Cos( const T &a ) { return std::cos(a); }
-    __device__ __host__ static void SinCos(const T &a, T *s, T *c) { sincos(a, s, c); }
-  };
-
-  /**
-     Specialization of Trig functions using fixed b/c gauge reconstructs are -1 -> 1 instead of -Pi -> Pi
-   */
-  template <>
-    struct Trig<true,float> {
-    __device__ __host__ static float Atan2( const float &a, const float &b) { return std::atan2(a,b)/M_PI; }
-    __device__ __host__ static float Sin(const float &a) { return std::sin(a * static_cast<float>(M_PI)); }
-    __device__ __host__ static float Cos(const float &a) { return std::cos(a * static_cast<float>(M_PI)); }
-    __device__ __host__ static void SinCos(const float &a, float *s, float *c) { sincos(a * static_cast<float>(M_PI), s, c); }
-  };
+  template<typename T> inline T rsqrt(T a) { return static_cast<T>(1.0) / std::sqrt(a); }
 
   /*
     @brief Fast power function that works for negative "a" argument
