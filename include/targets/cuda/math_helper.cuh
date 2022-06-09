@@ -71,6 +71,76 @@ namespace quda {
   inline __host__ __device__ void sincos(const float& a, float *s, float *c) { target::dispatch<sincosf_impl>(a, s, c); }
 
 
+  template <bool is_device> struct sincospi_impl {
+    template <typename T> inline void operator()(const T& a, T *s, T *c) { ::sincos(a * static_cast<T>(M_PI), s, c); }
+  };
+
+  template <> struct sincospi_impl<true> {
+    template <typename T> __device__ inline void operator()(const T& a, T *s, T *c) { sincospi(a, s, c); }
+  };
+
+
+  /**
+   * @brief Combined sinpi and cospi calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @param s pointer to the storage for the result of the sin
+   * @param c pointer to the storage for the result of the cos
+   */
+  template<typename T>
+  inline __host__ __device__ void sincospi(const T& a, T *s, T *c) { target::dispatch<sincospi_impl>(a, s, c); }
+
+  /**
+   * @brief Combined sinpi and cospi calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @param s pointer to the storage for the result of the sin
+   * @param c pointer to the storage for the result of the cos
+   *
+   * Specialization to float arguments.  Use sincos so that Device function calls CUDA intrinsic.
+   */
+  template<>
+  inline __host__ __device__ void sincospi(const float& a, float *s, float *c) { quda::sincos(a * static_cast<float>(M_PI), s, c); }
+
+
+  /**
+   * @brief Sine pi calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @return result of the sin(a * pi)
+   */
+  template<typename T> inline __host__ __device__ T sinpi(T a) { return ::sinpi(a); }
+
+  template <bool is_device> struct sinpif_impl { inline float operator()(float a) { return ::sinpif(a); } };
+  template <> struct sinpif_impl<true> { __device__ inline float operator()(float a) { return __sinf(a * static_cast<float>(M_PI)); } };
+
+  /**
+   * @brief Sine pi calculation in QUDA NAMESPACE.
+   * @param a the angle
+   * @return result of the sin(a * pi)
+   *
+   * Specialization to float.  Device function will call CUDA intrinsic.
+   */
+  template<> inline __host__ __device__ float sinpi(float a) { return target::dispatch<sinpif_impl>(a); }
+
+
+  /**
+   * @brief Cosine pi calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @return result of the cos(a * pi)
+   */
+  template<typename T> inline __host__ __device__ T cospi(T a) { return ::cospi(a); }
+
+  template <bool is_device> struct cospif_impl { inline float operator()(float a) { return ::cospif(a); } };
+  template <> struct cospif_impl<true> { __device__ inline float operator()(float a) { return __cosf(a * static_cast<float>(M_PI)); } };
+
+  /**
+   * @brief Cosine pi calculation in QUDA NAMESPACE.
+   * @param a the angle
+   * @return result of the cos(a * pi)
+   *
+   * Specialization to float.  Device function will call CUDA intrinsic.
+   */
+  template<> inline __host__ __device__ float cospi(float a) { return target::dispatch<cospif_impl>(a); }
+
+
   template <bool is_device> struct rsqrt_impl {
     template <typename T> inline T operator()(T a) { return static_cast<T>(1.0) / sqrt(a); }
   };
@@ -88,63 +158,6 @@ namespace quda {
    */
   template<typename T> inline __host__ __device__ T rsqrt(T a) { return target::dispatch<rsqrt_impl>(a); }
 
-
-  template <bool is_device> struct sin_impl { template <typename T> inline T operator()(const T& a) { return ::sin(a); } };
-  template <> struct sin_impl<true> {
-    template <typename T> __device__ inline T operator()(const T& a)
-    {
-      BUILTIN_ASSUME(fabs(a) <= 2.0 * M_PI);
-      return sin(a);
-    }
-  };
-
-  template <bool is_device> struct cos_impl { template <typename T> inline T operator()(const T& a) { return ::cos(a); } };
-  template <> struct cos_impl<true> {
-    template <typename T> __device__ inline T operator()(const T& a)
-    {
-      BUILTIN_ASSUME(fabs(a) <= 2.0 * M_PI);
-      return cos(a);
-    }
-  };
-
-  /**
-     Generic wrapper for Trig functions -- used in gauge field order
-  */
-  template <bool isFixed, typename T>
-  struct Trig {
-    __device__ __host__ static T Atan2( const T &a, const T &b) { return ::atan2(a,b); }
-    __device__ __host__ static T Sin( const T &a ) { return target::dispatch<sin_impl>(a); }
-    __device__ __host__ static T Cos( const T &a ) { return target::dispatch<cos_impl>(a); }
-    __device__ __host__ static void SinCos(const T &a, T *s, T *c) { target::dispatch<sincos_impl>(a, s, c); }
-  };
-
-  template <bool is_device> struct sinf_impl { inline float operator()(const float& a) { return ::sinf(a); } };
-  template <> struct sinf_impl<true> { __device__ inline float operator()(const float& a) { return __sinf(a); } };
-
-  template <bool is_device> struct cosf_impl { inline float operator()(const float& a) { return ::cosf(a); } };
-  template <> struct cosf_impl<true> { __device__ inline float operator()(const float& a) { return __cosf(a); } };
-
-  /**
-     Specialization of Trig functions using floats
-   */
-  template <>
-    struct Trig<false,float> {
-    __device__ __host__ static float Atan2( const float &a, const float &b) { return ::atan2f(a,b); }
-    __device__ __host__ static float Sin(const float &a) { return target::dispatch<sinf_impl>(a); }
-    __device__ __host__ static float Cos(const float &a) { return target::dispatch<cosf_impl>(a); }
-    __device__ __host__ static void SinCos(const float &a, float *s, float *c) { target::dispatch<sincosf_impl>(a, s, c); }
-  };
-
-  /**
-     Specialization of Trig functions using fixed b/c gauge reconstructs are -1 -> 1 instead of -Pi -> Pi
-   */
-  template <>
-    struct Trig<true,float> {
-    __device__ __host__ static float Atan2( const float &a, const float &b) { return ::atan2f(a,b) / static_cast<float>(M_PI); }
-    __device__ __host__ static float Sin(const float &a) { return target::dispatch<sinf_impl>(a * static_cast<float>(M_PI)); }
-    __device__ __host__ static float Cos(const float &a) { return target::dispatch<cosf_impl>(a * static_cast<float>(M_PI)); }
-    __device__ __host__ static void SinCos(const float &a, float *s, float *c) { target::dispatch<sincosf_impl>(a * static_cast<float>(M_PI), s, c); }
-  };
 
   template <bool is_device> struct fpow_impl { template <typename real> inline real operator()(real a, int b) { return std::pow(a, b); } };
 

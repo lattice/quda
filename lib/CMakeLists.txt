@@ -257,11 +257,11 @@ if(QUDA_DIRAC_DOMAIN_WALL)
 endif(QUDA_DIRAC_DOMAIN_WALL)
 
 if(QUDA_DIRAC_STAGGERED)
-  target_compile_definitions(quda PUBLIC GPU_STAGGERED_DIRAC GPU_FATLINK GPU_UNITARIZE)
+  target_compile_definitions(quda PUBLIC GPU_STAGGERED_DIRAC)
 endif(QUDA_DIRAC_STAGGERED)
 
 if(QUDA_DIRAC_CLOVER)
-  target_compile_definitions(quda PUBLIC GPU_CLOVER_DIRAC GPU_WILSON_DIRAC GPU_GAUGE_TOOLS)
+  target_compile_definitions(quda PUBLIC GPU_CLOVER_DIRAC GPU_WILSON_DIRAC)
 endif(QUDA_DIRAC_CLOVER)
 
 if(QUDA_DIRAC_TWISTED_MASS)
@@ -270,12 +270,12 @@ endif(QUDA_DIRAC_TWISTED_MASS)
 
 if(QUDA_DIRAC_TWISTED_CLOVER)
   target_compile_definitions(quda PUBLIC GPU_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC GPU_TWISTED_MASS_DIRAC
-                                         GPU_WILSON_DIRAC GPU_GAUGE_TOOLS)
+                                         GPU_WILSON_DIRAC)
 endif(QUDA_DIRAC_TWISTED_CLOVER)
 
 if(QUDA_DIRAC_CLOVER_HASENBUSCH)
   target_compile_definitions(quda PUBLIC GPU_CLOVER_HASENBUSCH_TWIST GPU_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC
-                                         GPU_WILSON_DIRAC GPU_GAUGE_TOOLS)
+                                         GPU_WILSON_DIRAC)
 endif(QUDA_DIRAC_CLOVER_HASENBUSCH)
 
 if(QUDA_DIRAC_NDEG_TWISTED_MASS)
@@ -283,8 +283,7 @@ if(QUDA_DIRAC_NDEG_TWISTED_MASS)
 endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
 if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
-  target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC GPU_TWISTED_CLOVER_DIRAC
-                                         GPU_GAUGE_TOOLS)
+  target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC GPU_TWISTED_CLOVER_DIRAC)
 endif(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
 
 
@@ -297,7 +296,7 @@ if(QUDA_MULTIGRID)
 endif(QUDA_MULTIGRID)
 
 if(QUDA_GAUGE_ALG)
-  target_compile_definitions(quda PUBLIC GPU_GAUGE_ALG GPU_GAUGE_TOOLS GPU_UNITARIZE)
+  target_compile_definitions(quda PUBLIC)
 endif(QUDA_GAUGE_ALG)
 
 if(QUDA_SSTEP)
@@ -309,19 +308,15 @@ if(QUDA_BLOCKSOLVER)
 endif()
 
 if(QUDA_FORCE_GAUGE)
-  target_compile_definitions(quda PUBLIC GPU_GAUGE_FORCE GPU_GAUGE_TOOLS)
+  target_compile_definitions(quda PUBLIC)
 endif(QUDA_FORCE_GAUGE)
 
-if(QUDA_FORCE_HISQ)
-  target_compile_definitions(quda PUBLIC GPU_HISQ_FORCE GPU_STAGGERED_OPROD GPU_GAUGE_TOOLS)
-endif(QUDA_FORCE_HISQ)
-
 if(QUDA_GAUGE_TOOLS)
-  target_compile_definitions(quda PUBLIC GPU_GAUGE_TOOLS)
+  target_compile_definitions(quda PUBLIC)
 endif(QUDA_GAUGE_TOOLS)
 
 if(QUDA_GAUGE_ALG)
-  target_compile_definitions(quda PUBLIC GPU_GAUGE_ALG GPU_GAUGE_TOOLS GPU_UNITARIZE)
+  target_compile_definitions(quda PUBLIC)
 endif(QUDA_GAUGE_ALG)
 
 if(QUDA_INTERFACE_QDP OR QUDA_INTERFACE_ALL)

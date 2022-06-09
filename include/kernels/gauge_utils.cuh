@@ -1,6 +1,7 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
 #include <quda_matrix.h>
+#include <shared_memory_cache_helper.cuh>
 
 namespace quda
 {
@@ -21,7 +22,7 @@ namespace quda
   __host__ __device__ inline void computeStaple(const Arg &arg, const int *x, const Int *X, const int parity, const int nu, Link &staple, const int dir_ignore)
   {
     setZero(&staple);
-    int dx[4] = { };
+    thread_array<int, 4> dx = { };
 QUDA_UNROLL
     for (int mu = 0; mu < 4 ; mu++) {
       // Identify directions orthogonal to the link and
@@ -96,7 +97,7 @@ QUDA_UNROLL
   {
     setZero(&staple);
     setZero(&rectangle);
-    int dx[4] = { };
+    thread_array<int, 4> dx = { };
 
     for (int mu = 0; mu < 4; mu++) { // do not unroll loop to prevent register spilling
       // Identify directions orthogonal to the link.

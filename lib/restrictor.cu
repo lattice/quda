@@ -1,10 +1,10 @@
 #include <array>
 
 #include <color_spinor_field.h>
+#include <multigrid.h>
 #include <power_of_two_array.h>
 #include <tunable_block_reduction.h>
 #include <kernels/restrictor.cuh>
-#include <instantiate.h>
 
 namespace quda {
 
@@ -130,7 +130,9 @@ namespace quda {
   template <> struct enabled<2, 24, 2, 96> : std::true_type { };
   template <> struct enabled<2, 64, 2, 64> : std::true_type { };
   template <> struct enabled<2, 64, 2, 96> : std::true_type { };
-#elif defined(NSPIN1) || defined(NSPIN4)
+  template <> struct enabled<2, 96, 2, 96> : std::true_type { };
+#endif
+#if defined(NSPIN1) || defined(NSPIN4)
   template <> struct enabled<2, 24, 2, 24> : std::true_type { };
 #endif
 

@@ -29,25 +29,6 @@ namespace quda
   }
 
   /**
-     @brief Helper function for returning if multigrid is enabled
-  */
-#ifdef GPU_MULTIGRID
-  constexpr bool is_enabled_multigrid() { return true; };
-#else
-  constexpr bool is_enabled_multigrid() { return false; };
-#endif
-
-    /**
-       @brief Helper function for returning if double-precision
-       multigrid is enabled
-    */
-#ifdef GPU_MULTIGRID_DOUBLE
-  constexpr bool is_enabled_multigrid_double() { return true; }
-#else
-  constexpr bool is_enabled_multigrid_double() { return false; }
-#endif
-
-  /**
      @brief Helper function for returning if a given gauge field order is enabled
      @tparam order The order requested
    */
@@ -114,6 +95,11 @@ namespace quda
   struct ReconstructFull {
     static constexpr std::array<QudaReconstructType, 6> recon
       = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_9, QUDA_RECONSTRUCT_8, QUDA_RECONSTRUCT_10};
+  };
+
+  struct ReconstructGauge {
+    static constexpr std::array<QudaReconstructType, 5> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_9, QUDA_RECONSTRUCT_8};
   };
 
   struct ReconstructWilson {
@@ -184,7 +170,7 @@ namespace quda
      @param[in] U Gauge field
      @param[in,out] args Any additional arguments required for the computation at hand
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructFull, typename G,
+  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructNo12, typename G,
             typename... Args>
   constexpr void instantiate(G &U, Args &&...args)
   {
@@ -211,7 +197,7 @@ namespace quda
      @param[in] U Gauge field
      @param[in,out] args Any additional arguments required for the computation at hand
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructFull, typename G,
+  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructNo12, typename G,
             typename... Args>
   constexpr void instantiate2(G &U, Args &&...args)
   {
@@ -445,41 +431,6 @@ namespace quda
     } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
       if constexpr (is_enabled<QUDA_QUARTER_PRECISION>())
         Apply<int8_t, T>(field, args...);
-      else
-        errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
-    } else {
-      errorQuda("Unsupported precision %d\n", field.Precision());
-    }
-  }
-
-  /**
-     @brief The instantiatePrecision function is used to instantiate
-     the precision
-     @param[in] field LatticeField we wish to instantiate
-     @param[in,out] args Any additional arguments required for the
-     computation at hand
-  */
-  template <template <typename> class Apply, typename F, typename... Args>
-  constexpr void instantiatePrecisionMG(F &field, Args &&... args)
-  {
-    if (field.Precision() == QUDA_DOUBLE_PRECISION) {
-      if constexpr (is_enabled_multigrid_double())
-        Apply<double>(field, args...);
-      else
-        errorQuda("Multigrid not supported in double precision");
-    } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
-      if constexpr (is_enabled<QUDA_SINGLE_PRECISION>())
-        Apply<float>(field, args...);
-      else
-        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
-    } else if (field.Precision() == QUDA_HALF_PRECISION) {
-      if constexpr (is_enabled<QUDA_HALF_PRECISION>())
-        Apply<short>(field, args...);
-      else
-        errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-    } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
-      if constexpr (is_enabled<QUDA_QUARTER_PRECISION>())
-        Apply<int8_t>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
     } else {
