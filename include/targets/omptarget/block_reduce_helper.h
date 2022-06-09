@@ -17,14 +17,19 @@ namespace quda
 
   namespace target
   {
+    template <typename T>
+    constexpr bool enough_shared_mem(void)
+    {
+      constexpr auto max_nthr = device::max_block_size();
+      return max_nthr*sizeof(T) <= device::max_shared_memory_size()-sizeof(target::omptarget::get_shared_cache()[0])*128;  // FIXME arbitrary, the number is arbitrary, offset 128 below & in reduce_helper.h:/reduce
+    }
     /**
        @brief OpenMP reduction over a group of consecutive threads smaller than omp_num_threads()
      */
     template <typename T, typename reducer_t>
-    inline T any_reduce(const reducer_t &r, const T &value_, const int batch, const int block_size, const bool all, const bool async)
+    inline T any_reduce_impl(const reducer_t &r, const T &value_, const int batch, const int block_size, const bool all, const bool async)
     {
-      constexpr max_nthr = device::max_block_size();
-      static_assert(max_nthr*sizeof(T) <= device::max_shared_memory_size()-sizeof(target::omptarget::get_shared_cache()[0])*128, "Shared cache not large enough for tempStorage");  // FIXME arbitrary, the number is arbitrary, offset 128 below
+      static_assert(enough_shared_mem<T>(), "Shared cache not large enough for tempStorage");
       T *storage = (T*)&target::omptarget::get_shared_cache()[128];  // FIXME arbitrary
       const int tid = omp_get_thread_num();
       const auto& v0 = r.init();
@@ -81,6 +86,29 @@ namespace quda
       const auto& value = storage[block_size*batch];
 #endif
       return value;
+    }
+    template <typename T, typename R>
+    inline T any_reduce(const R &r, const T &value_, const int batch, const int block_size, const bool all, const bool async)
+    {
+      if constexpr (enough_shared_mem<T>())
+        return any_reduce_impl(r, value_, batch, block_size, all, async);
+      else{
+        using V = typename T::value_type;
+        if constexpr (
+            std::is_same_v<typename R::reducer_t,plus<typename R::reduce_t>> &&
+            std::is_same_v<T,typename R::reduce_t> &&
+            std::is_same_v<T,array<V,T::N>>){
+          const constexpr plus<V> re {};
+          auto value = value_;
+          value[0] = any_reduce_impl(re, value_[0], batch, block_size, all, async);
+QUDA_UNROLL
+          for (int i = 1; i < value.size(); i++) {
+            value[i] = any_reduce_impl(re, value_[i], batch, block_size, all, false);
+          }
+          return value;
+        }else
+          static_assert(sizeof(T)==0, "unimplemented reduction");  // let me fail at compile time
+      }
     }
   }
 
