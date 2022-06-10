@@ -7,6 +7,8 @@ static sycl::queue *streams;
 static const int Nstream = 9;
 static size_t eventCount[Nstream];  // counts event recording and stream syncs
 static size_t syncStamp[Nstream];   // eventCount of last sync
+static void *argBufD[Nstream];
+static size_t argBufSizeD[Nstream];
 
 class mySelectorT : public sycl::device_selector {
   int operator()(const sycl::device& device) const override {
@@ -206,6 +208,8 @@ namespace quda
       for (int i=0; i<Nstream; i++) {
 	eventCount[i] = 0;
 	syncStamp[i] = 0;
+	argBufD[i] = nullptr;
+	argBufSizeD[i] = 0;
       }
       printfQuda("Testing submit...");
       auto q = streams[Nstream-1];
@@ -383,10 +387,10 @@ namespace quda
 	  if(size > b.size) {
 	    //if(b.buf!=nullptr) device_free(b.buf);
 	    //b.buf = device_malloc(size);
-	    //if(b.buf!=nullptr) host_free(b.buf);
-	    //b.buf = pinned_malloc(size);
-	    if(b.buf!=nullptr) managed_free(b.buf);
-	    b.buf = managed_malloc(size);
+	    if(b.buf!=nullptr) host_free(b.buf);
+	    b.buf = pinned_malloc(size);
+	    //if(b.buf!=nullptr) managed_free(b.buf);
+	    //b.buf = managed_malloc(size);
 	    b.size = size;
 	  }
 	  return b.buf;
@@ -409,11 +413,23 @@ namespace quda
 	a.sync = eventCount[stream.idx];
 	a.size = size;
 	//buf = device_malloc(size);
-	//buf = pinned_malloc(size);
-	buf = managed_malloc(size);
+	buf = pinned_malloc(size);
+	//buf = managed_malloc(size);
 	a.buf = buf;
 	argBuf.push_back(a);
 	//printfQuda("Added buf stream %i size %i\n", a.stream.idx, a.size);
+      }
+      return buf;
+    }
+
+    void *get_arg_buf_d(qudaStream_t stream, size_t size)
+    {
+      auto buf = argBufD[stream.idx];
+      if (size > argBufSizeD[stream.idx]) {
+	if(buf!=nullptr) device_free(buf);
+	buf = device_malloc(size);
+	argBufD[stream.idx] = buf;
+	argBufSizeD[stream.idx] = size;
       }
       return buf;
     }
@@ -424,8 +440,11 @@ namespace quda
       for (const auto &b: argBuf) {
 	printfQuda("  stream %i size %i\n", b.stream.idx, b.size);
 	//if(b.buf!=nullptr) device_free(b.buf);
-	//if(b.buf!=nullptr) host_free(b.buf);
-	if(b.buf!=nullptr) managed_free(b.buf);
+	if(b.buf!=nullptr) host_free(b.buf);
+	//if(b.buf!=nullptr) managed_free(b.buf);
+      }
+      for (int i=0; i<Nstream; i++) {
+	if (argBufD[i]!=nullptr) device_free(argBufD[i]);
       }
     }
 

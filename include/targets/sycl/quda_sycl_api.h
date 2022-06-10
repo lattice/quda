@@ -12,6 +12,7 @@ namespace quda
     void wasSynced(const qudaStream_t &stream);
     void wasSynced(const qudaStream_t &stream, size_t eventIdx);
     void *get_arg_buf(qudaStream_t stream, size_t size);
+    void *get_arg_buf_d(qudaStream_t stream, size_t size);
     void free_arg_buf();
   }
 
