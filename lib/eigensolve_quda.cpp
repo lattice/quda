@@ -147,17 +147,15 @@ namespace quda
       }
     } else {
       // Use 0th vector to extract meta data for the RNG.
-      RNG *rng = new RNG(*kSpace[0], 1234);	  
+      RNG *rng = new RNG(*kSpace[0], 1234);
       for (int b = 0; b < block_size; b++) {
-	// If the spinor contains initial data from the user
-	// preserve it, else populate with rands.
-        if (sqrt(blas::norm2(*kSpace[b])) == 0.0) {
-	  spinorNoise(*kSpace[b], *rng, QUDA_NOISE_UNIFORM);
-	}	
+        // If the spinor contains initial data from the user
+        // preserve it, else populate with rands.
+        if (sqrt(blas::norm2(*kSpace[b])) == 0.0) { spinorNoise(*kSpace[b], *rng, QUDA_NOISE_UNIFORM); }
       }
       delete rng;
     }
-    
+
     bool orthed = false;
     int k = 0, kmax = 5;
     while (!orthed && k < kmax) {

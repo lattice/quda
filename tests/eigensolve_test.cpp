@@ -143,7 +143,7 @@ int main(int argc, char **argv)
   double plaq[3];
   plaqQuda(plaq);
   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-  
+
   logQuda(QUDA_SUMMARIZE, "Solution = %s, Solve = %s, Solver = %s, Sloppy precision = %s\n",
           get_solution_str(eig_inv_param.solution_type), get_solve_str(eig_inv_param.solve_type),
           get_eig_type_str(eig_type), get_prec_str(eig_inv_param.cuda_prec_sloppy));
@@ -152,7 +152,7 @@ int main(int argc, char **argv)
   // by the ColorSpinorField destructor.
   {
     // Vector construct START
-    //----------------------------------------------------------------------------  
+    //----------------------------------------------------------------------------
     // Host side arrays to store the eigenpairs computed by QUDA
     std::vector<quda::ColorSpinorField> evecs(eig_n_conv);
     quda::ColorSpinorParam cs_param;
@@ -166,12 +166,12 @@ int main(int argc, char **argv)
       evecs[i] = quda::ColorSpinorField(cs_param);
       host_evecs_ptr[i] = evecs[i].V();
     }
-  
+
     // Complex eigenvalues
     std::vector<__complex__ double> evals(eig_n_conv);
     // Vector construct END
     //----------------------------------------------------------------------------
-  
+
     // QUDA eigensolver test BEGIN
     //----------------------------------------------------------------------------
     // This function returns the host_evecs and host_evals pointers, populated with the
@@ -189,14 +189,14 @@ int main(int argc, char **argv)
     // QUDA eigensolver test COMPLETE
     //----------------------------------------------------------------------------
   }
-  
+
   // Memory clean-up
   freeGaugeQuda();
   for (int dir = 0; dir < 4; dir++) host_free(gauge[dir]);
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     freeCloverQuda();
   }
-  
+
   // Finalize the QUDA library
   endQuda();
   finalizeComms();
