@@ -146,12 +146,18 @@ namespace quda
         if (sqrt(blas::norm2(*kSpace[b])) == 0.0) { kSpace[b]->Source(QUDA_RANDOM_SOURCE); }
       }
     } else {
-      RNG *rng = new RNG(*kSpace[0], 1234);
+      // Use 0th vector to extract meta data for the RNG.
+      RNG *rng = new RNG(*kSpace[0], 1234);	  
       for (int b = 0; b < block_size; b++) {
-        if (sqrt(blas::norm2(*kSpace[b])) == 0.0) { spinorNoise(*kSpace[b], *rng, QUDA_NOISE_UNIFORM); }
+	// If the spinor contains initial data from the user
+	// preserve it, else populate with rands.
+        if (sqrt(blas::norm2(*kSpace[b])) == 0.0) {
+	  spinorNoise(*kSpace[b], *rng, QUDA_NOISE_UNIFORM);
+	}	
       }
       delete rng;
     }
+    
     bool orthed = false;
     int k = 0, kmax = 5;
     while (!orthed && k < kmax) {
@@ -448,7 +454,7 @@ namespace quda
     for (int i = 0; i < size; i++) {
       for (int j = 0; j < i; j++) {
         Complex cnorm = blas::cDotProduct(*vecs_ptr[j], *vecs_ptr[i]); // <j|i> with i normalised.
-        blas::caxpy(-cnorm, *vecs_ptr[j], *vecs_ptr[i]);               // i = i - proj_{j}(i) = i - <j|i> * i
+        blas::caxpy(-cnorm, *vecs_ptr[j], *vecs_ptr[i]);               // i = i - proj_{j}(i) = i - <j|i> * j
       }
       double norm = sqrt(blas::norm2(*vecs_ptr[i]));
       blas::ax(1.0 / norm, *vecs_ptr[i]); // i/<i|i>

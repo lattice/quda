@@ -11,6 +11,7 @@
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
+#include <color_spinor_field.h> // convenient quark field container
 
 namespace quda
 {
@@ -128,55 +129,75 @@ int main(int argc, char **argv)
   loadGaugeQuda((void *)gauge, &gauge_param);
 
   // Allocate host side memory for clover terms if needed.
-  void *clover = 0, *clover_inv = 0;
+  std::vector<char> clover;
+  std::vector<char> clover_inv;
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    clover = safe_malloc(V * clover_site_size * host_clover_data_type_size);
-    clover_inv = safe_malloc(V * clover_site_size * host_spinor_data_type_size);
-    constructHostCloverField(clover, clover_inv, eig_inv_param);
+    clover.resize(V * clover_site_size * host_clover_data_type_size);
+    clover_inv.resize(V * clover_site_size * host_spinor_data_type_size);
+    constructHostCloverField(clover.data(), clover_inv.data(), eig_inv_param);
     // Load the clover terms to the device
-    loadCloverQuda(clover, clover_inv, &eig_inv_param);
+    loadCloverQuda(clover.data(), clover_inv.data(), &eig_inv_param);
   }
 
-  // QUDA eigensolver test BEGIN
-  //----------------------------------------------------------------------------
-  // Host side arrays to store the eigenpairs computed by QUDA
-  void **host_evecs = (void **)safe_malloc(eig_n_conv * sizeof(void *));
-  for (int i = 0; i < eig_n_conv; i++) {
-    host_evecs[i] = (void *)safe_malloc(V * eig_inv_param.Ls * spinor_site_size * eig_inv_param.cpu_prec);
+  // Compute plaquette as a sanity check
+  double plaq[3];
+  plaqQuda(plaq);
+  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  
+  logQuda(QUDA_SUMMARIZE, "Solution = %s, Solve = %s, Solver = %s, Sloppy precision = %s\n",
+          get_solution_str(eig_inv_param.solution_type), get_solve_str(eig_inv_param.solve_type),
+          get_eig_type_str(eig_type), get_prec_str(eig_inv_param.cuda_prec_sloppy));
+
+  // DMH: Make this a 'solve' type function so that the memory deletion is dealt with
+  // by the ColorSpinorField destructor.
+  {
+    // Vector construct START
+    //----------------------------------------------------------------------------  
+    // Host side arrays to store the eigenpairs computed by QUDA
+    std::vector<quda::ColorSpinorField> evecs(eig_n_conv);
+    quda::ColorSpinorParam cs_param;
+    constructWilsonTestSpinorParam(&cs_param, &eig_inv_param, &gauge_param);
+
+    // Void pointers to host side arrays, compatible with the QUDA interface.
+    std::vector<void *> host_evecs_ptr(eig_n_conv);
+
+    // Allocate host side memory and pointers
+    for (int i = 0; i < eig_n_conv; i++) {
+      evecs[i] = quda::ColorSpinorField(cs_param);
+      host_evecs_ptr[i] = evecs[i].V();
+    }
+  
+    // Complex eigenvalues
+    std::vector<__complex__ double> evals(eig_n_conv);
+    // Vector construct END
+    //----------------------------------------------------------------------------
+  
+    // QUDA eigensolver test BEGIN
+    //----------------------------------------------------------------------------
+    // This function returns the host_evecs and host_evals pointers, populated with the
+    // requested data, at the requested prec. All the information needed to perfom the
+    // solve is in the eig_param container. If eig_param.arpack_check == true and
+    // precision is double, the routine will use ARPACK rather than the GPU.
+    quda::host_timer_t host_timer;
+    host_timer.start();
+    if (eig_param.arpack_check && !(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION)) {
+      errorQuda("ARPACK check only available in double precision");
+    }
+    eigensolveQuda(host_evecs_ptr.data(), evals.data(), &eig_param);
+    host_timer.stop();
+    printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", host_timer.last());
+    // QUDA eigensolver test COMPLETE
+    //----------------------------------------------------------------------------
   }
-  double _Complex *host_evals = (double _Complex *)safe_malloc(eig_param.n_ev * sizeof(double _Complex));
-
-  // This function returns the host_evecs and host_evals pointers, populated with the
-  // requested data, at the requested prec. All the information needed to perfom the
-  // solve is in the eig_param container. If eig_param.arpack_check == true and
-  // precision is double, the routine will use ARPACK rather than the GPU.
-  quda::host_timer_t host_timer;
-  host_timer.start();
-  if (eig_param.arpack_check && !(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION)) {
-    errorQuda("ARPACK check only available in double precision");
-  }
-
-  eigensolveQuda(host_evecs, host_evals, &eig_param);
-  host_timer.stop();
-  printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", host_timer.last());
-  // QUDA eigensolver test COMPLETE
-  //----------------------------------------------------------------------------
-
-  // Clean up memory allocations
-  for (int i = 0; i < eig_n_conv; i++) host_free(host_evecs[i]);
-  host_free(host_evecs);
-  host_free(host_evals);
-
+  
+  // Memory clean-up
   freeGaugeQuda();
   for (int dir = 0; dir < 4; dir++) host_free(gauge[dir]);
-
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     freeCloverQuda();
-    if (clover) host_free(clover);
-    if (clover_inv) host_free(clover_inv);
   }
-
-  // finalize the QUDA library
+  
+  // Finalize the QUDA library
   endQuda();
   finalizeComms();
 

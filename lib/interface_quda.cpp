@@ -2242,11 +2242,11 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
 
   // Create device side ColorSpinorField vector space and to pass to the
   // compute function.
-  const auto X = cudaGauge->X();
-  ColorSpinorParam cpuParam(host_evecs[0], *inv_param, X, inv_param->solution_type, inv_param->input_location);
+  ColorSpinorParam cpuParam(host_evecs[0], *inv_param, cudaGauge->X(), inv_param->solution_type, inv_param->input_location);
 
   // create wrappers around application vector set
   std::vector<ColorSpinorField *> host_evecs_(eig_param->n_conv);
+  cpuParam.create = QUDA_REFERENCE_FIELD_CREATE;
   for (int i = 0; i < eig_param->n_conv; i++) {
     cpuParam.v = host_evecs[i];
     host_evecs_[i] = ColorSpinorField::Create(cpuParam);
@@ -2260,8 +2260,11 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   if (cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
   std::vector<Complex> evals(eig_param->n_conv, 0.0);
-  std::vector<ColorSpinorField *> kSpace(eig_param->n_conv, ColorSpinorField::Create(cudaParam));
-
+  std::vector<ColorSpinorField *> kSpace(eig_param->n_conv);
+  for(int i=0; i<eig_param->n_conv; i++) {
+    kSpace[i] = ColorSpinorField::Create(cudaParam);
+  }
+  
   // If you attempt to compute part of the imaginary spectrum of a symmetric matrix,
   // the solver will fail.
   if ((eig_param->spectrum == QUDA_SPECTRUM_LI_EIG || eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
