@@ -410,7 +410,7 @@ namespace quda
 	a.size = size;
 	//buf = device_malloc(size);
 	//buf = pinned_malloc(size);
-	a.buf = managed_malloc(size);
+	buf = managed_malloc(size);
 	a.buf = buf;
 	argBuf.push_back(a);
 	//printfQuda("Added buf stream %i size %i\n", a.stream.idx, a.size);
