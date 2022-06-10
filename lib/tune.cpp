@@ -971,6 +971,7 @@ namespace quda
                        static_cast<int>(param.aux.x), static_cast<int>(param.aux.y), static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
           }
 
+          tunable.apply(stream);
           timer.start();
           for (int i = 0; i < tuneiterations; i++) {
             tunable.apply(stream); // calls tuneLaunch() again, which simply returns the currently active param
@@ -1011,6 +1012,12 @@ namespace quda
         if (verbosity >= QUDA_VERBOSE) {
           printfQuda("Tuned %s giving %s for %s with %s\n", tunable.paramString(best_param).c_str(),
                      tunable.perfString(best_time).c_str(), key.name, key.aux);
+        }
+
+        auto regression_tol = 1.1;
+        if (best_time > regression_tol * tc.getBestTime() && best_time > 1e-5) {
+          warningQuda("Unexpected regression when tuning candidates for %s: (%g > %g * %g)",
+                      key.name, best_time, regression_tol, tc.getBestTime());
         }
 
         time(&now);
