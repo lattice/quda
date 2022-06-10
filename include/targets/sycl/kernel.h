@@ -354,8 +354,9 @@ namespace quda {
     auto size = sizeof(arg);
     auto ph = device::get_arg_buf(stream, size);
     memcpy(ph, &arg, size);
-    auto p = device::get_arg_buf_d(stream, size);
-    q.memcpy(p, ph, size);
+    auto p = ph;
+    //auto p = device::get_arg_buf_d(stream, size);
+    //q.memcpy(p, ph, size);
     try {
       q.submit([&](sycl::handler& h) {
 	//auto a = buf.get_access(h);
