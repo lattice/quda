@@ -30,7 +30,8 @@ namespace quda
     double tol;       /** Tolerance on eigenvalues */
     bool reverse;     /** True if using polynomial acceleration */
     char spectrum[3]; /** Part of the spectrum to be computed */
-
+    bool compute_svd; /** Compute the SVD if requested **/
+    
     // Algorithm variables
     //--------------------
     bool converged;

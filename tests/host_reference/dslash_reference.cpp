@@ -19,6 +19,16 @@ double verifyInversion(void *spinorOut, void *spinorIn, void *spinorCheck, QudaG
                          clover_inv);
 }
 
+// Overload for eigensolver workflows: spinorOut = Mat * spinorIn / lambda
+double verifyEigenvector(void *spinorOut, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param,
+			 QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv, double _Complex lambda)
+{
+  cax(1.0/lambda, spinorIn, V * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);  
+  void **spinorOutMulti = nullptr;
+  return verifyInversion(spinorOut, spinorOutMulti, spinorIn, spinorCheck, gauge_param, inv_param, gauge, clover,
+                         clover_inv);
+}
+
 double verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck,
                        QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover,
                        void *clover_inv)

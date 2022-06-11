@@ -92,6 +92,10 @@ namespace quda
       spectrum[0] = 'S';
     }
 
+    // For normal operators (MdagM, MMdag) the SVD of the
+    // underlying operators (M, Mdag) is computed.
+    compute_svd = eig_param->compute_svd;
+    
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
@@ -120,6 +124,7 @@ namespace quda
 
     // Sanity checks
     //--------------------------------------------------------------------------
+    // Cannot solve non-hermitian systems with Lanczos
     if (!mat.hermitian() && eig_solver->hermitian())
       errorQuda("Cannot solve non-Hermitian system with strictly Hermitian eigensolver %d, %d", (int)!mat.hermitian(),
                 (int)eig_solver->hermitian());
@@ -129,14 +134,19 @@ namespace quda
       if (!mat.hermitian()) errorQuda("Cannot use polynomial acceleration with non-Hermitian operator");
       if (!eig_solver->hermitian()) errorQuda("Polynomial acceleration not supported with non-Hermitian solver");
     }
-
+    
+    // Cannot solve for imaginary spectrum of hermitian systems
     if (mat.hermitian() && (eig_param->spectrum == QUDA_SPECTRUM_SI_EIG || eig_param->spectrum == QUDA_SPECTRUM_LI_EIG))
       errorQuda("The imaginary spectrum of a Hermitian operator cannot be computed");
-    //--------------------------------------------------------------------------
 
+    // Cannot compute SVD of non-normal operators
+    if (!eig_param->use_norm_op && eig_param->compute_svd) 
+      errorQuda("Computation of SVD supported for normal operators only");
+    //--------------------------------------------------------------------------
+    
     return eig_solver;
   }
-
+  
   // Utilities and functions common to all Eigensolver instances
   //------------------------------------------------------------------------------
   void EigenSolver::prepareInitialGuess(std::vector<ColorSpinorField *> &kSpace)
@@ -209,6 +219,7 @@ namespace quda
       printfQuda("n_ev %d\n", n_ev);
       printfQuda("n_kr %d\n", n_kr);
       if (block_size > 1) printfQuda("block size %d\n", block_size);
+      if (batched_rotate > 0) printfQuda("batched rotation size %d\n", batched_rotate);
       if (eig_param->use_poly_acc) {
         printfQuda("polyDeg %d\n", eig_param->poly_deg);
         printfQuda("a-min %f\n", eig_param->a_min);
@@ -621,7 +632,7 @@ namespace quda
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing SVD of M\n");
 
     int n_conv = eig_param->n_conv;
-    if (evecs.size() != (unsigned int)(2 * n_conv))
+    if (evecs.size() < (unsigned int)(2 * n_conv))
       errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()), 2 * n_conv);
 
     std::vector<double> sigma_tmp(n_conv);

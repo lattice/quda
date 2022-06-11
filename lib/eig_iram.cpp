@@ -528,12 +528,12 @@ namespace quda
         // Reorder the Krylov space and Ritz values
         reorder(kSpace, evals, eig_param->spectrum);
 
-        // Compute the eigenvalues.
+        // Compute the eigen/singular values.
         profile.TPSTART(QUDA_PROFILE_COMPUTE);
         computeEvals(mat, kSpace, evals);
-
+	if(compute_svd) computeSVD(mat, kSpace, evals);
         converged = true;
-
+	
       } else {
 
         // If num_keep changed, we resort the Ritz values and residua
