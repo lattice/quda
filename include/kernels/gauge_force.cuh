@@ -144,53 +144,6 @@ namespace quda {
     return linkA;
   }
 
-  template <typename Arg, int dir>
-  __device__ __host__ inline void GaugeForceKernel(const Arg &arg, int idx, int parity)
-  {
-    using real = typename Arg::Float;
-    using Link = typename Arg::Link;
-
-    int x[4] = {0, 0, 0, 0};
-    getCoords(x, idx, arg.X, parity);
-    for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
-
-    // prod: current matrix product
-    // accum: accumulator matrix
-    Link link_prod, accum;
-    thread_array<int, 4> dx{0};
-
-    for (int i=0; i<arg.p.num_paths; i++) {
-      real coeff = arg.p.path_coeff[i];
-      if (coeff == 0) continue;
-
-      const int* path = arg.p.input_path[dir] + i*arg.p.max_length;
-
-      // the gauge path starts pre-shifted, so we need to do the shift + update the parity
-      dx[dir]++;
-      int nbr_oddbit = (parity ^ 1);
-
-      // compute the path
-      link_prod = computeGaugePath<Arg>(arg, x, nbr_oddbit, path, arg.p.length[i], dx);
-
-      accum = accum + coeff * link_prod;
-    } //i
-
-    // multiply by U(x)
-    link_prod = arg.u(dir, linkIndex(x,arg.E), parity);
-    link_prod = link_prod * accum;
-
-    // update mom(x)
-    Link mom = arg.mom(dir, idx, parity);
-    if(arg.compute_force) {
-      mom = mom - arg.epsilon * link_prod;
-      makeAntiHerm(mom);
-    }
-    else {
-      mom = mom + arg.epsilon * link_prod;
-    }
-    arg.mom(dir, idx, parity) = mom;
-  }
-
   template <typename Arg> struct GaugeForce
   {
     const Arg &arg;
@@ -199,12 +152,47 @@ namespace quda {
 
     __device__ __host__ void operator()(int x_cb, int parity, int dir)
     {
-      switch(dir) {
-      case 0: GaugeForceKernel<Arg,0>(arg, x_cb, parity); break;
-      case 1: GaugeForceKernel<Arg,1>(arg, x_cb, parity); break;
-      case 2: GaugeForceKernel<Arg,2>(arg, x_cb, parity); break;
-      case 3: GaugeForceKernel<Arg,3>(arg, x_cb, parity); break;
+      using real = typename Arg::Float;
+      using Link = typename Arg::Link;
+
+      int x[4] = {0, 0, 0, 0};
+      getCoords(x, x_cb, arg.X, parity);
+      for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
+
+      // prod: current matrix product
+      // accum: accumulator matrix
+      Link link_prod, accum;
+      thread_array<int, 4> dx{0};
+
+      for (int i=0; i<arg.p.num_paths; i++) {
+        real coeff = arg.p.path_coeff[i];
+        if (coeff == 0) continue;
+
+        const int* path = arg.p.input_path[dir] + i*arg.p.max_length;
+
+        // the gauge path starts pre-shifted, so we need to do the shift + update the parity
+        dx[dir]++;
+        int nbr_oddbit = (parity ^ 1);
+
+        // compute the path
+        link_prod = computeGaugePath<Arg>(arg, x, nbr_oddbit, path, arg.p.length[i], dx);
+
+        accum = accum + coeff * link_prod;
+      } //i
+
+      // multiply by U(x)
+      link_prod = arg.u(dir, linkIndex(x,arg.E), parity);
+      link_prod = link_prod * accum;
+
+      // update mom(x)
+      Link mom = arg.mom(dir, x_cb, parity);
+      if (arg.compute_force) {
+        mom = mom - arg.epsilon * link_prod;
+        makeAntiHerm(mom);
+      } else {
+        mom = mom + arg.epsilon * link_prod;
       }
+      arg.mom(dir, x_cb, parity) = mom;
     }
   };
 
