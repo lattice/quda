@@ -60,7 +60,6 @@ namespace quda {
     }
   };
 
-
   template <typename Float_, int nColor_, QudaReconstructType recon_u, QudaReconstructType recon_m, bool force_>
   struct GaugeForceArg : kernel_param<> {
     using Float = Float_;
@@ -98,6 +97,68 @@ namespace quda {
   constexpr int flipDir(int dir) { return (7-dir); }
   constexpr bool isForwards(int dir) { return (dir <= 3); }
 
+  /**
+     @brief Calculates an arbitary gauge path, returning the product matrix
+
+     @return The product of the gauge path
+     @param[in] arg Kernel argumnt
+     @param[in] x Full index array
+     @param[in] parity Parity index
+     @param[in] path Gauge link path
+     @param[in] length Length of gauge path
+     @param[in] dx Temporary shared memory storage for relative coordinate shift
+  */
+  template <typename Arg, int dir>
+  __device__ __host__ inline Matrix<complex<typename Arg::Float>, Arg::nColor>
+  computeGaugePath(const Arg &arg, int x[4], int parity, const int* path, int length, thread_array<int, 4>& dx)
+  {
+    using real = typename Arg::Float;
+    typedef Matrix<complex<real>,Arg::nColor> Link;
+
+    // linkA: current matrix
+    // linkB: the loaded matrix in this round
+    Link linkA, linkB;
+
+    // start from end of link in direction dir
+    int nbr_oddbit = (parity^1);
+    dx[dir]++;
+
+    int path0 = path[0];
+    int lnkdir = isForwards(path0) ? path0 : flipDir(path0);
+
+    if (isForwards(path0)) {
+      linkB = arg.u(lnkdir, linkIndexShift(x,dx,arg.E), nbr_oddbit);
+      linkA = linkB;
+      dx[lnkdir]++; // now have to update location
+      nbr_oddbit = nbr_oddbit^1;
+    } else {
+      dx[lnkdir]--; // if we are going backwards the link is on the adjacent site
+      nbr_oddbit = nbr_oddbit^1;
+      linkB = arg.u(lnkdir, linkIndexShift(x,dx,arg.E), nbr_oddbit);
+      linkA = conj(linkB);
+    }
+
+    for (int j = 1; j < length; j++) {
+
+      int pathj = path[j];
+      int lnkdir = isForwards(pathj) ? pathj : flipDir(pathj);
+
+      if (isForwards(pathj)) {
+        linkB = arg.u(lnkdir, linkIndexShift(x,dx,arg.E), nbr_oddbit);
+        linkA = linkA * linkB;
+        dx[lnkdir]++; // now have to update to new location
+        nbr_oddbit = nbr_oddbit^1;
+      } else {
+        dx[lnkdir]--; // if we are going backwards the link is on the adjacent site
+        nbr_oddbit = nbr_oddbit^1;
+        linkB = arg.u(lnkdir, linkIndexShift(x,dx,arg.E), nbr_oddbit);
+        linkA = linkA * conj(linkB);
+      }
+    } //j
+
+    return linkA;
+  }
+
   template <typename Arg, int dir>
   __device__ __host__ inline void GaugeForceKernel(const Arg &arg, int idx, int parity)
   {
@@ -108,9 +169,9 @@ namespace quda {
     getCoords(x, idx, arg.X, parity);
     for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-    //linkA: current matrix
-    //linkB: the loaded matrix in this round
-    Link linkA, linkB, staple;
+    // prod: current matrix product
+    // accum: accumulator matrix
+    Link link_prod, accum;
     thread_array<int, 4> dx{0};
 
     for (int i=0; i<arg.p.num_paths; i++) {
@@ -119,57 +180,24 @@ namespace quda {
 
       const int* path = arg.p.input_path[dir] + i*arg.p.max_length;
 
-      // start from end of link in direction dir
-      int nbr_oddbit = (parity^1);
-      dx[dir]++;
+      // compute the path
+      link_prod = computeGaugePath<Arg, dir>(arg, x, parity, path, arg.p.length[i], dx);
 
-      int path0 = path[0];
-      int lnkdir = isForwards(path0) ? path0 : flipDir(path0);
-
-      if (isForwards(path0)) {
-        linkB = arg.u(lnkdir, linkIndexShift(x,dx,arg.E), nbr_oddbit);
-        linkA = linkB;
-        dx[lnkdir]++; // now have to update location
-	nbr_oddbit = nbr_oddbit^1;
-      } else {
-        dx[lnkdir]--; // if we are going backwards the link is on the adjacent site
-        nbr_oddbit = nbr_oddbit^1;
-	linkB = arg.u(lnkdir, linkIndexShift(x,dx,arg.E), nbr_oddbit);
-        linkA = conj(linkB);
-      }
-
-      for (int j=1; j<arg.p.length[i]; j++) {
-
-        int pathj = path[j];
-        int lnkdir = isForwards(pathj) ? pathj : flipDir(pathj);
-
-        if (isForwards(pathj)) {
-          linkB = arg.u(lnkdir, linkIndexShift(x,dx,arg.E), nbr_oddbit);
-          linkA = linkA * linkB;
-          dx[lnkdir]++; // now have to update to new location
-          nbr_oddbit = nbr_oddbit^1;
-        } else {
-          dx[lnkdir]--; // if we are going backwards the link is on the adjacent site
-	  nbr_oddbit = nbr_oddbit^1;
-          linkB = arg.u(lnkdir, linkIndexShift(x,dx,arg.E), nbr_oddbit);
-          linkA = linkA * conj(linkB);
-        }
-      } //j
-      staple = staple + coeff*linkA;
+      accum = accum + coeff * link_prod;
     } //i
 
     // multiply by U(x)
-    linkA = arg.u(dir, linkIndex(x,arg.E), parity);
-    linkA = linkA * staple;
+    link_prod = arg.u(dir, linkIndex(x,arg.E), parity);
+    link_prod = link_prod * accum;
 
     // update mom(x)
     Link mom = arg.mom(dir, idx, parity);
     if(arg.compute_force) {
-      mom = mom - arg.epsilon * linkA;
+      mom = mom - arg.epsilon * link_prod;
       makeAntiHerm(mom);
     }
     else {
-      mom = mom + arg.epsilon * linkA;
+      mom = mom + arg.epsilon * link_prod;
     }
     arg.mom(dir, idx, parity) = mom;
   }
