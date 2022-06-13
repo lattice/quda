@@ -65,6 +65,7 @@ namespace quda {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static constexpr bool compute_force = force_;
+    using Link = Matrix<complex<Float>, nColor>;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     typedef typename gauge_mapper<Float,recon_u>::type Gauge;
     typedef typename gauge_mapper<Float,recon_m>::type Mom;
@@ -103,42 +104,26 @@ namespace quda {
      @return The product of the gauge path
      @param[in] arg Kernel argumnt
      @param[in] x Full index array
-     @param[in] parity Parity index
+     @param[in] parity Parity index (note: assumes that an offset from a non-zero dx is baked in)
      @param[in] path Gauge link path
      @param[in] length Length of gauge path
      @param[in] dx Temporary shared memory storage for relative coordinate shift
   */
-  template <typename Arg, int dir>
-  __device__ __host__ inline Matrix<complex<typename Arg::Float>, Arg::nColor>
+  template <typename Arg>
+  __device__ __host__ inline typename Arg::Link
   computeGaugePath(const Arg &arg, int x[4], int parity, const int* path, int length, thread_array<int, 4>& dx)
   {
     using real = typename Arg::Float;
-    typedef Matrix<complex<real>,Arg::nColor> Link;
+    using Link = typename Arg::Link;
 
     // linkA: current matrix
     // linkB: the loaded matrix in this round
     Link linkA, linkB;
+    setIdentity(&linkA);
 
-    // start from end of link in direction dir
-    int nbr_oddbit = (parity^1);
-    dx[dir]++;
+    int nbr_oddbit = parity;
 
-    int path0 = path[0];
-    int lnkdir = isForwards(path0) ? path0 : flipDir(path0);
-
-    if (isForwards(path0)) {
-      linkB = arg.u(lnkdir, linkIndexShift(x,dx,arg.E), nbr_oddbit);
-      linkA = linkB;
-      dx[lnkdir]++; // now have to update location
-      nbr_oddbit = nbr_oddbit^1;
-    } else {
-      dx[lnkdir]--; // if we are going backwards the link is on the adjacent site
-      nbr_oddbit = nbr_oddbit^1;
-      linkB = arg.u(lnkdir, linkIndexShift(x,dx,arg.E), nbr_oddbit);
-      linkA = conj(linkB);
-    }
-
-    for (int j = 1; j < length; j++) {
+    for (int j = 0; j < length; j++) {
 
       int pathj = path[j];
       int lnkdir = isForwards(pathj) ? pathj : flipDir(pathj);
@@ -163,7 +148,7 @@ namespace quda {
   __device__ __host__ inline void GaugeForceKernel(const Arg &arg, int idx, int parity)
   {
     using real = typename Arg::Float;
-    typedef Matrix<complex<real>,Arg::nColor> Link;
+    using Link = typename Arg::Link;
 
     int x[4] = {0, 0, 0, 0};
     getCoords(x, idx, arg.X, parity);
@@ -180,8 +165,12 @@ namespace quda {
 
       const int* path = arg.p.input_path[dir] + i*arg.p.max_length;
 
+      // the gauge path starts pre-shifted, so we need to do the shift + update the parity
+      dx[dir]++;
+      int nbr_oddbit = (parity ^ 1);
+
       // compute the path
-      link_prod = computeGaugePath<Arg, dir>(arg, x, parity, path, arg.p.length[i], dx);
+      link_prod = computeGaugePath<Arg>(arg, x, nbr_oddbit, path, arg.p.length[i], dx);
 
       accum = accum + coeff * link_prod;
     } //i
