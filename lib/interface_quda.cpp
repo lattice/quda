@@ -5167,10 +5167,63 @@ void plaqQuda(double plaq[3])
   extendedGaugeResident = data;
 
   profilePlaq.TPSTART(QUDA_PROFILE_COMPUTE);
+  /* normal plaquette */
   double3 plaq3 = quda::plaquette(*data);
   plaq[0] = plaq3.x;
   plaq[1] = plaq3.y;
   plaq[2] = plaq3.z;
+  
+  /* alternative plaquette */
+  /*int num_paths = 6;
+  int path_max_length = 4;
+  double *loop_coeff = static_cast<double*>(safe_malloc(num_paths * sizeof(double)));
+  int *length = static_cast<int*>(safe_malloc(num_paths * sizeof(int)));
+  for (int i = 0; i < num_paths; i++) {
+    loop_coeff[i] = 1.0;
+    length[i] = 4;
+  }
+  // fix me: no need to be 4, but we deal for now
+  int** input_path_buf[4];
+  for (int d = 0; d < 4; d++) {
+    input_path_buf[d] = static_cast<int**>(safe_malloc(num_paths * sizeof(int*)));
+    for (int i = 0; i < num_paths; i++) {
+      input_path_buf[d][i] = static_cast<int*>(safe_malloc(length[i] * sizeof(int)));
+    }
+  }
+
+  // plaquette loops
+  // xy
+  input_path_buf[0][0][0] = 0; input_path_buf[0][0][1] = 1; input_path_buf[0][0][2] = 7; input_path_buf[0][0][3] = 6;
+
+  // xz
+  input_path_buf[0][1][0] = 0; input_path_buf[0][1][1] = 2; input_path_buf[0][1][2] = 7; input_path_buf[0][1][3] = 5;
+
+  // yz
+  input_path_buf[0][2][0] = 1; input_path_buf[0][2][1] = 2; input_path_buf[0][2][2] = 6; input_path_buf[0][2][3] = 5;
+
+  // xt
+  input_path_buf[0][3][0] = 0; input_path_buf[0][3][1] = 3; input_path_buf[0][3][2] = 7; input_path_buf[0][3][3] = 4;
+
+  // yt
+  input_path_buf[0][4][0] = 1; input_path_buf[0][4][1] = 3; input_path_buf[0][4][2] = 6; input_path_buf[0][4][3] = 4;
+
+  // zt
+  input_path_buf[0][5][0] = 2; input_path_buf[0][5][1] = 3; input_path_buf[0][5][2] = 5; input_path_buf[0][5][3] = 4;
+
+  std::vector<Complex> loop_traces(num_paths);
+
+  gaugeLoopTrace(*data, loop_traces, input_path_buf,
+     length, loop_coeff, num_paths, path_max_length);
+
+  plaq[1] = ((loop_traces[0] + loop_traces[1] + loop_traces[2]) / 9.).real();
+  plaq[2] = ((loop_traces[3] + loop_traces[4] + loop_traces[5]) / 9.).real();
+  plaq[0] = 0.5 * (plaq[1] + plaq[2]);
+
+  for (int i = 0; i < num_paths; i++) {
+    host_free(input_path_buf[0][i]);
+  }
+  */
+
   profilePlaq.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profilePlaq.TPSTOP(QUDA_PROFILE_TOTAL);
