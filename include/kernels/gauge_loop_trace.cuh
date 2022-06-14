@@ -41,7 +41,7 @@ namespace quda {
     const paths p;
 
     GaugeLoopTraceArg(const GaugeField &u, double factor, const paths &p) :
-      ReduceArg<reduce_t>(dim3(2 * u.LocalVolumeCB(), 1, p.num_paths), p.num_paths),
+      ReduceArg<reduce_t>(dim3(u.LocalVolumeCB(), 2, p.num_paths), p.num_paths),
       u(u),
       length_cb(u.LocalVolumeCB()),
       factor(factor),
@@ -59,22 +59,22 @@ namespace quda {
   {
     using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
-    static constexpr int reduce_block_dim = 1; // x_cb and parity are mapped to x
+    static constexpr int reduce_block_dim = 2; // x_cb and parity are mapped to x
     const Arg &arg;
     constexpr GaugeLoop(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline reduce_t operator()(reduce_t &value, int idx, int, int path_id)
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity, int path_id)
     {
       using real = typename Arg::Float;
       using Link = typename Arg::Link;
 
       reduce_t loop_trace{0, 0};
 
-      int parity = idx >= arg.length_cb ? 1 : 0;
-      int x_cb = idx - parity * arg.length_cb;
+      //int parity = idx >= arg.length_cb ? 1 : 0;
+      //int x_cb = idx - parity * arg.length_cb;
 
-      if (parity >= 2) return operator()(loop_trace, value);
+      //if (parity >= 2) return operator()(loop_trace, value);
 
       int x[4] = {0, 0, 0, 0};
       getCoords(x, x_cb, arg.X, parity);
