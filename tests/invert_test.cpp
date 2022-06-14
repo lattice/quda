@@ -185,6 +185,7 @@ std::vector<double> solve(test_t param)
   inv_param.cuda_prec_sloppy = ::testing::get<3>(param);
   inv_param.clover_cuda_prec_sloppy = ::testing::get<3>(param);
   multishift = ::testing::get<4>(param);
+  inv_param.solution_accumulator_pipeline = ::testing::get<5>(param);
 
   // reset lambda_max if we're doing a testing loop to ensure correct lambma_max
   if (enable_testing) inv_param.ca_lambda_max = -1.0;
@@ -400,7 +401,7 @@ int main(int argc, char **argv)
     if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
     result = RUN_ALL_TESTS();
   } else {
-    solve(test_t {inv_type, solution_type, solve_type, prec_sloppy, multishift});
+    solve(test_t {inv_type, solution_type, solve_type, prec_sloppy, multishift, solution_accumulator_pipeline});
   }
 
   // finalize the QUDA library
