@@ -149,6 +149,9 @@ static TimeProfile profileGaugeForce("computeGaugeForceQuda");
 //!< Profiler for computeGaugePathQuda
 static TimeProfile profileGaugePath("computeGaugePathQuda");
 
+//!< Profiler for computeGaugeLoopTraceQuda
+static TimeProfile profileGaugeLoopTrace("computeGaugeLoopTraceQuda");
+
 //!<Profiler for updateGaugeFieldQuda
 static TimeProfile profileGaugeUpdate("updateGaugeFieldQuda");
 
@@ -4119,6 +4122,74 @@ int computeGaugePathQuda(void *out, void *siteLink, int ***input_path_buf, int *
   return 0;
 }
 
+int computeGaugeLoopTraceQuda(Complex* traces, void *siteLink, int **input_path_buf, int *path_length, double *loop_coeff,
+                                    int num_paths, int max_length, double factor, QudaGaugeParam *qudaGaugeParam)
+{
+  profileGaugeLoopTrace.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGaugeLoopTrace.TPSTART(QUDA_PROFILE_INIT);
+
+  checkGaugeParam(qudaGaugeParam);
+
+  GaugeFieldParam gParam(*qudaGaugeParam, siteLink);
+  gParam.location = QUDA_CPU_FIELD_LOCATION;
+  gParam.site_offset = qudaGaugeParam->gauge_offset;
+  gParam.site_size = qudaGaugeParam->site_size;
+  cpuGaugeField *cpuSiteLink = (!qudaGaugeParam->use_resident_gauge) ? new cpuGaugeField(gParam) : nullptr;
+
+  cudaGaugeField *cudaSiteLink = nullptr;
+
+  if (qudaGaugeParam->use_resident_gauge) {
+    if (!gaugePrecise) errorQuda("No resident gauge field to use");
+    cudaSiteLink = gaugePrecise;
+  } else {
+    gParam.location = QUDA_CUDA_FIELD_LOCATION;
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    gParam.reconstruct = qudaGaugeParam->reconstruct;
+    gParam.setPrecision(qudaGaugeParam->cuda_prec, true);
+
+    cudaSiteLink = new cudaGaugeField(gParam);
+    profileGaugeLoopTrace.TPSTOP(QUDA_PROFILE_INIT);
+
+    profileGaugeLoopTrace.TPSTART(QUDA_PROFILE_H2D);
+    cudaSiteLink->loadCPUField(*cpuSiteLink);
+    profileGaugeLoopTrace.TPSTOP(QUDA_PROFILE_H2D);
+
+    profileGaugeLoopTrace.TPSTART(QUDA_PROFILE_INIT);
+  }
+
+  cudaGaugeField *cudaGauge = createExtendedGauge(*cudaSiteLink, R, profileGaugePath);
+  // apply / remove phase as appropriate
+  if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
+
+  // prepare trace storage
+  std::vector<Complex> loop_traces(num_paths);
+
+  // actually do the computation
+  profileGaugeLoopTrace.TPSTART(QUDA_PROFILE_COMPUTE);
+  gaugeLoopTrace(*cudaGauge, loop_traces, factor, &input_path_buf, path_length, loop_coeff, num_paths, max_length);
+  profileGaugeLoopTrace.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  for (int i = 0; i < num_paths; i++)
+    traces[i] = loop_traces[i];
+
+  profileGaugeLoopTrace.TPSTART(QUDA_PROFILE_FREE);
+  if (qudaGaugeParam->make_resident_gauge) {
+    if (gaugePrecise && gaugePrecise != cudaSiteLink) delete gaugePrecise;
+    gaugePrecise = cudaSiteLink;
+    if (extendedGaugeResident) delete extendedGaugeResident;
+    extendedGaugeResident = cudaGauge;
+  } else {
+    delete cudaSiteLink;
+    delete cudaGauge;
+  }
+
+  if (cpuSiteLink) delete cpuSiteLink;
+  profileGaugeLoopTrace.TPSTOP(QUDA_PROFILE_FREE);
+
+  profileGaugeLoopTrace.TPSTOP(QUDA_PROFILE_TOTAL);
+  return 0;
+}
+
 void momResidentQuda(void *mom, QudaGaugeParam *param)
 {
   profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
@@ -5172,8 +5243,6 @@ void plaqQuda(double plaq[3])
   plaq[0] = plaq3.x;
   plaq[1] = plaq3.y;
   plaq[2] = plaq3.z;
-
-  printfQuda("quda::plaquette plaquette %e Spatial %e Temporal %e\n", plaq[0], plaq[1], plaq[2]);
   
   /* alternative plaquette */
   int num_paths = 6;
