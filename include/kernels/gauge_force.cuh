@@ -30,9 +30,9 @@ namespace quda {
     int border[4]; // radius of border
 
     Float epsilon; // stepsize and any other overall scaling factor
-    const paths p;
+    const paths<4> p;
 
-    GaugeForceArg(GaugeField &mom, const GaugeField &u, double epsilon, const paths &p) :
+    GaugeForceArg(GaugeField &mom, const GaugeField &u, double epsilon, const paths<4> &p) :
       kernel_param(dim3(mom.VolumeCB(), 2, 4)),
       mom(mom),
       u(u),

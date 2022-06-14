@@ -31,19 +31,17 @@ namespace quda {
 
     const Gauge u;
 
-    const int length_cb;
     const double factor;
     static constexpr int nParity = 2; // always true for gauge fields
     int X[4]; // the regular volume parameters
     int E[4]; // the extended volume parameters
     int border[4]; // radius of border
 
-    const paths p;
+    const paths<1> p;
 
-    GaugeLoopTraceArg(const GaugeField &u, double factor, const paths &p) :
+    GaugeLoopTraceArg(const GaugeField &u, double factor, const paths<1> &p) :
       ReduceArg<reduce_t>(dim3(u.LocalVolumeCB(), 2, p.num_paths), p.num_paths),
       u(u),
-      length_cb(u.LocalVolumeCB()),
       factor(factor),
       p(p)
     {
@@ -70,11 +68,6 @@ namespace quda {
       using Link = typename Arg::Link;
 
       reduce_t loop_trace{0, 0};
-
-      //int parity = idx >= arg.length_cb ? 1 : 0;
-      //int x_cb = idx - parity * arg.length_cb;
-
-      //if (parity >= 2) return operator()(loop_trace, value);
 
       int x[4] = {0, 0, 0, 0};
       getCoords(x, x_cb, arg.X, parity);

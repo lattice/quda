@@ -9,11 +9,11 @@ namespace quda {
     const GaugeField &u;
     GaugeField &mom;
     double epsilon;
-    const paths &p;
+    const paths<4> &p;
     unsigned int minThreads() const { return mom.VolumeCB(); }
 
   public:
-    ForceGauge(const GaugeField &u, GaugeField &mom, double epsilon, const paths &p) :
+    ForceGauge(const GaugeField &u, GaugeField &mom, double epsilon, const paths<4> &p) :
       TunableKernel3D(u, 2, 4),
       u(u),
       mom(mom),
@@ -50,7 +50,7 @@ namespace quda {
     checkLocation(mom, u);
     if (mom.Reconstruct() != QUDA_RECONSTRUCT_10) errorQuda("Reconstruction type %d not supported", mom.Reconstruct());
 
-    paths p(input_path, length_h, path_coeff_h, num_paths, path_max_length);
+    paths<4> p(input_path, length_h, path_coeff_h, num_paths, path_max_length);
 
     // gauge field must be passed as first argument so we peel off its reconstruct type
     instantiate<GaugeForce_>(u, mom, epsilon, p);
@@ -64,7 +64,7 @@ namespace quda {
     checkLocation(out, u);
     checkReconstruct(out, u);
 
-    paths p(input_path, length_h, path_coeff_h, num_paths, path_max_length);
+    paths<4> p(input_path, length_h, path_coeff_h, num_paths, path_max_length);
 
     // gauge field must be passed as first argument so we peel off its reconstruct type
     instantiate<GaugePath>(u, out, coeff, p);

@@ -5188,13 +5188,10 @@ void plaqQuda(double plaq[3])
     loop_coeff[i] = 1.0;
     length[i] = 4;
   }
-  // fix me: no need to be 4, but we deal for now
-  int** input_path_buf[4];
-  for (int d = 0; d < 4; d++) {
-    input_path_buf[d] = static_cast<int**>(safe_malloc(num_paths * sizeof(int*)));
-    for (int i = 0; i < num_paths; i++) {
-      input_path_buf[d][i] = static_cast<int*>(safe_malloc(length[i] * sizeof(int)));
-    }
+  int** input_path_buf[1];
+  input_path_buf[0] = static_cast<int**>(safe_malloc(num_paths * sizeof(int*)));
+  for (int i = 0; i < num_paths; i++) {
+    input_path_buf[0][i] = static_cast<int*>(safe_malloc(length[i] * sizeof(int)));
   }
 
   // plaquette loops
@@ -5230,12 +5227,10 @@ void plaqQuda(double plaq[3])
 
   printfQuda("quda::gaugeLoopTrace plaquette %e Spatial %e Temporal %e\n", plaq[0], plaq[1], plaq[2]);
 
-  for (int d = 0; d < 4; d++) {
-    for (int i = 0; i < num_paths; i++) {
-      host_free(input_path_buf[d][i]);
-    }
-    host_free(input_path_buf[d]);
+  for (int i = 0; i < num_paths; i++) {
+    host_free(input_path_buf[0][i]);
   }
+  host_free(input_path_buf[0]);
   host_free(length);
   host_free(loop_coeff);
   

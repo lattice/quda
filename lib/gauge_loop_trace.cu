@@ -12,11 +12,11 @@ namespace quda {
     using reduce_t = array<double, 2>;
     std::vector<reduce_t>& loop_traces;
     double factor;
-    const paths p;
+    const paths<1> p;
 
   public:
     // max block size of 8 is arbitrary for now, u needs to be local volume??
-    GaugeLoopTrace(const GaugeField &u, std::vector<reduce_t> &loop_traces, double factor, const paths& p) :
+    GaugeLoopTrace(const GaugeField &u, std::vector<reduce_t> &loop_traces, double factor, const paths<1>& p) :
       TunableMultiReduction(u, 2u, p.num_paths, 8), //TunableMultiReduction(2 * u.LocalVolumeCB(), p.num_paths, 8, u.Location()),
       u(u),
       loop_traces(loop_traces),
@@ -58,7 +58,7 @@ namespace quda {
   void gaugeLoopTrace(const GaugeField& u, std::vector<Complex>& loop_traces, double factor, int ***input_path,
 		 int *length_h, double *path_coeff_h, int num_paths, int path_max_length)
   {
-    paths p(input_path, length_h, path_coeff_h, num_paths, path_max_length);
+    paths<1> p(input_path, length_h, path_coeff_h, num_paths, path_max_length);
 
     std::vector<array<double, 2>> tr_array(loop_traces.size());
 

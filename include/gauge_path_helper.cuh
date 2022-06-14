@@ -8,10 +8,12 @@
 
 namespace quda {
 
+  template <int dim_>
   struct paths {
+    static constexpr int dim = dim_;
     const int num_paths;
     const int max_length;
-    int *input_path[4];
+    int *input_path[dim];
     const int *length;
     const double *path_coeff;
     int *buffer;
@@ -23,7 +25,7 @@ namespace quda {
       count(0)
     {
       // create path struct in a single allocation
-      size_t bytes = 4 * num_paths * max_length * sizeof(int) + num_paths * sizeof(int);
+      size_t bytes = dim * num_paths * max_length * sizeof(int) + num_paths * sizeof(int);
       int pad = ((sizeof(double) - bytes % sizeof(double)) % sizeof(double))/sizeof(int);
       bytes += pad*sizeof(int) + num_paths*sizeof(double);
 
@@ -31,29 +33,29 @@ namespace quda {
       int *path_h = static_cast<int*>(safe_malloc(bytes));
       memset(path_h, 0, bytes);
 
-      for (int dir=0; dir<4; dir++) {
+      for (int dir=0; dir<dim; dir++) {
         // flatten the input_path array for copying to the device
-        for (int i=0; i < num_paths; i++) {
-          for (int j=0; j < length_h[i]; j++) {
-            path_h[dir*num_paths*max_length + i*max_length + j] = input_path[dir][i][j];
+        for (int i = 0; i < num_paths; i++) {
+          for (int j = 0; j < length_h[i]; j++) {
+            path_h[dir * num_paths * max_length + i * max_length + j] = input_path[dir][i][j];
             if (dir==0) count++;
           }
         }
       }
 
       // length array
-      memcpy(path_h + 4 * num_paths * max_length, length_h, num_paths*sizeof(int));
+      memcpy(path_h + dim * num_paths * max_length, length_h, num_paths*sizeof(int));
 
       // path_coeff array
-      memcpy(path_h + 4 * num_paths * max_length + num_paths + pad, path_coeff_h, num_paths*sizeof(double));
+      memcpy(path_h + dim * num_paths * max_length + num_paths + pad, path_coeff_h, num_paths*sizeof(double));
 
       qudaMemcpy(buffer, path_h, bytes, qudaMemcpyHostToDevice);
       host_free(path_h);
 
       // finally set the pointers to the correct offsets in the buffer
-      for (int d=0; d < 4; d++) this->input_path[d] = buffer + d*num_paths*max_length;
-      length = buffer + 4*num_paths*max_length;
-      path_coeff = reinterpret_cast<double*>(buffer + 4 * num_paths * max_length + num_paths + pad);
+      for (int d=0; d < dim; d++) this->input_path[d] = buffer + d*num_paths*max_length;
+      length = buffer + dim*num_paths*max_length;
+      path_coeff = reinterpret_cast<double*>(buffer + dim * num_paths * max_length + num_paths + pad);
     }
 
     void free() {
