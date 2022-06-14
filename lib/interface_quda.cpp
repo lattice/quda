@@ -5172,10 +5172,16 @@ void plaqQuda(double plaq[3])
   plaq[0] = plaq3.x;
   plaq[1] = plaq3.y;
   plaq[2] = plaq3.z;
+
+  printfQuda("quda::plaquette plaquette %e Spatial %e Temporal %e\n", plaq[0], plaq[1], plaq[2]);
   
   /* alternative plaquette */
-  /*int num_paths = 6;
+  int num_paths = 6;
   int path_max_length = 4;
+
+  // volume and nc normalization
+  double factor = 1. / (2. * data->LocalVolumeCB() * data->Ncolor() * comm_size());
+
   double *loop_coeff = static_cast<double*>(safe_malloc(num_paths * sizeof(double)));
   int *length = static_cast<int*>(safe_malloc(num_paths * sizeof(int)));
   for (int i = 0; i < num_paths; i++) {
@@ -5212,17 +5218,27 @@ void plaqQuda(double plaq[3])
 
   std::vector<Complex> loop_traces(num_paths);
 
-  gaugeLoopTrace(*data, loop_traces, input_path_buf,
-     length, loop_coeff, num_paths, path_max_length);
+  quda::gaugeLoopTrace(*data, loop_traces, factor, input_path_buf,
+           length, loop_coeff, num_paths, path_max_length);
 
-  plaq[1] = ((loop_traces[0] + loop_traces[1] + loop_traces[2]) / 9.).real();
-  plaq[2] = ((loop_traces[3] + loop_traces[4] + loop_traces[5]) / 9.).real();
+  printfQuda("Gauge loop trace xy %e xz %e yz %e xt %e yt %e zt %e\n", loop_traces[0].real(), loop_traces[1].real(),
+               loop_traces[2].real(), loop_traces[3].real(), loop_traces[4].real(), loop_traces[5].real());
+
+  plaq[1] = ((loop_traces[0] + loop_traces[1] + loop_traces[2]) / 3.).real();
+  plaq[2] = ((loop_traces[3] + loop_traces[4] + loop_traces[5]) / 3.).real();
   plaq[0] = 0.5 * (plaq[1] + plaq[2]);
 
-  for (int i = 0; i < num_paths; i++) {
-    host_free(input_path_buf[0][i]);
+  printfQuda("quda::gaugeLoopTrace plaquette %e Spatial %e Temporal %e\n", plaq[0], plaq[1], plaq[2]);
+
+  for (int d = 0; d < 4; d++) {
+    for (int i = 0; i < num_paths; i++) {
+      host_free(input_path_buf[d][i]);
+    }
+    host_free(input_path_buf[d]);
   }
-  */
+  host_free(length);
+  host_free(loop_coeff);
+  
 
   profilePlaq.TPSTOP(QUDA_PROFILE_COMPUTE);
 

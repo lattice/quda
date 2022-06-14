@@ -32,6 +32,7 @@ namespace quda {
     const Gauge u;
 
     const int length_cb;
+    const double factor;
     static constexpr int nParity = 2; // always true for gauge fields
     int X[4]; // the regular volume parameters
     int E[4]; // the extended volume parameters
@@ -39,10 +40,11 @@ namespace quda {
 
     const paths p;
 
-    GaugeLoopTraceArg(const GaugeField &u, const paths &p) :
+    GaugeLoopTraceArg(const GaugeField &u, double factor, const paths &p) :
       ReduceArg<reduce_t>(dim3(2 * u.LocalVolumeCB(), 1, p.num_paths), p.num_paths),
       u(u),
       length_cb(u.LocalVolumeCB()),
+      factor(factor),
       p(p)
     {
       for (int dir = 0; dir < 4; dir++) {
@@ -69,7 +71,7 @@ namespace quda {
 
       reduce_t loop_trace{0, 0};
 
-      int parity = idx > arg.length_cb ? 1 : 0;
+      int parity = idx >= arg.length_cb ? 1 : 0;
       int x_cb = idx - parity * arg.length_cb;
 
       if (parity >= 2) return operator()(loop_trace, value);
@@ -80,8 +82,8 @@ namespace quda {
 
       thread_array<int, 4> dx{0};
 
-      real coeff = arg.p.path_coeff[path_id];
-      if (coeff == 0) return operator()(loop_trace, value);
+      double coeff_loop = arg.p.path_coeff[path_id];
+      if (coeff_loop == 0) return operator()(loop_trace, value);
 
       // clean up input path, no need for `dir`...
       const int* path = arg.p.input_path[0] + path_id * arg.p.max_length;
@@ -92,8 +94,8 @@ namespace quda {
       // compute trace
       auto trace = getTrace(link_prod);
 
-      loop_trace[0] = coeff * trace.real();
-      loop_trace[1] = coeff * trace.imag();
+      loop_trace[0] = arg.factor * coeff_loop * trace.real();
+      loop_trace[1] = arg.factor * coeff_loop * trace.imag();
 
       return operator()(loop_trace, value);
     }
