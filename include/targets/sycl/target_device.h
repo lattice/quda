@@ -78,6 +78,32 @@ namespace quda {
 
     //inline uint local_linear_id() { return getLocalLinearId(); }
 
+    /**
+       @brief Helper function that returns a linear thread index within a thread block.
+    */
+    template <int dim> __device__ __host__ inline auto thread_idx_linear()
+    {
+      switch (dim) {
+      case 1: return thread_idx().x;
+      case 2: return thread_idx().y * block_dim().x + thread_idx().x;
+      case 3:
+      default: return (thread_idx().z * block_dim().y + thread_idx().y) * block_dim().x + thread_idx().x;
+      }
+    }
+
+    /**
+       @brief Helper function that returns the total number thread in a thread block
+    */
+    template <int dim> __device__ __host__ inline auto block_size()
+    {
+      switch (dim) {
+      case 1: return block_dim().x;
+      case 2: return block_dim().y * block_dim().x;
+      case 3:
+      default: return block_dim().z * block_dim().y * block_dim().x;
+      }
+    }
+
   } // namespace target
 
   namespace device {
@@ -162,6 +188,12 @@ namespace quda {
        shared memory bank width on the target architecture.
     */
     constexpr int shared_memory_bank_width() { return 32; }
+
+    /**
+       @brief Helper function that returns the size of the
+       shared memory on the target architecture.
+    */
+    constexpr int shared_memory_size() { return 32768; }
 
     /**
        @brief Helper function that returns true if we are to pass the

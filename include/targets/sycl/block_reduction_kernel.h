@@ -1,6 +1,7 @@
 #pragma once
 #include <tunable_kernel.h>
 #include <reduce_helper.h>
+#include <quda_sycl_api.h>
 
 namespace quda
 {

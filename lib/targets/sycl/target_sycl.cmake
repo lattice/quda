@@ -88,7 +88,7 @@ message(STATUS "Compiler ID is " ${CMAKE_CXX_COMPILER_ID})
 #set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},sycl_version=${CMAKE_SYCL_COMPILER_VERSION})
 set(HASH cpu_arch=${CPU_ARCH},Sycl)
 #set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH}")
-set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-Sycl")
+set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-SYCL")
 
 # ######################################################################################################################
 # sycl specific compile options
@@ -97,11 +97,12 @@ set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-Sycl")
 
 target_compile_options(quda PRIVATE -fsycl)
 target_compile_options(quda PRIVATE -mllvm -pragma-unroll-threshold=16)
-if(${CXX_COMPILER_ID} MATCHES "IntelLLVM")
-  target_compile_options(quda INTERFACE -fhonor-nan-compares)
-endif()
+#if(${CMAKE_CXX_COMPILER_ID} MATCHES "IntelLLVM")
+#  target_compile_options(quda INTERFACE -fhonor-nan-compares)
+#endif()
 
-target_compile_options(quda PRIVATE -Wno-tautological-constant-compare)
+target_compile_options(quda PUBLIC -Wno-tautological-constant-compare)
+
 target_compile_options(quda PRIVATE -Wno-division-by-zero)
 target_compile_options(quda PRIVATE -Wno-sign-compare)
 target_compile_options(quda PRIVATE -Wno-pass-failed)

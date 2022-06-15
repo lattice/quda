@@ -436,9 +436,9 @@ namespace quda
 
     void free_arg_buf()
     {
-      printfQuda("Arg buf count %i\n", argBuf.size());
+      printfQuda("Arg buf count %lu\n", argBuf.size());
       for (const auto &b: argBuf) {
-	printfQuda("  stream %i size %i\n", b.stream.idx, b.size);
+	printfQuda("  stream %i size %lu\n", b.stream.idx, b.size);
 	//if(b.buf!=nullptr) device_free(b.buf);
 	if(b.buf!=nullptr) host_free(b.buf);
 	//if(b.buf!=nullptr) managed_free(b.buf);

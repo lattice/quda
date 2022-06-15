@@ -2,383 +2,176 @@
 
 #include <target_device.h>
 #include <reducer.h>
-#include <group_reduce.h>
 
 /**
    @file block_reduce_helper.h
 
-   @section This files contains the SYCL implementations
-   for warp- and block-level reductions.
+   @section This files contains the CUDA device specializations for
+   warp- and block-level reductions, using the CUB library
  */
 
-using namespace quda;
+//using namespace quda;
 
 namespace quda
 {
 
-#if 0
   /**
-     @brief warp_reduce_param is used as a container for passing
-     non-type parameters to specialize warp_reduce through the
-     target::dispatch
-     @tparam width The number of logical threads taking part in the warp reduction
+     @brief The atomic word size we use for a given reduction type.
+     This type should be lock-free to guarantee correct behaviour on
+     platforms that are not coherent with respect to the host
    */
-  template <int width_ = device::warp_size()> struct warp_reduce_param {
-    static_assert(width_ <= device::warp_size(), "WarpReduce logical width must not be greater than the warp size");
-    static constexpr int width = width_;
+  template <typename T, typename Enable = void> struct atomic_type;
+
+  template <> struct atomic_type<device_reduce_t> {
+    using type = device_reduce_t;
   };
 
-  /**
-     @brief block_reduce_param is used as a container for passing
-     non-type parameters to specialize block_reduce through the
-     target::dispatch
-     @tparam block_size_x_ The number of threads in the x dimension
-     @tparam block_size_y_ The number of threads in the y dimension
-     @tparam block_size_z_ The number of threads in the z dimension
-     @tparam batched Whether this is a batched reduction or not.  If
-     batched, then the block_size_z_ parameter is set equal to the
-     batch size.
-   */
-  template <int block_size_x_, int block_size_y_, int block_size_z_, bool batched> struct block_reduce_param {
-    static constexpr int block_size_x = block_size_x_;
-    static constexpr int block_size_y = block_size_y_;
-    static constexpr int block_size_z = !batched ? block_size_z_ : 1;
-    static constexpr int batch_size = !batched ? 1 : block_size_z_;
+  template <> struct atomic_type<float> {
+    using type = float;
   };
 
+  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<device_reduce_t, T::N>>>> {
+    using type = device_reduce_t;
+  };
+
+  template <typename T>
+  struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<array<device_reduce_t, T::value_type::N>, T::N>>>> {
+    using type = device_reduce_t;
+  };
+
+  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<complex<double>, T::N>>>> {
+    using type = double;
+  };
+
+  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<complex<float>, T::N>>>> {
+    using type = float;
+  };
+
+  template <typename T, typename U> constexpr auto get_reducer(const plus<U> &) { return plus<T>(); }
+  template <typename T, typename U> constexpr auto get_reducer(const maximum<U> &) { return maximum<T>(); }
+  template <typename T, typename U> constexpr auto get_reducer(const minimum<U> &) { return minimum<T>(); }
+
+  //template <typename T, typename U> constexpr auto get_cg_reducer(const plus<U> &) { return cg::plus<T>(); }
+  //template <typename T, typename U> constexpr auto get_cg_reducer(const maximum<U> &) { return cg::greater<T>(); }
+  //template <typename T, typename U> constexpr auto get_cg_reducer(const minimum<U> &) { return cg::less<T>(); }
+
+
+  // pre-declaration of warp_reduce that we wish to specialize
+  template <bool> struct warp_reduce;
+
   /**
-     @brief Dummy generic implementation of warp_reduce
+     @brief CUDA specialization of warp_reduce, utilizing cooperative groups
   */
-  template <bool is_device> struct warp_reduce {
-    template <typename T, typename reducer_t, typename param_t> T operator()(const T &value, bool, reducer_t, param_t)
-    {
-      return value;
-    }
-  };
+  template <> struct warp_reduce<true> {
 
-  /**
-     @brief Dummy generic implementation of block_reduce
-  */
-  template <bool is_device> struct block_reduce {
+    /**
+       @brief Perform a warp-wide reduction using cooperative groups
+       @param[in] value_ thread-local value to be reduced
+       @param[in] all Whether we want all threads to have visibility
+       to the result (all = true) or just the first thread in the
+       warp (all = false).
+       @param[in] r The reduction operation we want to apply
+       @return The warp-wide reduced value
+     */
     template <typename T, typename reducer_t, typename param_t>
-    T operator()(const T &value, bool, int, bool, reducer_t, param_t)
+    T inline operator()(const T &value_, bool all, const reducer_t &r, const param_t &)
     {
+      auto sg = sycl::ext::oneapi::experimental::this_sub_group();
+      T value = value_;
+#pragma unroll
+      for (int offset = device::warp_size() / 2; offset >= 1; offset /= 2) {
+	//value = get_reducer<T>(r)(value, tile.shfl_down(value, offset));
+	value = r(value, sycl::shift_group_left(sg, value, offset));
+      }
+      //if (all) value = tile.shfl(value, 0);
+      if (all) value = sycl::select_from_group(sg, value, 0);
       return value;
     }
-  };
-#endif
 
-  /**
-     @brief WarpReduce provides a generic interface for performing
-     perform reductions at the warp or sub-warp level
-     @tparam T The type of the value that we are reducing
-     @tparam width The number of logical threads taking part in the warp reduction
-  */
-  template <typename T, int width> class WarpReduce
-  {
-    static_assert(width <= device::warp_size(),
-		  "WarpReduce logical width must not be greater than the warp size");
-    //using param_t = warp_reduce_param<width>;
-    //const nreduce = device::warp_size() / width;
-
-  public:
-    constexpr WarpReduce() { }
-
-    /**
-       @brief Perform a warp-wide sum reduction
-       @param[in] value Thread-local value to be reduced
-       @return Reduced value (defined in logical thread 0 only)
-     */
-    inline T Sum(const T &value)
-    {
-      //static const __SYCL_CONSTANT_AS char format[] = "WarpReduce::Sum unimplemented\n";
-      //sycl::ext::oneapi::experimental::printf(format);
-      return value;
-      //return target::dispatch<warp_reduce>(value, false, quda::plus<T>(), param_t());
-    }
-
-    /**
-       @brief Perform a warp-wide sum reduction
-       @param[in] value Thread-local value to be reduced
-       @return Reduced value (defined in all threads within the logical warp)
-     */
-    inline T AllSum(const T &value)
-    {
-      //static const __SYCL_CONSTANT_AS char format[] = "WarpReduce::AllSum unimplemented\n";
-      //sycl::ext::oneapi::experimental::printf(format);
-      return value;
-      //return target::dispatch<warp_reduce>(value, true, quda::plus<T>(), param_t());
-    }
-
-    /**
-       @brief Perform a warp-wide max reduction
-       @param[in] value Thread-local value to be reduced
-       @return Reduced value (defined in logical thread 0 only)
-     */
-    inline T Max(const T &value)
-    {
-      //static const __SYCL_CONSTANT_AS char format[] = "WarpReduce::Max unimplemented\n";
-      //sycl::ext::oneapi::experimental::printf(format);
-      return value;
-      //return target::dispatch<warp_reduce>(value, false, quda::maximum<T>(), param_t());
-    }
-
-    /**
-       @brief Perform a warp-wide max reduction
-       @param[in] value Thread-local value to be reduced
-       @return Reduced value (defined in all threads within the logical warp)
-     */
-    inline T AllMax(const T &value)
-    {
-      //static const __SYCL_CONSTANT_AS char format[] = "WarpReduce::AllMax unimplemented\n";
-      //sycl::ext::oneapi::experimental::printf(format);
-      return value;
-      //return target::dispatch<warp_reduce>(value, true, quda::maximum<T>(), param_t());
-    }
-
-    /**
-       @brief Perform a warp-wide min reduction
-       @param[in] value Thread-local value to be reduced
-       @return Reduced value (defined in logical thread 0 only)
-     */
-    inline T Min(const T &value)
-    {
-      //static const __SYCL_CONSTANT_AS char format[] = "WarpReduce::Min unimplemented\n";
-      //sycl::ext::oneapi::experimental::printf(format);
-      return value;
-      //return target::dispatch<warp_reduce>(value, false, quda::minimum<T>(), param_t());
-    }
-
-    /**
-       @brief Perform a warp-wide min reduction
-       @param[in] value Thread-local value to be reduced
-       @return Reduced value (defined in all threads within the logical warp)
-     */
-    inline T AllMin(const T &value)
-    {
-      //static const __SYCL_CONSTANT_AS char format[] = "WarpReduce::AllMin unimplemented\n";
-      //sycl::ext::oneapi::experimental::printf(format);
-      return value;
-      //return target::dispatch<warp_reduce>(value, true, quda::minimum<T>(), param_t());
-    }
   };
 
+
+  // pre-declaration of block_reduce that we wish to specialize
+  template <bool> struct block_reduce;
+
   /**
-     @brief BlockReduce provides a generic interface for performing
-     reductions at the block level
-     @tparam T The type of the value that we are reducing
-     @tparam block_dim The number of thread block dimensions we are reducing
-     @tparam batch_size Batch size of the reduction.  Threads will be
-     ordered such that batch size is the slowest running index.
+     @brief CUDA specialization of block_reduce, building on the warp_reduce
   */
-  template <typename T, int block_dim, int batch_size_ = 1>
-  class BlockReduce
-  {
-    static constexpr int batch_size = std::max(batch_size_, 1);
-    const int nbatch = batch_size_ != 0 ? batch_size_ : localRangeZ;
-    const int batch;
+  template <> struct block_reduce<true> {
 
-  public:
-    constexpr BlockReduce(int batch = 0) : batch(batch) { }
+    template <int width_> struct warp_reduce_param {
+      static constexpr int width = width_;
+    };
 
     /**
-       @brief Perform a block-wide sum reduction
-       @param[in] value Thread-local value to be reduced
-       @return Reduced value (defined in logical thread 0 only)
-     */
-    template <bool async = true> inline T Sum(const T &value)
-    {
-      if (!async) __syncthreads(); // only synchronize if we are not pipelining
-      auto grp = getGroup();
-#if 1
-      T result;
-      //for(int i=0; i<batch_size; i++) {
-      for(int i=0; i<nbatch; i++) {
-	T in = (i==batch) ? value : quda::zero<T>();
-	T out;
-	blockReduceSum(grp, out, in);
-	if(i==batch) result = out;
-      }
-      return result;
-#else
-      using atype = T[512]; // FIXME
-      auto mem0 = sycl::ext::oneapi::group_local_memory_for_overwrite<atype>(grp);
-      auto mem = *mem0.get();
-      auto r0 = localRangeX;
-      auto r1 = localRangeY;
-      auto r2 = localRangeZ;
-      auto i0 = localIdX;
-      auto i1 = localIdY;
-      auto i2 = localIdZ;
-      auto r = r0*r1;
-      auto i = i1*r0+i0;
-      if(i2*r+i < 512) {
-	mem[i2*r+i] = value;
-      }
-      group_barrier(grp);
-      for(int s=1; s<r; s*=2) {
-	int a = 2*s*i;
-	int as = a + s;
-	if(as<r) {
-	  if(i2*r+as < 512) {
-	    mem[i2*r+a] = mem[i2*r+a] + mem[i2*r+as];
-	  }
-	}
-	group_barrier(grp);
-      }
-      return mem[0];
-#endif
-    }
-
-    /**
-       @brief Perform a block-wide sum reduction
-       @param[in] value Thread-local value to be reduced
-       @return Reduced value (defined in all threads in the block)
-     */
-    template <bool async = true> __device__ __host__ inline T AllSum(const T &value)
-    {
-      static_assert(batch_size == 1, "Cannot do AllSum with batch_size > 1");
-      if (!async) __syncthreads(); // only synchronize if we are not pipelining
-      auto grp = getGroup();
-      T result;
-      blockReduceSum(grp, result, value);
-      return result;
-    }
-
-    /**
-       @brief Perform a block-wide max reduction
-       @param[in] value Thread-local value to be reduced
-       @return Reduced value (defined in logical thread 0 only)
-     */
-    template <bool async = true> __device__ __host__ inline T Max(const T &value)
-    {
-      static_assert(batch_size == 1, "Cannot do Max with batch_size > 1");
-      if (!async) __syncthreads(); // only synchronize if we are not pipelining
-      auto grp = getGroup();
-      T result;
-      blockReduceMax(grp, result, value);
-      return result;
-    }
-
-    /**
-       @brief Perform a block-wide max reduction
-       @param[in] value Thread-local value to be reduced
-       @return Reduced value (defined in all threads in the block)
-     */
-    template <bool async = true> __device__ __host__ inline T AllMax(const T &value)
-    {
-      static_assert(batch_size == 1, "Cannot do AllMax with batch_size > 1");
-      if (!async) __syncthreads(); // only synchronize if we are not pipelining
-      auto grp = getGroup();
-      T result;
-      blockReduceMax(grp, result, value);
-      return result;
-    }
-
-    /**
-       @brief Perform a block-wide min reduction
-       @param[in] value Thread-local value to be reduced
-       @return Reduced value (defined in logical thread 0 only)
-     */
-    template <bool async = true> __device__ __host__ inline T Min(const T &value)
-    {
-      static_assert(batch_size == 1, "Cannot do Min with batch_size > 1");
-      if (!async) __syncthreads(); // only synchronize if we are not pipelining
-      auto grp = getGroup();
-      T result;
-      blockReduceMin(grp, result, value);
-      return result;
-    }
-
-    /**
-       @brief Perform a block-wide min reduction
-       @param[in] value Thread-local value to be reduced
-       @return Reduced value (defined in all threads in the block)
-     */
-    template <bool async = true> __device__ __host__ inline T AllMin(const T &value)
-    {
-      static_assert(batch_size == 1, "Cannot do AllMin with batch_size > 1");
-      if (!async) __syncthreads(); // only synchronize if we are not pipelining
-      auto grp = getGroup();
-      T result;
-      blockReduceMin(grp, result, value);
-      return result;
-    }
-
-    /**
-       @brief Perform a block-wide custom reduction
-       @param[in] value Thread-local value to be reduced
+       @brief Perform a block-wide reduction
+       @param[in] value_ thread-local value to be reduced
+       @param[in] async Whether this reduction will be performed
+       asynchronously with respect to the calling threads
+       @param[in] batch The batch index of the reduction
+       @param[in] all Whether we want all threads to have visibility
+       to the result (all = true) or just the first thread in the
+       block (all = false)
        @param[in] r The reduction operation we want to apply
-       @return Reduced value (defined in logical thread 0 only)
+       @return The block-wide reduced value
      */
-#if 0
-    template <bool async = true, typename U>
-    inline T
-    ReduceNotSum(const T &value, const quda::maximum<U> &r)
+    template <typename T, typename reducer_t, typename param_t>
+    inline T operator()(const T &value_, bool async, int batch, bool all,
+			const reducer_t &r, const param_t &)
     {
-      return Max<async>(value);
-    }
+      constexpr auto max_items = device::max_block_size() / device::warp_size();
+      const auto thread_idx = target::thread_idx_linear<param_t::block_dim>();
+      const auto block_size = target::block_size<param_t::block_dim>();
+      const auto warp_idx = thread_idx / device::warp_size();
+      const auto warp_items = (block_size + device::warp_size() - 1) / device::warp_size();
 
-    template <bool async = true, typename U>
-    inline T
-    ReduceNotSum(const T &value, const quda::minimum<U> &r)
-    {
-      return Min<async>(value);
-    }
+      // first do warp reduce
+      T value = warp_reduce<true>()(value_, false, r, warp_reduce_param<device::warp_size()>());
 
-    template <bool async = true, typename reducer_t>
-    inline std::enable_if_t<!reducer_t::do_sum,T>
-    Reduce(const T &value, const reducer_t &r)
-    {
-      return ReduceNotSum<async>(value, typename reducer_t::reducer_t());
-    }
+      if (!all && warp_items == 1) return value; // short circuit for single warp CTA
 
-    template <bool async = true, typename reducer_t>
-    inline std::enable_if_t<reducer_t::do_sum,T>
-    Reduce(const T &value, const reducer_t &r)
-    {
-      return Sum<async>(value);
-    }
-#endif
+      // now do reduction between warps
+      if (!async) __syncthreads(); // only synchronize if we are not pipelining
 
-    template <bool async = true, typename R>
-    inline std::enable_if_t<std::is_same_v<typename R::reducer_t,plus<typename R::reduce_t>>,T>
-    Reduce(const T &value, const R &)
-    {
-      return Sum<async>(value);
-    }
+      //__shared__ T storage[max_items];
+      static_assert(sizeof(T[max_items])<=device::shared_memory_size(), "Block reduce shared mem size too large");
+      auto mem = sycl::ext::oneapi::group_local_memory_for_overwrite<T[max_items]>(getGroup());
+      auto storage = *mem.get();
 
-    template <bool async = true, typename R>
-    inline std::enable_if_t<std::is_same_v<typename R::reducer_t,maximum<typename R::reduce_t>>,T>
-    Reduce(const T &value, const R &)
-    {
-      return Max<async>(value);
-    }
+      // if first thread in warp, write result to shared memory
+      if (thread_idx % device::warp_size() == 0) storage[batch * warp_items + warp_idx] = value;
+      __syncthreads();
 
-    template <bool async = true, typename R>
-    inline std::enable_if_t<std::is_same_v<typename R::reducer_t,minimum<typename R::reduce_t>>,T>
-    Reduce(const T &value, const R &)
-    {
-      return Min<async>(value);
-    }
+      // whether to use the first warp or first thread for the final reduction
+      constexpr bool final_warp_reduction = true;
 
-#if 0
-    /**
-       @brief Perform a block-wide custom reduction
-       @param[in] value Thread-local value to be reduced
-       @param[in] r The reduction operation we want to apply
-       @return Reduced value (defined in all threads in the block)
-     */
-    template <bool async = true, typename R>
-    inline T AllReduce(const T &value, const R &r)
-    {
-      static_assert(batch_size == 1, "Cannot do AllReduce with batch_size > 1");
-      auto grp = getGroup();
-      T result;
-      blockReduce(grp, result, value, r);  // FIXME: not used
-      return result;
+      if constexpr (final_warp_reduction) { // first warp completes the reduction (requires first warp is full)
+        if (warp_idx == 0) {
+          if constexpr (max_items > device::warp_size()) { // never true for max block size 1024, warp = 32
+            value = r.init();
+            for (auto i = thread_idx; i < warp_items; i += device::warp_size())
+              value = r(storage[batch * warp_items + i], value);
+          } else { // optimized path where we know the final reduction will fit in a warp
+            value = thread_idx < warp_items ? storage[batch * warp_items + thread_idx] : r.init();
+          }
+          value = warp_reduce<true>()(value, false, r, warp_reduce_param<device::warp_size()>());
+        }
+      } else { // first thread completes the reduction
+        if (thread_idx == 0) {
+          for (unsigned int i = 1; i < warp_items; i++) value = r(storage[batch * warp_items + i], value);
+        }
+      }
+
+      if (all) {
+        if (thread_idx == 0) storage[batch * warp_items + 0] = value;
+        __syncthreads();
+        value = storage[batch * warp_items + 0];
+      }
+
+      return value;
     }
-#endif
   };
 
 } // namespace quda
+
+#include "../generic/block_reduce_helper.h"

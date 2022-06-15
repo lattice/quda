@@ -12,8 +12,11 @@ namespace quda {
 #pragma unroll
         for (int offset = warp_size / 2; offset >= warp_size / warp_split; offset /= 2) {
 	  //for (int offset = sg_size / 2; offset >= warp_size / warp_split; offset /= 2) {
-          x[i].real(x[i].real() + sg.shuffle_down(x[i].real(), offset));
-          x[i].imag(x[i].imag() + sg.shuffle_down(x[i].imag(), offset));
+          //x[i].real(x[i].real() + sg.shuffle_down(x[i].real(), offset));
+          //x[i].imag(x[i].imag() + sg.shuffle_down(x[i].imag(), offset));
+          //x[i].real(x[i].real() + sycl::shift_group_left(sg, x[i].real(), offset));
+          //x[i].imag(x[i].imag() + sycl::shift_group_left(sg, x[i].imag(), offset));
+          x[i] += sycl::shift_group_left(sg, x[i], offset);
         }
       }
     }
