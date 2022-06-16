@@ -258,8 +258,10 @@ namespace quda
     r.resize(0);
 
     // Resize Krylov Space
-    for (unsigned int i = n_conv; i < kSpace.size(); i++) { delete kSpace[i]; }
-    kSpace.resize(n_conv);
+    int n_eig = n_conv;
+    if(compute_svd) n_eig *= 2;
+    for (unsigned int i = n_eig; i < kSpace.size(); i++) { delete kSpace[i]; }
+    kSpace.resize(n_eig);
     evals.resize(n_conv);
 
     // Only save if outfile is defined
@@ -267,7 +269,7 @@ namespace quda
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
       // Make an array of size n_conv
       std::vector<ColorSpinorField *> vecs_ptr;
-      vecs_ptr.reserve(n_conv);
+      vecs_ptr.reserve(n_eig);
       const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
       // We may wish to compute vectors in high prec, but use in a lower
       // prec. This allows the user to down copy the data for later use.
@@ -285,7 +287,7 @@ namespace quda
                      vecs_ptr[0]->Precision());
         }
       } else {
-        for (int i = 0; i < n_conv; i++) {
+        for (int i = 0; i < n_eig; i++) {
           kSpace[i]->setSuggestedParity(mat_parity);
           vecs_ptr.push_back(kSpace[i]);
         }

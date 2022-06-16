@@ -34,7 +34,7 @@ std::vector<double> eigensolve(test_t test_param);
 TEST_P(EigensolveTest, verify)
 {
   if (skip_test(GetParam())) GTEST_SKIP();
-  auto tol = eig_param.tol;
+  auto tol = 5*eig_param.tol;
   for (auto rsd : eigensolve(GetParam())) EXPECT_LE(rsd, tol);
 }
 
@@ -42,9 +42,9 @@ std::string gettestname(::testing::TestParamInfo<test_t> param)
 {
   std::string name;
   name += get_eig_type_str(::testing::get<0>(param.param)) + std::string("_");
-  name += (::testing::get<1>(param.param) ? std::string("normop") : std::string("direct")) + std::string("_");
-  name += (::testing::get<2>(param.param) ? std::string("evenodd") : std::string("full")) + std::string("_");
-  name += (::testing::get<3>(param.param) ? std::string("withSVD") : std::string("noSVD")) + std::string("_");
+  name += (::testing::get<1>(param.param) == QUDA_BOOLEAN_TRUE ? std::string("normop") : std::string("direct")) + std::string("_");
+  name += (::testing::get<2>(param.param) == QUDA_BOOLEAN_TRUE ? std::string("evenodd") : std::string("full")) + std::string("_");
+  name += (::testing::get<3>(param.param) == QUDA_BOOLEAN_TRUE ? std::string("withSVD") : std::string("noSVD")) + std::string("_");
   name += get_eig_spectrum_str(::testing::get<4>(param.param));
   return name;
 }
@@ -61,9 +61,8 @@ auto non_hermitian_solvers = Values(QUDA_EIG_IR_ARNOLDI);
 
 // Eigensolver spectrum types
 auto hermitian_spectrum = Values(QUDA_SPECTRUM_LR_EIG, QUDA_SPECTRUM_SR_EIG);
-
-// Eigensolver spectrum types
-auto non_hermitian_spectrum = Values(QUDA_SPECTRUM_LM_EIG, QUDA_SPECTRUM_SM_EIG,
+auto non_hermitian_spectrum = Values(QUDA_SPECTRUM_LR_EIG, QUDA_SPECTRUM_SR_EIG,
+				     QUDA_SPECTRUM_LM_EIG, QUDA_SPECTRUM_SM_EIG,
 				     QUDA_SPECTRUM_LI_EIG, QUDA_SPECTRUM_SI_EIG);
 
 // preconditioned normal solves

@@ -124,12 +124,25 @@ void init(int argc, char **argv)
 
 std::vector<double> eigensolve(test_t test_param)
 {
+  // Collect testing parameters from gtest
   eig_param.eig_type = ::testing::get<0>(test_param);
   eig_param.use_norm_op = ::testing::get<1>(test_param);
   eig_param.use_pc = ::testing::get<2>(test_param);
   eig_param.compute_svd = ::testing::get<3>(test_param);
   eig_param.spectrum = ::testing::get<4>(test_param);
 
+  // For preconditioned matrices, spinors are only half the normal length.
+  // QUDA constructs spinors based on the "solution type" which is 
+  // strictly an inverter option. For QUDA_MATPC_SOLUTION, the inverter
+  // will not reconstruct the full solution, hence spinors are half length.
+  // For QUDA_MAT_SOLUTION the inverter will return the full solution,
+  // hence spinors are normal length.
+  // For the eigensolver, we must emulate these conditions. Therefore, if
+  // the user requests a preconditioned solve, we need only half length spinors.
+  // For full matrices, we need full length spinors.
+  if(eig_param.use_pc) eig_inv_param.solution_type = QUDA_MATPC_SOLUTION;
+  else eig_inv_param.solution_type = QUDA_MAT_SOLUTION;
+  
   logQuda(QUDA_SUMMARIZE, "Solver = %s, norm-op = %s, even-odd = %s, with SVD = %s, spectrum = %s\n",
 	  get_eig_type_str(eig_param.eig_type),
 	  eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? "true" : "false",
@@ -140,13 +153,15 @@ std::vector<double> eigensolve(test_t test_param)
   // Vector construct START
   //----------------------------------------------------------------------------
   // Host side arrays to store the eigenpairs computed by QUDA
-  std::vector<quda::ColorSpinorField> evecs(eig_n_conv);
+  int n_eig = eig_n_conv;
+  if(eig_param.compute_svd == QUDA_BOOLEAN_TRUE) n_eig *= 2;
+  std::vector<quda::ColorSpinorField> evecs(n_eig);
   quda::ColorSpinorParam cs_param;
   constructWilsonTestSpinorParam(&cs_param, &eig_inv_param, &gauge_param);
   // Void pointers to host side arrays, compatible with the QUDA interface.
-  std::vector<void *> host_evecs_ptr(eig_n_conv);
+  std::vector<void *> host_evecs_ptr(n_eig);
   // Allocate host side memory and pointers
-  for (int i = 0; i < eig_n_conv; i++) {
+  for (int i = 0; i < n_eig; i++) {
     evecs[i] = quda::ColorSpinorField(cs_param);
     host_evecs_ptr[i] = evecs[i].V();
   }
@@ -172,24 +187,22 @@ std::vector<double> eigensolve(test_t test_param)
   printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", host_timer.last());
 
   std::vector<double> residua(eig_n_conv, 0.0);
-  // Perform host side verification of inversion if requested.
-  // Here we utilise the inverter checking routine, i.e., to recover
-  // the source b from the solution x:
-  // M * x = M * M^-1 * b = b
-  // For the eigensolver, we wish to recover the scaled eigenvector:
-  // M * x = lambda * x
+  // Perform host side verification of eigenvector if requested.
   if (verify_results) {
     for (int i = 0; i < eig_n_conv; i++) {
-      double _Complex lambda = evals[i];
-      //cax(0.0, scaled_vector.V(), V * spinor_site_size, prec);
-      //caxpy(lambda, evecs[i].V(), scaled_vector.V(), V * spinor_site_size, prec);
-      //printfQuda("Norm2 test side %d = %e\n", i, norm_2(evecs[i].V(), V * spinor_site_size, prec));
-      //printfQuda("Norm2 test side scaled %d = %e\n", i, norm_2(scaled_vector.V(), V * spinor_site_size, prec));
-      //printfQuda("true res offset = %e\n", eig_param.invert_param->true_res_offset[i]);
-      residua[i] = verifyWilsonTypeEigenvector(evecs[i].V(), lambda, i, gauge_param, eig_param,
-					       gauge.data(), clover.data(), clover_inv.data());
+      if(eig_param.compute_svd == QUDA_BOOLEAN_TRUE) {
+	double _Complex sigma = evals[i];
+	residua[i] = verifyWilsonTypeSingularVector(evecs[i].V(), evecs[i + eig_n_conv].V(), sigma, i, gauge_param, eig_param,
+						    gauge.data(), clover.data(), clover_inv.data());
+	
+      } else {
+	double _Complex lambda = evals[i];
+	residua[i] = verifyWilsonTypeEigenvector(evecs[i].V(), lambda, i, gauge_param, eig_param,
+						 gauge.data(), clover.data(), clover_inv.data());
+	
+      }
     }
-  }
+  } 
   return residua;
   // QUDA eigensolver test COMPLETE
   //----------------------------------------------------------------------------
