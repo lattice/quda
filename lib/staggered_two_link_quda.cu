@@ -18,7 +18,7 @@ using namespace staggered_quark_smearing;
 
     public:
       TwoLink_(Arg &arg, const GaugeField &link, const GaugeField &outA) :
-        TunableKernel3D(link, 2, 1),
+        TunableKernel3D(link, 2, 4),
         arg(arg),
         outA(outA)
       {
@@ -42,9 +42,9 @@ using namespace staggered_quark_smearing;
         outA.restore();
       }
 
-      long long flops() const { return 2*arg.threads.x*792ll;}
+      long long flops() const { return 2*4*arg.threads.x*198ll;}
 
-      long long bytes() const { return 2*arg.threads.x*( 2*arg.link.Bytes() + arg.outA.Bytes() );}
+      long long bytes() const { return 2*4*arg.threads.x*( 2*arg.link.Bytes() + arg.outA.Bytes() );}
     };
 
     template <typename real, int nColor, QudaReconstructType recon>

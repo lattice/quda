@@ -62,11 +62,11 @@ namespace quda {
       // Flops count, in two-number pair (matrix_mult, matrix_add)
       // 				   (4, 4)
       // 198 Flops per direction
-      // 792 Flops per site in total
-      __device__ __host__ void operator()(int x_cb, int parity, int)
+      __device__ __host__ void operator()(int x_cb, int parity, int mu)
       {
         int x[4];
         int dx[4] = { 0, 0, 0, 0 };
+        dx[mu] = 1;
 
         getCoords(x, x_cb, arg.X, parity);
 
@@ -85,21 +85,15 @@ namespace quda {
          */
 
         // compute the forward two links
-#pragma unroll
-        for (int mu=0; mu<4; mu++) {
-          int point_c = e_cb;
+        int point_c = e_cb;
+        int point_d = linkIndexShift(x,dx,arg.E);
 
-          dx[mu] = 1;
-          int point_d = linkIndexShift(x,dx,arg.E);
-          dx[mu] = 0;
+        Link Ucd = arg.link(mu, point_c, parity);
+        Link Ude = arg.link(mu, point_d, 1-parity);
 
-          Link Ucd = arg.link(mu, point_c, parity);
-          Link Ude = arg.link(mu, point_d, 1-parity);
+        Link temp = Ucd*Ude;
 
-          Link temp = Ucd*Ude;
-
-          arg.outA(mu, x_cb, parity) = temp;
-        } // loop over mu
+        arg.outA(mu, x_cb, parity) = temp;
       }
     };
     
