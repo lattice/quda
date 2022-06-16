@@ -93,8 +93,8 @@ void init(int argc, char **argv)
   //------------------------------------------------------
 
   // Set lattice dimensions for Dslash reference
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      dslash_type == QUDA_MOBIUS_DWF_DSLASH  || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     dw_setDims(gauge_param.X, eig_inv_param.Ls);
   } else {
     setDims(gauge_param.X);
@@ -147,7 +147,7 @@ std::vector<double> eigensolve(test_t test_param)
   // the fine tuning required can inhibit convergence of an otherwise
   // perfectly good algorithm
   if (enable_testing) eig_param.use_poly_acc = QUDA_BOOLEAN_FALSE;
-  
+
   logQuda(QUDA_SUMMARIZE, "Solver = %s, norm-op = %s, even-odd = %s, with SVD = %s, spectrum = %s\n",
           get_eig_type_str(eig_param.eig_type), eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? "true" : "false",
           eig_param.use_pc == QUDA_BOOLEAN_TRUE ? "true" : "false",
@@ -232,10 +232,10 @@ int main(int argc, char **argv)
   initComms(argc, argv, gridsize_from_cmdline);
 
   // Only these fermions are supported in this file
-  if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
-      dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH &&
-      dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_MOBIUS_DWF_EOFA_DSLASH &&
-      dslash_type != QUDA_DOMAIN_WALL_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH) {
+  if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
+      && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH
+      && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_MOBIUS_DWF_EOFA_DSLASH
+      && dslash_type != QUDA_DOMAIN_WALL_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }
