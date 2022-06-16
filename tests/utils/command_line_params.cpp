@@ -709,8 +709,7 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Solve the Mdag problem instead of M (MMdag if eig-use-normop == true) (default false)");
   opgroup->add_option("--eig-use-normop", eig_use_normop,
                       "Solve the MdagM problem instead of M (MMdag if eig-use-dagger == true) (default false)");
-  opgroup->add_option("--eig-use-pc", eig_use_pc,
-                      "Solve the Even-Odd preconditioned problem (default false)");
+  opgroup->add_option("--eig-use-pc", eig_use_pc, "Solve the Even-Odd preconditioned problem (default false)");
   opgroup->add_option("--eig-use-poly-acc", eig_use_poly_acc, "Use Chebyshev polynomial acceleration in the eigensolver");
 }
 

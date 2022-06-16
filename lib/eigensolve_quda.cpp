@@ -95,7 +95,7 @@ namespace quda
     // For normal operators (MdagM, MMdag) the SVD of the
     // underlying operators (M, Mdag) is computed.
     compute_svd = eig_param->compute_svd;
-    
+
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
@@ -134,19 +134,19 @@ namespace quda
       if (!mat.hermitian()) errorQuda("Cannot use polynomial acceleration with non-Hermitian operator");
       if (!eig_solver->hermitian()) errorQuda("Polynomial acceleration not supported with non-Hermitian solver");
     }
-    
+
     // Cannot solve for imaginary spectrum of hermitian systems
     if (mat.hermitian() && (eig_param->spectrum == QUDA_SPECTRUM_SI_EIG || eig_param->spectrum == QUDA_SPECTRUM_LI_EIG))
       errorQuda("The imaginary spectrum of a Hermitian operator cannot be computed");
 
     // Cannot compute SVD of non-normal operators
-    if (!eig_param->use_norm_op && eig_param->compute_svd) 
+    if (!eig_param->use_norm_op && eig_param->compute_svd)
       errorQuda("Computation of SVD supported for normal operators only");
     //--------------------------------------------------------------------------
-    
+
     return eig_solver;
   }
-  
+
   // Utilities and functions common to all Eigensolver instances
   //------------------------------------------------------------------------------
   void EigenSolver::prepareInitialGuess(std::vector<ColorSpinorField *> &kSpace)
@@ -259,7 +259,7 @@ namespace quda
 
     // Resize Krylov Space
     int n_eig = n_conv;
-    if(compute_svd) n_eig *= 2;
+    if (compute_svd) n_eig *= 2;
     for (unsigned int i = n_eig; i < kSpace.size(); i++) { delete kSpace[i]; }
     kSpace.resize(n_eig);
     evals.resize(n_conv);
@@ -744,8 +744,8 @@ namespace quda
       Complex n_unit(-1.0, 0.0);
       blas::caxpby(evals[i], *evecs[i], n_unit, *temp[0]);
       residua[i] = sqrt(blas::norm2(*temp[0]));
-      //eig_param->invert_param->true_res_offset[i] = residua[i];
-      
+      // eig_param->invert_param->true_res_offset[i] = residua[i];
+
       // If size = n_conv, this routine is called post sort
       if (getVerbosity() >= QUDA_SUMMARIZE && size == n_conv)
         printfQuda("Eval[%04d] = (%+.16e,%+.16e) residual = %+.16e\n", i, evals[i].real(), evals[i].imag(), residua[i]);

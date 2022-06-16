@@ -96,13 +96,14 @@ double verifyDomainWallTypeInversion(void *spinorOut, void **spinorOutMulti, voi
                                      void *clover, void *clover_inv);
 
 double verifyWilsonTypeEigenvector(void *spinor, double _Complex lambda, int i, QudaGaugeParam &gauge_param,
-				  QudaEigParam &eig_param, void **gauge, void *clover, void *clover_inv);
+                                   QudaEigParam &eig_param, void **gauge, void *clover, void *clover_inv);
 
-double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, double _Complex sigma, int i, QudaGaugeParam &gauge_param,
-				      QudaEigParam &eig_param, void **gauge, void *clover, void *clover_inv);
+double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, double _Complex sigma, int i,
+                                      QudaGaugeParam &gauge_param, QudaEigParam &eig_param, void **gauge, void *clover,
+                                      void *clover_inv);
 
 double verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck,
-				 QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover,
+                                 QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover,
                                  void *clover_inv);
 
 double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorField &ref, quda::ColorSpinorField &in,

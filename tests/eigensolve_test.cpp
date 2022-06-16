@@ -49,10 +49,8 @@ void display_test_info()
     printfQuda(" - ****    SVD demands normal operator, will use MdagM    ****\n");
     printfQuda(" - ***********************************************************\n");
   } else {
-    printfQuda(" - Operator: daggered (%s) , norm-op (%s), even-odd pc (%s)\n",
-	       eig_use_dagger ? "true" : "false",
-               eig_use_normop ? "true" : "false",
-	       eig_use_pc ? "true" : "false");
+    printfQuda(" - Operator: daggered (%s) , norm-op (%s), even-odd pc (%s)\n", eig_use_dagger ? "true" : "false",
+               eig_use_normop ? "true" : "false", eig_use_pc ? "true" : "false");
   }
   if (eig_use_poly_acc) {
     printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
@@ -85,7 +83,7 @@ void init(int argc, char **argv)
   // construct the dirac operator.
   eig_inv_param = newQudaInvertParam();
   setInvertParam(eig_inv_param);
-  
+
   eig_param = newQudaEigParam();
   // We encapsualte the inv_param structure inside the
   // eig_param structure
@@ -132,7 +130,7 @@ std::vector<double> eigensolve(test_t test_param)
   eig_param.spectrum = ::testing::get<4>(test_param);
 
   // For preconditioned matrices, spinors are only half the normal length.
-  // QUDA constructs spinors based on the "solution type" which is 
+  // QUDA constructs spinors based on the "solution type" which is
   // strictly an inverter option. For QUDA_MATPC_SOLUTION, the inverter
   // will not reconstruct the full solution, hence spinors are half length.
   // For QUDA_MAT_SOLUTION the inverter will return the full solution,
@@ -140,21 +138,21 @@ std::vector<double> eigensolve(test_t test_param)
   // For the eigensolver, we must emulate these conditions. Therefore, if
   // the user requests a preconditioned solve, we need only half length spinors.
   // For full matrices, we need full length spinors.
-  if(eig_param.use_pc) eig_inv_param.solution_type = QUDA_MATPC_SOLUTION;
-  else eig_inv_param.solution_type = QUDA_MAT_SOLUTION;
-  
+  if (eig_param.use_pc)
+    eig_inv_param.solution_type = QUDA_MATPC_SOLUTION;
+  else
+    eig_inv_param.solution_type = QUDA_MAT_SOLUTION;
+
   logQuda(QUDA_SUMMARIZE, "Solver = %s, norm-op = %s, even-odd = %s, with SVD = %s, spectrum = %s\n",
-	  get_eig_type_str(eig_param.eig_type),
-	  eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? "true" : "false",
-	  eig_param.use_pc == QUDA_BOOLEAN_TRUE ? "true" : "false",
-	  eig_param.compute_svd == QUDA_BOOLEAN_TRUE ? "true" : "false",
-	  get_eig_spectrum_str(eig_param.spectrum));
-  
+          get_eig_type_str(eig_param.eig_type), eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? "true" : "false",
+          eig_param.use_pc == QUDA_BOOLEAN_TRUE ? "true" : "false",
+          eig_param.compute_svd == QUDA_BOOLEAN_TRUE ? "true" : "false", get_eig_spectrum_str(eig_param.spectrum));
+
   // Vector construct START
   //----------------------------------------------------------------------------
   // Host side arrays to store the eigenpairs computed by QUDA
   int n_eig = eig_n_conv;
-  if(eig_param.compute_svd == QUDA_BOOLEAN_TRUE) n_eig *= 2;
+  if (eig_param.compute_svd == QUDA_BOOLEAN_TRUE) n_eig *= 2;
   std::vector<quda::ColorSpinorField> evecs(n_eig);
   quda::ColorSpinorParam cs_param;
   constructWilsonTestSpinorParam(&cs_param, &eig_inv_param, &gauge_param);
@@ -190,19 +188,18 @@ std::vector<double> eigensolve(test_t test_param)
   // Perform host side verification of eigenvector if requested.
   if (verify_results) {
     for (int i = 0; i < eig_n_conv; i++) {
-      if(eig_param.compute_svd == QUDA_BOOLEAN_TRUE) {
-	double _Complex sigma = evals[i];
-	residua[i] = verifyWilsonTypeSingularVector(evecs[i].V(), evecs[i + eig_n_conv].V(), sigma, i, gauge_param, eig_param,
-						    gauge.data(), clover.data(), clover_inv.data());
-	
+      if (eig_param.compute_svd == QUDA_BOOLEAN_TRUE) {
+        double _Complex sigma = evals[i];
+        residua[i] = verifyWilsonTypeSingularVector(evecs[i].V(), evecs[i + eig_n_conv].V(), sigma, i, gauge_param,
+                                                    eig_param, gauge.data(), clover.data(), clover_inv.data());
+
       } else {
-	double _Complex lambda = evals[i];
-	residua[i] = verifyWilsonTypeEigenvector(evecs[i].V(), lambda, i, gauge_param, eig_param,
-						 gauge.data(), clover.data(), clover_inv.data());
-	
+        double _Complex lambda = evals[i];
+        residua[i] = verifyWilsonTypeEigenvector(evecs[i].V(), lambda, i, gauge_param, eig_param, gauge.data(),
+                                                 clover.data(), clover_inv.data());
       }
     }
-  } 
+  }
   return residua;
   // QUDA eigensolver test COMPLETE
   //----------------------------------------------------------------------------
@@ -225,7 +222,7 @@ int main(int argc, char **argv)
 
   // Set values for precisions via the command line.
   setQudaPrecisions();
-  
+
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
@@ -237,13 +234,13 @@ int main(int argc, char **argv)
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }
-  
+
   // Initialize the QUDA library
   initQuda(device_ordinal);
 
   // Initialise this test (parameters, gauge, clover)
   init(argc, argv);
-  
+
   // Compute plaquette as a sanity check
   double plaq[3];
   plaqQuda(plaq);
@@ -255,9 +252,10 @@ int main(int argc, char **argv)
     if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
     result = RUN_ALL_TESTS();
   } else {
-    eigensolve(test_t {eig_param.eig_type, eig_param.use_norm_op, eig_param.use_pc, eig_param.compute_svd, eig_param.spectrum});
+    eigensolve(
+      test_t {eig_param.eig_type, eig_param.use_norm_op, eig_param.use_pc, eig_param.compute_svd, eig_param.spectrum});
   }
-  
+
   // Memory clean-up
   freeGaugeQuda();
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {

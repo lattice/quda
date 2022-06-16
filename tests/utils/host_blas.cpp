@@ -19,9 +19,9 @@ void axpy(double a, void *x, void *y, int len, QudaPrecision precision)
 void caxpy(double _Complex a, void *x, void *y, int len, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION)
-    aXpY((double _Complex)a, (double _Complex *)x, (double _Complex *)y, len/2);
+    aXpY((double _Complex)a, (double _Complex *)x, (double _Complex *)y, len / 2);
   else
-    aXpY((float _Complex)a, (float _Complex *)x, (float _Complex *)y, len/2);
+    aXpY((float _Complex)a, (float _Complex *)x, (float _Complex *)y, len / 2);
 }
 
 // performs the operation x[i] *= a
@@ -41,9 +41,9 @@ void ax(double a, void *x, int len, QudaPrecision precision)
 void cax(double _Complex a, void *x, int len, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION)
-    aX((double _Complex)a, (double _Complex*)x, len/2);
+    aX((double _Complex)a, (double _Complex *)x, len / 2);
   else {
-    aX((float _Complex)a, (float _Complex*)x, len/2);
+    aX((float _Complex)a, (float _Complex *)x, len / 2);
   }
 }
 

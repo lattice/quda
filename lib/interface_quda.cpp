@@ -2209,7 +2209,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
 
   profileEigensolve.TPSTART(QUDA_PROFILE_TOTAL);
   profileEigensolve.TPSTART(QUDA_PROFILE_INIT);
-  
+
   // Transfer the inv param structure contained in eig_param.
   // This will define the operator to be eigensolved.
   QudaInvertParam *inv_param = eig_param->invert_param;
@@ -2231,24 +2231,28 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // the correct QudaInvertParam values for the solve_type and
   // solution_type based on those three booleans
 
-  if(eig_param->use_pc) {
-    if(eig_param->use_norm_op) inv_param->solve_type = QUDA_NORMOP_PC_SOLVE;
-    else                       inv_param->solve_type = QUDA_DIRECT_PC_SOLVE;
+  if (eig_param->use_pc) {
+    if (eig_param->use_norm_op)
+      inv_param->solve_type = QUDA_NORMOP_PC_SOLVE;
+    else
+      inv_param->solve_type = QUDA_DIRECT_PC_SOLVE;
     inv_param->solution_type = QUDA_MATPC_SOLUTION;
   } else {
-    if(eig_param->use_norm_op) inv_param->solve_type = QUDA_NORMOP_SOLVE;
-    else                       inv_param->solve_type = QUDA_DIRECT_SOLVE;
+    if (eig_param->use_norm_op)
+      inv_param->solve_type = QUDA_NORMOP_SOLVE;
+    else
+      inv_param->solve_type = QUDA_DIRECT_SOLVE;
     inv_param->solution_type = QUDA_MAT_SOLUTION;
   }
   //------------------------------------------------------------------
-  
+
   // Ensure that the parameter structures are sound.
   checkInvertParam(inv_param);
   checkEigParam(eig_param);
 
   // Check that the gaige field is valid
   cudaGaugeField *cudaGauge = checkGauge(inv_param);
-  
+
   // Set all timing statistics to zero
   inv_param->secs = 0;
   inv_param->gflops = 0;
@@ -2280,7 +2284,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
                             inv_param->input_location);
 
   int n_eig = eig_param->n_conv;
-  if(eig_param->compute_svd) n_eig *= 2;
+  if (eig_param->compute_svd) n_eig *= 2;
   std::vector<ColorSpinorField *> host_evecs_(n_eig);
   cpuParam.create = QUDA_REFERENCE_FIELD_CREATE;
   for (int i = 0; i < n_eig; i++) {
@@ -2299,13 +2303,13 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   std::vector<ColorSpinorField *> kSpace(n_eig);
   for (int i = 0; i < n_eig; i++) {
     kSpace[i] = ColorSpinorField::Create(cudaParam);
-    if(i < eig_param->block_size) *kSpace[i] = *host_evecs_[i];
+    if (i < eig_param->block_size) *kSpace[i] = *host_evecs_[i];
   }
 
   // Simple vector for eigenvalues.
   std::vector<Complex> evals(eig_param->n_conv, 0.0);
   //------------------------------------------------------
-  
+
   // Sanity checks for operator/eigensolver compatibility.
   //------------------------------------------------------
   // If you attempt to compute part of the imaginary spectrum of a hermitian matrix,
@@ -2314,7 +2318,8 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   if (eig_param->spectrum == QUDA_SPECTRUM_LI_EIG || eig_param->spectrum == QUDA_SPECTRUM_SI_EIG) {
     // Is the operator hermitian?
     if ((eig_param->use_norm_op || (inv_param->dslash_type == QUDA_LAPLACE_DSLASH))
-	|| ((inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_ASQTAD_DSLASH) && inv_param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
+        || ((inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_ASQTAD_DSLASH)
+            && inv_param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
       errorQuda("Cannot compute the pure imaginary spectrum of a hermitian operator");
     }
   }
@@ -2348,7 +2353,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
     errorQuda("Invalid use_norm_op, dagger, gamma_5 combination");
   }
 
-  // Perfrom the eigensolve 
+  // Perfrom the eigensolve
   if (eig_param->arpack_check) {
     arpack_solve(host_evecs_, evals, *m, eig_param, profileEigensolve);
   } else {
@@ -2357,8 +2362,8 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
     delete eig_solve;
   }
 
-  delete m;  
-  
+  delete m;
+
   // Transfer Eigenpairs back to host if using GPU eigensolver. The copy
   // will automatically rotate from device UKQCD gamma basis to the
   // host side gamma basis.
