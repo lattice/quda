@@ -19,16 +19,6 @@ double verifyInversion(void *spinorOut, void *spinorIn, void *spinorCheck, QudaG
                          clover_inv);
 }
 
-// Overload for eigensolver workflows: spinorOut = Mat * spinorIn / lambda
-double verifyEigenvector(void *spinorOut, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param,
-			 QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv, double _Complex lambda)
-{
-  cax(1.0/lambda, spinorIn, V * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);  
-  void **spinorOutMulti = nullptr;
-  return verifyInversion(spinorOut, spinorOutMulti, spinorIn, spinorCheck, gauge_param, inv_param, gauge, clover,
-                         clover_inv);
-}
-
 double verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck,
                        QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover,
                        void *clover_inv)
@@ -409,7 +399,7 @@ double verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *s
     } else {
       errorQuda("Solution type %s not implemented", get_solution_str(inv_param.solution_type));
     }
-
+    
     mxpy(spinorIn, spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
     double nrm2 = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
     double src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
@@ -423,6 +413,191 @@ double verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *s
 
   return l2r_max;
 }
+
+double verifyWilsonTypeEigenvector(void *spinor, double _Complex lambda, int i, QudaGaugeParam &gauge_param, QudaEigParam &eig_param, void **gauge, void *clover, void *clover_inv)
+{
+  bool use_pc = (eig_param.use_pc == QUDA_BOOLEAN_TRUE ? true : false);
+  bool normop = (eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? true : false);
+  int vol = (use_pc ? Vh : V);
+  
+  QudaInvertParam inv_param = *(eig_param.invert_param);  
+  int Ls = inv_param.Ls;
+  double mass = inv_param.mass;
+  double kappa = inv_param.kappa;
+  double epsilon = inv_param.epsilon;
+  double mu = inv_param.mu;
+  QudaPrecision cpu_prec = inv_param.cpu_prec;
+  QudaTwistFlavorType twist_flavor = inv_param.twist_flavor;
+  QudaMatPCType matpc_type = inv_param.matpc_type;
+  QudaDagType dagger = inv_param.dagger;
+  QudaDagType dagger_opposite = (inv_param.dagger == QUDA_DAG_YES ? QUDA_DAG_NO : QUDA_DAG_YES);
+  
+  int spinor_length = vol * spinor_site_size * Ls;
+  
+  // ONLY WILSON/CLOVER/TWISTED/DWF TYPES
+  if (eig_param.invert_param->mass_normalization == QUDA_MASS_NORMALIZATION) {
+    errorQuda("Mass normalization %s not implemented", get_mass_normalization_str(eig_param.invert_param->mass_normalization));
+  }
+  
+  void *spinorTmp = safe_malloc(vol * spinor_site_size * host_spinor_data_type_size * Ls);
+  void *spinorTmp2 = safe_malloc(vol * spinor_site_size * host_spinor_data_type_size * Ls);
+  
+  switch(dslash_type) {
+  case QUDA_DOMAIN_WALL_DSLASH: {
+    if(use_pc) {
+      dw_matpc(spinorTmp, gauge, spinor, kappa5, matpc_type, dagger, cpu_prec, gauge_param, mass);
+      if(normop) dw_matpc(spinorTmp2, gauge, spinorTmp, kappa5, matpc_type, dagger_opposite, cpu_prec, gauge_param, mass);
+    } else {
+      dw_mat(spinorTmp, gauge, spinor, kappa5, dagger, cpu_prec, gauge_param, mass);
+      if(normop) dw_mat(spinorTmp2, gauge, spinorTmp, kappa5, dagger_opposite, cpu_prec, gauge_param, mass);
+    }
+    break;
+  }
+  case QUDA_DOMAIN_WALL_4D_DSLASH: {
+    if(use_pc) {
+      dw_4d_matpc(spinorTmp, gauge, spinor, kappa5, matpc_type, dagger, cpu_prec, gauge_param, mass);
+      if(normop) dw_4d_matpc(spinorTmp, gauge, spinor, kappa5, matpc_type, dagger_opposite, cpu_prec, gauge_param, mass);
+    } else {
+      dw_4d_mat(spinorTmp, gauge, spinor, kappa5, dagger, cpu_prec, gauge_param, mass);
+      if(normop) dw_4d_mat(spinorTmp, gauge, spinor, kappa5, dagger_opposite, cpu_prec, gauge_param, mass);
+    }
+    break;
+  }
+  case QUDA_MOBIUS_DWF_DSLASH: {
+    double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+    double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+    for (int xs = 0; xs < Lsdim; xs++) {
+      kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
+      kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+    }
+    if(use_pc) {
+      mdw_matpc(spinorTmp, gauge, spinor, kappa_b, kappa_c, matpc_type, dagger, cpu_prec, gauge_param, mass, inv_param.b_5, inv_param.c_5);
+      if(normop) mdw_matpc(spinorTmp2, gauge, spinorTmp, kappa_b, kappa_c, matpc_type, dagger_opposite, cpu_prec, gauge_param, mass, inv_param.b_5, inv_param.c_5);
+    } else {
+      mdw_mat(spinorTmp, gauge, spinor, kappa_b, kappa_c, dagger, cpu_prec, gauge_param, mass, inv_param.b_5, inv_param.c_5);
+      if(normop) mdw_mat(spinorTmp2, gauge, spinorTmp, kappa_b, kappa_c, dagger_opposite, cpu_prec, gauge_param, mass, inv_param.b_5, inv_param.c_5);
+    }
+    host_free(kappa_b);
+    host_free(kappa_c);
+    break;
+  }
+  case QUDA_MOBIUS_DWF_EOFA_DSLASH: {
+    if(use_pc) {
+      mdw_eofa_matpc(spinorTmp, gauge, spinor, matpc_type, dagger, cpu_prec, gauge_param, mass,
+		     inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
+		     inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+      if(normop) mdw_eofa_matpc(spinorTmp2, gauge, spinorTmp, matpc_type, dagger_opposite, cpu_prec, gauge_param, mass,
+				inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
+				inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+    } else {
+      mdw_eofa_mat(spinorTmp, gauge, spinor, dagger, cpu_prec, gauge_param, mass,
+		   inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
+		     inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+      if(normop) mdw_eofa_mat(spinorTmp2, gauge, spinorTmp, dagger_opposite, cpu_prec, gauge_param, mass,
+			      inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
+			      inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+    }
+    break;
+  }
+  case QUDA_TWISTED_MASS_DSLASH: {
+    if (twist_flavor != QUDA_TWIST_SINGLET) {
+      if(use_pc) {
+	tm_ndeg_matpc(spinorTmp, gauge, spinor, kappa, mu, epsilon,
+		      matpc_type, 0, cpu_prec, gauge_param);
+	if(normop) tm_ndeg_matpc(spinorTmp2, gauge, spinorTmp, kappa, mu, epsilon,
+				 matpc_type, 1, cpu_prec, gauge_param);
+      } else {
+	tm_ndeg_mat(spinorTmp, gauge, spinor, kappa, mu, epsilon, 0,
+		    cpu_prec, gauge_param);
+	if(normop) tm_ndeg_mat(spinorTmp, gauge, spinor, kappa, mu, epsilon, 1,
+			       cpu_prec, gauge_param);
+	
+      }
+    } else {
+      tm_matpc(spinorTmp, gauge, spinor, kappa, mu, twist_flavor,
+	       matpc_type, 0, cpu_prec, gauge_param);
+      if(normop) tm_matpc(spinorTmp2, gauge, spinorTmp, kappa, mu, twist_flavor,
+			  matpc_type, 1, cpu_prec, gauge_param);
+    }
+    break;
+  }
+  case QUDA_TWISTED_CLOVER_DSLASH: {
+    if (twist_flavor != QUDA_TWIST_SINGLET) {
+      if(use_pc) {
+	tmc_ndeg_matpc(spinorTmp, gauge, spinor, clover, clover_inv, kappa, mu,
+		       epsilon, matpc_type, 0, cpu_prec, gauge_param);
+	if(normop) tmc_ndeg_matpc(spinorTmp2, gauge, spinorTmp, clover, clover_inv, kappa, mu,
+				  epsilon, matpc_type, 1, cpu_prec, gauge_param);
+      } else {
+	tmc_ndeg_mat(spinorTmp, gauge, spinor, clover, kappa, mu,
+		     epsilon, 0, cpu_prec, gauge_param);
+	if(normop) tmc_ndeg_mat(spinorTmp2, gauge, spinorTmp, clover, kappa, mu,
+				epsilon, 1, cpu_prec, gauge_param);
+      }
+    } else {
+      if(use_pc) {
+	tmc_matpc(spinorTmp, gauge, spinor, clover, clover_inv, kappa, mu,
+		  twist_flavor, matpc_type, 0, cpu_prec, gauge_param);
+	if(normop) tmc_matpc(spinorTmp2, gauge, spinorTmp, clover, clover_inv, kappa, mu,
+			     twist_flavor, matpc_type, 1, cpu_prec, gauge_param);
+      } else {
+	tmc_mat(spinorTmp, gauge, spinor, clover, kappa, mu,
+		twist_flavor, 0, cpu_prec, gauge_param);
+	if(normop) tmc_mat(spinorTmp2, gauge, spinorTmp, clover, kappa, mu,
+			   twist_flavor, 1, cpu_prec, gauge_param);
+      }      
+    }
+    break;
+  }
+  case QUDA_WILSON_DSLASH: {
+    if(use_pc) {
+      wil_matpc(spinorTmp, gauge, spinor, kappa, matpc_type, 0, cpu_prec,
+		gauge_param);
+      if(normop) wil_matpc(spinorTmp2, gauge, spinorTmp, kappa, matpc_type, 1, cpu_prec,
+			   gauge_param);
+    } else {
+      wil_mat(spinorTmp, gauge, spinor, kappa, 0, cpu_prec, gauge_param);
+      if(normop) wil_mat(spinorTmp2, gauge, spinorTmp, kappa, 1, cpu_prec, gauge_param);
+    }
+    break;
+  }
+  case QUDA_CLOVER_WILSON_DSLASH: {
+    if(use_pc) {
+      clover_matpc(spinorTmp, gauge, clover, clover_inv, spinor, kappa, matpc_type, 0,
+		   cpu_prec, gauge_param);
+      if(normop) clover_matpc(spinorTmp2, gauge, clover, clover_inv, spinorTmp, kappa, matpc_type, 1,
+			      cpu_prec, gauge_param);
+    } else {
+      clover_mat(spinorTmp, gauge, clover, spinor, kappa, 0, cpu_prec, gauge_param);
+      if(normop) clover_mat(spinorTmp2, gauge, clover, spinorTmp, kappa, 1,
+			    cpu_prec, gauge_param);
+    }
+    break;
+  }
+  default : errorQuda("Action not supported");
+  }
+
+  // Compute M * x - \lambda * x
+  double nrm2, src2, l2r;
+  if(normop) {
+    caxpy(-lambda, spinor, spinorTmp2, spinor_length, cpu_prec);    
+    nrm2 = norm_2(spinorTmp2, spinor_length, cpu_prec);
+  } else {
+    caxpy(-lambda, spinor, spinorTmp, spinor_length, cpu_prec);
+    nrm2 = norm_2(spinorTmp, spinor_length, cpu_prec);
+  }
+  
+  src2 = norm_2(spinor, spinor_length, cpu_prec);
+  l2r = sqrt(nrm2 / src2);
+  
+  printfQuda("Eigenvector %4d: tol %.2e, host residual = %.15e\n", i, eig_param.tol, l2r);
+  
+  
+  host_free(spinorTmp);
+  host_free(spinorTmp2);
+  return l2r;
+}
+
 
 double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorField &ref, quda::ColorSpinorField &in,
                                 quda::ColorSpinorField &out, double mass, void *qdp_fatlink[], void *qdp_longlink[],

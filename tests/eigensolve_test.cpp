@@ -141,14 +141,10 @@ std::vector<double> eigensolve(test_t test_param)
   //----------------------------------------------------------------------------
   // Host side arrays to store the eigenpairs computed by QUDA
   std::vector<quda::ColorSpinorField> evecs(eig_n_conv);
-  quda::ColorSpinorField check;
   quda::ColorSpinorParam cs_param;
   constructWilsonTestSpinorParam(&cs_param, &eig_inv_param, &gauge_param);
-  check = quda::ColorSpinorField(cs_param);
-  
   // Void pointers to host side arrays, compatible with the QUDA interface.
   std::vector<void *> host_evecs_ptr(eig_n_conv);
-
   // Allocate host side memory and pointers
   for (int i = 0; i < eig_n_conv; i++) {
     evecs[i] = quda::ColorSpinorField(cs_param);
@@ -176,11 +172,22 @@ std::vector<double> eigensolve(test_t test_param)
   printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", host_timer.last());
 
   std::vector<double> residua(eig_n_conv, 0.0);
-  // Perform host side verification of inversion if requested
+  // Perform host side verification of inversion if requested.
+  // Here we utilise the inverter checking routine, i.e., to recover
+  // the source b from the solution x:
+  // M * x = M * M^-1 * b = b
+  // For the eigensolver, we wish to recover the scaled eigenvector:
+  // M * x = lambda * x
   if (verify_results) {
     for (int i = 0; i < eig_n_conv; i++) {
-      residua[i] = verifyEigenvector(evecs[i].V(), evecs[i].V(), check.V(), gauge_param, eig_inv_param,
-				     gauge.data(), clover.data(), clover_inv.data(), *(double *)&evals[i]);
+      double _Complex lambda = evals[i];
+      //cax(0.0, scaled_vector.V(), V * spinor_site_size, prec);
+      //caxpy(lambda, evecs[i].V(), scaled_vector.V(), V * spinor_site_size, prec);
+      //printfQuda("Norm2 test side %d = %e\n", i, norm_2(evecs[i].V(), V * spinor_site_size, prec));
+      //printfQuda("Norm2 test side scaled %d = %e\n", i, norm_2(scaled_vector.V(), V * spinor_site_size, prec));
+      //printfQuda("true res offset = %e\n", eig_param.invert_param->true_res_offset[i]);
+      residua[i] = verifyWilsonTypeEigenvector(evecs[i].V(), lambda, i, gauge_param, eig_param,
+					       gauge.data(), clover.data(), clover_inv.data());
     }
   }
   return residua;

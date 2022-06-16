@@ -2287,15 +2287,17 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   }
 
   // Create device side ColorSpinorField vector space to pass to the
-  // compute function.
-  ColorSpinorParam cudaParam(cpuParam);
-  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+  // compute function. Download any use supplied data as an initial guess.
+  ColorSpinorParam cudaParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaParam.setPrecision(inv_param->cuda_prec_eigensolver, inv_param->cuda_prec_eigensolver, true);
   // Ensure device vectors qre in UKQCD basis for Wilson type fermions
   if (cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;  
   std::vector<ColorSpinorField *> kSpace(eig_param->n_conv);
-  for (int i = 0; i < eig_param->n_conv; i++) { kSpace[i] = ColorSpinorField::Create(cudaParam); }
+  for (int i = 0; i < eig_param->n_conv; i++) {
+    kSpace[i] = ColorSpinorField::Create(cudaParam);
+    if(i < eig_param->block_size) *kSpace[i] = *host_evecs_[i];
+  }
 
   // Simple vector of Complex for eigenvalues.
   std::vector<Complex> evals(eig_param->n_conv, 0.0);
@@ -2360,7 +2362,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   for (int i = 0; i < eig_param->n_conv; i++) { memcpy(host_evals + i, &evals[i], sizeof(Complex)); }
   if (!(eig_param->arpack_check)) {
     profileEigensolve.TPSTART(QUDA_PROFILE_D2H);
-    //for (int i = 0; i < eig_param->n_conv; i++) *host_evecs_[i] = *kSpace[i];
+    for (int i = 0; i < eig_param->n_conv; i++) *host_evecs_[i] = *kSpace[i];
     profileEigensolve.TPSTOP(QUDA_PROFILE_D2H);
   }
 

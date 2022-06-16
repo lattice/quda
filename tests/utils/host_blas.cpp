@@ -16,6 +16,14 @@ void axpy(double a, void *x, void *y, int len, QudaPrecision precision)
     aXpY((float)a, (float *)x, (float *)y, len);
 }
 
+void caxpy(double _Complex a, void *x, void *y, int len, QudaPrecision precision)
+{
+  if (precision == QUDA_DOUBLE_PRECISION)
+    aXpY((double _Complex)a, (double _Complex *)x, (double _Complex *)y, len/2);
+  else
+    aXpY((float _Complex)a, (float _Complex *)x, (float _Complex *)y, len/2);
+}
+
 // performs the operation x[i] *= a
 template <typename Float> inline void aX(Float a, Float *x, int len)
 {

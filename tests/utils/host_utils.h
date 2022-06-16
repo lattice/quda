@@ -202,6 +202,7 @@ void mxpy(void *x, void *y, int len, QudaPrecision precision);
 void ax(double a, void *x, int len, QudaPrecision precision);
 void cax(double _Complex a, void *x, int len, QudaPrecision precision);
 void axpy(double a, void *x, void *y, int len, QudaPrecision precision);
+void caxpy(double _Complex a, void *x, void *y, int len, QudaPrecision precision);
 void xpay(void *x, double a, void *y, int len, QudaPrecision precision);
 void cxpay(void *x, double _Complex a, void *y, int len, QudaPrecision precision);
 void cpu_axy(QudaPrecision prec, double a, void *x, void *y, int size);

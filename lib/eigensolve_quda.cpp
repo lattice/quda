@@ -742,7 +742,8 @@ namespace quda
       Complex n_unit(-1.0, 0.0);
       blas::caxpby(evals[i], *evecs[i], n_unit, *temp[0]);
       residua[i] = sqrt(blas::norm2(*temp[0]));
-
+      //eig_param->invert_param->true_res_offset[i] = residua[i];
+      
       // If size = n_conv, this routine is called post sort
       if (getVerbosity() >= QUDA_SUMMARIZE && size == n_conv)
         printfQuda("Eval[%04d] = (%+.16e,%+.16e) residual = %+.16e\n", i, evals[i].real(), evals[i].imag(), residua[i]);
