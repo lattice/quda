@@ -553,9 +553,9 @@ double verifyWilsonTypeEigenvector(void *spinor, double _Complex lambda, int i, 
           tmc_matpc(spinorTmp2, gauge, spinorTmp, clover, clover_inv, kappa, mu, twist_flavor, matpc_type,
                     dagger_opposite, cpu_prec, gauge_param);
       } else {
-        tmc_mat(spinorTmp, gauge, spinor, clover, kappa, mu, twist_flavor, dagger, cpu_prec, gauge_param);
+        tmc_mat(spinorTmp, gauge, clover, spinor, kappa, mu, twist_flavor, dagger, cpu_prec, gauge_param);
         if (normop)
-          tmc_mat(spinorTmp2, gauge, spinorTmp, clover, kappa, mu, twist_flavor, dagger_opposite, cpu_prec, gauge_param);
+          tmc_mat(spinorTmp2, gauge, clover, spinorTmp, kappa, mu, twist_flavor, dagger_opposite, cpu_prec, gauge_param);
       }
     }
     break;

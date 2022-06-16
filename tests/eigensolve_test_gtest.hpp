@@ -65,7 +65,6 @@ auto non_hermitian_solvers = Values(QUDA_EIG_IR_ARNOLDI);
 auto hermitian_spectrum = Values(QUDA_SPECTRUM_LR_EIG, QUDA_SPECTRUM_SR_EIG);
 auto non_hermitian_spectrum = Values(QUDA_SPECTRUM_LR_EIG, QUDA_SPECTRUM_SR_EIG, QUDA_SPECTRUM_LM_EIG,
                                      QUDA_SPECTRUM_SM_EIG, QUDA_SPECTRUM_LI_EIG, QUDA_SPECTRUM_SI_EIG);
-
 // preconditioned normal solves
 INSTANTIATE_TEST_SUITE_P(NormalEvenOdd, EigensolveTest,
                          ::testing::Combine(hermitian_solvers, Values(QUDA_BOOLEAN_TRUE), Values(QUDA_BOOLEAN_TRUE),
@@ -83,7 +82,6 @@ INSTANTIATE_TEST_SUITE_P(DirectEvenOdd, EigensolveTest,
                          ::testing::Combine(non_hermitian_solvers, Values(QUDA_BOOLEAN_FALSE), Values(QUDA_BOOLEAN_TRUE),
                                             Values(QUDA_BOOLEAN_FALSE), non_hermitian_spectrum),
                          gettestname);
-
 // full system direct solve
 INSTANTIATE_TEST_SUITE_P(DirectFull, EigensolveTest,
                          ::testing::Combine(non_hermitian_solvers, Values(QUDA_BOOLEAN_FALSE), Values(QUDA_BOOLEAN_FALSE),
