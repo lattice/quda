@@ -1,7 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "quda.h"
-#include <string.h>
 #include "invert_quda.h"
 #include "misc.h"
 #include <assert.h>

@@ -147,9 +147,9 @@ std::vector<double> eigensolve(test_t test_param)
   // the fine tuning required can inhibit convergence of an otherwise
   // perfectly good algorithm
   if (enable_testing) eig_param.use_poly_acc = QUDA_BOOLEAN_FALSE;
-
-  logQuda(QUDA_SUMMARIZE, "Solver = %s, norm-op = %s, even-odd = %s, with SVD = %s, spectrum = %s\n",
-          get_eig_type_str(eig_param.eig_type), eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? "true" : "false",
+  
+  logQuda(QUDA_SUMMARIZE, "Action = %s, Solver = %s, norm-op = %s, even-odd = %s, with SVD = %s, spectrum = %s\n",
+	  get_dslash_str(dslash_type), get_eig_type_str(eig_param.eig_type), eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? "true" : "false",
           eig_param.use_pc == QUDA_BOOLEAN_TRUE ? "true" : "false",
           eig_param.compute_svd == QUDA_BOOLEAN_TRUE ? "true" : "false", get_eig_spectrum_str(eig_param.spectrum));
 
