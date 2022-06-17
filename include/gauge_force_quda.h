@@ -1,5 +1,4 @@
-#ifndef _GAUGE_FORCE_QUDA_H
-#define _GAUGE_FORCE_QUDA_H
+#pragma once
 
 namespace quda {
 
@@ -30,7 +29,20 @@ namespace quda {
    */
   void gaugePath(GaugeField &out, const GaugeField &u, double coeff, int ***input_path, int *length, double *path_coeff,
                  int num_paths, int max_length);
+
+  /**
+     @brief Compute the trace of an arbitrary set of gauge loops
+     @param[in] u Gauge field (extended when running on multiple GPUs)
+     @param[in, out] loop_traces Output traces of loops
+     @param[in] input_path Host-array holding all path contributions for the gauge action
+     @param[in] factor Multiplicative factor for each loop (i.e., volume normalization, etc)
+     @param[in] length Host array holding the length of all paths
+     @param[in] path_coeff Coefficient of each path
+     @param[in] num_paths Numer of paths
+     @param[in] path_max_length Maximum length of each path
+   */
+  void gaugeLoopTrace(const GaugeField& u, std::vector<Complex>& loop_traces, double factor, int ***input_path,
+     int *length_h, double *path_coeff_h, int num_paths, int path_max_length);
+
 } // namespace quda
 
-
-#endif // _GAUGE_FORCE_QUDA_H

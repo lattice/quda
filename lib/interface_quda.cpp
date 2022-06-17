@@ -1432,6 +1432,7 @@ void endQuda(void)
     profileFatLink.Print();
     profileGaugeForce.Print();
     profileGaugeUpdate.Print();
+    profileGaugeLoopTrace.Print();
     profileExtendedGauge.Print();
     profileCloverForce.Print();
     profileStaggeredForce.Print();
@@ -4122,7 +4123,7 @@ int computeGaugePathQuda(void *out, void *siteLink, int ***input_path_buf, int *
   return 0;
 }
 
-int computeGaugeLoopTraceQuda(Complex* traces, void *siteLink, int **input_path_buf, int *path_length, double *loop_coeff,
+int computeGaugeLoopTraceQuda(double _Complex* traces, void *siteLink, int **input_path_buf, int *path_length, double *loop_coeff,
                                     int num_paths, int max_length, double factor, QudaGaugeParam *qudaGaugeParam)
 {
   profileGaugeLoopTrace.TPSTART(QUDA_PROFILE_TOTAL);
@@ -4156,6 +4157,7 @@ int computeGaugeLoopTraceQuda(Complex* traces, void *siteLink, int **input_path_
 
     profileGaugeLoopTrace.TPSTART(QUDA_PROFILE_INIT);
   }
+  profileGaugeLoopTrace.TPSTOP(QUDA_PROFILE_INIT);
 
   cudaGaugeField *cudaGauge = createExtendedGauge(*cudaSiteLink, R, profileGaugePath);
   // apply / remove phase as appropriate
@@ -4169,8 +4171,7 @@ int computeGaugeLoopTraceQuda(Complex* traces, void *siteLink, int **input_path_
   gaugeLoopTrace(*cudaGauge, loop_traces, factor, &input_path_buf, path_length, loop_coeff, num_paths, max_length);
   profileGaugeLoopTrace.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-  for (int i = 0; i < num_paths; i++)
-    traces[i] = loop_traces[i];
+  for (int i = 0; i < num_paths; i++) { memcpy(traces + i, &loop_traces[i], sizeof(Complex)); }
 
   profileGaugeLoopTrace.TPSTART(QUDA_PROFILE_FREE);
   if (qudaGaugeParam->make_resident_gauge) {
@@ -5244,8 +5245,9 @@ void plaqQuda(double plaq[3])
   plaq[1] = plaq3.y;
   plaq[2] = plaq3.z;
   
+  // FIXME: move somewhere useful?
   /* alternative plaquette */
-  int num_paths = 6;
+  /*int num_paths = 6;
   int path_max_length = 4;
 
   // volume and nc normalization
@@ -5301,7 +5303,7 @@ void plaqQuda(double plaq[3])
   }
   host_free(input_path_buf[0]);
   host_free(length);
-  host_free(loop_coeff);
+  host_free(loop_coeff);*/
   
 
   profilePlaq.TPSTOP(QUDA_PROFILE_COMPUTE);

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <complex.h>
 
 #include <quda.h>
 #include <host_utils.h>
@@ -62,9 +63,28 @@ int path_dir_t[][5] = {
   {2, 7, 4, 5, 0}, {7, 2, 4, 0, 5}, {5, 0, 4, 2, 7}, {7, 5, 4, 0, 2}, {2, 0, 4, 5, 7}, {1, 2, 4, 6, 5}, {5, 6, 4, 2, 1},
   {1, 5, 4, 6, 2}, {2, 6, 4, 5, 1}, {6, 2, 4, 1, 5}, {5, 1, 4, 2, 6}, {6, 5, 4, 1, 2}, {2, 1, 4, 5, 6}};
 
+// for gauge loop trace tests
+// plaquette + rectangle only
+int trace_loop_length[] = {
+  4, 4, 4, 4, 4, 4, 
+  6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6
+};
+
+double trace_loop_coeff_d[] = {
+  1.1, 1.2, 1.3, 1.4, 1.5, 1.6,
+  2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6
+};
+
+int trace_path[][6] {
+  {0, 1, 7, 6}, {0, 2, 7, 5}, {0, 3, 7, 4}, {1, 2, 6, 5}, {1, 3, 6, 4}, {2, 3, 5, 4},
+  {0, 0, 1, 7, 7, 6}, {0, 1, 1, 7, 6, 6}, {0, 0, 2, 7, 7, 5}, {0, 2, 2, 7, 5, 5}, {0, 0, 3, 7, 7, 4}, {0, 3, 3, 7, 4, 4},
+  {1, 1, 2, 6, 6, 5}, {1, 2, 2, 6, 5, 5}, {1, 1, 3, 6, 6, 4}, {1, 3, 3, 6, 4, 4}, {2, 2, 3, 5, 5, 4}, {2, 3, 3, 5, 4, 4}
+};
+
 static int force_check;
 static int path_check;
 static double force_deviation;
+static double loop_deviation;
 
 // The same function is used to test computePath.
 // If compute_force is false then a path is computed
@@ -214,6 +234,113 @@ void gauge_force_test(bool compute_force = true)
   delete Mom_ref_milc;
 }
 
+void gauge_loop_test()
+{
+  int max_length = 6;
+
+  setVerbosityQuda(QUDA_VERBOSE, "", stdout);
+
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  setGaugeParam(gauge_param);
+
+  gauge_param.gauge_order = gauge_order;
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
+
+  setDims(gauge_param.X);
+
+  double *trace_loop_coeff_p = &trace_loop_coeff_d[0];
+  int num_paths = sizeof(trace_path) / sizeof(trace_path[0]);
+  int *trace_loop_length_p = &trace_loop_length[0];
+
+  // b/c we can't cast int*[6] -> int**
+  int** trace_path_p = new int*[num_paths];
+  for (int i = 0; i < num_paths; i++) {
+    trace_path_p[i] = new int[max_length];
+    for (int j = 0; j < trace_loop_length[i]; j++)
+      trace_path_p[i][j] = trace_path[i][j];
+  }
+
+  quda::GaugeFieldParam param(gauge_param);
+  param.create = QUDA_NULL_FIELD_CREATE;
+  param.order = QUDA_QDP_GAUGE_ORDER;
+  auto U_qdp = new quda::cpuGaugeField(param);
+
+  // fills the gauge field with random numbers
+  createSiteLinkCPU((void **)U_qdp->Gauge_p(), gauge_param.cpu_prec, 0);
+
+  param.order = QUDA_MILC_GAUGE_ORDER;
+  auto U_milc = new quda::cpuGaugeField(param);
+  if (gauge_order == QUDA_MILC_GAUGE_ORDER) U_milc->copy(*U_qdp);
+
+  void *sitelink = nullptr;
+
+  if (gauge_order == QUDA_MILC_GAUGE_ORDER) {
+    sitelink = U_milc->Gauge_p();
+  } else if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
+    sitelink = U_qdp->Gauge_p();
+  } else {
+    errorQuda("Unsupported gauge order %d", gauge_order);
+  }
+
+  // storage for traces
+  using double_complex = double _Complex;
+  double_complex* traces = new double_complex[num_paths];
+  double scale_factor = 2.0;
+
+  if (getTuning() == QUDA_TUNE_YES) {
+    computeGaugeLoopTraceQuda(traces, sitelink, trace_path_p, trace_loop_length_p, trace_loop_coeff_p, num_paths, max_length, scale_factor, &gauge_param);
+  }
+
+  struct timeval t0, t1;
+  double total_time = 0.0;
+  // Multiple execution to exclude warmup time in the first run
+
+  for (int i = 0; i < niter; i++) {
+    gettimeofday(&t0, NULL);
+    computeGaugeLoopTraceQuda(traces, sitelink, trace_path_p, trace_loop_length_p, trace_loop_coeff_p, num_paths, max_length, scale_factor, &gauge_param);
+    gettimeofday(&t1, NULL);
+    total_time += t1.tv_sec - t0.tv_sec + 0.000001 * (t1.tv_usec - t0.tv_usec);
+  }
+  
+  for (int i = 0; i < num_paths; i++) {
+    double* traces_ = (double*)&traces[i];
+    printfQuda("QUDA Trace %d is %e + I %e\n", i, traces_[0], traces_[1]);
+  }
+
+  // FIXME FLOPS
+  int flops = 153004;
+
+  std::vector<quda::Complex> traces_ref(num_paths);
+
+  if (verify_results) {
+    gauge_loop_trace_reference((void**)U_qdp->Gauge_p(), gauge_param.cpu_prec, traces_ref, scale_factor, trace_path_p, trace_loop_length_p, trace_loop_coeff_p, num_paths);
+
+    for (int i = 0; i < num_paths; i++)
+      printfQuda("Reference Trace %d is %e + I %e\n", i, traces_ref[i].real(), traces_ref[i].imag());
+
+    loop_deviation = 0;
+    for (int i = 0; i < num_paths; i++) {
+      double* t_ptr = (double*)(&traces[i]);
+      std::complex<double> traces_(t_ptr[0], t_ptr[1]);
+      auto diff = std::abs(traces_ref[i] - traces_);
+      auto norm = std::abs(traces_ref[i]);
+      loop_deviation += diff / norm;
+      logQuda(QUDA_VERBOSE, "Loop %d QUDA trace %e + I %e Reference trace %e + I %e Deviation %e\n", i, traces_.real(), traces_.imag(), traces_ref[i].real(), traces_ref[i].imag(), loop_deviation);
+    }
+  }
+
+  double perf = 1.0 * niter * flops * V / (total_time * 1e+9);
+  printfQuda("total time = %.2f ms\n", total_time * 1e+3);
+  printfQuda("overall performance : %.2f GFLOPS\n", perf);
+
+  for (int i = 0; i < num_paths; i++)
+    delete[] trace_path_p[i];
+  delete[] trace_path_p;
+  delete[] traces;
+  delete U_qdp;
+  delete U_milc;
+}
+
 TEST(force, verify) { ASSERT_EQ(force_check, 1) << "CPU and QUDA force implementations do not agree"; }
 
 TEST(action, verify)
@@ -222,6 +349,10 @@ TEST(action, verify)
 }
 
 TEST(path, verify) { ASSERT_EQ(path_check, 1) << "CPU and QUDA path implementations do not agree"; }
+
+TEST(loop_traces, verify) {
+  ASSERT_LE(loop_deviation, getTolerance(cuda_prec)) << "CPU and QUDA loop trace implementations do not agree";
+}
 
 static void display_test_info()
 {
@@ -263,6 +394,8 @@ int main(int argc, char **argv)
 
   // The same test is also used for gauge path (compute_force=false)
   gauge_force_test(false);
+
+  gauge_loop_test();
 
   if (verify_results) {
     // Ensure gtest prints only from rank 0

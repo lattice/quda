@@ -1,5 +1,5 @@
 #include <gauge_field.h>
-#include <gauge_tools.h>
+#include <gauge_force_quda.h>
 #include <instantiate.h>
 #include <tunable_reduction.h>
 #include <kernels/gauge_loop_trace.cuh>
