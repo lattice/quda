@@ -155,16 +155,18 @@ std::vector<double> eigensolve(test_t test_param)
     eig_block_size != 4 ? eig_param.block_size = eig_block_size : eig_param.block_size = 4;
     eig_batched_rotate != 0 ? eig_param.batched_rotate = eig_batched_rotate : eig_param.batched_rotate = 4;
   }
-  
+
   logQuda(QUDA_SUMMARIZE, "Action = %s %s, Solver = %s, norm-op = %s, even-odd = %s, with SVD = %s, spectrum = %s\n",
-	  get_dslash_str(dslash_type),
-	  (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) ? get_flavor_str(twist_flavor) : "",
-	  get_eig_type_str(eig_param.eig_type), eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? "true" : "false",
+          get_dslash_str(dslash_type),
+          (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) ?
+            get_flavor_str(twist_flavor) :
+            "",
+          get_eig_type_str(eig_param.eig_type), eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? "true" : "false",
           eig_param.use_pc == QUDA_BOOLEAN_TRUE ? "true" : "false",
           eig_param.compute_svd == QUDA_BOOLEAN_TRUE ? "true" : "false", get_eig_spectrum_str(eig_param.spectrum));
-  
+
   display_test_info();
-  
+
   // Vector construct START
   //----------------------------------------------------------------------------
   // Host side arrays to store the eigenpairs computed by QUDA

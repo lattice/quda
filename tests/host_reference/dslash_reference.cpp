@@ -524,16 +524,14 @@ double verifyWilsonTypeEigenvector(void *spinor, double _Complex lambda, int i, 
       }
     } else {
       if (use_pc) {
-	tm_matpc(spinorTmp, gauge, spinor, kappa, mu, twist_flavor, matpc_type, dagger, cpu_prec, gauge_param);
-      if (normop)
-        tm_matpc(spinorTmp2, gauge, spinorTmp, kappa, mu, twist_flavor, matpc_type, dagger_opposite, cpu_prec,
-                 gauge_param);
+        tm_matpc(spinorTmp, gauge, spinor, kappa, mu, twist_flavor, matpc_type, dagger, cpu_prec, gauge_param);
+        if (normop)
+          tm_matpc(spinorTmp2, gauge, spinorTmp, kappa, mu, twist_flavor, matpc_type, dagger_opposite, cpu_prec,
+                   gauge_param);
       } else {
-	tm_mat(spinorTmp, gauge, spinor, kappa, mu, twist_flavor, dagger, cpu_prec, gauge_param);
-	if (normop)
-	  tm_mat(spinorTmp2, gauge, spinorTmp, kappa, mu, twist_flavor, dagger_opposite, cpu_prec,
-		 gauge_param);
-	
+        tm_mat(spinorTmp, gauge, spinor, kappa, mu, twist_flavor, dagger, cpu_prec, gauge_param);
+        if (normop)
+          tm_mat(spinorTmp2, gauge, spinorTmp, kappa, mu, twist_flavor, dagger_opposite, cpu_prec, gauge_param);
       }
     }
     break;
