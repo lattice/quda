@@ -34,7 +34,17 @@ std::vector<double> eigensolve(test_t test_param);
 TEST_P(EigensolveTest, verify)
 {
   if (skip_test(GetParam())) GTEST_SKIP();
-  auto tol = 5 * eig_param.tol;
+  double factor = 1.0;
+  // The IRAM eigensolver will sometimes report convergence with tolerances slightly
+  // higher than requested. The same phenomenon occurs in ARPACK. This factor
+  // prevents failure when IRAM has solved to say 2e-6 when 1e-6 is requested.
+  // The solution to avoid this is to use a Krylov space (eig-n-kr) about 3-4 times the
+  // size of the search space (eig-n-ev), or use a well chosen Chebyshev polynomial,
+  // or use a tighter than necessary tolerance.
+  if(eig_param.eig_type == QUDA_EIG_IR_ARNOLDI ||
+     eig_param.eig_type == QUDA_EIG_BLK_IR_ARNOLDI)
+    factor *= 5;
+  auto tol = factor * eig_param.tol;
   for (auto rsd : eigensolve(GetParam())) EXPECT_LE(rsd, tol);
 }
 
