@@ -2214,15 +2214,8 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // This will define the operator to be eigensolved.
   QudaInvertParam *inv_param = eig_param->invert_param;
 
-  // Specific changes to the default invert param for the eigensolver.
-  //------------------------------------------------------------------
-  // QUDA's device routines require UKQCD gamma basis. QUDA will
-  // automatically rotate from the Degrand-Rossi basis on the host, to UKQCD
-  // on the device, and back to this basis upon completion.
-  inv_param->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-
   // QUDA can employ even-odd preconditioning to an operator.
-  // For the eigensolver (I think...) the solution type must match
+  // For the eigensolver the solution type must match
   // the solve type, i.e., there is no full solution reconstruction
   // for an even-odd preconditioned solve. In the eigensolver we allow
   // for M, Mdag, MdagM, and MMdag type operators, chosen via
@@ -2250,7 +2243,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   checkInvertParam(inv_param);
   checkEigParam(eig_param);
 
-  // Check that the gaige field is valid
+  // Check that the gauge field is valid
   cudaGaugeField *cudaGauge = checkGauge(inv_param);
 
   // Set all timing statistics to zero
@@ -2293,7 +2286,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   }
 
   // Create device side ColorSpinorField vector space to pass to the
-  // compute function. Download any use supplied data as an initial guess.
+  // compute function. Download any user supplied data as an initial guess.
   ColorSpinorParam cudaParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaParam.setPrecision(inv_param->cuda_prec_eigensolver, inv_param->cuda_prec_eigensolver, true);
