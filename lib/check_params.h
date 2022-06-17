@@ -531,11 +531,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #if defined INIT_PARAM
   P(gcrNkrylov, INVALID_INT);
 #else
-  if (param->inv_type == QUDA_GCR_INVERTER ||
-      param->inv_type == QUDA_CA_GCR_INVERTER ||
-      param->inv_type == QUDA_CA_CG_INVERTER ||
-      param->inv_type == QUDA_CA_CGNE_INVERTER ||
-      param->inv_type == QUDA_CA_CGNR_INVERTER) {
+  if (param->inv_type == QUDA_GCR_INVERTER || param->inv_type == QUDA_BICGSTABL_INVERTER
+      || quda::is_ca_solver(param->inv_type)) {
     P(gcrNkrylov, INVALID_INT);
   }
 #endif
@@ -611,9 +608,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(ca_lambda_min, 0.0);
   P(ca_lambda_max, -1.0);
 #else
-  if (param->inv_type == QUDA_CA_CG_INVERTER ||
-      param->inv_type == QUDA_CA_CGNE_INVERTER ||
-      param->inv_type == QUDA_CA_CGNR_INVERTER) {
+  if (quda::is_ca_solver(param->inv_type)) {
     P(ca_basis, QUDA_INVALID_BASIS);
     if (param->ca_basis == QUDA_CHEBYSHEV_BASIS) {
       P(ca_lambda_min, INVALID_DOUBLE);
@@ -627,7 +622,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(ca_lambda_min_precondition, 0.0);
   P(ca_lambda_max_precondition, -1.0);
 #else
-  if (param->inv_type_precondition == QUDA_CA_CG_INVERTER) {
+  if (quda::is_ca_solver(param->inv_type)) {
     P(ca_basis_precondition, QUDA_INVALID_BASIS);
     if (param->ca_basis_precondition == QUDA_CHEBYSHEV_BASIS) {
       P(ca_lambda_min_precondition, INVALID_DOUBLE);
@@ -875,6 +870,16 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     }
 
 #ifdef INIT_PARAM
+    P(smoother_solver_ca_basis[i], QUDA_POWER_BASIS);
+    P(smoother_solver_ca_lambda_min[i], 0.0);
+    P(smoother_solver_ca_lambda_max[i], -1.0);
+#else
+    P(smoother_solver_ca_basis[i], QUDA_INVALID_BASIS);
+    P(smoother_solver_ca_lambda_min[i], INVALID_DOUBLE);
+    P(smoother_solver_ca_lambda_max[i], INVALID_DOUBLE);
+#endif
+
+#ifdef INIT_PARAM
     if (i<QUDA_MAX_MG_LEVEL) {
           P(n_vec[i], INVALID_INT);
     }
@@ -1029,6 +1034,47 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
   P(compute_plaquette, QUDA_BOOLEAN_INVALID);
   P(compute_qcharge, QUDA_BOOLEAN_INVALID);
   P(compute_qcharge_density, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
+
+#if defined INIT_PARAM
+QudaGaugeSmearParam newQudaGaugeSmearParam(void)
+{
+  QudaGaugeSmearParam ret;
+#elif defined CHECK_PARAM
+static void checkGaugeSmearParam(QudaGaugeSmearParam *param)
+{
+#else
+void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
+{
+  printfQuda("QUDA Gauge Smear Parameters:\n");
+#endif
+
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected QudaGaugeSmearParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
+  P(smear_type, QUDA_GAUGE_SMEAR_INVALID);
+
+#ifdef INIT_PARAM
+  P(n_steps, 0);
+  P(meas_interval, 0);
+  P(alpha, 0.0);
+  P(rho, 0.0);
+  P(epsilon, 0.0);
+#else
+  P(n_steps, (unsigned int)INVALID_INT);
+  P(meas_interval, (unsigned int)INVALID_INT);
+  P(alpha, INVALID_DOUBLE);
+  P(rho, INVALID_DOUBLE);
+  P(epsilon, INVALID_DOUBLE);
 #endif
 
 #ifdef INIT_PARAM

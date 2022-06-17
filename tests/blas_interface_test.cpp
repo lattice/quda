@@ -425,7 +425,7 @@ int main(int argc, char **argv)
 
   // Ensure gtest prints only from rank 0
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
-  if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+  if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
   // call srand() with a rank-dependent seed
   initRand();
@@ -443,7 +443,7 @@ int main(int argc, char **argv)
   if (verify_results) {
     // Run full set of test if we're doing a verification run
     ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
-    if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+    if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
     result = RUN_ALL_TESTS();
     if (result) warningQuda("Google tests for QUDA BLAS failed.");
   } else {

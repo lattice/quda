@@ -6,12 +6,12 @@
 #include <random_quda.h>
 #include <color_spinor_field.h>
 
-#define gauge_site_size 18      // real numbers per link
-#define spinor_site_size 24     // real numbers per wilson spinor
-#define stag_spinor_site_size 6 // real numbers per staggered 'spinor'
-#define clover_site_size 72     // real numbers per block-diagonal clover matrix
-#define mom_site_size 10        // real numbers per momentum
-#define hw_site_size 12         // real numbers per half wilson
+constexpr size_t gauge_site_size = 18;      // real numbers per link
+constexpr size_t spinor_site_size = 24;     // real numbers per wilson spinor
+constexpr size_t stag_spinor_site_size = 6; // real numbers per staggered 'spinor'
+constexpr size_t clover_site_size = 72;     // real numbers per block-diagonal clover matrix
+constexpr size_t mom_site_size = 10;        // real numbers per momentum
+constexpr size_t hw_site_size = 12;         // real numbers per half wilson
 
 extern int Z[4];
 extern int V;

@@ -578,11 +578,14 @@ typedef enum QudaFermionSmearType_s {
   QUDA_FERMION_SMEAR_TYPE_INVALID = QUDA_INVALID_ENUM
 } QudaFermionSmearType;
 
-typedef enum QudaWFlowType_s {
-  QUDA_WFLOW_TYPE_WILSON,
-  QUDA_WFLOW_TYPE_SYMANZIK,
-  QUDA_WFLOW_TYPE_INVALID = QUDA_INVALID_ENUM
-} QudaWFlowType;
+typedef enum QudaGaugeSmearType_s {
+  QUDA_GAUGE_SMEAR_APE,
+  QUDA_GAUGE_SMEAR_STOUT,
+  QUDA_GAUGE_SMEAR_OVRIMP_STOUT,
+  QUDA_GAUGE_SMEAR_WILSON_FLOW,
+  QUDA_GAUGE_SMEAR_SYMANZIK_FLOW,
+  QUDA_GAUGE_SMEAR_INVALID = QUDA_INVALID_ENUM
+} QudaGaugeSmearType;
 
 // Allows to choose an appropriate external library
 typedef enum QudaExtLibType_s {

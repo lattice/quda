@@ -39,7 +39,7 @@ void display_link_internal(Float* link)
 template <typename sFloat, typename gFloat>
 void covdevReference(sFloat *res, gFloat **link, const sFloat *spinorField, int oddBit, int daggerBit, int mu)
 {
-  for (int i = 0; i < Vh * spinor_site_size; i++) res[i] = 0.0;
+  for (auto i = 0lu; i < Vh * spinor_site_size; i++) res[i] = 0.0;
 
   gFloat *linkEven[4], *linkOdd[4];
 
@@ -49,7 +49,7 @@ void covdevReference(sFloat *res, gFloat **link, const sFloat *spinorField, int 
   }
 
   for (int sid = 0; sid < Vh; sid++) {
-    int offset = spinor_site_size * sid;
+    auto offset = spinor_site_size * sid;
 
     sFloat gaugedSpinor[spinor_site_size];
 
@@ -172,7 +172,7 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, cons
   auto fwd_nbr_spinor = reinterpret_cast<sFloat **>(in.fwdGhostFaceBuffer);
   auto back_nbr_spinor = reinterpret_cast<sFloat **>(in.backGhostFaceBuffer);
 
-  for (int i = 0; i < Vh * spinor_site_size; i++) res[i] = 0.0;
+  for (auto i = 0lu; i < Vh * spinor_site_size; i++) res[i] = 0.0;
 
   gFloat *linkEven[4], *linkOdd[4];
   gFloat *ghostLinkEven[4], *ghostLinkOdd[4];

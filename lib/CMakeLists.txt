@@ -1,4 +1,3 @@
-# all files for quda -- needs some cleanup
 # cmake-format: off
 
 # this allows simplified running of clang-tidy
@@ -78,8 +77,7 @@ set (QUDA_OBJS
   device_vector.cu
   inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
-  gauge_fix_fft.cu gauge_fix_ovr.cu
-  pgauge_det_trace.cu clover_outer_product.cu
+  gauge_fix_fft.cu gauge_fix_ovr.cu pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
   deflation.cpp checksum.cu transform_reduce.cu
   dslash5_mobius_eofa.cu make_4d_prop_quda.cpp
@@ -150,8 +148,8 @@ if(BUILD_FORTRAN_INTERFACE)
   set_source_files_properties(quda_fortran.F90 PROPERTIES OBJECT_OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/quda_fortran.mod)
 endif()
 
-# QUDA_CU_OBJS should contain all cuda files now QUDA_OBJS all c, cpp, fortran sources
 
+# QUDA_CU_OBJS should contain all cuda files now QUDA_OBJS all c, cpp, fortran sources
 # if we have a git version make version.cpp depend on git head so that it is rebuild if the git sha changed
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
   if(GITVERSION)
@@ -192,9 +190,7 @@ if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
   include(targets/cuda/target_cuda.cmake)
 endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
-  add_subdirectory(targets/hip)
-  target_include_directories(quda PRIVATE ../include/targets/hip)
-  set(QUDA_TARGET_HIP ON)
+	include(targets/hip/target_hip.cmake)
 endif()
 
 # make one library
@@ -216,6 +212,7 @@ target_include_directories(quda SYSTEM PRIVATE ../include/externals)
 target_link_libraries(quda PRIVATE $<BUILD_INTERFACE:Eigen>)
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
                                        $<INSTALL_INTERFACE:include/>)
+
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include> $<INSTALL_INTERFACE:include>)
 
 target_include_directories(quda_cpp SYSTEM PRIVATE ../include/externals)
@@ -227,7 +224,6 @@ target_compile_options(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
 
 add_subdirectory(targets/generic)
 target_include_directories(quda PRIVATE ../include/targets/generic)
-
 add_subdirectory(interface)
 
 # add some deifnitions that cause issues with cmake 3.7 and nvcc only to cpp files
@@ -245,6 +241,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   endif()
 endif()
 
+target_link_libraries(quda PUBLIC Threads::Threads)
 # QUDA FEATURES
 if(QUDA_DIRAC_WILSON)
   target_compile_definitions(quda PUBLIC GPU_WILSON_DIRAC)
@@ -444,6 +441,7 @@ endif()
 
 if(QUDA_BACKWARDS)
   target_include_directories(quda_cpp SYSTEM PRIVATE ${backward-cpp_SOURCE_DIR})
+
   set_property(
     SOURCE comm_common.cpp
     APPEND
@@ -494,3 +492,15 @@ write_basic_package_version_file(
   "${CMAKE_CURRENT_BINARY_DIR}/qudaConfigVersion.cmake"
   VERSION ${QUDA_VERSION}
   COMPATIBILITY AnyNewerVersion)
+
+include(CMakePackageConfigHelpers)
+
+configure_package_config_file(${CMAKE_SOURCE_DIR}/QUDAConfig.cmake.in QUDAConfig.cmake INSTALL_DESTINATION lib/cmake/QUDA)
+
+write_basic_package_version_file(
+  QUDAConfigVersion.cmake
+  VERSION ${PACKAGE_VERSION}
+  COMPATIBILITY AnyNewerVersion)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/QUDAConfigVersion.cmake ${CMAKE_CURRENT_BINARY_DIR}/QUDAConfig.cmake
+	DESTINATION lib/cmake/QUDA)
