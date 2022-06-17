@@ -44,14 +44,15 @@ namespace quda {
 
     long long flops() const
     {
-      // UPDATE ME
       auto Nc = u.Ncolor();
-      return 6ll*u.Volume()*(3 * (8 * Nc * Nc * Nc - 2 * Nc * Nc) + Nc);
+      auto mat_mul_flops = 8ll * Nc * Nc * Nc - 2 * Nc * Nc;
+      // matrix multiplies + traces + rescale
+      return (p.count * mat_mul_flops + p.num_paths * (2 * Nc + 2)) * u.Volume();
     }
 
     long long bytes() const {
-      // UPDATE ME
-      return u.Bytes();
+      // links * one LatticeColorMatrix worth of data
+      return p.count * u.Bytes() / 4;
     }
   };
 

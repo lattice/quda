@@ -304,8 +304,8 @@ void gauge_loop_test()
     total_time += t1.tv_sec - t0.tv_sec + 0.000001 * (t1.tv_usec - t0.tv_usec);
   }
   
-  // FIXME FLOPS
-  int flops = 153004;
+  // 6 loops of length 4, 12 loops of length 6 + 18 paths worth of traces and rescales
+  int flops = (4 * 6 + 6 * 12) * 198 + 18 * 8;
 
   std::vector<quda::Complex> traces_ref(num_paths);
 
@@ -319,7 +319,7 @@ void gauge_loop_test()
       auto diff = std::abs(traces_ref[i] - traces_);
       auto norm = std::abs(traces_ref[i]);
       loop_deviation += diff / norm;
-      logQuda(QUDA_VERBOSE, "Loop %d QUDA trace %e + I %e Reference trace %e + I %e Deviation %e\n", i, traces_.real(), traces_.imag(), traces_ref[i].real(), traces_ref[i].imag(), loop_deviation);
+      logQuda(QUDA_VERBOSE, "Loop %d QUDA trace %e + I %e Reference trace %e + I %e Deviation %e\n", i, traces_.real(), traces_.imag(), traces_ref[i].real(), traces_ref[i].imag(), diff / norm);
     }
 
     // Second check: we can reconstruct the plaquette from the first six loops we calculated

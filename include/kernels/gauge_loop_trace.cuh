@@ -75,20 +75,20 @@ namespace quda {
 
       thread_array<int, 4> dx{0};
 
-      double coeff_loop = arg.p.path_coeff[path_id];
+      double coeff_loop = arg.factor * arg.p.path_coeff[path_id];
       if (coeff_loop == 0) return operator()(loop_trace, value);
 
       // clean up input path, no need for `dir`...
       const int* path = arg.p.input_path[0] + path_id * arg.p.max_length;
 
       // compute the path
-      Link link_prod = computeGaugePath<Arg>(arg, x, parity, path, arg.p.length[path_id], dx);
+      Link link_prod = computeGaugePath(arg, x, parity, path, arg.p.length[path_id], dx);
 
       // compute trace
       auto trace = getTrace(link_prod);
 
-      loop_trace[0] = arg.factor * coeff_loop * trace.real();
-      loop_trace[1] = arg.factor * coeff_loop * trace.imag();
+      loop_trace[0] = coeff_loop * trace.real();
+      loop_trace[1] = coeff_loop * trace.imag();
 
       return operator()(loop_trace, value);
     }

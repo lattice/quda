@@ -78,7 +78,7 @@ namespace quda {
         int nbr_oddbit = (parity ^ 1);
 
         // compute the path
-        link_prod = computeGaugePath<Arg>(arg, x, nbr_oddbit, path, arg.p.length[i], dx);
+        link_prod = computeGaugePath(arg, x, nbr_oddbit, path, arg.p.length[i], dx);
 
         accum = accum + coeff * link_prod;
       } //i
