@@ -45,7 +45,10 @@ namespace quda
        @brief use the vectors currently stored and add to the given output field
        @param x the output field to add to
     */
-    void accumulate_x(ColorSpinorField &x) { blas::axpy(_alphas, {_ps.begin(), _ps.begin() + _j + 1}, {x}); }
+    void accumulate_x(ColorSpinorField &x)
+    {
+      blas::axpy({_alphas.begin(), _alphas.begin() + _j + 1}, {_ps.begin(), _ps.begin() + _j + 1}, {x});
+    }
 
     /**
        @brief Get the current vector
