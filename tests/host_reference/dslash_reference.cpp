@@ -430,8 +430,6 @@ double verifyWilsonTypeEigenvector(void *spinor, double _Complex lambda, int i, 
   QudaPrecision cpu_prec = inv_param.cpu_prec;
   QudaTwistFlavorType twist_flavor = inv_param.twist_flavor;
   QudaMatPCType matpc_type = inv_param.matpc_type;
-  // QudaDagType dagger = inv_param.dagger;
-  // QudaDagType dagger_opposite = (inv_param.dagger == QUDA_DAG_YES ? QUDA_DAG_NO : QUDA_DAG_YES);
   int dagger = inv_param.dagger == QUDA_DAG_YES ? 1 : 0;
   int dagger_opposite = dagger == 1 ? 0 : 1;
 
@@ -549,9 +547,9 @@ double verifyWilsonTypeEigenvector(void *spinor, double _Complex lambda, int i, 
           tmc_ndeg_matpc(spinorTmp2, gauge, spinorTmp, clover, clover_inv, kappa, mu, epsilon, matpc_type,
                          dagger_opposite, cpu_prec, gauge_param);
       } else {
-        tmc_ndeg_mat(spinorTmp, gauge, spinor, clover, kappa, mu, epsilon, dagger, cpu_prec, gauge_param);
+        tmc_ndeg_mat(spinorTmp, gauge, clover, spinor, kappa, mu, epsilon, dagger, cpu_prec, gauge_param);
         if (normop)
-          tmc_ndeg_mat(spinorTmp2, gauge, spinorTmp, clover, kappa, mu, epsilon, dagger_opposite, cpu_prec, gauge_param);
+          tmc_ndeg_mat(spinorTmp2, gauge, clover, spinorTmp, kappa, mu, epsilon, dagger_opposite, cpu_prec, gauge_param);
       }
     } else {
       if (use_pc) {

@@ -25,7 +25,7 @@ bool is_chiral(QudaDslashType type)
 bool skip_test(test_t param)
 {
   // dwf-style solves must use a normal solver
-  if (is_chiral(dslash_type) && (::testing::get<1>(param) == QUDA_BOOLEAN_FALSE)) return true;
+  if (is_chiral(dslash_type) && (::testing::get<1>(param) == QUDA_BOOLEAN_FALSE)) return true;  
   return false;
 }
 
@@ -65,6 +65,7 @@ auto non_hermitian_solvers = Values(QUDA_EIG_IR_ARNOLDI);
 auto hermitian_spectrum = Values(QUDA_SPECTRUM_LR_EIG, QUDA_SPECTRUM_SR_EIG);
 auto non_hermitian_spectrum = Values(QUDA_SPECTRUM_LR_EIG, QUDA_SPECTRUM_SR_EIG, QUDA_SPECTRUM_LM_EIG,
                                      QUDA_SPECTRUM_SM_EIG, QUDA_SPECTRUM_LI_EIG, QUDA_SPECTRUM_SI_EIG);
+
 // preconditioned normal solves
 INSTANTIATE_TEST_SUITE_P(NormalEvenOdd, EigensolveTest,
                          ::testing::Combine(hermitian_solvers, Values(QUDA_BOOLEAN_TRUE), Values(QUDA_BOOLEAN_TRUE),

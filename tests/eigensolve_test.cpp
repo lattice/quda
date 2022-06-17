@@ -145,18 +145,21 @@ std::vector<double> eigensolve(test_t test_param)
   // For gtest testing, we prohibit the use of polynomial acceleration as
   // the fine tuning required can inhibit convergence of an otherwise
   // perfectly good algorithm. We also have a default value of 4
-  // for the block size in Block TRLM, and 4 for the batched rotation.  
+  // for the block size in Block TRLM, and 4 for the batched rotation.
+  // The user may change these values via the command line:
+  // --eig-block-size
+  // --eig-batched-rotate
   if (enable_testing) {
     eig_use_poly_acc = false;
     eig_param.use_poly_acc = QUDA_BOOLEAN_FALSE;
-    eig_block_size = 4;
-    eig_param.block_size = 4;
-    eig_batched_rotate = 4;
-    eig_param.batched_rotate = 4;
+    eig_block_size != 4 ? eig_param.block_size = eig_block_size : eig_param.block_size = 4;
+    eig_batched_rotate != 0 ? eig_param.batched_rotate = eig_batched_rotate : eig_param.batched_rotate = 4;
   }
   
-  logQuda(QUDA_SUMMARIZE, "Action = %s, Solver = %s, norm-op = %s, even-odd = %s, with SVD = %s, spectrum = %s\n",
-	  get_dslash_str(dslash_type), get_eig_type_str(eig_param.eig_type), eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? "true" : "false",
+  logQuda(QUDA_SUMMARIZE, "Action = %s %s, Solver = %s, norm-op = %s, even-odd = %s, with SVD = %s, spectrum = %s\n",
+	  get_dslash_str(dslash_type),
+	  (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) ? get_flavor_str(twist_flavor) : "",
+	  get_eig_type_str(eig_param.eig_type), eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? "true" : "false",
           eig_param.use_pc == QUDA_BOOLEAN_TRUE ? "true" : "false",
           eig_param.compute_svd == QUDA_BOOLEAN_TRUE ? "true" : "false", get_eig_spectrum_str(eig_param.spectrum));
   
