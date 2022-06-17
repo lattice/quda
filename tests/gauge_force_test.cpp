@@ -63,8 +63,9 @@ int path_dir_t[][5] = {
   {2, 7, 4, 5, 0}, {7, 2, 4, 0, 5}, {5, 0, 4, 2, 7}, {7, 5, 4, 0, 2}, {2, 0, 4, 5, 7}, {1, 2, 4, 6, 5}, {5, 6, 4, 2, 1},
   {1, 5, 4, 6, 2}, {2, 6, 4, 5, 1}, {6, 2, 4, 1, 5}, {5, 1, 4, 2, 6}, {6, 5, 4, 1, 2}, {2, 1, 4, 5, 6}};
 
-// for gauge loop trace tests
-// plaquette + rectangle only
+// for gauge loop trace tests; plaquette + rectangle only
+// do not change---these are used for a verification relative
+// to the plaquette as well
 int trace_loop_length[] = {
   4, 4, 4, 4, 4, 4, 
   6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6
@@ -85,6 +86,7 @@ static int force_check;
 static int path_check;
 static double force_deviation;
 static double loop_deviation;
+static double plaq_deviation;
 
 // The same function is used to test computePath.
 // If compute_force is false then a path is computed
@@ -302,11 +304,6 @@ void gauge_loop_test()
     total_time += t1.tv_sec - t0.tv_sec + 0.000001 * (t1.tv_usec - t0.tv_usec);
   }
   
-  for (int i = 0; i < num_paths; i++) {
-    double* traces_ = (double*)&traces[i];
-    printfQuda("QUDA Trace %d is %e + I %e\n", i, traces_[0], traces_[1]);
-  }
-
   // FIXME FLOPS
   int flops = 153004;
 
@@ -314,9 +311,6 @@ void gauge_loop_test()
 
   if (verify_results) {
     gauge_loop_trace_reference((void**)U_qdp->Gauge_p(), gauge_param.cpu_prec, traces_ref, scale_factor, trace_path_p, trace_loop_length_p, trace_loop_coeff_p, num_paths);
-
-    for (int i = 0; i < num_paths; i++)
-      printfQuda("Reference Trace %d is %e + I %e\n", i, traces_ref[i].real(), traces_ref[i].imag());
 
     loop_deviation = 0;
     for (int i = 0; i < num_paths; i++) {
@@ -327,6 +321,33 @@ void gauge_loop_test()
       loop_deviation += diff / norm;
       logQuda(QUDA_VERBOSE, "Loop %d QUDA trace %e + I %e Reference trace %e + I %e Deviation %e\n", i, traces_.real(), traces_.imag(), traces_ref[i].real(), traces_ref[i].imag(), loop_deviation);
     }
+
+    // Second check: we can reconstruct the plaquette from the first six loops we calculated
+    double plaq_factor = 1. / (V * U_qdp->Ncolor() * quda::comm_size());
+    std::vector<quda::Complex> plaq_components(6);
+    for (int i = 0; i < 6; i++)
+      plaq_components[i] = traces_ref[i] / trace_loop_coeff_d[i] / scale_factor * plaq_factor;
+
+    double plaq_loop[3];
+    // spatial: xy, xz, yz
+    plaq_loop[1] = ((plaq_components[0] + plaq_components[1] + plaq_components[3]) / 3.).real();
+    // temporal: xt, yt, zt
+    plaq_loop[2] = ((plaq_components[2] + plaq_components[4] + plaq_components[5]) / 3.).real();
+    plaq_loop[0] = 0.5 * (plaq_loop[1] + plaq_loop[2]);
+
+    double plaq_default[3];
+
+    setWilsonGaugeParam(gauge_param);
+    gauge_param.t_boundary = QUDA_PERIODIC_T;
+    setDims(gauge_param.X);
+
+    loadGaugeQuda((void *)U_qdp->Gauge_p(), &gauge_param);
+    plaqQuda(plaq_default);
+
+    plaq_deviation = std::abs(plaq_default[0] - plaq_loop[0]) / std::abs(plaq_default[0]);
+    logQuda(QUDA_VERBOSE, "Plaquette loop space %e time %e total %e ; plaqQuda space %e time %e total %e ; deviation %e\n",
+                          plaq_loop[0], plaq_loop[1], plaq_loop[2], plaq_default[0], plaq_default[1], plaq_default[2], plaq_deviation);
+
   }
 
   double perf = 1.0 * niter * flops * V / (total_time * 1e+9);
@@ -352,6 +373,10 @@ TEST(path, verify) { ASSERT_EQ(path_check, 1) << "CPU and QUDA path implementati
 
 TEST(loop_traces, verify) {
   ASSERT_LE(loop_deviation, getTolerance(cuda_prec)) << "CPU and QUDA loop trace implementations do not agree";
+}
+
+TEST(plaquette, verify) {
+  ASSERT_LE(plaq_deviation, getTolerance(cuda_prec)) << "Plaquette from QUDA loop trace and QUDA dedicated plaquette function do not agree";
 }
 
 static void display_test_info()
