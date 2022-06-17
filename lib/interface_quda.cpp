@@ -2338,7 +2338,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // options: The normal operator, the daggered operator, and if we pre
   // multiply by gamma5. Each combination requires a unique Dirac operator
   // object.
-  DiracMatrix *m;
+  DiracMatrix *m = nullptr;
   if (!eig_param->use_norm_op && !eig_param->use_dagger && eig_param->compute_gamma5) {
     m = new DiracG5M(dirac);
   } else if (!eig_param->use_norm_op && !eig_param->use_dagger && !eig_param->compute_gamma5) {

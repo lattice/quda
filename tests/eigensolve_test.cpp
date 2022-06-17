@@ -89,7 +89,6 @@ void init(int argc, char **argv)
   // eig_param structure
   eig_param.invert_param = &eig_inv_param;
   setEigParam(eig_param);
-  display_test_info();
   //------------------------------------------------------
 
   // Set lattice dimensions for Dslash reference
@@ -145,14 +144,24 @@ std::vector<double> eigensolve(test_t test_param)
 
   // For gtest testing, we prohibit the use of polynomial acceleration as
   // the fine tuning required can inhibit convergence of an otherwise
-  // perfectly good algorithm
-  if (enable_testing) eig_param.use_poly_acc = QUDA_BOOLEAN_FALSE;
+  // perfectly good algorithm. We also have a default value of 4
+  // for the block size in Block TRLM, and 4 for the batched rotation.  
+  if (enable_testing) {
+    eig_use_poly_acc = false;
+    eig_param.use_poly_acc = QUDA_BOOLEAN_FALSE;
+    eig_block_size = 4;
+    eig_param.block_size = 4;
+    eig_batched_rotate = 4;
+    eig_param.batched_rotate = 4;
+  }
   
   logQuda(QUDA_SUMMARIZE, "Action = %s, Solver = %s, norm-op = %s, even-odd = %s, with SVD = %s, spectrum = %s\n",
 	  get_dslash_str(dslash_type), get_eig_type_str(eig_param.eig_type), eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? "true" : "false",
           eig_param.use_pc == QUDA_BOOLEAN_TRUE ? "true" : "false",
           eig_param.compute_svd == QUDA_BOOLEAN_TRUE ? "true" : "false", get_eig_spectrum_str(eig_param.spectrum));
-
+  
+  display_test_info();
+  
   // Vector construct START
   //----------------------------------------------------------------------------
   // Host side arrays to store the eigenpairs computed by QUDA
