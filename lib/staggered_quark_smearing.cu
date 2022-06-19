@@ -170,7 +170,7 @@ namespace quda
                         TimeProfile &profile)
     {
       if (in.Nspin() == 1) {
-#if defined(GPU_STAGGERED_DIRAC) // && defined(GPU_LAPLACE) => GPU_QSMEARING
+#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_TWOLINK_GSMEAR)
         constexpr int nDim = 4;
         constexpr int nSpin = 1;
         
@@ -191,7 +191,7 @@ namespace quda
           staggered_qsmear, in, volume,
           faceVolumeCB, profile);
 #else
-        errorQuda("nSpin=%d StaggeredQSmear operator required staggered dslash to be enabled", in.Nspin());
+        errorQuda("nSpin=%d StaggeredQSmear operator requires staggered dslash and two-link Gaussian quark smearing to be enabled", in.Nspin());
 #endif
       } else {
         errorQuda("Unsupported nSpin= %d", in.Nspin());

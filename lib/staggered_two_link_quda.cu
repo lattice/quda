@@ -56,25 +56,17 @@ using namespace staggered_quark_smearing;
       }
     };
 
-#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_TWOLINK_GSMEAR)
     void computeTwoLink(GaugeField &newTwoLink, const GaugeField &link)
     {
+#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_TWOLINK_GSMEAR)
       checkNative(newTwoLink, link);
       checkLocation(newTwoLink, link);
       checkPrecision(newTwoLink, link);
 
       instantiate<ComputeTwoLink, ReconstructNone>(newTwoLink, link);
       return;
-    }
-#elif !defined(GPU_STAGGERED_DIRAC)
-    void computeTwoLink(GaugeField &newTwoLink, const GaugeField &link)
-    {
-      errorQuda("Staggered dslash has not been built");
-    }
-#elif !defined(GPU_TWOLINK_GSMEAR)
-    void computeTwoLink(GaugeField &newTwoLink, const GaugeField &link)
-    {
-      errorQuda("Two-link Gaussian quark smearing is not enabled");
-    }
+#else
+      errorQuda("Two-link computation requires staggered dslash and two-link Gaussian quark smearing to be enabled");
 #endif
+    }
 } // namespace quda
