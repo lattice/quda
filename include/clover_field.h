@@ -321,6 +321,7 @@ namespace quda {
        @return Clover coefficient (explicitly includes kappa)
     */
     double Coeff() const { return coeff; }
+
     /**
        @return If the clover field is associated with twisted-clover fermions and which flavor type thereof
     */

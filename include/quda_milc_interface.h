@@ -119,18 +119,6 @@ extern "C" {
   } QudaFatLinkArgs_t;
 
   /**
-   * Parameters for propagator contractions with FT
-   */
-  typedef struct {
-    int n_mom;  /* Number of sink momenta */
-    int *mom_modes;  /* List of 4-component momenta as integers. Dimension 4*n_mom */
-    QudaFFTSymmType *fft_type; /* The "parity" of the FT component */
-    int *source_position;  /* The coordinate origin for the Fourier phases */
-    double flops; /* Return value */
-    double dtime; /* Return value */
-  } QudaContractArgs_t;
-  
-  /**
    * Optional: Set the MPI Comm Handle if it is not MPI_COMM_WORLD
    *
    * @param input Pointer to an MPI_Comm handle, static cast as a void *
@@ -1008,26 +996,6 @@ extern "C" {
     unsigned int stopWtheta,
     void* milc_sitelink
     );
-
-  /**
-   * @brief Tie together two staggered propagators including spatial Fourier phases.
-   * The result is summed separately over each time slice and across all MPI ranks.
-   * The FT is defined by a list of momentum indices (three-component integer vectors)
-   * Included with the FT is a parity (symmetry) parameter for each momentum
-   * component that selects an exp, cos, or sin factor for each direction
-   *
-   * @param[in] external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
-   * @param[in,out] parameters for the contraction, including FT specification
-   * @param[in] local storage of color spinor field.  three complex values * number of sites on node
-   * @param[in] local storage of color spinor field.  three complex values * number of sites on node
-e   * @param[out] hadron correlator  Flattened double array as though [n_mom][nt][2] for 2 = re,im. 
-   */
-  void qudaContractFT(int external_precision,
-		      QudaContractArgs_t *cont_args,
-		      void *const quark1,
-		      void *const quark2,
-		      double *corr
-		      );
 
   /* The below declarations are for removed functions from prior versions of QUDA. */
 

@@ -31,32 +31,10 @@ namespace quda
     void load(std::vector<ColorSpinorField *> &vecs);
 
     /**
-       @brief Load propagator (12 vecs, Chroma compliant) from filename
-       @param[in] vecs The set of vectors to load
-    */
-    void loadProp(std::vector<ColorSpinorField *> &vecs);
-
-    /**
        @brief Save vectors to filename
        @param[in] vecs The set of vectors to save
     */
     void save(const std::vector<ColorSpinorField *> &vecs);
-
-    /**
-       @brief Save propagator (12 vecs, Chroma compliant) to filename
-       @param[in] vecs The set of vectors to save
-    */
-    void saveProp(const std::vector<ColorSpinorField *> &vecs);
-
-    /**
-       @brief Create alias pointers to a vector space of lower precision
-       @param[in] vecs_high_prec The set of vectors with high precision
-       @param[in] vecs_low_prec The set of vectors with lower precision
-       @param[in] low_prec The low precsision value
-    */
-
-    void downPrec(const std::vector<ColorSpinorField *> &vecs_high_prec, std::vector<ColorSpinorField *> &vecs_low_prec,
-                  const QudaPrecision save_prec);
   };
 
 } // namespace quda

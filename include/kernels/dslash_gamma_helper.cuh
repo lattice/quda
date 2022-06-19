@@ -19,7 +19,6 @@ namespace quda {
     F out;                // output vector field
     const F in;           // input vector field
     const int d;          // which gamma matrix are we applying
-    const int proj = 0;   // which gamma projection are we applying
     const int nParity;    // number of parities we're working on
     bool doublet;         // whether we applying the operator to a doublet
     const int volumeCB;   // checkerboarded volume
@@ -27,7 +26,7 @@ namespace quda {
     real b;               // chiral twist
     real c;               // flavor twist
 
-    GammaArg(ColorSpinorField &out, const ColorSpinorField &in, int d, int proj = 0,
+    GammaArg(ColorSpinorField &out, const ColorSpinorField &in, int d,
 	     real kappa=0.0, real mu=0.0, real epsilon=0.0,
 	     bool dagger=false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID) :
       out(out), in(in), d(d), nParity(in.SiteSubset()),
@@ -37,7 +36,6 @@ namespace quda {
       checkPrecision(out, in);
       checkLocation(out, in);
       if (d < 0 || d > 4) errorQuda("Undefined gamma matrix %d", d);
-      if (proj < -1 || proj > 1) errorQuda("Undefined gamma projection %d", proj);
       if (in.Nspin() != 4) errorQuda("Cannot apply gamma5 to nSpin=%d field", in.Nspin());
       if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
@@ -88,40 +86,6 @@ namespace quda {
       }
     }
   };
-
-  /**
-     @brief Application of chiral projection to a color spinor field
-  */
-  template <typename Arg> struct ChiralProject {
-    const Arg &arg;
-    constexpr ChiralProject(const Arg &arg) : arg(arg) {}
-    static constexpr const char* filename() { return KERNEL_FILE; }
-
-    __device__ __host__ void operator()(int x_cb, int parity)
-    {
-      ColorSpinor<typename Arg::real, Arg::nColor, 4> in = arg.in(x_cb, parity);
-      ColorSpinor<typename Arg::real, Arg::nColor, 2> chi;
-
-      // arg.proj is either +1 or -1, or 0.
-      // chiral_project/reconstruct(int p) expects 0 (+ve proj) or 1 (-ve proj)
-      // chiral_reconstruct(int p) returns the projected spinor with the
-      // opposite projection zerod out.
-      switch(arg.proj) {
-      case -1:
-	chi = in.chiral_project(1);
-	arg.out(x_cb, parity) = chi.chiral_reconstruct(1);
-	break;
-
-      case 1:
-	chi = in.chiral_project(0);
-	arg.out(x_cb, parity) = chi.chiral_reconstruct(0);
-	break;
-      case 0: break; 
-      }
-    }
-  };
-
-
 
   /**
      @brief Application of twist to a color spinor field

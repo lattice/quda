@@ -51,6 +51,7 @@ namespace quda {
   void DiracImprovedStaggered::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     checkParitySpinor(in, out);
+
     ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., in, parity, dagger, commDim, profile);
     flops += 1146ll*in.Volume();
   }
@@ -59,6 +60,7 @@ namespace quda {
       const ColorSpinorField &x, const double &k) const
   {    
     checkParitySpinor(in, out);
+
     // Need to catch the zero mass case.
     if (k == 0.0) {
       // There's a sign convention difference for Dslash vs DslashXpay, which is

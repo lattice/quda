@@ -19,10 +19,10 @@
 #include <color_spinor_field.h>
 
 // If you add a new contraction type, this must be updated++
-constexpr int NcontractType = 3;
+constexpr int NcontractType = 2;
 // For googletest, names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore.
-const char *names[] = {"OpenSpin", "DegrandRossi", "Staggered"};
+const char *names[] = {"OpenSpin", "DegrandRossi"};
 const char *prec_str[] = {"quarter", "half", "single", "double"};
 
 namespace quda
@@ -105,16 +105,6 @@ int main(int argc, char **argv)
 // Performs the CPU GPU comparison with the given parameters
 int test(int contractionType, QudaPrecision test_prec)
 {
-  QudaContractType cType = QUDA_CONTRACT_TYPE_INVALID;
-  int nSpin = 0;
-  switch (contractionType) {
-  case 0: cType = QUDA_CONTRACT_TYPE_OPEN; nSpin = 4; break;
-  case 1: cType = QUDA_CONTRACT_TYPE_DR; nSpin = 4; break;
-  case 2: cType = QUDA_CONTRACT_TYPE_STAGGERED; nSpin = 1; break;
-  default: errorQuda("Undefined contraction type %d\n", contractionType);
-  }
-  int my_spinor_site_size = nSpin * 3 * 2;
-
   int X[4] = {xdim, ydim, zdim, tdim};
 
   QudaInvertParam inv_param = newQudaInvertParam();
@@ -123,13 +113,11 @@ int test(int contractionType, QudaPrecision test_prec)
   inv_param.cuda_prec = test_prec;
   inv_param.cuda_prec_sloppy = test_prec;
   inv_param.cuda_prec_precondition = test_prec;
-  if ( nSpin == 1 ) {
-    inv_param.dslash_type = QUDA_STAGGERED_DSLASH; }
 
   size_t data_size = (test_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  void *spinorX = safe_malloc(V * my_spinor_site_size * data_size);
-  void *spinorY = safe_malloc(V * my_spinor_site_size * data_size);
-  void *d_result = safe_malloc(V * nSpin*nSpin*2 * data_size);
+  void *spinorX = safe_malloc(V * spinor_site_size * data_size);
+  void *spinorY = safe_malloc(V * spinor_site_size * data_size);
+  void *d_result = safe_malloc(2 * V * 16 * data_size);
 
   if (test_prec == QUDA_SINGLE_PRECISION) {
     for (auto i = 0lu; i < V * spinor_site_size; i++) {
@@ -149,6 +137,12 @@ int test(int contractionType, QudaPrecision test_prec)
   // result in the array 'result'
   // We then compare the GPU result with a CPU refernce code
 
+  QudaContractType cType = QUDA_CONTRACT_TYPE_INVALID;
+  switch (contractionType) {
+  case 0: cType = QUDA_CONTRACT_TYPE_OPEN; break;
+  case 1: cType = QUDA_CONTRACT_TYPE_DR; break;
+  default: errorQuda("Undefined contraction type %d\n", contractionType);
+  }
 
   // Perform GPU contraction.
   contractQuda(spinorX, spinorY, d_result, cType, &inv_param, X);
@@ -161,8 +155,9 @@ int test(int contractionType, QudaPrecision test_prec)
   } else {
     faults = contraction_reference((float *)spinorX, (float *)spinorY, (float *)d_result, cType);
   }
+
   printfQuda("Contraction comparison for contraction type %s complete with %d/%d faults\n", get_contract_str(cType),
-             faults, V * nSpin*nSpin * 2);
+             faults, V * 16 * 2);
 
   host_free(spinorX);
   host_free(spinorY);

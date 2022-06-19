@@ -250,29 +250,35 @@ namespace quda
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
-      // Create vector IO object
-      VectorIO io(eig_param->vec_outfile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE);
-
       // Make an array of size n_conv
       std::vector<ColorSpinorField *> vecs_ptr;
       vecs_ptr.reserve(n_conv);
-      // Ensure the parity of the eigenvectors is correct
       const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
-      for (unsigned int i = 0; i < kSpace.size(); i++) kSpace[i]->setSuggestedParity(mat_parity);
-
       // We may wish to compute vectors in high prec, but use in a lower
-      // prec. This allows the user to create pointers that alias the
-      // vectors, but in a lower precision.
+      // prec. This allows the user to down copy the data for later use.
       QudaPrecision prec = kSpace[0]->Precision();
       if (save_prec < prec) {
-        io.downPrec(kSpace, vecs_ptr, save_prec);
-        // save the vectors
-        io.save(vecs_ptr);
-        for (unsigned int i = 0; i < kSpace.size() && save_prec < prec; i++) delete vecs_ptr[i];
+        ColorSpinorParam csParamClone(*kSpace[0]);
+        csParamClone.create = QUDA_REFERENCE_FIELD_CREATE;
+        csParamClone.setPrecision(save_prec);
+        for (unsigned int i = 0; i < kSpace.size(); i++) {
+          kSpace[i]->setSuggestedParity(mat_parity);
+          vecs_ptr.push_back(kSpace[i]->CreateAlias(csParamClone));
+        }
+        if (getVerbosity() >= QUDA_SUMMARIZE) {
+          printfQuda("kSpace successfully down copied from prec %d to prec %d\n", kSpace[0]->Precision(),
+                     vecs_ptr[0]->Precision());
+        }
       } else {
-        for (int i = 0; i < n_conv; i++) vecs_ptr.push_back(kSpace[i]);
-        io.save(vecs_ptr);
+        for (int i = 0; i < n_conv; i++) {
+          kSpace[i]->setSuggestedParity(mat_parity);
+          vecs_ptr.push_back(kSpace[i]);
+        }
       }
+      // save the vectors
+      VectorIO io(eig_param->vec_outfile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE);
+      io.save(vecs_ptr);
+      for (unsigned int i = 0; i < kSpace.size() && save_prec < prec; i++) delete vecs_ptr[i];
     }
 
     // Save TRLM tuning

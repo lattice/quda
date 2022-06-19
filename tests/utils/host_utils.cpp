@@ -184,37 +184,6 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
   constructQudaGaugeField(gauge, construct_type, gauge_param.cpu_prec, &gauge_param);
 }
 
-void saveHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, QudaLinkType link_type)
-{
-  if (strcmp(gauge_outfile, "")) {
-    // save gauge field using QIO and LIME
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Saving the gauge field in %s\n", gauge_outfile);
-    QudaLinkType temp = gauge_param.type;
-    gauge_param.type = link_type;
-    saveGaugeQuda(gauge, &gauge_param);
-    write_gauge_field(gauge_outfile, gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
-    gauge_param.type = temp;
-  } else {
-    printfQuda("No output file specified.\n");
-  }
-}
-
-void saveDeviceGaugeField(cudaGaugeField *gaugeEx, cudaGaugeField *gauge)
-{  
-  QudaGaugeParam gauge_param = newQudaGaugeParam();
-  setWilsonGaugeParam(gauge_param);
-
-  void *cpu_gauge[4];
-  for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
-
-  // copy into regular field
-  copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
-  saveGaugeFieldQuda((void*)cpu_gauge, (void*)gauge, &gauge_param);
-  write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
-  for (int dir = 0; dir<4; dir++) free(cpu_gauge[dir]);
-}
-
-
 void constructHostCloverField(void *clover, void *, QudaInvertParam &inv_param)
 {
   double norm = 0.01; // clover components are random numbers in the range (-norm, norm)
@@ -236,8 +205,8 @@ void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecis
     constructCloverField((float *)clover, norm, diag);
 }
 
-void constructWilsonSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
-                                const QudaGaugeParam *gauge_param)
+void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
+                                    const QudaGaugeParam *gauge_param)
 {
   // Lattice vector spacetime/colour/spin/parity properties
   cs_param->nColor = 3;
@@ -288,52 +257,6 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
   if (isPCSolution(sol_type)) param.x[0] /= 2;
   quda::ColorSpinorField spinor_in(param);
   quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
-}
-
-void constructPointSpinorSource(void *v, QudaPrecision precision, const int *const x,
-                                const int dil, const int *const source_position)
-{
-  int X[4] = {x[0], x[1], x[2], x[3]};
-  // Get local index
-  int src_local[4];
-  for (int d = 0; d < 4; d++) src_local[d] = source_position[d] - comm_coord(d) * X[d];
-  // Get linear index
-  int local_idx = ((X[2] * src_local[3] + src_local[2]) * X[1] + src_local[1]) * X[0] + src_local[0];
-  int local_idx_cb = local_idx / 2;
-  int parity = local_idx % 2;
-
-  size_t bytes = (size_t)V;
-  bytes *= (size_t)spinor_site_size;
-  bytes *= (size_t)host_spinor_data_type_size;
-  memset(v, 0, bytes);
-
-  // Deduce where to place the point source. If the following is satisfied,
-  // we have isolated the MPI rank that contains the point source posistion.
-  if ((comm_coord(0) * X[0] <= source_position[0] && source_position[0] < (comm_coord(0) + 1) * X[0])
-      && (comm_coord(1) * X[1] <= source_position[1] && source_position[1] < (comm_coord(1) + 1) * X[1])
-      && (comm_coord(2) * X[2] <= source_position[2] && source_position[2] < (comm_coord(2) + 1) * X[2])
-      && (comm_coord(3) * X[3] <= source_position[3] && source_position[3] < (comm_coord(3) + 1) * X[3])) {
-
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      ((double *)v)[spinor_site_size * (parity * Vh + local_idx_cb) + 2 * dil] = 1.0;
-    } else {
-      ((float *)v)[spinor_site_size * (parity * Vh + local_idx_cb) + 2 * dil] = 1.0;
-    }
-  }
-}
-
-void constructWallSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int dil)
-{
-  size_t bytes = V * spinor_site_size * host_spinor_data_type_size;
-  memset(v, bytes, 0.0);
-
-  for (int i = 0; i < V; i++) {
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      ((double *)v)[spinor_site_size * i + 2 * dil] = 1.0;
-    } else {
-      ((float *)v)[spinor_site_size * i + 2 * dil] = 1.0;
-    }
-  }
 }
 
 void initComms(int argc, char **argv, std::array<int, 4> &commDims) { initComms(argc, argv, commDims.data()); }

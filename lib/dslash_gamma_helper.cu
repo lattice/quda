@@ -10,24 +10,21 @@ namespace quda {
     ColorSpinorField &out;
     const ColorSpinorField &in;
     const int d;
-    const int proj;
     unsigned int minThreads() const { return in.VolumeCB(); }
 
   public:
-    GammaApply(ColorSpinorField &out, const ColorSpinorField &in, int d, int proj = 0) :
+    GammaApply(ColorSpinorField &out, const ColorSpinorField &in, int d) :
       TunableKernel2D(in, in.SiteSubset()),
       out(out),
       in(in),
-      d(d),
-      proj(proj)	
+      d(d)
     {
       apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if(proj == 0) launch<Gamma>(tp, stream, GammaArg<Float, nColor>(out, in, d, 0));
-      else launch<ChiralProject>(tp, stream, GammaArg<Float, nColor>(out, in, d, proj));
+      launch<Gamma>(tp, stream, GammaArg<Float, nColor>(out, in, d));
     }
 
     void preTune() { out.backup(); }
@@ -41,16 +38,6 @@ namespace quda {
   void ApplyGamma(ColorSpinorField &out, const ColorSpinorField &in, int d)
   {
     instantiate<GammaApply>(out, in, d);
-  }
-
-  // Applies out(x) = 1/2 * [(1 +/- gamma5) * in] + out
-  void ApplyChiralProj(ColorSpinorField &out, const ColorSpinorField &in, const int proj)
-  {
-    checkPrecision(out, in);    // check all precisions match
-    checkLocation(out, in);     // check all locations match
-    // Launch with 4 as the gamma matrix arg to stop the constructor from erroring out,
-    // but this parameter is not used for chiral projection.
-    instantiate<GammaApply>(out, in, 4, proj);
   }
 
   template <typename Float, int nColor> class TwistGammaApply : public TunableKernel2D {

@@ -27,19 +27,34 @@ const char *data_type_str[] = {
   "complexDouble",
 };
 
-extern QudaBLASOperation blas_trans_a;
-extern QudaBLASOperation blas_trans_b;
-extern QudaBLASDataType blas_data_type;
-extern QudaBLASDataOrder blas_data_order;
+QudaBLASOperation blas_trans_a = QUDA_BLAS_OP_N;
+QudaBLASOperation blas_trans_b = QUDA_BLAS_OP_N;
+QudaBLASDataType blas_data_type = QUDA_BLAS_DATATYPE_C;
+QudaBLASDataOrder blas_data_order = QUDA_BLAS_DATAORDER_COL;
 
-extern std::array<int, 3> blas_mnk;
-extern std::array<int, 3> blas_leading_dims;
-extern std::array<int, 3> blas_offsets;
-extern std::array<int, 3> blas_strides;
+std::array<int, 3> blas_mnk = {64, 64, 64};
+auto &blas_m = blas_mnk[0];
+auto &blas_n = blas_mnk[1];
+auto &blas_k = blas_mnk[2];
 
-extern std::array<double, 2> blas_alpha_re_im;
-extern std::array<double, 2> blas_beta_re_im;
-extern int blas_batch;
+std::array<int, 3> blas_leading_dims = {128, 128, 128};
+auto &blas_lda = blas_leading_dims[0];
+auto &blas_ldb = blas_leading_dims[1];
+auto &blas_ldc = blas_leading_dims[2];
+
+std::array<int, 3> blas_offsets = {0, 0, 0};
+auto &blas_a_offset = blas_offsets[0];
+auto &blas_b_offset = blas_offsets[1];
+auto &blas_c_offset = blas_offsets[2];
+
+std::array<int, 3> blas_strides = {1, 1, 1};
+auto &blas_a_stride = blas_strides[0];
+auto &blas_b_stride = blas_strides[1];
+auto &blas_c_stride = blas_strides[2];
+
+std::array<double, 2> blas_alpha_re_im = {M_PI, M_E};
+std::array<double, 2> blas_beta_re_im = {M_LN2, M_LN10};
+int blas_batch = 16;
 
 namespace quda
 {

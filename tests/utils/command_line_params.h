@@ -7,29 +7,19 @@
 // for compatibility while porting - remove later
 extern void usage(char **);
 
-// Put this is quda_constants.h?
-#define QUDA_MAX_SOURCES 128
-
-// Put this is quda_constants.h?
-#define QUDA_MAX_MASSES 128
-
 namespace quda
 {
   template <typename T> using mgarray = std::array<T, QUDA_MAX_MG_LEVEL>;
-  template <typename T> using file_array = std::array<T, QUDA_MAX_SOURCES>;
-  template <typename T> using source_array = std::array<T, QUDA_MAX_SOURCES>;
-  template <typename T> using mass_array = std::array<T, QUDA_MAX_MASSES>;
 }
 
 class QUDAApp : public CLI::App
 {
-  
- public:
+
+public:
   QUDAApp(std::string app_description = "", std::string app_name = "") : CLI::App(app_description, app_name) {};
 
   virtual ~QUDAApp() {};
 
-  // This template for strings
   template <typename T>
   CLI::Option *add_mgoption(std::string option_name, std::array<T, QUDA_MAX_MG_LEVEL> &variable, CLI::Validator trans,
                             std::string option_description = "", bool = false)
@@ -64,7 +54,6 @@ class QUDAApp : public CLI::App
     return opt;
   }
 
-  // This template for numbers
   template <typename T>
   CLI::Option *add_mgoption(CLI::Option_group *group, std::string option_name, std::array<T, QUDA_MAX_MG_LEVEL> &variable,
                             CLI::Validator trans, std::string option_description = "", bool = false)
@@ -72,6 +61,7 @@ class QUDAApp : public CLI::App
 
     CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
       size_t l;
+      // T j; // results_t is just a vector of strings
       bool worked = true;
 
       CLI::Range validlevel(0, QUDA_MAX_MG_LEVEL);
@@ -136,115 +126,6 @@ class QUDAApp : public CLI::App
     group->add_option(opt);
     return opt;
   }
-
-  // Add option to parse multiple point source locations
-  template <typename T>
-  CLI::Option *add_psoption(CLI::Option_group *group, std::string option_name,
-                            std::array<std::array<T, 4>, QUDA_MAX_SOURCES> &variable, CLI::Validator trans,
-                            std::string option_description = "", bool defaulted = false)
-  {
-
-    CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
-      size_t l;
-      T j; // results_t is just a vector of strings
-      bool worked = true;
-
-      CLI::Range validsource(0, QUDA_MAX_SOURCES);
-      for (size_t i {0}; i < vals.size() / (4 + 1); ++i) {
-        auto sourceok = validsource(vals.at((4 + 1) * i));
-
-        if (!sourceok.empty()) throw CLI::ValidationError(option_name, sourceok);
-        worked = worked and CLI::detail::lexical_cast(vals.at((4 + 1) * i), l);
-
-        for (int k = 0; k < 4; k++) {
-          auto transformok = trans(vals.at((4 + 1) * i + k + 1));
-          if (!transformok.empty()) throw CLI::ValidationError(option_name, transformok);
-          worked = worked and CLI::detail::lexical_cast(vals.at((4 + 1) * i + k + 1), j);
-          if (worked) variable[l][k] = j;
-        }
-      }
-      return worked;
-    };
-    CLI::Option *opt = add_option(option_name, f, option_description);
-    auto valuename = std::string("SOURCE ") + std::string(CLI::detail::type_name<T>());
-    opt->type_name(valuename)->type_size(-4 - 1);
-    opt->expected(-1);
-    opt->check(CLI::Validator(trans.get_description()));
-
-    group->add_option(opt);
-    return opt;
-  }
-
-  // Add option to parse multiple files.
-  template <typename T>
-  CLI::Option *add_fileoption(CLI::Option_group *group, std::string option_name,
-                              std::array<T, QUDA_MAX_SOURCES> &variable, CLI::Validator trans,
-                              std::string option_description = "", bool defaulted = false)
-  {
-
-    CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
-      size_t l;
-      // T j; // results_t is just a vector of strings
-      bool worked = true;
-
-      CLI::Range validsource(0, QUDA_MAX_SOURCES);
-      for (size_t i {0}; i < vals.size() / 2; ++i) { // will always be a multiple of 2
-        auto sourceok = validsource(vals.at(2 * i));
-        auto transformok = trans(vals.at(2 * i + 1));
-        if (!sourceok.empty()) throw CLI::ValidationError(option_name, sourceok);
-        if (!transformok.empty()) throw CLI::ValidationError(option_name, transformok);
-        worked = worked and CLI::detail::lexical_cast(vals.at(2 * i), l);
-        auto &j = variable[l];
-        worked = worked and CLI::detail::lexical_cast(vals.at(2 * i + 1), j);
-
-        // if (worked) variable[l] = j;
-      }
-      return worked;
-    };
-    CLI::Option *opt = add_option(option_name, f, option_description);
-    auto valuename = std::string("SOURCE ") + std::string(CLI::detail::type_name<T>());
-    opt->type_name(valuename)->type_size(-2);
-    opt->expected(-1);
-    opt->check(CLI::Validator(trans.get_description()));
-
-    group->add_option(opt);
-    return opt;
-  }
-
-  template <typename T>
-  CLI::Option *add_massoption(CLI::Option_group *group, std::string option_name, std::array<T, QUDA_MAX_MASSES> &variable,
-                            CLI::Validator trans, std::string option_description = "", bool = false)
-  {
-
-    CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
-      size_t l;
-      // T j; // results_t is just a vector of strings
-      bool worked = true;
-
-      CLI::Range validlevel(0, QUDA_MAX_MASSES);
-      for (size_t i {0}; i < vals.size() / 2; ++i) { // will always be a multiple of 2
-        auto levelok = validlevel(vals.at(2 * i));
-        auto transformok = trans(vals.at(2 * i + 1));
-        if (!levelok.empty()) throw CLI::ValidationError(option_name, levelok);
-        if (!transformok.empty()) throw CLI::ValidationError(option_name, transformok);
-        worked = worked and CLI::detail::lexical_cast(vals.at(2 * i), l);
-        auto &j = variable[l];
-        worked = worked and CLI::detail::lexical_cast(vals.at(2 * i + 1), j);
-
-        // if (worked) variable[l] = j;
-      }
-      return worked;
-    };
-    CLI::Option *opt = add_option(option_name, f, option_description);
-    auto valuename = std::string("FLAVOR<INT> ") + std::string(CLI::detail::type_name<T>());
-    opt->type_name(valuename)->type_size(-2);
-    opt->expected(-1);
-    opt->check(CLI::Validator(trans.get_description()));
-    // opt->transform(trans);
-    // opt->default_str("");
-    group->add_option(opt);
-    return opt;
-  }
 };
 
 std::shared_ptr<QUDAApp> make_app(std::string app_description = "QUDA internal test", std::string app_name = "");
@@ -255,8 +136,6 @@ void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_madwf_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app);
-void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app);
-void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app);
 
@@ -344,9 +223,7 @@ extern bool verify_results;
 extern bool low_mode_check;
 extern bool oblique_proj_check;
 extern double mass;
-extern quda::mass_array<double> mass_array;
 extern double kappa;
-extern quda::mass_array<double> kappa_array;
 extern double mu;
 extern double epsilon;
 extern double m5;
@@ -368,15 +245,10 @@ extern double reliable_delta;
 extern bool alternative_reliable;
 extern QudaTwistFlavorType twist_flavor;
 extern QudaMassNormalization normalization;
-extern QudaMassNormalization normalization_light;
-extern QudaMassNormalization normalization_strange;
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
 extern QudaSolutionType solution_type;
 extern QudaTboundary fermion_t_boundary;
-extern double gauge_smear_coeff;
-extern bool gauge_smear;
-extern QudaGaugeSmearType gauge_smear_type;
 
 extern int mg_levels;
 
@@ -508,9 +380,7 @@ extern bool mg_eig_preserve_deflation;
 
 extern double heatbath_beta_value;
 extern int heatbath_warmup_steps;
-extern int heatbath_step_start;
 extern int heatbath_num_steps;
-extern int heatbath_checkpoint;
 extern int heatbath_num_heatbath_per_step;
 extern int heatbath_num_overrelax_per_step;
 extern bool heatbath_coldstart;
@@ -521,46 +391,6 @@ extern double eofa_mq1;
 extern double eofa_mq2;
 extern double eofa_mq3;
 
-extern quda::file_array<char[256]> prop_source_infile;
-extern quda::file_array<char[256]> prop_source_outfile;
-extern quda::file_array<char[256]> prop_sink_infile;
-extern quda::file_array<char[256]> prop_sink_outfile;
-extern quda::source_array<std::array<int, 4>> prop_source_position;
-extern int prop_source_smear_steps;
-extern int prop_sink_smear_steps;
-extern double prop_source_smear_coeff;
-extern double prop_sink_smear_coeff;
-extern QudaFermionSmearType prop_smear_type;
-extern bool prop_read_sources;
-extern int prop_n_sources;
-extern QudaPrecision prop_save_prec;
-
-// SU(3) smearing options
-extern double stout_smear_rho;
-extern double stout_smear_epsilon;
-extern double ape_smear_rho;
-extern int gauge_smear_steps;
-extern double wflow_epsilon;
-extern int wflow_steps;
-extern QudaWFlowType wflow_type;
-extern int measurement_interval;
-
-// GF options
-extern int gf_gauge_dir;
-extern int gf_maxiter;
-extern int gf_verbosity_interval;
-extern double gf_ovr_relaxation_boost;
-extern double gf_fft_alpha;
-extern int gf_reunit_interval;
-extern double gf_tolerance;
-extern bool gf_theta_condition;
-extern bool gf_fft_autotune;
-
-// contract options
 extern QudaContractType contract_type;
-extern char correlator_save_dir[256];
-extern char correlator_file_affix[256];
-extern std::array<int,4> momentum;
-extern bool open_flavor;
 
 extern std::array<int, 4> grid_partition;

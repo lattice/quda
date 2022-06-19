@@ -525,37 +525,22 @@ typedef enum QudaStaggeredPhase_s {
 } QudaStaggeredPhase;
 
 typedef enum QudaContractType_s {
-  QUDA_CONTRACT_TYPE_OPEN,       // Open spin elementals, no summation
-  QUDA_CONTRACT_TYPE_OPEN_SUM_T, // Open spin elementals, spatially summed over tdim
-  QUDA_CONTRACT_TYPE_OPEN_SUM_Z, // Open spin elementals, spatially summed over zdim
-  QUDA_CONTRACT_TYPE_OPEN_FT_T,  // Open spin elementals, FT in tdim
-  QUDA_CONTRACT_TYPE_OPEN_FT_Z,  // Open spin elementals, FT in zdim
-  QUDA_CONTRACT_TYPE_DR,         // DegrandRossi insertion, no summation
-  QUDA_CONTRACT_TYPE_DR_FT_T,   // DegrandRossi insertion, FT in tdim
-  QUDA_CONTRACT_TYPE_DR_FT_Z,   // DegrandRossi insertion, FT in zdim
-  QUDA_CONTRACT_TYPE_STAGGERED, // Staggered, no summation (TODO: remove line)
-  QUDA_CONTRACT_TYPE_STAGGERED_FT_T, // Staggered, FT in tdim
+  QUDA_CONTRACT_TYPE_OPEN, // Open spin elementals
+  QUDA_CONTRACT_TYPE_DR,   // DegrandRossi
   QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
 } QudaContractType;
 
-typedef enum QudaFFTSymmType_t {
-  QUDA_FFT_SYMM_ODD  = 1,  // sin(phase)
-  QUDA_FFT_SYMM_EVEN = 2,  // cos(phase)
-  QUDA_FFT_SYMM_EO   = 3,  // exp(-i phase)
-  QUDA_FFT_SYMM_INVALID = QUDA_INVALID_ENUM
-} QudaFFTSymmType;
-
 typedef enum QudaContractGamma_s {
-  QUDA_CONTRACT_GAMMA_G1 = 0,
-  QUDA_CONTRACT_GAMMA_G2 = 1,
-  QUDA_CONTRACT_GAMMA_G3 = 2,
-  QUDA_CONTRACT_GAMMA_G4 = 3,
-  QUDA_CONTRACT_GAMMA_G5G1 = 4,
-  QUDA_CONTRACT_GAMMA_G5G2 = 5,
-  QUDA_CONTRACT_GAMMA_G5G3 = 6,
-  QUDA_CONTRACT_GAMMA_G5G4 = 7,
-  QUDA_CONTRACT_GAMMA_I = 8,
-  QUDA_CONTRACT_GAMMA_G5 = 9,
+  QUDA_CONTRACT_GAMMA_I = 0,
+  QUDA_CONTRACT_GAMMA_G1 = 1,
+  QUDA_CONTRACT_GAMMA_G2 = 2,
+  QUDA_CONTRACT_GAMMA_G3 = 3,
+  QUDA_CONTRACT_GAMMA_G4 = 4,
+  QUDA_CONTRACT_GAMMA_G5 = 5,
+  QUDA_CONTRACT_GAMMA_G1G5 = 6,
+  QUDA_CONTRACT_GAMMA_G2G5 = 7,
+  QUDA_CONTRACT_GAMMA_G3G5 = 8,
+  QUDA_CONTRACT_GAMMA_G4G5 = 9,
   QUDA_CONTRACT_GAMMA_S12 = 10,
   QUDA_CONTRACT_GAMMA_S13 = 11,
   QUDA_CONTRACT_GAMMA_S14 = 12,
@@ -564,19 +549,6 @@ typedef enum QudaContractGamma_s {
   QUDA_CONTRACT_GAMMA_S34 = 15,
   QUDA_CONTRACT_GAMMA_INVALID = QUDA_INVALID_ENUM
 } QudaContractGamma;
-    
-typedef enum QudaGaugeSmearType_s {
-  QUDA_GAUGE_SMEAR_TYPE_APE,
-  QUDA_GAUGE_SMEAR_TYPE_STOUT,
-  QUDA_GAUGE_SMEAR_TYPE_OVR_IMP_STOUT,
-  QUDA_GAUGE_SMEAR_TYPE_INVALID = QUDA_INVALID_ENUM
-} QudaGaugeSmearType;
-
-typedef enum QudaFermionSmearType_s {
-  QUDA_FERMION_SMEAR_TYPE_GAUSSIAN,
-  QUDA_FERMION_SMEAR_TYPE_WUPPERTAL,
-  QUDA_FERMION_SMEAR_TYPE_INVALID = QUDA_INVALID_ENUM
-} QudaFermionSmearType;
 
 typedef enum QudaGaugeSmearType_s {
   QUDA_GAUGE_SMEAR_APE,
@@ -586,6 +558,12 @@ typedef enum QudaGaugeSmearType_s {
   QUDA_GAUGE_SMEAR_SYMANZIK_FLOW,
   QUDA_GAUGE_SMEAR_INVALID = QUDA_INVALID_ENUM
 } QudaGaugeSmearType;
+
+typedef enum QudaFermionSmearType_s {
+  QUDA_FERMION_SMEAR_TYPE_GAUSSIAN,
+  QUDA_FERMION_SMEAR_TYPE_WUPPERTAL,
+  QUDA_FERMION_SMEAR_TYPE_INVALID = QUDA_INVALID_ENUM
+} QudaFermionSmearType;
 
 // Allows to choose an appropriate external library
 typedef enum QudaExtLibType_s {

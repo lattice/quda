@@ -1956,8 +1956,6 @@ public:
 			     const QudaSolutionType) const;
     virtual bool hermitian() const { return true; }
 
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b, const int &t0,  const QudaParity parity = QUDA_INVALID_PARITY) const;
-    
     virtual QudaDiracType getDiracType() const { return QUDA_GAUGE_LAPLACE_DIRAC; }
   };
 

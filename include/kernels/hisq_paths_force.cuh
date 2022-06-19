@@ -29,7 +29,6 @@ namespace quda {
       FORCE_LONG_LINK,
       FORCE_COMPLETE,
       FORCE_ONE_LINK,
-      FORCE_TWO_LINK,      
       FORCE_INVALID
     };
 
@@ -706,5 +705,6 @@ namespace quda {
         } // loop over sig
       }
     };
+
   }
 }

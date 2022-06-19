@@ -86,8 +86,6 @@ bool low_mode_check = false;
 bool oblique_proj_check = false;
 double mass = 0.1;
 double kappa = -1.0;
-quda::mass_array<double> kappa_array = {};
-quda::mass_array<double> mass_array = {};
 double mu = 0.1;
 double epsilon = 0.01;
 double m5 = -1.5;
@@ -113,7 +111,6 @@ QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 QudaSolveType solve_type = QUDA_NORMOP_PC_SOLVE;
 QudaSolutionType solution_type = QUDA_MAT_SOLUTION;
 QudaTboundary fermion_t_boundary = QUDA_ANTI_PERIODIC_T;
-bool gauge_smear = false;
 
 int mg_levels = 2;
 
@@ -260,8 +257,6 @@ bool mg_eig_preserve_deflation = false;
 double heatbath_beta_value = 6.2;
 int heatbath_warmup_steps = 10;
 int heatbath_num_steps = 10;
-int heatbath_step_start = 0;
-int heatbath_checkpoint = 5;
 int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
 bool heatbath_coldstart = false;
@@ -272,103 +267,16 @@ double eofa_mq1 = 1.0;
 double eofa_mq2 = 0.085;
 double eofa_mq3 = 1.0;
 
-// Propagator options
-quda::file_array<char[256]> prop_source_infile;
-quda::file_array<char[256]> prop_source_outfile;
-quda::file_array<char[256]> prop_sink_infile;
-quda::file_array<char[256]> prop_sink_outfile;
-quda::source_array<std::array<int, 4>> prop_source_position = {0, 0, 0, 0};
-
-int prop_source_smear_steps = 0;
-int prop_sink_smear_steps = 0;
-double prop_source_smear_coeff = 2.0;
-double prop_sink_smear_coeff = 2.0;
-bool prop_read_sources = false;
-int prop_n_sources = 1;
-QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
-
-// SU(3) smearing options
-double stout_smear_rho = 0.1;
-double stout_smear_epsilon = -0.25;
-double ape_smear_rho = 0.6;
-int gauge_smear_steps = 5;
-double wflow_epsilon = 0.01;
-int wflow_steps = 100;
-QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
-int measurement_interval = 5;
-QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_TYPE_STOUT;
-QudaFermionSmearType prop_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
-
-// contract options
-QudaContractType contract_type = QUDA_CONTRACT_TYPE_DR_FT_T;
-std::array<int,4> momentum = {0, 0, 0, 0};
-char correlator_file_affix[256] = "";
-char correlator_save_dir[256] = ".";
-bool open_flavor = false;
-
-// GF Options
-int gf_gauge_dir = 4;
-int gf_maxiter = 10000;
-int gf_verbosity_interval = 100;
-double gf_ovr_relaxation_boost = 1.5;
-double gf_fft_alpha = 0.8;
-int gf_reunit_interval = 10;
-double gf_tolerance = 1e-6;
-bool gf_theta_condition = false;
-bool gf_fft_autotune = false;
+QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
 std::array<int, 4> grid_partition = {1, 1, 1, 1};
-QudaBLASOperation blas_trans_a = QUDA_BLAS_OP_N;
-QudaBLASOperation blas_trans_b = QUDA_BLAS_OP_N;
-QudaBLASDataType blas_data_type = QUDA_BLAS_DATATYPE_C;
-QudaBLASDataOrder blas_data_order = QUDA_BLAS_DATAORDER_COL;
-
-std::array<int, 3> blas_mnk = {64, 64, 64};
-auto &blas_m = blas_mnk[0];
-auto &blas_n = blas_mnk[1];
-auto &blas_k = blas_mnk[2];
-
-std::array<int, 3> blas_leading_dims = {128, 128, 128};
-auto &blas_lda = blas_leading_dims[0];
-auto &blas_ldb = blas_leading_dims[1];
-auto &blas_ldc = blas_leading_dims[2];
-
-std::array<int, 3> blas_offsets = {0, 0, 0};
-auto &blas_a_offset = blas_offsets[0];
-auto &blas_b_offset = blas_offsets[1];
-auto &blas_c_offset = blas_offsets[2];
-
-std::array<int, 3> blas_strides = {1, 1, 1};
-auto &blas_a_stride = blas_strides[0];
-auto &blas_b_stride = blas_strides[1];
-auto &blas_c_stride = blas_strides[2];
-
-std::array<double, 2> blas_alpha_re_im = {1.0, 0.0};
-std::array<double, 2> blas_beta_re_im = {1.0, 0.0};
-int blas_batch = 16;
 
 namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
 
-  CLI::TransformPairs<QudaBLASDataType> blas_dt_map {
-    {"C", QUDA_BLAS_DATATYPE_C}, {"Z", QUDA_BLAS_DATATYPE_Z}, {"S", QUDA_BLAS_DATATYPE_S}, {"D", QUDA_BLAS_DATATYPE_D}};
-
-  CLI::TransformPairs<QudaBLASDataOrder> blas_data_order_map {{"row", QUDA_BLAS_DATAORDER_ROW},
-                                                              {"col", QUDA_BLAS_DATAORDER_COL}};
-
-  CLI::TransformPairs<QudaBLASOperation> blas_op_map {{"N", QUDA_BLAS_OP_N}, {"T", QUDA_BLAS_OP_T}, {"C", QUDA_BLAS_OP_C}};
-
   CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
-                                                           {"open-sum-t", QUDA_CONTRACT_TYPE_OPEN_SUM_T},
-                                                           {"open-sum-z", QUDA_CONTRACT_TYPE_OPEN_SUM_Z},
-							   {"open-ft-t", QUDA_CONTRACT_TYPE_OPEN_FT_T},
-                                                           {"open-ft-z", QUDA_CONTRACT_TYPE_OPEN_FT_Z},
-                                                           {"dr", QUDA_CONTRACT_TYPE_DR},
-							   {"dr-ft-t", QUDA_CONTRACT_TYPE_DR_FT_T},
-                                                           {"dr-ft-z", QUDA_CONTRACT_TYPE_DR_FT_Z}
-
-  };
+                                                           {"dr", QUDA_CONTRACT_TYPE_DR}};
 
   CLI::TransformPairs<QudaDslashType> dslash_type_map {{"wilson", QUDA_WILSON_DSLASH},
                                                        {"clover", QUDA_CLOVER_WILSON_DSLASH},
@@ -477,16 +385,6 @@ namespace
     {"SR", QUDA_SPECTRUM_SR_EIG}, {"LR", QUDA_SPECTRUM_LR_EIG}, {"SM", QUDA_SPECTRUM_SM_EIG},
     {"LM", QUDA_SPECTRUM_LM_EIG}, {"SI", QUDA_SPECTRUM_SI_EIG}, {"LI", QUDA_SPECTRUM_LI_EIG}};
 
-  CLI::TransformPairs<QudaWFlowType> wflow_type_map {{"wilson", QUDA_WFLOW_TYPE_WILSON},
-                                                     {"symanzik", QUDA_WFLOW_TYPE_SYMANZIK}};
-
-  CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map {{"ape", QUDA_GAUGE_SMEAR_TYPE_APE},
-                                                                {"stout", QUDA_GAUGE_SMEAR_TYPE_STOUT},
-                                                                {"ovr-imp-stout", QUDA_GAUGE_SMEAR_TYPE_OVR_IMP_STOUT}};
-
-  CLI::TransformPairs<QudaFermionSmearType> fermion_smear_type_map {{"gaussian", QUDA_FERMION_SMEAR_TYPE_GAUSSIAN},
-                                                                    {"wuppertal", QUDA_FERMION_SMEAR_TYPE_WUPPERTAL}};
-
   CLI::TransformPairs<QudaSetupType> setup_type_map {{"test", QUDA_TEST_VECTOR_SETUP}, {"null", QUDA_TEST_VECTOR_SETUP}};
 
   CLI::TransformPairs<QudaExtLibType> extlib_map {{"eigen", QUDA_EIGEN_EXTLIB}};
@@ -535,56 +433,12 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
                        "Compute the clover inverse trace log to check for singularity (default false)");
   quda_app->add_option("--compute-fat-long", compute_fatlong,
                        "Compute the fat/long field or use random numbers (default false)");
+
   quda_app
     ->add_option("--contraction-type", contract_type,
                  "Whether to leave spin elemental open, or use a gamma basis and contract on "
                  "spin (default open)")
     ->transform(CLI::QUDACheckedTransformer(contract_type_map));
-
-  quda_app
-    ->add_option("--blas-data-type", blas_data_type,
-                 "Whether to use single(S), double(D), and/or complex(C/Z) data types (default C)")
-    ->transform(CLI::QUDACheckedTransformer(blas_dt_map));
-
-  quda_app
-    ->add_option("--blas-data-order", blas_data_order, "Whether data is in row major or column major order (default row)")
-    ->transform(CLI::QUDACheckedTransformer(blas_data_order_map));
-
-  quda_app
-    ->add_option(
-      "--blas-trans-a", blas_trans_a,
-      "Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
-    ->transform(CLI::QUDACheckedTransformer(blas_op_map));
-
-  quda_app
-    ->add_option(
-      "--blas-trans-b", blas_trans_b,
-      "Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
-    ->transform(CLI::QUDACheckedTransformer(blas_op_map));
-
-  quda_app->add_option("--blas-alpha", blas_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")
-    ->expected(2);
-
-  quda_app->add_option("--blas-beta", blas_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")
-    ->expected(2);
-
-  quda_app
-    ->add_option("--blas-mnk", blas_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")
-    ->expected(3);
-
-  quda_app
-    ->add_option("--blas-leading-dims", blas_leading_dims,
-                 "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128) ")
-    ->expected(3);
-
-  quda_app->add_option("--blas-offsets", blas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")
-    ->expected(3);
-
-  quda_app->add_option("--blas-strides", blas_strides, "Set the strides for matrices A, B, and C (default 1 1 1)")
-    ->expected(3);
-
-  quda_app->add_option("--blas-batch", blas_batch, "Set the number of batches for GEMM (default 16)");
-
 
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
   quda_app->add_option("--device", device_ordinal, "Set the CUDA device to use (default 0, single GPU only)")
@@ -699,7 +553,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--reliable-delta", reliable_delta, "Set reliable update delta factor");
   quda_app->add_option("--save-gauge", gauge_outfile,
-                       "Save gauge field \" file \" for the test (requires QIO)");
+                       "Save gauge field \" file \" for the test (requires QIO, heatbath test only)");
 
   quda_app->add_option("--solution-pipeline", solution_accumulator_pipeline,
                        "The pipeline length for fused solution accumulation (default 0, no pipelining)");
@@ -889,7 +743,7 @@ void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app)
 
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-  auto opgroup = quda_app->add_option_group("MultiGrid", "Options controlling multigrid");
+  auto opgroup = quda_app->add_option_group("MultiGrid", "Options controlling deflation");
 
   // MWTODO: clean this up - code duplication
 
@@ -1138,156 +992,18 @@ void add_madwf_option_group(std::shared_ptr<QUDAApp> quda_app)
 void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   // Option group for heatbath related options
-  auto opgroup = quda_app->add_option_group("heatbath", "Options controlling heatbath routines");
+  auto opgroup = quda_app->add_option_group("heatbath", "Options controlling heatbath tests");
   opgroup->add_option("--heatbath-beta", heatbath_beta_value, "Beta value used in heatbath test (default 6.2)");
   opgroup->add_option("--heatbath-coldstart", heatbath_coldstart,
-                       "Whether to use a cold or hot start in heatbath test (default false)");
+                      "Whether to use a cold or hot start in heatbath test (default false)");
   opgroup->add_option("--heatbath-num-hb-per-step", heatbath_num_heatbath_per_step,
-                       "Number of heatbath hits per heatbath step (default 5)");
+                      "Number of heatbath hits per heatbath step (default 5)");
   opgroup->add_option("--heatbath-num-or-per-step", heatbath_num_overrelax_per_step,
-                       "Number of overrelaxation hits per heatbath step (default 5)");
+                      "Number of overrelaxation hits per heatbath step (default 5)");
   opgroup->add_option("--heatbath-num-steps", heatbath_num_steps,
-		      "Number of measurement steps in heatbath test (default 10)");
-  opgroup->add_option("--heatbath-step-start", heatbath_step_start,
-                       "The number from which to start the test (default 0)");
+                      "Number of measurement steps in heatbath test (default 10)");
   opgroup->add_option("--heatbath-warmup-steps", heatbath_warmup_steps,
-                       "Number of warmup steps in heatbath test (default 10)");
-  opgroup->add_option("--heatbath-checkpoint", heatbath_checkpoint,
-                       "Number of measurement steps in heatbath before checkpointing (default 5)");
-}
-
-void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
-{
-  CLI::QUDACheckedTransformer gauge_smear_transform(gauge_smear_type_map);
-  CLI::QUDACheckedTransformer wflow_type_transform(wflow_type_map);
-
-  // Option group for SU(3) related options
-  auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
-  
-  opgroup->add_option("--su3-smear", gauge_smear, "smear the gauge field in the spatial dims prior to inversion (default false)");
-  
-  opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
-
-  opgroup->add_option("--su3-stout-rho", stout_smear_rho,
-                      "rho coefficient for Stout and Over-Improved Stout smearing (default 0.08)");
-
-  opgroup->add_option("--su3-stout-epsilon", stout_smear_epsilon,
-                      "epsilon coefficient for Over-Improved Stout smearing (default -0.25)");
-
-  opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 50)");
-
-  opgroup->add_option("--su3-wflow-epsilon", wflow_epsilon, "The step size in the Runge-Kutta integrator (default 0.01)");
-
-  opgroup->add_option("--su3-wflow-steps", wflow_steps,
-                      "The number of steps in the Runge-Kutta integrator (default 100)");
-
-  opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
-    ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
-
-  opgroup->add_option("--su3-smear-type", gauge_smear_type, "The type of gauge smearing to use (default stout)")
-    ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
-
-  opgroup->add_option("--su3-measurement-interval", measurement_interval,
-                      "Measure the field energy and topological charge every Nth step (default 5) ");
-}
-
-void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
-{
-
-  CLI::QUDACheckedTransformer fermion_smear_transform(fermion_smear_type_map);
-
-  // Option group for propagator related options
-  auto opgroup = quda_app->add_option_group("Propagator", "Options controlling propagator construction");
-
-  opgroup->add_option("--prop-read-sources", prop_read_sources,
-                      "Read all sources from file. There will be one propagator for each source (default false)");
-
-  opgroup->add_option("--prop-n-sources", prop_n_sources, "The number of point sources to construct (default 1)");
-
-  quda_app->add_fileoption(opgroup, "--prop-save-sink-file", prop_sink_outfile, CLI::Validator(),
-                           "Save propagators to <file> (requires QIO)");
-
-  quda_app
-    ->add_fileoption(opgroup, "--prop-load-sink-file", prop_sink_infile, CLI::Validator(),
-                     "Load propagators from <file> (requires QIO)")
-    ->check(CLI::ExistingFile);
-
-  quda_app->add_fileoption(opgroup, "--prop-save-source-file", prop_source_outfile, CLI::Validator(),
-                           "Save source to <file> (requires QIO)");
-
-  // Do not check for an existing file as QUDA will append any
-  // string with a dilution index: "string_<dilution_index>"
-  quda_app->add_fileoption(opgroup, "--prop-load-source-file", prop_source_infile, CLI::Validator(),
-                           "Load source to <file> (requires QIO)");
-
-  opgroup->add_option("--prop-source-smear-coeff", prop_source_smear_coeff,
-                      "Set the alpha(Wuppertal) or omega(Gaussian) source smearing value (default 0.2)");
-
-  opgroup->add_option("--prop-source-smear-steps", prop_source_smear_steps,
-                      "Set the number of source smearing steps (default 0)");
-
-  opgroup->add_option("--prop-sink-smear-coeff", prop_sink_smear_coeff,
-                      "Set the alpha(Wuppertal) or omega(Gaussian) sink smearing value (default 0.2)");
-
-  opgroup->add_option("--prop-sink-smear-steps", prop_sink_smear_steps,
-                      "Set the number of sink smearing steps (default 0)");
-
-  opgroup->add_option("--prop-smear-type", prop_smear_type, "Type of fermion smearing to employ (default gaussian)")
-    ->transform(CLI::QUDACheckedTransformer(fermion_smear_type_map));
-
-  quda_app->add_psoption(opgroup, "--prop-source-position", prop_source_position, CLI::Validator(),
-                         "Set the position of the nth point source <Nth source> (X Y Z T) (default(0,0,0,0))");
-
-  CLI::QUDACheckedTransformer prec_transform(precision_map);
-  opgroup->add_option("--prop-save-prec", prop_save_prec, "Precision with which to save propagators (default single)")
-    ->transform(prec_transform);
-}
-
-void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)
-{
-    // Option group for contraction related options
-    auto opgroup = quda_app->add_option_group("Contraction", "Options controlling contraction");
-
-    opgroup->add_option("--contraction-type", contract_type,
-                    "Whether to leave spin elemental open or insert a gamma basis, "
-                        "and whether to sum in t,z, or not at all (default dr-sum-t)")
-            ->transform(CLI::QUDACheckedTransformer(contract_type_map));
-
-    opgroup->add_option("--correlator-save-dir", correlator_save_dir,"Save propagators in directory <dir>");
-    opgroup->add_option("--momentum", momentum, "Set momentum for correlators (px py pz pt) (default(0,0,0,0))")->expected(4);
-    opgroup->add_option("--open-flavor", open_flavor,
-                         "Compute the open flavor correlators (default false)");
-    opgroup->add_option("--correlator-file-affix", correlator_file_affix, "Additional string to put into the correlator file name");
-
-    quda_app->add_massoption(opgroup, "--kappa-array", kappa_array, CLI::Validator(),
-			     "set the Nth<INT> kappa value<FLOAT> of the Dirac operator)");
-    
-    quda_app->add_massoption(opgroup, "--mass-array", kappa_array, CLI::Validator(),
-			     "set the Nth<INT> mass value<FLOAT> of the Dirac operator)");
-}
-
-void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
-{
-  // Option group for gauge fixing related options
-  auto opgroup = quda_app->add_option_group("gaugefix", "Options controlling gauge fixing tests");
-  opgroup->add_option("--gf-dir", gf_gauge_dir,
-                      "The orthogonal direction of teh gauge fixing, 3=Coulomb, 4=Landau. (default 4)");
-  opgroup->add_option("--gf-maxiter", gf_maxiter,
-                      "The maximun number of gauge fixing iterations to be applied (default 10000) ");
-  opgroup->add_option("--gf-verbosity-interval", gf_verbosity_interval,
-                      "Print the gauge fixing progress every N steps (default 100)");
-  opgroup->add_option("--gf-ovr-relaxation-boost", gf_ovr_relaxation_boost,
-                      "The overrelaxation boost parameter for the overrelaxation method (default 1.5)");
-  opgroup->add_option("--gf-fft-alpha", gf_fft_alpha, "The Alpha parameter in the FFT method (default 0.8)");
-  opgroup->add_option("--gf-reunit-interval", gf_reunit_interval,
-                      "Reunitarise the gauge field every N steps (default 10)");
-  opgroup->add_option("--gf-tol", gf_tolerance, "The tolerance of the gauge fixing quality (default 1e-6)");
-  opgroup->add_option(
-    "--gf-theta-condition", gf_theta_condition,
-    "Use the theta value to determine the gauge fixing if true. If false, use the delta value (default false)");
-  opgroup->add_option(
-    "--gf-fft-autotune", gf_fft_autotune,
-    "In the FFT method, automatically adjust the alpha parameter if the quality begins to diverge (default false)");
+                      "Number of warmup steps in heatbath test (default 10)");
 }
 
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)

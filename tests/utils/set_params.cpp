@@ -119,21 +119,11 @@ void setInvertParam(QudaInvertParam &inv_param)
   if (kappa == -1.0) {
     inv_param.mass = mass;
     inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass));
-    if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      if (laplace3D < 4)
-        inv_param.kappa = 1.0 / (8.0 - 2.0 + inv_param.mass);
-      else
-        inv_param.kappa = 1.0 / (8 + inv_param.mass);
-    }
+    if (dslash_type == QUDA_LAPLACE_DSLASH) inv_param.kappa = 1.0 / (8 + mass);
   } else {
     inv_param.kappa = kappa;
     inv_param.mass = 0.5 / kappa - (1.0 + 3.0 / anisotropy);
-    if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      if (laplace3D < 4)
-        inv_param.mass = 1.0 / inv_param.kappa - (8.0 - 2.0);
-      else
-        inv_param.mass = 1.0 / inv_param.kappa - 8.0;
-    }
+    if (dslash_type == QUDA_LAPLACE_DSLASH) inv_param.mass = 1.0 / kappa - 8.0;
   }
   printfQuda("Kappa = %.8f Mass = %.8f\n", inv_param.kappa, inv_param.mass);
 
@@ -185,13 +175,6 @@ void setInvertParam(QudaInvertParam &inv_param)
     inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
   }
 
-  // Gauge smear param
-  inv_param.gauge_smear = (gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
-  inv_param.gauge_smear_type = gauge_smear_type;
-  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_STOUT) inv_param.gauge_smear_coeff = stout_smear_rho;
-  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_APE) inv_param.gauge_smear_coeff = ape_smear_rho;
-  inv_param.gauge_smear_steps = gauge_smear_steps;
-  
   // General parameter setup
   inv_param.inv_type = inv_type;
   inv_param.solution_type = solution_type;
@@ -295,23 +278,6 @@ void setInvertParam(QudaInvertParam &inv_param)
 
   inv_param.struct_size = sizeof(inv_param);
 }
-
-void setFermionSmearParam(QudaInvertParam &smear_param, double omega, int steps)
-{
-  // Construct a copy of the current invert parameters
-  setInvertParam(smear_param);
-  
-  // Construct 4D smearing parameters.
-  smear_param.dslash_type = QUDA_LAPLACE_DSLASH;
-  double smear_coeff = -1.0 * omega * omega / (4 * steps);
-  smear_param.mass_normalization = QUDA_KAPPA_NORMALIZATION; // Enforce kappa normalisation
-  smear_param.mass = 1.0;
-  smear_param.kappa = smear_coeff;
-  smear_param.laplace3D = laplace3D; // Omit this dim
-  smear_param.solution_type = QUDA_MAT_SOLUTION;
-  smear_param.solve_type = QUDA_DIRECT_SOLVE;
-}
-
 
 // Parameters defining the eigensolver
 void setEigParam(QudaEigParam &eig_param)
@@ -1001,13 +967,6 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
-  // Gauge smear param
-  inv_param.gauge_smear = (gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
-  inv_param.gauge_smear_type = gauge_smear_type;
-  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_STOUT) inv_param.gauge_smear_coeff = stout_smear_rho;
-  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_APE) inv_param.gauge_smear_coeff = ape_smear_rho;
-  inv_param.gauge_smear_steps = gauge_smear_steps;
-  
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
