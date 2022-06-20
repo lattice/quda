@@ -5385,7 +5385,7 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   
   // Create device side ColorSpinorField vectors and to pass to the
   // compute function.
-  const int *X = gaugeSmeared->X();
+  const lat_dim_t X = gaugeSmeared->X();
   
   inv_param->dslash_type = QUDA_ASQTAD_DSLASH;
   
