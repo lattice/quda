@@ -7,7 +7,7 @@ namespace quda
 {
 
   template <typename reducer, typename T, typename count_t, typename transformer>
-  class TransformReduce : TunableMultiReduction<1>
+  class TransformReduce : TunableMultiReduction
   {
     using reduce_t = typename reducer::reduce_t;
     using Arg = TransformReduceArg<reducer, T, count_t, transformer>;

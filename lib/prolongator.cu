@@ -1,4 +1,5 @@
 #include <color_spinor_field.h>
+#include <multigrid.h>
 #include <tunable_nd.h>
 #include <kernels/prolongator.cuh>
 
@@ -49,113 +50,111 @@ namespace quda {
 
   };
 
+  template <int fineSpin, int fineColor, int coarseSpin, int coarseColor>
+  struct enabled : std::false_type { };
+
+#ifdef NSPIN4
+  template <> struct enabled<4,  3, 2,  6> : std::true_type { };
+  template <> struct enabled<4,  3, 2, 24> : std::true_type { };
+  template <> struct enabled<4,  3, 2, 32> : std::true_type { };
+  template <> struct enabled<2, 24, 2, 32> : std::true_type { };
+  template <> struct enabled<2, 32, 2, 32> : std::true_type { };
+  template <> struct enabled<2,  6, 2,  6> : std::true_type { };
+#endif
+#ifdef NSPIN1
+  template <> struct enabled<1,  3, 2, 24> : std::true_type { };
+  template <> struct enabled<1,  3, 2, 64> : std::true_type { };
+  template <> struct enabled<1,  3, 2, 96> : std::true_type { };
+  template <> struct enabled<2, 24, 2, 64> : std::true_type { };
+  template <> struct enabled<2, 24, 2, 96> : std::true_type { };
+  template <> struct enabled<2, 64, 2, 64> : std::true_type { };
+  template <> struct enabled<2, 64, 2, 96> : std::true_type { };
+  template <> struct enabled<2, 96, 2, 96> : std::true_type { };
+#endif
+#if defined(NSPIN1) || defined(NSPIN4)
+  template <> struct enabled<2, 24, 2, 24> : std::true_type { };
+#endif
+
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-                  const int *fine_to_coarse, int parity) {
-
-    if (v.Precision() == QUDA_HALF_PRECISION) {
-#if QUDA_PRECISION & 2
-      ProlongateLaunch<Float, short, fineSpin, fineColor, coarseSpin, coarseColor>
-        prolongator(out, in, v, fine_to_coarse, parity);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-#endif
-    } else if (v.Precision() == in.Precision()) {
-      ProlongateLaunch<Float, Float, fineSpin, fineColor, coarseSpin, coarseColor>
-        prolongator(out, in, v, fine_to_coarse, parity);
+                  const int *fine_to_coarse, int parity)
+  {
+    if constexpr (enabled<fineSpin, fineColor, coarseSpin, coarseColor>::value) {
+      if (v.Precision() == QUDA_HALF_PRECISION) {
+        if constexpr(is_enabled<QUDA_HALF_PRECISION>()) {
+            ProlongateLaunch<Float, short, fineSpin, fineColor, coarseSpin, coarseColor>
+              prolongator(out, in, v, fine_to_coarse, parity);
+          } else {
+          errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+        }
+      } else if (v.Precision() == in.Precision()) {
+        ProlongateLaunch<Float, Float, fineSpin, fineColor, coarseSpin, coarseColor>
+          prolongator(out, in, v, fine_to_coarse, parity);
+      } else {
+        errorQuda("Unsupported V precision %d", v.Precision());
+      }
     } else {
-      errorQuda("Unsupported V precision %d", v.Precision());
+      errorQuda("Not enabled");
     }
   }
 
   template <typename Float, int fineSpin>
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-                  int nVec, const int *fine_to_coarse, const int * const * spin_map, int parity) {
-
+                  int nVec, const int *fine_to_coarse, const int * const * spin_map, int parity)
+  {
     if (in.Nspin() != 2) errorQuda("Coarse spin %d is not supported", in.Nspin());
-    const int coarseSpin = 2;
+    constexpr int coarseSpin = 2;
 
     // first check that the spin_map matches the spin_mapper
     spin_mapper<fineSpin,coarseSpin> mapper;
-    for (int s=0; s<fineSpin; s++) 
+    for (int s=0; s<fineSpin; s++)
       for (int p=0; p<2; p++)
         if (mapper(s,p) != spin_map[s][p]) errorQuda("Spin map does not match spin_mapper");
 
     if (out.Ncolor() == 3) {
-      const int fineColor = 3;
-#ifdef NSPIN4
-      if (nVec == 6) { // Free field Wilson
-        Prolongate<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, parity);
-      } else
-#endif // NSPIN4
-      if (nVec == 24) {
-        Prolongate<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, parity);
-#ifdef NSPIN4
-      } else if (nVec == 32) {
-        Prolongate<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, parity);
-#endif // NSPIN4
-#ifdef NSPIN1
-      } else if (nVec == 64) {
-        Prolongate<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, parity);
-      } else if (nVec == 96) {
-        Prolongate<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, parity);
-#endif // NSPIN1
-      } else {
-        errorQuda("Unsupported nVec %d", nVec);
+      constexpr int fineColor = 3;
+      switch (nVec) {
+      case 6: Prolongate<Float, fineSpin, fineColor, coarseSpin, 6>(out, in, v, fine_to_coarse, parity); break;
+      case 24: Prolongate<Float, fineSpin, fineColor, coarseSpin, 24>(out, in, v, fine_to_coarse, parity); break;
+      case 32: Prolongate<Float, fineSpin, fineColor, coarseSpin, 32>(out, in, v, fine_to_coarse, parity); break;
+      case 64: Prolongate<Float, fineSpin, fineColor, coarseSpin, 64>(out, in, v, fine_to_coarse, parity); break;
+      case 96: Prolongate<Float, fineSpin, fineColor, coarseSpin, 96>(out, in, v, fine_to_coarse, parity); break;
+      default: errorQuda("Unsupported nVec %d", nVec);
       }
-#ifdef NSPIN4
     } else if (out.Ncolor() == 6) { // for coarsening coarsened Wilson free field.
-      const int fineColor = 6;
-      if (nVec == 6) { // these are probably only for debugging only
-        Prolongate<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, parity);
-      } else {
-        errorQuda("Unsupported nVec %d", nVec);
+      constexpr int fineColor = 6;
+      switch (nVec) {
+      case 6: Prolongate<Float, fineSpin, fineColor, coarseSpin, 6>(out, in, v, fine_to_coarse, parity); break;
+      default: errorQuda("Unsupported nVec %d", nVec);
       }
-#endif // NSPIN4
     } else if (out.Ncolor() == 24) {
-      const int fineColor = 24;
-      if (nVec == 24) { // to keep compilation under control coarse grids have same or more colors
-        Prolongate<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, parity);
-#ifdef NSPIN4
-      } else if (nVec == 32) {
-        Prolongate<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, parity);
-#endif // NSPIN4
-#ifdef NSPIN1
-      } else if (nVec == 64) { 
-        Prolongate<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, parity);
-      } else if (nVec == 96) {
-        Prolongate<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, parity);
-#endif // NSPIN1
-      } else {
-        errorQuda("Unsupported nVec %d", nVec);
+      constexpr int fineColor = 24;
+      switch (nVec) {
+      case 24: Prolongate<Float, fineSpin, fineColor, coarseSpin, 24>(out, in, v, fine_to_coarse, parity); break;
+      case 32: Prolongate<Float, fineSpin, fineColor, coarseSpin, 32>(out, in, v, fine_to_coarse, parity); break;
+      case 64: Prolongate<Float, fineSpin, fineColor, coarseSpin, 64>(out, in, v, fine_to_coarse, parity); break;
+      case 96: Prolongate<Float, fineSpin, fineColor, coarseSpin, 96>(out, in, v, fine_to_coarse, parity); break;
+      default: errorQuda("Unsupported nVec %d", nVec);
       }
-#ifdef NSPIN4
     } else if (out.Ncolor() == 32) {
-      const int fineColor = 32;
-      if (nVec == 32) {
-        Prolongate<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, parity);
-      } else {
-        errorQuda("Unsupported nVec %d", nVec);
+      constexpr int fineColor = 32;
+      switch (nVec) {
+      case 32: Prolongate<Float, fineSpin, fineColor, coarseSpin, 32>(out, in, v, fine_to_coarse, parity); break;
+      default: errorQuda("Unsupported nVec %d", nVec);
       }
-#endif // NSPIN4
-#ifdef NSPIN1
     } else if (out.Ncolor() == 64) {
-      const int fineColor = 64;
-      if (nVec == 64) {
-        Prolongate<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, parity);
-      } else if (nVec == 96) {
-        Prolongate<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, parity);
-      } else {
-        errorQuda("Unsupported nVec %d", nVec);
+      constexpr int fineColor = 64;
+      switch (nVec) {
+      case 64: Prolongate<Float, fineSpin, fineColor, coarseSpin, 64>(out, in, v, fine_to_coarse, parity); break;
+      case 96: Prolongate<Float, fineSpin, fineColor, coarseSpin, 96>(out, in, v, fine_to_coarse, parity); break;
+      default: errorQuda("Unsupported nVec %d", nVec);
       }
     } else if (out.Ncolor() == 96) {
-      const int fineColor = 96;
-      if (nVec == 96) {
-        Prolongate<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, parity);
-      } else {
-        errorQuda("Unsupported nVec %d", nVec);
+      constexpr int fineColor = 96;
+      switch (nVec) {
+      case 96: Prolongate<Float, fineSpin, fineColor, coarseSpin, 96>(out, in, v, fine_to_coarse, parity); break;
+      default: errorQuda("Unsupported nVec %d", nVec);
       }
-#endif // NSPIN1
     } else {
       errorQuda("Unsupported nColor %d", out.Ncolor());
     }
@@ -163,51 +162,42 @@ namespace quda {
 
   template <typename Float>
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-                  int Nvec, const int *fine_to_coarse, const int * const * spin_map, int parity) {
-
+                  int Nvec, const int *fine_to_coarse, const int * const * spin_map, int parity)
+  {
     if (out.Nspin() == 2) {
       Prolongate<Float,2>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
-#ifdef NSPIN4
     } else if (out.Nspin() == 4) {
-      Prolongate<Float,4>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
-#endif
-#ifdef NSPIN1
+      if constexpr (is_enabled_spin(4)) Prolongate<Float,4>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
+      else errorQuda("nSpin 4 has not been built");
     } else if (out.Nspin() == 1) {
-      Prolongate<Float,1>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
-#endif
+      if constexpr (is_enabled_spin(1)) Prolongate<Float,1>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
+      else errorQuda("nSpin 1 has not been built");
     } else {
       errorQuda("Unsupported nSpin %d", out.Nspin());
     }
   }
 
-#ifdef GPU_MULTIGRID
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
                   int Nvec, const int *fine_to_coarse, const int * const * spin_map, int parity)
   {
-    if (out.FieldOrder() != in.FieldOrder() || out.FieldOrder() != v.FieldOrder())
-      errorQuda("Field orders do not match (out=%d, in=%d, v=%d)", 
-                out.FieldOrder(), in.FieldOrder(), v.FieldOrder());
+    if constexpr (is_enabled_multigrid()) {
+      if (out.FieldOrder() != in.FieldOrder() || out.FieldOrder() != v.FieldOrder())
+        errorQuda("Field orders do not match (out=%d, in=%d, v=%d)",
+                  out.FieldOrder(), in.FieldOrder(), v.FieldOrder());
 
-    QudaPrecision precision = checkPrecision(out, in);
+      QudaPrecision precision = checkPrecision(out, in);
 
-    if (precision == QUDA_DOUBLE_PRECISION) {
-#ifdef GPU_MULTIGRID_DOUBLE
-      Prolongate<double>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
-#else
-      errorQuda("Double precision multigrid has not been enabled");
-#endif
-    } else if (precision == QUDA_SINGLE_PRECISION) {
-      Prolongate<float>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
+      if (precision == QUDA_DOUBLE_PRECISION) {
+        if constexpr (is_enabled_multigrid_double()) Prolongate<double>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
+        else errorQuda("Double precision multigrid has not been enabled");
+      } else if (precision == QUDA_SINGLE_PRECISION) {
+        Prolongate<float>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
+      } else {
+        errorQuda("Unsupported precision %d", out.Precision());
+      }
     } else {
-      errorQuda("Unsupported precision %d", out.Precision());
+      errorQuda("Multigrid has not been built");
     }
   }
-#else
-  void Prolongate(ColorSpinorField &, const ColorSpinorField &, const ColorSpinorField &,
-                  int, const int *, const int * const *, int)
-  {
-    errorQuda("Multigrid has not been built");
-  }
-#endif
 
 } // end namespace quda

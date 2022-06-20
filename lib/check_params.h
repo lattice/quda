@@ -475,7 +475,11 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #ifndef CHECK_PARAM
   P(solver_normalization, QUDA_DEFAULT_NORMALIZATION);
 #endif
-  P(preserve_source, QUDA_PRESERVE_SOURCE_INVALID);
+
+#ifndef CHECK_PARAM
+  P(preserve_source, QUDA_PRESERVE_SOURCE_INVALID); // deprecated
+#endif
+
   P(cpu_prec, QUDA_INVALID_PRECISION);
   P(cuda_prec, QUDA_INVALID_PRECISION);
 
@@ -522,10 +526,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 #if defined INIT_PARAM
   P(Nsteps, INVALID_INT);
-#else
-  if(param->inv_type == QUDA_MPCG_INVERTER || param->inv_type == QUDA_MPBICGSTAB_INVERTER){
-    P(Nsteps, INVALID_INT);
-  }
 #endif
 
 #if defined INIT_PARAM

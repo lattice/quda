@@ -31,9 +31,10 @@ namespace quda
     // create the Fmunu field
     profile.TPSTART(QUDA_PROFILE_INIT);
     // u is an extended field we need to shrink for the Fmunu field
-    int x[4];
+    lat_dim_t x;
     for (int i = 0; i < 4; i++) x[i] = u.X()[i] - 2 * u.R()[i];
     GaugeFieldParam tensorParam(x, u.Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
+    tensorParam.location = QUDA_CUDA_FIELD_LOCATION;
     tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
     tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;

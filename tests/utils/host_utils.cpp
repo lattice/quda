@@ -98,7 +98,7 @@ void setQudaDefaultMgTestParams()
     smoother_solve_type[i] = QUDA_INVALID_SOLVE;
     mg_schwarz_type[i] = QUDA_INVALID_SCHWARZ;
     mg_schwarz_cycle[i] = 1;
-    smoother_type[i] = QUDA_GCR_INVERTER;
+    smoother_type[i] = QUDA_MR_INVERTER;
     smoother_tol[i] = 0.25;
     coarse_solver[i] = QUDA_GCR_INVERTER;
     coarse_solver_tol[i] = 0.25;
@@ -1494,12 +1494,16 @@ void createHwCPU(void *hw, QudaPrecision precision)
     if (precision == QUDA_DOUBLE_PRECISION) {
       for (int dir = 0; dir < 4; dir++) {
         double *thishw = (double *)hw;
-        for (auto k = 0lu; k < hw_site_size; k++) { thishw[(4 * i + dir) * hw_site_size + k] = 1.0 * rand() / RAND_MAX; }
+        for (auto k = 0lu; k < hw_site_size; k++) {
+          thishw[(4 * i + dir) * hw_site_size + k] = 1.0 * rand() / RAND_MAX;
+        }
       }
     } else {
       for (int dir = 0; dir < 4; dir++) {
         float *thishw = (float *)hw;
-        for (auto k = 0lu; k < hw_site_size; k++) { thishw[(4 * i + dir) * hw_site_size + k] = 1.0 * rand() / RAND_MAX; }
+        for (auto k = 0lu; k < hw_site_size; k++) {
+          thishw[(4 * i + dir) * hw_site_size + k] = 1.0 * rand() / RAND_MAX;
+        }
       }
     }
   }

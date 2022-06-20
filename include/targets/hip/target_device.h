@@ -109,6 +109,32 @@ namespace quda
     */
     __device__ __host__ inline dim3 thread_idx() { return dispatch<thread_idx_impl>(); }
 
+    /**
+       @brief Helper function that returns a linear thread index within a thread block.
+    */
+    template <int dim> __device__ __host__ inline auto thread_idx_linear()
+    {
+      switch (dim) {
+      case 1: return thread_idx().x;
+      case 2: return thread_idx().y * block_dim().x + thread_idx().x;
+      case 3:
+      default: return (thread_idx().z * block_dim().y + thread_idx().y) * block_dim().x + thread_idx().x;
+      }
+    }
+
+    /**
+       @brief Helper function that returns the total number thread in a thread block
+    */
+    template <int dim> __device__ __host__ inline auto block_size()
+    {
+      switch (dim) {
+      case 1: return block_dim().x;
+      case 2: return block_dim().y * block_dim().x;
+      case 3:
+      default: return block_dim().z * block_dim().y * block_dim().x;
+      }
+    }
+
   } // namespace target
 
   namespace device
@@ -132,34 +158,6 @@ namespace quda
     template <int block_size_y = 1, int block_size_z = 1> constexpr unsigned int max_block_size()
     {
       return std::max(warp_size(), 1024 / (block_size_y * block_size_z));
-    }
-
-    /**
-       @brief Helper function that returns the maximum number of threads
-       in a block in the x dimension for reduction kernels.
-    */
-    template <int block_size_y = 1, int block_size_z = 1> constexpr unsigned int max_reduce_block_size()
-    {
-#ifdef QUDA_FAST_COMPILE_REDUCE
-      // This is the specialized variant used when we have fast-compilation mode enabled
-      return warp_size();
-#else
-      return max_block_size<block_size_y, block_size_z>();
-#endif
-    }
-
-    /**
-       @brief Helper function that returns the maximum number of threads
-       in a block in the x dimension for reduction kernels.
-    */
-    template <int block_size_y = 1, int block_size_z = 1> constexpr unsigned int max_multi_reduce_block_size()
-    {
-#ifdef QUDA_FAST_COMPILE_REDUCE
-      // This is the specialized variant used when we have fast-compilation mode enabled
-      return warp_size();
-#else
-      return max_block_size<block_size_y, block_size_z>();
-#endif
     }
 
     /**
@@ -241,13 +239,31 @@ namespace quda
     template <typename Tag> constexpr int get_default_kernel2D_launch_bounds() { return 256; }
 
     /**
-     @brief Return the default launch bonds for a 3D Kernel for HIP
-      implementations where it is useful to explicitly set launch bounds>
+      @brief Return the default launch bounds for a 3D Kernel for HIP
+      implementations where it is useful to explicitly set launch bounds.
       Right now based on experience we will leave this constrained
       to 256 threads to prevent spilling. However templating on a tag
       type will allow further specialization
     */
     template <typename Tag> constexpr int get_default_kernel3D_launch_bounds() { return 256; }
+
+    /**
+      @brief Return the default launch bounds for Reduction kernel for HIP
+      implementations where it is useful to explicitly set launch bounds.
+      Right now based on experience we will leave this constrained
+      to 256 threads to prevent spilling. However templating on a tag
+      type will allow further specialization
+    */
+    template <typename Tag> constexpr int get_default_reduction_launch_bounds() { return 256; }
+
+    /**
+      @brief Return the default launch bounds for MultiReduction kernel for HIP
+      implementations where it is useful to explicitly set launch bounds.
+      Right now based on experience we will leave this constrained
+      to 256 threads to prevent spilling. However templating on a tag
+      type will allow further specialization
+    */
+    template <typename Tag> constexpr int get_default_multireduction_launch_bounds() { return 256; }
 
     /**
      @brief Return the maximum number of threads per block for block

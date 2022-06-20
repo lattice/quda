@@ -5,6 +5,7 @@ using namespace quda;
 StaggeredDslashTestWrapper dslash_test_wrapper;
 
 bool gauge_loaded = false;
+bool ctest_all_partitions = false;
 
 void display_test_info(int precision, QudaReconstructType link_recon)
 {
@@ -51,13 +52,18 @@ protected:
       return true;
     }
 
+    const std::array<bool, 16> partition_enabled {true, true, true,  false,  true,  false, false, false,
+                                                  true, false, false, false, true, false, true, true};
+    if (!ctest_all_partitions && !partition_enabled[::testing::get<2>(GetParam())]) return true;
+
     if (::testing::get<2>(GetParam()) > 0 && dslash_test_wrapper.test_split_grid) { return true; }
     return false;
   }
 
 public:
   virtual ~StaggeredDslashTest() { }
-  virtual void SetUp() {
+  virtual void SetUp()
+  {
     int prec = ::testing::get<0>(GetParam());
     QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
 
@@ -114,6 +120,7 @@ int main(int argc, char **argv)
   ::testing::InitGoogleTest(&argc, argv);
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
+  app->add_option("--all-partitions", ctest_all_partitions, "Test all instead of reduced combination of partitions");
   add_comms_option_group(app);
   try {
     app->parse(argc, argv);
@@ -174,28 +181,29 @@ int main(int argc, char **argv)
   return test_rc;
 }
 
-  std::string getstaggereddslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int>> param){
-   const int prec = ::testing::get<0>(param.param);
-   const int recon = ::testing::get<1>(param.param);
-   const int part = ::testing::get<2>(param.param);
-   std::stringstream ss;
-   // ss << get_dslash_str(dslash_type) << "_";
-   ss << get_prec_str(getPrecision(prec));
-   ss << "_r" << recon;
-   ss << "_partition" << part;
-   return ss.str();
-  }
+std::string getstaggereddslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int>> param)
+{
+  const int prec = ::testing::get<0>(param.param);
+  const int recon = ::testing::get<1>(param.param);
+  const int part = ::testing::get<2>(param.param);
+  std::stringstream ss;
+  // ss << get_dslash_str(dslash_type) << "_";
+  ss << get_prec_str(getPrecision(prec));
+  ss << "_r" << recon;
+  ss << "_partition" << part;
+  return ss.str();
+}
 
 #ifdef MULTI_GPU
-  INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
-                           Combine(Range(0, 4),
-                                   ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-                                   Range(0, 16)),
-                           getstaggereddslashtestname);
+INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
+                         Combine(Range(0, 4),
+                                 ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
+                                 Range(0, 16)),
+                         getstaggereddslashtestname);
 #else
-  INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
-                           Combine(Range(0, 4),
-                                   ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-                                   ::testing::Values(0)),
-                           getstaggereddslashtestname);
+INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
+                         Combine(Range(0, 4),
+                                 ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
+                                 ::testing::Values(0)),
+                         getstaggereddslashtestname);
 #endif

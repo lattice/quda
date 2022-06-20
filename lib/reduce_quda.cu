@@ -9,7 +9,7 @@ namespace quda {
 
     template <template <typename ReducerType, typename real> class Reducer,
               typename store_t, typename y_store_t, int nSpin, typename coeff_t>
-    class Reduce : public TunableReduction2D<1>
+    class Reduce : public TunableReduction2D
     {
       using real = typename mapper<y_store_t>::type;
       using host_reduce_t = typename Reducer<double, real>::reduce_t;
@@ -31,12 +31,10 @@ namespace quda {
         return false;
       }
 
-      unsigned int maxBlockSize(const TuneParam &) const { return device::max_reduce_block_size(); }
-
     public:
       Reduce(const coeff_t &a, const coeff_t &b, const coeff_t &, ColorSpinorField &x, ColorSpinorField &y,
              ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, host_reduce_t &result) :
-        TunableReduction2D(x),
+        TunableReduction2D(x, 1u),
         r(a, b),
         nParity((x.IsComposite() ? x.CompositeDim() : 1) * (x.SiteSubset())),
         a(a),
@@ -142,8 +140,6 @@ namespace quda {
         return (r.read.X + r.write.X) * x.Bytes() + (r.read.Y + r.write.Y) * y.Bytes() +
           (r.read.Z + r.write.Z) * z.Bytes() + (r.read.W + r.write.W) * w.Bytes() + (r.read.V + r.write.V) * v.Bytes();
       }
-
-      int tuningIter() const { return 3; }
     };
 
     template <template <typename reduce_t, typename real> class Functor, bool mixed, typename... Args>
@@ -209,10 +205,10 @@ namespace quda {
       return Complex(cdot[0], cdot[1]);
     }
 
-    double3 cDotProductNormA(ColorSpinorField &x, ColorSpinorField &y)
+    double4 cDotProductNormAB(ColorSpinorField &x, ColorSpinorField &y)
     {
-      auto rtn = instantiateReduce<CdotNormA, false>(0.0, 0.0, 0.0, x, y, x, x, x);
-      return make_double3(rtn[0], rtn[1], rtn[2]);
+      auto ab = instantiateReduce<CdotNormAB, false>(0.0, 0.0, 0.0, x, y, x, x, x);
+      return make_double4(ab[0], ab[1], ab[2], ab[3]);
     }
 
     double3 caxpbypzYmbwcDotProductUYNormY(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y,

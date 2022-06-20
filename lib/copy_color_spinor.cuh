@@ -113,7 +113,7 @@ namespace quda {
       errorQuda("QDPJIT interface has not been built\n");
 #endif
     } else {
-      errorQuda("Order %d not defined (Ns=%d, Nc=%d)", out.FieldOrder(), Ns, Nc);
+      errorQuda("Order %d not defined (Ns = %d, Nc = %d, precision = %d)", out.FieldOrder(), Ns, Nc, out.Precision());
     }
   }
 
@@ -154,7 +154,7 @@ namespace quda {
       errorQuda("QDPJIT interface has not been built\n");
 #endif
     } else {
-      errorQuda("Order %d not defined (Ns=%d, Nc=%d)", in.FieldOrder(), Ns, Nc);
+      errorQuda("Order %d not defined (Ns=%d, Nc=%d, precision = %d)", in.FieldOrder(), Ns, Nc, in.Precision());
     }
   }
 

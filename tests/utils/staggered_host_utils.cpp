@@ -582,13 +582,13 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
 
 #ifdef MULTI_GPU
 
-    exchange_cpu_sitelink(qudaGaugeParam.X, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec,
-                          &qudaGaugeParam, optflag);
+    lat_dim_t X = {qudaGaugeParam.X[0], qudaGaugeParam.X[1], qudaGaugeParam.X[2], qudaGaugeParam.X[3]};
+    exchange_cpu_sitelink(X, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, &qudaGaugeParam, optflag);
     llfat_reference_mg(fatlink, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, coeff);
 
     {
-      int R[4] = {2, 2, 2, 2};
-      exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, w_reflink_ex, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0, 4);
+      lat_dim_t R = {2, 2, 2, 2};
+      exchange_cpu_sitelink_ex(X, R, w_reflink_ex, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0, 4);
       computeLongLinkCPU(longlink, w_reflink_ex, qudaGaugeParam.cpu_prec, coeff);
     }
 #else
@@ -614,14 +614,13 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
   optflag = 0;
 
   // We've already built the extended W fields.
-
-  exchange_cpu_sitelink(qudaGaugeParam.X, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec,
-                        &qudaGaugeParam, optflag);
+  lat_dim_t X = {qudaGaugeParam.X[0], qudaGaugeParam.X[1], qudaGaugeParam.X[2], qudaGaugeParam.X[3]};
+  exchange_cpu_sitelink(X, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, &qudaGaugeParam, optflag);
   llfat_reference_mg(fatlink, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, coeff);
 
   {
-    int R[4] = {2, 2, 2, 2};
-    exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, w_reflink_ex, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0, 4);
+    lat_dim_t R = {2, 2, 2, 2};
+    exchange_cpu_sitelink_ex(X, R, w_reflink_ex, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0, 4);
     computeLongLinkCPU(longlink, w_reflink_ex, qudaGaugeParam.cpu_prec, coeff);
   }
 #else

@@ -5,6 +5,9 @@
 #include <worker.h>
 #include <tunable_nd.h>
 #include <kernels/dslash_coarse.cuh>
+#include <shmem_helper.cuh>
+#include <dslash_quda.h>
+#include <dslash_shmem.h>
 
 namespace quda {
 
@@ -245,25 +248,50 @@ namespace quda {
 
   template <typename Float, typename yFloat, typename ghostFloat, bool dagger, int coarseColor, int coarseSpin>
   inline void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-			  const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash,
-			  bool clover, DslashType type, MemoryLocation *halo_location)
+                          const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash, bool clover,
+                          DslashType type, MemoryLocation *halo_location)
   {
-    // for now we never instantiate any template except DSLASH_FULL, since never overlap comms and compute and do not properly support additive Schwarz here
     if (dslash) {
       if (clover) {
-
-        if (type == DSLASH_FULL) {
+        switch (type) {
+        case DSLASH_FULL: {
           DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, true, dagger, DSLASH_FULL> dslash(
             out, inA, inB, Y, X, kappa, parity, halo_location);
-        } else { errorQuda("Dslash type %d not instantiated", type); }
+          break;
+        }
+        case DSLASH_EXTERIOR: {
+          DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, true, dagger, DSLASH_EXTERIOR> dslash(
+            out, inA, inB, Y, X, kappa, parity, halo_location);
+          break;
+        }
+        case DSLASH_INTERIOR: {
+          DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, true, dagger, DSLASH_INTERIOR> dslash(
+            out, inA, inB, Y, X, kappa, parity, halo_location);
+          break;
+        }
+        default: errorQuda("Dslash type %d not instantiated", type);
+        }
 
       } else { // plain dslash
 
-        if (type == DSLASH_FULL) {
+        switch (type) {
+        case DSLASH_FULL: {
           DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, false, dagger, DSLASH_FULL> dslash(
             out, inA, inB, Y, X, kappa, parity, halo_location);
-        } else { errorQuda("Dslash type %d not instantiated", type); }
-
+          break;
+        }
+        case DSLASH_EXTERIOR: {
+          DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, false, dagger, DSLASH_EXTERIOR> dslash(
+            out, inA, inB, Y, X, kappa, parity, halo_location);
+          break;
+        }
+        case DSLASH_INTERIOR: {
+          DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, false, dagger, DSLASH_INTERIOR> dslash(
+            out, inA, inB, Y, X, kappa, parity, halo_location);
+          break;
+        }
+        default: errorQuda("Dslash type %d not instantiated", type);
+        }
       }
     } else {
 
@@ -274,7 +302,6 @@ namespace quda {
       } else {
         errorQuda("Unsupported dslash=false clover=false");
       }
-
     }
   }
 
@@ -322,13 +349,15 @@ namespace quda {
   }
 
   enum class DslashCoarsePolicy {
-    DSLASH_COARSE_BASIC,          // stage both sends and recvs in host memory using memcpys
-    DSLASH_COARSE_ZERO_COPY_PACK, // zero copy write pack buffers
-    DSLASH_COARSE_ZERO_COPY_READ, // zero copy read halos in dslash kernel
-    DSLASH_COARSE_ZERO_COPY,      // full zero copy
-    DSLASH_COARSE_GDR_SEND,       // GDR send
-    DSLASH_COARSE_GDR_RECV,       // GDR recv
-    DSLASH_COARSE_GDR,             // full GDR
+    DSLASH_COARSE_BASIC,                   // stage both sends and recvs in host memory using memcpys
+    DSLASH_COARSE_ZERO_COPY_PACK,          // zero copy write pack buffers
+    DSLASH_COARSE_ZERO_COPY_READ,          // zero copy read halos in dslash kernel
+    DSLASH_COARSE_ZERO_COPY,               // full zero copy
+    DSLASH_COARSE_SHMEM,                   // non overlapping shmem exchange
+    DSLASH_COARSE_SHMEM_OVERLAP,           // overlapping shmem exchange
+    DSLASH_COARSE_GDR_SEND,                // GDR send
+    DSLASH_COARSE_GDR_RECV,                // GDR recv
+    DSLASH_COARSE_GDR,                     // full GDR
     DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV, // zero copy write and GDR recv
     DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ, // GDR send and zero copy read
     DSLASH_COARSE_POLICY_DISABLED
@@ -348,6 +377,7 @@ namespace quda {
     bool clover;
     const int *commDim;
     const QudaPrecision halo_precision;
+    static constexpr bool enable_coarse_shmem_overlap() { return false; }
 
     inline DslashCoarseLaunch(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
 			      const GaugeField &Y, const GaugeField &X, double kappa, int parity,
@@ -374,68 +404,202 @@ namespace quda {
       if (commDim) for (int i=0; i<4; i++) comm_sum -= (1-commDim[i]);
       if (comm_sum != 4 && comm_sum != 0) errorQuda("Unsupported comms %d", comm_sum);
       bool comms = comm_sum;
+      int shmem = 0;
 
-      MemoryLocation pack_destination[2*QUDA_MAX_DIM]; // where we will pack the ghost buffer to
-      MemoryLocation halo_location[2*QUDA_MAX_DIM]; // where we load the halo from
-      for (int i=0; i<2*QUDA_MAX_DIM; i++) {
-	pack_destination[i] = (policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK || policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY ||
-			       policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV) ? Host : Device;
-	halo_location[i] = (policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_READ || policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY ||
-			    policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ) ? Host : Device;
+      MemoryLocation pack_destination[2 * QUDA_MAX_DIM]; // where we will pack the ghost buffer to
+      MemoryLocation halo_location[2 * QUDA_MAX_DIM];    // where we load the halo from
+      bool gdr_send = false;
+      bool gdr_recv = false;
+      if (policy == DslashCoarsePolicy::DSLASH_COARSE_SHMEM || policy == DslashCoarsePolicy::DSLASH_COARSE_SHMEM_OVERLAP) {
+        for (int i = 0; i < 2 * QUDA_MAX_DIM; i++) {
+          pack_destination[i] = Shmem;
+          halo_location[i] = Device;
+        }
+        shmem = 1;
+      } else {
+        for (int i = 0; i < 2 * QUDA_MAX_DIM; i++) {
+          pack_destination[i] = (policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK
+                                 || policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY
+                                 || policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV) ?
+            Host :
+            Device;
+          halo_location[i] = (policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_READ
+                              || policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY
+                              || policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ) ?
+            Host :
+            Device;
+        }
+        gdr_send = (policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND || policy == DslashCoarsePolicy::DSLASH_COARSE_GDR
+                    || policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ) ?
+          true :
+          false;
+        gdr_recv = (policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_RECV || policy == DslashCoarsePolicy::DSLASH_COARSE_GDR
+                    || policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV) ?
+          true :
+          false;
       }
-      bool gdr_send = (policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND || policy == DslashCoarsePolicy::DSLASH_COARSE_GDR ||
-		       policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ) ? true : false;
-      bool gdr_recv = (policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_RECV || policy == DslashCoarsePolicy::DSLASH_COARSE_GDR ||
-		       policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV) ? true : false;
-
       // disable peer-to-peer if doing a zero-copy policy (temporary)
-      if ( policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK ||
-	   policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_READ ||
-	   policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY ||
-	   policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV ||
-	   policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ) comm_enable_peer2peer(false);
+      bool p2p_enabled = comm_peer2peer_enabled_global();
+      if (policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK
+          || policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_READ
+          || policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY
+          || policy == DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV
+          || policy == DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ)
+        comm_enable_peer2peer(false);
 
-      if (dslash && comm_partitioned() && comms) {
-	const int nFace = 1;
-        inA.exchangeGhost((QudaParity)(inA.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace, dagger,
-                          pack_destination, halo_location, gdr_send, gdr_recv, halo_precision);
-      }
+      if (policy != DslashCoarsePolicy::DSLASH_COARSE_SHMEM_OVERLAP) {
+        ////////////////
+        /// NO OVERLAP
 
-      if (dslash::aux_worker) dslash::aux_worker->apply(device::get_default_stream());
+        if (dslash && comm_partitioned() && comms) {
+          const int nFace = 1;
+          inA.exchangeGhost((QudaParity)(inA.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace, dagger,
+                            pack_destination, halo_location, gdr_send, gdr_recv, halo_precision, shmem);
+        }
 
-      if (precision == QUDA_DOUBLE_PRECISION) {
+        if (dslash::aux_worker) dslash::aux_worker->apply(device::get_default_stream());
+
+        if (precision == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
-	if (Y.Precision() != QUDA_DOUBLE_PRECISION)
-          errorQuda("Y Precision %d not supported", Y.Precision());
-	if (halo_precision != QUDA_DOUBLE_PRECISION)
-          errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision, precision, Y.Precision());
-	ApplyCoarse<double,double,double,dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                 comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+          if (Y.Precision() != QUDA_DOUBLE_PRECISION) errorQuda("Y Precision %d not supported", Y.Precision());
+          if (halo_precision != QUDA_DOUBLE_PRECISION)
+            errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
+                      precision, Y.Precision());
+          ApplyCoarse<double, double, double, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                      comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+#else
+          errorQuda("Double precision multigrid has not been enabled");
+#endif
+        } else if (precision == QUDA_SINGLE_PRECISION) {
+          if (Y.Precision() == QUDA_SINGLE_PRECISION) {
+            if (halo_precision == QUDA_SINGLE_PRECISION) {
+              ApplyCoarse<float, float, float, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                       comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+            } else {
+              errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
+                        precision, Y.Precision());
+            }
+          } else if (Y.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
+            if (halo_precision == QUDA_HALF_PRECISION) {
+              ApplyCoarse<float, short, short, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                       comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+            } else if (halo_precision == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
+              ApplyCoarse<float, short, int8_t, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                        comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+#else
+              errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+#endif
+            } else {
+              errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
+                        precision, Y.Precision());
+            }
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
+          } else {
+            errorQuda("Unsupported precision %d\n", Y.Precision());
+          }
+        } else {
+          errorQuda("Unsupported precision %d\n", Y.Precision());
+        }
+      } else if constexpr (DslashCoarseLaunch<dagger>::enable_coarse_shmem_overlap()) {
+// OVERLAP
+#ifdef NVSHMEM_COMMS
+        if (dslash && comm_partitioned() && comms) {
+          const int nFace = 1;
+          shmem += 2;
+          inA.exchangeGhost((QudaParity)(inA.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace, dagger,
+                            pack_destination, halo_location, gdr_send, gdr_recv, halo_precision, shmem);
+        }
+        // INTERIOR
+        if (precision == QUDA_DOUBLE_PRECISION) {
+#ifdef GPU_MULTIGRID_DOUBLE
+          if (Y.Precision() != QUDA_DOUBLE_PRECISION) errorQuda("Y Precision %d not supported", Y.Precision());
+          if (halo_precision != QUDA_DOUBLE_PRECISION)
+            errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
+                      precision, Y.Precision());
+          ApplyCoarse<double, double, double, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                      comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location);
+#else
+          errorQuda("Double precision multigrid has not been enabled");
+#endif
+        } else if (precision == QUDA_SINGLE_PRECISION) {
+          if (Y.Precision() == QUDA_SINGLE_PRECISION) {
+            if (halo_precision == QUDA_SINGLE_PRECISION) {
+              ApplyCoarse<float, float, float, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                       comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location);
+            } else {
+              errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
+                        precision, Y.Precision());
+            }
+          } else if (Y.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
+            if (halo_precision == QUDA_HALF_PRECISION) {
+              ApplyCoarse<float, short, short, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                       comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location);
+            } else if (halo_precision == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
+              ApplyCoarse<float, short, int8_t, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                        comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location);
+#else
+              errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+#endif
+            } else {
+              errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
+                        precision, Y.Precision());
+            }
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
+          } else {
+            errorQuda("Unsupported precision %d\n", Y.Precision());
+          }
+        } else {
+          errorQuda("Unsupported precision %d\n", Y.Precision());
+        }
+        if (dslash::aux_worker) dslash::aux_worker->apply(device::get_default_stream());
+
+        if (dslash && comm_partitioned() && comms) {
+          quda::dslash::shmem_signal_wait_all();
+
+          // exterior
+          if (precision == QUDA_DOUBLE_PRECISION) {
+#ifdef GPU_MULTIGRID_DOUBLE
+            if (Y.Precision() != QUDA_DOUBLE_PRECISION) errorQuda("Y Precision %d not supported", Y.Precision());
+            if (halo_precision != QUDA_DOUBLE_PRECISION)
+              errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
+                        precision, Y.Precision());
+            ApplyCoarse<double, double, double, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                        comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location);
 #else
 	errorQuda("Double precision multigrid has not been enabled");
 #endif
-      } else if (precision == QUDA_SINGLE_PRECISION) {
-        if (Y.Precision() == QUDA_SINGLE_PRECISION) {
-          if (halo_precision == QUDA_SINGLE_PRECISION) {
-            ApplyCoarse<float,float,float,dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                  comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
-          } else {
-            errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision, precision, Y.Precision());
-          }
-        } else if (Y.Precision() == QUDA_HALF_PRECISION) {
+          } else if (precision == QUDA_SINGLE_PRECISION) {
+            if (Y.Precision() == QUDA_SINGLE_PRECISION) {
+              if (halo_precision == QUDA_SINGLE_PRECISION) {
+                ApplyCoarse<float, float, float, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                         comms ? DSLASH_EXTERIOR : DSLASH_INTERIOR, halo_location);
+              } else {
+                errorQuda("Halo precision %d not supported with field precision %d and link precision %d",
+                          halo_precision, precision, Y.Precision());
+              }
+            } else if (Y.Precision() == QUDA_HALF_PRECISION) {
 #if QUDA_PRECISION & 2
           if (halo_precision == QUDA_HALF_PRECISION) {
-            ApplyCoarse<float,short,short,dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                  comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+            ApplyCoarse<float, short, short, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                     comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location);
           } else if (halo_precision == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
             ApplyCoarse<float, short, int8_t, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                      comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+                                                      comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location);
 #else
             errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif
           } else {
-            errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision, precision, Y.Precision());
+            errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
+                      precision, Y.Precision());
           }
 #else
           errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
@@ -443,12 +607,17 @@ namespace quda {
         } else {
           errorQuda("Unsupported precision %d\n", Y.Precision());
         }
-      } else {
-	errorQuda("Unsupported precision %d\n", Y.Precision());
+          } else {
+            errorQuda("Unsupported precision %d\n", Y.Precision());
+          }
+        }
+#else
+        errorQuda("NVSHMEM policy called but NVSHMEM not enabled.");
+#endif
       }
-
       if (dslash && comm_partitioned() && comms) inA.bufferIndex = (1 - inA.bufferIndex);
-      comm_enable_peer2peer(true);
+
+      comm_enable_peer2peer(p2p_enabled); // restore the p2p state
     }
   };
 
@@ -475,6 +644,7 @@ namespace quda {
    bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
    unsigned int sharedBytesPerThread() const { return 0; }
    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+   static constexpr bool enable_coarse_shmem_overlap = Launch::enable_coarse_shmem_overlap();
 
  public:
    inline DslashCoarsePolicyTune(Launch &dslash) : dslash(dslash)
@@ -505,19 +675,23 @@ namespace quda {
 	  }
 	  if(first_active_policy == static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED)) errorQuda("No valid policy found in QUDA_ENABLE_DSLASH_COARSE_POLICY");
 	} else {
-	  first_active_policy = 0;
-	  enable_policy(DslashCoarsePolicy::DSLASH_COARSE_BASIC);
-	  enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK);
-	  enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_READ);
-	  enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY);
-	  if (comm_gdr_enabled()) {
-	    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND);
-	    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_RECV);
-	    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR);
-	    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV);
-	    enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ);
-	  }
-	}
+          first_active_policy = 0;
+          enable_policy(DslashCoarsePolicy::DSLASH_COARSE_BASIC);
+          enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK);
+          enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_READ);
+          enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY);
+          if (comm_nvshmem_enabled()) {
+            enable_policy(DslashCoarsePolicy::DSLASH_COARSE_SHMEM);
+            if constexpr (enable_coarse_shmem_overlap) enable_policy(DslashCoarsePolicy::DSLASH_COARSE_SHMEM_OVERLAP);
+          }
+          if (comm_gdr_enabled()) {
+            enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND);
+            enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_RECV);
+            enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR);
+            enable_policy(DslashCoarsePolicy::DSLASH_COARSE_ZERO_COPY_PACK_GDR_RECV);
+            enable_policy(DslashCoarsePolicy::DSLASH_COARSE_GDR_SEND_ZERO_COPY_READ);
+          }
+        }
 
         // construct string specifying which policies have been enabled
         strcat(policy_string, ",pol=");
@@ -574,8 +748,6 @@ namespace quda {
      if (policies[tp.aux.x] == DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED ) errorQuda("Requested policy is disabled");
      dslash(policies[tp.aux.x]);
    }
-
-   int tuningIter() const { return 10; }
 
    bool advanceAux(TuneParam &param) const
    {

@@ -168,25 +168,18 @@ void *qudaAllocateManaged(size_t bytes) { return managed_malloc(bytes); }
 
 void qudaFreeManaged(void *ptr) { managed_free(ptr); }
 
-#if defined(GPU_HISQ_FORCE) || defined(GPU_UNITARIZE)
 void qudaHisqParamsInit(QudaHisqParams_t params)
-#else
-void qudaHisqParamsInit(QudaHisqParams_t)
-#endif
 {
   static bool initialized = false;
 
   if (initialized) return;
   qudamilc_called<true>(__func__);
 
-#if defined(GPU_HISQ_FORCE) || defined(GPU_UNITARIZE)
   const bool reunit_allow_svd = (params.reunit_allow_svd) ? true : false;
   const bool reunit_svd_only  = (params.reunit_svd_only) ? true : false;
   const double unitarize_eps = 1e-14;
   const double max_error = 1e-10;
-#endif
 
-#ifdef GPU_HISQ_FORCE
   quda::fermion_force::setUnitarizeForceConstants(unitarize_eps,
       params.force_filter,
       max_error,
@@ -194,16 +187,13 @@ void qudaHisqParamsInit(QudaHisqParams_t)
       reunit_svd_only,
       params.reunit_svd_rel_error,
       params.reunit_svd_abs_error);
-#endif
 
-#ifdef GPU_UNITARIZE
   setUnitarizeLinksConstants(unitarize_eps,
       max_error,
       reunit_allow_svd,
       reunit_svd_only,
       params.reunit_svd_rel_error,
       params.reunit_svd_abs_error);
-#endif // UNITARIZE_GPU
 
   initialized = true;
   qudamilc_called<false>(__func__);
@@ -705,7 +695,6 @@ static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, Qud
 
   invertParam->solution_type = QUDA_MATPC_SOLUTION;
   invertParam->solve_type = QUDA_DIRECT_PC_SOLVE;
-  invertParam->preserve_source = QUDA_PRESERVE_SOURCE_YES;
   invertParam->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // not used, but required by the code.
   invertParam->dirac_order = QUDA_DIRAC_ORDER;
 
@@ -1918,7 +1907,6 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
   inv_param.cuda_prec = device_precision;
   inv_param.cuda_prec_sloppy = device_precision_sloppy;
   inv_param.cuda_prec_precondition = input_struct.preconditioner_precision;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
@@ -2543,7 +2531,6 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
   invertParam.cpu_prec                      = host_precision;
   invertParam.cuda_prec                     = device_precision;
   invertParam.cuda_prec_sloppy              = device_precision_sloppy;
-  invertParam.preserve_source               = QUDA_PRESERVE_SOURCE_NO;
   invertParam.gamma_basis                   = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   invertParam.dirac_order                   = QUDA_DIRAC_ORDER;
   invertParam.clover_cpu_prec               = host_precision;

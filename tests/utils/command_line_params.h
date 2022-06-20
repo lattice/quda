@@ -138,6 +138,7 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_testing_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
 {
@@ -394,3 +395,5 @@ extern double eofa_mq3;
 extern QudaContractType contract_type;
 
 extern std::array<int, 4> grid_partition;
+
+extern bool enable_testing;

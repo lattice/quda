@@ -22,7 +22,7 @@ set (QUDA_OBJS
   coarse_op_preconditioned.cu staggered_coarse_op.cu
   eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
   eigensolve_quda.cpp quda_arpack_interface.cpp
-  multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
+  multigrid.cpp transfer.cpp block_orthogonalize.cu
   prolongator.cu restrictor.cu staggered_prolong_restrict.cu
   gauge_phase.cu timer.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
@@ -32,7 +32,7 @@ set (QUDA_OBJS
   inv_cg3_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
-  color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
+  color_spinor_field.cpp color_spinor_util.cu
   gauge_covdev.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
@@ -43,7 +43,7 @@ set (QUDA_OBJS
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp 
   llfat_quda.cu staggered_two_link_quda.cu gauge_force.cu gauge_random.cu
-  gauge_field_strength_tensor.cu clover_quda.cu dslash_quda.cu
+  gauge_field_strength_tensor.cu clover_quda.cu 
   dslash_gamma_helper.cu dslash_clover_helper.cu
   staggered_kd_build_xinv.cu staggered_kd_reorder_xinv.cu staggered_kd_apply_xinv.cu
   madwf_transfer.cu madwf_tensor.cu
@@ -51,7 +51,8 @@ set (QUDA_OBJS
   multi_reduce_quda.cu reduce_helper.cu
   contract.cu comm_common.cpp communicator_stack.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
-  extract_gauge_ghost_extended.cu copy_color_spinor.cpp spinor_noise.cu
+  extract_gauge_ghost_extended.cu copy_color_spinor.cpp
+  spinor_noise.cu spinor_dilute.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_dq.cu
   copy_color_spinor_ss.cu copy_color_spinor_sd.cu
@@ -75,7 +76,7 @@ set (QUDA_OBJS
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
   tune.cpp
   device_vector.cu
-  inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
+  inv_gmresdr_quda.cpp
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
   gauge_fix_fft.cu gauge_fix_ovr.cu pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
@@ -87,6 +88,7 @@ set (QUDA_OBJS
 
 # current workaround for nvshmem
 set(QUDA_DSLASH_OBJS 
+  dslash_quda.cu color_spinor_pack.cu
   dslash_staggered.cu dslash_improved_staggered.cu
   dslash_wilson.cu dslash_wilson_clover.cu dslash5_domain_wall.cu
   dslash_wilson_clover_preconditioned.cu 
@@ -252,11 +254,11 @@ if(QUDA_DIRAC_DOMAIN_WALL)
 endif(QUDA_DIRAC_DOMAIN_WALL)
 
 if(QUDA_DIRAC_STAGGERED)
-  target_compile_definitions(quda PUBLIC GPU_STAGGERED_DIRAC GPU_FATLINK GPU_UNITARIZE)
+  target_compile_definitions(quda PUBLIC GPU_STAGGERED_DIRAC)
 endif(QUDA_DIRAC_STAGGERED)
 
 if(QUDA_DIRAC_CLOVER)
-  target_compile_definitions(quda PUBLIC GPU_CLOVER_DIRAC GPU_WILSON_DIRAC GPU_GAUGE_TOOLS)
+  target_compile_definitions(quda PUBLIC GPU_CLOVER_DIRAC GPU_WILSON_DIRAC)
 endif(QUDA_DIRAC_CLOVER)
 
 if(QUDA_DIRAC_TWISTED_MASS)
@@ -265,12 +267,12 @@ endif(QUDA_DIRAC_TWISTED_MASS)
 
 if(QUDA_DIRAC_TWISTED_CLOVER)
   target_compile_definitions(quda PUBLIC GPU_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC GPU_TWISTED_MASS_DIRAC
-                                         GPU_WILSON_DIRAC GPU_GAUGE_TOOLS)
+                                         GPU_WILSON_DIRAC)
 endif(QUDA_DIRAC_TWISTED_CLOVER)
 
 if(QUDA_DIRAC_CLOVER_HASENBUSCH)
   target_compile_definitions(quda PUBLIC GPU_CLOVER_HASENBUSCH_TWIST GPU_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC
-                                         GPU_WILSON_DIRAC GPU_GAUGE_TOOLS)
+                                         GPU_WILSON_DIRAC)
 endif(QUDA_DIRAC_CLOVER_HASENBUSCH)
 
 if(QUDA_DIRAC_NDEG_TWISTED_MASS)
@@ -278,8 +280,7 @@ if(QUDA_DIRAC_NDEG_TWISTED_MASS)
 endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
 if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
-  target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC GPU_TWISTED_CLOVER_DIRAC
-                                         GPU_GAUGE_TOOLS)
+  target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC GPU_TWISTED_CLOVER_DIRAC)
 endif(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
 
 
@@ -292,7 +293,7 @@ if(QUDA_MULTIGRID)
 endif(QUDA_MULTIGRID)
 
 if(QUDA_GAUGE_ALG)
-  target_compile_definitions(quda PUBLIC GPU_GAUGE_ALG GPU_GAUGE_TOOLS GPU_UNITARIZE)
+  target_compile_definitions(quda PUBLIC)
 endif(QUDA_GAUGE_ALG)
 
 if(QUDA_SSTEP)
@@ -304,19 +305,15 @@ if(QUDA_BLOCKSOLVER)
 endif()
 
 if(QUDA_FORCE_GAUGE)
-  target_compile_definitions(quda PUBLIC GPU_GAUGE_FORCE GPU_GAUGE_TOOLS)
+  target_compile_definitions(quda PUBLIC)
 endif(QUDA_FORCE_GAUGE)
 
-if(QUDA_FORCE_HISQ)
-  target_compile_definitions(quda PUBLIC GPU_HISQ_FORCE GPU_STAGGERED_OPROD GPU_GAUGE_TOOLS)
-endif(QUDA_FORCE_HISQ)
-
 if(QUDA_GAUGE_TOOLS)
-  target_compile_definitions(quda PUBLIC GPU_GAUGE_TOOLS)
+  target_compile_definitions(quda PUBLIC)
 endif(QUDA_GAUGE_TOOLS)
 
 if(QUDA_GAUGE_ALG)
-  target_compile_definitions(quda PUBLIC GPU_GAUGE_ALG GPU_GAUGE_TOOLS GPU_UNITARIZE)
+  target_compile_definitions(quda PUBLIC)
 endif(QUDA_GAUGE_ALG)
 
 if(QUDA_INTERFACE_QDP OR QUDA_INTERFACE_ALL)
@@ -443,6 +440,10 @@ if(QUDA_FAST_COMPILE_DSLASH)
   target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_DSLASH)
 endif()
 
+if(QUDA_ALTERNATIVE_I_TO_F)
+  target_compile_definitions(quda PRIVATE QUDA_ALTERNATIVE_I_TO_F)
+endif()
+
 if(QUDA_BACKWARDS)
   target_include_directories(quda_cpp SYSTEM PRIVATE ${backward-cpp_SOURCE_DIR})
 
@@ -471,8 +472,6 @@ add_custom_command(
   TARGET quda
   PRE_LINK
   COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
-
-set_target_properties(quda PROPERTIES INSTALL_RPATH_USE_LINK_PATH ON)
 
 install(
   TARGETS quda

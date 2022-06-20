@@ -49,8 +49,8 @@ namespace quda
       offset(offset),
       nParity(in_field.SiteSubset())
     {
-      const int *X_in = in_field.X();
-      const int *X_out = out_field.X();
+      auto X_in = in_field.X();
+      auto X_out = out_field.X();
 
       Ls = in_field.Ndim() == 4 ? 1 : X_in[4];
 

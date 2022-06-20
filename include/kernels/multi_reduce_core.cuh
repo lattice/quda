@@ -15,16 +15,8 @@ namespace quda
 
     /**
        @brief Return the batch block size used for multi reductions.
-       For now, we leave this at 1 unless fast-compilation is enabled,
-       since it provides negligible benefit (but substantially longer
-       tuning).  When fast-compilation is enabled, the increased batch
-       count can dramatically improve performance.
      */
-#ifndef QUDA_FAST_COMPILE_REDUCE
-    constexpr unsigned int max_n_batch_block_multi_reduce() { return 1; }
-#else
     constexpr unsigned int max_n_batch_block_multi_reduce() { return 8; }
-#endif
 
     /**
        @brief Parameter struct for generic multi-reduce blas kernel.
@@ -56,8 +48,8 @@ namespace quda
       const int length_cb;
       const int nParity;
 
-      MultiReduceArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
-                     std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
+      template <typename V>
+      MultiReduceArg(std::vector<V> &x, std::vector<V> &y, std::vector<V> &z, std::vector<V> &w,
                      Reducer f, int NYW, int length, int nParity) :
         // we have NYW * nParity reductions each of length NXZ
         ReduceArg<reduce_t>(dim3(length, 1, NYW), NYW),
@@ -69,13 +61,13 @@ namespace quda
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
         for (int i = 0; i < NXZ; ++i) {
-          this->X[i] = *x[i];
-          if (Reducer::use_z) this->Z[i] = *z[i];
+          this->X[i] = static_cast<ColorSpinorField&>(x[i]);
+          if (Reducer::use_z) this->Z[i] = static_cast<ColorSpinorField&>(z[i]);
         }
 
         for (int i = 0; i < NYW; ++i) {
-          this->Y[i] = *y[i];
-          if (Reducer::use_w) this->W[i] = *w[i];
+          this->Y[i] = static_cast<ColorSpinorField&>(y[i]);
+          if (Reducer::use_w) this->W[i] = static_cast<ColorSpinorField&>(w[i]);
         }
       }
     };
@@ -93,6 +85,7 @@ namespace quda
     template <typename Arg> struct MultiReduce_ : plus<typename Arg::reduce_t> {
       using reduce_t = typename Arg::reduce_t;
       using plus<reduce_t>::operator();
+      static constexpr int reduce_block_dim = 1; // x_cb and parity are mapped to x dim
       using vec = array<complex<typename Arg::real>, Arg::n/2>;
       const Arg &arg;
       constexpr MultiReduce_(const Arg &arg) : arg(arg) {}

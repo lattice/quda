@@ -39,7 +39,8 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<CopySpinor_>(tp, stream, CopyArg<Ns, Nc, OutOrder, InOrder>(out, in, Out, In));
+      constexpr bool enable_host = true;
+      launch<CopySpinor_, enable_host>(tp, stream, CopyArg<Ns, Nc, OutOrder, InOrder>(out, in, Out, In));
     }
 
     long long flops() const { return 0; }

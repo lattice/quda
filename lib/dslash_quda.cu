@@ -1,12 +1,10 @@
-#ifdef NVSHMEM_COMMS
-#include <cuda/atomic>
-#endif
-
 #include "color_spinor_field.h"
 #include "dslash_quda.h"
+#include "dslash_shmem.h"
 #include <dslash_policy.cuh>
 #include "tunable_nd.h"
 #include "instantiate.h"
+#include <shmem_helper.cuh>
 #include "kernels/dslash_shmem_helper.cuh"
 
 namespace quda {
@@ -25,16 +23,22 @@ namespace quda {
 
     // for shmem lightweight sync
     shmem_sync_t sync_counter = 10;
-    shmem_sync_t get_shmem_sync_counter() { return sync_counter; }
-    shmem_sync_t set_shmem_sync_counter(shmem_sync_t count) { return sync_counter = count; }
-    shmem_sync_t inc_shmem_sync_counter() { return sync_counter++; }
+    shmem_sync_t sync_counter2 = 10;
+    shmem_sync_t get_dslash_shmem_sync_counter() { return sync_counter; }
+    shmem_sync_t set_dslash_shmem_sync_counter(shmem_sync_t count) { return sync_counter = count; }
+    shmem_sync_t inc_dslash_shmem_sync_counter() { return ++sync_counter; }
+    shmem_sync_t get_exchangeghost_shmem_sync_counter() { return sync_counter2; }
+    shmem_sync_t set_exchangeghost_shmem_sync_counter(shmem_sync_t count) { return sync_counter2 = count; }
+    shmem_sync_t inc_exchangeghost_shmem_sync_counter() { return ++sync_counter2; }
+
 #ifdef NVSHMEM_COMMS
     shmem_sync_t *sync_arr = nullptr;
     shmem_retcount_intra_t *_retcount_intra = nullptr;
     shmem_retcount_inter_t *_retcount_inter = nullptr;
     shmem_interior_done_t *_interior_done = nullptr;
     shmem_interior_count_t *_interior_count = nullptr;
-    shmem_sync_t *get_shmem_sync_arr() { return sync_arr; }
+    shmem_sync_t *get_dslash_shmem_sync_arr() { return sync_arr; }
+    shmem_sync_t *get_exchangeghost_shmem_sync_arr() { return sync_arr + 2 * QUDA_MAX_DIM; }
     shmem_retcount_intra_t *get_shmem_retcount_intra() { return _retcount_intra; }
     shmem_retcount_inter_t *get_shmem_retcount_inter() { return _retcount_inter; }
     shmem_interior_done_t *get_shmem_interior_done() { return _interior_done; }
@@ -111,6 +115,31 @@ namespace quda {
     }
   };
 
+#ifdef NVSHMEM_COMMS
+  template <typename T> struct dslash_shmem_signal_wait : public TunableKernel1D {
+
+    long long bytes() const { return 0; }
+    unsigned int minThreads() const { return 8; }
+
+    dslash_shmem_signal_wait() : TunableKernel1D(8, QUDA_CUDA_FIELD_LOCATION) { }
+
+    void apply(const qudaStream_t &stream)
+    {
+      auto tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      launch_device<shmem_signal_wait>(tp, stream, shmem_signal_wait_arg<T>());
+    }
+  };
+
+  namespace dslash
+  {
+    void shmem_signal_wait_all()
+    {
+      dslash_shmem_signal_wait<quda::dslash::shmem_sync_t> d;
+      d.apply(device::get_default_stream());
+    }
+  } // namespace dslash
+#endif
+
   void createDslashEvents()
   {
     using namespace dslash;
@@ -123,11 +152,11 @@ namespace quda {
       dslashStart[i] = qudaEventCreate();
     }
 #ifdef NVSHMEM_COMMS
-    sync_arr = static_cast<shmem_sync_t *>(device_comms_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_sync_t)));
+    sync_arr = static_cast<shmem_sync_t *>(device_comms_pinned_malloc(4 * QUDA_MAX_DIM * sizeof(shmem_sync_t)));
 
     // initialize to 9 here so where we need to do tuning we can skip
     // the wait if necessary by using smaller values
-    init_arr<shmem_sync_t>(sync_arr, static_cast<shmem_sync_t>(9), 2 * QUDA_MAX_DIM);
+    init_arr<shmem_sync_t>(sync_arr, static_cast<shmem_sync_t>(9), 4 * QUDA_MAX_DIM);
     sync_counter = 10;
 
     // atomic for controlling signaling in nvshmem packing
