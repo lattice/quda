@@ -5340,7 +5340,7 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
 }
  
 
-void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double width, const int compute_2link, const int t0 /*=-1*/)
+void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double width, const int compute_2link = 1, const int delete_2link = 0, const int t0 = -1)
 {
   if(n_steps == 0) return;
   
@@ -5481,6 +5481,12 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   delete in;
   delete in_h;
   delete d;
+
+  if( delete_2link != 0 )
+  {
+    delete gaugeSmeared;
+    gaugeSmeared = nullptr;
+  }
 
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_TOTAL);

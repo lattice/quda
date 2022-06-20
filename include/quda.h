@@ -1656,11 +1656,13 @@ extern "C" {
    *                    and operator which will be applied to the spinor
    * @param n_steps     Number of steps to apply
    * @param width       The width of the Gaussian
-   * @param compute_2link nonzero to compute two-link gauge and save to gaugeSmeared,
-   *                      zero to reuse gaugeSmeared
+   * @param compute_2link nonzero to compute two-link,
+   *                      zero to reuse gaugeSmeared (default = 1)
+   * @param delete_2link nonzero to delete two-link after smearing,
+   *                     zero to keep two-link for future use (default = 0)
    * @param t0          Set if the input spinor is on a time slice (default = -1)
    */
-  void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double width, const int compute_2link, const int t0);  
+  void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double width, const int compute_2link /*= 1*/, const int delete_2link /*= 0*/, const int t0 /*= -1*/);
 
 #ifdef __cplusplus
 }
