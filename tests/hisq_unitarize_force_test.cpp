@@ -26,7 +26,7 @@ quda::cpuGaugeField *cpuReference = NULL;
 static QudaGaugeParam gaugeParam;
 
 // Create a field of links that are not su3_matrices
-void createNoisyLinkCPU(void **field, QudaPrecision prec, int seed)
+void createNoisyLinkCPU(void *const *field, QudaPrecision prec, int seed)
 {
   createSiteLinkCPU(field, prec, 0);
 
@@ -77,8 +77,8 @@ static void hisq_force_init()
   seed += quda::comm_rank();
 #endif
 
-  createNoisyLinkCPU((void **)cpuFatLink->Gauge_p(), gaugeParam.cpu_prec, seed);
-  createNoisyLinkCPU((void **)cpuOprod->Gauge_p(), gaugeParam.cpu_prec, seed + 1);
+  createNoisyLinkCPU(cpuFatLink->data<void *const *>(), gaugeParam.cpu_prec, seed);
+  createNoisyLinkCPU(cpuOprod->data<void *const *>(), gaugeParam.cpu_prec, seed + 1);
 
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.setPrecision(gaugeParam.cuda_prec, true);
@@ -142,7 +142,7 @@ TEST(hisq_force_unitarize, verify)
 
   double accuracy = prec == QUDA_DOUBLE_PRECISION ? 1e-10 : 1e-5;
   for (int dir = 0; dir < 4; ++dir) {
-    res[dir] = compare_floats(((char **)cpuReference->Gauge_p())[dir], ((char **)cpuResult->Gauge_p())[dir],
+    res[dir] = compare_floats(cpuReference->data<void *const *>()[dir], cpuResult->data<void *const *>()[dir],
                               cpuReference->Volume() * gauge_site_size, accuracy, gaugeParam.cpu_prec);
 
     quda::comm_allreduce_int(res[dir]);

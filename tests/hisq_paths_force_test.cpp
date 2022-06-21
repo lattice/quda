@@ -169,7 +169,7 @@ static void hisq_force_init()
   cpuGauge_ex = new cpuGaugeField(gParam_ex);
 
   if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
-    createSiteLinkCPU((void **)cpuGauge->Gauge_p(), qudaGaugeParam.cpu_prec, 1);
+    createSiteLinkCPU(cpuGauge->data<void *const *>(), qudaGaugeParam.cpu_prec, 1);
   } else {
     errorQuda("Unsupported gauge order %d", gauge_order);
   }
@@ -221,8 +221,6 @@ static void hisq_force_init()
   cpuMom = new cpuGaugeField(gParam);
   refMom = new cpuGaugeField(gParam);
 
-  // createMomCPU(cpuMom->Gauge_p(), mom_prec);
-
   hw = safe_malloc(4 * cpuGauge->Volume() * hw_site_size * qudaGaugeParam.cpu_prec);
 
   createHwCPU(hw, hw_prec);
@@ -232,9 +230,9 @@ static void hisq_force_init()
   gParam.order = gauge_order;
   gParam.pad = 0;
   cpuOprod = new cpuGaugeField(gParam);
-  computeLinkOrderedOuterProduct(hw, cpuOprod->Gauge_p(), hw_prec, 1, gauge_order);
+  computeLinkOrderedOuterProduct(hw, cpuOprod->data(), hw_prec, 1, gauge_order);
   cpuLongLinkOprod = new cpuGaugeField(gParam);
-  computeLinkOrderedOuterProduct(hw, cpuLongLinkOprod->Gauge_p(), hw_prec, 3, gauge_order);
+  computeLinkOrderedOuterProduct(hw, cpuLongLinkOprod->data(), hw_prec, 3, gauge_order);
 
   gParam_ex.location = QUDA_CPU_FIELD_LOCATION;
   gParam_ex.link_type = QUDA_GENERAL_LINKS;
@@ -366,10 +364,9 @@ static int hisq_force_test(void)
 
   int accuracy_level = 3;
   if (verify_results) {
-    int res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume() * mom_site_size, 1e-5,
+    int res = compare_floats(cpuMom->data(), refMom->data(), 4 * cpuMom->Volume() * mom_site_size, 1e-5,
                              qudaGaugeParam.cpu_prec);
-    accuracy_level
-      = strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume(), qudaGaugeParam.cpu_prec);
+    accuracy_level = strong_check_mom(cpuMom->data(), refMom->data(), 4 * cpuMom->Volume(), qudaGaugeParam.cpu_prec);
     printfQuda("Test %s\n", (1 == res) ? "PASSED" : "FAILED");
   }
   double total_io;

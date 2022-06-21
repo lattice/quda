@@ -126,8 +126,8 @@ void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, 
   }   // right-hand-side
 }
 
-void staggeredDslash(ColorSpinorField &out, void **fatlink, void **longlink, void **ghost_fatlink,
-                     void **ghost_longlink, const ColorSpinorField &in, int oddBit, int daggerBit,
+void staggeredDslash(ColorSpinorField &out, void *const *fatlink, void *const *longlink, void *const *ghost_fatlink,
+                     void *const *ghost_longlink, const ColorSpinorField &in, int oddBit, int daggerBit,
                      QudaPrecision sPrecision, QudaPrecision gPrecision, QudaDslashType dslash_type)
 {
   const int nSrc = in.X(4);
@@ -144,8 +144,8 @@ void staggeredDslash(ColorSpinorField &out, void **fatlink, void **longlink, voi
 
   in.exchangeGhost(otherparity, nFace, daggerBit);
 
-  void **fwd_nbr_spinor = in.fwdGhostFaceBuffer;
-  void **back_nbr_spinor = in.backGhostFaceBuffer;
+  auto fwd_nbr_spinor = in.fwdGhostFaceBuffer;
+  auto back_nbr_spinor = in.backGhostFaceBuffer;
 
   if (sPrecision == QUDA_DOUBLE_PRECISION) {
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
@@ -170,8 +170,8 @@ void staggeredDslash(ColorSpinorField &out, void **fatlink, void **longlink, voi
   }
 }
 
-void staggeredMatDagMat(ColorSpinorField &out, void **fatlink, void **longlink, void **ghost_fatlink,
-                        void **ghost_longlink, const ColorSpinorField &in, double mass, int dagger_bit,
+void staggeredMatDagMat(ColorSpinorField &out, void *const *fatlink, void *const *longlink, void *const *ghost_fatlink,
+                        void *const *ghost_longlink, const ColorSpinorField &in, double mass, int dagger_bit,
                         QudaPrecision sPrecision, QudaPrecision gPrecision, ColorSpinorField &tmp, QudaParity parity,
                         QudaDslashType dslash_type)
 {

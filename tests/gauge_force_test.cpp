@@ -116,7 +116,7 @@ void gauge_force_test(bool compute_force = true)
   auto U_qdp = new quda::cpuGaugeField(param);
 
   // fills the gauge field with random numbers
-  createSiteLinkCPU((void **)U_qdp->Gauge_p(), gauge_param.cpu_prec, 0);
+  createSiteLinkCPU(U_qdp->data<void *const *>(), gauge_param.cpu_prec, 0);
 
   param.order = QUDA_MILC_GAUGE_ORDER;
   auto U_milc = new quda::cpuGaugeField(param);
@@ -134,7 +134,7 @@ void gauge_force_test(bool compute_force = true)
 
   // initialize some data in cpuMom
   if (compute_force) {
-    createMomCPU(Mom_ref_milc->Gauge_p(), gauge_param.cpu_prec);
+    createMomCPU(Mom_ref_milc->data(), gauge_param.cpu_prec);
     if (gauge_order == QUDA_MILC_GAUGE_ORDER) Mom_milc->copy(*Mom_ref_milc);
     if (gauge_order == QUDA_QDP_GAUGE_ORDER) Mom_qdp->copy(*Mom_ref_milc);
   }
@@ -142,11 +142,11 @@ void gauge_force_test(bool compute_force = true)
   void *sitelink = nullptr;
 
   if (gauge_order == QUDA_MILC_GAUGE_ORDER) {
-    sitelink = U_milc->Gauge_p();
-    mom = Mom_milc->Gauge_p();
+    sitelink = U_milc->data();
+    mom = Mom_milc->data();
   } else if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
-    sitelink = U_qdp->Gauge_p();
-    mom = Mom_qdp->Gauge_p();
+    sitelink = U_qdp->data();
+    mom = Mom_qdp->data();
   } else {
     errorQuda("Unsupported gauge order %d", gauge_order);
   }
@@ -180,14 +180,14 @@ void gauge_force_test(bool compute_force = true)
   // The number comes from CPU implementation in MILC, gauge_force_imp.c
   int flops = 153004;
 
-  void *refmom = Mom_ref_milc->Gauge_p();
+  void *refmom = Mom_ref_milc->data();
   int *check_out = compute_force ? &force_check : &path_check;
   if (verify_results) {
-    gauge_force_reference(refmom, eb3, (void **)U_qdp->Gauge_p(), gauge_param.cpu_prec, input_path_buf, length,
+    gauge_force_reference(refmom, eb3, U_qdp->data<void *const *>(), gauge_param.cpu_prec, input_path_buf, length,
                           loop_coeff, num_paths, compute_force);
-    *check_out = compare_floats(Mom_milc->Gauge_p(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec),
-                                gauge_param.cpu_prec);
-    if (compute_force) strong_check_mom(Mom_milc->Gauge_p(), refmom, 4 * V, gauge_param.cpu_prec);
+    *check_out
+      = compare_floats(Mom_milc->data(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec), gauge_param.cpu_prec);
+    if (compute_force) strong_check_mom(Mom_milc->data(), refmom, 4 * V, gauge_param.cpu_prec);
   }
 
   if (compute_force) {

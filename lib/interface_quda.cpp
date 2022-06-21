@@ -3324,11 +3324,11 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     // the split topology.
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printfQuda("Split grid loading gauge field...\n"); }
     if (!is_staggered) {
-      loadGaugeQuda(collected_gauge->Gauge_p(), gauge_param);
+      loadGaugeQuda(collected_gauge->data(), gauge_param);
     } else {
       // freeGaugeQuda();
-      loadFatLongGaugeQuda(param, gauge_param, collected_milc_fatlink_field->Gauge_p(),
-                           collected_milc_longlink_field->Gauge_p());
+      loadFatLongGaugeQuda(param, gauge_param, collected_milc_fatlink_field->data(),
+                           collected_milc_longlink_field->data());
     }
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printfQuda("Split grid loaded gauge field...\n"); }
 
@@ -4619,7 +4619,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   if (*num_failures_h>0) errorQuda("Error in the unitarization component of the hisq fermion force: %d failures\n", *num_failures_h);
 
-  qudaMemset((void **)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
+  cudaOutForce->zero();
 
   // read in u-link
   cudaGauge->loadCPUField(cpuULink, profileHISQForce);

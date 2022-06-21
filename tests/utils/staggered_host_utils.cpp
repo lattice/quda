@@ -490,7 +490,7 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
   unitarizeLinksCPU(*cpuWLink, *cpuVLink);
 
   // Copy back into "w_reflink"
-  reorderMILCtoQDP(w_reflink, cpuWLink->Gauge_p(), V, gauge_site_size, prec, prec);
+  reorderMILCtoQDP(w_reflink, cpuWLink->data(), V, gauge_site_size, prec, prec);
 
   // Clean up cpuGaugeFields, we don't need them anymore.
   delete cpuVLink;

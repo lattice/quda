@@ -42,8 +42,8 @@ TEST(unitarization, verify)
   unitarizeLinksCPU(*cpuULink, *cpuFatLink);
   cudaULink->saveCPUField(*cudaResult);
 
-  int res = compare_floats(cudaResult->Gauge_p(), cpuULink->Gauge_p(), 4 * cudaResult->Volume() * gauge_site_size,
-                           unittol, cpu_prec);
+  int res = compare_floats(cudaResult->data(), cpuULink->data(), 4 * cudaResult->Volume() * gauge_site_size, unittol,
+                           cpu_prec);
 
 #ifdef MULTI_GPU
   quda::comm_allreduce_int(res);

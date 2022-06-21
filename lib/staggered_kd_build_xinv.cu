@@ -245,11 +245,11 @@ namespace quda {
         
         X_.copy(X);
 
-        blas::flops += invert((void*)xInvMilcOrder->Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X.Location());
+        blas::flops += invert(xInvMilcOrder->data(), X_.data(), n, X_.Volume(), X_.Precision(), X.Location());
 
       } else if (location == QUDA_CPU_FIELD_LOCATION) {
 
-        blas::flops += invert((void*)xInvMilcOrder->Gauge_p(), (void*)X.Gauge_p(), n, X.Volume(), X.Precision(), X.Location());
+        blas::flops += invert(xInvMilcOrder->data(), X.data(), n, X.Volume(), X.Precision(), X.Location());
       }
 
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("xInvMilcOrder = %e\n", xInvMilcOrder->norm2(0));

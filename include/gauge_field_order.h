@@ -355,10 +355,9 @@ namespace quda {
         scale(static_cast<Float>(1.0)),
         scale_inv(static_cast<Float>(1.0))
       {
-	for (int d=0; d<U.Geometry(); d++)
-	  u[d] = gauge_ ? static_cast<complex<storeFloat>**>(gauge_)[d] :
-	    static_cast<complex<storeFloat>**>(const_cast<void*>(U.Gauge_p()))[d];
-	resetScale(U.Scale());
+        for (int d = 0; d < U.Geometry(); d++)
+          u[d] = gauge_ ? static_cast<complex<storeFloat> **>(gauge_)[d] : U.data<complex<storeFloat> *const *>()[d];
+        resetScale(U.Scale());
       }
 
       void resetScale(Float max)
@@ -466,8 +465,7 @@ namespace quda {
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
 
       Accessor(const GaugeField &U, void *gauge_ = nullptr, void ** = nullptr) :
-        u(gauge_ ? static_cast<complex<storeFloat> *>(gauge_) :
-                   static_cast<complex<storeFloat> *>(const_cast<void *>(U.Gauge_p()))),
+        u(gauge_ ? static_cast<complex<storeFloat> *>(gauge_) : U.data<complex<storeFloat> *>()),
         volumeCB(U.VolumeCB()),
         geometry(U.Geometry()),
         scale(static_cast<Float>(1.0)),
@@ -601,8 +599,7 @@ namespace quda {
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
 
       Accessor(const GaugeField &U, void *gauge_ = nullptr, void ** = nullptr) :
-        u(gauge_ ? static_cast<complex<storeFloat> *>(gauge_) :
-                   static_cast<complex<storeFloat> *>(const_cast<void *>(U.Gauge_p()))),
+        u(gauge_ ? static_cast<complex<storeFloat> *>(gauge_) : U.data<complex<storeFloat> *>()),
         offset_cb((U.Bytes() >> 1) / sizeof(complex<storeFloat>)),
         volumeCB(U.VolumeCB()),
         stride(U.Stride()),
@@ -1512,7 +1509,7 @@ namespace quda {
 
         FloatNOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
           reconstruct(u),
-          gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
+          gauge(gauge_ ? gauge_ : u.data<Float *>()),
           offset(u.Bytes() / (2 * sizeof(Float) * N)),
           ghostExchange(u.GhostExchange()),
           volumeCB(u.VolumeCB()),
@@ -1829,7 +1826,9 @@ namespace quda {
       const int volumeCB;
     QDPOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
       : LegacyOrder<Float,length>(u, ghost_), volumeCB(u.VolumeCB())
-	{ for (int i=0; i<4; i++) gauge[i] = gauge_ ? ((Float**)gauge_)[i] : ((Float**)u.Gauge_p())[i]; }
+    {
+      for (int i = 0; i < 4; i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *const *>()[i];
+    }
 
         __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
         {
@@ -1873,7 +1872,9 @@ namespace quda {
       const int volumeCB;
     QDPJITOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
       : LegacyOrder<Float,length>(u, ghost_), volumeCB(u.VolumeCB())
-	{ for (int i=0; i<4; i++) gauge[i] = gauge_ ? ((Float**)gauge_)[i] : ((Float**)u.Gauge_p())[i]; }
+    {
+      for (int i = 0; i < 4; i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *const *>()[i];
+    }
 
         __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
         {
@@ -1920,9 +1921,14 @@ namespace quda {
     Float *gauge;
     const int volumeCB;
     const int geometry;
-  MILCOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) :
-    LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
-      volumeCB(u.VolumeCB()), geometry(u.Geometry()) { ; }
+    MILCOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
+      LegacyOrder<Float, length>(u, ghost_),
+      gauge(gauge_ ? gauge_ : u.data<Float *>()),
+      volumeCB(u.VolumeCB()),
+      geometry(u.Geometry())
+    {
+      ;
+    }
 
   __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
   {
@@ -1980,7 +1986,7 @@ namespace quda {
     const size_t size;
     MILCSiteOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
       LegacyOrder<Float, length>(u, ghost_),
-      gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
+      gauge(gauge_ ? gauge_ : u.data<Float *>()),
       volumeCB(u.VolumeCB()),
       geometry(u.Geometry()),
       offset(u.SiteOffset()),
@@ -2040,7 +2046,7 @@ namespace quda {
     const int geometry;
     CPSOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
       LegacyOrder<Float, length>(u, ghost_),
-      gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
+      gauge(gauge_ ? gauge_ : u.data<Float *>()),
       volumeCB(u.VolumeCB()),
       anisotropy(u.Anisotropy()),
       anisotropy_inv(1.0 / anisotropy),
@@ -2106,9 +2112,7 @@ namespace quda {
       int exVolumeCB; // extended checkerboard volume
       static constexpr int Nc = 3;
       BQCDOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
-        LegacyOrder<Float, length>(u, ghost_),
-        gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
-        volumeCB(u.VolumeCB())
+        LegacyOrder<Float, length>(u, ghost_), gauge(gauge_ ? gauge_ : u.data<Float *>()), volumeCB(u.VolumeCB())
       {
         if constexpr (length != 18) errorQuda("Gauge length %d not supported", length);
         // compute volumeCB + halo region
@@ -2172,7 +2176,7 @@ namespace quda {
       const real scale_inv;
       TIFROrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
         LegacyOrder<Float, length>(u, ghost_),
-        gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
+        gauge(gauge_ ? gauge_ : u.data<Float *>()),
         volumeCB(u.VolumeCB()),
         scale(u.Scale()),
         scale_inv(1.0 / scale)
@@ -2239,7 +2243,7 @@ namespace quda {
       const int exDim[4];
       TIFRPaddedOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
         LegacyOrder<Float, length>(u, ghost_),
-        gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
+        gauge(gauge_ ? gauge_ : u.data<Float *>()),
         volumeCB(u.VolumeCB()),
         exVolumeCB(1),
         scale(u.Scale()),

@@ -29,12 +29,16 @@ namespace quda {
 
   GaugeField::GaugeField(const GaugeFieldParam &param) :
     LatticeField(param),
+    gauge(nullptr),
+    gauge_h(nullptr),
+    gauge_qdp {},
     bytes(0),
     phase_offset(0),
     phase_bytes(0),
     nColor(param.nColor),
     nFace(param.nFace),
     geometry(param.geometry),
+    site_dim(1),
     reconstruct(param.reconstruct),
     nInternal(reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2),
     order(param.order),
@@ -102,6 +106,19 @@ namespace quda {
       if (isNative()) bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     }
     total_bytes = bytes;
+
+    if (geometry == QUDA_SCALAR_GEOMETRY)
+      site_dim = 1;
+    else if (geometry == QUDA_VECTOR_GEOMETRY)
+      site_dim = nDim;
+    else if (geometry == QUDA_TENSOR_GEOMETRY)
+      site_dim = nDim * (nDim - 1) / 2;
+    else if (geometry == QUDA_COARSE_GEOMETRY)
+      site_dim = 2 * nDim;
+    else if (geometry == QUDA_KDINVERSE_GEOMETRY)
+      site_dim = 1 << nDim;
+    else
+      errorQuda("Unknown geometry type %d", geometry);
 
     setTuningString();
   }
@@ -296,6 +313,19 @@ namespace quda {
     return output;  // for multiple << operators.
   }
 
+  void GaugeField::zero()
+  {
+    if (location == QUDA_CUDA_FIELD_LOCATION) {
+      qudaMemset(gauge, 0, bytes);
+    } else {
+      if (order != QUDA_QDP_GAUGE_ORDER) {
+        memset(gauge, 0, bytes);
+      } else {
+        for (int g = 0; g < geometry; g++) memset(gauge_qdp[g], 0, volume * nInternal * precision);
+      }
+    }
+  }
+
   ColorSpinorParam colorSpinorParam(const GaugeField &a) {
    if (a.FieldOrder() == QUDA_QDP_GAUGE_ORDER || a.FieldOrder() == QUDA_QDPJIT_GAUGE_ORDER)
      errorQuda("Not implemented for this order %d", a.FieldOrder());
@@ -318,7 +348,7 @@ namespace quda {
     spinor_param.setPrecision(a.Precision(), a.Precision(), true);
     spinor_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
-    spinor_param.v = (void*)a.Gauge_p();
+    spinor_param.v = a.data();
     spinor_param.location = a.Location();
     return spinor_param;
   }
@@ -415,6 +445,68 @@ namespace quda {
     padded_cpu->exchangeExtendedGhost(R, true); // Do comm to fill halo = true
 
     return padded_cpu;
+  }
+
+  void GaugeField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
+  {
+    if (location == QUDA_CUDA_FIELD_LOCATION && is_prefetch_enabled() && mem_type == QUDA_MEMORY_DEVICE) {
+      if (gauge) qudaMemPrefetchAsync(gauge, bytes, mem_space, stream);
+      if (!isNative()) {
+        for (int i = 0; i < nDim; i++) {
+          size_t nbytes = nFace * surface[i] * nInternal * precision;
+          if (ghost[i] && nbytes) qudaMemPrefetchAsync(ghost[i], nbytes, mem_space, stream);
+          if (ghost[i + 4] && nbytes && geometry == QUDA_COARSE_GEOMETRY)
+            qudaMemPrefetchAsync(ghost[i + 4], nbytes, mem_space, stream);
+        }
+      }
+    }
+  }
+
+  void GaugeField::backup() const
+  {
+    if (backed_up) errorQuda("Gauge field already backed up");
+
+    if (location == QUDA_CUDA_FIELD_LOCATION) {
+      backup_h = new char[bytes];
+      qudaMemcpy(backup_h, gauge, bytes, qudaMemcpyDefault);
+    } else {
+      if (order == QUDA_QDP_GAUGE_ORDER) {
+        char **buffer = new char *[geometry];
+        for (int d = 0; d < geometry; d++) {
+          buffer[d] = new char[bytes / geometry];
+          memcpy(buffer[d], gauge_qdp[d], bytes / geometry);
+        }
+        backup_h = reinterpret_cast<char *>(buffer);
+      } else {
+        backup_h = new char[bytes];
+        memcpy(backup_h, gauge, bytes);
+      }
+    }
+
+    backed_up = true;
+  }
+
+  void GaugeField::restore() const
+  {
+    if (!backed_up) errorQuda("Cannot restore since not backed up");
+
+    if (location == QUDA_CUDA_FIELD_LOCATION) {
+      qudaMemcpy(gauge, backup_h, bytes, qudaMemcpyDefault);
+      delete[] backup_h;
+    } else {
+      if (order == QUDA_QDP_GAUGE_ORDER) {
+        char **buffer = reinterpret_cast<char **>(backup_h);
+        for (int d = 0; d < geometry; d++) {
+          memcpy(gauge_qdp[d], buffer[d], bytes / geometry);
+          delete[] buffer[d];
+        }
+        delete[] buffer;
+      } else {
+        memcpy(gauge, backup_h, bytes);
+        delete[] backup_h;
+      }
+    }
+    backed_up = false;
   }
 
 } // namespace quda

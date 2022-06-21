@@ -159,7 +159,7 @@ int main(int argc, char **argv)
       gauge_param.gauge_order = gauge->Order();
       gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
 
-      loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
+      loadGaugeQuda(gauge->data(), &gauge_param);
     }
 
     QudaGaugeObservableParam param = newQudaGaugeObservableParam();
@@ -189,7 +189,7 @@ int main(int argc, char **argv)
     gauge_param.gauge_order = gauge->Order();
     gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
 
-    loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
+    loadGaugeQuda(gauge->data(), &gauge_param);
     gaugeObservablesQuda(&param);
     printfQuda("step=0 plaquette = %e topological charge = %e\n", param.plaquette[0], param.qcharge);
 
@@ -205,7 +205,7 @@ int main(int argc, char **argv)
       // copy into regular field
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
-      loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
+      loadGaugeQuda(gauge->data(), &gauge_param);
       gaugeObservablesQuda(&param);
       printfQuda("step=%d plaquette = %e topological charge = %e\n", step, param.plaquette[0], param.qcharge);
 

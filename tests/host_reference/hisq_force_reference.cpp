@@ -1266,12 +1266,12 @@ void hisqStaplesForceCPU(const double *path_coeff, const QudaGaugeParam &param, 
   act_path_coeff.lepage = path_coeff[5];
 
   if (param.cpu_prec == QUDA_DOUBLE_PRECISION) {
-    doHisqStaplesForceCPU<double>(param.X, act_path_coeff, (double *)oprod.Gauge_p(), (double *)link.Gauge_p(),
-                                  (double **)tempmat, (double *)newOprod->Gauge_p());
+    doHisqStaplesForceCPU<double>(param.X, act_path_coeff, oprod.data<double *>(), link.data<double *>(),
+                                  (double **)tempmat, newOprod->data<double *>());
 
   } else if (param.cpu_prec == QUDA_SINGLE_PRECISION) {
-    doHisqStaplesForceCPU<float>(param.X, act_path_coeff, (float *)oprod.Gauge_p(), (float *)link.Gauge_p(),
-                                 (float **)tempmat, (float *)newOprod->Gauge_p());
+    doHisqStaplesForceCPU<float>(param.X, act_path_coeff, oprod.data<float *>(), link.data<float *>(),
+                                 (float **)tempmat, newOprod->data<float *>());
   } else {
     errorQuda("Unsupported precision");
   }
@@ -1350,11 +1350,11 @@ void hisqLongLinkForceCPU(double coeff, const QudaGaugeParam &param, quda::cpuGa
 {
   for (int sig = 0; sig < 4; ++sig) {
     if (param.cpu_prec == QUDA_SINGLE_PRECISION) {
-      computeLongLinkField<float>(param.X, (float *)oprod.Gauge_p(), (float *)link.Gauge_p(), sig, coeff,
-                                  (float *)newOprod->Gauge_p());
+      computeLongLinkField<float>(param.X, (float *)oprod.data<float *>(), link.data<float *>(), sig, coeff,
+                                  newOprod->data<float *>());
     } else if (param.cpu_prec == QUDA_DOUBLE_PRECISION) {
-      computeLongLinkField<double>(param.X, (double *)oprod.Gauge_p(), (double *)link.Gauge_p(), sig, coeff,
-                                   (double *)newOprod->Gauge_p());
+      computeLongLinkField<double>(param.X, oprod.data<double *>(), link.data<double *>(), sig, coeff,
+                                   newOprod->data<double *>());
     } else {
       errorQuda("Unrecognised precision\n");
     }
@@ -1405,10 +1405,9 @@ void hisqCompleteForceCPU(const QudaGaugeParam &param, quda::cpuGaugeField &opro
 {
   for (int sig = 0; sig < 4; ++sig) {
     if (param.cpu_prec == QUDA_SINGLE_PRECISION) {
-      completeForceField<float>(param.X, (float *)oprod.Gauge_p(), (float *)link.Gauge_p(), sig, (float *)mom->Gauge_p());
+      completeForceField<float>(param.X, oprod.data<float *>(), link.data<float *>(), sig, mom->data<float *>());
     } else if (param.cpu_prec == QUDA_DOUBLE_PRECISION) {
-      completeForceField<double>(param.X, (double *)oprod.Gauge_p(), (double *)link.Gauge_p(), sig,
-                                 (double *)mom->Gauge_p());
+      completeForceField<double>(param.X, oprod.data<double *>(), link.data<double *>(), sig, mom->data<double *>());
     } else {
       errorQuda("Unrecognised precision\n");
     }

@@ -746,8 +746,8 @@ void mdw_eofa_m5inv(void *res, void *spinorField, int oddBit, int daggerBit, dou
 
 // this actually applies the preconditioned dslash, e.g., D_ee^{-1} D_eo or D_oo^{-1} D_oe
 #ifndef MULTI_GPU
-void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision, QudaGaugeParam &,
-               double mferm)
+void dw_dslash(void *out, void *const *gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision,
+               QudaGaugeParam &, double mferm)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     dslashReference_4d_sgpu<QUDA_5D_PC>((double *)out, (double **)gauge, (double *)in, oddBit, daggerBit);
@@ -758,10 +758,10 @@ void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qud
   }
 }
 #else
-void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision,
+void dw_dslash(void *out, void *const *gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision,
                QudaGaugeParam &gauge_param, double mferm)
 {
-  GaugeFieldParam gauge_field_param(gauge_param, gauge);
+  GaugeFieldParam gauge_field_param(gauge_param, (void **)gauge);
   gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuGaugeField cpu(gauge_field_param);
   void **ghostGauge = (void **)cpu.Ghost();
@@ -815,7 +815,7 @@ void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qud
 #endif
 
 #ifndef MULTI_GPU
-void dslash_4_4d(void *out, void **gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision,
+void dslash_4_4d(void *out, void *const *gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision,
                  QudaGaugeParam &, double)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
@@ -825,10 +825,10 @@ void dslash_4_4d(void *out, void **gauge, void *in, int oddBit, int daggerBit, Q
   }
 }
 #else
-void dslash_4_4d(void *out, void **gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision,
+void dslash_4_4d(void *out, void *const *gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision,
                  QudaGaugeParam &gauge_param, double)
 {
-  GaugeFieldParam gauge_field_param(gauge_param, gauge);
+  GaugeFieldParam gauge_field_param(gauge_param, (void **)gauge);
   gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuGaugeField cpu(gauge_field_param);
   void **ghostGauge = (void **)cpu.Ghost();
@@ -879,8 +879,8 @@ void dslash_4_4d(void *out, void **gauge, void *in, int oddBit, int daggerBit, Q
 }
 #endif
 
-void dw_dslash_5_4d(void *out, void **, void *in, int oddBit, int daggerBit, QudaPrecision precision, QudaGaugeParam &,
-                    double mferm, bool zero_initialize)
+void dw_dslash_5_4d(void *out, void *const *, void *in, int oddBit, int daggerBit, QudaPrecision precision,
+                    QudaGaugeParam &, double mferm, bool zero_initialize)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     if (zero_initialize)
@@ -895,8 +895,8 @@ void dw_dslash_5_4d(void *out, void **, void *in, int oddBit, int daggerBit, Qud
   }
 }
 
-void dslash_5_inv(void *out, void **, void *in, int oddBit, int daggerBit, QudaPrecision precision, QudaGaugeParam &,
-                  double mferm, double *kappa)
+void dslash_5_inv(void *out, void *const *, void *in, int oddBit, int daggerBit, QudaPrecision precision,
+                  QudaGaugeParam &, double mferm, double *kappa)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     dslashReference_5th_inv((double *)out, (double *)in, oddBit, daggerBit, mferm, kappa);
@@ -905,7 +905,7 @@ void dslash_5_inv(void *out, void **, void *in, int oddBit, int daggerBit, QudaP
   }
 }
 
-void mdw_dslash_5_inv(void *out, void **, void *in, int oddBit, int daggerBit, QudaPrecision precision,
+void mdw_dslash_5_inv(void *out, void *const *, void *in, int oddBit, int daggerBit, QudaPrecision precision,
                       QudaGaugeParam &, double mferm, double _Complex *kappa)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
@@ -915,8 +915,8 @@ void mdw_dslash_5_inv(void *out, void **, void *in, int oddBit, int daggerBit, Q
   }
 }
 
-void mdw_dslash_5(void *out, void **, void *in, int oddBit, int daggerBit, QudaPrecision precision, QudaGaugeParam &,
-                  double mferm, double _Complex *kappa, bool zero_initialize)
+void mdw_dslash_5(void *out, void *const *, void *in, int oddBit, int daggerBit, QudaPrecision precision,
+                  QudaGaugeParam &, double mferm, double _Complex *kappa, bool zero_initialize)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
     if (zero_initialize)
@@ -935,7 +935,7 @@ void mdw_dslash_5(void *out, void **, void *in, int oddBit, int daggerBit, QudaP
   }
 }
 
-void mdw_dslash_4_pre(void *out, void **, void *in, int oddBit, int daggerBit, QudaPrecision precision,
+void mdw_dslash_4_pre(void *out, void *const *, void *in, int oddBit, int daggerBit, QudaPrecision precision,
                       QudaGaugeParam &, double mferm, double _Complex *b5, double _Complex *c5, bool zero_initialize)
 {
   if (precision == QUDA_DOUBLE_PRECISION) {
@@ -960,7 +960,7 @@ void mdw_dslash_4_pre(void *out, void **, void *in, int oddBit, int daggerBit, Q
   }
 }
 
-void dw_mat(void *out, void **gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision,
+void dw_mat(void *out, void *const *gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision,
             QudaGaugeParam &gauge_param, double mferm)
 {
 
@@ -976,7 +976,7 @@ void dw_mat(void *out, void **gauge, void *in, double kappa, int dagger_bit, Qud
   xpay(in, -kappa, out, V5 * spinor_site_size, precision);
 }
 
-void dw_4d_mat(void *out, void **gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision,
+void dw_4d_mat(void *out, void *const *gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision,
                QudaGaugeParam &gauge_param, double mferm)
 {
 
@@ -995,7 +995,7 @@ void dw_4d_mat(void *out, void **gauge, void *in, double kappa, int dagger_bit, 
   xpay(in, -kappa, out, V5 * spinor_site_size, precision);
 }
 
-void mdw_mat(void *out, void **gauge, void *in, double _Complex *kappa_b, double _Complex *kappa_c, int dagger,
+void mdw_mat(void *out, void *const *gauge, void *in, double _Complex *kappa_b, double _Complex *kappa_c, int dagger,
              QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm, double _Complex *b5, double _Complex *c5)
 {
   void *tmp = safe_malloc(V5h * spinor_site_size * precision);
@@ -1042,9 +1042,9 @@ void mdw_mat(void *out, void **gauge, void *in, double _Complex *kappa_b, double
   host_free(tmp);
 }
 
-void mdw_eofa_mat(void *out, void **gauge, void *in, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param,
-                  double mferm, double m5, double b, double c, double mq1, double mq2, double mq3, int eofa_pm,
-                  double eofa_shift)
+void mdw_eofa_mat(void *out, void *const *gauge, void *in, int dagger, QudaPrecision precision,
+                  QudaGaugeParam &gauge_param, double mferm, double m5, double b, double c, double mq1, double mq2,
+                  double mq3, int eofa_pm, double eofa_shift)
 {
   void *tmp = safe_malloc(V5h * spinor_site_size * precision);
 
@@ -1096,7 +1096,7 @@ void mdw_eofa_mat(void *out, void **gauge, void *in, int dagger, QudaPrecision p
   host_free(tmp);
 }
 //
-void dw_matdagmat(void *out, void **gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision,
+void dw_matdagmat(void *out, void *const *gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision,
                   QudaGaugeParam &gauge_param, double mferm)
 {
   void *tmp = safe_malloc(V5 * spinor_site_size * precision);
@@ -1108,7 +1108,7 @@ void dw_matdagmat(void *out, void **gauge, void *in, double kappa, int dagger_bi
   host_free(tmp);
 }
 
-void dw_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType matpc_type, int dagger_bit,
+void dw_matpc(void *out, void *const *gauge, void *in, double kappa, QudaMatPCType matpc_type, int dagger_bit,
               QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm)
 {
   void *tmp = safe_malloc(V5h * spinor_site_size * precision);
@@ -1128,7 +1128,7 @@ void dw_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType mat
   host_free(tmp);
 }
 
-void dw_4d_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType matpc_type, int dagger_bit,
+void dw_4d_matpc(void *out, void *const *gauge, void *in, double kappa, QudaMatPCType matpc_type, int dagger_bit,
                  QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm)
 {
   double kappa2 = -kappa * kappa;
@@ -1168,7 +1168,7 @@ void dw_4d_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType 
   host_free(kappa5);
 }
 
-void mdw_matpc(void *out, void **gauge, void *in, double _Complex *kappa_b, double _Complex *kappa_c,
+void mdw_matpc(void *out, void *const *gauge, void *in, double _Complex *kappa_b, double _Complex *kappa_c,
                QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm,
                double _Complex *b5, double _Complex *c5)
 {
@@ -1240,9 +1240,9 @@ void mdw_matpc(void *out, void **gauge, void *in, double _Complex *kappa_b, doub
   host_free(kappa_mdwf);
 }
 
-void mdw_eofa_matpc(void *out, void **gauge, void *in, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
-                    QudaGaugeParam &gauge_param, double mferm, double m5, double b, double c, double mq1, double mq2,
-                    double mq3, int eofa_pm, double eofa_shift)
+void mdw_eofa_matpc(void *out, void *const *gauge, void *in, QudaMatPCType matpc_type, int dagger,
+                    QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm, double m5, double b, double c,
+                    double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift)
 {
   void *tmp = safe_malloc(V5h * spinor_site_size * precision);
 
@@ -1311,14 +1311,14 @@ void mdw_eofa_matpc(void *out, void **gauge, void *in, QudaMatPCType matpc_type,
   host_free(tmp);
 }
 
-void mdw_mdagm_local(void *out, void **gauge, void *in, double _Complex *kappa_b, double _Complex *kappa_c,
+void mdw_mdagm_local(void *out, void *const *gauge, void *in, double _Complex *kappa_b, double _Complex *kappa_c,
                      QudaMatPCType matpc_type, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm,
                      double _Complex *b5, double _Complex *c5)
 {
   lat_dim_t R;
   for (int d = 0; d < 4; d++) { R[d] = comm_dim_partitioned(d) ? 2 : 0; }
 
-  cpuGaugeField *padded_gauge = createExtendedGauge(gauge, gauge_param, R);
+  cpuGaugeField *padded_gauge = createExtendedGauge((void **)gauge, gauge_param, R);
 
   int padded_V = 1;
   int W[4];
@@ -1357,7 +1357,7 @@ void mdw_mdagm_local(void *out, void **gauge, void *in, double _Complex *kappa_b
   QudaGaugeParam padded_gauge_param(gauge_param);
   for (int d = 0; d < 4; d++) { padded_gauge_param.X[d] += 2 * R[d]; }
 
-  void **padded_gauge_p = (void **)(padded_gauge->Gauge_p());
+  auto padded_gauge_p = padded_gauge->data<void *const *>();
 
   // Extend these global variables then restore them
   int V5_old = V5;
@@ -1458,7 +1458,7 @@ void MatPCDag(sFloat *outEven, gFloat **gauge, sFloat *inEven, sFloat kappa,
 }
 */
 
-void matpc(void *, void **, void *, double, QudaMatPCType, int, QudaPrecision, QudaPrecision, double)
+void matpc(void *, void *const *, void *, double, QudaMatPCType, int, QudaPrecision, QudaPrecision, double)
 {
   /*
     if (!dagger_bit) {
@@ -1513,7 +1513,7 @@ void MatPCDagMatPC(sFloat *out, gFloat **gauge, sFloat *in, sFloat kappa,
 }
 */
 // Wrapper to templates that handles different precisions.
-void matdagmat(void *, void **, void *, double, QudaPrecision, QudaPrecision, double)
+void matdagmat(void *, void *const *, void *, double, QudaPrecision, QudaPrecision, double)
 {
   /*
     if (sPrecision == QUDA_DOUBLE_PRECISION) {
@@ -1533,7 +1533,7 @@ void matdagmat(void *, void **, void *, double, QudaPrecision, QudaPrecision, do
 }
 
 // Wrapper to templates that handles different precisions.
-void matpcdagmatpc(void *, void **, void *, double, QudaPrecision, QudaPrecision, double, QudaMatPCType)
+void matpcdagmatpc(void *, void *const *, void *, double, QudaPrecision, QudaPrecision, double, QudaMatPCType)
 {
   /*
     if (sPrecision == QUDA_DOUBLE_PRECISION) {

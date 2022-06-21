@@ -195,6 +195,9 @@ namespace quda {
   class GaugeField : public LatticeField {
 
   protected:
+    void *gauge; /** The gauge field allocation */
+    void *gauge_h; /** Mapped-memory pointer when allocating on the host */
+    void **gauge_qdp; /** Array of pointers to each subset (QDP order) */
       size_t bytes;        // bytes allocated per full field
       size_t phase_offset; // offset in bytes to gauge phases - useful to keep track of texture alignment
       size_t phase_bytes;  // bytes needed to store the phases
@@ -203,6 +206,7 @@ namespace quda {
       int nColor;
       int nFace;
       QudaFieldGeometry geometry; // whether the field is a scale, vector or tensor
+      int site_dim; // the dimensionality of each site (number of matrices per lattice site)
 
       QudaReconstructType reconstruct;
       int nInternal; // number of degrees of freedom per link matrix
@@ -350,24 +354,46 @@ namespace quda {
 
     size_t TotalBytes() const { return bytes; }
 
-    virtual void* Gauge_p() { errorQuda("Not implemented"); return (void*)0;}
-    virtual void* Even_p() { errorQuda("Not implemented"); return (void*)0;}
-    virtual void* Odd_p() { errorQuda("Not implemented"); return (void*)0;}
+    /**
+       @brief Helper function that returns true if the gauge order is an array of pointers
+       @param[in] order The gauge order requested
+       @return If the order is an array of pointers
+     */
+    constexpr bool is_pointer_array(QudaGaugeFieldOrder order) const
+    {
+      switch (order) {
+      case QUDA_QDP_GAUGE_ORDER:
+      case QUDA_QDPJIT_GAUGE_ORDER:
+        return true;
+      default:
+        return false;
+      }
+    }
 
-    virtual const void* Gauge_p() const { errorQuda("Not implemented"); return (void*)0;}
-    virtual const void* Even_p() const { errorQuda("Not implemented"); return (void*)0;}
-    virtual const void* Odd_p() const { errorQuda("Not implemented"); return (void*)0;}
+    /**
+       @brief Return base pointer to the gauge field allocation.
+       @tparam T Optional type to cast the pointer to.
+       @return Base pointer to the gauge field allocation
+     */
+    template <typename T = void*> auto data() const
+    {
+      static_assert(std::is_pointer_v<T>, "data() requires a pointer cast type");
+
+      using U = typename std::remove_pointer<T>::type;
+      if constexpr (std::is_pointer_v<U>) {
+        if (!is_pointer_array(order)) errorQuda("Dim-array ordered field requested but order is %d", order);
+        return reinterpret_cast<T>(gauge_qdp);
+      } else {
+        if (is_pointer_array(order) && !std::is_same_v<T, void*>) errorQuda("Non dim-array ordered field requested but order is %d", order);
+        return reinterpret_cast<T>(gauge);
+      }
+    }
 
     virtual int full_dim(int d) const { return x[d]; }
 
-    const void** Ghost() const {
+    auto Ghost() const {
       if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
-      return (const void**)ghost;
-    }
-
-    void** Ghost() {
-      if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
-      return ghost;
+      return (void * const *)ghost;
     }
 
     /**
@@ -383,9 +409,9 @@ namespace quda {
     size_t SiteSize() const { return site_size; }
 
     /**
-       Set all field elements to zero (virtual)
+       Set all field elements to zero
     */
-    virtual void zero() = 0;
+    void zero();
 
     /**
      * Generic gauge field copy
@@ -439,15 +465,28 @@ namespace quda {
     */
     static GaugeField* Create(const GaugeFieldParam &param);
 
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      the gauge field and buffers to the CPU or the GPU
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
+
+    /**
+       @brief Backs up the GaugeField
+    */
+    void backup() const;
+
+    /**
+       @brief Restores the GaugeField
+    */
+    void restore() const;
   };
 
   class cudaGaugeField : public GaugeField {
 
   private:
-    void *gauge;
-    void *gauge_h; // mapped-memory pointer when allocating on the host
-    void *even;
-    void *odd;
 
     /**
        @brief Initialize the padded region to 0
@@ -571,15 +610,6 @@ namespace quda {
     */
     void saveCPUField(cpuGaugeField &cpu, TimeProfile &profile) const;
 
-    // (ab)use with care
-    void* Gauge_p() { return gauge; }
-    void* Even_p() { return even; }
-    void* Odd_p() { return odd; }
-
-    const void* Gauge_p() const { return gauge; }
-    const void* Even_p() const { return even; }
-    const void *Odd_p() const { return odd; }
-
     /**
       @brief Copy all contents of the field to a host buffer.
       @param[in] the host buffer to copy to.
@@ -593,29 +623,6 @@ namespace quda {
     virtual void copy_from_buffer(void *buffer);
 
     void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
-
-    /**
-       Set all field elements to zero
-    */
-    void zero();
-
-    /**
-       @brief Backs up the cudaGaugeField to CPU memory
-    */
-    void backup() const;
-
-    /**
-       @brief Restores the cudaGaugeField to CUDA memory
-    */
-    void restore() const;
-
-    /**
-      @brief If managed memory and prefetch is enabled, prefetch
-      the gauge field and buffers to the CPU or the GPU
-      @param[in] mem_space Memory space we are prefetching to
-      @param[in] stream Which stream to run the prefetch in (default 0)
-    */
-    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   class cpuGaugeField : public GaugeField {
@@ -623,9 +630,6 @@ namespace quda {
     friend void cudaGaugeField::copy(const GaugeField &cpu);
     friend void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu);
     friend void cudaGaugeField::saveCPUField(cpuGaugeField &cpu) const;
-
-  private:
-    void **gauge; // the actual gauge field
 
   public:
     /**
@@ -680,9 +684,6 @@ namespace quda {
      */
     void copy(const GaugeField &src);
 
-    void* Gauge_p() { return gauge; }
-    const void* Gauge_p() const { return gauge; }
-
     /**
       @brief Copy all contents of the field to a host buffer.
       @param[in] the host buffer to copy to.
@@ -696,21 +697,6 @@ namespace quda {
     virtual void copy_from_buffer(void *buffer);
 
     void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
-
-    /**
-       Set all field elements to zero
-    */
-    void zero();
-
-    /**
-       @brief Backs up the cpuGaugeField
-    */
-    void backup() const;
-
-    /**
-       @brief Restores the cpuGaugeField
-    */
-    void restore() const;
   };
 
   /**

@@ -369,7 +369,7 @@ static void update_gauge(su3_matrix *gauge, int dir, su3_matrix **sitelink, su3_
 /* This function only computes one direction @dir
  *
  */
-void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelink, void **sitelink_ex,
+void gauge_force_reference_dir(void *refMom, int dir, double eb3, void *const *sitelink, void *const *sitelink_ex,
                                QudaPrecision prec, int **path_dir, int *length, void *loop_coeff, int num_paths,
                                const lattice_t &lat, bool compute_force)
 {
@@ -405,8 +405,8 @@ void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelin
   host_free(staple);
 }
 
-void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecision prec, int ***path_dir, int *length,
-                           void *loop_coeff, int num_paths, bool compute_force)
+void gauge_force_reference(void *refMom, double eb3, void *const *const sitelink, QudaPrecision prec, int ***path_dir,
+                           int *length, void *loop_coeff, int num_paths, bool compute_force)
 {
   // created extended field
   quda::lat_dim_t R;
@@ -420,7 +420,7 @@ void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecis
   lattice_t lat(*qdp_ex);
 
   for (int dir = 0; dir < 4; dir++) {
-    gauge_force_reference_dir(refMom, dir, eb3, sitelink, (void **)qdp_ex->Gauge_p(), prec, path_dir[dir], length,
+    gauge_force_reference_dir(refMom, dir, eb3, sitelink, qdp_ex->data<void *const *>(), prec, path_dir[dir], length,
                               loop_coeff, num_paths, lat, compute_force);
   }
 

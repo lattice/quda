@@ -270,7 +270,7 @@ int main(int argc, char **argv)
     // load the gauge field from gauge
     gauge_param.gauge_order = gauge->Order();
     gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
-    loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
+    loadGaugeQuda(gauge->data(), &gauge_param);
     gaugeObservablesQuda(&obs_param);
 
     // Demonstrate MG evolution on an evolving gauge field
@@ -318,7 +318,7 @@ int main(int argc, char **argv)
 
       // Copy into regular field
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
-      loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
+      loadGaugeQuda(gauge->data(), &gauge_param);
 
       if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         constructHostCloverField(clover, clover_inv, inv_param);
@@ -384,7 +384,7 @@ int main(int argc, char **argv)
     // copy into regular field
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
-    loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
+    loadGaugeQuda(gauge->data(), &gauge_param);
     // Recompute Gauge Observables
     gaugeObservablesQuda(&obs_param);
 
