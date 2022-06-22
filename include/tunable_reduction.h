@@ -330,7 +330,8 @@ namespace quda
         return true;
       } else {
         if (param.block.z < n_batch && param.block.z < device::max_threads_per_block_dim(2)
-            && param.block.x * param.block.y * (param.block.z + 1) <= device::max_threads_per_block()
+            //&& param.block.x * param.block.y * (param.block.z + 1) <= device::max_threads_per_block()
+            && param.block.x * param.block.y * (param.block.z + 1) <= device::max_block_size()
             && param.block.z < n_batch_block_max) {
           param.block.z++;
           param.grid.z = (n_batch + param.block.z - 1) / param.block.z;

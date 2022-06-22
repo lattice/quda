@@ -12,6 +12,7 @@
 
 #include <tune_key.h>
 #include <quda_internal.h>
+#include <target_device.h>
 #include <device.h>
 #include <uint_to_char.h>
 
@@ -91,7 +92,8 @@ namespace quda {
      */
     virtual unsigned int maxBlockSize(const TuneParam &param) const
     {
-      return device::max_threads_per_block() / (param.block.y * param.block.z);
+      //return device::max_threads_per_block() / (param.block.y * param.block.z);
+      return device::max_block_size() / (param.block.y * param.block.z);
     }
 
     /**
@@ -147,7 +149,8 @@ namespace quda {
       param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
 
       if (param.block.x > max_threads || param.shared_bytes > max_shared
-          || param.block.x * param.block.y * param.block.z > device::max_threads_per_block()) {
+          //|| param.block.x * param.block.y * param.block.z > device::max_threads_per_block()) {
+          || param.block.x * param.block.y * param.block.z > device::max_block_size()) {
         resetBlockDim(param);
         int nthreads = param.block.x * param.block.y * param.block.z;
         param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));

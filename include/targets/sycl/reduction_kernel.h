@@ -71,6 +71,9 @@ namespace quda {
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
 		 str(localSize).c_str(), str(arg.threads).c_str());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
+      printfQuda("  SLM size: %lu\n",
+                 localSize.size()*sizeof(typename Transformer<Arg>::reduce_t)/
+		 device::warp_size());
       timer.start();
     }
     //if (arg.threads.x%tp.block.x+arg.threads.y%tp.block.y) {
@@ -85,7 +88,8 @@ namespace quda {
       //h.parallel_for<class Reduction2D>
       h.parallel_for
 	(ndRange,
-	 [=](sycl::nd_item<3> ndi) {
+	 //[=](sycl::nd_item<3> ndi) {
+	 [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
 	   quda::Reduction2DImpl<Transformer, Arg, grid_stride>(arg, ndi);
 	   //quda::Reduction2DImpl<Transformer, Arg, false>(arg, ndi);
 	 });
