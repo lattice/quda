@@ -1082,6 +1082,11 @@ extern "C" {
   void freeGaugeQuda(void);
 
   /**
+   * Free QUDA's internal smeared gauge field.
+   */
+  void freeGaugeSmearedQuda(void);
+  
+  /**
    * Save the gauge field to the host.
    * @param h_gauge Base pointer to host gauge field (regardless of dimensionality)
    * @param param   Contains all metadata regarding host and device storage

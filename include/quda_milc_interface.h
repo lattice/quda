@@ -595,6 +595,17 @@ extern "C" {
   void qudaFreeGaugeField();
 
   /**
+     Free the smeared gauge field allocated in QUDA.
+   */
+  void qudaFreeGaugeSmeared();
+  
+  /**
+     Alias of qudaFreeGaugeSmeared().     
+     Free the two-link field allocated in QUDA.
+   */
+  void qudaFreeTwoLink();
+  
+  /**
    * Load the clover field and its inverse from the host.  If null
    * pointers are passed, the clover field and / or its inverse will
    * be computed dynamically from the resident gauge field.

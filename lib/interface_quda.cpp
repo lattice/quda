@@ -1129,6 +1129,14 @@ void freeGaugeQuda(void)
   }
 }
 
+void freeGaugeSmearedQuda()
+{
+  if (!initialized) errorQuda("QUDA not initialized");
+
+  if( gaugeSmeared ) delete gaugeSmeared;
+  gaugeSmeared = nullptr;
+}
+
 void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *recon)
 {
   // first do SU3 links (if they exist)
