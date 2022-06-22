@@ -645,6 +645,41 @@ void qudaGaugeForce(int precision, int num_loop_types, double milc_loop_coeff[3]
   qudaGaugeForcePhased(precision, num_loop_types, milc_loop_coeff, eb3, arg, 0);
 }
 
+void qudaGaugeLoopTracePhased(int precision, double *traces, int** input_path_buf, int* path_length, double *loop_coeff, int num_paths,
+                              int max_length, double factor, QudaMILCSiteArg_t *arg, int phase_in)
+{
+  qudamilc_called<true>(__func__);
+
+  QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
+      (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
+      QUDA_SU3_LINKS);
+  void *gauge = arg->site ? arg->site : arg->link;
+
+  qudaGaugeParam.gauge_offset = arg->link_offset;
+  qudaGaugeParam.mom_offset = arg->mom_offset;
+  qudaGaugeParam.site_size = arg->size;
+  qudaGaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
+  qudaGaugeParam.staggered_phase_applied = phase_in;
+  qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  if (phase_in) qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
+  if (phase_in) qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+
+  // do not update the gauge; this is a read-only style operation
+  if (!have_resident_gauge) {
+    qudaGaugeParam.make_resident_gauge = false;
+    qudaGaugeParam.use_resident_gauge = false;
+    // have_resident_gauge = true;
+  } else {
+    qudaGaugeParam.make_resident_gauge = false;
+    qudaGaugeParam.use_resident_gauge = true;
+  }
+
+  computeGaugeLoopTraceQuda(reinterpret_cast<double _Complex*>(traces), gauge, input_path_buf, path_length, loop_coeff, num_paths, max_length, factor, &qudaGaugeParam);
+
+  qudamilc_called<false>(__func__);
+  return;
+}
+
 static int getLinkPadding(const int dim[4])
 {
   int padding = MAX(dim[1]*dim[2]*dim[3]/2, dim[0]*dim[2]*dim[3]/2);

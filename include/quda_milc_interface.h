@@ -729,6 +729,25 @@ extern "C" {
                             QudaMILCSiteArg_t *arg, int phase_in);
 
   /**
+   * Compute the real traces of gauge loops, with direct application to computing the gauge
+   * action.  All fields here are CPU fields in MILC order, and their precisions should
+   * match.
+   *
+   * @param precision The precision of the field (2 - double, 1 - single)
+   * @param traces A pre-allocated buffer for computed traces of length 2 x num_paths to encode real and imaginary
+   * @param input_path_buf A double pointer of length num_paths x max_length containing loop paths
+   * @param path_length An array of length num_paths containing the lengths of each loop
+   * @param loop_coeff Coefficients for each individual loop
+   * @param num_paths The total number of paths that are computed
+   * @param max_length The maximum length across all loop paths
+   * @param factor An overall multiplicative factor applied to all traces
+   * @param arg Metadata for MILC's internal site struct array
+   * @param phase_in whether staggered phases are applied
+   */
+  void qudaGaugeLoopTracePhased(int precision, double *traces, int** input_path_buf, int* path_length, double *loop_coeff, int num_paths,
+                              int max_length, double factor, QudaMILCSiteArg_t *arg, int phase_in);
+
+  /**
    * Evolve the gauge field by step size dt, using the momentum field
    * I.e., Evalulate U(t+dt) = e(dt pi) U(t).  All fields are CPU fields in MILC order.
    *
