@@ -176,6 +176,9 @@ namespace quda {
       printfQuda("  Arg::max_n_batch_block: %d\n", Arg::max_n_batch_block);
       printfQuda("  max_block_z: %d\n",
 		 device::max_block_size()/ (tp.block.x * tp.block.y));
+      printfQuda("  SLM size: %lu\n",
+                 localSize.size()*sizeof(typename Transformer<Arg>::reduce_t)/
+		 device::warp_size());
     }
     //if (arg.threads.x%tp.block.x+arg.threads.y%tp.block.y+arg.threads.z%tp.block.z) {
     //if (Arg::hasBlockOps()) {
@@ -197,7 +200,8 @@ namespace quda {
 	//h.parallel_for<class MultiReductionx>
 	h.parallel_for<>
 	  (ndRange,
-	   [=](sycl::nd_item<3> ndi) {
+	   //[=](sycl::nd_item<3> ndi) {
+	   [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
 	    //MultiReductionImpl<Transformer,Arg,grid_stride>(arg,ndi);
 	    //const char *p = a.get_pointer();
 	    const Arg *arg2 = reinterpret_cast<const Arg*>(p);
