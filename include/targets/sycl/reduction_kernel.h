@@ -4,7 +4,7 @@
 #include <timer.h>
 #include <quda_sycl_api.h>
 
-//#define HIGH_LEVEL_REDUCTIONS
+#define HIGH_LEVEL_REDUCTIONS
 
 namespace quda {
 
