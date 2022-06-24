@@ -1480,10 +1480,11 @@ namespace quda {
         }
       }
 
-      template <typename Float, int length_, int N, int reconLenParam,
+      template <typename Float, int length_, int N_, int reconLenParam,
                 QudaStaggeredPhase stag_phase = QUDA_STAGGERED_PHASE_NO, bool huge_alloc = default_huge_alloc,
                 QudaGhostExchange ghostExchange_ = QUDA_GHOST_EXCHANGE_INVALID, bool use_inphase = false>
       struct FloatNOrder {
+        static constexpr int N = N_;
         using Accessor
           = FloatNOrder<Float, length_, N, reconLenParam, stag_phase, huge_alloc, ghostExchange_, use_inphase>;
 
@@ -1537,15 +1538,27 @@ namespace quda {
       __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
       {
         const int M = reconLen / N;
+        Vector vecTmp[M];
+
+#pragma unroll
+        for (int i = 0; i < M; i++){
+          // first load from memory
+          vecTmp[i] = vector_load<Vector>(gauge, parity * offset + (dir * M + i) * stride + x);
+        }
+
+        unpack(v, vecTmp, x, dir, parity, inphase);
+      }
+
+      __device__ __host__ inline void unpack(complex v[length / 2], Vector vecTmp[], int x, int dir, int parity, real inphase) const
+      {
+        const int M = reconLen / N;
         real tmp[reconLen];
 
 #pragma unroll
-        for (int i=0; i<M; i++){
-          // first load from memory
-          Vector vecTmp = vector_load<Vector>(gauge, parity * offset + (dir * M + i) * stride + x);
+        for (int i = 0; i < M; i++){
           // second do copy converting into register type
 #pragma unroll
-          for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
+          for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp[i])[j]);
         }
 
         real phase = 0.;
@@ -1595,6 +1608,18 @@ namespace quda {
       __device__ __host__ inline auto operator()(int dim, int x_cb, int parity, real phase = 1.0) const
       {
         return gauge_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, x_cb, parity, phase);
+      }
+
+      template <class Cache, class Pipe>
+      __device__ __host__ inline void cache(Cache &cache, int stage, Pipe &pipe, int dim, int x_cb, int parity, real phase = 1.0) const
+      {
+        const int M = reconLen / N;
+
+#pragma unroll
+        for (int i = 0; i < M; i++){
+          // first load from memory
+          vector_load_async<Vector>(cache.template gauge<Vector>(i, stage), gauge, parity * offset + (dim * M + i) * stride + x_cb, pipe);
+        }
       }
 
       __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const

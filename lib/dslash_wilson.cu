@@ -27,6 +27,15 @@ namespace quda
       }
     }
 
+    unsigned int sharedBytesPerThread() const
+    {
+      using Float = typename Arg::Float;
+      int bulk = Arg::F::length * sizeof(Float);
+      int norm = isFixed<Float>::value ? sizeof(float) : 0;
+      int gauge = Arg::G::reconLen * sizeof(Float);
+      return (bulk + norm + gauge) * 2;
+    }
+
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());

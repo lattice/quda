@@ -20,6 +20,20 @@ namespace quda
     return value;
   }
 
+  template <bool is_device> struct vector_load_async_impl {
+    template <typename T, class Pipe> __device__ __host__ inline void operator()(T *out, const void *ptr, int idx, Pipe &pipe)
+    {
+      // The generic version just does the synchronous load without using the pipe
+      *out = reinterpret_cast<const T *>(ptr)[idx];
+    }
+  };
+
+  template <typename VectorType, class pipe_t>
+  __device__ __host__ inline void vector_load_async(VectorType *out, const void *ptr, int idx, pipe_t &pipe)
+  {
+    target::dispatch<vector_load_async_impl>(out, ptr, idx, pipe);
+  }
+
   /**
      @brief Non-specialized store operation
   */

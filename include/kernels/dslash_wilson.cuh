@@ -6,6 +6,7 @@
 #include <color_spinor.h>
 #include <dslash_helper.cuh>
 #include <index_helper.cuh>
+#include <stencil_cache.cuh>
 #include <kernels/dslash_pack.cuh> // for the packing kernel
 
 namespace quda
@@ -133,6 +134,169 @@ namespace quda
     } // nDim
   }
 
+  /**
+     @brief Applies the off-diagonal part of the Wilson operator
+
+     @param[out] out The out result field
+     @param[in,out] arg Parameter struct
+     @param[in] coord Site coordinate struct
+     @param[in] s The fifth-dimension index
+     @param[in] parity Site parity
+     @param[in] idx Thread index (equal to face index for exterior kernels)
+     @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
+  */
+  template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
+  __device__ __host__ inline void applyWilsonAsync(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
+  {
+    typedef typename mapper<typename Arg::Float>::type real;
+    typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
+    typedef Matrix<complex<real>, Arg::nColor> Link;
+    const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
+
+    // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
+    const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
+
+    cuda::pipeline<cuda::thread_scope_thread> pipe = cuda::make_pipeline();
+
+    using Cache = StencilCache<typename Arg::F, typename Arg::G, 2>;
+    Cache cache(arg.in, arg.U);
+
+    auto load_forward = [&](int d) {
+        const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
+        const int gauge_idx = (Arg::nDim == 5 ? coord.x_cb % arg.dc.volume_4d_cb : coord.x_cb);
+        // constexpr int proj_dir = dagger ? +1 : -1;
+
+        const bool ghost
+            = (coord[d] + arg.nFace >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+
+        pipe.producer_acquire();
+        if (false && doHalo<kernel_type>(d) && ghost) {
+#if 0
+          // we need to compute the face index if we are updating a face that isn't ours
+          const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
+            ghostFaceIndex<1, Arg::nDim>(coord, arg.dim, d, arg.nFace) : idx;
+
+          Link U = arg.U(d, gauge_idx, gauge_parity);
+          HalfVector in = arg.in.Ghost(d, 1, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
+
+          out += (U * in).reconstruct(d, proj_dir);
+#endif
+        } else if (doBulk<kernel_type>() && !ghost) {
+
+          arg.U.cache(cache, 0, pipe, d, gauge_idx, gauge_parity);
+          arg.in.cache(cache, 0, pipe, fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+
+        }
+        pipe.producer_commit();
+    };
+
+    auto load_backward = [&](int d) {
+        const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
+        const int gauge_idx = (Arg::nDim == 5 ? back_idx % arg.dc.volume_4d_cb : back_idx);
+        // constexpr int proj_dir = dagger ? -1 : +1;
+
+        const bool ghost = (coord[d] - arg.nFace < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+
+        pipe.producer_acquire();
+        if (false && doHalo<kernel_type>(d) && ghost) {
+#if 0
+          // we need to compute the face index if we are updating a face that isn't ours
+          const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
+            ghostFaceIndex<0, Arg::nDim>(coord, arg.dim, d, arg.nFace) : idx;
+
+          const int gauge_ghost_idx = (Arg::nDim == 5 ? ghost_idx % arg.dc.ghostFaceCB[d] : ghost_idx);
+          Link U = arg.U.Ghost(d, gauge_ghost_idx, 1 - gauge_parity);
+          HalfVector in = arg.in.Ghost(d, 0, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
+
+          out += (conj(U) * in).reconstruct(d, proj_dir);
+#endif
+        } else if (doBulk<kernel_type>() && !ghost) {
+
+          arg.U.cache(cache, 1, pipe, d, gauge_idx, 1 - gauge_parity);
+          arg.in.cache(cache, 1, pipe, back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+
+        }
+        pipe.producer_commit();
+    };
+
+    auto compute_forward = [&](int d) {
+        const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
+        const int gauge_idx = (Arg::nDim == 5 ? coord.x_cb % arg.dc.volume_4d_cb : coord.x_cb);
+        constexpr int proj_dir = dagger ? +1 : -1;
+
+        const bool ghost
+            = (coord[d] + arg.nFace >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+
+        if (false && doHalo<kernel_type>(d) && ghost) {
+#if 0
+          // we need to compute the face index if we are updating a face that isn't ours
+          const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
+            ghostFaceIndex<1, Arg::nDim>(coord, arg.dim, d, arg.nFace) : idx;
+
+          Link U = arg.U(d, gauge_idx, gauge_parity);
+          HalfVector in = arg.in.Ghost(d, 1, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
+
+          out += (U * in).reconstruct(d, proj_dir);
+#endif
+        } else if (doBulk<kernel_type>() && !ghost) {
+
+          Link U = cache.load_gauge(0, d, gauge_idx, gauge_parity);
+          Vector in = cache.load_color_spinor(0);
+
+          out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+        }
+    };
+
+    auto compute_backward = [&](int d) {
+        const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
+        const int gauge_idx = (Arg::nDim == 5 ? back_idx % arg.dc.volume_4d_cb : back_idx);
+        constexpr int proj_dir = dagger ? -1 : +1;
+
+        const bool ghost = (coord[d] - arg.nFace < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+
+        if (false && doHalo<kernel_type>(d) && ghost) {
+#if 0
+          // we need to compute the face index if we are updating a face that isn't ours
+          const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
+            ghostFaceIndex<0, Arg::nDim>(coord, arg.dim, d, arg.nFace) : idx;
+
+          const int gauge_ghost_idx = (Arg::nDim == 5 ? ghost_idx % arg.dc.ghostFaceCB[d] : ghost_idx);
+          Link U = arg.U.Ghost(d, gauge_ghost_idx, 1 - gauge_parity);
+          HalfVector in = arg.in.Ghost(d, 0, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
+
+          out += (conj(U) * in).reconstruct(d, proj_dir);
+#endif
+        } else if (doBulk<kernel_type>() && !ghost) {
+
+          Link U = cache.load_gauge(1, d, gauge_idx, 1 - gauge_parity);
+          Vector in = cache.load_color_spinor(1);
+
+          out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+        }
+    };
+
+    // Load 0+
+    load_forward(0);
+
+#pragma unroll
+    for (int d = 0; d < 4; d++) {
+      // Load d-
+      load_backward(d);
+
+      // Wait 0, do d+
+      pipe.consumer_wait();
+      compute_forward(d);
+
+      // if d < 3, Load (d+1)+
+      if (d < 3) { load_forward(d + 1); }
+
+      // Wait 0, do d-
+      pipe.consumer_wait();
+      compute_backward(d);
+    }
+
+  }
+
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct wilson : dslash_default {
 
     const Arg &arg;
@@ -154,7 +318,7 @@ namespace quda
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      applyWilsonAsync<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
       int xs = coord.x_cb + coord.s * arg.dc.volume_4d_cb;
       if (xpay && mykernel_type == INTERIOR_KERNEL) {

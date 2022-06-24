@@ -974,11 +974,14 @@ namespace quda
        pointer arithmetic for huge allocations (e.g., packed set of
        vectors).  Default is to use 32-bit pointer arithmetic.
      */
-    template <typename Float, int Ns, int Nc, int N_, bool spin_project = false, bool huge_alloc = false>
+    template <typename Float_, int Ns_, int Nc_, int N_, bool spin_project = false, bool huge_alloc = false>
     struct FloatNOrder {
-      static_assert((2 * Ns * Nc) % N_ == 0, "Internal degrees of freedom not divisible by short-vector length");
-      static constexpr int length = 2 * Ns * Nc;
+      static_assert((2 * Ns_ * Nc_) % N_ == 0, "Internal degrees of freedom not divisible by short-vector length");
+      using Float = Float_;
+      static constexpr int length = 2 * Ns_ * Nc_;
       static constexpr int length_ghost = spin_project ? length / 2 : length;
+      static constexpr int Ns = Ns_;
+      static constexpr int Nc = Nc_;
       static constexpr int N = N_;
       static constexpr int M = length / N;
       // if spin projecting, check that short vector length is compatible, if not halve the vector length
@@ -1033,16 +1036,26 @@ namespace quda
 
       __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
       {
-        real v[length];
         norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, x + parity * norm_offset) : 0.0;
 
+        Vector vecTmp[M];
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first load from memory
-          Vector vecTmp = vector_load<Vector>(field, parity * offset + x + volumeCB * i);
+          vecTmp[i] = vector_load<Vector>(field, parity * offset + x + volumeCB * i);
+        }
+        unpack(out, vecTmp, nrm);
+      }
+
+      __device__ __host__ inline void unpack(complex out[length / 2], const Vector vecTmp[M], norm_type nrm) const
+      {
+        real v[length];
+
+#pragma unroll
+        for (int i = 0; i < M; i++) {
           // now copy into output and scale
 #pragma unroll
-          for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
+          for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<const Float *>(&vecTmp[i])[j], nrm);
         }
 
 #pragma unroll
@@ -1098,6 +1111,18 @@ namespace quda
       __device__ __host__ inline auto operator()(int x_cb, int parity) const
       {
         return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
+      }
+
+      template <class Cache, class Pipe>
+      __device__ __host__ inline void cache(Cache &cache, int stage, Pipe &pipe, int x_cb, int parity) const
+      {
+        if (isFixed<Float>::value) {
+          vector_load_async<float>(cache.norm(stage), norm, x_cb + parity * norm_offset, pipe);
+        }
+#pragma unroll
+        for (int i = 0; i < M; i++) {
+          vector_load_async<Vector>(cache.template bulk<Vector>(i, stage), field, parity * offset + x_cb + volumeCB * i, pipe);
+        }
       }
 
       __device__ __host__ inline void loadGhost(complex out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const
