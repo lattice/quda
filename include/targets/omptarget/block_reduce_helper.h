@@ -6,8 +6,8 @@
 /**
    @file block_reduce_helper.h
 
-   @section This files contains the CUDA device specialziations for
-   warp- and block-level reductions, using the CUB library
+   @section This files contains the OpenMP target specializations for
+   warp- and block-level reductions
  */
 
 using namespace quda;
@@ -46,15 +46,6 @@ namespace quda
         #pragma omp barrier
         const auto& v = j<batch_end ? storage[j] : v0;
         value = r(value, v);
-/*
-        const auto oid = (tid-batch_begin)%(offset*2);
-        if(oid==offset)
-          storage[tid] = value;
-        const auto j = tid+offset;
-        #pragma omp barrier
-        if(oid==0 && j<batch_end)
-          value = r(value, storage[j]);
-*/
       }
       if(all){
         if(tid==block_size*batch)
@@ -94,17 +85,23 @@ namespace quda
         return any_reduce_impl(r, value_, batch, block_size, all, async);
       else{
         using V = typename T::value_type;
+        constexpr auto N = T::N;
         if constexpr (
             std::is_same_v<typename R::reducer_t,plus<typename R::reduce_t>> &&
             std::is_same_v<T,typename R::reduce_t> &&
-            std::is_same_v<T,array<V,T::N>>){
-          const constexpr plus<V> re {};
+            std::is_same_v<T,array<V,N>>){
+          // make sure the implementation is still compatible: ../../array.h
+          constexpr auto N0 = N/2;
+          constexpr auto N1 = N-N0;
+          using T0 = array<V,N0>;
+          using T1 = array<V,N1>;
+          const constexpr plus<T0> r0 {};
+          const constexpr plus<T1> r1 {};
           auto value = value_;
-          value[0] = any_reduce_impl(re, value_[0], batch, block_size, all, async);
-QUDA_UNROLL
-          for (int i = 1; i < value.size(); i++) {
-            value[i] = any_reduce_impl(re, value_[i], batch, block_size, all, false);
-          }
+          // recurse to myself
+          reinterpret_cast<T0&>(value[0]) = any_reduce(r0, reinterpret_cast<const T0&>(value_[0]), batch, block_size, all, async);
+          // recurse with async==false
+          reinterpret_cast<T1&>(value[N0]) = any_reduce(r1, reinterpret_cast<const T1&>(value_[N0]), batch, block_size, all, false);
           return value;
         }else
           static_assert(sizeof(T)==0, "unimplemented reduction");  // let me fail at compile time
@@ -116,7 +113,7 @@ QUDA_UNROLL
   template <bool> struct warp_reduce;
 
   /**
-     @brief CUDA specialization of warp_reduce, utilizing cub::WarpReduce
+     @brief OpenMP target specialization of warp_reduce
   */
   template <> struct warp_reduce<true> {
 
@@ -142,7 +139,7 @@ QUDA_UNROLL
   template <bool> struct block_reduce;
 
   /**
-     @brief CUDA specialization of block_reduce, utilizing target::omptarget::get_shared_cache() and omp for
+     @brief OpenMP target  specialization of block_reduce
   */
   template <> struct block_reduce<true> {
 
