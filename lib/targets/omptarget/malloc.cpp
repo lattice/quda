@@ -316,8 +316,7 @@ namespace quda
   void *pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
     MemAlloc a(func, file, line);
-    void *ptr = aligned_malloc(a, size);
-    ompwip("ERROR: pinned_malloc_ uses aligned_malloc");
+    void *ptr = omp_target_alloc_host(size, omp_get_default_device());
     if(!ptr)
       errorQuda("Failed to register pinned memory of size %zu (%s:%d in %s())\n", size, file, line, func);
 /*
@@ -362,7 +361,8 @@ namespace quda
     a.size = a.base_size = size;
     void *ptr;
     if(0<omp_get_num_devices()){
-      ptr = omp_target_alloc_shared(size, omp_get_default_device());   // FIXME non-portable
+      // ptr = omp_target_alloc_shared(size, omp_get_default_device());   // FIXME non-portable
+      ptr = omp_target_alloc_host(size, omp_get_default_device());   // FIXME non-portable
     }else{
       warningQuda("%s:%d %s() mapped malloc without a device", file, line, func);
       ptr = aligned_malloc(a, size);
@@ -809,13 +809,11 @@ namespace quda
       } else {
         ptr = quda::pinned_malloc_(func, file, line, nbytes);
       }
-      ompwip("ERROR: untested pool::pinned_malloc_: %p",ptr);
       return ptr;
     }
 
     void pinned_free_(const char *func, const char *file, int line, void *ptr)
     {
-      ompwip("ERROR: untested pool::pinnd_free_: %p",ptr);
       if (pinned_memory_pool) {
         if (!pinnedSize.count(ptr)) { errorQuda("Attempt to free invalid pointer"); }
         pinnedCache.insert(std::make_pair(pinnedSize[ptr], ptr));
@@ -849,13 +847,11 @@ namespace quda
       } else {
         ptr = quda::device_malloc_(func, file, line, nbytes);
       }
-      // ompwip("pool::device_malloc_: %p",ptr);
       return ptr;
     }
 
     void device_free_(const char *func, const char *file, int line, void *ptr)
     {
-      // ompwip("pool::device_free_: %p",ptr);
       if (device_memory_pool) {
         if (!deviceSize.count(ptr)) { errorQuda("Attempt to free invalid pointer"); }
         deviceCache.insert(std::make_pair(deviceSize[ptr], ptr));
