@@ -4,6 +4,7 @@
 #include <ks_improved_force.h>
 #include <tune_quda.h>
 #include <instantiate.h>
+#include <constant_kernel_arg.h>
 #include <tunable_nd.h>
 #include <kernels/hisq_paths_force.cuh>
 
