@@ -21,21 +21,12 @@ namespace quda
   {
 
     /**
-       @brief The __constant__ buffer used for kernel parameters
+       @brief The buffer used for kernel parameters
     */
-#if defined(__CUDACC_RDC__) && !defined(QUDA_CONSTANT_DEFINE)
-    // rdc is enabled when NVSHMEM is enabled, so we need to make the
-    // buffer as extern and define it in one place only
-    extern __constant__ char buffer[max_constant_size()];
-#else
-    #pragma omp declare target
-    __constant__ char buffer[max_constant_size()];
-    #pragma omp end declare target
-#endif
+    extern char buffer[max_constant_size()];
 
     /**
-       @brief Helper function that returns kernel argument from
-       __constant__ memory.
+       @brief Helper function that returns kernel argument from buffer.
      */
     template <typename Arg> constexpr std::enable_if_t<!use_kernel_arg<Arg>(), Arg &> get_arg()
     {
@@ -43,8 +34,7 @@ namespace quda
     }
 
     /**
-       @brief Helper function that returns a pointer to the
-       __constant__ memory buffer.
+       @brief Helper function that returns a pointer to the buffer.
      */
     template <typename Arg> constexpr std::enable_if_t<!use_kernel_arg<Arg>(), void *> get_constant_buffer()
     {

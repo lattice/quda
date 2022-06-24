@@ -26,6 +26,12 @@ namespace quda
     return rtn;
   }
 
+  namespace device {
+    #pragma omp declare target
+    char buffer[max_constant_size()];
+    #pragma omp end declare target
+  }
+
   namespace target {
     namespace omptarget {
       #pragma omp declare target

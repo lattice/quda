@@ -8,7 +8,6 @@
 #define __host__
 #define __device__
 #define __global__
-#define __constant__ static
 #define __launch_bounds__(...)
 #define __syncthreads() _Pragma("omp barrier")
 #define __threadfence() _Pragma("omp barrier")
