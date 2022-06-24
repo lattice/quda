@@ -4159,7 +4159,7 @@ int computeGaugeLoopTraceQuda(double _Complex* traces, void *siteLink, int **inp
   }
   profileGaugeLoopTrace.TPSTOP(QUDA_PROFILE_INIT);
 
-  cudaGaugeField *cudaGauge = createExtendedGauge(*cudaSiteLink, R, profileGaugePath);
+  cudaGaugeField *cudaGauge = createExtendedGauge(*cudaSiteLink, R, profileGaugeLoopTrace);
   // apply / remove phase as appropriate
   if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
 
