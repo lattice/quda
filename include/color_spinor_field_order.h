@@ -1062,6 +1062,21 @@ namespace quda
         for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
       }
 
+      __device__ __host__ inline void unpack_half(complex out[length_ghost / 2], const GhostVector vecTmp[M_ghost], norm_type nrm) const
+      {
+        real v[length_ghost];
+
+#pragma unroll
+        for (int i = 0; i < M_ghost; i++) {
+#pragma unroll
+          for (int j = 0; j < N_ghost; j++)
+            copy_and_scale(v[i * N_ghost + j], reinterpret_cast<const Float *>(&vecTmp[i])[j], nrm);
+        }
+
+#pragma unroll
+        for (int i = 0; i < length_ghost / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
+      }
+
       __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0) const
       {
         real v[length];
@@ -1122,6 +1137,28 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < M; i++) {
           vector_load_async<Vector>(cache.template bulk<Vector>(i, stage), field, parity * offset + x_cb + volumeCB * i, pipe);
+        }
+      }
+
+      template <int c, class Cache, class Pipe>
+      __device__ __host__ inline void cache_half(Cache &cache, int stage, Pipe &pipe, int x_cb, int parity) const
+      {
+        if (isFixed<Float>::value) {
+          vector_load_async<float>(cache.norm(stage), norm, x_cb + parity * norm_offset, pipe);
+        }
+        constexpr int mul = sizeof(Vector) / sizeof(GhostVector);
+        if constexpr (mul == 1) {
+#pragma unroll
+          for (int i = 0; i < M_ghost; i++) {
+            int j = i + c * M_ghost;
+            vector_load_async<GhostVector>(cache.template bulk<GhostVector>(i, stage), field, parity * offset + x_cb + volumeCB * j, pipe);
+          }
+        } else {
+#pragma unroll
+          for (int i = 0; i < M_ghost; i++) {
+            int j = i + c * M_ghost;
+            vector_load_async<GhostVector>(cache.template bulk<Vector>(i, stage), field, (j % 2) + 2 * (parity * offset + x_cb + volumeCB * (j / 2)), pipe);
+          }
         }
       }
 

@@ -53,12 +53,21 @@ namespace quda
 
     unsigned int sharedBytesPerThread() const
     {
+      using Float = typename Arg::Float;
+      int bulk = Arg::F::length * sizeof(Float);
+      int norm = isFixed<Float>::value ? sizeof(float) : 0;
+      int gauge = Arg::G::reconLen * sizeof(Float);
+      int shared_bytes_4d = (bulk + norm + gauge) * 2;
+
+      int shared_bytes_m5;
       // spin components in shared depend on inversion algorithm
       if (mobius_m5::use_half_vector()) {
-        return 2 * (Arg::nSpin / 2) * Arg::nColor * sizeof(typename mapper<typename Arg::Float>::type);
+        shared_bytes_m5 = 2 * (Arg::nSpin / 2) * Arg::nColor * sizeof(typename mapper<typename Arg::Float>::type);
       } else {
-        return 2 * Arg::nSpin * Arg::nColor * sizeof(typename mapper<typename Arg::Float>::type);
+        shared_bytes_m5 = 2 * Arg::nSpin * Arg::nColor * sizeof(typename mapper<typename Arg::Float>::type);
       }
+
+      return std::max(shared_bytes_m5, shared_bytes_4d);
     }
 
     void initTuneParam(TuneParam &param) const

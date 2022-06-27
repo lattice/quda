@@ -164,7 +164,7 @@ namespace quda
     auto load_forward = [&](int d) {
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
         const int gauge_idx = (Arg::nDim == 5 ? coord.x_cb % arg.dc.volume_4d_cb : coord.x_cb);
-        // constexpr int proj_dir = dagger ? +1 : -1;
+        constexpr int proj_dir = dagger ? +1 : -1;
 
         const bool ghost
             = (coord[d] + arg.nFace >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
@@ -184,8 +184,11 @@ namespace quda
         } else if (doBulk<kernel_type>() && !ghost) {
 
           arg.U.cache(cache, 0, pipe, d, gauge_idx, gauge_parity);
-          arg.in.cache(cache, 0, pipe, fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
-
+          if (d < 3) {
+            arg.in.cache(cache, 0, pipe, fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          } else {
+            arg.in.cache_half<(1 - proj_dir) / 2>(cache, 0, pipe, fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          }
         }
         pipe.producer_commit();
     };
@@ -193,7 +196,7 @@ namespace quda
     auto load_backward = [&](int d) {
         const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
         const int gauge_idx = (Arg::nDim == 5 ? back_idx % arg.dc.volume_4d_cb : back_idx);
-        // constexpr int proj_dir = dagger ? -1 : +1;
+        constexpr int proj_dir = dagger ? -1 : +1;
 
         const bool ghost = (coord[d] - arg.nFace < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
@@ -213,8 +216,11 @@ namespace quda
         } else if (doBulk<kernel_type>() && !ghost) {
 
           arg.U.cache(cache, 1, pipe, d, gauge_idx, 1 - gauge_parity);
-          arg.in.cache(cache, 1, pipe, back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
-
+          if (d < 3) {
+            arg.in.cache(cache, 1, pipe, back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          } else {
+            arg.in.cache_half<(1 - proj_dir) / 2>(cache, 1, pipe, back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          }
         }
         pipe.producer_commit();
     };
@@ -241,9 +247,14 @@ namespace quda
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = cache.load_gauge(0, d, gauge_idx, gauge_parity);
-          Vector in = cache.load_color_spinor(0);
-
-          out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          if (d < 3) {
+            Vector in = cache.load_color_spinor(0);
+            load_forward(d + 1);
+            out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          } else {
+            HalfVector in = cache.load_color_spinor_half(0);
+            out += (U * (static_cast<real>(2.0) * in)).reconstruct(d, proj_dir);
+          }
         }
     };
 
@@ -269,31 +280,28 @@ namespace quda
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = cache.load_gauge(1, d, gauge_idx, 1 - gauge_parity);
-          Vector in = cache.load_color_spinor(1);
-
-          out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          if (d < 3) {
+            Vector in = cache.load_color_spinor(1);
+            load_backward(d + 1);
+            out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          } else {
+            HalfVector in = cache.load_color_spinor_half(1);
+            out += (conj(U) * (static_cast<real>(2.0) * in)).reconstruct(d, proj_dir);
+          }
         }
     };
 
-    // Load 0+
     load_forward(0);
+    load_backward(0);
 
 #pragma unroll
     for (int d = 0; d < 4; d++) {
-      // Load d-
-      load_backward(d);
-
-      // Wait 0, do d+
       cuda::pipeline_consumer_wait_prior<1>(pipe);
       compute_forward(d);
 
-      // if d < 3, Load (d+1)+
       if (d < 3) {
-        load_forward(d + 1);
-        // Wait 0
         cuda::pipeline_consumer_wait_prior<1>(pipe);
       } else {
-        // Wait 0
         cuda::pipeline_consumer_wait_prior<0>(pipe);
       }
 

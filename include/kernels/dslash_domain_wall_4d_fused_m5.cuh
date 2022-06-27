@@ -76,7 +76,9 @@ namespace quda
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector stencil_out;
-      applyWilson<nParity, dagger, mykernel_type>(stencil_out, arg, coord, parity, idx, thread_dim, active);
+      applyWilsonAsync<nParity, dagger, mykernel_type>(stencil_out, arg, coord, parity, idx, thread_dim, active);
+      SharedMemoryCache<int> cache;
+      cache.sync();
 
       Vector out;
 

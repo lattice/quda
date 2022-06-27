@@ -37,9 +37,9 @@ namespace quda
 
   // CUDA specializations of the vector_load_async
   template <> struct vector_load_async_impl<true> {
-    template <typename T, class Pipe> __device__ inline void operator()(T *out, const void *ptr, int idx, Pipe &pipe)
+    template <typename T, class Pipe> __device__ inline void operator()(T *out, const T *ptr, int idx, Pipe &pipe)
     {
-      cuda::memcpy_async(out, &reinterpret_cast<const T *>(ptr)[idx], sizeof(T), pipe);
+      cuda::memcpy_async(out, &ptr[idx], sizeof(T), pipe);
     }
   };
 

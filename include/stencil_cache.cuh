@@ -13,7 +13,8 @@ namespace quda
 
     using bulk_t = array<typename color_spinor_order_t::Vector, color_spinor_order_t::M>;
     using norm_t = float;
-    using gauge_t = array<typename gauge_order_t::Vector, gauge_order_t::reconLen / gauge_order_t::N>;
+    static constexpr int gauge_M = gauge_order_t::reconLen / gauge_order_t::N;
+    using gauge_t = array<typename gauge_order_t::Vector, gauge_M>;
 
     using Float = typename color_spinor_order_t::Float;
 
@@ -28,6 +29,8 @@ namespace quda
     dim3 thread;
     const int stride;
     int j;
+    int warp_id;
+    int lane_id;
 
     /**
        @brief This is a dummy instantiation for the host compiler
@@ -54,7 +57,8 @@ namespace quda
 
     template <class vector_t>
     __device__ __host__ vector_t *bulk(int index, int stage) {
-      return &reinterpret_cast<vector_t *>(_bulk_ptr[stage])[index * stride + j];
+      // return &reinterpret_cast<vector_t *>(_bulk_ptr[stage])[index * stride + j];
+      return &reinterpret_cast<vector_t *>(_bulk_ptr[stage])[(warp_id * color_spinor_order_t::M + index) * 32 + lane_id];
     }
 
     __device__ __host__ norm_t *norm(int stage) {
@@ -63,7 +67,7 @@ namespace quda
 
     template <class vector_t>
     __device__ __host__ vector_t *gauge(int index, int stage) {
-      return &reinterpret_cast<vector_t *>(_gauge_ptr[stage])[index * stride + j];
+      return &reinterpret_cast<vector_t *>(_gauge_ptr[stage])[(warp_id * gauge_M + index) * 32 + lane_id];
     }
 
     __device__ __host__ inline auto load_color_spinor(int stage)
@@ -81,6 +85,25 @@ namespace quda
       }
 
       color_spinor_order.unpack(color_spinor.data, vecTmp, nrm);
+      return color_spinor;
+    }
+
+    __device__ __host__ inline auto load_color_spinor_half(int stage)
+    {
+      ColorSpinor<typename color_spinor_order_t::real, color_spinor_order_t::Nc, color_spinor_order_t::Ns / 2> color_spinor;
+
+      norm_t nrm = isFixed<Float>::value ? *norm(stage) : 0.0;
+      using GhostVector = typename color_spinor_order_t::GhostVector;
+      using Vector = typename color_spinor_order_t::Vector;
+      GhostVector vecTmp[color_spinor_order_t::M_ghost];
+
+#pragma unroll
+      for (int i = 0; i < color_spinor_order_t::M_ghost; i++) {
+        // first load from memory
+        vecTmp[i] = *reinterpret_cast<GhostVector *>(bulk<Vector>(i, stage));
+      }
+
+      color_spinor_order.unpack_half(color_spinor.data, vecTmp, nrm);
       return color_spinor;
     }
 
@@ -107,7 +130,9 @@ namespace quda
       block(target::block_dim()),
       thread(target::thread_idx()),
       stride(block.x * block.y * block.z),
-      j((thread.z * block.y + thread.y) * block.x + thread.x)
+      j((thread.z * block.y + thread.y) * block.x + thread.x),
+      warp_id(j / 32),
+      lane_id(j % 32)
     {
       char *cache = target::dispatch<cache_dynamic>();
 #pragma unroll
