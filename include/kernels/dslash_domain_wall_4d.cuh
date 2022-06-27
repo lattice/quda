@@ -44,7 +44,7 @@ namespace quda
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      applyWilsonAsync<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
       int xs = coord.x_cb + s * arg.dc.volume_4d_cb;
       if (xpay && mykernel_type == INTERIOR_KERNEL) {

@@ -284,14 +284,19 @@ namespace quda
       load_backward(d);
 
       // Wait 0, do d+
-      pipe.consumer_wait();
+      cuda::pipeline_consumer_wait_prior<1>(pipe);
       compute_forward(d);
 
       // if d < 3, Load (d+1)+
-      if (d < 3) { load_forward(d + 1); }
+      if (d < 3) {
+        load_forward(d + 1);
+        // Wait 0
+        cuda::pipeline_consumer_wait_prior<1>(pipe);
+      } else {
+        // Wait 0
+        cuda::pipeline_consumer_wait_prior<0>(pipe);
+      }
 
-      // Wait 0, do d-
-      pipe.consumer_wait();
       compute_backward(d);
     }
 
