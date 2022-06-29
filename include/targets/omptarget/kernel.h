@@ -74,16 +74,16 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel1D(void)
+  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel1D(Arg *argp)
   {
     const auto& grid = target::omptarget::launch_param.grid;
     const auto& block = target::omptarget::launch_param.block;
     const int gd = grid.x*grid.y*grid.z;
     const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld)
+    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp)
     #pragma omp parallel num_threads(ld)
     {
-      Kernel1D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
+      Kernel1D_impl<Functor, Arg, grid_stride>(*argp);
     }
   }
 
@@ -157,16 +157,16 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel2D(void)
+  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel2D(Arg *argp)
   {
     const auto& grid = target::omptarget::launch_param.grid;
     const auto& block = target::omptarget::launch_param.block;
     const int gd = grid.x*grid.y*grid.z;
     const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld)
+    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp)
     #pragma omp parallel num_threads(ld)
     {
-      Kernel2D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
+      Kernel2D_impl<Functor, Arg, grid_stride>(*argp);
     }
   }
 
@@ -242,16 +242,16 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel3D(void)
+  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel3D(Arg *argp)
   {
     const auto& grid = target::omptarget::launch_param.grid;
     const auto& block = target::omptarget::launch_param.block;
     const int gd = grid.x*grid.y*grid.z;
     const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld)
+    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp)
     #pragma omp parallel num_threads(ld)
     {
-      Kernel3D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
+      Kernel3D_impl<Functor, Arg, grid_stride>(*argp);
     }
   }
 

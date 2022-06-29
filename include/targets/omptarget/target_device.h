@@ -182,15 +182,6 @@ namespace quda {
     }
 
     /**
-       @brief Helper function that returns kernel argument from
-       __constant__ memory.  Note this is the dummy implementation,
-       and is present only to keep the compiler happy in the
-       translation units where constant memory is not used.
-     */
-    template <typename Arg>
-      constexpr std::enable_if_t<use_kernel_arg<Arg>(), const Arg&> get_arg() { return reinterpret_cast<Arg&>(nullptr); }
-
-    /**
        @brief Helper function that returns a pointer to the
        __constant__ memory buffer.  Note this is the dummy
        implementation, and is present only to keep the compiler happy

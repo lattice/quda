@@ -48,8 +48,9 @@ namespace quda {
           reinterpret_cast<void(*)(Arg)>(const_cast<void*>(kernel.func))(arg);
         } else {
           static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
-          qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);
-          reinterpret_cast<void(*)(void)>(const_cast<void*>(kernel.func))();
+          Arg *argp = reinterpret_cast<Arg*>(device::get_constant_buffer<Arg>());
+          memcpy(argp, &arg, sizeof(Arg));
+          reinterpret_cast<void(*)(Arg*)>(const_cast<void*>(kernel.func))(argp);
         }
         launch_error = QUDA_SUCCESS;
       } else {

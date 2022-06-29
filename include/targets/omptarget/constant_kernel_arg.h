@@ -23,22 +23,14 @@ namespace quda
     /**
        @brief The buffer used for kernel parameters
     */
-    extern char buffer[max_constant_size()];
-
-    /**
-       @brief Helper function that returns kernel argument from buffer.
-     */
-    template <typename Arg> constexpr std::enable_if_t<!use_kernel_arg<Arg>(), Arg &> get_arg()
-    {
-      return reinterpret_cast<Arg &>(buffer);
-    }
+    extern void *constant_arg_buffer;
 
     /**
        @brief Helper function that returns a pointer to the buffer.
      */
     template <typename Arg> constexpr std::enable_if_t<!use_kernel_arg<Arg>(), void *> get_constant_buffer()
     {
-      return omp_get_mapped_ptr(buffer, omp_get_default_device());
+      return constant_arg_buffer;
     }
 
   } // namespace device

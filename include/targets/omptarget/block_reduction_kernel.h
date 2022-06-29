@@ -142,17 +142,17 @@ namespace quda
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __launch_bounds__(Arg::launch_bounds ?
                       Arg::block_size :
-                      0) __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> BlockKernel2D(void)
+                      0) __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> BlockKernel2D(Arg *argp)
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
     const auto& grid = target::omptarget::launch_param.grid;
     const auto& block = target::omptarget::launch_param.block;
     const int gd = grid.x*grid.y*grid.z;
     const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld)
+    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp)
     #pragma omp parallel num_threads(ld)
     {
-      BlockKernel2D_impl<Functor, Arg>(device::get_arg<Arg>());
+      BlockKernel2D_impl<Functor, Arg>(*argp);
     }
   }
 

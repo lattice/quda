@@ -27,9 +27,7 @@ namespace quda
   }
 
   namespace device {
-    #pragma omp declare target
-    char buffer[max_constant_size()];
-    #pragma omp end declare target
+    void *constant_arg_buffer;
   }
 
   namespace target {
@@ -50,6 +48,11 @@ namespace quda
         static int init = 0;
         int num_teams = tp.grid.x*tp.grid.y*tp.grid.z;
         if(!init){
+          device::constant_arg_buffer = omp_target_alloc_host(device::max_constant_size(), omp_get_default_device());
+          if(!device::constant_arg_buffer){
+            warningQuda("failed to allocate %lu bytes host memory for kernel arguments.", device::max_constant_size());
+            return -1;
+          }
           shared_cache.addr = (int*)omp_target_alloc(num_teams*(size_t)device::max_shared_memory_size(), omp_get_default_device());
           if(!shared_cache.addr){
             // warnQuda("failed to allocate %lu bytes device memory for shared cache among %d teams.", num_teams*(size_t)device::max_shared_memory_size(), num_teams);

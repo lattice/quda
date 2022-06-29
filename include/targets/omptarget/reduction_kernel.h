@@ -83,16 +83,16 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Reduction2D(void)
+  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Reduction2D(Arg *argp)
   {
     const auto& grid = target::omptarget::launch_param.grid;
     const auto& block = target::omptarget::launch_param.block;
     const int gd = grid.x*grid.y*grid.z;
     const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld)
+    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp)
     #pragma omp parallel num_threads(ld)
     {
-      Reduction2D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
+      Reduction2D_impl<Functor, Arg, grid_stride>(*argp);
     }
   }
 
@@ -177,16 +177,16 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> MultiReduction(void)
+  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> MultiReduction(Arg *argp)
   {
     const auto& grid = target::omptarget::launch_param.grid;
     const auto& block = target::omptarget::launch_param.block;
     const int gd = grid.x*grid.y*grid.z;
     const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld)
+    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp)
     #pragma omp parallel num_threads(ld)
     {
-      MultiReduction_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
+      MultiReduction_impl<Functor, Arg, grid_stride>(*argp);
     }
   }
 
