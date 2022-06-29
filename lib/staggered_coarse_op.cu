@@ -2,6 +2,7 @@
 
 #include <transfer.h>
 #include <gauge_field.h>
+#include <constant_kernel_arg.h>
 #include <tunable_nd.h>
 #include <instantiate.h>
 
