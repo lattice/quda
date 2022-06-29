@@ -87,15 +87,16 @@ namespace quda
   }
 
   template <typename Coord, typename I, typename J, typename K>
-  __device__ __host__ inline int getCoordsCB_blocking(Coord &x, int thread_idx_cb, int block_idx, const I &block_dim, J block_dim_0h, int parity, const K &X)
+  __device__ __host__ inline int getCoordsCB_blocking(Coord &x, Coord &local_coord, int thread_idx_cb,
+    int block_idx, const I &block_dim, J block_dim_0h, int parity, const K &X)
   {
-    int local_coord[4];
     int block_coord[4];
 
     int grid_dim[4] = {X[0] / block_dim[0], X[1] / block_dim[1],
                         X[2] / block_dim[2], X[3] / block_dim[3]};
 
-    getCoordsCB(local_coord, thread_idx_cb, block_dim, block_dim_0h, parity);
+    local_coord.X = getCoordsCB(local_coord, thread_idx_cb, block_dim, block_dim_0h, parity);
+    local_coord.x_cb = thread_idx_cb;
 #pragma unroll
     for (int d = 0; d < 4; d++) {
       block_coord[d] = block_idx % grid_dim[d];
@@ -125,7 +126,7 @@ namespace quda
      @return checkerboard space-time index
   */
   template <QudaPCType pc_type, KernelType kernel_type, typename Arg, int nface_ = 1>
-  __host__ __device__ inline auto getCoords(const Arg &arg, int &idx, int s, int parity, int &dim)
+  __host__ __device__ inline auto getCoords(const Arg &arg, int &idx, int s, int parity, int &dim, Coord<Arg::nDim> &local_coord)
   {
     constexpr auto nDim = Arg::nDim;
     Coord<nDim> coord;
@@ -142,7 +143,8 @@ namespace quda
         // coord.X = getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
         int block_idx = target::block_idx().x;
         int thread_idx = target::thread_idx().x;
-        coord.X = getCoordsCB_blocking(coord, thread_idx, block_idx, arg.thread_blocking, arg.thread_blocking_0h, parity, arg.dim);
+        coord.X = getCoordsCB_blocking(coord, local_coord, thread_idx, block_idx, arg.tb.dim, arg.tb.X0h, parity, arg.dim);
+        local_coord.s = s;
         coord.x_cb = coord.X / 2;
       }
     } else if (kernel_type != EXTERIOR_KERNEL_ALL) {
@@ -271,6 +273,20 @@ namespace quda
     return true;
   }
 
+  struct thread_blocking_t {
+    int_fastdiv dim[5];
+    int_fastdiv X0h;
+
+    int X1;
+    int X2X1;
+    int X3X2X1;
+
+    int X2X1mX1;
+    int X3X2X1mX2X1;
+    int X4X3X2X1mX3X2X1;
+    int X5X4X3X2X1mX4X3X2X1;
+  };
+
   template <typename Float_, int nDim_> struct DslashArg {
 
     using Float = Float_;
@@ -282,10 +298,10 @@ namespace quda
     const int nFace;   // hard code to 1 for now
     const QudaReconstructType reconstruct;
 
+    thread_blocking_t tb;
+
     const int_fastdiv X0h;
     const int_fastdiv dim[5]; // full lattice dimensions
-    int_fastdiv thread_blocking_0h; // full lattice dimensions
-    int_fastdiv thread_blocking[5]; // full lattice dimensions
     const int volumeCB;       // checkerboarded volume
     int commDim[4];           // whether a given dimension is partitioned or not (potentially overridden for Schwarz)
 

@@ -68,7 +68,7 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
   template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
+  __device__ __host__ inline void applyWilson(Vector &out, const Arg &arg, Coord &coord, Coord &local_coord, int parity, int idx, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -105,26 +105,13 @@ namespace quda
           out += (U * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {
 
-          int local_coord[4];
-#pragma unroll
-          for (int dd = 0; dd < 4; dd++) {
-            local_coord[dd] = coord[dd] % arg.thread_blocking[dd];
-          }
-
           Link U = arg.U(d, gauge_idx, gauge_parity);
           Vector in;
-          local_coord[d] = local_coord[d] + 1;
-          bool out_of_block = local_coord[d] >= arg.thread_blocking[d];
+          bool out_of_block = (local_coord[d] + 1) >= arg.tb.dim[d] && arg.tb.dim[d] < arg.dim[d];
           if (out_of_block) {
             in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
           } else {
-            int local_fwd_idx = 0;
-#pragma unroll
-            for (int dd = 3; dd >= 0; dd--) {
-              local_fwd_idx = local_fwd_idx * arg.thread_blocking[dd] + local_coord[dd];
-            }
-            local_fwd_idx /= 2;
-
+            int local_fwd_idx = thread_blocking_get_neighbor_index_cb(local_coord, d, +1, arg.tb);
             in = cache.load_x(local_fwd_idx);
           }
 
@@ -152,25 +139,12 @@ namespace quda
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
-          int local_coord[4];
-#pragma unroll
-          for (int dd = 0; dd < 4; dd++) {
-            local_coord[dd] = coord[dd] % arg.thread_blocking[dd];
-          }
-
           Vector in;
-          local_coord[d] = local_coord[d] - 1;
-          bool out_of_block = local_coord[d] < 0;
+          bool out_of_block = (local_coord[d] - 1) < 0 && arg.tb.dim[d] < arg.dim[d];
           if (out_of_block) {
             in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
           } else {
-            int local_fwd_idx = 0;
-#pragma unroll
-            for (int dd = 3; dd >= 0; dd--) {
-              local_fwd_idx = local_fwd_idx * arg.thread_blocking[dd] + local_coord[dd];
-            }
-            local_fwd_idx /= 2;
-
+            int local_fwd_idx = thread_blocking_get_neighbor_index_cb(local_coord, d, -1, arg.tb);
             in = cache.load_x(local_fwd_idx);
           }
 
@@ -197,11 +171,12 @@ namespace quda
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
 
-      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
+      Coord<4> local_coord;
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim, local_coord);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, local_coord, parity, idx, thread_dim, active);
 
       int xs = coord.x_cb + coord.s * arg.dc.volume_4d_cb;
       if (xpay && mykernel_type == INTERIOR_KERNEL) {
