@@ -70,7 +70,18 @@ namespace quda {
 
     even = gauge;
     odd = static_cast<char*>(gauge) + bytes/2;
-    if (create != QUDA_ZERO_FIELD_CREATE && isNative() && ghostExchange == QUDA_GHOST_EXCHANGE_PAD) zeroPad();
+
+    if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
+      if (isNative()) {
+        if (create != QUDA_ZERO_FIELD_CREATE) zeroPad();
+      } else {
+        for (int i=0; i<nDim; i++) {
+          size_t nbytes = nFace * surface[i] * nInternal * precision;
+          qudaMemset(ghost[i], 0, nbytes);
+          if (nbytes && geometry == QUDA_COARSE_GEOMETRY) qudaMemset(ghost[i], 0, nbytes);
+        }
+      }
+    }
   }
 
   void cudaGaugeField::zeroPad() {
