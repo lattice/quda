@@ -86,6 +86,33 @@ namespace quda
     return !incomplete;
   }
 
+  template <typename Coord, typename I, typename J, typename K>
+  __device__ __host__ inline int getCoordsCB_blocking(Coord &x, int thread_idx_cb, int block_idx, const I &block_dim, J block_dim_0h, int parity, const K &X)
+  {
+    int local_coord[4];
+    int block_coord[4];
+
+    int grid_dim[4] = {X[0] / block_dim[0], X[1] / block_dim[1],
+                        X[2] / block_dim[2], X[3] / block_dim[3]};
+
+    getCoordsCB(local_coord, thread_idx_cb, block_dim, block_dim_0h, parity);
+#pragma unroll
+    for (int d = 0; d < 4; d++) {
+      block_coord[d] = block_idx % grid_dim[d];
+      block_idx /= grid_dim[d];
+    }
+#pragma unroll
+    for (int d = 0; d < 4; d++) {
+      x[d] = local_coord[d] + block_coord[d] * block_dim[d];
+    }
+    int index = 0;
+#pragma unroll
+    for (int d = 3; d >= 0; d--) {
+      index = index * X[d] + x[d];
+    }
+    return index;
+  }
+
   /**
      @brief Compute the space-time coordinates we are at.
      @param[out] coord The computed space-time coordinates
@@ -109,10 +136,15 @@ namespace quda
 
     if (kernel_type == INTERIOR_KERNEL) {
       coord.x_cb = idx;
-      if (nDim == 5)
+      if (nDim == 5) {
         coord.X = getCoords5CB(coord, idx, arg.dim, arg.X0h, parity, pc_type);
-      else
-        coord.X = getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
+      } else {
+        // coord.X = getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
+        int block_idx = target::block_idx().x;
+        int thread_idx = target::thread_idx().x;
+        coord.X = getCoordsCB_blocking(coord, thread_idx, block_idx, arg.thread_blocking, arg.thread_blocking_0h, parity, arg.dim);
+        coord.x_cb = coord.X / 2;
+      }
     } else if (kernel_type != EXTERIOR_KERNEL_ALL) {
 
       // compute face index and then compute coords
@@ -252,6 +284,8 @@ namespace quda
 
     const int_fastdiv X0h;
     const int_fastdiv dim[5]; // full lattice dimensions
+    int_fastdiv thread_blocking_0h; // full lattice dimensions
+    int_fastdiv thread_blocking[5]; // full lattice dimensions
     const int volumeCB;       // checkerboarded volume
     int commDim[4];           // whether a given dimension is partitioned or not (potentially overridden for Schwarz)
 

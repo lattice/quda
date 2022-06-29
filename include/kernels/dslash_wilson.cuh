@@ -7,6 +7,7 @@
 #include <dslash_helper.cuh>
 #include <index_helper.cuh>
 #include <kernels/dslash_pack.cuh> // for the packing kernel
+#include <shared_memory_cache_helper.cuh>
 
 namespace quda
 {
@@ -77,6 +78,12 @@ namespace quda
     // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
+    SharedMemoryCache<Vector> cache(target::block_dim());
+    if (kernel_type == INTERIOR_KERNEL) {
+      cache.save(arg.in(coord.x_cb + coord.s * arg.dc.volume_4d_cb, their_spinor_parity));
+      cache.sync();
+    }
+
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
       {                           // Forward gather - compute fwd offset for vector fetch
@@ -98,8 +105,28 @@ namespace quda
           out += (U * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {
 
+          int local_coord[4];
+#pragma unroll
+          for (int dd = 0; dd < 4; dd++) {
+            local_coord[dd] = coord[dd] % arg.thread_blocking[dd];
+          }
+
           Link U = arg.U(d, gauge_idx, gauge_parity);
-          Vector in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          Vector in;
+          local_coord[d] = local_coord[d] + 1;
+          bool out_of_block = local_coord[d] >= arg.thread_blocking[d];
+          if (out_of_block) {
+            in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          } else {
+            int local_fwd_idx = 0;
+#pragma unroll
+            for (int dd = 3; dd >= 0; dd--) {
+              local_fwd_idx = local_fwd_idx * arg.thread_blocking[dd] + local_coord[dd];
+            }
+            local_fwd_idx /= 2;
+
+            in = cache.load_x(local_fwd_idx);
+          }
 
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
@@ -125,7 +152,27 @@ namespace quda
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
-          Vector in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          int local_coord[4];
+#pragma unroll
+          for (int dd = 0; dd < 4; dd++) {
+            local_coord[dd] = coord[dd] % arg.thread_blocking[dd];
+          }
+
+          Vector in;
+          local_coord[d] = local_coord[d] - 1;
+          bool out_of_block = local_coord[d] < 0;
+          if (out_of_block) {
+            in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          } else {
+            int local_fwd_idx = 0;
+#pragma unroll
+            for (int dd = 3; dd >= 0; dd--) {
+              local_fwd_idx = local_fwd_idx * arg.thread_blocking[dd] + local_coord[dd];
+            }
+            local_fwd_idx /= 2;
+
+            in = cache.load_x(local_fwd_idx);
+          }
 
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
@@ -149,7 +196,7 @@ namespace quda
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      
+
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;

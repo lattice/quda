@@ -223,6 +223,37 @@ namespace quda {
   }
 
   /**
+     @brief Compute the checkerboard 1-d index for the nearest
+     neighbor
+     @param[in] lattice coordinates
+     @param[in] mu dimension in which to add 1
+     @param[in] dir direction (+1 or -1)
+     @param[in] arg parameter struct
+     @return 1-d checkboard index
+   */
+  template <typename Coord, typename Arg>
+  __device__ __host__ inline int thread_blocking_get_neighbor_index_cb(const Coord &x, int mu, int dir, const Arg &arg)
+  {
+    switch (dir) {
+    case +1: // positive direction
+      switch (mu) {
+      case 0: return (x.X + 1) >> 1;
+      case 1: return (x.X + arg.tb_x1) >> 1;
+      case 2: return (x.X + arg.tb_x2x1) >> 1;
+      case 3: return (x.X + arg.tb_x3x2x1) >> 1;
+      }
+    case -1:
+      switch (mu) {
+      case 0: return (x.X - 1) >> 1;
+      case 1: return (x.X - arg.tb_x1) >> 1;
+      case 2: return (x.X - arg.tb_x2x1) >> 1;
+      case 3: return (x.X - arg.tb_x3x2x1) >> 1;
+      }
+    }
+    return 0; // should never reach here
+  }
+
+  /**
      Compute the 4-d spatial index from the checkerboarded 1-d index at parity parity
 
      @param[out] x Computed spatial index

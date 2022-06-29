@@ -18,12 +18,13 @@ namespace quda
   template <typename Arg> class Wilson : public Dslash<wilson, Arg>
   {
     using Dslash = Dslash<wilson, Arg>;
+    using Dslash::arg;
 
   public:
-    Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
+    Wilson(Arg &arg_, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg_, out, in)
     {
       if(in.Ndim() == 5) {
-        TunableKernel3D::resizeVector(in.X(4), arg.nParity);
+        TunableKernel3D::resizeVector(in.X(4), arg_.nParity);
       }
     }
 
@@ -31,8 +32,30 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
+      if (arg.kernel_type == INTERIOR_KERNEL) {
+        arg.thread_blocking_0h = static_cast<int>(tp.block.x * 2 / 32 / 2);
+        arg.thread_blocking[0] = arg.thread_blocking_0h * 2;
+        arg.thread_blocking[1] = 4;
+        arg.thread_blocking[2] = 4;
+        arg.thread_blocking[3] = 2;
+      }
       Dslash::template instantiate<packShmem>(tp, stream);
     }
+
+    virtual unsigned int sharedBytesPerThread() const
+    {
+      if (arg.kernel_type == INTERIOR_KERNEL) {
+        return 4 * 4 * 3 * 2;
+      } else {
+        return 0;
+      }
+    }
+
+    virtual int blockStep() const { return 128; }
+
+    virtual int blockMin() const { return 128; }
+
+    unsigned int maxBlockSize(const TuneParam &) const { return 128; }
   };
 
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonApply {
