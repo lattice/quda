@@ -263,17 +263,18 @@ namespace quda
   void *device_pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
     if (!comm_peer2peer_present()) return device_malloc_(func, file, line, size);
-    ompwip("ERROR: device_pinned_malloc_ with !comm_peer2peer_present() unimplemented");
-    return nullptr;
-/*
 
     MemAlloc a(func, file, line);
+    a.size = a.base_size = size;
     void *ptr;
 
-    a.size = a.base_size = size;
-
-    CUresult err = cuMemAlloc((CUdeviceptr *)&ptr, size);
-    if (err != CUDA_SUCCESS) {
+    if(0<omp_get_num_devices())
+      ptr = omp_target_alloc_device(size, omp_get_default_device());
+    else{
+      warningQuda("%s:%d %s() allocate on host instead of device", file, line, func);
+      ptr = aligned_alloc(64, size);
+    }
+    if (!ptr) {
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
     track_malloc(DEVICE_PINNED, a, ptr);
@@ -281,7 +282,6 @@ namespace quda
     cudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
-*/
   }
 
   /**
@@ -417,14 +417,19 @@ namespace quda
    * defined in malloc_quda.h
    */
   void *managed_malloc_(const char *func, const char *file, int line, size_t size)
-  {ompwip("ERROR: managed_malloc_ unimplemented return nullptr");return nullptr;/*
+  {
     MemAlloc a(func, file, line);
     void *ptr;
 
     a.size = a.base_size = size;
 
-    cudaError_t err = cudaMallocManaged(&ptr, size);
-    if (err != cudaSuccess) {
+    if(0<omp_get_num_devices()){
+      ptr = omp_target_alloc_shared(size, omp_get_default_device());
+    }else{
+      warningQuda("%s:%d %s() managed malloc without a device", file, line, func);
+      ptr = aligned_malloc(a, size);
+    }
+    if (!ptr) {
       errorQuda("Failed to allocate managed memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
     track_malloc(MANAGED, a, ptr);
@@ -432,7 +437,7 @@ namespace quda
     cudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
-  */}
+  }
 
   /**
    * Free device memory allocated with device_malloc().  This function
@@ -441,7 +446,7 @@ namespace quda
    */
   void device_free_(const char *func, const char *file, int line, void *ptr)
   {
-    if (use_managed_memory()) {ompwip("ERROR: unimplemented");
+    if (use_managed_memory()) {
       managed_free_(func, file, line, ptr);
       return;
     }
@@ -473,7 +478,6 @@ namespace quda
    */
   void device_pinned_free_(const char *func, const char *file, int line, void *ptr)
   {
-    ompwip("ERROR: device_pinned_free_ untested code path: %p",ptr); print_trace();
     if (!comm_peer2peer_present()) {
       device_free_(func, file, line, ptr);
       return;
@@ -500,15 +504,17 @@ namespace quda
    * malloc_quda.h
    */
   void managed_free_(const char *func, const char *file, int line, void *ptr)
-  {ompwip("ERROR: managed_free_ unimplemented doing nothing: %p",ptr);/*
+  {
     if (!ptr) { errorQuda("Attempt to free NULL managed pointer (%s:%d in %s())\n", file, line, func); }
     if (!alloc[MANAGED].count(ptr)) {
       errorQuda("Attempt to free invalid managed pointer (%s:%d in %s())\n", file, line, func);
     }
-    cudaError_t err = cudaFree(ptr);
-    if (err != cudaSuccess) { errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
+    if(0<omp_get_num_devices())
+      omp_target_free(ptr, omp_get_default_device());
+    else
+      free(ptr);
     track_free(MANAGED, ptr);
-  */}
+  }
 
   /**
    * Free host memory allocated with safe_malloc(), pinned_malloc(),
@@ -522,20 +528,25 @@ namespace quda
       track_free(HOST, ptr);
       free(ptr);
     } else if (alloc[PINNED].count(ptr)) {
-      ompwip("WARNING: free PINNED ptr: %p",ptr);
 /*
       cudaError_t err = cudaHostUnregister(ptr);
       if (err != cudaSuccess) { errorQuda("Failed to unregister pinned memory (%s:%d in %s())\n", file, line, func); }
 */
       track_free(PINNED, ptr);
-      free(ptr);
+      if(0<omp_get_num_devices())
+        omp_target_free(ptr, omp_get_default_device());
+      else
+        free(ptr);
     } else if (alloc[MAPPED].count(ptr)) {
 #ifdef HOST_ALLOC
 #ifdef OMPTARGET_MAPPED_USE_ASSOCIATE_PTR
       ompwip("ERROR: HOST_ALLOC alloc[MAPPED].count(ptr) untested code path: %p",ptr); print_trace();
       free(ptr);
 #else
-      omp_target_free(ptr, omp_get_default_device());
+      if(0<omp_get_num_devices())
+        omp_target_free(ptr, omp_get_default_device());
+      else
+        free(ptr);
 #endif
 /*
       cudaError_t err = cudaFreeHost(ptr);
@@ -552,7 +563,10 @@ namespace quda
       }
       free(ptr);
 #else
-      omp_target_free(ptr, omp_get_default_device());
+      if(0<omp_get_num_devices())
+        omp_target_free(ptr, omp_get_default_device());
+      else
+        free(ptr);
 #endif
 /*
       cudaError_t err = cudaHostUnregister(ptr);
@@ -706,7 +720,7 @@ namespace quda
 
   void register_pinned_(const char *func, const char *file, int line, void *ptr, size_t bytes)
   {
-    ompwip("ERROR: register_pinned_ unimplemented: %p",ptr);
+    ompwip("WARNING: register_pinned_ unimplemented: %p",ptr);
 /*
     auto error = cudaHostRegister(ptr, bytes, cudaHostRegisterDefault);
     if (error != cudaSuccess) {
@@ -718,7 +732,7 @@ namespace quda
 
   void unregister_pinned_(const char *func, const char *file, int line, void *ptr)
   {
-    ompwip("ERROR: unregister_pinned_ unimplemented: %p",ptr);
+    ompwip("WARNING: unregister_pinned_ unimplemented: %p",ptr);
 /*
     auto error = cudaHostUnregister(ptr);
     if (error != cudaSuccess) {
