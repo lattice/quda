@@ -138,6 +138,7 @@ namespace quda
 #ifdef NVSHMEM_COMMS
       errorQuda("Fused Mobius/DWF-4D kernels do not currently work with NVSHMEM.");
 #else
+#if 0
       constexpr int nDim = 4;
       using Arg = DomainWall4DFusedM5Arg<Float, nColor, nDim, recon, dslash5_type_impl>;
       Arg arg(out, in, U, a, m_5, b_5, c_5, a != 0.0, x, y, parity, dagger, comm_override, m_f);
@@ -145,6 +146,7 @@ namespace quda
 
       dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, in.getDslashConstant().volume_4d_cb,
                                                      in.getDslashConstant().ghostFaceCB, profile);
+#endif
 #endif
     }
   };

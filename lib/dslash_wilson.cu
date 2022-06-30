@@ -19,7 +19,7 @@ namespace quda
   constexpr int num_buckets = 4;
   using array_t = std::array<int, num_buckets>;
 
-  int powi(int base, int power) {
+  static int powi(int base, int power) {
     int prod = 1;
     for (int p = 0; p < power; p++) {
       prod *= base;
@@ -27,7 +27,7 @@ namespace quda
     return prod;
   }
 
-  int encode(const std::vector<bool> &v) {
+  static int encode(const std::vector<bool> &v) {
     int s = 0;
     for (size_t i = 0; i < v.size(); i++) {
       if (v[i]) {
@@ -40,7 +40,7 @@ namespace quda
     return s;
   }
 
-  auto decode(int code, int num_two) {
+  static auto decode(int code, int num_two) {
     std::vector<bool> v(num_buckets + num_two - 1);
     for (int i = v.size() - 1; i >= 0; i--) {
       v[i] = code % 2;
@@ -49,7 +49,7 @@ namespace quda
     return v;
   }
 
-  auto initialize_dist(int num_two) {
+  static auto initialize_dist(int num_two) {
     int num_divider = num_buckets - 1;
     std::vector<bool> v(num_two + num_divider);
 
@@ -63,7 +63,7 @@ namespace quda
     return v;
   }
 
-  auto get_dist(const std::vector<bool> &v, int num_two) {
+  static auto get_dist(const std::vector<bool> &v, int num_two) {
     std::vector<int> p(num_buckets);
     for (int d = 0; d < num_buckets; d++) {
       p[d] = 1;
@@ -81,7 +81,7 @@ namespace quda
     return p;
   }
 
-  int count_two(int in) {
+  static int count_two(int in) {
     int count = 0;
     while (in % 2 == 0 && in > 0) {
       count++;
@@ -166,40 +166,24 @@ namespace quda
       return found_valid_z;
     }
 
-    virtual bool advanceBlockDim(TuneParam &param) const
-    {
-      if (arg.kernel_type != INTERIOR_KERNEL) {
-        return Dslash::advanceBlockDim(param);
-      }
-
-      const unsigned int max_threads = maxBlockSize(param);
-      const unsigned int max_shared = this->maxSharedBytesPerBlock();
-      bool ret;
-
+    virtual bool moveBlockDimStep(TuneParam &param) const {
       param.block.x *= 2;
-      int nthreads = param.block.x * param.block.y * param.block.z;
-      param.shared_bytes = std::max(this->sharedBytesPerThread() * nthreads, this->sharedBytesPerBlock(param));
 
       int num_two = count_two(param.block.x * 2 / 32);
       auto v = initialize_dist(num_two);
       auto p = get_dist(v, num_two);
 
       bool found_valid_z = find_valid_z(v, num_two);
+      return found_valid_z;
+    }
 
-      if (param.block.x > max_threads || param.shared_bytes > max_shared
-          || param.block.x * param.block.y * param.block.z > device::max_threads_per_block() || !found_valid_z) {
-        this->resetBlockDim(param);
-        int nthreads = param.block.x * param.block.y * param.block.z;
-        param.shared_bytes = std::max(this->sharedBytesPerThread() * nthreads, this->sharedBytesPerBlock(param));
-        ret = false;
-      } else {
-        param.aux.z = encode(v);
-        ret = true;
-      }
+    virtual void moveAux(TuneParam &param) const {
+      int num_two = count_two(param.block.x * 2 / 32);
+      auto v = initialize_dist(num_two);
+      auto p = get_dist(v, num_two);
 
-      if (!this->tuneGridDim()) param.grid.x = (this->minThreads() + param.block.x - 1) / param.block.x;
-
-      return ret;
+      find_valid_z(v, num_two);
+      param.aux.z = encode(v);
     }
 
     virtual bool advanceAux(TuneParam & tp) const {

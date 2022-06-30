@@ -136,23 +136,32 @@ namespace quda {
       }
     }
 
+    virtual bool moveBlockDimStep(TuneParam &param) const {
+      param.block.x += blockStep();
+      return true;
+    }
+
+    virtual void moveAux(TuneParam &) const { }
+
     virtual bool advanceBlockDim(TuneParam &param) const
     {
       const unsigned int max_threads = maxBlockSize(param);
       const unsigned int max_shared = maxSharedBytesPerBlock();
       bool ret;
 
-      param.block.x += blockStep();
+      bool move_successful = moveBlockDimStep(param);
       int nthreads = param.block.x * param.block.y * param.block.z;
       param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
 
       if (param.block.x > max_threads || param.shared_bytes > max_shared
-          || param.block.x * param.block.y * param.block.z > device::max_threads_per_block()) {
+          || param.block.x * param.block.y * param.block.z > device::max_threads_per_block() || !move_successful) {
         resetBlockDim(param);
+        moveAux(param);
         int nthreads = param.block.x * param.block.y * param.block.z;
         param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
         ret = false;
       } else {
+        moveAux(param);
         ret = true;
       }
 
