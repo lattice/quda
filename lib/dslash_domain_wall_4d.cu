@@ -108,12 +108,12 @@ namespace quda
       Dslash::setParam(tp);
       if (arg.kernel_type == INTERIOR_KERNEL) {
         // offset = (4, 2, 2, 2)
-        int num_two = count_two(tp.block.x * 2 / 32);
+        int num_two = count_two(tp.block.x * 2 / 2);
         auto p = get_dist(decode(tp.aux.z, num_two), num_two);
-        p[0] *= 4;
-        p[1] *= 2;
-        p[2] *= 2;
-        p[3] *= 2;
+        p[0] *= 2;
+        p[1] *= 1;
+        p[2] *= 1;
+        p[3] *= 1;
 
         printf("Launching p: %d, %d, %d, %d\n", p[0], p[1], p[2], p[3]);
         arg.tb.X0h = p[0] / 2;
@@ -141,10 +141,10 @@ namespace quda
     }
 
     bool if_valid_thread_block(std::vector<int> p) const {
-      p[0] *= 4;
-      p[1] *= 2;
-      p[2] *= 2;
-      p[3] *= 2;
+      p[0] *= 2;
+      p[1] *= 1;
+      p[2] *= 1;
+      p[3] *= 1;
       return arg.dim[0] % p[0] == 0 && arg.dim[1] % p[1] == 0 && arg.dim[2] % p[2] == 0 && arg.dim[3] % p[3] == 0;
     }
 
@@ -171,7 +171,7 @@ namespace quda
     virtual bool moveBlockDimStep(TuneParam &param) const {
       param.block.x *= 2;
 
-      int num_two = count_two(param.block.x * 2 / 32);
+      int num_two = count_two(param.block.x * 2 / 2);
       auto v = initialize_dist(num_two);
       auto p = get_dist(v, num_two);
 
@@ -180,7 +180,7 @@ namespace quda
     }
 
     virtual void moveAux(TuneParam &param) const {
-      int num_two = count_two(param.block.x * 2 / 32);
+      int num_two = count_two(param.block.x * 2 / 2);
       auto v = initialize_dist(num_two);
       auto p = get_dist(v, num_two);
 
@@ -195,7 +195,7 @@ namespace quda
       if (Dslash::advanceAux(tp)) {
         return true;
       } else {
-        int num_two = count_two(tp.block.x * 2 / 32);
+        int num_two = count_two(tp.block.x * 2 / 2);
         auto v = decode(tp.aux.z, num_two);
         while (std::next_permutation(v.begin(), v.end())) {
           auto p = get_dist(v, num_two);
@@ -215,7 +215,7 @@ namespace quda
     virtual void initTuneParam(TuneParam &param) const {
       Dslash::initTuneParam(param);
       if (arg.kernel_type == INTERIOR_KERNEL) {
-        int num_two = count_two(param.block.x * 2 / 32);
+        int num_two = count_two(param.block.x * 2 / 2);
         auto v = initialize_dist(num_two);
         bool found_valid_z = find_valid_z(v, num_two);
         if (found_valid_z) {

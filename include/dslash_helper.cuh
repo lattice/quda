@@ -95,13 +95,22 @@ namespace quda
     int grid_dim[4] = {X[0] / block_dim[0], X[1] / block_dim[1],
                         X[2] / block_dim[2], X[3] / block_dim[3]};
 
-    local_coord.X = getCoordsCB(local_coord, thread_idx_cb, block_dim, block_dim_0h, parity);
-    local_coord.x_cb = thread_idx_cb;
 #pragma unroll
     for (int d = 0; d < 4; d++) {
       block_coord[d] = block_idx % grid_dim[d];
       block_idx /= grid_dim[d];
     }
+
+    int offset[4];
+#pragma unroll
+    for (int d = 0; d < 4; d++) {
+      offset[d] = block_coord[d] * block_dim[d];
+    }
+
+    int local_parity = (offset[0] + offset[1] + offset[2] + offset[3] + parity) % 2;
+
+    local_coord.X = getCoordsCB(local_coord, thread_idx_cb, block_dim, block_dim_0h, local_parity);
+    local_coord.x_cb = thread_idx_cb;
 #pragma unroll
     for (int d = 0; d < 4; d++) {
       x[d] = local_coord[d] + block_coord[d] * block_dim[d];
