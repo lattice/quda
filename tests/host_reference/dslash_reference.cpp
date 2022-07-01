@@ -520,7 +520,8 @@ double verifyWilsonTypeEigenvector(void *spinor, double _Complex lambda, int i, 
                         gauge_param);
       } else {
         tm_ndeg_mat(spinorTmp, gauge, spinor, kappa, mu, epsilon, dagger, cpu_prec, gauge_param);
-        if (normop) tm_ndeg_mat(spinorTmp2, gauge, spinorTmp, kappa, mu, epsilon, dagger_opposite, cpu_prec, gauge_param);
+        if (normop)
+          tm_ndeg_mat(spinorTmp2, gauge, spinorTmp, kappa, mu, epsilon, dagger_opposite, cpu_prec, gauge_param);
       }
     } else {
       if (use_pc) {
