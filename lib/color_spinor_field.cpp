@@ -1438,40 +1438,39 @@ namespace quda
               }
             }
           }
+        }
 
-          if (!gdr_recv) {
-            if (!fused_halo_memcpy) {
-              for (int i = 0; i < nDimComms; i++) {
-                if (comm_dim_partitioned(i)) {
-                  if (halo_location[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i)
-                      && // fuse forwards and backwards if possible
-                      halo_location[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i)) {
+        if (!gdr_recv) {
+          if (!fused_halo_memcpy) {
+            for (int i = 0; i < nDimComms; i++) {
+              if (comm_dim_partitioned(i)) {
+                if (halo_location[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i)
+                    && // fuse forwards and backwards if possible
+                    halo_location[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i)) {
+                  qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
+                                  2 * ghost_face_bytes_aligned[i], qudaMemcpyHostToDevice, device::get_default_stream());
+                } else {
+                  if (halo_location[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i))
                     qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
-                                    2 * ghost_face_bytes_aligned[i], qudaMemcpyHostToDevice,
-                                    device::get_default_stream());
-                  } else {
-                    if (halo_location[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i))
-                      qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
-                                      ghost_face_bytes[i], qudaMemcpyHostToDevice, device::get_default_stream());
-                    if (halo_location[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
-                      qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][1], from_face_dim_dir_h[bufferIndex][i][1],
-                                      ghost_face_bytes[i], qudaMemcpyHostToDevice, device::get_default_stream());
-                  }
+                                    ghost_face_bytes[i], qudaMemcpyHostToDevice, device::get_default_stream());
+                  if (halo_location[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
+                    qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][1], from_face_dim_dir_h[bufferIndex][i][1],
+                                    ghost_face_bytes[i], qudaMemcpyHostToDevice, device::get_default_stream());
                 }
               }
-            } else if (total_bytes && !halo_host) {
-              qudaMemcpyAsync(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes,
-                              qudaMemcpyHostToDevice, device::get_default_stream());
             }
+          } else if (total_bytes && !halo_host) {
+            qudaMemcpyAsync(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes,
+                            qudaMemcpyHostToDevice, device::get_default_stream());
           }
+        }
 
-          // ensure that the p2p sending is completed before returning
-          for (int dim = 0; dim < nDimComms; dim++) {
-            if (!comm_dim_partitioned(dim)) continue;
-            for (int dir = 0; dir < 2; dir++) {
-              if (comm_peer2peer_enabled(dir, dim))
-                qudaStreamWaitEvent(device::get_default_stream(), ipcCopyEvent[bufferIndex][dim][dir], 0);
-            }
+        // ensure that the p2p sending is completed before returning
+        for (int dim = 0; dim < nDimComms; dim++) {
+          if (!comm_dim_partitioned(dim)) continue;
+          for (int dir = 0; dir < 2; dir++) {
+            if (comm_peer2peer_enabled(dir, dim))
+              qudaStreamWaitEvent(device::get_default_stream(), ipcCopyEvent[bufferIndex][dim][dir], 0);
           }
         }
       } else {
