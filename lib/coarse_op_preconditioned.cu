@@ -210,6 +210,7 @@ namespace quda
           } else {
             GaugeFieldParam param(X);
             param.order = order;
+            // if we did the exchange on AoS order, then this zero initialize wouldn't be needed
             if (!copy_content) param.create = QUDA_ZERO_FIELD_CREATE;
             output = cudaGaugeField::Create(param);
             if (copy_content) output->copy(X);
