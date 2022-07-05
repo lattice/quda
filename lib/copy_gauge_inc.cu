@@ -23,7 +23,7 @@ namespace quda {
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
 #if QUDA_RECONSTRUCT & 1
         typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_8>::type G;
-        copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost), inOrder, out, in, location, type);
+        copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, type);
 #else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8", QUDA_RECONSTRUCT);
 #endif
@@ -31,7 +31,7 @@ namespace quda {
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
 #if QUDA_RECONSTRUCT & 2
         typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_13>::type G;
-        copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost), inOrder, out, in, location, type);
+        copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, type);
 #else
         errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-13", QUDA_RECONSTRUCT);
 #endif
@@ -39,17 +39,17 @@ namespace quda {
 #if QUDA_RECONSTRUCT & 1
         if (out.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
           typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_MILC>::type G;
-          copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost), inOrder, out, in, location, type);
+          copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, type);
         } else if (out.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
 #ifdef BUILD_TIFR_INTERFACE
           typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_TIFR>::type G;
-          copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost), inOrder, out, in, location, type);
+          copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, type);
 #else
           errorQuda("TIFR interface has not been built so TIFR phase type not enabled\n");
 #endif
         } else if (out.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO) {
           typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9>::type G;
-          copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost), inOrder, out, in, location, type);
+          copyGauge<FloatOut, FloatIn, length, fine_grain()>(G(out, Out, outGhost), inOrder, out, in, location, type);
         } else {
           errorQuda("Staggered phase type %d not supported", out.StaggeredPhase());
         }
@@ -117,8 +117,7 @@ namespace quda {
     } else if (out.Order() == QUDA_TIFR_GAUGE_ORDER) {
 
 #ifdef BUILD_TIFR_INTERFACE
-      copyGauge<FloatOut, FloatIn, length>,
-        fine_grain()(TIFROrder<FloatOut, length>(out, Out, outGhost), inOrder, out, in, location, type);
+      copyGauge<FloatOut, FloatIn, length>, fine_grain()>(TIFROrder<FloatOut, length>(out, Out, outGhost), inOrder, out, in, location, type);
 #else
       errorQuda("TIFR interface has not been built\n");
 #endif
