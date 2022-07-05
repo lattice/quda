@@ -24,12 +24,11 @@ namespace quda
      @param[in] v Vector of inputs
      @param[in] n_items Number of elements to be reduced in each input
      @param[in] transformer Functor that applies transform to each element
-     @param[in] init The results are initialized to this value
-     @param[in] reducer Functor that applies the reduction to each transformed element
+     @param[in] mapper Index mapper (defaults to identity)
    */
-  template <typename reducer, typename T, typename I, typename transformer>
+  template <typename reducer, typename T, typename I, typename transformer, typename mapper = identity>
   void transform_reduce(QudaFieldLocation location, std::vector<typename reducer::reduce_t> &result,
-                        const std::vector<T *> &v, I n_items, transformer h);
+                        const std::vector<T *> &v, I n_items, transformer h, mapper m = identity());
 
   /**
      @brief QUDA implementation providing thrust::transform_reduce like
@@ -41,8 +40,6 @@ namespace quda
      @param[in] v Input vector
      @param[in] n_items Number of elements to be reduced
      @param[in] transformer Functor that applies transform to each element
-     @param[in] init Results is initialized to this value
-     @param[in] reducer Functor that applies the reduction to each transformed element
    */
   template <typename reducer, typename T, typename I, typename transformer>
   typename reducer::reduce_t transform_reduce(QudaFieldLocation location, const T *v, I n_items, transformer h);
@@ -56,10 +53,8 @@ namespace quda
      @param[out] result Result
      @param[in] v Input vector
      @param[in] n_items Number of elements to be reduced
-     @param[in] init The results are initialized to this value
-     @param[in] reducer Functor that applies the reduction to each transformed element
    */
-  template <typename reducer, typename T, typename I, typename transformer>
+  template <typename reducer, typename T, typename I, typename mapper = identity>
   void reduce(QudaFieldLocation location, std::vector<typename reducer::reduce_t> &result, const std::vector<T *> &v,
               I n_items);
 
@@ -72,8 +67,6 @@ namespace quda
      @param[out] result Result
      @param[in] v Input vector
      @param[in] n_items Number of elements to be reduced
-     @param[in] init Result is initialized to this value
-     @param[in] reducer Functor that applies the reduction to each transformed element
    */
   template <typename reducer, typename T, typename I>
   typename reducer::reduce_t reduce(QudaFieldLocation location, const T *v, I n_items);

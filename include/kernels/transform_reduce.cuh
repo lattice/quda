@@ -6,7 +6,7 @@
 
 namespace quda {
 
-  template <typename reducer_, typename T, typename count_t, typename transformer>
+  template <typename reducer_, typename T, typename count_t, typename transformer, typename mapper>
   struct TransformReduceArg : public ReduceArg<typename reducer_::reduce_t> {
     using reducer = reducer_;
     using reduce_t = typename reducer::reduce_t;
@@ -15,12 +15,14 @@ namespace quda {
     count_t n_items;
     int n_batch;
     transformer h;
+    mapper m;
 
-    TransformReduceArg(const std::vector<T *> &v, count_t n_items, transformer h) :
+    TransformReduceArg(const std::vector<T *> &v, count_t n_items, transformer h, mapper m) :
       ReduceArg<reduce_t>(dim3(n_items, 1, v.size()), v.size()),
       n_items(n_items),
       n_batch(v.size()),
-      h(h)
+      h(h),
+      m(m)
     {
       if (n_batch > n_batch_max) errorQuda("Requested batch %d greater than max supported %d", n_batch, n_batch_max);
       if (n_items > std::numeric_limits<count_t>::max())
@@ -42,8 +44,9 @@ namespace quda {
 
     __device__ __host__ inline reduce_t operator()(reduce_t &value, count_t i, int, int j)
     {
+      auto k = arg.m(i);
       auto v = arg.v[j];
-      auto t = arg.h(v[i]);
+      auto t = arg.h(v[k]);
       return operator()(t, value);
     }
   };
