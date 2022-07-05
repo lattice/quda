@@ -69,11 +69,10 @@ namespace quda {
   }
 
   template <typename sFloatOut, typename sFloatIn, int Nc>
-    void copyGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
-		     sFloatOut *Out, sFloatIn *In, sFloatOut **outGhost, sFloatIn **inGhost, int type)
+  void copyGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location, sFloatOut *Out, sFloatIn *In,
+                   sFloatOut **outGhost, sFloatIn **inGhost, int type)
   {
     using FloatIn = typename mapper<sFloatIn>::type;
-    constexpr int length = 2*Nc*Nc;
 
     if (in.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Reconstruct type %d not supported", in.Reconstruct());
 
@@ -89,7 +88,7 @@ namespace quda {
                                               outGhost, type);
         }
       } else {
-        typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_NO, length>::type G;
+        typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_NO, 2 * Nc * Nc>::type G;
         copyGaugeMG<sFloatOut, FloatIn, Nc>(G(in, In, inGhost), out, in, location, Out, outGhost, type);
       }
     } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
@@ -99,7 +98,7 @@ namespace quda {
         copyGaugeMG<sFloatOut, FloatIn, Nc>(G(const_cast<GaugeField &>(in), In, inGhost), out, in, location, Out,
                                             outGhost, type);
       } else {
-        using G = typename gauge::QDPOrder<FloatIn, length>;
+        using G = typename gauge::QDPOrder<FloatIn, 2 * Nc * Nc>;
         copyGaugeMG<sFloatOut, FloatIn, Nc>(G(in, In, inGhost), out, in, location, Out, outGhost, type);
       }
 
@@ -110,7 +109,7 @@ namespace quda {
         copyGaugeMG<sFloatOut, FloatIn, Nc>(G(const_cast<GaugeField &>(in), In, inGhost), out, in, location, Out,
                                             outGhost, type);
       } else {
-        using G = typename gauge::MILCOrder<FloatIn, length>;
+        using G = typename gauge::MILCOrder<FloatIn, 2 * Nc * Nc>;
         copyGaugeMG<sFloatOut, FloatIn, Nc>(G(in, In, inGhost), out, in, location, Out, outGhost, type);
       }
 
