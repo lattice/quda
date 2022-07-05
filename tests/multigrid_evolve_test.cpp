@@ -233,6 +233,7 @@ int main(int argc, char **argv)
       if (comm_dim_partitioned(dir)) R[dir] = 2;
     for (int dir = 0; dir < 4; ++dir) y[dir] = gauge_param.X[dir] + 2 * R[dir];
     GaugeFieldParam gParamEx(y, prec, link_recon, pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
+    gParamEx.location = QUDA_CUDA_FIELD_LOCATION;
     gParamEx.create = QUDA_ZERO_FIELD_CREATE;
     gParamEx.order = gParam.order;
     gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
