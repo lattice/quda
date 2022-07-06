@@ -43,13 +43,19 @@ namespace quda
 
       if (basis == QUDA_POWER_BASIS) {
         // in power basis q[k] = p[k+1], so we don't need a separate q array
-        p.resize(param.Nkrylov + 1, ColorSpinorField(csParam));
+        p.resize(param.Nkrylov + 1);
         q.resize(param.Nkrylov);
-        for (int i = 0; i < param.Nkrylov + 1; i++)
+        for (int i = 0; i < param.Nkrylov + 1; i++) {
+          p[i] = ColorSpinorField(csParam);
           if (i > 0) q[i - 1] = p[i].create_alias(csParam);
+        }
       } else {
-        p.resize(param.Nkrylov, ColorSpinorField(csParam));
-        q.resize(param.Nkrylov, ColorSpinorField(csParam));
+        p.resize(param.Nkrylov);
+        q.resize(param.Nkrylov);
+        for (int i = 0; i < param.Nkrylov; i++) {
+          p[i] = ColorSpinorField(csParam);
+          q[i] = ColorSpinorField(csParam);
+        }
       }
 
       csParam.setPrecision(param.precision);
