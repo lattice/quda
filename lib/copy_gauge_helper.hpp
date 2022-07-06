@@ -1,22 +1,13 @@
 #include <tunable_nd.h>
 #include <kernels/copy_gauge.cuh>
 
-namespace quda {
+namespace quda
+{
 
   using namespace gauge;
 
-#ifdef FINE_GRAINED_ACCESS
-  constexpr bool fine_grain() { return true; }
-#define GAUGE_FUNCTOR CopyGaugeFineGrained_
-#define GHOST_FUNCTOR CopyGhostFineGrained_
-#else
-  constexpr bool fine_grain() { return false; }
-#define GAUGE_FUNCTOR CopyGauge_
-#define GHOST_FUNCTOR CopyGhost_
-#endif
-
-  template <typename Arg>
-  class CopyGauge : TunableKernel3D {
+  template <typename Arg> class CopyGauge : TunableKernel3D
+  {
     Arg &arg;
     int size;
     QudaFieldLocation location;
@@ -28,15 +19,17 @@ namespace quda {
 
   public:
     CopyGauge(Arg &arg, GaugeField &out, const GaugeField &in, QudaFieldLocation location) :
-      TunableKernel3D(in, fine_grain() ? in.Ncolor() : 1, in.Geometry() * 2, location),
-      arg(arg), location(location), is_ghost(false),
+      TunableKernel3D(in, Arg::fine_grain ? in.Ncolor() : 1, in.Geometry() * 2, location),
+      arg(arg),
+      location(location),
+      is_ghost(false),
       out(out),
       in(in)
     {
       set_ghost(is_ghost); // initial state is not ghost
       strcat(aux, ",");
       strcat(aux, out.AuxString());
-      if (fine_grain()) strcat(aux,",fine-grained");
+      if (Arg::fine_grain) strcat(aux, ",fine-grained");
     }
 
     void set_ghost(int is_ghost_)
@@ -45,10 +38,11 @@ namespace quda {
       if (is_ghost_ == 2) arg.out_offset = in.Ndim(); // forward links
 
       int face_max = 0;
-      for (int d=0; d<in.Ndim(); d++) face_max = std::max(in.SurfaceCB(d), face_max);
+      for (int d = 0; d < in.Ndim(); d++) face_max = std::max(in.SurfaceCB(d), face_max);
       size = is_ghost ? in.Nface() * face_max : in.VolumeCB();
       if (size == 0 && is_ghost) {
-	errorQuda("Cannot copy zero-sized ghost zone.  Check nFace parameter is non-zero for both input and output gauge fields");
+        errorQuda("Cannot copy zero-sized ghost zone.  Check nFace parameter is non-zero for both input and output "
+                  "gauge fields");
       }
 
       resizeVector(vector_length_y, (is_ghost ? in.Ndim() : in.Geometry()) * 2); // only resizing z component
@@ -59,34 +53,37 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       arg.threads.x = size;
       constexpr bool enable_host = true;
-      if (!is_ghost) launch<GAUGE_FUNCTOR, enable_host>(tp, stream, arg);
-      else           launch<GHOST_FUNCTOR, enable_host>(tp, stream, arg);
+      if (!is_ghost)
+        launch<CopyGauge_, enable_host>(tp, stream, arg);
+      else
+        launch<CopyGhost_, enable_host>(tp, stream, arg);
     }
 
     TuneKey tuneKey() const
     {
       char aux_[TuneKey::aux_n];
-      strcpy(aux_,aux);
+      strcpy(aux_, aux);
       if (is_ghost) strcat(aux_, ",ghost");
       return TuneKey(in.VolString(), typeid(*this).name(), aux_);
     }
 
-    long long flops() const { return 0; } 
-    long long bytes() const {
+    long long flops() const { return 0; }
+    long long bytes() const
+    {
       auto sites = 4 * in.VolumeCB();
       if (is_ghost) {
-	sites = 0;
-	for (int d=0; d<4; d++) sites += in.SurfaceCB(d) * in.Nface();
+        sites = 0;
+        for (int d = 0; d < 4; d++) sites += in.SurfaceCB(d) * in.Nface();
       }
       return sites * (out.Bytes() + in.Bytes()) / (4 * in.VolumeCB());
-    } 
+    }
   };
 
-  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
-    void copyGauge(OutOrder &&outOrder, const InOrder &inOrder, GaugeField &out, const GaugeField &in,
-		   QudaFieldLocation location, int type)
+  template <typename FloatOut, typename FloatIn, int length, bool fine_grain, typename OutOrder, typename InOrder>
+  void copyGauge(OutOrder &&outOrder, const InOrder &inOrder, GaugeField &out, const GaugeField &in,
+                 QudaFieldLocation location, int type)
   {
-    CopyGaugeArg<FloatOut, FloatIn, length, OutOrder, InOrder> arg(outOrder, inOrder, in);
+    CopyGaugeArg<FloatOut, FloatIn, length, fine_grain, OutOrder, InOrder> arg(outOrder, inOrder, in);
     CopyGauge<decltype(arg)> gaugeCopier(arg, out, in, location);
 
 #ifdef HOST_DEBUG
@@ -116,12 +113,12 @@ namespace quda {
     // the buffer into the field's ghost zone (padded
     // region), so we only have the offset on the receiver
     if (type == 3) {
-      if (in.Geometry() != QUDA_COARSE_GEOMETRY) errorQuda("Cannot request copy type %d on non-coarse link fields", in.Geometry());
+      if (in.Geometry() != QUDA_COARSE_GEOMETRY)
+        errorQuda("Cannot request copy type %d on non-coarse link fields", in.Geometry());
       gaugeCopier.set_ghost(2);
       gaugeCopier.apply(device::get_default_stream());
     }
 #endif
-
   }
 
 } // namespace quda

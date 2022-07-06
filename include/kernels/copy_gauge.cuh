@@ -9,12 +9,13 @@ namespace quda {
   /**
      Kernel argument struct
    */
-  template <typename store_out_t, typename store_in_t, int length_, typename OutOrder, typename InOrder>
+  template <typename store_out_t, typename store_in_t, int length_, bool fine_grain_, typename OutOrder, typename InOrder>
   struct CopyGaugeArg : kernel_param<> {
     using real_out_t  = typename mapper<store_out_t>::type;
     using real_in_t  = typename mapper<store_in_t>::type;
     static constexpr int length = length_;
     static constexpr int nColor = Ncolor(length);
+    static constexpr bool fine_grain = fine_grain_;
     OutOrder out;
     const InOrder in;
     int volume;
@@ -47,20 +48,20 @@ namespace quda {
 
       for (int d=0; d<arg.geometry; d++) {
 	for (int x=0; x<arg.volume/2; x++) {
-#ifdef FINE_GRAINED_ACCESS
-	  for (int i=0; i<Arg::nColor; i++)
-	    for (int j=0; j<Arg::nColor; j++) {
-              complex<typename Arg::real_in_t> u = arg.in(d, parity, x, i, j);
-	      if (std::isnan(u.real()))
-	        errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Ncolor(Arg::length)+j));
-	      if (std::isnan(u.imag()))
-		errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Ncolor(Arg::length)+j+1));
-            }
-#else
-	  Matrix<complex<typename Arg::real_in_t>, Arg::nColor> u = arg.in(d, x, parity);
-	  for (int i=0; i<Arg::length/2; i++)
-	    if (std::isnan(u(i).real()) || std::isnan(u(i).imag())) errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, i);
-#endif
+          if constexpr (Arg::fine_grain) {
+            for (int i=0; i<Arg::nColor; i++)
+              for (int j=0; j<Arg::nColor; j++) {
+                complex<typename Arg::real_in_t> u = arg.in(d, parity, x, i, j);
+                if (std::isnan(u.real()))
+                  errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Ncolor(Arg::length)+j));
+                if (std::isnan(u.imag()))
+                  errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Ncolor(Arg::length)+j+1));
+              }
+          } else {
+            Matrix<complex<typename Arg::real_in_t>, Arg::nColor> u = arg.in(d, x, parity);
+            for (int i=0; i<Arg::length/2; i++)
+              if (std::isnan(u(i).real()) || std::isnan(u(i).imag())) errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, i);
+          }
 	}
       }
 
@@ -73,65 +74,30 @@ namespace quda {
   template <typename Arg>
   struct CopyGauge_ {
     const Arg &arg;
-    constexpr CopyGauge_(const Arg &arg) : arg(arg) {}
-    static constexpr const char *filename() { return KERNEL_FILE; }
-
-    __device__ __host__ inline void operator()(int x, int, int parity_d)
-    {
-      int parity = parity_d / arg.geometry;
-      int d = parity_d % arg.geometry;
-      Matrix<complex<typename Arg::real_in_t>, Arg::nColor> in = arg.in(d, x, parity);
-      Matrix<complex<typename Arg::real_out_t>, Arg::nColor> out = in;
-      arg.out(d, x, parity) = out;
-    }
-  };
-
-  /**
-     @brief Generic gauge reordering and packing using fine-grain accessors
-  */
-  template <typename Arg>
-  struct CopyGaugeFineGrained_ {
-    const Arg &arg;
-    constexpr CopyGaugeFineGrained_(const Arg &arg) :arg(arg) {}
+    constexpr CopyGauge_(const Arg &arg) :arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x, int i, int parity_d)
     {
       int parity = parity_d / arg.geometry;
       int d = parity_d % arg.geometry;
-      for (int j=0; j<Arg::nColor; j++) arg.out(d, parity, x, i, j) = arg.in(d, parity, x, i, j);
-    }
-  };
-
-  /**
-     @brief Generic gauge reordering and packing
-  */
-  template <typename Arg>
-  struct CopyGhost_ {
-    const Arg &arg;
-    constexpr CopyGhost_(const Arg &arg) : arg(arg) {}
-    static constexpr const char *filename() { return KERNEL_FILE; }
-
-    __device__ __host__ inline void operator()(int x, int, int parity_d)
-    {
-      int parity = parity_d / arg.nDim;
-      int d = parity_d % arg.nDim;
-
-      if (x < arg.faceVolumeCB[d]) {
-        Matrix<complex<typename Arg::real_in_t>, Arg::nColor> in = arg.in.Ghost(d + arg.in_offset, x, parity);
+      if constexpr (Arg::fine_grain) {
+        for (int j=0; j<Arg::nColor; j++) arg.out(d, parity, x, i, j) = arg.in(d, parity, x, i, j);
+      } else {
+        Matrix<complex<typename Arg::real_in_t>, Arg::nColor> in = arg.in(d, x, parity);
         Matrix<complex<typename Arg::real_out_t>, Arg::nColor> out = in;
-        arg.out.Ghost(d + arg.out_offset, x, parity) = out;
+        arg.out(d, x, parity) = out;
       }
     }
   };
 
   /**
-     @brief Generic gauge reordering and packing using fine-grain accessors
+     @brief Generic gauge ghost reordering and packing
   */
   template <typename Arg>
-  struct CopyGhostFineGrained_ {
+  struct CopyGhost_ {
     const Arg &arg;
-    constexpr CopyGhostFineGrained_(const Arg &arg) :arg(arg) {}
+    constexpr CopyGhost_(const Arg &arg) :arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x, int i, int parity_d)
@@ -140,8 +106,14 @@ namespace quda {
       int d = parity_d % arg.nDim;
 
       if (x < arg.faceVolumeCB[d]) {
-        for (int j=0; j<Arg::nColor; j++) {
-          arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
+        if constexpr (Arg::fine_grain) {
+          for (int j=0; j<Arg::nColor; j++) {
+            arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
+          }
+        } else {
+          Matrix<complex<typename Arg::real_in_t>, Arg::nColor> in = arg.in.Ghost(d + arg.in_offset, x, parity);
+          Matrix<complex<typename Arg::real_out_t>, Arg::nColor> out = in;
+          arg.out.Ghost(d + arg.out_offset, x, parity) = out;
         }
       }
     }
