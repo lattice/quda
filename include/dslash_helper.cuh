@@ -151,8 +151,7 @@ namespace quda
       } else {
         // coord.X = getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
         int block_idx = target::block_idx().x;
-        int thread_idx = target::thread_idx().x;
-        coord.X = getCoordsCB_blocking(coord, local_coord, thread_idx, block_idx, arg.tb.dim, arg.tb.X0h, parity, arg.dim);
+        coord.X = getCoordsCB_blocking(coord, local_coord, idx, block_idx, arg.tb.dim, arg.tb.X0h, parity, arg.dim);
         local_coord.s = s;
         coord.x_cb = coord.X / 2;
       }
@@ -285,6 +284,11 @@ namespace quda
   struct thread_blocking_t {
     int_fastdiv dim[5];
     int_fastdiv X0h;
+
+    int_fastdiv dim_ex[5];
+    int_fastdiv Xex0h;
+
+    int volume_4d_cb;
 
     int X1;
     int X2X1;

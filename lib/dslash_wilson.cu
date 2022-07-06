@@ -19,75 +19,25 @@ namespace quda
   constexpr int num_buckets = 4;
   using array_t = std::array<int, num_buckets>;
 
-  static int powi(int base, int power) {
-    int prod = 1;
-    for (int p = 0; p < power; p++) {
-      prod *= base;
-    }
-    return prod;
+  template <class T>
+  static int encode(const array_t &a, T dim[]) {
+    return ((a[3] * (dim[2] + 1) + a[2]) * (dim[1] + 1) + a[1]) * (dim[0] + 1) + a[0];
   }
 
-  static int encode(const std::vector<bool> &v) {
-    int s = 0;
-    for (size_t i = 0; i < v.size(); i++) {
-      if (v[i]) {
-        // 1
-        s = s * 2 + 1;
-      } else {
-        s = s * 2;
-      }
+  template <class T>
+  static auto decode(int code, T dim[]) {
+    array_t a;
+    for (int d = 0; d < 4; d++) {
+      a[d] = code % (dim[d] + 1);
+      code /= (dim[d] + 1);
     }
-    return s;
+    return a;
   }
 
-  static auto decode(int code, int num_two) {
-    std::vector<bool> v(num_buckets + num_two - 1);
-    for (int i = v.size() - 1; i >= 0; i--) {
-      v[i] = code % 2;
-      code /= 2;
-    }
-    return v;
-  }
-
-  static auto initialize_dist(int num_two) {
-    int num_divider = num_buckets - 1;
-    std::vector<bool> v(num_two + num_divider);
-
-    // So we want num_divider of 1's, and num_two of 0's
-    for (size_t i = 0; i < num_two; i++) {
-      v[i] = 0;
-    }
-    for (size_t i = num_two; i < v.size(); i++) {
-      v[i] = 1;
-    }
-    return v;
-  }
-
-  static auto get_dist(const std::vector<bool> &v, int num_two) {
-    std::vector<int> p(num_buckets);
-    for (int d = 0; d < num_buckets; d++) {
-      p[d] = 1;
-    }
-    int d = 0;
-    for (size_t i = 0; i < v.size(); i++) {
-      if (v[i]) {
-        // 1
-        d++;
-      } else {
-        // 0
-        p[d] *= 2;
-      }
-    }
-    return p;
-  }
-
-  static int count_two(int in) {
-    int count = 0;
-    while (in % 2 == 0 && in > 0) {
-      count++;
-      in /= 2;
-    }
-    return count;
+  template <class T>
+  static int get_grid(const TuneParam &tp, T dim[]) {
+    auto a = decode(tp.aux.z, dim);
+    return ((dim[0] + 1) / a[0]) * ((dim[1] + 1) / a[1]) * ((dim[2] + 1) / a[2]) * ((dim[3] + 1) / a[3]);
   }
 
   template <typename Arg> class Wilson : public Dslash<wilson, Arg>
@@ -103,23 +53,25 @@ namespace quda
       }
     }
 
+    void set_shared_grid(TuneParam &tp, const array_t &p) const {
+      printf("p = %d, %d, %d, %d\n", p[0], p[1], p[2], p[3]);
+      tp.aux.z = encode(p, arg.dim);
+      tp.shared_bytes = sharedBytesPerBlock(tp);
+      tp.grid.x = get_grid(tp, arg.dim);
+    }
+
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
       if (arg.kernel_type == INTERIOR_KERNEL) {
-        // offset = (4, 2, 2, 2)
-        int num_two = count_two(tp.block.x * 2 / 32);
-        auto p = get_dist(decode(tp.aux.z, num_two), num_two);
-        p[0] *= 4;
-        p[1] *= 2;
-        p[2] *= 2;
-        p[3] *= 2;
+        auto p = decode(tp.aux.z, arg.dim);
 
         arg.tb.X0h = p[0] / 2;
         for (int d = 0; d < 4; d++) {
           arg.tb.dim[d] = p[d];
         }
+        printf("p = %d, %d, %d, %d\n", p[0], p[1], p[2], p[3]);
         arg.tb.X1 = p[0];
         arg.tb.X2X1 = p[1] * p[0];
         arg.tb.X3X2X1 = p[2] * p[1] * p[0];
@@ -127,63 +79,23 @@ namespace quda
         arg.tb.X2X1mX1 = (p[1] - 1) * p[0];
         arg.tb.X3X2X1mX2X1 = (p[2] - 1) * p[1] * p[0];
         arg.tb.X4X3X2X1mX3X2X1 = (p[3] - 1) * p[2] * p[1] * p[0];
+
+        arg.tb.volume_4d_cb = p[3] * p[2] * p[1] * p[0] / 2;
+
+        arg.threads = tp.block.x * tp.grid.x;
+        tp.set_max_shared_bytes = true;
       }
       Dslash::template instantiate<packShmem>(tp, stream);
     }
 
-    virtual unsigned int sharedBytesPerThread() const
+    virtual unsigned int sharedBytesPerBlock(const TuneParam &tp) const
     {
       if (arg.kernel_type == INTERIOR_KERNEL) {
-        return 4 * 4 * 3 * 2;
+        auto p = decode(tp.aux.z, arg.dim);
+        return p[0] * p[1] * p[2] * p[3] * 24 * 4 / 2;
       } else {
         return 0;
       }
-    }
-
-    bool if_valid_thread_block(std::vector<int> p) const {
-      p[0] *= 4;
-      p[1] *= 2;
-      p[2] *= 2;
-      p[3] *= 2;
-      return arg.dim[0] % p[0] == 0 && arg.dim[1] % p[1] == 0 && arg.dim[2] % p[2] == 0 && arg.dim[3] % p[3] == 0;
-    }
-
-    bool find_valid_z(std::vector<bool> &v, int num_two) const {
-      bool found_valid_z = false;
-      auto p = get_dist(v, num_two);
-      if (if_valid_thread_block(p)) {
-        found_valid_z = true;
-      } else {
-        while (std::next_permutation(v.begin(), v.end())) {
-          auto p = get_dist(v, num_two);
-          if (if_valid_thread_block(p)) {
-            // Valid config
-            found_valid_z = true;
-            break;
-          }
-        }
-      }
-      return found_valid_z;
-    }
-
-    virtual bool moveBlockDimStep(TuneParam &param) const {
-      param.block.x *= 2;
-
-      int num_two = count_two(param.block.x * 2 / 32);
-      auto v = initialize_dist(num_two);
-      auto p = get_dist(v, num_two);
-
-      bool found_valid_z = find_valid_z(v, num_two);
-      return found_valid_z;
-    }
-
-    virtual void moveAux(TuneParam &param) const {
-      int num_two = count_two(param.block.x * 2 / 32);
-      auto v = initialize_dist(num_two);
-      auto p = get_dist(v, num_two);
-
-      find_valid_z(v, num_two);
-      param.aux.z = encode(v);
     }
 
     virtual bool advanceAux(TuneParam & tp) const {
@@ -193,34 +105,44 @@ namespace quda
       if (Dslash::advanceAux(tp)) {
         return true;
       } else {
-        int num_two = count_two(tp.block.x * 2 / 32);
-        auto v = decode(tp.aux.z, num_two);
-        while (std::next_permutation(v.begin(), v.end())) {
-          auto p = get_dist(v, num_two);
-          if (if_valid_thread_block(p)) {
-            // Valid config
-            tp.aux.z = encode(v);
-            return true;
+        auto p = decode(tp.aux.z, arg.dim);
+        bool ret = false;
+        for (int d = 0; d < 4; d++) {
+          if (arg.dim[d] % (p[d] * 2) == 0) {
+            p[d] *= 2;
+            set_shared_grid(tp, p);
+            if (tp.shared_bytes <= this->maxSharedBytesPerBlock()) {
+              return true;
+            }
+          } else {
+            p[d] = 2;
           }
         }
-        // No valid config available
-        find_valid_z(v, num_two);
-        tp.aux.z = encode(v);
+
+        for (int d = 0; d < 4; d++) {
+          p[d] = 2;
+        }
+        set_shared_grid(tp, p);
         return false;
       }
+    }
+
+    virtual bool tuneGridDim() const { return true; }
+    virtual bool tuneSharedBytes() const { return false; }
+
+    virtual bool advanceGridDim(TuneParam &param) const
+    {
+      return false;
     }
 
     virtual void initTuneParam(TuneParam &param) const {
       Dslash::initTuneParam(param);
       if (arg.kernel_type == INTERIOR_KERNEL) {
-        int num_two = count_two(param.block.x * 2 / 32);
-        auto v = initialize_dist(num_two);
-        bool found_valid_z = find_valid_z(v, num_two);
-        if (found_valid_z) {
-          param.aux.z = encode(v);
-        } else {
-          errorQuda("No valid configuration available ...");
+        array_t p;
+        for (int d = 0; d < 4; d++) {
+          p[d] = 2;
         }
+        set_shared_grid(param, p);
       }
     }
 
@@ -228,21 +150,6 @@ namespace quda
       initTuneParam(param);
     }
 
-    virtual int blockMin() const {
-      if (arg.kernel_type == INTERIOR_KERNEL) {
-        return 32;
-      } else {
-        return Dslash::blockMin();
-      }
-    }
-
-    unsigned int maxBlockSize(const TuneParam &tp) const {
-      if (arg.kernel_type == INTERIOR_KERNEL) {
-        return 1024;
-      } else {
-        return Dslash::maxBlockSize(tp);
-      }
-    }
   };
 
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonApply {
