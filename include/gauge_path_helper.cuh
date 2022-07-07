@@ -81,7 +81,6 @@ namespace quda {
   __device__ __host__ inline typename Arg::Link
   computeGaugePath(const Arg &arg, int x[4], int parity, const int* path, int length, thread_array<int, 4>& dx)
   {
-    using real = typename Arg::Float;
     using Link = typename Arg::Link;
 
     // linkA: current matrix

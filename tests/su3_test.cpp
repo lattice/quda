@@ -115,6 +115,9 @@ int main(int argc, char **argv)
   gauge_param.t_boundary = QUDA_PERIODIC_T;
   setDims(gauge_param.X);
 
+  // All user inputs are now defined
+  display_test_info();
+
   void *gauge[4], *new_gauge[4];
 
   for (int dir = 0; dir < 4; dir++) {
@@ -134,13 +137,16 @@ int main(int argc, char **argv)
   loadGaugeQuda((void *)gauge, &gauge_param);
   saveGaugeQuda(new_gauge, &gauge_param);
 
+  // Compute the plaquette
   double plaq[3];
   plaqQuda(plaq);
   printfQuda("Computed plaquette gauge precise is %.16e (spatial = %.16e, temporal = %.16e)\n", plaq[0], plaq[1],
              plaq[2]);
 
-  // All user inputs now defined
-  display_test_info();
+  // Compute the temporal Polyakov loop
+  double ploop[2];
+  polyakovLoopQuda(ploop, 3);
+  printfQuda("Computed Polyakov loop gauge precise is %.16e +/- I %.16e\n", ploop[0], ploop[1]);
 
   // Topological charge and gauge energy
   double q_charge_check = 0.0;

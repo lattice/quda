@@ -1540,6 +1540,15 @@ extern "C" {
   void plaqQuda(double plaq[3]);
 
   /**
+     @brief Computes the trace of the Polyakov loop of the current resident field
+     in a given direction.
+
+     @param [out] ploop Trace of the Polyakov loop in direction dir
+     @param [in] dir Direction of Polyakov loop
+  */
+  void polyakovLoopQuda(double ploop[2], int dir);
+
+  /**
    * Performs a deep copy from the internal extendedGaugeResident field.
    * @param Pointer to externally allocated GaugeField
    */

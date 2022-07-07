@@ -170,6 +170,9 @@ static TimeProfile profileHISQForce("computeHISQForceQuda");
 //!<Profiler for plaqQuda
 static TimeProfile profilePlaq("plaqQuda");
 
+//!<Profiler for polyakovLoopQuda
+static TimeProfile profilePolyakovLoop("polyakovLoopQuda");
+
 //!< Profiler for wuppertalQuda
 static TimeProfile profileWuppertal("wuppertalQuda");
 
@@ -1441,6 +1444,7 @@ void endQuda(void)
     profileBLAS.Print();
     profileCovDev.Print();
     profilePlaq.Print();
+    profilePolyakovLoop.Print();
     profileGaugeObs.Print();
     profileGaugeSmear.Print();
     profileWFlow.Print();
@@ -5250,6 +5254,24 @@ void plaqQuda(double plaq[3])
   profilePlaq.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profilePlaq.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+/*
+ * Computes the trace of the Polyakov loop in direction dir
+ */
+void polyakovLoopQuda(double ploop[2], int dir)
+{
+  profilePolyakovLoop.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (!gaugePrecise) errorQuda("Cannot compute Polyakov loop as there is no resident gauge field");
+
+  profilePolyakovLoop.TPSTART(QUDA_PROFILE_COMPUTE);
+
+  quda::gaugePolyakovLoop(ploop, *gaugePrecise, dir);
+
+  profilePolyakovLoop.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profilePolyakovLoop.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 /*
