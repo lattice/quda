@@ -13,7 +13,7 @@ namespace quda
     template <typename T> __device__ inline T operator()(T &x, int warp_split)
     {
       using R = typename T::value_type;
-      constexpr max_nthr = device::max_block_size();
+      constexpr auto max_nthr = device::max_block_size();
       static_assert(max_nthr*sizeof(R) <= device::max_shared_memory_size()-sizeof(target::omptarget::get_shared_cache()[0])*128, "Shared cache not large enough for tempStorage");  // FIXME arbitrary, the number is arbitrary, offset 128 below
       R *storage = (R*)&target::omptarget::get_shared_cache()[128];  // FIXME arbitrary
       const int tid = omp_get_thread_num();
