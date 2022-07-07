@@ -3595,7 +3595,9 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   }
 
   // grow/shrink resident solutions to be correct size
-  solutionResident.resize(param->num_offset, cudaParam);
+  auto old_size = solutionResident.size();
+  solutionResident.resize(param->num_offset);
+  for (auto i = old_size; i < solutionResident.size(); i++) solutionResident[i] = ColorSpinorField(cudaParam);
 
   std::vector<ColorSpinorField> &x = solutionResident;
   std::vector<ColorSpinorField> p;

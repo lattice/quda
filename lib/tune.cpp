@@ -971,7 +971,7 @@ namespace quda
                        static_cast<int>(param.aux.x), static_cast<int>(param.aux.y), static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
           }
 
-          tunable.apply(stream);
+          tunable.apply(stream); // do warm up call, for consistency with the candidate tuning
           timer.start();
           for (int i = 0; i < tuneiterations; i++) {
             tunable.apply(stream); // calls tuneLaunch() again, which simply returns the currently active param
