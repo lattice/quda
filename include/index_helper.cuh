@@ -237,17 +237,17 @@ namespace quda {
     switch (dir) {
     case +1: // positive direction
       switch (mu) {
-      case 0: return (x[0] == arg.dim[0] - 1 ? x.X - (arg.X1 - 1) : x.X + 1) >> 1;
-      case 1: return (x[1] == arg.dim[1] - 1 ? x.X - arg.X2X1mX1 : x.X + arg.X1) >> 1;
-      case 2: return (x[2] == arg.dim[2] - 1 ? x.X - arg.X3X2X1mX2X1 : x.X + arg.X2X1) >> 1;
-      case 3: return (x[3] == arg.dim[3] - 1 ? x.X - arg.X4X3X2X1mX3X2X1 : x.X + arg.X3X2X1) >> 1;
+      case 0: return (x.X + 1) >> 1;
+      case 1: return (x.X + arg.X1) >> 1;
+      case 2: return (x.X + arg.X2X1) >> 1;
+      case 3: return (x.X + arg.X3X2X1) >> 1;
       }
     case -1:
       switch (mu) {
-      case 0: return (x[0] == 0 ? x.X + (arg.X1 - 1) : x.X - 1) >> 1;
-      case 1: return (x[1] == 0 ? x.X + arg.X2X1mX1 : x.X - arg.X1) >> 1;
-      case 2: return (x[2] == 0 ? x.X + arg.X3X2X1mX2X1 : x.X - arg.X2X1) >> 1;
-      case 3: return (x[3] == 0 ? x.X + arg.X4X3X2X1mX3X2X1 : x.X - arg.X3X2X1) >> 1;
+      case 0: return (x.X - 1) >> 1;
+      case 1: return (x.X - arg.X1) >> 1;
+      case 2: return (x.X - arg.X2X1) >> 1;
+      case 3: return (x.X - arg.X3X2X1) >> 1;
       }
     }
     return 0; // should never reach here

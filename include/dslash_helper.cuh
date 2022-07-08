@@ -88,12 +88,9 @@ namespace quda
 
   template <typename Coord, typename I, typename J, typename K>
   __device__ __host__ inline int getCoordsCB_blocking(Coord &x, Coord &local_coord, int thread_idx_cb,
-    int block_idx, const I &block_dim, J block_dim_0h, int parity, const K &X)
+    int block_idx, const I &block_dim, J block_dim_0h, const I &grid_dim, int parity, const K &X)
   {
     int block_coord[4];
-
-    int grid_dim[4] = {X[0] / block_dim[0], X[1] / block_dim[1],
-                        X[2] / block_dim[2], X[3] / block_dim[3]};
 
 #pragma unroll
     for (int d = 0; d < 4; d++) {
@@ -110,11 +107,22 @@ namespace quda
     int local_parity = (offset[0] + offset[1] + offset[2] + offset[3] + parity) % 2;
 
     local_coord.X = getCoordsCB(local_coord, thread_idx_cb, block_dim, block_dim_0h, local_parity);
-    local_coord.x_cb = thread_idx_cb;
+    // local_coord.x_cb = thread_idx_cb;
 #pragma unroll
     for (int d = 0; d < 4; d++) {
-      x[d] = local_coord[d] + block_coord[d] * block_dim[d];
+      x[d] = local_coord[d] + offset[d];
+      // Get the extended coord
+      local_coord[d] += 1;
     }
+
+    int local_index = 0;
+#pragma unroll
+    for (int d = 3; d >= 0; d--) {
+      local_index = local_index * (block_dim[d] + 2) + local_coord[d];
+    }
+    local_coord.X = local_index;
+    local_coord.x_cb = local_index / 2;
+
     int index = 0;
 #pragma unroll
     for (int d = 3; d >= 0; d--) {
@@ -151,7 +159,7 @@ namespace quda
       } else {
         // coord.X = getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
         int block_idx = target::block_idx().x;
-        coord.X = getCoordsCB_blocking(coord, local_coord, idx, block_idx, arg.tb.dim, arg.tb.X0h, parity, arg.dim);
+        coord.X = getCoordsCB_blocking(coord, local_coord, idx, block_idx, arg.tb.dim, arg.tb.X0h, arg.tb.grid_dim, parity, arg.dim);
         local_coord.s = s;
         coord.x_cb = coord.X / 2;
       }
@@ -285,10 +293,13 @@ namespace quda
     int_fastdiv dim[5];
     int_fastdiv X0h;
 
+    int_fastdiv grid_dim[5];
+
     int_fastdiv dim_ex[5];
     int_fastdiv Xex0h;
 
     int volume_4d_cb;
+    int volume_4d_cb_ex;
 
     int X1;
     int X2X1;

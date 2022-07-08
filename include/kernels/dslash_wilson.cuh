@@ -79,7 +79,7 @@ namespace quda
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
     auto block = target::block_dim();
-    SharedMemoryCache<Vector> cache({static_cast<unsigned int>(arg.tb.volume_4d_cb), block.y, block.z});
+    SharedMemoryCache<Vector> cache({static_cast<unsigned int>(arg.tb.volume_4d_cb_ex), block.y, block.z});
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
@@ -103,14 +103,9 @@ namespace quda
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, gauge_parity);
-          bool out_of_block = (local_coord[d] + 1) >= arg.tb.dim[d] && arg.tb.dim[d] < arg.dim[d];
-          Vector in;
-          if (out_of_block) {
-            in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
-          } else {
-            int local_fwd_idx = thread_blocking_get_neighbor_index_cb(local_coord, d, +1, arg.tb);
-            in = cache.load_x(local_fwd_idx);
-          }
+          int local_fwd_idx = thread_blocking_get_neighbor_index_cb(local_coord, d, +1, arg.tb);
+          Vector in = cache.load_x(local_fwd_idx);
+          // Vector in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
 
         }
@@ -136,19 +131,57 @@ namespace quda
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
-          bool out_of_block = (local_coord[d] - 1) < 0 && arg.tb.dim[d] < arg.dim[d];
-          Vector in;
-          if (out_of_block) {
-            in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
-          } else {
-            int local_fwd_idx = thread_blocking_get_neighbor_index_cb(local_coord, d, -1, arg.tb);
-            in = cache.load_x(local_fwd_idx);
-          }
+          int local_fwd_idx = thread_blocking_get_neighbor_index_cb(local_coord, d, -1, arg.tb);
+          Vector in = cache.load_x(local_fwd_idx);
+          // Vector in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
 
         }
       }
     } // nDim
+  }
+
+  template <typename Arg>
+  __host__ __device__ inline auto get_tb_coords_ex(const Arg &arg, int local_idx, int s, int parity)
+  {
+    Coord<4> coord;
+    Coord<4> local_coord;
+
+    int block_coord[4]; // coordinate of this threadblock in the threadblock grid
+
+    int block_idx = target::block_idx().x;
+#pragma unroll
+    for (int d = 0; d < 4; d++) {
+      block_coord[d] = block_idx % arg.tb.grid_dim[d];
+      block_idx /= arg.tb.grid_dim[d];
+    }
+
+    int block_offset[4]; // global coordinate offset
+#pragma unroll
+    for (int d = 0; d < 4; d++) {
+      block_offset[d] = block_coord[d] * arg.tb.dim[d];
+    }
+
+    int local_parity = (block_offset[0] + block_offset[1] + block_offset[2] + block_offset[3] + parity) % 2;
+
+    local_coord.X = getCoordsCB(local_coord, local_idx, arg.tb.dim_ex, arg.tb.Xex0h, local_parity);
+    local_coord.x_cb = local_idx;
+#pragma unroll
+    for (int d = 0; d < 4; d++) {
+      // -1 for the boundary terms, % makes sure we get the around the world terms
+      coord[d] = (local_coord[d] - 1 + block_offset[d] + arg.dim[d]) % arg.dim[d];
+    }
+    int index = 0;
+#pragma unroll
+    for (int d = 3; d >= 0; d--) {
+      index = index * arg.dim[d] + coord[d];
+    }
+    coord.X = index;
+    coord.x_cb = coord.X / 2;
+    coord.s = s;
+    local_coord.s = s;
+
+    return coord;
   }
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct wilson : dslash_default {
@@ -169,13 +202,13 @@ namespace quda
 
       // Load all interior color spinor fields
       auto block = target::block_dim();
-      SharedMemoryCache<Vector> cache({static_cast<unsigned int>(arg.tb.volume_4d_cb), block.y, block.z});
+      SharedMemoryCache<Vector> cache({static_cast<unsigned int>(arg.tb.volume_4d_cb_ex), block.y, block.z});
       int local_idx = target::thread_idx().x;
 
-      while (local_idx < arg.tb.volume_4d_cb) {
+      while (local_idx < arg.tb.volume_4d_cb_ex) {
         const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
-        Coord<4> local_coord;
-        auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, local_idx, 0, parity, thread_dim, local_coord);
+        // Get the coordinate with all the boundary conditions figured out
+        auto coord = get_tb_coords_ex(arg, local_idx, 0, 1 - parity);
         cache.save_x(arg.in(coord.x_cb + coord.s * arg.dc.volume_4d_cb, their_spinor_parity), local_idx);
         local_idx += target::block_dim().x;
       }
