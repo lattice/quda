@@ -337,12 +337,7 @@ void gauge_loop_test()
 
     double plaq_default[3];
 
-    setWilsonGaugeParam(gauge_param);
-    gauge_param.t_boundary = QUDA_PERIODIC_T;
-    setDims(gauge_param.X);
-
-    loadGaugeQuda((void *)U_qdp->Gauge_p(), &gauge_param);
-    plaqQuda(plaq_default);
+    plaqLoadGaugeQuda(plaq_default, sitelink, &gauge_param);
 
     plaq_deviation = std::abs(plaq_default[0] - plaq_loop[0]) / std::abs(plaq_default[0]);
     logQuda(QUDA_VERBOSE, "Plaquette loop space %e time %e total %e ; plaqQuda space %e time %e total %e ; deviation %e\n",

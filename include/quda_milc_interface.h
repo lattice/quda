@@ -748,6 +748,29 @@ extern "C" {
                               int max_length, double factor, QudaMILCSiteArg_t *arg, int phase_in);
 
   /**
+   * Compute the total, spatial, and temporal plaquette. All fields here are CPU fields in
+   * MILC order, and their precisions should match
+   *
+   * @param precision The precision of the field (2 - double, 1 - single)
+   * @param plaq Storage for the total, spatial, and temporal plaquette
+   * @param arg Metadata for MILC's internal site struct array
+   * @param phase_in whether staggered phases are applied
+   */
+  void qudaPlaquettePhased(int precision, double plaq[3], QudaMILCSiteArg_t *arg, int phase_in);
+
+   /**
+   * Compute the real and imaginary parts of the Polyakov loop in a given direction. All fields here are
+   * CPU fields in MILC order, and their precisions should match
+   *
+   * @param precision The precision of the field (2 - double, 1 - single)
+   * @param ploop Storage for the output Polyakov loop
+   * @param dir Direction of the polyakov loop (0 - x, 1 - y, 2 - z, 3 - t)
+   * @param arg Metadata for MILC's internal site struct array
+   * @param phase_in whether staggered phases are applied
+   */
+  void qudaPolyakovLoopPhased(int precision, double ploop[2], int dir, QudaMILCSiteArg_t *arg, int phase_in);
+
+  /**
    * Evolve the gauge field by step size dt, using the momentum field
    * I.e., Evalulate U(t+dt) = e(dt pi) U(t).  All fields are CPU fields in MILC order.
    *

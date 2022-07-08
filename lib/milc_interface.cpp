@@ -645,15 +645,19 @@ void qudaGaugeForce(int precision, int num_loop_types, double milc_loop_coeff[3]
   qudaGaugeForcePhased(precision, num_loop_types, milc_loop_coeff, eb3, arg, 0);
 }
 
-void qudaGaugeLoopTracePhased(int precision, double *traces, int** input_path_buf, int* path_length, double *loop_coeff, int num_paths,
-                              int max_length, double factor, QudaMILCSiteArg_t *arg, int phase_in)
+/**
+ * @brief Reusable routine that creates a qudaGaugeParam for gauge-related observable measurements
+ *
+ * @param [in] precision MILC precision
+ * @param [in] arg MILC Site arg structure
+ * @param [in] phase_in Whether or not phases have been applied
+ * @return A qudaGaugeParam that can be passed to QUDA interface functions
+ */
+QudaGaugeParam createGaugeParamForObservables(int precision, QudaMILCSiteArg_t *arg, int phase_in)
 {
-  qudamilc_called<true>(__func__);
-
   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
       (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_SU3_LINKS);
-  void *gauge = arg->site ? arg->site : arg->link;
 
   qudaGaugeParam.gauge_offset = arg->link_offset;
   qudaGaugeParam.mom_offset = arg->mom_offset;
@@ -674,7 +678,44 @@ void qudaGaugeLoopTracePhased(int precision, double *traces, int** input_path_bu
     qudaGaugeParam.use_resident_gauge = true;
   }
 
+  return qudaGaugeParam;
+}
+
+void qudaGaugeLoopTracePhased(int precision, double *traces, int** input_path_buf, int* path_length, double *loop_coeff, int num_paths,
+                              int max_length, double factor, QudaMILCSiteArg_t *arg, int phase_in)
+{
+  qudamilc_called<true>(__func__);
+
+  QudaGaugeParam qudaGaugeParam = createGaugeParamForObservables(precision, arg, phase_in);
+  void *gauge = arg->site ? arg->site : arg->link;
+
   computeGaugeLoopTraceQuda(reinterpret_cast<double _Complex*>(traces), gauge, input_path_buf, path_length, loop_coeff, num_paths, max_length, factor, &qudaGaugeParam);
+
+  qudamilc_called<false>(__func__);
+  return;
+}
+
+void qudaPlaquettePhased(int precision, double plaq[3], QudaMILCSiteArg_t *arg, int phase_in)
+{
+  qudamilc_called<true>(__func__);
+
+  QudaGaugeParam qudaGaugeParam = createGaugeParamForObservables(precision, arg, phase_in);
+  void *gauge = arg->site ? arg->site : arg->link;
+
+  plaqLoadGaugeQuda(plaq, gauge, &qudaGaugeParam);
+
+  qudamilc_called<false>(__func__);
+  return;
+}
+
+void qudaPolyakovLoopPhased(int precision, double ploop[2], int dir, QudaMILCSiteArg_t *arg, int phase_in)
+{
+  qudamilc_called<true>(__func__);
+
+  QudaGaugeParam qudaGaugeParam = createGaugeParamForObservables(precision, arg, phase_in);
+  void *gauge = arg->site ? arg->site : arg->link;
+
+  polyakovLoopLoadGaugeQuda(ploop, dir, gauge, &qudaGaugeParam);
 
   qudamilc_called<false>(__func__);
   return;

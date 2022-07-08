@@ -5231,10 +5231,6 @@ void gaussGaugeQuda(unsigned long long seed, double sigma)
   profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-
-/*
- * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
- */
 void plaqQuda(double plaq[3])
 {
   profilePlaq.TPSTART(QUDA_PROFILE_TOTAL);
@@ -5242,6 +5238,61 @@ void plaqQuda(double plaq[3])
   if (!gaugePrecise) errorQuda("Cannot compute plaquette as there is no resident gauge field");
 
   cudaGaugeField *data = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gaugePrecise, R, profilePlaq);
+  extendedGaugeResident = data;
+
+  profilePlaq.TPSTART(QUDA_PROFILE_COMPUTE);
+  double3 plaq3 = quda::plaquette(*data);
+  plaq[0] = plaq3.x;
+  plaq[1] = plaq3.y;
+  plaq[2] = plaq3.z;
+  profilePlaq.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profilePlaq.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+/*
+ * Computes the total, spatial and temporal plaquette averages after loading a gauge field.
+ */
+void plaqLoadGaugeQuda(double plaq[3], void *gauge, QudaGaugeParam *param)
+{
+
+  profilePlaq.TPSTART(QUDA_PROFILE_TOTAL);
+
+  profilePlaq.TPSTART(QUDA_PROFILE_INIT);
+  checkGaugeParam(param);
+
+  // create the gauge field
+  GaugeFieldParam gParam(*param, gauge, QUDA_GENERAL_LINKS);
+  gParam.location = QUDA_CPU_FIELD_LOCATION;
+  gParam.site_offset = param->gauge_offset;
+  gParam.site_size = param->site_size;
+  bool need_cpu = !param->use_resident_gauge || param->return_result_gauge;
+  cpuGaugeField *cpuGauge = need_cpu ? new cpuGaugeField(gParam) : nullptr;
+
+  // create the device fields
+  gParam.location = QUDA_CUDA_FIELD_LOCATION;
+  gParam.create = QUDA_NULL_FIELD_CREATE;
+  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gParam.reconstruct = param->reconstruct;
+  gParam.setPrecision(param->cuda_prec, true);
+  cudaGaugeField *cudaGauge = !param->use_resident_gauge ? new cudaGaugeField(gParam) : nullptr;
+  profilePlaq.TPSTOP(QUDA_PROFILE_INIT);
+
+  if (param->use_resident_gauge) {
+    if (!gaugePrecise) errorQuda("No resident gauge field to use");
+    cudaGauge = gaugePrecise;
+    gaugePrecise = nullptr;
+  } else {
+    profilePlaq.TPSTART(QUDA_PROFILE_H2D);
+    cudaGauge->loadCPUField(*cpuGauge);
+    profilePlaq.TPSTOP(QUDA_PROFILE_H2D);
+    if (extendedGaugeResident) {
+      delete extendedGaugeResident;
+      extendedGaugeResident = nullptr;
+    }
+  }
+
+  cudaGaugeField *data = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*cudaGauge, R, profilePlaq);
   extendedGaugeResident = data;
 
   profilePlaq.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -5253,11 +5304,24 @@ void plaqQuda(double plaq[3])
 
   profilePlaq.TPSTOP(QUDA_PROFILE_COMPUTE);
 
+  profilePlaq.TPSTART(QUDA_PROFILE_D2H);
+  if (param->return_result_gauge) cudaGauge->saveCPUField(*cpuGauge);
+  profilePlaq.TPSTOP(QUDA_PROFILE_D2H);
+
+  if (param->make_resident_gauge) {
+    if (gaugePrecise != nullptr && cudaGauge != gaugePrecise) delete gaugePrecise;
+    gaugePrecise = cudaGauge;
+  } else {
+    delete cudaGauge;
+  }
+  
+  if (cpuGauge) delete cpuGauge;
+
   profilePlaq.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 /*
- * Computes the trace of the Polyakov loop in direction dir
+ * Computes the trace of the Polyakov loop in direction dir from the resident gauge field
  */
 void polyakovLoopQuda(double ploop[2], int dir)
 {
@@ -5270,6 +5334,70 @@ void polyakovLoopQuda(double ploop[2], int dir)
   quda::gaugePolyakovLoop(ploop, *gaugePrecise, dir);
 
   profilePolyakovLoop.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profilePolyakovLoop.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+/*
+ * Computes the trace of the Polyakov loop in a direction dir from a loaded field
+ */
+void polyakovLoopLoadGaugeQuda(double ploop[2], int dir, void *gauge, QudaGaugeParam *param)
+{
+
+  profilePolyakovLoop.TPSTART(QUDA_PROFILE_TOTAL);
+
+  profilePolyakovLoop.TPSTART(QUDA_PROFILE_INIT);
+  checkGaugeParam(param);
+
+  // create the gauge field
+  GaugeFieldParam gParam(*param, gauge, QUDA_GENERAL_LINKS);
+  gParam.location = QUDA_CPU_FIELD_LOCATION;
+  gParam.site_offset = param->gauge_offset;
+  gParam.site_size = param->site_size;
+  bool need_cpu = !param->use_resident_gauge || param->return_result_gauge;
+  cpuGaugeField *cpuGauge = need_cpu ? new cpuGaugeField(gParam) : nullptr;
+
+  // create the device fields
+  gParam.location = QUDA_CUDA_FIELD_LOCATION;
+  gParam.create = QUDA_NULL_FIELD_CREATE;
+  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gParam.reconstruct = param->reconstruct;
+  gParam.setPrecision(param->cuda_prec, true);
+  cudaGaugeField *cudaGauge = !param->use_resident_gauge ? new cudaGaugeField(gParam) : nullptr;
+  profilePolyakovLoop.TPSTOP(QUDA_PROFILE_INIT);
+
+  if (param->use_resident_gauge) {
+    if (!gaugePrecise) errorQuda("No resident gauge field to use");
+    cudaGauge = gaugePrecise;
+    gaugePrecise = nullptr;
+  } else {
+    profilePlaq.TPSTART(QUDA_PROFILE_H2D);
+    cudaGauge->loadCPUField(*cpuGauge);
+    profilePlaq.TPSTOP(QUDA_PROFILE_H2D);
+    if (extendedGaugeResident) {
+      delete extendedGaugeResident;
+      extendedGaugeResident = nullptr;
+    }
+  }
+
+  profilePolyakovLoop.TPSTART(QUDA_PROFILE_COMPUTE);
+
+  quda::gaugePolyakovLoop(ploop, *cudaGauge, dir);
+
+  profilePolyakovLoop.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profilePolyakovLoop.TPSTART(QUDA_PROFILE_D2H);
+  if (param->return_result_gauge) cudaGauge->saveCPUField(*cpuGauge);
+  profilePolyakovLoop.TPSTOP(QUDA_PROFILE_D2H);
+
+  if (param->make_resident_gauge) {
+    if (gaugePrecise != nullptr && cudaGauge != gaugePrecise) delete gaugePrecise;
+    gaugePrecise = cudaGauge;
+  } else {
+    delete cudaGauge;
+  }
+
+  if (cpuGauge) delete cpuGauge;
 
   profilePolyakovLoop.TPSTOP(QUDA_PROFILE_TOTAL);
 }
