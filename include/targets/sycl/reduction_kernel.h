@@ -227,4 +227,102 @@ namespace quda {
     return err;
   }
 
+#if 0
+  template <template <typename> class Functor, bool grid_stride, typename Arg, typename R>
+  void MultiReductionImpl(const Arg &arg, const sycl::nd_item<3> &ndi, R &reducer)
+  {
+    using reduce_t = typename Functor<Arg>::reduce_t;
+    Functor<Arg> t(arg);
+
+    auto idx = globalIdX;
+    auto k = localIdY;
+    auto j = globalIdZ;
+
+    //if (j >= arg.threads.z) return;
+
+    reduce_t value = t.init();
+
+    if (j < arg.threads.z) {
+      while (idx < arg.threads.x) {
+	value = t(value, idx, k, j);
+	if (grid_stride) idx += globalRangeX; else break;
+      }
+    }
+
+    // perform final inter-block reduction and write out result
+    //reduce(arg, t, value, j);
+    sycl::vector<Arg::max_n_batch_block, reduce_t> v;
+    for (auto &vi: v) vi = t.init();
+    v[j] = value;
+    reducer.combine(v);
+  }
+
+  template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
+  qudaError_t
+  MultiReduction(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+  {
+    //if(tp.block.z>1) return QUDA_ERROR;
+    auto err = QUDA_SUCCESS;
+    auto globalSize = globalRange(tp);
+    auto localSize = localRange(tp);
+    sycl::nd_range<3> ndRange{globalSize, localSize};
+    auto q = device::get_target_stream(stream);
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      using reduce_t = typename Transformer<Arg>::reduce_t;
+      printfQuda("MultiReduction grid_stride: %s  sizeof(arg): %lu\n",
+		 grid_stride?"true":"false", sizeof(arg));
+      printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
+		 str(localSize).c_str(), str(arg.threads).c_str());
+      printfQuda("  reduce_t: %s\n", typeid(reduce_t).name());
+      printfQuda("  Arg::max_n_batch_block: %d\n", Arg::max_n_batch_block);
+      printfQuda("  max_block_z: %d\n",
+		 device::max_block_size()/ (tp.block.x * tp.block.y));
+      printfQuda("  SLM size: %lu\n",
+                 localSize.size()*sizeof(typename Transformer<Arg>::reduce_t)/
+		 device::warp_size());
+    }
+    //if (arg.threads.x%tp.block.x+arg.threads.y%tp.block.y+arg.threads.z%tp.block.z) {
+    //if (Arg::hasBlockOps()) {
+    //warningQuda("BlockOps");
+    //}
+    //warningQuda("MR %s nondiv %s %s %s", grid_stride?"true":"false",
+    //	  str(arg.threads).c_str(), str(tp.block).c_str(), typeid(Arg).name());
+    //}
+    //sycl::buffer<const char,1>
+    //  buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
+    auto size = sizeof(arg);
+    auto p = device::get_arg_buf(stream, size);
+    memcpy(p, &arg, size);
+    //auto evnt = q.memcpy(p, &arg, size);
+    try {
+      q.submit([&](sycl::handler& h) {
+	//auto a = buf.get_access<sycl::access::mode::read,
+	//			sycl::access::target::constant_buffer>(h);
+	//h.parallel_for<class MultiReductionx>
+	h.parallel_for<>
+	  (ndRange,
+	   //[=](sycl::nd_item<3> ndi) {
+	   [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
+	    //MultiReductionImpl<Transformer,Arg,grid_stride>(arg,ndi);
+	    //const char *p = a.get_pointer();
+	    const Arg *arg2 = reinterpret_cast<const Arg*>(p);
+	    MultiReductionImpl<Transformer,Arg,grid_stride>(*arg2,ndi);
+	    //MultiReductionImpl<Transformer,Arg,false>(*arg2,ndi);
+	  });
+	});
+    } catch (sycl::exception const& e) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+	printfQuda("  Caught synchronous SYCL exception:\n  %s\n",e.what());
+      }
+      err = QUDA_ERROR;
+    }
+    //device::wasSynced(stream);
+    //evnt.wait();
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      printfQuda("end MultiReduction\n");
+    }
+    return err;
+  }
+#endif
+
 }
