@@ -6,6 +6,7 @@ target_link_libraries(quda_test PUBLIC QUDA::quda)
 set_target_properties(quda_test PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_subdirectory(utils)
 add_subdirectory(host_reference)
+enable_language(Fortran)
 
 if(QUDA_NVSHMEM AND QUDA_DOWNLOAD_NVSHMEM)
   add_dependencies(quda_test NVSHMEM)
@@ -129,12 +130,10 @@ if(QUDA_MULTIGRID)
   quda_checkbuildtest(multigrid_benchmark_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS multigrid_benchmark_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-  if(${QUDA_GAUGE_ALG})
-    add_executable(multigrid_evolve_test multigrid_evolve_test.cpp)
-    target_link_libraries(multigrid_evolve_test ${TEST_LIBS})
-    quda_checkbuildtest(multigrid_evolve_test QUDA_BUILD_ALL_TESTS)
-    install(TARGETS multigrid_evolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-  endif()
+  add_executable(multigrid_evolve_test multigrid_evolve_test.cpp)
+  target_link_libraries(multigrid_evolve_test ${TEST_LIBS})
+  quda_checkbuildtest(multigrid_evolve_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS multigrid_evolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 endif()
 
@@ -189,28 +188,7 @@ if(QUDA_DIRAC_STAGGERED)
   target_link_libraries(hisq_stencil_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_stencil_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS hisq_stencil_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-endif()
 
-if(QUDA_FORCE_GAUGE)
-  add_executable(gauge_force_test gauge_force_test.cpp)
-  target_link_libraries(gauge_force_test ${TEST_LIBS})
-  quda_checkbuildtest(gauge_force_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS gauge_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-endif()
-
-if(QUDA_GAUGE_ALG)
-  add_executable(gauge_alg_test gauge_alg_test.cpp)
-  target_link_libraries(gauge_alg_test ${TEST_LIBS})
-  quda_checkbuildtest(gauge_alg_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS gauge_alg_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-
-  add_executable(heatbath_test heatbath_test.cpp)
-  target_link_libraries(heatbath_test ${TEST_LIBS})
-  quda_checkbuildtest(heatbath_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS heatbath_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-endif()
-
-if(QUDA_FORCE_HISQ)
   add_executable(hisq_paths_force_test hisq_paths_force_test.cpp)
   target_link_libraries(hisq_paths_force_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_paths_force_test QUDA_BUILD_ALL_TESTS)
@@ -221,6 +199,21 @@ if(QUDA_FORCE_HISQ)
   quda_checkbuildtest(hisq_unitarize_force_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS hisq_unitarize_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
+
+add_executable(gauge_force_test gauge_force_test.cpp)
+target_link_libraries(gauge_force_test ${TEST_LIBS})
+quda_checkbuildtest(gauge_force_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS gauge_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+add_executable(gauge_alg_test gauge_alg_test.cpp)
+target_link_libraries(gauge_alg_test ${TEST_LIBS})
+quda_checkbuildtest(gauge_alg_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS gauge_alg_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+add_executable(heatbath_test heatbath_test.cpp)
+target_link_libraries(heatbath_test ${TEST_LIBS})
+quda_checkbuildtest(heatbath_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS heatbath_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 if(QUDA_MPI OR QUDA_QMP)
   if(DEFINED ENV{QUDA_TEST_NUMPROCS})
@@ -245,7 +238,7 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_DOMAIN_WALL)
   add_test(NAME blas_test_parity_wilson
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS}
-                   --dim 2 4 6 8
+                   --dim 2 4 6 8 
                    --nsrc 8 --msrc 9
                    --solve-type direct-pc
                    --gtest_output=xml:blas_test_parity.xml)
@@ -858,6 +851,7 @@ elseif(single_prec)
   set(TEST_PRECS single)
 endif()
 
+# Inversions
 foreach(prec IN LISTS TEST_PRECS)
 
   if(${prec} STREQUAL "double")
@@ -866,167 +860,331 @@ foreach(prec IN LISTS TEST_PRECS)
     set(tol 1e-6)
   endif()
 
-  if(QUDA_DIRAC_WILSON)
+  if(QUDA_DIRAC_WILSON)    
     add_test(NAME invert_test_wilson_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type wilson --ngcrkrylov 8
-                     --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000
-                     --enable-testing true
-                     --gtest_output=xml:invert_test_wilson_${prec}.xml)
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type wilson --ngcrkrylov 8
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000
+      --enable-testing true
+      --gtest_output=xml:invert_test_wilson_${prec}.xml)
   endif()
-
+  
   if(QUDA_DIRAC_TWISTED_MASS)
     add_test(NAME invert_test_twisted_mass_sym_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-mass
-                     --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
-                     --matpc even-even --enable-testing true
-                     --gtest_output=xml:invert_test_twisted_mass_sym_${prec}.xml)
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type twisted-mass
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --matpc even-even --enable-testing true
+      --gtest_output=xml:invert_test_twisted_mass_sym_${prec}.xml)
 
     add_test(NAME invert_test_twisted_mass_asym_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-mass
-                     --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
-                     --matpc even-even-asym --enable-testing true
-                     --gtest_output=xml:invert_test_twisted_mass_asym_${prec}.xml)
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type twisted-mass
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --matpc even-even-asym --enable-testing true
+      --gtest_output=xml:invert_test_twisted_mass_asym_${prec}.xml)    
   endif()
 
   if(QUDA_DIRAC_NDEG_TWISTED_MASS)
     add_test(NAME invert_test_ndeg_twisted_mass_sym_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-mass
-                     --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
-                     --matpc even-even --flavor nondeg-doublet
-                     --enable-testing true
-                     --gtest_output=xml:invert_test_ndeg_twisted_mass_sym_${prec}.xml)
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type twisted-mass
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --matpc even-even --flavor nondeg-doublet
+      --enable-testing true
+      --gtest_output=xml:invert_test_ndeg_twisted_mass_sym_${prec}.xml)
 
     add_test(NAME invert_test_ndeg_twisted_mass_asym_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-mass
-                     --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
-                     --matpc even-even-asym --flavor nondeg-doublet
-                     --enable-testing true
-                     --gtest_output=xml:invert_test_ndeg_twisted_mass_asym_${prec}.xml)
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type twisted-mass
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --matpc even-even-asym --flavor nondeg-doublet
+      --enable-testing true
+      --gtest_output=xml:invert_test_ndeg_twisted_mass_asym_${prec}.xml)
   endif()
 
   if(QUDA_DIRAC_CLOVER)
     add_test(NAME invert_test_clover_sym_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type clover --compute-clover true
-                     --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
-                     --matpc even-even --enable-testing true
-                     --gtest_output=xml:invert_test_clover_sym_${prec}.xml)
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type clover --compute-clover true
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --matpc even-even --enable-testing true
+      --gtest_output=xml:invert_test_clover_sym_${prec}.xml)
 
     add_test(NAME invert_test_clover_asym_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type clover --compute-clover true
-                     --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
-                     --matpc even-even-asym --enable-testing true
-                     --gtest_output=xml:invert_test_clover_asym_${prec}.xml)
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type clover --compute-clover true
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --matpc even-even-asym --enable-testing true
+      --gtest_output=xml:invert_test_clover_asym_${prec}.xml)
   endif()
 
   if(QUDA_DIRAC_TWISTED_CLOVER)
     add_test(NAME invert_test_twisted_clover_sym_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-clover --compute-clover true
-                     --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
-                     --matpc even-even --enable-testing true
-                     --gtest_output=xml:invert_test_twisted_clover_sym_${prec}.xml)
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type twisted-clover --compute-clover true
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --matpc even-even --enable-testing true
+      --gtest_output=xml:invert_test_twisted_clover_sym_${prec}.xml)
 
     add_test(NAME invert_test_twisted_clover_asym_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-clover --compute-clover true
-                     --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
-                     --matpc even-even-asym --enable-testing true
-                     --gtest_output=xml:invert_test_twisted_clover_asym_${prec}.xml)
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type twisted-clover --compute-clover true
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --matpc even-even-asym --enable-testing true
+      --gtest_output=xml:invert_test_twisted_clover_asym_${prec}.xml)
   endif()
 
   if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
     add_test(NAME invert_test_ndeg_twisted_clover_sym_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-clover --compute-clover true
-                     --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
-                     --matpc even-even --flavor nondeg-doublet
-                     --enable-testing true
-                     --gtest_output=xml:invert_test_ndeg_twisted_clover_sym_${prec}.xml)
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type twisted-clover --compute-clover true
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --matpc even-even --flavor nondeg-doublet
+      --enable-testing true
+      --gtest_output=xml:invert_test_ndeg_twisted_clover_sym_${prec}.xml)
 
     add_test(NAME invert_test_ndeg_twisted_clover_asym_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-clover --compute-clover true
-                     --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
-                     --matpc even-even-asym --flavor nondeg-doublet
-                     --enable-testing true
-                     --gtest_output=xml:invert_test_ndeg_twisted_clover_asym_${prec}.xml)
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type twisted-clover --compute-clover true
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --matpc even-even-asym --flavor nondeg-doublet
+      --enable-testing true
+      --gtest_output=xml:invert_test_ndeg_twisted_clover_asym_${prec}.xml)
   endif()
 
   if(QUDA_DIRAC_DOMAIN_WALL)
     add_test(NAME invert_test_domain_wall_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type domain-wall
-                     --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
-                     --matpc even-even
-                     --enable-testing true
-                     --gtest_output=xml:invert_test_domain_wall_${prec}.xml)
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type domain-wall
+      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --matpc even-even
+      --enable-testing true
+      --gtest_output=xml:invert_test_domain_wall_${prec}.xml)
 
     add_test(NAME invert_test_domain_wall_4d_sym_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type domain-wall-4d
-                     --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
-                     --matpc even-even
-                     --enable-testing true
-                     --gtest_output=xml:invert_test_domain_wall_4d_sym_${prec}.xml)
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type domain-wall-4d
+      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --matpc even-even
+      --enable-testing true
+      --gtest_output=xml:invert_test_domain_wall_4d_sym_${prec}.xml)
 
     add_test(NAME invert_test_domain_wall_4d_asym_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type domain-wall-4d
-                     --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
-                     --matpc even-even-asym
-                     --enable-testing true
-                     --gtest_output=xml:invert_test_domain_wall_4d_asym_${prec}.xml)
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type domain-wall-4d
+      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --matpc even-even-asym
+      --enable-testing true
+      --gtest_output=xml:invert_test_domain_wall_4d_asym_${prec}.xml)
 
     add_test(NAME invert_test_mobius_sym_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type mobius
-                     --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
-                     --matpc even-even
-                     --enable-testing true
-                     --gtest_output=xml:invert_test_mobius_sym_${prec}.xml)
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type mobius
+      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --matpc even-even
+      --enable-testing true
+      --gtest_output=xml:invert_test_mobius_sym_${prec}.xml)
 
     add_test(NAME invert_test_mobius_asym_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type mobius
-                     --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
-                     --matpc even-even-asym
-                     --enable-testing true
-                     --gtest_output=xml:invert_test_mobius_asym_${prec}.xml)
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type mobius
+      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --matpc even-even-asym
+      --enable-testing true
+      --gtest_output=xml:invert_test_mobius_asym_${prec}.xml)
 
     add_test(NAME invert_test_mobius_eofa_sym_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type mobius-eofa
-                     --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
-                     --matpc even-even
-                     --enable-testing true
-                     --gtest_output=xml:invert_test_mobius_eofa_sym_${prec}.xml)
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type mobius-eofa
+      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --matpc even-even
+      --enable-testing true
+      --gtest_output=xml:invert_test_mobius_eofa_sym_${prec}.xml)
 
     add_test(NAME invert_test_mobius_eofa_asym_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type mobius-eofa
-                     --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
-                     --matpc even-even-asym
-                     --enable-testing true
-                     --gtest_output=xml:invert_test_mobius_eofa_asym_${prec}.xml)
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type mobius-eofa
+      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --matpc even-even-asym
+      --enable-testing true
+      --gtest_output=xml:invert_test_mobius_eofa_asym_${prec}.xml)
   endif()
-
 endforeach(prec)
 
+# Eigensolves
 foreach(prec IN LISTS TEST_PRECS)
 
-  if(QUDA_FORCE_GAUGE)
-    add_test(NAME gauge_force_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_force_test> ${MPIEXEC_POSTFLAGS}
-                     --dim 2 4 6 8 --prec ${prec}
-                     --gtest_output=xml:gauge_force_test_${prec}.xml)
+  if(${prec} STREQUAL "double")
+    set(tol 1e-12)
+  elseif(${prec} STREQUAL "single")
+    set(tol 1e-6)
   endif()
+
+  if(QUDA_DIRAC_WILSON)    
+    add_test(NAME eigensolve_test_wilson_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type wilson --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --dim 2 4 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000
+      --enable-testing true 
+      --gtest_output=xml:eigensolve_test_wilson_${prec}.xml)
+  endif()
+  
+  if(QUDA_DIRAC_TWISTED_MASS)
+    add_test(NAME eigensolve_test_twisted_mass_sym_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type twisted-mass --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --dim 2 4 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000
+      --matpc even-even --enable-testing true
+      --gtest_output=xml:eigensolve_test_twisted_mass_sym_${prec}.xml)
+    
+    add_test(NAME eigensolve_test_twisted_mass_asym_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type twisted-mass --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --dim 2 4 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000      
+      --matpc even-even-asym --enable-testing true 
+      --gtest_output=xml:eigensolve_test_twisted_mass_asym_${prec}.xml)
+  endif()
+  
+  if(QUDA_DIRAC_NDEG_TWISTED_MASS)
+    add_test(NAME eigensolve_test_ndeg_twisted_mass_sym_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type twisted-mass --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --dim 2 4 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000
+      --matpc even-even --flavor nondeg-doublet 
+      --enable-testing true --eig-use-eigen-qr false --eig-qr-tol ${tol}
+      --gtest_output=xml:eigensolve_test_ndeg_twisted_mass_sym_${prec}.xml)
+
+    add_test(NAME eigensolve_test_ndeg_twisted_mass_asym_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type twisted-mass --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --dim 2 4 6 8 --prec ${prec} --eig-tol ${tol} --eig-max-restarts 1000
+      --matpc even-even-asym --flavor nondeg-doublet
+      --enable-testing true --eig-use-eigen-qr false --eig-qr-tol ${tol}
+      --gtest_output=xml:eigensolve_test_ndeg_twisted_mass_asym_${prec}.xml)
+  endif()
+  
+  if(QUDA_DIRAC_CLOVER)
+    add_test(NAME eigensolve_test_clover_sym_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type clover --compute-clover true      
+      --dim 2 4 6 8 --prec ${prec} --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --eig-tol ${tol} --eig-max-restarts 1000 
+      --matpc even-even --enable-testing true 
+      --gtest_output=xml:eigensolve_test_clover_sym_${prec}.xml)
+
+    add_test(NAME eigensolve_test_clover_asym_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type clover --compute-clover true      
+      --dim 2 4 6 8 --prec ${prec} --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --eig-tol ${tol} --eig-max-restarts 1000
+      --matpc even-even-asym --enable-testing true
+      --gtest_output=xml:eigensolve_test_clover_asym_${prec}.xml)
+  endif()
+
+  if(QUDA_DIRAC_TWISTED_CLOVER)
+    add_test(NAME eigensolve_test_twisted_clover_sym_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type twisted-clover --compute-clover true
+      --dim 2 4 6 8 --prec ${prec} --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --eig-tol ${tol} --eig-max-restarts 1000
+      --matpc even-even --enable-testing true 
+      --gtest_output=xml:eigensolve_test_twisted_clover_sym_${prec}.xml)
+    
+    add_test(NAME eigensolve_test_twisted_clover_asym_${prec}      
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type twisted-clover --compute-clover true
+      --dim 2 4 6 8 --prec ${prec} --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --eig-tol ${tol} --eig-max-restarts 1000
+      --matpc even-even-asym --enable-testing true 
+      --gtest_output=xml:eigensolve_test_twisted_clover_asym_${prec}.xml)
+  endif()
+  
+  if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+    add_test(NAME eigensolve_test_ndeg_twisted_clover_sym_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type twisted-clover --compute-clover true
+      --dim 2 4 6 8 --prec ${prec} --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --eig-tol ${tol} --eig-max-restarts 1000
+      --matpc even-even --flavor nondeg-doublet
+      --enable-testing true 
+      --gtest_output=xml:eigensolve_test_ndeg_twisted_clover_sym_${prec}.xml)
+    
+    add_test(NAME eigensolve_test_ndeg_twisted_clover_asym_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type twisted-clover --compute-clover true
+      --dim 2 4 6 8 --prec ${prec} --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --eig-tol ${tol} --eig-max-restarts 1000
+      --matpc even-even-asym --flavor nondeg-doublet
+      --enable-testing true 
+      --gtest_output=xml:eigensolve_test_ndeg_twisted_clover_asym_${prec}.xml)
+  endif()
+  
+  if(QUDA_DIRAC_DOMAIN_WALL)
+    add_test(NAME eigensolve_test_domain_wall_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type domain-wall --prec ${prec}
+      --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --eig-tol ${tol} --eig-max-restarts 1000
+      --matpc even-even --enable-testing true 
+      --gtest_output=xml:eigensolve_test_domain_wall_${prec}.xml)
+
+    add_test(NAME eigensolve_test_domain_wall_4d_sym_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type domain-wall-4d --prec ${prec}
+      --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --eig-tol ${tol} --eig-max-restarts 1000
+      --matpc even-even --enable-testing true 
+      --gtest_output=xml:eigensolve_test_domain_wall_4d_sym_${prec}.xml)
+
+    add_test(NAME eigensolve_test_domain_wall_4d_asym_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type domain-wall-4d --prec ${prec}
+      --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --eig-tol ${tol} --eig-max-restarts 1000
+      --matpc even-even-asym --enable-testing true 
+      --gtest_output=xml:eigensolve_test_domain_wall_4d_asym_${prec}.xml)
+
+    add_test(NAME eigensolve_test_mobius_sym_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type mobius --prec ${prec}
+      --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --eig-tol ${tol} --eig-max-restarts 1000
+      --matpc even-even --enable-testing true 
+      --gtest_output=xml:eigensolve_test_mobius_sym_${prec}.xml)
+
+    add_test(NAME eigensolve_test_mobius_asym_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type mobius --prec ${prec}
+      --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --eig-tol ${tol} --eig-max-restarts 1000
+      --matpc even-even-asym --enable-testing true 
+      --gtest_output=xml:eigensolve_test_mobius_asym_${prec}.xml)
+
+    add_test(NAME eigensolve_test_mobius_eofa_sym_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type mobius-eofa --prec ${prec}
+      --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --eig-tol ${tol} --eig-max-restarts 1000
+      --matpc even-even --enable-testing true 
+      --gtest_output=xml:eigensolve_test_mobius_eofa_sym_${prec}.xml)
+
+    add_test(NAME eigensolve_test_mobius_eofa_asym_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:eigensolve_test> ${MPIEXEC_POSTFLAGS}
+      --dslash-type mobius-eofa --prec ${prec}
+      --dim 2 4 6 8 --Lsdim 4 --eig-n-conv 24 --eig-n-ev 24 --eig-n-kr 128
+      --eig-tol ${tol} --eig-max-restarts 1000
+      --matpc even-even-asym --enable-testing true 
+      --gtest_output=xml:eigensolve_test_mobius_eofa_asym_${prec}.xml)
+  endif()
+endforeach(prec)
+  
+foreach(prec IN LISTS TEST_PRECS)
+
+  add_test(NAME gauge_force_${prec}
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_force_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 2 4 6 8 --prec ${prec}
+                   --gtest_output=xml:gauge_force_test_${prec}.xml)
 
   if(QUDA_DIRAC_STAGGERED)
     add_test(NAME unitarize_link_${prec}
@@ -1047,12 +1205,10 @@ foreach(prec IN LISTS TEST_PRECS)
                      --gtest_output=xml:hisq_unitarize_force_test_${prec}.xml)
   endif()
 
-  if(QUDA_GAUGE_ALG)
-    add_test(NAME gauge_alg_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg_test> ${MPIEXEC_POSTFLAGS}
-                     --dim 4 6 8 10 --prec ${prec}
-                     --gtest_output=xml:gauge_alg_test_${prec}.xml)
-  endif()
+  add_test(NAME gauge_alg_${prec}
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 4 6 8 10 --prec ${prec}
+                   --gtest_output=xml:gauge_alg_test_${prec}.xml)
 
   if (TARGET dilution_test)
     add_test(NAME dilution_test_${prec}

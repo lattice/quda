@@ -189,7 +189,7 @@ namespace quda
          @tparam n Complex vector length
       */
       template <bool is_fixed, typename real, int n>
-      __device__ __host__ inline std::enable_if_t<!is_fixed, norm_t> store_norm(const array<complex<real>, n> &, int, int) const
+      __device__ __host__ inline std::enable_if_t<!is_fixed, norm_t> store_norm(const array<complex<real>, n> &, norm_t &) const
       {
         return 1.0;
       }
@@ -200,11 +200,11 @@ namespace quda
          @tparam real Precision of vector we wish to store from
          @tparam n Complex vector length
          @param[in] v elements we wish to find the max abs of for storing
-         @param[in] x checkerboard site index
-         @param[in] parity site parity
+         @param[in] norm The norm we are 
+         @return The scale factor to be applied when packing into fixed point
       */
       template <bool is_fixed, typename real, int n>
-      __device__ __host__ inline std::enable_if_t<is_fixed, norm_t> store_norm(const array<complex<real>, n> &v, int x, int parity) const
+      __device__ __host__ inline std::enable_if_t<is_fixed, norm_t> store_norm(const array<complex<real>, n> &v, norm_t &norm) const
       {
         norm_t max_[n];
         // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
@@ -213,8 +213,7 @@ namespace quda
         norm_t scale = 0.0;
 #pragma unroll
         for (int i = 0; i < n; i++) scale = fmaxf(max_[i], scale);
-        data.norm[x + parity * data.cb_norm_offset] = scale * fixedInvMaxValue<store_t>::value;
-
+        norm = scale * fixedInvMaxValue<store_t>::value;
         return fdividef(fixedMaxValue<store_t>::value, scale);
       }
 
@@ -230,21 +229,42 @@ namespace quda
       __device__ __host__ inline void load(array<complex<real>, n> &v, int x, int parity = 0) const
       {
         constexpr int len = 2 * n; // real-valued length
-        float nrm = load_norm<isFixed<store_t>::value>(x, parity);
 
-        array<real, len> v_;
+        if constexpr (!(n == 3 && isHalf<store_t>::value)) {
+          norm_t nrm = load_norm<isFixed<store_t>::value>(x, parity);
+          array<real, len> v_;
 
-        constexpr int M = len / N;
+          constexpr int M = len / N;
 #pragma unroll
-        for (int i = 0; i < M; i++) {
+          for (int i = 0; i < M; i++) {
+            // first load from memory
+            Vector vecTmp = vector_load<Vector>(data.spinor, parity * data.cb_offset + x + data.stride * i);
+            // now copy into output and scale
+#pragma unroll
+            for (int j = 0; j < N; j++) copy_and_scale(v_[i * N + j], reinterpret_cast<store_t *>(&vecTmp)[j], nrm);
+          }
+
+          for (int i = 0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
+        } else {
+          // specialized path for half precision staggered
+          using Vector = int4;
+          auto cb_offset = data.cb_norm_offset / 4;
+          norm_t nrm;
+          array<real, len> v_;
+
           // first load from memory
-          Vector vecTmp = vector_load<Vector>(data.spinor, parity * data.cb_offset + x + data.stride * i);
+          Vector vecTmp = vector_load<Vector>(data.spinor, parity * cb_offset + x);
+
+          // extract norm
+          memcpy(&nrm, &vecTmp.w, sizeof(norm_t));
+
           // now copy into output and scale
 #pragma unroll
-          for (int j = 0; j < N; j++) copy_and_scale(v_[i * N + j], reinterpret_cast<store_t *>(&vecTmp)[j], nrm);
-        }
+          for (int i = 0; i < len; i++) copy_and_scale(v_[i], reinterpret_cast<store_t *>(&vecTmp)[i], nrm);
 
-        for (int i = 0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
+#pragma unroll
+          for (int i = 0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
+        }
       }
 
       /**
@@ -259,32 +279,54 @@ namespace quda
       __device__ __host__ inline void save(const array<complex<real>, n> &v, int x, int parity = 0) const
       {
         constexpr int len = 2 * n; // real-valued length
-        array<real, len> v_;
 
-        if (isFixed<store_t>::value) {
-          real scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, x, parity);
+        if constexpr (!(n == 3 && isHalf<store_t>::value)) {
+          array<real, len> v_;
+
+          if constexpr (isFixed<store_t>::value) {
+            real scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, data.norm[x + parity * data.cb_norm_offset]);
+#pragma unroll
+            for (int i = 0; i < n; i++) {
+              v_[2 * i + 0] = scale_inv * v[i].real();
+              v_[2 * i + 1] = scale_inv * v[i].imag();
+            }
+          } else {
+#pragma unroll
+            for (int i = 0; i < n; i++) {
+              v_[2 * i + 0] = v[i].real();
+              v_[2 * i + 1] = v[i].imag();
+            }
+          }
+
+          constexpr int M = len / N;
+#pragma unroll
+          for (int i = 0; i < M; i++) {
+            Vector vecTmp;
+            // first do scalar copy converting into storage type
+#pragma unroll
+            for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[j], v_[i * N + j]);
+            // second do vectorized copy into memory
+            vector_store(data.spinor, parity * data.cb_offset + x + data.stride * i, vecTmp);
+          }
+        } else {
+          // specialized path for half precision staggered
+          using Vector = int4;
+          auto cb_offset = data.cb_norm_offset / 4;
+          norm_t norm;
+          norm_t scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, norm);
+          array<real, len> v_;
 #pragma unroll
           for (int i = 0; i < n; i++) {
             v_[2 * i + 0] = scale_inv * v[i].real();
             v_[2 * i + 1] = scale_inv * v[i].imag();
           }
-        } else {
-#pragma unroll
-          for (int i = 0; i < n; i++) {
-            v_[2 * i + 0] = v[i].real();
-            v_[2 * i + 1] = v[i].imag();
-          }
-        }
 
-        constexpr int M = len / N;
-#pragma unroll
-        for (int i = 0; i < M; i++) {
           Vector vecTmp;
-          // first do scalar copy converting into storage type
+          memcpy(&vecTmp.w, &norm, sizeof(norm_t)); // pack the norm
 #pragma unroll
-          for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[j], v_[i * N + j]);
+          for (int i = 0; i < len; i++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[i], v_[i]);
           // second do vectorized copy into memory
-          vector_store(data.spinor, parity * data.cb_offset + x + data.stride * i, vecTmp);
+          vector_store(data.spinor, parity * cb_offset + x, vecTmp);
         }
       }
     };

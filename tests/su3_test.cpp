@@ -139,8 +139,6 @@ int main(int argc, char **argv)
   printfQuda("Computed plaquette gauge precise is %.16e (spatial = %.16e, temporal = %.16e)\n", plaq[0], plaq[1],
              plaq[2]);
 
-#ifdef GPU_GAUGE_TOOLS
-
   // All user inputs now defined
   display_test_info();
 
@@ -185,7 +183,7 @@ int main(int argc, char **argv)
   // The user may specify which measurements they wish to perform/omit
   // using the QudaGaugeObservableParam struct, and whether or not to
   // perform suN projection at each measurement step. We recommend that
-  // users perfrom suN projection.
+  // users perform suN projection.
   // A unique observable param struct is constructed for each measurement.
 
   // Gauge Smearing Routines
@@ -241,10 +239,6 @@ int main(int argc, char **argv)
 
   host_timer.stop(); // stop the timer
   printfQuda("Total time for gauge smearing = %g secs\n", host_timer.last());
-
-#else
-  printfQuda("Skipping other gauge tests since gauge tools have not been compiled\n");
-#endif
 
   if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
 

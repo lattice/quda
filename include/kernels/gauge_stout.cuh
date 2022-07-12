@@ -25,14 +25,16 @@ namespace quda
     int X[4];    // grid dimensions
     int border[4];
     const Float rho;
-    const Float epsilon;
+    const Float staple_coeff;
+    const Float rectangle_coeff;
 
     STOUTArg(GaugeField &out, const GaugeField &in, Float rho, Float epsilon = 0) :
       kernel_param(dim3(1, 2, stoutDim)),
       out(out),
       in(in),
       rho(rho),
-      epsilon(epsilon)
+      staple_coeff(rho * (5.0 - 2.0 * epsilon) / 3.0),
+      rectangle_coeff(rho * (1.0 - epsilon) / 12.0)
     {
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = in.R()[dir];
@@ -65,14 +67,13 @@ namespace quda
         X[dr] += 2 * arg.border[dr];
       }
 
-      int dx[4] = {0, 0, 0, 0};
       Link U, Stap, Omega, Q;
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       computeStaple(arg, x, X, parity, dir, Stap, Arg::stoutDim);
 
       // Get link U
-      U = arg.in(dir, linkIndexShift(x, dx, X), parity);
+      U = arg.in(dir, linkIndex(x, X), parity);
 
       // Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
       //--------------------------------------------------------------------
@@ -85,7 +86,7 @@ namespace quda
 
       Link exp_iQ = exponentiate_iQ(Q);
       U = exp_iQ * U;
-      arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
+      arg.out(dir, linkIndex(x, X), parity) = U;
 
       // Debug tools
 #if 0
@@ -132,10 +133,6 @@ namespace quda
         X[dr] += 2 * arg.border[dr];
       }
 
-      real staple_coeff = (5.0 - 2.0 * arg.epsilon) / 3.0;
-      real rectangle_coeff = (1.0 - arg.epsilon) / 12.0;
-
-      int dx[4] = {0, 0, 0, 0};
       Link U, UDag, Stap, Rect, Omega, ODT, Q;
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
@@ -144,12 +141,12 @@ namespace quda
       computeStapleRectangle(arg, x, X, parity, dir, Stap, Rect, Arg::stoutDim);
 
       // Get link U
-      U = arg.in(dir, linkIndexShift(x, dx, X), parity);
+      U = arg.in(dir, linkIndex(x, X), parity);
 
       // Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
       //-------------------------------------------------------------------
       // Compute \rho * staple_coeff * S - \rho * rectangle_coeff * R
-      Q = ((arg.rho * staple_coeff) * (Stap) - (arg.rho * rectangle_coeff) * (Rect)) * conj(U);
+      Q = ((arg.staple_coeff * Stap) - (arg.rectangle_coeff * Rect)) * conj(U);
       // Compute \Q_{mu} = i/2[Omega_{mu}^dag - Omega_{mu}
       //                      - 1/3 Tr(Omega_{mu}^dag - Omega_{mu})]
       makeHerm(Q);
@@ -157,7 +154,7 @@ namespace quda
 
       Link exp_iQ = exponentiate_iQ(Q);
       U = exp_iQ * U;
-      arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
+      arg.out(dir, linkIndex(x, X), parity) = U;
 
       // Debug tools
 #if 0

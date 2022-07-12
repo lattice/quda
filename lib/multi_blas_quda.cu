@@ -134,16 +134,18 @@ namespace quda {
               Launch(tp, stream, MultiBlasArg<1, device_real_t, M, NXZ, device_store_t, N,
                      device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
               break;
-#ifdef WARP_SPLIT
             case 2:
-              Launch(tp, stream, MultiBlasArg<2, device_real_t, M, NXZ, device_store_t, N,
-                     device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
-              break;
+              if constexpr (enable_warp_split()) {
+                Launch(tp, stream, MultiBlasArg<2, device_real_t, M, NXZ, device_store_t, N,
+                       device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
+                break;
+              }
             case 4:
-              Launch(tp, stream, MultiBlasArg<4, device_real_t, M, NXZ, device_store_t, N,
-                     device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
-              break;
-#endif
+              if constexpr (enable_warp_split()) {
+                Launch(tp, stream, MultiBlasArg<4, device_real_t, M, NXZ, device_store_t, N,
+                       device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
+                break;
+              }
             default: errorQuda("warp-split factor %d not instantiated", static_cast<int>(tp.aux.x));
             }
 
@@ -212,28 +214,25 @@ namespace quda {
         }
       }
 
-#ifdef WARP_SPLIT
       bool advanceAux(TuneParam &param) const
       {
-        if (2 * param.aux.x <= max_warp_split) {
-          param.aux.x *= 2;
-          warp_split = param.aux.x;
-          return true;
+        if (enable_warp_split()) {
+          if (2 * param.aux.x <= max_warp_split) {
+            param.aux.x *= 2;
+            warp_split = param.aux.x;
+            return true;
+          } else {
+            param.aux.x = 1;
+            warp_split = param.aux.x;
+            // reset the block dimension manually here to pick up the warp_split parameter
+            resetBlockDim(param);
+            return false;
+          }
         } else {
-          param.aux.x = 1;
-          warp_split = param.aux.x;
-          // reset the block dimension manually here to pick up the warp_split parameter
-          resetBlockDim(param);
+          warp_split = 1;
           return false;
         }
       }
-#else
-      bool advanceAux(TuneParam &) const
-      {
-        warp_split = 1;
-        return false;
-      }
-#endif
 
       int blockStep() const { return device::warp_size() / warp_split; }
       int blockMin() const { return device::warp_size() / warp_split; }

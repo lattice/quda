@@ -473,6 +473,7 @@ namespace quda {
 
           arg.shared_atomic = tp.aux.y;
           arg.parity_flip = tp.aux.z;
+          arg.coarse_color_wave = !tp.aux.w;
 
           if (arg.shared_atomic) {
             // check we have a valid problem size for shared atomics

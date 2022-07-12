@@ -948,7 +948,10 @@ namespace quda {
       //Declarations
       using real = typename T::value_type;
 
-      real inv3 = 1.0 / 3.0;
+      constexpr real inv3 = static_cast<real>(1.0 / 3.0);
+      constexpr real inv_pi = static_cast<real>(1.0 / M_PI);
+      constexpr real inv_3pi = static_cast<real>(1.0 / (3.0 * M_PI));
+
       Matrix<T,3> temp1;
       Matrix<T,3> temp2;
       //[14] c0 = det(Q) = 1/3Tr(Q^3)
@@ -972,7 +975,7 @@ namespace quda {
       real theta = acos(c0 / c0_max);
 
       real u_p, w_p; // u, w parameters.
-      quda::sincos(theta * inv3, &w_p, &u_p);
+      quda::sincospi(theta * inv_3pi, &w_p, &u_p);
       //[23]
       u_p *= sqrt_c1_inv3;
 
@@ -984,18 +987,19 @@ namespace quda {
       real w_sq = w_p * w_p;
       real denom_inv = static_cast<real>(1.0) / (9 * u_sq - w_sq);
       real exp_iu_re, exp_iu_im;
-      quda::sincos(u_p, &exp_iu_im, &exp_iu_re);
+      quda::sincospi(u_p * inv_pi, &exp_iu_im, &exp_iu_re);
       real exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
       real exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
-      real cos_w = cos(w_p);
+      real cos_w = cospi(w_p * inv_pi);
       real sinc_w;
 
       //[33] Added one more term to the series given in the paper.
       if (w_p < 0.05 && w_p > -0.05) {
 	//1 - 1/6 x^2 (1 - 1/20 x^2 (1 - 1/42 x^2(1 - 1/72*x^2)))
 	sinc_w = 1.0 - (w_sq/6.0)*(1 - (w_sq*0.05)*(1 - (w_sq/42.0)*(1 - (w_sq/72.0))));
+      } else {
+        sinc_w = sinpi(w_p * inv_pi) / w_p;
       }
-      else sinc_w = sin(w_p)/w_p;
 
       //[34] Test for c0 < 0.
       int parity = 0;
@@ -1055,7 +1059,7 @@ namespace quda {
     /**
        Direct port of the TIFR expsu3 algorithm
     */
-    template <typename Float> __device__ __host__ void expsu3(Matrix<complex<Float>, 3> &q)
+    template <typename Float> __device__ __host__ inline void expsu3(Matrix<complex<Float>, 3> &q)
     {
       typedef complex<Float> Complex;
 

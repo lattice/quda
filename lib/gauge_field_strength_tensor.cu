@@ -32,17 +32,10 @@ namespace quda
     long long bytes() const { return ((16 * u.Reconstruct() + f.Reconstruct()) * 6 * f.Volume() * f.Precision()); }
   };
 
-#ifdef GPU_GAUGE_TOOLS
   void computeFmunu(GaugeField &f, const GaugeField &u)
   {
     checkPrecision(f, u);
     instantiate2<Fmunu,ReconstructWilson>(u, f); // u must be first here for correct template instantiation
   }
-#else
-  void computeFmunu(GaugeField &, const GaugeField &)
-  {
-    errorQuda("Gauge tools are not built");
-  }
-#endif // GPU_GAUGE_TOOLS
 
 } // namespace quda

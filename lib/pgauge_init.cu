@@ -61,7 +61,6 @@ namespace quda {
     long long bytes() const { return U.Bytes(); }
   };
 
-#ifdef GPU_GAUGE_ALG
   /**
    * @brief Perform a cold start to the gauge field, identity SU(3)
    * matrix, also fills the ghost links in multi-GPU case (no need to
@@ -85,9 +84,5 @@ namespace quda {
   {
     instantiate<InitGaugeHot>(data, rngstate);
   }
-#else
-  void InitGaugeField(GaugeField&) { errorQuda("Pure gauge code not built"); }
-  void InitGaugeField(GaugeField&, RNG &) { errorQuda("Pure gauge code not built"); }
-#endif
 
 }

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
-using test_t = ::testing::tuple<QudaInverterType, QudaSolutionType, QudaSolveType, QudaPrecision, int>;
+// tuple types: solver-type, solution-type, solve-type, sloppy-precision, multi-shift, solution_accumulator_pipeline
+using test_t = ::testing::tuple<QudaInverterType, QudaSolutionType, QudaSolveType, QudaPrecision, int, int>;
 
 class InvertTest : public ::testing::TestWithParam<test_t>
 {
@@ -68,11 +69,25 @@ bool is_chiral(QudaDslashType type)
   }
 }
 
+bool support_solution_accumulator_pipeline(QudaInverterType type)
+{
+  switch (type) {
+  case QUDA_CG_INVERTER:
+  case QUDA_CA_CG_INVERTER:
+  case QUDA_CGNR_INVERTER:
+  case QUDA_CGNE_INVERTER:
+  case QUDA_PCG_INVERTER: return true;
+  default: return false;
+  }
+}
+
 bool skip_test(test_t param)
 {
+  auto inverter_type = ::testing::get<0>(param);
   auto solution_type = ::testing::get<1>(param);
   auto prec_sloppy = ::testing::get<3>(param);
   auto multishift = ::testing::get<4>(param);
+  auto solution_accumulator_pipeline = ::testing::get<5>(param);
 
   if (prec < prec_sloppy) return true;              // out precision must be at least sloppy precision
   if (!(QUDA_PRECISION & prec_sloppy)) return true; // precision not enabled so skip it
@@ -83,6 +98,8 @@ bool skip_test(test_t param)
   if (is_chiral(dslash_type) && multishift > 1) return true;
   // FIXME this needs to be added to dslash_reference.cpp
   if (is_chiral(dslash_type) && solution_type == QUDA_MATDAG_MAT_SOLUTION) return true;
+  // Skip if the inverter does not support batched update and batched update is greater than one
+  if (!support_solution_accumulator_pipeline(inverter_type) && solution_accumulator_pipeline > 1) return true;
 
   return false;
 }
@@ -110,6 +127,8 @@ std::string gettestname(::testing::TestParamInfo<test_t> param)
   name += get_prec_str(::testing::get<3>(param.param));
   if (::testing::get<4>(param.param) > 1)
     name += std::string("_shift_") + std::to_string(::testing::get<4>(param.param));
+  if (::testing::get<5>(param.param) > 1)
+    name += std::string("_solution_accumulator_pipeline_") + std::to_string(::testing::get<5>(param.param));
   return name;
 }
 
@@ -124,32 +143,37 @@ auto direct_solvers
 auto sloppy_precisions
   = Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION, QUDA_QUARTER_PRECISION);
 
+auto solution_accumulator_pipelines = Values(1, 8);
+
 // preconditioned normal solves
 INSTANTIATE_TEST_SUITE_P(NormalEvenOdd, InvertTest,
                          ::testing::Combine(normal_solvers, Values(QUDA_MATPCDAG_MATPC_SOLUTION, QUDA_MAT_SOLUTION),
-                                            Values(QUDA_NORMOP_PC_SOLVE), sloppy_precisions, Values(1)),
+                                            Values(QUDA_NORMOP_PC_SOLVE), sloppy_precisions, Values(1),
+                                            solution_accumulator_pipelines),
                          gettestname);
 
 // full system normal solve
 INSTANTIATE_TEST_SUITE_P(NormalFull, InvertTest,
                          ::testing::Combine(normal_solvers, Values(QUDA_MATDAG_MAT_SOLUTION), Values(QUDA_NORMOP_SOLVE),
-                                            sloppy_precisions, Values(1)),
+                                            sloppy_precisions, Values(1), solution_accumulator_pipelines),
                          gettestname);
 
 // preconditioned direct solves
 INSTANTIATE_TEST_SUITE_P(EvenOdd, InvertTest,
                          ::testing::Combine(direct_solvers, Values(QUDA_MATPC_SOLUTION, QUDA_MAT_SOLUTION),
-                                            Values(QUDA_DIRECT_PC_SOLVE), sloppy_precisions, Values(1)),
+                                            Values(QUDA_DIRECT_PC_SOLVE), sloppy_precisions, Values(1),
+                                            solution_accumulator_pipelines),
                          gettestname);
 
 // full system direct solve
 INSTANTIATE_TEST_SUITE_P(Full, InvertTest,
                          ::testing::Combine(direct_solvers, Values(QUDA_MAT_SOLUTION), Values(QUDA_DIRECT_SOLVE),
-                                            sloppy_precisions, Values(1)),
+                                            sloppy_precisions, Values(1), solution_accumulator_pipelines),
                          gettestname);
 
 // preconditioned multi-shift solves
 INSTANTIATE_TEST_SUITE_P(MultiShiftEvenOdd, InvertTest,
                          ::testing::Combine(Values(QUDA_CG_INVERTER), Values(QUDA_MATPCDAG_MATPC_SOLUTION),
-                                            Values(QUDA_NORMOP_PC_SOLVE), sloppy_precisions, Values(10)),
+                                            Values(QUDA_NORMOP_PC_SOLVE), sloppy_precisions, Values(10),
+                                            solution_accumulator_pipelines),
                          gettestname);

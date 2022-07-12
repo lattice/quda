@@ -92,6 +92,10 @@ namespace quda
       spectrum[0] = 'S';
     }
 
+    // For normal operators (MdagM, MMdag) the SVD of the
+    // underlying operators (M, Mdag) is computed.
+    compute_svd = eig_param->compute_svd;
+
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
@@ -120,6 +124,7 @@ namespace quda
 
     // Sanity checks
     //--------------------------------------------------------------------------
+    // Cannot solve non-hermitian systems with Lanczos
     if (!mat.hermitian() && eig_solver->hermitian())
       errorQuda("Cannot solve non-Hermitian system with strictly Hermitian eigensolver %d, %d", (int)!mat.hermitian(),
                 (int)eig_solver->hermitian());
@@ -130,8 +135,13 @@ namespace quda
       if (!eig_solver->hermitian()) errorQuda("Polynomial acceleration not supported with non-Hermitian solver");
     }
 
+    // Cannot solve for imaginary spectrum of hermitian systems
     if (mat.hermitian() && (eig_param->spectrum == QUDA_SPECTRUM_SI_EIG || eig_param->spectrum == QUDA_SPECTRUM_LI_EIG))
       errorQuda("The imaginary spectrum of a Hermitian operator cannot be computed");
+
+    // Cannot compute SVD of non-normal operators
+    if (!eig_param->use_norm_op && eig_param->compute_svd)
+      errorQuda("Computation of SVD supported for normal operators only");
     //--------------------------------------------------------------------------
 
     return eig_solver;
@@ -146,12 +156,16 @@ namespace quda
         if (sqrt(blas::norm2(*kSpace[b])) == 0.0) { kSpace[b]->Source(QUDA_RANDOM_SOURCE); }
       }
     } else {
+      // Use 0th vector to extract meta data for the RNG.
       RNG *rng = new RNG(*kSpace[0], 1234);
       for (int b = 0; b < block_size; b++) {
+        // If the spinor contains initial data from the user
+        // preserve it, else populate with rands.
         if (sqrt(blas::norm2(*kSpace[b])) == 0.0) { spinorNoise(*kSpace[b], *rng, QUDA_NOISE_UNIFORM); }
       }
       delete rng;
     }
+
     bool orthed = false;
     int k = 0, kmax = 5;
     while (!orthed && k < kmax) {
@@ -205,6 +219,7 @@ namespace quda
       printfQuda("n_ev %d\n", n_ev);
       printfQuda("n_kr %d\n", n_kr);
       if (block_size > 1) printfQuda("block size %d\n", block_size);
+      if (batched_rotate > 0) printfQuda("batched rotation size %d\n", batched_rotate);
       if (eig_param->use_poly_acc) {
         printfQuda("polyDeg %d\n", eig_param->poly_deg);
         printfQuda("a-min %f\n", eig_param->a_min);
@@ -243,8 +258,10 @@ namespace quda
     r.resize(0);
 
     // Resize Krylov Space
-    for (unsigned int i = n_conv; i < kSpace.size(); i++) { delete kSpace[i]; }
-    kSpace.resize(n_conv);
+    int n_eig = n_conv;
+    if (compute_svd) n_eig *= 2;
+    for (unsigned int i = n_eig; i < kSpace.size(); i++) { delete kSpace[i]; }
+    kSpace.resize(n_eig);
     evals.resize(n_conv);
 
     // Only save if outfile is defined
@@ -252,7 +269,7 @@ namespace quda
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
       // Make an array of size n_conv
       std::vector<ColorSpinorField *> vecs_ptr;
-      vecs_ptr.reserve(n_conv);
+      vecs_ptr.reserve(n_eig);
       const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
       // We may wish to compute vectors in high prec, but use in a lower
       // prec. This allows the user to down copy the data for later use.
@@ -270,7 +287,7 @@ namespace quda
                      vecs_ptr[0]->Precision());
         }
       } else {
-        for (int i = 0; i < n_conv; i++) {
+        for (int i = 0; i < n_eig; i++) {
           kSpace[i]->setSuggestedParity(mat_parity);
           vecs_ptr.push_back(kSpace[i]);
         }
@@ -448,7 +465,7 @@ namespace quda
     for (int i = 0; i < size; i++) {
       for (int j = 0; j < i; j++) {
         Complex cnorm = blas::cDotProduct(*vecs_ptr[j], *vecs_ptr[i]); // <j|i> with i normalised.
-        blas::caxpy(-cnorm, *vecs_ptr[j], *vecs_ptr[i]);               // i = i - proj_{j}(i) = i - <j|i> * i
+        blas::caxpy(-cnorm, *vecs_ptr[j], *vecs_ptr[i]);               // i = i - proj_{j}(i) = i - <j|i> * j
       }
       double norm = sqrt(blas::norm2(*vecs_ptr[i]));
       blas::ax(1.0 / norm, *vecs_ptr[i]); // i/<i|i>
@@ -617,7 +634,7 @@ namespace quda
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing SVD of M\n");
 
     int n_conv = eig_param->n_conv;
-    if (evecs.size() != (unsigned int)(2 * n_conv))
+    if (evecs.size() < (unsigned int)(2 * n_conv))
       errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()), 2 * n_conv);
 
     std::vector<double> sigma_tmp(n_conv);
@@ -727,6 +744,7 @@ namespace quda
       Complex n_unit(-1.0, 0.0);
       blas::caxpby(evals[i], *evecs[i], n_unit, *temp[0]);
       residua[i] = sqrt(blas::norm2(*temp[0]));
+      // eig_param->invert_param->true_res_offset[i] = residua[i];
 
       // If size = n_conv, this routine is called post sort
       if (getVerbosity() >= QUDA_SUMMARIZE && size == n_conv)
