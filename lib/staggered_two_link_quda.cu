@@ -49,21 +49,22 @@ using namespace staggered_quark_smearing;
 
     template <typename real, int nColor, QudaReconstructType recon>
     struct ComputeTwoLink {
-      ComputeTwoLink(GaugeField &newTwoLink, const GaugeField &link)
+      ComputeTwoLink(const GaugeField &link, GaugeField &newTwoLink)
       {
-        TwoLinkArg<real, nColor> arg(newTwoLink, link);
+        TwoLinkArg<real, nColor, recon> arg(newTwoLink, link);
         TwoLink_<decltype(arg)>  twolnk(arg, link, newTwoLink);
       }
     };
 
-    void computeTwoLink(GaugeField &newTwoLink, const GaugeField &link)
+  void computeTwoLink(GaugeField &newTwoLink, const GaugeField &link)
     {
 #if defined(GPU_STAGGERED_DIRAC) && defined(GPU_TWOLINK_GSMEAR)
       checkNative(newTwoLink, link);
       checkLocation(newTwoLink, link);
       checkPrecision(newTwoLink, link);
 
-      instantiate<ComputeTwoLink, ReconstructNone>(newTwoLink, link);
+      instantiate<ComputeTwoLink, WilsonReconstruct>(link, newTwoLink);
+
       return;
 #else
       errorQuda("Two-link computation requires staggered dslash and two-link Gaussian quark smearing to be enabled");
