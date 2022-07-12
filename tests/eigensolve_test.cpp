@@ -24,7 +24,7 @@ QudaEigParam eig_param;
 // if "--enable-testing true" is passed, we run the tests defined in here
 #include <eigensolve_test_gtest.hpp>
 
-void display_test_info()
+void display_test_info(QudaEigParam &param)
 {
   printfQuda("running the following test:\n");
 
@@ -34,36 +34,35 @@ void display_test_info()
              tdim, Lsdim);
 
   printfQuda("\n   Eigensolver parameters\n");
-  printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
-  printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
-  if (eig_type == QUDA_EIG_BLK_TR_LANCZOS) printfQuda(" - eigenvector block size %d\n", eig_block_size);
-  printfQuda(" - number of eigenvectors requested %d\n", eig_n_conv);
-  printfQuda(" - size of eigenvector search space %d\n", eig_n_ev);
-  printfQuda(" - size of Krylov space %d\n", eig_n_kr);
-  printfQuda(" - solver tolerance %e\n", eig_tol);
-  printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
-  if (eig_compute_svd) {
+  printfQuda(" - solver mode %s\n", get_eig_type_str(param.eig_type));
+  printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(param.spectrum));
+  if (param.eig_type == QUDA_EIG_BLK_TR_LANCZOS) printfQuda(" - eigenvector block size %d\n", param.block_size);
+  printfQuda(" - number of eigenvectors requested %d\n", param.n_conv);
+  printfQuda(" - size of eigenvector search space %d\n", param.n_ev);
+  printfQuda(" - size of Krylov space %d\n", param.n_kr);
+  printfQuda(" - solver tolerance %e\n", param.tol);
+  printfQuda(" - convergence required (%s)\n", param.require_convergence ? "true" : "false");
+  if (param.compute_svd) {
     printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
     printfQuda(" - ***********************************************************\n");
     printfQuda(" - **** Overriding any previous choices of operator type. ****\n");
     printfQuda(" - ****    SVD demands normal operator, will use MdagM    ****\n");
     printfQuda(" - ***********************************************************\n");
   } else {
-    printfQuda(" - Operator: daggered (%s) , norm-op (%s), even-odd pc (%s)\n", eig_use_dagger ? "true" : "false",
-               eig_use_normop ? "true" : "false", eig_use_pc ? "true" : "false");
+    printfQuda(" - Operator: daggered (%s) , norm-op (%s), even-odd pc (%s)\n", param.use_dagger ? "true" : "false",
+               param.use_norm_op ? "true" : "false", param.use_pc ? "true" : "false");
   }
-  if (eig_use_poly_acc) {
-    printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
-    printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
-    if (eig_amax <= 0)
+  if (param.use_poly_acc) {
+    printfQuda(" - Chebyshev polynomial degree %d\n", param.poly_deg);
+    printfQuda(" - Chebyshev polynomial minumum %e\n", param.a_min);
+    if (param.a_max <= 0)
       printfQuda(" - Chebyshev polynomial maximum will be computed\n");
     else
-      printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
+      printfQuda(" - Chebyshev polynomial maximum %e\n\n", param.a_max);
   }
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
-  return;
 }
 
 std::vector<char> gauge_;
@@ -165,7 +164,7 @@ std::vector<double> eigensolve(test_t test_param)
           eig_param.use_pc == QUDA_BOOLEAN_TRUE ? "true" : "false",
           eig_param.compute_svd == QUDA_BOOLEAN_TRUE ? "true" : "false", get_eig_spectrum_str(eig_param.spectrum));
 
-  display_test_info();
+  display_test_info(eig_param);
 
   // Vector construct START
   //----------------------------------------------------------------------------
