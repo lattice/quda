@@ -8,13 +8,52 @@
 namespace quda {
 
   template<typename Float, int nColor, QudaReconstructType recon>
-  class GaugePolyakovLoopSplit : public TunableKernel2D {
+  class GaugeInsertTimeslice : public TunableKernel2D {
+    GaugeField &u;
+    const GaugeField &s;
+    int timeslice;
+    unsigned int minThreads() const { return s.LocalVolumeCB(); }
+
+  public:
+    GaugeInsertTimeslice(GaugeField &u, const GaugeField &s, int timeslice) :
+      TunableKernel2D(u, 2),
+      u(u),
+      s(s),
+      timeslice(timeslice)
+    {
+      strcat(aux, ",4d_vol=");
+      strcat(aux, u.VolString());
+
+      apply(device::get_default_stream());
+    }
+
+    void apply(const qudaStream_t &stream)
+    {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      GaugeInsertTimesliceArg<Float, nColor, recon> arg(u, s, timeslice);
+      launch<InsertTimeslice>(tp, stream, arg);
+    }
+
+    long long flops() const
+    {
+      // just a copy
+      return 0;
+    }
+
+    long long bytes() const {
+      // load timeslice, store into u
+      return 2ll * s.Bytes();
+    }
+  };
+
+  template<typename Float, int nColor, QudaReconstructType recon>
+  class GaugePolyakovLoopProduct : public TunableKernel2D {
     GaugeField &product_field;
     const GaugeField &u;
     unsigned int minThreads() const { return product_field.LocalVolumeCB(); }
 
   public:
-    GaugePolyakovLoopSplit(const GaugeField &u, GaugeField &product_field) :
+    GaugePolyakovLoopProduct(const GaugeField &u, GaugeField &product_field) :
       TunableKernel2D(u, 2),
       product_field(product_field),
       u(u)
@@ -30,8 +69,8 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      GaugePolyakovLoopSplitArg<Float, nColor, recon> arg(product_field, u);
-      launch<PolyakovLoopSplit>(tp, stream, arg);
+      GaugePolyakovLoopProductArg<Float, nColor, recon> arg(product_field, u);
+      launch<PolyakovLoopProduct>(tp, stream, arg);
     }
 
     long long flops() const
@@ -53,52 +92,53 @@ namespace quda {
     const GaugeField &u;
     using reduce_t = array<double, 2>;
     reduce_t &ploop;
-    bool compute_loop;
 
   public:
-    GaugePolyakovLoopTrace(const GaugeField &u, array<double, 2> &ploop, bool compute_loop) :
+    GaugePolyakovLoopTrace(const GaugeField &u, array<double, 2> &ploop) :
       TunableReduction2D(u),
       u(u),
-      ploop(ploop),
-      compute_loop(compute_loop)
+      ploop(ploop)
     {
+      if (u.Geometry() != QUDA_SCALAR_GEOMETRY && u.Geometry() != QUDA_VECTOR_GEOMETRY)
+        errorQuda("Invalid geometry %d in Polyakov loop calculation", u.Geometry());
       strcat(aux, ",4d_vol=");
       strcat(aux, u.VolString());
-      if (compute_loop) strcat(aux, ",loop");
+      strcat(aux, ",geometry=");
+      char aux2[3];
+      u32toa(aux2, u.Geometry());
+      strcat(aux, aux2);
 
       apply(device::get_default_stream());
 
-      // We normalize by the 3-d volume
-      long vol3d = u.Volume() * comm_dim(0) * comm_dim(1) * comm_dim(2) / u.X()[3];
-      ploop[0] /= vol3d;
-      ploop[1] /= vol3d;
+      // 3-d volume normalization is done outside this class
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (compute_loop) {
-        GaugePolyakovLoopTraceArg<Float, nColor, recon, true> arg(u);
-        launch<PolyakovLoopTrace>(ploop, tp, stream, arg);
-      } else {
-        GaugePolyakovLoopTraceArg<Float, nColor, recon, false> arg(u);
-        launch<PolyakovLoopTrace>(ploop, tp, stream, arg);
-      }
+      GaugePolyakovLoopTraceArg<Float, nColor, recon> arg(u);
+      launch<PolyakovLoopTrace>(ploop, tp, stream, arg);
     }
 
     long long flops() const
     {
       auto Nc = u.Ncolor();
       auto mat_mul_flops = 8ll * Nc * Nc * Nc - 2 * Nc * Nc;
+      int trace_direction = 3; // update for vector geometry, non-temporal loops
       // multiplies for each loop plus traces
-      return ((compute_loop) ? (mat_mul_flops * u.Volume() / 4) : 0) + 2 * Nc * u.Volume() / u.X()[3];
+      return mat_mul_flops * u.Volume() / u.Geometry() + 2 * Nc * u.Volume() / u.X()[trace_direction];
     }
 
     long long bytes() const {
       // links * one LatticeColorMatrix
-      return compute_loop ? (u.Bytes()) / 4 : u.Bytes();
+      return u.Bytes() / u.Geometry();
     }
   };
+
+  // to avoid multiple instantiations... FIXME doxygen
+  void gaugeInsertTimeslice(GaugeField &u, GaugeField &s, int timeslice) {
+    instantiate<GaugeInsertTimeslice>(u, s, timeslice);
+  }
 
   void gaugePolyakovLoop(double ploop[2], const GaugeField& u, int dir) {
 
@@ -107,12 +147,15 @@ namespace quda {
     // output array
     array<double, 2> loop;
 
+    // If the dir dimension isn't partitioned, we can just do a quick compute + reduce,
+    // otherwise we need a gather workflow
+    std::unique_ptr<GaugeField> condensed_field;
+
     // If the dir dimension isn't partitioned, we can just do a quick compute + reduce
     if (commDimPartitioned(dir)) {
-      // comms aren't actually supported yet
-      if (comm_dim(dir) > 1) errorQuda("Splitting in the %d direction is not supported yet", dir);
 
-      // Form a usable 3-d gauge slice
+      // Form a staging gauge field where each "t" slice corresponds to one rank in the "dir"
+      // direction. Note that odd dimensions are actually legal in the `t` dimension
       GaugeFieldParam gParam(u);
       lat_dim_t x;
       for (int d = 0; d < 3; d++) x[d] = u.X()[d];
@@ -123,23 +166,80 @@ namespace quda {
       gParam.location = QUDA_CUDA_FIELD_LOCATION;
       gParam.geometry = QUDA_SCALAR_GEOMETRY;
 
-      std::unique_ptr<GaugeField> product_field_ = std::make_unique<cudaGaugeField>(gParam);
-      GaugeField& product_field = reinterpret_cast<GaugeField&>(*product_field_.get());
+      std::unique_ptr<GaugeField> product_field = std::make_unique<cudaGaugeField>(gParam);
+      GaugeField& product_field_ref = reinterpret_cast<GaugeField&>(*product_field.get());
 
-      instantiate<GaugePolyakovLoopSplit, ReconstructNo12>(u, product_field);
+      instantiate<GaugePolyakovLoopProduct, ReconstructNo12>(u, product_field_ref);
 
-      // Combine (tbd)
+      // Create the gauge field we reduce into
+      for (int d = 0; d < 3; d++) x[d] = u.X()[d];
+      x[3] = comm_dim(3);
+      gParam.x = x;
+      gParam.create = QUDA_NULL_FIELD_CREATE;
+      condensed_field = std::make_unique<cudaGaugeField>(gParam);
+      GaugeField& condensed_field_ref = reinterpret_cast<GaugeField&>(*condensed_field.get());
 
-      // Trace only
-      instantiate<GaugePolyakovLoopTrace, ReconstructNo12>(product_field, loop, false);
+      // insert my timeslice
+      gaugeInsertTimeslice(condensed_field_ref, product_field_ref, comm_coord(3));
 
-    } else {
-      // construct loop and trace
-      instantiate<GaugePolyakovLoopTrace, ReconstructNo12>(u, loop, true);
+      // we can skip all of this if we're just doing a partition test
+      if (comm_dim(dir) > 1) {
+        // Send/gather other data; need to make this support direct GPU comms
+        // I wonder if I can just use the strided send APIs?
+        auto bytes = product_field_ref.TotalBytes();
+        void* v_double_buffer[2];
+        MsgHandle *recv_handle[2];
+        MsgHandle *send_handle[2];
+        for (int i = 0; i < 2; i++) {
+          v_double_buffer[i] = pinned_malloc(bytes);
+          // receive from in front of me, send behind
+          recv_handle[i] = comm_declare_receive_relative(v_double_buffer[i], dir, 1, bytes);
+          send_handle[i] = comm_declare_send_relative(v_double_buffer[i], dir, -1, bytes);
+        }
+        int SEND_BUFFER = 0;
+        int RECV_BUFFER = 1;
+        // prepare first send
+        product_field_ref.copy_to_buffer(v_double_buffer[SEND_BUFFER]);
+
+        // kick off
+        for (int t = 1; t < comm_dim(3); t++) {
+          // post a receive from rank behind me
+          comm_start(recv_handle[RECV_BUFFER]);
+          comm_start(send_handle[SEND_BUFFER]);
+
+          // wait
+          comm_wait(recv_handle[RECV_BUFFER]);
+          comm_wait(send_handle[SEND_BUFFER]);
+
+          // copy the received buffer into our staging field
+          product_field_ref.copy_from_buffer(v_double_buffer[RECV_BUFFER]);
+
+          // insert
+          gaugeInsertTimeslice(condensed_field_ref, product_field_ref, (comm_coord(3) + t) % comm_dim(3));
+
+          // swap buffers
+          SEND_BUFFER ^= 1;
+          RECV_BUFFER ^= 1;
+        }
+
+        // clean up
+        for (int i = 0; i < 2; i++) {
+          comm_free(recv_handle[i]);
+          comm_free(send_handle[i]);
+          host_free(v_double_buffer[i]);
+        }
+      }
+
     }
 
-    ploop[0] = loop[0];
-    ploop[1] = loop[1];
+    const GaugeField& G = commDimPartitioned(dir) ? const_cast<const GaugeField&>(*condensed_field.get()) : u;
+
+    // Trace over remaining bits
+    instantiate<GaugePolyakovLoopTrace, ReconstructNo12>(G, loop);
+    // We normalize by the 3-d volume, times the 4-d communications dim to cancel out redundant counting
+    long vol3d = u.Volume() * comm_dim(0) * comm_dim(1) * comm_dim(2) * comm_dim(3) / u.X()[3];
+    ploop[0] = loop[0] / vol3d;
+    ploop[1] = loop[1] / vol3d;
 
   }
 

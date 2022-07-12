@@ -8,6 +8,62 @@
 
 namespace quda {
 
+  template <typename Float_, int nColor_, QudaReconstructType recon_>
+  struct GaugeInsertTimesliceArg : public kernel_param<> {
+    using Float = Float_;
+    static constexpr int nColor = nColor_;
+    static_assert(nColor == 3, "Only nColor=3 enabled at this time");
+    static constexpr QudaReconstructType recon = recon_;
+    using Gauge = typename gauge_mapper<Float,recon>::type;
+    using Link = Matrix<complex<Float>, 3>;
+
+    int X_bulk[4];
+    int_fastdiv X_slice[4];
+    Gauge U;
+    Gauge S;
+    int timeslice;
+
+    GaugeInsertTimesliceArg(GaugeField &U_, const GaugeField &S_, const int timeslice_) :
+      kernel_param(dim3(S_.LocalVolumeCB(), 2, 1)),
+      U(U_),
+      S(S_),
+      timeslice(timeslice_)
+    {
+      if (U_.Geometry() != QUDA_SCALAR_GEOMETRY || S_.Geometry() != QUDA_SCALAR_GEOMETRY)
+        errorQuda("Unexpected geometry pair U %d ; S %d", U_.Geometry(), S_.Geometry());
+      for (int dir = 0; dir < 4; dir++) {
+        X_bulk[dir] = U_.X()[dir];
+        X_slice[dir] = S_.X()[dir];
+        if (dir != 3 && U_.X()[dir] != S_.X()[dir]) errorQuda("Lengths %d %d in dimension %d do not agree", U_.X()[dir], S_.X()[dir], dir);
+      }
+      if (S_.X()[3] != 1) errorQuda("Unexpected time extent %d, expected 1", S_.X()[3]);
+    }
+
+  };
+
+  template <typename Arg> struct InsertTimeslice {
+    const Arg &arg;
+    constexpr InsertTimeslice(const Arg &arg) : arg(arg) {}
+    static constexpr const char *filename() { return KERNEL_FILE; }
+
+    __device__ __host__ inline void operator()(int x_cb, int parity)
+    {
+      int x[4];
+      getCoords(x, x_cb, arg.X_slice, parity);
+
+      // Get bulk x_cb/parity
+      x[3] = arg.timeslice;
+      int x_bulk_cb = linkIndex(x, arg.X_bulk);
+      int parity_bulk = (x[0] + x[1] + x[2] + x[3]) & 1;
+
+      // Load from slice, store into bulk
+      typename Arg::Link link = arg.S(0, x_cb, parity);
+      arg.U(0, x_bulk_cb, parity_bulk) = link;
+
+    }
+
+  };
+
   /**
      @brief Calculates the Polyakov loop in a given direction, returning the product matrix
 
@@ -33,7 +89,7 @@ namespace quda {
 
     for (int dt = 0; dt < arg.X[dir]; dt++) {
       dx[dir] = dt;
-      link = arg.U(dir, linkIndexShift(x, dx, arg.X), nbr_oddbit);
+      link = arg.U(arg.geometry == QUDA_VECTOR_GEOMETRY ? dir : 0, linkIndexShift(x, dx, arg.X), nbr_oddbit);
       polyloop = polyloop * link;
       nbr_oddbit = nbr_oddbit ^ 1;
     } // dt
@@ -41,11 +97,12 @@ namespace quda {
   }
 
   template <typename Float_, int nColor_, QudaReconstructType recon_>
-  struct GaugePolyakovLoopSplitArg : public kernel_param<> {
+  struct GaugePolyakovLoopProductArg : public kernel_param<> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
+    static constexpr QudaFieldGeometry geometry = QUDA_VECTOR_GEOMETRY;
     using Gauge = typename gauge_mapper<Float,recon>::type;
     using Link = Matrix<complex<Float>, 3>;
 
@@ -53,11 +110,13 @@ namespace quda {
     Gauge P;
     Gauge U;
 
-    GaugePolyakovLoopSplitArg(GaugeField &P_, const GaugeField &U_) :
+    GaugePolyakovLoopProductArg(GaugeField &P_, const GaugeField &U_) :
       kernel_param(dim3(P_.LocalVolumeCB(), 2, 1)),
       P(P_),
       U(U_)
     {
+      if (U_.Geometry() != QUDA_VECTOR_GEOMETRY || P_.Geometry() != QUDA_SCALAR_GEOMETRY)
+        errorQuda("Unexpected geometry pair U %d ; P %d", U_.Geometry(), P_.Geometry());
       for (int dir=0; dir<4; ++dir){
         X[dir] = U_.X()[dir];
         if (dir != 3 && U_.X()[dir] != P_.X()[dir]) errorQuda("Lengths %d %d in dimension %d do not agree", U_.X()[dir], P_.X()[dir], dir);
@@ -66,15 +125,18 @@ namespace quda {
 
   };
 
-  template <typename Arg> struct PolyakovLoopSplit {
+  template <typename Arg> struct PolyakovLoopProduct {
     const Arg &arg;
-    constexpr PolyakovLoopSplit(const Arg &arg) : arg(arg) {}
+    constexpr PolyakovLoopProduct(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)
     {
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
+
+      // hack
+      if (x[3] > 0) return;
 
       auto polyloop = computePolyakovLoop<3>(arg, x, parity);
 
@@ -85,22 +147,23 @@ namespace quda {
 
   };
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, bool compute_loop_>
+  template <typename Float_, int nColor_, QudaReconstructType recon_>
   struct GaugePolyakovLoopTraceArg : public ReduceArg<array<double, 2>> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
-    static constexpr bool compute_loop = compute_loop_;
     using Gauge = typename gauge_mapper<Float,recon>::type;
     using Link = Matrix<complex<Float>, 3>;
 
     int X[4];
     Gauge U;
+    QudaFieldGeometry geometry;
 
     GaugePolyakovLoopTraceArg(const GaugeField &U_) :
       ReduceArg<reduce_t>(dim3(U_.LocalVolumeCB() / U_.X()[3], 2, 1)),
-      U(U_)
+      U(U_),
+      geometry(U_.Geometry())
     {
       for (int dir=0; dir<4; ++dir){
         X[dir] = U_.X()[dir];
@@ -125,14 +188,17 @@ namespace quda {
       Link polyloop;
       reduce_t ploop{0, 0};
 
-      if constexpr (arg.compute_loop) {
-        // Dimension is not split, we need to compute the Polyakov loop
-        int x[4];
-        getCoords(x, x_cb, arg.X, parity);
+      int x[4];
+      getCoords(x, x_cb, arg.X, parity);
+      if (arg.geometry == QUDA_VECTOR_GEOMETRY) {
+        // U is the full gauge field, need to contract over the right dimension
+        // This codepath is hit when the MPI decomposition isn't split over the
+        // loop direction
         polyloop = computePolyakovLoop<3>(arg, x, parity);
       } else {
-        // Dimension is split, we're only computing the trace
-        polyloop = arg.U(0, x_cb, parity);
+        // U is a "scalar" gauge field, which is the packed outputs of multi-GPU
+        // traces. In this case the "3" direction is the packing doimension
+        polyloop = computePolyakovLoop<3>(arg, x, parity);
       }
 
       // accumulate trace

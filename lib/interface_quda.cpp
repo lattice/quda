@@ -5331,6 +5331,7 @@ void polyakovLoopQuda(double ploop[2], int dir)
 
   profilePolyakovLoop.TPSTART(QUDA_PROFILE_COMPUTE);
 
+  // FIXME pass in profiler
   quda::gaugePolyakovLoop(ploop, *gaugePrecise, dir);
 
   profilePolyakovLoop.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -5371,9 +5372,9 @@ void polyakovLoopLoadGaugeQuda(double ploop[2], int dir, void *gauge, QudaGaugeP
     cudaGauge = gaugePrecise;
     gaugePrecise = nullptr;
   } else {
-    profilePlaq.TPSTART(QUDA_PROFILE_H2D);
+    profilePolyakovLoop.TPSTART(QUDA_PROFILE_H2D);
     cudaGauge->loadCPUField(*cpuGauge);
-    profilePlaq.TPSTOP(QUDA_PROFILE_H2D);
+    profilePolyakovLoop.TPSTOP(QUDA_PROFILE_H2D);
     if (extendedGaugeResident) {
       delete extendedGaugeResident;
       extendedGaugeResident = nullptr;
