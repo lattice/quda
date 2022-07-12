@@ -25,7 +25,7 @@ namespace quda {
          @param[in] link Gauge field
        */
       BaseArg(const GaugeField &link) :
-        kernel_param(dim3(1, 2, 1)),
+        kernel_param(dim3(1, 2, 4)),
         link(link),
         commDim{ comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3) }
       {
