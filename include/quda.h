@@ -493,8 +493,10 @@ extern "C" {
     /** If use_dagger, use Mdag **/
     /** If use_norm_op, use MdagM **/
     /** If use_norm_op && use_dagger use MMdag. **/
+    /** If use_pc for any, then use the even-odd pc version **/
     QudaBoolean use_dagger;
     QudaBoolean use_norm_op;
+    QudaBoolean use_pc;
 
     /** Use Eigen routines to eigensolve the upper Hessenberg via QR **/
     QudaBoolean use_eigen_qr;
