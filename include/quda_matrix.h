@@ -971,6 +971,14 @@ QUDA_UNROLL
       real sqrt_c1_inv3 = sqrt(c1 * inv3);
       real c0_max = 2 * (c1 * inv3 * sqrt_c1_inv3); // reuse the sqrt factor for a fast 1.5 power
 
+      //[34] Test for c0 < 0.
+      int parity = 0;
+      if(c0 < 0) {
+	c0 *= -1.0;
+	parity = 1;
+	//calculate fj with c0 > 0 and then convert all fj.
+      }
+
       //[25]
       real theta = acos(c0 / c0_max);
 
@@ -999,14 +1007,6 @@ QUDA_UNROLL
 	sinc_w = 1.0 - (w_sq/6.0)*(1 - (w_sq*0.05)*(1 - (w_sq/42.0)*(1 - (w_sq/72.0))));
       } else {
         sinc_w = sinpi(w_p * inv_pi) / w_p;
-      }
-
-      //[34] Test for c0 < 0.
-      int parity = 0;
-      if(c0 < 0) {
-	c0 *= -1.0;
-	parity = 1;
-	//calculate fj with c0 > 0 and then convert all fj.
       }
 
       //Get all the numerators for fj,
