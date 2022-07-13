@@ -140,7 +140,7 @@ namespace quda {
     instantiate<GaugeInsertTimeslice>(u, s, timeslice);
   }
 
-  void gaugePolyakovLoop(double ploop[2], const GaugeField& u, int dir) {
+  void gaugePolyakovLoop(double ploop[2], const GaugeField& u, int dir, TimeProfile &profile) {
 
     if (dir != 3) errorQuda("Unsupported direction %d", dir);
 
@@ -156,6 +156,7 @@ namespace quda {
 
       // Form a staging gauge field where each "t" slice corresponds to one rank in the "dir"
       // direction. Note that odd dimensions are actually legal in the `t` dimension
+      profile.TPSTART(QUDA_PROFILE_INIT);
       GaugeFieldParam gParam(u);
       lat_dim_t x;
       for (int d = 0; d < 3; d++) x[d] = u.X()[d];
@@ -169,23 +170,26 @@ namespace quda {
       std::unique_ptr<GaugeField> product_field = std::make_unique<cudaGaugeField>(gParam);
       GaugeField& product_field_ref = reinterpret_cast<GaugeField&>(*product_field.get());
 
-      instantiate<GaugePolyakovLoopProduct, ReconstructNo12>(u, product_field_ref);
-
-      // Create the gauge field we reduce into
-      for (int d = 0; d < 3; d++) x[d] = u.X()[d];
+      // Create the field we reduce into
       x[3] = comm_dim(3);
       gParam.x = x;
       gParam.create = QUDA_NULL_FIELD_CREATE;
       condensed_field = std::make_unique<cudaGaugeField>(gParam);
       GaugeField& condensed_field_ref = reinterpret_cast<GaugeField&>(*condensed_field.get());
+      profile.TPSTOP(QUDA_PROFILE_INIT);
 
-      // insert my timeslice
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      // Compute my local timeslice
+      instantiate<GaugePolyakovLoopProduct, ReconstructNo12>(u, product_field_ref);
+
       gaugeInsertTimeslice(condensed_field_ref, product_field_ref, comm_coord(3));
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
       // we can skip all of this if we're just doing a partition test
       if (comm_dim(dir) > 1) {
         // Send/gather other data; need to make this support direct GPU comms
         // I wonder if I can just use the strided send APIs?
+        profile.TPSTART(QUDA_PROFILE_INIT);
         auto bytes = product_field_ref.TotalBytes();
         void* v_double_buffer[2];
         MsgHandle *recv_handle[2];
@@ -198,11 +202,16 @@ namespace quda {
         }
         int SEND_BUFFER = 0;
         int RECV_BUFFER = 1;
+        profile.TPSTOP(QUDA_PROFILE_INIT);
+
         // prepare first send
+        profile.TPSTART(QUDA_PROFILE_D2H);
         product_field_ref.copy_to_buffer(v_double_buffer[SEND_BUFFER]);
+        profile.TPSTOP(QUDA_PROFILE_D2H);
 
         // kick off
         for (int t = 1; t < comm_dim(3); t++) {
+          profile.TPSTART(QUDA_PROFILE_COMMS);
           // post a receive from rank behind me
           comm_start(recv_handle[RECV_BUFFER]);
           comm_start(send_handle[SEND_BUFFER]);
@@ -210,12 +219,17 @@ namespace quda {
           // wait
           comm_wait(recv_handle[RECV_BUFFER]);
           comm_wait(send_handle[SEND_BUFFER]);
+          profile.TPSTOP(QUDA_PROFILE_COMMS);
 
           // copy the received buffer into our staging field
+          profile.TPSTART(QUDA_PROFILE_H2D);
           product_field_ref.copy_from_buffer(v_double_buffer[RECV_BUFFER]);
+          profile.TPSTOP(QUDA_PROFILE_H2D);
 
           // insert
+          profile.TPSTART(QUDA_PROFILE_COMPUTE);
           gaugeInsertTimeslice(condensed_field_ref, product_field_ref, (comm_coord(3) + t) % comm_dim(3));
+          profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
           // swap buffers
           SEND_BUFFER ^= 1;
@@ -223,11 +237,13 @@ namespace quda {
         }
 
         // clean up
+        profile.TPSTART(QUDA_PROFILE_FREE);
         for (int i = 0; i < 2; i++) {
           comm_free(recv_handle[i]);
           comm_free(send_handle[i]);
           host_free(v_double_buffer[i]);
         }
+        profile.TPSTOP(QUDA_PROFILE_FREE);
       }
 
     }
@@ -235,11 +251,13 @@ namespace quda {
     const GaugeField& G = commDimPartitioned(dir) ? const_cast<const GaugeField&>(*condensed_field.get()) : u;
 
     // Trace over remaining bits
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugePolyakovLoopTrace, ReconstructNo12>(G, loop);
     // We normalize by the 3-d volume, times the 4-d communications dim to cancel out redundant counting
     long vol3d = u.Volume() * comm_dim(0) * comm_dim(1) * comm_dim(2) * comm_dim(3) / u.X()[3];
     ploop[0] = loop[0] / vol3d;
     ploop[1] = loop[1] / vol3d;
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   }
 

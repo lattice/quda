@@ -5329,12 +5329,7 @@ void polyakovLoopQuda(double ploop[2], int dir)
 
   if (!gaugePrecise) errorQuda("Cannot compute Polyakov loop as there is no resident gauge field");
 
-  profilePolyakovLoop.TPSTART(QUDA_PROFILE_COMPUTE);
-
-  // FIXME pass in profiler
-  quda::gaugePolyakovLoop(ploop, *gaugePrecise, dir);
-
-  profilePolyakovLoop.TPSTOP(QUDA_PROFILE_COMPUTE);
+  quda::gaugePolyakovLoop(ploop, *gaugePrecise, dir, profilePolyakovLoop);
 
   profilePolyakovLoop.TPSTOP(QUDA_PROFILE_TOTAL);
 }
@@ -5381,11 +5376,7 @@ void polyakovLoopLoadGaugeQuda(double ploop[2], int dir, void *gauge, QudaGaugeP
     }
   }
 
-  profilePolyakovLoop.TPSTART(QUDA_PROFILE_COMPUTE);
-
-  quda::gaugePolyakovLoop(ploop, *cudaGauge, dir);
-
-  profilePolyakovLoop.TPSTOP(QUDA_PROFILE_COMPUTE);
+  quda::gaugePolyakovLoop(ploop, *cudaGauge, dir, profilePolyakovLoop);
 
   profilePolyakovLoop.TPSTART(QUDA_PROFILE_D2H);
   if (param->return_result_gauge) cudaGauge->saveCPUField(*cpuGauge);
