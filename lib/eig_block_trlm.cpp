@@ -209,6 +209,7 @@ namespace quda
 
       // Compute eigenvalues
       computeEvals(mat, kSpace, evals);
+      if (compute_svd) computeSVD(mat, kSpace, evals);
     }
 
     // Local clean-up

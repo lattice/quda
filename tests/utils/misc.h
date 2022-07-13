@@ -1,5 +1,6 @@
 #pragma once
 #include <quda.h>
+#include <string>
 
 const char *get_quda_ver_str();
 const char *get_recon_str(QudaReconstructType recon);
