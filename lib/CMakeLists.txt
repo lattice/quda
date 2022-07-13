@@ -386,9 +386,9 @@ if(QUDA_ARPACK)
     # ARPACK-NG does not suppport logging - we must warn the user
     message(
       WARNING
-        "Specifying QUDA_ARPACK_LOGGING with ARPACK-NG package will cause link failures. Please ensure that QUDA_ARPACK_LOGGING=OFF if downloading ARPACK-NG or using system installed ARPACK-NG"
-    )
-    target_compile_definitions(ARPACK_LOGGING)
+      "Specifying QUDA_ARPACK_LOGGING with ARPACK-NG package will cause link failures. Please ensure that QUDA_ARPACK_LOGGING=OFF if downloading ARPACK-NG or using system installed ARPACK-NG"
+      )
+    target_compile_definitions(QUDA_ARPACK_LOGGING ON)
   endif()
   if(QUDA_DOWNLOAD_ARPACK)
     target_link_libraries(quda PUBLIC arpack-ng)
