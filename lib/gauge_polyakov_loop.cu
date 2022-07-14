@@ -155,7 +155,8 @@ namespace quda {
     if (commDimPartitioned(dir)) {
 
       // Form a staging gauge field where each "t" slice corresponds to one rank in the "dir"
-      // direction. Note that odd dimensions are actually legal in the `t` dimension
+      // direction. Note that odd dimensions are carefully legal in the `t` dimension in this context
+      // Note that we promote the precision to double for numerical stability
       profile.TPSTART(QUDA_PROFILE_INIT);
       GaugeFieldParam gParam(u);
       lat_dim_t x;
@@ -166,6 +167,7 @@ namespace quda {
       gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
       gParam.location = QUDA_CUDA_FIELD_LOCATION;
       gParam.geometry = QUDA_SCALAR_GEOMETRY;
+      gParam.setPrecision(QUDA_DOUBLE_PRECISION);
 
       std::unique_ptr<GaugeField> product_field = std::make_unique<cudaGaugeField>(gParam);
       GaugeField& product_field_ref = reinterpret_cast<GaugeField&>(*product_field.get());

@@ -73,16 +73,18 @@ namespace quda {
      @param[in] parity Parity index
   */
   template <int dir, typename Arg>
-  __device__ __host__ inline typename Arg::Link
+  __device__ __host__ inline typename Arg::HighPrecLink
   computePolyakovLoop(const Arg &arg, int x[4], int parity)
   {
     int dx[4] = {0, 0, 0, 0};
 
     using Link = typename Arg::Link;
+    using HighPrecLink = typename Arg::HighPrecLink;
 
     // polyloop: current matrix
     // link: the loaded matrix in this round
-    Link polyloop, link;
+    Link link;
+    HighPrecLink hi_link, polyloop;
     setIdentity(&polyloop);
 
     int nbr_oddbit = parity;
@@ -90,7 +92,8 @@ namespace quda {
     for (int dt = 0; dt < arg.X[dir]; dt++) {
       dx[dir] = dt;
       link = arg.U(arg.geometry == QUDA_VECTOR_GEOMETRY ? dir : 0, linkIndexShift(x, dx, arg.X), nbr_oddbit);
-      polyloop = polyloop * link;
+      hi_link = link; // promote
+      polyloop = polyloop * hi_link;
       nbr_oddbit = nbr_oddbit ^ 1;
     } // dt
     return polyloop;
@@ -99,15 +102,18 @@ namespace quda {
   template <typename Float_, int nColor_, QudaReconstructType recon_>
   struct GaugePolyakovLoopProductArg : public kernel_param<> {
     using Float = Float_;
+    using AccumFloat = double;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr QudaFieldGeometry geometry = QUDA_VECTOR_GEOMETRY;
     using Gauge = typename gauge_mapper<Float,recon>::type;
+    using AccumGauge = typename gauge_mapper<AccumFloat,recon>::type;
     using Link = Matrix<complex<Float>, 3>;
+    using HighPrecLink = Matrix<complex<double>, 3>;
 
     int X[4];
-    Gauge P;
+    AccumGauge P;
     Gauge U;
 
     GaugePolyakovLoopProductArg(GaugeField &P_, const GaugeField &U_) :
@@ -155,6 +161,7 @@ namespace quda {
     static constexpr QudaReconstructType recon = recon_;
     using Gauge = typename gauge_mapper<Float,recon>::type;
     using Link = Matrix<complex<Float>, 3>;
+    using HighPrecLink = Matrix<complex<double>, 3>;
 
     int X[4];
     Gauge U;
@@ -183,9 +190,9 @@ namespace quda {
     // return the (temporal) Polyakov Loop at 3-d site (x_cb, parity)
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      using Link = typename Arg::Link;
+      using HighPrecLink = typename Arg::HighPrecLink;
 
-      Link polyloop;
+      HighPrecLink polyloop;
       reduce_t ploop{0, 0};
 
       int x[4];
