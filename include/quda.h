@@ -1597,21 +1597,7 @@ extern "C" {
                                 const unsigned int verbose_interval, const double relax_boost, const double tolerance,
                                 const unsigned int reunit_interval, const unsigned int stopWtheta,
                                 QudaGaugeParam *param, double *timeinfo);
-  /**
-   * @brief Gauge fixing with overrelaxation with support for single and multi GPU (MILC interface).
-   * @param[in] precision Precision of the MILC gauge field
-   * @param[in] gauge_dir, 3 for Coulomb gauge fixing, 4 for Landau gauge fixing
-   * @param[in] Nsteps, maximum number of steps to perform gauge fixing
-   * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
-   * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when
-   * iteration reachs the maximum number of steps defined by Nsteps
-   * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
-   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
-   * @param[in,out] milc_sitelink, gauge field to be fixed in MILC "G
-   */
-  void qudaGaugeFixingOVR(int precision, unsigned int gauge_dir, int Nsteps, int verbose_interval, double relax_boost,
-                          double tolerance, unsigned int reunit_interval, unsigned int stopWtheta, void *milc_sitelink);
+
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] gauge, gauge field to be fixed

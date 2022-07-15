@@ -970,7 +970,7 @@ extern "C" {
     const double tolerance,
     const unsigned int reunit_interval,
     const unsigned int stopWtheta,
-    void* milc_sitelink
+    QudaMILCSiteArg_t *arg
     );
 
   /**
