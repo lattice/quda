@@ -1,5 +1,6 @@
 #include <host_utils.h>
 #include <stdio.h>
+#include <complex.h>
 #include <comm_quda.h>
 
 template <typename Float> inline void aXpY(Float a, Float *x, Float *y, int len)
@@ -15,6 +16,14 @@ void axpy(double a, void *x, void *y, int len, QudaPrecision precision)
     aXpY((float)a, (float *)x, (float *)y, len);
 }
 
+void caxpy(double _Complex a, void *x, void *y, int len, QudaPrecision precision)
+{
+  if (precision == QUDA_DOUBLE_PRECISION)
+    aXpY((double _Complex)a, (double _Complex *)x, (double _Complex *)y, len / 2);
+  else
+    aXpY((float _Complex)a, (float _Complex *)x, (float _Complex *)y, len / 2);
+}
+
 // performs the operation x[i] *= a
 template <typename Float> inline void aX(Float a, Float *x, int len)
 {
@@ -27,6 +36,15 @@ void ax(double a, void *x, int len, QudaPrecision precision)
     aX(a, (double *)x, len);
   else
     aX((float)a, (float *)x, len);
+}
+
+void cax(double _Complex a, void *x, int len, QudaPrecision precision)
+{
+  if (precision == QUDA_DOUBLE_PRECISION)
+    aX((double _Complex)a, (double _Complex *)x, len / 2);
+  else {
+    aX((float _Complex)a, (float _Complex *)x, len / 2);
+  }
 }
 
 // performs the operation y[i] -= x[i] (minus x plus y)

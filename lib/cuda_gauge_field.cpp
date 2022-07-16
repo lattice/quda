@@ -67,7 +67,17 @@ namespace quda {
       if (create == QUDA_REFERENCE_FIELD_CREATE) exchangeGhost(geometry == QUDA_VECTOR_GEOMETRY ? QUDA_LINK_BACKWARDS : QUDA_LINK_BIDIRECTIONAL);
     }
 
-    if (create != QUDA_ZERO_FIELD_CREATE && isNative() && ghostExchange == QUDA_GHOST_EXCHANGE_PAD) zeroPad();
+    if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
+      if (isNative()) {
+        if (create != QUDA_ZERO_FIELD_CREATE) zeroPad();
+      } else {
+        for (int i = 0; i < nDim; i++) {
+          size_t nbytes = nFace * surface[i] * nInternal * precision;
+          qudaMemset(ghost[i], 0, nbytes);
+          if (nbytes && geometry == QUDA_COARSE_GEOMETRY) qudaMemset(ghost[i + 4], 0, nbytes);
+        }
+      }
+    }
   }
 
   void cudaGaugeField::zeroPad() {

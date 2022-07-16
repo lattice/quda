@@ -2205,30 +2205,58 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
 void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam *eig_param)
 {
+  if (!initialized) errorQuda("QUDA not initialized");
+
   profileEigensolve.TPSTART(QUDA_PROFILE_TOTAL);
   profileEigensolve.TPSTART(QUDA_PROFILE_INIT);
 
-  // Transfer the inv param structure contained in eig_param
+  // Transfer the inv param structure contained in eig_param.
+  // This will define the operator to be eigensolved.
   QudaInvertParam *inv_param = eig_param->invert_param;
 
-  if (!initialized) errorQuda("QUDA not initialized");
+  // QUDA can employ even-odd preconditioning to an operator.
+  // For the eigensolver the solution type must match
+  // the solve type, i.e., there is no full solution reconstruction
+  // for an even-odd preconditioned solve. In the eigensolver we allow
+  // for M, Mdag, MdagM, and MMdag type operators, chosen via
+  // eig_use_dagger and eig_use_norm_op booleans,
+  // each combination of which may be preconditioned via eig_use_pc_op. We select
+  // the correct QudaInvertParam values for the solve_type and
+  // solution_type based on those three booleans
 
+  if (eig_param->use_pc) {
+    if (eig_param->use_norm_op)
+      inv_param->solve_type = QUDA_NORMOP_PC_SOLVE;
+    else
+      inv_param->solve_type = QUDA_DIRECT_PC_SOLVE;
+    inv_param->solution_type = QUDA_MATPC_SOLUTION;
+  } else {
+    if (eig_param->use_norm_op)
+      inv_param->solve_type = QUDA_NORMOP_SOLVE;
+    else
+      inv_param->solve_type = QUDA_DIRECT_SOLVE;
+    inv_param->solution_type = QUDA_MAT_SOLUTION;
+  }
+  //------------------------------------------------------------------
+
+  // Ensure that the parameter structures are sound.
+  checkInvertParam(inv_param);
+  checkEigParam(eig_param);
+
+  // Check that the gauge field is valid
+  cudaGaugeField *cudaGauge = checkGauge(inv_param);
+
+  // Set all timing statistics to zero
+  inv_param->secs = 0;
+  inv_param->gflops = 0;
+  inv_param->iter = 0;
+
+  // Dump all eigensolver and invert param variables to stdout if requested.
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
     printQudaInvertParam(inv_param);
     printQudaEigParam(eig_param);
   }
-
-  checkInvertParam(inv_param);
-  checkEigParam(eig_param);
-  cudaGaugeField *cudaGauge = checkGauge(inv_param);
-
-  bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) || (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE)
-    || (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
-
-  inv_param->secs = 0;
-  inv_param->gflops = 0;
-  inv_param->iter = 0;
 
   // Define problem matrix
   //------------------------------------------------------
@@ -2237,38 +2265,56 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   Dirac *dPre = nullptr;
 
   // Create the dirac operator with a sloppy and a precon.
+  bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) || (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE);
   createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
   Dirac &dirac = *d;
+  //------------------------------------------------------
 
-  // Create device side ColorSpinorField vector space and to pass to the
-  // compute function.
-  const auto X = cudaGauge->X();
-  ColorSpinorParam cpuParam(host_evecs[0], *inv_param, X, inv_param->solution_type, inv_param->input_location);
+  // Construct vectors
+  //------------------------------------------------------
+  // Create host wrappers around application vector set
+  ColorSpinorParam cpuParam(host_evecs[0], *inv_param, cudaGauge->X(), inv_param->solution_type,
+                            inv_param->input_location);
 
-  // create wrappers around application vector set
-  std::vector<ColorSpinorField *> host_evecs_(eig_param->n_conv);
-  for (int i = 0; i < eig_param->n_conv; i++) {
+  int n_eig = eig_param->n_conv;
+  if (eig_param->compute_svd) n_eig *= 2;
+  std::vector<ColorSpinorField *> host_evecs_(n_eig);
+  cpuParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  for (int i = 0; i < n_eig; i++) {
     cpuParam.v = host_evecs[i];
     host_evecs_[i] = ColorSpinorField::Create(cpuParam);
   }
 
-  ColorSpinorParam cudaParam(cpuParam);
-  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+  // Create device side ColorSpinorField vector space to pass to the
+  // compute function. Download any user supplied data as an initial guess.
+  ColorSpinorParam cudaParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaParam.setPrecision(inv_param->cuda_prec_eigensolver, inv_param->cuda_prec_eigensolver, true);
   // Ensure device vectors qre in UKQCD basis for Wilson type fermions
   if (cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
-  std::vector<Complex> evals(eig_param->n_conv, 0.0);
-  std::vector<ColorSpinorField *> kSpace(eig_param->n_conv, ColorSpinorField::Create(cudaParam));
+  std::vector<ColorSpinorField *> kSpace(n_eig);
+  for (int i = 0; i < n_eig; i++) {
+    kSpace[i] = ColorSpinorField::Create(cudaParam);
+    if (i < eig_param->block_size) *kSpace[i] = *host_evecs_[i];
+  }
 
-  // If you attempt to compute part of the imaginary spectrum of a symmetric matrix,
+  // Simple vector for eigenvalues.
+  std::vector<Complex> evals(eig_param->n_conv, 0.0);
+  //------------------------------------------------------
+
+  // Sanity checks for operator/eigensolver compatibility.
+  //------------------------------------------------------
+  // If you attempt to compute part of the imaginary spectrum of a hermitian matrix,
   // the solver will fail.
-  if ((eig_param->spectrum == QUDA_SPECTRUM_LI_EIG || eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
-      && ((eig_param->use_norm_op || (inv_param->dslash_type == QUDA_LAPLACE_DSLASH))
-          || ((inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_ASQTAD_DSLASH)
-              && inv_param->solve_type == QUDA_DIRECT_PC_SOLVE))) {
-    errorQuda("Cannot compute imaginary spectra with a hermitian operator");
+  // Is the spectrum pure imaginary?
+  if (eig_param->spectrum == QUDA_SPECTRUM_LI_EIG || eig_param->spectrum == QUDA_SPECTRUM_SI_EIG) {
+    // Is the operator hermitian?
+    if ((eig_param->use_norm_op || (inv_param->dslash_type == QUDA_LAPLACE_DSLASH))
+        || ((inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_ASQTAD_DSLASH)
+            && inv_param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
+      errorQuda("Cannot compute the pure imaginary spectrum of a hermitian operator");
+    }
   }
 
   // Gamma5 pre-multiplication is only supported for the M type operator
@@ -2278,76 +2324,55 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
                 eig_param->use_dagger ? "true" : "false", eig_param->use_norm_op ? "true" : "false");
     }
   }
-
+  //------------------------------------------------------
   profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
 
+  // We must construct the correct Dirac operator type based on the three
+  // options: The normal operator, the daggered operator, and if we pre
+  // multiply by gamma5. Each combination requires a unique Dirac operator
+  // object.
+  DiracMatrix *m = nullptr;
   if (!eig_param->use_norm_op && !eig_param->use_dagger && eig_param->compute_gamma5) {
-    DiracG5M m(dirac);
-    if (eig_param->arpack_check) {
-      arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
-    } else {
-      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
-      (*eig_solve)(kSpace, evals);
-      delete eig_solve;
-    }
+    m = new DiracG5M(dirac);
   } else if (!eig_param->use_norm_op && !eig_param->use_dagger && !eig_param->compute_gamma5) {
-    DiracM m(dirac);
-    if (eig_param->arpack_check) {
-      arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
-    } else {
-      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
-      (*eig_solve)(kSpace, evals);
-      delete eig_solve;
-    }
+    m = new DiracM(dirac);
   } else if (!eig_param->use_norm_op && eig_param->use_dagger) {
-    DiracMdag m(dirac);
-    if (eig_param->arpack_check) {
-      arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
-    } else {
-      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
-      (*eig_solve)(kSpace, evals);
-      delete eig_solve;
-    }
+    m = new DiracMdag(dirac);
   } else if (eig_param->use_norm_op && !eig_param->use_dagger) {
-    DiracMdagM m(dirac);
-    if (eig_param->arpack_check) {
-      arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
-    } else {
-      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
-      (*eig_solve)(kSpace, evals);
-      delete eig_solve;
-    }
+    m = new DiracMdagM(dirac);
   } else if (eig_param->use_norm_op && eig_param->use_dagger) {
-    DiracMMdag m(dirac);
-    if (eig_param->arpack_check) {
-      arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
-    } else {
-      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
-      (*eig_solve)(kSpace, evals);
-      delete eig_solve;
-    }
+    m = new DiracMMdag(dirac);
   } else {
-    errorQuda("Invalid use_norm_op and dagger combination");
+    errorQuda("Invalid use_norm_op, dagger, gamma_5 combination");
   }
 
-  // Copy eigen values back
-  for (int i = 0; i < eig_param->n_conv; i++) { memcpy(host_evals + i, &evals[i], sizeof(Complex)); }
+  // Perfrom the eigensolve
+  if (eig_param->arpack_check) {
+    arpack_solve(host_evecs_, evals, *m, eig_param, profileEigensolve);
+  } else {
+    EigenSolver *eig_solve = EigenSolver::create(eig_param, *m, profileEigensolve);
+    (*eig_solve)(kSpace, evals);
+    delete eig_solve;
+  }
+
+  delete m;
 
   // Transfer Eigenpairs back to host if using GPU eigensolver. The copy
   // will automatically rotate from device UKQCD gamma basis to the
   // host side gamma basis.
+  for (int i = 0; i < eig_param->n_conv; i++) { memcpy(host_evals + i, &evals[i], sizeof(Complex)); }
   if (!(eig_param->arpack_check)) {
     profileEigensolve.TPSTART(QUDA_PROFILE_D2H);
-    for (int i = 0; i < eig_param->n_conv; i++) *host_evecs_[i] = *kSpace[i];
+    for (int i = 0; i < n_eig; i++) *host_evecs_[i] = *kSpace[i];
     profileEigensolve.TPSTOP(QUDA_PROFILE_D2H);
   }
 
   profileEigensolve.TPSTART(QUDA_PROFILE_FREE);
-  for (int i = 0; i < eig_param->n_conv; i++) delete host_evecs_[i];
+  for (int i = 0; i < n_eig; i++) delete host_evecs_[i];
   delete d;
   delete dSloppy;
   delete dPre;
-  for (int i = 0; i < eig_param->n_conv; i++) delete kSpace[i];
+  for (int i = 0; i < n_eig; i++) delete kSpace[i];
   profileEigensolve.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
@@ -3591,7 +3616,9 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   }
 
   // grow/shrink resident solutions to be correct size
-  solutionResident.resize(param->num_offset, cudaParam);
+  auto old_size = solutionResident.size();
+  solutionResident.resize(param->num_offset);
+  for (auto i = old_size; i < solutionResident.size(); i++) solutionResident[i] = ColorSpinorField(cudaParam);
 
   std::vector<ColorSpinorField> &x = solutionResident;
   std::vector<ColorSpinorField> p;

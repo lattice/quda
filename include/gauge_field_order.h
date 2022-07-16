@@ -519,13 +519,17 @@ namespace quda {
       __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {
         if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
-        auto start = dim == -1 ? 0 : dim;
         auto count = (dim == -1 ? geometry : 1) * volumeCB * nColor * nColor; // items per parity
         auto init = reducer::init();
         std::vector<decltype(init)> result = {init, init};
-        std::vector<decltype(u)> v = {u + (0 * geometry + start) * volumeCB * nColor * nColor,
-                                      u + (1 * geometry + start) * volumeCB * nColor * nColor};
-        ::quda::transform_reduce<reducer>(location, result, v, count, h);
+        std::vector<decltype(u)> v
+          = {u + 0 * volumeCB * geometry * nColor * nColor, u + 1 * volumeCB * geometry * nColor * nColor};
+        if (dim == -1) {
+          ::quda::transform_reduce<reducer>(location, result, v, count, h);
+        } else {
+          ::quda::transform_reduce<reducer>(location, result, v, count, h, milc_mapper(dim, geometry, nColor * nColor));
+        }
+
         return reducer::apply(result[0], result[1]);
       }
     };
