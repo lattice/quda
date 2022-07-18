@@ -324,6 +324,61 @@ void computeLongLinkCPU(void **longlink, void **sitelink, QudaPrecision prec, vo
   } // if(longlink)
 }
 
+template <typename su3_matrix>
+void computeTwoLinkCPU(void **twolink, su3_matrix **sitelinkEx)
+{
+  int E[4];
+  for (int dir = 0; dir < 4; ++dir) E[dir] = Z[dir] + 4;
+  const int extended_volume = E[3] * E[2] * E[1] * E[0];
+
+  su3_matrix temp;
+  for (int t = 0; t < Z[3]; ++t) {
+    for (int z = 0; z < Z[2]; ++z) {
+      for (int y = 0; y < Z[1]; ++y) {
+        for (int x = 0; x < Z[0]; ++x) {
+          const int oddBit = (x + y + z + t) & 1;
+          int little_index = ((((t * Z[2] + z) * Z[1] + y) * Z[0] + x) / 2) + oddBit * Vh;
+          int large_index
+            = (((((t + 2) * E[2] + (z + 2)) * E[1] + (y + 2)) * E[0] + x + 2) / 2) + oddBit * (extended_volume / 2);
+
+          for (int dir = XUP; dir <= TUP; ++dir) {
+            int dx[4] = {0, 0, 0, 0};
+            su3_matrix *llink = ((su3_matrix *)twolink[dir]) + little_index;
+            dx[dir] = 1;
+            int nbr_index = neighborIndexFullLattice(E, large_index, dx);
+            llfat_mult_su3_nn(sitelinkEx[dir] + large_index, sitelinkEx[dir] + nbr_index, llink);
+          }
+        } // x
+      }   // y
+    }     // z
+  }       // t
+  return;
+}
+
+void computeTwoLinkCPU(void **twolink, void **sitelink, QudaGaugeParam *qudaGaugeParam)
+{
+  quda::lat_dim_t R = {2,2,2,2};
+
+  quda::lat_dim_t X={qudaGaugeParam->X[0], qudaGaugeParam->X[1], qudaGaugeParam->X[2], qudaGaugeParam->X[3]}; 
+
+  exchange_cpu_sitelink_ex(X, R, sitelink, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam->cpu_prec, 0, 4);
+
+  switch (qudaGaugeParam->cpu_prec) {
+  case QUDA_DOUBLE_PRECISION:
+    computeTwoLinkCPU((void **)twolink, (su3_matrix<double> **)sitelink);
+    break;
+
+  case QUDA_SINGLE_PRECISION:
+    computeTwoLinkCPU((void **)twolink, (su3_matrix<float> **)sitelink);
+    break;
+  default:
+    fprintf(stderr, "ERROR: unsupported precision(%d)\n", qudaGaugeParam->cpu_prec);
+    exit(1);
+    break;
+  }
+}
+
+
 // Compute the full HISQ stencil on the CPU.
 // If "eps_naik" is 0, there's no naik correction,
 // and this routine skips building the paths in "act_path_coeffs[2]"
