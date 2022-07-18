@@ -51,6 +51,33 @@ namespace quda {
   }
 
   /**
+   * @brief Sine pi calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @return result of the sin(a * pi)
+   */
+  template<typename T> inline T sinpi(T a) { return sycl::sinpi(a); }
+
+  /**
+   * @brief Cosine pi calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @return result of the cos(a * pi)
+   */
+  template<typename T> inline T cospi(T a) { return sycl::cospi(a); }
+
+  /**
+   * @brief Combined sinpi and cospi calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @param s pointer to the storage for the result of the sin
+   * @param c pointer to the storage for the result of the cos
+   */
+  template<typename T>
+  inline void sincospi(const T& a, T *s, T *c)
+  {
+    *s = sycl::sinpi(a);
+    *c = sycl::cospi(a);
+  }
+
+  /**
    * @brief Reciprocal square root function (rsqrt)
    * @param a the argument  (In|out)
    *
@@ -62,51 +89,6 @@ namespace quda {
   {
     return sycl::rsqrt(a);
   }
-
-  /**
-     Generic wrapper for Trig functions -- used in gauge field order
-  */
-  template <bool isFixed, typename T>
-  struct Trig {
-    static T Atan2( const T &a, const T &b) { return sycl::atan2(a,b); }
-    static T Sin( const T &a ) { return sycl::sin(a); }
-    static T Cos( const T &a ) { return sycl::cos(a); }
-    static void SinCos(const T &a, T *s, T *c) { quda::sincos(a, s, c); }
-  };
-
-  /**
-     Specialization of Trig functions using fixed b/c gauge reconstructs are -1 -> 1 instead of -Pi -> Pi
-   */
-  template <>
-    struct Trig<true,float> {
-    __device__ __host__ static float Atan2( const float &a, const float &b) {
-      return sycl::atan2(a,b)/M_PI;
-    }
-    __device__ __host__ static float Sin(const float &a)
-    {
-#ifdef __CUDA_ARCH__
-      return __sinf(a * static_cast<float>(M_PI));
-#else
-      return sycl::sin(a * static_cast<float>(M_PI));
-#endif
-    }
-
-    __device__ __host__ static float Cos(const float &a)
-    {
-#ifdef __CUDA_ARCH__
-      return __cosf(a * static_cast<float>(M_PI));
-#else
-      return sycl::cos(a * static_cast<float>(M_PI));
-#endif
-    }
-
-    static void SinCos(const float &a, float *s, float *c)
-    {
-      //*s = sycl::sincos(a * static_cast<float>(M_PI), c);
-      *s = sycl::sinpi(a);
-      *c = sycl::cospi(a);
-    }
-  };
 
   /*
     @brief Fast power function that works for negative "a" argument
