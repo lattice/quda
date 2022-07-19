@@ -70,6 +70,12 @@ set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES COMPILE_FLAGS "-x c++")
 # target_link_libraries(quda PUBLIC hip::hiprand roc::rocrand hip::hipcub roc::rocprim_hip)
 # target_link_libraries(quda PUBLIC roc::hipblas roc::rocblas)
 
+set(OMPTARGET_MKL_LIBRARY "-lmkl_sycl -lmkl_intel_lp64 -lmkl_core -lmkl_intel_thread")
+
+if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
+  target_link_libraries(quda PUBLIC ${OMPTARGET_MKL_LIBRARY})
+endif()
+
 # if(QUDA_GAUGE_ALG)
 #   target_include_directories(quda PUBLIC ${ROCM_PATH}/hipfft/include)
 #   target_link_libraries(quda PUBLIC hip::hipfft)
