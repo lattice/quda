@@ -557,7 +557,8 @@ namespace quda {
     vol_ss << x[0];
     for (int d = 1; d < nDim; d++) vol_ss << "x" << x[d];
     vol_string = vol_ss.str();
-    if (vol_string.size() >= TuneKey::volume_n) errorQuda("Vol string too large %lu", vol_string.size());
+    if (vol_string.size() >= TuneKey::volume_n)
+      errorQuda("Vol string %s (size = %lu) larger than maximum %d", vol_string.c_str(), vol_string.size(), TuneKey::volume_n);
   }
 
   void LatticeField::checkField(const LatticeField &a) const {
