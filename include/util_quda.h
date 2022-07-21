@@ -14,6 +14,15 @@ namespace quda
   constexpr bool str_slant(const char *str) { return *str == '/' ? true : (*str ? str_slant(str + 1) : false); }
   constexpr const char *r_slant(const char *str) { return *str == '/' ? (str + 1) : r_slant(str - 1); }
   constexpr const char *file_name(const char *str) { return str_slant(str) ? r_slant(str_end(str)) : str; }
+
+  template<int A, int B, int D=1, typename F>
+  __attribute__((always_inline)) void static_for(F&&f)
+  {
+    if constexpr (A<B){
+      f.template operator()<A>();
+      __attribute__((musttail)) return static_for<A+D,B,D>(std::forward<F>(f));
+    }
+  }
 } // namespace quda
 
 /**
