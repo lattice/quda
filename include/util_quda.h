@@ -7,6 +7,14 @@
 #include <tune_key.h>
 #include <malloc_quda.h>
 
+#ifndef QUDA_MUSTTAIL
+#ifdef __clang__
+#define QUDA_MUSTTAIL __attribute__((musttail))
+#else
+#define QUDA_MUSTTAIL
+#endif
+#endif
+
 namespace quda
 {
   // strip path from __FILE__
@@ -20,7 +28,7 @@ namespace quda
   {
     if constexpr (A<B){
       f.template operator()<A>();
-      __attribute__((musttail)) return static_for<A+D,B,D>(std::forward<F>(f));
+      QUDA_MUSTTAIL return static_for<A+D,B,D>(std::forward<F>(f));
     }
   }
 } // namespace quda
