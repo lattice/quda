@@ -75,18 +75,18 @@ namespace quda {
       __device__ __host__ inline void operator=(const colorspinor_ghost_wrapper<Float, S> &s);
 
       /**
-	 @brief 2-d accessor functor
-	 @param[in] s Spin index
-	 @param[in] c Color index
-	 @return Complex number at this spin and color index
+         @brief 2-d accessor functor
+         @param[in] s Spin index
+         @param[in] c Color index
+         @return Complex number at this spin and color index
       */
       __device__ __host__ inline complex<Float>& operator()(int s, int c) { return data[s*Nc + c]; }
 
       /**
-	 @brief 2-d accessor functor
-	 @param[in] s Spin index
-	 @param[in] c Color index
-	 @return Complex number at this spin and color index
+         @brief 2-d accessor functor
+         @param[in] s Spin index
+         @param[in] c Color index
+         @return Complex number at this spin and color index
       */
       __device__ __host__ inline const complex<Float>& operator()(int s, int c) const { return data[s*Nc + c]; }
 
@@ -146,120 +146,114 @@ namespace quda {
     }
 
     /**
-	Return this application of gamma_dim to this spinor
-	@param dim Which dimension gamma matrix we are applying
-	@return The new spinor
+        Return this application of gamma_dim to this spinor
+        @param dim Which dimension gamma matrix we are applying
+        @return The new spinor
     */
-    __device__ __host__ inline ColorSpinor<Float,Nc,4> gamma(int dim) {
+    template<int dim>
+    __device__ __host__ inline ColorSpinor<Float,Nc,4> gamma() {
       ColorSpinor<Float,Nc,4> a;
       const auto &t = *this;
 
-      switch (dim) {
-      case 0: // x dimension
+      static_assert(0<=dim && dim<=4, "dim must be 0-4");
+
+      if constexpr (dim==0) { // x dimension
 #pragma unroll
-	for (int i=0; i<Nc; i++) {
+        for (int i=0; i<Nc; i++) {
           a(0, i) = i_(t(3, i));
           a(1, i) = i_(t(2, i));
           a(2, i) = -i_(t(1, i));
           a(3, i) = -i_(t(0, i));
         }
-        break;
-      case 1: // y dimension
+      } else if constexpr (dim==1) { // y dimension
 #pragma unroll
-	for (int i=0; i<Nc; i++) {
+        for (int i=0; i<Nc; i++) {
           a(0, i) = t(3, i);
           a(1, i) = -t(2, i);
           a(2, i) = -t(1, i);
           a(3, i) = t(0, i);
         }
-        break;
-      case 2: // z dimension
+      } else if constexpr (dim==2) { // z dimension
 #pragma unroll
-	for (int i=0; i<Nc; i++) {
+        for (int i=0; i<Nc; i++) {
           a(0, i) = i_(t(2, i));
           a(1, i) = -i_(t(3, i));
           a(2, i) = -i_(t(0, i));
           a(3, i) = i_(t(1, i));
         }
-        break;
-      case 3: // t dimension
+      } else if constexpr (dim==3) { // t dimension
 #pragma unroll
-	for (int i=0; i<Nc; i++) {
+        for (int i=0; i<Nc; i++) {
           a(0, i) = t(0, i);
           a(1, i) = t(1, i);
           a(2, i) = -t(2, i);
           a(3, i) = -t(3, i);
         }
-        break;
-      case 4: // gamma_5
+      } else if constexpr (dim==4) { // gamma_5
 #pragma unroll
-	for (int i=0; i<Nc; i++) {
+        for (int i=0; i<Nc; i++) {
           a(0, i) = t(2, i);
           a(1, i) = t(3, i);
           a(2, i) = t(0, i);
           a(3, i) = t(1, i);
         }
-        break;
       }
 
       return a;
     }
 
     /**
-	Return this application of gamma_dim to this spinor
-	@param dim Which dimension gamma matrix we are applying
-	@return The new spinor
+        Return this application of gamma_dim to this spinor
+        @param dim Which dimension gamma matrix we are applying
+        @return The new spinor
     */
-    __device__ __host__ inline ColorSpinor<Float,Nc,4> igamma(int dim) {
+    template<int dim>
+    __device__ __host__ inline ColorSpinor<Float,Nc,4> igamma() {
       ColorSpinor<Float,Nc,4> a;
       const auto &t = *this;
 
-      switch (dim) {
-      case 0: // x dimension
+      static_assert(0<=dim && dim<=4, "dim must be 0-4");
+
+      if constexpr (dim==0) { // x dimension
 #pragma unroll
-	for (int i=0; i<Nc; i++) {
+        for (int i=0; i<Nc; i++) {
           a(0, i) = -t(3, i);
           a(1, i) = -t(2, i);
           a(2, i) = t(1, i);
           a(3, i) = t(0, i);
         }
-        break;
-      case 1: // y dimension
+      } else if constexpr (dim==1) { // y dimension
 #pragma unroll
-	for (int i=0; i<Nc; i++) {
+        for (int i=0; i<Nc; i++) {
           a(0, i) = i_(t(3, i));
           a(1, i) = -i_(t(2, i));
           a(2, i) = -i_(t(1, i));
           a(3, i) = i_(t(0, i));
         }
-        break;
-      case 2: // z dimension
+      } else if constexpr (dim==2) { // z dimension
 #pragma unroll
-	for (int i=0; i<Nc; i++) {
+        for (int i=0; i<Nc; i++) {
           a(0, i) = -t(2, i);
           a(1, i) = t(3, i);
           a(2, i) = t(0, i);
           a(3, i) = -t(1, i);
         }
-        break;
-      case 3: // t dimension
+      } else if constexpr (dim==3) { // t dimension
 #pragma unroll
-	for (int i=0; i<Nc; i++) {
+        for (int i=0; i<Nc; i++) {
           a(0, i) = i_(t(0, i));
           a(1, i) = i_(t(1, i));
           a(2, i) = -i_(t(2, i));
           a(3, i) = -i_(t(3, i));
         }
-        break;
-      case 4: // gamma_5
+      } else if constexpr (dim==4) { // gamma_5
 #pragma unroll
-	for (int i=0; i<Nc; i++) {
+        for (int i=0; i<Nc; i++) {
           a(0, i) = i_(t(2, i));
           a(1, i) = i_(t(3, i));
           a(2, i) = i_(t(0, i));
           a(3, i) = i_(t(1, i));
         }
-        break;
       }
 
       return a;
@@ -274,9 +268,9 @@ namespace quda {
 #pragma unroll
       for (int s=0; s<Ns/2; s++) {
 #pragma unroll
-	for (int c=0; c<Nc; c++) {
-	  proj(s,c) = (*this)(chirality*Ns/2+s,c);
-	}
+        for (int c=0; c<Nc; c++) {
+          proj(s,c) = (*this)(chirality*Ns/2+s,c);
+        }
       }
       return proj;
     }
@@ -287,101 +281,85 @@ namespace quda {
         @param sign Positive or negative projector
         @return The spin-projected Spinor
     */
-    __device__ __host__ inline ColorSpinor<Float, Nc, 2> project(int dim, int sign) const
+    template<int dim, int sign>
+    __device__ __host__ inline ColorSpinor<Float, Nc, 2> project() const
     {
       ColorSpinor<Float,Nc,2> proj;
       const auto &t = *this;
-      switch (dim) {
-      case 0: // x dimension
-	switch (sign) {
-	case 1: // positive projector
+
+      static_assert(0<=dim && dim<=4, "dim must be 0-4");
+      static_assert(sign==-1 || sign==1, "sign must be -1 or 1");
+
+      if constexpr (dim==0) { // x dimension
+        if constexpr (sign==1) { // positive projector
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
+          for (int i=0; i<Nc; i++) {
             proj(0, i) = t(0, i) + i_(t(3, i));
             proj(1, i) = t(1, i) + i_(t(2, i));
           }
-          break;
-        case -1: // negative projector
+        } else if constexpr (sign==-1) { // negative projector
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
+          for (int i=0; i<Nc; i++) {
             proj(0, i) = t(0, i) - i_(t(3, i));
             proj(1, i) = t(1, i) - i_(t(2, i));
           }
-          break;
         }
-	break;
-      case 1: // y dimension
-	switch (sign) {
-	case 1: // positive projector
+      } else if constexpr (dim==1) { // y dimension
+        if constexpr (sign==1) { // positive projector
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
+          for (int i=0; i<Nc; i++) {
             proj(0, i) = t(0, i) + t(3, i);
             proj(1, i) = t(1, i) - t(2, i);
           }
-          break;
-        case -1: // negative projector
+        } else if constexpr (sign==-1) { // negative projector
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
+          for (int i=0; i<Nc; i++) {
             proj(0, i) = t(0, i) - t(3, i);
             proj(1, i) = t(1, i) + t(2, i);
           }
-          break;
         }
-      	break;
-      case 2: // z dimension
-	switch (sign) {
-	case 1: // positive projector
+      } else if constexpr (dim==2) { // z dimension
+        if constexpr (sign==1) { // positive projector
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
+          for (int i=0; i<Nc; i++) {
             proj(0, i) = t(0, i) + i_(t(2, i));
             proj(1, i) = t(1, i) - i_(t(3, i));
           }
-          break;
-        case -1: // negative projector
+        } else if constexpr (sign==-1) { // negative projector
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
+          for (int i=0; i<Nc; i++) {
             proj(0, i) = t(0, i) - i_(t(2, i));
             proj(1, i) = t(1, i) + i_(t(3, i));
           }
-          break;
         }
-	break;
-      case 3: // t dimension
-	switch (sign) {
-	case 1: // positive projector
+      } else if constexpr (dim==3) { // t dimension
+        if constexpr (sign==1) { // positive projector
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
+          for (int i=0; i<Nc; i++) {
             proj(0, i) = static_cast<Float>(2.0) * t(0, i);
             proj(1, i) = static_cast<Float>(2.0) * t(1, i);
           }
-          break;
-        case -1: // negative projector
+        } else if constexpr (sign==-1) { // negative projector
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
+          for (int i=0; i<Nc; i++) {
             proj(0, i) = static_cast<Float>(2.0) * t(2, i);
             proj(1, i) = static_cast<Float>(2.0) * t(3, i);
           }
-          break;
         }
-	break;
-      case 4:
-        switch (sign) {
-        case 1: // positive projector
+      } else if constexpr (dim==4) { // gamma_5
+        if constexpr (sign==1) { // positive projector
 #pragma unroll
           for (int i = 0; i < Nc; i++) {
             proj(0, i) = t(0, i) + t(2, i);
             proj(1, i) = t(1, i) + t(3, i);
           }
-          break;
-        case -1: // negative projector
+        } else if constexpr (sign==-1) { // negative projector
 #pragma unroll
           for (int i = 0; i < Nc; i++) {
             proj(0, i) = t(0, i) - t(2, i);
             proj(1, i) = t(1, i) - t(3, i);
           }
-          break;
         }
-        break;
       }
 
       return proj;
@@ -394,165 +372,149 @@ namespace quda {
 
        sigma(0,1) =  i  0  0  0
                      0 -i  0  0
-		     0  0  i  0
-		     0  0  0 -i
+                     0  0  i  0
+                     0  0  0 -i
 
        sigma(0,2) =  0 -1  0  0
                      1  0  0  0
-		     0  0  0 -1
-		     0  0  1  0
+                     0  0  0 -1
+                     0  0  1  0
 
        sigma(0,3) =  0  0  0 -i
                      0  0 -i  0
-		     0 -i  i  0
-		    -i  0  0  0
+                     0 -i  i  0
+                    -i  0  0  0
 
        sigma(1,2) =  0  i  0  0
                      i  0  0  0
-		     0  0  0  i
-		     0  0  i  0
+                     0  0  0  i
+                     0  0  i  0
 
        sigma(1,3) =  0  0  0 -1
                      0  0  1  0
-		     0 -1  0  0
-		     1  0  0  0
+                     0 -1  0  0
+                     1  0  0  0
 
        sigma(2,3) =  0  0 -i  0
                      0  0  0  i
-		    -i  0  0  0
-		     0  i  0  0
+                    -i  0  0  0
+                     0  i  0  0
     */
-    __device__ __host__ inline ColorSpinor<Float, Nc, 4> sigma(int mu, int nu) const
+    template<int mu, int nu>
+    __device__ __host__ inline ColorSpinor<Float, Nc, 4> sigma() const
     {
       ColorSpinor<Float,Nc,4> a;
       const ColorSpinor<Float, Nc, 4> &b = *this;
       complex<Float> j(0.0,1.0);
 
-      switch(mu) {
-      case 0:
-	switch(nu) {
-	case 1:
+      static_assert(0<=mu && mu<=3, "mu must be 0-3");
+      static_assert(0<=nu && nu<=3, "nu must be 0-3");
+      static_assert(mu!=nu, "mu!=nu");
+
+      if constexpr (mu==0) {
+        if constexpr (nu==1) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
-	    a(0,i) =  j*b(0,i);
-	    a(1,i) = -j*b(1,i);
-	    a(2,i) =  j*b(2,i);
-	    a(3,i) = -j*b(3,i);
-	  }
-	  break;
-	case 2:
+          for (int i=0; i<Nc; i++) {
+            a(0,i) =  j*b(0,i);
+            a(1,i) = -j*b(1,i);
+            a(2,i) =  j*b(2,i);
+            a(3,i) = -j*b(3,i);
+          }
+        } else if constexpr (nu==2) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
-	    a(0,i) = -b(1,i);
-	    a(1,i) =  b(0,i);
-	    a(2,i) = -b(3,i);
-	    a(3,i) =  b(2,i);
-	  }
-	  break;
-	case 3:
+          for (int i=0; i<Nc; i++) {
+            a(0,i) = -b(1,i);
+            a(1,i) =  b(0,i);
+            a(2,i) = -b(3,i);
+            a(3,i) =  b(2,i);
+          }
+        } else if constexpr (nu==3) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
-	    a(0,i) = -j*b(3,i);
-	    a(1,i) = -j*b(2,i);
-	    a(2,i) = -j*b(1,i);
-	    a(3,i) = -j*b(0,i);
-	  }
-	  break;
-	}
-	break;
-      case 1:
-	switch(nu) {
-	case 0:
+          for (int i=0; i<Nc; i++) {
+            a(0,i) = -j*b(3,i);
+            a(1,i) = -j*b(2,i);
+            a(2,i) = -j*b(1,i);
+            a(3,i) = -j*b(0,i);
+          }
+        }
+      } else if constexpr (mu==1) {
+        if constexpr (nu==0) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
-	    a(0,i) = -j*b(0,i);
-	    a(1,i) =  j*b(1,i);
-	    a(2,i) = -j*b(2,i);
-	    a(3,i) =  j*b(3,i);
-	  }
-	  break;
-	case 2:
+          for (int i=0; i<Nc; i++) {
+            a(0,i) = -j*b(0,i);
+            a(1,i) =  j*b(1,i);
+            a(2,i) = -j*b(2,i);
+            a(3,i) =  j*b(3,i);
+          }
+        } else if constexpr (nu==2) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
-	    a(0,i) = j*b(1,i);
-	    a(1,i) = j*b(0,i);
-	    a(2,i) = j*b(3,i);
-	    a(3,i) = j*b(2,i);
-	  }
-	  break;
-	case 3:
+          for (int i=0; i<Nc; i++) {
+            a(0,i) = j*b(1,i);
+            a(1,i) = j*b(0,i);
+            a(2,i) = j*b(3,i);
+            a(3,i) = j*b(2,i);
+          }
+        } else if constexpr (nu==3) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
-	    a(0,i) = -b(3,i);
-	    a(1,i) =  b(2,i);
-	    a(2,i) = -b(1,i);
-	    a(3,i) =  b(0,i);
-	  }
-	  break;
-	}
-	break;
-      case 2:
-	switch(nu) {
-	case 0:
+          for (int i=0; i<Nc; i++) {
+            a(0,i) = -b(3,i);
+            a(1,i) =  b(2,i);
+            a(2,i) = -b(1,i);
+            a(3,i) =  b(0,i);
+          }
+        }
+      } else if constexpr (mu==2) {
+        if constexpr (nu==0) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
-	    a(0,i) =  b(1,i);
-	    a(1,i) = -b(0,i);
-	    a(2,i) =  b(3,i);
-	    a(3,i) = -b(2,i);
-	  }
-	  break;
-	case 1:
+          for (int i=0; i<Nc; i++) {
+            a(0,i) =  b(1,i);
+            a(1,i) = -b(0,i);
+            a(2,i) =  b(3,i);
+            a(3,i) = -b(2,i);
+          }
+        } else if constexpr (nu==1) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
-	    a(0,i) = -j*b(1,i);
-	    a(1,i) = -j*b(0,i);
-	    a(2,i) = -j*b(3,i);
-	    a(3,i) = -j*b(2,i);
-	  }
-	  break;
-	case 3:
+          for (int i=0; i<Nc; i++) {
+            a(0,i) = -j*b(1,i);
+            a(1,i) = -j*b(0,i);
+            a(2,i) = -j*b(3,i);
+            a(3,i) = -j*b(2,i);
+          }
+        } else if constexpr (nu==3) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
-	    a(0,i) = -j*b(2,i);
-	    a(1,i) =  j*b(3,i);
-	    a(2,i) = -j*b(0,i);
-	    a(3,i) =  j*b(1,i);
-	  }
-	  break;
-	}
-	break;
-      case 3:
-	switch(nu) {
-	case 0:
+          for (int i=0; i<Nc; i++) {
+            a(0,i) = -j*b(2,i);
+            a(1,i) =  j*b(3,i);
+            a(2,i) = -j*b(0,i);
+            a(3,i) =  j*b(1,i);
+          }
+        }
+      } else if constexpr (mu==3) {
+        if constexpr (nu==0) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
-	    a(0,i) = j*b(3,i);
-	    a(1,i) = j*b(2,i);
-	    a(2,i) = j*b(1,i);
-	    a(3,i) = j*b(0,i);
-	  }
-	  break;
-	case 1:
+          for (int i=0; i<Nc; i++) {
+            a(0,i) = j*b(3,i);
+            a(1,i) = j*b(2,i);
+            a(2,i) = j*b(1,i);
+            a(3,i) = j*b(0,i);
+          }
+        } else if constexpr (nu==1) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
-	    a(0,i) =  b(3,i);
-	    a(1,i) = -b(2,i);
-	    a(2,i) =  b(1,i);
-	    a(3,i) = -b(0,i);
-	  }
-	  break;
-	case 2:
+          for (int i=0; i<Nc; i++) {
+            a(0,i) =  b(3,i);
+            a(1,i) = -b(2,i);
+            a(2,i) =  b(1,i);
+            a(3,i) = -b(0,i);
+          }
+        } else if constexpr (nu==2) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
-	    a(0,i) =  j*b(2,i);
-	    a(1,i) = -j*b(3,i);
-	    a(2,i) =  j*b(0,i);
-	    a(3,i) = -j*b(1,i);
-	  }
-	  break;
-	}
-	break;
+          for (int i=0; i<Nc; i++) {
+            a(0,i) =  j*b(2,i);
+            a(1,i) = -j*b(3,i);
+            a(2,i) =  j*b(0,i);
+            a(3,i) = -j*b(1,i);
+          }
+        }
       }
       return a;
     }
@@ -607,10 +569,10 @@ namespace quda {
       ColorSpinor<Float,Nc,Ns> a;
 #pragma unroll
       for (int c=0; c<Nc; c++) {
-	a(0,c) =  (*this)(1,c)+(*this)(3,c);
-	a(1,c) = -(*this)(2,c)-(*this)(0,c);
-	a(2,c) = -(*this)(3,c)+(*this)(1,c);
-	a(3,c) = -(*this)(0,c)+(*this)(2,c);
+        a(0,c) =  (*this)(1,c)+(*this)(3,c);
+        a(1,c) = -(*this)(2,c)-(*this)(0,c);
+        a(2,c) = -(*this)(3,c)+(*this)(1,c);
+        a(3,c) = -(*this)(0,c)+(*this)(2,c);
       }
       *this = a;
     }
@@ -622,10 +584,10 @@ namespace quda {
       ColorSpinor<Float,Nc,Ns> a;
 #pragma unroll
       for (int c=0; c<Nc; c++) {
-	a(0,c) = -(*this)(1,c)-(*this)(3,c);
-	a(1,c) =  (*this)(2,c)+(*this)(0,c);
-	a(2,c) =  (*this)(3,c)-(*this)(1,c);
-	a(3,c) =  (*this)(0,c)-(*this)(2,c);
+        a(0,c) = -(*this)(1,c)-(*this)(3,c);
+        a(1,c) =  (*this)(2,c)+(*this)(0,c);
+        a(2,c) =  (*this)(3,c)-(*this)(1,c);
+        a(3,c) =  (*this)(0,c)-(*this)(2,c);
       }
       *this = a;
     }
@@ -633,9 +595,9 @@ namespace quda {
     __device__ __host__ void print() const
     {
       for (int s=0; s<Ns; s++) {
-	for (int c=0; c<Nc; c++) {
-	  printf("s=%d c=%d %e %e\n", s, c, data[s*Nc+c].real(), data[s*Nc+c].imag());
-	}
+        for (int c=0; c<Nc; c++) {
+          printf("s=%d c=%d %e %e\n", s, c, data[s*Nc+c].real(), data[s*Nc+c].imag());
+        }
       }
     }
     };
@@ -677,9 +639,9 @@ namespace quda {
 #pragma unroll
       for (int s=0; s<Ns; s++) {
 #pragma unroll
-	for (int c=0; c<Nc; c++) {
-	  recon(chirality*Ns+s,c) = (*this)(s,c);
-	}
+        for (int c=0; c<Nc; c++) {
+          recon(chirality*Ns+s,c) = (*this)(s,c);
+        }
       }
       return recon;
     }
@@ -690,103 +652,89 @@ namespace quda {
         @param sign Positive or negative projector
         @return The spin-reconstructed Spinor
     */
-    __device__ __host__ inline ColorSpinor<Float, Nc, 4> reconstruct(int dim, int sign) const
+    template<int dim, int sign>
+    __device__ __host__ inline ColorSpinor<Float, Nc, 4> reconstruct() const
     {
       ColorSpinor<Float, Nc, 4> recon;
-      const auto t = *this;
+      const auto &t = *this;
 
-      switch (dim) {
-      case 0: // x dimension
-	switch (sign) {
-	case 1: // positive projector
+      static_assert(sign==1||sign==-1, "sign must be 1 or -1");
+      static_assert(dim==0||dim==1||dim==2||dim==3||dim==4, "dim must be 0-4");
+
+      if constexpr (dim==0) {
+        if constexpr (sign==1) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
+          for (int i=0; i<Nc; i++) {
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
             recon(2, i) = -i_(t(1, i));
             recon(3, i) = -i_(t(0, i));
           }
-          break;
-        case -1: // negative projector
+        } else if constexpr (sign==-1) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
+          for (int i=0; i<Nc; i++) {
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
             recon(2, i) = i_(t(1, i));
             recon(3, i) = i_(t(0, i));
           }
-          break;
         }
-	break;
-      case 1: // y dimension
-	switch (sign) {
-	case 1: // positive projector
+      } else if constexpr (dim==1) {
+        if constexpr (sign==1) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
+          for (int i=0; i<Nc; i++) {
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
             recon(2, i) = -t(1, i);
             recon(3, i) = t(0, i);
           }
-          break;
-        case -1: // negative projector
+        } else if constexpr (sign==-1) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
+          for (int i=0; i<Nc; i++) {
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
             recon(2, i) = t(1, i);
             recon(3, i) = -t(0, i);
           }
-          break;
         }
-        break;
-      case 2: // z dimension
-	switch (sign) {
-	case 1: // positive projector
+      } else if constexpr (dim==2) {
+        if constexpr (sign==1) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
+          for (int i=0; i<Nc; i++) {
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
             recon(2, i) = -i_(t(0, i));
             recon(3, i) = i_(t(1, i));
           }
-          break;
-        case -1: // negative projector
+        } else if constexpr (sign==-1) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
+          for (int i=0; i<Nc; i++) {
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
             recon(2, i) = i_(t(0, i));
             recon(3, i) = -i_(t(1, i));
           }
-          break;
         }
-	break;
-      case 3: // t dimension
-	switch (sign) {
-	case 1: // positive projector
+      } else if constexpr (dim==3) {
+        if constexpr (sign==1) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
+          for (int i=0; i<Nc; i++) {
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
             recon(2, i) = 0;
             recon(3, i) = 0;
           }
-	  break;
-	case -1: // negative projector
+        } else if constexpr (sign==-1) {
 #pragma unroll
-	  for (int i=0; i<Nc; i++) {
-	    recon(0,i) = 0;
-	    recon(1,i) = 0;
+          for (int i=0; i<Nc; i++) {
+            recon(0,i) = 0;
+            recon(1,i) = 0;
             recon(2, i) = t(0, i);
             recon(3, i) = t(1, i);
           }
-          break;
         }
-	break;
-      case 4:
-        switch (sign) {
-        case 1: // positive projector
+      } else if constexpr (dim==4) {
+        if constexpr (sign==1) {
 #pragma unroll
           for (int i = 0; i < Nc; i++) {
             recon(0, i) = t(0, i);
@@ -794,8 +742,7 @@ namespace quda {
             recon(2, i) = t(0, i);
             recon(3, i) = t(1, i);
           }
-          break;
-        case -1: // negative projector
+        } else if constexpr (sign==-1) {
 #pragma unroll
           for (int i = 0; i < Nc; i++) {
             recon(0, i) = t(0, i);
@@ -803,10 +750,9 @@ namespace quda {
             recon(2, i) = -t(0, i);
             recon(3, i) = -t(1, i);
           }
-          break;
         }
-        break;
       }
+
       return recon;
     }
 
@@ -855,9 +801,9 @@ namespace quda {
     __device__ __host__ void print() const
     {
       for (int s=0; s<Ns; s++) {
-	for (int c=0; c<Nc; c++) {
-	  printf("s=%d c=%d %e %e\n", s, c, data[s*Nc+c].real(), data[s*Nc+c].imag());
-	}
+        for (int c=0; c<Nc; c++) {
+          printf("s=%d c=%d %e %e\n", s, c, data[s*Nc+c].real(), data[s*Nc+c].imag());
+        }
       }
     }
   };
@@ -1020,13 +966,13 @@ namespace quda {
         // out(j,i) = a(0,j) * conj(b(0,i));
 
 #pragma unroll
-	for (int s=1; s<Ns; s++) {
-	  out(j,i).real( out(j,i).real() + a(s,j).real() * b(s,i).real() );
-	  out(j,i).real( out(j,i).real() + a(s,j).imag() * b(s,i).imag() );
-	  out(j,i).imag( out(j,i).imag() + a(s,j).imag() * b(s,i).real() );
-	  out(j,i).imag( out(j,i).imag() - a(s,j).real() * b(s,i).imag() );
-	  // out(j,i) += a(s,j) * conj(b(s,i));
-	}
+        for (int s=1; s<Ns; s++) {
+          out(j,i).real( out(j,i).real() + a(s,j).real() * b(s,i).real() );
+          out(j,i).real( out(j,i).real() + a(s,j).imag() * b(s,i).imag() );
+          out(j,i).imag( out(j,i).imag() + a(s,j).imag() * b(s,i).real() );
+          out(j,i).imag( out(j,i).imag() - a(s,j).real() * b(s,i).imag() );
+          // out(j,i) += a(s,j) * conj(b(s,i));
+        }
       }
     }
     return out;
@@ -1076,7 +1022,7 @@ namespace quda {
     for (int i=0; i<Nc; i++) {
 #pragma unroll
       for (int s=0; s<Ns; s++) {
-	z.data[s*Nc + i] = x.data[s*Nc + i] + y.data[s*Nc + i];
+        z.data[s*Nc + i] = x.data[s*Nc + i] + y.data[s*Nc + i];
       }
     }
 
@@ -1098,7 +1044,7 @@ namespace quda {
     for (int i=0; i<Nc; i++) {
 #pragma unroll
       for (int s=0; s<Ns; s++) {
-	z.data[s*Nc + i] = x.data[s*Nc + i] - y.data[s*Nc + i];
+        z.data[s*Nc + i] = x.data[s*Nc + i] - y.data[s*Nc + i];
       }
     }
 
@@ -1120,7 +1066,7 @@ namespace quda {
     for (int i=0; i<Nc; i++) {
 #pragma unroll
       for (int s=0; s<Ns; s++) {
-	y.data[s*Nc + i] = a * x.data[s*Nc + i];
+        y.data[s*Nc + i] = a * x.data[s*Nc + i];
       }
     }
 
@@ -1142,20 +1088,20 @@ namespace quda {
     for (int i=0; i<Nc; i++) {
 #pragma unroll
       for (int s=0; s<Ns; s++) {
-	y.data[s*Nc + i].x  = A(i,0).real() * x.data[s*Nc + 0].real();
-	y.data[s*Nc + i].x -= A(i,0).imag() * x.data[s*Nc + 0].imag();
-	y.data[s*Nc + i].y  = A(i,0).real() * x.data[s*Nc + 0].imag();
-	y.data[s*Nc + i].y += A(i,0).imag() * x.data[s*Nc + 0].real();
+        y.data[s*Nc + i].x  = A(i,0).real() * x.data[s*Nc + 0].real();
+        y.data[s*Nc + i].x -= A(i,0).imag() * x.data[s*Nc + 0].imag();
+        y.data[s*Nc + i].y  = A(i,0).real() * x.data[s*Nc + 0].imag();
+        y.data[s*Nc + i].y += A(i,0).imag() * x.data[s*Nc + 0].real();
       }
 #pragma unroll
       for (int j=1; j<Nc; j++) {
 #pragma unroll
-	for (int s=0; s<Ns; s++) {
-	  y.data[s*Nc + i].x += A(i,j).real() * x.data[s*Nc + j].real();
-	  y.data[s*Nc + i].x -= A(i,j).imag() * x.data[s*Nc + j].imag();
-	  y.data[s*Nc + i].y += A(i,j).real() * x.data[s*Nc + j].imag();
-	  y.data[s*Nc + i].y += A(i,j).imag() * x.data[s*Nc + j].real();
-	}
+        for (int s=0; s<Ns; s++) {
+          y.data[s*Nc + i].x += A(i,j).real() * x.data[s*Nc + j].real();
+          y.data[s*Nc + i].x -= A(i,j).imag() * x.data[s*Nc + j].imag();
+          y.data[s*Nc + i].y += A(i,j).real() * x.data[s*Nc + j].imag();
+          y.data[s*Nc + i].y += A(i,j).imag() * x.data[s*Nc + j].real();
+        }
       }
     }
 
@@ -1214,25 +1160,25 @@ namespace quda {
 #pragma unroll
     for (int i=0; i<N; i++) {
       if (i==0) {
-	y.data[i].x  = A(i,0).real() * x.data[0].real();
-	y.data[i].y  = A(i,0).real() * x.data[0].imag();
+        y.data[i].x  = A(i,0).real() * x.data[0].real();
+        y.data[i].y  = A(i,0).real() * x.data[0].imag();
       } else {
-	y.data[i].x  = A(i,0).real() * x.data[0].real();
-	y.data[i].x -= A(i,0).imag() * x.data[0].imag();
-	y.data[i].y  = A(i,0).real() * x.data[0].imag();
-	y.data[i].y += A(i,0).imag() * x.data[0].real();
+        y.data[i].x  = A(i,0).real() * x.data[0].real();
+        y.data[i].x -= A(i,0).imag() * x.data[0].imag();
+        y.data[i].y  = A(i,0).real() * x.data[0].imag();
+        y.data[i].y += A(i,0).imag() * x.data[0].real();
       }
 #pragma unroll
       for (int j=1; j<N; j++) {
-	if (i==j) {
-	  y.data[i].x += A(i,j).real() * x.data[j].real();
-	  y.data[i].y += A(i,j).real() * x.data[j].imag();
-	} else {
-	  y.data[i].x += A(i,j).real() * x.data[j].real();
-	  y.data[i].x -= A(i,j).imag() * x.data[j].imag();
-	  y.data[i].y += A(i,j).real() * x.data[j].imag();
-	  y.data[i].y += A(i,j).imag() * x.data[j].real();
-	}
+        if (i==j) {
+          y.data[i].x += A(i,j).real() * x.data[j].real();
+          y.data[i].y += A(i,j).real() * x.data[j].imag();
+        } else {
+          y.data[i].x += A(i,j).real() * x.data[j].real();
+          y.data[i].x -= A(i,j).imag() * x.data[j].imag();
+          y.data[i].y += A(i,j).real() * x.data[j].imag();
+          y.data[i].y += A(i,j).imag() * x.data[j].real();
+        }
       }
     }
 

@@ -154,16 +154,16 @@ namespace quda
       constexpr int proj_dir = dagger ? +1 : -1;
       Vector f = arg.in_pack(idx + s * arg.dc.volume_4d_cb, spinor_parity);
       if (twist == 1) {
-        f = arg.twist_a * (f + arg.twist_b * f.igamma(4));
+        f = arg.twist_a * (f + arg.twist_b * f.template igamma<4>());
       } else if (twist == 2) {
         Vector f1 = arg.in_pack(idx + (1 - s) * arg.dc.volume_4d_cb, spinor_parity); // load other flavor
         if (s == 0)
-          f = arg.twist_a * (f + arg.twist_b * f.igamma(4) + arg.twist_c * f1);
+          f = arg.twist_a * (f + arg.twist_b * f.template igamma<4>() + arg.twist_c * f1);
         else
-          f = arg.twist_a * (f - arg.twist_b * f.igamma(4) + arg.twist_c * f1);
+          f = arg.twist_a * (f - arg.twist_b * f.template igamma<4>() + arg.twist_c * f1);
       }
       if (arg.spin_project) {
-        arg.in_pack.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+        arg.in_pack.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.template project<dim, proj_dir>();
       } else {
         arg.in_pack.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
       }
@@ -173,16 +173,16 @@ namespace quda
       constexpr int proj_dir = dagger ? -1 : +1;
       Vector f = arg.in_pack(idx + s * arg.dc.volume_4d_cb, spinor_parity);
       if (twist == 1) {
-        f = arg.twist_a * (f + arg.twist_b * f.igamma(4));
+        f = arg.twist_a * (f + arg.twist_b * f.template igamma<4>());
       } else if (twist == 2) {
         Vector f1 = arg.in_pack(idx + (1 - s) * arg.dc.volume_4d_cb, spinor_parity); // load other flavor
         if (s == 0)
-          f = arg.twist_a * (f + arg.twist_b * f.igamma(4) + arg.twist_c * f1);
+          f = arg.twist_a * (f + arg.twist_b * f.template igamma<4>() + arg.twist_c * f1);
         else
-          f = arg.twist_a * (f - arg.twist_b * f.igamma(4) + arg.twist_c * f1);
+          f = arg.twist_a * (f - arg.twist_b * f.template igamma<4>() + arg.twist_c * f1);
       }
       if (arg.spin_project) {
-        arg.in_pack.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+        arg.in_pack.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.template project<dim, proj_dir>();
       } else {
         arg.in_pack.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
       }
