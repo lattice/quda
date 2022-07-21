@@ -51,7 +51,7 @@ namespace quda
 
       if (mykernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x(coord.x_cb, my_spinor_parity);
-        x += arg.b * x.igamma(4);
+        x += arg.b * x.template igamma<4>();
         out = x + arg.a * out;
       } else if (active) {
         Vector x = arg.out(coord.x_cb, my_spinor_parity);

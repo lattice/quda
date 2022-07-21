@@ -211,8 +211,7 @@ namespace quda {
 
       const int index_4d_cb = index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
 
-#pragma unroll
-      for (int d = 0; d < 4; d++) // loop over dimension
+      static_for<0,4>([&]<int d> // loop over dimension
       {
         int x[4] = {coordinate[0], coordinate[1], coordinate[2], coordinate[3]};
         x[d] = (coordinate[d] == arg.dim[d] - 1 && !arg.comm[d]) ? 0 : coordinate[d] + 1;
@@ -228,7 +227,7 @@ namespace quda {
 
           const Link U = arg.U(d, index_4d_cb, arg.parity);
           const Vector in = arg.in(fwd_idx, their_spinor_parity);
-          out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          out += (U * in.template project<d, proj_dir>()).template reconstruct<d, proj_dir>();
         }
         x[d] = (coordinate[d] == 0 && !arg.comm[d]) ? arg.dim[d] - 1 : coordinate[d] - 1;
         if (!halo || !is_halo_4d(x, arg.dim, arg.halo_shift)) {
@@ -245,9 +244,9 @@ namespace quda {
 
           const Link U = arg.U(d, gauge_idx, 1 - arg.parity);
           const Vector in = arg.in(back_idx, their_spinor_parity);
-          out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          out += (conj(U) * in.template project<d, proj_dir>()).template reconstruct<d, proj_dir>();
         }
-      } // nDim
+      }); // nDim
     }
 
     /**
