@@ -268,7 +268,6 @@ namespace quda
 
     template <int twist> __device__ __forceinline__ void operator()(const Arg &arg, int s, int parity)
     {
-      QUDA_RT_CONSTS;
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = target::block_idx().x % arg.blocks_per_dir;
       int dim_dir = target::block_idx().x / arg.blocks_per_dir;
@@ -400,7 +399,6 @@ namespace quda
 
     __device__ __forceinline__ void operator()(const Arg &arg, int s, int parity, int = 0)
     {
-      QUDA_RT_CONSTS;
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = target::block_idx().x % arg.blocks_per_dir;
       int dim_dir = target::block_idx().x / arg.blocks_per_dir;

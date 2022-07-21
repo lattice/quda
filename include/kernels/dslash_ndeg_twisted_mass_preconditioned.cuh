@@ -55,7 +55,6 @@ namespace quda
     template <KernelType mykernel_type = kernel_type>
     __device__ __host__ __forceinline__ void operator()(int idx, int flavor, int parity)
     {
-      QUDA_RT_CONSTS;
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 

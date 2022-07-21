@@ -500,7 +500,6 @@ namespace quda
   template <KernelType kernel_type, int nParity, class D, typename Arg>
   void __device__ __forceinline__ shmem_exterior(D &dslash, const Arg &arg, int s)
   {
-    QUDA_RT_CONSTS;
     // shmem exterior kernel with grid-strided loop
     if (kernel_type == UBER_KERNEL || kernel_type == EXTERIOR_KERNEL_ALL) {
       // figure out some details on blocks
