@@ -143,13 +143,13 @@ namespace quda {
 
       template <typename T1, typename T2> __device__ __host__ inline void unpack(T1 &out, const T2 &in) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < compressed_block_size(); i++) out[unpack_idx(i)] = in[i];
 
           // first reconstruct second set of diagonal elements before we reconstruct the first set
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < 3; i++) out[i + 3] = diagonal - out[i];
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < 3; i++) out[i + 0] = diagonal + out[i];
 
         out[30] = -out[6];
@@ -162,10 +162,10 @@ QUDA_UNROLL
 
       template <typename T1, typename T2> __device__ __host__ inline void pack(T1 &out, const T2 &in) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < compressed_block_size(); i++) out[i] = in[unpack_idx(i)];
           // remove diagonal constant
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < 3; i++) out[i] -= diagonal;
         out[3] = 0.0; // intentionally zero this so that it can't contribute to the max element
       }
@@ -184,13 +184,13 @@ QUDA_UNROLL
 
       template <typename T1, typename T2> __device__ __host__ inline void unpack(T1 &out, const T2 &in) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < block; i++) out[i] = in[i];
       }
 
       template <typename T1, typename T2> __device__ __host__ inline void pack(T1 &out, const T2 &in) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < block; i++) out[i] = in[i];
       }
     };
@@ -673,23 +673,23 @@ QUDA_UNROLL
           // the chiral block size may not be exactly divisible by N, in which case we need to over-size the read 
           array<real, M * N> tmp;             // array storing the elements read in
 
-QUDA_UNROLL
+#pragma unroll
           for (int i = 0; i < M; i++) {
             // first load from memory
             Vector vecTmp = vector_load<Vector>(clover, parity * offset + x + volumeCB * (chirality * M_offset + i));
 
             // second do scalar copy converting into register type
-QUDA_UNROLL
+#pragma unroll
             for (int j = 0; j < N; j++) { copy_and_scale(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
           }
 
-QUDA_UNROLL
+#pragma unroll
           for (int i = 0; i < compressed_block; i++) v[i] = tmp[i + chirality * compressed_block % N];
         }
 
         __device__ __host__ inline void raw_load(real v[2 * compressed_block], int x, int parity) const
         {
-QUDA_UNROLL
+#pragma unroll
           for (int ch = 0; ch < 2; ch++) raw_load(v + ch * compressed_block, x, parity, ch);
         }
 
@@ -707,7 +707,7 @@ QUDA_UNROLL
           recon.unpack(v, tmp);
 
           if (add_rho) {
-QUDA_UNROLL
+#pragma unroll
             for (int i = 0; i < 6; i++) v[i] += rho;
           }
         }
@@ -725,14 +725,14 @@ QUDA_UNROLL
           // in which case we write the divisble part first and then
           // deal with the remainder afterwards
           array<real, compressed_block> tmp;
-QUDA_UNROLL
+#pragma unroll
           for (int i = 0; i < compressed_block; i++) tmp[i] = isFixed<Float>::value ? v[i] * nrm_inv : v[i];
 
-QUDA_UNROLL
+#pragma unroll
           for (int i = 0; i < M_offset; i++) {
             Vector vecTmp;
             // first do scalar copy converting into storage type
-QUDA_UNROLL
+#pragma unroll
             for (int j = 0; j < N; j++)
               copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[chirality * M_rem + i * N + j]);
             // second do vectorized copy into memory
@@ -742,7 +742,7 @@ QUDA_UNROLL
           if (M_rem) {
             typename VectorType<Float, std::max(M_rem, 1)>::type vecTmp;
             // first do scalar copy converting into storage type
-QUDA_UNROLL
+#pragma unroll
             for (int j = 0; j < M_rem; j++)
               copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[(1 - chirality) * M_offset * N + j]);
 
@@ -754,7 +754,7 @@ QUDA_UNROLL
 
         __device__ __host__ inline void raw_save(const real v[2 * compressed_block], int x, int parity) const
         {
-QUDA_UNROLL
+#pragma unroll
           for (int ch = 0; ch < 2; ch++) raw_save(v + ch * compressed_block, x, parity, ch);
         }
 
@@ -781,7 +781,7 @@ QUDA_UNROLL
          */
         __device__ __host__ inline void load(real v[], int x, int parity) const
         {
-QUDA_UNROLL
+#pragma unroll
           for (int chirality = 0; chirality < 2; chirality++) load(&v[chirality * block], x, parity, chirality);
         }
 
@@ -794,7 +794,7 @@ QUDA_UNROLL
          */
         __device__ __host__ inline void save(const real v[], int x, int parity) const
         {
-QUDA_UNROLL
+#pragma unroll
           for (int chirality = 0; chirality < 2; chirality++) save(&v[chirality * block], x, parity, chirality);
         }
 
@@ -855,14 +855,14 @@ QUDA_UNROLL
 	  // factor of 0.5 comes from basis change
           Float v_[length];
           block_load<Float, length>(v_, &clover[parity * offset + x * length]);
-QUDA_UNROLL
+#pragma unroll
           for (int i = 0; i < length; i++) v[i] = 0.5 * v_[i];
         }
 
         __device__ __host__ inline void save(const RegType v[length], int x, int parity) const
         {
           Float v_[length];
-QUDA_UNROLL
+#pragma unroll
           for (int i = 0; i < length; i++) v_[i] = 2.0 * v[i];
           block_store<Float, length>(&clover[parity * offset + x * length], v_);
         }
@@ -902,16 +902,16 @@ QUDA_UNROLL
 
         __device__ __host__ inline void load(RegType v[length], int x, int parity) const {
 	  // the factor of 0.5 comes from a basis change
-QUDA_UNROLL
+#pragma unroll
           for (int chirality = 0; chirality < 2; chirality++) {
             // set diagonal elements
-QUDA_UNROLL
+#pragma unroll
             for (int i = 0; i < 6; i++) {
               v[chirality*36 + i] = 0.5*diag[((i*2 + chirality)*2 + parity)*volumeCB + x];
             }
 
             // the off diagonal elements
-QUDA_UNROLL
+#pragma unroll
             for (int i = 0; i < 30; i++) {
               int z = i%2;
 	      int off = i/2;
@@ -924,16 +924,16 @@ QUDA_UNROLL
         __device__ __host__ inline void save(const RegType v[length], int x, int parity) const
         {
           // the factor of 2.0 comes from undoing the basis change
-QUDA_UNROLL
+#pragma unroll
           for (int chirality = 0; chirality < 2; chirality++) {
             // set diagonal elements
-QUDA_UNROLL
+#pragma unroll
             for (int i = 0; i < 6; i++) {
               diag[((i*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + i];
             }
 
             // the off diagonal elements
-QUDA_UNROLL
+#pragma unroll
             for (int i = 0; i < 30; i++) {
               int z = i%2;
 	      int off = i/2;
@@ -993,18 +993,18 @@ QUDA_UNROLL
 
           // flip the sign of the imaginary components
           int sign[36];
-QUDA_UNROLL
+#pragma unroll
           for (int i = 0; i < 6; i++) sign[i] = 1;
-QUDA_UNROLL
+#pragma unroll
           for (int i = 6; i < 36; i += 2) {
             if ( (i >= 10 && i<= 15) || (i >= 18 && i <= 29) )  { sign[i] = -1; sign[i+1] = -1; }
 	    else { sign[i] = 1; sign[i+1] = -1; }
           }
 
           const int M = length / 2;
-QUDA_UNROLL
+#pragma unroll
           for (int chirality = 0; chirality < 2; chirality++)
-QUDA_UNROLL
+#pragma unroll
             for (int i = 0; i < M; i++)
               v[chirality * M + i] = sign[i] * clover[parity][x * length + chirality * M + bq[i]];
         }

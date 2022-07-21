@@ -113,17 +113,17 @@ namespace quda {
 
     __device__ __host__ inline void load(ColorSpinor<real, nColor, spinBlock> &v, int parity, int x_cb, int chirality, int i)
     {
-QUDA_UNROLL
+#pragma unroll
       for (int s = 0; s < spinBlock; s++)
-QUDA_UNROLL
+#pragma unroll
         for (int c = 0; c < nColor; c++) v(s, c) = arg.V(parity, x_cb, chirality * spinBlock + s, c, i);
     }
 
     __device__ __host__ inline void save(int parity, int x_cb, int chirality, int i, const ColorSpinor<real, nColor, spinBlock> &v)
     {
-QUDA_UNROLL
+#pragma unroll
       for (int s = 0; s < spinBlock; s++)
-QUDA_UNROLL
+#pragma unroll
         for (int c = 0; c < nColor; c++) arg.V(parity, x_cb, chirality * spinBlock + s, c, i) = v(s, c);
     }
 
@@ -163,14 +163,14 @@ QUDA_UNROLL
             if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
             if (n == 0) { // load from B on first Gram-Schmidt, otherwise V.
               if (chirality == 0) {
-QUDA_UNROLL
+#pragma unroll
                 for (int m = 0; m < mVec; m++) arg.B[j+m].template load<spinBlock>(v[m][tx].data, parity[tx], x_cb[tx], 0);
               } else {
-QUDA_UNROLL
+#pragma unroll
                 for (int m = 0; m < mVec; m++) arg.B[j+m].template load<spinBlock>(v[m][tx].data, parity[tx], x_cb[tx], 1);
               }
             } else {
-QUDA_UNROLL
+#pragma unroll
               for (int m = 0; m < mVec; m++) load(v[m][tx], parity[tx], x_cb[tx], chirality, j + m);
             }
           }
@@ -183,7 +183,7 @@ QUDA_UNROLL
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
               load(vi[tx], parity[tx], x_cb[tx], chirality, i);
 
-QUDA_UNROLL
+#pragma unroll
               for (int m = 0; m < mVec; m++) dot[m] += innerProduct(vi[tx], v[m][tx]);
             }
 
@@ -192,19 +192,19 @@ QUDA_UNROLL
             // subtract the blocks to orthogonalise
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
-QUDA_UNROLL
+#pragma unroll
               for (int m = 0; m < mVec; m++) caxpy(-complex<real>(dot[m].real(), dot[m].imag()), vi[tx], v[m][tx]);
             }
           } // i
 
           // now orthogonalize over the block diagonal and normalize each entry
-QUDA_UNROLL
+#pragma unroll
           for (int m = 0; m < mVec; m++) {
 
             dot_t dot{0};
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
-QUDA_UNROLL
+#pragma unroll
               for (int i = 0; i < m; i++) dot[i] += innerProduct(v[i][tx], v[m][tx]);
             }
             
@@ -213,7 +213,7 @@ QUDA_UNROLL
             sum_t nrm = 0.0;
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
-QUDA_UNROLL
+#pragma unroll
               for (int i = 0; i < m; i++) caxpy(-complex<real>(dot[i].real(), dot[i].imag()), v[i][tx], v[m][tx]); // subtract the blocks to orthogonalise
               nrm += norm2(v[m][tx]);
             }
@@ -229,7 +229,7 @@ QUDA_UNROLL
 
           for (int tx = 0; tx < n_sites_per_thread; tx++) {
             if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
-QUDA_UNROLL
+#pragma unroll
             for (int m = 0; m < mVec; m++) save(parity[tx], x_cb[tx], chirality, j + m, v[m][tx]);
           }
         } // j

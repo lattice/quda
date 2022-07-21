@@ -106,7 +106,7 @@ namespace quda
         // Each NYW owns its own thread.
         // The NXZ's are all in the same thread block,
         // so they can share the same memory.
-QUDA_UNROLL
+#pragma unroll
         for (int l = 0; l < Arg::NXZ; l++) {
           if (arg.f.read.X) arg.X[l].load(x, i, parity);
           if (arg.f.read.Z) arg.Z[l].load(z, i, parity);
@@ -159,7 +159,7 @@ QUDA_UNROLL
 
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &, int, int) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int k=0; k < x.size(); k++) dot_<reduce_t, real>(sum, x[k], y[k]);
       }
 
@@ -190,7 +190,7 @@ QUDA_UNROLL
 
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &, int, int) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int k=0; k < x.size(); k++) cdot_<reduce_t, real>(sum, x[k], y[k]);
       }
 
@@ -208,7 +208,7 @@ QUDA_UNROLL
 
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &w, int i, int j) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int k = 0; k < x.size(); k++) {
           cdot_<reduce_t, real>(sum, x[k], y[k]);
           if (i == j) w[k] = y[k];

@@ -54,7 +54,7 @@ namespace quda
       // first compute the field energy
       Link iden;
       setIdentity(&iden);
-QUDA_UNROLL
+#pragma unroll
       for (int i=0; i<6; i++) {
         // Make traceless
         auto tmp = F[i] - n_inv * getTrace(F[i]) * iden;
@@ -68,7 +68,7 @@ QUDA_UNROLL
       double Q_idx = 0.0;
       double Qi[3] = {0.0,0.0,0.0};
       // unroll computation
-QUDA_UNROLL
+#pragma unroll
       for (int i=0; i<3; i++) {
         Qi[i] = getTrace(F[i] * F[5 - i]).real();
       }

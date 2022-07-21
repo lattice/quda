@@ -72,7 +72,7 @@ namespace quda {
 
       // Get location of unit corner of hypercube
       int x_c[nDim];
-QUDA_UNROLL
+#pragma unroll
       for (int d = 0; d < nDim; d++)
         x_c[d] = 2 * (coord[d] / 2);
 
@@ -84,13 +84,13 @@ QUDA_UNROLL
 
       // Begin accumulating into the output vector
       int nbr_corner = 0;
-QUDA_UNROLL
+#pragma unroll
       for (int nbr_parity = 0; nbr_parity < 2; nbr_parity++) {
-QUDA_UNROLL
+#pragma unroll
         for (int nbr_t = 0; nbr_t < 2; nbr_t++) {
-QUDA_UNROLL
+#pragma unroll
           for (int nbr_z = 0; nbr_z < 2; nbr_z++) {
-QUDA_UNROLL
+#pragma unroll
             for (int nbr_y = 0; nbr_y < 2; nbr_y++) {
               const int offset[4] = { (nbr_parity + nbr_t + nbr_z + nbr_y) & 1, nbr_y, nbr_z, nbr_t };
               const int neighbor_idx = linkIndexShift(x_c, offset, arg.dim);

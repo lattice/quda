@@ -23,10 +23,10 @@ namespace quda
       const int warpend = (wid+1)*warp_size;
       const int split_size = warp_size / warp_split;
       if (warp_split > 1) {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < x.size(); i++) {
           // reduce down to the first group of column-split threads
-QUDA_UNROLL
+#pragma unroll
           for (int offset = warp_size / 2; offset >= split_size; offset /= 2) {
             #pragma omp barrier
             storage[tid] = x[i];

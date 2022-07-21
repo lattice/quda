@@ -54,7 +54,7 @@ namespace quda
       using Mat = HMatrix<real, N>;
       double trLogA = 0.0;
 
-QUDA_UNROLL
+#pragma unroll
       for (int ch = 0; ch < 2; ch++) {
         Mat A = arg.clover(x_cb, parity, ch);
         A *= static_cast<real>(2.0); // factor of two is inherent to QUDA clover storage

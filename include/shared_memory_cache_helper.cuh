@@ -113,7 +113,7 @@ namespace quda
       atom_t tmp[n_element];
       memcpy(tmp, (void*)&a, sizeof(T));
       int j = (z * block.y + y) * block.x + x;
-QUDA_UNROLL
+#pragma unroll
       for (int i = 0; i < n_element; i++) cache<dynamic>()[i * stride + j] = tmp[i];
     }
 
@@ -121,7 +121,7 @@ QUDA_UNROLL
     {
       atom_t tmp[n_element];
       int j = (z * block.y + y) * block.x + x;
-QUDA_UNROLL
+#pragma unroll
       for (int i = 0; i < n_element; i++) tmp[i] = cache<dynamic>()[i * stride + j];
       T a;
       memcpy((void*)&a, tmp, sizeof(T));

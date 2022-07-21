@@ -63,7 +63,7 @@ namespace quda {
       Spinor A = arg.inA(x_cb, 0);
       Spinor C = arg.inC(x_cb, 0);
 
-QUDA_UNROLL
+#pragma unroll
       for (int dim=0; dim<4; ++dim) {
         int shift[4] = {0, 0, 0, 0};
         shift[dim] = 1;

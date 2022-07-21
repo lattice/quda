@@ -24,9 +24,9 @@ namespace quda {
   __host__ __device__ inline bool checkUnitary(const Matrix &inv, const Matrix &in, const Float tol)
   {
     // first check U - U^{-1} = 0
-QUDA_UNROLL
+#pragma unroll
     for (int i = 0; i < in.rows(); i++) {
-QUDA_UNROLL
+#pragma unroll
       for (int j = 0; j < in.rows(); j++) {
         if (fabs(in(i,j).real() - inv(j,i).real()) > tol ||
             fabs(in(i,j).imag() + inv(j,i).imag()) > tol) return false;
@@ -36,12 +36,12 @@ QUDA_UNROLL
     // now check 1 - U^dag * U = 0
     // this check is more expensive so delay until we have passed first check
     const Matrix identity = conj(in)*in;
-QUDA_UNROLL
+#pragma unroll
     for (int i = 0; i < in.rows(); i++) {
       if (fabs(identity(i,i).real() - static_cast<Float>(1.0)) > tol ||
           fabs(identity(i,i).imag()) > tol)
         return false;
-QUDA_UNROLL
+#pragma unroll
       for (int j = 0; j < in.rows(); j++) {
         if (i>j) { // off-diagonal identity check
         if (fabs(identity(i,j).real()) > tol || fabs(identity(i,j).imag()) > tol ||

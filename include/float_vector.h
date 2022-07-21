@@ -39,7 +39,7 @@ namespace quda {
   __device__ __host__ inline array<T, n> operator+(const array<T, n> &a, const array<T, n> &b)
   {
     array<T, n> c;
-QUDA_UNROLL
+#pragma unroll
     for (int i = 0; i < n; i++) c[i] = a[i] + b[i];
     return c;
   }
@@ -69,7 +69,7 @@ QUDA_UNROLL
   template <typename T, int n> __device__ __host__ inline array<T, n> zero()
   {
     array<T, n> v;
-QUDA_UNROLL
+#pragma unroll
     for (int i = 0; i < n; i++) v[i] = zero<T>();
     return v;
   }
@@ -115,7 +115,7 @@ QUDA_UNROLL
     static inline __host__ __device__ array<T, N> value()
     {
       array<T, N> v;
-QUDA_UNROLL
+#pragma unroll
       for (int i = 0; i < N; i++) v[i] = low<T>::value();
       return v;
     }

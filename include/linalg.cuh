@@ -51,12 +51,12 @@ namespace quda {
       {
 	const Mat<T,N> &L = L_;
 
-QUDA_UNROLL
+#pragma unroll
 	for (int i=0; i<N; i++) {
-QUDA_UNROLL
+#pragma unroll
 	  for (int j=0; j<N; j++) if (j<i+1) {
 	    complex<T> s = 0;
-QUDA_UNROLL
+#pragma unroll
 	    for (int k=0; k<N; k++) {
 	      if (k==0) {
 		s.x  = L(i,k).real()*L(j,k).real();
@@ -101,10 +101,10 @@ QUDA_UNROLL
       __device__ __host__ inline Vector forward(const Vector &b) {
 	const Mat<T,N> &L = L_;
 	Vector x;
-QUDA_UNROLL
+#pragma unroll
 	for (int i=0; i<N; i++) {
 	  x(i) = b(i);
-QUDA_UNROLL
+#pragma unroll
 	  for (int j=0; j<N; j++) if (j<i) {
 	    x(i).x -= L(i,j).real()*x(j).real();
 	    x(i).x += L(i,j).imag()*x(j).imag();
@@ -127,10 +127,10 @@ QUDA_UNROLL
       __device__ __host__ inline Vector backward(const Vector &b) {
 	const Mat<T,N> &L = L_;
 	Vector x;
-QUDA_UNROLL
+#pragma unroll
 	for (int i=N-1; i>=0; i--) {
 	  x(i) = b(i);
-QUDA_UNROLL
+#pragma unroll
 	  for (int j=0; j<N; j++) if (j>=i+1) {
 	    x(i).x -= L(i,j).real()*x(j).real();
 	    x(i).x += L(i,j).imag()*x(j).imag();
@@ -157,14 +157,14 @@ QUDA_UNROLL
       {
         // copy source vector into factorization precision
 	ColorSpinor<T,1,N> b_;
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < N; i++) b_(i) = b(i);
 
         auto x_ = backward(forward(b_));
 
         // copy solution vector into desired precision
         Vector x;
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < N; i++) x(i) = x_(i);
 
         return x;
@@ -179,17 +179,17 @@ QUDA_UNROLL
 	matrix_t Ainv;
 	ColorSpinor<T,1,N> v;
 
-QUDA_UNROLL
+#pragma unroll
 	for (int k=0;k<N;k++) {
 
 	  // forward substitute
 	  if (!fast) v(k) = complex<T>(static_cast<T>(1.0)/L(k,k).real());
 	  else v(k) = L(k,k).real();
 
-QUDA_UNROLL
+#pragma unroll
 	  for (int i=0; i<N; i++) if (i>k) {
 	    v(i) = complex<T>(0.0);
-QUDA_UNROLL
+#pragma unroll
 	    for (int j=0; j<N; j++) if (j>=k && j<i) {
 	      v(i).x -= L(i,j).real() * v(j).real();
 	      v(i).x += L(i,j).imag() * v(j).imag();
@@ -204,9 +204,9 @@ QUDA_UNROLL
 	  if (!fast) v(N-1) *= static_cast<T>(1.0) / L(N-1,N-1);
 	  else v(N-1) *= L(N-1,N-1);
 
-QUDA_UNROLL
+#pragma unroll
 	  for (int i=N-2; i>=0; i--) if (i>=k) {
-QUDA_UNROLL
+#pragma unroll
 	    for (int j=0; j<N; j++) if (j>i) {
 	      v(i).x -= L(i,j).real() * v(j).real();
 	      v(i).x += L(i,j).imag() * v(j).imag();
@@ -220,7 +220,7 @@ QUDA_UNROLL
 	  // Overwrite column k
 	  Ainv(k,k) = v(k);
 
-QUDA_UNROLL
+#pragma unroll
 	  for(int i=0;i<N;i++) if (i>k) Ainv(i,k) = v(i);
 	}
 

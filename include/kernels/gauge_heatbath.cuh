@@ -614,12 +614,12 @@ namespace quda {
       auto parity = arg.parity;
 
       int X[4];
-QUDA_UNROLL
+#pragma unroll
       for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
 
       int x[4];
       getCoords(x, x_cb, X, parity);
-QUDA_UNROLL
+#pragma unroll
       for (int dr = 0; dr < 4; ++dr) {
         x[dr] += arg.border[dr];
         X[dr] += 2 * arg.border[dr];
@@ -630,7 +630,7 @@ QUDA_UNROLL
       setZero(&staple);
 
       Link U;
-QUDA_UNROLL
+#pragma unroll
       for (int nu = 0; nu < 4; nu++) if (mu != nu) {
           int dx[4] = { 0, 0, 0, 0 };
           Link link = arg.dataOr(nu, e_cb, parity);

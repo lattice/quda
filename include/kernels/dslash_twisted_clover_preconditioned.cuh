@@ -80,7 +80,7 @@ namespace quda
 
         Vector tmp;
 
-QUDA_UNROLL
+#pragma unroll
         for (int chirality = 0; chirality < 2; chirality++) {
 
           const complex<real> b(0.0, chirality == 0 ? arg.b : -arg.b);

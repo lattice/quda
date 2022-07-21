@@ -48,9 +48,9 @@ namespace quda {
     int parity_coarse = (x_coarse >= arg.in.VolumeCB()) ? 1 : 0;
     int x_coarse_cb = x_coarse - parity_coarse*arg.in.VolumeCB();
 
-QUDA_UNROLL
+#pragma unroll
     for (int s=0; s<Arg::fineSpin; s++) {
-QUDA_UNROLL
+#pragma unroll
       for (int c=0; c<Arg::coarseColor; c++) {
         out[s*Arg::coarseColor+c] = arg.in(parity_coarse, x_coarse_cb, arg.spin_map(s,parity), c);
       }
@@ -70,25 +70,25 @@ QUDA_UNROLL
 
     constexpr int color_unroll = 2;
 
-QUDA_UNROLL
+#pragma unroll
     for (int s=0; s<Arg::fineSpin; s++) {
-QUDA_UNROLL
+#pragma unroll
       for (int fine_color_local = 0; fine_color_local < fine_color_per_thread; fine_color_local++) {
         int i = fine_color_block + fine_color_local; // global fine color index
 
         complex<typename Arg::real> partial[color_unroll];
-QUDA_UNROLL
+#pragma unroll
         for (int k=0; k<color_unroll; k++) partial[k] = 0.0;
 
-QUDA_UNROLL
+#pragma unroll
         for (int j=0; j<Arg::coarseColor; j+=color_unroll) {
           // V is a ColorMatrixField with internal dimensions Ns * Nc * Nvec
-QUDA_UNROLL
+#pragma unroll
           for (int k=0; k<color_unroll; k++)
             partial[k] = cmac(arg.V(v_parity, x_cb, s, i, j + k), in[s * Arg::coarseColor + j + k], partial[k]);
         }
 
-QUDA_UNROLL
+#pragma unroll
         for (int k=1; k<color_unroll; k++) partial[0] += partial[k];
         arg.out(spinor_parity, x_cb, s, i) = partial[0];
       }

@@ -160,7 +160,7 @@ namespace quda {
       cache.save(thread_max);
       cache.sync();
       real this_site_max = static_cast<real>(0);
-QUDA_UNROLL
+#pragma unroll
       for (int sc = 0; sc < color_spin_threads; sc++) {
         auto sc_max = cache.load_y(sc);
         this_site_max = this_site_max > sc_max ? this_site_max : sc_max;
@@ -187,10 +187,10 @@ QUDA_UNROLL
     real thread_max_r = 0.0;
     real thread_max_i = 0.0;
 
-QUDA_UNROLL
+#pragma unroll
     for (int spin_local=0; spin_local<Ms; spin_local++) {
       int s = spin_block + spin_local;
-QUDA_UNROLL
+#pragma unroll
       for (int color_local=0; color_local<Mc; color_local++) {
         int c = color_block + color_local;
         complex<real> z = arg.field(spinor_parity, x_cb, s, c);
@@ -261,10 +261,10 @@ QUDA_UNROLL
       int x_cb = indexFromFaceIndex(dim, dir, ghost_idx, parity, arg);
       auto max = compute_site_max<Arg>(arg, x_cb, spinor_parity, spin_block, color_block);
 
-QUDA_UNROLL
+#pragma unroll
       for (int spin_local=0; spin_local<Ms; spin_local++) {
         int s = spin_block + spin_local;
-QUDA_UNROLL
+#pragma unroll
         for (int color_local=0; color_local<Mc; color_local++) {
           int c = color_block + color_local;
           arg.field.Ghost(dim, dir, spinor_parity, ghost_idx, s, c, 0, max) = arg.field(spinor_parity, x_cb, s, c);

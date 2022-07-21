@@ -175,7 +175,7 @@ namespace quda {
       if (mu == 0) {
         Float a0, a1, a2, a3;
         a0 = 0.0; a1 = 0.0; a2 = 0.0; a3 = 0.0;
-      QUDA_UNROLL
+      #pragma unroll
         for (int i = 0; i < gauge_dir; i++) {
           a0 += elems[tid + i * blockSize] + elems[tid + (i + 4) * blockSize];
           a1 += elems[tid + i * blockSize + blockSize * 8] + elems[tid + (i + 4) * blockSize + blockSize * 8];
@@ -252,7 +252,7 @@ namespace quda {
         elems[tid + blockSize * 3] = -(link(p,p).y - link(q,q).y);
       }
 
-QUDA_UNROLL
+#pragma unroll
       for (int mu_ = 1; mu_ < gauge_dir; mu_++) {
         cache.sync();
         if (mu_ == mu) {
@@ -263,7 +263,7 @@ QUDA_UNROLL
         }
       }
 
-QUDA_UNROLL
+#pragma unroll
       for (int mu_ = 4; mu_ < 4 + gauge_dir; mu_++) {
         cache.sync();
         if (mu_ == mu) {
@@ -435,7 +435,7 @@ QUDA_UNROLL
       if (mu == 0) {
         Float a0, a1, a2, a3;
         a0 = 0.0; a1 = 0.0; a2 = 0.0; a3 = 0.0;
-      QUDA_UNROLL
+      #pragma unroll
         for ( int i = 0; i < gauge_dir; i++ ) {
           a0 += elems[tid + i * blockSize];
           a1 += elems[tid + i * blockSize + blockSize * 4];
@@ -508,7 +508,7 @@ QUDA_UNROLL
         elems[tid + blockSize * 3] = (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y);
       }
 
-QUDA_UNROLL
+#pragma unroll
       for (int mu_ = 1; mu_ < gauge_dir; mu_++) {
         cache.sync();
         if (mu_ == mu) {

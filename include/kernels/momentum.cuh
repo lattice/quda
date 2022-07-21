@@ -111,7 +111,7 @@ namespace quda {
       for (int d=0; d<4; d++) x[d] += arg.border[d];
       int e_cb = linkIndex(x, arg.E);
 
-QUDA_UNROLL
+#pragma unroll
       for (int d=0; d<4; d++) {
         Matrix<complex<typename Arg::Float>, Arg::nColor> m = arg.mom(d, x_cb, parity);
         Matrix<complex<typename Arg::Float>, Arg::nColor> f = arg.force(d, e_cb, parity);

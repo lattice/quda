@@ -14,7 +14,7 @@ namespace quda {
   template <typename I, typename J, typename K>
   __device__ __host__ inline int linkIndexShift(const I &x, const J &dx, const K &X) {
     int y[4];
-QUDA_UNROLL
+#pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = (x[i] + dx[i] + X[i]) % X[i];
     int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
     return idx;
@@ -31,7 +31,7 @@ QUDA_UNROLL
    */
   template <typename I, typename J, typename K, typename L>
   __device__ __host__ inline int linkIndexShift(I &y, const J &x, const K &dx, const L &X) {
-QUDA_UNROLL
+#pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = (x[i] + dx[i] + X[i]) % X[i];
     int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
     return idx;
@@ -78,7 +78,7 @@ QUDA_UNROLL
   __device__ __host__ inline int linkIndexDn(const Coord &x, const I X[4], const int mu)
   {
     int y[4];
-QUDA_UNROLL
+#pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = x[i];
     y[mu] = (y[mu] + n + X[mu]) % X[mu];
     int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
@@ -98,7 +98,7 @@ QUDA_UNROLL
   __device__ __host__ inline auto linkIndexHop(const Coord &x, const I X[4], const int mu, int nFace)
   {
     int y[4];
-QUDA_UNROLL
+#pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = x[i];
     switch (mu) {
     case 0: y[0] = (y[0] + nFace + X[0]) % X[0]; break;
@@ -146,7 +146,7 @@ QUDA_UNROLL
   template <typename I>
   __device__ __host__ inline int linkNormalIndexP1(const int x[], const I X[4], const int mu) {
     int y[4];
-QUDA_UNROLL
+#pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = x[i];
     y[mu] = (y[mu] + 1 + X[mu]) % X[mu];
     int idx = ((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0];
@@ -289,7 +289,7 @@ QUDA_UNROLL
     x[2] = (zb - x[3] * X[2]);
     int x1odd = (x[1] + x[2] + x[3] + parity) & 1;
     x[0] = (2 * cb_index + x1odd  - za * X[0]);
-QUDA_UNROLL
+#pragma unroll
     for (int d=0; d<4; d++) x[d] += R[d];
     return;
   }

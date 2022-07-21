@@ -23,7 +23,7 @@ namespace quda
   {
     setZero(&staple);
     thread_array<int, 4> dx = { };
-QUDA_UNROLL
+#pragma unroll
     for (int mu = 0; mu < 4 ; mu++) {
       // Identify directions orthogonal to the link and
       // ignore the dir_ignore direction (usually the temporal dim

@@ -1,9 +1,5 @@
 #pragma once
 
-#ifndef QUDA_UNROLL
-#define QUDA_UNROLL
-#endif
-
 // OMPTARGET SPECIFIC workarounds
 #define __host__
 #define __device__

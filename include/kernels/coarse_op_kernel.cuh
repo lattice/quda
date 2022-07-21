@@ -270,11 +270,11 @@ namespace quda {
 
       int ghost_idx = ghostFaceIndex<1>(coord, arg.x_size, arg.dim, nFace);
 
-QUDA_UNROLL
+#pragma unroll
       for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
         auto U = make_tile_A<complex, false>(tile);
         U.load(arg.U, arg.dim, parity, x_cb, i0, k);
-QUDA_UNROLL
+#pragma unroll
         for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
           auto W = make_tile_B<complex, true>(tile);
           W.loadCS(Wacc, arg.dim, 1, (parity+1)&1, ghost_idx, s, k, j0);
@@ -286,11 +286,11 @@ QUDA_UNROLL
 
       int y_cb = linkIndexHop(coord, arg.x_size, arg.dim, nFace);
 
-QUDA_UNROLL
+#pragma unroll
       for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
         auto U = make_tile_A<complex, false>(tile);
         U.load(arg.U, arg.dim, parity, x_cb, i0, k);
-QUDA_UNROLL
+#pragma unroll
         for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
           auto W = make_tile_B<complex, false>(tile);
           W.loadCS(Wacc, 0, 0, (parity+1)&1, y_cb, s, k, j0);
@@ -300,7 +300,7 @@ QUDA_UNROLL
     }
 
     real uv_max = static_cast<real>(0.0);
-QUDA_UNROLL
+#pragma unroll
     for (int s = 0; s < uvSpin; s++) {
       if constexpr (Arg::compute_max) {
         uv_max = fmax(UV[s].abs_max(), uv_max);
@@ -531,13 +531,13 @@ QUDA_UNROLL
 
     if (arg.dir == QUDA_IN_PLACE) {
 
-QUDA_UNROLL
+#pragma unroll
       for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of coarse clover field
-QUDA_UNROLL
+#pragma unroll
         for (int s_col = 0; s_col < Arg::fineSpin; s_col++) {
           auto W = make_tile_B<complex, false>(tile);
           W.loadCS(Wacc, 0, 0, parity, x_cb, s_col, k, j0);
-QUDA_UNROLL
+#pragma unroll
           for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
             auto C = make_tile_A<complex, false>(tile);
             C.load(arg.C, 0, parity, x_cb, s, s_col, i0, k);
@@ -550,13 +550,13 @@ QUDA_UNROLL
 
       int ghost_idx = ghostFaceIndex<1>(coord, arg.x_size, arg.dim, nFace);
 
-QUDA_UNROLL
+#pragma unroll
       for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
-QUDA_UNROLL
+#pragma unroll
         for (int s_col=0; s_col<Arg::fineSpin; s_col++) {
           auto W = make_tile_B<complex, true>(tile);
           W.loadCS(Wacc, arg.dim, 1, (parity+1)&1, ghost_idx, s_col, k, j0);
-QUDA_UNROLL
+#pragma unroll
           for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
             // on coarse lattice, if forwards then use forwards links
             auto U = make_tile_A<complex, false>(tile);
@@ -571,13 +571,13 @@ QUDA_UNROLL
 
       int y_cb = linkIndexHop(coord, arg.x_size, arg.dim, nFace);
 
-QUDA_UNROLL
+#pragma unroll
       for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
-QUDA_UNROLL
+#pragma unroll
         for (int s_col = 0; s_col < Arg::fineSpin; s_col++) {
           auto W = make_tile_B<complex, false>(tile);
           W.loadCS(Wacc, 0, 0, (parity+1)&1, y_cb, s_col, k, j0);
-QUDA_UNROLL
+#pragma unroll
           for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
             // on coarse lattice, if forwards then use forwards links
             auto U = make_tile_A<complex, false>(tile);
@@ -590,7 +590,7 @@ QUDA_UNROLL
     }
 
     real uv_max = static_cast<real>(0.0);
-QUDA_UNROLL
+#pragma unroll
     for (int s = 0; s < uvSpin; s++) {
       if constexpr (Arg::compute_max) {
         uv_max = fmax(UV[s].abs_max(), uv_max);
@@ -703,11 +703,11 @@ QUDA_UNROLL
       constexpr int N = Arg::fineSpin * Arg::fineColor / 2;
       HMatrix<real, N> A;
 
-QUDA_UNROLL
+#pragma unroll
       for (int i = 0; i < N; i++) {
         int s_i = i / Arg::fineColor;
         int c_i = i % Arg::fineColor;
-QUDA_UNROLL
+#pragma unroll
         for (int j = 0; j <= i; j++) {
           int s_j = j / Arg::fineColor;
           int c_j = j % Arg::fineColor;
@@ -720,9 +720,9 @@ QUDA_UNROLL
       }
 
       ColorSpinor<real, Arg::fineColor, Arg::fineSpin / 2> V;
-QUDA_UNROLL
+#pragma unroll
       for (int s = 0; s < Arg::fineSpin / 2; s++) {
-QUDA_UNROLL
+#pragma unroll
         for (int c = 0; c < Arg::fineColor; c++) { V(s, c) = arg.V(parity, x_cb, 2 * ch + s, c, ic_c); }
       }
 
@@ -735,16 +735,16 @@ QUDA_UNROLL
 #endif
 
       if (!Arg::compute_max) {
-QUDA_UNROLL
+#pragma unroll
         for (int s = 0; s < Arg::fineSpin / 2; s++) {
-QUDA_UNROLL
+#pragma unroll
           for (int ic = 0; ic < Arg::fineColor; ic++) { arg.AV(parity, x_cb, 2 * ch + s, ic, ic_c) = AV(s, ic); }
         }
       } else {
         real max = static_cast<real>(0.0);
-QUDA_UNROLL
+#pragma unroll
         for (int s = 0; s < Arg::fineSpin / 2; s++) {
-QUDA_UNROLL
+#pragma unroll
           for (int ic = 0; ic < Arg::fineColor; ic++) {
             auto abs_max = fmax(abs(AV(s, ic).real()), abs(AV(s, ic).imag()));
             max = fmax(abs_max, max);
@@ -776,17 +776,17 @@ QUDA_UNROLL
       complex<real> fp(1./(1.+arg.mu*arg.mu),-arg.mu/(1.+arg.mu*arg.mu));
       complex<real> fm(1./(1.+arg.mu*arg.mu),+arg.mu/(1.+arg.mu*arg.mu));
 
-QUDA_UNROLL
+#pragma unroll
       for (int s = 0; s < Arg::fineSpin/2; s++) {
-QUDA_UNROLL
+#pragma unroll
         for (int c = 0; c < Arg::fineColor; c++) {
           arg.AV(parity,x_cb,s,c,v) = arg.V(parity,x_cb,s,c,v) * fp;
         }
       }
 
-QUDA_UNROLL
+#pragma unroll
       for (int s = Arg::fineSpin/2; s < Arg::fineSpin; s++) {
-QUDA_UNROLL
+#pragma unroll
         for (int c = 0; c < Arg::fineColor; c++) {
           arg.AV(parity,x_cb,s,c,v) = arg.V(parity,x_cb,s,c,v) * fm;
         }
@@ -822,11 +822,11 @@ QUDA_UNROLL
       constexpr int N = Arg::fineSpin * Arg::fineColor / 2;
       HMatrix<real, N> A;
 
-QUDA_UNROLL
+#pragma unroll
       for (int i = 0; i < N; i++) {
         int s_i = i / Arg::fineColor;
         int c_i = i % Arg::fineColor;
-QUDA_UNROLL
+#pragma unroll
         for (int j = 0; j <= i; j++) {
           int s_j = j / Arg::fineColor;
           int c_j = j % Arg::fineColor;
@@ -839,9 +839,9 @@ QUDA_UNROLL
 
       ColorSpinor<real, Arg::fineColor, Arg::fineSpin / 2> V;
 
-QUDA_UNROLL
+#pragma unroll
       for (int s = 0; s < Arg::fineSpin / 2; s++) {
-QUDA_UNROLL
+#pragma unroll
         for (int c = 0; c < Arg::fineColor; c++) {
           V(s, c) = arg.V(parity, x_cb, 2 * ch + s, c, ic_c);
         }
@@ -857,11 +857,11 @@ QUDA_UNROLL
       if (!clover::dynamic_inverse()) {
         // load in the clover inverse matrix
         HMatrix<real, N> Ainv;
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < N; i++) {
           int s_i = i / Arg::fineColor;
           int c_i = i % Arg::fineColor;
-QUDA_UNROLL
+#pragma unroll
           for (int j = 0; j <= i; j++) {
             int s_j = j / Arg::fineColor;
             int c_j = j % Arg::fineColor;
@@ -871,16 +871,16 @@ QUDA_UNROLL
         auto AV = Ainv * UV;
 
         if (!Arg::compute_max) {
-QUDA_UNROLL
+#pragma unroll
           for (int s = 0; s < Arg::fineSpin / 2; s++)
-QUDA_UNROLL
+#pragma unroll
             for (int c = 0; c < Arg::fineColor; c++)
               arg.AV(parity, x_cb, 2 * ch + s, c, ic_c) = AV(s, c);
         } else {
           real max = static_cast<real>(0.0);
-QUDA_UNROLL
+#pragma unroll
           for (int s = 0; s < Arg::fineSpin / 2; s++) {
-QUDA_UNROLL
+#pragma unroll
             for (int c = 0; c < Arg::fineColor; c++) {
               auto abs_max = fmax(abs(AV(s, c).real()), abs(AV(s, c).imag()));
               max = fmax(abs_max, max);
@@ -897,16 +897,16 @@ QUDA_UNROLL
         const auto AV = cholesky.solve(UV);
 
         if (!Arg::compute_max) {
-QUDA_UNROLL
+#pragma unroll
           for (int s = 0; s < Arg::fineSpin / 2; s++)
-QUDA_UNROLL
+#pragma unroll
             for (int c = 0; c < Arg::fineColor; c++)
               arg.AV(parity, x_cb, 2 * ch + s, c, ic_c) = AV(s, c);
         } else {
           real max = static_cast<real>(0.0);
-QUDA_UNROLL
+#pragma unroll
           for (int s = 0; s < Arg::fineSpin / 2; s++) {
-QUDA_UNROLL
+#pragma unroll
             for (int c = 0; c < Arg::fineColor; c++) {
               auto abs_max = fmax(abs(AV(s, c).real()), abs(AV(s, c).imag()));
               max = fmax(abs_max, max);
@@ -1068,7 +1068,7 @@ QUDA_UNROLL
     using TileType = typename Arg::vuvTileType;
     auto &tile = arg.vuvTile;
 
-QUDA_UNROLL
+#pragma unroll
     for (int s = 0; s < Arg::fineSpin; s++) { // Loop over fine spin
 
       //Spin part of the color matrix.  Will always consist
@@ -1086,7 +1086,7 @@ QUDA_UNROLL
       const int s_col = gamma.getcol(s);
       const int s_c_col = 1 - s_c_row; // always off-diagonal relative to row coord
 
-QUDA_UNROLL
+#pragma unroll
       for (int k = 0; k < TileType::k; k += TileType::K) { // Sum over fine color
 
         if (arg.dir == QUDA_BACKWARDS) {
@@ -1101,9 +1101,9 @@ QUDA_UNROLL
 
           //Off-diagonal Spin (backward link / positive projector applied)
           auto gammaV = make_tile_A<complex, false>(tile);
-QUDA_UNROLL
+#pragma unroll
           for (int i = 0; i < TileType::K; i++)
-QUDA_UNROLL
+#pragma unroll
             for (int j = 0; j < TileType::M; j++)
               gammaV(j, i) = gamma.apply(s, conj(V(i, j)));
 
@@ -1122,9 +1122,9 @@ QUDA_UNROLL
           //Off-diagonal Spin (forward link / negative projector applied)
           auto gammaAV = make_tile_A<complex, false>(tile);
 
-QUDA_UNROLL
+#pragma unroll
           for (int i = 0; i < TileType::K; i++)
-QUDA_UNROLL
+#pragma unroll
             for (int j = 0; j < TileType::M; j++)
               gammaAV(j, i) = -gamma.apply(s, conj(AV(i, j)));
 
@@ -1320,13 +1320,13 @@ QUDA_UNROLL
     using TileType = typename Arg::vuvTileType;
     auto &tile = arg.vuvTile;
 
-QUDA_UNROLL
+#pragma unroll
     for (int k = 0; k < TileType::k; k += TileType::K) { // Sum over fine color
-QUDA_UNROLL
+#pragma unroll
       for (int s = 0; s < Arg::fineSpin; s++) {
         auto AV = make_tile_At<complex, false>(tile);
         AV.loadCS(arg.AV, 0, 0, parity, x_cb, s, k, i0);
-QUDA_UNROLL
+#pragma unroll
         for (int s_col = 0; s_col < Arg::fineSpin; s_col++) { // which chiral block
           auto UV = make_tile_B<complex, false>(tile);
           UV.loadCS(arg.UV, 0, 0, parity, x_cb, s_col*Arg::fineSpin+s, k, j0);
@@ -1386,9 +1386,9 @@ QUDA_UNROLL
       int i_block0 = (threadIdx.y / (arg.parity_flip ? 1 : 2)) * TileType::M;
       int j_block0 = threadIdx.z * TileType::N;
 
-QUDA_UNROLL
+#pragma unroll
       for (int i = 0; i < TileType::M; i++) {
-QUDA_UNROLL
+#pragma unroll
         for (int j = 0; j < TileType::N; j++) {
           if (tx < Arg::coarseSpin*Arg::coarseSpin) {
             if (pack.dir != QUDA_IN_PLACE) Y[i_block0+i][j_block0+j][x_][s_row][s_col] = 0;
@@ -1399,24 +1399,24 @@ QUDA_UNROLL
 
       __syncthreads();
 
-QUDA_UNROLL
+#pragma unroll
       for (int i = 0; i < TileType::M; i++) {
-QUDA_UNROLL
+#pragma unroll
         for (int j = 0; j < TileType::N; j++) {
 
           if (pack.dir == QUDA_IN_PLACE || isDiagonal) {
-QUDA_UNROLL
+#pragma unroll
             for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
-QUDA_UNROLL
+#pragma unroll
               for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
                 atomic_helper<real, storeType>(&X[i_block0+i][j_block0+j][x_][s_row][s_col],
                                                arg.X_atomic, vuv[s_row*Arg::coarseSpin+s_col](i,j));
               }
             }
           } else {
-QUDA_UNROLL
+#pragma unroll
             for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
-QUDA_UNROLL
+#pragma unroll
               for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
                 atomic_helper<real, storeType>(&Y[i_block0+i][j_block0+j][x_][s_row][s_col],
                                                arg.Y_atomic, vuv[s_row*Arg::coarseSpin+s_col](i,j));
@@ -1430,9 +1430,9 @@ QUDA_UNROLL
 
       if (tx < Arg::coarseSpin*Arg::coarseSpin && (parity == 0 || arg.parity_flip == 1) ) {
 
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < TileType::M; i++) {
-QUDA_UNROLL
+#pragma unroll
           for (int j = 0; j < TileType::N; j++) {
             if (pack.dir == QUDA_IN_PLACE) {
               // same as dir == QUDA_FORWARDS
@@ -1487,25 +1487,25 @@ QUDA_UNROLL
 
     if (arg.dir == QUDA_IN_PLACE) {
       // same as dir == QUDA_FORWARDS
-QUDA_UNROLL
+#pragma unroll
       for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
-QUDA_UNROLL
+#pragma unroll
         for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
-QUDA_UNROLL
+#pragma unroll
           for (int i = 0; i < TileType::M; i++)
-QUDA_UNROLL
+#pragma unroll
             for (int j = 0; j < TileType::N; j++)
               arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,vuv[s_row*Arg::coarseSpin+s_col](i,j));
         }
       }
     } else if (!isDiagonal) {
-QUDA_UNROLL
+#pragma unroll
       for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
-QUDA_UNROLL
+#pragma unroll
         for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
-QUDA_UNROLL
+#pragma unroll
           for (int i = 0; i < TileType::M; i++)
-QUDA_UNROLL
+#pragma unroll
             for (int j = 0; j < TileType::N; j++)
               arg.Y_atomic.atomicAdd(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,vuv[s_row*Arg::coarseSpin+s_col](i,j));
         }
@@ -1513,25 +1513,25 @@ QUDA_UNROLL
     } else {
 
       if (arg.dir == QUDA_BACKWARDS) {
-QUDA_UNROLL
+#pragma unroll
         for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
-QUDA_UNROLL
+#pragma unroll
           for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
-QUDA_UNROLL
+#pragma unroll
             for (int i = 0; i < TileType::M; i++)
-QUDA_UNROLL
+#pragma unroll
               for (int j = 0; j < TileType::N; j++)
                 arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_col,s_row,j0+j,i0+i,conj(vuv[s_row*Arg::coarseSpin+s_col](i,j)));
           }
         }
       } else {
-QUDA_UNROLL
+#pragma unroll
         for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
-QUDA_UNROLL
+#pragma unroll
           for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
-QUDA_UNROLL
+#pragma unroll
             for (int i = 0; i < TileType::M; i++)
-QUDA_UNROLL
+#pragma unroll
               for (int j = 0; j < TileType::N; j++)
                 arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,vuv[s_row*Arg::coarseSpin+s_col](i,j));
           }
@@ -1539,15 +1539,15 @@ QUDA_UNROLL
       }
 
       if (!arg.bidirectional) {
-QUDA_UNROLL
+#pragma unroll
         for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
-QUDA_UNROLL
+#pragma unroll
           for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
             if (s_row != s_col) vuv[s_row * Arg::coarseSpin + s_col] *= static_cast<real>(-1.0);
             if (Arg::fineSpin != 1 || s_row != s_col) {
-QUDA_UNROLL
+#pragma unroll
               for (int i = 0; i < TileType::M; i++)
-QUDA_UNROLL
+#pragma unroll
                 for (int j = 0; j < TileType::N; j++)
                   arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,vuv[s_row*Arg::coarseSpin+s_col](i,j));
             }
@@ -1587,7 +1587,7 @@ QUDA_UNROLL
     multiplyVUV(vuv, arg, parity, x_cb, i0, j0);
 
     if (isDiagonal && !isFromCoarseClover) {
-QUDA_UNROLL
+#pragma unroll
       for (int s2=0; s2<Arg::coarseSpin*Arg::coarseSpin; s2++) vuv[s2] *= -arg.kappa;
     }
 
@@ -1745,20 +1745,20 @@ QUDA_UNROLL
       for (int i = 0; i < Arg::coarseSpin * Arg::coarseSpin; i++) X[i] = 0.0;
 
       // If Nspin = 4, then the clover term has structure C_{\mu\nu} = \gamma_{\mu\nu}C^{\mu\nu}
-QUDA_UNROLL
+#pragma unroll
       for (int chi = 0; chi < 2; chi++) {
 
-QUDA_UNROLL
+#pragma unroll
         for (int s_row = 0; s_row < Arg::fineSpin / 2; s_row++) { // Loop over fine spin row within a chiral block
           const int s_c = arg.spin_map(chi * Arg::fineSpin / 2 + s_row, parity);
           // On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
           // in the same chiral block.
-QUDA_UNROLL
+#pragma unroll
           for (int s_col = 0; s_col < Arg::fineSpin / 2; s_col++) { // Loop over fine spin column within a chiral block
-QUDA_UNROLL
+#pragma unroll
             for (int ic = 0; ic < Arg::fineColor; ic++) { // Sum over fine color row
               complex<real> CV = 0.0;
-QUDA_UNROLL
+#pragma unroll
               for (int jc = 0; jc < Arg::fineColor; jc++) {  // Sum over fine color column
                 CV = cmac(arg.C(parity, x_cb, chi, s_row, s_col, ic, jc), arg.V(parity, x_cb, chi * Arg::fineSpin / 2 + s_col, jc, c_col), CV);
               } // Fine color column
@@ -1770,9 +1770,9 @@ QUDA_UNROLL
 
       }
 
-QUDA_UNROLL
+#pragma unroll
       for (int si = 0; si < Arg::coarseSpin; si++) {
-QUDA_UNROLL
+#pragma unroll
         for (int sj = 0; sj < Arg::coarseSpin; sj++) {
           arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, si, sj, c_row, c_col, X[si*Arg::coarseSpin+sj]);
         }
@@ -1801,11 +1801,11 @@ QUDA_UNROLL
       int parity = parity_c_col / Arg::coarseColor;
       int c_col = parity_c_col % Arg::coarseColor;
 
-QUDA_UNROLL
+#pragma unroll
       for (int d=0; d<4; d++) {
-QUDA_UNROLL
+#pragma unroll
         for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { //Spin row
-QUDA_UNROLL
+#pragma unroll
           for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { //Spin column
             if (s_row == s_col && Arg::coarseSpin != 1)
               arg.Y(d+4, parity, x_cb, s_row, s_col, c_row, c_col) = arg.Y(d, parity, x_cb, s_row, s_col, c_row, c_col);
@@ -1918,9 +1918,9 @@ QUDA_UNROLL
         int d_in = arg.dim_index % in.geometry;
         int d_out = arg.dim_index % arg.Y.geometry;
 
-QUDA_UNROLL
+#pragma unroll
         for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { //Spin row
-QUDA_UNROLL
+#pragma unroll
           for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { //Spin column
             complex<real> M = in(d_in,parity,x_cb,s_row,s_col,c_row,c_col);
             arg.Y(d_out,parity,x_cb,s_row,s_col,c_row,c_col) = M;
@@ -1931,9 +1931,9 @@ QUDA_UNROLL
         int d_in = arg.dim_index % in.geometry;
         int d_out = arg.dim_index % arg.X.geometry;
 
-QUDA_UNROLL
+#pragma unroll
         for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { //Spin row
-QUDA_UNROLL
+#pragma unroll
           for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { //Spin column
             complex<real> M = in(d_in,parity,x_cb,s_row,s_col,c_row,c_col);
             arg.X(d_out,parity,x_cb,s_row,s_col,c_row,c_col) = M;
@@ -1963,9 +1963,9 @@ QUDA_UNROLL
       int c_col = parity_c_col % Arg::coarseColor; // color col index
       int parity = parity_c_col / Arg::coarseColor;
 
-QUDA_UNROLL
+#pragma unroll
       for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { //Spin row
-QUDA_UNROLL
+#pragma unroll
         for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { //Spin column
           complex<real> M = arg.Y(arg.dim_index,parity,x_cb,s_row,s_col,c_row,c_col);
           arg.Y(arg.dim_index,parity,x_cb,s_row,s_col,c_row,c_col) = arg.rescale*M;

@@ -50,9 +50,9 @@ namespace quda
       Vector y = arg.y(x_cb, parity);
 
       Matrix<complex<real>, nSpin> A;
-QUDA_UNROLL
+#pragma unroll
       for (int mu = 0; mu < nSpin; mu++) {
-QUDA_UNROLL
+#pragma unroll
         for (int nu = 0; nu < nSpin; nu++) {
           // Color inner product: <\phi(x)_{\mu} | \phi(y)_{\nu}>
           // The Bra is conjugated

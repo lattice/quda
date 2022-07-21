@@ -96,7 +96,7 @@ namespace quda {
       int hyperCorner = 4*(coord[3]%2)+2*(coord[2]%2)+(coord[1]%2);
       int c_row = 8*ic_f + hyperCorner;
 
-QUDA_UNROLL
+#pragma unroll
       for (int mu=0; mu < nDim; mu++) {
         // The coarse color column depends on my fine hypercube+mu corner.
         coord[mu]++; // linkIndexP1, it's fine if this wraps because we're modding by 2.
@@ -126,9 +126,9 @@ QUDA_UNROLL
 
       // lastly, add staggered mass term to diagonal
       if (ic_f == 0 && jc_f == 0 && x_cb < arg.coarseVolumeCB) {
-QUDA_UNROLL
+#pragma unroll
         for (int s = 0; s < Arg::coarseSpin; s++) {
-QUDA_UNROLL
+#pragma unroll
           for (int c = 0; c < Arg::coarseColor; c++) {
             arg.X(0,parity,x_cb,s,s,c,c) = complex(arg.two_mass, 0.0); // staggered conventions. No need to +=
           } //Color

@@ -238,29 +238,29 @@ namespace quda {
     Float t1 = 0.0;
     //first normalize first row
     //sum of squares of row
-QUDA_UNROLL
+#pragma unroll
     for ( int c = 0; c < 3; c++ ) t1 += norm(U(0,c));
     t1 = (Float)1.0 / sqrt(t1);
     //14
     //used to normalize row
-QUDA_UNROLL
+#pragma unroll
     for ( int c = 0; c < 3; c++ ) U(0,c) *= t1;
     //6
-QUDA_UNROLL
+#pragma unroll
     for ( int c = 0; c < 3; c++ ) t2 += conj(U(0,c)) * U(1,c);
     //24
-QUDA_UNROLL
+#pragma unroll
     for ( int c = 0; c < 3; c++ ) U(1,c) -= t2 * U(0,c);
     //24
     //normalize second row
     //sum of squares of row
     t1 = 0.0;
-QUDA_UNROLL
+#pragma unroll
     for ( int c = 0; c < 3; c++ ) t1 += norm(U(1,c));
     t1 = (Float)1.0 / sqrt(t1);
     //14
     //used to normalize row
-QUDA_UNROLL
+#pragma unroll
     for ( int c = 0; c < 3; c++ ) U(1, c) *= t1;
     //6
     //Reconstruct last row

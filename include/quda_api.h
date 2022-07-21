@@ -11,10 +11,6 @@
 #include "targets/omptarget/quda_api.h"
 #endif
 
-#ifndef QUDA_UNROLL
-#define QUDA_UNROLL _Pragma("unroll")
-#endif
-
 /**
    @file quda_api.h
 

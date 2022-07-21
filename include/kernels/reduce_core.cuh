@@ -127,7 +127,7 @@ namespace quda
       Norm1(const real &, const real &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &, T &, T &, T &) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i=0; i < x.size(); i++) sum += norm1_<reduce_t, real>(x[i]);
       }
       constexpr int flops() const { return 2; }   //! flops per element
@@ -149,7 +149,7 @@ QUDA_UNROLL
       Norm2(const real &, const real &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &, T &, T &, T &) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < x.size(); i++) norm2_<reduce_t, real>(sum, x[i]);
       }
       constexpr int flops() const { return 2; }   //! flops per element
@@ -172,7 +172,7 @@ QUDA_UNROLL
       Dot(const real &, const real &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < x.size(); i++) dot_<reduce_t, real>(sum, x[i], y[i]);
       }
       constexpr int flops() const { return 2; }   //! flops per element
@@ -191,7 +191,7 @@ QUDA_UNROLL
       axpbyzNorm2(const real &a, const real &b) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < x.size(); i++) {
           z[i] = a * x[i] + b * y[i];
           norm2_<reduce_t, real>(sum, z[i]);
@@ -212,7 +212,7 @@ QUDA_UNROLL
       AxpyReDot(const real &a, const real &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < x.size(); i++) {
           y[i] += a * x[i];
           dot_<reduce_t, real>(sum, x[i], y[i]);
@@ -233,7 +233,7 @@ QUDA_UNROLL
       caxpyNorm2(const complex<real> &a, const complex<real> &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < x.size(); i++) {
           y[i] = cmac(a, x[i], y[i]);
           norm2_<reduce_t, real>(sum, y[i]);
@@ -256,7 +256,7 @@ QUDA_UNROLL
       caxpyxmaznormx(const complex<real> &a, const complex<real> &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < x.size(); i++) {
           y[i] = cmac(a, x[i], y[i]);
           x[i] = cmac(-a, z[i], x[i]);
@@ -281,7 +281,7 @@ QUDA_UNROLL
       cabxpyzaxnorm(const complex<real> &a, const complex<real> &b) : a(a.real()), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < x.size(); i++) {
           x[i] *= a;
           z[i] = cmac(b, x[i], y[i]);
@@ -312,7 +312,7 @@ QUDA_UNROLL
       Cdot(const complex<real> &, const complex<real> &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < x.size(); i++) cdot_<reduce_t, real>(sum, x[i], y[i]);
       }
       constexpr int flops() const { return 4; }   //! flops per element
@@ -332,7 +332,7 @@ QUDA_UNROLL
       caxpydotzy(const complex<real> &a, const complex<real> &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < x.size(); i++) {
           y[i] = cmac(a, x[i], y[i]);
           cdot_<reduce_t, real>(sum, z[i], y[i]);
@@ -396,7 +396,7 @@ QUDA_UNROLL
       caxpbypzYmbwcDotProductUYNormY_(const complex<real> &a, const complex<real> &b) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < x.size(); i++) {
           y[i] = cmac(a, x[i], y[i]);
           y[i] = cmac(b, z[i], y[i]);
@@ -422,7 +422,7 @@ QUDA_UNROLL
       axpyCGNorm2(const real &a, const real &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < x.size(); i++) {
           auto y_new = y[i] + a * x[i];
           norm2_<real_reduce_t, real>(sum[0], y_new);
@@ -459,7 +459,7 @@ QUDA_UNROLL
 
       template <typename T> __device__ __host__ void operator()(reduce_t &, T &x, T &y, T &, T &, T &)
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < x.size(); i++) {
           norm2_<real_reduce_t, real>(aux[0], x[i]);
           norm2_<real_reduce_t, real>(aux[1], y[i]);
@@ -504,7 +504,7 @@ QUDA_UNROLL
 
       template <typename T> __device__ __host__ void operator()(reduce_t &, T &x, T &y, T &z, T &, T &)
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < x.size(); i++) {
           norm2_<real_reduce_t, real>(aux[0], x[i] + y[i]);
           norm2_<real_reduce_t, real>(aux[1], z[i]);
@@ -536,7 +536,7 @@ QUDA_UNROLL
       tripleCGReduction_(const real &, const real &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < x.size(); i++) {
           norm2_<real_reduce_t, real>(sum[0], x[i]);
           norm2_<real_reduce_t, real>(sum[1], y[i]);
@@ -561,7 +561,7 @@ QUDA_UNROLL
       quadrupleCGReduction_(const real &, const real &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < x.size(); i++) {
           norm2_<real_reduce_t, real>(sum[0], x[i]);
           norm2_<real_reduce_t, real>(sum[1], y[i]);
@@ -588,7 +588,7 @@ QUDA_UNROLL
       quadrupleCG3InitNorm_(const real &a, const real &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < x.size(); i++) {
           z[i] = x[i];
           w[i] = y[i];
@@ -619,7 +619,7 @@ QUDA_UNROLL
       quadrupleCG3UpdateNorm_(const real &a, const real &b) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < x.size(); i++) {
           auto tmpx = x[i];
           auto tmpy = y[i];

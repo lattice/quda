@@ -208,10 +208,10 @@ namespace quda
       {
         norm_t max_[n];
         // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < n; i++) max_[i] = fmaxf(fabsf((norm_t)v[i].real()), fabsf((norm_t)v[i].imag()));
         norm_t scale = 0.0;
-QUDA_UNROLL
+#pragma unroll
         for (int i = 0; i < n; i++) scale = fmaxf(max_[i], scale);
         norm = scale * fixedInvMaxValue<store_t>::value;
         return fdividef(fixedMaxValue<store_t>::value, scale);
@@ -235,12 +235,12 @@ QUDA_UNROLL
           array<real, len> v_;
 
           constexpr int M = len / N;
-QUDA_UNROLL
+#pragma unroll
           for (int i = 0; i < M; i++) {
             // first load from memory
             Vector vecTmp = vector_load<Vector>(data.spinor, parity * data.cb_offset + x + data.stride * i);
             // now copy into output and scale
-QUDA_UNROLL
+#pragma unroll
             for (int j = 0; j < N; j++) copy_and_scale(v_[i * N + j], reinterpret_cast<store_t *>(&vecTmp)[j], nrm);
           }
 
@@ -259,10 +259,10 @@ QUDA_UNROLL
           memcpy(&nrm, &vecTmp.w, sizeof(norm_t));
 
           // now copy into output and scale
-QUDA_UNROLL
+#pragma unroll
           for (int i = 0; i < len; i++) copy_and_scale(v_[i], reinterpret_cast<store_t *>(&vecTmp)[i], nrm);
 
-QUDA_UNROLL
+#pragma unroll
           for (int i = 0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
         }
       }
@@ -285,13 +285,13 @@ QUDA_UNROLL
 
           if constexpr (isFixed<store_t>::value) {
             real scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, data.norm[x + parity * data.cb_norm_offset]);
-QUDA_UNROLL
+#pragma unroll
             for (int i = 0; i < n; i++) {
               v_[2 * i + 0] = scale_inv * v[i].real();
               v_[2 * i + 1] = scale_inv * v[i].imag();
             }
           } else {
-QUDA_UNROLL
+#pragma unroll
             for (int i = 0; i < n; i++) {
               v_[2 * i + 0] = v[i].real();
               v_[2 * i + 1] = v[i].imag();
@@ -299,11 +299,11 @@ QUDA_UNROLL
           }
 
           constexpr int M = len / N;
-QUDA_UNROLL
+#pragma unroll
           for (int i = 0; i < M; i++) {
             Vector vecTmp;
             // first do scalar copy converting into storage type
-QUDA_UNROLL
+#pragma unroll
             for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[j], v_[i * N + j]);
             // second do vectorized copy into memory
             vector_store(data.spinor, parity * data.cb_offset + x + data.stride * i, vecTmp);
@@ -315,7 +315,7 @@ QUDA_UNROLL
           norm_t norm;
           norm_t scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, norm);
           array<real, len> v_;
-QUDA_UNROLL
+#pragma unroll
           for (int i = 0; i < n; i++) {
             v_[2 * i + 0] = scale_inv * v[i].real();
             v_[2 * i + 1] = scale_inv * v[i].imag();
@@ -323,7 +323,7 @@ QUDA_UNROLL
 
           Vector vecTmp;
           memcpy(&vecTmp.w, &norm, sizeof(norm_t)); // pack the norm
-QUDA_UNROLL
+#pragma unroll
           for (int i = 0; i < len; i++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[i], v_[i]);
           // second do vectorized copy into memory
           vector_store(data.spinor, parity * cb_offset + x, vecTmp);

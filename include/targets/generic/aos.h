@@ -12,7 +12,7 @@ namespace quda
    */
   template <typename T, int n> __host__ __device__ void block_load(T out[n], const T *in)
   {
-QUDA_UNROLL
+#pragma unroll
     for (int i = 0; i < n; i++) out[i] = in[i];
   }
 
@@ -25,7 +25,7 @@ QUDA_UNROLL
    */
   template <typename T, int n> __host__ __device__ void block_store(T *out, const T in[n])
   {
-QUDA_UNROLL
+#pragma unroll
     for (int i = 0; i < n; i++) out[i] = in[i];
   }
 

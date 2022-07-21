@@ -100,7 +100,7 @@ namespace quda {
 
       in.toRel(); // change to chiral basis here
 
-QUDA_UNROLL
+#pragma unroll
       for (int chirality=0; chirality<2; chirality++) {
         HMatrix<real, N> A = arg.clover(x_cb, clover_parity, chirality);
         half_fermion chi = in.chiral_project(chirality);
@@ -143,7 +143,7 @@ QUDA_UNROLL
 
       in.toRel(); // change to chiral basis here
 
-QUDA_UNROLL
+#pragma unroll
       for (int chirality=0; chirality<2; chirality++) {
         const complex<real> a(0.0, chirality == 0 ? arg.a : -arg.a);
         Mat A = arg.clover(x_cb, clover_parity, chirality);

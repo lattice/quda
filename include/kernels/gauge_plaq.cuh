@@ -66,12 +66,12 @@ namespace quda {
 
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
-QUDA_UNROLL
+#pragma unroll
       for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-QUDA_UNROLL
+#pragma unroll
       for (int mu = 0; mu < 3; mu++) {
-QUDA_UNROLL
+#pragma unroll
         for (int nu = 0; nu < 3; nu++) {
           if (nu >= mu + 1) plaq[0] += plaquette(arg, x, parity, mu, nu);
         }

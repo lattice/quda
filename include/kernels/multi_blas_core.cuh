@@ -96,7 +96,7 @@ namespace quda
           w = ::quda::zero<complex<typename Arg::real>, Arg::n/2>();
         }
 
-QUDA_UNROLL
+#pragma unroll
         for (int l_ = 0; l_ < Arg::NXZ; l_ += warp_split) {
           const int l = l_ + l_idx;
           if (l < Arg::NXZ || warp_split == 1) {
@@ -143,7 +143,7 @@ QUDA_UNROLL
 
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &, int i, int j) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int k = 0; k < x.size(); k++) y[k] += a(j, i) * x[k];
       }
 
@@ -165,7 +165,7 @@ QUDA_UNROLL
 
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &, int i, int j) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int k = 0; k < x.size(); k++) y[k] = cmac(a(j, i), x[k], y[k]);
       }
 
@@ -212,7 +212,7 @@ QUDA_UNROLL
 
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int i, int j) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int k = 0; k < x.size(); k++) {
           if (j == 0) w[k] = y[k];
           w[k] = cmac(a(j, i), x[k], w[k]);
@@ -242,7 +242,7 @@ QUDA_UNROLL
 
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int i, int) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int k = 0; k < x.size(); k++) {
           y[k] += a[i] * w[k];
           w[k] = b[i] * x[k] + c[i] * w[k];
@@ -278,7 +278,7 @@ QUDA_UNROLL
       // i loops over NYW, j loops over NXZ
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int, int j) const
       {
-QUDA_UNROLL
+#pragma unroll
         for (int k = 0; k < x.size(); k++) {
           y[k] = cmac(a[j], x[k], y[k]);
           w[k] = cmac(b[j], x[k], w[k]);
