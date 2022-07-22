@@ -24,7 +24,7 @@ namespace quda
   constexpr const char *file_name(const char *str) { return str_slant(str) ? r_slant(str_end(str)) : str; }
 
   template<int A, int B, int D=1, typename F>
-  __attribute__((always_inline)) void static_for(F&&f)
+  __attribute__((always_inline)) __host__ __device__ inline void static_for(F&&f)
   {
     if constexpr (A<B){
 #if __cplusplus < 202002L
