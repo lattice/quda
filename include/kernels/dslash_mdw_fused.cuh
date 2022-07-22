@@ -211,7 +211,7 @@ namespace quda {
 
       const int index_4d_cb = index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
 
-      static_for<0,4>([&]<int d> // loop over dimension
+      static_for<0,4>(static_for_var(d) // loop over dimension
       {
         int x[4] = {coordinate[0], coordinate[1], coordinate[2], coordinate[3]};
         x[d] = (coordinate[d] == arg.dim[d] - 1 && !arg.comm[d]) ? 0 : coordinate[d] + 1;
