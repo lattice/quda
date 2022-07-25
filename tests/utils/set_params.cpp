@@ -260,6 +260,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
   inv_param.cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
+  //inv_param.cuda_prec_ritz = cuda_prec_ritz;//?
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
@@ -268,8 +269,11 @@ void setInvertParam(QudaInvertParam &inv_param)
 
   inv_param.verbosity = verbosity;
 
-  inv_param.extlib_type = solver_ext_lib;
-
+  if (inv_param.inv_type == QUDA_EIGCG_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER) {
+    inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
+  } else if (inv_param.inv_type == QUDA_GMRESDR_INVERTER) {
+    inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+  }
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
@@ -280,7 +284,7 @@ void setInvertParam(QudaInvertParam &inv_param)
 }
 
 // Parameters defining the eigensolver
-void setEigParam(QudaEigParam &eig_param)
+void setEigParam(QudaEigParam &eig_param, QudaInverterType inv_type)
 {
   eig_param.eig_type = eig_type;
   eig_param.spectrum = eig_spectrum;
@@ -306,6 +310,13 @@ void setEigParam(QudaEigParam &eig_param)
     eig_param.n_ev_deflate = eig_n_ev_deflate;
   }
 
+  if (inv_type == QUDA_EIGCG_INVERTER || inv_type == QUDA_INC_EIGCG_INVERTER) {
+    if (eig_n_conv < 0) errorQuda("Invalid value for parameter eig_n_conv (= %d)", eig_n_conv);
+    eig_param.nLockedMax = eig_n_conv;
+    eig_param.n_conv = 0;
+    eig_param.is_complete = QUDA_BOOLEAN_FALSE;
+  }
+
   eig_param.block_size
     = (eig_param.eig_type == QUDA_EIG_TR_LANCZOS || eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ? 1 : eig_block_size;
   eig_param.n_ev = eig_n_ev;
@@ -316,6 +327,8 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.check_interval = eig_check_interval;
   eig_param.max_restarts = eig_max_restarts;
+  eig_param.cuda_prec_ritz
+    = (inv_type == QUDA_EIGCG_INVERTER || inv_type == QUDA_INC_EIGCG_INVERTER) ? prec_ritz : cuda_prec;
 
   eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -587,7 +600,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
-  mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  //mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   // Whether or not to use thin restarts in the evolve tests
   mg_param.thin_update_only = mg_evolve_thin_updates ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
@@ -1004,7 +1017,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
-  mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  //mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   // whether or not to allow dropping the long links for aggregation dimensions smaller than 3
   mg_param.allow_truncation = mg_allow_truncation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -1294,14 +1307,9 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
 
   inv_param.rhs_idx = 0;
 
-  inv_param.n_ev = n_ev;
-  inv_param.max_search_dim = max_search_dim;
-  inv_param.deflation_grid = deflation_grid;
   inv_param.tol_restart = tol_restart;
-  inv_param.eigcg_max_restarts = eigcg_max_restarts;
   inv_param.max_restart_num = max_restart_num;
   inv_param.inc_tol = inc_tol;
-  inv_param.eigenval_tol = eigenval_tol;
 
   if (inv_param.inv_type == QUDA_EIGCG_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER) {
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
@@ -1351,8 +1359,6 @@ void setDeflationParam(QudaEigParam &df_param)
   df_param.import_vectors = QUDA_BOOLEAN_FALSE;
   df_param.run_verify = QUDA_BOOLEAN_FALSE;
 
-  df_param.nk = df_param.invert_param->n_ev;
-  df_param.np = df_param.invert_param->n_ev * df_param.invert_param->deflation_grid;
   df_param.extlib_type = deflation_ext_lib;
 
   df_param.cuda_prec_ritz = prec_ritz;

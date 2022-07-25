@@ -265,7 +265,13 @@ namespace quda {
     {
       return instantiateReduce<quadrupleCG3UpdateNorm_, false>(a, b, 0.0, x, y, z, w, v);
     }
-
+    
+    double4 quadrupleEigCGUpdate(double a, double b, ColorSpinorField &x, ColorSpinorField &y,
+				 ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v)
+    {
+      return instantiateReduce<quadrupleEigCGUpdate_, false>(a, b, 0.0, x, y, z, w, v);
+    }
+    
   } // namespace blas
-
+  
 } // namespace quda

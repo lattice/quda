@@ -30,7 +30,6 @@
 #include <mpi_comm_handle.h>
 
 #include <multigrid.h>
-#include <deflation.h>
 
 #include <split_grid.h>
 
@@ -2618,87 +2617,6 @@ void dumpMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
   popVerbosity();
   profilerStop(__func__);
-}
-
-deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
-  : d(nullptr), m(nullptr), RV(nullptr), deflParam(nullptr), defl(nullptr),  profile(profile) {
-
-  QudaInvertParam *param = eig_param.invert_param;
-
-  if (param->inv_type != QUDA_EIGCG_INVERTER && param->inv_type != QUDA_INC_EIGCG_INVERTER) return;
-
-  profile.TPSTART(QUDA_PROFILE_INIT);
-
-  cudaGaugeField *cudaGauge = checkGauge(param);
-  eig_param.secs   = 0;
-  eig_param.gflops = 0;
-
-  DiracParam diracParam;
-  if(eig_param.cuda_prec_ritz == param->cuda_prec)
-  {
-    setDiracParam(diracParam, param, (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE));
-  } else {
-    setDiracSloppyParam(diracParam, param, (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE));
-  }
-
-  const bool pc_solve = (param->solve_type == QUDA_NORMOP_PC_SOLVE);
-
-  d = Dirac::create(diracParam);
-  m = pc_solve ? static_cast<DiracMatrix*>( new DiracMdagM(*d) ) : static_cast<DiracMatrix*>( new DiracM(*d));
-
-  ColorSpinorParam ritzParam(nullptr, *param, cudaGauge->X(), pc_solve, eig_param.location);
-
-  ritzParam.create        = QUDA_ZERO_FIELD_CREATE;
-  ritzParam.is_composite  = true;
-  ritzParam.is_component  = false;
-  ritzParam.composite_dim = param->n_ev * param->deflation_grid;
-  ritzParam.setPrecision(param->cuda_prec_ritz);
-
-  if (ritzParam.location==QUDA_CUDA_FIELD_LOCATION) {
-    ritzParam.setPrecision(param->cuda_prec_ritz, param->cuda_prec_ritz, true); // set native field order
-    if (ritzParam.nSpin != 1) ritzParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-
-    //select memory location here, by default ritz vectors will be allocated on the device
-    //but if not sufficient device memory, then the user may choose mapped type of memory
-    ritzParam.mem_type = eig_param.mem_type_ritz;
-  } else { //host location
-    ritzParam.mem_type = QUDA_MEMORY_PINNED;
-  }
-
-  int ritzVolume = 1;
-  for(int d = 0; d < ritzParam.nDim; d++) ritzVolume *= ritzParam.x[d];
-
-  if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
-
-    size_t byte_estimate = (size_t)ritzParam.composite_dim*(size_t)ritzVolume*(ritzParam.nColor*ritzParam.nSpin*ritzParam.Precision());
-    printfQuda("allocating bytes: %lu (lattice volume %d, prec %d)", byte_estimate, ritzVolume, ritzParam.Precision());
-    if(ritzParam.mem_type == QUDA_MEMORY_DEVICE) printfQuda("Using device memory type.\n");
-    else if (ritzParam.mem_type == QUDA_MEMORY_MAPPED)
-      printfQuda("Using mapped memory type.\n");
-  }
-
-  RV = ColorSpinorField::Create(ritzParam);
-
-  deflParam = new DeflationParam(eig_param, RV, *m);
-
-  defl = new Deflation(*deflParam, profile);
-
-  profile.TPSTOP(QUDA_PROFILE_INIT);
-}
-
-void* newDeflationQuda(QudaEigParam *eig_param) {
-  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
-  auto *defl = new deflated_solver(*eig_param, profileInvert);
-
-  profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
-
-  saveProfile(__func__);
-  flushProfile();
-  return static_cast<void*>(defl);
-}
-
-void destroyDeflationQuda(void *df) {
-  delete static_cast<deflated_solver*>(df);
 }
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)

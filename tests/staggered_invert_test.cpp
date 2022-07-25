@@ -198,7 +198,7 @@ int main(int argc, char **argv)
 
   QudaEigParam eig_param = newQudaEigParam();
   if (inv_deflate) {
-    setEigParam(eig_param);
+    setEigParam(eig_param, inv_type);
     inv_param.eig_param = &eig_param;
     if (use_split_grid) { errorQuda("Split grid does not work with deflation yet.\n"); }
   } else {
@@ -335,6 +335,9 @@ int main(int argc, char **argv)
     if (!use_split_grid) {
       for (int k = 0; k < Nsrc; k++) {
         if (inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+        if (inv_param.inv_type == QUDA_INC_EIGCG_INVERTER && eig_param.is_complete == QUDA_BOOLEAN_TRUE) {
+          inv_param.inv_type = QUDA_CG_INVERTER;
+        }
         invertQuda(out[k]->V(), in[k]->V(), &inv_param);
         time[k] = inv_param.secs;
         gflops[k] = inv_param.gflops / inv_param.secs;

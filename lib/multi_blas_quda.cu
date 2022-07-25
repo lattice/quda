@@ -675,11 +675,8 @@ namespace quda {
     }
 
     // Composite field version
-    void caxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y){ caxpy(a, x.Components(), y.Components()); }
-    void caxpy_U(const Complex *a, ColorSpinorField &x, ColorSpinorField &y) { caxpy_U(a, x.Components(), y.Components()); }
-    void caxpy_L(const Complex *a, ColorSpinorField &x, ColorSpinorField &y) { caxpy_L(a, x.Components(), y.Components()); }
-
-    void axpy(const double *a, ColorSpinorField &x, ColorSpinorField &y) { axpy(a, x.Components(), y.Components()); }
+    void axpy(const double *a, ColorSpinorField &x, ColorSpinorField &y) { axpy(a, x(), y()); }
+    //void axpy(const double *a, ColorSpinorField &x, ColorSpinorField &y) { axpy(a, x.Components(), y.Components()); }
     void axpy_U(const double *a, ColorSpinorField &x, ColorSpinorField &y) { axpy_U(a, x.Components(), y.Components()); }
     void axpy_L(const double *a, ColorSpinorField &x, ColorSpinorField &y) { axpy_L(a, x.Components(), y.Components()); }
 

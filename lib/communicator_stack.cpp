@@ -257,6 +257,38 @@ namespace quda
     comm_allreduce_min_array(a_.data(), a_.size());
     for (unsigned int i = 0; i < a.size(); i++) a[i] = a_[i];
   }
+  
+  void comm_nonblocking_allreduce_array(MsgHandle *&mh, double *outdata, double *indata, size_t size) {get_current_communicator().comm_nonblocking_allreduce_array(mh, outdata, indata, size);}
+
+  template <> void comm_nonblocking_allreduce_array<std::vector<double>>(MsgHandle *&mh, std::vector<double> &out, std::vector<double> &in)
+  {
+    comm_nonblocking_allreduce_array(mh, out.data(), in.data(), in.size());
+  }
+
+  template <> void comm_nonblocking_allreduce_array<std::vector<double2>>(MsgHandle *&mh, std::vector<double2> &out, std::vector<double2> &in)
+  {
+    comm_nonblocking_allreduce_array(mh, reinterpret_cast<double *>(out.data()), reinterpret_cast<double *>(in.data()), 2 * in.size());
+  }
+
+  template <> void comm_nonblocking_allreduce_array<std::vector<std::complex<double>>>(MsgHandle *&mh, std::vector<std::complex<double>> &out, std::vector<std::complex<double>> &in)
+  {
+    comm_nonblocking_allreduce_array(mh, reinterpret_cast<double *>(out.data()), reinterpret_cast<double *>(in.data()), 2 * in.size());
+  }
+
+  template <> void comm_nonblocking_allreduce_array<std::vector<array<double, 2>>>(MsgHandle *&mh, std::vector<array<double, 2>> &out, std::vector<array<double, 2>> &in)
+  {
+    comm_nonblocking_allreduce_array(mh, reinterpret_cast<double *>(out.data()), reinterpret_cast<double *>(in.data()), 2 * in.size());
+  }
+
+  template <> void comm_nonblocking_allreduce_array<std::vector<array<double, 3>>>(MsgHandle *&mh, std::vector<array<double, 3>> &out, std::vector<array<double, 3>> &in)
+  {
+    comm_nonblocking_allreduce_array(mh, reinterpret_cast<double *>(out.data()), reinterpret_cast<double *>(in.data()), 3 * in.size());
+  }
+
+  template <> void comm_nonblocking_allreduce_array<std::vector<array<double, 4>>>(MsgHandle *&mh, std::vector<array<double, 4>> &out, std::vector<array<double, 4>> &in)
+  {
+    comm_nonblocking_allreduce_array(mh, reinterpret_cast<double *>(out.data()), reinterpret_cast<double *>(in.data()), 4 * in.size());
+  }
 
   void comm_allreduce_int(int &data) { get_current_communicator().comm_allreduce_int(data); }
 

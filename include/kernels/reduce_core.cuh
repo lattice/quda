@@ -632,6 +632,39 @@ namespace quda
       }
       constexpr int flops() const { return 16; }  //! flops per element check if it's right
     };
+    
+    /**
+       double4 quadrupleCGReduction(V x, V y, V z){}
+       First performs the operation norm2(x)
+       Second performs the operatio norm2(y)
+       Third performs the operation dotPropduct(y,z)
+       Fourth performs the operation norm(z)
+    */
+    template <typename real_reduce_t, typename real>
+    struct quadrupleEigCGUpdate_ : public ReduceFunctor<typename VectorType<real_reduce_t, 4>::type> {
+      using reduce_t = typename VectorType<real_reduce_t, 4>::type;
+      static constexpr memory_access<1, 1, 1, 1, 1> read{ };
+      static constexpr memory_access<1, 1, 0, 1, 1> write{ };      
+      const real a;
+      const real b;
+      quadrupleEigCGUpdate_(const real &a, const real &b) : a(a), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v)
+      {
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+	  x[i] -= a*y[i];
+	  norm2_<real_reduce_t, real>(sum.x, x[i]);
+	  w[i] -= a*z[i];
+	  y[i] = w[i] + b*y[i];
+	  norm2_<real_reduce_t, real>(sum.y, y[i]);
+	  dot_<real_reduce_t, real>(sum.z, x[i], y[i]);
+	  v[i] = x[i] + b*v[i];
+	  dot_<real_reduce_t, real>(sum.w, v[i], y[i]);
+	}
+      }
+      static int streams() { return 9; } //! total number of input and output streams
+      static int flops() { return 16; }  //! flops per element
+    };
 
   } // namespace blas
 

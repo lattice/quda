@@ -27,13 +27,16 @@
       errorQuda("(MPI) %s", err_string);                                                                               \
     }                                                                                                                  \
   } while (0)
-
+  
 namespace quda
 {
 
   struct MsgHandle_s {
     QMP_msgmem_t mem;
     QMP_msghandle_t handle;
+#ifdef USE_MPI_GATHER
+    MPI_Request *request;
+#endif 
   };
 
   Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from_coords, void *map_data,
@@ -186,6 +189,10 @@ MsgHandle *Communicator::comm_declare_send_rank(void *buffer, int rank, int, siz
   mh->handle = QMP_comm_declare_send_to(QMP_COMM_HANDLE, mh->mem, rank, 0);
   if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
 
+#ifdef USE_MPI_GATHER
+  mh->request = nullptr;//for nonblocking allreduce
+#endif
+
   return mh;
 }
 
@@ -201,6 +208,10 @@ MsgHandle *Communicator::comm_declare_recv_rank(void *buffer, int rank, int, siz
 
   mh->handle = QMP_comm_declare_receive_from(QMP_COMM_HANDLE, mh->mem, rank, 0);
   if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
+  
+#ifdef USE_MPI_GATHER
+  mh->request = nullptr;//for nonblocking allreduce
+#endif  
 
   return mh;
 }
@@ -220,6 +231,10 @@ MsgHandle *Communicator::comm_declare_send_displaced(void *buffer, const int dis
 
   mh->handle = QMP_comm_declare_send_to(QMP_COMM_HANDLE, mh->mem, rank, 0);
   if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
+  
+#ifdef USE_MPI_GATHER
+  mh->request = nullptr;//for nonblocking allreduce
+#endif  
 
   return mh;
 }
@@ -239,6 +254,10 @@ MsgHandle *Communicator::comm_declare_receive_displaced(void *buffer, const int 
 
   mh->handle = QMP_comm_declare_receive_from(QMP_COMM_HANDLE, mh->mem, rank, 0);
   if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
+
+#ifdef USE_MPI_GATHER
+  mh->request = nullptr;//for nonblocking allreduce
+#endif
 
   return mh;
 }
@@ -261,6 +280,10 @@ MsgHandle *Communicator::comm_declare_strided_send_displaced(void *buffer, const
   mh->handle = QMP_comm_declare_send_to(QMP_COMM_HANDLE, mh->mem, rank, 0);
   if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
 
+#ifdef USE_MPI_GATHER
+  mh->request = nullptr;//for nonblocking allreduce
+#endif
+
   return mh;
 }
 
@@ -282,20 +305,43 @@ MsgHandle *Communicator::comm_declare_strided_receive_displaced(void *buffer, co
   mh->handle = QMP_comm_declare_receive_from(QMP_COMM_HANDLE, mh->mem, rank, 0);
   if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
 
+#ifdef USE_MPI_GATHER
+  mh->request = nullptr;//for nonblocking allreduce
+#endif
+
   return mh;
 }
 
 void Communicator::comm_free(MsgHandle *&mh)
 {
+#ifdef USE_MPI_GATHER
+  if(mh->request) {
+     host_free(mh->request);//for nonblocking allreduce
+  } else {
+     QMP_free_msghandle(mh->handle);
+     QMP_free_msgmem(mh->mem); 
+  } 
+#else 
   QMP_free_msghandle(mh->handle);
   QMP_free_msgmem(mh->mem);
+#endif
   host_free(mh);
   mh = nullptr;
 }
 
 void Communicator::comm_start(MsgHandle *mh) { QMP_CHECK(QMP_start(mh->handle)); }
 
-void Communicator::comm_wait(MsgHandle *mh) { QMP_CHECK(QMP_wait(mh->handle)); }
+void Communicator::comm_wait(MsgHandle *mh) { 
+#ifdef USE_MPI_GATHER  
+  if (mh->request) {
+    MPI_CHECK( MPI_Wait(mh->request, MPI_STATUS_IGNORE) );  
+  } else {
+#endif	  
+    QMP_CHECK( QMP_wait(mh->handle) );	  
+#ifdef USE_MPI_GATHER    
+  }
+#endif
+}
 
 int Communicator::comm_query(MsgHandle *mh) { return (QMP_is_complete(mh->handle) == QMP_TRUE); }
 
@@ -316,6 +362,19 @@ void Communicator::comm_allreduce_sum_array(double *data, size_t size)
 
     for (size_t i = 0; i < size; i++) { data[i] = deterministic_reduce(recv_trans.data() + i * n, n); }
   }
+}
+
+void Communicator::comm_nonblocking_allreduce_array(MsgHandle *&mh, double *outdata, double *indata, size_t size)
+{
+  // we need to break out of QMP for nonblocking all reduce
+#ifdef USE_MPI_GATHER
+  if(mh == nullptr) {
+    mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+    mh->request = (MPI_Request *)safe_malloc(sizeof(MPI_Request));    
+  }
+  MPI_CHECK(MPI_Iallreduce(outdata, indata, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_HANDLE, mh->request));
+#endif
+  return;
 }
 
 void Communicator::comm_allreduce_max_array(double *data, size_t size)

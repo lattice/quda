@@ -143,7 +143,7 @@ void init(int argc, char **argv)
   }
 
   if (inv_deflate) {
-    setEigParam(eig_param);
+    setEigParam(eig_param, inv_type);
     inv_param.eig_param = &eig_param;
   } else {
     inv_param.eig_param = nullptr;
@@ -263,7 +263,12 @@ std::vector<double> solve(test_t param)
 
     for (int i = 0; i < Nsrc; i++) {
       // If deflating, preserve the deflation space between solves
-      if (inv_deflate) eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      if (inv_deflate) eig_param.preserve_deflation = (i < Nsrc - 1 && eig_param.n_conv > 0) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      if (inv_param.inv_type == QUDA_INC_EIGCG_INVERTER) {
+        if( eig_param.is_complete == QUDA_BOOLEAN_TRUE ) inv_param.inv_type = QUDA_CG_INVERTER;
+        eig_param.is_last_rhs = (i == (Nsrc-1)) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      }
+      
       // Perform QUDA inversions
       if (multishift > 1) {
         invertMultiShiftQuda(_hp_multi_x[i].data(), in[i].V(), &inv_param);

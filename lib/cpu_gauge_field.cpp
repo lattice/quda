@@ -178,7 +178,7 @@ namespace quda {
     if (link_direction != QUDA_LINK_BACKWARDS)
       errorQuda("link_direction = %d not supported", link_direction);
 
-    void *recv[2*QUDA_MAX_DIM];
+    void *recv[2 * QUDA_MAX_DIM];
     for (int d=0; d<nDim; d++) recv[d] = safe_malloc(nFace*surface[d]*nInternal*precision);
 
     // communicate between nodes
@@ -384,7 +384,7 @@ namespace quda {
     if (order != QUDA_QDP_GAUGE_ORDER) {
       memset(gauge, 0, bytes);
     } else {
-      for (int g=0; g<geometry; g++) memset(gauge[g], 0, volume * nInternal * precision);
+      for (int g = 0; g < geometry; g++) memset(gauge[g], 0, volume * nInternal * precision);
     }
   }
 

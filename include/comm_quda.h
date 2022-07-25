@@ -388,9 +388,12 @@ namespace quda
   void comm_wait(MsgHandle *mh);
   int comm_query(MsgHandle *mh);
 
+//  void comm_nonblocking_allreduce_array(MsgHandle *&mh, double *outdata, double *indata, size_t size);
+
   template <typename T> void comm_allreduce_sum(T &v);
   template <typename T> void comm_allreduce_max(T &v);
   template <typename T> void comm_allreduce_min(T &v);
+  template <typename T> void comm_nonblocking_allreduce_sum(MsgHandle *&mh, T &v);//?
 
   void comm_allreduce_int(int &data);
   void comm_allreduce_xor(uint64_t &data);

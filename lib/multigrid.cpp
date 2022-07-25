@@ -1564,7 +1564,7 @@ namespace quda
           resetTransfer = true;
           reset();
           if ( param.level < param.Nlevel-2 ) {
-            if ( param.mg_global.generate_all_levels == QUDA_BOOLEAN_TRUE ) {
+            if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_TRUE) {
               coarse->generateNullVectors(*B_coarse, refresh);
             } else {
               if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Restricting null space vectors\n");

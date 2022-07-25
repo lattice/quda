@@ -190,11 +190,11 @@ void printQudaEigParam(QudaEigParam *param) {
   P(check_interval, 0);
   P(max_restarts, 0);
   P(arpack_check, QUDA_BOOLEAN_FALSE);
-  P(nk, 0);
-  P(np, 0);
   P(eig_type, QUDA_EIG_TR_LANCZOS);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
+  P(is_complete, QUDA_BOOLEAN_FALSE);
+  P(is_last_rhs, QUDA_BOOLEAN_FALSE);  
 #else
   P(use_eigen_qr, QUDA_BOOLEAN_INVALID);
   P(use_poly_acc, QUDA_BOOLEAN_INVALID);
@@ -217,11 +217,13 @@ void printQudaEigParam(QudaEigParam *param) {
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
   P(arpack_check, QUDA_BOOLEAN_INVALID);
-  P(nk, INVALID_INT);
-  P(np, INVALID_INT);
+  P(check_interval, INVALID_INT);
+  P(max_restarts, INVALID_INT);
   P(eig_type, QUDA_EIG_INVALID);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
+  P(is_complete, QUDA_BOOLEAN_FALSE);
+  P(is_last_rhs, QUDA_BOOLEAN_FALSE);
 #endif
 
   // only need to enfore block size checking if doing a block eigen solve
@@ -585,6 +587,11 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 #if defined(INIT_PARAM)
   P(eig_param, 0);
+#elif defined(CHECK_PARAM)
+  if (param->eig_param && param->inv_type_precondition != QUDA_INVALID_INVERTER
+      && param->inv_type != QUDA_GMRESDR_INVERTER) {
+    errorQuda("At present cannot combine deflation with Schwarz preconditioner");
+  }
 #endif
 
 #ifdef INIT_PARAM
@@ -646,27 +653,17 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 #if defined INIT_PARAM
   P(cuda_prec_ritz, QUDA_SINGLE_PRECISION);
-  P(n_ev, 8);
-  P(max_search_dim, 64);
   P(rhs_idx, 0);
-  P(deflation_grid, 1);
 
-  P(eigcg_max_restarts, 4);
   P(max_restart_num, 3);
   P(tol_restart,5e-5);
   P(inc_tol, 1e-2);
-  P(eigenval_tol, 1e-1);
 #else
   P(cuda_prec_ritz, QUDA_INVALID_PRECISION);
-  P(n_ev, INVALID_INT);
-  P(max_search_dim, INVALID_INT);
   P(rhs_idx, INVALID_INT);
-  P(deflation_grid, INVALID_INT);
-  P(eigcg_max_restarts, INVALID_INT);
   P(max_restart_num, INVALID_INT);
   P(tol_restart,INVALID_DOUBLE);
   P(inc_tol, INVALID_DOUBLE);
-  P(eigenval_tol, INVALID_DOUBLE);
 #endif
 
 #if defined INIT_PARAM

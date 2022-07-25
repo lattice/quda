@@ -236,9 +236,6 @@ module quda_fortran
      ! pointer to preconditioner instance
      integer(8) :: preconditioner
 
-     ! pointer to deflation instance
-     integer(8) :: deflation_op
-
      ! pointer to QudaEigParam that defines any deflation
      integer(8) :: eig_param
 

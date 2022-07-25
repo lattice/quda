@@ -305,12 +305,18 @@ namespace quda
     memcpy(data, recvbuf.data(), size * sizeof(double));
   }
 
-  void Communicator::comm_allreduce_int(int &data)
+  void Communicator::comm_nonblocking_allreduce_array(MsgHandle *&mh, double *outdata, double *indata, size_t size)
   {
-    int recvbuf;
-    MPI_CHECK(MPI_Allreduce(&data, &recvbuf, 1, MPI_INT, MPI_SUM, MPI_COMM_HANDLE));
-    data = recvbuf;
+    if(mh == nullptr){
+      mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));    	  
+      mh->custom = false;   
+    }	  
+
+    MPI_CHECK(MPI_Iallreduce(outdata, indata, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_HANDLE, &mh->request));
+
+    return;
   }
+
 
   void Communicator::comm_allreduce_xor(uint64_t &data)
   {

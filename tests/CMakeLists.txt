@@ -69,18 +69,6 @@ if(QUDA_DIRAC_WILSON
   install(TARGETS eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
-if(QUDA_DIRAC_WILSON
-   OR QUDA_DIRAC_CLOVER
-   OR QUDA_DIRAC_TWISTED_MASS
-   OR QUDA_DIRAC_TWISTED_CLOVER
-   OR QUDA_DIRAC_DOMAIN_WALL
-   OR QUDA_DIRAC_STAGGERED)
-  add_executable(deflated_invert_test deflated_invert_test.cpp)
-  target_link_libraries(deflated_invert_test ${TEST_LIBS})
-  quda_checkbuildtest(deflated_invert_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS deflated_invert_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-endif()
-
 if(QUDA_DIRAC_STAGGERED)
   add_executable(staggered_dslash_test staggered_dslash_test.cpp)
   target_link_libraries(staggered_dslash_test ${TEST_LIBS})

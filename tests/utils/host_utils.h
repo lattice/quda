@@ -268,7 +268,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param);
 // Eig param types
 void setDeflationParam(QudaEigParam &df_param);
 void setMultigridEigParam(QudaEigParam &eig_param, int level);
-void setEigParam(QudaEigParam &eig_param);
+void setEigParam(QudaEigParam &eig_param, QudaInverterType inv_type = QUDA_INVALID_INVERTER);
 
 // Invert param types
 void setInvertParam(QudaInvertParam &inv_param);

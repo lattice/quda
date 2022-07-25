@@ -34,7 +34,7 @@ namespace trove {
 __device__
 inline bool warp_converged() {
 #if (__CUDACC_VER_MAJOR__ >= 9 || CUDA_VERSION >= 9000)
-    return (__activemask() == WARP_CONVERGED);
+  return (__activemask() == WARP_CONVERGED);
 #else
     return (__ballot(true) == WARP_CONVERGED);
 #endif

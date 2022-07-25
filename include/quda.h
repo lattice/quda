@@ -298,9 +298,6 @@ extern "C" {
     /** Preconditioner instance, e.g., multigrid */
     void *preconditioner;
 
-    /** Deflation instance */
-    void *deflation_op;
-
     /** defines deflation */
     void *eig_param;
 
@@ -393,22 +390,8 @@ extern "C" {
     /**Parameters for deflated solvers*/
     /** The precision of the Ritz vectors */
     QudaPrecision cuda_prec_ritz;
-    /** How many vectors to compute after one solve
-     *  for eigCG recommended values 8 or 16
-    */
-    int n_ev;
-    /** EeigCG  : Search space dimension
-     *  gmresdr : Krylov subspace dimension
-     */
-    int max_search_dim;
     /** For systems with many RHS: current RHS index */
     int rhs_idx;
-    /** Specifies deflation space volume: total number of eigenvectors is n_ev*deflation_grid */
-    int deflation_grid;
-    /** eigCG: selection criterion for the reduced eigenvector set */
-    double eigenval_tol;
-    /** mixed precision eigCG tuning parameter:  minimum search vector space restarts */
-    int eigcg_max_restarts;
     /** initCG tuning parameter:  maximum restarts */
     int max_restart_num;
     /** initCG tuning parameter:  tolerance for cg refinement corrections in the deflation stage */
@@ -451,6 +434,7 @@ extern "C" {
 
   // Parameter set for solving eigenvalue problems.
   typedef struct QudaEigParam_s {
+
     /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
     size_t struct_size;
 
@@ -546,12 +530,6 @@ extern "C" {
     char QUDA_logfile[512];
 
     //-------------------------------------------------
-
-    // EIG-CG PARAMS
-    //-------------------------------------------------
-    int nk;
-    int np;
-
     /** Whether to load eigenvectors */
     QudaBoolean import_vectors;
 
@@ -590,6 +568,11 @@ extern "C" {
     /** Which external library to use in the deflation operations (Eigen) */
     QudaExtLibType extlib_type;
     //-------------------------------------------------
+    /** Whether deflation space is complete */
+    QudaBoolean is_complete;
+    /** Whether this is the last rhs solve */
+    QudaBoolean is_last_rhs;    
+
   } QudaEigParam;
 
   typedef struct QudaMultigridParam_s {
@@ -1634,18 +1617,6 @@ extern "C" {
    */
   void flushChronoQuda(int index);
 
-
-  /**
-  * Create deflation solver resources.
-  *
-  **/
-
-  void* newDeflationQuda(QudaEigParam *param);
-
-  /**
-   * Free resources allocated by the deflated solver
-   */
-  void destroyDeflationQuda(void *df_instance);
 
   void setMPICommHandleQuda(void *mycomm);
 

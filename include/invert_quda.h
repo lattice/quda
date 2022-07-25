@@ -14,6 +14,8 @@
 
 namespace quda {
 
+  using ColorSpinorFieldSet = ColorSpinorField;
+
   /**
      SolverParam is the meta data used to define linear solvers.
    */
@@ -34,11 +36,6 @@ namespace quda {
      * Preconditioner instance, e.g., multigrid
      */
     void *preconditioner;
-
-    /**
-     * Deflation operator
-     */
-    void *deflation_op;
 
     /**
      * Whether to use the L2 relative residual, L2 absolute residual
@@ -235,15 +232,10 @@ namespace quda {
     /**< The precision of the Ritz vectors */
     QudaPrecision precision_ritz;//also search space precision
 
-    int n_ev; // number of eigenvectors produced by EigCG
-    int m;//Dimension of the search space
-    int deflation_grid;
     int rhs_idx;
 
-    int     eigcg_max_restarts;
     int     max_restart_num;
     double  inc_tol;
-    double  eigenval_tol;
 
     QudaVerbosity verbosity_precondition; //! verbosity to use for preconditioner
 
@@ -287,7 +279,6 @@ namespace quda {
       inv_type(param.inv_type),
       inv_type_precondition(param.inv_type_precondition),
       preconditioner(param.preconditioner),
-      deflation_op(param.deflation_op),
       residual_type(param.residual_type),
       deflate(param.eig_param != 0),
       use_init_guess(param.use_init_guess),
@@ -336,14 +327,9 @@ namespace quda {
       secs(param.secs),
       gflops(param.gflops),
       precision_ritz(param.cuda_prec_ritz),
-      n_ev(param.n_ev),
-      m(param.max_search_dim),
-      deflation_grid(param.deflation_grid),
       rhs_idx(0),
-      eigcg_max_restarts(param.eigcg_max_restarts),
       max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol),
-      eigenval_tol(param.eigenval_tol),
       verbosity_precondition(param.verbosity_precondition),
       is_preconditioner(false),
       global_reduction(true),
@@ -359,7 +345,7 @@ namespace quda {
       }
 
       if (param.rhs_idx != 0
-          && (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_GMRESDR_PROJ_INVERTER)) {
+          && (param.inv_type == QUDA_INC_EIGCG_INVERTER)) {
         rhs_idx = param.rhs_idx;
       }
 
@@ -378,7 +364,6 @@ namespace quda {
       inv_type(param.inv_type),
       inv_type_precondition(param.inv_type_precondition),
       preconditioner(param.preconditioner),
-      deflation_op(param.deflation_op),
       residual_type(param.residual_type),
       deflate(param.deflate),
       eig_param(param.eig_param),
@@ -425,14 +410,9 @@ namespace quda {
       secs(param.secs),
       gflops(param.gflops),
       precision_ritz(param.precision_ritz),
-      n_ev(param.n_ev),
-      m(param.m),
-      deflation_grid(param.deflation_grid),
       rhs_idx(0),
-      eigcg_max_restarts(param.eigcg_max_restarts),
       max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol),
-      eigenval_tol(param.eigenval_tol),
       verbosity_precondition(param.verbosity_precondition),
       is_preconditioner(param.is_preconditioner),
       global_reduction(param.global_reduction),
@@ -447,11 +427,8 @@ namespace quda {
 	tol_hq_offset[i] = param.tol_hq_offset[i];
       }
 
-      if((param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_EIGCG_INVERTER) && m % 16){//current hack for the magma library
-        m = (m / 16) * 16 + 16;
-        warningQuda("\nSwitched eigenvector search dimension to %d\n", m);
-      }
-      if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER || param.inv_type==QUDA_GMRESDR_PROJ_INVERTER)){
+      if (param.rhs_idx != 0
+          && (param.inv_type == QUDA_INC_EIGCG_INVERTER)) {
         rhs_idx = param.rhs_idx;
       }
     }
@@ -480,7 +457,7 @@ namespace quda {
 	  param.true_res_hq_offset[i] = true_res_hq_offset[i];
 	}
       }
-      //for incremental eigCG:
+      // for mrhs solvers:
       param.rhs_idx = rhs_idx;
 
       param.ca_lambda_min = ca_lambda_min;
@@ -662,6 +639,11 @@ namespace quda {
     void constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat);
 
     /**
+       @brief Constructs the deflation space for some subset of deflated solvers (e.g., eigCG)
+    */
+    void constructDeflationSpace(const ColorSpinorField &meta, const int size);
+
+    /**
        @brief Destroy the allocated deflation space
     */
     void destroyDeflationSpace();
@@ -678,8 +660,9 @@ namespace quda {
        space transferred to the solver.
        @param[in,out] defl_space the deflation space we wish to
        transfer to the solver.
+       @param[in] Whether to destroy the defl_space containers (defaulted to true)
     */
-    void injectDeflationSpace(std::vector<ColorSpinorField *> &defl_space);
+    void injectDeflationSpace(std::vector<ColorSpinorField *> &defl_space, const bool destroy_defl_space = true);
 
     /**
        @brief Extracts the deflation space from the solver to the
@@ -1579,55 +1562,70 @@ public:
 
   using ColorSpinorFieldSet = ColorSpinorField;
 
-  //forward declaration
   class EigCGArgs;
 
+  // forward declaration
   class IncEigCG : public Solver {
 
   private:
-    Solver *K;
+    const DiracMatrix &matDefl;
+
+    std::shared_ptr<Solver> K;
     SolverParam Kparam; // parameters for preconditioner solve
 
-    ColorSpinorFieldSet *Vm;  //eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
+    /**
+       The size of the search space that EigCG uses.
+     */
+    int m;
 
-    ColorSpinorField *rp;       //! residual vector
-    ColorSpinorField *yp;       //! high precision accumulator
-    ColorSpinorField* p;  // conjugate vector
-    ColorSpinorField* Ap; // mat * conjugate vector
-    ColorSpinorField *tmpp;     //! temporary for mat-vec
-    ColorSpinorField *Az;       // mat * conjugate vector from the previous iteration
-    ColorSpinorField *r_pre;    //! residual passed to preconditioner
-    ColorSpinorField *p_pre;    //! preconditioner result
+    ColorSpinorField* ep; // full precision accumulator
+    ColorSpinorField* ep_sloppy;
+    ColorSpinorField* rp; // full precision residual
+    ColorSpinorField* rp_sloppy;
 
-    EigCGArgs *eigcg_args;
+    ColorSpinorFieldSet* work_space; // a workspace to keep the solver temporary fields
+
+    ColorSpinorField* r_pre; // residual passed to preconditioner
+    ColorSpinorField* p_pre; // preconditioner result
+
+    std::shared_ptr<EigCGArgs> local_eigcg_args;
 
     TimeProfile &profile; // time profile for initCG solver
 
     bool init;
 
-public:
-  IncEigCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
-           TimeProfile &profile);
+  public:
+    static EigCGArgs *eigcg_args;
 
-  virtual ~IncEigCG();
+    IncEigCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
+             TimeProfile &profile);
 
-  /**
-     @brief Expands deflation space.
-     @param V Composite field container of new eigenvectors
-     @param n_ev number of vectors to load
-   */
-  void increment(ColorSpinorField &V, int n_ev);
+    virtual ~IncEigCG();
 
-  void RestartVT(const double beta, const double rho);
-  void UpdateVm(ColorSpinorField &res, double beta, double sqrtr2);
-  // EigCG solver:
-  int eigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
-  // InitCG solver:
-  int initCGsolve(ColorSpinorField &out, ColorSpinorField &in);
-  // Incremental eigCG solver (for eigcg and initcg calls)
-  void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void EigenSolve();
+    //
+    void LegacySearchSpaceUpdate(const double &lanczos_diag, const double &lanzos_offdiag, const double &beta,
+                                 const double &resnorm);
+    // Pipelined routines:
+    void PipelinedSearchSpaceUpdate(const double &lanczos_diag, const double &lanzos_offdiag, const double &resnorm);
+    // legacy EigCG solver:
+    int EigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
+    // communation optimized version
+    int CAEigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
+    // init cg check
+    int initCGsolve(ColorSpinorField &out, ColorSpinorField &in);
+    // Incremental eigCG solver
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
-  bool hermitian() { return true; } // EigCG is only for Hermitian systems
+    void Increment();
+
+    void Deflate(ColorSpinorField &out, ColorSpinorField &in);
+
+    void Reduce(double tol, int max_nev);
+
+    void Verify();
+
+    bool hermitian() { return true; } // EigCG is only for Hermitian systems
   };
 
 //forward declaration
@@ -1639,19 +1637,25 @@ public:
     Solver *K;
     SolverParam Kparam; // parameters for preconditioner solve
 
-    ColorSpinorFieldSet *Vm;//arnoldi basis vectors, size (m+1)
-    ColorSpinorFieldSet *Zm;//arnoldi basis vectors, size (m+1)
+    /**
+       The size of the Krylov space that (F)GMRES(DR) uses.
+     */
+    int nKrylov;
+
+    std::shared_ptr<GMResDRArgs> gmresdr_args;
+
+    ColorSpinorFieldSet *Vm; // arnoldi basis vectors, size (m+1)
+    ColorSpinorFieldSet *Zm; // arnoldi basis vectors, size (m+1)
 
     ColorSpinorField *rp;       //! residual vector
     ColorSpinorField *yp;       //! high precision accumulator
+    ColorSpinorField *ep;    
     ColorSpinorField *tmpp;     //! temporary for mat-vec
     ColorSpinorField *r_sloppy; //! sloppy residual vector
     ColorSpinorField *r_pre;    //! residual passed to preconditioner
     ColorSpinorField *p_pre;    //! preconditioner result
 
-    TimeProfile &profile;    //time profile for initCG solver
-
-    GMResDRArgs *gmresdr_args;
+    TimeProfile &profile; // time profile for initCG solver
 
     bool init;
 
@@ -1673,7 +1677,7 @@ public:
 
     void RestartVZH();
 
-    void UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels);
+    void UpdateSolution(ColorSpinorField &x, ColorSpinorField &r, bool do_gels);
 
     bool hermitian() { return false; } // GMRESDR for any linear system
  };
