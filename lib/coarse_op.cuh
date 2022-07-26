@@ -1,6 +1,5 @@
 #pragma once
 
-#include <constant_kernel_arg.h>
 #include <kernels/coarse_op_kernel.cuh>
 #include <uint_to_char.h>
 #include <coarse_op_mma_launch.h>
