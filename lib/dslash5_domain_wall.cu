@@ -1,7 +1,6 @@
 #include <color_spinor_field.h>
 #include <dslash_quda.h>
 #include <instantiate.h>
-#include <constant_kernel_arg.h>
 #include <tunable_nd.h>
 #include <kernels/dslash_domain_wall_m5.cuh>
 
