@@ -13,10 +13,10 @@
 
 #define QUDA_RT_CONSTS \
   const dim3\
-    blockDim=target::omptarget::launch_param.block,\
-    gridDim=target::omptarget::launch_param.grid,\
-    threadIdx(omp_get_thread_num()%target::omptarget::launch_param.block.x, (omp_get_thread_num()/target::omptarget::launch_param.block.x)%target::omptarget::launch_param.block.y, omp_get_thread_num()/(target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y)),\
-    blockIdx(omp_get_team_num()%target::omptarget::launch_param.grid.x, (omp_get_team_num()/target::omptarget::launch_param.grid.x)%target::omptarget::launch_param.grid.y, omp_get_team_num()/(target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y))
+    blockDim=target::omptarget::launch_param->block,\
+    gridDim=target::omptarget::launch_param->grid,\
+    threadIdx(omp_get_thread_num()%target::omptarget::launch_param->block.x, (omp_get_thread_num()/target::omptarget::launch_param->block.x)%target::omptarget::launch_param->block.y, omp_get_thread_num()/(target::omptarget::launch_param->block.x*target::omptarget::launch_param->block.y)),\
+    blockIdx(omp_get_team_num()%target::omptarget::launch_param->grid.x, (omp_get_team_num()/target::omptarget::launch_param->grid.x)%target::omptarget::launch_param->grid.y, omp_get_team_num()/(target::omptarget::launch_param->grid.x*target::omptarget::launch_param->grid.y))
 
 #include <functional>
 #include <iostream>
@@ -92,17 +92,19 @@ namespace quda {
         int num_teams;
         int cache_length;
       };
-      inline int *get_shared_cache(void)
-      {
-        extern SharedCache shared_cache;
-        return &shared_cache.addr[omp_get_team_num()*shared_cache.cache_length];
-      }
 
       struct LaunchParam{
         dim3 block;
         dim3 grid;
+        SharedCache shared_cache;
       };
-      extern LaunchParam launch_param;
+      extern LaunchParam *launch_param;
+      extern LaunchParam *launch_param_host;
+
+      inline int *get_shared_cache(void)
+      {
+        return &launch_param->shared_cache.addr[omp_get_team_num()*launch_param->shared_cache.cache_length];
+      }
     }
   }
 }

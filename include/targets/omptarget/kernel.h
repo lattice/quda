@@ -50,8 +50,8 @@ namespace quda
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Kernel1D(Arg arg)
   {
-    const auto& grid = target::omptarget::launch_param.grid;
-    const auto& block = target::omptarget::launch_param.block;
+    const auto& grid = target::omptarget::launch_param_host->grid;
+    const auto& block = target::omptarget::launch_param_host->block;
     const int gd = grid.x*grid.y*grid.z;
     const int ld = block.x*block.y*block.z;
     #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg)
@@ -76,8 +76,8 @@ namespace quda
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel1D(Arg *argp)
   {
-    const auto& grid = target::omptarget::launch_param.grid;
-    const auto& block = target::omptarget::launch_param.block;
+    const auto& grid = target::omptarget::launch_param_host->grid;
+    const auto& block = target::omptarget::launch_param_host->block;
     const int gd = grid.x*grid.y*grid.z;
     const int ld = block.x*block.y*block.z;
     #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp)
@@ -133,8 +133,8 @@ namespace quda
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Kernel2D(Arg arg)
   {
-    const auto& grid = target::omptarget::launch_param.grid;
-    const auto& block = target::omptarget::launch_param.block;
+    const auto& grid = target::omptarget::launch_param_host->grid;
+    const auto& block = target::omptarget::launch_param_host->block;
     const int gd = grid.x*grid.y*grid.z;
     const int ld = block.x*block.y*block.z;
     #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg)
@@ -159,8 +159,8 @@ namespace quda
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel2D(Arg *argp)
   {
-    const auto& grid = target::omptarget::launch_param.grid;
-    const auto& block = target::omptarget::launch_param.block;
+    const auto& grid = target::omptarget::launch_param_host->grid;
+    const auto& block = target::omptarget::launch_param_host->block;
     const int gd = grid.x*grid.y*grid.z;
     const int ld = block.x*block.y*block.z;
     #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp)
@@ -218,8 +218,8 @@ namespace quda
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Kernel3D(Arg arg)
   {
-    const auto& grid = target::omptarget::launch_param.grid;
-    const auto& block = target::omptarget::launch_param.block;
+    const auto& grid = target::omptarget::launch_param_host->grid;
+    const auto& block = target::omptarget::launch_param_host->block;
     const int gd = grid.x*grid.y*grid.z;
     const int ld = block.x*block.y*block.z;
     #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg)
@@ -244,8 +244,8 @@ namespace quda
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel3D(Arg *argp)
   {
-    const auto& grid = target::omptarget::launch_param.grid;
-    const auto& block = target::omptarget::launch_param.block;
+    const auto& grid = target::omptarget::launch_param_host->grid;
+    const auto& block = target::omptarget::launch_param_host->block;
     const int gd = grid.x*grid.y*grid.z;
     const int ld = block.x*block.y*block.z;
     #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp)
@@ -272,8 +272,8 @@ namespace quda
   template <template <typename> class Functor, typename Arg, bool dummy = false>
   __launch_bounds__(Arg::block_dim, Arg::min_blocks) __global__ void raw_kernel(Arg arg)
   {
-    const auto& grid = target::omptarget::launch_param.grid;
-    const auto& block = target::omptarget::launch_param.block;
+    const auto& grid = target::omptarget::launch_param_host->grid;
+    const auto& block = target::omptarget::launch_param_host->block;
     const int gd = grid.x*grid.y*grid.z;
     const int ld = block.x*block.y*block.z;
     #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg)

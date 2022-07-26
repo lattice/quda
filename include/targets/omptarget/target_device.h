@@ -57,7 +57,7 @@ namespace quda {
     */
     __device__ __host__ inline dim3 block_dim()
     {
-      return target::omptarget::launch_param.block;
+      return target::omptarget::launch_param->block;
     }
 
     /**
@@ -67,7 +67,7 @@ namespace quda {
     */
     __device__ __host__ inline dim3 grid_dim()
     {
-      return target::omptarget::launch_param.grid;
+      return target::omptarget::launch_param->grid;
     }
 
     /**
@@ -78,7 +78,7 @@ namespace quda {
     __device__ __host__ inline dim3 block_idx()
     {
       const auto n = (unsigned int)omp_get_team_num();
-      return dim3(n%target::omptarget::launch_param.grid.x, (n/target::omptarget::launch_param.grid.x)%target::omptarget::launch_param.grid.y, n/(target::omptarget::launch_param.grid.x*target::omptarget::launch_param.grid.y));
+      return dim3(n%target::omptarget::launch_param->grid.x, (n/target::omptarget::launch_param->grid.x)%target::omptarget::launch_param->grid.y, n/(target::omptarget::launch_param->grid.x*target::omptarget::launch_param->grid.y));
     }
 
     /**
@@ -89,7 +89,7 @@ namespace quda {
     __device__ __host__ inline dim3 thread_idx()
     {
       const auto n = (unsigned int)omp_get_thread_num();
-      return dim3(n%target::omptarget::launch_param.block.x, (n/target::omptarget::launch_param.block.x)%target::omptarget::launch_param.block.y, n/(target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y));
+      return dim3(n%target::omptarget::launch_param->block.x, (n/target::omptarget::launch_param->block.x)%target::omptarget::launch_param->block.y, n/(target::omptarget::launch_param->block.x*target::omptarget::launch_param->block.y));
     }
 
     /**
@@ -99,8 +99,8 @@ namespace quda {
     {
       const auto n = (unsigned int)omp_get_thread_num();
       switch (dim) {
-      case 1: return n%target::omptarget::launch_param.block.x;
-      case 2: return n%(target::omptarget::launch_param.block.x*target::omptarget::launch_param.block.y);
+      case 1: return n%target::omptarget::launch_param->block.x;
+      case 2: return n%(target::omptarget::launch_param->block.x*target::omptarget::launch_param->block.y);
       case 3:
       default: return n;
       }
@@ -112,10 +112,10 @@ namespace quda {
     template <int dim> __device__ __host__ inline auto block_size()
     {
       switch (dim) {
-      case 1: return target::omptarget::launch_param.block.x;
-      case 2: return target::omptarget::launch_param.block.y * target::omptarget::launch_param.block.x;
+      case 1: return target::omptarget::launch_param->block.x;
+      case 2: return target::omptarget::launch_param->block.y * target::omptarget::launch_param->block.x;
       case 3:
-      default: return target::omptarget::launch_param.block.z * target::omptarget::launch_param.block.y * target::omptarget::launch_param.block.x;
+      default: return target::omptarget::launch_param->block.z * target::omptarget::launch_param->block.y * target::omptarget::launch_param->block.x;
       }
     }
 
