@@ -10,7 +10,7 @@
 #include <dslash_shmem.h>
 #include <shmem_pack_helper.cuh>
 
-#if defined(_NVHPC_CUDA) || defined(QUDA_TARGET_OMPTARGET)
+#if defined(_NVHPC_CUDA)
 #include <constant_kernel_arg.h>
 constexpr bool use_kernel_arg = false;
 #else
