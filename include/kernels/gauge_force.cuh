@@ -3,8 +3,8 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
+#include <thread_array.h>
 #include <kernel.h>
-#include <shared_memory_cache_helper.cuh>
 
 namespace quda {
 

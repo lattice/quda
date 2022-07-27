@@ -4,7 +4,7 @@
 #include <array.h>
 
 /**
-   @file shared_memory_cache_helper.cuh
+   @file shared_memory_cache_helper.h
 
    Helper functionality for aiding the use of the shared memory for
    sharing data between threads in a thread block.
@@ -137,7 +137,7 @@ namespace quda
        block_size_x.  Otherwise use the block sizes passed into the
        constructor.
 
-       @param[in] block Block dimensions for the 3-d shared memory object 
+       @param[in] block Block dimensions for the 3-d shared memory object
     */
     constexpr SharedMemoryCache(dim3 block = dim3(block_size_x, block_size_y, block_size_z)) :
       block(block),
@@ -256,31 +256,6 @@ namespace quda
        @brief Synchronize the cache
     */
     __device__ __host__ void sync() { target::dispatch<sync_impl>(); }
-  };
-
-  template <typename T, int n>
-  struct thread_array {
-    SharedMemoryCache<array<T, n>, 1, 1, false, false> device_array;
-    int offset;
-    array<T, n> host_array;
-    array<T, n> &array_;
-
-    __device__ __host__ constexpr thread_array() :
-      offset((target::thread_idx().z * target::block_dim().y + target::thread_idx().y) * target::block_dim().x + target::thread_idx().x),
-      array_(target::is_device() ? *(device_array.data() + offset) : host_array)
-    {
-      array_ = array<T, n>(); // call default constructor
-    }
-
-    template <typename ...Ts> __device__ __host__ constexpr thread_array(T first, const Ts... other) :
-      offset((target::thread_idx().z * target::block_dim().y + target::thread_idx().y) * target::block_dim().x + target::thread_idx().x),
-      array_(target::is_device() ? *(device_array.data() + offset) : host_array)
-    {
-      array_ = array<T, n>{first, other...};
-    }
-
-    __device__ __host__ T& operator[](int i) { return array_[i]; }
-    __device__ __host__ const T& operator[](int i) const { return array_[i]; }
   };
 
 } // namespace quda
