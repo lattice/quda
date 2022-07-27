@@ -156,7 +156,7 @@ namespace quda {
        the kernel arguments passed to a kernel on the target
        architecture.
     */
-    constexpr size_t max_kernel_arg_size() { return 4096; }
+    constexpr size_t max_kernel_arg_size() { return 64; }
 
     /**
        @brief Helper function that returns the bank width of the
@@ -178,7 +178,7 @@ namespace quda {
     */
     template <typename Arg> constexpr bool use_kernel_arg()
     {
-      return (sizeof(Arg) <= device::max_kernel_arg_size() && Arg::use_kernel_arg);
+      return Arg::use_kernel_arg > 1 || (sizeof(Arg) <= device::max_kernel_arg_size() && Arg::use_kernel_arg);
     }
 
     /**

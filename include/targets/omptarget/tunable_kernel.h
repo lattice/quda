@@ -1,5 +1,6 @@
 #pragma once
 
+#include <constant_kernel_arg.h>
 #include <tune_quda.h>
 #include <target_device.h>
 #include <kernel_helper.h>
@@ -26,8 +27,10 @@ namespace quda {
         (arg.threads.x%tp.block.x==0 &&
          arg.threads.y%tp.block.y==0 &&
          arg.threads.z%tp.block.z==0));
+    if(getVerbosity() >= QUDA_DEBUG_VERBOSE)
+      printfQuda("Checking threads setup for arg %d %d %d tp grid %d %d %d block %d %d %d\n",arg.threads.x,arg.threads.y,arg.threads.z,tp.grid.x,tp.grid.y,tp.grid.z,tp.block.x,tp.block.y,tp.block.z);
     if(!r && getVerbosity() >= QUDA_VERBOSE)
-      ompwip("WARNING: rejecting threads setup arg %d %d %d tp (%d %d %d)x(%d %d %d)",arg.threads.x,arg.threads.y,arg.threads.z,tp.grid.x,tp.grid.y,tp.grid.z,tp.block.x,tp.block.y,tp.block.z);
+      warningQuda("WARNING: rejecting threads setup arg %d %d %d tp grid %d %d %d block %d %d %d",arg.threads.x,arg.threads.y,arg.threads.z,tp.grid.x,tp.grid.y,tp.grid.z,tp.block.x,tp.block.y,tp.block.z);
     return r;
   }
 
