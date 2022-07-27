@@ -211,7 +211,7 @@ namespace quda
     */
     template <typename Arg> constexpr bool use_kernel_arg()
     {
-      return (sizeof(Arg) <= device::max_kernel_arg_size() && Arg::use_kernel_arg);
+      return Arg::use_kernel_arg > 1 || (sizeof(Arg) <= device::max_kernel_arg_size() && Arg::use_kernel_arg);
     }
 
     /**

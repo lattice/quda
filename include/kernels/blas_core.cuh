@@ -23,7 +23,7 @@ namespace quda
        @tparam Functor_ Functor used to operate on data
     */
     template <typename real_, int n_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
-    struct BlasArg : kernel_param<> {
+    struct BlasArg : kernel_param<Functor::use_kernel_arg> {
       using real = real_;
       static constexpr int n = n_;
       Spinor<store_t, N> X;
@@ -36,7 +36,7 @@ namespace quda
       const int nParity;
       BlasArg(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
               ColorSpinorField &v, Functor f, int length, int nParity) :
-        kernel_param(dim3(length, nParity, 1)),
+        kernel_param<Functor::use_kernel_arg>(dim3(length, nParity, 1)),
         X(x),
         Y(y),
         Z(z),
@@ -90,6 +90,7 @@ namespace quda
        Base class from which all blas functors should derive
      */
     struct BlasFunctor {
+      static constexpr int use_kernel_arg = true;
       //! pre-computation routine before the main loop
       __device__ __host__ void init() const { ; }
     };
@@ -368,6 +369,7 @@ namespace quda
        Second performs the operator x[i] -= a*z[i]
     */
     template <typename real> struct caxpyxmazMR_ {
+      static constexpr int use_kernel_arg = 2;
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
       complex<real> a;
