@@ -7,6 +7,7 @@
 #include <dslash_shmem.h>
 #include <shmem_helper.cuh>
 #include <shmem_pack_helper.cuh>
+#include <shared_memory_cache_helper.h>
 
 namespace quda {
 
