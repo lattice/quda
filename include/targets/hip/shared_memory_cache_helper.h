@@ -39,9 +39,10 @@ namespace quda
     static constexpr int max_block_size_x = device::max_block_size<block_size_y, block_size_z>();
 
     /** pad in the x dimension width if requested to ensure that it isn't a multiple of the bank width */
-    static constexpr int block_size_x = !pad ? max_block_size_x :
-      ((max_block_size_x + device::shared_memory_bank_width() - 1) /
-       device::shared_memory_bank_width()) * device::shared_memory_bank_width();
+    static constexpr int block_size_x = !pad ?
+      max_block_size_x :
+      ((max_block_size_x + device::shared_memory_bank_width() - 1) / device::shared_memory_bank_width())
+        * device::shared_memory_bank_width();
 
     using atom_t = std::conditional_t<sizeof(T) % 16 == 0, int4, std::conditional_t<sizeof(T) % 8 == 0, int2, int>>;
     static_assert(sizeof(T) % 4 == 0, "Shared memory cache does not support sub-word size types");
@@ -56,24 +57,25 @@ namespace quda
        @brief This is a dummy instantiation for the host compiler
     */
     template <bool, typename dummy = void> struct cache_dynamic {
-      atom_t* operator()()
+      atom_t *operator()()
       {
         static atom_t *cache_;
-        return reinterpret_cast<atom_t*>(cache_);
+        return reinterpret_cast<atom_t *>(cache_);
       }
     };
 
-    template <bool is_device, typename dummy = void> struct cache_static : cache_dynamic<is_device> {};
+    template <bool is_device, typename dummy = void> struct cache_static : cache_dynamic<is_device> {
+    };
 
     /**
        @brief This is the handle to the shared memory, dynamic specialization
        @return Shared memory pointer
      */
     template <typename dummy> struct cache_dynamic<true, dummy> {
-      __device__ inline atom_t* operator()()
+      __device__ inline atom_t *operator()()
       {
         extern __shared__ int cache_[];
-        return reinterpret_cast<atom_t*>(cache_);
+        return reinterpret_cast<atom_t *>(cache_);
       }
     };
 
@@ -82,19 +84,19 @@ namespace quda
        @return Shared memory pointer
      */
     template <typename dummy> struct cache_static<true, dummy> {
-      __device__ inline atom_t* operator()()
+      __device__ inline atom_t *operator()()
       {
         static __shared__ atom_t cache_[n_element * block_size_x * block_size_y * block_size_z];
-        return reinterpret_cast<atom_t*>(cache_);
+        return reinterpret_cast<atom_t *>(cache_);
       }
     };
 
-    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<dynamic_shared, atom_t*> cache()
+    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<dynamic_shared, atom_t *> cache()
     {
       return target::dispatch<cache_dynamic>();
     }
 
-    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<!dynamic_shared, atom_t*> cache()
+    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<!dynamic_shared, atom_t *> cache()
     {
       return target::dispatch<cache_static>();
     }
@@ -102,7 +104,7 @@ namespace quda
     __device__ __host__ inline void save_detail(const T &a, int x, int y, int z)
     {
       atom_t tmp[n_element];
-      memcpy(tmp, (void*)&a, sizeof(T));
+      memcpy(tmp, (void *)&a, sizeof(T));
       int j = (z * block.y + y) * block.x + x;
 #pragma unroll
       for (int i = 0; i < n_element; i++) cache<dynamic>()[i * stride + j] = tmp[i];
@@ -115,19 +117,23 @@ namespace quda
 #pragma unroll
       for (int i = 0; i < n_element; i++) tmp[i] = cache<dynamic>()[i * stride + j];
       T a;
-      memcpy((void*)&a, tmp, sizeof(T));
+      memcpy((void *)&a, tmp, sizeof(T));
       return a;
     }
 
     /**
        @brief Dummy instantiation for the host compiler
     */
-    template <bool is_device, typename dummy = void> struct sync_impl { void operator()() { } };
+    template <bool is_device, typename dummy = void> struct sync_impl {
+      void operator()() { }
+    };
 
     /**
        @brief Synchronize the cache when on the device
     */
-    template <typename dummy> struct sync_impl<true, dummy> { __device__ inline void operator()() { __syncthreads(); } };
+    template <typename dummy> struct sync_impl<true, dummy> {
+      __device__ inline void operator()() { __syncthreads(); }
+    };
 
   public:
     /**
@@ -140,13 +146,14 @@ namespace quda
        @param[in] block Block dimensions for the 3-d shared memory object
     */
     constexpr SharedMemoryCache(dim3 block = dim3(block_size_x, block_size_y, block_size_z)) :
-      block(block),
-      stride(block.x * block.y * block.z) {}
+      block(block), stride(block.x * block.y * block.z)
+    {
+    }
 
     /**
        @brief Grab the raw base address to shared memory.
     */
-    __device__ __host__ inline T* data() { return reinterpret_cast<T*>(cache<dynamic>()); }
+    __device__ __host__ inline T *data() { return reinterpret_cast<T *>(cache<dynamic>()); }
 
     /**
        @brief Save the value into the 3-d shared memory cache.
