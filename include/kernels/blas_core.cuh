@@ -10,6 +10,7 @@ namespace quda
 
   namespace blas
   {
+    template <typename real> struct caxpyxmazMR_;
 
     /**
        Parameter struct for generic blas kernel
@@ -43,7 +44,11 @@ namespace quda
         V(v),
         f(f),
         nParity(nParity)
-      { ; }
+      {
+        if constexpr (std::is_same_v<Functor, caxpyxmazMR_<real>>){
+          static_assert(device::use_kernel_arg<BlasArg>(), "This arg must be passed as a kernel argument");
+        }
+      }
     };
 
     /**
