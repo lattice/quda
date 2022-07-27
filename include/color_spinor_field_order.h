@@ -1252,10 +1252,11 @@ namespace quda
         }
       }
 
-      __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
+      template <typename Vector, int length>
+      __device__ __host__ inline void load(complex out[length / 2], const Float *ptr, AllocInt idx) const
       {
         real v[length];
-        Vector vecTmp = vector_load<Vector>(field, parity * offset + x);
+        Vector vecTmp = vector_load<Vector>(ptr, idx);
 
         // extract the norm
         norm_type nrm;
@@ -1269,7 +1270,8 @@ namespace quda
         for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
       }
 
-      __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0) const
+      template <typename Vector, int length>
+      __device__ __host__ inline void save(const complex in[length / 2], Float *ptr, AllocInt idx) const
       {
         real v[length];
 
@@ -1300,7 +1302,17 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < length; i++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[i], v[i]);
 
-        vector_store(field, parity * offset + x, vecTmp);
+        vector_store(ptr, idx, vecTmp);
+      }
+
+      __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
+      {
+        load<Vector, length>(out, field, parity * offset + x);
+      }
+
+      __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0) const
+      {
+        save<Vector, length>(in, field, parity * offset + x);
       }
 
       /**
@@ -1319,52 +1331,13 @@ namespace quda
 
       __device__ __host__ inline void loadGhost(complex out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const
       {
-        real v[length_ghost];
-        GhostVector vecTmp = vector_load<GhostVector>(ghost[2 * dim + dir], parity * faceVolumeCB[dim] + x);
-
-        // extract the norm
-        norm_type nrm;
-        memcpy(&nrm, &vecTmp.w, sizeof(norm_type));
-
-#pragma unroll
-        for (int i = 0; i < length_ghost; i++) copy_and_scale(v[i], reinterpret_cast<Float *>(&vecTmp)[i], nrm);
-
-#pragma unroll
-        for (int i = 0; i < length_ghost / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
+        load<GhostVector, length_ghost>(out, ghost[2 * dim + dir], parity * faceVolumeCB[dim] + x);
       }
 
       __device__ __host__ inline void saveGhost(const complex in[length_ghost / 2], int x, int dim, int dir,
                                                 int parity = 0) const
       {
-        real v[length_ghost];
-
-#pragma unroll
-        for (int i = 0; i < length_ghost / 2; i++) {
-          v[2 * i + 0] = in[i].real();
-          v[2 * i + 1] = in[i].imag();
-        }
-
-        norm_type max_[length_ghost / 2];
-        // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
-#pragma unroll
-        for (int i = 0; i < length_ghost / 2; i++)
-          max_[i] = fmaxf(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length_ghost / 2]));
-        norm_type scale = 0.0;
-#pragma unroll
-        for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
-        norm_type nrm = scale * fixedInvMaxValue<Float>::value;
-
-        real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
-#pragma unroll
-        for (int i = 0; i < length_ghost; i++) v[i] = v[i] * scale_inv;
-
-        GhostVector vecTmp;
-        memcpy(&vecTmp.w, &nrm, sizeof(norm_type)); // pack the norm
-
-        // pack the spinor elements
-#pragma unroll
-        for (int i = 0; i < length_ghost; i++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[i], v[i]);
-        vector_store(ghost[2 * dim + dir], parity * faceVolumeCB[dim] + x, vecTmp);
+        save<GhostVector, length_ghost>(in, ghost[2 * dim + dir], parity * faceVolumeCB[dim] + x);
       }
 
       /**
