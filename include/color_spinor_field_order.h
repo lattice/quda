@@ -21,6 +21,7 @@
 #include <load_store.h>
 #include <aos.h>
 #include <transform_reduce.h>
+#include <spinor_bitpack.h>
 
 namespace quda
 {
@@ -1252,6 +1253,26 @@ namespace quda
         }
       }
 
+#ifdef SPINOR_BITPACK
+      template <typename Vector, int length>
+      __device__ __host__ inline void load(complex out[length / 2], const Float *ptr, AllocInt idx) const
+      {
+        Vector vecTmp = vector_load<Vector>(ptr, idx);
+        spinor_20 packed;
+        memcpy(&packed, &vecTmp, sizeof(spinor_20));
+        unpack(out, packed);
+      }
+
+      template <typename Vector, int length>
+      __device__ __host__ inline void save(const complex in[length / 2], Float *ptr, AllocInt idx) const
+      {
+        spinor_20 packed;
+        pack(packed, in);
+        Vector vecTmp;
+        memcpy(&vecTmp, &packed, sizeof(spinor_20));
+        vector_store<Vector>(ptr, idx, vecTmp);
+      }
+#else
       template <typename Vector, int length>
       __device__ __host__ inline void load(complex out[length / 2], const Float *ptr, AllocInt idx) const
       {
@@ -1304,6 +1325,7 @@ namespace quda
 
         vector_store(ptr, idx, vecTmp);
       }
+#endif
 
       __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
       {

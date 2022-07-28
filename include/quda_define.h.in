@@ -73,6 +73,16 @@
 #undef QUDA_FLOAT8
 #endif
 
+#cmakedefine QUDA_SPINOR_BITPACK
+#ifdef QUDA_SPINOR_BITPACK
+/**
+ * @def SPINOR_BITPACK
+ * @brief This macro set whether we use bit-packed formats where available
+ */
+#define SPINOR_BITPACK
+#undef QUDA_SPINOR_BITPACK
+#endif
+
 /**
  * @def QUDA_TARGET_CUDA
  * @brief This macro is set by CMake if the CUDA Build Target is selected

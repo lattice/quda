@@ -5,6 +5,7 @@
 #include <convert.h>
 #include <float_vector.h>
 #include <array.h>
+#include <spinor_bitpack.h>
 
 //#define QUAD_SUM
 #ifdef QUAD_SUM
@@ -248,11 +249,16 @@ namespace quda
           // specialized path for half precision staggered
           using Vector = int4;
           auto cb_offset = data.cb_norm_offset / 4;
+          // first load from memory
+          auto vecTmp = vector_load<Vector>(data.spinor, parity * cb_offset + x);
+
+#ifdef SPINOR_BITPACK
+          spinor_20 packed;
+          memcpy(&packed, &vecTmp, sizeof(spinor_20));
+          unpack(v, packed);
+#else
           norm_t nrm;
           array<real, len> v_;
-
-          // first load from memory
-          Vector vecTmp = vector_load<Vector>(data.spinor, parity * cb_offset + x);
 
           // extract norm
           memcpy(&nrm, &vecTmp.w, sizeof(norm_t));
@@ -263,6 +269,7 @@ namespace quda
 
 #pragma unroll
           for (int i = 0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
+#endif
         }
       }
 
@@ -311,6 +318,13 @@ namespace quda
           // specialized path for half precision staggered
           using Vector = int4;
           auto cb_offset = data.cb_norm_offset / 4;
+#ifdef SPINOR_BITPACK
+          spinor_20 packed;
+          pack(packed, v);
+          Vector vecTmp;
+          memcpy(&vecTmp, &packed, sizeof(spinor_20));
+          vector_store<Vector>(data.spinor, parity * cb_offset + x, vecTmp);
+#else
           norm_t norm;
           norm_t scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, norm);
           array<real, len> v_;
@@ -326,6 +340,7 @@ namespace quda
           for (int i = 0; i < len; i++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[i], v_[i]);
           // second do vectorized copy into memory
           vector_store(data.spinor, parity * cb_offset + x, vecTmp);
+#endif
         }
       }
     };
