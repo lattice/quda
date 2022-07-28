@@ -231,10 +231,10 @@ option(QUDA_ALTERNATIVE_I_TO_F "enable using alternative integer-to-float conver
 
 option(QUDA_OPENMP "enable OpenMP" OFF)
 set(QUDA_CXX_STANDARD
-    17
-    CACHE STRING "set the CXX Standard (14 or 17)")
+    20
+    CACHE STRING "set the CXX Standard (14, 17, 20)")
 
-set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
+set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17 20)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
