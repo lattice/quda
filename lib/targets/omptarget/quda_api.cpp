@@ -5,6 +5,7 @@
 #include <timer.h>
 #include <device.h>
 #include <target_device.h>
+#include <quda_omptarget_api.h>
 
 namespace quda
 {
@@ -178,7 +179,7 @@ namespace quda
       }
 
       void set_runtime_error(int error, const char *api_func, const char *func, const char *file,
-                             const char *line, bool allow_error = false)
+                             const char *line, bool allow_error)
       {
         if (error == 0) return;
         last_error = error == 0 ? QUDA_SUCCESS : QUDA_ERROR;

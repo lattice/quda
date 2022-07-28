@@ -62,6 +62,7 @@ namespace quda
      @param[in] arg Kernel argument
    */
   template <unsigned int block_size_, typename Arg_> struct BlockKernelArg : Arg_ {
+    static constexpr ThreadsSync requires_threads_sync = ThreadsSyncYZ;
     using Arg = Arg_;
     static constexpr unsigned int block_size = block_size_;
     BlockKernelArg(const Arg &arg) : Arg(arg) { }

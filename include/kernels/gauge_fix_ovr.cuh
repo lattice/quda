@@ -102,6 +102,7 @@ namespace quda {
    */
   template <typename store_t, QudaReconstructType recon, int gauge_dir_, bool halo_, int type_>
   struct GaugeFixArg : kernel_param<> {
+    static constexpr ThreadsSync requires_threads_sync = ThreadsSyncAll;
     using real = typename mapper<store_t>::type;
     static constexpr int gauge_dir = gauge_dir_;
     static constexpr bool halo = halo_;

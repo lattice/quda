@@ -23,6 +23,7 @@ namespace quda
      memory
    */
   template <typename T, bool use_kernel_arg = true> struct ReduceArg : kernel_param<use_kernel_arg> {
+    static constexpr ThreadsSync requires_threads_sync = ThreadsSyncAll;
     using reduce_t = T;
 
     template <typename Reducer, typename Arg, typename I>
