@@ -63,7 +63,7 @@ namespace quda {
       Spinor A = arg.inA(x_cb, 0);
       Spinor C = arg.inC(x_cb, 0);
 
-      static_for<0,4>(static_for_var(dim){
+      static_for<0,4>([&](auto dim){
         int shift[4] = {0, 0, 0, 0};
         shift[dim] = 1;
         const int nbr_idx = neighborIndex(x_cb, shift, arg.partitioned, arg.parity, arg.X);

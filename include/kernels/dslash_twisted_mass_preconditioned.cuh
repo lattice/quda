@@ -55,7 +55,7 @@ namespace quda
     typedef Matrix<complex<real>, Arg::nColor> Link;
     const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
 
-    static_for<0,Arg::nDim>(static_for_var(d){ // loop over dimension
+    static_for<0,Arg::nDim>([&](auto d){ // loop over dimension
       {                              // Forward gather - compute fwd offset for vector fetch
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
         constexpr int proj_dir = dagger ? +1 : -1;

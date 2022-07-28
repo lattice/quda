@@ -7,14 +7,6 @@
 #include <tune_key.h>
 #include <malloc_quda.h>
 
-#ifndef QUDA_MUSTTAIL
-#ifdef __clang__
-#define QUDA_MUSTTAIL __attribute__((musttail))
-#else
-#define QUDA_MUSTTAIL
-#endif
-#endif
-
 namespace quda
 {
   // strip path from __FILE__
@@ -27,21 +19,11 @@ namespace quda
   __attribute__((always_inline)) __host__ __device__ inline void static_for(F&&f)
   {
     if constexpr (A<B){
-#if __cplusplus < 202002L
       f(std::integral_constant<int,A>());
-#else
-      f.template operator()<A>();
-#endif
-      QUDA_MUSTTAIL return static_for<A+D,B,D>(std::forward<F>(f));
+      static_for<A+D,B,D>(std::forward<F>(f));
     }
   }
 } // namespace quda
-
-#if __cplusplus < 202002L
-#define static_for_var(i) [&](auto i)
-#else
-#define static_for_var(i) [&]<int i>
-#endif
 
 /**
    @brief Query whether autotuning is enabled or not.  Default is enabled but can be overridden by setting QUDA_ENABLE_TUNING=0.
