@@ -1032,15 +1032,17 @@ namespace quda
         }
       }
 
-      __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
+      template <typename Vector, int length, int M, int N>
+      __device__ __host__ inline void load(complex out[length / 2], const Float *ptr, AllocInt idx, int stride,
+                                           const norm_type *norm_ptr, AllocInt norm_idx) const
       {
         real v[length];
-        norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, x + parity * norm_offset) : 0.0;
+        norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm_ptr, norm_idx) : 0.0;
 
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first load from memory
-          Vector vecTmp = vector_load<Vector>(field, parity * offset + x + volumeCB * i);
+          Vector vecTmp = vector_load<Vector>(ptr, idx + stride * i);
           // now copy into output and scale
 #pragma unroll
           for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
@@ -1050,7 +1052,9 @@ namespace quda
         for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
       }
 
-      __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0) const
+      template <typename Vector, int length, int M, int N>
+      __device__ __host__ inline void save(const complex in[length / 2], Float *ptr, AllocInt idx, int stride,
+                                           norm_type *norm_ptr, AllocInt norm_idx) const
       {
         real v[length];
 
@@ -1069,7 +1073,7 @@ namespace quda
           norm_type scale = 0.0;
 #pragma unroll
           for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
-          norm[x + parity * norm_offset] = scale * fixedInvMaxValue<Float>::value;
+          norm_ptr[norm_offset] = scale * fixedInvMaxValue<Float>::value;
 
           real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
 #pragma unroll
@@ -1083,8 +1087,19 @@ namespace quda
 #pragma unroll
           for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N + j]);
           // second do vectorized copy into memory
-          vector_store(field, parity * offset + x + volumeCB * i, vecTmp);
+          vector_store(ptr, idx + stride * i, vecTmp);
         }
+      }
+
+
+      __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
+      {
+        load<Vector, length, M, N>(out, field, parity * offset + x, volumeCB, norm, x + parity * norm_offset);
+      }
+
+      __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0) const
+      {
+        save<Vector, length, M, N>(in, field, parity * offset + x, volumeCB, norm, x + parity * norm_offset);
       }
 
       /**
@@ -1103,58 +1118,15 @@ namespace quda
 
       __device__ __host__ inline void loadGhost(complex out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const
       {
-        real v[length_ghost];
-        norm_type nrm
-          = isFixed<Float>::value ? vector_load<float>(ghost_norm[2 * dim + dir], parity * faceVolumeCB[dim] + x) : 0.0;
-
-#pragma unroll
-        for (int i = 0; i < M_ghost; i++) {
-          GhostVector vecTmp = vector_load<GhostVector>(
-            ghost[2 * dim + dir], parity * faceVolumeCB[dim] * M_ghost + i * faceVolumeCB[dim] + x);
-#pragma unroll
-          for (int j = 0; j < N_ghost; j++)
-            copy_and_scale(v[i * N_ghost + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
-        }
-
-#pragma unroll
-        for (int i = 0; i < length_ghost / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
+        load<GhostVector, length_ghost, M_ghost, N_ghost>(out, ghost[2 * dim + dir], parity * faceVolumeCB[dim] * M_ghost + x,
+                                                          faceVolumeCB[dim], ghost_norm[2 * dim + dir], parity * faceVolumeCB[dim] + x);
       }
 
       __device__ __host__ inline void saveGhost(const complex in[length_ghost / 2], int x, int dim, int dir,
                                                 int parity = 0) const
       {
-        real v[length_ghost];
-#pragma unroll
-        for (int i = 0; i < length_ghost / 2; i++) {
-          v[2 * i + 0] = in[i].real();
-          v[2 * i + 1] = in[i].imag();
-        }
-
-        if (isFixed<Float>::value) {
-          norm_type max_[length_ghost / 2];
-          // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
-#pragma unroll
-          for (int i = 0; i < length_ghost / 2; i++)
-            max_[i] = fmaxf((norm_type)fabsf((norm_type)v[i]), (norm_type)fabsf((norm_type)v[i + length_ghost / 2]));
-          norm_type scale = 0.0;
-#pragma unroll
-          for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
-          ghost_norm[2 * dim + dir][parity * faceVolumeCB[dim] + x] = scale * fixedInvMaxValue<Float>::value;
-
-          real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
-#pragma unroll
-          for (int i = 0; i < length_ghost; i++) v[i] = v[i] * scale_inv;
-        }
-
-#pragma unroll
-        for (int i = 0; i < M_ghost; i++) {
-          GhostVector vecTmp;
-          // first do scalar copy converting into storage type
-#pragma unroll
-          for (int j = 0; j < N_ghost; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N_ghost + j]);
-          // second do vectorized copy into memory
-          vector_store(ghost[2 * dim + dir], parity * faceVolumeCB[dim] * M_ghost + i * faceVolumeCB[dim] + x, vecTmp);
-        }
+        save<GhostVector, length_ghost, M_ghost, N_ghost>(in, ghost[2 * dim + dir], parity * faceVolumeCB[dim] * M_ghost + x,
+                                                          faceVolumeCB[dim], ghost_norm[2 * dim + dir], parity * faceVolumeCB[dim] + x);
       }
 
       /**
@@ -1260,14 +1232,13 @@ namespace quda
         Vector vecTmp = vector_load<Vector>(ptr, idx);
         spinor_20 packed;
         memcpy(&packed, &vecTmp, sizeof(spinor_20));
-        unpack(out, packed);
+        packed.unpack(out);
       }
 
       template <typename Vector, int length>
       __device__ __host__ inline void save(const complex in[length / 2], Float *ptr, AllocInt idx) const
       {
-        spinor_20 packed;
-        pack(packed, in);
+        spinor_20 packed(in);
         Vector vecTmp;
         memcpy(&vecTmp, &packed, sizeof(spinor_20));
         vector_store<Vector>(ptr, idx, vecTmp);

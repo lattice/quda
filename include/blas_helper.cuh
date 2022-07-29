@@ -255,7 +255,7 @@ namespace quda
 #ifdef SPINOR_BITPACK
           spinor_20 packed;
           memcpy(&packed, &vecTmp, sizeof(spinor_20));
-          unpack(v, packed);
+          packed.unpack(v);
 #else
           norm_t nrm;
           array<real, len> v_;
@@ -319,8 +319,7 @@ namespace quda
           using Vector = int4;
           auto cb_offset = data.cb_norm_offset / 4;
 #ifdef SPINOR_BITPACK
-          spinor_20 packed;
-          pack(packed, v);
+          spinor_20 packed(v);
           Vector vecTmp;
           memcpy(&vecTmp, &packed, sizeof(spinor_20));
           vector_store<Vector>(data.spinor, parity * cb_offset + x, vecTmp);
