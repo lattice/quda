@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits>
 #include <math_helper.cuh>
 
 namespace quda {
@@ -54,13 +55,16 @@ namespace quda {
     constexpr float scale = 524287; // 2^19-1
 
     // find the max
-    float max[2] = {fabs((float)in[0].real()), fabs((float)in[0].imag())};
+    float max[2] = {fabsf(in[0].real()), fabsf(in[0].imag())};
 #pragma unroll
     for (int i = 1; i < 3; i++) {
-      max[0] = fmaxf(max[0], fabs(in[i].real()));
-      max[1] = fmaxf(max[1], fabs(in[i].imag()));
+      max[0] = fmaxf(max[0], fabsf(in[i].real()));
+      max[1] = fmaxf(max[1], fabsf(in[i].imag()));
     }
     max[0] = fmaxf(max[0], max[1]);
+
+    // ensures correct max covers all values if input vector is higher precision
+    if (sizeof(in[0].real()) > sizeof(float)) max[0] += max[0] * std::numeric_limits<float>::epsilon();
 
     // compute rounded up exponent for rescaling
     float_structure fs;
@@ -73,8 +77,8 @@ namespace quda {
     int vs[6];
 #pragma unroll
     for (int i = 0; i < 3; i++) {
-      vs[2 * i + 0] = lrintf(fdividef(in[i].real(), fs.f));
-      vs[2 * i + 1] = lrintf(fdividef(in[i].imag(), fs.f));
+      vs[2 * i + 0] = lrint(fdividef(in[i].real(), fs.f));
+      vs[2 * i + 1] = lrint(fdividef(in[i].imag(), fs.f));
     }
 
     unsigned int vu[6];
