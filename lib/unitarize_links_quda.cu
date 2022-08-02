@@ -6,17 +6,15 @@
 
 namespace quda {
 
-  // supress compiler warnings about unused variables when GPU_UNITARIZE is not set
-  // when we switch to C++17 consider [[maybe_unused]]
-  __attribute__((unused)) static const int max_iter_newton = 20;
-  __attribute__((unused))static const int max_iter = 20;
+  static const int max_iter_newton = 20;
+  static const int max_iter = 20;
 
-  __attribute__((unused)) static double unitarize_eps = 1e-14;
-  __attribute__((unused)) static double max_error = 1e-10;
-  __attribute__((unused)) static int reunit_allow_svd = 1;
-  __attribute__((unused)) static int reunit_svd_only  = 0;
-  __attribute__((unused)) static double svd_rel_error = 1e-6;
-  __attribute__((unused)) static double svd_abs_error = 1e-6;
+  static double unitarize_eps = 1e-14;
+  static double max_error = 1e-10;
+  static int reunit_allow_svd = 1;
+  static int reunit_svd_only  = 0;
+  static double svd_rel_error = 1e-6;
+  static double svd_abs_error = 1e-6;
 
   void setUnitarizeLinksConstants(double unitarize_eps_, double max_error_,
 				  bool reunit_allow_svd_, bool reunit_svd_only_,
@@ -30,7 +28,6 @@ namespace quda {
     svd_abs_error = svd_abs_error_;
   }
 
-#ifdef GPU_UNITARIZE
   template <typename T, int n, class Real>
   void copyArrayToLink(Matrix<T,n> &link, Real* array)
   {
@@ -75,15 +72,8 @@ namespace quda {
       } // dir
     }   // loop over volume
   }
-#else
-  void unitarizeLinksCPU(GaugeField &, const GaugeField &)
-  {
-    errorQuda("Unitarization has not been built");
-  }
-#endif
 
   // CPU function which checks that the gauge field is unitary
-#ifdef GPU_UNITARIZE
   bool isUnitary(const GaugeField& field, double max_error)
   {
     if (field.Location() != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
@@ -110,13 +100,6 @@ namespace quda {
     }   // i
     return true;
   }
-#else
-  bool isUnitary(const GaugeField &, double)
-  {
-    errorQuda("Unitarization has not been built");
-    return false;
-  }
-#endif
 
   template <typename Float, int nColor, QudaReconstructType recon>
   class UnitarizeLinks : TunableKernel3D {
@@ -154,18 +137,11 @@ namespace quda {
     long long bytes() const { return in.Bytes() + out.Bytes(); }
   };
 
-#ifdef GPU_UNITARIZE
   void unitarizeLinks(GaugeField& out, const GaugeField &in, int* fails)
   {
     checkPrecision(out, in);
-    instantiate<UnitarizeLinks, ReconstructWilson>(out, in, fails);
+    instantiate<UnitarizeLinks, ReconstructNo12>(out, in, fails);
   }
-#else
-  void unitarizeLinks(GaugeField &, const GaugeField &, int*)
-  {
-    errorQuda("Unitarization has not been built");
-  }
-#endif
 
   void unitarizeLinks(GaugeField &links, int* fails) { unitarizeLinks(links, links, fails); }
 
@@ -202,20 +178,13 @@ namespace quda {
     long long bytes() const { return 2 * u.Bytes(); }
   };
 
-#ifdef GPU_GAUGE_TOOLS
   void projectSU3(GaugeField &u, double tol, int *fails)
   {
     // check the the field doesn't have staggered phases applied
     if (u.StaggeredPhaseApplied())
       errorQuda("Cannot project gauge field with staggered phases applied");
 
-    instantiate<ProjectSU3, ReconstructWilson>(u, tol, fails);
+    instantiate<ProjectSU3>(u, tol, fails);
   }
-#else
-  void projectSU3(GaugeField &, double, int *)
-  {
-    errorQuda("Gauge tools have not been built");
-  }
-#endif
 
 } // namespace quda

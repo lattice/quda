@@ -154,7 +154,8 @@ namespace quda {
       csParam.create = QUDA_COPY_FIELD_CREATE;
       r_sloppy = mixed ? ColorSpinorField(csParam) : r.create_alias(csParam);
 
-      p.resize(num_offset, ColorSpinorField(r_sloppy));
+      p.resize(num_offset);
+      for (auto &pi : p) pi = r_sloppy;
 
       csParam.create = QUDA_NULL_FIELD_CREATE;
       Ap = ColorSpinorField(csParam);

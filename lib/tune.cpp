@@ -314,12 +314,11 @@ namespace quda
       if (comm_rank_global() == 0) {
         comm_broadcast_global(const_cast<char *>(serialized.str().c_str()), size);
       } else {
-        char *serstr = new char[size + 1];
-        comm_broadcast_global(serstr, size);
+        std::vector<char> serstr(size + 1);
+        comm_broadcast_global(serstr.data(), size);
         serstr[size] = '\0'; // null-terminate
-        serialized.str(serstr);
+        serialized.str(serstr.data());
         deserializeTuneCache(serialized);
-        delete[] serstr;
       }
     }
 #endif
@@ -754,6 +753,7 @@ namespace quda
         push(candidate);
       }
     }
+
     /**
      * @brief Broadcast candidates among ranks to make sure policy tuning does not break.
      *
@@ -761,7 +761,6 @@ namespace quda
     void broadcast()
     {
 #ifdef MULTI_GPU
-
       size_t size;
       std::string serialized;
       if (comm_rank_global() == 0) {
@@ -774,12 +773,11 @@ namespace quda
         if (comm_rank_global() == 0) {
           comm_broadcast_global(const_cast<char *>(serialized.c_str()), size);
         } else {
-          char *serstr = new char[size + 1];
-          comm_broadcast_global(serstr, size);
+          std::vector<char> serstr(size + 1);
+          comm_broadcast_global(serstr.data(), size);
           serstr[size] = '\0'; // null-terminate
-          std::string_view deserialized(serstr);
+          std::string_view deserialized(serstr.data());
           deserialize(deserialized);
-          delete[] serstr;
         }
       }
 #endif
@@ -908,11 +906,11 @@ namespace quda
           qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);
           if (verbosity >= QUDA_DEBUG_VERBOSE) {
-            printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
+            printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
                        static_cast<int>(param.block.x), static_cast<int>(param.block.y),
                        static_cast<int>(param.block.z), static_cast<int>(param.grid.x), static_cast<int>(param.grid.y),
                        static_cast<int>(param.grid.z), static_cast<int>(param.shared_bytes),
-                       static_cast<int>(param.aux.x), static_cast<int>(param.aux.y), static_cast<int>(param.aux.z));
+                       static_cast<int>(param.aux.x), static_cast<int>(param.aux.y), static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
           }
 
           tunable.apply(stream); // do initial call in case we need to jit compile for these parameters or if policy tuning
@@ -966,13 +964,14 @@ namespace quda
           qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);
           if (verbosity >= QUDA_DEBUG_VERBOSE) {
-            printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
+            printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
                        static_cast<int>(param.block.x), static_cast<int>(param.block.y),
                        static_cast<int>(param.block.z), static_cast<int>(param.grid.x), static_cast<int>(param.grid.y),
                        static_cast<int>(param.grid.z), static_cast<int>(param.shared_bytes),
-                       static_cast<int>(param.aux.x), static_cast<int>(param.aux.y), static_cast<int>(param.aux.z));
+                       static_cast<int>(param.aux.x), static_cast<int>(param.aux.y), static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
           }
 
+          tunable.apply(stream); // do warm up call, for consistency with the candidate tuning
           timer.start();
           for (int i = 0; i < tuneiterations; i++) {
             tunable.apply(stream); // calls tuneLaunch() again, which simply returns the currently active param
@@ -1014,6 +1013,13 @@ namespace quda
           printfQuda("Tuned %s giving %s for %s with %s\n", tunable.paramString(best_param).c_str(),
                      tunable.perfString(best_time).c_str(), key.name, key.aux);
         }
+
+        auto regression_tol = 1.1;
+        if (best_time > regression_tol * tc.getBestTime() && best_time > 1e-5) {
+          warningQuda("Unexpected regression when tuning candidates for %s: (%g > %g * %g)",
+                      key.name, best_time, regression_tol, tc.getBestTime());
+        }
+
         time(&now);
         best_param.comment = "# " + tunable.perfString(best_time) + tunable.miscString(best_param);
         best_param.comment += ", tuning took " + std::to_string(tune_timer.last()) + " seconds at ";

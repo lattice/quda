@@ -32,7 +32,7 @@ set (QUDA_OBJS
   inv_cg3_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
-  color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
+  color_spinor_field.cpp color_spinor_util.cu
   gauge_covdev.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
@@ -43,7 +43,7 @@ set (QUDA_OBJS
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp 
   llfat_quda.cu gauge_force.cu gauge_random.cu
-  gauge_field_strength_tensor.cu clover_quda.cu dslash_quda.cu
+  gauge_field_strength_tensor.cu clover_quda.cu 
   dslash_gamma_helper.cu dslash_clover_helper.cu
   staggered_kd_build_xinv.cu staggered_kd_reorder_xinv.cu staggered_kd_apply_xinv.cu
   madwf_transfer.cu madwf_tensor.cu
@@ -88,6 +88,7 @@ set (QUDA_OBJS
 
 # current workaround for nvshmem
 set(QUDA_DSLASH_OBJS 
+  dslash_quda.cu color_spinor_pack.cu
   dslash_staggered.cu dslash_improved_staggered.cu
   dslash_wilson.cu dslash_wilson_clover.cu dslash5_domain_wall.cu
   dslash_wilson_clover_preconditioned.cu 
@@ -253,11 +254,11 @@ if(QUDA_DIRAC_DOMAIN_WALL)
 endif(QUDA_DIRAC_DOMAIN_WALL)
 
 if(QUDA_DIRAC_STAGGERED)
-  target_compile_definitions(quda PUBLIC GPU_STAGGERED_DIRAC GPU_FATLINK GPU_UNITARIZE)
+  target_compile_definitions(quda PUBLIC GPU_STAGGERED_DIRAC)
 endif(QUDA_DIRAC_STAGGERED)
 
 if(QUDA_DIRAC_CLOVER)
-  target_compile_definitions(quda PUBLIC GPU_CLOVER_DIRAC GPU_WILSON_DIRAC GPU_GAUGE_TOOLS)
+  target_compile_definitions(quda PUBLIC GPU_CLOVER_DIRAC GPU_WILSON_DIRAC)
 endif(QUDA_DIRAC_CLOVER)
 
 if(QUDA_DIRAC_TWISTED_MASS)
@@ -266,12 +267,12 @@ endif(QUDA_DIRAC_TWISTED_MASS)
 
 if(QUDA_DIRAC_TWISTED_CLOVER)
   target_compile_definitions(quda PUBLIC GPU_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC GPU_TWISTED_MASS_DIRAC
-                                         GPU_WILSON_DIRAC GPU_GAUGE_TOOLS)
+                                         GPU_WILSON_DIRAC)
 endif(QUDA_DIRAC_TWISTED_CLOVER)
 
 if(QUDA_DIRAC_CLOVER_HASENBUSCH)
   target_compile_definitions(quda PUBLIC GPU_CLOVER_HASENBUSCH_TWIST GPU_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC
-                                         GPU_WILSON_DIRAC GPU_GAUGE_TOOLS)
+                                         GPU_WILSON_DIRAC)
 endif(QUDA_DIRAC_CLOVER_HASENBUSCH)
 
 if(QUDA_DIRAC_NDEG_TWISTED_MASS)
@@ -279,8 +280,7 @@ if(QUDA_DIRAC_NDEG_TWISTED_MASS)
 endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
 if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
-  target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC GPU_TWISTED_CLOVER_DIRAC
-                                         GPU_GAUGE_TOOLS)
+  target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC GPU_TWISTED_CLOVER_DIRAC)
 endif(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
 
 
@@ -293,7 +293,7 @@ if(QUDA_MULTIGRID)
 endif(QUDA_MULTIGRID)
 
 if(QUDA_GAUGE_ALG)
-  target_compile_definitions(quda PUBLIC GPU_GAUGE_ALG GPU_GAUGE_TOOLS GPU_UNITARIZE)
+  target_compile_definitions(quda PUBLIC)
 endif(QUDA_GAUGE_ALG)
 
 if(QUDA_SSTEP)
@@ -305,19 +305,15 @@ if(QUDA_BLOCKSOLVER)
 endif()
 
 if(QUDA_FORCE_GAUGE)
-  target_compile_definitions(quda PUBLIC GPU_GAUGE_FORCE GPU_GAUGE_TOOLS)
+  target_compile_definitions(quda PUBLIC)
 endif(QUDA_FORCE_GAUGE)
 
-if(QUDA_FORCE_HISQ)
-  target_compile_definitions(quda PUBLIC GPU_HISQ_FORCE GPU_STAGGERED_OPROD GPU_GAUGE_TOOLS)
-endif(QUDA_FORCE_HISQ)
-
 if(QUDA_GAUGE_TOOLS)
-  target_compile_definitions(quda PUBLIC GPU_GAUGE_TOOLS)
+  target_compile_definitions(quda PUBLIC)
 endif(QUDA_GAUGE_TOOLS)
 
 if(QUDA_GAUGE_ALG)
-  target_compile_definitions(quda PUBLIC GPU_GAUGE_ALG GPU_GAUGE_TOOLS GPU_UNITARIZE)
+  target_compile_definitions(quda PUBLIC)
 endif(QUDA_GAUGE_ALG)
 
 if(QUDA_INTERFACE_QDP OR QUDA_INTERFACE_ALL)
@@ -390,9 +386,9 @@ if(QUDA_ARPACK)
     # ARPACK-NG does not suppport logging - we must warn the user
     message(
       WARNING
-        "Specifying QUDA_ARPACK_LOGGING with ARPACK-NG package will cause link failures. Please ensure that QUDA_ARPACK_LOGGING=OFF if downloading ARPACK-NG or using system installed ARPACK-NG"
-    )
-    target_compile_definitions(ARPACK_LOGGING)
+      "Specifying QUDA_ARPACK_LOGGING with ARPACK-NG package will cause link failures. Please ensure that QUDA_ARPACK_LOGGING=OFF if downloading ARPACK-NG or using system installed ARPACK-NG"
+      )
+    target_compile_definitions(QUDA_ARPACK_LOGGING ON)
   endif()
   if(QUDA_DOWNLOAD_ARPACK)
     target_link_libraries(quda PUBLIC arpack-ng)
@@ -472,8 +468,6 @@ add_custom_command(
   TARGET quda
   PRE_LINK
   COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
-
-set_target_properties(quda PROPERTIES INSTALL_RPATH_USE_LINK_PATH ON)
 
 install(
   TARGETS quda

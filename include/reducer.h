@@ -6,6 +6,7 @@
 #include <math_helper.cuh>
 #include <float_vector.h>
 #include "comm_quda.h"
+#include "fast_intdiv.h"
 
 /**
    @file reducer.h
@@ -21,6 +22,12 @@
 
 namespace quda
 {
+
+#ifdef QUAD_SUM
+  using device_reduce_t = doubledouble;
+#else
+  using device_reduce_t = double;
+#endif
 
   namespace reducer
   {
@@ -106,13 +113,6 @@ namespace quda
     __device__ __host__ static inline T init() { return high<T>::value(); }
     __device__ __host__ static inline T apply(T a, T b) { return min(a, b); }
     __device__ __host__ inline T operator()(T a, T b) const { return apply(a, b); }
-  };
-
-  /**
-     identity transformer, preserves input
-   */
-  template <typename T> struct identity {
-    __device__ __host__ inline T operator()(T a) const { return a; }
   };
 
   /**
@@ -311,6 +311,34 @@ namespace quda
     __host__ __device__ inline Float operator()(const quda::complex<int> &x) const
     {
       return minimum<Float>::apply(abs(scale * x.real()), abs(scale * x.imag()));
+    }
+  };
+
+  /**
+     identity transformer, preserves input
+   */
+  struct identity {
+    identity() { }
+    template <typename T> constexpr T operator()(T a) const { return a; }
+  };
+
+  /**
+     milc gauge field mapper, allows us to pick out a given dimension subset
+   */
+  struct milc_mapper {
+    int dim;
+    int geometry;
+    int_fastdiv width;
+    milc_mapper(int dim, int geometry, int width) : dim(dim), geometry(geometry), width(width)
+    {
+      if (dim < 0 || dim >= geometry) errorQuda("invalid dimension %d", dim);
+    }
+
+    template <typename T> constexpr auto operator()(T i) const
+    {
+      auto inner = i % width;
+      auto outer = i / width;
+      return (outer * geometry + dim) * width + inner;
     }
   };
 

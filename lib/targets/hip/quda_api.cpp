@@ -221,6 +221,7 @@ namespace quda
 
       if (copy) {
         if (async) {
+#ifdef API_PROFILE
           QudaProfileType type = QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC;
           switch (kind) {
           case hipMemcpyDeviceToHost: type = QUDA_PROFILE_MEMCPY_D2H_ASYNC; break;
@@ -229,6 +230,7 @@ namespace quda
           case hipMemcpyDefault: type = QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC; break;
           default: errorQuda("Unsupported cudaMemcpyTypeAsync %d", kind);
           }
+#endif
           hipError_t error;
           PROFILE(error = hipMemcpyAsync(dst, src, count, kind, get_stream(stream)), type);
           set_runtime_error(error, "hipMemcpyAsync", func, file, line, active_tuning);

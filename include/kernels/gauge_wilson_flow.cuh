@@ -136,7 +136,7 @@ namespace quda
       using Link = Matrix<complex<real>, Arg::nColor>;
       complex<real> im(0.0,-1.0);
 
-      //Get stacetime and local coords
+      //Get spacetime and local coords
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
       for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr];

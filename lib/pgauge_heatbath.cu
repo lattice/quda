@@ -149,16 +149,9 @@ namespace quda {
    * @param[in] nhb number of heatbath steps
    * @param[in] nover number of overrelaxation steps
    */
-#ifdef GPU_GAUGE_ALG
   void Monte(GaugeField& data, RNG &rngstate, double Beta, int nhb, int nover)
   {
     instantiate<MonteAlg>(data, rngstate, (float)Beta, nhb, nover);
   }
-#else
-  void Monte(GaugeField &, RNG &, double, int, int)
-  {
-    errorQuda("Pure gauge code has not been built");
-  }
-#endif // GPU_GAUGE_ALG
 
 }

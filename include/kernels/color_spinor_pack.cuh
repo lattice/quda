@@ -5,6 +5,9 @@
 #include <kernel.h>
 #include <shared_memory_cache_helper.cuh>
 #include <dslash_quda.h>
+#include <dslash_shmem.h>
+#include <shmem_helper.cuh>
+#include <shmem_pack_helper.cuh>
 
 namespace quda {
 
@@ -78,9 +81,22 @@ namespace quda {
     int_fastdiv work_items;
     int threadDimMapLower[4];
     int threadDimMapUpper[4];
+#ifdef NVSHMEM_COMMS
+    char *packBuffer[4 * QUDA_MAX_DIM];
+    int neighbor_ranks[2 * QUDA_MAX_DIM];
+    int bytes[2 * QUDA_MAX_DIM];
 
-    PackGhostArg(const ColorSpinorField &a, int work_items, void **ghost, int parity, int nFace, int dagger) :
-      kernel_param(dim3(work_items, (a.Nspin() / spins_per_thread(a)) * (a.Ncolor() / colors_per_thread(a)), a.SiteSubset())),
+    dslash::shmem_sync_t counter;
+    dslash::shmem_sync_t waitcounter;
+    dslash::shmem_retcount_intra_t *retcount_intra;
+    dslash::shmem_retcount_inter_t *retcount_inter;
+    dslash::shmem_sync_t *sync_arr;
+#endif
+    int shmem = 0;
+
+    PackGhostArg(const ColorSpinorField &a, int work_items, void **ghost, int parity, int nFace, int dagger, int shmem_) :
+      kernel_param(
+        dim3(work_items, (a.Nspin() / spins_per_thread(a)) * (a.Ncolor() / colors_per_thread(a)), a.SiteSubset())),
       field(a, nFace, 0, ghost),
       volumeCB(a.VolumeCB()),
       nFace(nFace),
@@ -89,8 +105,16 @@ namespace quda {
       dagger(dagger),
       pc_type(a.PCType()),
       dc(a.getDslashConstant()),
-      threadDimMapLower{ },
-      threadDimMapUpper{ }
+      threadDimMapLower {},
+      threadDimMapUpper {},
+#ifdef NVSHMEM_COMMS
+      counter((activeTuning() && !policyTuning()) ? 2 : dslash::inc_exchangeghost_shmem_sync_counter()),
+      waitcounter(counter),
+      retcount_intra(dslash::get_shmem_retcount_intra()),
+      retcount_inter(dslash::get_shmem_retcount_inter()),
+      sync_arr(dslash::get_exchangeghost_shmem_sync_arr()),
+#endif
+      shmem(shmem_)
     {
       int prev = -1; // previous dimension that was partitioned
       for (int i = 0; i < 4; i++) {
@@ -101,6 +125,15 @@ namespace quda {
         threadDimMapUpper[i] = threadDimMapLower[i] + 2 * dc.ghostFaceCB[i];
         prev = i;
       }
+#ifdef NVSHMEM_COMMS
+      for (int i = 0; i < 4 * QUDA_MAX_DIM; i++) { packBuffer[i] = static_cast<char *>(ghost[i]); }
+      for (int dim = 0; dim < 4; dim++) {
+        for (int dir = 0; dir < 2; dir++) {
+          neighbor_ranks[2 * dim + dir] = comm_dim_partitioned(dim) ? comm_neighbor_rank(dir, dim) : -1;
+          bytes[2 * dim + dir] = a.GhostFaceBytes(dim);
+        }
+      }
+#endif
     }
   };
 
@@ -237,6 +270,9 @@ namespace quda {
           arg.field.Ghost(dim, dir, spinor_parity, ghost_idx, s, c, 0, max) = arg.field(spinor_parity, x_cb, s, c);
         }
       }
+#ifdef NVSHMEM_COMMS
+      if (arg.shmem) shmem_signalwait(0, 0, (arg.shmem & 4), arg);
+#endif
     }
   };
 

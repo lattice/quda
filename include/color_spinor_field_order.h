@@ -877,6 +877,30 @@ namespace quda
 #endif
 
       /**
+         @brief Wrapper to transform_reduce which is called by the
+         reducer functions, e.g., norm2 and abs_max
+         @tparam reducer The reduction operation we which to apply
+         @param[in] location The location of execution
+         @param[in] nParity Number of parities of the field
+         @param[in] volumeCB Checkerboard volume
+         @param[in] h The helper functor which acts as the transformer
+         in transform_reduce
+       */
+      template <typename reducer, typename helper>
+      auto transform_reduce(QudaFieldLocation location, int nParity, unsigned int volumeCB, helper h) const
+      {
+        std::vector<decltype(v)> v_eo(nParity);
+        for (auto i = 0u; i < v_eo.size(); i++) v_eo[i] = v + i * accessor.offset_cb;
+        std::vector<typename reducer::reduce_t> result(nParity);
+
+        ::quda::transform_reduce<reducer>(location, result, v_eo, volumeCB * nSpin * nColor * nVec, h);
+
+        auto total = reducer::init();
+        for (auto &res : result) total = reducer::apply(total, res);
+        return total;
+      }
+
+      /**
        * Returns the L2 norm squared of the field in a given dimension
        * @param[in] global Whether to do a global or process local norm2 reduction
        * @return L2 norm squared
@@ -884,9 +908,8 @@ namespace quda
       __host__ double norm2(const ColorSpinorField &v, bool global = true) const
       {
         commGlobalReductionPush(global);
-        double nrm2 = ::quda::transform_reduce<plus<double>>(
-          v.Location(), this->v, v.SiteSubset() * (unsigned int)v.VolumeCB() * nSpin * nColor * nVec,
-          square_<double, storeFloat>(scale_inv));
+        auto nrm2 = transform_reduce<plus<double>>(v.Location(), v.SiteSubset(), v.VolumeCB(),
+                                                   square_<double, storeFloat>(scale_inv));
         commGlobalReductionPop();
         return nrm2;
       }
@@ -899,9 +922,8 @@ namespace quda
       __host__ double abs_max(const ColorSpinorField &v, bool global = true) const
       {
         commGlobalReductionPush(global);
-        double absmax = ::quda::transform_reduce<maximum<Float>>(
-          v.Location(), this->v, v.SiteSubset() * (unsigned int)v.VolumeCB() * nSpin * nColor * nVec,
-          abs_max_<Float, storeFloat>(scale_inv));
+        auto absmax = transform_reduce<maximum<Float>>(v.Location(), v.SiteSubset(), v.VolumeCB(),
+                                                       abs_max_<Float, storeFloat>(scale_inv));
         commGlobalReductionPop();
         return absmax;
       }
@@ -915,8 +937,7 @@ namespace quda
       __host__ double norm2(bool global = true) const
       {
         commGlobalReductionPush(global);
-        double nrm2 = ::quda::transform_reduce<plus<double>>(location, v, nParity * volumeCB * nSpin * nColor * nVec,
-                                                             square_<double, storeFloat>(scale_inv));
+        auto nrm2 = transform_reduce<plus<double>>(location, nParity, volumeCB, square_<double, storeFloat>(scale_inv));
         commGlobalReductionPop();
         return nrm2;
       }
@@ -929,8 +950,8 @@ namespace quda
       __host__ double abs_max(bool global = true) const
       {
         commGlobalReductionPush(global);
-        double absmax = ::quda::transform_reduce<maximum<Float>>(location, v, nParity * volumeCB * nSpin * nColor * nVec,
-                                                                 abs_max_<Float, storeFloat>(scale_inv));
+        auto absmax
+          = transform_reduce<maximum<Float>>(location, nParity, volumeCB, abs_max_<Float, storeFloat>(scale_inv));
         commGlobalReductionPop();
         return absmax;
       }
@@ -1133,6 +1154,217 @@ namespace quda
           // second do vectorized copy into memory
           vector_store(ghost[2 * dim + dir], parity * faceVolumeCB[dim] * M_ghost + i * faceVolumeCB[dim] + x, vecTmp);
         }
+      }
+
+      /**
+         @brief This accessor routine returns a const
+         colorspinor_ghost_wrapper to this object, allowing us to
+         overload various operators for manipulating at the site
+         level interms of matrix operations.
+         @param[in] dim Dimensions of the ghost we are requesting
+         @param[in] ghost_idx Checkerboarded space-time ghost index we are requesting
+         @param[in] parity Parity we are requesting
+         @return Instance of a colorspinor_ghost+wrapper that curries in access to
+         this field at the above coordinates.
+      */
+      __device__ __host__ inline auto Ghost(int dim, int dir, int ghost_idx, int parity) const
+      {
+        return colorspinor_ghost_wrapper<real, Accessor>(*this, dim, dir, ghost_idx, parity);
+      }
+
+      /**
+         @brief Backup the field to the host when tuning
+      */
+      void save()
+      {
+        if (backup_h) errorQuda("Already allocated host backup");
+        backup_h = safe_malloc(bytes);
+        qudaMemcpy(backup_h, field, bytes, qudaMemcpyDeviceToHost);
+      }
+
+      /**
+         @brief Restore the field from the host after tuning
+      */
+      void load()
+      {
+        qudaMemcpy(field, backup_h, bytes, qudaMemcpyHostToDevice);
+        host_free(backup_h);
+        backup_h = nullptr;
+      }
+
+      size_t Bytes() const
+      {
+        return nParity * volumeCB * (Nc * Ns * 2 * sizeof(Float) + (isFixed<Float>::value ? sizeof(norm_type) : 0));
+      }
+    };
+
+    /**
+       @brief Accessor routine for ColorSpinorFields in native field
+       order.  Specialization for half-precision staggered QCD fields
+       where we pack each site into a 128-bit word (int4).
+       @tparam N Number of real numbers per short vector.  Ignored in this specialization.
+       @tparam spin_project Whether the ghosts are spin projected or not
+       @tparam huge_alloc Template parameter that enables 64-bit
+       pointer arithmetic for huge allocations (e.g., packed set of
+       vectors).  Default is to use 32-bit pointer arithmetic.
+     */
+    template <int N_, bool spin_project, bool huge_alloc>
+    struct FloatNOrder<short, 1, 3, N_, spin_project, huge_alloc> {
+      using Float = short;
+      static constexpr int Ns = 1;
+      static constexpr int Nc = 3;
+      static constexpr int length = 2 * Ns * Nc;
+      static constexpr int length_ghost = 2 * Ns * Nc;
+      using Accessor = FloatNOrder<Float, Ns, Nc, N_, spin_project, huge_alloc>;
+      using real = typename mapper<Float>::type;
+      using complex = complex<real>;
+      using Vector = int4;      // 128-bit packed type
+      using GhostVector = int4; // 128-bit packed type
+      using AllocInt = typename AllocType<huge_alloc>::type;
+      using norm_type = float;
+      Float *field;
+      const AllocInt offset; // offset can be 32-bit or 64-bit
+      int volumeCB;
+      int faceVolumeCB[4];
+      mutable Float *ghost[8];
+      int nParity;
+      void *backup_h; //! host memory for backing up the field when tuning
+      size_t bytes;
+
+      FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *buffer = 0, Float **ghost_ = 0) :
+        field(buffer ? buffer : (Float *)a.V()),
+        offset(a.Bytes() / (2 * sizeof(Vector))),
+        volumeCB(a.VolumeCB()),
+        nParity(a.SiteSubset()),
+        backup_h(nullptr),
+        bytes(a.Bytes())
+      {
+        for (int i = 0; i < 4; i++) { faceVolumeCB[i] = a.SurfaceCB(i) * nFace; }
+        resetGhost(ghost_ ? (void **)ghost_ : a.Ghost());
+      }
+
+      void resetGhost(void *const *ghost_) const
+      {
+        for (int dim = 0; dim < 4; dim++) {
+          for (int dir = 0; dir < 2; dir++) {
+            ghost[2 * dim + dir] = comm_dim_partitioned(dim) ? static_cast<Float *>(ghost_[2 * dim + dir]) : nullptr;
+          }
+        }
+      }
+
+      __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
+      {
+        real v[length];
+        Vector vecTmp = vector_load<Vector>(field, parity * offset + x);
+
+        // extract the norm
+        norm_type nrm;
+        memcpy(&nrm, &vecTmp.w, sizeof(norm_type));
+
+        // now copy into output and scale
+#pragma unroll
+        for (int i = 0; i < length; i++) copy_and_scale(v[i], reinterpret_cast<Float *>(&vecTmp)[i], nrm);
+
+#pragma unroll
+        for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
+      }
+
+      __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0) const
+      {
+        real v[length];
+
+#pragma unroll
+        for (int i = 0; i < length / 2; i++) {
+          v[2 * i + 0] = in[i].real();
+          v[2 * i + 1] = in[i].imag();
+        }
+
+        norm_type max_[length / 2];
+        // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
+#pragma unroll
+        for (int i = 0; i < length / 2; i++)
+          max_[i] = fmaxf(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length / 2]));
+        norm_type scale = 0.0;
+#pragma unroll
+        for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
+        norm_type nrm = scale * fixedInvMaxValue<Float>::value;
+
+        real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
+#pragma unroll
+        for (int i = 0; i < length; i++) v[i] = v[i] * scale_inv;
+
+        Vector vecTmp;
+        memcpy(&vecTmp.w, &nrm, sizeof(norm_type)); // pack the norm
+
+        // pack the spinor elements
+#pragma unroll
+        for (int i = 0; i < length; i++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[i], v[i]);
+
+        vector_store(field, parity * offset + x, vecTmp);
+      }
+
+      /**
+         @brief This accessor routine returns a colorspinor_wrapper to this object,
+         allowing us to overload various operators for manipulating at
+         the site level interms of matrix operations.
+         @param[in] x_cb Checkerboarded space-time index we are requesting
+         @param[in] parity Parity we are requesting
+         @return Instance of a colorspinor_wrapper that curries in access to
+         this field at the above coordinates.
+      */
+      __device__ __host__ inline auto operator()(int x_cb, int parity) const
+      {
+        return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
+      }
+
+      __device__ __host__ inline void loadGhost(complex out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const
+      {
+        real v[length_ghost];
+        GhostVector vecTmp = vector_load<GhostVector>(ghost[2 * dim + dir], parity * faceVolumeCB[dim] + x);
+
+        // extract the norm
+        norm_type nrm;
+        memcpy(&nrm, &vecTmp.w, sizeof(norm_type));
+
+#pragma unroll
+        for (int i = 0; i < length_ghost; i++) copy_and_scale(v[i], reinterpret_cast<Float *>(&vecTmp)[i], nrm);
+
+#pragma unroll
+        for (int i = 0; i < length_ghost / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
+      }
+
+      __device__ __host__ inline void saveGhost(const complex in[length_ghost / 2], int x, int dim, int dir,
+                                                int parity = 0) const
+      {
+        real v[length_ghost];
+
+#pragma unroll
+        for (int i = 0; i < length_ghost / 2; i++) {
+          v[2 * i + 0] = in[i].real();
+          v[2 * i + 1] = in[i].imag();
+        }
+
+        norm_type max_[length_ghost / 2];
+        // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
+#pragma unroll
+        for (int i = 0; i < length_ghost / 2; i++)
+          max_[i] = fmaxf(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length_ghost / 2]));
+        norm_type scale = 0.0;
+#pragma unroll
+        for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
+        norm_type nrm = scale * fixedInvMaxValue<Float>::value;
+
+        real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
+#pragma unroll
+        for (int i = 0; i < length_ghost; i++) v[i] = v[i] * scale_inv;
+
+        GhostVector vecTmp;
+        memcpy(&vecTmp.w, &nrm, sizeof(norm_type)); // pack the norm
+
+        // pack the spinor elements
+#pragma unroll
+        for (int i = 0; i < length_ghost; i++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[i], v[i]);
+        vector_store(ghost[2 * dim + dir], parity * faceVolumeCB[dim] + x, vecTmp);
       }
 
       /**

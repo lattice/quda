@@ -208,13 +208,16 @@ namespace quda
       tmp_sloppy = tmp.create_alias(csParam);
       tmp2_sloppy = tmp2.create_alias(csParam);
 
-      AS.resize(param.Nkrylov, csParam);
-      Q.resize(param.Nkrylov, csParam);
-      AQ.resize(param.Nkrylov, csParam);
-      Qtmp.resize(param.Nkrylov, csParam); // only used as an intermediate for pointer swaps
-
+      AS.resize(param.Nkrylov);
+      Q.resize(param.Nkrylov);
+      AQ.resize(param.Nkrylov);
+      Qtmp.resize(param.Nkrylov); // only used as an intermediate for pointer swaps
       S.resize(param.Nkrylov);
       for (int i = 0; i < param.Nkrylov; i++) {
+        AS[i] = ColorSpinorField(csParam);
+        Q[i] = ColorSpinorField(csParam);
+        AQ[i] = ColorSpinorField(csParam);
+        Qtmp[i] = ColorSpinorField(csParam);
         // in the power basis we can alias AS[k] to S[k+1]
         S[i] = (basis == QUDA_POWER_BASIS && i > 0) ? AS[i - 1] : ColorSpinorField(csParam);
       }

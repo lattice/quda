@@ -98,7 +98,7 @@ void setQudaDefaultMgTestParams()
     smoother_solve_type[i] = QUDA_INVALID_SOLVE;
     mg_schwarz_type[i] = QUDA_INVALID_SCHWARZ;
     mg_schwarz_cycle[i] = 1;
-    smoother_type[i] = QUDA_GCR_INVERTER;
+    smoother_type[i] = QUDA_MR_INVERTER;
     smoother_tol[i] = 0.25;
     coarse_solver[i] = QUDA_GCR_INVERTER;
     coarse_solver_tol[i] = 0.25;

@@ -852,6 +852,11 @@ namespace quda
     return flops;
   }
 
+  bool check_deviation(double deviation, double tol)
+  {
+    return (deviation > tol || std::isnan(deviation) || std::isinf(deviation));
+  }
+
   /**
      Verification that the constructed multigrid operator is valid
   */
@@ -899,7 +904,8 @@ namespace quda
           printfQuda(
             "Vector %d: norms v_k = %e P^\\dagger v_k = %e (1 - P P^\\dagger) v_k = %e, L2 relative deviation = %e\n",
             i, norm2(tmp1), norm2(*r_coarse), norm2(tmp2), deviation);
-        if (deviation > tol) errorQuda("L2 relative deviation for k=%d failed, %e > %e", i, deviation, tol);
+        if (check_deviation(deviation, tol))
+          errorQuda("L2 relative deviation for k=%d failed, %e > %e", i, deviation, tol);
       }
 
       // the oblique check
@@ -983,7 +989,7 @@ namespace quda
 
     deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("relative deviation = %e\n", deviation);
-    if (deviation > tol ) errorQuda("L2 relative deviation = %e > %e failed", deviation, tol);
+    if (check_deviation(deviation, tol)) errorQuda("L2 relative deviation = %e > %e failed", deviation, tol);
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (D_c - P^\\dagger D P) (native coarse operator to emulated operator)\n");
 
     zero(*tmp_coarse);
@@ -1096,7 +1102,7 @@ namespace quda
       if (getVerbosity() >= QUDA_VERBOSE)
         printfQuda("L2 norms: Emulated = %e, Native = %e, relative deviation = %e\n", norm2(*x_coarse), r_nrm, deviation);
 
-      if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
+      if (check_deviation(deviation, tol)) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
     }
 
     // check the preconditioned operator construction on the lower level if applicable
@@ -1114,7 +1120,7 @@ namespace quda
       if (getVerbosity() >= QUDA_VERBOSE)
         printfQuda("L2 norms: Emulated = %e, Native = %e, relative deviation = %e\n", norm2(x_coarse->Even()), r_nrm,
                    deviation);
-      if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
+      if (check_deviation(deviation, tol)) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
 
       // check Doe
       if (getVerbosity() >= QUDA_SUMMARIZE)
@@ -1127,7 +1133,7 @@ namespace quda
       if (getVerbosity() >= QUDA_VERBOSE)
         printfQuda("L2 norms: Emulated = %e, Native = %e, relative deviation = %e\n", norm2(x_coarse->Odd()), r_nrm,
                    deviation);
-      if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
+      if (check_deviation(deviation, tol)) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
     }
 
     // here we check that the Hermitian conjugate operator is working
@@ -1143,7 +1149,7 @@ namespace quda
       double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Smoother normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
 						     real(dot), imag(dot), deviation);
-      if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
+      if (check_deviation(deviation, tol)) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
     }
 
     { // normal operator check for residual operator
@@ -1158,7 +1164,7 @@ namespace quda
       double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
 						     real(dot), imag(dot), deviation);
-      if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
+      if (check_deviation(deviation, tol)) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
     }
 
     // Not useful for staggered op since it's a unitary transform

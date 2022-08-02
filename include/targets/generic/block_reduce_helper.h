@@ -30,18 +30,15 @@ namespace quda
      @brief block_reduce_param is used as a container for passing
      non-type parameters to specialize block_reduce through the
      target::dispatch
-     @tparam block_size_x_ The number of threads in the x dimension
-     @tparam block_size_y_ The number of threads in the y dimension
-     @tparam block_size_z_ The number of threads in the z dimension
-     @tparam batched Whether this is a batched reduction or not.  If
-     batched, then the block_size_z_ parameter is set equal to the
-     batch size.
+     @tparam block_dim Block dimension of the reduction (1, 2 or 3)
+     @tparam batch_size Batch size of the reduction.  Threads will be
+     ordered such that batch size is the slowest running index.  Note
+     that batch_size > 1 requires block_dim <= 2.
    */
-  template <int block_size_x_, int block_size_y_, int block_size_z_, bool batched> struct block_reduce_param {
-    static constexpr int block_size_x = block_size_x_;
-    static constexpr int block_size_y = block_size_y_;
-    static constexpr int block_size_z = !batched ? block_size_z_ : 1;
-    static constexpr int batch_size = !batched ? 1 : block_size_z_;
+  template <int block_dim_, int batch_size_ = 1> struct block_reduce_param {
+    static constexpr int block_dim = block_dim_;
+    static constexpr int batch_size = batch_size_;
+    static_assert(batch_size == 1 || block_dim <= 2, "Batching not possible with 3-d block reduction");
   };
 
   /**
@@ -143,17 +140,13 @@ namespace quda
      @brief BlockReduce provides a generic interface for performing
      perform reductions at the block level
      @tparam T The type of the value that we are reducing
-     @tparam block_size_x The number of threads in the x dimension
-     @tparam block_size_y The number of threads in the y dimension
-     @tparam block_size_z The number of threads in the z dimension
-     @tparam batched Whether this is a batched reduction or not.  If
-     batched, then the block_size_z_ parameter is set equal to the
-     batch size.
+     @tparam block_dim The number of thread block dimensions we are reducing
+     @tparam batch_size Batch size of the reduction.  Threads will be
+     ordered such that batch size is the slowest running index.
   */
-  template <typename T, int block_size_x, int block_size_y = 1, int block_size_z = 1, bool batched = false>
-  class BlockReduce
+  template <typename T, int block_dim, int batch_size = 1> class BlockReduce
   {
-    using param_t = block_reduce_param<block_size_x, block_size_y, block_size_z, batched>;
+    using param_t = block_reduce_param<block_dim, batch_size>;
     const int batch;
 
   public:

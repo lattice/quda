@@ -113,6 +113,7 @@ enum class Kernel {
   reDotProduct_block,
   cDotProductNorm_block,
   cDotProduct_block,
+  hDotProduct_block,
   caxpyXmazMR
 };
 
@@ -159,6 +160,7 @@ const std::map<Kernel, std::string> kernel_map
      {Kernel::reDotProduct_block, "reDotProduct_block"},
      {Kernel::cDotProductNorm_block, "cDotProductNorm_block"},
      {Kernel::cDotProduct_block, "cDotProduct_block"},
+     {Kernel::hDotProduct_block, "hDotProduct_block"},
      {Kernel::caxpyXmazMR, "caxpyXmazMR"}};
 
 const int Nkernels = kernel_map.size();
@@ -522,6 +524,10 @@ protected:
 
       case Kernel::cDotProduct_block:
         for (int i = 0; i < niter; ++i) blas::cDotProduct(A, xmD, ymoD);
+        break;
+
+      case Kernel::hDotProduct_block:
+        for (int i = 0; i < niter; ++i) blas::hDotProduct(A2, xmD, xmD);
         break;
 
       case Kernel::caxpyXmazMR:
@@ -1012,6 +1018,19 @@ protected:
         }
       }
       error /= Nsrc * Msrc;
+      break;
+
+    case Kernel::hDotProduct_block:
+      for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
+      blas::hDotProduct(A2, xmD, xmD);
+      blas::cDotProduct(B2, xmD, xmD);
+      error = 0.0;
+      for (int i = 0; i < Nsrc; i++) {
+        for (int j = 0; j < Nsrc; j++) {
+          error += std::abs(A2[i * Nsrc + j] - B2[i * Nsrc + j]) / std::abs(B2[i * Nsrc + j]);
+        }
+      }
+      error /= Nsrc * Nsrc;
       break;
 
     case Kernel::caxpyXmazMR:

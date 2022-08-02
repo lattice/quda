@@ -52,7 +52,7 @@ namespace quda {
   };
 
   template <typename Arg>
-  class GaugeFixQuality : TunableReduction2D<> {
+  class GaugeFixQuality : TunableReduction2D {
     Arg &arg;
     const GaugeField &meta;
 
@@ -204,8 +204,8 @@ namespace quda {
     FFTPlanHandle plan_zt;
 
     GaugeFixArg<Float, recon> arg(data, alpha0);
-    SetPlanFFT2DMany(plan_zt, size, 0, data.Precision());     //for space and time ZT
-    SetPlanFFT2DMany(plan_xy, size, 1, data.Precision());    //with space only XY
+    SetPlanFFT2DMany(plan_zt, size, 0, data.Precision()); // for space and time ZT
+    SetPlanFFT2DMany(plan_xy, size, 1, data.Precision()); // with space only XY
 
     GaugeFixFFTRotate<Float> GFRotate(data);
 
@@ -300,8 +300,8 @@ namespace quda {
 
       action0 = action;
     }
-    if ((iter % verbose_interval) != 0 && getVerbosity() >= QUDA_SUMMARIZE)
-      printf("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter, argQ.getAction(), argQ.getTheta(), diff);
+    if ((iter % verbose_interval) != (verbose_interval - 1) && getVerbosity() >= QUDA_SUMMARIZE)
+      printf("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
     
     // Reunitarize at end
     const double unitarize_eps = 1e-14;
@@ -386,18 +386,11 @@ namespace quda {
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    */
-#if defined(GPU_GAUGE_ALG)
   void gaugeFixingFFT(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double alpha,
                       const int autotune, const double tolerance, const int stopWtheta)
   {
     if (comm_partitioned()) errorQuda("Gauge Fixing with FFTs in multi-GPU support NOT implemented yet!");
-    instantiate<GaugeFixingFFT, ReconstructNo12>(data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
+    instantiate<GaugeFixingFFT>(data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
   }
-#else
-  void gaugeFixingFFT(GaugeField&, const int, const int, const int, const double, const int, const double, const int)
-  {
-    errorQuda("Gauge fixing has bot been built");
-  }
-#endif
 
 }
