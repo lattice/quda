@@ -111,34 +111,13 @@ namespace quda {
    */
   template<typename> struct mapper { };
   template<> struct mapper<double> { typedef double type; };
+#ifdef SPINOR_BITPACK
+  template<> struct mapper<float> { typedef double type; };
+#else
   template<> struct mapper<float> { typedef float type; };
+#endif
   template<> struct mapper<short> { typedef float type; };
-  template <> struct mapper<int8_t> {
-    typedef float type;
-  };
-
-  template<> struct mapper<double2> { typedef double2 type; };
-  template<> struct mapper<float2> { typedef float2 type; };
-  template<> struct mapper<short2> { typedef float2 type; };
-  template<> struct mapper<char2> { typedef float2 type; };
-
-  template<> struct mapper<double4> { typedef double4 type; };
-  template<> struct mapper<float4> { typedef float4 type; };
-  template<> struct mapper<short4> { typedef float4 type; };
-  template<> struct mapper<char4> { typedef float4 type; };
-
-  template <> struct mapper<double8> {
-    typedef double8 type;
-  };
-  template <> struct mapper<float8> {
-    typedef float8 type;
-  };
-  template <> struct mapper<short8> {
-    typedef float8 type;
-  };
-  template <> struct mapper<char8> {
-    typedef float8 type;
-  };
+  template<> struct mapper<int8_t> { typedef float type; };
 
   template<typename> struct vec_length { static const int value = 0; };
   template <> struct vec_length<double8> {
