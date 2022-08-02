@@ -1861,8 +1861,8 @@ namespace quda
           }
         }
         // construct string specifying which policies have been enabled
-        for (int i = 0; i < (int)QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED; i++) {
-          strcat(policy_string, (int)policies[i] == i ? "1" : "0");
+        for (int i = 0; i < static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED); i++) {
+          strcat(policy_string, static_cast<int>(policies[i]) == i ? "1" : "0");
         }
 
        static char *dslash_pack_env = getenv("QUDA_ENABLE_DSLASH_PACK");
@@ -1989,13 +1989,13 @@ namespace quda
    // Find the best dslash policy
    bool advanceAux(TuneParam &param) const
    {
-     while ((unsigned)param.aux.x < policies.size()-1) {
+     while (static_cast<unsigned>(param.aux.x) < policies.size()-1) {
        param.aux.x++;
        if (policies[param.aux.x] != QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED) return true;
      }
      param.aux.x = first_active_policy;
 
-     while ((unsigned)param.aux.y < p2p_policies.size()-1) {
+     while (static_cast<unsigned>(param.aux.y) < p2p_policies.size()-1) {
        param.aux.y++;
        if (p2p_policies[param.aux.y] != QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED) return true;
      }

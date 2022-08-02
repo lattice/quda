@@ -274,8 +274,8 @@ namespace quda
       printfQuda("create = %d\n", create);
       printfQuda("pc_type = %d\n", pc_type);
       printfQuda("suggested_parity = %d\n", suggested_parity);
-      printfQuda("v = %lx\n", (unsigned long)v);
-      printfQuda("norm_offset = %lu\n", (unsigned long)norm_offset);
+      printfQuda("v = %lx\n", reinterpret_cast<unsigned long>(v));
+      printfQuda("norm_offset = %lu\n", static_cast<unsigned long>(norm_offset));
       //! for deflation etc.
       if (is_composite) printfQuda("Number of elements = %d\n", composite_dim);
     }

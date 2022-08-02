@@ -5,6 +5,12 @@
 
 namespace quda {
 
+#ifdef SPINOR_BITPACK
+  constexpr bool spinor_bitpack() { return true; }
+#else
+  constexpr bool spinor_bitpack() { return false; }
+#endif
+
   union float_structure {
     float f;
     struct float32 {

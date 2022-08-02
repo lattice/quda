@@ -117,7 +117,9 @@ namespace quda {
           Functor<device_real_t> f_(NXZ, NYW);
 
           // redefine site_unroll with device_store types to ensure we have correct N/Ny/M values
-          constexpr bool site_unroll = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
+          constexpr bool site_unroll = !std::is_same_v<device_store_t, device_y_store_t> ||
+            isFixed<device_store_t>::value || (spinor_bitpack() && nSpin == 1 && std::is_same_v<device_store_t, float>);
+
           constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
           constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
@@ -499,7 +501,7 @@ namespace quda {
     void axpyBzpcx(const std::vector<double> &a, csfield_ref_vec &&x_, csfield_ref_vec &&y_,
                         const std::vector<double> &b, ColorSpinorField &z_, const std::vector<double> &c)
     {
-      if (y_.size() <= (size_t)max_N_multi_1d()) {
+      if (y_.size() <= static_cast<size_t>(max_N_multi_1d())) {
         // swizzle order since we are writing to x_ and y_, but the
 	// multi-blas only allow writing to y and w, and moreover the
 	// block width of y and w must match, and x and z must match.
@@ -527,7 +529,7 @@ namespace quda {
     void caxpyBxpz(const std::vector<Complex> &a, csfield_ref_vec &&x_, ColorSpinorField &y_,
                         const std::vector<Complex> &b, ColorSpinorField &z_)
     {
-      if (x_.size() <= (size_t)max_N_multi_1d() && is_valid_NXZ(x_.size(), false, y_.Precision())) // only split if we have to.
+      if (x_.size() <= static_cast<size_t>(max_N_multi_1d()) && is_valid_NXZ(x_.size(), false, y_.Precision())) // only split if we have to.
       {
         // swizzle order since we are writing to y_ and z_, but the
         // multi-blas only allow writing to y and w, and moreover the

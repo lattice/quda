@@ -65,43 +65,43 @@ namespace quda
   };
 
   template <typename T, int Nc, int Ns>
-  template <typename S>
-  __device__ __host__ inline void ColorSpinor<T, Nc, Ns>::operator=(const colorspinor_wrapper<T, S> &a)
+  template <typename U, typename S>
+  __device__ __host__ inline void ColorSpinor<T, Nc, Ns>::operator=(const colorspinor_wrapper<U, S> &a)
   {
     a.field.load(data, a.x_cb, a.parity);
   }
 
   template <typename T, int Nc, int Ns>
-  template <typename S>
-  __device__ __host__ inline ColorSpinor<T, Nc, Ns>::ColorSpinor(const colorspinor_wrapper<T, S> &a)
+  template <typename U, typename S>
+  __device__ __host__ inline ColorSpinor<T, Nc, Ns>::ColorSpinor(const colorspinor_wrapper<U, S> &a)
   {
     a.field.load(data, a.x_cb, a.parity);
   }
 
   template <typename T, int Nc>
-  template <typename S>
-  __device__ __host__ inline void ColorSpinor<T, Nc, 2>::operator=(const colorspinor_wrapper<T, S> &a)
+  template <typename U, typename S>
+  __device__ __host__ inline void ColorSpinor<T, Nc, 2>::operator=(const colorspinor_wrapper<U, S> &a)
   {
     a.field.load(data, a.x_cb, a.parity);
   }
 
   template <typename T, int Nc>
-  template <typename S>
-  __device__ __host__ inline ColorSpinor<T, Nc, 2>::ColorSpinor(const colorspinor_wrapper<T, S> &a)
+  template <typename U, typename S>
+  __device__ __host__ inline ColorSpinor<T, Nc, 2>::ColorSpinor(const colorspinor_wrapper<U, S> &a)
   {
     a.field.load(data, a.x_cb, a.parity);
   }
 
   template <typename T, int Nc>
-  template <typename S>
-  __device__ __host__ inline void ColorSpinor<T, Nc, 4>::operator=(const colorspinor_wrapper<T, S> &a)
+  template <typename U, typename S>
+  __device__ __host__ inline void ColorSpinor<T, Nc, 4>::operator=(const colorspinor_wrapper<U, S> &a)
   {
     a.field.load(data, a.x_cb, a.parity);
   }
 
   template <typename T, int Nc>
-  template <typename S>
-  __device__ __host__ inline ColorSpinor<T, Nc, 4>::ColorSpinor(const colorspinor_wrapper<T, S> &a)
+  template <typename U, typename S>
+  __device__ __host__ inline ColorSpinor<T, Nc, 4>::ColorSpinor(const colorspinor_wrapper<U, S> &a)
   {
     a.field.load(data, a.x_cb, a.parity);
   }
@@ -150,43 +150,43 @@ namespace quda
   };
 
   template <typename T, int Nc, int Ns>
-  template <typename S>
-  __device__ __host__ inline void ColorSpinor<T, Nc, Ns>::operator=(const colorspinor_ghost_wrapper<T, S> &a)
+  template <typename U, typename S>
+  __device__ __host__ inline void ColorSpinor<T, Nc, Ns>::operator=(const colorspinor_ghost_wrapper<U, S> &a)
   {
     a.field.loadGhost(data, a.ghost_idx, a.dim, a.dir, a.parity);
   }
 
   template <typename T, int Nc, int Ns>
-  template <typename S>
-  __device__ __host__ inline ColorSpinor<T, Nc, Ns>::ColorSpinor(const colorspinor_ghost_wrapper<T, S> &a)
+  template <typename U, typename S>
+  __device__ __host__ inline ColorSpinor<T, Nc, Ns>::ColorSpinor(const colorspinor_ghost_wrapper<U, S> &a)
   {
     a.field.loadGhost(data, a.ghost_idx, a.dim, a.dir, a.parity);
   }
 
   template <typename T, int Nc>
-  template <typename S>
-  __device__ __host__ inline void ColorSpinor<T, Nc, 2>::operator=(const colorspinor_ghost_wrapper<T, S> &a)
+  template <typename U, typename S>
+  __device__ __host__ inline void ColorSpinor<T, Nc, 2>::operator=(const colorspinor_ghost_wrapper<U, S> &a)
   {
     a.field.loadGhost(data, a.ghost_idx, a.dim, a.dir, a.parity);
   }
 
   template <typename T, int Nc>
-  template <typename S>
-  __device__ __host__ inline ColorSpinor<T, Nc, 2>::ColorSpinor(const colorspinor_ghost_wrapper<T, S> &a)
+  template <typename U, typename S>
+  __device__ __host__ inline ColorSpinor<T, Nc, 2>::ColorSpinor(const colorspinor_ghost_wrapper<U, S> &a)
   {
     a.field.loadGhost(data, a.ghost_idx, a.dim, a.dir, a.parity);
   }
 
   template <typename T, int Nc>
-  template <typename S>
-  __device__ __host__ inline void ColorSpinor<T, Nc, 4>::operator=(const colorspinor_ghost_wrapper<T, S> &a)
+  template <typename U, typename S>
+  __device__ __host__ inline void ColorSpinor<T, Nc, 4>::operator=(const colorspinor_ghost_wrapper<U, S> &a)
   {
     a.field.loadGhost(data, a.ghost_idx, a.dim, a.dir, a.parity);
   }
 
   template <typename T, int Nc>
-  template <typename S>
-  __device__ __host__ inline ColorSpinor<T, Nc, 4>::ColorSpinor(const colorspinor_ghost_wrapper<T, S> &a)
+  template <typename U, typename S>
+  __device__ __host__ inline ColorSpinor<T, Nc, 4>::ColorSpinor(const colorspinor_ghost_wrapper<U, S> &a)
   {
     a.field.loadGhost(data, a.ghost_idx, a.dim, a.dir, a.parity);
   }
@@ -498,7 +498,7 @@ namespace quda
       */
       __device__ __host__ inline void operator=(const fieldorder_wrapper<Float, storeFloat, block_float_, norm_t> &a) const
       {
-        *this = complex<Float>(a);
+        *this = static_cast<complex<Float>>(a);
       }
 
       /**
@@ -509,7 +509,7 @@ namespace quda
       __device__ __host__ inline void
       operator=(const fieldorder_wrapper<theirFloat, theirStoreFloat, their_block_float, their_norm_t> &a) const
       {
-        *this = complex<Float>(a);
+        *this = static_cast<complex<Float>>(a);
       }
 
       /**
@@ -556,7 +556,7 @@ namespace quda
       */
       template <typename theirFloat> __device__ __host__ inline void operator+=(const complex<theirFloat> &a) const
       {
-        *this = complex<Float>(*this) + complex<Float>(a);
+        *this = static_cast<complex<Float>>(*this) + static_cast<complex<Float>>(a);
       }
 
       /**
@@ -573,28 +573,28 @@ namespace quda
     __device__ __host__ inline complex<Float>
     operator*(const Float &a, const fieldorder_wrapper<Float, storeFloat, block_float, norm_t> &b)
     {
-      return a * complex<Float>(b);
+      return a * static_cast<complex<Float>>(b);
     }
 
     template <typename Float, typename storeFloat, bool block_float, typename norm_t>
     __device__ __host__ inline complex<Float>
     operator*(const fieldorder_wrapper<Float, storeFloat, block_float, norm_t> &a, const Float &b)
     {
-      return complex<Float>(a) * b;
+      return static_cast<complex<Float>>(a) * b;
     }
 
     template <typename Float, typename storeFloat, bool block_float, typename norm_t>
     __device__ __host__ inline complex<Float>
     operator*(const complex<Float> &a, const fieldorder_wrapper<Float, storeFloat, block_float, norm_t> &b)
     {
-      return a * complex<Float>(b);
+      return a * static_cast<complex<Float>>(b);
     }
 
     template <typename Float, typename storeFloat, bool block_float, typename norm_t>
     __device__ __host__ inline complex<Float>
     operator*(const fieldorder_wrapper<Float, storeFloat, block_float, norm_t> &a, const complex<Float> &b)
     {
-      return complex<Float>(a) * b;
+      return static_cast<complex<Float>>(a) * b;
     }
 
     template <typename Float, typename storeFloat, bool block_float, typename norm_t>
@@ -1005,7 +1005,7 @@ namespace quda
       size_t bytes;
 
       FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *buffer = 0, Float **ghost_ = 0) :
-        field(buffer ? buffer : (Float *)a.V()),
+        field(buffer ? buffer : reinterpret_cast<Float *>(const_cast<ColorSpinorField&>(a).V())),
         norm(buffer ? reinterpret_cast<norm_type *>(reinterpret_cast<char *>(buffer) + a.NormOffset()) :
                       const_cast<norm_type *>(reinterpret_cast<const norm_type *>(a.Norm()))),
         offset(a.Bytes() / (2 * sizeof(Float) * N)),
@@ -1016,7 +1016,7 @@ namespace quda
         bytes(a.Bytes())
       {
         for (int i = 0; i < 4; i++) { faceVolumeCB[i] = a.SurfaceCB(i) * nFace; }
-        resetGhost(ghost_ ? (void **)ghost_ : a.Ghost());
+        resetGhost(ghost_ ? reinterpret_cast<void **>(ghost_) : a.Ghost());
       }
 
       void resetGhost(void *const *ghost_) const
@@ -1032,72 +1032,98 @@ namespace quda
         }
       }
 
-      template <typename Vector, int length, int M, int N>
-      __device__ __host__ inline void load(complex out[length / 2], const Float *ptr, AllocInt idx, int stride,
+      template <typename Vector, int length, int M, int N, typename T>
+      __device__ __host__ inline void load(T out[length / 2], const Float *ptr, AllocInt idx, int stride,
                                            const norm_type *norm_ptr, AllocInt norm_idx) const
       {
-        real v[length];
-        norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm_ptr, norm_idx) : 0.0;
+        if constexpr (spinor_bitpack() && Ns == 1 && Nc == 3 && std::is_same_v<float, Float>) {
+          spinor_30 packed;
 
 #pragma unroll
-        for (int i = 0; i < M; i++) {
-          // first load from memory
-          Vector vecTmp = vector_load<Vector>(ptr, idx + stride * i);
-          // now copy into output and scale
+          for (int i = 0; i < M; i++) {
+            Vector vecTmp = vector_load<Vector>(ptr, idx + stride * i);
+            memcpy(reinterpret_cast<char*>(&packed) + i * 2 * sizeof(int), &vecTmp, 2 * sizeof(int));
+          }
+
+          packed.unpack(out);
+
+        } else {
+          real v[length];
+          norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm_ptr, norm_idx) : 0.0;
+
 #pragma unroll
-          for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
+          for (int i = 0; i < M; i++) {
+            // first load from memory
+            Vector vecTmp = vector_load<Vector>(ptr, idx + stride * i);
+            // now copy into output and scale
+#pragma unroll
+            for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
+          }
+
+#pragma unroll
+          for (int i = 0; i < length / 2; i++) out[i] = T(v[2 * i + 0], v[2 * i + 1]);
         }
-
-#pragma unroll
-        for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
       }
 
-      template <typename Vector, int length, int M, int N>
-      __device__ __host__ inline void save(const complex in[length / 2], Float *ptr, AllocInt idx, int stride,
+      template <typename Vector, int length, int M, int N, typename T>
+      __device__ __host__ inline void save(const T in[length / 2], Float *ptr, AllocInt idx, int stride,
                                            norm_type *norm_ptr, AllocInt norm_idx) const
       {
-        real v[length];
+        if constexpr (spinor_bitpack() && Ns == 1 && Nc == 3 && std::is_same_v<float, Float>) {
+          spinor_30 packed(in);
 
 #pragma unroll
-        for (int i = 0; i < length / 2; i++) {
-          v[2 * i + 0] = in[i].real();
-          v[2 * i + 1] = in[i].imag();
-        }
+          for (int i = 0; i < M; i++) {
+            Vector vecTmp;
+            memcpy(&vecTmp, reinterpret_cast<char*>(&packed) + i * 2 * sizeof(int), 2 * sizeof(int));
+            vector_store(ptr, idx + stride * i, vecTmp);
+          }
+        } else {
 
-        if (isFixed<Float>::value) {
-          norm_type max_[length / 2];
-          // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
-#pragma unroll
-          for (int i = 0; i < length / 2; i++)
-            max_[i] = fmaxf(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length / 2]));
-          norm_type scale = 0.0;
-#pragma unroll
-          for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
-          norm_ptr[norm_offset] = scale * fixedInvMaxValue<Float>::value;
-
-          real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
-#pragma unroll
-          for (int i = 0; i < length; i++) v[i] = v[i] * scale_inv;
-        }
+          real v[length];
 
 #pragma unroll
-        for (int i = 0; i < M; i++) {
-          Vector vecTmp;
-          // first do scalar copy converting into storage type
+          for (int i = 0; i < length / 2; i++) {
+            v[2 * i + 0] = in[i].real();
+            v[2 * i + 1] = in[i].imag();
+          }
+
+          if (isFixed<Float>::value) {
+            norm_type max_[length / 2];
+            // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
-          for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N + j]);
-          // second do vectorized copy into memory
-          vector_store(ptr, idx + stride * i, vecTmp);
+            for (int i = 0; i < length / 2; i++)
+              max_[i] = fmaxf(fabsf(static_cast<norm_type>(v[i])), fabsf(static_cast<norm_type>(v[i + length / 2])));
+            norm_type scale = 0.0;
+#pragma unroll
+            for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
+            norm_ptr[norm_offset] = scale * fixedInvMaxValue<Float>::value;
+
+            real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
+#pragma unroll
+            for (int i = 0; i < length; i++) v[i] = v[i] * scale_inv;
+          }
+
+#pragma unroll
+          for (int i = 0; i < M; i++) {
+            Vector vecTmp;
+            // first do scalar copy converting into storage type
+#pragma unroll
+            for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N + j]);
+            // second do vectorized copy into memory
+            vector_store(ptr, idx + stride * i, vecTmp);
+          }
         }
       }
 
-
-      __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
+      template <typename T>
+      __device__ __host__ inline void load(T out[length / 2], int x, int parity = 0) const
       {
         load<Vector, length, M, N>(out, field, parity * offset + x, volumeCB, norm, x + parity * norm_offset);
       }
 
-      __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0) const
+      template <typename T>
+      __device__ __host__ inline void save(const T in[length / 2], int x, int parity = 0) const
       {
         save<Vector, length, M, N>(in, field, parity * offset + x, volumeCB, norm, x + parity * norm_offset);
       }
@@ -1116,13 +1142,15 @@ namespace quda
         return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
       }
 
-      __device__ __host__ inline void loadGhost(complex out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const
+      template <typename T>
+      __device__ __host__ inline void loadGhost(T out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const
       {
         load<GhostVector, length_ghost, M_ghost, N_ghost>(out, ghost[2 * dim + dir], parity * faceVolumeCB[dim] * M_ghost + x,
                                                           faceVolumeCB[dim], ghost_norm[2 * dim + dir], parity * faceVolumeCB[dim] + x);
       }
 
-      __device__ __host__ inline void saveGhost(const complex in[length_ghost / 2], int x, int dim, int dir,
+      template <typename T>
+      __device__ __host__ inline void saveGhost(const T in[length_ghost / 2], int x, int dim, int dir,
                                                 int parity = 0) const
       {
         save<GhostVector, length_ghost, M_ghost, N_ghost>(in, ghost[2 * dim + dir], parity * faceVolumeCB[dim] * M_ghost + x,
@@ -1205,7 +1233,7 @@ namespace quda
       size_t bytes;
 
       FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *buffer = 0, Float **ghost_ = 0) :
-        field(buffer ? buffer : (Float *)a.V()),
+        field(buffer ? buffer : reinterpret_cast<Float *>(const_cast<ColorSpinorField&>(a).V())),
         offset(a.Bytes() / (2 * sizeof(Vector))),
         volumeCB(a.VolumeCB()),
         nParity(a.SiteSubset()),
@@ -1213,7 +1241,7 @@ namespace quda
         bytes(a.Bytes())
       {
         for (int i = 0; i < 4; i++) { faceVolumeCB[i] = a.SurfaceCB(i) * nFace; }
-        resetGhost(ghost_ ? (void **)ghost_ : a.Ghost());
+        resetGhost(ghost_ ? reinterpret_cast<void **>(ghost_) : a.Ghost());
       }
 
       void resetGhost(void *const *ghost_) const
@@ -1225,78 +1253,72 @@ namespace quda
         }
       }
 
-#ifdef SPINOR_BITPACK
       template <typename Vector, int length>
       __device__ __host__ inline void load(complex out[length / 2], const Float *ptr, AllocInt idx) const
       {
-        Vector vecTmp = vector_load<Vector>(ptr, idx);
-        spinor_20 packed;
-        memcpy(&packed, &vecTmp, sizeof(spinor_20));
-        packed.unpack(out);
-      }
+        if constexpr (spinor_bitpack()) {
+          Vector vecTmp = vector_load<Vector>(ptr, idx);
+          spinor_20 packed;
+          memcpy(&packed, &vecTmp, sizeof(spinor_20));
+          packed.unpack(out);
+        } else {
+          real v[length];
+          Vector vecTmp = vector_load<Vector>(ptr, idx);
 
-      template <typename Vector, int length>
-      __device__ __host__ inline void save(const complex in[length / 2], Float *ptr, AllocInt idx) const
-      {
-        spinor_20 packed(in);
-        Vector vecTmp;
-        memcpy(&vecTmp, &packed, sizeof(spinor_20));
-        vector_store<Vector>(ptr, idx, vecTmp);
-      }
-#else
-      template <typename Vector, int length>
-      __device__ __host__ inline void load(complex out[length / 2], const Float *ptr, AllocInt idx) const
-      {
-        real v[length];
-        Vector vecTmp = vector_load<Vector>(ptr, idx);
+          // extract the norm
+          norm_type nrm;
+          memcpy(&nrm, &vecTmp.w, sizeof(norm_type));
 
-        // extract the norm
-        norm_type nrm;
-        memcpy(&nrm, &vecTmp.w, sizeof(norm_type));
-
-        // now copy into output and scale
+          // now copy into output and scale
 #pragma unroll
-        for (int i = 0; i < length; i++) copy_and_scale(v[i], reinterpret_cast<Float *>(&vecTmp)[i], nrm);
+          for (int i = 0; i < length; i++) copy_and_scale(v[i], reinterpret_cast<Float *>(&vecTmp)[i], nrm);
 
 #pragma unroll
-        for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
-      }
-
-      template <typename Vector, int length>
-      __device__ __host__ inline void save(const complex in[length / 2], Float *ptr, AllocInt idx) const
-      {
-        real v[length];
-
-#pragma unroll
-        for (int i = 0; i < length / 2; i++) {
-          v[2 * i + 0] = in[i].real();
-          v[2 * i + 1] = in[i].imag();
+          for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
         }
-
-        norm_type max_[length / 2];
-        // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
-#pragma unroll
-        for (int i = 0; i < length / 2; i++)
-          max_[i] = fmaxf(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length / 2]));
-        norm_type scale = 0.0;
-#pragma unroll
-        for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
-        norm_type nrm = scale * fixedInvMaxValue<Float>::value;
-
-        real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
-#pragma unroll
-        for (int i = 0; i < length; i++) v[i] = v[i] * scale_inv;
-
-        Vector vecTmp;
-        memcpy(&vecTmp.w, &nrm, sizeof(norm_type)); // pack the norm
-
-        // pack the spinor elements
-#pragma unroll
-        for (int i = 0; i < length; i++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[i], v[i]);
-
-        vector_store(ptr, idx, vecTmp);
       }
-#endif
+
+      template <typename Vector, int length>
+      __device__ __host__ inline void save(const complex in[length / 2], Float *ptr, AllocInt idx) const
+      {
+        if constexpr (spinor_bitpack()) {
+          spinor_20 packed(in);
+          Vector vecTmp;
+          memcpy(&vecTmp, &packed, sizeof(spinor_20));
+          vector_store<Vector>(ptr, idx, vecTmp);
+        } else {
+          real v[length];
+
+#pragma unroll
+          for (int i = 0; i < length / 2; i++) {
+            v[2 * i + 0] = in[i].real();
+            v[2 * i + 1] = in[i].imag();
+          }
+
+          norm_type max_[length / 2];
+          // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
+#pragma unroll
+          for (int i = 0; i < length / 2; i++)
+            max_[i] = fmaxf(fabsf(static_cast<norm_type>(v[i])), fabsf(static_cast<norm_type>(v[i + length / 2])));
+          norm_type scale = 0.0;
+#pragma unroll
+          for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
+          norm_type nrm = scale * fixedInvMaxValue<Float>::value;
+
+          real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
+#pragma unroll
+          for (int i = 0; i < length; i++) v[i] = v[i] * scale_inv;
+
+          Vector vecTmp;
+          memcpy(&vecTmp.w, &nrm, sizeof(norm_type)); // pack the norm
+
+          // pack the spinor elements
+#pragma unroll
+          for (int i = 0; i < length; i++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[i], v[i]);
+
+          vector_store(ptr, idx, vecTmp);
+        }
+      }
 
       __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
       {

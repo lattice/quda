@@ -62,17 +62,17 @@ namespace quda {
         return *this;
       }
 
-      template<typename S>
-      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_wrapper<Float, S> &s);
+      template<typename T, typename S>
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_wrapper<T, S> &s);
 
-      template<typename S>
-      __device__ __host__ inline void operator=(const colorspinor_wrapper<Float, S> &s);
+      template<typename T, typename S>
+      __device__ __host__ inline void operator=(const colorspinor_wrapper<T, S> &s);
 
-      template<typename S>
-      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_ghost_wrapper<Float, S> &s);
+      template<typename T, typename S>
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_ghost_wrapper<T, S> &s);
 
-      template<typename S>
-      __device__ __host__ inline void operator=(const colorspinor_ghost_wrapper<Float, S> &s);
+      template<typename T, typename S>
+      __device__ __host__ inline void operator=(const colorspinor_ghost_wrapper<T, S> &s);
 
       /**
 	 @brief 2-d accessor functor
@@ -587,17 +587,17 @@ namespace quda {
      */
     __device__ __host__ inline const complex<Float>& operator()(int idx) const { return data[idx]; }
 
-    template<typename S>
-      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_wrapper<Float, S> &s);
+    template<typename T, typename S>
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_wrapper<T, S> &s);
 
-    template<typename S>
-      __device__ __host__ inline void operator=(const colorspinor_wrapper<Float, S> &s);
+    template<typename T, typename S>
+      __device__ __host__ inline void operator=(const colorspinor_wrapper<T, S> &s);
 
-    template<typename S>
-      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_ghost_wrapper<Float, S> &s);
+    template<typename T, typename S>
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_ghost_wrapper<T, S> &s);
 
-    template<typename S>
-      __device__ __host__ inline void operator=(const colorspinor_ghost_wrapper<Float, S> &s);
+    template<typename T, typename S>
+      __device__ __host__ inline void operator=(const colorspinor_ghost_wrapper<T, S> &s);
 
     /**
        @brief Transform from relativistic into non-relavisitic basis
@@ -840,17 +840,17 @@ namespace quda {
      */
     __device__ __host__ inline const complex<Float>& operator()(int idx) const { return data[idx]; }
 
-    template<typename S>
-      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_wrapper<Float, S> &s);
+    template<typename T, typename S>
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_wrapper<T, S> &s);
 
-    template<typename S>
-      __device__ __host__ inline void operator=(const colorspinor_wrapper<Float, S> &s);
+    template<typename T, typename S>
+      __device__ __host__ inline void operator=(const colorspinor_wrapper<T, S> &s);
 
-    template<typename S>
-      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_ghost_wrapper<Float, S> &s);
+    template<typename T, typename S>
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_ghost_wrapper<T, S> &s);
 
-    template<typename S>
-      __device__ __host__ inline void operator=(const colorspinor_ghost_wrapper<Float, S> &s);
+    template<typename T, typename S>
+      __device__ __host__ inline void operator=(const colorspinor_ghost_wrapper<T, S> &s);
 
     __device__ __host__ void print() const
     {

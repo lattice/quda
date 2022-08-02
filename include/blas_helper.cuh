@@ -209,7 +209,8 @@ namespace quda
         norm_t max_[n];
         // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
-        for (int i = 0; i < n; i++) max_[i] = fmaxf(fabsf((norm_t)v[i].real()), fabsf((norm_t)v[i].imag()));
+        for (int i = 0; i < n; i++) max_[i] = fmaxf(fabsf(static_cast<norm_t>(v[i].real())),
+                                                    fabsf(static_cast<norm_t>(v[i].imag())));
         norm_t scale = 0.0;
 #pragma unroll
         for (int i = 0; i < n; i++) scale = fmaxf(max_[i], scale);
@@ -229,12 +230,23 @@ namespace quda
       __device__ __host__ inline void load(array<complex<real>, n> &v, int x, int parity = 0) const
       {
         constexpr int len = 2 * n; // real-valued length
+        constexpr int M = len / N; // loop trip count
 
-        if constexpr (!(n == 3 && isHalf<store_t>::value)) {
+        if constexpr (spinor_bitpack() && n == 3 && std::is_same_v<float, store_t>) {
+          spinor_30 packed;
+
+#pragma unroll
+          for (int i = 0; i < M; i++) {
+            Vector vecTmp = vector_load<Vector>(data.spinor, parity * data.cb_offset + x + data.stride * i);
+            memcpy(reinterpret_cast<char*>(&packed) + i * 2 * sizeof(int), &vecTmp, 2 * sizeof(int));
+          }
+
+          packed.unpack(v);
+
+        } else if constexpr (!(n == 3 && isHalf<store_t>::value)) {
           norm_t nrm = load_norm<isFixed<store_t>::value>(x, parity);
           array<real, len> v_;
 
-          constexpr int M = len / N;
 #pragma unroll
           for (int i = 0; i < M; i++) {
             // first load from memory
@@ -252,24 +264,24 @@ namespace quda
           // first load from memory
           auto vecTmp = vector_load<Vector>(data.spinor, parity * cb_offset + x);
 
-#ifdef SPINOR_BITPACK
-          spinor_20 packed;
-          memcpy(&packed, &vecTmp, sizeof(spinor_20));
-          packed.unpack(v);
-#else
-          norm_t nrm;
-          array<real, len> v_;
+          if constexpr(spinor_bitpack()) {
+            spinor_20 packed;
+            memcpy(&packed, &vecTmp, sizeof(spinor_20));
+            packed.unpack(v);
+          } else {
+            norm_t nrm;
+            array<real, len> v_;
 
-          // extract norm
-          memcpy(&nrm, &vecTmp.w, sizeof(norm_t));
+            // extract norm
+            memcpy(&nrm, &vecTmp.w, sizeof(norm_t));
 
-          // now copy into output and scale
+            // now copy into output and scale
 #pragma unroll
-          for (int i = 0; i < len; i++) copy_and_scale(v_[i], reinterpret_cast<store_t *>(&vecTmp)[i], nrm);
+            for (int i = 0; i < len; i++) copy_and_scale(v_[i], reinterpret_cast<store_t *>(&vecTmp)[i], nrm);
 
 #pragma unroll
-          for (int i = 0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
-#endif
+            for (int i = 0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
+          }
         }
       }
 
@@ -285,8 +297,18 @@ namespace quda
       __device__ __host__ inline void save(const array<complex<real>, n> &v, int x, int parity = 0) const
       {
         constexpr int len = 2 * n; // real-valued length
+        constexpr int M = len / N; // loop trip count
 
-        if constexpr (!(n == 3 && isHalf<store_t>::value)) {
+        if constexpr (spinor_bitpack() && n == 3 && std::is_same_v<float, store_t>) {
+          spinor_30 packed(v);
+
+#pragma unroll
+          for (int i = 0; i < M; i++) {
+            Vector vecTmp;
+            memcpy(&vecTmp, reinterpret_cast<char*>(&packed) + i * 2 * sizeof(int), 2 * sizeof(int));
+            vector_store(data.spinor, parity * data.cb_offset + x + data.stride * i, vecTmp);
+          }
+        } else if constexpr (!(n == 3 && isHalf<store_t>::value)) {
           array<real, len> v_;
 
           if constexpr (isFixed<store_t>::value) {
@@ -304,7 +326,6 @@ namespace quda
             }
           }
 
-          constexpr int M = len / N;
 #pragma unroll
           for (int i = 0; i < M; i++) {
             Vector vecTmp;
@@ -318,28 +339,28 @@ namespace quda
           // specialized path for half precision staggered
           using Vector = int4;
           auto cb_offset = data.cb_norm_offset / 4;
-#ifdef SPINOR_BITPACK
-          spinor_20 packed(v);
-          Vector vecTmp;
-          memcpy(&vecTmp, &packed, sizeof(spinor_20));
-          vector_store<Vector>(data.spinor, parity * cb_offset + x, vecTmp);
-#else
-          norm_t norm;
-          norm_t scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, norm);
-          array<real, len> v_;
+          if constexpr(spinor_bitpack()) {
+            spinor_20 packed(v);
+            Vector vecTmp;
+            memcpy(&vecTmp, &packed, sizeof(spinor_20));
+            vector_store<Vector>(data.spinor, parity * cb_offset + x, vecTmp);
+          } else {
+            norm_t norm;
+            norm_t scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, norm);
+            array<real, len> v_;
 #pragma unroll
-          for (int i = 0; i < n; i++) {
-            v_[2 * i + 0] = scale_inv * v[i].real();
-            v_[2 * i + 1] = scale_inv * v[i].imag();
-          }
+            for (int i = 0; i < n; i++) {
+              v_[2 * i + 0] = scale_inv * v[i].real();
+              v_[2 * i + 1] = scale_inv * v[i].imag();
+            }
 
-          Vector vecTmp;
-          memcpy(&vecTmp.w, &norm, sizeof(norm_t)); // pack the norm
+            Vector vecTmp;
+            memcpy(&vecTmp.w, &norm, sizeof(norm_t)); // pack the norm
 #pragma unroll
-          for (int i = 0; i < len; i++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[i], v_[i]);
-          // second do vectorized copy into memory
-          vector_store(data.spinor, parity * cb_offset + x, vecTmp);
-#endif
+            for (int i = 0; i < len; i++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[i], v_[i]);
+            // second do vectorized copy into memory
+            vector_store(data.spinor, parity * cb_offset + x, vecTmp);
+          }
         }
       }
     };

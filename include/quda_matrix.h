@@ -120,17 +120,17 @@ namespace quda {
 	  for (int i=0; i<N*N; i++) data[i] = b.data[i];
 	}
 
-	template<typename S>
-	  __device__ __host__ inline Matrix(const gauge_wrapper<real, S> &s);
+	template<typename U, typename S>
+	  __device__ __host__ inline Matrix(const gauge_wrapper<U, S> &s);
 
-	template<typename S>
-	  __device__ __host__ inline void operator=(const gauge_wrapper<real, S> &s);
+	template<typename U, typename S>
+	  __device__ __host__ inline void operator=(const gauge_wrapper<U, S> &s);
 
-	template<typename S>
-	  __device__ __host__ inline Matrix(const gauge_ghost_wrapper<real, S> &s);
+	template<typename U, typename S>
+	  __device__ __host__ inline Matrix(const gauge_ghost_wrapper<U, S> &s);
 
-	template<typename S>
-	  __device__ __host__ inline void operator=(const gauge_ghost_wrapper<real, S> &s);
+	template<typename U, typename S>
+	  __device__ __host__ inline void operator=(const gauge_ghost_wrapper<U, S> &s);
 
         /**
            @brief Compute the matrix L1 norm - this is the maximum of
@@ -305,7 +305,7 @@ namespace quda {
 
       __device__ __host__ inline HMatrix() {
 #pragma unroll
-        for (int i = 0; i < N * N; i++) data[i] = (T)0.0;
+        for (int i = 0; i < N * N; i++) data[i] = static_cast<T>(0.0);
       }
 
       HMatrix(const HMatrix<T, N> &) = default;
@@ -884,15 +884,15 @@ namespace quda {
 
   template<class T>
   __device__ __host__ inline double getRealTraceUVdagger(const Matrix<T,3>& a, const Matrix<T,3>& b){
-    double sum = (double)(a(0, 0).real() * b(0, 0).real() + a(0, 0).imag() * b(0, 0).imag());
-    sum += (double)(a(0, 1).real() * b(0, 1).real() + a(0, 1).imag() * b(0, 1).imag());
-    sum += (double)(a(0, 2).real() * b(0, 2).real() + a(0, 2).imag() * b(0, 2).imag());
-    sum += (double)(a(1, 0).real() * b(1, 0).real() + a(1, 0).imag() * b(1, 0).imag());
-    sum += (double)(a(1, 1).real() * b(1, 1).real() + a(1, 1).imag() * b(1, 1).imag());
-    sum += (double)(a(1, 2).real() * b(1, 2).real() + a(1, 2).imag() * b(1, 2).imag());
-    sum += (double)(a(2, 0).real() * b(2, 0).real() + a(2, 0).imag() * b(2, 0).imag());
-    sum += (double)(a(2, 1).real() * b(2, 1).real() + a(2, 1).imag() * b(2, 1).imag());
-    sum += (double)(a(2, 2).real() * b(2, 2).real() + a(2, 2).imag() * b(2, 2).imag());
+    double sum = static_cast<double>(a(0, 0).real() * b(0, 0).real() + a(0, 0).imag() * b(0, 0).imag());
+    sum += static_cast<double>(a(0, 1).real() * b(0, 1).real() + a(0, 1).imag() * b(0, 1).imag());
+    sum += static_cast<double>(a(0, 2).real() * b(0, 2).real() + a(0, 2).imag() * b(0, 2).imag());
+    sum += static_cast<double>(a(1, 0).real() * b(1, 0).real() + a(1, 0).imag() * b(1, 0).imag());
+    sum += static_cast<double>(a(1, 1).real() * b(1, 1).real() + a(1, 1).imag() * b(1, 1).imag());
+    sum += static_cast<double>(a(1, 2).real() * b(1, 2).real() + a(1, 2).imag() * b(1, 2).imag());
+    sum += static_cast<double>(a(2, 0).real() * b(2, 0).real() + a(2, 0).imag() * b(2, 0).imag());
+    sum += static_cast<double>(a(2, 1).real() * b(2, 1).real() + a(2, 1).imag() * b(2, 1).imag());
+    sum += static_cast<double>(a(2, 2).real() * b(2, 2).real() + a(2, 2).imag() * b(2, 2).imag());
     return sum;
   }
 
@@ -1059,20 +1059,20 @@ namespace quda {
     /**
        Direct port of the TIFR expsu3 algorithm
     */
-    template <typename Float> __device__ __host__ inline void expsu3(Matrix<complex<Float>, 3> &q)
+    template <typename real> __device__ __host__ inline void expsu3(Matrix<complex<real>, 3> &q)
     {
-      typedef complex<Float> Complex;
+      typedef complex<real> Complex;
 
-      Complex a2 = (q(3) * q(1) + q(7) * q(5) + q(6) * q(2) - (q(0) * q(4) + (q(0) + q(4)) * q(8))) / (Float)3.0;
+      Complex a2 = (q(3) * q(1) + q(7) * q(5) + q(6) * q(2) - (q(0) * q(4) + (q(0) + q(4)) * q(8))) / static_cast<real>(3.0);
       Complex a3 = q(0) * q(4) * q(8) + q(1) * q(5) * q(6) + q(2) * q(3) * q(7) - q(6) * q(4) * q(2)
         - q(3) * q(1) * q(8) - q(0) * q(7) * q(5);
 
-      Complex sg2h3 = sqrt(a3 * a3 - (Float)4. * a2 * a2 * a2);
-      Complex cp = exp(log((Float)0.5 * (a3 + sg2h3)) / (Float)3.0);
+      Complex sg2h3 = sqrt(a3 * a3 - static_cast<real>(4.) * a2 * a2 * a2);
+      Complex cp = exp(log(static_cast<real>(0.5) * (a3 + sg2h3)) / static_cast<real>(3.0));
       Complex cm = a2 / cp;
 
-      Complex r1 = exp(Complex(0.0, 1.0) * (Float)(2.0 * M_PI / 3.0));
-      Complex r2 = exp(-Complex(0.0, 1.0) * (Float)(2.0 * M_PI / 3.0));
+      Complex r1 = exp(Complex(0.0, 1.0) * static_cast<real>(2.0 * M_PI / 3.0));
+      Complex r2 = exp(-Complex(0.0, 1.0) * static_cast<real>(2.0 * M_PI / 3.0));
 
       Complex w1[3];
 
@@ -1109,9 +1109,9 @@ namespace quda {
       Complex wl23 = conj((z1 + al * q(5)) / (z2 + al * q(2)));
       Complex wl33 = conj((al - q(0) - conj(wl23) * q(1)) / q(2));
 
-      Complex xn1 = (Float)1. + wr21 * conj(wl21) + wr31 * conj(wl31);
-      Complex xn2 = (Float)1. + wr22 * conj(wl22) + wr32 * conj(wl32);
-      Complex xn3 = (Float)1. + wr23 * conj(wl23) + wr33 * conj(wl33);
+      Complex xn1 = static_cast<real>(1) + wr21 * conj(wl21) + wr31 * conj(wl31);
+      Complex xn2 = static_cast<real>(1) + wr22 * conj(wl22) + wr32 * conj(wl32);
+      Complex xn3 = static_cast<real>(1) + wr23 * conj(wl23) + wr33 * conj(wl33);
 
       Complex d1 = exp(w1[0]);
       Complex d2 = exp(w1[1]);

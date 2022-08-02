@@ -105,7 +105,7 @@ namespace quda
     dim = kernel_type; // keep compiler happy
 
     // only for 5-d checkerboarding where we need to include the fifth dimension
-    const int Ls = (nDim == 5 && pc_type == QUDA_5D_PC ? (int)arg.dim[4] : 1);
+    const int Ls = (nDim == 5 && pc_type == QUDA_5D_PC ? static_cast<int>(arg.dim[4]) : 1);
 
     if (kernel_type == INTERIOR_KERNEL) {
       coord.x_cb = idx;

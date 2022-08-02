@@ -72,8 +72,8 @@ namespace quda {
      @param[in] a Input gauge_wrapper that we use to fill in this matrix instance
    */
   template <typename T, int N>
-    template <typename S>
-    __device__ __host__ inline void Matrix<T,N>::operator=(const gauge_wrapper<typename RealType<T>::type,S> &a) {
+    template <typename U, typename S>
+    __device__ __host__ inline void Matrix<T,N>::operator=(const gauge_wrapper<U, S> &a) {
     a.gauge.load(data, a.x_cb, a.dim, a.parity, a.phase);
   }
 
@@ -82,8 +82,8 @@ namespace quda {
      @param[in] a Input gauge_wrapper that we use to fill in this matrix instance
    */
   template <typename T, int N>
-    template <typename S>
-    __device__ __host__ inline Matrix<T,N>::Matrix(const gauge_wrapper<typename RealType<T>::type,S> &a) {
+    template <typename U, typename S>
+    __device__ __host__ inline Matrix<T,N>::Matrix(const gauge_wrapper<U, S> &a) {
     a.gauge.load(data, a.x_cb, a.dim, a.parity, a.phase);
   }
 
@@ -134,8 +134,8 @@ namespace quda {
      @param[in] a Input gauge_wrapper that we use to fill in this matrix instance
    */
   template <typename T, int N>
-    template <typename S>
-    __device__ __host__ inline void Matrix<T,N>::operator=(const gauge_ghost_wrapper<typename RealType<T>::type,S> &a) {
+    template <typename U, typename S>
+    __device__ __host__ inline void Matrix<T,N>::operator=(const gauge_ghost_wrapper<U, S> &a) {
     a.gauge.loadGhost(data, a.ghost_idx, a.dim, a.parity, a.phase);
   }
 
@@ -144,8 +144,8 @@ namespace quda {
      @param[in] a Input gauge_wrapper that we use to fill in this matrix instance
    */
   template <typename T, int N>
-    template <typename S>
-    __device__ __host__ inline Matrix<T,N>::Matrix(const gauge_ghost_wrapper<typename RealType<T>::type,S> &a) {
+    template <typename U, typename S>
+    __device__ __host__ inline Matrix<T,N>::Matrix(const gauge_ghost_wrapper<U, S> &a) {
     a.gauge.loadGhost(data, a.ghost_idx, a.dim, a.parity, a.phase);
   }
 
@@ -280,28 +280,28 @@ namespace quda {
     template<typename Float, typename storeFloat>
     __device__ __host__ inline complex<Float> operator*(const Float &a, const fieldorder_wrapper<Float,storeFloat> &b)
     {
-      return a * complex<Float>(b);
+      return a * static_cast<complex<Float>>(b);
     }
 
     template <typename Float, typename storeFloat>
     __device__ __host__ inline complex<Float> operator*(const complex<Float> &a,
                                                         const fieldorder_wrapper<Float, storeFloat> &b)
     {
-      return a * complex<Float>(b);
+      return a * static_cast<complex<Float>>(b);
     }
 
     template <typename Float, typename storeFloat>
     __device__ __host__ inline complex<Float> operator+(const fieldorder_wrapper<Float, storeFloat> &a,
                                                         const complex<Float> &b)
     {
-      return complex<Float>(a) + b;
+      return static_cast<complex<Float>>(a) + b;
     }
 
     template <typename Float, typename storeFloat>
     __device__ __host__ inline complex<Float> operator+(const complex<Float> &a,
                                                         const fieldorder_wrapper<Float, storeFloat> &b)
     {
-      return a + complex<Float>(b);
+      return a + static_cast<complex<Float>>(b);
     }
 
     template <typename Float, typename storeFloat>
@@ -1538,7 +1538,8 @@ namespace quda {
           }
         }
 
-      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+      template <typename T>
+      __device__ __host__ inline void load(T v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
       {
         const int M = reconLen / N;
         real tmp[reconLen];
@@ -1562,14 +1563,20 @@ namespace quda {
           }
         }
 
-        reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
+        complex v_[length / 2];
+        reconstruct.Unpack(v_, tmp, x, dir, phase, X, R);
+        for (int i = 0; i < length / 2; i++) v[i] = v_[i];
       }
 
-      __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
+      template <typename T>
+      __device__ __host__ inline void save(const T v[length / 2], int x, int dir, int parity) const
       {
         const int M = reconLen / N;
         real tmp[reconLen];
-        reconstruct.Pack(tmp, v);
+
+        complex v_[length / 2];
+        for (int i = 0; i < length / 2; i++) v_[i] = v[i];
+        reconstruct.Pack(tmp, v_);
 
 #pragma unroll
         for (int i=0; i<M; i++){
@@ -1835,16 +1842,22 @@ namespace quda {
       : LegacyOrder<Float,length>(u, ghost_), volumeCB(u.VolumeCB())
 	{ for (int i=0; i<4; i++) gauge[i] = gauge_ ? ((Float**)gauge_)[i] : ((Float**)u.Gauge_p())[i]; }
 
-        __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
-        {
-          auto in = &gauge[dir][(parity * volumeCB + x) * length];
-          block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+      template <typename T>
+      __device__ __host__ inline void load(T v[length / 2], int x, int dir, int parity, real = 1.0) const
+      {
+        auto in = &gauge[dir][(parity * volumeCB + x) * length];
+        complex v_[length/2];
+        block_load<complex, length / 2>(v_, reinterpret_cast<complex *>(in));
+        for (int i = 0; i < length / 2; i++) v[i] = v_[i];
       }
 
-      __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
+      template <typename T>
+      __device__ __host__ inline void save(const T v[length / 2], int x, int dir, int parity) const
       {
+        complex v_[length/2];
+        for (int i = 0; i < length / 2; i++) v_[i] = v_[i];
         auto out = &gauge[dir][(parity * volumeCB + x) * length];
-        block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+        block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v_);
       }
 
       /**
@@ -1882,8 +1895,8 @@ namespace quda {
         __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
         {
           for (int i = 0; i < length / 2; i++) {
-            v[i].real((real)gauge[dir][((0 * (length / 2) + i) * 2 + parity) * volumeCB + x]);
-            v[i].imag((real)gauge[dir][((1 * (length / 2) + i) * 2 + parity) * volumeCB + x]);
+            v[i].real(gauge[dir][((0 * (length / 2) + i) * 2 + parity) * volumeCB + x]);
+            v[i].imag(gauge[dir][((1 * (length / 2) + i) * 2 + parity) * volumeCB + x]);
           }
       }
 
@@ -1928,16 +1941,22 @@ namespace quda {
     LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
       volumeCB(u.VolumeCB()), geometry(u.Geometry()) { ; }
 
-  __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
-  {
-    auto in = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
-    block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+    template <typename T>
+    __device__ __host__ inline void load(T v[length / 2], int x, int dir, int parity, real = 1.0) const
+    {
+      auto in = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
+      complex v_[length/2];
+      block_load<complex, length / 2>(v_, reinterpret_cast<complex *>(in));
+      for (int i = 0; i < length / 2; i++) v[i] = v_[i];
     }
 
-    __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
+    template <typename T>
+    __device__ __host__ inline void save(const T v[length / 2], int x, int dir, int parity) const
     {
+      complex v_[length/2];
+      for (int i = 0; i < length / 2; i++) v_[i] = v_[i];
       auto out = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
-      block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+      block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v_);
     }
 
     /**

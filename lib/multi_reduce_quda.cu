@@ -124,7 +124,8 @@ namespace quda {
           Reducer<device_reduce_t, device_real_t> r_(NXZ, NYW);
 
           // redefine site_unroll with device_store types to ensure we have correct N/Ny/M values
-          constexpr bool site_unroll = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
+          constexpr bool site_unroll = !std::is_same_v<device_store_t, device_y_store_t> || isFixed<device_store_t>::value ||
+            (spinor_bitpack() && nSpin == 1 && std::is_same_v<device_store_t, float>);
           constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
           constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
@@ -351,12 +352,12 @@ namespace quda {
           // reductions, but I'll keep this code here for now
           if (x.size() == 1) { // 1-d reduction
 
-            max_tile_size = make_uint2(1, std::min(NYW_max, (int)y.size()));
+            max_tile_size = make_uint2(1, std::min(NYW_max, static_cast<int>(y.size())));
             multiReduce_recurse<ReducerDiagonal, ReducerOffDiagonal>(result, x, y, z, w, 0, 0, hermitian, max_tile_size);
 
           } else if (y.size() == 1) { // 1-d reduction
 
-            max_tile_size = make_uint2(std::min((size_t)max_NXZ_power2(true), x.size()), 1);
+            max_tile_size = make_uint2(std::min(static_cast<size_t>(max_NXZ_power2(true)), x.size()), 1);
             multiReduce_recurse<ReducerDiagonal, ReducerOffDiagonal>(result, x, y, z, w, 0, 0, hermitian, max_tile_size);
 
           } else { // 2-d reduction
@@ -413,8 +414,8 @@ namespace quda {
             param.aux.x *= 2;
             param.aux.y *= 2;
             return true;
-          } else if (is_valid_NXZ(x.size(), true) && y.size() <= (size_t)NYW_max
-                     && ((size_t)param.aux.x != x.size() || (size_t)param.aux.y != y.size())) {
+          } else if (is_valid_NXZ(x.size(), true) && y.size() <= static_cast<size_t>(NYW_max)
+                     && (static_cast<size_t>(param.aux.x) != x.size() || static_cast<size_t>(param.aux.y) != y.size())) {
             // we've run out of power of two tiles to try, but before
             // we finish, try a single kernel if it fits
             param.aux.x = x.size();
@@ -613,7 +614,7 @@ namespace quda {
           max_YW_size<multiDot<device_reduce_t, float>>(x.size(), x0.Precision(), y0.Precision());
 
         // if fine-grid then we set max tile size to 32 to avoid unnecessary tuning
-        uint2 max_tile_size = make_uint2(1, std::min( {NYW_max, (int)y.size(), x0.Ncolor() == 3 ? 32 : NYW_max} ));
+        uint2 max_tile_size = make_uint2(1, std::min( {NYW_max, static_cast<int>(y.size()), x0.Ncolor() == 3 ? 32 : NYW_max} ));
         multiReduce_recurse<multiDot, multiDot>(result_tmp, x, y, x, x, 0, 0, false, max_tile_size);
       } else if (y.size() == 1 && x0.Precision() == y0.Precision()) {
 
@@ -625,7 +626,7 @@ namespace quda {
           max_YW_size<multiDot<device_reduce_t, float>>(y.size(), y0.Precision(), x0.Precision());
 
         // if fine-grid then we set max tile size to 32 to avoid unnecessary tuning
-        uint2 max_tile_size = make_uint2(1, std::min( {NXZ_max, (int)x.size(), x0.Ncolor() == 3 ? 32 : NXZ_max} ));
+        uint2 max_tile_size = make_uint2(1, std::min( {NXZ_max, static_cast<int>(x.size()), x0.Ncolor() == 3 ? 32 : NXZ_max} ));
         multiReduce_recurse<multiDot, multiDot>(result_trans, y, x, y, y, 0, 0, false, max_tile_size);
 
         // transpose the result if we are doing the transpose calculation
@@ -663,7 +664,7 @@ namespace quda {
           max_YW_size<multiCdot<device_reduce_t, float>>(x.size(), x0.Precision(), y0.Precision());
 
         // if fine-grid then we set max tile size to 32 to avoid unnecessary tuning
-        uint2 max_tile_size = make_uint2(1, std::min( {NYW_max, (int)y.size(), x0.Ncolor() == 3 ? 32 : NYW_max} ));
+        uint2 max_tile_size = make_uint2(1, std::min( {NYW_max, static_cast<int>(y.size()), x0.Ncolor() == 3 ? 32 : NYW_max} ));
         multiReduce_recurse<multiCdot, multiCdot>(result_tmp, x, y, x, x, 0, 0, false, max_tile_size);
       } else if (y.size() == 1 && x0.Precision() == y0.Precision()) {
 
@@ -675,7 +676,7 @@ namespace quda {
           max_YW_size<multiCdot<device_reduce_t, float>>(y.size(), y0.Precision(), x0.Precision());
 
         // if fine-grid then we set max tile size to 32 to avoid unnecessary tuning
-        uint2 max_tile_size = make_uint2(1, std::min( {NXZ_max, (int)x.size(), x0.Ncolor() == 3 ? 32 : NXZ_max} ));
+        uint2 max_tile_size = make_uint2(1, std::min( {NXZ_max, static_cast<int>(x.size()), x0.Ncolor() == 3 ? 32 : NXZ_max} ));
         multiReduce_recurse<multiCdot, multiCdot>(result_trans, y, x, y, y, 0, 0, false, max_tile_size);
 
         // transpose the result if we are doing the transpose calculation

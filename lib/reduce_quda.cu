@@ -84,7 +84,8 @@ namespace quda {
           Reducer<device_reduce_t, device_real_t> r_(a, b);
 
           // redefine site_unroll with device_store types to ensure we have correct N/Ny/M values
-          constexpr bool site_unroll = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value || decltype(r)::site_unroll;
+          constexpr bool site_unroll = !std::is_same_v<device_store_t, device_y_store_t> || isFixed<device_store_t>::value ||
+            decltype(r)::site_unroll || (spinor_bitpack() && nSpin == 1 && std::is_same_v<device_store_t, float>);
           constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
           constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
@@ -104,7 +105,8 @@ namespace quda {
           Reducer<double, host_real_t> r_(a, b);
 
           // redefine site_unroll with host_store types to ensure we have correct N/Ny/M values
-          constexpr bool site_unroll = !std::is_same<host_store_t, host_y_store_t>::value || isFixed<host_store_t>::value || decltype(r)::site_unroll;
+          constexpr bool site_unroll = !std::is_same_v<host_store_t, host_y_store_t> || isFixed<host_store_t>::value ||
+            decltype(r)::site_unroll || (spinor_bitpack() && nSpin == 1 && std::is_same_v<host_store_t, float>);
           constexpr int N = n_vector<host_store_t, false, nSpin, site_unroll>();
           constexpr int Ny = n_vector<host_y_store_t, false, nSpin, site_unroll>();
           constexpr int M = N; // if site unrolling then M=N will be 24/6, e.g., full AoS
