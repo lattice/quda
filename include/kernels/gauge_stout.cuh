@@ -10,25 +10,25 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, int stoutDim_>
+  template <typename store_t, int nColor_, QudaReconstructType recon_, int stoutDim_>
   struct STOUTArg : kernel_param<> {
-    using Float = Float_;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int stoutDim = stoutDim_;
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
+    using Gauge = typename gauge_mapper<store_t, recon>::type;
 
     Gauge out;
     const Gauge in;
 
     int X[4];    // grid dimensions
     int border[4];
-    const Float rho;
-    const Float staple_coeff;
-    const Float rectangle_coeff;
+    const real rho;
+    const real staple_coeff;
+    const real rectangle_coeff;
 
-    STOUTArg(GaugeField &out, const GaugeField &in, Float rho, Float epsilon = 0) :
+    STOUTArg(GaugeField &out, const GaugeField &in, double rho, double epsilon = 0) :
       kernel_param(dim3(1, 2, stoutDim)),
       out(out),
       in(in),
@@ -47,7 +47,7 @@ namespace quda
 
   template <typename Arg> struct STOUT
   {
-    using real = typename Arg::Float;
+    using real = typename Arg::real;
     using Complex = complex<real>;
     using Link = Matrix<complex<real>, Arg::nColor>;
 
@@ -113,7 +113,7 @@ namespace quda
   //------------------------//
   template <typename Arg> struct OvrImpSTOUT
   {
-    using real = typename Arg::Float;
+    using real = typename Arg::real;
     using Complex = complex<real>;
     using Link = Matrix<complex<real>, Arg::nColor>;
 

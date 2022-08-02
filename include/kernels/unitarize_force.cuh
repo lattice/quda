@@ -18,25 +18,25 @@ namespace quda {
 
   namespace fermion_force {
 
-    template <typename Float_, int nColor_, QudaReconstructType recon_, QudaGaugeFieldOrder order = QUDA_NATIVE_GAUGE_ORDER>
+    template <typename store_t, int nColor_, QudaReconstructType recon_, QudaGaugeFieldOrder order = QUDA_NATIVE_GAUGE_ORDER>
     struct UnitarizeForceArg : kernel_param<> {
-      using Float = Float_;
+      using real = double; // we always use double precision for this kernel
       static constexpr int nColor = nColor_;
       static constexpr QudaReconstructType recon = recon_;
       // use long form here to allow specification of order
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO,2*nColor*nColor,QUDA_STAGGERED_PHASE_NO,gauge::default_huge_alloc, QUDA_GHOST_EXCHANGE_INVALID,false,order>::type F;
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO,2*nColor*nColor,QUDA_STAGGERED_PHASE_NO,gauge::default_huge_alloc, QUDA_GHOST_EXCHANGE_INVALID,false,order>::type G;
+      typedef typename gauge_mapper<store_t, QUDA_RECONSTRUCT_NO,2*nColor*nColor,QUDA_STAGGERED_PHASE_NO,gauge::default_huge_alloc, QUDA_GHOST_EXCHANGE_INVALID,false,order>::type F;
+      typedef typename gauge_mapper<store_t, QUDA_RECONSTRUCT_NO,2*nColor*nColor,QUDA_STAGGERED_PHASE_NO,gauge::default_huge_alloc, QUDA_GHOST_EXCHANGE_INVALID,false,order>::type G;
       F force;
       const F force_old;
       const G u;
       int *fails;
-      const double unitarize_eps;
-      const double force_filter;
-      const double max_det_error;
+      const real unitarize_eps;
+      const real force_filter;
+      const real max_det_error;
       const int allow_svd;
       const int svd_only;
-      const double svd_rel_error;
-      const double svd_abs_error;
+      const real svd_rel_error;
+      const real svd_abs_error;
 
       UnitarizeForceArg(GaugeField &force, const GaugeField &force_old, const GaugeField &u, int *fails,
 			double unitarize_eps, double force_filter, double max_det_error, int allow_svd,
@@ -153,43 +153,43 @@ namespace quda {
 
     // Compute the reciprocal square root of the matrix q
     // Also modify q if the eigenvalues are dangerously small.
-    template<class Float, typename Arg>
-    __device__  __host__  void reciprocalRoot(Matrix<complex<Float>,3>* res, DerivativeCoefficients<Float>* deriv_coeffs,
-                                              Float f[3], Matrix<complex<Float>,3> & q, const Arg &arg)
+    template <typename Link, typename coeff_t, typename Arg>
+    __device__  __host__  void reciprocalRoot(Link &res, coeff_t &deriv_coeffs, typename Arg::real f[3], Link &q, const Arg &arg)
     {
-      Matrix<complex<Float>, 3> qsq, tempq;
+      using real = typename Arg::real;
+      Link qsq, tempq;
 
-      Float c[3] = { };
-      Float g[3] = { };
+      real c[3] = { };
+      real g[3] = { };
 
-      if(!arg.svd_only){
+      if (!arg.svd_only) {
 	qsq = q*q;
 	tempq = qsq*q;
 
-	c[0] = getTrace(q).x;
-	c[1] = getTrace(qsq).x / static_cast<Float>(2.0);
-	c[2] = getTrace(tempq).x / static_cast<Float>(3.0);
+	c[0] = getTrace(q).real();
+	c[1] = getTrace(qsq).real() / static_cast<real>(2.0);
+	c[2] = getTrace(tempq).real() / static_cast<real>(3.0);
 
-	g[0] = g[1] = g[2] = c[0] / static_cast<Float>(3.0);
-	Float r,s,theta;
-	s = c[1]/3. - c[0] * c[0] / static_cast<Float>(18.0);
-	r = c[2]/2. - (c[0] / static_cast<Float>(3.0)) * (c[1] - c[0] * c[0] / static_cast<Float>(9.0));
+	g[0] = g[1] = g[2] = c[0] / static_cast<real>(3.0);
+	real theta;
+	real s = c[1]/3. - c[0] * c[0] / static_cast<real>(18.0);
+	real r = c[2]/2. - (c[0] / static_cast<real>(3.0)) * (c[1] - c[0] * c[0] / static_cast<real>(9.0));
 
-	Float cosTheta = r * quda::rsqrt(s * s * s);
+	real cosTheta = r * quda::rsqrt(s * s * s);
 	if (fabs(s) < arg.unitarize_eps) {
-	  cosTheta = static_cast<Float>(1.0);
-	  s = static_cast<Float>(0.0);
+	  cosTheta = static_cast<real>(1.0);
+	  s = static_cast<real>(0.0);
 	}
-	if (fabs(cosTheta) > static_cast<Float>(1.0)) {
-          if (r > static_cast<Float>(0.0)) theta = static_cast<Float>(0.0);
-          else theta = static_cast<Float>(M_PI)/static_cast<Float>(3.0);
+	if (fabs(cosTheta) > static_cast<real>(1.0)) {
+          if (r > static_cast<real>(0.0)) theta = static_cast<real>(0.0);
+          else theta = static_cast<real>(M_PI)/static_cast<real>(3.0);
         } else {
-          theta = acos(cosTheta) / static_cast<Float>(3.0);
+          theta = acos(cosTheta) / static_cast<real>(3.0);
         }
 
 	s = 2.0 * sqrt(s);
 	for (int i=0; i<3; ++i) {
-	  g[i] += s * cos(theta + (i-1) * static_cast<Float>(M_PI * 2.0 / 3.0));
+	  g[i] += s * cos(theta + (i-1) * static_cast<real>(M_PI * 2.0 / 3.0));
 	}
 
       } // !REUNIT_SVD_ONLY?
@@ -209,21 +209,21 @@ namespace quda {
       if (arg.allow_svd) {
 	bool perform_svd = true;
 	if (!arg.svd_only) {
-	  const Float det = getDeterminant(q).x;
+	  const real det = getDeterminant(q).real();
 	  if( fabs(det) >= arg.svd_abs_error) {
-	    if( checkRelativeError(g[0]*g[1]*g[2],det,arg.svd_rel_error) ) perform_svd = false;
+	    if( checkRelativeError(g[0]*g[1]*g[2], det, arg.svd_rel_error) ) perform_svd = false;
 	  }
 	}
 
-	if(perform_svd){
-	  Matrix<complex<Float>,3> tmp2;
+	if (perform_svd) {
+	  Link tmp2;
 	  // compute the eigenvalues using the singular value decomposition
-	  computeSVD<Float>(q,tempq,tmp2,g);
+	  computeSVD<real>(q, tempq, tmp2, g);
 	  // The array g contains the eigenvalues of the matrix q
 	  // The determinant is the product of the eigenvalues, and I can use this
 	  // to check the SVD
-	  const Float determinant = getDeterminant(q).x;
-	  const Float gprod = g[0]*g[1]*g[2];
+	  const real determinant = getDeterminant(q).real();
+	  const real gprod = g[0] * g[1] * g[2];
 	  // Check the svd result for errors
 	  if (fabs(gprod - determinant) > arg.max_det_error) {
 	    //printf("Warning: Error in determinant computed by SVD : %g > %g\n", fabs(gprod-determinant), arg.max_det_error);
@@ -235,7 +235,7 @@ namespace quda {
 
       } // REUNIT_ALLOW_SVD?
 
-      Float delta = getAbsMin(g,3);
+      real delta = getAbsMin(g,3);
       if (delta < arg.force_filter) {
 	for (int i=0; i<3; ++i) {
 	  g[i]     += arg.force_filter;
@@ -255,14 +255,14 @@ namespace quda {
       g[2] = c[0]*c[1]*c[2];
 
       // set the derivative coefficients!
-      deriv_coeffs->set(g[0], g[1], g[2]);
+      deriv_coeffs.set(g[0], g[1], g[2]);
 
-      const Float& denominator  = g[2]*(g[0]*g[1]-g[2]);
-      c[0] = (g[0]*g[1]*g[1] - g[2]*(g[0]*g[0]+g[1]))/denominator;
-      c[1] = (-g[0]*g[0]*g[0] - g[2] + 2.*g[0]*g[1])/denominator;
-      c[2] = g[0]/denominator;
+      const real denominator  = g[2] * (g[0] * g[1] - g[2]);
+      c[0] = (g[0]*g[1]*g[1] - g[2]*(g[0]*g[0]+g[1])) / denominator;
+      c[1] = (-g[0]*g[0]*g[0] - g[2] + 2.*g[0]*g[1]) / denominator;
+      c[2] = g[0] / denominator;
 
-      tempq = c[1]*q + c[2]*qsq;
+      tempq = c[1] * q + c[2] * qsq;
       // Add a real scalar
       tempq(0,0).x += c[0];
       tempq(1,1).x += c[0];
@@ -272,25 +272,24 @@ namespace quda {
       f[1] = c[1];
       f[2] = c[2];
 
-      *res = tempq;
+      res = tempq;
     }
 
     // "v" denotes a "fattened" link variable
-    template <class Float, typename Arg>
-    __device__ __host__ void getUnitarizeForceSite(Matrix<complex<Float>,3>& result, const Matrix<complex<Float>,3> & v,
-                                                   const Matrix<complex<Float>,3> & outer_prod, const Arg &arg)
+    template <typename Link, typename Arg>
+    __device__ __host__ void getUnitarizeForceSite(Link &result, const Link &v, const Link &outer_prod, const Arg &arg)
     {
-      typedef Matrix<complex<Float>,3> Link;
-      Float f[3];
-      Float b[6];
+      using real = typename Arg::real;
+      real f[3];
+      real b[6];
 
       Link v_dagger = conj(v);  // okay!
       Link q   = v_dagger*v;    // okay!
       Link rsqrt_q;
 
-      DerivativeCoefficients<Float> deriv_coeffs;
+      DerivativeCoefficients<real> deriv_coeffs;
 
-      reciprocalRoot<Float>(&rsqrt_q, &deriv_coeffs, f, q, arg); // approx 529 flops (assumes no SVD)
+      reciprocalRoot(rsqrt_q, deriv_coeffs, f, q, arg); // approx 529 flops (assumes no SVD)
 
       // Pure hack here
       b[0] = deriv_coeffs.getB00();
@@ -338,22 +337,18 @@ namespace quda {
 
       __device__ __host__ void operator()(int x_cb, int parity)
       {
-        using real = typename Arg::Float;
+        using real = typename Arg::real;
 
         // This part of the calculation is always done in double precision
-        Matrix<complex<double>,3> v, result, oprod;
-        Matrix<complex<real>,3> v_tmp, result_tmp, oprod_tmp;
+        Matrix<complex<real>, 3> v, result, oprod;
 
         for (int dir=0; dir<4; ++dir) {
-          oprod_tmp = arg.force_old(dir, x_cb, parity);
-          v_tmp = arg.u(dir, x_cb, parity);
-          v = v_tmp;
-          oprod = oprod_tmp;
+          oprod = arg.force_old(dir, x_cb, parity);
+          v = arg.u(dir, x_cb, parity);
 
-          getUnitarizeForceSite<double>(result, v, oprod, arg);
-          result_tmp = result;
+          getUnitarizeForceSite(result, v, oprod, arg);
 
-          arg.force(dir, x_cb, parity) = result_tmp;
+          arg.force(dir, x_cb, parity) = result;
         } // 4*4528 flops per site
       } // getUnitarizeForceField
     };

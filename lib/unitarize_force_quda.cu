@@ -71,23 +71,17 @@ namespace quda {
     }
 #endif
 
-    template <typename Float, typename Arg> void unitarizeForceCPU(Arg &arg)
+    template <typename Arg> void unitarizeForceCPU(Arg &arg)
     {
-      Matrix<complex<double>, 3> v, result, oprod;
-      Matrix<complex<Float>, 3> v_tmp, result_tmp, oprod_tmp;
+      Matrix<complex<typename Arg::real>, 3> v, result, oprod;
 
       for (int parity = 0; parity < 2; parity++) {
         for (unsigned int i = 0; i < arg.threads.x; i++) {
           for (int dir = 0; dir < 4; dir++) {
-            oprod_tmp = arg.force_old(dir, i, parity);
-            v_tmp = arg.u(dir, i, parity);
-            v = v_tmp;
-            oprod = oprod_tmp;
-
-            getUnitarizeForceSite<double>(result, v, oprod, arg);
-
-            result_tmp = result;
-            arg.force(dir, i, parity) = result_tmp;
+            oprod = arg.force_old(dir, i, parity);
+            v = arg.u(dir, i, parity);
+            getUnitarizeForceSite(result, v, oprod, arg);
+            arg.force(dir, i, parity) = result;
           }
         }
       }
@@ -105,12 +99,12 @@ namespace quda {
           UnitarizeForceArg<double, nColor, QUDA_RECONSTRUCT_NO, QUDA_MILC_GAUGE_ORDER> arg(
             newForce, oldForce, u, &num_failures, unitarize_eps, force_filter, max_det_error, allow_svd, svd_only,
             svd_rel_error, svd_abs_error);
-          unitarizeForceCPU<double>(arg);
+          unitarizeForceCPU(arg);
         } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
           UnitarizeForceArg<float, nColor, QUDA_RECONSTRUCT_NO, QUDA_MILC_GAUGE_ORDER> arg(
             newForce, oldForce, u, &num_failures, unitarize_eps, force_filter, max_det_error, allow_svd, svd_only,
             svd_rel_error, svd_abs_error);
-          unitarizeForceCPU<float>(arg);
+          unitarizeForceCPU(arg);
         } else {
           errorQuda("Precision = %d not supported", u.Precision());
         }
@@ -119,12 +113,12 @@ namespace quda {
           UnitarizeForceArg<double, nColor, QUDA_RECONSTRUCT_NO, QUDA_QDP_GAUGE_ORDER> arg(
             newForce, oldForce, u, &num_failures, unitarize_eps, force_filter, max_det_error, allow_svd, svd_only,
             svd_rel_error, svd_abs_error);
-          unitarizeForceCPU<double>(arg);
+          unitarizeForceCPU(arg);
         } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
           UnitarizeForceArg<float, nColor, QUDA_RECONSTRUCT_NO, QUDA_QDP_GAUGE_ORDER> arg(
             newForce, oldForce, u, &num_failures, unitarize_eps, force_filter, max_det_error, allow_svd, svd_only,
             svd_rel_error, svd_abs_error);
-          unitarizeForceCPU<float>(arg);
+          unitarizeForceCPU(arg);
         } else {
           errorQuda("Precision = %d not supported", u.Precision());
         }

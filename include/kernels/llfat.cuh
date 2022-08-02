@@ -7,16 +7,16 @@
 
 namespace quda {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon>
+  template <typename store_t, int nColor_, QudaReconstructType recon>
   struct LinkArg : kernel_param<> {
-    using Float = Float_;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
-    typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type Link;
-    typedef typename gauge_mapper<Float, recon, 18, QUDA_STAGGERED_PHASE_MILC>::type Gauge;
+    typedef typename gauge_mapper<store_t, QUDA_RECONSTRUCT_NO>::type Link;
+    typedef typename gauge_mapper<store_t, recon, 18, QUDA_STAGGERED_PHASE_MILC>::type Gauge;
 
     Link link;
     Gauge u;
-    Float coeff;
+    real coeff;
 
     int_fastdiv X[4];
     int_fastdiv E[4];
@@ -28,7 +28,7 @@ namespace quda {
     partitioned then we have to correct for this when computing the local index */
     int odd_bit;
 
-    LinkArg(GaugeField &link, const GaugeField &u, Float coeff) :
+    LinkArg(GaugeField &link, const GaugeField &u, double coeff) :
       kernel_param(dim3(link.VolumeCB(), 2, 4)),
       link(link),
       u(u),
@@ -52,7 +52,7 @@ namespace quda {
     getCoords(x, idx, arg.X, parity);
     for (int d=0; d<4; d++) x[d] += arg.border[d];
 
-    using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+    using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
 
     Link a = arg.u(dir, linkIndex(x, arg.E), parity);
 
@@ -95,19 +95,19 @@ namespace quda {
       getCoords(x, x_cb, arg.X, parity);
       for (int d=0; d<4; d++) x[d] += arg.border[d];
 
-      using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+      using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
 
       Link a = arg.u(dir, linkIndex(x,arg.E), parity);
       arg.link(dir, x_cb, parity) = arg.coeff*a;
     }
   };
 
-  template <typename Float_, int nColor_, QudaReconstructType recon, QudaReconstructType recon_mu, bool save_staple_>
+  template <typename store_t, int nColor_, QudaReconstructType recon, QudaReconstructType recon_mu, bool save_staple_>
   struct StapleArg : kernel_param<> {
-    using Float = Float_;
-    using Link = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
-    using Gauge = typename gauge_mapper<Float, recon, 18, QUDA_STAGGERED_PHASE_MILC>::type;
-    using MuLink = typename gauge_mapper<Float, recon_mu, 18, QUDA_STAGGERED_PHASE_MILC>::type;
+    using real = typename mapper<store_t>::type;
+    using Link = typename gauge_mapper<store_t, QUDA_RECONSTRUCT_NO>::type;
+    using Gauge = typename gauge_mapper<store_t, recon, 18, QUDA_STAGGERED_PHASE_MILC>::type;
+    using MuLink = typename gauge_mapper<store_t, recon_mu, 18, QUDA_STAGGERED_PHASE_MILC>::type;
     static constexpr int nColor = nColor_;
     static constexpr bool save_staple = save_staple_;
 
@@ -122,7 +122,7 @@ namespace quda {
     Link staple;
     MuLink mulink;
     Gauge u;
-    Float coeff;
+    real coeff;
 
     int nu;
     int mu_map[4];
@@ -134,7 +134,7 @@ namespace quda {
     int odd_bit;
 
     StapleArg(GaugeField &fat, GaugeField &staple, const GaugeField &mulink, const GaugeField &u,
-              Float coeff, int nu, int mu_map[4]) :
+              double coeff, int nu, int mu_map[4]) :
       kernel_param(dim3(1, 2, 1)),
       fat(fat),
       staple(staple),
@@ -161,9 +161,9 @@ namespace quda {
   };
 
   template <int mu, int nu, typename Arg>
-  __device__ inline void computeStaple(Matrix<complex<typename Arg::Float>, Arg::nColor> &staple, const Arg &arg, int x[], int parity)
+  __device__ inline void computeStaple(Matrix<complex<typename Arg::real>, Arg::nColor> &staple, const Arg &arg, int x[], int parity)
   {
-    using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+    using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
     int dx[4] = {0, 0, 0, 0};
 
     /* Computes the upper staple :
@@ -234,7 +234,7 @@ namespace quda {
       getCoords(x, x_cb, arg.X, (parity+arg.odd_bit)%2);
       for (int d=0; d<4; d++) x[d] += arg.border[d];
 
-      using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+      using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       Link staple;
       switch (mu) {
       case 0:

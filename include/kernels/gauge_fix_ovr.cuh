@@ -314,15 +314,19 @@ namespace quda {
         parity = 1 - parity;
       }
       int id = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      using complex = complex<typename Arg::store_t>;
-      typename Arg::real tmp[Arg::NElems];
-      complex data[9];
+
+      using real = typename Arg::real;
+      real tmp[Arg::NElems];
+      complex<real> data[9];
+
+      // FIXME use accessors here
       if (Arg::pack) {
         arg.u.load(data, id, arg.dim, parity);
         arg.u.reconstruct.Pack(tmp, data);
-        for ( int i = 0; i < Arg::NElems / 2; ++i ) arg.array[idx + arg.threads.x * i] = complex(tmp[2*i+0], tmp[2*i+1]);
+        for (int i = 0; i < Arg::NElems / 2; ++i)
+          arg.array[idx + arg.threads.x * i] = complex<typename Arg::store_t>(tmp[2 * i + 0], tmp[2 * i + 1]);
       } else {
-        for ( int i = 0; i < Arg::NElems / 2; ++i ) {
+        for (int i = 0; i < Arg::NElems / 2; ++i) {
           tmp[2*i+0] = arg.array[idx + arg.threads.x * i].real();
           tmp[2*i+1] = arg.array[idx + arg.threads.x * i].imag();
         }

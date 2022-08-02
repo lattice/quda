@@ -15,12 +15,13 @@
 
 namespace quda {
 
-  template <typename Float>
+  template <typename store_t>
   class GaugeFixFFTRotate : TunableKernel1D {
-    template <int dir> using Arg = GaugeFixFFTRotateArg<Float, dir>;
+    using real = typename mapper<store_t>::type;
+    template <int dir> using Arg = GaugeFixFFTRotateArg<store_t, dir>;
     GaugeField &data;
-    complex<Float> *tmp0;
-    complex<Float> *tmp1;
+    complex<real> *tmp0;
+    complex<real> *tmp1;
     int dir;
     unsigned int minThreads() const { return data.Volume(); }
 
@@ -30,7 +31,7 @@ namespace quda {
       data(data),
       dir(0) {}
 
-    void setDirection(int dir_, complex<Float> *data_in, complex<Float> *data_out)
+    void setDirection(int dir_, complex<real> *data_in, complex<real> *data_out)
     {
       dir = dir_;
       tmp0 = data_in;
@@ -48,7 +49,7 @@ namespace quda {
     }
 
     long long flops() const { return 0; }
-    long long bytes() const { return 4 * sizeof(Float) * data.Volume(); }
+    long long bytes() const { return 4 * sizeof(real) * data.Volume(); }
   };
 
   template <typename Arg>
@@ -168,11 +169,11 @@ namespace quda {
     long long bytes() const
     {
       switch (type) {
-      case KERNEL_SET_INVPSQ: return sizeof(typename Arg::Float) * field.Volume();
-      case KERNEL_NORMALIZE: return 3 * sizeof(typename Arg::Float) * field.Volume();
+      case KERNEL_SET_INVPSQ: return sizeof(typename Arg::real) * field.Volume();
+      case KERNEL_NORMALIZE: return 3 * sizeof(typename Arg::real) * field.Volume();
       case KERNEL_GX: return 4 * arg.elems * field.Precision() * field.Volume();
 #ifdef GAUGEFIXING_DONT_USE_GX
-      case KERNEL_UEO: return field.Bytes() + (5 * 12 * sizeof(typename Arg::Float)) * field.Volume();
+      case KERNEL_UEO: return field.Bytes() + (5 * 12 * sizeof(typename Arg::real)) * field.Volume();
 #else
       case KERNEL_UEO: return 26 * arg.elems * field.Precision() * field.Volume();
 #endif
@@ -181,7 +182,7 @@ namespace quda {
     }
   };
 
-  template <typename Float, QudaReconstructType recon, int gauge_dir>
+  template <typename store_t, QudaReconstructType recon, int gauge_dir>
   void gaugeFixingFFT(GaugeField& data, int Nsteps, int verbose_interval,
                       double alpha0, int autotune, double tolerance, int stopWtheta)
   {
@@ -203,17 +204,17 @@ namespace quda {
     FFTPlanHandle plan_xy;
     FFTPlanHandle plan_zt;
 
-    GaugeFixArg<Float, recon> arg(data, alpha0);
+    GaugeFixArg<store_t, recon> arg(data, alpha0);
     SetPlanFFT2DMany(plan_zt, size, 0, data.Precision()); // for space and time ZT
     SetPlanFFT2DMany(plan_xy, size, 1, data.Precision()); // with space only XY
 
-    GaugeFixFFTRotate<Float> GFRotate(data);
+    GaugeFixFFTRotate<store_t> GFRotate(data);
 
     GaugeFixerFFT<decltype(arg)> gfix(arg, data);
     gfix.set_type(KERNEL_SET_INVPSQ);
     gfix.apply(device::get_default_stream());
 
-    GaugeFixQualityFFTArg<Float, recon, gauge_dir> argQ(data, arg.delta);
+    GaugeFixQualityFFTArg<store_t, recon, gauge_dir> argQ(data, arg.delta);
     GaugeFixQuality<decltype(argQ)> gfixquality(argQ, data);
     gfixquality.apply(device::get_default_stream());
     double action0 = argQ.getAction();
@@ -228,7 +229,7 @@ namespace quda {
         // each element is stored with stride lattice volume
         // it uses gx as temporary array!!!!!!
         //------------------------------------------------------------------------
-        complex<Float> *_array = arg.delta + k * delta_pad;
+        auto _array = arg.delta + k * delta_pad;
         //////  2D FFT + 2D FFT
         //------------------------------------------------------------------------
         // Perform FFT on xy plane
@@ -361,16 +362,16 @@ namespace quda {
     host_free(num_failures_h);
   }
 
-  template<typename Float, int nColors, QudaReconstructType recon> struct GaugeFixingFFT {
+  template<typename store_t, int nColors, QudaReconstructType recon> struct GaugeFixingFFT {
     GaugeFixingFFT(GaugeField& data, int gauge_dir, int Nsteps, int verbose_interval,
                    double alpha, int autotune, double tolerance, int stopWtheta)
     {
       if (gauge_dir != 3) {
 	if (getVerbosity() > QUDA_SUMMARIZE) printfQuda("Starting Landau gauge fixing with FFTs...\n");
-        gaugeFixingFFT<Float, recon, 4>(data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
+        gaugeFixingFFT<store_t, recon, 4>(data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
       } else {
 	if (getVerbosity() > QUDA_SUMMARIZE) printfQuda("Starting Coulomb gauge fixing with FFTs...\n");
-        gaugeFixingFFT<Float, recon, 3>(data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
+        gaugeFixingFFT<store_t, recon, 3>(data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
       }
     }
   };

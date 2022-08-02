@@ -11,22 +11,22 @@ namespace quda
 #define  DOUBLE_TOL	1e-15
 #define  SINGLE_TOL	2e-6
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, int apeDim_>
+  template <typename store_t, int nColor_, QudaReconstructType recon_, int apeDim_>
   struct GaugeAPEArg : kernel_param<> {
-    using Float = Float_;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int apeDim = apeDim_;
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
+    typedef typename gauge_mapper<store_t, recon>::type Gauge;
 
     Gauge out;
     const Gauge in;
 
     int X[4];    // grid dimensions
     int border[4];
-    const Float alpha;
-    const Float tolerance;
+    const real alpha;
+    const real tolerance;
 
     GaugeAPEArg(GaugeField &out, const GaugeField &in, double alpha) :
       kernel_param(dim3(in.LocalVolumeCB(), 2, apeDim)),
@@ -49,7 +49,7 @@ namespace quda
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
     {
-      using real = typename Arg::Float;
+      using real = typename Arg::real;
       typedef Matrix<complex<real>, Arg::nColor> Link;
 
       // compute spacetime and local coords

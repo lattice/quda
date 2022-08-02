@@ -277,10 +277,10 @@ namespace quda {
   }
 
   // v * u^dagger
-  template <class Float>
-  __host__ __device__ inline Matrix<Float,2> mulsu2UVDagger(Matrix<Float,2> v, Matrix<Float,2> u)
+  template <class Link>
+  __host__ __device__ inline Link mulsu2UVDagger(Link &v, Link &u)
   {
-    Matrix<Float,2> b;
+    Link b;
     b(0,0) = v(0,0) * u(0,0) + v(0,1) * u(0,1) + v(1,0) * u(1,0) + v(1,1) * u(1,1);
     b(0,1) = v(0,1) * u(0,0) - v(0,0) * u(0,1) + v(1,0) * u(1,1) - v(1,1) * u(1,0);
     b(1,0) = v(1,0) * u(0,0) - v(0,0) * u(1,0) + v(1,1) * u(0,1) - v(0,1) * u(1,1);
@@ -294,11 +294,11 @@ namespace quda {
     @param F staple
     @param localstate CURAND rng state
   */
-  template <class Float, int nColor>
-  __device__ inline void heatBathSUN( Matrix<complex<Float>,nColor>& U, Matrix<complex<Float>,nColor> F,
-                                      RNGState& localState, Float BetaOverNc )
+  template <class real, int nColor>
+  __device__ inline void heatBathSUN( Matrix<complex<real>,nColor>& U, Matrix<complex<real>,nColor> F,
+                                      RNGState& localState, real BetaOverNc )
   {
-    if (nColor == 3) {
+    if constexpr (nColor == 3) {
       //////////////////////////////////////////////////////////////////
       /*
          for( int block = 0; block < nColor; block++ ) {
@@ -321,10 +321,10 @@ namespace quda {
       for (int block = 0; block < nColor; block++) {
         int p,q;
         IndexBlock<nColor>(block, p, q);
-        complex<Float> a0((Float)0.0, (Float)0.0);
-        complex<Float> a1 = a0;
-        complex<Float> a2 = a0;
-        complex<Float> a3 = a0;
+        complex<real> a0((real)0.0, (real)0.0);
+        complex<real> a1 = a0;
+        complex<real> a2 = a0;
+        complex<real> a3 = a0;
 
 #pragma unroll
         for (int j = 0; j < nColor; j++) {
@@ -333,23 +333,23 @@ namespace quda {
           a2 += U(q,j) * F(j,p);
           a3 += U(q,j) * F(j,q);
         }
-        Matrix<Float,2> r;
+        Matrix<real,2> r;
         r(0,0) = a0.x + a3.x;
         r(0,1) = a1.y + a2.y;
         r(1,0) = a1.x - a2.x;
         r(1,1) = a0.y - a3.y;
-        Float k = sqrt(r(0,0) * r(0,0) + r(0,1) * r(0,1) + r(1,0) * r(1,0) + r(1,1) * r(1,1));;
-        Float ap = BetaOverNc * k;
+        real k = sqrt(r(0,0) * r(0,0) + r(0,1) * r(0,1) + r(1,0) * r(1,0) + r(1,1) * r(1,1));;
+        real ap = BetaOverNc * k;
         k = 1.0 / k;
         r *= k;
-        Matrix<Float,2> a = generate_su2_matrix_milc<Float>(ap, localState);
-        r = mulsu2UVDagger<Float>( a, r);
+        Matrix<real,2> a = generate_su2_matrix_milc<real>(ap, localState);
+        r = mulsu2UVDagger(a, r);
         ///////////////////////////////////////
-        a0 = complex<Float>( r(0,0), r(1,1) );
-        a1 = complex<Float>( r(1,0), r(0,1) );
-        a2 = complex<Float>(-r(1,0), r(0,1) );
-        a3 = complex<Float>( r(0,0),-r(1,1) );
-        complex<Float> tmp0;
+        a0 = complex<real>( r(0,0), r(1,1) );
+        a1 = complex<real>( r(1,0), r(0,1) );
+        a2 = complex<real>(-r(1,0), r(0,1) );
+        a3 = complex<real>( r(0,0),-r(1,1) );
+        complex<real> tmp0;
 
 #pragma unroll
         for (int j = 0; j < nColor; j++) {
@@ -363,21 +363,21 @@ namespace quda {
     } else if ( nColor > 3 ) {
       //////////////////////////////////////////////////////////////////
       //TESTED IN SU(4) SP THIS IS WORST
-      Matrix<complex<Float>,nColor> M = U * F;
+      Matrix<complex<real>,nColor> M = U * F;
 
 #pragma unroll
       for (int block = 0; block < nColor * ( nColor - 1) / 2; block++) {
         int2 id = IndexBlock<nColor>( block );
-        Matrix<Float,2> r = get_block_su2<Float>(M, id);
-        Float k = sqrt(r(0,0) * r(0,0) + r(0,1) * r(0,1) + r(1,0) * r(1,0) + r(1,1) * r(1,1));
-        Float ap = BetaOverNc * k;
+        Matrix<real,2> r = get_block_su2<real>(M, id);
+        real k = sqrt(r(0,0) * r(0,0) + r(0,1) * r(0,1) + r(1,0) * r(1,0) + r(1,1) * r(1,1));
+        real ap = BetaOverNc * k;
         k = 1.0 / k;
         r *= k;
-        Matrix<Float,2> a = generate_su2_matrix_milc<Float>(ap, localState);
-        Matrix<Float,2> rr = mulsu2UVDagger<Float>( a, r);
+        Matrix<real,2> a = generate_su2_matrix_milc<real>(ap, localState);
+        Matrix<real,2> rr = mulsu2UVDagger(a, r);
         ///////////////////////////////////////
-        mul_block_sun<Float, nColor>( rr, U, id);
-        mul_block_sun<Float, nColor>( rr, M, id);
+        mul_block_sun<real, nColor>( rr, U, id);
+        mul_block_sun<real, nColor>( rr, M, id);
         ///////////////////////////////////////
       }
       /* / TESTED IN SU(4) SP THIS IS FASTER
@@ -431,17 +431,17 @@ namespace quda {
      @param U link to be updated
      @param F staple
    */
-  template <class Float, int nColor>
-  __device__ inline void overrelaxationSUN( Matrix<complex<Float>,nColor>& U, Matrix<complex<Float>,nColor> F )
+  template <typename real, int nColor>
+  __device__ inline void overrelaxationSUN( Matrix<complex<real>, nColor>& U, Matrix<complex<real>,nColor> F )
   {
-    if (nColor == 3) {
+    if constexpr (nColor == 3) {
       //////////////////////////////////////////////////////////////////
       /*
          for( int block = 0; block < 3; block++ ) {
          Matrix<complex<T>,3> tmp1 = U * F;
          Matrix<T,2> r = get_block_su2<T>(tmp1, block);
          //normalize and conjugate
-         Float norm = 1.0 / sqrt(r(0,0)*r(0,0)+r(0,1)*r(0,1)+r(1,0)*r(1,0)+r(1,1)*r(1,1));;
+         real norm = 1.0 / sqrt(r(0,0)*r(0,0)+r(0,1)*r(0,1)+r(1,0)*r(1,0)+r(1,1)*r(1,1));;
          r(0,0) *= norm;
          r(0,1) *= -norm;
          r(1,0) *= -norm;
@@ -464,10 +464,10 @@ namespace quda {
       for (int block = 0; block < 3; block++) {
         int p,q;
         IndexBlock<nColor>(block, p, q);
-        complex<Float> a0((Float)0., (Float)0.);
-        complex<Float> a1 = a0;
-        complex<Float> a2 = a0;
-        complex<Float> a3 = a0;
+        complex<real> a0((real)0., (real)0.);
+        complex<real> a1 = a0;
+        complex<real> a2 = a0;
+        complex<real> a3 = a0;
 
 #pragma unroll
         for ( int j = 0; j < nColor; j++ ) {
@@ -476,14 +476,14 @@ namespace quda {
           a2 += U(q,j) * F(j,p);
           a3 += U(q,j) * F(j,q);
         }
-        Matrix<Float,2> r;
+        Matrix<real,2> r;
         r(0,0) = a0.x + a3.x;
         r(0,1) = a1.y + a2.y;
         r(1,0) = a1.x - a2.x;
         r(1,1) = a0.y - a3.y;
         //normalize and conjugate
         //r = r.conj_normalize();
-        Float norm = 1.0 / sqrt(r(0,0) * r(0,0) + r(0,1) * r(0,1) + r(1,0) * r(1,0) + r(1,1) * r(1,1));;
+        real norm = quda::rsqrt(r(0,0) * r(0,0) + r(0,1) * r(0,1) + r(1,0) * r(1,0) + r(1,1) * r(1,1));
         r(0,0) *= norm;
         r(0,1) *= -norm;
         r(1,0) *= -norm;
@@ -491,11 +491,11 @@ namespace quda {
 
 
         ///////////////////////////////////////
-        a0 = complex<Float>( r(0,0), r(1,1) );
-        a1 = complex<Float>( r(1,0), r(0,1) );
-        a2 = complex<Float>(-r(1,0), r(0,1) );
-        a3 = complex<Float>( r(0,0),-r(1,1) );
-        complex<Float> tmp0, tmp1;
+        a0 = complex<real>( r(0,0), r(1,1) );
+        a1 = complex<real>( r(1,0), r(0,1) );
+        a2 = complex<real>(-r(1,0), r(0,1) );
+        a3 = complex<real>( r(0,0),-r(1,1) );
+        complex<real> tmp0, tmp1;
 
 #pragma unroll
         for ( int j = 0; j < nColor; j++ ) {
@@ -510,21 +510,21 @@ namespace quda {
     }
     else if ( nColor > 3 ) {
       ///////////////////////////////////////////////////////////////////
-      Matrix<complex<Float>,nColor> M = U * F;
+      Matrix<complex<real>,nColor> M = U * F;
 #pragma unroll
       for ( int block = 0; block < nColor * ( nColor - 1) / 2; block++ ) {
         int2 id = IndexBlock<nColor>( block );
-        Matrix<Float,2> r = get_block_su2<Float, nColor>(M, id);
+        Matrix<real,2> r = get_block_su2<real, nColor>(M, id);
         //normalize and conjugate
-        Float norm = 1.0 / sqrt(r(0,0) * r(0,0) + r(0,1) * r(0,1) + r(1,0) * r(1,0) + r(1,1) * r(1,1));;
+        real norm = quda::rsqrt(r(0,0) * r(0,0) + r(0,1) * r(0,1) + r(1,0) * r(1,0) + r(1,1) * r(1,1));
         r(0,0) *= norm;
         r(0,1) *= -norm;
         r(1,0) *= -norm;
         r(1,1) *= -norm;
-        mul_block_sun<Float, nColor>( r, U, id);
-        mul_block_sun<Float, nColor>( r, U, id);
-        mul_block_sun<Float, nColor>( r, M, id);
-        mul_block_sun<Float, nColor>( r, M, id);
+        mul_block_sun<real, nColor>( r, U, id);
+        mul_block_sun<real, nColor>( r, U, id);
+        mul_block_sun<real, nColor>( r, M, id);
+        mul_block_sun<real, nColor>( r, M, id);
         ///////////////////////////////////////
       }
       /*  //TESTED IN SU(4) SP THIS IS WORST
@@ -547,7 +547,7 @@ namespace quda {
           r(1,0) = a1.x - a2.x;
           r(1,1) = a0.y - a3.y;
           //normalize and conjugate
-          Float norm = 1.0 / sqrt(r(0,0)*r(0,0)+r(0,1)*r(0,1)+r(1,0)*r(1,0)+r(1,1)*r(1,1));;
+          real norm = 1.0 / sqrt(r(0,0)*r(0,0)+r(0,1)*r(0,1)+r(1,0)*r(1,0)+r(1,1)*r(1,1));;
           r(0,0) *= norm;
           r(0,1) *= -norm;
           r(1,0) *= -norm;
@@ -572,28 +572,28 @@ namespace quda {
     }
   }
 
-  template <typename Float_, int nColor_, QudaReconstructType recon, bool heatbath_>
+  template <typename store_t, int nColor_, QudaReconstructType recon, bool heatbath_>
   struct MonteArg : kernel_param<> {
-    using Float = Float_;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
-    using Gauge = typename gauge_mapper<Float, recon>::type;
+    using Gauge = typename gauge_mapper<store_t, recon>::type;
     static constexpr bool heatbath = heatbath_;
 
     int X[4];       // grid dimensions
     int border[4];
     Gauge dataOr;
-    Float BetaOverNc;
+    real BetaOverNc;
     RNGState *rng;
     int mu;
     int parity;
-    MonteArg(GaugeField &data, Float Beta, RNGState *rng, int mu, int parity) :
+    MonteArg(GaugeField &data, double Beta, RNGState *rng, int mu, int parity) :
       kernel_param(dim3(data.LocalVolumeCB(), 1, 1)),
       dataOr(data),
       rng(rng),
       mu(mu),
       parity(parity)
     {
-      BetaOverNc = Beta / (Float)nColor;
+      BetaOverNc = Beta / (double)nColor;
       for (int dir = 0; dir < 4; dir++) {
         border[dir] = data.R()[dir];
         X[dir] = data.X()[dir] - border[dir] * 2;
@@ -609,7 +609,7 @@ namespace quda {
 
     __device__ __host__ void operator()(int x_cb)
     {
-      using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+      using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       auto mu = arg.mu;
       auto parity = arg.parity;
 

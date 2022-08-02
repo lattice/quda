@@ -88,8 +88,7 @@ namespace quda
   __device__ __host__ inline void applyStaggered(Vector &out, const Arg &arg, Coord & coord, int parity,
                                                  int, int thread_dim, bool &active)
   {
-    typedef typename mapper<typename Arg::Float>::type real;
-    typedef Matrix<complex<real>, Arg::nColor> Link;
+    typedef Matrix<complex<typename Arg::real>, Arg::nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
 
 #pragma unroll
@@ -112,7 +111,7 @@ namespace quda
       }
 
       // improved - forward direction
-      if (arg.improved) {
+      if constexpr (Arg::improved) {
         const bool ghost = (coord[d] + 3 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, arg.nFace);
@@ -149,7 +148,7 @@ namespace quda
       }
 
       // improved - backward direction
-      if (arg.improved) {
+      if constexpr (Arg::improved) {
         const bool ghost = (coord[d] - 3 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           // when updating replace arg.nFace with 1 here
@@ -179,8 +178,7 @@ namespace quda
     template <KernelType mykernel_type = kernel_type>
     __device__ __host__ __forceinline__ void operator()(int idx, int s, int parity)
     {
-      using real = typename mapper<typename Arg::Float>::type;
-      using Vector = ColorSpinor<real, Arg::nColor, 1>;
+      using Vector = ColorSpinor<typename Arg::real, Arg::nColor, 1>;
 
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)

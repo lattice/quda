@@ -5,15 +5,16 @@
 
 namespace quda {
 
-  template <typename Float, QudaReconstructType recon_>
+  template <typename store_t_, QudaReconstructType recon_>
   struct GaugeFixUnPackArg : kernel_param<> {
-    using real = typename mapper<Float>::type;
+    using store_t = store_t_;
+    using real = typename mapper<store_t>::type;
     static constexpr QudaReconstructType recon = recon_;
     int_fastdiv X[4]; // grid dimensions
     int_fastdiv Xh[4]; // grid dimensions
-    using Gauge = typename gauge_mapper<Float, recon>::type;
+    using Gauge = typename gauge_mapper<store_t, recon>::type;
     Gauge U;
-    complex<real> *array;
+    complex<store_t> *array;
     int parity;
     int face;
     int dir;
@@ -76,15 +77,16 @@ namespace quda {
       }
 
       int id = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      using real = typename mapper<typename Arg::real>::type;
+      using real = typename Arg::real;
       real tmp[Arg::recon];
       complex<real> data[9];
 
+      // FIXME: this should be rewritten using accessors
       if (arg.pack) {
         arg.U.load(data, id, arg.dir, arg.parity);
         arg.U.reconstruct.Pack(tmp, data);
         for (int i = 0; i < Arg::recon / 2; i++)
-          arg.array[idx + arg.threads.x * i] = complex<real>(tmp[2*i+0], tmp[2*i+1]);
+          arg.array[idx + arg.threads.x * i] = complex<typename Arg::store_t>(tmp[2*i+0], tmp[2*i+1]);
       } else {
         for (int i = 0; i < Arg::recon / 2; i++) {
           tmp[2*i+0] = arg.array[idx + arg.threads.x * i].real();

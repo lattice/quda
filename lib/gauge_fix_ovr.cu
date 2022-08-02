@@ -59,7 +59,7 @@ namespace quda {
   /**
    * @brief Tunable object for the gauge fixing kernel
    */
-  template<typename Float, QudaReconstructType recon, int gauge_dir>
+  template<typename store_t, QudaReconstructType recon, int gauge_dir>
   class GaugeFix : TunableKernel2D {
     GaugeField &u;
     double relax_boost;
@@ -80,12 +80,13 @@ namespace quda {
 
     unsigned int sharedBytesPerBlock(const TuneParam &param) const
     {
+      using real = typename mapper<store_t>::type;
       switch (param.aux.x) {
-      case 0: return 8 * param.block.x * 4 * sizeof(Float);
-      case 1: return 8 * param.block.x * 4 * sizeof(Float) / 8;
-      case 2: return 8 * param.block.x * 4 * sizeof(Float) / 8;
-      case 3: return 4 * param.block.x * 4 * sizeof(Float);
-      default: return 4 * param.block.x * sizeof(Float);
+      case 0: return 8 * param.block.x * 4 * sizeof(real);
+      case 1: return 8 * param.block.x * 4 * sizeof(real) / 8;
+      case 2: return 8 * param.block.x * 4 * sizeof(real) / 8;
+      case 3: return 4 * param.block.x * 4 * sizeof(real);
+      default: return 4 * param.block.x * sizeof(real);
       }
     }
 
@@ -118,7 +119,7 @@ namespace quda {
 
     void setParity(const int par) { parity = par; }
 
-    template <bool halo_, int type_> using Arg = GaugeFixArg<Float, recon, gauge_dir, halo_, type_>;
+    template <bool halo_, int type_> using Arg = GaugeFixArg<store_t, recon, gauge_dir, halo_, type_>;
 
     void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -163,7 +164,7 @@ namespace quda {
     void preTune() { u.backup(); }
     void postTune() { u.restore(); }
     long long flops() const { return 3LL * (22 + 28 * gauge_dir + 224 * 3) * threads; }
-    long long bytes() const { return 8LL * 2 * threads * u.Reconstruct() * sizeof(Float);  }
+    long long bytes() const { return 8LL * 2 * threads * u.Reconstruct() * sizeof(store_t);  }
   };
 
   /**
@@ -194,17 +195,17 @@ namespace quda {
     long long bytes() const { return 2LL * Arg::gauge_dir * meta.Volume() * meta.Reconstruct() * meta.Precision(); }
   };
 
-  template <typename Float, QudaReconstructType recon, bool pack, bool top>
+  template <typename store_t, QudaReconstructType recon, bool pack, bool top>
   class GaugeFixPacker : public TunableKernel1D {
     GaugeField &u;
-    complex<Float> *array;
+    complex<store_t> *array;
     int parity;
     int dim;
-    long long bytes() const { return u.LocalSurfaceCB(dim) * sizeof(Float) * recon * 2; }
+    long long bytes() const { return u.LocalSurfaceCB(dim) * sizeof(store_t) * recon * 2; }
     unsigned int minThreads() const { return u.LocalSurfaceCB(dim); }
 
   public:
-    GaugeFixPacker(GaugeField &u, complex<Float> *array, int parity, int dim, const qudaStream_t &stream) :
+    GaugeFixPacker(GaugeField &u, complex<store_t> *array, int parity, int dim, const qudaStream_t &stream) :
       TunableKernel1D(u),
       u(u),
       array(array),
@@ -218,11 +219,11 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       auto tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<Packer>(tp, stream, GaugeFixPackArg<Float, recon, pack, top>(u, array, parity, dim));
+      launch<Packer>(tp, stream, GaugeFixPackArg<store_t, recon, pack, top>(u, array, parity, dim));
     }
   };
 
-  template <typename Float, QudaReconstructType recon, int gauge_dir>
+  template <typename store_t, QudaReconstructType recon, int gauge_dir>
   void gaugeFixingOVR(GaugeField &data,const int Nsteps, const int verbose_interval,
                       const double relax_boost, const double tolerance,
                       const int reunit_interval, const int stopWtheta)
@@ -255,7 +256,7 @@ namespace quda {
     int *num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
     int *num_failures_d = static_cast<int*>(get_mapped_device_pointer(num_failures_h));
 
-    GaugeFixQualityOVRArg<Float, recon, gauge_dir> argQ(data);
+    GaugeFixQualityOVRArg<store_t, recon, gauge_dir> argQ(data);
     GaugeFixQuality<decltype(argQ)> GaugeFixQuality(argQ, data);
 
     void *send[4];
@@ -279,7 +280,7 @@ namespace quda {
       for (int d = 0; d < 4; d++) {
         if (!commDimPartitioned(d)) continue;
         offset[d] = data.LocalSurfaceCB(d) * recon;
-        bytes[d] =  sizeof(Float) * offset[d];
+        bytes[d] =  sizeof(store_t) * offset[d];
         send_d[d] = device_malloc(bytes[d]);
         recv_d[d] = device_malloc(bytes[d]);
         sendg_d[d] = device_malloc(bytes[d]);
@@ -320,8 +321,8 @@ namespace quda {
 
     if (*num_failures_h > 0) errorQuda("Error in the unitarization (%d errors)\n", *num_failures_h);
 
-    GaugeFix<Float, recon, gauge_dir> gfixIntPoints(data, relax_boost, borderpoints, false, -1);
-    GaugeFix<Float, recon, gauge_dir> gfixBorderPoints(data, relax_boost, borderpoints, true, threads);
+    GaugeFix<store_t, recon, gauge_dir> gfixIntPoints(data, relax_boost, borderpoints, false, -1);
+    GaugeFix<store_t, recon, gauge_dir> gfixBorderPoints(data, relax_boost, borderpoints, true, threads);
 
     int iter = 0;
     for (iter = 0; iter < Nsteps; iter++) {
@@ -343,11 +344,11 @@ namespace quda {
         for (int d = 0; d < 4; d++) {
           if (!commDimPartitioned(d)) continue;
           //extract top face
-          GaugeFixPacker<Float, recon, true, true>
-            (data, reinterpret_cast<complex<Float>*>(send_d[d]), p, d, device::get_stream(d));
+          GaugeFixPacker<store_t, recon, true, true>
+            (data, reinterpret_cast<complex<store_t>*>(send_d[d]), p, d, device::get_stream(d));
           //extract bottom ghost
-          GaugeFixPacker<Float, recon, true, false>
-            (data, reinterpret_cast<complex<Float>*>(sendg_d[d]), 1 - p, d, device::get_stream(4 + d));
+          GaugeFixPacker<store_t, recon, true, false>
+            (data, reinterpret_cast<complex<store_t>*>(sendg_d[d]), 1 - p, d, device::get_stream(4 + d));
         }
         for (int d = 0; d < 4; d++) {
           if (!commDimPartitioned(d)) continue;
@@ -381,13 +382,13 @@ namespace quda {
 
         for (int d = 0; d < 4; d++) {
           if (!commDimPartitioned(d)) continue;
-          GaugeFixPacker<Float, recon, false, false>
-            (data, reinterpret_cast<complex<Float>*>(recv_d[d]), p, d, device::get_stream(d));
+          GaugeFixPacker<store_t, recon, false, false>
+            (data, reinterpret_cast<complex<store_t>*>(recv_d[d]), p, d, device::get_stream(d));
         }
         for (int d = 0; d < 4; d++ ) {
           if (!commDimPartitioned(d)) continue;
-          GaugeFixPacker<Float, recon, false, true>
-            (data, reinterpret_cast<complex<Float>*>(recvg_d[d]), 1 - p, d, device::get_stream(4 + d));
+          GaugeFixPacker<store_t, recon, false, true>
+            (data, reinterpret_cast<complex<store_t>*>(recvg_d[d]), 1 - p, d, device::get_stream(4 + d));
         }
         for (int d = 0; d < 4; d++ ) {
           if (!commDimPartitioned(d)) continue;
@@ -469,16 +470,16 @@ namespace quda {
     }
   }
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct GaugeFixingOVR {
+  template <typename store_t, int nColor, QudaReconstructType recon> struct GaugeFixingOVR {
   GaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval,
                  const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta)
     {
       if (gauge_dir == 4) {
 	if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Starting Landau gauge fixing...\n");
-        gaugeFixingOVR<Float, recon, 4>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+        gaugeFixingOVR<store_t, recon, 4>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else if (gauge_dir == 3) {
 	if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Starting Coulomb gauge fixing...\n");
-        gaugeFixingOVR<Float, recon, 3>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+        gaugeFixingOVR<store_t, recon, 3>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else {
         errorQuda("Unexpected gauge_dir = %d", gauge_dir);
       }

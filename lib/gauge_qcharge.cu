@@ -6,7 +6,7 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, QudaReconstructType recon>
+  template <typename store_t, int nColor, QudaReconstructType recon>
   class QCharge : TunableReduction2D {
     const GaugeField &Fmunu;
     double *energy;
@@ -27,7 +27,7 @@ namespace quda
       apply(device::get_default_stream());
     }
 
-    template <bool compute_density = false> using Arg = QChargeArg<Float, nColor, recon, compute_density>;
+    template <bool compute_density = false> using Arg = QChargeArg<store_t, nColor, recon, compute_density>;
 
     void apply(const qudaStream_t &stream)
     {
@@ -35,10 +35,10 @@ namespace quda
 
       typename Arg<>::reduce_t result;
       if (!density) {
-        Arg<false> arg(Fmunu, static_cast<Float*>(qdensity));
+        Arg<false> arg(Fmunu, static_cast<store_t*>(qdensity));
         launch<qCharge>(result, tp, stream, arg);
       } else {
-        Arg<true> arg(Fmunu, static_cast<Float*>(qdensity));
+        Arg<true> arg(Fmunu, static_cast<store_t*>(qdensity));
         launch<qCharge>(result, tp, stream, arg);
       }
 

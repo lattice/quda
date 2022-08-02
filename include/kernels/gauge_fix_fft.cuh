@@ -23,13 +23,14 @@ namespace quda {
 #endif
 #endif
 
-  template <typename Float, int dir_>
+  template <typename store_t, int dir_>
   struct GaugeFixFFTRotateArg : kernel_param<> {
+    using real = typename mapper<store_t>::type;
     static constexpr int dir = dir_;
     int_fastdiv X[4];     // grid dimensions
-    complex<Float> *tmp0;
-    complex<Float> *tmp1;
-    GaugeFixFFTRotateArg(const GaugeField &data, complex<Float> *tmp0, complex<Float> *tmp1) :
+    complex<real> *tmp0;
+    complex<real> *tmp1;
+    GaugeFixFFTRotateArg(const GaugeField &data, complex<real> *tmp0, complex<real> *tmp1) :
       kernel_param(dim3(data.Volume(), 1, 1)),
       tmp0(tmp0),
       tmp1(tmp1)
@@ -72,30 +73,30 @@ namespace quda {
 
   template <typename store_t, QudaReconstructType recon>
   struct GaugeFixArg : kernel_param<> {
-    using Float = typename mapper<store_t>::type;
+    using real = typename mapper<store_t>::type;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
     static constexpr int elems = recon / 2;
     Gauge data;
     int_fastdiv X[4];     // grid dimensions
-    Float *invpsq;
-    complex<Float> *delta;
-    complex<Float> *gx;
-    Float alpha;
+    real *invpsq;
+    complex<real> *delta;
+    complex<real> *gx;
+    real alpha;
     int volume;
 
     GaugeFixArg(GaugeField &data, double alpha) :
       kernel_param(dim3(data.VolumeCB(), 2, 1)),
       data(data),
-      alpha(static_cast<Float>(alpha)),
+      alpha(static_cast<real>(alpha)),
       volume(data.Volume())
     {
       for (int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
-      invpsq = (Float*)device_malloc(sizeof(Float) * volume);
-      delta = (complex<Float>*)device_malloc(sizeof(complex<Float>) * volume * 6);
+      invpsq = (real*)device_malloc(sizeof(real) * volume);
+      delta = (complex<real>*)device_malloc(sizeof(complex<real>) * volume * 6);
 #ifdef GAUGEFIXING_DONT_USE_GX
-      gx = (complex<Float>*)device_malloc(sizeof(complex<Float>) * volume);
+      gx = (complex<real>*)device_malloc(sizeof(complex<real>) * volume);
 #else
-      gx = (complex<Float>*)device_malloc(sizeof(complex<Float>) * volume * elems);
+      gx = (complex<real>*)device_malloc(sizeof(complex<real>) * volume * elems);
 #endif
     }
 
@@ -115,21 +116,21 @@ namespace quda {
 
     __device__ __host__ inline void operator()(int x_cb, int parity)
     {
-      using Float = typename Arg::Float;
+      using real = typename Arg::real;
       int id = parity * arg.threads.x + x_cb;
       int x1 = id / (arg.X[2] * arg.X[3] * arg.X[0]);
       int x0 = (id / (arg.X[2] * arg.X[3])) % arg.X[0];
       int x3 = (id / arg.X[2]) % arg.X[3];
       int x2 = id % arg.X[2];
       //id  =  x2 + (x3 +  (x0 + x1 * arg.X[0]) * arg.X[3]) * arg.X[2];
-      Float sx = quda::sinpi( (Float)x0 / (Float)arg.X[0]);
-      Float sy = quda::sinpi( (Float)x1 / (Float)arg.X[1]);
-      Float sz = quda::sinpi( (Float)x2 / (Float)arg.X[2]);
-      Float st = quda::sinpi( (Float)x3 / (Float)arg.X[3]);
-      Float sinsq = sx * sx + sy * sy + sz * sz + st * st;
-      Float prcfact = 0.0;
+      auto sx = quda::sinpi( (real)x0 / (real)arg.X[0]);
+      auto sy = quda::sinpi( (real)x1 / (real)arg.X[1]);
+      auto sz = quda::sinpi( (real)x2 / (real)arg.X[2]);
+      auto st = quda::sinpi( (real)x3 / (real)arg.X[3]);
+      auto sinsq = sx * sx + sy * sy + sz * sz + st * st;
+      auto prcfact = 0.0;
       //The FFT normalization is done here
-      if (sinsq > 0.00001) prcfact = 4.0 / (sinsq * (Float)(arg.volume));
+      if (sinsq > 0.00001) prcfact = 4.0 / (sinsq * (real)(arg.volume));
       arg.invpsq[id] = prcfact;
     }
   };
@@ -231,16 +232,16 @@ namespace quda {
     }
   };
 
-  template <typename Float>
-  __host__ __device__ inline void reunit_link(Matrix<complex<Float>,3> &U)
+  template <typename real>
+  __host__ __device__ inline void reunit_link(Matrix<complex<real>,3> &U)
   {
-    complex<Float> t2((Float)0.0, (Float)0.0);
-    Float t1 = 0.0;
+    complex<real> t2((real)0.0, (real)0.0);
+    real t1 = 0.0;
     //first normalize first row
     //sum of squares of row
 #pragma unroll
     for ( int c = 0; c < 3; c++ ) t1 += norm(U(0,c));
-    t1 = (Float)1.0 / sqrt(t1);
+    t1 = quda::rsqrt(t1);
     //14
     //used to normalize row
 #pragma unroll
@@ -257,7 +258,7 @@ namespace quda {
     t1 = 0.0;
 #pragma unroll
     for ( int c = 0; c < 3; c++ ) t1 += norm(U(1,c));
-    t1 = (Float)1.0 / sqrt(t1);
+    t1 = quda::rsqrt(t1);
     //14
     //used to normalize row
 #pragma unroll
@@ -278,8 +279,8 @@ namespace quda {
 
     __device__ __host__ void operator()(int x_cb, int parity)
     {
-      using Float = typename Arg::Float;
-      using complex = complex<Float>;
+      using real = typename Arg::real;
+      using complex = complex<real>;
       using matrix = Matrix<complex, 3>;
 
       int x[4];
@@ -300,9 +301,9 @@ namespace quda {
 
       matrix g;
       setIdentity(&g);
-      g += de * (arg.alpha * static_cast<Float>(0.5));
+      g += de * (arg.alpha * static_cast<real>(0.5));
       //36
-      reunit_link<Float>(g);
+      reunit_link<real>(g);
       //130
 
       for ( int mu = 0; mu < 4; mu++ ) {
@@ -325,9 +326,9 @@ namespace quda {
         de(2,1) = complex(-de(1,2).real(), de(1,2).imag());
 
         setIdentity(&g0);
-        g0 += de * (arg.alpha * static_cast<Float>(0.5));
+        g0 += de * (arg.alpha * static_cast<real>(0.5));
         //36
-        reunit_link<Float>(g0);
+        reunit_link<real>(g0);
         //130
 
         U = U * conj(g0);
@@ -344,7 +345,7 @@ namespace quda {
 
     __device__ __host__ inline void operator()(int x_cb, int parity)
     {
-      using complex = complex<typename Arg::Float>;
+      using complex = complex<typename Arg::real>;
       using matrix = Matrix<complex, 3>;
 
       int x[4];
@@ -366,10 +367,10 @@ namespace quda {
 
       matrix g;
       setIdentity(&g);
-      g += de * (arg.alpha * static_cast<typename Arg::Float>(0.5));
+      g += de * (arg.alpha * static_cast<typename Arg::real>(0.5));
 
       //36
-      reunit_link<typename Arg::Float>(g);
+      reunit_link<typename Arg::real>(g);
 
       //130
       //gx is represented in even/odd order
@@ -387,7 +388,7 @@ namespace quda {
 
     __device__ __host__ inline void operator()(int x_cb, int parity)
     {
-      using complex = complex<typename Arg::Float>;
+      using complex = complex<typename Arg::real>;
       using matrix = Matrix<complex, 3>;
 
       int x[4];

@@ -6,12 +6,12 @@
 
 namespace quda {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_>
+  template <typename store_t, int nColor_, QudaReconstructType recon_>
   struct MomActionArg : ReduceArg<double> {
-    using Float = Float_;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
-    const typename gauge_mapper<Float, recon>::type mom;
+    const typename gauge_mapper<store_t, recon>::type mom;
 
     MomActionArg(const GaugeField &mom) :
       ReduceArg<double>(dim3(mom.VolumeCB(), 2, 1)),
@@ -31,7 +31,7 @@ namespace quda {
     // order to increase stability
     __device__ __host__ inline reduce_t operator()(reduce_t &action, int x_cb, int parity)
     {
-      using matrix = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+      using matrix = Matrix<complex<typename Arg::real>, Arg::nColor>;
 
       // loop over direction
       for (int mu=0; mu<4; mu++) {
@@ -55,20 +55,20 @@ namespace quda {
     }
   };
 
-  template<typename Float_, int nColor_, QudaReconstructType recon_>
+  template<typename store_t, int nColor_, QudaReconstructType recon_>
   struct UpdateMomArg : ReduceArg<array<double, 2>>
   {
-    using Float = Float_;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
-    typename gauge_mapper<Float, QUDA_RECONSTRUCT_10>::type mom;
-    typename gauge_mapper<Float, recon>::type force;
-    Float coeff;
+    typename gauge_mapper<store_t, QUDA_RECONSTRUCT_10>::type mom;
+    typename gauge_mapper<store_t, recon>::type force;
+    real coeff;
     int X[4]; // grid dimensions on mom
     int E[4]; // grid dimensions on force (possibly extended)
     int border[4]; //
 
-    UpdateMomArg(GaugeField &mom, const Float &coeff, const GaugeField &force) :
+    UpdateMomArg(GaugeField &mom, double coeff, const GaugeField &force) :
       ReduceArg<reduce_t>(dim3(mom.VolumeCB(), 2, 1)),
       mom(mom),
       force(force),
@@ -102,8 +102,8 @@ namespace quda {
 
 #pragma unroll
       for (int d=0; d<4; d++) {
-        Matrix<complex<typename Arg::Float>, Arg::nColor> m = arg.mom(d, x_cb, parity);
-        Matrix<complex<typename Arg::Float>, Arg::nColor> f = arg.force(d, e_cb, parity);
+        Matrix<complex<typename Arg::real>, Arg::nColor> m = arg.mom(d, x_cb, parity);
+        Matrix<complex<typename Arg::real>, Arg::nColor> f = arg.force(d, e_cb, parity);
 
         // project to traceless anti-hermitian prior to taking norm
         makeAntiHerm(f);
@@ -123,13 +123,13 @@ namespace quda {
     }
   };
 
-  template <typename Float_, int nColor_, QudaReconstructType recon>
+  template <typename store_t, int nColor_, QudaReconstructType recon>
   struct ApplyUArg : kernel_param<>
   {
-    using Float = Float_;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
-    typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type force;
-    const typename gauge_mapper<Float, recon>::type U;
+    typename gauge_mapper<store_t, QUDA_RECONSTRUCT_NO>::type force;
+    const typename gauge_mapper<store_t, recon>::type U;
     int X[4]; // grid dimensions
     ApplyUArg(GaugeField &force, const GaugeField &U) :
       kernel_param(dim3(U.VolumeCB(), 2, 1)),
@@ -148,7 +148,7 @@ namespace quda {
 
     __device__ __host__ inline void operator()(int x_cb, int parity)
     {
-      using mat = Matrix<complex<typename Arg::Float>, Arg::nColor>;
+      using mat = Matrix<complex<typename Arg::real>, Arg::nColor>;
 
       for (int d=0; d<4; d++) {
         mat f = arg.force(d, x_cb, parity);

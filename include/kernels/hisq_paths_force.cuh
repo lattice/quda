@@ -69,11 +69,11 @@ namespace quda {
           seven(path_coeff_array[4]), lepage(path_coeff_array[5]) { }
     };
 
-    template <typename real_, int nColor_, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
+    template <typename store_t, int nColor_, QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO>
     struct BaseForceArg : kernel_param<> {
-      using real = real_;
+      using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
-      typedef typename gauge_mapper<real,reconstruct>::type G;
+      using G = typename gauge_mapper<store_t, reconstruct>::type;
       const G link;
       int X[4]; // regular grid dims
       int D[4]; // working set grid dims
@@ -108,10 +108,11 @@ namespace quda {
       }
     };
 
-    template <typename real, int nColor, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
-    struct FatLinkArg : public BaseForceArg<real, nColor, reconstruct> {
-      using BaseForceArg = BaseForceArg<real, nColor, reconstruct>;
-      typedef typename gauge_mapper<real,QUDA_RECONSTRUCT_NO>::type F;
+    template <typename store_t, int nColor, QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO>
+    struct FatLinkArg : public BaseForceArg<store_t, nColor, reconstruct> {
+      using BaseForceArg = BaseForceArg<store_t, nColor, reconstruct>;
+      using real = typename mapper<store_t>::type;
+      using F = typename gauge_mapper<store_t, QUDA_RECONSTRUCT_NO>::type;
       F outA;
       F outB;
       F pMu;
@@ -128,7 +129,7 @@ namespace quda {
       const bool q_mu;
       const bool q_prev;
 
-      FatLinkArg(GaugeField &force, const GaugeField &oProd, const GaugeField &link, real coeff, HisqForceType type)
+      FatLinkArg(GaugeField &force, const GaugeField &oProd, const GaugeField &link, double coeff, HisqForceType type)
         : BaseForceArg(link, 0), outA(force), outB(force), pMu(oProd), p3(oProd), qMu(oProd),
         oProd(oProd), qProd(oProd), qPrev(oProd), coeff(coeff), accumu_coeff(0),
         p_mu(false), q_mu(false), q_prev(false)
@@ -136,41 +137,41 @@ namespace quda {
 
       FatLinkArg(GaugeField &newOprod, GaugeField &pMu, GaugeField &P3, GaugeField &qMu,
                  const GaugeField &oProd, const GaugeField &qPrev, const GaugeField &link,
-                 real coeff, int overlap, HisqForceType type)
+                 double coeff, int overlap, HisqForceType type)
         : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod), pMu(pMu), p3(P3), qMu(qMu),
         oProd(oProd), qProd(oProd), qPrev(qPrev), coeff(coeff), accumu_coeff(0), p_mu(true), q_mu(true), q_prev(true)
       { if (type != FORCE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_MIDDLE_LINK"); }
 
       FatLinkArg(GaugeField &newOprod, GaugeField &pMu, GaugeField &P3, GaugeField &qMu,
                  const GaugeField &oProd, const GaugeField &link,
-                 real coeff, int overlap, HisqForceType type)
+                 double coeff, int overlap, HisqForceType type)
         : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod), pMu(pMu), p3(P3), qMu(qMu),
         oProd(oProd), qProd(oProd), qPrev(qMu), coeff(coeff), accumu_coeff(0), p_mu(true), q_mu(true), q_prev(false)
       { if (type != FORCE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_MIDDLE_LINK"); }
 
       FatLinkArg(GaugeField &newOprod, GaugeField &P3, const GaugeField &oProd,
                  const GaugeField &qPrev, const GaugeField &link,
-                 real coeff, int overlap, HisqForceType type)
+                 double coeff, int overlap, HisqForceType type)
         : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod), pMu(P3), p3(P3), qMu(qPrev),
         oProd(oProd), qProd(oProd), qPrev(qPrev), coeff(coeff), accumu_coeff(0), p_mu(false), q_mu(false), q_prev(true)
       { if (type != FORCE_LEPAGE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_LEPAGE_MIDDLE_LINK"); }
 
       FatLinkArg(GaugeField &newOprod, GaugeField &shortP, const GaugeField &P3,
-                 const GaugeField &qProd, const GaugeField &link, real coeff, real accumu_coeff, int overlap, HisqForceType type)
+                 const GaugeField &qProd, const GaugeField &link, double coeff, double accumu_coeff, int overlap, HisqForceType type)
         : BaseForceArg(link, overlap), outA(newOprod), outB(shortP), pMu(P3), p3(P3), qMu(qProd), oProd(qProd), qProd(qProd),
         qPrev(qProd), coeff(coeff), accumu_coeff(accumu_coeff),
         p_mu(false), q_mu(false), q_prev(false)
       { if (type != FORCE_SIDE_LINK) errorQuda("This constructor is for FORCE_SIDE_LINK"); }
 
       FatLinkArg(GaugeField &newOprod, GaugeField &P3, const GaugeField &link,
-                 real coeff, int overlap, HisqForceType type)
+                 double coeff, int overlap, HisqForceType type)
         : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod),
         pMu(P3), p3(P3), qMu(P3), oProd(P3), qProd(P3), qPrev(P3), coeff(coeff), accumu_coeff(0.0),
         p_mu(false), q_mu(false), q_prev(false)
       { if (type != FORCE_SIDE_LINK_SHORT) errorQuda("This constructor is for FORCE_SIDE_LINK_SHORT"); }
 
       FatLinkArg(GaugeField &newOprod, GaugeField &shortP, const GaugeField &oProd, const GaugeField &qPrev,
-                 const GaugeField &link, real coeff, real accumu_coeff, int overlap, HisqForceType type, bool)
+                 const GaugeField &link, double coeff, double accumu_coeff, int overlap, HisqForceType type, bool)
         : BaseForceArg(link, overlap), outA(newOprod), outB(shortP), pMu(shortP),
           p3(shortP), qMu(qPrev), oProd(oProd), qProd(qPrev), qPrev(qPrev),
           coeff(coeff), accumu_coeff(accumu_coeff), p_mu(false), q_mu(false), q_prev(false)
@@ -581,16 +582,17 @@ namespace quda {
       }
     };
 
-    template <typename real, int nColor, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
-    struct CompleteForceArg : public BaseForceArg<real, nColor, reconstruct> {
+    template <typename store_t, int nColor, QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO>
+    struct CompleteForceArg : public BaseForceArg<store_t, nColor, reconstruct> {
 
-      typedef typename gauge_mapper<real,QUDA_RECONSTRUCT_NO>::type F;
+      using real = typename mapper<store_t>::type;
+      using F = typename gauge_mapper<store_t, QUDA_RECONSTRUCT_NO>::type;
       F outA;        // force output accessor
       const F oProd; // force input accessor
       const real coeff;
 
       CompleteForceArg(GaugeField &force, const GaugeField &link)
-        : BaseForceArg<real, nColor, reconstruct>(link, 0), outA(force), oProd(force), coeff(0.0)
+        : BaseForceArg<store_t, nColor, reconstruct>(link, 0), outA(force), oProd(force), coeff(0.0)
       { }
 
     };
@@ -619,23 +621,24 @@ namespace quda {
 
           makeAntiHerm(Ow);
 
-          typename Arg::real coeff = (parity==1) ? -1.0 : 1.0;
+          typename Arg::real coeff = (parity == 1) ? -1.0 : 1.0;
           arg.outA(sig, e_cb, parity) = coeff*Ow;
         }
       }
     };
 
-    template <typename real, int nColor, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
-    struct LongLinkArg : public BaseForceArg<real, nColor, reconstruct> {
+    template <typename store_t, int nColor, QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO>
+    struct LongLinkArg : public BaseForceArg<store_t, nColor, reconstruct> {
 
-      typedef typename gauge::FloatNOrder<real,18,2,11> M;
-      typedef typename gauge_mapper<real,QUDA_RECONSTRUCT_NO>::type F;
+      using real = typename mapper<store_t>::type;
+      typedef typename gauge::FloatNOrder<store_t, 18, 2, 11> M;
+      typedef typename gauge_mapper<store_t, QUDA_RECONSTRUCT_NO>::type F;
       F outA;
       const F oProd;
       const real coeff;
 
-      LongLinkArg(GaugeField &newOprod, const GaugeField &link, const GaugeField &oprod, real coeff)
-        : BaseForceArg<real, nColor, reconstruct>(link,0), outA(newOprod), oProd(oprod), coeff(coeff)
+      LongLinkArg(GaugeField &newOprod, const GaugeField &link, const GaugeField &oprod, double coeff)
+        : BaseForceArg<store_t, nColor, reconstruct>(link,0), outA(newOprod), oProd(oprod), coeff(coeff)
       { }
 
     };

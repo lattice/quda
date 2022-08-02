@@ -6,20 +6,20 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, bool density_ = false> struct QChargeArg :
+  template <typename store_t, int nColor_, QudaReconstructType recon_, bool density_ = false> struct QChargeArg :
     public ReduceArg<array<double, 3>>
   {
-    using Float = Float_;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr bool density = density_;
-    typedef typename gauge_mapper<Float,recon>::type F;
+    typedef typename gauge_mapper<store_t, recon>::type F;
 
     F f;
-    Float *qDensity;
+    store_t *qDensity;
 
-    QChargeArg(const GaugeField &Fmunu, Float *qDensity = nullptr) :
+    QChargeArg(const GaugeField &Fmunu, store_t *qDensity = nullptr) :
       ReduceArg<reduce_t>(dim3(Fmunu.VolumeCB(), 2, 1)),
       f(Fmunu),
       qDensity(qDensity) { }
@@ -37,7 +37,7 @@ namespace quda
     // return the qcharge and field strength at site (x_cb, parity)
     __device__ __host__ inline reduce_t operator()(reduce_t &E, int x_cb, int parity)
     {
-      using real = typename Arg::Float;
+      using real = typename Arg::real;
       using Link = Matrix<complex<real>, Arg::nColor>;
       constexpr real q_norm = static_cast<real>(-1.0 / (4*M_PI*M_PI));
       constexpr real n_inv = static_cast<real>(1.0 / Arg::nColor);

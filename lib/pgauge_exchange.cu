@@ -46,10 +46,10 @@ namespace quda {
     }
   }
 
-  template<typename Float, int nColor, QudaReconstructType recon>
+  template <typename store_t, int nColor, QudaReconstructType recon>
   struct PGaugeExchanger : TunableKernel1D {
     GaugeField &U;
-    GaugeFixUnPackArg<Float, recon> arg;
+    GaugeFixUnPackArg<store_t, recon> arg;
     const char *dim_str[4] = { "0", "1", "2", "3" };
     unsigned int minThreads() const { return arg.threads.x; }
 
@@ -75,7 +75,7 @@ namespace quda {
       void *recvg[4];
       for (int d = 0; d < 4; d++) {
         if (!commDimPartitioned(d)) continue;
-        bytes[d] = sizeof(Float) * U.SurfaceCB(d) * recon;
+        bytes[d] = sizeof(store_t) * U.SurfaceCB(d) * recon;
       }
 
       if (!init) {
@@ -124,12 +124,12 @@ namespace quda {
 
         //extract top face
         arg.pack = true;
-        arg.array = reinterpret_cast<complex<Float>*>(send_d[d]);
+        arg.array = reinterpret_cast<complex<store_t>*>(send_d[d]);
         arg.borderid = X[d] - U.R()[d] - 1;
         apply(device::get_stream(0));
 
         //extract bottom
-        arg.array = reinterpret_cast<complex<Float>*>(sendg_d[d]);
+        arg.array = reinterpret_cast<complex<store_t>*>(sendg_d[d]);
         arg.borderid = U.R()[d];
         apply(device::get_stream(1));
 
@@ -147,14 +147,14 @@ namespace quda {
 
         // insert
         arg.pack = false;
-        arg.array = reinterpret_cast<complex<Float>*>(recv_d[d]);
+        arg.array = reinterpret_cast<complex<store_t>*>(recv_d[d]);
         arg.borderid = U.R()[d] - 1;
         apply(device::get_stream(0));
 
         comm_wait(mh_recv_fwd[d]);
         qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], qudaMemcpyHostToDevice, device::get_stream(1));
 
-        arg.array = reinterpret_cast<complex<Float>*>(recvg_d[d]);
+        arg.array = reinterpret_cast<complex<store_t>*>(recvg_d[d]);
         arg.borderid = X[d] - U.R()[d];
         apply(device::get_stream(1));
 
