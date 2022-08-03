@@ -42,6 +42,7 @@ namespace quda
       int qudaSetupLaunchParameter(const TuneParam &tp)
       {
         static int init = 0;
+        static size_t res_mem = 1ULL << 32;
         int num_teams = tp.grid.x*tp.grid.y*tp.grid.z;
         if(!init){
           int dev = omp_get_default_device();
@@ -57,30 +58,30 @@ namespace quda
             errorQuda("failed to allocate %lu bytes host memory for kernel arguments.", device::max_constant_size());
             return -1;
           }
-          launch_param_host->shared_cache.addr = (int*)omp_target_alloc(num_teams*(size_t)device::max_shared_memory_size(), dev);
+          char *res_mem_env = getenv("QUDA_OMPTARGET_SLM_RESERVE");
+          if(res_mem_env){
+            size_t res_mem_env_val = std::strtoull(res_mem_env, nullptr, 10);
+            if(res_mem_env_val > 0){
+              res_mem = res_mem_env_val;
+              warningQuda("using environment variable QUDA_OMPTARGET_SLM_RESERVE=%ul", res_mem);
+            }else{
+              warningQuda("cannot parse environment variable QUDA_OMPTARGET_SLM_RESERVE=%s", res_mem_env);
+            }
+          }
+          launch_param_host->shared_cache.addr = (int*)omp_target_alloc(res_mem, dev);
           if(!launch_param_host->shared_cache.addr){
-            if(getVerbosity() >= QUDA_VERBOSE)
-              warningQuda("failed to allocate %lu bytes device memory for shared cache among %d teams.", num_teams*(size_t)device::max_shared_memory_size(), num_teams);
+            errorQuda("failed to allocate %lu bytes device memory for shared cache.", res_mem);
             return -1;
           }
-          init = 1;
-          launch_param_host->shared_cache.num_teams = num_teams;
+          launch_param_host->shared_cache.num_teams = res_mem/(size_t)device::max_shared_memory_size();
           launch_param_host->shared_cache.cache_length = device::max_shared_memory_size()/sizeof(launch_param_host->shared_cache.addr[0]);
+          warningQuda("allocated %lu bytes device memory for shared cache among maximum %d teams.", res_mem, launch_param_host->shared_cache.num_teams);
+          init = 1;
         }
         if(launch_param_host->shared_cache.num_teams<num_teams){
-          int dev = omp_get_default_device();
-          if(launch_param_host->shared_cache.addr)
-            omp_target_free(launch_param_host->shared_cache.addr, dev);
-          launch_param_host->shared_cache.addr = (int*)omp_target_alloc(num_teams*(size_t)device::max_shared_memory_size(), dev);
-          if(!launch_param_host->shared_cache.addr){
-            if(getVerbosity() >= QUDA_VERBOSE)
-              warningQuda("failed to allocate %lu bytes device memory for shared cache among %d teams.", num_teams*(size_t)device::max_shared_memory_size(), num_teams);
-            launch_param_host->shared_cache.num_teams = 0;
-            launch_param_host->shared_cache.cache_length = 0;
-            return -1;
-          }
-          launch_param_host->shared_cache.num_teams = num_teams;
-          launch_param_host->shared_cache.cache_length = device::max_shared_memory_size()/sizeof(launch_param_host->shared_cache.addr[0]);
+          if(getVerbosity() >= QUDA_VERBOSE)
+            warningQuda("requested %d teams, which is larger than maximum %d teams reserved for shared memory %lu bytes", num_teams, launch_param_host->shared_cache.num_teams, res_mem);
+          return -1;
         }
         launch_param_host->grid = tp.grid;
         launch_param_host->block = tp.block;
