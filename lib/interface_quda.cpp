@@ -5256,6 +5256,9 @@ void gaussGaugeQuda(unsigned long long seed, double sigma)
   profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+/*
+ * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
+ */
 void plaqQuda(double plaq[3])
 {
   profilePlaq.TPSTART(QUDA_PROFILE_TOTAL);

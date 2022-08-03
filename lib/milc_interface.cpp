@@ -658,7 +658,6 @@ QudaGaugeParam createGaugeParamForObservables(int precision, QudaMILCSiteArg_t *
   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
       (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       phase_in ? QUDA_GENERAL_LINKS : QUDA_SU3_LINKS);
-      //QUDA_GENERAL_LINKS);
 
   qudaGaugeParam.gauge_offset = arg->link_offset;
   qudaGaugeParam.mom_offset = arg->mom_offset;
