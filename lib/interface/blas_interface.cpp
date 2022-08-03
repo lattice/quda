@@ -161,26 +161,27 @@ void blasLUInvQuda(void *Ainv, void *A, QudaBoolean use_native, QudaBLASParam *b
 {
   getProfileBLAS().TPSTART(QUDA_PROFILE_TOTAL);
   checkBLASParam(*blas_param);
-  
-  if (use_native == QUDA_BOOLEAN_FALSE) {
-    getProfileBLAS().TPSTART(QUDA_PROFILE_INIT);
-    const int n = blas_param->inv_mat_size;
-    const uint64_t batches = blas_param->batch_count;
-    QudaPrecision prec = QUDA_INVALID_PRECISION;
-    switch (blas_param->data_type) {
-    case QUDA_BLAS_DATATYPE_Z : prec = QUDA_DOUBLE_PRECISION; break;
-    case QUDA_BLAS_DATATYPE_C : prec = QUDA_SINGLE_PRECISION; break;
-    case QUDA_BLAS_DATATYPE_D :
-    case QUDA_BLAS_DATATYPE_S :
-    default : errorQuda("LU inversion not supported for data type %d", blas_param->data_type);
-    }
-    getProfileBLAS().TPSTOP(QUDA_PROFILE_INIT);
-    getProfileBLAS().TPSTART(QUDA_PROFILE_COMPUTE);
+
+  getProfileBLAS().TPSTART(QUDA_PROFILE_INIT);
+  const int n = blas_param->inv_mat_size;
+  const uint64_t batches = blas_param->batch_count;
+  QudaPrecision prec = QUDA_INVALID_PRECISION;
+  switch (blas_param->data_type) {
+  case QUDA_BLAS_DATATYPE_Z : prec = QUDA_DOUBLE_PRECISION; break;
+  case QUDA_BLAS_DATATYPE_C : prec = QUDA_SINGLE_PRECISION; break;
+  case QUDA_BLAS_DATATYPE_D :
+  case QUDA_BLAS_DATATYPE_S :
+  default : errorQuda("LU inversion not supported for data type %d", blas_param->data_type);
+  }
+  getProfileBLAS().TPSTOP(QUDA_PROFILE_INIT);
+
+  getProfileBLAS().TPSTART(QUDA_PROFILE_COMPUTE);
+  if (use_native == QUDA_BOOLEAN_FALSE)
     blas_lapack::generic::BatchInvertMatrix(Ainv, A, n, batches, prec, QUDA_CPU_FIELD_LOCATION);
-    getProfileBLAS().TPSTOP(QUDA_PROFILE_COMPUTE);
-  } else {
-    
-  }  
+  else
+    blas_lapack::native::BatchInvertMatrix(Ainv, A, n, batches, prec, QUDA_CPU_FIELD_LOCATION);
+  
+  getProfileBLAS().TPSTOP(QUDA_PROFILE_COMPUTE);
   getProfileBLAS().TPSTOP(QUDA_PROFILE_TOTAL);
   saveTuneCache();
 }
