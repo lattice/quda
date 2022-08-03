@@ -93,19 +93,19 @@ namespace quda
 
 #ifdef _DEBUG
         // Debug code: Copy original A matrix to host
-	if (prec == QUDA_SINGLE_PRECISION) {
-	  std::complex<float> *A_h
-	    = (location == QUDA_CUDA_FIELD_LOCATION ? static_cast<std::complex<float> *>(pool_pinned_malloc(size)) :
-	       static_cast<std::complex<float> *>(A_d));
-	  if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy((void *)A_h, A_d, size, qudaMemcpyDeviceToHost);
-	} else if (prec == QUDA_DOUBLE_PRECISION) {
-	  std::complex<double> *A_h
-	    = (location == QUDA_CUDA_FIELD_LOCATION ? static_cast<std::complex<double> *>(pool_pinned_malloc(size)) :
-	       static_cast<std::complex<double> *>(A_d));
-	  if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy((void *)A_h, A_d, size, qudaMemcpyDeviceToHost);
-	} else {
-	  errorQuda("%s not implemented for precision=%d", __func__, prec);
-	}
+        if (prec == QUDA_SINGLE_PRECISION) {
+          std::complex<float> *A_h
+            = (location == QUDA_CUDA_FIELD_LOCATION ? static_cast<std::complex<float> *>(pool_pinned_malloc(size)) :
+                                                      static_cast<std::complex<float> *>(A_d));
+          if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy((void *)A_h, A_d, size, qudaMemcpyDeviceToHost);
+        } else if (prec == QUDA_DOUBLE_PRECISION) {
+          std::complex<double> *A_h
+            = (location == QUDA_CUDA_FIELD_LOCATION ? static_cast<std::complex<double> *>(pool_pinned_malloc(size)) :
+                                                      static_cast<std::complex<double> *>(A_d));
+          if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy((void *)A_h, A_d, size, qudaMemcpyDeviceToHost);
+        } else {
+          errorQuda("%s not implemented for precision=%d", __func__, prec);
+        }
 #endif
 
         int *dipiv = static_cast<int *>(pool_device_malloc(batch * n * sizeof(int)));
@@ -227,10 +227,10 @@ namespace quda
           pool_pinned_free(Ainv_h);
           pool_pinned_free(A_h);
 #endif
-	} else {
+        } else {
           errorQuda("%s not implemented for precision=%d", __func__, prec);
         }
-	
+
         if (location == QUDA_CPU_FIELD_LOCATION) {
           qudaMemcpy(Ainv, Ainv_d, size, qudaMemcpyDeviceToHost);
           pool_device_free(Ainv_d);

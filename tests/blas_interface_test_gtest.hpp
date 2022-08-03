@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 using test_t = ::testing::tuple<QudaBLASType, QudaBLASDataType>;
-  
+
 class BLASTest : public ::testing::TestWithParam<test_t>
 {
 protected:
@@ -9,17 +9,16 @@ protected:
 
 public:
   BLASTest() : param(GetParam()) { }
-  //virtual ~BLASTest() { }
+  // virtual ~BLASTest() { }
 };
 
 bool skip_test(test_t param)
 {
-  if(::testing::get<0>(param) == QUDA_BLAS_LU_INV &&
-     (::testing::get<1>(param) == QUDA_BLAS_DATATYPE_D ||
-      ::testing::get<1>(param) == QUDA_BLAS_DATATYPE_S))
-    return true;  
+  if (::testing::get<0>(param) == QUDA_BLAS_LU_INV
+      && (::testing::get<1>(param) == QUDA_BLAS_DATATYPE_D || ::testing::get<1>(param) == QUDA_BLAS_DATATYPE_S))
+    return true;
   else
-    return false;  
+    return false;
 }
 
 // For googletest, names must be non-empty, unique, and may only contain ASCII
@@ -52,7 +51,6 @@ std::string getBLASTestName(testing::TestParamInfo<test_t> param)
   return str;
 }
 
-
 // The following tests gets each BLAS type and precision using google testing framework
 using ::testing::Bool;
 using ::testing::Combine;
@@ -67,7 +65,7 @@ double lu_inv_test(test_t test_param);
 TEST_P(BLASTest, verify)
 {
   if (skip_test(GetParam())) GTEST_SKIP();
-  
+
   auto param = GetParam();
   auto test_type = ::testing::get<0>(param);
   auto data_type = ::testing::get<1>(param);
@@ -100,15 +98,14 @@ TEST_P(BLASTest, verify)
   }
   default: errorQuda("Unexpected BLAS test type %d", test_type);
   }
-  
 }
 
 // BLAS test type
 auto blas_test_type_value = Values(QUDA_BLAS_GEMM, QUDA_BLAS_LU_INV);
 
 // BLAS data type
-auto blas_data_type_value = Values(QUDA_BLAS_DATATYPE_Z, QUDA_BLAS_DATATYPE_C,
-				   QUDA_BLAS_DATATYPE_D, QUDA_BLAS_DATATYPE_S);
+auto blas_data_type_value
+  = Values(QUDA_BLAS_DATATYPE_Z, QUDA_BLAS_DATATYPE_C, QUDA_BLAS_DATATYPE_D, QUDA_BLAS_DATATYPE_S);
 
 std::string gettestname(::testing::TestParamInfo<test_t> param)
 {

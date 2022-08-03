@@ -826,8 +826,8 @@ extern "C" {
   typedef struct QudaBLASParam_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
 
-    QudaBLASType blas_type;    /**< Type of BLAS computation to perfrom */
-    
+    QudaBLASType blas_type; /**< Type of BLAS computation to perfrom */
+
     QudaBLASOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */
     QudaBLASOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */
     int m;                     /**< number of rows of matrix op(A) and C. */
@@ -850,7 +850,7 @@ extern "C" {
 
     QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
     QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
-    int inv_mat_size; /**< The rank of the square matrix in the LU batched inversion */
+    int inv_mat_size;             /**< The rank of the square matrix in the LU batched inversion */
   } QudaBLASParam;
 
   /*
@@ -1639,7 +1639,7 @@ extern "C" {
    * @param[in] param The data defining the problem execution.
    */
   void blasLUInvQuda(void *Ainv, void *A, QudaBoolean use_native, QudaBLASParam *param);
-  
+
   /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing

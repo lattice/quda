@@ -481,7 +481,7 @@ typedef enum QudaBLASType_s {
   QUDA_BLAS_LU_INV = 1,
   QUDA_BLAS_INVALID = QUDA_INVALID_ENUM
 } QudaBLASType;
-  
+
 typedef enum QudaBLASOperation_s {
   QUDA_BLAS_OP_N = 0, // No transpose
   QUDA_BLAS_OP_T = 1, // Transpose only

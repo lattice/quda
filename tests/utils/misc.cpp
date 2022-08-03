@@ -360,14 +360,14 @@ std::string get_dilution_type_str(QudaDilutionType type)
   }
   return s;
 }
-  
+
 const char *get_blas_type_str(QudaBLASType type)
 {
   const char *s;
 
   switch (type) {
   case QUDA_BLAS_GEMM: s = "gemm"; break;
-  case QUDA_BLAS_LU_INV: s = "lu-inv"; break;    
+  case QUDA_BLAS_LU_INV: s = "lu-inv"; break;
   default: fprintf(stderr, "Error: invalid BLAS type\n"); exit(1);
   }
   return s;
