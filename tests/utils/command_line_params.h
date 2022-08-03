@@ -396,6 +396,12 @@ extern double eofa_mq3;
 
 extern QudaContractType contract_type;
 
+extern double smear_coeff;
+extern int n_steps;
+extern int t0;
+extern bool compute_two_link;
+extern bool delete_two_link;
+
 extern std::array<int, 4> grid_partition;
 
 extern bool enable_testing;

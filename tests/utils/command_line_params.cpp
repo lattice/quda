@@ -272,6 +272,12 @@ double eofa_mq3 = 1.0;
 
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
+int n_steps = 50;
+double smear_coeff    = 0.1;
+int t0 = -1;
+bool compute_two_link = true;
+bool delete_two_link  = true;
+
 std::array<int, 4> grid_partition = {1, 1, 1, 1};
 
 bool enable_testing = false;
@@ -1022,4 +1028,14 @@ void add_testing_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("Testing", "Options controlling automated testing");
   opgroup->add_option("--enable-testing", enable_testing, "Enable automated testing (default false)");
+}
+
+void add_quark_smear_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup = quda_app->add_option_group("Quark smearing", "Options controlling quark smearing testing");
+  opgroup->add_option("--compute_two_link", compute_two_link, "Compute two link field (default true)");
+  opgroup->add_option("--delete_two_link", delete_two_link, "Compute two link field (default true)");
+  opgroup->add_option("--smear-coeff", smear_coeff, "Smearing coeff (default 0.1)");
+  opgroup->add_option("--n_steps", n_steps, "Number of smearing tests (default 50)");
+  opgroup->add_option("--t0", t0, "TS index (default -1)");
 }
