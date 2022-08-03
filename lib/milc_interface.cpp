@@ -657,17 +657,19 @@ QudaGaugeParam createGaugeParamForObservables(int precision, QudaMILCSiteArg_t *
 {
   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
       (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
-      QUDA_GENERAL_LINKS);
+      phase_in ? QUDA_GENERAL_LINKS : QUDA_SU3_LINKS);
+      //QUDA_GENERAL_LINKS);
 
   qudaGaugeParam.gauge_offset = arg->link_offset;
   qudaGaugeParam.mom_offset = arg->mom_offset;
   qudaGaugeParam.site_size = arg->size;
   qudaGaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
   qudaGaugeParam.staggered_phase_applied = phase_in;
-  if (phase_in) qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   if (phase_in) qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
-  qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  if (phase_in) qudaGaugeParam.reconstruct_sloppy = qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
 
+  // point of future optimization -- clean up residency a bit, right now it's not a critical-path problem
   qudaGaugeParam.make_resident_gauge = false;
   qudaGaugeParam.use_resident_gauge = false;
 

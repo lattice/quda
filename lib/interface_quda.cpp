@@ -5287,7 +5287,7 @@ void plaqLoadGaugeQuda(double plaq[3], void *gauge, QudaGaugeParam *param)
   checkGaugeParam(param);
 
   // create the gauge field
-  GaugeFieldParam gParam(*param, gauge, QUDA_GENERAL_LINKS);
+  GaugeFieldParam gParam(*param, gauge);
   gParam.location = QUDA_CPU_FIELD_LOCATION;
   gParam.site_offset = param->gauge_offset;
   gParam.site_size = param->site_size;
@@ -5371,7 +5371,7 @@ void polyakovLoopLoadGaugeQuda(double ploop[2], int dir, void *gauge, QudaGaugeP
   checkGaugeParam(param);
 
   // create the gauge field
-  GaugeFieldParam gParam(*param, gauge, QUDA_GENERAL_LINKS);
+  GaugeFieldParam gParam(*param, gauge);
   gParam.location = QUDA_CPU_FIELD_LOCATION;
   gParam.site_offset = param->gauge_offset;
   gParam.site_size = param->site_size;
