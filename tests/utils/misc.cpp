@@ -358,6 +358,17 @@ std::string get_dilution_type_str(QudaDilutionType type)
   case QUDA_DILUTION_SPIN_COLOR_EVEN_ODD: s = std::string("spin_color_even_odd"); break;
   default: fprintf(stderr, "Error: invalid dilution type\n"); exit(1);
   }
+  return s;
+}
+  
+const char *get_blas_type_str(QudaBLASType type)
+{
+  const char *s;
 
+  switch (type) {
+  case QUDA_BLAS_GEMM: s = "gemm"; break;
+  case QUDA_BLAS_LU_INV: s = "lu-inv"; break;    
+  default: fprintf(stderr, "Error: invalid BLAS type\n"); exit(1);
+  }
   return s;
 }

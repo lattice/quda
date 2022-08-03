@@ -4,6 +4,7 @@
 #include <math.h>
 #include <string.h>
 #include <complex>
+
 #include <inttypes.h>
 
 #include <util_quda.h>
@@ -18,19 +19,14 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
-// For googletest, names must be non-empty, unique, and may only contain ASCII
-// alphanumeric characters or underscore.
-const char *data_type_str[] = {
-  "realSingle",
-  "realDouble",
-  "complexSingle",
-  "complexDouble",
-};
+// if "--enable-testing true" is passed, we run the tests defined in here
+#include <blas_interface_test_gtest.hpp>
 
 QudaBLASOperation blas_trans_a = QUDA_BLAS_OP_N;
 QudaBLASOperation blas_trans_b = QUDA_BLAS_OP_N;
 QudaBLASDataType blas_data_type = QUDA_BLAS_DATATYPE_C;
 QudaBLASDataOrder blas_data_order = QUDA_BLAS_DATAORDER_COL;
+QudaBLASType blas_test_type = QUDA_BLAS_GEMM;
 
 std::array<int, 3> blas_mnk = {64, 64, 64};
 auto &blas_m = blas_mnk[0];
@@ -55,32 +51,50 @@ auto &blas_c_stride = blas_strides[2];
 std::array<double, 2> blas_alpha_re_im = {M_PI, M_E};
 std::array<double, 2> blas_beta_re_im = {M_LN2, M_LN10};
 int blas_batch = 16;
+int blas_inv_mat_size = 128;
 
 namespace quda
 {
   extern void setTransferGPU(bool);
 }
 
-void display_test_info()
+void display_test_info(QudaBLASParam &param)
 {
   printfQuda("running the following test:\n");
-  printfQuda("BLAS interface test\n");
+  printfQuda("BLAS interface %s test\n", get_blas_type_str(param.blas_type));
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
 }
 
-double test(int data_type)
-{
-  QudaBLASDataType test_data_type = QUDA_BLAS_DATATYPE_INVALID;
-  switch (data_type) {
-  case 0: test_data_type = QUDA_BLAS_DATATYPE_S; break;
-  case 1: test_data_type = QUDA_BLAS_DATATYPE_D; break;
-  case 2: test_data_type = QUDA_BLAS_DATATYPE_C; break;
-  case 3: test_data_type = QUDA_BLAS_DATATYPE_Z; break;
-  default: errorQuda("Undefined QUDA BLAS data type %d\n", data_type);
-  }
+void setBLASParam(QudaBLASParam &blas_param) {
+  blas_param.trans_a = blas_trans_a;
+  blas_param.trans_b = blas_trans_b;
+  blas_param.m = blas_mnk[0];
+  blas_param.n = blas_mnk[1];
+  blas_param.k = blas_mnk[2];
+  blas_param.lda = blas_leading_dims[0];
+  blas_param.ldb = blas_leading_dims[1];
+  blas_param.ldc = blas_leading_dims[2];
+  blas_param.a_offset = blas_offsets[0];
+  blas_param.b_offset = blas_offsets[1];
+  blas_param.c_offset = blas_offsets[2];
+  blas_param.a_stride = blas_strides[0];
+  blas_param.b_stride = blas_strides[1];
+  blas_param.c_stride = blas_strides[2];
+  memcpy(&blas_param.alpha, blas_alpha_re_im.data(), sizeof(__complex__ double));
+  memcpy(&blas_param.beta, blas_beta_re_im.data(), sizeof(__complex__ double));
+  blas_param.data_order = blas_data_order;
+  blas_param.data_type = blas_data_type;
+  blas_param.batch_count = blas_batch;
+  blas_param.blas_type = blas_test_type;
+  blas_param.inv_mat_size = blas_inv_mat_size;
+}
 
+double gemm_test(test_t test_param)
+{
+  blas_data_type = ::testing::get<1>(test_param);
+  
   QudaBLASParam blas_param = newQudaBLASParam();
   blas_param.trans_a = blas_trans_a;
   blas_param.trans_b = blas_trans_b;
@@ -99,9 +113,13 @@ double test(int data_type)
   memcpy(&blas_param.alpha, blas_alpha_re_im.data(), sizeof(__complex__ double));
   memcpy(&blas_param.beta, blas_beta_re_im.data(), sizeof(__complex__ double));
   blas_param.data_order = blas_data_order;
-  blas_param.data_type = test_data_type;
+  blas_param.data_type = blas_data_type;
   blas_param.batch_count = blas_batch;
+  blas_param.blas_type = blas_test_type;
+  blas_param.inv_mat_size = blas_inv_mat_size;
 
+  display_test_info(blas_param);
+  
   // Sanity checks on parameters
   //-------------------------------------------------------------------------
   // If the user passes non positive M,N, or K, we error out
@@ -167,10 +185,8 @@ double test(int data_type)
   //-------------------------------------------------------------------------
 
   // Reference data is always in complex double
-  size_t data_size = sizeof(double);
-  int re_im = 2;
-  data_size *= re_im;
-
+  size_t data_in_size = sizeof(double);
+  
   // If the user passes non-zero offsets, add one extra
   // matrix to the test data.
   int batches_extra = 0;
@@ -208,96 +224,55 @@ double test(int data_type)
     refC_size = blas_param.ldc * blas_param.m; // C_mn
   }
 
-  void *refA = pinned_malloc(batches * refA_size * data_size);
-  void *refB = pinned_malloc(batches * refB_size * data_size);
-  void *refC = pinned_malloc(batches * refC_size * data_size);
-  void *refCcopy = pinned_malloc(batches * refC_size * data_size);
-
-  memset(refA, 0, batches * refA_size * data_size);
-  memset(refB, 0, batches * refB_size * data_size);
-  memset(refC, 0, batches * refC_size * data_size);
-  memset(refCcopy, 0, batches * refC_size * data_size);
-
-  // Populate the real part with rands
-  for (uint64_t i = 0; i < 2 * refA_size * batches; i += 2) { ((double *)refA)[i] = rand() / (double)RAND_MAX; }
-  for (uint64_t i = 0; i < 2 * refB_size * batches; i += 2) { ((double *)refB)[i] = rand() / (double)RAND_MAX; }
-  for (uint64_t i = 0; i < 2 * refC_size * batches; i += 2) {
-    ((double *)refC)[i] = rand() / (double)RAND_MAX;
-    ((double *)refCcopy)[i] = ((double *)refC)[i];
-  }
-
-  // Populate the imaginary part with rands if needed
-  if (test_data_type == QUDA_BLAS_DATATYPE_C || test_data_type == QUDA_BLAS_DATATYPE_Z) {
-    for (uint64_t i = 1; i < 2 * refA_size * batches; i += 2) { ((double *)refA)[i] = rand() / (double)RAND_MAX; }
-    for (uint64_t i = 1; i < 2 * refB_size * batches; i += 2) { ((double *)refB)[i] = rand() / (double)RAND_MAX; }
-    for (uint64_t i = 1; i < 2 * refC_size * batches; i += 2) {
-      ((double *)refC)[i] = rand() / (double)RAND_MAX;
-      ((double *)refCcopy)[i] = ((double *)refC)[i];
-    }
-  }
-
+  void *refA = pinned_malloc(batches * refA_size * 2 * data_in_size);;
+  void *refB = pinned_malloc(batches * refB_size * 2 * data_in_size);;
+  void *refC = pinned_malloc(batches * refC_size * 2 * data_in_size);;
+  void *refCcopy = pinned_malloc(batches * refC_size * 2 * data_in_size);;
+  
+  prepare_ref_array(refA, batches, refA_size, data_in_size, blas_data_type);
+  prepare_ref_array(refB, batches, refB_size, data_in_size, blas_data_type);
+  prepare_ref_array(refC, batches, refC_size, data_in_size, blas_data_type);
+  prepare_ref_array(refCcopy, batches, refC_size, data_in_size, blas_data_type);
+  
   // Create new arrays appropriate for the requested problem, and copy over the data.
   void *arrayA = nullptr;
   void *arrayB = nullptr;
   void *arrayC = nullptr;
   void *arrayCcopy = nullptr;
-
-  switch (test_data_type) {
+  size_t data_out_size = 0;
+  // Reference data is always complex, but test data can be either real or complex
+  int re_im = 0;
+  
+  switch (blas_data_type) {
   case QUDA_BLAS_DATATYPE_S:
-    arrayA = pinned_malloc(batches * refA_size * sizeof(float));
-    arrayB = pinned_malloc(batches * refB_size * sizeof(float));
-    arrayC = pinned_malloc(batches * refC_size * sizeof(float));
-    arrayCcopy = pinned_malloc(batches * refC_size * sizeof(float));
-    // Populate
-    for (uint64_t i = 0; i < 2 * refA_size * batches; i += 2) { ((float *)arrayA)[i / 2] = ((double *)refA)[i]; }
-    for (uint64_t i = 0; i < 2 * refB_size * batches; i += 2) { ((float *)arrayB)[i / 2] = ((double *)refB)[i]; }
-    for (uint64_t i = 0; i < 2 * refC_size * batches; i += 2) {
-      ((float *)arrayC)[i / 2] = ((double *)refC)[i];
-      ((float *)arrayCcopy)[i / 2] = ((double *)refC)[i];
-    }
+    data_out_size = sizeof(float);
+    re_im = 1;
     break;
   case QUDA_BLAS_DATATYPE_D:
-    arrayA = pinned_malloc(batches * refA_size * sizeof(double));
-    arrayB = pinned_malloc(batches * refB_size * sizeof(double));
-    arrayC = pinned_malloc(batches * refC_size * sizeof(double));
-    arrayCcopy = pinned_malloc(batches * refC_size * sizeof(double));
-    // Populate
-    for (uint64_t i = 0; i < 2 * refA_size * batches; i += 2) { ((double *)arrayA)[i / 2] = ((double *)refA)[i]; }
-    for (uint64_t i = 0; i < 2 * refB_size * batches; i += 2) { ((double *)arrayB)[i / 2] = ((double *)refB)[i]; }
-    for (uint64_t i = 0; i < 2 * refC_size * batches; i += 2) {
-      ((double *)arrayC)[i / 2] = ((double *)refC)[i];
-      ((double *)arrayCcopy)[i / 2] = ((double *)refC)[i];
-    }
+    data_out_size = sizeof(double);
+    re_im = 1;
     break;
   case QUDA_BLAS_DATATYPE_C:
-    arrayA = pinned_malloc(batches * refA_size * 2 * sizeof(float));
-    arrayB = pinned_malloc(batches * refB_size * 2 * sizeof(float));
-    arrayC = pinned_malloc(batches * refC_size * 2 * sizeof(float));
-    arrayCcopy = pinned_malloc(batches * refC_size * 2 * sizeof(float));
-    // Populate
-    for (uint64_t i = 0; i < 2 * refA_size * batches; i++) { ((float *)arrayA)[i] = ((double *)refA)[i]; }
-    for (uint64_t i = 0; i < 2 * refB_size * batches; i++) { ((float *)arrayB)[i] = ((double *)refB)[i]; }
-    for (uint64_t i = 0; i < 2 * refC_size * batches; i++) {
-      ((float *)arrayC)[i] = ((double *)refC)[i];
-      ((float *)arrayCcopy)[i] = ((double *)refC)[i];
-    }
+    data_out_size = sizeof(float);
+    re_im = 2;
     break;
   case QUDA_BLAS_DATATYPE_Z:
-    arrayA = pinned_malloc(batches * refA_size * 2 * sizeof(double));
-    arrayB = pinned_malloc(batches * refB_size * 2 * sizeof(double));
-    arrayC = pinned_malloc(batches * refC_size * 2 * sizeof(double));
-    arrayCcopy = pinned_malloc(batches * refC_size * 2 * sizeof(double));
-    // Populate
-    for (uint64_t i = 0; i < 2 * refA_size * batches; i++) { ((double *)arrayA)[i] = ((double *)refA)[i]; }
-    for (uint64_t i = 0; i < 2 * refB_size * batches; i++) { ((double *)arrayB)[i] = ((double *)refB)[i]; }
-    for (uint64_t i = 0; i < 2 * refC_size * batches; i++) {
-      ((double *)arrayC)[i] = ((double *)refC)[i];
-      ((double *)arrayCcopy)[i] = ((double *)refC)[i];
-    }
+    data_out_size = sizeof(double);
+    re_im = 2;
     break;
-  default: errorQuda("Unrecognised data type %d\n", test_data_type);
+  default: errorQuda("Unrecognised data type %d\n", blas_data_type);
   }
 
+  arrayA = pinned_malloc(batches * refA_size * re_im * data_out_size);
+  arrayB = pinned_malloc(batches * refB_size * re_im * data_out_size);
+  arrayC = pinned_malloc(batches * refC_size * re_im * data_out_size);
+  arrayCcopy = pinned_malloc(batches * refC_size * re_im * data_out_size);
+  
+  copy_array(arrayA, refA, batches, refA_size, data_out_size, blas_data_type);
+  copy_array(arrayB, refB, batches, refB_size, data_out_size, blas_data_type);
+  copy_array(arrayC, refC, batches, refC_size, data_out_size, blas_data_type);
+  copy_array(arrayCcopy, refC, batches, refC_size, data_out_size, blas_data_type);
+  
   // Perform device GEMM Blas operation
   blasGEMMQuda(arrayA, arrayB, arrayC, native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE, &blas_param);
 
@@ -319,49 +294,89 @@ double test(int data_type)
   return deviation;
 }
 
-// The following tests gets each BLAS type and precision using google testing framework
-using ::testing::Bool;
-using ::testing::Combine;
-using ::testing::Range;
-using ::testing::TestWithParam;
-using ::testing::Values;
-
-class BLASTest : public ::testing::TestWithParam<int>
+double lu_inv_test(test_t test_param)
 {
-protected:
-  int param;
-
-public:
-  virtual ~BLASTest() { }
-  virtual void SetUp() { param = GetParam(); }
-};
-
-// Sets up the Google test
-TEST_P(BLASTest, verify)
-{
-  auto data_type = GetParam();
-  auto deviation = test(data_type);
-  decltype(deviation) tol;
-  switch (data_type) {
-  case 0:
-  case 2: tol = 10 * std::numeric_limits<float>::epsilon(); break;
-  case 1:
-  case 3: tol = 10 * std::numeric_limits<double>::epsilon(); break;
+  QudaBLASParam blas_param = newQudaBLASParam();
+  blas_data_type = ::testing::get<1>(test_param);
+  blas_test_type = ::testing::get<0>(test_param);
+  setBLASParam(blas_param);
+  
+  display_test_info(blas_param);
+  
+  // Sanity checks on parameters
+  //-------------------------------------------------------------------------
+  // If the user passes a negative stride, we error out as this has no meaning.
+  int min_stride = std::min(std::min(blas_param.a_stride, blas_param.b_stride), blas_param.c_stride);
+  if (min_stride < 0) {
+    errorQuda("BLAS strides must be positive or zero: a_stride=%d, b_stride=%d, c_stride=%d", blas_param.a_stride,
+              blas_param.b_stride, blas_param.c_stride);
   }
-  EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+
+  // If the user passes a negative offset, we error out as this has no meaning.
+  int min_offset = std::min(std::min(blas_param.a_offset, blas_param.b_offset), blas_param.c_offset);
+  if (min_offset < 0) {
+    errorQuda("BLAS offsets must be positive or zero: a_offset=%d, b_offset=%d, c_offset=%d", blas_param.a_offset,
+              blas_param.b_offset, blas_param.c_offset);
+  }
+
+  // If the batch value is non-positve, we error out
+  if (blas_param.batch_count <= 0) { errorQuda("Batches must be positive: batches=%d", blas_param.batch_count); }
+  //-------------------------------------------------------------------------
+
+  // Reference data is always in complex double
+  size_t data_in_size = sizeof(double);
+  
+  // If the user passes non-zero offsets, add one extra
+  // matrix to the test data.
+  int batches_extra = 0;
+  if (blas_param.a_offset + blas_param.b_offset + blas_param.c_offset > 0) { batches_extra++; }
+  int batches = blas_param.batch_count + batches_extra;
+  uint64_t array_size = blas_param.inv_mat_size * blas_param.inv_mat_size;
+
+  // Create host data reference arrays 
+  void *ref_array = pinned_malloc(batches * array_size * 2 * data_in_size);
+  void *ref_array_inv = pinned_malloc(batches * array_size * 2 * data_in_size);  
+  prepare_ref_array(ref_array, batches, array_size, data_in_size, blas_data_type);
+  
+  // Create device array appropriate for the requested problem.
+  void *dev_array = nullptr;
+  void *dev_array_inv = nullptr;
+  size_t data_out_size = 0;
+  // For now, data is always complex for LU inversion.
+  int re_im = 2;
+  
+  switch (blas_data_type) {
+  case QUDA_BLAS_DATATYPE_C:
+    data_out_size = sizeof(float);
+    break;
+  case QUDA_BLAS_DATATYPE_Z:
+    data_out_size = sizeof(double);
+    break;
+  case QUDA_BLAS_DATATYPE_S:
+  case QUDA_BLAS_DATATYPE_D:
+  default: errorQuda("Unsupported data type %d\n", blas_data_type);
+  }
+
+  dev_array = pinned_malloc(batches * array_size * re_im * data_out_size);
+  dev_array_inv = pinned_malloc(batches * array_size * re_im * data_out_size);
+  
+  copy_array(dev_array, ref_array, batches, array_size, data_out_size, blas_data_type);
+  
+  // Perform device LU inversion
+  blasLUInvQuda(dev_array_inv, dev_array, native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE, &blas_param);
+
+  double deviation = 0.0;
+  if (verify_results) {
+    deviation = blasLUInvQudaVerify(ref_array, dev_array_inv, array_size, &blas_param);
+  }
+
+  host_free(ref_array);
+  host_free(ref_array_inv);
+  host_free(dev_array);
+  host_free(dev_array_inv);
+
+  return deviation;
 }
-
-// Helper function to construct the test name
-std::string getBLASName(testing::TestParamInfo<int> param)
-{
-  int data_type = param.param;
-  std::string str(data_type_str[data_type]);
-  return str;
-}
-
-// Instantiate all test cases
-INSTANTIATE_TEST_SUITE_P(QUDA, BLASTest, Range(0, 4), getBLASName);
-
 void add_blas_interface_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   CLI::TransformPairs<QudaBLASDataType> blas_dt_map {
@@ -372,12 +387,22 @@ void add_blas_interface_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   CLI::TransformPairs<QudaBLASOperation> blas_op_map {{"N", QUDA_BLAS_OP_N}, {"T", QUDA_BLAS_OP_T}, {"C", QUDA_BLAS_OP_C}};
 
+  CLI::TransformPairs<QudaBLASType> blas_type_map {{"gemm", QUDA_BLAS_GEMM},
+      {"lu-inv", QUDA_BLAS_LU_INV}};
+  
+  // Option group for BLAS test related options  
   auto opgroup = quda_app->add_option_group("BLAS Interface", "Options controlling BLAS interface tests");
+  
   opgroup
     ->add_option("--blas-data-type", blas_data_type,
                  "Whether to use single(S), double(D), and/or complex(C/Z) data types (default C)")
     ->transform(CLI::QUDACheckedTransformer(blas_dt_map));
 
+  opgroup
+    ->add_option("--blas-test-type", blas_test_type,
+                 "Whether to perform the GEMM test or LU Inversion test (default GEMM)")
+    ->transform(CLI::QUDACheckedTransformer(blas_type_map));
+  
   opgroup
     ->add_option("--blas-data-order", blas_data_order, "Whether data is in row major or column major order (default row)")
     ->transform(CLI::QUDACheckedTransformer(blas_data_order_map));
@@ -415,7 +440,9 @@ void add_blas_interface_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--blas-strides", blas_strides, "Set the strides for matrices A, B, and C (default 1 1 1)")
     ->expected(3);
 
-  opgroup->add_option("--blas-batch", blas_batch, "Set the number of batches for GEMM (default 16)");
+  opgroup->add_option("--blas-batch", blas_batch, "Set the number of batches for GEMM or LU inversion (default 16)");
+
+  opgroup->add_option("--blas-inv-mat-size", blas_inv_mat_size, "Set the size of the square matrix to invert via LU (default 128)");
 }
 
 int main(int argc, char **argv)
@@ -445,7 +472,6 @@ int main(int argc, char **argv)
   // call srand() with a rank-dependent seed
   initRand();
   setQudaPrecisions();
-  display_test_info();
   setVerbosity(verbosity);
 
   // initialize the QUDA library
@@ -463,12 +489,24 @@ int main(int argc, char **argv)
     if (result) warningQuda("Google tests for QUDA BLAS failed.");
   } else {
     // Perform the BLAS op specified by the command line
-    switch (blas_data_type) {
-    case QUDA_BLAS_DATATYPE_S: test(0); break;
-    case QUDA_BLAS_DATATYPE_D: test(1); break;
-    case QUDA_BLAS_DATATYPE_C: test(2); break;
-    case QUDA_BLAS_DATATYPE_Z: test(3); break;
-    default: errorQuda("Undefined QUDA BLAS data type %d\n", blas_data_type);
+    switch (blas_test_type) {
+    case QUDA_BLAS_GEMM : {      
+      switch (blas_data_type) {
+      case QUDA_BLAS_DATATYPE_S: gemm_test(test_t {QUDA_BLAS_GEMM, QUDA_BLAS_DATATYPE_S}); break;
+      case QUDA_BLAS_DATATYPE_D: gemm_test(test_t {QUDA_BLAS_GEMM, QUDA_BLAS_DATATYPE_D}); break;
+      case QUDA_BLAS_DATATYPE_C: gemm_test(test_t {QUDA_BLAS_GEMM, QUDA_BLAS_DATATYPE_C}); break;
+      case QUDA_BLAS_DATATYPE_Z: gemm_test(test_t {QUDA_BLAS_GEMM, QUDA_BLAS_DATATYPE_Z}); break;
+      default: errorQuda("Undefined QUDA BLAS data type %d\n", blas_data_type);
+      } break;
+    }
+    case QUDA_BLAS_LU_INV : {
+      switch (blas_data_type) {
+      case QUDA_BLAS_DATATYPE_C: lu_inv_test(test_t {QUDA_BLAS_LU_INV, QUDA_BLAS_DATATYPE_C}); break;
+      case QUDA_BLAS_DATATYPE_Z: lu_inv_test(test_t {QUDA_BLAS_LU_INV, QUDA_BLAS_DATATYPE_Z}); break;
+      default: errorQuda("QUDA BLAS data type %d not supported for LU Inversion\n", blas_data_type);
+      }
+    } break;
+    default: errorQuda("Unknown QUDA BLAS test type %d\n", blas_test_type);
     }
   }
 
