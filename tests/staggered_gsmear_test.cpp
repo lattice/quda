@@ -24,7 +24,7 @@ static int gsmearTest()
   return test_rc;
 }
 
-TEST(dslash, verify)
+TEST(gsmear, verify)
 {
   double deviation = gsmear_test_wrapper.verify();
   double tol = getTolerance(prec);

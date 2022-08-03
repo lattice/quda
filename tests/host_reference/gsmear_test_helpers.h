@@ -4,7 +4,7 @@
 
 enum class gsmear_test_type {
   TwoLink = 0,
-  GaussSmear
+  GaussianSmear
 };
 
 
