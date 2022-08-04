@@ -206,8 +206,8 @@ target_link_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_LINKER_COMPRESS}:-Wl
 # set up QUDA compile options
 target_compile_options(
   quda PRIVATE
-  $<IF:$<CONFIG:RELEASE>,w,-Wall -Wextra>
-  $<$<CONFIG:STRICT>:-Werror>
+  $<IF:$<CONFIG:RELEASE>,-w,-Wall -Wextra>
+  $<$<CONFIG:STRICT>:$<$<COMPILE_LANGUAGE:CXX,C,Fortran>:-Werror>>
 )
 
 target_compile_definitions(
