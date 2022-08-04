@@ -86,9 +86,12 @@ TEST_P(BLASTest, verify)
   case QUDA_BLAS_LU_INV: {
     auto deviation_lu_inv = lu_inv_test(param);
     decltype(deviation_lu_inv) tol_lu_inv;
+    // We allow a factor of 500 (50x more than the gemm tolerance factor)
+    // due to variations in algorithmic implemntation and order of arithmetic
+    // operations.
     switch (data_type) {
-    case 2: tol_lu_inv = 10 * std::numeric_limits<float>::epsilon(); break;
-    case 3: tol_lu_inv = 10 * std::numeric_limits<double>::epsilon(); break;
+    case 2: tol_lu_inv = 500 * std::numeric_limits<float>::epsilon(); break;
+    case 3: tol_lu_inv = 500 * std::numeric_limits<double>::epsilon(); break;
     case 0:
     case 1:
     default: errorQuda("Unexpected BLAS data type %d", data_type);

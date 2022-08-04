@@ -10,11 +10,8 @@
 #include <util_quda.h>
 #include <host_utils.h>
 #include <command_line_params.h>
-#include "blas_reference.h"
-#include "misc.h"
-
-// google test
-#include <gtest/gtest.h>
+#include <blas_reference.h>
+#include <misc.h>
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
@@ -94,30 +91,10 @@ void setBLASParam(QudaBLASParam &blas_param)
 
 double gemm_test(test_t test_param)
 {
-  blas_data_type = ::testing::get<1>(test_param);
-
   QudaBLASParam blas_param = newQudaBLASParam();
-  blas_param.trans_a = blas_trans_a;
-  blas_param.trans_b = blas_trans_b;
-  blas_param.m = blas_mnk[0];
-  blas_param.n = blas_mnk[1];
-  blas_param.k = blas_mnk[2];
-  blas_param.lda = blas_leading_dims[0];
-  blas_param.ldb = blas_leading_dims[1];
-  blas_param.ldc = blas_leading_dims[2];
-  blas_param.a_offset = blas_offsets[0];
-  blas_param.b_offset = blas_offsets[1];
-  blas_param.c_offset = blas_offsets[2];
-  blas_param.a_stride = blas_strides[0];
-  blas_param.b_stride = blas_strides[1];
-  blas_param.c_stride = blas_strides[2];
-  memcpy(&blas_param.alpha, blas_alpha_re_im.data(), sizeof(__complex__ double));
-  memcpy(&blas_param.beta, blas_beta_re_im.data(), sizeof(__complex__ double));
-  blas_param.data_order = blas_data_order;
-  blas_param.data_type = blas_data_type;
-  blas_param.batch_count = blas_batch;
-  blas_param.blas_type = blas_test_type;
-  blas_param.inv_mat_size = blas_inv_mat_size;
+  blas_data_type = ::testing::get<1>(test_param);
+  blas_test_type = ::testing::get<0>(test_param);
+  setBLASParam(blas_param);
 
   display_test_info(blas_param);
 
@@ -226,13 +203,9 @@ double gemm_test(test_t test_param)
   }
 
   void *refA = pinned_malloc(batches * refA_size * 2 * data_in_size);
-  ;
   void *refB = pinned_malloc(batches * refB_size * 2 * data_in_size);
-  ;
   void *refC = pinned_malloc(batches * refC_size * 2 * data_in_size);
-  ;
   void *refCcopy = pinned_malloc(batches * refC_size * 2 * data_in_size);
-  ;
 
   prepare_ref_array(refA, batches, refA_size, data_in_size, blas_data_type);
   prepare_ref_array(refB, batches, refB_size, data_in_size, blas_data_type);
@@ -324,6 +297,8 @@ double lu_inv_test(test_t test_param)
               blas_param.b_offset, blas_param.c_offset);
   }
 
+  // Leading dims are irrelevant for LU inversions
+  
   // If the batch value is non-positve, we error out
   if (blas_param.batch_count <= 0) { errorQuda("Batches must be positive: batches=%d", blas_param.batch_count); }
   //-------------------------------------------------------------------------
@@ -455,6 +430,8 @@ int main(int argc, char **argv)
   // command line options
   auto app = make_app();
   add_blas_interface_option_group(app);
+  add_comms_option_group(app);
+  add_testing_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -480,7 +457,7 @@ int main(int argc, char **argv)
   //-----------------------------------------------------------------------------
 
   int result = 0;
-  if (verify_results) {
+  if (enable_testing) {
     // Run full set of test if we're doing a verification run
     ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
     if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }

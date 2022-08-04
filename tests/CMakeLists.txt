@@ -281,6 +281,7 @@ if(QUDA_BUILD_NATIVE_LAPACK)
     --blas-beta -3.0 1.5
     --blas-trans-a T
     --blas-trans-b C
+    --enable-testing true
     --gtest_output=xml:blas_interface_test.xml)
 endif()
 
