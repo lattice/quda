@@ -15,9 +15,9 @@ namespace quda {
     const paths<1> p;
 
   public:
-    // max block size of 8 is arbitrary for now, u needs to be local volume??
+    // max block size of 8 is arbitrary for now
     GaugeLoopTrace(const GaugeField &u, std::vector<reduce_t> &loop_traces, double factor, const paths<1>& p) :
-      TunableMultiReduction(u, 2u, p.num_paths, 8), //TunableMultiReduction(2 * u.LocalVolumeCB(), p.num_paths, 8, u.Location()),
+      TunableMultiReduction(u, 2u, p.num_paths, 8),
       u(u),
       loop_traces(loop_traces),
       factor(factor),

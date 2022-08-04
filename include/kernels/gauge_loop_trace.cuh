@@ -17,7 +17,6 @@ namespace quda {
   */
   constexpr unsigned int max_n_batch_block_loop_trace() { return 8; }
 
-  // to-do: also compute the determinant?
   template <typename Float_, int nColor_, QudaReconstructType recon_>
   struct GaugeLoopTraceArg : public ReduceArg<array<double, 2>>  {
     using Float = Float_;
@@ -78,7 +77,6 @@ namespace quda {
       double coeff_loop = arg.factor * arg.p.path_coeff[path_id];
       if (coeff_loop == 0) return operator()(loop_trace, value);
 
-      // clean up input path, no need for `dir`...
       const int* path = arg.p.input_path[0] + path_id * arg.p.max_length;
 
       // compute the path

@@ -135,7 +135,14 @@ namespace quda {
     }
   };
 
-  // to avoid multiple instantiations... FIXME doxygen
+  /**
+   * @brief Instantiation helper for the routine that inserts 3-d fields into a single timeslice
+   * of a 4-d field
+   *
+   * @param[out] u 4-d gauge field
+   * @param[in] ploop Input 3-d gauge field to be inserted
+   * @param[in] timeslice Timeslice of the 4-d field in which to insert the 3-d gauge field
+   */
   void gaugeInsertTimeslice(GaugeField &u, GaugeField &s, int timeslice) {
     instantiate<GaugeInsertTimeslice>(u, s, timeslice);
   }
@@ -147,16 +154,15 @@ namespace quda {
     // output array
     array<double, 2> loop;
 
-    // If the dir dimension isn't partitioned, we can just do a quick compute + reduce,
-    // otherwise we need a gather workflow
     std::unique_ptr<GaugeField> condensed_field;
 
-    // If the dir dimension isn't partitioned, we can just do a quick compute + reduce
+    // If the dir dimension isn't partitioned, we can just do a quick compute + reduce,
+    // otherwise we need to perform a two-step calculation: one per-GPU, then gather
+    // and do the final product + reduce.
     if (commDimPartitioned(dir)) {
 
       // Form a staging gauge field where each "t" slice corresponds to one rank in the "dir"
-      // direction. Note that odd dimensions are carefully legal in the `t` dimension in this context
-      // Note that we promote the precision to double for numerical stability
+      // direction. Odd dimensions are carefully legal in the `t` dimension in this context
       profile.TPSTART(QUDA_PROFILE_INIT);
       GaugeFieldParam gParam(u);
       lat_dim_t x;
@@ -167,6 +173,9 @@ namespace quda {
       gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
       gParam.location = QUDA_CUDA_FIELD_LOCATION;
       gParam.geometry = QUDA_SCALAR_GEOMETRY;
+
+      // We promote the precision to double to maintain sufficient reproducibility
+      // as a function of the number of ranks in the `t` dimension
       gParam.setPrecision(QUDA_DOUBLE_PRECISION);
 
       std::unique_ptr<GaugeField> product_field = std::make_unique<cudaGaugeField>(gParam);
@@ -181,16 +190,17 @@ namespace quda {
       profile.TPSTOP(QUDA_PROFILE_INIT);
 
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
-      // Compute my local timeslice
-      instantiate<GaugePolyakovLoopProduct, ReconstructNo12>(u, product_field_ref);
 
+      // Compute the rank-local product of loops in the temporal direction...
+      instantiate<GaugePolyakovLoopProduct, ReconstructNo12>(u, product_field_ref);
+      // ...and inject it into my own accumulation field
       gaugeInsertTimeslice(condensed_field_ref, product_field_ref, comm_coord(3));
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-      // we can skip all of this if we're just doing a partition test
+      // we can skip comms if we're only doing a partition test
       if (comm_dim(dir) > 1) {
-        // Send/gather other data; need to make this support direct GPU comms
-        // I wonder if I can just use the strided send APIs?
+        // Send/gather other data. For the time being this does host staging, but we could
+        // optimize this to us device-aware MPI.
         profile.TPSTART(QUDA_PROFILE_INIT);
         auto bytes = product_field_ref.TotalBytes();
         void* v_double_buffer[2];
