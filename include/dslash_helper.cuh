@@ -88,7 +88,7 @@ namespace quda
 
   template <typename Coord, typename I, typename J, typename K>
   __device__ __host__ inline int getCoordsCB_blocking(Coord &x, Coord &local_coord, int thread_idx_cb,
-    int block_idx, const I &block_dim, J block_dim_0h, const I &grid_dim, int parity, const K &X)
+    int block_idx, const I &block_dim, J block_dim_0h, const I &grid_dim, int parity, const K &X, bool cache_ext)
   {
     int block_coord[4];
 
@@ -111,17 +111,23 @@ namespace quda
 #pragma unroll
     for (int d = 0; d < 4; d++) {
       x[d] = local_coord[d] + offset[d];
-      // Get the extended coord
-      local_coord[d] += 1;
+      if (cache_ext) {
+        // Get the extended coord
+        local_coord[d] += 1;
+      }
     }
 
-    int local_index = 0;
+    if (cache_ext) {
+      int local_index = 0;
 #pragma unroll
-    for (int d = 3; d >= 0; d--) {
-      local_index = local_index * (block_dim[d] + 2) + local_coord[d];
+      for (int d = 3; d >= 0; d--) {
+        local_index = local_index * (block_dim[d] + 2) + local_coord[d];
+      }
+      local_coord.X = local_index;
+      local_coord.x_cb = local_index / 2;
+    } else {
+      local_coord.x_cb = thread_idx_cb;
     }
-    local_coord.X = local_index;
-    local_coord.x_cb = local_index / 2;
 
     int index = 0;
 #pragma unroll
@@ -159,7 +165,7 @@ namespace quda
       } else {
         // coord.X = getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
         int block_idx = target::block_idx().x;
-        coord.X = getCoordsCB_blocking(coord, local_coord, idx, block_idx, arg.tb.dim, arg.tb.X0h, arg.tb.grid_dim, parity, arg.dim);
+        coord.X = getCoordsCB_blocking(coord, local_coord, idx, block_idx, arg.tb.dim, arg.tb.X0h, arg.tb.grid_dim, parity, arg.dim, arg.tb.cache_ext);
         local_coord.s = s;
         coord.x_cb = coord.X / 2;
       }
@@ -309,6 +315,8 @@ namespace quda
     int X3X2X1mX2X1;
     int X4X3X2X1mX3X2X1;
     int X5X4X3X2X1mX4X3X2X1;
+
+    bool cache_ext;
   };
 
   template <typename Float_, int nDim_> struct DslashArg {

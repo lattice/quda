@@ -79,7 +79,7 @@ namespace quda
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
     auto block = target::block_dim();
-    SharedMemoryCache<Vector> cache({static_cast<unsigned int>(arg.tb.volume_4d_cb_ex), block.y, block.z});
+    SharedMemoryCache<Vector> cache({static_cast<unsigned int>(arg.tb.cache_ext ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb), block.y, block.z});
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
@@ -103,9 +103,19 @@ namespace quda
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, gauge_parity);
-          int local_fwd_idx = thread_blocking_get_neighbor_index_cb(local_coord, d, +1, arg.tb);
-          Vector in = cache.load_x(local_fwd_idx);
-          // Vector in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          Vector in;
+          if (arg.tb.cache_ext) {
+            int local_fwd_idx = thread_blocking_get_neighbor_index_cb(local_coord, d, +1, arg.tb);
+            in = cache.load_x(local_fwd_idx);
+          } else {
+            bool out_of_block = (local_coord[d] + 1) >= arg.tb.dim[d] && arg.tb.dim[d] < arg.dim[d];
+            if (out_of_block) {
+              in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+            } else {
+              int local_fwd_idx = thread_blocking_get_neighbor_index_cb(local_coord, d, +1, arg.tb);
+              in = cache.load_x(local_fwd_idx);
+            }
+          }
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
 
         }
@@ -131,9 +141,19 @@ namespace quda
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
-          int local_fwd_idx = thread_blocking_get_neighbor_index_cb(local_coord, d, -1, arg.tb);
-          Vector in = cache.load_x(local_fwd_idx);
-          // Vector in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+          Vector in;
+          if (arg.tb.cache_ext) {
+            int local_fwd_idx = thread_blocking_get_neighbor_index_cb(local_coord, d, -1, arg.tb);
+            in = cache.load_x(local_fwd_idx);
+          } else {
+            bool out_of_block = (local_coord[d] - 1) < 0 && arg.tb.dim[d] < arg.dim[d];
+            if (out_of_block) {
+              in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
+            } else {
+              int local_fwd_idx = thread_blocking_get_neighbor_index_cb(local_coord, d, -1, arg.tb);
+              in = cache.load_x(local_fwd_idx);
+            }
+          }
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
 
         }
@@ -202,13 +222,19 @@ namespace quda
 
       // Load all interior color spinor fields
       auto block = target::block_dim();
-      SharedMemoryCache<Vector> cache({static_cast<unsigned int>(arg.tb.volume_4d_cb_ex), block.y, block.z});
+      SharedMemoryCache<Vector> cache({static_cast<unsigned int>(arg.tb.cache_ext ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb), block.y, block.z});
       int local_idx = target::thread_idx().x;
 
-      while (local_idx < arg.tb.volume_4d_cb_ex) {
+      while (local_idx < (arg.tb.cache_ext ? arg.tb.volume_4d_cb_ex : arg.tb.volume_4d_cb)) {
         const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
-        // Get the coordinate with all the boundary conditions figured out
-        auto coord = get_tb_coords_ex(arg, local_idx, 0, 1 - parity);
+        Coord<4> coord;
+        if (arg.tb.cache_ext) {
+          // Get the coordinate with all the boundary conditions figured out
+          coord = get_tb_coords_ex(arg, local_idx, 0, 1 - parity);
+        } else {
+          Coord<4> local_coord;
+          coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, local_idx, 0, parity, thread_dim, local_coord);
+        }
         cache.save_x(arg.in(coord.x_cb + coord.s * arg.dc.volume_4d_cb, their_spinor_parity), local_idx);
         local_idx += target::block_dim().x;
       }

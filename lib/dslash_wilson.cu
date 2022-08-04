@@ -16,6 +16,9 @@
 
 namespace quda
 {
+
+  constexpr bool cache_ext = false;
+
   constexpr int num_buckets = 4;
   using array_t = std::array<int, num_buckets>;
 
@@ -74,9 +77,21 @@ namespace quda
           arg.tb.grid_dim[d] = arg.dim[d] / p[d];
         }
         printf("p = %d, %d, %d, %d\n", p[0], p[1], p[2], p[3]);
-        arg.tb.X1 = p[0] + 2;
-        arg.tb.X2X1 = (p[1] + 2) * (p[0] + 2);
-        arg.tb.X3X2X1 = (p[2] + 2) * (p[1] + 2) * (p[0] + 2);
+        arg.tb.cache_ext = cache_ext;
+        if (cache_ext) {
+          arg.tb.X1 = p[0] + 2;
+          arg.tb.X2X1 = (p[1] + 2) * (p[0] + 2);
+          arg.tb.X3X2X1 = (p[2] + 2) * (p[1] + 2) * (p[0] + 2);
+
+        } else {
+          arg.tb.X1 = p[0];
+          arg.tb.X2X1 = p[1] * p[0];
+          arg.tb.X3X2X1 = p[2] * p[1] * p[0];
+
+          arg.tb.X2X1mX1 = (p[1] - 1) * p[0];
+          arg.tb.X3X2X1mX2X1 = (p[2] - 1) * p[1] * p[0];
+          arg.tb.X4X3X2X1mX3X2X1 = (p[3] - 1) * p[2] * p[1] * p[0];
+        }
 
         arg.tb.volume_4d_cb = p[3] * p[2] * p[1] * p[0] / 2;
         arg.tb.volume_4d_cb_ex = (p[3] + 2) * (p[2] + 2) * (p[1] + 2) * (p[0] + 2) / 2;
@@ -91,7 +106,11 @@ namespace quda
     {
       if (arg.kernel_type == INTERIOR_KERNEL) {
         auto p = decode(tp.aux.z, arg.dim);
-        return (p[0] + 2) * (p[1] + 2) * (p[2] + 2) * (p[3] + 2) * 24 * 4 / 2;
+        if (cache_ext) {
+          return (p[0] + 2) * (p[1] + 2) * (p[2] + 2) * (p[3] + 2) * 24 * 4 / 2;
+        } else {
+          return p[0] * p[1] * p[2] * p[3] * 24 * 4 / 2;
+        }
       } else {
         return 0;
       }
