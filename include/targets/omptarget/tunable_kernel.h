@@ -18,9 +18,9 @@ namespace quda {
   inline bool acceptThreads(const TuneParam &tp, const Arg &arg)
   {
     bool fit = tp.block.x*tp.block.y*tp.block.z<=device::max_block_size();
-    bool xrem = arg.threads.x % (tp.block.x * tp.grid.x) > 0;
-    bool yrem = arg.threads.y % (tp.block.y * tp.grid.y) > 0;
-    bool zrem = arg.threads.z % (tp.block.z * tp.grid.z) > 0;
+    bool xrem = arg.threads.x % tp.block.x > 0;
+    bool yrem = arg.threads.y % tp.block.y > 0;
+    bool zrem = arg.threads.z % tp.block.z > 0;
     if (!fit) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
         warningQuda("rejecting threads setup with a large block size with arg %d %d %d tp grid %d %d %d block %d %d %d\n",arg.threads.x,arg.threads.y,arg.threads.z,tp.grid.x,tp.grid.y,tp.grid.z,tp.block.x,tp.block.y,tp.block.z);
