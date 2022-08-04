@@ -63,7 +63,7 @@ namespace quda
             size_t res_mem_env_val = std::strtoull(res_mem_env, nullptr, 10);
             if(res_mem_env_val > 0){
               res_mem = res_mem_env_val;
-              warningQuda("using environment variable QUDA_OMPTARGET_SLM_RESERVE=%ul", res_mem);
+              warningQuda("using environment variable QUDA_OMPTARGET_SLM_RESERVE=%lu", res_mem);
             }else{
               warningQuda("cannot parse environment variable QUDA_OMPTARGET_SLM_RESERVE=%s", res_mem_env);
             }
