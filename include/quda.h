@@ -852,7 +852,7 @@ extern "C" {
     int inv_stride;   /**< stride of the LU inversion array in strided(batched) mode */
 
     // Common params
-    int batch_count; /**< number of pointers contained in arrayA, arrayB and arrayC. */
+    int batch_count;              /**< number of pointers contained in arrayA, arrayB and arrayC. */
     QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
     QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
 
