@@ -174,7 +174,7 @@ double blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *
   MatrixXcd A = MatrixXd::Zero(m, k);
   MatrixXcd B = MatrixXd::Zero(k, n);
   MatrixXcd C_eigen = MatrixXd::Zero(m, n);
-  MatrixXcd C_gpu = MatrixXd::Zero(m, n);
+  MatrixXcd C_dev = MatrixXd::Zero(m, n);
   MatrixXcd C_resid = MatrixXd::Zero(m, n);
 
   // Pointers to data
@@ -203,7 +203,7 @@ double blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *
     fillEigenArray(A, A_ptr, m, k, lda, a_offset);
     fillEigenArray(B, B_ptr, k, n, ldb, b_offset);
     fillEigenArray(C_eigen, Ccopy_ptr, m, n, ldc, c_offset);
-    fillEigenArray(C_gpu, C_ptr, m, n, ldc, c_offset);
+    fillEigenArray(C_dev, C_ptr, m, n, ldc, c_offset);
 
     // Apply op(A) and op(B)
     switch (blas_param->trans_a) {
@@ -224,12 +224,12 @@ double blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *
     C_eigen = alpha * A * B + beta * C_eigen;
 
     // Check Eigen result against blas
-    C_resid = C_gpu - C_eigen;
+    C_resid = C_dev - C_eigen;
     double deviation = C_resid.norm();
     double relative_deviation = deviation / C_eigen.norm();
     max_relative_deviation = std::max(max_relative_deviation, relative_deviation);
 
-    printfQuda("batch %d: (C_host - C_gpu) Frobenius norm = %e. Relative deviation = %e\n", batch, deviation,
+    printfQuda("batch %d: (C_host - C_dev) Frobenius norm = %e. Relative deviation = %e\n", batch, deviation,
                relative_deviation);
 
     a_offset += refA_size * a_stride;
@@ -327,14 +327,6 @@ double blasLUInvEigenVerify(void *ref_array, void *dev_inv_array, uint64_t array
 
   // Sanity checks on parameters
   //-------------------------------------------------------------------------
-  // If the user passes a negative stride, we error out as this has no meaning.
-  int min_stride = blas_param->inv_stride;
-  if (min_stride < 0) { errorQuda("BLAS strides must be positive or zero: inv_stride=%d", blas_param->inv_stride); }
-
-  // If the user passes a negative offset, we error out as this has no meaning.
-  int min_offset = blas_param->inv_offset;
-  if (min_offset < 0) { errorQuda("BLAS offsets must be positive or zero: inv_offset=%d\n", blas_param->inv_offset); }
-
   // If the batch value is non-positve, we error out
   if (blas_param->batch_count <= 0) { errorQuda("Batches must be positive: batches=%d", blas_param->batch_count); }
   //-------------------------------------------------------------------------
@@ -342,8 +334,7 @@ double blasLUInvEigenVerify(void *ref_array, void *dev_inv_array, uint64_t array
   // Parse parameters for Eigen
   //-------------------------------------------------------------------------
   // Problem parameters
-  int inv_stride = blas_param->inv_stride;
-  int inv_offset = blas_param->inv_offset;
+  int offset = 0;
   int batches = blas_param->batch_count;
   int mat_rank = blas_param->inv_mat_size;
 
@@ -357,25 +348,15 @@ double blasLUInvEigenVerify(void *ref_array, void *dev_inv_array, uint64_t array
   complex<double> *ref_ptr = (complex<double> *)(&ref_array)[0];
   complex<double> *dev_inv_ptr = (complex<double> *)(&dev_inv_array)[0];
 
-  // Get maximum stride length to deduce the number of batches in the
-  // computation
-  int max_stride = inv_stride;
-
-  // If the user gives strides of 0 for all arrays, we are essentially performing
-  // an LU inversion on the first matrices in the array N_{batch} times.
-  // Give them what they ask for, YMMV...
-  // If the strides have not been set, we are just using strides of 1.
-  if (max_stride <= 0) max_stride = 1;
-
-  printfQuda("Computing Eigen matrix operation ref_inv{%lu,%lu} = ref_{%lu,%lu}^(-1)\n", ref.rows(), ref.cols(),
+  printfQuda("Computing Eigen matrix operation ref_inv{%lu,%lu} = ref{%lu,%lu}^(-1)\n", ref.rows(), ref.cols(),
              ref_inv.rows(), ref_inv.cols());
 
   double max_relative_deviation = 0.0;
-  for (int batch = 0; batch < batches; batch += max_stride) {
+  for (int batch = 0; batch < batches; batch++) {
 
     // Populate Eigen objects
-    fillEigenArray(ref, ref_ptr, mat_rank, mat_rank, mat_rank, inv_offset);
-    fillEigenArray(dev_inv, dev_inv_ptr, mat_rank, mat_rank, mat_rank, inv_offset);
+    fillEigenArray(ref, ref_ptr, mat_rank, mat_rank, mat_rank, offset);
+    fillEigenArray(dev_inv, dev_inv_ptr, mat_rank, mat_rank, mat_rank, offset);
 
     // Check Eigen result against blas
     ref_inv = ref.inverse();
@@ -385,10 +366,10 @@ double blasLUInvEigenVerify(void *ref_array, void *dev_inv_array, uint64_t array
     double relative_deviation = deviation / ref_inv.norm();
     max_relative_deviation = std::max(max_relative_deviation, relative_deviation);
 
-    printfQuda("batch %d: (ref_inv_host - dev_inv_gpu) Frobenius norm = %e. Relative deviation = %e\n", batch,
+    printfQuda("batch %d: (ref_inv - dev_inv) Frobenius norm = %e. Relative deviation = %e\n", batch,
                deviation, relative_deviation);
 
-    inv_offset += array_size * inv_stride;
+    offset += array_size;
   }
 
   return max_relative_deviation;
@@ -401,11 +382,7 @@ double blasLUInvQudaVerify(void *ref_array, void *dev_array_inv, uint64_t array_
   size_t data_out_size = sizeof(double);
   int re_im = 2;
 
-  // If the user passes non-zero offsets, add one extra
-  // matrix to the test data.
-  int batches_extra = 0;
-  if (blas_param->inv_offset > 0) { batches_extra++; }
-  int batches = blas_param->batch_count + batches_extra;
+  int batches = blas_param->batch_count;
 
   // Copy data from problem sized array to reference sized array.
   void *dev_array_inv_copy = pinned_malloc(array_size * re_im * data_out_size * batches);

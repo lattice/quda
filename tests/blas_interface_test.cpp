@@ -33,8 +33,6 @@ std::array<int, 3> blas_gemm_strides = {1, 1, 1};
 std::array<double, 2> blas_gemm_alpha_re_im = {M_PI, M_E};
 std::array<double, 2> blas_gemm_beta_re_im = {M_LN2, M_LN10};
 
-int blas_lu_inv_offset = 0;
-int blas_lu_inv_stride = 1;
 int blas_lu_inv_mat_size = 128;
 
 namespace quda
@@ -270,15 +268,7 @@ double lu_inv_test(test_t test_param)
 
   // Sanity checks on parameters
   //-------------------------------------------------------------------------
-  // Leading dims are irrelevant for LU inversions as matrices must be square
-
-  // If the user passes a negative stride, we error out as this has no meaning.
-  int min_stride = blas_param.inv_stride;
-  if (min_stride < 0) { errorQuda("BLAS strides must be positive or zero: inv_stride=%d", blas_param.inv_stride); }
-
-  // If the user passes a negative offset, we error out as this has no meaning.
-  int min_offset = blas_param.inv_offset;
-  if (min_offset < 0) { errorQuda("BLAS offsets must be positive or zero: inv_offset=%d", blas_param.inv_offset); }
+  // Leading dims, strides, and offsets are irrelevant for LU inversions.
 
   // If the batch value is non-positve, we error out
   if (blas_param.batch_count <= 0) { errorQuda("Batches must be positive: batches=%d", blas_param.batch_count); }
@@ -287,11 +277,7 @@ double lu_inv_test(test_t test_param)
   // Reference data is always in complex double
   size_t data_in_size = sizeof(double);
 
-  // If the user passes non-zero offsets, add one extra
-  // matrix to the test data.
-  int batches_extra = 0;
-  if (blas_param.inv_offset > 0) { batches_extra++; }
-  int batches = blas_param.batch_count + batches_extra;
+  int batches = blas_param.batch_count;
   uint64_t array_size = blas_param.inv_mat_size * blas_param.inv_mat_size;
 
   // Create host data reference arrays
@@ -398,10 +384,6 @@ void add_blas_interface_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup
     ->add_option("--blas-gemm-strides", blas_gemm_strides, "Set the strides for GEMM matrices A, B, and C (default 1 1 1)")
     ->expected(3);
-
-  opgroup->add_option("--blas-lu-inv-offset", blas_lu_inv_offset, "Set the offset for LU inversion array (default 0)");
-
-  opgroup->add_option("--blas-lu-inv-stride", blas_lu_inv_stride, "Set the stride for LU inversion array (default 1)");
 
   opgroup->add_option("--blas-batch", blas_batch, "Set the number of batches for GEMM or LU inversion (default 16)");
 
