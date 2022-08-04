@@ -850,7 +850,7 @@ extern "C" {
     int inv_mat_size; /**< The rank of the square matrix in the LU inversion */
     int inv_offset;   /**< position of the LU inversion array from which begin read/write. */
     int inv_stride;   /**< stride of the LU inversion array in strided(batched) mode */
-    
+
     // Common params
     int batch_count; /**< number of pointers contained in arrayA, arrayB and arrayC. */
     QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */

@@ -274,16 +274,12 @@ double lu_inv_test(test_t test_param)
 
   // If the user passes a negative stride, we error out as this has no meaning.
   int min_stride = blas_param.inv_stride;
-  if (min_stride < 0) {
-    errorQuda("BLAS strides must be positive or zero: inv_stride=%d", blas_param.inv_stride);
-  }
-  
+  if (min_stride < 0) { errorQuda("BLAS strides must be positive or zero: inv_stride=%d", blas_param.inv_stride); }
+
   // If the user passes a negative offset, we error out as this has no meaning.
   int min_offset = blas_param.inv_offset;
-  if (min_offset < 0) {
-    errorQuda("BLAS offsets must be positive or zero: inv_offset=%d", blas_param.inv_offset);
-  }
-  
+  if (min_offset < 0) { errorQuda("BLAS offsets must be positive or zero: inv_offset=%d", blas_param.inv_offset); }
+
   // If the batch value is non-positve, we error out
   if (blas_param.batch_count <= 0) { errorQuda("Batches must be positive: batches=%d", blas_param.batch_count); }
   //-------------------------------------------------------------------------
@@ -377,14 +373,17 @@ void add_blas_interface_option_group(std::shared_ptr<QUDAApp> quda_app)
       "Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
     ->transform(CLI::QUDACheckedTransformer(blas_op_map));
 
-  opgroup->add_option("--blas-gemm-alpha", blas_gemm_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")
-    ->expected(2);
-
-  opgroup->add_option("--blas-gemm-beta", blas_gemm_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")
+  opgroup
+    ->add_option("--blas-gemm-alpha", blas_gemm_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")
     ->expected(2);
 
   opgroup
-    ->add_option("--blas-gemm-mnk", blas_gemm_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")
+    ->add_option("--blas-gemm-beta", blas_gemm_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")
+    ->expected(2);
+
+  opgroup
+    ->add_option("--blas-gemm-mnk", blas_gemm_mnk,
+                 "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")
     ->expected(3);
 
   opgroup
@@ -392,16 +391,18 @@ void add_blas_interface_option_group(std::shared_ptr<QUDAApp> quda_app)
                  "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128) ")
     ->expected(3);
 
-  opgroup->add_option("--blas-gemm-offsets", blas_gemm_offsets, "Set the offsets for GEMM matrices A, B, and C (default 0 0 0)")
+  opgroup
+    ->add_option("--blas-gemm-offsets", blas_gemm_offsets, "Set the offsets for GEMM matrices A, B, and C (default 0 0 0)")
     ->expected(3);
 
-  opgroup->add_option("--blas-gemm-strides", blas_gemm_strides, "Set the strides for GEMM matrices A, B, and C (default 1 1 1)")
+  opgroup
+    ->add_option("--blas-gemm-strides", blas_gemm_strides, "Set the strides for GEMM matrices A, B, and C (default 1 1 1)")
     ->expected(3);
 
   opgroup->add_option("--blas-lu-inv-offset", blas_lu_inv_offset, "Set the offset for LU inversion array (default 0)");
 
   opgroup->add_option("--blas-lu-inv-stride", blas_lu_inv_stride, "Set the stride for LU inversion array (default 1)");
-  
+
   opgroup->add_option("--blas-batch", blas_batch, "Set the number of batches for GEMM or LU inversion (default 16)");
 
   opgroup->add_option("--blas-lu-inv-mat-size", blas_lu_inv_mat_size,
