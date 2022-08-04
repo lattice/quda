@@ -388,7 +388,7 @@ double blasLUInvEigenVerify(void *ref_array, void *dev_inv_array, uint64_t array
     printfQuda("batch %d: (ref_inv_host - dev_inv_gpu) Frobenius norm = %e. Relative deviation = %e\n", batch,
                deviation, relative_deviation);
 
-    a_offset += array_size * a_stride;
+    inv_offset += array_size * inv_stride;
   }
 
   return max_relative_deviation;
@@ -404,7 +404,7 @@ double blasLUInvQudaVerify(void *ref_array, void *dev_array_inv, uint64_t array_
   // If the user passes non-zero offsets, add one extra
   // matrix to the test data.
   int batches_extra = 0;
-  if (blas_param->a_offset + blas_param->b_offset + blas_param->c_offset > 0) { batches_extra++; }
+  if (blas_param->inv_offset > 0) { batches_extra++; }
   int batches = blas_param->batch_count + batches_extra;
 
   // Copy data from problem sized array to reference sized array.

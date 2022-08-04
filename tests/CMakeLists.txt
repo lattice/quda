@@ -271,17 +271,17 @@ endif()
 if(QUDA_BUILD_NATIVE_LAPACK)
   add_test(NAME blas_interface_test
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_interface_test> ${MPIEXEC_POSTFLAGS}
-    --blas-mnk 64 64 64
-    --blas-leading-dims 128 128 128
-    --blas-offsets 16 16 16
+    --blas-gemm-mnk 64 64 64
+    --blas-gemm-leading-dims 128 128 128
+    --blas-gemm-offsets 16 16 16
+    --blas-gemm-alpha 1.0 2.0
+    --blas-gemm-beta -3.0 1.5
+    --blas-gemm-trans-a T
+    --blas-gemm-trans-b C
+    --blas-lu-inv-mat-size 96
     --blas-data-type Z
     --blas-data-order row
     --blas-batch 20
-    --blas-alpha 1.0 2.0
-    --blas-beta -3.0 1.5
-    --blas-trans-a T
-    --blas-trans-b C
-    --blas-inv-mat-size 96
     --enable-testing true
     --gtest_output=xml:blas_interface_test.xml)
 endif()
