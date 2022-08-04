@@ -139,6 +139,7 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_testing_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_quark_smear_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
 {

@@ -44,7 +44,6 @@ void display_test_info()
 
 int main(int argc, char **argv)
 {
-  // hack for loading gauge fields
   gsmear_test_wrapper.argc_copy = argc;
   gsmear_test_wrapper.argv_copy = argv;
 
@@ -53,7 +52,8 @@ int main(int argc, char **argv)
 
   // command line options
   auto app = make_app();
-  app->add_option("--test", gtest_type, "Test method")->transform(CLI::CheckedTransformer(gtest_type_map));//?
+  app->add_option("--test", gtest_type, "Test method")->transform(CLI::CheckedTransformer(gtest_type_map));
+  add_quark_smear_option_group(app);
   add_comms_option_group(app);
   try {
     app->parse(argc, argv);
@@ -62,8 +62,6 @@ int main(int argc, char **argv)
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
-
-  updateR();
 
   initQuda(device_ordinal);
 

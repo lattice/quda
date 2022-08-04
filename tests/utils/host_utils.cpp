@@ -906,6 +906,28 @@ int compare_floats(void *a, void *b, int len, double epsilon, QudaPrecision prec
     return compareFloats((float *)a, (float *)b, len, epsilon);
 }
 
+template <typename Float> static double compareFloats_v2(Float *a, Float *b, int len, double epsilon)
+{
+  double global_diff = 0.0;
+  for (int i = 0; i < len; i++) {
+    double diff = fabs(a[i] - b[i]);
+    if (diff > epsilon || std::isnan(diff)) {
+      //printfQuda("ERROR: i=%d, a[%d]=%f, b[%d]=%f\n", i, i, a[i], i, b[i]);
+      return diff;
+    }
+    global_diff = std::max(global_diff, diff);
+  }
+  return global_diff;
+}
+
+double compare_floats_v2(void *a, void *b, int len, double epsilon, QudaPrecision precision)
+{
+  if (precision == QUDA_DOUBLE_PRECISION)
+    return compareFloats_v2((double *)a, (double *)b, len, epsilon);
+  else
+    return compareFloats_v2((float *)a, (float *)b, len, epsilon);
+}
+
 // 4d checkerboard.
 // given a "half index" i into either an even or odd half lattice (corresponding
 // to oddBit = {0, 1}), returns the corresponding full lattice index.

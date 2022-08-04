@@ -94,7 +94,8 @@ struct StaggeredGSmearTestWrapper {//
 
   // Allocate host staggered gauge fields
   void* qdp_inlink[4]    = {nullptr,nullptr,nullptr,nullptr};
-  void* qdp_twolnk[4]    = {nullptr,nullptr,nullptr,nullptr};  
+  void* qdp_twolnk[4]    = {nullptr,nullptr,nullptr,nullptr};
+  void* qdp_ref_twolnk[4]= {nullptr,nullptr,nullptr,nullptr};     
   void* qdp_inlink_ex[4] = {nullptr,nullptr,nullptr,nullptr};//sitelink_ex
   
   void *milc_inlink       = nullptr;
@@ -116,15 +117,16 @@ struct StaggeredGSmearTestWrapper {//
   void staggeredGSmearRef()
   {
     // compare to dslash reference implementation
-    printfQuda("Calculating reference implementation...");
+    printfQuda("Calculating reference implementation...\n");
     switch (gtest_type) {
       case gsmear_test_type::TwoLink:
-	      {
+      {
+        printfQuda("Doing Twolink..\n"); 
         computeTwoLinkCPU(qdp_twolnk, qdp_inlink_ex, &gauge_param);
         break;
-	      }
+      }
       case gsmear_test_type::GaussianSmear:
-	{
+      {
         const double ftmp    = -(smear_coeff*smear_coeff)/(4.0*n_steps*4.0);
         const double msq     = 1. / ftmp;
         const double a       = inv_param.laplace3D * 2.0 + msq;
@@ -145,7 +147,7 @@ struct StaggeredGSmearTestWrapper {//
           memset(tmp2->Odd().V(), 0, spinor->Odd().Length() * gauge_param.cpu_prec);
         }
         break;
-	}
+      }
       default: errorQuda("Test type not defined");
     }
   }
@@ -206,14 +208,13 @@ struct StaggeredGSmearTestWrapper {//
     inv_param.split_grid[2] = grid_partition[2];
     inv_param.split_grid[3] = grid_partition[3];
 
-    //num_src = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
-
     setDims(gauge_param.X);
     dw_setDims(gauge_param.X, 1);
     // Allocate a lot of memory because I'm very confused
     for (int dir = 0; dir < 4; dir++) {
       qdp_inlink[dir]    = safe_malloc(V    * gauge_site_size * host_gauge_data_type_size);
       qdp_twolnk[dir]    = safe_malloc(V    * gauge_site_size * host_gauge_data_type_size);
+      qdp_ref_twolnk[dir]= safe_malloc(V    * gauge_site_size * host_gauge_data_type_size);      
       qdp_inlink_ex[dir] = safe_malloc(V_ex * gauge_site_size * host_gauge_data_type_size);    
     }
     //
@@ -247,18 +248,18 @@ struct StaggeredGSmearTestWrapper {//
     }
     //
     loadGaugeQuda(milc_inlink, &gauge_param);
-    //
-    // Create ghost gauge fields in case of multi GPU builds.
-    reorderQDPtoMILC(milc_twolnk, qdp_twolnk, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
-  
-    gauge_param.type     = QUDA_ASQTAD_LONG_LINKS;
-    gauge_param.location = QUDA_CPU_FIELD_LOCATION;
+    //  
+    if(gtest_type == gsmear_test_type::GaussianSmear) {  
+      // Create ghost gauge fields in case of multi GPU builds.
+      reorderQDPtoMILC(milc_twolnk, qdp_twolnk, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
+      //
+      gauge_param.type     = QUDA_ASQTAD_LONG_LINKS;
+      gauge_param.location = QUDA_CPU_FIELD_LOCATION;
 
-    GaugeFieldParam cpuTwoLinkParam(gauge_param, milc_twolnk);
-    cpuTwoLinkParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-    cpuTwoLink                    = GaugeField::Create(cpuTwoLinkParam);    
+      GaugeFieldParam cpuTwoLinkParam(gauge_param, milc_twolnk);
+      cpuTwoLinkParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+      cpuTwoLink                    = GaugeField::Create(cpuTwoLinkParam);    
     
-    if(gtest_type == gsmear_test_type::GaussianSmear) {
       ColorSpinorParam cs_param;
 
       constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
@@ -281,6 +282,7 @@ struct StaggeredGSmearTestWrapper {//
       host_free(qdp_inlink[dir]);
       host_free(qdp_inlink_ex[dir]);
       host_free(qdp_twolnk[dir]);
+      host_free(qdp_ref_twolnk[dir]);
     }
   
     host_free(milc_inlink);
@@ -313,12 +315,13 @@ struct StaggeredGSmearTestWrapper {//
     // smearing parameters
     switch (gtest_type) {
       case gsmear_test_type::TwoLink:
-	      {
-        computeTwoLinkQuda((void*) qdp_twolnk, nullptr, &gauge_param);
+      {
+        printfQuda("Doing two link in QUDA\n");
+        computeTwoLinkQuda((void*) milc_twolnk, nullptr, &gauge_param);
 	break;
-	      }
+      }
       case gsmear_test_type::GaussianSmear:
-	      {
+      {
         double omega       = 2.0;
         int n_steps        = 50;
         double smear_coeff = -1.0 * omega * omega / ( 4*n_steps );
@@ -330,8 +333,8 @@ struct StaggeredGSmearTestWrapper {//
         performTwoLinkGaussianSmearNStep(spinor->V(), &inv_param, n_steps, smear_coeff, compute_2link, delete_2link, t0);
 
         break;
-	      }
-        default: errorQuda("Test type not defined");
+      }
+      default: errorQuda("Test type not defined");
     }
 
     device_timer.stop();
@@ -348,7 +351,7 @@ struct StaggeredGSmearTestWrapper {//
 
     GSmearTime gsmear_time = gsmearCUDA(niter);
     if(gtest_type == gsmear_test_type::GaussianSmear) *spinorRef = *spinor;
-
+#if 0
     if (print_metrics) {
       printfQuda("%fus per kernel call\n", 1e6 * gsmear_time.event_time / niter);
 
@@ -374,25 +377,27 @@ struct StaggeredGSmearTestWrapper {//
         1.0e-9 * 2 * ghost_bytes * niter / gsmear_time.cpu_time, 1.0e-9 * 2 * ghost_bytes / gsmear_time.cpu_max,
         1.0e-9 * 2 * ghost_bytes / gsmear_time.cpu_min, 2 * ghost_bytes);
     }
+#endif    
   }
 
   double verify()
   {
     double deviation = 0.0;
-
-    //double spinor_ref_norm = blas::norm2(*spinorRef);
-    //double spinor_out_norm = blas::norm2(*spinorOut);
-
-    //bool failed = false;
-    // Catching nans is weird.
-    //if (std::isnan(spinor_ref_norm)) { failed = true; }
-    //if (std::isnan(spinor_out_norm)) { failed = true; }
-
-    //printfQuda("Results: CPU = %f, QUDA = %f, L2 relative deviation = %e\n",
-    //             spinor_ref_norm, spinor_out_norm, 1.0 - sqrt(spinor_out_norm / spinor_ref_norm));
-    //deviation = pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *spinorOut)));
-    //if (failed) { deviation = 1.0; }
-
+    
+    for(int i=0; i < V; i++){
+      for(int dir=0; dir< 4; dir++){
+        char *src = ((char *)milc_twolnk) + (4 * i + dir) * gauge_site_size * host_gauge_data_type_size;
+        char *dst = ((char *)qdp_ref_twolnk[dir]) + i * gauge_site_size * host_gauge_data_type_size;
+        memcpy(dst, src, gauge_site_size * host_gauge_data_type_size);
+      }
+    }
+    
+    for(int dir=0; dir<4; ++dir){
+      double deviation_per_dir = compare_floats_v2(qdp_twolnk[dir], qdp_ref_twolnk[dir], V * gauge_site_size, 1e-3, gauge_param.cpu_prec);
+      deviation = std::max(deviation, deviation_per_dir);
+    }    
+    //printfQuda("Print Deviation %1.15e\n", deviation);
+  
     return deviation;
   }
 };
