@@ -189,7 +189,7 @@ namespace quda
 #pragma unroll
     for (int d = 0; d < 4; d++) {
       // -1 for the boundary terms, % makes sure we get the around the world terms
-      coord[d] = (local_coord[d] - 1 + block_offset[d] + arg.dim[d]) % arg.dim[d];
+      coord[d] = (local_coord[d] - (arg.tb.dim[d] == arg.dim[d] ? 0 : 1) + block_offset[d] + arg.dim[d]) % arg.dim[d];
     }
     int index = 0;
 #pragma unroll
@@ -230,10 +230,10 @@ namespace quda
         Coord<4> coord;
         if (arg.tb.cache_ext) {
           // Get the coordinate with all the boundary conditions figured out
-          coord = get_tb_coords_ex(arg, local_idx, 0, 1 - parity);
+          coord = get_tb_coords_ex(arg, local_idx, 0, 1 - (parity + arg.tb.parity_bit) % 2);
         } else {
           Coord<4> local_coord;
-          coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, local_idx, 0, parity, thread_dim, local_coord);
+          coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, local_idx, 0, 1 - parity, thread_dim, local_coord);
         }
         cache.save_x(arg.in(coord.x_cb + coord.s * arg.dc.volume_4d_cb, their_spinor_parity), local_idx);
         local_idx += target::block_dim().x;

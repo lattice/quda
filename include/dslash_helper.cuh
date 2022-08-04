@@ -86,42 +86,44 @@ namespace quda
     return !incomplete;
   }
 
-  template <typename Coord, typename I, typename J, typename K>
+  template <typename Coord, typename Arg>
   __device__ __host__ inline int getCoordsCB_blocking(Coord &x, Coord &local_coord, int thread_idx_cb,
-    int block_idx, const I &block_dim, J block_dim_0h, const I &grid_dim, int parity, const K &X, bool cache_ext)
+    int block_idx, const Arg &arg, int parity)
   {
     int block_coord[4];
 
 #pragma unroll
     for (int d = 0; d < 4; d++) {
-      block_coord[d] = block_idx % grid_dim[d];
-      block_idx /= grid_dim[d];
+      block_coord[d] = block_idx % arg.tb.grid_dim[d];
+      block_idx /= arg.tb.grid_dim[d];
     }
 
     int offset[4];
 #pragma unroll
     for (int d = 0; d < 4; d++) {
-      offset[d] = block_coord[d] * block_dim[d];
+      offset[d] = block_coord[d] * arg.tb.dim[d];
     }
 
     int local_parity = (offset[0] + offset[1] + offset[2] + offset[3] + parity) % 2;
 
-    local_coord.X = getCoordsCB(local_coord, thread_idx_cb, block_dim, block_dim_0h, local_parity);
+    local_coord.X = getCoordsCB(local_coord, thread_idx_cb, arg.tb.dim, arg.tb.X0h, local_parity);
     // local_coord.x_cb = thread_idx_cb;
 #pragma unroll
     for (int d = 0; d < 4; d++) {
       x[d] = local_coord[d] + offset[d];
-      if (cache_ext) {
+      if (arg.tb.cache_ext) {
         // Get the extended coord
-        local_coord[d] += 1;
+        if (arg.tb.dim[d] != arg.dim[d]) {
+          local_coord[d] += 1;
+        }
       }
     }
 
-    if (cache_ext) {
+    if (arg.tb.cache_ext) {
       int local_index = 0;
 #pragma unroll
       for (int d = 3; d >= 0; d--) {
-        local_index = local_index * (block_dim[d] + 2) + local_coord[d];
+        local_index = local_index * arg.tb.dim_ex[d] + local_coord[d];
       }
       local_coord.X = local_index;
       local_coord.x_cb = local_index / 2;
@@ -132,7 +134,7 @@ namespace quda
     int index = 0;
 #pragma unroll
     for (int d = 3; d >= 0; d--) {
-      index = index * X[d] + x[d];
+      index = index * arg.dim[d] + x[d];
     }
     return index;
   }
@@ -165,7 +167,7 @@ namespace quda
       } else {
         // coord.X = getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
         int block_idx = target::block_idx().x;
-        coord.X = getCoordsCB_blocking(coord, local_coord, idx, block_idx, arg.tb.dim, arg.tb.X0h, arg.tb.grid_dim, parity, arg.dim, arg.tb.cache_ext);
+        coord.X = getCoordsCB_blocking(coord, local_coord, idx, block_idx, arg, parity);
         local_coord.s = s;
         coord.x_cb = coord.X / 2;
       }
@@ -315,6 +317,8 @@ namespace quda
     int X3X2X1mX2X1;
     int X4X3X2X1mX3X2X1;
     int X5X4X3X2X1mX4X3X2X1;
+
+    int parity_bit;
 
     bool cache_ext;
   };

@@ -70,19 +70,33 @@ namespace quda
         auto p = decode(tp.aux.z, arg.dim);
 
         arg.tb.X0h = p[0] / 2;
-        arg.tb.Xex0h = (p[0] + 2) / 2;
+        arg.tb.Xex0h = arg.dim[0] == p[0] ? p[0] / 2 : (p[0] + 2) / 2;
+        int parity_bit = 0;
         for (int d = 0; d < 4; d++) {
           arg.tb.dim[d] = p[d];
-          arg.tb.dim_ex[d] = p[d] + 2;
+          if (cache_ext) {
+            if (arg.dim[d] == p[d]) {
+              arg.tb.dim_ex[d] = p[d];
+            } else {
+              parity_bit++;
+              arg.tb.dim_ex[d] = p[d] + 2;
+            }
+          } else {
+            arg.tb.dim_ex[d] = p[d];
+          }
+          arg.tb.parity_bit = parity_bit % 2;
           arg.tb.grid_dim[d] = arg.dim[d] / p[d];
         }
         printf("p = %d, %d, %d, %d\n", p[0], p[1], p[2], p[3]);
         arg.tb.cache_ext = cache_ext;
         if (cache_ext) {
-          arg.tb.X1 = p[0] + 2;
-          arg.tb.X2X1 = (p[1] + 2) * (p[0] + 2);
-          arg.tb.X3X2X1 = (p[2] + 2) * (p[1] + 2) * (p[0] + 2);
+          arg.tb.X1 = arg.tb.dim_ex[0]; // p[0] + 2;
+          arg.tb.X2X1 = arg.tb.dim_ex[1] * arg.tb.dim_ex[0]; // (p[1] + 2) * (p[0] + 2);
+          arg.tb.X3X2X1 = arg.tb.dim_ex[2] * arg.tb.dim_ex[1] * arg.tb.dim_ex[0]; // (p[2] + 2) * (p[1] + 2) * (p[0] + 2);
 
+          arg.tb.X2X1mX1 = (arg.tb.dim_ex[1] - 1) * arg.tb.dim_ex[0]; // p[1] - 1) * p[0];
+          arg.tb.X3X2X1mX2X1 = (arg.tb.dim_ex[2] - 1) * arg.tb.dim_ex[1] * arg.tb.dim_ex[0]; // (p[2] - 1) * p[1] * p[0];
+          arg.tb.X4X3X2X1mX3X2X1 = (arg.tb.dim_ex[3] - 1) * arg.tb.dim_ex[2] * arg.tb.dim_ex[1] * arg.tb.dim_ex[0]; // (p[3] - 1) * p[2] * p[1] * p[0];
         } else {
           arg.tb.X1 = p[0];
           arg.tb.X2X1 = p[1] * p[0];
@@ -94,7 +108,7 @@ namespace quda
         }
 
         arg.tb.volume_4d_cb = p[3] * p[2] * p[1] * p[0] / 2;
-        arg.tb.volume_4d_cb_ex = (p[3] + 2) * (p[2] + 2) * (p[1] + 2) * (p[0] + 2) / 2;
+        arg.tb.volume_4d_cb_ex = arg.tb.dim_ex[3] * arg.tb.dim_ex[2] * arg.tb.dim_ex[1] * arg.tb.dim_ex[0] / 2;
 
         arg.threads = tp.block.x * tp.grid.x;
         tp.set_max_shared_bytes = true;
@@ -106,11 +120,16 @@ namespace quda
     {
       if (arg.kernel_type == INTERIOR_KERNEL) {
         auto p = decode(tp.aux.z, arg.dim);
-        if (cache_ext) {
-          return (p[0] + 2) * (p[1] + 2) * (p[2] + 2) * (p[3] + 2) * 24 * 4 / 2;
-        } else {
-          return p[0] * p[1] * p[2] * p[3] * 24 * 4 / 2;
+        int prod = 1;
+        for (int d = 0; d < 4; d++) {
+          arg.tb.dim[d] = p[d];
+          if (cache_ext) {
+            prod *= (arg.dim[d] == p[d] ? p[d] : p[d] + 2);
+          } else {
+            prod *= p[d];
+          }
         }
+        return prod * 24 * 4 / 2;
       } else {
         return 0;
       }
@@ -124,11 +143,10 @@ namespace quda
         return true;
       } else {
         auto p = decode(tp.aux.z, arg.dim);
-        bool ret = false;
         for (int d = 0; d < 4; d++) {
           p[d] *= 2;
           set_shared_grid(tp, p);
-          if (arg.dim[d] % (p[d] * 2) == 0 && tp.shared_bytes <= this->maxSharedBytesPerBlock()) {
+          if (arg.dim[d] % p[d] == 0 && tp.shared_bytes <= this->maxSharedBytesPerBlock()) {
             return true;
           } else {
             p[d] = 2;
