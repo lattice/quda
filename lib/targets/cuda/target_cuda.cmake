@@ -186,6 +186,13 @@ target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/inc
 target_include_directories(quda SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/cuda/externals)
 
 # Specific config dependent warning suppressions and lineinfo forwarding
+
+target_compile_options(
+  quda 
+  PRIVATE $<$<COMPILE_LANGUAGE:CUDA>: 
+          $<IF:$<CONFIG:RELEASE>,-w,-Wall -Wextra>
+          >)
+
 target_compile_options(
   quda
   PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
@@ -205,7 +212,12 @@ target_compile_options(
           $<$<CONFIG:SANITIZE>:-lineinfo>
           >)
 
-target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>: -gpu=lineinfo >)
+target_compile_options(
+  quda 
+  PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:
+          -gpu=lineinfo
+          $<$<CONFIG:STRICT>:-Werror>
+          >)
 
 target_compile_options(
   quda
