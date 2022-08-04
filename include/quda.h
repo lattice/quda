@@ -828,6 +828,7 @@ extern "C" {
 
     QudaBLASType blas_type; /**< Type of BLAS computation to perfrom */
 
+    // GEMM params
     QudaBLASOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */
     QudaBLASOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */
     int m;                     /**< number of rows of matrix op(A) and C. */
@@ -842,15 +843,19 @@ extern "C" {
     int a_stride;              /**< stride of the A array in strided(batched) mode */
     int b_stride;              /**< stride of the B array in strided(batched) mode */
     int c_stride;              /**< stride of the C array in strided(batched) mode */
-
     double_complex alpha; /**< scalar used for multiplication. */
     double_complex beta;  /**< scalar used for multiplication. If beta==0, C does not have to be a valid input. */
 
+    // LU inversion params
+    int inv_mat_size; /**< The rank of the square matrix in the LU inversion */
+    int inv_offset;   /**< position of the LU inversion array from which begin read/write. */
+    int inv_stride;   /**< stride of the LU inversion array in strided(batched) mode */
+    
+    // Common params
     int batch_count; /**< number of pointers contained in arrayA, arrayB and arrayC. */
-
     QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
     QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
-    int inv_mat_size;             /**< The rank of the square matrix in the LU batched inversion */
+
   } QudaBLASParam;
 
   /*

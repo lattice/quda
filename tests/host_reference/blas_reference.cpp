@@ -328,12 +328,12 @@ double blasLUInvEigenVerify(void *ref_array, void *dev_inv_array, uint64_t array
   // Sanity checks on parameters
   //-------------------------------------------------------------------------
   // If the user passes a negative stride, we error out as this has no meaning.
-  int min_stride = blas_param->a_stride;
-  if (min_stride < 0) { errorQuda("BLAS strides must be positive or zero: a_stride=%d", blas_param->a_stride); }
+  int min_stride = blas_param->inv_stride;
+  if (min_stride < 0) { errorQuda("BLAS strides must be positive or zero: inv_stride=%d", blas_param->inv_stride); }
 
   // If the user passes a negative offset, we error out as this has no meaning.
-  int min_offset = blas_param->a_offset;
-  if (min_offset < 0) { errorQuda("BLAS offsets must be positive or zero: a_offset=%d\n", blas_param->a_offset); }
+  int min_offset = blas_param->inv_offset;
+  if (min_offset < 0) { errorQuda("BLAS offsets must be positive or zero: inv_offset=%d\n", blas_param->inv_offset); }
 
   // If the batch value is non-positve, we error out
   if (blas_param->batch_count <= 0) { errorQuda("Batches must be positive: batches=%d", blas_param->batch_count); }
@@ -342,8 +342,8 @@ double blasLUInvEigenVerify(void *ref_array, void *dev_inv_array, uint64_t array
   // Parse parameters for Eigen
   //-------------------------------------------------------------------------
   // Problem parameters
-  int a_stride = blas_param->a_stride;
-  int a_offset = blas_param->a_offset;
+  int inv_stride = blas_param->inv_stride;
+  int inv_offset = blas_param->inv_offset;
   int batches = blas_param->batch_count;
   int mat_rank = blas_param->inv_mat_size;
 
@@ -359,7 +359,7 @@ double blasLUInvEigenVerify(void *ref_array, void *dev_inv_array, uint64_t array
 
   // Get maximum stride length to deduce the number of batches in the
   // computation
-  int max_stride = a_stride;
+  int max_stride = inv_stride;
 
   // If the user gives strides of 0 for all arrays, we are essentially performing
   // an LU inversion on the first matrices in the array N_{batch} times.
@@ -374,8 +374,8 @@ double blasLUInvEigenVerify(void *ref_array, void *dev_inv_array, uint64_t array
   for (int batch = 0; batch < batches; batch += max_stride) {
 
     // Populate Eigen objects
-    fillEigenArray(ref, ref_ptr, mat_rank, mat_rank, mat_rank, a_offset);
-    fillEigenArray(dev_inv, dev_inv_ptr, mat_rank, mat_rank, mat_rank, a_offset);
+    fillEigenArray(ref, ref_ptr, mat_rank, mat_rank, mat_rank, inv_offset);
+    fillEigenArray(dev_inv, dev_inv_ptr, mat_rank, mat_rank, mat_rank, inv_offset);
 
     // Check Eigen result against blas
     ref_inv = ref.inverse();

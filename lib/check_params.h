@@ -1120,6 +1120,9 @@ void printQudaBLASParam(QudaBLASParam *param)
   P(batch_count, 1);
   P(data_type, QUDA_BLAS_DATATYPE_S);
   P(data_order, QUDA_BLAS_DATAORDER_ROW);
+  P(inv_offset, 0);
+  P(inv_stride, 1);
+  P(inv_mat_size, INVALID_INT);
 #else
   P(trans_a, QUDA_BLAS_OP_INVALID);
   P(trans_b, QUDA_BLAS_OP_INVALID);
@@ -1138,6 +1141,9 @@ void printQudaBLASParam(QudaBLASParam *param)
   P(batch_count, INVALID_INT);
   P(data_type, QUDA_BLAS_DATATYPE_INVALID);
   P(data_order, QUDA_BLAS_DATAORDER_INVALID);
+  P(inv_offset, INVALID_INT);
+  P(inv_stride, INVALID_INT);
+  P(inv_mat_size, INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM

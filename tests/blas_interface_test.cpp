@@ -19,36 +19,23 @@
 // if "--enable-testing true" is passed, we run the tests defined in here
 #include <blas_interface_test_gtest.hpp>
 
-QudaBLASOperation blas_trans_a = QUDA_BLAS_OP_N;
-QudaBLASOperation blas_trans_b = QUDA_BLAS_OP_N;
 QudaBLASDataType blas_data_type = QUDA_BLAS_DATATYPE_C;
 QudaBLASDataOrder blas_data_order = QUDA_BLAS_DATAORDER_COL;
 QudaBLASType blas_test_type = QUDA_BLAS_GEMM;
-
-std::array<int, 3> blas_mnk = {64, 64, 64};
-auto &blas_m = blas_mnk[0];
-auto &blas_n = blas_mnk[1];
-auto &blas_k = blas_mnk[2];
-
-std::array<int, 3> blas_leading_dims = {128, 128, 128};
-auto &blas_lda = blas_leading_dims[0];
-auto &blas_ldb = blas_leading_dims[1];
-auto &blas_ldc = blas_leading_dims[2];
-
-std::array<int, 3> blas_offsets = {0, 0, 0};
-auto &blas_a_offset = blas_offsets[0];
-auto &blas_b_offset = blas_offsets[1];
-auto &blas_c_offset = blas_offsets[2];
-
-std::array<int, 3> blas_strides = {1, 1, 1};
-auto &blas_a_stride = blas_strides[0];
-auto &blas_b_stride = blas_strides[1];
-auto &blas_c_stride = blas_strides[2];
-
-std::array<double, 2> blas_alpha_re_im = {M_PI, M_E};
-std::array<double, 2> blas_beta_re_im = {M_LN2, M_LN10};
 int blas_batch = 16;
-int blas_inv_mat_size = 128;
+
+QudaBLASOperation blas_gemm_trans_a = QUDA_BLAS_OP_N;
+QudaBLASOperation blas_gemm_trans_b = QUDA_BLAS_OP_N;
+std::array<int, 3> blas_gemm_mnk = {64, 64, 64};
+std::array<int, 3> blas_gemm_leading_dims = {128, 128, 128};
+std::array<int, 3> blas_gemm_offsets = {0, 0, 0};
+std::array<int, 3> blas_gemm_strides = {1, 1, 1};
+std::array<double, 2> blas_gemm_alpha_re_im = {M_PI, M_E};
+std::array<double, 2> blas_gemm_beta_re_im = {M_LN2, M_LN10};
+
+int blas_lu_inv_offset = 0;
+int blas_lu_inv_stride = 1;
+int blas_lu_inv_mat_size = 128;
 
 namespace quda
 {
@@ -66,27 +53,27 @@ void display_test_info(QudaBLASParam &param)
 
 void setBLASParam(QudaBLASParam &blas_param)
 {
-  blas_param.trans_a = blas_trans_a;
-  blas_param.trans_b = blas_trans_b;
-  blas_param.m = blas_mnk[0];
-  blas_param.n = blas_mnk[1];
-  blas_param.k = blas_mnk[2];
-  blas_param.lda = blas_leading_dims[0];
-  blas_param.ldb = blas_leading_dims[1];
-  blas_param.ldc = blas_leading_dims[2];
-  blas_param.a_offset = blas_offsets[0];
-  blas_param.b_offset = blas_offsets[1];
-  blas_param.c_offset = blas_offsets[2];
-  blas_param.a_stride = blas_strides[0];
-  blas_param.b_stride = blas_strides[1];
-  blas_param.c_stride = blas_strides[2];
-  memcpy(&blas_param.alpha, blas_alpha_re_im.data(), sizeof(__complex__ double));
-  memcpy(&blas_param.beta, blas_beta_re_im.data(), sizeof(__complex__ double));
+  blas_param.trans_a = blas_gemm_trans_a;
+  blas_param.trans_b = blas_gemm_trans_b;
+  blas_param.m = blas_gemm_mnk[0];
+  blas_param.n = blas_gemm_mnk[1];
+  blas_param.k = blas_gemm_mnk[2];
+  blas_param.lda = blas_gemm_leading_dims[0];
+  blas_param.ldb = blas_gemm_leading_dims[1];
+  blas_param.ldc = blas_gemm_leading_dims[2];
+  blas_param.a_offset = blas_gemm_offsets[0];
+  blas_param.b_offset = blas_gemm_offsets[1];
+  blas_param.c_offset = blas_gemm_offsets[2];
+  blas_param.a_stride = blas_gemm_strides[0];
+  blas_param.b_stride = blas_gemm_strides[1];
+  blas_param.c_stride = blas_gemm_strides[2];
+  memcpy(&blas_param.alpha, blas_gemm_alpha_re_im.data(), sizeof(__complex__ double));
+  memcpy(&blas_param.beta, blas_gemm_beta_re_im.data(), sizeof(__complex__ double));
   blas_param.data_order = blas_data_order;
   blas_param.data_type = blas_data_type;
   blas_param.batch_count = blas_batch;
   blas_param.blas_type = blas_test_type;
-  blas_param.inv_mat_size = blas_inv_mat_size;
+  blas_param.inv_mat_size = blas_lu_inv_mat_size;
 }
 
 double gemm_test(test_t test_param)
@@ -283,21 +270,19 @@ double lu_inv_test(test_t test_param)
 
   // Sanity checks on parameters
   //-------------------------------------------------------------------------
+  // Leading dims are irrelevant for LU inversions as matrices must be square
+
   // If the user passes a negative stride, we error out as this has no meaning.
-  int min_stride = std::min(std::min(blas_param.a_stride, blas_param.b_stride), blas_param.c_stride);
+  int min_stride = blas_param.inv_stride;
   if (min_stride < 0) {
-    errorQuda("BLAS strides must be positive or zero: a_stride=%d, b_stride=%d, c_stride=%d", blas_param.a_stride,
-              blas_param.b_stride, blas_param.c_stride);
+    errorQuda("BLAS strides must be positive or zero: inv_stride=%d", blas_param.inv_stride);
   }
-
+  
   // If the user passes a negative offset, we error out as this has no meaning.
-  int min_offset = std::min(std::min(blas_param.a_offset, blas_param.b_offset), blas_param.c_offset);
+  int min_offset = blas_param.inv_offset;
   if (min_offset < 0) {
-    errorQuda("BLAS offsets must be positive or zero: a_offset=%d, b_offset=%d, c_offset=%d", blas_param.a_offset,
-              blas_param.b_offset, blas_param.c_offset);
+    errorQuda("BLAS offsets must be positive or zero: inv_offset=%d", blas_param.inv_offset);
   }
-
-  // Leading dims are irrelevant for LU inversions
   
   // If the batch value is non-positve, we error out
   if (blas_param.batch_count <= 0) { errorQuda("Batches must be positive: batches=%d", blas_param.batch_count); }
@@ -309,7 +294,7 @@ double lu_inv_test(test_t test_param)
   // If the user passes non-zero offsets, add one extra
   // matrix to the test data.
   int batches_extra = 0;
-  if (blas_param.a_offset + blas_param.b_offset + blas_param.c_offset > 0) { batches_extra++; }
+  if (blas_param.inv_offset > 0) { batches_extra++; }
   int batches = blas_param.batch_count + batches_extra;
   uint64_t array_size = blas_param.inv_mat_size * blas_param.inv_mat_size;
 
@@ -382,40 +367,44 @@ void add_blas_interface_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup
     ->add_option(
-      "--blas-trans-a", blas_trans_a,
+      "--blas-gemm-trans-a", blas_gemm_trans_a,
       "Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
     ->transform(CLI::QUDACheckedTransformer(blas_op_map));
 
   opgroup
     ->add_option(
-      "--blas-trans-b", blas_trans_b,
+      "--blas-gemm-trans-b", blas_gemm_trans_b,
       "Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
     ->transform(CLI::QUDACheckedTransformer(blas_op_map));
 
-  opgroup->add_option("--blas-alpha", blas_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")
+  opgroup->add_option("--blas-gemm-alpha", blas_gemm_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")
     ->expected(2);
 
-  opgroup->add_option("--blas-beta", blas_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")
+  opgroup->add_option("--blas-gemm-beta", blas_gemm_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")
     ->expected(2);
 
   opgroup
-    ->add_option("--blas-mnk", blas_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")
+    ->add_option("--blas-gemm-mnk", blas_gemm_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")
     ->expected(3);
 
   opgroup
-    ->add_option("--blas-leading-dims", blas_leading_dims,
+    ->add_option("--blas-gemm-leading-dims", blas_gemm_leading_dims,
                  "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128) ")
     ->expected(3);
 
-  opgroup->add_option("--blas-offsets", blas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")
+  opgroup->add_option("--blas-gemm-offsets", blas_gemm_offsets, "Set the offsets for GEMM matrices A, B, and C (default 0 0 0)")
     ->expected(3);
 
-  opgroup->add_option("--blas-strides", blas_strides, "Set the strides for matrices A, B, and C (default 1 1 1)")
+  opgroup->add_option("--blas-gemm-strides", blas_gemm_strides, "Set the strides for GEMM matrices A, B, and C (default 1 1 1)")
     ->expected(3);
 
+  opgroup->add_option("--blas-lu-inv-offset", blas_lu_inv_offset, "Set the offset for LU inversion array (default 0)");
+
+  opgroup->add_option("--blas-lu-inv-stride", blas_lu_inv_stride, "Set the stride for LU inversion array (default 1)");
+  
   opgroup->add_option("--blas-batch", blas_batch, "Set the number of batches for GEMM or LU inversion (default 16)");
 
-  opgroup->add_option("--blas-inv-mat-size", blas_inv_mat_size,
+  opgroup->add_option("--blas-lu-inv-mat-size", blas_lu_inv_mat_size,
                       "Set the size of the square matrix to invert via LU (default 128)");
 }
 
