@@ -1,7 +1,7 @@
 #pragma once
 
 #include <color_spinor_field_order.h>
-#include <shared_memory_cache_helper.cuh>
+#include <shared_memory_cache_helper.h>
 #include <math_helper.cuh>
 #include <index_helper.cuh>
 #include <kernel.h>
