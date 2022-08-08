@@ -91,7 +91,8 @@ namespace quda
          */
         if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS_PRE) {
           constexpr bool sync = false;
-          out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity, 0, s, active);
+          out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity, 0, s,
+                                                                           active);
         }
       }
 
@@ -132,8 +133,8 @@ namespace quda
           constexpr bool sync = true;
           constexpr bool this_dagger = true;
           // Then we apply the second m5inv-dag
-          out
-            = variableInv<sync, this_dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s, complete && active);
+          out = variableInv<sync, this_dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0,
+                                                                                         s, complete && active);
         }
 
       } else if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS
@@ -204,7 +205,8 @@ namespace quda
                                                                                             0, s, complete && active);
             // Apply the m5pre.
             constexpr bool sync_m5pre = true;
-            out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s, complete && active);
+            out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s,
+                                                                                   complete && active);
           }
 
           /******
@@ -213,7 +215,8 @@ namespace quda
           if (Arg::dslash5_type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
             // Apply the m5pre.
             constexpr bool sync_m5pre = false;
-            out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s, complete && active);
+            out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s,
+                                                                                   complete && active);
             // Apply the m5inv.
             constexpr bool sync_m5inv = true;
             out = variableInv<sync_m5inv, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity,

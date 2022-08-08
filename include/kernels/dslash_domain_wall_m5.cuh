@@ -393,7 +393,8 @@ namespace quda
       in the cache.sync(), and return the input vector.
   */
   template <bool sync, bool dagger, bool shared, typename Vector, typename Arg>
-  __device__ __host__ inline Vector constantInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_, bool active = true)
+  __device__ __host__ inline Vector constantInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_,
+                                                bool active = true)
   {
     using real = typename Arg::real;
     const auto k = arg.kappa;
@@ -458,7 +459,8 @@ namespace quda
       in the cache.sync(), and return the input vector.
   */
   template <bool sync, bool dagger, bool shared, typename Vector, typename Arg>
-  __device__ __host__ inline Vector variableInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_, bool active = true)
+  __device__ __host__ inline Vector variableInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_,
+                                                bool active = true)
   {
     constexpr int nSpin = 4;
     using real = typename Arg::real;
