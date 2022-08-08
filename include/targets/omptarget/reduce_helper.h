@@ -22,7 +22,7 @@ namespace quda
      parameter struct as an explicit kernel argument or from constant
      memory
    */
-  template <typename T, bool use_kernel_arg = true> struct ReduceArg : kernel_param<use_kernel_arg> {
+  template <typename T, use_kernel_arg_p use_kernel_arg = use_kernel_arg_yes> struct ReduceArg : kernel_param<use_kernel_arg> {
     static constexpr ThreadsSync requires_threads_sync = ThreadsSyncAll;
     using reduce_t = T;
 
