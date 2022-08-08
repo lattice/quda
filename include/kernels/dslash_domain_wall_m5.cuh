@@ -207,6 +207,17 @@ namespace quda
     }
   };
 
+  /**
+     @brief Apply the D5 operator at given site
+     @param[in] arg Argument struct containing any meta data and accessors
+     @param[in] in The input vector
+     @param[in] parity Parity we are on
+     @param[in] x_b Checkerboarded 4-d space-time index
+     @param[in] s Ls dimension coordinate
+     @param[in] active Whether this specific thread is considered active for
+      the calculation. If active == false the thread will still participate
+      in the cache.sync(), and return the input vector.
+  */
   template <bool sync, bool dagger, bool shared, class Vector, class Arg, Dslash5Type type = Arg::type>
   __device__ __host__ inline Vector d5(const Arg &arg, const Vector &in, int parity, int x_cb, int s, bool active = true)
   {
@@ -373,12 +384,16 @@ namespace quda
      store the input field acroos the Ls dimension to minimize global
      memory reads.
      @param[in] arg Argument struct containing any meta data and accessors
+     @param[in] in The input vector
      @param[in] parity Parity we are on
      @param[in] x_b Checkerboarded 4-d space-time index
      @param[in] s_ Ls dimension coordinate
+     @param[in] active Whether this specific thread is considered active for
+      the calculation. If active == false the thread will still participate
+      in the cache.sync(), and return the input vector.
   */
   template <bool sync, bool dagger, bool shared, typename Vector, typename Arg>
-  __device__ __host__ inline Vector constantInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_)
+  __device__ __host__ inline Vector constantInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_, bool active = true)
   {
     using real = typename Arg::real;
     const auto k = arg.kappa;
@@ -389,29 +404,33 @@ namespace quda
     if (shared) {
       // cache.save(arg.in(s_ * arg.volume_4d_cb + x_cb, parity));
       if (sync) { cache.sync(); }
-      cache.save(in);
+      if (active) { cache.save(in); }
       cache.sync();
     }
 
     Vector out;
 
-    for (int s = 0; s < arg.Ls; s++) {
+    if (active) {
+      for (int s = 0; s < arg.Ls; s++) {
 
-      Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
+        Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
 
-      {
-        int exp = s_ < s ? arg.Ls - s + s_ : s_ - s;
-        real factorR = inv * fpow(k, exp) * (s_ < s ? -arg.m_f : static_cast<real>(1.0));
-        constexpr int proj_dir = dagger ? -1 : +1;
-        out += factorR * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
+        {
+          int exp = s_ < s ? arg.Ls - s + s_ : s_ - s;
+          real factorR = inv * fpow(k, exp) * (s_ < s ? -arg.m_f : static_cast<real>(1.0));
+          constexpr int proj_dir = dagger ? -1 : +1;
+          out += factorR * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
+        }
+
+        {
+          int exp = s_ > s ? arg.Ls - s_ + s : s - s_;
+          real factorL = inv * fpow(k, exp) * (s_ > s ? -arg.m_f : static_cast<real>(1.0));
+          constexpr int proj_dir = dagger ? +1 : -1;
+          out += factorL * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
+        }
       }
-
-      {
-        int exp = s_ > s ? arg.Ls - s_ + s : s - s_;
-        real factorL = inv * fpow(k, exp) * (s_ > s ? -arg.m_f : static_cast<real>(1.0));
-        constexpr int proj_dir = dagger ? +1 : -1;
-        out += factorL * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
-      }
+    } else {
+      out = in;
     }
 
     return out;
@@ -430,9 +449,13 @@ namespace quda
      fashion.
 
      @param[in] arg Argument struct containing any meta data and accessors
+     @param[in] in The input vector
      @param[in] parity Parity we are on
      @param[in] x_b Checkerboarded 4-d space-time index
      @param[in] s_ Ls dimension coordinate
+     @param[in] active Whether this specific thread is considered active for
+      the calculation. If active == false the thread will still participate
+      in the cache.sync(), and return the input vector.
   */
   template <bool sync, bool dagger, bool shared, typename Vector, typename Arg>
   __device__ __host__ inline Vector variableInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_, bool active = true)
