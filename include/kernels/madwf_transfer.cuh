@@ -2,7 +2,7 @@
 
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
-#include <shared_memory_cache_helper.cuh>
+#include <shared_memory_cache_helper.h>
 #include <madwf_transfer.h>
 #include <madwf_ml.h>
 
