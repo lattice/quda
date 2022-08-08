@@ -2,7 +2,7 @@
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <array.h>
-#include <shared_memory_cache_helper.cuh>
+#include <shared_memory_cache_helper.h>
 #include <kernel.h>
 #include <warp_collective.h>
 

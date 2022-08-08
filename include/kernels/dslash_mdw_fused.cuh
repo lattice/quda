@@ -3,7 +3,7 @@
 #include <mdw_dslash5_tensor_core.cuh>
 #endif
 #include <kernel.h>
-#include <shared_memory_cache_helper.cuh>
+#include <shared_memory_cache_helper.h>
 
 namespace quda {
 

@@ -4,7 +4,7 @@
 #include <quda_matrix.h>
 #include <index_helper.cuh>
 #include <kernel.h>
-#include <shared_memory_cache_helper.cuh>
+#include <thread_array.h>
 
 namespace quda {
 
