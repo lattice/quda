@@ -9,12 +9,13 @@
 #include <dslash_quda.h>
 #include <dslash_shmem.h>
 #include <shmem_pack_helper.cuh>
+#include <kernel_helper.h>
 
 #if defined(_NVHPC_CUDA) || defined(QUDA_TARGET_OMPTARGET)
 #include <constant_kernel_arg.h>
-constexpr bool use_kernel_arg = false;
+constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_no;
 #else
-constexpr bool use_kernel_arg = true;
+constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_yes;
 #endif
 
 #include <kernel.h>

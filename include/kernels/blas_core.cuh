@@ -45,7 +45,7 @@ namespace quda
         f(f),
         nParity(nParity)
       {
-        if constexpr (std::is_same_v<Functor, caxpyxmazMR_<real>>){
+        if constexpr (std::is_same_v<Functor, caxpyxmazMR_<real>>) {
           static_assert(device::use_kernel_arg<BlasArg>(), "This arg must be passed as a kernel argument");
         }
       }
@@ -59,7 +59,9 @@ namespace quda
       constexpr Blas_(const Arg &arg) : arg(const_cast<Arg&>(arg))
       {
         // this assertion ensures it's safe to make the arg non-const (required for caxpyxmazMR)
-        static_assert(Arg::use_kernel_arg, "This functor must be passed as a kernel argument");
+        // This catch-all assertion is lenient and only checks the struct member.
+        // BlasArg above uses a stringent assertion that matches Functor.
+        static_assert(Arg::default_use_kernel_arg(), "This functor must be passed as a kernel argument");
       }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
@@ -90,7 +92,7 @@ namespace quda
        Base class from which all blas functors should derive
      */
     struct BlasFunctor {
-      static constexpr int use_kernel_arg = true;
+      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_yes;
       //! pre-computation routine before the main loop
       __device__ __host__ void init() const { ; }
     };
@@ -369,7 +371,7 @@ namespace quda
        Second performs the operator x[i] -= a*z[i]
     */
     template <typename real> struct caxpyxmazMR_ {
-      static constexpr int use_kernel_arg = 2;
+      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_always;
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
       complex<real> a;
