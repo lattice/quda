@@ -92,7 +92,7 @@ namespace quda
        Base class from which all blas functors should derive
      */
     struct BlasFunctor {
-      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_yes;
+      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE;
       //! pre-computation routine before the main loop
       __device__ __host__ void init() const { ; }
     };
@@ -371,7 +371,7 @@ namespace quda
        Second performs the operator x[i] -= a*z[i]
     */
     template <typename real> struct caxpyxmazMR_ {
-      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_always;
+      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::ALWAYS;
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
       complex<real> a;

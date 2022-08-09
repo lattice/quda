@@ -112,7 +112,7 @@ namespace quda
     */
     template <typename reduce_t_, bool site_unroll_ = false>
     struct ReduceFunctor {
-      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_yes;
+      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE;
       using reduce_t = reduce_t_;
       static constexpr bool site_unroll = site_unroll_;
 
@@ -454,7 +454,7 @@ namespace quda
     */
     template <typename real_reduce_t, typename real>
     struct HeavyQuarkResidualNorm_ {
-      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_always;
+      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::ALWAYS;
       using reduce_t = array<real_reduce_t, 3>;
       static constexpr bool site_unroll = true;
 
@@ -500,7 +500,7 @@ namespace quda
     */
     template <typename real_reduce_t, typename real>
     struct xpyHeavyQuarkResidualNorm_ {
-      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_always;
+      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::ALWAYS;
       using reduce_t = array<real_reduce_t, 3>;
       static constexpr bool site_unroll = true;
 
