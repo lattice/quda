@@ -9,7 +9,6 @@ protected:
 
 public:
   BLASTest() : param(GetParam()) { }
-  // virtual ~BLASTest() { }
 };
 
 bool skip_test(test_t param)
@@ -74,10 +73,10 @@ TEST_P(BLASTest, verify)
     auto deviation_gemm = gemm_test(param);
     decltype(deviation_gemm) tol_gemm;
     switch (data_type) {
-    case 0:
-    case 2: tol_gemm = 10 * std::numeric_limits<float>::epsilon(); break;
-    case 1:
-    case 3: tol_gemm = 10 * std::numeric_limits<double>::epsilon(); break;
+    case QUDA_BLAS_DATATYPE_S:
+    case QUDA_BLAS_DATATYPE_C: tol_gemm = 10 * std::numeric_limits<float>::epsilon(); break;
+    case QUDA_BLAS_DATATYPE_D:
+    case QUDA_BLAS_DATATYPE_Z: tol_gemm = 10 * std::numeric_limits<double>::epsilon(); break;
     default: errorQuda("Unexpected BLAS data type %d", data_type);
     }
     EXPECT_LE(deviation_gemm, tol_gemm) << "CPU and CUDA GEMM implementations do not agree";
@@ -87,13 +86,13 @@ TEST_P(BLASTest, verify)
     auto deviation_lu_inv = lu_inv_test(param);
     decltype(deviation_lu_inv) tol_lu_inv;
     // We allow a factor of 5000 (500x more than the gemm tolerance factor)
-    // due to variations in algorithmic implemntation, order of arithmetic
+    // due to variations in algorithmic implementation, order of arithmetic
     // operations, and possible near singular eigenvalues or degeneracies.
     switch (data_type) {
-    case 2: tol_lu_inv = 5000 * std::numeric_limits<float>::epsilon(); break;
-    case 3: tol_lu_inv = 5000 * std::numeric_limits<double>::epsilon(); break;
-    case 0:
-    case 1:
+    case QUDA_BLAS_DATATYPE_C: tol_lu_inv = 5000 * std::numeric_limits<float>::epsilon(); break;
+    case QUDA_BLAS_DATATYPE_Z: tol_lu_inv = 5000 * std::numeric_limits<double>::epsilon(); break;
+    case QUDA_BLAS_DATATYPE_S:
+    case QUDA_BLAS_DATATYPE_D:
     default: errorQuda("Unexpected BLAS data type %d", data_type);
     }
     EXPECT_LE(deviation_lu_inv, tol_lu_inv) << "CPU and CUDA LU Inversion implementations do not agree";
