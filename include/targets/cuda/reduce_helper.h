@@ -40,7 +40,7 @@ namespace quda
      parameter struct as an explicit kernel argument or from constant
      memory
    */
-  template <typename T, use_kernel_arg_p use_kernel_arg = use_kernel_arg_yes> struct ReduceArg : kernel_param<use_kernel_arg> {
+  template <typename T, use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE> struct ReduceArg : kernel_param<use_kernel_arg> {
     using reduce_t = T;
 
     template <typename Arg, typename I> friend __device__ void write_result(Arg &, const I &, const int);

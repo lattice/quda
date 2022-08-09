@@ -12,13 +12,9 @@ namespace quda
     kernel_t(const void *func, const char *name) : func(func), name(name) { }
   };
 
-  enum use_kernel_arg_p {
-    use_kernel_arg_no,
-    use_kernel_arg_yes,
-    use_kernel_arg_always
-  };
+  enum class use_kernel_arg_p { FALSE, TRUE, ALWAYS };
 
-  template <use_kernel_arg_p use_kernel_arg_ = use_kernel_arg_yes> struct kernel_param {
+  template <use_kernel_arg_p use_kernel_arg_ = use_kernel_arg_p::TRUE> struct kernel_param {
     static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_;
     dim3 threads;          /** number of active threads required */
     int comms_rank;        /** per process value of comm_rank() */
@@ -43,7 +39,7 @@ namespace quda
     */
     static constexpr bool default_use_kernel_arg()
     {
-      return use_kernel_arg != use_kernel_arg_no;
+      return use_kernel_arg != use_kernel_arg_p::FALSE;
     }
 
     /**
@@ -52,7 +48,7 @@ namespace quda
     */
     static constexpr bool always_use_kernel_arg()
     {
-      return use_kernel_arg == use_kernel_arg_always;
+      return use_kernel_arg == use_kernel_arg_p::ALWAYS;
     }
   };
 
