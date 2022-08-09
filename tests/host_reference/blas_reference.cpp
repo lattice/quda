@@ -366,8 +366,8 @@ double blasLUInvEigenVerify(void *ref_array, void *dev_inv_array, uint64_t array
     double relative_deviation = deviation / ref_inv.norm();
     max_relative_deviation = std::max(max_relative_deviation, relative_deviation);
 
-    printfQuda("batch %d: (ref_inv - dev_inv) Frobenius norm = %e. Relative deviation = %e\n", batch,
-               deviation, relative_deviation);
+    printfQuda("batch %d: (ref_inv - dev_inv) Frobenius norm = %e. Relative deviation = %e\n", batch, deviation,
+               relative_deviation);
 
     offset += array_size;
   }
