@@ -36,7 +36,6 @@
 namespace quda {
 
   // this is the maximum number of colors for which we support block-float format
-  constexpr int max_block_float_nc = 96;
 
   template <typename store_t, typename ghost_store_t, QudaFieldOrder order, int nSpin, int nColor>
   class GhostPack : public TunableKernel3D {
@@ -48,7 +47,7 @@ namespace quda {
     static constexpr bool block_float = sizeof(store_t) == QUDA_SINGLE_PRECISION && isFixed<ghost_store_t>::value;
     size_t work_items;
     int shmem;
-
+    static constexpr int get_max_block_float_nc(){return 96;}
     unsigned int sharedBytesPerBlock(const TuneParam &) const
     {
       if (block_float) {
@@ -144,7 +143,7 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       auto tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch_<(!block_float || nColor <= max_block_float_nc)>(tp, stream);
+      launch_<(!block_float || nColor <= get_max_block_float_nc())>(tp, stream);
     }
 
     int blockStep() const { return block_float ? 2 : TunableKernel3D::blockStep(); }
