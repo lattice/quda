@@ -4,6 +4,11 @@ target_include_directories(quda_test SYSTEM PUBLIC  googletest/include googletes
 target_link_libraries(quda_test PUBLIC Eigen)
 target_link_libraries(quda_test PUBLIC QUDA::quda)
 set_target_properties(quda_test PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_options(
+  quda_test PUBLIC
+  $<IF:$<CONFIG:RELEASE>,w,-Wall -Wextra>
+  $<$<CONFIG:STRICT>:-Werror>
+)
 add_subdirectory(utils)
 add_subdirectory(host_reference)
 enable_language(Fortran)

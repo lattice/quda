@@ -137,26 +137,30 @@ namespace quda {
 #endif
 
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
-  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-                const int *fine_to_coarse, const int *coarse_to_fine, int parity)
+  std::enable_if_t<enabled<fineSpin, fineColor, coarseSpin, coarseColor>::value, void>
+  Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+           const int *fine_to_coarse, const int *coarse_to_fine, int parity)
   {
-    if constexpr (enabled<fineSpin, fineColor, coarseSpin, coarseColor>::value) {
-      if (v.Precision() == QUDA_HALF_PRECISION) {
+    if (v.Precision() == QUDA_HALF_PRECISION) {
         if constexpr (is_enabled<QUDA_HALF_PRECISION>()) {
-          RestrictLaunch<Float, short, fineSpin, fineColor, coarseSpin, coarseColor>
-            restrictor(out, in, v, fine_to_coarse, coarse_to_fine, parity);
-        } else {
+            RestrictLaunch<Float, short, fineSpin, fineColor, coarseSpin, coarseColor>
+              restrictor(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+          } else {
           errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
         }
-      } else if (v.Precision() == in.Precision()) {
-        RestrictLaunch<Float, Float, fineSpin, fineColor, coarseSpin, coarseColor>
-          restrictor(out, in, v, fine_to_coarse, coarse_to_fine, parity);
-      } else {
-        errorQuda("Unsupported V precision %d", v.Precision());
-      }
+    } else if (v.Precision() == in.Precision()) {
+      RestrictLaunch<Float, Float, fineSpin, fineColor, coarseSpin, coarseColor>
+        restrictor(out, in, v, fine_to_coarse, coarse_to_fine, parity);
     } else {
-      errorQuda("Not enabled");
+      errorQuda("Unsupported V precision %d", v.Precision());
     }
+  }
+
+  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
+  std::enable_if_t<!enabled<fineSpin, fineColor, coarseSpin, coarseColor>::value, void>
+  Restrict(ColorSpinorField &, const ColorSpinorField &, const ColorSpinorField &, const int *, const int *, int)
+  {
+    errorQuda("Not enabled");
   }
 
   template <typename Float>
