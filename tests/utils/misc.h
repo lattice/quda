@@ -24,6 +24,7 @@ const char *get_memory_type_str(QudaMemoryType type);
 const char *get_contract_str(QudaContractType type);
 const char *get_gauge_smear_str(QudaGaugeSmearType type);
 std::string get_dilution_type_str(QudaDilutionType type);
+const char *get_blas_type_str(QudaBLASType type);
 
 #define XUP 0
 #define YUP 1
