@@ -202,8 +202,6 @@ namespace quda {
     if (!gpu_setup) {
 
       dirac->createCoarseOp(*Y_h, *X_h, *transfer, kappa, mass, Mu(), MuFactor(), AllowTruncation());
-      // save the intermediate tunecache after the UV and VUV tune
-      saveTuneCache();
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to build the preconditioned coarse clover\n");
 
       createYhat(gpu_setup);
@@ -233,9 +231,6 @@ namespace quda {
 
         dirac->createCoarseOp(*Y_order, *X_order, *transfer, kappa, mass, Mu(), MuFactor(), AllowTruncation());
 
-        // save the intermediate tunecache after the UV and VUV tune
-        saveTuneCache();
-
         X_d->copy(*X_order);
 
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to build the preconditioned coarse clover\n");
@@ -261,9 +256,6 @@ namespace quda {
       } else {
         dirac->createCoarseOp(*Y_d, *X_d, *transfer, kappa, mass, Mu(), MuFactor(), AllowTruncation());
 
-        // save the intermediate tunecache after the UV and VUV tune
-        saveTuneCache();
-
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to build the preconditioned coarse clover\n");
 
         createYhat(gpu_setup);
@@ -276,9 +268,6 @@ namespace quda {
     }
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished creating the preconditioned coarse op\n");
-
-    // save the intermediate tunecache after the Yhat tune
-    saveTuneCache();
 
     if (gpu_setup) {
       enable_gpu = true;

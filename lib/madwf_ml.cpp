@@ -105,8 +105,6 @@ namespace quda
     profile.TPSTART(QUDA_PROFILE_INIT);
     for (auto pb : B) { blas::ax(5e3 / sqrt(blas::norm2(*pb)), *pb); }
 
-    saveTuneCache();
-
     commGlobalReductionPush(false);
 
     ColorSpinorField chi(csParam);
