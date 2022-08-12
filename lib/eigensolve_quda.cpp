@@ -25,9 +25,7 @@ namespace quda
   EigenSolver::EigenSolver(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
     mat(mat),
     eig_param(eig_param),
-    profile(profile),
-    tmp1(nullptr),
-    tmp2(nullptr)
+    profile(profile)
   {
     bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
     if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
@@ -151,19 +149,12 @@ namespace quda
   //------------------------------------------------------------------------------
   void EigenSolver::prepareInitialGuess(std::vector<ColorSpinorField *> &kSpace)
   {
-    if (kSpace[0]->Location() == QUDA_CPU_FIELD_LOCATION) {
-      for (int b = 0; b < block_size; b++) {
-        if (sqrt(blas::norm2(*kSpace[b])) == 0.0) { kSpace[b]->Source(QUDA_RANDOM_SOURCE); }
-      }
-    } else {
-      // Use 0th vector to extract meta data for the RNG.
-      RNG *rng = new RNG(*kSpace[0], 1234);
-      for (int b = 0; b < block_size; b++) {
-        // If the spinor contains initial data from the user
-        // preserve it, else populate with rands.
-        if (sqrt(blas::norm2(*kSpace[b])) == 0.0) { spinorNoise(*kSpace[b], *rng, QUDA_NOISE_UNIFORM); }
-      }
-      delete rng;
+    // Use 0th vector to extract meta data for the RNG.
+    RNG rng(*kSpace[0], 1234);
+    for (int b = 0; b < block_size; b++) {
+      // If the spinor contains initial data from the user
+      // preserve it, else populate with rands.
+      if (sqrt(blas::norm2(*kSpace[b])) == 0.0) { spinorNoise(*kSpace[b], rng, QUDA_NOISE_UNIFORM); }
     }
 
     bool orthed = false;
@@ -298,9 +289,6 @@ namespace quda
       for (unsigned int i = 0; i < kSpace.size() && save_prec < prec; i++) delete vecs_ptr[i];
     }
 
-    // Save TRLM tuning
-    saveTuneCache();
-
     mat.flops();
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {
@@ -310,28 +298,15 @@ namespace quda
     }
   }
 
-  void EigenSolver::matVec(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in)
-  {
-    if (!tmp1 || !tmp2) {
-      ColorSpinorParam param(in);
-      if (!tmp1) tmp1 = new ColorSpinorField(param);
-      if (!tmp2) tmp2 = new ColorSpinorField(param);
-    }
-    mat(out, in, *tmp1, *tmp2);
-
-    // Save matrix * vector tuning
-    saveTuneCache();
-  }
-
   void EigenSolver::chebyOp(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in)
   {
-    // Just do a simple matVec if no poly acc is requested
+    // Just do a simple mat-vec if no poly acc is requested
     if (!eig_param->use_poly_acc) {
-      matVec(mat, out, in);
+      mat(out, in);
       return;
     }
 
-    if (eig_param->poly_deg == 0) { errorQuda("Polynomial acceleration requested with zero polynomial degree"); }
+    if (eig_param->poly_deg == 0) errorQuda("Polynomial acceleration requested with zero polynomial degree");
 
     // Compute the polynomial accelerated operator.
     double a = eig_param->a_min;
@@ -346,7 +321,7 @@ namespace quda
 
     // out = d2 * in + d1 * out
     // C_1(x) = x
-    matVec(mat, out, in);
+    mat(out, in);
     blas::caxpby(d2, const_cast<ColorSpinorField &>(in), d1, out);
     if (eig_param->poly_deg == 1) return;
 
@@ -354,8 +329,8 @@ namespace quda
     // C_1 is the current 'out' vector.
 
     // Clone 'in' to two temporary vectors.
-    auto tmp1 = std::make_unique<ColorSpinorField>(in);
-    auto tmp2 = std::make_unique<ColorSpinorField>(out);
+    auto tmp1 = in;
+    auto tmp2 = out;
 
     // Using Chebyshev polynomial recursion relation,
     // C_{m+1}(x) = 2*x*C_{m} - C_{m-1}
@@ -370,31 +345,22 @@ namespace quda
       d2 = -d1 * theta;
       d3 = -sigma * sigma_old;
 
-      // FIXME - we could introduce a fused matVec + blas kernel here, eliminating one temporary
+      // FIXME - we could introduce a fused mat + blas kernel here, eliminating one temporary
       // mat*C_{m}(x)
-      matVec(mat, out, *tmp2);
+      mat(out, tmp2);
 
-      blas::axpbypczw(d3, *tmp1, d2, *tmp2, d1, out, *tmp1);
+      blas::axpbypczw(d3, tmp1, d2, tmp2, d1, out, tmp1);
       std::swap(tmp1, tmp2);
 
       sigma_old = sigma;
     }
-    blas::copy(out, *tmp2);
-
-    // Save Chebyshev tuning
-    saveTuneCache();
+    blas::copy(out, tmp2);
   }
 
   double EigenSolver::estimateChebyOpMax(const DiracMatrix &mat, ColorSpinorField &out, ColorSpinorField &in)
   {
-
-    if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
-      in.Source(QUDA_RANDOM_SOURCE);
-    } else {
-      RNG *rng = new RNG(in, 1234);
-      spinorNoise(in, *rng, QUDA_NOISE_UNIFORM);
-      delete rng;
-    }
+    RNG rng(in, 1234);
+    spinorNoise(in, rng, QUDA_NOISE_UNIFORM);
 
     ColorSpinorField *in_ptr = &in;
     ColorSpinorField *out_ptr = &out;
@@ -406,15 +372,12 @@ namespace quda
         norm = sqrt(blas::norm2(*in_ptr));
         blas::ax(1.0 / norm, *in_ptr);
       }
-      matVec(mat, *out_ptr, *in_ptr);
+      mat(*out_ptr, *in_ptr);
       std::swap(out_ptr, in_ptr);
     }
 
     // Compute spectral radius estimate
     double result = blas::reDotProduct(*out_ptr, *in_ptr);
-
-    // Save Chebyshev Max tuning
-    saveTuneCache();
 
     // Increase final result by 10% for safety
     return result * 1.10;
@@ -490,9 +453,6 @@ namespace quda
     // Block orthogonalise
     for (int i = 0; i < array_size; i++) s[i] *= -1.0;
     blas::caxpy(s.data(), vecs_ptr, rvecs);
-
-    // Save orthonormalisation tuning
-    saveTuneCache();
   }
 
   void EigenSolver::permuteVecs(std::vector<ColorSpinorField *> &kSpace, int *mat, int size)
@@ -554,7 +514,7 @@ namespace quda
       kSpace_ptr.push_back(kSpace[k]);
     }
 
-    double *batch_array = (double *)safe_malloc((block_i_rank * block_j_rank) * sizeof(double));
+    std::vector<double> batch_array(block_i_rank * block_j_rank);
     // Populate batch array (COLUMN major -> ROW major)
     for (int j = j_range.first; j < j_range.second; j++) {
       for (int i = i_range.first; i < i_range.second; i++) {
@@ -564,15 +524,11 @@ namespace quda
       }
     }
     switch (b_type) {
-    case PENCIL: blas::axpy(batch_array, vecs_ptr, kSpace_ptr); break;
-    case LOWER_TRI: blas::axpy_L(batch_array, vecs_ptr, kSpace_ptr); break;
-    case UPPER_TRI: blas::axpy_U(batch_array, vecs_ptr, kSpace_ptr); break;
+    case PENCIL: blas::axpy(batch_array.data(), vecs_ptr, kSpace_ptr); break;
+    case LOWER_TRI: blas::axpy_L(batch_array.data(), vecs_ptr, kSpace_ptr); break;
+    case UPPER_TRI: blas::axpy_U(batch_array.data(), vecs_ptr, kSpace_ptr); break;
     default: errorQuda("Undefined MultiBLAS type in blockRotate");
     }
-    host_free(batch_array);
-
-    // Save Krylov block rotation tuning
-    saveTuneCache();
   }
 
   void EigenSolver::blockReset(std::vector<ColorSpinorField *> &kSpace, int j_start, int j_end, int offset)
@@ -608,7 +564,7 @@ namespace quda
       kSpace_ptr.push_back(kSpace[k]);
     }
 
-    Complex *batch_array = (Complex *)safe_malloc((block_i_rank * block_j_rank) * sizeof(Complex));
+    std::vector<Complex> batch_array(block_i_rank * block_j_rank);
     // Populate batch array (COLUM major -> ROW major)
     for (int j = j_range.first; j < j_range.second; j++) {
       for (int i = i_range.first; i < i_range.second; i++) {
@@ -618,15 +574,11 @@ namespace quda
       }
     }
     switch (b_type) {
-    case PENCIL: blas::caxpy(batch_array, vecs_ptr, kSpace_ptr); break;
-    case LOWER_TRI: blas::caxpy_L(batch_array, vecs_ptr, kSpace_ptr); break;
-    case UPPER_TRI: blas::caxpy_U(batch_array, vecs_ptr, kSpace_ptr); break;
+    case PENCIL: blas::caxpy(batch_array.data(), vecs_ptr, kSpace_ptr); break;
+    case LOWER_TRI: blas::caxpy_L(batch_array.data(), vecs_ptr, kSpace_ptr); break;
+    case UPPER_TRI: blas::caxpy_U(batch_array.data(), vecs_ptr, kSpace_ptr); break;
     default: errorQuda("Undefined MultiBLAS type in blockRotate");
     }
-    host_free(batch_array);
-
-    // Save Krylov block rotation tuning
-    saveTuneCache();
   }
 
   void EigenSolver::computeSVD(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
@@ -670,9 +622,6 @@ namespace quda
       evals[i] = sigma_tmp[i];
       //--------------------------------------------------------------------------
     }
-
-    // Save SVD tuning
-    saveTuneCache();
   }
 
   // Deflate vec, place result in vec_defl
@@ -717,9 +666,6 @@ namespace quda
       s[i] /= evals[i].real();
     }
     blas::caxpy(s.data(), right_vecs, sol);
-
-    // Save SVD deflation tuning
-    saveTuneCache();
   }
 
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
@@ -736,7 +682,7 @@ namespace quda
 
     for (int i = 0; i < size; i++) {
       // r = A * v_i
-      matVec(mat, *temp[0], *evecs[i]);
+      mat(*temp[0], *evecs[i]);
 
       // lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
       evals[i] = blas::cDotProduct(*evecs[i], *temp[0]) / sqrt(blas::norm2(*evecs[i]));
@@ -751,9 +697,6 @@ namespace quda
         printfQuda("Eval[%04d] = (%+.16e,%+.16e) residual = %+.16e\n", i, evals[i].real(), evals[i].imag(), residua[i]);
     }
     delete temp[0];
-
-    // Save Eval tuning
-    saveTuneCache();
   }
 
   // Deflate vec, place result in vec_defl
@@ -792,9 +735,6 @@ namespace quda
     if (!accumulate)
       for (auto &x : sol) blas::zero(*x);
     blas::caxpy(s.data(), eig_vecs, sol);
-
-    // Save Deflation tuning
-    saveTuneCache();
   }
 
   void EigenSolver::loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace,
@@ -1204,9 +1144,4 @@ namespace quda
     }
   }
 
-  EigenSolver::~EigenSolver()
-  {
-    if (tmp1) delete tmp1;
-    if (tmp2) delete tmp2;
-  }
 } // namespace quda

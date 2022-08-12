@@ -54,9 +54,6 @@ namespace quda
     std::vector<ColorSpinorField *> r;
     std::vector<ColorSpinorField *> d_vecs_tmp;
 
-    ColorSpinorField *tmp1;
-    ColorSpinorField *tmp2;
-
     QudaPrecision save_prec;
 
   public:
@@ -70,7 +67,7 @@ namespace quda
     /**
        Destructor for EigenSolver class.
     */
-    virtual ~EigenSolver();
+    virtual ~EigenSolver() = default;
 
     /**
        @return Whether the solver is only for Hermitian systems
@@ -137,15 +134,6 @@ namespace quda
        @param[in] evals The eigenvalue array
     */
     void cleanUpEigensolver(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
-
-    /**
-       @brief Applies the specified matVec operation:
-       M, Mdag, MMdag, MdagM
-       @param[in] mat Matrix operator
-       @param[in] out Output spinor
-       @param[in] in Input spinor
-    */
-    void matVec(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
        @brief Promoted the specified matVec operation:
@@ -290,14 +278,7 @@ namespace quda
     void deflate(ColorSpinorField &sol, const ColorSpinorField &src, const std::vector<ColorSpinorField *> &evecs,
                  const std::vector<Complex> &evals, bool accumulate = false)
     {
-      // FIXME add support for mixed-precison dot product to avoid this copy
-      if (src.Precision() != evecs[0]->Precision() && !tmp1) {
-        ColorSpinorParam param(*evecs[0]);
-        tmp1 = new ColorSpinorField(param);
-      }
-      ColorSpinorField *src_tmp = src.Precision() != evecs[0]->Precision() ? tmp1 : const_cast<ColorSpinorField *>(&src);
-      blas::copy(*src_tmp, src); // no-op if these alias
-      std::vector<ColorSpinorField *> src_ {src_tmp};
+      std::vector<ColorSpinorField *> src_ {&const_cast<ColorSpinorField&>(src)};
       std::vector<ColorSpinorField *> sol_ {&sol};
       deflate(sol_, src_, evecs, evals, accumulate);
     }
@@ -327,14 +308,7 @@ namespace quda
     void deflateSVD(ColorSpinorField &sol, const ColorSpinorField &src, const std::vector<ColorSpinorField *> &evecs,
                     const std::vector<Complex> &evals, bool accumulate = false)
     {
-      // FIXME add support for mixed-precison dot product to avoid this copy
-      if (src.Precision() != evecs[0]->Precision() && !tmp1) {
-        ColorSpinorParam param(*evecs[0]);
-        tmp1 = new ColorSpinorField(param);
-      }
-      ColorSpinorField *src_tmp = src.Precision() != evecs[0]->Precision() ? tmp1 : const_cast<ColorSpinorField *>(&src);
-      blas::copy(*src_tmp, src); // no-op if these alias
-      std::vector<ColorSpinorField *> src_ {src_tmp};
+      std::vector<ColorSpinorField *> src_ {&const_cast<ColorSpinorField&>(src)};
       std::vector<ColorSpinorField *> sol_ {&sol};
       deflateSVD(sol_, src_, evecs, evals, accumulate);
     }
@@ -433,11 +407,6 @@ namespace quda
     TRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
 
     /**
-       @brief Destructor for Thick Restarted Eigensolver class
-    */
-    virtual ~TRLM();
-
-    /**
        @return Whether the solver is only for Hermitian systems
     */
     virtual bool hermitian() { return true; } /** TRLM is only for Hermitian systems */
@@ -446,8 +415,8 @@ namespace quda
     std::vector<double> ritz_mat;
 
     // Tridiagonal/Arrow matrix, fixed size.
-    double *alpha;
-    double *beta;
+    std::vector<double> alpha;
+    std::vector<double> beta;
 
     /**
        @brief Compute eigenpairs
@@ -496,22 +465,17 @@ namespace quda
     */
     BLKTRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
 
-    /**
-       @brief Destructor for Thick Restarted Eigensolver class
-    */
-    virtual ~BLKTRLM();
-
     virtual bool hermitian() { return true; } /** (BLOCK)TRLM is only for Hermitian systems */
 
     // Variable size matrix
     std::vector<Complex> block_ritz_mat;
 
     /** Block Tridiagonal/Arrow matrix, fixed size. */
-    Complex *block_alpha;
-    Complex *block_beta;
+    std::vector<Complex> block_alpha;
+    std::vector<Complex> block_beta;
 
     /** Temp storage used in blockLanczosStep, fixed size. */
-    Complex *jth_block;
+    std::vector<Complex> jth_block;
 
     /** Size of blocks of data in alpha/beta */
     int block_data_length;
@@ -557,9 +521,9 @@ namespace quda
   {
 
   public:
-    Complex **upperHess;
-    Complex **Qmat;
-    Complex **Rmat;
+    std::vector<std::vector<Complex>> upperHess;
+    std::vector<std::vector<Complex>> Qmat;
+    std::vector<std::vector<Complex>> Rmat;
 
     /**
        @brief Constructor for Thick Restarted Eigensolver class
@@ -573,11 +537,6 @@ namespace quda
        @return Whether the solver is only for Hermitian systems
     */
     virtual bool hermitian() { return false; } /** IRAM is for any linear system */
-
-    /**
-       @brief Destructor for Thick Restarted Eigensolver class
-    */
-    virtual ~IRAM();
 
     /**
        @brief Compute eigenpairs
@@ -621,7 +580,7 @@ namespace quda
        @param[in] Q The Q matrix
        @param[in] R The R matrix
     */
-    void qrIteration(Complex **Q, Complex **R);
+    void qrIteration(std::vector<std::vector<Complex>> &Q, std::vector<std::vector<Complex>> &R);
 
     /**
        @brief Reorder the Krylov space and eigenvalues

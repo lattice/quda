@@ -40,28 +40,21 @@ namespace quda
 
     if (block_size == 0) { errorQuda("Block size %d passed to block eigensolver", block_size); }
 
-    int n_blocks = n_kr / block_size;
+    auto n_blocks = n_kr / block_size;
     block_data_length = block_size * block_size;
-    int arrow_mat_array_size = block_data_length * n_blocks;
+    auto arrow_mat_array_size = block_data_length * n_blocks;
     // Tridiagonal/Arrow matrix
-    block_alpha = (Complex *)safe_malloc(arrow_mat_array_size * sizeof(Complex));
-    block_beta = (Complex *)safe_malloc(arrow_mat_array_size * sizeof(Complex));
-    for (int i = 0; i < arrow_mat_array_size; i++) {
-      block_alpha[i] = 0.0;
-      block_beta[i] = 0.0;
-    }
+    block_alpha.resize(arrow_mat_array_size, 0.0);
+    block_beta.resize(arrow_mat_array_size, 0.0);
 
     // Temp storage used in blockLanczosStep
-    jth_block = (Complex *)safe_malloc(block_data_length * sizeof(Complex));
+    jth_block.resize(block_data_length);
 
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
   void BLKTRLM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   {
-    // In case we are deflating an operator, save the tunechache from the inverter
-    saveTuneCache();
-
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
     if (getVerbosity() >= QUDA_VERBOSE) queryPrec(kSpace[0]->Precision());
@@ -215,14 +208,6 @@ namespace quda
     cleanUpEigensolver(kSpace, evals);
   }
 
-  // Destructor
-  BLKTRLM::~BLKTRLM()
-  {
-    host_free(jth_block);
-    host_free(block_alpha);
-    host_free(block_beta);
-  }
-
   // Block Thick Restart Member functions
   //---------------------------------------------------------------------------
   void BLKTRLM::blockLanczosStep(std::vector<ColorSpinorField *> v, int j)
@@ -274,7 +259,7 @@ namespace quda
     vecs_ptr.reserve(block_size);
     for (int b = 0; b < block_size; b++) { vecs_ptr.push_back(v[j + b]); }
     // Block dot products stored in alpha_block.
-    blas::cDotProduct(block_alpha + arrow_offset, vecs_ptr, r);
+    blas::cDotProduct(block_alpha.data() + arrow_offset, vecs_ptr, r);
 
     // Use jth_block to negate alpha data and apply block BLAS.
     // Data is in square hermitian form, no need to switch to ROW major
@@ -286,7 +271,7 @@ namespace quda
     }
 
     // r = r - a_j * v_j
-    blas::caxpy(jth_block, vecs_ptr, r);
+    blas::caxpy(jth_block.data(), vecs_ptr, r);
 
     // Orthogonalise R[0:block_size] against the Krylov space V[0:j + block_size]
     for (int k = 0; k < 1; k++) blockOrthogonalize(v, r, j + block_size);
@@ -334,9 +319,6 @@ namespace quda
     // Prepare next step.
     // v_{j+1} = r
     for (int b = 0; b < block_size; b++) *v[j + block_size + b] = *r[b];
-
-    // Save Lanczos step tuning
-    saveTuneCache();
   }
 
   void BLKTRLM::updateBlockBeta(int k, int arrow_offset)
@@ -475,12 +457,12 @@ namespace quda
     int dim = n_kr - num_locked;
 
     // Multi-BLAS friendly array to store part of Ritz matrix we want
-    Complex *ritz_mat_keep = (Complex *)safe_malloc((dim * iter_keep) * sizeof(Complex));
+    std::vector<Complex> ritz_mat_keep(dim * iter_keep);
     for (int j = 0; j < dim; j++) {
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = block_ritz_mat[i * dim + j]; }
     }
 
-    rotateVecsComplex(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked, profile);
+    rotateVecsComplex(kSpace, ritz_mat_keep.data(), offset, dim, iter_keep, num_locked, profile);
 
     // Update residual vectors
     for (int i = 0; i < block_size; i++) std::swap(kSpace[num_locked + iter_keep + i], kSpace[n_kr + i]);
@@ -517,11 +499,6 @@ namespace quda
         }
       }
     }
-
-    host_free(ritz_mat_keep);
-
-    // Save Krylov rotation tuning
-    saveTuneCache();
   }
 
 } // namespace quda

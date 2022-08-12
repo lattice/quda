@@ -24,12 +24,8 @@ namespace quda
     if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Tridiagonal/Arrow matrix
-    alpha = (double *)safe_malloc(n_kr * sizeof(double));
-    beta = (double *)safe_malloc(n_kr * sizeof(double));
-    for (int i = 0; i < n_kr; i++) {
-      alpha[i] = 0.0;
-      beta[i] = 0.0;
-    }
+    alpha.resize(n_kr, 0.0);
+    beta.resize(n_kr, 0.0);
 
     // Thick restart specific checks
     if (n_kr < n_ev + 6) errorQuda("n_kr=%d must be greater than n_ev+6=%d\n", n_kr, n_ev + 6);
@@ -43,9 +39,6 @@ namespace quda
 
   void TRLM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   {
-    // In case we are deflating an operator, save the tunechache from the inverter
-    saveTuneCache();
-
     // Override any user input for block size.
     block_size = 1;
 
@@ -194,15 +187,6 @@ namespace quda
     cleanUpEigensolver(kSpace, evals);
   }
 
-  // Destructor
-  TRLM::~TRLM()
-  {
-    ritz_mat.clear();
-    ritz_mat.shrink_to_fit();
-    host_free(alpha);
-    host_free(beta);
-  }
-
   // Thick Restart Member functions
   //---------------------------------------------------------------------------
   void TRLM::lanczosStep(std::vector<ColorSpinorField *> v, int j)
@@ -244,9 +228,6 @@ namespace quda
     // v_{j+1} = r / b_j
     blas::zero(*v[j + 1]);
     blas::axpy(1.0 / beta[j], *r[0], *v[j + 1]);
-
-    // Save Lanczos step tuning
-    saveTuneCache();
   }
 
   void TRLM::reorder(std::vector<ColorSpinorField *> &kSpace)
@@ -284,8 +265,7 @@ namespace quda
 
     // Eigen objects
     MatrixXd A = MatrixXd::Zero(dim, dim);
-    ritz_mat.resize(dim * dim);
-    for (int i = 0; i < dim * dim; i++) ritz_mat[i] = 0.0;
+    ritz_mat.resize(dim * dim, 0.0);
 
     // Invert the spectrum due to chebyshev
     if (reverse) {
@@ -345,19 +325,17 @@ namespace quda
     int dim = n_kr - num_locked;
 
     // Multi-BLAS friendly array to store part of Ritz matrix we want
-    double *ritz_mat_keep = (double *)safe_malloc((dim * iter_keep) * sizeof(double));
+    std::vector<double> ritz_mat_keep(dim * iter_keep);
     for (int j = 0; j < dim; j++) {
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j]; }
     }
 
-    rotateVecs(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked, profile);
+    rotateVecs(kSpace, ritz_mat_keep.data(), offset, dim, iter_keep, num_locked, profile);
 
     // Update residual vector
     std::swap(kSpace[num_locked + iter_keep], kSpace[n_kr]);
 
     // Update sub arrow matrix
     for (int i = 0; i < iter_keep; i++) beta[i + num_locked] = beta[n_kr - 1] * ritz_mat[dim * (i + 1) - 1];
-
-    host_free(ritz_mat_keep);
   }
 } // namespace quda

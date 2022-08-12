@@ -24,18 +24,13 @@ namespace quda
     if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Upper Hessenberg, Q and R matrices
-    upperHess = (Complex **)safe_malloc((n_kr) * sizeof(Complex *));
-    Qmat = (Complex **)safe_malloc((n_kr) * sizeof(Complex *));
-    Rmat = (Complex **)safe_malloc((n_kr) * sizeof(Complex *));
+    upperHess.resize(n_kr);
+    Qmat.resize(n_kr);
+    Rmat.resize(n_kr);
     for (int i = 0; i < n_kr; i++) {
-      upperHess[i] = (Complex *)safe_malloc((n_kr) * sizeof(Complex));
-      Qmat[i] = (Complex *)safe_malloc((n_kr) * sizeof(Complex));
-      Rmat[i] = (Complex *)safe_malloc((n_kr) * sizeof(Complex));
-      for (int j = 0; j < n_kr; j++) {
-        upperHess[i][j] = 0.0;
-        Qmat[i][j] = 0.0;
-        Rmat[i][j] = 0.0;
-      }
+      upperHess[i].resize(n_kr, 0.0);
+      Qmat[i].resize(n_kr, 0.0);
+      Rmat[i].resize(n_kr, 0.0);
     }
 
     if (eig_param->qr_tol == 0) { eig_param->qr_tol = eig_param->tol * 1e-2; }
@@ -55,7 +50,7 @@ namespace quda
     std::swap(v[j], r[0]);
 
     // r_{j} = M * v_{j};
-    matVec(mat, *r[0], *v[j]);
+    mat(*r[0], *v[j]);
 
     double beta_pre = sqrt(blas::norm2(*r[0]));
 
@@ -225,7 +220,7 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_HOST_COMPUTE);
   }
 
-  void IRAM::qrIteration(Complex **Q, Complex **R)
+  void IRAM::qrIteration(std::vector<std::vector<Complex>> &Q, std::vector<std::vector<Complex>> &R)
   {
     Complex T11, T12, T21, T22, U1, U2;
     double dV;
@@ -432,9 +427,6 @@ namespace quda
 
   void IRAM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   {
-    // In case we are deflating an operator, save the tunechache from the inverter
-    saveTuneCache();
-
     // Override any user input for block size.
     block_size = 1;
 
@@ -458,7 +450,7 @@ namespace quda
 
     // Apply a matrix op to the residual to place it in the
     // range of the operator
-    matVec(mat, *r[0], *kSpace[0]);
+    mat(*r[0], *kSpace[0]);
 
     // Convergence criteria
     double epsilon = setEpsilon(kSpace[0]->Precision());
@@ -584,16 +576,4 @@ namespace quda
     cleanUpEigensolver(kSpace, evals);
   }
 
-  // Destructor
-  IRAM::~IRAM()
-  {
-    for (int i = 0; i < n_kr; i++) {
-      host_free(upperHess[i]);
-      host_free(Qmat[i]);
-      host_free(Rmat[i]);
-    }
-    host_free(upperHess);
-    host_free(Qmat);
-    host_free(Rmat);
-  }
 } // namespace quda
