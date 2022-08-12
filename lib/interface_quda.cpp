@@ -6254,9 +6254,7 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   cs_param->location = QUDA_CPU_FIELD_LOCATION;
   cs_param->create = QUDA_REFERENCE_FIELD_CREATE;
   
-  // max results set by contraction kernel and sized for nSpin**2 = 16
-  const int max_contract_results = nSpin * nSpin;//16;
-  // The number of contraction results expected in the output
+  // The number of complex contraction results expected in the output
   size_t num_out_results = nSpin * nSpin;
 
   //FIXME can we merge the two propagators if they are the same to save mem?
@@ -6308,8 +6306,8 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   }
   profileContractFT.TPSTOP(QUDA_PROFILE_H2D);
 
-  // Array for all decay slices and channels, is zeroed prior to kernel launch
-  std::vector<Complex> result_global(max_contract_results * global_decay_dim_slices);
+  // Array for all decay slices and spins, is zeroed prior to kernel launch
+  std::vector<Complex> result_global(global_decay_dim_slices * num_out_results);
   
   for (int mom_idx=0; mom_idx<n_mom; ++mom_idx) {
 
@@ -6325,16 +6323,12 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 			     source_position, &mom_modes[4*mom_idx], &fft_type[4*mom_idx],
 			     s1, b1);
 		
-		//comm_allreduce_sum((double *)&result_global[0], 2*elems_per_slice * global_decay_dim_slices);
 		comm_allreduce_sum(result_global);
-		for (size_t G_idx = 0; G_idx < num_out_results; G_idx++) {
-		  for (size_t t = 0; t < global_decay_dim_slices; t++) {
-		    int index = ((mom_idx) * 2*num_out_results * global_decay_dim_slices + 2*num_out_results * t + 2*G_idx);
-		    
-		    ((double *)*result)[index]
-		      += result_global[(2*num_out_results * t) / 2 + G_idx].real();
-		    ((double *)*result)[index+1]
-		      += result_global[(2*num_out_results * t) / 2 + G_idx].imag();
+		for (size_t t = 0; t < global_decay_dim_slices; t++) {
+		  for (size_t G_idx = 0; G_idx < num_out_results; G_idx++) {
+		    int index = 2*( global_decay_dim_slices * num_out_results * mom_idx + num_out_results * t + G_idx );
+		    ((double *)*result)[index+0] += result_global[num_out_results * t + G_idx].real();
+		    ((double *)*result)[index+1] += result_global[num_out_results * t + G_idx].imag();
 		  }
 		}
 	  profileContractFT.TPSTOP(QUDA_PROFILE_COMPUTE);

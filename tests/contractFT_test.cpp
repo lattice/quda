@@ -8,7 +8,7 @@
 #include <host_utils.h>
 #include <command_line_params.h>
 #include <dslash_reference.h>
-#include <contract_reference.h>
+#include <contractFT_reference.h>
 #include "misc.h"
 
 // google test
@@ -75,7 +75,7 @@ int main(int argc, char **argv)
   initQuda(device_ordinal);
   int X[4] = {xdim, ydim, zdim, tdim}; // local dims
   setDims(X);
-  cudaDeviceSetLimit(cudaLimitPrintfFifoSize,64*1024*1024); // DEBUG-JNS
+  //cudaDeviceSetLimit(cudaLimitPrintfFifoSize,64*1024*1024); // DEBUG-JNS
   //-----------------------------------------------------------------------------
 
   prec = QUDA_INVALID_PRECISION;
@@ -178,23 +178,21 @@ int test(int contractionType, QudaPrecision test_prec)
     spinorY[s] = (void*)((uintptr_t)buffY + off);
   }
 
+  const QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
+  const QudaFFTSymmType ev = QUDA_FFT_SYMM_EVEN;
+  const QudaFFTSymmType od = QUDA_FFT_SYMM_ODD;
   const int source_position[4]{0,0,0,0};
-  const int n_mom = 19;
+  const int n_mom = 18;
   const int mom[n_mom*4]{
-      0, 0, 0, 0,     0, 0, 0, 0,     0, 0, 0, 0,
+      0, 0, 0, 0,     0, 0, 0, 0,
       1, 0, 0, 0,    -1, 0, 0, 0,     1, 0, 0, 0,     1, 0, 0, 0,
       0, 1, 0, 0,     0,-1, 0, 0,     0, 1, 0, 0,     0, 1, 0, 0,     
       0, 0, 1, 0,     0, 0,-1, 0,     0, 0, 1, 0,     0, 0, 1, 0,
       0, 1, 1, 0,     0,-1,-1, 0,     0, 1, 1, 0,     0, 1, 1, 0
       };
-  const char* ftype[4]{"?","O","E","EO"};
-  const QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
-  const QudaFFTSymmType ev = QUDA_FFT_SYMM_EVEN;
-  const QudaFFTSymmType od = QUDA_FFT_SYMM_ODD;
   const QudaFFTSymmType fft_type[n_mom*4]{
     eo, eo, eo, eo, // (0,0,0)
     ev, ev, ev, eo,
-    od, od, od, eo,
     eo, eo, eo, eo, // (1,0,0)
     eo, eo, eo, eo,
     ev, ev, ev, eo,
@@ -225,6 +223,8 @@ int test(int contractionType, QudaPrecision test_prec)
   // Perform GPU contraction.
   contractFTQuda(spinorX, spinorY, &d_result, cType, (void*)(&cs_param), src_colors, X, source_position, n_mom, mom, fft_type);
 
+  #if 0
+  const char* ftype[4]{"?","O","E","EO"};
   printfQuda("contractions:");
   for(int k=0; k<n_mom; ++k) {
     printfQuda("\np = %2d %2d %2d %2d;  sym = %2s %2s %2s %2s",
@@ -239,17 +239,16 @@ int test(int contractionType, QudaPrecision test_prec)
     printfQuda("]\n");
   }
   printfQuda("\n");
+  #endif
   // Compare contraction from the host and device. Return the number of detected faults.
   int faults = 0;
-  /*  TODO: write CPU checks
   if (test_prec == QUDA_DOUBLE_PRECISION) {
-    faults = contractionFT_reference((double *)spinorX, (double *)spinorY, (double *)d_result, cType,
-                          src_colors, X, source_position, n_mom, mom);
+    faults = contractionFT_reference<double>((double **)spinorX, (double **)spinorY, (double *)d_result, cType,
+                          src_colors, X, source_position, n_mom, mom, fft_type);
   } else {
-    faults = contractionFT_reference((float *)spinorX, (float *)spinorY, (float *)d_result, cType,
-                          src_colors, X, source_position, n_mom, mom);
+    faults = contractionFT_reference<float>((float **)spinorX, (float **)spinorY, (double *)d_result, cType,
+                          src_colors, X, source_position, n_mom, mom, fft_type);
   }
-  */
   printfQuda("Contraction comparison for contraction type %s complete with %d/%d faults\n", get_contract_str(cType),
              faults, n_contract_results);
 
