@@ -236,17 +236,46 @@ namespace quda {
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
 
     /**
+       @brief Apply M for the dirac op. E.g. the Schur Complement operator
+    */
+    void M(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    {
+      for (auto i = 0u; i < in.size(); i++) M(out[i], in[i]);
+    }
+
+    /**
        @brief Apply MdagM operator which may be optimized
     */
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
 
     /**
-       @brief Apply the local MdagM operator: equivalent to applying zero Dirichlet
-              boundary condition to MdagM on each rank. Depending on the number of
-              stencil steps of the fermion type, this may require additional effort
-              to include the terms that hop out of the boundary and then hop back.
+       @brief Apply MdagM operator which may be optimized
+    */
+    void MdagM(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    {
+      for (auto i = 0u; i < in.size(); i++) MdagM(out[i], in[i]);
+    }
+
+    /**
+       @brief Apply the local MdagM operator: equivalent to applying
+       zero Dirichlet boundary condition to MdagM on each
+       rank. Depending on the number of stencil steps of the fermion
+       type, this may require additional effort to include the terms
+       that hop out of the boundary and then hop back.
     */
     virtual void MdagMLocal(ColorSpinorField &, const ColorSpinorField &) const { errorQuda("Not implemented!\n"); }
+
+    /**
+       @brief Apply the local MdagM operator: equivalent to applying
+       zero Dirichlet boundary condition to MdagM on each
+       rank. Depending on the number of stencil steps of the fermion
+       type, this may require additional effort to include the terms
+       that hop out of the boundary and then hop back.
+    */
+    void MdagMLocal(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    {
+      for (auto i = 0u; i < in.size(); i++) MdagMLocal(out[i], in[i]);
+    }
 
     /**
        @brief Apply the local MdagM operator: equivalent to applying zero Dirichlet
@@ -260,14 +289,30 @@ namespace quda {
     }
 
     /**
-        @brief Apply Mdag (daggered operator of M
+       @brief Apply Mdag (daggered operator of M)
     */
     void Mdag(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    /**
+       @brief Apply Mdag (daggered operator of M)
+    */
+    void Mdag(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    {
+      for (auto i = 0u; i < in.size(); i++) Mdag(out[i], in[i]);
+    }
 
     /**
        @brief Apply Normal Operator
     */
     virtual void MMdag(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    /**
+       @brief Apply Normal Operator
+    */
+    void MMdag(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    {
+      for (auto i = 0u; i < in.size(); i++) MMdag(out[i], in[i]);
+    }
 
     // required methods to use e-o preconditioning for solving full system
     virtual void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
@@ -2048,6 +2093,13 @@ public:
     virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &Tmp1,
                             ColorSpinorField &Tmp2) const = 0;
 
+    /**
+       @brief Multi-RHS operator application
+       @param[out] out The vector of output fields
+       @param[out] out The vector of input fields
+     */
+    virtual void operator()(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const = 0;
+
     unsigned long long flops() const { return dirac->Flops(); }
 
     QudaMatPCType getMatPCType() const { return dirac->getMatPCType(); }
@@ -2126,12 +2178,12 @@ public:
     }
 
     /**
-        If the Dirac Operator's tmp1 member is not set, this provides
-        a tmp. The tmp is set as the DiracOperator's tmp before the matrix apply
-        and after the matrix apply it is unset and the tmp1 is set to null.
+       If the Dirac Operator's tmp1 member is not set, this provides
+       a tmp. The tmp is set as the DiracOperator's tmp before the matrix apply
+       and after the matrix apply it is unset and the tmp1 is set to null.
 
-        If the operator has a tmp1 member set it will be used and the passed
-        tmp will be untouched
+       If the operator has a tmp1 member set it will be used and the passed
+       tmp will be untouched
     */
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
@@ -2145,7 +2197,7 @@ public:
 
     /* Provides two tmps, in case the dirac op doesn't have them */
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
-			   ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
+                    ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
     {
       bool reset1 = false;
       bool reset2 = false;
@@ -2155,6 +2207,16 @@ public:
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
       if (reset2) { dirac->tmp2 = NULL; reset2 = false; }
       if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
+    }
+
+    /**
+       @brief Multi-RHS operator application.
+       @param[out] out The vector of output fields
+       @param[in] in The vector of input fields
+     */
+    void operator()(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    {
+      dirac->M(out, in);
     }
 
     int getStencilSteps() const
@@ -2216,6 +2278,16 @@ public:
       }
     }
  
+    /**
+       @brief Multi-RHS operator application
+       @param[out] out The vector of output fields
+       @param[out] out The vector of input fields
+     */
+    void operator()(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    {
+      dirac->MdagM(out, in);
+    }
+
     int getStencilSteps() const
     {
       return 2*dirac->getStencilSteps(); // 2 for M and M dagger
@@ -2271,6 +2343,16 @@ public:
         dirac->tmp1 = NULL;
         reset1 = false;
       }
+    }
+
+    /**
+       @brief Multi-RHS operator application.
+       @param[out] out The vector of output fields
+       @param[in] in The vector of input fields
+     */
+    void operator()(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    {
+      dirac->MdagMLocal(out, in);
     }
 
     int getStencilSteps() const
@@ -2331,6 +2413,16 @@ public:
         dirac->tmp1 = NULL;
         reset1 = false;
       }
+    }
+
+    /**
+       @brief Multi-RHS operator application.
+       @param[out] out The vector of output fields
+       @param[in] in The vector of input fields
+     */
+    void operator()(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    {
+      dirac->MMdag(out, in);
     }
 
     int getStencilSteps() const
@@ -2394,6 +2486,16 @@ public:
       }
     }
 
+    /**
+       @brief Multi-RHS operator application.
+       @param[out] out The vector of output fields
+       @param[in] in The vector of input fields
+     */
+    void operator()(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    {
+      dirac->Mdag(out, in);
+    }
+
     int getStencilSteps() const
     {
       return dirac->getStencilSteps(); 
@@ -2430,6 +2532,18 @@ public:
     {
       dirac->flipDagger();
       mat(out, in, Tmp1, Tmp2);
+      dirac->flipDagger();
+    }
+
+    /**
+       @brief Multi-RHS operator application.
+       @param[out] out The vector of output fields
+       @param[in] in The vector of input fields
+     */
+    void operator()(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    {
+      dirac->flipDagger();
+      mat(out, in);
       dirac->flipDagger();
     }
 
@@ -2568,6 +2682,20 @@ public:
       if (reset1) {
         dirac->tmp1 = NULL;
         reset1 = false;
+      }
+    }
+
+    /**
+       @brief Multi-RHS operator application.
+       @param[out] out The vector of output fields
+       @param[in] in The vector of input fields
+     */
+    void operator()(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    {
+      dirac->M(out, in);
+      for (auto i = 0u; i < in.size(); i++) {
+        if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in[i]), out[i]);
+        applyGamma5(out[i]);
       }
     }
 
