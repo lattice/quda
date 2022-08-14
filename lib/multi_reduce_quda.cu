@@ -749,9 +749,9 @@ namespace quda {
     void reDotProduct(double *result, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y)
     {
       std::vector<double> result_(x.size() * y.size());
-      std::vector<std::reference_wrapper<ColorSpinorField>> x_;
+      std::vector<ColorSpinorField_ref> x_;
       for (auto &xi : x) x_.push_back(*xi);
-      std::vector<std::reference_wrapper<ColorSpinorField>> y_;
+      std::vector<ColorSpinorField_ref> y_;
       for (auto &yi : y) y_.push_back(*yi);
       reDotProduct(result_, std::move(x_), std::move(y_));
       memcpy(result, result_.data(), x.size() * y.size() * sizeof(double));
@@ -760,9 +760,9 @@ namespace quda {
     void cDotProduct(Complex *result, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y)
     {
       std::vector<Complex> result_(x.size() * y.size());
-      std::vector<std::reference_wrapper<ColorSpinorField>> x_;
+      std::vector<ColorSpinorField_ref> x_;
       for (auto &xi : x) x_.push_back(*xi);
-      std::vector<std::reference_wrapper<ColorSpinorField>> y_;
+      std::vector<ColorSpinorField_ref> y_;
       for (auto &yi : y) y_.push_back(*yi);
       cDotProduct(result_, std::move(x_), std::move(y_));
       memcpy(result, result_.data(), x.size() * y.size() * sizeof(Complex));
@@ -771,9 +771,9 @@ namespace quda {
     void hDotProduct(Complex *result, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y)
     {
       std::vector<Complex> result_(x.size() * y.size());
-      std::vector<std::reference_wrapper<ColorSpinorField>> x_;
+      std::vector<ColorSpinorField_ref> x_;
       for (auto &xi : x) x_.push_back(*xi);
-      std::vector<std::reference_wrapper<ColorSpinorField>> y_;
+      std::vector<ColorSpinorField_ref> y_;
       for (auto &yi : y) y_.push_back(*yi);
       hDotProduct(result_, std::move(x_), std::move(y_));
       memcpy(result, result_.data(), x.size() * y.size() * sizeof(Complex));
