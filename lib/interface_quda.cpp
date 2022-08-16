@@ -36,7 +36,7 @@
 
 #include <ks_force_quda.h>
 
-#include <gauge_force_quda.h>
+#include <gauge_path_quda.h>
 #include <gauge_update_quda.h>
 
 #define MAX(a,b) ((a)>(b)? (a):(b))

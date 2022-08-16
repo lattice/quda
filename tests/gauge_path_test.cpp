@@ -288,11 +288,11 @@ void gauge_loop_test()
 
   // storage for traces
   using double_complex = double _Complex;
-  double_complex* traces = new double_complex[num_paths];
+  std::vector<double_complex> traces(num_paths);
   double scale_factor = 2.0;
 
   if (getTuning() == QUDA_TUNE_YES) {
-    computeGaugeLoopTraceQuda(traces, sitelink, trace_path_p, trace_loop_length_p, trace_loop_coeff_p, num_paths, max_length, scale_factor, &gauge_param);
+    computeGaugeLoopTraceQuda(traces.data(), sitelink, trace_path_p, trace_loop_length_p, trace_loop_coeff_p, num_paths, max_length, scale_factor, &gauge_param);
   }
 
   quda::host_timer_t host_timer;
@@ -300,7 +300,7 @@ void gauge_loop_test()
 
   host_timer.start();
   for (int i = 0; i < niter; i++) {
-    computeGaugeLoopTraceQuda(traces, sitelink, trace_path_p, trace_loop_length_p, trace_loop_coeff_p, num_paths, max_length, scale_factor, &gauge_param);
+    computeGaugeLoopTraceQuda(traces.data(), sitelink, trace_path_p, trace_loop_length_p, trace_loop_coeff_p, num_paths, max_length, scale_factor, &gauge_param);
   }
   host_timer.stop();
   
@@ -352,7 +352,6 @@ void gauge_loop_test()
   for (int i = 0; i < num_paths; i++)
     delete[] trace_path_p[i];
   delete[] trace_path_p;
-  delete[] traces;
   delete U_qdp;
   delete U_milc;
 }

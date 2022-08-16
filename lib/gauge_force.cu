@@ -1,5 +1,6 @@
 #include <tunable_nd.h>
 #include <instantiate.h>
+#include <gauge_path_quda.h>
 #include <kernels/gauge_force.cuh>
 
 namespace quda {
