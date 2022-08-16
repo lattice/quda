@@ -175,7 +175,7 @@ namespace quda {
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
       // Compute the rank-local product of loops in the temporal direction...
-      instantiate<GaugePolyakovLoopProduct, ReconstructNo12>(u, product_field_ref);
+      instantiate<GaugePolyakovLoopProduct>(u, product_field_ref);
       // ...and inject it into my own accumulation field
       gaugeInsertTimeslice(condensed_field_ref, product_field_ref, comm_coord(3));
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -246,7 +246,7 @@ namespace quda {
 
     // Trace over remaining bits
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    instantiate<GaugePolyakovLoopTrace, ReconstructNo12>(G, loop);
+    instantiate<GaugePolyakovLoopTrace>(G, loop);
     // We normalize by the 3-d volume, times the 4-d communications dim to cancel out redundant counting
     auto vol3d = u.Volume() * comm_dim(0) * comm_dim(1) * comm_dim(2) * comm_dim(3) / u.X()[3];
     ploop[0] = loop[0] / vol3d;

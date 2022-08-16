@@ -9,15 +9,15 @@
 
 namespace quda {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_u, QudaReconstructType recon_m, bool force_>
+  template <typename store_t, int nColor_, QudaReconstructType recon_u, QudaReconstructType recon_m, bool force_>
   struct GaugeForceArg : kernel_param<> {
-    using Float = Float_;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static constexpr bool compute_force = force_;
-    using Link = Matrix<complex<Float>, nColor>;
+    using Link = Matrix<complex<real>, nColor>;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
-    typedef typename gauge_mapper<Float,recon_u>::type Gauge;
-    typedef typename gauge_mapper<Float,recon_m>::type Mom;
+    typedef typename gauge_mapper<real,recon_u>::type Gauge;
+    typedef typename gauge_mapper<real,recon_m>::type Mom;
 
     Mom mom;
     const Gauge u;
@@ -26,7 +26,7 @@ namespace quda {
     int E[4]; // the extended volume parameters
     int border[4]; // radius of border
 
-    Float epsilon; // stepsize and any other overall scaling factor
+    real epsilon; // stepsize and any other overall scaling factor
     const paths<4> p;
 
     GaugeForceArg(GaugeField &mom, const GaugeField &u, double epsilon, const paths<4> &p) :
@@ -52,7 +52,7 @@ namespace quda {
 
     __device__ __host__ void operator()(int x_cb, int parity, int dir)
     {
-      using real = typename Arg::Float;
+      using real = typename Arg::real;
       using Link = typename Arg::Link;
 
       int x[4] = {0, 0, 0, 0};

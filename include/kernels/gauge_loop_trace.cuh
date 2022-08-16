@@ -17,16 +17,16 @@ namespace quda {
   */
   constexpr unsigned int max_n_batch_block_loop_trace() { return 8; }
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_>
+  template <typename store_t, int nColor_, QudaReconstructType recon_>
   struct GaugeLoopTraceArg : public ReduceArg<array<double, 2>>  {
-    using Float = Float_;
+    using real = typename mapper<store_t>::type;
     using reduce_t = array<double, 2>;
     static constexpr unsigned int max_n_batch_block = max_n_batch_block_loop_trace();
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
-    using Link = Matrix<complex<Float>, nColor>;
+    using Link = Matrix<complex<real>, nColor>;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
+    typedef typename gauge_mapper<real,recon>::type Gauge;
 
     const Gauge u;
 
@@ -63,7 +63,7 @@ namespace quda {
 
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity, int path_id)
     {
-      using real = typename Arg::Float;
+      using real = typename Arg::real;
       using Link = typename Arg::Link;
 
       reduce_t loop_trace{0, 0};

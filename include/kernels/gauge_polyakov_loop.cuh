@@ -8,14 +8,14 @@
 
 namespace quda {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_>
+  template <typename store_t, int nColor_, QudaReconstructType recon_>
   struct GaugeInsertTimesliceArg : public kernel_param<> {
-    using Float = Float_;
+    using real = typename::mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
-    using Gauge = typename gauge_mapper<Float,recon>::type;
-    using Link = Matrix<complex<Float>, 3>;
+    using Gauge = typename gauge_mapper<real,recon>::type;
+    using Link = Matrix<complex<real>, 3>;
 
     int X_bulk[4];
     int_fastdiv X_slice[4];
@@ -98,17 +98,17 @@ namespace quda {
     return polyloop;
   }
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_>
+  template <typename store_t, int nColor_, QudaReconstructType recon_>
   struct GaugePolyakovLoopProductArg : public kernel_param<> {
-    using Float = Float_;
+    using real = typename mapper<store_t>::type;
     using AccumFloat = double;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr QudaFieldGeometry geometry = QUDA_VECTOR_GEOMETRY;
-    using Gauge = typename gauge_mapper<Float,recon>::type;
+    using Gauge = typename gauge_mapper<real,recon>::type;
     using AccumGauge = typename gauge_mapper<AccumFloat,recon>::type;
-    using Link = Matrix<complex<Float>, 3>;
+    using Link = Matrix<complex<real>, 3>;
     using HighPrecLink = Matrix<complex<double>, 3>;
 
     int X[4];
@@ -151,14 +151,14 @@ namespace quda {
 
   };
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_>
+  template <typename store_t, int nColor_, QudaReconstructType recon_>
   struct GaugePolyakovLoopTraceArg : public ReduceArg<array<double, 2>> {
-    using Float = Float_;
+    using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
-    using Gauge = typename gauge_mapper<Float,recon>::type;
-    using Link = Matrix<complex<Float>, 3>;
+    using Gauge = typename gauge_mapper<real,recon>::type;
+    using Link = Matrix<complex<real>, 3>;
     using HighPrecLink = Matrix<complex<double>, 3>;
 
     int X[4];
