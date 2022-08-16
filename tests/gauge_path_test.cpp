@@ -9,7 +9,7 @@
 #include <gauge_field.h>
 #include "misc.h"
 #include "gauge_force_reference.h"
-#include "gauge_force_quda.h"
+#include <gauge_path_quda.h>
 #include <timer.h>
 #include <gtest/gtest.h>
 
@@ -223,9 +223,11 @@ void gauge_force_test(bool compute_force = true)
   }
 
   double perf = 1.0 * niter * flops * V / (time_sec * 1e+9);
-  printfQuda("total time = %.2f ms\n", time_sec * 1e+3);
-  printfQuda("overall performance : %.2f GFLOPS\n", perf);
-
+  if (compute_force) {
+    printfQuda("Force calculation total time = %.2f ms ; overall performance : %.2f GFLOPS\n", time_sec * 1e+3, perf);
+  } else {
+    printfQuda("Gauge path calculation total time = %.2f ms ; overall performance : %.2f GFLOPS\n", time_sec * 1e+3, perf);
+  }
   for (int dir = 0; dir < 4; dir++) {
     for (int i = 0; i < num_paths; i++) host_free(input_path_buf[dir][i]);
     host_free(input_path_buf[dir]);
@@ -346,8 +348,7 @@ void gauge_loop_test()
   }
 
   double perf = 1.0 * niter * flops * V / (host_timer.last() * 1e+9);
-  printfQuda("total time = %.2f ms\n", host_timer.last() * 1e+3);
-  printfQuda("overall performance : %.2f GFLOPS\n", perf);
+  printfQuda("Gauge loop trace total time = %.2f ms ; overall performance : %.2f GFLOPS\n", host_timer.last() * 1e+3, perf);
 
   for (int i = 0; i < num_paths; i++)
     delete[] trace_path_p[i];
