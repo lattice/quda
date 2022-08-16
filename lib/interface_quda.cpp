@@ -4017,16 +4017,30 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   // apply / remove phase as appropriate
   if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
 
+  // wrap 1-d arrays in std::vector
+  std::vector<int> path_length_v(num_paths);
+  std::vector<double> loop_coeff_v(num_paths);
+  for (int i = 0; i < num_paths; i++) {
+    path_length_v[i] = path_length[i];
+    loop_coeff_v[i] = loop_coeff[i];
+  }
+
+  // input_path should encode exactly 4 directions
+  std::vector<int**> input_path_v(4);
+  for (int d = 0; d < 4; d++) {
+    input_path_v[d] = input_path_buf[d];
+  }
+
   // actually do the computation
   profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
   if (!forceMonitor()) {
-    gaugeForce(*cudaMom, *cudaGauge, eb3, input_path_buf,  path_length, loop_coeff, num_paths, max_length);
+    gaugeForce(*cudaMom, *cudaGauge, eb3, input_path_v, path_length_v, loop_coeff_v, num_paths, max_length);
   } else {
     // if we are monitoring the force, separate the force computation from the momentum update
     GaugeFieldParam gParam(*cudaMom);
     gParam.create = QUDA_ZERO_FIELD_CREATE;
     GaugeField *force = GaugeField::Create(gParam);
-    gaugeForce(*force, *cudaGauge, 1.0, input_path_buf,  path_length, loop_coeff, num_paths, max_length);
+    gaugeForce(*force, *cudaGauge, 1.0, input_path_v, path_length_v, loop_coeff_v, num_paths, max_length);
     updateMomentum(*cudaMom, eb3, *force, "gauge");
     delete force;
   }
@@ -4124,9 +4138,23 @@ int computeGaugePathQuda(void *out, void *siteLink, int ***input_path_buf, int *
   // apply / remove phase as appropriate
   if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
 
+  // wrap 1-d arrays in a std::vector
+  std::vector<int> path_length_v(num_paths);
+  std::vector<double> loop_coeff_v(num_paths);
+  for (int i = 0; i < num_paths; i++) {
+    path_length_v[i] = path_length[i];
+    loop_coeff_v[i] = loop_coeff[i];
+  }
+
+  // input_path should encode exactly 4 directions
+  std::vector<int**> input_path_v(4);
+  for (int d = 0; d < 4; d++) {
+    input_path_v[d] = input_path_buf[d];
+  }
+
   // actually do the computation
   profileGaugePath.TPSTART(QUDA_PROFILE_COMPUTE);
-  gaugePath(*cudaOut, *cudaGauge, eb3, input_path_buf, path_length, loop_coeff, num_paths, max_length);
+  gaugePath(*cudaOut, *cudaGauge, eb3, input_path_v, path_length_v, loop_coeff_v, num_paths, max_length);
   profileGaugePath.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileGaugePath.TPSTART(QUDA_PROFILE_D2H);
@@ -4194,12 +4222,26 @@ int computeGaugeLoopTraceQuda(double _Complex* traces, void *siteLink, int **inp
   // apply / remove phase as appropriate
   if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
 
+  // wrap 1-d arrays in std::vector
+  std::vector<int> path_length_v(num_paths);
+  std::vector<double> loop_coeff_v(num_paths);
+  for (int i = 0; i < num_paths; i++) {
+    path_length_v[i] = path_length[i];
+    loop_coeff_v[i] = loop_coeff[i];
+  }
+
+  // input_path should encode exactly 1 direction
+  std::vector<int**> input_path_v(1);
+  for (int d = 0; d < 1; d++) {
+    input_path_v[d] = input_path_buf;
+  }
+
   // prepare trace storage
   std::vector<Complex> loop_traces(num_paths);
 
   // actually do the computation
   profileGaugeLoopTrace.TPSTART(QUDA_PROFILE_COMPUTE);
-  gaugeLoopTrace(*cudaGauge, loop_traces, factor, &input_path_buf, path_length, loop_coeff, num_paths, max_length);
+  gaugeLoopTrace(*cudaGauge, loop_traces, factor, input_path_v, path_length_v, loop_coeff_v, num_paths, max_length);
   profileGaugeLoopTrace.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   for (int i = 0; i < num_paths; i++) { memcpy(traces + i, &loop_traces[i], sizeof(Complex)); }

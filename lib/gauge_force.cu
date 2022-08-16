@@ -45,28 +45,28 @@ namespace quda {
 
   template<typename Float, int nColor, QudaReconstructType recon_u> using GaugePath = ForceGauge<Float,nColor,recon_u,false>;
 
-  void gaugeForce(GaugeField& mom, const GaugeField& u, double epsilon, int ***input_path,
-                  int *length_h, double *path_coeff_h, int num_paths, int path_max_length)
+  void gaugeForce(GaugeField& mom, const GaugeField& u, double epsilon, std::vector<int**>& input_path,
+                  std::vector<int>& length, std::vector<double>& path_coeff, int num_paths, int path_max_length)
   {
     checkPrecision(mom, u);
     checkLocation(mom, u);
     if (mom.Reconstruct() != QUDA_RECONSTRUCT_10) errorQuda("Reconstruction type %d not supported", mom.Reconstruct());
 
-    paths<4> p(input_path, length_h, path_coeff_h, num_paths, path_max_length);
+    paths<4> p(input_path, length, path_coeff, num_paths, path_max_length);
 
     // gauge field must be passed as first argument so we peel off its reconstruct type
     instantiate<GaugeForce_>(u, mom, epsilon, p);
     p.free();
   }
   
-  void gaugePath(GaugeField& out, const GaugeField& u, double coeff, int ***input_path,
-		 int *length_h, double *path_coeff_h, int num_paths, int path_max_length)
+  void gaugePath(GaugeField& out, const GaugeField& u, double coeff, std::vector<int**>& input_path,
+		 std::vector<int>& length, std::vector<double>& path_coeff, int num_paths, int path_max_length)
   {
     checkPrecision(out, u);
     checkLocation(out, u);
     if (out.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Reconstruction type %d not supported", out.Reconstruct());
 
-    paths<4> p(input_path, length_h, path_coeff_h, num_paths, path_max_length);
+    paths<4> p(input_path, length, path_coeff, num_paths, path_max_length);
 
     // gauge field must be passed as first argument so we peel off its reconstruct type
     instantiate<GaugePath>(u, out, coeff, p);

@@ -19,11 +19,18 @@ namespace quda {
     int *buffer;
     int count;
 
-    paths(int ***input_path, int *length_h, double *path_coeff_h, int num_paths, int max_length) :
+    paths(std::vector<int**>& input_path, std::vector<int>& length_h, std::vector<double>& path_coeff_h, int num_paths, int max_length) :
       num_paths(num_paths),
       max_length(max_length),
       count(0)
     {
+      if (static_cast<int>(input_path.size()) != dim)
+        errorQuda("Input path vector is of size %lu, expected %d", input_path.size(), dim);
+      if (static_cast<int>(length_h.size()) != num_paths)
+        errorQuda("Path length vector is of size %lu, expected %d", length_h.size(), num_paths);
+      if (static_cast<int>(path_coeff_h.size()) != num_paths)
+        errorQuda("Path coefficient vector is of size %lu, expected %d", path_coeff_h.size(), num_paths);
+
       // create path struct in a single allocation
       size_t bytes = dim * num_paths * max_length * sizeof(int) + num_paths * sizeof(int);
       int pad = ((sizeof(double) - bytes % sizeof(double)) % sizeof(double))/sizeof(int);
@@ -44,10 +51,10 @@ namespace quda {
       }
 
       // length array
-      memcpy(path_h + dim * num_paths * max_length, length_h, num_paths*sizeof(int));
+      memcpy(path_h + dim * num_paths * max_length, length_h.data(), num_paths*sizeof(int));
 
       // path_coeff array
-      memcpy(path_h + dim * num_paths * max_length + num_paths + pad, path_coeff_h, num_paths*sizeof(double));
+      memcpy(path_h + dim * num_paths * max_length + num_paths + pad, path_coeff_h.data(), num_paths*sizeof(double));
 
       qudaMemcpy(buffer, path_h, bytes, qudaMemcpyHostToDevice);
       host_free(path_h);
@@ -77,9 +84,9 @@ namespace quda {
      @param[in] length Length of gauge path
      @param[in] dx Temporary shared memory storage for relative coordinate shift
   */
-  template <typename Arg>
+  template <typename Arg, typename I>
   __device__ __host__ inline typename Arg::Link
-  computeGaugePath(const Arg &arg, int x[4], int parity, const int* path, int length, thread_array<int, 4>& dx)
+  computeGaugePath(const Arg &arg, int x[4], int parity, const int* path, int length, I& dx)
   {
     using Link = typename Arg::Link;
 
