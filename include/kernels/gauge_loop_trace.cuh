@@ -63,7 +63,6 @@ namespace quda {
 
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity, int path_id)
     {
-      using real = typename Arg::real;
       using Link = typename Arg::Link;
 
       reduce_t loop_trace{0, 0};
