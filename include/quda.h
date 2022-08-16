@@ -1377,7 +1377,7 @@ extern "C" {
    * @param[in] factor An overall normalization factor
    * @param[in] param The parameters of the external fields and the computation settings
    */
-  int computeGaugeLoopTraceQuda(double_complex* traces, void *siteLink, int **input_path_buf, int *path_length, double *loop_coeff,
+  void computeGaugeLoopTraceQuda(double_complex* traces, void *siteLink, int **input_path_buf, int *path_length, double *loop_coeff,
                                 int num_paths, int max_length, double factor, QudaGaugeParam *qudaGaugeParam);
 
   /**

@@ -4182,7 +4182,7 @@ int computeGaugePathQuda(void *out, void *siteLink, int ***input_path_buf, int *
   return 0;
 }
 
-int computeGaugeLoopTraceQuda(double _Complex* traces, void *siteLink, int **input_path_buf, int *path_length, double *loop_coeff,
+void computeGaugeLoopTraceQuda(double _Complex* traces, void *siteLink, int **input_path_buf, int *path_length, double *loop_coeff,
                                     int num_paths, int max_length, double factor, QudaGaugeParam *qudaGaugeParam)
 {
   profileGaugeLoopTrace.TPSTART(QUDA_PROFILE_TOTAL);
@@ -4261,7 +4261,6 @@ int computeGaugeLoopTraceQuda(double _Complex* traces, void *siteLink, int **inp
   profileGaugeLoopTrace.TPSTOP(QUDA_PROFILE_FREE);
 
   profileGaugeLoopTrace.TPSTOP(QUDA_PROFILE_TOTAL);
-  return 0;
 }
 
 void momResidentQuda(void *mom, QudaGaugeParam *param)
