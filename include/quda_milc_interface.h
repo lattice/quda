@@ -733,16 +733,16 @@ extern "C" {
    * action.  All fields here are CPU fields in MILC order, and their precisions should
    * match.
    *
-   * @param precision The precision of the field (2 - double, 1 - single)
-   * @param traces A pre-allocated buffer for computed traces of length 2 x num_paths to encode real and imaginary
-   * @param input_path_buf A double pointer of length num_paths x max_length containing loop paths
-   * @param path_length An array of length num_paths containing the lengths of each loop
-   * @param loop_coeff Coefficients for each individual loop
-   * @param num_paths The total number of paths that are computed
-   * @param max_length The maximum length across all loop paths
-   * @param factor An overall multiplicative factor applied to all traces
-   * @param arg Metadata for MILC's internal site struct array
-   * @param phase_in whether staggered phases are applied
+   * @param[in] precision The precision of the field (2 - double, 1 - single)
+   * @param[out] traces A pre-allocated buffer for computed traces of length 2 x num_paths to encode real and imaginary
+   * @param[in] input_path_buf A double pointer of length num_paths x max_length containing loop paths
+   * @param[in] path_length An array of length num_paths containing the lengths of each loop
+   * @param[in] loop_coeff Coefficients for each individual loop
+   * @param[in] num_paths The total number of paths that are computed
+   * @param[in] max_length The maximum length across all loop paths
+   * @param[in] factor An overall multiplicative factor applied to all traces
+   * @param[in] arg Metadata for MILC's internal site struct array
+   * @param[in] phase_in whether staggered phases are applied
    */
   void qudaGaugeLoopTracePhased(int precision, double *traces, int** input_path_buf, int* path_length, double *loop_coeff, int num_paths,
                               int max_length, double factor, QudaMILCSiteArg_t *arg, int phase_in);
@@ -751,10 +751,10 @@ extern "C" {
    * Compute the total, spatial, and temporal plaquette. All fields here are CPU fields in
    * MILC order, and their precisions should match
    *
-   * @param precision The precision of the field (2 - double, 1 - single)
-   * @param plaq Storage for the total, spatial, and temporal plaquette
-   * @param arg Metadata for MILC's internal site struct array
-   * @param phase_in whether staggered phases are applied
+   * @param[in] precision The precision of the field (2 - double, 1 - single)
+   * @param[out] plaq Storage for the total, spatial, and temporal plaquette
+   * @param[in] arg Metadata for MILC's internal site struct array
+   * @param[in] phase_in whether staggered phases are applied
    */
   void qudaPlaquettePhased(int precision, double plaq[3], QudaMILCSiteArg_t *arg, int phase_in);
 
@@ -762,11 +762,11 @@ extern "C" {
    * Compute the real and imaginary parts of the Polyakov loop in a given direction. All fields here are
    * CPU fields in MILC order, and their precisions should match
    *
-   * @param precision The precision of the field (2 - double, 1 - single)
-   * @param ploop Storage for the output Polyakov loop
-   * @param dir Direction of the polyakov loop (0 - x, 1 - y, 2 - z, 3 - t)
-   * @param arg Metadata for MILC's internal site struct array
-   * @param phase_in whether staggered phases are applied
+   * @param[in] precision The precision of the field (2 - double, 1 - single)
+   * @param[out] ploop Storage for the output Polyakov loop
+   * @param[in] dir Direction of the polyakov loop (0 - x, 1 - y, 2 - z, 3 - t)
+   * @param[in] arg Metadata for MILC's internal site struct array
+   * @param[in] phase_in whether staggered phases are applied
    */
   void qudaPolyakovLoopPhased(int precision, double ploop[2], int dir, QudaMILCSiteArg_t *arg, int phase_in);
 
