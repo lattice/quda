@@ -29,7 +29,8 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<GaugeForce>(tp, stream, GaugeForceArg<Float, nColor, recon_u, compute_force ? QUDA_RECONSTRUCT_10 : recon_u, compute_force>(mom, u, epsilon, p));
+      launch<GaugeForce>(tp, stream, GaugeForceArg<Float, nColor, recon_u,
+                         compute_force ? QUDA_RECONSTRUCT_10 : QUDA_RECONSTRUCT_NO, compute_force>(mom, u, epsilon, p));
     }
 
     void preTune() { mom.backup(); }
@@ -62,7 +63,7 @@ namespace quda {
   {
     checkPrecision(out, u);
     checkLocation(out, u);
-    checkReconstruct(out, u);
+    if (out.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Reconstruction type %d not supported", out.Reconstruct());
 
     paths<4> p(input_path, length_h, path_coeff_h, num_paths, path_max_length);
 

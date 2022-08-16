@@ -4110,7 +4110,7 @@ int computeGaugePathQuda(void *out, void *siteLink, int ***input_path_buf, int *
   cpuGaugeField *cpuOut = new cpuGaugeField(gParamOut);
   gParamOut.location = QUDA_CUDA_FIELD_LOCATION;
   gParamOut.create = qudaGaugeParam->overwrite_gauge ? QUDA_ZERO_FIELD_CREATE : QUDA_NULL_FIELD_CREATE;
-  gParamOut.reconstruct = qudaGaugeParam->reconstruct;
+  gParamOut.reconstruct = QUDA_RECONSTRUCT_NO;
   gParamOut.setPrecision(qudaGaugeParam->cuda_prec, true);
   cudaGaugeField *cudaOut = new cudaGaugeField(gParamOut);
   profileGaugePath.TPSTOP(QUDA_PROFILE_INIT);

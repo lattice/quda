@@ -146,6 +146,8 @@ void gauge_force_test(bool compute_force = true)
   if (compute_force) {
     param.reconstruct = QUDA_RECONSTRUCT_10;
     param.link_type = QUDA_ASQTAD_MOM_LINKS;
+  } else {
+    param.reconstruct = QUDA_RECONSTRUCT_NO;
   }
   param.create = QUDA_ZERO_FIELD_CREATE;
   auto Mom_milc = new quda::cpuGaugeField(param);
