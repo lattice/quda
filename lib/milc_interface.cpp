@@ -648,9 +648,9 @@ void qudaGaugeForce(int precision, int num_loop_types, double milc_loop_coeff[3]
 /**
  * @brief Reusable routine that creates a qudaGaugeParam for gauge-related observable measurements
  *
- * @param [in] precision MILC precision
- * @param [in] arg MILC Site arg structure
- * @param [in] phase_in Whether or not phases have been applied
+ * @param[in] precision MILC precision
+ * @param[in] arg MILC Site arg structure
+ * @param[in] phase_in Whether or not phases have been applied
  * @return A qudaGaugeParam that can be passed to QUDA interface functions
  */
 QudaGaugeParam createGaugeParamForObservables(int precision, QudaMILCSiteArg_t *arg, int phase_in)

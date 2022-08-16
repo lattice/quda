@@ -59,7 +59,6 @@ namespace quda {
       // Load from slice, store into bulk
       typename Arg::Link link = arg.S(0, x_cb, parity);
       arg.U(0, x_bulk_cb, parity_bulk) = link;
-
     }
 
   };
@@ -148,7 +147,6 @@ namespace quda {
 
       // save loop
       arg.P(0, x_cb, parity) = polyloop;
-
     }
 
   };

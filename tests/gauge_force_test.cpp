@@ -10,7 +10,7 @@
 #include "misc.h"
 #include "gauge_force_reference.h"
 #include "gauge_force_quda.h"
-#include <sys/time.h>
+#include <timer.h>
 #include <gtest/gtest.h>
 
 static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -181,21 +181,21 @@ void gauge_force_test(bool compute_force = true)
       computeGaugePathQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);
   }
 
-  struct timeval t0, t1;
-  double total_time = 0.0;
+  quda::host_timer_t host_timer;
+  double time_sec = 0.0;
   // Multiple execution to exclude warmup time in the first run
 
   auto &Mom_ = gauge_order == QUDA_MILC_GAUGE_ORDER ? Mom_milc : Mom_qdp;
   for (int i = 0; i < niter; i++) {
     Mom_->copy(*Mom_ref_milc); // restore initial momentum for correctness
-    gettimeofday(&t0, NULL);
+    host_timer.start();
     if (compute_force)
       computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3,
                             &gauge_param);
     else
       computeGaugePathQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);
-    gettimeofday(&t1, NULL);
-    total_time += t1.tv_sec - t0.tv_sec + 0.000001 * (t1.tv_usec - t0.tv_usec);
+    host_timer.stop();
+    time_sec += host_timer.last();
   }
   if (gauge_order == QUDA_QDP_GAUGE_ORDER) Mom_milc->copy(*Mom_qdp);
 
@@ -220,8 +220,8 @@ void gauge_force_test(bool compute_force = true)
     printfQuda("QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref, force_deviation);
   }
 
-  double perf = 1.0 * niter * flops * V / (total_time * 1e+9);
-  printfQuda("total time = %.2f ms\n", total_time * 1e+3);
+  double perf = 1.0 * niter * flops * V / (time_sec * 1e+9);
+  printfQuda("total time = %.2f ms\n", time_sec * 1e+3);
   printfQuda("overall performance : %.2f GFLOPS\n", perf);
 
   for (int dir = 0; dir < 4; dir++) {
@@ -293,16 +293,14 @@ void gauge_loop_test()
     computeGaugeLoopTraceQuda(traces, sitelink, trace_path_p, trace_loop_length_p, trace_loop_coeff_p, num_paths, max_length, scale_factor, &gauge_param);
   }
 
-  struct timeval t0, t1;
-  double total_time = 0.0;
+  quda::host_timer_t host_timer;
   // Multiple execution to exclude warmup time in the first run
 
+  host_timer.start();
   for (int i = 0; i < niter; i++) {
-    gettimeofday(&t0, NULL);
     computeGaugeLoopTraceQuda(traces, sitelink, trace_path_p, trace_loop_length_p, trace_loop_coeff_p, num_paths, max_length, scale_factor, &gauge_param);
-    gettimeofday(&t1, NULL);
-    total_time += t1.tv_sec - t0.tv_sec + 0.000001 * (t1.tv_usec - t0.tv_usec);
   }
+  host_timer.stop();
   
   // 6 loops of length 4, 12 loops of length 6 + 18 paths worth of traces and rescales
   int flops = (4 * 6 + 6 * 12) * 198 + 18 * 8;
@@ -345,8 +343,8 @@ void gauge_loop_test()
 
   }
 
-  double perf = 1.0 * niter * flops * V / (total_time * 1e+9);
-  printfQuda("total time = %.2f ms\n", total_time * 1e+3);
+  double perf = 1.0 * niter * flops * V / (host_timer.last() * 1e+9);
+  printfQuda("total time = %.2f ms\n", host_timer.last() * 1e+3);
   printfQuda("overall performance : %.2f GFLOPS\n", perf);
 
   for (int i = 0; i < num_paths; i++)

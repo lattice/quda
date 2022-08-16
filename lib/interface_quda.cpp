@@ -5283,7 +5283,6 @@ void plaqQuda(double plaq[3])
  */
 void plaqLoadGaugeQuda(double plaq[3], void *gauge, QudaGaugeParam *param)
 {
-
   profilePlaq.TPSTART(QUDA_PROFILE_TOTAL);
 
   profilePlaq.TPSTART(QUDA_PROFILE_INIT);
@@ -5367,7 +5366,6 @@ void polyakovLoopQuda(double ploop[2], int dir)
  */
 void polyakovLoopLoadGaugeQuda(double ploop[2], int dir, void *gauge, QudaGaugeParam *param)
 {
-
   profilePolyakovLoop.TPSTART(QUDA_PROFILE_TOTAL);
 
   profilePolyakovLoop.TPSTART(QUDA_PROFILE_INIT);

@@ -21,9 +21,6 @@ namespace quda {
       s(s),
       timeslice(timeslice)
     {
-      strcat(aux, ",4d_vol=");
-      strcat(aux, u.VolString());
-
       apply(device::get_default_stream());
     }
 
@@ -32,12 +29,6 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       GaugeInsertTimesliceArg<Float, nColor, recon> arg(u, s, timeslice);
       launch<InsertTimeslice>(tp, stream, arg);
-    }
-
-    long long flops() const
-    {
-      // just a copy
-      return 0;
     }
 
     long long bytes() const {
@@ -58,8 +49,6 @@ namespace quda {
       product_field(product_field),
       u(u)
     {
-      strcat(aux, ",4d_vol=");
-      strcat(aux, u.VolString());
       strcat(aux, ",3d_vol=");
       strcat(aux, product_field.VolString());
 
@@ -101,12 +90,6 @@ namespace quda {
     {
       if (u.Geometry() != QUDA_SCALAR_GEOMETRY && u.Geometry() != QUDA_VECTOR_GEOMETRY)
         errorQuda("Invalid geometry %d in Polyakov loop calculation", u.Geometry());
-      strcat(aux, ",4d_vol=");
-      strcat(aux, u.VolString());
-      strcat(aux, ",geometry=");
-      char aux2[3];
-      u32toa(aux2, u.Geometry());
-      strcat(aux, aux2);
 
       apply(device::get_default_stream());
 
@@ -244,8 +227,7 @@ namespace quda {
           profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
           // swap buffers
-          SEND_BUFFER ^= 1;
-          RECV_BUFFER ^= 1;
+	  std::swap(SEND_BUFFER, RECV_BUFFER);
         }
 
         // clean up
@@ -266,7 +248,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugePolyakovLoopTrace, ReconstructNo12>(G, loop);
     // We normalize by the 3-d volume, times the 4-d communications dim to cancel out redundant counting
-    long vol3d = u.Volume() * comm_dim(0) * comm_dim(1) * comm_dim(2) * comm_dim(3) / u.X()[3];
+    auto vol3d = u.Volume() * comm_dim(0) * comm_dim(1) * comm_dim(2) * comm_dim(3) / u.X()[3];
     ploop[0] = loop[0] / vol3d;
     ploop[1] = loop[1] / vol3d;
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
