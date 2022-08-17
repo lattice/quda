@@ -3,6 +3,7 @@
 #include <index_helper.cuh>
 #include <gauge_field_order.h>
 #include <fast_intdiv.h>
+#include <thread_array.h>
 #include <kernel.h>
 
 namespace quda {
@@ -44,28 +45,6 @@ namespace quda {
     }
   };
 
-  template <int dir, typename Arg>
-  __device__ void longLinkDir(const Arg &arg, int idx, int parity) {
-    int x[4];
-    int dx[4] = {0, 0, 0, 0};
-
-    getCoords(x, idx, arg.X, parity);
-    for (int d=0; d<4; d++) x[d] += arg.border[d];
-
-    using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
-
-    Link a = arg.u(dir, linkIndex(x, arg.E), parity);
-
-    dx[dir]++;
-    Link b = arg.u(dir, linkIndexShift(x, dx, arg.E), 1-parity);
-
-    dx[dir]++;
-    Link c = arg.u(dir, linkIndexShift(x, dx, arg.E), parity);
-    dx[dir]-=2;
-
-    arg.link(dir, idx, parity) = arg.coeff * a * b * c;
-  }
-
   template <typename Arg> struct ComputeLongLink
   {
     const Arg &arg;
@@ -74,12 +53,23 @@ namespace quda {
 
     __device__ __host__ void operator()(int x_cb, int parity, int dir)
     {
-      switch(dir) {
-      case 0: longLinkDir<0>(arg, x_cb, parity); break;
-      case 1: longLinkDir<1>(arg, x_cb, parity); break;
-      case 2: longLinkDir<2>(arg, x_cb, parity); break;
-      case 3: longLinkDir<3>(arg, x_cb, parity); break;
-      }
+      int x[4];
+      thread_array<int, 4> dx = {0, 0, 0, 0};
+
+      getCoords(x, x_cb, arg.X, parity);
+      for (int d = 0; d < 4; d++) x[d] += arg.border[d];
+
+      using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
+
+      Link a = arg.u(dir, linkIndex(x, arg.E), parity);
+
+      dx[dir]++;
+      Link b = arg.u(dir, linkIndexShift(x, dx, arg.E), 1 - parity);
+
+      dx[dir]++;
+      Link c = arg.u(dir, linkIndexShift(x, dx, arg.E), parity);
+
+      arg.link(dir, x_cb, parity) = arg.coeff * a * b * c;
     }
   };
 
@@ -93,12 +83,12 @@ namespace quda {
     {
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
-      for (int d=0; d<4; d++) x[d] += arg.border[d];
+      for (int d = 0; d < 4; d++) x[d] += arg.border[d];
 
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
 
-      Link a = arg.u(dir, linkIndex(x,arg.E), parity);
-      arg.link(dir, x_cb, parity) = arg.coeff*a;
+      Link a = arg.u(dir, linkIndex(x, arg.E), parity);
+      arg.link(dir, x_cb, parity) = arg.coeff * a;
     }
   };
 
@@ -160,11 +150,10 @@ namespace quda {
     }
   };
 
-  template <int mu, int nu, typename Arg>
-  __device__ inline void computeStaple(Matrix<complex<typename Arg::real>, Arg::nColor> &staple, const Arg &arg, int x[], int parity)
+  template <typename Link, typename Arg>
+  __device__ inline void computeStaple(Link &staple, const Arg &arg, int x[], int parity, int mu, int nu)
   {
-    using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
-    int dx[4] = {0, 0, 0, 0};
+    thread_array<int, 4> dx = {0, 0, 0, 0};
 
     /* Computes the upper staple :
      *                 mu (B)
@@ -211,7 +200,7 @@ namespace quda {
       dx[mu]--;
       dx[nu]++;
 
-      staple = staple + conj(a)*b*c;
+      staple = staple + conj(a) * b * c;
     }
   }
 
@@ -223,45 +212,14 @@ namespace quda {
 
     __device__ __host__ void operator()(int x_cb, int parity, int mu_idx)
     {
-      int mu;
-      switch(mu_idx) {
-      case 0: mu = arg.mu_map[0]; break;
-      case 1: mu = arg.mu_map[1]; break;
-      case 2: mu = arg.mu_map[2]; break;
-      }
-
+      int mu = arg.mu_map[mu_idx];
       int x[4];
-      getCoords(x, x_cb, arg.X, (parity+arg.odd_bit)%2);
-      for (int d=0; d<4; d++) x[d] += arg.border[d];
+      getCoords(x, x_cb, arg.X, (parity + arg.odd_bit) % 2);
+      for (int d = 0; d < 4; d++) x[d] += arg.border[d];
 
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       Link staple;
-      switch (mu) {
-      case 0:
-        switch (arg.nu) {
-        case 1: computeStaple<0,1>(staple, arg, x, parity); break;
-        case 2: computeStaple<0,2>(staple, arg, x, parity); break;
-        case 3: computeStaple<0,3>(staple, arg, x, parity); break;
-        } break;
-      case 1:
-        switch (arg.nu) {
-        case 0: computeStaple<1,0>(staple, arg, x, parity); break;
-        case 2: computeStaple<1,2>(staple, arg, x, parity); break;
-        case 3: computeStaple<1,3>(staple, arg, x, parity); break;
-        } break;
-      case 2:
-        switch (arg.nu) {
-        case 0: computeStaple<2,0>(staple, arg, x, parity); break;
-        case 1: computeStaple<2,1>(staple, arg, x, parity); break;
-        case 3: computeStaple<2,3>(staple, arg, x, parity); break;
-      } break;
-      case 3:
-        switch (arg.nu) {
-        case 0: computeStaple<3,0>(staple, arg, x, parity); break;
-        case 1: computeStaple<3,1>(staple, arg, x, parity); break;
-        case 2: computeStaple<3,2>(staple, arg, x, parity); break;
-        } break;
-      }
+      computeStaple(staple, arg, x, parity, mu, arg.nu);
 
       // exclude inner halo
       if ( !(x[0] < arg.inner_border[0] || x[0] >= arg.inner_X[0] + arg.inner_border[0] ||
