@@ -73,14 +73,24 @@
 #undef QUDA_FLOAT8
 #endif
 
-#cmakedefine QUDA_SPINOR_BITPACK
-#ifdef QUDA_SPINOR_BITPACK
+#cmakedefine QUDA_BITPACK_SPINOR
+#ifdef QUDA_BITPACK_SPINOR
 /**
- * @def SPINOR_BITPACK
- * @brief This macro set whether we use bit-packed formats where available
+ * @def BITPACK_SPINOR
+ * @brief This macro set whether we use bit-packed formats for the quarks where available
  */
-#define SPINOR_BITPACK
-#undef QUDA_SPINOR_BITPACK
+#define BITPACK_SPINOR
+#undef QUDA_BITPACK_SPINOR
+#endif
+
+#cmakedefine QUDA_BITPACK_GAUGE
+#ifdef QUDA_BITPACK_GAUGE
+/**
+ * @def BITPACK_GAUGE
+ * @brief This macro set whether we use bit-packed formats for the gauge where available
+ */
+#define BITPACK_GAUGE
+#undef QUDA_BITPACK_GAUGE
 #endif
 
 /**

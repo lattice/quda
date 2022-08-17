@@ -111,7 +111,7 @@ namespace quda {
    */
   template<typename> struct mapper { };
   template<> struct mapper<double> { typedef double type; };
-#ifdef SPINOR_BITPACK
+#if defined(BITPACK_SPINOR) || defined(BITPACK_GAUGE)
   template<> struct mapper<float> { typedef double type; };
 #else
   template<> struct mapper<float> { typedef float type; };
@@ -236,6 +236,17 @@ namespace quda {
   };
 
   template <typename Float, int number> struct VectorType;
+
+  // int precision
+  template <> struct VectorType<int, 1> {
+    typedef int type;
+  };
+  template <> struct VectorType<int, 2> {
+    typedef int2 type;
+  };
+  template <> struct VectorType<int, 4> {
+    typedef int4 type;
+  };
 
   // double precision
   template <> struct VectorType<double, 1>{typedef double type; };

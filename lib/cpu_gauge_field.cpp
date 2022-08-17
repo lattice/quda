@@ -271,7 +271,11 @@ namespace quda {
 
     if (link_type == QUDA_ASQTAD_FAT_LINKS) {
       fat_link_max = src.LinkMax();
-      if (fat_link_max == 0.0 && precision < QUDA_SINGLE_PRECISION) fat_link_max = src.abs_max();
+#ifdef BITPACK_GAUGE
+      if (fat_link_max == 0.0 && (precision < QUDA_DOUBLE_PRECISION)) fat_link_max = src.abs_max();
+#else
+      if (fat_link_max == 0.0 && (precision < QUDA_SINGLE_PRECISION)) fat_link_max = src.abs_max();
+#endif
     } else {
       fat_link_max = 1.0;
     }

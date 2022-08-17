@@ -195,7 +195,8 @@ option(QUDA_INSTALL_ALL_TESTS "install tests by default" ON)
 option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ON)
 
 option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" ON)
-option(QUDA_SPINOR_BITPACK "use bit-packed formats (where supported)?" OFF)
+option(QUDA_BITPACK_SPINOR "use bit-packed formats for the quark fields (where supported)?" OFF)
+option(QUDA_BITPACK_GAUGE "use bit-packed formats for the gauge fields (where supported)?" OFF)
 
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
 
@@ -255,7 +256,8 @@ mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 
 mark_as_advanced(QUDA_FLOAT8)
-mark_as_advanced(QUDA_SPINOR_BITPACK)
+mark_as_advanced(QUDA_BITPACK_SPINOR)
+mark_as_advanced(QUDA_BITPACK_GAUGE)
 mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
 mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
 

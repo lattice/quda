@@ -5,7 +5,7 @@
 
 namespace quda {
 
-#ifdef SPINOR_BITPACK
+#ifdef BITPACK_SPINOR
   constexpr bool spinor_bitpack() { return true; }
 #else
   constexpr bool spinor_bitpack() { return false; }

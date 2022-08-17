@@ -26,6 +26,12 @@
 
 namespace quda {
 
+#ifdef BITPACK_GAUGE
+  constexpr bool gauge_bitpack() { return true; }
+#else
+  constexpr bool gauge_bitpack() { return false; }
+#endif
+
   /**
      @brief gauge_wrapper is an internal class that is used to wrap
      instances of gauge accessors, currying in a specific location on
@@ -940,19 +946,18 @@ namespace quda {
       */
       template <int N, typename Float, QudaGhostExchange ghostExchange_, QudaStaggeredPhase = QUDA_STAGGERED_PHASE_NO>
       struct Reconstruct {
+        static constexpr bool is_fixed = isFixed<Float>::value || (gauge_bitpack() && std::is_same_v<Float, float>);
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
         real scale;
         real scale_inv;
-        Reconstruct(const GaugeField &u) :
-          scale(isFixed<Float>::value ? u.LinkMax() : 1.0),
-          scale_inv(isFixed<Float>::value ? 1.0 / scale : 1.0)
+        Reconstruct(const GaugeField &u) : scale(is_fixed ? u.LinkMax() : 1.0), scale_inv(is_fixed ? 1.0 / scale : 1.0)
         {
         }
 
         __device__ __host__ inline void Pack(real out[N], const complex in[N / 2]) const
         {
-          if constexpr (isFixed<Float>::value) {
+          if constexpr (is_fixed) {
 #pragma unroll
             for (int i = 0; i < N / 2; i++) {
               out[2 * i + 0] = scale_inv * in[i].real();
@@ -971,7 +976,7 @@ namespace quda {
         __device__ __host__ inline void Unpack(complex out[N / 2], const real in[N], int, int, real, const I *,
                                                const int *) const
         {
-          if constexpr (isFixed<Float>::value) {
+          if constexpr (is_fixed) {
 #pragma unroll
             for (int i = 0; i < N / 2; i++) { out[i] = scale * complex(in[2 * i + 0], in[2 * i + 1]); }
           } else {
@@ -1496,6 +1501,7 @@ namespace quda {
         typedef typename AllocType<huge_alloc>::type AllocInt;
         Reconstruct<reconLenParam, Float, ghostExchange_, stag_phase> reconstruct;
         static constexpr int reconLen = (reconLenParam == 11) ? 10 : reconLenParam;
+        static constexpr int M = reconLen / N;
         static constexpr int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
         Float *gauge;
         const AllocInt offset;
@@ -1535,215 +1541,237 @@ namespace quda {
           }
         }
 
-      template <typename T>
-      __device__ __host__ inline void load(T v[length / 2], int x, int dir, int parity, real phase = 1.0) const
-      {
-        const int M = reconLen / N;
-        real tmp[reconLen];
-
+        template <typename Vector, int M, typename T>
+        __device__ __host__ inline void load(T v[reconLen], const Float *ptr, int idx, int stride) const
+        {
+          if constexpr (!(gauge_bitpack() && std::is_same_v<Float, float>)) {
 #pragma unroll
-        for (int i=0; i<M; i++){
-          // first load from memory
-          Vector vecTmp = vector_load<Vector>(gauge, parity * offset + (dir * M + i) * stride + x);
-          // second do copy converting into register type
+            for (int i = 0; i < M; i++) {
+              // first load from memory
+              Vector vecTmp = vector_load<Vector>(ptr, idx + i * stride);
+              // second do copy converting into register type
 #pragma unroll
-          for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
-        }
+              for (int j = 0; j < N; j++) copy(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
+            }
+          } else {
+            constexpr double max_inv = fixedInvMaxValue<int32_t, real>::value;
 
-        constexpr bool load_phase = (hasPhase && !(static_phase<stag_phase>() && (reconLen == 13 || use_inphase)));
-        if constexpr (load_phase) {
-          copy(phase, gauge[parity * offset * N + phaseOffset + stride * dir + x]);
-          phase *= static_cast<real>(2.0);
-        }
-
-        complex v_[length / 2];
-        reconstruct.Unpack(v_, tmp, x, dir, phase, X, R);
-        for (int i = 0; i < length / 2; i++) v[i] = v_[i];
-      }
-
-      template <typename T>
-      __device__ __host__ inline void save(const T v[length / 2], int x, int dir, int parity) const
-      {
-        const int M = reconLen / N;
-        real tmp[reconLen];
-
-        complex v_[length / 2];
-        for (int i = 0; i < length / 2; i++) v_[i] = v[i];
-        reconstruct.Pack(tmp, v_);
-
+            using Vec = typename VectorType<int32_t, N>::type;
+            static_assert(sizeof(Vector) == sizeof(Vec), "Vector sizes must match");
 #pragma unroll
-        for (int i=0; i<M; i++){
-	  Vector vecTmp;
-	  // first do copy converting into storage type
+            for (int i = 0; i < M; i++) {
+              // first load from memory
+              Vec vecTmp = vector_load<Vec>(ptr, idx + i * stride);
+              // second do copy converting into register type
 #pragma unroll
-	  for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
-	  // second do vectorized copy into memory
-          vector_store(gauge, parity * offset + x + (dir * M + i) * stride, vecTmp);
-        }
-        if constexpr (hasPhase) {
-          real phase = reconstruct.getPhase(v);
-          copy(gauge[parity * offset * N + phaseOffset + dir * stride + x], static_cast<real>(0.5) * phase);
-        }
-      }
-
-      /**
-	 @brief This accessor routine returns a gauge_wrapper to this object,
-	 allowing us to overload various operators for manipulating at
-	 the site level interms of matrix operations.
-	 @param[in] dir Which dimension are we requesting
-	 @param[in] x_cb Checkerboarded space-time index we are requesting
-	 @param[in] parity Parity we are requesting
-	 @return Instance of a gauge_wrapper that curries in access to
-	 this field at the above coordinates.
-       */
-      __device__ __host__ inline auto operator()(int dim, int x_cb, int parity, real phase = 1.0) const
-      {
-        return gauge_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, x_cb, parity, phase);
-      }
-
-      __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
-      {
-        if (!ghost[dir]) { // load from main field not separate array
-          load(v, volumeCB + x, dir, parity, inphase); // an offset of size volumeCB puts us at the padded region
-          // This also works perfectly when phases are stored. No need to change this.
-        } else {
-          const int M = reconLen / N;
-          real tmp[reconLen];
-
-#pragma unroll
-          for (int i=0; i<M; i++) {
-	    // first do vectorized copy from memory into registers
-            Vector vecTmp = vector_load<Vector>(
-                ghost[dir] + parity * faceVolumeCB[dir] * (M * N + hasPhase), i * faceVolumeCB[dir] + x);
-            // second do copy converting into register type
-#pragma unroll
-            for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
+              for (int j = 0; j < N; j++) {
+                v[i * N + j] = static_cast<T>(reinterpret_cast<int *>(&vecTmp)[j]) * max_inv;
+              }
+            }
           }
-          real phase = 0.;
+        }
 
-          if constexpr (hasPhase) {
+        template <typename Vector, int M, typename T>
+        __device__ __host__ inline void save(T v[reconLen], Float *ptr, int idx, int stride) const
+        {
+          if constexpr (!(gauge_bitpack() && std::is_same_v<Float, float>)) {
+#pragma unroll
+            for (int i = 0; i < M; i++) {
+              Vector vecTmp;
+              // first do copy converting into storage type
+#pragma unroll
+              for (int j = 0; j < N; j++) copy(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N + j]);
+              // second do vectorized copy into memory
+              vector_store(ptr, idx + i * stride, vecTmp);
+            }
+          } else {
+            constexpr double max = fixedMaxValue<int32_t, real>::value;
 
-            // if(stag_phase == QUDA_STAGGERED_PHASE_MILC )  {
-            //   phase = inphase < static_cast<real>(0) ? static_cast<real>(-0.5) : static_cast<real>(0.5);
-            // } else {
-            copy(phase, ghost[dir][parity * faceVolumeCB[dir] * (M * N + 1) + faceVolumeCB[dir] * M * N + x]);
+            using Vec = typename VectorType<int, N>::type;
+            static_assert(sizeof(Vector) == sizeof(Vec), "Vector sizes must match");
+#pragma unroll
+            for (int i = 0; i < M; i++) {
+              Vec vecTmp;
+              // first do copy converting into storage type
+#pragma unroll
+              for (int j = 0; j < N; j++) {
+                reinterpret_cast<int *>(&vecTmp)[j] = static_cast<int>(v[i * N + j] * max);
+              }
+
+              // second do vectorized copy into memory
+              vector_store(ptr, idx + i * stride, vecTmp);
+            }
+          }
+        }
+
+        template <typename T>
+        __device__ __host__ inline void load(T v[length / 2], int x, int dir, int parity, real phase = 1.0) const
+        {
+          real tmp[reconLen];
+          load<Vector, M>(tmp, gauge, parity * offset + dir * M * stride + x, stride);
+
+          constexpr bool load_phase = (hasPhase && !(static_phase<stag_phase>() && (reconLen == 13 || use_inphase)));
+          if constexpr (load_phase) {
+            copy(phase, gauge[parity * offset * N + phaseOffset + stride * dir + x]);
             phase *= static_cast<real>(2.0);
-            // }
           }
-          reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
+
+          complex v_[length / 2];
+          reconstruct.Unpack(v_, tmp, x, dir, phase, X, R);
+#pragma unroll
+          for (int i = 0; i < length / 2; i++) v[i] = v_[i];
         }
-      }
 
-      __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dir, int parity) const
-      {
-        if (!ghost[dir]) { // store in main field not separate array
-          save(v, volumeCB + x, dir, parity); // an offset of size volumeCB puts us at the padded region
-        } else {
-          const int M = reconLen / N;
+        template <typename T>
+        __device__ __host__ inline void save(const T v[length / 2], int x, int dir, int parity) const
+        {
+          complex v_[length / 2];
+#pragma unroll
+          for (int i = 0; i < length / 2; i++) v_[i] = v[i];
+
           real tmp[reconLen];
-          reconstruct.Pack(tmp, v);
+          reconstruct.Pack(tmp, v_);
 
-#pragma unroll
-          for (int i=0; i<M; i++) {
-	    Vector vecTmp;
-	    // first do copy converting into storage type
-#pragma unroll
-	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
-	    // second do vectorized copy into memory
-	    vector_store(ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase), i*faceVolumeCB[dir]+x, vecTmp);
-          }
+          save<Vector, M>(tmp, gauge, parity * offset + dir * M * stride + x, stride);
 
           if constexpr (hasPhase) {
             real phase = reconstruct.getPhase(v);
-            copy(ghost[dir][parity * faceVolumeCB[dir] * (M * N + 1) + faceVolumeCB[dir] * M * N + x],
-                 static_cast<real>(0.5) * phase);
+            copy(gauge[parity * offset * N + phaseOffset + dir * stride + x], static_cast<real>(0.5) * phase);
           }
         }
-      }
 
-      /**
-         @brief This accessor routine returns a gauge_ghost_wrapper to this object,
-         allowing us to overload various operators for manipulating at
-         the site level interms of matrix operations.
-         @param[in] dir Which dimension are we requesting
-         @param[in] ghost_idx Ghost index we are requesting
-         @param[in] parity Parity we are requesting
-         @return Instance of a gauge_ghost_wrapper that curries in access to
-         this field at the above coordinates.
-       */
-      __device__ __host__ inline gauge_ghost_wrapper<real, Accessor> Ghost(int dim, int ghost_idx, int parity,
-                                                                           real phase = 1.0)
-      {
-        return gauge_ghost_wrapper<real, Accessor>(*this, dim, ghost_idx, parity, phase);
-      }
+        /**
+           @brief This accessor routine returns a gauge_wrapper to this object,
+           allowing us to overload various operators for manipulating at
+           the site level interms of matrix operations.
+           @param[in] dir Which dimension are we requesting
+           @param[in] x_cb Checkerboarded space-time index we are requesting
+           @param[in] parity Parity we are requesting
+           @return Instance of a gauge_wrapper that curries in access to
+           this field at the above coordinates.
+         */
+        __device__ __host__ inline auto operator()(int dim, int x_cb, int parity, real phase = 1.0) const
+        {
+          return gauge_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, x_cb, parity, phase);
+        }
 
-      /**
-         @brief This accessor routine returns a const gauge_ghost_wrapper to this object,
-         allowing us to overload various operators for manipulating at
-         the site level interms of matrix operations.
-         @param[in] dir Which dimension are we requesting
-         @param[in] ghost_idx Ghost index we are requesting
-         @param[in] parity Parity we are requesting
-         @return Instance of a gauge_ghost_wrapper that curries in access to
-         this field at the above coordinates.
-       */
-      __device__ __host__ inline const gauge_ghost_wrapper<real, Accessor> Ghost(int dim, int ghost_idx, int parity,
-                                                                                 real phase = 1.0) const
-      {
-        return gauge_ghost_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, ghost_idx, parity, phase);
-      }
+        __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dir, int parity,
+                                                  real inphase = 1.0) const
+        {
+          if (!ghost[dir]) {                             // load from main field not separate array
+            load(v, volumeCB + x, dir, parity, inphase); // an offset of size volumeCB puts us at the padded region
+            // This also works perfectly when phases are stored. No need to change this.
+          } else {
+            real tmp[reconLen];
+            load<Vector, M>(tmp, ghost[dir] + parity * faceVolumeCB[dir] * (M * N + hasPhase), x, faceVolumeCB[dir]);
 
-      __device__ __host__ inline void loadGhostEx(complex v[length / 2], int buff_idx, int extended_idx, int dir,
-                                                  int dim, int g, int parity, const int R[]) const
-      {
-        const int M = reconLen / N;
-        real tmp[reconLen];
+            real phase = 0.;
+            if constexpr (hasPhase) {
 
+              // if(stag_phase == QUDA_STAGGERED_PHASE_MILC )  {
+              //   phase = inphase < static_cast<real>(0) ? static_cast<real>(-0.5) : static_cast<real>(0.5);
+              // } else {
+              copy(phase, ghost[dir][parity * faceVolumeCB[dir] * (M * N + 1) + faceVolumeCB[dir] * M * N + x]);
+              phase *= static_cast<real>(2.0);
+              // }
+            }
+            reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
+          }
+        }
+
+        __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dir, int parity) const
+        {
+          if (!ghost[dir]) {                    // store in main field not separate array
+            save(v, volumeCB + x, dir, parity); // an offset of size volumeCB puts us at the padded region
+          } else {
+            real tmp[reconLen];
+            reconstruct.Pack(tmp, v);
+
+            save<Vector, M>(tmp, ghost[dir] + parity * faceVolumeCB[dir] * (M * N + hasPhase), x, faceVolumeCB[dir]);
+
+            if constexpr (hasPhase) {
+              real phase = reconstruct.getPhase(v);
+              copy(ghost[dir][parity * faceVolumeCB[dir] * (M * N + 1) + faceVolumeCB[dir] * M * N + x],
+                   static_cast<real>(0.5) * phase);
+            }
+          }
+        }
+
+        /**
+           @brief This accessor routine returns a gauge_ghost_wrapper to this object,
+           allowing us to overload various operators for manipulating at
+           the site level interms of matrix operations.
+           @param[in] dir Which dimension are we requesting
+           @param[in] ghost_idx Ghost index we are requesting
+           @param[in] parity Parity we are requesting
+           @return Instance of a gauge_ghost_wrapper that curries in access to
+           this field at the above coordinates.
+         */
+        __device__ __host__ inline gauge_ghost_wrapper<real, Accessor> Ghost(int dim, int ghost_idx, int parity,
+                                                                             real phase = 1.0)
+        {
+          return gauge_ghost_wrapper<real, Accessor>(*this, dim, ghost_idx, parity, phase);
+        }
+
+        /**
+           @brief This accessor routine returns a const gauge_ghost_wrapper to this object,
+           allowing us to overload various operators for manipulating at
+           the site level interms of matrix operations.
+           @param[in] dir Which dimension are we requesting
+           @param[in] ghost_idx Ghost index we are requesting
+           @param[in] parity Parity we are requesting
+           @return Instance of a gauge_ghost_wrapper that curries in access to
+           this field at the above coordinates.
+         */
+        __device__ __host__ inline const gauge_ghost_wrapper<real, Accessor> Ghost(int dim, int ghost_idx, int parity,
+                                                                                   real phase = 1.0) const
+        {
+          return gauge_ghost_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, ghost_idx, parity, phase);
+        }
+
+        template <typename T>
+        __device__ __host__ inline void loadGhostEx(T v[length / 2], int buff_idx, int extended_idx, int dir, int dim,
+                                                    int g, int parity, const int R[]) const
+        {
+          real tmp[reconLen];
+          auto ptr = ghost[dim] + ((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * (M * N + hasPhase);
+          load<Vector, M>(tmp, ptr, buff_idx, R[dim] * faceVolumeCB[dim]);
+
+          real phase = 0.;
+          if constexpr (hasPhase)
+            copy(phase,
+                 ghost[dim][((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * (M * N + 1)
+                            + R[dim] * faceVolumeCB[dim] * M * N + buff_idx]);
+
+          // use the extended_idx to determine the boundary condition
+          complex v_[length / 2];
+          reconstruct.Unpack(v_, tmp, extended_idx, g, 2. * phase, X, R);
 #pragma unroll
-	for (int i=0; i<M; i++) {
-	  // first do vectorized copy from memory
-	  Vector vecTmp = vector_load<Vector>(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
-					      +i*R[dim]*faceVolumeCB[dim]+buff_idx);
-	  // second do copy converting into register type
-#pragma unroll
-	  for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
-	}
-        real phase = 0.;
-        if constexpr (hasPhase)
-          copy(phase,
-               ghost[dim][((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * (M * N + 1)
-                          + R[dim] * faceVolumeCB[dim] * M * N + buff_idx]);
+          for (int i = 0; i < length / 2; i++) v[i] = v_[i];
+        }
 
-        // use the extended_idx to determine the boundary condition
-        reconstruct.Unpack(v, tmp, extended_idx, g, 2. * phase, X, R);
-      }
-
-      __device__ __host__ inline void saveGhostEx(const complex v[length / 2], int buff_idx, int, int dir, int dim,
-                                                  int g, int parity, const int R[]) const
-      {
-        const int M = reconLen / N;
-        real tmp[reconLen];
-        reconstruct.Pack(tmp, v);
-
+        __device__ __host__ inline void saveGhostEx(const complex v[length / 2], int buff_idx, int, int dir, int dim,
+                                                    int g, int parity, const int R[]) const
+        {
+          complex v_[length / 2];
 #pragma unroll
-	  for (int i=0; i<M; i++) {
-	    Vector vecTmp;
-	    // first do copy converting into storage type
-#pragma unroll
-	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
-	    // second do vectorized copy to memory
-	    vector_store(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
-			 i*R[dim]*faceVolumeCB[dim]+buff_idx, vecTmp);
-	  }
+          for (int i = 0; i < length / 2; i++) v_[i] = v[i];
+
+          real tmp[reconLen];
+          reconstruct.Pack(tmp, v_);
+
+          auto ptr = ghost[dim] + ((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * (M * N + hasPhase);
+          save<Vector, M>(tmp, ptr, buff_idx, R[dim] * faceVolumeCB[dim]);
+
           if constexpr (hasPhase) {
             real phase = reconstruct.getPhase(v);
             copy(ghost[dim][((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * (M * N + 1)
                             + R[dim] * faceVolumeCB[dim] * M * N + buff_idx],
                  static_cast<real>(0.5) * phase);
           }
-      }
+        }
 
-      size_t Bytes() const { return reconLen * sizeof(Float); }
+        size_t Bytes() const { return reconLen * sizeof(Float); }
       };
 
       /**
@@ -1841,6 +1869,7 @@ namespace quda {
         auto in = &gauge[dir][(parity * volumeCB + x) * length];
         complex v_[length/2];
         block_load<complex, length / 2>(v_, reinterpret_cast<complex *>(in));
+#pragma unroll
         for (int i = 0; i < length / 2; i++) v[i] = v_[i];
       }
 
@@ -1848,7 +1877,8 @@ namespace quda {
       __device__ __host__ inline void save(const T v[length / 2], int x, int dir, int parity) const
       {
         complex v_[length/2];
-        for (int i = 0; i < length / 2; i++) v_[i] = v_[i];
+#pragma unroll
+        for (int i = 0; i < length / 2; i++) v_[i] = v[i];
         auto out = &gauge[dir][(parity * volumeCB + x) * length];
         block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v_);
       }
@@ -1940,6 +1970,7 @@ namespace quda {
       auto in = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
       complex v_[length/2];
       block_load<complex, length / 2>(v_, reinterpret_cast<complex *>(in));
+#pragma unroll
       for (int i = 0; i < length / 2; i++) v[i] = v_[i];
     }
 
@@ -1947,7 +1978,8 @@ namespace quda {
     __device__ __host__ inline void save(const T v[length / 2], int x, int dir, int parity) const
     {
       complex v_[length/2];
-      for (int i = 0; i < length / 2; i++) v_[i] = v_[i];
+#pragma unroll
+      for (int i = 0; i < length / 2; i++) v_[i] = v[i];
       auto out = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
       block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v_);
     }
@@ -2072,7 +2104,7 @@ namespace quda {
       complex v_[9];
       block_load<complex, length / 2>(v_, reinterpret_cast<complex *>(in));
 
-      for (int i=0; i<Nc; i++) {
+      for (int i = 0; i < Nc; i++) {
         for (int j = 0; j < Nc; j++) { v[i * Nc + j] = v_[j * Nc + i] * anisotropy_inv; }
       }
     }
@@ -2081,7 +2113,7 @@ namespace quda {
     {
       auto out = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
       complex v_[9];
-      for (int i=0; i<Nc; i++) {
+      for (int i = 0; i < Nc; i++) {
         for (int j = 0; j < Nc; j++) { v_[i * Nc + j] = v[j * Nc + i] * anisotropy; }
       }
 
