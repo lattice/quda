@@ -363,7 +363,7 @@ namespace quda {
 
       void resetScale(Float max)
       {
-        if constexpr (fixed) {
+        if (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
           scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
         }
@@ -442,7 +442,7 @@ namespace quda {
 
       void resetScale(Float max)
       {
-        if constexpr (fixed) {
+        if (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
           scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
         }
@@ -478,7 +478,7 @@ namespace quda {
 
       void resetScale(Float max)
       {
-        if constexpr (fixed) {
+        if (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
           scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
         }
@@ -564,7 +564,7 @@ namespace quda {
 
       void resetScale(Float max)
       {
-        if constexpr (fixed) {
+        if (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
           scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
         }
@@ -599,7 +599,6 @@ namespace quda {
       const unsigned int volumeCB;
       const unsigned int stride;
       const int geometry;
-      Float max;
       Float scale;
       Float scale_inv;
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
@@ -611,17 +610,15 @@ namespace quda {
         volumeCB(U.VolumeCB()),
         stride(U.Stride()),
         geometry(U.Geometry()),
-        max(static_cast<Float>(1.0)),
         scale(static_cast<Float>(1.0)),
         scale_inv(static_cast<Float>(1.0))
       {
 	resetScale(U.Scale());
       }
 
-      void resetScale(Float max_)
+      void resetScale(Float max)
       {
-        if constexpr (fixed) {
-          max = max_;
+        if (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
 	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
         }
@@ -701,7 +698,7 @@ namespace quda {
       void resetScale(Float max)
       {
         accessor.resetScale(max);
-        if constexpr (fixed) {
+        if (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
           scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
         }
@@ -1538,7 +1535,7 @@ namespace quda {
           }
         }
 
-      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real phase = 1.0) const
       {
         const int M = reconLen / N;
         real tmp[reconLen];
@@ -1552,14 +1549,10 @@ namespace quda {
           for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
         }
 
-        real phase = 0.;
-        if constexpr (hasPhase) {
-          if constexpr (static_phase<stag_phase>() && (reconLen == 13 || use_inphase)) {
-            phase = inphase;
-          } else {
-            copy(phase, gauge[parity * offset * N + phaseOffset + stride * dir + x]);
-            phase *= static_cast<real>(2.0);
-          }
+        constexpr bool load_phase = (hasPhase && !(static_phase<stag_phase>() && (reconLen == 13 || use_inphase)));
+        if constexpr (load_phase) {
+          copy(phase, gauge[parity * offset * N + phaseOffset + stride * dir + x]);
+          phase *= static_cast<real>(2.0);
         }
 
         reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
