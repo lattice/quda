@@ -247,7 +247,7 @@ void gauge_loop_test()
   setVerbosityQuda(QUDA_VERBOSE, "", stdout);
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  setGaugeParam(gauge_param);
+  setWilsonGaugeParam(gauge_param);
 
   gauge_param.gauge_order = gauge_order;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
@@ -339,7 +339,8 @@ void gauge_loop_test()
 
     double plaq_default[3];
 
-    plaqLoadGaugeQuda(plaq_default, sitelink, &gauge_param);
+    loadGaugeQuda(sitelink, &gauge_param);
+    plaqQuda(plaq_default);
 
     plaq_deviation = std::abs(plaq_default[0] - plaq_loop[0]) / std::abs(plaq_default[0]);
     logQuda(QUDA_VERBOSE, "Plaquette loop space %e time %e total %e ; plaqQuda space %e time %e total %e ; deviation %e\n",

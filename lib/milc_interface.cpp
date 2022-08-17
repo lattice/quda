@@ -656,8 +656,7 @@ void qudaGaugeForce(int precision, int num_loop_types, double milc_loop_coeff[3]
 QudaGaugeParam createGaugeParamForObservables(int precision, QudaMILCSiteArg_t *arg, int phase_in)
 {
   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
-      (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
-      phase_in ? QUDA_GENERAL_LINKS : QUDA_SU3_LINKS);
+      (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, QUDA_WILSON_LINKS);
 
   qudaGaugeParam.gauge_offset = arg->link_offset;
   qudaGaugeParam.mom_offset = arg->mom_offset;
@@ -668,9 +667,26 @@ QudaGaugeParam createGaugeParamForObservables(int precision, QudaMILCSiteArg_t *
   if (phase_in) qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   if (phase_in) qudaGaugeParam.reconstruct_sloppy = qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
 
-  // point of future optimization -- clean up residency a bit, right now it's not a critical-path problem
-  qudaGaugeParam.make_resident_gauge = false;
-  qudaGaugeParam.use_resident_gauge = false;
+  qudaGaugeParam.ga_pad = 0;
+  // For multi-GPU, ga_pad must be large enough to store a time-slice
+#ifdef MULTI_GPU
+  int x_face_size = qudaGaugeParam.X[1] * qudaGaugeParam.X[2] * qudaGaugeParam.X[3] / 2;
+  int y_face_size = qudaGaugeParam.X[0] * qudaGaugeParam.X[2] * qudaGaugeParam.X[3] / 2;
+  int z_face_size = qudaGaugeParam.X[0] * qudaGaugeParam.X[1] * qudaGaugeParam.X[3] / 2;
+  int t_face_size = qudaGaugeParam.X[0] * qudaGaugeParam.X[1] * qudaGaugeParam.X[2] / 2;
+  int pad_size = x_face_size > y_face_size ? x_face_size : y_face_size;
+  pad_size = pad_size > z_face_size ? pad_size : z_face_size;
+  pad_size = pad_size > t_face_size ? pad_size : t_face_size;
+  qudaGaugeParam.ga_pad = pad_size;
+#endif
+
+  if (!have_resident_gauge) {
+    qudaGaugeParam.make_resident_gauge = false;
+    qudaGaugeParam.use_resident_gauge = false;
+  } else {
+    qudaGaugeParam.use_resident_gauge = true;
+    qudaGaugeParam.make_resident_gauge = true;
+  }
 
   return qudaGaugeParam;
 }
@@ -696,7 +712,8 @@ void qudaPlaquettePhased(int precision, double plaq[3], QudaMILCSiteArg_t *arg, 
   QudaGaugeParam qudaGaugeParam = createGaugeParamForObservables(precision, arg, phase_in);
   void *gauge = arg->site ? arg->site : arg->link;
 
-  plaqLoadGaugeQuda(plaq, gauge, &qudaGaugeParam);
+  loadGaugeQuda(gauge, &qudaGaugeParam);
+  plaqQuda(plaq);
 
   qudamilc_called<false>(__func__);
   return;
@@ -709,7 +726,8 @@ void qudaPolyakovLoopPhased(int precision, double ploop[2], int dir, QudaMILCSit
   QudaGaugeParam qudaGaugeParam = createGaugeParamForObservables(precision, arg, phase_in);
   void *gauge = arg->site ? arg->site : arg->link;
 
-  polyakovLoopLoadGaugeQuda(ploop, dir, gauge, &qudaGaugeParam);
+  loadGaugeQuda(gauge, &qudaGaugeParam);
+  polyakovLoopQuda(ploop, dir);
 
   qudamilc_called<false>(__func__);
   return;

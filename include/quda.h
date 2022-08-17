@@ -1548,14 +1548,6 @@ extern "C" {
   void plaqQuda(double plaq[3]);
 
   /**
-   * Computes the total, spatial and temporal plaquette averages of a specified gauge configuration
-   * @param[out] Array for storing the averages (total, spatial, temporal)
-   * @param[in] gauge The gauge field
-   * @param[in] param The parameters of the gauge field
-   */
-  void plaqLoadGaugeQuda(double plaq[3], void *gauge, QudaGaugeParam *param);
-
-  /**
      @brief Computes the trace of the Polyakov loop of the current resident field
      in a given direction.
 
@@ -1563,17 +1555,6 @@ extern "C" {
      @param[in] dir Direction of Polyakov loop
   */
   void polyakovLoopQuda(double ploop[2], int dir);
-
-  /**
-     @brief Computes the trace of the Polyakov loop of a provided field
-     in a given direction.
-
-     @param[out] ploop Trace of the Polyakov loop in direction dir
-     @param[in] dir Direction of Polyakov loop
-     @param[in] gauge The gauge field
-     @param[in] param The parameters of the gauge field
-  */
-  void polyakovLoopLoadGaugeQuda(double ploop[2], int dir, void* gauge, QudaGaugeParam *param);
 
   /**
    * Performs a deep copy from the internal extendedGaugeResident field.
