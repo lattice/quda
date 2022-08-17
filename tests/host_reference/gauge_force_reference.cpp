@@ -52,53 +52,56 @@ extern int E[4];
     (b).imag = -(a).imag;                                                                                              \
   }
 
-typedef struct {
+struct fcomplex {
   float real;
   float imag;
-} fcomplex;
+};
 
 /* specific for double complex */
-typedef struct {
+struct dcomplex {
   double real;
   double imag;
-} dcomplex;
+};
 
-typedef struct {
+struct fsu3_matrix {
   using real_t = float;
   using complex_t = fcomplex;
   fcomplex e[3][3];
-} fsu3_matrix;
-typedef struct {
+};
+
+struct fsu3_vector {
   using real_t = float;
   using complex_t = fcomplex;
   fcomplex c[3];
-} fsu3_vector;
-typedef struct {
+};
+
+struct dsu3_matrix {
   using real_t = double;
   using complex_t = dcomplex;
   dcomplex e[3][3];
-} dsu3_matrix;
-typedef struct {
+};
+
+struct dsu3_vector {
   using real_t = double;
   using complex_t = dcomplex;
   dcomplex c[3];
-} dsu3_vector;
+};
 
-typedef struct {
+struct fanti_hermitmat {
   using real_t = float;
   using complex_t = fcomplex;
   fcomplex m01, m02, m12;
   float m00im, m11im, m22im;
   float space;
-} fanti_hermitmat;
+};
 
-typedef struct {
+struct danti_hermitmat {
   using real_t = double;
   using complex_t = dcomplex;
   dcomplex m01, m02, m12;
   double m00im, m11im, m22im;
   double space;
-} danti_hermitmat;
+};
 
 // convenience struct for passing around lattice meta data
 struct lattice_t {
