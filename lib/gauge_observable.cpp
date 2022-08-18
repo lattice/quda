@@ -25,6 +25,10 @@ namespace quda
     }
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
+    if (param.compute_polyakov_loop) {
+      gaugePolyakovLoop(param.ploop, u, 3, profile);
+    }
+
     // no point constructing Fmunu unless we are going to use it
     if (!param.compute_qcharge && !param.compute_qcharge_density) return;
 

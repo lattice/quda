@@ -1026,12 +1026,14 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
 #ifdef INIT_PARAM
   P(su_project, QUDA_BOOLEAN_FALSE);
   P(compute_plaquette, QUDA_BOOLEAN_FALSE);
+  P(compute_polyakov_loop, QUDA_BOOLEAN_FALSE);
   P(compute_qcharge, QUDA_BOOLEAN_FALSE);
   P(compute_qcharge_density, QUDA_BOOLEAN_FALSE);
   P(qcharge_density, nullptr);
 #else
   P(su_project, QUDA_BOOLEAN_INVALID);
   P(compute_plaquette, QUDA_BOOLEAN_INVALID);
+  P(compute_polyakov_loop, QUDA_BOOLEAN_INVALID);
   P(compute_qcharge, QUDA_BOOLEAN_INVALID);
   P(compute_qcharge_density, QUDA_BOOLEAN_INVALID);
 #endif

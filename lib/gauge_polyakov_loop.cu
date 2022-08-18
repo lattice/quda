@@ -145,11 +145,12 @@ namespace quda {
     if (commDimPartitioned(dir)) {
 
       // Form a staging gauge field where each "t" slice corresponds to one rank in the "dir"
-      // direction. Odd dimensions are carefully legal in the `t` dimension in this context
+      // direction. Odd dimensions are carefully legal in the `t` dimension in this context.
+      // These fields do not need extended field regions.
       profile.TPSTART(QUDA_PROFILE_INIT);
       GaugeFieldParam gParam(u);
       lat_dim_t x;
-      for (int d = 0; d < 3; d++) x[d] = u.X()[d];
+      for (int d = 0; d < 3; d++) x[d] = u.X()[d] - 2 * u.R()[d];
       x[3] = 1;
       gParam.x = x;
       gParam.create = QUDA_NULL_FIELD_CREATE;
@@ -248,7 +249,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugePolyakovLoopTrace>(G, loop);
     // We normalize by the 3-d volume, times the 4-d communications dim to cancel out redundant counting
-    auto vol3d = u.Volume() * comm_dim(0) * comm_dim(1) * comm_dim(2) * comm_dim(3) / u.X()[3];
+    auto vol3d = u.LocalVolume() * comm_dim(0) * comm_dim(1) * comm_dim(2) * comm_dim(3) / (u.X()[3] - 2 * u.R()[3]);
     ploop[0] = loop[0] / vol3d;
     ploop[1] = loop[1] / vol3d;
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);

@@ -32,6 +32,8 @@ namespace quda {
       if (U_.Geometry() != QUDA_SCALAR_GEOMETRY || S_.Geometry() != QUDA_SCALAR_GEOMETRY)
         errorQuda("Unexpected geometry pair U %d ; S %d", U_.Geometry(), S_.Geometry());
       for (int dir = 0; dir < 4; dir++) {
+        if (U_.R()[dir] > 0 || S_.R()[dir] > 0)
+          errorQuda("Unexpected non-zero extended radii %d %d in direction %d", U_.R()[dir], S_.R()[dir], dir);
         X_bulk[dir] = U_.X()[dir];
         X_slice[dir] = S_.X()[dir];
         if (dir != 3 && U_.X()[dir] != S_.X()[dir]) errorQuda("Lengths %d %d in dimension %d do not agree", U_.X()[dir], S_.X()[dir], dir);
@@ -90,7 +92,7 @@ namespace quda {
 
     for (int dt = 0; dt < arg.X[dir]; dt++) {
       dx[dir] = dt;
-      link = arg.U(arg.geometry == QUDA_VECTOR_GEOMETRY ? dir : 0, linkIndexShift(x, dx, arg.X), nbr_oddbit);
+      link = arg.U(arg.geometry == QUDA_VECTOR_GEOMETRY ? dir : 0, linkIndexShift(x, dx, arg.E), nbr_oddbit);
       hi_link = link; // promote
       polyloop = polyloop * hi_link;
       nbr_oddbit = nbr_oddbit ^ 1;
@@ -111,7 +113,13 @@ namespace quda {
     using Link = Matrix<complex<real>, 3>;
     using HighPrecLink = Matrix<complex<double>, 3>;
 
-    int X[4];
+    // While the Polyakov loop doesn't need extended fields, it is a gauge
+    // observable, which means it tends to get passed extended fields. This
+    // logic keeps it robust to this reality.
+    int E[4]; // extended grid dimensions
+    int X[4]; // true grid dimensions
+    int border[4];
+
     AccumGauge P;
     Gauge U;
 
@@ -122,9 +130,12 @@ namespace quda {
     {
       if (U_.Geometry() != QUDA_VECTOR_GEOMETRY || P_.Geometry() != QUDA_SCALAR_GEOMETRY)
         errorQuda("Unexpected geometry pair U %d ; P %d", U_.Geometry(), P_.Geometry());
-      for (int dir=0; dir<4; ++dir){
-        X[dir] = U_.X()[dir];
-        if (dir != 3 && U_.X()[dir] != P_.X()[dir]) errorQuda("Lengths %d %d in dimension %d do not agree", U_.X()[dir], P_.X()[dir], dir);
+      for (int dir=0; dir<4; ++dir) {
+        if (P_.R()[dir] > 0) errorQuda("Unexpected extended field radius %d in direction %d", P_.R()[dir], dir);
+        border[dir] = U_.R()[dir];
+        E[dir] = U_.X()[dir];
+        X[dir] = U_.X()[dir] - 2 * border[dir];
+        if (dir != 3 && X[dir] != P_.X()[dir]) errorQuda("Lengths %d %d in dimension %d do not agree", X[dir], P_.X()[dir], dir);
       }
     }
 
@@ -142,6 +153,9 @@ namespace quda {
 
       // hack
       if (x[3] > 0) return;
+
+#pragma unroll
+      for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
       auto polyloop = computePolyakovLoop<3>(arg, x, parity);
 
@@ -161,17 +175,24 @@ namespace quda {
     using Link = Matrix<complex<real>, 3>;
     using HighPrecLink = Matrix<complex<double>, 3>;
 
-    int X[4];
+    // While the Polyakov loop doesn't need extended fields, it is a gauge
+    // observable, which means it tends to get passed extended fields. This
+    // logic keeps it robust to this reality.
+    int E[4]; // extended grid dimensions
+    int X[4]; // true grid dimensions
+    int border[4];
     Gauge U;
     QudaFieldGeometry geometry;
 
     GaugePolyakovLoopTraceArg(const GaugeField &U_) :
-      ReduceArg<reduce_t>(dim3(U_.LocalVolumeCB() / U_.X()[3], 2, 1)),
+      ReduceArg<reduce_t>(dim3(U_.LocalVolumeCB() / (U_.X()[3] - 2 * U_.R()[3]), 2, 1)),
       U(U_),
       geometry(U_.Geometry())
     {
-      for (int dir=0; dir<4; ++dir){
-        X[dir] = U_.X()[dir];
+      for (int dir=0; dir<4; ++dir) {
+        border[dir] = U_.R()[dir];
+        E[dir] = U_.X()[dir];
+        X[dir] = U_.X()[dir] - 2 * border[dir];
       }
     }
 
@@ -195,6 +216,9 @@ namespace quda {
 
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
+#pragma unroll
+      for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
+
       if (arg.geometry == QUDA_VECTOR_GEOMETRY) {
         // U is the full gauge field, need to contract over the right dimension
         // This codepath is hit when the MPI decomposition isn't split over the

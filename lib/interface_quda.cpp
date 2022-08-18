@@ -5324,13 +5324,19 @@ void plaqQuda(double plaq[3])
  */
 void polyakovLoopQuda(double ploop[2], int dir)
 {
-  profilePolyakovLoop.TPSTART(QUDA_PROFILE_TOTAL);
+  //profilePolyakovLoop.TPSTART(QUDA_PROFILE_TOTAL);
 
   if (!gaugePrecise) errorQuda("Cannot compute Polyakov loop as there is no resident gauge field");
 
-  quda::gaugePolyakovLoop(ploop, *gaugePrecise, dir, profilePolyakovLoop);
+  QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
+  obsParam.compute_polyakov_loop = QUDA_BOOLEAN_TRUE;
+  gaugeObservablesQuda(&obsParam);
+  ploop[0] = obsParam.ploop[0];
+  ploop[1] = obsParam.ploop[1];
 
-  profilePolyakovLoop.TPSTOP(QUDA_PROFILE_TOTAL);
+  //quda::gaugePolyakovLoop(ploop, *gaugePrecise, dir, profilePolyakovLoop);
+
+  //profilePolyakovLoop.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 /*
