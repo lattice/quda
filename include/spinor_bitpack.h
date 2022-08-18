@@ -97,12 +97,15 @@ namespace quda {
       fs.s.mantissa = 0;
       exponent = fs.s.exponent;
 
+      // negate the exponent to avoid the division below
+      fs.s.exponent = -(fs.s.exponent - 127) + 127;
+
       // rescale and convert to integer
       int vs[6];
 #pragma unroll
       for (int i = 0; i < 3; i++) {
-        vs[2 * i + 0] = lrint(fdividef(in[i].real(), fs.f));
-        vs[2 * i + 1] = lrint(fdividef(in[i].imag(), fs.f));
+        vs[2 * i + 0] = lrint(in[i].real() * fs.f);
+        vs[2 * i + 1] = lrint(in[i].imag() * fs.f);
       }
 
       unsigned int vu[6];
@@ -191,6 +194,7 @@ namespace quda {
     unsigned int dummy1: 2;
 
     spinor_packed() = default;
+
     template <typename spinor> __host__ __device__ spinor_packed(const spinor &in) { pack(in); }
 
     /**
@@ -223,12 +227,15 @@ namespace quda {
       exponent2 = fs.s.exponent >> 4;
       exponent3 = fs.s.exponent >> 6;
 
+      // negate the exponent to avoid the division below
+      fs.s.exponent = -(fs.s.exponent - 127) + 127;
+
       // rescale and convert to integer
       int vs[6];
 #pragma unroll
       for (int i = 0; i < 3; i++) {
-        vs[2 * i + 0] = lrint(in[i].real() / fs.f); // FIXME - can we avoid the division here?
-        vs[2 * i + 1] = lrint(in[i].imag() / fs.f);
+        vs[2 * i + 0] = lrint(in[i].real() * fs.f);
+        vs[2 * i + 1] = lrint(in[i].imag() * fs.f);
       }
 
       unsigned int vu[6];
