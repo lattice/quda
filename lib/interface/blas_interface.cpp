@@ -121,7 +121,7 @@ void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBoolean use_nati
     void *A_d = pool_device_malloc(A_bytes);
     void *B_d = pool_device_malloc(B_bytes);
     void *C_d = pool_device_malloc(C_bytes);
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QUDA: arrays allocated sucessfully.\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QUDA: arrays allocated successfully.\n");
     getProfileBLAS().TPSTOP(QUDA_PROFILE_INIT);
 
     // Transfer host data to device
@@ -129,7 +129,7 @@ void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBoolean use_nati
     qudaMemcpy(A_d, arrayA, A_bytes, qudaMemcpyHostToDevice);
     qudaMemcpy(B_d, arrayB, B_bytes, qudaMemcpyHostToDevice);
     qudaMemcpy(C_d, arrayC, C_bytes, qudaMemcpyHostToDevice);
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QUDA: arrays copied susessfully.\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QUDA: arrays copied successfully.\n");
     getProfileBLAS().TPSTOP(QUDA_PROFILE_H2D);
 
     // Compute Batched GEMM
@@ -153,6 +153,35 @@ void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBoolean use_nati
     getProfileBLAS().TPSTOP(QUDA_PROFILE_FREE);
   }
 
+  getProfileBLAS().TPSTOP(QUDA_PROFILE_TOTAL);
+  saveTuneCache();
+}
+
+void blasLUInvQuda(void *Ainv, void *A, QudaBoolean use_native, QudaBLASParam *blas_param)
+{
+  getProfileBLAS().TPSTART(QUDA_PROFILE_TOTAL);
+  checkBLASParam(*blas_param);
+
+  getProfileBLAS().TPSTART(QUDA_PROFILE_INIT);
+  const int n = blas_param->inv_mat_size;
+  const uint64_t batches = blas_param->batch_count;
+  QudaPrecision prec = QUDA_INVALID_PRECISION;
+  switch (blas_param->data_type) {
+  case QUDA_BLAS_DATATYPE_Z: prec = QUDA_DOUBLE_PRECISION; break;
+  case QUDA_BLAS_DATATYPE_C: prec = QUDA_SINGLE_PRECISION; break;
+  case QUDA_BLAS_DATATYPE_D:
+  case QUDA_BLAS_DATATYPE_S:
+  default: errorQuda("LU inversion not supported for data type %d", blas_param->data_type);
+  }
+  getProfileBLAS().TPSTOP(QUDA_PROFILE_INIT);
+
+  getProfileBLAS().TPSTART(QUDA_PROFILE_COMPUTE);
+  if (use_native == QUDA_BOOLEAN_FALSE)
+    blas_lapack::generic::BatchInvertMatrix(Ainv, A, n, batches, prec, QUDA_CPU_FIELD_LOCATION);
+  else
+    blas_lapack::native::BatchInvertMatrix(Ainv, A, n, batches, prec, QUDA_CPU_FIELD_LOCATION);
+
+  getProfileBLAS().TPSTOP(QUDA_PROFILE_COMPUTE);
   getProfileBLAS().TPSTOP(QUDA_PROFILE_TOTAL);
   saveTuneCache();
 }

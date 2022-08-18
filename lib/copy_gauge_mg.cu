@@ -68,9 +68,21 @@ namespace quda {
 
   }
 
-  template <typename sFloatOut, typename sFloatIn, int Nc>
-  void copyGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location, sFloatOut *Out, sFloatIn *In,
-                   sFloatOut **outGhost, sFloatIn **inGhost, int type)
+  template <int nVec, bool> struct enabled : std::false_type { };
+  template <> struct enabled<48, true> : std::true_type { };
+#ifdef NSPIN4
+  template <> struct enabled<12, true> : std::true_type { };
+  template <> struct enabled<64, true> : std::true_type { };
+#endif
+#ifdef NSPIN1
+  template <> struct enabled<128, true> : std::true_type { };
+  template <> struct enabled<192, true> : std::true_type { };
+#endif
+
+  template <typename sFloatOut, typename sFloatIn, int Nc, bool enable_mg>
+  std::enable_if_t<enabled<Nc, enable_mg>::value, void>
+  copyGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location, sFloatOut *Out, sFloatIn *In,
+              sFloatOut **outGhost, sFloatIn **inGhost, int type)
   {
     using FloatIn = typename mapper<sFloatIn>::type;
 
@@ -118,25 +130,24 @@ namespace quda {
     }
   }
 
+  template <typename sFloatOut, typename sFloatIn, int Nc, bool enable_mg>
+  std::enable_if_t<!enabled<Nc, enable_mg>::value, void>
+  copyGaugeMG(GaugeField &, const GaugeField &, QudaFieldLocation, sFloatOut *, sFloatIn *, sFloatOut **, sFloatIn **, int)
+  {
+    errorQuda("Multigrid not enabled");
+  }
+
   template <typename FloatOut, typename FloatIn>
   void copyGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location, FloatOut *Out, 
 		   FloatIn *In, FloatOut **outGhost, FloatIn **inGhost, int type)
   {
-    if constexpr (is_enabled_multigrid()) {
-      switch (in.Ncolor()) {
-      case 48: copyGaugeMG<FloatOut, FloatIn, 48>(out, in, location, Out, In, outGhost, inGhost, type); break;
-#ifdef NSPIN4
-      case 12: copyGaugeMG<FloatOut, FloatIn, 12>(out, in, location, Out, In, outGhost, inGhost, type); break;
-      case 64: copyGaugeMG<FloatOut, FloatIn, 64>(out, in, location, Out, In, outGhost, inGhost, type); break;
-#endif
-#ifdef NSPIN1
-      case 128: copyGaugeMG<FloatOut, FloatIn, 128>(out, in, location, Out, In, outGhost, inGhost, type); break;
-      case 192: copyGaugeMG<FloatOut, FloatIn, 192>(out, in, location, Out, In, outGhost, inGhost, type); break;
-#endif
-      default: errorQuda("Unsupported number of colors; out.Nc=%d, in.Nc=%d", out.Ncolor(), in.Ncolor());
-      }
-    } else {
-      errorQuda("Multigrid has not been enabled");
+    switch (in.Ncolor()) {
+    case 12: copyGaugeMG<FloatOut, FloatIn, 12, is_enabled_multigrid()>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case 48: copyGaugeMG<FloatOut, FloatIn, 48, is_enabled_multigrid()>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case 64: copyGaugeMG<FloatOut, FloatIn, 64, is_enabled_multigrid()>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case 128: copyGaugeMG<FloatOut, FloatIn, 128, is_enabled_multigrid()>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case 192: copyGaugeMG<FloatOut, FloatIn, 192, is_enabled_multigrid()>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    default: errorQuda("Unsupported number of colors; out.Nc=%d, in.Nc=%d", out.Ncolor(), in.Ncolor());
     }
   }
 

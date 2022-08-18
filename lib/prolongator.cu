@@ -76,26 +76,30 @@ namespace quda {
 #endif
 
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
-  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-                  const int *fine_to_coarse, int parity)
+  std::enable_if_t<enabled<fineSpin, fineColor, coarseSpin, coarseColor>::value, void>
+  Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+             const int *fine_to_coarse, int parity)
   {
-    if constexpr (enabled<fineSpin, fineColor, coarseSpin, coarseColor>::value) {
-      if (v.Precision() == QUDA_HALF_PRECISION) {
-        if constexpr(is_enabled<QUDA_HALF_PRECISION>()) {
-            ProlongateLaunch<Float, short, fineSpin, fineColor, coarseSpin, coarseColor>
-              prolongator(out, in, v, fine_to_coarse, parity);
+    if (v.Precision() == QUDA_HALF_PRECISION) {
+      if constexpr(is_enabled<QUDA_HALF_PRECISION>()) {
+          ProlongateLaunch<Float, short, fineSpin, fineColor, coarseSpin, coarseColor>
+            prolongator(out, in, v, fine_to_coarse, parity);
           } else {
-          errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-        }
-      } else if (v.Precision() == in.Precision()) {
-        ProlongateLaunch<Float, Float, fineSpin, fineColor, coarseSpin, coarseColor>
-          prolongator(out, in, v, fine_to_coarse, parity);
-      } else {
-        errorQuda("Unsupported V precision %d", v.Precision());
+        errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
       }
+    } else if (v.Precision() == in.Precision()) {
+      ProlongateLaunch<Float, Float, fineSpin, fineColor, coarseSpin, coarseColor>
+        prolongator(out, in, v, fine_to_coarse, parity);
     } else {
-      errorQuda("Not enabled");
+      errorQuda("Unsupported V precision %d", v.Precision());
     }
+  }
+
+  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
+  std::enable_if_t<!enabled<fineSpin, fineColor, coarseSpin, coarseColor>::value, void>
+  Prolongate(ColorSpinorField &, const ColorSpinorField &, const ColorSpinorField &, const int *, int)
+  {
+    errorQuda("Not enabled");
   }
 
   template <typename Float, int fineSpin>
