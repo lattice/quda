@@ -4688,6 +4688,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
         profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
         computeStaggeredOprod(oprod, cudaQuark, coeff[i], 3);
+        qudaDeviceSynchronize();
         profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
       }
     }
@@ -4712,6 +4713,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
         profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
         computeStaggeredOprod(oprod, cudaQuark, coeff[i + num_terms], 3);
+        qudaDeviceSynchronize();
         profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
       }
     }
@@ -4738,6 +4740,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
   hisqStaplesForce(*cudaOutForce, *cudaInForce, *cudaGauge, act_path_coeff);
+  qudaDeviceSynchronize();
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // Load naik outer product
@@ -4748,6 +4751,7 @@ void computeHISQForceQuda(void* const milc_momentum,
   // Compute Naik three-link term
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
   hisqLongLinkForce(*cudaOutForce, *cudaInForce, *cudaGauge, act_path_coeff[1]);
+  qudaDeviceSynchronize();
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   cudaOutForce->exchangeExtendedGhost(R,profileHISQForce,true);
@@ -4759,11 +4763,12 @@ void computeHISQForceQuda(void* const milc_momentum,
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
   *num_failures_h = 0;
   unitarizeForce(*cudaInForce, *cudaOutForce, *cudaGauge, num_failures_d);
-  profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (*num_failures_h>0) errorQuda("Error in the unitarization component of the hisq fermion force: %d failures\n", *num_failures_h);
 
-  qudaMemset((void **)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
+  cudaOutForce->zero();
+  qudaDeviceSynchronize();
+  profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // read in u-link
   cudaGauge->loadCPUField(cpuULink, profileHISQForce);
@@ -4772,6 +4777,7 @@ void computeHISQForceQuda(void* const milc_momentum,
   // Compute Fat7-staple term
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
   hisqStaplesForce(*cudaOutForce, *cudaInForce, *cudaGauge, fat7_coeff);
+  qudaDeviceSynchronize();
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   delete cudaInForce;
@@ -4780,7 +4786,6 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
   hisqCompleteForce(*cudaOutForce, *cudaGauge);
-  profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (gParam->use_resident_mom) {
     if (!momResident) errorQuda("No resident momentum field to use");
@@ -4788,6 +4793,8 @@ void computeHISQForceQuda(void* const milc_momentum,
   } else {
     updateMomentum(*cudaMom, dt, *cudaOutForce, "hisq");
   }
+  qudaDeviceSynchronize();
+  profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (gParam->return_result_mom) {
     // Close the paths, make anti-hermitian, and store in compressed format
