@@ -480,20 +480,18 @@ namespace quda
 
 #ifdef NVSHMEM_COMMS
   /**
-   * @brief helper function for nvshmem uber kernel to signal that the interior kernel has completed
+   * @brief helper function for nvshmem uber kernel to signal that the interior kernel has completed.
+      This function is supposed to be called only by the last thread of the block.
    */
   template <KernelType kernel_type, typename Arg> void __device__ inline shmem_signalinterior(const Arg &arg)
   {
     if (kernel_type == UBER_KERNEL) {
-      __syncthreads();
-      if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && target::thread_idx().z == 0) {
         int amlast = arg.interior_count.fetch_add(1, cuda::std::memory_order_acq_rel); // ensure that my block is done
         if (amlast == (target::grid_dim().x - arg.pack_blocks - arg.exterior_blocks) * target::grid_dim().y * target::grid_dim().z - 1) {
           arg.interior_done.store(arg.counter, cuda::std::memory_order_release);
           arg.interior_done.notify_all();
           arg.interior_count.store(0, cuda::std::memory_order_relaxed);
         }
-      }
     }
   }
 
@@ -685,7 +683,22 @@ namespace quda
         const int dslash_block_offset
           = ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) ? arg.pack_blocks : 0);
         int x_cb = (target::block_idx().x - dslash_block_offset) * target::block_dim().x + target::thread_idx().x;
-        if (x_cb >= arg.threads) return;
+#ifdef NVSHMEM_COMMS
+        // Initialize a shared memory counter for the threads int the block
+        __shared__ cuda::atomic<int, cuda::thread_scope_block> block_counter;
+        if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && target::thread_idx().z == 0) {
+          block_counter.store(0, cuda::std::memory_order_relaxed);
+        }
+        __syncthreads();
+#endif
+
+        if (x_cb >= arg.threads) {
+#ifdef NVSHMEM_COMMS
+          // Need to increment the counter even for the exiting threads
+          block_counter.fetch_add(1, cuda::std::memory_order_acq_rel);
+#endif
+          return;
+        }
 
 #ifdef QUDA_DSLASH_FAST_COMPILE
         dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, parity);
@@ -696,7 +709,12 @@ namespace quda
         }
 #endif
 #ifdef NVSHMEM_COMMS
-        if (kernel_type == UBER_KERNEL) shmem_signalinterior<kernel_type>(arg);
+        // Use the shared memory counter to see if is the last thread in the block.
+        // If yes, signal that interior is done for this block.
+        int am_last_thread = block_counter.fetch_add(1, cuda::std::memory_order_acq_rel);
+        if (kernel_type == UBER_KERNEL && am_last_thread == (target::block_dim().x * target::block_dim().y * target::block_dim().z - 1)) {
+          shmem_signalinterior<kernel_type>(arg);
+        }
 #endif
       }
     }

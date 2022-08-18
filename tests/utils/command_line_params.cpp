@@ -176,11 +176,7 @@ bool mg_use_mma = false;
 bool mg_allow_truncation = false;
 bool mg_staggered_kd_dagger_approximation = false;
 
-#ifdef NVSHMEM_COMMS
-bool use_mobius_fused_kernel = false;
-#else
 bool use_mobius_fused_kernel = true;
-#endif
 
 int n_ev = 8;
 int max_search_dim = 64;
