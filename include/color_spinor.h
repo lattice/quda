@@ -693,7 +693,7 @@ namespace quda {
     __device__ __host__ inline ColorSpinor<Float, Nc, 4> reconstruct(int dim, int sign) const
     {
       ColorSpinor<Float, Nc, 4> recon;
-      const auto t = *this;
+      const auto &t = *this;
 
       switch (dim) {
       case 0: // x dimension

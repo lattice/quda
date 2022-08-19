@@ -25,7 +25,6 @@ set(CMAKE_COLOR_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 # Disable gnu exentions
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CUDA_EXTENSIONS OFF)
 
 # Disable in source builds this is only a temporary fix, but for now we need it as
 # cmake will otherwise overwrite the existing makefiles.
@@ -319,44 +318,44 @@ endif()
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 
 set(CMAKE_CXX_FLAGS_DEVEL
-  "-g -O3 -Wall -Wextra"
+  "-g -O3"
   CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
-  "-O3 -Werror -Wall -Wextra"
+  "-O3"
   CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE
-  "-O3 -w ${CXX_OPT} "
+  "${CXX_OPT}"
   CACHE STRING "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG
-    "-Wall -Wextra -g"
+    "-g"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CXX_FLAGS_DEBUG
-    "-Wall -Wextra -g -fno-inline"
+    "-g -fno-inline"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CXX_FLAGS_SANITIZE
-    "-Wall -Wextra -g -fno-inline \"-fsanitize=address,undefined\""
+    "-g -fno-inline \"-fsanitize=address,undefined\""
     CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
 
 enable_language(CXX)
 
 # define C FLAGS
 set(CMAKE_C_FLAGS_DEVEL
-  "-g -O3 -Wall -Wextra"
+  "-g -O3"
   CACHE STRING "Flags used by the C compiler during regular development builds.")
 set(CMAKE_C_FLAGS_STRICT
-  "-O3 -Werror -Wall -Wextra"
+  "-O3"
   CACHE STRING "Flags used by the C compiler during strict jenkins builds.")
 set(CMAKE_C_FLAGS_RELEASE
-  "-O3 -w"
+  "-O3"
   CACHE STRING "Flags used by the C compiler during release builds.")
 set(CMAKE_C_FLAGS_HOSTDEBUG
-    "-Wall -Wextra -g"
+    "-g"
     CACHE STRING "Flags used by the C compiler during host-debug builds.")
 set(CMAKE_C_FLAGS_DEBUG
-  "-Wall -Wextra -g -fno-inline"
+  "-g -fno-inline"
   CACHE STRING "Flags used by the C compiler during full (host+device) debug builds.")
 set(CMAKE_C_FLAGS_SANITIZE
-    "-Wall -Wextra -g -fno-inline \"-fsanitize=address,undefined\""
+    "-g -fno-inline \"-fsanitize=address,undefined\""
     CACHE STRING "Flags used by the C compiler during sanitizer debug builds.")
 
 

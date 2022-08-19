@@ -2,7 +2,7 @@
 
 #include <kernels/dslash_wilson.cuh>
 #include <clover_field_order.h>
-#include <shared_memory_cache_helper.cuh>
+#include <shared_memory_cache_helper.h>
 
 namespace quda
 {

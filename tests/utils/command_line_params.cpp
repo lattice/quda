@@ -228,6 +228,7 @@ double eig_amin = 0.1;
 double eig_amax = 0.0; // If zero is passed to the solver, an estimate will be computed
 bool eig_use_normop = true;
 bool eig_use_dagger = false;
+bool eig_use_pc = false;
 bool eig_compute_svd = false;
 bool eig_compute_gamma5 = false;
 QudaEigSpectrumType eig_spectrum = QUDA_SPECTRUM_LR_EIG;
@@ -260,6 +261,7 @@ quda::mgarray<double> mg_eig_amin = {};
 quda::mgarray<double> mg_eig_amax = {};
 quda::mgarray<bool> mg_eig_use_normop = {};
 quda::mgarray<bool> mg_eig_use_dagger = {};
+quda::mgarray<bool> mg_eig_use_pc = {};
 quda::mgarray<QudaEigSpectrumType> mg_eig_spectrum = {};
 quda::mgarray<QudaEigType> mg_eig_type = {};
 quda::mgarray<QudaPrecision> mg_eig_save_prec = {};
@@ -721,9 +723,10 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->transform(CLI::QUDACheckedTransformer(eig_type_map));
 
   opgroup->add_option("--eig-use-dagger", eig_use_dagger,
-                      "Solve the Mdag  problem instead of M (MMdag if eig-use-normop == true) (default false)");
+                      "Solve the Mdag problem instead of M (MMdag if eig-use-normop == true) (default false)");
   opgroup->add_option("--eig-use-normop", eig_use_normop,
                       "Solve the MdagM problem instead of M (MMdag if eig-use-dagger == true) (default false)");
+  opgroup->add_option("--eig-use-pc", eig_use_pc, "Solve the Even-Odd preconditioned problem (default false)");
   opgroup->add_option("--eig-use-poly-acc", eig_use_poly_acc, "Use Chebyshev polynomial acceleration in the eigensolver");
 }
 
@@ -848,6 +851,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "Solve the MMdag problem instead of M (MMdag if eig-use-normop == true) (default false)");
   quda_app->add_mgoption(opgroup, "--mg-eig-use-normop", mg_eig_use_normop, CLI::Validator(),
                          "Solve the MdagM problem instead of M (MMdag if eig-use-dagger == true) (default false)");
+  quda_app->add_mgoption(opgroup, "--mg-eig-use-pc", mg_eig_use_pc, CLI::Validator(),
+                         "Solve the Even-Odd preconditioned problem (default false)");
   quda_app->add_mgoption(opgroup, "--mg-eig-use-poly-acc", mg_eig_use_poly_acc, CLI::Validator(),
                          "Use Chebyshev polynomial acceleration in the eigensolver (default true)");
   opgroup->add_option("--mg-evolve-thin-updates", mg_evolve_thin_updates,

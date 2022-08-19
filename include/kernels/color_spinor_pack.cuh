@@ -3,11 +3,11 @@
 #include <index_helper.cuh>
 #include <fast_intdiv.h>
 #include <kernel.h>
-#include <shared_memory_cache_helper.cuh>
 #include <dslash_quda.h>
 #include <dslash_shmem.h>
 #include <shmem_helper.cuh>
 #include <shmem_pack_helper.cuh>
+#include <shared_memory_cache_helper.h>
 
 namespace quda {
 
