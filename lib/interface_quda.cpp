@@ -149,9 +149,6 @@ static TimeProfile profileGaugeForce("computeGaugeForceQuda");
 //!< Profiler for computeGaugePathQuda
 static TimeProfile profileGaugePath("computeGaugePathQuda");
 
-//!< Profiler for computeGaugeLoopTraceQuda
-static TimeProfile profileGaugeLoopTrace("computeGaugeLoopTraceQuda");
-
 //!<Profiler for updateGaugeFieldQuda
 static TimeProfile profileGaugeUpdate("updateGaugeFieldQuda");
 
@@ -169,9 +166,6 @@ static TimeProfile profileHISQForce("computeHISQForceQuda");
 
 //!<Profiler for plaqQuda
 static TimeProfile profilePlaq("plaqQuda");
-
-//!<Profiler for polyakovLoopQuda
-static TimeProfile profilePolyakovLoop("polyakovLoopQuda");
 
 //!< Profiler for wuppertalQuda
 static TimeProfile profileWuppertal("wuppertalQuda");
@@ -1435,7 +1429,6 @@ void endQuda(void)
     profileFatLink.Print();
     profileGaugeForce.Print();
     profileGaugeUpdate.Print();
-    profileGaugeLoopTrace.Print();
     profileExtendedGauge.Print();
     profileCloverForce.Print();
     profileStaggeredForce.Print();
@@ -1444,7 +1437,6 @@ void endQuda(void)
     profileBLAS.Print();
     profileCovDev.Print();
     profilePlaq.Print();
-    profilePolyakovLoop.Print();
     profileGaugeObs.Print();
     profileGaugeSmear.Print();
     profileWFlow.Print();
@@ -4182,87 +4174,6 @@ int computeGaugePathQuda(void *out, void *siteLink, int ***input_path_buf, int *
   return 0;
 }
 
-void computeGaugeLoopTraceQuda(double _Complex* traces, void *siteLink, int **input_path_buf, int *path_length, double *loop_coeff,
-                                    int num_paths, int max_length, double factor, QudaGaugeParam *qudaGaugeParam)
-{
-  profileGaugeLoopTrace.TPSTART(QUDA_PROFILE_TOTAL);
-  profileGaugeLoopTrace.TPSTART(QUDA_PROFILE_INIT);
-
-  checkGaugeParam(qudaGaugeParam);
-
-  GaugeFieldParam gParam(*qudaGaugeParam, siteLink);
-  gParam.location = QUDA_CPU_FIELD_LOCATION;
-  gParam.site_offset = qudaGaugeParam->gauge_offset;
-  gParam.site_size = qudaGaugeParam->site_size;
-  cpuGaugeField *cpuSiteLink = (!qudaGaugeParam->use_resident_gauge) ? new cpuGaugeField(gParam) : nullptr;
-
-  cudaGaugeField *cudaSiteLink = nullptr;
-
-  if (qudaGaugeParam->use_resident_gauge) {
-    if (!gaugePrecise) errorQuda("No resident gauge field to use");
-    cudaSiteLink = gaugePrecise;
-  } else {
-    gParam.location = QUDA_CUDA_FIELD_LOCATION;
-    gParam.create = QUDA_NULL_FIELD_CREATE;
-    gParam.reconstruct = qudaGaugeParam->reconstruct;
-    gParam.setPrecision(qudaGaugeParam->cuda_prec, true);
-
-    cudaSiteLink = new cudaGaugeField(gParam);
-    profileGaugeLoopTrace.TPSTOP(QUDA_PROFILE_INIT);
-
-    profileGaugeLoopTrace.TPSTART(QUDA_PROFILE_H2D);
-    cudaSiteLink->loadCPUField(*cpuSiteLink);
-    profileGaugeLoopTrace.TPSTOP(QUDA_PROFILE_H2D);
-
-    profileGaugeLoopTrace.TPSTART(QUDA_PROFILE_INIT);
-  }
-  profileGaugeLoopTrace.TPSTOP(QUDA_PROFILE_INIT);
-
-  cudaGaugeField *cudaGauge = createExtendedGauge(*cudaSiteLink, R, profileGaugeLoopTrace);
-  // apply / remove phase as appropriate
-  if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
-
-  // wrap 1-d arrays in std::vector
-  std::vector<int> path_length_v(num_paths);
-  std::vector<double> loop_coeff_v(num_paths);
-  for (int i = 0; i < num_paths; i++) {
-    path_length_v[i] = path_length[i];
-    loop_coeff_v[i] = loop_coeff[i];
-  }
-
-  // input_path should encode exactly 1 direction
-  std::vector<int**> input_path_v(1);
-  for (int d = 0; d < 1; d++) {
-    input_path_v[d] = input_path_buf;
-  }
-
-  // prepare trace storage
-  std::vector<Complex> loop_traces(num_paths);
-
-  // actually do the computation
-  profileGaugeLoopTrace.TPSTART(QUDA_PROFILE_COMPUTE);
-  gaugeLoopTrace(*cudaGauge, loop_traces, factor, input_path_v, path_length_v, loop_coeff_v, num_paths, max_length);
-  profileGaugeLoopTrace.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-  for (int i = 0; i < num_paths; i++) { memcpy(traces + i, &loop_traces[i], sizeof(Complex)); }
-
-  profileGaugeLoopTrace.TPSTART(QUDA_PROFILE_FREE);
-  if (qudaGaugeParam->make_resident_gauge) {
-    if (gaugePrecise && gaugePrecise != cudaSiteLink) delete gaugePrecise;
-    gaugePrecise = cudaSiteLink;
-    if (extendedGaugeResident) delete extendedGaugeResident;
-    extendedGaugeResident = cudaGauge;
-  } else {
-    delete cudaSiteLink;
-    delete cudaGauge;
-  }
-
-  if (cpuSiteLink) delete cpuSiteLink;
-  profileGaugeLoopTrace.TPSTOP(QUDA_PROFILE_FREE);
-
-  profileGaugeLoopTrace.TPSTOP(QUDA_PROFILE_TOTAL);
-}
-
 void momResidentQuda(void *mom, QudaGaugeParam *param)
 {
   profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
@@ -5331,19 +5242,39 @@ void plaqQuda(double plaq[3])
  */
 void polyakovLoopQuda(double ploop[2], int dir)
 {
-  //profilePolyakovLoop.TPSTART(QUDA_PROFILE_TOTAL);
-
   if (!gaugePrecise) errorQuda("Cannot compute Polyakov loop as there is no resident gauge field");
+  if (dir != 3) errorQuda("The Polyakov loop can only be computed in the t == 3 direction, invalid direction %d", dir);
 
   QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
   obsParam.compute_polyakov_loop = QUDA_BOOLEAN_TRUE;
   gaugeObservablesQuda(&obsParam);
   ploop[0] = obsParam.ploop[0];
   ploop[1] = obsParam.ploop[1];
+}
 
-  //quda::gaugePolyakovLoop(ploop, *gaugePrecise, dir, profilePolyakovLoop);
+void computeGaugeLoopTraceQuda(double _Complex* traces, void *siteLink, int **input_path_buf, int *path_length, double *loop_coeff,
+                                    int num_paths, int max_length, double factor, QudaGaugeParam *qudaGaugeParam)
+{
+  if (!gaugePrecise) errorQuda("Cannot compute gauge loop traces as there is no resident gauge field");
 
-  //profilePolyakovLoop.TPSTOP(QUDA_PROFILE_TOTAL);
+  if (extendedGaugeResident) {
+    delete extendedGaugeResident;
+    extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGaugeObs);
+  }
+
+  // informed by gauge path code; apply / remove gauge as appropriate
+  if (extendedGaugeResident->StaggeredPhaseApplied()) extendedGaugeResident->removeStaggeredPhase();
+
+  QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
+  obsParam.compute_gauge_loop_trace = QUDA_BOOLEAN_TRUE;
+  obsParam.traces = traces;
+  obsParam.input_path_buff = input_path_buf;
+  obsParam.path_length = path_length;
+  obsParam.loop_coeff = loop_coeff;
+  obsParam.num_paths = num_paths;
+  obsParam.max_length = max_length;
+  obsParam.factor = factor;
+  gaugeObservablesQuda(&obsParam);
 }
 
 /*

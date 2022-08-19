@@ -699,6 +699,7 @@ void qudaGaugeLoopTracePhased(int precision, double *traces, int** input_path_bu
   QudaGaugeParam qudaGaugeParam = createGaugeParamForObservables(precision, arg, phase_in);
   void *gauge = arg->site ? arg->site : arg->link;
 
+  loadGaugeQuda(gauge, &qudaGaugeParam);
   computeGaugeLoopTraceQuda(reinterpret_cast<double _Complex*>(traces), gauge, input_path_buf, path_length, loop_coeff, num_paths, max_length, factor, &qudaGaugeParam);
 
   qudamilc_called<false>(__func__);

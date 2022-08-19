@@ -288,13 +288,31 @@ void gauge_loop_test()
     errorQuda("Unsupported gauge order %d", gauge_order);
   }
 
+  // upload gauge field
+  loadGaugeQuda(sitelink, &gauge_param);
+
   // storage for traces
   using double_complex = double _Complex;
   std::vector<double_complex> traces(num_paths);
   double scale_factor = 2.0;
 
+  // compute various observables
+  QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
+  obsParam.compute_gauge_loop_trace = QUDA_BOOLEAN_TRUE;
+  obsParam.traces = traces.data();
+  obsParam.input_path_buff = trace_path_p;
+  obsParam.path_length = trace_loop_length_p;
+  obsParam.loop_coeff = trace_loop_coeff_p;
+  obsParam.num_paths = num_paths;
+  obsParam.max_length = max_length;
+  obsParam.factor = scale_factor;
+
+  // compute the plaquette as part of validation
+  obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
+
   if (getTuning() == QUDA_TUNE_YES) {
-    computeGaugeLoopTraceQuda(traces.data(), sitelink, trace_path_p, trace_loop_length_p, trace_loop_coeff_p, num_paths, max_length, scale_factor, &gauge_param);
+    gaugeObservablesQuda(&obsParam);
+    //computeGaugeLoopTraceQuda(traces.data(), sitelink, trace_path_p, trace_loop_length_p, trace_loop_coeff_p, num_paths, max_length, scale_factor, &gauge_param);
   }
 
   quda::host_timer_t host_timer;
@@ -302,7 +320,8 @@ void gauge_loop_test()
 
   host_timer.start();
   for (int i = 0; i < niter; i++) {
-    computeGaugeLoopTraceQuda(traces.data(), sitelink, trace_path_p, trace_loop_length_p, trace_loop_coeff_p, num_paths, max_length, scale_factor, &gauge_param);
+    gaugeObservablesQuda(&obsParam);
+    //computeGaugeLoopTraceQuda(traces.data(), sitelink, trace_path_p, trace_loop_length_p, trace_loop_coeff_p, num_paths, max_length, scale_factor, &gauge_param);
   }
   host_timer.stop();
   
@@ -337,19 +356,21 @@ void gauge_loop_test()
     plaq_loop[2] = ((plaq_components[2] + plaq_components[4] + plaq_components[5]) / 3.).real();
     plaq_loop[0] = 0.5 * (plaq_loop[1] + plaq_loop[2]);
 
-    double plaq_default[3];
+    //double plaq_default[3];
 
-    loadGaugeQuda(sitelink, &gauge_param);
-    plaqQuda(plaq_default);
+    //loadGaugeQuda(sitelink, &gauge_param);
+    //plaqQuda(plaq_default);
 
-    plaq_deviation = std::abs(plaq_default[0] - plaq_loop[0]) / std::abs(plaq_default[0]);
+    plaq_deviation = std::abs(obsParam.plaquette[0] - plaq_loop[0]) / std::abs(obsParam.plaquette[0]);
     logQuda(QUDA_VERBOSE, "Plaquette loop space %e time %e total %e ; plaqQuda space %e time %e total %e ; deviation %e\n",
-                          plaq_loop[0], plaq_loop[1], plaq_loop[2], plaq_default[0], plaq_default[1], plaq_default[2], plaq_deviation);
+                          plaq_loop[0], plaq_loop[1], plaq_loop[2], obsParam.plaquette[0], obsParam.plaquette[1], obsParam.plaquette[2], plaq_deviation);
 
   }
 
   double perf = 1.0 * niter * flops * V / (host_timer.last() * 1e+9);
   printfQuda("Gauge loop trace total time = %.2f ms ; overall performance : %.2f GFLOPS\n", host_timer.last() * 1e+3, perf);
+
+  freeGaugeQuda();
 
   for (int i = 0; i < num_paths; i++)
     delete[] trace_path_p[i];

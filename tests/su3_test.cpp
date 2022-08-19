@@ -137,16 +137,30 @@ int main(int argc, char **argv)
   loadGaugeQuda((void *)gauge, &gauge_param);
   saveGaugeQuda(new_gauge, &gauge_param);
 
+  // Prepare a gauge observable struct
+  QudaGaugeObservableParam param = newQudaGaugeObservableParam();
+
+  // start the timer
+  quda::host_timer_t host_timer;
+
+  // We call gaugeObservablesQuda multiple times to time each bit individually
+
   // Compute the plaquette
-  double plaq[3];
-  plaqQuda(plaq);
-  printfQuda("Computed plaquette gauge precise is %.16e (spatial = %.16e, temporal = %.16e)\n", plaq[0], plaq[1],
-             plaq[2]);
+  host_timer.start();
+  param.compute_plaquette = QUDA_BOOLEAN_TRUE;
+  gaugeObservablesQuda(&param);
+  host_timer.stop();
+  printfQuda("Computed plaquette gauge precise is %.16e (spatial = %.16e, temporal = %.16e), done in %g seconds\n", param.plaquette[0], param.plaquette[1],
+             param.plaquette[2], host_timer.last());
+  param.compute_plaquette = QUDA_BOOLEAN_FALSE;
 
   // Compute the temporal Polyakov loop
-  double ploop[2];
-  polyakovLoopQuda(ploop, 3);
-  printfQuda("Computed Polyakov loop gauge precise is %.16e +/- I %.16e\n", ploop[0], ploop[1]);
+  host_timer.start();
+  param.compute_polyakov_loop = QUDA_BOOLEAN_TRUE;
+  gaugeObservablesQuda(&param);
+  host_timer.stop();
+  printfQuda("Computed Polyakov loop gauge precise is %.16e +/- I %.16e , done in %g seconds\n", param.ploop[0], param.ploop[1], host_timer.last());
+  param.compute_polyakov_loop = QUDA_BOOLEAN_FALSE;
 
   // Topological charge and gauge energy
   double q_charge_check = 0.0;
@@ -154,11 +168,10 @@ int main(int argc, char **argv)
   size_t data_size = prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
   size_t array_size = V * data_size;
   void *qDensity = safe_malloc(array_size);
+
   // start the timer
-  quda::host_timer_t host_timer;
   host_timer.start();
 
-  QudaGaugeObservableParam param = newQudaGaugeObservableParam();
   param.compute_qcharge = QUDA_BOOLEAN_TRUE;
   param.compute_qcharge_density = QUDA_BOOLEAN_TRUE;
   param.qcharge_density = qDensity;
