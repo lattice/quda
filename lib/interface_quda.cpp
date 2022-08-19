@@ -5658,12 +5658,22 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   profileGaugeObs.TPSTART(QUDA_PROFILE_TOTAL);
   checkGaugeObservableParam(param);
 
+  if (!gaugePrecise) errorQuda("Cannot compute Polyakov loop as there is no resident gauge field");
+
   cudaGaugeField *gauge = nullptr;
   if (!gaugeSmeared) {
     if (!extendedGaugeResident) extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGaugeObs);
     gauge = extendedGaugeResident;
   } else {
     gauge = gaugeSmeared;
+  }
+
+  // Apply / remove gauge as appropriate
+  if (param->remove_staggered_phase == QUDA_BOOLEAN_TRUE) {
+    if (gauge->StaggeredPhaseApplied())
+      gauge->removeStaggeredPhase();
+    else
+      errorQuda("Removing staggered phases was requested, however staggered phases aren't already applied");
   }
 
   gaugeObservables(*gauge, *param, profileGaugeObs);

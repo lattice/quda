@@ -1038,6 +1038,7 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
   P(compute_qcharge, QUDA_BOOLEAN_FALSE);
   P(compute_qcharge_density, QUDA_BOOLEAN_FALSE);
   P(qcharge_density, nullptr);
+  P(remove_staggered_phase, QUDA_BOOLEAN_FALSE);
 #else
   P(su_project, QUDA_BOOLEAN_INVALID);
   P(compute_plaquette, QUDA_BOOLEAN_INVALID);
@@ -1050,6 +1051,7 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
   }
   P(compute_qcharge, QUDA_BOOLEAN_INVALID);
   P(compute_qcharge_density, QUDA_BOOLEAN_INVALID);
+  P(remove_staggered_phase, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM

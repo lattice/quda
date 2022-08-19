@@ -700,7 +700,20 @@ void qudaGaugeLoopTracePhased(int precision, double *traces, int** input_path_bu
   void *gauge = arg->site ? arg->site : arg->link;
 
   loadGaugeQuda(gauge, &qudaGaugeParam);
-  computeGaugeLoopTraceQuda(reinterpret_cast<double _Complex*>(traces), gauge, input_path_buf, path_length, loop_coeff, num_paths, max_length, factor, &qudaGaugeParam);
+
+  QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
+  obsParam.compute_gauge_loop_trace = QUDA_BOOLEAN_TRUE;
+  obsParam.traces = reinterpret_cast<double _Complex*>(traces);
+  obsParam.input_path_buff = input_path_buf;
+  obsParam.path_length = path_length;
+  obsParam.loop_coeff = loop_coeff;
+  obsParam.num_paths = num_paths;
+  obsParam.max_length = max_length;
+  obsParam.factor = factor;
+  obsParam.remove_staggered_phase = phase_in ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  gaugeObservablesQuda(&obsParam);
+
+  //computeGaugeLoopTraceQuda(reinterpret_cast<double _Complex*>(traces), gauge, input_path_buf, path_length, loop_coeff, num_paths, max_length, factor, &qudaGaugeParam);
 
   qudamilc_called<false>(__func__);
   return;
@@ -714,7 +727,17 @@ void qudaPlaquettePhased(int precision, double plaq[3], QudaMILCSiteArg_t *arg, 
   void *gauge = arg->site ? arg->site : arg->link;
 
   loadGaugeQuda(gauge, &qudaGaugeParam);
-  plaqQuda(plaq);
+
+  QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
+  obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
+  obsParam.remove_staggered_phase = phase_in ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  gaugeObservablesQuda(&obsParam);
+
+  plaq[0] = obsParam.plaquette[0];
+  plaq[1] = obsParam.plaquette[1];
+  plaq[2] = obsParam.plaquette[2];
+
+  //plaqQuda(plaq);
 
   qudamilc_called<false>(__func__);
   return;
@@ -724,11 +747,59 @@ void qudaPolyakovLoopPhased(int precision, double ploop[2], int dir, QudaMILCSit
 {
   qudamilc_called<true>(__func__);
 
+  if (dir != 3) errorQuda("Invalid direction %d, only the temporal Polyakov loop can be computed at this time", dir);
+
   QudaGaugeParam qudaGaugeParam = createGaugeParamForObservables(precision, arg, phase_in);
   void *gauge = arg->site ? arg->site : arg->link;
 
   loadGaugeQuda(gauge, &qudaGaugeParam);
-  polyakovLoopQuda(ploop, dir);
+
+  QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
+  obsParam.compute_polyakov_loop = QUDA_BOOLEAN_TRUE;
+  obsParam.remove_staggered_phase = phase_in ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  gaugeObservablesQuda(&obsParam);
+
+  ploop[0] = obsParam.ploop[0];
+  ploop[1] = obsParam.ploop[1];
+  //polyakovLoopQuda(ploop, dir);
+
+  qudamilc_called<false>(__func__);
+  return;
+}
+
+void qudaGaugeMeasurementsPhased(int precision, double plaq[3], double ploop[2], int dir, double *traces, int** input_path_buf,
+                                 int* path_length, double *loop_coeff, int num_paths, int max_length, double factor, QudaMILCSiteArg_t *arg,
+                                 int phase_in)
+{
+  qudamilc_called<true>(__func__);
+
+  if (dir != 3) errorQuda("Invalid direction %d, only the temporal Polyakov loop can be computed at this time", dir);
+
+  QudaGaugeParam qudaGaugeParam = createGaugeParamForObservables(precision, arg, phase_in);
+  void *gauge = arg->site ? arg->site : arg->link;
+
+  loadGaugeQuda(gauge, &qudaGaugeParam);
+
+  QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
+  obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
+  obsParam.compute_polyakov_loop = QUDA_BOOLEAN_TRUE;
+  obsParam.compute_gauge_loop_trace = QUDA_BOOLEAN_TRUE;
+  obsParam.traces = reinterpret_cast<double _Complex*>(traces);
+  obsParam.input_path_buff = input_path_buf;
+  obsParam.path_length = path_length;
+  obsParam.loop_coeff = loop_coeff;
+  obsParam.num_paths = num_paths;
+  obsParam.max_length = max_length;
+  obsParam.factor = factor;
+  obsParam.remove_staggered_phase = phase_in ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  gaugeObservablesQuda(&obsParam);
+
+  // MILC has a factor of 3 convention
+  plaq[0] = obsParam.plaquette[0];
+  plaq[1] = obsParam.plaquette[1];
+  plaq[2] = obsParam.plaquette[2];
+  ploop[0] = obsParam.ploop[0];
+  ploop[1] = obsParam.ploop[1];
 
   qudamilc_called<false>(__func__);
   return;
