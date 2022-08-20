@@ -73,11 +73,15 @@ namespace quda
      @tparam precision The precision requested
      @return True if enabled, false if not
   */
-  template <QudaPrecision precision> constexpr bool is_enabled();
-  template <> constexpr bool is_enabled<QUDA_DOUBLE_PRECISION>() { return (QUDA_PRECISION & 8) ? true : false; }
-  template <> constexpr bool is_enabled<QUDA_SINGLE_PRECISION>() { return (QUDA_PRECISION & 4) ? true : false; }
-  template <> constexpr bool is_enabled<QUDA_HALF_PRECISION>() { return (QUDA_PRECISION & 2) ? true : false; }
-  template <> constexpr bool is_enabled<QUDA_QUARTER_PRECISION>() { return (QUDA_PRECISION & 1) ? true : false; }
+  constexpr bool is_enabled(QudaPrecision precision) {
+    switch (precision) {
+    case QUDA_DOUBLE_PRECISION: return (QUDA_PRECISION & 8) ? true : false;
+    case QUDA_SINGLE_PRECISION: return (QUDA_PRECISION & 4) ? true : false;
+    case QUDA_HALF_PRECISION:   return (QUDA_PRECISION & 2) ? true : false;
+    case QUDA_QUARTER_PRECISION:  return (QUDA_PRECISION & 1) ? true : false;
+    default: return false;
+    }
+  }
 
   /**
      @brief Helper function for returning if a given reconstruct is enabled
@@ -175,12 +179,12 @@ namespace quda
   constexpr void instantiate(G &U, Args &&...args)
   {
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
-      if constexpr (is_enabled<QUDA_DOUBLE_PRECISION>())
+      if constexpr (is_enabled(QUDA_DOUBLE_PRECISION))
         instantiate<Apply, Recon, double>(U, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
     } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
-      if constexpr (is_enabled<QUDA_SINGLE_PRECISION>())
+      if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
         instantiate<Apply, Recon, float>(U, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
@@ -204,7 +208,7 @@ namespace quda
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
       instantiate<Apply, Recon, double>(U, args...);
     } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
-      if constexpr (is_enabled<QUDA_SINGLE_PRECISION>())
+      if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
         instantiate<Apply, Recon, float>(U, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
@@ -224,7 +228,7 @@ namespace quda
     if (c.Precision() == QUDA_DOUBLE_PRECISION) {
       Apply<double>(c, args...);
     } else if (c.Precision() == QUDA_SINGLE_PRECISION) {
-      if constexpr (is_enabled<QUDA_SINGLE_PRECISION>())
+      if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
         Apply<float>(c, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
@@ -258,22 +262,22 @@ namespace quda
   constexpr void instantiate(F &field, Args &&... args)
   {
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
-      if constexpr (is_enabled<QUDA_DOUBLE_PRECISION>())
+      if constexpr (is_enabled(QUDA_DOUBLE_PRECISION))
         instantiate<Apply, double>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
     } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
-      if constexpr (is_enabled<QUDA_SINGLE_PRECISION>())
+      if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
         instantiate<Apply, float>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
     } else if (field.Precision() == QUDA_HALF_PRECISION) {
-      if constexpr (is_enabled<QUDA_HALF_PRECISION>())
+      if constexpr (is_enabled(QUDA_HALF_PRECISION))
         instantiate<Apply, short>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
     } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
-      if constexpr (is_enabled<QUDA_QUARTER_PRECISION>())
+      if constexpr (is_enabled(QUDA_QUARTER_PRECISION))
         instantiate<Apply, int8_t>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
@@ -335,22 +339,22 @@ namespace quda
   constexpr void instantiateSpinor(F &field, Args &&...args)
   {
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
-      if constexpr (is_enabled<QUDA_DOUBLE_PRECISION>())
+      if constexpr (is_enabled(QUDA_DOUBLE_PRECISION))
         instantiateSpinor<Apply, double>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
     } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
-      if constexpr (is_enabled<QUDA_SINGLE_PRECISION>())
+      if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
         instantiateSpinor<Apply, float>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
     } else if (field.Precision() == QUDA_HALF_PRECISION) {
-      if constexpr (is_enabled<QUDA_HALF_PRECISION>())
+      if constexpr (is_enabled(QUDA_HALF_PRECISION))
         instantiateSpinor<Apply, short>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
     } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
-      if constexpr (is_enabled<QUDA_QUARTER_PRECISION>())
+    if constexpr (is_enabled(QUDA_QUARTER_PRECISION))
         instantiateSpinor<Apply, int8_t>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
@@ -377,17 +381,17 @@ namespace quda
       // always instantiate double precision
       Apply<double>(field, args...);
     } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
-      if constexpr (is_enabled<QUDA_SINGLE_PRECISION>())
+      if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
         Apply<float>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
     } else if (field.Precision() == QUDA_HALF_PRECISION) {
-      if constexpr (is_enabled<QUDA_HALF_PRECISION>())
+      if constexpr (is_enabled(QUDA_HALF_PRECISION))
         Apply<short>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
     } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
-      if constexpr (is_enabled<QUDA_QUARTER_PRECISION>())
+      if constexpr (is_enabled(QUDA_QUARTER_PRECISION))
         Apply<int8_t>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
@@ -419,17 +423,17 @@ namespace quda
       // always instantiate double precision
       Apply<double, T>(field, args...);
     } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
-      if constexpr (is_enabled<QUDA_SINGLE_PRECISION>())
+      if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
         Apply<float, T>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
     } else if (field.Precision() == QUDA_HALF_PRECISION) {
-      if constexpr (is_enabled<QUDA_HALF_PRECISION>())
+      if constexpr (is_enabled(QUDA_HALF_PRECISION))
         Apply<short, T>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
     } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
-      if constexpr (is_enabled<QUDA_QUARTER_PRECISION>())
+      if constexpr (is_enabled(QUDA_QUARTER_PRECISION))
         Apply<int8_t, T>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
