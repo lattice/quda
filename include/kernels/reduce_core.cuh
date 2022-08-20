@@ -54,9 +54,9 @@ namespace quda
     /**
        Generic reduction kernel with up to five loads and saves.
     */
-    template <typename Arg> struct Reduce_ : plus<typename Arg::reduce_t> {
+    template <typename Arg> struct Reduce_ : Arg::Reducer::reducer {
       using reduce_t = typename Arg::reduce_t;
-      using plus<reduce_t>::operator();
+      using Arg::Reducer::reducer::operator();
       static constexpr int reduce_block_dim = 1; // x_cb and parity are mapped to x dim
       Arg &arg;
       constexpr Reduce_(const Arg &arg) : arg(const_cast<Arg&>(arg))
@@ -103,6 +103,7 @@ namespace quda
     template <typename reduce_t_, bool site_unroll_ = false>
     struct ReduceFunctor {
       using reduce_t = reduce_t_;
+      using reducer = plus<reduce_t>;
       static constexpr bool site_unroll = site_unroll_;
 
       //! pre-computation routine called before the "M-loop"
@@ -110,6 +111,43 @@ namespace quda
 
       //! post-computation routine called after the "M-loop"
       __device__ __host__ void post(reduce_t &) const { ; }
+    };
+
+    template <typename reduce_t, typename real>
+    struct Max : public ReduceFunctor<reduce_t> {
+      using reducer = maximum<reduce_t>;
+      static constexpr memory_access<1> read{ };
+      static constexpr memory_access<> write{ };
+      Max(const real &, const real &) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &max, T &x, T &, T &, T &, T &) const
+      {
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          max = max > abs(x[i].real()) ? max : abs(x[i].real());
+          max = max > abs(x[i].imag()) ? max : abs(x[i].imag());
+        }
+      }
+      constexpr int flops() const { return 0; }   //! flops per element
+    };
+
+    template <typename reduce_t, typename real>
+    struct MaxDeviation : public ReduceFunctor<reduce_t> {
+      using reducer = maximum<reduce_t>;
+      static constexpr memory_access<1, 1> read{ };
+      static constexpr memory_access<> write{ };
+      MaxDeviation(const real &, const real &) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &max, T &x, T &y, T &, T &, T &) const
+      {
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          auto diff_re = abs(y[i].real()) > 0.0 ? (x[i].real() - y[i].real()) / abs(y[i].real()) : 0;
+          auto diff_im = abs(y[i].imag()) > 0.0 ? (x[i].imag() - y[i].imag()) / abs(y[i].imag()) : 0;
+          
+          max = max > diff_re ? max : diff_re;
+          max = max > diff_im ? max : diff_im;
+        }
+      }
+      constexpr int flops() const { return 0; }   //! flops per element
     };
 
     /**
@@ -444,6 +482,7 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct HeavyQuarkResidualNorm_ {
       using reduce_t = array<real_reduce_t, 3>;
+      using reducer = plus<reduce_t>;
       static constexpr bool site_unroll = true;
 
       static constexpr memory_access<1, 1> read{ };
@@ -489,6 +528,7 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct xpyHeavyQuarkResidualNorm_ {
       using reduce_t = array<real_reduce_t, 3>;
+      using reducer = plus<reduce_t>;
       static constexpr bool site_unroll = true;
 
       static constexpr memory_access<1, 1, 1> read{ };

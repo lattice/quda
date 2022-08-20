@@ -151,6 +151,19 @@ namespace quda {
       return value;
     }
 
+    double max(const ColorSpinorField &x)
+    {
+      ColorSpinorField &y = const_cast<ColorSpinorField &>(x); // FIXME
+      return instantiateReduce<Max, false>(0.0, 0.0, 0.0, y, y, y, y, y);
+    }
+
+    double max_deviation(const ColorSpinorField &x, const ColorSpinorField &y)
+    {
+      ColorSpinorField &z = const_cast<ColorSpinorField &>(x); // FIXME
+      ColorSpinorField &w = const_cast<ColorSpinorField &>(y); // FIXME
+      return instantiateReduce<MaxDeviation, false>(0.0, 0.0, 0.0, z, w, w, w, w);
+    }
+
     double norm1(const ColorSpinorField &x)
     {
       ColorSpinorField &y = const_cast<ColorSpinorField &>(x); // FIXME

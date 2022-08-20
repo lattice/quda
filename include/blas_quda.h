@@ -67,7 +67,30 @@ namespace quda {
 
     // reduction kernels - defined in reduce_quda.cu
 
+    /**
+       @brief Compute the maximum absolute real element of a field
+       @param[in] a The field we are reducing
+    */
+    double max(const ColorSpinorField &a);
+
+    /**
+       @brief Compute the maximum relative real-valued deviation
+       between two fields.
+       @param[in] a The field we want to compare
+       @param[in] b The reference field to which we are comparing against
+    */
+    double max_deviation(const ColorSpinorField &a, const ColorSpinorField &b);
+
+    /**
+       @brief Compute the L1 norm of a field
+       @param[in] a The field we are reducing
+    */
     double norm1(const ColorSpinorField &b);
+
+    /**
+       @brief Compute the L2 norm (squared) of a field
+       @param[in] a The field we are reducing
+    */
     double norm2(const ColorSpinorField &a);
 
     double axpyReDot(double a, ColorSpinorField &x, ColorSpinorField &y);
