@@ -1,3 +1,5 @@
+#pragma once
+
 #include <functional>
 
 namespace quda
@@ -31,11 +33,28 @@ namespace quda
      @param[in] v Input vector whose elements we will wrap
      @return Reference wrapped vector
   */
-  template <typename T, typename std::enable_if_t<std::is_same_v<T, std::vector<typename T::value_type>>> * = nullptr>
+  template <typename T, typename std::enable_if_t<std::is_same_v<std::remove_const_t<T>, std::vector<typename T::value_type>> &&
+    !std::is_pointer_v<typename T::value_type>> * = nullptr>
   auto make_set_impl(T &v)
   {
     using V = unwrap_t<typename T::value_type>;
     return std::vector<std::reference_wrapper<V>>(v.begin(), v.end());
+  }
+
+  /**
+     @brief Create a std::vector<std::reference_wrappers<T>> from a
+     std::vector<T*>.
+     @param[in] vp Vector of pointers
+     @return Vector of reference_wrappers
+  */
+  template <typename T, typename std::enable_if_t<std::is_same_v<std::remove_const_t<T>, std::vector<typename T::value_type>> &&
+    std::is_pointer_v<typename T::value_type>> * = nullptr>
+  auto make_set_impl(T &vp)
+  {
+    using V = std::remove_pointer_t<typename T::value_type>;
+    std::vector<std::reference_wrapper<V>> v;
+    for (auto &vi : vp) v.push_back(*vi);
+    return v;
   }
 
   /**
