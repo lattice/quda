@@ -5,6 +5,7 @@
 #include <convert.h>
 #include <float_vector.h>
 #include <array.h>
+#include <math_helper.cuh>
 
 //#define QUAD_SUM
 #ifdef QUAD_SUM
