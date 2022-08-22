@@ -665,8 +665,8 @@ QudaGaugeParam createGaugeParamForObservables(int precision, QudaMILCSiteArg_t *
   qudaGaugeParam.staggered_phase_applied = phase_in;
   qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   // FIXME: phases and boundary conditions are "munged" together inside QUDA, so the unphase function
-  // doesn't change the boundary condition flag. This setting guarantees that boundary conditions
-  // are properly set deep under the hood.
+  // doesn't change the boundary condition flag. This setting guarantees that phases and boundary conditions
+  // are consistently set under the hood --- but we still need an extra minus sign on the output.
   qudaGaugeParam.t_boundary = QUDA_PERIODIC_T;
   //if (phase_in) qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   if (phase_in) qudaGaugeParam.reconstruct_sloppy = qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -735,11 +735,10 @@ void qudaPlaquettePhased(int precision, double plaq[3], QudaMILCSiteArg_t *arg, 
   obsParam.remove_staggered_phase = phase_in ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   gaugeObservablesQuda(&obsParam);
 
+  // Let MILC apply its own Nc normalization
   plaq[0] = obsParam.plaquette[0];
   plaq[1] = obsParam.plaquette[1];
   plaq[2] = obsParam.plaquette[2];
-
-  //plaqQuda(plaq);
 
   qudamilc_called<false>(__func__);
   return;
@@ -761,9 +760,9 @@ void qudaPolyakovLoopPhased(int precision, double ploop[2], int dir, QudaMILCSit
   obsParam.remove_staggered_phase = phase_in ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   gaugeObservablesQuda(&obsParam);
 
-  ploop[0] = obsParam.ploop[0];
-  ploop[1] = obsParam.ploop[1];
-  //polyakovLoopQuda(ploop, dir);
+  // FIXME: see comment in createGaugeParamForObservables
+  ploop[0] = -obsParam.ploop[0];
+  ploop[1] = -obsParam.ploop[1];
 
   qudamilc_called<false>(__func__);
   return;
@@ -796,12 +795,14 @@ void qudaGaugeMeasurementsPhased(int precision, double plaq[3], double ploop[2],
   obsParam.remove_staggered_phase = phase_in ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   gaugeObservablesQuda(&obsParam);
 
-  // MILC has a factor of 3 convention
+  // Let MILC apply its Nc normalization
   plaq[0] = obsParam.plaquette[0];
   plaq[1] = obsParam.plaquette[1];
   plaq[2] = obsParam.plaquette[2];
-  ploop[0] = obsParam.ploop[0];
-  ploop[1] = obsParam.ploop[1];
+
+  // FIXME: see comment in createGaugeParamForObservables
+  ploop[0] = -obsParam.ploop[0];
+  ploop[1] = -obsParam.ploop[1];
 
   qudamilc_called<false>(__func__);
   return;

@@ -157,7 +157,7 @@ namespace quda {
       gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
       gParam.location = QUDA_CUDA_FIELD_LOCATION;
       gParam.geometry = QUDA_SCALAR_GEOMETRY;
-      //errorQuda("u bc %d gparam bc %d\n recon %d gparam recon %d", u.TBoundary(), gParam.t_boundary, u.Reconstruct(), gParam.reconstruct);
+
       // We promote the precision to double to maintain sufficient reproducibility
       // as a function of the number of ranks in the `t` dimension
       gParam.setPrecision(QUDA_DOUBLE_PRECISION);
