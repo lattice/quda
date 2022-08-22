@@ -664,7 +664,11 @@ QudaGaugeParam createGaugeParamForObservables(int precision, QudaMILCSiteArg_t *
   qudaGaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
   qudaGaugeParam.staggered_phase_applied = phase_in;
   qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
-  if (phase_in) qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
+  // FIXME: phases and boundary conditions are "munged" together inside QUDA, so the unphase function
+  // doesn't change the boundary condition flag. This setting guarantees that boundary conditions
+  // are properly set deep under the hood.
+  qudaGaugeParam.t_boundary = QUDA_PERIODIC_T;
+  //if (phase_in) qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   if (phase_in) qudaGaugeParam.reconstruct_sloppy = qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
 
   qudaGaugeParam.ga_pad = 0;
