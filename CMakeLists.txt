@@ -324,7 +324,7 @@ set(CMAKE_CXX_FLAGS_STRICT
   "-O3"
   CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE
-  "${CXX_OPT}"
+  "-O3 ${CXX_OPT}"
   CACHE STRING "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG
     "-g"
