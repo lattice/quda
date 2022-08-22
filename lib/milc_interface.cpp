@@ -713,8 +713,6 @@ void qudaGaugeLoopTracePhased(int precision, double *traces, int** input_path_bu
   obsParam.remove_staggered_phase = phase_in ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   gaugeObservablesQuda(&obsParam);
 
-  //computeGaugeLoopTraceQuda(reinterpret_cast<double _Complex*>(traces), gauge, input_path_buf, path_length, loop_coeff, num_paths, max_length, factor, &qudaGaugeParam);
-
   qudamilc_called<false>(__func__);
   return;
 }

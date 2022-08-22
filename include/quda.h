@@ -1382,20 +1382,18 @@ extern "C" {
                            int num_paths, int max_length, double dt, QudaGaugeParam *qudaGaugeParam);
 
   /**
-   * Compute the traces of products of gauge links along paths
+   * Compute the traces of products of gauge links along paths using the resident field
    *
    * @param[in,out] traces The computed traces
    * @param[in] sitelink The gauge field from which we compute the products of gauge links
-   * @param[in] input_path_buf[num_paths][path_length]
    * @param[in] path_length The number of links in each loop
    * @param[in] loop_coeff Multiplicative coefficients for each loop
    * @param[in] num_paths Total number of loops
    * @param[in] max_length The maximum number of non-zero of links in any path in the action
    * @param[in] factor An overall normalization factor
-   * @param[in] param The parameters of the external fields and the computation settings
    */
-  void computeGaugeLoopTraceQuda(double_complex* traces, void *siteLink, int **input_path_buf, int *path_length, double *loop_coeff,
-                                int num_paths, int max_length, double factor, QudaGaugeParam *qudaGaugeParam);
+  void computeGaugeLoopTraceQuda(double_complex* traces, int **input_path_buf, int *path_length, double *loop_coeff,
+                                int num_paths, int max_length, double factor);
 
   /**
    * Evolve the gauge field by step size dt, using the momentum field

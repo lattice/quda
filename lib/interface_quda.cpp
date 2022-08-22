@@ -5252,8 +5252,8 @@ void polyakovLoopQuda(double ploop[2], int dir)
   ploop[1] = obsParam.ploop[1];
 }
 
-void computeGaugeLoopTraceQuda(double _Complex* traces, void *siteLink, int **input_path_buf, int *path_length, double *loop_coeff,
-                                    int num_paths, int max_length, double factor, QudaGaugeParam *qudaGaugeParam)
+void computeGaugeLoopTraceQuda(double _Complex* traces, int **input_path_buf, int *path_length, double *loop_coeff,
+                                    int num_paths, int max_length, double factor)
 {
   if (!gaugePrecise) errorQuda("Cannot compute gauge loop traces as there is no resident gauge field");
 

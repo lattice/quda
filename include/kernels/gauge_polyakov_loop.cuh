@@ -226,7 +226,7 @@ namespace quda {
         polyloop = computePolyakovLoop<3>(arg, x, parity);
       } else {
         // U is a "scalar" gauge field, which is the packed outputs of multi-GPU
-        // traces. In this case the "3" direction is the packing doimension
+        // traces. In this case the "3" direction is the packing dimension
         polyloop = computePolyakovLoop<3>(arg, x, parity);
       }
 
