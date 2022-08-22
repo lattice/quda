@@ -258,35 +258,12 @@ namespace quda
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
-      // Make an array of size n_conv
-      std::vector<ColorSpinorField *> vecs_ptr;
-      vecs_ptr.reserve(n_eig);
+
       const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
-      // We may wish to compute vectors in high prec, but use in a lower
-      // prec. This allows the user to down copy the data for later use.
-      QudaPrecision prec = kSpace[0]->Precision();
-      if (save_prec < prec) {
-        ColorSpinorParam csParamClone(*kSpace[0]);
-        csParamClone.create = QUDA_REFERENCE_FIELD_CREATE;
-        csParamClone.setPrecision(save_prec);
-        for (unsigned int i = 0; i < kSpace.size(); i++) {
-          kSpace[i]->setSuggestedParity(mat_parity);
-          vecs_ptr.push_back(kSpace[i]->CreateAlias(csParamClone));
-        }
-        if (getVerbosity() >= QUDA_SUMMARIZE) {
-          printfQuda("kSpace successfully down copied from prec %d to prec %d\n", kSpace[0]->Precision(),
-                     vecs_ptr[0]->Precision());
-        }
-      } else {
-        for (int i = 0; i < n_eig; i++) {
-          kSpace[i]->setSuggestedParity(mat_parity);
-          vecs_ptr.push_back(kSpace[i]);
-        }
-      }
-      // save the vectors
+      for (auto &k : kSpace) k->setSuggestedParity(mat_parity);
+
       VectorIO io(eig_param->vec_outfile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE);
-      io.save(vecs_ptr);
-      for (unsigned int i = 0; i < kSpace.size() && save_prec < prec; i++) delete vecs_ptr[i];
+      io.save(kSpace, save_prec, n_eig);
     }
 
     mat.flops();
