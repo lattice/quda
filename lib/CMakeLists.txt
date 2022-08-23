@@ -204,6 +204,12 @@ check_linker_flag(CXX "-Wl,--compress-debug-sections=zlib" QUDA_LINKER_COMPRESS)
 target_link_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_LINKER_COMPRESS}:-Wl,--compress-debug-sections=zlib>>)
 
 # set up QUDA compile options
+target_compile_options(
+  quda PRIVATE $<$<COMPILE_LANGUAGE:CXX,C,Fortran>: 
+               $<IF:$<CONFIG:RELEASE>,-w,-Wall -Wextra>
+               $<$<CONFIG:STRICT>:-Werror>
+  >)
+
 target_compile_definitions(
   quda PRIVATE $<$<CONFIG:DEVEL>:DEVEL> $<$<CONFIG:HOSTDEBUG>:HOST_DEBUG> $<$<CONFIG:DEBUG>:HOST_DEBUG>
                $<$<CONFIG:DEBUG>:DEVICE_DEBUG> $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
@@ -386,9 +392,9 @@ if(QUDA_ARPACK)
     # ARPACK-NG does not suppport logging - we must warn the user
     message(
       WARNING
-        "Specifying QUDA_ARPACK_LOGGING with ARPACK-NG package will cause link failures. Please ensure that QUDA_ARPACK_LOGGING=OFF if downloading ARPACK-NG or using system installed ARPACK-NG"
-    )
-    target_compile_definitions(ARPACK_LOGGING)
+      "Specifying QUDA_ARPACK_LOGGING with ARPACK-NG package will cause link failures. Please ensure that QUDA_ARPACK_LOGGING=OFF if downloading ARPACK-NG or using system installed ARPACK-NG"
+      )
+    target_compile_definitions(QUDA_ARPACK_LOGGING ON)
   endif()
   if(QUDA_DOWNLOAD_ARPACK)
     target_link_libraries(quda PUBLIC arpack-ng)

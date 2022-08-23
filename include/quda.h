@@ -493,8 +493,10 @@ extern "C" {
     /** If use_dagger, use Mdag **/
     /** If use_norm_op, use MdagM **/
     /** If use_norm_op && use_dagger use MMdag. **/
+    /** If use_pc for any, then use the even-odd pc version **/
     QudaBoolean use_dagger;
     QudaBoolean use_norm_op;
+    QudaBoolean use_pc;
 
     /** Use Eigen routines to eigensolve the upper Hessenberg via QR **/
     QudaBoolean use_eigen_qr;
@@ -824,6 +826,9 @@ extern "C" {
   typedef struct QudaBLASParam_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
 
+    QudaBLASType blas_type; /**< Type of BLAS computation to perfrom */
+
+    // GEMM params
     QudaBLASOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */
     QudaBLASOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */
     int m;                     /**< number of rows of matrix op(A) and C. */
@@ -838,14 +843,17 @@ extern "C" {
     int a_stride;              /**< stride of the A array in strided(batched) mode */
     int b_stride;              /**< stride of the B array in strided(batched) mode */
     int c_stride;              /**< stride of the C array in strided(batched) mode */
-
     double_complex alpha; /**< scalar used for multiplication. */
     double_complex beta;  /**< scalar used for multiplication. If beta==0, C does not have to be a valid input. */
 
-    int batch_count; /**< number of pointers contained in arrayA, arrayB and arrayC. */
+    // LU inversion params
+    int inv_mat_size; /**< The rank of the square matrix in the LU inversion */
 
+    // Common params
+    int batch_count;              /**< number of pointers contained in arrayA, arrayB and arrayC. */
     QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
     QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
+
   } QudaBLASParam;
 
   /*
@@ -1620,12 +1628,21 @@ extern "C" {
   /**
    * @brief Strided Batched GEMM
    * @param[in] arrayA The array containing the A matrix data
-   * @param[in] arrayB The array containing the A matrix data
-   * @param[in] arrayC The array containing the A matrix data
-   * @param[in] native boolean to use either the native or generic version
+   * @param[in] arrayB The array containing the B matrix data
+   * @param[in] arrayC The array containing the C matrix data
+   * @param[in] native Boolean to use either the native or generic version
    * @param[in] param The data defining the problem execution.
    */
   void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBoolean native, QudaBLASParam *param);
+
+  /**
+   * @brief Strided Batched in-place matrix inversion via LU
+   * @param[in] Ainv The array containing the A inverse matrix data
+   * @param[in] A The array containing the A matrix data
+   * @param[in] use_native Boolean to use either the native or generic version
+   * @param[in] param The data defining the problem execution.
+   */
+  void blasLUInvQuda(void *Ainv, void *A, QudaBoolean use_native, QudaBLASParam *param);
 
   /**
    * @brief Flush the chronological history for the given index

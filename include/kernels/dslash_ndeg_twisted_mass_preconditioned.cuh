@@ -2,7 +2,7 @@
 
 #include <kernels/dslash_wilson.cuh>
 #include <kernels/dslash_twisted_mass_preconditioned.cuh>
-#include <shared_memory_cache_helper.cuh>
+#include <shared_memory_cache_helper.h>
 
 namespace quda
 {
