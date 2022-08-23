@@ -152,7 +152,12 @@ namespace quda {
 
     void ax(double a, ColorSpinorField &x)
     {
-      instantiate<ax_, Blas, false>(a, 0.0, 0.0, x, x, x, x, x);
+      instantiate<axy_, Blas, false>(a, 0.0, 0.0, x, x, x, x, x);
+    }
+
+    void axy(double a, const ColorSpinorField &x, ColorSpinorField &y)
+    {
+      instantiate<axy_, Blas, false>(a, 0.0, 0.0, const_cast<ColorSpinorField&>(x), y, y, y, y);
     }
 
     void caxpy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y)

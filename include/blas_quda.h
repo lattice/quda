@@ -34,7 +34,20 @@ namespace quda {
       dst.copy(src);
     }
 
+    /**
+       @brief Apply the rescale operation x = a * x
+       @param[in] a scalar multiplier
+       @param[in] x vector
+    */
     void ax(double a, ColorSpinorField &x);
+
+    /**
+       @brief Apply the operation y = a * x
+       @param[in] a scalar multiplier
+       @param[in] x input vector
+       @param[out] y output vector
+    */
+    void axy(double a, const ColorSpinorField &x, ColorSpinorField &y);
 
     void axpbyz(double a, ColorSpinorField &x, double b, ColorSpinorField &y, ColorSpinorField &z);
 

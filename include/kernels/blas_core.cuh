@@ -107,17 +107,17 @@ namespace quda
     };
 
     /**
-       Functor to perform the operation x *= a
+       Functor to perform the operation y = a * x
     */
-    template <typename real> struct ax_ : public BlasFunctor {
-      static constexpr memory_access<1> read{ };
-      static constexpr memory_access<1> write{ };
+    template <typename real> struct axy_ : public BlasFunctor {
+      static constexpr memory_access<1, 0> read{ };
+      static constexpr memory_access<0, 1> write{ };
       const real a;
-      ax_(const real &a, const real &, const real &) : a(a) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &, T &, T &, T &) const
+      axy_(const real &a, const real &, const real &) : a(a) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &) const
       {
 #pragma unroll
-        for (int i = 0; i < x.size(); i++) x[i] *= a;
+        for (int i = 0; i < x.size(); i++) y[i] = a * x[i];
       }
       constexpr int flops() const { return 1; }   //! flops per element
     };
