@@ -137,6 +137,10 @@ int main(int argc, char **argv)
   loadGaugeQuda((void *)gauge, &gauge_param);
   saveGaugeQuda(new_gauge, &gauge_param);
 
+  // Prepare various perf info
+  long long flops_plaquette = 6ll * 597 * V;
+  long long flops_ploop = 198ll * V + 6 * V / gauge_param.X[3];
+
   // Prepare a gauge observable struct
   QudaGaugeObservableParam param = newQudaGaugeObservableParam();
 
@@ -146,20 +150,35 @@ int main(int argc, char **argv)
   // We call gaugeObservablesQuda multiple times to time each bit individually
 
   // Compute the plaquette
-  host_timer.start();
   param.compute_plaquette = QUDA_BOOLEAN_TRUE;
+
+  // Tuning call
   gaugeObservablesQuda(&param);
+
+  host_timer.start();
+  for (int i = 0; i < niter; i++)
+    gaugeObservablesQuda(&param);
   host_timer.stop();
-  printfQuda("Computed plaquette gauge precise is %.16e (spatial = %.16e, temporal = %.16e), done in %g seconds\n", param.plaquette[0], param.plaquette[1],
-             param.plaquette[2], host_timer.last());
+  double secs_plaquette = host_timer.last() / niter;
+  double perf_plaquette = flops_plaquette / (secs_plaquette * 1024 * 1024 * 1024);
+  printfQuda("Computed plaquette gauge precise is %.16e (spatial = %.16e, temporal = %.16e), done in %g seconds, %g GFLOPS\n",
+             param.plaquette[0], param.plaquette[1], param.plaquette[2], secs_plaquette, perf_plaquette);
   param.compute_plaquette = QUDA_BOOLEAN_FALSE;
 
   // Compute the temporal Polyakov loop
-  host_timer.start();
   param.compute_polyakov_loop = QUDA_BOOLEAN_TRUE;
+
+  // Tuning call
   gaugeObservablesQuda(&param);
+
+  host_timer.start();
+  for (int i = 0; i < niter; i++)
+    gaugeObservablesQuda(&param);
   host_timer.stop();
-  printfQuda("Computed Polyakov loop gauge precise is %.16e +/- I %.16e , done in %g seconds\n", param.ploop[0], param.ploop[1], host_timer.last());
+  double secs_ploop = host_timer.last() / niter;
+  double perf_ploop = flops_ploop / (secs_ploop * 1024 * 1024 * 1024);
+  printfQuda("Computed Polyakov loop gauge precise is %.16e +/- I %.16e , done in %g seconds, %g GFLOPS\n",
+             param.ploop[0], param.ploop[1], secs_ploop, perf_ploop);
   param.compute_polyakov_loop = QUDA_BOOLEAN_FALSE;
 
   // Topological charge and gauge energy
@@ -167,7 +186,7 @@ int main(int argc, char **argv)
   // Size of floating point data
   size_t data_size = prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
   size_t array_size = V * data_size;
-  void *qDensity = safe_malloc(array_size);
+  void *qDensity = pinned_malloc(array_size);
 
   // start the timer
   host_timer.start();

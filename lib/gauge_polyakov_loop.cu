@@ -49,6 +49,8 @@ namespace quda {
       product_field(product_field),
       u(u)
     {
+      if (u.Geometry() != QUDA_VECTOR_GEOMETRY)
+        errorQuda("Unexpected geometry %d", u.Geometry());
       strcat(aux, ",3d_vol=");
       strcat(aux, product_field.VolString());
 
@@ -67,12 +69,12 @@ namespace quda {
       auto Nc = u.Ncolor();
       auto mat_mul_flops = 8ll * Nc * Nc * Nc - 2 * Nc * Nc;
       // multiplies for each loop
-      return mat_mul_flops * u.Volume() / 4;
+      return mat_mul_flops * u.Volume();
     }
 
     long long bytes() const {
       // links * one LatticeColorMatrix worth of data
-      return u.Bytes() / 4 + product_field.Bytes();
+      return u.Bytes() / u.Geometry() + product_field.Bytes();
     }
   };
 
@@ -109,7 +111,7 @@ namespace quda {
       auto mat_mul_flops = 8ll * Nc * Nc * Nc - 2 * Nc * Nc;
       int trace_direction = 3; // update for vector geometry, non-temporal loops
       // multiplies for each loop plus traces
-      return mat_mul_flops * u.Volume() / u.Geometry() + 2 * Nc * u.Volume() / u.X()[trace_direction];
+      return mat_mul_flops * u.Volume() + 2 * Nc * u.Volume() / u.X()[trace_direction];
     }
 
     long long bytes() const {
