@@ -72,7 +72,7 @@ mark_as_advanced(CMAKE_CXX_FLAGS_RELEASE)
 mark_as_advanced(CMAKE_CXX_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_CXX_FLAGS_HOSTDEBUG)
 mark_as_advanced(CMAKE_CXX_FLAGS_SANITIZE)
-message(STATUS "Sycl compiler is" ${CMAKE_CXX_COMPILER})
+message(STATUS "Sycl compiler is " ${CMAKE_CXX_COMPILER})
 message(STATUS "Compiler ID is " ${CMAKE_CXX_COMPILER_ID})
 
 # ######################################################################################################################
@@ -86,7 +86,7 @@ message(STATUS "Compiler ID is " ${CMAKE_CXX_COMPILER_ID})
 
 # QUDA_HASH for tunecache
 #set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},sycl_version=${CMAKE_SYCL_COMPILER_VERSION})
-set(HASH cpu_arch=${CPU_ARCH},Sycl)
+set(HASH cpu_arch=${CPU_ARCH},SYCL)
 #set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH}")
 set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-SYCL")
 
@@ -97,9 +97,11 @@ set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-SYCL")
 
 target_compile_options(quda PRIVATE -fsycl)
 target_compile_options(quda PRIVATE -mllvm -pragma-unroll-threshold=16)
-#if(${CMAKE_CXX_COMPILER_ID} MATCHES "IntelLLVM")
-#  target_compile_options(quda INTERFACE -fhonor-nan-compares)
-#endif()
+if(${CMAKE_CXX_COMPILER_ID} MATCHES "IntelLLVM")
+  #target_compile_options(quda INTERFACE -fhonor-nan-compares)
+  target_compile_options(quda PRIVATE -fhonor-nan-compares)
+  target_compile_options(quda PUBLIC -fhonor-nan-compares)
+endif()
 
 target_compile_options(quda PUBLIC -Wno-tautological-constant-compare)
 

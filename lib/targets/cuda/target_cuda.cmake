@@ -1,5 +1,6 @@
 # ######################################################################################################################
 # CUDA specific part of CMakeLists
+set(CMAKE_CUDA_EXTENSIONS OFF)
 
 find_package(CUDAToolkit REQUIRED)
 include(CheckLanguage)
@@ -46,16 +47,16 @@ set(CMAKE_CUDA_FLAGS_STRICT
     "-O3"
     CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
 set(CMAKE_CUDA_FLAGS_RELEASE
-    "-O3 -w"
+    "-O3 ${CXX_OPT}"
     CACHE STRING "Flags used by the CUDA compiler during release builds.")
 set(CMAKE_CUDA_FLAGS_HOSTDEBUG
     "-g"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEBUG
-    "-g -G"
+    "-G -g -fno-inline"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CUDA_FLAGS_SANITIZE
-    "-g "
+    "-g -fno-inline \"-fsanitize=address,undefined\" "
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
 
 mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
@@ -185,6 +186,13 @@ target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/inc
 target_include_directories(quda SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/cuda/externals)
 
 # Specific config dependent warning suppressions and lineinfo forwarding
+
+target_compile_options(
+  quda 
+  PRIVATE $<$<COMPILE_LANGUAGE:CUDA>: 
+          $<IF:$<CONFIG:RELEASE>,-w,-Wall -Wextra>
+          >)
+
 target_compile_options(
   quda
   PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
@@ -204,7 +212,12 @@ target_compile_options(
           $<$<CONFIG:SANITIZE>:-lineinfo>
           >)
 
-target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>: -gpu=lineinfo >)
+target_compile_options(
+  quda 
+  PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:
+          -gpu=lineinfo
+          $<$<CONFIG:STRICT>:-Werror>
+          >)
 
 target_compile_options(
   quda

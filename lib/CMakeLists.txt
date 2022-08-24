@@ -198,6 +198,7 @@ if(${QUDA_TARGET_TYPE} STREQUAL "SYCL")
   include(targets/sycl/target_sycl.cmake)
 endif()
 
+
 # make one library
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pack>:$<TARGET_OBJECTS:quda_pack>>
                             ${QUDA_CU_OBJS})
@@ -207,6 +208,12 @@ check_linker_flag(CXX "-Wl,--compress-debug-sections=zlib" QUDA_LINKER_COMPRESS)
 target_link_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_LINKER_COMPRESS}:-Wl,--compress-debug-sections=zlib>>)
 
 # set up QUDA compile options
+target_compile_options(
+  quda BEFORE PRIVATE $<$<COMPILE_LANGUAGE:CXX,C,Fortran>:
+               $<IF:$<CONFIG:RELEASE>,-w,-Wall -Wextra>
+               $<$<CONFIG:STRICT>:-Werror>
+  >)
+
 target_compile_definitions(
   quda PRIVATE $<$<CONFIG:DEVEL>:DEVEL> $<$<CONFIG:HOSTDEBUG>:HOST_DEBUG> $<$<CONFIG:DEBUG>:HOST_DEBUG>
                $<$<CONFIG:DEBUG>:DEVICE_DEBUG> $<$<CONFIG:SANITIZE>:HOST_DEBUG>)

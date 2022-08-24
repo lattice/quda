@@ -108,7 +108,11 @@ namespace quda {
    */
   template<typename T> inline __host__ __device__ T sinpi(T a) { return ::sinpi(a); }
 
+#ifndef _NVHPC_CUDA
   template <bool is_device> struct sinpif_impl { inline float operator()(float a) { return ::sinpif(a); } };
+#else
+  template <bool is_device> struct sinpif_impl { inline float operator()(float a) { return ::sinf(a * static_cast<float>(M_PI)); } };
+#endif
   template <> struct sinpif_impl<true> { __device__ inline float operator()(float a) { return __sinf(a * static_cast<float>(M_PI)); } };
 
   /**
@@ -128,7 +132,11 @@ namespace quda {
    */
   template<typename T> inline __host__ __device__ T cospi(T a) { return ::cospi(a); }
 
+#ifndef _NVHPC_CUDA
   template <bool is_device> struct cospif_impl { inline float operator()(float a) { return ::cospif(a); } };
+#else
+  template <bool is_device> struct cospif_impl { inline float operator()(float a) { return ::cosf(a * static_cast<float>(M_PI)); } };
+#endif
   template <> struct cospif_impl<true> { __device__ inline float operator()(float a) { return __cosf(a * static_cast<float>(M_PI)); } };
 
   /**
