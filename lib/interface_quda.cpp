@@ -2046,11 +2046,9 @@ void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertPara
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   ColorSpinorField in(cudaParam); // cudaColorSpinorField
   in = *in_h;
-  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-  ColorSpinorField out(cudaParam); // cudaColorSpinorField
-  out = in;
-  ColorSpinorField tmp(cudaParam); // cudaColorSpinorField
-  tmp = in;
+  cudaParam.create = QUDA_ZERO_FIELD_CREATE; // create new field and zero it
+  ColorSpinorField out(cudaParam); // cudaColorSpinorField = 0
+  ColorSpinorField tmp(cudaParam); // cudaColorSpinorField = 0
 
   profileCovDev.TPSTOP(QUDA_PROFILE_INIT);
 
@@ -2095,8 +2093,7 @@ void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertPara
 
       if (offset == 1) { cDir = 0; } else if (offset == 2) { cDir = 1; } else if (offset == 4) { cDir = 2; } else if (offset == 8) { cDir = 3; }
 
-      ColorSpinorField pr1(cudaParam); // cudaColorSpinorField
-      pr1 = in;
+      ColorSpinorField pr1(cudaParam); // cudaColorSpinorField = 0
       applySpinTaste(out, in,  spin);
       myCovDev->MCD (tmp, out, cDir);
       myCovDev->MCD (pr1, out, cDir+4);
@@ -2125,10 +2122,8 @@ void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertPara
         if (offset == 12) { dirs[0] = 2; dirs[1] = 3; }
       }
 
-      ColorSpinorField pr1(cudaParam); // cudaColorSpinorField
-      pr1 = in;
-      ColorSpinorField acc(cudaParam); // cudaColorSpinorField
-      acc = in;
+      ColorSpinorField pr1(cudaParam); // cudaColorSpinorField = 0
+      ColorSpinorField acc(cudaParam); // cudaColorSpinorField = 0
 
       applySpinTaste(out, in,  spin);
       // YX result in acc
@@ -2161,12 +2156,9 @@ void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertPara
     case 11: // three-link 5Z
     case 7:  // three-link 5T
     {
-      ColorSpinorField pr1(cudaParam); // cudaColorSpinorField
-      pr1 = in;
-      ColorSpinorField pr2(cudaParam); // cudaColorSpinorField
-      pr2 = in;
-      ColorSpinorField acc(cudaParam); // cudaColorSpinorField
-      acc = in;
+      ColorSpinorField pr1(cudaParam); // cudaColorSpinorField = 0
+      ColorSpinorField pr2(cudaParam); // cudaColorSpinorField = 0
+      ColorSpinorField acc(cudaParam); // cudaColorSpinorField = 0
 
       applySpinTaste(out, in,  spin);
 
@@ -2230,12 +2222,9 @@ void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertPara
                                  { 3, 1, 2, 0}, { 3, 2, 0, 1}, { 3, 0, 1, 2},
                                  { 1, 2, 3, 0}, { 2, 0, 3, 1}, { 0, 1, 3, 2} };
 
-      ColorSpinorField pr1(cudaParam); // cudaColorSpinorField
-      pr1 = in;
-      ColorSpinorField pr2(cudaParam); // cudaColorSpinorField
-      pr2 = in;
-      ColorSpinorField acc(cudaParam); // cudaColorSpinorField
-      acc = in;
+      ColorSpinorField pr1(cudaParam); // cudaColorSpinorField = 0
+      ColorSpinorField pr2(cudaParam); // cudaColorSpinorField = 0
+      ColorSpinorField acc(cudaParam); // cudaColorSpinorField = 0
 
       applySpinTaste(out, in,  spin);
 
