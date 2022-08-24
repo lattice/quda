@@ -855,6 +855,7 @@ namespace quda
   };
 
   using ColorSpinorField_ref = std::reference_wrapper<ColorSpinorField>;
+  using ColorSpinorField_cref = std::reference_wrapper<const ColorSpinorField>;
 
   /**
      @brief Specialization of is_field to allow us to make sets of ColorSpinorField
