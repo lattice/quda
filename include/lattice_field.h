@@ -477,13 +477,13 @@ namespace quda {
        @brief Copy constructor for creating a LatticeField from another LatticeField
        @param field Instance of LatticeField from which we are cloning
     */
-    LatticeField(const LatticeField &field);
+    LatticeField(const LatticeField &field) noexcept;
 
     /**
        @brief Move constructor for creating a LatticeField from another LatticeField
        @param field Instance of LatticeField from which we are moving
     */
-    LatticeField(LatticeField &&field);
+    LatticeField(LatticeField &&field) noexcept;
 
     /**
        @brief Constructor for creating a LatticeField from a LatticeFieldParam

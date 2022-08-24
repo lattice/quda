@@ -49,7 +49,7 @@ namespace quda
     }
   }
 
-  ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) :
+  ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) noexcept :
     LatticeField(field),
     init(false),
     alloc(false),
@@ -75,7 +75,7 @@ namespace quda
     copy(field);
   }
 
-  ColorSpinorField::ColorSpinorField(ColorSpinorField &&field) : LatticeField(std::move(field))
+  ColorSpinorField::ColorSpinorField(ColorSpinorField &&field) noexcept : LatticeField(std::move(field))
   {
     move(std::move(field));
   }
