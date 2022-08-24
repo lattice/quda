@@ -336,7 +336,8 @@ namespace quda {
       //                                         which lets us skip some tiles.
       if (x.size() != y.size())
       {
-        errorQuda("An optimal block axpy_U with non-square 'a' has not yet been implemented. Use block axpy instead");
+        errorQuda("An optimal block axpy_U with non-square 'a' (%lu != %lu) has not yet been implemented. Use block axpy instead",
+                  x.size(), y.size());
       }
       axpy_recurse<multiaxpy_>(a, x, y, range(0, x.size()), range(0, y.size()), 1);
     }
@@ -348,7 +349,8 @@ namespace quda {
       //                                         which lets us skip some tiles.
       if (x.size() != y.size())
       {
-        errorQuda("An optimal block axpy_L with non-square 'a' has not yet been implemented. Use block axpy instead");
+        errorQuda("An optimal block axpy_L with non-square 'a' (%lu != %lu) has not yet been implemented. Use block axpy instead",
+                  x.size(), y.size());
       }
       axpy_recurse<multiaxpy_>(a, x, y, range(0, x.size()), range(0, y.size()), -1);
     }
@@ -366,7 +368,8 @@ namespace quda {
       // Pass a, x, y. (0,0) indexes the tiles. 1 indicates the matrix is upper-triangular,
       //                                         which lets us skip some tiles.
       if (x.size() != y.size()) {
-        errorQuda("An optimal block caxpy_U with non-square 'a' has not yet been implemented. Use block caxpy instead");
+        errorQuda("An optimal block caxpy_U with non-square 'a' (%lu != %lu) has not yet been implemented. Use block caxpy instead",
+                  x.size(), y.size());
       }
       axpy_recurse<multicaxpy_>(a, x, y, range(0,x.size()), range(0,y.size()), 1);
     }
@@ -377,7 +380,8 @@ namespace quda {
       // Pass a, x, y. (0,0) indexes the tiles. -1 indicates the matrix is lower-triangular
       //                                         which lets us skip some tiles.
       if (x.size() != y.size()) {
-        errorQuda("An optimal block caxpy_L with non-square 'a' has not yet been implemented. Use block caxpy instead");
+        errorQuda("An optimal block caxpy_L with non-square 'a' (%lu != %lu) has not yet been implemented. Use block caxpy instead",
+                  x.size(), y.size());
       }
       axpy_recurse<multicaxpy_>(a, x, y, range(0,x.size()), range(0,y.size()), -1);
     }
@@ -446,7 +450,8 @@ namespace quda {
     void axpyz_U(const std::vector<double> &a, csfield_ref_vec &&x, csfield_ref_vec &&y, csfield_ref_vec &&z)
     {
       if (x.size() != y.size()) {
-        errorQuda("An optimal block caxpyz_U with non-square 'a' has not yet been implemented. Use block caxpy instead");
+        errorQuda("An optimal block axpyz_U with non-square 'a' (%lu != %lu) has not yet been implemented. Use block axpyz instead",
+                  x.size(), y.size());
       }
       // a is upper triangular.
       // first pass does the axpyz on the diagonal
@@ -458,7 +463,8 @@ namespace quda {
     void axpyz_L(const std::vector<double> &a, csfield_ref_vec &&x, csfield_ref_vec &&y, csfield_ref_vec &&z)
     {
       if (x.size() != y.size()) {
-        errorQuda("An optimal block caxpyz_L with non-square 'a' has not yet been implemented. Use block caxpy instead");
+        errorQuda("An optimal block axpyz_L with non-square 'a' (%lu != %lu) has not yet been implemented. Use block axpyz instead",
+                  x.size(), y.size());
       }
       // a is upper triangular.
       // first pass does the axpyz on the diagonal
@@ -475,7 +481,8 @@ namespace quda {
     void caxpyz_U(const std::vector<Complex> &a, csfield_ref_vec &&x, csfield_ref_vec &&y, csfield_ref_vec &&z)
     {
       if (x.size() != y.size()) {
-        errorQuda("An optimal block caxpyz_U with non-square 'a' has not yet been implemented. Use block caxpy instead");
+        errorQuda("An optimal block caxpyz_U with non-square 'a' (%lu != %lu) has not yet been implemented. Use block caxpyz instead",
+                  x.size(), y.size());
       }
       // a is upper triangular.
       // first pass does the caxpyz on the diagonal
@@ -487,7 +494,8 @@ namespace quda {
     void axpyz_L(const std::vector<Complex> &a, csfield_ref_vec &&x, csfield_ref_vec &&y, csfield_ref_vec &&z)
     {
       if (x.size() != y.size()) {
-        errorQuda("An optimal block caxpyz_L with non-square 'a' has not yet been implemented. Use block caxpy instead");
+        errorQuda("An optimal block axpyz_U with non-square 'a' (%lu != %lu) has not yet been implemented. Use block axpyz instead",
+                  x.size(), y.size());
       }
       // a is upper triangular.
       // first pass does the caxpyz on the diagonal
