@@ -680,6 +680,10 @@ namespace quda
 
   ~Communicator();
 
+#if defined(QMP_COMMS) || defined(MPI_COMMS)
+  MPI_Comm get_mpi_handle() { return MPI_COMM_HANDLE; }
+#endif
+
   void comm_gather_hostname(char *hostname_recv_buf);
 
   void comm_gather_gpuid(int *gpuid_recv_buf);
