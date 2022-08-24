@@ -8,6 +8,7 @@ namespace quda {
   namespace blas {
 
     using csfield_ref_vec = std::vector<ColorSpinorField_ref>;
+    using csfield_cref_vec = std::vector<ColorSpinorField_cref>;
 
     template <template <typename ...> class Reducer, typename store_t, typename y_store_t, int nSpin,
               typename T>
@@ -35,8 +36,9 @@ namespace quda {
       }
 
     public:
+      template <typename Vx, typename Vy, typename Vz, typename Vw>
       MultiReduce(const T &a, const T &b, const T &c, const ColorSpinorField &x0, const ColorSpinorField &y0,
-                  csfield_ref_vec &x, csfield_ref_vec &y, csfield_ref_vec &z, csfield_ref_vec &w, T &result) :
+                  Vx &x, Vy &y, Vz &z, Vw &w, T &result) :
         TunableMultiReduction(x[0], 1u, y.size(), max_n_batch_block_multi_reduce()),
         NXZ(x.size()),
         NYW(y.size()),
@@ -45,10 +47,10 @@ namespace quda {
         a(a),
         b(b),
         c(c),
-        x(x),
-        y(y),
-        z(z),
-        w(w),
+        x(reinterpret_cast<csfield_ref_vec&>(x)),
+        y(reinterpret_cast<csfield_ref_vec&>(y)),
+        z(reinterpret_cast<csfield_ref_vec&>(z)),
+        w(reinterpret_cast<csfield_ref_vec&>(w)),
         result(result),
         location(checkLocation(x[0], y[0], z[0], w[0]))
       {
@@ -220,9 +222,10 @@ namespace quda {
       }
     };
 
-    template <template <typename ...> class ReducerDiagonal, template <typename ...> class ReducerOffDiagonal, typename T>
+    template <template <typename ...> class ReducerDiagonal, template <typename ...> class ReducerOffDiagonal,
+              typename T, typename Vx, typename Vy, typename Vz, typename Vw>
     void multiReduce(std::vector<T> &result, const std::vector<T> &a, const std::vector<T> &b, const std::vector<T> &c,
-                     csfield_ref_vec &x, csfield_ref_vec &y, csfield_ref_vec &z, csfield_ref_vec &w, int i, int j)
+                     Vx &x, Vy &y, Vz &z, Vw &w, int i, int j)
     {
       if (i == j) { // we are on the diagonal so invoke the diagonal reducer
         instantiate<ReducerDiagonal, MultiReduce, true>(a, b, c, x[0], y[0], x, y, z, w, result);
@@ -234,9 +237,9 @@ namespace quda {
     // This function does the outer product of dot products... in column major.
     // There's a function below called 'cDotProduct' that flips it to row major.
     template <template <typename ...> class reducer_diag,
-              template <typename ...> class reducer_off, typename T>
-    void multiReduce_recurse(std::vector<T> &result, csfield_ref_vec &x, csfield_ref_vec &y, csfield_ref_vec &z,
-                             csfield_ref_vec &w, int i_idx, int j_idx, bool hermitian, uint2 tile_size)
+              template <typename ...> class reducer_off, typename T, typename Vx, typename Vy, typename Vz, typename Vw>
+    void multiReduce_recurse(std::vector<T> &result, Vx &x, Vy &y, Vz &z, Vw &w, int i_idx, int j_idx,
+                             bool hermitian, uint2 tile_size)
     {
       if (y.size() > tile_size.y) { // if greater than max single-kernel size, split and recurse
         // Do the recurse first.
@@ -279,11 +282,15 @@ namespace quda {
     }
 
     template <template <typename ...> class ReducerDiagonal,
-              template <typename ...> class ReducerOffDiagonal, typename T>
+              template <typename ...> class ReducerOffDiagonal, typename T,
+              typename Vx, typename Vy, typename Vz = Vx, typename Vw = Vx>
     class TileSizeTune : public Tunable
     {
       std::vector<T> &result;
-      csfield_ref_vec &x, &y, &z, &w;
+      Vx &x;
+      Vy &y;
+      Vz &z;
+      Vw &w;
       bool hermitian;
       bool Anorm;
 
@@ -294,7 +301,7 @@ namespace quda {
       uint2 max_tile_size;
 
     public:
-      TileSizeTune(std::vector<T> &result, csfield_ref_vec &x, csfield_ref_vec &y, csfield_ref_vec &z, csfield_ref_vec &w, bool hermitian, bool Anorm = false,
+      TileSizeTune(std::vector<T> &result, Vx &x, Vy &y, Vz &z, Vw &w, bool hermitian, bool Anorm = false,
                    bool nested_policy = false) :
         result(result),
         x(x),
@@ -464,12 +471,13 @@ namespace quda {
     };
 
     template <template <typename ...> class ReducerDiagonal,
-              template <typename ...> class ReducerOffDiagonal, typename T>
+              template <typename ...> class ReducerOffDiagonal, typename T, typename Vx, typename Vy>
     class TransposeTune : public Tunable
     {
-      using TileTuner = TileSizeTune<ReducerDiagonal, ReducerOffDiagonal, T>;
+      using TileTuner = TileSizeTune<ReducerDiagonal, ReducerOffDiagonal, T, Vx, Vy, Vx, Vx>;
       std::vector<T> &result;
-      csfield_ref_vec &x, &y;
+      Vx &x;
+      Vy &y;
       bool hermitian;
       bool Anorm;
 
@@ -477,7 +485,7 @@ namespace quda {
       unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
     public:
-      TransposeTune(std::vector<T> &result, csfield_ref_vec &x, csfield_ref_vec &y, bool hermitian, bool Anorm = false) :
+      TransposeTune(std::vector<T> &result, Vx &x, Vy &y, bool hermitian, bool Anorm = false) :
         result(result),
         x(x),
         y(y),
@@ -599,7 +607,7 @@ namespace quda {
       void postTune() {} // FIXME - use write to determine what needs to be saved
     };
 
-    void reDotProduct(std::vector<double> &result, csfield_ref_vec &&x, csfield_ref_vec &&y)
+    void reDotProduct(std::vector<double> &result, csfield_cref_vec &&x, csfield_cref_vec &&y)
     {
       auto &x0 = x[0].get();
       auto &y0 = y[0].get();
@@ -635,9 +643,9 @@ namespace quda {
           for (unsigned int i = 0; i < ylen; i++) result_tmp[i * xlen + j] = result_trans[j * ylen + i];
 
       } else if (x0.Precision() == y0.Precision()) {
-        TransposeTune<multiDot, multiDot, double>(result_tmp, x, y, false);
+        TransposeTune<multiDot, multiDot, double, decltype(x), decltype(y)>(result_tmp, x, y, false);
       } else {
-        TileSizeTune<multiDot, multiDot, double>(result_tmp, x, y, x, x, false);
+        TileSizeTune<multiDot, multiDot, double, decltype(x), decltype(y)>(result_tmp, x, y, x, x, false);
       }
 
       // do a single multi-node reduction only once we have computed all local dot products
@@ -649,7 +657,7 @@ namespace quda {
       result = transpose(result_tmp, y.size(), x.size());
     }
 
-    void cDotProduct(std::vector<Complex> &result, csfield_ref_vec &&x, csfield_ref_vec &&y)
+    void cDotProduct(std::vector<Complex> &result, csfield_cref_vec &&x, csfield_cref_vec &&y)
     {
       auto &x0 = x[0].get();
       auto &y0 = y[0].get();
@@ -685,9 +693,9 @@ namespace quda {
           for (unsigned int i = 0; i < ylen; i++) result_tmp[i * xlen + j] = conj(result_trans[j * ylen + i]);
         }
       } else if (x0.Precision() == y0.Precision()) {
-        TransposeTune<multiCdot, multiCdot, Complex>(result_tmp, x, y, false);
+        TransposeTune<multiCdot, multiCdot, Complex, decltype(x), decltype(y)>(result_tmp, x, y, false);
       } else {
-        TileSizeTune<multiCdot, multiCdot, Complex>(result_tmp, x, y, x, x, false);
+        TileSizeTune<multiCdot, multiCdot, Complex, decltype(x), decltype(y)>(result_tmp, x, y, x, x, false);
       }
 
       // do a single multi-node reduction only once we have computed all local dot products
@@ -699,13 +707,13 @@ namespace quda {
       result = transpose(result_tmp, y.size(), x.size());
     }
 
-    void hDotProduct(std::vector<Complex> &result, csfield_ref_vec &&x, csfield_ref_vec &&y)
+    void hDotProduct(std::vector<Complex> &result, csfield_cref_vec &&x, csfield_cref_vec &&y)
     {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block dot product on non-square inputs");
 
       std::vector<Complex> result_tmp(x.size() * y.size(), 0.0);
-      TileSizeTune<multiCdot, multiCdot, Complex>(result_tmp, x, y, x, x, true, false); // last false is b/c L2 norm
+      TileSizeTune<multiCdot, multiCdot, Complex, decltype(x), decltype(y)>(result_tmp, x, y, x, x, true, false); // last false is b/c L2 norm
 
       // do a single multi-node reduction only once we have computed all local dot products
       comm_allreduce_sum(result_tmp); // FIXME - could optimize this for Hermiticity as well
@@ -723,13 +731,13 @@ namespace quda {
     }
 
     // for (p, Ap) norms in CG which are Hermitian.
-    void hDotProduct_Anorm(std::vector<Complex> &result, csfield_ref_vec &&x, csfield_ref_vec &&y)
+    void hDotProduct_Anorm(std::vector<Complex> &result, csfield_cref_vec &&x, csfield_cref_vec &&y)
     {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block A-norm dot product on non-square inputs");
 
       std::vector<Complex> result_tmp(x.size() * y.size(), 0.0);
-      TileSizeTune<multiCdot, multiCdot, Complex>(result_tmp, x, y, x, x, true, true); // last true is b/c A norm
+      TileSizeTune<multiCdot, multiCdot, Complex, decltype(x), decltype(y)>(result_tmp, x, y, x, x, true, true); // last true is b/c A norm
 
       // do a single multi-node reduction only once we have computed all local dot products
       comm_allreduce_sum(result_tmp);
