@@ -5479,7 +5479,6 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   
   const double msq     = 1. / ftmp;  
   const double a       = inv_param->laplace3D * 2.0 + msq;
-  const double b       = 0.0; // not used
   const QudaParity  parity   = QUDA_INVALID_PARITY;
   for (int i = 0; i < n_steps; i++) {
     if (i > 0) std::swap(in, out);
