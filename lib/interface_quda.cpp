@@ -5480,13 +5480,13 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   const double msq     = 1. / ftmp;  
   const double a       = inv_param->laplace3D * 2.0 + msq;
   const double b       = 0.0; // not used
-  
+  const QudaParity  parity   = QUDA_INVALID_PARITY;
   for (int i = 0; i < n_steps; i++) {
     if (i > 0) std::swap(in, out);
     blas::ax(ftmp, *in);
     blas::axpy(a, *in, *temp1);
     
-    qsmear_op.Expose()->SmearOp(*out, *in, a, 0.0, t0);
+    qsmear_op.Expose()->SmearOp(*out, *in, a, 0.0, t0, parity);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       double norm = blas::norm2(*out);
       printfQuda("Step %d, vector norm %e\n", i, norm);

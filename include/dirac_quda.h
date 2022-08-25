@@ -235,7 +235,7 @@ namespace quda {
        smearing.
     */    
     virtual void SmearOp(ColorSpinorField &, const ColorSpinorField &, 
-                         const double &a, const double &b, const int &t0,  const QudaParity parity = QUDA_INVALID_PARITY) const 
+                         const double&, const double &, const int &,  const QudaParity) const 
     {
       errorQuda("Not implemented!\n");
     }
@@ -1337,7 +1337,7 @@ public:
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
                         double mu_factor = 0., bool allow_truncation = false) const;
 
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b, const int &t0,  const QudaParity parity = QUDA_INVALID_PARITY) const;
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b, const int &t0,  const QudaParity parity) const;
   };
 
   // Even-odd preconditioned staggered
@@ -1569,7 +1569,7 @@ public:
     */
     virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
     
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b, const int &t0,  const QudaParity parity = QUDA_INVALID_PARITY) const;    
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b, const int &t0,  const QudaParity parity) const;    
   };
 
   // Even-odd preconditioned staggered
