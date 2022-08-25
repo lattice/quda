@@ -333,7 +333,6 @@ void computeTwoLinkCPU(void **twolink, su3_matrix **sitelinkEx)
   for (int dir = 0; dir < 4; ++dir) E[dir] = Z[dir] + 4;
   const int extended_volume = E[3] * E[2] * E[1] * E[0];
 
-  su3_matrix temp;
   for (int t = 0; t < Z[3]; ++t) {
     for (int z = 0; z < Z[2]; ++z) {
       for (int y = 0; y < Z[1]; ++y) {
