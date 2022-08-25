@@ -180,7 +180,7 @@ namespace quda {
     */
     template <typename T1, typename T2> void axpy(const std::vector<double> &a, T1 &&x, T2 &&y)
     {
-      axpy(a, make_set(x), make_set(y));
+      axpy(a, make_cset(x), make_set(y));
     }
 
     /**
@@ -207,7 +207,7 @@ namespace quda {
     */
     template <typename T1, typename T2> void axpy_U(const std::vector<double> &a, T1 &&x, T2 &&y)
     {
-      axpy_U(a, make_set(x), make_set(y));
+      axpy_U(a, make_cset(x), make_set(y));
     }
 
     /**
@@ -234,7 +234,7 @@ namespace quda {
     */
     template <typename T1, typename T2> void axpy_L(const std::vector<double> &a, T1 &&x, T2 &&y)
     {
-      axpy_L(a, make_set(x), make_set(y));
+      axpy_L(a, make_cset(x), make_set(y));
     }
 
     /**
@@ -263,7 +263,7 @@ et of
     */
     template <typename T1, typename T2> void caxpy(const std::vector<Complex> &a, T1 &&x, T2 &&y)
     {
-      caxpy(a, make_set(x), make_set(y));
+      caxpy(a, make_cset(x), make_set(y));
     }
 
     /**
@@ -290,7 +290,7 @@ et of
     */
     template <typename T1, typename T2> void caxpy_U(const std::vector<Complex> &a, T1 &&x, T2 &&y)
     {
-      caxpy_U(a, make_set(x), make_set(y));
+      caxpy_U(a, make_cset(x), make_set(y));
     }
 
     /**
@@ -317,7 +317,7 @@ et of
     */
     template <typename T1, typename T2> void caxpy_L(const std::vector<Complex> &a, T1 &&x, T2 &&y)
     {
-      caxpy_L(a, make_set(x), make_set(y));
+      caxpy_L(a, make_cset(x), make_set(y));
     }
 
     /**
@@ -348,7 +348,7 @@ et of
     */
     template <typename T1, typename T2, typename T3> void axpyz(const std::vector<double> &a, T1 &&x, T2 &&y, T3 &&z)
     {
-      axpyz(a, make_set(x), make_set(y), make_set(z));
+      axpyz(a, make_cset(x), make_cset(y), make_set(z));
     }
 
     /**
@@ -377,7 +377,7 @@ et of
     */
     template <typename T1, typename T2, typename T3> void axpyz_U(const std::vector<double> &a, T1 &&x, T2 &&y, T3 &&z)
     {
-      axpyz_U(a, make_set(x), make_set(y), make_set(z));
+      axpyz_U(a, make_cset(x), make_cset(y), make_set(z));
     }
 
     /**
@@ -406,7 +406,7 @@ et of
     */
     template <typename T1, typename T2, typename T3> void axpyz_L(const std::vector<double> &a, T1 &&x, T2 &&y, T3 &&z)
     {
-      axpyz_L(a, make_set(x), make_set(y), make_set(z));
+      axpyz_L(a, make_cset(x), make_cset(y), make_set(z));
     }
 
     /**
@@ -437,7 +437,7 @@ et of
     */
     template <typename T1, typename T2, typename T3> void caxpyz(const std::vector<Complex> &a, T1 &&x, T2 &&y, T3 &&z)
     {
-      caxpyz(a, make_set(x), make_set(y), make_set(z));
+      caxpyz(a, make_cset(x), make_cset(y), make_set(z));
     }
 
     /**
@@ -467,7 +467,7 @@ et of
     template <typename T1, typename T2, typename T3>
     void caxpyz_U(const std::vector<Complex> &a, T1 &&x, T2 &&y, T3 &&z)
     {
-      caxpyz_U(a, make_set(x), make_set(y), make_set(z));
+      caxpyz_U(a, make_cset(x), make_cset(y), make_set(z));
     }
 
     /**
@@ -497,7 +497,7 @@ et of
     template <typename T1, typename T2, typename T3>
     void caxpyz_L(const std::vector<Complex> &a, T1 &&x, T2 &&y, T3 &&z)
     {
-      caxpyz_L(a, make_set(x), make_set(y), make_set(z));
+      caxpyz_L(a, make_cset(x), make_cset(y), make_set(z));
     }
 
     /**
@@ -574,7 +574,7 @@ et of
     void caxpyBxpz(const std::vector<Complex> &a, T &&x, ColorSpinorField &y, const std::vector<Complex> &b,
                    ColorSpinorField &z)
     {
-      caxpyBxpz(a, make_set(x), y, b, z);
+      caxpyBxpz(a, make_cset(x), y, b, z);
     }
 
     // multi-reduce kernels - defined in multi_reduce.cu
@@ -599,7 +599,7 @@ et of
     */
     template <typename T1, typename T2> void reDotProduct(std::vector<double> &result, T1 &&a, T2 &&b)
     {
-      reDotProduct(result, make_set(a), make_set(b));
+      reDotProduct(result, make_cset(a), make_cset(b));
     }
 
     /**
@@ -622,7 +622,7 @@ et of
     */
     template <typename T1, typename T2> void cDotProduct(std::vector<Complex> &result, T1 &&a, T2 &&b)
     {
-      cDotProduct(result, make_set(a), make_set(b));
+      cDotProduct(result, make_cset(a), make_cset(b));
     }
 
     /**
@@ -648,7 +648,7 @@ et of
     */
     template <typename T1, typename T2> void hDotProduct(std::vector<Complex> &result, T1 &&a, T2 &&b)
     {
-      hDotProduct(result, make_set(a), make_set(b));
+      hDotProduct(result, make_cset(a), make_cset(b));
     }
 
     /**
@@ -676,7 +676,7 @@ et of
     */
     template <typename T1, typename T2> void hDotProduct_Anorm(std::vector<Complex> &result, T1 &&a, T2 &&b)
     {
-      hDotProduct_Anorm(result, make_set(a), make_set(b));
+      hDotProduct_Anorm(result, make_cset(a), make_cset(b));
     }
 
     // compatibility wrappers until we switch to

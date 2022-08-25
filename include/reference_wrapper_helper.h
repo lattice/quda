@@ -33,12 +33,26 @@ namespace quda
      @param[in] v Input vector whose elements we will wrap
      @return Reference wrapped vector
   */
-  template <typename T, typename std::enable_if_t<std::is_same_v<std::remove_const_t<T>, std::vector<typename T::value_type>> &&
+  template <typename T, typename std::enable_if_t<std::is_same_v<T, std::vector<typename T::value_type>> &&
     !std::is_pointer_v<typename T::value_type>> * = nullptr>
   auto make_set_impl(T &v)
   {
     using V = unwrap_t<typename T::value_type>;
     return std::vector<std::reference_wrapper<V>>(v.begin(), v.end());
+  }
+
+  /**
+     @brief Create a std::vector<std::reference_wrapper<T>> from input
+     std::vector<T>
+     @param[in] v Input vector whose elements we will wrap
+     @return Reference wrapped vector
+  */
+  template <typename T, typename std::enable_if_t<std::is_same_v<T, std::vector<typename T::value_type>> &&
+    !std::is_pointer_v<typename T::value_type>> * = nullptr>
+  auto make_cset_impl(T &v)
+  {
+    using V = unwrap_t<typename T::value_type>;
+    return std::vector<std::reference_wrapper<const V>>(v.begin(), v.end());
   }
 
   /**
@@ -69,14 +83,35 @@ namespace quda
   }
 
   /**
-     @brief Create a std::vector of std::reference_wrappers the input argument
+     @brief Create a std::vector<std::reference_wrapper<T>> from an
+     input instance of a QUDA field
+     @param[in] v Input T that we will wrap
+     @return Reference wrapped vector
+  */
+  template <typename T, typename std::enable_if_t<is_field_v<T>> * = nullptr> auto make_cset_impl(T &v)
+  {
+    return std::vector<std::reference_wrapper<const T>> {v};
+  }
 
+  /**
+     @brief Create a std::vector of std::reference_wrappers the input argument
      @param[in] v Input to be wrapped in a vector
      @return Vector of input
   */
   template <typename T> inline auto make_set(T &&v)
   {
     auto v_set = make_set_impl(v);
+    return v_set;
+  }
+
+  /**
+     @brief Create a std::vector of std::reference_wrappers the input argument
+     @param[in] v Input to be wrapped in a vector
+     @return Vector of input
+  */
+  template <typename T> inline auto make_cset(T &&v)
+  {
+    auto v_set = make_cset_impl(v);
     return v_set;
   }
 
