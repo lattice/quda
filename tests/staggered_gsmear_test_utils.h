@@ -302,7 +302,7 @@ struct StaggeredGSmearTestWrapper {//
     commDimPartitionedReset();
   }
 
-  GSmearTime gsmearCUDA(int niter)
+  GSmearTime gsmearCUDA(int niter) //niter
   {
     GSmearTime gsmear_time;
 
@@ -311,6 +311,8 @@ struct StaggeredGSmearTestWrapper {//
 
     comm_barrier();
     device_timer.start();
+
+    printfQuda("running test in %d iters.", niter);
 
     // smearing parameters
     switch (gtest_type) {
@@ -351,10 +353,10 @@ struct StaggeredGSmearTestWrapper {//
 
     GSmearTime gsmear_time = gsmearCUDA(niter);
     if(gtest_type == gsmear_test_type::GaussianSmear) *spinorRef = *spinor;
-#if 0
+
     if (print_metrics) {
       printfQuda("%fus per kernel call\n", 1e6 * gsmear_time.event_time / niter);
-
+#if 0
       unsigned long long flops = 0.0;//FIXME dirac->Flops();
       double gflops = 1.0e-9 * flops / gsmear_time.event_time;
       printfQuda("GFLOPS = %f\n", gflops);
@@ -376,8 +378,8 @@ struct StaggeredGSmearTestWrapper {//
         1.0e-9 * 2 * ghost_bytes * niter / gsmear_time.event_time,
         1.0e-9 * 2 * ghost_bytes * niter / gsmear_time.cpu_time, 1.0e-9 * 2 * ghost_bytes / gsmear_time.cpu_max,
         1.0e-9 * 2 * ghost_bytes / gsmear_time.cpu_min, 2 * ghost_bytes);
+#endif      
     }
-#endif    
   }
 
   double verify()
