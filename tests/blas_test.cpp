@@ -286,10 +286,10 @@ private:
     yH = ColorSpinorField(param);
     zH = ColorSpinorField(param);
 
-    xmH.resize(Nsrc, param);
-    ymH.resize(Msrc, param);
-    zmH.resize(Nsrc, param);
-    wmH.resize(Msrc, param);
+    resize(xmH, Nsrc, param);
+    resize(ymH, Msrc, param);
+    resize(zmH, Nsrc, param);
+    resize(wmH, Msrc, param);
 
     vH.Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
     wH.Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
@@ -323,15 +323,15 @@ private:
 
     // create device multi-field
     param.setPrecision(prec, prec, true);
-    xmD.resize(Nsrc, param);
-    ymD.resize(Msrc, param);
-    zmD.resize(Nsrc, param);
-    wmD.resize(Msrc, param);
+    resize(xmD, Nsrc, param);
+    resize(ymD, Msrc, param);
+    resize(zmD, Nsrc, param);
+    resize(wmD, Msrc, param);
 
     param.setPrecision(prec_other, prec_other, true);
-    xmoD.resize(Nsrc, param);
-    ymoD.resize(Msrc, param);
-    zmoD.resize(Nsrc, param);
+    resize(xmoD, Nsrc, param);
+    resize(ymoD, Msrc, param);
+    resize(zmoD, Nsrc, param);
 
     // only do copy if not doing half precision with mg
     bool flag = !(param.nSpin == 2 && (prec < QUDA_SINGLE_PRECISION || prec_other < QUDA_HALF_PRECISION));

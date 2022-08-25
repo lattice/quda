@@ -245,9 +245,9 @@ struct DslashTestWrapper {
     if (test_split_grid) {
       inv_param.num_src = num_src;
       inv_param.num_src_per_sub_partition = 1;
-      vp_spinor.resize(num_src, csParam);
-      vp_spinorOut.resize(num_src, csParam);
-      vp_spinorRef.resize(num_src, csParam);
+      resize(vp_spinor, num_src, csParam);
+      resize(vp_spinorOut, num_src, csParam);
+      resize(vp_spinorRef, num_src, csParam);
 
       std::fill(vp_spinor.begin(), vp_spinor.end(), spinor);
     }
