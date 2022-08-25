@@ -55,18 +55,20 @@ using namespace staggered_quark_smearing;
         TwoLink_<decltype(arg)>  twolnk(arg, link, newTwoLink);
       }
     };
-
+#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_TWOLINK_GSMEAR)
   void computeTwoLink(GaugeField &newTwoLink, const GaugeField &link)
     {
       checkNative(newTwoLink, link);
       checkLocation(newTwoLink, link);
       checkPrecision(newTwoLink, link);
-#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_TWOLINK_GSMEAR)
       instantiate<ComputeTwoLink, WilsonReconstruct>(link, newTwoLink);
 
       return;
-#else
-      errorQuda("Two-link computation requires staggered dslash and two-link Gaussian quark smearing to be enabled");
-#endif
     }
+#else
+    void computeTwoLink(GaugeField &, const GaugeField &)
+    {
+      errorQuda("Two-link computation requires staggered dslash and two-link Gaussian quark smearing to be enabled");
+    }
+#endif  
 } // namespace quda

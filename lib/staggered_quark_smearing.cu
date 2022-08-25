@@ -170,7 +170,6 @@ namespace quda
                         TimeProfile &profile)
     {
       if (in.Nspin() == 1) {
-#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_TWOLINK_GSMEAR)
         constexpr int nDim = 4;
         constexpr int nSpin = 1;
         
@@ -190,9 +189,6 @@ namespace quda
         dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(
           staggered_qsmear, in, volume,
           faceVolumeCB, profile);
-#else
-        errorQuda("nSpin=%d StaggeredQSmear operator requires staggered dslash and two-link Gaussian quark smearing to be enabled", in.Nspin());
-#endif
       } else {
         errorQuda("Unsupported nSpin= %d", in.Nspin());
       }
@@ -200,6 +196,7 @@ namespace quda
   };
 
   // Apply the StaggeredQSmear operator
+#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_TWOLINK_GSMEAR)
   void ApplyStaggeredQSmear(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0, bool is_tslice_kernel, int parity, int dir,
                     bool dagger, const int *comm_override, TimeProfile &profile)
   {
@@ -213,5 +210,12 @@ namespace quda
     
     instantiate<StaggeredQSmearApply>(out, in, U, t0, is_tslice_kernel, parity, dir, dagger, comm_override, profile);
   }
+#else
+    void ApplyStaggeredQSmear(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, int, bool, int, int,
+                    bool, const int*, TimeProfile&) {
+       errorQuda("StaggeredQSmear operator requires staggered dslash and two-link Gaussian quark smearing to be enabled");
+    }
+
+#endif  
 } // namespace quda
 
