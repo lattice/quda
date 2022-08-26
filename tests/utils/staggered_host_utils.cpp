@@ -379,6 +379,7 @@ void computeTwoLinkCPU(void **twolink, void **sitelink, QudaGaugeParam *qudaGaug
   }
 }
 
+#ifdef MULTI_GPU
 template <typename sFloat, typename gFloat>
 void staggeredTwoLinkGaussianSmear(sFloat *res, gFloat **twolink, gFloat **ghostTwolink,
                               sFloat *spinorField, sFloat **fwd_nbr_spinor,
@@ -463,7 +464,10 @@ void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk
   }
   return;
 }
-
+#else
+void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &, void **, void** ,  quda::ColorSpinorField&, QudaGaugeParam* , QudaInvertParam* , const int , const double , const int , QudaPrecision )
+{}
+#endif
 
 
 // Compute the full HISQ stencil on the CPU.
