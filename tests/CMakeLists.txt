@@ -19,11 +19,15 @@ endif()
 
 set(TEST_LIBS quda_test)
 
+# custom target for building all tests (useful if QUDA_BUILD_ALL_TESTS is OFF)
+add_custom_target(buildtests)
+
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   if(NOT ${qudabuildtests})
     set_property(TARGET ${mytarget} PROPERTY EXCLUDE_FROM_ALL 1)
     set(QUDA_EXCLUDE_FROM_INSTALL "EXCLUDE_FROM_ALL")
   endif()
+  add_dependencies(buildtests ${mytarget})
 endmacro()
 
 if(NOT ${QUDA_INSTALL_ALL_TESTS})
