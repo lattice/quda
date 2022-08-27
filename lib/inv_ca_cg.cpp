@@ -584,7 +584,7 @@ namespace quda
         // 1. Compute Q_AQ = Q^\dagger AQ and g = Q^dagger r = Q^dagger S[0]
         // 2. Solve Q_AQ alpha = g
         {
-          blas::reDotProduct(Q_AQandg, Q, make_set(AQ, S[0]));
+          blas::reDotProduct(Q_AQandg, Q, {AQ, S[0]});
           compute_alpha();
         }
 
@@ -606,7 +606,7 @@ namespace quda
         // We do compute the alpha coefficients: this is the same code as above
         // 1. Compute "Q_AQ" = S^\dagger AS and g = S^dagger r = S^dagger S[0]
         // 2. Solve "Q_AQ" alpha = g
-        blas::reDotProduct(Q_AQandg, S, make_set(AS, S[0]));
+        blas::reDotProduct(Q_AQandg, S, {AS, S[0]});
         compute_alpha();
 
         // update the solution vector

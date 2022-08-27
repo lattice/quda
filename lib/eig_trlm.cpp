@@ -37,14 +37,14 @@ namespace quda
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
-  void TRLM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
+  void TRLM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals)
   {
     // Override any user input for block size.
     block_size = 1;
 
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
-    if (getVerbosity() >= QUDA_VERBOSE) queryPrec(kSpace[0]->Precision());
+    if (getVerbosity() >= QUDA_VERBOSE) queryPrec(kSpace[0].Precision());
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
       printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
@@ -65,7 +65,7 @@ namespace quda
 
     // Convergence and locking criteria
     double mat_norm = 0.0;
-    double epsilon = setEpsilon(kSpace[0]->Precision());
+    double epsilon = setEpsilon(kSpace[0].Precision());
 
     // Print Eigensolver params
     printEigensolverSetup();
@@ -189,48 +189,41 @@ namespace quda
 
   // Thick Restart Member functions
   //---------------------------------------------------------------------------
-  void TRLM::lanczosStep(std::vector<ColorSpinorField *> v, int j)
+  void TRLM::lanczosStep(std::vector<ColorSpinorField> &v, int j)
   {
     // Compute r = A * v_j - b_{j-i} * v_{j-1}
     // r = A * v_j
 
-    chebyOp(mat, *r[0], *v[j]);
+    chebyOp(mat, r[0], v[j]);
 
     // a_j = v_j^dag * r
-    alpha[j] = blas::reDotProduct(*v[j], *r[0]);
+    alpha[j] = blas::reDotProduct(v[j], r[0]);
 
     // r = r - a_j * v_j
-    blas::axpy(-alpha[j], *v[j], *r[0]);
+    blas::axpy(-alpha[j], v[j], r[0]);
 
     int start = (j > num_keep) ? j - 1 : 0;
 
     if (j - start > 0) {
-      std::vector<ColorSpinorField *> r_ {r[0]};
-      std::vector<double> beta_;
-      beta_.reserve(j - start);
-      std::vector<ColorSpinorField *> v_;
-      v_.reserve(j - start);
-      for (int i = start; i < j; i++) {
-        beta_.push_back(-beta[i]);
-        v_.push_back(v[i]);
-      }
+      std::vector<double> beta_ = {beta.begin() + start, beta.begin() + j};
+      for (auto & bi : beta_) bi = -bi;
+
       // r = r - b_{j-1} * v_{j-1}
-      blas::axpy(beta_.data(), v_, r_);
+      blas::axpy(beta_, {v.begin() + start, v.begin() + j}, r[0]);
     }
 
     // Orthogonalise r against the Krylov space
     for (int k = 0; k < 1; k++) blockOrthogonalize(v, r, j + 1);
 
     // b_j = ||r||
-    beta[j] = sqrt(blas::norm2(*r[0]));
+    beta[j] = sqrt(blas::norm2(r[0]));
 
     // Prepare next step.
     // v_{j+1} = r / b_j
-    blas::zero(*v[j + 1]);
-    blas::axpy(1.0 / beta[j], *r[0], *v[j + 1]);
+    blas::axy(1.0 / beta[j], r[0], v[j + 1]);
   }
 
-  void TRLM::reorder(std::vector<ColorSpinorField *> &kSpace)
+  void TRLM::reorder(std::vector<ColorSpinorField> &kSpace)
   {
     int i = 0;
 
@@ -319,7 +312,7 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_EIGEN);
   }
 
-  void TRLM::computeKeptRitz(std::vector<ColorSpinorField *> &kSpace)
+  void TRLM::computeKeptRitz(std::vector<ColorSpinorField> &kSpace)
   {
     int offset = n_kr + 1;
     int dim = n_kr - num_locked;
@@ -330,7 +323,7 @@ namespace quda
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j]; }
     }
 
-    rotateVecs(kSpace, ritz_mat_keep.data(), offset, dim, iter_keep, num_locked, profile);
+    rotateVecs(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked, profile);
 
     // Update residual vector
     std::swap(kSpace[num_locked + iter_keep], kSpace[n_kr]);

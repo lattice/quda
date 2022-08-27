@@ -53,11 +53,11 @@ namespace quda
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
-  void BLKTRLM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
+  void BLKTRLM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals)
   {
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
-    if (getVerbosity() >= QUDA_VERBOSE) queryPrec(kSpace[0]->Precision());
+    if (getVerbosity() >= QUDA_VERBOSE) queryPrec(kSpace[0].Precision());
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
       printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
@@ -82,7 +82,7 @@ namespace quda
 
     // Convergence and locking criteria
     double mat_norm = 0.0;
-    double epsilon = setEpsilon(kSpace[0]->Precision());
+    double epsilon = setEpsilon(kSpace[0].Precision());
 
     // Print Eigensolver params
     printEigensolverSetup();
@@ -210,7 +210,7 @@ namespace quda
 
   // Block Thick Restart Member functions
   //---------------------------------------------------------------------------
-  void BLKTRLM::blockLanczosStep(std::vector<ColorSpinorField *> v, int j)
+  void BLKTRLM::blockLanczosStep(std::vector<ColorSpinorField> &v, int j)
   {
     // Compute r = A * v_j - b_{j-i} * v_{j-1}
 
@@ -219,19 +219,14 @@ namespace quda
     int idx = 0, idx_conj = 0;
 
     // r = A * v_j
-    for (int b = 0; b < block_size; b++) chebyOp(mat, *r[b], *v[j + b]);
+    for (int b = 0; b < block_size; b++) chebyOp(mat, r[b], v[j + b]);
 
     // r = r - b_{j-1} * v_{j-1}
     int start = (j > num_keep) ? j - block_size : 0;
+
     if (j - start > 0) {
-
-      std::vector<ColorSpinorField *> r_;
-      r_.reserve(block_size);
-      for (int i = 0; i < block_size; i++) r_.push_back(r[i]);
-
       int blocks = (j - start) / block_size;
-      std::vector<Complex> beta_;
-      beta_.reserve(blocks * block_data_length);
+      std::vector<Complex> beta_(blocks * block_data_length);
 
       // Switch beta block order from COLUMN to ROW major
       // This switches the block from upper to lower triangular
@@ -240,26 +235,22 @@ namespace quda
         for (int b = 0; b < block_size; b++) {
           for (int c = 0; c < block_size; c++) {
             idx = c * block_size + b;
-            beta_.push_back(-block_beta[block_offset + idx]);
+            beta_[(i * block_size + b) * block_size + c] = -block_beta[block_offset + idx];
           }
         }
       }
 
-      std::vector<ColorSpinorField *> v_;
-      v_.reserve(j - start);
-      for (int i = start; i < j; i++) { v_.push_back(v[i]); }
       if (blocks == 1)
-        blas::caxpy_L(beta_.data(), v_, r_);
+        blas::caxpy_L(beta_, {v.begin() + start, v.begin() + j}, {r.begin(), r.begin() + block_size});
       else
-        blas::caxpy(beta_.data(), v_, r_);
+        blas::caxpy(beta_, {v.begin() + start, v.begin() + j}, {r.begin(), r.begin() + block_size});
     }
 
     // a_j = v_j^dag * r
-    std::vector<ColorSpinorField *> vecs_ptr;
-    vecs_ptr.reserve(block_size);
-    for (int b = 0; b < block_size; b++) { vecs_ptr.push_back(v[j + b]); }
     // Block dot products stored in alpha_block.
-    blas::cDotProduct(block_alpha.data() + arrow_offset, vecs_ptr, r);
+    std::vector<Complex> block_alpha_(block_size);
+    blas::cDotProduct(block_alpha_, {v.begin() + j, v.begin() + j + block_size}, {r.begin(), r.end()});
+    for (auto i = 0u; i < block_alpha_.size(); i++) block_alpha[arrow_offset + i] = block_alpha_[i];
 
     // Use jth_block to negate alpha data and apply block BLAS.
     // Data is in square hermitian form, no need to switch to ROW major
@@ -271,7 +262,7 @@ namespace quda
     }
 
     // r = r - a_j * v_j
-    blas::caxpy(jth_block.data(), vecs_ptr, r);
+    blas::caxpy(jth_block, {v.begin() + j, v.begin() + j + block_size}, {r.begin(), r.end()});
 
     // Orthogonalise R[0:block_size] against the Krylov space V[0:j + block_size]
     for (int k = 0; k < 1; k++) blockOrthogonalize(v, r, j + block_size);
@@ -295,13 +286,13 @@ namespace quda
       // Compute R_{k}
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Orthing k = %d\n", k);
       for (int b = 0; b < block_size; b++) {
-        double norm = sqrt(blas::norm2(*r[b]));
-        blas::ax(1.0 / norm, *r[b]);
+        double norm = sqrt(blas::norm2(r[b]));
+        blas::ax(1.0 / norm, r[b]);
         jth_block[b * (block_size + 1)] = norm;
         for (int c = b + 1; c < block_size; c++) {
 
-          Complex cnorm = blas::cDotProduct(*r[b], *r[c]);
-          blas::caxpy(-cnorm, *r[b], *r[c]);
+          Complex cnorm = blas::cDotProduct(r[b], r[c]);
+          blas::caxpy(-cnorm, r[b], r[c]);
 
           idx = c * block_size + b;
           idx_conj = b * block_size + c;
@@ -318,7 +309,7 @@ namespace quda
 
     // Prepare next step.
     // v_{j+1} = r
-    for (int b = 0; b < block_size; b++) *v[j + block_size + b] = *r[b];
+    for (int b = 0; b < block_size; b++) v[j + block_size + b] = r[b];
   }
 
   void BLKTRLM::updateBlockBeta(int k, int arrow_offset)
@@ -451,7 +442,7 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_EIGEN);
   }
 
-  void BLKTRLM::computeBlockKeptRitz(std::vector<ColorSpinorField *> &kSpace)
+  void BLKTRLM::computeBlockKeptRitz(std::vector<ColorSpinorField> &kSpace)
   {
     int offset = n_kr + block_size;
     int dim = n_kr - num_locked;
@@ -462,7 +453,7 @@ namespace quda
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = block_ritz_mat[i * dim + j]; }
     }
 
-    rotateVecsComplex(kSpace, ritz_mat_keep.data(), offset, dim, iter_keep, num_locked, profile);
+    rotateVecsComplex(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked, profile);
 
     // Update residual vectors
     for (int i = 0; i < block_size; i++) std::swap(kSpace[num_locked + iter_keep + i], kSpace[n_kr + i]);

@@ -40,19 +40,19 @@ namespace quda
 
   // Arnoldi Member functions
   //---------------------------------------------------------------------------
-  void IRAM::arnoldiStep(std::vector<ColorSpinorField *> &v, std::vector<ColorSpinorField *> &r, double &beta, int j)
+  void IRAM::arnoldiStep(std::vector<ColorSpinorField> &v, std::vector<ColorSpinorField> &r, double &beta, int j)
   {
-    beta = sqrt(blas::norm2(*r[0]));
+    beta = sqrt(blas::norm2(r[0]));
     if (j > 0) upperHess[j][j - 1] = beta;
 
     // v_{j} = r_{j-1}/beta
-    blas::ax(1.0 / beta, *r[0]);
+    blas::ax(1.0 / beta, r[0]);
     std::swap(v[j], r[0]);
 
     // r_{j} = M * v_{j};
-    mat(*r[0], *v[j]);
+    mat(r[0], v[j]);
 
-    double beta_pre = sqrt(blas::norm2(*r[0]));
+    double beta_pre = sqrt(blas::norm2(r[0]));
 
     // Compute the j-th residual corresponding
     // to the j step factorization.
@@ -62,15 +62,12 @@ namespace quda
 
     // H_{j,i}_j = v_i^dag * r
     std::vector<Complex> tmp(j + 1);
-    std::vector<ColorSpinorField *> v_;
-    v_.reserve(j + 1);
-    for (int i = 0; i < j + 1; i++) { v_.push_back(v[i]); }
-    blas::cDotProduct(tmp.data(), v_, r);
+    blas::cDotProduct(tmp, {v.begin(), v.begin() + j + 1}, r);
 
     // Orthogonalise r_{j} against V_{j}.
     // r = r - H_{j,i} * v_j
     for (int i = 0; i < j + 1; i++) tmp[i] *= -1.0;
-    blas::caxpy(tmp.data(), v_, r);
+    blas::caxpy(tmp, {v.begin(), v.begin() + j + 1}, r);
     for (int i = 0; i < j + 1; i++) upperHess[i][j] = -1.0 * tmp[i];
 
     // Re-orthogonalization / Iterative refinement phase
@@ -92,7 +89,7 @@ namespace quda
 
     int orth_iter = 0;
     int orth_iter_max = 100;
-    beta = sqrt(blas::norm2(*r[0]));
+    beta = sqrt(blas::norm2(r[0]));
     while (beta < 0.717 * beta_pre && orth_iter < orth_iter_max) {
 
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -106,76 +103,75 @@ namespace quda
       // r_{j} = r_{j} - V_{j} * r_{j}
       // and adjust for the correction in the
       // upper Hessenberg matrix.
-      blas::cDotProduct(tmp.data(), v_, r);
+      blas::cDotProduct(tmp, {v.begin(), v.begin() + j + 1}, r);
       for (int i = 0; i < j + 1; i++) tmp[i] *= -1.0;
-      blas::caxpy(tmp.data(), v_, r);
+      blas::caxpy(tmp, {v.begin(), v.begin() + j + 1}, r);
       for (int i = 0; i < j + 1; i++) upperHess[i][j] -= tmp[i];
 
-      beta = sqrt(blas::norm2(*r[0]));
+      beta = sqrt(blas::norm2(r[0]));
       orth_iter++;
     }
 
     if (orth_iter == orth_iter_max) { errorQuda("Unable to orthonormalise r"); }
   }
 
-  void IRAM::rotateBasis(std::vector<ColorSpinorField *> &kSpace, int keep)
+  void IRAM::rotateBasis(std::vector<ColorSpinorField> &kSpace, int keep)
   {
     // Multi-BLAS friendly array to store the part of the rotation matrix
     std::vector<Complex> Qmat_keep(n_kr * keep, 0.0);
     for (int j = 0; j < n_kr; j++)
       for (int i = 0; i < keep; i++) { Qmat_keep[j * keep + i] = Qmat[j][i]; }
 
-    rotateVecsComplex(kSpace, Qmat_keep.data(), n_kr, n_kr, keep, 0, profile);
+    rotateVecsComplex(kSpace, Qmat_keep, n_kr, n_kr, keep, 0, profile);
   }
 
-  void IRAM::reorder(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals,
+  void IRAM::reorder(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals,
                      const QudaEigSpectrumType spec_type)
   {
-
     int n = n_kr;
-    std::vector<std::tuple<Complex, double, ColorSpinorField *>> array(n);
-    for (int i = 0; i < n; i++) array[i] = std::make_tuple(evals[i], residua[i], kSpace[i]);
+    std::vector<std::tuple<Complex, double, ColorSpinorField>> array(n);
+    for (int i = 0; i < n; i++) array[i] = std::make_tuple(evals[i], residua[i], std::move(kSpace[i]));
 
     switch (spec_type) {
     case QUDA_SPECTRUM_LM_EIG:
       std::sort(array.begin(), array.begin() + n,
-                [](const std::tuple<Complex, double, ColorSpinorField *> &a,
-                   const std::tuple<Complex, double, ColorSpinorField *> &b) {
+                [](const std::tuple<Complex, double, ColorSpinorField> &a,
+                   const std::tuple<Complex, double, ColorSpinorField> &b) {
                   return (abs(std::get<0>(a)) > abs(std::get<0>(b)));
                 });
       break;
     case QUDA_SPECTRUM_SM_EIG:
       std::sort(array.begin(), array.begin() + n,
-                [](const std::tuple<Complex, double, ColorSpinorField *> &a,
-                   const std::tuple<Complex, double, ColorSpinorField *> &b) {
+                [](const std::tuple<Complex, double, ColorSpinorField> &a,
+                   const std::tuple<Complex, double, ColorSpinorField> &b) {
                   return (abs(std::get<0>(a)) < abs(std::get<0>(b)));
                 });
       break;
     case QUDA_SPECTRUM_LR_EIG:
       std::sort(array.begin(), array.begin() + n,
-                [](const std::tuple<Complex, double, ColorSpinorField *> &a,
-                   const std::tuple<Complex, double, ColorSpinorField *> &b) {
+                [](const std::tuple<Complex, double, ColorSpinorField> &a,
+                   const std::tuple<Complex, double, ColorSpinorField> &b) {
                   return (std::get<0>(a).real() > std::get<0>(b).real());
                 });
       break;
     case QUDA_SPECTRUM_SR_EIG:
       std::sort(array.begin(), array.begin() + n,
-                [](const std::tuple<Complex, double, ColorSpinorField *> &a,
-                   const std::tuple<Complex, double, ColorSpinorField *> &b) {
+                [](const std::tuple<Complex, double, ColorSpinorField> &a,
+                   const std::tuple<Complex, double, ColorSpinorField> &b) {
                   return (std::get<0>(a).real() < std::get<0>(b).real());
                 });
       break;
     case QUDA_SPECTRUM_LI_EIG:
       std::sort(array.begin(), array.begin() + n,
-                [](const std::tuple<Complex, double, ColorSpinorField *> &a,
-                   const std::tuple<Complex, double, ColorSpinorField *> &b) {
+                [](const std::tuple<Complex, double, ColorSpinorField> &a,
+                   const std::tuple<Complex, double, ColorSpinorField> &b) {
                   return (std::get<0>(a).imag() > std::get<0>(b).imag());
                 });
       break;
     case QUDA_SPECTRUM_SI_EIG:
       std::sort(array.begin(), array.begin() + n,
-                [](const std::tuple<Complex, double, ColorSpinorField *> &a,
-                   const std::tuple<Complex, double, ColorSpinorField *> &b) {
+                [](const std::tuple<Complex, double, ColorSpinorField> &a,
+                   const std::tuple<Complex, double, ColorSpinorField> &b) {
                   return (std::get<0>(a).imag() < std::get<0>(b).imag());
                 });
       break;
@@ -425,14 +421,14 @@ namespace quda
     }
   }
 
-  void IRAM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
+  void IRAM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals)
   {
     // Override any user input for block size.
     block_size = 1;
 
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
-    if (getVerbosity() >= QUDA_SUMMARIZE) queryPrec(kSpace[0]->Precision());
+    if (getVerbosity() >= QUDA_SUMMARIZE) queryPrec(kSpace[0].Precision());
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
       printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
@@ -450,10 +446,10 @@ namespace quda
 
     // Apply a matrix op to the residual to place it in the
     // range of the operator
-    mat(*r[0], *kSpace[0]);
+    mat(r[0], kSpace[0]);
 
     // Convergence criteria
-    double epsilon = setEpsilon(kSpace[0]->Precision());
+    double epsilon = setEpsilon(kSpace[0].Precision());
     double epsilon23 = pow(epsilon, 2.0 / 3.0);
     double beta = 0.0;
 
@@ -543,9 +539,9 @@ namespace quda
         profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
         // Update the residual vector
-        blas::caxpby(upperHess[num_keep][num_keep - 1], *kSpace[num_keep], Qmat[n_kr - 1][num_keep - 1], *r[0]);
+        blas::caxpby(upperHess[num_keep][num_keep - 1], kSpace[num_keep], Qmat[n_kr - 1][num_keep - 1], r[0]);
 
-        if (sqrt(blas::norm2(*r[0])) < epsilon) { errorQuda("IRAM has encountered an invariant subspace..."); }
+        if (sqrt(blas::norm2(r[0])) < epsilon) { errorQuda("IRAM has encountered an invariant subspace..."); }
       }
       restart_iter++;
     }

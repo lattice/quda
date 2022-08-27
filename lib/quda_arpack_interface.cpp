@@ -28,7 +28,7 @@ namespace quda
   void arpackErrorHelpNAUPD();
   void arpackErrorHelpNEUPD();
 
-  void arpack_solve(std::vector<ColorSpinorField *> &h_evecs, std::vector<Complex> &h_evals, const DiracMatrix &mat,
+  void arpack_solve(std::vector<ColorSpinorField> &h_evecs, std::vector<Complex> &h_evals, const DiracMatrix &mat,
                     QudaEigParam *eig_param, TimeProfile &profile)
   {
     // Create Eigensolver object for member function use
@@ -62,16 +62,15 @@ namespace quda
     // all FORTRAN communication uses underscored
     int ido_ = 0;
     int info_ = 1; // if 0, use random vector. If 1, initial residual lives in resid_
-    int *ipntr_ = (int *)safe_malloc(14 * sizeof(int));
-    int *iparam_ = (int *)safe_malloc(11 * sizeof(int));
-    int n_ = h_evecs[0]->Volume() * h_evecs[0]->Nspin() * h_evecs[0]->Ncolor();
+    std::vector<int> ipntr_(14);
+    std::vector<int> iparam_(11);
+    int n_ = h_evecs[0].Volume() * h_evecs[0].Nspin() * h_evecs[0].Ncolor();
     int n_ev_ = eig_param->n_ev;
     int n_kr_ = eig_param->n_kr;
-    int ldv_ = h_evecs[0]->Volume() * h_evecs[0]->Nspin() * h_evecs[0]->Ncolor();
+    int ldv_ = h_evecs[0].Volume() * h_evecs[0].Nspin() * h_evecs[0].Ncolor();
     int lworkl_ = (3 * n_kr_ * n_kr_ + 5 * n_kr_) * 2;
     int rvec_ = 1;
     int max_iter = eig_param->max_restarts * (n_kr_ - n_ev_) + n_ev_;
-    int *h_evals_sorted_idx = (int *)safe_malloc(n_kr_ * sizeof(int));
 
     // Assign values to ARPACK params
     iparam_[0] = 1;
@@ -104,11 +103,10 @@ namespace quda
     }
 
     double tol_ = eig_param->tol;
-    double *mod_h_evals_sorted = (double *)safe_malloc(n_kr_ * sizeof(double));
 
     // ARPACK workspace
     Complex I(0.0, 1.0);
-    Complex *resid_ = (Complex *)safe_malloc(ldv_ * sizeof(Complex));
+    std::vector<Complex> resid_(ldv_);
 
     // Use initial guess?
     if (info_ > 0) {
@@ -116,35 +114,37 @@ namespace quda
     }
 
     Complex sigma_ = 0.0;
-    Complex *w_workd_ = (Complex *)safe_malloc(3 * ldv_ * sizeof(Complex));
-    Complex *w_workl_ = (Complex *)safe_malloc(lworkl_ * sizeof(Complex));
-    Complex *w_workev_ = (Complex *)safe_malloc(2 * n_kr_ * sizeof(Complex));
-    double *w_rwork_ = (double *)safe_malloc(n_kr_ * sizeof(double));
-    int *select_ = (int *)safe_malloc(n_kr_ * sizeof(int));
+    std::vector<Complex> w_workd_(3 * ldv_);
+    std::vector<Complex> w_workl_(lworkl_);
+    std::vector<Complex> w_workev_(2 * n_kr_);
+    std::vector<double> w_rwork_(n_kr_);
+    std::vector<int> select_(n_kr_);
 
-    Complex *h_evecs_ = (Complex *)safe_malloc(n_kr_ * ldv_ * sizeof(Complex));
-    Complex *h_evals_ = (Complex *)safe_malloc(n_ev_ * sizeof(Complex));
-    std::vector<ColorSpinorField *> h_evecs_arpack;
+    std::vector<Complex> h_evecs_(n_kr_ * ldv_);
+    std::vector<Complex> h_evals_(n_ev_);
+
+    // create container wrapping the vectors returned from ARPACK
+    ColorSpinorParam param(h_evecs[0]);
+    param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    param.location = QUDA_CPU_FIELD_LOCATION;
+    param.create = QUDA_REFERENCE_FIELD_CREATE;
+    param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+
+    std::vector<ColorSpinorField> h_evecs_arpack(n_kr_);
 
     for (int i = 0; i < n_kr_; i++) {
-      // create container wrapping the vectors returned from ARPACK
-      ColorSpinorParam param(*h_evecs[0]);
-      param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-      param.location = QUDA_CPU_FIELD_LOCATION;
-      param.create = QUDA_REFERENCE_FIELD_CREATE;
-      param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-      param.v = (Complex *)h_evecs_ + i * ldv_;
-      h_evecs_arpack.push_back(ColorSpinorField::Create(param));
+      param.v = h_evecs_.data() + i * ldv_;
+      h_evecs_arpack[i] = ColorSpinorField(param);
     }
 
     int iter_count = 0;
 
     bool allocate = true;
-    ColorSpinorField *h_v = nullptr;
-    ColorSpinorField *d_v = nullptr;
-    ColorSpinorField *h_v2 = nullptr;
-    ColorSpinorField *d_v2 = nullptr;
-    ColorSpinorField *resid = nullptr;
+    ColorSpinorField h_v;
+    ColorSpinorField d_v;
+    ColorSpinorField h_v2;
+    ColorSpinorField d_v2;
+    ColorSpinorField resid;
 
 #ifdef ARPACK_LOGGING
     // ARPACK log routines
@@ -208,8 +208,8 @@ namespace quda
       //----------------------------
 #if (defined(QMP_COMMS) || defined(MPI_COMMS))
       ARPACK(pznaupd)
-      (fcomm_, &ido_, &bmat, &n_, spectrum, &n_ev_, &tol_, resid_, &n_kr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_,
-       w_workl_, &lworkl_, w_rwork_, &info_, 1, 2);
+      (fcomm_, &ido_, &bmat, &n_, spectrum, &n_ev_, &tol_, resid_.data(), &n_kr_, h_evecs_.data(), &n_, iparam_.data(),
+       ipntr_.data(), w_workd_.data(), w_workl_.data(), &lworkl_, w_rwork_.data(), &info_, 1, 2);
 
       if (info_ != 0) {
         arpackErrorHelpNAUPD();
@@ -217,8 +217,8 @@ namespace quda
       }
 #else
       ARPACK(znaupd)
-      (&ido_, &bmat, &n_, spectrum, &n_ev_, &tol_, resid_, &n_kr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_,
-       &lworkl_, w_rwork_, &info_, 1, 2);
+      (&ido_, &bmat, &n_, spectrum, &n_ev_, &tol_, resid_.data(), &n_kr_, h_evecs_.data(), &n_, iparam_.data(),
+       ipntr_.data(), w_workd_.data(), w_workl_.data(), &lworkl_, w_rwork_.data(), &info_, 1, 2);
       if (info_ != 0) {
         arpackErrorHelpNAUPD();
         errorQuda("\nError in znaupd info = %d. Exiting.", info_);
@@ -229,7 +229,7 @@ namespace quda
 
       // If this is the first iteration, we allocate CPU and GPU memory for QUDA
       if (allocate) {
-        ColorSpinorParam param(*h_evecs[0]);
+        ColorSpinorParam param(h_evecs[0]);
         param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
         param.location = QUDA_CPU_FIELD_LOCATION;
         param.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -237,20 +237,20 @@ namespace quda
 
         // Fortran arrays start at 1. The C++ pointer is therefore the Fortran pointer
         // less one, hence ipntr[0] - 1 to specify the correct address.
-        param.v = w_workd_ + (ipntr_[0] - 1);
-        h_v = ColorSpinorField::Create(param);
+        param.v = w_workd_.data() + (ipntr_[0] - 1);
+        h_v = ColorSpinorField(param);
         // Adjust the position of the start of the array.
-        param.v = w_workd_ + (ipntr_[1] - 1);
-        h_v2 = ColorSpinorField::Create(param);
+        param.v = w_workd_.data() + (ipntr_[1] - 1);
+        h_v2 = ColorSpinorField(param);
 
         // create device field temporaries
         param.location = QUDA_CUDA_FIELD_LOCATION;
         param.create = QUDA_ZERO_FIELD_CREATE;
         param.setPrecision(param.Precision(), param.Precision(), true);
 
-        d_v = ColorSpinorField::Create(param);
-        d_v2 = ColorSpinorField::Create(param);
-        resid = ColorSpinorField::Create(param);
+        d_v = ColorSpinorField(param);
+        d_v2 = ColorSpinorField(param);
+        resid = ColorSpinorField(param);
         allocate = false;
       }
 
@@ -260,18 +260,18 @@ namespace quda
 
         profile.TPSTART(QUDA_PROFILE_D2H);
 
-        *d_v = *h_v;
+        d_v = h_v;
 
         profile.TPSTOP(QUDA_PROFILE_D2H);
         profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
         // apply matrix-vector operation here:
-        eig_solver->chebyOp(mat, *d_v2, *d_v);
+        eig_solver->chebyOp(mat, d_v2, d_v);
 
         profile.TPSTOP(QUDA_PROFILE_COMPUTE);
         profile.TPSTART(QUDA_PROFILE_H2D);
 
-        *h_v2 = *d_v2;
+        h_v2 = d_v2;
 
         profile.TPSTOP(QUDA_PROFILE_H2D);
       }
@@ -295,8 +295,9 @@ namespace quda
     //----------------------------
 #if (defined(QMP_COMMS) || defined(MPI_COMMS))
     ARPACK(pzneupd)
-    (fcomm_, &rvec_, &howmny, select_, h_evals_, h_evecs_, &n_, &sigma_, w_workev_, &bmat, &n_, spectrum, &n_ev_, &tol_,
-     resid_, &n_kr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_, &lworkl_, w_rwork_, &info_, 1, 1, 2);
+    (fcomm_, &rvec_, &howmny, select_.data(), h_evals_.data(), h_evecs_.data(), &n_, &sigma_, w_workev_.data(), &bmat,
+     &n_, spectrum, &n_ev_, &tol_, resid_.data(), &n_kr_, h_evecs_.data(), &n_, iparam_.data(), ipntr_.data(),
+     w_workd_.data(), w_workl_.data(), &lworkl_, w_rwork_.data(), &info_, 1, 1, 2);
     if (info_ == -15) {
       arpackErrorHelpNEUPD();
       errorQuda("\nError in pzneupd info = %d. You likely need to\n"
@@ -308,8 +309,9 @@ namespace quda
     }
 #else
     ARPACK(zneupd)
-    (&rvec_, &howmny, select_, h_evals_, h_evecs_, &n_, &sigma_, w_workev_, &bmat, &n_, spectrum, &n_ev_, &tol_, resid_,
-     &n_kr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_, &lworkl_, w_rwork_, &info_, 1, 1, 2);
+    (&rvec_, &howmny, select_.data(), h_evals_.data(), h_evecs_.data(), &n_, &sigma_, w_workev_.data(), &bmat, &n_,
+     spectrum, &n_ev_, &tol_, resid_.data(), &n_kr_, h_evecs_.data(), &n_, iparam_.data(), ipntr_.data(),
+     w_workd_.data(), w_workl_.data(), &lworkl_, w_rwork_.data(), &info_, 1, 1, 2);
     if (info_ == -15) {
       arpackErrorHelpNEUPD();
       errorQuda("\nError in zneupd info = %d. You likely need to\n"
@@ -361,7 +363,7 @@ namespace quda
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("RitzValue[%04d] = %+.16e %+.16e Residual: %+.16e\n", j, real(h_evals_[evals_sorted[j].second]),
                    imag(h_evals_[evals_sorted[j].second]),
-                   std::abs(*(w_workl_ + ipntr_[10] - 1 + evals_sorted[j].second)));
+                   std::abs(*(w_workl_.data() + ipntr_[10] - 1 + evals_sorted[j].second)));
     }
 
     // Compute Eigenvalues from Eigenvectors.
@@ -369,22 +371,22 @@ namespace quda
       int idx = evals_sorted[i].second;
 
       profile.TPSTART(QUDA_PROFILE_D2H);
-      *d_v = *h_evecs_arpack[idx];
+      d_v = h_evecs_arpack[idx];
       profile.TPSTOP(QUDA_PROFILE_D2H);
 
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
       // d_v2 = M*v
-      eig_solver->matVec(mat, *d_v2, *d_v);
+      mat(d_v2, d_v);
 
-      // lambda = v^dag * M*v
-      h_evals_[idx] = blas::cDotProduct(*d_v, *d_v2);
+      // lambda = v^dag * M * v
+      h_evals_[idx] = blas::cDotProduct(d_v, d_v2);
 
       Complex unit(1.0, 0.0);
       Complex m_lambda(-h_evals_[idx]);
 
       // d_v = ||M*v - lambda*v||
-      blas::caxpby(unit, *d_v2, m_lambda, *d_v);
-      double L2norm = blas::norm2(*d_v);
+      blas::caxpby(unit, d_v2, m_lambda, d_v);
+      double L2norm = blas::norm2(d_v);
 
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
@@ -397,30 +399,10 @@ namespace quda
     for (int i = 0; i < nconv; i++) h_evals[i] = h_evals_[evals_sorted[i].second];
 
     // copy back eigenvectors using the sorting index
-    for (int i = 0; i < nconv; i++) *h_evecs[i] = *h_evecs_arpack[evals_sorted[i].second];
+    for (int i = 0; i < nconv; i++) h_evecs[i] = h_evecs_arpack[evals_sorted[i].second];
 
     profile.TPSTART(QUDA_PROFILE_FREE);
 
-    // cleanup
-    host_free(h_evals_);
-    for (int i = 0; i < n_kr_; i++) delete h_evecs_arpack[i];
-    host_free(h_evecs_);
-    host_free(ipntr_);
-    host_free(iparam_);
-    host_free(mod_h_evals_sorted);
-    host_free(h_evals_sorted_idx);
-    host_free(resid_);
-    host_free(w_workd_);
-    host_free(w_workl_);
-    host_free(w_workev_);
-    host_free(w_rwork_);
-    host_free(select_);
-
-    delete h_v;
-    delete h_v2;
-    delete d_v;
-    delete d_v2;
-    delete resid;
     delete eig_solver;
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
@@ -504,7 +486,7 @@ namespace quda
 
 #else
 
-  void arpack_solve(std::vector<ColorSpinorField *> &, std::vector<Complex> &, const DiracMatrix &, QudaEigParam *,
+  void arpack_solve(std::vector<ColorSpinorField> &, std::vector<Complex> &, const DiracMatrix &, QudaEigParam *,
                     TimeProfile &)
   {
     errorQuda("(P)ARPACK has not been enabled for this build");

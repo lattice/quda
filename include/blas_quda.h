@@ -169,19 +169,7 @@ namespace quda {
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void axpy(const std::vector<double> &a, std::vector<ColorSpinorField_cref> &&x, std::vector<ColorSpinorField_ref> &&y);
-
-    /**
-       @brief Overloaded version of block axpy that allows us to call
-       with either, or both arguments, being std::vector<ColorSpinorField>.
-       @param a[in] Matrix of real coefficients
-       @param x[in] vector of input ColorSpinorFields
-       @param y[in,out] vector of input/output ColorSpinorFields
-    */
-    template <typename T1, typename T2> void axpy(const std::vector<double> &a, T1 &&x, T2 &&y)
-    {
-      axpy(a, make_cset(x), make_set(y));
-    }
+    void axpy(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y);
 
     /**
        @brief Compute the block "axpy_U" with over the set of
@@ -195,20 +183,7 @@ namespace quda {
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void axpy_U(const std::vector<double> &a, std::vector<ColorSpinorField_cref> &&x,
-                std::vector<ColorSpinorField_ref> &&y);
-
-    /**
-       @brief Wrapper function for block axpy_U that allows us to call
-       with either, or both arguments, being std::vector<ColorSpinorField>.
-       @param a[in] Matrix of real coefficients
-       @param x[in] vector of input ColorSpinorFields
-       @param y[in,out] vector of input/output ColorSpinorFields
-    */
-    template <typename T1, typename T2> void axpy_U(const std::vector<double> &a, T1 &&x, T2 &&y)
-    {
-      axpy_U(a, make_cset(x), make_set(y));
-    }
+    void axpy_U(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y);
 
     /**
        @brief Compute the block "axpy_L" with over the set of
@@ -222,20 +197,7 @@ namespace quda {
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void axpy_L(const std::vector<double> &a, std::vector<ColorSpinorField_cref> &&x,
-                std::vector<ColorSpinorField_ref> &&y);
-
-    /**
-       @brief Wrapper function for block axpy_L that allows us to call
-       with either, or both arguments, being std::vector<ColorSpinorField>.
-       @param a[in] Matrix of real coefficients
-       @param x[in] vector of input ColorSpinorFields
-       @param y[in,out] vector of input/output ColorSpinorFields
-    */
-    template <typename T1, typename T2> void axpy_L(const std::vector<double> &a, T1 &&x, T2 &&y)
-    {
-      axpy_L(a, make_cset(x), make_set(y));
-    }
+    void axpy_L(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y);
 
     /**
        @brief Compute the block "caxpy" with over the s
@@ -251,20 +213,7 @@ et of
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void caxpy(const std::vector<Complex> &a, std::vector<ColorSpinorField_cref> &&x,
-               std::vector<ColorSpinorField_ref> &&y);
-
-    /**
-       @brief Wrapper function for block caxpy that allows us to call
-       with either, or both arguments, being std::vector<ColorSpinorField>.
-       @param a[in] Matrix of real coefficients
-       @param x[in] vector of input ColorSpinorFields
-       @param y[in,out] vector of input/output ColorSpinorFields
-    */
-    template <typename T1, typename T2> void caxpy(const std::vector<Complex> &a, T1 &&x, T2 &&y)
-    {
-      caxpy(a, make_cset(x), make_set(y));
-    }
+    void caxpy(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y);
 
     /**
        @brief Compute the block "caxpy_U" with over the set of
@@ -278,20 +227,7 @@ et of
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void caxpy_U(const std::vector<Complex> &a, std::vector<ColorSpinorField_cref> &&x,
-                 std::vector<ColorSpinorField_ref> &&y);
-
-    /**
-       @brief Wrapper function for block caxpy_U that allows us to call
-       with either, or both arguments, being std::vector<ColorSpinorField>.
-       @param a[in] Matrix of real coefficients
-       @param x[in] vector of input ColorSpinorFields
-       @param y[in,out] vector of input/output ColorSpinorFields
-    */
-    template <typename T1, typename T2> void caxpy_U(const std::vector<Complex> &a, T1 &&x, T2 &&y)
-    {
-      caxpy_U(a, make_cset(x), make_set(y));
-    }
+    void caxpy_U(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y);
 
     /**
        @brief Compute the block "caxpy_L" with over the set of
@@ -305,20 +241,7 @@ et of
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void caxpy_L(const std::vector<Complex> &a, std::vector<ColorSpinorField_cref> &&x,
-                 std::vector<ColorSpinorField_ref> &&y);
-
-    /**
-       @brief Wrapper function for block caxpy_L that allows us to call
-       with either, or both arguments, being std::vector<ColorSpinorField>.
-       @param a[in] Matrix of real coefficients
-       @param x[in] vector of input ColorSpinorFields
-       @param y[in,out] vector of input/output ColorSpinorFields
-    */
-    template <typename T1, typename T2> void caxpy_L(const std::vector<Complex> &a, T1 &&x, T2 &&y)
-    {
-      caxpy_L(a, make_cset(x), make_set(y));
-    }
+    void caxpy_L(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y);
 
     /**
        @brief Compute the block "axpyz" with over the set of
@@ -335,21 +258,8 @@ et of
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void axpyz(const std::vector<double> &a, std::vector<ColorSpinorField_cref> &&x,
-               std::vector<ColorSpinorField_cref> &&y, std::vector<ColorSpinorField_ref> &&z);
-
-    /**
-       @brief Wrapper function for block axpyz that allows us to call
-       with any or all arguments being std::vector<ColorSpinorField>.
-       @param a[in] Matrix of real coefficients
-       @param x[in] vector of input ColorSpinorFields
-       @param y[in] vector of input ColorSpinorFields
-       @param z[out] vector of output ColorSpinorFields
-    */
-    template <typename T1, typename T2, typename T3> void axpyz(const std::vector<double> &a, T1 &&x, T2 &&y, T3 &&z)
-    {
-      axpyz(a, make_cset(x), make_cset(y), make_set(z));
-    }
+    void axpyz(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x,
+               vector_ref<const ColorSpinorField> &&y, vector_ref<ColorSpinorField> &&z);
 
     /**
        @brief Compute the block "axpyz" with over the set of
@@ -364,21 +274,8 @@ et of
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void axpyz_U(const std::vector<double> &a, std::vector<ColorSpinorField_cref> &&x,
-                 std::vector<ColorSpinorField_cref> &&y, std::vector<ColorSpinorField_ref> &&z);
-
-    /**
-       @brief Wrapper function for block axpyz_U that allows us to call
-       with any or all arguments being std::vector<ColorSpinorField>.
-       @param a[in] Matrix of real coefficients
-       @param x[in] vector of input ColorSpinorFields
-       @param y[in] vector of input ColorSpinorFields
-       @param z[out] vector of output ColorSpinorFields
-    */
-    template <typename T1, typename T2, typename T3> void axpyz_U(const std::vector<double> &a, T1 &&x, T2 &&y, T3 &&z)
-    {
-      axpyz_U(a, make_cset(x), make_cset(y), make_set(z));
-    }
+    void axpyz_U(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x,
+                 vector_ref<const ColorSpinorField> &&y, vector_ref<ColorSpinorField> &&z);
 
     /**
        @brief Compute the block "axpyz" with over the set of
@@ -393,21 +290,8 @@ et of
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void axpyz_L(const std::vector<double> &a, std::vector<ColorSpinorField_cref> &&x,
-                 std::vector<ColorSpinorField_cref> &&y, std::vector<ColorSpinorField_ref> &&z);
-
-    /**
-       @brief Wrapper function for block axpyz_L that allows us to call
-       with any or all arguments being std::vector<ColorSpinorField>.
-       @param a[in] Matrix of real coefficients
-       @param x[in] vector of input ColorSpinorFields
-       @param y[in] vector of input ColorSpinorFields
-       @param z[out] vector of output ColorSpinorFields
-    */
-    template <typename T1, typename T2, typename T3> void axpyz_L(const std::vector<double> &a, T1 &&x, T2 &&y, T3 &&z)
-    {
-      axpyz_L(a, make_cset(x), make_cset(y), make_set(z));
-    }
+    void axpyz_L(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x,
+                 vector_ref<const ColorSpinorField> &&y, vector_ref<ColorSpinorField> &&z);
 
     /**
        @brief Compute the block "caxpyz" with over the set of
@@ -424,21 +308,8 @@ et of
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void caxpyz(const std::vector<Complex> &a, std::vector<ColorSpinorField_cref> &&x,
-                std::vector<ColorSpinorField_cref> &&y, std::vector<ColorSpinorField_ref> &&z);
-
-    /**
-       @brief Wrapper function for block caxpyz that allows us to call
-       with any or all arguments being std::vector<ColorSpinorField>.
-       @param a[in] Matrix of real coefficients
-       @param x[in] vector of input ColorSpinorFields
-       @param y[in] vector of input ColorSpinorFields
-       @param z[out] vector of output ColorSpinorFields
-    */
-    template <typename T1, typename T2, typename T3> void caxpyz(const std::vector<Complex> &a, T1 &&x, T2 &&y, T3 &&z)
-    {
-      caxpyz(a, make_cset(x), make_cset(y), make_set(z));
-    }
+    void caxpyz(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x,
+                vector_ref<const ColorSpinorField> &&y, vector_ref<ColorSpinorField> &&z);
 
     /**
        @brief Compute the block "caxpyz" with over the set of
@@ -453,22 +324,8 @@ et of
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void caxpyz_U(const std::vector<Complex> &a, std::vector<ColorSpinorField_cref> &&x,
-                  std::vector<ColorSpinorField_cref> &&y, std::vector<ColorSpinorField_ref> &&z);
-
-    /**
-       @brief Wrapper function for block caxpyz_U that allows us to call
-       with any or all arguments being std::vector<ColorSpinorField>.
-       @param a[in] Matrix of real coefficients
-       @param x[in] vector of input ColorSpinorFields
-       @param y[in] vector of input ColorSpinorFields
-       @param z[out] vector of output ColorSpinorFields
-    */
-    template <typename T1, typename T2, typename T3>
-    void caxpyz_U(const std::vector<Complex> &a, T1 &&x, T2 &&y, T3 &&z)
-    {
-      caxpyz_U(a, make_cset(x), make_cset(y), make_set(z));
-    }
+    void caxpyz_U(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x,
+                  vector_ref<const ColorSpinorField> &&y, vector_ref<ColorSpinorField> &&z);
 
     /**
        @brief Compute the block "caxpyz" with over the set of
@@ -483,22 +340,8 @@ et of
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void caxpyz_L(const std::vector<Complex> &a, std::vector<ColorSpinorField_cref> &&x,
-                  std::vector<ColorSpinorField_cref> &&y, std::vector<ColorSpinorField_ref> &&z);
-
-    /**
-       @brief Wrapper function for block caxpyz_L that allows us to call
-       with any or all arguments, being std::vector<ColorSpinorField>.
-       @param a[in] Matrix of real coefficients
-       @param x[in] vector of input ColorSpinorFields
-       @param y[in] vector of input ColorSpinorFields
-       @param z[out] vector of output ColorSpinorFields
-    */
-    template <typename T1, typename T2, typename T3>
-    void caxpyz_L(const std::vector<Complex> &a, T1 &&x, T2 &&y, T3 &&z)
-    {
-      caxpyz_L(a, make_cset(x), make_cset(y), make_set(z));
-    }
+    void caxpyz_L(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x,
+                  vector_ref<const ColorSpinorField> &&y, vector_ref<ColorSpinorField> &&z);
 
     /**
        @brief Compute the vectorized "axpyBzpcx" with over the set of
@@ -518,27 +361,9 @@ et of
        @param z[in] input ColorSpinorField
        @param c[in] Array of coefficients
     */
-    void axpyBzpcx(const std::vector<double> &a, std::vector<ColorSpinorField_ref> &&x,
-                   std::vector<ColorSpinorField_ref> &&y, const std::vector<double> &b, ColorSpinorField &z,
+    void axpyBzpcx(const std::vector<double> &a, vector_ref<ColorSpinorField> &&x,
+                   vector_ref<ColorSpinorField> &&y, const std::vector<double> &b, ColorSpinorField &z,
                    const std::vector<double> &c);
-
-    /**
-       @brief Wrapper function for axpyBzpcx that allows us to call
-       with either x or y, or both arguments, being std::vector<ColorSpinorField>.
-
-       @param a[in] Array of coefficients
-       @param x[in,out] vector of ColorSpinorFields
-       @param y[in,out] vector of ColorSpinorFields
-       @param b[in] Array of coefficients
-       @param z[in] input ColorSpinorField
-       @param c[in] Array of coefficients
-    */
-    template <typename T1, typename T2>
-    void axpyBzpcx(const std::vector<double> &a, T1 &&x, T2 &&y, const std::vector<double> &b, ColorSpinorField &z,
-                   const std::vector<double> &c)
-    {
-      axpyBzpcx(a, make_set(x), make_set(y), b, z, c);
-    }
 
     /**
        @brief Compute the vectorized "caxpyBxpz" over the set of
@@ -557,25 +382,8 @@ et of
        @param b[in] Array of coefficients
        @param z[in,out] input ColorSpinorField
     */
-    void caxpyBxpz(const std::vector<Complex> &a, std::vector<ColorSpinorField_cref> &&x, ColorSpinorField &y,
+    void caxpyBxpz(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, ColorSpinorField &y,
                    const std::vector<Complex> &b, ColorSpinorField &z);
-
-    /**
-       @brief Wrapper function for caxpyBxpz that allows us to call
-       with the x argument being std::vector<ColorSpinorField>.
-
-       @param a[in] Array of coefficients
-       @param x[in] vector of ColorSpinorFields
-       @param y[in,out] input ColorSpinorField
-       @param b[in] Array of coefficients
-       @param z[in,out] input ColorSpinorField
-    */
-    template <typename T>
-    void caxpyBxpz(const std::vector<Complex> &a, T &&x, ColorSpinorField &y, const std::vector<Complex> &b,
-                   ColorSpinorField &z)
-    {
-      caxpyBxpz(a, make_cset(x), y, b, z);
-    }
 
     // multi-reduce kernels - defined in multi_reduce.cu
 
@@ -586,21 +394,8 @@ et of
        @param a[in] set of input ColorSpinorFields
        @param b[in] set of input ColorSpinorFields
     */
-    void reDotProduct(std::vector<double> &result, std::vector<ColorSpinorField_cref> &&a,
-                      std::vector<ColorSpinorField_cref> &&b);
-
-    /**
-       @brief Wrapper function for reDotProduct that allows us to call
-       with either, or both arguments, being std::vector<ColorSpinorField>.
-
-       @param result[out] Matrix of inner product result[i][j] = (a[j],b[i])
-       @param a[in] set of input ColorSpinorFields
-       @param b[in] set of input ColorSpinorFields
-    */
-    template <typename T1, typename T2> void reDotProduct(std::vector<double> &result, T1 &&a, T2 &&b)
-    {
-      reDotProduct(result, make_cset(a), make_cset(b));
-    }
+    void reDotProduct(std::vector<double> &result, vector_ref<const ColorSpinorField> &&a,
+                      vector_ref<const ColorSpinorField> &&b);
 
     /**
        @brief Computes the matrix of inner products between the vector set a and the vector set b
@@ -609,21 +404,8 @@ et of
        @param a[in] set of input ColorSpinorFields
        @param b[in] set of input ColorSpinorFields
     */
-    void cDotProduct(std::vector<Complex> &result, std::vector<ColorSpinorField_cref> &&a,
-                     std::vector<ColorSpinorField_cref> &&b);
-
-    /**
-       @brief Wrapper function for cDotProduct that allows us to call
-       with either, or both arguments, being std::vector<ColorSpinorField>.
-
-       @param result[out] Matrix of inner product result[i][j] = (a[j],b[i])
-       @param a[in] set of input ColorSpinorFields
-       @param b[in] set of input ColorSpinorFields
-    */
-    template <typename T1, typename T2> void cDotProduct(std::vector<Complex> &result, T1 &&a, T2 &&b)
-    {
-      cDotProduct(result, make_cset(a), make_cset(b));
-    }
+    void cDotProduct(std::vector<Complex> &result, vector_ref<const ColorSpinorField> &&a,
+                     vector_ref<const ColorSpinorField> &&b);
 
     /**
        @brief Computes the matrix of inner products between the vector
@@ -635,21 +417,8 @@ et of
        @param a[in] set of input ColorSpinorFields
        @param b[in] set of input ColorSpinorFields
     */
-    void hDotProduct(std::vector<Complex> &result, std::vector<ColorSpinorField_cref> &&a,
-                     std::vector<ColorSpinorField_cref> &&b);
-
-    /**
-       @brief Wrapper function for hDotProduct that allows us to call
-       with either, or both arguments, being std::vector<ColorSpinorField>.
-
-       @param result[out] Matrix of inner product result[i][j] = (a[j],b[i])
-       @param a[in] set of input ColorSpinorFields
-       @param b[in] set of input ColorSpinorFields
-    */
-    template <typename T1, typename T2> void hDotProduct(std::vector<Complex> &result, T1 &&a, T2 &&b)
-    {
-      hDotProduct(result, make_cset(a), make_cset(b));
-    }
+    void hDotProduct(std::vector<Complex> &result, vector_ref<const ColorSpinorField> &&a,
+                     vector_ref<const ColorSpinorField> &&b);
 
     /**
         @brief Computes the matrix of inner products between the vector
@@ -663,21 +432,8 @@ et of
         @param a[in] set of input ColorSpinorFields
         @param b[in] set of input ColorSpinorFields
      */
-    void hDotProduct_Anorm(std::vector<Complex> &result, std::vector<ColorSpinorField_cref> &&a,
-                           std::vector<ColorSpinorField_cref> &&b);
-
-    /**
-       @brief Wrapper function for hDotProduct_Anorm that allows us to call
-       with either, or both arguments, being std::vector<ColorSpinorField>.
-
-       @param result[out] Matrix of inner product result[i][j] = (a[j],b[i])
-       @param a[in] set of input ColorSpinorFields
-       @param b[in] set of input ColorSpinorFields
-    */
-    template <typename T1, typename T2> void hDotProduct_Anorm(std::vector<Complex> &result, T1 &&a, T2 &&b)
-    {
-      hDotProduct_Anorm(result, make_cset(a), make_cset(b));
-    }
+    void hDotProduct_Anorm(std::vector<Complex> &result, vector_ref<const ColorSpinorField> &&a,
+                           vector_ref<const ColorSpinorField> &&b);
 
     // compatibility wrappers until we switch to
     // std::vector<ColorSpinorField> and

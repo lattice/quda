@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <initializer_list>
 
 namespace quda
 {
@@ -133,5 +134,111 @@ namespace quda
 
     return v1_set;
   }
+
+  /** trait that can be used to determine if a type is an iterator */
+  template <class T, class = void> struct is_iterator : std::false_type { };
+
+  template <class T>
+  struct is_iterator<T,
+    std::void_t<typename std::iterator_traits<T>::difference_type,
+    typename std::iterator_traits<T>::pointer,
+    typename std::iterator_traits<T>::reference,
+    typename std::iterator_traits<T>::value_type,
+    typename std::iterator_traits<T>::iterator_category>> : std::true_type
+    { };
+
+  template <class T> constexpr bool is_iterator_v = is_iterator<T>::value;
+
+  /** trait that can be used to determine if a type is an initializer_list */
+  template <typename T> struct is_initializer_list : std::false_type {};
+  template <typename T> struct is_initializer_list<std::initializer_list<T>> : std::true_type {};
+  template <typename T> static constexpr bool is_initializer_list_v = is_initializer_list<T>::value;
+
+   /**
+     Derived specializaton of std::vector<std::reference_wrapper<T>>
+     which allows us to write generic multi-field functions.
+   */
+  template <class T>
+  class vector_ref : public std::vector<std::reference_wrapper<T>> {
+    using vector = std::vector<std::reference_wrapper<T>>;
+
+    /**
+       make_set is a helper function that creates a vector of
+       reference wrapped objects from the input reference argument.
+       This is the default base case that is for a simple object
+       @param[in] v Object reference we wish to wrap
+     */
+    template <typename U>
+      std::enable_if_t<!is_initializer_list_v<U>, vector> make_set(U &v) { return vector(1, v); }
+
+    /**
+       make_set is a helper function that creates a vector of
+       reference wrapped objects from the input reference argument.
+       This is the specialized overload that handles a vector of
+       objects.
+       @param[in] v Vector argument we wish to wrap
+     */
+    template <typename U> vector make_set(std::vector<U> &v) { return vector{v.begin(), v.end()}; }
+
+    /**
+       make_set is a helper function that creates a vector of
+       reference wrapped objects from the input reference argument.
+       This is the specialized overload that handles an
+       initializer_list of a pair of iterators.
+       @param[in] v initializer_list
+     */
+    template <typename U>
+    std::enable_if_t<is_initializer_list_v<U> && is_iterator_v<typename U::value_type>, vector> make_set(U &v)
+    {
+      if (v.size() != 2) errorQuda("this constructor requires a size=2 initializer list"); // static_assert is flakey
+      return vector{*(v.begin() + 0), *(v.begin() + 1)}; // need to dereference the iterators
+    }
+
+  public:
+    vector_ref(const vector_ref &) = default;
+    vector_ref(vector_ref &&) = default;
+
+    /**
+       Unary constructor
+       @param[in] v Object to which we are constructing a vector_ref around
+     */
+    template <class U> vector_ref(U &v)
+    {
+      auto vset = make_set(v);
+      vector::reserve(vset.size());
+      vector::insert(vector::end(), vset.begin(), vset.end());
+    }
+
+    /**
+       Constructor from pair of iterators
+       @param[in] first Begin iterator
+       @param[in] last End iterator
+     */
+    template <class U, std::enable_if_t<is_iterator_v<U>>* = nullptr>
+    vector_ref(U first, U last)
+    {
+      vector::reserve(last - first);
+      for (auto it = first; it != last; it++) vector::push_back(*it);
+    }
+
+    /**
+       Constructor from pair of non-iterator references constructing a
+       vector_ref that is a union E.g., where we have a pair of
+       objects, or a vector and an object, etc.
+       FIXME: perhaps could generalize this to an arbitrary number of elements with a tuple interface?
+       @param[in] u first reference
+       @param[in] v second reference
+     */
+    template <class U, class V, std::enable_if_t<!is_iterator_v<U>>* = nullptr>
+    vector_ref(U &u, V &v)
+    {
+      auto uset = make_set(u);
+      auto vset = make_set(v);
+      vector::reserve(uset.size() + vset.size());
+      vector::insert(vector::end(), uset.begin(), uset.end());
+      vector::insert(vector::end(), vset.begin(), vset.end());
+    }
+
+  };
 
 } // namespace quda

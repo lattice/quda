@@ -87,7 +87,7 @@ namespace quda
     // Construct the matrix Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
     std::vector<Complex> A_(N * (N + 1));
 
-    blas::cDotProduct(A_, q, make_set(q, b));
+    blas::cDotProduct(A_, q, {q, b});
     for (int i = 0; i < N; i++) {
       phi(i) = A_[i * (N + 1) + N];
       for (int j = 0; j < N; j++) { A(i, j) = A_[i * (N + 1) + j]; }

@@ -5,6 +5,7 @@
 #include <timer.h>
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
+#include <eigen_helper.h>
 
 namespace quda
 {
@@ -51,8 +52,8 @@ namespace quda
     std::vector<double> residua;
 
     // Device side vector workspace
-    std::vector<ColorSpinorField *> r;
-    std::vector<ColorSpinorField *> d_vecs_tmp;
+    std::vector<ColorSpinorField> r;
+    std::vector<ColorSpinorField> d_vecs_tmp;
 
     QudaPrecision save_prec;
 
@@ -79,7 +80,7 @@ namespace quda
        @param kSpace The converged eigenvectors
        @param evals The converged eigenvalues
      */
-    virtual void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals) = 0;
+    virtual void operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals) = 0;
 
     /**
        @brief Creates the eigensolver using the parameters given and the matrix.
@@ -94,21 +95,21 @@ namespace quda
        orthonormalise
        @param[in] kSpace The Krylov space vectors
     */
-    void prepareInitialGuess(std::vector<ColorSpinorField *> &kSpace);
+    void prepareInitialGuess(std::vector<ColorSpinorField> &kSpace);
 
     /**
        @brief Check for a maximum of the Chebyshev operator
        @param[in] mat The problem operator
        @param[in] kSpace The Krylov space vectors
     */
-    void checkChebyOpMax(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace);
+    void checkChebyOpMax(const DiracMatrix &mat, std::vector<ColorSpinorField> &kSpace);
 
     /**
        @brief Extend the Krylov space
        @param[in] kSpace The Krylov space vectors
        @param[in] evals The eigenvalue array
     */
-    void prepareKrylovSpace(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+    void prepareKrylovSpace(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals);
 
     /**
        @brief Set the epsilon parameter
@@ -133,7 +134,7 @@ namespace quda
        @param[in] kSpace The Krylov space vectors
        @param[in] evals The eigenvalue array
     */
-    void cleanUpEigensolver(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+    void cleanUpEigensolver(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals);
 
     /**
        @brief Promoted the specified matVec operation:
@@ -161,14 +162,14 @@ namespace quda
        @param[in] j Use vectors v[0:j]
        @param[in] s array of
     */
-    void blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> &r, int j);
+    void blockOrthogonalize(std::vector<ColorSpinorField> &v, std::vector<ColorSpinorField> &r, int j);
 
     /**
        @brief Orthonormalise input vector space v using Modified Gram-Schmidt
        @param[in] v Vector space
        @param[in] j Use vectors v[0:j-1]
     */
-    void orthonormalizeMGS(std::vector<ColorSpinorField *> &v, int j);
+    void orthonormalizeMGS(std::vector<ColorSpinorField> &v, int j);
 
     /**
        @brief Check orthonormality of input vector space v
@@ -177,7 +178,7 @@ namespace quda
        @param[in] v Vector space
        @param[in] j Use vectors v[0:j-1]
     */
-    bool orthoCheck(std::vector<ColorSpinorField *> v, int j);
+    bool orthoCheck(std::vector<ColorSpinorField> &v, int j);
 
     /**
        @brief Rotate the Krylov space
@@ -189,8 +190,8 @@ namespace quda
        @param[in] locked The number of locked vectors in kSpace
        @param[in] profile Time profiler
     */
-    void rotateVecs(std::vector<ColorSpinorField *> &kSpace, const double *rot_array, const int offset, const int dim,
-                    const int keep, const int locked, TimeProfile &profile);
+    void rotateVecs(std::vector<ColorSpinorField> &kSpace, const std::vector<double> &rot_array,
+                    int offset, int dim, int keep, int locked, TimeProfile &profile);
 
     /**
        @brief Rotate the Krylov space
@@ -202,8 +203,8 @@ namespace quda
        @param[in] locked The number of locked vectors in kSpace
        @param[in] profile Time profiler
     */
-    void rotateVecsComplex(std::vector<ColorSpinorField *> &kSpace, const Complex *rot_array, const int offset,
-                           const int dim, const int keep, const int locked, TimeProfile &profile);
+    void rotateVecsComplex(std::vector<ColorSpinorField> &kSpace, const std::vector<Complex> &rot_array,
+                           int offset, int dim, int keep, int locked, TimeProfile &profile);
 
     /**
        @brief Permute the vector space using the permutation matrix.
@@ -211,7 +212,7 @@ namespace quda
        @param[in] mat Eigen object storing the pivots
        @param[in] size The size of the (square) permutation matrix
     */
-    void permuteVecs(std::vector<ColorSpinorField *> &kSpace, int *mat, int size);
+    void permuteVecs(std::vector<ColorSpinorField> &kSpace, MatrixXi &mat, int size);
 
     /**
        @brief Rotate part of kSpace
@@ -226,7 +227,7 @@ namespace quda
        @param[in] je End of j index
        @param[in] offset Position of extra vectors in kSpace
     */
-    void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i, const range &j,
+    void blockRotate(std::vector<ColorSpinorField> &kSpace, MatrixXd &array, int rank, const range &i, const range &j,
                      blockType b_type);
 
     /**
@@ -242,7 +243,7 @@ namespace quda
        @param[in] offset Position of extra vectors in kSpace
     */
 
-    void blockRotateComplex(std::vector<ColorSpinorField *> &kSpace, Complex *array, int rank, const range &i,
+    void blockRotateComplex(std::vector<ColorSpinorField> &kSpace, MatrixXcd &array, int rank, const range &i,
                             const range &j, blockType b_type, int offset);
 
     /**
@@ -252,7 +253,7 @@ namespace quda
        @param[in] je End of j index
        @param[in] offset Position of extra vectors in kSpace
     */
-    void blockReset(std::vector<ColorSpinorField *> &kSpace, int js, int je, int offset);
+    void blockReset(std::vector<ColorSpinorField> &kSpace, int js, int je, int offset);
 
     /**
        @brief Deflate a set of source vectors with a given eigenspace
@@ -262,26 +263,9 @@ namespace quda
        @param[in] evals The eigenvalues to use in deflation
        @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
     */
-    void deflate(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &src,
-                 const std::vector<ColorSpinorField *> &evecs, const std::vector<Complex> &evals,
+    void deflate(vector_ref<ColorSpinorField> &&sol, vector_ref<const ColorSpinorField> &&src,
+                 vector_ref<const ColorSpinorField> &&evecs, const std::vector<Complex> &evals,
                  bool accumulate = false) const;
-
-    /**
-       @brief Deflate a given source vector with a given eigenspace.
-       This is a wrapper variant for a single source vector.
-       @param[in] sol The resulting deflated vector
-       @param[in] src The source vector we are deflating
-       @param[in] evecs The eigenvectors to use in deflation
-       @param[in] evals The eigenvalues to use in deflation
-       @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
-    */
-    void deflate(ColorSpinorField &sol, const ColorSpinorField &src, const std::vector<ColorSpinorField *> &evecs,
-                 const std::vector<Complex> &evals, bool accumulate = false)
-    {
-      std::vector<ColorSpinorField *> src_ {&const_cast<ColorSpinorField&>(src)};
-      std::vector<ColorSpinorField *> sol_ {&sol};
-      deflate(sol_, src_, evecs, evals, accumulate);
-    }
 
     /**
        @brief Deflate a set of source vectors with a set of left and
@@ -292,26 +276,9 @@ namespace quda
        @param[in] evals The singular values to use in deflation
        @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
     */
-    void deflateSVD(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &vec,
-                    const std::vector<ColorSpinorField *> &evecs, const std::vector<Complex> &evals,
+    void deflateSVD(vector_ref<ColorSpinorField> &&sol, vector_ref<const ColorSpinorField> &&vec,
+                    vector_ref<const ColorSpinorField> &&evecs, const std::vector<Complex> &evals,
                     bool accumulate = false) const;
-
-    /**
-       @brief Deflate a a given source vector with a given with a set of left and
-       right singular vectors  This is a wrapper variant for a single source vector.
-       @param[in] sol The resulting deflated vector set
-       @param[in] src The source vector set we are deflating
-       @param[in] evecs The singular vectors to use in deflation
-       @param[in] evals The singular values to use in deflation
-       @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
-    */
-    void deflateSVD(ColorSpinorField &sol, const ColorSpinorField &src, const std::vector<ColorSpinorField *> &evecs,
-                    const std::vector<Complex> &evals, bool accumulate = false)
-    {
-      std::vector<ColorSpinorField *> src_ {&const_cast<ColorSpinorField&>(src)};
-      std::vector<ColorSpinorField *> sol_ {&sol};
-      deflateSVD(sol_, src_, evecs, evals, accumulate);
-    }
 
     /**
        @brief Computes Left/Right SVD from pre computed Right/Left
@@ -319,7 +286,7 @@ namespace quda
        @param[in] evecs Computed eigenvectors of NormOp
        @param[in] evals Computed eigenvalues of NormOp
     */
-    void computeSVD(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals);
+    void computeSVD(const DiracMatrix &mat, std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals);
 
     /**
        @brief Compute eigenvalues and their residiua
@@ -328,7 +295,7 @@ namespace quda
        @param[in] evals The eigenvalues
        @param[in] size The number of eigenvalues to compute
     */
-    void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals,
+    void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals,
                       int size);
 
     /**
@@ -337,7 +304,7 @@ namespace quda
        @param[in] evecs The eigenvectors
        @param[in] evals The eigenvalues
     */
-    void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
+    void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals)
     {
       computeEvals(mat, evecs, evals, n_conv);
     }
@@ -348,7 +315,7 @@ namespace quda
        @param[in] eig_vecs The eigenvectors to save
        @param[in] file The filename to save
     */
-    void loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField *> &eig_vecs, std::vector<Complex> &evals);
+    void loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField> &eig_vecs, std::vector<Complex> &evals);
 
     /**
        @brief Sort array the first n elements of x according to spec_type, y comes along for the ride
@@ -423,20 +390,20 @@ namespace quda
        @param[in] kSpace Krylov vector space
        @param[in] evals Computed eigenvalues
     */
-    void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+    void operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals);
 
     /**
        @brief Lanczos step: extends the Krylov space.
        @param[in] v Vector space
        @param[in] j Index of vector being computed
     */
-    void lanczosStep(std::vector<ColorSpinorField *> v, int j);
+    void lanczosStep(std::vector<ColorSpinorField> &v, int j);
 
     /**
        @brief Reorder the Krylov space by eigenvalue
        @param[in] kSpace the Krylov space
     */
-    void reorder(std::vector<ColorSpinorField *> &kSpace);
+    void reorder(std::vector<ColorSpinorField> &kSpace);
 
     /**
        @brief Get the eigendecomposition from the arrow matrix
@@ -447,7 +414,7 @@ namespace quda
        @brief Rotate the Ritz vectors usinng the arrow matrix eigendecomposition
        @param[in] nKspace current Krylov space
     */
-    void computeKeptRitz(std::vector<ColorSpinorField *> &kSpace);
+    void computeKeptRitz(std::vector<ColorSpinorField> &kSpace);
 
   };
 
@@ -485,14 +452,14 @@ namespace quda
        @param[in] kSpace Krylov vector space
        @param[in] evals Computed eigenvalues
     */
-    void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+    void operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals);
 
     /**
        @brief block lanczos step: extends the Krylov space in block step
        @param[in] v Vector space
        @param[in] j Index of block of vectors being computed
     */
-    void blockLanczosStep(std::vector<ColorSpinorField *> v, int j);
+    void blockLanczosStep(std::vector<ColorSpinorField> &v, int j);
 
     /**
        @brief Get the eigendecomposition from the current block arrow matrix
@@ -511,7 +478,7 @@ namespace quda
        Uses a complex ritz matrix
        @param[in] nKspace current Krylov space
     */
-    void computeBlockKeptRitz(std::vector<ColorSpinorField *> &kSpace);
+    void computeBlockKeptRitz(std::vector<ColorSpinorField> &kSpace);
   };
 
   /**
@@ -543,7 +510,7 @@ namespace quda
        @param[in] kSpace Krylov vector space
        @param[in] evals Computed eigenvalues
     */
-    void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+    void operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals);
 
     /**
        @brief Arnoldi step: extends the Krylov space by one vector
@@ -552,7 +519,7 @@ namespace quda
        @param[in] beta Norm of residual vector
        @param[in] j Index of vector being computed
     */
-    void arnoldiStep(std::vector<ColorSpinorField *> &v, std::vector<ColorSpinorField *> &r, double &beta, int j);
+    void arnoldiStep(std::vector<ColorSpinorField> &v, std::vector<ColorSpinorField> &r, double &beta, int j);
 
     /**
        @brief Get the eigendecomposition from the upper Hessenberg matrix via QR
@@ -566,7 +533,7 @@ namespace quda
        @param[in] v Vector space
        @param[in] keep The number of vectors to keep after rotation
     */
-    void rotateBasis(std::vector<ColorSpinorField *> &v, int keep);
+    void rotateBasis(std::vector<ColorSpinorField> &v, int keep);
 
     /**
        @brief Apply shifts to the upper Hessenberg matrix via QR decomposition
@@ -589,7 +556,7 @@ namespace quda
        @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real) that
        determines the sorting condition
     */
-    void reorder(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals,
+    void reorder(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals,
                  const QudaEigSpectrumType spec_type);
   };
 
@@ -608,7 +575,7 @@ namespace quda
      @param[in] eig_param Parameter structure for all QUDA eigensolvers
      @param[in,out] profile TimeProfile instance used for profiling
   */
-  void arpack_solve(std::vector<ColorSpinorField *> &h_evecs, std::vector<Complex> &h_evals, const DiracMatrix &mat,
+  void arpack_solve(std::vector<ColorSpinorField> &h_evecs, std::vector<Complex> &h_evals, const DiracMatrix &mat,
                     QudaEigParam *eig_param, TimeProfile &profile);
 
 } // namespace quda

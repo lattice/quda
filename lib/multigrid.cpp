@@ -1787,16 +1787,15 @@ namespace quda
     bool normop = param.mg_global.eig_param[param.level]->use_norm_op;
 
     // Dummy array to keep the eigensolver happy.
-    std::vector<Complex> evals(n_conv, 0.0);
-
-    std::vector<ColorSpinorField *> B_evecs;
     ColorSpinorParam csParam(*param.B[0]);
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     // This is the vector precision used by matResidual
     csParam.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION, true);
 
-    for (int i = 0; i < n_conv; i++) B_evecs.push_back(new ColorSpinorField(csParam));
+    std::vector<Complex> evals(n_conv, 0.0);
+    std::vector<ColorSpinorField> B_evecs(n_conv);
+    for (auto &b : B_evecs) b = ColorSpinorField(csParam);
 
     // before entering the eigen solver, let's free the B vectors to save some memory
     ColorSpinorParam bParam(*param.B[0]);
@@ -1832,11 +1831,8 @@ namespace quda
     // now reallocate the B vectors copy in e-vectors
     for (int i = 0; i < (int)param.B.size(); i++) {
       param.B[i] = new ColorSpinorField(bParam);
-      *param.B[i] = *B_evecs[i];
+      *param.B[i] = B_evecs[i]; // FIXME can std::move this
     }
-
-    // Local clean-up
-    for (auto b : B_evecs) { delete b; }
 
     // only save if outfile is defined
     if (strcmp(param.mg_global.vec_outfile[param.level], "") != 0) { saveVectors(param.B); }

@@ -7,9 +7,6 @@ namespace quda {
 
   namespace blas {
 
-    using csfield_ref_vec = std::vector<ColorSpinorField_ref>;
-    using csfield_cref_vec = std::vector<ColorSpinorField_cref>;
-
     template <template <typename ...> class Reducer, typename store_t, typename y_store_t, int nSpin,
               typename T>
     class MultiReduce : public TunableMultiReduction
@@ -21,7 +18,7 @@ namespace quda {
       Reducer<device_reduce_t, real> r;
       const int nParity;
       const T &a, &b, &c;
-      csfield_ref_vec &x, &y, &z, &w;
+      vector_ref<ColorSpinorField> &x, &y, &z, &w;
       T &result;
       QudaFieldLocation location;
 
@@ -47,10 +44,10 @@ namespace quda {
         a(a),
         b(b),
         c(c),
-        x(reinterpret_cast<csfield_ref_vec&>(x)),
-        y(reinterpret_cast<csfield_ref_vec&>(y)),
-        z(reinterpret_cast<csfield_ref_vec&>(z)),
-        w(reinterpret_cast<csfield_ref_vec&>(w)),
+        x(reinterpret_cast<vector_ref<ColorSpinorField>&>(x)),
+        y(reinterpret_cast<vector_ref<ColorSpinorField>&>(y)),
+        z(reinterpret_cast<vector_ref<ColorSpinorField>&>(z)),
+        w(reinterpret_cast<vector_ref<ColorSpinorField>&>(w)),
         result(result),
         location(checkLocation(x[0], y[0], z[0], w[0]))
       {
@@ -607,7 +604,8 @@ namespace quda {
       void postTune() {} // FIXME - use write to determine what needs to be saved
     };
 
-    void reDotProduct(std::vector<double> &result, csfield_cref_vec &&x, csfield_cref_vec &&y)
+    void reDotProduct(std::vector<double> &result, vector_ref<const ColorSpinorField>  &&x,
+                      vector_ref<const ColorSpinorField> &&y)
     {
       auto &x0 = x[0].get();
       auto &y0 = y[0].get();
@@ -657,7 +655,8 @@ namespace quda {
       result = transpose(result_tmp, y.size(), x.size());
     }
 
-    void cDotProduct(std::vector<Complex> &result, csfield_cref_vec &&x, csfield_cref_vec &&y)
+    void cDotProduct(std::vector<Complex> &result, vector_ref<const ColorSpinorField>  &&x,
+                      vector_ref<const ColorSpinorField> &&y)
     {
       auto &x0 = x[0].get();
       auto &y0 = y[0].get();
@@ -707,7 +706,8 @@ namespace quda {
       result = transpose(result_tmp, y.size(), x.size());
     }
 
-    void hDotProduct(std::vector<Complex> &result, csfield_cref_vec &&x, csfield_cref_vec &&y)
+    void hDotProduct(std::vector<Complex> &result, vector_ref<const ColorSpinorField>  &&x,
+                     vector_ref<const ColorSpinorField> &&y)
     {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block dot product on non-square inputs");
@@ -731,7 +731,8 @@ namespace quda {
     }
 
     // for (p, Ap) norms in CG which are Hermitian.
-    void hDotProduct_Anorm(std::vector<Complex> &result, csfield_cref_vec &&x, csfield_cref_vec &&y)
+    void hDotProduct_Anorm(std::vector<Complex> &result, vector_ref<const ColorSpinorField>  &&x,
+                     vector_ref<const ColorSpinorField> &&y)
     {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block A-norm dot product on non-square inputs");
@@ -761,7 +762,7 @@ namespace quda {
       for (auto &xi : x) x_.push_back(*xi);
       std::vector<ColorSpinorField_ref> y_;
       for (auto &yi : y) y_.push_back(*yi);
-      reDotProduct(result_, std::move(x_), std::move(y_));
+      reDotProduct(result_, x_, y_);
       memcpy(result, result_.data(), x.size() * y.size() * sizeof(double));
     }
 
@@ -772,7 +773,7 @@ namespace quda {
       for (auto &xi : x) x_.push_back(*xi);
       std::vector<ColorSpinorField_ref> y_;
       for (auto &yi : y) y_.push_back(*yi);
-      cDotProduct(result_, std::move(x_), std::move(y_));
+      cDotProduct(result_, x_, y_);
       memcpy(result, result_.data(), x.size() * y.size() * sizeof(Complex));
     }
 
@@ -783,7 +784,7 @@ namespace quda {
       for (auto &xi : x) x_.push_back(*xi);
       std::vector<ColorSpinorField_ref> y_;
       for (auto &yi : y) y_.push_back(*yi);
-      hDotProduct(result_, std::move(x_), std::move(y_));
+      hDotProduct(result_, x_, y_);
       memcpy(result, result_.data(), x.size() * y.size() * sizeof(Complex));
     }
 

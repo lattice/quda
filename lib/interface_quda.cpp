@@ -2278,11 +2278,11 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
 
   int n_eig = eig_param->n_conv;
   if (eig_param->compute_svd) n_eig *= 2;
-  std::vector<ColorSpinorField *> host_evecs_(n_eig);
+  std::vector<ColorSpinorField> host_evecs_(n_eig);
   cpuParam.create = QUDA_REFERENCE_FIELD_CREATE;
   for (int i = 0; i < n_eig; i++) {
     cpuParam.v = host_evecs[i];
-    host_evecs_[i] = ColorSpinorField::Create(cpuParam);
+    host_evecs_[i] = ColorSpinorField(cpuParam);
   }
 
   // Create device side ColorSpinorField vector space to pass to the
@@ -2293,10 +2293,10 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // Ensure device vectors qre in UKQCD basis for Wilson type fermions
   if (cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
-  std::vector<ColorSpinorField *> kSpace(n_eig);
+  std::vector<ColorSpinorField> kSpace(n_eig);
   for (int i = 0; i < n_eig; i++) {
-    kSpace[i] = ColorSpinorField::Create(cudaParam);
-    if (i < eig_param->block_size) *kSpace[i] = *host_evecs_[i];
+    kSpace[i] = ColorSpinorField(cudaParam);
+    if (i < eig_param->block_size) kSpace[i] = host_evecs_[i];
   }
 
   // Simple vector for eigenvalues.
@@ -2350,7 +2350,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   if (eig_param->arpack_check) {
     arpack_solve(host_evecs_, evals, *m, eig_param, profileEigensolve);
   } else {
-    EigenSolver *eig_solve = EigenSolver::create(eig_param, *m, profileEigensolve);
+    auto *eig_solve = quda::EigenSolver::create(eig_param, *m, profileEigensolve);
     (*eig_solve)(kSpace, evals);
     delete eig_solve;
   }
@@ -2363,16 +2363,14 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   for (int i = 0; i < eig_param->n_conv; i++) { memcpy(host_evals + i, &evals[i], sizeof(Complex)); }
   if (!(eig_param->arpack_check)) {
     profileEigensolve.TPSTART(QUDA_PROFILE_D2H);
-    for (int i = 0; i < n_eig; i++) *host_evecs_[i] = *kSpace[i];
+    for (int i = 0; i < n_eig; i++) host_evecs_[i] = kSpace[i];
     profileEigensolve.TPSTOP(QUDA_PROFILE_D2H);
   }
 
   profileEigensolve.TPSTART(QUDA_PROFILE_FREE);
-  for (int i = 0; i < n_eig; i++) delete host_evecs_[i];
   delete d;
   delete dSloppy;
   delete dPre;
-  for (int i = 0; i < n_eig; i++) delete kSpace[i];
   profileEigensolve.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();

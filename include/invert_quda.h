@@ -514,8 +514,8 @@ namespace quda {
     bool deflate_init;      /** If true, the deflation space has been computed. */
     bool deflate_compute;   /** If true, instruct the solver to create a deflation space. */
     bool recompute_evals;   /** If true, instruct the solver to recompute evals from an existing deflation space. */
-    std::vector<ColorSpinorField *> evecs; /** Holds the eigenvectors. */
-    std::vector<Complex> evals;            /** Holds the eigenvalues. */
+    std::vector<ColorSpinorField> evecs; /** Holds the eigenvectors. */
+    std::vector<Complex> evals;          /** Holds the eigenvalues. */
 
     bool mixed() { return param.precision != param.precision_sloppy; }
 
@@ -679,7 +679,7 @@ namespace quda {
        @param[in,out] defl_space the deflation space we wish to
        transfer to the solver.
     */
-    void injectDeflationSpace(std::vector<ColorSpinorField *> &defl_space);
+    void injectDeflationSpace(std::vector<ColorSpinorField> &defl_space);
 
     /**
        @brief Extracts the deflation space from the solver to the
@@ -689,7 +689,7 @@ namespace quda {
        @param[in,out] defl_space the extracted deflation space.  On
        input, this vector should have zero size.
     */
-    void extractDeflationSpace(std::vector<ColorSpinorField *> &defl_space);
+    void extractDeflationSpace(std::vector<ColorSpinorField> &defl_space);
 
     /**
        @brief Returns the size of deflation space
@@ -1683,9 +1683,9 @@ public:
     deflated solver.
  */
  struct deflation_space : public Object {
-   bool svd;                              /** Whether this space is for an SVD deflaton */
-   std::vector<ColorSpinorField *> evecs; /** Container for the eigenvectors */
-   std::vector<Complex> evals;            /** The eigenvalues */
+   bool svd;                            /** Whether this space is for an SVD deflaton */
+   std::vector<ColorSpinorField> evecs; /** Container for the eigenvectors */
+   std::vector<Complex> evals;          /** The eigenvalues */
  };
 
  /**

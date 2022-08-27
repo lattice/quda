@@ -7,9 +7,6 @@ namespace quda {
 
   namespace blas {
 
-    using csfield_ref_vec = std::vector<ColorSpinorField_ref>;
-    using csfield_cref_vec = std::vector<ColorSpinorField_cref>;
-
     template <template <typename ...> class Functor, typename store_t, typename y_store_t, int nSpin, typename T>
     class MultiBlas : public TunableGridStrideKernel3D
     {
@@ -21,7 +18,7 @@ namespace quda {
       mutable int warp_split; // helper used to keep track of current warp splitting
       const int nParity;
       const T &a, &b, &c;
-      csfield_ref_vec &x, &y, &z, &w;
+      vector_ref<ColorSpinorField> &x, &y, &z, &w;
 
       bool tuneSharedBytes() const { return false; }
 
@@ -41,10 +38,10 @@ namespace quda {
         a(a),
         b(b),
         c(c),
-        x(reinterpret_cast<csfield_ref_vec&>(x)),
-        y(reinterpret_cast<csfield_ref_vec&>(y)),
-        z(reinterpret_cast<csfield_ref_vec&>(z)),
-        w(reinterpret_cast<csfield_ref_vec&>(w))
+        x(reinterpret_cast<vector_ref<ColorSpinorField>&>(x)),
+        y(reinterpret_cast<vector_ref<ColorSpinorField>&>(y)),
+        z(reinterpret_cast<vector_ref<ColorSpinorField>&>(z)),
+        w(reinterpret_cast<vector_ref<ColorSpinorField>&>(w))
       {
         checkLocation(x[0], y[0], z[0], w[0]);
         checkLength(x[0], y[0], z[0], w[0]);
@@ -268,7 +265,8 @@ namespace quda {
     using range = std::pair<size_t,size_t>;
 
     template <template <typename...> class Functor, typename T>
-    void axpy_recurse(const std::vector<T> &a, csfield_cref_vec &x, csfield_ref_vec &y,
+    void axpy_recurse(const std::vector<T> &a, vector_ref<const ColorSpinorField> &x,
+                      vector_ref<ColorSpinorField> &y,
                       const range &range_x, const range &range_y, int upper)
     {
       if (a.size() != x.size() * y.size())
@@ -309,28 +307,28 @@ namespace quda {
       } // end if (y.size() > max_YW_size())
     }
 
-    void axpy(const std::vector<double> &a, csfield_cref_vec &x, csfield_ref_vec &y)
+    void axpy(const std::vector<double> &a, vector_ref<const ColorSpinorField> &x, vector_ref<ColorSpinorField> &y)
     {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
       axpy_recurse<multiaxpy_>(a, x, y, range(0, x.size()), range(0, y.size()), 0);
     }
 
-    void axpy(const std::vector<Complex> &a, csfield_cref_vec &x, csfield_ref_vec &y)
+    void axpy(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &x, vector_ref<ColorSpinorField> &y)
     {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
       axpy_recurse<multicaxpy_>(a, x, y, range(0,x.size()), range(0,y.size()), 0);
     }
 
-    void axpy(const std::vector<double> &a, csfield_cref_vec &&x, csfield_ref_vec &&y)
+    void axpy(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
     {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
       axpy_recurse<multicaxpy_>(a, x, y, range(0,x.size()), range(0,y.size()), 0);
     }
 
-    void axpy_U(const std::vector<double> &a, csfield_cref_vec &&x, csfield_ref_vec &&y)
+    void axpy_U(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
     {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. 1 indicates the matrix is upper-triangular,
@@ -343,7 +341,7 @@ namespace quda {
       axpy_recurse<multiaxpy_>(a, x, y, range(0, x.size()), range(0, y.size()), 1);
     }
 
-    void axpy_L(const std::vector<double> &a, csfield_cref_vec &&x, csfield_ref_vec &&y)
+    void axpy_L(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
     {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. -1 indicates the matrix is lower-triangular
@@ -356,14 +354,14 @@ namespace quda {
       axpy_recurse<multiaxpy_>(a, x, y, range(0, x.size()), range(0, y.size()), -1);
     }
 
-    void caxpy(const std::vector<Complex> &a, csfield_cref_vec &&x, csfield_ref_vec &&y)
+    void caxpy(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
     {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
       axpy_recurse<multicaxpy_>(a, x, y, range(0,x.size()), range(0,y.size()), 0);
     }
 
-    void caxpy_U(const std::vector<Complex> &a, csfield_cref_vec &&x, csfield_ref_vec &&y)
+    void caxpy_U(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
     {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. 1 indicates the matrix is upper-triangular,
@@ -375,7 +373,7 @@ namespace quda {
       axpy_recurse<multicaxpy_>(a, x, y, range(0,x.size()), range(0,y.size()), 1);
     }
 
-    void caxpy_L(const std::vector<Complex> &a, csfield_cref_vec &&x, csfield_ref_vec &&y)
+    void caxpy_L(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
     {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. -1 indicates the matrix is lower-triangular
@@ -388,9 +386,9 @@ namespace quda {
     }
 
     template <template <typename...> class Functor, typename T>
-    void axpyz_recurse(const std::vector<T> &a, csfield_cref_vec &x, csfield_cref_vec &y,
-                       csfield_ref_vec &z, const range &range_x, const range &range_y,
-                       int pass, int upper)
+    void axpyz_recurse(const std::vector<T> &a, vector_ref<const ColorSpinorField> &x,
+                       vector_ref<const ColorSpinorField> &y, vector_ref<ColorSpinorField> &z,
+                       const range &range_x, const range &range_y, int pass, int upper)
     {
       if (a.size() != x.size() * y.size())
         errorQuda("coefficient size %lu does not match vector set %lu * %lu", a.size(), x.size(), y.size());
@@ -443,12 +441,12 @@ namespace quda {
       } // end if (y.size() > max_YW_size())
     }
 
-    void axpyz(const std::vector<double> &a, csfield_cref_vec &&x, csfield_cref_vec &&y, csfield_ref_vec &&z)
+    void axpyz(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<const ColorSpinorField> &&y, vector_ref<ColorSpinorField> &&z)
     {
       axpyz_recurse<multiaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 0, 0);
     }
 
-    void axpyz_U(const std::vector<double> &a, csfield_cref_vec &&x, csfield_cref_vec &&y, csfield_ref_vec &&z)
+    void axpyz_U(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<const ColorSpinorField> &&y, vector_ref<ColorSpinorField> &&z)
     {
       if (x.size() != y.size()) {
         errorQuda("An optimal block axpyz_U with non-square 'a' (%lu != %lu) has not yet been implemented. Use block axpyz instead",
@@ -461,7 +459,7 @@ namespace quda {
       axpyz_recurse<multiaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 1, 1);
     }
 
-    void axpyz_L(const std::vector<double> &a, csfield_cref_vec &&x, csfield_cref_vec &&y, csfield_ref_vec &&z)
+    void axpyz_L(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<const ColorSpinorField> &&y, vector_ref<ColorSpinorField> &&z)
     {
       if (x.size() != y.size()) {
         errorQuda("An optimal block axpyz_L with non-square 'a' (%lu != %lu) has not yet been implemented. Use block axpyz instead",
@@ -474,12 +472,12 @@ namespace quda {
       axpyz_recurse<multiaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 1, -1);
     }
 
-    void caxpyz(const std::vector<Complex> &a, csfield_cref_vec &&x, csfield_cref_vec &&y, csfield_ref_vec &&z)
+    void caxpyz(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<const ColorSpinorField> &&y, vector_ref<ColorSpinorField> &&z)
     {
       axpyz_recurse<multicaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 0, 0);
     }
 
-    void caxpyz_U(const std::vector<Complex> &a, csfield_cref_vec &&x, csfield_cref_vec &&y, csfield_ref_vec &&z)
+    void caxpyz_U(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<const ColorSpinorField> &&y, vector_ref<ColorSpinorField> &&z)
     {
       if (x.size() != y.size()) {
         errorQuda("An optimal block caxpyz_U with non-square 'a' (%lu != %lu) has not yet been implemented. Use block caxpyz instead",
@@ -492,7 +490,7 @@ namespace quda {
       axpyz_recurse<multicaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 1, 1);
     }
 
-    void axpyz_L(const std::vector<Complex> &a, csfield_cref_vec &&x, csfield_cref_vec &&y, csfield_ref_vec &&z)
+    void axpyz_L(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<const ColorSpinorField> &&y, vector_ref<ColorSpinorField> &&z)
     {
       if (x.size() != y.size()) {
         errorQuda("An optimal block axpyz_U with non-square 'a' (%lu != %lu) has not yet been implemented. Use block axpyz instead",
@@ -505,18 +503,18 @@ namespace quda {
       axpyz_recurse<multicaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 1, -1);
     }
 
-    void axpyBzpcx(const std::vector<double> &a, csfield_ref_vec &&x_, csfield_ref_vec &&y_,
-                        const std::vector<double> &b, ColorSpinorField &z_, const std::vector<double> &c)
+    void axpyBzpcx(const std::vector<double> &a, vector_ref<ColorSpinorField> &x_, vector_ref<ColorSpinorField> &y_,
+                   const std::vector<double> &b, ColorSpinorField &z_, const std::vector<double> &c)
     {
       if (y_.size() <= (size_t)max_N_multi_1d()) {
         // swizzle order since we are writing to x_ and y_, but the
 	// multi-blas only allow writing to y and w, and moreover the
 	// block width of y and w must match, and x and z must match.
-	csfield_ref_vec &y = y_;
-	csfield_ref_vec &w = x_;
+	vector_ref<ColorSpinorField> &y = y_;
+	vector_ref<ColorSpinorField> &w = x_;
 
 	// wrap a container around the third solo vector
-	csfield_ref_vec x{z_};
+	vector_ref<ColorSpinorField> x{z_};
 
         constexpr bool mixed = true;
         instantiate<multi_axpyBzpcx_, MultiBlas, mixed>(a, b, c, x[0], y[0], x, y, x, w);
@@ -533,8 +531,14 @@ namespace quda {
       }
     }
 
-    void caxpyBxpz(const std::vector<Complex> &a, csfield_cref_vec &&x_, ColorSpinorField &y_,
-                        const std::vector<Complex> &b, ColorSpinorField &z_)
+    void axpyBzpcx(const std::vector<double> &a, vector_ref<ColorSpinorField> &&x_, vector_ref<ColorSpinorField> &&y_,
+                   const std::vector<double> &b, ColorSpinorField &z_, const std::vector<double> &c)
+    {
+      axpyBzpcx(a, x_, y_, b, z_, c);
+    }
+
+    void caxpyBxpz(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &x_, ColorSpinorField &y_,
+                   const std::vector<Complex> &b, ColorSpinorField &z_)
     {
       if (x_.size() <= (size_t)max_N_multi_1d() && is_valid_NXZ(x_.size(), false, y_.Precision())) // only split if we have to.
       {
@@ -542,11 +546,11 @@ namespace quda {
         // multi-blas only allow writing to y and w, and moreover the
         // block width of y and w must match, and x and z must match.
         // Also, wrap a container around them.
-        csfield_ref_vec y{y_};
-        csfield_ref_vec w{z_};
+        vector_ref<ColorSpinorField> y{y_};
+        vector_ref<ColorSpinorField> w{z_};
 
         // we're reading from x
-        csfield_cref_vec &x = x_;
+        vector_ref<const ColorSpinorField> &x = x_;
 
         constexpr bool mixed = true;
         instantiate<multi_caxpyBxpz_, MultiBlas, mixed>(a, b, std::vector<Complex>(), x[0], y[0], x, y, x, w);
@@ -559,6 +563,12 @@ namespace quda {
         caxpyBxpz(a_.first, x.first, y_, b_.first, z_);
         caxpyBxpz(a_.second, x.second, y_, b_.second, z_);
       }
+    }
+
+    void caxpyBxpz(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x_, ColorSpinorField &y_,
+                   const std::vector<Complex> &b, ColorSpinorField &z_)
+    {
+      caxpyBxpz(a, x_, y_, b, z_);
     }
 
     // temporary wrappers
@@ -602,7 +612,7 @@ namespace quda {
       for (auto &xi : x) x_.push_back(*xi);
       std::vector<std::reference_wrapper<ColorSpinorField>> y_;
       for (auto &yi : y) y_.push_back(*yi);
-      axpy(a_, x_, y_);
+      caxpy(a_, x_, y_);
     }
 
     void caxpy_U(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
@@ -612,7 +622,7 @@ namespace quda {
       for (auto &xi : x) x_.push_back(*xi);
       std::vector<std::reference_wrapper<ColorSpinorField>> y_;
       for (auto &yi : y) y_.push_back(*yi);
-      caxpy_U(a_, std::move(x_), std::move(y_));
+      caxpy_U(a_, x_, y_);
     }
 
     void caxpy_L(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
@@ -622,7 +632,7 @@ namespace quda {
       for (auto &xi : x) x_.push_back(*xi);
       std::vector<std::reference_wrapper<ColorSpinorField>> y_;
       for (auto &yi : y) y_.push_back(*yi);
-      caxpy_L(a_, std::move(x_), std::move(y_));
+      caxpy_L(a_, x_, y_);
     }
 
     void axpyz(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
@@ -636,7 +646,7 @@ namespace quda {
       for (auto &yi : y) y_.push_back(*yi);
       std::vector<std::reference_wrapper<ColorSpinorField>> z_;
       for (auto &zi : z) z_.push_back(*zi);
-      axpyz(a_, std::move(x_), std::move(y_), std::move(z_));
+      axpyz(a_, x_, y_, z_);
     }
 
     void caxpyz(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
@@ -650,7 +660,7 @@ namespace quda {
       for (auto &yi : y) y_.push_back(*yi);
       std::vector<std::reference_wrapper<ColorSpinorField>> z_;
       for (auto &zi : z) z_.push_back(*zi);
-      caxpyz(a_, std::move(x_), std::move(y_), std::move(z_));
+      caxpyz(a_, x_, y_, z_);
     }
 
     void axpyBzpcx(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
@@ -667,7 +677,7 @@ namespace quda {
       for (auto &xi : x) x_.push_back(*xi);
       std::vector<std::reference_wrapper<ColorSpinorField>> y_;
       for (auto &yi : y) y_.push_back(*yi);
-      axpyBzpcx(a_, std::move(x_), std::move(y_), b_, z, c_);
+      axpyBzpcx(a_, x_, y_, b_, z, c_);
     }
 
     void caxpyBxpz(const Complex *a, std::vector<ColorSpinorField*> &x, ColorSpinorField &y,
@@ -680,7 +690,7 @@ namespace quda {
 
       std::vector<std::reference_wrapper<const ColorSpinorField>> x_;
       for (auto &xi : x) x_.push_back(*xi);
-      caxpyBxpz(a_, std::move(x_), y, b_, z);
+      caxpyBxpz(a_, x_, y, b_, z);
     }
 
     // Composite field version
