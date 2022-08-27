@@ -562,6 +562,7 @@ if(QUDA_ARPACK)
   if(QUDA_DOWNLOAD_ARPACK)
   #TODO: switch to CPM
     include(GNUInstallDirs)
+    include(ExternalProject)
     ExternalProject_Add(
       ARPACK-NG
       GIT_REPOSITORY https://github.com/opencollab/arpack-ng.git
