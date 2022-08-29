@@ -101,7 +101,7 @@ namespace quda {
     real s = c[1] * static_cast<real>(1.0 / 3.0) - c[0] * c[0] * static_cast<real>(1.0 / 18.0);
 
     real cosTheta;
-    if (fabs(s) >= arg.unitarize_eps) { // faster when this conditional is removed?
+    if (s >= arg.unitarize_eps) { // faster when this conditional is removed?
       const real rsqrt_s = quda::rsqrt(s);
       r = c[2]*0.5 - (c[0] * static_cast<real>(1.0 / 3.0)) * (c[1] - c[0] * c[0] * static_cast<real>(1.0 / 9.0));
       cosTheta = r*rsqrt_s*rsqrt_s*rsqrt_s;
@@ -137,7 +137,7 @@ namespace quda {
 
     // At this point we have finished with the c's
     // use these to store sqrt(g)
-    for(int i=0; i<3; ++i) c[i] = sqrt(g[i]);
+    for(int i=0; i<3; ++i) c[i] = sqrt(fabs(g[i]));
 
     // done with the g's, use these to store u, v, w
     g[0] = c[0]+c[1]+c[2];
