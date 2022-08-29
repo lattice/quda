@@ -55,7 +55,7 @@ namespace quda
     // MPI objects
 #if (defined(QMP_COMMS) || defined(MPI_COMMS))
     int *fcomm_ = nullptr;
-    MPI_Fint mpi_comm_fort = MPI_Comm_c2f(MPI_COMM_HANDLE);
+    MPI_Fint mpi_comm_fort = MPI_Comm_c2f(get_mpi_handle());
     fcomm_ = static_cast<int *>(&mpi_comm_fort);
 #endif
 
