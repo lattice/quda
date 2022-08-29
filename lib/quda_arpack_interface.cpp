@@ -366,41 +366,112 @@ namespace quda
                    std::abs(*(w_workl_.data() + ipntr_[10] - 1 + evals_sorted[j].second)));
     }
 
-    // Compute Eigenvalues from Eigenvectors.
-    for (int i = 0; i < nconv; i++) {
-      int idx = evals_sorted[i].second;
+    // Compute singular/eigenvalues values from eigenvectors.
+    if (eig_param->compute_svd) {
+      printfQuda("Computing SVD\n");
 
-      profile.TPSTART(QUDA_PROFILE_D2H);
-      d_v = h_evecs_arpack[idx];
-      profile.TPSTOP(QUDA_PROFILE_D2H);
+      // This function assumes that you have computed the eigenvectors
+      // of MdagM(MMdag), ie, the right(left) SVD of M. The ith eigen vector in the
+      // array corresponds to the ith right(left) singular vector. We place the
+      // computed left(right) singular vectors in the second half of the array. We
+      // assume that right vectors are given and we compute the left.
+      //
+      // As a cross check, we recompute the singular values from mat vecs rather
+      // than make the direct relation (sigma_i)^2 = |lambda_i|
+      //--------------------------------------------------------------------------
 
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
-      // d_v2 = M*v
-      mat(d_v2, d_v);
+      std::vector<double> sigma_tmp(nconv);
+      for (int i = 0; i < nconv; i++) {
+	int idx = evals_sorted[i].second;
+	
+	profile.TPSTART(QUDA_PROFILE_H2D);
+	d_v = h_evecs_arpack[idx];
+	profile.TPSTOP(QUDA_PROFILE_H2D);
 
-      // lambda = v^dag * M * v
-      h_evals_[idx] = blas::cDotProduct(d_v, d_v2);
-
-      Complex unit(1.0, 0.0);
-      Complex m_lambda(-h_evals_[idx]);
-
-      // d_v = ||M*v - lambda*v||
-      blas::caxpby(unit, d_v2, m_lambda, d_v);
-      double L2norm = blas::norm2(d_v);
-
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-      if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("EigValue[%04d] = %+.16e  %+.16e  Residual: %.16e\n", i, real(h_evals_[idx]), imag(h_evals_[idx]),
-                   sqrt(L2norm));
+	h_evecs[i] = h_evecs_arpack[evals_sorted[i].second];
+	
+	profile.TPSTART(QUDA_PROFILE_COMPUTE);
+	
+	// Lambda contains eigenvalue of the norm op.
+	Complex lambda = h_evals_[idx];
+	
+	// M*Rev_i = M*Rsv_i = sigma_i Lsv_i
+	mat.Expose()->M(d_v2, d_v);
+	
+	// sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
+	sigma_tmp[i] = sqrt(blas::norm2(d_v2));
+	
+	// Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
+	blas::ax(1.0 / sigma_tmp[i], d_v2);	
+	profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+	
+	if (getVerbosity() >= QUDA_SUMMARIZE)
+	  printfQuda("Sval[%04d] = %+.16e sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp[i],
+		     sigma_tmp[i] - sqrt(abs(lambda.real())));
+      }
+    } else {
+      printfQuda("Computing Eigenvalues\n");
+      for (int i = 0; i < nconv; i++) {
+	int idx = evals_sorted[i].second;
+	
+	profile.TPSTART(QUDA_PROFILE_D2H);
+	d_v = h_evecs_arpack[idx];
+	profile.TPSTOP(QUDA_PROFILE_D2H);
+	
+	profile.TPSTART(QUDA_PROFILE_COMPUTE);
+	// d_v2 = M*v
+	mat(d_v2, d_v);
+	
+	// lambda = v^dag * M * v
+	h_evals_[idx] = blas::cDotProduct(d_v, d_v2);
+	
+	Complex unit(1.0, 0.0);
+	Complex m_lambda(-h_evals_[idx]);
+	
+	// d_v = ||M*v - lambda*v||
+	blas::caxpby(unit, d_v2, m_lambda, d_v);
+	double L2norm = blas::norm2(d_v);
+	
+	profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+	
+	if (getVerbosity() >= QUDA_SUMMARIZE)
+	  printfQuda("Eval[%04d] = %+.16e  %+.16e  Residual: %.16e\n", i, real(h_evals_[idx]), imag(h_evals_[idx]),
+		     sqrt(L2norm));
+      }
     }
 
-    // copy back eigenvalues using the sorting index
-    for (int i = 0; i < nconv; i++) h_evals[i] = h_evals_[evals_sorted[i].second];
+    // copy back singular/eigenvectors and singular/eigenvalues using the sorting index
+    if (eig_param->compute_svd) {
+      for (int i = 0; i < nconv; i++) {
 
-    // copy back eigenvectors using the sorting index
-    for (int i = 0; i < nconv; i++) h_evecs[i] = h_evecs_arpack[evals_sorted[i].second];
+	profile.TPSTART(QUDA_PROFILE_H2D);
+	d_v = h_evecs_arpack[evals_sorted[i].second];
+	profile.TPSTOP(QUDA_PROFILE_H2D);
 
+	// M*Rev_i = M*Rsv_i = sigma_i Lsv_i
+	mat.Expose()->M(d_v2, d_v);
+	
+	// sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
+	double sigma_tmp = sqrt(blas::norm2(d_v2));
+	
+	// Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
+	blas::ax(1.0 / sigma_tmp, d_v2);	
+
+	h_evecs[i] = h_evecs_arpack[evals_sorted[i].second];
+	profile.TPSTART(QUDA_PROFILE_D2H);
+	h_evecs[i + nconv] = d_v2;
+	profile.TPSTOP(QUDA_PROFILE_D2H);
+
+	h_evals[i].real(sigma_tmp);
+	h_evals[i].imag(0.0);
+      }
+    } else {
+      for (int i = 0; i < nconv; i++) {
+	h_evecs[i] = h_evecs_arpack[evals_sorted[i].second];
+	h_evals[i] = h_evals_[evals_sorted[i].second];
+      }
+    }
+    
     profile.TPSTART(QUDA_PROFILE_FREE);
 
     delete eig_solver;
