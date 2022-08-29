@@ -917,6 +917,7 @@ namespace quda
     if (batched_rotate <= 0 || batched_rotate >= keep) {
       if ((int)kSpace.size() < offset + keep) {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + keep);
+        resize(kSpace, offset + keep, QUDA_ZERO_FIELD_CREATE, kSpace[0]);
       }
 
       // Reference to the relevant subsets
