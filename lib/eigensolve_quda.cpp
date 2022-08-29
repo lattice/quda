@@ -775,6 +775,16 @@ namespace quda
     }
   }
 
+  // Overloaded version of sortArrays to deal with complex x and integer y array.
+  void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<int> &y)
+  {
+    std::vector<Complex> y_tmp(n, 0.0);
+    for (int i = 0; i < n; i++) y_tmp[i].real(y[i]);
+    sortArrays(spec_type, n, x, y_tmp);
+    for (int i = 0; i < n; i++) y[i] = y_tmp[i].real();    
+  }
+
+  
   void EigenSolver::rotateVecsComplex(std::vector<ColorSpinorField> &kSpace, const std::vector<Complex> &rot_array,
                                       int offset, int dim, int keep, int locked, TimeProfile &profile)
   {

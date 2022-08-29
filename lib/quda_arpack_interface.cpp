@@ -79,7 +79,7 @@ namespace quda
     iparam_[6] = 1;
 
     // ARPACK problem type to be solved
-    char howmny = 'P';
+    char howmny = 'A';
     char bmat = 'I';
     char spectrum[3];
 
@@ -110,7 +110,7 @@ namespace quda
 
     // Use initial guess?
     if (info_ > 0) {
-      for (int a = 0; a < ldv_; a++) resid_[a] = I;
+      for (int a = 0; a < ldv_; a++) resid_[a] = drand48();
     }
 
     Complex sigma_ = 0.0;
@@ -348,24 +348,29 @@ namespace quda
 
     int nconv = iparam_[4];
 
-    // Sort the eigenvalues in absolute ascending order
-    std::vector<std::pair<double, int>> evals_sorted;
-    for (int j = 0; j < nconv; j++) { evals_sorted.push_back(std::make_pair(h_evals_[j].real(), j)); }
+    // Sort the eigenvalues. To do this we use the QUDA EigenSolver method, which
+    // requires transferring data to std::vector arrays.
+    std::vector<Complex> evals(nconv, 0.0);
+    std::vector<int> arpack_index(nconv, 0.0);
+    for (int i = 0; i < nconv; i++) {
+      evals[i] = h_evals_[i];
+      arpack_index[i] = i;
+    }
+    
+    eig_solver->sortArrays(eig_param->spectrum, nconv, evals, arpack_index);
 
-    // Sort the array by value (first in the pair)
-    // and the index (second in the pair) will come along
-    // for the ride.
-    std::sort(evals_sorted.begin(), evals_sorted.end());
+    std::vector<std::pair<Complex, int>> evals_sorted;
+    for (int j = 0; j < nconv; j++) { evals_sorted.push_back(std::make_pair(evals[j], arpack_index[j])); }    
     if (reverse) std::reverse(evals_sorted.begin(), evals_sorted.end());
 
     // print out the computed Ritz values and their error estimates
     for (int j = 0; j < nconv; j++) {
       if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("RitzValue[%04d] = %+.16e %+.16e Residual: %+.16e\n", j, real(h_evals_[evals_sorted[j].second]),
-                   imag(h_evals_[evals_sorted[j].second]),
-                   std::abs(*(w_workl_.data() + ipntr_[10] - 1 + evals_sorted[j].second)));
+        printfQuda("RitzValue[%04d] = %+.16e %+.16e Residual: %+.16e\n", j, real(h_evals_[arpack_index[j]]),
+                   imag(h_evals_[arpack_index[j]]),
+		   std::abs(*(w_workl_.data() + ipntr_[10] - 1 + arpack_index[j])));
     }
-
+    
     // Compute singular/eigenvalues values from eigenvectors.
     if (eig_param->compute_svd) {
       printfQuda("Computing SVD\n");
@@ -412,7 +417,7 @@ namespace quda
     } else {
       printfQuda("Computing Eigenvalues\n");
       for (int i = 0; i < nconv; i++) {
-	int idx = evals_sorted[i].second;
+	int idx = arpack_index[i];
 	
 	profile.TPSTART(QUDA_PROFILE_D2H);
 	d_v = h_evecs_arpack[idx];
@@ -435,8 +440,8 @@ namespace quda
 	profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 	
 	if (getVerbosity() >= QUDA_SUMMARIZE)
-	  printfQuda("Eval[%04d] = %+.16e  %+.16e  Residual: %.16e\n", i, real(h_evals_[idx]), imag(h_evals_[idx]),
-		     sqrt(L2norm));
+	  printfQuda("Eval[%04d] = %+.16e  %+.16e ||%+.16e|| Residual: %.16e\n", i, real(h_evals_[idx]), imag(h_evals_[idx]),
+		     abs(h_evals_[idx]), sqrt(L2norm));
       }
     }
 

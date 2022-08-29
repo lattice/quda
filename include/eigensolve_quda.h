@@ -356,6 +356,17 @@ namespace quda
        @param[in] y An array whose elements will be permuted in tandem with x
     */
     void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<double> &y);
+
+    /**
+       @brief Sort array the first n elements of x according to spec_type, y comes along for the ride
+       Overloaded version with complex x and integer y
+       @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real) that
+       determines the sorting condition
+       @param[in] n The number of elements to sort
+       @param[in] x The array to sort
+       @param[in] y An array whose elements will be permuted in tandem with x
+    */
+    void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<int> &y);
   };
 
   /**
