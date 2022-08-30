@@ -165,11 +165,13 @@ namespace quda {
        @brief Compute the block "axpy" with over the set of
               ColorSpinorFields.  E.g., it computes y = x * a + y
               The dimensions of a can be rectangular, e.g., the width of x and y need not be same.
+       @tparam T The type of a coefficients (double or Complex)
        @param a[in] Matrix of real coefficients
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void axpy(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y);
+    template <typename T>
+    void axpy(const std::vector<T> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y);
 
     /**
        @brief Compute the block "axpy_U" with over the set of
@@ -179,11 +181,13 @@ namespace quda {
 
        Where 'a' must be a square, upper triangular matrix.
 
+       @tparam T The type of a coefficients (double or Complex)
        @param a[in] Matrix of coefficients
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void axpy_U(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y);
+    template <typename T>
+    void axpy_U(const std::vector<T> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y);
 
     /**
        @brief Compute the block "axpy_L" with over the set of
@@ -193,11 +197,13 @@ namespace quda {
 
        Where 'a' must be a square, lower triangular matrix.
 
+       @tparam T The type of a coefficients (double or Complex)
        @param a[in] Matrix of coefficients
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void axpy_L(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y);
+    template <typename T>
+    void axpy_L(const std::vector<T> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y);
 
     /**
        @brief Compute the block "caxpy" with over the s
