@@ -627,7 +627,7 @@ namespace quda
 
       // If size = n_conv, this routine is called post sort
       if (getVerbosity() >= QUDA_SUMMARIZE && size == n_conv)
-        printfQuda("Eval[%04d] = (%+.16e,%+.16e) residual = %+.16e\n", i, evals[i].real(), evals[i].imag(), residua[i]);
+        printfQuda("Eval[%04d] = (%+.16e,%+.16e) ||%+.16e|| Residual = %+.16e\n", i, evals[i].real(), evals[i].imag(), abs(evals[i]), residua[i]);
     }
   }
 
@@ -684,13 +684,18 @@ namespace quda
 
   void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<Complex> &y)
   {
-    //  'LM' -> sort into increasing order of magnitude.
-    //  'SM' -> sort into decreasing order of magnitude.
-    //  'LR' -> sort with real(x) in increasing algebraic order
-    //  'SR' -> sort with real(x) in decreasing algebraic order
-    //  'LI' -> sort with imag(x) in increasing algebraic order
-    //  'SI' -> sort with imag(x) in decreasing algebraic order
-
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      switch (spec_type) {
+      case QUDA_SPECTRUM_LM_EIG: printfQuda("'LM' -> sort into decreasing order of magnitude, largest first.\n"); break;
+      case QUDA_SPECTRUM_SM_EIG: printfQuda("'SM' -> sort into increasing order of magnitude, smallest first.\n"); break;
+      case QUDA_SPECTRUM_LR_EIG: printfQuda("'LR' -> sort with real(x) in decreasing algebraic order, largest first.\n"); break;
+      case QUDA_SPECTRUM_SR_EIG: printfQuda("'SR' -> sort with real(x) in increasing algebraic order, smallest first.\n"); break;
+      case QUDA_SPECTRUM_LI_EIG: printfQuda("'LI' -> sort with imag(x) in decreasing algebraic order, largest first.\n"); break;
+      case QUDA_SPECTRUM_SI_EIG: printfQuda("'SI' -> sort with imag(x) in increasing algebraic order, smallest first\n"); break;
+      default: errorQuda("Unkown spectrum type requested: %d", spec_type);
+      }
+    }
+    
     std::vector<std::pair<Complex, Complex>> array(n);
     for (int i = 0; i < n; i++) array[i] = std::make_pair(x[i], y[i]);
 
@@ -781,9 +786,9 @@ namespace quda
     std::vector<Complex> y_tmp(n, 0.0);
     for (int i = 0; i < n; i++) y_tmp[i].real(y[i]);
     sortArrays(spec_type, n, x, y_tmp);
-    for (int i = 0; i < n; i++) y[i] = y_tmp[i].real();    
+    for (int i = 0; i < n; i++) y[i] = (int)(y_tmp[i].real());    
   }
-
+  
   
   void EigenSolver::rotateVecsComplex(std::vector<ColorSpinorField> &kSpace, const std::vector<Complex> &rot_array,
                                       int offset, int dim, int keep, int locked, TimeProfile &profile)
