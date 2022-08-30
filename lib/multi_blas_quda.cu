@@ -321,14 +321,16 @@ namespace quda {
       axpy_recurse<multicaxpy_>(a, x, y, range(0,x.size()), range(0,y.size()), 0);
     }
 
-    void axpy(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
+    template <>
+    void axpy<double>(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
     {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
-      axpy_recurse<multicaxpy_>(a, x, y, range(0,x.size()), range(0,y.size()), 0);
+      axpy_recurse<multiaxpy_>(a, x, y, range(0,x.size()), range(0,y.size()), 0);
     }
 
-    void axpy_U(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
+    template <>
+    void axpy_U<double>(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
     {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. 1 indicates the matrix is upper-triangular,
@@ -341,7 +343,8 @@ namespace quda {
       axpy_recurse<multiaxpy_>(a, x, y, range(0, x.size()), range(0, y.size()), 1);
     }
 
-    void axpy_L(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
+    template <>
+    void axpy_L<double>(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
     {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. -1 indicates the matrix is lower-triangular
@@ -354,14 +357,21 @@ namespace quda {
       axpy_recurse<multiaxpy_>(a, x, y, range(0, x.size()), range(0, y.size()), -1);
     }
 
-    void caxpy(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
+    template <>
+    void axpy<Complex>(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
     {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
       axpy_recurse<multicaxpy_>(a, x, y, range(0,x.size()), range(0,y.size()), 0);
     }
 
-    void caxpy_U(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
+    void caxpy(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
+    {
+      axpy(a, std::move(x), std::move(y));
+    }
+
+    template <>
+    void axpy_U<Complex>(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
     {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. 1 indicates the matrix is upper-triangular,
@@ -373,7 +383,13 @@ namespace quda {
       axpy_recurse<multicaxpy_>(a, x, y, range(0,x.size()), range(0,y.size()), 1);
     }
 
-    void caxpy_L(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
+    void caxpy_U(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
+    {
+      axpy_U(a, std::move(x), std::move(y));
+    }
+
+    template <>
+    void axpy_L<Complex>(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
     {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. -1 indicates the matrix is lower-triangular
@@ -383,6 +399,11 @@ namespace quda {
                   x.size(), y.size());
       }
       axpy_recurse<multicaxpy_>(a, x, y, range(0,x.size()), range(0,y.size()), -1);
+    }
+
+    void caxpy_L(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y)
+    {
+      axpy_L(a, std::move(x), std::move(y));
     }
 
     template <template <typename...> class Functor, typename T>
