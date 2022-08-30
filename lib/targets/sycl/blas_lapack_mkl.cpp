@@ -140,6 +140,59 @@ namespace quda
 	    pool_device_free(Ainv_d);
 	    pool_device_free(A_d);
 	  }
+        } else if (prec == QUDA_DOUBLE_PRECISION) {
+          typedef std::complex<double> C;
+
+	  C *A_d = static_cast<C *>(A);
+	  C *Ainv_d = static_cast<C *>(Ainv);
+	  if(location == QUDA_CPU_FIELD_LOCATION) {
+	    A_d = static_cast<C *>(pool_device_malloc(size));
+	    Ainv_d = static_cast<C *>(pool_device_malloc(size));
+	    qudaMemcpy(A_d, A, size, qudaMemcpyHostToDevice);
+	  }
+
+#ifdef _DEBUG
+	  // Debug code: Copy original A matrix to host
+	  C *A_h = static_cast<C *>(pool_pinned_malloc(size));
+	  qudaMemcpy(A_h, A_d, size, qudaMemcpyDeviceToHost);
+#endif
+
+	  try {
+	    std::int64_t getrf_scratchpad_size = getrf_batch_scratchpad_size<C>(q, n, n, n, stride_a, n, batch);
+	    C *getrf_scratchpad = static_cast<C *>(pool_device_malloc(getrf_scratchpad_size*sizeof(C)));
+	    auto getrf_event = getrf_batch(q, n, n, A_d, n, stride_a, dipiv, n, batch, getrf_scratchpad, getrf_scratchpad_size);
+	    flops += batch * FLOPS_CGETRF(n, n);
+
+	    std::int64_t getri_scratchpad_size = getri_batch_scratchpad_size<C>(q, n, n, n, n, batch);
+	    C *getri_scratchpad = static_cast<C *>(pool_device_malloc(getri_scratchpad_size*sizeof(C)));
+	    auto getri_event = getri_batch(q, n, A_d, n, stride_a, dipiv, n, Ainv_d, n, stride_a, batch, getri_scratchpad, getri_scratchpad_size, {getrf_event});
+	    flops += batch * FLOPS_CGETRI(n);
+	    getri_event.wait_and_throw();
+	    pool_device_free(getrf_scratchpad);
+	    pool_device_free(getri_scratchpad);
+	  } catch(oneapi::mkl::lapack::exception const& e) {
+	    // Handle LAPACK related exceptions happened during synchronous call
+	    errorQuda("Unexpected exception caught during synchronous call to LAPACK API:\nreason: %s\ninfo: %ld", e.what(), e.info());
+	  } catch(cl::sycl::exception const& e) {
+	    // Handle not LAPACK related exceptions happened during synchronous call
+	    errorQuda("Unexpected exception caught during synchronous call to SYCL API:\n %s", e.what());
+	  }
+
+#ifdef _DEBUG
+          // Debug code: Copy computed Ainv to host
+          C *Ainv_h = static_cast<C *>(pool_pinned_malloc(size));
+          qudaMemcpy(Ainv_h, Ainv_d, size, qudaMemcpyDeviceToHost);
+          for (uint64_t i = 0; i < batch; i++) {
+	    checkEigen<MatrixXcf, double>(A_h, Ainv_h, n, i);
+	  }
+          pool_pinned_free(Ainv_h);
+          pool_pinned_free(A_h);
+#endif
+	  if (location == QUDA_CPU_FIELD_LOCATION) {
+	    qudaMemcpy(Ainv, Ainv_d, size, qudaMemcpyDeviceToHost);
+	    pool_device_free(Ainv_d);
+	    pool_device_free(A_d);
+	  }
         } else {
           errorQuda("%s not implemented for precision=%d", __func__, prec);
         }
