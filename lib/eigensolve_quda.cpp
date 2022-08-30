@@ -444,8 +444,19 @@ namespace quda
     }
   }
 
-  void EigenSolver::blockRotate(std::vector<ColorSpinorField> &kSpace, MatrixXd &array, int rank, const range &i_range,
-                                const range &j_range, blockType b_type)
+  void EigenSolver::blockReset(std::vector<ColorSpinorField> &kSpace, int j_start, int j_end, int offset)
+  {
+    // copy back to correct position, zero out the workspace
+    for (int j = j_start; j < j_end; j++) {
+      int k = offset + j - j_start;
+      std::swap(kSpace[j + num_locked], kSpace[k]);
+      blas::zero(kSpace[k]);
+    }
+  }
+
+  template <typename T, typename matrix_t>
+  void EigenSolver::blockRotate(std::vector<ColorSpinorField> &kSpace, matrix_t &array, int rank,
+                                const range &i_range, const range &j_range, blockType b_type, int offset)
   {
     auto block_i_rank = i_range.second - i_range.first;
     auto block_j_rank = j_range.second - j_range.first;
@@ -453,7 +464,7 @@ namespace quda
     // Quick return if no op.
     if (block_i_rank == 0 || block_j_rank == 0) return;
 
-    std::vector<double> batch_array(block_i_rank * block_j_rank);
+    std::vector<T> batch_array(block_i_rank * block_j_rank);
     // Populate batch array (COLUMN major -> ROW major)
     for (int j = j_range.first; j < j_range.second; j++) {
       for (int i = i_range.first; i < i_range.second; i++) {
@@ -467,58 +478,12 @@ namespace quda
     auto v = {kSpace.begin() + num_locked + i_range.first, kSpace.begin() + num_locked + i_range.second};
 
     // Range of the extra space vectors
-    auto k = {kSpace.begin() + n_kr + 1, kSpace.begin() + n_kr + 1 + j_range.second - j_range.first};
+    auto k = {kSpace.begin() + offset, kSpace.begin() + offset + j_range.second - j_range.first};
 
     switch (b_type) {
-    case PENCIL:    blas::axpy(batch_array,   v, k); break;
+    case PENCIL: blas::axpy(batch_array, v, k); break;
     case LOWER_TRI: blas::axpy_L(batch_array, v, k); break;
     case UPPER_TRI: blas::axpy_U(batch_array, v, k); break;
-    default: errorQuda("Undefined MultiBLAS type in blockRotate");
-    }
-  }
-
-  void EigenSolver::blockReset(std::vector<ColorSpinorField> &kSpace, int j_start, int j_end, int offset)
-  {
-    // copy back to correct position, zero out the workspace
-    for (int j = j_start; j < j_end; j++) {
-      int k = offset + j - j_start;
-      std::swap(kSpace[j + num_locked], kSpace[k]);
-      blas::zero(kSpace[k]);
-    }
-  }
-
-  void EigenSolver::blockRotateComplex(std::vector<ColorSpinorField> &kSpace, MatrixXcd &array, int rank,
-                                       const range &i_range, const range &j_range, blockType b_type, int offset)
-  {
-    auto block_i_rank = i_range.second - i_range.first;
-    auto block_j_rank = j_range.second - j_range.first;
-
-    // Quick return if no op.
-    if (block_i_rank == 0 || block_j_rank == 0) return;
-
-    // Alias the vectors we wish to keep
-    std::vector<ColorSpinorField_ref> vecs_ref = {kSpace.begin() + num_locked + i_range.first,
-                                                  kSpace.begin() + num_locked + i_range.second};
-
-    // Alias the extra space vectors
-    int k = offset - j_range.first;
-    std::vector<ColorSpinorField_ref> kSpace_ref = {kSpace.begin() + k + j_range.first,
-                                                    kSpace.begin() + k + j_range.second};
-
-    std::vector<Complex> batch_array(block_i_rank * block_j_rank);
-    // Populate batch array (COLUMN major -> ROW major)
-    for (int j = j_range.first; j < j_range.second; j++) {
-      for (int i = i_range.first; i < i_range.second; i++) {
-        int j_arr = j - j_range.first;
-        int i_arr = i - i_range.first;
-        batch_array[i_arr * block_j_rank + j_arr] = array.data()[j * rank + i];
-      }
-    }
-
-    switch (b_type) {
-    case PENCIL: blas::caxpy(batch_array, vecs_ref, kSpace_ref); break;
-    case LOWER_TRI: blas::caxpy_L(batch_array, vecs_ref, kSpace_ref); break;
-    case UPPER_TRI: blas::caxpy_U(batch_array, vecs_ref, kSpace_ref); break;
     default: errorQuda("Undefined MultiBLAS type in blockRotate");
     }
   }
@@ -784,11 +749,22 @@ namespace quda
     for (int i = 0; i < n; i++) y[i] = y_tmp[i].real();    
   }
 
-  
-  void EigenSolver::rotateVecsComplex(std::vector<ColorSpinorField> &kSpace, const std::vector<Complex> &rot_array,
-                                      int offset, int dim, int keep, int locked, TimeProfile &profile)
+  /**
+     Template helper for selecting the Eigen matrix type based on the
+     arithmetic (real or complex)
+   */
+  template <class T> struct eigen_matrix_map;
+  template <> struct eigen_matrix_map<double> { using type = MatrixXd; };
+  template <> struct eigen_matrix_map<Complex> { using type = MatrixXcd; };
+  template <class T> using eigen_matrix_t = typename eigen_matrix_map<T>::type;
+
+  template <typename T>
+  void EigenSolver::rotateVecs(std::vector<ColorSpinorField> &kSpace, const std::vector<T> &rot_array,
+                               int offset, int dim, int keep, int locked, TimeProfile &profile)
   {
-    // If we have memory availible, do the entire rotation
+    using matrix_t = eigen_matrix_t<T>;
+
+    // If we have memory available, do the entire rotation
     if (batched_rotate <= 0 || batched_rotate >= keep) {
       if ((int)kSpace.size() < offset + keep) {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", n_kr + keep);
@@ -804,7 +780,7 @@ namespace quda
 
       // multiBLAS caxpy
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
-      blas::caxpy(rot_array, vecs_ref, kSpace_ref);
+      blas::axpy(rot_array, vecs_ref, kSpace_ref);
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
       // Copy compressed Krylov
@@ -824,20 +800,19 @@ namespace quda
       }
 
       profile.TPSTART(QUDA_PROFILE_EIGENLU);
-      MatrixXcd mat = MatrixXcd::Zero(dim, keep);
+      matrix_t mat = matrix_t::Zero(dim, keep);
       for (int j = 0; j < keep; j++)
         for (int i = 0; i < dim; i++) mat(i, j) = rot_array[i * keep + j];
 
-      FullPivLU<MatrixXcd> matLU(mat);
+      FullPivLU<matrix_t> matLU(mat);
 
       // Extract the upper triangular matrix
-      MatrixXcd matUpper = MatrixXcd::Zero(keep, keep);
-      matUpper = matLU.matrixLU().triangularView<Eigen::Upper>();
+      matrix_t matUpper = matLU.matrixLU().template triangularView<Eigen::Upper>();
       matUpper.conservativeResize(keep, keep);
 
       // Extract the lower triangular matrix
-      MatrixXcd matLower = MatrixXcd::Identity(dim, dim);
-      matLower.block(0, 0, dim, keep).triangularView<Eigen::StrictlyLower>() = matLU.matrixLU();
+      matrix_t matLower = matrix_t::Identity(dim, dim);
+      matLower.block(0, 0, dim, keep).template triangularView<Eigen::StrictlyLower>() = matLU.matrixLU();
       matLower.conservativeResize(dim, keep);
 
       // Extract the desired permutation matrices
@@ -860,20 +835,20 @@ namespace quda
       for (int b = 0; b < full_batches; b++) {
 
         // batch triangle
-        blockRotateComplex(kSpace, matLower, dim, {b * batch_size, (b + 1) * batch_size},
-                           {b * batch_size, (b + 1) * batch_size}, LOWER_TRI, offset);
+        blockRotate<T>(kSpace, matLower, dim, {b * batch_size, (b + 1) * batch_size},
+                       {b * batch_size, (b + 1) * batch_size}, LOWER_TRI, offset);
         // batch pencil
-        blockRotateComplex(kSpace, matLower, dim, {(b + 1) * batch_size, dim},
-                           {b * batch_size, (b + 1) * batch_size}, PENCIL, offset);
+        blockRotate<T>(kSpace, matLower, dim, {(b + 1) * batch_size, dim},
+                       {b * batch_size, (b + 1) * batch_size}, PENCIL, offset);
         blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
       }
       if (do_batch_remainder) {
         // remainder triangle
-        blockRotateComplex(kSpace, matLower, dim, {full_batches * batch_size, keep},
-                           {full_batches * batch_size, keep}, LOWER_TRI, offset);
+        blockRotate<T>(kSpace, matLower, dim, {full_batches * batch_size, keep},
+                       {full_batches * batch_size, keep}, LOWER_TRI, offset);
         // remainder pencil
         if (keep < dim) {
-          blockRotateComplex(kSpace, matLower, dim, {keep, dim}, {full_batches * batch_size, keep}, PENCIL, offset);
+          blockRotate<T>(kSpace, matLower, dim, {keep, dim}, {full_batches * batch_size, keep}, PENCIL, offset);
         }
         blockReset(kSpace, full_batches * batch_size, keep, offset);
       }
@@ -882,23 +857,23 @@ namespace quda
       //---------------------------------------------------------------------------
       if (do_batch_remainder) {
         // remainder triangle
-        blockRotateComplex(kSpace, matUpper, keep, {full_batches * batch_size, keep},
-                           {full_batches * batch_size, keep}, UPPER_TRI, offset);
+        blockRotate<T>(kSpace, matUpper, keep, {full_batches * batch_size, keep},
+                       {full_batches * batch_size, keep}, UPPER_TRI, offset);
         // remainder pencil
-        blockRotateComplex(kSpace, matUpper, keep, {0, full_batches * batch_size},
-                           {full_batches * batch_size, keep}, PENCIL, offset);
+        blockRotate<T>(kSpace, matUpper, keep, {0, full_batches * batch_size},
+                    {full_batches * batch_size, keep}, PENCIL, offset);
         blockReset(kSpace, full_batches * batch_size, keep, offset);
       }
 
       // Loop over full batches
       for (int b = full_batches - 1; b >= 0; b--) {
         // batch triangle
-        blockRotateComplex(kSpace, matUpper, keep, {b * batch_size, (b + 1) * batch_size},
-                           {b * batch_size, (b + 1) * batch_size}, UPPER_TRI, offset);
+        blockRotate<T>(kSpace, matUpper, keep, {b * batch_size, (b + 1) * batch_size},
+                       {b * batch_size, (b + 1) * batch_size}, UPPER_TRI, offset);
         if (b > 0) {
           // batch pencil
-          blockRotateComplex(kSpace, matUpper, keep, {0, b * batch_size}, {b * batch_size, (b + 1) * batch_size},
-                             PENCIL, offset);
+          blockRotate<T>(kSpace, matUpper, keep, {0, b * batch_size}, {b * batch_size, (b + 1) * batch_size},
+                         PENCIL, offset);
         }
         blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
       }
@@ -910,126 +885,10 @@ namespace quda
     }
   }
 
-  void EigenSolver::rotateVecs(std::vector<ColorSpinorField> &kSpace, const std::vector<double> &rot_array, int offset,
-                               int dim, int keep, int locked, TimeProfile &profile)
-  {
-    // If we have memory availible, do the entire rotation
-    if (batched_rotate <= 0 || batched_rotate >= keep) {
-      if ((int)kSpace.size() < offset + keep) {
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + keep);
-        resize(kSpace, offset + keep, QUDA_ZERO_FIELD_CREATE, kSpace[0]);
-      }
+  template void EigenSolver::rotateVecs<double>(std::vector<ColorSpinorField> &kSpace, const std::vector<double> &rot_array,
+                                                int offset, int dim, int keep, int locked, TimeProfile &profile);
 
-      // Reference to the relevant subsets
-      std::vector<ColorSpinorField_ref> vecs_ref = {kSpace.begin() + locked, kSpace.begin() + locked + dim};
-      std::vector<ColorSpinorField_ref> kSpace_ref = {kSpace.begin() + offset, kSpace.begin() + offset + keep};
-
-      // zero the workspace
-      for (auto &ki : kSpace_ref) blas::zero(ki);
-
-      // multiBLAS axpy
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
-      blas::axpy(rot_array, vecs_ref, kSpace_ref);
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-      // Copy compressed Krylov
-      for (int i = 0; i < keep; i++) std::swap(kSpace[locked + i], kSpace[offset + i]);
-
-    } else {
-
-      int batch_size = batched_rotate;
-      int full_batches = keep / batch_size;
-      int batch_size_r = keep % batch_size;
-      bool do_batch_remainder = (batch_size_r != 0 ? true : false);
-
-      if ((int)kSpace.size() < offset + batch_size) {
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
-        resize(kSpace, offset + batch_size, QUDA_ZERO_FIELD_CREATE, kSpace[0]);
-      }
-
-      profile.TPSTART(QUDA_PROFILE_EIGEN);
-      MatrixXd mat = MatrixXd::Zero(dim, keep);
-      for (int j = 0; j < keep; j++)
-        for (int i = 0; i < dim; i++) mat(i, j) = rot_array[i * keep + j];
-
-      FullPivLU<MatrixXd> matLU(mat);
-
-      // Extract the upper triangular matrix
-      MatrixXd matUpper = MatrixXd::Zero(keep, keep);
-      matUpper = matLU.matrixLU().triangularView<Eigen::Upper>();
-      matUpper.conservativeResize(keep, keep);
-
-      // Extract the lower triangular matrix
-      MatrixXd matLower = MatrixXd::Identity(dim, dim);
-      matLower.block(0, 0, dim, keep).triangularView<Eigen::StrictlyLower>() = matLU.matrixLU();
-      matLower.conservativeResize(dim, keep);
-
-      // Extract the desired permutation matrices
-      MatrixXi matP = MatrixXi::Zero(dim, dim);
-      MatrixXi matQ = MatrixXi::Zero(keep, keep);
-      matP = matLU.permutationP().inverse();
-      matQ = matLU.permutationQ().inverse();
-      profile.TPSTOP(QUDA_PROFILE_EIGEN);
-
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
-      // Compute V * A = V * PLUQ
-
-      // Do P Permute
-      //---------------------------------------------------------------------------
-      permuteVecs(kSpace, matP, dim);
-
-      // Do L Multiply
-      //---------------------------------------------------------------------------
-      // Loop over full batches
-      for (int b = 0; b < full_batches; b++) {
-
-        // batch triangle
-        blockRotate(kSpace, matLower, dim, {b * batch_size, (b + 1) * batch_size},
-                    {b * batch_size, (b + 1) * batch_size}, LOWER_TRI);
-        // batch pencil
-        blockRotate(kSpace, matLower, dim, {(b + 1) * batch_size, dim}, {b * batch_size, (b + 1) * batch_size},
-                    PENCIL);
-        blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
-      }
-      if (do_batch_remainder) {
-        // remainder triangle
-        blockRotate(kSpace, matLower, dim, {full_batches * batch_size, keep}, {full_batches * batch_size, keep},
-                    LOWER_TRI);
-        // remainder pencil
-        if (keep < dim) {
-          blockRotate(kSpace, matLower, dim, {keep, dim}, {full_batches * batch_size, keep}, PENCIL);
-        }
-        blockReset(kSpace, full_batches * batch_size, keep, offset);
-      }
-
-      // Do U Multiply
-      //---------------------------------------------------------------------------
-      if (do_batch_remainder) {
-        // remainder triangle
-        blockRotate(kSpace, matUpper, keep, {full_batches * batch_size, keep}, {full_batches * batch_size, keep},
-                    UPPER_TRI);
-        // remainder pencil
-        blockRotate(kSpace, matUpper, keep, {0, full_batches * batch_size}, {full_batches * batch_size, keep}, PENCIL);
-        blockReset(kSpace, full_batches * batch_size, keep, offset);
-      }
-
-      // Loop over full batches
-      for (int b = full_batches - 1; b >= 0; b--) {
-        // batch triangle
-        blockRotate(kSpace, matUpper, keep, {b * batch_size, (b + 1) * batch_size},
-                    {b * batch_size, (b + 1) * batch_size}, UPPER_TRI);
-        if (b > 0) {
-          // batch pencil
-          blockRotate(kSpace, matUpper, keep, {0, b * batch_size}, {b * batch_size, (b + 1) * batch_size}, PENCIL);
-        }
-        blockReset(kSpace, b * batch_size, (b + 1) * batch_size, offset);
-      }
-
-      // Do Q Permute
-      //---------------------------------------------------------------------------
-      permuteVecs(kSpace, matQ, keep);
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    }
-  }
+  template void EigenSolver::rotateVecs<Complex>(std::vector<ColorSpinorField> &kSpace, const std::vector<Complex> &rot_array,
+                                                 int offset, int dim, int keep, int locked, TimeProfile &profile);
 
 } // namespace quda

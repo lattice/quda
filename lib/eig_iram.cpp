@@ -122,7 +122,7 @@ namespace quda
     for (int j = 0; j < n_kr; j++)
       for (int i = 0; i < keep; i++) { Qmat_keep[j * keep + i] = Qmat[j][i]; }
 
-    rotateVecsComplex(kSpace, Qmat_keep, n_kr, n_kr, keep, 0, profile);
+    rotateVecs(kSpace, Qmat_keep, n_kr, n_kr, keep, 0, profile);
   }
 
   void IRAM::reorder(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals,

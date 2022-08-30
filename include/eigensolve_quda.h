@@ -182,29 +182,18 @@ namespace quda
 
     /**
        @brief Rotate the Krylov space
+       @tparam T type that determines if we're using real- or complex-valued
        @param[in] kSpace the Krylov space
-       @param[in] rot_array The real rotation matrix
+       @param[in] rot_array The rotation matrix
        @param[in] offset The position of the start of unused vectors in kSpace
        @param[in] dim The number of rows in the rotation array
        @param[in] keep The number of columns in the rotation array
        @param[in] locked The number of locked vectors in kSpace
        @param[in] profile Time profiler
     */
-    void rotateVecs(std::vector<ColorSpinorField> &kSpace, const std::vector<double> &rot_array,
+    template <typename T>
+    void rotateVecs(std::vector<ColorSpinorField> &kSpace, const std::vector<T> &rot_array,
                     int offset, int dim, int keep, int locked, TimeProfile &profile);
-
-    /**
-       @brief Rotate the Krylov space
-       @param[in] kSpace the Krylov space
-       @param[in] rot_array The complex rotation matrix
-       @param[in] offset The position of the start of unused vector in kSpace
-       @param[in] dim The number of rows in the rotation array
-       @param[in] keep The number of columns in the rotation array
-       @param[in] locked The number of locked vectors in kSpace
-       @param[in] profile Time profiler
-    */
-    void rotateVecsComplex(std::vector<ColorSpinorField> &kSpace, const std::vector<Complex> &rot_array,
-                           int offset, int dim, int keep, int locked, TimeProfile &profile);
 
     /**
        @brief Permute the vector space using the permutation matrix.
@@ -216,6 +205,7 @@ namespace quda
 
     /**
        @brief Rotate part of kSpace
+       @tparam T type that determines if we're using real- or complex-valued
        @param[in/out] kSpace The current Krylov space
        @param[in] array The real rotation matrix
        @param[in] rank row rank of array
@@ -226,25 +216,11 @@ namespace quda
        @param[in] blockType Type of caxpy(_U/L) to perform
        @param[in] je End of j index
        @param[in] offset Position of extra vectors in kSpace
-    */
-    void blockRotate(std::vector<ColorSpinorField> &kSpace, MatrixXd &array, int rank, const range &i, const range &j,
-                     blockType b_type);
-
-    /**
-       @brief Rotate part of kSpace
-       @param[in/out] kSpace The current Krylov space
-       @param[in] array The complex rotation matrix
-       @param[in] rank row rank of array
-       @param[in] is Start of i index
-       @param[in] ie End of i index
-       @param[in] js Start of j index
-       @param[in] je End of j index
-       @param[in] blockType Type of caxpy(_U/L) to perform
        @param[in] offset Position of extra vectors in kSpace
     */
-
-    void blockRotateComplex(std::vector<ColorSpinorField> &kSpace, MatrixXcd &array, int rank, const range &i,
-                            const range &j, blockType b_type, int offset);
+    template <typename T, typename matrix_t>
+    void blockRotate(std::vector<ColorSpinorField> &kSpace, matrix_t &array, int rank,
+                     const range &i, const range &j, blockType b_type, int offset);
 
     /**
        @brief Copy temp part of kSpace, zero out for next use
