@@ -195,6 +195,7 @@ namespace quda
     }
 
   public:
+    vector_ref() = default;
     vector_ref(const vector_ref &) = default;
     vector_ref(vector_ref &&) = default;
 
@@ -222,21 +223,19 @@ namespace quda
     }
 
     /**
-       Constructor from pair of non-iterator references constructing a
-       vector_ref that is a union E.g., where we have a pair of
-       objects, or a vector and an object, etc.
-       FIXME: perhaps could generalize this to an arbitrary number of elements with a tuple interface?
+       Constructor from a set of non-iterator references constructing a
+       vector_ref that is a union of this set
        @param[in] u first reference
-       @param[in] v second reference
+       @param[in] args other references
      */
-    template <class U, class V, std::enable_if_t<!is_iterator_v<U>>* = nullptr>
-    vector_ref(U &u, V &v)
+    template <class U, class... Args, std::enable_if_t<!is_iterator_v<U>>* = nullptr>
+    vector_ref(U &u, Args &...args)
     {
       auto uset = make_set(u);
-      auto vset = make_set(v);
-      vector::reserve(uset.size() + vset.size());
+      auto tmp = vector_ref(args...);
+      vector::reserve(uset.size() + tmp.size());
       vector::insert(vector::end(), uset.begin(), uset.end());
-      vector::insert(vector::end(), vset.begin(), vset.end());
+      vector::insert(vector::end(), tmp.begin(), tmp.end());
     }
 
   };
