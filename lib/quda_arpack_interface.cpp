@@ -356,7 +356,7 @@ namespace quda
       evals[i] = h_evals_[i];
       arpack_index[i] = i;
     }
-    
+
     eig_solver->sortArrays(eig_param->spectrum, nconv, evals, arpack_index);
 
     // print out the computed Ritz values and their error estimates
@@ -365,7 +365,7 @@ namespace quda
         printfQuda("RitzValue[%04d] = %+.16e %+.16e Residual: %+.16e\n", i, evals[i].real(), evals[i].imag(),
 		   std::abs(*(w_workl_.data() + ipntr_[10] - 1 + arpack_index[i])));
     }
-    
+
     // Compute singular/eigenvalues values from eigenvectors.
     if (eig_param->compute_svd) {
       printfQuda("Computing SVD\n");
@@ -381,20 +381,20 @@ namespace quda
       //--------------------------------------------------------------------------
 
       for (int i = 0; i < nconv; i++) {
-	
+
 	profile.TPSTART(QUDA_PROFILE_H2D);
 	d_v = h_evecs_arpack[arpack_index[i]];
 	profile.TPSTOP(QUDA_PROFILE_H2D);
 
-	profile.TPSTART(QUDA_PROFILE_COMPUTE);	
+	profile.TPSTART(QUDA_PROFILE_COMPUTE);
 	// M*Rev_i = M*Rsv_i = sigma_i Lsv_i
-	mat.Expose()->M(d_v2, d_v);	
+	mat.Expose()->M(d_v2, d_v);
 	// sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
-	double sigma_tmp = sqrt(blas::norm2(d_v2));	
+	double sigma_tmp = sqrt(blas::norm2(d_v2));
 	// Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
-	blas::ax(1.0 / sigma_tmp, d_v2);	
+	blas::ax(1.0 / sigma_tmp, d_v2);
 	profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-	
+
 	if (getVerbosity() >= QUDA_SUMMARIZE)
 	  printfQuda("Sval[%04d] = %+.16e sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp,
 		     sigma_tmp - sqrt(abs(evals[i].real())));
@@ -402,19 +402,19 @@ namespace quda
     } else {
       printfQuda("Computing Eigenvalues\n");
       for (int i = 0; i < nconv; i++) {
-	
+
 	profile.TPSTART(QUDA_PROFILE_D2H);
 	d_v = h_evecs_arpack[arpack_index[i]];
 	profile.TPSTOP(QUDA_PROFILE_D2H);
-	
-	profile.TPSTART(QUDA_PROFILE_COMPUTE);	
-	// d_v2 = M*v = lambda_measured * v	
-	mat(d_v2, d_v);	
+
+	profile.TPSTART(QUDA_PROFILE_COMPUTE);
+	// d_v2 = M*v = lambda_measured * v
+	mat(d_v2, d_v);
 	// d_v = ||lambda_measured*v - lambda_arpack*v||
 	blas::caxpby(Complex {1.0, 0.0}, d_v2, -evals[i], d_v);
-	double L2norm = blas::norm2(d_v);	
+	double L2norm = blas::norm2(d_v);
 	profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-	
+
 	if (getVerbosity() >= QUDA_SUMMARIZE)
 	  printfQuda("Eval[%04d] = (%+.16e  %+.16e) ||%+.16e|| Residual: %.16e\n", i, evals[i].real(), evals[i].imag(),
 		     abs(evals[i]), sqrt(L2norm));
@@ -431,12 +431,12 @@ namespace quda
 
 	// M*Rev_i = M*Rsv_i = sigma_i Lsv_i
 	mat.Expose()->M(d_v2, d_v);
-	
+
 	// sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
 	double sigma_tmp = sqrt(blas::norm2(d_v2));
-	
+
 	// Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
-	blas::ax(1.0 / sigma_tmp, d_v2);	
+	blas::ax(1.0 / sigma_tmp, d_v2);
 
 	h_evecs[i] = h_evecs_arpack[arpack_index[i]];
 	profile.TPSTART(QUDA_PROFILE_D2H);
@@ -452,7 +452,7 @@ namespace quda
 	h_evals[i] = evals[i];
       }
     }
-    
+
     profile.TPSTART(QUDA_PROFILE_FREE);
 
     delete eig_solver;

@@ -660,7 +660,7 @@ namespace quda
       default: errorQuda("Unkown spectrum type requested: %d", spec_type);
       }
     }
-    
+
     std::vector<std::pair<Complex, Complex>> array(n);
     for (int i = 0; i < n; i++) array[i] = std::make_pair(x[i], y[i]);
 
@@ -751,7 +751,7 @@ namespace quda
     std::vector<Complex> y_tmp(n, 0.0);
     for (int i = 0; i < n; i++) y_tmp[i].real(y[i]);
     sortArrays(spec_type, n, x, y_tmp);
-    for (int i = 0; i < n; i++) y[i] = (int)(y_tmp[i].real());    
+    for (int i = 0; i < n; i++) y[i] = (int)(y_tmp[i].real());
   }
 
   /**
