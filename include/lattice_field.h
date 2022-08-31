@@ -62,6 +62,9 @@ namespace quda {
     /** Ghost precision */
     QudaPrecision GhostPrecision() const { return ghost_precision; }
 
+    /** indicate if the param has been initialized (created with a non trivial constructor) */
+    bool init = false;
+
     /** Number of field dimensions */
     int nDim = 4;
 
@@ -101,6 +104,7 @@ namespace quda {
       location(location),
       precision(precision),
       ghost_precision(precision),
+      init(true),
       nDim(nDim),
       pad(pad),
       siteSubset(QUDA_FULL_SITE_SUBSET),
@@ -125,6 +129,7 @@ namespace quda {
       location(QUDA_CPU_FIELD_LOCATION),
       precision(param.cpu_prec),
       ghost_precision(param.cpu_prec),
+      init(true),
       nDim(4),
       pad(0),
       siteSubset(QUDA_FULL_SITE_SUBSET),

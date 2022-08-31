@@ -11,6 +11,7 @@ namespace quda {
     location(field.Location()),
     precision(field.Precision()),
     ghost_precision(field.Precision()),
+    init(true),
     nDim(field.Ndim()),
     pad(field.Pad()),
     siteSubset(field.SiteSubset()),

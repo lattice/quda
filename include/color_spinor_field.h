@@ -749,7 +749,7 @@ namespace quda
        precisions, but do not need them simultaneously.  Use this functionality with caution.
        @param[in] param Parameters for the alias field
     */
-    ColorSpinorField create_alias(const ColorSpinorParam &param);
+    ColorSpinorField create_alias(const ColorSpinorParam &param = ColorSpinorParam());
 
     /**
        @brief Create a field that aliases this field's storage.  The
