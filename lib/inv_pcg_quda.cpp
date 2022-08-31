@@ -95,7 +95,7 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  void PreconCG::solve_and_collect(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r,
+  void PreconCG::solve_and_collect(ColorSpinorField &x, ColorSpinorField &b, vector_ref<ColorSpinorField> &&v_r,
                                    int collect_miniter, double collect_tol)
   {
     K->train_param(*this, b);
@@ -325,7 +325,7 @@ namespace quda
       if (convergence(r2, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol) ru.set_updateX();
 
       if (collect > 0 && k > collect_miniter && r2 < collect_tol * collect_tol * b2) {
-        *v_r[v_r.size() - collect] = rSloppy;
+        v_r[v_r.size() - collect] = rSloppy;
         printfQuda("Collecting r %2d: r2 / b2 = %12.8e, k = %5d.\n", collect, sqrt(r2 / b2), k);
         collect--;
       }

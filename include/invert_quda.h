@@ -553,7 +553,7 @@ namespace quda {
       @brief a virtual method that performs the inversion and collect some vectors.
         The default here is a no-op and should not be called.
      */
-    virtual void solve_and_collect(ColorSpinorField &, ColorSpinorField &, std::vector<ColorSpinorField *> &, int, double)
+    virtual void solve_and_collect(ColorSpinorField &, ColorSpinorField &, vector_ref<ColorSpinorField> &&, int, double)
     {
       errorQuda("NOT implemented.");
     }
@@ -946,8 +946,7 @@ namespace quda {
 
       void operator()(ColorSpinorField &out, ColorSpinorField &in)
       {
-        std::vector<ColorSpinorField *> v_r(0);
-        this->solve_and_collect(out, in, v_r, 0, 0);
+        this->solve_and_collect(out, in, vector_ref<ColorSpinorField>(), 0, 0);
       }
 
       /**
@@ -958,7 +957,7 @@ namespace quda {
         @param collect_miniter minimal iteration start from which the r vectors are to be collected
         @param collect_tol maxiter tolerance start from which the r vectors are to be collected
        */
-      virtual void solve_and_collect(ColorSpinorField &out, ColorSpinorField &in, std::vector<ColorSpinorField *> &v_r,
+      virtual void solve_and_collect(ColorSpinorField &out, ColorSpinorField &in, vector_ref<ColorSpinorField> &&v_r,
                                      int collect_miniter, double collect_tol);
 
       virtual bool hermitian() { return true; } /** PCG is only Hermitian system */
@@ -1003,19 +1002,23 @@ namespace quda {
     std::vector<Complex> tau; // Parameters for MR part of BiCGstab-L. Tech. modified Gram-Schmidt coeffs. (L+1)x(L+1) length.
     std::vector<double> sigma; // Parameters for MR part of BiCGstab-L. Tech. the normalization part of Gram-Scmidt. (L+1) length.
 
-    // pointers to fields to avoid multiple creation overhead
-    // full precision fields
-    std::unique_ptr<ColorSpinorField> r_fullp; //! Full precision residual.
-    std::unique_ptr<ColorSpinorField> yp;      //! Full precision temporary.
-    // sloppy precision fields
-    std::unique_ptr<ColorSpinorField> tempp; //! Sloppy temporary vector.
-    std::vector<ColorSpinorField*> r; // Current residual + intermediate residual values, along the MR.
-    std::vector<ColorSpinorField*> u; // Search directions.
+    ColorSpinorField r_full; //! Full precision residual.
+    ColorSpinorField y;      //! Full precision temporary.
 
-    // Saved, preallocated vectors. (may or may not get used depending on precision.)
-    ColorSpinorField *x_sloppy_saved_p; //! Sloppy solution vector.
-    ColorSpinorField *r0_saved_p;       //! Shadow residual, in BiCG language.
-    ColorSpinorField *r_sloppy_saved_p; //! Current residual, in BiCG language.
+    // sloppy precision fields
+    ColorSpinorField temp; //! Sloppy temporary vector.
+    std::vector<ColorSpinorField> r; // Current residual + intermediate residual values, along the MR.
+    std::vector<ColorSpinorField> u; // Search directions.
+
+    ColorSpinorField x_sloppy;  //! Sloppy solution vector.
+    ColorSpinorField r0;        //! Shadow residual, in BiCG language.
+
+    /**
+       @brief Allocate persistent fields and parameter checking
+       @param[in] x Solution vector
+       @param[in] b Source vector
+     */
+    void create(ColorSpinorField &x, const ColorSpinorField &b);
 
     /**
      @brief Internal routine for reliable updates. Made to not conflict with BiCGstab's implementation.
@@ -1105,21 +1108,28 @@ namespace quda {
      */
     bool init;
 
-    ColorSpinorField *rp;       //! residual vector
-    ColorSpinorField *tmpp;     //! temporary for mat-vec
-    ColorSpinorField *tmp_sloppy; //! temporary for sloppy mat-vec
-    ColorSpinorField *r_sloppy; //! sloppy residual vector
+    ColorSpinorField r;       //! residual vector
+    ColorSpinorField tmp;     //! temporary for mat-vec
+    ColorSpinorField tmp_sloppy; //! temporary for sloppy mat-vec
+    ColorSpinorField r_sloppy; //! sloppy residual vector
 
-    std::vector<ColorSpinorField*> p;  // GCR direction vectors
-    std::vector<ColorSpinorField*> Ap; // mat * direction vectors
+    std::vector<ColorSpinorField> p;  // GCR direction vectors
+    std::vector<ColorSpinorField> Ap; // mat * direction vectors
 
-    void computeBeta(std::vector<Complex> &beta, std::vector<ColorSpinorField *> Ap, int i, int N, int k);
-    void updateAp(std::vector<Complex> &beta, std::vector<ColorSpinorField *> Ap, int begin, int size, int k);
-    void orthoDir(std::vector<Complex> &beta, std::vector<ColorSpinorField *> Ap, int k, int pipeline);
+    void computeBeta(std::vector<Complex> &beta, std::vector<ColorSpinorField> &Ap, int i, int N, int k);
+    void updateAp(std::vector<Complex> &beta, std::vector<ColorSpinorField> &Ap, int begin, int size, int k);
+    void orthoDir(std::vector<Complex> &beta, std::vector<ColorSpinorField> &Ap, int k, int pipeline);
     void backSubs(const std::vector<Complex> &alpha, const std::vector<Complex> &beta, const std::vector<double> &gamma,
                   std::vector<Complex> &delta, int n);
     void updateSolution(ColorSpinorField &x, const std::vector<Complex> &alpha, const std::vector<Complex> &beta,
-                        std::vector<double> &gamma, int k, std::vector<ColorSpinorField *> p);
+                        std::vector<double> &gamma, int k, std::vector<ColorSpinorField> &p);
+
+    /**
+       @brief Initiate the fields needed by the solver
+       @param[in] x Solution vector
+       @param[in] b Source vector
+    */
+    void create(ColorSpinorField &x, const ColorSpinorField &b);
 
   public:
     GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
