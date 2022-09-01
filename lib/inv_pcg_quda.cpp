@@ -147,33 +147,12 @@ namespace quda
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     ColorSpinorField y(csParam);
 
-    csParam.setPrecision(param.precision_sloppy);
-
-    // temporary fields
-    ColorSpinorField *tmpp = ColorSpinorField::Create(csParam);
-    ColorSpinorField *tmp2p = nullptr;
-    ColorSpinorField *tmp3p = nullptr;
-    if (!mat.isStaggered()) {
-      // tmp2 only needed for multi-gpu Wilson-like kernels
-      tmp2p = ColorSpinorField::Create(csParam);
-      // additional high-precision temporary if Wilson and mixed-precision
-      csParam.setPrecision(param.precision);
-      tmp3p = (param.precision != param.precision_sloppy) ? ColorSpinorField::Create(csParam) : tmpp;
-      csParam.setPrecision(param.precision_sloppy);
-    } else {
-      tmp3p = tmp2p = tmpp;
-    }
-
-    ColorSpinorField &tmp = *tmpp;
-    ColorSpinorField &tmp2 = *tmp2p;
-    ColorSpinorField &tmp3 = *tmp3p;
-
     double Anorm = 0;
 
     // for alternative reliable updates
     if (alternative_reliable) {
       // estimate norm for reliable updates
-      mat(r, b, y, tmp3);
+      mat(r, b);
       Anorm = sqrt(blas::norm2(r) / b2);
     }
 
@@ -181,7 +160,7 @@ namespace quda
     double r2 = 0.0;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       // Compute r = b - A * x
-      mat(r, x, y, tmp3);
+      mat(r, x);
       r2 = blas::xmyNorm(b, r);
       if (b2 == 0) b2 = r2;
       // y contains the original guess.
@@ -195,7 +174,7 @@ namespace quda
     if (param.deflate && param.maxiter > 1) {
       // Deflate and accumulate to solution vector
       eig_solve->deflate(y, r, evecs, evals, true);
-      mat(r, y, x, tmp3);
+      mat(r, y);
       r2 = blas::xmyNorm(b, r);
     }
 
@@ -295,7 +274,7 @@ namespace quda
 
     while (!converged && k < param.maxiter) {
 
-      matSloppy(Ap, x_update_batch.get_current_field(), tmp, tmp2);
+      matSloppy(Ap, x_update_batch.get_current_field());
 
       double sigma;
       // alternative reliable updates,
@@ -370,7 +349,7 @@ namespace quda
 
         xpy(xSloppy, y);          // y += x
         // Now compute r
-        mat(r, y, x, tmp3); // x is just a temporary here
+        mat(r, y);
         r2 = xmyNorm(b, r);
 
         if (param.deflate && sqrt(r2) < ru.maxr_deflate * param.tol_restart) {
@@ -378,7 +357,7 @@ namespace quda
           eig_solve->deflate(y, r, evecs, evals, true);
 
           // Compute r_defl = RHS - A * LHS
-          mat(r, y, x, tmp3);
+          mat(r, y);
           r2 = blas::xmyNorm(b, r);
 
           ru.update_maxr_deflate(r2);
@@ -455,7 +434,7 @@ namespace quda
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("PCG: Reliable updates = %d\n", ru.rUpdate);
 
     // compute the true residual
-    mat(r, x, y, tmp3);
+    mat(r, x);
     double true_res = xmyNorm(b, r);
     param.true_res = sqrt(true_res / b2);
 
@@ -468,12 +447,6 @@ namespace quda
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     profile.TPSTART(QUDA_PROFILE_FREE);
-
-    if (tmpp) delete tmpp;
-    if (!mat.isStaggered()) {
-      if (tmp2p && tmpp != tmp2p) delete tmp2p;
-      if (tmp3p && tmpp != tmp3p && param.precision != param.precision_sloppy) delete tmp3p;
-    }
 
     if (K) { // These are only needed if preconditioning is used
       delete minvrPre;

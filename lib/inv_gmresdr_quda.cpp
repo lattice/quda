@@ -212,7 +212,6 @@ namespace quda {
         delete K;
       }
 
-      delete tmpp;
       delete yp;
       delete rp;
 
@@ -315,7 +314,6 @@ namespace quda {
   {
     int j = start_idx;
     GMResDRArgs &args = *gmresdr_args;
-    ColorSpinorField &tmp = *tmpp;
 
     std::unique_ptr<Complex[]> givensH((do_givens) ? new Complex[(args.m + 1) * args.m] : nullptr);
     std::unique_ptr<Complex[]> cn((do_givens) ? new Complex[args.m] : nullptr);
@@ -336,7 +334,7 @@ namespace quda {
 
         if (param.precision_precondition != param.precision_sloppy) Zm->Component(j) = outPre;
       }
-      matSloppy(Vm->Component(j + 1), Zm->Component(j), tmp);
+      matSloppy(Vm->Component(j + 1), Zm->Component(j));
 
       args.H(0, j) = cDotProduct(Vm->Component(0), Vm->Component(j + 1));
       caxpy(-args.H(0, j), Vm->Component(0), Vm->Component(j + 1));
@@ -409,7 +407,6 @@ namespace quda {
 
       csParam.setPrecision(param.precision_sloppy);
 
-      tmpp     = ColorSpinorField::Create(csParam);
       r_sloppy = ColorSpinorField::Create(csParam);
 
       if ( K && (param.precision_precondition != param.precision_sloppy) ) {

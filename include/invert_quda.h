@@ -756,7 +756,7 @@ namespace quda {
 
   private:
     // pointers to fields to avoid multiple creation overhead
-    ColorSpinorField *yp, *rp, *rnewp, *pp, *App, *tmpp, *tmp2p, *tmp3p, *rSloppyp, *xSloppyp;
+    ColorSpinorField *yp, *rp, *rnewp, *pp, *App, *tmpp, *rSloppyp, *xSloppyp;
     bool init;
 
   public:
@@ -857,7 +857,7 @@ namespace quda {
 
   private:
     // pointers to fields to avoid multiple creation overhead
-    ColorSpinorField *yp, *rp, *tmpp, *ArSp, *rSp, *xSp, *xS_oldp, *tmpSp, *rS_oldp, *tmp2Sp;
+    ColorSpinorField *yp, *rp, *tmpp, *ArSp, *rSp, *xSp, *xS_oldp, *tmpSp, *rS_oldp;
     bool init;
 
   public:
@@ -1109,8 +1109,6 @@ namespace quda {
     bool init;
 
     ColorSpinorField r;       //! residual vector
-    ColorSpinorField tmp;     //! temporary for mat-vec
-    ColorSpinorField tmp_sloppy; //! temporary for sloppy mat-vec
     ColorSpinorField r_sloppy; //! sloppy residual vector
 
     std::vector<ColorSpinorField> p;  // GCR direction vectors
@@ -1153,8 +1151,6 @@ namespace quda {
     ColorSpinorField r;
     ColorSpinorField r_sloppy;
     ColorSpinorField Ar;
-    ColorSpinorField tmp;
-    ColorSpinorField tmp_sloppy;
     ColorSpinorField x_sloppy;
     bool init;
 
@@ -1200,10 +1196,6 @@ namespace quda {
     std::vector<double> beta;     // QAQ^{-1} QpolyS
 
     ColorSpinorField r;
-    ColorSpinorField tmp;
-    ColorSpinorField tmp_sloppy;
-    ColorSpinorField tmp2;
-    ColorSpinorField tmp2_sloppy;
 
     std::vector<ColorSpinorField> S;    // residual vectors
     std::vector<ColorSpinorField> AS;   // mat * residual vectors. Can be replaced by a single temporary.
@@ -1335,8 +1327,6 @@ namespace quda {
     std::vector<Complex> alpha; // Solution coefficient vectors
 
     ColorSpinorField r;
-    ColorSpinorField tmp;
-    ColorSpinorField tmp_sloppy;
 
     std::vector<ColorSpinorField> p; // GCR direction vectors
     std::vector<ColorSpinorField> q; // mat * direction vectors
@@ -1377,7 +1367,6 @@ namespace quda {
     private:
       ColorSpinorField *Ar;
       ColorSpinorField *r;
-      ColorSpinorField *y;
       bool init;
 
     public:
@@ -1498,11 +1487,6 @@ public:
     ColorSpinorField Ap;
     std::vector<ColorSpinorField> x_sloppy;
 
-    ColorSpinorField tmp1;        // high precision temporary
-    ColorSpinorField tmp1_sloppy; // sloppy precision alias
-    ColorSpinorField tmp2;        // high precision temporary for Wilson-like kernels
-    ColorSpinorField tmp2_sloppy; // sloppy precision alias
-
     void create(std::vector<ColorSpinorField> &x, const ColorSpinorField &b, std::vector<ColorSpinorField> &p);
 
   public:
@@ -1604,7 +1588,6 @@ public:
     ColorSpinorField *yp;       //! high precision accumulator
     ColorSpinorField* p;  // conjugate vector
     ColorSpinorField* Ap; // mat * conjugate vector
-    ColorSpinorField *tmpp;     //! temporary for mat-vec
     ColorSpinorField *Az;       // mat * conjugate vector from the previous iteration
     ColorSpinorField *r_pre;    //! residual passed to preconditioner
     ColorSpinorField *p_pre;    //! preconditioner result
@@ -1654,7 +1637,6 @@ public:
 
     ColorSpinorField *rp;       //! residual vector
     ColorSpinorField *yp;       //! high precision accumulator
-    ColorSpinorField *tmpp;     //! temporary for mat-vec
     ColorSpinorField *r_sloppy; //! sloppy residual vector
     ColorSpinorField *r_pre;    //! residual passed to preconditioner
     ColorSpinorField *p_pre;    //! preconditioner result

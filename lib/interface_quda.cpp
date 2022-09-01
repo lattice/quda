@@ -1388,6 +1388,7 @@ void endQuda(void)
 
   LatticeField::freeGhostBuffer();
   ColorSpinorField::freeGhostBuffer();
+  FieldTmp<ColorSpinorField>::destroy();
 
   blas_lapack::generic::destroy();
   blas_lapack::native::destroy();
@@ -2914,14 +2915,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       auto &basis = chronoResident[param->chrono_index];
 
       ColorSpinorParam cs_param(basis[0]);
-      ColorSpinorField tmp(cs_param);
-      ColorSpinorField tmp2 = out->create_alias(cs_param);
       std::vector<ColorSpinorField> Ap(basis.size(), cs_param);
 
       if (param->chrono_precision == param->cuda_prec) {
-        for (unsigned int j = 0; j < basis.size(); j++) m(Ap[j], basis[j], tmp, tmp2);
+        for (unsigned int j = 0; j < basis.size(); j++) m(Ap[j], basis[j]);
       } else if (param->chrono_precision == param->cuda_prec_sloppy) {
-        for (unsigned int j = 0; j < basis.size(); j++) mSloppy(Ap[j], basis[j], tmp, tmp2);
+        for (unsigned int j = 0; j < basis.size(); j++) mSloppy(Ap[j], basis[j]);
       } else {
         errorQuda("Unexpected precision %d for chrono vectors (doesn't match outer %d or sloppy precision %d)",
                   param->chrono_precision, param->cuda_prec, param->cuda_prec_sloppy);
@@ -2952,13 +2951,11 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
       ColorSpinorParam cs_param(basis[0]);
       std::vector<ColorSpinorField> Ap(basis.size(), cs_param);
-      ColorSpinorField tmp(cs_param);
-      ColorSpinorField tmp2 = out->create_alias(cs_param);
 
       if (param->chrono_precision == param->cuda_prec) {
-        for (unsigned int j = 0; j < basis.size(); j++) m(Ap[j], basis[j], tmp, tmp2);
+        for (unsigned int j = 0; j < basis.size(); j++) m(Ap[j], basis[j]);
       } else if (param->chrono_precision == param->cuda_prec_sloppy) {
-        for (unsigned int j = 0; j < basis.size(); j++) mSloppy(Ap[j], basis[j], tmp, tmp2);
+        for (unsigned int j = 0; j < basis.size(); j++) mSloppy(Ap[j], basis[j]);
       } else {
         errorQuda("Unexpected precision %d for chrono vectors (doesn't match outer %d or sloppy precision %d)",
                   param->chrono_precision, param->cuda_prec, param->cuda_prec_sloppy);

@@ -160,18 +160,6 @@ namespace quda {
       csParam.create = QUDA_NULL_FIELD_CREATE;
       Ap = ColorSpinorField(csParam);
 
-      csParam.setPrecision(param.precision);
-      tmp1 = ColorSpinorField(csParam);
-      csParam.setPrecision(param.precision_sloppy);
-      tmp1_sloppy = tmp1.create_alias(csParam);
-
-      if (!mat.isStaggered()) {
-        csParam.setPrecision(param.precision);
-        tmp2 = ColorSpinorField(csParam);
-        csParam.setPrecision(param.precision_sloppy);
-        tmp2_sloppy = tmp2.create_alias(csParam);
-      }
-
       profile.TPSTOP(QUDA_PROFILE_INIT);
     }
   }
@@ -288,7 +276,7 @@ namespace quda {
     while ( !convergence(r2, stop, num_offset_now) &&  !exit_early && k < param.maxiter) {
 
       if (aux_update) dslash::aux_worker = &shift_update;
-      matSloppy(Ap, p[0], tmp1_sloppy, tmp2_sloppy);
+      matSloppy(Ap, p[0]);
       dslash::aux_worker = nullptr;
       aux_update = false;
 
@@ -355,7 +343,7 @@ namespace quda {
           }
         }
 
-        mat(r, x[0], tmp1, tmp2);
+        mat(r, x[0]);
         if (r.Nspin() == 4) blas::axpy(offset[0], x[0], r);
 
         r2[0] = blas::xmyNorm(b, r);
@@ -466,7 +454,7 @@ namespace quda {
         // 1.) For higher shifts if we did not use mixed precision
         // 2.) For shift 0 if we did not exit early  (we went to the full solution)
         if ( (i > 0 and not mixed) or (i == 0 and not exit_early) ) {
-          mat(r, x[i], tmp1, tmp2);
+          mat(r, x[i]);
           if (r.Nspin() == 4) {
             blas::axpy(offset[i], x[i], r); // Offset it.
           } else if (i != 0) {

@@ -1,13 +1,13 @@
 #pragma once
 
+#include <typeinfo>
 #include <quda_internal.h>
 #include <timer.h>
 #include <color_spinor_field.h>
 #include <gauge_field.h>
 #include <clover_field.h>
 #include <blas_quda.h>
-
-#include <typeinfo>
+#include <field_cache.h>
 
 namespace quda {
 
@@ -163,13 +163,8 @@ namespace quda {
     QudaMatPCType matpcType;
     mutable QudaDagType dagger; // mutable to simplify implementation of Mdag
     mutable unsigned long long flops;
-    mutable ColorSpinorField *tmp1; // temporary hack
-    mutable ColorSpinorField *tmp2; // temporary hack
     QudaDiracType type; 
     mutable QudaPrecision halo_precision; // only does something for DiracCoarse at present
-
-    bool newTmp(ColorSpinorField **, const ColorSpinorField &) const;
-    void deleteTmp(ColorSpinorField **, const bool &reset) const;
 
     mutable int commDim[QUDA_MAX_DIM]; // whether do comms or not
 
@@ -2089,9 +2084,6 @@ public:
     virtual ~DiracMatrix() { }
 
     virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
-    virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const = 0;
-    virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &Tmp1,
-                            ColorSpinorField &Tmp2) const = 0;
 
     /**
        @brief Multi-RHS operator application
@@ -2178,38 +2170,6 @@ public:
     }
 
     /**
-       If the Dirac Operator's tmp1 member is not set, this provides
-       a tmp. The tmp is set as the DiracOperator's tmp before the matrix apply
-       and after the matrix apply it is unset and the tmp1 is set to null.
-
-       If the operator has a tmp1 member set it will be used and the passed
-       tmp will be untouched
-    */
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
-    {
-      bool reset1 = false;
-      if (!dirac->tmp1) { dirac->tmp1 = &tmp; reset1 = true; }
-      dirac->M(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
-    }
-
-    /* Provides two tmps, in case the dirac op doesn't have them */
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
-                    ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
-    {
-      bool reset1 = false;
-      bool reset2 = false;
-      if (!dirac->tmp1) { dirac->tmp1 = &Tmp1; reset1 = true; }
-      if (!dirac->tmp2) { dirac->tmp2 = &Tmp2; reset2 = true; }
-      dirac->M(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      if (reset2) { dirac->tmp2 = NULL; reset2 = false; }
-      if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
-    }
-
-    /**
        @brief Multi-RHS operator application.
        @param[out] out The vector of output fields
        @param[in] in The vector of input fields
@@ -2238,46 +2198,6 @@ public:
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
     }
 
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
-    {
-      bool reset1 = false;
-      if (!dirac->tmp1) {
-        dirac->tmp1 = &tmp;
-        reset1 = true;
-      }
-      dirac->MdagM(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      if (reset1) {
-        dirac->tmp1 = NULL;
-        reset1 = false;
-      }
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
-			   ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
-    {
-      bool reset1 = false;
-      bool reset2 = false;
-      if (!dirac->tmp1) {
-        dirac->tmp1 = &Tmp1;
-        reset1 = true;
-      }
-      if (!dirac->tmp2) {
-        dirac->tmp2 = &Tmp2;
-        reset2 = true;
-      }
-      dirac->MdagM(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      if (reset2) {
-        dirac->tmp2 = NULL;
-        reset2 = false;
-      }
-      if (reset1) {
-        dirac->tmp1 = NULL;
-        reset1 = false;
-      }
-    }
- 
     /**
        @brief Multi-RHS operator application
        @param[out] out The vector of output fields
@@ -2305,45 +2225,6 @@ public:
     DiracMdagMLocal(const Dirac *d) : DiracMatrix(d) { }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const { dirac->MdagMLocal(out, in); }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
-    {
-      bool reset1 = false;
-      if (!dirac->tmp1) {
-        dirac->tmp1 = &tmp;
-        reset1 = true;
-      }
-      dirac->MdagMLocal(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
-      if (reset1) {
-        dirac->tmp1 = NULL;
-        reset1 = false;
-      }
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
-    {
-      bool reset1 = false;
-      bool reset2 = false;
-      if (!dirac->tmp1) {
-        dirac->tmp1 = &Tmp1;
-        reset1 = true;
-      }
-      if (!dirac->tmp2) {
-        dirac->tmp2 = &Tmp2;
-        reset2 = true;
-      }
-      dirac->MdagMLocal(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
-      if (reset2) {
-        dirac->tmp2 = NULL;
-        reset2 = false;
-      }
-      if (reset1) {
-        dirac->tmp1 = NULL;
-        reset1 = false;
-      }
-    }
 
     /**
        @brief Multi-RHS operator application.
@@ -2373,46 +2254,6 @@ public:
     {
       dirac->MMdag(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
-    {
-      bool reset1 = false;
-      if (!dirac->tmp1) {
-        dirac->tmp1 = &tmp;
-        reset1 = true;
-      }
-      dirac->MMdag(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      if (reset1) {
-        dirac->tmp1 = NULL;
-        reset1 = false;
-      }
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
-			   ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
-    {
-      bool reset1 = false;
-      bool reset2 = false;
-      if (!dirac->tmp1) {
-        dirac->tmp1 = &Tmp1;
-        reset1 = true;
-      }
-      if (!dirac->tmp2) {
-        dirac->tmp2 = &Tmp2;
-        reset2 = true;
-      }
-      dirac->MMdag(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      if (reset2) {
-        dirac->tmp2 = NULL;
-        reset2 = false;
-      }
-      if (reset1) {
-        dirac->tmp1 = NULL;
-        reset1 = false;
-      }
     }
 
     /**
@@ -2446,46 +2287,6 @@ public:
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
     }
 
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
-    {
-      bool reset1 = false;
-      if (!dirac->tmp1) {
-        dirac->tmp1 = &tmp;
-        reset1 = true;
-      }
-      dirac->Mdag(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      if (reset1) {
-        dirac->tmp1 = NULL;
-        reset1 = false;
-      }
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
-		    ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
-    {
-      bool reset1 = false;
-      bool reset2 = false;
-      if (!dirac->tmp1) {
-        dirac->tmp1 = &Tmp1;
-        reset1 = true;
-      }
-      if (!dirac->tmp2) {
-        dirac->tmp2 = &Tmp2;
-        reset2 = true;
-      }
-      dirac->Mdag(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
-      if (reset2) {
-        dirac->tmp2 = NULL;
-        reset2 = false;
-      }
-      if (reset1) {
-        dirac->tmp1 = NULL;
-        reset1 = false;
-      }
-    }
-
     /**
        @brief Multi-RHS operator application.
        @param[out] out The vector of output fields
@@ -2517,21 +2318,6 @@ public:
     {
       dirac->flipDagger();
       mat(out, in);
-      dirac->flipDagger();
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
-    {
-      dirac->flipDagger();
-      mat(out, in, tmp);
-      dirac->flipDagger();
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
-                    ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
-    {
-      dirac->flipDagger();
-      mat(out, in, Tmp1, Tmp2);
       dirac->flipDagger();
     }
 
@@ -2642,47 +2428,6 @@ public:
       dirac->M(out, in);
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
       applyGamma5(out);
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
-    {
-      bool reset1 = false;
-      if (!dirac->tmp1) {
-        dirac->tmp1 = &tmp;
-        reset1 = true;
-      }
-      dirac->M(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
-      applyGamma5(out);
-      if (reset1) {
-        dirac->tmp1 = NULL;
-        reset1 = false;
-      }
-    }
-
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
-    {
-      bool reset1 = false;
-      bool reset2 = false;
-      if (!dirac->tmp1) {
-        dirac->tmp1 = &Tmp1;
-        reset1 = true;
-      }
-      if (!dirac->tmp2) {
-        dirac->tmp2 = &Tmp2;
-        reset2 = true;
-      }
-      dirac->M(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
-      applyGamma5(out);
-      if (reset2) {
-        dirac->tmp2 = NULL;
-        reset2 = false;
-      }
-      if (reset1) {
-        dirac->tmp1 = NULL;
-        reset1 = false;
-      }
     }
 
     /**

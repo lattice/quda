@@ -37,13 +37,10 @@ namespace quda {
 
   void GaugeCovDev::MdagMCD(ColorSpinorField &out, const ColorSpinorField &in, const int mu) const
   {
-    bool reset = newTmp(&tmp1, in);
-    checkFullSpinor(*tmp1, in);
+    auto tmp = getTmp(in);
 
-    MCD(*tmp1, in, mu);
-    MCD(out, *tmp1, (mu+4)%8);
-
-    deleteTmp(&tmp1, reset);
+    MCD(tmp, in, mu);
+    MCD(out, tmp, (mu+4)%8);
   }
 
   void GaugeCovDev::Dslash(ColorSpinorField &, const ColorSpinorField &, const QudaParity) const

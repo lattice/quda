@@ -199,12 +199,8 @@ namespace quda {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_NULL_FIELD_CREATE;
 
-      // high precision temporary
-      tmp = ColorSpinorField(csParam);
-      csParam.setPrecision(param.precision_sloppy);
-      tmp_sloppy = tmp.create_alias(csParam);
-
       // create sloppy fields used for orthogonalization
+      csParam.setPrecision(param.precision_sloppy);
       resize(p, n_krylov + 1, QUDA_NULL_FIELD_CREATE, csParam);
       resize(Ap, n_krylov, QUDA_NULL_FIELD_CREATE, csParam);
 
@@ -273,7 +269,7 @@ namespace quda {
     // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       // Compute r = b - A * x
-      mat(r, x, tmp);
+      mat(r, x);
       r2 = blas::xmyNorm(b, r);
       // x contains the original guess.
     } else {
@@ -287,7 +283,7 @@ namespace quda {
       eig_solve->deflateSVD(x, r, evecs, evals, true);
 
       // Compute r_defl = RHS - A * LHS
-      mat(r, x, tmp);
+      mat(r, x);
       r2 = blas::xmyNorm(b, r);
     }
 
@@ -357,7 +353,7 @@ namespace quda {
 	//if (param.omega!=1.0) blas::axpby((1.0-param.omega), rPre, param.omega, pPre);
       }
 
-      matSloppy(Ap[k], p[k], tmp_sloppy);
+      matSloppy(Ap[k], p[k]);
 
       orthoDir(beta, Ap, k, pipeline);
 
@@ -383,7 +379,7 @@ namespace quda {
         updateSolution(x, alpha, beta, gamma, k, p);
 
         if ( (r2 < stop || total_iter==param.maxiter) && param.sloppy_converge) break;
-        mat(r, x, tmp);
+        mat(r, x);
         r2 = blas::xmyNorm(b, r);
 
         if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
@@ -391,7 +387,7 @@ namespace quda {
           eig_solve->deflateSVD(x, r, evecs, evals, true);
 
           // Compute r_defl = RHS - A * LHS
-          mat(r, x, tmp);
+          mat(r, x);
           r2 = blas::xmyNorm(b, r);
 
           maxr_deflate = sqrt(r2);
@@ -446,7 +442,7 @@ namespace quda {
 
     if (param.compute_true_res) {
       // Calculate the true residual
-      mat(r, x, tmp);
+      mat(r, x);
       double true_res = blas::xmyNorm(b, r);
       param.true_res = sqrt(true_res / b2);
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL)

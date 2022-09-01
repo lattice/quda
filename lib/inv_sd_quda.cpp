@@ -25,7 +25,6 @@ namespace quda {
     if(init){
       delete r;
       delete Ar; 
-      delete y;
     }
     if(!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
@@ -38,7 +37,6 @@ namespace quda {
     if (!init) {
       r = new ColorSpinorField(b);
       Ar = new ColorSpinorField(b);
-      y = new ColorSpinorField(b);
       init = true;
     }
 
@@ -51,7 +49,7 @@ namespace quda {
 
     int k=0;
     while (k < param.maxiter - 1) {
-      mat(*Ar, *r, *y);
+      mat(*Ar, *r);
       rAr = cDotProductNormA(*r, *Ar);
       alpha = rAr.z/rAr.x;
       axpy(alpha, *r, x);
@@ -77,7 +75,7 @@ namespace quda {
 
     if(getVerbosity() >= QUDA_DEBUG_VERBOSE){
       // Compute the true residual
-      mat(*r, x, *y);
+      mat(*r, x);
       double true_r2 = xmyNorm(b,*r);
       printfQuda("Steepest Descent: %d iterations, accumulated |r| = %e, true |r| = %e,  |r|/|b| = %e\n", k, sqrt(r2), sqrt(true_r2), sqrt(true_r2/b2));
     } // >= QUDA_DEBUG_VERBOSITY

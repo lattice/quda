@@ -81,7 +81,7 @@ namespace quda {
 
     // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      mat(r, x, y);
+      mat(r, x);
       r2 = blas::xmyNorm(b, r);
       blas::copy(y, x);
     } else {
@@ -197,8 +197,8 @@ namespace quda {
 
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && 
 	    k < param.maxiter) {
-    
-      matSloppy(v, p, tmp);
+
+      matSloppy(v, p);
 
       Complex r0v;
       if (param.pipeline) {
@@ -213,8 +213,8 @@ namespace quda {
       // r -= alpha*v
       blas::caxpy(-alpha, v, rSloppy);
 
-      matSloppy(t, rSloppy, tmp);
-    
+      matSloppy(t, rSloppy);
+
       int updateR = 0;
       if (param.pipeline) {
 	// omega = (t, r) / (t, t)
@@ -265,8 +265,8 @@ namespace quda {
       
 	blas::xpy(x, y); // swap these around?
 
-	mat(r, y, x);
-	r2 = blas::xmyNorm(b, r);
+        mat(r, y);
+        r2 = blas::xmyNorm(b, r);
 
 	if (x.Precision() != rSloppy.Precision()) blas::copy(rSloppy, r);            
 	blas::zero(xSloppy);

@@ -18,7 +18,7 @@
 // path uses a BLAS-3 approach to MinRes which is empirically a bit less
 // stable (in terms of iteration count) but more than compensates for that
 // with improved time-to-solution
-#define LEGACY_MR
+//#define LEGACY_MR
 
 namespace quda {
 
@@ -488,7 +488,7 @@ namespace quda {
 
     // Compute initial residual depending on whether we have an initial guess or not.
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      mat(r_full, x, y); // r[0] = Ax
+      mat(r_full, x); // r[0] = Ax
       if (!fixed_iteration) {
         r2 = blas::xmyNorm(b, r_full); // r = b - Ax, return norm.
       } else {
@@ -508,7 +508,7 @@ namespace quda {
       eig_solve->deflateSVD(x, r_full, evecs, evals, true);
 
       // Compute r_defl = RHS - A * LHS
-      mat(r_full, x, temp);
+      mat(r_full, x);
       if (!fixed_iteration) {
         r2 = blas::xmyNorm(b, r_full);
       } else {
@@ -613,7 +613,7 @@ namespace quda {
         }
 
         // u[j+1] = A ( u[j] )
-        matSloppy(u[j+1], u[j], temp);
+        matSloppy(u[j + 1], u[j]);
 
         // alpha = rho0/<r0, u[j+1]>
         // The machinary isn't there yet, but this could be fused with the matSloppy above.
@@ -628,7 +628,7 @@ namespace quda {
         bicgstabl_update.update_update_type(BICGSTABL_UPDATE_R);
 
         // r[j+1] = A r[j], x = x + alpha*u[0]
-        matSloppy(r[j+1], r[j], temp);
+        matSloppy(r[j + 1], r[j]);
         dslash::aux_worker = NULL;
 
       } // End BiCG part.
@@ -677,7 +677,7 @@ namespace quda {
         dslash::aux_worker = nullptr;
 
         // Explicitly recompute the residual.
-        mat(r_full, y, x); // r[0] = Ax
+        mat(r_full, y); // r[0] = Ax
 
         r2 = blas::xmyNorm(b, r_full); // r = b - Ax, return norm.
 
@@ -721,7 +721,7 @@ namespace quda {
     // compute the true residual
     // !param.is_preconditioner comes from bicgstab, param.compute_true_res came from gcr.
     if (!param.is_preconditioner && param.compute_true_res) { // do not do the below if this is an inner solver.
-      mat(r_full, x, y);
+      mat(r_full, x);
       double true_res = blas::xmyNorm(b, r_full);
       param.true_res = sqrt(true_res / b2);
       param.true_res_hq = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x, r[0]).z) : 0.0;

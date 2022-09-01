@@ -97,17 +97,15 @@ namespace quda {
 
   void DiracStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    bool reset = newTmp(&tmp1, in);
+    auto tmp = getTmp(in);
 
     //even
-    Dslash(tmp1->Even(), in.Even(), QUDA_ODD_PARITY);  
-    DslashXpay(out.Even(), tmp1->Even(), QUDA_EVEN_PARITY, in.Even(), 4*mass*mass);
-  
-    //odd
-    Dslash(tmp1->Even(), in.Odd(), QUDA_EVEN_PARITY);  
-    DslashXpay(out.Odd(), tmp1->Even(), QUDA_ODD_PARITY, in.Odd(), 4*mass*mass);    
+    Dslash(tmp, in.Even(), QUDA_ODD_PARITY);
+    DslashXpay(out.Even(), tmp, QUDA_EVEN_PARITY, in.Even(), 4 * mass * mass);
 
-    deleteTmp(&tmp1, reset);
+    // odd
+    Dslash(tmp, in.Odd(), QUDA_EVEN_PARITY);
+    DslashXpay(out.Odd(), tmp, QUDA_ODD_PARITY, in.Odd(), 4 * mass * mass);
   }
 
   void DiracStaggered::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
@@ -172,8 +170,8 @@ namespace quda {
 
   void DiracStaggeredPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    bool reset = newTmp(&tmp1, in);
-  
+    auto tmp = getTmp(in);
+
     QudaParity parity = QUDA_INVALID_PARITY;
     QudaParity other_parity = QUDA_INVALID_PARITY;
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
@@ -190,10 +188,8 @@ namespace quda {
     // Note the minus sign convention in the Xpay version.
     // This applies equally for the e <-> o permutation.
 
-    Dslash(*tmp1, in, other_parity);  
-    DslashXpay(out, *tmp1, parity, in, 4*mass*mass);
-
-    deleteTmp(&tmp1, reset);
+    Dslash(tmp, in, other_parity);
+    DslashXpay(out, tmp, parity, in, 4 * mass * mass);
   }
 
   void DiracStaggeredPC::MdagM(ColorSpinorField &, const ColorSpinorField &) const
