@@ -777,13 +777,12 @@ namespace quda
       }
 
       // References to the relevant subsets
-      std::vector<ColorSpinorField_ref> vecs_ref = {kSpace.begin() + locked, kSpace.begin() + locked + dim};
-      std::vector<ColorSpinorField_ref> kSpace_ref = {kSpace.begin() + offset, kSpace.begin() + offset + keep};
+      auto vecs_ref = {kSpace.begin() + locked, kSpace.begin() + locked + dim};
+      auto kSpace_ref = {kSpace.begin() + offset, kSpace.begin() + offset + keep};
 
       // zero the workspace
-      for (auto &ki : kSpace_ref) blas::zero(ki);
+      for (auto &ki : kSpace_ref) blas::zero(*ki);
 
-      // multiBLAS caxpy
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
       blas::axpy(rot_array, vecs_ref, kSpace_ref);
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
