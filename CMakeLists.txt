@@ -619,6 +619,7 @@ if(QUDA_OPENBLAS)
   if(QUDA_DOWNLOAD_OPENBLAS)
   #TODO: switch to CPM
     include(GNUInstallDirs)
+    include(ExternalProject)
     ExternalProject_Add(
       OPENBLAS
       GIT_REPOSITORY https://github.com/xianyi/OpenBLAS.git
