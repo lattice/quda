@@ -2166,7 +2166,7 @@ public:
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->M(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
+      if (shift != 0.0) blas::axpy(shift, in, out);
     }
 
     /**
@@ -2178,7 +2178,7 @@ public:
     {
       dirac->M(out, in);
       for (auto i = 0u; i < in.size(); i++)
-        if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in[i].get()), out[i]);
+        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
     }
 
     int getStencilSteps() const
@@ -2197,7 +2197,7 @@ public:
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->MdagM(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
+      if (shift != 0.0) blas::axpy(shift, in, out);
     }
 
     /**
@@ -2209,7 +2209,7 @@ public:
     {
       dirac->MdagM(out, in);
       for (auto i = 0u; i < in.size(); i++)
-        if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in[i].get()), out[i]);
+        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
     }
 
     int getStencilSteps() const
@@ -2257,7 +2257,7 @@ public:
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->MMdag(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
+      if (shift != 0.0) blas::axpy(shift, in, out);
     }
 
     /**
@@ -2269,7 +2269,7 @@ public:
     {
       dirac->MMdag(out, in);
       for (auto i = 0u; i < in.size(); i++)
-        if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in[i].get()), out[i]);
+        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
     }
 
     int getStencilSteps() const
@@ -2290,7 +2290,7 @@ public:
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->Mdag(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
+      if (shift != 0.0) blas::axpy(shift, in, out);
     }
 
     /**
@@ -2302,7 +2302,7 @@ public:
     {
       dirac->Mdag(out, in);
       for (auto i = 0u; i < in.size(); i++)
-        if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in[i].get()), out[i]);
+        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
     }
 
     int getStencilSteps() const
@@ -2434,7 +2434,7 @@ public:
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->M(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
+      if (shift != 0.0) blas::axpy(shift, in, out);
       applyGamma5(out);
     }
 
@@ -2447,7 +2447,7 @@ public:
     {
       dirac->M(out, in);
       for (auto i = 0u; i < in.size(); i++) {
-        if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in[i].get()), out[i]);
+        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
         applyGamma5(out[i]);
       }
     }

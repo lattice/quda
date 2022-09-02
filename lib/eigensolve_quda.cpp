@@ -290,7 +290,7 @@ namespace quda
     // out = d2 * in + d1 * out
     // C_1(x) = x
     mat(out, in);
-    blas::caxpby(d2, const_cast<ColorSpinorField &>(in), d1, out);
+    blas::caxpby(d2, in, d1, out);
     if (eig_param->poly_deg == 1) return;
 
     // C_0 is the current 'in'  vector.
@@ -322,9 +322,9 @@ namespace quda
 
       sigma_old = sigma;
     }
-    blas::copy(out, tmp2);
-  }
 
+    std::swap(out, tmp2);
+  }
   double EigenSolver::estimateChebyOpMax(const DiracMatrix &mat, ColorSpinorField &out, ColorSpinorField &in)
   {
     RNG rng(in, 1234);
