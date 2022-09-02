@@ -847,7 +847,7 @@ namespace quda
       auto kSpace_ref = {kSpace.begin() + offset, kSpace.begin() + offset + keep};
 
       // zero the workspace
-      for (auto &ki : kSpace_ref) blas::zero(*ki);
+      blas::zero(kSpace_ref);
 
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
       blas::axpy(rot_array, vecs_ref, kSpace_ref);

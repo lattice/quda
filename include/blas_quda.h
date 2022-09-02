@@ -26,7 +26,10 @@ namespace quda {
     extern unsigned long long flops;
     extern unsigned long long bytes;
 
-    void zero(ColorSpinorField &a);
+    inline void zero(vector_ref<ColorSpinorField> &&x)
+    {
+      for (auto &xi : x) xi.get().zero();
+    }
 
     inline void copy(ColorSpinorField &dst, const ColorSpinorField &src)
     {

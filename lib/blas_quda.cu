@@ -140,11 +140,6 @@ namespace quda {
       }
     };
 
-    void zero(ColorSpinorField &a)
-    {
-      a.zero();
-    }
-
     void axpbyz(double a, const ColorSpinorField &x, double b, const ColorSpinorField &y, ColorSpinorField &z)
     {
       instantiate<axpbyz_, Blas, true>(a, b, 0.0, x, y, x, x, z);
