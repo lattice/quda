@@ -432,7 +432,7 @@ namespace quda
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
       printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
-      loadFromFile(mat, kSpace, evals);
+      loadFromFile(kSpace, evals);
       return;
     }
 
@@ -518,8 +518,8 @@ namespace quda
 
         // Compute the eigen/singular values.
         profile.TPSTART(QUDA_PROFILE_COMPUTE);
-        computeEvals(mat, kSpace, evals);
-        if (compute_svd) computeSVD(mat, kSpace, evals);
+        computeEvals(kSpace, evals);
+        if (compute_svd) computeSVD(kSpace, evals);
         converged = true;
 
       } else {

@@ -266,7 +266,7 @@ namespace quda
         profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
         // apply matrix-vector operation here:
-        eig_solver->chebyOp(mat, d_v2, d_v);
+        eig_solver->chebyOp(d_v2, d_v);
 
         profile.TPSTOP(QUDA_PROFILE_COMPUTE);
         profile.TPSTART(QUDA_PROFILE_H2D);

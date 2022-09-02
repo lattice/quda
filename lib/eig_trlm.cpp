@@ -48,7 +48,7 @@ namespace quda
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
       printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
-      loadFromFile(mat, kSpace, evals);
+      loadFromFile(kSpace, evals);
       return;
     }
 
@@ -61,7 +61,7 @@ namespace quda
     prepareKrylovSpace(kSpace, evals);
 
     // Check for Chebyshev maximum estimation
-    checkChebyOpMax(mat, kSpace);
+    checkChebyOpMax(kSpace);
 
     // Convergence and locking criteria
     double mat_norm = 0.0;
@@ -179,8 +179,8 @@ namespace quda
 
       // Compute eigenvalues/singular values
 
-      computeEvals(mat, kSpace, evals);
-      if (compute_svd) computeSVD(mat, kSpace, evals);
+      computeEvals(kSpace, evals);
+      if (compute_svd) computeSVD(kSpace, evals);
     }
 
     // Local clean-up
@@ -194,7 +194,7 @@ namespace quda
     // Compute r = A * v_j - b_{j-i} * v_{j-1}
     // r = A * v_j
 
-    chebyOp(mat, r[0], v[j]);
+    chebyOp(r[0], v[j]);
 
     // a_j = v_j^dag * r
     alpha[j] = blas::reDotProduct(v[j], r[0]);

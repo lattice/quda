@@ -99,10 +99,9 @@ namespace quda
 
     /**
        @brief Check for a maximum of the Chebyshev operator
-       @param[in] mat The problem operator
        @param[in] kSpace The Krylov space vectors
     */
-    void checkChebyOpMax(const DiracMatrix &mat, std::vector<ColorSpinorField> &kSpace);
+    void checkChebyOpMax(std::vector<ColorSpinorField> &kSpace);
 
     /**
        @brief Extend the Krylov space
@@ -148,20 +147,18 @@ namespace quda
     /**
        @brief Promoted the specified matVec operation:
        M, Mdag, MMdag, MdagM to a Chebyshev polynomial
-       @param[in] mat Matrix operator
        @param[in] out Output spinor
        @param[in] in Input spinor
     */
-    void chebyOp(const DiracMatrix &mat, vector_ref<ColorSpinorField> &&out, vector_ref <const ColorSpinorField> &&in);
+    void chebyOp(vector_ref<ColorSpinorField> &&out, vector_ref <const ColorSpinorField> &&in);
 
     /**
        @brief Estimate the spectral radius of the operator for the max value of the
        Chebyshev polynomial
-       @param[in] mat Matrix operator
        @param[in] out Output spinor
        @param[in] in Input spinor
     */
-    double estimateChebyOpMax(const DiracMatrix &mat, ColorSpinorField &out, ColorSpinorField &in);
+    double estimateChebyOpMax(ColorSpinorField &out, ColorSpinorField &in);
 
     /**
        @brief Orthogonalise input vectors r against
@@ -267,11 +264,10 @@ namespace quda
 
     /**
        @brief Computes Left/Right SVD from pre computed Right/Left
-       @param[in] mat Matrix operator
        @param[in] evecs Computed eigenvectors of NormOp
        @param[in] evals Computed eigenvalues of NormOp
     */
-    void computeSVD(const DiracMatrix &mat, std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals);
+    void computeSVD(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals);
 
     /**
        @brief Compute eigenvalues and their residiua
@@ -280,7 +276,7 @@ namespace quda
        @param[in] evals The eigenvalues
        @param[in] size The number of eigenvalues to compute
     */
-    void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals,
+    void computeEvals(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals,
                       int size);
 
     /**
@@ -289,9 +285,9 @@ namespace quda
        @param[in] evecs The eigenvectors
        @param[in] evals The eigenvalues
     */
-    void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals)
+    void computeEvals(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals)
     {
-      computeEvals(mat, evecs, evals, n_conv);
+      computeEvals(evecs, evals, n_conv);
     }
 
     /**
@@ -300,7 +296,7 @@ namespace quda
        @param[in] eig_vecs The eigenvectors to save
        @param[in] file The filename to save
     */
-    void loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField> &eig_vecs, std::vector<Complex> &evals);
+    void loadFromFile(std::vector<ColorSpinorField> &eig_vecs, std::vector<Complex> &evals);
 
     /**
        @brief Sort array the first n elements of x according to spec_type, y comes along for the ride

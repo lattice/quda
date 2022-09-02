@@ -172,11 +172,11 @@ namespace quda
     if (!orthed) errorQuda("Failed to orthonormalise initial guesses");
   }
 
-  void EigenSolver::checkChebyOpMax(const DiracMatrix &mat, std::vector<ColorSpinorField> &kSpace)
+  void EigenSolver::checkChebyOpMax(std::vector<ColorSpinorField> &kSpace)
   {
     if (eig_param->use_poly_acc && eig_param->a_max <= 0.0) {
       // Use part of the kSpace as temps
-      eig_param->a_max = estimateChebyOpMax(mat, kSpace[block_size + 2], kSpace[block_size + 1]);
+      eig_param->a_max = estimateChebyOpMax(kSpace[block_size + 2], kSpace[block_size + 1]);
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Chebyshev maximum estimate: %e.\n", eig_param->a_max);
     }
   }
@@ -267,7 +267,7 @@ namespace quda
   }
 
 #if 0
-  void EigenSolver::chebyOp(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in)
+  void EigenSolver::chebyOp(ColorSpinorField &out, const ColorSpinorField &in)
   {
     // Just do a simple mat-vec if no poly acc is requested
     if (!eig_param->use_poly_acc) {
@@ -327,7 +327,7 @@ namespace quda
     std::swap(out, tmp2);
   }
 #endif
-  void EigenSolver::chebyOp(const DiracMatrix &mat, vector_ref<ColorSpinorField> &&out,
+  void EigenSolver::chebyOp(vector_ref<ColorSpinorField> &&out,
                             vector_ref<const ColorSpinorField> &&in)
   {
     // Just do a simple mat-vec if no poly acc is requested
@@ -391,7 +391,7 @@ namespace quda
     for (auto i = 0u; i < in.size(); i++) std::swap(out[i].get(), tmp2[i]);
   }
 
-  double EigenSolver::estimateChebyOpMax(const DiracMatrix &mat, ColorSpinorField &out, ColorSpinorField &in)
+  double EigenSolver::estimateChebyOpMax(ColorSpinorField &out, ColorSpinorField &in)
   {
     RNG rng(in, 1234);
     spinorNoise(in, rng, QUDA_NOISE_UNIFORM);
@@ -554,7 +554,7 @@ namespace quda
     }
   }
 
-  void EigenSolver::computeSVD(const DiracMatrix &mat, std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals)
+  void EigenSolver::computeSVD(std::vector<ColorSpinorField> &evecs, std::vector<Complex> &evals)
   {
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing SVD of M\n");
 
@@ -632,7 +632,7 @@ namespace quda
     blas::caxpy(s, {evecs.begin(), evecs.begin() + n_defl}, {sol.begin(), sol.end()});
   }
 
-  void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField> &evecs,
+  void EigenSolver::computeEvals(std::vector<ColorSpinorField> &evecs,
                                  std::vector<Complex> &evals, int size)
   {
     if (size > (int)evecs.size())
@@ -692,7 +692,7 @@ namespace quda
     blas::caxpy(s, {evecs.begin(), evecs.begin() + n_defl}, {sol.begin(), sol.end()});
   }
 
-  void EigenSolver::loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField> &kSpace,
+  void EigenSolver::loadFromFile(std::vector<ColorSpinorField> &kSpace,
                                  std::vector<Complex> &evals)
   {
     // Set suggested parity of fields
@@ -710,7 +710,7 @@ namespace quda
     resize(r, 1, QUDA_ZERO_FIELD_CREATE, kSpace[0]);
 
     // Error estimates (residua) given by ||A*vec - lambda*vec||
-    computeEvals(mat, kSpace, evals);
+    computeEvals(kSpace, evals);
   }
 
   void EigenSolver::sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<Complex> &x, std::vector<Complex> &y)

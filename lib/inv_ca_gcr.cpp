@@ -169,14 +169,14 @@ namespace quda
           // double the size of the Krylov space
           extendSVDDeflationSpace();
           // populate extra memory with L/R singular vectors
-          eig_solve->computeSVD(matMdagM, evecs, evals);
+          eig_solve->computeSVD(evecs, evals);
         }
         if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
         deflate_compute = false;
       }
       if (recompute_evals) {
-        eig_solve->computeEvals(matMdagM, evecs, evals);
-        eig_solve->computeSVD(matMdagM, evecs, evals);
+        eig_solve->computeEvals(evecs, evals);
+        eig_solve->computeSVD(evecs, evals);
         recompute_evals = false;
       }
     }

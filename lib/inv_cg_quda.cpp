@@ -288,7 +288,7 @@ namespace quda {
         deflate_compute = false;
       }
       if (recompute_evals) {
-        eig_solve->computeEvals(matEig, evecs, evals);
+        eig_solve->computeEvals(evecs, evals);
         recompute_evals = false;
       }
     }
