@@ -143,7 +143,16 @@ namespace quda
        @param[in] out Output spinor
        @param[in] in Input spinor
     */
-    void chebyOp(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in);
+    //void chebyOp(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in);
+
+    /**
+       @brief Promoted the specified matVec operation:
+       M, Mdag, MMdag, MdagM to a Chebyshev polynomial
+       @param[in] mat Matrix operator
+       @param[in] out Output spinor
+       @param[in] in Input spinor
+    */
+    void chebyOp(const DiracMatrix &mat, vector_ref<ColorSpinorField> &&out, vector_ref <const ColorSpinorField> &&in);
 
     /**
        @brief Estimate the spectral radius of the operator for the max value of the

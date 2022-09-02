@@ -233,7 +233,7 @@ namespace quda {
     /**
        @brief Apply M for the dirac op. E.g. the Schur Complement operator
     */
-    void M(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    void M(vector_ref<ColorSpinorField> &out, vector_ref<const ColorSpinorField> &in) const
     {
       for (auto i = 0u; i < in.size(); i++) M(out[i], in[i]);
     }
@@ -246,7 +246,7 @@ namespace quda {
     /**
        @brief Apply MdagM operator which may be optimized
     */
-    void MdagM(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    void MdagM(vector_ref<ColorSpinorField> &out, vector_ref<const ColorSpinorField> &in) const
     {
       for (auto i = 0u; i < in.size(); i++) MdagM(out[i], in[i]);
     }
@@ -267,7 +267,7 @@ namespace quda {
        type, this may require additional effort to include the terms
        that hop out of the boundary and then hop back.
     */
-    void MdagMLocal(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    void MdagMLocal(vector_ref<ColorSpinorField> &out, vector_ref<const ColorSpinorField> &in) const
     {
       for (auto i = 0u; i < in.size(); i++) MdagMLocal(out[i], in[i]);
     }
@@ -291,7 +291,7 @@ namespace quda {
     /**
        @brief Apply Mdag (daggered operator of M)
     */
-    void Mdag(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    void Mdag(vector_ref<ColorSpinorField> &out, vector_ref<const ColorSpinorField> &in) const
     {
       for (auto i = 0u; i < in.size(); i++) Mdag(out[i], in[i]);
     }
@@ -304,7 +304,7 @@ namespace quda {
     /**
        @brief Apply Normal Operator
     */
-    void MMdag(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    void MMdag(vector_ref<ColorSpinorField> &out, vector_ref<const ColorSpinorField> &in) const
     {
       for (auto i = 0u; i < in.size(); i++) MMdag(out[i], in[i]);
     }
@@ -2090,7 +2090,7 @@ public:
        @param[out] out The vector of output fields
        @param[out] out The vector of input fields
      */
-    virtual void operator()(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const = 0;
+    virtual void operator()(vector_ref<ColorSpinorField> &&out, vector_ref<const ColorSpinorField> &&in) const = 0;
 
     unsigned long long flops() const { return dirac->Flops(); }
 
@@ -2166,7 +2166,7 @@ public:
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->M(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
+      if (shift != 0.0) blas::axpy(shift, in, out);
     }
 
     /**
@@ -2174,9 +2174,11 @@ public:
        @param[out] out The vector of output fields
        @param[in] in The vector of input fields
      */
-    void operator()(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    void operator()(vector_ref<ColorSpinorField> &&out, vector_ref<const ColorSpinorField> &&in) const
     {
       dirac->M(out, in);
+      for (auto i = 0u; i < in.size(); i++)
+        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
     }
 
     int getStencilSteps() const
@@ -2195,7 +2197,7 @@ public:
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->MdagM(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
+      if (shift != 0.0) blas::axpy(shift, in, out);
     }
 
     /**
@@ -2203,9 +2205,11 @@ public:
        @param[out] out The vector of output fields
        @param[out] out The vector of input fields
      */
-    void operator()(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    void operator()(vector_ref<ColorSpinorField> &&out, vector_ref<const ColorSpinorField> &&in) const
     {
       dirac->MdagM(out, in);
+      for (auto i = 0u; i < in.size(); i++)
+        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
     }
 
     int getStencilSteps() const
@@ -2231,7 +2235,7 @@ public:
        @param[out] out The vector of output fields
        @param[in] in The vector of input fields
      */
-    void operator()(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    void operator()(vector_ref<ColorSpinorField> &&out, vector_ref<const ColorSpinorField> &&in) const
     {
       dirac->MdagMLocal(out, in);
     }
@@ -2253,7 +2257,7 @@ public:
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->MMdag(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
+      if (shift != 0.0) blas::axpy(shift, in, out);
     }
 
     /**
@@ -2261,9 +2265,11 @@ public:
        @param[out] out The vector of output fields
        @param[in] in The vector of input fields
      */
-    void operator()(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    void operator()(vector_ref<ColorSpinorField> &&out, vector_ref<const ColorSpinorField> &&in) const
     {
       dirac->MMdag(out, in);
+      for (auto i = 0u; i < in.size(); i++)
+        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
     }
 
     int getStencilSteps() const
@@ -2284,7 +2290,7 @@ public:
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->Mdag(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
+      if (shift != 0.0) blas::axpy(shift, in, out);
     }
 
     /**
@@ -2292,9 +2298,11 @@ public:
        @param[out] out The vector of output fields
        @param[in] in The vector of input fields
      */
-    void operator()(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    void operator()(vector_ref<ColorSpinorField> &&out, vector_ref<const ColorSpinorField> &&in) const
     {
       dirac->Mdag(out, in);
+      for (auto i = 0u; i < in.size(); i++)
+        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
     }
 
     int getStencilSteps() const
@@ -2326,10 +2334,10 @@ public:
        @param[out] out The vector of output fields
        @param[in] in The vector of input fields
      */
-    void operator()(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    void operator()(vector_ref<ColorSpinorField> &&out, vector_ref<const ColorSpinorField> &&in) const
     {
       dirac->flipDagger();
-      mat(out, in);
+      mat(std::move(out), std::move(in));
       dirac->flipDagger();
     }
 
@@ -2426,7 +2434,7 @@ public:
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->M(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
+      if (shift != 0.0) blas::axpy(shift, in, out);
       applyGamma5(out);
     }
 
@@ -2435,11 +2443,11 @@ public:
        @param[out] out The vector of output fields
        @param[in] in The vector of input fields
      */
-    void operator()(std::vector<ColorSpinorField> &out, const std::vector<ColorSpinorField> &in) const
+    void operator()(vector_ref<ColorSpinorField> &&out, vector_ref<const ColorSpinorField> &&in) const
     {
       dirac->M(out, in);
       for (auto i = 0u; i < in.size(); i++) {
-        if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in[i]), out[i]);
+        if (shift != 0.0) blas::axpy(shift, in[i], out[i]);
         applyGamma5(out[i]);
       }
     }

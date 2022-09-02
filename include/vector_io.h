@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <color_spinor_field.h>
+#include <reference_wrapper_helper.h>
 
 namespace quda
 {
@@ -27,7 +29,7 @@ namespace quda
        @brief Load vectors from filename
        @param[in] vecs The set of vectors to load
     */
-    void load(std::vector<ColorSpinorField_ref> &&vecs);
+    void load(vector_ref<ColorSpinorField> &&vecs);
 
     /**
        @brief Load vectors from filename.  Generic interface that
@@ -45,7 +47,7 @@ namespace quda
        @param[in] prec Optional change of precision when saving
        @param[in] size Optional cap to number of vectors saved
     */
-    void save(const std::vector<ColorSpinorField_ref> &&vecs, QudaPrecision prec = QUDA_INVALID_PRECISION, uint32_t size = 0);
+    void save(vector_ref<const ColorSpinorField> &&vecs, QudaPrecision prec = QUDA_INVALID_PRECISION, uint32_t size = 0);
 
     /**
        @brief Save vectors to filename.  Generic interface that

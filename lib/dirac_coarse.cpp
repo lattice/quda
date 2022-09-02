@@ -467,7 +467,7 @@ namespace quda {
   {
     // emulated for now
     Dslash(out, in, parity);
-    blas::xpay(const_cast<ColorSpinorField&>(x), k, out);
+    blas::xpay(x, k, out);
 
     int n = in.Nspin()*in.Ncolor();
     flops += (8*(8*n*n)-2*n)*in.VolumeCB(); // blas flops counted separately so only need to count dslash flops
@@ -532,7 +532,7 @@ namespace quda {
 #if 0
       CloverInv(*src, b.Odd(), QUDA_ODD_PARITY);
       DiracCoarse::Dslash(tmp, *src, QUDA_EVEN_PARITY);
-      blas::xpay(const_cast<ColorSpinorField&>(b.Even()), -1.0, tmp);
+      blas::xpay(b.Even(), -1.0, tmp);
       CloverInv(*src, tmp, QUDA_EVEN_PARITY);
 #endif
       // src = A_ee^{-1} b_e - (A_ee^{-1} D_eo) A_oo^{-1} b_o
@@ -548,7 +548,7 @@ namespace quda {
 #if 0
       CloverInv(*src, b.Even(), QUDA_EVEN_PARITY);
       DiracCoarse::Dslash(tmp, *src, QUDA_ODD_PARITY);
-      blas::xpay(const_cast<ColorSpinorField&>(b.Odd()), -1.0, tmp);
+      blas::xpay(b.Odd(), -1.0, tmp);
       CloverInv(*src, tmp, QUDA_ODD_PARITY);
 #endif
       // src = A_oo^{-1} b_o - (A_oo^{-1} D_oe) A_ee^{-1} b_e
@@ -563,14 +563,14 @@ namespace quda {
       src = &(x.Odd());
       CloverInv(tmp, b.Odd(), QUDA_ODD_PARITY);
       DiracCoarse::Dslash(*src, tmp, QUDA_EVEN_PARITY);
-      blas::xpay(const_cast<ColorSpinorField&>(b.Even()), -1.0, *src);
+      blas::xpay(b.Even(), -1.0, *src);
       sol = &(x.Even());
     } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
       // src = b_o - D_oe A_ee^-1 b_e
       src = &(x.Even());
       CloverInv(tmp, b.Even(), QUDA_EVEN_PARITY);
       DiracCoarse::Dslash(*src, tmp, QUDA_ODD_PARITY);
-      blas::xpay(const_cast<ColorSpinorField&>(b.Odd()), -1.0, *src);
+      blas::xpay(b.Odd(), -1.0, *src);
       sol = &(x.Odd());
     } else {
       errorQuda("MatPCType %d not valid for DiracCloverPC", matpcType);
@@ -597,7 +597,7 @@ namespace quda {
 #if 0
       // x_o = A_oo^-1 (b_o - D_oe x_e)
       DiracCoarse::Dslash(tmp, x.Even(), QUDA_ODD_PARITY);
-      blas::xpay(const_cast<ColorSpinorField&>(b.Odd()), -1.0, tmp);
+      blas::xpay(b.Odd(), -1.0, tmp);
       CloverInv(x.Odd(), tmp, QUDA_ODD_PARITY);
 #endif
       // x_o = A_oo^{-1} b_o - (A_oo^{-1} D_oe) x_e
@@ -610,7 +610,7 @@ namespace quda {
 #if 0
       // x_e = A_ee^-1 (b_e - D_eo x_o)
       DiracCoarse::Dslash(tmp, x.Odd(), QUDA_EVEN_PARITY);
-      blas::xpay(const_cast<ColorSpinorField&>(b.Even()), -1.0, tmp);
+      blas::xpay(b.Even(), -1.0, tmp);
       CloverInv(x.Even(), tmp, QUDA_EVEN_PARITY);
 #endif
       // x_e = A_ee^{-1} b_e - (A_ee^{-1} D_eo) x_o

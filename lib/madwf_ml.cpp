@@ -37,12 +37,11 @@ namespace quda
     base(backward_tmp, forward_tmp);
     madwf_ml::transfer_5d_hh(out, backward_tmp, device_param, true);
 
-    blas::axpy(mu, const_cast<ColorSpinorField &>(in), out);
+    blas::axpy(mu, in, out);
   }
 
   double MadwfAcc::cost(const DiracMatrix &ref, Solver &base, ColorSpinorField &out, const ColorSpinorField &in)
   {
-
     ColorSpinorParam csParam(in);
     ColorSpinorField tmp1(csParam);
     ColorSpinorField tmp2(csParam);

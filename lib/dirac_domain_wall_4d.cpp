@@ -83,7 +83,7 @@ namespace quda {
     long long wall = 2 * in.Volume() / Ls;
     flops += (48LL) * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
 
-    blas::xpay(const_cast<ColorSpinorField &>(in), -kappa5, out);
+    blas::xpay(in, -kappa5, out);
   }
 
   void DiracDomainWall4D::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
