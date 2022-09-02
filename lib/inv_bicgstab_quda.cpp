@@ -16,10 +16,12 @@ namespace quda {
 
   BiCGstab::BiCGstab(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
                      const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile), init(false)
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
+    matMdagM(matEig.Expose()),
+    init(false)
   {
   }
-
+  
   BiCGstab::~BiCGstab() {
     profile.TPSTART(QUDA_PROFILE_FREE);
 
@@ -31,7 +33,7 @@ namespace quda {
       delete tmpp;
       delete tp;
     }
-
+    destroyDeflationSpace();
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
@@ -79,17 +81,6 @@ namespace quda {
     double b2 = blas::norm2(b); // norm sq of source
     double r2;               // norm sq of residual
 
-    // compute initial residual depending on whether we have an initial guess or not
-    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      mat(r, x);
-      r2 = blas::xmyNorm(b, r);
-      blas::copy(y, x);
-    } else {
-      blas::copy(r, b);
-      r2 = b2;
-      blas::zero(x);
-    }
-
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
       if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
@@ -105,7 +96,56 @@ namespace quda {
         errorQuda("Null vector computing requires non-zero guess!");
       }
     }
+    
+    if (param.deflate) {
+      // Construct the eigensolver and deflation space if requested.
+      if (param.eig_param.eig_type == QUDA_EIG_TR_LANCZOS || param.eig_param.eig_type == QUDA_EIG_BLK_TR_LANCZOS) {
+        constructDeflationSpace(b, matMdagM);
+      } else {
+        // Use Arnoldi to inspect the space only and turn off deflation
+        constructDeflationSpace(b, mat);
+        param.deflate = false;
+      }
+      if (deflate_compute) {
+        // compute the deflation space.
+        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        (*eig_solve)(evecs, evals);
+        if (param.deflate) {
+          // double the size of the Krylov space
+          extendSVDDeflationSpace();
+          // populate extra memory with L/R singular vectors
+          eig_solve->computeSVD(matMdagM, evecs, evals);
+        }
+        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+        deflate_compute = false;
+      }
+      if (recompute_evals) {
+        eig_solve->computeEvals(matMdagM, evecs, evals);
+        eig_solve->computeSVD(matMdagM, evecs, evals);
+        recompute_evals = false;
+      }
+    }
 
+    // Compute initial residual depending on whether we have an initial guess or not.
+    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      mat(r, x);
+      r2 = blas::xmyNorm(b, r);
+      blas::copy(y, x);
+    } else {
+      blas::copy(r, b);
+      r2 = b2;
+      blas::zero(x);
+    }
+
+    if (param.deflate && param.maxiter > 1) {
+      // Deflate: Hardcoded to SVD. If maxiter == 1, this is a dummy solve
+      eig_solve->deflateSVD(x, r, evecs, evals, true);
+
+      // Compute r_defl = RHS - A * LHS
+      mat(r, x);
+      r2 = blas::xmyNorm(b, r);
+    }
+    
     // set field aliasing according to whether we are doing mixed precision or not
     if (param.precision_sloppy == x.Precision()) {
       r_sloppy = &r;
@@ -268,6 +308,15 @@ namespace quda {
         mat(r, y);
         r2 = blas::xmyNorm(b, r);
 
+        if (param.deflate && sqrt(r2) < param.tol_restart) {
+          // Deflate and accumulate to solution vector
+          eig_solve->deflate(y, r, evecs, evals, true);
+
+          // Compute r_defl = RHS - A * LHS
+          mat(r, y);
+          r2 = blas::xmyNorm(b, r);
+        }
+	
 	if (x.Precision() != rSloppy.Precision()) blas::copy(rSloppy, r);            
 	blas::zero(xSloppy);
 

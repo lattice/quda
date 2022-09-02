@@ -967,6 +967,7 @@ namespace quda {
   class BiCGstab : public Solver {
 
   private:
+    const DiracMdagM matMdagM; // used by the eigensolver
     // pointers to fields to avoid multiple creation overhead
     ColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
     bool init;
