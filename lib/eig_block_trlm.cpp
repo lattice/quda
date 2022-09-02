@@ -219,7 +219,8 @@ namespace quda
     int idx = 0, idx_conj = 0;
 
     // r = A * v_j
-    for (int b = 0; b < block_size; b++) chebyOp(mat, r[b], v[j + b]);
+    //for (int b = 0; b < block_size; b++) chebyOp(mat, r[b], v[j + b]);
+    chebyOp(mat, {r.begin(), r.begin() + block_size}, {v.begin() + j, v.begin() + j + block_size});
 
     // r = r - b_{j-1} * v_{j-1}
     int start = (j > num_keep) ? j - block_size : 0;
