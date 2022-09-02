@@ -20,8 +20,7 @@ namespace quda
    * @param [in] offset -- the offset
    * @param [in,out] state - the RNG State
    */
-  inline void random_init(unsigned long long seed, unsigned long long sequence,
-			  unsigned long long offset, RNGState &state)
+  inline void random_init(unsigned long long seed, unsigned long long sequence, unsigned long long offset, RNGState &state)
   {
     target::rng::seed(state.state, seed, sequence);
     target::rng::skip(state.state, offset);
@@ -40,10 +39,7 @@ namespace quda
      * \brief Return a uniform deviate between 0 and 1
      * @param [in,out] the RNG State
      */
-    static inline float rand(RNGState &state)
-    {
-      return (float)target::rng::uniform(state.state);
-    }
+    static inline float rand(RNGState &state) { return (float)target::rng::uniform(state.state); }
 
     /**
      * \brief return a uniform deviate between a and b
@@ -55,7 +51,6 @@ namespace quda
     {
       return a + (b - a) * (float)target::rng::uniform(state.state);
     }
-
   };
 
   template <> struct uniform<double> {
@@ -63,10 +58,7 @@ namespace quda
      * \brief Return a uniform deviate between 0 and 1
      * @param [in,out] the RNG State
      */
-    static inline double rand(RNGState &state)
-    {
-      return target::rng::uniform(state.state);
-    }
+    static inline double rand(RNGState &state) { return target::rng::uniform(state.state); }
 
     /**
      * \brief Return a uniform deviate between a and b
@@ -90,11 +82,11 @@ namespace quda
      */
     static inline float rand(RNGState &state)
     {
-      if(state.has_extf){
+      if (state.has_extf) {
         state.has_extf = 0;
         return state.extf;
-      }else{
-        float x,y;
+      } else {
+        float x, y;
         target::rng::gaussian(state.state, x, y);
         state.has_extf = 1;
         state.extf = y;
@@ -110,11 +102,11 @@ namespace quda
      */
     static inline double rand(RNGState &state)
     {
-      if(state.has_extd){
+      if (state.has_extd) {
         state.has_extd = 0;
         return state.extd;
-      }else{
-        double x,y;
+      } else {
+        double x, y;
         target::rng::gaussian(state.state, x, y);
         state.has_extd = 1;
         state.extd = y;
