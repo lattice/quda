@@ -91,7 +91,6 @@ enum class Kernel {
   axpbyzNorm,
   axpyCGNorm,
   caxpyNorm,
-  caxpyXmazNormX,
   cabxpyzAxNorm,
   cDotProduct,
   caxpyDotzy,
@@ -138,7 +137,6 @@ const std::map<Kernel, std::string> kernel_map
      {Kernel::axpbyzNorm, "axpbyzNorm"},
      {Kernel::axpyCGNorm, "axpyCGNorm"},
      {Kernel::caxpyNorm, "caxpyNorm"},
-     {Kernel::caxpyXmazNormX, "caxpyXmazNormX"},
      {Kernel::cabxpyzAxNorm, "cabxpyzAxNorm"},
      {Kernel::cDotProduct, "cDotProduct"},
      {Kernel::caxpyDotzy, "caxpyDotzy"},
@@ -438,10 +436,6 @@ protected:
         for (int i = 0; i < niter; ++i) blas::caxpyNorm(a2, xD, yD);
         break;
 
-      case Kernel::caxpyXmazNormX:
-        for (int i = 0; i < niter; ++i) blas::caxpyXmazNormX(a2, xD, yD, zD);
-        break;
-
       case Kernel::cabxpyzAxNorm:
         for (int i = 0; i < niter; ++i) blas::cabxpyzAxNorm(a, b2, xD, yD, yD);
         break;
@@ -725,9 +719,9 @@ protected:
       xD = xH;
       yoD = yH;
       {
-        quda::Complex d = blas::axpyCGNorm(a, xD, yoD);
-        quda::Complex h = blas::axpyCGNorm(a, xH, yH);
-        error = ERROR(yo) + fabs(d.real() - h.real()) / fabs(h.real()) + fabs(d.imag() - h.imag()) / fabs(h.imag());
+        double2 d = blas::axpyCGNorm(a, xD, yoD);
+        double2 h = blas::axpyCGNorm(a, xH, yH);
+        error = ERROR(yo) + fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y);
       }
       break;
 
@@ -738,17 +732,6 @@ protected:
         double d = blas::caxpyNorm(a, xD, yD);
         double h = blas::caxpyNorm(a, xH, yH);
         error = ERROR(y) + fabs(d - h) / fabs(h);
-      }
-      break;
-
-    case Kernel::caxpyXmazNormX:
-      xD = xH;
-      yD = yH;
-      zD = zH;
-      {
-        double d = blas::caxpyXmazNormX(a, xD, yD, zD);
-        double h = blas::caxpyXmazNormX(a, xH, yH, zH);
-        error = ERROR(y) + ERROR(x) + fabs(d - h) / fabs(h);
       }
       break;
 

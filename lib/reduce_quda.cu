@@ -32,18 +32,18 @@ namespace quda {
       }
 
     public:
-      Reduce(const coeff_t &a, const coeff_t &b, const coeff_t &, ColorSpinorField &x, ColorSpinorField &y,
-             ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, host_reduce_t &result) :
+      template <typename Vx, typename Vy, typename Vz, typename Vw, typename Vv>
+      Reduce(const coeff_t &a, const coeff_t &b, const coeff_t &, Vx &x, Vy &y, Vz &z, Vw &w, Vv &v, host_reduce_t &result) :
         TunableReduction2D(x, 1u),
         r(a, b),
         nParity((x.IsComposite() ? x.CompositeDim() : 1) * (x.SiteSubset())),
         a(a),
         b(b),
-        x(x),
-        y(y),
-        z(z),
-        w(w),
-        v(v),
+        x(const_cast<ColorSpinorField&>(x)),
+        y(const_cast<ColorSpinorField&>(y)),
+        z(const_cast<ColorSpinorField&>(z)),
+        w(const_cast<ColorSpinorField&>(w)),
+        v(const_cast<ColorSpinorField&>(v)),
         result(result)
       {
         checkLocation(x, y, z, w, v);
@@ -153,91 +153,82 @@ namespace quda {
 
     double max(const ColorSpinorField &x)
     {
-      ColorSpinorField &y = const_cast<ColorSpinorField &>(x); // FIXME
-      return instantiateReduce<Max, false>(0.0, 0.0, 0.0, y, y, y, y, y);
+      return instantiateReduce<Max, false>(0.0, 0.0, 0.0, x, x, x, x, x);
     }
 
     double max_deviation(const ColorSpinorField &x, const ColorSpinorField &y)
     {
-      ColorSpinorField &z = const_cast<ColorSpinorField &>(x); // FIXME
-      ColorSpinorField &w = const_cast<ColorSpinorField &>(y); // FIXME
-      return instantiateReduce<MaxDeviation, false>(0.0, 0.0, 0.0, z, w, w, w, w);
+      return instantiateReduce<MaxDeviation, false>(0.0, 0.0, 0.0, x, y, y, y, y);
     }
 
     double norm1(const ColorSpinorField &x)
     {
-      ColorSpinorField &y = const_cast<ColorSpinorField &>(x); // FIXME
-      return instantiateReduce<Norm1, false>(0.0, 0.0, 0.0, y, y, y, y, y);
+      return instantiateReduce<Norm1, false>(0.0, 0.0, 0.0, x, x, x, x, x);
     }
 
     double norm2(const ColorSpinorField &x)
     {
-      ColorSpinorField &y = const_cast<ColorSpinorField &>(x);
-      return instantiateReduce<Norm2, false>(0.0, 0.0, 0.0, y, y, y, y, y);
+      return instantiateReduce<Norm2, false>(0.0, 0.0, 0.0, x, x, x, x, x);
     }
 
-    double reDotProduct(ColorSpinorField &x, ColorSpinorField &y)
+    double reDotProduct(const ColorSpinorField &x, const ColorSpinorField &y)
     {
       return instantiateReduce<Dot, false>(0.0, 0.0, 0.0, x, y, x, x, x);
     }
 
-    double axpbyzNorm(double a, ColorSpinorField &x, double b, ColorSpinorField &y, ColorSpinorField &z)
+    double axpbyzNorm(double a, const ColorSpinorField &x, double b, const ColorSpinorField &y, ColorSpinorField &z)
     {
       return instantiateReduce<axpbyzNorm2, false>(a, b, 0.0, x, y, z, x, x);
     }
 
-    double axpyReDot(double a, ColorSpinorField &x, ColorSpinorField &y)
+    double axpyReDot(double a, const ColorSpinorField &x, ColorSpinorField &y)
     {
       return instantiateReduce<AxpyReDot, false>(a, 0.0, 0.0, x, y, x, x, x);
     }
 
-    double caxpyNorm(const Complex &a, ColorSpinorField &x, ColorSpinorField &y)
+    double caxpyNorm(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y)
     {
       return instantiateReduce<caxpyNorm2, false>(a, Complex(0.0), Complex(0.0), x, y, x, x, x);
     }
 
-    double caxpyXmazNormX(const Complex &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
-    {
-      return instantiateReduce<caxpyxmaznormx, false>(a, Complex(0.0), Complex(0.0), x, y, z, x, x);
-    }
-
-    double cabxpyzAxNorm(double a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
+    double cabxpyzAxNorm(double a, const Complex &b, ColorSpinorField &x, const ColorSpinorField &y, ColorSpinorField &z)
     {
       return instantiateReduce<cabxpyzaxnorm, false>(Complex(a), b, Complex(0.0), x, y, z, x, x);
     }
 
-    Complex cDotProduct(ColorSpinorField &x, ColorSpinorField &y)
+    Complex cDotProduct(const ColorSpinorField &x, const ColorSpinorField &y)
     {
       auto cdot = instantiateReduce<Cdot, false>(0.0, 0.0, 0.0, x, y, x, x, x);
       return Complex(cdot[0], cdot[1]);
     }
 
-    Complex caxpyDotzy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
+    Complex caxpyDotzy(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &z)
     {
       auto cdot = instantiateReduce<caxpydotzy, false>(a, Complex(0.0), Complex(0.0), x, y, z, x, x);
       return Complex(cdot[0], cdot[1]);
     }
 
-    double4 cDotProductNormAB(ColorSpinorField &x, ColorSpinorField &y)
+    double4 cDotProductNormAB(const ColorSpinorField &x, const ColorSpinorField &y)
     {
       auto ab = instantiateReduce<CdotNormAB, false>(0.0, 0.0, 0.0, x, y, x, x, x);
       return make_double4(ab[0], ab[1], ab[2], ab[3]);
     }
 
-    double3 caxpbypzYmbwcDotProductUYNormY(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y,
-                                           ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &u)
+    double3 caxpbypzYmbwcDotProductUYNormY(const Complex &a, const ColorSpinorField &x, const Complex &b,
+                                           ColorSpinorField &y, ColorSpinorField &z,
+                                           const ColorSpinorField &w, const ColorSpinorField &v)
     {
-      auto rtn = instantiateReduce<caxpbypzYmbwcDotProductUYNormY_, true>(a, b, Complex(0.0), x, z, y, w, u);
+      auto rtn = instantiateReduce<caxpbypzYmbwcDotProductUYNormY_, true>(a, b, Complex(0.0), x, z, y, w, v);
       return make_double3(rtn[0], rtn[1], rtn[2]);
     }
 
-    Complex axpyCGNorm(double a, ColorSpinorField &x, ColorSpinorField &y)
+    double2 axpyCGNorm(double a, const ColorSpinorField &x, ColorSpinorField &y)
     {
       auto cg_norm = instantiateReduce<axpyCGNorm2, true>(a, 0.0, 0.0, x, y, x, x, x);
-      return Complex(cg_norm[0], cg_norm[1]);
+      return make_double2(cg_norm[0], cg_norm[1]);
     }
 
-    double3 HeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &r)
+    double3 HeavyQuarkResidualNorm(const ColorSpinorField &x, const ColorSpinorField &r)
     {
       // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
       if (x.Ncolor() != 3) return make_double3(0.0, 0.0, 0.0);
@@ -246,7 +237,7 @@ namespace quda {
       return make_double3(rtn[0], rtn[1], rtn[2]);
     }
 
-    double3 xpyHeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &r)
+    double3 xpyHeavyQuarkResidualNorm(const ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &r)
     {
       // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
       if (x.Ncolor()!=3) return make_double3(0.0, 0.0, 0.0);
@@ -255,26 +246,26 @@ namespace quda {
       return make_double3(rtn[0], rtn[1], rtn[2]);
     }
 
-    double3 tripleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
+    double3 tripleCGReduction(const ColorSpinorField &x, const ColorSpinorField &y, const ColorSpinorField &z)
     {
       auto rtn = instantiateReduce<tripleCGReduction_, false>(0.0, 0.0, 0.0, x, y, z, x, x);
       return make_double3(rtn[0], rtn[1], rtn[2]);
     }
 
-    double4 quadrupleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
+    double4 quadrupleCGReduction(const ColorSpinorField &x, const ColorSpinorField &y, const ColorSpinorField &z)
     {
       auto red = instantiateReduce<quadrupleCGReduction_, false>(0.0, 0.0, 0.0, x, y, z, x, x);
       return make_double4(red[0], red[1], red[2], red[3]);
     }
 
     double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y,
-                                ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v)
+                                ColorSpinorField &z, ColorSpinorField &w, const ColorSpinorField &v)
     {
       return instantiateReduce<quadrupleCG3InitNorm_, false>(a, 0.0, 0.0, x, y, z, w, v);
     }
 
     double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y,
-                                  ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v)
+                                  ColorSpinorField &z, ColorSpinorField &w, const ColorSpinorField &v)
     {
       return instantiateReduce<quadrupleCG3UpdateNorm_, false>(a, b, 0.0, x, y, z, w, v);
     }

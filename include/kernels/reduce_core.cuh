@@ -281,30 +281,6 @@ namespace quda
     };
 
     /**
-       double caxpyXmayNormCuda(float a, float *x, float *y, n){}
-       First performs the operation y[i] = a*x[i] + y[i]
-       Second performs the operator x[i] -= a*z[i]
-       Third returns the norm of x
-    */
-    template <typename reduce_t, typename real>
-    struct caxpyxmaznormx : public ReduceFunctor<reduce_t> {
-      static constexpr memory_access<1, 1, 1> read{ };
-      static constexpr memory_access<1, 1> write{ };
-      const complex<real> a;
-      caxpyxmaznormx(const complex<real> &a, const complex<real> &) : a(a) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &) const
-      {
-#pragma unroll
-        for (int i = 0; i < x.size(); i++) {
-          y[i] = cmac(a, x[i], y[i]);
-          x[i] = cmac(-a, z[i], x[i]);
-          norm2_<reduce_t, real>(sum, x[i]);
-        }
-      }
-      constexpr int flops() const { return 10; }  //! flops per element
-    };
-
-    /**
        double cabxpyzAxNorm(float a, complex b, float *x, float *y, float *z){}
        First performs the operation z[i] = y[i] + a*b*x[i]
        Second performs x[i] *= a
