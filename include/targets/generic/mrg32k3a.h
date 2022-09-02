@@ -146,12 +146,12 @@ namespace quda
             = static_cast<uint64_t>(defaultSEED) * static_cast<uint64_t>((static_cast<uint32_t>(seed) ^ 0x55555555u));
           const uint64_t d2 = static_cast<uint64_t>(defaultSEED)
             * static_cast<uint64_t>((static_cast<uint32_t>(seed >> 32u) ^ 0xAAAAAAAAu));
-          prn.s1[0] = static_cast<uint32_t>((d1 % static_cast<uint64_t>(m1));
-          prn.s1[1] = static_cast<uint32_t>((d2 % static_cast<uint64_t>(m1));
-          prn.s1[2] = static_cast<uint32_t>((d1 % static_cast<uint64_t>(m1));
-          prn.s2[0] = static_cast<uint32_t>((d2 % static_cast<uint64_t>(m2));
-          prn.s2[1] = static_cast<uint32_t>((d1 % static_cast<uint64_t>(m2));
-          prn.s2[2] = static_cast<uint32_t>((d2 % static_cast<uint64_t>(m2));
+          prn.s1[0] = static_cast<uint32_t>(d1 % static_cast<uint64_t>(m1));
+          prn.s1[1] = static_cast<uint32_t>(d2 % static_cast<uint64_t>(m1));
+          prn.s1[2] = static_cast<uint32_t>(d1 % static_cast<uint64_t>(m1));
+          prn.s2[0] = static_cast<uint32_t>(d2 % static_cast<uint64_t>(m2));
+          prn.s2[1] = static_cast<uint32_t>(d1 % static_cast<uint64_t>(m2));
+          prn.s2[2] = static_cast<uint32_t>(d2 % static_cast<uint64_t>(m2));
         } else {
           prn.s1[0] = defaultSEED;
           prn.s1[1] = defaultSEED;
