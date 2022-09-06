@@ -22,7 +22,7 @@ namespace quda
       template <typename E, int N> struct Arr {
         constexpr E &operator[](int i) { return d[i]; }
         constexpr const E &operator[](int i) const { return d[i]; }
-        E d[N];
+        E d[N] = {};
       };
 
       template <typename E> struct Arr3 {
@@ -31,7 +31,7 @@ namespace quda
         constexpr E &operator[](int i) { return d[i]; }
         constexpr const E &operator[](int i) const { return d[i]; }
         constexpr bool operator==(const Arr3 &x) const { return d[0] == x.d[0] && d[1] == x.d[1] && d[2] == x.d[2]; }
-        E d[3];
+        E d[3] = {};
       };
 
       template <typename E> inline std::ostream &operator<<(std::ostream &o, const Arr3<E> &a)
