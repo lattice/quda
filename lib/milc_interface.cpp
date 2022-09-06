@@ -655,8 +655,8 @@ void qudaGaugeForce(int precision, int num_loop_types, double milc_loop_coeff[3]
  */
 QudaGaugeParam createGaugeParamForObservables(int precision, QudaMILCSiteArg_t *arg, int phase_in)
 {
-  QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
-      (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, QUDA_WILSON_LINKS);
+  QudaGaugeParam qudaGaugeParam
+    = newMILCGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, QUDA_WILSON_LINKS);
 
   qudaGaugeParam.gauge_offset = arg->link_offset;
   qudaGaugeParam.mom_offset = arg->mom_offset;
@@ -668,7 +668,7 @@ QudaGaugeParam createGaugeParamForObservables(int precision, QudaMILCSiteArg_t *
   // doesn't change the boundary condition flag. This setting guarantees that phases and boundary conditions
   // are consistently set under the hood --- but we still need an extra minus sign on the output.
   qudaGaugeParam.t_boundary = QUDA_PERIODIC_T;
-  //if (phase_in) qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
+  // if (phase_in) qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   if (phase_in) qudaGaugeParam.reconstruct_sloppy = qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
 
   qudaGaugeParam.ga_pad = 0;
@@ -695,8 +695,8 @@ QudaGaugeParam createGaugeParamForObservables(int precision, QudaMILCSiteArg_t *
   return qudaGaugeParam;
 }
 
-void qudaGaugeLoopTracePhased(int precision, double *traces, int** input_path_buf, int* path_length, double *loop_coeff, int num_paths,
-                              int max_length, double factor, QudaMILCSiteArg_t *arg, int phase_in)
+void qudaGaugeLoopTracePhased(int precision, double *traces, int **input_path_buf, int *path_length, double *loop_coeff,
+                              int num_paths, int max_length, double factor, QudaMILCSiteArg_t *arg, int phase_in)
 {
   qudamilc_called<true>(__func__);
 
@@ -707,7 +707,7 @@ void qudaGaugeLoopTracePhased(int precision, double *traces, int** input_path_bu
 
   QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
   obsParam.compute_gauge_loop_trace = QUDA_BOOLEAN_TRUE;
-  obsParam.traces = reinterpret_cast<double _Complex*>(traces);
+  obsParam.traces = reinterpret_cast<double _Complex *>(traces);
   obsParam.input_path_buff = input_path_buf;
   obsParam.path_length = path_length;
   obsParam.loop_coeff = loop_coeff;
@@ -768,9 +768,9 @@ void qudaPolyakovLoopPhased(int precision, double ploop[2], int dir, QudaMILCSit
   return;
 }
 
-void qudaGaugeMeasurementsPhased(int precision, double plaq[3], double ploop[2], int dir, double *traces, int** input_path_buf,
-                                 int* path_length, double *loop_coeff, int num_paths, int max_length, double factor, QudaMILCSiteArg_t *arg,
-                                 int phase_in)
+void qudaGaugeMeasurementsPhased(int precision, double plaq[3], double ploop[2], int dir, double *traces,
+                                 int **input_path_buf, int *path_length, double *loop_coeff, int num_paths,
+                                 int max_length, double factor, QudaMILCSiteArg_t *arg, int phase_in)
 {
   qudamilc_called<true>(__func__);
 
@@ -785,7 +785,7 @@ void qudaGaugeMeasurementsPhased(int precision, double plaq[3], double ploop[2],
   obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
   obsParam.compute_polyakov_loop = QUDA_BOOLEAN_TRUE;
   obsParam.compute_gauge_loop_trace = QUDA_BOOLEAN_TRUE;
-  obsParam.traces = reinterpret_cast<double _Complex*>(traces);
+  obsParam.traces = reinterpret_cast<double _Complex *>(traces);
   obsParam.input_path_buff = input_path_buf;
   obsParam.path_length = path_length;
   obsParam.loop_coeff = loop_coeff;

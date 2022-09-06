@@ -66,21 +66,15 @@ int path_dir_t[][5] = {
 // for gauge loop trace tests; plaquette + rectangle only
 // do not change---these are used for a verification relative
 // to the plaquette as well
-int trace_loop_length[] = {
-  4, 4, 4, 4, 4, 4, 
-  6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6
-};
+int trace_loop_length[] = {4, 4, 4, 4, 4, 4, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6};
 
-double trace_loop_coeff_d[] = {
-  1.1, 1.2, 1.3, 1.4, 1.5, 1.6,
-  2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6
-};
+double trace_loop_coeff_d[]
+  = {1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6};
 
-int trace_path[][6] {
-  {0, 1, 7, 6}, {0, 2, 7, 5}, {0, 3, 7, 4}, {1, 2, 6, 5}, {1, 3, 6, 4}, {2, 3, 5, 4},
-  {0, 0, 1, 7, 7, 6}, {0, 1, 1, 7, 6, 6}, {0, 0, 2, 7, 7, 5}, {0, 2, 2, 7, 5, 5}, {0, 0, 3, 7, 7, 4}, {0, 3, 3, 7, 4, 4},
-  {1, 1, 2, 6, 6, 5}, {1, 2, 2, 6, 5, 5}, {1, 1, 3, 6, 6, 4}, {1, 3, 3, 6, 4, 4}, {2, 2, 3, 5, 5, 4}, {2, 3, 3, 5, 4, 4}
-};
+int trace_path[][6] {{0, 1, 7, 6},       {0, 2, 7, 5},       {0, 3, 7, 4},       {1, 2, 6, 5},       {1, 3, 6, 4},
+                     {2, 3, 5, 4},       {0, 0, 1, 7, 7, 6}, {0, 1, 1, 7, 6, 6}, {0, 0, 2, 7, 7, 5}, {0, 2, 2, 7, 5, 5},
+                     {0, 0, 3, 7, 7, 4}, {0, 3, 3, 7, 4, 4}, {1, 1, 2, 6, 6, 5}, {1, 2, 2, 6, 5, 5}, {1, 1, 3, 6, 6, 4},
+                     {1, 3, 3, 6, 4, 4}, {2, 2, 3, 5, 5, 4}, {2, 3, 3, 5, 4, 4}};
 
 static int force_check;
 static int path_check;
@@ -226,7 +220,8 @@ void gauge_force_test(bool compute_force = true)
   if (compute_force) {
     printfQuda("Force calculation total time = %.2f ms ; overall performance : %.2f GFLOPS\n", time_sec * 1e+3, perf);
   } else {
-    printfQuda("Gauge path calculation total time = %.2f ms ; overall performance : %.2f GFLOPS\n", time_sec * 1e+3, perf);
+    printfQuda("Gauge path calculation total time = %.2f ms ; overall performance : %.2f GFLOPS\n", time_sec * 1e+3,
+               perf);
   }
   for (int dir = 0; dir < 4; dir++) {
     for (int i = 0; i < num_paths; i++) host_free(input_path_buf[dir][i]);
@@ -259,11 +254,10 @@ void gauge_loop_test()
   int *trace_loop_length_p = &trace_loop_length[0];
 
   // b/c we can't cast int*[6] -> int**
-  int** trace_path_p = new int*[num_paths];
+  int **trace_path_p = new int *[num_paths];
   for (int i = 0; i < num_paths; i++) {
     trace_path_p[i] = new int[max_length];
-    for (int j = 0; j < trace_loop_length[i]; j++)
-      trace_path_p[i][j] = trace_path[i][j];
+    for (int j = 0; j < trace_loop_length[i]; j++) trace_path_p[i][j] = trace_path[i][j];
   }
 
   quda::GaugeFieldParam param(gauge_param);
@@ -310,42 +304,39 @@ void gauge_loop_test()
   // compute the plaquette as part of validation
   obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
 
-  if (getTuning() == QUDA_TUNE_YES) {
-    gaugeObservablesQuda(&obsParam);
-  }
+  if (getTuning() == QUDA_TUNE_YES) { gaugeObservablesQuda(&obsParam); }
 
   quda::host_timer_t host_timer;
   // Multiple execution to exclude warmup time in the first run
 
   host_timer.start();
-  for (int i = 0; i < niter; i++) {
-    gaugeObservablesQuda(&obsParam);
-  }
+  for (int i = 0; i < niter; i++) { gaugeObservablesQuda(&obsParam); }
   host_timer.stop();
-  
+
   // 6 loops of length 4, 12 loops of length 6 + 18 paths worth of traces and rescales
   int flops = (4 * 6 + 6 * 12) * 198 + 18 * 8;
 
   std::vector<quda::Complex> traces_ref(num_paths);
 
   if (verify_results) {
-    gauge_loop_trace_reference((void**)U_qdp->Gauge_p(), gauge_param.cpu_prec, traces_ref, scale_factor, trace_path_p, trace_loop_length_p, trace_loop_coeff_p, num_paths);
+    gauge_loop_trace_reference((void **)U_qdp->Gauge_p(), gauge_param.cpu_prec, traces_ref, scale_factor, trace_path_p,
+                               trace_loop_length_p, trace_loop_coeff_p, num_paths);
 
     loop_deviation = 0;
     for (int i = 0; i < num_paths; i++) {
-      double* t_ptr = (double*)(&traces[i]);
+      double *t_ptr = (double *)(&traces[i]);
       std::complex<double> traces_(t_ptr[0], t_ptr[1]);
       auto diff = std::abs(traces_ref[i] - traces_);
       auto norm = std::abs(traces_ref[i]);
       loop_deviation += diff / norm;
-      logQuda(QUDA_VERBOSE, "Loop %d QUDA trace %e + I %e Reference trace %e + I %e Deviation %e\n", i, traces_.real(), traces_.imag(), traces_ref[i].real(), traces_ref[i].imag(), diff / norm);
+      logQuda(QUDA_VERBOSE, "Loop %d QUDA trace %e + I %e Reference trace %e + I %e Deviation %e\n", i, traces_.real(),
+              traces_.imag(), traces_ref[i].real(), traces_ref[i].imag(), diff / norm);
     }
 
     // Second check: we can reconstruct the plaquette from the first six loops we calculated
     double plaq_factor = 1. / (V * U_qdp->Ncolor() * quda::comm_size());
     std::vector<quda::Complex> plaq_components(6);
-    for (int i = 0; i < 6; i++)
-      plaq_components[i] = traces_ref[i] / trace_loop_coeff_d[i] / scale_factor * plaq_factor;
+    for (int i = 0; i < 6; i++) plaq_components[i] = traces_ref[i] / trace_loop_coeff_d[i] / scale_factor * plaq_factor;
 
     double plaq_loop[3];
     // spatial: xy, xz, yz
@@ -354,24 +345,25 @@ void gauge_loop_test()
     plaq_loop[2] = ((plaq_components[2] + plaq_components[4] + plaq_components[5]) / 3.).real();
     plaq_loop[0] = 0.5 * (plaq_loop[1] + plaq_loop[2]);
 
-    //double plaq_default[3];
+    // double plaq_default[3];
 
-    //loadGaugeQuda(sitelink, &gauge_param);
-    //plaqQuda(plaq_default);
+    // loadGaugeQuda(sitelink, &gauge_param);
+    // plaqQuda(plaq_default);
 
     plaq_deviation = std::abs(obsParam.plaquette[0] - plaq_loop[0]) / std::abs(obsParam.plaquette[0]);
-    logQuda(QUDA_VERBOSE, "Plaquette loop space %e time %e total %e ; plaqQuda space %e time %e total %e ; deviation %e\n",
-                          plaq_loop[0], plaq_loop[1], plaq_loop[2], obsParam.plaquette[0], obsParam.plaquette[1], obsParam.plaquette[2], plaq_deviation);
-
+    logQuda(QUDA_VERBOSE,
+            "Plaquette loop space %e time %e total %e ; plaqQuda space %e time %e total %e ; deviation %e\n",
+            plaq_loop[0], plaq_loop[1], plaq_loop[2], obsParam.plaquette[0], obsParam.plaquette[1],
+            obsParam.plaquette[2], plaq_deviation);
   }
 
   double perf = 1.0 * niter * flops * V / (host_timer.last() * 1e+9);
-  printfQuda("Gauge loop trace total time = %.2f ms ; overall performance : %.2f GFLOPS\n", host_timer.last() * 1e+3, perf);
+  printfQuda("Gauge loop trace total time = %.2f ms ; overall performance : %.2f GFLOPS\n", host_timer.last() * 1e+3,
+             perf);
 
   freeGaugeQuda();
 
-  for (int i = 0; i < num_paths; i++)
-    delete[] trace_path_p[i];
+  for (int i = 0; i < num_paths; i++) delete[] trace_path_p[i];
   delete[] trace_path_p;
   delete U_qdp;
   delete U_milc;
@@ -386,12 +378,15 @@ TEST(action, verify)
 
 TEST(path, verify) { ASSERT_EQ(path_check, 1) << "CPU and QUDA path implementations do not agree"; }
 
-TEST(loop_traces, verify) {
+TEST(loop_traces, verify)
+{
   ASSERT_LE(loop_deviation, getTolerance(cuda_prec)) << "CPU and QUDA loop trace implementations do not agree";
 }
 
-TEST(plaquette, verify) {
-  ASSERT_LE(plaq_deviation, getTolerance(cuda_prec)) << "Plaquette from QUDA loop trace and QUDA dedicated plaquette function do not agree";
+TEST(plaquette, verify)
+{
+  ASSERT_LE(plaq_deviation, getTolerance(cuda_prec))
+    << "Plaquette from QUDA loop trace and QUDA dedicated plaquette function do not agree";
 }
 
 static void display_test_info()

@@ -801,7 +801,7 @@ extern "C" {
   } QudaMultigridParam;
 
   typedef struct QudaGaugeObservableParam_s {
-    size_t struct_size;                   /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
     QudaBoolean su_project;               /**< Whether to project onto the manifold prior to measurement */
     QudaBoolean compute_plaquette;        /**< Whether to compute the plaquette */
     double plaquette[3];                  /**< Total, spatial and temporal field energies, respectively */
@@ -819,8 +819,8 @@ extern "C" {
     double qcharge;                       /**< Computed topological charge */
     double energy[3];                     /**< Total, spatial and temporal field energies, respectively */
     QudaBoolean compute_qcharge_density;  /**< Whether to compute the topological charge density */
-    void *qcharge_density;                /**< Pointer to host array of length volume where the q-charge density will be copied */
-    QudaBoolean remove_staggered_phase;   /**< Whether or not the resident gauge field has staggered phases applied and if they should be removed */
+    void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */
+    QudaBoolean remove_staggered_phase; /**< Whether or not the resident gauge field has staggered phases applied and if they should be removed */
   } QudaGaugeObservableParam;
 
   typedef struct QudaGaugeSmearParam_s {
@@ -1392,8 +1392,8 @@ extern "C" {
    * @param[in] max_length The maximum number of non-zero of links in any path in the action
    * @param[in] factor An overall normalization factor
    */
-  void computeGaugeLoopTraceQuda(double_complex* traces, int **input_path_buf, int *path_length, double *loop_coeff,
-                                int num_paths, int max_length, double factor);
+  void computeGaugeLoopTraceQuda(double_complex *traces, int **input_path_buf, int *path_length, double *loop_coeff,
+                                 int num_paths, int max_length, double factor);
 
   /**
    * Evolve the gauge field by step size dt, using the momentum field

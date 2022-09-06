@@ -176,6 +176,6 @@ namespace quda
    * @param[in] dir The direction to compute the Polyakov loop in
    * @param[in] profile TimeProfile instance used for profiling.
    */
-  void gaugePolyakovLoop(double ploop[2], const GaugeField& u, int dir, TimeProfile &profile);
+  void gaugePolyakovLoop(double ploop[2], const GaugeField &u, int dir, TimeProfile &profile);
 
 } // namespace quda

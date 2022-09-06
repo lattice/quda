@@ -744,8 +744,8 @@ extern "C" {
    * @param[in] arg Metadata for MILC's internal site struct array
    * @param[in] phase_in whether staggered phases are applied
    */
-  void qudaGaugeLoopTracePhased(int precision, double *traces, int** input_path_buf, int* path_length, double *loop_coeff, int num_paths,
-                              int max_length, double factor, QudaMILCSiteArg_t *arg, int phase_in);
+  void qudaGaugeLoopTracePhased(int precision, double *traces, int **input_path_buf, int *path_length, double *loop_coeff,
+                                int num_paths, int max_length, double factor, QudaMILCSiteArg_t *arg, int phase_in);
 
   /**
    * Compute the total, spatial, and temporal plaquette. All fields here are CPU fields in
@@ -758,7 +758,7 @@ extern "C" {
    */
   void qudaPlaquettePhased(int precision, double plaq[3], QudaMILCSiteArg_t *arg, int phase_in);
 
-   /**
+  /**
    * Compute the real and imaginary parts of the Polyakov loop in a given direction. All fields here are
    * CPU fields in MILC order, and their precisions should match
    *
@@ -772,7 +772,7 @@ extern "C" {
 
   /**
    * Compute the plaquette, temporal Polyakov loop, and real traces of gauge loops in one go. The
-   * gauge loop traces have a direct application to computing the gauge action. All fields here 
+   * gauge loop traces have a direct application to computing the gauge action. All fields here
    * are CPU fields in MILC order, and their precisions should match.
    *
    * @param[in] precision The precision of the field (2 - double, 1 - single)
@@ -789,9 +789,9 @@ extern "C" {
    * @param[in] arg Metadata for MILC's internal site struct array
    * @param[in] phase_in whether staggered phases are applied
    */
-  void qudaGaugeMeasurementsPhased(int precision, double plaq[3], double ploop[2], int dir, double *traces, int** input_path_buf,
-                                   int* path_length, double *loop_coeff, int num_paths, int max_length, double factor, QudaMILCSiteArg_t *arg,
-                                   int phase_in);
+  void qudaGaugeMeasurementsPhased(int precision, double plaq[3], double ploop[2], int dir, double *traces,
+                                   int **input_path_buf, int *path_length, double *loop_coeff, int num_paths,
+                                   int max_length, double factor, QudaMILCSiteArg_t *arg, int phase_in);
 
   /**
    * Evolve the gauge field by step size dt, using the momentum field

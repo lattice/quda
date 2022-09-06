@@ -4018,10 +4018,8 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   }
 
   // input_path should encode exactly 4 directions
-  std::vector<int**> input_path_v(4);
-  for (int d = 0; d < 4; d++) {
-    input_path_v[d] = input_path_buf[d];
-  }
+  std::vector<int **> input_path_v(4);
+  for (int d = 0; d < 4; d++) { input_path_v[d] = input_path_buf[d]; }
 
   // actually do the computation
   profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -4139,10 +4137,8 @@ int computeGaugePathQuda(void *out, void *siteLink, int ***input_path_buf, int *
   }
 
   // input_path should encode exactly 4 directions
-  std::vector<int**> input_path_v(4);
-  for (int d = 0; d < 4; d++) {
-    input_path_v[d] = input_path_buf[d];
-  }
+  std::vector<int **> input_path_v(4);
+  for (int d = 0; d < 4; d++) { input_path_v[d] = input_path_buf[d]; }
 
   // actually do the computation
   profileGaugePath.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -5252,8 +5248,8 @@ void polyakovLoopQuda(double ploop[2], int dir)
   ploop[1] = obsParam.ploop[1];
 }
 
-void computeGaugeLoopTraceQuda(double _Complex* traces, int **input_path_buf, int *path_length, double *loop_coeff,
-                                    int num_paths, int max_length, double factor)
+void computeGaugeLoopTraceQuda(double _Complex *traces, int **input_path_buf, int *path_length, double *loop_coeff,
+                               int num_paths, int max_length, double factor)
 {
   if (!gaugePrecise) errorQuda("Cannot compute gauge loop traces as there is no resident gauge field");
 

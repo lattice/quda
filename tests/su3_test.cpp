@@ -156,13 +156,13 @@ int main(int argc, char **argv)
   gaugeObservablesQuda(&param);
 
   host_timer.start();
-  for (int i = 0; i < niter; i++)
-    gaugeObservablesQuda(&param);
+  for (int i = 0; i < niter; i++) gaugeObservablesQuda(&param);
   host_timer.stop();
   double secs_plaquette = host_timer.last() / niter;
   double perf_plaquette = flops_plaquette / (secs_plaquette * 1024 * 1024 * 1024);
-  printfQuda("Computed plaquette gauge precise is %.16e (spatial = %.16e, temporal = %.16e), done in %g seconds, %g GFLOPS\n",
-             param.plaquette[0], param.plaquette[1], param.plaquette[2], secs_plaquette, perf_plaquette);
+  printfQuda(
+    "Computed plaquette gauge precise is %.16e (spatial = %.16e, temporal = %.16e), done in %g seconds, %g GFLOPS\n",
+    param.plaquette[0], param.plaquette[1], param.plaquette[2], secs_plaquette, perf_plaquette);
   param.compute_plaquette = QUDA_BOOLEAN_FALSE;
 
   // Compute the temporal Polyakov loop
@@ -172,8 +172,7 @@ int main(int argc, char **argv)
   gaugeObservablesQuda(&param);
 
   host_timer.start();
-  for (int i = 0; i < niter; i++)
-    gaugeObservablesQuda(&param);
+  for (int i = 0; i < niter; i++) gaugeObservablesQuda(&param);
   host_timer.stop();
   double secs_ploop = host_timer.last() / niter;
   double perf_ploop = flops_ploop / (secs_ploop * 1024 * 1024 * 1024);

@@ -157,7 +157,7 @@ template <typename anti_hermitmat, typename su3_matrix>
 static void uncompress_anti_hermitian(anti_hermitmat *mat_antihermit, su3_matrix *mat_su3)
 {
   typename anti_hermitmat::real_t temp1;
-  //typename std::remove_reference<decltype(mat_antihermit->m00im)>::type temp1;
+  // typename std::remove_reference<decltype(mat_antihermit->m00im)>::type temp1;
   mat_su3->e[0][0].imag = mat_antihermit->m00im;
   mat_su3->e[0][0].real = 0.;
   mat_su3->e[1][1].imag = mat_antihermit->m11im;
@@ -319,7 +319,7 @@ int gf_neighborIndexFullLattice(size_t i, int dx[], const lattice_t &lat)
    @param[in] lat Utility lattice information
 */
 template <typename su3_matrix>
-static su3_matrix compute_gauge_path(su3_matrix** sitelink, int i, int *path, int len, int dx[4], const lattice_t &lat)
+static su3_matrix compute_gauge_path(su3_matrix **sitelink, int i, int *path, int len, int dx[4], const lattice_t &lat)
 {
   su3_matrix prev_matrix, curr_matrix;
 
@@ -360,7 +360,6 @@ static su3_matrix compute_gauge_path(su3_matrix** sitelink, int i, int *path, in
   return curr_matrix;
 }
 
-
 // this function compute one path for all lattice sites
 template <typename su3_matrix, typename Float>
 static void compute_path_product(su3_matrix *staple, su3_matrix **sitelink, int *path, int len, Float loop_coeff,
@@ -399,7 +398,6 @@ static dcomplex compute_loop_trace(su3_matrix **sitelink, int *path, int len, do
   CSCALE(accum, loop_coeff);
 
   return accum;
-
 };
 
 template <typename su3_matrix, typename anti_hermitmat, typename Float>
@@ -501,8 +499,8 @@ void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecis
   delete qdp_ex;
 }
 
-void gauge_loop_trace_reference(void **sitelink, QudaPrecision prec, std::vector<quda::Complex>& loop_traces, double factor, int **input_path, int* length,
-                                double *path_coeff, int num_paths)
+void gauge_loop_trace_reference(void **sitelink, QudaPrecision prec, std::vector<quda::Complex> &loop_traces,
+                                double factor, int **input_path, int *length, double *path_coeff, int num_paths)
 {
   // create extended field
   quda::lat_dim_t R;
@@ -514,27 +512,25 @@ void gauge_loop_trace_reference(void **sitelink, QudaPrecision prec, std::vector
 
   auto qdp_ex = quda::createExtendedGauge((void **)sitelink, param, R);
   lattice_t lat(*qdp_ex);
-  void** sitelink_ex = (void**)qdp_ex->Gauge_p();
+  void **sitelink_ex = (void **)qdp_ex->Gauge_p();
 
   std::vector<double> loop_tr_dbl(2 * num_paths);
 
   for (int i = 0; i < num_paths; i++) {
     if (prec == QUDA_DOUBLE_PRECISION) {
-      dcomplex tr = compute_loop_trace((dsu3_matrix**)sitelink_ex, input_path[i], length[i], path_coeff[i], lat);
+      dcomplex tr = compute_loop_trace((dsu3_matrix **)sitelink_ex, input_path[i], length[i], path_coeff[i], lat);
       loop_tr_dbl[2 * i] = factor * tr.real;
       loop_tr_dbl[2 * i + 1] = factor * tr.imag;
     } else {
-      dcomplex tr = compute_loop_trace((fsu3_matrix**)sitelink_ex, input_path[i], length[i], path_coeff[i], lat);
+      dcomplex tr = compute_loop_trace((fsu3_matrix **)sitelink_ex, input_path[i], length[i], path_coeff[i], lat);
       loop_tr_dbl[2 * i] = factor * tr.real;
       loop_tr_dbl[2 * i + 1] = factor * tr.imag;
     }
   }
-  
+
   quda::comm_allreduce_sum(loop_tr_dbl);
 
-  for (int i = 0; i < num_paths; i++)
-    loop_traces[i] = quda::Complex(loop_tr_dbl[2 * i], loop_tr_dbl[2 * i + 1]);
+  for (int i = 0; i < num_paths; i++) loop_traces[i] = quda::Complex(loop_tr_dbl[2 * i], loop_tr_dbl[2 * i + 1]);
 
   delete qdp_ex;
 }
-

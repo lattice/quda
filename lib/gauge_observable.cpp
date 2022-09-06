@@ -26,9 +26,7 @@ namespace quda
     }
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-    if (param.compute_polyakov_loop) {
-      gaugePolyakovLoop(param.ploop, u, 3, profile);
-    }
+    if (param.compute_polyakov_loop) { gaugePolyakovLoop(param.ploop, u, 3, profile); }
 
     if (param.compute_gauge_loop_trace) {
       // wrap 1-d arrays in std::vector
@@ -40,17 +38,16 @@ namespace quda
       }
 
       // input_path should encode exactly 1 direction
-      std::vector<int**> input_path_v(1);
-      for (int d = 0; d < 1; d++) {
-        input_path_v[d] = param.input_path_buff;
-      }
+      std::vector<int **> input_path_v(1);
+      for (int d = 0; d < 1; d++) { input_path_v[d] = param.input_path_buff; }
 
       // prepare trace storage
       std::vector<Complex> loop_traces(param.num_paths);
 
       // actually do the computation
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
-      gaugeLoopTrace(u, loop_traces, param.factor, input_path_v, path_length_v, loop_coeff_v, param.num_paths, param.max_length);
+      gaugeLoopTrace(u, loop_traces, param.factor, input_path_v, path_length_v, loop_coeff_v, param.num_paths,
+                     param.max_length);
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
       for (int i = 0; i < param.num_paths; i++) { memcpy(param.traces + i, &loop_traces[i], sizeof(Complex)); }

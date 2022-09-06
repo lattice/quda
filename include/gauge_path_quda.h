@@ -13,8 +13,8 @@ namespace quda {
      @param[in] num_paths Numer of paths
      @param[in] max_length Maximum length of each path
    */
-  void gaugeForce(GaugeField& mom, const GaugeField& u, double coeff, std::vector<int**>& input_path,
-		  std::vector<int>& length, std::vector<double>& path_coeff, int num_paths, int max_length);
+  void gaugeForce(GaugeField &mom, const GaugeField &u, double coeff, std::vector<int **> &input_path,
+                  std::vector<int> &length, std::vector<double> &path_coeff, int num_paths, int max_length);
 
   /**
      @brief Compute the product of gauge-links along the given path
@@ -27,8 +27,8 @@ namespace quda {
      @param[in] num_paths Numer of paths
      @param[in] max_length Maximum length of each path
    */
-  void gaugePath(GaugeField &out, const GaugeField &u, double coeff, std::vector<int**>& input_path, std::vector<int>& length,
-                 std::vector<double>& path_coeff, int num_paths, int max_length);
+  void gaugePath(GaugeField &out, const GaugeField &u, double coeff, std::vector<int **> &input_path,
+                 std::vector<int> &length, std::vector<double> &path_coeff, int num_paths, int max_length);
 
   /**
      @brief Compute the trace of an arbitrary set of gauge loops
@@ -41,8 +41,8 @@ namespace quda {
      @param[in] num_paths Numer of paths
      @param[in] path_max_length Maximum length of each path
    */
-  void gaugeLoopTrace(const GaugeField& u, std::vector<Complex>& loop_traces, double factor, std::vector<int**>& input_path,
-     std::vector<int>& length, std::vector<double>& path_coeff_h, int num_paths, int path_max_length);
+  void gaugeLoopTrace(const GaugeField &u, std::vector<Complex> &loop_traces, double factor,
+                      std::vector<int **> &input_path, std::vector<int> &length, std::vector<double> &path_coeff_h,
+                      int num_paths, int path_max_length);
 
 } // namespace quda
-
