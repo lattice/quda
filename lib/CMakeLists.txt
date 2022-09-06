@@ -147,9 +147,9 @@ endif()
 
 if(BUILD_FORTRAN_INTERFACE)
   list(APPEND QUDA_OBJS quda_fortran.F90)
-  set_source_files_properties(quda_fortran.F90 PROPERTIES OBJECT_OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/quda_fortran.mod)
-endif()
 
+  # set_source_files_properties(quda_fortran.F90 PROPERTIES OBJECT_OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/quda_fortran.mod)
+endif()
 
 # QUDA_CU_OBJS should contain all cuda files now QUDA_OBJS all c, cpp, fortran sources
 # if we have a git version make version.cpp depend on git head so that it is rebuild if the git sha changed
@@ -388,28 +388,30 @@ endif()
 
 if(QUDA_ARPACK)
   target_compile_definitions(quda PRIVATE ARPACK_LIB)
+
   if(QUDA_ARPACK_LOGGING)
     # ARPACK-NG does not suppport logging - we must warn the user
     message(
       WARNING
       "Specifying QUDA_ARPACK_LOGGING with ARPACK-NG package will cause link failures. Please ensure that QUDA_ARPACK_LOGGING=OFF if downloading ARPACK-NG or using system installed ARPACK-NG"
-      )
+    )
     target_compile_definitions(QUDA_ARPACK_LOGGING ON)
-  endif()
+  endif(QUDA_ARPACK_LOGGING)
+
   if(QUDA_DOWNLOAD_ARPACK)
-    target_link_libraries(quda PUBLIC arpack-ng)
-    target_link_libraries(quda_cpp PUBLIC arpack-ng)
+    target_link_libraries(quda PUBLIC $<BUILD_INTERFACE:ARPACK::arpack>)
+
     if(QUDA_MPI OR QUDA_QMP)
-      target_link_libraries(quda PUBLIC parpack-ng)
-      target_link_libraries(quda_cpp PUBLIC parpack-ng)
+      target_link_libraries(quda PUBLIC $<BUILD_INTERFACE:ARPACK::parpack>)
     endif()
-  else()
+  else(QUDA_DOWNLOAD_ARPACK)
     target_link_libraries(quda INTERFACE ${ARPACK})
+
     if(QUDA_MPI OR QUDA_QMP)
       target_link_libraries(quda INTERFACE ${PARPACK} MPI::MPI_Fortran)
     endif()
-  endif()
-endif()
+  endif(QUDA_DOWNLOAD_ARPACK)
+endif(QUDA_ARPACK)
 
 if(QUDA_OPENBLAS)
   target_compile_definitions(quda PRIVATE OPENBLAS_LIB)
