@@ -32,6 +32,13 @@ extern int E[4];
     (a).imag += (b).imag;                                                                                              \
   }
 
+/* rescale by real scalar */
+#define CSCALE(a, b)                                                                                                   \
+  {                                                                                                                    \
+    (a).real *= b;                                                                                                     \
+    (a).imag *= b;                                                                                                     \
+  }
+
 /* c = a* * b */
 #define CMULJ_(a, b, c)                                                                                                \
   {                                                                                                                    \
@@ -386,12 +393,10 @@ static dcomplex compute_loop_trace(su3_matrix **sitelink, int *path, int len, do
     memset(dx, 0, sizeof(dx));
     tmat = compute_gauge_path(sitelink, i, path, len, dx, lat);
     auto tr = trace_su3(&tmat);
-    accum.real += tr.real;
-    accum.imag += tr.imag;
+    CSUM(accum, tr);
   }
 
-  accum.real *= loop_coeff;
-  accum.imag *= loop_coeff;
+  CSCALE(accum, loop_coeff);
 
   return accum;
 
