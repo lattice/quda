@@ -2821,7 +2821,7 @@ void qudaCloverMultishiftInvert(int external_precision, int quda_precision, int 
 } // qudaCloverMultishiftInvert
 
 void qudaGaugeFixingOVR(int precision, unsigned int gauge_dir, int Nsteps, int verbose_interval, double relax_boost,
-                        double tolerance, unsigned int reunit_interval, unsigned int stopWtheta, QudaMILCSiteArg_t* arg)
+                        double tolerance, unsigned int reunit_interval, unsigned int stopWtheta, QudaMILCSiteArg_t *arg)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
@@ -2837,8 +2837,8 @@ void qudaGaugeFixingOVR(int precision, unsigned int gauge_dir, int Nsteps, int v
   qudaGaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
 
   double timeinfo[3];
-  computeGaugeFixingOVRQuda(gauge, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta, \
-    &qudaGaugeParam, timeinfo);
+  computeGaugeFixingOVRQuda(gauge, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval,
+                            stopWtheta, &qudaGaugeParam, timeinfo);
 
   printfQuda("Time H2D: %lf\n", timeinfo[0]);
   printfQuda("Time to Compute: %lf\n", timeinfo[1]);
