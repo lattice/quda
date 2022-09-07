@@ -820,7 +820,7 @@ extern "C" {
     double energy[3];                     /**< Total, spatial and temporal field energies, respectively */
     QudaBoolean compute_qcharge_density;  /**< Whether to compute the topological charge density */
     void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */
-    QudaBoolean remove_staggered_phase; /**< Whether or not the resident gauge field has staggered phases applied and if they should be removed */
+    QudaBoolean remove_staggered_phase; /**< Whether or not the resident gauge field has staggered phases applied and if they should be removed; this was needed for the Polyakov loop calculation when called through MILC, with the underlying issue documented https://github.com/lattice/quda/issues/1315 */
   } QudaGaugeObservableParam;
 
   typedef struct QudaGaugeSmearParam_s {

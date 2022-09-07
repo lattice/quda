@@ -88,8 +88,6 @@ void gauge_force_test(bool compute_force = true)
 {
   int max_length = 6;
 
-  setVerbosityQuda(QUDA_VERBOSE, "", stdout);
-
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setGaugeParam(gauge_param);
 
@@ -129,14 +127,15 @@ void gauge_force_test(bool compute_force = true)
   quda::GaugeFieldParam param(gauge_param);
   param.create = QUDA_NULL_FIELD_CREATE;
   param.order = QUDA_QDP_GAUGE_ORDER;
-  auto U_qdp = new quda::cpuGaugeField(param);
+  param.location = QUDA_CPU_FIELD_LOCATION;
+  quda::cpuGaugeField U_qdp(param);
 
   // fills the gauge field with random numbers
-  createSiteLinkCPU((void **)U_qdp->Gauge_p(), gauge_param.cpu_prec, 0);
+  createSiteLinkCPU((void **)U_qdp.Gauge_p(), gauge_param.cpu_prec, 0);
 
   param.order = QUDA_MILC_GAUGE_ORDER;
-  auto U_milc = new quda::cpuGaugeField(param);
-  if (gauge_order == QUDA_MILC_GAUGE_ORDER) U_milc->copy(*U_qdp);
+  quda::cpuGaugeField U_milc(param);
+  if (gauge_order == QUDA_MILC_GAUGE_ORDER) U_milc.copy(U_qdp);
   if (compute_force) {
     param.reconstruct = QUDA_RECONSTRUCT_10;
     param.link_type = QUDA_ASQTAD_MOM_LINKS;
@@ -144,27 +143,27 @@ void gauge_force_test(bool compute_force = true)
     param.reconstruct = QUDA_RECONSTRUCT_NO;
   }
   param.create = QUDA_ZERO_FIELD_CREATE;
-  auto Mom_milc = new quda::cpuGaugeField(param);
-  auto Mom_ref_milc = new quda::cpuGaugeField(param);
+  quda::cpuGaugeField Mom_milc(param);
+  quda::cpuGaugeField Mom_ref_milc(param);
 
   param.order = QUDA_QDP_GAUGE_ORDER;
-  auto Mom_qdp = new quda::cpuGaugeField(param);
+  quda::cpuGaugeField Mom_qdp(param);
 
   // initialize some data in cpuMom
   if (compute_force) {
-    createMomCPU(Mom_ref_milc->Gauge_p(), gauge_param.cpu_prec);
-    if (gauge_order == QUDA_MILC_GAUGE_ORDER) Mom_milc->copy(*Mom_ref_milc);
-    if (gauge_order == QUDA_QDP_GAUGE_ORDER) Mom_qdp->copy(*Mom_ref_milc);
+    createMomCPU(Mom_ref_milc.Gauge_p(), gauge_param.cpu_prec);
+    if (gauge_order == QUDA_MILC_GAUGE_ORDER) Mom_milc.copy(Mom_ref_milc);
+    if (gauge_order == QUDA_QDP_GAUGE_ORDER) Mom_qdp.copy(Mom_ref_milc);
   }
   void *mom = nullptr;
   void *sitelink = nullptr;
 
   if (gauge_order == QUDA_MILC_GAUGE_ORDER) {
-    sitelink = U_milc->Gauge_p();
-    mom = Mom_milc->Gauge_p();
+    sitelink = U_milc.Gauge_p();
+    mom = Mom_milc.Gauge_p();
   } else if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
-    sitelink = U_qdp->Gauge_p();
-    mom = Mom_qdp->Gauge_p();
+    sitelink = U_qdp.Gauge_p();
+    mom = Mom_qdp.Gauge_p();
   } else {
     errorQuda("Unsupported gauge order %d", gauge_order);
   }
@@ -183,7 +182,7 @@ void gauge_force_test(bool compute_force = true)
 
   auto &Mom_ = gauge_order == QUDA_MILC_GAUGE_ORDER ? Mom_milc : Mom_qdp;
   for (int i = 0; i < niter; i++) {
-    Mom_->copy(*Mom_ref_milc); // restore initial momentum for correctness
+    Mom_.copy(Mom_ref_milc); // restore initial momentum for correctness
     host_timer.start();
     if (compute_force)
       computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3,
@@ -193,27 +192,27 @@ void gauge_force_test(bool compute_force = true)
     host_timer.stop();
     time_sec += host_timer.last();
   }
-  if (gauge_order == QUDA_QDP_GAUGE_ORDER) Mom_milc->copy(*Mom_qdp);
+  if (gauge_order == QUDA_QDP_GAUGE_ORDER) Mom_milc.copy(Mom_qdp);
 
   // The number comes from CPU implementation in MILC, gauge_force_imp.c
   int flops = 153004;
 
-  void *refmom = Mom_ref_milc->Gauge_p();
+  void *refmom = Mom_ref_milc.Gauge_p();
   int *check_out = compute_force ? &force_check : &path_check;
   if (verify_results) {
-    gauge_force_reference(refmom, eb3, (void **)U_qdp->Gauge_p(), gauge_param.cpu_prec, input_path_buf, length,
+    gauge_force_reference(refmom, eb3, (void **)U_qdp.Gauge_p(), gauge_param.cpu_prec, input_path_buf, length,
                           loop_coeff, num_paths, compute_force);
-    *check_out = compare_floats(Mom_milc->Gauge_p(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec),
+    *check_out = compare_floats(Mom_milc.Gauge_p(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec),
                                 gauge_param.cpu_prec);
-    if (compute_force) strong_check_mom(Mom_milc->Gauge_p(), refmom, 4 * V, gauge_param.cpu_prec);
+    if (compute_force) strong_check_mom(Mom_milc.Gauge_p(), refmom, 4 * V, gauge_param.cpu_prec);
   }
 
   if (compute_force) {
-    printfQuda("\nComputing momentum action\n");
+    logQuda(QUDA_VERBOSE, "\nComputing momentum action\n");
     auto action_quda = momActionQuda(mom, &gauge_param);
     auto action_ref = mom_action(refmom, gauge_param.cpu_prec, 4 * V);
     force_deviation = std::abs(action_quda - action_ref) / std::abs(action_ref);
-    printfQuda("QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref, force_deviation);
+    logQuda(QUDA_VERBOSE, "QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref, force_deviation);
   }
 
   double perf = 1.0 * niter * flops * V / (time_sec * 1e+9);
@@ -227,19 +226,11 @@ void gauge_force_test(bool compute_force = true)
     for (int i = 0; i < num_paths; i++) host_free(input_path_buf[dir][i]);
     host_free(input_path_buf[dir]);
   }
-
-  delete U_qdp;
-  delete U_milc;
-  delete Mom_qdp;
-  delete Mom_milc;
-  delete Mom_ref_milc;
 }
 
 void gauge_loop_test()
 {
   int max_length = 6;
-
-  setVerbosityQuda(QUDA_VERBOSE, "", stdout);
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
@@ -263,21 +254,22 @@ void gauge_loop_test()
   quda::GaugeFieldParam param(gauge_param);
   param.create = QUDA_NULL_FIELD_CREATE;
   param.order = QUDA_QDP_GAUGE_ORDER;
-  auto U_qdp = new quda::cpuGaugeField(param);
+  param.location = QUDA_CPU_FIELD_LOCATION;
+  quda::cpuGaugeField U_qdp(param);
 
   // fills the gauge field with random numbers
-  createSiteLinkCPU((void **)U_qdp->Gauge_p(), gauge_param.cpu_prec, 0);
+  createSiteLinkCPU((void **)U_qdp.Gauge_p(), gauge_param.cpu_prec, 0);
 
   param.order = QUDA_MILC_GAUGE_ORDER;
-  auto U_milc = new quda::cpuGaugeField(param);
-  if (gauge_order == QUDA_MILC_GAUGE_ORDER) U_milc->copy(*U_qdp);
+  quda::cpuGaugeField U_milc(param);
+  if (gauge_order == QUDA_MILC_GAUGE_ORDER) U_milc.copy(U_qdp);
 
   void *sitelink = nullptr;
 
   if (gauge_order == QUDA_MILC_GAUGE_ORDER) {
-    sitelink = U_milc->Gauge_p();
+    sitelink = U_milc.Gauge_p();
   } else if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
-    sitelink = U_qdp->Gauge_p();
+    sitelink = U_qdp.Gauge_p();
   } else {
     errorQuda("Unsupported gauge order %d", gauge_order);
   }
@@ -319,7 +311,7 @@ void gauge_loop_test()
   std::vector<quda::Complex> traces_ref(num_paths);
 
   if (verify_results) {
-    gauge_loop_trace_reference((void **)U_qdp->Gauge_p(), gauge_param.cpu_prec, traces_ref, scale_factor, trace_path_p,
+    gauge_loop_trace_reference((void **)U_qdp.Gauge_p(), gauge_param.cpu_prec, traces_ref, scale_factor, trace_path_p,
                                trace_loop_length_p, trace_loop_coeff_p, num_paths);
 
     loop_deviation = 0;
@@ -334,7 +326,7 @@ void gauge_loop_test()
     }
 
     // Second check: we can reconstruct the plaquette from the first six loops we calculated
-    double plaq_factor = 1. / (V * U_qdp->Ncolor() * quda::comm_size());
+    double plaq_factor = 1. / (V * U_qdp.Ncolor() * quda::comm_size());
     std::vector<quda::Complex> plaq_components(6);
     for (int i = 0; i < 6; i++) plaq_components[i] = traces_ref[i] / trace_loop_coeff_d[i] / scale_factor * plaq_factor;
 
@@ -344,11 +336,6 @@ void gauge_loop_test()
     // temporal: xt, yt, zt
     plaq_loop[2] = ((plaq_components[2] + plaq_components[4] + plaq_components[5]) / 3.).real();
     plaq_loop[0] = 0.5 * (plaq_loop[1] + plaq_loop[2]);
-
-    // double plaq_default[3];
-
-    // loadGaugeQuda(sitelink, &gauge_param);
-    // plaqQuda(plaq_default);
 
     plaq_deviation = std::abs(obsParam.plaquette[0] - plaq_loop[0]) / std::abs(obsParam.plaquette[0]);
     logQuda(QUDA_VERBOSE,
@@ -365,8 +352,6 @@ void gauge_loop_test()
 
   for (int i = 0; i < num_paths; i++) delete[] trace_path_p[i];
   delete[] trace_path_p;
-  delete U_qdp;
-  delete U_milc;
 }
 
 TEST(force, verify) { ASSERT_EQ(force_check, 1) << "CPU and QUDA force implementations do not agree"; }

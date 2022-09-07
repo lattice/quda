@@ -16,8 +16,8 @@ namespace quda {
     static constexpr bool compute_force = force_;
     using Link = Matrix<complex<real>, nColor>;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
-    typedef typename gauge_mapper<real,recon_u>::type Gauge;
-    typedef typename gauge_mapper<real,recon_m>::type Mom;
+    using Gauge = typename gauge_mapper<real,recon_u>::type;
+    using Mom = typename gauge_mapper<real,recon_m>::type;
 
     Mom mom;
     const Gauge u;

@@ -26,11 +26,11 @@ namespace quda {
     static constexpr QudaReconstructType recon = recon_;
     using Link = Matrix<complex<real>, nColor>;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
-    typedef typename gauge_mapper<real,recon>::type Gauge;
+    using Gauge = typename gauge_mapper<real,recon>::type;
 
     const Gauge u;
 
-    const double factor;
+    const double factor; // overall scaling factor for all loops
     static constexpr int nParity = 2; // always true for gauge fields
     int X[4]; // the regular volume parameters
     int E[4]; // the extended volume parameters
