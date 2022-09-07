@@ -169,4 +169,13 @@ namespace quda
   */
   void computeQChargeDensity(double energy[3], double &qcharge, void *qdensity, const GaugeField &Fmunu);
 
+  /**
+   * @brief Compute the trace of the Polyakov loop in a given dimension
+   * @param[out] ploop The real and imaginary parts of the Polyakov loop
+   * @param[in] gauge The gauge field upon which to compute the Polyakov loop
+   * @param[in] dir The direction to compute the Polyakov loop in
+   * @param[in] profile TimeProfile instance used for profiling.
+   */
+  void gaugePolyakovLoop(double ploop[2], const GaugeField &u, int dir, TimeProfile &profile);
+
 } // namespace quda
