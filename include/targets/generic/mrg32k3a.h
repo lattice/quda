@@ -121,16 +121,24 @@ namespace quda
       __device__ constexpr auto a2sq_d = a2sq;
 
       // default functor for grabbing the appropriate a1sq
-      template <bool is_device> struct get_a1sq { constexpr auto operator()(int i) { return a1sq[i]; } };
+      template <bool is_device> struct get_a1sq {
+        constexpr auto operator()(int i) { return a1sq[i]; }
+      };
 
       // device-specialized functor for grabbing the appropriate a1sq
-      template <> struct get_a1sq<true> { constexpr auto operator()(int i) { return a1sq_d[i]; } };
+      template <> struct get_a1sq<true> {
+        constexpr auto operator()(int i) { return a1sq_d[i]; }
+      };
 
       // default functor for grabbing the appropriate a2sq
-      template <bool is_device> struct get_a2sq { constexpr auto operator()(int i) { return a2sq[i]; } };
+      template <bool is_device> struct get_a2sq {
+        constexpr auto operator()(int i) { return a2sq[i]; }
+      };
 
       // device-specialized functor for grabbing the appropriate a2sq
-      template <> struct get_a2sq<true> { constexpr auto operator()(int i) { return a2sq_d[i]; } };
+      template <> struct get_a2sq<true> {
+        constexpr auto operator()(int i) { return a2sq_d[i]; }
+      };
 
       static_assert(a1sq_d[76]
                       == Trans {State {82758667u, 1871391091u, 4127413238u}, State {3672831523u, 69195019u, 1871391091u},
