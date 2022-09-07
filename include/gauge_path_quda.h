@@ -1,6 +1,7 @@
 #pragma once
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief Compute the gauge-force contribution to the momentum

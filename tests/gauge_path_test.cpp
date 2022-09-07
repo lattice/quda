@@ -202,8 +202,8 @@ void gauge_force_test(bool compute_force = true)
   if (verify_results) {
     gauge_force_reference(refmom, eb3, (void **)U_qdp.Gauge_p(), gauge_param.cpu_prec, input_path_buf, length,
                           loop_coeff, num_paths, compute_force);
-    *check_out = compare_floats(Mom_milc.Gauge_p(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec),
-                                gauge_param.cpu_prec);
+    *check_out
+      = compare_floats(Mom_milc.Gauge_p(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec), gauge_param.cpu_prec);
     if (compute_force) strong_check_mom(Mom_milc.Gauge_p(), refmom, 4 * V, gauge_param.cpu_prec);
   }
 
@@ -212,7 +212,8 @@ void gauge_force_test(bool compute_force = true)
     auto action_quda = momActionQuda(mom, &gauge_param);
     auto action_ref = mom_action(refmom, gauge_param.cpu_prec, 4 * V);
     force_deviation = std::abs(action_quda - action_ref) / std::abs(action_ref);
-    logQuda(QUDA_VERBOSE, "QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref, force_deviation);
+    logQuda(QUDA_VERBOSE, "QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref,
+            force_deviation);
   }
 
   double perf = 1.0 * niter * flops * V / (time_sec * 1e+9);
