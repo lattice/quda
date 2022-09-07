@@ -22,7 +22,7 @@ namespace quda
       template <typename E, int N> struct Arr {
         constexpr E &operator[](int i) { return d[i]; }
         constexpr const E &operator[](int i) const { return d[i]; }
-        E d[N];
+        E d[N] = {};
       };
 
       template <typename E> struct Arr3 {
@@ -31,7 +31,7 @@ namespace quda
         constexpr E &operator[](int i) { return d[i]; }
         constexpr const E &operator[](int i) const { return d[i]; }
         constexpr bool operator==(const Arr3 &x) const { return d[0] == x.d[0] && d[1] == x.d[1] && d[2] == x.d[2]; }
-        E d[3];
+        E d[3] = {};
       };
 
       template <typename E> inline std::ostream &operator<<(std::ostream &o, const Arr3<E> &a)
@@ -51,7 +51,7 @@ namespace quda
         return o << "MRG32k3a(" << prn.s1 << ' ' << prn.s2 << ')';
       }
 
-      inline constexpr Trans squaremod(Trans a, uint64_t m)
+      constexpr Trans squaremod(Trans a, uint64_t m)
       {
         Trans x;
         for (int i = 0; i < 3; ++i) {
@@ -69,7 +69,7 @@ namespace quda
         return x;
       }
 
-      template <int p> inline constexpr Arr<Trans, p> squaremodarray(Trans a, uint64_t m)
+      template <int p> constexpr Arr<Trans, p> squaremodarray(Trans a, uint64_t m)
       {
         Arr<Trans, p> x;
         x[0] = a;
@@ -77,7 +77,7 @@ namespace quda
         return x;
       }
 
-      inline void matvecmod(Trans a, State &v, uint64_t m)
+      constexpr void matvecmod(Trans a, State &v, uint64_t m)
       {
         uint64_t v0 = static_cast<uint64_t>(v[0]);
         uint64_t v1 = static_cast<uint64_t>(v[1]);
@@ -112,10 +112,27 @@ namespace quda
                           State {static_cast<uint32_t>(m2 - a23n), 0u, static_cast<uint32_t>(a21)}};
 
       constexpr int maxpower2 = 190;
-      constexpr Arr<Trans, maxpower2> a1sq = squaremodarray<maxpower2>(a1, static_cast<uint64_t>(m1));
-      constexpr Arr<Trans, maxpower2> a2sq = squaremodarray<maxpower2>(a2, static_cast<uint64_t>(m2));
 
-      static_assert(a1sq[76]
+      constexpr auto a1sq = squaremodarray<maxpower2>(a1, static_cast<uint64_t>(m1));
+      constexpr auto a2sq = squaremodarray<maxpower2>(a2, static_cast<uint64_t>(m2));
+
+      // device copies of a1sq and a2sq
+      __device__ constexpr auto a1sq_d = a1sq;
+      __device__ constexpr auto a2sq_d = a2sq;
+
+      // default functor for grabbing the appropriate a1sq
+      template <bool is_device> struct get_a1sq { constexpr auto operator()(int i) { return a1sq[i]; } };
+
+      // device-specialized functor for grabbing the appropriate a1sq
+      template <> struct get_a1sq<true> { constexpr auto operator()(int i) { return a1sq_d[i]; } };
+
+      // default functor for grabbing the appropriate a2sq
+      template <bool is_device> struct get_a2sq { constexpr auto operator()(int i) { return a2sq[i]; } };
+
+      // device-specialized functor for grabbing the appropriate a2sq
+      template <> struct get_a2sq<true> { constexpr auto operator()(int i) { return a2sq_d[i]; } };
+
+      static_assert(a1sq_d[76]
                       == Trans {State {82758667u, 1871391091u, 4127413238u}, State {3672831523u, 69195019u, 1871391091u},
                                 State {3672091415u, 3528743235u, 69195019u}},
                     "a1sq[76] wrong!");
@@ -125,21 +142,21 @@ namespace quda
                                 State {3859662829u, 4292754251u, 3708466080u}},
                     "a2sq[76] wrong!");
 
-      inline void skip(MRG32k3a &prn, uint64_t offset, int base = 0)
+      constexpr void skip(MRG32k3a &prn, uint64_t offset, int base = 0)
       {
         int i = 0;
         uint64_t s = offset;
         while (s > 0) {
           if (s & 1u) {
-            matvecmod(a1sq[base + i], prn.s1, static_cast<uint64_t>(m1));
-            matvecmod(a2sq[base + i], prn.s2, static_cast<uint64_t>(m2));
+            matvecmod(target::dispatch<get_a1sq>(base + i), prn.s1, static_cast<uint64_t>(m1));
+            matvecmod(target::dispatch<get_a2sq>(base + i), prn.s2, static_cast<uint64_t>(m2));
           }
           s >>= 1u;
           ++i;
         }
       }
 
-      inline void seed(MRG32k3a &prn, uint64_t seed, uint64_t subsequence)
+      constexpr void seed(MRG32k3a &prn, uint64_t seed, uint64_t subsequence)
       {
         if (seed) {
           const uint64_t d1
@@ -163,17 +180,16 @@ namespace quda
         skip(prn, subsequence, subsequenceBase);
       }
 
-      inline double uniform(MRG32k3a &prn)
+      constexpr double uniform(MRG32k3a &prn)
       {
-        double p1, p2;
-        p1 = a12 * (double)(prn.s1[1]) - a13n * (double)(prn.s1[0]);
+        double p1 = a12 * (double)(prn.s1[1]) - a13n * (double)(prn.s1[0]);
         p1 = std::fmod(p1, m1);
         if (p1 < 0.0) p1 += m1;
         prn.s1[0] = prn.s1[1];
         prn.s1[1] = prn.s1[2];
         prn.s1[2] = static_cast<uint32_t>(p1);
 
-        p2 = a21 * (double)(prn.s2[2]) - a23n * (double)(prn.s2[0]);
+        double p2 = a21 * (double)(prn.s2[2]) - a23n * (double)(prn.s2[0]);
         p2 = std::fmod(p2, m2);
         if (p2 < 0.0) p2 += m2;
         prn.s2[0] = prn.s2[1];

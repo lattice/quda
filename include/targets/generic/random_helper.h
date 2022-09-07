@@ -20,7 +20,7 @@ namespace quda
    * @param [in] offset -- the offset
    * @param [in,out] state - the RNG State
    */
-  inline void random_init(unsigned long long seed, unsigned long long sequence, unsigned long long offset, RNGState &state)
+  constexpr void random_init(unsigned long long seed, unsigned long long sequence, unsigned long long offset, RNGState &state)
   {
     target::rng::seed(state.state, seed, sequence);
     target::rng::skip(state.state, offset);
@@ -39,7 +39,7 @@ namespace quda
      * \brief Return a uniform deviate between 0 and 1
      * @param [in,out] the RNG State
      */
-    static inline float rand(RNGState &state) { return (float)target::rng::uniform(state.state); }
+    static constexpr float rand(RNGState &state) { return (float)target::rng::uniform(state.state); }
 
     /**
      * \brief return a uniform deviate between a and b
@@ -47,7 +47,7 @@ namespace quda
      * @param [in] a (the lower end of the range)
      * @param [in] b (the upper end of the range)
      */
-    static inline float rand(RNGState &state, float a, float b)
+    static constexpr float rand(RNGState &state, float a, float b)
     {
       return a + (b - a) * (float)target::rng::uniform(state.state);
     }
@@ -58,7 +58,7 @@ namespace quda
      * \brief Return a uniform deviate between 0 and 1
      * @param [in,out] the RNG State
      */
-    static inline double rand(RNGState &state) { return target::rng::uniform(state.state); }
+    static constexpr double rand(RNGState &state) { return target::rng::uniform(state.state); }
 
     /**
      * \brief Return a uniform deviate between a and b
@@ -66,7 +66,7 @@ namespace quda
      * @param [in] a -- the lower end of the range
      * @param [in] b -- the high end of the range
      */
-    static inline double rand(RNGState &state, double a, double b)
+    static constexpr double rand(RNGState &state, double a, double b)
     {
       return a + (b - a) * target::rng::uniform(state.state);
     }
