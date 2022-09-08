@@ -192,7 +192,10 @@ if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
   include(targets/cuda/target_cuda.cmake)
 endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
-	include(targets/hip/target_hip.cmake)
+  include(targets/hip/target_hip.cmake)
+endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "SYCL")
+  include(targets/sycl/target_sycl.cmake)
 endif()
 
 # make one library
@@ -203,9 +206,9 @@ include(CheckLinkerFlag)
 check_linker_flag(CXX "-Wl,--compress-debug-sections=zlib" QUDA_LINKER_COMPRESS)
 target_link_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_LINKER_COMPRESS}:-Wl,--compress-debug-sections=zlib>>)
 
-# set up QUDA compile options
+# set up QUDA compile options, put them before target specific options
 target_compile_options(
-  quda PRIVATE $<$<COMPILE_LANGUAGE:CXX,C,Fortran>: 
+  quda BEFORE PRIVATE $<$<COMPILE_LANGUAGE:CXX,C,Fortran>:
                $<IF:$<CONFIG:RELEASE>,-w,-Wall -Wextra>
                $<$<CONFIG:STRICT>:-Werror>
   >)
