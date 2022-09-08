@@ -1347,7 +1347,9 @@ namespace quda
       vec_infile += "_nvec_";
       vec_infile += std::to_string(param.mg_global.n_vec[param.level]);
       VectorIO io(vec_infile);
-      io.load(B);
+      vector_ref<ColorSpinorField> B_ref;
+      for (auto i = 0u; i < B.size(); i++) B_ref.push_back(*B[i]);
+      io.load(std::move(B_ref));
       popLevel();
       profile_global.TPSTOP(QUDA_PROFILE_IO);
       if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);
@@ -1369,7 +1371,9 @@ namespace quda
       vec_outfile += "_nvec_";
       vec_outfile += std::to_string(param.mg_global.n_vec[param.level]);
       VectorIO io(vec_outfile);
-      io.save(B);
+      vector_ref<const ColorSpinorField> B_ref;
+      for (auto i = 0u; i < B.size(); i++) B_ref.push_back(*B[i]);
+      io.save(std::move(B_ref));
       popLevel();
       profile_global.TPSTOP(QUDA_PROFILE_IO);
       if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);

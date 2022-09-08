@@ -32,35 +32,12 @@ namespace quda
     void load(vector_ref<ColorSpinorField> &&vecs);
 
     /**
-       @brief Load vectors from filename.  Generic interface that
-       accepts vector of fields or vector of pointers
-       @param[in] vecs The set of vectors to load
-    */
-    template <typename T> void load(T &&vecs)
-    {
-      load(make_set(vecs));
-    }
-
-    /**
        @brief Save vectors to filename
        @param[in] vecs The set of vectors to save
        @param[in] prec Optional change of precision when saving
        @param[in] size Optional cap to number of vectors saved
     */
     void save(vector_ref<const ColorSpinorField> &&vecs, QudaPrecision prec = QUDA_INVALID_PRECISION, uint32_t size = 0);
-
-    /**
-       @brief Save vectors to filename.  Generic interface that
-       accepts vector of fields or vector of pointers
-       @param[in] vecs The set of vectors to save
-       @param[in] prec Optional change of precision when saving
-       @param[in] size Optional cap to number of vectors saved
-    */
-    template <typename T>
-    void save(T &&vecs, QudaPrecision prec = QUDA_INVALID_PRECISION, uint32_t size = 0)
-    {
-      save(make_set(vecs), prec, size);
-    }
 
   };
 
