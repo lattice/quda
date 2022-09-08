@@ -303,14 +303,8 @@ namespace quda {
     /** Coarse temporary vector */
     ColorSpinorField *tmp_coarse;
 
-    /** Coarse temporary vector */
-    ColorSpinorField *tmp2_coarse;
-
     /** Sloppy coarse temporary vector */
     ColorSpinorField *tmp_coarse_sloppy;
-
-    /** Sloppy coarse temporary vector */
-    ColorSpinorField *tmp2_coarse_sloppy;
 
     /** Kahler-Dirac Xinv */
     std::shared_ptr<GaugeField> xInvKD;

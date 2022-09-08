@@ -51,9 +51,6 @@ namespace quda {
     double tm_rho;  // "rho"-type Hasenbusch mass used for twisted clover (like regular rho but
                     // applied like a twisted mass and ignored in the inverse)
 
-    ColorSpinorField *tmp1;
-    ColorSpinorField *tmp2; // used by Wilson-like kernels only
-
     int commDim[QUDA_MAX_DIM]; // whether to do comms or not
 
     QudaPrecision halo_precision; // only does something for DiracCoarse at present
@@ -80,8 +77,6 @@ namespace quda {
       mu_factor(0.0),
       epsilon(0.0),
       tm_rho(0.0),
-      tmp1(0),
-      tmp2(0),
       halo_precision(QUDA_INVALID_PRECISION),
       need_bidirectional(false),
 #ifdef QUDA_MMA_AVAILABLE

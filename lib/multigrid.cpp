@@ -35,9 +35,7 @@ namespace quda
     r_coarse(nullptr),
     x_coarse(nullptr),
     tmp_coarse(nullptr),
-    tmp2_coarse(nullptr),
     tmp_coarse_sloppy(nullptr),
-    tmp2_coarse_sloppy(nullptr),
     xInvKD(nullptr),
     xInvKD_sloppy(nullptr),
     diracResidual(param.matResidual->Expose()),
@@ -167,11 +165,6 @@ namespace quda
         if (!tmp_coarse)
           tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
                                                 param.mg_global.location[param.level + 1]);
-
-        // create coarse temporary vector if not already created in verify()
-        if (!tmp2_coarse)
-          tmp2_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
-                                                 param.mg_global.location[param.level + 1]);
 
         // create coarse residual vector if not already created in verify()
         if (!r_coarse)
@@ -445,8 +438,6 @@ namespace quda
       diracParam.dagger = QUDA_DAG_NO;
       diracParam.matpcType = matpc_type;
       diracParam.type = QUDA_COARSE_DIRAC;
-      diracParam.tmp1 = tmp_coarse;
-      diracParam.tmp2 = tmp2_coarse;
       diracParam.halo_precision = param.mg_global.precision_null[param.level];
       diracParam.use_mma = param.use_mma;
       diracParam.allow_truncation = (param.mg_global.allow_truncation == QUDA_BOOLEAN_TRUE) ? true : false;
@@ -460,8 +451,6 @@ namespace quda
 
       if (param.mg_global.smoother_solve_type[param.level + 1] == QUDA_DIRECT_PC_SOLVE) {
         diracParam.type = QUDA_COARSEPC_DIRAC;
-        diracParam.tmp1 = &(tmp_coarse->Even());
-        diracParam.tmp2 = &(tmp2_coarse->Even());
         diracCoarseSmoother = new DiracCoarsePC(static_cast<DiracCoarse &>(*diracCoarseResidual), diracParam);
         {
           bool schwarz = param.mg_global.smoother_schwarz_type[param.level + 1] != QUDA_INVALID_SCHWARZ;
@@ -470,8 +459,6 @@ namespace quda
         diracCoarseSmootherSloppy = new DiracCoarsePC(static_cast<DiracCoarse &>(*diracCoarseSmoother), diracParam);
       } else {
         diracParam.type = QUDA_COARSE_DIRAC;
-        diracParam.tmp1 = tmp_coarse;
-        diracParam.tmp2 = tmp2_coarse;
         diracCoarseSmoother = new DiracCoarse(static_cast<DiracCoarse &>(*diracCoarseResidual), diracParam);
         {
           bool schwarz = param.mg_global.smoother_schwarz_type[param.level + 1] != QUDA_INVALID_SCHWARZ;
@@ -542,7 +529,6 @@ namespace quda
       sloppy_tmp_param.setPrecision(param.mg_global.invert_param->cuda_prec_precondition);
 
       tmp_coarse_sloppy = new ColorSpinorField(sloppy_tmp_param);
-      tmp2_coarse_sloppy = new ColorSpinorField(sloppy_tmp_param);
 
     } else {
       // We can just alias fields
@@ -562,9 +548,6 @@ namespace quda
     diracParamKD.dirac
       = const_cast<Dirac *>(diracSmoother); // used to determine if the outer solve is preconditioned or not
 
-    diracParamKD.tmp1 = tmp_coarse;
-    diracParamKD.tmp2 = tmp2_coarse;
-
     if (is_coarse_naive_staggered) {
       diracParamKD.type = QUDA_STAGGEREDKD_DIRAC;
 
@@ -574,8 +557,6 @@ namespace quda
         diracParamKD.gauge = sloppy_gauge;
         diracParamKD.xInvKD = xInvKD_sloppy.get();
         diracParamKD.dirac = nullptr;
-        diracParamKD.tmp1 = tmp_coarse_sloppy;
-        diracParamKD.tmp2 = tmp2_coarse_sloppy;
       }
       diracCoarseSmootherSloppy = new DiracStaggeredKD(diracParamKD);
 
@@ -593,8 +574,6 @@ namespace quda
         diracParamKD.longGauge = diracSmootherSloppy->getStaggeredLongLinkField();
         diracParamKD.xInvKD = xInvKD_sloppy.get();
         diracParamKD.dirac = nullptr;
-        diracParamKD.tmp1 = tmp_coarse_sloppy;
-        diracParamKD.tmp2 = tmp2_coarse_sloppy;
       }
 
       diracCoarseSmootherSloppy = new DiracImprovedStaggeredKD(diracParamKD);
@@ -813,9 +792,7 @@ namespace quda
     if (r_coarse) delete r_coarse;
     if (x_coarse) delete x_coarse;
     if (tmp_coarse) delete tmp_coarse;
-    if (tmp2_coarse) delete tmp2_coarse;
     if (tmp_coarse_sloppy) delete tmp_coarse_sloppy;
-    if (tmp2_coarse_sloppy) delete tmp2_coarse_sloppy;
 
     if (param_coarse) delete param_coarse;
 
@@ -962,11 +939,6 @@ namespace quda
     if (!tmp_coarse)
       tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
                                             param.mg_global.location[param.level + 1]);
-
-    // create coarse temporary vector if not already created in verify()
-    if (!tmp2_coarse)
-      tmp2_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
-                                             param.mg_global.location[param.level + 1]);
 
     // create coarse residual vector if not already created in verify()
     if (!r_coarse)

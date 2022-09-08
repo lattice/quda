@@ -4755,7 +4755,6 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
     (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE);
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc_solve);
-  diracParam.tmp1 = &tmp; // use as temporary for dirac->M
   Dirac *dirac = Dirac::create(diracParam);
 
   if (inv_param->use_resident_solution) {
