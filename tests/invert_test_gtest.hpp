@@ -134,7 +134,7 @@ std::string gettestname(::testing::TestParamInfo<test_t> param)
 
 using ::testing::Combine;
 using ::testing::Values;
-auto normal_solvers = Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER);
+auto normal_solvers = Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER, QUDA_PCG_INVERTER);
 
 auto direct_solvers
   = Values(QUDA_CGNE_INVERTER, QUDA_CGNR_INVERTER, QUDA_CA_CGNE_INVERTER, QUDA_CA_CGNR_INVERTER, QUDA_GCR_INVERTER,
