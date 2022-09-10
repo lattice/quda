@@ -1034,8 +1034,8 @@ void add_quark_smear_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("Quark smearing", "Options controlling quark smearing testing");
   opgroup->add_option("--compute_two_link", compute_two_link, "Compute two link field (default true)");
-  opgroup->add_option("--delete_two_link", delete_two_link, "Compute two link field (default true)");
-  opgroup->add_option("--smear-coeff", smear_coeff, "Smearing coeff (default 0.1)");
-  opgroup->add_option("--n_steps", n_steps, "Number of smearing tests (default 50)");
-  opgroup->add_option("--t0", t0, "TS index (default -1)");
+  opgroup->add_option("--delete_two_link", delete_two_link, "Delete two link field (default true)");
+  opgroup->add_option("--smear-coeff", smear_coeff, "Set smearing coefficient (default 0.1)");
+  opgroup->add_option("--n_steps", n_steps, "Number of smearing steps (default 50)");
+  opgroup->add_option("--t0", t0, "Index of the time slice (default -1)");
 }

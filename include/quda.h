@@ -802,14 +802,28 @@ extern "C" {
 
   typedef struct QudaGaugeObservableParam_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
-    QudaBoolean su_project;              /**< Whether to project onto the manifold prior to measurement */
-    QudaBoolean compute_plaquette;       /**< Whether to compute the plaquette */
-    double plaquette[3];                 /**< Total, spatial and temporal field energies, respectively */
-    QudaBoolean compute_qcharge;         /**< Whether to compute the topological charge and field energy */
-    double qcharge;                      /**< Computed topological charge */
-    double energy[3];                    /**< Total, spatial and temporal field energies, respectively */
-    QudaBoolean compute_qcharge_density; /**< Whether to compute the topological charge density */
+    QudaBoolean su_project;               /**< Whether to project onto the manifold prior to measurement */
+    QudaBoolean compute_plaquette;        /**< Whether to compute the plaquette */
+    double plaquette[3];                  /**< Total, spatial and temporal field energies, respectively */
+    QudaBoolean compute_polyakov_loop;    /**< Whether to compute the temporal Polyakov loop */
+    double ploop[2];                      /**< Real and imaginary part of temporal Polyakov loop */
+    QudaBoolean compute_gauge_loop_trace; /**< Whether to compute gauge loop traces */
+    double_complex *traces;               /**< Individual complex traces of each loop */
+    int **input_path_buff;                /**< Array of paths */
+    int *path_length;                     /**< Length of each path */
+    double *loop_coeff;                   /**< Multiplicative factor for each loop */
+    int num_paths;                        /**< Total number of paths */
+    int max_length;                       /**< Maximum length of any path */
+    double factor;                        /**< Global multiplicative factor to apply to each loop trace */
+    QudaBoolean compute_qcharge;          /**< Whether to compute the topological charge and field energy */
+    double qcharge;                       /**< Computed topological charge */
+    double energy[3];                     /**< Total, spatial and temporal field energies, respectively */
+    QudaBoolean compute_qcharge_density;  /**< Whether to compute the topological charge density */
     void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */
+    QudaBoolean
+      remove_staggered_phase; /**< Whether or not the resident gauge field has staggered phases applied and if they should
+                                 be removed; this was needed for the Polyakov loop calculation when called through MILC,
+                                 with the underlying issue documented https://github.com/lattice/quda/issues/1315 */
   } QudaGaugeObservableParam;
 
   typedef struct QudaGaugeSmearParam_s {
@@ -1378,6 +1392,20 @@ extern "C" {
                            int num_paths, int max_length, double dt, QudaGaugeParam *qudaGaugeParam);
 
   /**
+   * Compute the traces of products of gauge links along paths using the resident field
+   *
+   * @param[in,out] traces The computed traces
+   * @param[in] sitelink The gauge field from which we compute the products of gauge links
+   * @param[in] path_length The number of links in each loop
+   * @param[in] loop_coeff Multiplicative coefficients for each loop
+   * @param[in] num_paths Total number of loops
+   * @param[in] max_length The maximum number of non-zero of links in any path in the action
+   * @param[in] factor An overall normalization factor
+   */
+  void computeGaugeLoopTraceQuda(double_complex *traces, int **input_path_buf, int *path_length, double *loop_coeff,
+                                 int num_paths, int max_length, double factor);
+
+  /**
    * Evolve the gauge field by step size dt, using the momentum field
    * I.e., Evalulate U(t+dt) = e(dt pi) U(t)
    *
@@ -1534,9 +1562,18 @@ extern "C" {
 
   /**
    * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
-   * @param Array for storing the averages (total, spatial, temporal)
+   * @param[out] Array for storing the averages (total, spatial, temporal)
    */
   void plaqQuda(double plaq[3]);
+
+  /**
+     @brief Computes the trace of the Polyakov loop of the current resident field
+     in a given direction.
+
+     @param[out] ploop Trace of the Polyakov loop in direction dir
+     @param[in] dir Direction of Polyakov loop
+  */
+  void polyakovLoopQuda(double ploop[2], int dir);
 
   /**
    * Performs a deep copy from the internal extendedGaugeResident field.
