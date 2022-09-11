@@ -78,15 +78,12 @@ namespace quda
 
   template <typename T> constexpr float i2f(T a)
   {
-#if 1
+#ifndef QUDA_ALTERNATIVE_I_TO_F
     return static_cast<float>(a);
 #else
     // will work for up to 23-bit int
-    union {
-      int32_t i;
-      float f;
-    };
-    i = a + 0x4B400000;
+    int32_t i = a + 0x4B400000;
+    float &f = reinterpret_cast<float &>(i);
     return f - 12582912.0f;
 #endif
   }
@@ -182,7 +179,7 @@ namespace quda
   template <typename T1, typename T2, typename T3>
   constexpr std::enable_if_t<isFixed<T2>::value, void> copy_and_scale(T1 &a, const T2 &b, const T3 &c)
   {
-    a = i2f(b) * fixedInvMaxValue<T2>::value * c;
+    a = i2f(b) * c;
   }
 
 } // namespace quda

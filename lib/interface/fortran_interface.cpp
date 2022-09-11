@@ -66,7 +66,7 @@ void invert_multishift_quda_(void *h_x, void *hp_b, QudaInvertParam *param)
   if (param->dirac_order != QUDA_TIFR_PADDED_DIRAC_ORDER)
     errorQuda("Fortran multi-shift solver presently only supports QUDA_TIFR_PADDED_DIRAC_ORDER and not %d",
               param->dirac_order);
-  const int *X = U.X();
+  auto X = U.X();
   size_t cb_offset = (X[0] / 2) * X[1] * (X[2] + 4) * X[3] * U.Ncolor() * nSpin * 2 * param->cpu_prec;
   void *hp_x[QUDA_MAX_MULTI_SHIFT];
   for (int i = 0; i < param->num_offset; i++) hp_x[i] = static_cast<char *>(h_x) + i * cb_offset;

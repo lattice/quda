@@ -59,7 +59,6 @@ namespace quda {
     long long bytes() const { return ((288ll + 1ll) * in.Bytes() + 2ll*mom.Bytes()) * 2 * mom.VolumeCB() * 4; }
   };
   
-#ifdef GPU_GAUGE_FORCE
   void gaugeForceNew(GaugeField& mom, const GaugeField& in, const QudaGaugeActionType action_type, const double epsilon, void *path_coeff)
   {
     checkPrecision(mom, in);
@@ -67,11 +66,4 @@ namespace quda {
     if (mom.Reconstruct() != QUDA_RECONSTRUCT_10) errorQuda("Reconstruction type %d not supported", mom.Reconstruct());    
     instantiate<ForceGaugeNew>(in, mom, action_type, epsilon, path_coeff);
   }
-#else
-  void gaugeForceNew(GaugeField&, const GaugeField&, const QudaGaugeActionType, const double, void*)
-  {
-    errorQuda("Gauge force has not been built");
-  }
-#endif
-
 } // namespace quda

@@ -21,6 +21,7 @@ namespace quda {
     tmp2(param.tmp2),
     type(param.type),
     halo_precision(param.halo_precision),
+    use_mobius_fused_kernel(param.use_mobius_fused_kernel),
     profile("Dirac", false)
   {
     for (int i=0; i<4; i++) commDim[i] = param.commDim[i];
@@ -73,10 +74,7 @@ namespace quda {
     if (*tmp) return false;
     ColorSpinorParam param(a);
     param.create = QUDA_ZERO_FIELD_CREATE; // need to zero elements else padded region will be junk
-
-    if (typeid(a) == typeid(cudaColorSpinorField)) *tmp = new cudaColorSpinorField(a, param);
-    else *tmp = new cpuColorSpinorField(param);
-
+    *tmp = ColorSpinorField::Create(param);
     return true;
   }
 
@@ -118,8 +116,8 @@ namespace quda {
 		in.SiteSubset(), out.SiteSubset());
     }
 
-    if (!static_cast<const cudaColorSpinorField&>(in).isNative()) errorQuda("Input field is not in native order");
-    if (!static_cast<const cudaColorSpinorField&>(out).isNative()) errorQuda("Output field is not in native order");
+    if (!in.isNative()) errorQuda("Input field is not in native order");
+    if (!out.isNative()) errorQuda("Output field is not in native order");
 
     if (out.Ndim() != 5) {
       if ((out.Volume() != gauge->Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
@@ -212,29 +210,33 @@ namespace quda {
       return new DiracImprovedStaggeredKD(param);
     } else if (param.type == QUDA_TWISTED_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracTwistedClover operator (%d flavor(s))\n", param.Ls);
-      if (param.Ls == 1) {
-	return new DiracTwistedClover(param, 4);
-      } else { 
-	errorQuda("Cannot create DiracTwistedClover operator for %d flavors\n", param.Ls);
+      switch (param.Ls) {
+      case 1: return new DiracTwistedClover(param, 4);
+      case 2: return new DiracTwistedClover(param, 5);
+      default: errorQuda("Unexpected Ls = %d", param.Ls);
       }
     } else if (param.type == QUDA_TWISTED_CLOVERPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracTwistedCloverPC operator (%d flavor(s))\n", param.Ls);
-      if (param.Ls == 1) {
-	return new DiracTwistedCloverPC(param, 4);
-      } else {
-	errorQuda("Cannot create DiracTwistedCloverPC operator for %d flavors\n", param.Ls);
+      switch (param.Ls) {
+      case 1: return new DiracTwistedCloverPC(param, 4);
+      case 2: return new DiracTwistedCloverPC(param, 5);
+      default: errorQuda("Unexpected Ls = %d", param.Ls);
       }
     } else if (param.type == QUDA_TWISTED_MASS_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracTwistedMass operator (%d flavor(s))\n", param.Ls);
-        if (param.Ls == 1) return new DiracTwistedMass(param, 4);
-        else return new DiracTwistedMass(param, 5);
+      switch (param.Ls) {
+      case 1: return new DiracTwistedMass(param, 4);
+      case 2: return new DiracTwistedMass(param, 5);
+      default: errorQuda("Unexpected Ls = %d", param.Ls);
+      }
     } else if (param.type == QUDA_TWISTED_MASSPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
         printfQuda("Creating a DiracTwistedMassPC operator (%d flavor(s))\n", param.Ls);
-      if (param.Ls == 1)
-        return new DiracTwistedMassPC(param, 4);
-      else
-        return new DiracTwistedMassPC(param, 5);
+      switch (param.Ls) {
+      case 1: return new DiracTwistedMassPC(param, 4);
+      case 2: return new DiracTwistedMassPC(param, 5);
+      default: errorQuda("Unexpected Ls = %d", param.Ls);
+      }
     } else if (param.type == QUDA_COARSE_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCoarse operator\n");
       return new DiracCoarse(param);
@@ -263,20 +265,24 @@ namespace quda {
     int steps = 0;
     switch (type)
     {
-      case QUDA_COARSE_DIRAC: // single fused operator
-      case QUDA_GAUGE_LAPLACE_DIRAC:
-      case QUDA_GAUGE_COVDEV_DIRAC:
-	steps = 1;
-	break;
       case QUDA_WILSON_DIRAC:
       case QUDA_CLOVER_DIRAC:
-      case QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC:
       case QUDA_DOMAIN_WALL_DIRAC:
+      case QUDA_DOMAIN_WALL_4D_DIRAC:
       case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
-      case QUDA_STAGGERED_DIRAC:
-      case QUDA_ASQTAD_DIRAC:
+      case QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC:
       case QUDA_TWISTED_CLOVER_DIRAC:
       case QUDA_TWISTED_MASS_DIRAC:
+      case QUDA_STAGGERED_DIRAC:
+      case QUDA_ASQTAD_DIRAC:
+      case QUDA_STAGGEREDKD_DIRAC:
+      case QUDA_ASQTADKD_DIRAC:
+      case QUDA_COARSE_DIRAC:
+      case QUDA_GAUGE_LAPLACE_DIRAC:
+      case QUDA_GAUGE_COVDEV_DIRAC:
+        steps = 1; // single fused operator
+        break;
+      case QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC: // implemented as separate even, odd
         steps = 2; // For D_{eo} and D_{oe} piece.
         break;
       case QUDA_WILSONPC_DIRAC:
@@ -285,6 +291,7 @@ namespace quda {
       case QUDA_DOMAIN_WALLPC_DIRAC:
       case QUDA_DOMAIN_WALL_4DPC_DIRAC:
       case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:
+      case QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC:
       case QUDA_STAGGEREDPC_DIRAC:
       case QUDA_ASQTADPC_DIRAC:
       case QUDA_TWISTED_CLOVERPC_DIRAC:
@@ -293,13 +300,13 @@ namespace quda {
       case QUDA_GAUGE_LAPLACEPC_DIRAC:
         steps = 2;
         break;
-	  default:
-	    errorQuda("Unsupported Dslash type %d.\n", type);
+      default:
+        errorQuda("Unsupported Dslash type %d.\n", type);
         steps = 0;
         break;
     }
-    
-    return steps; 
+
+    return steps;
   }
 
   void Dirac::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const

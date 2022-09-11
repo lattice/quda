@@ -32,7 +32,7 @@ namespace quda {
         GaugePhaseArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_TIFR> arg(u);
         launch<GaugePhase>(tp, stream, arg);
       } else {
-        errorQuda("Undefined phase type");
+        errorQuda("Undefined phase type %d", u.StaggeredPhase());
       }
     }
 
@@ -43,18 +43,11 @@ namespace quda {
     long long bytes() const { return 2 * u.Bytes(); }
   };
 
-#ifdef GPU_GAUGE_TOOLS
   void applyGaugePhase(GaugeField &u)
   {
     instantiate<GaugePhase_, ReconstructNone>(u);
     // ensure that ghosts are updated if needed
     if (u.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) u.exchangeGhost();
   }
-#else
-  void applyGaugePhase(GaugeField &)
-  {
-    errorQuda("Gauge tools are not build");
-  }
-#endif
 
 } // namespace quda

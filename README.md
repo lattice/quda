@@ -77,7 +77,7 @@ See also "Known Issues" below.
 It is recommended to build QUDA in a separate directory from the
 source directory.  For instructions on how to build QUDA using cmake
 see this page
-https://github.com/lattice/quda/wiki/Building-QUDA-with-cmake. Note
+https://github.com/lattice/quda/wiki/QUDA-Build-With-CMake. Note
 that this requires cmake version 3.15 or later. You can obtain cmake
 from https://cmake.org/download/. On Linux the binary tar.gz archives
 unpack into a cmake directory and usually run fine from that
@@ -210,6 +210,8 @@ reports are especially welcome.
 
 ## Acknowledging QUDA:
 
+[![DOI](https://zenodo.org/badge/1300564.svg)](https://zenodo.org/badge/latestdoi/1300564)
+  
 If you find this software useful in your work, please cite:
 
 M. A. Clark, R. Babich, K. Barros, R. Brower, and C. Rebbi, "Solving
@@ -259,14 +261,16 @@ Advanced Scientific Computing (PASC21) [arXiv:2104.05615[hep-lat]].
 *  Carleton DeTar (Utah University)
 *  Justin Foley (NIH)
 *  Arjun Gambhir (William and Mary)
+*  Marco Garofalo (HISKP, University of Bonn)
 *  Joel Giedt (Rensselaer Polytechnic Institute) 
 *  Steven Gottlieb (Indiana University) 
 *  Kyriakos Hadjiyiannakou (Cyprus)
 *  Dean Howarth (Lawrence Livermore Lab, Lawrence Berkeley Lab)
 *  Balint Joo (OLCF, Oak Ridge National Laboratory, formerly Jefferson Lab)
 *  Hyung-Jin Kim (Samsung Advanced Institute of Technology)
-*  Bartek Kostrzewa (Bonn)
+*  Bartosz Kostrzewa (HPC/A-Lab, University of Bonn)
 *  James Osborn (Argonne National Laboratory)
+*  Ferenc Pittler (Cyprus)
 *  Claudio Rebbi (Boston University) 
 *  Eloy Romero (William and Mary)
 *  Hauke Sandmeyer (Bielefeld)
@@ -274,6 +278,7 @@ Advanced Scientific Computing (PASC21) [arXiv:2104.05615[hep-lat]].
 *  Guochun Shi (NCSA)
 *  Alexei Strelchenko (Fermi National Accelerator Laboratory)
 *  Jiqun Tu (NVIDIA)
+*  Carsten Urbach (HISKP, University of Bonn)
 *  Alejandro Vaquero (Utah University)
 *  Mathias Wagner (NVIDIA)
 *  Andre Walker-Loud (Lawrence Berkley Laboratory)

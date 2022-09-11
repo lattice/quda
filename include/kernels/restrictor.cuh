@@ -1,7 +1,8 @@
 #include <color_spinor_field_order.h>
-#include <cub_helper.cuh>
+#include <block_reduce_helper.h>
 #include <multigrid_helper.cuh>
 #include <fast_intdiv.h>
+#include <array.h>
 #include <block_reduction_kernel.h>
 
 namespace quda {
@@ -15,7 +16,7 @@ namespace quda {
     //coarseColor >= 8 && coarseColor % 8 == 0 ? 8 : coarseColor >= 4 && coarseColor % 4 == 0 ? 4 : 2;
   }
 
-  constexpr int max_y_block() { return 8; }
+  constexpr int max_z_block() { return 8; }
 
   /** 
       Kernel argument struct
@@ -33,7 +34,7 @@ namespace quda {
     const FieldOrderCB<Float,fineSpin,fineColor,1,order> in;
     const FieldOrderCB<Float,fineSpin,fineColor,coarseColor,order,vFloat> V;
     const int aggregate_size;    // number of sites that form a single aggregate
-    const int aggregate_size_cb; // number of checkerboard sites that form a single aggregate
+    const int_fastdiv aggregate_size_cb; // number of checkerboard sites that form a single aggregate
     const int *fine_to_coarse;
     const int *coarse_to_fine;
     const spin_mapper<fineSpin,coarseSpin> spin_map;
@@ -44,8 +45,8 @@ namespace quda {
     static constexpr bool swizzle = true;
     int_fastdiv swizzle_factor; // for transposing blockIdx.x mapping to coarse grid coordinate
 
-    static constexpr int n_vector_y = std::min(coarseColor/coarse_colors_per_thread<fineColor, coarseColor>(), max_y_block());
-    static_assert(n_vector_y > 0, "n_vector_y cannot be less than 1");
+    static constexpr int n_vector_z = std::min(coarseColor/coarse_colors_per_thread<fineColor, coarseColor>(), max_z_block());
+    static_assert(n_vector_z > 0, "n_vector_z cannot be less than 1");
 
     static constexpr bool launch_bounds = false;
     dim3 grid_dim;
@@ -53,7 +54,7 @@ namespace quda {
 
     RestrictArg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &V,
 		const int *fine_to_coarse, const int *coarse_to_fine, int parity) :
-      kernel_param(dim3(in.Volume()/out.Volume(), coarseColor/coarse_colors_per_thread<fineColor, coarseColor>(), 1)),
+      kernel_param(dim3(in.Volume()/out.Volume(), 1, coarseColor/coarse_colors_per_thread<fineColor, coarseColor>())),
       out(out), in(in), V(V),
       aggregate_size(in.Volume()/out.Volume()),
       aggregate_size_cb(in.VolumeCB()/out.Volume()),
@@ -105,24 +106,24 @@ namespace quda {
   }
 
   template <typename Arg> struct Restrictor {
-    static constexpr unsigned block_size = Arg::block_size;
     static constexpr int coarse_color_per_thread = coarse_colors_per_thread<Arg::fineColor, Arg::coarseColor>();
-    using vector = vector_type<complex<typename Arg::real>, Arg::coarseSpin*coarse_color_per_thread>;
+    using vector = array<complex<typename Arg::real>, Arg::coarseSpin*coarse_color_per_thread>;
     const Arg &arg;
     constexpr Restrictor(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(dim3 block, dim3 thread)
     {
-      int x_coarse = block.x;
       int x_fine_offset = thread.x;
-      int coarse_color_thread = block.y * arg.block_dim.y + thread.y;
+      const int x_coarse = block.x;
+      const int coarse_color_thread = block.z * arg.block_dim.z + thread.z;
+      const int coarse_color_block = coarse_color_thread * coarse_color_per_thread;
 
-      vector reduced;
-      if (x_fine_offset < arg.aggregate_size) {
+      vector reduced{0};
+      while (x_fine_offset < arg.aggregate_size) {
         // all threads with x_fine_offset greater than aggregate_size_cb are second parity
         const int parity_offset = x_fine_offset >= arg.aggregate_size_cb ? 1 : 0;
-        const int x_fine_cb_offset = x_fine_offset - parity_offset * arg.aggregate_size_cb;
+        const int x_fine_cb_offset = x_fine_offset % arg.aggregate_size_cb;
         const int parity = arg.nParity == 2 ? parity_offset : arg.parity;
 
         // look-up map is ordered as (coarse-block-id + fine-point-id),
@@ -131,24 +132,26 @@ namespace quda {
         const int x_fine = arg.coarse_to_fine[x_fine_site_id];
         const int x_fine_cb = x_fine - parity * arg.in.VolumeCB();
 
-        const int coarse_color_block = coarse_color_thread * coarse_color_per_thread;
+        array<complex<typename Arg::real>, Arg::fineSpin * coarse_color_per_thread> tmp{0};
 
-        vector_type<complex<typename Arg::real>, Arg::fineSpin*coarse_color_per_thread> tmp;
         rotateCoarseColor(tmp, arg, parity, x_fine_cb, coarse_color_block);
 
         // perform any local spin coarsening
 #pragma unroll
-        for (int s=0; s<Arg::fineSpin; s++) {
+        for (int s = 0; s<Arg::fineSpin; s++) {
 #pragma unroll
-          for (int v=0; v<coarse_color_per_thread; v++) {
-            reduced[arg.spin_map(s,parity)*coarse_color_per_thread+v] += tmp[s*coarse_color_per_thread+v];
+          for (int v = 0; v<coarse_color_per_thread; v++) {
+            reduced[arg.spin_map(s,parity) * coarse_color_per_thread + v] += tmp[s*coarse_color_per_thread + v];
           }
         }
+
+        x_fine_offset += target::block_dim().x;
       }
 
-      reduced = BlockReduce<vector, block_size, Arg::n_vector_y>(thread.y). template Sum<true>(reduced);
+      constexpr int block_dim = 1;
+      reduced = BlockReduce<vector, block_dim, Arg::n_vector_z>(thread.z).Sum(reduced);
 
-      if (x_fine_offset == 0) {
+      if (target::thread_idx().x == 0) {
         const int parity_coarse = x_coarse >= arg.out.VolumeCB() ? 1 : 0;
         const int x_coarse_cb = x_coarse - parity_coarse*arg.out.VolumeCB();
 

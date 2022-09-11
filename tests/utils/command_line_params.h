@@ -7,29 +7,19 @@
 // for compatibility while porting - remove later
 extern void usage(char **);
 
-// Put this is quda_constants.h?
-#define QUDA_MAX_SOURCES 128
-
-// Put this is quda_constants.h?
-#define QUDA_MAX_MASSES 128
-
 namespace quda
 {
   template <typename T> using mgarray = std::array<T, QUDA_MAX_MG_LEVEL>;
-  template <typename T> using file_array = std::array<T, QUDA_MAX_SOURCES>;
-  template <typename T> using source_array = std::array<T, QUDA_MAX_SOURCES>;
-  template <typename T> using mass_array = std::array<T, QUDA_MAX_MASSES>;
 }
 
 class QUDAApp : public CLI::App
 {
-  
- public:
+
+public:
   QUDAApp(std::string app_description = "", std::string app_name = "") : CLI::App(app_description, app_name) {};
 
   virtual ~QUDAApp() {};
 
-  // This template for strings
   template <typename T>
   CLI::Option *add_mgoption(std::string option_name, std::array<T, QUDA_MAX_MG_LEVEL> &variable, CLI::Validator trans,
                             std::string option_description = "", bool = false)
@@ -64,7 +54,6 @@ class QUDAApp : public CLI::App
     return opt;
   }
 
-  // This template for numbers
   template <typename T>
   CLI::Option *add_mgoption(CLI::Option_group *group, std::string option_name, std::array<T, QUDA_MAX_MG_LEVEL> &variable,
                             CLI::Validator trans, std::string option_description = "", bool = false)
@@ -72,6 +61,7 @@ class QUDAApp : public CLI::App
 
     CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
       size_t l;
+      // T j; // results_t is just a vector of strings
       bool worked = true;
 
       CLI::Range validlevel(0, QUDA_MAX_MG_LEVEL);
@@ -136,115 +126,6 @@ class QUDAApp : public CLI::App
     group->add_option(opt);
     return opt;
   }
-
-  // Add option to parse multiple point source locations
-  template <typename T>
-  CLI::Option *add_psoption(CLI::Option_group *group, std::string option_name,
-                            std::array<std::array<T, 4>, QUDA_MAX_SOURCES> &variable, CLI::Validator trans,
-                            std::string option_description = "")
-  {
-
-    CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
-      size_t l;
-      T j; // results_t is just a vector of strings
-      bool worked = true;
-
-      CLI::Range validsource(0, QUDA_MAX_SOURCES);
-      for (size_t i {0}; i < vals.size() / (4 + 1); ++i) {
-        auto sourceok = validsource(vals.at((4 + 1) * i));
-
-        if (!sourceok.empty()) throw CLI::ValidationError(option_name, sourceok);
-        worked = worked and CLI::detail::lexical_cast(vals.at((4 + 1) * i), l);
-
-        for (int k = 0; k < 4; k++) {
-          auto transformok = trans(vals.at((4 + 1) * i + k + 1));
-          if (!transformok.empty()) throw CLI::ValidationError(option_name, transformok);
-          worked = worked and CLI::detail::lexical_cast(vals.at((4 + 1) * i + k + 1), j);
-          if (worked) variable[l][k] = j;
-        }
-      }
-      return worked;
-    };
-    CLI::Option *opt = add_option(option_name, f, option_description);
-    auto valuename = std::string("SOURCE ") + std::string(CLI::detail::type_name<T>());
-    opt->type_name(valuename)->type_size(-4 - 1);
-    opt->expected(-1);
-    opt->check(CLI::Validator(trans.get_description()));
-
-    group->add_option(opt);
-    return opt;
-  }
-
-  // Add option to parse multiple files.
-  template <typename T>
-  CLI::Option *add_fileoption(CLI::Option_group *group, std::string option_name,
-                              std::array<T, QUDA_MAX_SOURCES> &variable, CLI::Validator trans,
-                              std::string option_description = "")
-  {
-
-    CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
-      size_t l;
-      // T j; // results_t is just a vector of strings
-      bool worked = true;
-
-      CLI::Range validsource(0, QUDA_MAX_SOURCES);
-      for (size_t i {0}; i < vals.size() / 2; ++i) { // will always be a multiple of 2
-        auto sourceok = validsource(vals.at(2 * i));
-        auto transformok = trans(vals.at(2 * i + 1));
-        if (!sourceok.empty()) throw CLI::ValidationError(option_name, sourceok);
-        if (!transformok.empty()) throw CLI::ValidationError(option_name, transformok);
-        worked = worked and CLI::detail::lexical_cast(vals.at(2 * i), l);
-        auto &j = variable[l];
-        worked = worked and CLI::detail::lexical_cast(vals.at(2 * i + 1), j);
-
-        // if (worked) variable[l] = j;
-      }
-      return worked;
-    };
-    CLI::Option *opt = add_option(option_name, f, option_description);
-    auto valuename = std::string("SOURCE ") + std::string(CLI::detail::type_name<T>());
-    opt->type_name(valuename)->type_size(-2);
-    opt->expected(-1);
-    opt->check(CLI::Validator(trans.get_description()));
-
-    group->add_option(opt);
-    return opt;
-  }
-
-  template <typename T>
-  CLI::Option *add_massoption(CLI::Option_group *group, std::string option_name, std::array<T, QUDA_MAX_MASSES> &variable,
-                            CLI::Validator trans, std::string option_description = "", bool = false)
-  {
-
-    CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
-      size_t l;
-      // T j; // results_t is just a vector of strings
-      bool worked = true;
-
-      CLI::Range validlevel(0, QUDA_MAX_MASSES);
-      for (size_t i {0}; i < vals.size() / 2; ++i) { // will always be a multiple of 2
-        auto levelok = validlevel(vals.at(2 * i));
-        auto transformok = trans(vals.at(2 * i + 1));
-        if (!levelok.empty()) throw CLI::ValidationError(option_name, levelok);
-        if (!transformok.empty()) throw CLI::ValidationError(option_name, transformok);
-        worked = worked and CLI::detail::lexical_cast(vals.at(2 * i), l);
-        auto &j = variable[l];
-        worked = worked and CLI::detail::lexical_cast(vals.at(2 * i + 1), j);
-
-        // if (worked) variable[l] = j;
-      }
-      return worked;
-    };
-    CLI::Option *opt = add_option(option_name, f, option_description);
-    auto valuename = std::string("FLAVOR<INT> ") + std::string(CLI::detail::type_name<T>());
-    opt->type_name(valuename)->type_size(-2);
-    opt->expected(-1);
-    opt->check(CLI::Validator(trans.get_description()));
-    // opt->transform(trans);
-    // opt->default_str("");
-    group->add_option(opt);
-    return opt;
-  }
 };
 
 std::shared_ptr<QUDAApp> make_app(std::string app_description = "QUDA internal test", std::string app_name = "");
@@ -252,13 +133,12 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_madwf_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app);
-void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app);
-void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app);
-void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_testing_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
 {
@@ -299,38 +179,52 @@ extern int Lsdim;
 extern bool dagger;
 extern QudaDslashType dslash_type;
 extern int laplace3D;
-extern char latfile[256];
+extern std::string latfile;
 extern bool unit_gauge;
 extern double gaussian_sigma;
-extern char gauge_outfile[256];
+extern std::string gauge_outfile;
 extern int Nsrc;
 extern int Msrc;
 extern int niter;
 extern int maxiter_precondition;
+extern QudaVerbosity verbosity_precondition;
 extern int gcrNkrylov;
 extern QudaCABasis ca_basis;
 extern double ca_lambda_min;
 extern double ca_lambda_max;
+extern QudaCABasis ca_basis_precondition;
+extern double ca_lambda_min_precondition;
+extern double ca_lambda_max_precondition;
 extern int pipeline;
 extern int solution_accumulator_pipeline;
 extern int test_type;
 extern quda::mgarray<int> nvec;
-extern quda::mgarray<char[256]> mg_vec_infile;
-extern quda::mgarray<char[256]> mg_vec_outfile;
+extern quda::mgarray<std::string> mg_vec_infile;
+extern quda::mgarray<std::string> mg_vec_outfile;
 extern QudaInverterType inv_type;
 extern bool inv_deflate;
 extern bool inv_multigrid;
 extern QudaInverterType precon_type;
 extern QudaSchwarzType precon_schwarz_type;
+extern QudaAcceleratorType precon_accelerator_type;
+
+extern double madwf_diagonal_suppressor;
+extern int madwf_ls;
+extern int madwf_null_miniter;
+extern double madwf_null_tol;
+extern int madwf_train_maxiter;
+extern bool madwf_param_load;
+extern bool madwf_param_save;
+extern std::string madwf_param_infile;
+extern std::string madwf_param_outfile;
+
 extern int precon_schwarz_cycle;
 extern int multishift;
 extern bool verify_results;
 extern bool low_mode_check;
 extern bool oblique_proj_check;
 extern double mass;
-extern quda::mass_array<double> mass_array;
 extern double kappa;
-extern quda::mass_array<double> kappa_array;
 extern double mu;
 extern double epsilon;
 extern double m5;
@@ -352,21 +246,18 @@ extern double reliable_delta;
 extern bool alternative_reliable;
 extern QudaTwistFlavorType twist_flavor;
 extern QudaMassNormalization normalization;
-extern QudaMassNormalization normalization_light;
-extern QudaMassNormalization normalization_strange;
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
 extern QudaSolutionType solution_type;
 extern QudaTboundary fermion_t_boundary;
-extern double gauge_smear_coeff;
-extern bool gauge_smear;
-extern QudaGaugeSmearType gauge_smear_type;
 
 extern int mg_levels;
 
+extern int max_res_increase;
+extern int max_res_increase_total;
+
 extern quda::mgarray<QudaFieldLocation> solver_location;
 extern quda::mgarray<QudaFieldLocation> setup_location;
-
 extern quda::mgarray<int> nu_pre;
 extern quda::mgarray<int> nu_post;
 extern quda::mgarray<int> n_block_ortho;
@@ -391,6 +282,9 @@ extern double omega;
 extern quda::mgarray<QudaInverterType> coarse_solver;
 extern quda::mgarray<double> coarse_solver_tol;
 extern quda::mgarray<QudaInverterType> smoother_type;
+extern quda::mgarray<QudaCABasis> smoother_solver_ca_basis;
+extern quda::mgarray<double> smoother_solver_ca_lambda_min;
+extern quda::mgarray<double> smoother_solver_ca_lambda_max;
 extern QudaPrecision smoother_halo_prec;
 extern quda::mgarray<double> smoother_tol;
 extern quda::mgarray<int> coarse_solver_maxiter;
@@ -407,6 +301,10 @@ extern QudaTransferType staggered_transfer_type;
 
 extern quda::mgarray<std::array<int, 4>> geo_block_size;
 extern bool mg_use_mma;
+extern bool mg_allow_truncation;
+extern bool mg_staggered_kd_dagger_approximation;
+
+extern bool use_mobius_fused_kernel;
 
 extern int n_ev;
 extern int max_search_dim;
@@ -442,15 +340,15 @@ extern double eig_amin;
 extern double eig_amax;
 extern bool eig_use_normop;
 extern bool eig_use_dagger;
+extern bool eig_use_pc;
 extern bool eig_compute_svd;
 extern bool eig_compute_gamma5;
 extern QudaEigSpectrumType eig_spectrum;
 extern QudaEigType eig_type;
 extern bool eig_arpack_check;
-extern char eig_arpack_logfile[256];
-extern char eig_QUDA_logfile[256];
-extern char eig_vec_infile[256];
-extern char eig_vec_outfile[256];
+extern std::string eig_arpack_logfile;
+extern std::string eig_vec_infile;
+extern std::string eig_vec_outfile;
 extern bool eig_io_parity_inflate;
 extern QudaPrecision eig_save_prec;
 
@@ -475,6 +373,7 @@ extern quda::mgarray<double> mg_eig_amin;
 extern quda::mgarray<double> mg_eig_amax;
 extern quda::mgarray<bool> mg_eig_use_normop;
 extern quda::mgarray<bool> mg_eig_use_dagger;
+extern quda::mgarray<bool> mg_eig_use_pc;
 extern quda::mgarray<QudaEigSpectrumType> mg_eig_spectrum;
 extern quda::mgarray<QudaEigType> mg_eig_type;
 extern quda::mgarray<QudaPrecision> mg_eig_save_prec;
@@ -482,27 +381,12 @@ extern quda::mgarray<QudaPrecision> mg_eig_save_prec;
 extern bool mg_eig_coarse_guess;
 extern bool mg_eig_preserve_deflation;
 
-// Heatbath params
 extern double heatbath_beta_value;
 extern int heatbath_warmup_steps;
-extern int heatbath_step_start;
 extern int heatbath_num_steps;
-extern int heatbath_checkpoint;
 extern int heatbath_num_heatbath_per_step;
 extern int heatbath_num_overrelax_per_step;
 extern bool heatbath_coldstart;
-
-// HMC params
-extern int hmc_start;
-extern int hmc_updates;
-extern int hmc_therm_updates;
-extern int hmc_checkpoint;
-extern int hmc_traj_steps;
-extern QudaGaugeActionType hmc_gauge_action;
-extern double hmc_step_size;
-extern double hmc_traj_length;
-extern bool hmc_coldstart;
-extern double hmc_beta;
 
 extern int eofa_pm;
 extern double eofa_shift;
@@ -510,47 +394,8 @@ extern double eofa_mq1;
 extern double eofa_mq2;
 extern double eofa_mq3;
 
-extern quda::file_array<char[256]> prop_source_infile;
-extern quda::file_array<char[256]> prop_source_outfile;
-extern quda::file_array<char[256]> prop_sink_infile;
-extern quda::file_array<char[256]> prop_sink_outfile;
-extern quda::source_array<std::array<int, 4>> prop_source_position;
-extern int prop_source_smear_steps;
-extern int prop_sink_smear_steps;
-extern double prop_source_smear_coeff;
-extern double prop_sink_smear_coeff;
-extern QudaFermionSmearType prop_smear_type;
-extern bool prop_read_sources;
-extern int prop_n_sources;
-extern QudaPrecision prop_save_prec;
-
-// SU(3) smearing options
-extern double stout_smear_rho;
-extern double stout_smear_epsilon;
-extern double ape_smear_rho;
-extern int gauge_smear_steps;
-extern double wflow_epsilon;
-extern int wflow_steps;
-extern QudaWFlowType wflow_type;
-extern int measurement_interval;
-
-// GF options
-extern int gf_gauge_dir;
-extern int gf_maxiter;
-extern int gf_verbosity_interval;
-extern double gf_ovr_relaxation_boost;
-extern double gf_fft_alpha;
-extern int gf_reunit_interval;
-extern double gf_tolerance;
-extern bool gf_theta_condition;
-extern bool gf_fft_autotune;
-
-// contract options
-
 extern QudaContractType contract_type;
-extern char correlator_save_dir[256];
-extern char correlator_file_affix[256];
-extern std::array<int,4> momentum;
-extern bool open_flavor;
 
 extern std::array<int, 4> grid_partition;
+
+extern bool enable_testing;

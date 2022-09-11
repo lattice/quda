@@ -1,7 +1,8 @@
 #pragma once
 
-#include <color_spinor_field_order.h>
 #include <blas_helper.cuh>
+#include <reducer.h>
+#include <array.h>
 #include <kernel.h>
 
 namespace quda
@@ -59,7 +60,7 @@ namespace quda
 
       __device__ __host__ inline void operator()(int i, int parity) const
       {
-        using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
+        using vec = array<complex<typename Arg::real>, Arg::n/2>;
 
         arg.f.init();
 
@@ -170,23 +171,24 @@ namespace quda
       constexpr int flops() const { return 7; }   //! flops per element
     };
 
-    template <typename real> struct caxpbypczw_ : public BlasFunctor {
+    /**
+       Functor performing the operation: w[i] = a*x[i] + b*y[i] + c*z[i]
+    */
+    template <typename real> struct axpbypczw_ : public BlasFunctor {
       static constexpr memory_access<1, 1, 1, 1> read{ };
       static constexpr memory_access<0, 0, 0, 1> write{ };
-      const complex<real> a;
-      const complex<real> b;
-      const complex<real> c;
-      caxpbypczw_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b), c(c) { ; }
+      const real a;
+      const real b;
+      const real c;
+      axpbypczw_(const real &a, const real &b, const real &c) : a(a), b(b), c(c) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &) const
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          w[i] = y[i];
-          _caxpby(a, x[i], b, w[i]);
-          w[i] = cmac(c, z[i], w[i]);
+          w[i] = a * x[i] + b * y[i] + c * z[i];
         }
       }
-      constexpr int flops() const { return 8; }   //! flops per element
+      constexpr int flops() const { return 5; }   //! flops per element
     };
 
     /**
@@ -228,6 +230,26 @@ namespace quda
         }
       }
       constexpr int flops() const { return 4; }   //! flops per element
+    };
+
+    /**
+       Functor performing the operation z[i] = x[i] + a * y[i] + b * z[i]
+    */
+    template <typename real> struct cxpaypbz_ : public BlasFunctor {
+      static constexpr memory_access<1, 1, 1> read{ };
+      static constexpr memory_access<0, 0, 1> write{ };
+      const complex<real> a;
+      const complex<real> b;
+      cxpaypbz_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &) const
+      {
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          _caxpby(a, y[i], b, z[i]);
+          z[i] += x[i];
+        }
+      }
+      constexpr int flops() const { return 9; }   //! flops per element
     };
 
     /**

@@ -9,6 +9,9 @@
 
 #include <complex_quda.h>
 #include <register_traits.h>
+#include <array.h>
+#include <limits>
+#include <type_traits>
 
 namespace quda {
 
@@ -31,6 +34,96 @@ namespace quda {
   {
     return make_float2(x.x + y.x, x.y + y.y);
   }
+
+  template <typename T, int n>
+  __device__ __host__ inline array<T, n> operator+(const array<T, n> &a, const array<T, n> &b)
+  {
+    array<T, n> c;
+#pragma unroll
+    for (int i = 0; i < n; i++) c[i] = a[i] + b[i];
+    return c;
+  }
+
+  template <typename T> constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> zero() { return static_cast<T>(0); }
+  template <typename T> constexpr std::enable_if_t<std::is_same_v<T, complex<typename T::value_type>>, T> zero()
+  {
+    return static_cast<T>(0);
+  }
+
+  template <typename T, typename U> using specialize = std::enable_if_t<std::is_same_v<T, U>, U>;
+
+  template <typename T> constexpr specialize<T, double2> zero() { return double2 {0.0, 0.0}; }
+  template <typename T> constexpr specialize<T, double3> zero() { return double3 {0.0, 0.0, 0.0}; }
+  template <typename T> constexpr specialize<T, double4> zero() { return double4 {0.0, 0.0, 0.0, 0.0}; }
+
+  template <typename T> constexpr specialize<T, float2> zero() { return float2 {0.0f, 0.0f}; }
+  template <typename T> constexpr specialize<T, float3> zero() { return float3 {0.0f, 0.0f, 0.0f}; }
+  template <typename T> constexpr specialize<T, float4> zero() { return float4 {0.0f, 0.0f, 0.0f, 0.0f}; }
+
+#ifdef QUAD_SUM
+  template <typename T> __device__ __host__ inline specialize<T, doubledouble> zero() { return doubledouble(); }
+  template <typename T> __device__ __host__ inline specialize<T, doubledouble2> zero() { return doubledouble2(); }
+  template <typename T> __device__ __host__ inline specialize<T, doubledouble3> zero() { return doubledouble3(); }
+#endif
+
+  template <typename T, int n> __device__ __host__ inline array<T, n> zero()
+  {
+    array<T, n> v;
+#pragma unroll
+    for (int i = 0; i < n; i++) v[i] = zero<T>();
+    return v;
+  }
+
+  // array of arithmetic types specialization
+  template <typename T>
+  __device__ __host__ inline std::enable_if_t<
+    std::is_same_v<T, array<typename T::value_type, T::N>> && std::is_arithmetic_v<typename T::value_type>, T>
+  zero()
+  {
+    return zero<typename T::value_type, T::N>();
+  }
+
+  // array of array specialization
+  template <typename T>
+  __device__ __host__ inline std::enable_if_t<
+    std::is_same_v<T, array<array<typename T::value_type::value_type, T::value_type::N>, T::N>>, T>
+  zero()
+  {
+    T v;
+#pragma unroll
+    for (int i = 0; i < v.size(); i++) v[i] = zero<typename T::value_type>();
+    return v;
+  }
+
+  // array of complex specialization
+  template <typename T>
+  __device__
+    __host__ inline std::enable_if_t<std::is_same_v<T, array<complex<typename T::value_type::value_type>, T::N>>, T>
+    zero()
+  {
+    T v;
+#pragma unroll
+    for (int i = 0; i < v.size(); i++) v[i] = zero<typename T::value_type>();
+    return v;
+  }
+
+  template <typename T> struct low {
+    static constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> value() { return std::numeric_limits<T>::lowest(); }
+  };
+
+  template <typename T, int N> struct low<array<T, N>> {
+    static inline __host__ __device__ array<T, N> value()
+    {
+      array<T, N> v;
+#pragma unroll
+      for (int i = 0; i < N; i++) v[i] = low<T>::value();
+      return v;
+    }
+  };
+
+  template <typename T> struct high {
+    static constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> value() { return std::numeric_limits<T>::max(); }
+  };
 
   template <typename T> struct RealType {
   };
@@ -100,78 +193,4 @@ namespace quda {
   }
 #endif
 
-  template <typename T> __device__ __host__ inline T zero() { return static_cast<T>(0); }
-  template <> __device__ __host__ inline double2 zero() { return make_double2(0.0, 0.0); }
-  template <> __device__ __host__ inline double3 zero() { return make_double3(0.0, 0.0, 0.0); }
-  template <> __device__ __host__ inline double4 zero() { return make_double4(0.0, 0.0, 0.0, 0.0); }
-
-  template <> __device__ __host__ inline float2 zero() { return make_float2(0.0, 0.0); }
-  template <> __device__ __host__ inline float3 zero() { return make_float3(0.0, 0.0, 0.0); }
-  template <> __device__ __host__ inline float4 zero() { return make_float4(0.0, 0.0, 0.0, 0.0); }
-
-#ifdef QUAD_SUM
-  template <> __device__ __host__ inline doubledouble zero() { return doubledouble(); }
-  template <> __device__ __host__ inline doubledouble2 zero() { return doubledouble2(); }
-  template <> __device__ __host__ inline doubledouble3 zero() { return doubledouble3(); }
-#endif
-
-  /**
-     struct which acts as a wrapper to a vector of data.
-   */
-  template <typename scalar_, int n> struct vector_type {
-    using scalar = scalar_;
-    scalar data[n];
-    __device__ __host__ inline scalar &operator[](int i) { return data[i]; }
-    __device__ __host__ inline const scalar &operator[](int i) const { return data[i]; }
-    constexpr int size() const { return n; }
-    __device__ __host__ inline void operator+=(const vector_type &a)
-    {
-#pragma unroll
-      for (int i = 0; i < n; i++) data[i] += a[i];
-    }
-    __device__ __host__ vector_type()
-    {
-#pragma unroll
-      for (int i = 0; i < n; i++) data[i] = zero<scalar>();
-    }
-
-    vector_type(const vector_type<scalar, n> &) = default;
-    vector_type(vector_type<scalar, n> &&) = default;
-
-    template <typename... T> constexpr vector_type(scalar first, const T... data) : data {first, data...} { }
-
-    template <typename... T> constexpr vector_type(const scalar &a)
-    {
-      for (auto &e : data) e = a;
-    }
-
-    vector_type<scalar, n> &operator=(const vector_type<scalar, n> &) = default;
-    vector_type<scalar, n> &operator=(vector_type<scalar, n> &&) = default;
-  };
-
-  template <typename T, int n> std::ostream &operator<<(std::ostream &output, const vector_type<T, n> &a)
-  {
-    output << "{ ";
-    for (int i = 0; i < n - 1; i++) output << a[i] << ", ";
-    output << a[n - 1] << " }";
-    return output;
-  }
-
-  template <typename scalar, int n> __device__ __host__ inline vector_type<scalar, n> zero()
-  {
-    vector_type<scalar, n> v;
-#pragma unroll
-    for (int i = 0; i < n; i++) v.data[i] = zero<scalar>();
-    return v;
-  }
-
-  template <typename scalar, int n>
-  __device__ __host__ inline vector_type<scalar, n> operator+(const vector_type<scalar, n> &a,
-                                                              const vector_type<scalar, n> &b)
-  {
-    vector_type<scalar, n> c;
-#pragma unroll
-    for (int i = 0; i < n; i++) c[i] = a[i] + b[i];
-    return c;
-  }
 }

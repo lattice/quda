@@ -98,7 +98,7 @@ void setQudaDefaultMgTestParams()
     smoother_solve_type[i] = QUDA_INVALID_SOLVE;
     mg_schwarz_type[i] = QUDA_INVALID_SCHWARZ;
     mg_schwarz_cycle[i] = 1;
-    smoother_type[i] = QUDA_GCR_INVERTER;
+    smoother_type[i] = QUDA_MR_INVERTER;
     smoother_tol[i] = 0.25;
     coarse_solver[i] = QUDA_GCR_INVERTER;
     coarse_solver_tol[i] = 0.25;
@@ -138,8 +138,9 @@ void setQudaDefaultMgTestParams()
     coarse_solver_ca_lambda_min[i] = 0.0;
     coarse_solver_ca_lambda_max[i] = -1.0;
 
-    strcpy(mg_vec_infile[i], "");
-    strcpy(mg_vec_outfile[i], "");
+    smoother_solver_ca_basis[i] = QUDA_POWER_BASIS;
+    smoother_solver_ca_lambda_min[i] = 0.0;
+    smoother_solver_ca_lambda_max[i] = -1.0; // use power iterations
   }
 }
 
@@ -169,10 +170,10 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
   // 1 = random SU(3)
   // 2 = supplied field
   int construct_type = 0;
-  if (strcmp(latfile, "")) {
+  if (latfile.size() > 0) {
     // load in the command line supplied gauge field using QIO and LIME
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Loading the gauge field in %s\n", latfile);
-    read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Loading the gauge field in %s\n", latfile.c_str());
+    read_gauge_field(latfile.c_str(), gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_type = 2;
   } else {
     if (unit_gauge)
@@ -183,6 +184,7 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
   constructQudaGaugeField(gauge, construct_type, gauge_param.cpu_prec, &gauge_param);
 }
 
+/*
 void saveHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, QudaLinkType link_type)
 {
   if (strcmp(gauge_outfile, "")) {
@@ -212,7 +214,7 @@ void saveDeviceGaugeField(cudaGaugeField *gaugeEx, cudaGaugeField *gauge)
   write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
   for (int dir = 0; dir<4; dir++) free(cpu_gauge[dir]);
 }
-
+*/
 
 void constructHostCloverField(void *clover, void *, QudaInvertParam &inv_param)
 {
@@ -235,8 +237,8 @@ void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecis
     constructCloverField((float *)clover, norm, diag);
 }
 
-void constructWilsonSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
-                                const QudaGaugeParam *gauge_param)
+void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
+				    const QudaGaugeParam *gauge_param)
 {
   // Lattice vector spacetime/colour/spin/parity properties
   cs_param->nColor = 3;
@@ -246,8 +248,7 @@ void constructWilsonSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInve
     cs_param->nDim = 5;
     cs_param->x[4] = inv_param->Ls;
   } else if ((inv_param->dslash_type == QUDA_TWISTED_MASS_DSLASH || inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
-             && (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET
-                 || inv_param->twist_flavor == QUDA_TWIST_DEG_DOUBLET)) {
+             && (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET)) {
     cs_param->nDim = 5;
     cs_param->x[4] = 2;
   } else {
@@ -270,7 +271,7 @@ void constructWilsonSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInve
 }
 
 void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, QudaSolutionType sol_type,
-                                 const int *const x, quda::RNG &rng)
+                                 const int *const x, int nDim, quda::RNG &rng)
 {
   quda::ColorSpinorParam param;
   param.v = v;
@@ -279,14 +280,14 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
   param.setPrecision(precision);
   param.create = QUDA_REFERENCE_FIELD_CREATE;
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  param.nDim = 4;
+  param.nDim = nDim;
   param.pc_type = QUDA_4D_PC;
   param.siteSubset = isPCSolution(sol_type) ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   param.location = QUDA_CPU_FIELD_LOCATION; // DMH FIXME so one can construct device noise
-  for (int d = 0; d < 4; d++) param.x[d] = x[d];
+  for (int d = 0; d < nDim; d++) param.x[d] = x[d];
   if (isPCSolution(sol_type)) param.x[0] /= 2;
-  quda::cpuColorSpinorField spinor_in(param);
+  quda::ColorSpinorField spinor_in(param);
   quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
 }
 
@@ -379,7 +380,7 @@ void initComms(int, char **, int *const commDims)
 
 void finalizeComms()
 {
-  comm_finalize();
+  quda::comm_finalize();
 #if defined(QMP_COMMS)
   QMP_finalize_msg_passing();
 #elif defined(MPI_COMMS)
@@ -561,7 +562,7 @@ int neighborIndex_mg(int i, int oddBit, int dx4, int dx3, int dx2, int dx1)
   x2 = (x2 + dx2 + Z[1]) % Z[1];
   x1 = (x1 + dx1 + Z[0]) % Z[0];
 
-  if ((ghost_x4 >= 0 && ghost_x4 < Z[3]) || !comm_dim_partitioned(3)) {
+  if ((ghost_x4 >= 0 && ghost_x4 < Z[3]) || !quda::comm_dim_partitioned(3)) {
     ret = (x4 * (Z[2] * Z[1] * Z[0]) + x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
   } else {
     ret = (x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
@@ -1058,13 +1059,13 @@ template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, Qud
 {
   // Apply spatial scaling factor (u0) to spatial links
   for (int d = 0; d < 3; d++) {
-    for (int i = 0; i < gauge_site_size * Vh * 2; i++) { gauge[d][i] /= param->anisotropy; }
+    for (auto i = 0lu; i < gauge_site_size * Vh * 2; i++) { gauge[d][i] /= param->anisotropy; }
   }
 
   // Apply boundary conditions to temporal links
   if (param->t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t()) {
     for (int j = (Z[0] / 2) * Z[1] * Z[2] * (Z[3] - 1); j < Vh; j++) {
-      for (int i = 0; i < gauge_site_size; i++) {
+      for (auto i = 0lu; i < gauge_site_size; i++) {
         gauge[3][j * gauge_site_size + i] *= -1.0;
         gauge[3][(Vh + j) * gauge_site_size + i] *= -1.0;
       }
@@ -1280,7 +1281,7 @@ template <typename Float> void constructCloverField(Float *res, double norm, dou
 
   Float c = 2.0 * norm / RAND_MAX;
 
-  for (int i = 0; i < V; i++) {
+  for (auto i = 0lu; i < static_cast<size_t>(V); i++) {
     for (int j = 0; j < 72; j++) { res[i * 72 + j] = c * rand() - norm; }
 
     // impose clover symmetry on each chiral block
@@ -1432,17 +1433,17 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
 
 #if 1
   for (int dir = 0; dir < 4; dir++) {
-    for (int i = 0; i < V * gauge_site_size; i++) {
+    for (auto i = 0lu; i < V * gauge_site_size; i++) {
       if (precision == QUDA_SINGLE_PRECISION) {
         float *f = (float *)link[dir];
         if (f[i] != f[i] || (fabsf(f[i]) > 1.e+3)) {
-          fprintf(stderr, "ERROR:  %dth: bad number(%f) in function %s \n", i, f[i], __FUNCTION__);
+          fprintf(stderr, "ERROR:  %luth: bad number(%f) in function %s \n", i, f[i], __FUNCTION__);
           exit(1);
         }
       } else {
         double *f = (double *)link[dir];
         if (f[i] != f[i] || (fabs(f[i]) > 1.e+3)) {
-          fprintf(stderr, "ERROR:  %dth: bad number(%f) in function %s \n", i, f[i], __FUNCTION__);
+          fprintf(stderr, "ERROR:  %luth: bad number(%f) in function %s \n", i, f[i], __FUNCTION__);
           exit(1);
         }
       }
@@ -1545,7 +1546,7 @@ void createMomCPU(void *mom, QudaPrecision precision)
     if (precision == QUDA_DOUBLE_PRECISION) {
       for (int dir = 0; dir < 4; dir++) {
         double *thismom = (double *)mom;
-        for (int k = 0; k < mom_site_size; k++) {
+        for (auto k = 0lu; k < mom_site_size; k++) {
           thismom[(4 * i + dir) * mom_site_size + k] = 1.0 * rand() / RAND_MAX;
           if (k == mom_site_size - 1) thismom[(4 * i + dir) * mom_site_size + k] = 0.0;
         }
@@ -1553,7 +1554,7 @@ void createMomCPU(void *mom, QudaPrecision precision)
     } else {
       for (int dir = 0; dir < 4; dir++) {
         float *thismom = (float *)mom;
-        for (int k = 0; k < mom_site_size; k++) {
+        for (auto k = 0lu; k < mom_site_size; k++) {
           thismom[(4 * i + dir) * mom_site_size + k] = 1.0 * rand() / RAND_MAX;
           if (k == mom_site_size - 1) thismom[(4 * i + dir) * mom_site_size + k] = 0.0;
         }
@@ -1571,12 +1572,16 @@ void createHwCPU(void *hw, QudaPrecision precision)
     if (precision == QUDA_DOUBLE_PRECISION) {
       for (int dir = 0; dir < 4; dir++) {
         double *thishw = (double *)hw;
-        for (int k = 0; k < hw_site_size; k++) { thishw[(4 * i + dir) * hw_site_size + k] = 1.0 * rand() / RAND_MAX; }
+        for (auto k = 0lu; k < hw_site_size; k++) {
+          thishw[(4 * i + dir) * hw_site_size + k] = 1.0 * rand() / RAND_MAX;
+        }
       }
     } else {
       for (int dir = 0; dir < 4; dir++) {
         float *thishw = (float *)hw;
-        for (int k = 0; k < hw_site_size; k++) { thishw[(4 * i + dir) * hw_site_size + k] = 1.0 * rand() / RAND_MAX; }
+        for (auto k = 0lu; k < hw_site_size; k++) {
+          thishw[(4 * i + dir) * hw_site_size + k] = 1.0 * rand() / RAND_MAX;
+        }
       }
     }
   }
@@ -1591,10 +1596,10 @@ template <typename Float> int compare_mom(Float *momA, Float *momB, int len)
   for (int f = 0; f < fail_check; f++) fail[f] = 0;
 
   int iter[mom_site_size];
-  for (int i = 0; i < mom_site_size; i++) iter[i] = 0;
+  for (auto i = 0lu; i < mom_site_size; i++) iter[i] = 0;
 
   for (int i = 0; i < len; i++) {
-    for (int j = 0; j < mom_site_size - 1; j++) {
+    for (auto j = 0lu; j < mom_site_size - 1; j++) {
       int is = i * mom_site_size + j;
       double diff = fabs(momA[is] - momB[is]);
       for (int f = 0; f < fail_check; f++)
@@ -1609,7 +1614,7 @@ template <typename Float> int compare_mom(Float *momA, Float *momB, int len)
     if (fail[f] == 0) { accuracy_level = f + 1; }
   }
 
-  for (int i = 0; i < mom_site_size; i++) printfQuda("%d fails = %d\n", i, iter[i]);
+  for (auto i = 0u; i < mom_site_size; i++) printfQuda("%u fails = %d\n", i, iter[i]);
 
   for (int f = 0; f < fail_check; f++) {
     printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0, -(f + 1)), fail[f], len * 9, fail[f] / (double)(len * 9));
@@ -1689,7 +1694,7 @@ double mom_action(void *mom, QudaPrecision prec, int len)
   } else if (prec == QUDA_SINGLE_PRECISION) {
     action = mom_action<float>((float *)mom, len);
   }
-  comm_allreduce(&action);
+  quda::comm_allreduce_sum(action);
   return action;
 }
 

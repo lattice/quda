@@ -2,20 +2,22 @@
 
 #include <blas_helper.cuh>
 #include <multi_blas_helper.cuh>
-#include <float_vector.h>
+#include <array.h>
 #include <constant_kernel_arg.h>
 #include <kernel.h>
 #include <warp_collective.h>
-
-#ifndef QUDA_FAST_COMPILE_REDUCE
-#define WARP_SPLIT
-#endif
 
 namespace quda
 {
 
   namespace blas
   {
+
+#ifndef QUDA_FAST_COMPILE_REDUCE
+    constexpr bool enable_warp_split() { return false; }
+#else
+    constexpr bool enable_warp_split() { return true; }
+#endif
 
     /**
        @brief Parameter struct for generic multi-blas kernel.
@@ -41,32 +43,26 @@ namespace quda
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Functor>();
       const int NYW;
       Functor f;
-      MultiBlasArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
-                   std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
+
+      template <typename V>
+      MultiBlasArg(std::vector<V> &x, std::vector<V> &y, std::vector<V> &z, std::vector<V> &w,
                    Functor f, int NYW, int length) :
-        kernel_param(dim3(length * warp_split, NYW, x[0]->SiteSubset())),
+        kernel_param(dim3(length * warp_split, NYW, x[0].get().SiteSubset())),
         NYW(NYW),
         f(f)
       {
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
         for (int i = 0; i < NXZ; ++i) {
-          this->X[i] = *x[i];
-          if (Functor::use_z) this->Z[i] = *z[i];
+          this->X[i] = static_cast<ColorSpinorField&>(x[i]);
+          if (Functor::use_z) this->Z[i] = static_cast<ColorSpinorField&>(z[i]);
         }
         for (int i = 0; i < NYW; ++i) {
-          this->Y[i] = *y[i];
-          if (Functor::use_w) this->W[i] = *w[i];
+          this->Y[i] = static_cast<ColorSpinorField&>(y[i]);
+          if (Functor::use_w) this->W[i] = static_cast<ColorSpinorField&>(w[i]);
         }
       }
     };
-
-    // strictly required pre-C++17 and can cause link errors otherwise
-    template <int warp_split_, typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
-    constexpr int MultiBlasArg<warp_split_, real_, n_, NXZ_, store_t, N, y_store_t, Ny, Functor>::NXZ;
-
-    template <int warp_split_, typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
-    constexpr int MultiBlasArg<warp_split_, real_, n_, NXZ_, store_t, N, y_store_t, Ny, Functor>::NYW_max;
 
     /**
        @brief Generic multi-blas kernel with four loads and up to four stores.
@@ -80,7 +76,7 @@ namespace quda
 
       __device__ __host__ inline void operator()(int i, int k, int parity)
       {
-        using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
+        using vec = array<complex<typename Arg::real>, Arg::n/2>;
 
         // partition the warp between grid points and the NXZ update
         constexpr int warp_size = device::warp_size();
@@ -177,11 +173,36 @@ namespace quda
     };
 
     /**
+       Functor to perform the operation w = a * x + y
+    */
+    template <typename real>
+    struct multiaxpyz_ : public MultiBlasFunctor<real> {
+      static constexpr memory_access<1, 1, 0, 0> read{ };
+      static constexpr memory_access<0, 0, 0, 1> write{ };
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = true;
+      static constexpr int NXZ_max = 0;
+      using MultiBlasFunctor<real>::a;
+      multiaxpyz_(int NXZ, int NYW) : MultiBlasFunctor<real>(NXZ, NYW) {}
+
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int i, int j) const
+      {
+#pragma unroll
+        for (int k = 0; k < x.size(); k++) {
+          if (j == 0) w[k] = y[k];
+          w[k] = a(j, i) * x[k] + w[k];
+        }
+      }
+
+      constexpr int flops() const { return 2; }         //! flops per real element
+    };
+
+    /**
        Functor to perform the operation w = a * x + y  (complex-valued)
     */
     template <typename real>
     struct multicaxpyz_ : public MultiBlasFunctor<complex<real>> {
-      static constexpr memory_access<1, 0, 0, 1> read{ };
+      static constexpr memory_access<1, 1, 0, 0> read{ };
       static constexpr memory_access<0, 0, 0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;

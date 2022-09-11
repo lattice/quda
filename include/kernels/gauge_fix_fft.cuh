@@ -2,13 +2,14 @@
 
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
+#include <array.h>
 #include <kernel.h>
 #include <reduction_kernel.h>
 #include <fast_intdiv.h>
 
 namespace quda {
 
-//UNCOMMENT THIS IF YOU WAN'T TO USE LESS MEMORY
+//UNCOMMENT THIS IF YOU WANT TO USE LESS MEMORY
 #define GAUGEFIXING_DONT_USE_GX
 //Without using the precalculation of g(x),
 //we loose some performance, because Delta(x) is written in normal lattice coordinates need for the FFTs
@@ -51,8 +52,8 @@ namespace quda {
         int x1 = (id / arg.X[0]) % arg.X[1];
         int x0 = id % arg.X[0];
 
-        int id  =  x0 + (x1 + (x2 + x3 * arg.X[2]) * arg.X[1]) * arg.X[0];
-        int id_out =  x2 + (x3 +  (x0 + x1 * arg.X[0]) * arg.X[3]) * arg.X[2];
+        int id = x0 + (x1 + (x2 + x3 * arg.X[2]) * arg.X[1]) * arg.X[0];
+        int id_out = x2 + (x3 + (x0 + x1 * arg.X[0]) * arg.X[3]) * arg.X[2];
         arg.tmp1[id_out] = arg.tmp0[id];
       }
 
@@ -62,8 +63,8 @@ namespace quda {
         int x3 = (id / arg.X[2]) % arg.X[3];
         int x2 = id % arg.X[2];
 
-        int id  =  x2 + (x3 +  (x0 + x1 * arg.X[0]) * arg.X[3]) * arg.X[2];
-        int id_out =  x0 + (x1 + (x2 + x3 * arg.X[2]) * arg.X[1]) * arg.X[0];
+        int id = x2 + (x3 + (x0 + x1 * arg.X[0]) * arg.X[3]) * arg.X[2];
+        int id_out = x0 + (x1 + (x2 + x3 * arg.X[2]) * arg.X[1]) * arg.X[0];
         arg.tmp1[id_out] = arg.tmp0[id];
       }
     }
@@ -121,10 +122,10 @@ namespace quda {
       int x3 = (id / arg.X[2]) % arg.X[3];
       int x2 = id % arg.X[2];
       //id  =  x2 + (x3 +  (x0 + x1 * arg.X[0]) * arg.X[3]) * arg.X[2];
-      Float sx = sin( (Float)x0 * M_PI / (Float)arg.X[0]);
-      Float sy = sin( (Float)x1 * M_PI / (Float)arg.X[1]);
-      Float sz = sin( (Float)x2 * M_PI / (Float)arg.X[2]);
-      Float st = sin( (Float)x3 * M_PI / (Float)arg.X[3]);
+      Float sx = quda::sinpi( (Float)x0 / (Float)arg.X[0]);
+      Float sy = quda::sinpi( (Float)x1 / (Float)arg.X[1]);
+      Float sz = quda::sinpi( (Float)x2 / (Float)arg.X[2]);
+      Float st = quda::sinpi( (Float)x3 / (Float)arg.X[3]);
       Float sinsq = sx * sx + sy * sy + sz * sz + st * st;
       Float prcfact = 0.0;
       //The FFT normalization is done here
@@ -149,8 +150,7 @@ namespace quda {
    * @brief container to pass parameters for the gauge fixing quality kernel
    */
   template <typename store_t, QudaReconstructType recon_, int gauge_dir_>
-  struct GaugeFixQualityFFTArg : public ReduceArg<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  struct GaugeFixQualityFFTArg : public ReduceArg<array<double, 2>> {
     using real = typename mapper<store_t>::type;
     static constexpr QudaReconstructType recon = recon_;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
@@ -166,19 +166,20 @@ namespace quda {
       ReduceArg<reduce_t>(dim3(data.VolumeCB(), 2, 1), 1, true), // reset = true
       data(data),
       delta(delta),
+      result{0, 0},
       volume(data.Volume())
     {
       for (int dir = 0; dir < 4; dir++) X[dir] = data.X()[dir];
     }
 
-    __device__ __host__ reduce_t init() const { return reduce_t(); }
     double getAction() { return result[0]; }
     double getTheta() { return result[1]; }
   };
 
-  template <typename Arg> struct FixQualityFFT : plus<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  template <typename Arg> struct FixQualityFFT : plus<typename Arg::reduce_t> {
+    using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
+    static constexpr int reduce_block_dim = 2; // x_cb in x, parity in y
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr FixQualityFFT(const Arg &arg) : arg(arg) {}
@@ -188,7 +189,7 @@ namespace quda {
      */
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t data;
+      reduce_t data{0, 0};
       using matrix = Matrix<complex<typename Arg::real>, 3>;
       int x[4];
       getCoords(x, x_cb, arg.X, parity);

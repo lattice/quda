@@ -18,13 +18,15 @@ namespace quda
                    double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
                    bool need_bidirectional)
   {
+    constexpr bool allow_truncation = false;
+
     if (Y.Location() == QUDA_CPU_FIELD_LOCATION) {
       constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
       constexpr QudaGaugeFieldOrder gOrder = QUDA_QDP_GAUGE_ORDER;
 
       if (T.Vectors(Y.Location()).FieldOrder() != csOrder)
-        errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
-      if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
+        errorQuda("Unsupported field order %d", T.Vectors(Y.Location()).FieldOrder());
+      if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d", g.FieldOrder());
 
       using V = typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat>;
       using F = typename colorspinor::FieldOrderCB<Float, 2 * fineSpin, fineColor, coarseColor, csOrder, vFloat>;
@@ -47,9 +49,10 @@ namespace quda
       gCoarseAtomic xAccessorAtomic(const_cast<GaugeField &>(Xatomic));
 
       calculateY<use_mma, QUDA_CPU_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
-        yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, cAccessor,
-        cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, kappa, mass, mu, mu_factor,
-        dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
+        yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, gAccessor,
+        gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, kappa,
+        mass, mu, mu_factor, allow_truncation, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
+        T.coarseToFine(Y.Location()));
 
     } else {
 
@@ -57,8 +60,8 @@ namespace quda
       constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
 
       if (T.Vectors(Y.Location()).FieldOrder() != csOrder)
-        errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
-      if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
+        errorQuda("Unsupported field order %d", T.Vectors(Y.Location()).FieldOrder());
+      if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d", g.FieldOrder());
 
       using V = typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat>;
       using F = typename colorspinor::FieldOrderCB<Float, 2 * fineSpin, fineColor, coarseColor, csOrder, vFloat>;
@@ -82,9 +85,10 @@ namespace quda
 
       // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
       calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
-        yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, cAccessor,
-        cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, kappa, mass, mu, mu_factor,
-        dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
+        yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, gAccessor,
+        gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, kappa,
+        mass, mu, mu_factor, allow_truncation, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
+        T.coarseToFine(Y.Location()));
     }
   }
 
@@ -95,6 +99,8 @@ namespace quda
                                                    double mass, double mu, double mu_factor, QudaDiracType dirac,
                                                    QudaMatPCType matpc, bool need_bidirectional)
   {
+    constexpr bool allow_truncation = false;
+
     if (Y.Location() == QUDA_CPU_FIELD_LOCATION) {
       errorQuda("use_mma not supported on the CPU");
     } else {
@@ -114,7 +120,7 @@ namespace quda
       ColorSpinorParam param_v(v);
       param_v.fieldOrder = csOrder;
       param_v.setPrecision(v.Precision());
-      cudaColorSpinorField v_(param_v);
+      ColorSpinorField v_(param_v);
       v_.copy(v);
 
       V vAccessor(v_);
@@ -130,9 +136,10 @@ namespace quda
 
       // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
       calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
-        yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, cAccessor,
-        cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<cudaColorSpinorField &>(v_), v_, kappa, mass, mu,
-        mu_factor, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
+        yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, gAccessor,
+        gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v_), v_, kappa,
+        mass, mu, mu_factor, allow_truncation, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
+        T.coarseToFine(Y.Location()));
     }
   }
 
@@ -144,7 +151,7 @@ namespace quda
                         QudaMatPCType matpc, bool need_bidirectional)
   {
     if (T.Vectors().Nspin() / T.Spin_bs() != 2)
-      errorQuda("Unsupported number of coarse spins %d\n", T.Vectors().Nspin() / T.Spin_bs());
+      errorQuda("Unsupported number of coarse spins %d", T.Vectors().Nspin() / T.Spin_bs());
     const int fineColor = g.Ncolor() / fineSpin;
     const int coarseSpin = 2;
     const int coarseColor = Y.Ncolor() / coarseSpin;
@@ -155,7 +162,7 @@ namespace quda
                                                                              cloverInv, kappa, mass, mu, mu_factor,
                                                                              dirac, matpc, need_bidirectional);
       } else {
-        errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
+        errorQuda("Unsupported fineColor = %d coarseColor = %d", fineColor, coarseColor);
       }
     } else
 #endif
@@ -180,7 +187,7 @@ namespace quda
       } else // --- note, coarsening Nc == 24 -> Nc == 96 for staggered is worth revisiting in the future
 #endif
       {
-        errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
+        errorQuda("Unsupported fineColor = %d coarseColor = %d", fineColor, coarseColor);
       }
 #ifdef NSPIN4
     } else if (fineColor == 32) {
@@ -189,25 +196,34 @@ namespace quda
                                                                                cloverInv, kappa, mass, mu, mu_factor,
                                                                                dirac, matpc, need_bidirectional);
       } else {
-        errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
+        errorQuda("Unsupported fineColor = %d coarseColor = %d", fineColor, coarseColor);
       }
 #endif // NSPIN4
 #ifdef NSPIN1
     } else if (fineColor == 64) {
-      if (coarseColor == 64) {
-        calculateYcoarse<use_mma, Float, vFloat, 64, fineSpin, 64, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-                                                                               cloverInv, kappa, mass, mu, mu_factor,
-                                                                               dirac, matpc, need_bidirectional);
-      } else if (coarseColor == 96) {
+      // if (coarseColor == 64) {
+      //  calculateYcoarse<use_mma, Float, vFloat, 64, fineSpin, 64, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+      //                                                                         cloverInv, kappa, mass, mu, mu_factor,
+      //                                                                         dirac, matpc, need_bidirectional);
+      //} else
+      if (coarseColor == 96) {
         calculateYcoarse<use_mma, Float, vFloat, 64, fineSpin, 96, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
                                                                                cloverInv, kappa, mass, mu, mu_factor,
                                                                                dirac, matpc, need_bidirectional);
       } else {
-        errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
-      } // --- note, revisit Nc == 96 -> Nc == 96 in the future
+        errorQuda("Unsupported fineColor = %d coarseColor = %d", fineColor, coarseColor);
+      }
+    } else if (fineColor == 96) {
+      if (coarseColor == 96) {
+        calculateYcoarse<use_mma, Float, vFloat, 96, fineSpin, 96, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+                                                                               cloverInv, kappa, mass, mu, mu_factor,
+                                                                               dirac, matpc, need_bidirectional);
+      } else {
+        errorQuda("Unsupported fineColor = %d coarseColor = %d", fineColor, coarseColor);
+      }
 #endif // NSPIN1
     } else {
-      errorQuda("Unsupported number of colors %d\n", g.Ncolor());
+      errorQuda("Unsupported number of colors %d", g.Ncolor());
     }
   }
 
@@ -222,7 +238,7 @@ namespace quda
       calculateYcoarse<use_mma, Float, vFloat, 2>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mass, mu,
                                                   mu_factor, dirac, matpc, need_bidirectional);
     } else {
-      errorQuda("Unsupported number of spins %d\n", T.Vectors().Nspin());
+      errorQuda("Unsupported number of spins %d", T.Vectors().Nspin());
     }
   }
 
@@ -237,7 +253,7 @@ namespace quda
     checkPrecision(X, Y, g, clover, cloverInv, uv, T.Vectors(X.Location()));
     checkPrecision(Xatomic, Yatomic);
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Y field......\n");
+    logQuda(QUDA_SUMMARIZE, "Computing Y field......\n");
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       if (use_mma) errorQuda("MG-MMA does not support double precision, yet.");
@@ -245,7 +261,7 @@ namespace quda
         calculateYcoarse<use_mma, double, double>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mass, mu,
                                                   mu_factor, dirac, matpc, need_bidirectional);
       } else {
-        errorQuda("Unsupported precision %d\n", Y.Precision());
+        errorQuda("Unsupported precision %d", Y.Precision());
       }
 #else
       errorQuda("Double precision multigrid has not been enabled");
@@ -256,7 +272,7 @@ namespace quda
         calculateYcoarse<use_mma, float, float>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mass, mu,
                                                 mu_factor, dirac, matpc, need_bidirectional);
       } else {
-        errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
+        errorQuda("Unsupported precision %d", T.Vectors(X.Location()).Precision());
       }
 #else
       errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
@@ -267,15 +283,15 @@ namespace quda
         calculateYcoarse<use_mma, float, short>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mass, mu,
                                                 mu_factor, dirac, matpc, need_bidirectional);
       } else {
-        errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
+        errorQuda("Unsupported precision %d", T.Vectors(X.Location()).Precision());
       }
 #else
       errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
 #endif
     } else {
-      errorQuda("Unsupported precision %d\n", Y.Precision());
+      errorQuda("Unsupported precision %d", Y.Precision());
     }
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Y field\n");
+    logQuda(QUDA_SUMMARIZE, "....done computing Y field\n");
   }
 #else
   template <bool use_mma>

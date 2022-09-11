@@ -170,7 +170,7 @@ namespace quda {
    * @brief Tunable object for the gauge fixing quality kernel
    */
   template <typename Arg>
-  class GaugeFixQuality : TunableReduction2D<> {
+  class GaugeFixQuality : TunableReduction2D {
     Arg &arg;
     const GaugeField &meta;
 
@@ -496,17 +496,10 @@ namespace quda {
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    */
-#ifdef GPU_GAUGE_ALG
   void gaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double relax_boost,
                       const double tolerance, const int reunit_interval, const int stopWtheta)
   {
     instantiate<GaugeFixingOVR>(data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
   }
-#else
-  void gaugeFixingOVR(GaugeField&, const int, const int, const int, const double, const double, const int, const int)
-  {
-    errorQuda("Gauge fixing has not been built");
-  }
-#endif
 
 }   //namespace quda

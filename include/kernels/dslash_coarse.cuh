@@ -1,8 +1,8 @@
 #include <gauge_field_order.h>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
-#include <float_vector.h>
-#include <shared_memory_cache_helper.cuh>
+#include <array.h>
+#include <shared_memory_cache_helper.h>
 #include <kernel.h>
 #include <warp_collective.h>
 
@@ -15,7 +15,7 @@ namespace quda {
   };
 
   // we use two colors per thread unless we have large dim_stride, when we're aiming for maximum parallelism
-  constexpr int colors_per_thread(int nColor, int dim_stride) { return (nColor % 2 == 0 && dim_stride <= 2) ? 2 : 1; }
+  constexpr int colors_per_thread(int nColor, int dim_stride) { return (nColor % 2 == 0 && nColor <= 32 && dim_stride <= 2) ? 2 : 1; }
 
   template <bool dslash_, bool clover_, bool dagger_, DslashType type_, int color_stride_, int dim_stride_, typename Float,
             typename yFloat, typename ghostFloat, int nSpin_, int nColor_, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
@@ -329,7 +329,7 @@ namespace quda {
       int color_block = (sM % (Arg::nColor/Mc)) * Mc;
 
       constexpr int src_idx = 0;
-      vector_type<complex <typename Arg::real>, Mc> out;
+      array<complex <typename Arg::real>, Mc> out{ };
 
       if (Arg::dslash) {
         if (dim == 0)      applyDslash<Mc, 0>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);

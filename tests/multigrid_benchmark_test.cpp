@@ -13,15 +13,14 @@
 #include <dslash_reference.h>
 #include <dirac_quda.h>
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-
-extern void usage(char** );
+extern void usage(char **);
 
 using namespace quda;
 
-ColorSpinorField *xH, *yH;
-ColorSpinorField *xD, *yD;
+std::unique_ptr<ColorSpinorField> xH, yH;
+std::unique_ptr<ColorSpinorField> xD, yD;
 
 cpuGaugeField *Y_h, *X_h, *Xinv_h, *Yhat_h;
 cudaGaugeField *Y_d, *X_d, *Xinv_d, *Yhat_d;
@@ -29,7 +28,7 @@ cudaGaugeField *Y_d, *X_d, *Xinv_d, *Yhat_d;
 int Nspin;
 int Ncolor;
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 void display_test_info()
 {
@@ -37,11 +36,8 @@ void display_test_info()
   printfQuda("S_dimension T_dimension Nspin Ncolor\n");
   printfQuda("%3d /%3d / %3d   %3d      %d     %d\n", xdim, ydim, zdim, tdim, Nspin, Ncolor);
   printfQuda("Grid partition info:     X  Y  Z  T\n");
-  printfQuda("                         %d  %d  %d  %d\n",
-	     dimPartitioned(0),
-	     dimPartitioned(1),
-	     dimPartitioned(2),
-	     dimPartitioned(3));
+  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
+             dimPartitioned(3));
 }
 
 void initFields(QudaPrecision prec)
@@ -66,23 +62,22 @@ void initFields(QudaPrecision prec)
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
   param.create = QUDA_ZERO_FIELD_CREATE;
+  param.location = QUDA_CPU_FIELD_LOCATION;
 
-  xH = new cpuColorSpinorField(param);
-  yH = new cpuColorSpinorField(param);
-
-  //static_cast<cpuColorSpinorField*>(xH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  //static_cast<cpuColorSpinorField*>(yH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  xH = std::make_unique<ColorSpinorField>(param);
+  yH = std::make_unique<ColorSpinorField>(param);
 
   // Now set the parameters for the cuda fields
-  //param.pad = xdim*ydim*zdim/2;
+  // param.pad = xdim*ydim*zdim/2;
 
   if (param.nSpin == 4) param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
   param.create = QUDA_ZERO_FIELD_CREATE;
   param.setPrecision(prec);
   param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  param.location = QUDA_CUDA_FIELD_LOCATION;
 
-  xD = new cudaColorSpinorField(param);
-  yD = new cudaColorSpinorField(param);
+  xD = std::make_unique<ColorSpinorField>(param);
+  yD = std::make_unique<ColorSpinorField>(param);
 
   //*xD = *xH;
   //*yD = *yH;
@@ -92,7 +87,7 @@ void initFields(QudaPrecision prec)
   gParam.x[1] = ydim;
   gParam.x[2] = zdim;
   gParam.x[3] = tdim;
-  gParam.nColor = param.nColor*param.nSpin;
+  gParam.nColor = param.nColor * param.nSpin;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.order = QUDA_QDP_GAUGE_ORDER;
   gParam.link_type = QUDA_COARSE_LINKS;
@@ -105,6 +100,7 @@ void initFields(QudaPrecision prec)
   gParam.nFace = 1;
 
   gParam.geometry = QUDA_COARSE_GEOMETRY;
+  gParam.location = QUDA_CPU_FIELD_LOCATION;
   Y_h = new cpuGaugeField(gParam);
   Yhat_h = new cpuGaugeField(gParam);
 
@@ -117,16 +113,17 @@ void initFields(QudaPrecision prec)
   gParam.geometry = QUDA_COARSE_GEOMETRY;
   gParam.nFace = 1;
 
-  int x_face_size = gParam.x[1]*gParam.x[2]*gParam.x[3]/2;
-  int y_face_size = gParam.x[0]*gParam.x[2]*gParam.x[3]/2;
-  int z_face_size = gParam.x[0]*gParam.x[1]*gParam.x[3]/2;
-  int t_face_size = gParam.x[0]*gParam.x[1]*gParam.x[2]/2;
+  int x_face_size = gParam.x[1] * gParam.x[2] * gParam.x[3] / 2;
+  int y_face_size = gParam.x[0] * gParam.x[2] * gParam.x[3] / 2;
+  int z_face_size = gParam.x[0] * gParam.x[1] * gParam.x[3] / 2;
+  int t_face_size = gParam.x[0] * gParam.x[1] * gParam.x[2] / 2;
   int pad = MAX(x_face_size, y_face_size);
   pad = MAX(pad, z_face_size);
   pad = MAX(pad, t_face_size);
   gParam.pad = gParam.nFace * pad * 2;
 
   gParam.setPrecision(prec_sloppy);
+  gParam.location = QUDA_CUDA_FIELD_LOCATION;
 
   Y_d = new cudaGaugeField(gParam);
   Yhat_d = new cudaGaugeField(gParam);
@@ -142,14 +139,12 @@ void initFields(QudaPrecision prec)
   Xinv_d->copy(*Xinv_h);
 }
 
-
 void freeFields()
 {
-  delete xD;
-  delete yD;
-
-  delete xH;
-  delete yH;
+  xD.reset();
+  yD.reset();
+  xH.reset();
+  yH.reset();
 
   delete Y_h;
   delete X_h;
@@ -169,31 +164,26 @@ double benchmark(int test, const int niter)
   device_timer_t device_timer;
   device_timer.start();
 
-  switch(test) {
+  switch (test) {
   case 0:
-    for (int i=0; i < niter; ++i) dirac->Dslash(xD->Even(), yD->Odd(), QUDA_EVEN_PARITY);
+    for (int i = 0; i < niter; ++i) dirac->Dslash(xD->Even(), yD->Odd(), QUDA_EVEN_PARITY);
     break;
   case 1:
-    for (int i=0; i < niter; ++i) dirac->M(*xD, *yD);
+    for (int i = 0; i < niter; ++i) dirac->M(*xD, *yD);
     break;
   case 2:
-    for (int i=0; i < niter; ++i) dirac->Clover(xD->Even(), yD->Even(), QUDA_EVEN_PARITY);
+    for (int i = 0; i < niter; ++i) dirac->Clover(xD->Even(), yD->Even(), QUDA_EVEN_PARITY);
     break;
-  default:
-    errorQuda("Undefined test %d", test);
+  default: errorQuda("Undefined test %d", test);
   }
 
   device_timer.stop();
   return device_timer.last();
 }
 
-const char *names[] = {
-  "Dslash",
-  "Mat",
-  "Clover"
-};
+const char *names[] = {"Dslash", "Mat", "Clover"};
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
   // Set some defaults that lets the benchmark fit in memory if you run it
   // with default parameters.
@@ -223,7 +213,7 @@ int main(int argc, char** argv)
   Nspin = 2;
 
   printfQuda("\nBenchmarking %s precision with %d iterations...\n\n", get_prec_str(prec), niter);
-  for (int c=24; c<=32; c+=8) {
+  for (int c = 24; c <= 32; c += 8) {
     Ncolor = c;
 
     initFields(prec);
@@ -239,7 +229,7 @@ int main(int argc, char** argv)
     dirac->Flops(); // reset flops counter
 
     double secs = benchmark(test_type, niter);
-    double gflops = (dirac->Flops()*1e-9)/(secs);
+    double gflops = (dirac->Flops() * 1e-9) / (secs);
 
     printfQuda("Ncolor = %2d, %-31s: Gflop/s = %6.1f\n", Ncolor, names[test_type], gflops);
 

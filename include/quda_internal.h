@@ -1,12 +1,7 @@
 #pragma once
 
-#include <quda_define.h>
+#include <quda_arch.h>
 #include <quda_api.h>
-
-#if defined(QUDA_TARGET_CUDA)
-#include <cuda.h>
-#include <cuda_runtime.h>
-#endif
 
 #include <string>
 #include <complex>
@@ -27,7 +22,7 @@
 // these are helper macros used to enable spin-1, spin-2 and spin-4 building blocks as needed
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_CLOVER_DIRAC)                           \
   || defined(GPU_TWISTED_MASS_DIRAC) || defined(GPU_TWISTED_CLOVER_DIRAC) || defined(GPU_NDEG_TWISTED_MASS_DIRAC)      \
-  || defined(GPU_CLOVER_HASENBUSCH_TWIST) || defined(GPU_COVDEV)
+  || defined(GPU_CLOVER_HASENBUSCH_TWIST) || defined(GPU_COVDEV) || defined(GPU_CONTRACT)
 #define NSPIN4
 #endif
 
@@ -45,17 +40,24 @@
   (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 :                                                               \
                             strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
 
-#define TEX_ALIGN_REQ (512*2) //Fermi, factor 2 comes from even/odd
-#define ALIGNMENT_ADJUST(n) ( (n+TEX_ALIGN_REQ-1)/TEX_ALIGN_REQ*TEX_ALIGN_REQ)
+#define ALIGN_REQ 128 // Align on 128-byte boundaries
+#define ALIGNMENT_ADJUST(n) (((n + ALIGN_REQ - 1) / ALIGN_REQ) * ALIGN_REQ)
+
 #include <quda.h>
 #include <util_quda.h>
 #include <malloc_quda.h>
 #include <object.h>
 #include <device.h>
+#include <array.h>
 
 namespace quda {
 
   using Complex = std::complex<double>;
+
+  /**
+     Array object type used to storing lattice dimensions
+   */
+  using lat_dim_t = array<int, QUDA_MAX_DIM>;
 
   /**
    * Check that the resident gauge field is compatible with the requested inv_param

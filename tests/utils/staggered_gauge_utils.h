@@ -25,6 +25,5 @@ void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, vo
 // Routine that takes in a QDP-ordered field and outputs the plaquette.
 // Assumes the gauge fields already have phases on them (unless it's the Laplace op),
 // so it corrects the sign as appropriate.
-void computeStaggeredPlaquetteQDPOrder(void** qdp_link, double plaq[3], const QudaGaugeParam &gauge_param_in,
+void computeStaggeredPlaquetteQDPOrder(void **qdp_link, double plaq[3], const QudaGaugeParam &gauge_param_in,
                                        const QudaDslashType dslash_type);
-

@@ -7,23 +7,6 @@ namespace quda
 {
 
   /**
-     @brief This class is derived from the arg class that the functor
-     creates and curries in the block size.  This allows the block
-     size to be set statically at launch time in the actual argument
-     class that is passed to the kernel.
-
-     @tparam block_size_x x-dimension block-size
-     @tparam block_size_y y-dimension block-size
-     @tparam Arg Kernel argument struct
-  */
-  template <int block_size_x_, int block_size_y_, typename Arg_> struct ReduceKernelArg : Arg_ {
-    using Arg = Arg_;
-    static constexpr int block_size_x = block_size_x_;
-    static constexpr int block_size_y = block_size_y_;
-    ReduceKernelArg(const Arg &arg) : Arg(arg) { }
-  };
-
-  /**
      @brief Reduction2D_impl is the implementation of the generic 2-d
      reduction kernel.  Functors that utilize this kernel have two
      parallelization dimensions.  The y thread dimenion is constrained
@@ -46,7 +29,7 @@ namespace quda
     auto idx = threadIdx.x + blockIdx.x * blockDim.x;
     auto j = threadIdx.y;
 
-    reduce_t value = arg.init();
+    reduce_t value = t.init();
 
     while (idx < arg.threads.x) {
       value = t(value, idx, j);
@@ -57,7 +40,7 @@ namespace quda
     }
 
     // perform final inter-block reduction and write out result
-    reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value);
+    reduce(arg, t, value);
   }
 
   /**
@@ -99,10 +82,10 @@ namespace quda
   /**
      @brief MultiReduction_impl is the implementation of the generic
      multi-reduction kernel.  Functors that utilize this kernel have
-     three parallelization dimensions.  The y thread dimenion is a
-     batch dimension that is not contracted in the reduction.  The z
-     thread dimension is constrained to remain inside the thread block
-     and this dimension is contracted in the reduction.
+     three parallelization dimensions.  The y thread dimension is
+     constrained to remain inside the thread block and this dimension
+     is contracted in the reduction.  The z thread dimension is a
+     batch dimension that is not contracted in the reduction.
 
      @tparam Functor Kernel functor that defines the kernel
      @tparam Arg Kernel argument struct that set any required meta
@@ -118,15 +101,15 @@ namespace quda
     Functor<Arg> t(arg);
 
     auto idx = threadIdx.x + blockIdx.x * blockDim.x;
-    auto j = threadIdx.y + blockIdx.y * blockDim.y;
-    auto k = threadIdx.z;
+    auto k = threadIdx.y;
+    auto j = threadIdx.z + blockIdx.z * blockDim.z;
 
-    if (j >= arg.threads.y) return;
+    if (j >= arg.threads.z) return;
 
-    reduce_t value = arg.init();
+    reduce_t value = t.init();
 
     while (idx < arg.threads.x) {
-      value = t(value, idx, j, k);
+      value = t(value, idx, k, j);
       if (grid_stride)
         idx += blockDim.x * gridDim.x;
       else
@@ -134,7 +117,7 @@ namespace quda
     }
 
     // perform final inter-block reduction and write out result
-    reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value, j);
+    reduce(arg, t, value, j);
   }
 
   /**

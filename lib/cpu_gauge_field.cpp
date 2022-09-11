@@ -31,6 +31,8 @@ namespace quda {
     else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;
     else if (geometry == QUDA_TENSOR_GEOMETRY) siteDim = nDim * (nDim-1) / 2;
     else if (geometry == QUDA_COARSE_GEOMETRY) siteDim = 2*nDim;
+    else if (geometry == QUDA_KDINVERSE_GEOMETRY)
+      siteDim = 1 << nDim;
     else errorQuda("Unknown geometry type %d", geometry);
 
     // compute the correct bytes size for these padded field orders
@@ -107,6 +109,8 @@ namespace quda {
     else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;
     else if (geometry == QUDA_TENSOR_GEOMETRY) siteDim = nDim * (nDim-1) / 2;
     else if (geometry == QUDA_COARSE_GEOMETRY) siteDim = 2*nDim;
+    else if (geometry == QUDA_KDINVERSE_GEOMETRY)
+      siteDim = 1 << nDim;
     else errorQuda("Unknown geometry type %d", geometry);
 
     if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
@@ -186,8 +190,9 @@ namespace quda {
     for (int d=0; d<nDim; d++) host_free(recv[d]);
   }
 
-  void cpuGaugeField::exchangeExtendedGhost(const int *R, bool no_comms_fill) {
-    
+  void cpuGaugeField::exchangeExtendedGhost(const lat_dim_t &R, bool no_comms_fill)
+  {
+
     void *send[QUDA_MAX_DIM];
     void *recv[QUDA_MAX_DIM];
     size_t bytes[QUDA_MAX_DIM];
@@ -244,10 +249,10 @@ namespace quda {
       host_free(send[d]);
       host_free(recv[d]);
     }
-
   }
 
-  void cpuGaugeField::exchangeExtendedGhost(const int *R, TimeProfile &profile, bool no_comms_fill) {
+  void cpuGaugeField::exchangeExtendedGhost(const lat_dim_t &R, TimeProfile &profile, bool no_comms_fill)
+  {
     profile.TPSTART(QUDA_PROFILE_COMMS);
     exchangeExtendedGhost(R, no_comms_fill);
     profile.TPSTOP(QUDA_PROFILE_COMMS);
@@ -422,37 +427,5 @@ namespace quda {
       errorQuda("Unsupported order = %d\n", Order());
     }
   }
-
-/*template <typename Float>
-void print_matrix(const Float &m, unsigned int x) {
-
-  for (int s=0; s<o.Nspin(); s++) {
-    std::cout << "x = " << x << ", s = " << s << ", { ";
-    for (int c=0; c<o.Ncolor(); c++) {
-      std::cout << " ( " << o(x, s, c, 0) << " , " ;
-      if (c<o.Ncolor()-1) std::cout << o(x, s, c, 1) << " ) ," ;
-      else std::cout << o(x, s, c, 1) << " ) " ;
-    }
-    std::cout << " } " << std::endl;
-  }
-
-}
-
-// print out the vector at volume point x
-void cpuColorSpinorField::PrintMatrix(unsigned int x) {
-  
-  switch(precision) {
-  case QUDA_DOUBLE_PRECISION:
-    print_matrix(*order_double, x);
-    break;
-  case QUDA_SINGLE_PRECISION:
-    print_matrix(*order_single, x);
-    break;
-  default:
-    errorQuda("Precision %d not implemented", precision); 
-  }
-
-}
-*/
 
 } // namespace quda

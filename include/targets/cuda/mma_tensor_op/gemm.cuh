@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array.h>
 
 #if (__COMPUTE_CAPABILITY__ == 700)
 
@@ -84,16 +85,16 @@ namespace quda
         auto scale_inv = gmem.scale_inv;
         constexpr bool fixed = GmemAccessor::fixed;
 
-        static constexpr int n_stride = transpose == dagger ? block_y * 1 : block_z * 1;
-        static constexpr int m_stride = transpose == dagger ? block_z * 2 : block_y * 2;
+        constexpr int n_stride = transpose == dagger ? block_y * 1 : block_z * 1;
+        constexpr int m_stride = transpose == dagger ? block_z * 2 : block_y * 2;
         int n_thread_offset = transpose == dagger ? threadIdx.y * 1 : threadIdx.z * 1;
         int m_thread_offset = transpose == dagger ? threadIdx.z * 2 : threadIdx.y * 2;
 
-        static constexpr int n_dim = (bN + n_stride - 1) / n_stride;
-        static constexpr int m_dim = (bM + m_stride - 1) / m_stride;
+        constexpr int n_dim = (bN + n_stride - 1) / n_stride;
+        constexpr int m_dim = (bM + m_stride - 1) / m_stride;
 
-        static constexpr bool check_global_bound = !(M % bM == 0 && N % bN == 0);
-        static constexpr bool check_shared_bound = !(bM % m_stride == 0 && bN % n_stride == 0);
+        constexpr bool check_global_bound = !(M % bM == 0 && N % bN == 0);
+        constexpr bool check_shared_bound = !(bM % m_stride == 0 && bN % n_stride == 0);
 
 #pragma unroll
         for (int n = 0; n < n_dim; n++) {
@@ -129,8 +130,8 @@ namespace quda
                 } else {
 
                   using store_type = typename GmemAccessor::store_type;
-                  using store_vector_type = typename VectorType<store_type, 4>::type;
-                  store_vector_type v = *reinterpret_cast<store_vector_type *>(&p[n_idx * ld + m_idx]);
+                  using store_array = typename VectorType<store_type, 4>::type;
+                  store_array v = *reinterpret_cast<store_array *>(&p[n_idx * ld + m_idx]);
 
                   if (fixed) {
                     reg_real[m * n_dim + n] = __floats2half2_rn(scale_inv * v.x, scale_inv * v.z);
@@ -154,13 +155,13 @@ namespace quda
 
       template <bool dagger, class SmemObj> __device__ inline void r2s(SmemObj &smem_real, SmemObj &smem_imag)
       {
-        static constexpr int n_stride = transpose == dagger ? block_y * 1 : block_z * 1;
-        static constexpr int m_stride = transpose == dagger ? block_z * 2 : block_y * 2;
+        constexpr int n_stride = transpose == dagger ? block_y * 1 : block_z * 1;
+        constexpr int m_stride = transpose == dagger ? block_z * 2 : block_y * 2;
         int n_thread_offset = transpose == dagger ? threadIdx.y * 1 : threadIdx.z * 1;
         int m_thread_offset = transpose == dagger ? threadIdx.z * 2 : threadIdx.y * 2;
 
-        static constexpr int n_dim = (bN + n_stride - 1) / n_stride;
-        static constexpr int m_dim = (bM + m_stride - 1) / m_stride;
+        constexpr int n_dim = (bN + n_stride - 1) / n_stride;
+        constexpr int m_dim = (bM + m_stride - 1) / m_stride;
 
 #pragma unroll
         for (int n = 0; n < n_dim; n++) {

@@ -1,41 +1,16 @@
 #pragma once
 
 #include <quda_cuda_api.h>
-#include <cufft.h>
 #include <quda_internal.h>
-#include <quda_matrix.h>
+#include <cufft.h>
 
-using FFTPlanHandle = cufftHandle;
 #define FFT_FORWARD CUFFT_FORWARD
 #define FFT_INVERSE CUFFT_INVERSE
 
-#ifndef GPU_GAUGE_ALG
-
-#define CUFFT_SAFE_CALL(call)
-
-inline void ApplyFFT(FFTPlanHandle &, float2 *, float2 *, int)
+namespace quda
 {
-  errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
-}
 
-inline void ApplyFFT(FFTPlanHandle &, double2 *, double2 *, int)
-{
-  errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
-}
-
-inline void SetPlanFFTMany(FFTPlanHandle &, int4, int, QudaPrecision)
-{
-  errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
-}
-
-inline void SetPlanFFT2DMany(FFTPlanHandle &, int4, int, QudaPrecision)
-{
-  errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
-}
-
-inline void FFTDestroyPlan(FFTPlanHandle &) { errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled"); }
-
-#else
+  using FFTPlanHandle = cufftHandle;
 
 /**
    @brief Helper function for decoding cuFFT return codes
@@ -134,11 +109,11 @@ inline void SetPlanFFT2DMany(cufftHandle &plan, int4 size, int dim, QudaPrecisio
   auto type = precision == QUDA_DOUBLE_PRECISION ? CUFFT_Z2Z : CUFFT_C2C;
   switch (dim) {
   case 0: {
-    int n[2] = {size.w, size.z};
+    int n[2] = {size.w, size.z}; // outer-most dimension is first
     CUFFT_SAFE_CALL(cufftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, type, size.x * size.y));
   } break;
   case 1: {
-    int n[2] = {size.x, size.y};
+    int n[2] = {size.y, size.x}; // outer-most dimension is first
     CUFFT_SAFE_CALL(cufftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, type, size.z * size.w));
   } break;
   }
@@ -147,4 +122,4 @@ inline void SetPlanFFT2DMany(cufftHandle &plan, int4 size, int dim, QudaPrecisio
 
 inline void FFTDestroyPlan(FFTPlanHandle &plan) { CUFFT_SAFE_CALL(cufftDestroy(plan)); }
 
-#endif
+} // namespace quda

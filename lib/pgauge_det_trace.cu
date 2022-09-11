@@ -11,13 +11,13 @@
 namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType recon>
-  class CalcFunc : TunableReduction2D<> {
+  class CalcFunc : TunableReduction2D {
     const GaugeField &u;
-    std::vector<double> &result;
+    array<double, 2> &result;
     const compute_type type;
 
   public:
-    CalcFunc(const GaugeField &u, std::vector<double> &result, compute_type type) :
+    CalcFunc(const GaugeField &u, array<double, 2> &result, compute_type type) :
       TunableReduction2D(u),
       u(u),
       result(result),
@@ -50,32 +50,18 @@ namespace quda {
     long long bytes() const { return u.Bytes(); }
   };
 
-#ifdef GPU_GAUGE_ALG
   double2 getLinkDeterminant(GaugeField& data)
   {
-    std::vector<double> det{0.0, 0.0};
+    array<double, 2> det{0.0, 0.0};
     instantiate<CalcFunc>(data, det, compute_type::determinant);
     return make_double2(det[0], det[1]);
   }
 
   double2 getLinkTrace(GaugeField& data)
   {
-    std::vector<double> tr{0.0, 0.0};
+    array<double, 2> tr{0.0, 0.0};
     instantiate<CalcFunc>(data, tr, compute_type::trace);
     return make_double2(tr[0], tr[1]);
   }
-#else
-  double2 getLinkDeterminant(GaugeField&)
-  {
-    errorQuda("Pure gauge code has not been built");
-    return make_double2(0.0,0.0);
-  }
-
-  double2 getLinkTrace(GaugeField&)
-  {
-    errorQuda("Pure gauge code has not been built");
-    return make_double2(0.0,0.0);
-  }
-#endif
 
 } // namespace quda

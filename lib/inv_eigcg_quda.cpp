@@ -12,9 +12,6 @@
 #include <util_quda.h>
 #include <string.h>
 
-#ifdef MAGMA_LIB 
-#include <blas_magma.h>
-#endif
 
 #include <eigen_helper.h>
 #include <deflation.h>
@@ -39,7 +36,7 @@ namespace quda {
 
    static int max_eigcg_cycles = 4;//how many eigcg cycles do we allow?
 
-   enum  class libtype {eigen_lib, magma_lib, lapack_lib, mkl_lib};
+   enum  class libtype {eigen_lib, lapack_lib, mkl_lib};
 
    class EigCGArgs
    {
@@ -191,10 +188,6 @@ namespace quda {
     inner.is_preconditioner = true; // used to tell the inner solver it is an inner solver
 
     inner.use_sloppy_partial_accumulator= use_sloppy_partial_accumulator;
-
-    if(outer.inv_type == QUDA_EIGCG_INVERTER && outer.precision_sloppy != outer.precision_precondition)
-      inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
-    else inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   }
 
   // set the required parameters for the initCG solver
@@ -293,9 +286,7 @@ namespace quda {
   {
     EigCGArgs &args = *eigcg_args;
 
-    if ( param.extlib_type == QUDA_MAGMA_EXTLIB ) {
-      ComputeRitz<libtype::magma_lib>(args);
-    } else if( param.extlib_type == QUDA_EIGEN_EXTLIB ) {
+    if( param.extlib_type == QUDA_EIGEN_EXTLIB ) {
       ComputeRitz<libtype::eigen_lib>(args);//if args.m > 128, one may better use libtype::magma_lib
     } else {
       errorQuda("Library type %d is currently not supported.", param.extlib_type);
@@ -379,9 +370,10 @@ namespace quda {
       eigcg_args = new EigCGArgs(param.m, param.n_ev); // need only deflation meta structure
 
       csParam.create = QUDA_COPY_FIELD_CREATE;
-      rp = ColorSpinorField::Create(b, csParam);
+      csParam.field = &b;
+      rp = ColorSpinorField::Create(csParam);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      yp = ColorSpinorField::Create(b, csParam);
+      yp = ColorSpinorField::Create(csParam);
 
       Ap = ColorSpinorField::Create(csParam);
       p  = ColorSpinorField::Create(csParam);

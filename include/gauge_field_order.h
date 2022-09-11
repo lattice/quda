@@ -17,7 +17,7 @@
 #include <quda_matrix.h>
 #include <index_helper.cuh>
 #include <fast_intdiv.h>
-#include <atomic.cuh>
+#include <atomic_helper.h>
 #include <gauge_field.h>
 #include <index_helper.cuh>
 #include <load_store.h>
@@ -219,7 +219,7 @@ namespace quda {
       */
       template <typename theirFloat> __device__ __host__ inline void operator=(const complex<theirFloat> &a)
       {
-        if (match<storeFloat, theirFloat>()) {
+        if constexpr (match<storeFloat, theirFloat>()) {
           v[idx] = complex<storeFloat>(a.x, a.y);
         } else {
           v[idx] = fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
@@ -232,11 +232,8 @@ namespace quda {
       __device__ __host__ inline operator complex<Float>() const
       {
         complex<storeFloat> tmp = v[idx];
-        if (fixed) {
-          return scale_inv * complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
-        } else {
-          return complex<Float>(tmp.x, tmp.y);
-        }
+        if constexpr (fixed) return scale_inv * complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+        return complex<Float>(tmp.x, tmp.y);
       }
 
       /**
@@ -259,7 +256,7 @@ namespace quda {
       */
       template <typename theirFloat> __device__ __host__ inline void operator+=(const complex<theirFloat> &a)
       {
-        if (match<storeFloat, theirFloat>()) {
+        if constexpr (match<storeFloat, theirFloat>()) {
           v[idx] += complex<storeFloat>(a.x, a.y);
         } else {
           v[idx] += fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
@@ -272,7 +269,7 @@ namespace quda {
       */
       template <typename theirFloat> __device__ __host__ inline void operator-=(const complex<theirFloat> &a)
       {
-        if (match<storeFloat, theirFloat>()) {
+        if constexpr (match<storeFloat, theirFloat>()) {
           v[idx] -= complex<storeFloat>(a.x, a.y);
         } else {
           v[idx] -= fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
@@ -364,11 +361,12 @@ namespace quda {
 	resetScale(U.Scale());
       }
 
-      void resetScale(Float max) {
-	if (fixed) {
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
-	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
-	}
+      void resetScale(Float max)
+      {
+        if (fixed) {
+          scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+          scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
+        }
       }
 
       __device__ __host__ inline wrapper operator()(int d, int parity, int x, int row, int col) const
@@ -380,28 +378,38 @@ namespace quda {
       __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col,
                                                  const complex<theirFloat> &val) const
       {
-        using vec2 = vector_type<storeFloat, 2>;
+        using vec2 = array<storeFloat, 2>;
         vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
-          vec2(static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))) :
-          vec2(static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag()));
+          vec2{static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))} :
+          vec2{static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag())};
 
         atomic_fetch_add(u2, val_);
       }
 
-      template <typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, double init, reducer r) const
+      /**
+         @brief Wrapper to transform_reduce which is called by the
+         reducer functions, e.g., norm2 and abs_max
+         @tparam reducer The reduction operation we which to apply
+         @param[in] location The location of execution
+         @param[in] dim The dimension of of the field we wish to
+         reduce.  If dim = -1, then we reduce over all dimensions.
+         @param[in] h The helper functor which acts as the transformer
+         in transform_reduce
+       */
+      template <typename reducer, typename helper>
+      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {
         if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
         int lower = (dim == -1) ? 0 : dim;
         int ndim = (dim == -1 ? geometry : 1);
-        std::vector<double> result(ndim);
+        std::vector<typename reducer::reduce_t> result(ndim);
         std::vector<complex<storeFloat> *> v(ndim);
         for (int d = 0; d < ndim; d++) v[d] = u[d + lower];
-        ::quda::transform_reduce(location, result, v, 2 * volumeCB * nColor * nColor, h, init, r);
-        double total = init;
-        for (auto &res : result) total = r(total, res);
+        ::quda::transform_reduce<reducer>(location, result, v, 2 * volumeCB * nColor * nColor, h);
+        auto total = reducer::init();
+        for (auto &res : result) total = reducer::apply(total, res);
         return total;
       }
     };
@@ -432,11 +440,12 @@ namespace quda {
 	resetScale(U.Scale());
       }
 
-      void resetScale(Float max) {
-	if (fixed) {
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
-	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
-	}
+      void resetScale(Float max)
+      {
+        if (fixed) {
+          scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+          scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
+        }
       }
 
       __device__ __host__ inline wrapper operator()(int d, int parity, int x, int row, int col) const
@@ -467,11 +476,12 @@ namespace quda {
         resetScale(U.Scale());
       }
 
-      void resetScale(Float max) {
-	if (fixed) {
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
-	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
-	}
+      void resetScale(Float max)
+      {
+        if (fixed) {
+          scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+          scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
+        }
       }
 
       /**
@@ -487,27 +497,42 @@ namespace quda {
       __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col,
                                                  const complex<theirFloat> &val) const
       {
-        using vec2 = vector_type<storeFloat, 2>;
+        using vec2 = array<storeFloat, 2>;
         vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
-          vec2(static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))) :
-          vec2(static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag()));
+          vec2{static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))} :
+          vec2{static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag())};
 
         atomic_fetch_add(u2, val_);
       }
 
-      template <typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, double init, reducer r) const
+      /**
+         @brief Wrapper to transform_reduce which is called by the
+         reducer functions, e.g., norm2 and abs_max
+         @tparam reducer The reduction operation we which to apply
+         @param[in] location The location of execution
+         @param[in] dim The dimension of of the field we wish to
+         reduce.  If dim = -1, then we reduce over all dimensions.
+         @param[in] h The helper functor which acts as the transformer
+         in transform_reduce
+       */
+      template <typename reducer, typename helper>
+      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {
         if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
-        auto start = dim == -1 ? 0 : dim;
         auto count = (dim == -1 ? geometry : 1) * volumeCB * nColor * nColor; // items per parity
-        std::vector<double> result = {init, init};
-        std::vector<decltype(u)> v = {u + (0 * geometry + start) * volumeCB * nColor * nColor,
-                                      u + (1 * geometry + start) * volumeCB * nColor * nColor};
-        ::quda::transform_reduce(location, result, v, count, h, init, r);
-        return r(result[0], result[1]);
+        auto init = reducer::init();
+        std::vector<decltype(init)> result = {init, init};
+        std::vector<decltype(u)> v
+          = {u + 0 * volumeCB * geometry * nColor * nColor, u + 1 * volumeCB * geometry * nColor * nColor};
+        if (dim == -1) {
+          ::quda::transform_reduce<reducer>(location, result, v, count, h);
+        } else {
+          ::quda::transform_reduce<reducer>(location, result, v, count, h, milc_mapper(dim, geometry, nColor * nColor));
+        }
+
+        return reducer::apply(result[0], result[1]);
       }
     };
 
@@ -537,11 +562,12 @@ namespace quda {
 	resetScale(U.Scale());
       }
 
-      void resetScale(Float max) {
-	if (fixed) {
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
-	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
-	}
+      void resetScale(Float max)
+      {
+        if (fixed) {
+          scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+          scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
+        }
       }
 
       /**
@@ -573,7 +599,6 @@ namespace quda {
       const unsigned int volumeCB;
       const unsigned int stride;
       const int geometry;
-      Float max;
       Float scale;
       Float scale_inv;
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
@@ -585,19 +610,18 @@ namespace quda {
         volumeCB(U.VolumeCB()),
         stride(U.Stride()),
         geometry(U.Geometry()),
-        max(static_cast<Float>(1.0)),
         scale(static_cast<Float>(1.0)),
         scale_inv(static_cast<Float>(1.0))
       {
 	resetScale(U.Scale());
       }
 
-      void resetScale(Float max_) {
-	if (fixed) {
-	  max = max_;
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+      void resetScale(Float max)
+      {
+        if (fixed) {
+          scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
 	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
-	}
+        }
       }
 
       __device__ __host__ inline wrapper operator()(int dim, int parity, int x_cb, int row, int col) const
@@ -610,26 +634,37 @@ namespace quda {
       __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col,
                                           const complex<theirFloat> &val) const
       {
-        using vec2 = vector_type<storeFloat, 2>;
+        using vec2 = array<storeFloat, 2>;
         vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
-          vec2(static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))) :
-          vec2(static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag()));
+          vec2{static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))} :
+          vec2{static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag())};
 
         atomic_fetch_add(u2, val_);
       }
 
-      template <typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, double init, reducer r) const
+      /**
+         @brief Wrapper to transform_reduce which is called by the
+         reducer functions, e.g., norm2 and abs_max
+         @tparam reducer The reduction operation we which to apply
+         @param[in] location The location of execution
+         @param[in] dim The dimension of of the field we wish to
+         reduce.  If dim = -1, then we reduce over all dimensions.
+         @param[in] h The helper functor which acts as the transformer
+         in transform_reduce
+       */
+      template <typename reducer, typename helper>
+      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {
         if (dim >= geometry) errorQuda("Requested dimension %d exceeds dimensionality of the field %d", dim, geometry);
         auto start = (dim == -1) ? 0 : dim;
         auto count = (dim == -1 ? geometry : 1) * stride * nColor * nColor;
-        std::vector<double> result = {init, init};
+        auto init = reducer::init();
+        std::vector<decltype(init)> result = {init, init};
         std::vector<decltype(u)> v = {u + 0 * offset_cb + start * count, u + 1 * offset_cb + start * count};
-        ::quda::transform_reduce(location, result, v, count, h, init, r);
-        return r(result[0], result[1]);
+        ::quda::transform_reduce<reducer>(location, result, v, count, h);
+        return reducer::apply(result[0], result[1]);
       }
     };
 
@@ -650,30 +685,30 @@ namespace quda {
         scale_inv(static_cast<Float>(1.0)),
         accessor(U, gauge_, ghost_)
       {
-	if (!native_ghost) assert(ghost_ != nullptr);
-	for (int d=0; d<4; d++) {
-	  ghost[d] = !native_ghost ? static_cast<complex<storeFloat>*>(ghost_[d]) : nullptr;
+        if constexpr (!native_ghost) assert(ghost_ != nullptr);
+        for (int d = 0; d < 4; d++) {
+          ghost[d] = !native_ghost ? static_cast<complex<storeFloat>*>(ghost_[d]) : nullptr;
 	  ghostVolumeCB[d] = U.Nface()*U.SurfaceCB(d);
 	  ghost[d+4] = !native_ghost && U.Geometry() == QUDA_COARSE_GEOMETRY? static_cast<complex<storeFloat>*>(ghost_[d+4]) : nullptr;
 	  ghostVolumeCB[d+4] = U.Nface()*U.SurfaceCB(d);
-	}
-	resetScale(U.Scale());
+        }
+        resetScale(U.Scale());
       }
 
-      void resetScale(Float max) {
-	accessor.resetScale(max);
-	if (fixed) {
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
-	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
-	}
+      void resetScale(Float max)
+      {
+        accessor.resetScale(max);
+        if (fixed) {
+          scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+          scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
+        }
       }
 
       __device__ __host__ inline wrapper operator()(int d, int parity, int x_cb, int row, int col) const
       {
-	if (native_ghost)
-	  return accessor(d%4, parity, x_cb+(d/4)*ghostVolumeCB[d]+volumeCB, row, col);
-	else
-          return wrapper(ghost[d], ((parity * nColor + row) * nColor + col) * ghostVolumeCB[d] + x_cb, scale, scale_inv);
+        if constexpr (native_ghost)
+          return accessor(d % 4, parity, x_cb + (d / 4) * ghostVolumeCB[d] + volumeCB, row, col);
+        return wrapper(ghost[d], ((parity * nColor + row) * nColor + col) * ghostVolumeCB[d] + x_cb, scale, scale_inv);
       }
     };
 
@@ -843,8 +878,8 @@ namespace quda {
 	 */
 	__host__ double norm1(int dim=-1, bool global=true) const {
           commGlobalReductionPush(global);
-          double nrm1 = accessor.transform_reduce(location, dim, abs_<double, storeFloat>(accessor.scale_inv), 0.0,
-                                                  plus<double>());
+          double nrm1 = accessor.template transform_reduce<plus<double>>(location, dim,
+                                                                         abs_<double, storeFloat>(accessor.scale_inv));
           commGlobalReductionPop();
           return nrm1;
         }
@@ -857,8 +892,8 @@ namespace quda {
         __host__ double norm2(int dim = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double nrm2 = accessor.transform_reduce(location, dim, square_<double, storeFloat>(accessor.scale_inv), 0.0,
-                                                  plus<double>());
+          double nrm2 = accessor.template transform_reduce<plus<double>>(
+            location, dim, square_<double, storeFloat>(accessor.scale_inv));
           commGlobalReductionPop();
           return nrm2;
         }
@@ -871,8 +906,8 @@ namespace quda {
         __host__ double abs_max(int dim = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double absmax = accessor.transform_reduce(location, dim, abs_max_<Float, storeFloat>(accessor.scale_inv), 0.0,
-                                                    maximum<Float>());
+          double absmax = accessor.template transform_reduce<maximum<Float>>(
+            location, dim, abs_max_<Float, storeFloat>(accessor.scale_inv));
           commGlobalReductionPop();
           return absmax;
         }
@@ -885,8 +920,8 @@ namespace quda {
         __host__ double abs_min(int dim = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double absmin = accessor.transform_reduce(location, dim, abs_min_<Float, storeFloat>(accessor.scale_inv),
-                                                    std::numeric_limits<double>::max(), minimum<Float>());
+          double absmin = accessor.template transform_reduce<minimum<Float>>(
+            location, dim, abs_min_<Float, storeFloat>(accessor.scale_inv));
           commGlobalReductionPop();
           return absmin;
         }
@@ -917,7 +952,7 @@ namespace quda {
 
         __device__ __host__ inline void Pack(real out[N], const complex in[N / 2]) const
         {
-          if (isFixed<Float>::value) {
+          if constexpr (isFixed<Float>::value) {
 #pragma unroll
             for (int i = 0; i < N / 2; i++) {
               out[2 * i + 0] = scale_inv * in[i].real();
@@ -936,7 +971,7 @@ namespace quda {
         __device__ __host__ inline void Unpack(complex out[N / 2], const real in[N], int, int, real, const I *,
                                                const int *) const
         {
-          if (isFixed<Float>::value) {
+          if constexpr (isFixed<Float>::value) {
 #pragma unroll
             for (int i = 0; i < N / 2; i++) { out[i] = scale * complex(in[2 * i + 0], in[2 * i + 1]); }
           } else {
@@ -1160,10 +1195,10 @@ namespace quda {
           out[8] = cmac(out[0], out[4], -out[8]);
           out[8] = scale_inv * conj(out[8]);
 
-          if (stag_phase == QUDA_STAGGERED_PHASE_NO) { // dynamic phasing
+          if constexpr (stag_phase == QUDA_STAGGERED_PHASE_NO) { // dynamic phasing
             // Multiply the third row by exp(I*3*phase), since the cross product will end up in a scale factor of exp(-I*2*phase)
             real cos_sin[2];
-            Trig<isFixed<real>::value, real>::SinCos(static_cast<real>(3. * phase), &cos_sin[1], &cos_sin[0]);
+            sincospi(static_cast<real>(3.0) * phase, &cos_sin[1], &cos_sin[0]);
             complex A(cos_sin[0], cos_sin[1]);
             out[6] = cmul(A, out[6]);
             out[7] = cmul(A, out[7]);
@@ -1182,17 +1217,16 @@ namespace quda {
           complex denom = conj(in[0] * in[4] - in[1] * in[3]) * scale_inv;
           complex expI3Phase = in[8] / denom; // numerator = U[2][2]
 
-          if (stag_phase == QUDA_STAGGERED_PHASE_NO) { // dynamic phasing
-            return arg(expI3Phase) / static_cast<real>(3.0);
-          } else {
-            return expI3Phase.real() > 0 ? 1 : -1;
-          }
+          // dynamic phasing
+          if constexpr (stag_phase == QUDA_STAGGERED_PHASE_NO) return arg(expI3Phase) / static_cast<real>(3.0 * M_PI);
+          // static phasing
+          return expI3Phase.real() > 0 ? 1 : -1;
 #else // phase from determinant
           Matrix<complex, 3> a;
 #pragma unroll
           for (int i = 0; i < 9; i++) a(i) = scale_inv * in[i];
           const complex det = getDeterminant(a);
-          return phase = arg(det) / 3;
+          return phase = arg(det) / static_cast<real>(3.0 * M_PI);
 #endif
         }
       };
@@ -1234,8 +1268,8 @@ namespace quda {
 
         __device__ __host__ inline void Pack(real out[8], const complex in[9]) const
         {
-          out[0] = Trig<isFixed<Float>::value, real>::Atan2(in[3].imag(), in[3].real());   // a1 -> b1
-          out[1] = Trig<isFixed<Float>::value, real>::Atan2(-in[6].imag(), -in[6].real()); // c1 -> -c1
+          out[0] = atan2(in[3].imag(), in[3].real()) / static_cast<real>(M_PI);   // a1 -> b1
+          out[1] = atan2(-in[6].imag(), -in[6].real()) / static_cast<real>(M_PI); // c1 -> -c1
 
           out[2] = in[4].real();
           out[3] = in[4].imag(); // a2 -> b2
@@ -1257,10 +1291,10 @@ namespace quda {
             out[i] = complex(in[2 * i + 0], in[2 * i + 1]); // these elements are copied directly
 
           real tmp[2];
-          Trig<isFixed<Float>::value, real>::SinCos(in[0], &tmp[1], &tmp[0]);
+          quda::sincospi(in[0], &tmp[1], &tmp[0]);
           out[0] = complex(tmp[0], tmp[1]);
 
-          Trig<isFixed<Float>::value, real>::SinCos(in[1], &tmp[1], &tmp[0]);
+          quda::sincospi(in[1], &tmp[1], &tmp[0]);
           out[6] = complex(tmp[0], tmp[1]);
 
           // First, reconstruct first row
@@ -1367,17 +1401,16 @@ namespace quda {
           // denominator = (U[0][0]*U[1][1] - U[0][1]*U[1][0])*
           complex denom = conj(in[0] * in[4] - in[1] * in[3]) * scale_inv;
           complex expI3Phase = in[8] / denom; // numerator = U[2][2]
-          if (stag_phase == QUDA_STAGGERED_PHASE_NO) {
-            return arg(expI3Phase) / static_cast<real>(3.0);
-          } else {
-            return expI3Phase.real() > 0 ? 1 : -1;
-          }
+          // dynamic phasing
+          if constexpr (stag_phase == QUDA_STAGGERED_PHASE_NO) return arg(expI3Phase) / static_cast<real>(3.0 * M_PI);
+          // static phasing
+          return expI3Phase.real() > 0 ? 1 : -1;
 #else // phase from determinant
           Matrix<complex, 3> a;
 #pragma unroll
           for (int i = 0; i < 9; i++) a(i) = scale_inv * in[i];
           const complex det = getDeterminant(a);
-          real phase = arg(det) / 3;
+          real phase = arg(det) / static_cast<real>(3.0 * M_PI);
           return phase;
 #endif
         }
@@ -1388,9 +1421,9 @@ namespace quda {
           real phase = getPhase(in);
           complex su3[9];
 
-          if (stag_phase == QUDA_STAGGERED_PHASE_NO) {
+          if constexpr (stag_phase == QUDA_STAGGERED_PHASE_NO) {
             real cos_sin[2];
-            Trig<isFixed<real>::value, real>::SinCos(static_cast<real>(-phase), &cos_sin[1], &cos_sin[0]);
+            sincospi(static_cast<real>(-phase), &cos_sin[1], &cos_sin[0]);
             complex z(cos_sin[0], cos_sin[1]);
             z *= scale_inv;
 #pragma unroll
@@ -1409,9 +1442,9 @@ namespace quda {
           reconstruct_8.Unpack(out, in, idx, dir, phase, X, R, complex(static_cast<real>(1.0), static_cast<real>(1.0)),
                                complex(static_cast<real>(1.0), static_cast<real>(1.0)));
 
-          if (stag_phase == QUDA_STAGGERED_PHASE_NO) { // dynamic phase
+          if constexpr (stag_phase == QUDA_STAGGERED_PHASE_NO) { // dynamic phase
             real cos_sin[2];
-            Trig<isFixed<real>::value, real>::SinCos(static_cast<real>(phase), &cos_sin[1], &cos_sin[0]);
+            sincospi(static_cast<real>(phase), &cos_sin[1], &cos_sin[0]);
             complex z(cos_sin[0], cos_sin[1]);
             z *= scale;
 #pragma unroll
@@ -1438,7 +1471,7 @@ namespace quda {
       // we default to huge allocations for gauge field (for now)
       constexpr bool default_huge_alloc = true;
 
-      template <QudaStaggeredPhase phase> __host__ __device__ inline bool static_phase()
+      template <QudaStaggeredPhase phase> constexpr bool static_phase()
       {
         switch (phase) {
         case QUDA_STAGGERED_PHASE_MILC:
@@ -1502,7 +1535,7 @@ namespace quda {
           }
         }
 
-      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real phase = 1.0) const
       {
         const int M = reconLen / N;
         real tmp[reconLen];
@@ -1516,14 +1549,10 @@ namespace quda {
           for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
         }
 
-        real phase = 0.;
-        if (hasPhase) {
-          if (static_phase<stag_phase>() && (reconLen == 13 || use_inphase)) {
-            phase = inphase;
-          } else {
-            copy(phase, gauge[parity * offset * N + phaseOffset + stride * dir + x]);
-            phase *= static_cast<real>(2.0) * static_cast<real>(M_PI);
-          }
+        constexpr bool load_phase = (hasPhase && !(static_phase<stag_phase>() && (reconLen == 13 || use_inphase)));
+        if constexpr (load_phase) {
+          copy(phase, gauge[parity * offset * N + phaseOffset + stride * dir + x]);
+          phase *= static_cast<real>(2.0);
         }
 
         reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
@@ -1544,9 +1573,9 @@ namespace quda {
 	  // second do vectorized copy into memory
           vector_store(gauge, parity * offset + x + (dir * M + i) * stride, vecTmp);
         }
-        if (hasPhase) {
+        if constexpr (hasPhase) {
           real phase = reconstruct.getPhase(v);
-          copy(gauge[parity * offset * N + phaseOffset + dir * stride + x], static_cast<real>(phase / (2. * M_PI)));
+          copy(gauge[parity * offset * N + phaseOffset + dir * stride + x], static_cast<real>(0.5) * phase);
         }
       }
 
@@ -1585,13 +1614,13 @@ namespace quda {
           }
           real phase = 0.;
 
-          if (hasPhase) {
+          if constexpr (hasPhase) {
 
             // if(stag_phase == QUDA_STAGGERED_PHASE_MILC )  {
-            //   phase = inphase < static_cast<Float>(0) ? static_cast<Float>(-1./(2.*M_PI)) : static_cast<Float>(1./2.*M_PI);
+            //   phase = inphase < static_cast<real>(0) ? static_cast<real>(-0.5) : static_cast<real>(0.5);
             // } else {
             copy(phase, ghost[dir][parity * faceVolumeCB[dir] * (M * N + 1) + faceVolumeCB[dir] * M * N + x]);
-            phase *= static_cast<real>(2.0) * static_cast<real>(M_PI);
+            phase *= static_cast<real>(2.0);
             // }
           }
           reconstruct.Unpack(v, tmp, x, dir, phase, X, R);
@@ -1617,10 +1646,10 @@ namespace quda {
 	    vector_store(ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase), i*faceVolumeCB[dir]+x, vecTmp);
           }
 
-	  if (hasPhase) {
+          if constexpr (hasPhase) {
             real phase = reconstruct.getPhase(v);
             copy(ghost[dir][parity * faceVolumeCB[dir] * (M * N + 1) + faceVolumeCB[dir] * M * N + x],
-                 static_cast<real>(phase / (2. * M_PI)));
+                 static_cast<real>(0.5) * phase);
           }
         }
       }
@@ -1673,13 +1702,13 @@ namespace quda {
 	  for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
 	}
         real phase = 0.;
-        if (hasPhase)
+        if constexpr (hasPhase)
           copy(phase,
                ghost[dim][((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * (M * N + 1)
                           + R[dim] * faceVolumeCB[dim] * M * N + buff_idx]);
 
         // use the extended_idx to determine the boundary condition
-        reconstruct.Unpack(v, tmp, extended_idx, g, 2. * M_PI * phase, X, R);
+        reconstruct.Unpack(v, tmp, extended_idx, g, 2. * phase, X, R);
       }
 
       __device__ __host__ inline void saveGhostEx(const complex v[length / 2], int buff_idx, int, int dir, int dim,
@@ -1699,11 +1728,11 @@ namespace quda {
 	    vector_store(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
 			 i*R[dim]*faceVolumeCB[dim]+buff_idx, vecTmp);
 	  }
-	  if (hasPhase) {
+          if constexpr (hasPhase) {
             real phase = reconstruct.getPhase(v);
             copy(ghost[dim][((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * (M * N + 1)
                             + R[dim] * faceVolumeCB[dim] * M * N + buff_idx],
-                 static_cast<real>(phase / (2. * M_PI)));
+                 static_cast<real>(0.5) * phase);
           }
       }
 
@@ -2014,7 +2043,7 @@ namespace quda {
       anisotropy_inv(1.0 / anisotropy),
       geometry(u.Geometry())
     {
-      if (length != 18) errorQuda("Gauge length %d not supported", length);
+      if constexpr (length != 18) errorQuda("Gauge length %d not supported", length);
     }
 
     // we need to transpose and scale for CPS ordering
@@ -2078,7 +2107,7 @@ namespace quda {
         gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
         volumeCB(u.VolumeCB())
       {
-        if (length != 18) errorQuda("Gauge length %d not supported", length);
+        if constexpr (length != 18) errorQuda("Gauge length %d not supported", length);
         // compute volumeCB + halo region
         exVolumeCB = u.X()[0]/2 + 2;
 	for (int i=1; i<4; i++) exVolumeCB *= u.X()[i] + 2;
@@ -2145,7 +2174,7 @@ namespace quda {
         scale(u.Scale()),
         scale_inv(1.0 / scale)
       {
-        if (length != 18) errorQuda("Gauge length %d not supported", length);
+        if constexpr (length != 18) errorQuda("Gauge length %d not supported", length);
       }
 
       // we need to transpose for TIFR ordering
@@ -2215,7 +2244,7 @@ namespace quda {
         dim {u.X()[0], u.X()[1], u.X()[2], u.X()[3]},
         exDim {u.X()[0], u.X()[1], u.X()[2] + 4, u.X()[3]}
       {
-        if (length != 18) errorQuda("Gauge length %d not supported", length);
+        if constexpr (length != 18) errorQuda("Gauge length %d not supported", length);
 
         // exVolumeCB is the padded checkboard volume
         for (int i=0; i<4; i++) exVolumeCB *= exDim[i];
@@ -2350,9 +2379,9 @@ namespace quda {
   };
 
 #ifdef FLOAT8
-#define N8 8
+#define FLOATN 8
 #else
-#define N8 4
+#define FLOATN 4
 #endif
 
   // half precision
@@ -2374,11 +2403,11 @@ namespace quda {
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<short, N, N8, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<short, N, FLOATN, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<short, N, N8, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<short, N, FLOATN, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
   // quarter precision
@@ -2400,12 +2429,14 @@ namespace quda {
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<int8_t, N, N8, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<int8_t, N, FLOATN, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<int8_t, N, N8, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<int8_t, N, FLOATN, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
+
+#undef FLOATN
 
   template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc,
             QudaGhostExchange ghostExchange, bool use_inphase>

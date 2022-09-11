@@ -1244,16 +1244,14 @@ void doHisqStaplesForceCPU(const int dim[4], PathCoefficients<double> staple_coe
 #undef Qmu
 #undef Qnumu
 
-void hisqStaplesForceCPU(const double *path_coeff, const QudaGaugeParam &param, cpuGaugeField &oprod,
-                         cpuGaugeField &link, cpuGaugeField *newOprod)
+void hisqStaplesForceCPU(const double *path_coeff, const QudaGaugeParam &param, quda::cpuGaugeField &oprod,
+                         quda::cpuGaugeField &link, quda::cpuGaugeField *newOprod)
 {
-  int volume = 1;
-  for (int dir = 0; dir < 4; ++dir) volume *= param.X[dir];
-
 #ifdef MULTI_GPU
   int len = Vh_ex * 2;
 #else
-  int len = volume;
+  int len = 1;
+  for (int dir = 0; dir < 4; ++dir) len *= param.X[dir];
 #endif
   // allocate memory for temporary fields
   void *tempmat[6];
@@ -1347,8 +1345,8 @@ void computeLongLinkField(const int dim[4], const Real *const oprod, const Real 
   }
 }
 
-void hisqLongLinkForceCPU(double coeff, const QudaGaugeParam &param, cpuGaugeField &oprod, cpuGaugeField &link,
-                          cpuGaugeField *newOprod)
+void hisqLongLinkForceCPU(double coeff, const QudaGaugeParam &param, quda::cpuGaugeField &oprod,
+                          quda::cpuGaugeField &link, quda::cpuGaugeField *newOprod)
 {
   for (int sig = 0; sig < 4; ++sig) {
     if (param.cpu_prec == QUDA_SINGLE_PRECISION) {
@@ -1402,7 +1400,8 @@ void completeForceField(const int dim[4], const Real *const oprod, const Real *c
   for (int site = 0; site < half_volume; ++site) { completeForceSite<Real, 1>(site, dim, oprod, link, sig, ls, mom); }
 }
 
-void hisqCompleteForceCPU(const QudaGaugeParam &param, cpuGaugeField &oprod, cpuGaugeField &link, cpuGaugeField *mom)
+void hisqCompleteForceCPU(const QudaGaugeParam &param, quda::cpuGaugeField &oprod, quda::cpuGaugeField &link,
+                          quda::cpuGaugeField *mom)
 {
   for (int sig = 0; sig < 4; ++sig) {
     if (param.cpu_prec == QUDA_SINGLE_PRECISION) {

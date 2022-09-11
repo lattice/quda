@@ -4,10 +4,6 @@
 
 #include <memory>
 
-#ifdef MAGMA_LIB
-#include <blas_magma.h>
-#endif
-
 #include <eigen_helper.h>
 
 namespace quda
@@ -88,15 +84,7 @@ namespace quda
 
     std::unique_ptr<Complex, decltype(pinned_deleter) > projm( pinned_allocator(param.ld*param.cur_dim * sizeof(Complex)), pinned_deleter);
 
-    if (param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB) {
-#ifdef MAGMA_LIB
-      memcpy(projm.get(), param.matProj, param.ld*param.cur_dim*sizeof(Complex));
-      std::unique_ptr<double[] > evals(new double[param.ld]);
-      magma_Xheev(projm.get(), param.cur_dim, param.ld, evals.get(), sizeof(Complex));
-#else
-      errorQuda("MAGMA library was not built");
-#endif
-    } else if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
+if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
       Map<MatrixXcd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
       Map<MatrixXcd, Unaligned, DynamicStride> evecs_(projm.get(), param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
 
@@ -147,13 +135,7 @@ namespace quda
     blas::cDotProduct(vec.get(), rv_, in_);//<i, b>
 
     if (!param.use_inv_ritz) {
-      if (param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB) {
-#ifdef MAGMA_LIB
-        magma_Xgesv(vec.get(), param.ld, param.cur_dim, param.matProj, param.ld, sizeof(Complex));
-#else
-        errorQuda("MAGMA library was not built");
-#endif
-      } else if (param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB) {
+      if (param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB) {
         Map<MatrixXcd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim,
                                                         DynamicStride(param.ld, 1));
         Map<VectorXcd, Unaligned> vec_(vec.get(), param.cur_dim);
@@ -268,13 +250,7 @@ namespace quda
 
     memcpy(projm.get(), param.matProj, param.ld * param.cur_dim * sizeof(Complex));
 
-    if (param.eig_global.extlib_type == QUDA_MAGMA_EXTLIB) {
-#ifdef MAGMA_LIB
-      magma_Xheev(projm.get(), param.cur_dim, param.ld, evals.get(), sizeof(Complex));
-#else
-      errorQuda("MAGMA library was not built");
-#endif
-    } else if (param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB) {
+    if (param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB) {
       Map<MatrixXcd, Unaligned, DynamicStride> projm_(projm.get(), param.cur_dim, param.cur_dim,
                                                       DynamicStride(param.ld, 1));
       Map<VectorXd, Unaligned> evals_(evals.get(), param.cur_dim);

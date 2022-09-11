@@ -56,13 +56,13 @@ namespace quda {
     if (!init) {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      yp = ColorSpinorField::Create(csParam);
-      rp = ColorSpinorField::Create(csParam);
+      yp = new ColorSpinorField(csParam);
+      rp = new ColorSpinorField(csParam);
       csParam.setPrecision(param.precision_sloppy);
-      pp = ColorSpinorField::Create(csParam);
-      vp = ColorSpinorField::Create(csParam);
-      tmpp = ColorSpinorField::Create(csParam);
-      tp = ColorSpinorField::Create(csParam);
+      pp = new ColorSpinorField(csParam);
+      vp = new ColorSpinorField(csParam);
+      tmpp = new ColorSpinorField(csParam);
+      tp = new ColorSpinorField(csParam);
 
       init = true;
     }
@@ -118,16 +118,16 @@ namespace quda {
       {
         ColorSpinorParam csParam(r);
         csParam.create = QUDA_ZERO_FIELD_CREATE;
-        r_0 = ColorSpinorField::Create(csParam);//remember to delete this pointer.
+        r_0 = new ColorSpinorField(csParam); // remember to delete this pointer.
         *r_0 = r;
       }
     } else {
       ColorSpinorParam csParam(x);
       csParam.setPrecision(param.precision_sloppy);
       csParam.create = QUDA_NULL_FIELD_CREATE;
-      r_sloppy = ColorSpinorField::Create(csParam);
+      r_sloppy = new ColorSpinorField(csParam);
       *r_sloppy = r;
-      r_0 = ColorSpinorField::Create(csParam);
+      r_0 = new ColorSpinorField(csParam);
       *r_0 = r;
     }
 
@@ -141,7 +141,7 @@ namespace quda {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       csParam.setPrecision(param.precision_sloppy);
-      x_sloppy = ColorSpinorField::Create(csParam);
+      x_sloppy = new ColorSpinorField(csParam);
     }
 
     // Syntatic sugar
@@ -325,9 +325,6 @@ namespace quda {
     mat.flops();
     matSloppy.flops();
     matPrecon.flops();
-
-    // copy the residual to b so we can use it outside of the solver
-    if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b,r);
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 

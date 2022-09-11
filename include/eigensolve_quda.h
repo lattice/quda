@@ -30,6 +30,7 @@ namespace quda
     double tol;       /** Tolerance on eigenvalues */
     bool reverse;     /** True if using polynomial acceleration */
     char spectrum[3]; /** Part of the spectrum to be computed */
+    bool compute_svd; /** Compute the SVD if requested **/
 
     // Algorithm variables
     //--------------------
@@ -292,7 +293,7 @@ namespace quda
       // FIXME add support for mixed-precison dot product to avoid this copy
       if (src.Precision() != evecs[0]->Precision() && !tmp1) {
         ColorSpinorParam param(*evecs[0]);
-        tmp1 = ColorSpinorField::Create(param);
+        tmp1 = new ColorSpinorField(param);
       }
       ColorSpinorField *src_tmp = src.Precision() != evecs[0]->Precision() ? tmp1 : const_cast<ColorSpinorField *>(&src);
       blas::copy(*src_tmp, src); // no-op if these alias
@@ -329,7 +330,7 @@ namespace quda
       // FIXME add support for mixed-precison dot product to avoid this copy
       if (src.Precision() != evecs[0]->Precision() && !tmp1) {
         ColorSpinorParam param(*evecs[0]);
-        tmp1 = ColorSpinorField::Create(param);
+        tmp1 = new ColorSpinorField(param);
       }
       ColorSpinorField *src_tmp = src.Precision() != evecs[0]->Precision() ? tmp1 : const_cast<ColorSpinorField *>(&src);
       blas::copy(*src_tmp, src); // no-op if these alias

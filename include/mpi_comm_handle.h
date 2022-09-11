@@ -3,7 +3,9 @@
 
 #if defined(QMP_COMMS) || defined(MPI_COMMS)
 #include <mpi.h>
-extern MPI_Comm MPI_COMM_HANDLE;
+namespace quda {
+  MPI_Comm get_mpi_handle();
+}
 #endif
 
 #ifdef QMP_COMMS

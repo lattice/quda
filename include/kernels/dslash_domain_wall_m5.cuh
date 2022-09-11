@@ -1,7 +1,7 @@
 #pragma once
 
 #include <color_spinor_field_order.h>
-#include <shared_memory_cache_helper.cuh>
+#include <shared_memory_cache_helper.h>
 #include <math_helper.cuh>
 #include <index_helper.cuh>
 #include <kernel.h>
@@ -10,35 +10,44 @@
 namespace quda
 {
 
-  /** Whether to use a shared memory scratch pad to store the input
-     field acrosss the Ls dimension to minimize global memory
-     reads. */
-  constexpr bool shared() { return true; }
+  namespace mobius_m5
+  {
+    /** Whether to use a shared memory scratch pad to store the input
+      field acrosss the Ls dimension to minimize global memory
+      reads. */
+    constexpr bool shared() { return true; }
 
-  /** Whether to use variable or fixed coefficient algorithm.  Must be
+    /** Whether to use variable or fixed coefficient algorithm.  Must be
       true if using ZMOBIUS */
-  constexpr bool var_inverse() { return true; }
+    constexpr bool var_inverse() { return true; }
+
+    /** Whether to use half vector, i.e. utilizing spin projection properties.
+      Half vector uses less shared memory but results in more shared memory stores/loads. */
+    constexpr bool use_half_vector() { return true; }
+  } // namespace mobius_m5
 
   /**
      @brief Structure containing zMobius / Zolotarev coefficients
   */
   template <typename real> struct coeff_5 {
-    complex<real> a[QUDA_MAX_DWF_LS]; // xpay coefficients
-    complex<real> b[QUDA_MAX_DWF_LS];
-    complex<real> c[QUDA_MAX_DWF_LS];
+    complex<real> a[QUDA_MAX_DWF_LS];     // xpay coefficients
+    complex<real> alpha[QUDA_MAX_DWF_LS]; // alpha * D5 + beta
+    complex<real> beta[QUDA_MAX_DWF_LS];
+    complex<real> kappa[QUDA_MAX_DWF_LS];
+    complex<real> inv;
   };
 
   // helper trait for determining if we are using variable coefficients
   template <Dslash5Type type> struct is_variable {
     static constexpr bool value = false;
   };
-  template <> struct is_variable<DSLASH5_MOBIUS_PRE> {
+  template <> struct is_variable<Dslash5Type::DSLASH5_MOBIUS_PRE> {
     static constexpr bool value = true;
   };
-  template <> struct is_variable<DSLASH5_MOBIUS> {
+  template <> struct is_variable<Dslash5Type::DSLASH5_MOBIUS> {
     static constexpr bool value = true;
   };
-  template <> struct is_variable<M5_INV_ZMOBIUS> {
+  template <> struct is_variable<Dslash5Type::M5_INV_ZMOBIUS> {
     static constexpr bool value = true;
   };
 
@@ -46,25 +55,27 @@ namespace quda
      @brief Helper class for grabbing the constant struct, whether
      we are on the GPU or CPU.
   */
-  template <typename real, bool is_variable, typename Arg> struct coeff_type
-  {
+  template <typename real, bool is_variable, typename Arg> struct coeff_type {
     const Arg &arg;
-    __device__ __host__ coeff_type(const Arg &arg) : arg(arg) {}
+    __device__ __host__ coeff_type(const Arg &arg) : arg(arg) { }
     __device__ __host__ real a(int) { return arg.a; }
-    __device__ __host__ real b(int) { return arg.b; }
-    __device__ __host__ real c(int) { return arg.c; }
+    __device__ __host__ real alpha(int) { return arg.alpha; }
+    __device__ __host__ real beta(int) { return arg.beta; }
+    __device__ __host__ real kappa(int) { return arg.kappa; }
+    __device__ __host__ real inv() { return arg.inv; }
   };
 
   /**
      @brief Specialization for variable complex coefficients
   */
-  template <typename real, typename Arg> struct coeff_type<real, true, Arg>
-  {
+  template <typename real, typename Arg> struct coeff_type<real, true, Arg> {
     const Arg &arg;
-    __device__ __host__ inline coeff_type(const Arg &arg) : arg(arg) {}
+    __device__ __host__ inline coeff_type(const Arg &arg) : arg(arg) { }
     __device__ __host__ complex<real> a(int s) { return arg.coeff.a[s]; }
-    __device__ __host__ complex<real> b(int s) { return arg.coeff.b[s]; }
-    __device__ __host__ complex<real> c(int s) { return arg.coeff.c[s]; }
+    __device__ __host__ complex<real> alpha(int s) { return arg.coeff.alpha[s]; }
+    __device__ __host__ complex<real> beta(int s) { return arg.coeff.beta[s]; }
+    __device__ __host__ complex<real> kappa(int s) { return arg.coeff.kappa[s]; }
+    __device__ __host__ complex<real> inv() { return arg.coeff.inv; }
   };
 
   /**
@@ -90,86 +101,223 @@ namespace quda
     const real m_f; // fermion mass parameter
     const real m_5; // Wilson mass shift
 
-    real b; // real constant Mobius coefficient
-    real c; // real constant Mobius coefficient
-    real a; // real xpay coefficient
+    // real constant Mobius coefficient - there are the zMobius counterparts in the `coeff_5` struct
+    real a;     // real xpay coefficient
+    real alpha; // out = alpha * op(in) + beta * in
+    real beta;
+    real kappa; // kappa = kappa_b / kappa_c
+    real inv;   // The denominator for the M5inv
 
     coeff_5<real> coeff; // constant buffer used for Mobius coefficients for CPU kernel
 
+    void compute_coeff_mobius_pre(const Complex *b_5, const Complex *c_5)
+    {
+      // out = (b + c * D5) * in
+      for (int s = 0; s < Ls; s++) {
+        coeff.beta[s] = b_5[s];
+        coeff.alpha[s] = 0.5 * c_5[s]; // 0.5 from gamma matrices
+        // xpay
+        coeff.a[s] = 0.5 / (b_5[s] * (m_5 + 4.0) + 1.0);
+        coeff.a[s] *= coeff.a[s] * static_cast<real>(a); // kappa_b * kappa_b * a
+      }
+    }
+
+    void compute_coeff_mobius(const Complex *b_5, const Complex *c_5)
+    {
+      // out = (1 + kappa * D5) * in
+      for (int s = 0; s < Ls; s++) {
+        coeff.kappa[s] = 0.5 * (c_5[s] * (m_5 + 4.0) - 1.0) / (b_5[s] * (m_5 + 4.0) + 1.0); // 0.5 from gamma matrices
+        // axpy
+        coeff.a[s] = 0.5 / (b_5[s] * (m_5 + 4.0) + 1.0);
+        coeff.a[s] *= coeff.a[s] * static_cast<real>(a); // kappa_b * kappa_b * a
+      }
+    }
+
+    void compute_coeff_m5inv_dwf()
+    {
+      kappa = 2.0 * (0.5 / (5.0 + m_5)); // 2  * kappa_5
+      inv = 0.5 / (1.0 + std::pow(kappa, (int)Ls) * m_f);
+    }
+
+    void compute_coeff_m5inv_mobius(const Complex *b_5, const Complex *c_5)
+    {
+      // out = (1 + kappa * D5)^-1 * in = M5inv * in
+      kappa = -(c_5[0].real() * (4.0 + m_5) - 1.0) / (b_5[0].real() * (4.0 + m_5) + 1.0); // kappa = kappa_b / kappa_c
+      inv = 0.5 / (1.0 + std::pow(kappa, (int)Ls) * m_f);                                 // 0.5 from gamma matrices
+      a *= pow(0.5 / (b_5[0].real() * (m_5 + 4.0) + 1.0), 2);                             // kappa_b * kappa_b * a
+    }
+
+    void compute_coeff_m5inv_zmobius(const Complex *b_5, const Complex *c_5)
+    {
+      // out = (1 + kappa * D5)^-1 * in = M5inv * in
+      // Similar to mobius convention, but variadic across 5th dim
+      complex<real> k = 1.0;
+      for (int s = 0; s < Ls; s++) {
+        coeff.kappa[s] = -(c_5[s] * (4.0 + m_5) - 1.0) / (b_5[s] * (4.0 + m_5) + 1.0);
+        k *= coeff.kappa[s];
+      }
+      coeff.inv = static_cast<real>(0.5) / (static_cast<real>(1.0) + k * m_f);
+
+      for (int s = 0; s < Ls; s++) { // axpy coefficients
+        coeff.a[s] = 0.5 / (b_5[s] * (m_5 + 4.0) + 1.0);
+        coeff.a[s] *= coeff.a[s] * static_cast<real>(a);
+      }
+    }
+
     Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f, double m_5,
-               const Complex *b_5_, const Complex *c_5_, double a_) :
-        kernel_param(dim3(in.VolumeCB() / in.X(4), in.X(4), in.SiteSubset())),
-        out(out),
-        in(in),
-        x(x),
-        nParity(in.SiteSubset()),
-        volume_cb(in.VolumeCB()),
-        volume_4d_cb(volume_cb / in.X(4)),
-        Ls(in.X(4)),
-        m_f(m_f),
-        m_5(m_5),
-        a(a_)
+               const Complex *b_5, const Complex *c_5, double a_) :
+      kernel_param(dim3(in.VolumeCB() / in.X(4), in.X(4), in.SiteSubset())),
+      out(out),
+      in(in),
+      x(x),
+      nParity(in.SiteSubset()),
+      volume_cb(in.VolumeCB()),
+      volume_4d_cb(volume_cb / in.X(4)),
+      Ls(in.X(4)),
+      m_f(m_f),
+      m_5(m_5),
+      a(a_)
     {
       if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
       if (!in.isNative() || !out.isNative())
         errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
-      auto *a_5 = coeff.a;
-      auto *b_5 = coeff.b;
-      auto *c_5 = coeff.c;
-
       switch (type) {
-      case DSLASH5_DWF: break;
-      case DSLASH5_MOBIUS_PRE:
-        for (int s = 0; s < Ls; s++) {
-          b_5[s] = b_5_[s];
-          c_5[s] = 0.5 * c_5_[s];
-
-          // xpay
-          a_5[s] = 0.5 / (b_5_[s] * (m_5 + 4.0) + 1.0);
-          a_5[s] *= a_5[s] * static_cast<real>(a);
-        }
+      case Dslash5Type::DSLASH5_DWF: break;
+      case Dslash5Type::DSLASH5_MOBIUS_PRE: compute_coeff_mobius_pre(b_5, c_5); break;
+      case Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB:
+        compute_coeff_mobius_pre(b_5, c_5);
+        compute_coeff_mobius(b_5, c_5);
         break;
-      case DSLASH5_MOBIUS:
-        for (int s = 0; s < Ls; s++) {
-          b_5[s] = 1.0;
-          c_5[s] = 0.5 * (c_5_[s] * (m_5 + 4.0) - 1.0) / (b_5_[s] * (m_5 + 4.0) + 1.0);
-
-          // axpy
-          a_5[s] = 0.5 / (b_5_[s] * (m_5 + 4.0) + 1.0);
-          a_5[s] *= a_5[s] * static_cast<real>(a);
-        }
+      case Dslash5Type::DSLASH5_MOBIUS: compute_coeff_mobius(b_5, c_5); break;
+      case Dslash5Type::M5_INV_DWF: compute_coeff_m5inv_dwf(); break;
+      case Dslash5Type::M5_INV_MOBIUS_M5_PRE:
+      case Dslash5Type::M5_PRE_MOBIUS_M5_INV:
+        compute_coeff_mobius_pre(b_5, c_5);
+        compute_coeff_m5inv_mobius(b_5, c_5);
         break;
-      case M5_INV_DWF:
-        b = 2.0 * (0.5 / (5.0 + m_5)); // 2  * kappa_5
-        c = 0.5 / (1.0 + std::pow(b, (int)Ls) * m_f);
+      case Dslash5Type::M5_INV_MOBIUS:
+      case Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG:
+        compute_coeff_mobius(b_5, c_5);
+        compute_coeff_m5inv_mobius(b_5, c_5);
         break;
-      case M5_INV_MOBIUS:
-        b = -(c_5_[0].real() * (4.0 + m_5) - 1.0) / (b_5_[0].real() * (4.0 + m_5) + 1.0);
-        c = 0.5 / (1.0 + std::pow(b, (int)Ls) * m_f);
-        a *= std::pow(0.5 / (b_5_[0].real() * (m_5 + 4.0) + 1.0), 2);
-        break;
-      case M5_INV_ZMOBIUS: {
-        complex<double> k = 1.0;
-        for (int s = 0; s < Ls; s++) {
-          b_5[s] = -(c_5_[s] * (4.0 + m_5) - 1.0) / (b_5_[s] * (4.0 + m_5) + 1.0);
-          k *= b_5[s];
-        }
-        c_5[0] = 0.5 / (1.0 + k * m_f);
-
-        for (int s = 0; s < Ls; s++) { // axpy coefficients
-          a_5[s] = 0.5 / (b_5_[s] * (m_5 + 4.0) + 1.0);
-          a_5[s] *= a_5[s] * static_cast<real>(a);
-        }
-      } break;
-      default: errorQuda("Unknown Dslash5Type %d", type);
+      case Dslash5Type::M5_INV_ZMOBIUS: compute_coeff_m5inv_zmobius(b_5, c_5); break;
+      default: errorQuda("Unknown Dslash5Type %d", static_cast<int>(type));
       }
     }
   };
 
+  template <bool sync, bool dagger, bool shared, class Vector, class Arg, Dslash5Type type = Arg::type>
+  __device__ __host__ inline Vector d5(const Arg &arg, const Vector &in, int parity, int x_cb, int s)
+  {
+
+    using real = typename Arg::real;
+    constexpr bool is_variable = true;
+    coeff_type<real, is_variable, Arg> coeff(arg);
+
+    Vector out;
+
+    if (mobius_m5::use_half_vector()) {
+      // if using shared-memory caching then load spinor field for my site into cache
+      typedef ColorSpinor<real, Arg::nColor, 4 / 2> HalfVector;
+      SharedMemoryCache<HalfVector> cache(target::block_dim());
+
+      { // forwards direction
+        constexpr int proj_dir = dagger ? +1 : -1;
+        if (shared) {
+          if (sync) { cache.sync(); }
+          cache.save(in.project(4, proj_dir));
+          cache.sync();
+        }
+        const int fwd_s = (s + 1) % arg.Ls;
+        const int fwd_idx = fwd_s * arg.volume_4d_cb + x_cb;
+        HalfVector half_in;
+        if (shared) {
+          half_in = cache.load(threadIdx.x, fwd_s, parity);
+        } else {
+          Vector full_in = arg.in(fwd_idx, parity);
+          half_in = full_in.project(4, proj_dir);
+        }
+        if (s == arg.Ls - 1) {
+          out += (-arg.m_f * half_in).reconstruct(4, proj_dir);
+        } else {
+          out += half_in.reconstruct(4, proj_dir);
+        }
+      }
+
+      { // backwards direction
+        constexpr int proj_dir = dagger ? -1 : +1;
+        if (shared) {
+          cache.sync();
+          cache.save(in.project(4, proj_dir));
+          cache.sync();
+        }
+        const int back_s = (s + arg.Ls - 1) % arg.Ls;
+        const int back_idx = back_s * arg.volume_4d_cb + x_cb;
+        HalfVector half_in;
+        if (shared) {
+          half_in = cache.load(threadIdx.x, back_s, parity);
+        } else {
+          Vector full_in = arg.in(back_idx, parity);
+          half_in = full_in.project(4, proj_dir);
+        }
+        if (s == 0) {
+          out += (-arg.m_f * half_in).reconstruct(4, proj_dir);
+        } else {
+          out += half_in.reconstruct(4, proj_dir);
+        }
+      }
+
+    } else { // use_half_vector
+
+      // if using shared-memory caching then load spinor field for my site into cache
+      SharedMemoryCache<Vector> cache(target::block_dim());
+      if (shared) {
+        if (sync) { cache.sync(); }
+        cache.save(in);
+        cache.sync();
+      }
+
+      { // forwards direction
+        const int fwd_s = (s + 1) % arg.Ls;
+        const int fwd_idx = fwd_s * arg.volume_4d_cb + x_cb;
+        const Vector in = shared ? cache.load(threadIdx.x, fwd_s, parity) : arg.in(fwd_idx, parity);
+        constexpr int proj_dir = dagger ? +1 : -1;
+        if (s == arg.Ls - 1) {
+          out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
+        } else {
+          out += in.project(4, proj_dir).reconstruct(4, proj_dir);
+        }
+      }
+
+      { // backwards direction
+        const int back_s = (s + arg.Ls - 1) % arg.Ls;
+        const int back_idx = back_s * arg.volume_4d_cb + x_cb;
+        const Vector in = shared ? cache.load(threadIdx.x, back_s, parity) : arg.in(back_idx, parity);
+        constexpr int proj_dir = dagger ? -1 : +1;
+        if (s == 0) {
+          out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
+        } else {
+          out += in.project(4, proj_dir).reconstruct(4, proj_dir);
+        }
+      }
+    } // use_half_vector
+
+    if (type == Dslash5Type::DSLASH5_MOBIUS_PRE || type == Dslash5Type::M5_INV_MOBIUS_M5_PRE
+        || type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
+      Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
+      out = coeff.alpha(s) * out + coeff.beta(s) * diagonal;
+    } else if (type == Dslash5Type::DSLASH5_MOBIUS) {
+      Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
+      out = coeff.kappa(s) * out + diagonal;
+    }
+
+    return out;
+  }
+
   template <typename Arg> struct dslash5 {
     const Arg &arg;
-    constexpr dslash5(const Arg &arg) : arg(arg) {}
+    constexpr dslash5(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**
@@ -184,46 +332,19 @@ namespace quda
       coeff_type<real, is_variable<Arg::type>::value, Arg> coeff(arg);
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
-      Vector out;
+      constexpr bool sync = false;
+      constexpr bool shared = false;
 
-      { // forwards direction
-        const int fwd_idx = ((s + 1) % arg.Ls) * arg.volume_4d_cb + x_cb;
-        const Vector in = arg.in(fwd_idx, parity);
-        constexpr int proj_dir = Arg::dagger ? +1 : -1;
-        if (s == arg.Ls - 1) {
-          out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
-        } else {
-          out += in.project(4, proj_dir).reconstruct(4, proj_dir);
-        }
-      }
+      Vector out = d5<sync, Arg::dagger, shared, Vector, Arg>(arg, Vector(), parity, x_cb, s);
 
-      { // backwards direction
-        const int back_idx = ((s + arg.Ls - 1) % arg.Ls) * arg.volume_4d_cb + x_cb;
-        const Vector in = arg.in(back_idx, parity);
-        constexpr int proj_dir = Arg::dagger ? -1 : +1;
-        if (s == 0) {
-          out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
-        } else {
-          out += in.project(4, proj_dir).reconstruct(4, proj_dir);
-        }
-      }
-
-      if (Arg::type == DSLASH5_DWF && Arg::xpay) {
-        Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
-        out = x + arg.a * out;
-      } else if (Arg::type == DSLASH5_MOBIUS_PRE) {
-        Vector diagonal = arg.in(s * arg.volume_4d_cb + x_cb, parity);
-        out = coeff.c(s) * out + coeff.b(s) * diagonal;
-
-        if (Arg::xpay) {
+      if (Arg::xpay) {
+        if (Arg::type == Dslash5Type::DSLASH5_DWF) {
+          Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
+          out = x + arg.a * out;
+        } else if (Arg::type == Dslash5Type::DSLASH5_MOBIUS_PRE) {
           Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
           out = x + coeff.a(s) * out;
-        }
-      } else if (Arg::type == DSLASH5_MOBIUS) {
-        Vector diagonal = arg.in(s * arg.volume_4d_cb + x_cb, parity);
-        out = coeff.c(s) * out + diagonal;
-
-        if (Arg::xpay) { // really axpy
+        } else if (Arg::type == Dslash5Type::DSLASH5_MOBIUS) {
           Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
           out = coeff.a(s) * x + out;
         }
@@ -248,17 +369,19 @@ namespace quda
      @param[in] x_b Checkerboarded 4-d space-time index
      @param[in] s_ Ls dimension coordinate
   */
-  template <typename Vector, typename Arg>
-  __device__ __host__ inline Vector constantInv(const Arg &arg, int parity, int x_cb, int s_)
+  template <bool sync, bool dagger, bool shared, typename Vector, typename Arg>
+  __device__ __host__ inline Vector constantInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_)
   {
     using real = typename Arg::real;
-    const auto k = arg.b;
-    const auto inv = arg.c;
+    const auto k = arg.kappa;
+    const auto inv = arg.inv;
 
     // if using shared-memory caching then load spinor field for my site into cache
     SharedMemoryCache<Vector> cache(target::block_dim());
-    if (shared()) {
-      cache.save(arg.in(s_ * arg.volume_4d_cb + x_cb, parity));
+    if (shared) {
+      // cache.save(arg.in(s_ * arg.volume_4d_cb + x_cb, parity));
+      if (sync) { cache.sync(); }
+      cache.save(in);
       cache.sync();
     }
 
@@ -266,19 +389,19 @@ namespace quda
 
     for (int s = 0; s < arg.Ls; s++) {
 
-      Vector in = shared() ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
+      Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
 
       {
         int exp = s_ < s ? arg.Ls - s + s_ : s_ - s;
         real factorR = inv * fpow(k, exp) * (s_ < s ? -arg.m_f : static_cast<real>(1.0));
-        constexpr int proj_dir = Arg::dagger ? -1 : +1;
+        constexpr int proj_dir = dagger ? -1 : +1;
         out += factorR * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
       }
 
       {
         int exp = s_ > s ? arg.Ls - s_ + s : s - s_;
         real factorL = inv * fpow(k, exp) * (s_ > s ? -arg.m_f : static_cast<real>(1.0));
-        constexpr int proj_dir = Arg::dagger ? +1 : -1;
+        constexpr int proj_dir = dagger ? +1 : -1;
         out += factorL * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
       }
     }
@@ -303,73 +426,120 @@ namespace quda
      @param[in] x_b Checkerboarded 4-d space-time index
      @param[in] s_ Ls dimension coordinate
   */
-  template <typename Vector, typename Arg>
-  __device__ __host__ inline Vector variableInv(const Arg &arg, int parity, int x_cb, int s_)
+  template <bool sync, bool dagger, bool shared, typename Vector, typename Arg>
+  __device__ __host__ inline Vector variableInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_)
   {
     constexpr int nSpin = 4;
     using real = typename Arg::real;
     typedef ColorSpinor<real, Arg::nColor, nSpin / 2> HalfVector;
     coeff_type<real, is_variable<Arg::type>::value, Arg> coeff(arg);
-    Vector in = arg.in(s_ * arg.volume_4d_cb + x_cb, parity);
     Vector out;
 
-    SharedMemoryCache<HalfVector> cache(target::block_dim());
+    if (mobius_m5::use_half_vector()) {
+      SharedMemoryCache<HalfVector> cache(target::block_dim());
 
-    { // first do R
-      constexpr int proj_dir = Arg::dagger ? -1 : +1;
+      { // first do R
+        constexpr int proj_dir = dagger ? -1 : +1;
 
-      if (shared()) {
-        cache.save(in.project(4, proj_dir));
+        if (shared) {
+          if (sync) { cache.sync(); }
+          cache.save(in.project(4, proj_dir));
+          cache.sync();
+        }
+
+        int s = s_;
+        auto R = coeff.inv();
+        HalfVector r;
+        for (int s_count = 0; s_count < arg.Ls; s_count++) {
+          auto factorR = (s_ < s ? -arg.m_f * R : R);
+
+          if (shared) {
+            r += factorR * cache.load(threadIdx.x, s, parity);
+          } else {
+            Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
+            r += factorR * in.project(4, proj_dir);
+          }
+
+          R *= coeff.kappa(s);
+          s = (s + arg.Ls - 1) % arg.Ls;
+        }
+
+        out += r.reconstruct(4, proj_dir);
+      }
+
+      { // second do L
+        constexpr int proj_dir = dagger ? +1 : -1;
+        if (shared) {
+          cache.sync(); // ensure we finish R before overwriting cache
+          cache.save(in.project(4, proj_dir));
+          cache.sync();
+        }
+
+        int s = s_;
+        auto L = coeff.inv();
+        HalfVector l;
+        for (int s_count = 0; s_count < arg.Ls; s_count++) {
+          auto factorL = (s_ > s ? -arg.m_f * L : L);
+
+          if (shared) {
+            l += factorL * cache.load(threadIdx.x, s, parity);
+          } else {
+            Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
+            l += factorL * in.project(4, proj_dir);
+          }
+
+          L *= coeff.kappa(s);
+          s = (s + 1) % arg.Ls;
+        }
+
+        out += l.reconstruct(4, proj_dir);
+      }
+    } else { // use_half_vector
+      SharedMemoryCache<Vector> cache(target::block_dim());
+      if (shared) {
+        if (sync) { cache.sync(); }
+        cache.save(in);
         cache.sync();
       }
 
-      int s = s_;
-      auto R = coeff.c(0);
-      HalfVector r;
-      for (int s_count = 0; s_count < arg.Ls; s_count++) {
-        auto factorR = (s_ < s ? -arg.m_f * R : R);
+      { // first do R
+        constexpr int proj_dir = dagger ? -1 : +1;
 
-        if (shared()) {
-          r += factorR * cache.load(threadIdx.x, s, parity);
-        } else {
-          Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
+        int s = s_;
+        auto R = coeff.inv();
+        HalfVector r;
+        for (int s_count = 0; s_count < arg.Ls; s_count++) {
+          auto factorR = (s_ < s ? -arg.m_f * R : R);
+
+          Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
           r += factorR * in.project(4, proj_dir);
+
+          R *= coeff.kappa(s);
+          s = (s + arg.Ls - 1) % arg.Ls;
         }
 
-        R *= coeff.b(s);
-        s = (s + arg.Ls - 1) % arg.Ls;
+        out += r.reconstruct(4, proj_dir);
       }
 
-      out += r.reconstruct(4, proj_dir);
-    }
+      { // second do L
+        constexpr int proj_dir = dagger ? +1 : -1;
 
-    { // second do L
-      constexpr int proj_dir = Arg::dagger ? +1 : -1;
-      if (shared()) {
-        cache.sync(); // ensure we finish R before overwriting cache
-        cache.save(in.project(4, proj_dir));
-        cache.sync();
-      }
+        int s = s_;
+        auto L = coeff.inv();
+        HalfVector l;
+        for (int s_count = 0; s_count < arg.Ls; s_count++) {
+          auto factorL = (s_ > s ? -arg.m_f * L : L);
 
-      int s = s_;
-      auto L = coeff.c(0);
-      HalfVector l;
-      for (int s_count = 0; s_count < arg.Ls; s_count++) {
-        auto factorL = (s_ > s ? -arg.m_f * L : L);
-
-        if (shared()) {
-          l += factorL * cache.load(threadIdx.x, s, parity);
-        } else {
-          Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
+          Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
           l += factorL * in.project(4, proj_dir);
+
+          L *= coeff.kappa(s);
+          s = (s + 1) % arg.Ls;
         }
 
-        L *= coeff.b(s);
-        s = (s + 1) % arg.Ls;
+        out += l.reconstruct(4, proj_dir);
       }
-
-      out += l.reconstruct(4, proj_dir);
-    }
+    } // use_half_vector
 
     return out;
   }
@@ -397,11 +567,13 @@ namespace quda
       typedef ColorSpinor<real, Arg::nColor, nSpin> Vector;
       coeff_type<real, is_variable<Arg::type>::value, Arg> coeff(arg);
 
+      Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
       Vector out;
-      if (var_inverse()) { // zMobius, must call variableInv
-        out = variableInv<Vector>(arg, parity, x_cb, s);
+      constexpr bool sync = false;
+      if (mobius_m5::var_inverse()) { // zMobius, must call variableInv
+        out = variableInv<sync, Arg::dagger, mobius_m5::shared()>(arg, in, parity, x_cb, s);
       } else {
-        out = constantInv<Vector>(arg, parity, x_cb, s);
+        out = constantInv<sync, Arg::dagger, mobius_m5::shared()>(arg, in, parity, x_cb, s);
       }
 
       if (Arg::xpay) {

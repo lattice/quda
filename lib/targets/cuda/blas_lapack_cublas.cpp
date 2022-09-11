@@ -46,7 +46,7 @@ namespace quda
 #ifdef NATIVE_LAPACK_LIB
           cublasStatus_t error = cublasDestroy(handle);
           if (error != CUBLAS_STATUS_SUCCESS)
-            errorQuda("\nError indestroying cublas context, error code = %d\n", error);
+            errorQuda("\nError in destroying cublas context, error code = %d\n", error);
           cublas_init = false;
 #endif
         }
@@ -93,10 +93,19 @@ namespace quda
 
 #ifdef _DEBUG
         // Debug code: Copy original A matrix to host
-        std::complex<float> *A_h
-          = (location == QUDA_CUDA_FIELD_LOCATION ? static_cast<std::complex<float> *>(pool_pinned_malloc(size)) :
-                                                    static_cast<std::complex<float> *>(A_d));
-        if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy((void *)A_h, A_d, size, qudaMemcpyDeviceToHost);
+        if (prec == QUDA_SINGLE_PRECISION) {
+          std::complex<float> *A_h
+            = (location == QUDA_CUDA_FIELD_LOCATION ? static_cast<std::complex<float> *>(pool_pinned_malloc(size)) :
+                                                      static_cast<std::complex<float> *>(A_d));
+          if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy((void *)A_h, A_d, size, qudaMemcpyDeviceToHost);
+        } else if (prec == QUDA_DOUBLE_PRECISION) {
+          std::complex<double> *A_h
+            = (location == QUDA_CUDA_FIELD_LOCATION ? static_cast<std::complex<double> *>(pool_pinned_malloc(size)) :
+                                                      static_cast<std::complex<double> *>(A_d));
+          if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy((void *)A_h, A_d, size, qudaMemcpyDeviceToHost);
+        } else {
+          errorQuda("%s not implemented for precision=%d", __func__, prec);
+        }
 #endif
 
         int *dipiv = static_cast<int *>(pool_device_malloc(batch * n * sizeof(int)));
@@ -158,6 +167,63 @@ namespace quda
           qudaMemcpy((void *)Ainv_h, Ainv_d, size, qudaMemcpyDeviceToHost);
 
           for (uint64_t i = 0; i < batch; i++) { checkEigen<MatrixXcf, float>(A_h, Ainv_h, n, i); }
+          pool_pinned_free(Ainv_h);
+          pool_pinned_free(A_h);
+#endif
+        } else if (prec == QUDA_DOUBLE_PRECISION) {
+          typedef cuDoubleComplex Z;
+          Z **A_array = static_cast<Z **>(pool_device_malloc(2 * batch * sizeof(Z *)));
+          Z **Ainv_array = A_array + batch;
+          Z **A_array_h = static_cast<Z **>(pool_pinned_malloc(2 * batch * sizeof(Z *)));
+          Z **Ainv_array_h = A_array_h + batch;
+          for (uint64_t i = 0; i < batch; i++) {
+            A_array_h[i] = static_cast<Z *>(A_d) + i * n * n;
+            Ainv_array_h[i] = static_cast<Z *>(Ainv_d) + i * n * n;
+          }
+          qudaMemcpy(A_array, A_array_h, 2 * batch * sizeof(Z *), qudaMemcpyHostToDevice);
+
+          cublasStatus_t error = cublasZgetrfBatched(handle, n, A_array, n, dipiv, dinfo_array, batch);
+          flops += batch * FLOPS_ZGETRF(n, n);
+
+          if (error != CUBLAS_STATUS_SUCCESS)
+            errorQuda("\nError in LU decomposition (cublasZgetrfBatched), error code = %d\n", error);
+
+          qudaMemcpy(info_array, dinfo_array, batch * sizeof(int), qudaMemcpyDeviceToHost);
+          for (uint64_t i = 0; i < batch; i++) {
+            if (info_array[i] < 0) {
+              errorQuda("%lu argument had an illegal value or another error occured, such as memory allocation failed",
+                        i);
+            } else if (info_array[i] > 0) {
+              errorQuda("%lu factorization completed but the factor U is exactly singular", i);
+            }
+          }
+
+          error = cublasZgetriBatched(handle, n, (const Z **)A_array, n, dipiv, Ainv_array, n, dinfo_array, batch);
+          flops += batch * FLOPS_CGETRI(n);
+
+          if (error != CUBLAS_STATUS_SUCCESS)
+            errorQuda("\nError in matrix inversion (cublasCgetriBatched), error code = %d\n", error);
+
+          qudaMemcpy(info_array, dinfo_array, batch * sizeof(int), qudaMemcpyDeviceToHost);
+
+          for (uint64_t i = 0; i < batch; i++) {
+            if (info_array[i] < 0) {
+              errorQuda("%lu argument had an illegal value or another error occured, such as memory allocation failed",
+                        i);
+            } else if (info_array[i] > 0) {
+              errorQuda("%lu factorization completed but the factor U is exactly singular", i);
+            }
+          }
+
+          pool_device_free(A_array);
+          pool_pinned_free(A_array_h);
+
+#ifdef _DEBUG
+          // Debug code: Copy computed Ainv to host
+          std::complex<double> *Ainv_h = static_cast<std::complex<double> *>(pool_pinned_malloc(size));
+          qudaMemcpy((void *)Ainv_h, Ainv_d, size, qudaMemcpyDeviceToHost);
+
+          for (uint64_t i = 0; i < batch; i++) { checkEigen<MatrixXcd, double>(A_h, Ainv_h, n, i); }
           pool_pinned_free(Ainv_h);
           pool_pinned_free(A_h);
 #endif
@@ -373,6 +439,7 @@ namespace quda
 
             if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASZGEMM, error code = %d\n", error);
           }
+          flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_C) {
 
           typedef cuFloatComplex C;
@@ -399,6 +466,7 @@ namespace quda
 
             if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASCGEMMBatched, error code = %d\n", error);
           }
+          flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_D) {
 
           typedef double D;
@@ -422,6 +490,7 @@ namespace quda
 
             if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASDGEMMBatched, error code = %d\n", error);
           }
+          flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_S) {
 
           typedef float S;
@@ -445,6 +514,7 @@ namespace quda
 
             if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASSGEMMBatched, error code = %d\n", error);
           }
+          flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else {
           errorQuda("cublasGEMM type %d not implemented\n", blas_param.data_type);
         }

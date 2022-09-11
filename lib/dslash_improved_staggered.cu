@@ -156,9 +156,7 @@ namespace quda
                                                                         comm_override);
       Staggered<decltype(arg)> staggered(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(staggered)> policy(
-        staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-        in.GhostFaceCB(), profile);
+      dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, in.VolumeCB(), in.GhostFaceCB(), profile);
     }
   };
 

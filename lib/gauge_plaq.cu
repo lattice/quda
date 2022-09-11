@@ -6,12 +6,12 @@
 namespace quda {
 
   template<typename Float, int nColor, QudaReconstructType recon>
-  class GaugePlaq : public TunableReduction2D<> {
+  class GaugePlaq : public TunableReduction2D {
     const GaugeField &u;
-    std::vector<double> &plq;
+    array<double, 2> &plq;
 
   public:
-    GaugePlaq(const GaugeField &u, std::vector<double> &plq) :
+    GaugePlaq(const GaugeField &u, array<double, 2> &plq) :
       TunableReduction2D(u),
       u(u),
       plq(plq)
@@ -37,8 +37,8 @@ namespace quda {
 
   double3 plaquette(const GaugeField &U)
   {
-    std::vector<double> plq{0.0, 0.0};
-    instantiate<GaugePlaq>(U, plq);
+    array<double, 2> plq{0.0, 0.0};
+    instantiate<GaugePlaq, ReconstructGauge>(U, plq);
     double3 plaq = make_double3(0.5*(plq[0] + plq[1]), plq[0], plq[1]);
     return plaq;
   }

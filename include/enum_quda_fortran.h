@@ -9,8 +9,7 @@
 #   gfortran).
 #*/
 
-#/* can't include limits.h in a Fortran program */
-#define QUDA_INVALID_ENUM (-2147483647 - 1) 
+#define QUDA_INVALID_ENUM (-Z'7fffffff' - 1)
 
 #define QudaLinkType integer(4)
 
@@ -103,27 +102,25 @@
 #define QUDA_BICGSTAB_INVERTER 1
 #define QUDA_GCR_INVERTER 2
 #define QUDA_MR_INVERTER 3
-#define QUDA_MPBICGSTAB_INVERTER 4
-#define QUDA_SD_INVERTER 5
-#define QUDA_PCG_INVERTER 6
-#define QUDA_MPCG_INVERTER 7
-#define QUDA_EIGCG_INVERTER 8
-#define QUDA_INC_EIGCG_INVERTER 9
-#define QUDA_GMRESDR_INVERTER 10
-#define QUDA_GMRESDR_PROJ_INVERTER 11
-#define QUDA_GMRESDR_SH_INVERTER 12
-#define QUDA_FGMRESDR_INVERTER 13
-#define QUDA_MG_INVERTER 14
-#define QUDA_BICGSTABL_INVERTER 15
-#define QUDA_CGNE_INVERTER 16
-#define QUDA_CGNR_INVERTER 17
-#define QUDA_CG3_INVERTER 18
-#define QUDA_CG3NE_INVERTER 19
-#define QUDA_CG3NR_INVERTER 20
-#define QUDA_CA_CG_INVERTER 21
-#define QUDA_CA_CGNE_INVERTER 22
-#define QUDA_CA_CGNR_INVERTER 23
-#define QUDA_CA_GCR_INVERTER 24
+#define QUDA_SD_INVERTER 4
+#define QUDA_PCG_INVERTER 5
+#define QUDA_EIGCG_INVERTER 6
+#define QUDA_INC_EIGCG_INVERTER 7
+#define QUDA_GMRESDR_INVERTER 8
+#define QUDA_GMRESDR_PROJ_INVERTER 9
+#define QUDA_GMRESDR_SH_INVERTER 10
+#define QUDA_FGMRESDR_INVERTER 11
+#define QUDA_MG_INVERTER 12
+#define QUDA_BICGSTABL_INVERTER 13
+#define QUDA_CGNE_INVERTER 14
+#define QUDA_CGNR_INVERTER 15
+#define QUDA_CG3_INVERTER 16
+#define QUDA_CG3NE_INVERTER 17
+#define QUDA_CG3NR_INVERTER 18
+#define QUDA_CA_CG_INVERTER 19
+#define QUDA_CA_CGNE_INVERTER 20
+#define QUDA_CA_CGNR_INVERTER 21
+#define QUDA_CA_GCR_INVERTER 22
 #define QUDA_INVALID_INVERTER QUDA_INVALID_ENUM
 
 #define QudaEigType integer(4)
@@ -173,6 +170,10 @@
 #define QUDA_ADDITIVE_SCHWARZ 0 
 #define QUDA_MULTIPLICATIVE_SCHWARZ 1
 #define QUDA_INVALID_SCHWARZ QUDA_INVALID_ENUM
+
+#define QudaAcceleratorType integer(4)
+#define QUDA_MADWF_ACCELERATOR 0
+#define QUDA_INVALID_ACCELERATOR QUDA_INVALID_ENUM
 
 #define QudaResidualType integer(4)
 #define QUDA_L2_RELATIVE_RESIDUAL 1
@@ -237,9 +238,10 @@
 #define QUDA_FLOAT_CLOVER_ORDER 1   // even-odd float ordering 
 #define QUDA_FLOAT2_CLOVER_ORDER 2   // even-odd float2 ordering
 #define QUDA_FLOAT4_CLOVER_ORDER 4   // even-odd float4 ordering
-#define QUDA_PACKED_CLOVER_ORDER 5    // even-odd packed
-#define QUDA_QDPJIT_CLOVER_ORDER 6 // lexicographical order packed
-#define QUDA_BQCD_CLOVER_ORDER 7 // BQCD order which is a packed super-diagonal form
+#define QUDA_FLOAT8_CLOVER_ORDER 8   // even-odd float8 ordering
+#define QUDA_PACKED_CLOVER_ORDER 9   // even-odd packed
+#define QUDA_QDPJIT_CLOVER_ORDER 10  // lexicographical order packed
+#define QUDA_BQCD_CLOVER_ORDER 11    // BQCD order which is a packed super-diagonal form
 #define QUDA_INVALID_CLOVER_ORDER QUDA_INVALID_ENUM
 
 #define QudaVerbosity integer(4)
@@ -358,6 +360,13 @@
 #define QUDA_NOISE_UNIFORM 1
 #define QUDA_NOISE_INVALID QUDA_INVALID_ENUM
 
+#define QudaDilutionType integer(4)
+#define QUDA_DILUTION_SPIN 0
+#define QUDA_DILUTION_COLOR 1
+#define QUDA_DILUTION_SPIN_COLOR 2
+#define QUDA_DILUTION_SPIN_COLOR_EVEN_ODD 3
+#define QUDA_DILUTION_INVALID QUDA_INVALID_ENUM
+
 #define QudaProjectionType integer(4)
 #define QUDA_MINRES_PROJECTION 0
 #define QUDA_GALERKIN_PROJECTION 1
@@ -371,7 +380,6 @@
 #define QudaTwistFlavorType integer(4)
 #define QUDA_TWIST_SINGLET 1
 #define QUDA_TWIST_NONDEG_DOUBLET +2
-#define QUDA_TWIST_DEG_DOUBLET -2
 #define QUDA_TWIST_NO  0
 #define QUDA_TWIST_INVALID QUDA_INVALID_ENUM
 
@@ -412,6 +420,7 @@
 #define QUDA_TRANSFER_AGGREGATE 0
 #define QUDA_TRANSFER_COARSE_KD 1
 #define QUDA_TRANSFER_OPTIMIZED_KD 2
+#define QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG 3
 #define QUDA_TRANSFER_INVALID QUDA_INVALID_ENUM
 
 #define QudaBoolean integer(4)
@@ -454,6 +463,7 @@
 #define QUDA_VECTOR_GEOMETRY 4
 #define QUDA_TENSOR_GEOMETRY 6
 #define QUDA_COARSE_GEOMETRY 8
+#define QUDA_KDINVERSE_GEOMETRY 16 // Decomposition of the Kahler-Dirac block
 #define QUDA_INVALID_GEOMETRY QUDA_INVALID_ENUM
 
 #define QudaGhostExchange integer(4)
@@ -499,8 +509,15 @@
 #define QUDA_CONTRACT_GAMMA_S34 15
 #define QUDA_CONTRACT_GAMMA_INVALID QUDA_INVALID_ENUM
 
+#define QudaGaugeSmearType integer(4)
+#define QUDA_GAUGE_SMEAR_APE 0
+#define QUDA_GAUGE_SMEAR_STOUT 1
+#define QUDA_GAUGE_SMEAR_OVRIMP_STOUT 2
+#define QUDA_GAUGE_SMEAR_WILSON_FLOW 3
+#define QUDA_GAUGE_SMEAR_SYMANZIK_FLOW 4
+#define QUDA_GAUGE_SMEAR_INVALID QUDA_INVALID_ENUM
+
 #define QudaExtLibType integer(4)
 #define QUDA_CUSOLVE_EXTLIB 0
 #define QUDA_EIGEN_EXTLIB 1
-#define QUDA_MAGMA_EXTLIB 2
 #define QUDA_EXTLIB_INVALID QUDA_INVALID_ENUM

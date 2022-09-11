@@ -27,10 +27,10 @@ QudaInvertParam inv_param;
 
 cpuGaugeField *cpuLink = nullptr;
 
-cpuColorSpinorField *spinor, *spinorOut, *spinorRef;
-cudaColorSpinorField *cudaSpinor, *cudaSpinorOut;
+std::unique_ptr<ColorSpinorField> spinor, spinorOut, spinorRef;
+std::unique_ptr<ColorSpinorField> cudaSpinor, cudaSpinorOut;
 
-cudaColorSpinorField* tmp;
+std::unique_ptr<ColorSpinorField> tmp;
 
 void *links[4];
 
@@ -38,7 +38,7 @@ void **ghostLink;
 
 QudaParity parity = QUDA_EVEN_PARITY;
 
-GaugeCovDev* dirac;
+GaugeCovDev *dirac;
 
 const int nColor = 3;
 
@@ -61,9 +61,9 @@ void init(int argc, char **argv)
   inv_param.dslash_type = QUDA_COVDEV_DSLASH; // ensure we use the correct dslash
 
   ColorSpinorParam csParam;
-  csParam.nColor=nColor;
-  csParam.nSpin=4;
-  csParam.nDim=4;
+  csParam.nColor = nColor;
+  csParam.nSpin = 4;
+  csParam.nDim = 4;
   for (int d = 0; d < 4; d++) { csParam.x[d] = gauge_param.X[d]; }
   //  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
 
@@ -73,13 +73,14 @@ void init(int argc, char **argv)
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   csParam.pc_type = QUDA_4D_PC;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = inv_param.gamma_basis; // this parameter is meaningless for staggered
-  csParam.create = QUDA_ZERO_FIELD_CREATE;    
+  csParam.create = QUDA_ZERO_FIELD_CREATE;
+  csParam.location = QUDA_CPU_FIELD_LOCATION;
 
-  spinor = new cpuColorSpinorField(csParam);
-  spinorOut = new cpuColorSpinorField(csParam);
-  spinorRef = new cpuColorSpinorField(csParam);
+  spinor = std::make_unique<ColorSpinorField>(csParam);
+  spinorOut = std::make_unique<ColorSpinorField>(csParam);
+  spinorRef = std::make_unique<ColorSpinorField>(csParam);
 
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   csParam.x[0] = gauge_param.X[0];
@@ -95,7 +96,7 @@ void init(int argc, char **argv)
   // cpuLink is only used for ghost allocation
   GaugeFieldParam cpuParam(gauge_param, links);
   cpuParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  cpuLink   = new cpuGaugeField(cpuParam);
+  cpuLink = new cpuGaugeField(cpuParam);
   ghostLink = cpuLink->Ghost();
 
   printfQuda("Links sending...");
@@ -105,14 +106,14 @@ void init(int argc, char **argv)
   printfQuda("Sending fields to GPU...");
 
   csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-  csParam.pad = inv_param.sp_pad;
   csParam.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
+  csParam.location = QUDA_CUDA_FIELD_LOCATION;
 
   printfQuda("Creating cudaSpinor\n");
-  cudaSpinor = new cudaColorSpinorField(csParam);
+  cudaSpinor = std::make_unique<ColorSpinorField>(csParam);
 
   printfQuda("Creating cudaSpinorOut\n");
-  cudaSpinorOut = new cudaColorSpinorField(csParam);
+  cudaSpinorOut = std::make_unique<ColorSpinorField>(csParam);
 
   printfQuda("Sending spinor field to GPU\n");
   *cudaSpinor = *spinor;
@@ -122,27 +123,27 @@ void init(int argc, char **argv)
   printfQuda("Source CPU = %f, CUDA=%f\n", spinor_norm2, cuda_spinor_norm2);
 
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  tmp = new cudaColorSpinorField(csParam);
+  tmp = std::make_unique<ColorSpinorField>(csParam);
 
   DiracParam diracParam;
   setDiracParam(diracParam, &inv_param, false);
 
-  diracParam.tmp1 = tmp;
+  diracParam.tmp1 = tmp.get();
 
   dirac = new GaugeCovDev(diracParam);
 }
 
-void end(void) 
+void end(void)
 {
   for (int dir = 0; dir < 4; dir++) { host_free(links[dir]); }
 
   delete dirac;
-  delete cudaSpinor;
-  delete cudaSpinorOut;
-  delete tmp;
-  delete spinor;
-  delete spinorOut;
-  delete spinorRef;
+  cudaSpinor.reset();
+  cudaSpinorOut.reset();
+  tmp.reset();
+  spinor.reset();
+  spinorOut.reset();
+  spinorRef.reset();
 
   if (cpuLink) delete cpuLink;
 
@@ -165,18 +166,19 @@ void covdevRef(int mu)
   // compare to dslash reference implementation
   printfQuda("Calculating reference implementation...");
 #ifdef MULTI_GPU
-  mat_mg4dir(spinorRef, links, ghostLink, spinor, dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
+  mat_mg4dir(*spinorRef, links, ghostLink, *spinor, dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
 #else
   mat(spinorRef->V(), links, spinor->V(), dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
-#endif    
+#endif
   printfQuda("done.\n");
 }
 
 TEST(dslash, verify)
 {
-  double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
-  double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
-		(inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
+  double deviation = pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *spinorOut)));
+  double tol
+    = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
+                                                      (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
 
@@ -185,18 +187,14 @@ void display_test_info()
   printfQuda("running the following test:\n");
 
   printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
-  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d \n", 
-      get_prec_str(prec), get_recon_str(link_recon), 
-      test_type, dagger, xdim, ydim, zdim, tdim);
-  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
-  printfQuda("                         %d  %d  %d  %d\n", 
-      dimPartitioned(0),
-      dimPartitioned(1),
-      dimPartitioned(2),
-      dimPartitioned(3));
+  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d \n", get_prec_str(prec), get_recon_str(link_recon),
+             test_type, dagger, xdim, ydim, zdim, tdim);
+  printfQuda("Grid partition info:     X  Y  Z  T\n");
+  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
+             dimPartitioned(3));
 }
 
-int main(int argc, char **argv) 
+int main(int argc, char **argv)
 {
   // initalize google test
   ::testing::InitGoogleTest(&argc, argv);
@@ -273,4 +271,3 @@ int main(int argc, char **argv)
   finalizeComms();
   return test_rc;
 }
-

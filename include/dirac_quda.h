@@ -42,12 +42,14 @@ namespace quda {
     cudaGaugeField *fatGauge;  // used by staggered only
     cudaGaugeField *longGauge; // used by staggered only
     int laplace3D;
-    cudaCloverField *clover;
-    cudaGaugeField *xInvKD; // used for the Kahler-Dirac operator only
+    CloverField *clover;
+    GaugeField *xInvKD; // used for the Kahler-Dirac operator only
 
     double mu; // used by twisted mass only
     double mu_factor; // used by multigrid only
     double epsilon; //2nd tm parameter (used by twisted mass only)
+    double tm_rho;  // "rho"-type Hasenbusch mass used for twisted clover (like regular rho but
+                    // applied like a twisted mass and ignored in the inverse)
 
     ColorSpinorField *tmp1;
     ColorSpinorField *tmp2; // used by Wilson-like kernels only
@@ -61,6 +63,9 @@ namespace quda {
     Dirac *dirac;
     bool need_bidirectional; // whether or not we need to force a bi-directional build
     bool use_mma;            // whether to use tensor cores where applicable
+    bool allow_truncation; /** whether or not we let MG coarsening drop improvements, for ex drop long links for small aggregate dimensions */
+
+    bool use_mobius_fused_kernel; // Whether or not use fused kernels for Mobius
 
     // Default constructor
     DiracParam() :
@@ -74,14 +79,21 @@ namespace quda {
       mu(0.0),
       mu_factor(0.0),
       epsilon(0.0),
+      tm_rho(0.0),
       tmp1(0),
       tmp2(0),
       halo_precision(QUDA_INVALID_PRECISION),
       need_bidirectional(false),
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
-      use_mma(true)
+#ifdef QUDA_MMA_AVAILABLE
+      use_mma(true),
 #else
-      use_mma(false)
+      use_mma(false),
+#endif
+      allow_truncation(false),
+#ifdef NVSHMEM_COMMS
+      use_mobius_fused_kernel(false)
+#else
+      use_mobius_fused_kernel(true)
 #endif
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
@@ -99,6 +111,7 @@ namespace quda {
       printfQuda("matpcType = %d\n", matpcType);
       printfQuda("dagger = %d\n", dagger);
       printfQuda("mu = %g\n", mu);
+      printfQuda("tm_rho = %g\n", tm_rho);
       printfQuda("epsilon = %g\n", epsilon);
       printfQuda("halo_precision = %d\n", halo_precision);
       for (int i=0; i<QUDA_MAX_DIM; i++) printfQuda("commDim[%d] = %d\n", i, commDim[i]);
@@ -106,6 +119,8 @@ namespace quda {
         printfQuda(
             "b_5[%d] = %e %e \t c_5[%d] = %e %e\n", i, b_5[i].real(), b_5[i].imag(), i, c_5[i].real(), c_5[i].imag());
       printfQuda("use_mma = %d\n", use_mma);
+      printfQuda("allow_truncation = %d\n", allow_truncation);
+      printfQuda("use_mobius_fused_kernel = %s\n", use_mobius_fused_kernel ? "true" : "false");
     }
   };
 
@@ -158,12 +173,14 @@ namespace quda {
 
     mutable int commDim[QUDA_MAX_DIM]; // whether do comms or not
 
+    bool use_mobius_fused_kernel; // Whether or not use fused kernels for Mobius
+
     mutable TimeProfile profile;
 
   public:
     Dirac(const DiracParam &param);       // construct from params
     Dirac(const Dirac &dirac);            // Copy construct
-    virtual ~Dirac();                     // virtual destructor as this is a base classe
+    virtual ~Dirac();                     // virtual destructor as this is a base class
     Dirac &operator=(const Dirac &dirac); // assignment
 
     /**
@@ -260,7 +277,7 @@ namespace quda {
     /**
        @brief Apply Normal Operator
     */
-    void MMdag(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MMdag(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     // required methods to use e-o preconditioning for solving full system
     virtual void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
@@ -315,6 +332,11 @@ namespace quda {
     virtual double MuFactor() const { return 0.; }
 
     /**
+       @brief accessor for if we let MG coarsening drop we can drop improvements, for ex long links for small aggregation dimensions
+    */
+    virtual bool AllowTruncation() const { return false; }
+
+    /**
        @brief  returns and then zeroes flopcount
     */
     unsigned long long Flops() const
@@ -356,6 +378,28 @@ namespace quda {
     virtual QudaDiracType getDiracType() const = 0;
 
     /**
+        @brief Return the one-hop field for staggered operators for MG setup
+
+        @return Error for non-staggered operators
+    */
+    virtual cudaGaugeField *getStaggeredShortLinkField() const
+    {
+      errorQuda("Invalid dirac type %d", getDiracType());
+      return nullptr;
+    }
+
+    /**
+        @brief return the long link field for staggered operators for MG setup, if it exists
+
+        @return Error for non-improved staggered operators
+    */
+    virtual cudaGaugeField *getStaggeredLongLinkField() const
+    {
+      errorQuda("Invalid dirac type %d", getDiracType());
+      return nullptr;
+    }
+
+    /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
      *  These are pointers as opposed to references to support passing in `nullptr`.
      *
@@ -364,7 +408,7 @@ namespace quda {
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, cudaCloverField *)
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, CloverField *)
     {
       gauge = gauge_in;
     }
@@ -376,11 +420,14 @@ namespace quda {
      * @param X[out] Coarse clover field
      * @param T[in] Transfer operator defining the coarse grid
      * @param kappa Kappa parameter for the coarse operator
-     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for non-staggered ops)
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for
+     * non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, for ex dropping long links for
+     * small aggregate sizes
      */
-    virtual void createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double, double, double, double) const
+    virtual void createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double, double, double, double, bool) const
     {errorQuda("Not implemented");}
 
     QudaPrecision HaloPrecision() const { return halo_precision; }
@@ -440,9 +487,10 @@ namespace quda {
      * @param T[in] Transfer operator defining the coarse grid
      * @param mass Mass parameter for the coarse operator (hard coded to 0 when CoarseOp is called)
      * @param kappa Kappa parameter for the coarse operator
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for Wilson operator
      */
-    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-				double kappa, double mass=0.,double mu=0., double mu_factor=0.) const;
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0.,
+                                double mu = 0., double mu_factor = 0., bool allow_truncation = false) const;
   };
 
   // Even-odd preconditioned Wilson
@@ -472,7 +520,7 @@ namespace quda {
   class DiracClover : public DiracWilson {
 
   protected:
-    cudaCloverField *clover;
+    CloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void initConstants();
 
@@ -508,7 +556,7 @@ namespace quda {
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, cudaCloverField *clover_in)
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, CloverField *clover_in)
     {
       DiracWilson::updateFields(gauge_in, nullptr, nullptr, nullptr);
       clover = clover_in;
@@ -529,9 +577,10 @@ namespace quda {
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
      * @param mass Mass parameter for the coarse operator (hard coded to 0 when CoarseOp is called)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for clover operator
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mass=0., double mu=0., double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0., double mu = 0.,
+                        double mu_factor = 0., bool allow_truncation = false) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -591,9 +640,10 @@ namespace quda {
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
      * @param mass Mass parameter for the coarse operator (set to zero)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for clover operator
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mass=0., double mu=0., double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0., double mu = 0.,
+                        double mu_factor = 0., bool allow_truncation = false) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -620,7 +670,7 @@ namespace quda {
     // Inherit these so I will comment them out
     /*
   protected:
-    cudaCloverField *clover;
+    CloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void initConstants();
     */
@@ -646,9 +696,10 @@ namespace quda {
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
      * @param mass Mass parameter for the coarse operator (hard coded to 0 when CoarseOp is called)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for clover
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0., double mu = 0.,
-                        double mu_factor = 0.) const;
+                        double mu_factor = 0., bool allow_truncation = false) const;
   };
 
   // Even-odd preconditioned clover
@@ -699,9 +750,10 @@ namespace quda {
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
      * @param mass Mass parameter for the coarse operator (set to zero)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for clover hasenbusch
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0., double mu = 0.,
-                        double mu_factor = 0.) const;
+                        double mu_factor = 0., bool allow_truncation = false) const;
   };
 
   // Full domain wall
@@ -711,9 +763,13 @@ namespace quda {
     double m5;
     double kappa5;
     int Ls; // length of the fifth dimension
-    void checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const;
 
-public:
+    /**
+      @brief Check whether the input and output are valid 5D fields.
+     */
+    virtual void checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const;
+
+  public:
     DiracDomainWall(const DiracParam &param);
     DiracDomainWall(const DiracDomainWall &dirac);
     virtual ~DiracDomainWall();
@@ -801,9 +857,8 @@ public:
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-    void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-		 ColorSpinorField &x, ColorSpinorField &b,
-		 const QudaSolutionType) const;
+    void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
+                 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
 
@@ -828,6 +883,12 @@ public:
       double mobius_kappa_b;
       double mobius_kappa_c;
       double mobius_kappa;
+
+      /**
+        @brief Check whether the input and output are valid 5D fields. If zMobius, we require that they
+        have the same 5th dimension as the one in record.
+       */
+      virtual void checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const;
 
     public:
       DiracMobius(const DiracParam &param);
@@ -872,10 +933,25 @@ public:
     void M5inv(ColorSpinorField &out, const ColorSpinorField &in) const;
     void M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const;
 
+    void Dslash4M5invM5pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void Dslash4M5preM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void Dslash4M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                          const ColorSpinorField &x, const double &a) const;
+    void Dslash4M5preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                          const ColorSpinorField &x, const double &a) const;
+    void Dslash4XpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                          const ColorSpinorField &x, const double &a) const;
+    void Dslash4M5preXpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                               const ColorSpinorField &x, const double &a) const;
+    void Dslash4M5invXpayM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                               const ColorSpinorField &x, const double &a, ColorSpinorField &y) const;
+
     void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+    // this needs to be specialized for Mobius since we have a fused MdagM kernel
+    void MMdag(ColorSpinorField &out, const ColorSpinorField &in) const;
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, 
 		 ColorSpinorField &b, const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
@@ -899,6 +975,12 @@ public:
     double eofa_u[QUDA_MAX_DWF_LS];
     double eofa_x[QUDA_MAX_DWF_LS];
     double eofa_y[QUDA_MAX_DWF_LS];
+
+    /**
+      @brief Check whether the input and output are valid 5D fields, and we require that they
+      have the same 5th dimension as the one in record.
+     */
+    virtual void checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const;
 
   public:
     DiracMobiusEofa(const DiracParam &param);
@@ -992,9 +1074,10 @@ public:
      * non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for twisted mass
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mass, double mu, double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor = 0., bool allow_trunation = false) const;
   };
 
   // Even-odd preconditioned twisted mass
@@ -1035,9 +1118,10 @@ public:
      * non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for twisted mass
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mass, double mu, double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor = 0., bool allow_truncation = false) const;
   };
 
   // Full twisted mass with a clover term
@@ -1046,7 +1130,8 @@ public:
   protected:
     double mu;
     double epsilon;
-    cudaCloverField *clover;
+    double tm_rho;
+    CloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void twistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, 
           const QudaTwistGamma5Type twistType, const int parity) const;
@@ -1085,7 +1170,7 @@ public:
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, cudaCloverField *clover_in)
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, CloverField *clover_in)
     {
       DiracWilson::updateFields(gauge_in, nullptr, nullptr, nullptr);
       clover = clover_in;
@@ -1109,9 +1194,10 @@ public:
      * non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for twisted clover
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mass, double mu, double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor = 0., bool allow_truncation = false) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -1136,6 +1222,17 @@ public:
     DiracTwistedCloverPC& operator=(const DiracTwistedCloverPC &dirac);
 
     void TwistCloverInv(ColorSpinorField &out, const ColorSpinorField &in, const int parity) const;
+
+    /**
+       @brief Convenience wrapper for single/doublet
+     */
+    void WilsonDslash(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity) const;
+
+    /**
+       @brief Convenience wrapper for single/doublet
+     */
+    void WilsonDslashXpay(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity,
+                          const ColorSpinorField &x, double k) const;
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
@@ -1164,9 +1261,10 @@ public:
      * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for twisted clover
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mass, double mu, double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor = 0., bool allow_truncation = false) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -1209,11 +1307,11 @@ public:
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGERED_DIRAC; }
 
     /**
-     * @brief Get the fine gauge field for MG setup.
-     *
-     * @return gauge field
-     */
-    virtual const cudaGaugeField *getGaugeField() const { return gauge; }
+       @brief Return the one-hop field for staggered operators for MG setup
+
+       @return Gauge field
+   */
+    virtual cudaGaugeField *getStaggeredShortLinkField() const { return gauge; }
 
     /**
      * @brief Create the coarse staggered operator.
@@ -1234,9 +1332,10 @@ public:
      * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
      * @param mu Mu parameter for the coarse operator (ignored for staggered)
      * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for staggered
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-      double kappa, double mass, double mu=0., double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
+                        double mu_factor = 0., bool allow_truncation = false) const;
   };
 
   // Even-odd preconditioned staggered
@@ -1262,6 +1361,30 @@ public:
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGEREDPC_DIRAC; }
 
     virtual bool hermitian() const { return true; }
+
+    /**
+     * @brief Create the coarse staggered operator.
+     *
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term. Unike the Wilson operator,
+     *          we assume a mass normalization, not a kappa normalization.
+     *          Ultimately this routine just performs the Kahler-Dirac rotation.
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param kappa Kappa parameter for the coarse operator (ignored, set to 1.0)
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
+     * @param mu Mu parameter for the coarse operator (ignored for staggered)
+     * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for staggered
+     */
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
+                        double mu_factor = 0., bool allow_truncation = false) const;
   };
 
   // Kahler-Dirac preconditioned staggered
@@ -1269,7 +1392,8 @@ public:
   {
 
   protected:
-    mutable cudaGaugeField *Xinv; /** inverse Kahler-Dirac matrix */
+    mutable GaugeField *Xinv;        /** inverse Kahler-Dirac matrix */
+    QudaDiracType parent_dirac_type; /** Type of parent Dirac operator, needed here to determine if parent is pc'd or not */
 
   public:
     DiracStaggeredKD(const DiracParam &param);
@@ -1313,7 +1437,7 @@ public:
      *  @param clover_in Updated clover field
      */
     virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                              cudaCloverField *clover_in);
+                              CloverField *clover_in);
 
     /**
      * @brief Create the coarse staggered KD operator.
@@ -1332,9 +1456,10 @@ public:
      * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
      * @param mu Mu parameter for the coarse operator (ignored for staggered)
      * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for staggered
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
-                        double mu_factor = 0.) const;
+                        double mu_factor = 0., bool allow_truncation = false) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -1379,18 +1504,18 @@ public:
     virtual QudaDiracType getDiracType() const { return QUDA_ASQTAD_DIRAC; }
 
     /**
-     * @brief Get the fat link field for MG setup.
-     *
-     * @return fat link field
-     */
-    virtual const cudaGaugeField *getFatLinkField() const { return fatGauge; }
+        @brief Return the one-hop field for staggered operators for MG setup
+
+        @return fat link field
+    */
+    virtual cudaGaugeField *getStaggeredShortLinkField() const { return fatGauge; }
 
     /**
-     * @brief Get the long link field for MG setup.
-     *
-     * @return long link field
-     */
-    virtual const cudaGaugeField *getLongLinkField() const { return longGauge; }
+        @brief return the long link field for staggered operators for MG setup
+
+        @return long link field
+    */
+    virtual cudaGaugeField *getStaggeredLongLinkField() const { return longGauge; }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -1401,8 +1526,7 @@ public:
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                              cudaCloverField *)
+    virtual void updateFields(cudaGaugeField *, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in, CloverField *)
     {
       Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
       fatGauge = fat_gauge_in;
@@ -1429,9 +1553,10 @@ public:
      * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
      * @param mu Mu parameter for the coarse operator (ignored for staggered)
      * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, dropping long links here
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
-                        double mu_factor = 0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor, bool allow_truncation) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -1466,6 +1591,30 @@ public:
     virtual QudaDiracType getDiracType() const { return QUDA_ASQTADPC_DIRAC; }
 
     virtual bool hermitian() const { return true; }
+
+    /**
+     * @brief Create the coarse staggered operator.
+     *
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term. Unike the Wilson operator,
+     *          we assume a mass normalization, not a kappa normalization.
+     *          Ultimately this routine just performs the Kahler-Dirac rotation.
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param kappa Kappa parameter for the coarse operator (ignored, set to 1.0)
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
+     * @param mu Mu parameter for the coarse operator (ignored for staggered)
+     * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, dropping long links here
+     */
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor, bool allow_truncation) const;
   };
 
   // Kahler-Dirac preconditioned staggered
@@ -1473,7 +1622,8 @@ public:
   {
 
   protected:
-    mutable cudaGaugeField *Xinv; /** inverse Kahler-Dirac matrix */
+    mutable GaugeField *Xinv;        /** inverse Kahler-Dirac matrix */
+    QudaDiracType parent_dirac_type; /** Type of parent Dirac operator, needed here to determine if parent is pc'd or not */
 
   public:
     DiracImprovedStaggeredKD(const DiracParam &param);
@@ -1516,7 +1666,7 @@ public:
      *  @param clover_in Updated clover field
      */
     virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                              cudaCloverField *clover_in);
+                              CloverField *clover_in);
 
     /**
      * @brief Create the coarse improved staggered KD operator.
@@ -1535,9 +1685,10 @@ public:
      * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
      * @param mu Mu parameter for the coarse operator (ignored for staggered)
      * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, dropping long for asqtad
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
-                        double mu_factor = 0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor, bool allow_truncation) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -1564,6 +1715,7 @@ public:
     const Transfer *transfer; /** restrictor / prolongator defined here */
     const Dirac *dirac; /** Parent Dirac operator */
     const bool need_bidirectional; /** Whether or not to force a bi-directional build */
+    const bool allow_truncation; /** Whether or not we let coarsening drop improvements, for ex dropping long links for small aggregate sizes */
     const bool use_mma;            /** Whether to use tensor cores or not */
 
     mutable cpuGaugeField *Y_h; /** CPU copy of the coarse link field */
@@ -1613,6 +1765,7 @@ public:
     double Mass() const { return mass; }
     double Mu() const { return mu; }
     double MuFactor() const { return mu_factor; }
+    bool AllowTruncation() const { return allow_truncation; }
 
     /**
        @param[in] param Parameters defining this operator
@@ -1695,7 +1848,7 @@ public:
 
     virtual QudaDiracType getDiracType() const { return QUDA_COARSE_DIRAC; }
 
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, cudaCloverField *)
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, CloverField *)
     {
       Dirac::updateFields(gauge_in, nullptr, nullptr, nullptr);
       warningQuda("Coarse gauge links cannot be trivially updated for DiracCoarse(PC). Perform an MG update instead.");
@@ -1711,10 +1864,10 @@ public:
      * @param mass Mass parameter (assumed to be zero, staggered mass gets built into clover)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for coarse op
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mass, double mu, double mu_factor=0.) const;
-
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor = 0., bool allow_truncation = false) const;
 
     /**
      * @brief Create the precondtioned coarse operator
@@ -1780,9 +1933,10 @@ public:
      * @param mass Mass parameter for the coarse operator, assumed to be zero
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for coarse op
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mass, double mu, double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor = 0., bool allow_truncation = false) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch

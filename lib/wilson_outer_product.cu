@@ -90,7 +90,7 @@ namespace quda {
     }
   }; // WilsonForce
 
-  void exchangeGhost(cudaColorSpinorField &a, int parity, int dag) {
+  void exchangeGhost(ColorSpinorField &a, int parity, int dag) {
     // this sets the communications pattern for the packing kernel
     int comms[QUDA_MAX_DIM] = { commDimPartitioned(0), commDimPartitioned(1),
                                 commDimPartitioned(2), commDimPartitioned(3) };
@@ -142,10 +142,10 @@ namespace quda {
     int dag = 1;
 
     for (unsigned int i=0; i<x.size(); i++) {
-      static_cast<cudaColorSpinorField&>(x[i]->Even()).allocateGhostBuffer(1);
-      static_cast<cudaColorSpinorField&>(x[i]->Odd()).allocateGhostBuffer(1);
-      static_cast<cudaColorSpinorField&>(p[i]->Even()).allocateGhostBuffer(1);
-      static_cast<cudaColorSpinorField&>(p[i]->Odd()).allocateGhostBuffer(1);
+      x[i]->Even().allocateGhostBuffer(1);
+      x[i]->Odd().allocateGhostBuffer(1);
+      p[i]->Even().allocateGhostBuffer(1);
+      p[i]->Odd().allocateGhostBuffer(1);
 
       for (int parity=0; parity<2; parity++) {
 	ColorSpinorField& inA = (parity&1) ? p[i]->Odd() : p[i]->Even();
@@ -153,8 +153,8 @@ namespace quda {
 	ColorSpinorField& inC = (parity&1) ? x[i]->Odd() : x[i]->Even();
 	ColorSpinorField& inD = (parity&1) ? p[i]->Even(): p[i]->Odd();
 
-        exchangeGhost(static_cast<cudaColorSpinorField&>(inB), parity, dag);
-        exchangeGhost(static_cast<cudaColorSpinorField&>(inD), parity, 1-dag);
+        exchangeGhost(inB, parity, dag);
+        exchangeGhost(inD, parity, 1-dag);
 
         instantiate<WilsonForce, ReconstructNo12>(U, force, inA, inB, inC, inD, parity, coeff[i]);
       }

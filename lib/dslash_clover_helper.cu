@@ -93,10 +93,18 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (inverse) {
         CloverArg<Float, nColor, true> arg(out, in, clover, parity, kappa, mu, epsilon, dagger, twist);
-        launch<TwistCloverApply>(tp, stream, arg);
+        if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
+          launch<TwistCloverApply>(tp, stream, arg);
+        } else {
+          launch<NdegTwistCloverApply>(tp, stream, arg);
+        }
       } else {
         CloverArg<Float, nColor, false> arg(out, in, clover, parity, kappa, mu, epsilon, dagger, twist);
-        launch<TwistCloverApply>(tp, stream, arg);
+        if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
+          launch<TwistCloverApply>(tp, stream, arg);
+        } else {
+          launch<NdegTwistCloverApply>(tp, stream, arg);
+        }
       }
     }
 
@@ -105,7 +113,7 @@ namespace quda {
     long long flops() const { return (inverse ? 1056ll : 552ll) * in.Volume(); }
     long long bytes() const {
       long long rtn = out.Bytes() + in.Bytes() + clover.Bytes() / (3 - in.SiteSubset());
-      if (twist == QUDA_TWIST_GAMMA5_INVERSE && !dynamic_clover_inverse())
+      if (twist == QUDA_TWIST_GAMMA5_INVERSE && !clover::dynamic_inverse())
 	rtn += clover.Bytes() / (3 - in.SiteSubset());
       return rtn;
     }

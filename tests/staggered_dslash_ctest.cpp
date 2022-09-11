@@ -5,13 +5,11 @@ using namespace quda;
 StaggeredDslashTestWrapper dslash_test_wrapper;
 
 bool gauge_loaded = false;
-
-const char *prec_str[] = {"quarter", "half", "single", "double"};
-const char *recon_str[] = {"r18", "r13", "r9"};
+bool ctest_all_partitions = false;
 
 void display_test_info(int precision, QudaReconstructType link_recon)
 {
-  auto prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
+  auto prec = getPrecision(precision);
 
   printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
   printfQuda("%s   %s       %s           %d       %d/%d/%d        %d \n", get_prec_str(prec), get_recon_str(link_recon),
@@ -54,13 +52,18 @@ protected:
       return true;
     }
 
+    const std::array<bool, 16> partition_enabled {true, true, true,  false,  true,  false, false, false,
+                                                  true, false, false, false, true, false, true, true};
+    if (!ctest_all_partitions && !partition_enabled[::testing::get<2>(GetParam())]) return true;
+
     if (::testing::get<2>(GetParam()) > 0 && dslash_test_wrapper.test_split_grid) { return true; }
     return false;
   }
 
 public:
   virtual ~StaggeredDslashTest() { }
-  virtual void SetUp() {
+  virtual void SetUp()
+  {
     int prec = ::testing::get<0>(GetParam());
     QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
 
@@ -117,6 +120,7 @@ int main(int argc, char **argv)
   ::testing::InitGoogleTest(&argc, argv);
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
+  app->add_option("--all-partitions", ctest_all_partitions, "Test all instead of reduced combination of partitions");
   add_comms_option_group(app);
   try {
     app->parse(argc, argv);
@@ -139,7 +143,7 @@ int main(int argc, char **argv)
 
   // Sanity check: if you pass in a gauge field, want to test the asqtad/hisq dslash, and don't
   // ask to build the fat/long links... it doesn't make sense.
-  if (strcmp(latfile, "") && !compute_fatlong && dslash_type == QUDA_ASQTAD_DSLASH) {
+  if (latfile.size() > 0 && !compute_fatlong && dslash_type == QUDA_ASQTAD_DSLASH) {
     errorQuda(
       "Cannot load a gauge field and test the ASQTAD/HISQ operator without setting \"--compute-fat-long true\".\n");
     compute_fatlong = true;
@@ -177,28 +181,29 @@ int main(int argc, char **argv)
   return test_rc;
 }
 
-  std::string getstaggereddslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int>> param){
-   const int prec = ::testing::get<0>(param.param);
-   const int recon = ::testing::get<1>(param.param);
-   const int part = ::testing::get<2>(param.param);
-   std::stringstream ss;
-   // ss << get_dslash_str(dslash_type) << "_";
-   ss << prec_str[prec];
-   ss << "_r" << recon;
-   ss << "_partition" << part;
-   return ss.str();
-  }
+std::string getstaggereddslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int>> param)
+{
+  const int prec = ::testing::get<0>(param.param);
+  const int recon = ::testing::get<1>(param.param);
+  const int part = ::testing::get<2>(param.param);
+  std::stringstream ss;
+  // ss << get_dslash_str(dslash_type) << "_";
+  ss << get_prec_str(getPrecision(prec));
+  ss << "_r" << recon;
+  ss << "_partition" << part;
+  return ss.str();
+}
 
 #ifdef MULTI_GPU
-  INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
-                           Combine(Range(0, 4),
-                                   ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-                                   Range(0, 16)),
-                           getstaggereddslashtestname);
+INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
+                         Combine(Range(0, 4),
+                                 ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
+                                 Range(0, 16)),
+                         getstaggereddslashtestname);
 #else
-  INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
-                           Combine(Range(0, 4),
-                                   ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-                                   ::testing::Values(0)),
-                           getstaggereddslashtestname);
+INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
+                         Combine(Range(0, 4),
+                                 ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
+                                 ::testing::Values(0)),
+                         getstaggereddslashtestname);
 #endif

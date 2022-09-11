@@ -70,7 +70,18 @@ namespace quda {
 
     even = gauge;
     odd = static_cast<char*>(gauge) + bytes/2;
-    if (create != QUDA_ZERO_FIELD_CREATE && isNative() && ghostExchange == QUDA_GHOST_EXCHANGE_PAD) zeroPad();
+
+    if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
+      if (isNative()) {
+        if (create != QUDA_ZERO_FIELD_CREATE) zeroPad();
+      } else {
+        for (int i = 0; i < nDim; i++) {
+          size_t nbytes = nFace * surface[i] * nInternal * precision;
+          qudaMemset(ghost[i], 0, nbytes);
+          if (nbytes && geometry == QUDA_COARSE_GEOMETRY) qudaMemset(ghost[i + 4], 0, nbytes);
+        }
+      }
+    }
   }
 
   void cudaGaugeField::zeroPad() {
@@ -86,8 +97,6 @@ namespace quda {
 
   cudaGaugeField::~cudaGaugeField()
   {
-    destroyComms();
-
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       switch(mem_type) {
       case QUDA_MEMORY_DEVICE:
@@ -121,7 +130,7 @@ namespace quda {
     if (nFace == 0) errorQuda("nFace = 0");
 
     const int dir = 1; // sending forwards only
-    const int R[] = {nFace, nFace, nFace, nFace};
+    const lat_dim_t R = {nFace, nFace, nFace, nFace};
     const bool no_comms_fill = true; // dslash kernels presently require this
     const bool bidir = false; // communication is only ever done in one direction at once
     createComms(R, true, bidir); // always need to allocate space for non-partitioned dimension for copyGenericGauge
@@ -210,7 +219,7 @@ namespace quda {
     if (nFace == 0) errorQuda("nFace = 0");
 
     const int dir = 0; // sending backwards only
-    const int R[] = {nFace, nFace, nFace, nFace};
+    const lat_dim_t R = {nFace, nFace, nFace, nFace};
     const bool no_comms_fill = false; // injection never does no_comms_fill
     const bool bidir = false; // communication is only ever done in one direction at once
     createComms(R, true, bidir); // always need to allocate space for non-partitioned dimension for copyGenericGauge
@@ -290,13 +299,13 @@ namespace quda {
     qudaDeviceSynchronize();
   }
 
-  void cudaGaugeField::allocateGhostBuffer(const int *R, bool no_comms_fill, bool bidir) const
+  void cudaGaugeField::allocateGhostBuffer(const lat_dim_t &R, bool no_comms_fill, bool bidir) const
   {
     createGhostZone(R, no_comms_fill, bidir);
     LatticeField::allocateGhostBuffer(ghost_bytes);
   }
 
-  void cudaGaugeField::createComms(const int *R, bool no_comms_fill, bool bidir)
+  void cudaGaugeField::createComms(const lat_dim_t &R, bool no_comms_fill, bool bidir)
   {
     allocateGhostBuffer(R, no_comms_fill, bidir); // allocate the ghost buffer if not yet allocated
 
@@ -316,24 +325,13 @@ namespace quda {
   {
     if (!comm_dim_partitioned(dim)) return;
 
-    if (dir==0) { // sending backwards
-      // receive from the processor in the +1 direction
-      if (comm_peer2peer_enabled(1,dim)) {
-	comm_start(mh_recv_p2p_fwd[bufferIndex][dim]);
-      } else if (comm_gdr_enabled()) {
-        comm_start(mh_recv_rdma_fwd[bufferIndex][dim]);
-      } else {
-        comm_start(mh_recv_fwd[bufferIndex][dim]);
-      }
-    } else { //sending forwards
-      // receive from the processor in the -1 direction
-      if (comm_peer2peer_enabled(0,dim)) {
-	comm_start(mh_recv_p2p_back[bufferIndex][dim]);
-      } else if (comm_gdr_enabled()) {
-        comm_start(mh_recv_rdma_back[bufferIndex][dim]);
-      } else {
-        comm_start(mh_recv_back[bufferIndex][dim]);
-      }
+    // receive from neighboring the processor
+    if (comm_peer2peer_enabled(1 - dir, dim)) {
+      comm_start(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+    } else if (comm_gdr_enabled()) {
+      comm_start(mh_recv_rdma[bufferIndex][dim][1 - dir]);
+    } else {
+      comm_start(mh_recv[bufferIndex][dim][1 - dir]);
     }
   }
 
@@ -342,18 +340,11 @@ namespace quda {
     if (!comm_dim_partitioned(dim)) return;
 
     if (!comm_peer2peer_enabled(dir,dim)) {
-      if (dir == 0)
-	if (comm_gdr_enabled()) {
-	  comm_start(mh_send_rdma_back[bufferIndex][dim]);
-	} else {
-	  comm_start(mh_send_back[bufferIndex][dim]);
-	}
-      else
-	if (comm_gdr_enabled()) {
-	  comm_start(mh_send_rdma_fwd[bufferIndex][dim]);
-	} else {
-	  comm_start(mh_send_fwd[bufferIndex][dim]);
-	}
+      if (comm_gdr_enabled()) {
+        comm_start(mh_send_rdma[bufferIndex][dim][dir]);
+      } else {
+        comm_start(mh_send[bufferIndex][dim][dir]);
+      }
     } else { // doing peer-to-peer
 
       void *ghost_dst
@@ -361,16 +352,10 @@ namespace quda {
 
       qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
 
-      if (dir == 0) {
-	// record the event
-        qudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], stream);
-        // send to the processor in the -1 direction
-	comm_start(mh_send_p2p_back[bufferIndex][dim]);
-      } else {
-        qudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], stream);
-        // send to the processor in the +1 direction
-	comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
-      }
+      // record the event
+      qudaEventRecord(ipcCopyEvent[bufferIndex][dim][dir], stream);
+      // send to the neighboring processor
+      comm_start(mh_send_p2p[bufferIndex][dim][dir]);
     }
   }
 
@@ -378,46 +363,26 @@ namespace quda {
   {
     if (!comm_dim_partitioned(dim)) return;
 
-    if (dir==0) {
-      if (comm_peer2peer_enabled(1,dim)) {
-	comm_wait(mh_recv_p2p_fwd[bufferIndex][dim]);
-	qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][1][dim]);
-      } else if (comm_gdr_enabled()) {
-	comm_wait(mh_recv_rdma_fwd[bufferIndex][dim]);
-      } else {
-	comm_wait(mh_recv_fwd[bufferIndex][dim]);
-      }
-
-      if (comm_peer2peer_enabled(0,dim)) {
-	comm_wait(mh_send_p2p_back[bufferIndex][dim]);
-	qudaEventSynchronize(ipcCopyEvent[bufferIndex][0][dim]);
-      } else if (comm_gdr_enabled()) {
-	comm_wait(mh_send_rdma_back[bufferIndex][dim]);
-      } else {
-	comm_wait(mh_send_back[bufferIndex][dim]);
-      }
+    if (comm_peer2peer_enabled(1 - dir, dim)) {
+      comm_wait(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+      qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][dim][1 - dir]);
+    } else if (comm_gdr_enabled()) {
+      comm_wait(mh_recv_rdma[bufferIndex][dim][1 - dir]);
     } else {
-      if (comm_peer2peer_enabled(0,dim)) {
-	comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
-	qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
-      } else if (comm_gdr_enabled()) {
-	comm_wait(mh_recv_rdma_back[bufferIndex][dim]);
-      } else {
-	comm_wait(mh_recv_back[bufferIndex][dim]);
-      }
+      comm_wait(mh_recv[bufferIndex][dim][1 - dir]);
+    }
 
-      if (comm_peer2peer_enabled(1,dim)) {
-	comm_wait(mh_send_p2p_fwd[bufferIndex][dim]);
-	qudaEventSynchronize(ipcCopyEvent[bufferIndex][1][dim]);
-      } else if (comm_gdr_enabled()) {
-	comm_wait(mh_send_rdma_fwd[bufferIndex][dim]);
-      } else {
-	comm_wait(mh_send_fwd[bufferIndex][dim]);
-      }
+    if (comm_peer2peer_enabled(dir, dim)) {
+      comm_wait(mh_send_p2p[bufferIndex][dim][dir]);
+      qudaEventSynchronize(ipcCopyEvent[bufferIndex][dim][dir]);
+    } else if (comm_gdr_enabled()) {
+      comm_wait(mh_send_rdma[bufferIndex][dim][dir]);
+    } else {
+      comm_wait(mh_send[bufferIndex][dim][dir]);
     }
   }
 
-  void cudaGaugeField::exchangeExtendedGhost(const int *R, bool no_comms_fill)
+  void cudaGaugeField::exchangeExtendedGhost(const lat_dim_t &R, bool no_comms_fill)
   {
     const int b = bufferIndex;
     void *send_d[QUDA_MAX_DIM], *recv_d[QUDA_MAX_DIM];
@@ -486,7 +451,8 @@ namespace quda {
     qudaDeviceSynchronize();
   }
 
-  void cudaGaugeField::exchangeExtendedGhost(const int *R, TimeProfile &profile, bool no_comms_fill) {
+  void cudaGaugeField::exchangeExtendedGhost(const lat_dim_t &R, TimeProfile &profile, bool no_comms_fill)
+  {
     profile.TPSTART(QUDA_PROFILE_COMMS);
     exchangeExtendedGhost(R, no_comms_fill);
     profile.TPSTOP(QUDA_PROFILE_COMMS);

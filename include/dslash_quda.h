@@ -8,10 +8,6 @@
 #include <domain_wall_helper.h>
 #include <fast_intdiv.h>
 
-#ifdef NVSHMEM_COMMS
-#include <cuda/atomic>
-#endif
-
 namespace quda
 {
 
@@ -63,77 +59,6 @@ namespace quda
 
   void createDslashEvents();
   void destroyDslashEvents();
-
-  namespace dslash
-  {
-    /**
-     * @brief type used for shmem signaling
-     */
-    using shmem_sync_t = uint64_t;
-
-    /**
-     * @brief Get the shmem sync counter
-     *
-     * @return shmem_sync_t
-     */
-    shmem_sync_t get_shmem_sync_counter();
-
-    /**
-     * @brief Set the shmem sync counter to count
-     *
-     * @param count
-     * @return shmem_sync_t
-     */
-    shmem_sync_t set_shmem_sync_counter(shmem_sync_t count);
-
-    /**
-     * @brief increase the shmem sync counter for the next dslash application
-     *
-     * @return shmem_sync_t
-     */
-    shmem_sync_t inc_shmem_sync_counter();
-#ifdef NVSHMEM_COMMS
-    using shmem_retcount_intra_t = cuda::atomic<int, cuda::thread_scope_system>;
-    using shmem_retcount_inter_t = cuda::atomic<int, cuda::thread_scope_device>;
-    using shmem_interior_done_t = cuda::atomic<shmem_sync_t, cuda::thread_scope_device>;
-    using shmem_interior_count_t = cuda::atomic<int, cuda::thread_scope_block>;
-
-    /**
-     * @brief Get the shmem sync arr which is used for signaling which exterior halos have arrived
-     *
-     * @return shmem_sync_t*
-     */
-    shmem_sync_t *get_shmem_sync_arr();
-
-    /**
-     * @brief Get the array[2*QUDA_MAX_DIM] of atomic to count which intra node packing blocks have finished per dim/dir
-     *
-     * @return shmem_retcount_intra_t*
-     */
-    shmem_retcount_intra_t *get_shmem_retcount_intra();
-
-    /**
-     * @brief Get the array[2*QUDA_MAX_DIM] of atomic to count which inter node packing blocks have finished per dim/dir
-     *
-     * @return shmem_retcount_inter_t*
-     */
-    shmem_retcount_inter_t *get_shmem_retcount_inter();
-
-    /**
-     * @brief Get the atomic object used for signaling that the interior Dslash has been applied. Used in the uber kernel.
-     *
-     * @return shmem_interior_done_t*
-     */
-    shmem_interior_done_t *get_shmem_interior_done();
-
-    /**
-     * @brief Get the atomic counter for tracking how many of the interior blocks have finished. See also above.
-     *
-     * @return shmem_interior_count_t*
-     */
-    shmem_interior_count_t *get_shmem_interior_count();
-#endif
-  } // namespace dslash
 
   /**
      @brief Driver for applying the Wilson stencil
@@ -446,7 +371,8 @@ namespace quda
      @param[in] x Vector field we accumulate onto to
      @param[in] parity Destination parity
      @param[in] dagger Whether this is for the dagger operator
-     @param[in] asymmetric Whether this is for the asymmetric preconditioned dagger operator (a*(1 - i*b*gamma_5) * D^dagger * in)
+     @param[in] asymmetric Whether this is for the asymmetric preconditioned dagger operator (a*(1 - i*b*gamma_5*tau3 +
+     c*tau1) * D^dagger * in)
      @param[in] comm_override Override for which dimensions are partitioned
      @param[in] profile The TimeProfile used for profiling the dslash
   */
@@ -485,7 +411,7 @@ namespace quda
      @brief Driver for applying the preconditioned twisted-clover stencil
 
      out = a * (C + i*b*gamma_5)^{-1} * D * in + x
-         = a * C^{-2} (C - i*b*gamma_5) * D * in + x
+         = a * (C - i*b*gamma_5)/(C^2 + b^2) * D * in + x
          = A^{-1} * D * in + x
 
      where D is the gauged Wilson linear operator and C is the clover
@@ -521,6 +447,81 @@ namespace quda
   void ApplyTwistedCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
       const CloverField &C, double a, double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
       const int *comm_override, TimeProfile &profile);
+
+  /**
+     @brief Driver for applying the non-degenerate twisted-clover
+     stencil
+
+     out = a * D * in + (C + i*b*gamma_5*tau_3 + c*tau_1) * x
+
+     where D is the gauged Wilson linear operator. The quark fields
+     out, in and x are five dimensional, with the fifth dimension
+     corresponding to the flavor dimension.  The convention is that
+     the first 4-d slice (s=0) corresponds to the positive twist and
+     the second slice (s=1) corresponds to the negative twist.
+
+     This operator can be applied to both single parity
+     (4d checker-boarded) fields, or to full fields.
+
+     @param[out] out The output result field
+     @param[in] in The input field
+     @param[in] U The gauge field used for the operator
+     @param[in] C The clover field used for the operator
+     @param[in] a Scale factor applied to Wilson term (typically -kappa)
+     @param[in] b Chiral twist factor applied (typically 2*mu*kappa)
+     @param[in] c Flavor twist factor applied (typically -2*epsilon*kappa)
+     @param[in] x Vector field we accumulate onto to
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
+  */
+  void ApplyNdegTwistedClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                              const CloverField &C, double a, double b, double c, const ColorSpinorField &x, int parity,
+                              bool dagger, const int *comm_override, TimeProfile &profile);
+
+  /**
+     @brief Driver for applying the non-degenerate preconditioned twisted-clover stencil
+
+     out = a * (C + i*b*gamma_5*tau_3 - c*tau_1)^{-1} * D * in + x
+         = a * (C - i*b*gamma_5*tau_3 + c*tau_1)/(C^2 + b^2 - c^2) * D * in + x
+         = A^{-1} * D * in + x
+
+     where D is the gauged Wilson linear operator and C is the clover
+     field.  This operator can (at present) be applied to only single
+     parity (checker-boarded) fields.  When the dagger operator is
+     requested, we do not transpose the order of operations, e.g.
+
+     out = A^{-\dagger} D^\dagger  (no xpay term)
+
+     Although not a conjugate transpose of the regular operator, this
+     variant is used to enable kernel fusion between the application
+     of D and the subsequent application of A, e.g., in the symmetric
+     dagger operator we need to apply
+
+     M = (1 - kappa^2 D^{\dagger} A^{-\dagger} D{^\dagger} A^{-\dagger} )
+
+     and since cannot fuse D{^\dagger} A^{-\dagger}, we instead fused
+     A^{-\dagger} D{^\dagger}.
+
+     @param[out] out The output result field
+     @param[in] in The input field
+     @param[in] U The gauge field used for the operator
+     @param[in] C The clover field used for the operator
+     @param[in] a Scale factor applied to Wilson term ( typically 1.0)
+     @param[in] b chiral twist factor applied (typically -2*kappa*mu)
+     @param[in] c flavor twist factor applied (typically 2*kappa*epsilon)
+     @param[in] xpay Whether to do xpay or not
+     @param[in] x Vector field we accumulate onto to when xpay is true
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
+  */
+  void ApplyNdegTwistedCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                                            const CloverField &C, double a, double b, double c, bool xpay,
+                                            const ColorSpinorField &x, int parity, bool dagger,
+                                            const int *comm_override, TimeProfile &profile);
 
   /**
      @brief Driver for applying the Domain-wall 5-d stencil to a
@@ -579,6 +580,40 @@ namespace quda
                          const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
                          const int *comm_override, TimeProfile &profile);
 
+  void ApplyDomainWall4DM5inv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                              double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                              ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
+                              TimeProfile &profile);
+
+  void ApplyDomainWall4DM5pre(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                              double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                              ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
+                              TimeProfile &profile);
+
+  void ApplyDomainWall4DM5invM5pre(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                                   double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                                   ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
+                                   TimeProfile &profile);
+
+  void ApplyDomainWall4DM5preM5inv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                                   double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                                   ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
+                                   TimeProfile &profile);
+
+  void ApplyDomainWall4DM5invM5inv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                                   double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                                   ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
+                                   TimeProfile &profile);
+
+  void ApplyDomainWall4DM5mob(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                              double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                              ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
+                              TimeProfile &profile);
+
+  void ApplyDomainWall4DM5preM5mob(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                                   double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                                   ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
+                                   TimeProfile &profile);
   /**
      @brief Apply either the domain-wall / mobius Dslash5 operator or
      the M5 inverse operator.  In the current implementation, it is
@@ -596,14 +631,6 @@ namespace quda
   */
   void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
                     double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type);
-
-  // Tensor core functions for Mobius DWF
-  namespace mobius_tensor_core
-  {
-    void apply_fused_dslash(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
-                            const ColorSpinorField &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
-                            bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type);
-  }
 
   // The EOFA stuff
   namespace mobius_eofa

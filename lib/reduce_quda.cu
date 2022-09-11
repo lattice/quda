@@ -9,7 +9,7 @@ namespace quda {
 
     template <template <typename ReducerType, typename real> class Reducer,
               typename store_t, typename y_store_t, int nSpin, typename coeff_t>
-    class Reduce : public TunableReduction2D<1>
+    class Reduce : public TunableReduction2D
     {
       using real = typename mapper<y_store_t>::type;
       using host_reduce_t = typename Reducer<double, real>::reduce_t;
@@ -31,12 +31,10 @@ namespace quda {
         return false;
       }
 
-      unsigned int maxBlockSize(const TuneParam &) const { return device::max_reduce_block_size(); }
-
     public:
       Reduce(const coeff_t &a, const coeff_t &b, const coeff_t &, ColorSpinorField &x, ColorSpinorField &y,
              ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, host_reduce_t &result) :
-        TunableReduction2D(x),
+        TunableReduction2D(x, 1u),
         r(a, b),
         nParity((x.IsComposite() ? x.CompositeDim() : 1) * (x.SiteSubset())),
         a(a),
@@ -142,8 +140,6 @@ namespace quda {
         return (r.read.X + r.write.X) * x.Bytes() + (r.read.Y + r.write.Y) * y.Bytes() +
           (r.read.Z + r.write.Z) * z.Bytes() + (r.read.W + r.write.W) * w.Bytes() + (r.read.V + r.write.V) * v.Bytes();
       }
-
-      int tuningIter() const { return 3; }
     };
 
     template <template <typename reduce_t, typename real> class Functor, bool mixed, typename... Args>
@@ -200,58 +196,62 @@ namespace quda {
     Complex cDotProduct(ColorSpinorField &x, ColorSpinorField &y)
     {
       auto cdot = instantiateReduce<Cdot, false>(0.0, 0.0, 0.0, x, y, x, x, x);
-      return Complex(cdot.x, cdot.y);
+      return Complex(cdot[0], cdot[1]);
     }
 
     Complex caxpyDotzy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
     {
       auto cdot = instantiateReduce<caxpydotzy, false>(a, Complex(0.0), Complex(0.0), x, y, z, x, x);
-      return Complex(cdot.x, cdot.y);
+      return Complex(cdot[0], cdot[1]);
     }
 
-    double3 cDotProductNormA(ColorSpinorField &x, ColorSpinorField &y)
+    double4 cDotProductNormAB(ColorSpinorField &x, ColorSpinorField &y)
     {
-      return instantiateReduce<CdotNormA, false>(0.0, 0.0, 0.0, x, y, x, x, x);
+      auto ab = instantiateReduce<CdotNormAB, false>(0.0, 0.0, 0.0, x, y, x, x, x);
+      return make_double4(ab[0], ab[1], ab[2], ab[3]);
     }
 
     double3 caxpbypzYmbwcDotProductUYNormY(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y,
                                            ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &u)
     {
-      return instantiateReduce<caxpbypzYmbwcDotProductUYNormY_, true>(a, b, Complex(0.0), x, z, y, w, u);
+      auto rtn = instantiateReduce<caxpbypzYmbwcDotProductUYNormY_, true>(a, b, Complex(0.0), x, z, y, w, u);
+      return make_double3(rtn[0], rtn[1], rtn[2]);
     }
 
     Complex axpyCGNorm(double a, ColorSpinorField &x, ColorSpinorField &y)
     {
-      double2 cg_norm = instantiateReduce<axpyCGNorm2, true>(a, 0.0, 0.0, x, y, x, x, x);
-      return Complex(cg_norm.x, cg_norm.y);
+      auto cg_norm = instantiateReduce<axpyCGNorm2, true>(a, 0.0, 0.0, x, y, x, x, x);
+      return Complex(cg_norm[0], cg_norm[1]);
     }
 
     double3 HeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &r)
     {
       // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
       if (x.Ncolor() != 3) return make_double3(0.0, 0.0, 0.0);
-      double3 rtn = instantiateReduce<HeavyQuarkResidualNorm_, false>(0.0, 0.0, 0.0, x, r, r, r, r);
-      rtn.z /= (x.Volume()*comm_size());
-      return rtn;
+      auto rtn = instantiateReduce<HeavyQuarkResidualNorm_, false>(0.0, 0.0, 0.0, x, r, r, r, r);
+      rtn[2] /= (x.Volume()*comm_size());
+      return make_double3(rtn[0], rtn[1], rtn[2]);
     }
 
     double3 xpyHeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &r)
     {
       // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
       if (x.Ncolor()!=3) return make_double3(0.0, 0.0, 0.0);
-      double3 rtn = instantiateReduce<xpyHeavyQuarkResidualNorm_, false>(0.0, 0.0, 0.0, x, y, r, r, r);
-      rtn.z /= (x.Volume()*comm_size());
-      return rtn;
+      auto rtn = instantiateReduce<xpyHeavyQuarkResidualNorm_, false>(0.0, 0.0, 0.0, x, y, r, r, r);
+      rtn[2] /= (x.Volume()*comm_size());
+      return make_double3(rtn[0], rtn[1], rtn[2]);
     }
 
     double3 tripleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
     {
-      return instantiateReduce<tripleCGReduction_, false>(0.0, 0.0, 0.0, x, y, z, x, x);
+      auto rtn = instantiateReduce<tripleCGReduction_, false>(0.0, 0.0, 0.0, x, y, z, x, x);
+      return make_double3(rtn[0], rtn[1], rtn[2]);
     }
 
     double4 quadrupleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
     {
-      return instantiateReduce<quadrupleCGReduction_, false>(0.0, 0.0, 0.0, x, y, z, x, x);
+      auto red = instantiateReduce<quadrupleCGReduction_, false>(0.0, 0.0, 0.0, x, y, z, x, x);
+      return make_double4(red[0], red[1], red[2], red[3]);
     }
 
     double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y,

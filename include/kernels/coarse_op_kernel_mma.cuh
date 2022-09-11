@@ -8,7 +8,7 @@
 #include <linalg.cuh>
 #include <matrix_tile.cuh>
 #include <mma_tensor_op/gemm.cuh>
-#include <cub_helper.cuh>
+#include <block_reduce_helper.h>
 #include <kernel.h>
 #include <kernels/coarse_op_kernel.cuh>
 
@@ -138,10 +138,9 @@ namespace quda
           max = impl::computeUV(arg, arg.AV, parity, x_cb);
 
         if (Arg::compute_max) {
-          using BlockReduce = cub::BlockReduce<unsigned, 1, cub::BLOCK_REDUCE_WARP_REDUCTIONS, Arg::block_y, Arg::block_z, __COMPUTE_CAPABILITY__>;
-          __shared__ typename BlockReduce::TempStorage temp_storage;
-          unsigned aggregate = BlockReduce(temp_storage).Reduce(__float_as_uint(max), cub::Max());
-          if (threadIdx.y == 0 && threadIdx.z == 0) atomicAbsMax(arg.max_d, __uint_as_float(aggregate));
+          constexpr int block_dim = 3;
+          unsigned aggregate = BlockReduce<unsigned, block_dim>().Max(__float_as_uint(max));
+          if (threadIdx.y == 0 && threadIdx.z == 0) atomic_fetch_abs_max(arg.max_d, __uint_as_float(aggregate));
         }
       }
     };
@@ -156,6 +155,7 @@ namespace quda
         constexpr int coarseSpin = Arg::coarseSpin;
 
         constexpr int nDim = 4;
+        constexpr int nFace = 1;
         int coord[QUDA_MAX_DIM];
         int coord_coarse[QUDA_MAX_DIM];
 
@@ -166,7 +166,7 @@ namespace quda
 
         // Check to see if we are on the edge of a block.  If adjacent site
         // is in same block, M = X, else M = Y
-        const bool isDiagonal = isFromCoarseClover || isCoarseDiagonal(coord, coord_coarse, Arg::dim, arg);
+        const bool isDiagonal = isFromCoarseClover || isCoarseDiagonal(coord, coord_coarse, Arg::dim, nFace, arg);
 
         int coarse_parity = 0;
 

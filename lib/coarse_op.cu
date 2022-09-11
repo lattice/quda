@@ -18,6 +18,7 @@ namespace quda {
   {
     QudaFieldLocation location = Y.Location();
     constexpr bool use_mma = false;
+    constexpr bool staggered_allow_truncation = false;
 
     bool need_bidirectional = false;
     if (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC) { need_bidirectional = QUDA_BOOLEAN_TRUE; }
@@ -29,16 +30,16 @@ namespace quda {
       constexpr QudaCloverFieldOrder clOrder = QUDA_PACKED_CLOVER_ORDER;
 
       if (T.Vectors(Y.Location()).FieldOrder() != csOrder)
-        errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
-      if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
-      if (c.Order() != clOrder && c.Bytes()) errorQuda("Unsupported field order %d\n", c.Order());
+        errorQuda("Unsupported field order %d", T.Vectors(Y.Location()).FieldOrder());
+      if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d", g.FieldOrder());
+      if (c.Order() != clOrder && c.Bytes()) errorQuda("Unsupported field order %d", c.Order());
 
-      typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> V;
-      typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat> F;
-      typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
-      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> gCoarse;
-      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType> gCoarseAtomic;
-      typedef typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder> cFine;
+      using V = typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat>;
+      using F = typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat>;
+      using gFine = typename gauge::FieldOrder<Float,fineColor,1,gOrder>;
+      using gCoarse = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat>;
+      using gCoarseAtomic = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType>;
+      using cFine = typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder>;
 
       const ColorSpinorField &v = T.Vectors(g.Location());
 
@@ -55,8 +56,8 @@ namespace quda {
 
       calculateY<use_mma, QUDA_CPU_FIELD_LOCATION, false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
 	(yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
-	 avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v,
-         kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional,
+	 avAccessor, vAccessor, gAccessor, gAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v,
+         kappa, mass, mu, mu_factor, staggered_allow_truncation, dirac, matpc, need_bidirectional,
 	 T.fineToCoarse(location), T.coarseToFine(location));
 
     } else {
@@ -66,15 +67,15 @@ namespace quda {
       constexpr QudaCloverFieldOrder clOrder = QUDA_FLOAT4_CLOVER_ORDER;
 
       if (T.Vectors(Y.Location()).FieldOrder() != csOrder)
-        errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
-      if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
-      if (c.Order() != clOrder && c.Bytes()) errorQuda("Unsupported field order %d\n", c.Order());
+        errorQuda("Unsupported field order %d", T.Vectors(Y.Location()).FieldOrder());
+      if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d", g.FieldOrder());
+      if (c.Order() != clOrder && c.Bytes()) errorQuda("Unsupported field order %d", c.Order());
 
-      typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat,vFloat,false,false> F;
-      typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder,true,Float> gFine;
-      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat> gCoarse;
-      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType> gCoarseAtomic;
-      typedef typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder> cFine;
+      using F = typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat,vFloat,false,false>;
+      using gFine = typename gauge::FieldOrder<Float,fineColor,1,gOrder,true,Float>;
+      using gCoarse = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat>;
+      using gCoarseAtomic = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType>;
+      using cFine = typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder>;
 
       const ColorSpinorField &v = T.Vectors(g.Location());
 
@@ -91,8 +92,8 @@ namespace quda {
 
       calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
         (yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
-         avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v,
-         kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional,
+         avAccessor, vAccessor, gAccessor, gAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v,
+         kappa, mass, mu, mu_factor, staggered_allow_truncation, dirac, matpc, need_bidirectional,
          T.fineToCoarse(location), T.coarseToFine(location));
     }
 
@@ -111,7 +112,7 @@ namespace quda {
 #endif
   {
     if (T.Vectors().Nspin()/T.Spin_bs() != 2)
-      errorQuda("Unsupported number of coarse spins %d\n",T.Vectors().Nspin()/T.Spin_bs());
+      errorQuda("Unsupported number of coarse spins %d",T.Vectors().Nspin()/T.Spin_bs());
 
 #ifdef NSPIN4
     const int coarseSpin = 2;
@@ -125,7 +126,7 @@ namespace quda {
     } else
 #endif
     {
-      errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
+      errorQuda("Unsupported number of coarse dof %d", Y.Ncolor());
     }
   }
 
@@ -138,7 +139,7 @@ namespace quda {
     if (uv.Nspin() == 4) {
       calculateY<Float,vFloat,fineColor,4>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
     } else {
-      errorQuda("Unsupported number of spins %d\n", uv.Nspin());
+      errorQuda("Unsupported number of spins %d", uv.Nspin());
     }
   }
 
@@ -151,7 +152,7 @@ namespace quda {
     if (g.Ncolor() == 3) {
       calculateY<Float,vFloat,3>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
     } else {
-      errorQuda("Unsupported number of colors %d\n", g.Ncolor());
+      errorQuda("Unsupported number of colors %d", g.Ncolor());
     }
   }
 
@@ -164,14 +165,14 @@ namespace quda {
     checkPrecision(Xatomic, Yatomic, g);
     checkPrecision(uv, av, T.Vectors(X.Location()), X, Y);
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Y field......\n");
+    logQuda(QUDA_SUMMARIZE, "Computing Y field......\n");
 
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       if (T.Vectors(X.Location()).Precision() == QUDA_DOUBLE_PRECISION) {
         calculateY<double,double>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
       } else {
-        errorQuda("Unsupported precision %d\n", Y.Precision());
+        errorQuda("Unsupported precision %d", Y.Precision());
       }
 #else
       errorQuda("Double precision multigrid has not been enabled");
@@ -181,7 +182,7 @@ namespace quda {
       if (T.Vectors(X.Location()).Precision() == QUDA_SINGLE_PRECISION) {
         calculateY<float,float>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
       } else {
-        errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
+        errorQuda("Unsupported precision %d", T.Vectors(X.Location()).Precision());
       }
 #else
       errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
@@ -191,15 +192,15 @@ namespace quda {
       if (T.Vectors(X.Location()).Precision() == QUDA_HALF_PRECISION) {
         calculateY<float,short>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
       } else {
-        errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
+        errorQuda("Unsupported precision %d", T.Vectors(X.Location()).Precision());
       }
 #else
       errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
 #endif
     } else {
-      errorQuda("Unsupported precision %d\n", Y.Precision());
+      errorQuda("Unsupported precision %d", Y.Precision());
     }
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Y field\n");
+    logQuda(QUDA_SUMMARIZE, "....done computing Y field\n");
   }
 #else
   //Does the heavy lifting of creating the coarse color matrices Y
@@ -214,14 +215,14 @@ namespace quda {
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
   void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-		const cudaGaugeField &gauge, const cudaCloverField *clover,
+		const cudaGaugeField &gauge, const CloverField *clover,
 		double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
   {
     QudaPrecision precision = Y.Precision();
     QudaFieldLocation location = checkLocation(Y, X);
 
     GaugeField *U = location == QUDA_CUDA_FIELD_LOCATION ? const_cast<cudaGaugeField*>(&gauge) : nullptr;
-    CloverField *C = location == QUDA_CUDA_FIELD_LOCATION ? const_cast<cudaCloverField*>(clover) : nullptr;
+    CloverField *C = location == QUDA_CUDA_FIELD_LOCATION ? const_cast<CloverField*>(clover) : nullptr;
 
     if (location == QUDA_CPU_FIELD_LOCATION) {
       //First make a cpu gauge field from the cuda gauge field
@@ -259,26 +260,26 @@ namespace quda {
     cf_param.setPrecision(clover ? clover->Precision() : QUDA_SINGLE_PRECISION);
 
     // if we have no clover term then create an empty clover field
-    for(int i = 0; i < cf_param.nDim; i++) cf_param.x[i] = clover ? clover->X()[i] : 0;
+    for (int i = 0; i < cf_param.nDim; i++) cf_param.x[i] = clover ? clover->X()[i] : 0;
 
-    cf_param.direct = true;
-    cf_param.inverse = true;
-    cf_param.clover = NULL;
-    cf_param.norm = 0;
-    cf_param.cloverInv = NULL;
-    cf_param.invNorm = 0;
+    // only create inverse if not doing dynamic clover and one already exists
+    cf_param.inverse = !clover::dynamic_inverse() && clover && clover->V(true);
+    cf_param.clover = nullptr;
+    cf_param.cloverInv = nullptr;
     cf_param.create = QUDA_NULL_FIELD_CREATE;
     cf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+    cf_param.location = location;
+    cf_param.reconstruct = false;
 
     if (location == QUDA_CUDA_FIELD_LOCATION && !clover) {
-      // create a dummy cudaCloverField if one is not defined
+      // create a dummy CloverField if one is not defined
       cf_param.order = QUDA_INVALID_CLOVER_ORDER;
-      C = new cudaCloverField(cf_param);
+      C = new CloverField(cf_param);
     } else if (location == QUDA_CPU_FIELD_LOCATION) {
-      //Create a cpuCloverField from the cudaCloverField
+      // Create a host field from the device one
       cf_param.order = QUDA_PACKED_CLOVER_ORDER;
-      C = new cpuCloverField(cf_param);
-      if (clover) clover->saveCPUField(*static_cast<cpuCloverField*>(C));
+      C = new CloverField(cf_param);
+      if (clover) C->copy(*clover);
     }
 
     //Create a field UV which holds U*V.  Has the same structure as V.

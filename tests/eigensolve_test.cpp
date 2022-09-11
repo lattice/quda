@@ -1,23 +1,30 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 #include <math.h>
 #include <string.h>
 #include <algorithm>
 
+// In a typical application, quda.h is the only QUDA header required.
+#include <quda.h>
+//#include <color_spinor_field.h> // convenient quark field container
+
+#include <misc.h>
 #include <timer.h>
 #include <host_utils.h>
 #include <command_line_params.h>
-#include "misc.h"
+#include <dslash_reference.h>
 
-// In a typical application, quda.h is the only QUDA header required.
-#include <quda.h>
+// Place params above "eigensolve_test_gtest.hpp" so they
+// are visible therein.
+QudaGaugeParam gauge_param;
+QudaInvertParam eig_inv_param;
+QudaEigParam eig_param;
 
-namespace quda
-{
-  extern void setTransferGPU(bool);
-}
+// if "--enable-testing true" is passed, we run the tests defined in here
+#include <eigensolve_test_gtest.hpp>
 
-void display_test_info()
+void display_test_info(QudaEigParam &param)
 {
   printfQuda("running the following test:\n");
 
@@ -27,43 +34,204 @@ void display_test_info()
              tdim, Lsdim);
 
   printfQuda("\n   Eigensolver parameters\n");
-  printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
-  printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
-  if (eig_type == QUDA_EIG_BLK_TR_LANCZOS) printfQuda(" - eigenvector block size %d\n", eig_block_size);
-  printfQuda(" - number of eigenvectors requested %d\n", eig_n_conv);
-  printfQuda(" - size of eigenvector search space %d\n", eig_n_ev);
-  printfQuda(" - size of Krylov space %d\n", eig_n_kr);
-  printfQuda(" - solver tolerance %e\n", eig_tol);
-  printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
-  if (eig_compute_svd) {
+  printfQuda(" - solver mode %s\n", get_eig_type_str(param.eig_type));
+  printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(param.spectrum));
+  if (param.eig_type == QUDA_EIG_BLK_TR_LANCZOS) printfQuda(" - eigenvector block size %d\n", param.block_size);
+  printfQuda(" - number of eigenvectors requested %d\n", param.n_conv);
+  printfQuda(" - size of eigenvector search space %d\n", param.n_ev);
+  printfQuda(" - size of Krylov space %d\n", param.n_kr);
+  printfQuda(" - solver tolerance %e\n", param.tol);
+  printfQuda(" - convergence required (%s)\n", param.require_convergence ? "true" : "false");
+  if (param.compute_svd) {
     printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
     printfQuda(" - ***********************************************************\n");
     printfQuda(" - **** Overriding any previous choices of operator type. ****\n");
     printfQuda(" - ****    SVD demands normal operator, will use MdagM    ****\n");
     printfQuda(" - ***********************************************************\n");
   } else {
-    printfQuda(" - Operator: daggered (%s) , norm-op (%s)\n", eig_use_dagger ? "true" : "false",
-               eig_use_normop ? "true" : "false");
+    printfQuda(" - Operator: daggered (%s) , norm-op (%s), even-odd pc (%s)\n", param.use_dagger ? "true" : "false",
+               param.use_norm_op ? "true" : "false", param.use_pc ? "true" : "false");
   }
-  if (eig_use_poly_acc) {
-    printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
-    printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
-    if (eig_amax <= 0)
+  if (param.use_poly_acc) {
+    printfQuda(" - Chebyshev polynomial degree %d\n", param.poly_deg);
+    printfQuda(" - Chebyshev polynomial minumum %e\n", param.a_min);
+    if (param.a_max <= 0)
       printfQuda(" - Chebyshev polynomial maximum will be computed\n");
     else
-      printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
+      printfQuda(" - Chebyshev polynomial maximum %e\n\n", param.a_max);
   }
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
-  return;
+}
+
+std::vector<char> gauge_;
+std::array<void *, 4> gauge;
+std::vector<char> clover;
+std::vector<char> clover_inv;
+
+void init(int argc, char **argv)
+{
+  // Construct QUDA param structures to define the problem
+  //------------------------------------------------------
+  gauge_param = newQudaGaugeParam();
+  setWilsonGaugeParam(gauge_param);
+
+  // Though no inversions are performed, the inv_param
+  // structure contains all the information we need to
+  // construct the dirac operator.
+  eig_inv_param = newQudaInvertParam();
+  setInvertParam(eig_inv_param);
+
+  eig_param = newQudaEigParam();
+  // We encapsualte the inv_param structure inside the
+  // eig_param structure
+  eig_param.invert_param = &eig_inv_param;
+  setEigParam(eig_param);
+  //------------------------------------------------------
+
+  // Set lattice dimensions for Dslash reference
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+    dw_setDims(gauge_param.X, eig_inv_param.Ls);
+  } else {
+    setDims(gauge_param.X);
+  }
+
+  // Allocate host side memory for the gauge field.
+  //----------------------------------------------------------------------------
+  gauge_.resize(4 * V * gauge_site_size * host_gauge_data_type_size);
+  for (int i = 0; i < 4; i++) gauge[i] = gauge_.data() + i * V * gauge_site_size * host_gauge_data_type_size;
+  constructHostGaugeField(gauge.data(), gauge_param, argc, argv);
+  // Load the gauge field to the device
+  loadGaugeQuda(gauge.data(), &gauge_param);
+
+  // Allocate host side memory for clover terms if needed.
+  //----------------------------------------------------------------------------
+  // Allocate space on the host (always best to allocate and free in the same scope)
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    clover.resize(V * clover_site_size * host_clover_data_type_size);
+    clover_inv.resize(V * clover_site_size * host_spinor_data_type_size);
+    constructHostCloverField(clover.data(), clover_inv.data(), eig_inv_param);
+    // Load the clover terms to the device
+    loadCloverQuda(clover.data(), clover_inv.data(), &eig_inv_param);
+  }
+}
+
+std::vector<double> eigensolve(test_t test_param)
+{
+  // Collect testing parameters from gtest
+  eig_param.eig_type = ::testing::get<0>(test_param);
+  eig_param.use_norm_op = ::testing::get<1>(test_param);
+  eig_param.use_pc = ::testing::get<2>(test_param);
+  eig_param.compute_svd = ::testing::get<3>(test_param);
+  eig_param.spectrum = ::testing::get<4>(test_param);
+
+  // For preconditioned matrices, spinors are only half the normal length.
+  // QUDA constructs spinors based on the "solution type" which is
+  // strictly an inverter option. For QUDA_MATPC_SOLUTION, the inverter
+  // will not reconstruct the full solution, hence spinors are half length.
+  // For QUDA_MAT_SOLUTION the inverter will return the full solution,
+  // hence spinors are normal length.
+  // For the eigensolver, we must emulate these conditions. Therefore, if
+  // the user requests a preconditioned solve, we need only half length spinors.
+  // For full matrices, we need full length spinors.
+  if (eig_param.use_pc)
+    eig_inv_param.solution_type = QUDA_MATPC_SOLUTION;
+  else
+    eig_inv_param.solution_type = QUDA_MAT_SOLUTION;
+
+  // For gtest testing, we prohibit the use of polynomial acceleration as
+  // the fine tuning required can inhibit convergence of an otherwise
+  // perfectly good algorithm. We also have a default value of 4
+  // for the block size in Block TRLM, and 4 for the batched rotation.
+  // The user may change these values via the command line:
+  // --eig-block-size
+  // --eig-batched-rotate
+  if (enable_testing) {
+    eig_use_poly_acc = false;
+    eig_param.use_poly_acc = QUDA_BOOLEAN_FALSE;
+    eig_block_size != 4 ? eig_param.block_size = eig_block_size : eig_param.block_size = 4;
+    eig_batched_rotate != 0 ? eig_param.batched_rotate = eig_batched_rotate : eig_param.batched_rotate = 4;
+  }
+
+  logQuda(QUDA_SUMMARIZE, "Action = %s %s, Solver = %s, norm-op = %s, even-odd = %s, with SVD = %s, spectrum = %s\n",
+          get_dslash_str(dslash_type),
+          (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) ?
+            get_flavor_str(twist_flavor) :
+            "",
+          get_eig_type_str(eig_param.eig_type), eig_param.use_norm_op == QUDA_BOOLEAN_TRUE ? "true" : "false",
+          eig_param.use_pc == QUDA_BOOLEAN_TRUE ? "true" : "false",
+          eig_param.compute_svd == QUDA_BOOLEAN_TRUE ? "true" : "false", get_eig_spectrum_str(eig_param.spectrum));
+
+  display_test_info(eig_param);
+
+  // Vector construct START
+  //----------------------------------------------------------------------------
+  // Host side arrays to store the eigenpairs computed by QUDA
+  int n_eig = eig_n_conv;
+  if (eig_param.compute_svd == QUDA_BOOLEAN_TRUE) n_eig *= 2;
+  std::vector<quda::ColorSpinorField> evecs(n_eig);
+  quda::ColorSpinorParam cs_param;
+  constructWilsonTestSpinorParam(&cs_param, &eig_inv_param, &gauge_param);
+  // Void pointers to host side arrays, compatible with the QUDA interface.
+  std::vector<void *> host_evecs_ptr(n_eig);
+  // Allocate host side memory and pointers
+  for (int i = 0; i < n_eig; i++) {
+    evecs[i] = quda::ColorSpinorField(cs_param);
+    host_evecs_ptr[i] = evecs[i].V();
+  }
+
+  // Complex eigenvalues
+  std::vector<__complex__ double> evals(eig_n_conv);
+  // Vector construct END
+  //----------------------------------------------------------------------------
+
+  // QUDA eigensolver test BEGIN
+  //----------------------------------------------------------------------------
+  // This function returns the host_evecs and host_evals pointers, populated with the
+  // requested data, at the requested prec. All the information needed to perfom the
+  // solve is in the eig_param container. If eig_param.arpack_check == true and
+  // precision is double, the routine will use ARPACK rather than the GPU.
+  quda::host_timer_t host_timer;
+  host_timer.start();
+  if (eig_param.arpack_check && !(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION)) {
+    errorQuda("ARPACK check only available in double precision");
+  }
+  eigensolveQuda(host_evecs_ptr.data(), evals.data(), &eig_param);
+  host_timer.stop();
+  printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", host_timer.last());
+
+  std::vector<double> residua(eig_n_conv, 0.0);
+  // Perform host side verification of eigenvector if requested.
+  if (verify_results) {
+    for (int i = 0; i < eig_n_conv; i++) {
+      if (eig_param.compute_svd == QUDA_BOOLEAN_TRUE) {
+        double _Complex sigma = evals[i];
+        residua[i] = verifyWilsonTypeSingularVector(evecs[i].V(), evecs[i + eig_n_conv].V(), sigma, i, gauge_param,
+                                                    eig_param, gauge.data(), clover.data(), clover_inv.data());
+
+      } else {
+        double _Complex lambda = evals[i];
+        residua[i] = verifyWilsonTypeEigenvector(evecs[i].V(), lambda, i, gauge_param, eig_param, gauge.data(),
+                                                 clover.data(), clover_inv.data());
+      }
+    }
+  }
+  return residua;
+  // QUDA eigensolver test COMPLETE
+  //----------------------------------------------------------------------------
 }
 
 int main(int argc, char **argv)
 {
+  ::testing::InitGoogleTest(&argc, argv);
   // Parse command line options
   auto app = make_app();
   add_eigen_option_group(app);
+  add_madwf_option_group(app);
+  add_comms_option_group(app);
+  add_testing_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -78,107 +246,43 @@ int main(int argc, char **argv)
 
   // Only these fermions are supported in this file
   if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
-      && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH
-      && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH
-      && dslash_type != QUDA_DOMAIN_WALL_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
+      && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH
+      && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_MOBIUS_DWF_EOFA_DSLASH
+      && dslash_type != QUDA_DOMAIN_WALL_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }
 
-  QudaGaugeParam gauge_param = newQudaGaugeParam();
-  setWilsonGaugeParam(gauge_param);
-
-  // Though no inversions are performed, the inv_param
-  // structure contains all the information we need to
-  // construct the dirac operator. We encapsualte the
-  // inv_param structure inside the eig_param structure
-  // to avoid any confusion
-  QudaInvertParam eig_inv_param = newQudaInvertParam();
-  setInvertParam(eig_inv_param);
-  // Specific changes to the invert param for the eigensolver
-  // QUDA's device routines require UKQCD gamma basis. QUDA will
-  // automatically rotate from this basis on the host, to UKQCD
-  // on the device, and back to this basis upon completion.
-  eig_inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-
-  eig_inv_param.solve_type
-    = (eig_inv_param.solution_type == QUDA_MAT_SOLUTION ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE);
-  QudaEigParam eig_param = newQudaEigParam();
-  // Place Invert param inside Eig param
-  eig_param.invert_param = &eig_inv_param;
-  setEigParam(eig_param);
-
   // Initialize the QUDA library
   initQuda(device_ordinal);
-  display_test_info();
 
-  // Set some dimension parameters
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-      || dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-    dw_setDims(gauge_param.X, eig_inv_param.Ls);
+  // Initialise this test (parameters, gauge, clover)
+  init(argc, argv);
+
+  // Compute plaquette as a sanity check
+  double plaq[3];
+  plaqQuda(plaq);
+  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+
+  int result = 0;
+  if (enable_testing) { // tests are defined in invert_test_gtest.hpp
+    ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+    if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+    result = RUN_ALL_TESTS();
   } else {
-    setDims(gauge_param.X);
+    eigensolve(
+      test_t {eig_param.eig_type, eig_param.use_norm_op, eig_param.use_pc, eig_param.compute_svd, eig_param.spectrum});
   }
 
-  // Allocate host side memory for the gauge field.
-  void *gauge[4];
-  for (int dir = 0; dir < 4; dir++) gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-  constructHostGaugeField(gauge, gauge_param, argc, argv);
-  // Load the gauge field to the device
-  loadGaugeQuda((void *)gauge, &gauge_param);
-
-  // Allocate host side memory for clover terms if needed.
-  void *clover = 0, *clover_inv = 0;
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    clover = safe_malloc(V * clover_site_size * host_clover_data_type_size);
-    clover_inv = safe_malloc(V * clover_site_size * host_spinor_data_type_size);
-    constructHostCloverField(clover, clover_inv, eig_inv_param);
-    // Load the clover terms to the device
-    loadCloverQuda(clover, clover_inv, &eig_inv_param);
-  }
-
-  // QUDA eigensolver test BEGIN
-  //----------------------------------------------------------------------------
-  // Host side arrays to store the eigenpairs computed by QUDA
-  void **host_evecs = (void **)safe_malloc(eig_n_conv * sizeof(void *));
-  for (int i = 0; i < eig_n_conv; i++) {
-    host_evecs[i] = (void *)safe_malloc(V * eig_inv_param.Ls * spinor_site_size * eig_inv_param.cpu_prec);
-  }
-  double _Complex *host_evals = (double _Complex *)safe_malloc(eig_param.n_ev * sizeof(double _Complex));
-
-  // This function returns the host_evecs and host_evals pointers, populated with the
-  // requested data, at the requested prec. All the information needed to perfom the
-  // solve is in the eig_param container. If eig_param.arpack_check == true and
-  // precision is double, the routine will use ARPACK rather than the GPU.
-  host_timer_t host_timer;
-  host_timer.start();
-  if (eig_param.arpack_check && !(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION)) {
-    errorQuda("ARPACK check only available in double precision");
-  }
-
-  eigensolveQuda(host_evecs, host_evals, &eig_param);
-  host_timer.stop();
-  printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", host_timer.last());
-  // QUDA eigensolver test COMPLETE
-  //----------------------------------------------------------------------------
-
-  // Clean up memory allocations
-  for (int i = 0; i < eig_n_conv; i++) host_free(host_evecs[i]);
-  host_free(host_evecs);
-  host_free(host_evals);
-
+  // Memory clean-up
   freeGaugeQuda();
-  for (int dir = 0; dir < 4; dir++) host_free(gauge[dir]);
-
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     freeCloverQuda();
-    if (clover) host_free(clover);
-    if (clover_inv) host_free(clover_inv);
   }
 
-  // finalize the QUDA library
+  // Finalize the QUDA library
   endQuda();
   finalizeComms();
 
-  return 0;
+  return result;
 }
