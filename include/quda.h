@@ -1348,6 +1348,15 @@ extern "C" {
   void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
                          double *path_coeff, QudaGaugeParam *param);
                          
+  /**
+   * Compute two-link field
+   *
+   * @param[out] twolink computed two-link field
+   * @param[in] inlink  the external field
+   * @param param  Contains all metadata regarding host and device
+   *               storage
+   */
+                         
   void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param);
 
   /**
@@ -1710,16 +1719,16 @@ extern "C" {
 
   /**
    * Performs two-link Gaussian smearing on a given spinor (for staggered fermions).
-   * @param h_in        Input spinor field to smear
-   * @param inv_param   Contains all metadata regarding host and device storage 
+   * @param[in,out] h_in Input spinor field to smear
+   * @param[in] inv_param   Contains all metadata regarding host and device storage 
    *                    and operator which will be applied to the spinor
-   * @param n_steps     Number of steps to apply
-   * @param width       The width of the Gaussian
-   * @param compute_2link nonzero to compute two-link,
-   *                      zero to reuse gaugeSmeared (default = 1)
-   * @param delete_2link nonzero to delete two-link after smearing,
-   *                     zero to keep two-link for future use (default = 0)
-   * @param t0          Set if the input spinor is on a time slice (default = -1)
+   * @param[in] n_steps     Number of steps to apply
+   * @param[in] width       The width of the Gaussian
+   * @param[in] compute_2link nonzero to compute two-link,
+   *                      zero to reuse gaugeSmeared
+   * @param[in] delete_2link nonzero to delete two-link after smearing,
+   *                     zero to keep two-link for future use
+   * @param[in] t0          Set if the input spinor is on a time slice
    */
   void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double width, const int compute_2link /*= 1*/, const int delete_2link /*= 0*/, const int t0 /*= -1*/);
 

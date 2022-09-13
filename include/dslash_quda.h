@@ -730,9 +730,12 @@ namespace quda
      @brief Apply the 2-link staggered operator to a color-spinor field.
      @param[out] out Result color-spinor field
      @param[in] in Input color-spinor field
+     @param[in] U the 2-link field
+     @param[in] t0 time-slice index
+     @param[in] compute_time_slice whether we apply the operator to a single time-slice
+     @param[in] parity parity parameter
      @param[in] dir Direction of the derivative 0,1,2,3 to omit (-1 is full 4D)
-     @param[in] a Scale factor applied to derivative
-     @param[in] b Scale factor applied to aux field
+     @param[in] dagger (not used)
   */
   void ApplyStaggeredQSmear(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0, bool compute_time_slice, int parity, int dir, 
                     bool dagger, const int *comm_override, TimeProfile &profile);                             

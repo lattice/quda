@@ -1,7 +1,6 @@
 #pragma once
 
 #include <quda_internal.h>
-#include <quda.h>
 #include <gauge_field.h>
 
 namespace quda {

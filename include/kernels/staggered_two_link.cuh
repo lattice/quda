@@ -91,9 +91,7 @@ namespace quda {
         Link Ucd = arg.link(mu, point_c, parity);
         Link Ude = arg.link(mu, point_d, 1-parity);
 
-        Link temp = Ucd*Ude;
-
-        arg.outA(mu, x_cb, parity) = temp;
+        arg.outA(mu, x_cb, parity) = Ucd*Ude;
       }
     };
     

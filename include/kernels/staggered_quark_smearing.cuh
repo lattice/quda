@@ -12,7 +12,7 @@ namespace quda
 {
 
   /**
-     @brief Parameter structure for driving the covariatnt derivative operator
+     @brief Parameter structure for driving the covariant derivative operator
   */
   template <typename Float, int nSpin_, int nColor_, int nDim, QudaReconstructType reconstruct_>
   struct StaggeredQSmearArg : DslashArg<Float, nDim> {
@@ -20,14 +20,14 @@ namespace quda
     static constexpr int nSpin  = 1;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type;
 
     static constexpr QudaReconstructType reconstruct = reconstruct_;
     static constexpr bool gauge_direct_load = false; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
-    typedef typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type G;
+    using G = typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type;
 
-    typedef typename mapper<Float>::type real;
+    using real = typename mapper<Float>::type;
 
     F out;        /** output vector field */
     const F in;   /** input vector field */
@@ -90,10 +90,8 @@ namespace quda
 
      @param[out] out The out result field
      @param[in,out] arg Parameter struct
-     @param[in] U The gauge field
      @param[in] coord Site coordinate struct
      @param[in] parity The site parity
-     @param[in] idx Thread index (equal to face index for exterior kernels)
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
 
   */
@@ -118,13 +116,13 @@ namespace quda
             const Link U = arg.U(d, coord.x_cb, parity);
             const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);//?
 
-            out += U * in;
+            mv_add(U, in, out);
 
           } else if (doBulk<kernel_type>() && !ghost) {//doBulk
             const int _2hop_fwd_idx    = linkIndexP2(coord, arg.dim, d);
             const Vector in_2hop       = arg.in(_2hop_fwd_idx, their_spinor_parity);
             const Link U_2link         = arg.U(d, coord.x_cb, parity);            
-            out += U_2link * in_2hop;
+            mv_add(U_2link, in_2hop, out);
           }
         }
         {
@@ -138,7 +136,7 @@ namespace quda
             const Link U = arg.U.Ghost(d, ghost_idx, parity);
             const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
 	    
-            out += conj(U) * in;	    
+            mv_add(conj(U), in, out);	    
 
           } else if (doBulk<kernel_type>() && !ghost) {//?
           
@@ -147,7 +145,7 @@ namespace quda
           
             const Link   U_2link = arg.U(d, _2hop_gauge_idx, parity);
             const Vector in_2hop = arg.in(_2hop_back_idx, their_spinor_parity);
-            out += conj(U_2link) * in_2hop;
+            mv_add(conj(U_2link), in_2hop, out);
           }
         }
       }
