@@ -150,7 +150,7 @@ namespace quda
        @param[in] out Output spinor
        @param[in] in Input spinor
     */
-    void chebyOp(vector_ref<ColorSpinorField> &&out, vector_ref <const ColorSpinorField> &&in);
+    void chebyOp(const vector_ref<ColorSpinorField> &out, const vector_ref <const ColorSpinorField> &in);
 
     /**
        @brief Estimate the spectral radius of the operator for the max value of the
@@ -239,27 +239,27 @@ namespace quda
 
     /**
        @brief Deflate a set of source vectors with a given eigenspace
-       @param[in] sol The resulting deflated vector set
+       @param[in,out] sol The resulting deflated vector set
        @param[in] src The source vector set we are deflating
        @param[in] evecs The eigenvectors to use in deflation
        @param[in] evals The eigenvalues to use in deflation
        @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
     */
-    void deflate(vector_ref<ColorSpinorField> &&sol, vector_ref<const ColorSpinorField> &&src,
-                 vector_ref<const ColorSpinorField> &&evecs, const std::vector<Complex> &evals,
+    void deflate(const vector_ref<ColorSpinorField> &sol, const vector_ref<const ColorSpinorField> &src,
+                 const vector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
                  bool accumulate = false) const;
 
     /**
        @brief Deflate a set of source vectors with a set of left and
        right singular vectors
-       @param[in] sol The resulting deflated vector set
+       @param[in,out] sol The resulting deflated vector set
        @param[in] src The source vector set we are deflating
        @param[in] evecs The singular vectors to use in deflation
        @param[in] evals The singular values to use in deflation
        @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
     */
-    void deflateSVD(vector_ref<ColorSpinorField> &&sol, vector_ref<const ColorSpinorField> &&vec,
-                    vector_ref<const ColorSpinorField> &&evecs, const std::vector<Complex> &evals,
+    void deflateSVD(const vector_ref<ColorSpinorField> &sol, const vector_ref<const ColorSpinorField> &vec,
+                    const vector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
                     bool accumulate = false) const;
 
     /**

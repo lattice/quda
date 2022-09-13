@@ -154,7 +154,7 @@ namespace quda
   template <typename T> struct is_initializer_list<std::initializer_list<T>> : std::true_type {};
   template <typename T> static constexpr bool is_initializer_list_v = is_initializer_list<T>::value;
 
-   /**
+  /**
      Derived specializaton of std::vector<std::reference_wrapper<T>>
      which allows us to write generic multi-field functions.
    */
@@ -237,6 +237,18 @@ namespace quda
       vector::insert(vector::end(), uset.begin(), uset.end());
       vector::insert(vector::end(), tmp.begin(), tmp.end());
     }
+
+    /**
+       @brief This overload allows us to directly access the
+       underlying reference without needing to invoke get() like would
+       do for the parent method.  Moreover, we intentionally mark this
+       function as const, since it will allow us to return non-const
+       references from a constant container if the underlying
+       references are themselves non-const.
+       @param[in] idx The location index we are requesting
+       @return The underlying object reference
+     */
+    T& operator[](size_t idx) const { return vector::operator[](idx).get(); }
 
   };
 

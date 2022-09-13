@@ -18,7 +18,7 @@ namespace quda {
       Reducer<device_reduce_t, real> r;
       const int nParity;
       const T &a, &b, &c;
-      vector_ref<ColorSpinorField> &x, &y, &z, &w;
+      const vector_ref<ColorSpinorField> &x, &y, &z, &w;
       T &result;
       QudaFieldLocation location;
 
@@ -44,10 +44,10 @@ namespace quda {
         a(a),
         b(b),
         c(c),
-        x(reinterpret_cast<vector_ref<ColorSpinorField>&>(x)),
-        y(reinterpret_cast<vector_ref<ColorSpinorField>&>(y)),
-        z(reinterpret_cast<vector_ref<ColorSpinorField>&>(z)),
-        w(reinterpret_cast<vector_ref<ColorSpinorField>&>(w)),
+        x(reinterpret_cast<const vector_ref<ColorSpinorField>&>(x)),
+        y(reinterpret_cast<const vector_ref<ColorSpinorField>&>(y)),
+        z(reinterpret_cast<const vector_ref<ColorSpinorField>&>(z)),
+        w(reinterpret_cast<const vector_ref<ColorSpinorField>&>(w)),
         result(result),
         location(checkLocation(x[0], y[0], z[0], w[0]))
       {
@@ -88,7 +88,7 @@ namespace quda {
         if (NXZ == NYW) {
           is_norm = true;
           for (int i = 0; i < NXZ; i++) {
-            if (x[i].get().V() != y[i].get().V() || x[i].get().V() != z[i].get().V() || x[i].get().V() != w[i].get().V()) {
+            if (x[i].V() != y[i].V() || x[i].V() != z[i].V() || x[i].V() != w[i].V()) {
               is_norm = false;
               break;
             }
@@ -108,7 +108,7 @@ namespace quda {
       {
         staticCheck<NXZ, store_t, y_store_t, decltype(r)>(r, x, y);
 
-        auto &x0 = x[0].get();
+        auto &x0 = x[0];
         constexpr bool site_unroll_check = !std::is_same<store_t, y_store_t>::value || isFixed<store_t>::value;
         if (site_unroll_check && (x0.Ncolor() != 3 || x0.Nspin() == 2))
           errorQuda("site unroll not supported for nSpin = %d nColor = %d", x0.Nspin(), x0.Ncolor());
@@ -186,36 +186,36 @@ namespace quda {
       void preTune()
       {
         for (int i = 0; i < NYW; ++i) {
-          if (r.write.X) x[i].get().backup();
-          if (r.write.Y) y[i].get().backup();
-          if (r.write.Z) z[i].get().backup();
-          if (r.write.W) w[i].get().backup();
+          if (r.write.X) x[i].backup();
+          if (r.write.Y) y[i].backup();
+          if (r.write.Z) z[i].backup();
+          if (r.write.W) w[i].backup();
         }
       }
 
       void postTune()
       {
         for (int i = 0; i < NYW; ++i) {
-          if (r.write.X) x[i].get().restore();
-          if (r.write.Y) y[i].get().restore();
-          if (r.write.Z) z[i].get().restore();
-          if (r.write.W) w[i].get().restore();
+          if (r.write.X) x[i].restore();
+          if (r.write.Y) y[i].restore();
+          if (r.write.Z) z[i].restore();
+          if (r.write.W) w[i].restore();
         }
       }
 
       long long flops() const
       {
-        return NYW * NXZ * r.flops() * x[0].get().Length();
+        return NYW * NXZ * r.flops() * x[0].Length();
       }
 
       long long bytes() const
       {
         // X and Z reads are repeated (and hopefully cached) across NYW
         // each Y and W read/write is done once
-        return NYW * NXZ * (r.read.X + r.write.X) * x[0].get().Bytes() +
-          NYW * (r.read.Y + r.write.Y) * y[0].get().Bytes() +
-          NYW * NXZ * (r.read.Z + r.write.Z) * z[0].get().Bytes() +
-          NYW * (r.read.W + r.write.W) * w[0].get().Bytes();
+        return NYW * NXZ * (r.read.X + r.write.X) * x[0].Bytes() +
+          NYW * (r.read.Y + r.write.Y) * y[0].Bytes() +
+          NYW * NXZ * (r.read.Z + r.write.Z) * z[0].Bytes() +
+          NYW * (r.read.W + r.write.W) * w[0].Bytes();
       }
     };
 
@@ -308,8 +308,8 @@ namespace quda {
         hermitian(hermitian),
         Anorm(Anorm)
       {
-        auto &x0 = x[0].get();
-        auto &y0 = y[0].get();
+        auto &x0 = x[0];
+        auto &y0 = y[0];
 
         NYW_max = std::min(
           (y0.Precision() == QUDA_DOUBLE_PRECISION ?
@@ -323,9 +323,9 @@ namespace quda {
         max_tile_size = make_uint2(1, 1);
 
         strcpy(aux, nested_policy ? "nested_policy," : "policy,");
-        strcat(aux, x[0].get().AuxString());
+        strcat(aux, x[0].AuxString());
       	strcat(aux, ",");
-      	strcat(aux, y[0].get().AuxString());
+        strcat(aux, y[0].AuxString());
         if (hermitian) strcat(aux, ",hermitian");
         if (Anorm) strcat(aux, ",Anorm");
 	strcat(aux,",n=");
@@ -457,7 +457,7 @@ namespace quda {
       }
 
       TuneKey tuneKey() const {
-        return TuneKey(x[0].get().VolString(), typeid(*this).name(), aux);
+        return TuneKey(x[0].VolString(), typeid(*this).name(), aux);
       }
 
       long long flops() const { return 0; } // FIXME
@@ -490,9 +490,9 @@ namespace quda {
         Anorm(Anorm)
       {
         strcpy(aux, "policy,");
-        strcat(aux, x[0].get().AuxString());
+        strcat(aux, x[0].AuxString());
         strcat(aux, ",");
-        strcat(aux, y[0].get().AuxString());
+        strcat(aux, y[0].AuxString());
         if (hermitian) strcat(aux, ",hermitian");
         if (Anorm) strcat(aux, ",Anorm");
         strcat(aux, ",n=");
@@ -595,7 +595,7 @@ namespace quda {
 
       void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
 
-      TuneKey tuneKey() const { return TuneKey(x[0].get().VolString(), typeid(*this).name(), aux); }
+      TuneKey tuneKey() const { return TuneKey(x[0].VolString(), typeid(*this).name(), aux); }
 
       long long flops() const { return 0; } // FIXME
       long long bytes() const { return 0; } // FIXME
@@ -604,11 +604,11 @@ namespace quda {
       void postTune() {} // FIXME - use write to determine what needs to be saved
     };
 
-    void reDotProduct(std::vector<double> &result, vector_ref<const ColorSpinorField>  &&x,
-                      vector_ref<const ColorSpinorField> &&y)
+    void reDotProduct(std::vector<double> &result, const vector_ref<const ColorSpinorField> &x,
+                      const vector_ref<const ColorSpinorField> &y)
     {
-      auto &x0 = x[0].get();
-      auto &y0 = y[0].get();
+      auto &x0 = x[0];
+      auto &y0 = y[0];
 
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       std::vector<double> result_tmp(x.size() * y.size(), 0.0);
@@ -655,11 +655,11 @@ namespace quda {
       result = transpose(result_tmp, y.size(), x.size());
     }
 
-    void cDotProduct(std::vector<Complex> &result, vector_ref<const ColorSpinorField>  &&x,
-                      vector_ref<const ColorSpinorField> &&y)
+    void cDotProduct(std::vector<Complex> &result, const vector_ref<const ColorSpinorField> &x,
+                      const vector_ref<const ColorSpinorField> &y)
     {
-      auto &x0 = x[0].get();
-      auto &y0 = y[0].get();
+      auto &x0 = x[0];
+      auto &y0 = y[0];
 
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       std::vector<Complex> result_tmp(x.size() * y.size(), 0.0);
@@ -706,8 +706,8 @@ namespace quda {
       result = transpose(result_tmp, y.size(), x.size());
     }
 
-    void hDotProduct(std::vector<Complex> &result, vector_ref<const ColorSpinorField>  &&x,
-                     vector_ref<const ColorSpinorField> &&y)
+    void hDotProduct(std::vector<Complex> &result, const vector_ref<const ColorSpinorField> &x,
+                     const vector_ref<const ColorSpinorField> &y)
     {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block dot product on non-square inputs");
@@ -731,8 +731,8 @@ namespace quda {
     }
 
     // for (p, Ap) norms in CG which are Hermitian.
-    void hDotProduct_Anorm(std::vector<Complex> &result, vector_ref<const ColorSpinorField>  &&x,
-                     vector_ref<const ColorSpinorField> &&y)
+    void hDotProduct_Anorm(std::vector<Complex> &result, const vector_ref<const ColorSpinorField> &x,
+                     const vector_ref<const ColorSpinorField> &y)
     {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block A-norm dot product on non-square inputs");

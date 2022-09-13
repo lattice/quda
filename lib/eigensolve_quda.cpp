@@ -266,73 +266,12 @@ namespace quda
     }
   }
 
-#if 0
-  void EigenSolver::chebyOp(ColorSpinorField &out, const ColorSpinorField &in)
+  void EigenSolver::chebyOp(const vector_ref<ColorSpinorField> &out,
+                            const vector_ref<const ColorSpinorField> &in)
   {
     // Just do a simple mat-vec if no poly acc is requested
     if (!eig_param->use_poly_acc) {
       mat(out, in);
-      return;
-    }
-
-    if (eig_param->poly_deg == 0) errorQuda("Polynomial acceleration requested with zero polynomial degree");
-
-    // Compute the polynomial accelerated operator.
-    double a = eig_param->a_min;
-    double b = eig_param->a_max;
-    double delta = (b - a) / 2.0;
-    double theta = (b + a) / 2.0;
-    double sigma1 = -delta / theta;
-    double sigma;
-    double d1 = sigma1 / delta;
-    double d2 = 1.0;
-    double d3;
-
-    // out = d2 * in + d1 * out
-    // C_1(x) = x
-    mat(out, in);
-    blas::caxpby(d2, in, d1, out);
-    if (eig_param->poly_deg == 1) return;
-
-    // C_0 is the current 'in'  vector.
-    // C_1 is the current 'out' vector.
-
-    // Clone 'in' to two temporary vectors.
-    auto tmp1 = in;
-    auto tmp2 = out;
-
-    // Using Chebyshev polynomial recursion relation,
-    // C_{m+1}(x) = 2*x*C_{m} - C_{m-1}
-
-    double sigma_old = sigma1;
-
-    // construct C_{m+1}(x)
-    for (int i = 2; i < eig_param->poly_deg; i++) {
-      sigma = 1.0 / (2.0 / sigma1 - sigma_old);
-
-      d1 = 2.0 * sigma / delta;
-      d2 = -d1 * theta;
-      d3 = -sigma * sigma_old;
-
-      // FIXME - we could introduce a fused mat + blas kernel here, eliminating one temporary
-      // mat*C_{m}(x)
-      mat(out, tmp2);
-
-      blas::axpbypczw(d3, tmp1, d2, tmp2, d1, out, tmp1);
-      std::swap(tmp1, tmp2);
-
-      sigma_old = sigma;
-    }
-
-    std::swap(out, tmp2);
-  }
-#endif
-  void EigenSolver::chebyOp(vector_ref<ColorSpinorField> &&out,
-                            vector_ref<const ColorSpinorField> &&in)
-  {
-    // Just do a simple mat-vec if no poly acc is requested
-    if (!eig_param->use_poly_acc) {
-      mat(std::move(out), std::move(in));
       return;
     }
 
@@ -379,7 +318,7 @@ namespace quda
 
       // FIXME - we could introduce a fused mat + blas kernel here, eliminating one temporary
       // mat*C_{m}(x)
-      mat({out.begin(), out.end()}, {tmp2.begin(), tmp2.end()});
+      mat(out, tmp2);
 
       for (auto i = 0u; i < in.size(); i++)
         blas::axpbypczw(d3, tmp1[i], d2, tmp2[i], d1, out[i], tmp1[i]);
@@ -388,7 +327,7 @@ namespace quda
       sigma_old = sigma;
     }
 
-    for (auto i = 0u; i < in.size(); i++) std::swap(out[i].get(), tmp2[i]);
+    for (auto i = 0u; i < in.size(); i++) std::swap(out[i], tmp2[i]);
   }
 
   double EigenSolver::estimateChebyOpMax(ColorSpinorField &out, ColorSpinorField &in)
@@ -598,8 +537,8 @@ namespace quda
   }
 
   // Deflate vec, place result in vec_defl
-  void EigenSolver::deflateSVD(vector_ref<ColorSpinorField> &&sol, vector_ref<const ColorSpinorField> &&src,
-                               vector_ref<const ColorSpinorField> &&evecs, const std::vector<Complex> &evals,
+  void EigenSolver::deflateSVD(const vector_ref<ColorSpinorField> &sol, const vector_ref<const ColorSpinorField> &src,
+                               const vector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
                                bool accumulate) const
   {
     // number of evecs
@@ -663,8 +602,8 @@ namespace quda
   }
 
   // Deflate vec, place result in vec_defl
-  void EigenSolver::deflate(vector_ref<ColorSpinorField> &&sol, vector_ref<const ColorSpinorField> &&src,
-                            vector_ref<const ColorSpinorField> &&evecs, const std::vector<Complex> &evals,
+  void EigenSolver::deflate(const vector_ref<ColorSpinorField> &sol, const vector_ref<const ColorSpinorField> &src,
+                            const vector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
                             bool accumulate) const
   {
     // number of evecs

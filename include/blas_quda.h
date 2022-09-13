@@ -26,7 +26,7 @@ namespace quda {
     extern unsigned long long flops;
     extern unsigned long long bytes;
 
-    inline void zero(vector_ref<ColorSpinorField> &&x)
+    inline void zero(const vector_ref<ColorSpinorField> &x)
     {
       for (auto &xi : x) xi.get().zero();
     }
@@ -477,7 +477,7 @@ namespace quda {
        @param y[in,out] vector of input/output ColorSpinorFields
     */
     template <typename T>
-    void axpy(const std::vector<T> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y);
+    void axpy(const std::vector<T> &a, const vector_ref<const ColorSpinorField> &x, const vector_ref<ColorSpinorField> &y);
 
     /**
        @brief Compute the block "axpy_U" with over the set of
@@ -493,7 +493,7 @@ namespace quda {
        @param y[in,out] vector of input/output ColorSpinorFields
     */
     template <typename T>
-    void axpy_U(const std::vector<T> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y);
+    void axpy_U(const std::vector<T> &a, const vector_ref<const ColorSpinorField> &x, const vector_ref<ColorSpinorField> &y);
 
     /**
        @brief Compute the block "axpy_L" with over the set of
@@ -509,7 +509,7 @@ namespace quda {
        @param y[in,out] vector of input/output ColorSpinorFields
     */
     template <typename T>
-    void axpy_L(const std::vector<T> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y);
+    void axpy_L(const std::vector<T> &a, const vector_ref<const ColorSpinorField> &x, const vector_ref<ColorSpinorField> &y);
 
     /**
        @brief Compute the block "caxpy" with over the s
@@ -525,7 +525,7 @@ et of
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void caxpy(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y);
+    void caxpy(const std::vector<Complex> &a, const vector_ref<const ColorSpinorField> &x, const vector_ref<ColorSpinorField> &y);
 
     /**
        @brief Compute the block "caxpy_U" with over the set of
@@ -539,7 +539,7 @@ et of
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void caxpy_U(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y);
+    void caxpy_U(const std::vector<Complex> &a, const vector_ref<const ColorSpinorField> &x, const vector_ref<ColorSpinorField> &y);
 
     /**
        @brief Compute the block "caxpy_L" with over the set of
@@ -553,7 +553,7 @@ et of
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void caxpy_L(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, vector_ref<ColorSpinorField> &&y);
+    void caxpy_L(const std::vector<Complex> &a, const vector_ref<const ColorSpinorField> &x, const vector_ref<ColorSpinorField> &y);
 
     /**
        @brief Compute the block "axpyz" with over the set of
@@ -570,8 +570,8 @@ et of
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void axpyz(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x,
-               vector_ref<const ColorSpinorField> &&y, vector_ref<ColorSpinorField> &&z);
+    void axpyz(const std::vector<double> &a, const vector_ref<const ColorSpinorField> &x,
+               const vector_ref<const ColorSpinorField> &y, const vector_ref<ColorSpinorField> &z);
 
     /**
        @brief Compute the block "axpyz" with over the set of
@@ -586,8 +586,8 @@ et of
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void axpyz_U(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x,
-                 vector_ref<const ColorSpinorField> &&y, vector_ref<ColorSpinorField> &&z);
+    void axpyz_U(const std::vector<double> &a, const vector_ref<const ColorSpinorField> &x,
+                 const vector_ref<const ColorSpinorField> &y, const vector_ref<ColorSpinorField> &z);
 
     /**
        @brief Compute the block "axpyz" with over the set of
@@ -602,8 +602,8 @@ et of
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void axpyz_L(const std::vector<double> &a, vector_ref<const ColorSpinorField> &&x,
-                 vector_ref<const ColorSpinorField> &&y, vector_ref<ColorSpinorField> &&z);
+    void axpyz_L(const std::vector<double> &a, const vector_ref<const ColorSpinorField> &x,
+                 const vector_ref<const ColorSpinorField> &y, const vector_ref<ColorSpinorField> &z);
 
     /**
        @brief Compute the block "caxpyz" with over the set of
@@ -620,8 +620,8 @@ et of
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void caxpyz(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x,
-                vector_ref<const ColorSpinorField> &&y, vector_ref<ColorSpinorField> &&z);
+    void caxpyz(const std::vector<Complex> &a, const vector_ref<const ColorSpinorField> &x,
+                const vector_ref<const ColorSpinorField> &y, const vector_ref<ColorSpinorField> &z);
 
     /**
        @brief Compute the block "caxpyz" with over the set of
@@ -636,8 +636,8 @@ et of
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void caxpyz_U(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x,
-                  vector_ref<const ColorSpinorField> &&y, vector_ref<ColorSpinorField> &&z);
+    void caxpyz_U(const std::vector<Complex> &a, const vector_ref<const ColorSpinorField> &x,
+                  const vector_ref<const ColorSpinorField> &y, const vector_ref<ColorSpinorField> &z);
 
     /**
        @brief Compute the block "caxpyz" with over the set of
@@ -652,8 +652,8 @@ et of
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void caxpyz_L(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x,
-                  vector_ref<const ColorSpinorField> &&y, vector_ref<ColorSpinorField> &&z);
+    void caxpyz_L(const std::vector<Complex> &a, const vector_ref<const ColorSpinorField> &x,
+                  const vector_ref<const ColorSpinorField> &y, const vector_ref<ColorSpinorField> &z);
 
     /**
        @brief Compute the vectorized "axpyBzpcx" with over the set of
@@ -673,8 +673,8 @@ et of
        @param z[in] input ColorSpinorField
        @param c[in] Array of coefficients
     */
-    void axpyBzpcx(const std::vector<double> &a, vector_ref<ColorSpinorField> &&x,
-                   vector_ref<ColorSpinorField> &&y, const std::vector<double> &b, ColorSpinorField &z,
+    void axpyBzpcx(const std::vector<double> &a, const vector_ref<ColorSpinorField> &x,
+                   const vector_ref<ColorSpinorField> &y, const std::vector<double> &b, ColorSpinorField &z,
                    const std::vector<double> &c);
 
     /**
@@ -694,7 +694,7 @@ et of
        @param b[in] Array of coefficients
        @param z[in,out] input ColorSpinorField
     */
-    void caxpyBxpz(const std::vector<Complex> &a, vector_ref<const ColorSpinorField> &&x, ColorSpinorField &y,
+    void caxpyBxpz(const std::vector<Complex> &a, const vector_ref<const ColorSpinorField> &x, ColorSpinorField &y,
                    const std::vector<Complex> &b, ColorSpinorField &z);
 
     // multi-reduce kernels - defined in multi_reduce.cu
@@ -706,8 +706,8 @@ et of
        @param a[in] set of input ColorSpinorFields
        @param b[in] set of input ColorSpinorFields
     */
-    void reDotProduct(std::vector<double> &result, vector_ref<const ColorSpinorField> &&a,
-                      vector_ref<const ColorSpinorField> &&b);
+    void reDotProduct(std::vector<double> &result, const vector_ref<const ColorSpinorField> &a,
+                      const vector_ref<const ColorSpinorField> &b);
 
     /**
        @brief Computes the matrix of inner products between the vector set a and the vector set b
@@ -716,8 +716,8 @@ et of
        @param a[in] set of input ColorSpinorFields
        @param b[in] set of input ColorSpinorFields
     */
-    void cDotProduct(std::vector<Complex> &result, vector_ref<const ColorSpinorField> &&a,
-                     vector_ref<const ColorSpinorField> &&b);
+    void cDotProduct(std::vector<Complex> &result, const vector_ref<const ColorSpinorField> &a,
+                     const vector_ref<const ColorSpinorField> &b);
 
     /**
        @brief Computes the matrix of inner products between the vector
@@ -729,8 +729,8 @@ et of
        @param a[in] set of input ColorSpinorFields
        @param b[in] set of input ColorSpinorFields
     */
-    void hDotProduct(std::vector<Complex> &result, vector_ref<const ColorSpinorField> &&a,
-                     vector_ref<const ColorSpinorField> &&b);
+    void hDotProduct(std::vector<Complex> &result, const vector_ref<const ColorSpinorField> &a,
+                     const vector_ref<const ColorSpinorField> &b);
 
     /**
         @brief Computes the matrix of inner products between the vector
@@ -744,8 +744,8 @@ et of
         @param a[in] set of input ColorSpinorFields
         @param b[in] set of input ColorSpinorFields
      */
-    void hDotProduct_Anorm(std::vector<Complex> &result, vector_ref<const ColorSpinorField> &&a,
-                           vector_ref<const ColorSpinorField> &&b);
+    void hDotProduct_Anorm(std::vector<Complex> &result, const vector_ref<const ColorSpinorField> &a,
+                           const vector_ref<const ColorSpinorField> &b);
 
     // compatibility wrappers until we switch to
     // std::vector<ColorSpinorField> and

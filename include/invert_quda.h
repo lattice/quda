@@ -553,7 +553,7 @@ namespace quda {
       @brief a virtual method that performs the inversion and collect some vectors.
         The default here is a no-op and should not be called.
      */
-    virtual void solve_and_collect(ColorSpinorField &, ColorSpinorField &, vector_ref<ColorSpinorField> &&, int, double)
+    virtual void solve_and_collect(ColorSpinorField &, ColorSpinorField &, const vector_ref<ColorSpinorField> &, int, double)
     {
       errorQuda("NOT implemented.");
     }
@@ -957,7 +957,7 @@ namespace quda {
         @param collect_miniter minimal iteration start from which the r vectors are to be collected
         @param collect_tol maxiter tolerance start from which the r vectors are to be collected
        */
-      virtual void solve_and_collect(ColorSpinorField &out, ColorSpinorField &in, vector_ref<ColorSpinorField> &&v_r,
+      virtual void solve_and_collect(ColorSpinorField &out, ColorSpinorField &in, const vector_ref<ColorSpinorField> &v_r,
                                      int collect_miniter, double collect_tol);
 
       virtual bool hermitian() { return true; } /** PCG is only Hermitian system */

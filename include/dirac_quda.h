@@ -228,7 +228,7 @@ namespace quda {
     /**
        @brief Apply M for the dirac op. E.g. the Schur Complement operator
     */
-    void M(vector_ref<ColorSpinorField> &out, vector_ref<const ColorSpinorField> &in) const
+    void M(const vector_ref<ColorSpinorField> &out, const vector_ref<const ColorSpinorField> &in) const
     {
       for (auto i = 0u; i < in.size(); i++) M(out[i], in[i]);
     }
@@ -241,7 +241,7 @@ namespace quda {
     /**
        @brief Apply MdagM operator which may be optimized
     */
-    void MdagM(vector_ref<ColorSpinorField> &out, vector_ref<const ColorSpinorField> &in) const
+    void MdagM(const vector_ref<ColorSpinorField> &out, const vector_ref<const ColorSpinorField> &in) const
     {
       for (auto i = 0u; i < in.size(); i++) MdagM(out[i], in[i]);
     }
@@ -262,7 +262,7 @@ namespace quda {
        type, this may require additional effort to include the terms
        that hop out of the boundary and then hop back.
     */
-    void MdagMLocal(vector_ref<ColorSpinorField> &out, vector_ref<const ColorSpinorField> &in) const
+    void MdagMLocal(const vector_ref<ColorSpinorField> &out, const vector_ref<const ColorSpinorField> &in) const
     {
       for (auto i = 0u; i < in.size(); i++) MdagMLocal(out[i], in[i]);
     }
@@ -286,7 +286,7 @@ namespace quda {
     /**
        @brief Apply Mdag (daggered operator of M)
     */
-    void Mdag(vector_ref<ColorSpinorField> &out, vector_ref<const ColorSpinorField> &in) const
+    void Mdag(const vector_ref<ColorSpinorField> &out, const vector_ref<const ColorSpinorField> &in) const
     {
       for (auto i = 0u; i < in.size(); i++) Mdag(out[i], in[i]);
     }
@@ -299,7 +299,7 @@ namespace quda {
     /**
        @brief Apply Normal Operator
     */
-    void MMdag(vector_ref<ColorSpinorField> &out, vector_ref<const ColorSpinorField> &in) const
+    void MMdag(const vector_ref<ColorSpinorField> &out, const vector_ref<const ColorSpinorField> &in) const
     {
       for (auto i = 0u; i < in.size(); i++) MMdag(out[i], in[i]);
     }
@@ -2085,7 +2085,7 @@ public:
        @param[out] out The vector of output fields
        @param[out] out The vector of input fields
      */
-    virtual void operator()(vector_ref<ColorSpinorField> &&out, vector_ref<const ColorSpinorField> &&in) const = 0;
+    virtual void operator()(const vector_ref<ColorSpinorField> &out, const vector_ref<const ColorSpinorField> &in) const = 0;
 
     unsigned long long flops() const { return dirac->Flops(); }
 
@@ -2169,7 +2169,7 @@ public:
        @param[out] out The vector of output fields
        @param[in] in The vector of input fields
      */
-    void operator()(vector_ref<ColorSpinorField> &&out, vector_ref<const ColorSpinorField> &&in) const
+    void operator()(const vector_ref<ColorSpinorField> &out, const vector_ref<const ColorSpinorField> &in) const
     {
       dirac->M(out, in);
       for (auto i = 0u; i < in.size(); i++)
@@ -2200,7 +2200,7 @@ public:
        @param[out] out The vector of output fields
        @param[out] out The vector of input fields
      */
-    void operator()(vector_ref<ColorSpinorField> &&out, vector_ref<const ColorSpinorField> &&in) const
+    void operator()(const vector_ref<ColorSpinorField> &out, const vector_ref<const ColorSpinorField> &in) const
     {
       dirac->MdagM(out, in);
       for (auto i = 0u; i < in.size(); i++)
@@ -2230,7 +2230,7 @@ public:
        @param[out] out The vector of output fields
        @param[in] in The vector of input fields
      */
-    void operator()(vector_ref<ColorSpinorField> &&out, vector_ref<const ColorSpinorField> &&in) const
+    void operator()(const vector_ref<ColorSpinorField> &out, const vector_ref<const ColorSpinorField> &in) const
     {
       dirac->MdagMLocal(out, in);
     }
@@ -2260,7 +2260,7 @@ public:
        @param[out] out The vector of output fields
        @param[in] in The vector of input fields
      */
-    void operator()(vector_ref<ColorSpinorField> &&out, vector_ref<const ColorSpinorField> &&in) const
+    void operator()(const vector_ref<ColorSpinorField> &out, const vector_ref<const ColorSpinorField> &in) const
     {
       dirac->MMdag(out, in);
       for (auto i = 0u; i < in.size(); i++)
@@ -2293,7 +2293,7 @@ public:
        @param[out] out The vector of output fields
        @param[in] in The vector of input fields
      */
-    void operator()(vector_ref<ColorSpinorField> &&out, vector_ref<const ColorSpinorField> &&in) const
+    void operator()(const vector_ref<ColorSpinorField> &out, const vector_ref<const ColorSpinorField> &in) const
     {
       dirac->Mdag(out, in);
       for (auto i = 0u; i < in.size(); i++)
@@ -2329,7 +2329,7 @@ public:
        @param[out] out The vector of output fields
        @param[in] in The vector of input fields
      */
-    void operator()(vector_ref<ColorSpinorField> &&out, vector_ref<const ColorSpinorField> &&in) const
+    void operator()(const vector_ref<ColorSpinorField> &out, const vector_ref<const ColorSpinorField> &in) const
     {
       dirac->flipDagger();
       mat(std::move(out), std::move(in));
@@ -2438,7 +2438,7 @@ public:
        @param[out] out The vector of output fields
        @param[in] in The vector of input fields
      */
-    void operator()(vector_ref<ColorSpinorField> &&out, vector_ref<const ColorSpinorField> &&in) const
+    void operator()(const vector_ref<ColorSpinorField> &out, const vector_ref<const ColorSpinorField> &in) const
     {
       dirac->M(out, in);
       for (auto i = 0u; i < in.size(); i++) {

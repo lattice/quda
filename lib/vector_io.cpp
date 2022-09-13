@@ -14,9 +14,9 @@ namespace quda
       errorQuda("No eigenspace input file defined (filename = %s, parity_inflate = %d", filename.c_str(), parity_inflate);
   }
 
-  void VectorIO::load(vector_ref<ColorSpinorField> &&vecs)
+  void VectorIO::load(const vector_ref<ColorSpinorField> &vecs)
   {
-    const ColorSpinorField &v0 = vecs[0].get();
+    const ColorSpinorField &v0 = vecs[0];
     const int Nvec = vecs.size();
     const QudaPrecision load_prec = v0.Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : v0.Precision();
 
@@ -51,7 +51,7 @@ namespace quda
       auto stride = V4 * v0.Ncolor() * v0.Nspin() * 2 * v0.Precision();
       std::vector<void *> V(Nvec * Ls);
       for (int i = 0; i < Nvec; i++) {
-        auto &v = create_tmp ? tmp[i] : vecs[i].get();
+        auto &v = create_tmp ? tmp[i] : vecs[i];
         for (int j = 0; j < Ls; j++) { V[i * Ls + j] = static_cast<char *>(v.V()) + j * stride; }
       }
 
@@ -63,18 +63,18 @@ namespace quda
 
     if (create_tmp) {
       if (v0.SiteSubset() == QUDA_FULL_SITE_SUBSET || !parity_inflate) {
-        for (int i = 0; i < Nvec; i++) vecs[i].get() = tmp[i];
+        for (int i = 0; i < Nvec; i++) vecs[i] = tmp[i];
       } else {
-        for (int i = 0; i < Nvec; i++) vecs[i].get() = spinor_parity == QUDA_EVEN_PARITY ? tmp[i].Even() : tmp[i].Odd();
+        for (int i = 0; i < Nvec; i++) vecs[i] = spinor_parity == QUDA_EVEN_PARITY ? tmp[i].Even() : tmp[i].Odd();
       }
     }
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Done loading vectors\n");
   }
 
-  void VectorIO::save(vector_ref<const ColorSpinorField> &&vecs, QudaPrecision prec, uint32_t size)
+  void VectorIO::save(const vector_ref<const ColorSpinorField> &vecs, QudaPrecision prec, uint32_t size)
   {
-    const ColorSpinorField &v0 = vecs[0].get();
+    const ColorSpinorField &v0 = vecs[0];
     const int Nvec = (size != 0 && size < vecs.size()) ? size : vecs.size();
     if (prec < QUDA_SINGLE_PRECISION && prec != QUDA_INVALID_PRECISION) errorQuda("Unsupported precision %d", prec);
     const QudaPrecision save_prec = prec != QUDA_INVALID_PRECISION ? prec :
@@ -124,7 +124,7 @@ namespace quda
       auto stride = V4 * v0.Ncolor() * v0.Nspin() * 2 * v0.Precision();
       std::vector<const void *> V(Nvec * Ls);
       for (int i = 0; i < Nvec; i++) {
-        auto &v = create_tmp ? tmp[i] : vecs[i].get();
+        auto &v = create_tmp ? tmp[i] : vecs[i];
         for (int j = 0; j < Ls; j++) { V[i * Ls + j] = static_cast<const char *>(v.V()) + j * stride; }
       }
 
