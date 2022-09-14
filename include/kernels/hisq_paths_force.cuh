@@ -39,19 +39,15 @@ namespace quda {
     constexpr int Sign(int parity) { return parity ? -1 : 1; }
     constexpr int posDir(int dir) { return (dir >= 4) ? 7-dir : dir; }
 
-    template <int dir, typename Arg>
-    constexpr void updateCoords(int x[], int shift, const Arg &arg) {
-      x[dir] = (x[dir] + shift + arg.E[dir]) % arg.E[dir];
-    }
-
-    template <typename Arg>
-    constexpr void updateCoords(int x[], int dir, int shift, const Arg &arg) {
+    constexpr int updateCoordsIndex(int x[], const int X[], int dir, int shift) {
       switch (dir) {
-      case 0: updateCoords<0>(x, shift, arg); break;
-      case 1: updateCoords<1>(x, shift, arg); break;
-      case 2: updateCoords<2>(x, shift, arg); break;
-      case 3: updateCoords<3>(x, shift, arg); break;
+      case 0: x[0] = (x[0] + shift + X[0]) % X[0]; break;
+      case 1: x[1] = (x[1] + shift + X[1]) % X[1]; break;
+      case 2: x[2] = (x[2] + shift + X[2]) % X[2]; break;
+      case 3: x[3] = (x[3] + shift + X[3]) % X[3]; break;
       }
+      int idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
+      return idx;
     }
 
     //struct for holding the fattening path coefficients
@@ -261,8 +257,7 @@ namespace quda {
 
         int y[4] = {x[0], x[1], x[2], x[3]};
         int mysig = posDir(arg.sig);
-        updateCoords(y, mysig, (sig_positive ? 1 : -1), arg);
-        int point_b = linkIndex(y,arg.E);
+        int point_b = updateCoordsIndex(y, arg.E, mysig, (sig_positive ? 1 : -1));
         int ab_link_nbr_idx = (sig_positive) ? e_cb : point_b;
 
         for (int d=0; d<4; d++) y[d] = x[d];
@@ -279,10 +274,8 @@ namespace quda {
         int mu = mu_positive ? arg.mu : opp_dir(arg.mu);
         int dir = mu_positive ? -1 : 1;
 
-        updateCoords(y, mu, dir, arg);
-        int point_d = linkIndex(y,arg.E);
-        updateCoords(y, mysig, (sig_positive ? 1 : -1), arg);
-        int point_c = linkIndex(y,arg.E);
+        int point_d = updateCoordsIndex(y, arg.E, mu, dir);
+        int point_c = updateCoordsIndex(y, arg.E, mysig, (sig_positive ? 1 : -1));
 
         Link Uab = arg.link(posDir(arg.sig), ab_link_nbr_idx, sig_positive^(1-parity));
         Link Uad = arg.link(mu, mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
@@ -385,18 +378,14 @@ namespace quda {
         int y[4] = {x[0], x[1], x[2], x[3]};
 
         int mymu = posDir(arg.mu);
-        updateCoords(y, mymu, (mu_positive ? -1 : 1), arg);
-
-        int point_d = linkIndex(y, arg.E);
+        int point_d = updateCoordsIndex(y, arg.E, mymu, (mu_positive ? -1 : 1));
         int ad_link_nbr_idx = mu_positive ? point_d : e_cb;
 
         int mysig = posDir(arg.sig);
-        updateCoords(y, mysig, (sig_positive ? 1 : -1), arg);
-        int point_c = linkIndex(y, arg.E);
+        int point_c = updateCoordsIndex(y, arg.E, mysig, (sig_positive ? 1 : -1));
 
         for (int d=0; d<4; d++) y[d] = x[d];
-        updateCoords(y, mysig, (sig_positive ? 1 : -1), arg);
-        int point_b = linkIndex(y, arg.E);
+        int point_b = updateCoordsIndex(y, arg.E, mysig, (sig_positive ? 1 : -1));
 
         int bc_link_nbr_idx = mu_positive ? point_c : point_b;
         int ab_link_nbr_idx = sig_positive ? e_cb : point_b;
@@ -507,8 +496,7 @@ namespace quda {
 
         int mymu = posDir(arg.mu);
         int y[4] = {x[0], x[1], x[2], x[3]};
-        updateCoords(y, mymu, (mu_positive ? -1 : 1), arg);
-        int point_d = linkIndex(y,arg.E);
+        int point_d = updateCoordsIndex(y, arg.E, mymu, (mu_positive ? -1 : 1));
 
         Link Oy = arg.p3(0, e_cb, parity);
 
@@ -568,8 +556,7 @@ namespace quda {
          */
         int mymu = posDir(arg.mu);
         int y[4] = {x[0], x[1], x[2], x[3]};
-        updateCoords(y, mymu, (mu_positive ? -1 : 1), arg);
-        int point_d = mu_positive ? linkIndex(y,arg.E) : e_cb;
+        int point_d = mu_positive ? updateCoordsIndex(y, arg.E, mymu, (mu_positive ? -1 : 1)) : e_cb;
 
         int parity_ = mu_positive ? 1-parity : parity;
         auto mycoeff = CoeffSign(goes_forward(arg.sig),parity)*CoeffSign(goes_forward(arg.mu),parity)*arg.coeff;
