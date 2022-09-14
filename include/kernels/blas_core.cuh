@@ -10,7 +10,6 @@ namespace quda
 
   namespace blas
   {
-    template <typename real> struct caxpyxmazMR_;
 
     /**
        Parameter struct for generic blas kernel
@@ -22,9 +21,10 @@ namespace quda
        @tparam Ny Y-field vector i/o length
        @tparam Functor_ Functor used to operate on data
     */
-    template <typename real_, int n_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
-    struct BlasArg : kernel_param<Functor::use_kernel_arg> {
+    template <typename real_, int n_, typename store_t, int N, typename y_store_t, int Ny, typename Functor_>
+    struct BlasArg : kernel_param<Functor_::use_kernel_arg> {
       using real = real_;
+      using Functor = Functor_;
       static constexpr int n = n_;
       Spinor<store_t, N> X;
       Spinor<y_store_t, Ny> Y;
@@ -44,12 +44,10 @@ namespace quda
         V(v),
         f(f),
         nParity(nParity)
-      {
-        if constexpr (std::is_same_v<Functor, caxpyxmazMR_<real>>) {
-          static_assert(device::use_kernel_arg<BlasArg>(), "This arg must be passed as a kernel argument");
-        }
-      }
+      { ; }
     };
+
+    template <typename real> struct caxpyxmazMR_;
 
     /**
        Generic blas functor  with four loads and up to four stores.
@@ -61,7 +59,9 @@ namespace quda
         // this assertion ensures it's safe to make the arg non-const (required for caxpyxmazMR)
         // This catch-all assertion is lenient and only checks the struct member.
         // BlasArg above uses a stringent assertion that matches Functor.
-        static_assert(Arg::default_use_kernel_arg(), "This functor must be passed as a kernel argument");
+        if constexpr (std::is_same_v<typename Arg::Functor, caxpyxmazMR_<typename Arg::real>>) {
+          static_assert(device::use_kernel_arg<Arg>(), "This functor must be passed as a kernel argument");
+        }
       }
       static constexpr const char *filename() { return KERNEL_FILE; }
 

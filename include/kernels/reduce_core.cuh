@@ -11,8 +11,6 @@ namespace quda
 
   namespace blas
   {
-    template <typename real_reduce_t, typename real> struct HeavyQuarkResidualNorm_;
-    template <typename real_reduce_t, typename real> struct xpyHeavyQuarkResidualNorm_;
 
     /**
        @brief Parameter struct for generic reduction blas kernel.
@@ -50,14 +48,11 @@ namespace quda
         V(v),
         r(r),
         length_cb(length / nParity),
-        nParity(nParity)
-      {
-        if constexpr (std::is_same_v<Reducer_, HeavyQuarkResidualNorm_<device_reduce_t, real>> ||
-                      std::is_same_v<Reducer_, xpyHeavyQuarkResidualNorm_<device_reduce_t, real>>) {
-          static_assert(device::use_kernel_arg<ReductionArg>(), "This arg must be passed as a kernel argument");
-        }
-      }
+        nParity(nParity) { }
     };
+
+    template <typename real_reduce_t, typename real> struct HeavyQuarkResidualNorm_;
+    template <typename real_reduce_t, typename real> struct xpyHeavyQuarkResidualNorm_;
 
     /**
        Generic reduction kernel with up to five loads and saves.
@@ -72,7 +67,12 @@ namespace quda
         // this assertion ensures it's safe to make the arg non-const (required for HQ residual)
         // This catch-all assertion is lenient and only checks the struct member.
         // ReductionArg above uses a stringent assertion that matches Reducer.
-        static_assert(Arg::default_use_kernel_arg(), "This functor must be passed as a kernel argument");
+        if constexpr (std::is_same_v<typename Arg::Reducer,
+                                     HeavyQuarkResidualNorm_<device_reduce_t, typename Arg::real>> ||
+                      std::is_same_v<typename Arg::Reducer,
+                                     xpyHeavyQuarkResidualNorm_<device_reduce_t, typename Arg::real>>) {
+          static_assert(device::use_kernel_arg<Arg>(), "This functor must be passed as a kernel argument");
+        }
       }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
