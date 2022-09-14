@@ -138,7 +138,7 @@ namespace quda
 
   /**
      @brief BlockReduce provides a generic interface for performing
-     perform reductions at the block level
+     reductions at the block level
      @tparam T The type of the value that we are reducing
      @tparam block_dim The number of thread block dimensions we are reducing
      @tparam batch_size Batch size of the reduction.  Threads will be

@@ -36,7 +36,7 @@
 
 #include <ks_force_quda.h>
 
-#include <gauge_force_quda.h>
+#include <gauge_path_quda.h>
 #include <gauge_update_quda.h>
 
 #define MAX(a,b) ((a)>(b)? (a):(b))
@@ -4009,16 +4009,28 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   // apply / remove phase as appropriate
   if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
 
+  // wrap 1-d arrays in std::vector
+  std::vector<int> path_length_v(num_paths);
+  std::vector<double> loop_coeff_v(num_paths);
+  for (int i = 0; i < num_paths; i++) {
+    path_length_v[i] = path_length[i];
+    loop_coeff_v[i] = loop_coeff[i];
+  }
+
+  // input_path should encode exactly 4 directions
+  std::vector<int **> input_path_v(4);
+  for (int d = 0; d < 4; d++) { input_path_v[d] = input_path_buf[d]; }
+
   // actually do the computation
   profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
   if (!forceMonitor()) {
-    gaugeForce(*cudaMom, *cudaGauge, eb3, input_path_buf,  path_length, loop_coeff, num_paths, max_length);
+    gaugeForce(*cudaMom, *cudaGauge, eb3, input_path_v, path_length_v, loop_coeff_v, num_paths, max_length);
   } else {
     // if we are monitoring the force, separate the force computation from the momentum update
     GaugeFieldParam gParam(*cudaMom);
     gParam.create = QUDA_ZERO_FIELD_CREATE;
     GaugeField *force = GaugeField::Create(gParam);
-    gaugeForce(*force, *cudaGauge, 1.0, input_path_buf,  path_length, loop_coeff, num_paths, max_length);
+    gaugeForce(*force, *cudaGauge, 1.0, input_path_v, path_length_v, loop_coeff_v, num_paths, max_length);
     updateMomentum(*cudaMom, eb3, *force, "gauge");
     delete force;
   }
@@ -4102,7 +4114,7 @@ int computeGaugePathQuda(void *out, void *siteLink, int ***input_path_buf, int *
   cpuGaugeField *cpuOut = new cpuGaugeField(gParamOut);
   gParamOut.location = QUDA_CUDA_FIELD_LOCATION;
   gParamOut.create = qudaGaugeParam->overwrite_gauge ? QUDA_ZERO_FIELD_CREATE : QUDA_NULL_FIELD_CREATE;
-  gParamOut.reconstruct = qudaGaugeParam->reconstruct;
+  gParamOut.reconstruct = QUDA_RECONSTRUCT_NO;
   gParamOut.setPrecision(qudaGaugeParam->cuda_prec, true);
   cudaGaugeField *cudaOut = new cudaGaugeField(gParamOut);
   profileGaugePath.TPSTOP(QUDA_PROFILE_INIT);
@@ -4116,9 +4128,21 @@ int computeGaugePathQuda(void *out, void *siteLink, int ***input_path_buf, int *
   // apply / remove phase as appropriate
   if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
 
+  // wrap 1-d arrays in a std::vector
+  std::vector<int> path_length_v(num_paths);
+  std::vector<double> loop_coeff_v(num_paths);
+  for (int i = 0; i < num_paths; i++) {
+    path_length_v[i] = path_length[i];
+    loop_coeff_v[i] = loop_coeff[i];
+  }
+
+  // input_path should encode exactly 4 directions
+  std::vector<int **> input_path_v(4);
+  for (int d = 0; d < 4; d++) { input_path_v[d] = input_path_buf[d]; }
+
   // actually do the computation
   profileGaugePath.TPSTART(QUDA_PROFILE_COMPUTE);
-  gaugePath(*cudaOut, *cudaGauge, eb3, input_path_buf, path_length, loop_coeff, num_paths, max_length);
+  gaugePath(*cudaOut, *cudaGauge, eb3, input_path_v, path_length_v, loop_coeff_v, num_paths, max_length);
   profileGaugePath.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileGaugePath.TPSTART(QUDA_PROFILE_D2H);
@@ -4571,6 +4595,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
         profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
         computeStaggeredOprod(oprod, cudaQuark, coeff[i], 3);
+        qudaDeviceSynchronize();
         profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
       }
     }
@@ -4595,6 +4620,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
         profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
         computeStaggeredOprod(oprod, cudaQuark, coeff[i + num_terms], 3);
+        qudaDeviceSynchronize();
         profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
       }
     }
@@ -4621,6 +4647,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
   hisqStaplesForce(*cudaOutForce, *cudaInForce, *cudaGauge, act_path_coeff);
+  qudaDeviceSynchronize();
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // Load naik outer product
@@ -4631,6 +4658,7 @@ void computeHISQForceQuda(void* const milc_momentum,
   // Compute Naik three-link term
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
   hisqLongLinkForce(*cudaOutForce, *cudaInForce, *cudaGauge, act_path_coeff[1]);
+  qudaDeviceSynchronize();
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   cudaOutForce->exchangeExtendedGhost(R,profileHISQForce,true);
@@ -4642,11 +4670,12 @@ void computeHISQForceQuda(void* const milc_momentum,
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
   *num_failures_h = 0;
   unitarizeForce(*cudaInForce, *cudaOutForce, *cudaGauge, num_failures_d);
-  profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (*num_failures_h>0) errorQuda("Error in the unitarization component of the hisq fermion force: %d failures\n", *num_failures_h);
 
-  qudaMemset((void **)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
+  cudaOutForce->zero();
+  qudaDeviceSynchronize();
+  profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // read in u-link
   cudaGauge->loadCPUField(cpuULink, profileHISQForce);
@@ -4655,6 +4684,7 @@ void computeHISQForceQuda(void* const milc_momentum,
   // Compute Fat7-staple term
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
   hisqStaplesForce(*cudaOutForce, *cudaInForce, *cudaGauge, fat7_coeff);
+  qudaDeviceSynchronize();
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   delete cudaInForce;
@@ -4663,7 +4693,6 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
   hisqCompleteForce(*cudaOutForce, *cudaGauge);
-  profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (gParam->use_resident_mom) {
     if (!momResident) errorQuda("No resident momentum field to use");
@@ -4671,6 +4700,8 @@ void computeHISQForceQuda(void* const milc_momentum,
   } else {
     updateMomentum(*cudaMom, dt, *cudaOutForce, "hisq");
   }
+  qudaDeviceSynchronize();
+  profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (gParam->return_result_mom) {
     // Close the paths, make anti-hermitian, and store in compressed format
@@ -5180,7 +5211,6 @@ void gaussGaugeQuda(unsigned long long seed, double sigma)
   profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-
 /*
  * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
  */
@@ -5201,6 +5231,46 @@ void plaqQuda(double plaq[3])
   profilePlaq.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profilePlaq.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+/*
+ * Computes the trace of the Polyakov loop in direction dir from the resident gauge field
+ */
+void polyakovLoopQuda(double ploop[2], int dir)
+{
+  if (!gaugePrecise) errorQuda("Cannot compute Polyakov loop as there is no resident gauge field");
+  if (dir != 3) errorQuda("The Polyakov loop can only be computed in the t == 3 direction, invalid direction %d", dir);
+
+  QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
+  obsParam.compute_polyakov_loop = QUDA_BOOLEAN_TRUE;
+  gaugeObservablesQuda(&obsParam);
+  ploop[0] = obsParam.ploop[0];
+  ploop[1] = obsParam.ploop[1];
+}
+
+void computeGaugeLoopTraceQuda(double _Complex *traces, int **input_path_buf, int *path_length, double *loop_coeff,
+                               int num_paths, int max_length, double factor)
+{
+  if (!gaugePrecise) errorQuda("Cannot compute gauge loop traces as there is no resident gauge field");
+
+  if (extendedGaugeResident) {
+    delete extendedGaugeResident;
+    extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGaugeObs);
+  }
+
+  // informed by gauge path code; apply / remove gauge as appropriate
+  if (extendedGaugeResident->StaggeredPhaseApplied()) extendedGaugeResident->removeStaggeredPhase();
+
+  QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
+  obsParam.compute_gauge_loop_trace = QUDA_BOOLEAN_TRUE;
+  obsParam.traces = traces;
+  obsParam.input_path_buff = input_path_buf;
+  obsParam.path_length = path_length;
+  obsParam.loop_coeff = loop_coeff;
+  obsParam.num_paths = num_paths;
+  obsParam.max_length = max_length;
+  obsParam.factor = factor;
+  gaugeObservablesQuda(&obsParam);
 }
 
 /*
@@ -5584,12 +5654,22 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   profileGaugeObs.TPSTART(QUDA_PROFILE_TOTAL);
   checkGaugeObservableParam(param);
 
+  if (!gaugePrecise) errorQuda("Cannot compute Polyakov loop as there is no resident gauge field");
+
   cudaGaugeField *gauge = nullptr;
   if (!gaugeSmeared) {
     if (!extendedGaugeResident) extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGaugeObs);
     gauge = extendedGaugeResident;
   } else {
     gauge = gaugeSmeared;
+  }
+
+  // Apply / remove gauge as appropriate
+  if (param->remove_staggered_phase == QUDA_BOOLEAN_TRUE) {
+    if (gauge->StaggeredPhaseApplied())
+      gauge->removeStaggeredPhase();
+    else
+      errorQuda("Removing staggered phases was requested, however staggered phases aren't already applied");
   }
 
   gaugeObservables(*gauge, *param, profileGaugeObs);
