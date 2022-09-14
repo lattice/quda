@@ -156,8 +156,6 @@ int main(int argc, char **argv)
   // Vector construct
   quda::ColorSpinorParam cs_param;
   constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
-  inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION;
-  inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
   auto in = quda::ColorSpinorField::Create(cs_param);
   auto out = quda::ColorSpinorField::Create(cs_param);
   auto check = quda::ColorSpinorField::Create(cs_param);

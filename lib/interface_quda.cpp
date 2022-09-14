@@ -1535,14 +1535,16 @@ namespace quda {
 
   void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
   {
+    // HMC: Fix this
     // Decide which fields to use. The Evolved fields take precedent over Precise fields
     // because if it exists then gaugePrecise is being preserved.
-    CloverField *cloverField = cloverEvolved ? cloverEvolved : cloverPrecise;
-    cudaGaugeField *gaugeField = gaugeEvolved ? gaugeEvolved : gaugePrecise;
-
+    CloverField *clover_field = cloverEvolved ? cloverEvolved : cloverPrecise;
+    cudaGaugeField *gauge_field = gaugeEvolved ? gaugeEvolved : gaugePrecise;
+    //cudaGaugeField *gauge_field = gaugePrecise;
+    
     double kappa = inv_param->kappa;
     if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
-      kappa *= gaugeField->Anisotropy();
+      kappa *= gauge_field->Anisotropy();
     }
 
     switch (inv_param->dslash_type) {
@@ -1640,10 +1642,10 @@ namespace quda {
 
     diracParam.matpcType = inv_param->matpc_type;
     diracParam.dagger = inv_param->dagger;
-    diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatPrecise : gaugeField; //DMH HMC FIXME
+    diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatPrecise : gauge_field; //DMH HMC FIXME
     diracParam.fatGauge = gaugeFatPrecise; //DMH HMC FIXME
     diracParam.longGauge = gaugeLongPrecise; //DMH HMC FIXME
-    diracParam.clover = cloverField; 
+    diracParam.clover = clover_field; 
     diracParam.kappa = kappa;
     diracParam.mass = inv_param->mass;
     diracParam.m5 = inv_param->m5;
@@ -1664,7 +1666,9 @@ namespace quda {
   {
     setDiracParam(diracParam, inv_param, pc);
 
-    diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatSloppy : gaugeSloppy;
+    // HMC: Fix this
+    //diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatSloppy : gaugeSloppy;
+    diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatSloppy : gaugeEvolved;
     diracParam.fatGauge = gaugeFatSloppy;
     diracParam.longGauge = gaugeLongSloppy;
     diracParam.clover = cloverSloppy;
@@ -2790,26 +2794,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   // check the gauge fields have been created
   cudaGaugeField *cudaGauge = checkGauge(param);
-  cudaGaugeField *gaugeTemp = nullptr;
   
-  // Smear the gauge field
-  /*
-  if (param->gauge_smear == QUDA_BOOLEAN_TRUE) {
-    profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);    
-    switch(param->gauge_smear_type) {
-    case QUDA_GAUGE_SMEAR_APE: performAPEnStep(param->gauge_smear_steps, param->gauge_smear_coeff, 1); break;
-    case QUDA_GAUGE_SMEAR_STOUT: performSTOUTnStep(param->gauge_smear_steps, param->gauge_smear_coeff, 1); break;
-    default: errorQuda("Unsupported smear type %d", param->gauge_smear_type);
-    }
-
-    // Copy the gauge field, restore after the solve
-    GaugeFieldParam gParam(*gaugeSmeared);
-    gaugeTemp = new cudaGaugeField(gParam);
-    gaugeTemp->copy(*gaugePrecise);
-    gaugePrecise->copy(*gaugeSmeared);
-    profileInvert.TPSTART(QUDA_PROFILE_TOTAL);    
-  }
-  */
   // It was probably a bad design decision to encode whether the system is even/odd preconditioned (PC) in
   // solve_type and solution_type, rather than in separate members of QudaInvertParam.  We're stuck with it
   // for now, though, so here we factorize everything for convenience.
@@ -3161,13 +3146,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete dPre;
   delete dEig;
 
-  /*
-  if (param->gauge_smear == QUDA_BOOLEAN_TRUE) {
-    gaugePrecise->copy(*gaugeTemp);
-    delete gaugeTemp;
-  }
-  */
-  
   profileInvert.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
@@ -4338,8 +4316,7 @@ void createCloverQuda(QudaInvertParam* invertParam)
   
   // Decide which fields to use. The Evolved fields take precedent over Precise fields
   // because if it exists then gaugePrecise is being preserved.
-  CloverField *CloverField = cloverEvolved ? cloverEvolved : cloverPrecise;
-  cudaGaugeField *gaugeField = gaugeEvolved ? gaugeEvolved : gaugePrecise;
+  cudaGaugeField *gauge_field = gaugeEvolved ? gaugeEvolved : gaugePrecise;
 
   QudaReconstructType recon = (gaugePrecise->Reconstruct() == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_12 : gaugePrecise->Reconstruct();
   // for clover we optimize to only send depth 1 halos in y/z/t (FIXME - make work for x, make robust in general)
@@ -4347,7 +4324,7 @@ void createCloverQuda(QudaInvertParam* invertParam)
   for (int d=0; d<4; d++) R[d] = (d==0 ? 2 : 1) * (redundant_comms || commDimPartitioned(d));
 
   // Check to see if we have an extended gauge in residency.
-  cudaGaugeField *gauge = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gaugeField, R, profileClover, false, recon);
+  cudaGaugeField *gauge = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gauge_field, R, profileClover, false, recon);
   
   profileClover.TPSTART(QUDA_PROFILE_INIT);
 
@@ -4377,7 +4354,7 @@ void createCloverQuda(QudaInvertParam* invertParam)
   if (ex != gauge) delete ex;
 
   // FIXME always preserve the extended gauge
-  extendedGaugeResident = gauge;
+  extendedGaugeResident = gauge_field;
 }
 
 void* createGaugeFieldQuda(void* gauge, int geometry, QudaGaugeParam* param)
@@ -4897,7 +4874,8 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **,
   qParam.create = QUDA_NULL_FIELD_CREATE;
   qParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
   qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-
+  
+  
   std::vector<ColorSpinorField*> quarkX, quarkP;
   for (int i=0; i<nvector; i++) {
     quarkX.push_back(ColorSpinorField::Create(qParam));
@@ -4937,6 +4915,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **,
   profileWilsonForce.TPSTART(QUDA_PROFILE_COMPUTE);
   
   std::vector<double> force_coeff(nvector);
+
   // loop over different quark fields
   for(int i=0; i<nvector; i++){
     ColorSpinorField &x = *(quarkX[i]);
@@ -4946,18 +4925,15 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **,
       // for downloading x_e
       qParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
       qParam.x[0] /= 2;
-
       // Wrap the even-parity quark field
       profileWilsonForce.TPSTOP(QUDA_PROFILE_COMPUTE);
       profileWilsonForce.TPSTART(QUDA_PROFILE_INIT);
       qParam.v = h_x[i];
       ColorSpinorField cpuQuarkX(qParam); // create host quark field
-      profileCloverForce.TPSTOP(QUDA_PROFILE_INIT);
-
+      profileWilsonForce.TPSTOP(QUDA_PROFILE_INIT);
       profileWilsonForce.TPSTART(QUDA_PROFILE_H2D);
       x.Even() = cpuQuarkX;
       profileWilsonForce.TPSTOP(QUDA_PROFILE_H2D);
-
       profileWilsonForce.TPSTART(QUDA_PROFILE_COMPUTE);
       gamma5(x.Even(), x.Even());
     } else {
@@ -5023,7 +4999,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **,
     
     if (u != &gaugeEx) delete u;
   }
-
+  
   profileWilsonForce.TPSTART(QUDA_PROFILE_COMPUTE);
   updateMomentum(cudaMom, -1.0, cudaForce, "wilson");
   profileWilsonForce.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -5423,95 +5399,6 @@ void copyExtendedResidentGaugeQuda(void *resident_gauge)
     = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gaugePrecise, R, profilePlaq);
   static_cast<GaugeField *>(resident_gauge)->copy(*extendedGaugeResident);
 }
-
-/* 
-void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double omega)
-{
-  if(n_steps == 0) return;
-  
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
-
-  if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
-  
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
-  
-  cudaGaugeField *gauge_ptr = nullptr;
-
-  if (gaugeSmeared != nullptr) {
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gaussian smearing done with gaugeSmeared\n");
-    GaugeFieldParam gParam(*gaugePrecise);
-    gParam.create = QUDA_NULL_FIELD_CREATE;
-    gauge_ptr = new cudaGaugeField(gParam);
-    copyExtendedGauge(*gauge_ptr, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-    gauge_ptr->exchangeGhost();
-  } else {
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gaussian smearing done with gaugePrecise\n");
-    gauge_ptr = gaugePrecise;
-  }
-
-  ColorSpinorParam cpuParam(h_in, *inv_param, precise->X(), false, inv_param->input_location);
-  ColorSpinorField in_h(cpuParam);
-
-  ColorSpinorParam cudaParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
-  ColorSpinorField in(cudaParam);
-  in = in_h;
-
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(in_h);
-    double gpu = blas::norm2(in);
-    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
-  }
-
-  cudaParam.create = QUDA_NULL_FIELD_CREATE;
-  ColorSpinorField out(cudaParam);
-  int parity = 0;
-
-  // Scale up the source to prevent underflow
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
-  blas::ax(1e6, *in);
-
-  double alpha = - (omega * omega) / (4 * n_steps);  
-  double a = -alpha;
-  double b = (6.0*alpha + 1.0);  
-
-  for (int i = 0; i < n_steps; i++) {
-    if (i > 0) std::swap(in, out);
-    // The SmearOp computes:
-    // out(x) = b * in(x) - a * \sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
-    // Which gives the use finer control over the operation that DslashXpay and
-    // allows us to omit a vector rescaling.
-    laplace_op.Expose()->SmearOp(*out, *in, a, b);
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      double norm = blas::norm2(*out);
-      printfQuda("Step %d, vector norm %e\n", i, norm);
-    }
-  }
-  
-  // Normalise the source
-  double nout = blas::norm2(*out);
-  blas::ax(1.0 / sqrt(nout), *out);
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-  cpuParam.v = h_out;
-  cpuParam.location = inv_param->output_location;
-  ColorSpinorField out_h(cpuParam);
-  out_h = out;
-
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(out_h);
-    double gpu = blas::norm2(out);
-    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
-  }
-
-  if (gaugeSmeared != nullptr)
-    delete precise;
-
-  popVerbosity();
-
-  profileWuppertal.TPSTOP(QUDA_PROFILE_TOTAL);
-}
-*/
  
 void performGaugeSmearQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam *obs_param)
 {
@@ -5858,12 +5745,12 @@ int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCP
   checkGaugeParam(gauge_param);
   
   // check the gauge fields have been created
-  //cudaGaugeField *cudaGauge = checkGauge(inv_param);
-
+  cudaGaugeField *cudaGauge = checkGauge(inv_param);
+  
   // Define gauge coefficients
   QudaGaugeActionType gauge_action_type = QUDA_GAUGE_ACTION_TYPE_WILSON;
   double path_coeff[3] = {1.0, 1.0, 1.0};
-  double epsilon = (hmc_param->traj_length/(1.0*hmc_param->traj_steps));
+  double epsilon = (hmc_param->traj_length/((double)hmc_param->traj_steps));
   //---------------------------------------------------------------------
 
   // Create a new gauge field and copy gauge precise. We will evolve this
@@ -5891,7 +5778,6 @@ int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCP
   
   // Create a field for the force
   GaugeFieldParam force_param(*gaugeEvolved);
-  force_param.link_type = QUDA_GENERAL_LINKS;
   force_param.create = QUDA_ZERO_FIELD_CREATE;
   force_param.reconstruct = QUDA_RECONSTRUCT_NO;
   GaugeField *force = GaugeField::Create(force_param);
@@ -5938,11 +5824,35 @@ int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCP
   
   // Measure the gauge action
   double gauge_action = 6.0 * (1.0 - gauge_obs_param.plaquette[0]) * gaugeTemp->Volume() * hmc_param->beta;
-
+  
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Pre  step %d: gauge action %.16e momentum action %.16e Q charge %+.16e plaq = %.16e\n",
 						 step, gauge_action, momentum_action, gauge_obs_param.qcharge, gauge_obs_param.plaquette[0]);
 
   double hmc_coeff = hmc_param->beta*epsilon/3.0;
+
+  // HMC: Edit out to be pure gauge Leapfrog
+#if 0
+  // Construct vectors
+  //------------------------------------------------------
+  // Create host wrappers around application vector set
+  ColorSpinorParam cpuParam(host_source_ptr, *inv_param, cudaGauge->X(), inv_param->solution_type,
+			    inv_param->input_location);
+  
+  // Create device side ColorSpinorField vector space to pass to the
+  // compute function. Download any user supplied data as an initial guess.
+  ColorSpinorParam cudaParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+  cudaParam.setPrecision(inv_param->cuda_prec, inv_param->cuda_prec, true);
+
+  
+  std::vector<ColorSpinorField *> quarkX, quarkP;
+  for (int i = 0; i < 1; i++) {
+    quarkX.push_back(ColorSpinorField::Create(cudaParam));
+    quarkP.push_back(ColorSpinorField::Create(cudaParam));
+  }
+#endif
+  
+  //------------------------------------------------------
 
   // Begin HMC
   //----------------------------------
@@ -5969,6 +5879,58 @@ int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCP
     profileGaugeForce.TPSTOP(QUDA_PROFILE_COMPUTE);
     profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
 
+    // DMH:
+    // Here we must call an inverter on the fermion field with the updated gauge
+    // field, then compute the associated fermion force. The momentum will then
+    // be updated with the fermion contribution, and we may update the gauge.
+
+    // HMC: Edit out to be pure gauge Leapfrog
+#if 0
+    invertQuda(host_solution_ptr, host_source_ptr, inv_param);
+
+    ColorSpinorField *in = nullptr;
+    ColorSpinorField *out = nullptr;
+    
+    const auto X = cudaGauge->X();
+  
+    // wrap CPU host side pointers
+    ColorSpinorParam cpuSolParam(host_solution_ptr, *inv_param, X, inv_param->solution_type,
+				 inv_param->input_location);
+    
+    ColorSpinorField sol(cpuSolParam);
+
+    // download source
+    *quarkX[0] = sol;
+    
+    bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
+      (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE);
+    //bool pc_solve = false;
+    DiracParam diracParam;
+    setDiracParam(diracParam, inv_param, pc_solve);
+    Dirac *dirac = Dirac::create(diracParam);
+    
+    //dirac->Dslash(quarkX[0]->Odd(), quarkX[0]->Even(), QUDA_ODD_PARITY);
+    //dirac->Dagger(QUDA_DAG_YES);
+    dirac->M(*quarkP[0], *quarkX[0]);    
+    //dirac->Dslash(quarkP[0]->Odd(), quarkP[0]->Even(), QUDA_ODD_PARITY);
+    //dirac->Dagger(QUDA_DAG_NO);
+
+    //gamma5(*quarkX[0], *quarkX[0]);
+    gamma5(*quarkP[0], *quarkP[0]);    
+
+    delete dirac;
+
+    std::vector<double> force_coeff;
+    force_coeff.push_back(2.0*epsilon*hmc_coeff*inv_param->kappa * inv_param->kappa);
+    force_coeff.push_back(epsilon);
+    computeWilsonForce(*force, *gaugeEvolved, quarkX, quarkP, force_coeff);
+    double momentum_action_pre = computeMomAction(*device_mom);
+    updateMomentum(*device_mom, -1.0, *force, "wilson");
+    double momentum_action_post = computeMomAction(*device_mom);
+    double ferm_action = momentum_action_post - momentum_action_pre;
+    printfQuda("Ferm action step %d: %+.16e\n", k, ferm_action);
+#endif
+    
     profileGaugeUpdate.TPSTART(QUDA_PROFILE_TOTAL);
     profileGaugeUpdate.TPSTART(QUDA_PROFILE_COMPUTE);
     updateGaugeField(*gaugeTemp, 0.5*epsilon, *gaugeEvolved, *device_mom, false, true);
@@ -6022,11 +5984,17 @@ int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCP
       printfQuda("\n");
     }
   }
-
+  
   delete gaugeTemp;
   delete force;
   delete device_mom;
   delete device_mom_copy;
   popVerbosity();
+#if 0
+  for (int i=0; i<1; i++) {
+    delete quarkX[i];
+    delete quarkP[i];
+  }
+#endif
   return accept ? 1 : 0;
 }
