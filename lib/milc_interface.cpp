@@ -2984,22 +2984,31 @@ void qudaCloverMultishiftInvert(int external_precision, int quda_precision, int 
 } // qudaCloverMultishiftInvert
 
 void qudaGaugeFixingOVR(int precision, unsigned int gauge_dir, int Nsteps, int verbose_interval, double relax_boost,
-                        double tolerance, unsigned int reunit_interval, unsigned int stopWtheta, void *milc_sitelink)
+                        double tolerance, unsigned int reunit_interval, unsigned int stopWtheta, QudaMILCSiteArg_t *arg)
 {
+  static const QudaVerbosity verbosity = getVerbosity();
+  qudamilc_called<true>(__func__, verbosity);
+
   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
       (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_SU3_LINKS);
-  qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  //qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
+  void *gauge = arg->site ? arg->site : arg->link;
+
+  qudaGaugeParam.gauge_offset = arg->link_offset;
+  qudaGaugeParam.mom_offset = arg->mom_offset;
+  qudaGaugeParam.site_size = arg->size;
+  qudaGaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
 
   double timeinfo[3];
-  computeGaugeFixingOVRQuda(milc_sitelink, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta, \
-    &qudaGaugeParam, timeinfo);
+  computeGaugeFixingOVRQuda(gauge, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval,
+                            stopWtheta, &qudaGaugeParam, timeinfo);
 
   printfQuda("Time H2D: %lf\n", timeinfo[0]);
   printfQuda("Time to Compute: %lf\n", timeinfo[1]);
   printfQuda("Time D2H: %lf\n", timeinfo[2]);
   printfQuda("Time all: %lf\n", timeinfo[0]+timeinfo[1]+timeinfo[2]);
+
+  qudamilc_called<false>(__func__, verbosity);
 }
 
 void qudaGaugeFixingFFT( int precision,
