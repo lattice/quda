@@ -5445,7 +5445,7 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
 }
  
 
-void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double width, const int compute_2link = 1, const int delete_2link = 0, const int t0 = -1)
+void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double width, const int compute_2link, const int delete_2link, const int t0)
 {
   if(n_steps == 0) return;
   
@@ -5564,11 +5564,6 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
     blas::zero(*temp1);
   }
 
-#if 0
-  // Normalise the source
-  double nout = blas::norm2(*out);
-  blas::ax(1.0 / sqrt(nout), *out);
-#endif
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // Copy device data to host.

@@ -152,12 +152,9 @@ namespace quda {
       if (laplace3D == i) comm_dim[i] = 0;
     }
  
-    if (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET)
-    {
+    if (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET){
       errorQuda( "Single parity site smearing is not supported yet." );
-    }
-    else
-    {
+    } else {
       ApplyStaggeredQSmear(out, in, *gauge, t0_local, is_time_slice, QUDA_INVALID_PARITY, laplace3D, dagger, comm_dim, profile);
     }
 

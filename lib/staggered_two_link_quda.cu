@@ -62,8 +62,6 @@ using namespace staggered_quark_smearing;
       checkLocation(newTwoLink, link);
       checkPrecision(newTwoLink, link);
       instantiate<ComputeTwoLink, WilsonReconstruct>(link, newTwoLink);
-
-      return;
     }
 #else
     void computeTwoLink(GaugeField &, const GaugeField &)

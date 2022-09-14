@@ -157,7 +157,7 @@ option(QUDA_COVDEV "build code for covariant derivative" OFF)
 option(QUDA_LAPLACE "build laplace operator" OFF)
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
 
-option(QUDA_TWOLINK_GSMEAR "build code for two-link Gaussian smearing" OFF)
+option(QUDA_SMEAR_GAUSS_TWOLINK "build code for two-link Gaussian smearing" OFF)
 
 # Multi-GPU options
 option(QUDA_QMP "build the QMP multi-GPU code" OFF)

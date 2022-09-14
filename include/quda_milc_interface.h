@@ -594,13 +594,8 @@ extern "C" {
    */
   void qudaFreeGaugeField();
 
-  /**
-     Free the smeared gauge field allocated in QUDA.
-   */
-  void qudaFreeGaugeSmeared();
-  
-  /**
-     Alias of qudaFreeGaugeSmeared().     
+
+  /**.     
      Free the two-link field allocated in QUDA.
    */
   void qudaFreeTwoLink();
