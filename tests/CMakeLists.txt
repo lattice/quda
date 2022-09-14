@@ -6,7 +6,7 @@ target_link_libraries(quda_test PUBLIC QUDA::quda)
 set_target_properties(quda_test PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_options(
   quda_test PUBLIC
-  $<IF:$<CONFIG:RELEASE>,w,-Wall -Wextra>
+  $<IF:$<CONFIG:RELEASE>,-w,-Wall -Wextra>
   $<$<CONFIG:STRICT>:-Werror>
 )
 add_subdirectory(utils)
@@ -19,11 +19,15 @@ endif()
 
 set(TEST_LIBS quda_test)
 
+# custom target for building all tests (useful if QUDA_BUILD_ALL_TESTS is OFF)
+add_custom_target(all_tests)
+
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   if(NOT ${qudabuildtests})
     set_property(TARGET ${mytarget} PROPERTY EXCLUDE_FROM_ALL 1)
     set(QUDA_EXCLUDE_FROM_INSTALL "EXCLUDE_FROM_ALL")
   endif()
+  add_dependencies(all_tests ${mytarget})
 endmacro()
 
 if(NOT ${QUDA_INSTALL_ALL_TESTS})
@@ -205,10 +209,10 @@ if(QUDA_DIRAC_STAGGERED)
   install(TARGETS hisq_unitarize_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
-add_executable(gauge_force_test gauge_force_test.cpp)
-target_link_libraries(gauge_force_test ${TEST_LIBS})
-quda_checkbuildtest(gauge_force_test QUDA_BUILD_ALL_TESTS)
-install(TARGETS gauge_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+add_executable(gauge_path_test gauge_path_test.cpp)
+target_link_libraries(gauge_path_test ${TEST_LIBS})
+quda_checkbuildtest(gauge_path_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS gauge_path_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 add_executable(gauge_alg_test gauge_alg_test.cpp)
 target_link_libraries(gauge_alg_test ${TEST_LIBS})
@@ -276,16 +280,18 @@ endif()
 if(QUDA_BUILD_NATIVE_LAPACK)
   add_test(NAME blas_interface_test
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_interface_test> ${MPIEXEC_POSTFLAGS}
-    --blas-mnk 64 64 64
-    --blas-leading-dims 128 128 128
-    --blas-offsets 16 16 16
+    --blas-gemm-mnk 64 64 64
+    --blas-gemm-leading-dims 128 128 128
+    --blas-gemm-offsets 16 16 16
+    --blas-gemm-alpha 1.0 2.0
+    --blas-gemm-beta -3.0 1.5
+    --blas-gemm-trans-a T
+    --blas-gemm-trans-b C
+    --blas-lu-inv-mat-size 96
     --blas-data-type Z
     --blas-data-order row
     --blas-batch 20
-    --blas-alpha 1.0 2.0
-    --blas-beta -3.0 1.5
-    --blas-trans-a T
-    --blas-trans-b C
+    --enable-testing true
     --gtest_output=xml:blas_interface_test.xml)
 endif()
 
@@ -1186,10 +1192,10 @@ endforeach(prec)
   
 foreach(prec IN LISTS TEST_PRECS)
 
-  add_test(NAME gauge_force_${prec}
-           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_force_test> ${MPIEXEC_POSTFLAGS}
+  add_test(NAME gauge_path_${prec}
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_path_test> ${MPIEXEC_POSTFLAGS}
                    --dim 2 4 6 8 --prec ${prec}
-                   --gtest_output=xml:gauge_force_test_${prec}.xml)
+                   --gtest_output=xml:gauge_path_test_${prec}.xml)
 
   if(QUDA_DIRAC_STAGGERED)
     add_test(NAME unitarize_link_${prec}
@@ -1213,7 +1219,7 @@ foreach(prec IN LISTS TEST_PRECS)
   add_test(NAME gauge_alg_${prec}
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg_test> ${MPIEXEC_POSTFLAGS}
                    --dim 4 6 8 10 --prec ${prec}
-                   --gtest_output=xml:gauge_arg_test_${prec}.xml)
+                   --gtest_output=xml:gauge_alg_test_${prec}.xml)
 
   if (TARGET dilution_test)
     add_test(NAME dilution_test_${prec}
