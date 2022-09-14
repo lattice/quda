@@ -1027,9 +1027,9 @@ extern "C" {
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in,out] milc_sitelink, MILC gauge field to be fixed
    */
-  void qudaGaugeFixingOVR(int precision, unsigned int gauge_dir, int Nsteps,
-                          int verbose_interval, double relax_boost, double tolerance,
-                          unsigned int reunit_interval, unsigned int stopWtheta, QudaMILCSiteArg_t *arg);
+  void qudaGaugeFixingOVR(int precision, unsigned int gauge_dir, int Nsteps, int verbose_interval, double relax_boost,
+                          double tolerance, unsigned int reunit_interval, unsigned int stopWtheta,
+                          QudaMILCSiteArg_t *arg);
 
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
