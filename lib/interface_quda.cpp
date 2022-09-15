@@ -5211,6 +5211,21 @@ void gaussGaugeQuda(unsigned long long seed, double sigma)
   profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+void gaussMomQuda(unsigned long long seed, double sigma)
+{
+  profileGauss.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (!momResident) errorQuda("Cannot generate Gauss GaugeField as there is no resident momentum field");
+
+  cudaGaugeField *data = momResident;
+
+  profileGauss.TPSTART(QUDA_PROFILE_COMPUTE);
+  quda::gaugeGauss(*data, seed, sigma);
+  profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
 /*
  * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
  */
