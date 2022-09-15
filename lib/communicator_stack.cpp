@@ -54,6 +54,10 @@ namespace quda
     current_key = split_key;
   }
 
+#if defined(QMP_COMMS) || defined(MPI_COMMS)
+  MPI_Comm get_mpi_handle() { return get_current_communicator().get_mpi_handle(); }
+#endif
+
   int comm_neighbor_rank(int dir, int dim) { return get_current_communicator().comm_neighbor_rank(dir, dim); }
 
   int comm_dim(int dim) { return get_current_communicator().comm_dim(dim); }

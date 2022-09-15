@@ -64,7 +64,7 @@ if(BUILD_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid CMAKE_BUILD_TYPE type! Valid build types are:" "${VALID_BUILD_TYPES}")
 endif()
 
-# QUDA may be built to run using HIP or CUDA, which we call the
+# QUDA may be built to run using CUDA, HIP or SYCL, which we call the
 # Target type. By default, the target is CUDA.
 if(DEFINED ENV{QUDA_TARGET})
   set(DEFTARGET $ENV{QUDA_TARGET})
@@ -74,8 +74,8 @@ endif()
 
 set(VALID_TARGET_TYPES CUDA HIP SYCL)
 set(QUDA_TARGET_TYPE
-    "${DEFTARGET}"
-    CACHE STRING "Choose the type of target, options are: ${VALID_TARGET_TYPES}")
+  "${DEFTARGET}"
+  CACHE STRING "Choose the type of target, options are: ${VALID_TARGET_TYPES}")
 set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP SYCL)
 
 string(TOUPPER ${QUDA_TARGET_TYPE} CHECK_TARGET_TYPE)
@@ -534,7 +534,7 @@ if(QUDA_QIO)
 endif()
 
 # ######################################################################################################################
- # USQCD QDPJIT
+# USQCD QDPJIT
 # ######################################################################################################################
  if(QUDA_QDPJIT)
    if(NOT QUDA_QMP)
@@ -547,11 +547,11 @@ endif()
    set(QUDA_INTERFACE_QDPJIT ON)
  endif()
 
-####################################
+
+# ######################################################################################################################
 # ARPACK
 # ######################################################################################################################
 if(QUDA_ARPACK)
-  enable_language(Fortran)
 
   if(QUDA_MPI OR QUDA_QMP)
     set(ARPACK_MPI ON)
@@ -560,35 +560,22 @@ if(QUDA_ARPACK)
   endif()
 
   if(QUDA_DOWNLOAD_ARPACK)
-  #TODO: switch to CPM
-    include(GNUInstallDirs)
-    ExternalProject_Add(
+    CPMAddPackage(
+      NAME
       ARPACK-NG
-      GIT_REPOSITORY https://github.com/opencollab/arpack-ng.git
-      GIT_TAG 3.7.0
-      GIT_SHALLOW YES
-      PREFIX arpack-ng
-      CMAKE_ARGS -DMPI=${ARPACK_MPI} -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-      CMAKE_GENERATOR "Unix Makefiles")
-    ExternalProject_Get_Property(ARPACK-NG INSTALL_DIR)
-    set(QUDA_ARPACK_HOME ${INSTALL_DIR})
-    add_library(arpack-ng STATIC IMPORTED)
-    add_dependencies(arpack-ng ARPACK-NG)
-    find_package(BLAS REQUIRED)
-    find_package(LAPACK REQUIRED)
-    target_link_libraries(arpack-ng INTERFACE ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
-    set_target_properties(arpack-ng PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
-    set_target_properties(arpack-ng PROPERTIES IMPORTED_LOCATION
-      ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libarpack.a)
-    if(QUDA_MPI OR QUDA_QMP)
-      add_library(parpack-ng STATIC IMPORTED)
-      target_link_libraries(parpack-ng INTERFACE arpack-ng MPI::MPI_Fortran)
-      set_target_properties(parpack-ng PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
-      set_target_properties(parpack-ng PROPERTIES IMPORTED_LOCATION
-        ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libparpack.a)
+      GITHUB_REPOSITORY
+      opencollab/arpack-ng
+      GIT_TAG 3.8.0
+      OPTIONS
+      "EXAMPLES OFF ON"
+      "MPI ${ARPACK_MPI}"
+      "BLAS_openblas_LIBRARY ${OpenBLAS_LIBS}"
+    )
+    add_library(ARPACK::arpack ALIAS arpack)
+    if(ARPACK_MPI)
+      add_library(ARPACK::parpack ALIAS parpack)
     endif()
-
-  else(QUDA_DOWNLOAD_ARPACK)
+else(QUDA_DOWNLOAD_ARPACK)
     find_package(PkgConfig REQUIRED)
     # We always need the serial library
     pkg_check_modules(ARPACK QUIET arpack)
@@ -618,6 +605,7 @@ if(QUDA_OPENBLAS)
   if(QUDA_DOWNLOAD_OPENBLAS)
   #TODO: switch to CPM
     include(GNUInstallDirs)
+    include(ExternalProject)
     ExternalProject_Add(
       OPENBLAS
       GIT_REPOSITORY https://github.com/xianyi/OpenBLAS.git

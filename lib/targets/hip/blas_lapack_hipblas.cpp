@@ -372,7 +372,7 @@ namespace quda
 
             if (error != HIPBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASZGEMM, error code = %d\n", error);
           }
-	  flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
+          flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_C) {
 
           typedef hipblasComplex C;
@@ -399,7 +399,7 @@ namespace quda
 
             if (error != HIPBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASCGEMMBatched, error code = %d\n", error);
           }
-	  flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
+          flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_D) {
 
           typedef double D;
@@ -423,7 +423,7 @@ namespace quda
 
             if (error != HIPBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASDGEMMBatched, error code = %d\n", error);
           }
-	  flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
+          flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_S) {
 
           typedef float S;
@@ -447,7 +447,7 @@ namespace quda
 
             if (error != HIPBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASSGEMMBatched, error code = %d\n", error);
           }
-	  flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
+          flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else {
           errorQuda("hipblasGEMM type %d not implemented\n", blas_param.data_type);
         }

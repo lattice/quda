@@ -323,7 +323,7 @@ namespace quda
     {
       bool rtn;
       do {
-        rtn = Tunable::advanceBlockDim(param);
+        rtn = TunableReduction2D::advanceBlockDim(param);
       } while (rtn && !is_power2(param.block.x));
 
       if (rtn) {
@@ -350,7 +350,7 @@ namespace quda
      */
     void initTuneParam(TuneParam &param) const
     {
-      Tunable::initTuneParam(param);
+      TunableReduction2D::initTuneParam(param);
       param.block = {param.block.x, param.block.y, 1};
       param.grid = {param.grid.x, param.grid.y, (n_batch + param.block.z - 1) / param.block.z};
     }
@@ -361,7 +361,7 @@ namespace quda
      */
     void defaultTuneParam(TuneParam &param) const
     {
-      Tunable::defaultTuneParam(param);
+      TunableReduction2D::defaultTuneParam(param);
       param.block = {param.block.x, param.block.y, 1};
       param.grid = {param.grid.x, param.grid.y, (n_batch + param.block.z - 1) / param.block.z};
     }

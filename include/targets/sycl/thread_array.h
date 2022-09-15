@@ -1,3 +1,5 @@
+#pragma once
+
 #include "shared_memory_cache_helper.h"
 
 namespace quda

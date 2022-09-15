@@ -20,7 +20,8 @@ namespace quda
    * @param [in] offset -- the offset
    * @param [in,out] state - the RNG State
    */
-  constexpr void random_init(unsigned long long seed, unsigned long long sequence, unsigned long long offset, RNGState &state)
+  constexpr void random_init(unsigned long long seed, unsigned long long sequence, unsigned long long offset,
+                             RNGState &state)
   {
     target::rng::seed(state.state, seed, sequence);
     target::rng::skip(state.state, offset);
