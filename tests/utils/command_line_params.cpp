@@ -115,7 +115,7 @@ QudaTboundary fermion_t_boundary = QUDA_ANTI_PERIODIC_T;
 
 int mg_levels = 2;
 
-int max_res_increase = 1;
+int max_res_increase = 3;
 int max_res_increase_total = 10;
 
 quda::mgarray<QudaFieldLocation> solver_location = {};
