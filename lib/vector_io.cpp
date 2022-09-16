@@ -14,7 +14,7 @@ namespace quda
       errorQuda("No eigenspace input file defined (filename = %s, parity_inflate = %d", filename.c_str(), parity_inflate);
   }
 
-  void VectorIO::load(const vector_ref<ColorSpinorField> &vecs)
+  void VectorIO::load(cvector_ref<ColorSpinorField> &vecs)
   {
     const ColorSpinorField &v0 = vecs[0];
     const int Nvec = vecs.size();
@@ -72,7 +72,7 @@ namespace quda
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Done loading vectors\n");
   }
 
-  void VectorIO::save(const vector_ref<const ColorSpinorField> &vecs, QudaPrecision prec, uint32_t size)
+  void VectorIO::save(cvector_ref<const ColorSpinorField> &vecs, QudaPrecision prec, uint32_t size)
   {
     const ColorSpinorField &v0 = vecs[0];
     const int Nvec = (size != 0 && size < vecs.size()) ? size : vecs.size();

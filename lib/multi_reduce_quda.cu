@@ -18,7 +18,7 @@ namespace quda {
       Reducer<device_reduce_t, real> r;
       const int nParity;
       const T &a, &b, &c;
-      const vector_ref<ColorSpinorField> &x, &y, &z, &w;
+      cvector_ref<ColorSpinorField> &x, &y, &z, &w;
       T &result;
       QudaFieldLocation location;
 
@@ -44,10 +44,10 @@ namespace quda {
         a(a),
         b(b),
         c(c),
-        x(reinterpret_cast<const vector_ref<ColorSpinorField>&>(x)),
-        y(reinterpret_cast<const vector_ref<ColorSpinorField>&>(y)),
-        z(reinterpret_cast<const vector_ref<ColorSpinorField>&>(z)),
-        w(reinterpret_cast<const vector_ref<ColorSpinorField>&>(w)),
+        x(reinterpret_cast<cvector_ref<ColorSpinorField>&>(x)),
+        y(reinterpret_cast<cvector_ref<ColorSpinorField>&>(y)),
+        z(reinterpret_cast<cvector_ref<ColorSpinorField>&>(z)),
+        w(reinterpret_cast<cvector_ref<ColorSpinorField>&>(w)),
         result(result),
         location(checkLocation(x[0], y[0], z[0], w[0]))
       {
@@ -604,8 +604,8 @@ namespace quda {
       void postTune() {} // FIXME - use write to determine what needs to be saved
     };
 
-    void reDotProduct(std::vector<double> &result, const vector_ref<const ColorSpinorField> &x,
-                      const vector_ref<const ColorSpinorField> &y)
+    void reDotProduct(std::vector<double> &result, cvector_ref<const ColorSpinorField> &x,
+                      cvector_ref<const ColorSpinorField> &y)
     {
       auto &x0 = x[0];
       auto &y0 = y[0];
@@ -655,8 +655,8 @@ namespace quda {
       result = transpose(result_tmp, y.size(), x.size());
     }
 
-    void cDotProduct(std::vector<Complex> &result, const vector_ref<const ColorSpinorField> &x,
-                      const vector_ref<const ColorSpinorField> &y)
+    void cDotProduct(std::vector<Complex> &result, cvector_ref<const ColorSpinorField> &x,
+                      cvector_ref<const ColorSpinorField> &y)
     {
       auto &x0 = x[0];
       auto &y0 = y[0];
@@ -706,8 +706,8 @@ namespace quda {
       result = transpose(result_tmp, y.size(), x.size());
     }
 
-    void hDotProduct(std::vector<Complex> &result, const vector_ref<const ColorSpinorField> &x,
-                     const vector_ref<const ColorSpinorField> &y)
+    void hDotProduct(std::vector<Complex> &result, cvector_ref<const ColorSpinorField> &x,
+                     cvector_ref<const ColorSpinorField> &y)
     {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block dot product on non-square inputs");
@@ -731,8 +731,8 @@ namespace quda {
     }
 
     // for (p, Ap) norms in CG which are Hermitian.
-    void hDotProduct_Anorm(std::vector<Complex> &result, const vector_ref<const ColorSpinorField> &x,
-                     const vector_ref<const ColorSpinorField> &y)
+    void hDotProduct_Anorm(std::vector<Complex> &result, cvector_ref<const ColorSpinorField> &x,
+                     cvector_ref<const ColorSpinorField> &y)
     {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block A-norm dot product on non-square inputs");

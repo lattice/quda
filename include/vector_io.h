@@ -29,7 +29,7 @@ namespace quda
        @brief Load vectors from filename
        @param[in] vecs The set of vectors to load
     */
-    void load(const vector_ref<ColorSpinorField> &vecs);
+    void load(cvector_ref<ColorSpinorField> &vecs);
 
     /**
        @brief Save vectors to filename
@@ -37,7 +37,7 @@ namespace quda
        @param[in] prec Optional change of precision when saving
        @param[in] size Optional cap to number of vectors saved
     */
-    void save(const vector_ref<const ColorSpinorField> &vecs, QudaPrecision prec = QUDA_INVALID_PRECISION, uint32_t size = 0);
+    void save(cvector_ref<const ColorSpinorField> &vecs, QudaPrecision prec = QUDA_INVALID_PRECISION, uint32_t size = 0);
 
   };
 

@@ -150,7 +150,7 @@ namespace quda
        @param[in] out Output spinor
        @param[in] in Input spinor
     */
-    void chebyOp(const vector_ref<ColorSpinorField> &out, const vector_ref <const ColorSpinorField> &in);
+    void chebyOp(cvector_ref<ColorSpinorField> &out, cvector_ref <const ColorSpinorField> &in);
 
     /**
        @brief Estimate the spectral radius of the operator for the max value of the
@@ -245,8 +245,8 @@ namespace quda
        @param[in] evals The eigenvalues to use in deflation
        @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
     */
-    void deflate(const vector_ref<ColorSpinorField> &sol, const vector_ref<const ColorSpinorField> &src,
-                 const vector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
+    void deflate(cvector_ref<ColorSpinorField> &sol, cvector_ref<const ColorSpinorField> &src,
+                 cvector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
                  bool accumulate = false) const;
 
     /**
@@ -258,8 +258,8 @@ namespace quda
        @param[in] evals The singular values to use in deflation
        @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
     */
-    void deflateSVD(const vector_ref<ColorSpinorField> &sol, const vector_ref<const ColorSpinorField> &vec,
-                    const vector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
+    void deflateSVD(cvector_ref<ColorSpinorField> &sol, cvector_ref<const ColorSpinorField> &vec,
+                    cvector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
                     bool accumulate = false) const;
 
     /**

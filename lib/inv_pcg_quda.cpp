@@ -95,7 +95,7 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  void PreconCG::solve_and_collect(ColorSpinorField &x, ColorSpinorField &b, const vector_ref<ColorSpinorField> &v_r,
+  void PreconCG::solve_and_collect(ColorSpinorField &x, ColorSpinorField &b, cvector_ref<ColorSpinorField> &v_r,
                                    int collect_miniter, double collect_tol)
   {
     if (K) K->train_param(*this, b);

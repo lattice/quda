@@ -252,4 +252,6 @@ namespace quda
 
   };
 
+  template <class T> using cvector_ref = const vector_ref<T>;
+
 } // namespace quda

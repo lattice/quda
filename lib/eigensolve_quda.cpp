@@ -266,8 +266,8 @@ namespace quda
     }
   }
 
-  void EigenSolver::chebyOp(const vector_ref<ColorSpinorField> &out,
-                            const vector_ref<const ColorSpinorField> &in)
+  void EigenSolver::chebyOp(cvector_ref<ColorSpinorField> &out,
+                            cvector_ref<const ColorSpinorField> &in)
   {
     // Just do a simple mat-vec if no poly acc is requested
     if (!eig_param->use_poly_acc) {
@@ -537,8 +537,8 @@ namespace quda
   }
 
   // Deflate vec, place result in vec_defl
-  void EigenSolver::deflateSVD(const vector_ref<ColorSpinorField> &sol, const vector_ref<const ColorSpinorField> &src,
-                               const vector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
+  void EigenSolver::deflateSVD(cvector_ref<ColorSpinorField> &sol, cvector_ref<const ColorSpinorField> &src,
+                               cvector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
                                bool accumulate) const
   {
     // number of evecs
@@ -602,8 +602,8 @@ namespace quda
   }
 
   // Deflate vec, place result in vec_defl
-  void EigenSolver::deflate(const vector_ref<ColorSpinorField> &sol, const vector_ref<const ColorSpinorField> &src,
-                            const vector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
+  void EigenSolver::deflate(cvector_ref<ColorSpinorField> &sol, cvector_ref<const ColorSpinorField> &src,
+                            cvector_ref<const ColorSpinorField> &evecs, const std::vector<Complex> &evals,
                             bool accumulate) const
   {
     // number of evecs
