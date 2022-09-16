@@ -5194,11 +5194,6 @@ void gaussGaugeQuda(unsigned long long seed, double sigma)
 
   cudaGaugeField *data = gaugePrecise;
 
-  GaugeFieldParam param(*data);
-  param.reconstruct = QUDA_RECONSTRUCT_12;
-  param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  cudaGaugeField u(param);
-
   profileGauss.TPSTART(QUDA_PROFILE_COMPUTE);
   quda::gaugeGauss(*data, seed, sigma);
   profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
