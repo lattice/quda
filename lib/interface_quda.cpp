@@ -5253,10 +5253,8 @@ void computeGaugeLoopTraceQuda(double _Complex *traces, int **input_path_buf, in
 {
   if (!gaugePrecise) errorQuda("Cannot compute gauge loop traces as there is no resident gauge field");
 
-  if (extendedGaugeResident) {
-    delete extendedGaugeResident;
-    extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGaugeObs);
-  }
+  if (extendedGaugeResident) delete extendedGaugeResident;
+  extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGaugeObs);
 
   // informed by gauge path code; apply / remove gauge as appropriate
   if (extendedGaugeResident->StaggeredPhaseApplied()) extendedGaugeResident->removeStaggeredPhase();
