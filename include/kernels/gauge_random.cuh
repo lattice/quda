@@ -46,7 +46,7 @@ namespace quda {
       rand1[i] = uniform<real>::rand(localState);
       rand2[i] = uniform<real>::rand(localState);
       phi[i] = 2.0 * rand1[i];
-      radius[i] = sqrt(-2.0 * log(rand2[i]));
+      radius[i] = sqrt(-log(rand2[i]));
       quda::sincospi(phi[i], &temp2[i], &temp1[i]);
       temp1[i] *= radius[i];
       temp2[i] *= radius[i];
