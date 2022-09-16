@@ -160,8 +160,7 @@ namespace quda {
     Vm(nullptr),
     Zm(nullptr),
     profile(profile),
-    gmresdr_args(nullptr),
-    init(false)
+    gmresdr_args(nullptr)
   {
     fillFGMResDRInnerSolveParam(Kparam, param);
 
@@ -187,8 +186,7 @@ namespace quda {
     Vm(nullptr),
     Zm(nullptr),
     profile(profile),
-    gmresdr_args(nullptr),
-    init(false)
+    gmresdr_args(nullptr)
   {
   }
 

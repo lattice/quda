@@ -17,6 +17,8 @@ namespace quda
     std::vector<ColorSpinorField> _ps; /**< the container for the p-vectors */
     std::vector<double> _alphas;       /**< @param _alphas the alpha's */
 
+    XUpdateBatch() = default;
+
     /**
       @brief A struct that contains multiple p-vectors which are to be added to an output vector:
         x += alpha[i] * p[i], i = 0, 1, ..., Np - 1

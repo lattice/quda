@@ -15,7 +15,7 @@ namespace quda {
 
   CG3::CG3(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
            TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matPrecon, param, profile), init(false)
+    Solver(mat, matSloppy, matPrecon, matPrecon, param, profile)
   {
   }
 
@@ -33,8 +33,6 @@ namespace quda {
         delete xS_oldp;
         delete tmpSp;
       }
-
-      init = false;
     }
   }
 
@@ -43,8 +41,7 @@ namespace quda {
     CG3(mmdag, mmdagSloppy, mmdagPrecon, param, profile),
     mmdag(mat.Expose()),
     mmdagSloppy(matSloppy.Expose()),
-    mmdagPrecon(matPrecon.Expose()),
-    init(false)
+    mmdagPrecon(matPrecon.Expose())
   {
   }
 
@@ -125,8 +122,7 @@ namespace quda {
     CG3(mdagm, mdagmSloppy, mdagmPrecon, param, profile),
     mdagm(mat.Expose()),
     mdagmSloppy(matSloppy.Expose()),
-    mdagmPrecon(matPrecon.Expose()),
-    init(false)
+    mdagmPrecon(matPrecon.Expose())
   {
   }
 

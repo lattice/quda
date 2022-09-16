@@ -29,8 +29,7 @@ namespace quda {
     App(nullptr),
     tmpp(nullptr),
     rSloppyp(nullptr),
-    xSloppyp(nullptr),
-    init(false)
+    xSloppyp(nullptr)
   {
   }
 
@@ -61,8 +60,7 @@ namespace quda {
     mmdag(mat.Expose()),
     mmdagSloppy(matSloppy.Expose()),
     mmdagPrecon(matPrecon.Expose()),
-    mmdagEig(matEig.Expose()),
-    init(false)
+    mmdagEig(matEig.Expose())
   {
   }
 
@@ -144,8 +142,7 @@ namespace quda {
     mdagm(mat.Expose()),
     mdagmSloppy(matSloppy.Expose()),
     mdagmPrecon(matPrecon.Expose()),
-    mdagmEig(matEig.Expose()),
-    init(false)
+    mdagmEig(matEig.Expose())
   {
   }
 

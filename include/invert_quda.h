@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+#include <memory>
 #include <quda.h>
 #include <quda_internal.h>
 #include <timer.h>
@@ -7,9 +9,7 @@
 #include <color_spinor_field.h>
 #include <qio_field.h>
 #include <eigensolve_quda.h>
-#include <vector>
-#include <memory>
-
+#include <invert_x_update.h>
 #include <madwf_param.h>
 
 namespace quda {
@@ -757,7 +757,7 @@ namespace quda {
   private:
     // pointers to fields to avoid multiple creation overhead
     ColorSpinorField *yp, *rp, *rnewp, *pp, *App, *tmpp, *rSloppyp, *xSloppyp;
-    bool init;
+    bool init = false;
 
   public:
     CG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
@@ -797,7 +797,7 @@ namespace quda {
     DiracMMdag mmdagEig;
     ColorSpinorField xp;
     ColorSpinorField yp;
-    bool init;
+    bool init = false;
 
     /**
        @brief Initiate the fields needed by the solver
@@ -829,7 +829,7 @@ namespace quda {
     DiracMdagM mdagmPrecon;
     DiracMdagM mdagmEig;
     ColorSpinorField br;
-    bool init;
+    bool init = false;
 
     /**
        @brief Initiate the fields needed by the solver
@@ -858,7 +858,7 @@ namespace quda {
   private:
     // pointers to fields to avoid multiple creation overhead
     ColorSpinorField *yp, *rp, *tmpp, *ArSp, *rSp, *xSp, *xS_oldp, *tmpSp, *rS_oldp;
-    bool init;
+    bool init = false;
 
   public:
     CG3(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
@@ -879,7 +879,7 @@ namespace quda {
     DiracMMdag mmdagPrecon;
     ColorSpinorField xp;
     ColorSpinorField yp;
-    bool init;
+    bool init = false;
 
     /**
        @brief Initiate the fields needed by the solver
@@ -910,7 +910,7 @@ namespace quda {
     DiracMdagM mdagmSloppy;
     DiracMdagM mdagmPrecon;
     ColorSpinorField br;
-    bool init;
+    bool init = false;
 
     /**
        @brief Initiate the fields needed by the solver
@@ -935,32 +935,53 @@ namespace quda {
 
   class PreconCG : public Solver {
     private:
-      std::shared_ptr<Solver> K;
-      SolverParam Kparam; // parameters for preconditioner solve
+    std::shared_ptr<Solver> K;
+    SolverParam Kparam; // parameters for preconditioner solve
 
-    public:
-      PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-               const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
+    ColorSpinorField r;
+    ColorSpinorField y;
+    ColorSpinorField Ap;
+    ColorSpinorField x_sloppy;
+    ColorSpinorField r_sloppy;
+    ColorSpinorField minvr;
+    ColorSpinorField minvr_sloppy;
+    ColorSpinorField minvr_pre;
+    ColorSpinorField r_pre;
+    XUpdateBatch x_update_batch;
+    int Np; /** the size of the accumulator pipeline */
 
-      virtual ~PreconCG();
+    bool init = false;
 
-      void operator()(ColorSpinorField &out, ColorSpinorField &in)
-      {
-        this->solve_and_collect(out, in, vector_ref<ColorSpinorField>(), 0, 0);
-      }
+    /**
+       @brief Allocate persistent fields and parameter checking
+       @param[in] x Solution vector
+       @param[in] b Source vector
+     */
+    void create(ColorSpinorField &x, const ColorSpinorField &b);
 
-      /**
-        @brief a virtual method that performs the inversion and collect the r vectors in PCG.
-        @param out the output vector
-        @param in the input vector
-        @param v_r the series of vectors that is to be collected
-        @param collect_miniter minimal iteration start from which the r vectors are to be collected
-        @param collect_tol maxiter tolerance start from which the r vectors are to be collected
-       */
-      virtual void solve_and_collect(ColorSpinorField &out, ColorSpinorField &in, cvector_ref<ColorSpinorField> &v_r,
-                                     int collect_miniter, double collect_tol);
+  public:
+    PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+             const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
 
-      virtual bool hermitian() { return true; } /** PCG is only Hermitian system */
+    virtual ~PreconCG();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in)
+    {
+      this->solve_and_collect(out, in, cvector_ref<ColorSpinorField>(), 0, 0);
+    }
+
+    /**
+       @brief a virtual method that performs the inversion and collect the r vectors in PCG.
+       @param out the output vector
+       @param in the input vector
+       @param v_r the series of vectors that is to be collected
+       @param collect_miniter minimal iteration start from which the r vectors are to be collected
+       @param collect_tol maxiter tolerance start from which the r vectors are to be collected
+    */
+    virtual void solve_and_collect(ColorSpinorField &out, ColorSpinorField &in, cvector_ref<ColorSpinorField> &v_r,
+                                   int collect_miniter, double collect_tol);
+
+    virtual bool hermitian() { return true; } /** PCG is only Hermitian system */
   };
 
 
@@ -970,7 +991,7 @@ namespace quda {
     const DiracMdagM matMdagM; // used by the eigensolver
     // pointers to fields to avoid multiple creation overhead
     ColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
-    bool init;
+    bool init = false;
 
   public:
     BiCGstab(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
@@ -1073,7 +1094,7 @@ namespace quda {
     /**
        Solver uses lazy allocation: this flag determines whether we have allocated or not.
      */
-    bool init;
+    bool init = false;
 
     std::string solver_name; // holds BiCGstab-l, where 'l' literally equals n_krylov.
 
@@ -1107,7 +1128,7 @@ namespace quda {
     /**
        Solver uses lazy allocation: this flag to determine whether we have allocated.
      */
-    bool init;
+    bool init = false;
 
     ColorSpinorField r;       //! residual vector
     ColorSpinorField r_sloppy; //! sloppy residual vector
@@ -1153,7 +1174,7 @@ namespace quda {
     ColorSpinorField r_sloppy;
     ColorSpinorField Ar;
     ColorSpinorField x_sloppy;
-    bool init;
+    bool init = false;
 
     /**
        @brief Allocate persistent fields and parameter checking
@@ -1186,7 +1207,7 @@ namespace quda {
   class CACG : public Solver {
 
   protected:
-    bool init;
+    bool init = false;
 
     bool lambda_init;
     QudaCABasis basis;
@@ -1254,7 +1275,7 @@ namespace quda {
     DiracMMdag mmdagEig;
     ColorSpinorField xp;
     ColorSpinorField yp;
-    bool init;
+    bool init = false;
 
     /**
        @brief Initiate the fields needed by the solver
@@ -1286,7 +1307,7 @@ namespace quda {
     DiracMdagM mdagmPrecon;
     DiracMdagM mdagmEig;
     ColorSpinorField br;
-    bool init;
+    bool init = false;
 
     /**
        @brief Initiate the fields needed by the solver
@@ -1320,7 +1341,7 @@ namespace quda {
 
   private:
     const DiracMdagM matMdagM; // used by the eigensolver
-    bool init;
+    bool init = false;
 
     bool lambda_init;  // whether or not lambda_max has been initialized
     QudaCABasis basis; // CA basis
@@ -1368,7 +1389,7 @@ namespace quda {
     private:
       ColorSpinorField *Ar;
       ColorSpinorField *r;
-      bool init;
+      bool init = false;
 
     public:
       SD(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
@@ -1376,26 +1397,7 @@ namespace quda {
 
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
-      virtual bool hermitian() { return false; } /** CGNE is for any linear system */
-  };
-
-  // Extended Steepest Descent solver used for overlapping DD preconditioning
-  class XSD : public Solver
-  {
-  private:
-    ColorSpinorField *xx;
-    ColorSpinorField *bx;
-    SD *sd; // extended sd is implemented using standard sd
-    bool init;
-    int R[4];
-
-  public:
-    XSD(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
-    virtual ~XSD();
-
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
-
-    virtual bool hermitian() { return false; } /** CGNE is for any linear system */
+      virtual bool hermitian() { return false; } /** SD is for any linear system */
   };
 
   class PreconditionedSolver : public Solver
@@ -1478,7 +1480,7 @@ public:
    */
   class MultiShiftCG : public MultiShiftSolver {
 
-    bool init;
+    bool init = false;
     bool mixed;        // whether we will be using mixed precision
     bool reliable;     // whether we will be using reliable updates or not
     bool group_update; // whether we will be using solution group updates
@@ -1597,7 +1599,7 @@ public:
 
     TimeProfile &profile; // time profile for initCG solver
 
-    bool init;
+    bool init = false;
 
 public:
   IncEigCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
@@ -1646,7 +1648,7 @@ public:
 
     GMResDRArgs *gmresdr_args;
 
-    bool init;
+    bool init = false;
 
   public:
     GMResDR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,

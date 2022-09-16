@@ -148,8 +148,7 @@ namespace quda {
     n_krylov(param.Nkrylov),
     alpha(n_krylov),
     beta(n_krylov * n_krylov),
-    gamma(n_krylov),
-    init(false)
+    gamma(n_krylov)
   {
     fillInnerSolveParam(Kparam, param);
 
@@ -178,8 +177,7 @@ namespace quda {
     n_krylov(param.Nkrylov),
     alpha(n_krylov),
     beta(n_krylov * n_krylov),
-    gamma(n_krylov),
-    init(false)
+    gamma(n_krylov)
   {
   }
 

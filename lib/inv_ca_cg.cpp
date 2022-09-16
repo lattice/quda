@@ -16,7 +16,7 @@ namespace quda
 
   CACG::CACG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
              const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile), init(false), lambda_init(false), basis(param.ca_basis)
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile), lambda_init(false), basis(param.ca_basis)
   {
   }
 
@@ -33,8 +33,7 @@ namespace quda
     mmdag(mat.Expose()),
     mmdagSloppy(matSloppy.Expose()),
     mmdagPrecon(matPrecon.Expose()),
-    mmdagEig(matEig.Expose()),
-    init(false)
+    mmdagEig(matEig.Expose())
   {
   }
 
@@ -116,8 +115,7 @@ namespace quda
     mdagm(mat.Expose()),
     mdagmSloppy(matSloppy.Expose()),
     mdagmPrecon(matPrecon.Expose()),
-    mdagmEig(matEig.Expose()),
-    init(false)
+    mdagmEig(matEig.Expose())
   {
   }
 

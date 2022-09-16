@@ -218,8 +218,7 @@ namespace quda {
     r_pre(nullptr),
     p_pre(nullptr),
     eigcg_args(nullptr),
-    profile(profile),
-    init(false)
+    profile(profile)
   {
 
     if (2 * param.n_ev >= param.m)

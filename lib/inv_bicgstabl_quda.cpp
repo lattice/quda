@@ -347,8 +347,7 @@ namespace quda {
                        SolverParam &param, TimeProfile &profile) :
     Solver(mat, matSloppy, matSloppy, matEig, param, profile),
     matMdagM(matEig.Expose()),
-    n_krylov(param.Nkrylov),
-    init(false)
+    n_krylov(param.Nkrylov)
   {
     r.resize(n_krylov + 1);
     u.resize(n_krylov + 1);
