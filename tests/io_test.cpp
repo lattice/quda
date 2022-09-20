@@ -75,7 +75,7 @@ TEST_P(GaugeIOTest, verify)
   for (int i = 0; i < 3; i++) EXPECT_EQ(plaq_old[i], plaq_new[i]);
 
   // cleanup after ourselves and delete the dummy lattice
-  if (remove(file) != 0) errorQuda("Error deleting file");
+  if (::quda::comm_rank() == 0 && remove(file) != 0) errorQuda("Error deleting file");
 
   // release memory
   for (int dir = 0; dir < 4; dir++) { host_free(gauge[dir]); }
@@ -163,7 +163,7 @@ TEST_P(ColorSpinorIOTest, verify)
   }
 
   // cleanup after ourselves and delete the dummy lattice
-  if (remove(file) != 0) errorQuda("Error deleting file");
+  if (::quda::comm_rank() == 0 && remove(file) != 0) errorQuda("Error deleting file");
 }
 
 int main(int argc, char **argv)
