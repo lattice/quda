@@ -79,8 +79,8 @@ struct DslashTestWrapper {
   // Test options
   QudaParity parity = QUDA_EVEN_PARITY;
   dslash_test_type dtest_type = dslash_test_type::Dslash;
-  bool test_split_grid;
-  int num_src;
+  bool test_split_grid = false;
+  int num_src = 1;
 
   const bool transfer = false;
 
