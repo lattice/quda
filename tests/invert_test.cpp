@@ -187,6 +187,13 @@ std::vector<double> solve(test_t param)
   multishift = ::testing::get<4>(param);
   inv_param.solution_accumulator_pipeline = ::testing::get<5>(param);
 
+  // schwarz parameters
+  auto schwarz_param = ::testing::get<6>(param);
+  inv_param.schwarz_type           = ::testing::get<0>(schwarz_param);
+  inv_param.inv_type_precondition  = ::testing::get<1>(schwarz_param);
+  inv_param.cuda_prec_precondition = ::testing::get<2>(schwarz_param);
+  inv_param.clover_cuda_prec_precondition = ::testing::get<2>(schwarz_param);
+
   // reset lambda_max if we're doing a testing loop to ensure correct lambma_max
   if (enable_testing) inv_param.ca_lambda_max = -1.0;
 
@@ -401,7 +408,8 @@ int main(int argc, char **argv)
     if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
     result = RUN_ALL_TESTS();
   } else {
-    solve(test_t {inv_type, solution_type, solve_type, prec_sloppy, multishift, solution_accumulator_pipeline});
+    solve(test_t {inv_type, solution_type, solve_type, prec_sloppy, multishift, solution_accumulator_pipeline,
+                  schwarz_t {precon_schwarz_type, precon_type, prec_precondition} } );
   }
 
   // finalize the QUDA library
