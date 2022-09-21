@@ -120,7 +120,7 @@ namespace quda {
   void DiracTwistedClover::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     M(tmp, in);
     Mdag(out, tmp);
@@ -224,7 +224,7 @@ namespace quda {
 
     bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     if (dagger && symmetric && !reverse) {
-      auto tmp = getTmp(in);
+      auto tmp = getFieldTmp(in);
       TwistCloverInv(tmp, in, 1 - parity);
       WilsonDslash(out, tmp, parity);
     } else {
@@ -253,7 +253,7 @@ namespace quda {
 
     bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     if (dagger && symmetric && !reverse) {
-      auto tmp = getTmp(in);
+      auto tmp = getFieldTmp(in);
       TwistCloverInv(tmp, in, 1 - parity);
       WilsonDslashXpay(out, tmp, parity, x, k);
     } else {
@@ -272,7 +272,7 @@ namespace quda {
   void DiracTwistedCloverPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     double kappa2 = -kappa*kappa;
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     bool symmetric =(matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
@@ -296,7 +296,7 @@ namespace quda {
   void DiracTwistedCloverPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     // need extra temporary because of symmetric preconditioning dagger
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
     M(tmp, in);
     Mdag(out, tmp);
   }
@@ -311,7 +311,7 @@ namespace quda {
       return;
     }
 
-    auto tmp = getTmp(b.Even());
+    auto tmp = getFieldTmp(b.Even());
 
     bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
@@ -350,7 +350,7 @@ namespace quda {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) { return; }
 
     checkFullSpinor(x, b);
-    auto tmp = getTmp(b.Even());
+    auto tmp = getFieldTmp(b.Even());
     int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {

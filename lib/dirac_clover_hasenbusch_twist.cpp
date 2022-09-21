@@ -65,7 +65,7 @@ namespace quda
   void DiracCloverHasenbuschTwist::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     M(tmp, in);
     Mdag(out, tmp);
@@ -138,7 +138,7 @@ namespace quda
   void DiracCloverHasenbuschTwistPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     double kappa2 = -kappa * kappa;
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
@@ -178,7 +178,7 @@ namespace quda
 
   void DiracCloverHasenbuschTwistPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
     M(tmp, in);
     Mdag(out, tmp);
   }

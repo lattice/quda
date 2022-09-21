@@ -52,7 +52,7 @@ namespace quda {
   void DiracWilson::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
     M(tmp, in);
     Mdag(out, tmp);
   }
@@ -108,7 +108,7 @@ namespace quda {
   void DiracWilsonPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     double kappa2 = -kappa*kappa;
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       Dslash(tmp, in, QUDA_ODD_PARITY);
@@ -123,7 +123,7 @@ namespace quda {
 
   void DiracWilsonPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
     M(tmp, in);
     Mdag(out, tmp);
   }

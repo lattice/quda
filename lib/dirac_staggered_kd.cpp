@@ -69,7 +69,7 @@ namespace quda
 
     checkFullSpinor(out, in);
 
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     if (dagger == QUDA_DAG_NO) {
 
@@ -100,7 +100,7 @@ namespace quda
 
   void DiracStaggeredKD::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
     M(tmp, in);
     Mdag(out, tmp);
   }
@@ -133,7 +133,7 @@ namespace quda
     checkFullSpinor(x, b);
 
     // need to modify rhs
-    auto tmp = getTmp(b);
+    auto tmp = getFieldTmp(b);
 
     KahlerDiracInv(tmp, b);
 

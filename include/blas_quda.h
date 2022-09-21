@@ -28,7 +28,7 @@ namespace quda {
 
     inline void zero(cvector_ref<ColorSpinorField> &x)
     {
-      for (auto &xi : x) xi.get().zero();
+      for (auto i = 0u; i < x.size(); i++) x[i].zero();
     }
 
     inline void copy(ColorSpinorField &dst, const ColorSpinorField &src)

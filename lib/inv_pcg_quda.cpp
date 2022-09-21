@@ -205,7 +205,6 @@ namespace quda
       // y contains the original guess.
       blas::copy(y, x);
     } else {
-      std::cout << r.SiteSubset() << " " << b.SiteSubset() << std::endl;
       blas::copy(r, b);
       r2 = b2;
       blas::zero(y);

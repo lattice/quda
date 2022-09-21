@@ -142,7 +142,7 @@ namespace quda {
 
     // zMobius breaks the following code. Refer to the zMobius check in DiracMobius::DiracMobius(param)
     double mobius_kappa_b = 0.5 / (b_5[0].real() * (4.0 + m5) + 1.0);
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     // cannot use Xpay variants since it will scale incorrectly for this operator
     if (dagger == QUDA_DAG_NO) {
@@ -168,7 +168,7 @@ namespace quda {
   void DiracMobius::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     M(tmp, in);
     Mdag(out, tmp);
@@ -385,7 +385,7 @@ namespace quda {
   // Actually, Dslash5 will return M5 operation and M5 = 1 + 0.5*kappa_b/kappa_c * D5
   void DiracMobiusPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
     bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
@@ -450,12 +450,12 @@ namespace quda {
   void DiracMobiusPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
-    auto tmp2 = getTmp(in);
+    auto tmp2 = getFieldTmp(in);
 
     if (symmetric && this->use_mobius_fused_kernel) {
       int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
       QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
-      auto tmp1 = getTmp(in);
+      auto tmp1 = getFieldTmp(in);
 
       Dslash4pre(tmp2, in);
       Dslash4M5invM5pre(tmp1, tmp2, parity[0]);
@@ -475,7 +475,7 @@ namespace quda {
 
   void DiracMobiusPC::MMdag(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
     Mdag(tmp, in);
     M(out, tmp);
   }
@@ -489,7 +489,7 @@ namespace quda {
       sol = &x;
     } else { // we desire solution to full system
       // prepare function in MDWF is not tested yet.
-      auto tmp = getTmp(b.Even());
+      auto tmp = getFieldTmp(b.Even());
 
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
         // src = D5^-1 (b_e + k D4_eo * D4pre * D5^-1 b_o)
@@ -533,7 +533,7 @@ namespace quda {
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) { return; }
 
-    auto tmp = getTmp(b.Even());
+    auto tmp = getFieldTmp(b.Even());
 
     // create full solution
     checkFullSpinor(x, b);
@@ -753,7 +753,7 @@ namespace quda {
 
     // FIXME broken for variable coefficients
     double mobius_kappa_b = 0.5 / (b_5[0].real() * (4.0 + m5) + 1.0);
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     // cannot use Xpay variants since it will scale incorrectly for this operator
     if (dagger == QUDA_DAG_NO) {
@@ -782,7 +782,7 @@ namespace quda {
   void DiracMobiusEofa::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     M(tmp, in);
     Mdag(out, tmp);
@@ -842,7 +842,7 @@ namespace quda {
   // Apply the even-odd preconditioned mobius DWF EOFA operator
   void DiracMobiusEofaPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
     bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
@@ -890,7 +890,7 @@ namespace quda {
       sol = &x;
     } else {
       // we desire solution to full system
-      auto tmp = getTmp(b.Even());
+      auto tmp = getFieldTmp(b.Even());
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
         // src = D5^-1 (b_e + k D4_eo * D4pre * D5^-1 b_o)
         src = &(x.Odd());
@@ -932,7 +932,7 @@ namespace quda {
   void DiracMobiusEofaPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) { return; }
-    auto tmp = getTmp(b.Even());
+    auto tmp = getFieldTmp(b.Even());
 
     // create full solution
     checkFullSpinor(x, b);
@@ -953,7 +953,7 @@ namespace quda {
 
   void DiracMobiusEofaPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
     M(tmp, in);
     Mdag(out, tmp);
   }
@@ -963,8 +963,8 @@ namespace quda {
                                  const ColorSpinorField &in) const // ye = Mee * xe + Meo * xo, yo = Moo * xo + Moe * xe
   {
     checkFullSpinor(out, in);
-    auto tmp1 = getTmp(in);
-    auto tmp2 = getTmp(in);
+    auto tmp1 = getFieldTmp(in);
+    auto tmp2 = getFieldTmp(in);
 
     if (!dagger) {
       // Even

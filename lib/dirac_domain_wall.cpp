@@ -87,7 +87,7 @@ namespace quda {
   void DiracDomainWall::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     M(tmp, in);
     Mdag(out, tmp);
@@ -141,7 +141,7 @@ namespace quda {
   {
     checkDWF(out, in);
     double kappa2 = -kappa5*kappa5;
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       Dslash(tmp, in, QUDA_ODD_PARITY);
@@ -156,7 +156,7 @@ namespace quda {
 
   void DiracDomainWallPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
     M(tmp, in);
     Mdag(out, tmp);
   }

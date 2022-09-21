@@ -37,7 +37,7 @@ namespace quda {
 
   void GaugeCovDev::MdagMCD(ColorSpinorField &out, const ColorSpinorField &in, const int mu) const
   {
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     MCD(tmp, in, mu);
     MCD(out, tmp, (mu+4)%8);

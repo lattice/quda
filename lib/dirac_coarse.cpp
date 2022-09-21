@@ -388,7 +388,7 @@ namespace quda {
 
   void DiracCoarse::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
     M(tmp, in);
     Mdag(out, tmp);
   }
@@ -475,7 +475,7 @@ namespace quda {
 
   void DiracCoarsePC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     if (in.SiteSubset() == QUDA_FULL_SITE_SUBSET || out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
       errorQuda("Cannot apply preconditioned operator to full field (subsets = %d %d)", in.SiteSubset(),
@@ -508,7 +508,7 @@ namespace quda {
 
   void DiracCoarsePC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
     M(tmp, in);
     Mdag(out, tmp);
   }
@@ -523,7 +523,7 @@ namespace quda {
       return;
     }
 
-    auto tmp = getTmp(b.Even());
+    auto tmp = getFieldTmp(b.Even());
 
     // we desire solution to full system
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
@@ -588,7 +588,7 @@ namespace quda {
 
     checkFullSpinor(x, b);
 
-    auto tmp = getTmp(b.Even());
+    auto tmp = getFieldTmp(b.Even());
 
     // create full solution
 

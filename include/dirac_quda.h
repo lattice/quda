@@ -56,7 +56,7 @@ namespace quda {
     QudaPrecision halo_precision; // only does something for DiracCoarse at present
 
     // for multigrid only
-    Transfer *transfer; 
+    Transfer *transfer;
     Dirac *dirac;
     bool need_bidirectional; // whether or not we need to force a bi-directional build
     bool use_mma;            // whether to use tensor cores where applicable
@@ -158,7 +158,7 @@ namespace quda {
     QudaMatPCType matpcType;
     mutable QudaDagType dagger; // mutable to simplify implementation of Mdag
     mutable unsigned long long flops;
-    QudaDiracType type; 
+    QudaDiracType type;
     mutable QudaPrecision halo_precision; // only does something for DiracCoarse at present
 
     mutable int commDim[QUDA_MAX_DIM]; // whether do comms or not
@@ -555,7 +555,7 @@ namespace quda {
     virtual ~DiracClover();
     DiracClover& operator=(const DiracClover &dirac);
 
-    // APply clover
+    // Apply clover
     void Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
 
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
@@ -2178,7 +2178,7 @@ public:
 
     int getStencilSteps() const
     {
-      return dirac->getStencilSteps(); 
+      return dirac->getStencilSteps();
     }
   };
 
@@ -2302,7 +2302,7 @@ public:
 
     int getStencilSteps() const
     {
-      return dirac->getStencilSteps(); 
+      return dirac->getStencilSteps();
     }
   };
 
@@ -2338,7 +2338,7 @@ public:
 
     int getStencilSteps() const
     {
-      return mat.getStencilSteps(); 
+      return mat.getStencilSteps();
     }
   };
 

@@ -100,7 +100,7 @@ namespace quda {
 
   void DiracImprovedStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    auto tmp = getTmp(in.Even());
+    auto tmp = getFieldTmp(in.Even());
 
     //even
     Dslash(tmp, in.Even(), QUDA_ODD_PARITY);
@@ -194,7 +194,7 @@ namespace quda {
     // Note the minus sign convention in the Xpay version.
     // This applies equally for the e <-> o permutation.
 
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
     Dslash(tmp, in, other_parity);
     DslashXpay(out, tmp, parity, in, 4 * mass * mass);
   }

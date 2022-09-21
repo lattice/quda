@@ -89,7 +89,7 @@ namespace quda {
   void DiracDomainWall4D::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     M(tmp, in);
     Mdag(out, tmp);
@@ -155,7 +155,7 @@ namespace quda {
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
     double kappa2 = kappa5*kappa5;
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
     bool symmetric =(matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
@@ -184,7 +184,7 @@ namespace quda {
 
   void DiracDomainWall4DPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
     M(tmp, in);
     Mdag(out, tmp);
   }
@@ -198,7 +198,7 @@ namespace quda {
       src = &b;
       sol = &x;
     } else {  // we desire solution to full system
-      auto tmp = getTmp(b.Even());
+      auto tmp = getFieldTmp(b.Even());
 
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
         // src = M5^-1 (b_e + k D4_eo*M5^-1 b_o)
@@ -242,7 +242,7 @@ namespace quda {
     }				
 
     checkFullSpinor(x, b);
-    auto tmp = getTmp(b.Even());
+    auto tmp = getFieldTmp(b.Even());
 
     // create full solution
     if (matpcType == QUDA_MATPC_EVEN_EVEN ||

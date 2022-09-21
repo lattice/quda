@@ -97,7 +97,7 @@ namespace quda {
 
   void DiracStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     //even
     Dslash(tmp, in.Even(), QUDA_ODD_PARITY);
@@ -170,7 +170,7 @@ namespace quda {
 
   void DiracStaggeredPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    auto tmp = getTmp(in);
+    auto tmp = getFieldTmp(in);
 
     QudaParity parity = QUDA_INVALID_PARITY;
     QudaParity other_parity = QUDA_INVALID_PARITY;
