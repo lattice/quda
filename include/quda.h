@@ -1716,21 +1716,31 @@ extern "C" {
   void destroyDeflationQuda(void *df_instance);
 
   void setMPICommHandleQuda(void *mycomm);
+  
+  // Parameter set for quark smearing operations
+  typedef struct QudaQuarkSmearParam_s {
+    //-------------------------------------------------
+    /** Used to store information pertinent to the operator **/
+    QudaInvertParam *inv_param;
+
+    /** Number of steps to apply **/
+    int  n_steps;
+    /** The width of the Gaussian **/
+    double  width;
+    /** if nonzero then compute two-link, otherwise reuse gaugeSmeared**/
+    int compute_2link;
+    /** if nonzero then delete two-link, otherwise keep two-link for future use**/
+    int delete_2link;
+    /** Set if the input spinor is on a time slice **/
+    int t0;
+  } QudaQuarkSmearParam;
 
   /**
    * Performs two-link Gaussian smearing on a given spinor (for staggered fermions).
    * @param[in,out] h_in Input spinor field to smear
-   * @param[in] inv_param   Contains all metadata regarding host and device storage 
-   *                    and operator which will be applied to the spinor
-   * @param[in] n_steps     Number of steps to apply
-   * @param[in] width       The width of the Gaussian
-   * @param[in] compute_2link nonzero to compute two-link,
-   *                      zero to reuse gaugeSmeared
-   * @param[in] delete_2link nonzero to delete two-link after smearing,
-   *                     zero to keep two-link for future use
-   * @param[in] t0          Set if the input spinor is on a time slice
+   * @param[in] smear_param   Contains all metadata the operator which will be applied to the spinor
    */
-  void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double width, const int compute_2link /*= 1*/, const int delete_2link /*= 0*/, const int t0 /*= -1*/);
+  void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *smear_param);
 
 #ifdef __cplusplus
 }

@@ -324,15 +324,17 @@ struct StaggeredGSmearTestWrapper {//
       }
       case gsmear_test_type::GaussianSmear:
       {
+        QudaQuarkSmearParam qsm_param;
+        qsm_param.inv_param = inv_param;
         double omega       = 2.0;
-        int n_steps        = 50;
-        double smear_coeff = -1.0 * omega * omega / ( 4*n_steps );
+        qsm_param.n_steps        = 50;
+        qsm_param.width          = -1.0 * omega * omega / ( 4*n_steps );
 
-        const int compute_2link = 1;
-        const int delete_2link  = 0;
-        const int t0            = -1;
+        qsm_param.compute_2link = 1;
+        qsm_param.delete_2link  = 0;
+        qsm_param.t0            = -1;
   
-        performTwoLinkGaussianSmearNStep(spinor->V(), &inv_param, n_steps, smear_coeff, compute_2link, delete_2link, t0);
+        performTwoLinkGaussianSmearNStep(spinor->V(), &qsm_param);
 
         break;
       }

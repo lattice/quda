@@ -5445,9 +5445,11 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
 }
  
 
-void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double width, const int compute_2link, const int delete_2link, const int t0)
+void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_param)
 {
-  if(n_steps == 0) return;
+  if(smear_param->n_steps == 0) return;
+  
+  QudaInvertParam *inv_param = smear_param->inv_param;
   
   profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
   profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
@@ -5456,7 +5458,7 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
     
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
-  if ( gaugeSmeared == nullptr || compute_2link != 0 ) {
+  if ( gaugeSmeared == nullptr || smear_param->compute_2link != 0 ) {
   
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gaussian smearing done with gaugeSmeared\n");
     if ( gaugeSmeared != nullptr) delete gaugeSmeared;
@@ -5543,19 +5545,19 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   *in = *in_h;
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_H2D);
 
-  const double ftmp    = -(width*width)/(4.0*n_steps*4.0);  /* Extra 4 to compensate for stride 2 */
+  const double ftmp    = -(smear_param->width*smear_param->width)/(4.0*smear_param->n_steps*4.0);  /* Extra 4 to compensate for stride 2 */
   // Scale up the source to prevent underflow
   profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
   
   const double msq     = 1. / ftmp;  
   const double a       = inv_param->laplace3D * 2.0 + msq;
   const QudaParity  parity   = QUDA_INVALID_PARITY;
-  for (int i = 0; i < n_steps; i++) {
+  for (int i = 0; i < smear_param->n_steps; i++) {
     if (i > 0) std::swap(in, out);
     blas::ax(ftmp, *in);
     blas::axpy(a, *in, *temp1);
     
-    qsmear_op.Expose()->SmearOp(*out, *in, a, 0.0, t0, parity);
+    qsmear_op.Expose()->SmearOp(*out, *in, a, 0.0, smear_param->t0, parity);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       double norm = blas::norm2(*out);
       printfQuda("Step %d, vector norm %e\n", i, norm);
@@ -5581,7 +5583,7 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   delete in_h;
   delete d;
 
-  if( delete_2link != 0 )
+  if( smear_param->delete_2link != 0 )
   {
     delete gaugeSmeared;
     gaugeSmeared = nullptr;
