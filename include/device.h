@@ -1,5 +1,7 @@
 #pragma once
 
+#include <quda_api.h>
+
 namespace quda
 {
 

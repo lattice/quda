@@ -31,26 +31,6 @@ namespace quda
      @param arg Kernel argument struct
      @return Swizzled block index
    */
-#if 0
-  template <typename Arg> __device__ constexpr int virtual_block_idx(const Arg &arg)
-  {
-    auto block_idx = blockIdx.x;
-    if (arg.swizzle) {
-      // the portion of the grid that is exactly divisible by the number of SMs
-      const auto gridp = gridDim.x - gridDim.x % arg.swizzle_factor;
-
-      if (block_idx < gridp) {
-        // this is the portion of the block that we are going to transpose
-        const int i = blockIdx.x % arg.swizzle_factor;
-        const int j = blockIdx.x / arg.swizzle_factor;
-
-        // transpose the coordinates
-        block_idx = i * (gridp / arg.swizzle_factor) + j;
-      }
-    }
-    return block_idx;
-  }
-#else
   template <typename Arg>
   int virtual_block_idx(const Arg &arg, const sycl::nd_item<3> &ndi)
   {
@@ -76,7 +56,6 @@ namespace quda
     }
     return block_idx;
   }
-#endif
 
   /**
      @brief This class is derived from the arg class that the functor
@@ -118,6 +97,17 @@ namespace quda
     Transformer<Arg> t(arg);
     t(block_idx, thread_idx);
   }
+  template <template <typename> class Functor, typename Arg>
+  struct BlockKernel2DS {
+    BlockKernel2DS(const Arg &arg, const sycl::nd_item<3> &ndi)
+    {
+#ifdef QUDA_THREADS_BLOCKED
+      BlockKernel2DImpl<Functor,Arg>(arg, ndi);
+#else
+      BlockKernel2DImpl<Functor,Arg>(arg, ndi);
+#endif
+    }
+  };
 
   template <template <typename> class Transformer, typename Arg, bool grid_stride=false>
   qudaError_t
@@ -127,14 +117,21 @@ namespace quda
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
-    sycl::nd_range<3> ndRange{globalSize, localSize};
-    auto q = device::get_target_stream(stream);
+    if (globalSize[RANGE_Z]!=arg.threads.z) {
+      globalSize[RANGE_Z] = arg.threads.z;
+    }
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("BlockKernel2D sizeof(arg): %lu\n", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
 		 str(localSize).c_str(), str(arg.threads).c_str());
       printfQuda("  Transformer: %s\n", typeid(Transformer<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
+    }
+    if (globalSize[RANGE_Y]!=arg.threads.y) {
+      errorQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
+    }
+    if (globalSize[RANGE_Z]!=arg.threads.z) {
+      errorQuda("globalSize Z (%lu) != arg.threads.z (%i)", globalSize[RANGE_Z], arg.threads.z);
     }
     //if (arg.threads.x%tp.block.x+arg.threads.y%tp.block.y+arg.threads.z%tp.block.z) {
     //  if (Arg::hasBlockOps()) {
@@ -143,34 +140,8 @@ namespace quda
     //warningQuda("BK2D %s nondiv %s %s %s", grid_stride?"true":"false",
     //	  str(arg.threads).c_str(), str(tp.block).c_str(), typeid(Arg).name());
     //}
-    //sycl::buffer<const char,1>
-    //  buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
-    auto size = sizeof(arg);
-    auto p = device::get_arg_buf(stream, size);
-    memcpy(p, &arg, size);
-    //auto evnt = q.memcpy(p, &arg, size);
-    try {
-      q.submit([&](sycl::handler& h) {
-	//auto a = buf.get_access<sycl::access::mode::read,
-	//			sycl::access::target::constant_buffer>(h);
-	//h.parallel_for<class BlockKernel2D>
-	h.parallel_for<>
-	  (ndRange,
-	   [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
-	     //quda::BlockKernel2DImpl<Transformer, Arg>(arg, ndi);
-	     //const char *p = a.get_pointer();
-	     const Arg *arg2 = reinterpret_cast<const Arg*>(p);
-	     quda::BlockKernel2DImpl<Transformer, Arg>(*arg2, ndi);
-	   });
-      });
-    } catch (sycl::exception const& e) {
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-	printfQuda("  Caught synchronous SYCL exception:\n  %s\n",e.what());
-      }
-      err = QUDA_ERROR;
-    }
-    //device::wasSynced(stream);
-    //evnt.wait();
+    sycl::nd_range<3> ndRange{globalSize, localSize};
+    err = launch<BlockKernel2DS<Transformer, Arg>>(stream, ndRange, arg);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("end BlockKernel2D\n");
     }

@@ -21,9 +21,10 @@ namespace quda
        @tparam Ny Y-field vector i/o length
        @tparam Functor_ Functor used to operate on data
     */
-    template <typename real_, int n_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
-    struct BlasArg : kernel_param<> {
+    template <typename real_, int n_, typename store_t, int N, typename y_store_t, int Ny, typename Functor_>
+    struct BlasArg : kernel_param<Functor_::use_kernel_arg> {
       using real = real_;
+      using Functor = Functor_;
       static constexpr int n = n_;
       Spinor<store_t, N> X;
       Spinor<y_store_t, Ny> Y;
@@ -35,7 +36,7 @@ namespace quda
       const int nParity;
       BlasArg(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
               ColorSpinorField &v, Functor f, int length, int nParity) :
-        kernel_param(dim3(length, nParity, 1)),
+        kernel_param<Functor::use_kernel_arg>(dim3(length, nParity, 1)),
         X(x),
         Y(y),
         Z(z),
@@ -46,6 +47,8 @@ namespace quda
       { ; }
     };
 
+    template <typename real> struct caxpyxmazMR_;
+
     /**
        Generic blas functor  with four loads and up to four stores.
     */
@@ -54,7 +57,11 @@ namespace quda
       constexpr Blas_(const Arg &arg) : arg(const_cast<Arg&>(arg))
       {
         // this assertion ensures it's safe to make the arg non-const (required for caxpyxmazMR)
-        static_assert(Arg::use_kernel_arg, "This functor must be passed as a kernel argument");
+        // This catch-all assertion is lenient and only checks the struct member.
+        // BlasArg above uses a stringent assertion that matches Functor.
+        if constexpr (std::is_same_v<typename Arg::Functor, caxpyxmazMR_<typename Arg::real>>) {
+          static_assert(device::use_kernel_arg<Arg>(), "This functor must be passed as a kernel argument");
+        }
       }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
@@ -85,6 +92,7 @@ namespace quda
        Base class from which all blas functors should derive
      */
     struct BlasFunctor {
+      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE;
       //! pre-computation routine before the main loop
       __device__ __host__ void init() const { ; }
     };
@@ -363,6 +371,7 @@ namespace quda
        Second performs the operator x[i] -= a*z[i]
     */
     template <typename real> struct caxpyxmazMR_ {
+      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::ALWAYS;
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
       complex<real> a;

@@ -23,7 +23,7 @@ namespace quda
        @tparam Reducer_ Functor used to operate on data
     */
     template <typename real_, int n_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
-    struct ReductionArg : public ReduceArg<typename Reducer_::reduce_t> {
+    struct ReductionArg : public ReduceArg<typename Reducer_::reduce_t, Reducer_::use_kernel_arg> {
       using real = real_;
       static constexpr int n = n_;
       using Reducer = Reducer_;
@@ -40,7 +40,7 @@ namespace quda
 
       ReductionArg(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
                    ColorSpinorField &v, Reducer r, int length, int nParity) :
-        ReduceArg<reduce_t>(dim3(length, 1, 1)),
+        ReduceArg<reduce_t, Reducer_::use_kernel_arg>(dim3(length, 1, 1)),
         X(x),
         Y(y),
         Z(z),
@@ -50,6 +50,9 @@ namespace quda
         length_cb(length / nParity),
         nParity(nParity) { }
     };
+
+    template <typename real_reduce_t, typename real> struct HeavyQuarkResidualNorm_;
+    template <typename real_reduce_t, typename real> struct xpyHeavyQuarkResidualNorm_;
 
     /**
        Generic reduction kernel with up to five loads and saves.
@@ -62,7 +65,14 @@ namespace quda
       constexpr Reduce_(const Arg &arg) : arg(const_cast<Arg&>(arg))
       {
         // this assertion ensures it's safe to make the arg non-const (required for HQ residual)
-        static_assert(Arg::use_kernel_arg, "This functor must be passed as a kernel argument");
+        // This catch-all assertion is lenient and only checks the struct member.
+        // ReductionArg above uses a stringent assertion that matches Reducer.
+        if constexpr (std::is_same_v<typename Arg::Reducer,
+                                     HeavyQuarkResidualNorm_<device_reduce_t, typename Arg::real>> ||
+                      std::is_same_v<typename Arg::Reducer,
+                                     xpyHeavyQuarkResidualNorm_<device_reduce_t, typename Arg::real>>) {
+          static_assert(device::use_kernel_arg<Arg>(), "This functor must be passed as a kernel argument");
+        }
       }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
@@ -102,6 +112,7 @@ namespace quda
     */
     template <typename reduce_t_, bool site_unroll_ = false>
     struct ReduceFunctor {
+      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE;
       using reduce_t = reduce_t_;
       static constexpr bool site_unroll = site_unroll_;
 
@@ -443,6 +454,7 @@ namespace quda
     */
     template <typename real_reduce_t, typename real>
     struct HeavyQuarkResidualNorm_ {
+      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::ALWAYS;
       using reduce_t = array<real_reduce_t, 3>;
       static constexpr bool site_unroll = true;
 
@@ -488,6 +500,7 @@ namespace quda
     */
     template <typename real_reduce_t, typename real>
     struct xpyHeavyQuarkResidualNorm_ {
+      static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::ALWAYS;
       using reduce_t = array<real_reduce_t, 3>;
       static constexpr bool site_unroll = true;
 

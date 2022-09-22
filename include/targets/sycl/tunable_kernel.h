@@ -1,10 +1,12 @@
 #pragma once
 
+#include <device.h>
 #include <tune_quda.h>
 #include <target_device.h>
 #include <kernel_helper.h>
-//#include <kernel.h>
 #include <quda_sycl.h>
+#include <quda_sycl_api.h>
+#include <reduce_helper.h>
 
 namespace quda {
 
@@ -54,6 +56,100 @@ namespace quda {
     r[RANGE_Y] = tp.block.y;
     r[RANGE_Z] = tp.block.z;
     return r;
+  }
+
+  template <typename F, typename Arg>
+  std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
+  launch(const qudaStream_t &stream, sycl::nd_range<3> &ndRange, const Arg &arg)
+  {
+    static_assert(sizeof(Arg)<=device::max_kernel_arg_size(), "kernel arg too large");
+    qudaError_t err = QUDA_SUCCESS;
+    auto q = device::get_target_stream(stream);
+    try {
+      q.submit([&](sycl::handler &h) {
+	h.parallel_for<>
+	  (ndRange,
+	   //[=](sycl::nd_item<3> ndi) {
+	   [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
+	     F f(arg, ndi);
+	   });
+      });
+    } catch (sycl::exception const& e) {
+      auto what = e.what();
+      target::sycl::set_error(what, "submit", __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+	printfQuda("  Caught synchronous SYCL exception:\n  %s\n",e.what());
+      }
+      err = QUDA_ERROR;
+    }
+    return err;
+  }
+
+  template <typename F, typename Arg>
+  std::enable_if_t<!device::use_kernel_arg<Arg>(), qudaError_t>
+  launch(const qudaStream_t &stream, sycl::nd_range<3> &ndRange, const Arg &arg)
+  {
+    qudaError_t err = QUDA_SUCCESS;
+    auto q = device::get_target_stream(stream);
+    auto size = sizeof(arg);
+    auto ph = device::get_arg_buf(stream, size);
+    memcpy(ph, &arg, size);
+    auto p = ph;
+    try {
+      q.submit([&](sycl::handler &h) {
+	h.parallel_for<>
+	  (ndRange,
+	   //[=](sycl::nd_item<3> ndi) {
+	   [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
+	     const Arg *arg2 = reinterpret_cast<const Arg*>(p);
+	     F f(*arg2, ndi);
+	   });
+      });
+    } catch (sycl::exception const& e) {
+      auto what = e.what();
+      target::sycl::set_error(what, "submit", __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+	printfQuda("  Caught synchronous SYCL exception:\n  %s\n",e.what());
+      }
+      err = QUDA_ERROR;
+    }
+    return err;
+  }
+
+  template <template <typename> class Transformer, typename F, typename Arg>
+  std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
+  launchR(const qudaStream_t &stream, sycl::nd_range<3> &ndRange, const Arg &arg)
+  {
+    static_assert(sizeof(Arg)<=device::max_kernel_arg_size(), "kernel arg too large");
+    qudaError_t err = QUDA_SUCCESS;
+    auto q = device::get_target_stream(stream);
+    using reduce_t = typename Transformer<Arg>::reduce_t;
+    using reducer_t = typename Transformer<Arg>::reducer_t;
+    auto result_h = reinterpret_cast<reduce_t *>(quda::reducer::get_host_buffer());
+    *result_h = reducer_t::init();
+    reduce_t *result_d = result_h;
+    if (commAsyncReduction()) {
+      result_d = reinterpret_cast<reduce_t *>(quda::reducer::get_device_buffer());
+      q.memcpy(result_d, result_h, sizeof(reduce_t));
+    }
+    auto reducer_h = sycl::reduction(result_d, *result_h, reducer_t());
+    try {
+      q.submit([&](sycl::handler& h) {
+	h.parallel_for<>
+	  (ndRange, reducer_h,
+	   [=](sycl::nd_item<3> ndi, auto &reducer_d) {
+	     F::apply(arg, ndi, reducer_d);
+	   });
+      });
+    } catch (sycl::exception const& e) {
+      auto what = e.what();
+      target::sycl::set_error(what, "submit", __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+	printfQuda("  Caught synchronous SYCL exception:\n  %s\n",e.what());
+      }
+      err = QUDA_ERROR;
+    }
+    return err;
   }
 
 }
