@@ -61,7 +61,7 @@ namespace quda
       checkPrecision(out, in, U); // check all precisions match
       checkLocation(out, in, U);  // check all locations match
       if (!in.isNative() || !U.isNative())
-        errorQuda("Unsupported field order colorspinor(in)=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
+        errorQuda("Unsupported field order colorspinor(in)=%d gauge=%d combination", in.FieldOrder(), U.FieldOrder());
       if (dir < 3 || dir > 4) errorQuda("Unsupported laplace direction %d (must be 3 or 4)", dir);
 
       for( int i=0; i<4; i++ )
@@ -116,13 +116,13 @@ namespace quda
             const Link U = arg.U(d, coord.x_cb, parity);
             const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);//?
 
-            mv_add(U, in, out);
+            out = mv_add(U, in, out);
 
           } else if (doBulk<kernel_type>() && !ghost) {//doBulk
             const int _2hop_fwd_idx    = linkIndexP2(coord, arg.dim, d);
             const Vector in_2hop       = arg.in(_2hop_fwd_idx, their_spinor_parity);
             const Link U_2link         = arg.U(d, coord.x_cb, parity);            
-            mv_add(U_2link, in_2hop, out);
+            out = mv_add(U_2link, in_2hop, out);
           }
         }
         {
@@ -136,7 +136,7 @@ namespace quda
             const Link U = arg.U.Ghost(d, ghost_idx, parity);
             const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
 	    
-            mv_add(conj(U), in, out);	    
+            out = mv_add(conj(U), in, out);
 
           } else if (doBulk<kernel_type>() && !ghost) {//?
           
@@ -145,7 +145,7 @@ namespace quda
           
             const Link   U_2link = arg.U(d, _2hop_gauge_idx, parity);
             const Vector in_2hop = arg.in(_2hop_back_idx, their_spinor_parity);
-            mv_add(conj(U_2link), in_2hop, out);
+            out = mv_add(conj(U_2link), in_2hop, out);
           }
         }
       }
