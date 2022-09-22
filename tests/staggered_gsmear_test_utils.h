@@ -325,8 +325,9 @@ struct StaggeredGSmearTestWrapper {//
       case gsmear_test_type::GaussianSmear:
       {
         QudaQuarkSmearParam qsm_param;
-        qsm_param.inv_param = inv_param;
-        double omega       = 2.0;
+        qsm_param.inv_param      = &inv_param;
+
+        double omega             = 2.0;
         qsm_param.n_steps        = 50;
         qsm_param.width          = -1.0 * omega * omega / ( 4*n_steps );
 

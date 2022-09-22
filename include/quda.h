@@ -1753,7 +1753,7 @@ extern "C" {
    * @param[in,out] h_in Input spinor field to smear
    * @param[in] smear_param   Contains all metadata the operator which will be applied to the spinor
    */
-  void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *smear_param);
+  void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_param);
 
 #ifdef __cplusplus
 }
