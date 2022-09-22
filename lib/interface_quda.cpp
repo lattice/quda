@@ -5281,11 +5281,6 @@ void gaussGaugeQuda(unsigned long long seed, double sigma)
 
   cudaGaugeField *data = gaugePrecise;
 
-  GaugeFieldParam param(*data);
-  param.reconstruct = QUDA_RECONSTRUCT_12;
-  param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  cudaGaugeField u(param);
-
   profileGauss.TPSTART(QUDA_PROFILE_COMPUTE);
   quda::gaugeGauss(*data, seed, sigma);
   profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -5294,6 +5289,21 @@ void gaussGaugeQuda(unsigned long long seed, double sigma)
     extendedGaugeResident->copy(*gaugePrecise);
     extendedGaugeResident->exchangeExtendedGhost(R, profileGauss, redundant_comms);
   }
+
+  profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void gaussMomQuda(unsigned long long seed, double sigma)
+{
+  profileGauss.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (!momResident) errorQuda("Cannot generate Gauss GaugeField as there is no resident momentum field");
+
+  cudaGaugeField *data = momResident;
+
+  profileGauss.TPSTART(QUDA_PROFILE_COMPUTE);
+  quda::gaugeGauss(*data, seed, sigma);
+  profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
 }
@@ -5340,10 +5350,8 @@ void computeGaugeLoopTraceQuda(double _Complex *traces, int **input_path_buf, in
 {
   if (!gaugePrecise) errorQuda("Cannot compute gauge loop traces as there is no resident gauge field");
 
-  if (extendedGaugeResident) {
-    delete extendedGaugeResident;
-    extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGaugeObs);
-  }
+  if (extendedGaugeResident) delete extendedGaugeResident;
+  extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGaugeObs);
 
   // informed by gauge path code; apply / remove gauge as appropriate
   if (extendedGaugeResident->StaggeredPhaseApplied()) extendedGaugeResident->removeStaggeredPhase();
@@ -5708,11 +5716,15 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
   checkGaugeParam(param);
 
   GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_INIT);
+
   GaugeFieldParam gParam(*param, gauge);
+  gParam.location = QUDA_CPU_FIELD_LOCATION;
+  gParam.site_offset = param->gauge_offset;
+  gParam.site_size = param->site_size;
   auto *cpuGauge = new cpuGaugeField(gParam);
 
-  // gParam.pad = getFatLinkPadding(param->X);
   gParam.create = QUDA_NULL_FIELD_CREATE;
+  gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.link_type = param->type;
   gParam.reconstruct = param->reconstruct;
   gParam.setPrecision(gParam.Precision(), true);
@@ -5721,15 +5733,11 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
   GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_INIT);
   GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_H2D);
 
-  ///if (!param->use_resident_gauge) {   // load fields onto the device
   cudaInGauge->loadCPUField(*cpuGauge);
- /* } else { // or use resident fields already present
-    if (!gaugePrecise) errorQuda("No resident gauge field allocated");
-    cudaInGauge = gaugePrecise;
-    gaugePrecise = nullptr;
-  } */
 
   GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_H2D);
+
+  cudaGaugeField *cudaInGaugeEx = nullptr;
 
   if (comm_size() == 1) {
     // perform the update
@@ -5738,7 +5746,7 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
                    stopWtheta);
     GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_COMPUTE);
   } else {
-    cudaGaugeField *cudaInGaugeEx = createExtendedGauge(*cudaInGauge, R, GaugeFixOVRQuda);
+    cudaInGaugeEx = createExtendedGauge(*cudaInGauge, R, GaugeFixOVRQuda);
 
     // perform the update
     GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -5746,7 +5754,6 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
                    stopWtheta);
     GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-    //HOW TO COPY BACK TO CPU: cudaInGaugeEx->cpuGauge
     copyExtendedGauge(*cudaInGauge, *cudaInGaugeEx, QUDA_CUDA_FIELD_LOCATION);
   }
 
@@ -5760,9 +5767,14 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
   if (param->make_resident_gauge) {
     if (gaugePrecise != nullptr) delete gaugePrecise;
     gaugePrecise = cudaInGauge;
+    if (extendedGaugeResident) delete extendedGaugeResident;
+    extendedGaugeResident = cudaInGaugeEx;
   } else {
     delete cudaInGauge;
+    if (cudaInGaugeEx) delete cudaInGaugeEx;
   }
+
+  delete cpuGauge;
 
   if(timeinfo){
     timeinfo[0] = GaugeFixOVRQuda.Last(QUDA_PROFILE_H2D);
@@ -5784,27 +5796,23 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
   GaugeFixFFTQuda.TPSTART(QUDA_PROFILE_INIT);
 
   GaugeFieldParam gParam(*param, gauge);
+  gParam.location = QUDA_CPU_FIELD_LOCATION;
+  gParam.site_offset = param->gauge_offset;
+  gParam.site_size = param->site_size;
   auto *cpuGauge = new cpuGaugeField(gParam);
 
-  //gParam.pad = getFatLinkPadding(param->X);
-  gParam.create      = QUDA_NULL_FIELD_CREATE;
-  gParam.link_type   = param->type;
+  gParam.create = QUDA_NULL_FIELD_CREATE;
+  gParam.location = QUDA_CUDA_FIELD_LOCATION;
+  gParam.link_type = param->type;
   gParam.reconstruct = param->reconstruct;
   gParam.setPrecision(gParam.Precision(), true);
   auto *cudaInGauge = new cudaGaugeField(gParam);
-
 
   GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_INIT);
 
   GaugeFixFFTQuda.TPSTART(QUDA_PROFILE_H2D);
 
-  //if (!param->use_resident_gauge) {   // load fields onto the device
   cudaInGauge->loadCPUField(*cpuGauge);
-  /*} else { // or use resident fields already present
-    if (!gaugePrecise) errorQuda("No resident gauge field allocated");
-    cudaInGauge = gaugePrecise;
-    gaugePrecise = nullptr;
-  } */
 
   GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_H2D);
 

@@ -1558,16 +1558,28 @@ extern "C" {
 
   /**
      @brief Generate Gaussian distributed fields and store in the
-     resident gauge field.  We create a Gaussian-distributed su(n)
+     resident gauge field. We create a Gaussian-distributed su(n)
      field and exponentiate it, e.g., U = exp(sigma * H), where H is
-     the distributed su(n) field and beta is the width of the
-     distribution (beta = 0 results in a free field, and sigma = 1 has
+     the distributed su(n) field and sigma is the width of the
+     distribution (sigma = 0 results in a free field, and sigma = 1 has
      maximum disorder).
 
      @param seed The seed used for the RNG
      @param sigma Width of Gaussian distrubution
   */
   void gaussGaugeQuda(unsigned long long seed, double sigma);
+
+  /**
+   * @brief Generate Gaussian distributed fields and store in the
+   * resident momentum field. We create a Gaussian-distributed su(n)
+   * field, e.g., sigma * H, where H is the distributed su(n) field
+   * and sigma is the width of the distribution (sigma = 0 results
+   * in a free field, and sigma = 1 has maximum disorder).
+   *
+   * @param seed The seed used for the RNG
+   * @param sigma Width of Gaussian distrubution
+   */
+  void gaussMomQuda(unsigned long long seed, double sigma);
 
   /**
    * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
@@ -1658,6 +1670,7 @@ extern "C" {
                                 const unsigned int verbose_interval, const double relax_boost, const double tolerance,
                                 const unsigned int reunit_interval, const unsigned int stopWtheta,
                                 QudaGaugeParam *param, double *timeinfo);
+
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] gauge, gauge field to be fixed
