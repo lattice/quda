@@ -221,6 +221,73 @@ namespace quda {
       }
     };
 
+    template <typename Arg> class SideLinkForce : public TunableKernel3D {
+      Arg &arg;
+      const GaugeField &outA;
+      const GaugeField &outB;
+      const GaugeField &pMu;
+      const GaugeField &qMu;
+      const GaugeField &p3;
+      const GaugeField &link;
+      const HisqForceType type;
+      unsigned int minThreads() const { return arg.threads.x; }
+
+    public:
+      SideLinkForce(Arg &arg, const GaugeField &link, int sig, int mu, HisqForceType type,
+                   const GaugeField &outA, const GaugeField &outB, const GaugeField &pMu,
+                   const GaugeField &qMu, const GaugeField &p3) :
+        TunableKernel3D(link, 2, 1),
+        arg(arg),
+        outA(outA),
+        outB(outB),
+        pMu(pMu),
+        qMu(qMu),
+        p3(p3),
+        link(link),
+        type(type)
+      {
+        arg.sig = sig;
+        arg.mu = mu;
+
+        strcat(aux, (std::string(comm_dim_partitioned_string()) + "threads=" + std::to_string(arg.threads.x)).c_str());
+        strcat(aux, (std::string(",mu=") + std::to_string(arg.mu)).c_str()); // no sig dependence needed for side link
+
+        strcat(aux, ",SIDE_LINK");
+
+        apply(device::get_default_stream());
+      }
+
+      void apply(const qudaStream_t &stream)
+      {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        if (goes_forward(arg.mu)) {
+          launch<SideLink>(tp, stream, FatLinkParam<Arg, 1>(arg));
+        } else {
+          launch<SideLink>(tp, stream, FatLinkParam<Arg, 0>(arg));
+        }
+      }
+
+      void preTune() {
+        outB.backup();
+        outA.backup();
+      }
+
+      void postTune() {
+        outB.restore();
+        outA.restore();
+      }
+
+      long long flops() const {
+        return 2*arg.threads.x*2*234;
+      }
+
+      long long bytes() const {
+        return 2*arg.threads.x*( 2*arg.outA.Bytes() + 2*arg.outB.Bytes() +
+                               arg.p3.Bytes() + arg.link.Bytes() + arg.qProd.Bytes() );
+      }
+    };
+
+
     template <typename Arg> class FatLinkForce : public TunableKernel3D {
       Arg &arg;
       const GaugeField &outA;
@@ -261,7 +328,6 @@ namespace quda {
 
         switch (type) {
         case FORCE_LEPAGE_MIDDLE_LINK: strcat(aux, ",LEPAGE_MIDDLE_LINK"); break;
-        case FORCE_SIDE_LINK:          strcat(aux, ",SIDE_LINK");          break;
         case FORCE_SIDE_LINK_SHORT:    strcat(aux, ",SIDE_LINK_SHORT");    break;
         default: errorQuda("Undefined force type %d", type);
         }
@@ -286,13 +352,6 @@ namespace quda {
             launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 0, 0, false, false, true>(arg));
           }
           break;
-        case FORCE_SIDE_LINK:
-          if (goes_forward(arg.mu)) {
-            launch<SideLink>(tp, stream, FatLinkParam<Arg, 1>(arg));
-          } else {
-            launch<SideLink>(tp, stream, FatLinkParam<Arg, 0>(arg));
-          }
-          break;
         case FORCE_SIDE_LINK_SHORT:
           if (goes_forward(arg.mu)) {
             launch<SideLinkShort>(tp, stream, FatLinkParam<Arg, 1>(arg));
@@ -311,10 +370,6 @@ namespace quda {
           outA.backup();
           p3.backup();
           break;
-        case FORCE_SIDE_LINK:
-          outB.backup();
-          outA.backup();
-          break;
         case FORCE_SIDE_LINK_SHORT:
           outA.backup();
           break;
@@ -327,10 +382,6 @@ namespace quda {
         case FORCE_LEPAGE_MIDDLE_LINK:
           outA.restore();
           p3.restore();
-          break;
-        case FORCE_SIDE_LINK:
-          outB.restore();
-          outA.restore();
           break;
         case FORCE_SIDE_LINK_SHORT:
           outA.restore();
@@ -347,7 +398,6 @@ namespace quda {
                                 (arg.q_prev && (arg.q_mu || goes_forward(arg.sig) ) ? 198 : 0) +
                                 ((arg.q_prev && goes_forward(arg.sig) ) ?  198 : 0) +
                                 ( goes_forward(arg.sig) ? 216 : 0) );
-        case FORCE_SIDE_LINK:       return 2*arg.threads.x*2*234;
         case FORCE_SIDE_LINK_SHORT: return 2*arg.threads.x*36;
         default: errorQuda("Undefined force type %d", type);
         }
@@ -362,9 +412,6 @@ namespace quda {
                                  (arg.q_mu ? arg.qMu.Bytes() : 0) +
                                  ( ( goes_forward(arg.sig) || arg.q_mu ) ? arg.qPrev.Bytes() : 0) +
                                  arg.p3.Bytes() + 3*arg.link.Bytes() + arg.oProd.Bytes() );
-        case FORCE_SIDE_LINK:
-          return 2*arg.threads.x*( 2*arg.outA.Bytes() + 2*arg.outB.Bytes() +
-                                 arg.p3.Bytes() + arg.link.Bytes() + arg.qProd.Bytes() );
         case FORCE_SIDE_LINK_SHORT:
           return 2*arg.threads.x*( 2*arg.outA.Bytes() + arg.p3.Bytes() );
         default: errorQuda("Undefined force type %d", type);
@@ -424,7 +471,7 @@ namespace quda {
 
               //5-link: side link
               FatLinkArg<real, nColor> arg(newOprod, P3, P5, Qmu, link, mFiveSt, (ThreeSt != 0 ? FiveSt/ThreeSt : 0), 1, FORCE_SIDE_LINK);
-              FatLinkForce<decltype(arg)> side(arg, link, sig, nu, FORCE_SIDE_LINK, newOprod, P3, P5, P5, Qmu);
+              SideLinkForce<decltype(arg)> side(arg, link, sig, nu, FORCE_SIDE_LINK, newOprod, P3, P5, P5, Qmu);
 
             } //nu
 
@@ -434,7 +481,7 @@ namespace quda {
               FatLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, FORCE_LEPAGE_MIDDLE_LINK, newOprod, newOprod, P5, P5, Qmu);
 
               FatLinkArg<real, nColor> arg(newOprod, P3, P5, Qmu, link, mLepage, (ThreeSt != 0 ? Lepage/ThreeSt : 0), 2, FORCE_SIDE_LINK);
-              FatLinkForce<decltype(arg)> side(arg, link, sig, mu, FORCE_SIDE_LINK, newOprod, P3, P5, P5, Qmu);
+              SideLinkForce<decltype(arg)> side(arg, link, sig, mu, FORCE_SIDE_LINK, newOprod, P3, P5, P5, Qmu);
             } // Lepage != 0.0
 
             // 3-link side link
