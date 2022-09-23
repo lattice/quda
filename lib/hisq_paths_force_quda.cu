@@ -150,6 +150,77 @@ namespace quda {
 
     };
 
+    template <typename Arg> class AllLinkForce : public TunableKernel3D {
+      Arg &arg;
+      const GaugeField &outA;
+      const GaugeField &outB;
+      const GaugeField &pMu;
+      const GaugeField &qMu;
+      const GaugeField &p3;
+      const GaugeField &link;
+      const HisqForceType type;
+      unsigned int minThreads() const { return arg.threads.x; }
+
+    public:
+      AllLinkForce(Arg &arg, const GaugeField &link, int sig, int mu, HisqForceType type,
+                   const GaugeField &outA, const GaugeField &outB, const GaugeField &pMu,
+                   const GaugeField &qMu, const GaugeField &p3) :
+        TunableKernel3D(link, 2, 1),
+        arg(arg),
+        outA(outA),
+        outB(outB),
+        pMu(pMu),
+        qMu(qMu),
+        p3(p3),
+        link(link),
+        type(type)
+      {
+        arg.sig = sig;
+        arg.mu = mu;
+
+        strcat(aux, (std::string(comm_dim_partitioned_string()) + "threads=" + std::to_string(arg.threads.x)).c_str());
+        strcat(aux, (std::string(",mu=") + std::to_string(arg.mu)).c_str()); // no sig dependence needed for side link
+        // does the all link force also need sigma dependence??
+
+        strcat(aux, ",ALL_LINK");
+
+        apply(device::get_default_stream());
+      }
+
+      void apply(const qudaStream_t &stream)
+      {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
+          launch<AllLink>(tp, stream, FatLinkParam<Arg, 1, 1>(arg));
+        } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
+          launch<AllLink>(tp, stream, FatLinkParam<Arg, 0, 1>(arg));
+        } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
+          launch<AllLink>(tp, stream, FatLinkParam<Arg, 1, 0>(arg));
+        } else {
+          launch<AllLink>(tp, stream, FatLinkParam<Arg, 0, 0>(arg));
+        }
+      }
+
+      void preTune() {
+        outA.backup();
+        outB.backup();
+      }
+
+      void postTune() {
+        outA.restore();
+        outB.restore();
+      }
+
+      long long flops() const {
+        return 2*arg.threads.x*(goes_forward(arg.sig) ? 1242ll : 828ll);
+      }
+
+      long long bytes() const {
+        return 2*arg.threads.x*( (goes_forward(arg.sig) ? 4 : 2)*arg.outA.Bytes() + 3*arg.link.Bytes()
+                               + arg.oProd.Bytes() + arg.qPrev.Bytes() + 2*arg.outB.Bytes());
+      }
+    };
+
     template <typename Arg> class FatLinkForce : public TunableKernel3D {
       Arg &arg;
       const GaugeField &outA;
@@ -189,7 +260,6 @@ namespace quda {
           strcat(aux, (std::string(",mu=") + std::to_string(arg.mu)).c_str()); // no sig dependence needed for side link
 
         switch (type) {
-        case FORCE_ALL_LINK:           strcat(aux, ",ALL_LINK");           break;
         case FORCE_LEPAGE_MIDDLE_LINK: strcat(aux, ",LEPAGE_MIDDLE_LINK"); break;
         case FORCE_SIDE_LINK:          strcat(aux, ",SIDE_LINK");          break;
         case FORCE_SIDE_LINK_SHORT:    strcat(aux, ",SIDE_LINK_SHORT");    break;
@@ -203,17 +273,6 @@ namespace quda {
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         switch (type) {
-        case FORCE_ALL_LINK:
-          if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
-            launch<AllLink>(tp, stream, FatLinkParam<Arg, 1, 1>(arg));
-          } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
-            launch<AllLink>(tp, stream, FatLinkParam<Arg, 0, 1>(arg));
-          } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
-            launch<AllLink>(tp, stream, FatLinkParam<Arg, 1, 0>(arg));
-          } else {
-            launch<AllLink>(tp, stream, FatLinkParam<Arg, 0, 0>(arg));
-          }
-          break;
         case FORCE_LEPAGE_MIDDLE_LINK:
           if (arg.p_mu || arg.q_mu || !arg.q_prev)
             errorQuda("Expect p_mu=%d and q_mu=%d to both be false and q_prev=%d true", arg.p_mu, arg.q_mu, arg.q_prev);
@@ -248,10 +307,6 @@ namespace quda {
 
       void preTune() {
         switch (type) {
-        case FORCE_ALL_LINK:
-          outA.backup();
-          outB.backup();
-          break;
         case FORCE_LEPAGE_MIDDLE_LINK:
           outA.backup();
           p3.backup();
@@ -269,10 +324,6 @@ namespace quda {
 
       void postTune() {
         switch (type) {
-        case FORCE_ALL_LINK:
-          outA.restore();
-          outB.restore();
-          break;
         case FORCE_LEPAGE_MIDDLE_LINK:
           outA.restore();
           p3.restore();
@@ -290,8 +341,6 @@ namespace quda {
 
       long long flops() const {
         switch (type) {
-        case FORCE_ALL_LINK:
-          return 2*arg.threads.x*(goes_forward(arg.sig) ? 1242ll : 828ll);
         case FORCE_LEPAGE_MIDDLE_LINK:
           return 2*arg.threads.x*(2 * 198 +
                                 (!arg.q_prev && goes_forward(arg.sig) ? 198 : 0) +
@@ -307,9 +356,6 @@ namespace quda {
 
       long long bytes() const {
         switch (type) {
-        case FORCE_ALL_LINK:
-          return 2*arg.threads.x*( (goes_forward(arg.sig) ? 4 : 2)*arg.outA.Bytes() + 3*arg.link.Bytes()
-                                 + arg.oProd.Bytes() + arg.qPrev.Bytes() + 2*arg.outB.Bytes());
         case FORCE_LEPAGE_MIDDLE_LINK:
           return 2*arg.threads.x*( ( goes_forward(arg.sig) ? 2*arg.outA.Bytes() : 0 ) +
                                  (arg.p_mu ? arg.pMu.Bytes() : 0) +
@@ -372,7 +418,7 @@ namespace quda {
 
                 //7-link: middle link and side link
                 FatLinkArg<real, nColor> arg(newOprod, P5, Pnumu, Qnumu, link, SevenSt, FiveSt != 0 ? SevenSt/FiveSt : 0, 1, FORCE_ALL_LINK, true);
-                FatLinkForce<decltype(arg)> all(arg, link, sig, rho, FORCE_ALL_LINK, newOprod, P5, P5, P5, Qnumu);
+                AllLinkForce<decltype(arg)> all(arg, link, sig, rho, FORCE_ALL_LINK, newOprod, P5, P5, P5, Qnumu);
 
               }//rho
 
