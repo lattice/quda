@@ -287,8 +287,7 @@ namespace quda {
       }
     };
 
-
-    template <typename Arg> class FatLinkForce : public TunableKernel3D {
+    template <typename Arg> class LepageMiddleLinkForce : public TunableKernel3D {
       Arg &arg;
       const GaugeField &outA;
       const GaugeField &outB;
@@ -300,7 +299,7 @@ namespace quda {
       unsigned int minThreads() const { return arg.threads.x; }
 
     public:
-      FatLinkForce(Arg &arg, const GaugeField &link, int sig, int mu, HisqForceType type,
+      LepageMiddleLinkForce(Arg &arg, const GaugeField &link, int sig, int mu, HisqForceType type,
                    const GaugeField &outA, const GaugeField &outB, const GaugeField &pMu,
                    const GaugeField &qMu, const GaugeField &p3) :
         TunableKernel3D(link, 2, 1),
@@ -317,20 +316,13 @@ namespace quda {
         arg.mu = mu;
 
         strcat(aux, (std::string(comm_dim_partitioned_string()) + "threads=" + std::to_string(arg.threads.x)).c_str());
-        if (type == FORCE_LEPAGE_MIDDLE_LINK)
-          strcat(aux, (std::string(",sig=") + std::to_string(arg.sig) +
-                       std::string(",mu=") + std::to_string(arg.mu) +
-                       std::string(",pMu=") + std::to_string(arg.p_mu) +
-                       std::string(",q_mu=") + std::to_string(arg.q_mu) +
-                       std::string(",q_prev=") + std::to_string(arg.q_prev)).c_str());
-        else
-          strcat(aux, (std::string(",mu=") + std::to_string(arg.mu)).c_str()); // no sig dependence needed for side link
+        strcat(aux, (std::string(",sig=") + std::to_string(arg.sig) +
+                     std::string(",mu=") + std::to_string(arg.mu) +
+                     std::string(",pMu=") + std::to_string(arg.p_mu) +
+                     std::string(",q_mu=") + std::to_string(arg.q_mu) +
+                     std::string(",q_prev=") + std::to_string(arg.q_prev)).c_str());
 
-        switch (type) {
-        case FORCE_LEPAGE_MIDDLE_LINK: strcat(aux, ",LEPAGE_MIDDLE_LINK"); break;
-        case FORCE_SIDE_LINK_SHORT:    strcat(aux, ",SIDE_LINK_SHORT");    break;
-        default: errorQuda("Undefined force type %d", type);
-        }
+        strcat(aux, ",LEPAGE_MIDDLE_LINK");
 
         apply(device::get_default_stream());
       }
@@ -338,85 +330,107 @@ namespace quda {
       void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        switch (type) {
-        case FORCE_LEPAGE_MIDDLE_LINK:
-          if (arg.p_mu || arg.q_mu || !arg.q_prev)
-            errorQuda("Expect p_mu=%d and q_mu=%d to both be false and q_prev=%d true", arg.p_mu, arg.q_mu, arg.q_prev);
-          if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
-            launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 1, 1, false, false, true>(arg));
-          } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
-            launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 0, 1, false, false, true>(arg));
-          } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
-            launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 1, 0, false, false, true>(arg));
-          } else {
-            launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 0, 0, false, false, true>(arg));
-          }
-          break;
-        case FORCE_SIDE_LINK_SHORT:
-          if (goes_forward(arg.mu)) {
-            launch<SideLinkShort>(tp, stream, FatLinkParam<Arg, 1>(arg));
-          } else {
-            launch<SideLinkShort>(tp, stream, FatLinkParam<Arg, 0>(arg));
-          }
-          break;
-        default:
-          errorQuda("Undefined force type %d", type);
+        if (arg.p_mu || arg.q_mu || !arg.q_prev)
+          errorQuda("Expect p_mu=%d and q_mu=%d to both be false and q_prev=%d true", arg.p_mu, arg.q_mu, arg.q_prev);
+        if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
+          launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 1, 1, false, false, true>(arg));
+        } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
+          launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 0, 1, false, false, true>(arg));
+        } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
+          launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 1, 0, false, false, true>(arg));
+        } else {
+          launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 0, 0, false, false, true>(arg));
         }
       }
 
       void preTune() {
-        switch (type) {
-        case FORCE_LEPAGE_MIDDLE_LINK:
-          outA.backup();
-          p3.backup();
-          break;
-        case FORCE_SIDE_LINK_SHORT:
-          outA.backup();
-          break;
-        default: errorQuda("Undefined force type %d", type);
-        }
+        outA.backup();
+        p3.backup();
       }
 
       void postTune() {
-        switch (type) {
-        case FORCE_LEPAGE_MIDDLE_LINK:
-          outA.restore();
-          p3.restore();
-          break;
-        case FORCE_SIDE_LINK_SHORT:
-          outA.restore();
-          break;
-        default: errorQuda("Undefined force type %d", type);
-        }
+        outA.restore();
+        p3.restore();
       }
 
       long long flops() const {
-        switch (type) {
-        case FORCE_LEPAGE_MIDDLE_LINK:
-          return 2*arg.threads.x*(2 * 198 +
-                                (!arg.q_prev && goes_forward(arg.sig) ? 198 : 0) +
-                                (arg.q_prev && (arg.q_mu || goes_forward(arg.sig) ) ? 198 : 0) +
-                                ((arg.q_prev && goes_forward(arg.sig) ) ?  198 : 0) +
-                                ( goes_forward(arg.sig) ? 216 : 0) );
-        case FORCE_SIDE_LINK_SHORT: return 2*arg.threads.x*36;
-        default: errorQuda("Undefined force type %d", type);
-        }
-        return 0;
+        return 2*arg.threads.x*(2 * 198 +
+                              (!arg.q_prev && goes_forward(arg.sig) ? 198 : 0) +
+                              (arg.q_prev && (arg.q_mu || goes_forward(arg.sig) ) ? 198 : 0) +
+                              ((arg.q_prev && goes_forward(arg.sig) ) ?  198 : 0) +
+                              ( goes_forward(arg.sig) ? 216 : 0) );
       }
 
       long long bytes() const {
-        switch (type) {
-        case FORCE_LEPAGE_MIDDLE_LINK:
-          return 2*arg.threads.x*( ( goes_forward(arg.sig) ? 2*arg.outA.Bytes() : 0 ) +
-                                 (arg.p_mu ? arg.pMu.Bytes() : 0) +
-                                 (arg.q_mu ? arg.qMu.Bytes() : 0) +
-                                 ( ( goes_forward(arg.sig) || arg.q_mu ) ? arg.qPrev.Bytes() : 0) +
-                                 arg.p3.Bytes() + 3*arg.link.Bytes() + arg.oProd.Bytes() );
-        case FORCE_SIDE_LINK_SHORT:
-          return 2*arg.threads.x*( 2*arg.outA.Bytes() + arg.p3.Bytes() );
-        default: errorQuda("Undefined force type %d", type);
+        return 2*arg.threads.x*( ( goes_forward(arg.sig) ? 2*arg.outA.Bytes() : 0 ) +
+                               (arg.p_mu ? arg.pMu.Bytes() : 0) +
+                               (arg.q_mu ? arg.qMu.Bytes() : 0) +
+                               ( ( goes_forward(arg.sig) || arg.q_mu ) ? arg.qPrev.Bytes() : 0) +
+                               arg.p3.Bytes() + 3*arg.link.Bytes() + arg.oProd.Bytes() );
+      }
+    };
+    
+
+    template <typename Arg> class SideLinkShortForce : public TunableKernel3D {
+      Arg &arg;
+      const GaugeField &outA;
+      const GaugeField &outB;
+      const GaugeField &pMu;
+      const GaugeField &qMu;
+      const GaugeField &p3;
+      const GaugeField &link;
+      const HisqForceType type;
+      unsigned int minThreads() const { return arg.threads.x; }
+
+    public:
+      SideLinkShortForce(Arg &arg, const GaugeField &link, int sig, int mu, HisqForceType type,
+                   const GaugeField &outA, const GaugeField &outB, const GaugeField &pMu,
+                   const GaugeField &qMu, const GaugeField &p3) :
+        TunableKernel3D(link, 2, 1),
+        arg(arg),
+        outA(outA),
+        outB(outB),
+        pMu(pMu),
+        qMu(qMu),
+        p3(p3),
+        link(link),
+        type(type)
+      {
+        arg.sig = sig;
+        arg.mu = mu;
+
+        strcat(aux, (std::string(comm_dim_partitioned_string()) + "threads=" + std::to_string(arg.threads.x)).c_str());
+        strcat(aux, (std::string(",mu=") + std::to_string(arg.mu)).c_str()); // no sig dependence needed for side link
+
+        strcat(aux, ",SIDE_LINK_SHORT");
+
+        apply(device::get_default_stream());
+      }
+
+      void apply(const qudaStream_t &stream)
+      {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        if (goes_forward(arg.mu)) {
+          launch<SideLinkShort>(tp, stream, FatLinkParam<Arg, 1>(arg));
+        } else {
+          launch<SideLinkShort>(tp, stream, FatLinkParam<Arg, 0>(arg));
         }
-        return 0;
+      }
+
+      void preTune() {
+        outA.backup();
+      }
+
+      void postTune() {
+        outA.restore();
+      }
+
+      long long flops() const {
+        return 2*arg.threads.x*36;
+      }
+
+      long long bytes() const {
+        return 2*arg.threads.x*( 2*arg.outA.Bytes() + arg.p3.Bytes() );
       }
     };
 
@@ -478,7 +492,7 @@ namespace quda {
             //lepage
             if (Lepage != 0.) {
               FatLinkArg<real, nColor> middleLinkArg(newOprod, P5, Pmu, Qmu, link, Lepage, 2, FORCE_LEPAGE_MIDDLE_LINK);
-              FatLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, FORCE_LEPAGE_MIDDLE_LINK, newOprod, newOprod, P5, P5, Qmu);
+              LepageMiddleLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, FORCE_LEPAGE_MIDDLE_LINK, newOprod, newOprod, P5, P5, Qmu);
 
               FatLinkArg<real, nColor> arg(newOprod, P3, P5, Qmu, link, mLepage, (ThreeSt != 0 ? Lepage/ThreeSt : 0), 2, FORCE_SIDE_LINK);
               SideLinkForce<decltype(arg)> side(arg, link, sig, mu, FORCE_SIDE_LINK, newOprod, P3, P5, P5, Qmu);
@@ -486,7 +500,7 @@ namespace quda {
 
             // 3-link side link
             FatLinkArg<real, nColor> arg(newOprod, P3, link, ThreeSt, 1, FORCE_SIDE_LINK_SHORT);
-            FatLinkForce<decltype(arg)> side(arg, P3, sig, mu, FORCE_SIDE_LINK_SHORT, newOprod, newOprod, P3, P3, P3);
+            SideLinkShortForce<decltype(arg)> side(arg, P3, sig, mu, FORCE_SIDE_LINK_SHORT, newOprod, newOprod, P3, P3, P3);
           }//mu
         }//sig
       }
