@@ -123,7 +123,7 @@ namespace quda {
     if (!thread_dir || target::is_host()) {
 
       //Forward gather - compute fwd offset for spinor fetch
-//#pragma unroll
+#pragma unroll
       for(int d = thread_dim; d < Arg::nDim; d += Arg::dim_stride) // loop over dimension
       {
 	const int fwd_idx = linkIndexP1(coord, arg.dim, d);
@@ -132,13 +132,13 @@ namespace quda {
 	  if (doHalo<Arg::type>()) {
             int ghost_idx = ghostFaceIndex<1, 5>(coord, arg.dim, d, arg.nFace);
 
-//#pragma unroll
+#pragma unroll
 	    for(int color_local = 0; color_local < Mc; color_local++) { //Color row
 	      int c_row = color_block + color_local; // global color index
 	      int row = s_row * Arg::nColor + c_row;
-//#pragma unroll
+#pragma unroll
 	      for(int s_col = 0; s_col < Arg::nSpin; s_col++) { //Spin column
-//#pragma unroll
+#pragma unroll
 		for(int c_col = 0; c_col < Arg::nColor; c_col += Arg::color_stride) { //Color column
 		  int col = s_col * Arg::nColor + c_col + color_offset;
 		  if (!Arg::dagger)
@@ -152,13 +152,13 @@ namespace quda {
 	    }
 	  }
 	} else if (doBulk<Arg::type>()) {
-//#pragma unroll
+#pragma unroll
 	  for(int color_local = 0; color_local < Mc; color_local++) { //Color row
 	    int c_row = color_block + color_local; // global color index
 	    int row = s_row * Arg::nColor + c_row;
-//#pragma unroll
+#pragma unroll
 	    for(int s_col = 0; s_col < Arg::nSpin; s_col++) { //Spin column
-//#pragma unroll
+#pragma unroll
 	      for(int c_col = 0; c_col < Arg::nColor; c_col += Arg::color_stride) { //Color column
 		int col = s_col * Arg::nColor + c_col + color_offset;
 		if (!Arg::dagger)
@@ -178,7 +178,7 @@ namespace quda {
     if (thread_dir || target::is_host()) {
 
       //Backward gather - compute back offset for spinor and gauge fetch
-//#pragma unroll
+#pragma unroll
       for(int d = thread_dim; d < Arg::nDim; d += Arg::dim_stride)
 	{
 	const int back_idx = linkIndexM1(coord, arg.dim, d);
@@ -186,13 +186,13 @@ namespace quda {
 	if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
 	  if (doHalo<Arg::type>()) {
             const int ghost_idx = ghostFaceIndex<0, 5>(coord, arg.dim, d, arg.nFace);
-//#pragma unroll
+#pragma unroll
 	    for (int color_local=0; color_local<Mc; color_local++) {
 	      int c_row = color_block + color_local;
 	      int row = s_row * Arg::nColor + c_row;
-//#pragma unroll
+#pragma unroll
 	      for (int s_col=0; s_col < Arg::nSpin; s_col++)
-//#pragma unroll
+#pragma unroll
 		for (int c_col=0; c_col < Arg::nColor; c_col += Arg::color_stride) {
 		  int col = s_col * Arg::nColor + c_col + color_offset;
 		  if (!Arg::dagger)
@@ -205,13 +205,13 @@ namespace quda {
 	    }
 	  }
 	} else if (doBulk<Arg::type>()) {
-//#pragma unroll
+#pragma unroll
 	  for(int color_local = 0; color_local < Mc; color_local++) {
 	    int c_row = color_block + color_local;
 	    int row = s_row * Arg::nColor + c_row;
-//#pragma unroll
+#pragma unroll
 	    for(int s_col = 0; s_col < Arg::nSpin; s_col++)
-//#pragma unroll
+#pragma unroll
 	      for(int c_col = 0; c_col < Arg::nColor; c_col += Arg::color_stride) {
 		int col = s_col * Arg::nColor + c_col + color_offset;
 		if (!Arg::dagger)
@@ -244,13 +244,13 @@ namespace quda {
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
 
     // M is number of colors per thread
-//#pragma unroll
+#pragma unroll
     for(int color_local = 0; color_local < Mc; color_local++) {//Color out
       int c = color_block + color_local; // global color index
       int row = s * Arg::nColor + c;
-//#pragma unroll
+#pragma unroll
       for (int s_col = 0; s_col < Arg::nSpin; s_col++) //Spin in
-//#pragma unroll
+#pragma unroll
 	for (int c_col = 0; c_col < Arg::nColor; c_col += Arg::color_stride) { //Color in
 	  //Factor of kappa and diagonal addition now incorporated in X
 	  int col = s_col * Arg::nColor + c_col + color_offset;
@@ -281,14 +281,14 @@ namespace quda {
 
       if (dir == 0 && dim == 0) {
         // full split over dimension and direction
-//#pragma unroll
+#pragma unroll
         for (int d=1; d < Arg::dim_stride; d++) { // get remaining forward gathers (if any)
           // 4-way 1,2,3  (stride = 4)
           // 2-way 1      (stride = 2)
           out += cache.load_z(target::thread_idx().z + d * 2 + 0);
         }
 
-//#pragma unroll
+#pragma unroll
         for (int d=0; d < Arg::dim_stride; d++) { // get all backward gathers
           out += cache.load_z(target::thread_idx().z + d * 2 + 1);
         }
@@ -348,7 +348,7 @@ namespace quda {
         // reduce down to the first group of column-split threads
         out = warp_combine<Arg::color_stride>(out);
 
-//#pragma unroll
+#pragma unroll
         for (int color_local=0; color_local<Mc; color_local++) {
           int c = color_block + color_local; // global color index
           if (color_offset == 0) {

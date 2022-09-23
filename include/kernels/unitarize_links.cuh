@@ -137,7 +137,7 @@ namespace quda {
 
     // At this point we have finished with the c's
     // use these to store sqrt(g)
-    for(int i=0; i<3; ++i) c[i] = sqrt(fabs(g[i]));
+    for(int i=0; i<3; ++i) c[i] = sqrt(g[i]);
 
     // done with the g's, use these to store u, v, w
     g[0] = c[0]+c[1]+c[2];
