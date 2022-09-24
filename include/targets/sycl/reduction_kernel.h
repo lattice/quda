@@ -223,7 +223,8 @@ namespace quda {
     //sycl::buffer<const char,1>
     //  buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
     sycl::nd_range<3> ndRange{globalSize, localSize};
-    err = launch<MultiReductionS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
+    //err = launch<MultiReductionS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
+    err = launchX<MultiReductionS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
 #if 0
     auto size = sizeof(arg);
     auto p = device::get_arg_buf(stream, size);
