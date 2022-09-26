@@ -2308,7 +2308,87 @@ namespace quda {
 
       size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
     };
+    /**
+         struct to define OpenQCD ordered gauge fields:
+         [volumecb][dim][parity*][row][col]
+      */
+    template <typename Float, int length> struct OpenQCDOrder : LegacyOrder<Float, length> {
+      using Accessor = OpenQCDOrder<Float, length>;
+      using real = typename mapper<Float>::type;
+      using complex = complex<real>;
+      Float *gauge;
+      const int volumeCB;
+      static constexpr int Nc = 3;
+      const int dim[4];
+      OpenQCDOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
+        LegacyOrder<Float, length>(u, ghost_),
+        gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
+        volumeCB(u.VolumeCB()),
+        dim {u.X()[0], u.X()[1], u.X()[2], u.X()[3]}
+      {
+        if constexpr (length != 18) errorQuda("Gauge length %d not supported", length);
+      }
 
+      // fields are only defined for odd points
+      //      The pointer to the
+      // link variable U(x,mu) at any given *odd* point x is then
+      //   ud+8*(ix-VOLUME/2)+2*mu
+      // while
+      //   ud+8*(ix-VOLUME/2)+2*mu+1
+      // is the pointer to the link variable U(x-mu,mu), where ix denotes the label of
+      // x. All link variables that constitute the local gauge field can thus be
+      // accessed in this simple way.
+      // see https://gitlab.com/rcstar/openQxD/-/blob/master/main/README.global
+      // typedef struct
+      // {
+      //    complex c11,c12,c13,c21,c22,c23,c31,c32,c33;
+      // } su3;
+
+      __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, Float = 1.0) const
+      {
+        if (parity == 1) { // odd points can be loaded directly
+          auto in = &gauge[(8 * x + 2 * dir) * length];
+          block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+        } else {
+          // gauge field for even points needs to be fetched from odd points, some indexing fun
+          //   ud+8*(ix-VOLUME/2)+2*mu+1
+          // is the pointer to the link variable U(x-mu,mu),
+          // so to get U(x,mu) for even x we need to load U(ix,mu) with ix=x+mu
+          int xmu = linkIndexP1(x, dim, dir); // TODO: What about on boundaries?, do we need to index into them?
+
+          auto in = &gauge[(8 * xmu + 2 * dir + 1) * length];
+          block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+        }
+      }
+
+      __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity) const
+      {
+        // auto out = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
+        // complex v_[9];
+        // for (int i=0; i<Nc; i++) {
+        //   for (int j = 0; j < Nc; j++) { v_[i * Nc + j] = v[j * Nc + i] * anisotropy; }
+        // }
+
+        // block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v_);
+      }
+
+      /**
+         @brief This accessor routine returns a gauge_wrapper to this object,
+         allowing us to overload various operators for manipulating at
+         the site level interms of matrix operations.
+         @param[in] dir Which dimension are we requesting
+         @param[in] x_cb Checkerboarded space-time index we are requesting
+         @param[in] parity Parity we are requesting
+         @return Instance of a gauge_wrapper that curries in access to
+         this field at the above coordinates.
+      */
+      __device__ __host__ inline auto operator()(int dim, int x_cb, int parity) const
+      {
+        return gauge_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, x_cb, parity);
+      }
+
+      size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
+    };
   } // namespace gauge
 
   template <typename real_out_t, typename store_out_t, typename real_in_t, typename store_in_t, bool block_float, typename norm_t>

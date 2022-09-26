@@ -110,10 +110,18 @@ namespace quda {
       errorQuda("TIFR interface has not been built\n");
 #endif
 
+    } else if (out.Order() == QUDA_OPENQCD_GAUGE_ORDER) {
+
+#ifdef BUILD_OPENQCD_INTERFACE
+      using G = OpenQCDOrder<FloatOut, length>;
+      CopyGaugeEx<FloatOut, FloatIn, length, G, InOrder>(out, in, location, Out, In);
+#else
+      errorQuda("OPENQCD interface has not been built\n");
+#endif
+
     } else {
       errorQuda("Gauge field %d order not supported", out.Order());
     }
-
   }
 
   template <typename FloatOut, typename FloatIn, int length>
@@ -184,10 +192,17 @@ namespace quda {
       errorQuda("TIFR interface has not been built\n");
 #endif
 
+    } else if (in.Order() == QUDA_OPENQCD_GAUGE_ORDER) {
+#ifdef BUILD_OPENQCD_INTERFACE
+      using G = OpenQCDOrder<FloatIn, length>;
+      copyGaugeEx<FloatOut, FloatIn, length, G>(out, in, location, Out, In);
+#else
+      errorQuda("OpenQCD interface has not been built\n");
+#endif
+
     } else {
       errorQuda("Gauge field %d order not supported", in.Order());
     }
-
   }
 
   template <typename FloatOut, typename FloatIn>

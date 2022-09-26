@@ -51,6 +51,7 @@
 #define QUDA_BQCD_GAUGE_ORDER 15 // expect *gauge mu even-odd spacetime+halos row-column order
 #define QUDA_TIFR_GAUGE_ORDER 16
 #define QUDA_TIFR_PADDED_GAUGE_ORDER 17
+#define QUDA_OPENQCD_GAUGE_ORDER 18
 #define QUDA_INVALID_GAUGE_ORDER QUDA_INVALID_ENUM
 
 #define QudaTboundary integer(4)

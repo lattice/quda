@@ -58,10 +58,10 @@ namespace quda {
           errorQuda("Unsupported creation type %d", create);
         }
       }
-    
-    } else if (order == QUDA_CPS_WILSON_GAUGE_ORDER || order == QUDA_MILC_GAUGE_ORDER  ||
-	       order == QUDA_BQCD_GAUGE_ORDER || order == QUDA_TIFR_GAUGE_ORDER ||
-	       order == QUDA_TIFR_PADDED_GAUGE_ORDER || order == QUDA_MILC_SITE_GAUGE_ORDER) {
+
+    } else if (order == QUDA_CPS_WILSON_GAUGE_ORDER || order == QUDA_MILC_GAUGE_ORDER || order == QUDA_BQCD_GAUGE_ORDER
+               || order == QUDA_TIFR_GAUGE_ORDER || order == QUDA_TIFR_PADDED_GAUGE_ORDER
+               || order == QUDA_MILC_SITE_GAUGE_ORDER || order == QUDA_OPENQCD_GAUGE_ORDER) {
 
       if (order == QUDA_MILC_SITE_GAUGE_ORDER && create != QUDA_REFERENCE_FIELD_CREATE) {
 	errorQuda("MILC site gauge order only supported for reference fields");
@@ -79,7 +79,7 @@ namespace quda {
     } else {
       errorQuda("Unsupported gauge order type %d", order);
     }
-  
+
     // no need to exchange data if this is a momentum field
     if (link_type != QUDA_ASQTAD_MOM_LINKS) {
       // Ghost zone is always 2-dimensional    
@@ -399,7 +399,8 @@ namespace quda {
       for (int d = 0; d < 4; d++) { std::memcpy(&dst_buffer[d * dbytes], p[d], dbytes); }
     } else if (Order() == QUDA_CPS_WILSON_GAUGE_ORDER || Order() == QUDA_MILC_GAUGE_ORDER
                || Order() == QUDA_MILC_SITE_GAUGE_ORDER || Order() == QUDA_BQCD_GAUGE_ORDER
-               || Order() == QUDA_TIFR_GAUGE_ORDER || Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+               || Order() == QUDA_TIFR_GAUGE_ORDER || Order() == QUDA_TIFR_PADDED_GAUGE_ORDER
+               || Order() == QUDA_OPENQCD_GAUGE_ORDER) {
       const void *p = Gauge_p();
       int bytes = Bytes();
       std::memcpy(buffer, p, bytes);

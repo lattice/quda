@@ -171,6 +171,7 @@ option(QUDA_OPENBLAS "enable OpenBLAS" OFF)
 # Interface options
 option(QUDA_INTERFACE_QDP "build qdp interface" ON)
 option(QUDA_INTERFACE_MILC "build milc interface" ON)
+option(QUDA_INTERFACE_OpenQCD "build OpenQCD interface" OFF)
 option(QUDA_INTERFACE_CPS "build cps interface" OFF)
 option(QUDA_INTERFACE_QDPJIT "build qdpjit interface" OFF)
 option(QUDA_INTERFACE_BQCD "build bqcd interface" OFF)
