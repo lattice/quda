@@ -164,19 +164,19 @@ namespace quda {
     CalculateYArg(coarseGauge &Y, coarseGauge &X,
       coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
       fineSpinorUV &UV, fineSpinorAV &AV, const fineGauge &U, const fineGauge &L, const fineGauge &K, const fineSpinorV &V,
-      const fineClover &C, const fineClover &Cinv, double kappa, double mass, double mu, double mu_factor,
+      const fineClover &C, const fineClover &Cinv, const ColorSpinorField &v, double kappa, double mass, double mu, double mu_factor,
       const int *x_size_, const int *xc_size_, int spin_bs_,
       const int *fine_to_coarse, const int *coarse_to_fine, bool bidirectional)
       : Y(Y), X(X), Y_atomic(Y_atomic), X_atomic(X_atomic),
       UV(UV), AV(AV), U(U), L(L), K(K), V(V), C(C), Cinv(Cinv), spin_bs(spin_bs_), spin_map(),
       kappa(static_cast<Float>(kappa)), mass(static_cast<Float>(mass)), mu(static_cast<Float>(mu)), mu_factor(static_cast<Float>(mu_factor)),
-      fineVolumeCB(V.VolumeCB()), coarseVolumeCB(X.VolumeCB()),
+      fineVolumeCB(v.VolumeCB()), coarseVolumeCB(X.VolumeCB()),
       fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
       bidirectional(bidirectional), shared_atomic(false), parity_flip(false),
         aggregates_per_block(1), max_h(nullptr), max_d(nullptr), max(nullptr)
     {
-      if (V.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
-        errorQuda("Gamma basis %d not supported", V.GammaBasis());
+      if (v.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
+        errorQuda("Gamma basis %d not supported", v.GammaBasis());
 
       for (int i=0; i<QUDA_MAX_DIM; i++) {
         x_size[i] = i < 4 ? x_size_[i] : 1;

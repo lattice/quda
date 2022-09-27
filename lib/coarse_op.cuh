@@ -45,6 +45,8 @@ namespace quda {
   protected:
     Arg &arg;
     const ColorSpinorField &V;
+    const ColorSpinorField &UV;
+    const ColorSpinorField &AV;
     GaugeField &Y;
     GaugeField &X;
     GaugeField &Y_atomic;
@@ -159,23 +161,23 @@ namespace quda {
           bytes_ = 2 * ((type == COMPUTE_UV) ? arg.U.Bytes() : arg.L.Bytes()) * coarseColor;
 
           // Loading V/AV: this is only relevant for the KD op, otherwise these two have the same size
-          bytes_ += (dir == QUDA_BACKWARDS) ? arg.AV.Bytes() : arg.V.Bytes();
+          bytes_ += (dir == QUDA_BACKWARDS) ? AV.Bytes() : V.Bytes();
 
           // Storing to UV: only special for the KD op
-          bytes_ += compute_max * ((from_kd_op && dir == QUDA_FORWARDS) ? (arg.UV.Bytes() / 2) : arg.UV.Bytes());
+          bytes_ += compute_max * ((from_kd_op && dir == QUDA_FORWARDS) ? (UV.Bytes() / 2) : UV.Bytes());
         }
 	break;
       case COMPUTE_AV:
-	bytes_ = compute_max * arg.AV.Bytes() + arg.V.Bytes() + 2*arg.C.Bytes()*coarseColor;
+	bytes_ = compute_max * AV.Bytes() + V.Bytes() + 2*arg.C.Bytes()*coarseColor;
 	break;
       case COMPUTE_TMAV:
-	bytes_ = arg.AV.Bytes() + arg.V.Bytes();
+	bytes_ = AV.Bytes() + V.Bytes();
 	break;
       case COMPUTE_TMCAV:
-	bytes_ = compute_max * arg.AV.Bytes() + arg.V.Bytes() + (2 + 2 * !clover::dynamic_inverse()) * arg.C.Bytes()*coarseColor;
+	bytes_ = compute_max * AV.Bytes() + V.Bytes() + (2 + 2 * !clover::dynamic_inverse()) * arg.C.Bytes()*coarseColor;
 	break;
       case COMPUTE_KV:
-        bytes_ = arg.AV.Bytes() + arg.V.Bytes() + arg.K.Bytes() * coarseColor;
+        bytes_ = AV.Bytes() + V.Bytes() + arg.K.Bytes() * coarseColor;
         break;
       case COMPUTE_VUV:
       case COMPUTE_VLV:
@@ -184,11 +186,11 @@ namespace quda {
           int writes = 4;
           // we use a (coarseColor * coarseColor) matrix of threads so each load is input element is loaded coarseColor times
           // we ignore the multiple loads of spin since these are per thread (and should be cached?)
-          bytes_ = 2*writes*arg.Y.Bytes() + (arg.bidirectional ? 1 : 2) * 2*writes*arg.X.Bytes() + coarseColor*(arg.UV.Bytes() + arg.V.Bytes());
+          bytes_ = 2*writes*arg.Y.Bytes() + (arg.bidirectional ? 1 : 2) * 2*writes*arg.X.Bytes() + coarseColor*(UV.Bytes() + V.Bytes());
           break;
         }
       case COMPUTE_COARSE_CLOVER:
-	bytes_ = 2 * arg.X.Bytes() + 2 * arg.C.Bytes() + (1 + coarseColor) * arg.V.Bytes(); // 2 from parity
+	bytes_ = 2 * arg.X.Bytes() + 2 * arg.C.Bytes() + (1 + coarseColor) * V.Bytes(); // 2 from parity
 	break;
       case COMPUTE_REVERSE_Y:
 	bytes_ = 4 * 2 * 2 * arg.Y.Bytes(); // 4 from direction, 2 from i/o, 2 from parity
@@ -254,11 +256,13 @@ namespace quda {
     }
 
   public:
-    CalculateY(Arg &arg, const ColorSpinorField &V, GaugeField &Y, GaugeField &X, GaugeField &Y_atomic,
-               GaugeField &X_atomic, int nFace) :
+    CalculateY(Arg &arg, const ColorSpinorField &V, const ColorSpinorField &UV, const ColorSpinorField &AV,
+               GaugeField &Y, GaugeField &X, GaugeField &Y_atomic, GaugeField &X_atomic, int nFace) :
       TunableKernel3D(V, 2, 1),
       arg(arg),
       V(V),
+      UV(UV),
+      AV(AV),
       Y(Y),
       X(X),
       Y_atomic(Y_atomic),
@@ -1026,12 +1030,12 @@ namespace quda {
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
     using Arg = CalculateYArg<from_coarse, Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,avSpinor,uvSpinor,vSpinor,fineClover>;
-    Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, L, K, V, C, Cinv, kappa, mass,
+    Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, L, K, V, C, Cinv, v, kappa, mass,
 	    mu, mu_factor, x_size, xc_size, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
     arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
     arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
 
-    CalculateY<use_mma, location, Arg> y(arg, v, Y_, X_, Y_atomic_, X_atomic_, nFace);
+    CalculateY<use_mma, location, Arg> y(arg, v, uv, av, Y_, X_, Y_atomic_, X_atomic_, nFace);
 
     QudaFieldLocation location_ = checkLocation(Y_, X_, av, v);
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Running link coarsening on the %s\n", location_ == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
@@ -1042,7 +1046,7 @@ namespace quda {
     if (&v == &av) arg.AV.resetGhost(av.Ghost());
     LatticeField::bufferIndex = (1 - LatticeField::bufferIndex); // update ghost bufferIndex for next exchange
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("V2 = %e\n", arg.V.norm2());
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("V2 = %e\n", arg.V.norm2(v));
 
     // If doing preconditioned clover then we first multiply the
     // null-space vectors by the clover inverse matrix, since this is
@@ -1062,7 +1066,7 @@ namespace quda {
       }
 
       y.apply(device::get_default_stream());
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2());
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2(av));
     }
 
     // If doing preconditioned twisted-mass then we first multiply the
@@ -1084,7 +1088,7 @@ namespace quda {
       y.setComputeType(COMPUTE_TMAV);
       y.apply(device::get_default_stream());
 
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2());
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2(av));
     }
 
     // If doing preconditioned twisted-clover then we first multiply the
@@ -1106,7 +1110,7 @@ namespace quda {
       }
 
       y.apply(device::get_default_stream());
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2());
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2(av));
     }
 
     // If doing the staggered or ASQTAD KD op we first multiply the null-space vectors by
@@ -1128,7 +1132,7 @@ namespace quda {
       }
 
       y.apply(device::get_default_stream());
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("KV2 = %e\n", arg.AV.norm2());
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("KV2 = %e\n", arg.AV.norm2(av));
     }
 
     // work out what to set the scales to
@@ -1165,7 +1169,7 @@ namespace quda {
         }
 
         y.apply(device::get_default_stream());
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2());
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2(uv));
 
         // if we are writing to a temporary, we need to zero it before each computation
         if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
@@ -1191,7 +1195,7 @@ namespace quda {
             }
 
             y.apply(device::get_default_stream());
-            if (getVerbosity() >= QUDA_VERBOSE) printfQuda("LV2[%d] = %e\n", d, arg.UV.norm2());
+            if (getVerbosity() >= QUDA_VERBOSE) printfQuda("LV2[%d] = %e\n", d, arg.UV.norm2(uv));
 
             // *do not* zero out X and Y --- X;Y = VUV + VLV
             y.setComputeType(COMPUTE_VLV); // compute Y += VLV
@@ -1267,7 +1271,7 @@ namespace quda {
       }
 
       y.apply(device::get_default_stream());
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UAV2[%d] = %e\n", d, arg.UV.norm2());
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UAV2[%d] = %e\n", d, arg.UV.norm2(uv));
 
       // if we are writing to a temporary, we need to zero it before each computation
       if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
@@ -1293,7 +1297,7 @@ namespace quda {
           }
 
           y.apply(device::get_default_stream());
-          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("LAV2[%d] = %e\n", d, arg.UV.norm2());
+          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("LAV2[%d] = %e\n", d, arg.UV.norm2(uv));
 
           // *do not* zero out X and Y --- X;Y = VUV + VLV
           y.setComputeType(COMPUTE_VLV); // compute Y += VLV
@@ -1387,7 +1391,7 @@ namespace quda {
       }
 
       y.apply(device::get_default_stream());
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("CV2 = %e\n", arg.UV.norm2());
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("CV2 = %e\n", arg.UV.norm2(uv));
 
       y.setComputeType(COMPUTE_VUV); // compute X += VCV
       y.apply(device::get_default_stream());

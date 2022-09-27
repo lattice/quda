@@ -55,9 +55,9 @@ namespace quda {
      Insert a sinusoidal wave sin ( n * (x[d] / X[d]) * pi ) in dimension d
    */
   template <class P>
-  void sin(P &p, int d, int n, int offset) {
+  void sin(P &p, int d, int n, int offset, const ColorSpinorField &meta) {
     int coord[4];
-    int X[4] = { p.X(0), p.X(1), p.X(2), p.X(3)};
+    int X[4] = { meta.X(0), meta.X(1), meta.X(2), meta.X(3) };
     X[0] *= (p.Nparity() == 1) ? 2 : 1; // need full lattice dims
 
     for (int parity=0; parity<p.Nparity(); parity++) {
@@ -81,11 +81,11 @@ namespace quda {
      corner, for ex.
   */
   template <class T>
-  void corner(T &p, int v, int s, int c) {
+  void corner(T &p, int v, int s, int c, const ColorSpinorField &meta) {
     if (p.Nspin() != 1) errorQuda("corner() is only defined for Nspin = 1 fields");
 
     int coord[4];
-    int X[4] = { p.X(0), p.X(1), p.X(2), p.X(3)};
+    int X[4] = { meta.X(0), meta.X(1), meta.X(2), meta.X(3) };
     X[0] *= (p.Nparity() == 1) ? 2 : 1; // need full lattice dims
 
     for (int parity=0; parity<p.Nparity(); parity++) {
@@ -122,8 +122,8 @@ namespace quda {
     if (sourceType == QUDA_RANDOM_SOURCE) random(A);
     else if (sourceType == QUDA_POINT_SOURCE) point(A, x, s, c);
     else if (sourceType == QUDA_CONSTANT_SOURCE) constant(A, x, s, c);
-    else if (sourceType == QUDA_SINUSOIDAL_SOURCE) sin(A, x, s, c);
-    else if (sourceType == QUDA_CORNER_SOURCE) corner(A, x, s, c);
+    else if (sourceType == QUDA_SINUSOIDAL_SOURCE) sin(A, x, s, c, a);
+    else if (sourceType == QUDA_CORNER_SOURCE) corner(A, x, s, c, a);
     else errorQuda("Unsupported source type %d", sourceType);
   }
 
@@ -281,7 +281,7 @@ namespace quda {
         FieldOrderCB<oFloat,Ns,Nc,1,order> A(a);
 	FieldOrderCB<iFloat,Ns,Nc,1,order> B(b);
 
-        double rescale = 1.0 / A.abs_max();
+        double rescale = 1.0 / A.abs_max(a);
 
         auto a_(a), b_(b);
         blas::ax(rescale, a_);
@@ -295,7 +295,7 @@ namespace quda {
         FieldOrderCB<oFloat,Ns,Nc,1,order> A(a);
 	FieldOrderCB<iFloat,Ns,Nc,1,order> B(b);
 
-        double rescale = 1.0 / A.abs_max();
+        double rescale = 1.0 / A.abs_max(a);
 
         auto a_(a), b_(b);
         blas::ax(rescale, a_);
