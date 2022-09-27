@@ -80,9 +80,9 @@ using namespace quda;
 static int rankFromCoords(const int *coords, void *fdata)
 {
   int *dims = static_cast<int *>(fdata);
-
-  int rank = coords[3];
-  for (int i = 2; i >= 0; i--) { rank = dims[i] * rank + coords[i]; }
+// rank = coords[0]*dims[1]*dims[2]*dims[3] + coords[1]*dims[2]*dims[3]  + coords[2]*dims[3] + coords[3]
+  int rank = coords[0];
+  for (int i = 0; i < 3; i++) { rank = dims[i] * rank + coords[i]; }
   return rank;
 }
 
