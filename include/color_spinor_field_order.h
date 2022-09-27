@@ -196,20 +196,26 @@ namespace quda
     template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order> struct AccessorCB {
       AccessorCB(const ColorSpinorField &) { errorQuda("Not implemented"); }
       AccessorCB() { errorQuda("Not implemented"); }
-      __device__ __host__ inline int index(int, int, int, int, int) const { return 0; }
+      AccessorCB(const AccessorCB &) { errorQuda("Not implemented"); }
+      AccessorCB &operator=(const AccessorCB &) { errorQuda("Not implemented"); }
+      constexpr int index(int, int, int, int, int, int) const { return 0; }
     };
 
     template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order> struct GhostAccessorCB {
       GhostAccessorCB(const ColorSpinorField &) { errorQuda("Not implemented"); }
       GhostAccessorCB() { errorQuda("Not implemented"); }
-      __device__ __host__ inline int index(int, int, int, int, int, int, int) const { return 0; }
+      GhostAccessorCB(const GhostAccessorCB &) { errorQuda("Not implemented"); }
+      GhostAccessorCB &operator=(const GhostAccessorCB &) { errorQuda("Not implemented"); }
+      constexpr int index(int, int, int, int, int, int, int) const { return 0; }
     };
 
     template <typename Float, int nSpin, int nColor, int nVec>
     struct AccessorCB<Float, nSpin, nColor, nVec, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> {
-      const int offset_cb;
+      int offset_cb = 0;
       AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>)) { }
-      AccessorCB() : offset_cb(0) { }
+      AccessorCB() = default;
+      AccessorCB(const AccessorCB &) = default;
+      AccessorCB &operator=(const AccessorCB &) = default;
 
       /**
        * @brief This method returns the index for the pointer that
@@ -221,7 +227,7 @@ namespace quda
        * @param c color index
        * @param v vector index
        */
-      __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
+      constexpr int index(int parity, int x_cb, int s, int c, int v) const
       {
         return parity * offset_cb + ((x_cb * nSpin + s) * nColor + c) * nVec + v;
       }
@@ -244,8 +250,8 @@ namespace quda
 
     template <typename Float, int nSpin, int nColor, int nVec>
     struct GhostAccessorCB<Float, nSpin, nColor, nVec, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> {
-      int faceVolumeCB[4];
-      int ghostOffset[4];
+      int faceVolumeCB[4] = {};
+      int ghostOffset[4] = {};
       GhostAccessorCB(const ColorSpinorField &a, int nFace = 1)
       {
         for (int d = 0; d < 4; d++) {
@@ -253,16 +259,18 @@ namespace quda
           ghostOffset[d] = faceVolumeCB[d] * nColor * nSpin * nVec;
         }
       }
-      GhostAccessorCB() : ghostOffset {} { }
+      GhostAccessorCB() = default;
+      GhostAccessorCB(const GhostAccessorCB &) = default;
+      GhostAccessorCB &operator=(const GhostAccessorCB &) = default;
 
-      __device__ __host__ inline int index(int dim, int parity, int x_cb, int s, int c, int v) const
+      constexpr int index(int dim, int parity, int x_cb, int s, int c, int v) const
       {
         return parity * ghostOffset[dim] + ((x_cb * nSpin + s) * nColor + c) * nVec + v;
       }
     };
 
     template <int nSpin, int nColor, int nVec, int N> // note this will not work for N=1
-    __device__ __host__ inline int indexFloatN(int x_cb, int s, int c, int v, int stride)
+    constexpr int indexFloatN(int x_cb, int s, int c, int v, int stride)
     {
       int k = (s * nColor + c) * nVec + v;
       int j = k / (N / 2);
@@ -272,15 +280,17 @@ namespace quda
 
     template <typename Float, int nSpin, int nColor, int nVec>
     struct AccessorCB<Float, nSpin, nColor, nVec, QUDA_FLOAT2_FIELD_ORDER> {
-      const int stride;
-      const int offset_cb;
+      int stride = 0;
+      int offset_cb = 0;
       AccessorCB(const ColorSpinorField &field) :
         stride(field.VolumeCB()), offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>))
       {
       }
-      AccessorCB() : stride(0), offset_cb(0) { }
+      AccessorCB() = default;
+      AccessorCB(const AccessorCB &) = default;
+      AccessorCB &operator=(const AccessorCB &) = default;
 
-      __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
+      constexpr int index(int parity, int x_cb, int s, int c, int v) const
       {
         return parity * offset_cb + ((s * nColor + c) * nVec + v) * stride + x_cb;
       }
@@ -302,8 +312,8 @@ namespace quda
 
     template <typename Float, int nSpin, int nColor, int nVec>
     struct GhostAccessorCB<Float, nSpin, nColor, nVec, QUDA_FLOAT2_FIELD_ORDER> {
-      int faceVolumeCB[4];
-      int ghostOffset[4];
+      int faceVolumeCB[4] = {};
+      int ghostOffset[4] = {};
       GhostAccessorCB(const ColorSpinorField &a, int nFace = 1)
       {
         for (int d = 0; d < 4; d++) {
@@ -311,9 +321,11 @@ namespace quda
           ghostOffset[d] = faceVolumeCB[d] * nColor * nSpin * nVec;
         }
       }
-      GhostAccessorCB() : faceVolumeCB {}, ghostOffset {} { }
+      GhostAccessorCB() = default;
+      GhostAccessorCB(const GhostAccessorCB &) = default;
+      GhostAccessorCB &operator=(const GhostAccessorCB &) = default;
 
-      __device__ __host__ inline int index(int dim, int parity, int x_cb, int s, int c, int v) const
+      constexpr int index(int dim, int parity, int x_cb, int s, int c, int v) const
       {
         return parity * ghostOffset[dim] + ((s * nColor + c) * nVec + v) * faceVolumeCB[dim] + x_cb;
       }
@@ -321,14 +333,17 @@ namespace quda
 
     template <typename Float, int nSpin, int nColor, int nVec>
     struct AccessorCB<Float, nSpin, nColor, nVec, QUDA_FLOAT4_FIELD_ORDER> {
-      const int stride;
-      const int offset_cb;
+      int stride = 0;
+      int offset_cb = 0;
       AccessorCB(const ColorSpinorField &field) :
         stride(field.VolumeCB()), offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>))
       {
       }
-      AccessorCB() : stride(0), offset_cb(0) { }
-      __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
+      AccessorCB() = default;
+      AccessorCB(const AccessorCB &) = default;
+      AccessorCB &operator=(const AccessorCB &) = default;
+
+      constexpr int index(int parity, int x_cb, int s, int c, int v) const
       {
         return parity * offset_cb + indexFloatN<nSpin, nColor, nVec, 4>(x_cb, s, c, v, stride);
       }
@@ -350,8 +365,8 @@ namespace quda
 
     template <typename Float, int nSpin, int nColor, int nVec>
     struct GhostAccessorCB<Float, nSpin, nColor, nVec, QUDA_FLOAT4_FIELD_ORDER> {
-      int faceVolumeCB[4];
-      int ghostOffset[4];
+      int faceVolumeCB[4] = {};
+      int ghostOffset[4] = {};
       GhostAccessorCB(const ColorSpinorField &a, int nFace = 1)
       {
         for (int d = 0; d < 4; d++) {
@@ -359,9 +374,11 @@ namespace quda
           ghostOffset[d] = faceVolumeCB[d] * nColor * nSpin * nVec;
         }
       }
-      GhostAccessorCB() : faceVolumeCB {}, ghostOffset {} { }
+      GhostAccessorCB() = default;
+      GhostAccessorCB(const GhostAccessorCB &) = default;
+      GhostAccessorCB &operator=(const GhostAccessorCB &) = default;
 
-      __device__ __host__ inline int index(int dim, int parity, int x_cb, int s, int c, int v) const
+      constexpr int index(int dim, int parity, int x_cb, int s, int c, int v) const
       {
         return parity * ghostOffset[dim] + indexFloatN<nSpin, nColor, nVec, 4>(x_cb, s, c, v, faceVolumeCB[dim]);
       }
@@ -369,15 +386,17 @@ namespace quda
 
     template <typename Float, int nSpin, int nColor, int nVec>
     struct AccessorCB<Float, nSpin, nColor, nVec, QUDA_FLOAT8_FIELD_ORDER> {
-      const int stride;
-      const int offset_cb;
+      int stride = 0;
+      int offset_cb = 0;
       AccessorCB(const ColorSpinorField &field) :
         stride(field.VolumeCB()), offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>))
       {
       }
-      AccessorCB() : stride(0), offset_cb(0) { }
+      AccessorCB() = default;
+      AccessorCB(const AccessorCB &) = default;
+      AccessorCB &operator=(const AccessorCB &) = default;
 
-      __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
+      constexpr int index(int parity, int x_cb, int s, int c, int v) const
       {
         return parity * offset_cb + indexFloatN<nSpin, nColor, nVec, 8>(x_cb, s, c, v, stride);
       }
@@ -407,8 +426,8 @@ namespace quda
 
     template <typename Float, int nSpin, int nColor, int nVec>
     struct GhostAccessorCB<Float, nSpin, nColor, nVec, QUDA_FLOAT8_FIELD_ORDER> {
-      int faceVolumeCB[4];
-      int ghostOffset[4];
+      int faceVolumeCB[4] = {};
+      int ghostOffset[4] = {};
       GhostAccessorCB(const ColorSpinorField &a, int nFace = 1)
       {
         for (int d = 0; d < 4; d++) {
@@ -416,28 +435,23 @@ namespace quda
           ghostOffset[d] = faceVolumeCB[d] * nColor * nSpin * nVec;
         }
       }
-      GhostAccessorCB() : faceVolumeCB {}, ghostOffset {} { }
-      __device__ __host__ inline int index(int dim, int parity, int x_cb, int s, int c, int v) const
+      GhostAccessorCB() = default;
+      GhostAccessorCB(const GhostAccessorCB &) = default;
+      GhostAccessorCB &operator=(const GhostAccessorCB &) = default;
+
+      constexpr int index(int dim, int parity, int x_cb, int s, int c, int v) const
       {
         return parity * ghostOffset[dim] + indexFloatN<nSpin, nColor, nVec, 8>(x_cb, s, c, v, faceVolumeCB[dim]);
       }
     };
 
-    template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool fixed_point()
-    {
-      return false;
-    }
-    template <> __host__ __device__ inline constexpr bool fixed_point<double, int8_t>() { return true; }
-    template <> __host__ __device__ inline constexpr bool fixed_point<double, short>() { return true; }
-    template <> __host__ __device__ inline constexpr bool fixed_point<double, int>() { return true; }
-    template <> __host__ __device__ inline constexpr bool fixed_point<float, int8_t>() { return true; }
-    template <> __host__ __device__ inline constexpr bool fixed_point<float, short>() { return true; }
-    template <> __host__ __device__ inline constexpr bool fixed_point<float, int>() { return true; }
-
-    template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool match() { return false; }
-    template <> __host__ __device__ inline constexpr bool match<int8_t, int8_t>() { return true; }
-    template <> __host__ __device__ inline constexpr bool match<int, int>() { return true; }
-    template <> __host__ __device__ inline constexpr bool match<short, short>() { return true; }
+    template <typename Float, typename storeFloat> constexpr bool fixed_point() { return false; }
+    template <> constexpr bool fixed_point<double, int8_t>() { return true; }
+    template <> constexpr bool fixed_point<double, short>() { return true; }
+    template <> constexpr bool fixed_point<double, int>() { return true; }
+    template <> constexpr bool fixed_point<float, int8_t>() { return true; }
+    template <> constexpr bool fixed_point<float, short>() { return true; }
+    template <> constexpr bool fixed_point<float, int>() { return true; }
 
     /**
        @brief fieldorder_wrapper is an internal class that is used to
@@ -483,7 +497,7 @@ namespace quda
         // float format, and if specifically requested (in general,
         // this will be a specific thread that requests this (norm_write = true)
         if (block_float && norm_write) norm[norm_idx] = scale_inv;
-        if (match<storeFloat, theirFloat>()) {
+        if (std::is_same_v<storeFloat, theirFloat>) {
           v[idx] = complex<storeFloat>(a.real(), a.imag());
         } else {
           v[idx] = fixed ? complex<storeFloat>(round(scale * a.real()), round(scale * a.imag())) :
