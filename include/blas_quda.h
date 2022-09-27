@@ -278,7 +278,7 @@ namespace quda {
 
     /**
        @brief Compute y += a * x and then (x, y)
-       @param[in] a scalar multipler
+       @param[in] a scalar multiplier
        @param[in] x input vector
        @param[in,out] y update vector
     */
@@ -293,9 +293,9 @@ namespace quda {
 
     /**
        @brief Compute z = a * x + b * y and then ||z||^2
-       @param[in] a scalar multipler
+       @param[in] a scalar multiplier
        @param[in] x input vector
-       @param[in] b scalar multipler
+       @param[in] b scalar multiplier
        @param[in] y input vector
        @param[in,out] z update vector
     */
@@ -303,7 +303,7 @@ namespace quda {
 
     /**
        @brief Compute y += a * x and then ||y||^2
-       @param[in] a scalar multipler
+       @param[in] a scalar multiplier
        @param[in] x input vector
        @param[in,out] y update vector
     */
@@ -342,7 +342,7 @@ namespace quda {
     }
 
     /**
-       @brief Return complex-valued inner producr (x,y) and ||y||^2
+       @brief Return complex-valued inner product (x,y) and ||y||^2
        @param[in] x input vector
        @param[in] y input vector
      */
@@ -369,7 +369,7 @@ namespace quda {
 
     /**
        @brief Compute y += a * x and then ||y||^2
-       @param[in] a scalar multipler
+       @param[in] a scalar multiplier
        @param[in] x input vector
        @param[in,out] y update vector
     */
@@ -388,7 +388,7 @@ namespace quda {
 
     /**
        @brief Compute y += a * x and the resulting complex-valued inner product (z, y)
-       @param[in] a scalar multipler
+       @param[in] a scalar multiplier
        @param[in] x input vector
        @param[in,out] y update vector
        @param[in] z input vector
@@ -399,7 +399,7 @@ namespace quda {
     /**
        @brief Compute y += a * x and then compute ||y||^2 and
        real-valued inner product (y_out, y_out-y_in)
-       @param[in] a scalar multipler
+       @param[in] a scalar multiplier
        @param[in] x input vector
        @param[in,out] y update vector
     */
@@ -512,8 +512,7 @@ namespace quda {
     void axpy_L(const std::vector<T> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
 
     /**
-       @brief Compute the block "caxpy" with over the s
-et of
+       @brief Compute the block "caxpy" with over the set of
        ColorSpinorFields.  E.g., it computes
 
        y = x * a + y
