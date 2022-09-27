@@ -409,7 +409,7 @@ int main(int argc, char **argv)
     result = RUN_ALL_TESTS();
   } else {
     solve(test_t {inv_type, solution_type, solve_type, prec_sloppy, multishift, solution_accumulator_pipeline,
-                  schwarz_t {precon_schwarz_type, precon_type, prec_precondition} } );
+                  schwarz_t {precon_schwarz_type, inv_multigrid ? QUDA_MG_INVERTER : precon_type, prec_precondition} } );
   }
 
   // finalize the QUDA library
