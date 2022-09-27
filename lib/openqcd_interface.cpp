@@ -55,7 +55,6 @@ static int localDim[4];
 using namespace quda;
 
 // #define QUDAMILC_VERBOSE 1
-
 // template <bool start> void inline qudamilc_called(const char *func, QudaVerbosity verb)
 // {
 //   // add NVTX markup if enabled
@@ -77,6 +76,15 @@ using namespace quda;
 // }
 
 // template <bool start> void inline qudamilc_called(const char *func) { qudamilc_called<start>(func, getVerbosity()); }
+// TODO: fix me for openQCD
+static int rankFromCoords(const int *coords, void *fdata)
+{
+  int *dims = static_cast<int *>(fdata);
+
+  int rank = coords[3];
+  for (int i = 2; i >= 0; i--) { rank = dims[i] * rank + coords[i]; }
+  return rank;
+}
 
 void openQCD_qudaSetLayout(openQCD_QudaLayout_t input)
 {
@@ -122,16 +130,6 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t input)
 
 void openQCD_qudaFinalize() { endQuda(); }
 
-// TODO: fix me for openQCD
-static int rankFromCoords(const int *coords, void *fdata)
-{
-  int *dims = static_cast<int *>(fdata);
-
-  int rank = coords[3];
-  for (int i = 2; i >= 0; i--) { rank = dims[i] * rank + coords[i]; }
-  return rank;
-}
-
 // not sure we want to use allocators, but in case we want to
 #if 0
 void *qudaAllocatePinned(size_t bytes) { return pool_pinned_malloc(bytes); }
@@ -143,15 +141,14 @@ void *qudaAllocateManaged(size_t bytes) { return managed_malloc(bytes); }
 void qudaFreeManaged(void *ptr) { managed_free(ptr); }
 #endif
 
-static QudaGaugeParam newOpenQCDGaugeParam(const int *dim, QudaPrecision prec, QudaLinkType link_type)
+static QudaGaugeParam newOpenQCDGaugeParam(const int *dim, QudaPrecision prec)
 {
   QudaGaugeParam gParam = newQudaGaugeParam();
   for (int dir = 0; dir < 4; ++dir) gParam.X[dir] = dim[dir];
   gParam.cuda_prec_sloppy = gParam.cpu_prec = gParam.cuda_prec = prec;
-  gParam.type = link_type;
+  gParam.type = QUDA_SU3_LINKS;
 
-  gParam.reconstruct_sloppy = gParam.reconstruct
-    = ((link_type == QUDA_SU3_LINKS) ? QUDA_RECONSTRUCT_12 : QUDA_RECONSTRUCT_NO);
+  gParam.reconstruct_sloppy = gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.gauge_order = QUDA_OPENQCD_GAUGE_ORDER;
   gParam.t_boundary = QUDA_PERIODIC_T;
   gParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
@@ -166,28 +163,30 @@ static QudaGaugeParam newOpenQCDGaugeParam(const int *dim, QudaPrecision prec, Q
   return gParam;
 }
 
-// void qudaPlaquettePhased(int precision, double plaq[3], QudaMILCSiteArg_t *arg, int phase_in)
-// {
-//   qudamilc_called<true>(__func__);
+void openQCD_qudaPlaquette(int precision, double plaq[3], void *gauge)
+{
+  // qudamilc_called<true>(__func__);
 
-//   QudaGaugeParam qudaGaugeParam = createGaugeParamForObservables(precision, arg, phase_in);
-//   void *gauge = arg->site ? arg->site : arg->link;
+  QudaGaugeParam qudaGaugeParam
+    = newOpenQCDGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION); // fixme
+  // reateGaugeParamForObservables(precision, arg, phase_in);
 
-//   loadGaugeQuda(gauge, &qudaGaugeParam);
+  loadGaugeQuda(gauge, &qudaGaugeParam);
 
-//   QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
-//   obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
-//   obsParam.remove_staggered_phase = phase_in ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-//   gaugeObservablesQuda(&obsParam);
+  QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
+  obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
+  obsParam.remove_staggered_phase = QUDA_BOOLEAN_FALSE; //
+  // phase_in ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  gaugeObservablesQuda(&obsParam);
 
-//   // Let MILC apply its own Nc normalization
-//   plaq[0] = obsParam.plaquette[0];
-//   plaq[1] = obsParam.plaquette[1];
-//   plaq[2] = obsParam.plaquette[2];
+  // Let MILC apply its own Nc normalization
+  plaq[0] = obsParam.plaquette[0];
+  plaq[1] = obsParam.plaquette[1];
+  plaq[2] = obsParam.plaquette[2];
 
-//   qudamilc_called<false>(__func__);
-//   return;
-// }
+  // qudamilc_called<false>(__func__);
+  return;
+}
 
 // static int getLinkPadding(const int dim[4])
 // {
