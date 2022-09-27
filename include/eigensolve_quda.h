@@ -138,15 +138,6 @@ namespace quda
     /**
        @brief Promoted the specified matVec operation:
        M, Mdag, MMdag, MdagM to a Chebyshev polynomial
-       @param[in] mat Matrix operator
-       @param[in] out Output spinor
-       @param[in] in Input spinor
-    */
-    //void chebyOp(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in);
-
-    /**
-       @brief Promoted the specified matVec operation:
-       M, Mdag, MMdag, MdagM to a Chebyshev polynomial
        @param[in] out Output spinor
        @param[in] in Input spinor
     */
