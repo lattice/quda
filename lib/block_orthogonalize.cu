@@ -148,7 +148,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream)
     {
-      constexpr bool disable_ghost = DISABLE_GHOST;
+      constexpr bool disable_ghost = true;
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (V.Location() == QUDA_CPU_FIELD_LOCATION) {
         if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER && B[0]->FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {

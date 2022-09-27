@@ -227,14 +227,14 @@ namespace quda
        * @param c color index
        * @param v vector index
        */
-      constexpr int index(int parity, int x_cb, int s, int c, int v) const
+      constexpr int index(int parity, int x_cb, int s, int c, int v, int) const
       {
         return parity * offset_cb + ((x_cb * nSpin + s) * nColor + c) * nVec + v;
       }
 
       template <int nSpinBlock>
       __device__ __host__ inline void load(complex<Float> out[nSpinBlock * nColor * nVec], complex<Float> *in,
-                                           int parity, int x_cb, int chi) const
+                                           int parity, int x_cb, int chi, int) const
       {
         using vec_t = typename VectorType<Float, 2>::type;
         constexpr int N = nSpin * nColor * nVec;
@@ -280,24 +280,20 @@ namespace quda
 
     template <typename Float, int nSpin, int nColor, int nVec>
     struct AccessorCB<Float, nSpin, nColor, nVec, QUDA_FLOAT2_FIELD_ORDER> {
-      int stride = 0;
       int offset_cb = 0;
-      AccessorCB(const ColorSpinorField &field) :
-        stride(field.VolumeCB()), offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>))
-      {
-      }
+      AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>)) { }
       AccessorCB() = default;
       AccessorCB(const AccessorCB &) = default;
       AccessorCB &operator=(const AccessorCB &) = default;
 
-      constexpr int index(int parity, int x_cb, int s, int c, int v) const
+      constexpr int index(int parity, int x_cb, int s, int c, int v, int stride) const
       {
         return parity * offset_cb + ((s * nColor + c) * nVec + v) * stride + x_cb;
       }
 
       template <int nSpinBlock>
       __device__ __host__ inline void load(complex<Float> out[nSpinBlock * nColor * nVec], complex<Float> *in,
-                                           int parity, int x_cb, int chi) const
+                                           int parity, int x_cb, int chi, int stride) const
       {
         using vec_t = typename VectorType<Float, 2>::type;
         constexpr int M = nSpinBlock * nColor * nVec;
@@ -333,24 +329,20 @@ namespace quda
 
     template <typename Float, int nSpin, int nColor, int nVec>
     struct AccessorCB<Float, nSpin, nColor, nVec, QUDA_FLOAT4_FIELD_ORDER> {
-      int stride = 0;
       int offset_cb = 0;
-      AccessorCB(const ColorSpinorField &field) :
-        stride(field.VolumeCB()), offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>))
-      {
-      }
+      AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>)) { }
       AccessorCB() = default;
       AccessorCB(const AccessorCB &) = default;
       AccessorCB &operator=(const AccessorCB &) = default;
 
-      constexpr int index(int parity, int x_cb, int s, int c, int v) const
+      constexpr int index(int parity, int x_cb, int s, int c, int v, int stride) const
       {
         return parity * offset_cb + indexFloatN<nSpin, nColor, nVec, 4>(x_cb, s, c, v, stride);
       }
 
       template <int nSpinBlock>
       __device__ __host__ inline void load(complex<Float> out[nSpinBlock * nColor * nVec], complex<Float> *in,
-                                           int parity, int x_cb, int chi) const
+                                           int parity, int x_cb, int chi, int stride) const
       {
         using vec_t = typename VectorType<Float, 4>::type;
         constexpr int M = (nSpinBlock * nColor * nVec * 2) / 4;
@@ -386,24 +378,20 @@ namespace quda
 
     template <typename Float, int nSpin, int nColor, int nVec>
     struct AccessorCB<Float, nSpin, nColor, nVec, QUDA_FLOAT8_FIELD_ORDER> {
-      int stride = 0;
       int offset_cb = 0;
-      AccessorCB(const ColorSpinorField &field) :
-        stride(field.VolumeCB()), offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>))
-      {
-      }
+      AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>)) { }
       AccessorCB() = default;
       AccessorCB(const AccessorCB &) = default;
       AccessorCB &operator=(const AccessorCB &) = default;
 
-      constexpr int index(int parity, int x_cb, int s, int c, int v) const
+      constexpr int index(int parity, int x_cb, int s, int c, int v, int stride) const
       {
         return parity * offset_cb + indexFloatN<nSpin, nColor, nVec, 8>(x_cb, s, c, v, stride);
       }
 
       template <int nSpinBlock>
       __device__ __host__ inline void load(complex<Float> out[nSpinBlock * nColor * nVec], complex<Float> *in,
-                                           int parity, int x_cb, int chi) const
+                                           int parity, int x_cb, int chi, int stride) const
       {
         using vec_t = typename VectorType<Float, 8>::type;
 
@@ -616,127 +604,198 @@ namespace quda
       return conj(static_cast<complex<Float>>(a));
     }
 
-    template <typename Float, int nSpin_, int nColor_, int nVec, QudaFieldOrder order, typename storeFloat = Float,
-              typename ghostFloat = storeFloat, bool disable_ghost = false, bool block_float = false>
-    class FieldOrderCB
+    template <typename Float, int nSpin_, int nColor_, int nVec, QudaFieldOrder order, typename storeFloat,
+              typename ghostFloat, bool disable_ghost>
+    class GhostOrder
+    {
+    protected:
+      GhostOrder() = default;
+      GhostOrder(const ColorSpinorField &, int, void **) { }
+      GhostOrder &operator=(const GhostOrder &) = default;
+
+      void resetScale(Float) { }
+      void resetGhost(void *const *) const { }
+      void Ghost();
+      constexpr int Nparity() const { return 0; }
+    };
+
+    template <typename store_t, typename norm_t, bool ghost_fixed, bool block_float_ghost> struct ghost_t {
+      complex<store_t> *ghost[8] = {};
+      constexpr auto &operator[](int idx) { return ghost[idx]; }
+    };
+
+    template <typename store_t, typename norm_t> struct ghost_t<store_t, norm_t, true, true> {
+      complex<store_t> *ghost[8] = {};
+      norm_t *norm_[8] = {};
+      constexpr auto &operator[](int idx) { return ghost[idx]; }
+      constexpr auto &norm(int idx) { return norm_[idx]; }
+    };
+
+    template <typename store_t, typename norm_t> struct ghost_t<store_t, norm_t, true, false> {
+      complex<store_t> *ghost[8] = {};
+      norm_t scale = 1.0;
+      norm_t scale_inv = 1.0;
+      constexpr auto &operator[](int idx) { return ghost[idx]; }
+    };
+
+    template <typename Float, int nSpin_, int nColor_, int nVec, QudaFieldOrder order, typename storeFloat, typename ghostFloat>
+    class GhostOrder<Float, nSpin_, nColor_, nVec, order, storeFloat, ghostFloat, false>
     {
       using norm_t = float;
-
-    public:
-      /** Does this field type support ghost zones? */
-      static constexpr bool supports_ghost_zone = true;
-
       static constexpr int nSpin = nSpin_;
       static constexpr int nColor = nColor_;
-
-    protected:
-      complex<storeFloat> *v;
-      const AccessorCB<storeFloat, nSpin, nColor, nVec, order> accessor;
-      // since these variables are mutually exclusive, we use a union to minimize the accessor footprint
-      union {
-        norm_t *norm;
-        Float scale;
-      };
-      union {
-        Float scale_inv;
-        int norm_offset;
-      };
-
-#ifndef DISABLE_GHOST
-      mutable complex<ghostFloat> *ghost[8];
-      mutable norm_t *ghost_norm[8];
-      mutable int x[QUDA_MAX_DIM];
-      const unsigned int volumeCB;
-      const int nDim;
-      const QudaGammaBasis gammaBasis;
-      const int siteSubset;
-      const int nParity;
-      const QudaFieldLocation location;
-      const GhostAccessorCB<ghostFloat, nSpin, nColor, nVec, order> ghostAccessor;
-      Float ghost_scale;
-      Float ghost_scale_inv;
-#endif
       static constexpr bool fixed = fixed_point<Float, storeFloat>();
       static constexpr bool ghost_fixed = fixed_point<Float, ghostFloat>();
       static constexpr bool block_float_ghost = !fixed && ghost_fixed;
 
-    public:
-      using real = Float;
+      mutable ghost_t<ghostFloat, norm_t, ghost_fixed, block_float_ghost> ghost;
+      int nParity = 0;
+      using ghost_accessor_t = GhostAccessorCB<ghostFloat, nSpin, nColor, nVec, order>;
+      ghost_accessor_t ghostAccessor;
 
-      /**
-       * Constructor for the FieldOrderCB class
-       * @param field The field that we are accessing
-       */
-#ifndef DISABLE_GHOST
-      FieldOrderCB(const ColorSpinorField &field, int nFace = 1, void *v_ = 0, void **ghost_ = 0)
-#else
-      FieldOrderCB(const ColorSpinorField &field, int = 1, void *v_ = 0, void ** = 0)
-#endif
-        :
-        v(v_ ? static_cast<complex<storeFloat> *>(const_cast<void *>(v_)) :
-               static_cast<complex<storeFloat> *>(const_cast<void *>(field.V()))),
-        accessor(field),
-        scale(static_cast<Float>(1.0)),
-        scale_inv(static_cast<Float>(1.0))
-#ifndef DISABLE_GHOST
-        ,
-        volumeCB(field.VolumeCB()),
-        nDim(field.Ndim()),
-        gammaBasis(field.GammaBasis()),
-        siteSubset(field.SiteSubset()),
-        nParity(field.SiteSubset()),
-        location(field.Location()),
-        ghostAccessor(field, nFace),
-        ghost_scale(static_cast<Float>(1.0)),
-        ghost_scale_inv(static_cast<Float>(1.0))
-#endif
+    protected:
+      GhostOrder() = default;
+
+      GhostOrder(const ColorSpinorField &field, int nFace, void **ghost_ = nullptr) :
+        nParity(field.SiteSubset()), ghostAccessor(field, nFace)
       {
-#ifndef DISABLE_GHOST
-        for (int d = 0; d < QUDA_MAX_DIM; d++) x[d] = field.X(d);
         resetGhost(ghost_ ? ghost_ : field.Ghost());
-#endif
-        resetScale(field.Scale());
+      }
 
-#ifdef DISABLE_GHOST
-        if (!disable_ghost) errorQuda("DISABLE_GHOST macro set but corresponding disable_ghost template not set");
-#endif
+      GhostOrder &operator=(const GhostOrder &) = default;
 
-        if (block_float) {
-          norm = static_cast<norm_t *>(const_cast<void *>(field.Norm()));
-          norm_offset = field.Bytes() / (2 * sizeof(norm_t));
+      void resetScale(Float max)
+      {
+        if (block_float_ghost && max != static_cast<Float>(1.0))
+          errorQuda("Block-float accessor requires max=1.0 not max=%e", max);
+        if constexpr (ghost_fixed && !block_float_ghost) {
+          ghost.scale = static_cast<Float>(std::numeric_limits<ghostFloat>::max() / max);
+          ghost.scale_inv = static_cast<Float>(max / std::numeric_limits<ghostFloat>::max());
         }
       }
 
-#ifndef DISABLE_GHOST
+    public:
       void resetGhost(void *const *ghost_) const
       {
         for (int dim = 0; dim < 4; dim++) {
           for (int dir = 0; dir < 2; dir++) {
             ghost[2 * dim + dir] = static_cast<complex<ghostFloat> *>(ghost_[2 * dim + dir]);
-            ghost_norm[2 * dim + dir] = !block_float_ghost ?
-              nullptr :
-              reinterpret_cast<norm_t *>(static_cast<char *>(ghost_[2 * dim + dir])
-                                         + nParity * nColor * nSpin * nVec * 2 * ghostAccessor.faceVolumeCB[dim]
-                                           * sizeof(ghostFloat));
+            if constexpr (block_float_ghost)
+              ghost.norm(2 * dim + dir) = reinterpret_cast<norm_t *>(
+                static_cast<char *>(ghost_[2 * dim + dir])
+                + nParity * nColor * nSpin * nVec * 2 * ghostAccessor.faceVolumeCB[dim] * sizeof(ghostFloat));
           }
         }
       }
-#endif
+
+      /**
+       * Complex-member accessor function for the ghost zone.  The
+       * parameter n is only used for indexed into the packed
+       * null-space vectors.
+       * @param x 1-d checkerboard site index
+       * @param s spin index
+       * @param c color index
+       * @param n vector number
+       * @param max site-element max (only when writing in block-float format)
+       */
+      __device__ __host__ inline auto Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n = 0,
+                                            Float max = 0) const
+      {
+        norm_t *norm_ptr = nullptr;
+        norm_t scale = 1.0;
+        norm_t scale_inv = 1.0;
+        if constexpr (ghost_fixed) {
+          if constexpr (block_float_ghost) {
+            norm_ptr = ghost.norm(2 * dim + dir);
+            scale = fdividef(fixedMaxValue<ghostFloat>::value, max);
+            scale_inv = fixedInvMaxValue<ghostFloat>::value * max;
+          } else {
+            scale = ghost.scale;
+            scale_inv = ghost.scale_inv;
+          }
+        }
+        return fieldorder_wrapper<Float, ghostFloat, block_float_ghost, norm_t>(
+          ghost[2 * dim + dir], ghostAccessor.index(dim, parity, x_cb, s, c, n), scale, scale_inv, norm_ptr,
+          parity * ghostAccessor.faceVolumeCB[dim] + x_cb, s == 0 && c == 0 && n == 0);
+      }
+
+      /** Returns the number of field parities (1 or 2) */
+      constexpr int Nparity() const { return nParity; }
+    };
+
+    template <typename real, typename store_t, bool fixed, bool block_float> struct field {
+      complex<store_t> *v = nullptr;
+    };
+
+    template <typename real, typename store_t> struct field<real, store_t, true, false> {
+      complex<store_t> *v = nullptr;
+      real scale = 1.0;
+      real scale_inv = 1.0;
+    };
+
+    template <typename real, typename store_t> struct field<real, store_t, true, true> {
+      using norm_t = float;
+      complex<store_t> *v = nullptr;
+      norm_t *norm = nullptr;
+      int norm_offset = 0;
+    };
+
+    template <typename Float, int nSpin_, int nColor_, int nVec, QudaFieldOrder order, typename storeFloat = Float,
+              typename ghostFloat = storeFloat, bool disable_ghost = false, bool block_float = false>
+    class FieldOrderCB : GhostOrder<Float, nSpin_, nColor_, nVec, order, storeFloat, ghostFloat, disable_ghost>
+    {
+      using GhostOrder = GhostOrder<Float, nSpin_, nColor_, nVec, order, storeFloat, ghostFloat, disable_ghost>;
+      using norm_t = float;
+
+    public:
+      /** Does this field type support ghost zones? */
+      static constexpr bool supports_ghost_zone = true;
+      static constexpr bool fixed = fixed_point<Float, storeFloat>();
+      static constexpr int nSpin = nSpin_;
+      static constexpr int nColor = nColor_;
+
+      field<Float, storeFloat, fixed, block_float> v;
+      unsigned int volumeCB = 0;
+      using GhostOrder::Ghost;
+      using GhostOrder::Nparity;
+      using GhostOrder::resetGhost;
+
+    protected:
+      using accessor_t = AccessorCB<storeFloat, nSpin, nColor, nVec, order>;
+      accessor_t accessor;
+
+    public:
+      using real = Float;
+      FieldOrderCB() = default;
+
+      /**
+       * Constructor for the FieldOrderCB class
+       * @param field The field that we are accessing
+       */
+      FieldOrderCB(const ColorSpinorField &field, int nFace = 1, void *v_ = 0, void **ghost_ = 0) :
+        GhostOrder(field, nFace, ghost_), volumeCB(field.VolumeCB()), accessor(field)
+      {
+        v.v = v_ ? static_cast<complex<storeFloat> *>(const_cast<void *>(v_)) :
+                   static_cast<complex<storeFloat> *>(const_cast<void *>(field.V()));
+        resetScale(field.Scale());
+
+        if constexpr (fixed && block_float) {
+          v.norm = static_cast<norm_t *>(const_cast<void *>(field.Norm()));
+          v.norm_offset = field.Bytes() / (2 * sizeof(norm_t));
+        }
+      }
+
+      FieldOrderCB &operator=(const FieldOrderCB&) = default;
 
       void resetScale(Float max)
       {
-        if ((block_float || block_float_ghost) && max != static_cast<Float>(1.0))
-          errorQuda("Block-float accessor requires max=1.0 not max=%e\n", max);
-        if (fixed && !block_float) {
-          scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
-          scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
+        if (block_float && max != static_cast<Float>(1.0))
+          errorQuda("Block-float accessor requires max=1.0 not max=%e", max);
+        if constexpr (fixed && !block_float) {
+          v.scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
+          v.scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
         }
-#ifndef DISABLE_GHOST
-        if (ghost_fixed && !block_float_ghost) {
-          ghost_scale = static_cast<Float>(std::numeric_limits<ghostFloat>::max() / max);
-          ghost_scale_inv = static_cast<Float>(max / std::numeric_limits<ghostFloat>::max());
-        }
-#endif
+        GhostOrder::resetScale(max);
       }
 
       /**
@@ -753,11 +812,18 @@ namespace quda
                                            int chi) const
       {
         if (!fixed) {
-          accessor.template load<nSpinBlock>((complex<storeFloat> *)out, v, parity, x_cb, chi);
+          accessor.template load<nSpinBlock>((complex<storeFloat> *)out, v.v, parity, x_cb, chi, volumeCB);
         } else {
           complex<storeFloat> tmp[nSpinBlock * nColor * nVec];
-          accessor.template load<nSpinBlock>(tmp, v, parity, x_cb, chi);
-          Float norm_ = block_float ? norm[parity * norm_offset + x_cb] : scale_inv;
+          accessor.template load<nSpinBlock>(tmp, v.v, parity, x_cb, chi, volumeCB);
+
+          Float norm_ = 0.0;
+          if constexpr (fixed) {
+            if constexpr (block_float)
+              norm_ = v.norm[parity * v.norm_offset + x_cb];
+            else
+              norm_ = v.scale_inv;
+          }
 #pragma unroll
           for (int s = 0; s < nSpinBlock; s++) {
 #pragma unroll
@@ -782,113 +848,34 @@ namespace quda
        */
       __device__ __host__ inline auto operator()(int parity, int x_cb, int s, int c, int n = 0) const
       {
+        Float scale = 1.0;
+        Float scale_inv = 1.0;
+        norm_t *norm = nullptr;
+        int norm_offset = 0;
+        if constexpr (fixed) {
+          if constexpr (block_float) {
+            norm = v.norm;
+            norm_offset = v.norm_offset;
+          } else {
+            scale = v.scale;
+            scale_inv = v.scale_inv;
+          }
+        }
         return fieldorder_wrapper<Float, storeFloat, block_float, norm_t>(
-          v, accessor.index(parity, x_cb, s, c, n), scale, scale_inv, norm, parity * norm_offset + x_cb);
+          v.v, accessor.index(parity, x_cb, s, c, n, volumeCB), scale, scale_inv, norm, parity * norm_offset + x_cb);
       }
-
-#ifndef DISABLE_GHOST
-      /**
-       * Complex-member accessor function for the ghost zone.  The
-       * parameter n is only used for indexed into the packed
-       * null-space vectors.
-       * @param x 1-d checkerboard site index
-       * @param s spin index
-       * @param c color index
-       * @param n vector number
-       * @param max site-element max (only when writing in block-float format)
-       */
-      __device__ __host__ inline auto Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n = 0,
-                                            Float max = 0) const
-      {
-        return fieldorder_wrapper<Float, ghostFloat, block_float_ghost, norm_t>(
-          ghost[2 * dim + dir], ghostAccessor.index(dim, parity, x_cb, s, c, n),
-          block_float_ghost ? fdividef(fixedMaxValue<ghostFloat>::value, max) : ghost_scale,
-          block_float_ghost ? fixedInvMaxValue<ghostFloat>::value * max : ghost_scale_inv, ghost_norm[2 * dim + dir],
-          parity * ghostAccessor.faceVolumeCB[dim] + x_cb, s == 0 && c == 0 && n == 0);
-      }
-
-      /**
-       @brief Convert from 1-dimensional index to the n-dimensional
-       spatial index.  With full fields, we assume that the field is
-       even-odd ordered.  The lattice coordinates that are computed
-       here are full-field coordinates.
-    */
-      __device__ __host__ inline void LatticeIndex(int y[QUDA_MAX_DIM], int i) const
-      {
-        if (siteSubset == QUDA_FULL_SITE_SUBSET) x[0] /= 2;
-
-        for (int d = 0; d < nDim; d++) {
-          y[d] = i % x[d];
-          i /= x[d];
-        }
-        int parity = i; // parity is the slowest running dimension
-
-        // convert into the full-field lattice coordinate
-        if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-          for (int d = 1; d < nDim; d++) parity += y[d];
-          parity = parity & 1;
-          x[0] *= 2; // restore x[0]
-        }
-        y[0] = 2 * y[0] + parity; // compute the full x coordinate
-      }
-
-      /**
-         Convert from n-dimensional spatial index to the 1-dimensional index.
-         With full fields, we assume that the field is even-odd ordered.  The
-         input lattice coordinates are always full-field coordinates.
-      */
-      __device__ __host__ inline void OffsetIndex(int &i, int y[QUDA_MAX_DIM]) const
-      {
-        int parity = 0;
-        int savey0 = y[0];
-
-        if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-          for (int d = 0; d < nDim; d++) parity += y[d];
-          parity = parity & 1;
-          y[0] /= 2;
-          x[0] /= 2;
-        }
-
-        i = parity;
-        for (int d = nDim - 1; d >= 0; d--) i = x[d] * i + y[d];
-
-        if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-          // y[0] = 2*y[0] + parity;
-          y[0] = savey0;
-          x[0] *= 2; // restore x[0]
-        }
-      }
-
-      /** Return the length of dimension d */
-      __device__ __host__ inline int X(int d) const { return x[d]; }
-
-      /** Return the length of dimension d */
-      __device__ __host__ inline const int *X() const { return x; }
-#endif
 
       /** Returns the number of field colors */
-      __device__ __host__ inline int Ncolor() const { return nColor; }
+      constexpr int Ncolor() const { return nColor; }
 
       /** Returns the number of field spins */
-      __device__ __host__ inline int Nspin() const { return nSpin; }
+      constexpr int Nspin() const { return nSpin; }
 
       /** Returns the number of packed vectors (for mg prolongator) */
-      __device__ __host__ inline int Nvec() const { return nVec; }
-
-#ifndef DISABLE_GHOST
-      /** Returns the number of field parities (1 or 2) */
-      __device__ __host__ inline int Nparity() const { return nParity; }
+      constexpr int Nvec() const { return nVec; }
 
       /** Returns the field volume */
-      __device__ __host__ inline int VolumeCB() const { return volumeCB; }
-
-      /** Returns the field geometric dimension */
-      __device__ __host__ inline int Ndim() const { return nDim; }
-
-      /** Returns the field geometric dimension */
-      __device__ __host__ inline QudaGammaBasis GammaBasis() const { return gammaBasis; }
-
-#endif
+      constexpr int VolumeCB() const { return volumeCB; }
 
       /**
          @brief Wrapper to transform_reduce which is called by the
@@ -901,10 +888,10 @@ namespace quda
          in transform_reduce
        */
       template <typename reducer, typename helper>
-      auto transform_reduce(QudaFieldLocation location, int nParity, unsigned int volumeCB, helper h) const
+      auto transform_reduce(QudaFieldLocation location, int nParity, helper h) const
       {
-        std::vector<decltype(v)> v_eo(nParity);
-        for (auto i = 0u; i < v_eo.size(); i++) v_eo[i] = v + i * accessor.offset_cb;
+        std::vector<decltype(v.v)> v_eo(nParity);
+        for (auto i = 0u; i < v_eo.size(); i++) v_eo[i] = v.v + i * accessor.offset_cb;
         std::vector<typename reducer::reduce_t> result(nParity);
 
         ::quda::transform_reduce<reducer>(location, result, v_eo, volumeCB * nSpin * nColor * nVec, h);
@@ -919,11 +906,13 @@ namespace quda
        * @param[in] global Whether to do a global or process local norm2 reduction
        * @return L2 norm squared
        */
-      __host__ double norm2(const ColorSpinorField &v, bool global = true) const
+      auto norm2(const ColorSpinorField &field, bool global = true) const
       {
         commGlobalReductionPush(global);
-        auto nrm2 = transform_reduce<plus<double>>(v.Location(), v.SiteSubset(), v.VolumeCB(),
-                                                   square_<double, storeFloat>(scale_inv));
+        Float scale_inv = 1.0;
+        if constexpr (fixed && !block_float) scale_inv = v.scale_inv;
+        auto nrm2
+          = transform_reduce<plus<double>>(field.Location(), field.SiteSubset(), square_<double, storeFloat>(scale_inv));
         commGlobalReductionPop();
         return nrm2;
       }
@@ -933,48 +922,16 @@ namespace quda
        * @param[in] global Whether to do a global or process local Linfinity reduction
        * @return Linfinity norm
        */
-      __host__ double abs_max(const ColorSpinorField &v, bool global = true) const
+      auto abs_max(const ColorSpinorField &field, bool global = true) const
       {
         commGlobalReductionPush(global);
-        auto absmax = transform_reduce<maximum<Float>>(v.Location(), v.SiteSubset(), v.VolumeCB(),
+        Float scale_inv = 1.0;
+        if constexpr (fixed && !block_float) scale_inv = v.scale_inv;
+        auto absmax = transform_reduce<maximum<Float>>(field.Location(), field.SiteSubset(),
                                                        abs_max_<Float, storeFloat>(scale_inv));
         commGlobalReductionPop();
         return absmax;
       }
-
-#ifndef DISABLE_GHOST
-      /**
-       * Returns the L2 norm squared of the field in a given dimension
-       * @param[in] global Whether to do a global or process local norm2 reduction
-       * @return L2 norm squared
-       */
-      __host__ double norm2(bool global = true) const
-      {
-        commGlobalReductionPush(global);
-        auto nrm2 = transform_reduce<plus<double>>(location, nParity, volumeCB, square_<double, storeFloat>(scale_inv));
-        commGlobalReductionPop();
-        return nrm2;
-      }
-
-      /**
-       * Returns the Linfinity norm of the field
-       * @param[in] global Whether to do a global or process local Linfinity reduction
-       * @return Linfinity norm
-       */
-      __host__ double abs_max(bool global = true) const
-      {
-        commGlobalReductionPush(global);
-        auto absmax
-          = transform_reduce<maximum<Float>>(location, nParity, volumeCB, abs_max_<Float, storeFloat>(scale_inv));
-        commGlobalReductionPop();
-        return absmax;
-      }
-
-      size_t Bytes() const
-      {
-        return nParity * static_cast<size_t>(volumeCB) * nColor * nSpin * nVec * 2ll * sizeof(storeFloat);
-      }
-#endif
     };
 
     /**
