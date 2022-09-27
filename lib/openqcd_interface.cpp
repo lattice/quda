@@ -82,7 +82,7 @@ static int rankFromCoords(const int *coords, void *fdata)
   int *dims = static_cast<int *>(fdata);
 // rank = coords[0]*dims[1]*dims[2]*dims[3] + coords[1]*dims[2]*dims[3]  + coords[2]*dims[3] + coords[3]
   int rank = coords[0];
-  for (int i = 0; i < 3; i++) { rank = dims[i] * rank + coords[i]; }
+  for (int i = 1; i < 3; i++) { rank = dims[i] * rank + coords[i]; }
   return rank;
 }
 
