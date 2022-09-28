@@ -1356,7 +1356,6 @@ extern "C" {
    * @param param  Contains all metadata regarding host and device
    *               storage
    */
-                         
   void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param);
 
   /**

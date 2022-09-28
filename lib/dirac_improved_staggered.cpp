@@ -131,7 +131,7 @@ namespace quda {
   }
   
   void DiracImprovedStaggered::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &, const double &,
-                             const int &t0, const QudaParity) const
+                             const int &t0, const QudaParity parity) const
   {
     checkSpinorAlias(in, out);
 
@@ -155,7 +155,7 @@ namespace quda {
     if (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET){
       errorQuda( "Single parity site smearing is not supported yet." );
     } else {
-      ApplyStaggeredQSmear(out, in, *gauge, t0_local, is_time_slice, QUDA_INVALID_PARITY, laplace3D, dagger, comm_dim, profile);
+      ApplyStaggeredQSmear(out, in, *gauge, t0_local, is_time_slice, parity, laplace3D, dagger, comm_dim, profile);
     }
 
     flops += ( laplace3D > 3 ? 570ll : 426ll ) * ( in.Volume() / ( is_time_slice ? in.X(3) : 1 ) );
