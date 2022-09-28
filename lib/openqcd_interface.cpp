@@ -159,6 +159,15 @@ void *qudaAllocateManaged(size_t bytes) { return managed_malloc(bytes); }
 void qudaFreeManaged(void *ptr) { managed_free(ptr); }
 #endif
 
+
+static int getLinkPadding(const int dim[4])
+{
+  int padding = MAX(dim[1]*dim[2]*dim[3]/2, dim[0]*dim[2]*dim[3]/2);
+  padding = MAX(padding, dim[0]*dim[1]*dim[3]/2);
+  padding = MAX(padding, dim[0]*dim[1]*dim[2]/2);
+  return padding;
+}
+
 static QudaGaugeParam newOpenQCDGaugeParam(const int *dim, QudaPrecision prec)
 {
   QudaGaugeParam gParam = newQudaGaugeParam();
@@ -174,10 +183,8 @@ static QudaGaugeParam newOpenQCDGaugeParam(const int *dim, QudaPrecision prec)
   gParam.anisotropy = 1.0;
   gParam.tadpole_coeff = 1.0;
   gParam.scale = 0;
-  gParam.ga_pad = 0;
-  gParam.site_ga_pad = 0;
-  gParam.mom_ga_pad = 0;
-  gParam.llfat_ga_pad = 0;
+  gParam.ga_pad = getLinkPadding(dim);
+
   return gParam;
 }
 

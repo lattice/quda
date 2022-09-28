@@ -2354,7 +2354,9 @@ namespace quda {
           //   ud+8*(ix-VOLUME/2)+2*mu+1
           // is the pointer to the link variable U(x-mu,mu),
           // so to get U(x,mu) for even x we need to load U(ix,mu) with ix=x+mu
-          int xmu = linkIndexP1(x, dim, dir); // TODO: What about on boundaries?, do we need to index into them?
+          int coord[4];
+	        getCoords(coord, x, dim, 1);
+          int xmu = linkIndexP1(coord, dim, dir); // TODO: What about on boundaries?, do we need to index into them?
 
           auto in = &gauge[(8 * xmu + 2 * dir + 1) * length];
           block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));

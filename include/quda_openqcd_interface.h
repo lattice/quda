@@ -51,7 +51,7 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t input);
 /**
  * Destroy the QUDA context.
  */
-void openQCD_qudaFinalize();
+void openQCD_qudaFinalize(void);
 
 #if 0
 // leave that here for now
@@ -154,6 +154,8 @@ void openQCD_qudaInvert(int external_precision, int quda_precision, double mass,
  */
 void openQCD_qudaLoadGaugeField(int external_precision, int quda_precision, openQCD_QudaInvertArgs_t inv_args,
                                 const void *milc_link);
+
+void openQCD_qudaPlaquette(int precision, double plaq[3], void *gauge);
 
 /**
    Free the gauge field allocated in QUDA.
