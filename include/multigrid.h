@@ -508,8 +508,9 @@ namespace quda {
      @param[in] commDim Which dimensions are partitioned?
      @param[in] halo_precision What precision to use for the halos (if QUDA_INVALID_PRECISION, use field precision)
    */
-  void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-		   const GaugeField &Y, const GaugeField &X, double kappa, int parity = QUDA_INVALID_PARITY,
+  void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
+                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
+                   double kappa, int parity = QUDA_INVALID_PARITY,
 		   bool dslash=true, bool clover=true, bool dagger=false, const int *commDim=0,
                    QudaPrecision halo_precision=QUDA_INVALID_PRECISION);
 

@@ -314,32 +314,32 @@ namespace quda {
     calculateYhat(Yhat, Xinv, Y, X, use_mma);
   }
 
-  void DiracCoarse::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  void DiracCoarse::Clover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                           const QudaParity parity) const
   {
-    if (&in == &out) errorQuda("Fields cannot alias");
-    QudaFieldLocation location = checkLocation(out,in);
+    QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
     if (location == QUDA_CUDA_FIELD_LOCATION) {
       ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, false, true, dagger, commDim);
     } else if (location == QUDA_CPU_FIELD_LOCATION) {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true, dagger, commDim);
     }
-    int n = in.Nspin()*in.Ncolor();
-    flops += (8*n*n-2*n)*(long long)in.VolumeCB();
+    int n = in[0].Nspin() * in[0].Ncolor();
+    flops += (8 * n * n - 2 * n) * (long long)in[0].VolumeCB() * in.size();
   }
 
-  void DiracCoarse::CloverInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  void DiracCoarse::CloverInv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                              const QudaParity parity) const
   {
-    if (&in == &out) errorQuda("Fields cannot alias");
-    QudaFieldLocation location = checkLocation(out,in);
+    QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
     if ( location  == QUDA_CUDA_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_d, *Xinv_d, kappa, parity, false, true, dagger, commDim);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true, dagger, commDim);
     }
-    int n = in.Nspin()*in.Ncolor();
-    flops += (8*n*n-2*n)*(long long)in.VolumeCB();
+    int n = in[0].Nspin() * in[0].Ncolor();
+    flops += (8 * n * n - 2 * n) * (long long)in[0].VolumeCB() * in.size();
   }
 
   void DiracCoarse::Dslash(ColorSpinorField &out, const ColorSpinorField &in,
@@ -354,6 +354,20 @@ namespace quda {
     }
     int n = in.Nspin()*in.Ncolor();
     flops += (8*(8*n*n)-2*n)*(long long)in.VolumeCB()*in.SiteSubset();
+  }
+
+  void DiracCoarse::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+			   const QudaParity parity) const
+  {
+    QudaFieldLocation location = checkLocation(out[0],in[0]);
+    initializeLazy(location);
+    if ( location == QUDA_CUDA_FIELD_LOCATION ) {
+      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision);
+    } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision);
+    }
+    int n = in[0].Nspin() * in[0].Ncolor();
+    flops += (8 * ( 8 * n * n) - 2 * n) * (long long)in[0].VolumeCB() * in[0].SiteSubset() * in.size();
   }
 
   void DiracCoarse::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,

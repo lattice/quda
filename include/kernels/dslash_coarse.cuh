@@ -33,12 +33,16 @@ namespace quda {
     static constexpr int nDim = 4;
 
     using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, csOrder, Float, ghostFloat>;
+    // disable ghost to reduce arg size
+    using Fdg = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, csOrder, Float, ghostFloat, true>;
     using G = typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat>;
     using GY = typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat>;
 
-    F out;
-    const F inA;
-    const F inB;
+    static constexpr unsigned int max_n_src = 16;
+    const int_fastdiv n_src;
+    Fdg out[max_n_src];
+    F inA[max_n_src];
+    Fdg inB[max_n_src];
     const GY Y;
     const GY X;
     const real kappa;
@@ -50,23 +54,30 @@ namespace quda {
     const int commDim[4]; // whether a given dimension is partitioned or not
     const int volumeCB;
 
-    inline DslashCoarseArg(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-                           const GaugeField &Y, const GaugeField &X, real kappa, int parity) :
-      kernel_param(dim3(color_stride * X.VolumeCB(), out.SiteSubset(), 2 * dim_stride * 2 * (nColor / colors_per_thread(nColor, dim_stride)))),
-      out(const_cast<ColorSpinorField &>(out)),
-      inA(const_cast<ColorSpinorField &>(inA)),
-      inB(const_cast<ColorSpinorField &>(inB)),
+    inline DslashCoarseArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
+                           cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
+                           real kappa, int parity) :
+      kernel_param(dim3(color_stride * X.VolumeCB(), out[0].SiteSubset() * out.size(),
+                        2 * dim_stride * 2 * (nColor / colors_per_thread(nColor, dim_stride)))),
+      n_src(out.size()),
       Y(const_cast<GaugeField &>(Y)),
       X(const_cast<GaugeField &>(X)),
       kappa(kappa),
       parity(parity),
-      nParity(out.SiteSubset()),
+      nParity(out[0].SiteSubset()),
       nFace(1),
-      X0h(((3 - nParity) * out.X(0)) / 2),
-      dim {(3 - nParity) * out.X(0), out.X(1), out.X(2), out.X(3), out.Ndim() == 5 ? out.X(4) : 1},
+      X0h(((3 - nParity) * out[0].X(0)) / 2),
+      dim {(3 - nParity) * out[0].X(0), out[0].X(1), out[0].X(2), out[0].X(3), out[0].Ndim() == 5 ? out[0].X(4) : 1},
       commDim {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-      volumeCB((unsigned int)out.VolumeCB() / dim[4])
-    {  }
+      volumeCB((unsigned int)out[0].VolumeCB() / dim[4])
+    {
+      if (out.size() > (unsigned)n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), (int)n_src);
+      for (auto i = 0u; i < out.size(); i++) {
+        this->out[i] = out[i];
+        this->inA[i] = inA[i];
+        this->inB[i] = inB[i];
+      }
+    }
   };
 
   /**
@@ -101,24 +112,23 @@ namespace quda {
      Applies the coarse dslash on a given parity and checkerboard site index
      /out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
 
-     @param out The result vector
-     @param thread_dir Direction
-     @param x_cb The checkerboarded site index
-     @param src_idx dummy for now
-     @param parity The site parity
-     @param s_row Which spin row are acting on
-     @param color_block Which color row are we acting on
-     @param color_off Which color column offset are we acting on
-     @param arg Arguments
+     @param[in,out] out The result vector
+     @param[in] thread_dir Direction
+     @param[in] x_cb The checkerboarded site index
+     @param[in] src_idx Which src are we working on
+     @param[in] parity The site parity
+     @param[in] s_row Which spin row are acting on
+     @param[in] color_block Which color row are we acting on
+     @param[in] color_off Which color column offset are we acting on
+     @param[in] arg Arguments
    */
   template <int Mc, int thread_dim, typename V, typename Arg>
   __device__ __host__ inline void applyDslash(V &out, int thread_dir, int x_cb, int src_idx, int parity, int s_row, int color_block, int color_offset, const Arg &arg)
   {
     const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
 
-    int coord[5];
+    int coord[4];
     getCoordsCB(coord, x_cb, arg.dim, arg.X0h, parity);
-    coord[4] = src_idx;
 
     if (!thread_dir || target::is_host()) {
 
@@ -128,9 +138,9 @@ namespace quda {
       {
 	const int fwd_idx = linkIndexP1(coord, arg.dim, d);
 
-	if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
-	  if (doHalo<Arg::type>()) {
-            int ghost_idx = ghostFaceIndex<1, 5>(coord, arg.dim, d, arg.nFace);
+	if (arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
+	  if constexpr (doHalo<Arg::type>()) {
+            int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
 
 #pragma unroll
 	    for(int color_local = 0; color_local < Mc; color_local++) { //Color row
@@ -143,15 +153,16 @@ namespace quda {
 		  int col = s_col * Arg::nColor + c_col + color_offset;
 		  if (!Arg::dagger)
                     out[color_local] = cmac(arg.Y(d+4, parity, x_cb, row, col),
-                                            arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
+                                            arg.inA[src_idx].Ghost(d, 1, their_spinor_parity, ghost_idx, s_col, c_col+color_offset), out[color_local]);
 		  else
 		    out[color_local] = cmac(arg.Y(d, parity, x_cb, row, col),
-                                            arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
-		}
+                                            arg.inA[src_idx].Ghost(d, 1, their_spinor_parity, ghost_idx, s_col, c_col+color_offset), out[color_local]);
+
+                }
 	      }
 	    }
 	  }
-	} else if (doBulk<Arg::type>()) {
+	} else if constexpr (doBulk<Arg::type>()) {
 #pragma unroll
 	  for(int color_local = 0; color_local < Mc; color_local++) { //Color row
 	    int c_row = color_block + color_local; // global color index
@@ -163,10 +174,10 @@ namespace quda {
 		int col = s_col * Arg::nColor + c_col + color_offset;
 		if (!Arg::dagger)
 		  out[color_local] = cmac(arg.Y(d+4, parity, x_cb, row, col),
-                                          arg.inA(their_spinor_parity, fwd_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
+                                          arg.inA[src_idx](their_spinor_parity, fwd_idx, s_col, c_col+color_offset), out[color_local]);
 		else
 		  out[color_local] = cmac(arg.Y(d, parity, x_cb, row, col),
-                                          arg.inA(their_spinor_parity, fwd_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
+                                          arg.inA[src_idx](their_spinor_parity, fwd_idx, s_col, c_col+color_offset), out[color_local]);
 	      }
 	    }
 	  }
@@ -183,9 +194,9 @@ namespace quda {
 	{
 	const int back_idx = linkIndexM1(coord, arg.dim, d);
 	const int gauge_idx = back_idx;
-	if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
-	  if (doHalo<Arg::type>()) {
-            const int ghost_idx = ghostFaceIndex<0, 5>(coord, arg.dim, d, arg.nFace);
+	if (arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
+	  if constexpr (doHalo<Arg::type>()) {
+            const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
 #pragma unroll
 	    for (int color_local=0; color_local<Mc; color_local++) {
 	      int c_row = color_block + color_local;
@@ -197,14 +208,14 @@ namespace quda {
 		  int col = s_col * Arg::nColor + c_col + color_offset;
 		  if (!Arg::dagger)
 		    out[color_local] = cmac(conj(arg.Y.Ghost(d, 1-parity, ghost_idx, col, row)),
-                                            arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
+                                            arg.inA[src_idx].Ghost(d, 0, their_spinor_parity, ghost_idx, s_col, c_col+color_offset), out[color_local]);
 		  else
 		    out[color_local] = cmac(conj(arg.Y.Ghost(d+4, 1-parity, ghost_idx, col, row)),
-                                            arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
+                                            arg.inA[src_idx].Ghost(d, 0, their_spinor_parity, ghost_idx, s_col, c_col+color_offset), out[color_local]);
 		}
 	    }
 	  }
-	} else if (doBulk<Arg::type>()) {
+	} else if constexpr (doBulk<Arg::type>()) {
 #pragma unroll
 	  for(int color_local = 0; color_local < Mc; color_local++) {
 	    int c_row = color_block + color_local;
@@ -216,10 +227,10 @@ namespace quda {
 		int col = s_col * Arg::nColor + c_col + color_offset;
 		if (!Arg::dagger)
 		  out[color_local] = cmac(conj(arg.Y(d, 1-parity, gauge_idx, col, row)),
-                                          arg.inA(their_spinor_parity, back_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
+                                          arg.inA[src_idx](their_spinor_parity, back_idx, s_col, c_col+color_offset), out[color_local]);
 		else
 		  out[color_local] = cmac(conj(arg.Y(d+4, 1-parity, gauge_idx, col, row)),
-                                          arg.inA(their_spinor_parity, back_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
+                                          arg.inA[src_idx](their_spinor_parity, back_idx, s_col, c_col+color_offset), out[color_local]);
 	      }
 	  }
 	}
@@ -255,9 +266,9 @@ namespace quda {
 	  //Factor of kappa and diagonal addition now incorporated in X
 	  int col = s_col * Arg::nColor + c_col + color_offset;
 	  if (!Arg::dagger) {
-	    out[color_local] = cmac(arg.X(0, parity, x_cb, row, col), arg.inB(spinor_parity, x_cb+src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
+	    out[color_local] = cmac(arg.X(0, parity, x_cb, row, col), arg.inB[src_idx](spinor_parity, x_cb, s_col, c_col+color_offset), out[color_local]);
 	  } else {
-	    out[color_local] = cmac(conj(arg.X(0, parity, x_cb, col, row)), arg.inB(spinor_parity, x_cb+src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
+	    out[color_local] = cmac(conj(arg.X(0, parity, x_cb, col, row)), arg.inB[src_idx](spinor_parity, x_cb, s_col, c_col+color_offset), out[color_local]);
 	  }
 	}
     }
@@ -303,7 +314,7 @@ namespace quda {
     constexpr CoarseDslash(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb_color_offset, int parity, int sMd)
+    __device__ __host__ inline void operator()(int x_cb_color_offset, int src_parity, int sMd)
     {
       int x_cb = x_cb_color_offset;
       int color_offset = 0;
@@ -317,7 +328,8 @@ namespace quda {
         color_offset = lane_id / vector_site_width;
       }
 
-      parity = (arg.nParity == 2) ? parity : arg.parity;
+      int src_idx = src_parity % arg.n_src;
+      int parity = (arg.nParity == 2) ? (src_parity / arg.n_src) : arg.parity;
 
       // z thread dimension is (( s*(Nc/Mc) + color_block )*dim_thread_split + dim)*2 + dir
       constexpr int Mc = colors_per_thread(Arg::nColor, Arg::dim_stride);
@@ -328,7 +340,6 @@ namespace quda {
       int s = sM / (Arg::nColor/Mc);
       int color_block = (sM % (Arg::nColor/Mc)) * Mc;
 
-      constexpr int src_idx = 0;
       array<complex <typename Arg::real>, Mc> out{ };
 
       if (Arg::dslash) {
@@ -353,8 +364,8 @@ namespace quda {
           int c = color_block + color_local; // global color index
           if (color_offset == 0) {
             // if not halo we just store, else we accumulate
-            if (doBulk<Arg::type>()) arg.out(my_spinor_parity, x_cb+src_idx*arg.volumeCB, s, c) = out[color_local];
-            else arg.out(my_spinor_parity, x_cb+src_idx*arg.volumeCB, s, c) += out[color_local];
+            if (doBulk<Arg::type>()) arg.out[src_idx](my_spinor_parity, x_cb, s, c) = out[color_local];
+            else arg.out[src_idx](my_spinor_parity, x_cb, s, c) += out[color_local];
           }
         }
       }
