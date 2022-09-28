@@ -189,10 +189,10 @@ extern int niter;
 extern int maxiter_precondition;
 extern QudaVerbosity verbosity_precondition;
 extern int gcrNkrylov;
-extern QudaCABasis ca_basis;
+extern QudaPolynomialBasis ca_basis;
 extern double ca_lambda_min;
 extern double ca_lambda_max;
-extern QudaCABasis ca_basis_precondition;
+extern QudaPolynomialBasis ca_basis_precondition;
 extern double ca_lambda_min_precondition;
 extern double ca_lambda_max_precondition;
 extern int pipeline;
@@ -267,33 +267,46 @@ extern quda::mgarray<QudaVerbosity> mg_verbosity;
 extern quda::mgarray<QudaInverterType> setup_inv;
 extern quda::mgarray<QudaSolveType> coarse_solve_type;
 extern quda::mgarray<QudaSolveType> smoother_solve_type;
+
+extern quda::mgarray<QudaNullVectorSetupType> setup_type;
+extern quda::mgarray<QudaNullVectorSetupType> setup_restrict_remaining_type;
+
+// Parameters for inverse iterations setup
 extern quda::mgarray<int> num_setup_iter;
 extern quda::mgarray<double> setup_tol;
 extern quda::mgarray<int> setup_maxiter;
 extern quda::mgarray<int> setup_maxiter_refresh;
-extern quda::mgarray<QudaCABasis> setup_ca_basis;
+extern quda::mgarray<int> setup_maxiter_inverse_iterations_refinement;
+extern quda::mgarray<QudaPolynomialBasis> setup_ca_basis;
 extern quda::mgarray<int> setup_ca_basis_size;
 extern quda::mgarray<double> setup_ca_lambda_min;
 extern quda::mgarray<double> setup_ca_lambda_max;
-extern QudaSetupType setup_type;
+
+// Parameters for Chebyshev filter setup
+extern quda::mgarray<int> filter_startup_vectors;
+extern quda::mgarray<int> filter_startup_iterations;
+extern quda::mgarray<int> filter_startup_rescale_frequency;
+extern quda::mgarray<int> filter_iterations_between_vectors;
+extern quda::mgarray<double> filter_lambda_min;
+extern quda::mgarray<double> filter_lambda_max;
+
+
 extern bool pre_orthonormalize;
 extern bool post_orthonormalize;
 extern double omega;
 extern quda::mgarray<QudaInverterType> coarse_solver;
 extern quda::mgarray<double> coarse_solver_tol;
 extern quda::mgarray<QudaInverterType> smoother_type;
-extern quda::mgarray<QudaCABasis> smoother_solver_ca_basis;
+extern quda::mgarray<QudaPolynomialBasis> smoother_solver_ca_basis;
 extern quda::mgarray<double> smoother_solver_ca_lambda_min;
 extern quda::mgarray<double> smoother_solver_ca_lambda_max;
 extern QudaPrecision smoother_halo_prec;
 extern quda::mgarray<double> smoother_tol;
 extern quda::mgarray<int> coarse_solver_maxiter;
-extern quda::mgarray<QudaCABasis> coarse_solver_ca_basis;
+extern quda::mgarray<QudaPolynomialBasis> coarse_solver_ca_basis;
 extern quda::mgarray<int> coarse_solver_ca_basis_size;
 extern quda::mgarray<double> coarse_solver_ca_lambda_min;
 extern quda::mgarray<double> coarse_solver_ca_lambda_max;
-extern bool generate_nullspace;
-extern bool generate_all_levels;
 extern quda::mgarray<QudaSchwarzType> mg_schwarz_type;
 extern quda::mgarray<int> mg_schwarz_cycle;
 extern bool mg_evolve_thin_updates;

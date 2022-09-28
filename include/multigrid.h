@@ -286,7 +286,7 @@ namespace quda {
     SolverParam *param_coarse_solver;
 
     /** The coarse-grid representation of the null space vectors */
-    std::vector<ColorSpinorField*> *B_coarse;
+    std::vector<ColorSpinorField*> B_coarse;
 
     /** Residual vector */
     ColorSpinorField *r;
@@ -449,7 +449,7 @@ namespace quda {
 
     /**
        @brief Load the null space vectors in from file
-       @param B Loaded null-space vectors (pre-allocated)
+       @param B Load null-space vectors to here
     */
     void loadVectors(std::vector<ColorSpinorField *> &B);
 
@@ -460,22 +460,59 @@ namespace quda {
     void saveVectors(const std::vector<ColorSpinorField *> &B) const;
 
     /**
-       @brief Generate the null-space vectors
-       @param B Generated null-space vectors
-       @param refresh Whether we refreshing pre-exising vectors or starting afresh
+       @brief Initialize a set of vectors to random noise
+       @param B set of vectors
     */
-    void generateNullVectors(std::vector<ColorSpinorField*> &B, bool refresh=false);
+    void initializeRandomVectors(const std::vector<ColorSpinorField*> &B) const;
+
+    /**
+       @brief Wrapping function that manages logic for constructing near-null vectors
+       @param refresh whether or not we're only refreshing near null vectors
+    */
+    void constructNearNulls(bool refresh = false);
+
+    /**
+       @brief Generate the null-space vectors via inverse iterations
+       @param B Generated null-space vectors
+       @param iterations if non-zero, override the max number of iterations
+    */
+    void generateInverseIterations(std::vector<ColorSpinorField*> &B, int iterations = 0);
+
+    /**
+       @brief Generate the null-space vectors via a Chebyshev filter; this approach is
+              based on arXiv:2103.05034, P. Boyle and A. Yamaguchi.
+       @param B Generated null-space vectors
+    */
+    void generateChebyshevFilter(std::vector<ColorSpinorField*> &B);
 
     /**
        @brief Generate lowest eigenvectors
+       @param B Generated null-space vectors
+       @param post_restrict whether or not we're generating extra eigenvectors after restricting
+              some fine eigenvectors; if true we override the requested n_conv in the multigrid
+              eigenvalue struct
     */
-    void generateEigenVectors();
+    void generateEigenvectors(std::vector<ColorSpinorField*> &B, bool post_restrict = false);
+
+    /**
+       @brief Generate near-null vectors via restricting finer near-nulls, generating extras if need be
+       @param refresh Whether or not we're only refreshing extra near nulls
+    */
+    void generateRestrictedVectors(bool refresh = false);
 
     /**
        @brief Build free-field null-space vectors
-       @param B Free-field null-space vectors
+       @param B Generated null-space vectors
     */
-    void buildFreeVectors(std::vector<ColorSpinorField*> &B);
+    void generateFreeVectors(std::vector<ColorSpinorField*> &B);
+
+    /**
+      @brief Orthonormalize a vector of ColorSpinorField, erroring out if
+             the fields are not sufficiently linearly independent
+      @param vecs vector of ColorSpinorFields to normalize
+      @param count number of near-null vectors to orthonormalize, default all
+    */
+    void orthonormalizeVectors(const std::vector<ColorSpinorField*>& vecs, int count = -1) const;
 
     /**
        @brief Return the total flops done on this and all coarser levels.
@@ -495,6 +532,14 @@ namespace quda {
 
       return (param.level == 0 || kd_nearnull_gen);
     }
+
+    /**
+      @brief Return if we're on the coarsest grid right now
+    */
+    bool is_coarsest_grid() const {
+      return (param.level == (param.Nlevel - 1));
+    }
+
   };
 
   /**

@@ -262,7 +262,15 @@ inline void safe_strcpy(char *cstr, const std::string &str, size_t limit, const 
 }
 
 // MG param types
-void setMultigridParam(QudaMultigridParam &mg_param);
+
+/**
+  @brief Set multigrid parameters that are specific to Wilson-type multigrid
+*/
+void setWilsonMultigridParam(QudaMultigridParam &mg_param);
+
+/**
+  @brief Set multigrid parameters that are specific to staggered-type multigrid
+*/
 void setStaggeredMultigridParam(QudaMultigridParam &mg_param);
 
 // Eig param types

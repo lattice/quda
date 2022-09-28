@@ -271,6 +271,7 @@ namespace quda {
   std::shared_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass, const bool dagger_approximation)
   {
     GaugeFieldParam gParam(gauge);
+    gParam.location = QUDA_CUDA_FIELD_LOCATION;
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
     gParam.create = QUDA_NULL_FIELD_CREATE;
     gParam.geometry = QUDA_KDINVERSE_GEOMETRY;

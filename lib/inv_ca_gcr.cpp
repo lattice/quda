@@ -1,7 +1,7 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
 #include <eigen_helper.h>
-#include <solver.hpp>
+#include <polynomial.hpp>
 
 namespace quda
 {
@@ -229,7 +229,14 @@ namespace quda
       // Perform 100 power iterations, normalizing every 10 mat-vecs, using r_ as an initial seed
       // and q[0]/q[1] as temporaries for the power iterations. tmpSloppy get passed in a temporary
       // for matSloppy. Technically illegal if n_krylov == 1, but in that case lambda_max isn't used anyway.
-      lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r, q[0], q[1], 100, 10, tmp_sloppy);
+      PolynomialBasisParams basis_params;
+      basis_params.basis = QUDA_POWER_BASIS;
+      basis_params.n_order = 100;
+      basis_params.normalize_freq = 10;
+      basis_params.tmp_vectors.emplace_back(std::ref(q[0]));
+      basis_params.tmp_vectors.emplace_back(std::ref(q[1]));
+      lambda_max = 1.1 * performPowerIterations(matSloppy, r, basis_params, tmp_sloppy);
+
       logQuda(QUDA_SUMMARIZE, "CA-GCR Approximate lambda max = 1.1 x %e\n", lambda_max / 1.1);
 
       lambda_init = true;
@@ -240,13 +247,17 @@ namespace quda
       }
     }
 
-    // Factors which map linear operator onto [-1,1]
-    double m_map = 2. / (lambda_max - lambda_min);
-    double b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
+    // Parameters for the basis polynomial
+    PolynomialBasisParams ca_params;
+    ca_params.basis = basis;
+    ca_params.n_order = n_krylov;
+    ca_params.normalize_freq = 0;
+    ca_params.m_map = PolynomialBasisParams::compute_m_map(lambda_min, lambda_max);
+    ca_params.b_map = PolynomialBasisParams::compute_b_map(lambda_min, lambda_max);
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
-      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
+      if (!param.compute_null_vector) {
         warningQuda("inverting on zero-field source\n");
         x = b;
         param.true_res = 0.0;
@@ -290,7 +301,7 @@ namespace quda
     while (!convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
       // build up a space of size n_krylov
-      computeCAKrylovSpace(matSloppy, q, p, n_krylov, basis, m_map, b_map, tmp_sloppy);
+      computeCAKrylovSpace(matSloppy, q, p, ca_params, tmp_sloppy);
 
       solve(alpha, q, p[0]);
 

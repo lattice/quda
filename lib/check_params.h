@@ -761,12 +761,6 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-  P(setup_type, QUDA_NULL_VECTOR_SETUP);
-#else
-  P(setup_type, QUDA_INVALID_SETUP_TYPE);
-#endif
-
-#ifdef INIT_PARAM
   P(pre_orthonormalize, QUDA_BOOLEAN_FALSE);
 #else
   P(pre_orthonormalize, QUDA_BOOLEAN_INVALID);
@@ -779,6 +773,14 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
   for (int i=0; i<n_level; i++) {
+#ifdef INIT_PARAM
+    P(setup_type[i], QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS);
+    P(setup_restrict_remaining_type[i], QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS);
+#else
+    P(setup_type[i], QUDA_SETUP_NULL_VECTOR_INVALID);
+    P(setup_restrict_remaining_type[i], QUDA_SETUP_NULL_VECTOR_INVALID);
+#endif
+
 #ifdef INIT_PARAM
     P(verbosity[i], QUDA_SILENT);
 #else
@@ -803,10 +805,12 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(setup_tol[i], 5e-6);
     P(setup_maxiter[i], 500);
     P(setup_maxiter_refresh[i], 0);
+    P(setup_maxiter_inverse_iterations_refinement[i], 0);
 #else
     P(setup_tol[i], INVALID_DOUBLE);
     P(setup_maxiter[i], INVALID_INT);
     P(setup_maxiter_refresh[i], INVALID_INT);
+    P(setup_maxiter_inverse_iterations_refinement[i], INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
@@ -820,6 +824,23 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(setup_ca_lambda_min[i], INVALID_DOUBLE);
     P(setup_ca_lambda_max[i], INVALID_DOUBLE);
 #endif
+
+#ifdef INIT_PARAM
+    P(filter_startup_vectors[i], 1);
+    P(filter_startup_iterations[i], 1000);
+    P(filter_startup_rescale_frequency[i], 50);
+    P(filter_iterations_between_vectors[i], 150);
+    P(filter_lambda_min[i], 1.0);
+    P(filter_lambda_max[i], -1.0);
+#else
+    P(filter_startup_vectors[i], INVALID_INT);
+    P(filter_startup_iterations[i], INVALID_INT);
+    P(filter_startup_rescale_frequency[i], INVALID_INT);
+    P(filter_iterations_between_vectors[i], INVALID_INT);
+    P(filter_lambda_min[i], INVALID_DOUBLE);
+    P(filter_lambda_max[i], INVALID_DOUBLE);
+#endif
+
 
 #ifdef INIT_PARAM
     P(n_block_ortho[i], 1);
@@ -922,20 +943,6 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   P(setup_minimize_memory, QUDA_BOOLEAN_FALSE);
 #else
   P(setup_minimize_memory, QUDA_BOOLEAN_INVALID);
-#endif
-
-  P(compute_null_vector, QUDA_COMPUTE_NULL_VECTOR_INVALID);
-  P(generate_all_levels, QUDA_BOOLEAN_INVALID);
-
-#ifdef CHECK_PARAM
-  // if only doing top-level null-space generation, check that n_vec
-  // is equal on all levels
-  if (param->generate_all_levels == QUDA_BOOLEAN_FALSE && param->compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
-    for (int i=1; i<n_level-1; i++)
-      if (param->n_vec[0] != param->n_vec[i])
-	errorQuda("n_vec %d != %d must be equal on all levels if generate_all_levels == false",
-		  param->n_vec[0], param->n_vec[i]);
-  }
 #endif
 
   P(run_verify, QUDA_BOOLEAN_INVALID);

@@ -549,7 +549,7 @@ namespace quda {
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
-      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
+      if (!param.compute_null_vector) {
         warningQuda("inverting on zero-field source");
         x = b;
         param.true_res = 0.0;
@@ -567,7 +567,7 @@ namespace quda {
     // There probably be bugs and headaches hiding here.
     if (param.precision_sloppy == x.Precision()) {
       r[0] = &r_full; // r[0] \equiv r_sloppy points to the same memory location as r.
-      if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO)
+      if (!param.compute_null_vector)
       {
         r0p = &b; // r0, b point to the same vector in memory.
       }

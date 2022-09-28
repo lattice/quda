@@ -322,7 +322,7 @@ extern "C" {
     double omega;
 
     /** Basis for CA algorithms */
-    QudaCABasis ca_basis;
+    QudaPolynomialBasis ca_basis;
 
     /** Minimum eigenvalue for Chebyshev CA basis */
     double ca_lambda_min;
@@ -331,7 +331,7 @@ extern "C" {
     double ca_lambda_max;
 
     /** Basis for CA algorithms in a preconditioned solver */
-    QudaCABasis ca_basis_precondition;
+    QudaPolynomialBasis ca_basis_precondition;
 
     /** Minimum eigenvalue for Chebyshev CA basis in a preconditioner solver */
     double ca_lambda_min_precondition;
@@ -640,8 +640,11 @@ extern "C" {
     /** Maximum number of iterations for refreshing the null-space vectors */
     int setup_maxiter_refresh[QUDA_MAX_MG_LEVEL];
 
+    /** Maximum number of iterations for inverse iteration refinement of null-space vectors */
+    int setup_maxiter_inverse_iterations_refinement[QUDA_MAX_MG_LEVEL];
+
     /** Basis to use for CA solver setup */
-    QudaCABasis setup_ca_basis[QUDA_MAX_MG_LEVEL];
+    QudaPolynomialBasis setup_ca_basis[QUDA_MAX_MG_LEVEL];
 
     /** Basis size for CA solver setup */
     int setup_ca_basis_size[QUDA_MAX_MG_LEVEL];
@@ -652,8 +655,29 @@ extern "C" {
     /** Maximum eigenvalue for Chebyshev CA basis */
     double setup_ca_lambda_max[QUDA_MAX_MG_LEVEL];
 
+    /** Number of random starting vectors for Chebyshev filter null space generation */
+    int filter_startup_vectors[QUDA_MAX_MG_LEVEL];
+
+    /** Number of iterations for initial Chebyshev filter */
+    int filter_startup_iterations[QUDA_MAX_MG_LEVEL];
+
+    /** Frequency of rescales during initial filtering which helps avoid overflow */
+    int filter_startup_rescale_frequency[QUDA_MAX_MG_LEVEL];
+
+    /** Number of iterations between null vectors generated from each starting vector */
+    int filter_iterations_between_vectors[QUDA_MAX_MG_LEVEL];
+
+    /** Conservative estimate of largest eigenvalue of operator used for Chebyshev filter setup */
+    double filter_lambda_min[QUDA_MAX_MG_LEVEL];
+
+    /** Lower bound of eigenvalues that are not enhanced by the initial Chebyshev filter */
+    double filter_lambda_max[QUDA_MAX_MG_LEVEL];
+
     /** Null-space type to use in the setup phase */
-    QudaSetupType setup_type;
+    QudaNullVectorSetupType setup_type[QUDA_MAX_MG_LEVEL];
+
+    /** Null-space type to use to "fill in" extra vectors after restricting some */
+    QudaNullVectorSetupType setup_restrict_remaining_type[QUDA_MAX_MG_LEVEL];
 
     /** Pre orthonormalize vectors in the setup phase */
     QudaBoolean pre_orthonormalize;
@@ -671,7 +695,7 @@ extern "C" {
     int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
 
     /** Basis to use for CA coarse solvers */
-    QudaCABasis coarse_solver_ca_basis[QUDA_MAX_MG_LEVEL];
+    QudaPolynomialBasis coarse_solver_ca_basis[QUDA_MAX_MG_LEVEL];
 
     /** Basis size for CA coarse solvers */
     int coarse_solver_ca_basis_size[QUDA_MAX_MG_LEVEL];
@@ -695,7 +719,7 @@ extern "C" {
     int nu_post[QUDA_MAX_MG_LEVEL];
 
     /** Basis to use for CA smoother solvers */
-    QudaCABasis smoother_solver_ca_basis[QUDA_MAX_MG_LEVEL];
+    QudaPolynomialBasis smoother_solver_ca_basis[QUDA_MAX_MG_LEVEL];
 
     /** Minimum eigenvalue for Chebyshev CA smoother basis */
     double smoother_solver_ca_lambda_min[QUDA_MAX_MG_LEVEL];
@@ -716,7 +740,7 @@ extern "C" {
     int smoother_schwarz_cycle[QUDA_MAX_MG_LEVEL];
 
     /** The type of residual to send to the next coarse grid, and thus the
-	type of solution to receive back from this coarse grid */
+        type of solution to receive back from this coarse grid */
     QudaSolutionType coarse_grid_solution_type[QUDA_MAX_MG_LEVEL];
 
     /** The type of smoother solve to do on each grid (e/o preconditioning or not)*/
@@ -741,12 +765,6 @@ extern "C" {
         placing temporary fields in mapped memory instad of device
         memory */
     QudaBoolean setup_minimize_memory;
-
-    /** Whether to compute the null vectors or reload them */
-    QudaComputeNullVector compute_null_vector;
-
-    /** Whether to generate on all levels or just on level 0 */
-    QudaBoolean generate_all_levels;
 
     /** Whether to run the verification checks once set up is complete */
     QudaBoolean run_verify;

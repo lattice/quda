@@ -204,7 +204,7 @@ namespace quda {
     // Check to see that we're not trying to invert on a zero-field source    
     double b2 = blas::norm2(b);
     if(b2 == 0 &&
-       (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO || param.use_init_guess == QUDA_USE_INIT_GUESS_NO)){
+       (!param.compute_null_vector || param.use_init_guess == QUDA_USE_INIT_GUESS_NO)){
       profile.TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x = b;

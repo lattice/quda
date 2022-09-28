@@ -1300,7 +1300,7 @@ public:
        @brief Return the one-hop field for staggered operators for MG setup
 
        @return Gauge field
-   */
+    */
     virtual cudaGaugeField *getStaggeredShortLinkField() const { return gauge; }
 
     /**

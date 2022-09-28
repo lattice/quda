@@ -202,8 +202,7 @@ namespace quda {
     }
 
     /**
-       @brief Compute the block "caxpy" with over the s
-et of
+       @brief Compute the block "caxpy" with over the set of
        ColorSpinorFields.  E.g., it computes
 
        y = x * a + y

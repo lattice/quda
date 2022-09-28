@@ -50,10 +50,10 @@ int niter = 100;
 int maxiter_precondition = 10;
 QudaVerbosity verbosity_precondition = QUDA_SUMMARIZE;
 int gcrNkrylov = 8;
-QudaCABasis ca_basis = QUDA_CHEBYSHEV_BASIS;
+QudaPolynomialBasis ca_basis = QUDA_CHEBYSHEV_BASIS;
 double ca_lambda_min = 0.0;
 double ca_lambda_max = -1.0;
-QudaCABasis ca_basis_precondition = QUDA_POWER_BASIS;
+QudaPolynomialBasis ca_basis_precondition = QUDA_POWER_BASIS;
 double ca_lambda_min_precondition = 0.0;
 double ca_lambda_max_precondition = -1.0;
 int pipeline = 0;
@@ -130,33 +130,45 @@ quda::mgarray<QudaVerbosity> mg_verbosity = {};
 quda::mgarray<QudaInverterType> setup_inv = {};
 quda::mgarray<QudaSolveType> coarse_solve_type = {};
 quda::mgarray<QudaSolveType> smoother_solve_type = {};
+
+quda::mgarray<QudaNullVectorSetupType> setup_type = {};
+quda::mgarray<QudaNullVectorSetupType> setup_restrict_remaining_type = {};
+
+// Parameters for inverse iterations setup
 quda::mgarray<int> num_setup_iter = {};
 quda::mgarray<double> setup_tol = {};
 quda::mgarray<int> setup_maxiter = {};
 quda::mgarray<int> setup_maxiter_refresh = {};
-quda::mgarray<QudaCABasis> setup_ca_basis = {};
+quda::mgarray<int> setup_maxiter_inverse_iterations_refinement = {};
+quda::mgarray<QudaPolynomialBasis> setup_ca_basis = {};
 quda::mgarray<int> setup_ca_basis_size = {};
 quda::mgarray<double> setup_ca_lambda_min = {};
 quda::mgarray<double> setup_ca_lambda_max = {};
-QudaSetupType setup_type = QUDA_NULL_VECTOR_SETUP;
+
+// Parameters for Chebyshev filter setup
+quda::mgarray<int> filter_startup_vectors = {};
+quda::mgarray<int> filter_startup_iterations = {};
+quda::mgarray<int> filter_startup_rescale_frequency = {};
+quda::mgarray<int> filter_iterations_between_vectors = {};
+quda::mgarray<double> filter_lambda_min = {};
+quda::mgarray<double> filter_lambda_max = {};
+
 bool pre_orthonormalize = false;
 bool post_orthonormalize = true;
 double omega = 0.85;
 quda::mgarray<QudaInverterType> coarse_solver = {};
 quda::mgarray<double> coarse_solver_tol = {};
 quda::mgarray<QudaInverterType> smoother_type = {};
-quda::mgarray<QudaCABasis> smoother_solver_ca_basis = {};
+quda::mgarray<QudaPolynomialBasis> smoother_solver_ca_basis = {};
 quda::mgarray<double> smoother_solver_ca_lambda_min = {};
 quda::mgarray<double> smoother_solver_ca_lambda_max = {};
 QudaPrecision smoother_halo_prec = QUDA_INVALID_PRECISION;
 quda::mgarray<double> smoother_tol = {};
 quda::mgarray<int> coarse_solver_maxiter = {};
-quda::mgarray<QudaCABasis> coarse_solver_ca_basis = {};
+quda::mgarray<QudaPolynomialBasis> coarse_solver_ca_basis = {};
 quda::mgarray<int> coarse_solver_ca_basis_size = {};
 quda::mgarray<double> coarse_solver_ca_lambda_min = {};
 quda::mgarray<double> coarse_solver_ca_lambda_max = {};
-bool generate_nullspace = true;
-bool generate_all_levels = true;
 quda::mgarray<QudaSchwarzType> mg_schwarz_type = {};
 quda::mgarray<int> mg_schwarz_cycle = {};
 bool mg_evolve_thin_updates = false;
@@ -278,7 +290,7 @@ bool enable_testing = false;
 
 namespace
 {
-  CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
+  CLI::TransformPairs<QudaPolynomialBasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
 
   CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
                                                            {"dr", QUDA_CONTRACT_TYPE_DR}};
@@ -387,7 +399,12 @@ namespace
     {"SR", QUDA_SPECTRUM_SR_EIG}, {"LR", QUDA_SPECTRUM_LR_EIG}, {"SM", QUDA_SPECTRUM_SM_EIG},
     {"LM", QUDA_SPECTRUM_LM_EIG}, {"SI", QUDA_SPECTRUM_SI_EIG}, {"LI", QUDA_SPECTRUM_LI_EIG}};
 
-  CLI::TransformPairs<QudaSetupType> setup_type_map {{"test", QUDA_TEST_VECTOR_SETUP}, {"null", QUDA_TEST_VECTOR_SETUP}};
+  CLI::TransformPairs<QudaNullVectorSetupType> setup_type_map {{"inverse-iterations", QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS},
+                                                               {"chebyshev-filter", QUDA_SETUP_NULL_VECTOR_CHEBYSHEV_FILTER},
+                                                               {"eigenvectors", QUDA_SETUP_NULL_VECTOR_EIGENVECTORS},
+                                                               {"test-vectors", QUDA_SETUP_NULL_VECTOR_TEST_VECTORS},
+                                                               {"restrict-fine", QUDA_SETUP_NULL_VECTOR_RESTRICT_FINE},
+                                                               {"free-field", QUDA_SETUP_NULL_VECTOR_FREE_FIELD}};
 
   CLI::TransformPairs<QudaExtLibType> extlib_map {{"eigen", QUDA_EIGEN_EXTLIB}};
 
@@ -838,19 +855,13 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "Solve the Even-Odd preconditioned problem (default false)");
   quda_app->add_mgoption(opgroup, "--mg-eig-use-poly-acc", mg_eig_use_poly_acc, CLI::Validator(),
                          "Use Chebyshev polynomial acceleration in the eigensolver (default true)");
-  opgroup->add_option(
-    "--mg-generate-all-levels",
-    generate_all_levels, "true=generate null-space on all levels, false=generate on level 0 and create other levels from that (default true)");
   opgroup->add_option("--mg-evolve-thin-updates", mg_evolve_thin_updates,
                       "Utilize thin updates for multigrid evolution tests (default false)");
-  opgroup->add_option("--mg-generate-nullspace", generate_nullspace,
-                      "Generate the null-space vector dynamically (default true, if set false and mg-load-vec isn't "
-                      "set, creates free-field null vectors)");
   opgroup->add_option("--mg-levels", mg_levels, "The number of multigrid levels to do (default 2)");
 
   // TODO
   quda_app->add_mgoption(opgroup, "--mg-load-vec", mg_vec_infile, CLI::Validator(),
-                         "Load the vectors <file> for the multigrid_test (requires QIO)");
+                         "Load the vectors <file> for the multigrid_test, overrides setup (requires QIO)");
   quda_app->add_mgoption(opgroup, "--mg-save-vec", mg_vec_outfile, CLI::Validator(),
                          "Save the generated null-space vectors <file> from the multigrid_test (requires QIO)");
 
@@ -891,6 +902,13 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->transform(CLI::QUDACheckedTransformer(schwarz_type_map));
   quda_app->add_mgoption(opgroup, "--mg-schwarz-cycle", mg_schwarz_cycle, CLI::PositiveNumber,
                          "The number of Schwarz cycles to apply per smoother application (default=1)");
+
+  quda_app->add_mgoption(opgroup, "--mg-setup-type", setup_type, CLI::QUDACheckedTransformer(setup_type_map),
+    "The type of setup to use for the multigrid; ignored if --mg-load-vec is set (inverse-iterations (default), chebyshev-filter, eigenvectors, test-vectors, restrict-fine, free-field)");
+
+  quda_app->add_mgoption(opgroup, "--mg-setup-restrict-remaining-type", setup_restrict_remaining_type, CLI::QUDACheckedTransformer(setup_type_map),
+    "The type of setup to use for remaining vectors if restricting all fine null vectors (inverse-iterations (default), chebyshev-filter)");
+
   quda_app->add_mgoption(opgroup, "--mg-setup-ca-basis-size", setup_ca_basis_size, CLI::PositiveNumber,
                          "The basis size to use for CA solver setup of multigrid (default 4)");
   quda_app->add_mgoption(opgroup, "--mg-setup-ca-basis-type", setup_ca_basis, CLI::QUDACheckedTransformer(ca_basis_map),
@@ -905,7 +923,7 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(opgroup, "--mg-setup-inv", setup_inv, solver_trans,
                          "The inverter to use for the setup of multigrid (default bicgstab)");
   quda_app->add_mgoption(opgroup, "--mg-setup-iters", num_setup_iter, CLI::PositiveNumber,
-                         "The number of setup iterations to use for the multigrid (default 1)");
+                         "The number of setup iterations to use for the multigrid, requires test vector setup (default 1)");
 
   quda_app->add_mgoption(opgroup, "--mg-setup-location", setup_location, CLI::QUDACheckedTransformer(field_location_map),
                          "The location where the multigrid setup will be computed (default cuda)");
@@ -915,11 +933,26 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(
     opgroup, "--mg-setup-maxiter-refresh", setup_maxiter_refresh, CLI::Validator(),
     "The maximum number of solver iterations to use when refreshing the pre-existing null space vectors (default 100)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-setup-maxiter-inverse-iterations-refinement", setup_maxiter_inverse_iterations_refinement, CLI::Validator(),
+    "The maximum number of solver iterations to use when refining pre-existing null space vectors after a non-inverse-iteration setup (default 0, no refinement)");
   quda_app->add_mgoption(opgroup, "--mg-setup-tol", setup_tol, CLI::Validator(),
                          "The tolerance to use for the setup of multigrid (default 5e-6)");
 
-  opgroup->add_option("--mg-setup-type", setup_type, "The type of setup to use for the multigrid (default null)")
-    ->transform(CLI::QUDACheckedTransformer(setup_type_map));
+  quda_app->add_mgoption(opgroup, "--mg-setup-filter-startup-vectors", filter_startup_vectors, CLI::PositiveNumber,
+                         "Number of random starting vectors for Chebyshev filter null space generation (default 1)");
+  quda_app->add_mgoption(opgroup, "--mg-setup-filter-startup-iterations", filter_startup_iterations, CLI::PositiveNumber,
+                         "Number of iterations for initial Chebyshev filter (default 1000)");
+  quda_app->add_mgoption(opgroup, "--mg-setup-filter-startup-rescale-frequency", filter_startup_rescale_frequency, CLI::PositiveNumber,
+                         "Frequency of rescales during initial filtering which helps avoid overflow (default 50)");
+  quda_app->add_mgoption(opgroup, "--mg-setup-filter-iterations-between-vectors", filter_iterations_between_vectors, CLI::PositiveNumber,
+                         "Number of iterations between null vectors generated from each starting vector (default 150)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-setup-filter-lambda-max", filter_lambda_max, CLI::Validator(),
+    "Conservative estimate of largest eigenvalue of operator used for Chebyshev filter setup (default is to guess with power iterations)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-setup-filter-lambda-min", filter_lambda_min, CLI::PositiveNumber,
+    "Lower bound of eigenvalues that are not enhanced by the initial Chebyshev filter (default 1)");
 
   opgroup
     ->add_option(

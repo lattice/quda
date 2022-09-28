@@ -197,12 +197,12 @@ typedef enum QudaResidualType_s {
   QUDA_INVALID_RESIDUAL = QUDA_INVALID_ENUM
 } QudaResidualType;
 
-// Which basis to use for CA algorithms
-typedef enum QudaCABasis_s {
+// Which basis to use for polynomials, CA solver basis
+typedef enum QudaPolynomialBasis_s {
   QUDA_POWER_BASIS,
   QUDA_CHEBYSHEV_BASIS,
   QUDA_INVALID_BASIS = QUDA_INVALID_ENUM
-} QudaCABasis;
+} QudaPolynomialBasis;
 
 // Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
 //
@@ -446,17 +446,15 @@ typedef enum QudaDeflatedGuess_s {
   QUDA_DEFLATED_GUESS_INVALID = QUDA_INVALID_ENUM
 } QudaDeflatedGuess;
 
-typedef enum QudaComputeNullVector_s {
-  QUDA_COMPUTE_NULL_VECTOR_NO,
-  QUDA_COMPUTE_NULL_VECTOR_YES,
-  QUDA_COMPUTE_NULL_VECTOR_INVALID = QUDA_INVALID_ENUM
-} QudaComputeNullVector;
-
-typedef enum QudaSetupType_s {
-  QUDA_NULL_VECTOR_SETUP,
-  QUDA_TEST_VECTOR_SETUP,
-  QUDA_INVALID_SETUP_TYPE = QUDA_INVALID_ENUM
-} QudaSetupType;
+typedef enum QudaNullVectorSetupType_s {
+  QUDA_SETUP_NULL_VECTOR_INVERSE_ITERATIONS,
+  QUDA_SETUP_NULL_VECTOR_CHEBYSHEV_FILTER,
+  QUDA_SETUP_NULL_VECTOR_EIGENVECTORS,
+  QUDA_SETUP_NULL_VECTOR_TEST_VECTORS,
+  QUDA_SETUP_NULL_VECTOR_RESTRICT_FINE,
+  QUDA_SETUP_NULL_VECTOR_FREE_FIELD,
+  QUDA_SETUP_NULL_VECTOR_INVALID = QUDA_INVALID_ENUM
+} QudaNullVectorSetupType;
 
 typedef enum QudaTransferType_s {
   QUDA_TRANSFER_AGGREGATE,

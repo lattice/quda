@@ -344,6 +344,7 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.struct_size = sizeof(eig_param);
 }
 
+
 void setMultigridParam(QudaMultigridParam &mg_param)
 {
   QudaInvertParam &inv_param = *mg_param.invert_param; // this will be used to setup SolverParam parent in MGParam class
@@ -361,60 +362,21 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  if (kappa == -1.0) {
-    inv_param.mass = mass;
-    inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass));
-  } else {
-    inv_param.kappa = kappa;
-    inv_param.mass = 0.5 / kappa - (1 + 3 / anisotropy);
-  }
-
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
-      || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
-    inv_param.clover_cpu_prec = cpu_prec;
-    inv_param.clover_cuda_prec = cuda_prec;
-    inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
-    inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
-    inv_param.clover_cuda_prec_eigensolver = cuda_prec_eigensolver;
-    inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
-    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-    // Use kappa * csw or supplied clover_coeff
-    inv_param.clover_csw = clover_csw;
-    if (clover_coeff == 0.0) {
-      inv_param.clover_coeff = clover_csw * inv_param.kappa;
-    } else {
-      inv_param.clover_coeff = clover_coeff;
-    }
-    inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
-  }
-
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
   inv_param.dslash_type = dslash_type;
 
-  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.mu = mu;
-    inv_param.epsilon = epsilon;
-    inv_param.twist_flavor = twist_flavor;
-    inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
-
-    if (twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-      printfQuda("Twisted-mass doublet non supported (yet)\n");
-      exit(0);
-    }
-  }
-
   inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
-
   inv_param.matpc_type = matpc_type;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
 
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
-  mg_param.invert_param = &inv_param;
+  mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
   mg_param.n_level = mg_levels;
+
   for (int i = 0; i < mg_param.n_level; i++) {
     for (int j = 0; j < 4; j++) {
       // if not defined use 4
@@ -428,19 +390,33 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_tol[i] = setup_tol[i];
     mg_param.setup_maxiter[i] = setup_maxiter[i];
     mg_param.setup_maxiter_refresh[i] = setup_maxiter_refresh[i];
+    mg_param.setup_maxiter_inverse_iterations_refinement[i] = setup_maxiter_inverse_iterations_refinement[i];
+
+    // Setup type to use (inverse iterations, chebyshev filter, eigenvectors, restriction, free field)
+    mg_param.setup_type[i] = setup_type[i];
+
+    // Setup type to use to generate remaining near-null vectors when some are restricted
+    mg_param.setup_restrict_remaining_type[i] = setup_restrict_remaining_type[i];
 
     // Basis to use for CA solver setups
     mg_param.setup_ca_basis[i] = setup_ca_basis[i];
 
-    // Basis size for CA solver setup
+    // Basis size for CA solver setups
     mg_param.setup_ca_basis_size[i] = setup_ca_basis_size[i];
 
     // Minimum and maximum eigenvalue for Chebyshev CA basis setup
     mg_param.setup_ca_lambda_min[i] = setup_ca_lambda_min[i];
     mg_param.setup_ca_lambda_max[i] = setup_ca_lambda_max[i];
 
+    // Parameters for Chebyshev filter multigrid setup
+    mg_param.filter_startup_vectors[i] = filter_startup_vectors[i];
+    mg_param.filter_startup_iterations[i] = filter_startup_iterations[i];
+    mg_param.filter_startup_rescale_frequency[i] = filter_startup_rescale_frequency[i];
+    mg_param.filter_iterations_between_vectors[i] = filter_iterations_between_vectors[i];
+    mg_param.filter_lambda_min[i] = filter_lambda_min[i];
+    mg_param.filter_lambda_max[i] = filter_lambda_max[i];
+
     mg_param.spin_block_size[i] = 1;
-    mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
     mg_param.n_block_ortho[i] = n_block_ortho[i];    // number of times to Gram-Schmidt
     mg_param.block_ortho_two_pass[i]
       = block_ortho_two_pass[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE; // whether to use a two-pass block ortho
@@ -451,9 +427,6 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.mu_factor[i] = mu_factor[i];
 
     mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
-
-    // Is not a staggered solve, always aggregate
-    mg_param.transfer_type[i] = QUDA_TRANSFER_AGGREGATE;
 
     // set the coarse solver wrappers including bottom solver
     mg_param.coarse_solver[i] = coarse_solver[i];
@@ -495,7 +468,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.smoother_solver_ca_lambda_min[i] = smoother_solver_ca_lambda_min[i];
     mg_param.smoother_solver_ca_lambda_max[i] = smoother_solver_ca_lambda_max[i];
 
-    // Set set coarse_grid_solution_type: this defines which linear
+        // Set set coarse_grid_solution_type: this defines which linear
     // system we are solving on a given level
     // * QUDA_MAT_SOLUTION - we are solving the full system and inject
     //   a full field into coarse grid
@@ -541,15 +514,15 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
     if (i == 0) { // top-level treatment
       if (coarse_solve_type[0] != solve_type)
-        errorQuda("Mismatch between top-level MG solve type %d and outer solve type %d", coarse_solve_type[0],
-                  solve_type);
+        errorQuda("Mismatch between top-level MG solve type %s and outer solve type %s",
+                  get_solve_str(coarse_solve_type[0]), get_solve_str(solve_type));
 
       if (solve_type == QUDA_DIRECT_SOLVE) {
         mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
       } else if (solve_type == QUDA_DIRECT_PC_SOLVE) {
         mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
       } else {
-        errorQuda("Unexpected solve_type = %d\n", solve_type);
+        errorQuda("Unexpected solve_type = %s\n", get_solve_str(solve_type));
       }
 
     } else {
@@ -559,7 +532,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
       } else if (coarse_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
         mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
       } else {
-        errorQuda("Unexpected solve_type = %d\n", coarse_solve_type[i]);
+        errorQuda("Unexpected solve_type = %s\n", get_solve_str(coarse_solve_type[i]));
       }
     }
 
@@ -572,32 +545,12 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
   mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
 
-  // only coarsen the spin on the first restriction
-  mg_param.spin_block_size[0] = 2;
-
-  mg_param.setup_type = setup_type;
   mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-  mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_NULL_VECTOR_NO;
-
-  mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_param.run_verify = verify_results ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-  mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  // Whether or not to use thin restarts in the evolve tests
-  mg_param.thin_update_only = mg_evolve_thin_updates ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-  // whether or not to let MG coarsening drop improvements
-  // ex: for asqtad, dropping the long links for aggregation dimensions smaller than 3
-  mg_param.allow_truncation = mg_allow_truncation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-  // whether or not to use the dagger approximation to Xinv, which is X^dagger
-  mg_param.staggered_kd_dagger_approximation
-    = mg_staggered_kd_dagger_approximation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
@@ -609,7 +562,12 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
   mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
-  mg_param.struct_size = sizeof(mg_param);
+    // Whether or not to use thin restarts in the evolve tests
+  mg_param.thin_update_only = mg_evolve_thin_updates ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  // whether or not to let MG coarsening drop improvements
+  // ex: for asqtad, dropping the long links for aggregation dimensions smaller than 3
+  mg_param.allow_truncation = mg_allow_truncation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
@@ -621,6 +579,70 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
   inv_param.verbosity = verbosity;
   inv_param.verbosity_precondition = verbosity;
+
+  inv_param.struct_size = sizeof(inv_param);
+}
+
+void setWilsonMultigridParam(QudaMultigridParam &mg_param)
+{
+  QudaInvertParam &inv_param = *mg_param.invert_param; // this will be used to setup SolverParam parent in MGParam class
+
+  setMultigridParam(mg_param);
+
+  if (kappa == -1.0) {
+    inv_param.mass = mass;
+    inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass));
+  } else {
+    inv_param.kappa = kappa;
+    inv_param.mass = 0.5 / kappa - (1 + 3 / anisotropy);
+  }
+
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+      || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
+    inv_param.clover_cpu_prec = cpu_prec;
+    inv_param.clover_cuda_prec = cuda_prec;
+    inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
+    inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
+    inv_param.clover_cuda_prec_eigensolver = cuda_prec_eigensolver;
+    inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
+    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
+    // Use kappa * csw or supplied clover_coeff
+    inv_param.clover_csw = clover_csw;
+    if (clover_coeff == 0.0) {
+      inv_param.clover_coeff = clover_csw * inv_param.kappa;
+    } else {
+      inv_param.clover_coeff = clover_coeff;
+    }
+    inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
+  }
+
+  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    inv_param.mu = mu;
+    inv_param.epsilon = epsilon;
+    inv_param.twist_flavor = twist_flavor;
+    inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
+
+    if (twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
+      printfQuda("Twisted-mass doublet non supported (yet)\n");
+      exit(0);
+    }
+  }
+
+  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
+
+  mg_param.invert_param = &inv_param;
+
+  for (int i = 0; i < mg_param.n_level; i++) {
+
+    mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
+
+    // Is not a staggered solve, always aggregate
+    mg_param.transfer_type[i] = QUDA_TRANSFER_AGGREGATE;
+
+  }
+
+  // only coarsen the spin on the first restriction
+  mg_param.spin_block_size[0] = 2;
 
   // Use kappa * csw or supplied clover_coeff
   inv_param.clover_csw = clover_csw;
@@ -973,246 +995,38 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
 
 void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 {
+
   QudaInvertParam &inv_param = *mg_param.invert_param; // this will be used to setup SolverParam parent in MGParam class
 
-  // Whether or not to use native BLAS LAPACK
-  inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
-
-  inv_param.Ls = 1;
-
-  inv_param.cpu_prec = cpu_prec;
-  inv_param.cuda_prec = cuda_prec;
-  inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
-  inv_param.cuda_prec_precondition = cuda_prec_precondition;
-  inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
-  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  inv_param.dirac_order = QUDA_DIRAC_ORDER;
-
-  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
-
-  inv_param.dslash_type = dslash_type;
+  setMultigridParam(mg_param);
 
   inv_param.mass = mass;
   inv_param.kappa = 1.0 / (2.0 * (4.0 + inv_param.mass));
 
-  inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
 
-  inv_param.matpc_type = matpc_type;
-  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  mg_param.invert_param = &inv_param;
+  
+  for (int i = 0; i < mg_param.n_level; i++) {
 
-  inv_param.solve_type = QUDA_DIRECT_SOLVE;
+    mg_param.n_vec[i] = nvec[i] == 0 ? 64 : nvec[i]; // default to 64 vectors if not set
 
-  mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    mg_param.transfer_type[i] = (i == 0) ? staggered_transfer_type : QUDA_TRANSFER_AGGREGATE;
 
-  // whether or not to allow dropping the long links for aggregation dimensions smaller than 3
-  mg_param.allow_truncation = mg_allow_truncation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  }
+
+  // coarsening the spin on the first restriction is undefined for staggered fields.
+  mg_param.spin_block_size[0] = 0;
 
   // whether or not to use the dagger approximation to Xinv, which is X^dagger
   mg_param.staggered_kd_dagger_approximation
     = mg_staggered_kd_dagger_approximation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-  mg_param.invert_param = &inv_param;
-  mg_param.n_level = mg_levels;
-  for (int i = 0; i < mg_param.n_level; i++) {
-    for (int j = 0; j < 4; j++) {
-      // if not defined use 4
-      mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
-    }
-    mg_param.use_eig_solver[i] = mg_eig[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-    mg_param.verbosity[i] = mg_verbosity[i];
-    mg_param.setup_inv_type[i] = setup_inv[i];
-    mg_param.num_setup_iter[i] = num_setup_iter[i];
-    mg_param.setup_tol[i] = setup_tol[i];
-    mg_param.setup_maxiter[i] = setup_maxiter[i];
-
-    // Basis to use for CA solver setups
-    mg_param.setup_ca_basis[i] = setup_ca_basis[i];
-
-    // Basis size for CA solver setups
-    mg_param.setup_ca_basis_size[i] = setup_ca_basis_size[i];
-
-    // Minimum and maximum eigenvalue for Chebyshev CA basis setup
-    mg_param.setup_ca_lambda_min[i] = setup_ca_lambda_min[i];
-    mg_param.setup_ca_lambda_max[i] = setup_ca_lambda_max[i];
-
-    mg_param.spin_block_size[i] = 1;
-    mg_param.n_vec[i] = nvec[i] == 0 ? 64 : nvec[i]; // default to 64 vectors if not set
-    mg_param.n_block_ortho[i] = n_block_ortho[i];    // number of times to Gram-Schmidt
-    mg_param.block_ortho_two_pass[i]
-      = block_ortho_two_pass[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE; // whether to use a two-pass block ortho
-    mg_param.precision_null[i] = prec_null;                               // precision to store the null-space basis
-    mg_param.smoother_halo_precision[i] = smoother_halo_prec; // precision of the halo exchange in the smoother
-    mg_param.nu_pre[i] = nu_pre[i];
-    mg_param.nu_post[i] = nu_post[i];
-    mg_param.mu_factor[i] = mu_factor[i];
-
-    mg_param.transfer_type[i] = (i == 0) ? staggered_transfer_type : QUDA_TRANSFER_AGGREGATE;
-
-    mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
-
-    // set the coarse solver wrappers including bottom solver
-    mg_param.coarse_solver[i] = coarse_solver[i];
-    mg_param.coarse_solver_tol[i] = coarse_solver_tol[i];
-    mg_param.coarse_solver_maxiter[i] = coarse_solver_maxiter[i];
-
-    // Basis to use for CA coarse solvers
-    mg_param.coarse_solver_ca_basis[i] = coarse_solver_ca_basis[i];
-
-    // Basis size for CA coarse solvers
-    mg_param.coarse_solver_ca_basis_size[i] = coarse_solver_ca_basis_size[i];
-
-    // Minimum and maximum eigenvalue for Chebyshev CA basis
-    mg_param.coarse_solver_ca_lambda_min[i] = coarse_solver_ca_lambda_min[i];
-    mg_param.coarse_solver_ca_lambda_max[i] = coarse_solver_ca_lambda_max[i];
-
-    mg_param.smoother[i] = smoother_type[i];
-
-    // set the smoother / bottom solver tolerance (for MR smoothing this will be ignored)
-    mg_param.smoother_tol[i] = smoother_tol[i];
-
-    // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
-    // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
-    mg_param.smoother_solve_type[i] = smoother_solve_type[i];
-
-    // set to QUDA_ADDITIVE_SCHWARZ for Additive Schwarz precondioned smoother (presently only impelemented for MR)
-    mg_param.smoother_schwarz_type[i] = mg_schwarz_type[i];
-
-    // if using Schwarz preconditioning then use local reductions only
-    mg_param.global_reduction[i] = (mg_schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-    // set number of Schwarz cycles to apply
-    mg_param.smoother_schwarz_cycle[i] = mg_schwarz_cycle[i];
-
-    // Basis to use for CA smoothers
-    mg_param.smoother_solver_ca_basis[i] = smoother_solver_ca_basis[i];
-
-    // Minimum and maximum eigenvalue for Chebyshev CA basis smoothers
-    mg_param.smoother_solver_ca_lambda_min[i] = smoother_solver_ca_lambda_min[i];
-    mg_param.smoother_solver_ca_lambda_max[i] = smoother_solver_ca_lambda_max[i];
-
-    // Set set coarse_grid_solution_type: this defines which linear
-    // system we are solving on a given level
-    // * QUDA_MAT_SOLUTION - we are solving the full system and inject
-    //   a full field into coarse grid
-    // * QUDA_MATPC_SOLUTION - we are solving the e/o-preconditioned
-    //   system, and only inject single parity field into coarse grid
-    //
-    // Multiple possible scenarios here
-    //
-    // 1. **Direct outer solver and direct smoother**: here we use
-    // full-field residual coarsening, and everything involves the
-    // full system so coarse_grid_solution_type = QUDA_MAT_SOLUTION
-    //
-    // 2. **Direct outer solver and preconditioned smoother**: here,
-    // only the smoothing uses e/o preconditioning, so
-    // coarse_grid_solution_type = QUDA_MAT_SOLUTION_TYPE.
-    // We reconstruct the full residual prior to coarsening after the
-    // pre-smoother, and then need to project the solution for post
-    // smoothing.
-    //
-    // 3. **Preconditioned outer solver and preconditioned smoother**:
-    // here we use single-parity residual coarsening throughout, so
-    // coarse_grid_solution_type = QUDA_MATPC_SOLUTION.  This is a bit
-    // questionable from a theoretical point of view, since we don't
-    // coarsen the preconditioned operator directly, rather we coarsen
-    // the full operator and preconditioned that, but it just works.
-    // This is the optimal combination in general for Wilson-type
-    // operators: although there is an occasional increase in
-    // iteration or two), by working completely in the preconditioned
-    // space, we save the cost of reconstructing the full residual
-    // from the preconditioned smoother, and re-projecting for the
-    // subsequent smoother, as well as reducing the cost of the
-    // ancillary blas operations in the coarse-grid solve.
-    //
-    // Note, we cannot use preconditioned outer solve with direct
-    // smoother
-    //
-    // Finally, we have to treat the top level carefully: for all
-    // other levels the entry into and out of the grid will be a
-    // full-field, which we can then work in Schur complement space or
-    // not (e.g., freedom to choose coarse_grid_solution_type).  For
-    // the top level, if the outer solver is for the preconditioned
-    // system, then we must use preconditoning, e.g., option 3.) above.
-
-    if (i == 0) { // top-level treatment
-      if (coarse_solve_type[0] != solve_type)
-        errorQuda("Mismatch between top-level MG solve type %s and outer solve type %s",
-                  get_solve_str(coarse_solve_type[0]), get_solve_str(solve_type));
-
-      if (solve_type == QUDA_DIRECT_SOLVE) {
-        mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
-      } else if (solve_type == QUDA_DIRECT_PC_SOLVE) {
-        mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
-      } else {
-        errorQuda("Unexpected solve_type = %s\n", get_solve_str(solve_type));
-      }
-
-    } else {
-
-      if (coarse_solve_type[i] == QUDA_DIRECT_SOLVE) {
-        mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
-      } else if (coarse_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
-        mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
-      } else {
-        errorQuda("Unexpected solve_type = %s\n", get_solve_str(coarse_solve_type[i]));
-      }
-    }
-
-    mg_param.omega[i] = omega; // over/under relaxation factor
-
-    mg_param.location[i] = solver_location[i];
-    mg_param.setup_location[i] = setup_location[i];
-    nu_pre[i] = 2;
-    nu_post[i] = 2;
-  }
-
-  // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
-  mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
-
-  // coarsening the spin on the first restriction is undefined for staggered fields.
-  mg_param.spin_block_size[0] = 0;
 
   if (staggered_transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
       || staggered_transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
     mg_param.spin_block_size[1] = 0; // we're coarsening the optimized KD op
   }
 
-  mg_param.setup_type = setup_type;
-  mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-  mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_NULL_VECTOR_NO;
-
-  mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-  mg_param.run_verify = verify_results ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-  // set file i/o parameters
-  for (int i = 0; i < mg_param.n_level; i++) {
-    safe_strcpy(mg_param.vec_infile[i], mg_vec_infile[i], 256, "mg_vec_infile[" + std::to_string(i) + "]");
-    safe_strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i], 256, "mg_vec_outfile[" + std::to_string(i) + "]");
-    if (mg_vec_infile[i].size() > 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
-    if (mg_vec_outfile[i].size() > 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
-  }
-
-  mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-  // these need to tbe set for now but are actually ignored by the MG setup
-  // needed to make it pass the initialization test
-  inv_param.inv_type = QUDA_GCR_INVERTER;
-  inv_param.tol = 1e-10;
-  inv_param.maxiter = 1000;
-  inv_param.reliable_delta = reliable_delta;
-  inv_param.gcrNkrylov = 10;
-
-  inv_param.verbosity = verbosity;
-  inv_param.verbosity_precondition = verbosity;
-
-  inv_param.struct_size = sizeof(inv_param);
 }
 
 void setDeflatedInvertParam(QudaInvertParam &inv_param)
