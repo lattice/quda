@@ -51,15 +51,9 @@ namespace quda
 
       // operator is Hermitian so do not instantiate dagger
       if (arg.nParity == 1) {
-        if(arg.is_t0_kernel) //FIXME we reuse xpay non-type template parameter for t0 option!
-          Dslash::template instantiate<packStaggeredShmem, 1, false, true>(tp, stream);
-        else
-          Dslash::template instantiate<packStaggeredShmem, 1, false, false>(tp, stream);
+        Dslash::template instantiate<packStaggeredShmem, 1, false, false>(tp, stream);
       } else if (arg.nParity == 2) {
-        if(arg.is_t0_kernel) //FIXME we reuse xpay non-type template parameter for t0 option!
-          Dslash::template instantiate<packStaggeredShmem, 2, false, true>(tp, stream);
-        else
-          Dslash::template instantiate<packStaggeredShmem, 2, false, false>(tp, stream);
+        Dslash::template instantiate<packStaggeredShmem, 2, false, false>(tp, stream);
       }
     }
 
@@ -159,6 +153,12 @@ namespace quda
       char staggered_qsmear_[32];
       u32toa(staggered_qsmear_, arg.dir);
       strcat(aux, staggered_qsmear_);
+
+      strcat(aux, ",tslice_kernel=");
+      char tslice_kernel[4];
+      u32toa(tslice_kernel, arg.is_t0_kernel);
+      strcat(aux, tslice_kernel);
+
       return TuneKey(in.VolString(), typeid(*this).name(), aux);
     }
   };

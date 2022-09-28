@@ -46,7 +46,7 @@ namespace quda
     StaggeredQSmearArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0, bool is_t0_kernel, int parity, int dir, 
                bool dagger, const int *comm_override) :
 
-      DslashArg<Float, nDim>(in, U, parity, dagger, is_t0_kernel, 3, false, comm_override),//FIXME reuse xpay argument for t0 option
+      DslashArg<Float, nDim>(in, U, parity, dagger, false, 3, false, comm_override),
       out(out, 3),
       in(in, 3),
       in_pack(in, 3),
@@ -152,8 +152,7 @@ namespace quda
     }
   }
   
-  // WARNING: xpay is reused for t0 kernel tuning : is_t0_kernel non-type templ. par is coorelated with that one from StaggeredQSmear::apply
-  template <int nParity, bool dagger, bool is_t0_kernel, KernelType kernel_type, typename Arg> struct staggered_qsmear : dslash_default {
+  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct staggered_qsmear : dslash_default {
 
     const Arg &arg;
     constexpr staggered_qsmear(const Arg &arg) : arg(arg) {}
@@ -171,7 +170,7 @@ namespace quda
       // which dimension is thread working on (fused kernel only)
       int thread_dim;
 
-      if( is_t0_kernel )
+      if( arg.is_t0_kernel )
       {
         if( arg.t0 < 0 ) return ;
 
