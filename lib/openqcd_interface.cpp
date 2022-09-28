@@ -76,13 +76,31 @@ using namespace quda;
 // }
 
 // template <bool start> void inline qudamilc_called(const char *func) { qudamilc_called<start>(func, getVerbosity()); }
-// TODO: fix me for openQCD
+
+// fdata should point to 8 integers in order {BLK_NPROC0, BLK_NPROC1, BLK_NPROC2, BLK_NPROC3, NPROC0, NPROC1, NPROC2, NPROC3]
 static int rankFromCoords(const int *coords, void *fdata)
 {
-  int *dims = static_cast<int *>(fdata);
-// rank = coords[0]*dims[1]*dims[2]*dims[3] + coords[1]*dims[2]*dims[3]  + coords[2]*dims[3] + coords[3]
-  int rank = coords[0];
-  for (int i = 1; i <= 3; i++) { rank = dims[i] * rank + coords[i]; }
+  int *BLK_NPROC = static_cast<int *>(fdata);
+  int *NPROC = BLK_NPROC + 4;
+  
+  int BLK_coords[4];
+  int local_coords[4];
+	
+  for (int i = 0; i < 4; i++) {
+	  // coordinate of BLK in the BLK grid
+	  BLK_coords[i] = coords[i] / BLK_NPROC[i];
+	  // local coordinate inside BLK
+	  local_coords[i] = coords[i] - BLK_coords[i]*BLK_NPROC[i];
+  }
+
+  int rank = BLK_coords[0];
+  for (int i = 1; i <= 3; i++) { 
+	rank = (NPROC[i] / BLK_NPROC[i]) * rank + BLK_coords[i];
+  }
+
+  for (int i = 0; i <= 3; i++) { 
+	rank = BLK_NPROC[i] * rank + local_coords[i];
+  }
   return rank;
 }
 
