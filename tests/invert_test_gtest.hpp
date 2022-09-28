@@ -137,7 +137,7 @@ std::string gettestname(::testing::TestParamInfo<test_t> param)
   name += get_prec_str(::testing::get<3>(param.param));
   if (::testing::get<4>(param.param) > 1)
     name += std::string("_shift") + std::to_string(::testing::get<4>(param.param));
-  if (::testing::get<5>(param.param) > 1)// && support_solution_accumulator_pipeline(::testing::get<0>(param.param)))
+  if (::testing::get<5>(param.param) > 1)
     name += std::string("_solution_accumulator_pipeline") + std::to_string(::testing::get<5>(param.param));
   auto &schwarz_param = ::testing::get<6>(param.param);
   if (::testing::get<0>(schwarz_param) != QUDA_INVALID_SCHWARZ) {
