@@ -12,7 +12,7 @@
 #include <misc.h>
 #include <timer.h>
 #include <gauge_tools.h>
-#include <tune_quda.h>
+#include <tune_quda_api.h>
 
 #include <pgauge_monte.h>
 #include <random_quda.h>
