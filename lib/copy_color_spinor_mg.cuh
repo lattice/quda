@@ -52,8 +52,8 @@ namespace quda {
   void genericCopyColorSpinor(ColorSpinorField &out, const ColorSpinorField &in, QudaFieldLocation location,
                               FloatOut *Out, FloatIn *In)
   {
-    if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-      using O = FieldOrderCB<typename mapper<FloatOut>::type, Ns, Nc, 1, QUDA_FLOAT2_FIELD_ORDER,FloatOut>;
+    if (out.isNative()) {
+      using O = FieldOrderCB<typename mapper<FloatOut>::type, Ns, Nc, 1, colorspinor::getNative<FloatOut>(Ns), FloatOut>;
       CopySpinor<FloatOut, FloatIn, Ns, Nc, O, I>(out, in, location, Out, In);
     } else if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       using O = FieldOrderCB<typename mapper<FloatOut>::type, Ns, Nc, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,FloatOut>;
@@ -68,8 +68,8 @@ namespace quda {
   void genericCopyColorSpinor(ColorSpinorField &out, const ColorSpinorField &in, QudaFieldLocation location,
                               FloatOut *Out, FloatIn *In)
   {
-    if (in.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-      using I = FieldOrderCB<typename mapper<FloatIn>::type, Ns, Nc, 1, QUDA_FLOAT2_FIELD_ORDER,FloatIn>;
+    if (in.isNative()) {
+      using I = FieldOrderCB<typename mapper<FloatIn>::type, Ns, Nc, 1, colorspinor::getNative<FloatIn>(Ns), FloatIn>;
       genericCopyColorSpinor<FloatOut, FloatIn, Ns, Nc, I>(out, in, location, Out, In);
     } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       using I = FieldOrderCB<typename mapper<FloatIn>::type, Ns, Nc, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,FloatIn>;

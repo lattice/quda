@@ -13,32 +13,63 @@ namespace quda
   namespace colorspinor
   {
 
-    inline bool isNative(QudaFieldOrder order, QudaPrecision precision, int nSpin, int)
-    {
-      if (precision == QUDA_DOUBLE_PRECISION) {
-        if (order == QUDA_FLOAT2_FIELD_ORDER) return true;
-      } else if (precision == QUDA_SINGLE_PRECISION) {
-        if (nSpin == 4) {
-          if (order == QUDA_FLOAT4_FIELD_ORDER) return true;
-        } else if (nSpin == 2) {
-          if (order == QUDA_FLOAT2_FIELD_ORDER) return true;
-        } else if (nSpin == 1) {
-          if (order == QUDA_FLOAT2_FIELD_ORDER) return true;
-        }
-      } else if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-        if (nSpin == 4) {
-#ifdef FLOAT8
-          if (order == QUDA_FLOAT8_FIELD_ORDER) return true;
+    template <typename real> constexpr auto getNative(int nSpin) { return QUDA_INVALID_FIELD_ORDER; }
+    template <> constexpr auto getNative<double>(int) { return QUDA_FLOAT2_FIELD_ORDER; }
+
+#ifdef FLOAT4_MG
+    template <> constexpr auto getNative<float>(int nSpin) { return nSpin == 1 ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER; }
 #else
-          if (order == QUDA_FLOAT4_FIELD_ORDER) return true;
+    template <> constexpr auto getNative<float>(int nSpin) { return nSpin == 4 ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER; }
 #endif
-        } else if (nSpin == 2) {
-          if (order == QUDA_FLOAT2_FIELD_ORDER) return true;
-        } else if (nSpin == 1) {
-          if (order == QUDA_FLOAT2_FIELD_ORDER) return true;
-        }
+
+    template <> constexpr auto getNative<short>(int nSpin)
+    {
+      if (nSpin == 4) {
+#ifdef FLOAT8
+        return QUDA_FLOAT8_FIELD_ORDER;
+#else
+        return QUDA_FLOAT4_FIELD_ORDER;
+#endif
+      } else {
+#ifdef FLOAT4_MG
+        return nSpin == 1 ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+#else
+        return QUDA_FLOAT2_FIELD_ORDER;
+#endif
       }
-      return false;
+    }
+
+    template <> constexpr auto getNative<int8_t>(int nSpin)
+    {
+      if (nSpin == 4) {
+#ifdef FLOAT8
+        return QUDA_FLOAT8_FIELD_ORDER;
+#else
+        return QUDA_FLOAT4_FIELD_ORDER;
+#endif
+      } else {
+#ifdef FLOAT4_MG
+        return nSpin == 1 ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+#else
+        return QUDA_FLOAT2_FIELD_ORDER;
+#endif
+      }
+    }
+
+    constexpr QudaFieldOrder getNative(QudaPrecision precision, int nSpin)
+    {
+      switch (precision) {
+      case QUDA_DOUBLE_PRECISION:  return getNative<double>(nSpin);
+      case QUDA_SINGLE_PRECISION:  return getNative<float>(nSpin);
+      case QUDA_HALF_PRECISION:    return getNative<short>(nSpin);
+      case QUDA_QUARTER_PRECISION: return getNative<int8_t>(nSpin);
+      default: return QUDA_INVALID_FIELD_ORDER;
+      }
+    }
+
+    constexpr bool isNative(QudaFieldOrder order, QudaPrecision precision, int nSpin, int)
+    {
+      return order == getNative(precision, nSpin);
     }
 
   } // namespace colorspinor
@@ -147,13 +178,7 @@ namespace quda
       this->ghost_precision = (ghost_precision == QUDA_INVALID_PRECISION) ? precision : ghost_precision;
 
       // if this is a native field order, let's preserve that status, else keep the same field order
-      if (native) {
-        fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ? QUDA_FLOAT2_FIELD_ORDER :
-                                                                                        QUDA_FLOAT4_FIELD_ORDER;
-#ifdef FLOAT8
-        if (precision <= QUDA_HALF_PRECISION && nSpin == 4) fieldOrder = QUDA_FLOAT8_FIELD_ORDER;
-#endif
-      }
+      if (native) fieldOrder = colorspinor::getNative(precision, nSpin);
     }
 
     ColorSpinorParam(const ColorSpinorField &a);

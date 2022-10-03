@@ -37,17 +37,6 @@ namespace quda {
 
   using namespace quda::colorspinor;
 
-  // B fields in general use float2 ordering except for fine-grid Wilson
-  template <typename store_t, int nSpin, int nColor> struct BOrder { static constexpr QudaFieldOrder order = QUDA_FLOAT2_FIELD_ORDER; };
-  template<> struct BOrder<float, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
-#ifdef FLOAT8
-  template<> struct BOrder<short, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT8_FIELD_ORDER; };
-  template<> struct BOrder<int8_t, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT8_FIELD_ORDER; };
-#else
-  template<> struct BOrder<short, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
-  template<> struct BOrder<int8_t, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
-#endif
-
   template <typename vFloat, typename bFloat, int nSpin, int spinBlockSize, int nColor_, int coarseSpin, int nVec>
   class BlockOrtho : public TunableBlock2D {
 
@@ -159,9 +148,11 @@ namespace quda {
           errorQuda("Unsupported field order %d", V.FieldOrder());
         }
       } else {
-        if (V.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && B[0]->FieldOrder() == BOrder<bFloat,nSpin,nColor>::order) {
-          typedef FieldOrderCB<real,nSpin,nColor,nVec,QUDA_FLOAT2_FIELD_ORDER,vFloat,vFloat,disable_ghost> Rotator;
-          typedef FieldOrderCB<real,nSpin,nColor,1,BOrder<bFloat,nSpin,nColor>::order,bFloat,bFloat,disable_ghost,isFixed<bFloat>::value> Vector;
+        constexpr auto vOrder = colorspinor::getNative<vFloat>(nSpin);
+        constexpr auto bOrder = colorspinor::getNative<bFloat>(nSpin);
+        if (V.FieldOrder() == vOrder && B[0]->FieldOrder() == bOrder) {
+          typedef FieldOrderCB<real,nSpin,nColor,nVec,vOrder,vFloat,vFloat,disable_ghost> Rotator;
+          typedef FieldOrderCB<real,nSpin,nColor,1,bOrder,bFloat,bFloat,disable_ghost,isFixed<bFloat>::value> Vector;
           launch_device_<Rotator, Vector>(tp, stream, B, std::make_index_sequence<nVec>());
         } else {
           errorQuda("Unsupported field order V=%d B=%d", V.FieldOrder(), B[0]->FieldOrder());

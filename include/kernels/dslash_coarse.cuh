@@ -18,7 +18,7 @@ namespace quda {
   constexpr int colors_per_thread(int nColor, int dim_stride) { return (nColor % 2 == 0 && nColor <= 32 && dim_stride <= 2) ? 2 : 1; }
 
   template <bool dslash_, bool clover_, bool dagger_, DslashType type_, int color_stride_, int dim_stride_, typename Float,
-            typename yFloat, typename ghostFloat, int nSpin_, int nColor_, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
+            typename yFloat, typename ghostFloat, int nSpin_, int nColor_, bool native>
   struct DslashCoarseArg : kernel_param<> {
     static constexpr bool dslash = dslash_;
     static constexpr bool clover = clover_;
@@ -31,6 +31,9 @@ namespace quda {
     static constexpr int nSpin = nSpin_;
     static constexpr int nColor = nColor_;
     static constexpr int nDim = 4;
+
+    static constexpr QudaFieldOrder csOrder = native ? colorspinor::getNative<real>(nSpin) : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    static constexpr QudaGaugeFieldOrder gOrder = native ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
 
     using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, csOrder, Float, ghostFloat>;
     // disable ghost to reduce arg size

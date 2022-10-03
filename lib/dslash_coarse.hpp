@@ -1,4 +1,3 @@
-
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 #include <uint_to_char.h>
@@ -52,7 +51,7 @@ namespace quda {
     {
       return ((color_col_stride == 1 || minThreads() % (unsigned)device::warp_size() == 0)
               &&                                          // active threads must be a multiple of the warp
-              param.block.x % device::warp_size() == 0 && // block size must be a multiple of the warp
+              (color_col_stride == 1 || param.block.x % device::warp_size() == 0) && // block must be a multiple of the warp
               Nc % color_col_stride == 0 &&               // number of colors must be divisible by the split
               param.grid.x < device::max_grid_size(0));   // ensure the resulting grid size valid
     }
@@ -186,10 +185,9 @@ namespace quda {
       apply(device::get_default_stream());
     }
 
-    template <int color_stride, int dim_stride, QudaFieldOrder csOrder = QUDA_FLOAT2_FIELD_ORDER,
-              QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER>
+    template <int color_stride, int dim_stride, bool native = true>
     using Arg = DslashCoarseArg<dslash, clover, dagger, type, color_stride, dim_stride, Float, yFloat, ghostFloat, Ns,
-                                Nc, csOrder, gOrder>;
+                                Nc, native>;
 
     void apply(const qudaStream_t &stream)
     {
@@ -200,15 +198,9 @@ namespace quda {
       if (!checkParam(tp)) errorQuda("Invalid launch param");
 
       if (out[0].Location() == QUDA_CPU_FIELD_LOCATION) {
-        if (out[0].FieldOrder() != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER || Y.FieldOrder() != QUDA_QDP_GAUGE_ORDER)
-          errorQuda("Unsupported field order colorspinor=%d gauge=%d combination", inA[0].FieldOrder(), Y.FieldOrder());
-
-        launch_host<CoarseDslash>(
-          tp, stream,
-          Arg<1, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, QUDA_QDP_GAUGE_ORDER>(out, inA, inB, Y, X, (Float)kappa, parity));
+        errorQuda("Not enabled");
       } else {
-        if (out[0].FieldOrder() != QUDA_FLOAT2_FIELD_ORDER || Y.FieldOrder() != QUDA_FLOAT2_GAUGE_ORDER)
-          errorQuda("Unsupported field order colorspinor=%d gauge=%d combination", inA[0].FieldOrder(), Y.FieldOrder());
+        checkNative(out[0], inA[0], inB[0], Y, X);
 
         switch (tp.aux.y) { // dimension gather parallelisation
         case 1:

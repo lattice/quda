@@ -1,6 +1,7 @@
 #include <color_spinor_field.h>
 #include <tunable_nd.h>
 #include <kernels/color_spinor_pack.cuh>
+#include <instantiate.h>
 
 /**
    @file color_spinor_pack.cu
@@ -182,10 +183,12 @@ namespace quda {
 #endif
 #endif
 
-  template <typename Float, typename ghostFloat, QudaFieldOrder order, int Ns>
+  template <typename Float, typename ghostFloat, int Ns, bool native>
   void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity, int nFace, int dagger,
                         MemoryLocation *destination, int shmem)
   {
+    constexpr QudaFieldOrder order = native ? colorspinor::getNative<Float>(Ns) : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+
 #ifndef NSPIN1
     if (a.Ncolor() != 3 && a.Nspin() == 1)
       errorQuda("Ncolor = %d not supported for Nspin = %d fields", a.Ncolor(), a.Nspin());
@@ -273,93 +276,34 @@ namespace quda {
     }
   }
 
-  // traits used to ensure we only instantiate float4 for spin=4 fields
-  template<int nSpin,QudaFieldOrder order_> struct spin_order_mapper { static constexpr QudaFieldOrder order = order_; };
-  template<> struct spin_order_mapper<2,QUDA_FLOAT4_FIELD_ORDER> { static constexpr QudaFieldOrder order = QUDA_FLOAT2_FIELD_ORDER; };
-  template<> struct spin_order_mapper<1,QUDA_FLOAT4_FIELD_ORDER> { static constexpr QudaFieldOrder order = QUDA_FLOAT2_FIELD_ORDER; };
-
-  template <typename Float, typename ghostFloat, QudaFieldOrder order>
-#if defined(NSPIN1) || defined(NSPIN2) || defined(NSPIN4)
-  inline void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity, int nFace, int dagger,
-                               MemoryLocation *destination, int shmem)
-#else
-  inline void genericPackGhost(void **, const ColorSpinorField &a, QudaParity, int, int, MemoryLocation *, int)
-#endif
+  template <typename Float, typename ghostFloat, bool native>
+  void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity, int nFace, int dagger,
+                        MemoryLocation *destination, int shmem)
   {
+    if (!is_enabled_spin(a.Nspin())) errorQuda("nSpin=%d not enabled for this build", a.Nspin());
+
     if (a.Nspin() == 4) {
-#ifdef NSPIN4
-      genericPackGhost<Float, ghostFloat, order, 4>(ghost, a, parity, nFace, dagger, destination, shmem);
-#else
-      errorQuda("nSpin=4 not enabled for this build");
-#endif
+      if constexpr (is_enabled_spin(4))
+        genericPackGhost<Float, ghostFloat, 4, native>(ghost, a, parity, nFace, dagger, destination, shmem);
     } else if (a.Nspin() == 2) {
-#ifdef NSPIN2
-      if (order == QUDA_FLOAT4_FIELD_ORDER) errorQuda("Field order %d with nSpin = %d not supported", order, a.Nspin());
-      genericPackGhost<Float, ghostFloat, spin_order_mapper<2, order>::order, 2>(ghost, a, parity, nFace, dagger,
-                                                                                 destination, shmem);
-#else
-      errorQuda("nSpin=2 not enabled for this build");
-#endif
+      if constexpr (is_enabled_spin(2))
+        genericPackGhost<Float, ghostFloat, 2, native>(ghost, a, parity, nFace, dagger, destination, shmem);
     } else if (a.Nspin() == 1) {
-#ifdef NSPIN1
-      if (order == QUDA_FLOAT4_FIELD_ORDER) errorQuda("Field order %d with nSpin = %d not supported", order, a.Nspin());
-      genericPackGhost<Float, ghostFloat, spin_order_mapper<1, order>::order, 1>(ghost, a, parity, nFace, dagger,
-                                                                                 destination, shmem);
-#else
-      errorQuda("nSpin=1 not enabled for this build");
-#endif
+      if constexpr (is_enabled_spin(1))
+        genericPackGhost<Float, ghostFloat, 1, native>(ghost, a, parity, nFace, dagger, destination, shmem);
     } else {
       errorQuda("Unsupported nSpin = %d", a.Nspin());
     }
-
   }
 
-  // traits used to ensure we only instantiate double and float templates for non-native fields
-  template<typename> struct non_native_precision_mapper { };
-  template<> struct non_native_precision_mapper<double> { typedef double type; };
-  template<> struct non_native_precision_mapper<float> { typedef float type; };
-  template<> struct non_native_precision_mapper<short> { typedef float type; };
-  template<> struct non_native_precision_mapper<int8_t> { typedef float type; };
-
-  // traits used to ensure we only instantiate float and lower precision for float4 fields
-  template<typename T> struct float4_precision_mapper { typedef T type; };
-  template<> struct float4_precision_mapper<double> { typedef float type; };
-  template<> struct float4_precision_mapper<short> { typedef float type; };
-  template<> struct float4_precision_mapper<int8_t> { typedef float type; };
-
   template <typename Float, typename ghostFloat>
-  inline void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity, int nFace, int dagger,
-                               MemoryLocation *destination, int shmem)
+  void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity, int nFace, int dagger,
+                        MemoryLocation *destination, int shmem)
   {
-
-    if (a.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-
-      // all precisions, color and spin can use this order
-      genericPackGhost<Float, ghostFloat, QUDA_FLOAT2_FIELD_ORDER>(ghost, a, parity, nFace, dagger, destination, shmem);
-
-    } else if (a.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
-
-      // never have double fields here
-      if (typeid(Float) != typeid(typename float4_precision_mapper<Float>::type))
-        errorQuda("Precision %d not supported for field type %d", a.Precision(), a.FieldOrder());
-      if (typeid(ghostFloat) != typeid(typename float4_precision_mapper<ghostFloat>::type))
-        errorQuda("Ghost precision %d not supported for field type %d", a.GhostPrecision(), a.FieldOrder());
-      genericPackGhost<typename float4_precision_mapper<Float>::type, typename float4_precision_mapper<ghostFloat>::type,
-                       QUDA_FLOAT4_FIELD_ORDER>(ghost, a, parity, nFace, dagger, destination, shmem);
-
+    if (a.isNative()) {
+      genericPackGhost<Float, ghostFloat, true>(ghost, a, parity, nFace, dagger, destination, shmem);
     } else if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-#ifndef GPU_MULTIGRID // with MG mma we need half-precision AoS exchange support
-      if (typeid(Float) != typeid(typename non_native_precision_mapper<Float>::type))
-        errorQuda("Precision %d not supported for field type %d", a.Precision(), a.FieldOrder());
-      if (typeid(ghostFloat) != typeid(typename non_native_precision_mapper<ghostFloat>::type))
-        errorQuda("Ghost precision %d not supported for field type %d", a.GhostPrecision(), a.FieldOrder());
-      genericPackGhost<typename non_native_precision_mapper<Float>::type,
-                       typename non_native_precision_mapper<ghostFloat>::type, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(
-        ghost, a, parity, nFace, dagger, destination, shmem);
-#else
-      genericPackGhost<Float, ghostFloat, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(ghost, a, parity, nFace, dagger,
-                                                                             destination, shmem);
-#endif
+      genericPackGhost<Float, ghostFloat, false>(ghost, a, parity, nFace, dagger, destination, shmem);
     } else {
       errorQuda("Unsupported field order = %d", a.FieldOrder());
     }

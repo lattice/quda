@@ -62,7 +62,7 @@ namespace quda {
 
     } else {
 
-      constexpr QudaFieldOrder csOrder = QUDA_FLOAT2_FIELD_ORDER;
+      constexpr QudaFieldOrder csOrder = colorspinor::getNative<vFloat>(fineSpin);
       constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
       constexpr QudaCloverFieldOrder clOrder = QUDA_FLOAT4_CLOVER_ORDER;
 

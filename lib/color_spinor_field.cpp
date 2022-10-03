@@ -161,7 +161,7 @@ namespace quda
     norm_offset = volumeCB * nColor * nSpin * 2 * precision; // this is the offset in bytes to start of the norm
 
     // alignment must be done on parity boundaries
-    if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER)
+    if (isNative())
       bytes = siteSubset * ALIGNMENT_ADJUST(bytes_raw / siteSubset);
     else
       bytes = bytes_raw;
@@ -903,11 +903,8 @@ namespace quda
     // if new location is not set, use this->location
     new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location() : new_location;
 
-    // for GPU fields, always use native ordering to ensure coalescing
-    if (new_location == QUDA_CUDA_FIELD_LOCATION)
-      coarseParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-    else
-      coarseParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    coarseParam.fieldOrder = (new_location == QUDA_CUDA_FIELD_LOCATION) ?
+      colorspinor::getNative(new_precision, coarseParam.nSpin) : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
     coarseParam.setPrecision(new_precision);
 

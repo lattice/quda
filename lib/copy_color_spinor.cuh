@@ -85,10 +85,6 @@ namespace quda {
     if (out.isNative()) {
       using O = typename colorspinor_mapper<FloatOut,Ns,Nc>::type;
       CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
-    } else if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && Ns == 4) {
-      // this is needed for single-precision mg for changing basis in the transfer
-      using O = typename colorspinor::FloatNOrder<FloatOut, 4, Nc, 2>;
-      CopyColorSpinor<4, Nc, O, I, param_t>(out, in, param);
     } else if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       using O = SpaceSpinorColorOrder<FloatOut, Ns, Nc>;
       CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);

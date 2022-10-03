@@ -7,7 +7,7 @@ namespace quda {
 
   template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
   class ProlongateLaunch : public TunableKernel3D {
-    template <QudaFieldOrder order> using Arg = ProlongateArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor,order>;
+    using Arg = ProlongateArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor>;
 
     ColorSpinorField &out;
     const ColorSpinorField &in;
@@ -33,11 +33,9 @@ namespace quda {
     }
 
     void apply(const qudaStream_t &stream) {
-      if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
+      if (checkNative(out, in, V)) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        launch<Prolongator>(tp, stream, Arg<QUDA_FLOAT2_FIELD_ORDER>(out, in, V, fine_to_coarse, parity));
-      } else {
-        errorQuda("Unsupported field order %d", out.FieldOrder());
+        launch<Prolongator>(tp, stream, Arg(out, in, V, fine_to_coarse, parity));
       }
     }
 
@@ -185,10 +183,6 @@ namespace quda {
                   int Nvec, const int *fine_to_coarse, const int * const * spin_map, int parity)
   {
     if constexpr (is_enabled_multigrid()) {
-      if (out.FieldOrder() != in.FieldOrder() || out.FieldOrder() != v.FieldOrder())
-        errorQuda("Field orders do not match (out=%d, in=%d, v=%d)",
-                  out.FieldOrder(), in.FieldOrder(), v.FieldOrder());
-
       QudaPrecision precision = checkPrecision(out, in);
 
       if (precision == QUDA_DOUBLE_PRECISION) {

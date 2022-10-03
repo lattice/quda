@@ -15,8 +15,7 @@ namespace quda {
 
   template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
   class RestrictLaunch : public TunableBlock2D {
-    template <QudaFieldOrder order = QUDA_FLOAT2_FIELD_ORDER> using Arg =
-      RestrictArg<Float, vFloat, fineSpin, fineColor, coarseSpin, coarseColor, order>;
+    using Arg = RestrictArg<Float, vFloat, fineSpin, fineColor, coarseSpin, coarseColor>;
     ColorSpinorField &out;
     const ColorSpinorField &in;
     const ColorSpinorField &v;
@@ -46,18 +45,16 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-        Arg<QUDA_FLOAT2_FIELD_ORDER> arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+      if (checkNative(out, in, v)) {
+        Arg arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
         arg.swizzle_factor = tp.aux.x;
         launch<Restrictor, Aggregates>(tp, stream, arg);
-      } else {
-        errorQuda("Unsupported field order %d", out.FieldOrder());
       }
     }
 
     bool advanceAux(TuneParam &param) const
     {
-      if (Arg<>::swizzle) {
+      if (Arg::swizzle) {
         if (param.aux.x < 2 * (int)device::processor_count()) {
           param.aux.x++;
           return true;
@@ -260,7 +257,6 @@ namespace quda {
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
                 int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity)
   {
-    checkOrder(out, in, v);
     checkLocation(out, in, v);
     QudaPrecision precision = checkPrecision(out, in);
 

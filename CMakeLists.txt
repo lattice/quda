@@ -195,6 +195,7 @@ option(QUDA_INSTALL_ALL_TESTS "install tests by default" ON)
 option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ON)
 
 option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" ON)
+option(QUDA_FLOAT4_MG "enable float-4 ordered fixed-point fields for multigrid?" ON)
 
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
 
@@ -254,6 +255,7 @@ mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 
 mark_as_advanced(QUDA_FLOAT8)
+mark_as_advanced(QUDA_FLOAT4_MG)
 mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
 mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
 
