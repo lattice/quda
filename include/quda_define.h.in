@@ -186,7 +186,9 @@
  */
 #define QUDA_ORDER_FP @QUDA_ORDER_FP@
 
+#ifdef __cplusplus
 static_assert(QUDA_ORDER_FP == 4 || QUDA_ORDER_FP == 8, "invalid QUDA_ORDER_FP");
+#endif
 
 /**
  * @def QUDA_ORDER_SP
@@ -194,7 +196,9 @@ static_assert(QUDA_ORDER_FP == 4 || QUDA_ORDER_FP == 8, "invalid QUDA_ORDER_FP")
  */
 #define QUDA_ORDER_SP_MG @QUDA_ORDER_SP_MG@
 
+#ifdef __cplusplus
 static_assert(QUDA_ORDER_SP_MG == 2 || QUDA_ORDER_SP_MG == 4, "invalid QUDA_ORDER_SP_MG");
+#endif
 
 /**
  * @def QUDA_ORDER_FP_MG
@@ -202,7 +206,9 @@ static_assert(QUDA_ORDER_SP_MG == 2 || QUDA_ORDER_SP_MG == 4, "invalid QUDA_ORDE
  */
 #define QUDA_ORDER_FP_MG @QUDA_ORDER_FP_MG@
 
+#ifdef __cplusplus
 static_assert(QUDA_ORDER_FP_MG == 2 || QUDA_ORDER_FP_MG == 4 || QUDA_ORDER_FP_MG == 8, "invalid QUDA_ORDER_FP_MG");
+#endif
 
 /**
  * @def QUDA_TARGET_CUDA
