@@ -645,6 +645,169 @@ void qudaGaugeForce(int precision, int num_loop_types, double milc_loop_coeff[3]
   qudaGaugeForcePhased(precision, num_loop_types, milc_loop_coeff, eb3, arg, 0);
 }
 
+/**
+ * @brief Reusable routine that creates a qudaGaugeParam for gauge-related observable measurements
+ *
+ * @param[in] precision MILC precision
+ * @param[in] arg MILC Site arg structure
+ * @param[in] phase_in Whether or not phases have been applied
+ * @return A qudaGaugeParam that can be passed to QUDA interface functions
+ */
+QudaGaugeParam createGaugeParamForObservables(int precision, QudaMILCSiteArg_t *arg, int phase_in)
+{
+  QudaGaugeParam qudaGaugeParam
+    = newMILCGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, QUDA_WILSON_LINKS);
+
+  qudaGaugeParam.gauge_offset = arg->link_offset;
+  qudaGaugeParam.mom_offset = arg->mom_offset;
+  qudaGaugeParam.site_size = arg->size;
+  qudaGaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
+  qudaGaugeParam.staggered_phase_applied = phase_in;
+  qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  // FIXME: phases and boundary conditions are "munged" together inside QUDA, so the unphase function
+  // doesn't change the boundary condition flag. This setting guarantees that phases and boundary conditions
+  // are consistently set under the hood --- but we still need an extra minus sign on the output.
+  qudaGaugeParam.t_boundary = QUDA_PERIODIC_T;
+  // if (phase_in) qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
+  if (phase_in) qudaGaugeParam.reconstruct_sloppy = qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+
+  qudaGaugeParam.ga_pad = 0;
+  // For multi-GPU, ga_pad must be large enough to store a time-slice
+#ifdef MULTI_GPU
+  int x_face_size = qudaGaugeParam.X[1] * qudaGaugeParam.X[2] * qudaGaugeParam.X[3] / 2;
+  int y_face_size = qudaGaugeParam.X[0] * qudaGaugeParam.X[2] * qudaGaugeParam.X[3] / 2;
+  int z_face_size = qudaGaugeParam.X[0] * qudaGaugeParam.X[1] * qudaGaugeParam.X[3] / 2;
+  int t_face_size = qudaGaugeParam.X[0] * qudaGaugeParam.X[1] * qudaGaugeParam.X[2] / 2;
+  int pad_size = x_face_size > y_face_size ? x_face_size : y_face_size;
+  pad_size = pad_size > z_face_size ? pad_size : z_face_size;
+  pad_size = pad_size > t_face_size ? pad_size : t_face_size;
+  qudaGaugeParam.ga_pad = pad_size;
+#endif
+
+  if (!have_resident_gauge) {
+    qudaGaugeParam.make_resident_gauge = false;
+    qudaGaugeParam.use_resident_gauge = false;
+  } else {
+    qudaGaugeParam.use_resident_gauge = true;
+    qudaGaugeParam.make_resident_gauge = true;
+  }
+
+  return qudaGaugeParam;
+}
+
+void qudaGaugeLoopTracePhased(int precision, double *traces, int **input_path_buf, int *path_length, double *loop_coeff,
+                              int num_paths, int max_length, double factor, QudaMILCSiteArg_t *arg, int phase_in)
+{
+  qudamilc_called<true>(__func__);
+
+  QudaGaugeParam qudaGaugeParam = createGaugeParamForObservables(precision, arg, phase_in);
+  void *gauge = arg->site ? arg->site : arg->link;
+
+  loadGaugeQuda(gauge, &qudaGaugeParam);
+
+  QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
+  obsParam.compute_gauge_loop_trace = QUDA_BOOLEAN_TRUE;
+  obsParam.traces = reinterpret_cast<double _Complex *>(traces);
+  obsParam.input_path_buff = input_path_buf;
+  obsParam.path_length = path_length;
+  obsParam.loop_coeff = loop_coeff;
+  obsParam.num_paths = num_paths;
+  obsParam.max_length = max_length;
+  obsParam.factor = factor;
+  obsParam.remove_staggered_phase = phase_in ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  gaugeObservablesQuda(&obsParam);
+
+  qudamilc_called<false>(__func__);
+  return;
+}
+
+void qudaPlaquettePhased(int precision, double plaq[3], QudaMILCSiteArg_t *arg, int phase_in)
+{
+  qudamilc_called<true>(__func__);
+
+  QudaGaugeParam qudaGaugeParam = createGaugeParamForObservables(precision, arg, phase_in);
+  void *gauge = arg->site ? arg->site : arg->link;
+
+  loadGaugeQuda(gauge, &qudaGaugeParam);
+
+  QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
+  obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
+  obsParam.remove_staggered_phase = phase_in ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  gaugeObservablesQuda(&obsParam);
+
+  // Let MILC apply its own Nc normalization
+  plaq[0] = obsParam.plaquette[0];
+  plaq[1] = obsParam.plaquette[1];
+  plaq[2] = obsParam.plaquette[2];
+
+  qudamilc_called<false>(__func__);
+  return;
+}
+
+void qudaPolyakovLoopPhased(int precision, double ploop[2], int dir, QudaMILCSiteArg_t *arg, int phase_in)
+{
+  qudamilc_called<true>(__func__);
+
+  if (dir != 3) errorQuda("Invalid direction %d, only the temporal Polyakov loop can be computed at this time", dir);
+
+  QudaGaugeParam qudaGaugeParam = createGaugeParamForObservables(precision, arg, phase_in);
+  void *gauge = arg->site ? arg->site : arg->link;
+
+  loadGaugeQuda(gauge, &qudaGaugeParam);
+
+  QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
+  obsParam.compute_polyakov_loop = QUDA_BOOLEAN_TRUE;
+  obsParam.remove_staggered_phase = phase_in ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  gaugeObservablesQuda(&obsParam);
+
+  // FIXME: see comment in createGaugeParamForObservables
+  ploop[0] = -obsParam.ploop[0];
+  ploop[1] = -obsParam.ploop[1];
+
+  qudamilc_called<false>(__func__);
+  return;
+}
+
+void qudaGaugeMeasurementsPhased(int precision, double plaq[3], double ploop[2], int dir, double *traces,
+                                 int **input_path_buf, int *path_length, double *loop_coeff, int num_paths,
+                                 int max_length, double factor, QudaMILCSiteArg_t *arg, int phase_in)
+{
+  qudamilc_called<true>(__func__);
+
+  if (dir != 3) errorQuda("Invalid direction %d, only the temporal Polyakov loop can be computed at this time", dir);
+
+  QudaGaugeParam qudaGaugeParam = createGaugeParamForObservables(precision, arg, phase_in);
+  void *gauge = arg->site ? arg->site : arg->link;
+
+  loadGaugeQuda(gauge, &qudaGaugeParam);
+
+  QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
+  obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
+  obsParam.compute_polyakov_loop = QUDA_BOOLEAN_TRUE;
+  obsParam.compute_gauge_loop_trace = QUDA_BOOLEAN_TRUE;
+  obsParam.traces = reinterpret_cast<double _Complex *>(traces);
+  obsParam.input_path_buff = input_path_buf;
+  obsParam.path_length = path_length;
+  obsParam.loop_coeff = loop_coeff;
+  obsParam.num_paths = num_paths;
+  obsParam.max_length = max_length;
+  obsParam.factor = factor;
+  obsParam.remove_staggered_phase = phase_in ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  gaugeObservablesQuda(&obsParam);
+
+  // Let MILC apply its Nc normalization
+  plaq[0] = obsParam.plaquette[0];
+  plaq[1] = obsParam.plaquette[1];
+  plaq[2] = obsParam.plaquette[2];
+
+  // FIXME: see comment in createGaugeParamForObservables
+  ploop[0] = -obsParam.ploop[0];
+  ploop[1] = -obsParam.ploop[1];
+
+  qudamilc_called<false>(__func__);
+  return;
+}
+
 static int getLinkPadding(const int dim[4])
 {
   int padding = MAX(dim[1]*dim[2]*dim[3]/2, dim[0]*dim[2]*dim[3]/2);
@@ -2821,22 +2984,31 @@ void qudaCloverMultishiftInvert(int external_precision, int quda_precision, int 
 } // qudaCloverMultishiftInvert
 
 void qudaGaugeFixingOVR(int precision, unsigned int gauge_dir, int Nsteps, int verbose_interval, double relax_boost,
-                        double tolerance, unsigned int reunit_interval, unsigned int stopWtheta, void *milc_sitelink)
+                        double tolerance, unsigned int reunit_interval, unsigned int stopWtheta, QudaMILCSiteArg_t *arg)
 {
+  static const QudaVerbosity verbosity = getVerbosity();
+  qudamilc_called<true>(__func__, verbosity);
+
   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
       (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_SU3_LINKS);
-  qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  //qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
+  void *gauge = arg->site ? arg->site : arg->link;
+
+  qudaGaugeParam.gauge_offset = arg->link_offset;
+  qudaGaugeParam.mom_offset = arg->mom_offset;
+  qudaGaugeParam.site_size = arg->size;
+  qudaGaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
 
   double timeinfo[3];
-  computeGaugeFixingOVRQuda(milc_sitelink, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta, \
-    &qudaGaugeParam, timeinfo);
+  computeGaugeFixingOVRQuda(gauge, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval,
+                            stopWtheta, &qudaGaugeParam, timeinfo);
 
   printfQuda("Time H2D: %lf\n", timeinfo[0]);
   printfQuda("Time to Compute: %lf\n", timeinfo[1]);
   printfQuda("Time D2H: %lf\n", timeinfo[2]);
   printfQuda("Time all: %lf\n", timeinfo[0]+timeinfo[1]+timeinfo[2]);
+
+  qudamilc_called<false>(__func__, verbosity);
 }
 
 void qudaGaugeFixingFFT( int precision,

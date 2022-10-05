@@ -386,7 +386,7 @@ void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
   // Option group for gauge fixing related options
   auto opgroup = quda_app->add_option_group("gaugefix", "Options controlling gauge fixing tests");
   opgroup->add_option("--gf-dir", gf_gauge_dir,
-                      "The orthogonal direction of teh gauge fixing, 3=Coulomb, 4=Landau. (default 4)");
+                      "The orthogonal direction of the gauge fixing, 3=Coulomb, 4=Landau. (default 4)");
   opgroup->add_option("--gf-maxiter", gf_maxiter,
                       "The maximun number of gauge fixing iterations to be applied (default 10000) ");
   opgroup->add_option("--gf-verbosity-interval", gf_verbosity_interval,
