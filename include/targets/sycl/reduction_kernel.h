@@ -69,6 +69,18 @@ namespace quda {
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
+    if (localSize[RANGE_X] > arg.threads.x) {
+      localSize[RANGE_X] = arg.threads.x;
+      globalSize[RANGE_X] = arg.threads.x;
+    } else if (grid_stride) {
+      if (globalSize[RANGE_X] > arg.threads.x) {
+	globalSize[RANGE_X] = ((arg.threads.x+localSize[RANGE_X]-1)/localSize[RANGE_X])*localSize[RANGE_X];
+      }
+    } else {
+      if (globalSize[RANGE_X] != arg.threads.x) {
+	globalSize[RANGE_X] = ((arg.threads.x+localSize[RANGE_X]-1)/localSize[RANGE_X])*localSize[RANGE_X];
+      }
+    }
     host_timer_t timer;
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Reduction2D grid_stride: %s  sizeof(arg): %lu\n",
@@ -81,13 +93,14 @@ namespace quda {
 		 device::warp_size());
       timer.start();
     }
-    //if (arg.threads.x%tp.block.x+arg.threads.y%tp.block.y) {
-    //  if (Arg::hasBlockOps()) {
-    //warningQuda("BlockOps");
-    //}
-    //warningQuda("R2D %s nondiv %s %s %s", grid_stride?"true":"false",
-    //	  str(arg.threads).c_str(), str(tp.block).c_str(), typeid(Arg).name());
-    //}
+    if (arg.threads.x%localSize[RANGE_X] != 0) {
+      warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
+      return QUDA_ERROR;
+    }
+    if (globalSize[RANGE_Y] != arg.threads.y) { // shouldn't happen here
+      warningQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
+      return QUDA_ERROR;
+    }
     sycl::nd_range<3> ndRange{globalSize, localSize};
 #ifndef HIGH_LEVEL_REDUCTIONS
     err = launch<Reduction2DS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
@@ -133,17 +146,20 @@ namespace quda {
       }
       err = QUDA_ERROR;
     }
+#endif
+#endif
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       timer.stop();
-      printfQuda("  launch time: %g\n", timer.last());
-      if (commAsyncReduction()) {
-	q.memcpy(result_h, result_d, sizeof(reduce_t));
-      }
-      q.wait_and_throw();
-      printfQuda("end Reduction2D result_h: %g\n", *(double *)result_h);
+      //printfQuda("  launch time: %g\n", timer.last());
+      //auto q = device::get_target_stream(stream);
+      //using reduce_t = typename Functor<Arg>::reduce_t;
+      //if (commAsyncReduction()) {
+      //q.memcpy(result_h, result_d, sizeof(reduce_t));
+      //}
+      //q.wait_and_throw();
+      //printfQuda("end Reduction2D result_h: %g\n", *(double *)result_h);
+      printfQuda("end Reduction2D launch time: %g\n", timer.last());
     }
-#endif
-#endif
     return err;
   }
 
@@ -193,8 +209,17 @@ namespace quda {
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
-    if (globalSize[RANGE_Z]!=arg.threads.z) {
-      globalSize[RANGE_Z] = arg.threads.z;
+    if (localSize[RANGE_X] > arg.threads.x) {
+      localSize[RANGE_X] = arg.threads.x;
+      globalSize[RANGE_X] = arg.threads.x;
+    } else if (grid_stride) {
+      if (globalSize[RANGE_X] > arg.threads.x) {
+	globalSize[RANGE_X] = ((arg.threads.x+localSize[RANGE_X]-1)/localSize[RANGE_X])*localSize[RANGE_X];
+      }
+    } else {
+      if (globalSize[RANGE_X] != arg.threads.x) {
+	globalSize[RANGE_X] = ((arg.threads.x+localSize[RANGE_X]-1)/localSize[RANGE_X])*localSize[RANGE_X];
+      }
     }
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       using reduce_t = typename Functor<Arg>::reduce_t;
@@ -210,51 +235,21 @@ namespace quda {
                  localSize.size()*sizeof(typename Functor<Arg>::reduce_t)/
 		 device::warp_size());
     }
-    if (globalSize[RANGE_Z]!=arg.threads.z) {
-      errorQuda("globalSize Z (%lu) != arg.threads.z (%i)", globalSize[RANGE_Z], arg.threads.z);
+    if (arg.threads.x%localSize[RANGE_X] != 0) {
+      warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
+      return QUDA_ERROR;
     }
-    //if (arg.threads.x%tp.block.x+arg.threads.y%tp.block.y+arg.threads.z%tp.block.z) {
-    //if (Arg::hasBlockOps()) {
-    //warningQuda("BlockOps");
-    //}
-    //warningQuda("MR %s nondiv %s %s %s", grid_stride?"true":"false",
-    //	  str(arg.threads).c_str(), str(tp.block).c_str(), typeid(Arg).name());
-    //}
-    //sycl::buffer<const char,1>
-    //  buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
+    if (globalSize[RANGE_Y] != arg.threads.y) { // shouldn't happen here
+      warningQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
+      return QUDA_ERROR;
+    }
+    if (globalSize[RANGE_Z] != arg.threads.z) {
+      warningQuda("globalSize Z (%lu) != arg.threads.z (%i)", globalSize[RANGE_Z], arg.threads.z);
+      return QUDA_ERROR;
+    }
     sycl::nd_range<3> ndRange{globalSize, localSize};
     //err = launch<MultiReductionS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
     err = launchX<MultiReductionS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
-#if 0
-    auto size = sizeof(arg);
-    auto p = device::get_arg_buf(stream, size);
-    memcpy(p, &arg, size);
-    //auto evnt = q.memcpy(p, &arg, size);
-    try {
-      q.submit([&](sycl::handler& h) {
-	//auto a = buf.get_access<sycl::access::mode::read,
-	//			sycl::access::target::constant_buffer>(h);
-	//h.parallel_for<class MultiReductionx>
-	h.parallel_for<>
-	  (ndRange,
-	   //[=](sycl::nd_item<3> ndi) {
-	   [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
-	    //MultiReductionImpl<Functor,Arg,grid_stride>(arg,ndi);
-	    //const char *p = a.get_pointer();
-	    const Arg *arg2 = reinterpret_cast<const Arg*>(p);
-	    MultiReductionImpl<Functor,Arg,grid_stride>(*arg2,ndi);
-	    //MultiReductionImpl<Functor,Arg,false>(*arg2,ndi);
-	  });
-	});
-    } catch (sycl::exception const& e) {
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-	printfQuda("  Caught synchronous SYCL exception:\n  %s\n",e.what());
-      }
-      err = QUDA_ERROR;
-    }
-    //device::wasSynced(stream);
-    //evnt.wait();
-#endif
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("end MultiReduction\n");
     }

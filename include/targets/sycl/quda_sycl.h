@@ -164,6 +164,11 @@ inline uint getLocalLinearId()
 }
 #endif
 
+#define gridDim getGridDim()
+#define blockIdx getBlockIdx()
+#define blockDim getBlockDim()
+#define threadIdx getThreadIdx()
+
 inline void __syncthreads(void)
 {
   //auto ndi = getNdItem();
@@ -171,7 +176,8 @@ inline void __syncthreads(void)
   group_barrier(getGroup());
 }
 
-#define gridDim getGridDim()
-#define blockIdx getBlockIdx()
-#define blockDim getBlockDim()
-#define threadIdx getThreadIdx()
+namespace quda {
+  namespace device {
+    unsigned int max_parameter_size();
+  }
+}

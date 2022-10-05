@@ -117,9 +117,6 @@ namespace quda
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
-    if (globalSize[RANGE_Z]!=arg.threads.z) {
-      globalSize[RANGE_Z] = arg.threads.z;
-    }
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("BlockKernel2D sizeof(arg): %lu\n", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
@@ -127,19 +124,17 @@ namespace quda
       printfQuda("  Transformer: %s\n", typeid(Transformer<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
     }
-    if (globalSize[RANGE_Y]!=arg.threads.y) {
-      errorQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
+    if (globalSize[RANGE_X] != arg.threads.x) {
+      errorQuda("globalSize X (%lu) != arg.threads.x (%i)", globalSize[RANGE_X], arg.threads.x);
     }
-    if (globalSize[RANGE_Z]!=arg.threads.z) {
-      errorQuda("globalSize Z (%lu) != arg.threads.z (%i)", globalSize[RANGE_Z], arg.threads.z);
+    if (globalSize[RANGE_Y] != arg.threads.y) {
+      warningQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
+      return QUDA_ERROR;
     }
-    //if (arg.threads.x%tp.block.x+arg.threads.y%tp.block.y+arg.threads.z%tp.block.z) {
-    //  if (Arg::hasBlockOps()) {
-    //warningQuda("BlockOps");
-    //}
-    //warningQuda("BK2D %s nondiv %s %s %s", grid_stride?"true":"false",
-    //	  str(arg.threads).c_str(), str(tp.block).c_str(), typeid(Arg).name());
-    //}
+    if (globalSize[RANGE_Z] != arg.threads.z) {
+      warningQuda("globalSize Z (%lu) != arg.threads.z (%i)", globalSize[RANGE_Z], arg.threads.z);
+      return QUDA_ERROR;
+    }
     sycl::nd_range<3> ndRange{globalSize, localSize};
     err = launch<BlockKernel2DS<Transformer, Arg>>(stream, ndRange, arg);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {

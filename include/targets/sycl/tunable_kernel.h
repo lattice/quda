@@ -62,7 +62,9 @@ namespace quda {
   std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
   launch(const qudaStream_t &stream, sycl::nd_range<3> &ndRange, const Arg &arg)
   {
-    static_assert(sizeof(Arg)<=device::max_kernel_arg_size(), "kernel arg too large");
+    if ( sizeof(Arg) > device::max_parameter_size() ) {
+      errorQuda("Kernel arg too large: %lu > %u\n", sizeof(Arg), device::max_parameter_size());
+    }
     qudaError_t err = QUDA_SUCCESS;
     auto q = device::get_target_stream(stream);
     try {
@@ -151,7 +153,9 @@ namespace quda {
   std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
   launchR(const qudaStream_t &stream, sycl::nd_range<3> &ndRange, const Arg &arg)
   {
-    static_assert(sizeof(Arg)<=device::max_kernel_arg_size(), "kernel arg too large");
+    if ( sizeof(Arg) > device::max_parameter_size() ) {
+      errorQuda("Kernel arg too large: %lu > %u\n", sizeof(Arg), device::max_parameter_size());
+    }
     qudaError_t err = QUDA_SUCCESS;
     auto q = device::get_target_stream(stream);
     using reduce_t = typename Transformer<Arg>::reduce_t;

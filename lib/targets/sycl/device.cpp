@@ -1,5 +1,6 @@
 #include <util_quda.h>
 #include <quda_internal.h>
+#include <target_device.h>
 #include <algorithm>
 
 static sycl::device myDevice;
@@ -300,7 +301,7 @@ namespace quda
     }
 
     size_t max_default_shared_memory() {
-      static int max_shared_bytes = 0;
+      static size_t max_shared_bytes = 0;
       if (max_shared_bytes==0) {
 	max_shared_bytes = myDevice.get_info<sycl::info::device::local_mem_size>();
       }
@@ -309,7 +310,7 @@ namespace quda
 
     size_t max_dynamic_shared_memory()
     {
-      static int max_shared_bytes = 0;
+      static size_t max_shared_bytes = 0;
       if (max_shared_bytes==0) {
 	max_shared_bytes = myDevice.get_info<sycl::info::device::local_mem_size>();
       }
@@ -317,17 +318,21 @@ namespace quda
     }
 
     unsigned int max_threads_per_block() {
-      auto val = myDevice.get_info<sycl::info::device::max_work_group_size>();
-      //auto val = 128;
-      return val;
+      static unsigned int max_threads = 0;
+      if (max_threads == 0) {
+	max_threads = myDevice.get_info<sycl::info::device::max_work_group_size>();
+	max_threads = std::min(max_threads,device::max_block_size());
+      }
+      return max_threads;
     }
 
-    unsigned int max_threads_per_processor() { // not in portable SYCL
-      //auto mcu = myDevice.get_info<sycl::info::device::max_compute_units>();
-      auto mwgs = myDevice.get_info<sycl::info::device::max_work_group_size>();
-      //auto val = 2*128;
-      auto val = 2*mwgs;
-      return val;
+    unsigned int max_threads_per_processor() {  // not in portable SYCL
+      static unsigned int max_threads = 0;
+      if (max_threads == 0) {
+	max_threads = max_threads_per_block();
+	max_threads *= 2;
+      }
+      return max_threads;
     }
 
     unsigned int max_threads_per_block_dim(int i) {
@@ -348,10 +353,17 @@ namespace quda
       return val;
     }
 
-    unsigned int max_blocks_per_processor() // FIXME
-    {
-      static int max_blocks_per_sm = 2;
+    unsigned int max_blocks_per_processor() { // FIXME
+      static unsigned int max_blocks_per_sm = 2;
       return max_blocks_per_sm;
+    }
+
+    unsigned int max_parameter_size() {
+      static unsigned int max_parameter_size = 0;
+      if (max_parameter_size == 0) {
+	max_parameter_size = myDevice.get_info<sycl::info::device::max_parameter_size>();
+      }
+      return max_parameter_size;
     }
 
     namespace profile {
