@@ -9,6 +9,11 @@
 #include <blas_quda.h>
 #include <field_cache.h>
 
+// temporary addition until multi-RHS for all Dirac operator functions
+#ifdef __CUDACC__
+#pragma nv_diag_suppress 611
+#endif
+
 namespace quda {
 
   // Forward declare: MG Transfer Class
@@ -2533,3 +2538,7 @@ public:
                           const bool pc_solve);
 
 } // namespace quda
+
+#ifdef __CUDACC__
+#pragma nv_diag_default 611
+#endif
