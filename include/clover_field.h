@@ -68,11 +68,7 @@ namespace quda {
       } else if (precision == QUDA_SINGLE_PRECISION) {
         if (order == QUDA_FLOAT4_CLOVER_ORDER) return true;
       } else if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-#ifdef FLOAT8
-        if (order == QUDA_FLOAT8_CLOVER_ORDER) return true;
-#else
-        if (order == QUDA_FLOAT4_CLOVER_ORDER) return true;
-#endif
+        if (order == static_cast<QudaCloverFieldOrder>(QUDA_ORDER_FP)) return true;
       }
       return false;
     }

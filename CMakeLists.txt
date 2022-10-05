@@ -194,8 +194,9 @@ option(QUDA_BUILD_ALL_TESTS "build tests by default" ON)
 option(QUDA_INSTALL_ALL_TESTS "install tests by default" ON)
 option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ON)
 
-option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" ON)
-option(QUDA_FLOAT4_MG "enable float-4 ordered fixed-point fields for multigrid?" ON)
+set(QUDA_ORDER_FP "8" CACHE STRING "which data order to use for Wilson, gauge (recon-8/9) and clover fixed-point fields (4, 8)")
+set(QUDA_ORDER_SP_MG "2" CACHE STRING "which data order to use for fp32 MG fields (2, 4)")
+set(QUDA_ORDER_FP_MG "2" CACHE STRING "which data order to use for fixed-point MG fields (2, 4, 8)")
 
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
 
@@ -254,8 +255,9 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 
-mark_as_advanced(QUDA_FLOAT8)
-mark_as_advanced(QUDA_FLOAT4_MG)
+mark_as_advanced(QUDA_ORDER_FP)
+mark_as_advanced(QUDA_ORDER_SP_MG)
+mark_as_advanced(QUDA_ORDER_FP_MG)
 mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
 mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
 

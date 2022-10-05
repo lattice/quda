@@ -13,47 +13,40 @@ namespace quda
   namespace colorspinor
   {
 
-    template <typename real> constexpr auto getNative(int nSpin) { return QUDA_INVALID_FIELD_ORDER; }
-    template <> constexpr auto getNative<double>(int) { return QUDA_FLOAT2_FIELD_ORDER; }
+    template <typename T, int nSpin> constexpr auto getNative() { return QUDA_FLOAT2_FIELD_ORDER; }
+    template <> constexpr auto getNative<float, 4>() { return QUDA_FLOAT4_FIELD_ORDER; }
 
-#ifdef FLOAT4_MG
-    template <> constexpr auto getNative<float>(int nSpin) { return nSpin == 1 ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER; }
-#else
-    template <> constexpr auto getNative<float>(int nSpin) { return nSpin == 4 ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER; }
-#endif
+    // fixed-point Wilson fields
+    template <> constexpr auto getNative<short, 4>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_FP); }
+    template <> constexpr auto getNative<int8_t, 4>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_FP); }
+
+    // fp32 multigrid fields
+    template <> constexpr auto getNative<float, 2>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_SP_MG); }
+
+    // fixed-point multigrid fields
+    template <> constexpr auto getNative<short, 2>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_FP_MG); }
+    template <> constexpr auto getNative<int8_t, 2>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_FP_MG); }
+
+    template <typename T> constexpr auto getNative(int nSpin) { return QUDA_INVALID_FIELD_ORDER; }
+
+    template <> constexpr auto getNative<double>(int nSpin)
+    {
+      return nSpin == 1 ? getNative<double, 1>() : nSpin == 2 ? getNative<double, 2>() : getNative<double, 4>();
+    }
+
+    template <> constexpr auto getNative<float>(int nSpin)
+    {
+      return nSpin == 1 ? getNative<float, 1>() : nSpin == 2 ? getNative<float, 2>() : getNative<float, 4>();
+    }
 
     template <> constexpr auto getNative<short>(int nSpin)
     {
-      if (nSpin == 4) {
-#ifdef FLOAT8
-        return QUDA_FLOAT8_FIELD_ORDER;
-#else
-        return QUDA_FLOAT4_FIELD_ORDER;
-#endif
-      } else {
-#ifdef FLOAT4_MG
-        return nSpin == 1 ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
-#else
-        return QUDA_FLOAT2_FIELD_ORDER;
-#endif
-      }
+      return nSpin == 1 ? getNative<short, 1>() : nSpin == 2 ? getNative<short, 2>() : getNative<short, 4>();
     }
 
     template <> constexpr auto getNative<int8_t>(int nSpin)
     {
-      if (nSpin == 4) {
-#ifdef FLOAT8
-        return QUDA_FLOAT8_FIELD_ORDER;
-#else
-        return QUDA_FLOAT4_FIELD_ORDER;
-#endif
-      } else {
-#ifdef FLOAT4_MG
-        return nSpin == 1 ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
-#else
-        return QUDA_FLOAT2_FIELD_ORDER;
-#endif
-      }
+      return nSpin == 1 ? getNative<int8_t, 1>() : nSpin == 2 ? getNative<int8_t, 2>() : getNative<int8_t, 4>();
     }
 
     constexpr QudaFieldOrder getNative(QudaPrecision precision, int nSpin)

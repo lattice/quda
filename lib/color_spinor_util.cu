@@ -364,42 +364,39 @@ namespace quda {
     }
   }
 
-  template <typename Float, QudaFieldOrder order, int nSpin, int nColor>
+  template <typename Float, int nSpin, int nColor>
   void genericPrintVector(const ColorSpinorField &a, int parity, unsigned int x_cb)
   {
-    print_vector(FieldOrderCB<double, nSpin, nColor, 1, order, Float, Float, false, true>(a), parity, x_cb);
-  }
-
-  template <typename Float, QudaFieldOrder order> void genericPrintVector(const ColorSpinorField &a, int parity, unsigned int x_cb)
-  {
-    if (a.Ncolor() == 3) {
-      switch (a.Nspin()) {
-      case 1: genericPrintVector<Float, order, 1, 3>(a, parity, x_cb); break;
-      case 4: genericPrintVector<Float, order, 4, 3>(a, parity, x_cb); break;
-      default: errorQuda("Not supported Ncolor = %d, Nspin = %d", a.Ncolor(), a.Nspin());
-      }
-    } else if (a.Nspin() == 2) {
-      switch (a.Ncolor()) {
-      case  2: genericPrintVector<Float, order, 2,  2>(a, parity, x_cb); break;
-      case  6: genericPrintVector<Float, order, 2,  6>(a, parity, x_cb); break;
-      case 24: genericPrintVector<Float, order, 2, 24>(a, parity, x_cb); break;
-      case 32: genericPrintVector<Float, order, 2, 32>(a, parity, x_cb); break;
-      case 64: genericPrintVector<Float, order, 2, 64>(a, parity, x_cb); break;
-      case 72: genericPrintVector<Float, order, 2, 72>(a, parity, x_cb); break;
-      case 96: genericPrintVector<Float, order, 2, 96>(a, parity, x_cb); break;
-      default: errorQuda("Not supported Ncolor = %d, Nspin = %d", a.Ncolor(), a.Nspin());
-      }
+    if (a.isNative()) {
+      constexpr auto order = colorspinor::getNative<Float>(nSpin);
+      print_vector(FieldOrderCB<double, nSpin, nColor, 1, order, Float, Float, false, true>(a), parity, x_cb);
+    } else if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+      constexpr auto order = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      print_vector(FieldOrderCB<double, nSpin, nColor, 1, order, Float, Float, false, true>(a), parity, x_cb);
+    } else {
+      errorQuda("Unsupported field order %d", a.FieldOrder());
     }
   }
 
   template <typename Float> void genericPrintVector(const ColorSpinorField &a, int parity, unsigned int x_cb)
   {
-    switch (a.FieldOrder()) {
-    case QUDA_FLOAT2_FIELD_ORDER: genericPrintVector<Float, QUDA_FLOAT2_FIELD_ORDER>(a, parity, x_cb); break;
-    case QUDA_FLOAT4_FIELD_ORDER: genericPrintVector<Float, QUDA_FLOAT4_FIELD_ORDER>(a, parity, x_cb); break;
-    case QUDA_FLOAT8_FIELD_ORDER: genericPrintVector<Float, QUDA_FLOAT8_FIELD_ORDER>(a, parity, x_cb); break;
-    case QUDA_SPACE_SPIN_COLOR_FIELD_ORDER: genericPrintVector<Float, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a, parity, x_cb); break;
-    default: errorQuda("Unsupported field order %d", a.FieldOrder());
+    if (a.Ncolor() == 3) {
+      switch (a.Nspin()) {
+      case 1: genericPrintVector<Float, 1, 3>(a, parity, x_cb); break;
+      case 4: genericPrintVector<Float, 4, 3>(a, parity, x_cb); break;
+      default: errorQuda("Not supported Ncolor = %d, Nspin = %d", a.Ncolor(), a.Nspin());
+      }
+    } else if (a.Nspin() == 2) {
+      switch (a.Ncolor()) {
+      case  2: genericPrintVector<Float, 2,  2>(a, parity, x_cb); break;
+      case  6: genericPrintVector<Float, 2,  6>(a, parity, x_cb); break;
+      case 24: genericPrintVector<Float, 2, 24>(a, parity, x_cb); break;
+      case 32: genericPrintVector<Float, 2, 32>(a, parity, x_cb); break;
+      case 64: genericPrintVector<Float, 2, 64>(a, parity, x_cb); break;
+      case 72: genericPrintVector<Float, 2, 72>(a, parity, x_cb); break;
+      case 96: genericPrintVector<Float, 2, 96>(a, parity, x_cb); break;
+      default: errorQuda("Not supported Ncolor = %d, Nspin = %d", a.Ncolor(), a.Nspin());
+      }
     }
   }
 

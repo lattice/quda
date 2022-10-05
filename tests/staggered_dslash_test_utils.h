@@ -309,7 +309,7 @@ struct StaggeredDslashTestWrapper {
       }
     }
 
-    csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+    csParam.fieldOrder = colorspinor::getNative(inv_param.cuda_prec, 1);
     csParam.pad = 0;
     csParam.setPrecision(inv_param.cuda_prec);
     csParam.location = QUDA_CUDA_FIELD_LOCATION;

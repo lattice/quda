@@ -6,7 +6,7 @@
 
 namespace quda {
 
-  template <typename real, int Ns, int Nc, QudaFieldOrder order>
+  template <typename real, int Ns, int Nc>
   class SpinorNoise : TunableKernel2D {
     ColorSpinorField &v;
     RNG &rng;
@@ -28,10 +28,10 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       switch (type) {
       case QUDA_NOISE_GAUSS:
-        launch<NoiseSpinor>(tp, stream, SpinorNoiseArg<real, Ns, Nc, order, QUDA_NOISE_GAUSS>(v, rng.State()));
+        launch<NoiseSpinor>(tp, stream, SpinorNoiseArg<real, Ns, Nc, QUDA_NOISE_GAUSS>(v, rng.State()));
         break;
       case QUDA_NOISE_UNIFORM:
-        launch<NoiseSpinor>(tp, stream, SpinorNoiseArg<real, Ns, Nc, order, QUDA_NOISE_UNIFORM>(v, rng.State()));
+        launch<NoiseSpinor>(tp, stream, SpinorNoiseArg<real, Ns, Nc, QUDA_NOISE_UNIFORM>(v, rng.State()));
         break;
       default: errorQuda("Noise type %d not implemented", type);
       }
@@ -42,34 +42,21 @@ namespace quda {
     void postTune(){ rng.restore(); }
   };
 
-  /** Decide on the input order*/
-  template <typename real, int Ns, int Nc>
-  void spinorNoise(ColorSpinorField &in, RNG &rng, QudaNoiseType type)
-  {
-    if (in.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-      SpinorNoise<real,Ns,Nc,QUDA_FLOAT2_FIELD_ORDER>(in, rng, type);
-    } else if (in.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
-      SpinorNoise<real,Ns,Nc,QUDA_FLOAT4_FIELD_ORDER>(in, rng, type);
-    } else {
-      errorQuda("Order %d not defined (Ns=%d, Nc=%d)", in.FieldOrder(), Ns, Nc);
-    }
-  }
-
   template <typename real, int Ns>
   void spinorNoise(ColorSpinorField &src, RNG& randstates, QudaNoiseType type)
   {
     if (src.Ncolor() == 3) {
-      spinorNoise<real,Ns,3>(src, randstates, type);
+      SpinorNoise<real,Ns,3>(src, randstates, type);
     } else if (src.Ncolor() == 6) {
-      spinorNoise<real,Ns,6>(src, randstates, type);
+      SpinorNoise<real,Ns,6>(src, randstates, type);
     } else if (src.Ncolor() == 24) {
-      spinorNoise<real,Ns,24>(src, randstates, type);
+      SpinorNoise<real,Ns,24>(src, randstates, type);
     } else if (src.Ncolor() == 32) {
-      spinorNoise<real,Ns,32>(src, randstates, type);
+      SpinorNoise<real,Ns,32>(src, randstates, type);
     } else if (src.Ncolor() == 64) {
-      spinorNoise<real,Ns,64>(src, randstates, type);
+      SpinorNoise<real,Ns,64>(src, randstates, type);
     } else if (src.Ncolor() == 96) {
-      spinorNoise<real,Ns,96>(src, randstates, type);
+      SpinorNoise<real,Ns,96>(src, randstates, type);
     } else {
       errorQuda("nColor = %d not implemented", src.Ncolor());
     }
@@ -78,21 +65,16 @@ namespace quda {
   template <typename real>
   void spinorNoise(ColorSpinorField &src, RNG& randstates, QudaNoiseType type)
   {
+    checkNative(src);
+    if (!is_enabled_spin(src.Nspin()))
+      errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
+
     if (src.Nspin() == 4) {
-      if constexpr (is_enabled_spin(4))
-        spinorNoise<real, 4>(src, randstates, type);
-      else
-        errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
+      if constexpr (is_enabled_spin(4)) spinorNoise<real, 4>(src, randstates, type);
     } else if (src.Nspin() == 2) {
-      if constexpr (is_enabled_spin(2))
-        spinorNoise<real, 2>(src, randstates, type);
-      else
-        errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
+      if constexpr (is_enabled_spin(2)) spinorNoise<real, 2>(src, randstates, type);
     } else if (src.Nspin() == 1) {
-      if constexpr (is_enabled_spin(1))
-        spinorNoise<real, 1>(src, randstates, type);
-      else
-        errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
+      if constexpr (is_enabled_spin(1)) spinorNoise<real, 1>(src, randstates, type);
     } else {
       errorQuda("Nspin = %d not implemented", src.Nspin());
     }
