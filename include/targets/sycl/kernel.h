@@ -72,7 +72,7 @@ namespace quda {
       printfQuda("  Arg: %s\n", typeid(Arg).name());
     }
     if (arg.threads.x%localSize[RANGE_X] != 0) {
-      warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
+      //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
       return QUDA_ERROR;
     }
     sycl::nd_range<3> ndRange{globalSize, localSize};
@@ -151,7 +151,7 @@ namespace quda {
       printfQuda("  Arg: %s\n", typeid(Arg).name());
     }
     if (arg.threads.x%localSize[RANGE_X] != 0) {
-      warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
+      //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
       return QUDA_ERROR;
     }
     if (globalSize[RANGE_Y] != arg.threads.y) {
@@ -244,7 +244,7 @@ namespace quda {
       //fflush(stdout);
     }
     if (arg.threads.x%localSize[RANGE_X] != 0) {
-      warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
+      //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
       return QUDA_ERROR;
     }
     if (globalSize[RANGE_Y] != arg.threads.y) {

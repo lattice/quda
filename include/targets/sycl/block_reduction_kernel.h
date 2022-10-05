@@ -124,8 +124,9 @@ namespace quda
       printfQuda("  Transformer: %s\n", typeid(Transformer<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
     }
-    if (globalSize[RANGE_X] != arg.threads.x) {
-      errorQuda("globalSize X (%lu) != arg.threads.x (%i)", globalSize[RANGE_X], arg.threads.x);
+    if (arg.threads.x%localSize[RANGE_X] != 0) {
+      //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
+      return QUDA_ERROR;
     }
     if (globalSize[RANGE_Y] != arg.threads.y) {
       warningQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
