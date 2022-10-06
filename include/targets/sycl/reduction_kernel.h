@@ -98,7 +98,7 @@ namespace quda {
       return QUDA_ERROR;
     }
     if (globalSize[RANGE_Y] != arg.threads.y) { // shouldn't happen here
-      warningQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
+      //warningQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
       return QUDA_ERROR;
     }
     sycl::nd_range<3> ndRange{globalSize, localSize};
@@ -240,11 +240,11 @@ namespace quda {
       return QUDA_ERROR;
     }
     if (globalSize[RANGE_Y] != arg.threads.y) { // shouldn't happen here
-      warningQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
+      //warningQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
       return QUDA_ERROR;
     }
     if (globalSize[RANGE_Z] != arg.threads.z) {
-      warningQuda("globalSize Z (%lu) != arg.threads.z (%i)", globalSize[RANGE_Z], arg.threads.z);
+      //warningQuda("globalSize Z (%lu) != arg.threads.z (%i)", globalSize[RANGE_Z], arg.threads.z);
       return QUDA_ERROR;
     }
     sycl::nd_range<3> ndRange{globalSize, localSize};
