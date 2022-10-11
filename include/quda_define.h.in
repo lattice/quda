@@ -222,6 +222,12 @@ static_assert(QUDA_ORDER_FP_MG == 2 || QUDA_ORDER_FP_MG == 4 || QUDA_ORDER_FP_MG
  */
 #cmakedefine QUDA_TARGET_HIP @QUDA_TARGET_HIP@
 
-#if !defined(QUDA_TARGET_CUDA) && !defined(QUDA_TARGET_HIP)
+/**
+ * @def QUDA_TARGET_SYCL
+ * @brief This macro is set by CMake if the SYCL Build target is selected
+ */
+#cmakedefine QUDA_TARGET_SYCL @QUDA_TARGET_SYCL@
+
+#if !defined(QUDA_TARGET_CUDA) && !defined(QUDA_TARGET_HIP) && !defined(QUDA_TARGET_SYCL)
 #error "No QUDA_TARGET selected"
 #endif

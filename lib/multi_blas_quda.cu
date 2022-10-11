@@ -571,9 +571,9 @@ namespace quda {
     {
       std::vector<double> a_(x.size() * y.size());
       memcpy(a_.data(), a, x.size() * y.size() * sizeof(double));
-      std::vector<std::reference_wrapper<const ColorSpinorField>> x_;
+      vector_ref<const ColorSpinorField> x_;
       for (auto &xi : x) x_.push_back(*xi);
-      std::vector<std::reference_wrapper<ColorSpinorField>> y_;
+      vector_ref<ColorSpinorField> y_;
       for (auto &yi : y) y_.push_back(*yi);
       axpy(a_, x_, y_);
     }
@@ -582,9 +582,9 @@ namespace quda {
     {
       std::vector<double> a_(x.size() * y.size());
       memcpy(a_.data(), a, x.size() * y.size() * sizeof(double));
-      std::vector<std::reference_wrapper<const ColorSpinorField>> x_;
+      vector_ref<const ColorSpinorField> x_;
       for (auto &xi : x) x_.push_back(*xi);
-      std::vector<std::reference_wrapper<ColorSpinorField>> y_;
+      vector_ref<ColorSpinorField> y_;
       for (auto &yi : y) y_.push_back(*yi);
       axpy_U(a_, x_, y_);
     }
@@ -593,9 +593,9 @@ namespace quda {
     {
       std::vector<double> a_(x.size() * y.size());
       memcpy(a_.data(), a, x.size() * y.size() * sizeof(double));
-      std::vector<std::reference_wrapper<const ColorSpinorField>> x_;
+      vector_ref<const ColorSpinorField> x_;
       for (auto &xi : x) x_.push_back(*xi);
-      std::vector<std::reference_wrapper<ColorSpinorField>> y_;
+      vector_ref<ColorSpinorField> y_;
       for (auto &yi : y) y_.push_back(*yi);
       axpy_L(a_, x_, y_);
     }
@@ -603,9 +603,9 @@ namespace quda {
     void caxpy(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
       std::vector<Complex> a_(x.size() * y.size());
       memcpy(a_.data(), a, x.size() * y.size() * sizeof(Complex));
-      std::vector<std::reference_wrapper<const ColorSpinorField>> x_;
+      vector_ref<const ColorSpinorField> x_;
       for (auto &xi : x) x_.push_back(*xi);
-      std::vector<std::reference_wrapper<ColorSpinorField>> y_;
+      vector_ref<ColorSpinorField> y_;
       for (auto &yi : y) y_.push_back(*yi);
       caxpy(a_, x_, y_);
     }
@@ -613,9 +613,9 @@ namespace quda {
     void caxpy_U(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
       std::vector<Complex> a_(x.size() * y.size());
       memcpy(a_.data(), a, x.size() * y.size() * sizeof(Complex));
-      std::vector<std::reference_wrapper<const ColorSpinorField>> x_;
+      vector_ref<const ColorSpinorField> x_;
       for (auto &xi : x) x_.push_back(*xi);
-      std::vector<std::reference_wrapper<ColorSpinorField>> y_;
+      vector_ref<ColorSpinorField> y_;
       for (auto &yi : y) y_.push_back(*yi);
       caxpy_U(a_, x_, y_);
     }
@@ -623,9 +623,9 @@ namespace quda {
     void caxpy_L(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
       std::vector<Complex> a_(x.size() * y.size());
       memcpy(a_.data(), a, x.size() * y.size() * sizeof(Complex));
-      std::vector<std::reference_wrapper<const ColorSpinorField>> x_;
+      vector_ref<const ColorSpinorField> x_;
       for (auto &xi : x) x_.push_back(*xi);
-      std::vector<std::reference_wrapper<ColorSpinorField>> y_;
+      vector_ref<ColorSpinorField> y_;
       for (auto &yi : y) y_.push_back(*yi);
       caxpy_L(a_, x_, y_);
     }
@@ -635,11 +635,11 @@ namespace quda {
     {
       std::vector<double> a_(x.size() * y.size());
       memcpy(a_.data(), a, x.size() * y.size() * sizeof(double));
-      std::vector<std::reference_wrapper<const ColorSpinorField>> x_;
+      vector_ref<const ColorSpinorField> x_;
       for (auto &xi : x) x_.push_back(*xi);
-      std::vector<std::reference_wrapper<const ColorSpinorField>> y_;
+      vector_ref<const ColorSpinorField> y_;
       for (auto &yi : y) y_.push_back(*yi);
-      std::vector<std::reference_wrapper<ColorSpinorField>> z_;
+      vector_ref<ColorSpinorField> z_;
       for (auto &zi : z) z_.push_back(*zi);
       axpyz(a_, x_, y_, z_);
     }
@@ -649,11 +649,11 @@ namespace quda {
     {
       std::vector<Complex> a_(x.size() * y.size());
       memcpy(a_.data(), a, x.size() * y.size() * sizeof(Complex));
-      std::vector<std::reference_wrapper<const ColorSpinorField>> x_;
+      vector_ref<const ColorSpinorField> x_;
       for (auto &xi : x) x_.push_back(*xi);
-      std::vector<std::reference_wrapper<const ColorSpinorField>> y_;
+      vector_ref<const ColorSpinorField> y_;
       for (auto &yi : y) y_.push_back(*yi);
-      std::vector<std::reference_wrapper<ColorSpinorField>> z_;
+      vector_ref<ColorSpinorField> z_;
       for (auto &zi : z) z_.push_back(*zi);
       caxpyz(a_, x_, y_, z_);
     }
@@ -668,9 +668,9 @@ namespace quda {
       std::vector<double> c_(x.size());
       memcpy(c_.data(), c, x.size() * sizeof(double));
 
-      std::vector<std::reference_wrapper<ColorSpinorField>> x_;
+      vector_ref<ColorSpinorField> x_;
       for (auto &xi : x) x_.push_back(*xi);
-      std::vector<std::reference_wrapper<ColorSpinorField>> y_;
+      vector_ref<ColorSpinorField> y_;
       for (auto &yi : y) y_.push_back(*yi);
       axpyBzpcx(a_, x_, y_, b_, z, c_);
     }
@@ -683,7 +683,7 @@ namespace quda {
       std::vector<Complex> b_(x.size());
       memcpy(b_.data(), b, x.size() * sizeof(Complex));
 
-      std::vector<std::reference_wrapper<const ColorSpinorField>> x_;
+      vector_ref<const ColorSpinorField> x_;
       for (auto &xi : x) x_.push_back(*xi);
       caxpyBxpz(a_, x_, y, b_, z);
     }

@@ -1,8 +1,4 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <time.h>
-#include <math.h>
-#include <string.h>
+#include <cstdio>
 #include <limits>
 
 #include <instantiate.h>
@@ -168,7 +164,7 @@ TEST_P(ColorSpinorIOTest, verify)
 
 int main(int argc, char **argv)
 {
-  // initalize google test, includes command line options
+  // initialize google test, includes command line options
   ::testing::InitGoogleTest(&argc, argv);
   // return code for google test
   int test_rc = 0;

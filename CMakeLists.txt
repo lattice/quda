@@ -64,7 +64,7 @@ if(BUILD_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid CMAKE_BUILD_TYPE type! Valid build types are:" "${VALID_BUILD_TYPES}")
 endif()
 
-# QUDA may be built to run using HIP or CUDA, which we call the
+# QUDA may be built to run using CUDA, HIP or SYCL, which we call the
 # Target type. By default, the target is CUDA.
 if(DEFINED ENV{QUDA_TARGET})
   set(DEFTARGET $ENV{QUDA_TARGET})
@@ -72,11 +72,11 @@ else()
   set(DEFTARGET "CUDA")
 endif()
 
-set(VALID_TARGET_TYPES CUDA HIP)
+set(VALID_TARGET_TYPES CUDA HIP SYCL)
 set(QUDA_TARGET_TYPE
   "${DEFTARGET}"
   CACHE STRING "Choose the type of target, options are: ${VALID_TARGET_TYPES}")
-set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP)
+set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP SYCL)
 
 string(TOUPPER ${QUDA_TARGET_TYPE} CHECK_TARGET_TYPE)
 list(FIND VALID_TARGET_TYPES ${CHECK_TARGET_TYPE} TARGET_TYPE_VALID)
