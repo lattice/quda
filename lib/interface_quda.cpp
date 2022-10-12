@@ -4762,6 +4762,9 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   qParam.nDim = 4;
+  qParam.pc_type = QUDA_4D_PC;
+  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) { qParam.pc_type = QUDA_5D_PC; }
+
   qParam.setPrecision(fParam.Precision());
   qParam.pad = 0;
   for(int dir=0; dir<4; ++dir) qParam.x[dir] = fParam.x[dir];
@@ -4826,11 +4829,11 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
       qParam.v = h_x[i];
       ColorSpinorField cpuQuarkX(qParam); // create host quark field
       profileCloverForce.TPSTOP(QUDA_PROFILE_INIT);
-
+printfQuda("So far so good: volume x : %lu  , volume cpuQuarkX: %lu \n",x.Even().VolumeCB(), cpuQuarkX.VolumeCB());
       profileCloverForce.TPSTART(QUDA_PROFILE_H2D);
       x.Even() = cpuQuarkX;
       profileCloverForce.TPSTOP(QUDA_PROFILE_H2D);
-
+printfQuda("The program does not arrive here\n");
       profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
       gamma5(x.Even(), x.Even());
     } else {
