@@ -461,13 +461,15 @@ namespace quda {
       }
     };
 
-    template <typename real, int nColor, QudaReconstructType recon>
+    template <typename Float, int nColor, QudaReconstructType recon>
     struct HisqStaplesForce {
       HisqStaplesForce(GaugeField &Pmu, GaugeField &P3, GaugeField &P5, GaugeField &Pnumu,
                        GaugeField &Qmu, GaugeField &Qnumu, GaugeField &newOprod,
                        const GaugeField &oprod, const GaugeField &link,
                        const double *path_coeff_array)
       {
+        using real = typename mapper<Float>::type;
+
         PathCoefficients<real> act_path_coeff(path_coeff_array);
         real OneLink = act_path_coeff.one;
         real ThreeSt = act_path_coeff.three;
@@ -479,7 +481,7 @@ namespace quda {
         real mLepage  = -Lepage;
 
         {
-          FatLinkArg<real, nColor> arg(newOprod, oprod, link, OneLink, FORCE_ONE_LINK);
+          FatLinkArg<real, nColor, recon> arg(newOprod, oprod, link, OneLink, FORCE_ONE_LINK);
           arg.threads.z = 4;
           OneLinkForce<decltype(arg)> oneLink(arg, link, 0, 0, FORCE_ONE_LINK, newOprod);
         }
@@ -490,7 +492,7 @@ namespace quda {
 
             //3-link
             //Kernel A: middle link
-            FatLinkArg<real, nColor> middleLinkArg(newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt, 2, FORCE_MIDDLE_LINK);
+            FatLinkArg<Float, nColor, recon> middleLinkArg(newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt, 2, FORCE_MIDDLE_LINK);
             MiddleLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, FORCE_MIDDLE_LINK, newOprod, newOprod, Pmu, P3, Qmu);
 
             for (int nu=0; nu < 8; nu++) {
@@ -498,35 +500,35 @@ namespace quda {
 
               //5-link: middle link
               //Kernel B
-              FatLinkArg<real, nColor> middleLinkArg(newOprod, Pnumu, P5, Qnumu, Pmu, Qmu, link, FiveSt, 1, FORCE_MIDDLE_LINK);
+              FatLinkArg<Float, nColor, recon> middleLinkArg(newOprod, Pnumu, P5, Qnumu, Pmu, Qmu, link, FiveSt, 1, FORCE_MIDDLE_LINK);
               MiddleLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, nu, FORCE_MIDDLE_LINK, newOprod, newOprod, Pnumu, P5, Qnumu);
 
               for (int rho = 0; rho < 8; rho++) {
                 if (rho == sig || rho == opp_dir(sig) || rho == mu || rho == opp_dir(mu) || rho == nu || rho == opp_dir(nu)) continue;
 
                 //7-link: middle link and side link
-                FatLinkArg<real, nColor> arg(newOprod, P5, Pnumu, Qnumu, link, SevenSt, FiveSt != 0 ? SevenSt/FiveSt : 0, 1, FORCE_ALL_LINK, true);
+                FatLinkArg<Float, nColor, recon> arg(newOprod, P5, Pnumu, Qnumu, link, SevenSt, FiveSt != 0 ? SevenSt/FiveSt : 0, 1, FORCE_ALL_LINK, true);
                 AllLinkForce<decltype(arg)> all(arg, link, sig, rho, FORCE_ALL_LINK, newOprod, P5, P5, P5, Qnumu);
 
               }//rho
 
               //5-link: side link
-              FatLinkArg<real, nColor> arg(newOprod, P3, P5, Qmu, link, mFiveSt, (ThreeSt != 0 ? FiveSt/ThreeSt : 0), 1, FORCE_SIDE_LINK);
+              FatLinkArg<Float, nColor, recon> arg(newOprod, P3, P5, Qmu, link, mFiveSt, (ThreeSt != 0 ? FiveSt/ThreeSt : 0), 1, FORCE_SIDE_LINK);
               SideLinkForce<decltype(arg)> side(arg, link, sig, nu, FORCE_SIDE_LINK, newOprod, P3, P5, P5, Qmu);
 
             } //nu
 
             //lepage
             if (Lepage != 0.) {
-              FatLinkArg<real, nColor> middleLinkArg(newOprod, P5, Pmu, Qmu, link, Lepage, 2, FORCE_LEPAGE_MIDDLE_LINK);
+              FatLinkArg<Float, nColor, recon> middleLinkArg(newOprod, P5, Pmu, Qmu, link, Lepage, 2, FORCE_LEPAGE_MIDDLE_LINK);
               LepageMiddleLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, FORCE_LEPAGE_MIDDLE_LINK, newOprod, newOprod, P5, P5, Qmu);
 
-              FatLinkArg<real, nColor> arg(newOprod, P3, P5, Qmu, link, mLepage, (ThreeSt != 0 ? Lepage/ThreeSt : 0), 2, FORCE_SIDE_LINK);
+              FatLinkArg<Float, nColor, recon> arg(newOprod, P3, P5, Qmu, link, mLepage, (ThreeSt != 0 ? Lepage/ThreeSt : 0), 2, FORCE_SIDE_LINK);
               SideLinkForce<decltype(arg)> side(arg, link, sig, mu, FORCE_SIDE_LINK, newOprod, P3, P5, P5, Qmu);
             } // Lepage != 0.0
 
             // 3-link side link
-            FatLinkArg<real, nColor> arg(newOprod, P3, link, ThreeSt, 1, FORCE_SIDE_LINK_SHORT);
+            FatLinkArg<Float, nColor, recon> arg(newOprod, P3, link, ThreeSt, 1, FORCE_SIDE_LINK_SHORT);
             SideLinkShortForce<decltype(arg)> side(arg, P3, sig, mu, FORCE_SIDE_LINK_SHORT, newOprod, newOprod, P3, P3, P3);
           }//mu
         }//sig

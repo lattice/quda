@@ -65,12 +65,13 @@ namespace quda {
           seven(path_coeff_array[4]), lepage(path_coeff_array[5]) { }
     };
 
-    template <typename real_, int nColor_, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
+    template <typename store_t, int nColor_, QudaReconstructType recon>
     struct BaseForceArg : kernel_param<> {
-      using real = real_;
+      using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
-      typedef typename gauge_mapper<real,reconstruct>::type G;
-      const G link;
+      using Gauge = typename gauge_mapper<real, recon>::type;
+
+      const Gauge link;
       int X[4]; // regular grid dims
       int D[4]; // working set grid dims
       int E[4]; // extended grid dims
@@ -104,19 +105,22 @@ namespace quda {
       }
     };
 
-    template <typename real, int nColor, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
-    struct FatLinkArg : public BaseForceArg<real, nColor, reconstruct> {
-      using BaseForceArg = BaseForceArg<real, nColor, reconstruct>;
-      typedef typename gauge_mapper<real,QUDA_RECONSTRUCT_NO>::type F;
-      F outA;
-      F outB;
-      F pMu;
-      F p3;
-      F qMu;
+    template <typename store_t, int nColor_, QudaReconstructType recon>
+    struct FatLinkArg : public BaseForceArg<store_t, nColor_, recon> {
+      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
+      using real = typename mapper<store_t>::type;
+      static constexpr int nColor = nColor_;
+      using Gauge = typename gauge_mapper<real, recon>::type;
 
-      const F oProd;
-      const F qProd;
-      const F qPrev;
+      Gauge outA;
+      Gauge outB;
+      Gauge pMu;
+      Gauge p3;
+      Gauge qMu;
+
+      const Gauge oProd;
+      const Gauge qProd;
+      const Gauge qPrev;
       const real coeff;
       const real accumu_coeff;
 
