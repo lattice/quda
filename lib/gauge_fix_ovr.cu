@@ -412,7 +412,7 @@ namespace quda {
 
       double action = argQ.getAction();
       double diff = abs(action0 - action);
-      if ((iter % verbose_interval) == (verbose_interval - 1) && getVerbosity() >= QUDA_VERBOSE)
+      if ((iter % verbose_interval) == (verbose_interval - 1) && getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
       if (stopWtheta) {
         if (argQ.getTheta() < tolerance) break;
