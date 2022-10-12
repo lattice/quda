@@ -105,8 +105,23 @@ namespace quda {
       }
     };
 
+    template <typename Arg_, int mu_positive_ = 0, int sig_positive_ = 0,
+              bool pMu_ = false, bool qMu_ = false, bool qPrev_ = false>
+    struct FatLinkParam : kernel_param<> {
+      static constexpr int mu_positive = mu_positive_;
+      static constexpr int sig_positive = sig_positive_;
+      static constexpr bool pMu = pMu_;
+      static constexpr bool qMu = qMu_;
+      static constexpr bool qPrev = qPrev_;
+      using Arg = Arg_;
+      Arg arg;
+      FatLinkParam(Arg &arg) :
+        kernel_param<>(arg.threads),
+        arg(arg) {}
+    };
+
     template <typename store_t, int nColor_, QudaReconstructType recon>
-    struct FatLinkArg : public BaseForceArg<store_t, nColor_, recon> {
+    struct OneLinkArg : public BaseForceArg<store_t, nColor_, recon> {
       using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
@@ -128,69 +143,12 @@ namespace quda {
       const bool q_mu;
       const bool q_prev;
 
-      FatLinkArg(GaugeField &force, const GaugeField &oProd, const GaugeField &link, real coeff, HisqForceType type)
+      OneLinkArg(GaugeField &force, const GaugeField &oProd, const GaugeField &link, real coeff, HisqForceType type)
         : BaseForceArg(link, 0), outA(force), outB(force), pMu(oProd), p3(oProd), qMu(oProd),
         oProd(oProd), qProd(oProd), qPrev(oProd), coeff(coeff), accumu_coeff(0),
         p_mu(false), q_mu(false), q_prev(false)
       { if (type != FORCE_ONE_LINK) errorQuda("This constructor is for FORCE_ONE_LINK"); }
 
-      FatLinkArg(GaugeField &newOprod, GaugeField &pMu, GaugeField &P3, GaugeField &qMu,
-                 const GaugeField &oProd, const GaugeField &qPrev, const GaugeField &link,
-                 real coeff, int overlap, HisqForceType type)
-        : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod), pMu(pMu), p3(P3), qMu(qMu),
-        oProd(oProd), qProd(oProd), qPrev(qPrev), coeff(coeff), accumu_coeff(0), p_mu(true), q_mu(true), q_prev(true)
-      { if (type != FORCE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_MIDDLE_LINK"); }
-
-      FatLinkArg(GaugeField &newOprod, GaugeField &pMu, GaugeField &P3, GaugeField &qMu,
-                 const GaugeField &oProd, const GaugeField &link,
-                 real coeff, int overlap, HisqForceType type)
-        : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod), pMu(pMu), p3(P3), qMu(qMu),
-        oProd(oProd), qProd(oProd), qPrev(qMu), coeff(coeff), accumu_coeff(0), p_mu(true), q_mu(true), q_prev(false)
-      { if (type != FORCE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_MIDDLE_LINK"); }
-
-      FatLinkArg(GaugeField &newOprod, GaugeField &P3, const GaugeField &oProd,
-                 const GaugeField &qPrev, const GaugeField &link,
-                 real coeff, int overlap, HisqForceType type)
-        : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod), pMu(P3), p3(P3), qMu(qPrev),
-        oProd(oProd), qProd(oProd), qPrev(qPrev), coeff(coeff), accumu_coeff(0), p_mu(false), q_mu(false), q_prev(true)
-      { if (type != FORCE_LEPAGE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_LEPAGE_MIDDLE_LINK"); }
-
-      FatLinkArg(GaugeField &newOprod, GaugeField &shortP, const GaugeField &P3,
-                 const GaugeField &qProd, const GaugeField &link, real coeff, real accumu_coeff, int overlap, HisqForceType type)
-        : BaseForceArg(link, overlap), outA(newOprod), outB(shortP), pMu(P3), p3(P3), qMu(qProd), oProd(qProd), qProd(qProd),
-        qPrev(qProd), coeff(coeff), accumu_coeff(accumu_coeff),
-        p_mu(false), q_mu(false), q_prev(false)
-      { if (type != FORCE_SIDE_LINK) errorQuda("This constructor is for FORCE_SIDE_LINK"); }
-
-      FatLinkArg(GaugeField &newOprod, GaugeField &P3, const GaugeField &link,
-                 real coeff, int overlap, HisqForceType type)
-        : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod),
-        pMu(P3), p3(P3), qMu(P3), oProd(P3), qProd(P3), qPrev(P3), coeff(coeff), accumu_coeff(0.0),
-        p_mu(false), q_mu(false), q_prev(false)
-      { if (type != FORCE_SIDE_LINK_SHORT) errorQuda("This constructor is for FORCE_SIDE_LINK_SHORT"); }
-
-      FatLinkArg(GaugeField &newOprod, GaugeField &shortP, const GaugeField &oProd, const GaugeField &qPrev,
-                 const GaugeField &link, real coeff, real accumu_coeff, int overlap, HisqForceType type, bool)
-        : BaseForceArg(link, overlap), outA(newOprod), outB(shortP), pMu(shortP),
-          p3(shortP), qMu(qPrev), oProd(oProd), qProd(qPrev), qPrev(qPrev),
-          coeff(coeff), accumu_coeff(accumu_coeff), p_mu(false), q_mu(false), q_prev(false)
-      { if (type != FORCE_ALL_LINK) errorQuda("This constructor is for FORCE_ALL_LINK"); }
-
-    };
-
-    template <typename Arg_, int mu_positive_ = 0, int sig_positive_ = 0,
-              bool pMu_ = false, bool qMu_ = false, bool qPrev_ = false>
-    struct FatLinkParam : kernel_param<> {
-      static constexpr int mu_positive = mu_positive_;
-      static constexpr int sig_positive = sig_positive_;
-      static constexpr bool pMu = pMu_;
-      static constexpr bool qMu = qMu_;
-      static constexpr bool qPrev = qPrev_;
-      using Arg = Arg_;
-      Arg arg;
-      FatLinkParam(Arg &arg) :
-        kernel_param<>(arg.threads),
-        arg(arg) {}
     };
 
     template <typename Arg> struct OneLinkTerm
@@ -238,6 +196,38 @@ namespace quda {
      *             else                     (4,2)
      *
      ************************************************************************************************/
+    template <typename store_t, int nColor_, QudaReconstructType recon>
+    struct AllLinkArg : public BaseForceArg<store_t, nColor_, recon> {
+      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
+      using real = typename mapper<store_t>::type;
+      static constexpr int nColor = nColor_;
+      using Gauge = typename gauge_mapper<real, recon>::type;
+
+      Gauge outA;
+      Gauge outB;
+      Gauge pMu;
+      Gauge p3;
+      Gauge qMu;
+
+      const Gauge oProd;
+      const Gauge qProd;
+      const Gauge qPrev;
+      const real coeff;
+      const real accumu_coeff;
+
+      const bool p_mu;
+      const bool q_mu;
+      const bool q_prev;
+
+      AllLinkArg(GaugeField &newOprod, GaugeField &shortP, const GaugeField &oProd, const GaugeField &qPrev,
+                 const GaugeField &link, real coeff, real accumu_coeff, int overlap, HisqForceType type, bool)
+        : BaseForceArg(link, overlap), outA(newOprod), outB(shortP), pMu(shortP),
+          p3(shortP), qMu(qPrev), oProd(oProd), qProd(qPrev), qPrev(qPrev),
+          coeff(coeff), accumu_coeff(accumu_coeff), p_mu(false), q_mu(false), q_prev(false)
+      { if (type != FORCE_ALL_LINK) errorQuda("This constructor is for FORCE_ALL_LINK"); }
+
+    };
+
     template <typename Param> struct AllLink
     {
       using Arg = typename Param::Arg;
@@ -307,7 +297,6 @@ namespace quda {
       }
     };
 
-
     /**************************middleLinkKernel*****************************
      *
      *
@@ -349,6 +338,77 @@ namespace quda {
      *   (Lepage)    else                  (2, 0)
      *
      ****************************************************************************/
+    template <typename store_t, int nColor_, QudaReconstructType recon>
+    struct MiddleLinkArg : public BaseForceArg<store_t, nColor_, recon> {
+      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
+      using real = typename mapper<store_t>::type;
+      static constexpr int nColor = nColor_;
+      using Gauge = typename gauge_mapper<real, recon>::type;
+
+      Gauge outA;
+      Gauge outB;
+      Gauge pMu;
+      Gauge p3;
+      Gauge qMu;
+
+      const Gauge oProd;
+      const Gauge qProd;
+      const Gauge qPrev;
+      const real coeff;
+      const real accumu_coeff;
+
+      const bool p_mu;
+      const bool q_mu;
+      const bool q_prev;
+
+      MiddleLinkArg(GaugeField &newOprod, GaugeField &pMu, GaugeField &P3, GaugeField &qMu,
+                 const GaugeField &oProd, const GaugeField &qPrev, const GaugeField &link,
+                 real coeff, int overlap, HisqForceType type)
+        : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod), pMu(pMu), p3(P3), qMu(qMu),
+        oProd(oProd), qProd(oProd), qPrev(qPrev), coeff(coeff), accumu_coeff(0), p_mu(true), q_mu(true), q_prev(true)
+      { if (type != FORCE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_MIDDLE_LINK"); }
+
+      MiddleLinkArg(GaugeField &newOprod, GaugeField &pMu, GaugeField &P3, GaugeField &qMu,
+                 const GaugeField &oProd, const GaugeField &link,
+                 real coeff, int overlap, HisqForceType type)
+        : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod), pMu(pMu), p3(P3), qMu(qMu),
+        oProd(oProd), qProd(oProd), qPrev(qMu), coeff(coeff), accumu_coeff(0), p_mu(true), q_mu(true), q_prev(false)
+      { if (type != FORCE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_MIDDLE_LINK"); }
+
+    };
+
+    template <typename store_t, int nColor_, QudaReconstructType recon>
+    struct LepageMiddleLinkArg : public BaseForceArg<store_t, nColor_, recon> {
+      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
+      using real = typename mapper<store_t>::type;
+      static constexpr int nColor = nColor_;
+      using Gauge = typename gauge_mapper<real, recon>::type;
+
+      Gauge outA;
+      Gauge outB;
+      Gauge pMu;
+      Gauge p3;
+      Gauge qMu;
+
+      const Gauge oProd;
+      const Gauge qProd;
+      const Gauge qPrev;
+      const real coeff;
+      const real accumu_coeff;
+
+      const bool p_mu;
+      const bool q_mu;
+      const bool q_prev;
+
+      LepageMiddleLinkArg(GaugeField &newOprod, GaugeField &P3, const GaugeField &oProd,
+                 const GaugeField &qPrev, const GaugeField &link,
+                 real coeff, int overlap, HisqForceType type)
+        : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod), pMu(P3), p3(P3), qMu(qPrev),
+        oProd(oProd), qProd(oProd), qPrev(qPrev), coeff(coeff), accumu_coeff(0), p_mu(false), q_mu(false), q_prev(true)
+      { if (type != FORCE_LEPAGE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_LEPAGE_MIDDLE_LINK"); }
+
+    };
+
     template <typename Param> struct MiddleLink
     {
       using Arg = typename Param::Arg;
@@ -469,6 +529,38 @@ namespace quda {
      *   call 2:       (0, 1)
      *
      *********************************************************************************/
+    template <typename store_t, int nColor_, QudaReconstructType recon>
+    struct SideLinkArg : public BaseForceArg<store_t, nColor_, recon> {
+      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
+      using real = typename mapper<store_t>::type;
+      static constexpr int nColor = nColor_;
+      using Gauge = typename gauge_mapper<real, recon>::type;
+
+      Gauge outA;
+      Gauge outB;
+      Gauge pMu;
+      Gauge p3;
+      Gauge qMu;
+
+      const Gauge oProd;
+      const Gauge qProd;
+      const Gauge qPrev;
+      const real coeff;
+      const real accumu_coeff;
+
+      const bool p_mu;
+      const bool q_mu;
+      const bool q_prev;
+
+      SideLinkArg(GaugeField &newOprod, GaugeField &shortP, const GaugeField &P3,
+                 const GaugeField &qProd, const GaugeField &link, real coeff, real accumu_coeff, int overlap, HisqForceType type)
+        : BaseForceArg(link, overlap), outA(newOprod), outB(shortP), pMu(P3), p3(P3), qMu(qProd), oProd(qProd), qProd(qProd),
+        qPrev(qProd), coeff(coeff), accumu_coeff(accumu_coeff),
+        p_mu(false), q_mu(false), q_prev(false)
+      { if (type != FORCE_SIDE_LINK) errorQuda("This constructor is for FORCE_SIDE_LINK"); }
+
+    };
+
     template <typename Param> struct SideLink
     {
       using Arg = typename Param::Arg;
@@ -530,6 +622,38 @@ namespace quda {
 
     // Flop count, in two-number pair (matrix_mult, matrix_add)
     // 		(0,1)
+    template <typename store_t, int nColor_, QudaReconstructType recon>
+    struct SideLinkShortArg : public BaseForceArg<store_t, nColor_, recon> {
+      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
+      using real = typename mapper<store_t>::type;
+      static constexpr int nColor = nColor_;
+      using Gauge = typename gauge_mapper<real, recon>::type;
+
+      Gauge outA;
+      Gauge outB;
+      Gauge pMu;
+      Gauge p3;
+      Gauge qMu;
+
+      const Gauge oProd;
+      const Gauge qProd;
+      const Gauge qPrev;
+      const real coeff;
+      const real accumu_coeff;
+
+      const bool p_mu;
+      const bool q_mu;
+      const bool q_prev;
+
+      SideLinkShortArg(GaugeField &newOprod, GaugeField &P3, const GaugeField &link,
+                 real coeff, int overlap, HisqForceType type)
+        : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod),
+        pMu(P3), p3(P3), qMu(P3), oProd(P3), qProd(P3), qPrev(P3), coeff(coeff), accumu_coeff(0.0),
+        p_mu(false), q_mu(false), q_prev(false)
+      { if (type != FORCE_SIDE_LINK_SHORT) errorQuda("This constructor is for FORCE_SIDE_LINK_SHORT"); }
+
+    };
+
     template <typename Param> struct SideLinkShort
     {
       using Arg = typename Param::Arg;
