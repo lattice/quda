@@ -30,9 +30,11 @@ namespace quda {
         arg.sig = sig;
         arg.mu = mu;
 
-        strcat(aux, (std::string(comm_dim_partitioned_string()) + "threads=" + std::to_string(arg.threads.x)).c_str());
-
-        strcat(aux, ",ONE_LINK");
+        char aux2[16];
+        strcat(aux, comm_dim_partitioned_string());
+        strcat(aux, ",threads=");
+        u32toa(aux2, arg.threads.x);
+        strcat(aux, aux2);
 
         apply(device::get_default_stream());
       }
@@ -79,14 +81,21 @@ namespace quda {
         arg.sig = sig;
         arg.mu = mu;
 
-        strcat(aux, (std::string(comm_dim_partitioned_string()) + "threads=" + std::to_string(arg.threads.x)).c_str());
-        strcat(aux, (std::string(",sig=") + std::to_string(arg.sig) +
-                     std::string(",mu=") + std::to_string(arg.mu) +
-                     std::string(",pMu=") + std::to_string(arg.p_mu) +
-                     std::string(",q_mu=") + std::to_string(arg.q_mu) +
-                     std::string(",q_prev=") + std::to_string(arg.q_prev)).c_str());
-
-        strcat(aux, ",MIDDLE_LINK");
+        char aux2[16];
+        strcat(aux, comm_dim_partitioned_string());
+        strcat(aux, ",threads=");
+        u32toa(aux2, arg.threads.x);
+        strcat(aux, aux2);
+        strcat(aux, ",sig=");
+        u32toa(aux2, arg.sig);
+        strcat(aux, aux2);
+        strcat(aux, ",mu=");
+        u32toa(aux2, arg.mu);
+        strcat(aux, aux2);
+        strcat(aux, ",q_prev=");
+        u32toa(aux2, arg.q_prev);
+        strcat(aux, aux2);
+        // no need to embed p_mu, q_mu because certain values are enforced in `apply`
 
         apply(device::get_default_stream());
       }
@@ -178,11 +187,16 @@ namespace quda {
         arg.sig = sig;
         arg.mu = mu;
 
-        strcat(aux, (std::string(comm_dim_partitioned_string()) + "threads=" + std::to_string(arg.threads.x)).c_str());
-        strcat(aux, (std::string(",mu=") + std::to_string(arg.mu)).c_str()); // no sig dependence needed for side link
+        char aux2[16];
+        strcat(aux, comm_dim_partitioned_string());
+        strcat(aux, ",threads=");
+        u32toa(aux2, arg.threads.x);
+        strcat(aux, aux2);
+        strcat(aux, ",mu=");
+        u32toa(aux2, arg.mu);
+        strcat(aux, aux2);
+        // no sig dependence needed for side link
         // does the all link force also need sigma dependence??
-
-        strcat(aux, ",ALL_LINK");
 
         apply(device::get_default_stream());
       }
@@ -249,10 +263,15 @@ namespace quda {
         arg.sig = sig;
         arg.mu = mu;
 
-        strcat(aux, (std::string(comm_dim_partitioned_string()) + "threads=" + std::to_string(arg.threads.x)).c_str());
-        strcat(aux, (std::string(",mu=") + std::to_string(arg.mu)).c_str()); // no sig dependence needed for side link
-
-        strcat(aux, ",SIDE_LINK");
+        char aux2[16];
+        strcat(aux, comm_dim_partitioned_string());
+        strcat(aux, ",threads=");
+        u32toa(aux2, arg.threads.x);
+        strcat(aux, aux2);
+        strcat(aux, ",mu=");
+        u32toa(aux2, arg.mu);
+        strcat(aux, aux2);
+        // no sig dependence needed for side link
 
         apply(device::get_default_stream());
       }
@@ -315,14 +334,18 @@ namespace quda {
         arg.sig = sig;
         arg.mu = mu;
 
-        strcat(aux, (std::string(comm_dim_partitioned_string()) + "threads=" + std::to_string(arg.threads.x)).c_str());
-        strcat(aux, (std::string(",sig=") + std::to_string(arg.sig) +
-                     std::string(",mu=") + std::to_string(arg.mu) +
-                     std::string(",pMu=") + std::to_string(arg.p_mu) +
-                     std::string(",q_mu=") + std::to_string(arg.q_mu) +
-                     std::string(",q_prev=") + std::to_string(arg.q_prev)).c_str());
-
-        strcat(aux, ",LEPAGE_MIDDLE_LINK");
+        char aux2[16];
+        strcat(aux, comm_dim_partitioned_string());
+        strcat(aux, ",threads=");
+        u32toa(aux2, arg.threads.x);
+        strcat(aux, aux2);
+        strcat(aux, ",sig=");
+        u32toa(aux2, arg.sig);
+        strcat(aux, aux2);
+        strcat(aux, ",mu=");
+        u32toa(aux2, arg.mu);
+        strcat(aux, aux2);
+        // no need to embed p_mu, q_mu, q_prev because certain values are enforced in `apply`
 
         apply(device::get_default_stream());
       }
@@ -399,10 +422,14 @@ namespace quda {
         arg.sig = sig;
         arg.mu = mu;
 
-        strcat(aux, (std::string(comm_dim_partitioned_string()) + "threads=" + std::to_string(arg.threads.x)).c_str());
-        strcat(aux, (std::string(",mu=") + std::to_string(arg.mu)).c_str()); // no sig dependence needed for side link
-
-        strcat(aux, ",SIDE_LINK_SHORT");
+        char aux2[16];
+        strcat(aux, comm_dim_partitioned_string());
+        strcat(aux, ",threads=");
+        u32toa(aux2, arg.threads.x);
+        strcat(aux, aux2);
+        strcat(aux, ",mu=");
+        u32toa(aux2, arg.mu);
+        strcat(aux, aux2);
 
         apply(device::get_default_stream());
       }
