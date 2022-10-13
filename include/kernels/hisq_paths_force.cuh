@@ -696,16 +696,19 @@ namespace quda {
       }
     };
 
-    template <typename real, int nColor, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
-    struct CompleteForceArg : public BaseForceArg<real, nColor, reconstruct> {
+    template <typename store_t, int nColor_, QudaReconstructType recon>
+    struct CompleteForceArg : public BaseForceArg<store_t, nColor_, recon> {
+      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
+      using real = typename mapper<store_t>::type;
+      static constexpr int nColor = nColor_;
+      using Gauge = typename gauge_mapper<real, recon>::type;
 
-      typedef typename gauge_mapper<real,QUDA_RECONSTRUCT_NO>::type F;
-      F outA;        // force output accessor
-      const F oProd; // force input accessor
+      Gauge outA;        // force output accessor
+      const Gauge oProd; // force input accessor
       const real coeff;
 
       CompleteForceArg(GaugeField &force, const GaugeField &link)
-        : BaseForceArg<real, nColor, reconstruct>(link, 0), outA(force), oProd(force), coeff(0.0)
+        : BaseForceArg(link, 0), outA(force), oProd(force), coeff(0.0)
       { }
 
     };
@@ -740,17 +743,19 @@ namespace quda {
       }
     };
 
-    template <typename real, int nColor, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
-    struct LongLinkArg : public BaseForceArg<real, nColor, reconstruct> {
+    template <typename store_t, int nColor_, QudaReconstructType recon>
+    struct LongLinkArg : public BaseForceArg<store_t, nColor_, recon> {
+      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
+      using real = typename mapper<store_t>::type;
+      static constexpr int nColor = nColor_;
+      using Gauge = typename gauge_mapper<real, recon>::type;
 
-      typedef typename gauge::FloatNOrder<real,18,2,11> M;
-      typedef typename gauge_mapper<real,QUDA_RECONSTRUCT_NO>::type F;
-      F outA;
-      const F oProd;
+      Gauge outA;
+      const Gauge oProd;
       const real coeff;
 
       LongLinkArg(GaugeField &newOprod, const GaugeField &link, const GaugeField &oprod, real coeff)
-        : BaseForceArg<real, nColor, reconstruct>(link,0), outA(newOprod), oProd(oprod), coeff(coeff)
+        : BaseForceArg(link,0), outA(newOprod), oProd(oprod), coeff(coeff)
       { }
 
     };

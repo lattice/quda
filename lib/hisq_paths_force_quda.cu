@@ -572,81 +572,51 @@ namespace quda {
 #endif
 
     template <typename Arg>
-    class HisqForce : public TunableKernel2D {
+    class HisqLongForce : public TunableKernel2D {
 
       Arg &arg;
       GaugeField &force;
       const GaugeField &meta;
-      const HisqForceType type;
       unsigned int minThreads() const { return arg.threads.x; }
 
     public:
-      HisqForce(Arg &arg, GaugeField &force, const GaugeField &meta, int sig, int mu, HisqForceType type) :
+      HisqLongForce(Arg &arg, GaugeField &force, const GaugeField &meta, int sig, int mu) :
         TunableKernel2D(meta, 2),
         arg(arg),
         force(force),
-        meta(meta),
-        type(type)
+        meta(meta)
       {
         arg.sig = sig;
         arg.mu = mu;
+
+        char aux2[16];
+        strcat(aux, comm_dim_partitioned_string());
+        strcat(aux, ",threads=");
+        u32toa(aux2, arg.threads.x);
+        strcat(aux, aux2);
+
         apply(device::get_default_stream());
       }
 
       void apply(const qudaStream_t &stream) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        switch (type) {
-        case FORCE_LONG_LINK: launch<LongLink>(tp, stream, arg); break;
-        case FORCE_COMPLETE:  launch<CompleteForce>(tp, stream, arg); break;
-        default: errorQuda("Undefined force type %d", type);
-        }
-      }
-
-      TuneKey tuneKey() const {
-        std::stringstream aux;
-        aux << meta.AuxString() << comm_dim_partitioned_string() << ",threads=" << arg.threads.x;
-        switch (type) {
-        case FORCE_LONG_LINK: aux << ",LONG_LINK"; break;
-        case FORCE_COMPLETE:  aux << ",COMPLETE";  break;
-        default: errorQuda("Undefined force type %d", type);
-        }
-        return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
+        launch<LongLink>(tp, stream, arg);
       }
 
       void preTune() {
-        switch (type) {
-        case FORCE_LONG_LINK:
-        case FORCE_COMPLETE:
-          force.backup(); break;
-        default: errorQuda("Undefined force type %d", type);
-        }
+        force.backup();
       }
 
       void postTune() {
-        switch (type) {
-        case FORCE_LONG_LINK:
-        case FORCE_COMPLETE:
-          force.restore(); break;
-        default: errorQuda("Undefined force type %d", type);
-        }
+        force.restore();
       }
 
       long long flops() const {
-        switch (type) {
-        case FORCE_LONG_LINK: return 2*arg.threads.x*4968ll;
-        case FORCE_COMPLETE:  return 2*arg.threads.x*792ll;
-        default: errorQuda("Undefined force type %d", type);
-        }
-        return 0;
+        return 2*arg.threads.x*4968ll;
       }
 
       long long bytes() const {
-        switch (type) {
-        case FORCE_LONG_LINK: return 4*2*arg.threads.x*(2*arg.outA.Bytes() + 4*arg.link.Bytes() + 3*arg.oProd.Bytes());
-        case FORCE_COMPLETE:  return 4*2*arg.threads.x*(arg.outA.Bytes() + arg.link.Bytes() + arg.oProd.Bytes());
-        default: errorQuda("Undefined force type %d", type);
-        }
-        return 0;
+        return 4*2*arg.threads.x*(2*arg.outA.Bytes() + 4*arg.link.Bytes() + 3*arg.oProd.Bytes());
       }
     };
 
@@ -655,7 +625,7 @@ namespace quda {
       HisqLongLinkForce(GaugeField &newOprod, const GaugeField &oldOprod, const GaugeField &link, double coeff)
       {
         LongLinkArg<real, nColor, recon> arg(newOprod, link, oldOprod, coeff);
-        HisqForce<decltype(arg)> longLink(arg, newOprod, link, 0, 0, FORCE_LONG_LINK);
+        HisqLongForce<decltype(arg)> longLink(arg, newOprod, link, 0, 0);
       }
     };
 
@@ -674,12 +644,61 @@ namespace quda {
     }
 #endif
 
+    template <typename Arg>
+    class HisqCompleteLinkForce : public TunableKernel2D {
+
+      Arg &arg;
+      GaugeField &force;
+      const GaugeField &meta;
+      unsigned int minThreads() const { return arg.threads.x; }
+
+    public:
+      HisqCompleteLinkForce(Arg &arg, GaugeField &force, const GaugeField &meta, int sig, int mu) :
+        TunableKernel2D(meta, 2),
+        arg(arg),
+        force(force),
+        meta(meta)
+      {
+        arg.sig = sig;
+        arg.mu = mu;
+
+        char aux2[16];
+        strcat(aux, comm_dim_partitioned_string());
+        strcat(aux, ",threads=");
+        u32toa(aux2, arg.threads.x);
+        strcat(aux, aux2);
+
+        apply(device::get_default_stream());
+      }
+
+      void apply(const qudaStream_t &stream) {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        launch<CompleteForce>(tp, stream, arg);
+      }
+
+      void preTune() {
+        force.backup();
+      }
+
+      void postTune() {
+        force.restore();
+      }
+
+      long long flops() const {
+        return 2*arg.threads.x*792ll;
+      }
+
+      long long bytes() const {
+        return 4*2*arg.threads.x*(arg.outA.Bytes() + arg.link.Bytes() + arg.oProd.Bytes());
+      }
+    };
+
     template <typename real, int nColor, QudaReconstructType recon>
     struct HisqCompleteForce {
       HisqCompleteForce(GaugeField &force, const GaugeField &link)
       {
         CompleteForceArg<real, nColor, recon> arg(force, link);
-        HisqForce<decltype(arg)> completeForce(arg, force, link, 0, 0, FORCE_COMPLETE);
+        HisqCompleteLinkForce<decltype(arg)> completeForce(arg, force, link, 0, 0);
       }
     };
 
