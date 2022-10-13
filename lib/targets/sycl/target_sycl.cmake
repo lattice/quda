@@ -44,6 +44,12 @@ target_compile_definitions(quda PUBLIC QUDA_MAX_ARGUMENT_SIZE=${QUDA_MAX_ARGUMEN
 message(STATUS "Using max argument size " "${QUDA_MAX_ARGUMENT_SIZE}")
 mark_as_advanced(QUDA_MAX_ARGUMENT_SIZE)
 
+option(QUDA_BUILD_NATIVE_FFT "build the native FFT library according to QUDA_TARGET" ON)
+if(${QUDA_BUILD_NATIVE_FFT} STREQUAL "ON")
+  target_compile_definitions(quda PRIVATE NATIVE_FFT_LIB)
+endif()
+
+
 # ######################################################################################################################
 # define SYCL flags
 
@@ -173,8 +179,8 @@ if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
   target_link_libraries(quda PUBLIC ${SYCL_MKL_LIBRARY})
 endif()
 
-if(QUDA_GAUGE_ALG)
+if(${QUDA_BUILD_NATIVE_FFT} STREQUAL "ON")
   target_link_libraries(quda PUBLIC ${SYCL_MKL_LIBRARY})
-endif(QUDA_GAUGE_ALG)
+endif()
 
 add_subdirectory(targets/sycl)

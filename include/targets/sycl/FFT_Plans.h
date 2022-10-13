@@ -6,7 +6,7 @@
 #define FFT_FORWARD 0
 #define FFT_INVERSE 1
 
-#ifdef QUDA_NO_FFT
+#ifndef NATIVE_FFT_LIB
 
 namespace quda
 {
