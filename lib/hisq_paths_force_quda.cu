@@ -47,30 +47,26 @@ namespace quda {
       long long bytes() const { return 2*4*arg.threads.x*( arg.oProd.Bytes() + 2*arg.force.Bytes() ); }
     };
 
-    template <typename Arg> class MiddleThreeLinkForce : public TunableKernel3D {
+    template <typename Arg> class MiddleThreeLinkForce : public TunableKernel2D {
       Arg &arg;
-      const GaugeField &outA;
-      const GaugeField &outB;
+      const GaugeField &force;
       const GaugeField &pMu;
       const GaugeField &qMu;
       const GaugeField &p3;
       const GaugeField &link;
-      const HisqForceType type;
       unsigned int minThreads() const { return arg.threads.x; }
 
     public:
-      MiddleThreeLinkForce(Arg &arg, const GaugeField &link, int sig, int mu, HisqForceType type,
-                   const GaugeField &outA, const GaugeField &outB, const GaugeField &pMu,
+      MiddleThreeLinkForce(Arg &arg, const GaugeField &link, int sig, int mu,
+                   const GaugeField &force, const GaugeField &pMu,
                    const GaugeField &qMu, const GaugeField &p3) :
-        TunableKernel3D(link, 2, 1),
+        TunableKernel2D(link, 2),
         arg(arg),
-        outA(outA),
-        outB(outB),
+        force(force),
         pMu(pMu),
         qMu(qMu),
         p3(p3),
-        link(link),
-        type(type)
+        link(link)
       {
         arg.sig = sig;
         arg.mu = mu;
@@ -86,10 +82,6 @@ namespace quda {
         strcat(aux, ",mu=");
         u32toa(aux2, arg.mu);
         strcat(aux, aux2);
-        strcat(aux, ",q_prev=");
-        u32toa(aux2, arg.q_prev);
-        strcat(aux, aux2);
-        // no need to embed p_mu, q_mu because certain values are enforced in `apply`
 
         apply(device::get_default_stream());
       }
@@ -97,58 +89,39 @@ namespace quda {
       void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        if (!arg.p_mu || !arg.q_mu) errorQuda("Expect p_mu=%d and q_mu=%d to both be true", arg.p_mu, arg.q_mu);
-        if (arg.q_prev) {
-          if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
-            launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 1, 1, true, true, true>(arg));
-          } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
-            launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 0, 1, true, true, true>(arg));
-          } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
-            launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 1, 0, true, true, true>(arg));
-          } else {
-            launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 0, 0, true, true, true>(arg));
-          }
+        if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
+          launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 1, 1, true, true, false>(arg));
+        } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
+          launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 0, 1, true, true, false>(arg));
+        } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
+          launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 1, 0, true, true, false>(arg));
         } else {
-          if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
-            launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 1, 1, true, true, false>(arg));
-          } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
-            launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 0, 1, true, true, false>(arg));
-          } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
-            launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 1, 0, true, true, false>(arg));
-          } else {
-            launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 0, 0, true, true, false>(arg));
-          }
+          launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 0, 0, true, true, false>(arg));
         }
       }
 
       void preTune() {
         pMu.backup();
         qMu.backup();
-        outA.backup();
+        force.backup();
         p3.backup();
       }
 
       void postTune() {
         pMu.restore();
         qMu.restore();
-        outA.restore();
+        force.restore();
         p3.restore();
       }
 
       long long flops() const {
-        return 2*arg.threads.x*(2 * 198 +
-                               (!arg.q_prev && goes_forward(arg.sig) ? 198 : 0) +
-                               (arg.q_prev && (arg.q_mu || goes_forward(arg.sig) ) ? 198 : 0) +
-                               ((arg.q_prev && goes_forward(arg.sig) ) ?  198 : 0) +
-                               ( goes_forward(arg.sig) ? 216 : 0) );
+        return 2*arg.threads.x*(2 * 198 + (goes_forward(arg.sig) ? 414 : 0));
       }
 
       long long bytes() const {
-        return 2*arg.threads.x*( ( goes_forward(arg.sig) ? 2*arg.outA.Bytes() : 0 ) +
-                               (arg.p_mu ? arg.pMu.Bytes() : 0) +
-                               (arg.q_mu ? arg.qMu.Bytes() : 0) +
-                               ( ( goes_forward(arg.sig) || arg.q_mu ) ? arg.qPrev.Bytes() : 0) +
-                               arg.p3.Bytes() + 3*arg.link.Bytes() + arg.oProd.Bytes() );
+        return 2*arg.threads.x*( ( goes_forward(arg.sig) ? 2 * force.Bytes() : 0 ) +
+                               arg.pMu.Bytes() + arg.qMu.Bytes() +
+                               arg.p3.Bytes() + 3 * arg.link.Bytes() + arg.oProd.Bytes() );
       }
 
     };
@@ -591,8 +564,8 @@ namespace quda {
 
             //3-link
             //Kernel A: middle link
-            MiddleThreeLinkArg<Float, nColor, recon> middleThreeLinkArg(newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt, 2, FORCE_MIDDLE_LINK);
-            MiddleThreeLinkForce<decltype(middleThreeLinkArg)> middleThreeLink(middleThreeLinkArg, link, sig, mu, FORCE_MIDDLE_LINK, newOprod, newOprod, Pmu, P3, Qmu);
+            MiddleThreeLinkArg<Float, nColor, recon> middleThreeLinkArg(newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt, 2);
+            MiddleThreeLinkForce<decltype(middleThreeLinkArg)> middleThreeLink(middleThreeLinkArg, link, sig, mu, newOprod, Pmu, P3, Qmu);
 
             for (int nu=0; nu < 8; nu++) {
               if (nu == sig || nu == opp_dir(sig) || nu == mu || nu == opp_dir(mu)) continue;
