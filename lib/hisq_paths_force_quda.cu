@@ -47,7 +47,7 @@ namespace quda {
       long long bytes() const { return 2*4*arg.threads.x*( arg.oProd.Bytes() + 2*arg.outA.Bytes() ); }
     };
 
-    template <typename Arg> class MiddleLinkForce : public TunableKernel3D {
+    template <typename Arg> class MiddleThreeLinkForce : public TunableKernel3D {
       Arg &arg;
       const GaugeField &outA;
       const GaugeField &outB;
@@ -59,7 +59,7 @@ namespace quda {
       unsigned int minThreads() const { return arg.threads.x; }
 
     public:
-      MiddleLinkForce(Arg &arg, const GaugeField &link, int sig, int mu, HisqForceType type,
+      MiddleThreeLinkForce(Arg &arg, const GaugeField &link, int sig, int mu, HisqForceType type,
                    const GaugeField &outA, const GaugeField &outB, const GaugeField &pMu,
                    const GaugeField &qMu, const GaugeField &p3) :
         TunableKernel3D(link, 2, 1),
@@ -100,23 +100,129 @@ namespace quda {
         if (!arg.p_mu || !arg.q_mu) errorQuda("Expect p_mu=%d and q_mu=%d to both be true", arg.p_mu, arg.q_mu);
         if (arg.q_prev) {
           if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
-            launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 1, 1, true, true, true>(arg));
+            launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 1, 1, true, true, true>(arg));
           } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
-            launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 0, 1, true, true, true>(arg));
+            launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 0, 1, true, true, true>(arg));
           } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
-            launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 1, 0, true, true, true>(arg));
+            launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 1, 0, true, true, true>(arg));
           } else {
-            launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 0, 0, true, true, true>(arg));
+            launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 0, 0, true, true, true>(arg));
           }
         } else {
           if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
-            launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 1, 1, true, true, false>(arg));
+            launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 1, 1, true, true, false>(arg));
           } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
-            launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 0, 1, true, true, false>(arg));
+            launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 0, 1, true, true, false>(arg));
           } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
-            launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 1, 0, true, true, false>(arg));
+            launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 1, 0, true, true, false>(arg));
           } else {
-            launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 0, 0, true, true, false>(arg));
+            launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 0, 0, true, true, false>(arg));
+          }
+        }
+      }
+
+      void preTune() {
+        pMu.backup();
+        qMu.backup();
+        outA.backup();
+        p3.backup();
+      }
+
+      void postTune() {
+        pMu.restore();
+        qMu.restore();
+        outA.restore();
+        p3.restore();
+      }
+
+      long long flops() const {
+        return 2*arg.threads.x*(2 * 198 +
+                               (!arg.q_prev && goes_forward(arg.sig) ? 198 : 0) +
+                               (arg.q_prev && (arg.q_mu || goes_forward(arg.sig) ) ? 198 : 0) +
+                               ((arg.q_prev && goes_forward(arg.sig) ) ?  198 : 0) +
+                               ( goes_forward(arg.sig) ? 216 : 0) );
+      }
+
+      long long bytes() const {
+        return 2*arg.threads.x*( ( goes_forward(arg.sig) ? 2*arg.outA.Bytes() : 0 ) +
+                               (arg.p_mu ? arg.pMu.Bytes() : 0) +
+                               (arg.q_mu ? arg.qMu.Bytes() : 0) +
+                               ( ( goes_forward(arg.sig) || arg.q_mu ) ? arg.qPrev.Bytes() : 0) +
+                               arg.p3.Bytes() + 3*arg.link.Bytes() + arg.oProd.Bytes() );
+      }
+
+    };
+
+    template <typename Arg> class MiddleFiveLinkForce : public TunableKernel3D {
+      Arg &arg;
+      const GaugeField &outA;
+      const GaugeField &outB;
+      const GaugeField &pMu;
+      const GaugeField &qMu;
+      const GaugeField &p3;
+      const GaugeField &link;
+      const HisqForceType type;
+      unsigned int minThreads() const { return arg.threads.x; }
+
+    public:
+      MiddleFiveLinkForce(Arg &arg, const GaugeField &link, int sig, int mu, HisqForceType type,
+                   const GaugeField &outA, const GaugeField &outB, const GaugeField &pMu,
+                   const GaugeField &qMu, const GaugeField &p3) :
+        TunableKernel3D(link, 2, 1),
+        arg(arg),
+        outA(outA),
+        outB(outB),
+        pMu(pMu),
+        qMu(qMu),
+        p3(p3),
+        link(link),
+        type(type)
+      {
+        arg.sig = sig;
+        arg.mu = mu;
+
+        char aux2[16];
+        strcat(aux, comm_dim_partitioned_string());
+        strcat(aux, ",threads=");
+        u32toa(aux2, arg.threads.x);
+        strcat(aux, aux2);
+        strcat(aux, ",sig=");
+        u32toa(aux2, arg.sig);
+        strcat(aux, aux2);
+        strcat(aux, ",mu=");
+        u32toa(aux2, arg.mu);
+        strcat(aux, aux2);
+        strcat(aux, ",q_prev=");
+        u32toa(aux2, arg.q_prev);
+        strcat(aux, aux2);
+        // no need to embed p_mu, q_mu because certain values are enforced in `apply`
+
+        apply(device::get_default_stream());
+      }
+
+      void apply(const qudaStream_t &stream)
+      {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        if (!arg.p_mu || !arg.q_mu) errorQuda("Expect p_mu=%d and q_mu=%d to both be true", arg.p_mu, arg.q_mu);
+        if (arg.q_prev) {
+          if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
+            launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 1, 1, true, true, true>(arg));
+          } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
+            launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 0, 1, true, true, true>(arg));
+          } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
+            launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 1, 0, true, true, true>(arg));
+          } else {
+            launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 0, 0, true, true, true>(arg));
+          }
+        } else {
+          if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
+            launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 1, 1, true, true, false>(arg));
+          } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
+            launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 0, 1, true, true, false>(arg));
+          } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
+            launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 1, 0, true, true, false>(arg));
+          } else {
+            launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 0, 0, true, true, false>(arg));
           }
         }
       }
@@ -350,13 +456,13 @@ namespace quda {
         if (arg.p_mu || arg.q_mu || !arg.q_prev)
           errorQuda("Expect p_mu=%d and q_mu=%d to both be false and q_prev=%d true", arg.p_mu, arg.q_mu, arg.q_prev);
         if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
-          launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 1, 1, false, false, true>(arg));
+          launch<LepageMiddleLink>(tp, stream, FatLinkParam<Arg, 1, 1, false, false, true>(arg));
         } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
-          launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 0, 1, false, false, true>(arg));
+          launch<LepageMiddleLink>(tp, stream, FatLinkParam<Arg, 0, 1, false, false, true>(arg));
         } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
-          launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 1, 0, false, false, true>(arg));
+          launch<LepageMiddleLink>(tp, stream, FatLinkParam<Arg, 1, 0, false, false, true>(arg));
         } else {
-          launch<MiddleLink>(tp, stream, FatLinkParam<Arg, 0, 0, false, false, true>(arg));
+          launch<LepageMiddleLink>(tp, stream, FatLinkParam<Arg, 0, 0, false, false, true>(arg));
         }
       }
 
@@ -486,16 +592,16 @@ namespace quda {
 
             //3-link
             //Kernel A: middle link
-            MiddleLinkArg<Float, nColor, recon> middleLinkArg(newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt, 2, FORCE_MIDDLE_LINK);
-            MiddleLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, FORCE_MIDDLE_LINK, newOprod, newOprod, Pmu, P3, Qmu);
+            MiddleThreeLinkArg<Float, nColor, recon> middleThreeLinkArg(newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt, 2, FORCE_MIDDLE_LINK);
+            MiddleThreeLinkForce<decltype(middleThreeLinkArg)> middleThreeLink(middleThreeLinkArg, link, sig, mu, FORCE_MIDDLE_LINK, newOprod, newOprod, Pmu, P3, Qmu);
 
             for (int nu=0; nu < 8; nu++) {
               if (nu == sig || nu == opp_dir(sig) || nu == mu || nu == opp_dir(mu)) continue;
 
               //5-link: middle link
               //Kernel B
-              MiddleLinkArg<Float, nColor, recon> middleLinkArg(newOprod, Pnumu, P5, Qnumu, Pmu, Qmu, link, FiveSt, 1, FORCE_MIDDLE_LINK);
-              MiddleLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, nu, FORCE_MIDDLE_LINK, newOprod, newOprod, Pnumu, P5, Qnumu);
+              MiddleFiveLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, Pnumu, P5, Qnumu, Pmu, Qmu, link, FiveSt, 1, FORCE_MIDDLE_LINK);
+              MiddleFiveLinkForce<decltype(middleFiveLinkArg)> middleFiveLink(middleFiveLinkArg, link, sig, nu, FORCE_MIDDLE_LINK, newOprod, newOprod, Pnumu, P5, Qnumu);
 
               for (int rho = 0; rho < 8; rho++) {
                 if (rho == sig || rho == opp_dir(sig) || rho == mu || rho == opp_dir(mu) || rho == nu || rho == opp_dir(nu)) continue;
