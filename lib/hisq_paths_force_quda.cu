@@ -13,15 +13,15 @@ namespace quda {
 
     template <typename Arg> class OneLinkForce : public TunableKernel3D {
       Arg &arg;
-      const GaugeField &outA;
+      const GaugeField &force;
       const GaugeField &link;
       unsigned int minThreads() const { return arg.threads.x; }
 
     public:
-      OneLinkForce(Arg &arg, const GaugeField &link, const GaugeField &outA) :
+      OneLinkForce(Arg &arg, const GaugeField &link, const GaugeField &force) :
         TunableKernel3D(link, 2, 4),
         arg(arg),
-        outA(outA),
+        force(force),
         link(link)
       {
         char aux2[16];
@@ -39,12 +39,12 @@ namespace quda {
         launch<OneLinkTerm>(tp, stream, arg);
       }
 
-      void preTune() { outA.backup(); }
-      void postTune() { outA.restore(); }
+      void preTune() { force.backup(); }
+      void postTune() { force.restore(); }
 
       long long flops() const { return 2*4*arg.threads.x*36ll; }
 
-      long long bytes() const { return 2*4*arg.threads.x*( arg.oProd.Bytes() + 2*arg.outA.Bytes() ); }
+      long long bytes() const { return 2*4*arg.threads.x*( arg.oProd.Bytes() + 2*arg.force.Bytes() ); }
     };
 
     template <typename Arg> class MiddleThreeLinkForce : public TunableKernel3D {
@@ -582,7 +582,6 @@ namespace quda {
 
         {
           OneLinkArg<real, nColor, recon> arg(newOprod, oprod, link, OneLink);
-          arg.threads.z = 4;
           OneLinkForce<decltype(arg)> oneLink(arg, link, newOprod);
         }
 

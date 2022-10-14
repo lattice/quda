@@ -127,13 +127,15 @@ namespace quda {
       static constexpr int nColor = nColor_;
       using Gauge = typename gauge_mapper<real, recon>::type;
 
-      Gauge outA;
+      Gauge force;
 
       const Gauge oProd;
       const real coeff;
 
       OneLinkArg(GaugeField &force, const GaugeField &oProd, const GaugeField &link, real coeff)
-        : BaseForceArg(link, 0), outA(force), oProd(oProd), coeff(coeff) { }
+        : BaseForceArg(link, 0), force(force), oProd(oProd), coeff(coeff) {
+          this->threads.z = 4;
+        }
 
     };
 
@@ -153,9 +155,9 @@ namespace quda {
         int e_cb = linkIndex(x,arg.E);
 
         Link w = arg.oProd(sig, e_cb, parity);
-        Link force = arg.outA(sig, e_cb, parity);
+        Link force = arg.force(sig, e_cb, parity);
         force += arg.coeff * w;
-        arg.outA(sig, e_cb, parity) = force;
+        arg.force(sig, e_cb, parity) = force;
       }
     };
 
