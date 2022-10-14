@@ -415,39 +415,27 @@ namespace quda {
      * Generally we need
      * READ
      *    3 LINKS:         ab_link,     bc_link,    ad_link
-     *    3 COLOR MATRIX:  newOprod_at_A, oprod_at_C,  Qprod_at_D
+     *    3 COLOR MATRIX:  newOprod_at_A, Pmu_at_C,  Qmu_at_D
      * WRITE
-     *    4 COLOR MATRIX:  newOprod_at_A, P3_at_A, Pmu_at_B, Qmu_at_A
+     *    4 COLOR MATRIX:  newOprod_at_A, P3_at_A, Pnumu_at_B, Qnumu_at_A
      *
      * Three call variations:
-     *   1. when Qprev == NULL:   Qprod_at_D does not exist and is not read in
      *   2. full read/write
-     *   3. when Pmu/Qmu == NULL,   Pmu_at_B and Qmu_at_A are not written out
      *
      *   In all three above case, if the direction sig is negative, newOprod_at_A is
      *   not read in or written out.
      *
      * Therefore the data traffic, in two-number pair (num_of_link, num_of_color_matrix)
-     *   Call 1:  (called 48 times, half positive sig, half negative sig)
-     *             if (sig is positive):    (3, 6)
-     *             else               :     (3, 4)
      *   Call 2:  (called 192 time, half positive sig, half negative sig)
      *             if (sig is positive):    (3, 7)
      *             else               :     (3, 5)
-     *   Call 3:  (called 48 times, half positive sig, half negative sig)
-     *             if (sig is positive):    (3, 5)
-     *             else               :     (3, 2) no need to loadQprod_at_D in this case
      *
-     * note: oprod_at_C could actually be read in from D when it is the fresh outer product
-     *       and we call it oprod_at_C to simply naming. This does not affect our data traffic analysis
+     * note: Pmu_at_C could actually be read in from D when it is the fresh outer product
+     *       and we call it Pmu_at_C to simply naming. This does not affect our data traffic analysis
      *
      * Flop count, in two-number pair (matrix_multi, matrix_add)
-     *   call 1:     if (sig is positive)  (3, 1)
-     *               else                  (2, 0)
      *   call 2:     if (sig is positive)  (4, 1)
      *               else                  (3, 0)
-     *   call 3:     if (sig is positive)  (4, 1)
-     *   (Lepage)    else                  (2, 0)
      *
      ****************************************************************************/
     template <typename store_t, int nColor_, QudaReconstructType recon>
@@ -457,28 +445,21 @@ namespace quda {
       static constexpr int nColor = nColor_;
       using Gauge = typename gauge_mapper<real, recon>::type;
 
-      Gauge outA;
-      Gauge outB;
-      Gauge pMu;
-      Gauge p3;
-      Gauge qMu;
+      Gauge force;
+      Gauge pNuMu;
+      Gauge p5;
+      Gauge qNuMu;
 
-      const Gauge oProd;
-      const Gauge qProd;
-      const Gauge qPrev;
+      const Gauge pMu;
+      const Gauge qMu;
       const real coeff;
-      const real accumu_coeff;
 
-      const bool p_mu;
-      const bool q_mu;
-      const bool q_prev;
-
-      MiddleFiveLinkArg(GaugeField &newOprod, GaugeField &pMu, GaugeField &P3, GaugeField &qMu,
-                 const GaugeField &oProd, const GaugeField &qPrev, const GaugeField &link,
-                 real coeff, int overlap, HisqForceType type)
-        : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod), pMu(pMu), p3(P3), qMu(qMu),
-        oProd(oProd), qProd(oProd), qPrev(qPrev), coeff(coeff), accumu_coeff(0), p_mu(true), q_mu(true), q_prev(true)
-      { if (type != FORCE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_MIDDLE_LINK"); }
+      MiddleFiveLinkArg(GaugeField &force, GaugeField &pNuMu, GaugeField &P5, GaugeField &qNuMu,
+                 const GaugeField &pMu, const GaugeField &qMu, const GaugeField &link,
+                 real coeff, int overlap)
+        : BaseForceArg(link, overlap), force(force), pNuMu(pNuMu), p5(P5), qNuMu(qNuMu),
+        pMu(pMu), qMu(qMu), coeff(coeff)
+      { }
 
     };
 
@@ -489,9 +470,6 @@ namespace quda {
       const Arg &arg;
       static constexpr int mu_positive = Param::mu_positive;
       static constexpr int sig_positive = Param::sig_positive;
-      static constexpr bool pMu = Param::pMu;
-      static constexpr bool qMu = Param::qMu;
-      static constexpr bool qPrev = Param::qPrev;
 
       constexpr MiddleFiveLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
@@ -533,40 +511,27 @@ namespace quda {
         // load the link variable connecting b and c
         Link Ubc = arg.link(mymu, bc_link_nbr_idx, mu_positive^(1-parity));
 
-        Link Oy;
-        if (!qPrev) {
-          Oy = arg.oProd(posDir(arg.sig), sig_positive ? point_d : point_c, sig_positive^parity);
-          if (!sig_positive) Oy = conj(Oy);
-        } else { // QprevOdd != NULL
-          Oy = arg.oProd(0, point_c, parity);
-        }
+        Link Oy = arg.pMu(0, point_c, parity);
 
         Link Ow = !mu_positive ? Ubc*Oy : conj(Ubc)*Oy;
 
-        if (pMu) arg.pMu(0, point_b, 1-parity) = Ow;
+        arg.pNuMu(0, point_b, 1-parity) = Ow;
 
-        arg.p3(0, e_cb, parity) = sig_positive ? Uab*Ow : conj(Uab)*Ow;
+        arg.p5(0, e_cb, parity) = sig_positive ? Uab*Ow : conj(Uab)*Ow;
 
         Link Uad = arg.link(mymu, ad_link_nbr_idx, mu_positive^parity);
         if (!mu_positive)  Uad = conj(Uad);
 
-        if (!qPrev) {
-          if (sig_positive) Oy = Ow*Uad;
-          if ( qMu ) arg.qMu(0, e_cb, parity) = Uad;
-        } else {
-          Link Ox;
-          if ( qMu || sig_positive ) {
-            Oy = arg.qPrev(0, point_d, 1-parity);
-            Ox = Oy*Uad;
-          }
-          if ( qMu ) arg.qMu(0, e_cb, parity) = Ox;
-          if (sig_positive) Oy = Ow*Ox;
-        }
+        Link Ox;
+        Oy = arg.qMu(0, point_d, 1-parity);
+        Ox = Oy*Uad;
+        arg.qNuMu(0, e_cb, parity) = Ox;
+        if constexpr (sig_positive) Oy = Ow*Ox;
 
-        if (sig_positive) {
-          Link oprod = arg.outA(arg.sig, e_cb, parity);
+        if constexpr (sig_positive) {
+          Link oprod = arg.force(arg.sig, e_cb, parity);
           oprod += arg.coeff*Oy;
-          arg.outA(arg.sig, e_cb, parity) = oprod;
+          arg.force(arg.sig, e_cb, parity) = oprod;
         }
 
       }
