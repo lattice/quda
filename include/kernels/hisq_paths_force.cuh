@@ -128,26 +128,12 @@ namespace quda {
       using Gauge = typename gauge_mapper<real, recon>::type;
 
       Gauge outA;
-      Gauge outB;
-      Gauge pMu;
-      Gauge p3;
-      Gauge qMu;
 
       const Gauge oProd;
-      const Gauge qProd;
-      const Gauge qPrev;
       const real coeff;
-      const real accumu_coeff;
 
-      const bool p_mu;
-      const bool q_mu;
-      const bool q_prev;
-
-      OneLinkArg(GaugeField &force, const GaugeField &oProd, const GaugeField &link, real coeff, HisqForceType type)
-        : BaseForceArg(link, 0), outA(force), outB(force), pMu(oProd), p3(oProd), qMu(oProd),
-        oProd(oProd), qProd(oProd), qPrev(oProd), coeff(coeff), accumu_coeff(0),
-        p_mu(false), q_mu(false), q_prev(false)
-      { if (type != FORCE_ONE_LINK) errorQuda("This constructor is for FORCE_ONE_LINK"); }
+      OneLinkArg(GaugeField &force, const GaugeField &oProd, const GaugeField &link, real coeff)
+        : BaseForceArg(link, 0), outA(force), oProd(oProd), coeff(coeff) { }
 
     };
 

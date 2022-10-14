@@ -15,21 +15,15 @@ namespace quda {
       Arg &arg;
       const GaugeField &outA;
       const GaugeField &link;
-      const HisqForceType type;
       unsigned int minThreads() const { return arg.threads.x; }
 
     public:
-      OneLinkForce(Arg &arg, const GaugeField &link, int sig, int mu, HisqForceType type,
-                   const GaugeField &outA) :
+      OneLinkForce(Arg &arg, const GaugeField &link, const GaugeField &outA) :
         TunableKernel3D(link, 2, 4),
         arg(arg),
         outA(outA),
-        link(link),
-        type(type)
+        link(link)
       {
-        arg.sig = sig;
-        arg.mu = mu;
-
         char aux2[16];
         strcat(aux, comm_dim_partitioned_string());
         strcat(aux, ",threads=");
@@ -481,9 +475,9 @@ namespace quda {
         real mLepage  = -Lepage;
 
         {
-          OneLinkArg<real, nColor, recon> arg(newOprod, oprod, link, OneLink, FORCE_ONE_LINK);
+          OneLinkArg<real, nColor, recon> arg(newOprod, oprod, link, OneLink);
           arg.threads.z = 4;
-          OneLinkForce<decltype(arg)> oneLink(arg, link, 0, 0, FORCE_ONE_LINK, newOprod);
+          OneLinkForce<decltype(arg)> oneLink(arg, link, newOprod);
         }
 
         for (int sig=0; sig<8; sig++) {
