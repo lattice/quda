@@ -207,28 +207,19 @@ namespace quda {
 
     template <typename Arg> class AllLinkForce : public TunableKernel3D {
       Arg &arg;
-      const GaugeField &outA;
-      const GaugeField &outB;
-      const GaugeField &pMu;
-      const GaugeField &qMu;
-      const GaugeField &p3;
+      const GaugeField &force;
+      const GaugeField &shortP;
       const GaugeField &link;
-      const HisqForceType type;
       unsigned int minThreads() const { return arg.threads.x; }
 
     public:
-      AllLinkForce(Arg &arg, const GaugeField &link, int sig, int mu, HisqForceType type,
-                   const GaugeField &outA, const GaugeField &outB, const GaugeField &pMu,
-                   const GaugeField &qMu, const GaugeField &p3) :
+      AllLinkForce(Arg &arg, const GaugeField &link, int sig, int mu,
+                   const GaugeField &force, const GaugeField &shortP) :
         TunableKernel3D(link, 2, 1),
         arg(arg),
-        outA(outA),
-        outB(outB),
-        pMu(pMu),
-        qMu(qMu),
-        p3(p3),
-        link(link),
-        type(type)
+        force(force),
+        shortP(shortP),
+        link(link)
       {
         arg.sig = sig;
         arg.mu = mu;
@@ -262,13 +253,13 @@ namespace quda {
       }
 
       void preTune() {
-        outA.backup();
-        outB.backup();
+        force.backup();
+        shortP.backup();
       }
 
       void postTune() {
-        outA.restore();
-        outB.restore();
+        force.restore();
+        shortP.restore();
       }
 
       long long flops() const {
@@ -276,8 +267,8 @@ namespace quda {
       }
 
       long long bytes() const {
-        return 2*arg.threads.x*( (goes_forward(arg.sig) ? 4 : 2)*arg.outA.Bytes() + 3*arg.link.Bytes()
-                               + arg.oProd.Bytes() + arg.qPrev.Bytes() + 2*arg.outB.Bytes());
+        return 2*arg.threads.x*( (goes_forward(arg.sig) ? 4 : 2)*arg.force.Bytes() + 3*arg.link.Bytes()
+                               + arg.oProd.Bytes() + arg.p5.Bytes() + 2*arg.shortP.Bytes());
       }
     };
 
@@ -552,9 +543,8 @@ namespace quda {
                 if (rho == sig || rho == opp_dir(sig) || rho == mu || rho == opp_dir(mu) || rho == nu || rho == opp_dir(nu)) continue;
 
                 //7-link: middle link and side link
-                AllLinkArg<Float, nColor, recon> arg(newOprod, P5, Pnumu, Qnumu, link, SevenSt, FiveSt != 0 ? SevenSt/FiveSt : 0, 1, FORCE_ALL_LINK, true);
-                AllLinkForce<decltype(arg)> all(arg, link, sig, rho, FORCE_ALL_LINK, newOprod, P5, P5, P5, Qnumu);
-
+                AllLinkArg<Float, nColor, recon> arg(newOprod, P5, Pnumu, Qnumu, link, SevenSt, FiveSt != 0 ? SevenSt/FiveSt : 0, 1);
+                AllLinkForce<decltype(arg)> all(arg, link, sig, rho, newOprod, P5);
               }//rho
 
               //5-link: side link

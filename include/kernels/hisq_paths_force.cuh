@@ -191,28 +191,20 @@ namespace quda {
       static constexpr int nColor = nColor_;
       using Gauge = typename gauge_mapper<real, recon>::type;
 
-      Gauge outA;
-      Gauge outB;
-      Gauge pMu;
-      Gauge p3;
-      Gauge qMu;
+      Gauge force;
+      Gauge shortP;
 
       const Gauge oProd;
-      const Gauge qProd;
-      const Gauge qPrev;
+      const Gauge p5;
       const real coeff;
       const real accumu_coeff;
 
-      const bool p_mu;
-      const bool q_mu;
-      const bool q_prev;
-
-      AllLinkArg(GaugeField &newOprod, GaugeField &shortP, const GaugeField &oProd, const GaugeField &qPrev,
-                 const GaugeField &link, real coeff, real accumu_coeff, int overlap, HisqForceType type, bool)
-        : BaseForceArg(link, overlap), outA(newOprod), outB(shortP), pMu(shortP),
-          p3(shortP), qMu(qPrev), oProd(oProd), qProd(qPrev), qPrev(qPrev),
-          coeff(coeff), accumu_coeff(accumu_coeff), p_mu(false), q_mu(false), q_prev(false)
-      { if (type != FORCE_ALL_LINK) errorQuda("This constructor is for FORCE_ALL_LINK"); }
+      AllLinkArg(GaugeField &force, GaugeField &shortP, const GaugeField &oProd, const GaugeField &P5,
+                 const GaugeField &link, real coeff, real accumu_coeff, int overlap)
+        : BaseForceArg(link, overlap), force(force), shortP(shortP),
+          oProd(oProd), p5(P5),
+          coeff(coeff), accumu_coeff(accumu_coeff)
+      { }
 
     };
 
@@ -262,26 +254,26 @@ namespace quda {
         Link Uab = arg.link(posDir(arg.sig), ab_link_nbr_idx, sig_positive^(1-parity));
         Link Uad = arg.link(mu, mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
         Link Ubc = arg.link(mu, mu_positive ? point_c : point_b, mu_positive ? parity : 1-parity);
-        Link Ox = arg.qPrev(0, point_d, 1-parity);
+        Link Ox = arg.p5(0, point_d, 1-parity);
         Link Oy = arg.oProd(0, point_c, parity);
         Link Oz = mu_positive ? conj(Ubc)*Oy : Ubc*Oy;
 
         if (sig_positive) {
-          Link force = arg.outA(arg.sig, e_cb, parity);
+          Link force = arg.force(arg.sig, e_cb, parity);
           force += Sign(parity)*mycoeff*Oz*Ox* (mu_positive ? Uad : conj(Uad));
-          arg.outA(arg.sig, e_cb, parity) = force;
+          arg.force(arg.sig, e_cb, parity) = force;
           Oy = Uab*Oz;
         } else {
           Oy = conj(Uab)*Oz;
         }
 
-        Link force = arg.outA(mu, mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
+        Link force = arg.force(mu, mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
         force += Sign(mu_positive ? 1-parity : parity)*mycoeff* (mu_positive ? Oy*Ox : conj(Ox)*conj(Oy));
-        arg.outA(mu, mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity) = force;
+        arg.force(mu, mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity) = force;
 
-        Link shortP = arg.outB(0, point_d, 1-parity);
-        shortP += arg.accumu_coeff* (mu_positive ? Uad : conj(Uad)) *Oy;
-        arg.outB(0, point_d, 1-parity) = shortP;
+        Link shortP = arg.shortP(0, point_d, 1-parity);
+        shortP += arg.accumu_coeff * (mu_positive ? Uad : conj(Uad)) *Oy;
+        arg.shortP(0, point_d, 1-parity) = shortP;
       }
     };
 
