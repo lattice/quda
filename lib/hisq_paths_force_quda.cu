@@ -422,30 +422,21 @@ namespace quda {
     };
     
 
-    template <typename Arg> class SideLinkShortForce : public TunableKernel3D {
+    template <typename Arg> class SideLinkShortForce : public TunableKernel2D {
       Arg &arg;
-      const GaugeField &outA;
-      const GaugeField &outB;
-      const GaugeField &pMu;
-      const GaugeField &qMu;
+      const GaugeField &force;
       const GaugeField &p3;
       const GaugeField &link;
-      const HisqForceType type;
       unsigned int minThreads() const { return arg.threads.x; }
 
     public:
-      SideLinkShortForce(Arg &arg, const GaugeField &link, int sig, int mu, HisqForceType type,
-                   const GaugeField &outA, const GaugeField &outB, const GaugeField &pMu,
-                   const GaugeField &qMu, const GaugeField &p3) :
-        TunableKernel3D(link, 2, 1),
+      SideLinkShortForce(Arg &arg, const GaugeField &link, int sig, int mu,
+                   const GaugeField &force, const GaugeField &p3) :
+        TunableKernel2D(link, 2),
         arg(arg),
-        outA(outA),
-        outB(outB),
-        pMu(pMu),
-        qMu(qMu),
+        force(force),
         p3(p3),
-        link(link),
-        type(type)
+        link(link)
       {
         arg.sig = sig;
         arg.mu = mu;
@@ -473,11 +464,11 @@ namespace quda {
       }
 
       void preTune() {
-        outA.backup();
+        force.backup();
       }
 
       void postTune() {
-        outA.restore();
+        force.restore();
       }
 
       long long flops() const {
@@ -485,7 +476,7 @@ namespace quda {
       }
 
       long long bytes() const {
-        return 2*arg.threads.x*( 2*arg.outA.Bytes() + arg.p3.Bytes() );
+        return 2*arg.threads.x*( 2*arg.force.Bytes() + arg.p3.Bytes() );
       }
     };
 
@@ -554,8 +545,8 @@ namespace quda {
             } // Lepage != 0.0
 
             // 3-link side link
-            SideLinkShortArg<Float, nColor, recon> arg(newOprod, P3, link, ThreeSt, 1, FORCE_SIDE_LINK_SHORT);
-            SideLinkShortForce<decltype(arg)> side(arg, P3, sig, mu, FORCE_SIDE_LINK_SHORT, newOprod, newOprod, P3, P3, P3);
+            SideLinkShortArg<Float, nColor, recon> arg(newOprod, P3, link, ThreeSt, 1);
+            SideLinkShortForce<decltype(arg)> side(arg, P3, sig, mu, newOprod, P3);
           }//mu
         }//sig
       }

@@ -813,28 +813,15 @@ namespace quda {
       static constexpr int nColor = nColor_;
       using Gauge = typename gauge_mapper<real, recon>::type;
 
-      Gauge outA;
-      Gauge outB;
-      Gauge pMu;
+      Gauge force;
       Gauge p3;
-      Gauge qMu;
 
-      const Gauge oProd;
-      const Gauge qProd;
-      const Gauge qPrev;
       const real coeff;
-      const real accumu_coeff;
 
-      const bool p_mu;
-      const bool q_mu;
-      const bool q_prev;
-
-      SideLinkShortArg(GaugeField &newOprod, GaugeField &P3, const GaugeField &link,
-                 real coeff, int overlap, HisqForceType type)
-        : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod),
-        pMu(P3), p3(P3), qMu(P3), oProd(P3), qProd(P3), qPrev(P3), coeff(coeff), accumu_coeff(0.0),
-        p_mu(false), q_mu(false), q_prev(false)
-      { if (type != FORCE_SIDE_LINK_SHORT) errorQuda("This constructor is for FORCE_SIDE_LINK_SHORT"); }
+      SideLinkShortArg(GaugeField &force, GaugeField &P3, const GaugeField &link,
+                 real coeff, int overlap)
+        : BaseForceArg(link, overlap), force(force), p3(P3), coeff(coeff)
+      {  }
 
     };
 
@@ -848,7 +835,7 @@ namespace quda {
       constexpr SideLinkShort(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ void operator()(int x_cb, int parity, int)
+      __device__ __host__ void operator()(int x_cb, int parity)
       {
         int x[4];
         getCoords(x, x_cb, arg.D, parity);
@@ -874,9 +861,9 @@ namespace quda {
         auto mycoeff = CoeffSign(goes_forward(arg.sig),parity)*CoeffSign(goes_forward(arg.mu),parity)*arg.coeff;
 
         Link Oy = arg.p3(0, e_cb, parity);
-        Link oprod = arg.outA(posDir(arg.mu), point_d, parity_);
+        Link oprod = arg.force(posDir(arg.mu), point_d, parity_);
         oprod += mu_positive ? mycoeff * Oy : mycoeff * conj(Oy);
-        arg.outA(posDir(arg.mu), point_d, parity_) = oprod;
+        arg.force(posDir(arg.mu), point_d, parity_) = oprod;
       }
     };
 
