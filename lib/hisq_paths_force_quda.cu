@@ -136,7 +136,7 @@ namespace quda {
       unsigned int minThreads() const { return arg.threads.x; }
 
     public:
-      MiddleFiveLinkForce(Arg &arg, const GaugeField &link, int sig, int mu,
+      MiddleFiveLinkForce(Arg &arg, const GaugeField &link, int sig, int nu,
                    const GaugeField &force, const GaugeField &pNuMu,
                    const GaugeField &p5, const GaugeField &qNuMu) :
         TunableKernel2D(link, 2),
@@ -148,7 +148,7 @@ namespace quda {
         link(link)
       {
         arg.sig = sig;
-        arg.mu = mu;
+        arg.nu = nu;
 
         char aux2[16];
         strcat(aux, comm_dim_partitioned_string());
@@ -158,8 +158,8 @@ namespace quda {
         strcat(aux, ",sig=");
         u32toa(aux2, arg.sig);
         strcat(aux, aux2);
-        strcat(aux, ",mu=");
-        u32toa(aux2, arg.mu);
+        strcat(aux, ",nu=");
+        u32toa(aux2, arg.nu);
         strcat(aux, aux2);
 
         apply(device::get_default_stream());
@@ -168,11 +168,11 @@ namespace quda {
       void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
+        if (goes_forward(arg.sig) && goes_forward(arg.nu)) {
           launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 1, 1>(arg));
-        } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
+        } else if (goes_forward(arg.sig) && goes_backward(arg.nu)) {
           launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 0, 1>(arg));
-        } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
+        } else if (goes_backward(arg.sig) && goes_forward(arg.nu)) {
           launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 1, 0>(arg));
         } else {
           launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 0, 0>(arg));
@@ -213,7 +213,7 @@ namespace quda {
       unsigned int minThreads() const { return arg.threads.x; }
 
     public:
-      AllLinkForce(Arg &arg, const GaugeField &link, int sig, int mu,
+      AllLinkForce(Arg &arg, const GaugeField &link, int sig, int rho,
                    const GaugeField &force, const GaugeField &shortP) :
         TunableKernel2D(link, 2),
         arg(arg),
@@ -222,18 +222,16 @@ namespace quda {
         link(link)
       {
         arg.sig = sig;
-        arg.mu = mu;
+        arg.rho = rho;
 
         char aux2[16];
         strcat(aux, comm_dim_partitioned_string());
         strcat(aux, ",threads=");
         u32toa(aux2, arg.threads.x);
         strcat(aux, aux2);
-        strcat(aux, ",mu=");
-        u32toa(aux2, arg.mu);
+        strcat(aux, ",rho=");
+        u32toa(aux2, arg.rho);
         strcat(aux, aux2);
-        // no sig dependence needed for side link
-        // does the all link force also need sigma dependence??
 
         apply(device::get_default_stream());
       }
@@ -241,11 +239,11 @@ namespace quda {
       void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
+        if (goes_forward(arg.sig) && goes_forward(arg.rho)) {
           launch<AllLink>(tp, stream, FatLinkParam<Arg, 1, 1>(arg));
-        } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
+        } else if (goes_forward(arg.sig) && goes_backward(arg.rho)) {
           launch<AllLink>(tp, stream, FatLinkParam<Arg, 0, 1>(arg));
-        } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
+        } else if (goes_backward(arg.sig) && goes_forward(arg.rho)) {
           launch<AllLink>(tp, stream, FatLinkParam<Arg, 1, 0>(arg));
         } else {
           launch<AllLink>(tp, stream, FatLinkParam<Arg, 0, 0>(arg));
@@ -280,7 +278,7 @@ namespace quda {
       unsigned int minThreads() const { return arg.threads.x; }
 
     public:
-      SideLinkForce(Arg &arg, const GaugeField &link, int sig, int mu,
+      SideLinkForce(Arg &arg, const GaugeField &link, int sig, int nu,
                    const GaugeField &force, const GaugeField &shortP) :
         TunableKernel2D(link, 2),
         arg(arg),
@@ -289,15 +287,15 @@ namespace quda {
         link(link)
       {
         arg.sig = sig;
-        arg.mu = mu;
+        arg.nu = nu;
 
         char aux2[16];
         strcat(aux, comm_dim_partitioned_string());
         strcat(aux, ",threads=");
         u32toa(aux2, arg.threads.x);
         strcat(aux, aux2);
-        strcat(aux, ",mu=");
-        u32toa(aux2, arg.mu);
+        strcat(aux, ",nu=");
+        u32toa(aux2, arg.nu);
         strcat(aux, aux2);
         // no sig dependence needed for side link
 
@@ -307,7 +305,7 @@ namespace quda {
       void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        if (goes_forward(arg.mu)) {
+        if (goes_forward(arg.nu)) {
           launch<SideLink>(tp, stream, FatLinkParam<Arg, 1>(arg));
         } else {
           launch<SideLink>(tp, stream, FatLinkParam<Arg, 0>(arg));

@@ -68,7 +68,11 @@ namespace quda {
       int border[4];
       int base_idx[4]; // the offset into the extended field
       int oddness_change;
+
+      // for readability, we explicitly set the different directions
       int mu;
+      int nu;
+      int rho;
       int sig;
 
       /**
@@ -78,7 +82,8 @@ namespace quda {
       BaseForceArg(const GaugeField &link, int overlap) :
         kernel_param(dim3(1, 2, 1)),
         link(link),
-        commDim{ comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3) }
+        commDim{ comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3) },
+        mu(-1), nu(-1), rho(-1), sig(-1)
       {
         for (int d=0; d<4; d++) {
           E[d] = link.X()[d];
@@ -93,10 +98,14 @@ namespace quda {
       }
     };
 
-    template <typename Arg_, int mu_positive_ = 0, int sig_positive_ = 0>
+    template <typename Arg_, int orthogonal_positive_ = 0, int sig_positive_ = 0>
     struct FatLinkParam : kernel_param<> {
-      static constexpr int mu_positive = mu_positive_;
+      // whether or not the "orthogonal" direction is forwards or backwards
+      static constexpr int orthogonal_positive = orthogonal_positive_;
+      // whether the base link direction is forwards or backwards
       static constexpr int sig_positive = sig_positive_;
+
+      // base argument structure
       using Arg = Arg_;
       Arg arg;
       FatLinkParam(Arg &arg) :
@@ -204,7 +213,7 @@ namespace quda {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       const Arg &arg;
-      static constexpr int mu_positive = Param::mu_positive;
+      static constexpr int mu_positive = Param::orthogonal_positive;
       static constexpr int sig_positive = Param::sig_positive;
 
       constexpr MiddleThreeLink(const Param &param) : arg(param.arg) {}
@@ -334,7 +343,7 @@ namespace quda {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       const Arg &arg;
-      static constexpr int mu_positive = Param::mu_positive;
+      static constexpr int nu_positive = Param::orthogonal_positive;
       static constexpr int sig_positive = Param::sig_positive;
 
       constexpr MiddleFiveLink(const Param &param) : arg(param.arg) {}
@@ -346,7 +355,7 @@ namespace quda {
         getCoords(x, x_cb, arg.D, parity);
 
         /*        A________B
-         *   mu   |        |
+         *   nu   |        |
          *       D|        |C
          *
          *    A is the current point (sid)
@@ -358,9 +367,9 @@ namespace quda {
         parity = parity ^ arg.oddness_change;
         int y[4] = {x[0], x[1], x[2], x[3]};
 
-        int mymu = posDir(arg.mu);
-        int point_d = updateCoordsIndex(y, arg.E, mymu, (mu_positive ? -1 : 1));
-        int ad_link_nbr_idx = mu_positive ? point_d : e_cb;
+        int mynu = posDir(arg.nu);
+        int point_d = updateCoordsIndex(y, arg.E, mynu, (nu_positive ? -1 : 1));
+        int ad_link_nbr_idx = nu_positive ? point_d : e_cb;
 
         int mysig = posDir(arg.sig);
         int point_c = updateCoordsIndex(y, arg.E, mysig, (sig_positive ? 1 : -1));
@@ -368,33 +377,32 @@ namespace quda {
         for (int d=0; d<4; d++) y[d] = x[d];
         int point_b = updateCoordsIndex(y, arg.E, mysig, (sig_positive ? 1 : -1));
 
-        int bc_link_nbr_idx = mu_positive ? point_c : point_b;
+        int bc_link_nbr_idx = nu_positive ? point_c : point_b;
         int ab_link_nbr_idx = sig_positive ? e_cb : point_b;
 
         // load the link variable connecting a and b
         Link Uab = arg.link(mysig, ab_link_nbr_idx, sig_positive^(1-parity));
 
         // load the link variable connecting b and c
-        Link Ubc = arg.link(mymu, bc_link_nbr_idx, mu_positive^(1-parity));
+        Link Ubc = arg.link(mynu, bc_link_nbr_idx, nu_positive^(1-parity));
 
         Link Oy = arg.pMu(0, point_c, parity);
 
-        Link Ow = !mu_positive ? Ubc*Oy : conj(Ubc)*Oy;
+        Link Ow = !nu_positive ? Ubc*Oy : conj(Ubc)*Oy;
 
         arg.pNuMu(0, point_b, 1-parity) = Ow;
 
         arg.p5(0, e_cb, parity) = sig_positive ? Uab*Ow : conj(Uab)*Ow;
 
-        Link Uad = arg.link(mymu, ad_link_nbr_idx, mu_positive^parity);
-        if (!mu_positive)  Uad = conj(Uad);
+        Link Uad = arg.link(mynu, ad_link_nbr_idx, nu_positive^parity);
+        if (!nu_positive)  Uad = conj(Uad);
 
-        Link Ox;
         Oy = arg.qMu(0, point_d, 1-parity);
-        Ox = Oy*Uad;
+        Link Ox = Oy*Uad;
         arg.qNuMu(0, e_cb, parity) = Ox;
-        if constexpr (sig_positive) Oy = Ow*Ox;
 
         if constexpr (sig_positive) {
+          Oy = Ow * Ox;
           Link oprod = arg.force(arg.sig, e_cb, parity);
           oprod += arg.coeff*Oy;
           arg.force(arg.sig, e_cb, parity) = oprod;
@@ -457,7 +465,7 @@ namespace quda {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       const Arg &arg;
-      static constexpr int mu_positive = Param::mu_positive;
+      static constexpr int rho_positive = Param::orthogonal_positive;
       static constexpr int sig_positive = Param::sig_positive;
 
       constexpr AllLink(const Param &param) : arg(param.arg) {}
@@ -482,41 +490,41 @@ namespace quda {
 
         /*            sig
          *         A________B
-         *      mu  |      |
+         *      rho |      |
          *        D |      |C
          *
          *   A is the current point (sid)
          *
          */
 
-        int mu = mu_positive ? arg.mu : opp_dir(arg.mu);
-        int dir = mu_positive ? -1 : 1;
+        int rho = rho_positive ? arg.rho : opp_dir(arg.rho);
+        int dir = rho_positive ? -1 : 1;
 
-        int point_d = updateCoordsIndex(y, arg.E, mu, dir);
+        int point_d = updateCoordsIndex(y, arg.E, rho, dir);
         int point_c = updateCoordsIndex(y, arg.E, mysig, (sig_positive ? 1 : -1));
 
         Link Uab = arg.link(posDir(arg.sig), ab_link_nbr_idx, sig_positive^(1-parity));
-        Link Uad = arg.link(mu, mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
-        Link Ubc = arg.link(mu, mu_positive ? point_c : point_b, mu_positive ? parity : 1-parity);
+        Link Uad = arg.link(rho, rho_positive ? point_d : e_cb, rho_positive ? 1-parity : parity);
+        Link Ubc = arg.link(rho, rho_positive ? point_c : point_b, rho_positive ? parity : 1-parity);
         Link Ox = arg.p5(0, point_d, 1-parity);
         Link Oy = arg.oProd(0, point_c, parity);
-        Link Oz = mu_positive ? conj(Ubc)*Oy : Ubc*Oy;
+        Link Oz = rho_positive ? conj(Ubc)*Oy : Ubc*Oy;
 
         if (sig_positive) {
           Link force = arg.force(arg.sig, e_cb, parity);
-          force += Sign(parity)*mycoeff*Oz*Ox* (mu_positive ? Uad : conj(Uad));
+          force += Sign(parity)*mycoeff*Oz*Ox* (rho_positive ? Uad : conj(Uad));
           arg.force(arg.sig, e_cb, parity) = force;
           Oy = Uab*Oz;
         } else {
           Oy = conj(Uab)*Oz;
         }
 
-        Link force = arg.force(mu, mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
-        force += Sign(mu_positive ? 1-parity : parity)*mycoeff* (mu_positive ? Oy*Ox : conj(Ox)*conj(Oy));
-        arg.force(mu, mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity) = force;
+        Link force = arg.force(rho, rho_positive ? point_d : e_cb, rho_positive ? 1-parity : parity);
+        force += Sign(rho_positive ? 1-parity : parity)*mycoeff* (rho_positive ? Oy*Ox : conj(Ox)*conj(Oy));
+        arg.force(rho, rho_positive ? point_d : e_cb, rho_positive ? 1-parity : parity) = force;
 
         Link shortP = arg.shortP(0, point_d, 1-parity);
-        shortP += arg.accumu_coeff * (mu_positive ? Uad : conj(Uad)) *Oy;
+        shortP += arg.accumu_coeff * (rho_positive ? Uad : conj(Uad)) *Oy;
         arg.shortP(0, point_d, 1-parity) = shortP;
       }
     };
@@ -578,7 +586,7 @@ namespace quda {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       const Arg &arg;
-      static constexpr int mu_positive = Param::mu_positive;
+      static constexpr int nu_positive = Param::orthogonal_positive;
 
       constexpr SideLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
@@ -595,40 +603,36 @@ namespace quda {
          *
          *             sig
          *          A________B
-         *           |       |   mu
+         *           |       |   nu
          *         D |       |C
          *
          *      A is the current point (x_cb)
          *
          */
 
-        int mymu = posDir(arg.mu);
+        int mynu = posDir(arg.nu);
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_d = updateCoordsIndex(y, arg.E, mymu, (mu_positive ? -1 : 1));
+        int point_d = updateCoordsIndex(y, arg.E, mynu, (nu_positive ? -1 : 1));
 
         Link Oy = arg.p3(0, e_cb, parity);
 
-        {
-          int ad_link_nbr_idx = mu_positive ? point_d : e_cb;
+        int ad_link_nbr_idx = nu_positive ? point_d : e_cb;
 
-          Link Uad = arg.link(mymu, ad_link_nbr_idx, mu_positive^parity);
-          Link Ow = mu_positive ? Uad*Oy : conj(Uad)*Oy;
+        Link Uad = arg.link(mynu, ad_link_nbr_idx, nu_positive^parity);
+        Link Ow = nu_positive ? Uad*Oy : conj(Uad)*Oy;
 
-          Link shortP = arg.shortP(0, point_d, 1-parity);
-          shortP += arg.accumu_coeff * Ow;
-          arg.shortP(0, point_d, 1-parity) = shortP;
-        }
+        Link shortP = arg.shortP(0, point_d, 1-parity);
+        shortP += arg.accumu_coeff * Ow;
+        arg.shortP(0, point_d, 1-parity) = shortP;
 
-        {
-          Link Ox = arg.qProd(0, point_d, 1-parity);
-          Link Ow = mu_positive ? Oy*Ox : conj(Ox)*conj(Oy);
+        Link Ox = arg.qProd(0, point_d, 1-parity);
+        Ow = nu_positive ? Oy*Ox : conj(Ox)*conj(Oy);
 
-          auto mycoeff = CoeffSign(goes_forward(arg.sig), parity)*CoeffSign(goes_forward(arg.mu),parity)*arg.coeff;
+        auto mycoeff = CoeffSign(goes_forward(arg.sig), parity)*CoeffSign(goes_forward(arg.nu),parity)*arg.coeff;
 
-          Link oprod = arg.force(mu_positive ? arg.mu : opp_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
-          oprod += mycoeff * Ow;
-          arg.force(mu_positive ? arg.mu : opp_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity) = oprod;
-        }
+        Link oprod = arg.force(nu_positive ? arg.nu : opp_dir(arg.nu), nu_positive ? point_d : e_cb, nu_positive ? 1-parity : parity);
+        oprod += mycoeff * Ow;
+        arg.force(nu_positive ? arg.nu : opp_dir(arg.nu), nu_positive ? point_d : e_cb, nu_positive ? 1-parity : parity) = oprod;
       }
     };
 
@@ -691,7 +695,7 @@ namespace quda {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       const Arg &arg;
-      static constexpr int mu_positive = Param::mu_positive;
+      static constexpr int mu_positive = Param::orthogonal_positive;
       static constexpr int sig_positive = Param::sig_positive;
 
       constexpr LepageMiddleLink(const Param &param) : arg(param.arg) {}
@@ -813,7 +817,7 @@ namespace quda {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       const Arg &arg;
-      static constexpr int mu_positive = Param::mu_positive;
+      static constexpr int mu_positive = Param::orthogonal_positive;
 
       constexpr LepageSideLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
@@ -843,27 +847,23 @@ namespace quda {
 
         Link Oy = arg.p3(0, e_cb, parity);
 
-        {
-          int ad_link_nbr_idx = mu_positive ? point_d : e_cb;
+        int ad_link_nbr_idx = mu_positive ? point_d : e_cb;
 
-          Link Uad = arg.link(mymu, ad_link_nbr_idx, mu_positive^parity);
-          Link Ow = mu_positive ? Uad*Oy : conj(Uad)*Oy;
+        Link Uad = arg.link(mymu, ad_link_nbr_idx, mu_positive^parity);
+        Link Ow = mu_positive ? Uad*Oy : conj(Uad)*Oy;
 
-          Link shortP = arg.shortP(0, point_d, 1-parity);
-          shortP += arg.accumu_coeff * Ow;
-          arg.shortP(0, point_d, 1-parity) = shortP;
-        }
+        Link shortP = arg.shortP(0, point_d, 1-parity);
+        shortP += arg.accumu_coeff * Ow;
+        arg.shortP(0, point_d, 1-parity) = shortP;
 
-        {
-          Link Ox = arg.qProd(0, point_d, 1-parity);
-          Link Ow = mu_positive ? Oy*Ox : conj(Ox)*conj(Oy);
+        Link Ox = arg.qProd(0, point_d, 1-parity);
+        Ow = mu_positive ? Oy*Ox : conj(Ox)*conj(Oy);
 
-          auto mycoeff = CoeffSign(goes_forward(arg.sig), parity)*CoeffSign(goes_forward(arg.mu),parity)*arg.coeff;
+        auto mycoeff = CoeffSign(goes_forward(arg.sig), parity)*CoeffSign(goes_forward(arg.mu),parity)*arg.coeff;
 
-          Link oprod = arg.force(mu_positive ? arg.mu : opp_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
-          oprod += mycoeff * Ow;
-          arg.force(mu_positive ? arg.mu : opp_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity) = oprod;
-        }
+        Link oprod = arg.force(mu_positive ? arg.mu : opp_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
+        oprod += mycoeff * Ow;
+        arg.force(mu_positive ? arg.mu : opp_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity) = oprod;
       }
     };
 
@@ -896,7 +896,7 @@ namespace quda {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       const Arg &arg;
-      static constexpr int mu_positive = Param::mu_positive;
+      static constexpr int mu_positive = Param::orthogonal_positive;
 
       constexpr SideLinkShort(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
