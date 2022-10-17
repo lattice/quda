@@ -1083,12 +1083,6 @@ namespace quda
     packGhost(nFace, (QudaParity)parity, dagger, stream, location, location_label, spin_project, a, b, c, shmem);
   }
 
-  // FIXME reconcile with above
-  void ColorSpinorField::packGhostHost(void **ghost, const QudaParity parity, const int nFace, const int dagger) const
-  {
-    genericPackGhost(ghost, *this, parity, nFace, dagger);
-  }
-
   void ColorSpinorField::sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir, const qudaStream_t &stream)
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
@@ -1294,8 +1288,7 @@ namespace quda
         ghost_buf[2 * i + 1] = fwdGhostFaceBuffer[i];
       }
 
-      packGhostHost(sendbuf, parity, nFace, dagger);
-
+      genericPackGhost(sendbuf, *this, parity, nFace, dagger);
       exchange(ghost_buf.data, sendbuf, nFace);
 
       host_free(sendbuf);

@@ -531,9 +531,6 @@ namespace quda
                    MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label, bool spin_project,
                    double a = 0, double b = 0, double c = 0, int shmem = 0);
 
-    // fuse with above
-    void packGhostHost(void **ghost, const QudaParity parity, const int nFace, const int dagger) const;
-
     /**
        Pack the field halos in preparation for halo exchange, e.g., for Dslash
        @param[in] nFace Depth of faces
