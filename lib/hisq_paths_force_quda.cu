@@ -272,30 +272,21 @@ namespace quda {
       }
     };
 
-    template <typename Arg> class SideLinkForce : public TunableKernel3D {
+    template <typename Arg> class SideLinkForce : public TunableKernel2D {
       Arg &arg;
-      const GaugeField &outA;
-      const GaugeField &outB;
-      const GaugeField &pMu;
-      const GaugeField &qMu;
-      const GaugeField &p3;
+      const GaugeField &force;
+      const GaugeField &shortP;
       const GaugeField &link;
-      const HisqForceType type;
       unsigned int minThreads() const { return arg.threads.x; }
 
     public:
-      SideLinkForce(Arg &arg, const GaugeField &link, int sig, int mu, HisqForceType type,
-                   const GaugeField &outA, const GaugeField &outB, const GaugeField &pMu,
-                   const GaugeField &qMu, const GaugeField &p3) :
-        TunableKernel3D(link, 2, 1),
+      SideLinkForce(Arg &arg, const GaugeField &link, int sig, int mu,
+                   const GaugeField &force, const GaugeField &shortP) :
+        TunableKernel2D(link, 2),
         arg(arg),
-        outA(outA),
-        outB(outB),
-        pMu(pMu),
-        qMu(qMu),
-        p3(p3),
-        link(link),
-        type(type)
+        force(force),
+        shortP(shortP),
+        link(link)
       {
         arg.sig = sig;
         arg.mu = mu;
@@ -324,13 +315,13 @@ namespace quda {
       }
 
       void preTune() {
-        outB.backup();
-        outA.backup();
+        shortP.backup();
+        force.backup();
       }
 
       void postTune() {
-        outB.restore();
-        outA.restore();
+        shortP.restore();
+        force.restore();
       }
 
       long long flops() const {
@@ -338,7 +329,7 @@ namespace quda {
       }
 
       long long bytes() const {
-        return 2*arg.threads.x*( 2*arg.outA.Bytes() + 2*arg.outB.Bytes() +
+        return 2*arg.threads.x*( 2*arg.force.Bytes() + 2*arg.shortP.Bytes() +
                                arg.p3.Bytes() + arg.link.Bytes() + arg.qProd.Bytes() );
       }
     };
@@ -548,8 +539,8 @@ namespace quda {
               }//rho
 
               //5-link: side link
-              SideLinkArg<Float, nColor, recon> arg(newOprod, P3, P5, Qmu, link, mFiveSt, (ThreeSt != 0 ? FiveSt/ThreeSt : 0), 1, FORCE_SIDE_LINK);
-              SideLinkForce<decltype(arg)> side(arg, link, sig, nu, FORCE_SIDE_LINK, newOprod, P3, P5, P5, Qmu);
+              SideLinkArg<Float, nColor, recon> arg(newOprod, P3, P5, Qmu, link, mFiveSt, (ThreeSt != 0 ? FiveSt/ThreeSt : 0), 1);
+              SideLinkForce<decltype(arg)> side(arg, link, sig, nu, newOprod, P3);
 
             } //nu
 
@@ -558,8 +549,8 @@ namespace quda {
               LepageMiddleLinkArg<Float, nColor, recon> middleLinkArg(newOprod, P5, Pmu, Qmu, link, Lepage, 2, FORCE_LEPAGE_MIDDLE_LINK);
               LepageMiddleLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, FORCE_LEPAGE_MIDDLE_LINK, newOprod, newOprod, P5, P5, Qmu);
 
-              SideLinkArg<Float, nColor, recon> arg(newOprod, P3, P5, Qmu, link, mLepage, (ThreeSt != 0 ? Lepage/ThreeSt : 0), 2, FORCE_SIDE_LINK);
-              SideLinkForce<decltype(arg)> side(arg, link, sig, mu, FORCE_SIDE_LINK, newOprod, P3, P5, P5, Qmu);
+              SideLinkArg<Float, nColor, recon> arg(newOprod, P3, P5, Qmu, link, mLepage, (ThreeSt != 0 ? Lepage/ThreeSt : 0), 2);
+              SideLinkForce<decltype(arg)> side(arg, link, sig, mu, newOprod, P3);
             } // Lepage != 0.0
 
             // 3-link side link

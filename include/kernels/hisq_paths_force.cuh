@@ -730,28 +730,18 @@ namespace quda {
       static constexpr int nColor = nColor_;
       using Gauge = typename gauge_mapper<real, recon>::type;
 
-      Gauge outA;
-      Gauge outB;
-      Gauge pMu;
+      Gauge force;
+      Gauge shortP;
       Gauge p3;
-      Gauge qMu;
 
-      const Gauge oProd;
       const Gauge qProd;
-      const Gauge qPrev;
       const real coeff;
       const real accumu_coeff;
 
-      const bool p_mu;
-      const bool q_mu;
-      const bool q_prev;
-
-      SideLinkArg(GaugeField &newOprod, GaugeField &shortP, const GaugeField &P3,
-                 const GaugeField &qProd, const GaugeField &link, real coeff, real accumu_coeff, int overlap, HisqForceType type)
-        : BaseForceArg(link, overlap), outA(newOprod), outB(shortP), pMu(P3), p3(P3), qMu(qProd), oProd(qProd), qProd(qProd),
-        qPrev(qProd), coeff(coeff), accumu_coeff(accumu_coeff),
-        p_mu(false), q_mu(false), q_prev(false)
-      { if (type != FORCE_SIDE_LINK) errorQuda("This constructor is for FORCE_SIDE_LINK"); }
+      SideLinkArg(GaugeField &force, GaugeField &shortP, const GaugeField &P3,
+                 const GaugeField &qProd, const GaugeField &link, real coeff, real accumu_coeff, int overlap)
+        : BaseForceArg(link, overlap), force(force), shortP(shortP), p3(P3), qProd(qProd), coeff(coeff), accumu_coeff(accumu_coeff)
+      { }
 
     };
 
@@ -765,7 +755,7 @@ namespace quda {
       constexpr SideLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ void operator()(int x_cb, int parity, int)
+      __device__ __host__ void operator()(int x_cb, int parity)
       {
         int x[4];
         getCoords(x, x_cb ,arg.D, parity);
@@ -796,9 +786,9 @@ namespace quda {
           Link Uad = arg.link(mymu, ad_link_nbr_idx, mu_positive^parity);
           Link Ow = mu_positive ? Uad*Oy : conj(Uad)*Oy;
 
-          Link shortP = arg.outB(0, point_d, 1-parity);
+          Link shortP = arg.shortP(0, point_d, 1-parity);
           shortP += arg.accumu_coeff * Ow;
-          arg.outB(0, point_d, 1-parity) = shortP;
+          arg.shortP(0, point_d, 1-parity) = shortP;
         }
 
         {
@@ -807,9 +797,9 @@ namespace quda {
 
           auto mycoeff = CoeffSign(goes_forward(arg.sig), parity)*CoeffSign(goes_forward(arg.mu),parity)*arg.coeff;
 
-          Link oprod = arg.outA(mu_positive ? arg.mu : opp_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
+          Link oprod = arg.force(mu_positive ? arg.mu : opp_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
           oprod += mycoeff * Ow;
-          arg.outA(mu_positive ? arg.mu : opp_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity) = oprod;
+          arg.force(mu_positive ? arg.mu : opp_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity) = oprod;
         }
       }
     };
