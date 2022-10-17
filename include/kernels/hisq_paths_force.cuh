@@ -756,6 +756,118 @@ namespace quda {
       }
     };
 
+    /***********************************lepageSideLinkKernel***************************
+     *
+     * In general we need
+     * READ
+     *    1  LINK:          ad_link
+     *    4  COLOR MATRIX:  shortP_at_D, newOprod, P3_at_A, Qprod_at_D,
+     * WRITE
+     *    2  COLOR MATRIX:  shortP_at_D, newOprod,
+     *
+     * Two call variations:
+     *   1. full read/write
+     *   2. when shortP == NULL && Qprod == NULL:
+     *          no need to read ad_link/shortP_at_D or write shortP_at_D
+     *          Qprod_at_D does not exit and is not read in
+     *
+     *
+     * Therefore the data traffic, in two-number pair (num_of_links, num_of_color_matrix)
+     *   Call 1:   (called 192 times)
+     *                           (1, 6)
+     *
+     *   Call 2:   (called 48 times)
+     *                           (0, 3)
+     *
+     * note: newOprod can be at point D or A, depending on if mu is postive or negative
+     *
+     * Flop count, in two-number pair (matrix_multi, matrix_add)
+     *   call 1:       (2, 2)
+     *   call 2:       (0, 1)
+     *
+     *********************************************************************************/
+    template <typename store_t, int nColor_, QudaReconstructType recon>
+    struct LepageSideLinkArg : public BaseForceArg<store_t, nColor_, recon> {
+      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
+      using real = typename mapper<store_t>::type;
+      static constexpr int nColor = nColor_;
+      using Gauge = typename gauge_mapper<real, recon>::type;
+
+      Gauge force;
+      Gauge shortP;
+      Gauge p3;
+
+      const Gauge qProd;
+      const real coeff;
+      const real accumu_coeff;
+
+      LepageSideLinkArg(GaugeField &force, GaugeField &shortP, const GaugeField &P3,
+                 const GaugeField &qProd, const GaugeField &link, real coeff, real accumu_coeff, int overlap)
+        : BaseForceArg(link, overlap), force(force), shortP(shortP), p3(P3), qProd(qProd), coeff(coeff), accumu_coeff(accumu_coeff)
+      { }
+
+    };
+
+    template <typename Param> struct LepageSideLink
+    {
+      using Arg = typename Param::Arg;
+      using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
+      const Arg &arg;
+      static constexpr int mu_positive = Param::mu_positive;
+
+      constexpr LepageSideLink(const Param &param) : arg(param.arg) {}
+      constexpr static const char *filename() { return KERNEL_FILE; }
+
+      __device__ __host__ void operator()(int x_cb, int parity)
+      {
+        int x[4];
+        getCoords(x, x_cb ,arg.D, parity);
+        for (int d=0; d<4; d++) x[d] = x[d] + arg.base_idx[d];
+        int e_cb = linkIndex(x,arg.E);
+        parity = parity ^ arg.oddness_change;
+
+        /*      compute the side link contribution to the momentum
+         *
+         *             sig
+         *          A________B
+         *           |       |   mu
+         *         D |       |C
+         *
+         *      A is the current point (x_cb)
+         *
+         */
+
+        int mymu = posDir(arg.mu);
+        int y[4] = {x[0], x[1], x[2], x[3]};
+        int point_d = updateCoordsIndex(y, arg.E, mymu, (mu_positive ? -1 : 1));
+
+        Link Oy = arg.p3(0, e_cb, parity);
+
+        {
+          int ad_link_nbr_idx = mu_positive ? point_d : e_cb;
+
+          Link Uad = arg.link(mymu, ad_link_nbr_idx, mu_positive^parity);
+          Link Ow = mu_positive ? Uad*Oy : conj(Uad)*Oy;
+
+          Link shortP = arg.shortP(0, point_d, 1-parity);
+          shortP += arg.accumu_coeff * Ow;
+          arg.shortP(0, point_d, 1-parity) = shortP;
+        }
+
+        {
+          Link Ox = arg.qProd(0, point_d, 1-parity);
+          Link Ow = mu_positive ? Oy*Ox : conj(Ox)*conj(Oy);
+
+          auto mycoeff = CoeffSign(goes_forward(arg.sig), parity)*CoeffSign(goes_forward(arg.mu),parity)*arg.coeff;
+
+          Link oprod = arg.force(mu_positive ? arg.mu : opp_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
+          oprod += mycoeff * Ow;
+          arg.force(mu_positive ? arg.mu : opp_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity) = oprod;
+        }
+      }
+    };
+
+
     // Flop count, in two-number pair (matrix_mult, matrix_add)
     // 		(0,1)
     template <typename store_t, int nColor_, QudaReconstructType recon>

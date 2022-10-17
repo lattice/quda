@@ -403,6 +403,68 @@ namespace quda {
                                arg.p3.Bytes() + 3 * arg.link.Bytes() + arg.oProd.Bytes() );
       }
     };
+
+    template <typename Arg> class LepageSideLinkForce : public TunableKernel2D {
+      Arg &arg;
+      const GaugeField &force;
+      const GaugeField &shortP;
+      const GaugeField &link;
+      unsigned int minThreads() const { return arg.threads.x; }
+
+    public:
+      LepageSideLinkForce(Arg &arg, const GaugeField &link, int sig, int mu,
+                   const GaugeField &force, const GaugeField &shortP) :
+        TunableKernel2D(link, 2),
+        arg(arg),
+        force(force),
+        shortP(shortP),
+        link(link)
+      {
+        arg.sig = sig;
+        arg.mu = mu;
+
+        char aux2[16];
+        strcat(aux, comm_dim_partitioned_string());
+        strcat(aux, ",threads=");
+        u32toa(aux2, arg.threads.x);
+        strcat(aux, aux2);
+        strcat(aux, ",mu=");
+        u32toa(aux2, arg.mu);
+        strcat(aux, aux2);
+        // no sig dependence needed for side link
+
+        apply(device::get_default_stream());
+      }
+
+      void apply(const qudaStream_t &stream)
+      {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        if (goes_forward(arg.mu)) {
+          launch<LepageSideLink>(tp, stream, FatLinkParam<Arg, 1>(arg));
+        } else {
+          launch<LepageSideLink>(tp, stream, FatLinkParam<Arg, 0>(arg));
+        }
+      }
+
+      void preTune() {
+        shortP.backup();
+        force.backup();
+      }
+
+      void postTune() {
+        shortP.restore();
+        force.restore();
+      }
+
+      long long flops() const {
+        return 2*arg.threads.x*2*234;
+      }
+
+      long long bytes() const {
+        return 2*arg.threads.x*( 2*arg.force.Bytes() + 2*arg.shortP.Bytes() +
+                               arg.p3.Bytes() + arg.link.Bytes() + arg.qProd.Bytes() );
+      }
+    };
     
 
     template <typename Arg> class SideLinkShortForce : public TunableKernel2D {
@@ -523,8 +585,8 @@ namespace quda {
               LepageMiddleLinkArg<Float, nColor, recon> middleLinkArg(newOprod, P5, Pmu, Qmu, link, Lepage);
               LepageMiddleLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, newOprod, Qmu);
 
-              SideLinkArg<Float, nColor, recon> arg(newOprod, P3, P5, Qmu, link, mLepage, (ThreeSt != 0 ? Lepage/ThreeSt : 0), 2);
-              SideLinkForce<decltype(arg)> side(arg, link, sig, mu, newOprod, P3);
+              LepageSideLinkArg<Float, nColor, recon> arg(newOprod, P3, P5, Qmu, link, mLepage, (ThreeSt != 0 ? Lepage/ThreeSt : 0), 2);
+              LepageSideLinkForce<decltype(arg)> side(arg, link, sig, mu, newOprod, P3);
             } // Lepage != 0.0
 
             // 3-link side link
