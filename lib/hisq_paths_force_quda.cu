@@ -573,7 +573,7 @@ namespace quda {
               }//rho
 
               //5-link: side link
-              SideLinkArg<Float, nColor, recon> arg(newOprod, P3, P5, Qmu, link, mFiveSt, (ThreeSt != 0 ? FiveSt/ThreeSt : 0), 1);
+              SideLinkArg<Float, nColor, recon> arg(newOprod, P3, P5, Qmu, link, mFiveSt, (ThreeSt != 0 ? FiveSt/ThreeSt : 0));
               SideLinkForce<decltype(arg)> side(arg, link, sig, nu, newOprod, P3);
 
             } //nu
@@ -583,7 +583,7 @@ namespace quda {
               LepageMiddleLinkArg<Float, nColor, recon> middleLinkArg(newOprod, P5, Pmu, Qmu, link, Lepage);
               LepageMiddleLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, newOprod, Qmu);
 
-              LepageSideLinkArg<Float, nColor, recon> arg(newOprod, P3, P5, Qmu, link, mLepage, (ThreeSt != 0 ? Lepage/ThreeSt : 0), 2);
+              LepageSideLinkArg<Float, nColor, recon> arg(newOprod, P3, P5, Qmu, link, mLepage, (ThreeSt != 0 ? Lepage/ThreeSt : 0));
               LepageSideLinkForce<decltype(arg)> side(arg, link, sig, mu, newOprod, P3);
             } // Lepage != 0.0
 
