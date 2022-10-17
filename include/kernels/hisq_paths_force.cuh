@@ -541,20 +541,12 @@ namespace quda {
      *    4 COLOR MATRIX:  newOprod_at_A, P3_at_A, Pmu_at_B, Qmu_at_A
      *
      * Three call variations:
-     *   1. when Qprev == NULL:   Qprod_at_D does not exist and is not read in
-     *   2. full read/write
      *   3. when Pmu/Qmu == NULL,   Pmu_at_B and Qmu_at_A are not written out
      *
      *   In all three above case, if the direction sig is negative, newOprod_at_A is
      *   not read in or written out.
      *
      * Therefore the data traffic, in two-number pair (num_of_link, num_of_color_matrix)
-     *   Call 1:  (called 48 times, half positive sig, half negative sig)
-     *             if (sig is positive):    (3, 6)
-     *             else               :     (3, 4)
-     *   Call 2:  (called 192 time, half positive sig, half negative sig)
-     *             if (sig is positive):    (3, 7)
-     *             else               :     (3, 5)
      *   Call 3:  (called 48 times, half positive sig, half negative sig)
      *             if (sig is positive):    (3, 5)
      *             else               :     (3, 2) no need to loadQprod_at_D in this case
@@ -563,10 +555,6 @@ namespace quda {
      *       and we call it oprod_at_C to simply naming. This does not affect our data traffic analysis
      *
      * Flop count, in two-number pair (matrix_multi, matrix_add)
-     *   call 1:     if (sig is positive)  (3, 1)
-     *               else                  (2, 0)
-     *   call 2:     if (sig is positive)  (4, 1)
-     *               else                  (3, 0)
      *   call 3:     if (sig is positive)  (4, 1)
      *   (Lepage)    else                  (2, 0)
      *
@@ -578,28 +566,19 @@ namespace quda {
       static constexpr int nColor = nColor_;
       using Gauge = typename gauge_mapper<real, recon>::type;
 
-      Gauge outA;
-      Gauge outB;
-      Gauge pMu;
+      Gauge force;
       Gauge p3;
-      Gauge qMu;
 
       const Gauge oProd;
-      const Gauge qProd;
       const Gauge qPrev;
       const real coeff;
-      const real accumu_coeff;
 
-      const bool p_mu;
-      const bool q_mu;
-      const bool q_prev;
-
-      LepageMiddleLinkArg(GaugeField &newOprod, GaugeField &P3, const GaugeField &oProd,
+      LepageMiddleLinkArg(GaugeField &force, GaugeField &P3, const GaugeField &oProd,
                  const GaugeField &qPrev, const GaugeField &link,
-                 real coeff, int overlap, HisqForceType type)
-        : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod), pMu(P3), p3(P3), qMu(qPrev),
-        oProd(oProd), qProd(oProd), qPrev(qPrev), coeff(coeff), accumu_coeff(0), p_mu(false), q_mu(false), q_prev(true)
-      { if (type != FORCE_LEPAGE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_LEPAGE_MIDDLE_LINK"); }
+                 real coeff, int overlap)
+        : BaseForceArg(link, overlap), force(force), p3(P3),
+        oProd(oProd), qPrev(qPrev), coeff(coeff)
+      { }
 
     };
 
@@ -610,14 +589,11 @@ namespace quda {
       const Arg &arg;
       static constexpr int mu_positive = Param::mu_positive;
       static constexpr int sig_positive = Param::sig_positive;
-      static constexpr bool pMu = Param::pMu;
-      static constexpr bool qMu = Param::qMu;
-      static constexpr bool qPrev = Param::qPrev;
 
       constexpr LepageMiddleLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ void operator()(int x_cb, int parity, int)
+      __device__ __host__ void operator()(int x_cb, int parity)
       {
         int x[4];
         getCoords(x, x_cb, arg.D, parity);
@@ -654,40 +630,23 @@ namespace quda {
         // load the link variable connecting b and c
         Link Ubc = arg.link(mymu, bc_link_nbr_idx, mu_positive^(1-parity));
 
-        Link Oy;
-        if (!qPrev) {
-          Oy = arg.oProd(posDir(arg.sig), sig_positive ? point_d : point_c, sig_positive^parity);
-          if (!sig_positive) Oy = conj(Oy);
-        } else { // QprevOdd != NULL
-          Oy = arg.oProd(0, point_c, parity);
-        }
+        Link Oy = arg.oProd(0, point_c, parity);
 
         Link Ow = !mu_positive ? Ubc*Oy : conj(Ubc)*Oy;
-
-        if (pMu) arg.pMu(0, point_b, 1-parity) = Ow;
 
         arg.p3(0, e_cb, parity) = sig_positive ? Uab*Ow : conj(Uab)*Ow;
 
         Link Uad = arg.link(mymu, ad_link_nbr_idx, mu_positive^parity);
-        if (!mu_positive)  Uad = conj(Uad);
+        if constexpr (!mu_positive)  Uad = conj(Uad);
 
-        if (!qPrev) {
-          if (sig_positive) Oy = Ow*Uad;
-          if ( qMu ) arg.qMu(0, e_cb, parity) = Uad;
-        } else {
-          Link Ox;
-          if ( qMu || sig_positive ) {
-            Oy = arg.qPrev(0, point_d, 1-parity);
-            Ox = Oy*Uad;
-          }
-          if ( qMu ) arg.qMu(0, e_cb, parity) = Ox;
-          if (sig_positive) Oy = Ow*Ox;
-        }
+        if constexpr ( sig_positive ) {
+          Oy = arg.qPrev(0, point_d, 1-parity);
+          Link Ox = Oy*Uad;
+          Oy = Ow*Ox;
 
-        if (sig_positive) {
-          Link oprod = arg.outA(arg.sig, e_cb, parity);
+          Link oprod = arg.force(arg.sig, e_cb, parity);
           oprod += arg.coeff*Oy;
-          arg.outA(arg.sig, e_cb, parity) = oprod;
+          arg.force(arg.sig, e_cb, parity) = oprod;
         }
 
       }
