@@ -90,13 +90,13 @@ namespace quda {
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
-          launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 1, 1, true, true, false>(arg));
+          launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 1, 1>(arg));
         } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
-          launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 0, 1, true, true, false>(arg));
+          launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 0, 1>(arg));
         } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
-          launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 1, 0, true, true, false>(arg));
+          launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 1, 0>(arg));
         } else {
-          launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 0, 0, true, true, false>(arg));
+          launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 0, 0>(arg));
         }
       }
 
@@ -126,7 +126,7 @@ namespace quda {
 
     };
 
-    template <typename Arg> class MiddleFiveLinkForce : public TunableKernel3D {
+    template <typename Arg> class MiddleFiveLinkForce : public TunableKernel2D {
       Arg &arg;
       const GaugeField &force;
       const GaugeField &pNuMu;
@@ -139,7 +139,7 @@ namespace quda {
       MiddleFiveLinkForce(Arg &arg, const GaugeField &link, int sig, int mu,
                    const GaugeField &force, const GaugeField &pNuMu,
                    const GaugeField &p5, const GaugeField &qNuMu) :
-        TunableKernel3D(link, 2, 1),
+        TunableKernel2D(link, 2),
         arg(arg),
         force(force),
         pNuMu(pNuMu),
@@ -169,13 +169,13 @@ namespace quda {
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
-          launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 1, 1, true, true, true>(arg));
+          launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 1, 1>(arg));
         } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
-          launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 0, 1, true, true, true>(arg));
+          launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 0, 1>(arg));
         } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
-          launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 1, 0, true, true, true>(arg));
+          launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 1, 0>(arg));
         } else {
-          launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 0, 0, true, true, true>(arg));
+          launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 0, 0>(arg));
         }
       }
 
@@ -205,7 +205,7 @@ namespace quda {
 
     };
 
-    template <typename Arg> class AllLinkForce : public TunableKernel3D {
+    template <typename Arg> class AllLinkForce : public TunableKernel2D {
       Arg &arg;
       const GaugeField &force;
       const GaugeField &shortP;
@@ -215,7 +215,7 @@ namespace quda {
     public:
       AllLinkForce(Arg &arg, const GaugeField &link, int sig, int mu,
                    const GaugeField &force, const GaugeField &shortP) :
-        TunableKernel3D(link, 2, 1),
+        TunableKernel2D(link, 2),
         arg(arg),
         force(force),
         shortP(shortP),
@@ -372,13 +372,13 @@ namespace quda {
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
-          launch<LepageMiddleLink>(tp, stream, FatLinkParam<Arg, 1, 1, false, false, true>(arg));
+          launch<LepageMiddleLink>(tp, stream, FatLinkParam<Arg, 1, 1>(arg));
         } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
-          launch<LepageMiddleLink>(tp, stream, FatLinkParam<Arg, 0, 1, false, false, true>(arg));
+          launch<LepageMiddleLink>(tp, stream, FatLinkParam<Arg, 0, 1>(arg));
         } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
-          launch<LepageMiddleLink>(tp, stream, FatLinkParam<Arg, 1, 0, false, false, true>(arg));
+          launch<LepageMiddleLink>(tp, stream, FatLinkParam<Arg, 1, 0>(arg));
         } else {
-          launch<LepageMiddleLink>(tp, stream, FatLinkParam<Arg, 0, 0, false, false, true>(arg));
+          launch<LepageMiddleLink>(tp, stream, FatLinkParam<Arg, 0, 0>(arg));
         }
       }
 
@@ -493,7 +493,7 @@ namespace quda {
 
             //3-link
             //Kernel A: middle link
-            MiddleThreeLinkArg<Float, nColor, recon> middleThreeLinkArg(newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt, 2);
+            MiddleThreeLinkArg<Float, nColor, recon> middleThreeLinkArg(newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt);
             MiddleThreeLinkForce<decltype(middleThreeLinkArg)> middleThreeLink(middleThreeLinkArg, link, sig, mu, newOprod, Pmu, P3, Qmu);
 
             for (int nu=0; nu < 8; nu++) {
@@ -501,14 +501,14 @@ namespace quda {
 
               //5-link: middle link
               //Kernel B
-              MiddleFiveLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, Pnumu, P5, Qnumu, Pmu, Qmu, link, FiveSt, 1);
+              MiddleFiveLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, Pnumu, P5, Qnumu, Pmu, Qmu, link, FiveSt);
               MiddleFiveLinkForce<decltype(middleFiveLinkArg)> middleFiveLink(middleFiveLinkArg, link, sig, nu, newOprod, Pnumu, P5, Qnumu);
 
               for (int rho = 0; rho < 8; rho++) {
                 if (rho == sig || rho == opp_dir(sig) || rho == mu || rho == opp_dir(mu) || rho == nu || rho == opp_dir(nu)) continue;
 
                 //7-link: middle link and side link
-                AllLinkArg<Float, nColor, recon> arg(newOprod, P5, Pnumu, Qnumu, link, SevenSt, FiveSt != 0 ? SevenSt/FiveSt : 0, 1);
+                AllLinkArg<Float, nColor, recon> arg(newOprod, P5, Pnumu, Qnumu, link, SevenSt, FiveSt != 0 ? SevenSt/FiveSt : 0);
                 AllLinkForce<decltype(arg)> all(arg, link, sig, rho, newOprod, P5);
               }//rho
 
@@ -520,7 +520,7 @@ namespace quda {
 
             //lepage
             if (Lepage != 0.) {
-              LepageMiddleLinkArg<Float, nColor, recon> middleLinkArg(newOprod, P5, Pmu, Qmu, link, Lepage, 2);
+              LepageMiddleLinkArg<Float, nColor, recon> middleLinkArg(newOprod, P5, Pmu, Qmu, link, Lepage);
               LepageMiddleLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, newOprod, Qmu);
 
               SideLinkArg<Float, nColor, recon> arg(newOprod, P3, P5, Qmu, link, mLepage, (ThreeSt != 0 ? Lepage/ThreeSt : 0), 2);
@@ -528,7 +528,7 @@ namespace quda {
             } // Lepage != 0.0
 
             // 3-link side link
-            SideLinkShortArg<Float, nColor, recon> arg(newOprod, P3, link, ThreeSt, 1);
+            SideLinkShortArg<Float, nColor, recon> arg(newOprod, P3, link, ThreeSt);
             SideLinkShortForce<decltype(arg)> side(arg, P3, sig, mu, newOprod, P3);
           }//mu
         }//sig
