@@ -397,7 +397,7 @@ namespace quda {
 
       long long bytes() const {
         return 2*arg.threads.x*( ( goes_forward(arg.sig) ? 2*arg.force.Bytes() : 0 ) +
-                               ( ( goes_forward(arg.sig) ) ? arg.qPrev.Bytes() : 0) +
+                               ( ( goes_forward(arg.sig) ) ? arg.qProd.Bytes() : 0) +
                                arg.p3.Bytes() + 3 * arg.link.Bytes() + arg.oProd.Bytes() );
       }
     };
@@ -464,6 +464,74 @@ namespace quda {
       }
     };
     
+    template <typename Arg> class LepageAllLinkForce : public TunableKernel2D {
+      Arg &arg;
+      const GaugeField &force;
+      const GaugeField &shortP;
+      const GaugeField &link;
+      unsigned int minThreads() const { return arg.threads.x; }
+
+    public:
+      LepageAllLinkForce(Arg &arg, const GaugeField &link, int sig, int mu,
+                   const GaugeField &force, const GaugeField &shortP) :
+        TunableKernel2D(link, 2),
+        arg(arg),
+        force(force),
+        shortP(shortP),
+        link(link)
+      {
+        arg.sig = sig;
+        arg.mu = mu;
+
+        char aux2[16];
+        strcat(aux, comm_dim_partitioned_string());
+        strcat(aux, ",threads=");
+        u32toa(aux2, arg.threads.x);
+        strcat(aux, aux2);
+        strcat(aux, ",sig=");
+        u32toa(aux2, arg.sig);
+        strcat(aux, aux2);
+        strcat(aux, ",mu=");
+        u32toa(aux2, arg.mu);
+        strcat(aux, aux2);
+
+        apply(device::get_default_stream());
+      }
+
+      void apply(const qudaStream_t &stream)
+      {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
+          launch<LepageAllLink>(tp, stream, FatLinkParam<Arg, 1, 1>(arg));
+        } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
+          launch<LepageAllLink>(tp, stream, FatLinkParam<Arg, 0, 1>(arg));
+        } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
+          launch<LepageAllLink>(tp, stream, FatLinkParam<Arg, 1, 0>(arg));
+        } else {
+          launch<LepageAllLink>(tp, stream, FatLinkParam<Arg, 0, 0>(arg));
+        }
+      }
+
+      void preTune() {
+        force.backup();
+        shortP.backup();
+      }
+
+      void postTune() {
+        force.restore();
+        shortP.restore();
+      }
+
+      long long flops() const {
+        return 2*arg.threads.x*(2 * 432 + ( goes_forward(arg.sig) ? 612 : 0) );
+      }
+
+      long long bytes() const {
+        return 2*arg.threads.x*( ( goes_forward(arg.sig) ? 2 * arg.force.Bytes() : 0 ) +
+                               2 * arg.force.Bytes() + 3 * arg.link.Bytes() + arg.oProd.Bytes() +
+                               2 * arg.shortP.Bytes() + arg.qProd.Bytes() );
+      }
+    };
 
     template <typename Arg> class SideLinkShortForce : public TunableKernel2D {
       Arg &arg;
@@ -584,15 +652,21 @@ namespace quda {
               // Lepage: middle link
               // In/out: newOprod
               // Out: P5 (called "P3")
-              // In: Pmu (called "oProd"), Qmu (called "qPrev"), link
-              LepageMiddleLinkArg<Float, nColor, recon> middleLinkArg(newOprod, P5, Pmu, Qmu, link, act_path_coeff);
-              LepageMiddleLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, newOprod, Qmu);
+              // In: Pmu (called "oProd"), Qmu (called "qProd"), link
+              //LepageMiddleLinkArg<Float, nColor, recon> middleLinkArg(newOprod, P5, Pmu, Qmu, link, act_path_coeff);
+              //LepageMiddleLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, newOprod, P5);
 
               // Lepage: side link
               // In/out: newOprod, P3 (called "shortP")
               // In: P5 (called "P3"), Qmu (called "qProd"), link
-              LepageSideLinkArg<Float, nColor, recon> arg(newOprod, P3, P5, Qmu, link, act_path_coeff);
-              LepageSideLinkForce<decltype(arg)> side(arg, link, sig, mu, newOprod, P3);
+              //LepageSideLinkArg<Float, nColor, recon> arg(newOprod, P3, P5, Qmu, link, act_path_coeff);
+              //LepageSideLinkForce<decltype(arg)> side(arg, link, sig, mu, newOprod, P3);
+
+              // Lepage: all link
+              // In/out: newOprod, P3 (called "shortP")
+              // In: Pmu (called "oProd"), Qmu (called "qProd"), link
+              LepageAllLinkArg<Float, nColor, recon> arg(newOprod, P3, Pmu, Qmu, link, act_path_coeff);
+              LepageAllLinkForce<decltype(arg)> all(arg, link, sig, mu, newOprod, P3);
             } // Lepage != 0.0
 
             // 3-link: side link
