@@ -111,6 +111,8 @@ struct StaggeredGSmearTestWrapper {//
   std::unique_ptr<ColorSpinorField> tmp;
   std::unique_ptr<ColorSpinorField> tmp2;
   // For loading the gauge fields
+  Dirac *dirac;  
+  
   int argc_copy;
   char **argv_copy;
 
@@ -273,6 +275,12 @@ struct StaggeredGSmearTestWrapper {//
     
       *tmp = *spinor;
     }
+    bool pc = false;
+    // because both call the same "Dslash" directly.
+    DiracParam diracParam;
+    setDiracParam(diracParam, &inv_param, pc);
+    diracParam.tmp1 = tmp.get();
+    dirac = Dirac::create(diracParam);
   }
 
   void end()
@@ -289,6 +297,11 @@ struct StaggeredGSmearTestWrapper {//
     host_free(milc_twolnk);
 
     if (cpuTwoLink != nullptr) { delete cpuTwoLink; cpuTwoLink = nullptr; }
+    
+    if (dirac != nullptr) {
+      delete dirac;
+      dirac = nullptr;
+    }    
 
     if(gtest_type == gsmear_test_type::GaussianSmear) {
       tmp2.reset();
@@ -353,19 +366,18 @@ struct StaggeredGSmearTestWrapper {//
     printfQuda("Tuning...\n");
     gsmearCUDA(1);
 
-
     GSmearTime gsmear_time = gsmearCUDA(niter);
     if(gtest_type == gsmear_test_type::GaussianSmear) *spinorRef = *spinor;
 
-    if (print_metrics) {
+    if (print_metrics) {   
       printfQuda("%fus per kernel call\n", 1e6 * gsmear_time.event_time / niter);
-#if 0
-      unsigned long long flops = 0.0;//FIXME dirac->Flops();
+
+      unsigned long long flops = gtest_type == gsmear_test_type::GaussianSmear ? dirac->Flops() : 2*4*198ll*V*(long long)niter;
       double gflops = 1.0e-9 * flops / gsmear_time.event_time;
       printfQuda("GFLOPS = %f\n", gflops);
       ::testing::Test::RecordProperty("Gflops", std::to_string(gflops));
 
-      size_t ghost_bytes = spinor->GhostBytes();
+      size_t ghost_bytes = gtest_type == gsmear_test_type::GaussianSmear ? spinor->GhostBytes() : 0;
 
       ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_GPU",
                                       1.0e-9 * 2 * ghost_bytes * niter / gsmear_time.event_time);
@@ -381,7 +393,6 @@ struct StaggeredGSmearTestWrapper {//
         1.0e-9 * 2 * ghost_bytes * niter / gsmear_time.event_time,
         1.0e-9 * 2 * ghost_bytes * niter / gsmear_time.cpu_time, 1.0e-9 * 2 * ghost_bytes / gsmear_time.cpu_max,
         1.0e-9 * 2 * ghost_bytes / gsmear_time.cpu_min, 2 * ghost_bytes);
-#endif      
     }
   }
 
