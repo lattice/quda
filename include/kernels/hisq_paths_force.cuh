@@ -131,8 +131,8 @@ namespace quda {
 
       static constexpr int overlap = 0;
 
-      OneLinkArg(GaugeField &force, const GaugeField &oProd, const GaugeField &link, real coeff)
-        : BaseForceArg(link, overlap), force(force), oProd(oProd), coeff(coeff) {
+      OneLinkArg(GaugeField &force, const GaugeField &oProd, const GaugeField &link, const PathCoefficients<real> &act_path_coeff)
+        : BaseForceArg(link, overlap), force(force), oProd(oProd), coeff(act_path_coeff.one) {
           this->threads.z = 4;
         }
 
@@ -205,9 +205,9 @@ namespace quda {
 
       MiddleThreeLinkArg(GaugeField &force, GaugeField &pMu, GaugeField &P3, GaugeField &qMu,
                  const GaugeField &oProd, const GaugeField &link,
-                 real coeff)
+                  const PathCoefficients<real> &act_path_coeff)
         : BaseForceArg(link, overlap), force(force), pMu(pMu), p3(P3), qMu(qMu),
-        oProd(oProd), coeff(coeff)
+        oProd(oProd), coeff(-act_path_coeff.three)
       { }
 
     };
@@ -339,9 +339,9 @@ namespace quda {
 
       MiddleFiveLinkArg(GaugeField &force, GaugeField &pNuMu, GaugeField &P5, GaugeField &qNuMu,
                  const GaugeField &pMu, const GaugeField &qMu, const GaugeField &link,
-                 real coeff)
+                  const PathCoefficients<real> &act_path_coeff)
         : BaseForceArg(link, overlap), force(force), pNuMu(pNuMu), p5(P5), qNuMu(qNuMu),
-        pMu(pMu), qMu(qMu), coeff(coeff)
+        pMu(pMu), qMu(qMu), coeff(act_path_coeff.five)
       { }
 
     };
@@ -458,10 +458,10 @@ namespace quda {
       static constexpr int overlap = 1;
 
       AllLinkArg(GaugeField &force, GaugeField &shortP, const GaugeField &oProd, const GaugeField &qNuMu,
-                 const GaugeField &link, real coeff, real accumu_coeff)
+                 const GaugeField &link, const PathCoefficients<real> &act_path_coeff)
         : BaseForceArg(link, overlap), force(force), shortP(shortP),
           oProd(oProd), qNuMu(qNuMu),
-          coeff(coeff), accumu_coeff(accumu_coeff)
+          coeff(act_path_coeff.seven), accumu_coeff(act_path_coeff.five != 0 ? act_path_coeff.seven / act_path_coeff.five : 0)
       { }
 
     };
@@ -579,8 +579,9 @@ namespace quda {
       static constexpr int overlap = 1;
 
       SideLinkArg(GaugeField &force, GaugeField &shortP, const GaugeField &P5,
-                 const GaugeField &qProd, const GaugeField &link, real coeff, real accumu_coeff)
-        : BaseForceArg(link, overlap), force(force), shortP(shortP), p5(P5), qProd(qProd), coeff(coeff), accumu_coeff(accumu_coeff)
+                 const GaugeField &qProd, const GaugeField &link,  const PathCoefficients<real> &act_path_coeff)
+        : BaseForceArg(link, overlap), force(force), shortP(shortP), p5(P5), qProd(qProd),
+          coeff(-act_path_coeff.five), accumu_coeff(act_path_coeff.three != 0 ? act_path_coeff.five / act_path_coeff.three : 0)
       { }
 
     };
@@ -686,9 +687,9 @@ namespace quda {
 
       LepageMiddleLinkArg(GaugeField &force, GaugeField &P3, const GaugeField &oProd,
                  const GaugeField &qPrev, const GaugeField &link,
-                 real coeff)
+                 const PathCoefficients<real> &act_path_coeff)
         : BaseForceArg(link, overlap), force(force), p3(P3),
-        oProd(oProd), qPrev(qPrev), coeff(coeff)
+        oProd(oProd), qPrev(qPrev), coeff(act_path_coeff.lepage)
       { }
 
     };
@@ -809,8 +810,9 @@ namespace quda {
       static constexpr int overlap = 2;
 
       LepageSideLinkArg(GaugeField &force, GaugeField &shortP, const GaugeField &P3,
-                 const GaugeField &qProd, const GaugeField &link, real coeff, real accumu_coeff)
-        : BaseForceArg(link, overlap), force(force), shortP(shortP), p3(P3), qProd(qProd), coeff(coeff), accumu_coeff(accumu_coeff)
+                 const GaugeField &qProd, const GaugeField &link, const PathCoefficients<real> &act_path_coeff)
+        : BaseForceArg(link, overlap), force(force), shortP(shortP), p3(P3), qProd(qProd),
+          coeff(-act_path_coeff.lepage), accumu_coeff(act_path_coeff.three != 0 ? act_path_coeff.lepage / act_path_coeff.three : 0)
       { }
 
     };
@@ -887,8 +889,8 @@ namespace quda {
       static constexpr int overlap = 1;
 
       SideLinkShortArg(GaugeField &force, GaugeField &P3, const GaugeField &link,
-                 real coeff)
-        : BaseForceArg(link, overlap), force(force), p3(P3), coeff(coeff)
+                   const PathCoefficients<real> &act_path_coeff)
+        : BaseForceArg(link, overlap), force(force), p3(P3), coeff(act_path_coeff.three)
       {  }
 
     };
