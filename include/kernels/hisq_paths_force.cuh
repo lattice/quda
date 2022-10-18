@@ -234,9 +234,12 @@ namespace quda {
          *
          *    A is the current point (sid)
          *
+         * Variables have been named to reflection dimensionality for
+         * mu_positive == true, sig_positive == true
          */
 
-        for (int d=0; d<4; d++) x[d] += arg.base_idx[d];
+#pragma unroll
+        for (int d = 0; d < 4; d++) x[d] += arg.base_idx[d];
         int e_cb = linkIndex(x,arg.E);
         parity = parity ^ arg.oddness_change;
         int y[4] = {x[0], x[1], x[2], x[3]};
@@ -246,37 +249,40 @@ namespace quda {
 
         int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
 
-        for (int d=0; d<4; d++) y[d] = x[d];
+#pragma unroll
+        for (int d = 0; d < 4; d++) y[d] = x[d];
         int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
 
         int bc_link_nbr_idx = mu_positive ? point_c : point_b;
         int ab_link_nbr_idx = sig_positive ? e_cb : point_b;
 
-        // load the link variable connecting a and b
+        // load the link variable connecting a and b (need a -> b for sig positive)
         Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, sig_positive ^ (1 - parity));
 
-        // load the link variable connecting b and c
-        Link Ubc = arg.link(pos_dir(arg.mu), bc_link_nbr_idx, mu_positive ^ (1 - parity));
+        // load the link variable connecting b and c (need b -> c for mu positive)
+        Link Ucb = arg.link(pos_dir(arg.mu), bc_link_nbr_idx, mu_positive ^ (1 - parity));
 
-        Link Oy;
-        Oy = arg.oProd(pos_dir(arg.sig), sig_positive ? point_d : point_c, sig_positive ^ parity);
-        if constexpr (!sig_positive) Oy = conj(Oy);
+        // load the input oprod connecting c and d (need d -> c for sig positive)
+        Link Odc = arg.oProd(pos_dir(arg.sig), sig_positive ? point_d : point_c, sig_positive ^ parity);
+        if constexpr (!sig_positive) Odc = conj(Odc);
 
-        Link Ow = !mu_positive ? Ubc * Oy : conj(Ubc) * Oy;
+        // for sig_positive, mu_positive, this is U_{b -> c} * O_{d -> c}
+        Link UbcOdc = !mu_positive ? Ucb * Odc : conj(Ucb) * Odc;
 
-        arg.pMu(0, point_b, 1 - parity) = Ow;
+        arg.pMu(0, point_b, 1 - parity) = UbcOdc;
 
-        arg.p3(0, e_cb, parity) = sig_positive ? Uab * Ow : conj(Uab) * Ow;
+        arg.p3(0, e_cb, parity) = sig_positive ? Uab * UbcOdc : conj(Uab) * UbcOdc;
 
-        Link Uad = arg.link(pos_dir(arg.mu), ad_link_nbr_idx, mu_positive ^ parity);
-        if (!mu_positive) Uad = conj(Uad);
+        // load the link variable connecting a and d (need d -> a for mu positive)
+        Link Uda = arg.link(pos_dir(arg.mu), ad_link_nbr_idx, mu_positive ^ parity);
+        if (!mu_positive) Uda = conj(Uda);
 
-        if constexpr (sig_positive) Oy = Ow * Uad;
-        arg.qMu(0, e_cb, parity) = Uad;
+        arg.qMu(0, e_cb, parity) = Uda;
 
         if constexpr (sig_positive) {
+          Link UbcOdcUda = UbcOdc * Uda;
           Link oprod = arg.force(arg.sig, e_cb, parity);
-          oprod += arg.coeff * Oy;
+          oprod += arg.coeff * UbcOdcUda;
           arg.force(arg.sig, e_cb, parity) = oprod;
         }
 
@@ -445,16 +451,16 @@ namespace quda {
       Gauge shortP;
 
       const Gauge oProd;
-      const Gauge p5;
+      const Gauge qNuMu;
       const real coeff;
       const real accumu_coeff;
 
       static constexpr int overlap = 1;
 
-      AllLinkArg(GaugeField &force, GaugeField &shortP, const GaugeField &oProd, const GaugeField &P5,
+      AllLinkArg(GaugeField &force, GaugeField &shortP, const GaugeField &oProd, const GaugeField &qNuMu,
                  const GaugeField &link, real coeff, real accumu_coeff)
         : BaseForceArg(link, overlap), force(force), shortP(shortP),
-          oProd(oProd), p5(P5),
+          oProd(oProd), qNuMu(qNuMu),
           coeff(coeff), accumu_coeff(accumu_coeff)
       { }
 
@@ -502,7 +508,7 @@ namespace quda {
         Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, sig_positive^(1-parity));
         Link Uad = arg.link(pos_dir(arg.rho), rho_positive ? point_d : e_cb, rho_positive ? 1-parity : parity);
         Link Ubc = arg.link(pos_dir(arg.rho), rho_positive ? point_c : point_b, rho_positive ? parity : 1-parity);
-        Link Ox = arg.p5(0, point_d, 1-parity);
+        Link Ox = arg.qNuMu(0, point_d, 1-parity);
         Link Oy = arg.oProd(0, point_c, parity);
         Link Oz = rho_positive ? conj(Ubc)*Oy : Ubc*Oy;
 
@@ -563,8 +569,8 @@ namespace quda {
       using Gauge = typename gauge_mapper<real, recon>::type;
 
       Gauge force;
-      Gauge shortP;
-      Gauge p3;
+      Gauge shortP; // == P3
+      Gauge p5;
 
       const Gauge qProd;
       const real coeff;
@@ -572,9 +578,9 @@ namespace quda {
 
       static constexpr int overlap = 1;
 
-      SideLinkArg(GaugeField &force, GaugeField &shortP, const GaugeField &P3,
+      SideLinkArg(GaugeField &force, GaugeField &shortP, const GaugeField &P5,
                  const GaugeField &qProd, const GaugeField &link, real coeff, real accumu_coeff)
-        : BaseForceArg(link, overlap), force(force), shortP(shortP), p3(P3), qProd(qProd), coeff(coeff), accumu_coeff(accumu_coeff)
+        : BaseForceArg(link, overlap), force(force), shortP(shortP), p5(P5), qProd(qProd), coeff(coeff), accumu_coeff(accumu_coeff)
       { }
 
     };
@@ -611,7 +617,7 @@ namespace quda {
         int y[4] = {x[0], x[1], x[2], x[3]};
         int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.nu));
 
-        Link Oy = arg.p3(0, e_cb, parity);
+        Link Oy = arg.p5(0, e_cb, parity);
 
         int ad_link_nbr_idx = nu_positive ? point_d : e_cb;
 

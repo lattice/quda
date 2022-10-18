@@ -266,7 +266,7 @@ namespace quda {
 
       long long bytes() const {
         return 2*arg.threads.x*( (goes_forward(arg.sig) ? 4 : 2)*arg.force.Bytes() + 3*arg.link.Bytes()
-                               + arg.oProd.Bytes() + arg.p5.Bytes() + 2*arg.shortP.Bytes());
+                               + arg.oProd.Bytes() + arg.qNuMu.Bytes() + 2*arg.shortP.Bytes());
       }
     };
 
@@ -328,7 +328,7 @@ namespace quda {
 
       long long bytes() const {
         return 2*arg.threads.x*( 2*arg.force.Bytes() + 2*arg.shortP.Bytes() +
-                               arg.p3.Bytes() + arg.link.Bytes() + arg.qProd.Bytes() );
+                               arg.p5.Bytes() + arg.link.Bytes() + arg.qProd.Bytes() );
       }
     };
 
@@ -543,6 +543,8 @@ namespace quda {
         real mLepage  = -Lepage;
 
         {
+          // Out: newOprod
+          // In: oprod, link
           OneLinkArg<real, nColor, recon> arg(newOprod, oprod, link, OneLink);
           OneLinkForce<decltype(arg)> oneLink(arg, link, newOprod);
         }
@@ -551,43 +553,60 @@ namespace quda {
           for (int mu=0; mu<8; mu++) {
             if ( (mu == sig) || (mu == opp_dir(sig))) continue;
 
-            //3-link
-            //Kernel A: middle link
+            // 3-link: middle link
+            // In/out: newOprod
+            // Out: Pmu, P3, Qmu
+            // In: oprod, link
             MiddleThreeLinkArg<Float, nColor, recon> middleThreeLinkArg(newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt);
             MiddleThreeLinkForce<decltype(middleThreeLinkArg)> middleThreeLink(middleThreeLinkArg, link, sig, mu, newOprod, Pmu, P3, Qmu);
 
             for (int nu=0; nu < 8; nu++) {
               if (nu == sig || nu == opp_dir(sig) || nu == mu || nu == opp_dir(mu)) continue;
 
-              //5-link: middle link
-              //Kernel B
+              // 5-link: middle link
+              // In/out: newOprod
+              // Out: Pnumu, P5, Qnumu
+              // In: Pmu, Qmu, link
               MiddleFiveLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, Pnumu, P5, Qnumu, Pmu, Qmu, link, FiveSt);
               MiddleFiveLinkForce<decltype(middleFiveLinkArg)> middleFiveLink(middleFiveLinkArg, link, sig, nu, newOprod, Pnumu, P5, Qnumu);
 
               for (int rho = 0; rho < 8; rho++) {
                 if (rho == sig || rho == opp_dir(sig) || rho == mu || rho == opp_dir(mu) || rho == nu || rho == opp_dir(nu)) continue;
 
-                //7-link: middle link and side link
+                // 7-link: middle link and side link
+                // In/out: newOprod, P5 (called "sideP")
+                // In: Pnumu (called "oProd"), Qnumu, link
                 AllLinkArg<Float, nColor, recon> arg(newOprod, P5, Pnumu, Qnumu, link, SevenSt, FiveSt != 0 ? SevenSt/FiveSt : 0);
                 AllLinkForce<decltype(arg)> all(arg, link, sig, rho, newOprod, P5);
-              }//rho
+              } //rho
 
-              //5-link: side link
+              // 5-link: side link
+              // In/out: newOprod, P3 (called "sideP")
+              // In: P5, Qmu (called "qProd"), link
               SideLinkArg<Float, nColor, recon> arg(newOprod, P3, P5, Qmu, link, mFiveSt, (ThreeSt != 0 ? FiveSt/ThreeSt : 0));
               SideLinkForce<decltype(arg)> side(arg, link, sig, nu, newOprod, P3);
 
             } //nu
 
-            //lepage
+            // Lepage
             if (Lepage != 0.) {
+              // Lepage: middle link
+              // In/out: newOprod
+              // Out: P5 (called "P3")
+              // In: Pmu (called "oProd"), Qmu (called "qPrev"), link
               LepageMiddleLinkArg<Float, nColor, recon> middleLinkArg(newOprod, P5, Pmu, Qmu, link, Lepage);
               LepageMiddleLinkForce<decltype(middleLinkArg)> middleLink(middleLinkArg, link, sig, mu, newOprod, Qmu);
 
+              // Lepage: side link
+              // In/out: newOprod, P3 (called "shortP")
+              // In: P5 (called "P3"), Qmu (called "qProd"), link
               LepageSideLinkArg<Float, nColor, recon> arg(newOprod, P3, P5, Qmu, link, mLepage, (ThreeSt != 0 ? Lepage/ThreeSt : 0));
               LepageSideLinkForce<decltype(arg)> side(arg, link, sig, mu, newOprod, P3);
             } // Lepage != 0.0
 
-            // 3-link side link
+            // 3-link: side link
+            // In/out: newOprod
+            // In: P3
             SideLinkShortArg<Float, nColor, recon> arg(newOprod, P3, link, ThreeSt);
             SideLinkShortForce<decltype(arg)> side(arg, P3, sig, mu, newOprod, P3);
           }//mu
