@@ -29,10 +29,10 @@ namespace quda {
 
     constexpr int updateCoordsIndexMILCDir(int x[], const int X[], int signed_dir) {
       switch (signed_dir) {
-      case 0: x[0] = (x[0] + 1) % X[0]; break;
-      case 1: x[1] = (x[1] + 1) % X[1]; break;
-      case 2: x[2] = (x[2] + 1) % X[2]; break;
-      case 3: x[3] = (x[3] + 1) % X[3]; break;
+      case 0: x[0] = (x[0] + 1 + X[0]) % X[0]; break;
+      case 1: x[1] = (x[1] + 1 + X[1]) % X[1]; break;
+      case 2: x[2] = (x[2] + 1 + X[2]) % X[2]; break;
+      case 3: x[3] = (x[3] + 1 + X[3]) % X[3]; break;
       case 4: x[3] = (x[3] - 1 + X[3]) % X[3]; break;
       case 5: x[2] = (x[2] - 1 + X[2]) % X[2]; break;
       case 6: x[1] = (x[1] - 1 + X[1]) % X[1]; break;
@@ -335,7 +335,8 @@ namespace quda {
       const Gauge qMu;
       const real coeff;
 
-      static constexpr int overlap = 1;
+      // test --- we may need this to fuse AllLink in each direction
+      static constexpr int overlap = 2;
 
       MiddleFiveLinkArg(GaugeField &force, GaugeField &pNuMu, GaugeField &P5, GaugeField &qNuMu,
                  const GaugeField &pMu, const GaugeField &qMu, const GaugeField &link,
@@ -455,7 +456,7 @@ namespace quda {
       const real coeff;
       const real accumu_coeff;
 
-      static constexpr int overlap = 1;
+      static constexpr int overlap = 2;
 
       AllLinkArg(GaugeField &force, GaugeField &shortP, const GaugeField &oProd, const GaugeField &qNuMu,
                  const GaugeField &link, const PathCoefficients<real> &act_path_coeff)
@@ -487,47 +488,165 @@ namespace quda {
 
         auto mycoeff = CoeffSign(sig_positive,parity)*arg.coeff;
 
+        int point_a = e_cb;
+        int parity_a = parity;
+
         int y[4] = {x[0], x[1], x[2], x[3]};
         int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
-        int ab_link_nbr_idx = (sig_positive) ? e_cb : point_b;
+        int parity_b = 1 - parity;
 
-        for (int d=0; d<4; d++) y[d] = x[d];
+        int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
+        int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
 
-        /*            sig
-         *         A________B
-         *      rho |      |
-         *        D |      |C
-         *
-         *   A is the current point (sid)
-         *
-         */
+        {
+          // rho positive
+          for (int d=0; d<4; d++) y[d] = x[d];
 
-        int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.rho));
-        int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+          /*            sig
+           *         F        E
+           *          |      |
+           *         A|______|B
+           *      rho |      |
+           *        D |      |C
+           *
+           *   A is the current point (sid)
+           *
+           */
 
-        Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, sig_positive^(1-parity));
-        Link Uad = arg.link(pos_dir(arg.rho), rho_positive ? point_d : e_cb, rho_positive ? 1-parity : parity);
-        Link Ubc = arg.link(pos_dir(arg.rho), rho_positive ? point_c : point_b, rho_positive ? parity : 1-parity);
-        Link Ox = arg.qNuMu(0, point_d, 1-parity);
-        Link Oy = arg.oProd(0, point_c, parity);
-        Link Oz = rho_positive ? conj(Ubc)*Oy : Ubc*Oy;
+          int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.rho));
+          int parity_d = 1 - parity;
 
-        if constexpr (sig_positive) {
-          Link force = arg.force(arg.sig, e_cb, parity);
-          force += Sign(parity)*mycoeff*Oz*Ox* (rho_positive ? Uad : conj(Uad));
-          arg.force(arg.sig, e_cb, parity) = force;
-          Oy = Uab*Oz;
-        } else {
-          Oy = conj(Uab)*Oz;
+          int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+          int parity_c = parity;
+
+          Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
+          Link Uad = arg.link(pos_dir(arg.rho), point_d, parity_d);
+          Link Ubc = arg.link(pos_dir(arg.rho), point_c, parity_c);
+          Link Ox = arg.qNuMu(0, point_d, parity_d);
+          Link Oy = arg.oProd(0, point_c, parity_c);
+          Link Oz = conj(Ubc)*Oy;
+
+          if constexpr (sig_positive) {
+            Link force = arg.force(arg.sig, point_a, parity_a);
+            force += (Sign(parity_a) * mycoeff) * Oz * Ox * Uad;
+            arg.force(arg.sig, point_a, parity_a) = force;
+            Oy = Uab * Oz;
+          } else {
+            Oy = conj(Uab) * Oz;
+          }
+
+          
+
+          // shift everything up by one
+          {
+            // compute an "e" above b and an "f" above a
+            for (int d=0; d<4; d++) y[d] = x[d];
+
+            int point_f = updateCoordsIndexMILCDir(y, arg.E, arg.rho);
+            int parity_f = 1 - parity;
+
+            int point_e = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+            int parity_e = parity;
+
+            int fe_link_nbr_idx = (sig_positive) ? point_f : point_e;
+            int fe_link_nbr_parity = (sig_positive) ? parity_f : parity_e;
+
+            Link Ufe = arg.link(pos_dir(arg.sig), fe_link_nbr_idx, fe_link_nbr_parity);
+            Link Uaf = arg.link(pos_dir(arg.rho), point_a, parity_a);
+            Link Ube = arg.link(pos_dir(arg.rho), point_b, parity_b);
+            Link Ox = arg.qNuMu(0, point_a, parity_a);
+            Link Oy = arg.oProd(0, point_b, parity_b);
+            Link Oz = conj(Ube) * Oy;
+            if constexpr(sig_positive) {
+              Oy = Ufe * Oz;
+            } else {
+              Oy = conj(Ufe) * Oz;
+            }
+
+            Link force = arg.force(pos_dir(arg.rho), point_a, parity_a);
+            force += (-Sign(parity_a)) * mycoeff * Oy * Ox; // haven't figured out why we need a minus sign
+            arg.force(pos_dir(arg.rho), point_a, parity_a) = force;
+
+            Link shortP = arg.shortP(0, point_a, parity_a);
+            shortP += arg.accumu_coeff * Uaf * Oy;
+            arg.shortP(0, point_a, parity_a) = shortP;
+          }
         }
 
-        Link force = arg.force(pos_dir(arg.rho), rho_positive ? point_d : e_cb, rho_positive ? 1-parity : parity);
-        force += Sign(rho_positive ? 1-parity : parity)*mycoeff* (rho_positive ? Oy*Ox : conj(Ox)*conj(Oy));
-        arg.force(pos_dir(arg.rho), rho_positive ? point_d : e_cb, rho_positive ? 1-parity : parity) = force;
+        {
 
-        Link shortP = arg.shortP(0, point_d, 1-parity);
-        shortP += arg.accumu_coeff * (rho_positive ? Uad : conj(Uad)) *Oy;
-        arg.shortP(0, point_d, 1-parity) = shortP;
+          for (int d=0; d<4; d++) y[d] = x[d];
+
+            // need to flip d <-> f, c <-> e
+
+          /*            sig
+           *         F        E
+           *      rho |      |
+           *        A |______|B
+           *          |      |
+           *        D |      |C
+           *
+           *   A is the current point (sid)
+           *
+           */
+
+          int point_f = updateCoordsIndexMILCDir(y, arg.E, arg.rho);
+          int parity_f = 1 - parity;
+          int point_e = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+          int parity_e = parity;
+
+          Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
+          Link Uaf = arg.link(pos_dir(arg.rho), point_a, parity_a);
+          Link Ube = arg.link(pos_dir(arg.rho), point_b, parity_b);
+          Link Ox = arg.qNuMu(0, point_f, parity_f);
+          Link Oy = arg.oProd(0, point_e, parity_e);
+          Link Oz = Ube * Oy;
+
+          if constexpr (sig_positive) {
+            Link force = arg.force(arg.sig, point_a, parity_a);
+            force += Sign(parity_a) * mycoeff * Oz * Ox * conj(Uaf);
+            arg.force(arg.sig, point_a, parity_a) = force;
+            Oy = Uab * Oz;
+          } else {
+            Oy = conj(Uab) * Oz;
+          }
+
+          Link force = arg.force(pos_dir(arg.rho), point_a, parity_a);
+          force += Sign(parity) * mycoeff * conj(Ox) * conj(Oy);
+          arg.force(pos_dir(arg.rho), point_a, parity_a) = force;
+
+          // need to shift everything down by one
+          {
+            // compute an "c" below b and an "d" below a
+            for (int d=0; d<4; d++) y[d] = x[d];
+
+            int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.rho));
+            int parity_d = 1 - parity;
+
+            int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+            int parity_c = parity;
+
+            int dc_link_nbr_idx = (sig_positive) ? point_d : point_c;
+            int dc_link_nbr_parity = (sig_positive) ? parity_d : parity_c;
+            Link Udc = arg.link(pos_dir(arg.sig), dc_link_nbr_idx, dc_link_nbr_parity);
+            Link Uda = arg.link(pos_dir(arg.rho), point_d, parity_d);
+            Link Ucb = arg.link(pos_dir(arg.rho), point_c, parity_c);
+            Link Ox = arg.qNuMu(0, point_a, parity_a);
+            Link Oy = arg.oProd(0, point_b, parity_b);
+            Link Oz = Ucb * Oy;
+
+            if constexpr (sig_positive) {
+              Oy = Udc * Oz;
+            } else {
+              Oy = conj(Udc) * Oz;
+            }
+
+            Link shortP = arg.shortP(0, point_a, parity_a);
+            shortP += arg.accumu_coeff * conj(Uda) * Oy;
+            arg.shortP(0, point_a, parity_a) = shortP;
+          }
+        }
+          
       }
     };
 
@@ -634,9 +753,9 @@ namespace quda {
 
         auto mycoeff = CoeffSign(goes_forward(arg.sig), parity)*CoeffSign(goes_forward(arg.nu),parity)*arg.coeff;
 
-        Link oprod = arg.force(nu_positive ? arg.nu : opp_dir(arg.nu), nu_positive ? point_d : e_cb, nu_positive ? 1-parity : parity);
+        Link oprod = arg.force(pos_dir(arg.nu), nu_positive ? point_d : e_cb, nu_positive ? 1-parity : parity);
         oprod += mycoeff * Ow;
-        arg.force(nu_positive ? arg.nu : opp_dir(arg.nu), nu_positive ? point_d : e_cb, nu_positive ? 1-parity : parity) = oprod;
+        arg.force(pos_dir(arg.nu), nu_positive ? point_d : e_cb, nu_positive ? 1-parity : parity) = oprod;
       }
     };
 

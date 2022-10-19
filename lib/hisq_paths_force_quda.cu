@@ -248,6 +248,11 @@ namespace quda {
         } else {
           launch<AllLink>(tp, stream, FatLinkParam<Arg, 0, 0>(arg));
         }
+        //if (goes_forward(arg.sig)) {
+        //  launch<AllLink>(tp, stream, FatLinkParam<Arg, 0, 1>(arg));
+        //} else {
+        //  launch<AllLink>(tp, stream, FatLinkParam<Arg, 0, 0>(arg));
+        //}
       }
 
       void preTune() {
@@ -629,7 +634,8 @@ namespace quda {
               MiddleFiveLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, Pnumu, P5, Qnumu, Pmu, Qmu, link, act_path_coeff);
               MiddleFiveLinkForce<decltype(middleFiveLinkArg)> middleFiveLink(middleFiveLinkArg, link, sig, nu, newOprod, Pnumu, P5, Qnumu);
 
-              for (int rho = 0; rho < 8; rho++) {
+              // for (int rho = 0; rho < 8; rho++) {
+              for (int rho = 0; rho < 4; rho++) {
                 if (rho == sig || rho == opp_dir(sig) || rho == mu || rho == opp_dir(mu) || rho == nu || rho == opp_dir(nu)) continue;
 
                 // 7-link: middle link and side link
