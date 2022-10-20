@@ -702,237 +702,6 @@ namespace quda {
       }
     };
 
-    /**************************lepageMiddleLinkKernel*****************************
-     *
-     *
-     * Generally we need
-     * READ
-     *    3 LINKS:         ab_link,     bc_link,    ad_link
-     *    3 COLOR MATRIX:  newOprod_at_A, oprod_at_C,  Qprod_at_D
-     * WRITE
-     *    2 COLOR MATRIX:  newOprod_at_A, P3_at_A
-     *
-     * Three call variations:
-     *   3. when Pmu/Qmu == NULL,   Pmu_at_B and Qmu_at_A are not written out
-     *
-     *   In all three above case, if the direction sig is negative, newOprod_at_A is
-     *   not read in or written out.
-     *
-     * Therefore the data traffic, in two-number pair (num_of_link, num_of_color_matrix)
-     *   Call 3:  (called 48 times, half positive sig, half negative sig)
-     *             if (sig is positive):    (3, 5)
-     *             else               :     (3, 2) no need to loadQprod_at_D in this case
-     *
-     * note: oprod_at_C could actually be read in from D when it is the fresh outer product
-     *       and we call it oprod_at_C to simply naming. This does not affect our data traffic analysis
-     *
-     * Flop count, in two-number pair (matrix_multi, matrix_add)
-     *   call 3:     if (sig is positive)  (4, 1)
-     *   (Lepage)    else                  (2, 0)
-     *
-     ****************************************************************************/
-    template <typename store_t, int nColor_, QudaReconstructType recon>
-    struct LepageMiddleLinkArg : public BaseForceArg<store_t, nColor_, recon> {
-      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
-      using real = typename mapper<store_t>::type;
-      static constexpr int nColor = nColor_;
-      using Gauge = typename gauge_mapper<real, recon>::type;
-
-      Gauge force;
-      Gauge p3;
-
-      const Gauge oProd;
-      const Gauge qProd;
-      const real coeff;
-
-      static constexpr int overlap = 2;
-
-      LepageMiddleLinkArg(GaugeField &force, GaugeField &P3, const GaugeField &oProd,
-                 const GaugeField &qProd, const GaugeField &link,
-                 const PathCoefficients<real> &act_path_coeff)
-        : BaseForceArg(link, overlap), force(force), p3(P3),
-        oProd(oProd), qProd(qProd), coeff(act_path_coeff.lepage)
-      { }
-
-    };
-
-    template <typename Param> struct LepageMiddleLink
-    {
-      using Arg = typename Param::Arg;
-      using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
-      const Arg &arg;
-      static constexpr int mu_positive = Param::orthogonal_positive;
-      static constexpr int sig_positive = Param::sig_positive;
-
-      constexpr LepageMiddleLink(const Param &param) : arg(param.arg) {}
-      constexpr static const char *filename() { return KERNEL_FILE; }
-
-      __device__ __host__ void operator()(int x_cb, int parity)
-      {
-        int x[4];
-        getCoords(x, x_cb, arg.D, parity);
-
-        /*        A________B
-         *   mu   |        |
-         *       D|        |C
-         *
-         *    A is the current point (sid)
-         *
-         */
-
-        for (int d=0; d<4; d++) x[d] += arg.base_idx[d];
-        int e_cb = linkIndex(x,arg.E);
-        parity = parity ^ arg.oddness_change;
-        int y[4] = {x[0], x[1], x[2], x[3]};
-
-        int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu));
-        int ad_link_nbr_idx = mu_positive ? point_d : e_cb;
-
-        int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
-
-        for (int d=0; d<4; d++) y[d] = x[d];
-        int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
-
-        int bc_link_nbr_idx = mu_positive ? point_c : point_b;
-        int ab_link_nbr_idx = sig_positive ? e_cb : point_b;
-
-        // load the link variable connecting a and b
-        Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, sig_positive^(1-parity));
-
-        // load the link variable connecting b and c
-        Link Ubc = arg.link(pos_dir(arg.mu), bc_link_nbr_idx, mu_positive^(1-parity));
-
-        Link Oy = arg.oProd(0, point_c, parity);
-
-        Link Ow = !mu_positive ? Ubc*Oy : conj(Ubc)*Oy;
-
-        arg.p3(0, e_cb, parity) = sig_positive ? Uab*Ow : conj(Uab)*Ow;
-
-        Link Uad = arg.link(pos_dir(arg.mu), ad_link_nbr_idx, mu_positive^parity);
-        if constexpr (!mu_positive)  Uad = conj(Uad);
-
-        if constexpr ( sig_positive ) {
-          Oy = arg.qProd(0, point_d, 1-parity);
-          Link Ox = Oy*Uad;
-          Oy = Ow*Ox;
-
-          Link oprod = arg.force(arg.sig, e_cb, parity);
-          oprod += arg.coeff*Oy;
-          arg.force(arg.sig, e_cb, parity) = oprod;
-        }
-
-      }
-    };
-
-    /***********************************lepageSideLinkKernel***************************
-     *
-     * In general we need
-     * READ
-     *    1  LINK:          ad_link
-     *    4  COLOR MATRIX:  shortP_at_D, newOprod, P3_at_A, Qprod_at_D,
-     * WRITE
-     *    2  COLOR MATRIX:  shortP_at_D, newOprod,
-     *
-     * Two call variations:
-     *   1. full read/write
-     *   2. when shortP == NULL && Qprod == NULL:
-     *          no need to read ad_link/shortP_at_D or write shortP_at_D
-     *          Qprod_at_D does not exit and is not read in
-     *
-     *
-     * Therefore the data traffic, in two-number pair (num_of_links, num_of_color_matrix)
-     *   Call 1:   (called 192 times)
-     *                           (1, 6)
-     *
-     *   Call 2:   (called 48 times)
-     *                           (0, 3)
-     *
-     * note: newOprod can be at point D or A, depending on if mu is postive or negative
-     *
-     * Flop count, in two-number pair (matrix_multi, matrix_add)
-     *   call 1:       (2, 2)
-     *   call 2:       (0, 1)
-     *
-     *********************************************************************************/
-    template <typename store_t, int nColor_, QudaReconstructType recon>
-    struct LepageSideLinkArg : public BaseForceArg<store_t, nColor_, recon> {
-      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
-      using real = typename mapper<store_t>::type;
-      static constexpr int nColor = nColor_;
-      using Gauge = typename gauge_mapper<real, recon>::type;
-
-      Gauge force;
-      Gauge shortP;
-      Gauge p3;
-
-      const Gauge qProd;
-      const real coeff;
-      const real accumu_coeff;
-
-      static constexpr int overlap = 2;
-
-      LepageSideLinkArg(GaugeField &force, GaugeField &shortP, const GaugeField &P3,
-                 const GaugeField &qProd, const GaugeField &link, const PathCoefficients<real> &act_path_coeff)
-        : BaseForceArg(link, overlap), force(force), shortP(shortP), p3(P3), qProd(qProd),
-          coeff(-act_path_coeff.lepage), accumu_coeff(act_path_coeff.three != 0 ? act_path_coeff.lepage / act_path_coeff.three : 0)
-      { }
-
-    };
-
-    template <typename Param> struct LepageSideLink
-    {
-      using Arg = typename Param::Arg;
-      using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
-      const Arg &arg;
-      static constexpr int mu_positive = Param::orthogonal_positive;
-
-      constexpr LepageSideLink(const Param &param) : arg(param.arg) {}
-      constexpr static const char *filename() { return KERNEL_FILE; }
-
-      __device__ __host__ void operator()(int x_cb, int parity)
-      {
-        int x[4];
-        getCoords(x, x_cb ,arg.D, parity);
-        for (int d=0; d<4; d++) x[d] = x[d] + arg.base_idx[d];
-        int e_cb = linkIndex(x,arg.E);
-        parity = parity ^ arg.oddness_change;
-
-        /*      compute the side link contribution to the momentum
-         *
-         *             sig
-         *          A________B
-         *           |       |   mu
-         *         D |       |C
-         *
-         *      A is the current point (x_cb)
-         *
-         */
-
-        int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu));
-
-        Link Oy = arg.p3(0, e_cb, parity);
-
-        int ad_link_nbr_idx = mu_positive ? point_d : e_cb;
-
-        Link Uad = arg.link(pos_dir(arg.mu), ad_link_nbr_idx, mu_positive^parity);
-        Link Ow = mu_positive ? Uad*Oy : conj(Uad)*Oy;
-
-        Link shortP = arg.shortP(0, point_d, 1-parity);
-        shortP += arg.accumu_coeff * Ow;
-        arg.shortP(0, point_d, 1-parity) = shortP;
-
-        Link Ox = arg.qProd(0, point_d, 1-parity);
-        Ow = mu_positive ? Oy*Ox : conj(Ox)*conj(Oy);
-
-        auto mycoeff = CoeffSign(goes_forward(arg.sig), parity)*CoeffSign(goes_forward(arg.mu),parity)*arg.coeff;
-
-        Link oprod = arg.force(mu_positive ? arg.mu : opp_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
-        oprod += mycoeff * Ow;
-        arg.force(mu_positive ? arg.mu : opp_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity) = oprod;
-      }
-    };
-
     /**************************lepageAllLinkKernel*****************************
      * 
      * Generally we need
@@ -954,7 +723,7 @@ namespace quda {
      *
      * Flop count, in two-number pair (matrix_multi, matrix_add)
      *   if (sig is positive)  (6, 3)
-     *   else                  (4, 1)
+     *   else                  (4, 2)
      *
      ****************************************************************************/
     template <typename store_t, int nColor_, QudaReconstructType recon>
@@ -1031,9 +800,9 @@ namespace quda {
         // load the link variable connecting b and c
         Link Ubc = arg.link(pos_dir(arg.mu), bc_link_nbr_idx, mu_positive^(1-parity));
 
-        Link Oy = arg.oProd(0, point_c, parity);
+        Link Oc = arg.oProd(0, point_c, parity);
 
-        Link Ow = !mu_positive ? Ubc*Oy : conj(Ubc)*Oy;
+        Link Ow = !mu_positive ? Ubc*Oc : conj(Ubc)*Oc;
 
         Link p3 = sig_positive ? Uab*Ow : conj(Uab)*Ow;
 
@@ -1057,7 +826,7 @@ namespace quda {
 
         if constexpr ( sig_positive ) {
           Link Ox = mu_positive ? Qd * Uad : Qd * conj(Uad);
-          Oy = Ow*Ox;
+          Link Oy = Ow*Ox;
 
           Link oprod = arg.force(arg.sig, e_cb, parity);
           oprod += arg.coeff*Oy;
