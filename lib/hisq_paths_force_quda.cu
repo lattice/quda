@@ -229,6 +229,9 @@ namespace quda {
         strcat(aux, ",threads=");
         u32toa(aux2, arg.threads.x);
         strcat(aux, aux2);
+        strcat(aux, ",sig=");
+        u32toa(aux2, arg.sig);
+        strcat(aux, aux2);
         strcat(aux, ",rho=");
         u32toa(aux2, arg.rho);
         strcat(aux, aux2);
@@ -239,20 +242,11 @@ namespace quda {
       void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        if (goes_forward(arg.sig) && goes_forward(arg.rho)) {
-          launch<AllLink>(tp, stream, FatLinkParam<Arg, 1, 1>(arg));
-        } else if (goes_forward(arg.sig) && goes_backward(arg.rho)) {
-          launch<AllLink>(tp, stream, FatLinkParam<Arg, 0, 1>(arg));
-        } else if (goes_backward(arg.sig) && goes_forward(arg.rho)) {
-          launch<AllLink>(tp, stream, FatLinkParam<Arg, 1, 0>(arg));
+        if (goes_forward(arg.sig)) {
+          launch<AllLink>(tp, stream, FatLinkParam<Arg, -1, 1>(arg));
         } else {
-          launch<AllLink>(tp, stream, FatLinkParam<Arg, 0, 0>(arg));
+          launch<AllLink>(tp, stream, FatLinkParam<Arg, -1, 0>(arg));
         }
-        //if (goes_forward(arg.sig)) {
-        //  launch<AllLink>(tp, stream, FatLinkParam<Arg, 0, 1>(arg));
-        //} else {
-        //  launch<AllLink>(tp, stream, FatLinkParam<Arg, 0, 0>(arg));
-        //}
       }
 
       void preTune() {
@@ -266,12 +260,17 @@ namespace quda {
       }
 
       long long flops() const {
-        return 2*arg.threads.x*(goes_forward(arg.sig) ? 1242ll : 828ll);
+        int multiplies = (goes_forward(arg.sig) ? 16 : 10);
+        int adds = (goes_forward(arg.sig) ? 9 : 6);
+        int rescales = (goes_forward(arg.sig) ? 6 : 4);
+        return 2*arg.threads.x*(198ll * multiplies + 18ll * adds + 18ll * rescales);
       }
 
       long long bytes() const {
-        return 2*arg.threads.x*( (goes_forward(arg.sig) ? 4 : 2)*arg.force.Bytes() + 3*arg.link.Bytes()
-                               + arg.oProd.Bytes() + arg.qNuMu.Bytes() + 2*arg.shortP.Bytes());
+        return 2*arg.threads.x*( (goes_forward(arg.sig) ? 4 : 2) * arg.force.Bytes() +
+                                 (goes_forward(arg.sig) ? 3 : 2) * arg.qNuMu.Bytes() +
+                                 (goes_forward(arg.sig) ? 3 : 2) * arg.oProd.Bytes() +
+                                 7 * arg.link.Bytes() + 2 * arg.shortP.Bytes() );
       }
     };
 
