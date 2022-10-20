@@ -92,9 +92,9 @@ namespace quda {
         if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
           launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 1, 1>(arg));
         } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
-          launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 0, 1>(arg));
-        } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
           launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 1, 0>(arg));
+        } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
+          launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 0, 1>(arg));
         } else {
           launch<MiddleThreeLink>(tp, stream, FatLinkParam<Arg, 0, 0>(arg));
         }
@@ -169,13 +169,13 @@ namespace quda {
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (goes_forward(arg.sig) && goes_forward(arg.nu)) {
-          launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 1, 1>(arg));
+          launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 1, -1, 1>(arg));
         } else if (goes_forward(arg.sig) && goes_backward(arg.nu)) {
-          launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 0, 1>(arg));
+          launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 1, -1, 0>(arg));
         } else if (goes_backward(arg.sig) && goes_forward(arg.nu)) {
-          launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 1, 0>(arg));
+          launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 0, -1, 1>(arg));
         } else {
-          launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 0, 0>(arg));
+          launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, 0, -1, 0>(arg));
         }
       }
 
@@ -243,9 +243,9 @@ namespace quda {
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (goes_forward(arg.sig)) {
-          launch<AllLink>(tp, stream, FatLinkParam<Arg, -1, 1>(arg));
+          launch<AllLink>(tp, stream, FatLinkParam<Arg, 1>(arg));
         } else {
-          launch<AllLink>(tp, stream, FatLinkParam<Arg, -1, 0>(arg));
+          launch<AllLink>(tp, stream, FatLinkParam<Arg, 0>(arg));
         }
       }
 
@@ -310,9 +310,9 @@ namespace quda {
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (goes_forward(arg.nu)) {
-          launch<SideLink>(tp, stream, FatLinkParam<Arg, 1>(arg));
+          launch<SideLink>(tp, stream, FatLinkParam<Arg, -1, -1, 1>(arg));
         } else {
-          launch<SideLink>(tp, stream, FatLinkParam<Arg, 0>(arg));
+          launch<SideLink>(tp, stream, FatLinkParam<Arg, -1, -1, 0>(arg));
         }
       }
 
@@ -376,9 +376,9 @@ namespace quda {
         if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
           launch<LepageAllLink>(tp, stream, FatLinkParam<Arg, 1, 1>(arg));
         } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
-          launch<LepageAllLink>(tp, stream, FatLinkParam<Arg, 0, 1>(arg));
-        } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
           launch<LepageAllLink>(tp, stream, FatLinkParam<Arg, 1, 0>(arg));
+        } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
+          launch<LepageAllLink>(tp, stream, FatLinkParam<Arg, 0, 1>(arg));
         } else {
           launch<LepageAllLink>(tp, stream, FatLinkParam<Arg, 0, 0>(arg));
         }
@@ -443,9 +443,9 @@ namespace quda {
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (goes_forward(arg.mu)) {
-          launch<SideLinkShort>(tp, stream, FatLinkParam<Arg, 1>(arg));
+          launch<SideLinkShort>(tp, stream, FatLinkParam<Arg, -1, 1>(arg));
         } else {
-          launch<SideLinkShort>(tp, stream, FatLinkParam<Arg, 0>(arg));
+          launch<SideLinkShort>(tp, stream, FatLinkParam<Arg, -1, 0>(arg));
         }
       }
 

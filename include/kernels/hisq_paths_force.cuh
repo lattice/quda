@@ -102,12 +102,16 @@ namespace quda {
       }
     };
 
-    template <typename Arg_, int orthogonal_positive_ = 0, int sig_positive_ = 0>
+    template <typename Arg_, int sig_positive_, int mu_positive_ = -1, int nu_positive_ = -1>
     struct FatLinkParam : kernel_param<> {
-      // whether or not the "orthogonal" direction is forwards or backwards
-      static constexpr int orthogonal_positive = orthogonal_positive_;
-      // whether the base link direction is forwards or backwards
+      // whether the sig direction, if relevant, is forwards or backwards
       static constexpr int sig_positive = sig_positive_;
+
+      // whether the mu direction, if relevant, is forwards or backwards
+      static constexpr int mu_positive = mu_positive_;
+
+      // whether the nu direction, if relevant, is forwards or backwards
+      static constexpr int nu_positive = nu_positive_;
 
       // base argument structure
       using Arg = Arg_;
@@ -217,8 +221,10 @@ namespace quda {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       const Arg &arg;
-      static constexpr int mu_positive = Param::orthogonal_positive;
+
       static constexpr int sig_positive = Param::sig_positive;
+      static constexpr int mu_positive = Param::mu_positive;
+      static_assert(Param::nu_positive == -1, "nu_positive should be set to -1 for MiddleThreeLink");
 
       constexpr MiddleThreeLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
@@ -351,8 +357,10 @@ namespace quda {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       const Arg &arg;
-      static constexpr int nu_positive = Param::orthogonal_positive;
+
       static constexpr int sig_positive = Param::sig_positive;
+      static_assert(Param::mu_positive == -1, "mu_positive should be set to -1 for MiddleFiveLink");
+      static constexpr int nu_positive = Param::nu_positive;
 
       constexpr MiddleFiveLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
@@ -476,8 +484,10 @@ namespace quda {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       const Arg &arg;
-      static constexpr int rho_positive = Param::orthogonal_positive;
+
       static constexpr int sig_positive = Param::sig_positive;
+      static_assert(Param::mu_positive == -1, "mu_positive should be set to -1 for AllLink");
+      static_assert(Param::nu_positive == -1, "nu_positive should be set to -1 for AllLink");
 
       constexpr AllLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
@@ -653,7 +663,10 @@ namespace quda {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       const Arg &arg;
-      static constexpr int nu_positive = Param::orthogonal_positive;
+
+      static_assert(Param::sig_positive == -1, "sig_positive should be set to -1 for SideLink");
+      static_assert(Param::mu_positive == -1, "mu_positive should be set to -1 for SideLink");
+      static constexpr int nu_positive = Param::nu_positive;
 
       constexpr SideLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
@@ -671,34 +684,38 @@ namespace quda {
          *             sig
          *          A________B
          *           |       |   nu
-         *         D |       |C
+         *         H |       |G
          *
          *      A is the current point (x_cb)
          *
          */
 
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.nu));
+        int point_a = e_cb;
+        int parity_a = parity;
+        int point_h = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.nu));
+        int parity_h = 1 - parity;
 
-        Link Oy = arg.p5(0, e_cb, parity);
+        Link Oy = arg.p5(0, point_a, parity_a);
 
-        int ad_link_nbr_idx = nu_positive ? point_d : e_cb;
+        int ah_link_nbr_idx = nu_positive ? point_h : point_a;
+        int ah_link_nbr_parity = nu_positive ? parity_h : parity_a;
 
-        Link Uad = arg.link(pos_dir(arg.nu), ad_link_nbr_idx, nu_positive^parity);
+        Link Uad = arg.link(pos_dir(arg.nu), ah_link_nbr_idx, ah_link_nbr_parity);
         Link Ow = nu_positive ? Uad*Oy : conj(Uad)*Oy;
 
-        Link shortP = arg.shortP(0, point_d, 1-parity);
+        Link shortP = arg.shortP(0, point_h, parity_h);
         shortP += arg.accumu_coeff * Ow;
-        arg.shortP(0, point_d, 1-parity) = shortP;
+        arg.shortP(0, point_h, parity_h) = shortP;
 
-        Link Ox = arg.qProd(0, point_d, 1-parity);
+        Link Ox = arg.qProd(0, point_h, parity_h);
         Ow = nu_positive ? Oy*Ox : conj(Ox)*conj(Oy);
 
-        auto mycoeff = CoeffSign(goes_forward(arg.sig), parity)*CoeffSign(goes_forward(arg.nu),parity)*arg.coeff;
+        auto mycoeff = CoeffSign(goes_forward(arg.sig), parity_a)*CoeffSign(goes_forward(arg.nu),parity_a)*arg.coeff;
 
-        Link oprod = arg.force(pos_dir(arg.nu), nu_positive ? point_d : e_cb, nu_positive ? 1-parity : parity);
+        Link oprod = arg.force(pos_dir(arg.nu), nu_positive ? point_h : point_a, nu_positive ? parity_h : parity_a);
         oprod += mycoeff * Ow;
-        arg.force(pos_dir(arg.nu), nu_positive ? point_d : e_cb, nu_positive ? 1-parity : parity) = oprod;
+        arg.force(pos_dir(arg.nu), nu_positive ? point_h : point_a, nu_positive ? parity_h : parity_a) = oprod;
       }
     };
 
@@ -758,8 +775,10 @@ namespace quda {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       const Arg &arg;
-      static constexpr int mu_positive = Param::orthogonal_positive;
+
       static constexpr int sig_positive = Param::sig_positive;
+      static constexpr int mu_positive = Param::mu_positive;
+      static_assert(Param::nu_positive == -1, "nu_positive should be set to -1 for LepageAllLink");
 
       constexpr LepageAllLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
@@ -864,7 +883,10 @@ namespace quda {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       const Arg &arg;
-      static constexpr int mu_positive = Param::orthogonal_positive;
+
+      static_assert(Param::sig_positive == -1, "sig_positive should be set to -1 for SideLinkShort");
+      static constexpr int mu_positive = Param::mu_positive;
+      static_assert(Param::nu_positive == -1, "nu_positive should be set to -1 for SideLinkShort");
 
       constexpr SideLinkShort(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
