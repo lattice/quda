@@ -23,8 +23,8 @@ namespace quda {
     constexpr int opp_dir(int signed_dir) { return 7 - signed_dir; }
     constexpr int goes_forward(int signed_dir) { return signed_dir <= 3; }
     constexpr int goes_backward(int signed_dir) { return signed_dir > 3; }
-    constexpr int CoeffSign(int pos_dir, int odd_lattice) { return 2*((pos_dir + odd_lattice + 1) & 1) - 1; }
-    constexpr int Sign(int parity) { return parity ? -1 : 1; }
+    constexpr int coeff_sign(int pos_dir, int odd_lattice) { return 2*((pos_dir + odd_lattice + 1) & 1) - 1; }
+    constexpr int parity_sign(int parity) { return parity ? -1 : 1; }
     constexpr int pos_dir(int signed_dir) { return (signed_dir >= 4) ? 7 - signed_dir : signed_dir; }
 
     constexpr int updateCoordsIndexMILCDir(int x[], const int X[], int signed_dir) {
@@ -131,12 +131,12 @@ namespace quda {
       Gauge force;
 
       const Gauge oProd;
-      const real coeff;
+      const real coeff_one;
 
       static constexpr int overlap = 0;
 
       OneLinkArg(GaugeField &force, const GaugeField &oProd, const GaugeField &link, const PathCoefficients<real> &act_path_coeff)
-        : BaseForceArg(link, overlap), force(force), oProd(oProd), coeff(act_path_coeff.one) {
+        : BaseForceArg(link, overlap), force(force), oProd(oProd), coeff_one(act_path_coeff.one) {
           this->threads.z = 4;
         }
 
@@ -159,7 +159,7 @@ namespace quda {
 
         Link w = arg.oProd(sig, e_cb, parity);
         Link force = arg.force(sig, e_cb, parity);
-        force += arg.coeff * w;
+        force += arg.coeff_one * w;
         arg.force(sig, e_cb, parity) = force;
       }
     };
@@ -203,7 +203,7 @@ namespace quda {
       Gauge qMu;
 
       const Gauge oProd;
-      const real coeff;
+      const real coeff_three;
 
       static constexpr int overlap = 2;
 
@@ -211,7 +211,7 @@ namespace quda {
                  const GaugeField &oProd, const GaugeField &link,
                   const PathCoefficients<real> &act_path_coeff)
         : BaseForceArg(link, overlap), force(force), pMu(pMu), p3(P3), qMu(qMu),
-        oProd(oProd), coeff(-act_path_coeff.three)
+        oProd(oProd), coeff_three(act_path_coeff.three)
       { }
 
     };
@@ -288,7 +288,7 @@ namespace quda {
         if constexpr (sig_positive) {
           Link UbcOdcUda = UbcOdc * Uda;
           Link oprod = arg.force(arg.sig, e_cb, parity);
-          oprod += arg.coeff * UbcOdcUda;
+          oprod -= arg.coeff_three * UbcOdcUda;
           arg.force(arg.sig, e_cb, parity) = oprod;
         }
 
@@ -339,7 +339,7 @@ namespace quda {
 
       const Gauge pMu;
       const Gauge qMu;
-      const real coeff;
+      const real coeff_five;
 
       static constexpr int overlap = 2;
 
@@ -347,7 +347,7 @@ namespace quda {
                  const GaugeField &pMu, const GaugeField &qMu, const GaugeField &link,
                   const PathCoefficients<real> &act_path_coeff)
         : BaseForceArg(link, overlap), force(force), pNuMu(pNuMu), p5(P5), qNuMu(qNuMu),
-        pMu(pMu), qMu(qMu), coeff(act_path_coeff.five)
+        pMu(pMu), qMu(qMu), coeff_five(act_path_coeff.five)
       { }
 
     };
@@ -418,7 +418,7 @@ namespace quda {
         if constexpr (sig_positive) {
           Oy = Ow * Ox;
           Link oprod = arg.force(arg.sig, e_cb, parity);
-          oprod += arg.coeff*Oy;
+          oprod += arg.coeff_five * Oy;
           arg.force(arg.sig, e_cb, parity) = oprod;
         }
 
@@ -465,8 +465,8 @@ namespace quda {
 
       const Gauge oProd;
       const Gauge qNuMu;
-      const real coeff;
-      const real accumu_coeff;
+      const real coeff_seven;
+      const real accumu_coeff_seven;
 
       static constexpr int overlap = 2;
 
@@ -474,7 +474,7 @@ namespace quda {
                  const GaugeField &link, const PathCoefficients<real> &act_path_coeff)
         : BaseForceArg(link, overlap), force(force), shortP(shortP),
           oProd(oProd), qNuMu(qNuMu),
-          coeff(act_path_coeff.seven), accumu_coeff(act_path_coeff.five != 0 ? act_path_coeff.seven / act_path_coeff.five : 0)
+          coeff_seven(act_path_coeff.seven), accumu_coeff_seven(act_path_coeff.five != 0 ? act_path_coeff.seven / act_path_coeff.five : 0)
       { }
 
     };
@@ -500,7 +500,7 @@ namespace quda {
         int e_cb = linkIndex(x,arg.E);
         parity = parity^arg.oddness_change;
 
-        auto mycoeff = CoeffSign(sig_positive,parity)*arg.coeff;
+        auto mycoeff_seven = coeff_sign(sig_positive,parity)*arg.coeff_seven;
 
         // Intermediate accumulators; force_sig is only needed when sig is positive
         Link force_sig, force_rho, shortP_sig;
@@ -552,9 +552,9 @@ namespace quda {
         Link Oe = arg.oProd(0, point_e, parity_e);
         Oz = Ube * Oe;
         Oy = (sig_positive ? Uab : conj(Uab)) * Oz;
-        force_rho += (Sign(parity_a) * mycoeff) * conj(Of) * conj(Oy);
+        force_rho += (parity_sign(parity_a) * mycoeff_seven) * conj(Of) * conj(Oy);
         if constexpr (sig_positive) {
-          force_sig += (Sign(parity_a) * mycoeff) * Oz * Of * conj(Uaf);
+          force_sig += (parity_sign(parity_a) * mycoeff_seven) * Oz * Of * conj(Uaf);
         }
 
         // Compute the force_rho and sideP contribution from the positive rho direction
@@ -563,8 +563,8 @@ namespace quda {
         Link Ob = arg.oProd(0, point_b, parity_b);
         Oz = conj(Ube) * Ob;
         Oy = (sig_positive ? Ufe : conj(Ufe)) * Oz;
-        force_rho -= (Sign(parity_a) * mycoeff) * Oy * Oa;
-        shortP_sig += arg.accumu_coeff * Uaf * Oy;
+        force_rho -= (parity_sign(parity_a) * mycoeff_seven) * Oy * Oa;
+        shortP_sig += arg.accumu_coeff_seven * Uaf * Oy;
 
         // Compute the sideP contribution from the negative rho direction
         Link Udc = arg.link(pos_dir(arg.sig), dc_link_nbr_idx, dc_link_nbr_parity);
@@ -572,7 +572,7 @@ namespace quda {
         Link Ucb = arg.link(pos_dir(arg.rho), point_c, parity_c);
         Oz = Ucb * Ob;
         Oy = (sig_positive ? Udc : conj(Udc)) * Oz;
-        shortP_sig += arg.accumu_coeff * conj(Uda) * Oy;
+        shortP_sig += arg.accumu_coeff_seven * conj(Uda) * Oy;
 
         // When sig is positive, compute the force_sig contribution from the
         // positive rho direction
@@ -580,7 +580,7 @@ namespace quda {
           Link Od = arg.qNuMu(0, point_d, parity_d);
           Link Oc = arg.oProd(0, point_c, parity_c);
           Oz = conj(Ucb) * Oc;
-          force_sig += (Sign(parity_a) * mycoeff) * Oz * Od * Uda;
+          force_sig += (parity_sign(parity_a) * mycoeff_seven) * Oz * Od * Uda;
         }
 
         // update the force in the rho direction
@@ -645,15 +645,15 @@ namespace quda {
       Gauge p5;
 
       const Gauge qProd;
-      const real coeff;
-      const real accumu_coeff;
+      const real coeff_five;
+      const real accumu_coeff_five;
 
       static constexpr int overlap = 1;
 
       SideLinkArg(GaugeField &force, GaugeField &shortP, const GaugeField &P5,
                  const GaugeField &qProd, const GaugeField &link,  const PathCoefficients<real> &act_path_coeff)
         : BaseForceArg(link, overlap), force(force), shortP(shortP), p5(P5), qProd(qProd),
-          coeff(-act_path_coeff.five), accumu_coeff(act_path_coeff.three != 0 ? act_path_coeff.five / act_path_coeff.three : 0)
+          coeff_five(act_path_coeff.five), accumu_coeff_five(act_path_coeff.three != 0 ? act_path_coeff.five / act_path_coeff.three : 0)
       { }
 
     };
@@ -695,27 +695,26 @@ namespace quda {
         int parity_a = parity;
         int point_h = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.nu));
         int parity_h = 1 - parity;
-
-        Link Oy = arg.p5(0, point_a, parity_a);
-
         int ah_link_nbr_idx = nu_positive ? point_h : point_a;
         int ah_link_nbr_parity = nu_positive ? parity_h : parity_a;
+
+        Link Oy = arg.p5(0, point_a, parity_a);
 
         Link Uad = arg.link(pos_dir(arg.nu), ah_link_nbr_idx, ah_link_nbr_parity);
         Link Ow = nu_positive ? Uad*Oy : conj(Uad)*Oy;
 
         Link shortP = arg.shortP(0, point_h, parity_h);
-        shortP += arg.accumu_coeff * Ow;
+        shortP += arg.accumu_coeff_five * Ow;
         arg.shortP(0, point_h, parity_h) = shortP;
 
         Link Ox = arg.qProd(0, point_h, parity_h);
-        Ow = nu_positive ? Oy*Ox : conj(Ox)*conj(Oy);
+        Ow = nu_positive ? Oy * Ox : conj(Ox) * conj(Oy);
 
-        auto mycoeff = CoeffSign(goes_forward(arg.sig), parity_a)*CoeffSign(goes_forward(arg.nu),parity_a)*arg.coeff;
+        auto mycoeff_five = -coeff_sign(goes_forward(arg.sig), parity_a)*coeff_sign(goes_forward(arg.nu),parity_a)*arg.coeff_five;
 
-        Link oprod = arg.force(pos_dir(arg.nu), nu_positive ? point_h : point_a, nu_positive ? parity_h : parity_a);
-        oprod += mycoeff * Ow;
-        arg.force(pos_dir(arg.nu), nu_positive ? point_h : point_a, nu_positive ? parity_h : parity_a) = oprod;
+        Link oprod = arg.force(pos_dir(arg.nu), ah_link_nbr_idx, ah_link_nbr_parity);
+        oprod += mycoeff_five * Ow;
+        arg.force(pos_dir(arg.nu), ah_link_nbr_idx, ah_link_nbr_parity) = oprod;
       }
     };
 
@@ -755,8 +754,8 @@ namespace quda {
 
       const Gauge oProd;
       const Gauge qProd;
-      const real coeff;
-      const real accumu_coeff;
+      const real coeff_lepage;
+      const real accumu_coeff_lepage;
 
       static constexpr int overlap = 2;
 
@@ -764,8 +763,8 @@ namespace quda {
                  const GaugeField &qProd, const GaugeField &link,
                  const PathCoefficients<real> &act_path_coeff)
         : BaseForceArg(link, overlap), force(force), shortP(shortP),
-        oProd(oProd), qProd(qProd), coeff(act_path_coeff.lepage),
-        accumu_coeff(act_path_coeff.three != 0 ? act_path_coeff.lepage / act_path_coeff.three : 0)
+        oProd(oProd), qProd(qProd), coeff_lepage(act_path_coeff.lepage),
+        accumu_coeff_lepage(act_path_coeff.three != 0 ? act_path_coeff.lepage / act_path_coeff.three : 0)
       { }
 
     };
@@ -831,16 +830,16 @@ namespace quda {
         Link Ox = mu_positive ? Uad * p3 : conj(Uad) * p3;
 
         Link shortP = arg.shortP(0, point_d, 1-parity);
-        shortP += arg.accumu_coeff * Ox;
+        shortP += arg.accumu_coeff_lepage * Ox;
         arg.shortP(0, point_d, 1-parity) = shortP;
 
         Link Qd = arg.qProd(0, point_d, 1-parity);
         Ox = mu_positive ? p3 * Qd : conj(Qd) * conj(p3);
 
-        auto mycoeff = -CoeffSign(goes_forward(arg.sig), parity)*CoeffSign(goes_forward(arg.mu),parity)*arg.coeff;
+        auto mycoeff_lepage = -coeff_sign(goes_forward(arg.sig), parity)*coeff_sign(goes_forward(arg.mu),parity)*arg.coeff_lepage;
 
         Link oprod = arg.force(pos_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
-        oprod += mycoeff * Ox;
+        oprod += mycoeff_lepage * Ox;
         arg.force(pos_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity) = oprod;
 
         if constexpr ( sig_positive ) {
@@ -848,7 +847,7 @@ namespace quda {
           Link Oy = Ow*Ox;
 
           Link oprod = arg.force(arg.sig, e_cb, parity);
-          oprod += arg.coeff*Oy;
+          oprod += arg.coeff_lepage*Oy;
           arg.force(arg.sig, e_cb, parity) = oprod;
         }
 
@@ -867,13 +866,13 @@ namespace quda {
       Gauge force;
       Gauge p3;
 
-      const real coeff;
+      const real coeff_three;
 
       static constexpr int overlap = 1;
 
       SideLinkShortArg(GaugeField &force, GaugeField &P3, const GaugeField &link,
                    const PathCoefficients<real> &act_path_coeff)
-        : BaseForceArg(link, overlap), force(force), p3(P3), coeff(act_path_coeff.three)
+        : BaseForceArg(link, overlap), force(force), p3(P3), coeff_three(act_path_coeff.three)
       {  }
 
     };
@@ -913,11 +912,11 @@ namespace quda {
         int point_d = mu_positive ? updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu)) : e_cb;
 
         int parity_ = mu_positive ? 1-parity : parity;
-        auto mycoeff = CoeffSign(goes_forward(arg.sig),parity)*CoeffSign(goes_forward(arg.mu),parity)*arg.coeff;
+        auto mycoeff_three = coeff_sign(goes_forward(arg.sig),parity)*coeff_sign(goes_forward(arg.mu),parity)*arg.coeff_three;
 
         Link Oy = arg.p3(0, e_cb, parity);
         Link oprod = arg.force(pos_dir(arg.mu), point_d, parity_);
-        oprod += mu_positive ? mycoeff * Oy : mycoeff * conj(Oy);
+        oprod += mu_positive ? mycoeff_three * Oy : mycoeff_three * conj(Oy);
         arg.force(pos_dir(arg.mu), point_d, parity_) = oprod;
       }
     };
