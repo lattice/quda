@@ -1745,6 +1745,9 @@ extern "C" {
     int delete_2link;
     /** Set if the input spinor is on a time slice **/
     int t0;
+    /** Flops count for the smearing operations **/
+    int gflops;
+    
   } QudaQuarkSmearParam;
 
   /**

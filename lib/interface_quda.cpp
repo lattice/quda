@@ -5591,6 +5591,8 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
   delete in_h;
   delete d;
 
+  smear_param->gflops = dirac.Flops();
+
   if( smear_param->delete_2link != 0 )
   {
     delete gaugeSmeared;

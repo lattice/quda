@@ -34,9 +34,9 @@ TEST(gsmear, verify)
 void display_test_info()
 {
   printfQuda("running the following test:\n");
-  printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
-  printfQuda("%s   %s       %s           %d       %d/%d/%d        %d \n", get_prec_str(prec), get_recon_str(link_recon),
-             get_string(gtest_type_map, gtest_type).c_str(), dagger, xdim, ydim, zdim, tdim);
+  printfQuda("prec     recon    test_type     S_dim         T_dimension\n");
+  printfQuda("%s   %s       %s       %d/%d/%d      %d \n", get_prec_str(prec), get_recon_str(link_recon),
+             get_string(gtest_type_map, gtest_type).c_str(), xdim, ydim, zdim, tdim);
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));

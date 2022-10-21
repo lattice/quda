@@ -91,6 +91,7 @@ struct GSmearTime {//DslashTime
 struct StaggeredGSmearTestWrapper {//
 
   bool is_ctest = false; 
+  double quda_gflops;
 
   // Allocate host staggered gauge fields
   void* qdp_inlink[4]    = {nullptr,nullptr,nullptr,nullptr};
@@ -110,8 +111,7 @@ struct StaggeredGSmearTestWrapper {//
   std::unique_ptr<ColorSpinorField> spinorRef;
   std::unique_ptr<ColorSpinorField> tmp;
   std::unique_ptr<ColorSpinorField> tmp2;
-  // For loading the gauge fields
-  Dirac *dirac;  
+  // For loading the gauge fields 
   
   int argc_copy;
   char **argv_copy;
@@ -275,12 +275,6 @@ struct StaggeredGSmearTestWrapper {//
     
       *tmp = *spinor;
     }
-    bool pc = false;
-    // because both call the same "Dslash" directly.
-    DiracParam diracParam;
-    setDiracParam(diracParam, &inv_param, pc);
-    diracParam.tmp1 = tmp.get();
-    dirac = Dirac::create(diracParam);
   }
 
   void end()
@@ -296,12 +290,7 @@ struct StaggeredGSmearTestWrapper {//
     host_free(milc_inlink);
     host_free(milc_twolnk);
 
-    if (cpuTwoLink != nullptr) { delete cpuTwoLink; cpuTwoLink = nullptr; }
-    
-    if (dirac != nullptr) {
-      delete dirac;
-      dirac = nullptr;
-    }    
+    if (cpuTwoLink != nullptr) { delete cpuTwoLink; cpuTwoLink = nullptr; }   
 
     if(gtest_type == gsmear_test_type::GaussianSmear) {
       tmp2.reset();
@@ -333,10 +322,12 @@ struct StaggeredGSmearTestWrapper {//
       {
         printfQuda("Doing two link in QUDA\n");
         computeTwoLinkQuda((void*) milc_twolnk, nullptr, &gauge_param);
+        quda_gflops = 2*4*198ll*V;
 	break;
       }
       case gsmear_test_type::GaussianSmear:
       {
+        printfQuda("Doing gaussian smearing in QUDA\n");
         QudaQuarkSmearParam qsm_param;
         qsm_param.inv_param      = &inv_param;
 
@@ -350,6 +341,8 @@ struct StaggeredGSmearTestWrapper {//
   
         performTwoLinkGaussianSmearNStep(spinor->V(), &qsm_param);
 
+        quda_gflops = qsm_param.gflops;
+        
         break;
       }
       default: errorQuda("Test type not defined");
@@ -372,27 +365,29 @@ struct StaggeredGSmearTestWrapper {//
     if (print_metrics) {   
       printfQuda("%fus per kernel call\n", 1e6 * gsmear_time.event_time / niter);
 
-      unsigned long long flops = gtest_type == gsmear_test_type::GaussianSmear ? dirac->Flops() : 2*4*198ll*V*(long long)niter;
+      unsigned long long flops = quda_gflops*(long long)niter;
       double gflops = 1.0e-9 * flops / gsmear_time.event_time;
       printfQuda("GFLOPS = %f\n", gflops);
       ::testing::Test::RecordProperty("Gflops", std::to_string(gflops));
 
       size_t ghost_bytes = gtest_type == gsmear_test_type::GaussianSmear ? spinor->GhostBytes() : 0;
 
-      ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_GPU",
+      if(gtest_type == gsmear_test_type::GaussianSmear) {
+        ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_GPU",
                                       1.0e-9 * 2 * ghost_bytes * niter / gsmear_time.event_time);
-      ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_CPU",
+        ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_CPU",
                                       1.0e-9 * 2 * ghost_bytes * niter / gsmear_time.cpu_time);
-      ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_CPU_min", 1.0e-9 * 2 * ghost_bytes / gsmear_time.cpu_max);
-      ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_CPU_max", 1.0e-9 * 2 * ghost_bytes / gsmear_time.cpu_min);
-      ::testing::Test::RecordProperty("Halo_message_size_bytes", 2 * ghost_bytes);
+        ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_CPU_min", 1.0e-9 * 2 * ghost_bytes / gsmear_time.cpu_max);
+        ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_CPU_max", 1.0e-9 * 2 * ghost_bytes / gsmear_time.cpu_min);
+        ::testing::Test::RecordProperty("Halo_message_size_bytes", 2 * ghost_bytes);
 
-      printfQuda(
+        printfQuda(
         "Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate "
         "message size %lu bytes\n",
         1.0e-9 * 2 * ghost_bytes * niter / gsmear_time.event_time,
         1.0e-9 * 2 * ghost_bytes * niter / gsmear_time.cpu_time, 1.0e-9 * 2 * ghost_bytes / gsmear_time.cpu_max,
         1.0e-9 * 2 * ghost_bytes / gsmear_time.cpu_min, 2 * ghost_bytes);
+      }
     }
   }
 
