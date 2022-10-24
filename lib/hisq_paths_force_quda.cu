@@ -202,10 +202,9 @@ namespace quda {
                                arg.pNuMu.Bytes() + arg.qNuMu.Bytes() + arg.qMu.Bytes() +
                                arg.p5.Bytes() + 3 * arg.link.Bytes() + arg.pMu.Bytes() );
       }
-
     };
 
-    template <typename Arg> class AllLinkForce : public TunableKernel2D {
+    template <typename Arg> class AllSevenSideFiveLinkForce : public TunableKernel2D {
       Arg &arg;
       const GaugeField &force;
       const GaugeField &shortP;
@@ -213,7 +212,7 @@ namespace quda {
       unsigned int minThreads() const { return arg.threads.x; }
 
     public:
-      AllLinkForce(Arg &arg, const GaugeField &link, int sig, int rho,
+      AllSevenSideFiveLinkForce(Arg &arg, const GaugeField &link, int sig, int nu, int rho,
                    const GaugeField &force, const GaugeField &shortP) :
         TunableKernel2D(link, 2),
         arg(arg),
@@ -222,6 +221,7 @@ namespace quda {
         link(link)
       {
         arg.sig = sig;
+        arg.nu = nu;
         arg.rho = rho;
 
         char aux2[16];
@@ -231,6 +231,9 @@ namespace quda {
         strcat(aux, aux2);
         strcat(aux, ",sig=");
         u32toa(aux2, arg.sig);
+        strcat(aux, aux2);
+        strcat(aux, ",nu=");
+        u32toa(aux2, arg.nu);
         strcat(aux, aux2);
         strcat(aux, ",rho=");
         u32toa(aux2, arg.rho);
@@ -243,9 +246,17 @@ namespace quda {
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (goes_forward(arg.sig)) {
-          launch<AllLink>(tp, stream, FatLinkParam<Arg, 1>(arg));
+          if (goes_forward(arg.nu)) {
+            launch<AllSevenSideFiveLink>(tp, stream, FatLinkParam<Arg, 1, -1, 1>(arg));
+          } else {
+            launch<AllSevenSideFiveLink>(tp, stream, FatLinkParam<Arg, 1, -1, 0>(arg));
+          }
         } else {
-          launch<AllLink>(tp, stream, FatLinkParam<Arg, 0>(arg));
+          if (goes_forward(arg.nu)) {
+            launch<AllSevenSideFiveLink>(tp, stream, FatLinkParam<Arg, 0, -1, 1>(arg));
+          } else {
+            launch<AllSevenSideFiveLink>(tp, stream, FatLinkParam<Arg, 0, -1, 0>(arg));
+          }
         }
       }
 
@@ -260,79 +271,18 @@ namespace quda {
       }
 
       long long flops() const {
-        int multiplies = (goes_forward(arg.sig) ? 16 : 10);
-        int adds = (goes_forward(arg.sig) ? 9 : 6);
-        int rescales = (goes_forward(arg.sig) ? 6 : 4);
+        int multiplies = (goes_forward(arg.sig) ? 17 : 12);
+        int adds = (goes_forward(arg.sig) ? 11 : 8);
+        int rescales = (goes_forward(arg.sig) ? 8 : 6);
         return 2*arg.threads.x*(198ll * multiplies + 18ll * adds + 18ll * rescales);
       }
 
       long long bytes() const {
-        return 2*arg.threads.x*( (goes_forward(arg.sig) ? 4 : 2) * arg.force.Bytes() +
+        return 2*arg.threads.x*( (goes_forward(arg.sig) ? 6 : 4) * arg.force.Bytes() +
                                  (goes_forward(arg.sig) ? 3 : 2) * arg.qNuMu.Bytes() +
                                  (goes_forward(arg.sig) ? 3 : 2) * arg.oProd.Bytes() +
-                                 7 * arg.link.Bytes() + 2 * arg.shortP.Bytes() );
-      }
-    };
-
-    template <typename Arg> class SideLinkForce : public TunableKernel2D {
-      Arg &arg;
-      const GaugeField &force;
-      const GaugeField &shortP;
-      const GaugeField &link;
-      unsigned int minThreads() const { return arg.threads.x; }
-
-    public:
-      SideLinkForce(Arg &arg, const GaugeField &link, int sig, int nu,
-                   const GaugeField &force, const GaugeField &shortP) :
-        TunableKernel2D(link, 2),
-        arg(arg),
-        force(force),
-        shortP(shortP),
-        link(link)
-      {
-        arg.sig = sig;
-        arg.nu = nu;
-
-        char aux2[16];
-        strcat(aux, comm_dim_partitioned_string());
-        strcat(aux, ",threads=");
-        u32toa(aux2, arg.threads.x);
-        strcat(aux, aux2);
-        strcat(aux, ",nu=");
-        u32toa(aux2, arg.nu);
-        strcat(aux, aux2);
-        // no sig dependence needed for side link
-
-        apply(device::get_default_stream());
-      }
-
-      void apply(const qudaStream_t &stream)
-      {
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        if (goes_forward(arg.nu)) {
-          launch<SideLink>(tp, stream, FatLinkParam<Arg, -1, -1, 1>(arg));
-        } else {
-          launch<SideLink>(tp, stream, FatLinkParam<Arg, -1, -1, 0>(arg));
-        }
-      }
-
-      void preTune() {
-        shortP.backup();
-        force.backup();
-      }
-
-      void postTune() {
-        shortP.restore();
-        force.restore();
-      }
-
-      long long flops() const {
-        return 2*arg.threads.x*2*234;
-      }
-
-      long long bytes() const {
-        return 2*arg.threads.x*( 2*arg.force.Bytes() + 2*arg.shortP.Bytes() +
-                               arg.p5.Bytes() + arg.link.Bytes() + arg.qProd.Bytes() );
+                                 8 * arg.link.Bytes() + 2 * arg.shortP.Bytes() +
+                                 arg.qProd.Bytes() + arg.p5.Bytes() );
       }
     };
 
@@ -504,22 +454,18 @@ namespace quda {
               MiddleFiveLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, Pnumu, P5, Qnumu, Pmu, Qmu, link, act_path_coeff);
               MiddleFiveLinkForce<decltype(middleFiveLinkArg)> middleFiveLink(middleFiveLinkArg, link, sig, nu, newOprod, Pnumu, P5, Qnumu);
 
-              // for (int rho = 0; rho < 8; rho++) {
-              for (int rho = 0; rho < 4; rho++) {
-                if (rho == sig || rho == opp_dir(sig) || rho == mu || rho == opp_dir(mu) || rho == nu || rho == opp_dir(nu)) continue;
+              // determine the remaining orthogonal direction
+              int rho;
+              for (rho = 0; rho < 4; rho++) {
+                if (rho != pos_dir(sig) && rho != pos_dir(mu) && rho != pos_dir(nu))
+                  break;
+              }
 
-                // 7-link: middle link and side link
-                // In/out: newOprod, P5 (called "sideP")
-                // In: Pnumu (called "oProd"), Qnumu, link
-                AllLinkArg<Float, nColor, recon> arg(newOprod, P5, Pnumu, Qnumu, link, act_path_coeff);
-                AllLinkForce<decltype(arg)> all(arg, link, sig, rho, newOprod, P5);
-              } //rho
-
-              // 5-link: side link
-              // In/out: newOprod, P3 (called "sideP")
-              // In: P5, Qmu (called "qProd"), link
-              SideLinkArg<Float, nColor, recon> arg(newOprod, P3, P5, Qmu, link, act_path_coeff);
-              SideLinkForce<decltype(arg)> side(arg, link, sig, nu, newOprod, P3);
+              // Fused 7-link middle and side link with 5-link side link:
+              // In/out: newOprod, P3 (called shortP), 
+              // In: P5, Pmunu (called "oprod"), Qnumu, Qmu (called qProd), link
+              AllSevenSideFiveLinkArg<Float, nColor, recon> argAll(newOprod, P3, P5, Pnumu, Qnumu, Qmu, link, act_path_coeff);
+              AllSevenSideFiveLinkForce<decltype(argAll)> all(argAll, link, sig, nu, rho, newOprod, P3);
 
             } //nu
 

@@ -425,36 +425,35 @@ namespace quda {
       }
     };
 
-    /********************************allLinkKernel*********************************************
-     *
+    /********************************allSevenSideFiveLinkKernel*********************************************
      * Note: this kernel names points differently than the other kernels, there's a diagram
      *   within the kernel code
      *
      * In this function we need
      *   READ
-     *     7 LINKS:         ab_link, af_link, be_link, fe_link, dc_link, da_link, cb_link
-     *     9 COLOR MATRIX:  qnumu_at_{a, f, d}, oprod_at_{e, b, c}, newOprod_{rho,sig}_at_a,
-     *                      shortP_at_a
+     *     8 LINKS:         ab_link, af_link, be_link, fe_link, dc_link, da_link, cb_link, ah_link
+     *     12 COLOR MATRIX:  qnumu_at_{a, f, d}, oprod_at_{e, b, c}, newOprod_{rho,sig,nu}_at_a,
+     *                      p5_at_a, shortP_at_h, qProd_at_h
      *   WRITE:
-     *     3 COLOR MATRIX:  newOprod_{rho,sig}_at_a, shortP_at_a
+     *     4 COLOR MATRIX:  newOprod_{rho,sig,nu}_at_a, shortP_at_h
      *
      * If sig is negative, then we don't need to read qnumu_at_c, oprod_at_b, read/write
      *             newOprod_sig_at_a
      *
      * Therefore the data traffic, in two-number pair (num_of_link, num_of_color_matrix)
      *
-     *             if (sig is positive):    (7, 12)
-     *             else               :     (7, 8)
+     *             if (sig is positive):    (8, 16)
+     *             else               :     (8, 12)
      *
      * This function is called 192 times, half positive sig, half negative sig
      *
      * Flop count, in two-number pair (matrix_multi, matrix_add)
-     *             if(sig is positive)      (16,9)
-     *             else                     (10,6)
+     *             if(sig is positive)      (17,11)
+     *             else                     (12,8)
      *
      ************************************************************************************************/
     template <typename store_t, int nColor_, QudaReconstructType recon>
-    struct AllLinkArg : public BaseForceArg<store_t, nColor_, recon> {
+    struct AllSevenSideFiveLinkArg : public BaseForceArg<store_t, nColor_, recon> {
       using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
@@ -462,48 +461,47 @@ namespace quda {
 
       Gauge force;
       Gauge shortP;
+      Gauge p5;
 
       const Gauge oProd;
       const Gauge qNuMu;
+      const Gauge qProd;
+
+      const real coeff_five;
+      const real accumu_coeff_five;
       const real coeff_seven;
       const real accumu_coeff_seven;
 
       static constexpr int overlap = 2;
 
-      AllLinkArg(GaugeField &force, GaugeField &shortP, const GaugeField &oProd, const GaugeField &qNuMu,
-                 const GaugeField &link, const PathCoefficients<real> &act_path_coeff)
-        : BaseForceArg(link, overlap), force(force), shortP(shortP),
-          oProd(oProd), qNuMu(qNuMu),
+      AllSevenSideFiveLinkArg(GaugeField &force, GaugeField &shortP, GaugeField &P5, const GaugeField &oProd, const GaugeField &qNuMu,
+                 const GaugeField &qProd, const GaugeField &link, const PathCoefficients<real> &act_path_coeff)
+        : BaseForceArg(link, overlap), force(force), shortP(shortP), p5(P5),
+          oProd(oProd), qNuMu(qNuMu), qProd(qProd),
+          coeff_five(act_path_coeff.five), accumu_coeff_five(act_path_coeff.three != 0 ? act_path_coeff.five / act_path_coeff.three : 0),
           coeff_seven(act_path_coeff.seven), accumu_coeff_seven(act_path_coeff.five != 0 ? act_path_coeff.seven / act_path_coeff.five : 0)
       { }
 
     };
 
-    template <typename Param> struct AllLink
+    template <typename Param> struct AllSevenSideFiveLink
     {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       const Arg &arg;
 
       static constexpr int sig_positive = Param::sig_positive;
-      static_assert(Param::mu_positive == -1, "mu_positive should be set to -1 for AllLink");
-      static_assert(Param::nu_positive == -1, "nu_positive should be set to -1 for AllLink");
+      static_assert(Param::mu_positive == -1, "mu_positive should be set to -1 for AllSevenSideFiveLink");
+      static constexpr int nu_positive = Param::nu_positive;
 
-      constexpr AllLink(const Param &param) : arg(param.arg) {}
+      constexpr AllSevenSideFiveLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ void operator()(int x_cb, int parity)
-      {
-        int x[4];
-        getCoords(x, x_cb, arg.D, parity);
-        for (int d=0; d<4; d++) x[d] += arg.base_idx[d];
-        int e_cb = linkIndex(x,arg.E);
-        parity = parity^arg.oddness_change;
-
+      __device__ __host__ Link all_link(int x[4], int e_cb, int parity) {
         auto mycoeff_seven = coeff_sign(sig_positive,parity)*arg.coeff_seven;
 
         // Intermediate accumulators; force_sig is only needed when sig is positive
-        Link force_sig, force_rho, shortP_sig;
+        Link force_sig, force_rho, p5_sig;
 
         // Link product intermediates
         Link Oy, Oz;
@@ -557,22 +555,22 @@ namespace quda {
           force_sig += (parity_sign(parity_a) * mycoeff_seven) * Oz * Of * conj(Uaf);
         }
 
-        // Compute the force_rho and sideP contribution from the positive rho direction
+        // Compute the force_rho and p5 contribution from the positive rho direction
         Link Ufe = arg.link(pos_dir(arg.sig), fe_link_nbr_idx, fe_link_nbr_parity);
         Link Oa = arg.qNuMu(0, point_a, parity_a);
         Link Ob = arg.oProd(0, point_b, parity_b);
         Oz = conj(Ube) * Ob;
         Oy = (sig_positive ? Ufe : conj(Ufe)) * Oz;
         force_rho -= (parity_sign(parity_a) * mycoeff_seven) * Oy * Oa;
-        shortP_sig += arg.accumu_coeff_seven * Uaf * Oy;
+        p5_sig += arg.accumu_coeff_seven * Uaf * Oy;
 
-        // Compute the sideP contribution from the negative rho direction
+        // Compute the p5 contribution from the negative rho direction
         Link Udc = arg.link(pos_dir(arg.sig), dc_link_nbr_idx, dc_link_nbr_parity);
         Link Uda = arg.link(pos_dir(arg.rho), point_d, parity_d);
         Link Ucb = arg.link(pos_dir(arg.rho), point_c, parity_c);
         Oz = Ucb * Ob;
         Oy = (sig_positive ? Udc : conj(Udc)) * Oz;
-        shortP_sig += arg.accumu_coeff_seven * conj(Uda) * Oy;
+        p5_sig += arg.accumu_coeff_seven * conj(Uda) * Oy;
 
         // When sig is positive, compute the force_sig contribution from the
         // positive rho direction
@@ -588,96 +586,24 @@ namespace quda {
         force += force_rho;
         arg.force(pos_dir(arg.rho), point_a, parity_a) = force;
 
-        // update shortP
-        Link shortP = arg.shortP(0, point_a, parity_a);
-        shortP += shortP_sig;
-        arg.shortP(0, point_a, parity_a) = shortP;
-
         // update the force in the sigma direction
         if constexpr (sig_positive) {
           Link force = arg.force(arg.sig, point_a, parity_a);
           force += force_sig;
           arg.force(arg.sig, point_a, parity_a) = force;
         }
-          
+
+        return p5_sig;
+
       }
-    };
-
-    /***********************************sideLinkKernel***************************
-     *
-     * In general we need
-     * READ
-     *    1  LINK:          ad_link
-     *    4  COLOR MATRIX:  shortP_at_D, newOprod, P3_at_A, Qprod_at_D,
-     * WRITE
-     *    2  COLOR MATRIX:  shortP_at_D, newOprod,
-     *
-     * Two call variations:
-     *   1. full read/write
-     *   2. when shortP == NULL && Qprod == NULL:
-     *          no need to read ad_link/shortP_at_D or write shortP_at_D
-     *          Qprod_at_D does not exit and is not read in
-     *
-     *
-     * Therefore the data traffic, in two-number pair (num_of_links, num_of_color_matrix)
-     *   Call 1:   (called 192 times)
-     *                           (1, 6)
-     *
-     *   Call 2:   (called 48 times)
-     *                           (0, 3)
-     *
-     * note: newOprod can be at point D or A, depending on if mu is postive or negative
-     *
-     * Flop count, in two-number pair (matrix_multi, matrix_add)
-     *   call 1:       (2, 2)
-     *   call 2:       (0, 1)
-     *
-     *********************************************************************************/
-    template <typename store_t, int nColor_, QudaReconstructType recon>
-    struct SideLinkArg : public BaseForceArg<store_t, nColor_, recon> {
-      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
-      using real = typename mapper<store_t>::type;
-      static constexpr int nColor = nColor_;
-      using Gauge = typename gauge_mapper<real, recon>::type;
-
-      Gauge force;
-      Gauge shortP; // == P3
-      Gauge p5;
-
-      const Gauge qProd;
-      const real coeff_five;
-      const real accumu_coeff_five;
-
-      static constexpr int overlap = 1;
-
-      SideLinkArg(GaugeField &force, GaugeField &shortP, const GaugeField &P5,
-                 const GaugeField &qProd, const GaugeField &link,  const PathCoefficients<real> &act_path_coeff)
-        : BaseForceArg(link, overlap), force(force), shortP(shortP), p5(P5), qProd(qProd),
-          coeff_five(act_path_coeff.five), accumu_coeff_five(act_path_coeff.three != 0 ? act_path_coeff.five / act_path_coeff.three : 0)
-      { }
-
-    };
-
-    template <typename Param> struct SideLink
-    {
-      using Arg = typename Param::Arg;
-      using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
-      const Arg &arg;
-
-      static_assert(Param::sig_positive == -1, "sig_positive should be set to -1 for SideLink");
-      static_assert(Param::mu_positive == -1, "mu_positive should be set to -1 for SideLink");
-      static constexpr int nu_positive = Param::nu_positive;
-
-      constexpr SideLink(const Param &param) : arg(param.arg) {}
-      constexpr static const char *filename() { return KERNEL_FILE; }
 
       __device__ __host__ void operator()(int x_cb, int parity)
       {
         int x[4];
-        getCoords(x, x_cb ,arg.D, parity);
-        for (int d=0; d<4; d++) x[d] = x[d] + arg.base_idx[d];
+        getCoords(x, x_cb, arg.D, parity);
+        for (int d=0; d<4; d++) x[d] += arg.base_idx[d];
         int e_cb = linkIndex(x,arg.E);
-        parity = parity ^ arg.oddness_change;
+        parity = parity^arg.oddness_change;
 
         /*      compute the side link contribution to the momentum
          *
@@ -698,10 +624,15 @@ namespace quda {
         int ah_link_nbr_idx = nu_positive ? point_h : point_a;
         int ah_link_nbr_parity = nu_positive ? parity_h : parity_a;
 
-        Link Oy = arg.p5(0, point_a, parity_a);
+        // calculate p5_sig
+        Link p5_sig = all_link(x, e_cb, parity);
 
-        Link Uad = arg.link(pos_dir(arg.nu), ah_link_nbr_idx, ah_link_nbr_parity);
-        Link Ow = nu_positive ? Uad*Oy : conj(Uad)*Oy;
+        // load and accumulate p5
+        Link Oy = arg.p5(0, point_a, parity_a);
+        Oy += p5_sig;
+
+        Link Uah = arg.link(pos_dir(arg.nu), ah_link_nbr_idx, ah_link_nbr_parity);
+        Link Ow = nu_positive ? Uah * Oy : conj(Uah) * Oy;
 
         Link shortP = arg.shortP(0, point_h, parity_h);
         shortP += arg.accumu_coeff_five * Ow;
