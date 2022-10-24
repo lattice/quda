@@ -322,7 +322,7 @@ struct StaggeredGSmearTestWrapper {//
       {
         printfQuda("Doing two link in QUDA\n");
         computeTwoLinkQuda((void*) milc_twolnk, nullptr, &gauge_param);
-        quda_gflops = 2*4*198ll*V;
+        quda_gflops = 2*4*198ll*V; // i.e. : 2 mat-mat prods, 4 dirs, Nc*(Nc*(8*NC-2)) flops per mat-mat
 	break;
       }
       case gsmear_test_type::GaussianSmear:
