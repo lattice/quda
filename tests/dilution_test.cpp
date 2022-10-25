@@ -12,9 +12,6 @@
 
 #include <gtest/gtest.h>
 
-QudaGaugeParam gauge_param;
-QudaInvertParam inv_param;
-
 void display_test_info()
 {
   printfQuda("running the following test:\n");
@@ -52,6 +49,12 @@ TEST_P(DilutionTest, verify)
   using namespace quda;
 
   if (!is_enabled_spin(nSpin)) GTEST_SKIP();
+
+  // Set some parameters
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  QudaInvertParam inv_param = newQudaInvertParam();
+  setWilsonGaugeParam(gauge_param);
+  setInvertParam(inv_param);
 
   ColorSpinorParam param;
   constructWilsonTestSpinorParam(&param, &inv_param, &gauge_param);
@@ -148,12 +151,6 @@ int main(int argc, char **argv)
 
   // Initialize the QUDA library
   initQuda(device_ordinal);
-
-  // Set some parameters
-  gauge_param = newQudaGaugeParam();
-  setWilsonGaugeParam(gauge_param);
-  inv_param = newQudaInvertParam();
-  setInvertParam(inv_param);
 
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
   if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }

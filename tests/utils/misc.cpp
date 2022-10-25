@@ -259,6 +259,19 @@ const char *get_solve_str(QudaSolveType type)
   return ret;
 }
 
+const char *get_schwarz_str(QudaSchwarzType type)
+{
+  const char *ret;
+
+  switch (type) {
+  case QUDA_ADDITIVE_SCHWARZ: ret = "additive_schwarz"; break;
+  case QUDA_MULTIPLICATIVE_SCHWARZ: ret = "multiplicative_schwarz"; break;
+  default: fprintf(stderr, "Error: invalid schwarz type %d\n", type); exit(1);
+  }
+
+  return ret;
+}
+
 const char *get_flavor_str(QudaTwistFlavorType type)
 {
   const char *ret;

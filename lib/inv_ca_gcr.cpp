@@ -60,13 +60,8 @@ namespace quda
 
       csParam.setPrecision(param.precision);
       r = mixed ? ColorSpinorField(csParam) : p[0].create_alias(csParam);
-      tmp = ColorSpinorField(csParam);
-
-      csParam.setPrecision(param.precision_sloppy);
-      tmp_sloppy = tmp.create_alias(csParam);
 
       if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
-
       init = true;
     } // init
   }
@@ -87,7 +82,7 @@ namespace quda
     // Construct the matrix Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
     std::vector<Complex> A_(N * (N + 1));
 
-    blas::cDotProduct(A_, q, make_set(q, b));
+    blas::cDotProduct(A_, q, {q, b});
     for (int i = 0; i < N; i++) {
       phi(i) = A_[i * (N + 1) + N];
       for (int j = 0; j < N; j++) { A(i, j) = A_[i * (N + 1) + j]; }
@@ -174,21 +169,21 @@ namespace quda
           // double the size of the Krylov space
           extendSVDDeflationSpace();
           // populate extra memory with L/R singular vectors
-          eig_solve->computeSVD(matMdagM, evecs, evals);
+          eig_solve->computeSVD(evecs, evals);
         }
         if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
         deflate_compute = false;
       }
       if (recompute_evals) {
-        eig_solve->computeEvals(matMdagM, evecs, evals);
-        eig_solve->computeSVD(matMdagM, evecs, evals);
+        eig_solve->computeEvals(evecs, evals);
+        eig_solve->computeSVD(evecs, evals);
         recompute_evals = false;
       }
     }
 
     // compute intitial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      mat(r, x, tmp);
+      mat(r, x);
       // r = b - Ax0
       if (!fixed_iteration) {
         r2 = blas::xmyNorm(b, r);
@@ -207,7 +202,7 @@ namespace quda
       eig_solve->deflateSVD(x, r, evecs, evals, true);
 
       // Compute r_defl = RHS - A * LHS
-      mat(r, x, tmp);
+      mat(r, x);
       if (!fixed_iteration) {
         r2 = blas::xmyNorm(b, r);
       } else {
@@ -227,9 +222,8 @@ namespace quda
       }
 
       // Perform 100 power iterations, normalizing every 10 mat-vecs, using r_ as an initial seed
-      // and q[0]/q[1] as temporaries for the power iterations. tmpSloppy get passed in a temporary
-      // for matSloppy. Technically illegal if n_krylov == 1, but in that case lambda_max isn't used anyway.
-      lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r, q[0], q[1], 100, 10, tmp_sloppy);
+      // and q[0]/q[1] as temporaries for the power iterations. Technically illegal if n_krylov == 1, but in that case lambda_max isn't used anyway.
+      lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r, q[0], q[1], 100, 10);
       logQuda(QUDA_SUMMARIZE, "CA-GCR Approximate lambda max = 1.1 x %e\n", lambda_max / 1.1);
 
       lambda_init = true;
@@ -290,7 +284,7 @@ namespace quda
     while (!convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
       // build up a space of size n_krylov
-      computeCAKrylovSpace(matSloppy, q, p, n_krylov, basis, m_map, b_map, tmp_sloppy);
+      computeCAKrylovSpace(matSloppy, q, p, n_krylov, basis, m_map, b_map);
 
       solve(alpha, q, p[0]);
 
@@ -318,7 +312,7 @@ namespace quda
       if (total_iter >= param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2 / r2_old) < param.delta) {
 
         if ((r2 < stop || total_iter >= param.maxiter) && param.sloppy_converge) break;
-        mat(r, x, tmp);
+        mat(r, x);
         r2 = blas::xmyNorm(b, r);
 
         if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
@@ -326,7 +320,7 @@ namespace quda
           eig_solve->deflateSVD(x, r, evecs, evals, true);
 
           // Compute r_defl = RHS - A * LHS
-          mat(r, x, tmp);
+          mat(r, x);
           r2 = blas::xmyNorm(b, r);
 
           maxr_deflate = sqrt(r2);
@@ -373,7 +367,7 @@ namespace quda
 
     if (param.compute_true_res) {
       // Calculate the true residual
-      mat(r, x, tmp);
+      mat(r, x);
       double true_res = blas::xmyNorm(b, r);
       param.true_res = sqrt(true_res / b2);
       param.true_res_hq
