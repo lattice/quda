@@ -304,7 +304,7 @@ struct StaggeredGSmearTestWrapper {//
     commDimPartitionedReset();
   }
 
-  GSmearTime gsmearCUDA(int niter) //niter
+  GSmearTime gsmearQUDA(int niter) //niter
   {
     GSmearTime gsmear_time;
 
@@ -357,9 +357,9 @@ struct StaggeredGSmearTestWrapper {//
   void run_test(int niter, bool print_metrics = false)
   {
     printfQuda("Tuning...\n");
-    gsmearCUDA(1);
+    gsmearQUDA(1);
 
-    GSmearTime gsmear_time = gsmearCUDA(niter);
+    GSmearTime gsmear_time = gsmearQUDA(niter);
     if(gtest_type == gsmear_test_type::GaussianSmear) *spinorRef = *spinor;
 
     if (print_metrics) {   

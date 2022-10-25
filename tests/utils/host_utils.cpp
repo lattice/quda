@@ -920,6 +920,7 @@ template <typename Float> static double compareFloats_v2(Float *a, Float *b, int
   return global_diff;
 }
 
+// returns deviation instead of failure flag
 double compare_floats_v2(void *a, void *b, int len, double epsilon, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION)

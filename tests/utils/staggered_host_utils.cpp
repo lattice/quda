@@ -434,8 +434,6 @@ void staggeredTwoLinkGaussianSmear(sFloat *res, gFloat **twolink, gFloat **ghost
 
 void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk[], void** ghost_twolnk,  quda::ColorSpinorField &in, QudaGaugeParam* /*qudaGaugeParam*/, QudaInvertParam* /*inv_param*/, const int oddBit, const double /*width*/, const int /*t0*/, QudaPrecision prec)
 {
-  //const int nSrc = in.X(4);
-
   QudaParity otherparity = QUDA_INVALID_PARITY;
   if (oddBit == QUDA_EVEN_PARITY) {
     otherparity = QUDA_ODD_PARITY;
