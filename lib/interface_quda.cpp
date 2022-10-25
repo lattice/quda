@@ -5507,16 +5507,16 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
   ColorSpinorParam cpuParam(h_in, *inv_param, X, QUDA_MAT_SOLUTION, QUDA_CPU_FIELD_LOCATION);
   cpuParam.nSpin = 1;
   // QUDA style pointer for host data.
-  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField in_h(cpuParam);
 
   // Device side data.
   ColorSpinorParam cudaParam(cpuParam);
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam.create   = QUDA_ZERO_FIELD_CREATE;
   cudaParam.setPrecision(inv_param->cuda_prec, inv_param->cuda_prec, true);
-  ColorSpinorField *in    = ColorSpinorField::Create(cudaParam);
-  ColorSpinorField *out   = ColorSpinorField::Create(cudaParam);
-  ColorSpinorField *temp1 = ColorSpinorField::Create(cudaParam);
+  ColorSpinorField in(cudaParam);
+  ColorSpinorField out(cudaParam);
+  ColorSpinorField temp1(cudaParam);
  
 
   // Create the smearing operator
@@ -5550,7 +5550,7 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
 
   // Copy host data to device
   profileGaussianSmear.TPSTART(QUDA_PROFILE_H2D);
-  *in = *in_h;
+  in = in_h;
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_H2D);
 
   const double ftmp    = -(smear_param->width*smear_param->width)/(4.0*smear_param->n_steps*4.0);  /* Extra 4 to compensate for stride 2 */
@@ -5562,33 +5562,29 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
   const QudaParity  parity   = QUDA_INVALID_PARITY;
   for (int i = 0; i < smear_param->n_steps; i++) {
     if (i > 0) std::swap(in, out);
-    blas::ax(ftmp, *in);
-    blas::axpy(a, *in, *temp1);
+    blas::ax(ftmp, in);
+    blas::axpy(a, in, temp1);
     
-    qsmear_op.Expose()->SmearOp(*out, *in, a, 0.0, smear_param->t0, parity);
+    qsmear_op.Expose()->SmearOp(out, in, a, 0.0, smear_param->t0, parity);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      double norm = blas::norm2(*out);
+      double norm = blas::norm2(out);
       printfQuda("Step %d, vector norm %e\n", i, norm);
     }
-    blas::xpay(*temp1, -1.0, *out);
-    blas::zero(*temp1);
+    blas::xpay(temp1, -1.0, out);
+    blas::zero(temp1);
   }
 
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // Copy device data to host.
   profileGaussianSmear.TPSTART(QUDA_PROFILE_D2H);
-  *in_h = *out;
+  in_h = out;
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_D2H);
 
   profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
 
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished 2link Gaussian smearing.\n");
 
-  delete temp1;
-  delete out;
-  delete in;
-  delete in_h;
   delete d;
 
   smear_param->gflops = dirac.Flops();
