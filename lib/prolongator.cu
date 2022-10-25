@@ -81,10 +81,10 @@ namespace quda {
              const int *fine_to_coarse, int parity)
   {
     if (v.Precision() == QUDA_HALF_PRECISION) {
-      if constexpr(is_enabled<QUDA_HALF_PRECISION>()) {
-          ProlongateLaunch<Float, short, fineSpin, fineColor, coarseSpin, coarseColor>
-            prolongator(out, in, v, fine_to_coarse, parity);
-          } else {
+      if constexpr(is_enabled(QUDA_HALF_PRECISION)) {
+        ProlongateLaunch<Float, short, fineSpin, fineColor, coarseSpin, coarseColor>
+          prolongator(out, in, v, fine_to_coarse, parity);
+      } else {
         errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
       }
     } else if (v.Precision() == in.Precision()) {

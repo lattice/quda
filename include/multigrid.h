@@ -49,17 +49,17 @@ namespace quda {
       else
         errorQuda("Multigrid not supported in double precision");
     } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
-      if constexpr (is_enabled<QUDA_SINGLE_PRECISION>())
+      if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
         Apply<float>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
     } else if (field.Precision() == QUDA_HALF_PRECISION) {
-      if constexpr (is_enabled<QUDA_HALF_PRECISION>())
+      if constexpr (is_enabled(QUDA_HALF_PRECISION))
         Apply<short>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
     } else if (field.Precision() == QUDA_QUARTER_PRECISION) {
-      if constexpr (is_enabled<QUDA_QUARTER_PRECISION>())
+      if constexpr (is_enabled(QUDA_QUARTER_PRECISION))
         Apply<int8_t>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
@@ -303,14 +303,8 @@ namespace quda {
     /** Coarse temporary vector */
     ColorSpinorField *tmp_coarse;
 
-    /** Coarse temporary vector */
-    ColorSpinorField *tmp2_coarse;
-
     /** Sloppy coarse temporary vector */
     ColorSpinorField *tmp_coarse_sloppy;
-
-    /** Sloppy coarse temporary vector */
-    ColorSpinorField *tmp2_coarse_sloppy;
 
     /** Kahler-Dirac Xinv */
     std::shared_ptr<GaugeField> xInvKD;

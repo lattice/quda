@@ -53,7 +53,7 @@ int gcrNkrylov = 8;
 QudaCABasis ca_basis = QUDA_CHEBYSHEV_BASIS;
 double ca_lambda_min = 0.0;
 double ca_lambda_max = -1.0;
-QudaCABasis ca_basis_precondition = QUDA_POWER_BASIS;
+QudaCABasis ca_basis_precondition = QUDA_CHEBYSHEV_BASIS;
 double ca_lambda_min_precondition = 0.0;
 double ca_lambda_max_precondition = -1.0;
 int pipeline = 0;
@@ -115,7 +115,7 @@ QudaTboundary fermion_t_boundary = QUDA_ANTI_PERIODIC_T;
 
 int mg_levels = 2;
 
-int max_res_increase = 1;
+int max_res_increase = 3;
 int max_res_increase_total = 10;
 
 quda::mgarray<QudaFieldLocation> solver_location = {};
@@ -417,7 +417,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app
     ->add_option("--ca-basis-type-precondition", ca_basis_precondition,
-                 "The basis to use for CA solvers when used as a preconditioner (default power)")
+                 "The basis to use for CA solvers when used as a preconditioner (default chebyshev)")
     ->transform(CLI::QUDACheckedTransformer(ca_basis_map));
   quda_app->add_option("--cheby-basis-eig-max-precondition", ca_lambda_max_precondition,
                        "Conservative estimate of largest eigenvalue for Chebyshev basis CA solvers when used as a "
