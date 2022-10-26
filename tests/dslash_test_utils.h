@@ -61,8 +61,6 @@ struct DslashTestWrapper {
   // CUDA color spinor fields
   ColorSpinorField cudaSpinor;
   ColorSpinorField cudaSpinorOut;
-  ColorSpinorField tmp1;
-  ColorSpinorField tmp2;
 
   // Dirac pointers
   quda::Dirac *dirac = nullptr;
@@ -81,8 +79,8 @@ struct DslashTestWrapper {
   // Test options
   QudaParity parity = QUDA_EVEN_PARITY;
   dslash_test_type dtest_type = dslash_test_type::Dslash;
-  bool test_split_grid;
-  int num_src;
+  bool test_split_grid = false;
+  int num_src = 1;
 
   const bool transfer = false;
 
@@ -245,9 +243,9 @@ struct DslashTestWrapper {
     if (test_split_grid) {
       inv_param.num_src = num_src;
       inv_param.num_src_per_sub_partition = 1;
-      vp_spinor.resize(num_src, csParam);
-      vp_spinorOut.resize(num_src, csParam);
-      vp_spinorRef.resize(num_src, csParam);
+      resize(vp_spinor, num_src, csParam);
+      resize(vp_spinorOut, num_src, csParam);
+      resize(vp_spinorRef, num_src, csParam);
 
       std::fill(vp_spinor.begin(), vp_spinor.end(), spinor);
     }
@@ -297,14 +295,11 @@ struct DslashTestWrapper {
       printfQuda("Creating cudaSpinorOut with nParity = %d\n", csParam.siteSubset);
       cudaSpinorOut = ColorSpinorField(csParam);
 
-      tmp1 = ColorSpinorField(csParam);
-
       if (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
         csParam.x[0] /= 2;
       }
 
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      tmp2 = ColorSpinorField(csParam);
 
       printfQuda("Sending spinor field to GPU\n");
       cudaSpinor = spinor;
@@ -317,9 +312,6 @@ struct DslashTestWrapper {
 
       DiracParam diracParam;
       setDiracParam(diracParam, &inv_param, pc);
-
-      diracParam.tmp1 = &tmp1;
-      diracParam.tmp2 = &tmp2;
 
       dirac = Dirac::create(diracParam);
 

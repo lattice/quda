@@ -2052,7 +2052,6 @@ namespace quda
 
    void postTune()
    {
-     saveTuneCache();
      dslash.postTune();
    }
   };

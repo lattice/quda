@@ -46,9 +46,8 @@ namespace quda
       Functor f;
 
       template <typename V>
-      MultiBlasArg(std::vector<V> &x, std::vector<V> &y, std::vector<V> &z, std::vector<V> &w,
-                   Functor f, int NYW, int length) :
-        kernel_param(dim3(length * warp_split, NYW, x[0].get().SiteSubset())),
+      MultiBlasArg(V &x, V&y, V &z, V &w, Functor f, int NYW, int length) :
+        kernel_param(dim3(length * warp_split, NYW, x[0].SiteSubset())),
         NYW(NYW),
         f(f)
       {

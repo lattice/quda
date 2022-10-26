@@ -54,6 +54,10 @@ namespace quda
     current_key = split_key;
   }
 
+#if defined(QMP_COMMS) || defined(MPI_COMMS)
+  MPI_Comm get_mpi_handle() { return get_current_communicator().get_mpi_handle(); }
+#endif
+
   int comm_neighbor_rank(int dir, int dim) { return get_current_communicator().comm_neighbor_rank(dir, dim); }
 
   int comm_dim(int dim) { return get_current_communicator().comm_dim(dim); }
@@ -163,13 +167,17 @@ namespace quda
                                                                              stride);
   }
 
-  void comm_free(MsgHandle *&mh) { get_current_communicator().comm_free(mh); }
+#define CHECK_MH(mh) { if (mh == nullptr) errorQuda("null message handle"); }
 
-  void comm_start(MsgHandle *mh) { get_current_communicator().comm_start(mh); }
+  void comm_free(MsgHandle *&mh) { CHECK_MH(mh); get_current_communicator().comm_free(mh); }
 
-  void comm_wait(MsgHandle *mh) { get_current_communicator().comm_wait(mh); }
+  void comm_start(MsgHandle *mh) { CHECK_MH(mh); get_current_communicator().comm_start(mh); }
 
-  int comm_query(MsgHandle *mh) { return get_current_communicator().comm_query(mh); }
+  void comm_wait(MsgHandle *mh) { CHECK_MH(mh); get_current_communicator().comm_wait(mh); }
+
+  int comm_query(MsgHandle *mh) { CHECK_MH(mh); return get_current_communicator().comm_query(mh); }
+
+#undef CHECK_MH
 
   void comm_allreduce_sum_array(double *data, size_t size)
   {
@@ -276,9 +284,15 @@ namespace quda
 
   int commDimPartitioned(int dir) { return get_current_communicator().commDimPartitioned(dir); }
 
-  void commDimPartitionedSet(int dir) { get_current_communicator().commDimPartitionedSet(dir); }
+  void commDimPartitionedSet(int dir)
+  {
+    get_current_communicator().commDimPartitionedSet(dir);
+  }
 
-  void commDimPartitionedReset() { get_current_communicator().comm_dim_partitioned_reset(); }
+  void commDimPartitionedReset()
+  {
+    get_current_communicator().comm_dim_partitioned_reset();
+  }
 
   bool commGlobalReduction() { return get_current_communicator().commGlobalReduction(); }
 

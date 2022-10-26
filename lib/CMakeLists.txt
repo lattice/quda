@@ -33,6 +33,7 @@ set (QUDA_OBJS
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu
+  field_cache.cpp
   gauge_covdev.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
@@ -42,7 +43,7 @@ set (QUDA_OBJS
   dirac_improved_staggered.cpp dirac_improved_staggered_kd.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp 
-  llfat_quda.cu gauge_force.cu gauge_random.cu
+  llfat_quda.cu gauge_force.cu gauge_loop_trace.cu gauge_polyakov_loop.cu gauge_random.cu
   gauge_field_strength_tensor.cu clover_quda.cu 
   dslash_gamma_helper.cu dslash_clover_helper.cu
   staggered_kd_build_xinv.cu staggered_kd_reorder_xinv.cu staggered_kd_apply_xinv.cu
@@ -147,9 +148,9 @@ endif()
 
 if(BUILD_FORTRAN_INTERFACE)
   list(APPEND QUDA_OBJS quda_fortran.F90)
-  set_source_files_properties(quda_fortran.F90 PROPERTIES OBJECT_OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/quda_fortran.mod)
-endif()
 
+  # set_source_files_properties(quda_fortran.F90 PROPERTIES OBJECT_OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/quda_fortran.mod)
+endif()
 
 # QUDA_CU_OBJS should contain all cuda files now QUDA_OBJS all c, cpp, fortran sources
 # if we have a git version make version.cpp depend on git head so that it is rebuild if the git sha changed
@@ -192,7 +193,10 @@ if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
   include(targets/cuda/target_cuda.cmake)
 endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
-	include(targets/hip/target_hip.cmake)
+  include(targets/hip/target_hip.cmake)
+endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "SYCL")
+  include(targets/sycl/target_sycl.cmake)
 endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "OMPTARGET")
 	include(targets/omptarget/target_omptarget.cmake)
@@ -206,9 +210,9 @@ include(CheckLinkerFlag)
 check_linker_flag(CXX "-Wl,--compress-debug-sections=zlib" QUDA_LINKER_COMPRESS)
 target_link_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_LINKER_COMPRESS}:-Wl,--compress-debug-sections=zlib>>)
 
-# set up QUDA compile options
+# set up QUDA compile options, put them before target specific options
 target_compile_options(
-  quda PRIVATE $<$<COMPILE_LANGUAGE:CXX,C,Fortran>: 
+  quda BEFORE PRIVATE $<$<COMPILE_LANGUAGE:CXX,C,Fortran>:
                $<IF:$<CONFIG:RELEASE>,-w,-Wall -Wextra>
                $<$<CONFIG:STRICT>:-Werror>
   >)
@@ -253,77 +257,14 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 target_link_libraries(quda PUBLIC Threads::Threads)
-# QUDA FEATURES
-if(QUDA_DIRAC_WILSON)
-  target_compile_definitions(quda PUBLIC GPU_WILSON_DIRAC)
-endif(QUDA_DIRAC_WILSON)
-
-if(QUDA_DIRAC_DOMAIN_WALL)
-  target_compile_definitions(quda PUBLIC GPU_DOMAIN_WALL_DIRAC)
-endif(QUDA_DIRAC_DOMAIN_WALL)
-
-if(QUDA_DIRAC_STAGGERED)
-  target_compile_definitions(quda PUBLIC GPU_STAGGERED_DIRAC)
-endif(QUDA_DIRAC_STAGGERED)
-
-if(QUDA_DIRAC_CLOVER)
-  target_compile_definitions(quda PUBLIC GPU_CLOVER_DIRAC GPU_WILSON_DIRAC)
-endif(QUDA_DIRAC_CLOVER)
-
-if(QUDA_DIRAC_TWISTED_MASS)
-  target_compile_definitions(quda PUBLIC GPU_TWISTED_MASS_DIRAC GPU_WILSON_DIRAC)
-endif(QUDA_DIRAC_TWISTED_MASS)
-
-if(QUDA_DIRAC_TWISTED_CLOVER)
-  target_compile_definitions(quda PUBLIC GPU_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC GPU_TWISTED_MASS_DIRAC
-                                         GPU_WILSON_DIRAC)
-endif(QUDA_DIRAC_TWISTED_CLOVER)
-
-if(QUDA_DIRAC_CLOVER_HASENBUSCH)
-  target_compile_definitions(quda PUBLIC GPU_CLOVER_HASENBUSCH_TWIST GPU_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC
-                                         GPU_WILSON_DIRAC)
-endif(QUDA_DIRAC_CLOVER_HASENBUSCH)
-
-if(QUDA_DIRAC_NDEG_TWISTED_MASS)
-  target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_MASS_DIRAC)
-endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
-
-if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
-  target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC GPU_TWISTED_CLOVER_DIRAC)
-endif(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
-
 
 if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
   target_compile_definitions(quda PRIVATE NATIVE_LAPACK_LIB)
 endif()
 
-if(QUDA_MULTIGRID)
-  target_compile_definitions(quda PRIVATE GPU_MULTIGRID)
-endif(QUDA_MULTIGRID)
-
-if(QUDA_GAUGE_ALG)
-  target_compile_definitions(quda PUBLIC)
-endif(QUDA_GAUGE_ALG)
-
-if(QUDA_SSTEP)
-  target_compile_definitions(quda PRIVATE SSTEP)
-endif()
-
 if(QUDA_BLOCKSOLVER)
   target_compile_definitions(quda PRIVATE BLOCKSOLVER)
 endif()
-
-if(QUDA_FORCE_GAUGE)
-  target_compile_definitions(quda PUBLIC)
-endif(QUDA_FORCE_GAUGE)
-
-if(QUDA_GAUGE_TOOLS)
-  target_compile_definitions(quda PUBLIC)
-endif(QUDA_GAUGE_TOOLS)
-
-if(QUDA_GAUGE_ALG)
-  target_compile_definitions(quda PUBLIC)
-endif(QUDA_GAUGE_ALG)
 
 if(QUDA_INTERFACE_QDP OR QUDA_INTERFACE_ALL)
   target_compile_definitions(quda PUBLIC BUILD_QDP_INTERFACE)
@@ -348,18 +289,6 @@ endif(QUDA_INTERFACE_BQCD OR QUDA_INTERFACE_ALL)
 if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_ALL)
   target_compile_definitions(quda PUBLIC BUILD_TIFR_INTERFACE)
 endif(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_ALL)
-
-if(QUDA_CONTRACT)
-  target_compile_definitions(quda PUBLIC GPU_CONTRACT)
-endif(QUDA_CONTRACT)
-
-if(QUDA_COVDEV)
-  target_compile_definitions(quda PUBLIC GPU_COVDEV)
-endif(QUDA_COVDEV)
-
-if(QUDA_LAPLACE)
-  target_compile_definitions(quda PUBLIC GPU_LAPLACE)
-endif(QUDA_LAPLACE)
 
 # MULTI GPU AND USQCD
 if(QUDA_MPI OR QUDA_QMP)
@@ -391,28 +320,30 @@ endif()
 
 if(QUDA_ARPACK)
   target_compile_definitions(quda PRIVATE ARPACK_LIB)
+
   if(QUDA_ARPACK_LOGGING)
     # ARPACK-NG does not suppport logging - we must warn the user
     message(
       WARNING
       "Specifying QUDA_ARPACK_LOGGING with ARPACK-NG package will cause link failures. Please ensure that QUDA_ARPACK_LOGGING=OFF if downloading ARPACK-NG or using system installed ARPACK-NG"
-      )
+    )
     target_compile_definitions(QUDA_ARPACK_LOGGING ON)
-  endif()
+  endif(QUDA_ARPACK_LOGGING)
+
   if(QUDA_DOWNLOAD_ARPACK)
-    target_link_libraries(quda PUBLIC arpack-ng)
-    target_link_libraries(quda_cpp PUBLIC arpack-ng)
+    target_link_libraries(quda PUBLIC $<BUILD_INTERFACE:ARPACK::arpack>)
+
     if(QUDA_MPI OR QUDA_QMP)
-      target_link_libraries(quda PUBLIC parpack-ng)
-      target_link_libraries(quda_cpp PUBLIC parpack-ng)
+      target_link_libraries(quda PUBLIC $<BUILD_INTERFACE:ARPACK::parpack>)
     endif()
-  else()
+  else(QUDA_DOWNLOAD_ARPACK)
     target_link_libraries(quda INTERFACE ${ARPACK})
+
     if(QUDA_MPI OR QUDA_QMP)
       target_link_libraries(quda INTERFACE ${PARPACK} MPI::MPI_Fortran)
     endif()
-  endif()
-endif()
+  endif(QUDA_DOWNLOAD_ARPACK)
+endif(QUDA_ARPACK)
 
 if(QUDA_OPENBLAS)
   target_compile_definitions(quda PRIVATE OPENBLAS_LIB)

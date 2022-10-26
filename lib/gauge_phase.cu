@@ -32,7 +32,7 @@ namespace quda {
         GaugePhaseArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_TIFR> arg(u);
         launch<GaugePhase>(tp, stream, arg);
       } else {
-        errorQuda("Undefined phase type");
+        errorQuda("Undefined phase type %d", u.StaggeredPhase());
       }
     }
 

@@ -394,13 +394,13 @@ namespace quda
        @brief Copy constructor for creating a ColorSpinorField from another ColorSpinorField
        @param[in] field Instance of ColorSpinorField from which we are cloning
     */
-    ColorSpinorField(const ColorSpinorField &field);
+    ColorSpinorField(const ColorSpinorField &field) noexcept;
 
     /**
        @brief Move constructor for creating a ColorSpinorField from another ColorSpinorField
        @param[in] field Instance of ColorSpinorField from which we are moving
     */
-    ColorSpinorField(ColorSpinorField &&field);
+    ColorSpinorField(ColorSpinorField &&field) noexcept;
 
     /**
        @brief Constructor for creating a ColorSpinorField from a ColorSpinorParam
@@ -749,7 +749,7 @@ namespace quda
        precisions, but do not need them simultaneously.  Use this functionality with caution.
        @param[in] param Parameters for the alias field
     */
-    ColorSpinorField create_alias(const ColorSpinorParam &param);
+    ColorSpinorField create_alias(const ColorSpinorParam &param = ColorSpinorParam());
 
     /**
        @brief Create a field that aliases this field's storage.  The
@@ -854,13 +854,39 @@ namespace quda
     friend class ColorSpinorParam;
   };
 
-  using ColorSpinorField_ref = std::reference_wrapper<ColorSpinorField>;
-
   /**
      @brief Specialization of is_field to allow us to make sets of ColorSpinorField
    */
   template <> struct is_field<ColorSpinorField> : std::true_type {
   };
+
+  /**
+     @brief Helper function to resize a std::vector of
+     ColorSpinorFields.  This should be favored over using
+     std::vector::resize, since it avoids unnecessary copies.
+
+     @param[in,out] v The vector we are resizing
+     @param[in] new_size The size we are resizing the vector to
+     @param[in] param The parameter struct used to create the new
+     elements
+   */
+  void resize(std::vector<ColorSpinorField> &v, size_t new_size, const ColorSpinorParam &param);
+
+  /**
+     @brief Helper function to resize a std::vector of
+     ColorSpinorFields.  This should be favored over using
+     std::vector::resize, since it avoids unnecessary copies.  If no
+     src vector is passed, the meta data for the newly constructed
+     fields will be sourced from element 0.
+
+     @param[in,out] v The vector we are resizing
+     @param[in] new_size The size we are resizing the vector to
+     @param[in] create The create type we using for the field
+     @param[in] src Any src vector from which we are copying from,
+     referencing to or obtaining any meta data from
+   */
+  void resize(std::vector<ColorSpinorField> &v, size_t new_size, QudaFieldCreate create,
+              const ColorSpinorField &src = ColorSpinorField());
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, QudaFieldLocation location,
                               void *Dst = nullptr, const void *Src = nullptr);

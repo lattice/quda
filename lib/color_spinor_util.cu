@@ -424,4 +424,29 @@ namespace quda {
     }
   }
 
+  void resize(std::vector<ColorSpinorField> &v, size_t new_size, const ColorSpinorParam &param)
+  {
+    auto old_size = v.size();
+    v.resize(new_size);
+    for (auto k = old_size; k < new_size; k++) v[k] = ColorSpinorField(param);
+  }
+
+  void resize(std::vector<ColorSpinorField> &v, size_t new_size, QudaFieldCreate create, const ColorSpinorField &src)
+  {
+    ColorSpinorParam param;
+    if (v.size()) {
+      param = ColorSpinorParam(v[0]);
+    } else if (src.Volume() > 0) {
+      param = ColorSpinorParam(src);
+    } else {
+      errorQuda("Cannot resize an empty vector unless a src is passed");
+    }
+
+    param.create = create;
+    if (create == QUDA_COPY_FIELD_CREATE) param.field = &const_cast<ColorSpinorField&>(src);
+    else if (create == QUDA_REFERENCE_FIELD_CREATE) param.v = const_cast<ColorSpinorField&>(src).V();
+
+    resize(v, new_size, param);
+  }
+
 } // namespace quda

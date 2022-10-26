@@ -87,13 +87,10 @@ namespace quda {
   void DiracDomainWall::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
+    auto tmp = getFieldTmp(in);
 
-    bool reset = newTmp(&tmp1, in);
-
-    M(*tmp1, in);
-    Mdag(out, *tmp1);
-
-    deleteTmp(&tmp1, reset);
+    M(tmp, in);
+    Mdag(out, tmp);
   }
 
   void DiracDomainWall::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
@@ -144,30 +141,24 @@ namespace quda {
   {
     checkDWF(out, in);
     double kappa2 = -kappa5*kappa5;
-
-    bool reset = newTmp(&tmp1, in);
+    auto tmp = getFieldTmp(in);
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      Dslash(*tmp1, in, QUDA_ODD_PARITY);
-      DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, in, kappa2); 
+      Dslash(tmp, in, QUDA_ODD_PARITY);
+      DslashXpay(out, tmp, QUDA_EVEN_PARITY, in, kappa2);
     } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-      Dslash(*tmp1, in, QUDA_EVEN_PARITY);
-      DslashXpay(out, *tmp1, QUDA_ODD_PARITY, in, kappa2); 
+      Dslash(tmp, in, QUDA_EVEN_PARITY);
+      DslashXpay(out, tmp, QUDA_ODD_PARITY, in, kappa2);
     } else {
       errorQuda("MatPCType %d not valid for DiracDomainWallPC", matpcType);
     }
-
-    deleteTmp(&tmp1, reset);
   }
 
   void DiracDomainWallPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    //M(out, in);
-    //Mdag(out, out);
-    bool reset = newTmp(&tmp2, in);
-    M(*tmp2, in);
-    Mdag(out, *tmp2);
-    deleteTmp(&tmp2, reset);
+    auto tmp = getFieldTmp(in);
+    M(tmp, in);
+    Mdag(out, tmp);
   }
 
   void DiracDomainWallPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,

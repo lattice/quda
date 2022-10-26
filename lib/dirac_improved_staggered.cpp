@@ -100,17 +100,15 @@ namespace quda {
 
   void DiracImprovedStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    bool reset = newTmp(&tmp1, in);
-  
-    //even
-    Dslash(tmp1->Even(), in.Even(), QUDA_ODD_PARITY);  
-    DslashXpay(out.Even(), tmp1->Even(), QUDA_EVEN_PARITY, in.Even(), 4*mass*mass);
-  
-    //odd
-    Dslash(tmp1->Even(), in.Odd(), QUDA_EVEN_PARITY);  
-    DslashXpay(out.Odd(), tmp1->Even(), QUDA_ODD_PARITY, in.Odd(), 4*mass*mass);    
+    auto tmp = getFieldTmp(in.Even());
 
-    deleteTmp(&tmp1, reset);
+    //even
+    Dslash(tmp, in.Even(), QUDA_ODD_PARITY);
+    DslashXpay(out.Even(), tmp, QUDA_EVEN_PARITY, in.Even(), 4 * mass * mass);
+
+    // odd
+    Dslash(tmp, in.Odd(), QUDA_EVEN_PARITY);
+    DslashXpay(out.Odd(), tmp, QUDA_ODD_PARITY, in.Odd(), 4 * mass * mass);
   }
 
   void DiracImprovedStaggered::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
@@ -180,8 +178,6 @@ namespace quda {
 
   void DiracImprovedStaggeredPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    bool reset = newTmp(&tmp1, in);
-  
     QudaParity parity = QUDA_INVALID_PARITY;
     QudaParity other_parity = QUDA_INVALID_PARITY;
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
@@ -198,23 +194,14 @@ namespace quda {
     // Note the minus sign convention in the Xpay version.
     // This applies equally for the e <-> o permutation.
 
-    Dslash(*tmp1, in, other_parity);  
-    DslashXpay(out, *tmp1, parity, in, 4*mass*mass);
-
-    deleteTmp(&tmp1, reset);
+    auto tmp = getFieldTmp(in);
+    Dslash(tmp, in, other_parity);
+    DslashXpay(out, tmp, parity, in, 4 * mass * mass);
   }
 
   void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &, const ColorSpinorField &) const
   {
-    errorQuda("MdagM is no longer defined for DiracImprovedStaggeredPC. Use M instead.\n");
-    /*
-    // need extra temporary because for multi-gpu the input
-    // and output fields cannot alias
-    bool reset = newTmp(&tmp2, in);
-    M(*tmp2, in);
-    M(out, *tmp2); // doesn't need to be Mdag b/c M is normal!
-    deleteTmp(&tmp2, reset);
-    */
+    errorQuda("MdagM is no longer defined for DiracImprovedStaggeredPC. Use M instead");
   }
 
   void DiracImprovedStaggeredPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,

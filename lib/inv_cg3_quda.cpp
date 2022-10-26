@@ -15,7 +15,7 @@ namespace quda {
 
   CG3::CG3(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
            TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matPrecon, param, profile), init(false)
+    Solver(mat, matSloppy, matPrecon, matPrecon, param, profile)
   {
   }
 
@@ -33,9 +33,6 @@ namespace quda {
         delete xS_oldp;
         delete tmpSp;
       }
-      if (!mat.isStaggered()) delete tmp2Sp;
-
-      init = false;
     }
   }
 
@@ -44,8 +41,7 @@ namespace quda {
     CG3(mmdag, mmdagSloppy, mmdagPrecon, param, profile),
     mmdag(mat.Expose()),
     mmdagSloppy(matSloppy.Expose()),
-    mmdagPrecon(matPrecon.Expose()),
-    init(false)
+    mmdagPrecon(matPrecon.Expose())
   {
   }
 
@@ -126,8 +122,7 @@ namespace quda {
     CG3(mdagm, mdagmSloppy, mdagmPrecon, param, profile),
     mdagm(mat.Expose()),
     mdagmSloppy(matSloppy.Expose()),
-    mdagmPrecon(matPrecon.Expose()),
-    init(false)
+    mdagmPrecon(matPrecon.Expose())
   {
   }
 
@@ -234,11 +229,6 @@ namespace quda {
         xS_oldp = yp;
         tmpSp = tmpp;
       }
-      if(!mat.isStaggered()) {
-        tmp2Sp = ColorSpinorField::Create(csParam);
-      } else {
-        tmp2Sp = tmpSp;
-      }
 
       init = true;
     }
@@ -250,9 +240,7 @@ namespace quda {
     ColorSpinorField &ArS = *ArSp;
     ColorSpinorField &rS_old = *rS_oldp;
     ColorSpinorField &xS_old = *xS_oldp;
-    ColorSpinorField &tmp = *tmpp;
     ColorSpinorField &tmpS = *tmpSp;
-    ColorSpinorField &tmp2S = *tmp2Sp;
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
@@ -285,7 +273,7 @@ namespace quda {
     // compute initial residual depending on whether we have an initial guess or not
     double r2;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      mat(r, x, y, tmp);
+      mat(r, x);
       r2 = blas::xmyNorm(b, r);
       if(b2==0) b2 = r2;
       if (mixed_precision) {
@@ -326,7 +314,7 @@ namespace quda {
 
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter) {
 
-      matSloppy(ArS, rS, tmpS, tmp2S);
+      matSloppy(ArS, rS);
       double gamma_old = gamma;
       double rAr = blas::reDotProduct(rS,ArS);
       gamma = r2/rAr;
@@ -350,17 +338,15 @@ namespace quda {
         if (pipeline) {
           r2 = blas::quadrupleCG3UpdateNorm(gamma, rho, xS, rS, xS_old, rS_old, ArS);
         } else {
-          blas::copy(tmpS, xS);
-          blas::copy(tmp2S, rS);
+          blas::axpbyz(gamma * rho, rS, rho, xS, tmpS);
+          blas::axpy(1. - rho, xS_old, tmpS);
+          std::swap(xS_old, xS);
+          std::swap(xS, tmpS);
 
-          blas::axpby(gamma*rho, rS, rho, xS);
-          blas::axpby(-gamma*rho, ArS, rho, rS);
-
-          blas::axpy(1.-rho, xS_old, xS);
-          r2 = blas::axpyNorm(1.-rho, rS_old, rS);
-
-          blas::copy(xS_old, tmpS);
-          blas::copy(rS_old, tmp2S);
+          blas::axpbyz(-gamma * rho, ArS, rho, rS, tmpS);
+          r2 = blas::axpyNorm(1. - rho, rS_old, tmpS);
+          std::swap(rS_old, rS);
+          std::swap(rS, tmpS);
         }
       }
 
@@ -396,7 +382,7 @@ namespace quda {
           // updating the "new" vectors
           blas::copy(x, xS);
           blas::xpy(x, y);
-          mat(r, y, x, tmp); //  here we can use x as tmp
+          mat(r, y);
           r2 = blas::xmyNorm(b, r);
           param.true_res = sqrt(r2 / b2);
           if (use_heavy_quark_res) {
@@ -456,7 +442,7 @@ namespace quda {
         }
       } else {
         if (convergence(r2, heavy_quark_res, stop, param.tol_hq)) {
-          mat(r, x, tmp, tmp2S);
+          mat(r, x);
           r2 = blas::xmyNorm(b, r);
           r0Norm = sqrt(r2);
           // we update sloppy and old fields
@@ -498,7 +484,7 @@ namespace quda {
 
     // compute the true residuals
     if (!mixed_precision && param.compute_true_res) {
-      mat(r, x, y, tmp);
+      mat(r, x);
       param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
       if (use_heavy_quark_res) param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
     }

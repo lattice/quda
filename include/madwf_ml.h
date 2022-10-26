@@ -84,8 +84,8 @@ namespace quda
 
     double mu;
 
-    std::unique_ptr<ColorSpinorField> forward_tmp;
-    std::unique_ptr<ColorSpinorField> backward_tmp;
+    ColorSpinorField forward_tmp;
+    ColorSpinorField backward_tmp;
 
     QudaPrecision prec_precondition;
 

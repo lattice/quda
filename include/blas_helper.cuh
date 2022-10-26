@@ -429,12 +429,12 @@ namespace quda
 
     template <template <typename...> class Functor,
               template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
-              bool mixed, typename T, typename x_store_t, typename V, typename... Args>
-    constexpr std::enable_if_t<mixed, void> instantiate(const T &a, const T &b, const T &c, V &x_, V &y_,
+              bool mixed, typename T, typename x_store_t, typename Vx, typename Vy, typename... Args>
+    constexpr std::enable_if_t<mixed, void> instantiate(const T &a, const T &b, const T &c, Vx &x_, Vy &y_,
                                                         Args &&... args)
     {
-      unwrap_t<V> &x(x_);
-      unwrap_t<V> &y(y_);
+      unwrap_t<Vx> &x(x_);
+      unwrap_t<Vy> &y(y_);
 
       if (y.Precision() < x.Precision()) errorQuda("Y precision %d not supported", y.Precision());
 

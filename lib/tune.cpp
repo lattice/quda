@@ -300,7 +300,6 @@ namespace quda
    */
   static void broadcastTuneCache()
   {
-#ifdef MULTI_GPU
     std::stringstream serialized;
     size_t size;
 
@@ -321,7 +320,6 @@ namespace quda
         deserializeTuneCache(serialized);
       }
     }
-#endif
   }
 
   /*
@@ -361,10 +359,7 @@ namespace quda
       warningQuda("Disabling QUDA tunecache version check");
     }
 
-#ifdef MULTI_GPU
     if (comm_rank_global() == 0) {
-#endif
-
       cache_path = resource_path;
       cache_path += "/tunecache.tsv";
       cache_file.open(cache_path.c_str());
@@ -418,10 +413,7 @@ namespace quda
       } else {
         warningQuda("Cache file not found.  All kernels will be re-tuned (if tuning is enabled).");
       }
-
-#ifdef MULTI_GPU
     }
-#endif
 
     broadcastTuneCache();
   }
@@ -442,9 +434,7 @@ namespace quda
       //       stand, the corresponding launch parameters would never get cached to disk in this situation.  This will come up if we
       //       ever support different subvolumes per GPU (as might be convenient for lattice volumes that don't divide evenly).
 
-#ifdef MULTI_GPU
     if (comm_rank_global() == 0) {
-#endif
 
       if (tunecache.size() == initial_cache_size && !error) return;
 
@@ -492,13 +482,11 @@ namespace quda
 
       initial_cache_size = tunecache.size();
 
-#ifdef MULTI_GPU
     } else {
       // give process 0 time to write out its tunecache if needed, but
       // doesn't cause a hang if error is not triggered on process 0
       if (error) sleep(10);
     }
-#endif
   }
 
   static bool policy_tuning = false;
@@ -531,9 +519,7 @@ namespace quda
 
     if (resource_path.empty()) return;
 
-#ifdef MULTI_GPU
     if (comm_rank_global() == 0) { // Make sure only one rank is writing to disk
-#endif
 
       // Acquire lock.  Note that this is only robust if the filesystem supports flock() semantics, which is true for
       // NFS on recent versions of linux but not Lustre by default (unless the filesystem was mounted with "-o flock").
@@ -657,10 +643,7 @@ namespace quda
       // Release lock.
       close(lock_handle);
       remove(lock_path.c_str());
-
-#ifdef MULTI_GPU
     }
-#endif
   }
 
   TuneParam::TuneParam() :
@@ -760,7 +743,6 @@ namespace quda
      */
     void broadcast()
     {
-#ifdef MULTI_GPU
       size_t size;
       std::string serialized;
       if (comm_rank_global() == 0) {
@@ -780,7 +762,6 @@ namespace quda
           deserialize(deserialized);
         }
       }
-#endif
     }
 
     /**
@@ -1034,6 +1015,19 @@ namespace quda
         tunecache[key] = best_param;
       }
       if (commGlobalReduction() || policyTuning() || uberTuning()) { broadcastTuneCache(); }
+
+      {
+        static host_timer_t time_since_save;
+        if (!time_since_save.running) time_since_save.start();
+
+        const double max_time = 120; // dump the tunecache every 120 seconds
+        time_since_save.peek();
+        if (time_since_save.last() > max_time) {
+          time_since_save.stop();
+          saveTuneCache();
+          time_since_save.start();
+        }
+      }
 
       // check this process is getting the key that is expected
       if (tunecache.find(key) == tunecache.end()) {
