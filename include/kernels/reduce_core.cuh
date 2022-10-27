@@ -51,9 +51,6 @@ namespace quda
         nParity(nParity) { }
     };
 
-    template <typename real_reduce_t, typename real> struct HeavyQuarkResidualNorm_;
-    template <typename real_reduce_t, typename real> struct xpyHeavyQuarkResidualNorm_;
-
     /**
        Generic reduction kernel with up to five loads and saves.
     */
@@ -64,15 +61,8 @@ namespace quda
       Arg &arg;
       constexpr Reduce_(const Arg &arg) : arg(const_cast<Arg&>(arg))
       {
-        // this assertion ensures it's safe to make the arg non-const (required for HQ residual)
-        // This catch-all assertion is lenient and only checks the struct member.
-        // ReductionArg above uses a stringent assertion that matches Reducer.
-        if constexpr (std::is_same_v<typename Arg::Reducer,
-                                     HeavyQuarkResidualNorm_<device_reduce_t, typename Arg::real>> ||
-                      std::is_same_v<typename Arg::Reducer,
-                                     xpyHeavyQuarkResidualNorm_<device_reduce_t, typename Arg::real>>) {
-          static_assert(device::use_kernel_arg<Arg>(), "This functor must be passed as a kernel argument");
-        }
+        // The safety of making the arg non-const (required for HQ residual) is guaranteed
+        // by setting `use_kernel_arg = use_kernel_arg_p::ALWAYS` inside the functors.
       }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
