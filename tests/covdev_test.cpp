@@ -128,8 +128,6 @@ void init(int argc, char **argv)
   DiracParam diracParam;
   setDiracParam(diracParam, &inv_param, false);
 
-  diracParam.tmp1 = tmp.get();
-
   dirac = new GaugeCovDev(diracParam);
 }
 

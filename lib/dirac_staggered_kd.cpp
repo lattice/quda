@@ -69,46 +69,40 @@ namespace quda
 
     checkFullSpinor(out, in);
 
-    bool reset = newTmp(&tmp2, in);
+    auto tmp = getFieldTmp(in);
 
     if (dagger == QUDA_DAG_NO) {
 
       if (mass == 0.) {
-        ApplyStaggered(*tmp2, in, *gauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim, profile);
+        ApplyStaggered(tmp, in, *gauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim, profile);
         flops += 570ll * in.Volume();
       } else {
-        ApplyStaggered(*tmp2, in, *gauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+        ApplyStaggered(tmp, in, *gauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
         flops += 582ll * in.Volume();
       }
-      ApplyStaggeredKahlerDiracInverse(out, *tmp2, *Xinv, false);
+      ApplyStaggeredKahlerDiracInverse(out, tmp, *Xinv, false);
       flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
 
     } else { // QUDA_DAG_YES
 
-      ApplyStaggeredKahlerDiracInverse(*tmp2, in, *Xinv, true);
+      ApplyStaggeredKahlerDiracInverse(tmp, in, *Xinv, true);
       flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
 
       if (mass == 0.) {
-        ApplyStaggered(out, *tmp2, *gauge, 0., *tmp2, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim, profile);
+        ApplyStaggered(out, tmp, *gauge, 0., tmp, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim, profile);
         flops += 570ll * in.Volume();
       } else {
-        ApplyStaggered(out, *tmp2, *gauge, 2. * mass, *tmp2, QUDA_INVALID_PARITY, dagger, commDim, profile);
+        ApplyStaggered(out, tmp, *gauge, 2. * mass, tmp, QUDA_INVALID_PARITY, dagger, commDim, profile);
         flops += 582ll * in.Volume();
       }
     }
-
-    deleteTmp(&tmp2, reset);
   }
 
   void DiracStaggeredKD::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-
-    bool reset = newTmp(&tmp1, in);
-
-    M(*tmp1, in);
-    Mdag(out, *tmp1);
-
-    deleteTmp(&tmp1, reset);
+    auto tmp = getFieldTmp(in);
+    M(tmp, in);
+    Mdag(out, tmp);
   }
 
   void DiracStaggeredKD::KahlerDiracInv(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -139,21 +133,20 @@ namespace quda
     checkFullSpinor(x, b);
 
     // need to modify rhs
-    bool reset = newTmp(&tmp1, b);
+    auto tmp = getFieldTmp(b);
 
-    KahlerDiracInv(*tmp1, b);
+    KahlerDiracInv(tmp, b);
 
     // if we're preconditioning the Schur op, we need to rescale by the mass
     // parent could be an ASQTAD operator if we've enabled dropping the long links
     if (parent_dirac_type == QUDA_STAGGERED_DIRAC || parent_dirac_type == QUDA_ASQTAD_DIRAC) {
-      b = *tmp1;
+      b = tmp;
     } else if (parent_dirac_type == QUDA_STAGGEREDPC_DIRAC || parent_dirac_type == QUDA_ASQTADPC_DIRAC) {
-      b = *tmp1;
-      blas::ax(0.5 / mass, b);
-    } else
+      blas::axy(0.5 / mass, tmp, b);
+    } else {
       errorQuda("Unexpected parent Dirac type %d", parent_dirac_type);
+    }
 
-    deleteTmp(&tmp1, reset);
     sol = &x;
     src = &b;
   }

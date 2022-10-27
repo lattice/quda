@@ -138,18 +138,6 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
     /**
-       @brief Load the eigen space vectors from file
-       @param RV Loaded eigen-space vectors (pre-allocated)
-     */
-    void loadVectors(ColorSpinorField *RV);
-
-    /**
-       @brief Save the eigen space vectors in file
-       @param RV Save eigen-space vectors from here
-     */
-    void saveVectors(ColorSpinorField *RV);
-
-    /**
        @brief Test whether the deflation space is complete
        and therefore cannot be further extended      
      */

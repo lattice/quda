@@ -10,7 +10,11 @@ static bool zeroCopy = false;
 namespace quda
 {
 
-  ColorSpinorParam::ColorSpinorParam(const ColorSpinorField &field) : LatticeFieldParam() { field.fill(*this); }
+  ColorSpinorParam::ColorSpinorParam(const ColorSpinorField &field) : LatticeFieldParam()
+  {
+    field.fill(*this);
+    init = true;
+  }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) :
     LatticeField(param),
@@ -49,7 +53,7 @@ namespace quda
     }
   }
 
-  ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) :
+  ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) noexcept :
     LatticeField(field),
     init(false),
     alloc(false),
@@ -75,7 +79,7 @@ namespace quda
     copy(field);
   }
 
-  ColorSpinorField::ColorSpinorField(ColorSpinorField &&field) : LatticeField(std::move(field))
+  ColorSpinorField::ColorSpinorField(ColorSpinorField &&field) noexcept : LatticeField(std::move(field))
   {
     move(std::move(field));
   }
@@ -850,9 +854,9 @@ namespace quda
 
   ColorSpinorField ColorSpinorField::create_alias(const ColorSpinorParam &param_)
   {
-    if (param_.Precision() > precision)
+    if (param_.init && param_.Precision() > precision)
       errorQuda("Cannot create an alias to source with lower precision than the alias");
-    ColorSpinorParam param(param_);
+    ColorSpinorParam param = param_.init ? param_ : ColorSpinorParam(*this);
     param.create = QUDA_REFERENCE_FIELD_CREATE;
     param.v = V();
 

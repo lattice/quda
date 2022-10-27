@@ -37,7 +37,9 @@ protected:
       return true;
     }
 
-    if (::testing::get<2>(GetParam()) > 0 && dslash_test_wrapper.test_split_grid) { return true; }
+    // work out if test_split_grid is enabled
+    bool test_split_grid = (grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3] > 1);
+    if (::testing::get<2>(GetParam()) > 0 && test_split_grid) { return true; }
 
     const std::array<bool, 16> partition_enabled {true, true, true,  false,  true,  false, false, false,
                                                   true, false, false, false, true, false, true, true};

@@ -11,6 +11,7 @@ namespace quda {
     location(field.Location()),
     precision(field.Precision()),
     ghost_precision(field.Precision()),
+    init(true),
     nDim(field.Ndim()),
     pad(field.Pad()),
     siteSubset(field.SiteSubset()),
@@ -67,7 +68,7 @@ namespace quda {
     create(param);
   }
 
-  LatticeField::LatticeField(const LatticeField &field) :
+  LatticeField::LatticeField(const LatticeField &field) noexcept :
     volume(field.volume),
     volumeCB(field.volumeCB),
     localVolume(field.localVolume),
@@ -116,7 +117,7 @@ namespace quda {
     create(param);
   }
 
-  LatticeField::LatticeField(LatticeField &&field) { move(std::move(field)); }
+  LatticeField::LatticeField(LatticeField &&field) noexcept { move(std::move(field)); }
 
   LatticeField::~LatticeField() { destroyComms(); }
 

@@ -33,6 +33,7 @@ set (QUDA_OBJS
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu
+  field_cache.cpp
   gauge_covdev.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
@@ -253,77 +254,14 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 target_link_libraries(quda PUBLIC Threads::Threads)
-# QUDA FEATURES
-if(QUDA_DIRAC_WILSON)
-  target_compile_definitions(quda PUBLIC GPU_WILSON_DIRAC)
-endif(QUDA_DIRAC_WILSON)
-
-if(QUDA_DIRAC_DOMAIN_WALL)
-  target_compile_definitions(quda PUBLIC GPU_DOMAIN_WALL_DIRAC)
-endif(QUDA_DIRAC_DOMAIN_WALL)
-
-if(QUDA_DIRAC_STAGGERED)
-  target_compile_definitions(quda PUBLIC GPU_STAGGERED_DIRAC)
-endif(QUDA_DIRAC_STAGGERED)
-
-if(QUDA_DIRAC_CLOVER)
-  target_compile_definitions(quda PUBLIC GPU_CLOVER_DIRAC GPU_WILSON_DIRAC)
-endif(QUDA_DIRAC_CLOVER)
-
-if(QUDA_DIRAC_TWISTED_MASS)
-  target_compile_definitions(quda PUBLIC GPU_TWISTED_MASS_DIRAC GPU_WILSON_DIRAC)
-endif(QUDA_DIRAC_TWISTED_MASS)
-
-if(QUDA_DIRAC_TWISTED_CLOVER)
-  target_compile_definitions(quda PUBLIC GPU_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC GPU_TWISTED_MASS_DIRAC
-                                         GPU_WILSON_DIRAC)
-endif(QUDA_DIRAC_TWISTED_CLOVER)
-
-if(QUDA_DIRAC_CLOVER_HASENBUSCH)
-  target_compile_definitions(quda PUBLIC GPU_CLOVER_HASENBUSCH_TWIST GPU_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC
-                                         GPU_WILSON_DIRAC)
-endif(QUDA_DIRAC_CLOVER_HASENBUSCH)
-
-if(QUDA_DIRAC_NDEG_TWISTED_MASS)
-  target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_MASS_DIRAC)
-endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
-
-if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
-  target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC GPU_TWISTED_CLOVER_DIRAC)
-endif(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
-
 
 if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
   target_compile_definitions(quda PRIVATE NATIVE_LAPACK_LIB)
 endif()
 
-if(QUDA_MULTIGRID)
-  target_compile_definitions(quda PRIVATE GPU_MULTIGRID)
-endif(QUDA_MULTIGRID)
-
-if(QUDA_GAUGE_ALG)
-  target_compile_definitions(quda PUBLIC)
-endif(QUDA_GAUGE_ALG)
-
-if(QUDA_SSTEP)
-  target_compile_definitions(quda PRIVATE SSTEP)
-endif()
-
 if(QUDA_BLOCKSOLVER)
   target_compile_definitions(quda PRIVATE BLOCKSOLVER)
 endif()
-
-if(QUDA_FORCE_GAUGE)
-  target_compile_definitions(quda PUBLIC)
-endif(QUDA_FORCE_GAUGE)
-
-if(QUDA_GAUGE_TOOLS)
-  target_compile_definitions(quda PUBLIC)
-endif(QUDA_GAUGE_TOOLS)
-
-if(QUDA_GAUGE_ALG)
-  target_compile_definitions(quda PUBLIC)
-endif(QUDA_GAUGE_ALG)
 
 if(QUDA_INTERFACE_QDP OR QUDA_INTERFACE_ALL)
   target_compile_definitions(quda PUBLIC BUILD_QDP_INTERFACE)
@@ -348,18 +286,6 @@ endif(QUDA_INTERFACE_BQCD OR QUDA_INTERFACE_ALL)
 if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_ALL)
   target_compile_definitions(quda PUBLIC BUILD_TIFR_INTERFACE)
 endif(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_ALL)
-
-if(QUDA_CONTRACT)
-  target_compile_definitions(quda PUBLIC GPU_CONTRACT)
-endif(QUDA_CONTRACT)
-
-if(QUDA_COVDEV)
-  target_compile_definitions(quda PUBLIC GPU_COVDEV)
-endif(QUDA_COVDEV)
-
-if(QUDA_LAPLACE)
-  target_compile_definitions(quda PUBLIC GPU_LAPLACE)
-endif(QUDA_LAPLACE)
 
 # MULTI GPU AND USQCD
 if(QUDA_MPI OR QUDA_QMP)
