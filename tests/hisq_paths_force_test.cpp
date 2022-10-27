@@ -10,7 +10,7 @@
 #include "hisq_force_reference.h"
 #include "ks_improved_force.h"
 #include "momentum.h"
-#include <sys/time.h>
+#include <timer.h>
 #include <gtest/gtest.h>
 
 #define TDIFF(a, b) (b.tv_sec - a.tv_sec + 0.000001 * (b.tv_usec - a.tv_usec))
@@ -68,6 +68,8 @@ static void setPrecision(QudaPrecision precision)
 
 void total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, double *io, double *flops)
 {
+  // TO DO: update me with new counts in hisq kernel core file
+
   // total IO counting for the middle/side/all link kernels
   // Explanation about these numbers can be founed in the corresnponding kernel functions in
   // the hisq kernel core file
@@ -77,14 +79,19 @@ void total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, double
   int matrix_mul_flops = 198;
   int matrix_add_flops = 18;
 
+  // { 3-link sig pos, 3-link sig neg, 5-link sig pos, 5-link sig neg,
+  //     Lepage sig pos, Lepage sig neg }
   int num_calls_middle_link[6] = {24, 24, 96, 96, 24, 24};
   int middle_link_data_io[6][2] = {{3, 6}, {3, 4}, {3, 7}, {3, 5}, {3, 5}, {3, 2}};
   int middle_link_data_flops[6][2] = {{3, 1}, {2, 0}, {4, 1}, {3, 0}, {4, 1}, {2, 0}};
 
+  // is Lepage side link ever counted?
+  // { 5-link side, 3-link side }
   int num_calls_side_link[2] = {192, 48};
   int side_link_data_io[2][2] = {{1, 6}, {0, 3}};
   int side_link_data_flops[2][2] = {{2, 2}, {0, 1}};
 
+  // { 7-link all sig pos, 7-link all sig neg }
   int num_calls_all_link[2] = {192, 192};
   int all_link_data_io[2][2] = {{3, 8}, {3, 6}};
   int all_link_data_flops[2][2] = {{6, 3}, {4, 2}};
@@ -267,7 +274,7 @@ static void hisq_force_end()
   delete cudaForce_ex;
   delete cudaGauge_ex;
   // delete cudaOprod_ex; // already deleted
-  delete cudaLongLinkOprod_ex;
+  // delete cudaLongLinkOprod_ex; // already deleted
 
   delete cpuGauge;
   delete cpuMom;
@@ -283,19 +290,15 @@ static void hisq_force_end()
   host_free(hw);
 }
 
-static int hisq_force_test(void)
+static int hisq_force_test(bool lepage)
 {
   setVerbosity(verbosity);
   hisq_force_init();
 
-  // float weight = 1.0;
+  // float d_weight = 1.0;
   // { one, naik, three, five, seven, lepage }
-  float act_path_coeff[6] = { 0.625000, -0.058479, -0.087719,
-                              0.030778, -0.007200, -0.123113 };
-
-  // double d_weight = 1.0;
-  double d_act_path_coeff[6];
-  for (int i = 0; i < 6; ++i) { d_act_path_coeff[i] = act_path_coeff[i]; }
+  double d_act_path_coeff[6] = { 0.625000, -0.058479, -0.087719,
+                                 0.030778, -0.007200, lepage ? -0.123113 : 0. };
 
   cpuGauge_ex->exchangeExtendedGhost(R, true);
   cudaGauge_ex->loadCPUField(*cpuGauge);
@@ -307,38 +310,50 @@ static int hisq_force_test(void)
 
   cpuLongLinkOprod_ex->exchangeExtendedGhost(R, true);
 
-  struct timeval ht0, ht1;
-  gettimeofday(&ht0, NULL);
+  quda::host_timer_t host_timer;
+
+  double host_time_sec = 0.0;
+  double staples_time_sec = 0.0;
+  double long_time_sec = 0.0;
+  double complete_time_sec = 0.0;
+  
   if (verify_results) {
+    host_timer.start();
     hisqStaplesForceCPU(d_act_path_coeff, qudaGaugeParam, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
-    hisqLongLinkForceCPU(d_act_path_coeff[1], qudaGaugeParam, *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
+    if (!lepage) hisqLongLinkForceCPU(d_act_path_coeff[1], qudaGaugeParam, *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
     hisqCompleteForceCPU(qudaGaugeParam, *cpuForce_ex, *cpuGauge_ex, refMom);
+    host_timer.stop();
+    host_time_sec = host_timer.last();
   }
-  gettimeofday(&ht1, NULL);
 
-  struct timeval t0, t1, t2, t3;
-
-  gettimeofday(&t0, NULL);
-
+  host_timer.start();
   fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
   qudaDeviceSynchronize();
-  gettimeofday(&t1, NULL);
+  host_timer.stop();
+  staples_time_sec = host_timer.last();
 
   delete cudaOprod_ex; // doing this to lower the peak memory usage
 
-  gParam_ex.location = QUDA_CUDA_FIELD_LOCATION;
-  gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
-  for (int d = 0; d < 4; d++) {
-    gParam_ex.r[d] = (comm_dim_partitioned(d)) ? 2 : 0;
-    gParam_ex.x[d] = gParam.x[d] + 2 * gParam_ex.r[d];
-  } // set halo region
-  cudaLongLinkOprod_ex = new cudaGaugeField(gParam_ex);
-  cudaLongLinkOprod_ex->loadCPUField(*cpuLongLinkOprod);
-  cudaLongLinkOprod_ex->exchangeExtendedGhost(cudaLongLinkOprod_ex->R());
-  fermion_force::hisqLongLinkForce(*cudaForce_ex, *cudaLongLinkOprod_ex, *cudaGauge_ex, d_act_path_coeff[1]);
-  qudaDeviceSynchronize();
+  // Only compute the long link when also computing the Lepage term
+  // This is consistent with the chain rule for HISQ
+  if (!lepage) {
+    gParam_ex.location = QUDA_CUDA_FIELD_LOCATION;
+    gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
+    for (int d = 0; d < 4; d++) {
+      gParam_ex.r[d] = (comm_dim_partitioned(d)) ? 2 : 0;
+      gParam_ex.x[d] = gParam.x[d] + 2 * gParam_ex.r[d];
+    } // set halo region
+    cudaLongLinkOprod_ex = new cudaGaugeField(gParam_ex);
+    cudaLongLinkOprod_ex->loadCPUField(*cpuLongLinkOprod);
+    cudaLongLinkOprod_ex->exchangeExtendedGhost(cudaLongLinkOprod_ex->R());
+    host_timer.start();
+    fermion_force::hisqLongLinkForce(*cudaForce_ex, *cudaLongLinkOprod_ex, *cudaGauge_ex, d_act_path_coeff[1]);
+    qudaDeviceSynchronize();
+    host_timer.stop();
+    long_time_sec = host_timer.last();
 
-  gettimeofday(&t2, NULL);
+    delete cudaLongLinkOprod_ex;
+  }
 
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.create = QUDA_ZERO_FIELD_CREATE; // initialize to zero
@@ -351,11 +366,12 @@ static int hisq_force_test(void)
   // record the mom pad
   qudaGaugeParam.mom_ga_pad = gParam.pad;
 
+  host_timer.start();
   fermion_force::hisqCompleteForce(*cudaForce_ex, *cudaGauge_ex);
   updateMomentum(*cudaMom, 1.0, *cudaForce_ex, __func__);
-
   qudaDeviceSynchronize();
-  gettimeofday(&t3, NULL);
+  host_timer.stop();
+  complete_time_sec = host_timer.last();
 
   cudaMom->saveCPUField(*cpuMom);
 
@@ -365,19 +381,19 @@ static int hisq_force_test(void)
                              qudaGaugeParam.cpu_prec);
     accuracy_level
       = strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume(), qudaGaugeParam.cpu_prec);
-    printfQuda("Test %s\n", (1 == res) ? "PASSED" : "FAILED");
+    printfQuda("Test (lepage coeff %e) %s\n", d_act_path_coeff[5], (1 == res) ? "PASSED" : "FAILED");
   }
   double total_io;
   double total_flops;
   total_staple_io_flops(link_prec, link_recon, &total_io, &total_flops);
 
-  float perf_flops = total_flops / (TDIFF(t0, t1)) * 1e-9;
-  float perf = total_io / (TDIFF(t0, t1)) * 1e-9;
-  printfQuda("Staples time: %.2f ms, perf = %.2f GFLOPS, achieved bandwidth= %.2f GB/s\n", TDIFF(t0, t1) * 1000,
+  float perf_flops = total_flops / (staples_time_sec) * 1e-9;
+  float perf = total_io / (staples_time_sec) * 1e-9;
+  printfQuda("Staples time: %.2f ms, perf = %.2f GFLOPS, achieved bandwidth= %.2f GB/s\n", staples_time_sec * 1e3,
              perf_flops, perf);
-  printfQuda("Staples time : %g ms\t LongLink time : %g ms\t Completion time : %g ms\n", TDIFF(t0, t1) * 1000,
-             TDIFF(t1, t2) * 1000, TDIFF(t2, t3) * 1000);
-  printfQuda("Host time (half-wilson fermion force) : %g ms\n", TDIFF(ht0, ht1) * 1000);
+  printfQuda("Staples time : %g ms\t LongLink time : %g ms\t Completion time : %g ms\n",
+             staples_time_sec * 1e3, long_time_sec * 1e3, complete_time_sec * 1e3);
+  printfQuda("Host time (half-wilson fermion force) : %g ms\n", host_time_sec * 1e3);
 
   hisq_force_end();
 
@@ -397,7 +413,14 @@ static void display_test_info()
 
 TEST(paths, verify)
 {
-  int level = hisq_force_test();
+  int level = hisq_force_test(true);
+  int tolerance = link_prec == QUDA_SINGLE_PRECISION ? 5 : 13;
+  ASSERT_GE(level, tolerance) << "CPU and GPU implementations do not agree";
+}
+
+TEST(paths_no_lepage, verify)
+{
+  int level = hisq_force_test(false);
   int tolerance = link_prec == QUDA_SINGLE_PRECISION ? 5 : 13;
   ASSERT_GE(level, tolerance) << "CPU and GPU implementations do not agree";
 }
