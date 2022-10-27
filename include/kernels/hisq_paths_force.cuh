@@ -27,7 +27,7 @@ namespace quda {
     constexpr int parity_sign(int parity) { return parity ? -1 : 1; }
     constexpr int pos_dir(int signed_dir) { return (signed_dir >= 4) ? 7 - signed_dir : signed_dir; }
 
-    constexpr int updateCoordsIndexMILCDir(int x[], const int X[], int signed_dir) {
+    __host__ __device__ int updateCoordsIndexMILCDir(int x[], const int X[], int signed_dir) {
       switch (signed_dir) {
       case 0: x[0] = (x[0] + 1 + X[0]) % X[0]; break;
       case 1: x[1] = (x[1] + 1 + X[1]) % X[1]; break;
@@ -93,7 +93,7 @@ namespace quda {
           E[d] = link.X()[d];
           border[d] = link.R()[d];
           X[d] = E[d] - 2*border[d];
-          D[d] = comm_dim_partitioned(d) ? X[d]+overlap*2 : X[d];
+          D[d] = comm_dim_partitioned(d) ? X[d]+overlap*2 : int(X[d]);
           base_idx[d] = comm_dim_partitioned(d) ? border[d]-overlap : 0;
           this->threads.x *= D[d];
         }
@@ -719,11 +719,20 @@ namespace quda {
         int x[4];
         getCoords(x, x_cb, arg.D, parity);
 
-        /*        A________B
-         *   mu   |        |
-         *       D|        |C
+        /*
+         * Very top points are to prepare p3 for the 3-link side link
+         * 
+         *  
+         *            sig
+         *         H|      |G
+         *          |      |
+         *         F        E
+         *          |      |
+         *         A|______|B
+         *       mu |      |
+         *        D |      |C
          *
-         *    A is the current point (sid)
+         *   A is the current point (sid)
          *
          */
 
@@ -732,54 +741,185 @@ namespace quda {
         parity = parity ^ arg.oddness_change;
 
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu));
-        int ad_link_nbr_idx = mu_positive ? point_d : e_cb;
-
-        int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+        int point_a = e_cb;
+        int parity_a = parity;
+        int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+        int parity_b = 1 - parity;
 
         for (int d=0; d<4; d++) y[d] = x[d];
-        int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+        int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu));
+        int parity_d = 1 - parity;
+        int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+        int parity_c = parity;
 
-        int bc_link_nbr_idx = mu_positive ? point_c : point_b;
-        int ab_link_nbr_idx = sig_positive ? e_cb : point_b;
+        for (int d=0; d<4; d++) y[d] = x[d];
+        int point_f = updateCoordsIndexMILCDir(y, arg.E, arg.mu);
+        int parity_f = 1 - parity;
+        int point_e = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+        int parity_e = parity;
 
-        // load the link variable connecting a and b
-        Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, sig_positive^(1-parity));
+        int point_g = updateCoordsIndexMILCDir(y, arg.E, arg.mu);
+        int parity_g = 1 - parity;
+        int point_h = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.sig));
+        int parity_h = parity;
 
-        // load the link variable connecting b and c
-        Link Ubc = arg.link(pos_dir(arg.mu), bc_link_nbr_idx, mu_positive^(1-parity));
+        int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
+        int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
 
-        Link Oc = arg.oProd(0, point_c, parity);
+        int da_link_nbr_idx = (mu_positive) ? point_d : point_a;
+        int da_link_nbr_parity = (mu_positive) ? parity_d : parity_a;
 
-        Link Ow = !mu_positive ? Ubc*Oc : conj(Ubc)*Oc;
+        int cb_link_nbr_idx = mu_positive ? point_c : point_b;
+        int cb_link_nbr_parity = mu_positive ? parity_c : parity_b;
 
-        Link p3 = sig_positive ? Uab*Ow : conj(Uab)*Ow;
+        int fe_link_nbr_idx = (sig_positive) ? point_f : point_e;
+        int fe_link_nbr_parity = (sig_positive) ? parity_f : parity_e;
+
+        int af_link_nbr_idx = (mu_positive) ? point_a : point_f;
+        int af_link_nbr_parity = (mu_positive) ? parity_a : parity_f;
+
+        int be_link_nbr_idx = (mu_positive) ? point_b : point_e;
+        int be_link_nbr_parity = (mu_positive) ? parity_b : parity_e;
+
+        int hg_link_nbr_idx = (sig_positive) ? point_h : point_g;
+        int hg_link_nbr_parity = (sig_positive) ? parity_h : parity_g;
+
+        int eg_link_nbr_idx = (mu_positive) ? point_e : point_g;
+        int eg_link_nbr_parity = (mu_positive) ? parity_e : parity_g;
+
+        int fh_link_nbr_idx = (mu_positive) ? point_f : point_h;
+        int fh_link_nbr_parity = (mu_positive) ? parity_f : parity_h;
+
+        // Compute shortP
+        // note: if mu is positive, we need shortP --> p3 at f
+        Link Ufe = arg.link(pos_dir(arg.sig), fe_link_nbr_idx, fe_link_nbr_parity);
+        Link Ube = arg.link(pos_dir(arg.mu), be_link_nbr_idx, be_link_nbr_parity);
+        Link Uaf = arg.link(pos_dir(arg.mu), af_link_nbr_idx, af_link_nbr_parity);
+        Link Ob = arg.oProd(0, point_b, parity_b);
+
+        Link Ow = !mu_positive ? Ube * Ob : conj(Ube) * Ob;
+        Link p3 = sig_positive ? Ufe * Ow : conj(Ufe) * Ow;
+        Link Ox = mu_positive ? Uaf * p3 : conj(Uaf) * p3;
+
+        //Link shortP = arg.shortP(0, point_a, parity_a);
+        //shortP += arg.accumu_coeff_lepage * Ox;
+        //arg.shortP(0, point_a, parity_a) = shortP;
+
+        Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
+        Link Ucb = arg.link(pos_dir(arg.mu), cb_link_nbr_idx, cb_link_nbr_parity);
 
         // load the link variable connecting a and d
-        Link Uad = arg.link(pos_dir(arg.mu), ad_link_nbr_idx, mu_positive^parity);
+        Link Uad = arg.link(pos_dir(arg.mu), point_a, parity_a);
 
-        Link Ox = mu_positive ? Uad * p3 : conj(Uad) * p3;
+        if constexpr ( mu_positive ) {
 
-        Link shortP = arg.shortP(0, point_d, 1-parity);
-        shortP += arg.accumu_coeff_lepage * Ox;
-        arg.shortP(0, point_d, 1-parity) = shortP;
+          {
+            // need to shift this up so we compute shortP at e
+            Link Uhg = arg.link(pos_dir(arg.sig), hg_link_nbr_idx, hg_link_nbr_parity);
+            Link Ueg = arg.link(pos_dir(arg.mu), point_e, parity_e);
+            Link Ufh = arg.link(pos_dir(arg.mu), point_f, parity_f);
+            Link Oe = arg.oProd(0, point_e, parity_e);
 
-        Link Qd = arg.qProd(0, point_d, 1-parity);
-        Ox = mu_positive ? p3 * Qd : conj(Qd) * conj(p3);
+            Link Ow = !mu_positive ? Ueg * Oe : conj(Ueg) * Oe;
+            Link p3 = sig_positive ? Uhg * Ow : conj(Uhg) * Ow;
+            Link Ox = mu_positive ? Ufh * p3 : conj(Ufh) * p3;
 
-        auto mycoeff_lepage = -coeff_sign(goes_forward(arg.sig), parity)*coeff_sign(goes_forward(arg.mu),parity)*arg.coeff_lepage;
+            Link shortP = arg.shortP(0, point_f, parity_f);
+            shortP += arg.accumu_coeff_lepage * Ox;
+            arg.shortP(0, point_f, parity_f) = shortP;
+          }
 
-        Link oprod = arg.force(pos_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
-        oprod += mycoeff_lepage * Ox;
-        arg.force(pos_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity) = oprod;
+          {
+            Link Ufe = arg.link(pos_dir(arg.sig), fe_link_nbr_idx, fe_link_nbr_parity);
+            Link Uad = arg.link(pos_dir(arg.mu), point_a, parity_a);
+            Link Ube = arg.link(pos_dir(arg.mu), point_b, parity_b);
+            Link Ob = arg.oProd(0, point_b, parity_b);
 
-        if constexpr ( sig_positive ) {
-          Link Ox = mu_positive ? Qd * Uad : Qd * conj(Uad);
-          Link Oy = Ow*Ox;
+            Link Ow = !mu_positive ? Ube * Ob : conj(Ube) * Ob;
+            Link p3 = sig_positive ? Ufe * Ow : conj(Ufe) * Ow;
+            Link Ox = Uad * p3;
 
-          Link oprod = arg.force(arg.sig, e_cb, parity);
-          oprod += arg.coeff_lepage*Oy;
-          arg.force(arg.sig, e_cb, parity) = oprod;
+            Link Qd = arg.qProd(0, point_a, parity_a);
+            Ox = p3 * Qd;
+
+            auto mycoeff_lepage = -coeff_sign(goes_forward(arg.sig), parity)*coeff_sign(goes_forward(arg.mu),parity)*arg.coeff_lepage;
+
+            Link oprod = arg.force(pos_dir(arg.mu), point_a, parity_a);
+            oprod += mycoeff_lepage * Ox;
+            arg.force(pos_dir(arg.mu), point_a, parity_a) = oprod;
+          }
+
+          if constexpr ( sig_positive ) {
+            Link Uab = arg.link(pos_dir(arg.sig), point_a, parity_a);
+            Link Ucb = arg.link(pos_dir(arg.mu), point_c, parity_c);
+            Link Uda = arg.link(pos_dir(arg.mu), point_d, parity_d);
+            Link Oc = arg.oProd(0, point_c, parity_c);
+
+            Link Ow = !mu_positive ? Ucb*Oc : conj(Ucb)*Oc;
+            Link p3 = sig_positive ? Uab*Ow : conj(Uab)*Ow;
+
+            Link Qd = arg.qProd(0, point_d, parity_d);
+            Link Ox = mu_positive ? Qd * Uda : Qd * conj(Uda);
+            Link Oy = Ow*Ox;
+
+            Link oprod = arg.force(arg.sig, point_a, parity_a);
+            oprod += arg.coeff_lepage*Oy;
+            arg.force(arg.sig, point_a, parity_a) = oprod;
+          }
+        } else {
+          {
+            Link Ufe = arg.link(pos_dir(arg.sig), fe_link_nbr_idx, fe_link_nbr_parity);
+            Link Ube = arg.link(pos_dir(arg.mu), point_e, parity_e);
+            Link Uaf = arg.link(pos_dir(arg.mu), point_f, parity_f);
+            Link Ob = arg.oProd(0, point_b, parity_b);
+
+            Link Ow = !mu_positive ? Ube * Ob : conj(Ube) * Ob;
+            Link p3 = sig_positive ? Ufe * Ow : conj(Ufe) * Ow;
+            Link Ox = mu_positive ? Uaf * p3 : conj(Uaf) * p3;
+
+            Link shortP = arg.shortP(0, point_a, parity_a);
+            shortP += arg.accumu_coeff_lepage * Ox;
+            arg.shortP(0, point_a, parity_a) = shortP;
+          }
+
+          {
+            Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
+            Link Ucb = arg.link(pos_dir(arg.mu), point_b, parity_b);
+            Link Uad = arg.link(pos_dir(arg.mu), point_a, parity_a);
+            Link Oc = arg.oProd(0, point_c, parity_c);
+
+            Link Ow = !mu_positive ? Ucb*Oc : conj(Ucb)*Oc;
+            Link p3 = sig_positive ? Uab*Ow : conj(Uab)*Ow;
+            Link Ox = conj(Uad) * p3;
+
+            Link Qd = arg.qProd(0, point_d, parity_d);
+            Ox = conj(Qd) * conj(p3);
+
+            auto mycoeff_lepage = -coeff_sign(goes_forward(arg.sig), parity)*coeff_sign(goes_forward(arg.mu),parity)*arg.coeff_lepage;
+
+            Link oprod = arg.force(pos_dir(arg.mu), point_a, parity_a);
+            oprod += mycoeff_lepage * Ox;
+            arg.force(pos_dir(arg.mu), point_a, parity_a) = oprod;
+          }
+
+          if constexpr ( sig_positive ) {
+            Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
+            Link Ucb = arg.link(pos_dir(arg.mu), point_b, parity_b);
+            Link Uda = arg.link(pos_dir(arg.mu), point_a, parity_a);
+            Link Oc = arg.oProd(0, point_c, parity_c);
+
+            Link Ow = !mu_positive ? Ucb*Oc : conj(Ucb)*Oc;
+            Link p3 = sig_positive ? Uab*Ow : conj(Uab)*Ow;
+
+            Link Qd = arg.qProd(0, point_d, parity_d);
+
+            Link Ox = mu_positive ? Qd * Uda : Qd * conj(Uda);
+            Link Oy = Ow*Ox;
+
+            Link oprod = arg.force(arg.sig, point_a, parity_a);
+            oprod += arg.coeff_lepage*Oy;
+            arg.force(arg.sig, point_a, parity_a) = oprod;
+          }
         }
 
       }
@@ -799,7 +939,7 @@ namespace quda {
 
       const real coeff_three;
 
-      static constexpr int overlap = 1;
+      static constexpr int overlap = 2;
 
       SideLinkShortArg(GaugeField &force, GaugeField &P3, const GaugeField &link,
                    const PathCoefficients<real> &act_path_coeff)
@@ -840,15 +980,27 @@ namespace quda {
          *
          */
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_d = mu_positive ? updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu)) : e_cb;
+        int point_a = e_cb;
+        int parity_a = parity;
+        int point_f = updateCoordsIndexMILCDir(y, arg.E, arg.mu);
+        int parity_f = 1 - parity;
 
-        int parity_ = mu_positive ? 1-parity : parity;
+        int fa_link_nbr_idx = (mu_positive) ? point_f : point_a;
+        int fa_link_nbr_parity = (mu_positive) ? parity_f : parity_a;
+
         auto mycoeff_three = coeff_sign(goes_forward(arg.sig),parity)*coeff_sign(goes_forward(arg.mu),parity)*arg.coeff_three;
 
-        Link Oy = arg.p3(0, e_cb, parity);
-        Link oprod = arg.force(pos_dir(arg.mu), point_d, parity_);
-        oprod += mu_positive ? mycoeff_three * Oy : mycoeff_three * conj(Oy);
-        arg.force(pos_dir(arg.mu), point_d, parity_) = oprod;
+        if constexpr (mu_positive) {
+          Link Oy = arg.p3(0, point_f, parity_f);
+          Link oprod = arg.force(pos_dir(arg.mu), point_a, parity_a);
+          oprod += mycoeff_three * Oy;
+          arg.force(pos_dir(arg.mu), point_a, parity_a) = oprod;
+        } else {
+          Link Oy = arg.p3(0, point_a, parity_a);
+          Link oprod = arg.force(pos_dir(arg.mu), point_a, parity_a);
+          oprod += mycoeff_three * conj(Oy);
+          arg.force(pos_dir(arg.mu), point_a, parity_a) = oprod;
+        }
       }
     };
 

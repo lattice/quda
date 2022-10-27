@@ -289,14 +289,9 @@ static int hisq_force_test(void)
   hisq_force_init();
 
   // float weight = 1.0;
-  float act_path_coeff[6];
-
-  act_path_coeff[0] = 0.625000;
-  act_path_coeff[1] = -0.058479;
-  act_path_coeff[2] = -0.087719;
-  act_path_coeff[3] = 0.030778;
-  act_path_coeff[4] = -0.007200;
-  act_path_coeff[5] = -0.123113;
+  // { one, naik, three, five, seven, lepage }
+  float act_path_coeff[6] = { 0.625000, -0.058479, -0.087719,
+                              0.030778, -0.007200, -0.123113 };
 
   // double d_weight = 1.0;
   double d_act_path_coeff[6];
