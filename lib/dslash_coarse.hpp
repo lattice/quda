@@ -25,6 +25,7 @@ namespace quda {
     const int parity;
     const int nParity;
     const int nSrc;
+    ColorSpinorField &dummy;
 
     const int max_color_col_stride = 8;
     mutable int color_col_stride;
@@ -135,7 +136,8 @@ namespace quda {
   public:
     DslashCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                  cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y,
-                 const GaugeField &X, double kappa, int parity, MemoryLocation *halo_location) :
+                 const GaugeField &X, double kappa, int parity, MemoryLocation *halo_location,
+                 ColorSpinorField &dummy) :
       TunableKernel3D(out[0], out[0].SiteSubset() * out.size(), 1),
       out(out),
       inA(inA),
@@ -146,6 +148,7 @@ namespace quda {
       parity(parity),
       nParity(out[0].SiteSubset()),
       nSrc(out[0].Ndim() == 5 ? out[0].X(4) : 1),
+      dummy(dummy),
       color_col_stride(-1)
     {
       strcpy(aux, (std::string("policy_kernel,") + aux).c_str());
@@ -205,11 +208,11 @@ namespace quda {
         switch (tp.aux.y) { // dimension gather parallelisation
         case 1:
           switch (tp.aux.x) { // this is color_col_stride
-          case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 1>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
+          case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 1>(out, inA, inB, Y, X, (Float)kappa, parity, dummy)); break;
 #ifndef QUDA_FAST_COMPILE_DSLASH
-          case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 1>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-          case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 1>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-          case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 1>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
+          case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 1>(out, inA, inB, Y, X, (Float)kappa, parity, dummy)); break;
+          case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 1>(out, inA, inB, Y, X, (Float)kappa, parity, dummy)); break;
+          case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 1>(out, inA, inB, Y, X, (Float)kappa, parity, dummy)); break;
 #endif
           default: errorQuda("Color column stride %d not valid", static_cast<int>(tp.aux.x));
           }
@@ -217,19 +220,19 @@ namespace quda {
 #ifndef QUDA_FAST_COMPILE_DSLASH
         case 2:
           switch (tp.aux.x) { // this is color_col_stride
-          case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-          case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-          case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-          case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
+          case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 2>(out, inA, inB, Y, X, (Float)kappa, parity, dummy)); break;
+          case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 2>(out, inA, inB, Y, X, (Float)kappa, parity, dummy)); break;
+          case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 2>(out, inA, inB, Y, X, (Float)kappa, parity, dummy)); break;
+          case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 2>(out, inA, inB, Y, X, (Float)kappa, parity, dummy)); break;
           default: errorQuda("Color column stride %d not valid", static_cast<int>(tp.aux.x));
           }
           break;
         case 4:
           switch (tp.aux.x) { // this is color_col_stride
-          case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-          case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-          case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-          case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
+          case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 4>(out, inA, inB, Y, X, (Float)kappa, parity, dummy)); break;
+          case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 4>(out, inA, inB, Y, X, (Float)kappa, parity, dummy)); break;
+          case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 4>(out, inA, inB, Y, X, (Float)kappa, parity, dummy)); break;
+          case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 4>(out, inA, inB, Y, X, (Float)kappa, parity, dummy)); break;
           default: errorQuda("Color column stride %d not valid", static_cast<int>(tp.aux.x));
           }
           break;
@@ -246,24 +249,24 @@ namespace quda {
   template <typename Float, typename yFloat, typename ghostFloat, bool dagger, int coarseColor, int coarseSpin>
   inline void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA, cvector_ref<const ColorSpinorField> &inB,
                           const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash, bool clover,
-                          DslashType type, MemoryLocation *halo_location)
+                          DslashType type, MemoryLocation *halo_location, ColorSpinorField &dummy)
   {
     if (dslash) {
       if (clover) {
         switch (type) {
         case DSLASH_FULL: {
           DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, true, dagger, DSLASH_FULL> dslash(
-            out, inA, inB, Y, X, kappa, parity, halo_location);
+                                                                                                                   out, inA, inB, Y, X, kappa, parity, halo_location, dummy);
           break;
         }
         case DSLASH_EXTERIOR: {
           DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, true, dagger, DSLASH_EXTERIOR> dslash(
-            out, inA, inB, Y, X, kappa, parity, halo_location);
+                                                                                                                       out, inA, inB, Y, X, kappa, parity, halo_location, dummy);
           break;
         }
         case DSLASH_INTERIOR: {
           DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, true, dagger, DSLASH_INTERIOR> dslash(
-            out, inA, inB, Y, X, kappa, parity, halo_location);
+                                                                                                                       out, inA, inB, Y, X, kappa, parity, halo_location, dummy);
           break;
         }
         default: errorQuda("Dslash type %d not instantiated", type);
@@ -274,17 +277,17 @@ namespace quda {
         switch (type) {
         case DSLASH_FULL: {
           DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, false, dagger, DSLASH_FULL> dslash(
-            out, inA, inB, Y, X, kappa, parity, halo_location);
+                                                                                                                    out, inA, inB, Y, X, kappa, parity, halo_location, dummy);
           break;
         }
         case DSLASH_EXTERIOR: {
           DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, false, dagger, DSLASH_EXTERIOR> dslash(
-            out, inA, inB, Y, X, kappa, parity, halo_location);
+                                                                                                                        out, inA, inB, Y, X, kappa, parity, halo_location, dummy);
           break;
         }
         case DSLASH_INTERIOR: {
           DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, false, dagger, DSLASH_INTERIOR> dslash(
-            out, inA, inB, Y, X, kappa, parity, halo_location);
+                                                                                                                        out, inA, inB, Y, X, kappa, parity, halo_location, dummy);
           break;
         }
         default: errorQuda("Dslash type %d not instantiated", type);
@@ -295,7 +298,7 @@ namespace quda {
       if (type == DSLASH_EXTERIOR) errorQuda("Cannot call halo on pure clover kernel");
       if (clover) {
         DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, false, true, dagger, DSLASH_FULL> dslash(
-          out, inA, inB, Y, X, kappa, parity, halo_location);
+                                                                                                                  out, inA, inB, Y, X, kappa, parity, halo_location, dummy);
       } else {
         errorQuda("Unsupported dslash=false clover=false");
       }
@@ -306,7 +309,7 @@ namespace quda {
   template <typename Float, typename yFloat, typename ghostFloat, bool dagger>
   inline void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA, cvector_ref<const ColorSpinorField> &inB,
 			  const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash,
-			  bool clover, DslashType type, MemoryLocation *halo_location)
+			  bool clover, DslashType type, MemoryLocation *halo_location, ColorSpinorField &dummy)
   {
     if (Y.FieldOrder() != X.FieldOrder())
       errorQuda("Field order mismatch Y = %d, X = %d", Y.FieldOrder(), X.FieldOrder());
@@ -319,20 +322,20 @@ namespace quda {
 
 #ifdef NSPIN4
     if (inA[0].Ncolor() == 6) { // free field Wilson
-      ApplyCoarse<Float,yFloat,ghostFloat,dagger,6,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location);
+      ApplyCoarse<Float,yFloat,ghostFloat,dagger,6,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location, dummy);
     } else
 #endif // NSPIN4
     if (inA[0].Ncolor() == 24) {
-      ApplyCoarse<Float,yFloat,ghostFloat,dagger,24,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location);
+      ApplyCoarse<Float,yFloat,ghostFloat,dagger,24,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location, dummy);
 #ifdef NSPIN4
     } else if (inA[0].Ncolor() == 32) {
-      ApplyCoarse<Float,yFloat,ghostFloat,dagger,32,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location);
+      ApplyCoarse<Float,yFloat,ghostFloat,dagger,32,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location, dummy);
 #endif // NSPIN4
 #ifdef NSPIN1
     } else if (inA[0].Ncolor() == 64) {
-      ApplyCoarse<Float,yFloat,ghostFloat,dagger,64,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location);
+      ApplyCoarse<Float,yFloat,ghostFloat,dagger,64,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location, dummy);
     } else if (inA[0].Ncolor() == 96) {
-      ApplyCoarse<Float,yFloat,ghostFloat,dagger,96,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location);
+      ApplyCoarse<Float,yFloat,ghostFloat,dagger,96,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location, dummy);
 #endif // NSPIN1
     } else {
       errorQuda("Unsupported number of coarse dof %d", Y.Ncolor());
@@ -397,6 +400,9 @@ namespace quda {
       // check all locations match
       checkLocation(out[0], inA[0], inB[0], Y, X);
 
+      // first create a dummy ndim+1 field
+      auto dummy = ColorSpinorField::create_comms_batch(inA);
+
       int comm_sum = 4;
       if (commDim) for (int i=0; i<4; i++) comm_sum -= (1-commDim[i]);
       if (comm_sum != 4 && comm_sum != 0) errorQuda("Unsupported comms %d", comm_sum);
@@ -450,8 +456,8 @@ namespace quda {
 
         if (dslash && comm_partitioned() && comms) {
           const int nFace = 1;
-          inA[0].exchangeGhost((QudaParity)(inA[0].SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace, dagger,
-                            pack_destination, halo_location, gdr_send, gdr_recv, halo_precision, shmem);
+          dummy.exchangeGhost((QudaParity)(inA[0].SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace, dagger,
+                              pack_destination, halo_location, gdr_send, gdr_recv, halo_precision, shmem, inA);
         }
 
         if (dslash::aux_worker) dslash::aux_worker->apply(device::get_default_stream());
@@ -463,7 +469,7 @@ namespace quda {
             errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
                       precision, Y.Precision());
           ApplyCoarse<double, double, double, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                      comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+                                                      comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location, dummy);
 #else
           errorQuda("Double precision multigrid has not been enabled");
 #endif
@@ -471,7 +477,7 @@ namespace quda {
           if (Y.Precision() == QUDA_SINGLE_PRECISION) {
             if (halo_precision == QUDA_SINGLE_PRECISION) {
               ApplyCoarse<float, float, float, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                       comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+                                                       comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location, dummy);
             } else {
               errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
                         precision, Y.Precision());
@@ -480,11 +486,11 @@ namespace quda {
 #if QUDA_PRECISION & 2
             if (halo_precision == QUDA_HALF_PRECISION) {
               ApplyCoarse<float, short, short, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                       comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+                                                       comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location, dummy);
             } else if (halo_precision == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
               ApplyCoarse<float, short, int8_t, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                        comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+                                                        comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location, dummy);
 #else
               errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif
@@ -507,8 +513,8 @@ namespace quda {
         if (dslash && comm_partitioned() && comms) {
           const int nFace = 1;
           shmem += 2;
-          inA[0].exchangeGhost((QudaParity)(inA[0].SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace, dagger,
-                            pack_destination, halo_location, gdr_send, gdr_recv, halo_precision, shmem);
+          dummy.exchangeGhost((QudaParity)(inA[0].SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace, dagger,
+                              pack_destination, halo_location, gdr_send, gdr_recv, halo_precision, shmem, inA);
         }
         // INTERIOR
         if (precision == QUDA_DOUBLE_PRECISION) {
@@ -518,7 +524,7 @@ namespace quda {
             errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
                       precision, Y.Precision());
           ApplyCoarse<double, double, double, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                      comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location);
+                                                      comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location, dummy);
 #else
           errorQuda("Double precision multigrid has not been enabled");
 #endif
@@ -526,7 +532,7 @@ namespace quda {
           if (Y.Precision() == QUDA_SINGLE_PRECISION) {
             if (halo_precision == QUDA_SINGLE_PRECISION) {
               ApplyCoarse<float, float, float, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                       comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location);
+                                                       comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location, dummy);
             } else {
               errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
                         precision, Y.Precision());
@@ -535,11 +541,11 @@ namespace quda {
 #if QUDA_PRECISION & 2
             if (halo_precision == QUDA_HALF_PRECISION) {
               ApplyCoarse<float, short, short, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                       comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location);
+                                                       comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location, dummy);
             } else if (halo_precision == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
               ApplyCoarse<float, short, int8_t, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                        comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location);
+                                                        comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location, dummy);
 #else
               errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif
@@ -569,7 +575,7 @@ namespace quda {
               errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
                         precision, Y.Precision());
             ApplyCoarse<double, double, double, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                        comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location);
+                                                        comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location, dummy);
 #else
 	errorQuda("Double precision multigrid has not been enabled");
 #endif
@@ -577,7 +583,7 @@ namespace quda {
             if (Y.Precision() == QUDA_SINGLE_PRECISION) {
               if (halo_precision == QUDA_SINGLE_PRECISION) {
                 ApplyCoarse<float, float, float, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                         comms ? DSLASH_EXTERIOR : DSLASH_INTERIOR, halo_location);
+                                                         comms ? DSLASH_EXTERIOR : DSLASH_INTERIOR, halo_location, dummy);
               } else {
                 errorQuda("Halo precision %d not supported with field precision %d and link precision %d",
                           halo_precision, precision, Y.Precision());
@@ -586,11 +592,11 @@ namespace quda {
 #if QUDA_PRECISION & 2
           if (halo_precision == QUDA_HALF_PRECISION) {
             ApplyCoarse<float, short, short, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                     comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location);
+                                                     comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location, dummy);
           } else if (halo_precision == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
             ApplyCoarse<float, short, int8_t, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                      comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location);
+                                                      comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location, dummy);
 #else
             errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif

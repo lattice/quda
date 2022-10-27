@@ -5,6 +5,7 @@
 #include <shared_memory_cache_helper.h>
 #include <kernel.h>
 #include <warp_collective.h>
+#include <dslash_quda.h>
 
 namespace quda {
 
@@ -56,10 +57,11 @@ namespace quda {
     const int_fastdiv dim[5];   // full lattice dimensions
     const int commDim[4]; // whether a given dimension is partitioned or not
     const int volumeCB;
+    int ghostFaceCB[4];
 
-    inline DslashCoarseArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
-                           cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
-                           real kappa, int parity) :
+    DslashCoarseArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
+                    cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
+                    real kappa, int parity, ColorSpinorField &dummy) :
       kernel_param(dim3(color_stride * X.VolumeCB(), out[0].SiteSubset() * out.size(),
                         2 * dim_stride * 2 * (nColor / colors_per_thread(nColor, dim_stride)))),
       n_src(out.size()),
@@ -74,12 +76,13 @@ namespace quda {
       commDim {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
       volumeCB((unsigned int)out[0].VolumeCB() / dim[4])
     {
-      if (out.size() > (unsigned)n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), (int)n_src);
+      if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
       for (auto i = 0u; i < out.size(); i++) {
         this->out[i] = out[i];
-        this->inA[i] = inA[i];
+        this->inA[i] = F(inA[i], 1, nullptr, dummy.Ghost());
         this->inB[i] = inB[i];
       }
+      for (int i = 0; i < 4; i++) ghostFaceCB[i] = inA[0].getDslashConstant().ghostFaceCB[i];
     }
   };
 
@@ -156,11 +159,10 @@ namespace quda {
 		  int col = s_col * Arg::nColor + c_col + color_offset;
 		  if (!Arg::dagger)
                     out[color_local] = cmac(arg.Y(d+4, parity, x_cb, row, col),
-                                            arg.inA[src_idx].Ghost(d, 1, their_spinor_parity, ghost_idx, s_col, c_col+color_offset), out[color_local]);
+                                            arg.inA[0].Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx * arg.ghostFaceCB[d], s_col, c_col+color_offset), out[color_local]);
 		  else
 		    out[color_local] = cmac(arg.Y(d, parity, x_cb, row, col),
-                                            arg.inA[src_idx].Ghost(d, 1, their_spinor_parity, ghost_idx, s_col, c_col+color_offset), out[color_local]);
-
+                                            arg.inA[0].Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx * arg.ghostFaceCB[d], s_col, c_col+color_offset), out[color_local]);
                 }
 	      }
 	    }
@@ -211,10 +213,10 @@ namespace quda {
 		  int col = s_col * Arg::nColor + c_col + color_offset;
 		  if (!Arg::dagger)
 		    out[color_local] = cmac(conj(arg.Y.Ghost(d, 1-parity, ghost_idx, col, row)),
-                                            arg.inA[src_idx].Ghost(d, 0, their_spinor_parity, ghost_idx, s_col, c_col+color_offset), out[color_local]);
+                                            arg.inA[0].Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx * arg.ghostFaceCB[d], s_col, c_col+color_offset), out[color_local]);
 		  else
 		    out[color_local] = cmac(conj(arg.Y.Ghost(d+4, 1-parity, ghost_idx, col, row)),
-                                            arg.inA[src_idx].Ghost(d, 0, their_spinor_parity, ghost_idx, s_col, c_col+color_offset), out[color_local]);
+                                            arg.inA[0].Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx * arg.ghostFaceCB[d], s_col, c_col+color_offset), out[color_local]);
 		}
 	    }
 	  }

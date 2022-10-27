@@ -610,7 +610,7 @@ namespace quda
     {
     protected:
       GhostOrder() = default;
-      GhostOrder(const ColorSpinorField &, int, void **) { }
+      GhostOrder(const ColorSpinorField &, int, void * const *) { }
       GhostOrder &operator=(const GhostOrder &) = default;
 
       void resetScale(Float) { }
@@ -656,7 +656,7 @@ namespace quda
     protected:
       GhostOrder() = default;
 
-      GhostOrder(const ColorSpinorField &field, int nFace, void **ghost_ = nullptr) :
+      GhostOrder(const ColorSpinorField &field, int nFace, void * const *ghost_ = nullptr) :
         nParity(field.SiteSubset()), ghostAccessor(field, nFace)
       {
         resetGhost(ghost_ ? ghost_ : field.Ghost());
@@ -772,7 +772,7 @@ namespace quda
        * Constructor for the FieldOrderCB class
        * @param field The field that we are accessing
        */
-      FieldOrderCB(const ColorSpinorField &field, int nFace = 1, void *v_ = 0, void **ghost_ = 0) :
+      FieldOrderCB(const ColorSpinorField &field, int nFace = 1, void * const v_ = 0, void * const *ghost_ = 0) :
         GhostOrder(field, nFace, ghost_), volumeCB(field.VolumeCB()), accessor(field)
       {
         v.v = v_ ? static_cast<complex<storeFloat> *>(const_cast<void *>(v_)) :

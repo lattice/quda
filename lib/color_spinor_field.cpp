@@ -852,6 +852,17 @@ namespace quda
     if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] = savey0;
   }
 
+  ColorSpinorField ColorSpinorField::create_comms_batch(cvector_ref<const ColorSpinorField> &v)
+  {
+    // first create a dummy ndim+1 field
+    if (v[0].Ndim() == 5) errorQuda("Cannot batch together 5-d fields");
+    ColorSpinorParam param(v[0]);
+    param.nDim++;
+    param.x[param.nDim-1] = v.size();
+    param.create = QUDA_REFERENCE_FIELD_CREATE;
+    return ColorSpinorField(param);
+  }
+
   ColorSpinorField ColorSpinorField::create_alias(const ColorSpinorParam &param_)
   {
     if (param_.init && param_.Precision() > precision)
@@ -1273,7 +1284,8 @@ namespace quda
 
   void ColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger,
                                        const MemoryLocation *pack_destination_, const MemoryLocation *halo_location_,
-                                       bool gdr_send, bool gdr_recv, QudaPrecision ghost_precision_, int shmem) const
+                                       bool gdr_send, bool gdr_recv, QudaPrecision ghost_precision_, int shmem,
+                                       cvector_ref<const ColorSpinorField> v) const
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) {
       // allocate ghost buffer if not yet allocated
@@ -1288,7 +1300,7 @@ namespace quda
         ghost_buf[2 * i + 1] = fwdGhostFaceBuffer[i];
       }
 
-      genericPackGhost(sendbuf, *this, parity, nFace, dagger);
+      genericPackGhost(sendbuf, *this, parity, nFace, dagger, nullptr, 0, v);
       exchange(ghost_buf.data, sendbuf, nFace);
 
       host_free(sendbuf);
@@ -1363,7 +1375,7 @@ namespace quda
           errorQuda("Cannot use zero-copy memory with peer-to-peer comms yet");
 
         genericPackGhost(send, *this, parity, nFace, dagger,
-                         pack_destination); // FIXME - need support for asymmetric topologies
+                         pack_destination, 0, v); // FIXME - need support for asymmetric topologies
 
         size_t total_bytes = 0;
         for (int i = 0; i < nDimComms; i++)
@@ -1491,7 +1503,7 @@ namespace quda
           }
         }
         genericPackGhost(packBuffer, *this, parity, nFace, dagger, pack_destination,
-                         shmem); // FIXME - need support for asymmetric topologies
+                         shmem, v); // FIXME - need support for asymmetric topologies
       }
     }
   }

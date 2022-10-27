@@ -660,10 +660,14 @@ namespace quda
        @param[in] gdr_send Are we using GDR for sending
        @param[in] gdr_recv Are we using GDR for receiving
        @param[in] ghost_precision The precision used for the ghost exchange
+       @param[in] shmem The type of shmem communication (if applicable)
+       @param[in] v Vector of fields to be used for batched exchange
      */
     void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination = nullptr,
                        const MemoryLocation *halo_location = nullptr, bool gdr_send = false, bool gdr_recv = false,
-                       QudaPrecision ghost_precision = QUDA_INVALID_PRECISION, int shmem = 0) const;
+                       QudaPrecision ghost_precision = QUDA_INVALID_PRECISION, int shmem = 0,
+                       cvector_ref<const ColorSpinorField> v = {}) const;
+
     /**
       This function returns true if the field is stored in an internal
       field order, given the precision and the length of the spin
@@ -755,6 +759,13 @@ namespace quda
     void OffsetIndex(int &i, int *y) const;
 
     static ColorSpinorField *Create(const ColorSpinorParam &param) { return new ColorSpinorField(param); }
+
+    /**
+      @brief Create a dummy field used for batched communication
+      @param[in] v Vector of fields we which to batch together
+      @return Dummy (nDim+1)-dimensional field
+     */
+    static ColorSpinorField create_comms_batch(cvector_ref<const ColorSpinorField> &v);
 
     /**
        @brief Create a field that aliases this field's storage.  The
@@ -934,11 +945,14 @@ namespace quda
      @param[out] ghost Array of packed ghosts with array ordering [2*dim+dir]
      @param[in] a Input field that is being packed
      @param[in] parity Which parity are we packing
+     @param[in] nFace The depth of the face in each dimension and direction
      @param[in] dagger Is for a dagger operator (presently ignored)
-     @param[in[ location Array specifiying the memory location of each resulting ghost [2*dim+dir]
+     @param[in] destination Array specifying the memory location of each resulting ghost [2*dim+dir]
+     @param[in] shmem The shmem type to use
+     @param[in] v Vector fields to batch into ghost (if v.size() > 0)
   */
   void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity, int nFace, int dagger,
-                        MemoryLocation *destination = nullptr, int shmem = 0);
+                        MemoryLocation *destination = nullptr, int shmem = 0, cvector_ref<const ColorSpinorField> v = {});
 
   /**
      @brief pre-declaration of RNG class (defined in non-device-safe random_quda.h)
