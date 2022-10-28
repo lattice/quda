@@ -78,6 +78,7 @@ namespace quda {
       int nu;
       int rho;
       int sig;
+      int compute_lepage;
 
       /**
          @param[in] link Gauge field
@@ -87,7 +88,7 @@ namespace quda {
         kernel_param(dim3(1, 2, 1)),
         link(link),
         commDim{ comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3) },
-        mu(-1), nu(-1), rho(-1), sig(-1)
+        mu(-1), nu(-1), rho(-1), sig(-1), compute_lepage(-1)
       {
         for (int d=0; d<4; d++) {
           E[d] = link.X()[d];
@@ -102,7 +103,7 @@ namespace quda {
       }
     };
 
-    template <typename Arg_, int sig_positive_, int mu_positive_ = -1, int nu_positive_ = -1>
+    template <typename Arg_, int sig_positive_, int mu_positive_ = -1, int nu_positive_ = -1, int compute_lepage_ = -1>
     struct FatLinkParam : kernel_param<> {
       // whether the sig direction, if relevant, is forwards or backwards
       static constexpr int sig_positive = sig_positive_;
@@ -112,6 +113,9 @@ namespace quda {
 
       // whether the nu direction, if relevant, is forwards or backwards
       static constexpr int nu_positive = nu_positive_;
+
+      // whether or not to compute the lepage contribution
+      static constexpr int compute_lepage = compute_lepage_;
 
       // base argument structure
       using Arg = Arg_;
@@ -225,6 +229,7 @@ namespace quda {
       static constexpr int sig_positive = Param::sig_positive;
       static constexpr int mu_positive = Param::mu_positive;
       static_assert(Param::nu_positive == -1, "nu_positive should be set to -1 for MiddleThreeLink");
+      static_assert(Param::compute_lepage == -1, "compute_lepage should be set to -1 for MiddleThreeLink");
 
       constexpr MiddleThreeLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
@@ -361,6 +366,7 @@ namespace quda {
       static constexpr int sig_positive = Param::sig_positive;
       static_assert(Param::mu_positive == -1, "mu_positive should be set to -1 for MiddleFiveLink");
       static constexpr int nu_positive = Param::nu_positive;
+      static_assert(Param::compute_lepage == -1, "compute_lepage should be set to -1 for MiddleFiveLink");
 
       constexpr MiddleFiveLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
@@ -493,6 +499,7 @@ namespace quda {
       static constexpr int sig_positive = Param::sig_positive;
       static_assert(Param::mu_positive == -1, "mu_positive should be set to -1 for AllSevenSideFiveLink");
       static constexpr int nu_positive = Param::nu_positive;
+      static_assert(Param::compute_lepage == -1, "compute_lepage should be set to -1 for AllSevenSideFiveLink");
 
       constexpr AllSevenSideFiveLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
@@ -649,68 +656,100 @@ namespace quda {
       }
     };
 
-    /**************************lepageAllLinkKernel*****************************
-     * 
-     * Generally we need
+
+    /************************AllLepageSideThreeLink*****************************
+     * Note: this kernel names points differently than the other kernels, there's a diagram
+     *   within the kernel code
+     *
+     * If we are only computing the side three link term (when the Lepage coefficient
+     * is zero), we only need:
      * READ
-     *    3 LINKS:         ab_link,     bc_link,    ad_link
-     *    5 COLOR MATRIX:  newOprod_at_A (mu and sig direction),
-     *                     oprod_at_C,  Qprod_at_D, shortP_at_D
-     * WRITE
-     *    3 COLOR MATRIX:  newOprod_at_A (mu and sig direction), shortP_at_D
+     *    0 LINKS
+     *    2 COLOR MATRIX:  p3_at_{F for mu_positive, A for sig_positive},
+     *                     newOprod_at_A (mu direction)
+     *  WRITE
+     *    1 COLOR MATRIX:  newOprod_at_A (mu direction)
      *
-     *   If the direction sig is negative, newOprod_at_A in the sig direction is
-     *   not read in or written out.
+     * Therefore the data traffic, in two-number pair (num of link, num_of_color_matrix), is
+     *      (sig positive or negative):   (0, 3)
      *
-     * Therefore the data traffic, in two-number pair (num_of_link, num_of_color_matrix)
-     *   (called 48 times, half positive sig, half negative sig)
-     *    if (sig is positive):    (3, 6)
-     *    else                :    (3, 4) no need to load/save newOprod_at_A_sig
+     * Flop count, in two-number pair (matrix_multi, matrix_add) is (0, 1)
      *
+     * If we are are computing the Lepage middle and all link, this gets complicated.
+     * We have an additional:
+     * READ
+     *    5 LINKS:          hg_link, eg_link, fh_link, fe_link, be_link
+     *    3 COLOR MATRIX:   oprod_at_e, oprod_at_b, qProd_at_d
+     *    additionally, if sig positive:
+     *      1 LINK:         af_link
+     *      1 COLOR MATRIX: qProd_at_a, newOprod_at_f (sig direction)
+     * WRITE if sig is positive
+     *    1 COLOR MATRIX:   newOprod_at_f (sig_direction)
      *
-     * Flop count, in two-number pair (matrix_multi, matrix_add)
-     *   if (sig is positive)  (6, 3)
-     *   else                  (4, 2)
+     * If mu is negative, there is no link load when sig is positive. Further, many
+     * of the sites that components are loaded from are shifted --- the code uses
+     * self-documenting variables, so check there for the shifts.
+     *
+     * The TOTAL data traffic (including side link), in two-number pair (num_of_link, num_of_color_matrix)
+     *   if (mu is positive):
+     *     if (sig is positive):   (6, 9)
+     *     else:                   (6, 6)
+     *   else (mu is negative):
+     *     if (sig is positive):   (6, 8)
+     *     else:                   (6, 6)
+     *
+     * This kernel is called 48 times, 24 for sig positive and 24 for sig negative
+     *
+     * The TOTAL flop count, in two-number pair (matrix_multi, matrix_add)
+     *   if (sig is positive):     (8, 3)
+     *   else:                     (6, 2)
      *
      ****************************************************************************/
     template <typename store_t, int nColor_, QudaReconstructType recon>
-    struct LepageAllLinkArg : public BaseForceArg<store_t, nColor_, recon> {
+    struct AllLepageSideThreeLinkArg : public BaseForceArg<store_t, nColor_, recon> {
       using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
       using Gauge = typename gauge_mapper<real, recon>::type;
 
       Gauge force;
-      Gauge shortP;
 
+      const Gauge p3;
       const Gauge oProd;
       const Gauge qProd;
+
+      const real coeff_three;
       const real coeff_lepage;
       const real accumu_coeff_lepage;
 
       static constexpr int overlap = 2;
 
-      LepageAllLinkArg(GaugeField &force, GaugeField &shortP, const GaugeField &oProd,
+      AllLepageSideThreeLinkArg(GaugeField &force, const GaugeField &P3, const GaugeField &oProd,
                  const GaugeField &qProd, const GaugeField &link,
                  const PathCoefficients<real> &act_path_coeff)
-        : BaseForceArg(link, overlap), force(force), shortP(shortP),
-        oProd(oProd), qProd(qProd), coeff_lepage(act_path_coeff.lepage),
+        : BaseForceArg(link, overlap), force(force), p3(P3),
+        oProd(oProd), qProd(qProd),
+        coeff_three(act_path_coeff.three), coeff_lepage(act_path_coeff.lepage),
         accumu_coeff_lepage(act_path_coeff.three != 0 ? act_path_coeff.lepage / act_path_coeff.three : 0)
       { }
 
     };
 
-    template <typename Param> struct LepageAllLink
+    template <typename Param> struct AllLepageSideThreeLink
     {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       const Arg &arg;
 
+      static_assert( (Param::compute_lepage == 1 && Param::sig_positive != -1) ||
+                     (Param::compute_lepage == 0 && Param::sig_positive == -1),
+                     "sig_positive should only be set when compute_lepage == 1 for AllLepageSideThreeLink");
       static constexpr int sig_positive = Param::sig_positive;
       static constexpr int mu_positive = Param::mu_positive;
-      static_assert(Param::nu_positive == -1, "nu_positive should be set to -1 for LepageAllLink");
+      static_assert(Param::nu_positive == -1, "nu_positive should be set to -1 for AllLepageSideThreeLink");
+      static constexpr int compute_lepage = Param::compute_lepage;
 
-      constexpr LepageAllLink(const Param &param) : arg(param.arg) {}
+      constexpr AllLepageSideThreeLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
       __device__ __host__ void operator()(int x_cb, int parity)
@@ -720,7 +759,7 @@ namespace quda {
         getCoords(x, x_cb, arg.D, parity);
 
         /*
-         * Very top points are to prepare p3 for the 3-link side link
+         * Very top points are for the Lepage term, to prepare p3 for the 3-link side link
          * 
          *  
          *            sig
@@ -766,241 +805,114 @@ namespace quda {
         int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
         int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
 
-        int da_link_nbr_idx = (mu_positive) ? point_d : point_a;
-        int da_link_nbr_parity = (mu_positive) ? parity_d : parity_a;
-
-        int cb_link_nbr_idx = mu_positive ? point_c : point_b;
-        int cb_link_nbr_parity = mu_positive ? parity_c : parity_b;
-
         int fe_link_nbr_idx = (sig_positive) ? point_f : point_e;
         int fe_link_nbr_parity = (sig_positive) ? parity_f : parity_e;
-
-        int af_link_nbr_idx = (mu_positive) ? point_a : point_f;
-        int af_link_nbr_parity = (mu_positive) ? parity_a : parity_f;
-
-        int be_link_nbr_idx = (mu_positive) ? point_b : point_e;
-        int be_link_nbr_parity = (mu_positive) ? parity_b : parity_e;
 
         int hg_link_nbr_idx = (sig_positive) ? point_h : point_g;
         int hg_link_nbr_parity = (sig_positive) ? parity_h : parity_g;
 
-        int eg_link_nbr_idx = (mu_positive) ? point_e : point_g;
-        int eg_link_nbr_parity = (mu_positive) ? parity_e : parity_g;
-
-        int fh_link_nbr_idx = (mu_positive) ? point_f : point_h;
-        int fh_link_nbr_parity = (mu_positive) ? parity_f : parity_h;
-
-        // Compute shortP
-        // note: if mu is positive, we need shortP --> p3 at f
-        Link Ufe = arg.link(pos_dir(arg.sig), fe_link_nbr_idx, fe_link_nbr_parity);
-        Link Ube = arg.link(pos_dir(arg.mu), be_link_nbr_idx, be_link_nbr_parity);
-        Link Uaf = arg.link(pos_dir(arg.mu), af_link_nbr_idx, af_link_nbr_parity);
-        Link Ob = arg.oProd(0, point_b, parity_b);
-
-        Link Ow = !mu_positive ? Ube * Ob : conj(Ube) * Ob;
-        Link p3 = sig_positive ? Ufe * Ow : conj(Ufe) * Ow;
-        Link Ox = mu_positive ? Uaf * p3 : conj(Uaf) * p3;
-
-        //Link shortP = arg.shortP(0, point_a, parity_a);
-        //shortP += arg.accumu_coeff_lepage * Ox;
-        //arg.shortP(0, point_a, parity_a) = shortP;
-
-        Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
-        Link Ucb = arg.link(pos_dir(arg.mu), cb_link_nbr_idx, cb_link_nbr_parity);
-
-        // load the link variable connecting a and d
-        Link Uad = arg.link(pos_dir(arg.mu), point_a, parity_a);
-
+        Link p3;
         if constexpr ( mu_positive ) {
+          p3 = arg.p3(0, point_f, parity_f);
+        } else {
+          p3 = arg.p3(0, point_a, parity_a);
+        }
 
-          {
-            // need to shift this up so we compute shortP at e
-            Link Uhg = arg.link(pos_dir(arg.sig), hg_link_nbr_idx, hg_link_nbr_parity);
-            Link Ueg = arg.link(pos_dir(arg.mu), point_e, parity_e);
-            Link Ufh = arg.link(pos_dir(arg.mu), point_f, parity_f);
-            Link Oe = arg.oProd(0, point_e, parity_e);
+        Link force_mu = arg.force(pos_dir(arg.mu), point_a, parity_a);
 
-            Link Ow = !mu_positive ? Ueg * Oe : conj(Ueg) * Oe;
-            Link p3 = sig_positive ? Uhg * Ow : conj(Uhg) * Ow;
-            Link Ox = mu_positive ? Ufh * p3 : conj(Ufh) * p3;
+        if constexpr ( compute_lepage ) {
 
-            Link shortP = arg.shortP(0, point_f, parity_f);
-            shortP += arg.accumu_coeff_lepage * Ox;
-            arg.shortP(0, point_f, parity_f) = shortP;
-          }
+          if constexpr ( mu_positive ) {
 
-          {
+            // Accumulate p3
+            {
+              Link Uhg = arg.link(pos_dir(arg.sig), hg_link_nbr_idx, hg_link_nbr_parity);
+              Link Ueg = arg.link(pos_dir(arg.mu), point_e, parity_e);
+              Link Ufh = arg.link(pos_dir(arg.mu), point_f, parity_f);
+              Link Oe = arg.oProd(0, point_e, parity_e);
+
+              Link Ow = conj(Ueg) * Oe;
+              Link Oy = sig_positive ? Uhg * Ow : conj(Uhg) * Ow;
+              Link Ox = Ufh * Oy;
+
+              p3 += arg.accumu_coeff_lepage * Ox;
+            }
+
+            // Accumulate force_mu
             Link Ufe = arg.link(pos_dir(arg.sig), fe_link_nbr_idx, fe_link_nbr_parity);
-            Link Uad = arg.link(pos_dir(arg.mu), point_a, parity_a);
             Link Ube = arg.link(pos_dir(arg.mu), point_b, parity_b);
             Link Ob = arg.oProd(0, point_b, parity_b);
-
-            Link Ow = !mu_positive ? Ube * Ob : conj(Ube) * Ob;
-            Link p3 = sig_positive ? Ufe * Ow : conj(Ufe) * Ow;
-            Link Ox = Uad * p3;
-
             Link Qd = arg.qProd(0, point_a, parity_a);
-            Ox = p3 * Qd;
+
+            Link Ow = conj(Ube) * Ob;
+            Link Oy = sig_positive ? Ufe * Ow : conj(Ufe) * Ow;
+            Link Ox = Oy * Qd;
 
             auto mycoeff_lepage = -coeff_sign(goes_forward(arg.sig), parity)*coeff_sign(goes_forward(arg.mu),parity)*arg.coeff_lepage;
 
-            Link oprod = arg.force(pos_dir(arg.mu), point_a, parity_a);
-            oprod += mycoeff_lepage * Ox;
-            arg.force(pos_dir(arg.mu), point_a, parity_a) = oprod;
-          }
+            force_mu += mycoeff_lepage * Ox;
 
-          if constexpr ( sig_positive ) {
-            Link Uab = arg.link(pos_dir(arg.sig), point_a, parity_a);
-            Link Ucb = arg.link(pos_dir(arg.mu), point_c, parity_c);
-            Link Uda = arg.link(pos_dir(arg.mu), point_d, parity_d);
-            Link Oc = arg.oProd(0, point_c, parity_c);
+            // Update force_sig if sig is positive
+            if constexpr ( sig_positive ) {
+              Link Uaf = arg.link(pos_dir(arg.mu), point_a, parity_a);
+              Link Qa = arg.qProd(0, point_a, parity_a);
+              Link Ox = Qa * Uaf;
+              Link Oy = Ow * Ox;
 
-            Link Ow = !mu_positive ? Ucb*Oc : conj(Ucb)*Oc;
-            Link p3 = sig_positive ? Uab*Ow : conj(Uab)*Ow;
+              Link oprod = arg.force(arg.sig, point_f, parity_f);
+              oprod += arg.coeff_lepage * Oy;
+              arg.force(arg.sig, point_f, parity_f) = oprod;
+            }
 
-            Link Qd = arg.qProd(0, point_d, parity_d);
-            Link Ox = mu_positive ? Qd * Uda : Qd * conj(Uda);
-            Link Oy = Ow*Ox;
+          } else {
+            // mu negative
 
-            Link oprod = arg.force(arg.sig, point_a, parity_a);
-            oprod += arg.coeff_lepage*Oy;
-            arg.force(arg.sig, point_a, parity_a) = oprod;
-          }
-        } else {
-          {
-            Link Ufe = arg.link(pos_dir(arg.sig), fe_link_nbr_idx, fe_link_nbr_parity);
-            Link Ube = arg.link(pos_dir(arg.mu), point_e, parity_e);
-            Link Uaf = arg.link(pos_dir(arg.mu), point_f, parity_f);
-            Link Ob = arg.oProd(0, point_b, parity_b);
+            // Accumulate p3
+            {
+              Link Ufe = arg.link(pos_dir(arg.sig), fe_link_nbr_idx, fe_link_nbr_parity);
+              Link Ueg = arg.link(pos_dir(arg.mu), point_e, parity_e);
+              Link Ufh = arg.link(pos_dir(arg.mu), point_f, parity_f);
+              Link Ob = arg.oProd(0, point_b, parity_b);
 
-            Link Ow = !mu_positive ? Ube * Ob : conj(Ube) * Ob;
-            Link p3 = sig_positive ? Ufe * Ow : conj(Ufe) * Ow;
-            Link Ox = mu_positive ? Uaf * p3 : conj(Uaf) * p3;
+              Link Ow = Ueg * Ob;
+              Link Oy = sig_positive ? Ufe * Ow : conj(Ufe) * Ow;
+              Link Ox = conj(Ufh) * Oy;
 
-            Link shortP = arg.shortP(0, point_a, parity_a);
-            shortP += arg.accumu_coeff_lepage * Ox;
-            arg.shortP(0, point_a, parity_a) = shortP;
-          }
+              p3 += arg.accumu_coeff_lepage * Ox;
+            }
 
-          {
-            Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
-            Link Ucb = arg.link(pos_dir(arg.mu), point_b, parity_b);
-            Link Uad = arg.link(pos_dir(arg.mu), point_a, parity_a);
-            Link Oc = arg.oProd(0, point_c, parity_c);
+            // Accumulate force_mu, update force_sig if sig is positive
+            {
+              Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
+              Link Ubc = arg.link(pos_dir(arg.mu), point_b, parity_b);
+              Link Oc = arg.oProd(0, point_c, parity_c);
+              Link Qd = arg.qProd(0, point_d, parity_d);
 
-            Link Ow = !mu_positive ? Ucb*Oc : conj(Ucb)*Oc;
-            Link p3 = sig_positive ? Uab*Ow : conj(Uab)*Ow;
-            Link Ox = conj(Uad) * p3;
+              Link Ow = Ubc * Oc;
+              Link Oy = sig_positive ? Uab*Ow : conj(Uab)*Ow;
+              Link Ox = conj(Qd) * conj(Oy);
 
-            Link Qd = arg.qProd(0, point_d, parity_d);
-            Ox = conj(Qd) * conj(p3);
+              auto mycoeff_lepage = -coeff_sign(goes_forward(arg.sig), parity)*coeff_sign(goes_forward(arg.mu),parity)*arg.coeff_lepage;
+              force_mu += mycoeff_lepage * Ox;
 
-            auto mycoeff_lepage = -coeff_sign(goes_forward(arg.sig), parity)*coeff_sign(goes_forward(arg.mu),parity)*arg.coeff_lepage;
+              if constexpr ( sig_positive ) {
+                Link Uad = arg.link(pos_dir(arg.mu), point_a, parity_a);
+                Link Ox = Qd * conj(Uad);
+                Link Oy = Ow * Ox;
 
-            Link oprod = arg.force(pos_dir(arg.mu), point_a, parity_a);
-            oprod += mycoeff_lepage * Ox;
-            arg.force(pos_dir(arg.mu), point_a, parity_a) = oprod;
-          }
-
-          if constexpr ( sig_positive ) {
-            Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
-            Link Ucb = arg.link(pos_dir(arg.mu), point_b, parity_b);
-            Link Uda = arg.link(pos_dir(arg.mu), point_a, parity_a);
-            Link Oc = arg.oProd(0, point_c, parity_c);
-
-            Link Ow = !mu_positive ? Ucb*Oc : conj(Ucb)*Oc;
-            Link p3 = sig_positive ? Uab*Ow : conj(Uab)*Ow;
-
-            Link Qd = arg.qProd(0, point_d, parity_d);
-
-            Link Ox = mu_positive ? Qd * Uda : Qd * conj(Uda);
-            Link Oy = Ow*Ox;
-
-            Link oprod = arg.force(arg.sig, point_a, parity_a);
-            oprod += arg.coeff_lepage*Oy;
-            arg.force(arg.sig, point_a, parity_a) = oprod;
+                Link oprod = arg.force(arg.sig, point_a, parity_a);
+                oprod += arg.coeff_lepage*Oy;
+                arg.force(arg.sig, point_a, parity_a) = oprod;
+              }
+            }
           }
         }
 
-      }
-    };
-
-    // Flop count, in two-number pair (matrix_mult, matrix_add)
-    // 		(0,1)
-    template <typename store_t, int nColor_, QudaReconstructType recon>
-    struct SideLinkShortArg : public BaseForceArg<store_t, nColor_, recon> {
-      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
-      using real = typename mapper<store_t>::type;
-      static constexpr int nColor = nColor_;
-      using Gauge = typename gauge_mapper<real, recon>::type;
-
-      Gauge force;
-      Gauge p3;
-
-      const real coeff_three;
-
-      static constexpr int overlap = 2;
-
-      SideLinkShortArg(GaugeField &force, GaugeField &P3, const GaugeField &link,
-                   const PathCoefficients<real> &act_path_coeff)
-        : BaseForceArg(link, overlap), force(force), p3(P3), coeff_three(act_path_coeff.three)
-      {  }
-
-    };
-
-    template <typename Param> struct SideLinkShort
-    {
-      using Arg = typename Param::Arg;
-      using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
-      const Arg &arg;
-
-      static_assert(Param::sig_positive == -1, "sig_positive should be set to -1 for SideLinkShort");
-      static constexpr int mu_positive = Param::mu_positive;
-      static_assert(Param::nu_positive == -1, "nu_positive should be set to -1 for SideLinkShort");
-
-      constexpr SideLinkShort(const Param &param) : arg(param.arg) {}
-      constexpr static const char *filename() { return KERNEL_FILE; }
-
-      __device__ __host__ void operator()(int x_cb, int parity)
-      {
-        int x[4];
-        getCoords(x, x_cb, arg.D, parity);
-        for (int d=0; d<4; d++) x[d] = x[d] + arg.base_idx[d];
-        int e_cb = linkIndex(x,arg.E);
-        parity = parity ^ arg.oddness_change;
-
-        /*      compute the side link contribution to the momentum
-         *
-         *             sig
-         *          A________B
-         *           |       |   mu
-         *         D |       |C
-         *
-         *      A is the current point (x_cb)
-         *
-         */
-        int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_a = e_cb;
-        int parity_a = parity;
-        int point_f = updateCoordsIndexMILCDir(y, arg.E, arg.mu);
-        int parity_f = 1 - parity;
-
-        int fa_link_nbr_idx = (mu_positive) ? point_f : point_a;
-        int fa_link_nbr_parity = (mu_positive) ? parity_f : parity_a;
-
+        // Update force_mu
         auto mycoeff_three = coeff_sign(goes_forward(arg.sig),parity)*coeff_sign(goes_forward(arg.mu),parity)*arg.coeff_three;
+        force_mu += mycoeff_three * (mu_positive ? p3 : conj(p3));
+        arg.force(pos_dir(arg.mu), point_a, parity_a) = force_mu;
 
-        if constexpr (mu_positive) {
-          Link Oy = arg.p3(0, point_f, parity_f);
-          Link oprod = arg.force(pos_dir(arg.mu), point_a, parity_a);
-          oprod += mycoeff_three * Oy;
-          arg.force(pos_dir(arg.mu), point_a, parity_a) = oprod;
-        } else {
-          Link Oy = arg.p3(0, point_a, parity_a);
-          Link oprod = arg.force(pos_dir(arg.mu), point_a, parity_a);
-          oprod += mycoeff_three * conj(Oy);
-          arg.force(pos_dir(arg.mu), point_a, parity_a) = oprod;
-        }
       }
     };
 

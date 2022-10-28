@@ -320,7 +320,7 @@ static int hisq_force_test(bool lepage)
   if (verify_results) {
     host_timer.start();
     hisqStaplesForceCPU(d_act_path_coeff, qudaGaugeParam, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
-    if (!lepage) hisqLongLinkForceCPU(d_act_path_coeff[1], qudaGaugeParam, *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
+    if (lepage) hisqLongLinkForceCPU(d_act_path_coeff[1], qudaGaugeParam, *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
     hisqCompleteForceCPU(qudaGaugeParam, *cpuForce_ex, *cpuGauge_ex, refMom);
     host_timer.stop();
     host_time_sec = host_timer.last();
@@ -336,7 +336,7 @@ static int hisq_force_test(bool lepage)
 
   // Only compute the long link when also computing the Lepage term
   // This is consistent with the chain rule for HISQ
-  if (!lepage) {
+  if (lepage) {
     gParam_ex.location = QUDA_CUDA_FIELD_LOCATION;
     gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
     for (int d = 0; d < 4; d++) {
