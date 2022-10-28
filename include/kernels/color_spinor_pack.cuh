@@ -68,12 +68,14 @@ namespace quda {
     static constexpr int nDim = nDim_;
 
     using real = typename mapper<store_t>::type;
-    using Field = typename colorspinor::FieldOrderCB<real,nSpin,nColor,1,order,store_t,ghost_store_t>;
+    using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, order, store_t, ghost_store_t>;
+    // disable ghost to reduce arg size
+    using Fdg = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, order, store_t, ghost_store_t, true>;
 
-    static constexpr int max_n_src = 8;
+    static constexpr int max_n_src = 64;
     const int_fastdiv n_src;
-    Field out;
-    Field in[max_n_src];
+    F out;
+    Fdg in[max_n_src];
 
     const int_fastdiv volumeCB;
     const int nFace;
