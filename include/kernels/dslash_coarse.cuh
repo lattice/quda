@@ -85,7 +85,8 @@ namespace quda {
         this->inA[i] = inA[i];
         this->inB[i] = inB[i];
       }
-      for (int i = 0; i < 4; i++) ghostFaceCB[i] = inA[0].getDslashConstant().ghostFaceCB[i];
+      // ghostFaceCB does not include the batch (5th) dimension at present
+      for (int i = 0; i < 4; i++) ghostFaceCB[i] = halo.getDslashConstant().ghostFaceCB[i];
     }
   };
 

@@ -84,10 +84,11 @@ namespace quda {
     const int dagger;
     const QudaPCType pc_type;
     DslashConstant dc;
-    DslashConstant dc_out;
     int_fastdiv work_items;
-    int threadDimMapLower[4];
-    int threadDimMapUpper[4];
+    int_fastdiv ghostFaceCB[4] = {}; /** (non-batched) ghost face dimensions */
+    int ghostThreadsCB[4] = {};      /** (batched) ghost face thread count */
+    int threadDimMapLower[4] = {};
+    int threadDimMapUpper[4] = {};
 #ifdef NVSHMEM_COMMS
     char *packBuffer[4 * QUDA_MAX_DIM];
     int neighbor_ranks[2 * QUDA_MAX_DIM];
@@ -114,9 +115,6 @@ namespace quda {
       dagger(dagger),
       pc_type(a.PCType()),
       dc(a.getDslashConstant()),
-      dc_out(a.getDslashConstant()),
-      threadDimMapLower {},
-      threadDimMapUpper {},
 #ifdef NVSHMEM_COMMS
       counter((activeTuning() && !policyTuning()) ? 2 : dslash::inc_exchangeghost_shmem_sync_counter()),
       waitcounter(counter),
@@ -129,10 +127,12 @@ namespace quda {
       int prev = -1; // previous dimension that was partitioned
       for (int i = 0; i < 4; i++) {
         if (!comm_dim_partitioned(i)) continue;
-        // include fifth dimension in output indices
-        dc_out.ghostFaceCB[i] *= nFace * (nDim == 5 ? dc_out.Ls : 1);
+        // include fifth dimension but not batch dimension in face indices
+        ghostFaceCB[i] = dc.ghostFaceCB[i] * nFace * ((nDim == 5 && v.size() == 0) ? dc.Ls : 1);
+        // include fifth and batch dimensions in thread count
+        ghostThreadsCB[i] = dc.ghostFaceCB[i] * nFace * (nDim == 5 ? dc.Ls : 1);
         threadDimMapLower[i] = (prev >= 0 ? threadDimMapUpper[prev] : 0);
-        threadDimMapUpper[i] = threadDimMapLower[i] + 2 * dc_out.ghostFaceCB[i];
+        threadDimMapUpper[i] = threadDimMapLower[i] + 2 * ghostThreadsCB[i];
         prev = i;
       }
 #ifdef NVSHMEM_COMMS
@@ -148,7 +148,6 @@ namespace quda {
       if (n_src > max_n_src) errorQuda("vector set size %d greater than max size %d", (int)n_src, max_n_src);
       if (v.size() == 0) {
         this->in[0] = a;
-        dc = dc_out; // if not using batched pack the constants used for in = out
       } else {
         for (auto i = 0u; i < v.size(); i++) this->in[i] = v[i];
       }
@@ -254,19 +253,19 @@ namespace quda {
   template <typename Arg>
   constexpr auto dirFromFaceIndex(int dim, int &ghost_idx, const Arg &arg)
   {
-    int dir = (ghost_idx >= arg.dc_out.ghostFaceCB[dim]) ? 1 : 0;
-    ghost_idx -= dir * arg.dc_out.ghostFaceCB[dim];
+    int dir = (ghost_idx >= arg.ghostThreadsCB[dim]) ? 1 : 0;
+    ghost_idx -= dir * arg.ghostThreadsCB[dim];
     return dir;
   }
 
   template <typename Arg>
   constexpr auto indexFromFaceIndex(int &src_idx, int dim, int dir, int ghost_idx, int parity, const Arg &arg)
   {
-    src_idx = ghost_idx / arg.dc.ghostFaceCB[dim];
+    src_idx = ghost_idx / arg.ghostFaceCB[dim]; // this must include the fifth dimension but not the batched dimension
     if (arg.nFace == 1) {
-      return indexFromFaceIndex<Arg::nDim>(dim, dir, ghost_idx % arg.dc.ghostFaceCB[dim], parity, 1, arg.pc_type, arg);
+      return indexFromFaceIndex<Arg::nDim>(dim, dir, ghost_idx % arg.ghostFaceCB[dim], parity, 1, arg.pc_type, arg);
     } else {
-      return indexFromFaceIndexStaggered<Arg::nDim>(dim, dir, ghost_idx % arg.dc.ghostFaceCB[dim], parity, 3, arg.pc_type, arg);
+      return indexFromFaceIndexStaggered<Arg::nDim>(dim, dir, ghost_idx % arg.ghostFaceCB[dim], parity, 3, arg.pc_type, arg);
     }
   }
 
