@@ -210,7 +210,7 @@ namespace quda {
 #pragma unroll
       for (int color_local=0; color_local<Mc; color_local++) {
         int c = color_block + color_local;
-        complex<real> z = arg.v[src_idx](spinor_parity, x_cb, s, c);
+        complex<real> z = arg.in[src_idx](spinor_parity, x_cb, s, c);
         thread_max.real(std::max(thread_max.real(), std::abs(z.real())));
         thread_max.imag(std::max(thread_max.imag(), std::abs(z.imag())));
       }
