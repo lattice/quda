@@ -931,12 +931,14 @@ namespace quda {
       static constexpr int nColor = nColor_;
       using Gauge = typename gauge_mapper<real, recon>::type;
 
-      Gauge outA;        // force output accessor
+      Gauge force;        // force output accessor
       const Gauge oProd; // force input accessor
       const real coeff;
 
+      static constexpr int overlap = 0;
+
       CompleteForceArg(GaugeField &force, const GaugeField &link)
-        : BaseForceArg(link, 0), outA(force), oProd(force), coeff(0.0)
+        : BaseForceArg(link, overlap), force(force), oProd(force), coeff(0.0)
       { }
 
     };
@@ -948,7 +950,6 @@ namespace quda {
       constexpr CompleteForce(const Arg &arg) : arg(arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
-      // Flops count: 4 matrix multiplications per lattice site = 792 Flops per site
       __device__ __host__ void operator()(int x_cb, int parity)
       {
         int x[4];
@@ -961,12 +962,12 @@ namespace quda {
         for (int sig=0; sig<4; ++sig) {
           Link Uw = arg.link(sig, e_cb, parity);
           Link Ox = arg.oProd(sig, e_cb, parity);
-          Link Ow = Uw*Ox;
+          Link Ow = Uw * Ox;
 
           makeAntiHerm(Ow);
 
           typename Arg::real coeff = (parity==1) ? -1.0 : 1.0;
-          arg.outA(sig, e_cb, parity) = coeff*Ow;
+          arg.force(sig, e_cb, parity) = coeff * Ow;
         }
       }
     };
@@ -978,12 +979,14 @@ namespace quda {
       static constexpr int nColor = nColor_;
       using Gauge = typename gauge_mapper<real, recon>::type;
 
-      Gauge outA;
+      Gauge force;
       const Gauge oProd;
       const real coeff;
 
-      LongLinkArg(GaugeField &newOprod, const GaugeField &link, const GaugeField &oprod, real coeff)
-        : BaseForceArg(link,0), outA(newOprod), oProd(oprod), coeff(coeff)
+      static constexpr int overlap = 0;
+
+      LongLinkArg(GaugeField &force, const GaugeField &link, const GaugeField &oprod, real coeff)
+        : BaseForceArg(link, overlap), force(force), oProd(oprod), coeff(coeff)
       { }
 
     };
@@ -997,7 +1000,6 @@ namespace quda {
 
       // Flops count, in two-number pair (matrix_mult, matrix_add)
       // 				   (24, 12)
-      // 4968 Flops per site in total
       __device__ __host__ void operator()(int x_cb, int parity)
       {
         int x[4];
@@ -1023,33 +1025,38 @@ namespace quda {
 #pragma unroll
         for (int sig=0; sig<4; sig++) {
           int point_c = e_cb;
+          int parity_c = parity;
 
           dx[sig]++;
           int point_d = linkIndexShift(x,dx,arg.E);
+          int parity_d = 1 - parity;
 
           dx[sig]++;
           int point_e = linkIndexShift(x,dx,arg.E);
+          int parity_e = parity;
 
           dx[sig] = -1;
           int point_b = linkIndexShift(x,dx,arg.E);
+          int parity_b = 1 - parity;
 
           dx[sig]--;
           int point_a = linkIndexShift(x,dx,arg.E);
+          int parity_a = parity;
           dx[sig] = 0;
 
-          Link Uab = arg.link(sig, point_a, parity);
-          Link Ubc = arg.link(sig, point_b, 1-parity);
-          Link Ude = arg.link(sig, point_d, 1-parity);
-          Link Uef = arg.link(sig, point_e, parity);
+          Link Uab = arg.link(sig, point_a, parity_a);
+          Link Ubc = arg.link(sig, point_b, parity_b);
+          Link Ude = arg.link(sig, point_d, parity_d);
+          Link Uef = arg.link(sig, point_e, parity_e);
 
-          Link Oz = arg.oProd(sig, point_c, parity);
-          Link Oy = arg.oProd(sig, point_b, 1-parity);
-          Link Ox = arg.oProd(sig, point_a, parity);
+          Link Oz = arg.oProd(sig, point_c, parity_c);
+          Link Oy = arg.oProd(sig, point_b, parity_b);
+          Link Ox = arg.oProd(sig, point_a, parity_a);
 
           Link temp = Ude*Uef*Oz - Ude*Oy*Ubc + Ox*Uab*Ubc;
 
-          Link force = arg.outA(sig, e_cb, parity);
-          arg.outA(sig, e_cb, parity) = force + arg.coeff*temp;
+          Link force = arg.force(sig, point_c, parity_c);
+          arg.force(sig, point_c, parity_c) = force + arg.coeff * temp;
         } // loop over sig
       }
     };

@@ -522,15 +522,12 @@ namespace quda {
       unsigned int minThreads() const { return arg.threads.x; }
 
     public:
-      HisqLongForce(Arg &arg, GaugeField &force, const GaugeField &meta, int sig, int mu) :
+      HisqLongForce(Arg &arg, GaugeField &force, const GaugeField &meta) :
         TunableKernel2D(meta, 2),
         arg(arg),
         force(force),
         meta(meta)
       {
-        arg.sig = sig;
-        arg.mu = mu;
-
         char aux2[16];
         strcat(aux, comm_dim_partitioned_string());
         strcat(aux, ",threads=");
@@ -554,20 +551,24 @@ namespace quda {
       }
 
       long long flops() const {
-        return 2*arg.threads.x*4968ll;
+        // all 4 directions
+        long long multiplies_per_site = 4ll * 6ll;
+        long long adds_per_site = 4ll * 3ll;
+        long long rescales_per_site = 4ll;
+        return 2 * arg.threads.x * (198ll * multiplies_per_site + 18ll * adds_per_site + 18ll * rescales_per_site);
       }
 
       long long bytes() const {
-        return 4*2*arg.threads.x*(2*arg.outA.Bytes() + 4*arg.link.Bytes() + 3*arg.oProd.Bytes());
+        return 4 * 2 * arg.threads.x * (2 * arg.force.Bytes() + 4 * arg.link.Bytes() + 3 * arg.oProd.Bytes());
       }
     };
 
-    template <typename real, int nColor, QudaReconstructType recon>
+    template <typename Float, int nColor, QudaReconstructType recon>
     struct HisqLongLinkForce {
       HisqLongLinkForce(GaugeField &newOprod, const GaugeField &oldOprod, const GaugeField &link, double coeff)
       {
-        LongLinkArg<real, nColor, recon> arg(newOprod, link, oldOprod, coeff);
-        HisqLongForce<decltype(arg)> longLink(arg, newOprod, link, 0, 0);
+        LongLinkArg<Float, nColor, recon> arg(newOprod, link, oldOprod, coeff);
+        HisqLongForce<decltype(arg)> longLink(arg, newOprod, link);
       }
     };
 
@@ -595,15 +596,12 @@ namespace quda {
       unsigned int minThreads() const { return arg.threads.x; }
 
     public:
-      HisqCompleteLinkForce(Arg &arg, GaugeField &force, const GaugeField &meta, int sig, int mu) :
+      HisqCompleteLinkForce(Arg &arg, GaugeField &force, const GaugeField &meta) :
         TunableKernel2D(meta, 2),
         arg(arg),
         force(force),
         meta(meta)
       {
-        arg.sig = sig;
-        arg.mu = mu;
-
         char aux2[16];
         strcat(aux, comm_dim_partitioned_string());
         strcat(aux, ",threads=");
@@ -627,11 +625,16 @@ namespace quda {
       }
 
       long long flops() const {
-        return 2*arg.threads.x*792ll;
+        // all 4 directions
+        int multiplies_per_site = 4ll;
+        int rescales_per_site = 4ll;
+        int antiherm_per_site = 4ll;
+        // the flops counts for antiherm_per_site assumes the rescale by 1/2 is fused into the coefficient rescale
+        return 2ll * arg.threads.x * (198ll * multiplies_per_site + 18ll * rescales_per_site + 23ll * antiherm_per_site);
       }
 
       long long bytes() const {
-        return 4*2*arg.threads.x*(arg.outA.Bytes() + arg.link.Bytes() + arg.oProd.Bytes());
+        return 4*2*arg.threads.x*(arg.force.Bytes() + arg.link.Bytes() + arg.oProd.Bytes());
       }
     };
 
@@ -640,7 +643,7 @@ namespace quda {
       HisqCompleteForce(GaugeField &force, const GaugeField &link)
       {
         CompleteForceArg<real, nColor, recon> arg(force, link);
-        HisqCompleteLinkForce<decltype(arg)> completeForce(arg, force, link, 0, 0);
+        HisqCompleteLinkForce<decltype(arg)> completeForce(arg, force, link);
       }
     };
 
