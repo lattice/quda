@@ -42,7 +42,12 @@ namespace quda {
       void preTune() { force.backup(); }
       void postTune() { force.restore(); }
 
-      long long flops() const { return 2*4*arg.threads.x*36ll; }
+      long long flops() const {
+        // all four directions are handled in one kernel
+        long long adds_per_site = 4ll;
+        long long rescales_per_site = 4ll;
+        return 2 * arg.threads.x * ( 18ll * adds_per_site + 18ll * rescales_per_site );
+      }
 
       long long bytes() const { return 2*4*arg.threads.x*( arg.oProd.Bytes() + 2*arg.force.Bytes() ); }
     };
@@ -115,7 +120,14 @@ namespace quda {
       }
 
       long long flops() const {
-        return 2*arg.threads.x*(2 * 198 + (goes_forward(arg.sig) ? 414 : 0));
+        long long multiplies_per_site = 2ll;
+        long long adds_per_site = 0ll;
+        long long rescales_per_site = 0ll;
+        if (goes_forward(arg.sig)) {
+          adds_per_site += 1ll;
+          rescales_per_site += 1ll;
+        }
+        return 2 * arg.threads.x * (198ll * multiplies_per_site + 18ll * adds_per_site + 18ll * rescales_per_site);
       }
 
       long long bytes() const {
@@ -194,7 +206,15 @@ namespace quda {
       }
 
       long long flops() const {
-        return 2*arg.threads.x*(3 * 198 + (goes_forward(arg.sig) ? 414 : 0) );
+        long long multiplies_per_site = 3ll;
+        long long adds_per_site = 0ll;
+        long long rescales_per_site = 0ll;
+        if (goes_forward(arg.sig)) {
+          multiplies_per_site += 1ll;
+          adds_per_site += 1ll;
+          rescales_per_site += 1ll;
+        }
+        return 2*arg.threads.x*(198ll * multiplies_per_site + 18ll * adds_per_site + 18ll * rescales_per_site);
       }
 
       long long bytes() const {
@@ -271,10 +291,15 @@ namespace quda {
       }
 
       long long flops() const {
-        int multiplies = (goes_forward(arg.sig) ? 17 : 12);
-        int adds = (goes_forward(arg.sig) ? 11 : 8);
-        int rescales = (goes_forward(arg.sig) ? 8 : 6);
-        return 2*arg.threads.x*(198ll * multiplies + 18ll * adds + 18ll * rescales);
+        long long multiplies_per_site = 12ll;
+        long long adds_per_site = 8ll;
+        long long rescales_per_site = 6ll;
+        if (goes_forward(arg.sig)) {
+          multiplies_per_site += 5ll;
+          adds_per_site += 3ll;
+          rescales_per_site += 2ll;
+        }
+        return 2*arg.threads.x*(198ll * multiplies_per_site + 18ll * adds_per_site + 18ll * rescales_per_site);
       }
 
       long long bytes() const {

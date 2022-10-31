@@ -253,48 +253,50 @@ namespace quda {
         for (int d = 0; d < 4; d++) x[d] += arg.base_idx[d];
         int e_cb = linkIndex(x,arg.E);
         parity = parity ^ arg.oddness_change;
-        int y[4] = {x[0], x[1], x[2], x[3]};
 
+        int y[4] = {x[0], x[1], x[2], x[3]};
+        int point_a = e_cb;
+        int parity_a = parity;
         int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu));
-        int ad_link_nbr_idx = mu_positive ? point_d : e_cb;
+        int parity_d = 1 - parity;
 
         int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+        int parity_c = parity;
+        int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.mu);
+        int parity_b = 1 - parity;
 
-#pragma unroll
-        for (int d = 0; d < 4; d++) y[d] = x[d];
-        int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+        int da_link_nbr_idx = mu_positive ? point_d : point_a;
+        int da_link_nbr_parity = mu_positive ? parity_d : parity_a;
 
-        int bc_link_nbr_idx = mu_positive ? point_c : point_b;
-        int ab_link_nbr_idx = sig_positive ? e_cb : point_b;
+        int cb_link_nbr_idx = mu_positive ? point_c : point_b;
+        int cb_link_nbr_parity = mu_positive ? parity_c : parity_b;
 
-        // load the link variable connecting a and b (need a -> b for sig positive)
-        Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, sig_positive ^ (1 - parity));
+        int ab_link_nbr_idx = sig_positive ? point_a : point_b;
+        int ab_link_nbr_parity = sig_positive ? parity_a : parity_b;
 
-        // load the link variable connecting b and c (need b -> c for mu positive)
-        Link Ucb = arg.link(pos_dir(arg.mu), bc_link_nbr_idx, mu_positive ^ (1 - parity));
+        int dc_link_nbr_idx = sig_positive ? point_d : point_c;
+        int dc_link_nbr_parity = sig_positive ? parity_d : parity_c;
 
-        // load the input oprod connecting c and d (need d -> c for sig positive)
-        Link Odc = arg.oProd(pos_dir(arg.sig), sig_positive ? point_d : point_c, sig_positive ^ parity);
-        if constexpr (!sig_positive) Odc = conj(Odc);
+        // Load link and outer product contributions for Pmu, P3, and Qmu
+        Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
+        Link Ucb = arg.link(pos_dir(arg.mu), cb_link_nbr_idx, cb_link_nbr_parity);
+        Link Uda = arg.link(pos_dir(arg.mu), da_link_nbr_idx, da_link_nbr_parity);
+        Link Od = arg.oProd(pos_dir(arg.sig), dc_link_nbr_idx, dc_link_nbr_parity);
 
-        // for sig_positive, mu_positive, this is U_{b -> c} * O_{d -> c}
-        Link UbcOdc = !mu_positive ? Ucb * Odc : conj(Ucb) * Odc;
+        if constexpr (!sig_positive) Od = conj(Od);
+        if constexpr (!mu_positive) Uda = conj(Uda);
 
-        arg.pMu(0, point_b, 1 - parity) = UbcOdc;
-
-        arg.p3(0, e_cb, parity) = sig_positive ? Uab * UbcOdc : conj(Uab) * UbcOdc;
-
-        // load the link variable connecting a and d (need d -> a for mu positive)
-        Link Uda = arg.link(pos_dir(arg.mu), ad_link_nbr_idx, mu_positive ^ parity);
-        if (!mu_positive) Uda = conj(Uda);
-
+        Link Oz = !mu_positive ? Ucb * Od : conj(Ucb) * Od;
+        arg.pMu(0, point_b, parity_b) = Oz;
+        arg.p3(0, e_cb, parity) = sig_positive ? Uab * Oz : conj(Uab) * Oz;
         arg.qMu(0, e_cb, parity) = Uda;
 
+        // Update the force in the sigma direction
         if constexpr (sig_positive) {
-          Link UbcOdcUda = UbcOdc * Uda;
-          Link oprod = arg.force(arg.sig, e_cb, parity);
-          oprod -= arg.coeff_three * UbcOdcUda;
-          arg.force(arg.sig, e_cb, parity) = oprod;
+          Link Oy = Oz * Uda;
+          Link oprod = arg.force(arg.sig, point_a, parity_a);
+          oprod -= arg.coeff_three * Oy;
+          arg.force(arg.sig, point_a, parity_a) = oprod;
         }
 
       }
@@ -384,48 +386,53 @@ namespace quda {
          *
          */
 
+#pragma unroll
         for (int d=0; d<4; d++) x[d] += arg.base_idx[d];
         int e_cb = linkIndex(x,arg.E);
         parity = parity ^ arg.oddness_change;
-        int y[4] = {x[0], x[1], x[2], x[3]};
 
+        int y[4] = {x[0], x[1], x[2], x[3]};
+        int point_a = e_cb;
+        int parity_a = parity;
         int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.nu));
-        int ad_link_nbr_idx = nu_positive ? point_d : e_cb;
+        int parity_d = 1 - parity;
 
         int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+        int parity_c = parity;
+        int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.nu);
+        int parity_b = 1 - parity;
 
-        for (int d=0; d<4; d++) y[d] = x[d];
-        int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+        int da_link_nbr_idx = nu_positive ? point_d : point_a;
+        int da_link_nbr_parity = nu_positive ? parity_d : parity_a;
 
-        int bc_link_nbr_idx = nu_positive ? point_c : point_b;
-        int ab_link_nbr_idx = sig_positive ? e_cb : point_b;
+        int cb_link_nbr_idx = nu_positive ? point_c : point_b;
+        int cb_link_nbr_parity = nu_positive ? parity_c : parity_b;
 
-        // load the link variable connecting a and b
-        Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, sig_positive^(1-parity));
+        int ab_link_nbr_idx = sig_positive ? point_a : point_b;
+        int ab_link_nbr_parity = sig_positive ? parity_a : parity_b;
 
-        // load the link variable connecting b and c
-        Link Ubc = arg.link(pos_dir(arg.nu), bc_link_nbr_idx, nu_positive^(1-parity));
+        // Load link and outer product contributions for pNuMu, P5, qNuMu
+        Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
+        Link Ubc = arg.link(pos_dir(arg.nu), cb_link_nbr_idx, cb_link_nbr_parity);
+        Link Uda = arg.link(pos_dir(arg.nu), da_link_nbr_idx, da_link_nbr_parity);
+        Link Oc = arg.pMu(0, point_c, parity_c);
+        Link Oy = arg.qMu(0, point_d, parity_d);
 
-        Link Oy = arg.pMu(0, point_c, parity);
+        Link Ow = !nu_positive ? Ubc * Oc : conj(Ubc) * Oc;
+        if constexpr (!nu_positive) Uda = conj(Uda);
 
-        Link Ow = !nu_positive ? Ubc*Oy : conj(Ubc)*Oy;
+        arg.pNuMu(0, point_b, parity_b) = Ow;
+        arg.p5(0, e_cb, parity) = sig_positive ? Uab * Ow : conj(Uab) * Ow;
 
-        arg.pNuMu(0, point_b, 1-parity) = Ow;
+        Link Ox = Oy * Uda;
+        arg.qNuMu(0, point_a, parity_a) = Ox;
 
-        arg.p5(0, e_cb, parity) = sig_positive ? Uab*Ow : conj(Uab)*Ow;
-
-        Link Uad = arg.link(pos_dir(arg.nu), ad_link_nbr_idx, nu_positive^parity);
-        if (!nu_positive)  Uad = conj(Uad);
-
-        Oy = arg.qMu(0, point_d, 1-parity);
-        Link Ox = Oy*Uad;
-        arg.qNuMu(0, e_cb, parity) = Ox;
-
+        // Update the force in the sigma direction
         if constexpr (sig_positive) {
           Oy = Ow * Ox;
-          Link oprod = arg.force(arg.sig, e_cb, parity);
+          Link oprod = arg.force(arg.sig, point_a, parity_a);
           oprod += arg.coeff_five * Oy;
-          arg.force(arg.sig, e_cb, parity) = oprod;
+          arg.force(arg.sig, point_a, parity_a) = oprod;
         }
 
       }
@@ -532,6 +539,7 @@ namespace quda {
         int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
         int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
 
+#pragma unroll
         for (int d=0; d<4; d++) y[d] = x[d];
         int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.rho));
         int parity_d = 1 - parity;
@@ -540,6 +548,7 @@ namespace quda {
         int dc_link_nbr_idx = (sig_positive) ? point_d : point_c;
         int dc_link_nbr_parity = (sig_positive) ? parity_d : parity_c;
 
+#pragma unroll
         for (int d = 0; d < 4; d++) y[d] = x[d];
         int point_f = updateCoordsIndexMILCDir(y, arg.E, arg.rho);
         int parity_f = 1 - parity;
@@ -784,30 +793,29 @@ namespace quda {
         int parity_a = parity;
         int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
         int parity_b = 1 - parity;
+        int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
+        int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
 
+#pragma unroll
         for (int d=0; d<4; d++) y[d] = x[d];
         int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu));
         int parity_d = 1 - parity;
         int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
         int parity_c = parity;
 
+#pragma unroll
         for (int d=0; d<4; d++) y[d] = x[d];
         int point_f = updateCoordsIndexMILCDir(y, arg.E, arg.mu);
         int parity_f = 1 - parity;
         int point_e = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
         int parity_e = parity;
+        int fe_link_nbr_idx = (sig_positive) ? point_f : point_e;
+        int fe_link_nbr_parity = (sig_positive) ? parity_f : parity_e;
 
         int point_g = updateCoordsIndexMILCDir(y, arg.E, arg.mu);
         int parity_g = 1 - parity;
         int point_h = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.sig));
         int parity_h = parity;
-
-        int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
-        int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
-
-        int fe_link_nbr_idx = (sig_positive) ? point_f : point_e;
-        int fe_link_nbr_parity = (sig_positive) ? parity_f : parity_e;
-
         int hg_link_nbr_idx = (sig_positive) ? point_h : point_g;
         int hg_link_nbr_parity = (sig_positive) ? parity_h : parity_g;
 
