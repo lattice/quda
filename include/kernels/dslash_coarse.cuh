@@ -32,28 +32,27 @@ namespace quda {
     static constexpr int nSpin = nSpin_;
     static constexpr int nColor = nColor_;
     static constexpr int nDim = 4;
+    static constexpr int nFace = 1;
 
     static constexpr QudaFieldOrder csOrder = native ? colorspinor::getNative<real>(nSpin) : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     static constexpr QudaGaugeFieldOrder gOrder = native ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
 
-    using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, csOrder, Float, ghostFloat>;
+    using G = typename colorspinor::GhostOrder<real, nSpin, nColor, 1, csOrder, Float, ghostFloat>;
     // disable ghost to reduce arg size
-    using Fdg = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, csOrder, Float, ghostFloat, true>;
-    using G = typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat>;
+    using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, csOrder, Float, ghostFloat, true>;
     using GY = typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat>;
 
     static constexpr unsigned int max_n_src = 64;
     const int_fastdiv n_src;
-    Fdg out[max_n_src];
-    Fdg inA[max_n_src];
-    Fdg inB[max_n_src];
-    F halo;
+    F out[max_n_src];
+    F inA[max_n_src];
+    F inB[max_n_src];
+    G halo;
     const GY Y;
     const GY X;
     const real kappa;
     const int parity; // only use this for single parity fields
     const int nParity; // number of parities we're working on
-    const int nFace;  // hard code to 1 for now
     const int_fastdiv X0h; // X[0]/2
     const int_fastdiv dim[5];   // full lattice dimensions
     const int commDim[4]; // whether a given dimension is partitioned or not
@@ -66,14 +65,12 @@ namespace quda {
       kernel_param(dim3(color_stride * X.VolumeCB(), out[0].SiteSubset() * out.size(),
                         2 * dim_stride * 2 * (nColor / colors_per_thread(nColor, dim_stride)))),
       n_src(out.size()),
-      halo(halo),
-      //halo(inA[i], 1, nullptr, halo.Ghost()),
+      halo(halo, nFace),
       Y(const_cast<GaugeField &>(Y)),
       X(const_cast<GaugeField &>(X)),
       kappa(kappa),
       parity(parity),
       nParity(out[0].SiteSubset()),
-      nFace(1),
       X0h(((3 - nParity) * out[0].X(0)) / 2),
       dim {(3 - nParity) * out[0].X(0), out[0].X(1), out[0].X(2), out[0].X(3), out[0].Ndim() == 5 ? out[0].X(4) : 1},
       commDim {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},

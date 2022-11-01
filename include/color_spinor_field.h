@@ -325,6 +325,7 @@ namespace quda
     bool init = false;
     bool alloc = false;     // whether we allocated memory
     bool reference = false; // whether the field is a reference or not
+    bool ghost_only = false; // whether the field is only a ghost wrapper
 
     /** Used to keep local track of allocated ghost_precision in createGhostZone */
     mutable QudaPrecision ghost_precision_allocated = QUDA_INVALID_PRECISION;
@@ -478,10 +479,26 @@ namespace quda
     size_t GhostNormBytes() const { return ghost_bytes; }
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
 
-    void *V() { return v; }
-    const void *V() const { return v; }
-    void *Norm() { return static_cast<char *>(v) + norm_offset; }
-    const void *Norm() const { return static_cast<char *>(v) + norm_offset; }
+    /**
+       @brief Return pointer to the field allocation
+    */
+    void *V() { if (ghost_only) errorQuda("Not defined for ghost-only field"); return v; }
+
+    /**
+       @brief Return pointer to the field allocation
+    */
+    const void * V() const { if (ghost_only) errorQuda("Not defined for ghost-only field"); return v; }
+
+    /**
+       @brief Return pointer to the norm base pointer in the field allocation
+    */
+    void *Norm() { if (ghost_only) errorQuda("Not defined for ghost-only field"); return static_cast<char *>(v) + norm_offset; }
+
+    /**
+       @brief Return pointer to the norm base pointer in the field allocation
+    */
+    const void * Norm() const { if (ghost_only) errorQuda("Not defined for ghost-only field"); return static_cast<char *>(v) + norm_offset; }
+
     size_t NormOffset() const { return norm_offset; }
 
     /**

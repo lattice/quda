@@ -68,14 +68,14 @@ namespace quda {
     static constexpr int nDim = nDim_;
 
     using real = typename mapper<store_t>::type;
-    using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, order, store_t, ghost_store_t>;
+    using G = typename colorspinor::GhostOrder<real, nSpin, nColor, 1, order, store_t, ghost_store_t>;
     // disable ghost to reduce arg size
-    using Fdg = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, order, store_t, ghost_store_t, true>;
+    using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, order, store_t, ghost_store_t, true>;
 
     static constexpr int max_n_src = 64;
     const int_fastdiv n_src;
-    F out;
-    Fdg in[max_n_src];
+    G out;
+    F in[max_n_src];
 
     const int_fastdiv volumeCB;
     const int nFace;
@@ -107,7 +107,7 @@ namespace quda {
       kernel_param(
         dim3(work_items, (a.Nspin() / spins_per_thread(a)) * (a.Ncolor() / colors_per_thread(a)), a.SiteSubset())),
       n_src(v.size() > 0 ? 1 : v.size()),
-      out(a, nFace, 0, ghost),
+      out(a, nFace, ghost),
       volumeCB(a.VolumeCB()),
       nFace(nFace),
       parity(parity),

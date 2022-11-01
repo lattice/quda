@@ -18,20 +18,6 @@ namespace quda
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) :
     LatticeField(param),
-    init(false),
-    alloc(false),
-    reference(false),
-    ghost_precision_allocated(QUDA_INVALID_PRECISION),
-    v(nullptr),
-    norm_offset(0),
-    ghost(),
-    ghostFace(),
-    ghost_buf {},
-    dslash_constant(nullptr),
-    bytes(0),
-    bytes_raw(0),
-    even(nullptr),
-    odd(nullptr),
     composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
     components(0)
   {
@@ -40,13 +26,16 @@ namespace quda
       v = param.v;
       norm_offset = param.norm_offset;
       reference = true;
+    } else if (param.create == QUDA_GHOST_FIELD_CREATE) {
+      ghost_only = true;
     }
 
     create(param);
 
     switch (param.create) {
     case QUDA_NULL_FIELD_CREATE:
-    case QUDA_REFERENCE_FIELD_CREATE: break; // do nothing;
+    case QUDA_REFERENCE_FIELD_CREATE:
+    case QUDA_GHOST_FIELD_CREATE: break; // do nothing;
     case QUDA_ZERO_FIELD_CREATE: zero(); break;
     case QUDA_COPY_FIELD_CREATE: copy(*param.field); break;
     default: errorQuda("Unexpected create type %d", param.create);
@@ -55,20 +44,6 @@ namespace quda
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) noexcept :
     LatticeField(field),
-    init(false),
-    alloc(false),
-    reference(false),
-    ghost_precision_allocated(QUDA_INVALID_PRECISION),
-    v(nullptr),
-    norm_offset(0),
-    ghost(),
-    ghostFace(),
-    ghost_buf {},
-    dslash_constant(nullptr),
-    bytes(0),
-    bytes_raw(0),
-    even(nullptr),
-    odd(nullptr),
     composite_descr(field.composite_descr),
     components(0)
   {
@@ -190,7 +165,7 @@ namespace quda
     if (siteSubset == QUDA_FULL_SITE_SUBSET && siteOrder != QUDA_EVEN_ODD_SITE_ORDER)
       errorQuda("Subset not implemented");
 
-    if (param.create != QUDA_REFERENCE_FIELD_CREATE) {
+    if (param.create != QUDA_REFERENCE_FIELD_CREATE && param.create != QUDA_GHOST_FIELD_CREATE) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
         v = safe_malloc(bytes);
       } else if (location == QUDA_CUDA_FIELD_LOCATION) {
@@ -208,7 +183,7 @@ namespace quda
       alloc = true;
     }
 
-    if (composite_descr.is_composite && param.create != QUDA_REFERENCE_FIELD_CREATE) {
+    if (composite_descr.is_composite && param.create != QUDA_REFERENCE_FIELD_CREATE && param.create != QUDA_GHOST_FIELD_CREATE) {
       ColorSpinorParam param;
       fill(param);
       param.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -240,7 +215,7 @@ namespace quda
       odd = new ColorSpinorField(param);
     }
 
-    if (isNative() && param.create != QUDA_REFERENCE_FIELD_CREATE) {
+    if (isNative() && param.create != QUDA_REFERENCE_FIELD_CREATE && param.create != QUDA_GHOST_FIELD_CREATE) {
       if (!(siteSubset == QUDA_FULL_SITE_SUBSET && composite_descr.is_composite)) {
         zeroPad();
       } else { // temporary hack for the full spinor field sets, manual zeroPad for each component:
@@ -859,7 +834,7 @@ namespace quda
     ColorSpinorParam param(v[0]);
     param.nDim++;
     param.x[param.nDim-1] = v.size();
-    param.create = QUDA_REFERENCE_FIELD_CREATE;
+    param.create = QUDA_GHOST_FIELD_CREATE;
     return ColorSpinorField(param);
   }
 

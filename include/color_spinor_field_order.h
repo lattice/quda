@@ -605,7 +605,7 @@ namespace quda
     }
 
     template <typename Float, int nSpin_, int nColor_, int nVec, QudaFieldOrder order, typename storeFloat,
-              typename ghostFloat, bool disable_ghost>
+              typename ghostFloat, bool disable_ghost = false>
     class GhostOrder
     {
     protected:
@@ -653,7 +653,7 @@ namespace quda
       using ghost_accessor_t = GhostAccessorCB<ghostFloat, nSpin, nColor, nVec, order>;
       ghost_accessor_t ghostAccessor;
 
-    protected:
+    public:
       GhostOrder() = default;
 
       GhostOrder(const ColorSpinorField &field, int nFace, void * const *ghost_ = nullptr) :
@@ -674,7 +674,6 @@ namespace quda
         }
       }
 
-    public:
       void resetGhost(void *const *ghost_) const
       {
         for (int dim = 0; dim < 4; dim++) {
