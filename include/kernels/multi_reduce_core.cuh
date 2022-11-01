@@ -49,8 +49,7 @@ namespace quda
       const int nParity;
 
       template <typename V>
-      MultiReduceArg(std::vector<V> &x, std::vector<V> &y, std::vector<V> &z, std::vector<V> &w,
-                     Reducer f, int NYW, int length, int nParity) :
+      MultiReduceArg(V &x, V &y, V &z, V &w, Reducer f, int NYW, int length, int nParity) :
         // we have NYW * nParity reductions each of length NXZ
         ReduceArg<reduce_t>(dim3(length, 1, NYW), NYW),
         NYW(NYW),

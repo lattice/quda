@@ -24,12 +24,8 @@ namespace quda
     if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Tridiagonal/Arrow matrix
-    alpha = (double *)safe_malloc(n_kr * sizeof(double));
-    beta = (double *)safe_malloc(n_kr * sizeof(double));
-    for (int i = 0; i < n_kr; i++) {
-      alpha[i] = 0.0;
-      beta[i] = 0.0;
-    }
+    alpha.resize(n_kr, 0.0);
+    beta.resize(n_kr, 0.0);
 
     // Thick restart specific checks
     if (n_kr < n_ev + 6) errorQuda("n_kr=%d must be greater than n_ev+6=%d\n", n_kr, n_ev + 6);
@@ -41,21 +37,18 @@ namespace quda
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
-  void TRLM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
+  void TRLM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals)
   {
-    // In case we are deflating an operator, save the tunechache from the inverter
-    saveTuneCache();
-
     // Override any user input for block size.
     block_size = 1;
 
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
-    if (getVerbosity() >= QUDA_VERBOSE) queryPrec(kSpace[0]->Precision());
+    if (getVerbosity() >= QUDA_VERBOSE) queryPrec(kSpace[0].Precision());
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
       printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
-      loadFromFile(mat, kSpace, evals);
+      loadFromFile(kSpace, evals);
       return;
     }
 
@@ -68,11 +61,11 @@ namespace quda
     prepareKrylovSpace(kSpace, evals);
 
     // Check for Chebyshev maximum estimation
-    checkChebyOpMax(mat, kSpace);
+    checkChebyOpMax(kSpace);
 
     // Convergence and locking criteria
     double mat_norm = 0.0;
-    double epsilon = setEpsilon(kSpace[0]->Precision());
+    double epsilon = setEpsilon(kSpace[0].Precision());
 
     // Print Eigensolver params
     printEigensolverSetup();
@@ -186,70 +179,51 @@ namespace quda
 
       // Compute eigenvalues/singular values
 
-      computeEvals(mat, kSpace, evals);
-      if (compute_svd) computeSVD(mat, kSpace, evals);
+      computeEvals(kSpace, evals);
+      if (compute_svd) computeSVD(kSpace, evals);
     }
 
     // Local clean-up
     cleanUpEigensolver(kSpace, evals);
   }
 
-  // Destructor
-  TRLM::~TRLM()
-  {
-    ritz_mat.clear();
-    ritz_mat.shrink_to_fit();
-    host_free(alpha);
-    host_free(beta);
-  }
-
   // Thick Restart Member functions
   //---------------------------------------------------------------------------
-  void TRLM::lanczosStep(std::vector<ColorSpinorField *> v, int j)
+  void TRLM::lanczosStep(std::vector<ColorSpinorField> &v, int j)
   {
     // Compute r = A * v_j - b_{j-i} * v_{j-1}
     // r = A * v_j
 
-    chebyOp(mat, *r[0], *v[j]);
+    chebyOp(r[0], v[j]);
 
     // a_j = v_j^dag * r
-    alpha[j] = blas::reDotProduct(*v[j], *r[0]);
+    alpha[j] = blas::reDotProduct(v[j], r[0]);
 
     // r = r - a_j * v_j
-    blas::axpy(-alpha[j], *v[j], *r[0]);
+    blas::axpy(-alpha[j], v[j], r[0]);
 
     int start = (j > num_keep) ? j - 1 : 0;
 
     if (j - start > 0) {
-      std::vector<ColorSpinorField *> r_ {r[0]};
-      std::vector<double> beta_;
-      beta_.reserve(j - start);
-      std::vector<ColorSpinorField *> v_;
-      v_.reserve(j - start);
-      for (int i = start; i < j; i++) {
-        beta_.push_back(-beta[i]);
-        v_.push_back(v[i]);
-      }
+      std::vector<double> beta_ = {beta.begin() + start, beta.begin() + j};
+      for (auto & bi : beta_) bi = -bi;
+
       // r = r - b_{j-1} * v_{j-1}
-      blas::axpy(beta_.data(), v_, r_);
+      blas::axpy(beta_, {v.begin() + start, v.begin() + j}, r[0]);
     }
 
     // Orthogonalise r against the Krylov space
     for (int k = 0; k < 1; k++) blockOrthogonalize(v, r, j + 1);
 
     // b_j = ||r||
-    beta[j] = sqrt(blas::norm2(*r[0]));
+    beta[j] = sqrt(blas::norm2(r[0]));
 
     // Prepare next step.
     // v_{j+1} = r / b_j
-    blas::zero(*v[j + 1]);
-    blas::axpy(1.0 / beta[j], *r[0], *v[j + 1]);
-
-    // Save Lanczos step tuning
-    saveTuneCache();
+    blas::axy(1.0 / beta[j], r[0], v[j + 1]);
   }
 
-  void TRLM::reorder(std::vector<ColorSpinorField *> &kSpace)
+  void TRLM::reorder(std::vector<ColorSpinorField> &kSpace)
   {
     int i = 0;
 
@@ -284,8 +258,7 @@ namespace quda
 
     // Eigen objects
     MatrixXd A = MatrixXd::Zero(dim, dim);
-    ritz_mat.resize(dim * dim);
-    for (int i = 0; i < dim * dim; i++) ritz_mat[i] = 0.0;
+    ritz_mat.resize(dim * dim, 0.0);
 
     // Invert the spectrum due to chebyshev
     if (reverse) {
@@ -339,13 +312,13 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_EIGEN);
   }
 
-  void TRLM::computeKeptRitz(std::vector<ColorSpinorField *> &kSpace)
+  void TRLM::computeKeptRitz(std::vector<ColorSpinorField> &kSpace)
   {
     int offset = n_kr + 1;
     int dim = n_kr - num_locked;
 
     // Multi-BLAS friendly array to store part of Ritz matrix we want
-    double *ritz_mat_keep = (double *)safe_malloc((dim * iter_keep) * sizeof(double));
+    std::vector<double> ritz_mat_keep(dim * iter_keep);
     for (int j = 0; j < dim; j++) {
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j]; }
     }
@@ -357,7 +330,5 @@ namespace quda
 
     // Update sub arrow matrix
     for (int i = 0; i < iter_keep; i++) beta[i + num_locked] = beta[n_kr - 1] * ritz_mat[dim * (i + 1) - 1];
-
-    host_free(ritz_mat_keep);
   }
 } // namespace quda

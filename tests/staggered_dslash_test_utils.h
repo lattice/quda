@@ -63,7 +63,6 @@ struct StaggeredDslashTestWrapper {
   std::unique_ptr<ColorSpinorField> tmpCpu;
   std::unique_ptr<ColorSpinorField> cudaSpinor;
   std::unique_ptr<ColorSpinorField> cudaSpinorOut;
-  std::unique_ptr<ColorSpinorField> tmp;
 
   std::vector<ColorSpinorField *> vp_spinor;
   std::vector<ColorSpinorField *> vp_spinor_out;
@@ -318,13 +317,11 @@ struct StaggeredDslashTestWrapper {
     cudaSpinor = std::make_unique<ColorSpinorField>(csParam);
     cudaSpinorOut = std::make_unique<ColorSpinorField>(csParam);
     *cudaSpinor = *spinor;
-    tmp = std::make_unique<ColorSpinorField>(csParam);
 
     bool pc = (dtest_type == dslash_test_type::MatPC); // For test_type 0, can use either pc or not pc
     // because both call the same "Dslash" directly.
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
-    diracParam.tmp1 = tmp.get();
     dirac = Dirac::create(diracParam);
 
     for (int dir = 0; dir < 4; dir++) {
@@ -355,7 +352,6 @@ struct StaggeredDslashTestWrapper {
     }
     cudaSpinor.reset();
     cudaSpinorOut.reset();
-    tmp.reset();
     spinor.reset();
     spinorOut.reset();
     spinorRef.reset();
