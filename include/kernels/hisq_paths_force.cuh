@@ -27,7 +27,15 @@ namespace quda {
     constexpr int parity_sign(int parity) { return parity ? -1 : 1; }
     constexpr int pos_dir(int signed_dir) { return (signed_dir >= 4) ? 7 - signed_dir : signed_dir; }
 
-    __host__ __device__ int updateCoordsIndexMILCDir(int x[], const int X[], int signed_dir) {
+    /**
+      @brief Compute the checkerboard 1-d index for the nearest neighbor in a MILC-convention
+             signed direction, updating the lattice coordinates in-place
+      @param[in/out] x Local coordinate, which is returned shifted
+      @param[in] X Full lattice dimensions
+      @param[in] signed_dir Signed MILC direction
+      @return Shifted 1-d checkboard index
+   */
+    __host__ __device__ int updateCoordsIndexMILCDir(int x[], const int_fastdiv X[], int signed_dir) {
       switch (signed_dir) {
       case 0: x[0] = (x[0] + 1 + X[0]) % X[0]; break;
       case 1: x[1] = (x[1] + 1 + X[1]) % X[1]; break;
@@ -40,6 +48,19 @@ namespace quda {
       }
       int idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
       return idx;
+    }
+
+    /**
+      @brief Compute the checkerboard 1-d index for the nearest neighbor in a MILC-convention
+             signed direction
+      @param[in/out] x Local coordinate
+      @param[in] X Full lattice dimensions
+      @param[in] signed_dir Signed MILC direction
+      @return Shifted 1-d checkboard index
+   */
+    __host__ __device__ int getIndexMILCDir(const int x[], const int_fastdiv X[], int signed_dir) {
+      int y[4] = {x[0], x[1], x[2], x[3]};
+      return updateCoordsIndexMILCDir(y, X, signed_dir);
     }
 
     //struct for holding the fattening path coefficients
@@ -62,11 +83,12 @@ namespace quda {
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
       using Gauge = typename gauge_mapper<real, recon>::type;
+      using Link = Matrix<complex<real>, nColor>;
 
       const Gauge link;
-      int X[4]; // regular grid dims
-      int D[4]; // working set grid dims
-      int E[4]; // extended grid dims
+      int_fastdiv X[4]; // regular grid dims
+      int_fastdiv D[4]; // working set grid dims
+      int_fastdiv E[4]; // extended grid dims
 
       int commDim[4];
       int border[4];
@@ -173,25 +195,26 @@ namespace quda {
      *
      * Generally we need
      * READ
-     *    3 LINKS:         ab_link,     bc_link,    ad_link
-     *    2 COLOR MATRIX:  newOprod_at_A, oprod_at_C
+     *    2 LINKS:         ab_link,     bc_link
+     *    1 COLOR MATRIX:  oprod_at_C
      * WRITE
-     *    4 COLOR MATRIX:  newOprod_at_A, P3_at_A, Pmu_at_B, Qmu_at_A
+     *    2 COLOR MATRIX:  P3_at_A, Pmu_at_B
      *
-     *   In all three above case, if the direction sig is negative, newOprod_at_A is
-     *   not read in or written out.
+     * If sig is positive, we additionally:
+     * READ
+     *    1 LINK:          da_link
+     *    1 COLOR MATRIX:  newOprod_{sig}_at_A
+     * WRITE
+     *    1 COLOR MATRIX:  newOprod_{sig}_at_A
      *
      * Therefore the data traffic, in two-number pair (num_of_link, num_of_color_matrix)
      *   Call 1:  (called 48 times, half positive sig, half negative sig)
-     *             if (sig is positive):    (3, 6)
-     *             else               :     (3, 4)
+     *             if (sig is positive):    (2, 5)
+     *             else                :    (3, 3)
      *
-     * note: oprod_at_C could actually be read in from D when it is the fresh outer product
-     *       and we call it oprod_at_C to simply naming. This does not affect our data traffic analysis
-     *
-     * Flop count, in two-number pair (matrix_multi, matrix_add)
-     *   call 1:     if (sig is positive)  (3, 1)
-     *               else                  (2, 0)
+     * Flop count, in three-number pair (matrix_multi, matrix_add, matrix_rescale)
+     *   call 1:     if (sig is positive)  (3, 1, 1)
+     *               else                  (2, 0, 0)
      *
      ****************************************************************************/
     template <typename store_t, int nColor_, QudaReconstructType recon>
@@ -204,17 +227,16 @@ namespace quda {
       Gauge force;
       Gauge pMu;
       Gauge p3;
-      Gauge qMu;
 
       const Gauge oProd;
       const real coeff_three;
 
       static constexpr int overlap = 2;
 
-      MiddleThreeLinkArg(GaugeField &force, GaugeField &pMu, GaugeField &P3, GaugeField &qMu,
+      MiddleThreeLinkArg(GaugeField &force, GaugeField &pMu, GaugeField &P3,
                  const GaugeField &oProd, const GaugeField &link,
                   const PathCoefficients<real> &act_path_coeff)
-        : BaseForceArg(link, overlap), force(force), pMu(pMu), p3(P3), qMu(qMu),
+        : BaseForceArg(link, overlap), force(force), pMu(pMu), p3(P3),
         oProd(oProd), coeff_three(act_path_coeff.three)
       { }
 
@@ -277,7 +299,8 @@ namespace quda {
         int dc_link_nbr_idx = sig_positive ? point_d : point_c;
         int dc_link_nbr_parity = sig_positive ? parity_d : parity_c;
 
-        // Load link and outer product contributions for Pmu, P3, and Qmu
+        // Load link and outer product contributions for Pmu and P3, as well as
+        // force_sig when sig is positive
         Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
         Link Ucb = arg.link(pos_dir(arg.mu), cb_link_nbr_idx, cb_link_nbr_parity);
         Link Uda = arg.link(pos_dir(arg.mu), da_link_nbr_idx, da_link_nbr_parity);
@@ -289,7 +312,6 @@ namespace quda {
         Link Oz = !mu_positive ? Ucb * Od : conj(Ucb) * Od;
         arg.pMu(0, point_b, parity_b) = Oz;
         arg.p3(0, e_cb, parity) = sig_positive ? Uab * Oz : conj(Uab) * Oz;
-        arg.qMu(0, e_cb, parity) = Uda;
 
         // Update the force in the sigma direction
         if constexpr (sig_positive) {
@@ -308,28 +330,26 @@ namespace quda {
      *
      * Generally we need
      * READ
-     *    3 LINKS:         ab_link,     bc_link,    ad_link
-     *    3 COLOR MATRIX:  newOprod_at_A, Pmu_at_C,  Qmu_at_D
+     *    4 LINKS:         ab_link, cb_link, da_link, qd_link
+     *    1 COLOR MATRIX:  Pmu_at_C
      * WRITE
-     *    4 COLOR MATRIX:  newOprod_at_A, P3_at_A, Pnumu_at_B, Qnumu_at_A
+     *    3 COLOR MATRIX:  P5_at_A, Pnumu_at_B, Qnumu_at_A
      *
-     * Three call variations:
-     *   2. full read/write
-     *
-     *   In all three above case, if the direction sig is negative, newOprod_at_A is
-     *   not read in or written out.
+     * If sig is positive, we additionally:
+     * READ
+     *    1 COLOR MATRIX:  newOprod_{sig}_at_A
+     * WRITE
+     *    1 COLOR MATRIX:  newOprod_{sig}_at_A
      *
      * Therefore the data traffic, in two-number pair (num_of_link, num_of_color_matrix)
      *   Call 2:  (called 192 time, half positive sig, half negative sig)
-     *             if (sig is positive):    (3, 7)
-     *             else               :     (3, 5)
+     *             if (sig is positive):    (4, 4)
+     *             else               :     (4, 6)
      *
-     * note: Pmu_at_C could actually be read in from D when it is the fresh outer product
-     *       and we call it Pmu_at_C to simply naming. This does not affect our data traffic analysis
      *
-     * Flop count, in two-number pair (matrix_multi, matrix_add)
-     *   call 2:     if (sig is positive)  (4, 1)
-     *               else                  (3, 0)
+     * Flop count, in three-number pair (matrix_multi, matrix_add, matrix_rescale)
+     *   call 2:     if (sig is positive)  (4, 1, 1)
+     *               else                  (3, 0, 0)
      *
      ****************************************************************************/
     template <typename store_t, int nColor_, QudaReconstructType recon>
@@ -345,16 +365,15 @@ namespace quda {
       Gauge qNuMu;
 
       const Gauge pMu;
-      const Gauge qMu;
       const real coeff_five;
 
       static constexpr int overlap = 2;
 
       MiddleFiveLinkArg(GaugeField &force, GaugeField &pNuMu, GaugeField &P5, GaugeField &qNuMu,
-                 const GaugeField &pMu, const GaugeField &qMu, const GaugeField &link,
+                 const GaugeField &pMu, const GaugeField &link,
                   const PathCoefficients<real> &act_path_coeff)
         : BaseForceArg(link, overlap), force(force), pNuMu(pNuMu), p5(P5), qNuMu(qNuMu),
-        pMu(pMu), qMu(qMu), coeff_five(act_path_coeff.five)
+        pMu(pMu), coeff_five(act_path_coeff.five)
       { }
 
     };
@@ -366,7 +385,7 @@ namespace quda {
       const Arg &arg;
 
       static constexpr int sig_positive = Param::sig_positive;
-      static_assert(Param::mu_positive == -1, "mu_positive should be set to -1 for MiddleFiveLink");
+      static constexpr int mu_positive = Param::mu_positive;
       static constexpr int nu_positive = Param::nu_positive;
       static_assert(Param::compute_lepage == -1, "compute_lepage should be set to -1 for MiddleFiveLink");
 
@@ -384,6 +403,9 @@ namespace quda {
          *
          *    A is the current point (sid)
          *
+         * This kernel also depends on U_{mu} flowing *into* point D,
+         * formerly referred to as "qMu" or "qProd". We denote the point
+         * in the negative "mu" direction from D as "Q".
          */
 
 #pragma unroll
@@ -397,6 +419,9 @@ namespace quda {
         int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.nu));
         int parity_d = 1 - parity;
 
+        int point_q = getIndexMILCDir(y, arg.E, opp_dir(arg.mu));
+        int parity_q = parity;
+
         int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
         int parity_c = parity;
         int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.nu);
@@ -404,6 +429,9 @@ namespace quda {
 
         int da_link_nbr_idx = nu_positive ? point_d : point_a;
         int da_link_nbr_parity = nu_positive ? parity_d : parity_a;
+
+        int qd_link_nbr_idx = mu_positive ? point_q : point_d;
+        int qd_link_nbr_parity = mu_positive ? parity_q : parity_d;
 
         int cb_link_nbr_idx = nu_positive ? point_c : point_b;
         int cb_link_nbr_parity = nu_positive ? parity_c : parity_b;
@@ -415,21 +443,22 @@ namespace quda {
         Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
         Link Ubc = arg.link(pos_dir(arg.nu), cb_link_nbr_idx, cb_link_nbr_parity);
         Link Uda = arg.link(pos_dir(arg.nu), da_link_nbr_idx, da_link_nbr_parity);
+        Link Uqd = arg.link(pos_dir(arg.mu), qd_link_nbr_idx, qd_link_nbr_parity);
         Link Oc = arg.pMu(0, point_c, parity_c);
-        Link Oy = arg.qMu(0, point_d, parity_d);
 
         Link Ow = !nu_positive ? Ubc * Oc : conj(Ubc) * Oc;
         if constexpr (!nu_positive) Uda = conj(Uda);
+        if constexpr (!mu_positive) Uqd = conj(Uqd);
 
         arg.pNuMu(0, point_b, parity_b) = Ow;
-        arg.p5(0, e_cb, parity) = sig_positive ? Uab * Ow : conj(Uab) * Ow;
+        arg.p5(0, point_a, parity_a) = sig_positive ? Uab * Ow : conj(Uab) * Ow;
 
-        Link Ox = Oy * Uda;
+        Link Ox = Uqd * Uda;
         arg.qNuMu(0, point_a, parity_a) = Ox;
 
         // Update the force in the sigma direction
         if constexpr (sig_positive) {
-          Oy = Ow * Ox;
+          Link Oy = Ow * Ox;
           Link oprod = arg.force(arg.sig, point_a, parity_a);
           oprod += arg.coeff_five * Oy;
           arg.force(arg.sig, point_a, parity_a) = oprod;
@@ -442,27 +471,31 @@ namespace quda {
      * Note: this kernel names points differently than the other kernels, there's a diagram
      *   within the kernel code
      *
-     * In this function we need
-     *   READ
-     *     8 LINKS:         ab_link, af_link, be_link, fe_link, dc_link, da_link, cb_link, ah_link
-     *     12 COLOR MATRIX:  qnumu_at_{a, f, d}, oprod_at_{e, b, c}, newOprod_{rho,sig,nu}_at_a,
-     *                      p5_at_a, shortP_at_h, qProd_at_h
-     *   WRITE:
-     *     4 COLOR MATRIX:  newOprod_{rho,sig,nu}_at_a, shortP_at_h
+     * Generally we need
+     * READ
+     *    9 LINKS:         ab_link, af_link, be_link, fe_link, dc_link,
+     *                     da_link, cb_link, ah_link, qh_link
+     *    8 COLOR MATRIX:  qnumu_at_{F, A}, oProd_at_{E, B}, p5_at_A, shortP_at_H,
+     *                     newOprod_{rho, nu}_at_A
+     * WRITE
+     *    3 COLOR MATRIX:  newOprod_{rho, nu}_at_A, shortP_at_H
      *
-     * If sig is negative, then we don't need to read qnumu_at_c, oprod_at_b, read/write
-     *             newOprod_sig_at_a
+     * If sig is positive, we additionally:
+     * READ
+     *    3 COLOR MATRIX:  qnumu_at_D, oProd_at_C, newOprod_{sig}_at_A
+     * WRITE
+     *    1 COLOR MATRIX:  newOprod_{sig}_at_A
      *
      * Therefore the data traffic, in two-number pair (num_of_link, num_of_color_matrix)
      *
-     *             if (sig is positive):    (8, 16)
-     *             else               :     (8, 12)
+     *             if (sig is positive):    (9, 15)
+     *             else               :     (9, 11)
      *
      * This function is called 192 times, half positive sig, half negative sig
      *
-     * Flop count, in two-number pair (matrix_multi, matrix_add)
-     *             if(sig is positive)      (17,11)
-     *             else                     (12,8)
+     * Flop count, in three-number pair (matrix_multi, matrix_add, matrix_rescale)
+     *             if (sig is positive)     (17, 11, 8)
+     *             else                     (12,  8, 6)
      *
      ************************************************************************************************/
     template <typename store_t, int nColor_, QudaReconstructType recon>
@@ -478,7 +511,6 @@ namespace quda {
 
       const Gauge oProd;
       const Gauge qNuMu;
-      const Gauge qProd;
 
       const real coeff_five;
       const real accumu_coeff_five;
@@ -488,9 +520,9 @@ namespace quda {
       static constexpr int overlap = 2;
 
       AllSevenSideFiveLinkArg(GaugeField &force, GaugeField &shortP, GaugeField &P5, const GaugeField &oProd, const GaugeField &qNuMu,
-                 const GaugeField &qProd, const GaugeField &link, const PathCoefficients<real> &act_path_coeff)
+                 const GaugeField &link, const PathCoefficients<real> &act_path_coeff)
         : BaseForceArg(link, overlap), force(force), shortP(shortP), p5(P5),
-          oProd(oProd), qNuMu(qNuMu), qProd(qProd),
+          oProd(oProd), qNuMu(qNuMu),
           coeff_five(act_path_coeff.five), accumu_coeff_five(act_path_coeff.three != 0 ? act_path_coeff.five / act_path_coeff.three : 0),
           coeff_seven(act_path_coeff.seven), accumu_coeff_seven(act_path_coeff.five != 0 ? act_path_coeff.seven / act_path_coeff.five : 0)
       { }
@@ -504,7 +536,8 @@ namespace quda {
       const Arg &arg;
 
       static constexpr int sig_positive = Param::sig_positive;
-      static_assert(Param::mu_positive == -1, "mu_positive should be set to -1 for AllSevenSideFiveLink");
+      static constexpr int mu_positive = Param::mu_positive;
+      //static_assert(Param::mu_positive == -1, "mu_positive should be set to -1 for AllSevenSideFiveLink");
       static constexpr int nu_positive = Param::nu_positive;
       static_assert(Param::compute_lepage == -1, "compute_lepage should be set to -1 for AllSevenSideFiveLink");
 
@@ -630,6 +663,9 @@ namespace quda {
          *
          *      A is the current point (x_cb)
          *
+         * This kernel also depends on U_{mu} flowing *into* point H,
+         * formerly referred to as "qMu" or "qProd". We denote the point
+         * in the negative "mu" direction from H as "Q".
          */
 
         int y[4] = {x[0], x[1], x[2], x[3]};
@@ -637,8 +673,15 @@ namespace quda {
         int parity_a = parity;
         int point_h = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.nu));
         int parity_h = 1 - parity;
+
+        int point_q = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu));
+        int parity_q = parity;
+
         int ah_link_nbr_idx = nu_positive ? point_h : point_a;
         int ah_link_nbr_parity = nu_positive ? parity_h : parity_a;
+
+        int qh_link_nbr_idx = mu_positive ? point_q : point_h;
+        int qh_link_nbr_parity = mu_positive ? parity_q : parity_h;
 
         // calculate p5_sig
         Link p5_sig = all_link(x, e_cb, parity);
@@ -649,13 +692,14 @@ namespace quda {
 
         Link Uah = arg.link(pos_dir(arg.nu), ah_link_nbr_idx, ah_link_nbr_parity);
         Link Ow = nu_positive ? Uah * Oy : conj(Uah) * Oy;
+        Link Uqh = arg.link(pos_dir(arg.mu), qh_link_nbr_idx, qh_link_nbr_parity);
+        if constexpr (!mu_positive) Uqh = conj(Uqh);
 
         Link shortP = arg.shortP(0, point_h, parity_h);
         shortP += arg.accumu_coeff_five * Ow;
         arg.shortP(0, point_h, parity_h) = shortP;
 
-        Link Ox = arg.qProd(0, point_h, parity_h);
-        Ow = nu_positive ? Oy * Ox : conj(Ox) * conj(Oy);
+        Ow = nu_positive ? Oy * Uqh : conj(Uqh) * conj(Oy);
 
         auto mycoeff_five = -coeff_sign(goes_forward(arg.sig), parity_a)*coeff_sign(goes_forward(arg.nu),parity_a)*arg.coeff_five;
 
@@ -668,50 +712,44 @@ namespace quda {
 
     /************************AllLepageSideThreeLink*****************************
      * Note: this kernel names points differently than the other kernels, there's a diagram
-     *   within the kernel code
+     *   within the kernel code. The site names printed below assume sig and mu are positive.
+     *   Many of the load/store locations get shifted if mu is negative; this code uses relatively
+     *  self-documenting variables, so check there for the shifted sites.
      *
      * If we are only computing the side three link term (when the Lepage coefficient
      * is zero), we only need:
      * READ
      *    0 LINKS
-     *    2 COLOR MATRIX:  p3_at_{F for mu_positive, A for sig_positive},
-     *                     newOprod_at_A (mu direction)
-     *  WRITE
-     *    1 COLOR MATRIX:  newOprod_at_A (mu direction)
+     *    2 COLOR MATRIX:  p3_at_F, newOprod_{mu}_at_A
+     * WRITE
+     *    1 COLOR MATRIX:  newOprod_{mu}_at_A
      *
      * Therefore the data traffic, in two-number pair (num of link, num_of_color_matrix), is
      *      (sig positive or negative):   (0, 3)
      *
-     * Flop count, in two-number pair (matrix_multi, matrix_add) is (0, 1)
+     * Flop count, in three-number set (matrix_multi, matrix_add, matrix_rescale) is (0, 1, 1)
      *
      * If we are are computing the Lepage middle and all link, this gets complicated.
      * We have an additional:
      * READ
-     *    5 LINKS:          hg_link, eg_link, fh_link, fe_link, be_link
-     *    3 COLOR MATRIX:   oprod_at_e, oprod_at_b, qProd_at_d
-     *    additionally, if sig positive:
-     *      1 LINK:         af_link
-     *      1 COLOR MATRIX: qProd_at_a, newOprod_at_f (sig direction)
-     * WRITE if sig is positive
-     *    1 COLOR MATRIX:   newOprod_at_f (sig_direction)
-     *
-     * If mu is negative, there is no link load when sig is positive. Further, many
-     * of the sites that components are loaded from are shifted --- the code uses
-     * self-documenting variables, so check there for the shifts.
+     *    6 LINKS:          hg_link, eg_link, fh_link, fe_link, be_link, ud_link
+     *    2 COLOR MATRIX:   oprod_at_e, oprod_at_b
+     * If sig is positive, we additionally:
+     * READ
+     *    1 LINK:           af_link
+     *    1 COLOR MATRIX:   newOprod_{sig}_at_F
+     * WRITE
+     *    1 COLOR MATRIX:   newOprod_{sig}_at_F
      *
      * The TOTAL data traffic (including side link), in two-number pair (num_of_link, num_of_color_matrix)
-     *   if (mu is positive):
-     *     if (sig is positive):   (6, 9)
-     *     else:                   (6, 6)
-     *   else (mu is negative):
-     *     if (sig is positive):   (6, 8)
-     *     else:                   (6, 6)
+     *    if (sig is positive):   (7, 7)
+     *    else:                   (6, 5)
      *
      * This kernel is called 48 times, 24 for sig positive and 24 for sig negative
      *
-     * The TOTAL flop count, in two-number pair (matrix_multi, matrix_add)
-     *   if (sig is positive):     (8, 3)
-     *   else:                     (6, 2)
+     * The TOTAL flop count, in three-number set (matrix_multi, matrix_add, matrix_rescale)
+     *   if (sig is positive):     (8, 4, 4)
+     *   else:                     (6, 3, 3)
      *
      ****************************************************************************/
     template <typename store_t, int nColor_, QudaReconstructType recon>
@@ -725,7 +763,6 @@ namespace quda {
 
       const Gauge p3;
       const Gauge oProd;
-      const Gauge qProd;
 
       const real coeff_three;
       const real coeff_lepage;
@@ -734,10 +771,10 @@ namespace quda {
       static constexpr int overlap = 2;
 
       AllLepageSideThreeLinkArg(GaugeField &force, const GaugeField &P3, const GaugeField &oProd,
-                 const GaugeField &qProd, const GaugeField &link,
+                 const GaugeField &link,
                  const PathCoefficients<real> &act_path_coeff)
         : BaseForceArg(link, overlap), force(force), p3(P3),
-        oProd(oProd), qProd(qProd),
+        oProd(oProd),
         coeff_three(act_path_coeff.three), coeff_lepage(act_path_coeff.lepage),
         accumu_coeff_lepage(act_path_coeff.three != 0 ? act_path_coeff.lepage / act_path_coeff.three : 0)
       { }
@@ -819,13 +856,10 @@ namespace quda {
         int hg_link_nbr_idx = (sig_positive) ? point_h : point_g;
         int hg_link_nbr_parity = (sig_positive) ? parity_h : parity_g;
 
-        Link p3;
-        if constexpr ( mu_positive ) {
-          p3 = arg.p3(0, point_f, parity_f);
-        } else {
-          p3 = arg.p3(0, point_a, parity_a);
-        }
+        int fa_link_nbr_idx = (mu_positive) ? point_f : point_a;
+        int fa_link_nbr_parity = (mu_positive) ? parity_f : parity_a;
 
+        Link p3 = arg.p3(0, fa_link_nbr_idx, fa_link_nbr_parity);
         Link force_mu = arg.force(pos_dir(arg.mu), point_a, parity_a);
 
         if constexpr ( compute_lepage ) {
@@ -850,11 +884,11 @@ namespace quda {
             Link Ufe = arg.link(pos_dir(arg.sig), fe_link_nbr_idx, fe_link_nbr_parity);
             Link Ube = arg.link(pos_dir(arg.mu), point_b, parity_b);
             Link Ob = arg.oProd(0, point_b, parity_b);
-            Link Qd = arg.qProd(0, point_a, parity_a);
+            Link Uda = arg.link(pos_dir(arg.mu), point_d, parity_d);
 
             Link Ow = conj(Ube) * Ob;
             Link Oy = sig_positive ? Ufe * Ow : conj(Ufe) * Ow;
-            Link Ox = Oy * Qd;
+            Link Ox = Oy * Uda;
 
             auto mycoeff_lepage = -coeff_sign(goes_forward(arg.sig), parity)*coeff_sign(goes_forward(arg.mu),parity)*arg.coeff_lepage;
 
@@ -863,8 +897,7 @@ namespace quda {
             // Update force_sig if sig is positive
             if constexpr ( sig_positive ) {
               Link Uaf = arg.link(pos_dir(arg.mu), point_a, parity_a);
-              Link Qa = arg.qProd(0, point_a, parity_a);
-              Link Ox = Qa * Uaf;
+              Link Ox = Uda * Uaf;
               Link Oy = Ow * Ox;
 
               Link oprod = arg.force(arg.sig, point_f, parity_f);
@@ -894,27 +927,27 @@ namespace quda {
               Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
               Link Ubc = arg.link(pos_dir(arg.mu), point_b, parity_b);
               Link Oc = arg.oProd(0, point_c, parity_c);
-              Link Qd = arg.qProd(0, point_d, parity_d);
+              Link Uda = arg.link(pos_dir(arg.mu), point_d, parity_d);
 
               Link Ow = Ubc * Oc;
-              Link Oy = sig_positive ? Uab*Ow : conj(Uab)*Ow;
-              Link Ox = conj(Qd) * conj(Oy);
+              Link Oy = sig_positive ? Uab * Ow : conj(Uab) * Ow;
+              Link Ox = Uda * conj(Oy);
 
               auto mycoeff_lepage = -coeff_sign(goes_forward(arg.sig), parity)*coeff_sign(goes_forward(arg.mu),parity)*arg.coeff_lepage;
               force_mu += mycoeff_lepage * Ox;
 
               if constexpr ( sig_positive ) {
-                Link Uad = arg.link(pos_dir(arg.mu), point_a, parity_a);
-                Link Ox = Qd * conj(Uad);
+                Link Uaf = arg.link(pos_dir(arg.mu), point_a, parity_a);
+                Link Ox = conj(Uda) * conj(Uaf);
                 Link Oy = Ow * Ox;
 
                 Link oprod = arg.force(arg.sig, point_a, parity_a);
-                oprod += arg.coeff_lepage*Oy;
+                oprod += arg.coeff_lepage * Oy;
                 arg.force(arg.sig, point_a, parity_a) = oprod;
               }
             }
           }
-        }
+        } // if (compute_lepage)
 
         // Update force_mu
         auto mycoeff_three = coeff_sign(goes_forward(arg.sig),parity)*coeff_sign(goes_forward(arg.mu),parity)*arg.coeff_three;

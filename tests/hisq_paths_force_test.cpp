@@ -71,7 +71,7 @@ void total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, double
   // TO DO: update me with new counts in hisq kernel core file
 
   // total IO counting for the middle/side/all link kernels
-  // Explanation about these numbers can be founed in the corresnponding kernel functions in
+  // Explanation about these numbers can be founed in the corresponding kernel functions in
   // the hisq kernel core file
   int linksize = prec * recon;
   int cmsize = prec * 18;
