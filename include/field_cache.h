@@ -3,6 +3,8 @@
 #include <string>
 #include <map>
 #include <stack>
+#include <vector>
+#include <reference_wrapper_helper.h>
 
 namespace quda {
 
@@ -81,5 +83,25 @@ namespace quda {
      @param[in] a Field we wish to create a matching temporary for
    */
   template <typename T> auto getFieldTmp(const T &a) { return FieldTmp<T>(a); }
+
+  /**
+     @brief Get a vector of field temporaries that are identical to
+     the vector instance argument.  If enough matching fields are
+     present in the cache, they will be popped from the cache.  If an
+     insufficient number of temporaries exist, enough will be
+     allocated.  When the destructor is called, e.g.,
+     the returned object goes out of scope, the temporaries will be
+     pushed onto the cache.
+
+     @param[in] a Vector of fields we wish to create a matching
+     temporary for
+   */
+  template <typename T> auto getFieldTmp(const vector_ref<T> &a)
+  {
+    std::vector<FieldTmp<T>> tmp;
+    tmp.reserve(a.size());
+    for (auto i = 0u; i < a.size(); i++) tmp.push_back(getFieldTmp(a[i]));
+    return tmp;
+  }
 
 }
