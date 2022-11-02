@@ -305,27 +305,27 @@ namespace quda {
     /**
        @brief Apply Mdag (daggered operator of M)
     */
-    void Mdag(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void Mdag(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
     /**
        @brief Apply Mdag (daggered operator of M)
     */
-    virtual void Mdag(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
+    virtual void Mdag(ColorSpinorField &out, const ColorSpinorField &in) const
     {
-      for (auto i = 0u; i < in.size(); i++) Mdag(out[i], in[i]);
+      Mdag(cvector_ref<ColorSpinorField>{out}, cvector_ref<const ColorSpinorField>{in});
     }
 
     /**
        @brief Apply Normal Operator
     */
-    virtual void MMdag(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MMdag(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
     /**
        @brief Apply Normal Operator
     */
-    virtual void MMdag(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
+    virtual void MMdag(ColorSpinorField &out, const ColorSpinorField &in) const
     {
-      for (auto i = 0u; i < in.size(); i++) MMdag(out[i], in[i]);
+      MMdag(cvector_ref<ColorSpinorField>{out}, cvector_ref<const ColorSpinorField>{in});
     }
 
     // required methods to use e-o preconditioning for solving full system
@@ -1853,7 +1853,7 @@ public:
        @param[in] in Input field
        @param[parity] parity Parity which we are applying the operator to
      */
-    void Clover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const QudaParity parity) const;
+    void Clover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity) const;
 
     /**
        @brief Apply the inverse coarse clover operator
@@ -1861,37 +1861,64 @@ public:
        @param[in] in Input field
        @param[parity] parity Parity which we are applying the operator to
      */
-    void CloverInv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, const QudaParity parity) const;
+    void CloverInv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity) const;
 
     /**
        @brief Apply DslashXpay out = (D * in)
        @param[out] out Output field
        @param[in] in Input field
-       @param[paraity] parity Parity which we are applying the operator to
+       @param[parity] parity Parity which we are applying the operator to
      */
-    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in,
-			const QudaParity parity) const;
+    virtual void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                        QudaParity parity) const;
 
-    void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                const QudaParity parity) const;
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in,
+			const QudaParity parity) const
+    {
+      Dslash(cvector_ref<ColorSpinorField>{out}, cvector_ref<const ColorSpinorField>{in}, parity);
+    }
 
     /**
        @brief Apply DslashXpay out = (D * in + A * x)
        @param[out] out Output field
        @param[in] in Input field
-       @param[paraity] parity Parity which we are applying the operator to
+       @param[parity] parity Parity which we are applying the operator to
+       @param[in] x Auxiliary field
+       @param[in] k scalar multiplier
      */
+    virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const;
+
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-			    const ColorSpinorField &x, const double &k) const;
+			    const ColorSpinorField &x, const double &k) const
+    {
+      DslashXpay(cvector_ref<ColorSpinorField>{out}, cvector_ref<const ColorSpinorField>{in}, parity,
+                 cvector_ref<const ColorSpinorField>{x}, k);
+    }
 
     /**
        @brief Apply the full operator
        @param[out] out output vector, out = M * in
        @param[in] in input vector
      */
-    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
 
-    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const
+    {
+      M(cvector_ref<ColorSpinorField>{out}, cvector_ref<const ColorSpinorField>{in});
+    }
+
+    /**
+       @brief Apply the normal full operator
+       @param[out] out output vector, out = M * in
+       @param[in] in input vector
+     */
+    virtual void MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+    {
+      MdagM(cvector_ref<ColorSpinorField>{out}, cvector_ref<const ColorSpinorField>{in});
+    }
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
@@ -1961,11 +1988,61 @@ public:
 
     virtual ~DiracCoarsePC();
 
-    void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    /**
+       @brief Apply preconditioned Dslash out = (D * in)
+       @param[out] out Output field
+       @param[in] in Input field
+       @param[parity] parity Parity which we are applying the operator to
+     */
+    void Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity) const;
+
+    void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+    {
+      Dslash(cvector_ref<ColorSpinorField>{out}, cvector_ref<const ColorSpinorField>{in}, parity);
+    }
+
+    /**
+       @brief Apply preconditioned DslashXpay out = (x + k * D * in)
+       @param[out] out Output field
+       @param[in] in Input field
+       @param[parity] parity Parity which we are applying the operator to
+       @param[in] x Auxiliary field
+       @param[in] k scalar multiplier
+     */
+    void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity,
+		    cvector_ref<const ColorSpinorField> &x, double k) const;
+
     void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-		    const ColorSpinorField &x, const double &k) const;
-    void M(ColorSpinorField &out, const ColorSpinorField &in) const;
-    void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+		    const ColorSpinorField &x, const double &k) const
+    {
+      DslashXpay(cvector_ref<ColorSpinorField>{out}, cvector_ref<const ColorSpinorField>{in}, parity,
+             cvector_ref<const ColorSpinorField>{x}, k);
+    }
+
+    /**
+       @brief Apply the preconditioned operator
+       @param[out] out output vector, out = M * in
+       @param[in] in input vector
+     */
+    void M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+
+    void M(ColorSpinorField &out, const ColorSpinorField &in) const
+    {
+      M(cvector_ref<ColorSpinorField>{out}, cvector_ref<const ColorSpinorField>{in});
+    }
+
+    /**
+       @brief Apply the preconditioned full operator
+       @param[out] out output vector, out = M * in
+       @param[in] in input vector
+     */
+    void MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const;
+
+    void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+    {
+      MdagM(cvector_ref<ColorSpinorField>{out}, cvector_ref<const ColorSpinorField>{in});
+    }
+
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, ColorSpinorField &b,
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;

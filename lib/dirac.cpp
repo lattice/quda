@@ -64,14 +64,14 @@ namespace quda {
 
 #define flip(x) (x) = ((x) == QUDA_DAG_YES ? QUDA_DAG_NO : QUDA_DAG_YES)
 
-  void Dirac::Mdag(ColorSpinorField &out, const ColorSpinorField &in) const
+  void Dirac::Mdag(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     flip(dagger);
     M(out, in);
     flip(dagger);
   }
 
-  void Dirac::MMdag(ColorSpinorField &out, const ColorSpinorField &in) const
+  void Dirac::MMdag(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
   {
     flip(dagger);
     MdagM(out, in);
