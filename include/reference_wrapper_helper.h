@@ -2,6 +2,8 @@
 
 #include <functional>
 #include <initializer_list>
+#include <enum_quda.h>
+#include <util_quda.h>
 
 namespace quda
 {
@@ -154,6 +156,8 @@ namespace quda
   template <typename T> struct is_initializer_list<std::initializer_list<T>> : std::true_type {};
   template <typename T> static constexpr bool is_initializer_list_v = is_initializer_list<T>::value;
 
+  class ColorSpinorField;
+
   /**
      Derived specializaton of std::vector<std::reference_wrapper<T>>
      which allows us to write generic multi-field functions.
@@ -259,6 +263,24 @@ namespace quda
        @return The underlying object reference
      */
     T& operator[](size_t idx) const { return vector::operator[](idx).get(); }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, vector_ref<T>> Even() const
+    {
+      vector_ref<T> even;
+      even.reserve(vector::size());
+      for (auto i = 0u; i < vector::size(); i++) even.push_back(operator[](i).Even());
+      return even;
+    }
+
+    template <class U = T>
+    std::enable_if_t<std::is_same_v<std::remove_const_t<U>, ColorSpinorField>, vector_ref<T>> Odd() const
+    {
+      vector_ref<T> odd;
+      odd.reserve(vector::size());
+      for (auto i = 0u; i < vector::size(); i++) odd.push_back(operator[](i).Odd());
+      return odd;
+    }
 
   };
 
