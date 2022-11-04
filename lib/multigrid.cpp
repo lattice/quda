@@ -430,7 +430,7 @@ namespace quda
       for (int i = 0; i <= param.level; i++) {
         if ((param.mg_global.coarse_grid_solution_type[i] == QUDA_MATPC_SOLUTION
              && param.mg_global.smoother_solve_type[i] == QUDA_DIRECT_PC_SOLVE)
-            || (param.mg_global.transfer_type[i] == QUDA_TRANSFER_OPTIMIZED_KD)) {
+            || (param.mg_global.transfer_type[i] == QUDA_TRANSFER_OPTIMIZED_KD || param.mg_global.transfer_type[i] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)) {
           diracParam.need_bidirectional = QUDA_BOOLEAN_TRUE;
         }
       }
