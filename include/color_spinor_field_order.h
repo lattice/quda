@@ -612,11 +612,6 @@ namespace quda
       GhostOrder() = default;
       GhostOrder(const ColorSpinorField &, int, void * const *) { }
       GhostOrder &operator=(const GhostOrder &) = default;
-
-      void resetScale(Float) { }
-      void resetGhost(void *const *) const { }
-      void Ghost();
-      constexpr int Nparity() const { return 0; }
     };
 
     template <typename store_t, typename norm_t, bool ghost_fixed, bool block_float_ghost> struct ghost_t {
@@ -660,6 +655,7 @@ namespace quda
         nParity(field.SiteSubset()), ghostAccessor(field, nFace)
       {
         resetGhost(ghost_ ? ghost_ : field.Ghost());
+        resetScale(field.Scale());
       }
 
       GhostOrder &operator=(const GhostOrder &) = default;
@@ -720,6 +716,67 @@ namespace quda
 
       /** Returns the number of field parities (1 or 2) */
       constexpr int Nparity() const { return nParity; }
+
+      /**
+         @brief Wrapper to transform_reduce which is called by the
+         reducer functions, e.g., norm2 and abs_max
+         @tparam reducer The reduction operation we which to apply
+         @param[in] Dimension of the ghost we are concerned with
+         @param[in] location The location of execution
+         @param[in] nParity Number of parities of the field
+         @param[in] volumeCB Checkerboard volume
+         @param[in] h The helper functor which acts as the transformer
+         in transform_reduce
+       */
+      template <typename reducer, typename helper>
+      auto transform_reduce(int dim, QudaFieldLocation location, int nParity, helper h) const
+      {
+        // separate norms for forwards and backwards
+        if constexpr (fixed && block_float_ghost) {
+          errorQuda("Reduction not defined");
+        } else {
+          std::vector<complex<ghostFloat>*> g{ghost[2 * dim + 0], ghost[2 * dim + 1]};
+          std::vector<typename reducer::reduce_t> result(2);
+          ::quda::transform_reduce<reducer>(location, result, g, unsigned(nParity * ghostAccessor.faceVolumeCB[dim] * nSpin * nColor * nVec), h);
+          return result;
+        }
+      }
+
+      /**
+       * Returns the L2 norm squared of the ghost elements in a given dimension
+       * @param[in] field Field instance we use to source some meta data
+       * @param[in] dim Dimension of the ghost we are concerned with
+       * @param[in] global Whether to do a global or process local norm2 reduction
+       * @return L2 norm squared
+       */
+      auto ghost_norm2(const ColorSpinorField &field, int dim, bool global = true) const
+      {
+        commGlobalReductionPush(global);
+        Float scale_inv = 1.0;
+        if constexpr (fixed && !block_float_ghost) scale_inv = ghost.scale_inv;
+        auto nrm2
+          = transform_reduce<plus<double>>(dim, field.Location(), field.SiteSubset(), square_<double, ghostFloat>(scale_inv));
+        commGlobalReductionPop();
+        return nrm2;
+      }
+
+      /**
+       * Returns the Linfinity norm of the field
+       * @param[in] field Field instance we use to source some meta data
+       * @param[in] dim Dimension of the ghost we are concerned with
+       * @param[in] global Whether to do a global or process local norm2 reduction
+       * @return Linfinity norm
+       */
+      auto ghost_abs_max(const ColorSpinorField &field, bool global = true) const
+      {
+        commGlobalReductionPush(global);
+        Float scale_inv = 1.0;
+        if constexpr (fixed && !block_float_ghost) scale_inv = ghost.scale_inv;
+        auto absmax = transform_reduce<maximum<Float>>(field.Location(), field.SiteSubset(),
+                                                       abs_max_<Float, ghostFloat>(scale_inv));
+        commGlobalReductionPop();
+        return absmax;
+      }
     };
 
     template <typename real, typename store_t, bool fixed, bool block_float> struct field {
@@ -741,7 +798,7 @@ namespace quda
 
     template <typename Float, int nSpin_, int nColor_, int nVec, QudaFieldOrder order, typename storeFloat = Float,
               typename ghostFloat = storeFloat, bool disable_ghost = false, bool block_float = false>
-    class FieldOrderCB : GhostOrder<Float, nSpin_, nColor_, nVec, order, storeFloat, ghostFloat, disable_ghost>
+    class FieldOrderCB : public GhostOrder<Float, nSpin_, nColor_, nVec, order, storeFloat, ghostFloat, disable_ghost>
     {
       using GhostOrder = GhostOrder<Float, nSpin_, nColor_, nVec, order, storeFloat, ghostFloat, disable_ghost>;
       using norm_t = float;
@@ -755,9 +812,6 @@ namespace quda
 
       field<Float, storeFloat, fixed, block_float> v;
       unsigned int volumeCB = 0;
-      using GhostOrder::Ghost;
-      using GhostOrder::Nparity;
-      using GhostOrder::resetGhost;
 
     protected:
       using accessor_t = AccessorCB<storeFloat, nSpin, nColor, nVec, order>;
@@ -794,7 +848,6 @@ namespace quda
           v.scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
           v.scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
         }
-        GhostOrder::resetScale(max);
       }
 
       /**
@@ -901,7 +954,8 @@ namespace quda
       }
 
       /**
-       * Returns the L2 norm squared of the field in a given dimension
+       * Returns the L2 norm squared of the field
+       * @param[in] field  Field instance we use to soruce some metadata
        * @param[in] global Whether to do a global or process local norm2 reduction
        * @return L2 norm squared
        */
@@ -918,6 +972,7 @@ namespace quda
 
       /**
        * Returns the Linfinity norm of the field
+       * @param[in] field  Field instance we use to soruce some metadata
        * @param[in] global Whether to do a global or process local Linfinity reduction
        * @return Linfinity norm
        */
