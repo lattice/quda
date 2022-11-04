@@ -63,6 +63,17 @@ namespace quda {
     FieldTmp(const T &a);
 
     /**
+       @brief Copy constructor is deleted to prevent accidental cache
+       bloat
+    */
+    FieldTmp(const FieldTmp<T> &a) = delete;
+
+    /**
+       @brief Move constructor is noexcept to ensure it is used by STL
+     */
+    FieldTmp(FieldTmp<T> &&a) noexcept = default;
+
+    /**
        @brief Push the temporary onto the cache, where it will be
        available for subsequent reuse.
     */
@@ -100,7 +111,7 @@ namespace quda {
   {
     std::vector<FieldTmp<T>> tmp;
     tmp.reserve(a.size());
-    for (auto i = 0u; i < a.size(); i++) tmp.push_back(getFieldTmp(a[i]));
+    for (auto i = 0u; i < a.size(); i++) tmp.push_back(std::move(getFieldTmp(a[i])));
     return tmp;
   }
 

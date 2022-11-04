@@ -22,6 +22,8 @@ namespace quda {
 
   template <typename T> FieldTmp<T>::~FieldTmp()
   {
+    // don't cache the field if it's empty (e.g., has been moved)
+    if (tmp.Bytes() == 0) return;
     auto key = FieldKey(tmp);
     cache[key].push(std::move(tmp));
   }
