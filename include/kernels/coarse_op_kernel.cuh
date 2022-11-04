@@ -94,22 +94,22 @@ namespace quda {
         atomics.  Doing so means that all (modulo the parity) of the
         coarsening for a coarse degree of freedom is handled by a
         single thread block.  For computeVUV only at present. */
-    bool shared_atomic;
+    bool shared_atomic = false;
 
     /** With parity_flip enabled we make parity the slowest running
         dimension in the y-thread axis, and coarse color runs faster.
         This improves read locality at the expense of write
         locality */
-    bool parity_flip;
+    bool parity_flip = false;
 
-    int_fastdiv aggregates_per_block; /** number of aggregates per thread block */
+    int_fastdiv aggregates_per_block = 1; /** number of aggregates per thread block */
     int_fastdiv grid_z; /** this is the coarseColor grid that is wrapped into the x grid when coarse_color_wave is enabled */
     int_fastdiv coarse_color_grid_z; /** constant we ned to divide by */
 
     static constexpr bool compute_max = false;
-    Float *max_h; /** scalar that stores the maximum element on the host */
-    Float *max_d; /** scalar that stores the maximum elenent on the device */
-    Float *max;   /** points to either max_h or max_d, for host or device, respectively */
+    Float *max_h = nullptr; /** scalar that stores the maximum element on the host */
+    Float *max_d = nullptr; /** scalar that stores the maximum elenent on the device */
+    Float *max = nullptr;   /** points to either max_h or max_d, for host or device, respectively */
 
     int dim;           /** which dimension are we working on */
     QudaDirection dir; /** which direction are working on */
@@ -172,8 +172,7 @@ namespace quda {
       kappa(static_cast<Float>(kappa)), mass(static_cast<Float>(mass)), mu(static_cast<Float>(mu)), mu_factor(static_cast<Float>(mu_factor)),
       fineVolumeCB(v.VolumeCB()), coarseVolumeCB(X.VolumeCB()),
       fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
-      bidirectional(bidirectional), shared_atomic(false), parity_flip(false),
-        aggregates_per_block(1), max_h(nullptr), max_d(nullptr), max(nullptr)
+      bidirectional(bidirectional)
     {
       if (v.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
         errorQuda("Gamma basis %d not supported", v.GammaBasis());
