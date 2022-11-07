@@ -98,7 +98,9 @@ namespace quda {
         dim3 grid;
         SharedCache shared_cache;
       };
+#pragma omp declare target
       extern LaunchParam *launch_param;
+#pragma omp end declare target
       extern LaunchParam *launch_param_host;
 
       inline int *get_shared_cache(void)
