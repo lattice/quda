@@ -78,17 +78,6 @@ namespace quda
     return *this;
   }
 
-  static bool are_compatible(ColorSpinorField &a, ColorSpinorField &b)
-  {
-    bool rtn = true;
-    if (a.Precision() != b.Precision() || a.FieldOrder() != b.FieldOrder() || a.SiteSubset() != b.SiteSubset()
-        || a.VolumeCB() != b.VolumeCB() || a.Ncolor() != b.Ncolor() || a.Nspin() != b.Nspin() || a.Nvec() != b.Nvec()
-        || a.TwistFlavor() != b.TwistFlavor())
-      rtn = false;
-
-    return rtn;
-  }
-
   ColorSpinorField &ColorSpinorField::operator=(ColorSpinorField &&src)
   {
     if (&src != this) {
@@ -449,7 +438,7 @@ namespace quda
 
   void ColorSpinorField::copy(const ColorSpinorField &src)
   {
-    checkField(*this, src);
+    test_compatible_weak(*this, src);
     if (Location() == src.Location()) { // H2H and D2D
 
       copyGenericColorSpinor(*this, src, Location());
@@ -700,16 +689,33 @@ namespace quda
     }
   }
 
-  void ColorSpinorField::checkField(const ColorSpinorField &a, const ColorSpinorField &b)
+  bool ColorSpinorField::are_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b)
   {
-    if (a.SiteSubset() != b.SiteSubset())
-      errorQuda("siteSubsets do not match: %d %d\n", a.SiteSubset(), b.SiteSubset());
+    return (a.SiteSubset() == b.SiteSubset() && a.VolumeCB() == b.VolumeCB() && a.Ncolor() == b.Ncolor()
+            && a.Nspin() == b.Nspin() && a.Nvec() == b.Nvec() && a.TwistFlavor() == b.TwistFlavor());
+  }
+
+  bool ColorSpinorField::are_compatible(const ColorSpinorField &a, const ColorSpinorField &b)
+  {
+    return (a.Precision() == b.Precision() && a.FieldOrder() == b.FieldOrder() && are_compatible_weak(a, b));
+  }
+
+  void ColorSpinorField::test_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b)
+  {
+    if (a.SiteSubset() != b.SiteSubset()) errorQuda("siteSubsets do not match: %d %d", a.SiteSubset(), b.SiteSubset());
     if (a.VolumeCB() != b.VolumeCB()) errorQuda("volumes do not match: %lu %lu", a.VolumeCB(), b.VolumeCB());
     if (a.Ncolor() != b.Ncolor()) errorQuda("colors do not match: %d %d", a.Ncolor(), b.Ncolor());
     if (a.Nspin() != b.Nspin()) errorQuda("spins do not match: %d %d", a.Nspin(), b.Nspin());
     if (a.Nvec() != b.Nvec()) errorQuda("nVec does not match: %d %d", a.Nvec(), b.Nvec());
     if (a.TwistFlavor() != b.TwistFlavor())
       errorQuda("twist flavors do not match: %d %d", a.TwistFlavor(), b.TwistFlavor());
+  }
+
+  void ColorSpinorField::test_compatible(const ColorSpinorField &a, const ColorSpinorField &b)
+  {
+    test_compatible_weak(a, b);
+    if (a.Precision() != b.Precision()) errorQuda("precisions do not match: %d %d", a.Precision(), b.Precision());
+    if (a.FieldOrder() != b.FieldOrder()) errorQuda("orders do not match: %d %d", a.FieldOrder(), b.FieldOrder());
   }
 
   const ColorSpinorField &ColorSpinorField::Even() const
@@ -1569,7 +1575,7 @@ namespace quda
   int ColorSpinorField::Compare(const ColorSpinorField &a, const ColorSpinorField &b, const int tol)
   {
     if (checkLocation(a, b) == QUDA_CUDA_FIELD_LOCATION) errorQuda("device field not implemented");
-    checkField(a, b);
+    test_compatible_weak(a, b);
     return genericCompare(a, b, tol);
   }
 

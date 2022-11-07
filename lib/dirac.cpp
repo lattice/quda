@@ -84,7 +84,7 @@ namespace quda {
   {
     if ( (in.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS || out.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS) && 
 	 in.Nspin() == 4) {
-      errorQuda("CUDA Dirac operator requires UKQCD basis, out = %d, in = %d", 
+      errorQuda("Dirac operator requires UKQCD basis, out = %d, in = %d",
 		out.GammaBasis(), in.GammaBasis());
     }
 
@@ -92,9 +92,6 @@ namespace quda {
       errorQuda("ColorSpinorFields are not single parity: in = %d, out = %d", 
 		in.SiteSubset(), out.SiteSubset());
     }
-
-    if (!in.isNative()) errorQuda("Input field is not in native order");
-    if (!out.isNative()) errorQuda("Output field is not in native order");
 
     if (out.Ndim() != 5) {
       if ((out.Volume() != gauge->Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||

@@ -388,8 +388,6 @@ namespace quda
     */
     void fill(ColorSpinorParam &) const;
 
-    static void checkField(const ColorSpinorField &, const ColorSpinorField &);
-
     /**
        @brief Set the vol_string and aux_string for use in tuning
     */
@@ -892,6 +890,39 @@ namespace quda
        covering the range [1e-15,1.0].
      */
     static int Compare(const ColorSpinorField &a, const ColorSpinorField &b, const int resolution = 1);
+
+    /**
+       @brief Check if two instances are compatible
+       @param[in] a Input field
+       @param[in] b Input field
+       @return Return true if two fields are compatible
+     */
+    static bool are_compatible(const ColorSpinorField &a, const ColorSpinorField &b);
+
+    /**
+       @brief Check if two instances are weakly compatible (precision
+       and order can differ)
+       @param[in] a Input field
+       @param[in] b Input field
+       @return Return true if two fields are compatible
+     */
+    static bool are_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b);
+
+    /**
+       @brief Test if two instances are compatible.  Throws an error
+       if test fails.
+       @param[in] a Input field
+       @param[in] b Input field
+     */
+    static void test_compatible(const ColorSpinorField &a, const ColorSpinorField &b);
+
+    /**
+       @brief Test if two instances are weakly compatible (precision
+       and order can differ).  Throws an error if test fails.
+       @param[in] a Input field
+       @param[in] b Input field
+     */
+    static void test_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b);
 
     friend std::ostream &operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
