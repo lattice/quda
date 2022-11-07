@@ -64,6 +64,7 @@ namespace quda
     if (n_kr == 0) errorQuda("n_kr=0 passed to Eigensolver");
     if (n_conv == 0) errorQuda("n_conv=0 passed to Eigensolver");
     if (n_ev_deflate > n_conv) errorQuda("deflation vecs = %d is greater than n_conv = %d", n_ev_deflate, n_conv);
+    if (eig_param->eig_type == QUDA_EIG_BLK_TR_LANCZOS && block_size <= 0) errorQuda("block_size=%d must be positive", block_size);
 
     residua.resize(n_kr, 0.0);
 
@@ -174,10 +175,14 @@ namespace quda
 
   void EigenSolver::checkChebyOpMax(std::vector<ColorSpinorField> &kSpace)
   {
-    if (eig_param->use_poly_acc && eig_param->a_max <= 0.0) {
-      // Use part of the kSpace as temps
-      eig_param->a_max = estimateChebyOpMax(kSpace[block_size + 2], kSpace[block_size + 1]);
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Chebyshev maximum estimate: %e.\n", eig_param->a_max);
+    if (eig_param->use_poly_acc) {
+      if (eig_param->a_max <= 0.0) {
+        // Use part of the kSpace as temps
+        eig_param->a_max = estimateChebyOpMax(kSpace[block_size + 2], kSpace[block_size + 1]);
+        if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Chebyshev maximum estimate: %e.\n", eig_param->a_max);
+      }
+      if (eig_param->a_min >= eig_param->a_max)
+        errorQuda("Invalid a_min = %e a_max = %e combination", eig_param->a_min, eig_param->a_max);
     }
   }
 
