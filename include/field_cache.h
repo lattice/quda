@@ -18,6 +18,8 @@ namespace quda {
     std::string volume; /** volume kstring */
     std::string aux;    /** auxiliary string */
 
+    FieldKey() = default;
+
     /**
        @brief Constructor for FieldKey
        @param[in] a Field whose key we wish to generate
@@ -46,6 +48,7 @@ namespace quda {
   class FieldTmp {
     static std::map<FieldKey<T>, std::stack<T>> cache; /** Field Cache */
     T tmp;                                             /** The temporary field instance */
+    FieldKey<T> key;                                   /** Key associated with this instance */
 
   public:
     /**
@@ -61,6 +64,19 @@ namespace quda {
        @param[in] a Field we wish to create a matching temporary for
     */
     FieldTmp(const T &a);
+
+    /**
+       @brief Create a field temporary that corresponds to the key
+       parameter.  If a matching field is present in the cache, it
+       will be popped from the cache.  If no such temporary exists an
+       error will be thrown.  Note that this constructor allows for a
+       custom key that doesn't necessarily correspond to the key
+       return by FieldKey<T>(const T&).
+       @param[in] key Key corresponding to the field instance we
+       require
+       @param[in] param Parameter structure used to allocated the temporary
+     */
+    FieldTmp(const FieldKey<T> &key, const typename T::param_type &param);
 
     /**
        @brief Copy constructor is deleted to prevent accidental cache
