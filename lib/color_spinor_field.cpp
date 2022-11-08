@@ -783,9 +783,9 @@ namespace quda
       return nullptr;
     } else {
       if (bufferIndex < 2) {
-        return ghost_recv_buffer_d[bufferIndex];
+        return gb.ghost_recv_buffer_d[bufferIndex];
       } else {
-        return ghost_pinned_recv_buffer_hd[bufferIndex % 2];
+        return gb.ghost_pinned_recv_buffer_hd[bufferIndex % 2];
       }
     }
   }
@@ -1003,13 +1003,15 @@ namespace quda
     allocateGhostBuffer(nFace, spin_project); // allocate the ghost buffer if not yet allocated
 
     // ascertain if this instance needs its comms buffers to be updated
-    bool comms_reset = ghost_field_reset || // FIXME add send buffer check
-      (my_face_h[0] != ghost_pinned_send_buffer_h[0]) || (my_face_h[1] != ghost_pinned_send_buffer_h[1])
-      || (from_face_h[0] != ghost_pinned_recv_buffer_h[0]) || (from_face_h[1] != ghost_pinned_recv_buffer_h[1])
-      || (my_face_d[0] != ghost_send_buffer_d[0]) || (my_face_d[1] != ghost_send_buffer_d[1]) ||  // send buffers
-      (from_face_d[0] != ghost_recv_buffer_d[0]) || (from_face_d[1] != ghost_recv_buffer_d[1]) || // receive buffers
-      ghost_precision_reset; // ghost_precision has changed
+    bool comms_reset = gb.ghost_field_reset || // FIXME add send buffer check
 
+      (my_face_h[0] != gb.ghost_pinned_send_buffer_h[0]) || (my_face_h[1] != gb.ghost_pinned_send_buffer_h[1])
+      || (from_face_h[0] != gb.ghost_pinned_recv_buffer_h[0]) || (from_face_h[1] != gb.ghost_pinned_recv_buffer_h[1])
+      || (my_face_d[0] != gb.ghost_send_buffer_d[0]) || (my_face_d[1] != gb.ghost_send_buffer_d[1]) || // send buffers
+      (from_face_d[0] != gb.ghost_recv_buffer_d[0]) || (from_face_d[1] != gb.ghost_recv_buffer_d[1])
+      ||                     // receive buffers
+      ghost_precision_reset; // ghost_precision has changed
+      
     if (!initComms || comms_reset) {
 
       LatticeField::createComms();
@@ -1018,7 +1020,7 @@ namespace quda
       for (int i = 0; i < nDimComms; ++i) {
         if (commDimPartitioned(i)) {
           for (int b = 0; b < 2; b++) {
-            ghost[b][i] = static_cast<char *>(ghost_recv_buffer_d[b]) + ghost_offset[i][0];
+            ghost[b][i] = static_cast<char *>(gb.ghost_recv_buffer_d[b]) + ghost_offset[i][0];
           }
         }
       }
@@ -1026,7 +1028,7 @@ namespace quda
       ghost_precision_reset = false;
     }
 
-    if (ghost_field_reset) destroyIPCComms();
+    if (gb.ghost_field_reset) destroyIPCComms();
     createIPCComms();
   }
 
@@ -1050,19 +1052,19 @@ namespace quda
           // this is the remote buffer when using shmem ...
           // if the ghost_remote_send_buffer_d exists we can directly use it
           // - else we need pack locally and send data to the recv buffer
-          packBuffer[2 * dim + dir] = ghost_remote_send_buffer_d[bufferIndex][dim][dir] != nullptr ?
-            static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir] :
+          packBuffer[2 * dim + dir] = gb.ghost_remote_send_buffer_d[bufferIndex][dim][dir] != nullptr ?
+            static_cast<char *>(gb.ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir] :
             my_face_dim_dir_d[bufferIndex][dim][dir];
-          packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = ghost_remote_send_buffer_d[bufferIndex][dim][dir] != nullptr ?
+          packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = gb.ghost_remote_send_buffer_d[bufferIndex][dim][dir] != nullptr ?
             nullptr :
-            static_cast<char *>(ghost_recv_buffer_d[bufferIndex]) + ghost_offset[dim][1 - dir];
+            static_cast<char *>(gb.ghost_recv_buffer_d[bufferIndex]) + ghost_offset[dim][1 - dir];
           break;
         case Host: // pack to zero-copy memory
           packBuffer[2 * dim + dir] = my_face_dim_dir_hd[bufferIndex][dim][dir];
           break;
         case Remote: // pack to remote peer memory
           packBuffer[2 * dim + dir]
-            = static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir];
+            = static_cast<char *>(gb.ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir];
           break;
         default: errorQuda("Undefined location %d", location[2 * dim + dir]);
         }
@@ -1102,7 +1104,7 @@ namespace quda
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
     const void *src = ghost_spinor;
     auto offset = (dir == QUDA_BACKWARDS) ? ghost_offset[dim][0] : ghost_offset[dim][1];
-    void *ghost_dst = static_cast<char *>(ghost_recv_buffer_d[bufferIndex]) + offset;
+    void *ghost_dst = static_cast<char *>(gb.ghost_recv_buffer_d[bufferIndex]) + offset;
 
     qudaMemcpyAsync(ghost_dst, src, ghost_face_bytes[dim], qudaMemcpyHostToDevice, stream);
   }
@@ -1137,7 +1139,7 @@ namespace quda
     if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
     if (comm_peer2peer_enabled(1 - dir, dim)) {
-      comm_start(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+      comm_start(gb.mh_recv_p2p[bufferIndex][dim][1 - dir]);
     } else if (gdr) {
       comm_start(mh_recv_rdma[bufferIndex][dim][1 - dir]);
     } else {
@@ -1167,15 +1169,15 @@ namespace quda
       if (!remote_write) {
         // all goes here
         void *ghost_dst
-          = static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][(dir + 1) % 2];
+          = static_cast<char *>(gb.ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][(dir + 1) % 2];
 
         qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
       } // remote_write
 
         // record the event
-      qudaEventRecord(ipcCopyEvent[bufferIndex][dim][dir], stream);
+      qudaEventRecord(gb.ipcCopyEvent[bufferIndex][dim][dir], stream);
       // send to the processor in the -1 direction
-      comm_start(mh_send_p2p[bufferIndex][dim][dir]);
+      comm_start(gb.mh_send_p2p[bufferIndex][dim][dir]);
     }
   }
 
@@ -1202,7 +1204,7 @@ namespace quda
 
     // first query send to backwards
     if (comm_peer2peer_enabled(dir, dim)) {
-      if (!complete_send[dim][dir]) complete_send[dim][dir] = comm_query(mh_send_p2p[bufferIndex][dim][dir]);
+      if (!complete_send[dim][dir]) complete_send[dim][dir] = comm_query(gb.mh_send_p2p[bufferIndex][dim][dir]);
     } else if (gdr_send) {
       if (!complete_send[dim][dir]) complete_send[dim][dir] = comm_query(mh_send_rdma[bufferIndex][dim][dir]);
     } else {
@@ -1212,7 +1214,7 @@ namespace quda
     // second query receive from forwards
     if (comm_peer2peer_enabled(1 - dir, dim)) {
       if (!complete_recv[dim][1 - dir])
-        complete_recv[dim][1 - dir] = comm_query(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+        complete_recv[dim][1 - dir] = comm_query(gb.mh_recv_p2p[bufferIndex][dim][1 - dir]);
     } else if (gdr_recv) {
       if (!complete_recv[dim][1 - dir])
         complete_recv[dim][1 - dir] = comm_query(mh_recv_rdma[bufferIndex][dim][1 - dir]);
@@ -1243,8 +1245,8 @@ namespace quda
 
     // first wait on send to "dir"
     if (comm_peer2peer_enabled(dir, dim)) {
-      comm_wait(mh_send_p2p[bufferIndex][dim][dir]);
-      qudaEventSynchronize(ipcCopyEvent[bufferIndex][dim][dir]);
+      comm_wait(gb.mh_send_p2p[bufferIndex][dim][dir]);
+      qudaEventSynchronize(gb.ipcCopyEvent[bufferIndex][dim][dir]);
     } else if (gdr_send) {
       comm_wait(mh_send_rdma[bufferIndex][dim][dir]);
     } else {
@@ -1253,8 +1255,8 @@ namespace quda
 
     // second wait on receive from "1 - dir"
     if (comm_peer2peer_enabled(1 - dir, dim)) {
-      comm_wait(mh_recv_p2p[bufferIndex][dim][1 - dir]);
-      qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][dim][1 - dir]);
+      comm_wait(gb.mh_recv_p2p[bufferIndex][dim][1 - dir]);
+      qudaEventSynchronize(gb.ipcRemoteCopyEvent[bufferIndex][dim][1 - dir]);
     } else if (gdr_recv) {
       comm_wait(mh_recv_rdma[bufferIndex][dim][1 - dir]);
     } else {
@@ -1395,7 +1397,7 @@ namespace quda
               }
             }
           } else if (total_bytes && !pack_host) {
-            qudaMemcpyAsync(my_face_h[bufferIndex], ghost_send_buffer_d[bufferIndex], total_bytes,
+            qudaMemcpyAsync(my_face_h[bufferIndex], gb.ghost_send_buffer_d[bufferIndex], total_bytes,
                             qudaMemcpyDeviceToHost, device::get_default_stream());
           }
         }
@@ -1433,7 +1435,7 @@ namespace quda
                 if (comms_complete[2 * dim + dir]) {
                   comms_done++;
                   if (comm_peer2peer_enabled(1 - dir, dim))
-                    qudaStreamWaitEvent(device::get_default_stream(), ipcRemoteCopyEvent[bufferIndex][dim][1 - dir], 0);
+                    qudaStreamWaitEvent(device::get_default_stream(), gb.ipcRemoteCopyEvent[bufferIndex][dim][1 - dir], 0);
                 }
               }
             }
@@ -1460,7 +1462,7 @@ namespace quda
               }
             }
           } else if (total_bytes && !halo_host) {
-            qudaMemcpyAsync(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes,
+            qudaMemcpyAsync(gb.ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes,
                             qudaMemcpyHostToDevice, device::get_default_stream());
           }
         }
@@ -1470,7 +1472,7 @@ namespace quda
           if (!comm_dim_partitioned(dim)) continue;
           for (int dir = 0; dir < 2; dir++) {
             if (comm_peer2peer_enabled(dir, dim))
-              qudaStreamWaitEvent(device::get_default_stream(), ipcCopyEvent[bufferIndex][dim][dir], 0);
+              qudaStreamWaitEvent(device::get_default_stream(), gb.ipcCopyEvent[bufferIndex][dim][dir], 0);
           }
         }
       } else {
@@ -1481,13 +1483,13 @@ namespace quda
           for (int dir = 0; dir < 2; dir++) {
             switch (pack_destination[2 * dim + dir]) {
             case Shmem: {
-              bool intranode = ghost_remote_send_buffer_d[bufferIndex][dim][dir] != nullptr;
+              bool intranode = gb.ghost_remote_send_buffer_d[bufferIndex][dim][dir] != nullptr;
               packBuffer[2 * dim + dir] = intranode ?
-                static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir] :
+                static_cast<char *>(gb.ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir] :
                 my_face_dim_dir_d[bufferIndex][dim][dir];
               packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = intranode ?
                 nullptr :
-                static_cast<char *>(ghost_recv_buffer_d[bufferIndex]) + ghost_offset[dim][1 - dir];
+                static_cast<char *>(gb.ghost_recv_buffer_d[bufferIndex]) + ghost_offset[dim][1 - dir];
               ghost_buf[2 * dim + dir] = from_face_dim_dir_d[bufferIndex][dim][dir];
             } break;
             case Host:

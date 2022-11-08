@@ -33,7 +33,7 @@ set (QUDA_OBJS
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu
-  gauge_covdev.cpp dirac.cpp
+  gauge_covdev.cpp dirac.cpp ghost_buffer.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
   extract_gauge_ghost_mg.cu max_gauge.cu gauge_update_quda.cu
@@ -204,7 +204,9 @@ target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pa
 
 include(CheckLinkerFlag)
 check_linker_flag(CXX "-Wl,--compress-debug-sections=zlib" QUDA_LINKER_COMPRESS)
-target_link_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_LINKER_COMPRESS}:-Wl,--compress-debug-sections=zlib>>)
+if(NOT QUDA_BACKWARDS)
+  target_link_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_LINKER_COMPRESS}:-Wl,--compress-debug-sections=zlib>>)
+endif()
 
 # set up QUDA compile options, put them before target specific options
 target_compile_options(
@@ -224,7 +226,7 @@ target_link_libraries(quda PRIVATE $<BUILD_INTERFACE:Eigen>)
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
                                        $<INSTALL_INTERFACE:include/>)
 
-target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include> $<INSTALL_INTERFACE:include>)
+target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/../include> $<INSTALL_INTERFACE:include>)
 
 target_include_directories(quda_cpp SYSTEM PRIVATE ../include/externals)
 

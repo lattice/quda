@@ -145,9 +145,9 @@ namespace quda {
 
       size_t offset = 0;
       for (int d=0; d<nDim; d++) {
-        recv_d[d] = static_cast<char *>(ghost_recv_buffer_d[bufferIndex]) + offset;
+        recv_d[d] = static_cast<char *>(gb.ghost_recv_buffer_d[bufferIndex]) + offset;
         if (bidir) offset += ghost_face_bytes_aligned[d];
-        send_d[d] = static_cast<char *>(ghost_send_buffer_d[bufferIndex]) + offset;
+        send_d[d] = static_cast<char *>(gb.ghost_send_buffer_d[bufferIndex]) + offset;
         offset += ghost_face_bytes_aligned[d];
       }
 
@@ -235,10 +235,10 @@ namespace quda {
       size_t offset = 0;
       for (int d=0; d<nDim; d++) {
 	// send backwards is first half of each ghost_send_buffer
-        send_d[d] = static_cast<char *>(ghost_send_buffer_d[bufferIndex]) + offset;
+        send_d[d] = static_cast<char *>(gb.ghost_send_buffer_d[bufferIndex]) + offset;
         if (bidir) offset += ghost_face_bytes_aligned[d];
         // receive from forwards is the second half of each ghost_recv_buffer
-        recv_d[d] = static_cast<char *>(ghost_recv_buffer_d[bufferIndex]) + offset;
+        recv_d[d] = static_cast<char *>(gb.ghost_recv_buffer_d[bufferIndex]) + offset;
         offset += ghost_face_bytes_aligned[d];
       }
 
@@ -310,14 +310,14 @@ namespace quda {
     allocateGhostBuffer(R, no_comms_fill, bidir); // allocate the ghost buffer if not yet allocated
 
     // ascertain if this instance needs it comms buffers to be updated
-    bool comms_reset = ghost_field_reset || // FIXME add send buffer check
-      (my_face_h[0] != ghost_pinned_send_buffer_h[0]) || (my_face_h[1] != ghost_pinned_send_buffer_h[1]) ||
-      (from_face_h[0] != ghost_pinned_recv_buffer_h[0]) || (from_face_h[1] != ghost_pinned_recv_buffer_h[1]) ||
+    bool comms_reset = gb.ghost_field_reset || // FIXME add send buffer check
+      (my_face_h[0] != gb.ghost_pinned_send_buffer_h[0]) || (my_face_h[1] != gb.ghost_pinned_send_buffer_h[1]) ||
+      (from_face_h[0] != gb.ghost_pinned_recv_buffer_h[0]) || (from_face_h[1] != gb.ghost_pinned_recv_buffer_h[1]) ||
       ghost_bytes != ghost_bytes_old; // ghost buffer has been resized (e.g., bidir to unidir)
 
     if (!initComms || comms_reset) LatticeField::createComms(no_comms_fill);
 
-    if (ghost_field_reset) destroyIPCComms();
+    if (gb.ghost_field_reset) destroyIPCComms();
     createIPCComms();
   }
 
@@ -327,7 +327,7 @@ namespace quda {
 
     // receive from neighboring the processor
     if (comm_peer2peer_enabled(1 - dir, dim)) {
-      comm_start(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+      comm_start(gb.mh_recv_p2p[bufferIndex][dim][1 - dir]);
     } else if (comm_gdr_enabled()) {
       comm_start(mh_recv_rdma[bufferIndex][dim][1 - dir]);
     } else {
@@ -348,14 +348,14 @@ namespace quda {
     } else { // doing peer-to-peer
 
       void *ghost_dst
-        = static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][(dir + 1) % 2];
+        = static_cast<char *>(gb.ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][(dir + 1) % 2];
 
       qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
 
       // record the event
-      qudaEventRecord(ipcCopyEvent[bufferIndex][dim][dir], stream);
+      qudaEventRecord(gb.ipcCopyEvent[bufferIndex][dim][dir], stream);
       // send to the neighboring processor
-      comm_start(mh_send_p2p[bufferIndex][dim][dir]);
+      comm_start(gb.mh_send_p2p[bufferIndex][dim][dir]);
     }
   }
 
@@ -364,8 +364,8 @@ namespace quda {
     if (!comm_dim_partitioned(dim)) return;
 
     if (comm_peer2peer_enabled(1 - dir, dim)) {
-      comm_wait(mh_recv_p2p[bufferIndex][dim][1 - dir]);
-      qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][dim][1 - dir]);
+      comm_wait(gb.mh_recv_p2p[bufferIndex][dim][1 - dir]);
+      qudaEventSynchronize(gb.ipcRemoteCopyEvent[bufferIndex][dim][1 - dir]);
     } else if (comm_gdr_enabled()) {
       comm_wait(mh_recv_rdma[bufferIndex][dim][1 - dir]);
     } else {
@@ -373,8 +373,8 @@ namespace quda {
     }
 
     if (comm_peer2peer_enabled(dir, dim)) {
-      comm_wait(mh_send_p2p[bufferIndex][dim][dir]);
-      qudaEventSynchronize(ipcCopyEvent[bufferIndex][dim][dir]);
+      comm_wait(gb.mh_send_p2p[bufferIndex][dim][dir]);
+      qudaEventSynchronize(gb.ipcCopyEvent[bufferIndex][dim][dir]);
     } else if (comm_gdr_enabled()) {
       comm_wait(mh_send_rdma[bufferIndex][dim][dir]);
     } else {
@@ -392,8 +392,8 @@ namespace quda {
     size_t offset = 0;
     for (int dim=0; dim<nDim; dim++) {
       if ( !(comm_dim_partitioned(dim) || (no_comms_fill && R[dim])) ) continue;
-      send_d[dim] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
-      recv_d[dim] = static_cast<char*>(ghost_recv_buffer_d[b]) + offset;
+      send_d[dim] = static_cast<char*>(gb.ghost_send_buffer_d[b]) + offset;
+      recv_d[dim] = static_cast<char*>(gb.ghost_recv_buffer_d[b]) + offset;
 
       // silence cuda-memcheck initcheck errors that arise since we
       // have an oversized ghost buffer when doing the extended exchange

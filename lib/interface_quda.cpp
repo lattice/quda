@@ -1388,6 +1388,7 @@ void endQuda(void)
 
   LatticeField::freeGhostBuffer();
   ColorSpinorField::freeGhostBuffer();
+  GhostBuffer::free();
 
   blas_lapack::generic::destroy();
   blas_lapack::native::destroy();
