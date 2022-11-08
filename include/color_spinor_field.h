@@ -27,7 +27,7 @@ namespace quda
     template <> constexpr auto getNative<short, 2>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_FP_MG); }
     template <> constexpr auto getNative<int8_t, 2>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_FP_MG); }
 
-    template <typename T> constexpr auto getNative(int nSpin) { return QUDA_INVALID_FIELD_ORDER; }
+    template <typename T> constexpr auto getNative(int) { return QUDA_INVALID_FIELD_ORDER; }
 
     template <> constexpr auto getNative<double>(int nSpin)
     {
