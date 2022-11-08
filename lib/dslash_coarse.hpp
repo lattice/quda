@@ -708,7 +708,7 @@ namespace quda {
       strcpy(aux, "policy,");
       if (dslash.dslash) strcat(aux, "dslash");
       strcat(aux, dslash.clover ? "clover," : ",");
-      strcat(aux, dslash.inA[0].AuxString());
+      strcat(aux, dslash.inA[0].AuxString().c_str());
       strcat(aux, ",gauge_prec=");
 
       char prec_str[8];
@@ -782,7 +782,7 @@ namespace quda {
    }
 
    TuneKey tuneKey() const {
-     return TuneKey(dslash.inA[0].VolString(), typeid(*this).name(), aux);
+     return TuneKey(dslash.inA[0].VolString().c_str(), typeid(*this).name(), aux);
    }
 
    long long flops() const {

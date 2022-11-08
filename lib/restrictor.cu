@@ -35,9 +35,9 @@ namespace quda {
       parity(parity)
     {
       strcat(vol, ",");
-      strcat(vol, out.VolString());
+      strcat(vol, out.VolString().c_str());
       strcat(aux, ",");
-      strcat(aux, out.AuxString());
+      strcat(aux, out.AuxString().c_str());
 
       apply(device::get_default_stream());
     }

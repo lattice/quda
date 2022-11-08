@@ -25,9 +25,9 @@ namespace quda {
       parity(parity)
     {
       strcat(vol, ",");
-      strcat(vol, coarseColorSpinorField<transferType>(in,out).VolString());
+      strcat(vol, coarseColorSpinorField<transferType>(in,out).VolString().c_str());
       strcat(aux, ",");
-      strcat(aux, coarseColorSpinorField<transferType>(in,out).AuxString());
+      strcat(aux, coarseColorSpinorField<transferType>(in,out).AuxString().c_str());
 
       apply(device::get_default_stream());
     }

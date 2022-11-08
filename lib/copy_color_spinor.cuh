@@ -27,7 +27,7 @@ namespace quda {
       out(out),
       in(in)
     {
-      strcat(aux, out.AuxString());
+      strcat(aux, out.AuxString().c_str());
       if (out.GammaBasis()==in.GammaBasis()) strcat(aux, ",PreserveBasis");
       else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) strcat(aux, ",NonRelBasis");
       else if (out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) strcat(aux, ",RelBasis");
