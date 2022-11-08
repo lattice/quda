@@ -11,7 +11,11 @@
 
 // temporary addition until multi-RHS for all Dirac operator functions
 #ifdef __CUDACC__
+#ifdef __NVCC_DIAG_PRAGMA_SUPPORT__
 #pragma nv_diag_suppress 611
+#else
+#pragma diag_suppress 611
+#endif
 #endif
 
 namespace quda {
