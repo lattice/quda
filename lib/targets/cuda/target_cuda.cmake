@@ -213,6 +213,13 @@ target_compile_options(
           $<$<CONFIG:SANITIZE>:-lineinfo>
           >)
 
+if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "11.3")
+target_compile_options(
+  quda
+  PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
+          -diag-suppress 607>)
+endif()
+
 target_compile_options(
   quda 
   PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:

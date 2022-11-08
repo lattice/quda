@@ -199,7 +199,6 @@ namespace quda {
       for(int d = thread_dim; d < Arg::nDim; d += Arg::dim_stride)
 	{
 	const int back_idx = linkIndexM1(coord, arg.dim, d);
-	const int gauge_idx = back_idx;
 	if (arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
 	  if constexpr (doHalo<Arg::type>()) {
             const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
@@ -222,6 +221,7 @@ namespace quda {
 	    }
 	  }
 	} else if constexpr (doBulk<Arg::type>()) {
+          const int gauge_idx = back_idx;
 #pragma unroll
 	  for(int color_local = 0; color_local < Mc; color_local++) {
 	    int c_row = color_block + color_local;
