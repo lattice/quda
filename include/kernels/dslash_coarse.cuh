@@ -61,7 +61,7 @@ namespace quda {
 
     DslashCoarseArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                     cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
-                    real kappa, int parity, ColorSpinorField &halo) :
+                    real kappa, int parity, const ColorSpinorField &halo) :
       kernel_param(dim3(color_stride * X.VolumeCB(), out[0].SiteSubset() * out.size(),
                         2 * dim_stride * 2 * (nColor / colors_per_thread(nColor, dim_stride)))),
       n_src(out.size()),

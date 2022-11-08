@@ -4,6 +4,8 @@
 
 #include <color_spinor_field.h>
 #include <dslash_quda.h>
+#include <field_cache.h>
+#include <uint_to_char.h>
 
 static bool zeroCopy = false;
 
@@ -833,7 +835,7 @@ namespace quda
     if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] = savey0;
   }
 
-  ColorSpinorField ColorSpinorField::create_comms_batch(cvector_ref<const ColorSpinorField> &v)
+  FieldTmp<ColorSpinorField> ColorSpinorField::create_comms_batch(cvector_ref<const ColorSpinorField> &v)
   {
     // first create a dummy ndim+1 field
     if (v[0].Ndim() == 5) errorQuda("Cannot batch together 5-d fields");
@@ -841,7 +843,17 @@ namespace quda
     param.nDim++;
     param.x[param.nDim-1] = v.size();
     param.create = QUDA_GHOST_FIELD_CREATE;
-    return ColorSpinorField(param);
+
+    // we use a custom cache key for ghost-only fields
+    FieldKey<ColorSpinorField> key;
+    key.volume = v[0].VolString();
+    key.aux = v[0].AuxString();
+    char aux[32];
+    strcpy(aux, ",ghost_batch=");
+    u32toa(aux + 13, v.size());
+    key.aux += aux;
+
+    return FieldTmp<ColorSpinorField>(key, param);
   }
 
   ColorSpinorField ColorSpinorField::create_alias(const ColorSpinorParam &param_)

@@ -4,7 +4,7 @@
 #include <quda_internal.h>
 #include <quda.h>
 #include <lattice_field.h>
-
+#include <field_cache.h>
 #include <comm_key.h>
 
 namespace quda
@@ -780,7 +780,7 @@ namespace quda
       @param[in] v Vector of fields we which to batch together
       @return Dummy (nDim+1)-dimensional field
      */
-    static ColorSpinorField create_comms_batch(cvector_ref<const ColorSpinorField> &v);
+    static FieldTmp<ColorSpinorField> create_comms_batch(cvector_ref<const ColorSpinorField> &v);
 
     /**
        @brief Create a field that aliases this field's storage.  The

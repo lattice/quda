@@ -7,6 +7,7 @@
 #include <shmem_helper.cuh>
 #include <dslash_quda.h>
 #include <dslash_shmem.h>
+#include <multigrid.h>
 
 namespace quda {
 
@@ -25,7 +26,7 @@ namespace quda {
     const int parity;
     const int nParity;
     const int nSrc;
-    ColorSpinorField &halo;
+    const ColorSpinorField &halo;
 
     const int max_color_col_stride = 8;
     mutable int color_col_stride;
@@ -137,7 +138,7 @@ namespace quda {
     DslashCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                  cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y,
                  const GaugeField &X, double kappa, int parity, MemoryLocation *halo_location,
-                 ColorSpinorField &halo) :
+                 const ColorSpinorField &halo) :
       TunableKernel3D(out[0], out[0].SiteSubset() * out.size(), 1),
       out(out),
       inA(inA),
@@ -249,7 +250,7 @@ namespace quda {
   template <typename Float, typename yFloat, typename ghostFloat, bool dagger, int coarseColor, int coarseSpin>
   inline void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA, cvector_ref<const ColorSpinorField> &inB,
                           const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash, bool clover,
-                          DslashType type, MemoryLocation *halo_location, ColorSpinorField &halo)
+                          DslashType type, MemoryLocation *halo_location, const ColorSpinorField &halo)
   {
     if (dslash) {
       if (clover) {
@@ -309,7 +310,7 @@ namespace quda {
   template <typename Float, typename yFloat, typename ghostFloat, bool dagger>
   inline void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA, cvector_ref<const ColorSpinorField> &inB,
 			  const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash,
-			  bool clover, DslashType type, MemoryLocation *halo_location, ColorSpinorField &halo)
+			  bool clover, DslashType type, MemoryLocation *halo_location, const ColorSpinorField &halo)
   {
     if (Y.FieldOrder() != X.FieldOrder())
       errorQuda("Field order mismatch Y = %d, X = %d", Y.FieldOrder(), X.FieldOrder());
@@ -369,6 +370,7 @@ namespace quda {
     cvector_ref<ColorSpinorField> &out;
     cvector_ref<const ColorSpinorField> &inA;
     cvector_ref<const ColorSpinorField> &inB;
+    const ColorSpinorField &halo;
     const GaugeField &Y;
     const GaugeField &X;
     double kappa;
@@ -380,9 +382,10 @@ namespace quda {
     static constexpr bool enable_coarse_shmem_overlap() { return false; }
 
     DslashCoarseLaunch(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
-                       cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
+                       cvector_ref<const ColorSpinorField> &inB, const ColorSpinorField &halo,
+                       const GaugeField &Y, const GaugeField &X,
                        double kappa, int parity, bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision)
-      : out(out), inA(inA), inB(inB), Y(Y), X(X), kappa(kappa), parity(parity),
+      : out(out), inA(inA), inB(inB), halo(halo), Y(Y), X(X), kappa(kappa), parity(parity),
 	dslash(dslash), clover(clover), commDim(commDim),
         halo_precision(halo_precision == QUDA_INVALID_PRECISION ? Y.Precision() : halo_precision) { }
 
@@ -399,9 +402,6 @@ namespace quda {
 
       // check all locations match
       checkLocation(out[0], inA[0], inB[0], Y, X);
-
-      // create a halo ndim+1 field for batched comms
-      auto halo = ColorSpinorField::create_comms_batch(inA);
 
       int comm_sum = 4;
       if (commDim) for (int i=0; i<4; i++) comm_sum -= (1-commDim[i]);
