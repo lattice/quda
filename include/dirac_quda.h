@@ -241,9 +241,8 @@ namespace quda {
     /**
        @brief Xpay version of Dslash
     */
-    virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<ColorSpinorField> &in,
-			    const QudaParity parity, cvector_ref<const ColorSpinorField> &x,
-			    const double &k) const
+    virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
+			    QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
     {
       for (auto i = 0u; i < in.size(); i++) DslashXpay(out[i], in[i], parity, x[i], k);
     }

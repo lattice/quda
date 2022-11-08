@@ -851,20 +851,20 @@ namespace quda {
         if (arg.bidirectional && (type == COMPUTE_VUV || type == COMPUTE_VLV)) strcat(Aux,",bidirectional");
       }
 
-      const char *vol_str = (type == COMPUTE_REVERSE_Y || type == COMPUTE_DIAGONAL || type == COMPUTE_STAGGEREDMASS || type == COMPUTE_TMDIAGONAL ||
-                             type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) ? X.VolString().c_str() : V.VolString().c_str();
+      auto vol_str = (type == COMPUTE_REVERSE_Y || type == COMPUTE_DIAGONAL || type == COMPUTE_STAGGEREDMASS || type == COMPUTE_TMDIAGONAL ||
+                      type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) ? X.VolString() : V.VolString();
 
       if (type == COMPUTE_VUV || type == COMPUTE_VLV || type == COMPUTE_COARSE_CLOVER) {
 	strcat(Aux, (location == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_MAPPED) ? ",GPU-mapped," :
                location == QUDA_CUDA_FIELD_LOCATION ? ",GPU-device," : ",CPU,");
 	strcat(Aux,"coarse_vol=");
-	strcat(Aux,X.VolString().c_str());
+	strcat(Aux, X.VolString().c_str());
       } else {
 	strcat(Aux, (location == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_MAPPED) ? ",GPU-mapped" :
                location == QUDA_CUDA_FIELD_LOCATION ? ",GPU-device" : ",CPU");
       }
 
-      return TuneKey(vol_str, typeid(*this).name(), Aux);
+      return TuneKey(vol_str.c_str(), typeid(*this).name(), Aux);
     }
 
     void preTune() override
