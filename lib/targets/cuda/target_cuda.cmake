@@ -213,6 +213,14 @@ target_compile_options(
           $<$<CONFIG:SANITIZE>:-lineinfo>
           >)
 
+# older gcc throws false warnings so disable these
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11.0)
+    target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CUDA,NVIDIA>: -Wno-unused-but-set-parameter>)
+  endif()
+endif()
+
+# older nvcc throws false warnings with respect to constexpr if code removal
 if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "11.3")
 target_compile_options(
   quda
