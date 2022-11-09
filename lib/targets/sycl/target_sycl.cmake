@@ -78,7 +78,7 @@ mark_as_advanced(CMAKE_CXX_FLAGS_RELEASE)
 mark_as_advanced(CMAKE_CXX_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_CXX_FLAGS_HOSTDEBUG)
 mark_as_advanced(CMAKE_CXX_FLAGS_SANITIZE)
-message(STATUS "Sycl compiler is " ${CMAKE_CXX_COMPILER})
+message(STATUS "SYCL compiler is " ${CMAKE_CXX_COMPILER})
 message(STATUS "Compiler ID is " ${CMAKE_CXX_COMPILER_ID})
 
 # ######################################################################################################################
@@ -98,82 +98,46 @@ set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-SYCL")
 
 # ######################################################################################################################
 # sycl specific compile options
-#target_compile_options(quda PRIVATE $<$<CXX_COMPILER_ID:Clang>:-DClang>)
-#target_compile_options(quda PRIVATE $<$<CXX_COMPILER_ID:IntelLLVM>:-DIntelLLVM>)
 
-target_compile_options(quda PRIVATE -fsycl)
-target_compile_options(quda PRIVATE -mllvm -pragma-unroll-threshold=16)
-if(${CMAKE_CXX_COMPILER_ID} MATCHES "IntelLLVM")
+if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xClang" OR
+   "x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xIntelLLVM")
   #target_compile_options(quda INTERFACE -fhonor-nan-compares)
-  target_compile_options(quda PRIVATE -fhonor-nan-compares)
+  #target_compile_options(quda PRIVATE -fhonor-nan-compares)
   target_compile_options(quda PUBLIC -fhonor-nan-compares)
+  target_compile_options(quda PUBLIC -Wno-tautological-constant-compare)
+  target_compile_options(quda PRIVATE -Wno-division-by-zero)
+  target_compile_options(quda PRIVATE -Wno-sign-compare)
+  target_compile_options(quda PRIVATE -Wno-pass-failed)
+  target_compile_options(quda PRIVATE -Wno-unused-parameter)
+  #target_compile_options(quda PRIVATE -Wno-unused-but-set-variable)
+  #target_compile_options(quda PRIVATE -Wno-error)
+  #target_compile_options(quda INTERFACE -fsycl)
+  #target_compile_options(quda PRIVATE -fsycl)
+  target_compile_options(quda PUBLIC -fsycl)
+
+  set(SYCL_FLAGS "-mllvm -pragma-unroll-threshold=16")
+
+  set(SYCL_LINK_FLAGS -fsycl -fsycl-device-code-split=per_kernel)
 endif()
 
-target_compile_options(quda PUBLIC -Wno-tautological-constant-compare)
+if(DEFINED ENV{SYCL_FLAGS})
+  set(SYCL_FLAGS $ENV{SYCL_FLAGS})
+endif()
 
-target_compile_options(quda PRIVATE -Wno-division-by-zero)
-target_compile_options(quda PRIVATE -Wno-sign-compare)
-target_compile_options(quda PRIVATE -Wno-pass-failed)
-target_compile_options(quda PRIVATE -Wno-unused-parameter)
-#target_compile_options(quda PRIVATE -Wno-unused-but-set-variable)
-#target_compile_options(quda PRIVATE -Wno-error)
-
-target_link_options(quda INTERFACE -fsycl-device-code-split=per_kernel)
-
-set(SYCL_MKL_LIBRARY "-lmkl_sycl -lmkl_intel_ilp64 -lmkl_core -lmkl_tbb_thread")
-
-#target_link_options(quda PUBLIC $<$<SYCL_COMPILER_ID:Clang>: --sycl-path=${SYCLToolkit_TARGET_DIR}>)
-
-#if(QUDA_VERBOSE_BUILD)
-#  target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:SYCL,NVIDIA>:--ptxas-options=-v>)
-#endif(QUDA_VERBOSE_BUILD)
-
-#if(${CMAKE_SYCL_COMPILER_ID} MATCHES "NVHPC" AND NOT ${CMAKE_BUILD_TYPE} MATCHES "DEBUG")
-#  target_compile_options(quda PRIVATE "$<$<COMPILE_LANG_AND_ID:SYCL,NVHPC>:SHELL: -gpu=nodebug" >)
-#endif()
-
-#target_include_directories(quda SYSTEM PUBLIC $<$<COMPILE_LANGUAGE:SYCL>:${SYCLToolkit_INCLUDE_DIRS}>)
-#target_include_directories(quda_cpp SYSTEM PUBLIC ${SYCLToolkit_INCLUDE_DIRS})
+if(DEFINED ENV{SYCL_LINK_FLAGS})
+  separate_arguments(SYCL_LINK_FLAGS NATIVE_COMMAND $ENV{SYCL_LINK_FLAGS})
+endif()
 
 target_include_directories(quda PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/sycl)
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/targets/sycl>
                                        $<INSTALL_INTERFACE:include/targets/sycl>)
-#target_include_directories(quda SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/sycl/externals)
 
-# Specific config dependent warning suppressions and lineinfo forwarding
-#target_compile_options(
-#  quda
-#  PRIVATE $<$<COMPILE_LANG_AND_ID:SYCL,NVIDIA>:
-#          -Wreorder
-#          $<$<CXX_COMPILER_ID:Clang>:
-#          -Xcompiler=-Wno-unused-function
-#          -Xcompiler=-Wno-unknown-pragmas>
-#          $<$<CXX_COMPILER_ID:GNU>:
-#          -Xcompiler=-Wno-unknown-pragmas>
-#          $<$<CONFIG:DEVEL>:-Xptxas
-#          -warn-lmem-usage,-warn-spills
-#          -lineinfo>
-#          $<$<CONFIG:STRICT>:
-#          -Werror=all-warnings
-#          -lineinfo>
-#          $<$<CONFIG:HOSTDEBUG>:-lineinfo>
-#          $<$<CONFIG:SANITIZE>:-lineinfo>
-#          >)
-
-#target_compile_options(
-#  quda
-#  PRIVATE $<$<COMPILE_LANG_AND_ID:SYCL,Clang>:
-#          -Wall
-#          -Wextra
-#          -Wno-unknown-pragmas
-#          $<$<CONFIG:STRICT>:-Werror
-#          -Wno-error=pass-failed>
-#          $<$<CONFIG:SANITIZE>:-fsanitize=address
-#          -fsanitize=undefined>
-#          >)
-
+set(SYCL_FLAGS "-x c++ ${SYCL_FLAGS}")
 set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES LANGUAGE CXX)
-set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES COMPILE_FLAGS "-x c++")
+set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES COMPILE_FLAGS ${SYCL_FLAGS})
+target_link_options(quda PUBLIC ${SYCL_LINK_FLAGS})
+
+set(SYCL_MKL_LIBRARY "-lmkl_sycl -lmkl_intel_ilp64 -lmkl_core -lmkl_tbb_thread")
 
 if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
   target_link_libraries(quda PUBLIC ${SYCL_MKL_LIBRARY})

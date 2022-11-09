@@ -68,9 +68,9 @@ namespace quda
         // This catch-all assertion is lenient and only checks the struct member.
         // ReductionArg above uses a stringent assertion that matches Reducer.
         if constexpr (std::is_same_v<typename Arg::Reducer,
-                                     HeavyQuarkResidualNorm_<device_reduce_t, typename Arg::real>> ||
+		      HeavyQuarkResidualNorm_<device_reduce_t, typename Arg::real>> ||
                       std::is_same_v<typename Arg::Reducer,
-                                     xpyHeavyQuarkResidualNorm_<device_reduce_t, typename Arg::real>>) {
+		      xpyHeavyQuarkResidualNorm_<device_reduce_t, typename Arg::real>>) {
           static_assert(device::use_kernel_arg<Arg>(), "This functor must be passed as a kernel argument");
         }
       }
@@ -455,6 +455,7 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct HeavyQuarkResidualNorm_ {
       static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::ALWAYS;
+      //static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE;
       using reduce_t = array<real_reduce_t, 3>;
       static constexpr bool site_unroll = true;
 
@@ -501,6 +502,7 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct xpyHeavyQuarkResidualNorm_ {
       static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::ALWAYS;
+      //static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE;
       using reduce_t = array<real_reduce_t, 3>;
       static constexpr bool site_unroll = true;
 

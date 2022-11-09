@@ -372,6 +372,7 @@ namespace quda
     */
     template <typename real> struct caxpyxmazMR_ {
       static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::ALWAYS;
+      //static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE;
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
       complex<real> a;

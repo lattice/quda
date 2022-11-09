@@ -85,8 +85,11 @@ namespace quda
       printfQuda("  Driver version: %s\n", myDevice.get_info<sycl::info::device::driver_version>().c_str());
       printfQuda("  Max compute units: %u\n", myDevice.get_info<sycl::info::device::max_compute_units>());
       printfQuda("  Max work item dimensions: %u\n", myDevice.get_info<sycl::info::device::max_work_item_dimensions>());
-      //printfQuda("  Max work item sizes: %s\n", str(myDevice.get_info<sycl::info::device::max_work_item_sizes>()).c_str());
+#ifdef OLDSYCL
+      printfQuda("  Max work item sizes: %s\n", str(myDevice.get_info<sycl::info::device::max_work_item_sizes>()).c_str());
+#else
       printfQuda("  Max work item sizes: %s\n", str(myDevice.get_info<sycl::info::device::max_work_item_sizes<3>>()).c_str());
+#endif
       printfQuda("  Max work group size: %lu\n", myDevice.get_info<sycl::info::device::max_work_group_size>());
       printfQuda("  Max num sub groups: %u\n", myDevice.get_info<sycl::info::device::max_num_sub_groups>());
       printfQuda("  Sub group independent forward progress: %s\n", myDevice.get_info<sycl::info::device::sub_group_independent_forward_progress>()?"true":"false");
@@ -138,8 +141,11 @@ namespace quda
       auto ds = p.get_devices();
       int dev_count = ds.size();
       for (int device = 0; device < dev_count; device++) {
-	//using id = sycl::info::device;
+#ifdef OLDSYCL
+	using id = sycl::info::device;
+#else
 	namespace id = sycl::info::device;
+#endif
 	auto d = ds[device];
         printfQuda("%d - name:                    %s\n", device, d.get_info<id::name>().c_str());
       }
@@ -338,8 +344,11 @@ namespace quda
     }
 
     unsigned int max_threads_per_block_dim(int i) {
-      //auto val = myDevice.get_info<sycl::info::device::max_work_item_sizes>();
+#ifdef OLDSYCL
+      auto val = myDevice.get_info<sycl::info::device::max_work_item_sizes>();
+#else
       auto val = myDevice.get_info<sycl::info::device::max_work_item_sizes<3>>();
+#endif
       return val[i];
     }
 
