@@ -1375,12 +1375,12 @@ public:
     /**
      * @brief Create two-link staggered quark smearing operator
      *
-     * @param in[in] input field 
-     * @param out[out] output smeared field
-     * @param a smearing parameter
-     * @param b (ignored)
-     * @param t0 time-slice index
-     * @param parity Parity flag
+     * @param[out] out output smeared field
+     * @param[in] in input field 
+     * @param[in] a smearing parameter
+     * @param     b (ignored)
+     * @param[in] t0 time-slice index
+     * @param[in] parity Parity flag
      */
     void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b, const int &t0,  const QudaParity parity) const;
   };
@@ -1617,12 +1617,12 @@ public:
     /**
      * @brief Create two-link staggered quark smearing operator
      *
-     * @param in[in] input field
-     * @param out[out] output smeared field
-     * @param a smearing parameter
-     * @param b (ignored)
-     * @param t0 time-slice index
-     * @param parity Parity flag
+     * @param[out] out output smeared field
+     * @param[in]  in input field
+     * @param[in] a smearing parameter
+     * @param     b (ignored)
+     * @param[in] t0 time-slice index
+     * @param[in] parity Parity flag
      */   
     void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b, const int &t0,  const QudaParity parity) const;    
   };
