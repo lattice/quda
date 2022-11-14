@@ -20,6 +20,37 @@ namespace quda {
       XDOWN = 7
     };
 
+    // for readability
+    enum {
+      SIG_POSITIVE = 1,
+      SIG_NEGATIVE = 0,
+      SIG_IGNORED = -1
+    };
+
+    enum {
+      MU_POSITIVE = 1,
+      MU_NEGATIVE = 0,
+      MU_IGNORED = -1
+    };
+
+    enum {
+      NU_POSITIVE = 1,
+      NU_NEGATIVE = 0,
+      NU_IGNORED = -1
+    };
+
+    enum {
+      NU_NEXT_POSITIVE = 1,
+      NU_NEXT_NEGATIVE = 0,
+      NU_NEXT_IGNORED = -1
+    };
+
+    enum {
+      COMPUTE_LEPAGE_YES = 1,
+      COMPUTE_LEPAGE_NO = 0,
+      COMPUTE_LEPAGE_IGNORED = -1
+    };
+
     constexpr int opp_dir(int signed_dir) { return 7 - signed_dir; }
     constexpr int goes_forward(int signed_dir) { return signed_dir <= 3; }
     constexpr int goes_backward(int signed_dir) { return signed_dir > 3; }
@@ -34,7 +65,7 @@ namespace quda {
       @param[in] X Full lattice dimensions
       @param[in] signed_dir Signed MILC direction
       @return Shifted 1-d checkboard index
-   */
+    */
     __host__ __device__ int updateCoordsIndexMILCDir(int x[], const int_fastdiv X[], int signed_dir) {
       switch (signed_dir) {
       case 0: x[0] = (x[0] + 1 + X[0]) % X[0]; break;
@@ -57,7 +88,7 @@ namespace quda {
       @param[in] X Full lattice dimensions
       @param[in] signed_dir Signed MILC direction
       @return Shifted 1-d checkboard index
-   */
+    */
     __host__ __device__ int getIndexMILCDir(const int x[], const int_fastdiv X[], int signed_dir) {
       int y[4] = {x[0], x[1], x[2], x[3]};
       return updateCoordsIndexMILCDir(y, X, signed_dir);
@@ -102,6 +133,9 @@ namespace quda {
       int sig;
       int compute_lepage;
 
+      // for fused all 5 all seven
+      int nu_next;
+
       /**
          @param[in] link Gauge field
          @param[in] overlap Radius of additional redundant computation to do
@@ -110,7 +144,7 @@ namespace quda {
         kernel_param(dim3(1, 2, 1)),
         link(link),
         commDim{ comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3) },
-        mu(-1), nu(-1), rho(-1), sig(-1), compute_lepage(-1)
+        mu(-1), nu(-1), rho(-1), sig(-1), compute_lepage(-1), nu_next(-1)
       {
         for (int d=0; d<4; d++) {
           E[d] = link.X()[d];
@@ -125,7 +159,7 @@ namespace quda {
       }
     };
 
-    template <typename Arg_, int sig_positive_, int mu_positive_ = -1, int nu_positive_ = -1, int compute_lepage_ = -1>
+    template <typename Arg_, int sig_positive_, int mu_positive_ = -1, int nu_positive_ = -1, int nu_side_positive_ = -1, int compute_lepage_ = -1>
     struct FatLinkParam : kernel_param<> {
       // whether the sig direction, if relevant, is forwards or backwards
       static constexpr int sig_positive = sig_positive_;
@@ -135,6 +169,10 @@ namespace quda {
 
       // whether the nu direction, if relevant, is forwards or backwards
       static constexpr int nu_positive = nu_positive_;
+
+      // for fused AllFiveAllSeven, whether the nu direction for the side 5 is forwards or backwards
+      // I guess this is always technically the opposite of nu_positive...
+      static constexpr int nu_side_positive = nu_side_positive_;
 
       // whether or not to compute the lepage contribution
       static constexpr int compute_lepage = compute_lepage_;
@@ -392,32 +430,31 @@ namespace quda {
       constexpr MiddleFiveLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ void operator()(int x_cb, int parity)
-      {
-        int x[4];
-        getCoords(x, x_cb, arg.D, parity);
+      /**
+        @brief Compute the middle five link contribution to the HISQ force
+        @param[in] x Local coordinate
+        @param[in] e_cb 1-d checkerboard index in the full extended lattice
+        @param[in] parity Parity of the coordinate x
+        @return Contribution to the force in the sigma direction (when sigma is positive)
+      */
+      __device__ __host__ Link middle_five(int x[4], int e_cb, int parity) {
 
         /*        A________B
          *   nu   |        |
-         *       D|        |C
+         *       H|        |C
          *
          *    A is the current point (sid)
          *
-         * This kernel also depends on U_{mu} flowing *into* point D,
+         * This kernel also depends on U_{mu} flowing *into* point H,
          * formerly referred to as "qMu" or "qProd". We denote the point
-         * in the negative "mu" direction from D as "Q".
+         * in the negative "mu" direction from H as "Q".
          */
-
-#pragma unroll
-        for (int d=0; d<4; d++) x[d] += arg.base_idx[d];
-        int e_cb = linkIndex(x,arg.E);
-        parity = parity ^ arg.oddness_change;
 
         int y[4] = {x[0], x[1], x[2], x[3]};
         int point_a = e_cb;
         int parity_a = parity;
-        int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.nu));
-        int parity_d = 1 - parity;
+        int point_h = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.nu));
+        int parity_h = 1 - parity;
 
         int point_q = getIndexMILCDir(y, arg.E, opp_dir(arg.mu));
         int parity_q = parity;
@@ -427,11 +464,11 @@ namespace quda {
         int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.nu);
         int parity_b = 1 - parity;
 
-        int da_link_nbr_idx = nu_positive ? point_d : point_a;
-        int da_link_nbr_parity = nu_positive ? parity_d : parity_a;
+        int ha_link_nbr_idx = nu_positive ? point_h : point_a;
+        int ha_link_nbr_parity = nu_positive ? parity_h : parity_a;
 
-        int qd_link_nbr_idx = mu_positive ? point_q : point_d;
-        int qd_link_nbr_parity = mu_positive ? parity_q : parity_d;
+        int qh_link_nbr_idx = mu_positive ? point_q : point_h;
+        int qh_link_nbr_parity = mu_positive ? parity_q : parity_h;
 
         int cb_link_nbr_idx = nu_positive ? point_c : point_b;
         int cb_link_nbr_parity = nu_positive ? parity_c : parity_b;
@@ -442,25 +479,58 @@ namespace quda {
         // Load link and outer product contributions for pNuMu, P5, qNuMu
         Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
         Link Ubc = arg.link(pos_dir(arg.nu), cb_link_nbr_idx, cb_link_nbr_parity);
-        Link Uda = arg.link(pos_dir(arg.nu), da_link_nbr_idx, da_link_nbr_parity);
-        Link Uqd = arg.link(pos_dir(arg.mu), qd_link_nbr_idx, qd_link_nbr_parity);
+        Link Uha = arg.link(pos_dir(arg.nu), ha_link_nbr_idx, ha_link_nbr_parity);
+        Link Uqh = arg.link(pos_dir(arg.mu), qh_link_nbr_idx, qh_link_nbr_parity);
         Link Oc = arg.pMu(0, point_c, parity_c);
 
         Link Ow = !nu_positive ? Ubc * Oc : conj(Ubc) * Oc;
-        if constexpr (!nu_positive) Uda = conj(Uda);
-        if constexpr (!mu_positive) Uqd = conj(Uqd);
+        if constexpr (!nu_positive) Uha = conj(Uha);
+        if constexpr (!mu_positive) Uqh = conj(Uqh);
 
         arg.pNuMu(0, point_b, parity_b) = Ow;
         arg.p5(0, point_a, parity_a) = sig_positive ? Uab * Ow : conj(Uab) * Ow;
 
-        Link Ox = Uqd * Uda;
+        Link Ox = Uqh * Uha;
         arg.qNuMu(0, point_a, parity_a) = Ox;
+
+        // compute the force in the sigma direction if sig is positive
+        Link force_sig;
+        if constexpr (sig_positive) {
+          force_sig = arg.coeff_five * (Ow * Ox);
+        }
+
+        return force_sig;
+      }
+
+      __device__ __host__ void operator()(int x_cb, int parity)
+      {
+        int x[4];
+        getCoords(x, x_cb, arg.D, parity);
+
+        /*        A________B
+         *   nu   |        |
+         *       H|        |C
+         *
+         *    A is the current point (sid)
+         *
+         * This kernel also depends on U_{mu} flowing *into* point H,
+         * formerly referred to as "qMu" or "qProd". We denote the point
+         * in the negative "mu" direction from H as "Q".
+         */
+
+#pragma unroll
+        for (int d=0; d<4; d++) x[d] += arg.base_idx[d];
+        int e_cb = linkIndex(x,arg.E);
+        parity = parity ^ arg.oddness_change;
+
+        Link force_sig = middle_five(x, e_cb, parity);
 
         // Update the force in the sigma direction
         if constexpr (sig_positive) {
-          Link Oy = Ow * Ox;
+          int point_a = e_cb;
+          int parity_a = parity;
           Link oprod = arg.force(arg.sig, point_a, parity_a);
-          oprod += arg.coeff_five * Oy;
+          oprod += force_sig;
           arg.force(arg.sig, point_a, parity_a) = oprod;
         }
 
@@ -507,9 +577,9 @@ namespace quda {
 
       Gauge force;
       Gauge shortP;
-      Gauge p5;
 
-      const Gauge oProd;
+      const Gauge p5;
+      const Gauge pNuMu;
       const Gauge qNuMu;
 
       const real coeff_five;
@@ -519,10 +589,10 @@ namespace quda {
 
       static constexpr int overlap = 2;
 
-      AllSevenSideFiveLinkArg(GaugeField &force, GaugeField &shortP, GaugeField &P5, const GaugeField &oProd, const GaugeField &qNuMu,
+      AllSevenSideFiveLinkArg(GaugeField &force, GaugeField &shortP, const GaugeField &P5, const GaugeField &pNuMu, const GaugeField &qNuMu,
                  const GaugeField &link, const PathCoefficients<real> &act_path_coeff)
         : BaseForceArg(link, overlap), force(force), shortP(shortP), p5(P5),
-          oProd(oProd), qNuMu(qNuMu),
+          pNuMu(pNuMu), qNuMu(qNuMu),
           coeff_five(act_path_coeff.five), accumu_coeff_five(act_path_coeff.three != 0 ? act_path_coeff.five / act_path_coeff.three : 0),
           coeff_seven(act_path_coeff.seven), accumu_coeff_seven(act_path_coeff.five != 0 ? act_path_coeff.seven / act_path_coeff.five : 0)
       { }
@@ -544,11 +614,19 @@ namespace quda {
       constexpr AllSevenSideFiveLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ Link all_link(int x[4], int e_cb, int parity) {
+      /**
+        @brief Compute the all seven link contribution to the HISQ force
+        @param[in] x Local coordinate
+        @param[in] e_cb 1-d checkerboard index in the full extended lattice
+        @param[in] parity Parity of the coordinate x
+        @param[in/out] p5_sig Contribution to the P5 field from the seven link calculation
+        @param[in/out] force_sig Contribution to the force in the sigma direction (when sigma is positive)
+      */
+      __device__ __host__ void all_link(int x[4], int e_cb, int parity, Link &p5_sig, Link &force_sig) {
         auto mycoeff_seven = coeff_sign(sig_positive,parity)*arg.coeff_seven;
 
         // Intermediate accumulators; force_sig is only needed when sig is positive
-        Link force_sig, force_rho, p5_sig;
+        Link force_rho;
 
         // Link product intermediates
         Link Oy, Oz;
@@ -596,7 +674,7 @@ namespace quda {
         Link Uaf = arg.link(pos_dir(arg.rho), point_a, parity_a);
         Link Ube = arg.link(pos_dir(arg.rho), point_b, parity_b);
         Link Of = arg.qNuMu(0, point_f, parity_f);
-        Link Oe = arg.oProd(0, point_e, parity_e);
+        Link Oe = arg.pNuMu(0, point_e, parity_e);
         Oz = Ube * Oe;
         Oy = (sig_positive ? Uab : conj(Uab)) * Oz;
         force_rho += (parity_sign(parity_a) * mycoeff_seven) * conj(Of) * conj(Oy);
@@ -607,7 +685,7 @@ namespace quda {
         // Compute the force_rho and p5 contribution from the positive rho direction
         Link Ufe = arg.link(pos_dir(arg.sig), fe_link_nbr_idx, fe_link_nbr_parity);
         Link Oa = arg.qNuMu(0, point_a, parity_a);
-        Link Ob = arg.oProd(0, point_b, parity_b);
+        Link Ob = arg.pNuMu(0, point_b, parity_b);
         Oz = conj(Ube) * Ob;
         Oy = (sig_positive ? Ufe : conj(Ufe)) * Oz;
         force_rho -= (parity_sign(parity_a) * mycoeff_seven) * Oy * Oa;
@@ -625,7 +703,7 @@ namespace quda {
         // positive rho direction
         if constexpr (sig_positive) {
           Link Od = arg.qNuMu(0, point_d, parity_d);
-          Link Oc = arg.oProd(0, point_c, parity_c);
+          Link Oc = arg.pNuMu(0, point_c, parity_c);
           Oz = conj(Ucb) * Oc;
           force_sig += (parity_sign(parity_a) * mycoeff_seven) * Oz * Od * Uda;
         }
@@ -635,25 +713,16 @@ namespace quda {
         force += force_rho;
         arg.force(pos_dir(arg.rho), point_a, parity_a) = force;
 
-        // update the force in the sigma direction
-        if constexpr (sig_positive) {
-          Link force = arg.force(arg.sig, point_a, parity_a);
-          force += force_sig;
-          arg.force(arg.sig, point_a, parity_a) = force;
-        }
-
-        return p5_sig;
-
       }
 
-      __device__ __host__ void operator()(int x_cb, int parity)
-      {
-        int x[4];
-        getCoords(x, x_cb, arg.D, parity);
-        for (int d=0; d<4; d++) x[d] += arg.base_idx[d];
-        int e_cb = linkIndex(x,arg.E);
-        parity = parity^arg.oddness_change;
-
+      /**
+        @brief Compute the side five link contribution to the HISQ force
+        @param[in] x Local coordinate
+        @param[in] e_cb 1-d checkerboard index in the full extended lattice
+        @param[in] parity Parity of the coordinate x
+        @param[in] P5 Full P5 contribution summed from the previous middle five and all seven
+      */
+      __device__ __host__ void side_link(int x[4], int e_cb, int parity, const Link &P5) {
         /*      compute the side link contribution to the momentum
          *
          *             sig
@@ -677,21 +746,14 @@ namespace quda {
         int point_q = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu));
         int parity_q = parity;
 
-        int ah_link_nbr_idx = nu_positive ? point_h : point_a;
-        int ah_link_nbr_parity = nu_positive ? parity_h : parity_a;
+        int ha_link_nbr_idx = nu_positive ? point_h : point_a;
+        int ha_link_nbr_parity = nu_positive ? parity_h : parity_a;
 
         int qh_link_nbr_idx = mu_positive ? point_q : point_h;
         int qh_link_nbr_parity = mu_positive ? parity_q : parity_h;
 
-        // calculate p5_sig
-        Link p5_sig = all_link(x, e_cb, parity);
-
-        // load and accumulate p5
-        Link Oy = arg.p5(0, point_a, parity_a);
-        Oy += p5_sig;
-
-        Link Uah = arg.link(pos_dir(arg.nu), ah_link_nbr_idx, ah_link_nbr_parity);
-        Link Ow = nu_positive ? Uah * Oy : conj(Uah) * Oy;
+        Link Uah = arg.link(pos_dir(arg.nu), ha_link_nbr_idx, ha_link_nbr_parity);
+        Link Ow = nu_positive ? Uah * P5 : conj(Uah) * P5;
         Link Uqh = arg.link(pos_dir(arg.mu), qh_link_nbr_idx, qh_link_nbr_parity);
         if constexpr (!mu_positive) Uqh = conj(Uqh);
 
@@ -699,13 +761,382 @@ namespace quda {
         shortP += arg.accumu_coeff_five * Ow;
         arg.shortP(0, point_h, parity_h) = shortP;
 
-        Ow = nu_positive ? Oy * Uqh : conj(Uqh) * conj(Oy);
+        Ow = nu_positive ? P5 * Uqh : conj(Uqh) * conj(P5);
 
         auto mycoeff_five = -coeff_sign(goes_forward(arg.sig), parity_a)*coeff_sign(goes_forward(arg.nu),parity_a)*arg.coeff_five;
 
-        Link oprod = arg.force(pos_dir(arg.nu), ah_link_nbr_idx, ah_link_nbr_parity);
+        Link oprod = arg.force(pos_dir(arg.nu), ha_link_nbr_idx, ha_link_nbr_parity);
         oprod += mycoeff_five * Ow;
-        arg.force(pos_dir(arg.nu), ah_link_nbr_idx, ah_link_nbr_parity) = oprod;
+        arg.force(pos_dir(arg.nu), ha_link_nbr_idx, ha_link_nbr_parity) = oprod;
+      }
+
+      __device__ __host__ void operator()(int x_cb, int parity)
+      {
+        int x[4];
+        getCoords(x, x_cb, arg.D, parity);
+        for (int d=0; d<4; d++) x[d] += arg.base_idx[d];
+        int e_cb = linkIndex(x,arg.E);
+        parity = parity^arg.oddness_change;
+
+        int point_a = e_cb;
+        int parity_a = parity;
+        
+        // calculate p5_sig
+        Link force_sig;
+        if constexpr (sig_positive) {
+          force_sig = arg.force(arg.sig, point_a, parity_a);
+        }
+        Link P5 = arg.p5(0, point_a, parity_a);
+
+        // accumulate into P5, force_sig
+        all_link(x, e_cb, parity, P5, force_sig);
+
+        // update the force in the sigma direction
+        if constexpr (sig_positive) {
+          arg.force(arg.sig, point_a, parity_a) = force_sig;
+        }
+
+        side_link(x, e_cb, parity, P5);
+
+      }
+    };
+
+    /********************************allFiveAllSevenLinkKernel*********************************************
+     * Note: this kernel names points differently than the other kernels, there's a diagram
+     *   within the kernel code
+     *
+     * In lieu of a lot of copy and paste, we refer to the documentation for AllSevenSideFive and
+     * MiddleFive. There is no math reuse so the flops counts for each component are unchanged,
+     * and the only reuse in load/store is reusing link_ab and, when sig is positive, the read/write
+     * of newOprod_sig_at_A.
+     *
+     * This kernel uses a double buffer for P5, Pnumu, and Qnumu to safely read from multiple sites
+     * in each field during the all_link portion and write to each field during the middle_five portion.
+     ************************************************************************************************/
+    template <typename store_t, int nColor_, QudaReconstructType recon>
+    struct AllFiveAllSevenLinkArg : public BaseForceArg<store_t, nColor_, recon> {
+      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
+      using real = typename mapper<store_t>::type;
+      static constexpr int nColor = nColor_;
+      using Gauge = typename gauge_mapper<real, recon>::type;
+
+      Gauge force;
+      Gauge shortP;
+      
+      const Gauge pMu;
+
+      // double-buffer: read p5, pNuMu, qNuMu for side 5, middle 7
+      const Gauge p5;
+      const Gauge pNuMu;
+      const Gauge qNuMu;
+
+      // write the other p5, pNuMu, qNuMu for next middle 5
+      Gauge p5_next;
+      Gauge pNuMu_next;
+      Gauge qNuMu_next;
+
+      const real coeff_five;
+      const real accumu_coeff_five;
+      const real coeff_seven;
+      const real accumu_coeff_seven;
+
+      static constexpr int overlap = 2;
+
+      AllFiveAllSevenLinkArg(GaugeField &force, GaugeField &shortP, const Gauge &pMu,
+                 const GaugeField &P5, const GaugeField &pNuMu, const GaugeField &qNuMu,
+                 const GaugeField &P5_next, const GaugeField &pNuMu_next, const GaugeField &qNuMu_next,
+                 const GaugeField &link, const PathCoefficients<real> &act_path_coeff)
+        : BaseForceArg(link, overlap), force(force), shortP(shortP), pMu(pMu),
+          p5(P5), pNuMu(pNuMu), qNuMu(qNuMu),
+          p5_next(P5_next), pNuMu_next(pNuMu_next), qNuMu_next(qNuMu_next),
+          coeff_five(act_path_coeff.five), accumu_coeff_five(act_path_coeff.three != 0 ? act_path_coeff.five / act_path_coeff.three : 0),
+          coeff_seven(act_path_coeff.seven), accumu_coeff_seven(act_path_coeff.five != 0 ? act_path_coeff.seven / act_path_coeff.five : 0)
+      { }
+
+    };
+
+    template <typename Param> struct AllFiveAllSevenLink
+    {
+      using Arg = typename Param::Arg;
+      using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
+      const Arg &arg;
+
+      static constexpr int sig_positive = Param::sig_positive;
+      static constexpr int mu_positive = Param::mu_positive;
+      //static_assert(Param::mu_positive == -1, "mu_positive should be set to -1 for AllSevenSideFiveLink");
+      static constexpr int nu_positive = Param::nu_positive; // if nu_positive == -1, skip
+      static constexpr int nu_side_positive = Param::nu_side_positive; // if nu_side_positive == -1, skip
+      static_assert(Param::compute_lepage == -1, "compute_lepage should be set to -1 for AllFiveAllSevenLink");
+
+      constexpr AllFiveAllSevenLink(const Param &param) : arg(param.arg) {}
+      constexpr static const char *filename() { return KERNEL_FILE; }
+
+      /**
+        @brief Compute the all seven link contribution to the HISQ force
+        @param[in] x Local coordinate
+        @param[in] e_cb 1-d checkerboard index in the full extended lattice
+        @param[in] parity Parity of the coordinate x
+        @param[in/out] p5_sig Contribution to the P5 field from the seven link calculation
+        @param[in/out] force_sig Contribution to the force in the sigma direction (when sigma is positive)
+        @param[in] Uab Gauge link going from site a to site b
+      */
+      __device__ __host__ void all_link(int x[4], int e_cb, int parity, Link &p5_sig, Link &force_sig, const Link &Uab) {
+        auto mycoeff_seven = coeff_sign(sig_positive,parity)*arg.coeff_seven;
+
+        // Intermediate accumulators; force_sig is only needed when sig is positive
+        Link force_rho;
+
+        // Link product intermediates
+        Link Oy, Oz;
+
+        /*            sig
+         *         F        E
+         *          |      |
+         *         A|______|B
+         *      rho |      |
+         *        D |      |C
+         *
+         *   A is the current point (sid)
+         *
+         */
+
+        int y[4] = {x[0], x[1], x[2], x[3]};
+        int point_a = e_cb;
+        int parity_a = parity;
+        int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+        int parity_b = 1 - parity;
+        int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
+        int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
+
+#pragma unroll
+        for (int d=0; d<4; d++) y[d] = x[d];
+        int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.rho));
+        int parity_d = 1 - parity;
+        int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+        int parity_c = parity;
+        int dc_link_nbr_idx = (sig_positive) ? point_d : point_c;
+        int dc_link_nbr_parity = (sig_positive) ? parity_d : parity_c;
+
+#pragma unroll
+        for (int d = 0; d < 4; d++) y[d] = x[d];
+        int point_f = updateCoordsIndexMILCDir(y, arg.E, arg.rho);
+        int parity_f = 1 - parity;
+        int point_e = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+        int parity_e = parity;
+        int fe_link_nbr_idx = (sig_positive) ? point_f : point_e;
+        int fe_link_nbr_parity = (sig_positive) ? parity_f : parity_e;
+
+        // Compute the force_rho (and force_sig, when sig is positive) contribution
+        // from the negative rho direction
+        Link Uaf = arg.link(pos_dir(arg.rho), point_a, parity_a);
+        Link Ube = arg.link(pos_dir(arg.rho), point_b, parity_b);
+        Link Of = arg.qNuMu(0, point_f, parity_f);
+        Link Oe = arg.pNuMu(0, point_e, parity_e);
+        Oz = Ube * Oe;
+        Oy = (sig_positive ? Uab : conj(Uab)) * Oz;
+        force_rho += (parity_sign(parity_a) * mycoeff_seven) * conj(Of) * conj(Oy);
+        if constexpr (sig_positive) {
+          force_sig += (parity_sign(parity_a) * mycoeff_seven) * Oz * Of * conj(Uaf);
+        }
+
+        // Compute the force_rho and p5 contribution from the positive rho direction
+        Link Ufe = arg.link(pos_dir(arg.sig), fe_link_nbr_idx, fe_link_nbr_parity);
+        Link Oa = arg.qNuMu(0, point_a, parity_a);
+        Link Ob = arg.pNuMu(0, point_b, parity_b);
+        Oz = conj(Ube) * Ob;
+        Oy = (sig_positive ? Ufe : conj(Ufe)) * Oz;
+        force_rho -= (parity_sign(parity_a) * mycoeff_seven) * Oy * Oa;
+        p5_sig += arg.accumu_coeff_seven * Uaf * Oy;
+
+        // Compute the p5 contribution from the negative rho direction
+        Link Udc = arg.link(pos_dir(arg.sig), dc_link_nbr_idx, dc_link_nbr_parity);
+        Link Uda = arg.link(pos_dir(arg.rho), point_d, parity_d);
+        Link Ucb = arg.link(pos_dir(arg.rho), point_c, parity_c);
+        Oz = Ucb * Ob;
+        Oy = (sig_positive ? Udc : conj(Udc)) * Oz;
+        p5_sig += arg.accumu_coeff_seven * conj(Uda) * Oy;
+
+        // When sig is positive, compute the force_sig contribution from the
+        // positive rho direction
+        if constexpr (sig_positive) {
+          Link Od = arg.qNuMu(0, point_d, parity_d);
+          Link Oc = arg.pNuMu(0, point_c, parity_c);
+          Oz = conj(Ucb) * Oc;
+          force_sig += (parity_sign(parity_a) * mycoeff_seven) * Oz * Od * Uda;
+        }
+
+        // update the force in the rho direction
+        Link force = arg.force(pos_dir(arg.rho), point_a, parity_a);
+        force += force_rho;
+        arg.force(pos_dir(arg.rho), point_a, parity_a) = force;
+
+      }
+
+      /**
+        @brief Compute the side five link contribution to the HISQ force
+        @param[in] x Local coordinate
+        @param[in] e_cb 1-d checkerboard index in the full extended lattice
+        @param[in] parity Parity of the coordinate x
+        @param[in] P5 Full P5 contribution summed from the previous middle five and all seven
+      */
+      __device__ __host__ void side_link(int x[4], int e_cb, int parity, const Link &P5) {
+        /*      compute the side link contribution to the momentum
+         *
+         *             sig
+         *          A________B
+         *           |       |   nu
+         *         H |       |G
+         *
+         *      A is the current point (x_cb)
+         *
+         * This kernel also depends on U_{mu} flowing *into* point H,
+         * formerly referred to as "qMu" or "qProd". We denote the point
+         * in the negative "mu" direction from H as "Q".
+         */
+
+        int y[4] = {x[0], x[1], x[2], x[3]};
+        int point_a = e_cb;
+        int parity_a = parity;
+        int point_h = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.nu));
+        int parity_h = 1 - parity;
+
+        int point_q = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu));
+        int parity_q = parity;
+
+        int ha_link_nbr_idx = nu_positive ? point_h : point_a;
+        int ha_link_nbr_parity = nu_positive ? parity_h : parity_a;
+
+        int qh_link_nbr_idx = mu_positive ? point_q : point_h;
+        int qh_link_nbr_parity = mu_positive ? parity_q : parity_h;
+
+        Link Uah = arg.link(pos_dir(arg.nu), ha_link_nbr_idx, ha_link_nbr_parity);
+        Link Ow = nu_positive ? Uah * P5 : conj(Uah) * P5;
+        Link Uqh = arg.link(pos_dir(arg.mu), qh_link_nbr_idx, qh_link_nbr_parity);
+        if constexpr (!mu_positive) Uqh = conj(Uqh);
+
+        Link shortP = arg.shortP(0, point_h, parity_h);
+        shortP += arg.accumu_coeff_five * Ow;
+        arg.shortP(0, point_h, parity_h) = shortP;
+
+        Ow = nu_positive ? P5 * Uqh : conj(Uqh) * conj(P5);
+
+        auto mycoeff_five = -coeff_sign(goes_forward(arg.sig), parity_a)*coeff_sign(goes_forward(arg.nu),parity_a)*arg.coeff_five;
+
+        Link oprod = arg.force(pos_dir(arg.nu), ha_link_nbr_idx, ha_link_nbr_parity);
+        oprod += mycoeff_five * Ow;
+        arg.force(pos_dir(arg.nu), ha_link_nbr_idx, ha_link_nbr_parity) = oprod;
+      }
+
+      /**
+        @brief Compute the middle five link contribution to the HISQ force
+        @param[in] x Local coordinate
+        @param[in] e_cb 1-d checkerboard index in the full extended lattice
+        @param[in] parity Parity of the coordinate x
+        @param[in/out] force_sig Contribution to the force in the sigma direction (when sigma is positive)
+        @param[in] Uab Gauge link going from site a to site b
+      */
+      __device__ __host__ void middle_five(int x[4], int e_cb, int parity, Link &force_sig, const Link &Uab) {
+
+        /*        A________B
+         *   nu   |        |
+         *       H|        |C
+         *
+         *    A is the current point (sid)
+         *
+         * This kernel also depends on U_{mu} flowing *into* point H,
+         * formerly referred to as "qMu" or "qProd". We denote the point
+         * in the negative "mu" direction from H as "Q".
+         */
+
+        int y[4] = {x[0], x[1], x[2], x[3]};
+        int point_a = e_cb;
+        int parity_a = parity;
+        int point_h = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.nu_next));
+        int parity_h = 1 - parity;
+
+        int point_q = getIndexMILCDir(y, arg.E, opp_dir(arg.mu));
+        int parity_q = parity;
+
+        int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+        int parity_c = parity;
+        int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.nu_next);
+        int parity_b = 1 - parity;
+
+        int ha_link_nbr_idx = nu_side_positive ? point_h : point_a;
+        int ha_link_nbr_parity = nu_side_positive ? parity_h : parity_a;
+
+        int qh_link_nbr_idx = mu_positive ? point_q : point_h;
+        int qh_link_nbr_parity = mu_positive ? parity_q : parity_h;
+
+        int cb_link_nbr_idx = nu_side_positive ? point_c : point_b;
+        int cb_link_nbr_parity = nu_side_positive ? parity_c : parity_b;
+
+        int ab_link_nbr_idx = sig_positive ? point_a : point_b;
+        int ab_link_nbr_parity = sig_positive ? parity_a : parity_b;
+
+        // Load link and outer product contributions for pNuMu, P5, qNuMu
+        Link Ubc = arg.link(pos_dir(arg.nu_next), cb_link_nbr_idx, cb_link_nbr_parity);
+        Link Uha = arg.link(pos_dir(arg.nu_next), ha_link_nbr_idx, ha_link_nbr_parity);
+        Link Uqh = arg.link(pos_dir(arg.mu), qh_link_nbr_idx, qh_link_nbr_parity);
+        Link Oc = arg.pMu(0, point_c, parity_c);
+
+        Link Ow = !nu_side_positive ? Ubc * Oc : conj(Ubc) * Oc;
+        if constexpr (!nu_side_positive) Uha = conj(Uha);
+        if constexpr (!mu_positive) Uqh = conj(Uqh);
+
+        arg.pNuMu_next(0, point_b, parity_b) = Ow;
+        arg.p5_next(0, point_a, parity_a) = sig_positive ? Uab * Ow : conj(Uab) * Ow;
+
+        Link Ox = Uqh * Uha;
+        arg.qNuMu_next(0, point_a, parity_a) = Ox;
+
+        // compute the force in the sigma direction if sig is positive
+        if constexpr (sig_positive) {
+          force_sig += arg.coeff_five * (Ow * Ox);
+        }
+      }
+
+      __device__ __host__ void operator()(int x_cb, int parity)
+      {
+        int x[4];
+        getCoords(x, x_cb, arg.D, parity);
+        for (int d=0; d<4; d++) x[d] += arg.base_idx[d];
+        int e_cb = linkIndex(x,arg.E);
+        parity = parity^arg.oddness_change;
+
+        int point_a = e_cb;
+        int parity_a = parity;
+        
+        // calculate p5_sig
+        Link force_sig;
+        if constexpr (sig_positive) {
+          force_sig = arg.force(arg.sig, point_a, parity_a);
+        }
+
+        // Link Uab can be reused, nothing else can
+        int y[4] = {x[0], x[1], x[2], x[3]};
+        int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+        int parity_b = 1 - parity;
+        int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
+        int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
+        Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
+
+        if constexpr (nu_positive != NU_IGNORED) {
+          Link P5 = arg.p5(0, point_a, parity_a);
+          // accumulate into P5, force_sig
+          all_link(x, e_cb, parity, P5, force_sig, Uab);
+          side_link(x, e_cb, parity, P5);
+        }
+
+        if constexpr (nu_side_positive != NU_NEXT_IGNORED) {
+          middle_five(x, e_cb, parity, force_sig, Uab);
+        }
+
+        // update the force in the sigma direction
+        if constexpr (sig_positive) {
+          arg.force(arg.sig, point_a, parity_a) = force_sig;
+        }
+
       }
     };
 
