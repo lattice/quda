@@ -31,12 +31,16 @@ QudaPrecision prec_eigensolver = QUDA_INVALID_PRECISION;
 QudaPrecision prec_null = QUDA_INVALID_PRECISION;
 QudaPrecision prec_ritz = QUDA_INVALID_PRECISION;
 QudaVerbosity verbosity = QUDA_SUMMARIZE;
+
 std::array<int, 4> dim = {24, 24, 24, 24};
+std::array<int, 4> grid_partition = {1, 1, 1, 1};
+
 int &xdim = dim[0];
 int &ydim = dim[1];
 int &zdim = dim[2];
 int &tdim = dim[3];
 int Lsdim = 16;
+
 bool dagger = false;
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 int laplace3D = 4;
@@ -272,13 +276,12 @@ double eofa_mq3 = 1.0;
 
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
+// Parameters for the (gaussian) quark smearing operator
 int n_steps = 50;
 double smear_coeff    = 0.1;
 int t0 = -1;
 bool compute_two_link = true;
 bool delete_two_link  = true;
-
-std::array<int, 4> grid_partition = {1, 1, 1, 1};
 
 bool enable_testing = false;
 

@@ -110,11 +110,6 @@ if(QUDA_DIRAC_STAGGERED)
   quda_checkbuildtest(staggered_eigensolve_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS staggered_eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-  add_executable(staggered_gsmear_test staggered_gsmear_test.cpp)
-  target_link_libraries(staggered_gsmear_test ${TEST_LIBS})
-  quda_checkbuildtest(staggered_gsmear_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS staggered_gsmear_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-
 endif()
 
 if(QUDA_DIRAC_WILSON
@@ -192,6 +187,13 @@ if(QUDA_CONTRACT)
   target_link_libraries(contract_test ${TEST_LIBS})
   quda_checkbuildtest(contract_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
+if(QUDA_SMEAR_GAUSS_TWOLINK)
+  add_executable(staggered_gsmear_test staggered_gsmear_test.cpp)
+  target_link_libraries(staggered_gsmear_test ${TEST_LIBS})
+  quda_checkbuildtest(staggered_gsmear_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS staggered_gsmear_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR}) 	
 endif()
 
 if(QUDA_DIRAC_STAGGERED)
@@ -313,6 +315,15 @@ if(QUDA_CONTRACT)
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:contract_test> ${MPIEXEC_POSTFLAGS}
     --dim 2 4 6 8
     --gtest_output=xml:contract_test.xml)
+endif()
+
+#Smearing test
+if(QUDA_SMEAR_GAUSS_TWOLINK)
+  add_test(NAME gsmear_test
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gsmear_test> ${MPIEXEC_POSTFLAGS}
+    --dim 2 4 6 8
+    --test TwoLink
+    --gtest_output=xml:gsmear_test.xml)
 endif()
 
 # loop over Dslash policies
