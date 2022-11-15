@@ -129,18 +129,18 @@ struct StaggeredGSmearTestWrapper {//
       }
       case gsmear_test_type::GaussianSmear:
       {
-        const double ftmp    = -(smear_coeff*smear_coeff)/(4.0*n_steps*4.0);
+        const double ftmp    = -(smear_coeff*smear_coeff)/(4.0*smear_n_steps*4.0);
         const double msq     = 1. / ftmp;
         const double a       = inv_param.laplace3D * 2.0 + msq;
 
-        for (int i = 0; i < n_steps; i++) {
+        for (int i = 0; i < smear_n_steps; i++) {
           if (i > 0) std::swap(*tmp, *spinorRef);
       
           quda::blas::ax(ftmp, *tmp);
           quda::blas::axpy(a, *tmp, *tmp2);
       
-          staggeredTwoLinkGaussianSmear(spinorRef->Even(), qdp_twolnk, (void **)cpuTwoLink->Ghost(),  tmp->Even(), &gauge_param, &inv_param, 0, smear_coeff, t0, gauge_param.cpu_prec);
-          staggeredTwoLinkGaussianSmear(spinorRef->Odd(),  qdp_twolnk, (void **)cpuTwoLink->Ghost(),  tmp->Odd(),  &gauge_param, &inv_param, 1, smear_coeff, t0, gauge_param.cpu_prec);
+          staggeredTwoLinkGaussianSmear(spinorRef->Even(), qdp_twolnk, (void **)cpuTwoLink->Ghost(),  tmp->Even(), &gauge_param, &inv_param, 0, smear_coeff, smear_t0, gauge_param.cpu_prec);
+          staggeredTwoLinkGaussianSmear(spinorRef->Odd(),  qdp_twolnk, (void **)cpuTwoLink->Ghost(),  tmp->Odd(),  &gauge_param, &inv_param, 1, smear_coeff, smear_t0, gauge_param.cpu_prec);
           //blas::xpay(*tmp2, -1.0, *spinorRef);
           xpay(tmp2->Even().V(), -1.0, spinorRef->Even().V(), spinor->Even().Length(), gauge_param.cpu_prec);
           xpay(tmp2->Odd().V(),  -1.0, spinorRef->Odd().V(), spinor->Odd().Length(), gauge_param.cpu_prec);
@@ -228,10 +228,10 @@ struct StaggeredGSmearTestWrapper {//
     constructHostGaugeField(qdp_inlink, gauge_param, argc_copy, argv_copy);
     initExtendedField(qdp_inlink_ex, qdp_inlink);
     // Prepare two link field:
-    if(verify_results or (gtest_type == gsmear_test_type::GaussianSmear and  compute_two_link == false)) computeTwoLinkCPU(qdp_twolnk, qdp_inlink_ex, &gauge_param);
+    if(verify_results or (gtest_type == gsmear_test_type::GaussianSmear and  smear_compute_two_link == false)) computeTwoLinkCPU(qdp_twolnk, qdp_inlink_ex, &gauge_param);
 
     // Reorder gauge fields to MILC order
-    if(compute_two_link or gtest_type == gsmear_test_type::TwoLink)
+    if(smear_compute_two_link or gtest_type == gsmear_test_type::TwoLink)
       reorderQDPtoMILC(milc_inlink, qdp_inlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
     else
       reorderQDPtoMILC(milc_inlink, qdp_twolnk, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
