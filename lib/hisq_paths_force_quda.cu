@@ -139,6 +139,106 @@ namespace quda {
 
     };
 
+    template <typename Arg> class AllLepageSideThreeLinkForce : public TunableKernel2D {
+      Arg &arg;
+      const GaugeField &force;
+      const GaugeField &link;
+      const bool has_lepage;
+      unsigned int minThreads() const { return arg.threads.x; }
+
+    public:
+      AllLepageSideThreeLinkForce(Arg &arg, const GaugeField &link, int sig, int mu,
+                         const PathCoefficients<typename Arg::real> &act_path_coeff, const GaugeField &force) :
+        TunableKernel2D(link, 2),
+        arg(arg),
+        force(force),
+        link(link),
+        has_lepage(act_path_coeff.lepage != 0.)
+      {
+        arg.sig = sig;
+        arg.mu = mu;
+        arg.compute_lepage = has_lepage ? 1 : 0;
+
+        char aux2[16];
+        strcat(aux, comm_dim_partitioned_string());
+        strcat(aux, ",threads=");
+        u32toa(aux2, arg.threads.x);
+        strcat(aux, aux2);
+        if (has_lepage) {
+          strcat(aux, ",lepage,sig=");
+          u32toa(aux2, arg.sig);
+          strcat(aux, aux2);
+        }
+        strcat(aux, ",mu=");
+        u32toa(aux2, arg.mu);
+        strcat(aux, aux2);
+
+        apply(device::get_default_stream());
+      }
+
+      void apply(const qudaStream_t &stream)
+      {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        if (has_lepage) {
+          if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
+            launch<AllLepageSideThreeLink>(tp, stream, FatLinkParam<Arg, SIG_POSITIVE, MU_POSITIVE, NU_IGNORED, NU_NEXT_IGNORED, COMPUTE_LEPAGE_YES>(arg));
+          } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
+            launch<AllLepageSideThreeLink>(tp, stream, FatLinkParam<Arg, SIG_POSITIVE, MU_NEGATIVE, NU_IGNORED, NU_NEXT_IGNORED, COMPUTE_LEPAGE_YES>(arg));
+          } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
+            launch<AllLepageSideThreeLink>(tp, stream, FatLinkParam<Arg, SIG_NEGATIVE, MU_POSITIVE, NU_IGNORED, NU_NEXT_IGNORED, COMPUTE_LEPAGE_YES>(arg));
+          } else {
+            launch<AllLepageSideThreeLink>(tp, stream, FatLinkParam<Arg, SIG_NEGATIVE, MU_NEGATIVE, NU_IGNORED, NU_NEXT_IGNORED, COMPUTE_LEPAGE_YES>(arg));
+          }
+        } else {
+          if (goes_forward(arg.mu)) {
+            launch<AllLepageSideThreeLink>(tp, stream, FatLinkParam<Arg, SIG_IGNORED, MU_POSITIVE, NU_IGNORED, NU_NEXT_IGNORED, COMPUTE_LEPAGE_NO>(arg));
+          } else {
+            launch<AllLepageSideThreeLink>(tp, stream, FatLinkParam<Arg, SIG_IGNORED, MU_NEGATIVE, NU_IGNORED, NU_NEXT_IGNORED, COMPUTE_LEPAGE_NO>(arg));
+          }
+        }
+      }
+
+      void preTune() {
+        force.backup();
+      }
+
+      void postTune() {
+        force.restore();
+      }
+
+      long long flops() const {
+        // 3-link side contribution: 1 add, 1 rescale
+        long long multiplies_per_site = 0ll;
+        long long adds_per_site = 1ll;
+        long long rescales_per_site = 1ll;
+        // Lepage contributions
+        if (has_lepage) {
+          multiplies_per_site += 6ll;
+          adds_per_site += 2ll;
+          rescales_per_site += 2ll;
+          if (goes_forward(arg.sig)) {
+            multiplies_per_site += 2ll;
+            adds_per_site += 1ll;
+            rescales_per_site += 1ll;
+          }
+        }
+        return 2 * arg.threads.x * (198ll * multiplies_per_site + 18ll * adds_per_site + 18ll * rescales_per_site);
+      }
+
+      long long bytes() const {
+        // 3-link side contribution
+        long long bytes_per_site = ( 2 * arg.force.Bytes() + arg.p3.Bytes() );
+        // Lepage contributions
+        if (has_lepage) {
+          bytes_per_site += ( 6 * arg.link.Bytes() + 2 * arg.pMu.Bytes() );
+          if (goes_forward(arg.sig)) {
+            bytes_per_site += ( 2 * arg.force.Bytes() + arg.link.Bytes() );
+          }
+        }
+        return 2 * arg.threads.x * bytes_per_site;
+      }
+    };
+
     template <typename Arg> class MiddleFiveLinkForce : public TunableKernel2D {
       Arg &arg;
       const GaugeField &force;
@@ -496,106 +596,6 @@ namespace quda {
       }
     };
 
-    template <typename Arg> class AllLepageSideThreeLinkForce : public TunableKernel2D {
-      Arg &arg;
-      const GaugeField &force;
-      const GaugeField &link;
-      const bool has_lepage;
-      unsigned int minThreads() const { return arg.threads.x; }
-
-    public:
-      AllLepageSideThreeLinkForce(Arg &arg, const GaugeField &link, int sig, int mu,
-                         const PathCoefficients<typename Arg::real> &act_path_coeff, const GaugeField &force) :
-        TunableKernel2D(link, 2),
-        arg(arg),
-        force(force),
-        link(link),
-        has_lepage(act_path_coeff.lepage != 0.)
-      {
-        arg.sig = sig;
-        arg.mu = mu;
-        arg.compute_lepage = has_lepage ? 1 : 0;
-
-        char aux2[16];
-        strcat(aux, comm_dim_partitioned_string());
-        strcat(aux, ",threads=");
-        u32toa(aux2, arg.threads.x);
-        strcat(aux, aux2);
-        if (has_lepage) {
-          strcat(aux, ",lepage,sig=");
-          u32toa(aux2, arg.sig);
-          strcat(aux, aux2);
-        }
-        strcat(aux, ",mu=");
-        u32toa(aux2, arg.mu);
-        strcat(aux, aux2);
-
-        apply(device::get_default_stream());
-      }
-
-      void apply(const qudaStream_t &stream)
-      {
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        if (has_lepage) {
-          if (goes_forward(arg.sig) && goes_forward(arg.mu)) {
-            launch<AllLepageSideThreeLink>(tp, stream, FatLinkParam<Arg, SIG_POSITIVE, MU_POSITIVE, NU_IGNORED, NU_NEXT_IGNORED, COMPUTE_LEPAGE_YES>(arg));
-          } else if (goes_forward(arg.sig) && goes_backward(arg.mu)) {
-            launch<AllLepageSideThreeLink>(tp, stream, FatLinkParam<Arg, SIG_POSITIVE, MU_NEGATIVE, NU_IGNORED, NU_NEXT_IGNORED, COMPUTE_LEPAGE_YES>(arg));
-          } else if (goes_backward(arg.sig) && goes_forward(arg.mu)) {
-            launch<AllLepageSideThreeLink>(tp, stream, FatLinkParam<Arg, SIG_NEGATIVE, MU_POSITIVE, NU_IGNORED, NU_NEXT_IGNORED, COMPUTE_LEPAGE_YES>(arg));
-          } else {
-            launch<AllLepageSideThreeLink>(tp, stream, FatLinkParam<Arg, SIG_NEGATIVE, MU_NEGATIVE, NU_IGNORED, NU_NEXT_IGNORED, COMPUTE_LEPAGE_YES>(arg));
-          }
-        } else {
-          if (goes_forward(arg.mu)) {
-            launch<AllLepageSideThreeLink>(tp, stream, FatLinkParam<Arg, SIG_IGNORED, MU_POSITIVE, NU_IGNORED, NU_NEXT_IGNORED, COMPUTE_LEPAGE_NO>(arg));
-          } else {
-            launch<AllLepageSideThreeLink>(tp, stream, FatLinkParam<Arg, SIG_IGNORED, MU_NEGATIVE, NU_IGNORED, NU_NEXT_IGNORED, COMPUTE_LEPAGE_NO>(arg));
-          }
-        }
-      }
-
-      void preTune() {
-        force.backup();
-      }
-
-      void postTune() {
-        force.restore();
-      }
-
-      long long flops() const {
-        // 3-link side contribution: 1 add, 1 rescale
-        long long multiplies_per_site = 0ll;
-        long long adds_per_site = 1ll;
-        long long rescales_per_site = 1ll;
-        // Lepage contributions
-        if (has_lepage) {
-          multiplies_per_site += 6ll;
-          adds_per_site += 2ll;
-          rescales_per_site += 2ll;
-          if (goes_forward(arg.sig)) {
-            multiplies_per_site += 2ll;
-            adds_per_site += 1ll;
-            rescales_per_site += 1ll;
-          }
-        }
-        return 2 * arg.threads.x * (198ll * multiplies_per_site + 18ll * adds_per_site + 18ll * rescales_per_site);
-      }
-
-      long long bytes() const {
-        // 3-link side contribution
-        long long bytes_per_site = ( 2 * arg.force.Bytes() + arg.p3.Bytes() );
-        // Lepage contributions
-        if (has_lepage) {
-          bytes_per_site += ( 6 * arg.link.Bytes() + 2 * arg.oProd.Bytes() );
-          if (goes_forward(arg.sig)) {
-            bytes_per_site += ( 2 * arg.force.Bytes() + arg.link.Bytes() );
-          }
-        }
-        return 2 * arg.threads.x * bytes_per_site;
-      }
-    };
-
     template <typename Float, int nColor, QudaReconstructType recon>
     struct HisqStaplesForce {
       using real = typename mapper<Float>::type;
@@ -705,11 +705,15 @@ namespace quda {
 
             constexpr bool low_memory_path = false;
 
+            // All 5 and 7 link contributions
+            // In/out: newOprod, P3
+            // In: Pmu, link
+            // Internal only: P5, Pnumu, Qnumu, and the double-buffer flavors
             hisqFiveSeven<low_memory_path>(newOprod, P3, P5, Pnumu, Qnumu, P5_2, Pnumu_2, Qnumu_2, Pmu, link, act_path_coeff, sig, mu);
 
             // Side 3-link, fused with Lepage all link when the lepage coeff != 0.
             // In/out: newOprod
-            // In: P3, Pmu (called "oProd"), link
+            // In: P3, Pmu, link
             AllLepageSideThreeLinkArg<Float, nColor, recon> allLepageSideThreeLinkArg(newOprod, P3, Pmu, link, act_path_coeff);
             AllLepageSideThreeLinkForce<decltype(allLepageSideThreeLinkArg)> allLepageSideThreeLink(allLepageSideThreeLinkArg, link, sig, mu, act_path_coeff, newOprod);
           }//mu

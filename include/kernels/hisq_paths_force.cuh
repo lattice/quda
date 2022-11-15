@@ -349,7 +349,7 @@ namespace quda {
 
         Link Oz = !mu_positive ? Ucb * Od : conj(Ucb) * Od;
         arg.pMu(0, point_b, parity_b) = Oz;
-        arg.p3(0, e_cb, parity) = sig_positive ? Uab * Oz : conj(Uab) * Oz;
+        arg.p3(0, point_a, parity_a) = sig_positive ? Uab * Oz : conj(Uab) * Oz;
 
         // Update the force in the sigma direction
         if constexpr (sig_positive) {
@@ -359,6 +359,228 @@ namespace quda {
           arg.force(arg.sig, point_a, parity_a) = oprod;
         }
 
+      }
+    };
+
+    /************************AllLepageSideThreeLink*****************************
+     * Note: this kernel names points differently than the other kernels, there's a diagram
+     *   within the kernel code. The site names printed below assume sig and mu are positive.
+     *   Many of the load/store locations get shifted if mu is negative; this code uses relatively
+     *  self-documenting variables, so check there for the shifted sites.
+     *
+     * If we are only computing the side three link term (when the Lepage coefficient
+     * is zero), we only need:
+     * READ
+     *    0 LINKS
+     *    2 COLOR MATRIX:  p3_at_A, da_newOprod
+     * WRITE
+     *    1 COLOR MATRIX:  da_newOprod
+     *
+     * Therefore the data traffic, in two-number pair (num of link, num_of_color_matrix), is
+     *      (sig positive or negative):   (0, 3)
+     *
+     * Flop count, in three-number set (matrix_multi, matrix_add, matrix_rescale) is (0, 1, 1)
+     *
+     * If we are are computing the Lepage middle and all link, this gets complicated.
+     * We have an additional:
+     * READ
+     *    6 LINKS:          fe_link, be_link, af_link, ab_link, cb_link, id_link
+     *    2 COLOR MATRIX:   pMu_at_b, pMu_at_c
+     * If sig is positive, we additionally:
+     * READ
+     *    1 LINK:           da_link
+     *    1 COLOR MATRIX:   newOprod_{sig}_at_A
+     * WRITE
+     *    1 COLOR MATRIX:   newOprod_{sig}_at_A
+     *
+     * The TOTAL data traffic (including side link), in two-number pair (num_of_link, num_of_color_matrix)
+     *    if (sig is positive):   (7, 7)
+     *    else:                   (6, 5)
+     *
+     * This kernel is called 48 times, 24 for sig positive and 24 for sig negative
+     *
+     * The TOTAL flop count, in three-number set (matrix_multi, matrix_add, matrix_rescale)
+     *   if (sig is positive):     (8, 4, 4)
+     *   else:                     (6, 3, 3)
+     *
+     ****************************************************************************/
+    template <typename store_t, int nColor_, QudaReconstructType recon>
+    struct AllLepageSideThreeLinkArg : public BaseForceArg<store_t, nColor_, recon> {
+      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
+      using real = typename mapper<store_t>::type;
+      static constexpr int nColor = nColor_;
+      using Gauge = typename gauge_mapper<real, recon>::type;
+
+      Gauge force;
+
+      const Gauge p3;
+      const Gauge pMu;
+
+      const real coeff_three;
+      const real coeff_lepage;
+      const real accumu_coeff_lepage;
+
+      static constexpr int overlap = 2;
+
+      AllLepageSideThreeLinkArg(GaugeField &force, const GaugeField &P3, const GaugeField &pMu,
+                 const GaugeField &link,
+                 const PathCoefficients<real> &act_path_coeff)
+        : BaseForceArg(link, overlap), force(force), p3(P3),
+        pMu(pMu),
+        coeff_three(act_path_coeff.three), coeff_lepage(act_path_coeff.lepage),
+        accumu_coeff_lepage(act_path_coeff.three != 0 ? act_path_coeff.lepage / act_path_coeff.three : 0)
+      { }
+
+    };
+
+    template <typename Param> struct AllLepageSideThreeLink
+    {
+      using Arg = typename Param::Arg;
+      using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
+      const Arg &arg;
+
+      static_assert( (Param::compute_lepage == 1 && Param::sig_positive != -1) ||
+                     (Param::compute_lepage == 0 && Param::sig_positive == -1),
+                     "sig_positive should only be set when compute_lepage == 1 for AllLepageSideThreeLink");
+      static constexpr int sig_positive = Param::sig_positive;
+      static constexpr int mu_positive = Param::mu_positive;
+      static_assert(Param::nu_positive == -1, "nu_positive should be set to -1 for AllLepageSideThreeLink");
+      static constexpr int compute_lepage = Param::compute_lepage;
+
+      constexpr AllLepageSideThreeLink(const Param &param) : arg(param.arg) {}
+      constexpr static const char *filename() { return KERNEL_FILE; }
+
+      __device__ __host__ void lepage_p3(int x[4], int e_cb, int parity, Link &p3) {
+        int y[4] = {x[0], x[1], x[2], x[3]};
+        int point_a = e_cb;
+        int parity_a = parity;
+        int point_f = updateCoordsIndexMILCDir(y, arg.E, arg.mu);
+        int parity_f = 1 - parity;
+        int point_e = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+        int parity_e = parity;
+        int point_b = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu));
+        int parity_b = 1 - parity;
+
+        int af_link_nbr_idx = (mu_positive) ? point_a : point_f;
+        int af_link_nbr_parity = (mu_positive) ? parity_a : parity_f;
+        int fe_link_nbr_idx = (sig_positive) ? point_f : point_e;
+        int fe_link_nbr_parity = (sig_positive) ? parity_f : parity_e;
+        int be_link_nbr_idx = (mu_positive) ? point_b : point_e;
+        int be_link_nbr_parity = (mu_positive) ? parity_b : parity_e;
+
+        // Accumulate Lepage contribution to P3
+        Link Ufe = arg.link(pos_dir(arg.sig), fe_link_nbr_idx, fe_link_nbr_parity);
+        Link Ube = arg.link(pos_dir(arg.mu), be_link_nbr_idx, be_link_nbr_parity);
+        Link Uaf = arg.link(pos_dir(arg.mu), af_link_nbr_idx, af_link_nbr_parity);
+        Link Ob = arg.pMu(0, point_b, parity_b);
+
+        Link Ow = mu_positive ? conj(Ube) * Ob : Ube * Ob;
+        Link Oy = sig_positive ? Ufe * Ow : conj(Ufe) * Ow;
+        Link Ox = mu_positive ? Uaf * Oy : conj(Uaf) * Oy;
+
+        p3 += arg.accumu_coeff_lepage * Ox;
+      }
+
+      __device__ __host__ void lepage_force(int x[4], int e_cb, int parity, Link &force_mu) {
+
+        int y[4] = {x[0], x[1], x[2], x[3]};
+        int point_a = e_cb;
+        int parity_a = parity;
+        int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+        int parity_b = 1 - parity;
+        int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
+        int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
+
+#pragma unroll
+        for (int d=0; d<4; d++) y[d] = x[d];
+        int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu));
+        int parity_d = 1 - parity;
+        int point_i = getIndexMILCDir(y, arg.E, opp_dir(arg.mu));
+        int parity_i = parity;
+        int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+        int parity_c = parity;
+
+        int da_link_nbr_idx = (mu_positive) ? point_d : point_a;
+        int da_link_nbr_parity = (mu_positive) ? parity_d : parity_a;
+
+        int cb_link_nbr_idx = (mu_positive) ? point_c : point_b;
+        int cb_link_nbr_parity = (mu_positive) ? parity_c : parity_b;
+
+        int id_link_nbr_idx = (mu_positive) ? point_i : point_d;
+        int id_link_nbr_parity = (mu_positive) ? parity_i : parity_d;
+
+        // Accumulate Lepage contribution to force_mu
+        Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
+        Link Ucb = arg.link(pos_dir(arg.mu), cb_link_nbr_idx, cb_link_nbr_parity);
+        Link Oc = arg.pMu(0, point_c, parity_c);
+        Link Uid = arg.link(pos_dir(arg.mu), id_link_nbr_idx, id_link_nbr_parity);
+
+        Link Ow = mu_positive ? (conj(Ucb) * Oc) : (Ucb * Oc);
+        Link Oy = sig_positive ? Uab * Ow : conj(Uab) * Ow;
+        Link Ox = mu_positive ? (Oy * Uid) : (Uid * conj(Oy));
+
+        auto mycoeff_lepage = -coeff_sign(goes_forward(arg.sig), parity_a)*coeff_sign(goes_forward(arg.mu),parity_a)*arg.coeff_lepage;
+        force_mu += mycoeff_lepage * Ox;
+
+        // Update force_sig if sig is positive
+        if constexpr ( sig_positive ) {
+          Link Uda = arg.link(pos_dir(arg.mu), da_link_nbr_idx, da_link_nbr_parity);
+          Link Ox = mu_positive ? (Uid * Uda) : (conj(Uid) * conj(Uda));
+          Link Oy = Ow * Ox;
+
+          Link oprod = arg.force(arg.sig, point_a, parity_a);
+          oprod += arg.coeff_lepage * Oy;
+          arg.force(arg.sig, point_a, parity_a) = oprod;
+        }
+      }
+
+      __device__ __host__ void operator()(int x_cb, int parity)
+      {
+
+        int x[4];
+        getCoords(x, x_cb, arg.D, parity);
+
+        /*
+         * The "extra" low point corresponds to the Lepage contribution to the
+         * force_mu term.
+         * 
+         *  
+         *            sig
+         *         F        E
+         *          |      |
+         *         A|______|B
+         *       mu |      |
+         *        D |      |C
+         *          |
+         *         I|
+         *
+         *   A is the current point (sid)
+         *
+         */
+
+        for (int d=0; d<4; d++) x[d] += arg.base_idx[d];
+        int e_cb = linkIndex(x,arg.E);
+        parity = parity ^ arg.oddness_change;
+
+        int point_a = e_cb;
+        int parity_a = parity;
+        int point_d = getIndexMILCDir(x, arg.E, opp_dir(arg.mu));
+        int parity_d = 1 - parity;
+        int da_link_nbr_idx = (mu_positive) ? point_d : point_a;
+        int da_link_nbr_parity = (mu_positive) ? parity_d : parity_a;
+
+        Link p3 = arg.p3(0, point_a, parity_a);
+        Link force_mu = arg.force(pos_dir(arg.mu), da_link_nbr_idx, da_link_nbr_parity);
+
+        if constexpr (compute_lepage) {
+          lepage_p3(x, e_cb, parity, p3);
+          lepage_force(x, e_cb, parity, force_mu);
+        }
+
+        // Update force_mu
+        auto mycoeff_three = coeff_sign(goes_forward(arg.sig),parity_a)*coeff_sign(goes_forward(arg.mu),parity_a)*arg.coeff_three;
+        force_mu += mycoeff_three * (mu_positive ? p3 : conj(p3));
+        arg.force(pos_dir(arg.mu), da_link_nbr_idx, da_link_nbr_parity) = force_mu;
       }
     };
 
@@ -1131,254 +1353,6 @@ namespace quda {
         if constexpr (sig_positive) {
           arg.force(arg.sig, point_a, parity_a) = force_sig;
         }
-
-      }
-    };
-
-
-    /************************AllLepageSideThreeLink*****************************
-     * Note: this kernel names points differently than the other kernels, there's a diagram
-     *   within the kernel code. The site names printed below assume sig and mu are positive.
-     *   Many of the load/store locations get shifted if mu is negative; this code uses relatively
-     *  self-documenting variables, so check there for the shifted sites.
-     *
-     * If we are only computing the side three link term (when the Lepage coefficient
-     * is zero), we only need:
-     * READ
-     *    0 LINKS
-     *    2 COLOR MATRIX:  p3_at_F, newOprod_{mu}_at_A
-     * WRITE
-     *    1 COLOR MATRIX:  newOprod_{mu}_at_A
-     *
-     * Therefore the data traffic, in two-number pair (num of link, num_of_color_matrix), is
-     *      (sig positive or negative):   (0, 3)
-     *
-     * Flop count, in three-number set (matrix_multi, matrix_add, matrix_rescale) is (0, 1, 1)
-     *
-     * If we are are computing the Lepage middle and all link, this gets complicated.
-     * We have an additional:
-     * READ
-     *    6 LINKS:          hg_link, eg_link, fh_link, fe_link, be_link, ud_link
-     *    2 COLOR MATRIX:   oprod_at_e, oprod_at_b
-     * If sig is positive, we additionally:
-     * READ
-     *    1 LINK:           af_link
-     *    1 COLOR MATRIX:   newOprod_{sig}_at_F
-     * WRITE
-     *    1 COLOR MATRIX:   newOprod_{sig}_at_F
-     *
-     * The TOTAL data traffic (including side link), in two-number pair (num_of_link, num_of_color_matrix)
-     *    if (sig is positive):   (7, 7)
-     *    else:                   (6, 5)
-     *
-     * This kernel is called 48 times, 24 for sig positive and 24 for sig negative
-     *
-     * The TOTAL flop count, in three-number set (matrix_multi, matrix_add, matrix_rescale)
-     *   if (sig is positive):     (8, 4, 4)
-     *   else:                     (6, 3, 3)
-     *
-     ****************************************************************************/
-    template <typename store_t, int nColor_, QudaReconstructType recon>
-    struct AllLepageSideThreeLinkArg : public BaseForceArg<store_t, nColor_, recon> {
-      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
-      using real = typename mapper<store_t>::type;
-      static constexpr int nColor = nColor_;
-      using Gauge = typename gauge_mapper<real, recon>::type;
-
-      Gauge force;
-
-      const Gauge p3;
-      const Gauge oProd;
-
-      const real coeff_three;
-      const real coeff_lepage;
-      const real accumu_coeff_lepage;
-
-      static constexpr int overlap = 2;
-
-      AllLepageSideThreeLinkArg(GaugeField &force, const GaugeField &P3, const GaugeField &oProd,
-                 const GaugeField &link,
-                 const PathCoefficients<real> &act_path_coeff)
-        : BaseForceArg(link, overlap), force(force), p3(P3),
-        oProd(oProd),
-        coeff_three(act_path_coeff.three), coeff_lepage(act_path_coeff.lepage),
-        accumu_coeff_lepage(act_path_coeff.three != 0 ? act_path_coeff.lepage / act_path_coeff.three : 0)
-      { }
-
-    };
-
-    template <typename Param> struct AllLepageSideThreeLink
-    {
-      using Arg = typename Param::Arg;
-      using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
-      const Arg &arg;
-
-      static_assert( (Param::compute_lepage == 1 && Param::sig_positive != -1) ||
-                     (Param::compute_lepage == 0 && Param::sig_positive == -1),
-                     "sig_positive should only be set when compute_lepage == 1 for AllLepageSideThreeLink");
-      static constexpr int sig_positive = Param::sig_positive;
-      static constexpr int mu_positive = Param::mu_positive;
-      static_assert(Param::nu_positive == -1, "nu_positive should be set to -1 for AllLepageSideThreeLink");
-      static constexpr int compute_lepage = Param::compute_lepage;
-
-      constexpr AllLepageSideThreeLink(const Param &param) : arg(param.arg) {}
-      constexpr static const char *filename() { return KERNEL_FILE; }
-
-      __device__ __host__ void operator()(int x_cb, int parity)
-      {
-
-        int x[4];
-        getCoords(x, x_cb, arg.D, parity);
-
-        /*
-         * Very top points are for the Lepage term, to prepare p3 for the 3-link side link
-         * 
-         *  
-         *            sig
-         *         H|      |G
-         *          |      |
-         *         F        E
-         *          |      |
-         *         A|______|B
-         *       mu |      |
-         *        D |      |C
-         *
-         *   A is the current point (sid)
-         *
-         */
-
-        for (int d=0; d<4; d++) x[d] += arg.base_idx[d];
-        int e_cb = linkIndex(x,arg.E);
-        parity = parity ^ arg.oddness_change;
-
-        int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_a = e_cb;
-        int parity_a = parity;
-        int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
-        int parity_b = 1 - parity;
-        int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
-        int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
-
-#pragma unroll
-        for (int d=0; d<4; d++) y[d] = x[d];
-        int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu));
-        int parity_d = 1 - parity;
-        int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
-        int parity_c = parity;
-
-#pragma unroll
-        for (int d=0; d<4; d++) y[d] = x[d];
-        int point_f = updateCoordsIndexMILCDir(y, arg.E, arg.mu);
-        int parity_f = 1 - parity;
-        int point_e = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
-        int parity_e = parity;
-        int fe_link_nbr_idx = (sig_positive) ? point_f : point_e;
-        int fe_link_nbr_parity = (sig_positive) ? parity_f : parity_e;
-
-        int point_g = updateCoordsIndexMILCDir(y, arg.E, arg.mu);
-        int parity_g = 1 - parity;
-        int point_h = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.sig));
-        int parity_h = parity;
-        int hg_link_nbr_idx = (sig_positive) ? point_h : point_g;
-        int hg_link_nbr_parity = (sig_positive) ? parity_h : parity_g;
-
-        int fa_link_nbr_idx = (mu_positive) ? point_f : point_a;
-        int fa_link_nbr_parity = (mu_positive) ? parity_f : parity_a;
-
-        Link p3 = arg.p3(0, fa_link_nbr_idx, fa_link_nbr_parity);
-        Link force_mu = arg.force(pos_dir(arg.mu), point_a, parity_a);
-
-        if constexpr ( compute_lepage ) {
-
-          if constexpr ( mu_positive ) {
-
-            // Accumulate p3
-            {
-              Link Uhg = arg.link(pos_dir(arg.sig), hg_link_nbr_idx, hg_link_nbr_parity);
-              Link Ueg = arg.link(pos_dir(arg.mu), point_e, parity_e);
-              Link Ufh = arg.link(pos_dir(arg.mu), point_f, parity_f);
-              Link Oe = arg.oProd(0, point_e, parity_e);
-
-              Link Ow = conj(Ueg) * Oe;
-              Link Oy = sig_positive ? Uhg * Ow : conj(Uhg) * Ow;
-              Link Ox = Ufh * Oy;
-
-              p3 += arg.accumu_coeff_lepage * Ox;
-            }
-
-            // Accumulate force_mu
-            Link Ufe = arg.link(pos_dir(arg.sig), fe_link_nbr_idx, fe_link_nbr_parity);
-            Link Ube = arg.link(pos_dir(arg.mu), point_b, parity_b);
-            Link Ob = arg.oProd(0, point_b, parity_b);
-            Link Uda = arg.link(pos_dir(arg.mu), point_d, parity_d);
-
-            Link Ow = conj(Ube) * Ob;
-            Link Oy = sig_positive ? Ufe * Ow : conj(Ufe) * Ow;
-            Link Ox = Oy * Uda;
-
-            auto mycoeff_lepage = -coeff_sign(goes_forward(arg.sig), parity)*coeff_sign(goes_forward(arg.mu),parity)*arg.coeff_lepage;
-
-            force_mu += mycoeff_lepage * Ox;
-
-            // Update force_sig if sig is positive
-            if constexpr ( sig_positive ) {
-              Link Uaf = arg.link(pos_dir(arg.mu), point_a, parity_a);
-              Link Ox = Uda * Uaf;
-              Link Oy = Ow * Ox;
-
-              Link oprod = arg.force(arg.sig, point_f, parity_f);
-              oprod += arg.coeff_lepage * Oy;
-              arg.force(arg.sig, point_f, parity_f) = oprod;
-            }
-
-          } else {
-            // mu negative
-
-            // Accumulate p3
-            {
-              Link Ufe = arg.link(pos_dir(arg.sig), fe_link_nbr_idx, fe_link_nbr_parity);
-              Link Ueg = arg.link(pos_dir(arg.mu), point_e, parity_e);
-              Link Ufh = arg.link(pos_dir(arg.mu), point_f, parity_f);
-              Link Ob = arg.oProd(0, point_b, parity_b);
-
-              Link Ow = Ueg * Ob;
-              Link Oy = sig_positive ? Ufe * Ow : conj(Ufe) * Ow;
-              Link Ox = conj(Ufh) * Oy;
-
-              p3 += arg.accumu_coeff_lepage * Ox;
-            }
-
-            // Accumulate force_mu, update force_sig if sig is positive
-            {
-              Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
-              Link Ubc = arg.link(pos_dir(arg.mu), point_b, parity_b);
-              Link Oc = arg.oProd(0, point_c, parity_c);
-              Link Uda = arg.link(pos_dir(arg.mu), point_d, parity_d);
-
-              Link Ow = Ubc * Oc;
-              Link Oy = sig_positive ? Uab * Ow : conj(Uab) * Ow;
-              Link Ox = Uda * conj(Oy);
-
-              auto mycoeff_lepage = -coeff_sign(goes_forward(arg.sig), parity)*coeff_sign(goes_forward(arg.mu),parity)*arg.coeff_lepage;
-              force_mu += mycoeff_lepage * Ox;
-
-              if constexpr ( sig_positive ) {
-                Link Uaf = arg.link(pos_dir(arg.mu), point_a, parity_a);
-                Link Ox = conj(Uda) * conj(Uaf);
-                Link Oy = Ow * Ox;
-
-                Link oprod = arg.force(arg.sig, point_a, parity_a);
-                oprod += arg.coeff_lepage * Oy;
-                arg.force(arg.sig, point_a, parity_a) = oprod;
-              }
-            }
-          }
-        } // if (compute_lepage)
-
-        // Update force_mu
-        auto mycoeff_three = coeff_sign(goes_forward(arg.sig),parity)*coeff_sign(goes_forward(arg.mu),parity)*arg.coeff_three;
-        force_mu += mycoeff_three * (mu_positive ? p3 : conj(p3));
-        arg.force(pos_dir(arg.mu), point_a, parity_a) = force_mu;
 
       }
     };
