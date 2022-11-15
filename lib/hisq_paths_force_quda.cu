@@ -376,15 +376,20 @@ namespace quda {
         strcat(aux, ",mu=");
         u32toa(aux2, arg.mu);
         strcat(aux, aux2);
-        strcat(aux, ",nu=");
-        u32toa(aux2, arg.nu);
-        strcat(aux, aux2);
-        strcat(aux, ",nu_next=");
-        u32toa(aux2, arg.nu_next);
-        strcat(aux, aux2);
-        strcat(aux, ",rho=");
-        u32toa(aux2, arg.rho);
-        strcat(aux, aux2);
+        if (nu != NU_IGNORED) {
+          strcat(aux, ",nu=");
+          u32toa(aux2, arg.nu);
+          strcat(aux, aux2);
+          strcat(aux, ",rho=");
+          u32toa(aux2, arg.rho);
+          strcat(aux, aux2);
+        }
+        if (nu_next != NU_NEXT_IGNORED) {
+          strcat(aux, ",nu_next=");
+          u32toa(aux2, arg.nu_next);
+          strcat(aux, aux2);
+        }
+        
 
         apply(device::get_default_stream());
       }
@@ -593,12 +598,91 @@ namespace quda {
 
     template <typename Float, int nColor, QudaReconstructType recon>
     struct HisqStaplesForce {
+      using real = typename mapper<Float>::type;
+
+      template <bool low_memory>
+      void hisqFiveSeven(GaugeField &newOprod, GaugeField &P3, GaugeField &P5, GaugeField &Pnumu, GaugeField &Qnumu,
+                         GaugeField &P5_2, GaugeField &Pnumu_2, GaugeField &Qnumu_2, const GaugeField &Pmu,
+                         const GaugeField &link, const PathCoefficients<real> &act_path_coeff, int sig, int mu) {
+        if constexpr (low_memory) {
+          for (int nu=0; nu < 8; nu++) {
+            if (nu == sig || nu == opp_dir(sig) || nu == mu || nu == opp_dir(mu)) continue;
+
+            // 5-link: middle link
+            // In/out: newOprod
+            // Out: Pnumu, P5, Qnumu
+            // In: Pmu, link
+            MiddleFiveLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, Pnumu, P5, Qnumu, Pmu, link, act_path_coeff);
+            MiddleFiveLinkForce<decltype(middleFiveLinkArg)> middleFiveLink(middleFiveLinkArg, link, sig, mu, nu, newOprod, Pnumu, P5, Qnumu);
+
+            // determine the remaining orthogonal direction
+            int rho;
+            for (rho = 0; rho < 4; rho++) {
+              if (rho != pos_dir(sig) && rho != pos_dir(mu) && rho != pos_dir(nu))
+                break;
+            }
+
+            // Fused 7-link middle and side link with 5-link side link:
+            // In/out: newOprod, P3 (called shortP), 
+            // In: P5, Pmunu (called "oprod"), Qnumu, link
+            AllSevenSideFiveLinkArg<Float, nColor, recon> argAll(newOprod, P3, P5, Pnumu, Qnumu, link, act_path_coeff);
+            AllSevenSideFiveLinkForce<decltype(argAll)> all(argAll, link, sig, mu, nu, rho, newOprod, P3);
+
+          } //nu
+        } else {
+          // optimized, more fused path
+          // Uses a "double buffer" for P5/Pnumu/Qnumu
+
+          // unroll the nu loop
+          std::vector<std::pair<int, int> > nu_rho_pairs;
+          nu_rho_pairs.reserve(4);
+          for (int nu = 0; nu < 8; nu++) {
+            if (pos_dir(nu) == pos_dir(sig) || pos_dir(nu) == pos_dir(mu)) continue;
+            int rho;
+            for (rho = 0; rho < 4; rho++) {
+              if (rho != pos_dir(sig) && rho != pos_dir(mu) && rho != pos_dir(nu))
+                break;
+            }
+            nu_rho_pairs.emplace_back(std::make_pair(nu, rho));
+          }
+
+          // first: just MiddleFiveLink
+          // In/out: newOprod
+          // Out: P5, Pnumu, Qnumu
+          // In: Pmu, link
+          // Ignored: P5_2, Pnumu_2, Qnumu_2 (since this is MiddleFive only)
+          AllFiveAllSevenLinkArg<Float, nColor, recon> midarg0(newOprod, P3, Pmu, P5_2, Pnumu_2, Qnumu_2, P5, Pnumu, Qnumu, link, act_path_coeff);
+          AllFiveAllSevenLinkForce<decltype(midarg0)> midarglink0(midarg0, link, sig, mu, -1, -1, nu_rho_pairs[0].first, newOprod, P3, P5, Pnumu, Qnumu);
+
+          // next: fully fused kernels
+          // In/out: new Oprod, P3 (called shortP)
+          // In: Pmu, P5, Pnumu, Qnumu, link
+          // Out: P5_2, Pnumu_2, Qnumu_2
+          AllFiveAllSevenLinkArg<Float, nColor, recon> midarg1(newOprod, P3, Pmu, P5, Pnumu, Qnumu, P5_2, Pnumu_2, Qnumu_2, link, act_path_coeff);
+          AllFiveAllSevenLinkForce<decltype(midarg1)> midarglink1(midarg1, link, sig, mu, nu_rho_pairs[0].first, nu_rho_pairs[0].second, nu_rho_pairs[1].first, newOprod, P3, P5_2, Pnumu_2, Qnumu_2);
+
+          AllFiveAllSevenLinkArg<Float, nColor, recon> midarg2(newOprod, P3, Pmu, P5_2, Pnumu_2, Qnumu_2, P5, Pnumu, Qnumu, link, act_path_coeff);
+          AllFiveAllSevenLinkForce<decltype(midarg2)> midarglink2(midarg2, link, sig, mu, nu_rho_pairs[1].first, nu_rho_pairs[1].second, nu_rho_pairs[2].first, newOprod, P3, P5, Pnumu, Qnumu);
+
+          AllFiveAllSevenLinkArg<Float, nColor, recon> midarg3(newOprod, P3, Pmu, P5, Pnumu, Qnumu, P5_2, Pnumu_2, Qnumu_2, link, act_path_coeff);
+          AllFiveAllSevenLinkForce<decltype(midarg3)> midarglink3(midarg3, link, sig, mu, nu_rho_pairs[2].first, nu_rho_pairs[2].second, nu_rho_pairs[3].first, newOprod, P3, P5_2, Pnumu_2, Qnumu_2);
+
+          // last: just SideFiveAllSevenLink
+          // In/out: newOprod, P3 (called shortP)
+          // In: P5_2, Pnumu_2, Qnumu_2, link
+          // Out: none
+          // Ignored: Pmu, P5, Pnumu, Qnumu
+          AllFiveAllSevenLinkArg<Float, nColor, recon> midarg4(newOprod, P3, Pmu, P5_2, Pnumu_2, Qnumu_2, P5, Pnumu, Qnumu, link, act_path_coeff);
+          AllFiveAllSevenLinkForce<decltype(midarg4)> midarglink4(midarg4, link, sig, mu, nu_rho_pairs[3].first, nu_rho_pairs[3].second, -1, newOprod, P3, P5, Pnumu, Qnumu);
+
+        }
+      }
+
       HisqStaplesForce(GaugeField &Pmu, GaugeField &P3, GaugeField &P5, GaugeField &Pnumu, GaugeField &Qnumu,
                        GaugeField &P5_2, GaugeField &Pnumu_2, GaugeField &Qnumu_2, GaugeField &newOprod,
                        const GaugeField &oprod, const GaugeField &link,
                        const double *path_coeff_array)
       {
-        using real = typename mapper<Float>::type;
         PathCoefficients<real> act_path_coeff(path_coeff_array);
 
         {
@@ -619,81 +703,9 @@ namespace quda {
             MiddleThreeLinkArg<Float, nColor, recon> middleThreeLinkArg(newOprod, Pmu, P3, oprod, link, act_path_coeff);
             MiddleThreeLinkForce<decltype(middleThreeLinkArg)> middleThreeLink(middleThreeLinkArg, link, sig, mu, newOprod, Pmu, P3);
 
-            constexpr bool low_memory_path = true;
+            constexpr bool low_memory_path = false;
 
-            if constexpr (low_memory_path) {
-              for (int nu=0; nu < 8; nu++) {
-                if (nu == sig || nu == opp_dir(sig) || nu == mu || nu == opp_dir(mu)) continue;
-
-                // 5-link: middle link
-                // In/out: newOprod
-                // Out: Pnumu, P5, Qnumu
-                // In: Pmu, link
-                MiddleFiveLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, Pnumu, P5, Qnumu, Pmu, link, act_path_coeff);
-                MiddleFiveLinkForce<decltype(middleFiveLinkArg)> middleFiveLink(middleFiveLinkArg, link, sig, mu, nu, newOprod, Pnumu, P5, Qnumu);
-
-                // determine the remaining orthogonal direction
-                int rho;
-                for (rho = 0; rho < 4; rho++) {
-                  if (rho != pos_dir(sig) && rho != pos_dir(mu) && rho != pos_dir(nu))
-                    break;
-                }
-
-                // Fused 7-link middle and side link with 5-link side link:
-                // In/out: newOprod, P3 (called shortP), 
-                // In: P5, Pmunu (called "oprod"), Qnumu, link
-                AllSevenSideFiveLinkArg<Float, nColor, recon> argAll(newOprod, P3, P5, Pnumu, Qnumu, link, act_path_coeff);
-                AllSevenSideFiveLinkForce<decltype(argAll)> all(argAll, link, sig, mu, nu, rho, newOprod, P3);
-
-              } //nu
-            } else {
-              // optimized, more fused path
-              // Uses a "double buffer" for P5/Pnumu/Qnumu
-
-              // unroll the nu loop
-              std::vector<std::pair<int, int> > nu_rho_pairs;
-              nu_rho_pairs.reserve(4);
-              for (int nu = 0; nu < 8; nu++) {
-                if (pos_dir(nu) == pos_dir(sig) || pos_dir(nu) == pos_dir(mu)) continue;
-                int rho;
-                for (rho = 0; rho < 4; rho++) {
-                  if (rho != pos_dir(sig) && rho != pos_dir(mu) && rho != pos_dir(nu))
-                    break;
-                }
-                nu_rho_pairs.emplace_back(std::make_pair(nu, rho));
-              }
-
-              // first: just MiddleFiveLink
-              // In/out: newOprod
-              // Out: P5, Pnumu, Qnumu
-              // In: Pmu, link
-              // Ignored: P5_2, Pnumu_2, Qnumu_2 (since this is MiddleFive only)
-              AllFiveAllSevenLinkArg<Float, nColor, recon> midarg0(newOprod, P3, Pmu, P5_2, Pnumu_2, Qnumu_2, P5, Pnumu, Qnumu, link, act_path_coeff);
-              AllFiveAllSevenLinkForce<decltype(midarg0)> midarglink0(midarg0, link, sig, mu, -1, -1, nu_rho_pairs[0].first, newOprod, P3, P5, Pnumu, Qnumu);
-
-              // next: fully fused
-              // In/out: new Oprod, P3 (called shortP)
-              // In: Pmu, P5, Pnumu, Qnumu, link
-              // Out: P5_2, Pnumu_2, Qnumu_2
-              AllFiveAllSevenLinkArg<Float, nColor, recon> midarg1(newOprod, P3, Pmu, P5, Pnumu, Qnumu, P5_2, Pnumu_2, Qnumu_2, link, act_path_coeff);
-              AllFiveAllSevenLinkForce<decltype(midarg1)> midarglink1(midarg1, link, sig, mu, nu_rho_pairs[0].first, nu_rho_pairs[0].second, nu_rho_pairs[1].first, newOprod, P3, P5_2, Pnumu_2, Qnumu_2);
-
-              AllFiveAllSevenLinkArg<Float, nColor, recon> midarg2(newOprod, P3, Pmu, P5_2, Pnumu_2, Qnumu_2, P5, Pnumu, Qnumu, link, act_path_coeff);
-              AllFiveAllSevenLinkForce<decltype(midarg2)> midarglink2(midarg2, link, sig, mu, nu_rho_pairs[1].first, nu_rho_pairs[1].second, nu_rho_pairs[2].first, newOprod, P3, P5, Pnumu, Qnumu);
-
-              // next: fully fused
-              AllFiveAllSevenLinkArg<Float, nColor, recon> midarg3(newOprod, P3, Pmu, P5, Pnumu, Qnumu, P5_2, Pnumu_2, Qnumu_2, link, act_path_coeff);
-              AllFiveAllSevenLinkForce<decltype(midarg3)> midarglink3(midarg3, link, sig, mu, nu_rho_pairs[2].first, nu_rho_pairs[2].second, nu_rho_pairs[3].first, newOprod, P3, P5_2, Pnumu_2, Qnumu_2);
-
-              // last: just SideFiveAllSevenLink
-              // In/out: newOprod, P3 (called shortP)
-              // In: P5_2, Pnumu_2, Qnumu_2, link
-              // Out: none
-              // Ignored: P5, Pnumu, Qnumu
-              AllFiveAllSevenLinkArg<Float, nColor, recon> midarg4(newOprod, P3, Pmu, P5_2, Pnumu_2, Qnumu_2, P5, Pnumu, Qnumu, link, act_path_coeff);
-              AllFiveAllSevenLinkForce<decltype(midarg4)> midarglink4(midarg4, link, sig, mu, nu_rho_pairs[3].first, nu_rho_pairs[3].second, -1, newOprod, P3, P5, Pnumu, Qnumu);
-
-            }
+            hisqFiveSeven<low_memory_path>(newOprod, P3, P5, Pnumu, Qnumu, P5_2, Pnumu_2, Qnumu_2, Pmu, link, act_path_coeff, sig, mu);
 
             // Side 3-link, fused with Lepage all link when the lepage coeff != 0.
             // In/out: newOprod

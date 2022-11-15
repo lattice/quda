@@ -905,8 +905,6 @@ namespace quda {
         int parity_a = parity;
         int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
         int parity_b = 1 - parity;
-        int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
-        int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
 
 #pragma unroll
         for (int d=0; d<4; d++) y[d] = x[d];
@@ -1070,9 +1068,6 @@ namespace quda {
 
         int cb_link_nbr_idx = nu_side_positive ? point_c : point_b;
         int cb_link_nbr_parity = nu_side_positive ? parity_c : parity_b;
-
-        int ab_link_nbr_idx = sig_positive ? point_a : point_b;
-        int ab_link_nbr_parity = sig_positive ? parity_a : parity_b;
 
         // Load link and outer product contributions for pNuMu, P5, qNuMu
         Link Ubc = arg.link(pos_dir(arg.nu_next), cb_link_nbr_idx, cb_link_nbr_parity);
