@@ -34,6 +34,12 @@ namespace quda {
     };
 
     enum {
+      MU_NEXT_POSITIVE = 1,
+      MU_NEXT_NEGATIVE = 0,
+      MU_NEXT_IGNORED = -1
+    };
+
+    enum {
       NU_POSITIVE = 1,
       NU_NEGATIVE = 0,
       NU_IGNORED = -1
@@ -133,6 +139,9 @@ namespace quda {
       int sig;
       int compute_lepage;
 
+      // for fused all 3 all lepage
+      int mu_next;
+
       // for fused all 5 all seven
       int nu_next;
 
@@ -159,7 +168,7 @@ namespace quda {
       }
     };
 
-    template <typename Arg_, int sig_positive_, int mu_positive_ = -1, int nu_positive_ = -1, int nu_side_positive_ = -1, int compute_lepage_ = -1>
+    template <typename Arg_, int sig_positive_, int mu_positive_ = -1, int mu_side_positive_ = -1, int nu_positive_ = -1, int nu_side_positive_ = -1, int compute_lepage_ = -1>
     struct FatLinkParam : kernel_param<> {
       // whether the sig direction, if relevant, is forwards or backwards
       static constexpr int sig_positive = sig_positive_;
@@ -167,11 +176,13 @@ namespace quda {
       // whether the mu direction, if relevant, is forwards or backwards
       static constexpr int mu_positive = mu_positive_;
 
+      // whether the next mu direction, if relevant, is forwards or backwards
+      static constexpr int mu_side_positive = mu_side_positive_;
+
       // whether the nu direction, if relevant, is forwards or backwards
       static constexpr int nu_positive = nu_positive_;
 
       // for fused AllFiveAllSeven, whether the nu direction for the side 5 is forwards or backwards
-      // I guess this is always technically the opposite of nu_positive...
       static constexpr int nu_side_positive = nu_side_positive_;
 
       // whether or not to compute the lepage contribution
@@ -228,193 +239,45 @@ namespace quda {
       }
     };
 
-    /**************************middleThreeLinkKernel*****************************
+    /************************AllThreeAllLepageLink******************************
+     * Fully fused kernels which handle all force contributions from the 3-link
+     * term and the Lepage contribution (when the Lepage coefficient != 0).
      *
+     * Link diagrams, where "A" is the unit point:
      *
-     * Generally we need
-     * READ
-     *    2 LINKS:         ab_link,     bc_link
-     *    1 COLOR MATRIX:  oprod_at_C
-     * WRITE
-     *    2 COLOR MATRIX:  P3_at_A, Pmu_at_B
+     *         Lepage and 3-link side-link:
      *
-     * If sig is positive, we additionally:
-     * READ
-     *    1 LINK:          da_link
-     *    1 COLOR MATRIX:  newOprod_{sig}_at_A
-     * WRITE
-     *    1 COLOR MATRIX:  newOprod_{sig}_at_A
+     *                sig
+     *            F        E
+     *             |      |
+     *            A|______|B
+     *          mu |      |
+     *            D|      |C
+     *             |
+     *            I|
      *
-     * Therefore the data traffic, in two-number pair (num_of_link, num_of_color_matrix)
-     *   Call 1:  (called 48 times, half positive sig, half negative sig)
-     *             if (sig is positive):    (2, 5)
-     *             else                :    (3, 3)
-     *
-     * Flop count, in three-number pair (matrix_multi, matrix_add, matrix_rescale)
-     *   call 1:     if (sig is positive)  (3, 1, 1)
-     *               else                  (2, 0, 0)
-     *
-     ****************************************************************************/
+     *    3-link middle-link:
+     *                sig
+     *            A _______ B
+     *    mu_next  |       |
+     *            H|       |G
+     *   
+     *   Variables have been named to reflection dimensionality for
+     *   mu_positive == true, sig_positive == true, mu_next_positive == true
+     **************************************************************************/
     template <typename store_t, int nColor_, QudaReconstructType recon>
-    struct MiddleThreeLinkArg : public BaseForceArg<store_t, nColor_, recon> {
+    struct AllThreeAllLepageLinkArg : public BaseForceArg<store_t, nColor_, recon> {
       using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
       using Gauge = typename gauge_mapper<real, recon>::type;
 
       Gauge force;
-      Gauge pMu;
       Gauge p3;
 
       const Gauge oProd;
-      const real coeff_three;
-
-      static constexpr int overlap = 2;
-
-      MiddleThreeLinkArg(GaugeField &force, GaugeField &pMu, GaugeField &P3,
-                 const GaugeField &oProd, const GaugeField &link,
-                  const PathCoefficients<real> &act_path_coeff)
-        : BaseForceArg(link, overlap), force(force), pMu(pMu), p3(P3),
-        oProd(oProd), coeff_three(act_path_coeff.three)
-      { }
-
-    };
-
-    template <typename Param> struct MiddleThreeLink
-    {
-      using Arg = typename Param::Arg;
-      using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
-      const Arg &arg;
-
-      static constexpr int sig_positive = Param::sig_positive;
-      static constexpr int mu_positive = Param::mu_positive;
-      static_assert(Param::nu_positive == -1, "nu_positive should be set to -1 for MiddleThreeLink");
-      static_assert(Param::compute_lepage == -1, "compute_lepage should be set to -1 for MiddleThreeLink");
-
-      constexpr MiddleThreeLink(const Param &param) : arg(param.arg) {}
-      constexpr static const char *filename() { return KERNEL_FILE; }
-
-      __device__ __host__ void operator()(int x_cb, int parity)
-      {
-        int x[4];
-        getCoords(x, x_cb, arg.D, parity);
-
-        /*        A________B
-         *   mu   |        |
-         *       D|        |C
-         *
-         *    A is the current point (sid)
-         *
-         * Variables have been named to reflection dimensionality for
-         * mu_positive == true, sig_positive == true
-         */
-
-#pragma unroll
-        for (int d = 0; d < 4; d++) x[d] += arg.base_idx[d];
-        int e_cb = linkIndex(x,arg.E);
-        parity = parity ^ arg.oddness_change;
-
-        int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_a = e_cb;
-        int parity_a = parity;
-        int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu));
-        int parity_d = 1 - parity;
-
-        int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
-        int parity_c = parity;
-        int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.mu);
-        int parity_b = 1 - parity;
-
-        int da_link_nbr_idx = mu_positive ? point_d : point_a;
-        int da_link_nbr_parity = mu_positive ? parity_d : parity_a;
-
-        int cb_link_nbr_idx = mu_positive ? point_c : point_b;
-        int cb_link_nbr_parity = mu_positive ? parity_c : parity_b;
-
-        int ab_link_nbr_idx = sig_positive ? point_a : point_b;
-        int ab_link_nbr_parity = sig_positive ? parity_a : parity_b;
-
-        int dc_link_nbr_idx = sig_positive ? point_d : point_c;
-        int dc_link_nbr_parity = sig_positive ? parity_d : parity_c;
-
-        // Load link and outer product contributions for Pmu and P3, as well as
-        // force_sig when sig is positive
-        Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
-        Link Ucb = arg.link(pos_dir(arg.mu), cb_link_nbr_idx, cb_link_nbr_parity);
-        Link Uda = arg.link(pos_dir(arg.mu), da_link_nbr_idx, da_link_nbr_parity);
-        Link Od = arg.oProd(pos_dir(arg.sig), dc_link_nbr_idx, dc_link_nbr_parity);
-
-        if constexpr (!sig_positive) Od = conj(Od);
-        if constexpr (!mu_positive) Uda = conj(Uda);
-
-        Link Oz = !mu_positive ? Ucb * Od : conj(Ucb) * Od;
-        arg.pMu(0, point_b, parity_b) = Oz;
-        arg.p3(0, point_a, parity_a) = sig_positive ? Uab * Oz : conj(Uab) * Oz;
-
-        // Update the force in the sigma direction
-        if constexpr (sig_positive) {
-          Link Oy = Oz * Uda;
-          Link oprod = arg.force(arg.sig, point_a, parity_a);
-          oprod -= arg.coeff_three * Oy;
-          arg.force(arg.sig, point_a, parity_a) = oprod;
-        }
-
-      }
-    };
-
-    /************************AllLepageSideThreeLink*****************************
-     * Note: this kernel names points differently than the other kernels, there's a diagram
-     *   within the kernel code. The site names printed below assume sig and mu are positive.
-     *   Many of the load/store locations get shifted if mu is negative; this code uses relatively
-     *  self-documenting variables, so check there for the shifted sites.
-     *
-     * If we are only computing the side three link term (when the Lepage coefficient
-     * is zero), we only need:
-     * READ
-     *    0 LINKS
-     *    2 COLOR MATRIX:  p3_at_A, da_newOprod
-     * WRITE
-     *    1 COLOR MATRIX:  da_newOprod
-     *
-     * Therefore the data traffic, in two-number pair (num of link, num_of_color_matrix), is
-     *      (sig positive or negative):   (0, 3)
-     *
-     * Flop count, in three-number set (matrix_multi, matrix_add, matrix_rescale) is (0, 1, 1)
-     *
-     * If we are are computing the Lepage middle and all link, this gets complicated.
-     * We have an additional:
-     * READ
-     *    6 LINKS:          fe_link, be_link, af_link, ab_link, cb_link, id_link
-     *    2 COLOR MATRIX:   pMu_at_b, pMu_at_c
-     * If sig is positive, we additionally:
-     * READ
-     *    1 LINK:           da_link
-     *    1 COLOR MATRIX:   newOprod_{sig}_at_A
-     * WRITE
-     *    1 COLOR MATRIX:   newOprod_{sig}_at_A
-     *
-     * The TOTAL data traffic (including side link), in two-number pair (num_of_link, num_of_color_matrix)
-     *    if (sig is positive):   (7, 7)
-     *    else:                   (6, 5)
-     *
-     * This kernel is called 48 times, 24 for sig positive and 24 for sig negative
-     *
-     * The TOTAL flop count, in three-number set (matrix_multi, matrix_add, matrix_rescale)
-     *   if (sig is positive):     (8, 4, 4)
-     *   else:                     (6, 3, 3)
-     *
-     ****************************************************************************/
-    template <typename store_t, int nColor_, QudaReconstructType recon>
-    struct AllLepageSideThreeLinkArg : public BaseForceArg<store_t, nColor_, recon> {
-      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
-      using real = typename mapper<store_t>::type;
-      static constexpr int nColor = nColor_;
-      using Gauge = typename gauge_mapper<real, recon>::type;
-
-      Gauge force;
-
-      const Gauge p3;
       const Gauge pMu;
+      Gauge pMu_2;
 
       const real coeff_three;
       const real coeff_lepage;
@@ -422,44 +285,54 @@ namespace quda {
 
       static constexpr int overlap = 2;
 
-      AllLepageSideThreeLinkArg(GaugeField &force, const GaugeField &P3, const GaugeField &pMu,
-                 const GaugeField &link,
+      AllThreeAllLepageLinkArg(GaugeField &force, GaugeField &P3, const GaugeField &oProd, const GaugeField &pMu,
+                 GaugeField &pMu_2, const GaugeField &link,
                  const PathCoefficients<real> &act_path_coeff)
-        : BaseForceArg(link, overlap), force(force), p3(P3),
-        pMu(pMu),
+        : BaseForceArg(link, overlap), force(force), p3(P3), oProd(oProd),
+        pMu(pMu), pMu_2(pMu_2),
         coeff_three(act_path_coeff.three), coeff_lepage(act_path_coeff.lepage),
         accumu_coeff_lepage(act_path_coeff.three != 0 ? act_path_coeff.lepage / act_path_coeff.three : 0)
       { }
 
     };
 
-    template <typename Param> struct AllLepageSideThreeLink
+    template <typename Param> struct AllThreeAllLepageLink
     {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
       const Arg &arg;
 
-      static_assert( (Param::compute_lepage == 1 && Param::sig_positive != -1) ||
-                     (Param::compute_lepage == 0 && Param::sig_positive == -1),
-                     "sig_positive should only be set when compute_lepage == 1 for AllLepageSideThreeLink");
       static constexpr int sig_positive = Param::sig_positive;
       static constexpr int mu_positive = Param::mu_positive;
-      static_assert(Param::nu_positive == -1, "nu_positive should be set to -1 for AllLepageSideThreeLink");
+      static constexpr int mu_side_positive = Param::mu_side_positive;
+      static_assert(Param::nu_positive == -1, "nu_positive should be set to -1 for AllThreeAllLepageLink");
+      static_assert(Param::nu_side_positive == -1, "nu_side_positive should be set to -1 for AllThreeAllLepageLink");
       static constexpr int compute_lepage = Param::compute_lepage;
 
-      constexpr AllLepageSideThreeLink(const Param &param) : arg(param.arg) {}
+      constexpr AllThreeAllLepageLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ void lepage_p3(int x[4], int e_cb, int parity, Link &p3) {
+      /**
+        @brief Compute the contribution to "P3" from the Lepage term
+        @param[in] x Local coordinate
+        @param[in] point_a Checkerboard 1-d index for unit site
+        @param[in] point_b Checkerboard 1-d index for unit site shifted in sig direction
+        @param[in] parity_a Parity of unit site
+        @param[in/out] p3 Accumulated p3 link contribution
+        @details This subset of the code computes the Lepage contribution to P3.
+          Data traffic:
+            READ: fe_link, be_link, af_link, pMu_at_b
+          Flops:
+            3 Multiplies, 1 add, 1 rescale
+      */
+      __device__ __host__ void lepage_p3(int x[4], int point_a, int point_b, int parity_a, Link &p3) {
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_a = e_cb;
-        int parity_a = parity;
         int point_f = updateCoordsIndexMILCDir(y, arg.E, arg.mu);
-        int parity_f = 1 - parity;
-        int point_e = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
-        int parity_e = parity;
-        int point_b = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu));
-        int parity_b = 1 - parity;
+        int parity_f = 1 - parity_a;
+        int point_e = getIndexMILCDir(y, arg.E, arg.sig);
+        int parity_e = parity_a;
+
+        int parity_b = 1 - parity_a;
 
         int af_link_nbr_idx = (mu_positive) ? point_a : point_f;
         int af_link_nbr_parity = (mu_positive) ? parity_a : parity_f;
@@ -481,24 +354,37 @@ namespace quda {
         p3 += arg.accumu_coeff_lepage * Ox;
       }
 
-      __device__ __host__ void lepage_force(int x[4], int e_cb, int parity, Link &force_mu) {
+      /**
+        @brief Compute the Lepage middle link and side link contribution to the force.
+        @param[in] x Local coordinate
+        @param[in] point_a Checkerboard 1-d index for unit site
+        @param[in] point_b Checkerboard 1-d index for unit site shifted in sig direction
+        @param[in] parity_a Parity of unit site
+        @param[in/out] force_mu Accumulated force in the mu direction
+        @param[in] Uab Link in the ab direction
+        @details This subset of the code computes the Lepage contribution to the fermion force.
+          Data traffic:
+            READ: cb_link, id_link, pMu_at_c
+          Flops:
+            3 Multiplies, 1 add, 1 rescale
+
+          In addition, if sig is positive:
+          Data traffic:
+            READ: da_link, force_sig_at_a
+            WRITE: force_sig_at_a
+          Flops:
+            2 multiplies, 1 add, 1 rescale
+      */
+      __device__ __host__ void lepage_force(int x[4], int point_a, int point_b, int parity_a, Link &force_mu, const Link &Uab) {
+        int parity_b = 1 - parity_a;
 
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_a = e_cb;
-        int parity_a = parity;
-        int point_b = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
-        int parity_b = 1 - parity;
-        int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
-        int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
-
-#pragma unroll
-        for (int d=0; d<4; d++) y[d] = x[d];
         int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu));
-        int parity_d = 1 - parity;
+        int parity_d = 1 - parity_a;
         int point_i = getIndexMILCDir(y, arg.E, opp_dir(arg.mu));
-        int parity_i = parity;
-        int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
-        int parity_c = parity;
+        int parity_i = parity_a;
+        int point_c = getIndexMILCDir(y, arg.E, arg.sig);
+        int parity_c = parity_a;
 
         int da_link_nbr_idx = (mu_positive) ? point_d : point_a;
         int da_link_nbr_parity = (mu_positive) ? parity_d : parity_a;
@@ -510,7 +396,6 @@ namespace quda {
         int id_link_nbr_parity = (mu_positive) ? parity_i : parity_d;
 
         // Accumulate Lepage contribution to force_mu
-        Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
         Link Ucb = arg.link(pos_dir(arg.mu), cb_link_nbr_idx, cb_link_nbr_parity);
         Link Oc = arg.pMu(0, point_c, parity_c);
         Link Uid = arg.link(pos_dir(arg.mu), id_link_nbr_idx, id_link_nbr_parity);
@@ -534,6 +419,93 @@ namespace quda {
         }
       }
 
+      /**
+        @brief Compute the 3-link middle link contribution to the force, plus begin accumulating products for
+               higher-link contributions.
+        @param[in] x Local coordinate
+        @param[in] point_a Checkerboard 1-d index for unit site
+        @param[in] point_b Checkerboard 1-d index for unit site shifted in sig direction
+        @param[in] parity_a Parity of unit site
+        @param[in] Uab Link in the ab direction
+        @details This subset of the code computes the Lepage contribution to the fermion force.
+          Data traffic:
+            READ: gb_link, oProd_at_h
+            WRITE: pMu_2_at_b, p3_at_a
+          Flops:
+            2 Multiplies
+
+          In addition, if sig is positive:
+          Data traffic:
+            READ: ha_link, force_sig_at_a
+            WRITE: force_sig_at_a
+          Flops:
+            2 multiplies, 1 add, 1 rescale
+      */
+      __device__ __host__ void middle_three(int x[4], int point_a, int point_b, int parity_a, const Link &Uab)
+      {
+        int y[4] = {x[0], x[1], x[2], x[3]};
+        int point_h = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu_next));
+        int parity_h = 1 - parity_a;
+
+        int point_g = getIndexMILCDir(y, arg.E, arg.sig);
+        int parity_g = parity_a;
+
+        int parity_b = 1 - parity_a;
+
+        int ha_link_nbr_idx = mu_side_positive ? point_h : point_a;
+        int ha_link_nbr_parity = mu_side_positive ? parity_h : parity_a;
+
+        int gb_link_nbr_idx = mu_side_positive ? point_g : point_b;
+        int gb_link_nbr_parity = mu_side_positive ? parity_g : parity_b;
+
+        int hg_link_nbr_idx = sig_positive ? point_h : point_g;
+        int hg_link_nbr_parity = sig_positive ? parity_h : parity_g;
+
+        // Load link and outer product contributions for Pmu and P3, as well as
+        // force_sig when sig is positive
+        Link Ugb = arg.link(pos_dir(arg.mu_next), gb_link_nbr_idx, gb_link_nbr_parity);
+        Link Oh = arg.oProd(pos_dir(arg.sig), hg_link_nbr_idx, hg_link_nbr_parity);
+
+        if constexpr (!sig_positive) Oh = conj(Oh);
+
+        Link Oz = !mu_side_positive ? Ugb * Oh : conj(Ugb) * Oh;
+        arg.pMu_2(0, point_b, parity_b) = Oz;
+        arg.p3(0, point_a, parity_a) = sig_positive ? Uab * Oz : conj(Uab) * Oz;
+
+        // Update the force in the sigma direction
+        if constexpr (sig_positive) {
+          Link Uha = arg.link(pos_dir(arg.mu_next), ha_link_nbr_idx, ha_link_nbr_parity);
+          if constexpr (!mu_side_positive) Uha = conj(Uha);
+
+          Link Oy = Oz * Uha;
+          Link oprod = arg.force(arg.sig, point_a, parity_a);
+          oprod -= arg.coeff_three * Oy;
+          arg.force(arg.sig, point_a, parity_a) = oprod;
+        }
+
+      }
+
+      /**
+        @brief Overall routine that manages a fully fused 3-link and Lepage term force contribution
+        @param[in] x_cb Global checkerboard coordinate
+        @param[in] parity Parity of input site
+        @details This code manages the fully fused 3-link and Lepage term force calculation, loading and
+          storing contributions shared across multiple sub-calculations, and containing the necessary
+          compile time flags to toggle bits of fusion on and off.
+
+          Data traffic:
+            READ: ab_link
+
+          If we're calculating the Lepage and 3-link side-link contribution (mu_positive != MU_IGNORED)
+          Data traffic:
+            READ: p3_at_a, force_mu_at_d
+            WRITE: force_mu_at_d
+          Flops:
+            1 add, 1 rescale
+
+          If we're calculating the 3-link middle-link contribution (mu_next_positive != MU_NEXT_IGNORED),
+          there's no extra work in this routine.
+      */
       __device__ __host__ void operator()(int x_cb, int parity)
       {
 
@@ -569,21 +541,32 @@ namespace quda {
         int da_link_nbr_idx = (mu_positive) ? point_d : point_a;
         int da_link_nbr_parity = (mu_positive) ? parity_d : parity_a;
 
-        Link p3 = arg.p3(0, point_a, parity_a);
-        Link force_mu = arg.force(pos_dir(arg.mu), da_link_nbr_idx, da_link_nbr_parity);
+        int point_b = getIndexMILCDir(x, arg.E, arg.sig);
+        int parity_b = 1 - parity;
+        int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
+        int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
 
-        if constexpr (compute_lepage) {
-          lepage_p3(x, e_cb, parity, p3);
-          lepage_force(x, e_cb, parity, force_mu);
+        Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
+
+        if constexpr (mu_positive != MU_IGNORED) {
+          Link p3 = arg.p3(0, point_a, parity_a);
+          Link force_mu = arg.force(pos_dir(arg.mu), da_link_nbr_idx, da_link_nbr_parity);
+
+          if constexpr (compute_lepage) {
+            lepage_p3(x, point_a, point_b, parity_a, p3);
+            lepage_force(x, point_a, point_b, parity_a, force_mu, Uab);
+          }
+
+          // Update force_mu
+          auto mycoeff_three = coeff_sign(goes_forward(arg.sig),parity_a)*coeff_sign(goes_forward(arg.mu),parity_a)*arg.coeff_three;
+          force_mu += mycoeff_three * (mu_positive ? p3 : conj(p3));
+          arg.force(pos_dir(arg.mu), da_link_nbr_idx, da_link_nbr_parity) = force_mu;
         }
 
-        // Update force_mu
-        auto mycoeff_three = coeff_sign(goes_forward(arg.sig),parity_a)*coeff_sign(goes_forward(arg.mu),parity_a)*arg.coeff_three;
-        force_mu += mycoeff_three * (mu_positive ? p3 : conj(p3));
-        arg.force(pos_dir(arg.mu), da_link_nbr_idx, da_link_nbr_parity) = force_mu;
+        if constexpr (mu_side_positive != MU_NEXT_IGNORED)
+          middle_three(x, point_a, point_b, parity_a, Uab);
       }
     };
-
 
     /**************************middleFiveLinkKernel*****************************
      *
