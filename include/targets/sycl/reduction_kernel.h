@@ -250,8 +250,8 @@ namespace quda {
       return QUDA_ERROR;
     }
     sycl::nd_range<3> ndRange{globalSize, localSize};
-    //err = launch<MultiReductionS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
-    err = launchX<MultiReductionS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
+    err = launch<MultiReductionS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
+    //err = launchX<MultiReductionS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("end MultiReduction\n");
     }

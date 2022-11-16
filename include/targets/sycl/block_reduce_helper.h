@@ -2,6 +2,7 @@
 
 #include <target_device.h>
 #include <reducer.h>
+#include <group_reduce.h>
 
 /**
    @file block_reduce_helper.h
@@ -96,6 +97,45 @@ namespace quda
   // pre-declaration of block_reduce that we wish to specialize
   template <bool> struct block_reduce;
 
+#if 1
+  /**
+     @brief CUDA specialization of block_reduce, building on the warp_reduce
+  */
+  template <> struct block_reduce<true> {
+    /**
+       @brief Perform a block-wide reduction
+       @param[in] value_ thread-local value to be reduced
+       @param[in] async Whether this reduction will be performed
+       asynchronously with respect to the calling threads
+       @param[in] batch The batch index of the reduction
+       @param[in] all Whether we want all threads to have visibility
+       to the result (all = true) or just the first thread in the
+       block (all = false)
+       @param[in] r The reduction operation we want to apply
+       @return The block-wide reduced value
+     */
+    template <typename T, typename reducer_t, typename param_t>
+    inline T operator()(const T &value_, bool async, int batch, bool all,
+			const reducer_t &r, const param_t &)
+    {
+      if (!async) __syncthreads(); // only synchronize if we are not pipelining
+      const int nbatch = param_t::batch_size;
+      //const int nbatch = std::min(param_t::batch_size, localRangeZ);
+      auto grp = getGroup();
+      T result;
+      //for(int i=0; i<batch_size; i++) {
+      for(int i=0; i<nbatch; i++) {
+	//T in = (i==batch) ? value_ : quda::zero<T>();
+	T in = (i==batch) ? value_ : reducer_t::init();
+	T out;
+	//blockReduceSum(grp, out, in);   // FIXME: only Sum for now
+	blockReduce(grp, out, in, r);
+	if(i==batch) result = out;
+      }
+      return result;
+    }
+  };
+#else
   /**
      @brief CUDA specialization of block_reduce, building on the warp_reduce
   */
@@ -173,6 +213,7 @@ namespace quda
       return value;
     }
   };
+#endif
 
 } // namespace quda
 

@@ -140,10 +140,10 @@ namespace quda
     //constexpr int n_batch_block_ = n_batch_block == 1;
     using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
     //__shared__ bool isLastBlockDone[n_batch_block];
-    //auto glmem = sycl::ext::oneapi::group_local_memory_for_overwrite<bool[n_batch_block]>(getGroup());
-    //bool *isLastBlockDone = *glmem.get();
+    auto glmem = sycl::ext::oneapi::group_local_memory_for_overwrite<bool[n_batch_block]>(getGroup());
+    bool *isLastBlockDone = *glmem.get();
     //auto &isLastBlockDone = *glmem;
-    auto isLastBlockDone = false; // all valid values of idx should finish at the same time
+    //auto isLastBlockDone = false; // all valid values of idx should finish at the same time
 
     T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
 
@@ -158,20 +158,23 @@ namespace quda
 
       // determine if last block
       //isLastBlockDone[target::thread_idx().z] = (value == (target::grid_dim().x - 1));
-      //isLastBlockDone[idx] = (value == (target::grid_dim().x - 1));
-      isLastBlockDone = (value == (target::grid_dim().x - 1));
+      isLastBlockDone[idx] = (value == (target::grid_dim().x - 1));
+      //isLastBlockDone = (value == (target::grid_dim().x - 1));
     }
 
-    //__syncthreads();
+    __syncthreads();
+    bool active = isLastBlockDone[idx];
     //isLastBlockDone = sycl::group_broadcast(getGroup(), isLastBlockDone);
-    isLastBlockDone = sycl::any_of_group(getGroup(), isLastBlockDone);
+    //isLastBlockDone = sycl::any_of_group(getGroup(), isLastBlockDone);
+    bool anyActive = sycl::any_of_group(getGroup(), active);
 
     // finish the reduction if last block
     //if (isLastBlockDone[target::thread_idx().z]) {
     //if (idx < arg.threads.z && isLastBlockDone[idx]) {
-    if (isLastBlockDone) {
+    //if (isLastBlockDone) {
+    if (anyActive) {
       T sum = Reducer::init();
-      if (idx < arg.threads.z) {
+      if (active && idx < arg.threads.z) {
 	auto i = target::thread_idx().y * target::block_dim().x + target::thread_idx().x;
 	sycl::atomic_fence(sycl::memory_order::acquire,sycl::memory_scope::device);
 	while (i < target::grid_dim().x) {
@@ -185,7 +188,7 @@ namespace quda
       // write out the final reduced value
       //if (target::thread_idx().y * block_size_x + target::thread_idx().x == 0) {
       //if (target::thread_idx().y * block_size_x + target::thread_idx().x == 0 && idx < arg.threads.z) {
-      if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && idx < arg.threads.z) {
+      if (active && target::thread_idx().x == 0 && target::thread_idx().y == 0 && idx < arg.threads.z) {
 	if (arg.result_d) { // write to host mapped memory
 	  //using atomic_t = typename atomic_type<T>::type;
           //constexpr size_t n = sizeof(T) / sizeof(atomic_t);
