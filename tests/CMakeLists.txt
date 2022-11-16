@@ -319,11 +319,11 @@ endif()
 
 #Smearing test
 if(QUDA_SMEAR_GAUSS_TWOLINK)
-  add_test(NAME gsmear_test
-    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gsmear_test> ${MPIEXEC_POSTFLAGS}
+  add_test(NAME staggered_gsmear_test
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gsmear_test> ${MPIEXEC_POSTFLAGS}
     --dim 2 4 6 8
     --test TwoLink
-    --gtest_output=xml:gsmear_test.xml)
+    --gtest_output=xml:staggered_gsmear_test.xml)
 endif()
 
 # loop over Dslash policies
