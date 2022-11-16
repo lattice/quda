@@ -150,6 +150,7 @@ namespace quda
 	}
 	arg.count[idx] = 0; // set to zero for next time
       }
+      return;
     }
 
     //__shared__ bool isLastBlockDone[n_batch_block];
