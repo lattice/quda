@@ -129,22 +129,22 @@ inline void blockReduceMin(sycl::group<3> grp, T &out, const T &in)
 
 
 template <typename T, typename R>
-  inline std::enable_if_t<std::is_same_v<typename R::reducer_t,quda::plus<typename R::reduce_t>>,T>
-  blockReduce(sycl::group<3> grp, T &out, const T &in, const R &)
+inline std::enable_if_t<std::is_same_v<typename R::reducer_t,quda::plus<typename R::reduce_t>>,void>
+blockReduce(sycl::group<3> grp, T &out, const T &in, const R &)
 {
   blockReduceSum(grp, out, in);
 }
 
 template <typename T, typename R>
-  inline std::enable_if_t<std::is_same_v<typename R::reducer_t,quda::maximum<typename R::reduce_t>>,T>
-  blockReduce(sycl::group<3> grp, T &out, const T &in, const R &)
+inline std::enable_if_t<std::is_same_v<typename R::reducer_t,quda::maximum<typename R::reduce_t>>,void>
+blockReduce(sycl::group<3> grp, T &out, const T &in, const R &)
 {
   blockReduceMax(grp, out, in);
 }
 
 template <typename T, typename R>
-  inline std::enable_if_t<std::is_same_v<typename R::reducer_t,quda::minimum<typename R::reduce_t>>,T>
-  blockReduce(sycl::group<3> grp, T &out, const T &in, const R &)
+inline std::enable_if_t<std::is_same_v<typename R::reducer_t,quda::minimum<typename R::reduce_t>>,void>
+blockReduce(sycl::group<3> grp, T &out, const T &in, const R &)
 {
   blockReduceMin(grp, out, in);
 }

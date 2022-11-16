@@ -122,13 +122,12 @@ namespace quda
       const int nbatch = param_t::batch_size;
       //const int nbatch = std::min(param_t::batch_size, localRangeZ);
       auto grp = getGroup();
-      T result;
+      //T result;
+      T result = reducer_t::init();
       //for(int i=0; i<batch_size; i++) {
       for(int i=0; i<nbatch; i++) {
-	//T in = (i==batch) ? value_ : quda::zero<T>();
 	T in = (i==batch) ? value_ : reducer_t::init();
 	T out;
-	//blockReduceSum(grp, out, in);   // FIXME: only Sum for now
 	blockReduce(grp, out, in, r);
 	if(i==batch) result = out;
       }
