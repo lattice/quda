@@ -47,9 +47,9 @@ namespace quda
     using type = float;
   };
 
-  template <typename T, typename U> constexpr auto get_reducer(const plus<U> &) { return plus<T>(); }
-  template <typename T, typename U> constexpr auto get_reducer(const maximum<U> &) { return maximum<T>(); }
-  template <typename T, typename U> constexpr auto get_reducer(const minimum<U> &) { return minimum<T>(); }
+  //template <typename T, typename U> constexpr auto get_reducer(const plus<U> &) { return plus<T>(); }
+  //template <typename T, typename U> constexpr auto get_reducer(const maximum<U> &) { return maximum<T>(); }
+  //template <typename T, typename U> constexpr auto get_reducer(const minimum<U> &) { return minimum<T>(); }
 
   //template <typename T, typename U> constexpr auto get_cg_reducer(const plus<U> &) { return cg::plus<T>(); }
   //template <typename T, typename U> constexpr auto get_cg_reducer(const maximum<U> &) { return cg::greater<T>(); }
@@ -79,12 +79,14 @@ namespace quda
       auto sg = sycl::ext::oneapi::experimental::this_sub_group();
       T value = value_;
 #pragma unroll
-      for (int offset = device::warp_size() / 2; offset >= 1; offset /= 2) {
+      //for (int offset = device::warp_size() / 2; offset >= 1; offset /= 2) {
+      for (int offset = param_t::width/2; offset >= 1; offset /= 2) {
 	//value = get_reducer<T>(r)(value, tile.shfl_down(value, offset));
 	value = r(value, sycl::shift_group_left(sg, value, offset));
       }
       //if (all) value = tile.shfl(value, 0);
-      if (all) value = sycl::select_from_group(sg, value, 0);
+      //if (all) value = sycl::select_from_group(sg, value, 0);
+      if (all) value = sycl::group_broadcast(sg, value);
       return value;
     }
 

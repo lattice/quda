@@ -137,8 +137,8 @@ namespace quda
   inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx)
   {
     constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
-    constexpr int n_batch_block_ = n_batch_block == 1;
-    using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block_>;
+    //constexpr int n_batch_block_ = n_batch_block == 1;
+    using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
     //__shared__ bool isLastBlockDone[n_batch_block];
     //auto glmem = sycl::ext::oneapi::group_local_memory_for_overwrite<bool[n_batch_block]>(getGroup());
     //bool *isLastBlockDone = *glmem.get();

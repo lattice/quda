@@ -227,8 +227,10 @@ namespace quda {
 		 grid_stride?"true":"false", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
 		 str(localSize).c_str(), str(arg.threads).c_str());
+      printfQuda("  Arg: %s\n", typeid(Arg).name());
       printfQuda("  reduce_t: %s\n", typeid(reduce_t).name());
       printfQuda("  Arg::max_n_batch_block: %d\n", Arg::max_n_batch_block);
+      printfQuda("  Functor::reduce_block_dim: %d\n", Functor<Arg>::reduce_block_dim);
       printfQuda("  max_block_z: %d\n",
 		 device::max_block_size()/ (tp.block.x * tp.block.y));
       printfQuda("  SLM size: %lu\n",

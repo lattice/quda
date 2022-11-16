@@ -172,7 +172,8 @@ namespace quda {
       q.submit([&](sycl::handler& h) {
 	h.parallel_for<>
 	  (ndRange, reducer_h,
-	   [=](sycl::nd_item<3> ndi, auto &reducer_d) {
+	   //[=](sycl::nd_item<3> ndi, auto &reducer_d) {
+	   [=](sycl::nd_item<3> ndi, auto &reducer_d) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
 	     F::apply(arg, ndi, reducer_d);
 	   });
       });
@@ -211,7 +212,8 @@ namespace quda {
       q.submit([&](sycl::handler& h) {
 	h.parallel_for<>
 	  (ndRange, reducer_h,
-	   [=](sycl::nd_item<3> ndi, auto &reducer_d) {
+	   //[=](sycl::nd_item<3> ndi, auto &reducer_d) {
+	   [=](sycl::nd_item<3> ndi, auto &reducer_d) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
 	     const Arg *arg2 = reinterpret_cast<const Arg*>(p);
 	     F::apply(*arg2, ndi, reducer_d);
 	   });
