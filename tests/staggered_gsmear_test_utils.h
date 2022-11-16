@@ -333,7 +333,7 @@ struct StaggeredGSmearTestWrapper {//
 
         double omega             = 2.0;
         qsm_param.n_steps        = 50;
-        qsm_param.width          = -1.0 * omega * omega / ( 4*n_steps );
+        qsm_param.width          = -1.0 * omega * omega / ( 4*smear_n_steps );
 
         qsm_param.compute_2link = 1;
         qsm_param.delete_2link  = 0;
