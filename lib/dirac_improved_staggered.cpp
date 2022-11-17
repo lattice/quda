@@ -128,8 +128,8 @@ namespace quda {
     // do nothing
   }
   
-  void DiracImprovedStaggered::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &, const double &,
-                             const int &t0, const QudaParity parity) const
+  void DiracImprovedStaggered::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double, const double,
+                             const int t0, const QudaParity parity) const
   {
     checkSpinorAlias(in, out);
 

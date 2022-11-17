@@ -137,8 +137,8 @@ namespace quda {
     StaggeredCoarseOp(Y, X, T, *gauge, *gauge, *gauge, mass, allow_truncation, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);
   }
   
-  void DiracStaggered::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &, const double &,
-                             const int &t0, const QudaParity parity) const
+  void DiracStaggered::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double, const double,
+                             const int t0, const QudaParity parity) const
   {
     checkSpinorAlias(in, out);
     

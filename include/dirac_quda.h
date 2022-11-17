@@ -225,7 +225,7 @@ namespace quda {
        smearing.
     */    
     virtual void SmearOp(ColorSpinorField &, const ColorSpinorField &, 
-                         const double&, const double &, const int &,  const QudaParity) const 
+                         const double, const double, const int, const QudaParity) const
     {
       errorQuda("Not implemented.");
     }
@@ -1377,12 +1377,12 @@ public:
      *
      * @param[out] out output smeared field
      * @param[in] in input field 
-     * @param[in] a smearing parameter
+     * @param     a (ignored)
      * @param     b (ignored)
      * @param[in] t0 time-slice index
      * @param[in] parity Parity flag
      */
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b, const int &t0,  const QudaParity parity) const;
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double a, const double b, const int t0, const QudaParity parity) const;
   };
 
   // Even-odd preconditioned staggered
@@ -1619,12 +1619,12 @@ public:
      *
      * @param[out] out output smeared field
      * @param[in]  in input field
-     * @param[in] a smearing parameter
+     * @param     a smearing parameter
      * @param     b (ignored)
      * @param[in] t0 time-slice index
      * @param[in] parity Parity flag
      */   
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b, const int &t0,  const QudaParity parity) const;    
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double a, const double b, const int t0, const QudaParity parity) const;
   };
 
   // Even-odd preconditioned staggered
