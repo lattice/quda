@@ -4012,7 +4012,8 @@ void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
 
   profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
   
-  delete gaugeSmeared;gaugeSmeared = nullptr;
+  delete gaugeSmeared;
+  gaugeSmeared = nullptr;
   delete cudaInLinkEx;
 
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
