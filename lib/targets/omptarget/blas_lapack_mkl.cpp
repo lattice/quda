@@ -91,10 +91,8 @@ namespace quda
 
         if (prec == QUDA_SINGLE_PRECISION) {
           typedef MKL_Complex8 C;
-          #pragma omp target variant dispatch use_device_ptr(A_d, dipiv, dinfo_array)
-          {
-            cgetrf_batch_strided(&n_array, &n_array, (C *)A_d, &n_array, &stride_array, dipiv, &n_array, &batch_size, dinfo_array);
-          }
+          #pragma omp dispatch is_device_ptr(A_d, dipiv, dinfo_array)
+          cgetrf_batch_strided(&n_array, &n_array, (C *)A_d, &n_array, &stride_array, dipiv, &n_array, &batch_size, dinfo_array);
           flops += batch * FLOPS_CGETRF(n, n);
 
           qudaMemcpy(info_array, dinfo_array, batch * sizeof(MKL_INT), qudaMemcpyDeviceToHost);
@@ -107,10 +105,8 @@ namespace quda
             }
           }
 
-          #pragma omp target variant dispatch use_device_ptr(A_d, Ainv_d, dipiv, dinfo_array)
-          {
-            cgetri_oop_batch_strided(&n_array, (C *)A_d, &n_array, &stride_array, dipiv, &n_array, (C *)Ainv_d, &n_array, &stride_array, &batch_size, dinfo_array);
-          }
+          #pragma omp dispatch is_device_ptr(A_d, Ainv_d, dipiv, dinfo_array)
+          cgetri_oop_batch_strided(&n_array, (C *)A_d, &n_array, &stride_array, dipiv, &n_array, (C *)Ainv_d, &n_array, &stride_array, &batch_size, dinfo_array);
           flops += batch * FLOPS_CGETRI(n);
 
           qudaMemcpy(info_array, dinfo_array, batch * sizeof(MKL_INT), qudaMemcpyDeviceToHost);
@@ -135,10 +131,8 @@ namespace quda
 #endif
         } else if (prec == QUDA_DOUBLE_PRECISION) {
           typedef MKL_Complex16 Z;
-          #pragma omp target variant dispatch use_device_ptr(A_d, dipiv, dinfo_array)
-          {
-            zgetrf_batch_strided(&n_array, &n_array, (Z *)A_d, &n_array, &stride_array, dipiv, &n_array, &batch_size, dinfo_array);
-          }
+          #pragma omp dispatch is_device_ptr(A_d, dipiv, dinfo_array)
+          zgetrf_batch_strided(&n_array, &n_array, (Z *)A_d, &n_array, &stride_array, dipiv, &n_array, &batch_size, dinfo_array);
           flops += batch * FLOPS_ZGETRF(n, n);
 
           qudaMemcpy(info_array, dinfo_array, batch * sizeof(MKL_INT), qudaMemcpyDeviceToHost);
@@ -151,10 +145,8 @@ namespace quda
             }
           }
 
-          #pragma omp target variant dispatch use_device_ptr(A_d, Ainv_d, dipiv, dinfo_array)
-          {
-            zgetri_oop_batch_strided(&n_array, (Z *)A_d, &n_array, &stride_array, dipiv, &n_array, (Z *)Ainv_d, &n_array, &stride_array, &batch_size, dinfo_array);
-          }
+          #pragma omp dispatch is_device_ptr(A_d, Ainv_d, dipiv, dinfo_array)
+          zgetri_oop_batch_strided(&n_array, (Z *)A_d, &n_array, &stride_array, dipiv, &n_array, (Z *)Ainv_d, &n_array, &stride_array, &batch_size, dinfo_array);
           flops += batch * FLOPS_CGETRI(n);
 
           qudaMemcpy(info_array, dinfo_array, batch * sizeof(MKL_INT), qudaMemcpyDeviceToHost);
@@ -374,20 +366,16 @@ namespace quda
                                             (double)(static_cast<std::complex<double>>(blas_param.beta).imag()));
 
           if (batch > 1) {
-            #pragma omp target variant dispatch use_device_ptr(A_d, B_d, C_d)
-            {
-              cblas_zgemm_batch_strided(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                        &alpha, (Z *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
-                                        (Z *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
-                                        (Z *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
-            }
+            #pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
+            cblas_zgemm_batch_strided(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
+                                      &alpha, (Z *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+                                      (Z *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
+                                      (Z *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
           } else {
-            #pragma omp target variant dispatch use_device_ptr(A_d, B_d, C_d)
-            {
-              cblas_zgemm(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
-                          (Z *)A_d + blas_param.a_offset, blas_param.lda, (Z *)B_d + blas_param.b_offset,
-                          blas_param.ldb, &beta, (Z *)C_d + blas_param.c_offset, blas_param.ldc);
-            }
+            #pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
+            cblas_zgemm(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
+                        (Z *)A_d + blas_param.a_offset, blas_param.lda, (Z *)B_d + blas_param.b_offset,
+                        blas_param.ldb, &beta, (Z *)C_d + blas_param.c_offset, blas_param.ldc);
           }
           flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_C) {
@@ -402,20 +390,16 @@ namespace quda
                                           (float)(static_cast<std::complex<double>>(blas_param.beta).imag()));
 
           if (batch > 1) {
-            #pragma omp target variant dispatch use_device_ptr(A_d, B_d, C_d)
-            {
-              cblas_cgemm_batch_strided(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                         &alpha, (C *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
-                                         (C *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
-                                         (C *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
-            }
+            #pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
+            cblas_cgemm_batch_strided(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
+                                      &alpha, (C *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+                                      (C *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
+                                      (C *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
           } else {
-            #pragma omp target variant dispatch use_device_ptr(A_d, B_d, C_d)
-            {
-              cblas_cgemm(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
-                          (C *)A_d + blas_param.a_offset, blas_param.lda, (C *)B_d + blas_param.b_offset,
-                          blas_param.ldb, &beta, (C *)C_d + blas_param.c_offset, blas_param.ldc);
-            }
+            #pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
+            cblas_cgemm(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
+                        (C *)A_d + blas_param.a_offset, blas_param.lda, (C *)B_d + blas_param.b_offset,
+                        blas_param.ldb, &beta, (C *)C_d + blas_param.c_offset, blas_param.ldc);
           }
           flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_D) {
@@ -426,20 +410,16 @@ namespace quda
           const D beta = (D)(static_cast<std::complex<double>>(blas_param.beta).real());
 
           if (batch > 1) {
-            #pragma omp target variant dispatch use_device_ptr(A_d, B_d, C_d)
-            {
-              cblas_dgemm_batch_strided(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                        alpha, (D *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
-                                        (D *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, beta,
-                                        (D *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
-            }
+            #pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
+            cblas_dgemm_batch_strided(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
+                                      alpha, (D *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+                                      (D *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, beta,
+                                      (D *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
           } else {
-            #pragma omp target variant dispatch use_device_ptr(A_d, B_d, C_d)
-            {
-              cblas_dgemm(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
-                          (D *)A_d + blas_param.a_offset, blas_param.lda, (D *)B_d + blas_param.b_offset,
-                          blas_param.ldb, beta, (D *)C_d + blas_param.c_offset, blas_param.ldc);
-            }
+            #pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
+            cblas_dgemm(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+                        (D *)A_d + blas_param.a_offset, blas_param.lda, (D *)B_d + blas_param.b_offset,
+                        blas_param.ldb, beta, (D *)C_d + blas_param.c_offset, blas_param.ldc);
           }
           flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_S) {
@@ -450,20 +430,16 @@ namespace quda
           const S beta = (S)(static_cast<std::complex<float>>(blas_param.beta).real());
 
           if (batch > 1) {
-            #pragma omp target variant dispatch use_device_ptr(A_d, B_d, C_d)
-            {
-              cblas_sgemm_batch_strided(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                        alpha, (S *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
-                                        (S *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, beta,
-                                        (S *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
-            }
+            #pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
+            cblas_sgemm_batch_strided(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
+                                      alpha, (S *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+                                      (S *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, beta,
+                                      (S *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
           } else {
-            #pragma omp target variant dispatch use_device_ptr(A_d, B_d, C_d)
-            {
-              cblas_sgemm(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
-                          (S *)A_d + blas_param.a_offset, blas_param.lda, (S *)B_d + blas_param.b_offset,
-                          blas_param.ldb, beta, (S *)C_d + blas_param.c_offset, blas_param.ldc);
-            }
+            #pragma omp dispatch is_device_ptr(A_d, B_d, C_d)
+            cblas_sgemm(CblasColMajor, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+                        (S *)A_d + blas_param.a_offset, blas_param.lda, (S *)B_d + blas_param.b_offset,
+                        blas_param.ldb, beta, (S *)C_d + blas_param.c_offset, blas_param.ldc);
           }
           flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else {
