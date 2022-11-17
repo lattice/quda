@@ -1619,7 +1619,7 @@ public:
      *
      * @param[out] out output smeared field
      * @param[in]  in input field
-     * @param     a smearing parameter
+     * @param     a (ignored)
      * @param     b (ignored)
      * @param[in] t0 time-slice index
      * @param[in] parity Parity flag
