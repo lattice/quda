@@ -11,6 +11,8 @@ namespace quda {
 
   namespace fermion_force {
 
+    typedef std::reference_wrapper<GaugeField> GaugeField_ref;
+
     template <typename Arg> class OneLinkForce : public TunableKernel3D {
       Arg &arg;
       const GaugeField &force;
@@ -203,203 +205,6 @@ namespace quda {
       }
     };
 
-    template <typename Arg> class MiddleFiveLinkForce : public TunableKernel2D {
-      Arg &arg;
-      const GaugeField &force;
-      const GaugeField &pNuMu;
-      const GaugeField &p5;
-      const GaugeField &qNuMu;
-      const GaugeField &link;
-      unsigned int minThreads() const { return arg.threads.x; }
-
-    public:
-      MiddleFiveLinkForce(Arg &arg, const GaugeField &link, int sig, int mu, int nu,
-                   const GaugeField &force, const GaugeField &pNuMu,
-                   const GaugeField &p5, const GaugeField &qNuMu) :
-        TunableKernel2D(link, 2),
-        arg(arg),
-        force(force),
-        pNuMu(pNuMu),
-        p5(p5),
-        qNuMu(qNuMu),
-        link(link)
-      {
-        arg.sig = sig;
-        arg.mu = mu;
-        arg.nu = nu;
-
-        char aux2[16];
-        strcat(aux, comm_dim_partitioned_string());
-        strcat(aux, ",threads=");
-        u32toa(aux2, arg.threads.x);
-        strcat(aux, aux2);
-        strcat(aux, ",sig=");
-        u32toa(aux2, arg.sig);
-        strcat(aux, aux2);
-        strcat(aux, ",mu=");
-        u32toa(aux2, arg.mu);
-        strcat(aux, aux2);
-        strcat(aux, ",nu=");
-        u32toa(aux2, arg.nu);
-        strcat(aux, aux2);
-
-        apply(device::get_default_stream());
-      }
-
-      template <int sig, int mu>
-      void instantiate(int nu, TuneParam &tp, const qudaStream_t &stream) {
-        if (goes_forward(nu)) launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, sig, mu, MU_NEXT_IGNORED, NU_POSITIVE>(arg));
-        else launch<MiddleFiveLink>(tp, stream, FatLinkParam<Arg, sig, mu, MU_NEXT_IGNORED, NU_NEGATIVE>(arg));
-      }
-
-      template <int sig>
-      void instantiate(int mu, int nu, TuneParam &tp, const qudaStream_t &stream) {
-        if (goes_forward(mu)) instantiate<sig, MU_POSITIVE>(nu, tp, stream);
-        else instantiate<sig, MU_NEGATIVE>(nu, tp, stream);
-      }
-
-      void instantiate(int sig, int mu, int nu, TuneParam &tp, const qudaStream_t &stream) {
-        if (goes_forward(sig)) instantiate<SIG_POSITIVE>(mu, nu, tp, stream);
-        else instantiate<SIG_NEGATIVE>(mu, nu, tp, stream);
-      }
-
-      void apply(const qudaStream_t &stream)
-      {
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        instantiate(arg.sig, arg.mu, arg.nu, tp, stream);
-      }
-
-      void preTune() {
-        pNuMu.backup();
-        p5.backup();
-        force.backup();
-        qNuMu.backup();
-      }
-
-      void postTune() {
-        pNuMu.restore();
-        p5.restore();
-        force.restore();
-        qNuMu.restore();
-      }
-
-      long long flops() const {
-        long long multiplies_per_site = 3ll;
-        long long adds_per_site = 0ll;
-        long long rescales_per_site = 0ll;
-        if (goes_forward(arg.sig)) {
-          multiplies_per_site += 1ll;
-          adds_per_site += 1ll;
-          rescales_per_site += 1ll;
-        }
-        return 2*arg.threads.x*(198ll * multiplies_per_site + 18ll * adds_per_site + 18ll * rescales_per_site);
-      }
-
-      long long bytes() const {
-        long long bytes_per_site = 4 * arg.link.Bytes() + arg.pMu.Bytes() + arg.p5.Bytes() +
-                                   arg.pNuMu.Bytes() + arg.qNuMu.Bytes();
-        if (goes_forward(arg.sig))
-          bytes_per_site += 2 * arg.force.Bytes();
-        return 2 * arg.threads.x * bytes_per_site;
-      }
-    };
-
-    template <typename Arg> class AllSevenSideFiveLinkForce : public TunableKernel2D {
-      Arg &arg;
-      const GaugeField &force;
-      const GaugeField &shortP;
-      const GaugeField &link;
-      unsigned int minThreads() const { return arg.threads.x; }
-
-    public:
-      AllSevenSideFiveLinkForce(Arg &arg, const GaugeField &link, int sig, int mu, int nu, int rho,
-                   const GaugeField &force, const GaugeField &shortP) :
-        TunableKernel2D(link, 2),
-        arg(arg),
-        force(force),
-        shortP(shortP),
-        link(link)
-      {
-        arg.sig = sig;
-        arg.mu = mu;
-        arg.nu = nu;
-        arg.rho = rho;
-
-        char aux2[16];
-        strcat(aux, comm_dim_partitioned_string());
-        strcat(aux, ",threads=");
-        u32toa(aux2, arg.threads.x);
-        strcat(aux, aux2);
-        strcat(aux, ",sig=");
-        u32toa(aux2, arg.sig);
-        strcat(aux, aux2);
-        strcat(aux, ",mu=");
-        u32toa(aux2, arg.mu);
-        strcat(aux, aux2);
-        strcat(aux, ",nu=");
-        u32toa(aux2, arg.nu);
-        strcat(aux, aux2);
-        strcat(aux, ",rho=");
-        u32toa(aux2, arg.rho);
-        strcat(aux, aux2);
-
-        apply(device::get_default_stream());
-      }
-
-      template <int sig, int mu>
-      void instantiate(int nu, TuneParam &tp, const qudaStream_t &stream) {
-        if (goes_forward(nu)) launch<AllSevenSideFiveLink>(tp, stream, FatLinkParam<Arg, sig, mu, MU_NEXT_IGNORED, NU_POSITIVE>(arg));
-        else launch<AllSevenSideFiveLink>(tp, stream, FatLinkParam<Arg, sig, mu, MU_NEXT_IGNORED, NU_NEGATIVE>(arg));
-      }
-
-      template <int sig>
-      void instantiate(int mu, int nu, TuneParam &tp, const qudaStream_t &stream) {
-        if (goes_forward(mu)) instantiate<sig, MU_POSITIVE>(nu, tp, stream);
-        else instantiate<sig, MU_NEGATIVE>(nu, tp, stream);
-      }
-
-      void instantiate(int sig, int mu, int nu, TuneParam &tp, const qudaStream_t &stream) {
-        if (goes_forward(sig)) instantiate<SIG_POSITIVE>(mu, nu, tp, stream);
-        else instantiate<SIG_NEGATIVE>(mu, nu, tp, stream);
-      }
-
-      void apply(const qudaStream_t &stream)
-      {
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        instantiate(arg.sig, arg.mu, arg.nu, tp, stream);
-      }
-
-      void preTune() {
-        force.backup();
-        shortP.backup();
-      }
-
-      void postTune() {
-        force.restore();
-        shortP.restore();
-      }
-
-      long long flops() const {
-        long long multiplies_per_site = 12ll;
-        long long adds_per_site = 8ll;
-        long long rescales_per_site = 6ll;
-        if (goes_forward(arg.sig)) {
-          multiplies_per_site += 5ll;
-          adds_per_site += 3ll;
-          rescales_per_site += 2ll;
-        }
-        return 2*arg.threads.x*(198ll * multiplies_per_site + 18ll * adds_per_site + 18ll * rescales_per_site);
-      }
-
-      long long bytes() const {
-        long long bytes_per_site = 9 * arg.link.Bytes() + 2 * arg.qNuMu.Bytes() + 2 * arg.pNuMu.Bytes() +
-                                   arg.p5.Bytes() + 2 * arg.shortP.Bytes() + 4 * arg.force.Bytes();
-        if (goes_forward(arg.sig))
-          bytes_per_site += arg.qNuMu.Bytes() + arg.pNuMu.Bytes() + 2 * arg.force.Bytes();
-        return 2 * arg.threads.x * bytes_per_site;
-      }
-    };
-
     template <typename Arg> class AllFiveAllSevenLinkForce : public TunableKernel2D {
       Arg &arg;
       const GaugeField &force;
@@ -443,9 +248,6 @@ namespace quda {
         if (nu != NU_IGNORED) {
           strcat(aux, ",nu=");
           u32toa(aux2, arg.nu);
-          strcat(aux, aux2);
-          strcat(aux, ",rho=");
-          u32toa(aux2, arg.rho);
           strcat(aux, aux2);
         }
         if (nu_next != NU_NEXT_IGNORED) {
@@ -515,11 +317,11 @@ namespace quda {
         // SideFiveAllSeven contribution
         if (arg.nu != NU_IGNORED) {
           multiplies_per_site += 12ll;
-          adds_per_site += 8ll;
+          adds_per_site += 7ll;
           rescales_per_site += 6ll;
           if (goes_forward(arg.sig)) {
             multiplies_per_site += 5ll;
-            adds_per_site += 3ll;
+            adds_per_site += 2ll;
             rescales_per_site += 2ll;
           }
         }
@@ -538,7 +340,6 @@ namespace quda {
       }
 
       long long bytes() const {
-        // FIXME update
         long long bytes_per_site = arg.link.Bytes();
         if (goes_forward(arg.sig)) bytes_per_site += 2 * arg.force.Bytes();
 
@@ -565,19 +366,20 @@ namespace quda {
       using real = typename mapper<Float>::type;
 
       template <bool low_memory>
-      void hisqFiveSeven(GaugeField &newOprod, GaugeField &P3, GaugeField &P5, GaugeField &Pnumu, GaugeField &Qnumu,
-                         GaugeField &P5_2, GaugeField &Pnumu_2, GaugeField &Qnumu_2, const GaugeField &Pmu,
+      void hisqFiveSeven(GaugeField &newOprod, GaugeField &P3, GaugeField_ref &P5, GaugeField_ref &Pnumu, GaugeField_ref &Qnumu,
+                         GaugeField_ref &P5_2, GaugeField_ref &Pnumu_2, GaugeField_ref &Qnumu_2, const GaugeField &Pmu,
                          const GaugeField &link, const PathCoefficients<real> &act_path_coeff, int sig, int mu) {
         if constexpr (low_memory) {
           for (int nu=0; nu < 8; nu++) {
-            if (nu == sig || nu == opp_dir(sig) || nu == mu || nu == opp_dir(mu)) continue;
+            if (pos_dir(nu) == pos_dir(sig) || pos_dir(nu) == pos_dir(mu)) continue;
 
             // 5-link: middle link
             // In/out: newOprod
-            // Out: Pnumu, P5, Qnumu
+            // Out: P5, Pnumu, Qnumu
             // In: Pmu, link
-            MiddleFiveLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, Pnumu, P5, Qnumu, Pmu, link, act_path_coeff);
-            MiddleFiveLinkForce<decltype(middleFiveLinkArg)> middleFiveLink(middleFiveLinkArg, link, sig, mu, nu, newOprod, Pnumu, P5, Qnumu);
+            // Ignored: P5_2, Pnumu_2, Qnumu_2
+            AllFiveAllSevenLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, P3, Pmu, P5_2, Pnumu_2, Qnumu_2, P5, Pnumu, Qnumu, link, act_path_coeff);
+            AllFiveAllSevenLinkForce<decltype(middleFiveLinkArg)> middleFiveLink(middleFiveLinkArg, link, sig, mu, -1, -1, nu, newOprod, P3, P5, Pnumu, Qnumu);
 
             // determine the remaining orthogonal direction
             int rho;
@@ -586,12 +388,13 @@ namespace quda {
                 break;
             }
 
-            // Fused 7-link middle and side link with 5-link side link:
-            // In/out: newOprod, P3 (called shortP), 
-            // In: P5, Pmunu (called "oprod"), Qnumu, link
-            AllSevenSideFiveLinkArg<Float, nColor, recon> argAll(newOprod, P3, P5, Pnumu, Qnumu, link, act_path_coeff);
-            AllSevenSideFiveLinkForce<decltype(argAll)> all(argAll, link, sig, mu, nu, rho, newOprod, P3);
-
+            // All 7 link, 5-link side-link
+            // In/out: newOprod, P3 (called shortP)
+            // In: P5_2, Pnumu_2, Qnumu_2, link
+            // Out: none
+            // Ignored: Pmu, P5, Pnumu, Qnumu
+            AllFiveAllSevenLinkArg<Float, nColor, recon> allSevenSideFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, P5_2, Pnumu_2, Qnumu_2, link, act_path_coeff);
+            AllFiveAllSevenLinkForce<decltype(allSevenSideFiveLinkArg)> allSevenSideLinkFive(allSevenSideFiveLinkArg, link, sig, mu, nu, rho, -1, newOprod, P3, P5_2, Pnumu_2, Qnumu_2);
           } //nu
         } else {
           // optimized, more fused path
@@ -615,36 +418,35 @@ namespace quda {
           // Out: P5, Pnumu, Qnumu
           // In: Pmu, link
           // Ignored: P5_2, Pnumu_2, Qnumu_2 (since this is MiddleFive only)
-          AllFiveAllSevenLinkArg<Float, nColor, recon> midarg0(newOprod, P3, Pmu, P5_2, Pnumu_2, Qnumu_2, P5, Pnumu, Qnumu, link, act_path_coeff);
-          AllFiveAllSevenLinkForce<decltype(midarg0)> midarglink0(midarg0, link, sig, mu, -1, -1, nu_rho_pairs[0].first, newOprod, P3, P5, Pnumu, Qnumu);
+          AllFiveAllSevenLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, P3, Pmu, P5_2, Pnumu_2, Qnumu_2, P5, Pnumu, Qnumu, link, act_path_coeff);
+          AllFiveAllSevenLinkForce<decltype(middleFiveLinkArg)> middleFiveArg(middleFiveLinkArg, link, sig, mu, -1, -1, nu_rho_pairs[0].first, newOprod, P3, P5, Pnumu, Qnumu);
 
-          // next: fully fused kernels
-          // In/out: new Oprod, P3 (called shortP)
-          // In: Pmu, P5, Pnumu, Qnumu, link
-          // Out: P5_2, Pnumu_2, Qnumu_2
-          AllFiveAllSevenLinkArg<Float, nColor, recon> midarg1(newOprod, P3, Pmu, P5, Pnumu, Qnumu, P5_2, Pnumu_2, Qnumu_2, link, act_path_coeff);
-          AllFiveAllSevenLinkForce<decltype(midarg1)> midarglink1(midarg1, link, sig, mu, nu_rho_pairs[0].first, nu_rho_pairs[0].second, nu_rho_pairs[1].first, newOprod, P3, P5_2, Pnumu_2, Qnumu_2);
+          for (int i = 0; i < 3; i++) {
+            // next: fully fused kernels
+            // In/out: new Oprod, P3 (called shortP)
+            // In: Pmu, P5, Pnumu, Qnumu, link
+            // Out: P5_2, Pnumu_2, Qnumu_2
+            AllFiveAllSevenLinkArg<Float, nColor, recon> allFiveAllSevenLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, P5_2, Pnumu_2, Qnumu_2, link, act_path_coeff);
+            AllFiveAllSevenLinkForce<decltype(allFiveAllSevenLinkArg)> allFiveAllSevenLink(allFiveAllSevenLinkArg, link, sig, mu, nu_rho_pairs[i].first, nu_rho_pairs[i].second, nu_rho_pairs[i+1].first, newOprod, P3, P5_2, Pnumu_2, Qnumu_2);
 
-          AllFiveAllSevenLinkArg<Float, nColor, recon> midarg2(newOprod, P3, Pmu, P5_2, Pnumu_2, Qnumu_2, P5, Pnumu, Qnumu, link, act_path_coeff);
-          AllFiveAllSevenLinkForce<decltype(midarg2)> midarglink2(midarg2, link, sig, mu, nu_rho_pairs[1].first, nu_rho_pairs[1].second, nu_rho_pairs[2].first, newOprod, P3, P5, Pnumu, Qnumu);
-
-          AllFiveAllSevenLinkArg<Float, nColor, recon> midarg3(newOprod, P3, Pmu, P5, Pnumu, Qnumu, P5_2, Pnumu_2, Qnumu_2, link, act_path_coeff);
-          AllFiveAllSevenLinkForce<decltype(midarg3)> midarglink3(midarg3, link, sig, mu, nu_rho_pairs[2].first, nu_rho_pairs[2].second, nu_rho_pairs[3].first, newOprod, P3, P5_2, Pnumu_2, Qnumu_2);
+            std::swap(P5, P5_2);
+            std::swap(Pnumu, Pnumu_2);
+            std::swap(Qnumu, Qnumu_2);
+          }
 
           // last: just SideFiveAllSevenLink
           // In/out: newOprod, P3 (called shortP)
-          // In: P5_2, Pnumu_2, Qnumu_2, link
+          // In: P5, Pnumu, Qnumu, link
           // Out: none
-          // Ignored: Pmu, P5, Pnumu, Qnumu
-          AllFiveAllSevenLinkArg<Float, nColor, recon> midarg4(newOprod, P3, Pmu, P5_2, Pnumu_2, Qnumu_2, P5, Pnumu, Qnumu, link, act_path_coeff);
-          AllFiveAllSevenLinkForce<decltype(midarg4)> midarglink4(midarg4, link, sig, mu, nu_rho_pairs[3].first, nu_rho_pairs[3].second, -1, newOprod, P3, P5, Pnumu, Qnumu);
-
+          // Ignored: Pmu, P5_2, Pnumu_2, Qnumu_2
+          AllFiveAllSevenLinkArg<Float, nColor, recon> allSevenSideFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, P5_2, Pnumu_2, Qnumu_2, link, act_path_coeff);
+          AllFiveAllSevenLinkForce<decltype(allSevenSideFiveLinkArg)> allSevenSideFiveLink(allSevenSideFiveLinkArg, link, sig, mu, nu_rho_pairs[3].first, nu_rho_pairs[3].second, -1, newOprod, P3, P5, Pnumu, Qnumu);
         }
       }
 
-      HisqStaplesForce(GaugeField &P3, std::reference_wrapper<GaugeField> Pmu, GaugeField &P5, GaugeField &Pnumu, GaugeField &Qnumu,
-                       std::reference_wrapper<GaugeField> Pmu_2, GaugeField &P5_2, GaugeField &Pnumu_2, GaugeField &Qnumu_2, GaugeField &newOprod,
-                       const GaugeField &oprod, const GaugeField &link,
+      HisqStaplesForce(GaugeField &P3, GaugeField_ref &Pmu, GaugeField_ref &P5, GaugeField_ref &Pnumu, GaugeField_ref &Qnumu,
+                       GaugeField_ref &Pmu_2, GaugeField_ref &P5_2, GaugeField_ref &Pnumu_2, GaugeField_ref &Qnumu_2,
+                       GaugeField &newOprod, const GaugeField &oprod, const GaugeField &link,
                        const double *path_coeff_array)
       {
         PathCoefficients<real> act_path_coeff(path_coeff_array);
@@ -659,7 +461,6 @@ namespace quda {
         constexpr bool low_memory_path = false;
 
         for (int sig=0; sig<8; sig++) {
-
           if constexpr (low_memory_path) {
             for (int mu=0; mu<8; mu++) {
               if (pos_dir(mu) == pos_dir(sig)) continue;
@@ -764,7 +565,10 @@ namespace quda {
       auto Pnumu_2 = GaugeField::Create(gauge_param);
       auto Qnumu_2 = GaugeField::Create(gauge_param);
 
-      instantiate<HisqStaplesForce, ReconstructNone>(*P3, std::reference_wrapper<GaugeField>(*Pmu), *P5, *Pnumu, *Qnumu, std::reference_wrapper<GaugeField>(*Pmu_2), *P5_2, *Pnumu_2, *Qnumu_2, newOprod, oprod, link, path_coeff_array);
+      instantiate<HisqStaplesForce, ReconstructNone>(*P3, GaugeField_ref(*Pmu),
+        GaugeField_ref(*P5), GaugeField_ref(*Pnumu), GaugeField_ref(*Qnumu),
+        GaugeField_ref(*Pmu_2), GaugeField_ref(*P5_2), GaugeField_ref(*Pnumu_2), GaugeField_ref(*Qnumu_2),
+        newOprod, oprod, link, path_coeff_array);
 
       delete Pmu;
       delete P3;
