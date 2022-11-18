@@ -1497,6 +1497,21 @@ extern "C" {
   void computeCloverForceQuda(void *mom, double dt, void **x, void **p, double *coeff, double kappa2, double ck,
 			      int nvector, double multiplicity, void *gauge,
 			      QudaGaugeParam *gauge_param, QudaInvertParam *inv_param);
+  
+  /** this is a minimal test example of a function which computes the force
+   * from a twisted clover determinant or a set of partial fractions
+   * stemming from a rational approximation suitable for use from within tmLQCD
+   *
+   * @param h_mom Host force matrix
+   * @param h_x Array of solution vectors x_i = ( Q^2 + s_i )^{-1} b
+   * @param coeff Array of coefficients for the rational approximation or {1.0} for the determinant.
+   * @param nvector Number of solution vectors and coefficients
+   * @param h_gauge Host gauge field
+   * @param gauge_param Gauge field meta data
+   * @param inv_param Dirac and solver meta data
+   * */ 
+  void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvector, void *h_gauge,
+      QudaGaugeParam *gauge_param, QudaInvertParam *inv_param);
 
   /**
    * Compute the naive staggered force.  All fields must be in the same precision.

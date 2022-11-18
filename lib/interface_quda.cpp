@@ -158,6 +158,9 @@ static TimeProfile profileExtendedGauge("createExtendedGaugeField");
 //!<Profiler for computeCloverForceQuda
 static TimeProfile profileCloverForce("computeCloverForceQuda");
 
+//!<Profiles for computeTMCloverForceQuda
+static TimeProfile profileTMCloverForce("computeTMCloverForceQuda");
+
 //!<Profiler for computeStaggeredForceQuda
 static TimeProfile profileStaggeredForce("computeStaggeredForceQuda");
 
@@ -4897,6 +4900,168 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   profileCloverForce.TPSTOP(QUDA_PROFILE_FREE);
 
   profileCloverForce.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvector, 
+    void *h_gauge, QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
+{
+  using namespace quda;
+  profileTMCloverForce.TPSTART(QUDA_PROFILE_TOTAL);
+  profileTMCloverForce.TPSTART(QUDA_PROFILE_INIT);
+
+  printQudaInvertParam(inv_param);
+
+  double kappa = inv_param->kappa;
+  double k_csw_ov_8 = kappa * inv_param->clover_csw / 8.0;
+
+  checkGaugeParam(gauge_param);
+  if (!gaugePrecise) errorQuda("No resident gauge field");
+
+  GaugeFieldParam gParamMom(*gauge_param, h_mom, QUDA_ASQTAD_MOM_LINKS);
+  // create the host momentum field
+  gParamMom.location = QUDA_CPU_FIELD_LOCATION;
+  gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
+  gParamMom.order = gauge_param->gauge_order;
+  cpuGaugeField cpuMom(gParamMom);
+
+  //create the device momentum field
+  gParamMom.location = QUDA_CUDA_FIELD_LOCATION;
+  gParamMom.create = QUDA_ZERO_FIELD_CREATE;
+  gParamMom.order = QUDA_FLOAT2_GAUGE_ORDER;
+  cudaGaugeField gpuMom(gParamMom);
+
+  // create the device force field
+  gParamMom.link_type = QUDA_GENERAL_LINKS;
+  gParamMom.create = QUDA_ZERO_FIELD_CREATE;
+  gParamMom.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gParamMom.reconstruct = QUDA_RECONSTRUCT_NO;
+  cudaGaugeField cudaForce(gParamMom);
+
+  ColorSpinorParam qParam;
+  qParam.location = QUDA_CUDA_FIELD_LOCATION;
+  qParam.nColor = 3;
+  qParam.nSpin = 4;
+  qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  qParam.nDim = 4;
+  qParam.setPrecision(gParamMom.Precision());
+  qParam.pad = 0;
+  qParam.pc_type = QUDA_4D_PC;
+  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) { qParam.pc_type = QUDA_5D_PC; }
+  for(int dir = 0; dir<4; ++dir) qParam.x[dir] = gParamMom.x[dir];
+
+  // create the device quark field
+  qParam.create = QUDA_NULL_FIELD_CREATE;
+  qParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+
+  std::vector<ColorSpinorField*> quarkX, quarkP;
+  for (int i=0; i<nvector; i++){
+    quarkX.push_back(ColorSpinorField::Create(qParam));
+    quarkP.push_back(ColorSpinorField::Create(qParam));
+  }
+
+  qParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+  qParam.x[0] /= 2;
+  ColorSpinorField tmp(qParam);
+
+  bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) || 
+    (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE);
+
+  DiracParam diracParam;
+  setDiracParam(diracParam, inv_param, pc_solve);
+  Dirac *dirac = Dirac::create(diracParam);
+
+  cudaGaugeField &gaugeEx = *extendedGaugeResident;
+
+  // create oprod and trace field
+  gParamMom.geometry = QUDA_TENSOR_GEOMETRY;
+  cudaGaugeField oprod(gParamMom);
+
+  // create the host quark field
+  qParam.location = QUDA_CPU_FIELD_LOCATION;
+  qParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  qParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  qParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+
+  std::vector<double> force_coeff(nvector);
+  for(int i=0; i<nvector; i++){
+    force_coeff[i] = 1.0 * coeff[i];
+
+    ColorSpinorField &x = *(quarkX[i]);
+    ColorSpinorField &p = *(quarkP[i]);
+
+    qParam.v = h_x[i];
+    ColorSpinorField cpuQuarkX(qParam);
+
+    profileTMCloverForce.TPSTOP(QUDA_PROFILE_INIT);
+    profileTMCloverForce.TPSTART(QUDA_PROFILE_H2D);
+    x.Even() = cpuQuarkX; // in tmLQCD-parlance this is the even part of X
+    profileTMCloverForce.TPSTOP(QUDA_PROFILE_H2D);
+    profileTMCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
+
+    printfQuda("Dslash(x.Odd(), x.Even(), QUDA_ODD_PARITY)\n");
+    dirac->Dslash(x.Odd(), x.Even(), QUDA_ODD_PARITY);
+    
+    // want to apply \hat Q_{-} = \hat M_{+}^\dagger \gamma_5 to get Y_o
+    printfQuda("gamma5(tmp, x.Even())\n");
+    gamma5(tmp, x.Even());
+    dirac->Dagger(QUDA_DAG_YES);
+    printfQuda("M(p.Even(), tmp)\n");
+    dirac->M(p.Even(), tmp); // this is the even part of Y
+    dirac->Dagger(QUDA_DAG_NO);
+    printfQuda("Dslash(p.Odd(), p.Even(), QUDA_ODD_PARITY)\n");
+    dirac->Dslash(p.Odd(), p.Even(), QUDA_ODD_PARITY); // and now the odd part of Y
+     
+    profileTMCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profileTMCloverForce.TPSTART(QUDA_PROFILE_INIT);
+  }
+
+  profileTMCloverForce.TPSTOP(QUDA_PROFILE_INIT);
+  profileTMCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
+  
+  printfQuda("computeCloverForce(cudaForce, *gaugePrecise, quarkX, quarkP, force_coeff);");
+  computeCloverForce(cudaForce, *gaugePrecise, quarkX, quarkP, force_coeff);
+  printfQuda("computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8);");
+  computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8); 
+
+  // FIXME: these need to be checked
+  std::vector< std::vector<double> > ferm_epsilon(nvector);
+  for (int i = 0; i < nvector; i++) {
+    ferm_epsilon[i].reserve(2);
+    ferm_epsilon[i][0] = - k_csw_ov_8 * coeff[i];
+    ferm_epsilon[i][1] = - 2.0 * k_csw_ov_8 * coeff[i]; 
+  }
+
+  printfQuda("computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon)\n");
+  computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon);
+
+  cudaGaugeField *oprodEx = createExtendedGauge(oprod, R, profileTMCloverForce);
+
+  profileTMCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
+
+  printfQuda("cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_ODD_PARITY)\n");
+  cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_ODD_PARITY);
+  printfQuda("cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_EVEN_PARITY)\n");
+  cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_EVEN_PARITY);
+
+  updateMomentum(gpuMom, -1.0, cudaForce, "tmclover");
+  profileTMCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileTMCloverForce.TPSTART(QUDA_PROFILE_D2H);
+  gpuMom.saveCPUField(cpuMom);
+  profileTMCloverForce.TPSTOP(QUDA_PROFILE_D2H);
+
+  profileTMCloverForce.TPSTART(QUDA_PROFILE_FREE);
+  for (int i = 0; i < nvector; i++){
+    delete quarkX[i];
+    delete quarkP[i];
+  }
+
+  delete dirac;
+
+  profileTMCloverForce.TPSTOP(QUDA_PROFILE_FREE);
+  profileTMCloverForce.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 void updateGaugeFieldQuda(void* gauge,
