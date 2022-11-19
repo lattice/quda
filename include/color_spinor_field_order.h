@@ -610,6 +610,7 @@ namespace quda
     {
     protected:
       GhostOrder() = default;
+      GhostOrder(const GhostOrder &) = default;
       GhostOrder(const ColorSpinorField &, int, void * const *) { }
       GhostOrder &operator=(const GhostOrder &) = default;
     };
@@ -650,6 +651,7 @@ namespace quda
 
     public:
       GhostOrder() = default;
+      GhostOrder(const GhostOrder &) = default;
 
       GhostOrder(const ColorSpinorField &field, int nFace, void * const *ghost_ = nullptr) :
         nParity(field.SiteSubset()), ghostAccessor(field, nFace)
@@ -820,6 +822,7 @@ namespace quda
     public:
       using real = Float;
       FieldOrderCB() = default;
+      FieldOrderCB(const FieldOrderCB&) = default;
 
       /**
        * Constructor for the FieldOrderCB class
