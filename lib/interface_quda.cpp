@@ -4946,6 +4946,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
   qParam.nDim = 4;
   qParam.setPrecision(gParamMom.Precision());
   qParam.pad = 0;
+  qParam.twistFlavor = inv_param->twist_flavor;
   qParam.pc_type = QUDA_4D_PC;
   if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) { qParam.pc_type = QUDA_5D_PC; }
   for(int dir = 0; dir<4; ++dir) qParam.x[dir] = gParamMom.x[dir];
