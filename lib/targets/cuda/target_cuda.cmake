@@ -222,10 +222,10 @@ endif()
 
 # older nvcc throws false warnings with respect to constexpr if code removal
 if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "11.3")
-target_compile_options(
-  quda
-  PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-          -diag-suppress 607>)
+  target_compile_options(
+    quda
+    PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
+            -Xcudafe --diag_suppress=607>)
 endif()
 
 target_compile_options(
