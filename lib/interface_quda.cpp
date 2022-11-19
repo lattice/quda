@@ -4911,6 +4911,8 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
 
   printQudaInvertParam(inv_param);
 
+  printQudaGaugeParam(gauge_param);
+
   double kappa = inv_param->kappa;
   double k_csw_ov_8 = kappa * inv_param->clover_csw / 8.0;
 
@@ -5021,9 +5023,9 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
   profileTMCloverForce.TPSTOP(QUDA_PROFILE_INIT);
   profileTMCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
   
-  printfQuda("computeCloverForce(cudaForce, *gaugePrecise, quarkX, quarkP, force_coeff);");
+  printfQuda("computeCloverForce(cudaForce, gaugePrecise, quarkX, quarkP, force_coeff);\n");
   computeCloverForce(cudaForce, *gaugePrecise, quarkX, quarkP, force_coeff);
-  printfQuda("computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8);");
+  printfQuda("computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8);\n");
   computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8); 
 
   // FIXME: these need to be checked
@@ -5038,8 +5040,6 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
   computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon);
 
   cudaGaugeField *oprodEx = createExtendedGauge(oprod, R, profileTMCloverForce);
-
-  profileTMCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
 
   printfQuda("cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_ODD_PARITY)\n");
   cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_ODD_PARITY);
