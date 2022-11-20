@@ -4735,13 +4735,21 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   fParam.location = QUDA_CPU_FIELD_LOCATION;
   fParam.reconstruct = QUDA_RECONSTRUCT_10;
   fParam.order = gauge_param->gauge_order;
-  cpuGaugeField cpuMom(fParam);
+  cpuGaugeField *cpuMom = !gauge_param->use_resident_gauge ? new cpuGaugeField(fParam) : nullptr;
 
   // create the device momentum field
   fParam.location = QUDA_CUDA_FIELD_LOCATION;
   fParam.create = QUDA_ZERO_FIELD_CREATE;
   fParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-  cudaGaugeField cudaMom(fParam);
+  cudaGaugeField *cudaMom = !gauge_param->use_resident_gauge ? new cudaGaugeField(fParam) : nullptr;
+
+  if (gauge_param->use_resident_mom) {
+    if (!momResident) errorQuda("No resident mom field allocated");
+    cudaMom = momResident;
+    momResident = nullptr;
+  } else {
+    cudaMom->loadCPUField(*cpuMom);
+  }
 
   // create the device force field
   fParam.link_type = QUDA_GENERAL_LINKS;
@@ -4757,6 +4765,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   qParam.nDim = 4;
+  qParam.pc_type = QUDA_4D_PC;
   qParam.setPrecision(fParam.Precision());
   qParam.pad = 0;
   for(int dir=0; dir<4; ++dir) qParam.x[dir] = fParam.x[dir];
@@ -4772,9 +4781,9 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
     quarkP.push_back(ColorSpinorField::Create(qParam));
   }
 
+  // for downloading x_e
   qParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
   qParam.x[0] /= 2;
-  ColorSpinorField tmp(qParam);
 
   // create the host quark field
   qParam.location = QUDA_CPU_FIELD_LOCATION;
@@ -4810,10 +4819,6 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
     ColorSpinorField &p = *(quarkP[i]);
 
     if (!inv_param->use_resident_solution) {
-      // for downloading x_e
-      qParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      qParam.x[0] /= 2;
-
       // Wrap the even-parity MILC quark field
       profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
       profileCloverForce.TPSTART(QUDA_PROFILE_INIT);
@@ -4868,22 +4873,30 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
 
   cudaGaugeField *oprodEx = createExtendedGauge(oprod, R, profileCloverForce);
 
-  profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
-
   cloverDerivative(cudaForce, *u, *oprodEx, 1.0, QUDA_ODD_PARITY);
   cloverDerivative(cudaForce, *u, *oprodEx, 1.0, QUDA_EVEN_PARITY);
 
   if (u != &gaugeEx) delete u;
 
-  updateMomentum(cudaMom, -1.0, cudaForce, "clover");
+  updateMomentum(*cudaMom, -1.0, cudaForce, "clover");
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-  // copy the outer product field back to the host
-  profileCloverForce.TPSTART(QUDA_PROFILE_D2H);
-  cudaMom.saveCPUField(cpuMom);
-  profileCloverForce.TPSTOP(QUDA_PROFILE_D2H);
+  if (gauge_param->return_result_mom) {
+    cudaMom->saveCPUField(*cpuMom, profileGaugeForce);
+  }
 
   profileCloverForce.TPSTART(QUDA_PROFILE_FREE);
+
+  if (gauge_param->make_resident_mom) {
+    if (momResident != nullptr && momResident != cudaMom) delete momResident;
+    momResident = cudaMom;
+  } else {
+    delete cudaMom;
+    momResident = nullptr;
+  }
+  if (cpuMom) {
+    delete cpuMom;
+  }
 
   for (int i=0; i<nvector; i++) {
     delete quarkX[i];

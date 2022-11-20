@@ -28,6 +28,9 @@ namespace quda {
       launch<CloverSigmaTr>(tp, stream, CloverTraceArg<Float, nColor>(output, clover, coeff));
     }
 
+    void preTune() { output.backup(); }
+    void postTune() { output.restore(); }
+
     long long flops() const { return 0; } // Fix this
     long long bytes() const { return clover.Bytes() + output.Bytes(); }
   };

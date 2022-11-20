@@ -19,7 +19,7 @@ namespace quda {
     real coeff;
 
     CloverTraceArg(GaugeField& output, const CloverField& clover, double coeff) :
-      kernel_param(dim3(clover.VolumeCB(), 1, 1)),
+      kernel_param(dim3(output.VolumeCB(), 1, 1)),
       output(output),
       clover1(clover, 0),
       clover2(clover, 1),
@@ -31,8 +31,9 @@ namespace quda {
   {
     using real = typename Arg::real;
     real A[72];
-    if (parity==0) arg.clover1.load(A,x,parity);
-    else arg.clover2.load(A,x,parity);
+    // if (parity==0) arg.clover1.load(A,x,parity);
+    // else arg.clover2.load(A,x,parity);
+    arg.clover1.load(A,x,parity);
 
     // load the clover term into memory
     for (int mu=0; mu<4; mu++) {
