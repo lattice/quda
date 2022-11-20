@@ -4735,13 +4735,13 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   fParam.location = QUDA_CPU_FIELD_LOCATION;
   fParam.reconstruct = QUDA_RECONSTRUCT_10;
   fParam.order = gauge_param->gauge_order;
-  cpuGaugeField *cpuMom = !gauge_param->use_resident_gauge ? new cpuGaugeField(fParam) : nullptr;
+  cpuGaugeField *cpuMom = !gauge_param->use_resident_mom ? new cpuGaugeField(fParam) : nullptr;
 
   // create the device momentum field
   fParam.location = QUDA_CUDA_FIELD_LOCATION;
   fParam.create = QUDA_ZERO_FIELD_CREATE;
   fParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-  cudaGaugeField *cudaMom = !gauge_param->use_resident_gauge ? new cudaGaugeField(fParam) : nullptr;
+  cudaGaugeField *cudaMom = !gauge_param->use_resident_mom ? new cudaGaugeField(fParam) : nullptr;
 
   if (gauge_param->use_resident_mom) {
     if (!momResident) errorQuda("No resident mom field allocated");
