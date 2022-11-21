@@ -4,6 +4,7 @@
 #include <index_helper.cuh>
 #include <gauge_field_order.h>
 #include <kernel.h>
+#include <shared_memory_cache_helper.h>
 
 namespace quda {
 
@@ -271,6 +272,7 @@ namespace quda {
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
       using Gauge = typename gauge_mapper<real, recon>::type;
+      using Link = Matrix<complex<real>, nColor>;
 
       Gauge force;
       Gauge p3;
@@ -281,7 +283,6 @@ namespace quda {
 
       const real coeff_three;
       const real coeff_lepage;
-      const real accumu_coeff_lepage;
 
       static constexpr int overlap = 2;
 
@@ -290,8 +291,7 @@ namespace quda {
                  const PathCoefficients<real> &act_path_coeff)
         : BaseForceArg(link, overlap), force(force), p3(P3), oProd(oProd),
         pMu(pMu), pMu_2(pMu_2),
-        coeff_three(act_path_coeff.three), coeff_lepage(act_path_coeff.lepage),
-        accumu_coeff_lepage(act_path_coeff.three != 0 ? act_path_coeff.lepage / act_path_coeff.three : 0)
+        coeff_three(act_path_coeff.three), coeff_lepage(act_path_coeff.lepage)
       { }
 
     };
@@ -325,14 +325,15 @@ namespace quda {
           Flops:
             3 Multiplies, 1 add, 1 rescale
       */
-      __device__ __host__ void lepage_p3(int x[4], int point_a, int point_b, int parity_a, Link &p3) {
+      __device__ __host__ inline void lepage_p3(int x[4], int point_a, int parity_a, Link &force_mu) {
+        int point_b = getIndexMILCDir(x, arg.E, arg.sig);
+        int parity_b = 1 - parity_a;
+
         int y[4] = {x[0], x[1], x[2], x[3]};
         int point_f = updateCoordsIndexMILCDir(y, arg.E, arg.mu);
         int parity_f = 1 - parity_a;
         int point_e = getIndexMILCDir(y, arg.E, arg.sig);
         int parity_e = parity_a;
-
-        int parity_b = 1 - parity_a;
 
         int af_link_nbr_idx = (mu_positive) ? point_a : point_f;
         int af_link_nbr_parity = (mu_positive) ? parity_a : parity_f;
@@ -351,7 +352,8 @@ namespace quda {
         Link Oy = sig_positive ? Ufe * Ow : conj(Ufe) * Ow;
         Link Ox = mu_positive ? Uaf * Oy : conj(Uaf) * Oy;
 
-        p3 += arg.accumu_coeff_lepage * Ox;
+        auto mycoeff_three = coeff_sign(goes_forward(arg.sig),parity_a)*coeff_sign(goes_forward(arg.mu),parity_a)*arg.coeff_lepage;
+        force_mu += mycoeff_three * (mu_positive ? Ox : conj(Ox));
       }
 
       /**
@@ -361,7 +363,7 @@ namespace quda {
         @param[in] point_b 1-d checkerboard index for the unit site shifted in the sig direction
         @param[in] parity_a Parity of the coordinate x
         @param[in/out] force_mu Accumulated force in the mu direction
-        @param[in] Uab Link in the ab direction
+        @param[in] Uab_cache Shared memory cache that stores the gauge link going from a to b (read)
         @details This subset of the code computes the Lepage contribution to the fermion force.
           Data traffic:
             READ: cb_link, id_link, pMu_at_c
@@ -375,7 +377,8 @@ namespace quda {
           Flops:
             2 multiplies, 1 add, 1 rescale
       */
-      __device__ __host__ void lepage_force(int x[4], int point_a, int point_b, int parity_a, Link &force_mu, const Link &Uab) {
+      __device__ __host__ inline void lepage_force(int x[4], int point_a, int parity_a, Link &force_mu, SharedMemoryCache<Link> &Uab_cache) {
+        int point_b = getIndexMILCDir(x, arg.E, arg.sig);
         int parity_b = 1 - parity_a;
 
         int y[4] = {x[0], x[1], x[2], x[3]};
@@ -401,11 +404,13 @@ namespace quda {
         Link Uid = arg.link(pos_dir(arg.mu), id_link_nbr_idx, id_link_nbr_parity);
 
         Link Ow = mu_positive ? (conj(Ucb) * Oc) : (Ucb * Oc);
-        Link Oy = sig_positive ? Uab * Ow : conj(Uab) * Ow;
-        Link Ox = mu_positive ? (Oy * Uid) : (Uid * conj(Oy));
-
-        auto mycoeff_lepage = -coeff_sign(goes_forward(arg.sig), parity_a)*coeff_sign(goes_forward(arg.mu),parity_a)*arg.coeff_lepage;
-        force_mu += mycoeff_lepage * Ox;
+        {
+          Link Uab = Uab_cache.load();
+          Link Oy = sig_positive ? Uab * Ow : conj(Uab) * Ow;
+          Link Ox = mu_positive ? (Oy * Uid) : (Uid * conj(Oy));
+          auto mycoeff_lepage = -coeff_sign(goes_forward(arg.sig), parity_a)*coeff_sign(goes_forward(arg.mu),parity_a)*arg.coeff_lepage;
+          force_mu += mycoeff_lepage * Ox;
+        }
 
         // Update force_sig if sig is positive
         if constexpr ( sig_positive ) {
@@ -426,8 +431,7 @@ namespace quda {
         @param[in] point_a 1-d checkerboard index for the unit site in the full extended lattice
         @param[in] point_b 1-d checkerboard index for the unit site shifted in the sig direction
         @param[in] parity_a Parity of the coordinate x
-        @param[in] Uab Link in the ab direction
-        @details This subset of the code computes the Lepage contribution to the fermion force.
+        @param[in] Uab_cache Shared memory cache that stores the gauge link going from a to b (read)
           Data traffic:
             READ: gb_link, oProd_at_h
             WRITE: pMu_2_at_b, p3_at_a
@@ -441,16 +445,17 @@ namespace quda {
           Flops:
             2 multiplies, 1 add, 1 rescale
       */
-      __device__ __host__ void middle_three(int x[4], int point_a, int point_b, int parity_a, const Link &Uab)
+      __device__ __host__ inline void middle_three(int x[4], int point_a, int parity_a, SharedMemoryCache<Link> &Uab_cache)
       {
+        int point_b = getIndexMILCDir(x, arg.E, arg.sig);
+        int parity_b = 1 - parity_a;
+
         int y[4] = {x[0], x[1], x[2], x[3]};
         int point_h = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu_next));
         int parity_h = 1 - parity_a;
 
         int point_g = getIndexMILCDir(y, arg.E, arg.sig);
         int parity_g = parity_a;
-
-        int parity_b = 1 - parity_a;
 
         int ha_link_nbr_idx = mu_side_positive ? point_h : point_a;
         int ha_link_nbr_parity = mu_side_positive ? parity_h : parity_a;
@@ -467,10 +472,16 @@ namespace quda {
         Link Oh = arg.oProd(pos_dir(arg.sig), hg_link_nbr_idx, hg_link_nbr_parity);
 
         if constexpr (!sig_positive) Oh = conj(Oh);
+        if constexpr (mu_side_positive) Ugb = conj(Ugb);
 
-        Link Oz = !mu_side_positive ? Ugb * Oh : conj(Ugb) * Oh;
+        Link Oz = Ugb * Oh;
         arg.pMu_2(0, point_b, parity_b) = Oz;
-        arg.p3(0, point_a, parity_a) = sig_positive ? Uab * Oz : conj(Uab) * Oz;
+        {
+          // scoped Uab load
+          Link Uab = Uab_cache.load();
+          if constexpr (!sig_positive) Uab = conj(Uab);
+          arg.p3(0, point_a, parity_a) = Uab * Oz;
+        }
 
         // Update the force in the sigma direction
         if constexpr (sig_positive) {
@@ -536,35 +547,44 @@ namespace quda {
 
         int point_a = e_cb;
         int parity_a = parity;
-        int point_d = getIndexMILCDir(x, arg.E, opp_dir(arg.mu));
-        int parity_d = 1 - parity;
-        int da_link_nbr_idx = (mu_positive) ? point_d : point_a;
-        int da_link_nbr_parity = (mu_positive) ? parity_d : parity_a;
 
-        int point_b = getIndexMILCDir(x, arg.E, arg.sig);
-        int parity_b = 1 - parity;
-        int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
-        int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
-
-        Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
+        SharedMemoryCache<Link> Uab_cache(target::block_dim());
+        // Scoped load of Uab
+        {
+          int point_b = getIndexMILCDir(x, arg.E, arg.sig);
+          int parity_b = 1 - parity;
+          int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
+          int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
+          Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
+          Uab_cache.save(Uab);
+        }
 
         if constexpr (mu_positive != MU_IGNORED) {
-          Link p3 = arg.p3(0, point_a, parity_a);
+          int point_d = getIndexMILCDir(x, arg.E, opp_dir(arg.mu));
+          int parity_d = 1 - parity;
+          int da_link_nbr_idx = (mu_positive) ? point_d : point_a;
+          int da_link_nbr_parity = (mu_positive) ? parity_d : parity_a;
+
           Link force_mu = arg.force(pos_dir(arg.mu), da_link_nbr_idx, da_link_nbr_parity);
+          auto mycoeff_three = coeff_sign(goes_forward(arg.sig),parity_a)*coeff_sign(goes_forward(arg.mu),parity_a)*arg.coeff_three;
+          {
+            Link p3 = arg.p3(0, point_a, parity_a);
+            force_mu += mycoeff_three * (mu_positive ? p3 : conj(p3));
+          }
 
           if constexpr (compute_lepage) {
-            lepage_p3(x, point_a, point_b, parity_a, p3);
-            lepage_force(x, point_a, point_b, parity_a, force_mu, Uab);
+            lepage_p3(x, point_a, parity_a, force_mu);
+            lepage_force(x, point_a, parity_a, force_mu, Uab_cache);
           }
 
           // Update force_mu
-          auto mycoeff_three = coeff_sign(goes_forward(arg.sig),parity_a)*coeff_sign(goes_forward(arg.mu),parity_a)*arg.coeff_three;
-          force_mu += mycoeff_three * (mu_positive ? p3 : conj(p3));
           arg.force(pos_dir(arg.mu), da_link_nbr_idx, da_link_nbr_parity) = force_mu;
         }
 
+        // middle_three overrides arg.p3 in-place, so this kernel call needs to come
+        // *after* loading p3 above
         if constexpr (mu_side_positive != MU_NEXT_IGNORED)
-          middle_three(x, point_a, point_b, parity_a, Uab);
+          middle_three(x, point_a, parity_a, Uab_cache);
       }
     };
 
@@ -659,9 +679,8 @@ namespace quda {
         @param[in] point_a 1-d checkerboard index for the unit site in the full extended lattice
         @param[in] point_b 1-d checkerboard index for the unit site shifted in the sig direction
         @param[in] parity_a Parity of the coordinate x
-        @param[in/out] p5_sig Contribution to the P5 field from the seven link calculation
-        @param[in/out] force_sig Contribution to the force in the sigma direction (when sigma is positive)
-        @param[in] Uab Gauge link going from site a to site b
+        @param[in/out] Matrix_cache Shared memory cache that maintains the accumulated P5 contribution (write)
+                       the gauge link going from a to b (read), as well as force_sig when sig is positive (read/write)
         @details This subset of the code computes the full seven link contribution to the HISQ force.
           Data traffic:
             READ: af_link, be_link, fe_link, dc_link, da_link, cb_link,
@@ -669,35 +688,25 @@ namespace quda {
                   force_rho_at_a
             WRITE: force_rho_at_a
           Flops:
-            10 multiplies, 5 adds, 4 rescales
+            10 multiplies, 4 adds, 4 rescales
 
           In addition, if sig is positive:
           Data traffic:
             READ: qNuMu_at_d, pNuMu_at_c
           Flops:
-            5 multiplies, 2 adds, 2 rescales
+            4 multiplies, 2 adds, 2 rescales
       */
-      __device__ __host__ void all_link(int x[4], int point_a, int point_b, int parity_a, Link &p5_sig, Link &force_sig, const Link &Uab) {
+      __device__ __host__ inline void all_link(int x[4], int point_a, int parity_a,
+          SharedMemoryCache<Link> &Matrix_cache) {
         auto mycoeff_seven = coeff_sign(sig_positive,parity_a) * arg.coeff_seven;
-
-        // Intermediate accumulators; force_sig is only needed when sig is positive
-        Link force_rho;
 
         // Link product intermediates
         Link Oy, Oz;
 
+        int point_b = getIndexMILCDir(x, arg.E, arg.sig);
         int parity_b = 1 - parity_a;
 
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.rho));
-        int parity_d = 1 - parity_a;
-        int point_c = getIndexMILCDir(y, arg.E, arg.sig);
-        int parity_c = parity_a;
-        int dc_link_nbr_idx = (sig_positive) ? point_d : point_c;
-        int dc_link_nbr_parity = (sig_positive) ? parity_d : parity_c;
-
-#pragma unroll
-        for (int d = 0; d < 4; d++) y[d] = x[d];
         int point_f = updateCoordsIndexMILCDir(y, arg.E, arg.rho);
         int parity_f = 1 - parity_a;
         int point_e = getIndexMILCDir(y, arg.E, arg.sig);
@@ -705,27 +714,66 @@ namespace quda {
         int fe_link_nbr_idx = (sig_positive) ? point_f : point_e;
         int fe_link_nbr_parity = (sig_positive) ? parity_f : parity_e;
 
-        // Compute the force_rho (and force_sig, when sig is positive) contribution
-        // from the negative rho direction
-        Link Uaf = arg.link(pos_dir(arg.rho), point_a, parity_a);
-        Link Ube = arg.link(pos_dir(arg.rho), point_b, parity_b);
-        Link Of = arg.qNuMu(0, point_f, parity_f);
+        // Compute the product OeOf
         Link Oe = arg.pNuMu(0, point_e, parity_e);
-        Oz = Ube * Oe;
-        Oy = (sig_positive ? Uab : conj(Uab)) * Oz;
-        force_rho += (parity_sign(parity_a) * mycoeff_seven) * conj(Of) * conj(Oy);
-        if constexpr (sig_positive) {
-          force_sig += (parity_sign(parity_a) * mycoeff_seven) * Oz * Of * conj(Uaf);
+        Link Of = arg.qNuMu(0, point_f, parity_f);
+        Link OeOf = Oe * Of;
+
+        // Pre-declare product UbeOeOf
+        Link UbeOeOf;
+        {
+          // Scoped load of Ube, which is cached in shared memory to be used in multiple contexts
+          Link Ube = arg.link(pos_dir(arg.rho), point_b, parity_b);
+
+          // Form the product UbeOeOf, which is needed for force_rho (and force_sig)
+          UbeOeOf = Ube * OeOf;
+
+          // Cache Ube to below
+          Matrix_cache.save_z(Ube, 1);
         }
 
-        // Compute the force_rho and p5 contribution from the positive rho direction
+        // Take care of force_sig --- contribution from the negative rho direction
+        Link Uaf = arg.link(pos_dir(arg.rho), point_a, parity_a);
+        if constexpr (sig_positive) {
+          Link force_sig = Matrix_cache.load_z(2);
+          force_sig += (parity_sign(parity_a) * mycoeff_seven) * UbeOeOf * conj(Uaf);
+          Matrix_cache.save_z(force_sig, 2);
+        }
+
+        // Compute the force_rho --- contribution from the negative rho direction
+        Link Uab = Matrix_cache.load_z(0);
+        if constexpr (!sig_positive) Uab = conj(Uab);
+        Link force_rho = arg.force(pos_dir(arg.rho), point_a, parity_a);
+        force_rho += (parity_sign(parity_a) * mycoeff_seven) * conj(UbeOeOf) * conj(Uab);
+
+        // Compute the force_rho contribution from the positive rho direction
         Link Ufe = arg.link(pos_dir(arg.sig), fe_link_nbr_idx, fe_link_nbr_parity);
-        Link Oa = arg.qNuMu(0, point_a, parity_a);
+
+        // Load Ube from the cache
+        Link Ube = Matrix_cache.load_z(1);
+
+        // Form the product UfeUebOb
+        Link UfeUeb = (sig_positive ? Ufe : conj(Ufe)) * conj(Ube);
+
+        // Load Ob, since it's used in multiple contexts
         Link Ob = arg.pNuMu(0, point_b, parity_b);
-        Oz = conj(Ube) * Ob;
-        Oy = (sig_positive ? Ufe : conj(Ufe)) * Oz;
-        force_rho -= (parity_sign(parity_a) * mycoeff_seven) * Oy * Oa;
-        p5_sig += arg.accumu_coeff_seven * Uaf * Oy;
+        Link UfeUebOb = UfeUeb * Ob;
+        Link Oa = arg.qNuMu(0, point_a, parity_a);
+        force_rho -= (parity_sign(parity_a) * mycoeff_seven) * UfeUebOb * Oa;
+        arg.force(pos_dir(arg.rho), point_a, parity_a) = force_rho;
+
+        // Compute the p5 contribution from the positive rho direction
+        Link p5_sig = arg.p5(0, point_a, parity_a);
+        p5_sig += arg.accumu_coeff_seven * Uaf * UfeUebOb;
+
+#pragma unroll
+        for (int d = 0; d < 4; d++) y[d] = x[d];
+        int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.rho));
+        int parity_d = 1 - parity_a;
+        int point_c = getIndexMILCDir(y, arg.E, arg.sig);
+        int parity_c = parity_a;
+        int dc_link_nbr_idx = (sig_positive) ? point_d : point_c;
+        int dc_link_nbr_parity = (sig_positive) ? parity_d : parity_c;
 
         // Compute the p5 contribution from the negative rho direction
         Link Udc = arg.link(pos_dir(arg.sig), dc_link_nbr_idx, dc_link_nbr_parity);
@@ -734,6 +782,7 @@ namespace quda {
         Oz = Ucb * Ob;
         Oy = (sig_positive ? Udc : conj(Udc)) * Oz;
         p5_sig += arg.accumu_coeff_seven * conj(Uda) * Oy;
+        Matrix_cache.save_z(p5_sig, 1);
 
         // When sig is positive, compute the force_sig contribution from the
         // positive rho direction
@@ -741,13 +790,10 @@ namespace quda {
           Link Od = arg.qNuMu(0, point_d, parity_d);
           Link Oc = arg.pNuMu(0, point_c, parity_c);
           Oz = conj(Ucb) * Oc;
+          Link force_sig = Matrix_cache.load_z(2);
           force_sig += (parity_sign(parity_a) * mycoeff_seven) * Oz * Od * Uda;
+          Matrix_cache.save_z(force_sig, 2);
         }
-
-        // update the force in the rho direction
-        Link force = arg.force(pos_dir(arg.rho), point_a, parity_a);
-        force += force_rho;
-        arg.force(pos_dir(arg.rho), point_a, parity_a) = force;
 
       }
 
@@ -756,7 +802,9 @@ namespace quda {
         @param[in] x Local coordinate
         @param[in] point_a 1-d checkerboard index for the unit site in the full extended lattice
         @param[in] parity_a Parity of the coordinate x
-        @param[in] P5 Full P5 contribution summed from the previous middle five and all seven
+        @param[in/out] Matrix_cache Shared memory cache that maintains the full P5 contribution
+                       summed from the previous middle five and all seven (read), as well as force_sig
+                       when sig is positive (read/write)
         @details This subset of the code computes the side link five link contribution to the HISQ force.
           Data traffic:
             READ: ah_link, qh_link, shortP_at_h, force_nu_at_h
@@ -764,7 +812,7 @@ namespace quda {
           Flops:
             2 multiplies, 2 adds, 2 rescales
       */
-      __device__ __host__ void side_five(int x[4], int point_a, int parity_a, const Link &P5) {
+      __device__ __host__ inline void side_five(int x[4], int point_a, int parity_a, SharedMemoryCache<Link> &Matrix_cache) {
         int y[4] = {x[0], x[1], x[2], x[3]};
         int point_h = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.nu));
         int parity_h = 1 - parity_a;
@@ -778,15 +826,16 @@ namespace quda {
         int qh_link_nbr_idx = mu_positive ? point_q : point_h;
         int qh_link_nbr_parity = mu_positive ? parity_q : parity_h;
 
+        Link P5 = Matrix_cache.load_z(1);
         Link Uah = arg.link(pos_dir(arg.nu), ha_link_nbr_idx, ha_link_nbr_parity);
         Link Ow = nu_positive ? Uah * P5 : conj(Uah) * P5;
-        Link Uqh = arg.link(pos_dir(arg.mu), qh_link_nbr_idx, qh_link_nbr_parity);
-        if constexpr (!mu_positive) Uqh = conj(Uqh);
 
         Link shortP = arg.shortP(0, point_h, parity_h);
         shortP += arg.accumu_coeff_five * Ow;
         arg.shortP(0, point_h, parity_h) = shortP;
 
+        Link Uqh = arg.link(pos_dir(arg.mu), qh_link_nbr_idx, qh_link_nbr_parity);
+        if constexpr (!mu_positive) Uqh = conj(Uqh);
         Ow = nu_positive ? P5 * Uqh : conj(Uqh) * conj(P5);
 
         auto mycoeff_five = -coeff_sign(goes_forward(arg.sig), parity_a)*coeff_sign(goes_forward(arg.nu),parity_a)*arg.coeff_five;
@@ -802,8 +851,8 @@ namespace quda {
         @param[in] point_a 1-d checkerboard index for the unit site in the full extended lattice
         @param[in] point_b 1-d checkerboard index for the unit site shifted in the sig direction
         @param[in] parity_a Parity of the coordinate x
-        @param[in/out] force_sig Contribution to the force in the sigma direction (when sigma is positive)
-        @param[in] Uab Gauge link going from site a to site b
+        @param[in/out] Matrix_cache Helper shared memory cache that maintains  the gauge link going
+                       from a to b (read) and, when sig is positive, force_sig (read/write)
         @details This subset of the code computes the middle link five link contribution to the HISQ force.
           Data traffic:
             READ: bc_link, ha_link, qh_link, pMu_at_c
@@ -815,7 +864,11 @@ namespace quda {
           Flops:
             1 multiply, 1 add, 1 rescale
       */
-      __device__ __host__ void middle_five(int x[4], int point_a, int point_b, int parity_a, Link &force_sig, const Link &Uab) {
+      __device__ __host__ inline void middle_five(int x[4], int point_a, int parity_a,
+          SharedMemoryCache<Link> &Matrix_cache) {
+        int point_b = getIndexMILCDir(x, arg.E, arg.sig);
+        int parity_b = 1 - parity_a;
+
         int y[4] = {x[0], x[1], x[2], x[3]};
         int point_h = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.nu_next));
         int parity_h = 1 - parity_a;
@@ -825,8 +878,6 @@ namespace quda {
 
         int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
         int parity_c = parity_a;
-
-        int parity_b = 1 - parity_a;
 
         int ha_link_nbr_idx = nu_side_positive ? point_h : point_a;
         int ha_link_nbr_parity = nu_side_positive ? parity_h : parity_a;
@@ -839,23 +890,30 @@ namespace quda {
 
         // Load link and outer product contributions for pNuMu, P5, qNuMu
         Link Ubc = arg.link(pos_dir(arg.nu_next), cb_link_nbr_idx, cb_link_nbr_parity);
-        Link Uha = arg.link(pos_dir(arg.nu_next), ha_link_nbr_idx, ha_link_nbr_parity);
-        Link Uqh = arg.link(pos_dir(arg.mu), qh_link_nbr_idx, qh_link_nbr_parity);
         Link Oc = arg.pMu(0, point_c, parity_c);
-
         Link Ow = !nu_side_positive ? Ubc * Oc : conj(Ubc) * Oc;
-        if constexpr (!nu_side_positive) Uha = conj(Uha);
-        if constexpr (!mu_positive) Uqh = conj(Uqh);
 
         arg.pNuMu_next(0, point_b, parity_b) = Ow;
-        arg.p5(0, point_a, parity_a) = sig_positive ? Uab * Ow : conj(Uab) * Ow;
+        {
+          // scoped Uab load
+          Link Uab = Matrix_cache.load_z(0);
+          if constexpr (!sig_positive) Uab = conj(Uab);
+          arg.p5(0, point_a, parity_a) = Uab * Ow;
+        }
+
+        Link Uha = arg.link(pos_dir(arg.nu_next), ha_link_nbr_idx, ha_link_nbr_parity);
+        Link Uqh = arg.link(pos_dir(arg.mu), qh_link_nbr_idx, qh_link_nbr_parity);
+        if constexpr (!nu_side_positive) Uha = conj(Uha);
+        if constexpr (!mu_positive) Uqh = conj(Uqh);
 
         Link Ox = Uqh * Uha;
         arg.qNuMu_next(0, point_a, parity_a) = Ox;
 
         // compute the force in the sigma direction if sig is positive
         if constexpr (sig_positive) {
+          Link force_sig = Matrix_cache.load_z(2);
           force_sig += arg.coeff_five * (Ow * Ox);
+          Matrix_cache.save_z(force_sig, 2);
         }
       }
 
@@ -870,9 +928,8 @@ namespace quda {
           Data traffic:
             READ: ab_link
 
-          If we're calculating the 7-link and 5-link side-link contribution (nu_positive != NU_IGNORED)
-          Data traffic:
-            READ: p5_at_a
+          If we're calculating the 7-link and 5-link side-link contribution (nu_positive != NU_IGNORED),
+          there's no extra work in this routine
 
           If we're calculating the 5-link middle-link contribution (nu_next_positive != NU_NEXT_IGNORED),
           there's no extra work in this routine.
@@ -894,32 +951,37 @@ namespace quda {
         int parity_a = parity;
         
         // calculate p5_sig
-        Link force_sig;
+        auto block_dim = target::block_dim();
+        block_dim.z = (sig_positive ? 3 : 2);
+        SharedMemoryCache<Link> Matrix_cache(block_dim);
         if constexpr (sig_positive) {
-          force_sig = arg.force(arg.sig, point_a, parity_a);
+          Link force_sig = arg.force(arg.sig, point_a, parity_a);
+          Matrix_cache.save_z(force_sig, 2);
         }
 
-        // Link Uab can be reused, nothing else can
-        int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_b = getIndexMILCDir(y, arg.E, arg.sig);
-        int parity_b = 1 - parity_a;
-        int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
-        int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
-        Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
+        // Scoped load of Uab
+        {
+          int point_b = getIndexMILCDir(x, arg.E, arg.sig);
+          int parity_b = 1 - parity;
+          int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
+          int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
+          Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
+          Matrix_cache.save_z(Uab, 0);
+        }
 
+        // accumulate into P5, force_sig
         if constexpr (nu_positive != NU_IGNORED) {
-          Link P5 = arg.p5(0, point_a, parity_a);
-          // accumulate into P5, force_sig
-          all_link(x, point_a, point_b, parity_a, P5, force_sig, Uab);
-          side_five(x, point_a, parity_a, P5);
+          all_link(x, point_a, parity_a, Matrix_cache);
+          side_five(x, point_a, parity_a, Matrix_cache);
         }
 
         if constexpr (nu_side_positive != NU_NEXT_IGNORED) {
-          middle_five(x, point_a, point_b, parity_a, force_sig, Uab);
+          middle_five(x, point_a, parity_a, Matrix_cache);
         }
 
         // update the force in the sigma direction
         if constexpr (sig_positive) {
+          Link force_sig = Matrix_cache.load_z(2);
           arg.force(arg.sig, point_a, parity_a) = force_sig;
         }
 

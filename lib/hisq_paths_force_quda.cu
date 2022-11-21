@@ -61,7 +61,11 @@ namespace quda {
       const GaugeField &pMu_2;
       const GaugeField &link;
       const bool has_lepage;
-      unsigned int minThreads() const { return arg.threads.x; }
+      unsigned int minThreads() const override { return arg.threads.x; }
+
+      unsigned int sharedBytesPerThread() const override { return sizeof(typename Arg::Link); }
+
+      unsigned int maxSharedBytesPerBlock() const override { return maxDynamicSharedBytesPerBlock(); }
 
     public:
       AllThreeAllLepageLinkForce(Arg &arg, const GaugeField &link, int sig, int mu, int mu_next,
@@ -133,6 +137,7 @@ namespace quda {
       void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        tp.set_max_shared_bytes = true; // maximize the shared memory pool
         instantiate(arg.sig, arg.mu, arg.mu_next, tp, stream);
       }
 
@@ -213,7 +218,11 @@ namespace quda {
       const GaugeField &pNuMu_next;
       const GaugeField &qNuMu_next;
       const GaugeField &link;
-      unsigned int minThreads() const { return arg.threads.x; }
+      unsigned int minThreads() const override { return arg.threads.x; }
+
+      unsigned int sharedBytesPerThread() const override { return (goes_forward(arg.sig) ? 3 : 2) * sizeof(typename Arg::Link); }
+
+      unsigned int maxSharedBytesPerBlock() const override { return maxDynamicSharedBytesPerBlock(); }
 
     public:
       AllFiveAllSevenLinkForce(Arg &arg, const GaugeField &link, int sig, int mu, int nu, int rho,
@@ -296,6 +305,7 @@ namespace quda {
       void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        tp.set_max_shared_bytes = true; // maximize the shared memory pool
         instantiate(arg.sig, arg.mu, arg.nu, arg.nu_next, tp, stream);
       }
 
@@ -303,12 +313,16 @@ namespace quda {
         force.backup();
         shortP.backup();
         p5.backup();
+        pNuMu_next.backup();
+        qNuMu_next.backup();
       }
 
       void postTune() {
         force.restore();
         shortP.restore();
         p5.restore();
+        pNuMu_next.restore();
+        qNuMu_next.restore();
       }
 
       long long flops() const {
@@ -319,10 +333,10 @@ namespace quda {
         // SideFiveAllSeven contribution
         if (arg.nu != NU_IGNORED) {
           multiplies_per_site += 12ll;
-          adds_per_site += 7ll;
+          adds_per_site += 6ll;
           rescales_per_site += 6ll;
           if (goes_forward(arg.sig)) {
-            multiplies_per_site += 5ll;
+            multiplies_per_site += 4ll;
             adds_per_site += 2ll;
             rescales_per_site += 2ll;
           }
