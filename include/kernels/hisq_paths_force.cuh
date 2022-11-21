@@ -606,16 +606,15 @@ namespace quda {
 
       Gauge force;
       Gauge shortP;
+      Gauge p5;
       
       const Gauge pMu;
 
-      // double-buffer: read p5, pNuMu, qNuMu for side 5, middle 7
-      const Gauge p5;
+      // double-buffer: read pNuMu, qNuMu for side 5, middle 7
       const Gauge pNuMu;
       const Gauge qNuMu;
 
-      // write the other p5, pNuMu, qNuMu for next middle 5
-      Gauge p5_next;
+      // write the other pNuMu, qNuMu for next middle 5
       Gauge pNuMu_next;
       Gauge qNuMu_next;
 
@@ -628,11 +627,10 @@ namespace quda {
 
       AllFiveAllSevenLinkArg(GaugeField &force, GaugeField &shortP, const Gauge &pMu,
                  const GaugeField &P5, const GaugeField &pNuMu, const GaugeField &qNuMu,
-                 const GaugeField &P5_next, const GaugeField &pNuMu_next, const GaugeField &qNuMu_next,
+                 const GaugeField &pNuMu_next, const GaugeField &qNuMu_next,
                  const GaugeField &link, const PathCoefficients<real> &act_path_coeff)
-        : BaseForceArg(link, overlap), force(force), shortP(shortP), pMu(pMu),
-          p5(P5), pNuMu(pNuMu), qNuMu(qNuMu),
-          p5_next(P5_next), pNuMu_next(pNuMu_next), qNuMu_next(qNuMu_next),
+        : BaseForceArg(link, overlap), force(force), shortP(shortP), p5(P5), pMu(pMu),
+          pNuMu(pNuMu), qNuMu(qNuMu), pNuMu_next(pNuMu_next), qNuMu_next(qNuMu_next),
           coeff_five(act_path_coeff.five), accumu_coeff_five(act_path_coeff.three != 0 ? act_path_coeff.five / act_path_coeff.three : 0),
           coeff_seven(act_path_coeff.seven), accumu_coeff_seven(act_path_coeff.five != 0 ? act_path_coeff.seven / act_path_coeff.five : 0)
       { }
@@ -809,7 +807,7 @@ namespace quda {
         @details This subset of the code computes the middle link five link contribution to the HISQ force.
           Data traffic:
             READ: bc_link, ha_link, qh_link, pMu_at_c
-            WRITE: pNuMu_next_at_b, p5_next_at_a, qNuMu_next_at_a
+            WRITE: pNuMu_next_at_b, p5_at_a, qNuMu_next_at_a
           Flops:
             3 multiplies
 
@@ -850,7 +848,7 @@ namespace quda {
         if constexpr (!mu_positive) Uqh = conj(Uqh);
 
         arg.pNuMu_next(0, point_b, parity_b) = Ow;
-        arg.p5_next(0, point_a, parity_a) = sig_positive ? Uab * Ow : conj(Uab) * Ow;
+        arg.p5(0, point_a, parity_a) = sig_positive ? Uab * Ow : conj(Uab) * Ow;
 
         Link Ox = Uqh * Uha;
         arg.qNuMu_next(0, point_a, parity_a) = Ox;
@@ -1003,7 +1001,7 @@ namespace quda {
       constexpr static const char *filename() { return KERNEL_FILE; }
 
       // Flops count, in two-number pair (matrix_mult, matrix_add)
-      // 				   (24, 12)
+      //           (24, 12)
       __device__ __host__ void operator()(int x_cb, int parity)
       {
         int x[4];
