@@ -1036,17 +1036,21 @@ struct DslashTestWrapper {
     double deviation;
     if (test_split_grid) {
       for (int n = 0; n < num_src; n++) {
-        double norm_cpu = blas::norm2(spinorRef);
-        double norm_cpu_quda = blas::norm2(vp_spinorOut[n]);
-        printfQuda("Results: CPU = %f, QUDA = %f, L2 relative deviation = %e\n", norm_cpu, norm_cpu_quda,
-                   1.0 - sqrt(norm_cpu_quda / norm_cpu));
+        auto norm_cpu = blas::norm2(spinorRef);
+        auto norm_cpu_quda = blas::norm2(vp_spinorOut[n]);
+        auto max_deviation = blas::max_deviation(spinorRef, vp_spinorOut[n]);
+
+        printfQuda("Results: reference = %f, QUDA = %f, L2 relative deviation = %e, max deviation = %e\n",
+                   norm_cpu, norm_cpu_quda, 1.0 - sqrt(norm_cpu_quda / norm_cpu), max_deviation);
         deviation = std::max(deviation, std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef, vp_spinorOut[n]))));
       }
     } else {
-      double norm_cpu = blas::norm2(spinorRef);
-      double norm_cpu_quda = blas::norm2(spinorOut);
-      printfQuda("Results: CPU = %f, QUDA = %f, L2 relative deviation = %e\n", norm_cpu, norm_cpu_quda,
-                 1.0 - sqrt(norm_cpu_quda / norm_cpu));
+      auto norm_cpu = blas::norm2(spinorRef);
+      auto norm_cpu_quda = blas::norm2(spinorOut);
+      auto max_deviation = blas::max_deviation(spinorRef, spinorOut);
+
+      printfQuda("Results: reference = %f, QUDA = %f, L2 relative deviation = %e, max deviation = %e\n",
+                 norm_cpu, norm_cpu_quda, 1.0 - sqrt(norm_cpu_quda / norm_cpu), max_deviation);
       deviation = std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef, spinorOut)));
     }
     return deviation;

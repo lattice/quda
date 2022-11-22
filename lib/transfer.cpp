@@ -70,10 +70,7 @@ namespace quda {
       if (geo_bs[d] == 0) errorQuda("Unable to block dimension %d", d);
     }
 
-    if (ndim > 4) {
-      geo_bs[4] = 1;
-      warningQuda("5th dimension block size is being set to 1. This is a benign side effect of staggered fermions");
-    }
+    if (ndim > 4) errorQuda("Number of dimensions %d not supported", ndim);
 
     this->geo_bs = new int[ndim];
     int total_block_size = 1;

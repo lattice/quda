@@ -222,9 +222,6 @@ namespace quda
                  && twistFlavor == QUDA_TWIST_NONDEG_DOUBLET) {
         nDim++;
         x[4] = 2; // for two flavors
-      } else if (inv_param.dslash_type == QUDA_STAGGERED_DSLASH || inv_param.dslash_type == QUDA_ASQTAD_DSLASH) {
-        nDim++;
-        x[4] = inv_param.Ls;
       } else {
         x[4] = 1;
       }

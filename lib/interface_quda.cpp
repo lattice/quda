@@ -4337,7 +4337,7 @@ void computeStaggeredForceQuda(void *h_mom, double dt, double delta, void *, voi
   qParam.nSpin = 1;
   qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  qParam.nDim = 5; // 5 since staggered mrhs
+  qParam.nDim = 4;
   qParam.pc_type = QUDA_4D_PC;
   qParam.setPrecision(gParam.Precision(), gParam.Precision(), true);
   qParam.pad = 0;

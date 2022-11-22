@@ -2,19 +2,10 @@
 
 using namespace quda;
 
-StaggeredDslashTestWrapper dslash_test_wrapper;
-
-bool gauge_loaded = false;
+// For loading the gauge fields
+int argc_copy;
+char **argv_copy;
 bool ctest_all_partitions = false;
-
-void display_test_info(int precision, QudaReconstructType link_recon)
-{
-  auto prec = getPrecision(precision);
-
-  printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
-  printfQuda("%s   %s       %s           %d       %d/%d/%d        %d \n", get_prec_str(prec), get_recon_str(link_recon),
-             get_string(dtest_type_map, dtest_type).c_str(), dagger, xdim, ydim, zdim, tdim);
-}
 
 using ::testing::Bool;
 using ::testing::Combine;
@@ -60,8 +51,19 @@ protected:
     return false;
   }
 
+  StaggeredDslashTestWrapper dslash_test_wrapper;
+  void display_test_info(int precision, QudaReconstructType link_recon)
+  {
+    auto prec = getPrecision(precision);
+
+    printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
+    printfQuda("%s   %s       %s           %d       %d/%d/%d        %d \n", get_prec_str(prec), get_recon_str(link_recon),
+               get_string(dtest_type_map, dtest_type).c_str(), dagger, xdim, ydim, zdim, tdim);
+  }
+
 public:
   virtual ~StaggeredDslashTest() { }
+
   virtual void SetUp()
   {
     int prec = ::testing::get<0>(GetParam());
@@ -75,7 +77,7 @@ public:
     }
     updateR();
 
-    dslash_test_wrapper.init_ctest(prec, link_recon);
+    dslash_test_wrapper.init_ctest(argc_copy, argv_copy, prec, recon);
     display_test_info(prec, recon);
   }
 
@@ -95,27 +97,19 @@ public:
 
 TEST_P(StaggeredDslashTest, verify)
 {
-  double deviation = 1.0;
-  double tol = getTolerance(dslash_test_wrapper.inv_param.cuda_prec);
-  // check for skip_kernel
   dslash_test_wrapper.staggeredDslashRef();
-  if (dslash_test_wrapper.spinorRef != nullptr) {
-    dslash_test_wrapper.run_test(2);
-    deviation = dslash_test_wrapper.verify();
-  }
-  ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+  dslash_test_wrapper.run_test(2);
+
+  double deviation = dslash_test_wrapper.verify();
+  double tol = getTolerance(dslash_test_wrapper.inv_param.cuda_prec);
+
+  ASSERT_LE(deviation, tol) << "Reference CPU and QUDA implementations do not agree";
 }
 
 TEST_P(StaggeredDslashTest, benchmark) { dslash_test_wrapper.run_test(niter, true); }
 
 int main(int argc, char **argv)
 {
-  // hack for loading gauge fields
-  dslash_test_wrapper.argc_copy = argc;
-  dslash_test_wrapper.argv_copy = argv;
-
-  dslash_test_wrapper.init_ctest_once();
-
   // initalize google test
   ::testing::InitGoogleTest(&argc, argv);
   auto app = make_app();
@@ -127,7 +121,16 @@ int main(int argc, char **argv)
   } catch (const CLI::ParseError &e) {
     return app->exit(e);
   }
+
   initComms(argc, argv, gridsize_from_cmdline);
+
+  // The 'SetUp()' method of the Google Test class from which DslashTest
+  // in derived has no arguments, but QUDA's implementation requires the
+  // use of argc and argv to set up the test via the function 'init'.
+  // As a workaround, we declare argc_copy and argv_copy as global pointers
+  // so that they are visible inside the 'init' function.
+  argc_copy = argc;
+  argv_copy = argv;
 
   // Ensure gtest prints only from rank 0
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
@@ -171,10 +174,7 @@ int main(int argc, char **argv)
     }
   }
 
-  // return result of RUN_ALL_TESTS
   int test_rc = RUN_ALL_TESTS();
-
-  dslash_test_wrapper.end_ctest_once();
 
   finalizeComms();
 

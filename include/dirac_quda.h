@@ -719,13 +719,6 @@ namespace quda {
   class DiracCloverHasenbuschTwist : public DiracClover
   {
 
-    // Inherit these so I will comment them out
-    /*
-  protected:
-    CloverField *clover;
-    void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
-    void initConstants();
-    */
   protected:
     double mu;
 
@@ -1341,8 +1334,6 @@ public:
     virtual ~DiracStaggered();
     DiracStaggered& operator=(const DiracStaggered &dirac);
 
-    virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
-
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in,
 			const QudaParity parity) const;
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
@@ -1454,8 +1445,6 @@ public:
     virtual ~DiracStaggeredKD();
     DiracStaggeredKD &operator=(const DiracStaggeredKD &dirac);
 
-    virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
-
     virtual bool hasDslash() const { return false; }
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
@@ -1537,8 +1526,6 @@ public:
     DiracImprovedStaggered(const DiracImprovedStaggered &dirac);
     virtual ~DiracImprovedStaggered();
     DiracImprovedStaggered& operator=(const DiracImprovedStaggered &dirac);
-
-    virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in,
 			const QudaParity parity) const;
@@ -1682,8 +1669,6 @@ public:
     DiracImprovedStaggeredKD(const DiracImprovedStaggeredKD &dirac);
     virtual ~DiracImprovedStaggeredKD();
     DiracImprovedStaggeredKD &operator=(const DiracImprovedStaggeredKD &dirac);
-
-    virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
 
     virtual bool hasDslash() const { return false; }
 
