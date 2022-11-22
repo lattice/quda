@@ -4876,8 +4876,6 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   cloverDerivative(cudaForce, *u, *oprodEx, 1.0, QUDA_ODD_PARITY);
   cloverDerivative(cudaForce, *u, *oprodEx, 1.0, QUDA_EVEN_PARITY);
 
-  if (u != &gaugeEx) delete u;
-
   updateMomentum(*cudaMom, -1.0, cudaForce, "clover");
   profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
@@ -4886,6 +4884,9 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   }
 
   profileCloverForce.TPSTART(QUDA_PROFILE_FREE);
+
+  if (u != &gaugeEx) delete u;
+  delete oprodEx;
 
   if (gauge_param->make_resident_mom) {
     if (momResident != nullptr && momResident != cudaMom) delete momResident;
