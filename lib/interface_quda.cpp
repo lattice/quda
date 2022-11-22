@@ -4803,8 +4803,6 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
 		solutionResident.size(), nvector);
   }
 
-  cudaGaugeField &gaugeEx = *extendedGaugeResident;
-
   // create oprod and trace fields
   fParam.geometry = QUDA_TENSOR_GEOMETRY;
   cudaGaugeField oprod(fParam);
@@ -4849,6 +4847,12 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   }
 
   computeCloverForce(cudaForce, *gaugePrecise, quarkX, quarkP, force_coeff);
+
+  // Make sure extendedGaugeResident has the correct R
+  // TODO: In most situation, deallocation is unnecessery
+  if (extendedGaugeResident) delete extendedGaugeResident;
+  extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGaugeForce);
+  cudaGaugeField &gaugeEx = *extendedGaugeResident;
 
   // In double precision the clover derivative is faster with no reconstruct
   cudaGaugeField *u = &gaugeEx;
