@@ -1,4 +1,3 @@
-#include <enum_quda.h>
 #include <dslash_quda.h>
 #include <tunable_nd.h>
 #include <instantiate.h>
@@ -47,10 +46,10 @@ namespace quda {
         if (!commDimPartitioned(i)) continue;
         strcpy(aux, aux2);
         strcat(aux, ",exterior");
-        if (i==0) strcat(aux, ",dir=0");
-        else if (i==1) strcat(aux, ",dir=1");
-        else if (i==2) strcat(aux, ",dir=2");
-        else if (i==3) strcat(aux, ",dir=3");
+        if (dir==0) strcat(aux, ",dir=0");
+        else if (dir==1) strcat(aux, ",dir=1");
+        else if (dir==2) strcat(aux, ",dir=2");
+        else if (dir==3) strcat(aux, ",dir=3");
         kernel = EXTERIOR;
         dir = i;
         apply(device::get_default_stream());
@@ -143,6 +142,10 @@ namespace quda {
     int dag = 1;
 
     for (unsigned int i=0; i<x.size(); i++) {
+      x[i]->Even().allocateGhostBuffer(1);
+      x[i]->Odd().allocateGhostBuffer(1);
+      p[i]->Even().allocateGhostBuffer(1);
+      p[i]->Odd().allocateGhostBuffer(1);
 
       for (int parity=0; parity<2; parity++) {
 	ColorSpinorField& inA = (parity&1) ? p[i]->Odd() : p[i]->Even();
@@ -150,8 +153,8 @@ namespace quda {
 	ColorSpinorField& inC = (parity&1) ? x[i]->Odd() : x[i]->Even();
 	ColorSpinorField& inD = (parity&1) ? p[i]->Even(): p[i]->Odd();
 
-        inB.exchangeGhost(parity ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY, 1, dag);
-        inD.exchangeGhost(parity ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY, 1, 1 - dag);
+        exchangeGhost(inB, parity, dag);
+        exchangeGhost(inD, parity, 1-dag);
 
         instantiate<CloverForce, ReconstructNo12>(U, force, inA, inB, inC, inD, parity, coeff[i]);
       }

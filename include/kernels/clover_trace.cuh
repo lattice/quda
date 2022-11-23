@@ -1,9 +1,5 @@
 #pragma once
 
-#include "clover_field.h"
-#include "complex_quda.h"
-#include "util_quda.h"
-#include <cstring>
 #include <quda_matrix.h>
 #include <gauge_field_order.h>
 #include <clover_field_order.h>
