@@ -67,7 +67,7 @@ namespace quda
         X[dr] += 2 * arg.border[dr];
       }
 
-      Link U, Stap, Omega, Q;
+      Link U, Stap, Q;
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       computeStaple(arg, x, X, parity, dir, Stap, Arg::stoutDim);
@@ -133,7 +133,7 @@ namespace quda
         X[dr] += 2 * arg.border[dr];
       }
 
-      Link U, UDag, Stap, Rect, Omega, ODT, Q;
+      Link U, Stap, Rect, Q;
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
