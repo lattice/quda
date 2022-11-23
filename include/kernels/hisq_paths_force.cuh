@@ -284,7 +284,7 @@ namespace quda {
       const real coeff_three;
       const real coeff_lepage;
 
-      static constexpr int overlap = 2;
+      static constexpr int overlap = 1;
 
       AllThreeAllLepageLinkArg(GaugeField &force, GaugeField &P3, const GaugeField &oProd, const GaugeField &pMu,
                  GaugeField &pMu_2, const GaugeField &link,
@@ -643,7 +643,7 @@ namespace quda {
       const real coeff_seven;
       const real accumu_coeff_seven;
 
-      static constexpr int overlap = 2;
+      static constexpr int overlap = 1;
 
       AllFiveAllSevenLinkArg(GaugeField &force, GaugeField &shortP, const Gauge &pMu,
                  const GaugeField &P5, const GaugeField &pNuMu, const GaugeField &qNuMu,

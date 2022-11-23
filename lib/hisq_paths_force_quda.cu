@@ -225,7 +225,7 @@ namespace quda {
       unsigned int maxSharedBytesPerBlock() const override { return maxDynamicSharedBytesPerBlock(); }
 
     public:
-      AllFiveAllSevenLinkForce(Arg &arg, const GaugeField &link, int sig, int mu, int nu, int rho,
+      AllFiveAllSevenLinkForce(Arg &arg, const GaugeField &link, int sig, int mu, int nu,
                    int nu_next, const GaugeField &force, const GaugeField &shortP,
                    const GaugeField &P5, const GaugeField &pNuMu_next, const GaugeField &qNuMu_next) :
         TunableKernel2D(link, 2),
@@ -240,8 +240,18 @@ namespace quda {
         arg.sig = sig;
         arg.mu = mu;
         arg.nu = nu;
-        arg.rho = rho;
         arg.nu_next = nu_next;
+
+        if (nu != NU_IGNORED) {
+          // rho is the "last" direction that's orthogonal to sig, mu, and nu
+          // it's only relevant for the side 5 + All-7 part of the calculation
+          for (arg.rho = 0; arg.rho < 4; arg.rho++) {
+            if (arg.rho != pos_dir(sig) && arg.rho != pos_dir(mu) && arg.rho != pos_dir(nu))
+              break;
+          }
+        } else {
+          arg.rho = -1;
+        }
 
         char aux2[16];
         strcat(aux, comm_dim_partitioned_string());
@@ -265,7 +275,6 @@ namespace quda {
           strcat(aux, aux2);
         }
         
-
         apply(device::get_default_stream());
       }
 
@@ -397,36 +406,24 @@ namespace quda {
             AllFiveAllSevenLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu_2, Qnumu_2, Pnumu, Qnumu, link, act_path_coeff);
             AllFiveAllSevenLinkForce<decltype(middleFiveLinkArg)> middleFiveLink(middleFiveLinkArg, link, sig, mu, -1, -1, nu, newOprod, P3, P5, Pnumu, Qnumu);
 
-            // determine the remaining orthogonal direction
-            int rho;
-            for (rho = 0; rho < 4; rho++) {
-              if (rho != pos_dir(sig) && rho != pos_dir(mu) && rho != pos_dir(nu))
-                break;
-            }
-
             // All 7 link, 5-link side-link
             // In/out: newOprod, P3 (called shortP)
             // In: P5, Qnumu_2, link
             // Out: none
             // Ignored: Pmu, Pnumu, Qnumu
             AllFiveAllSevenLinkArg<Float, nColor, recon> allSevenSideFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_2, Qnumu_2, link, act_path_coeff);
-            AllFiveAllSevenLinkForce<decltype(allSevenSideFiveLinkArg)> allSevenSideLinkFive(allSevenSideFiveLinkArg, link, sig, mu, nu, rho, -1, newOprod, P3, P5, Pnumu_2, Qnumu_2);
+            AllFiveAllSevenLinkForce<decltype(allSevenSideFiveLinkArg)> allSevenSideLinkFive(allSevenSideFiveLinkArg, link, sig, mu, nu, -1, newOprod, P3, P5, Pnumu_2, Qnumu_2);
           } //nu
         } else {
           // optimized, more fused path
-          // Uses a "double buffer" for P5/Pnumu/Qnumu
+          // Uses a "double buffer" for Pnumu/Qnumu
 
           // unroll the nu loop
-          std::vector<std::pair<int, int> > nu_rho_pairs;
-          nu_rho_pairs.reserve(4);
+          std::vector<int> nu_vals;
+          nu_vals.reserve(4);
           for (int nu = 0; nu < 8; nu++) {
             if (pos_dir(nu) == pos_dir(sig) || pos_dir(nu) == pos_dir(mu)) continue;
-            int rho;
-            for (rho = 0; rho < 4; rho++) {
-              if (rho != pos_dir(sig) && rho != pos_dir(mu) && rho != pos_dir(nu))
-                break;
-            }
-            nu_rho_pairs.emplace_back(std::make_pair(nu, rho));
+            nu_vals.emplace_back(nu);
           }
 
           // first: just MiddleFiveLink
@@ -435,7 +432,7 @@ namespace quda {
           // In: Pmu, link
           // Ignored: Pnumu_2, Qnumu_2 (since this is MiddleFive only)
           AllFiveAllSevenLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu_2, Qnumu_2, Pnumu, Qnumu, link, act_path_coeff);
-          AllFiveAllSevenLinkForce<decltype(middleFiveLinkArg)> middleFiveArg(middleFiveLinkArg, link, sig, mu, -1, -1, nu_rho_pairs[0].first, newOprod, P3, P5, Pnumu, Qnumu);
+          AllFiveAllSevenLinkForce<decltype(middleFiveLinkArg)> middleFiveArg(middleFiveLinkArg, link, sig, mu, -1, nu_vals[0], newOprod, P3, P5, Pnumu, Qnumu);
 
           for (int i = 0; i < 3; i++) {
             // next: fully fused kernels
@@ -443,7 +440,7 @@ namespace quda {
             // In: Pmu, Pnumu, Qnumu, link
             // Out: Pnumu_2, Qnumu_2
             AllFiveAllSevenLinkArg<Float, nColor, recon> allFiveAllSevenLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_2, Qnumu_2, link, act_path_coeff);
-            AllFiveAllSevenLinkForce<decltype(allFiveAllSevenLinkArg)> allFiveAllSevenLink(allFiveAllSevenLinkArg, link, sig, mu, nu_rho_pairs[i].first, nu_rho_pairs[i].second, nu_rho_pairs[i+1].first, newOprod, P3, P5, Pnumu_2, Qnumu_2);
+            AllFiveAllSevenLinkForce<decltype(allFiveAllSevenLinkArg)> allFiveAllSevenLink(allFiveAllSevenLinkArg, link, sig, mu, nu_vals[i], nu_vals[i+1], newOprod, P3, P5, Pnumu_2, Qnumu_2);
 
             std::swap(Pnumu, Pnumu_2);
             std::swap(Qnumu, Qnumu_2);
@@ -455,7 +452,7 @@ namespace quda {
           // Out: none
           // Ignored: Pmu, Pnumu_2, Qnumu_2
           AllFiveAllSevenLinkArg<Float, nColor, recon> allSevenSideFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_2, Qnumu_2, link, act_path_coeff);
-          AllFiveAllSevenLinkForce<decltype(allSevenSideFiveLinkArg)> allSevenSideFiveLink(allSevenSideFiveLinkArg, link, sig, mu, nu_rho_pairs[3].first, nu_rho_pairs[3].second, -1, newOprod, P3, P5, Pnumu, Qnumu);
+          AllFiveAllSevenLinkForce<decltype(allSevenSideFiveLinkArg)> allSevenSideFiveLink(allSevenSideFiveLinkArg, link, sig, mu, nu_vals[3], -1, newOprod, P3, P5, Pnumu, Qnumu);
         }
       }
 
