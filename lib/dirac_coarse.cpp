@@ -111,8 +111,6 @@ namespace quda {
   void DiracCoarse::createY(bool gpu, bool mapped) const
   {
     int ndim = transfer->Vectors().Ndim();
-    // FIXME MRHS NDIM hack
-    if (ndim == 5 && transfer->Vectors().Nspin() != 4) ndim = 4; // forced case for staggered, coarsened staggered
     lat_dim_t x;
     const int *geo_bs = transfer->Geo_bs(); // Number of coarse sites.
     for (int i = 0; i < ndim; i++) x[i] = transfer->Vectors().X(i)/geo_bs[i];
