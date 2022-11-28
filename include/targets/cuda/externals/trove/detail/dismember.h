@@ -73,8 +73,9 @@ struct dismember {
     static const int idx = aliased_size<T, U>::value - r;
     __host__ __device__
     static result_type impl(const T& t) {
-        return result_type(((const U*)&t)[idx],
-                           dismember<T, U, r-1>::impl(t));
+        U tmp;
+        memcpy(&tmp, reinterpret_cast<const char*>(&t) + idx * sizeof(U), sizeof(U));
+        return result_type(tmp, dismember<T, U, r-1>::impl(t));
     }
 };
 
@@ -84,7 +85,9 @@ struct dismember<T, U, 1> {
     static const int idx = aliased_size<T, U>::value - 1;
     __host__ __device__
     static result_type impl(const T& t) {
-        return result_type(((const U*)&t)[idx]);
+        U tmp;
+        memcpy(&tmp, reinterpret_cast<const char*>(&t) + idx * sizeof(U), sizeof(U));
+        return result_type(tmp);
     }
 };
 
@@ -96,7 +99,7 @@ struct remember {
     static const int idx = aliased_size<T, U>::value - r;
     __host__ __device__
     static void impl(const array<U, r>& d, T& t) {
-        ((U*)&t)[idx] = d.head;
+        memcpy(reinterpret_cast<char*>(&t) + idx * sizeof(U), &d.head, sizeof(d.head));
         remember<T, U, r-1>::impl(d.tail, t);
     }
 };
@@ -105,8 +108,8 @@ template<typename T, typename U>
 struct remember<T, U, 1> {
     static const int idx = aliased_size<T, U>::value - 1;
     __host__ __device__
-    static void impl(const array<U, 1>& d, const T& t) {
-        ((U*)&t)[idx] = d.head;
+    static void impl(const array<U, 1>& d, T& t) {
+        memcpy(reinterpret_cast<char*>(&t) + idx * sizeof(U), &d.head, sizeof(d.head));
     }
 };
 

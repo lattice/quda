@@ -19,20 +19,18 @@ namespace quda
   };
 
   /**
-     @brief block_load for the host or when DEVICE_DEBUG is enabled
+     @brief block_load for the host
   */
   template <bool use_trove> struct block_load_impl {
     template <typename T> __host__ __device__ inline T operator()(const T *in) { return *(in); }
   };
 
-#ifndef DEVICE_DEBUG
   /**
-     @brief Device block_load that uses trove (except when DEVICE_DEBUG is enabled)
+     @brief Device block_load that uses trove
   */
   template <> struct block_load_impl<true> {
     template <typename T> __device__ inline T operator()(const T *in) { return *(trove::coalesced_ptr<const T>(in)); }
   };
-#endif
 
   /**
      @brief Load n-length block of memory of type T and return in local array
@@ -62,15 +60,14 @@ namespace quda
   }
 
   /**
-     @brief block_store for the host or when DEVICE_DEBUG is enabled
+     @brief block_store for the host
   */
   template <bool use_trove> struct block_store_impl {
     template <typename T> __host__ __device__ inline void operator()(T *out, const T &in) { *out = in; }
   };
 
-#ifndef DEVICE_DEBUG
   /**
-     @brief Device block_store that uses trove (except when DEVICE_DEBUG is enabled)
+     @brief Device block_store that uses trove
   */
   template <> struct block_store_impl<true> {
     template <typename T> __device__ inline void operator()(T *out, const T &in)
@@ -78,7 +75,6 @@ namespace quda
       *(trove::coalesced_ptr<T>(out)) = in;
     }
   };
-#endif
 
   /**
      @brief Store n-length array of type T in block of memory
