@@ -712,9 +712,6 @@ namespace quda {
           SharedMemoryCache<Link> &Matrix_cache) {
         auto mycoeff_seven = coeff_sign<sig_positive>(parity_a) * arg.coeff_seven;
 
-        // Link product intermediates
-        Link Oy, Oz;
-
         int point_b = getIndexMILC<sig_positive>(x, arg.E, arg.sig);
         int parity_b = 1 - parity_a;
 
@@ -748,7 +745,7 @@ namespace quda {
         Link Uaf = arg.link(arg.rho, point_a, parity_a);
         if constexpr (sig_positive) {
           Link force_sig = Matrix_cache.load_z(2);
-          force_sig += (parity_sign(parity_a) * mycoeff_seven) * UbeOeOf * conj(Uaf);
+          force_sig = mm_add((parity_sign(parity_a) * mycoeff_seven) * UbeOeOf, conj(Uaf), force_sig);
           Matrix_cache.save_z(force_sig, 2);
         }
 
@@ -756,7 +753,7 @@ namespace quda {
         Link Uab = Matrix_cache.load_z(0);
         if constexpr (!sig_positive) Uab = conj(Uab);
         Link force_rho = arg.force(arg.rho, point_a, parity_a);
-        force_rho += (parity_sign(parity_a) * mycoeff_seven) * conj(UbeOeOf) * conj(Uab);
+        force_rho = mm_add((parity_sign(parity_a) * mycoeff_seven) * conj(UbeOeOf), conj(Uab), force_rho);
 
         // Compute the force_rho contribution from the positive rho direction
         Link Ufe = arg.link(arg.sig, fe_link_nbr_idx, fe_link_nbr_parity);
@@ -771,12 +768,12 @@ namespace quda {
         Link Ob = arg.pNuMu(0, point_b, parity_b);
         Link UfeUebOb = UfeUeb * Ob;
         Link Oa = arg.qNuMu(0, point_a, parity_a);
-        force_rho -= (parity_sign(parity_a) * mycoeff_seven) * UfeUebOb * Oa;
+        force_rho = mm_add((-parity_sign(parity_a) * mycoeff_seven) * UfeUebOb, Oa, force_rho);
         arg.force(arg.rho, point_a, parity_a) = force_rho;
 
         // Compute the p5 contribution from the positive rho direction
         Link p5_sig = arg.p5(0, point_a, parity_a);
-        p5_sig += arg.accumu_coeff_seven * Uaf * UfeUebOb;
+        p5_sig = mm_add(arg.accumu_coeff_seven * Uaf, UfeUebOb, p5_sig);
 
 #pragma unroll
         for (int d = 0; d < 4; d++) y[d] = x[d];
@@ -791,9 +788,9 @@ namespace quda {
         Link Udc = arg.link(arg.sig, dc_link_nbr_idx, dc_link_nbr_parity);
         Link Uda = arg.link(arg.rho, point_d, parity_d);
         Link Ucb = arg.link(arg.rho, point_c, parity_c);
-        Oz = Ucb * Ob;
-        Oy = (sig_positive ? Udc : conj(Udc)) * Oz;
-        p5_sig += arg.accumu_coeff_seven * conj(Uda) * Oy;
+        Link Oz = Ucb * Ob;
+        Link Oy = (sig_positive ? Udc : conj(Udc)) * Oz;
+        p5_sig = mm_add(arg.accumu_coeff_seven * conj(Uda), Oy, p5_sig);
         Matrix_cache.save_z(p5_sig, 1);
 
         // When sig is positive, compute the force_sig contribution from the
@@ -801,9 +798,9 @@ namespace quda {
         if constexpr (sig_positive) {
           Link Od = arg.qNuMu(0, point_d, parity_d);
           Link Oc = arg.pNuMu(0, point_c, parity_c);
-          Oz = conj(Ucb) * Oc;
+          Link Oz = conj(Ucb) * Oc;
           Link force_sig = Matrix_cache.load_z(2);
-          force_sig += (parity_sign(parity_a) * mycoeff_seven) * Oz * Od * Uda;
+          force_sig = mm_add((parity_sign(parity_a) * mycoeff_seven) * Oz, Od * Uda, force_sig);
           Matrix_cache.save_z(force_sig, 2);
         }
 
@@ -924,7 +921,7 @@ namespace quda {
         // compute the force in the sigma direction if sig is positive
         if constexpr (sig_positive) {
           Link force_sig = Matrix_cache.load_z(2);
-          force_sig += arg.coeff_five * (Ow * Ox);
+          force_sig = mm_add(arg.coeff_five * Ow, Ox, force_sig);
           Matrix_cache.save_z(force_sig, 2);
         }
       }

@@ -547,6 +547,36 @@ namespace quda {
       return result;
     }
 
+  /**
+     @brief Specialization of complex matrix multiplication
+     accumulation (a * b + c) that will issue optimal fma instructions
+   */
+  template< template<typename> class complex, typename T, int N>
+    __device__ __host__ inline Matrix<complex<T>,N> mm_add(const Matrix<complex<T>,N> &a, const Matrix<complex<T>,N> &b,
+                                                           const Matrix<complex<T>,N> &c)
+    {
+      Matrix<complex<T>,N> result;
+#pragma unroll
+      for (int i=0; i<N; i++) {
+#pragma unroll
+	for (int k=0; k<N; k++) {
+          result(i, k).real(c(i,k).real()       + a(i, 0).real() * b(0, k).real());
+          result(i, k).real(result(i, k).real() - a(i, 0).imag() * b(0, k).imag());
+          result(i, k).imag(c(i,k).imag()       + a(i, 0).real() * b(0, k).imag());
+          result(i, k).imag(result(i, k).imag() + a(i, 0).imag() * b(0, k).real());
+#pragma unroll
+	  for (int j=1; j<N; j++) {
+            result(i, k).real(result(i, k).real() + a(i, j).real() * b(j, k).real());
+            result(i, k).real(result(i, k).real() - a(i, j).imag() * b(j, k).imag());
+            result(i, k).imag(result(i, k).imag() + a(i, j).real() * b(j, k).imag());
+            result(i, k).imag(result(i, k).imag() + a(i, j).imag() * b(j, k).real());
+          }
+	}
+      }
+      return result;
+    }
+
+
   template<class T, int N>
     __device__ __host__ inline Matrix<T,N> operator *=(Matrix<T,N> & a, const Matrix<T,N>& b){
 
