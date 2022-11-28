@@ -53,52 +53,64 @@ namespace quda {
     };
 
     enum {
+      RHO_POSITIVE = 1,
+      RHO_NEGATIVE = 0,
+      RHO_IGNORED = -1
+    };
+
+    enum {
       COMPUTE_LEPAGE_YES = 1,
       COMPUTE_LEPAGE_NO = 0,
       COMPUTE_LEPAGE_IGNORED = -1
     };
 
-    constexpr int opp_dir(int signed_dir) { return 7 - signed_dir; }
-    constexpr int goes_forward(int signed_dir) { return signed_dir <= 3; }
-    constexpr int goes_backward(int signed_dir) { return signed_dir > 3; }
-    constexpr int coeff_sign(int pos_dir, int odd_lattice) { return 2*((pos_dir + odd_lattice + 1) & 1) - 1; }
+    constexpr int flip_dir(int direction) { return 1 - direction; }
+    template <int dir>
+    constexpr int coeff_sign(int odd_lattice) { return 2*((dir + odd_lattice + 1) & 1) - 1; }
     constexpr int parity_sign(int parity) { return parity ? -1 : 1; }
-    constexpr int pos_dir(int signed_dir) { return (signed_dir >= 4) ? 7 - signed_dir : signed_dir; }
 
     /**
-      @brief Compute the checkerboard 1-d index for the nearest neighbor in a MILC-convention
-             signed direction, updating the lattice coordinates in-place
+      @brief Compute the checkerboard 1-d index for the nearest neighbor in a given direction,
+               updating the lattice coordinates in-place
       @param[in/out] x Local coordinate, which is returned shifted
       @param[in] X Full lattice dimensions
-      @param[in] signed_dir Signed MILC direction
+      @param[in] dim Shifted dimension
+      @tparam dir Positive (1) or negative (0) direction shift
       @return Shifted 1-d checkboard index
     */
-    __host__ __device__ int updateCoordsIndexMILCDir(int x[], const int_fastdiv X[], int signed_dir) {
-      switch (signed_dir) {
-      case 0: x[0] = (x[0] + 1 + X[0]) % X[0]; break;
-      case 1: x[1] = (x[1] + 1 + X[1]) % X[1]; break;
-      case 2: x[2] = (x[2] + 1 + X[2]) % X[2]; break;
-      case 3: x[3] = (x[3] + 1 + X[3]) % X[3]; break;
-      case 4: x[3] = (x[3] - 1 + X[3]) % X[3]; break;
-      case 5: x[2] = (x[2] - 1 + X[2]) % X[2]; break;
-      case 6: x[1] = (x[1] - 1 + X[1]) % X[1]; break;
-      case 7: x[0] = (x[0] - 1 + X[0]) % X[0]; break;
+    template <int dir>
+    __host__ __device__ int updateCoordsIndexMILC(int x[], const int_fastdiv X[], int dim) {
+      if constexpr (dir == 0) {
+        switch (dim) {
+        case 0: x[0] = (x[0] - 1 + X[0]) % X[0]; break;
+        case 1: x[1] = (x[1] - 1 + X[1]) % X[1]; break;
+        case 2: x[2] = (x[2] - 1 + X[2]) % X[2]; break;
+        case 3: x[3] = (x[3] - 1 + X[3]) % X[3]; break;
+        }
+      } else {
+        switch (dim) {
+        case 0: x[0] = (x[0] + 1 + X[0]) % X[0]; break;
+        case 1: x[1] = (x[1] + 1 + X[1]) % X[1]; break;
+        case 2: x[2] = (x[2] + 1 + X[2]) % X[2]; break;
+        case 3: x[3] = (x[3] + 1 + X[3]) % X[3]; break;
+        }
       }
       int idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
       return idx;
     }
 
     /**
-      @brief Compute the checkerboard 1-d index for the nearest neighbor in a MILC-convention
-             signed direction
+      @brief Compute the checkerboard 1-d index for the nearest neighbor in a given direction
       @param[in/out] x Local coordinate
       @param[in] X Full lattice dimensions
-      @param[in] signed_dir Signed MILC direction
+      @param[in] dim Shifted dimension
+      @tparam dir Positive (1) or negative (0) direction shift
       @return Shifted 1-d checkboard index
     */
-    __host__ __device__ int getIndexMILCDir(const int x[], const int_fastdiv X[], int signed_dir) {
+    template <int dir>
+    __host__ __device__ int getIndexMILC(const int x[], const int_fastdiv X[], int dim) {
       int y[4] = {x[0], x[1], x[2], x[3]};
-      return updateCoordsIndexMILCDir(y, X, signed_dir);
+      return updateCoordsIndexMILC<dir>(y, X, dim);
     }
 
     //struct for holding the fattening path coefficients
@@ -326,13 +338,13 @@ namespace quda {
             3 Multiplies, 1 add, 1 rescale
       */
       __device__ __host__ inline void lepage_p3(int x[4], int point_a, int parity_a, Link &force_mu) {
-        int point_b = getIndexMILCDir(x, arg.E, arg.sig);
+        int point_b = getIndexMILC<sig_positive>(x, arg.E, arg.sig);
         int parity_b = 1 - parity_a;
 
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_f = updateCoordsIndexMILCDir(y, arg.E, arg.mu);
+        int point_f = updateCoordsIndexMILC<mu_positive>(y, arg.E, arg.mu);
         int parity_f = 1 - parity_a;
-        int point_e = getIndexMILCDir(y, arg.E, arg.sig);
+        int point_e = getIndexMILC<sig_positive>(y, arg.E, arg.sig);
         int parity_e = parity_a;
 
         int af_link_nbr_idx = (mu_positive) ? point_a : point_f;
@@ -343,16 +355,16 @@ namespace quda {
         int be_link_nbr_parity = (mu_positive) ? parity_b : parity_e;
 
         // Accumulate Lepage contribution to P3
-        Link Ufe = arg.link(pos_dir(arg.sig), fe_link_nbr_idx, fe_link_nbr_parity);
-        Link Ube = arg.link(pos_dir(arg.mu), be_link_nbr_idx, be_link_nbr_parity);
-        Link Uaf = arg.link(pos_dir(arg.mu), af_link_nbr_idx, af_link_nbr_parity);
+        Link Ufe = arg.link(arg.sig, fe_link_nbr_idx, fe_link_nbr_parity);
+        Link Ube = arg.link(arg.mu, be_link_nbr_idx, be_link_nbr_parity);
+        Link Uaf = arg.link(arg.mu, af_link_nbr_idx, af_link_nbr_parity);
         Link Ob = arg.pMu(0, point_b, parity_b);
 
         Link Ow = mu_positive ? conj(Ube) * Ob : Ube * Ob;
         Link Oy = sig_positive ? Ufe * Ow : conj(Ufe) * Ow;
         Link Ox = mu_positive ? Uaf * Oy : conj(Uaf) * Oy;
 
-        auto mycoeff_three = coeff_sign(goes_forward(arg.sig),parity_a)*coeff_sign(goes_forward(arg.mu),parity_a)*arg.coeff_lepage;
+        auto mycoeff_three = coeff_sign<sig_positive>(parity_a)*coeff_sign<mu_positive>(parity_a)*arg.coeff_lepage;
         force_mu += mycoeff_three * (mu_positive ? Ox : conj(Ox));
       }
 
@@ -378,15 +390,15 @@ namespace quda {
             2 multiplies, 1 add, 1 rescale
       */
       __device__ __host__ inline void lepage_force(int x[4], int point_a, int parity_a, Link &force_mu, SharedMemoryCache<Link> &Uab_cache) {
-        int point_b = getIndexMILCDir(x, arg.E, arg.sig);
+        int point_b = getIndexMILC<sig_positive>(x, arg.E, arg.sig);
         int parity_b = 1 - parity_a;
 
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu));
+        int point_d = updateCoordsIndexMILC<flip_dir(mu_positive)>(y, arg.E, arg.mu);
         int parity_d = 1 - parity_a;
-        int point_i = getIndexMILCDir(y, arg.E, opp_dir(arg.mu));
+        int point_i = getIndexMILC<flip_dir(mu_positive)>(y, arg.E, arg.mu);
         int parity_i = parity_a;
-        int point_c = getIndexMILCDir(y, arg.E, arg.sig);
+        int point_c = getIndexMILC<sig_positive>(y, arg.E, arg.sig);
         int parity_c = parity_a;
 
         int da_link_nbr_idx = (mu_positive) ? point_d : point_a;
@@ -399,22 +411,22 @@ namespace quda {
         int id_link_nbr_parity = (mu_positive) ? parity_i : parity_d;
 
         // Accumulate Lepage contribution to force_mu
-        Link Ucb = arg.link(pos_dir(arg.mu), cb_link_nbr_idx, cb_link_nbr_parity);
+        Link Ucb = arg.link(arg.mu, cb_link_nbr_idx, cb_link_nbr_parity);
         Link Oc = arg.pMu(0, point_c, parity_c);
-        Link Uid = arg.link(pos_dir(arg.mu), id_link_nbr_idx, id_link_nbr_parity);
+        Link Uid = arg.link(arg.mu, id_link_nbr_idx, id_link_nbr_parity);
 
         Link Ow = mu_positive ? (conj(Ucb) * Oc) : (Ucb * Oc);
         {
           Link Uab = Uab_cache.load();
           Link Oy = sig_positive ? Uab * Ow : conj(Uab) * Ow;
           Link Ox = mu_positive ? (Oy * Uid) : (Uid * conj(Oy));
-          auto mycoeff_lepage = -coeff_sign(goes_forward(arg.sig), parity_a)*coeff_sign(goes_forward(arg.mu),parity_a)*arg.coeff_lepage;
+          auto mycoeff_lepage = -coeff_sign<sig_positive>(parity_a)*coeff_sign<mu_positive>(parity_a)*arg.coeff_lepage;
           force_mu += mycoeff_lepage * Ox;
         }
 
         // Update force_sig if sig is positive
         if constexpr ( sig_positive ) {
-          Link Uda = arg.link(pos_dir(arg.mu), da_link_nbr_idx, da_link_nbr_parity);
+          Link Uda = arg.link(arg.mu, da_link_nbr_idx, da_link_nbr_parity);
           Link Ox = mu_positive ? (Uid * Uda) : (conj(Uid) * conj(Uda));
           Link Oy = Ow * Ox;
 
@@ -447,14 +459,14 @@ namespace quda {
       */
       __device__ __host__ inline void middle_three(int x[4], int point_a, int parity_a, SharedMemoryCache<Link> &Uab_cache)
       {
-        int point_b = getIndexMILCDir(x, arg.E, arg.sig);
+        int point_b = getIndexMILC<sig_positive>(x, arg.E, arg.sig);
         int parity_b = 1 - parity_a;
 
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_h = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.mu_next));
+        int point_h = updateCoordsIndexMILC<flip_dir(mu_side_positive)>(y, arg.E, arg.mu_next);
         int parity_h = 1 - parity_a;
 
-        int point_g = getIndexMILCDir(y, arg.E, arg.sig);
+        int point_g = getIndexMILC<sig_positive>(y, arg.E, arg.sig);
         int parity_g = parity_a;
 
         int ha_link_nbr_idx = mu_side_positive ? point_h : point_a;
@@ -468,8 +480,8 @@ namespace quda {
 
         // Load link and outer product contributions for Pmu and P3, as well as
         // force_sig when sig is positive
-        Link Ugb = arg.link(pos_dir(arg.mu_next), gb_link_nbr_idx, gb_link_nbr_parity);
-        Link Oh = arg.oProd(pos_dir(arg.sig), hg_link_nbr_idx, hg_link_nbr_parity);
+        Link Ugb = arg.link(arg.mu_next, gb_link_nbr_idx, gb_link_nbr_parity);
+        Link Oh = arg.oProd(arg.sig, hg_link_nbr_idx, hg_link_nbr_parity);
 
         if constexpr (!sig_positive) Oh = conj(Oh);
         if constexpr (mu_side_positive) Ugb = conj(Ugb);
@@ -485,7 +497,7 @@ namespace quda {
 
         // Update the force in the sigma direction
         if constexpr (sig_positive) {
-          Link Uha = arg.link(pos_dir(arg.mu_next), ha_link_nbr_idx, ha_link_nbr_parity);
+          Link Uha = arg.link(arg.mu_next, ha_link_nbr_idx, ha_link_nbr_parity);
           if constexpr (!mu_side_positive) Uha = conj(Uha);
 
           Link Oy = Oz * Uha;
@@ -551,22 +563,22 @@ namespace quda {
         SharedMemoryCache<Link> Uab_cache(target::block_dim());
         // Scoped load of Uab
         {
-          int point_b = getIndexMILCDir(x, arg.E, arg.sig);
+          int point_b = getIndexMILC<sig_positive>(x, arg.E, arg.sig);
           int parity_b = 1 - parity;
           int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
           int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
-          Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
+          Link Uab = arg.link(arg.sig, ab_link_nbr_idx, ab_link_nbr_parity);
           Uab_cache.save(Uab);
         }
 
         if constexpr (mu_positive != MU_IGNORED) {
-          int point_d = getIndexMILCDir(x, arg.E, opp_dir(arg.mu));
+          int point_d = getIndexMILC<flip_dir(mu_positive)>(x, arg.E, arg.mu);
           int parity_d = 1 - parity;
           int da_link_nbr_idx = (mu_positive) ? point_d : point_a;
           int da_link_nbr_parity = (mu_positive) ? parity_d : parity_a;
 
-          Link force_mu = arg.force(pos_dir(arg.mu), da_link_nbr_idx, da_link_nbr_parity);
-          auto mycoeff_three = coeff_sign(goes_forward(arg.sig),parity_a)*coeff_sign(goes_forward(arg.mu),parity_a)*arg.coeff_three;
+          Link force_mu = arg.force(arg.mu, da_link_nbr_idx, da_link_nbr_parity);
+          auto mycoeff_three = coeff_sign<sig_positive>(parity_a)*coeff_sign<mu_positive>(parity_a)*arg.coeff_three;
           {
             Link p3 = arg.p3(0, point_a, parity_a);
             force_mu += mycoeff_three * (mu_positive ? p3 : conj(p3));
@@ -578,7 +590,7 @@ namespace quda {
           }
 
           // Update force_mu
-          arg.force(pos_dir(arg.mu), da_link_nbr_idx, da_link_nbr_parity) = force_mu;
+          arg.force(arg.mu, da_link_nbr_idx, da_link_nbr_parity) = force_mu;
         }
 
         // middle_three overrides arg.p3 in-place, so this kernel call needs to come
@@ -698,18 +710,18 @@ namespace quda {
       */
       __device__ __host__ inline void all_link(int x[4], int point_a, int parity_a,
           SharedMemoryCache<Link> &Matrix_cache) {
-        auto mycoeff_seven = coeff_sign(sig_positive,parity_a) * arg.coeff_seven;
+        auto mycoeff_seven = coeff_sign<sig_positive>(parity_a) * arg.coeff_seven;
 
         // Link product intermediates
         Link Oy, Oz;
 
-        int point_b = getIndexMILCDir(x, arg.E, arg.sig);
+        int point_b = getIndexMILC<sig_positive>(x, arg.E, arg.sig);
         int parity_b = 1 - parity_a;
 
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_f = updateCoordsIndexMILCDir(y, arg.E, arg.rho);
+        int point_f = updateCoordsIndexMILC<RHO_POSITIVE>(y, arg.E, arg.rho);
         int parity_f = 1 - parity_a;
-        int point_e = getIndexMILCDir(y, arg.E, arg.sig);
+        int point_e = getIndexMILC<sig_positive>(y, arg.E, arg.sig);
         int parity_e = parity_a;
         int fe_link_nbr_idx = (sig_positive) ? point_f : point_e;
         int fe_link_nbr_parity = (sig_positive) ? parity_f : parity_e;
@@ -723,7 +735,7 @@ namespace quda {
         Link UbeOeOf;
         {
           // Scoped load of Ube, which is cached in shared memory to be used in multiple contexts
-          Link Ube = arg.link(pos_dir(arg.rho), point_b, parity_b);
+          Link Ube = arg.link(arg.rho, point_b, parity_b);
 
           // Form the product UbeOeOf, which is needed for force_rho (and force_sig)
           UbeOeOf = Ube * OeOf;
@@ -733,7 +745,7 @@ namespace quda {
         }
 
         // Take care of force_sig --- contribution from the negative rho direction
-        Link Uaf = arg.link(pos_dir(arg.rho), point_a, parity_a);
+        Link Uaf = arg.link(arg.rho, point_a, parity_a);
         if constexpr (sig_positive) {
           Link force_sig = Matrix_cache.load_z(2);
           force_sig += (parity_sign(parity_a) * mycoeff_seven) * UbeOeOf * conj(Uaf);
@@ -743,11 +755,11 @@ namespace quda {
         // Compute the force_rho --- contribution from the negative rho direction
         Link Uab = Matrix_cache.load_z(0);
         if constexpr (!sig_positive) Uab = conj(Uab);
-        Link force_rho = arg.force(pos_dir(arg.rho), point_a, parity_a);
+        Link force_rho = arg.force(arg.rho, point_a, parity_a);
         force_rho += (parity_sign(parity_a) * mycoeff_seven) * conj(UbeOeOf) * conj(Uab);
 
         // Compute the force_rho contribution from the positive rho direction
-        Link Ufe = arg.link(pos_dir(arg.sig), fe_link_nbr_idx, fe_link_nbr_parity);
+        Link Ufe = arg.link(arg.sig, fe_link_nbr_idx, fe_link_nbr_parity);
 
         // Load Ube from the cache
         Link Ube = Matrix_cache.load_z(1);
@@ -760,7 +772,7 @@ namespace quda {
         Link UfeUebOb = UfeUeb * Ob;
         Link Oa = arg.qNuMu(0, point_a, parity_a);
         force_rho -= (parity_sign(parity_a) * mycoeff_seven) * UfeUebOb * Oa;
-        arg.force(pos_dir(arg.rho), point_a, parity_a) = force_rho;
+        arg.force(arg.rho, point_a, parity_a) = force_rho;
 
         // Compute the p5 contribution from the positive rho direction
         Link p5_sig = arg.p5(0, point_a, parity_a);
@@ -768,17 +780,17 @@ namespace quda {
 
 #pragma unroll
         for (int d = 0; d < 4; d++) y[d] = x[d];
-        int point_d = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.rho));
+        int point_d = updateCoordsIndexMILC<RHO_NEGATIVE>(y, arg.E, arg.rho);
         int parity_d = 1 - parity_a;
-        int point_c = getIndexMILCDir(y, arg.E, arg.sig);
+        int point_c = getIndexMILC<sig_positive>(y, arg.E, arg.sig);
         int parity_c = parity_a;
         int dc_link_nbr_idx = (sig_positive) ? point_d : point_c;
         int dc_link_nbr_parity = (sig_positive) ? parity_d : parity_c;
 
         // Compute the p5 contribution from the negative rho direction
-        Link Udc = arg.link(pos_dir(arg.sig), dc_link_nbr_idx, dc_link_nbr_parity);
-        Link Uda = arg.link(pos_dir(arg.rho), point_d, parity_d);
-        Link Ucb = arg.link(pos_dir(arg.rho), point_c, parity_c);
+        Link Udc = arg.link(arg.sig, dc_link_nbr_idx, dc_link_nbr_parity);
+        Link Uda = arg.link(arg.rho, point_d, parity_d);
+        Link Ucb = arg.link(arg.rho, point_c, parity_c);
         Oz = Ucb * Ob;
         Oy = (sig_positive ? Udc : conj(Udc)) * Oz;
         p5_sig += arg.accumu_coeff_seven * conj(Uda) * Oy;
@@ -814,10 +826,10 @@ namespace quda {
       */
       __device__ __host__ inline void side_five(int x[4], int point_a, int parity_a, SharedMemoryCache<Link> &Matrix_cache) {
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_h = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.nu));
+        int point_h = updateCoordsIndexMILC<flip_dir(nu_positive)>(y, arg.E, arg.nu);
         int parity_h = 1 - parity_a;
 
-        int point_q = getIndexMILCDir(y, arg.E, opp_dir(arg.mu));
+        int point_q = getIndexMILC<flip_dir(mu_positive)>(y, arg.E, arg.mu);
         int parity_q = parity_a;
 
         int ha_link_nbr_idx = nu_positive ? point_h : point_a;
@@ -827,22 +839,22 @@ namespace quda {
         int qh_link_nbr_parity = mu_positive ? parity_q : parity_h;
 
         Link P5 = Matrix_cache.load_z(1);
-        Link Uah = arg.link(pos_dir(arg.nu), ha_link_nbr_idx, ha_link_nbr_parity);
+        Link Uah = arg.link(arg.nu, ha_link_nbr_idx, ha_link_nbr_parity);
         Link Ow = nu_positive ? Uah * P5 : conj(Uah) * P5;
 
         Link shortP = arg.shortP(0, point_h, parity_h);
         shortP += arg.accumu_coeff_five * Ow;
         arg.shortP(0, point_h, parity_h) = shortP;
 
-        Link Uqh = arg.link(pos_dir(arg.mu), qh_link_nbr_idx, qh_link_nbr_parity);
+        Link Uqh = arg.link(arg.mu, qh_link_nbr_idx, qh_link_nbr_parity);
         if constexpr (!mu_positive) Uqh = conj(Uqh);
         Ow = nu_positive ? P5 * Uqh : conj(Uqh) * conj(P5);
 
-        auto mycoeff_five = -coeff_sign(goes_forward(arg.sig), parity_a)*coeff_sign(goes_forward(arg.nu),parity_a)*arg.coeff_five;
+        auto mycoeff_five = -coeff_sign<sig_positive>(parity_a)*coeff_sign<nu_positive>(parity_a)*arg.coeff_five;
 
-        Link oprod = arg.force(pos_dir(arg.nu), ha_link_nbr_idx, ha_link_nbr_parity);
+        Link oprod = arg.force(arg.nu, ha_link_nbr_idx, ha_link_nbr_parity);
         oprod += mycoeff_five * Ow;
-        arg.force(pos_dir(arg.nu), ha_link_nbr_idx, ha_link_nbr_parity) = oprod;
+        arg.force(arg.nu, ha_link_nbr_idx, ha_link_nbr_parity) = oprod;
       }
 
       /**
@@ -866,17 +878,17 @@ namespace quda {
       */
       __device__ __host__ inline void middle_five(int x[4], int point_a, int parity_a,
           SharedMemoryCache<Link> &Matrix_cache) {
-        int point_b = getIndexMILCDir(x, arg.E, arg.sig);
+        int point_b = getIndexMILC<sig_positive>(x, arg.E, arg.sig);
         int parity_b = 1 - parity_a;
 
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_h = updateCoordsIndexMILCDir(y, arg.E, opp_dir(arg.nu_next));
+        int point_h = updateCoordsIndexMILC<flip_dir(nu_side_positive)>(y, arg.E, arg.nu_next);
         int parity_h = 1 - parity_a;
 
-        int point_q = getIndexMILCDir(y, arg.E, opp_dir(arg.mu));
+        int point_q = getIndexMILC<flip_dir(mu_positive)>(y, arg.E, arg.mu);
         int parity_q = parity_a;
 
-        int point_c = updateCoordsIndexMILCDir(y, arg.E, arg.sig);
+        int point_c = updateCoordsIndexMILC<sig_positive>(y, arg.E, arg.sig);
         int parity_c = parity_a;
 
         int ha_link_nbr_idx = nu_side_positive ? point_h : point_a;
@@ -889,7 +901,7 @@ namespace quda {
         int cb_link_nbr_parity = nu_side_positive ? parity_c : parity_b;
 
         // Load link and outer product contributions for pNuMu, P5, qNuMu
-        Link Ubc = arg.link(pos_dir(arg.nu_next), cb_link_nbr_idx, cb_link_nbr_parity);
+        Link Ubc = arg.link(arg.nu_next, cb_link_nbr_idx, cb_link_nbr_parity);
         Link Oc = arg.pMu(0, point_c, parity_c);
         Link Ow = !nu_side_positive ? Ubc * Oc : conj(Ubc) * Oc;
 
@@ -901,8 +913,8 @@ namespace quda {
           arg.p5(0, point_a, parity_a) = Uab * Ow;
         }
 
-        Link Uha = arg.link(pos_dir(arg.nu_next), ha_link_nbr_idx, ha_link_nbr_parity);
-        Link Uqh = arg.link(pos_dir(arg.mu), qh_link_nbr_idx, qh_link_nbr_parity);
+        Link Uha = arg.link(arg.nu_next, ha_link_nbr_idx, ha_link_nbr_parity);
+        Link Uqh = arg.link(arg.mu, qh_link_nbr_idx, qh_link_nbr_parity);
         if constexpr (!nu_side_positive) Uha = conj(Uha);
         if constexpr (!mu_positive) Uqh = conj(Uqh);
 
@@ -931,7 +943,7 @@ namespace quda {
           If we're calculating the 7-link and 5-link side-link contribution (nu_positive != NU_IGNORED),
           there's no extra work in this routine
 
-          If we're calculating the 5-link middle-link contribution (nu_next_positive != NU_NEXT_IGNORED),
+          If we're calculating the 5-link middle-link contribution (nu_side_positive != NU_NEXT_IGNORED),
           there's no extra work in this routine.
 
           In all cases, if sig is positive, we have:
@@ -961,11 +973,11 @@ namespace quda {
 
         // Scoped load of Uab
         {
-          int point_b = getIndexMILCDir(x, arg.E, arg.sig);
+          int point_b = getIndexMILC<sig_positive>(x, arg.E, arg.sig);
           int parity_b = 1 - parity;
           int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
           int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
-          Link Uab = arg.link(pos_dir(arg.sig), ab_link_nbr_idx, ab_link_nbr_parity);
+          Link Uab = arg.link(arg.sig, ab_link_nbr_idx, ab_link_nbr_parity);
           Matrix_cache.save_z(Uab, 0);
         }
 
