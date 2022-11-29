@@ -80,7 +80,7 @@ namespace quda {
       Arg &arg;
       const GaugeField &force;
       const GaugeField &p3;
-      const GaugeField &pMu_2;
+      const GaugeField &pMu_next;
       const GaugeField &link;
 
       const dim_dir_pair sig, mu, mu_next;
@@ -94,12 +94,12 @@ namespace quda {
     public:
       AllThreeAllLepageLinkForce(Arg &arg, const GaugeField &link, dim_dir_pair sig, dim_dir_pair mu, dim_dir_pair mu_next,
                          const PathCoefficients<typename Arg::real> &act_path_coeff, const GaugeField &force,
-                         const GaugeField &p3, const GaugeField &pMu_2) :
+                         const GaugeField &p3, const GaugeField &pMu_next) :
         TunableKernel2D(link, 2),
         arg(arg),
         force(force),
         p3(p3),
-        pMu_2(pMu_2),
+        pMu_next(pMu_next),
         link(link),
         sig(sig),
         mu(mu),
@@ -141,27 +141,27 @@ namespace quda {
 
       template <int sig, int mu, int mu_next>
       void instantiate(TuneParam &tp, const qudaStream_t &stream) {
-        if (has_lepage) launch<AllThreeAllLepageLink>(tp, stream, FatLinkParam<Arg, sig, mu, mu_next, NU_IGNORED, NU_NEXT_IGNORED, COMPUTE_LEPAGE_YES>(arg));
-        else launch<AllThreeAllLepageLink>(tp, stream, FatLinkParam<Arg, sig, mu, mu_next, NU_IGNORED, NU_NEXT_IGNORED, COMPUTE_LEPAGE_NO>(arg));
+        if (has_lepage) launch<AllThreeAllLepageLink>(tp, stream, FatLinkParam<Arg, sig, mu, mu_next, DIR_IGNORED, DIR_IGNORED, COMPUTE_LEPAGE_YES>(arg));
+        else launch<AllThreeAllLepageLink>(tp, stream, FatLinkParam<Arg, sig, mu, mu_next, DIR_IGNORED, DIR_IGNORED, COMPUTE_LEPAGE_NO>(arg));
       }
 
       template <int sig, int mu>
       void instantiate(dim_dir_pair mu_next, TuneParam &tp, const qudaStream_t &stream) {
-        if (mu_next.is_invalid()) instantiate<sig, mu, MU_NEXT_IGNORED>(tp, stream);
-        else if (mu_next.is_forward()) instantiate<sig, mu, MU_NEXT_POSITIVE>(tp, stream);
-        else instantiate<sig, mu, MU_NEXT_NEGATIVE>(tp, stream);
+        if (mu_next.is_invalid()) instantiate<sig, mu, DIR_IGNORED>(tp, stream);
+        else if (mu_next.is_forward()) instantiate<sig, mu, DIR_POSITIVE>(tp, stream);
+        else instantiate<sig, mu, DIR_NEGATIVE>(tp, stream);
       }
 
       template <int sig>
       void instantiate(dim_dir_pair mu, dim_dir_pair mu_next, TuneParam &tp, const qudaStream_t &stream) {
-        if (mu.is_invalid()) instantiate<sig, MU_IGNORED>(mu_next, tp, stream);
-        else if (mu.is_forward()) instantiate<sig, MU_POSITIVE>(mu_next, tp, stream);
-        else instantiate<sig, MU_NEGATIVE>(mu_next, tp, stream);
+        if (mu.is_invalid()) instantiate<sig, DIR_IGNORED>(mu_next, tp, stream);
+        else if (mu.is_forward()) instantiate<sig, DIR_POSITIVE>(mu_next, tp, stream);
+        else instantiate<sig, DIR_NEGATIVE>(mu_next, tp, stream);
       }
 
       void instantiate(dim_dir_pair sig, dim_dir_pair mu, dim_dir_pair mu_next, TuneParam &tp, const qudaStream_t &stream) {
-        if (sig.is_forward()) instantiate<SIG_POSITIVE>(mu, mu_next, tp, stream);
-        else instantiate<SIG_NEGATIVE>(mu, mu_next, tp, stream);
+        if (sig.is_forward()) instantiate<DIR_POSITIVE>(mu, mu_next, tp, stream);
+        else instantiate<DIR_NEGATIVE>(mu, mu_next, tp, stream);
       }
 
       void apply(const qudaStream_t &stream)
@@ -174,13 +174,13 @@ namespace quda {
       void preTune() {
         force.backup();
         p3.backup();
-        pMu_2.backup();
+        pMu_next.backup();
       }
 
       void postTune() {
         force.restore();
         p3.restore();
-        pMu_2.restore();
+        pMu_next.restore();
       }
 
       long long flops() const {
@@ -228,7 +228,7 @@ namespace quda {
         }
         // Three link middle link
         if (mu_next.is_valid()) {
-          bytes_per_site += ( arg.link.Bytes() + arg.oProd.Bytes() + arg.pMu_2.Bytes() + arg.p3.Bytes() );
+          bytes_per_site += ( arg.link.Bytes() + arg.oProd.Bytes() + arg.pMu_next.Bytes() + arg.p3.Bytes() );
           if (sig.is_forward()) {
             bytes_per_site += ( arg.link.Bytes() + 2 * arg.force.Bytes() );
           }
@@ -323,34 +323,34 @@ namespace quda {
       template <int sig, int mu, int nu>
       void instantiate(dim_dir_pair nu_next, TuneParam &tp, const qudaStream_t &stream) {
         if (nu_next.is_invalid()) {
-          launch<AllFiveAllSevenLink>(tp, stream, FatLinkParam<Arg, sig, mu, MU_NEXT_IGNORED, nu, NU_NEXT_IGNORED>(arg));
+          launch<AllFiveAllSevenLink>(tp, stream, FatLinkParam<Arg, sig, mu, DIR_IGNORED, nu, DIR_IGNORED>(arg));
         } else if (nu_next.is_forward()) {
-          launch<AllFiveAllSevenLink>(tp, stream, FatLinkParam<Arg, sig, mu, MU_NEXT_IGNORED, nu, NU_NEXT_POSITIVE>(arg));
+          launch<AllFiveAllSevenLink>(tp, stream, FatLinkParam<Arg, sig, mu, DIR_IGNORED, nu, DIR_POSITIVE>(arg));
         } else {
-          launch<AllFiveAllSevenLink>(tp, stream, FatLinkParam<Arg, sig, mu, MU_NEXT_IGNORED, nu, NU_NEXT_NEGATIVE>(arg));
+          launch<AllFiveAllSevenLink>(tp, stream, FatLinkParam<Arg, sig, mu, DIR_IGNORED, nu, DIR_NEGATIVE>(arg));
         }
       }
 
       template <int sig, int mu>
       void instantiate(dim_dir_pair nu, dim_dir_pair nu_next, TuneParam &tp, const qudaStream_t &stream) {
         if (nu.is_invalid()) {
-          instantiate<sig, mu, NU_IGNORED>(nu_next, tp, stream);
+          instantiate<sig, mu, DIR_IGNORED>(nu_next, tp, stream);
         } else if (nu.is_forward()) {
-          instantiate<sig, mu, NU_POSITIVE>(nu_next, tp, stream);
+          instantiate<sig, mu, DIR_POSITIVE>(nu_next, tp, stream);
         } else {
-          instantiate<sig, mu, NU_NEGATIVE>(nu_next, tp, stream);
+          instantiate<sig, mu, DIR_NEGATIVE>(nu_next, tp, stream);
         }
       }
 
       template <int sig>
       void instantiate(dim_dir_pair mu, dim_dir_pair nu, dim_dir_pair nu_next, TuneParam &tp, const qudaStream_t &stream) {
-        if (mu.is_forward()) instantiate<sig, MU_POSITIVE>(nu, nu_next, tp, stream);
-        else instantiate<sig, MU_NEGATIVE>(nu, nu_next, tp, stream);
+        if (mu.is_forward()) instantiate<sig, DIR_POSITIVE>(nu, nu_next, tp, stream);
+        else instantiate<sig, DIR_NEGATIVE>(nu, nu_next, tp, stream);
       }
 
       void instantiate(dim_dir_pair sig, dim_dir_pair mu, dim_dir_pair nu, dim_dir_pair nu_next, TuneParam &tp, const qudaStream_t &stream) {
-        if (sig.is_forward()) instantiate<SIG_POSITIVE>(mu, nu, nu_next, tp, stream);
-        else instantiate<SIG_NEGATIVE>(mu, nu, nu_next, tp, stream);
+        if (sig.is_forward()) instantiate<DIR_POSITIVE>(mu, nu, nu_next, tp, stream);
+        else instantiate<DIR_NEGATIVE>(mu, nu, nu_next, tp, stream);
       }
 
       void apply(const qudaStream_t &stream)
@@ -434,7 +434,7 @@ namespace quda {
 
       template <bool low_memory>
       void hisqFiveSeven(GaugeField &newOprod, GaugeField &P3, GaugeField_ref &P5, GaugeField_ref &Pnumu, GaugeField_ref &Qnumu,
-                         GaugeField_ref &Pnumu_2, GaugeField_ref &Qnumu_2, const GaugeField &Pmu,
+                         GaugeField_ref &Pnumu_next, GaugeField_ref &Qnumu_next, const GaugeField &Pmu,
                          const GaugeField &link, const PathCoefficients<real> &act_path_coeff, dim_dir_pair sig_pair, dim_dir_pair mu_pair) {
         if constexpr (low_memory) {
           for (int nu = 0; nu < 8; nu++) {
@@ -446,17 +446,17 @@ namespace quda {
             // In/out: newOprod
             // Out: P5, Pnumu, Qnumu
             // In: Pmu, link
-            // Ignored: Pnumu_2, Qnumu_2
-            AllFiveAllSevenLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu_2, Qnumu_2, Pnumu, Qnumu, link, act_path_coeff);
+            // Ignored: Pnumu_next, Qnumu_next
+            AllFiveAllSevenLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu_next, Qnumu_next, Pnumu, Qnumu, link, act_path_coeff);
             AllFiveAllSevenLinkForce<decltype(middleFiveLinkArg)> middleFiveLink(middleFiveLinkArg, link, sig_pair, mu_pair, dim_dir_pair::invalid_pair(), nu_pair, newOprod, P3, P5, Pnumu, Qnumu);
 
             // All 7 link, 5-link side-link
             // In/out: newOprod, P3 (called shortP)
-            // In: P5, Qnumu_2, link
+            // In: P5, Qnumu_next, link
             // Out: none
             // Ignored: Pmu, Pnumu, Qnumu
-            AllFiveAllSevenLinkArg<Float, nColor, recon> allSevenSideFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_2, Qnumu_2, link, act_path_coeff);
-            AllFiveAllSevenLinkForce<decltype(allSevenSideFiveLinkArg)> allSevenSideLinkFive(allSevenSideFiveLinkArg, link, sig_pair, mu_pair, nu_pair, dim_dir_pair::invalid_pair(), newOprod, P3, P5, Pnumu_2, Qnumu_2);
+            AllFiveAllSevenLinkArg<Float, nColor, recon> allSevenSideFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, link, act_path_coeff);
+            AllFiveAllSevenLinkForce<decltype(allSevenSideFiveLinkArg)> allSevenSideLinkFive(allSevenSideFiveLinkArg, link, sig_pair, mu_pair, nu_pair, dim_dir_pair::invalid_pair(), newOprod, P3, P5, Pnumu_next, Qnumu_next);
           } //nu
         } else {
           // optimized, more fused path
@@ -475,34 +475,34 @@ namespace quda {
           // In/out: newOprod
           // Out: P5, Pnumu, Qnumu
           // In: Pmu, link
-          // Ignored: Pnumu_2, Qnumu_2 (since this is MiddleFive only)
-          AllFiveAllSevenLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu_2, Qnumu_2, Pnumu, Qnumu, link, act_path_coeff);
+          // Ignored: Pnumu_next, Qnumu_next (since this is MiddleFive only)
+          AllFiveAllSevenLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu_next, Qnumu_next, Pnumu, Qnumu, link, act_path_coeff);
           AllFiveAllSevenLinkForce<decltype(middleFiveLinkArg)> middleFiveArg(middleFiveLinkArg, link, sig_pair, mu_pair, dim_dir_pair::invalid_pair(), nu_vals[0], newOprod, P3, P5, Pnumu, Qnumu);
 
           for (int i = 0; i < 3; i++) {
             // next: fully fused kernels
             // In/out: new Oprod, P3 (called shortP), P5
             // In: Pmu, Pnumu, Qnumu, link
-            // Out: Pnumu_2, Qnumu_2
-            AllFiveAllSevenLinkArg<Float, nColor, recon> allFiveAllSevenLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_2, Qnumu_2, link, act_path_coeff);
-            AllFiveAllSevenLinkForce<decltype(allFiveAllSevenLinkArg)> allFiveAllSevenLink(allFiveAllSevenLinkArg, link, sig_pair, mu_pair, nu_vals[i], nu_vals[i+1], newOprod, P3, P5, Pnumu_2, Qnumu_2);
+            // Out: Pnumu_next, Qnumu_next
+            AllFiveAllSevenLinkArg<Float, nColor, recon> allFiveAllSevenLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, link, act_path_coeff);
+            AllFiveAllSevenLinkForce<decltype(allFiveAllSevenLinkArg)> allFiveAllSevenLink(allFiveAllSevenLinkArg, link, sig_pair, mu_pair, nu_vals[i], nu_vals[i+1], newOprod, P3, P5, Pnumu_next, Qnumu_next);
 
-            std::swap(Pnumu, Pnumu_2);
-            std::swap(Qnumu, Qnumu_2);
+            std::swap(Pnumu, Pnumu_next);
+            std::swap(Qnumu, Qnumu_next);
           }
 
           // last: just SideFiveAllSevenLink
           // In/out: newOprod, P3 (called shortP)
           // In: P5, Pnumu, Qnumu, link
           // Out: none
-          // Ignored: Pmu, Pnumu_2, Qnumu_2
-          AllFiveAllSevenLinkArg<Float, nColor, recon> allSevenSideFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_2, Qnumu_2, link, act_path_coeff);
+          // Ignored: Pmu, Pnumu_next, Qnumu_next
+          AllFiveAllSevenLinkArg<Float, nColor, recon> allSevenSideFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, link, act_path_coeff);
           AllFiveAllSevenLinkForce<decltype(allSevenSideFiveLinkArg)> allSevenSideFiveLink(allSevenSideFiveLinkArg, link, sig_pair, mu_pair, nu_vals[3], dim_dir_pair::invalid_pair(), newOprod, P3, P5, Pnumu, Qnumu);
         }
       }
 
       HisqStaplesForce(GaugeField &P3, GaugeField_ref &Pmu, GaugeField_ref &P5, GaugeField_ref &Pnumu, GaugeField_ref &Qnumu,
-                       GaugeField_ref &Pmu_2, GaugeField_ref &Pnumu_2, GaugeField_ref &Qnumu_2,
+                       GaugeField_ref &Pmu_next, GaugeField_ref &Pnumu_next, GaugeField_ref &Qnumu_next,
                        GaugeField &newOprod, const GaugeField &oprod, const GaugeField &link,
                        const double *path_coeff_array)
       {
@@ -537,7 +537,7 @@ namespace quda {
               // In/out: newOprod, P3
               // In: Pmu, link
               // Internal only: P5, Pnumu, Qnumu, and the double-buffer flavors
-              hisqFiveSeven<low_memory_path>(newOprod, P3, P5, Pnumu, Qnumu, Pnumu_2, Qnumu_2, Pmu, link, act_path_coeff, sig_pair, mu_pair);
+              hisqFiveSeven<low_memory_path>(newOprod, P3, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, Pmu, link, act_path_coeff, sig_pair, mu_pair);
 
               // Side 3-link, fused with Lepage all link when the lepage coeff != 0.
               // In/out: newOprod
@@ -562,37 +562,37 @@ namespace quda {
             // In/out: newOprod
             // Out: (first) Pmu, P3
             // In: oprod, link
-            // Ignored: Pmu_2
-            AllThreeAllLepageLinkArg<Float, nColor, recon> middleThreeLinkArg(newOprod, P3, oprod, Pmu_2, Pmu, link, act_path_coeff);
+            // Ignored: Pmu_next
+            AllThreeAllLepageLinkArg<Float, nColor, recon> middleThreeLinkArg(newOprod, P3, oprod, Pmu_next, Pmu, link, act_path_coeff);
             AllThreeAllLepageLinkForce<decltype(middleThreeLinkArg)> middleThreeLink(middleThreeLinkArg, link, sig_pair, dim_dir_pair::invalid_pair(), mu_vals[0], act_path_coeff, newOprod, P3, Pmu);
 
             // All 5 and 7 link contributions
             // In/out: newOprod, P3
             // In: Pmu, link
             // Internal only: P5, Pnumu, Qnumu, and the double-buffer flavors
-            hisqFiveSeven<low_memory_path>(newOprod, P3, P5, Pnumu, Qnumu, Pnumu_2, Qnumu_2, Pmu, link, act_path_coeff, sig_pair, mu_vals[0]);
+            hisqFiveSeven<low_memory_path>(newOprod, P3, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, Pmu, link, act_path_coeff, sig_pair, mu_vals[0]);
 
             for (int i = 0; i < 5; i++) {
-              std::swap(Pmu, Pmu_2);
+              std::swap(Pmu, Pmu_next);
 
               // Fully fused 3-link and Lepage contributions (when Lepage coeff != 0.)
               // In/out: oProd, P3 (read + overwritten)
               // In: (first) Pmu, oProd, link
               // Out: (second) Pmu
-              AllThreeAllLepageLinkArg<Float, nColor, recon> allThreeAllLepageLinkArg(newOprod, P3, oprod, Pmu_2, Pmu, link, act_path_coeff);
+              AllThreeAllLepageLinkArg<Float, nColor, recon> allThreeAllLepageLinkArg(newOprod, P3, oprod, Pmu_next, Pmu, link, act_path_coeff);
               AllThreeAllLepageLinkForce<decltype(allThreeAllLepageLinkArg)> allLepageAllThreeLink(allThreeAllLepageLinkArg, link, sig_pair, mu_vals[i], mu_vals[i+1], act_path_coeff, newOprod, P3, Pmu);
 
               // All 5 and 7 link contributions, as above
-              hisqFiveSeven<low_memory_path>(newOprod, P3, P5, Pnumu, Qnumu, Pnumu_2, Qnumu_2, Pmu, link, act_path_coeff, sig_pair, mu_vals[i+1]);
+              hisqFiveSeven<low_memory_path>(newOprod, P3, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, Pmu, link, act_path_coeff, sig_pair, mu_vals[i+1]);
             }
 
-            std::swap(Pmu, Pmu_2);
+            std::swap(Pmu, Pmu_next);
 
             // Side 3-link, fused with Lepage all link when the lepage coeff != 0.
             // In/out: newOprod
             // In: P3, (second) Pmu, link
             // Ignored: (first) Pmu, oProd
-            AllThreeAllLepageLinkArg<Float, nColor, recon> allLepageSideThreeLinkArg(newOprod, P3, oprod, Pmu_2, Pmu, link, act_path_coeff);
+            AllThreeAllLepageLinkArg<Float, nColor, recon> allLepageSideThreeLinkArg(newOprod, P3, oprod, Pmu_next, Pmu, link, act_path_coeff);
             AllThreeAllLepageLinkForce<decltype(allLepageSideThreeLinkArg)> allLepageSideThreeLink(allLepageSideThreeLinkArg, link, sig_pair, mu_vals[5], dim_dir_pair::invalid_pair(), act_path_coeff, newOprod, P3, Pmu);
 
 
@@ -621,15 +621,15 @@ namespace quda {
       auto Pnumu = GaugeField::Create(gauge_param);
       auto Qnumu = GaugeField::Create(gauge_param);
 
-      // need double buffers for these fields to fuse "middle link" terms with
-      // subsequent "side link" in a different direction
-      auto Pmu_2 = GaugeField::Create(gauge_param);
-      auto Pnumu_2 = GaugeField::Create(gauge_param);
-      auto Qnumu_2 = GaugeField::Create(gauge_param);
+      // need double buffers for these fields to fuse "side link" terms with
+      // subsequent "middle link" terms in a different direction
+      auto Pmu_next = GaugeField::Create(gauge_param);
+      auto Pnumu_next = GaugeField::Create(gauge_param);
+      auto Qnumu_next = GaugeField::Create(gauge_param);
 
       instantiate<HisqStaplesForce, ReconstructNone>(*P3, GaugeField_ref(*Pmu),
         GaugeField_ref(*P5), GaugeField_ref(*Pnumu), GaugeField_ref(*Qnumu),
-        GaugeField_ref(*Pmu_2), GaugeField_ref(*Pnumu_2), GaugeField_ref(*Qnumu_2),
+        GaugeField_ref(*Pmu_next), GaugeField_ref(*Pnumu_next), GaugeField_ref(*Qnumu_next),
         newOprod, oprod, link, path_coeff_array);
 
       delete Pmu;
@@ -637,9 +637,9 @@ namespace quda {
       delete P5;
       delete Pnumu;
       delete Qnumu;
-      delete Pmu_2;
-      delete Pnumu_2;
-      delete Qnumu_2;
+      delete Pmu_next;
+      delete Pnumu_next;
+      delete Qnumu_next;
     }
 #else
     void hisqStaplesForce(GaugeField &, const GaugeField &, const GaugeField &, const double[6])

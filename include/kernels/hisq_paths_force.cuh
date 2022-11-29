@@ -21,41 +21,10 @@ namespace quda {
       XDOWN = 7
     };
 
-    // for readability
     enum {
-      SIG_POSITIVE = 1,
-      SIG_NEGATIVE = 0,
-      SIG_IGNORED = -1
-    };
-
-    enum {
-      MU_POSITIVE = 1,
-      MU_NEGATIVE = 0,
-      MU_IGNORED = -1
-    };
-
-    enum {
-      MU_NEXT_POSITIVE = 1,
-      MU_NEXT_NEGATIVE = 0,
-      MU_NEXT_IGNORED = -1
-    };
-
-    enum {
-      NU_POSITIVE = 1,
-      NU_NEGATIVE = 0,
-      NU_IGNORED = -1
-    };
-
-    enum {
-      NU_NEXT_POSITIVE = 1,
-      NU_NEXT_NEGATIVE = 0,
-      NU_NEXT_IGNORED = -1
-    };
-
-    enum {
-      RHO_POSITIVE = 1,
-      RHO_NEGATIVE = 0,
-      RHO_IGNORED = -1
+      DIR_POSITIVE = 1,
+      DIR_NEGATIVE = 0,
+      DIR_IGNORED = -1
     };
 
     enum {
@@ -181,7 +150,7 @@ namespace quda {
       }
     };
 
-    template <typename Arg_, int sig_positive_, int mu_positive_ = -1, int mu_side_positive_ = -1, int nu_positive_ = -1, int nu_side_positive_ = -1, int compute_lepage_ = -1>
+    template <typename Arg_, int sig_positive_, int mu_positive_ = -1, int mu_next_positive_ = -1, int nu_positive_ = -1, int nu_next_positive_ = -1, int compute_lepage_ = -1>
     struct FatLinkParam : kernel_param<> {
       // whether the sig direction, if relevant, is forwards or backwards
       static constexpr int sig_positive = sig_positive_;
@@ -189,14 +158,14 @@ namespace quda {
       // whether the mu direction, if relevant, is forwards or backwards
       static constexpr int mu_positive = mu_positive_;
 
-      // whether the next mu direction, if relevant, is forwards or backwards
-      static constexpr int mu_side_positive = mu_side_positive_;
+      // for fused AllThreeAllLepage, whether the mu direction for the middle 3 is forwards or backwards
+      static constexpr int mu_next_positive = mu_next_positive_;
 
       // whether the nu direction, if relevant, is forwards or backwards
       static constexpr int nu_positive = nu_positive_;
 
-      // for fused AllFiveAllSeven, whether the nu direction for the side 5 is forwards or backwards
-      static constexpr int nu_side_positive = nu_side_positive_;
+      // for fused AllFiveAllSeven, whether the nu direction for the middle 5 is forwards or backwards
+      static constexpr int nu_next_positive = nu_next_positive_;
 
       // whether or not to compute the lepage contribution
       static constexpr int compute_lepage = compute_lepage_;
@@ -291,7 +260,7 @@ namespace quda {
 
       const Gauge oProd;
       const Gauge pMu;
-      Gauge pMu_2;
+      Gauge pMu_next;
 
       const real coeff_three;
       const real coeff_lepage;
@@ -299,10 +268,10 @@ namespace quda {
       static constexpr int overlap = 1;
 
       AllThreeAllLepageLinkArg(GaugeField &force, GaugeField &P3, const GaugeField &oProd, const GaugeField &pMu,
-                 GaugeField &pMu_2, const GaugeField &link,
+                 GaugeField &pMu_next, const GaugeField &link,
                  const PathCoefficients<real> &act_path_coeff)
         : BaseForceArg(link, overlap), force(force), p3(P3), oProd(oProd),
-        pMu(pMu), pMu_2(pMu_2),
+        pMu(pMu), pMu_next(pMu_next),
         coeff_three(act_path_coeff.three), coeff_lepage(act_path_coeff.lepage)
       { }
 
@@ -316,9 +285,9 @@ namespace quda {
 
       static constexpr int sig_positive = Param::sig_positive;
       static constexpr int mu_positive = Param::mu_positive;
-      static constexpr int mu_side_positive = Param::mu_side_positive;
+      static constexpr int mu_next_positive = Param::mu_next_positive;
       static_assert(Param::nu_positive == -1, "nu_positive should be set to -1 for AllThreeAllLepageLink");
-      static_assert(Param::nu_side_positive == -1, "nu_side_positive should be set to -1 for AllThreeAllLepageLink");
+      static_assert(Param::nu_next_positive == -1, "nu_next_positive should be set to -1 for AllThreeAllLepageLink");
       static constexpr int compute_lepage = Param::compute_lepage;
 
       constexpr AllThreeAllLepageLink(const Param &param) : arg(param.arg) {}
@@ -446,7 +415,7 @@ namespace quda {
         @param[in] Uab_cache Shared memory cache that stores the gauge link going from a to b (read)
           Data traffic:
             READ: gb_link, oProd_at_h
-            WRITE: pMu_2_at_b, p3_at_a
+            WRITE: pMu_next_at_b, p3_at_a
           Flops:
             2 Multiplies
 
@@ -463,17 +432,17 @@ namespace quda {
         int parity_b = 1 - parity_a;
 
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_h = updateCoordsIndexMILC<flip_dir(mu_side_positive)>(y, arg.E, arg.mu_next);
+        int point_h = updateCoordsIndexMILC<flip_dir(mu_next_positive)>(y, arg.E, arg.mu_next);
         int parity_h = 1 - parity_a;
 
         int point_g = getIndexMILC<sig_positive>(y, arg.E, arg.sig);
         int parity_g = parity_a;
 
-        int ha_link_nbr_idx = mu_side_positive ? point_h : point_a;
-        int ha_link_nbr_parity = mu_side_positive ? parity_h : parity_a;
+        int ha_link_nbr_idx = mu_next_positive ? point_h : point_a;
+        int ha_link_nbr_parity = mu_next_positive ? parity_h : parity_a;
 
-        int gb_link_nbr_idx = mu_side_positive ? point_g : point_b;
-        int gb_link_nbr_parity = mu_side_positive ? parity_g : parity_b;
+        int gb_link_nbr_idx = mu_next_positive ? point_g : point_b;
+        int gb_link_nbr_parity = mu_next_positive ? parity_g : parity_b;
 
         int hg_link_nbr_idx = sig_positive ? point_h : point_g;
         int hg_link_nbr_parity = sig_positive ? parity_h : parity_g;
@@ -484,10 +453,10 @@ namespace quda {
         Link Oh = arg.oProd(arg.sig, hg_link_nbr_idx, hg_link_nbr_parity);
 
         if constexpr (!sig_positive) Oh = conj(Oh);
-        if constexpr (mu_side_positive) Ugb = conj(Ugb);
+        if constexpr (mu_next_positive) Ugb = conj(Ugb);
 
         Link Oz = Ugb * Oh;
-        arg.pMu_2(0, point_b, parity_b) = Oz;
+        arg.pMu_next(0, point_b, parity_b) = Oz;
         {
           // scoped Uab load
           Link Uab = Uab_cache.load();
@@ -498,7 +467,7 @@ namespace quda {
         // Update the force in the sigma direction
         if constexpr (sig_positive) {
           Link Uha = arg.link(arg.mu_next, ha_link_nbr_idx, ha_link_nbr_parity);
-          if constexpr (!mu_side_positive) Uha = conj(Uha);
+          if constexpr (!mu_next_positive) Uha = conj(Uha);
 
           Link Oy = Oz * Uha;
           Link oprod = arg.force(arg.sig, point_a, parity_a);
@@ -519,14 +488,14 @@ namespace quda {
           Data traffic:
             READ: ab_link
 
-          If we're calculating the Lepage and 3-link side-link contribution (mu_positive != MU_IGNORED)
+          If we're calculating the Lepage and 3-link side-link contribution (mu_positive != DIR_IGNORED)
           Data traffic:
             READ: p3_at_a, force_mu_at_d
             WRITE: force_mu_at_d
           Flops:
             1 add, 1 rescale
 
-          If we're calculating the 3-link middle-link contribution (mu_next_positive != MU_NEXT_IGNORED),
+          If we're calculating the 3-link middle-link contribution (mu_next_positive != DIR_IGNORED),
           there's no extra work in this routine.
       */
       __device__ __host__ void operator()(int x_cb, int parity)
@@ -571,7 +540,7 @@ namespace quda {
           Uab_cache.save(Uab);
         }
 
-        if constexpr (mu_positive != MU_IGNORED) {
+        if constexpr (mu_positive != DIR_IGNORED) {
           int point_d = getIndexMILC<flip_dir(mu_positive)>(x, arg.E, arg.mu);
           int parity_d = 1 - parity;
           int da_link_nbr_idx = (mu_positive) ? point_d : point_a;
@@ -595,7 +564,7 @@ namespace quda {
 
         // middle_three overrides arg.p3 in-place, so this kernel call needs to come
         // *after* loading p3 above
-        if constexpr (mu_side_positive != MU_NEXT_IGNORED)
+        if constexpr (mu_next_positive != DIR_IGNORED)
           middle_three(x, point_a, parity_a, Uab_cache);
       }
     };
@@ -679,7 +648,7 @@ namespace quda {
       static constexpr int mu_positive = Param::mu_positive;
       //static_assert(Param::mu_positive == -1, "mu_positive should be set to -1 for AllSevenSideFiveLink");
       static constexpr int nu_positive = Param::nu_positive; // if nu_positive == -1, skip
-      static constexpr int nu_side_positive = Param::nu_side_positive; // if nu_side_positive == -1, skip
+      static constexpr int nu_next_positive = Param::nu_next_positive; // if nu_next_positive == -1, skip
       static_assert(Param::compute_lepage == -1, "compute_lepage should be set to -1 for AllFiveAllSevenLink");
 
       constexpr AllFiveAllSevenLink(const Param &param) : arg(param.arg) {}
@@ -710,13 +679,13 @@ namespace quda {
       */
       __device__ __host__ inline void all_link(int x[4], int point_a, int parity_a,
           SharedMemoryCache<Link> &Matrix_cache) {
-        auto mycoeff_seven = coeff_sign<sig_positive>(parity_a) * arg.coeff_seven;
+        auto mycoeff_seven = parity_sign(parity_a) * coeff_sign<sig_positive>(parity_a) * arg.coeff_seven;
 
         int point_b = getIndexMILC<sig_positive>(x, arg.E, arg.sig);
         int parity_b = 1 - parity_a;
 
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_f = updateCoordsIndexMILC<RHO_POSITIVE>(y, arg.E, arg.rho);
+        int point_f = updateCoordsIndexMILC<DIR_POSITIVE>(y, arg.E, arg.rho);
         int parity_f = 1 - parity_a;
         int point_e = getIndexMILC<sig_positive>(y, arg.E, arg.sig);
         int parity_e = parity_a;
@@ -745,7 +714,7 @@ namespace quda {
         Link Uaf = arg.link(arg.rho, point_a, parity_a);
         if constexpr (sig_positive) {
           Link force_sig = Matrix_cache.load_z(2);
-          force_sig = mm_add((parity_sign(parity_a) * mycoeff_seven) * UbeOeOf, conj(Uaf), force_sig);
+          force_sig = mm_add(mycoeff_seven * UbeOeOf, conj(Uaf), force_sig);
           Matrix_cache.save_z(force_sig, 2);
         }
 
@@ -753,7 +722,7 @@ namespace quda {
         Link Uab = Matrix_cache.load_z(0);
         if constexpr (!sig_positive) Uab = conj(Uab);
         Link force_rho = arg.force(arg.rho, point_a, parity_a);
-        force_rho = mm_add((parity_sign(parity_a) * mycoeff_seven) * conj(UbeOeOf), conj(Uab), force_rho);
+        force_rho = mm_add(mycoeff_seven * conj(UbeOeOf), conj(Uab), force_rho);
 
         // Compute the force_rho contribution from the positive rho direction
         Link Ufe = arg.link(arg.sig, fe_link_nbr_idx, fe_link_nbr_parity);
@@ -768,7 +737,7 @@ namespace quda {
         Link Ob = arg.pNuMu(0, point_b, parity_b);
         Link UfeUebOb = UfeUeb * Ob;
         Link Oa = arg.qNuMu(0, point_a, parity_a);
-        force_rho = mm_add((-parity_sign(parity_a) * mycoeff_seven) * UfeUebOb, Oa, force_rho);
+        force_rho = mm_add((-mycoeff_seven) * UfeUebOb, Oa, force_rho);
         arg.force(arg.rho, point_a, parity_a) = force_rho;
 
         // Compute the p5 contribution from the positive rho direction
@@ -777,7 +746,7 @@ namespace quda {
 
 #pragma unroll
         for (int d = 0; d < 4; d++) y[d] = x[d];
-        int point_d = updateCoordsIndexMILC<RHO_NEGATIVE>(y, arg.E, arg.rho);
+        int point_d = updateCoordsIndexMILC<DIR_NEGATIVE>(y, arg.E, arg.rho);
         int parity_d = 1 - parity_a;
         int point_c = getIndexMILC<sig_positive>(y, arg.E, arg.sig);
         int parity_c = parity_a;
@@ -800,7 +769,7 @@ namespace quda {
           Link Oc = arg.pNuMu(0, point_c, parity_c);
           Link Oz = conj(Ucb) * Oc;
           Link force_sig = Matrix_cache.load_z(2);
-          force_sig = mm_add((parity_sign(parity_a) * mycoeff_seven) * Oz, Od * Uda, force_sig);
+          force_sig = mm_add(mycoeff_seven * Oz, Od * Uda, force_sig);
           Matrix_cache.save_z(force_sig, 2);
         }
 
@@ -879,7 +848,7 @@ namespace quda {
         int parity_b = 1 - parity_a;
 
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_h = updateCoordsIndexMILC<flip_dir(nu_side_positive)>(y, arg.E, arg.nu_next);
+        int point_h = updateCoordsIndexMILC<flip_dir(nu_next_positive)>(y, arg.E, arg.nu_next);
         int parity_h = 1 - parity_a;
 
         int point_q = getIndexMILC<flip_dir(mu_positive)>(y, arg.E, arg.mu);
@@ -888,19 +857,19 @@ namespace quda {
         int point_c = updateCoordsIndexMILC<sig_positive>(y, arg.E, arg.sig);
         int parity_c = parity_a;
 
-        int ha_link_nbr_idx = nu_side_positive ? point_h : point_a;
-        int ha_link_nbr_parity = nu_side_positive ? parity_h : parity_a;
+        int ha_link_nbr_idx = nu_next_positive ? point_h : point_a;
+        int ha_link_nbr_parity = nu_next_positive ? parity_h : parity_a;
 
         int qh_link_nbr_idx = mu_positive ? point_q : point_h;
         int qh_link_nbr_parity = mu_positive ? parity_q : parity_h;
 
-        int cb_link_nbr_idx = nu_side_positive ? point_c : point_b;
-        int cb_link_nbr_parity = nu_side_positive ? parity_c : parity_b;
+        int cb_link_nbr_idx = nu_next_positive ? point_c : point_b;
+        int cb_link_nbr_parity = nu_next_positive ? parity_c : parity_b;
 
         // Load link and outer product contributions for pNuMu, P5, qNuMu
         Link Ubc = arg.link(arg.nu_next, cb_link_nbr_idx, cb_link_nbr_parity);
         Link Oc = arg.pMu(0, point_c, parity_c);
-        Link Ow = !nu_side_positive ? Ubc * Oc : conj(Ubc) * Oc;
+        Link Ow = !nu_next_positive ? Ubc * Oc : conj(Ubc) * Oc;
 
         arg.pNuMu_next(0, point_b, parity_b) = Ow;
         {
@@ -912,7 +881,7 @@ namespace quda {
 
         Link Uha = arg.link(arg.nu_next, ha_link_nbr_idx, ha_link_nbr_parity);
         Link Uqh = arg.link(arg.mu, qh_link_nbr_idx, qh_link_nbr_parity);
-        if constexpr (!nu_side_positive) Uha = conj(Uha);
+        if constexpr (!nu_next_positive) Uha = conj(Uha);
         if constexpr (!mu_positive) Uqh = conj(Uqh);
 
         Link Ox = Uqh * Uha;
@@ -937,10 +906,10 @@ namespace quda {
           Data traffic:
             READ: ab_link
 
-          If we're calculating the 7-link and 5-link side-link contribution (nu_positive != NU_IGNORED),
+          If we're calculating the 7-link and 5-link side-link contribution (nu_positive != DIR_IGNORED),
           there's no extra work in this routine
 
-          If we're calculating the 5-link middle-link contribution (nu_side_positive != NU_NEXT_IGNORED),
+          If we're calculating the 5-link middle-link contribution (nu_next_positive != DIR_IGNORED),
           there's no extra work in this routine.
 
           In all cases, if sig is positive, we have:
@@ -979,12 +948,12 @@ namespace quda {
         }
 
         // accumulate into P5, force_sig
-        if constexpr (nu_positive != NU_IGNORED) {
+        if constexpr (nu_positive != DIR_IGNORED) {
           all_link(x, point_a, parity_a, Matrix_cache);
           side_five(x, point_a, parity_a, Matrix_cache);
         }
 
-        if constexpr (nu_side_positive != NU_NEXT_IGNORED) {
+        if constexpr (nu_next_positive != DIR_IGNORED) {
           middle_five(x, point_a, parity_a, Matrix_cache);
         }
 
