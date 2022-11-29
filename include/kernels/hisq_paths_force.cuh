@@ -11,17 +11,6 @@ namespace quda {
   namespace fermion_force {
 
     enum {
-      XUP = 0,
-      YUP = 1,
-      ZUP = 2,
-      TUP = 3,
-      TDOWN = 4,
-      ZDOWN = 5,
-      YDOWN = 6,
-      XDOWN = 7
-    };
-
-    enum {
       DIR_POSITIVE = 1,
       DIR_NEGATIVE = 0,
       DIR_IGNORED = -1
@@ -34,9 +23,16 @@ namespace quda {
     };
 
     constexpr int flip_dir(int direction) { return 1 - direction; }
-    template <int dir>
-    constexpr int coeff_sign(int odd_lattice) { return 2*((dir + odd_lattice + 1) & 1) - 1; }
-    constexpr int parity_sign(int parity) { return parity ? -1 : 1; }
+
+    template <int dir, typename real>
+    constexpr real coeff_sign(int odd_lattice)
+    {
+      auto sign = (dir + odd_lattice + 1) & 1;
+      return sign ? static_cast<real>(1) : static_cast<real>(-1);
+    }
+
+    template <typename real>
+    constexpr real parity_sign(int parity) { return parity ? static_cast<real>(-1) : static_cast<real>(1); }
 
     /**
       @brief Compute the checkerboard 1-d index for the nearest neighbor in a given direction,
@@ -333,7 +329,7 @@ namespace quda {
         Link Oy = sig_positive ? Ufe * Ow : conj(Ufe) * Ow;
         Link Ox = mu_positive ? Uaf * Oy : conj(Uaf) * Oy;
 
-        auto mycoeff_three = coeff_sign<sig_positive>(parity_a)*coeff_sign<mu_positive>(parity_a)*arg.coeff_lepage;
+        auto mycoeff_three = coeff_sign<sig_positive, typename Arg::real>(parity_a)*coeff_sign<mu_positive, typename Arg::real>(parity_a)*arg.coeff_lepage;
         force_mu += mycoeff_three * (mu_positive ? Ox : conj(Ox));
       }
 
@@ -389,7 +385,7 @@ namespace quda {
           Link Uab = Uab_cache.load();
           Link Oy = sig_positive ? Uab * Ow : conj(Uab) * Ow;
           Link Ox = mu_positive ? (Oy * Uid) : (Uid * conj(Oy));
-          auto mycoeff_lepage = -coeff_sign<sig_positive>(parity_a)*coeff_sign<mu_positive>(parity_a)*arg.coeff_lepage;
+          auto mycoeff_lepage = -coeff_sign<sig_positive, typename Arg::real>(parity_a)*coeff_sign<mu_positive, typename Arg::real>(parity_a)*arg.coeff_lepage;
           force_mu += mycoeff_lepage * Ox;
         }
 
@@ -547,7 +543,7 @@ namespace quda {
           int da_link_nbr_parity = (mu_positive) ? parity_d : parity_a;
 
           Link force_mu = arg.force(arg.mu, da_link_nbr_idx, da_link_nbr_parity);
-          auto mycoeff_three = coeff_sign<sig_positive>(parity_a)*coeff_sign<mu_positive>(parity_a)*arg.coeff_three;
+          auto mycoeff_three = coeff_sign<sig_positive, typename Arg::real>(parity_a)*coeff_sign<mu_positive, typename Arg::real>(parity_a)*arg.coeff_three;
           {
             Link p3 = arg.p3(0, point_a, parity_a);
             force_mu += mycoeff_three * (mu_positive ? p3 : conj(p3));
@@ -679,7 +675,7 @@ namespace quda {
       */
       __device__ __host__ inline void all_link(int x[4], int point_a, int parity_a,
           SharedMemoryCache<Link> &Matrix_cache) {
-        auto mycoeff_seven = parity_sign(parity_a) * coeff_sign<sig_positive>(parity_a) * arg.coeff_seven;
+        auto mycoeff_seven = parity_sign<typename Arg::real>(parity_a) * coeff_sign<sig_positive, typename Arg::real>(parity_a) * arg.coeff_seven;
 
         int point_b = getIndexMILC<sig_positive>(x, arg.E, arg.sig);
         int parity_b = 1 - parity_a;
@@ -816,7 +812,7 @@ namespace quda {
         if constexpr (!mu_positive) Uqh = conj(Uqh);
         Ow = nu_positive ? P5 * Uqh : conj(Uqh) * conj(P5);
 
-        auto mycoeff_five = -coeff_sign<sig_positive>(parity_a)*coeff_sign<nu_positive>(parity_a)*arg.coeff_five;
+        auto mycoeff_five = -coeff_sign<sig_positive, typename Arg::real>(parity_a)*coeff_sign<nu_positive, typename Arg::real>(parity_a)*arg.coeff_five;
 
         Link oprod = arg.force(arg.nu, ha_link_nbr_idx, ha_link_nbr_parity);
         oprod += mycoeff_five * Ow;

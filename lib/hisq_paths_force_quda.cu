@@ -563,14 +563,14 @@ namespace quda {
             // Out: (first) Pmu, P3
             // In: oprod, link
             // Ignored: Pmu_next
-            AllThreeAllLepageLinkArg<Float, nColor, recon> middleThreeLinkArg(newOprod, P3, oprod, Pmu_next, Pmu, link, act_path_coeff);
-            AllThreeAllLepageLinkForce<decltype(middleThreeLinkArg)> middleThreeLink(middleThreeLinkArg, link, sig_pair, dim_dir_pair::invalid_pair(), mu_vals[0], act_path_coeff, newOprod, P3, Pmu);
+            AllThreeAllLepageLinkArg<Float, nColor, recon> middleThreeLinkArg(newOprod, P3, oprod, Pmu, Pmu_next, link, act_path_coeff);
+            AllThreeAllLepageLinkForce<decltype(middleThreeLinkArg)> middleThreeLink(middleThreeLinkArg, link, sig_pair, dim_dir_pair::invalid_pair(), mu_vals[0], act_path_coeff, newOprod, P3, Pmu_next);
 
             // All 5 and 7 link contributions
             // In/out: newOprod, P3
             // In: Pmu, link
             // Internal only: P5, Pnumu, Qnumu, and the double-buffer flavors
-            hisqFiveSeven<low_memory_path>(newOprod, P3, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, Pmu, link, act_path_coeff, sig_pair, mu_vals[0]);
+            hisqFiveSeven<low_memory_path>(newOprod, P3, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, Pmu_next, link, act_path_coeff, sig_pair, mu_vals[0]);
 
             for (int i = 0; i < 5; i++) {
               std::swap(Pmu, Pmu_next);
@@ -579,11 +579,11 @@ namespace quda {
               // In/out: oProd, P3 (read + overwritten)
               // In: (first) Pmu, oProd, link
               // Out: (second) Pmu
-              AllThreeAllLepageLinkArg<Float, nColor, recon> allThreeAllLepageLinkArg(newOprod, P3, oprod, Pmu_next, Pmu, link, act_path_coeff);
-              AllThreeAllLepageLinkForce<decltype(allThreeAllLepageLinkArg)> allLepageAllThreeLink(allThreeAllLepageLinkArg, link, sig_pair, mu_vals[i], mu_vals[i+1], act_path_coeff, newOprod, P3, Pmu);
+              AllThreeAllLepageLinkArg<Float, nColor, recon> allThreeAllLepageLinkArg(newOprod, P3, oprod, Pmu, Pmu_next, link, act_path_coeff);
+              AllThreeAllLepageLinkForce<decltype(allThreeAllLepageLinkArg)> allLepageAllThreeLink(allThreeAllLepageLinkArg, link, sig_pair, mu_vals[i], mu_vals[i+1], act_path_coeff, newOprod, P3, Pmu_next);
 
               // All 5 and 7 link contributions, as above
-              hisqFiveSeven<low_memory_path>(newOprod, P3, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, Pmu, link, act_path_coeff, sig_pair, mu_vals[i+1]);
+              hisqFiveSeven<low_memory_path>(newOprod, P3, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, Pmu_next, link, act_path_coeff, sig_pair, mu_vals[i+1]);
             }
 
             std::swap(Pmu, Pmu_next);
@@ -592,8 +592,8 @@ namespace quda {
             // In/out: newOprod
             // In: P3, (second) Pmu, link
             // Ignored: (first) Pmu, oProd
-            AllThreeAllLepageLinkArg<Float, nColor, recon> allLepageSideThreeLinkArg(newOprod, P3, oprod, Pmu_next, Pmu, link, act_path_coeff);
-            AllThreeAllLepageLinkForce<decltype(allLepageSideThreeLinkArg)> allLepageSideThreeLink(allLepageSideThreeLinkArg, link, sig_pair, mu_vals[5], dim_dir_pair::invalid_pair(), act_path_coeff, newOprod, P3, Pmu);
+            AllThreeAllLepageLinkArg<Float, nColor, recon> allLepageSideThreeLinkArg(newOprod, P3, oprod, Pmu, Pmu_next, link, act_path_coeff);
+            AllThreeAllLepageLinkForce<decltype(allLepageSideThreeLinkArg)> allLepageSideThreeLink(allLepageSideThreeLinkArg, link, sig_pair, mu_vals[5], dim_dir_pair::invalid_pair(), act_path_coeff, newOprod, P3, Pmu_next);
 
 
           }
