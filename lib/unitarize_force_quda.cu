@@ -99,7 +99,6 @@ namespace quda {
       if (checkLocation(newForce, oldForce, u) != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
       int num_failures = 0;
       constexpr int nColor = 3;
-      Matrix<complex<double>, nColor> old_force, new_force, v;
       if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
         if (u.Precision() == QUDA_DOUBLE_PRECISION) {
           UnitarizeForceArg<double, nColor, QUDA_RECONSTRUCT_NO, QUDA_MILC_GAUGE_ORDER> arg(
