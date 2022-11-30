@@ -4918,6 +4918,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
 
   checkGaugeParam(gauge_param);
   if (!gaugePrecise) errorQuda("No resident gauge field");
+  if (!cloverPrecise) errorQuda("No resident clover field");
 
   GaugeFieldParam gParamMom(*gauge_param, h_mom, QUDA_ASQTAD_MOM_LINKS);
   // create the host momentum field
@@ -5004,16 +5005,20 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
     profileTMCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
 
     printfQuda("Dslash(x.Odd(), x.Even(), QUDA_ODD_PARITY)\n");
+    fflush(stdout);
     dirac->Dslash(x.Odd(), x.Even(), QUDA_ODD_PARITY);
     
     // want to apply \hat Q_{-} = \hat M_{+}^\dagger \gamma_5 to get Y_o
     printfQuda("gamma5(tmp, x.Even())\n");
+    fflush(stdout);
     gamma5(tmp, x.Even());
     dirac->Dagger(QUDA_DAG_YES);
     printfQuda("M(p.Even(), tmp)\n");
+    fflush(stdout);
     dirac->M(p.Even(), tmp); // this is the even part of Y
     dirac->Dagger(QUDA_DAG_NO);
     printfQuda("Dslash(p.Odd(), p.Even(), QUDA_ODD_PARITY)\n");
+    fflush(stdout);
     dirac->Dslash(p.Odd(), p.Even(), QUDA_ODD_PARITY); // and now the odd part of Y
      
     profileTMCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -5023,7 +5028,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
   profileTMCloverForce.TPSTOP(QUDA_PROFILE_INIT);
   profileTMCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
   
-  printfQuda("computeCloverForce(cudaForce, gaugePrecise, quarkX, quarkP, force_coeff);\n");
+  printfQuda("computeCloverForce(cudaForce, *gaugePrecise, quarkX, quarkP, force_coeff);\n");
   computeCloverForce(cudaForce, *gaugePrecise, quarkX, quarkP, force_coeff);
   printfQuda("computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8);\n");
   computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8); 
@@ -5046,6 +5051,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
   printfQuda("cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_EVEN_PARITY)\n");
   cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_EVEN_PARITY);
 
+  printfQuda("updateMomentum(gpuMom, -1.0, cudaForce, \"tmclover\")\n");
   updateMomentum(gpuMom, -1.0, cudaForce, "tmclover");
   profileTMCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
