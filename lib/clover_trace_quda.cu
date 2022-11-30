@@ -25,8 +25,18 @@ namespace quda {
 
     void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<CloverSigmaTr>(tp, stream, CloverTraceArg<Float, nColor>(output, clover, coeff));
+      if (clover.TwistFlavor() == QUDA_TWIST_SINGLET ||
+          clover.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET) {
+        CloverTraceArg<Float, nColor, true> arg(output, clover, coeff);
+        launch<CloverSigmaTr>(tp, stream, arg);
+      } else {
+        CloverTraceArg<Float, nColor, false> arg(output, clover, coeff);
+        launch<CloverSigmaTr>(tp, stream, arg);
+      }
     }
+
+    void preTune() { output.backup(); }
+    void postTune() { output.restore(); }
 
     long long flops() const { return 0; } // Fix this
     long long bytes() const { return clover.Bytes() + output.Bytes(); }
