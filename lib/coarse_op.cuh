@@ -727,21 +727,23 @@ namespace quda {
 
     bool advanceTuneParam(TuneParam &param) const override
     {
-      // note: for now there aren't MMA versions of COMPUTE_LV or COMPUTE_VLV, this is just forward thinking if we find it makes sense one day
-      if (use_mma && (type == COMPUTE_UV || type == COMPUTE_LV || type == COMPUTE_VUV || type == COMPUTE_VLV)) {
-        constexpr bool query_max = true;
-        int max = 0;
-        if (type == COMPUTE_UV) {
-          max = mma::launch_compute_uv_kernel<query_max>(param, arg, 1, device::get_default_stream(), *this);
-        } else if (type == COMPUTE_VUV) {
-          max = mma::launch_compute_vuv_kernel<query_max>(param, arg, 1, device::get_default_stream(), *this);
-        }
+      if constexpr (use_mma) {
+        // note: for now there aren't MMA versions of COMPUTE_LV or COMPUTE_VLV, this is just forward thinking if we find it makes sense one day
+        if (type == COMPUTE_UV || type == COMPUTE_LV || type == COMPUTE_VUV || type == COMPUTE_VLV) {
+          constexpr bool query_max = true;
+          int max = 0;
+          if (type == COMPUTE_UV) {
+            max = mma::launch_compute_uv_kernel<query_max>(param, arg, 1, device::get_default_stream(), *this);
+          } else if (type == COMPUTE_VUV) {
+            max = mma::launch_compute_vuv_kernel<query_max>(param, arg, 1, device::get_default_stream(), *this);
+          }
 
-        if (param.aux.x < max) {
-          param.aux.x++;
-          return true;
-        } else {
-          return false;
+          if (param.aux.x < max) {
+            param.aux.x++;
+            return true;
+          } else {
+            return false;
+          }
         }
       }
 

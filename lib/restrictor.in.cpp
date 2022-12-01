@@ -17,7 +17,7 @@ namespace quda {
       }
     } else {
       if constexpr (sizeof...(N) > 0) {
-        Restrict2<fineColor>(out, in, v, fine_to_coarse, spin_map, parity, IntList<N...>());
+        Restrict2<fineColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity, IntList<N...>());
       } else {
         errorQuda("Coarse Nc = %d has not been instantiated", out.Ncolor());
       }

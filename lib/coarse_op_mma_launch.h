@@ -310,6 +310,23 @@ namespace quda
       return -1;
     }
 
+    // catch any cases that have not been implemented
+    template <bool query_max = false, class Arg, class Tunable>
+    std::enable_if_t<!((Arg::fineColor == 6 && Arg::coarseColor == 6 && Arg::fineSpin == 2 && Arg::coarseSpin == 2) ||
+                       (Arg::fineColor == 24 && Arg::coarseColor == 24 && Arg::fineSpin == 2 && Arg::coarseSpin == 2) ||
+                       (Arg::fineColor == 24 && Arg::coarseColor == 32 && Arg::fineSpin == 2 && Arg::coarseSpin == 2) ||
+                       (Arg::fineColor == 24 && Arg::coarseColor == 64 && Arg::fineSpin == 2 && Arg::coarseSpin == 2) ||
+                       (Arg::fineColor == 24 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2) ||
+                       (Arg::fineColor == 32 && Arg::coarseColor == 32 && Arg::fineSpin == 2 && Arg::coarseSpin == 2) ||
+                       (Arg::fineColor == 64 && Arg::coarseColor == 64 && Arg::fineSpin == 2 && Arg::coarseSpin == 2) ||
+                       (Arg::fineColor == 64 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2) ||
+                       (Arg::fineColor == 96 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)), int>
+    launch_compute_uv_kernel(TuneParam &, const Arg &, int, const qudaStream_t &, Tunable &)
+    {
+      errorQuda("MMA implementation not available for fineColor = %d coarseColor = %d", Arg::fineColor, Arg::coarseColor);
+      return -1;      
+    }
+
     template <int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, class Arg, class Tunable>
     typename std::enable_if_t<!Arg::is_mma_compatible, void> launch_compute_vuv_kernel(TuneParam &, const Arg &, int,
                                                                                        const qudaStream_t &, Tunable &)
@@ -595,6 +612,22 @@ namespace quda
       return -1;
     }
 
+    // catch any cases that have not been implemented
+    template <bool query_max = false, class Arg, class Tunable>
+    std::enable_if_t<!((Arg::fineColor == 6 && Arg::coarseColor == 6 && Arg::fineSpin == 2 && Arg::coarseSpin == 2) ||
+                       (Arg::fineColor == 24 && Arg::coarseColor == 24 && Arg::fineSpin == 2 && Arg::coarseSpin == 2) ||
+                       (Arg::fineColor == 24 && Arg::coarseColor == 32 && Arg::fineSpin == 2 && Arg::coarseSpin == 2) ||
+                       (Arg::fineColor == 24 && Arg::coarseColor == 64 && Arg::fineSpin == 2 && Arg::coarseSpin == 2) ||
+                       (Arg::fineColor == 24 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2) ||
+                       (Arg::fineColor == 32 && Arg::coarseColor == 32 && Arg::fineSpin == 2 && Arg::coarseSpin == 2) ||
+                       (Arg::fineColor == 64 && Arg::coarseColor == 64 && Arg::fineSpin == 2 && Arg::coarseSpin == 2) ||
+                       (Arg::fineColor == 64 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2) ||
+                       (Arg::fineColor == 96 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2)), int>
+    launch_compute_vuv_kernel(TuneParam &, const Arg &, int, const qudaStream_t &, Tunable &)
+    {
+      errorQuda("MMA implementation not available for fineColor = %d coarseColor = %d", Arg::fineColor, Arg::coarseColor);
+      return -1;      
+    }
 #else
 
     template <bool query_max = false, class Arg, class Tunable>
