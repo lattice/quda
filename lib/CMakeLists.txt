@@ -22,7 +22,7 @@ set (QUDA_OBJS
   coarse_op_preconditioned.cpp staggered_coarse_op.cu
   eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
   eigensolve_quda.cpp quda_arpack_interface.cpp
-  multigrid.cpp transfer.cpp block_orthogonalize.cu
+  multigrid.cpp transfer.cpp block_orthogonalize.cpp
   prolongator.cpp restrictor.cpp staggered_prolong_restrict.cu
   gauge_phase.cu timer.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
@@ -158,6 +158,7 @@ configure_file(coarsecoarse_op.in.cpp coarsecoarse_op.cpp @ONLY)
 configure_file(coarse_op_preconditioned.in.cpp coarse_op_preconditioned.cpp @ONLY)
 configure_file(prolongator.in.cpp prolongator.cpp @ONLY)
 configure_file(restrictor.in.cpp restrictor.cpp @ONLY)
+configure_file(block_orthogonalize.in.cpp block_orthogonalize.cpp @ONLY)
 
 if(QUDA_MULTIGRID)
   string(REPLACE "," ";" QUDA_MULTIGRID_NVEC_LIST_SEMICOLON "${QUDA_MULTIGRID_NVEC_LIST}")
@@ -192,8 +193,10 @@ if(QUDA_MULTIGRID)
       if(${QUDA_MULTIGRID_NVEC2} GREATER_EQUAL ${QUDA_MULTIGRID_NC_NVEC})
          configure_file(prolongator.in.cu "prolongator_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu" @ONLY)
          configure_file(restrictor.in.cu "restrictor_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu" @ONLY)
+         configure_file(block_orthogonalize.in.cu "block_orthogonalize_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu" @ONLY)
          list(APPEND QUDA_CU_OBJS "prolongator_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
          list(APPEND QUDA_CU_OBJS "restrictor_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
+         list(APPEND QUDA_CU_OBJS "block_orthogonalize_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
       endif()
     endforeach()
 

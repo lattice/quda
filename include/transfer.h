@@ -298,6 +298,10 @@ namespace quda {
   void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
                           const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho, bool two_pass);
 
+  template <int coarseColor, int fineColor>
+  void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
+                          const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho, bool two_pass);
+
   /**
      @brief Apply the prolongation operator
      @param[out] out Resulting fine grid field
