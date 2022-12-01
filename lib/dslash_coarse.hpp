@@ -247,11 +247,22 @@ namespace quda {
     void postTune() { for (auto i = 0u; i < out.size(); i++) out[i].restore(); }
   };
 
-  template <typename Float, typename yFloat, typename ghostFloat, bool dagger, int coarseColor, int coarseSpin>
+  template <typename Float, typename yFloat, typename ghostFloat, bool dagger, int coarseColor>
   inline void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA, cvector_ref<const ColorSpinorField> &inB,
                           const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash, bool clover,
                           DslashType type, MemoryLocation *halo_location, const ColorSpinorField &halo)
   {
+    if (Y.FieldOrder() != X.FieldOrder())
+      errorQuda("Field order mismatch Y = %d, X = %d", Y.FieldOrder(), X.FieldOrder());
+
+    if (inA[0].FieldOrder() != out[0].FieldOrder())
+      errorQuda("Field order mismatch inA = %d, out = %d", inA[0].FieldOrder(), out[0].FieldOrder());
+
+    if (inA[0].Nspin() != 2)
+      errorQuda("Unsupported number of coarse spins %d", inA[0].Nspin());
+
+    constexpr int coarseSpin = 2;
+
     if (dslash) {
       if (clover) {
         switch (type) {
@@ -306,43 +317,6 @@ namespace quda {
     }
   }
 
-  // template on the number of coarse colors
-  template <typename Float, typename yFloat, typename ghostFloat, bool dagger>
-  inline void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA, cvector_ref<const ColorSpinorField> &inB,
-			  const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash,
-			  bool clover, DslashType type, MemoryLocation *halo_location, const ColorSpinorField &halo)
-  {
-    if (Y.FieldOrder() != X.FieldOrder())
-      errorQuda("Field order mismatch Y = %d, X = %d", Y.FieldOrder(), X.FieldOrder());
-
-    if (inA[0].FieldOrder() != out[0].FieldOrder())
-      errorQuda("Field order mismatch inA = %d, out = %d", inA[0].FieldOrder(), out[0].FieldOrder());
-
-    if (inA[0].Nspin() != 2)
-      errorQuda("Unsupported number of coarse spins %d", inA[0].Nspin());
-
-#ifdef NSPIN4
-    if (inA[0].Ncolor() == 6) { // free field Wilson
-      ApplyCoarse<Float,yFloat,ghostFloat,dagger,6,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location, halo);
-    } else
-#endif // NSPIN4
-    if (inA[0].Ncolor() == 24) {
-      ApplyCoarse<Float,yFloat,ghostFloat,dagger,24,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location, halo);
-#ifdef NSPIN4
-    } else if (inA[0].Ncolor() == 32) {
-      ApplyCoarse<Float,yFloat,ghostFloat,dagger,32,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location, halo);
-#endif // NSPIN4
-#ifdef NSPIN1
-    } else if (inA[0].Ncolor() == 64) {
-      ApplyCoarse<Float,yFloat,ghostFloat,dagger,64,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location, halo);
-    } else if (inA[0].Ncolor() == 96) {
-      ApplyCoarse<Float,yFloat,ghostFloat,dagger,96,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location, halo);
-#endif // NSPIN1
-    } else {
-      errorQuda("Unsupported number of coarse dof %d", Y.Ncolor());
-    }
-  }
-
   // this is the Worker pointer that may have issue additional work
   // while we're waiting on communication to finish
   namespace dslash {
@@ -364,7 +338,7 @@ namespace quda {
     DSLASH_COARSE_POLICY_DISABLED
   };
 
-  template <bool dagger>
+  template <bool dagger, int coarseColor>
   struct DslashCoarseLaunch {
 
     cvector_ref<ColorSpinorField> &out;
@@ -468,16 +442,16 @@ namespace quda {
           if (halo_precision != QUDA_DOUBLE_PRECISION)
             errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
                       precision, Y.Precision());
-          ApplyCoarse<double, double, double, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                      comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location, halo);
+          ApplyCoarse<double, double, double, dagger, coarseColor>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                                   comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location, halo);
 #else
           errorQuda("Double precision multigrid has not been enabled");
 #endif
         } else if (precision == QUDA_SINGLE_PRECISION) {
           if (Y.Precision() == QUDA_SINGLE_PRECISION) {
             if (halo_precision == QUDA_SINGLE_PRECISION) {
-              ApplyCoarse<float, float, float, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                       comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location, halo);
+              ApplyCoarse<float, float, float, dagger, coarseColor>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                                    comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location, halo);
             } else {
               errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
                         precision, Y.Precision());
@@ -485,12 +459,12 @@ namespace quda {
           } else if (Y.Precision() == QUDA_HALF_PRECISION) {
 #if QUDA_PRECISION & 2
             if (halo_precision == QUDA_HALF_PRECISION) {
-              ApplyCoarse<float, short, short, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+              ApplyCoarse<float, short, short, dagger, coarseColor>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
                                                        comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location, halo);
             } else if (halo_precision == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-              ApplyCoarse<float, short, int8_t, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                        comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location, halo);
+              ApplyCoarse<float, short, int8_t, dagger, coarseColor>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                                     comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location, halo);
 #else
               errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif
@@ -507,7 +481,7 @@ namespace quda {
         } else {
           errorQuda("Unsupported precision %d", Y.Precision());
         }
-      } else if constexpr (DslashCoarseLaunch<dagger>::enable_coarse_shmem_overlap()) {
+      } else if constexpr (DslashCoarseLaunch<dagger, coarseColor>::enable_coarse_shmem_overlap()) {
 // OVERLAP
 #ifdef NVSHMEM_COMMS
         if (dslash && comm_partitioned() && comms) {
@@ -523,16 +497,16 @@ namespace quda {
           if (halo_precision != QUDA_DOUBLE_PRECISION)
             errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
                       precision, Y.Precision());
-          ApplyCoarse<double, double, double, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                      comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location, halo);
+          ApplyCoarse<double, double, double, dagger, coarseColor>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                                   comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location, halo);
 #else
           errorQuda("Double precision multigrid has not been enabled");
 #endif
         } else if (precision == QUDA_SINGLE_PRECISION) {
           if (Y.Precision() == QUDA_SINGLE_PRECISION) {
             if (halo_precision == QUDA_SINGLE_PRECISION) {
-              ApplyCoarse<float, float, float, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                       comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location, halo);
+              ApplyCoarse<float, float, float, dagger, coarseColor>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                                    comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location, halo);
             } else {
               errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
                         precision, Y.Precision());
@@ -540,12 +514,12 @@ namespace quda {
           } else if (Y.Precision() == QUDA_HALF_PRECISION) {
 #if QUDA_PRECISION & 2
             if (halo_precision == QUDA_HALF_PRECISION) {
-              ApplyCoarse<float, short, short, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                       comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location, halo);
+              ApplyCoarse<float, short, short, dagger, coarseColor>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                                    comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location, halo);
             } else if (halo_precision == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-              ApplyCoarse<float, short, int8_t, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                        comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location, halo);
+              ApplyCoarse<float, short, int8_t, dagger, coarseColor>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                                     comms ? DSLASH_INTERIOR : DSLASH_INTERIOR, halo_location, halo);
 #else
               errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif
@@ -574,16 +548,16 @@ namespace quda {
             if (halo_precision != QUDA_DOUBLE_PRECISION)
               errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision,
                         precision, Y.Precision());
-            ApplyCoarse<double, double, double, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                        comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location, halo);
+            ApplyCoarse<double, double, double, dagger, coarseColor>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                                     comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location, halo);
 #else
 	errorQuda("Double precision multigrid has not been enabled");
 #endif
           } else if (precision == QUDA_SINGLE_PRECISION) {
             if (Y.Precision() == QUDA_SINGLE_PRECISION) {
               if (halo_precision == QUDA_SINGLE_PRECISION) {
-                ApplyCoarse<float, float, float, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                         comms ? DSLASH_EXTERIOR : DSLASH_INTERIOR, halo_location, halo);
+                ApplyCoarse<float, float, float, dagger, coarseColor>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                                      comms ? DSLASH_EXTERIOR : DSLASH_INTERIOR, halo_location, halo);
               } else {
                 errorQuda("Halo precision %d not supported with field precision %d and link precision %d",
                           halo_precision, precision, Y.Precision());
@@ -591,12 +565,12 @@ namespace quda {
             } else if (Y.Precision() == QUDA_HALF_PRECISION) {
 #if QUDA_PRECISION & 2
           if (halo_precision == QUDA_HALF_PRECISION) {
-            ApplyCoarse<float, short, short, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                     comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location, halo);
+            ApplyCoarse<float, short, short, dagger, coarseColor>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                                  comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location, halo);
           } else if (halo_precision == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-            ApplyCoarse<float, short, int8_t, dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                      comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location, halo);
+            ApplyCoarse<float, short, int8_t, dagger, coarseColor>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
+                                                                   comms ? DSLASH_EXTERIOR : DSLASH_EXTERIOR, halo_location, halo);
 #else
             errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif
