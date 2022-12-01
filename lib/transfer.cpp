@@ -408,7 +408,7 @@ namespace quda {
                   output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
       }
 
-      Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map, parity);
+      Prolongate(*output, *input, *V, fine_to_coarse, spin_map, parity);
 
       flops_ += 8 * in.Ncolor() * out.Ncolor() * out.VolumeCB() * out.SiteSubset();
     } else {
@@ -471,7 +471,7 @@ namespace quda {
         errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
                   out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
 
-      Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
+      Restrict(*output, *input, *V, fine_to_coarse, coarse_to_fine, spin_map, parity);
 
       flops_ += 8 * out.Ncolor() * in.Ncolor() * in.VolumeCB() * in.SiteSubset();
     } else {

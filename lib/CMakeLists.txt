@@ -23,7 +23,7 @@ set (QUDA_OBJS
   eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
   eigensolve_quda.cpp quda_arpack_interface.cpp
   multigrid.cpp transfer.cpp block_orthogonalize.cu
-  prolongator.cu restrictor.cu staggered_prolong_restrict.cu
+  prolongator.cpp restrictor.cpp staggered_prolong_restrict.cu
   gauge_phase.cu timer.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
@@ -148,6 +148,7 @@ endif()
 
 
 set(QUDA_MULTIGRID_NVEC_LIST "6,24,32" CACHE STRING "The list of null space vector sizes that get compiled")
+set(QUDA_MULTIGRID_NC_NVEC_LIST "3,${QUDA_MULTIGRID_NVEC_LIST}")
 mark_as_advanced(QUDA_MULTIGRID_NVEC_LIST)
 
 message(STATUS "QUDA_MULTIGRID_NVEC_LIST=${QUDA_MULTIGRID_NVEC_LIST}")
@@ -155,28 +156,18 @@ configure_file(dslash_coarse.in.cpp dslash_coarse.cpp @ONLY)
 configure_file(coarse_op.in.cpp coarse_op.cpp @ONLY)
 configure_file(coarsecoarse_op.in.cpp coarsecoarse_op.cpp @ONLY)
 configure_file(coarse_op_preconditioned.in.cpp coarse_op_preconditioned.cpp @ONLY)
-
-set(QUDA_MULTIGRID_ALLOWED_NVEC_LIST 24)
-if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIRAC_TWISTED_CLOVER)
-set(QUDA_MULTIGRID_ALLOWED_NVEC_LIST 6 32 ${QUDA_MULTIGRID_ALLOWED_NVEC_LIST})
-endif()
-if(QUDA_DIRAC_STAGGERED)
-set(QUDA_MULTIGRID_ALLOWED_NVEC_LIST 64 96 ${QUDA_MULTIGRID_ALLOWED_NVEC_LIST})
-endif()
+configure_file(prolongator.in.cpp prolongator.cpp @ONLY)
+configure_file(restrictor.in.cpp restrictor.cpp @ONLY)
 
 if(QUDA_MULTIGRID)
   string(REPLACE "," ";" QUDA_MULTIGRID_NVEC_LIST_SEMICOLON "${QUDA_MULTIGRID_NVEC_LIST}")
   foreach(QUDA_MULTIGRID_NVEC ${QUDA_MULTIGRID_NVEC_LIST_SEMICOLON})
-    if(NOT ${QUDA_MULTIGRID_NVEC} IN_LIST QUDA_MULTIGRID_ALLOWED_NVEC_LIST)
-      string(REPLACE ";" "," QUDA_MULTIGRID_ALLOWED_NVEC_LIST_COMMA "${QUDA_MULTIGRID_ALLOWED_NVEC_LIST}")
-      message(FATAL_ERROR "'${QUDA_MULTIGRID_NVEC}' is not a valid Nvec: allowed ones are '${QUDA_MULTIGRID_ALLOWED_NVEC_LIST_COMMA}'")
-    endif()
     set(QUDA_MULTIGRID_DAGGER "false")
-    configure_file(dslash_coarse.in.cu "dslash_coarse_nvec${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
+    configure_file(dslash_coarse.in.cu "dslash_coarse_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
     set(QUDA_MULTIGRID_DAGGER "true")
-    configure_file(dslash_coarse.in.cu "dslash_coarse_dagger_nvec${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
-    list(APPEND QUDA_CU_OBJS "dslash_coarse_nvec${QUDA_MULTIGRID_NVEC}.cu")
-    list(APPEND QUDA_CU_OBJS "dslash_coarse_dagger_nvec${QUDA_MULTIGRID_NVEC}.cu")
+    configure_file(dslash_coarse.in.cu "dslash_coarse_dagger_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
+    list(APPEND QUDA_CU_OBJS "dslash_coarse_${QUDA_MULTIGRID_NVEC}.cu")
+    list(APPEND QUDA_CU_OBJS "dslash_coarse_dagger_${QUDA_MULTIGRID_NVEC}.cu")
 
     configure_file(coarse_op.in.cu "coarse_op_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
     list(APPEND QUDA_CU_OBJS "coarse_op_${QUDA_MULTIGRID_NVEC}.cu")
@@ -194,6 +185,20 @@ if(QUDA_MULTIGRID)
     endforeach()
 
   endforeach()
+
+  string(REPLACE "," ";" QUDA_MULTIGRID_NC_NVEC_LIST_SEMICOLON "${QUDA_MULTIGRID_NC_NVEC_LIST}")
+  foreach(QUDA_MULTIGRID_NC_NVEC ${QUDA_MULTIGRID_NC_NVEC_LIST_SEMICOLON})
+    foreach(QUDA_MULTIGRID_NVEC2 ${QUDA_MULTIGRID_NVEC_LIST_SEMICOLON})
+      if(${QUDA_MULTIGRID_NVEC2} GREATER_EQUAL ${QUDA_MULTIGRID_NC_NVEC})
+         configure_file(prolongator.in.cu "prolongator_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu" @ONLY)
+         configure_file(restrictor.in.cu "restrictor_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu" @ONLY)
+         list(APPEND QUDA_CU_OBJS "prolongator_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
+         list(APPEND QUDA_CU_OBJS "restrictor_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
+      endif()
+    endforeach()
+
+  endforeach()
+
 endif()
 
 if(BUILD_FORTRAN_INTERFACE)

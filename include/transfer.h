@@ -4,7 +4,7 @@
 /**
  * @file transfer.h
  *
- * @section DESCRIPTION 
+ * @section DESCRIPTION
  *
  * Defines the prolongation and restriction operators used to transfer
  * between grids.
@@ -135,7 +135,7 @@ namespace quda {
      */
     void createGeoMap(int *geo_bs);
 
-    /** 
+    /**
      * @brief Creates the map between fine spin and parity to coarse spin dimensions
      * @param spin_bs The spin block size
      */
@@ -226,7 +226,7 @@ namespace quda {
     int nvec() const {return Nvec;}
 
     /**
-     * Returns the amount of spin blocking. Defined as zero when coarsening staggered. 
+     * Returns the amount of spin blocking. Defined as zero when coarsening staggered.
      * @return spin_bs
      */
     int Spin_bs() const {return spin_bs;}
@@ -303,13 +303,17 @@ namespace quda {
      @param[out] out Resulting fine grid field
      @param[in] in Input field on coarse grid
      @param[in] v Matrix field containing the null-space components
-     @param[in] Nvec Number of null-space components
      @param[in] fine_to_coarse Fine-to-coarse lookup table (linear indices)
      @param[in] spin_map Spin blocking lookup table
      @param[in] parity of the output fine field (if single parity output field)
    */
-  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, 
-		  int Nvec, const int *fine_to_coarse, const int * const *spin_map,
+  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+		  const int *fine_to_coarse, const int * const *spin_map,
+		  int parity=QUDA_INVALID_PARITY);
+
+  template <int coarseColor, int fineColor>
+  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+		  const int *fine_to_coarse, const int * const *spin_map,
 		  int parity=QUDA_INVALID_PARITY);
 
   /**
@@ -322,8 +326,13 @@ namespace quda {
      @param[in] spin_map Spin blocking lookup table
      @param[in] parity of the input fine field (if single parity input field)
    */
-  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, 
-		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const *spin_map,
+  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+		const int *fine_to_coarse, const int *coarse_to_fine, const int * const *spin_map,
+		int parity=QUDA_INVALID_PARITY);
+
+  template <int coarseColor, int fineColor>
+  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+		const int *fine_to_coarse, const int *coarse_to_fine, const int * const *spin_map,
 		int parity=QUDA_INVALID_PARITY);
 
   /**
