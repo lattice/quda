@@ -1,18 +1,18 @@
 #pragma once
 
 #include <unistd.h> // for gethostname()
-#include <assert.h>
+#include <cassert>
+#include <csignal>
 #include <limits>
 #include <stack>
+#include <algorithm>
+#include <numeric>
 
 #include <quda_internal.h>
 #include <comm_quda.h>
-#include <csignal>
-
+#include <color_spinor_field.h>
+#include <field_cache.h>
 #include <comm_key.h>
-
-#include <algorithm>
-#include <numeric>
 
 #if defined(MPI_COMMS) || defined(QMP_COMMS)
 #include <mpi.h>
@@ -415,6 +415,8 @@ namespace quda
 
     snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1),
              comm_dim_partitioned(2), comm_dim_partitioned(3));
+
+    FieldTmp<ColorSpinorField>::destroy(); // destroy field cache since message handles can be invalid
   }
 #else
   void comm_dim_partitioned_set(int)
@@ -430,6 +432,8 @@ namespace quda
 
     snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1),
              comm_dim_partitioned(2), comm_dim_partitioned(3));
+
+    FieldTmp<ColorSpinorField>::destroy(); // destroy field cache since message handles can be invalid
   }
 
 #ifdef MULTI_GPU

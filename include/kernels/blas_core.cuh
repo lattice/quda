@@ -47,8 +47,6 @@ namespace quda
       { ; }
     };
 
-    template <typename real> struct caxpyxmazMR_;
-
     /**
        Generic blas functor  with four loads and up to four stores.
     */
@@ -56,12 +54,8 @@ namespace quda
       Arg &arg;
       constexpr Blas_(const Arg &arg) : arg(const_cast<Arg&>(arg))
       {
-        // this assertion ensures it's safe to make the arg non-const (required for caxpyxmazMR)
-        // This catch-all assertion is lenient and only checks the struct member.
-        // BlasArg above uses a stringent assertion that matches Functor.
-        if constexpr (std::is_same_v<typename Arg::Functor, caxpyxmazMR_<typename Arg::real>>) {
-          static_assert(device::use_kernel_arg<Arg>(), "This functor must be passed as a kernel argument");
-        }
+        // The safety of making the arg non-const (required for caxpyxmazMR) is guaranteed
+        // by settting `use_kernel_arg = use_kernel_arg_p::ALWAYS` inside the functor.
       }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
@@ -115,17 +109,17 @@ namespace quda
     };
 
     /**
-       Functor to perform the operation x *= a
+       Functor to perform the operation y = a * x
     */
-    template <typename real> struct ax_ : public BlasFunctor {
-      static constexpr memory_access<1> read{ };
-      static constexpr memory_access<1> write{ };
+    template <typename real> struct axy_ : public BlasFunctor {
+      static constexpr memory_access<1, 0> read{ };
+      static constexpr memory_access<0, 1> write{ };
       const real a;
-      ax_(const real &a, const real &, const real &) : a(a) { ; }
-      template <typename T> __device__ __host__ void operator()(T &x, T &, T &, T &, T &) const
+      axy_(const real &a, const real &, const real &) : a(a) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &) const
       {
 #pragma unroll
-        for (int i = 0; i < x.size(); i++) x[i] *= a;
+        for (int i = 0; i < x.size(); i++) y[i] = a * x[i];
       }
       constexpr int flops() const { return 1; }   //! flops per element
     };
@@ -372,7 +366,6 @@ namespace quda
     */
     template <typename real> struct caxpyxmazMR_ {
       static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::ALWAYS;
-      //static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE;
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
       complex<real> a;

@@ -1131,8 +1131,6 @@ namespace quda {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("KV2 = %e\n", arg.AV.norm2());
     }
 
-    saveTuneCache();
-
     // work out what to set the scales to
     if (coarseGaugeAtomic::fixedPoint()) {
       double max = 500.0; // Should be more than sufficient
@@ -1169,15 +1167,11 @@ namespace quda {
         y.apply(device::get_default_stream());
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2());
 
-        saveTuneCache();
-
         // if we are writing to a temporary, we need to zero it before each computation
         if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
 
         y.setComputeType(COMPUTE_VUV); // compute Y += VUV
         y.apply(device::get_default_stream());
-
-        saveTuneCache();
 
         // long link coarsen, if necessary
         if (dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) {
@@ -1198,12 +1192,10 @@ namespace quda {
 
             y.apply(device::get_default_stream());
             if (getVerbosity() >= QUDA_VERBOSE) printfQuda("LV2[%d] = %e\n", d, arg.UV.norm2());
-            saveTuneCache();
 
             // *do not* zero out X and Y --- X;Y = VUV + VLV
             y.setComputeType(COMPUTE_VLV); // compute Y += VLV
             y.apply(device::get_default_stream());
-            saveTuneCache();
 
           } else if (allow_truncation) {
             if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Skipping long link coarsening because geo_bs[%d] = %d is too small\n", d, geo_bs[d]);
@@ -1277,15 +1269,11 @@ namespace quda {
       y.apply(device::get_default_stream());
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UAV2[%d] = %e\n", d, arg.UV.norm2());
 
-      saveTuneCache();
-
       // if we are writing to a temporary, we need to zero it before each computation
       if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
 
       y.setComputeType(COMPUTE_VUV); // compute Y += VUV
       y.apply(device::get_default_stream());
-
-      saveTuneCache();
 
       // long link coarsen, if necessary
       if (dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) {
@@ -1306,12 +1294,10 @@ namespace quda {
 
           y.apply(device::get_default_stream());
           if (getVerbosity() >= QUDA_VERBOSE) printfQuda("LAV2[%d] = %e\n", d, arg.UV.norm2());
-          saveTuneCache();
 
           // *do not* zero out X and Y --- X;Y = VUV + VLV
           y.setComputeType(COMPUTE_VLV); // compute Y += VLV
           y.apply(device::get_default_stream());
-          saveTuneCache();
 
         } else if (allow_truncation) {
           if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Skipping long link coarsening because geo_bs[%d] = %d is too small\n", d, geo_bs[d]);

@@ -51,28 +51,18 @@ namespace quda
         nParity(nParity) { }
     };
 
-    template <typename real_reduce_t, typename real> struct HeavyQuarkResidualNorm_;
-    template <typename real_reduce_t, typename real> struct xpyHeavyQuarkResidualNorm_;
-
     /**
        Generic reduction kernel with up to five loads and saves.
     */
-    template <typename Arg> struct Reduce_ : plus<typename Arg::reduce_t> {
+    template <typename Arg> struct Reduce_ : Arg::Reducer::reducer {
       using reduce_t = typename Arg::reduce_t;
-      using plus<reduce_t>::operator();
+      using Arg::Reducer::reducer::operator();
       static constexpr int reduce_block_dim = 1; // x_cb and parity are mapped to x dim
       Arg &arg;
       constexpr Reduce_(const Arg &arg) : arg(const_cast<Arg&>(arg))
       {
-        // this assertion ensures it's safe to make the arg non-const (required for HQ residual)
-        // This catch-all assertion is lenient and only checks the struct member.
-        // ReductionArg above uses a stringent assertion that matches Reducer.
-        if constexpr (std::is_same_v<typename Arg::Reducer,
-		      HeavyQuarkResidualNorm_<device_reduce_t, typename Arg::real>> ||
-                      std::is_same_v<typename Arg::Reducer,
-		      xpyHeavyQuarkResidualNorm_<device_reduce_t, typename Arg::real>>) {
-          static_assert(device::use_kernel_arg<Arg>(), "This functor must be passed as a kernel argument");
-        }
+        // The safety of making the arg non-const (required for HQ residual) is guaranteed
+        // by setting `use_kernel_arg = use_kernel_arg_p::ALWAYS` inside the functors.
       }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
@@ -114,6 +104,7 @@ namespace quda
     struct ReduceFunctor {
       static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE;
       using reduce_t = reduce_t_;
+      using reducer = plus<reduce_t>;
       static constexpr bool site_unroll = site_unroll_;
 
       //! pre-computation routine called before the "M-loop"
@@ -121,6 +112,43 @@ namespace quda
 
       //! post-computation routine called after the "M-loop"
       __device__ __host__ void post(reduce_t &) const { ; }
+    };
+
+    template <typename reduce_t, typename real>
+    struct Max : public ReduceFunctor<reduce_t> {
+      using reducer = maximum<reduce_t>;
+      static constexpr memory_access<1> read{ };
+      static constexpr memory_access<> write{ };
+      Max(const real &, const real &) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &max, T &x, T &, T &, T &, T &) const
+      {
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          max = max > abs(x[i].real()) ? max : abs(x[i].real());
+          max = max > abs(x[i].imag()) ? max : abs(x[i].imag());
+        }
+      }
+      constexpr int flops() const { return 0; }   //! flops per element
+    };
+
+    template <typename reduce_t, typename real>
+    struct MaxDeviation : public ReduceFunctor<reduce_t> {
+      using reducer = maximum<reduce_t>;
+      static constexpr memory_access<1, 1> read{ };
+      static constexpr memory_access<> write{ };
+      MaxDeviation(const real &, const real &) { ; }
+      template <typename T> __device__ __host__ void operator()(reduce_t &max, T &x, T &y, T &, T &, T &) const
+      {
+#pragma unroll
+        for (int i = 0; i < x.size(); i++) {
+          auto diff_re = abs(y[i].real()) > 0.0 ? abs(x[i].real() - y[i].real()) / abs(y[i].real()) : 0;
+          auto diff_im = abs(y[i].imag()) > 0.0 ? abs(x[i].imag() - y[i].imag()) / abs(y[i].imag()) : 0;
+          
+          max = max > diff_re ? max : diff_re;
+          max = max > diff_im ? max : diff_im;
+        }
+      }
+      constexpr int flops() const { return 0; }   //! flops per element
     };
 
     /**
@@ -251,30 +279,6 @@ namespace quda
         }
       }
       constexpr int flops() const { return 6; }   //! flops per element
-    };
-
-    /**
-       double caxpyXmayNormCuda(float a, float *x, float *y, n){}
-       First performs the operation y[i] = a*x[i] + y[i]
-       Second performs the operator x[i] -= a*z[i]
-       Third returns the norm of x
-    */
-    template <typename reduce_t, typename real>
-    struct caxpyxmaznormx : public ReduceFunctor<reduce_t> {
-      static constexpr memory_access<1, 1, 1> read{ };
-      static constexpr memory_access<1, 1> write{ };
-      const complex<real> a;
-      caxpyxmaznormx(const complex<real> &a, const complex<real> &) : a(a) { ; }
-      template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &) const
-      {
-#pragma unroll
-        for (int i = 0; i < x.size(); i++) {
-          y[i] = cmac(a, x[i], y[i]);
-          x[i] = cmac(-a, z[i], x[i]);
-          norm2_<reduce_t, real>(sum, x[i]);
-        }
-      }
-      constexpr int flops() const { return 10; }  //! flops per element
     };
 
     /**
@@ -455,8 +459,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct HeavyQuarkResidualNorm_ {
       static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::ALWAYS;
-      //static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE;
       using reduce_t = array<real_reduce_t, 3>;
+      using reducer = plus<reduce_t>;
       static constexpr bool site_unroll = true;
 
       static constexpr memory_access<1, 1> read{ };
@@ -502,8 +506,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct xpyHeavyQuarkResidualNorm_ {
       static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::ALWAYS;
-      //static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE;
       using reduce_t = array<real_reduce_t, 3>;
+      using reducer = plus<reduce_t>;
       static constexpr bool site_unroll = true;
 
       static constexpr memory_access<1, 1, 1> read{ };

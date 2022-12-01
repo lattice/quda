@@ -31,12 +31,12 @@ namespace quda
       // linear system is Hermitian, solve directly
       // compute rhs vector phi = P* b = (q_i, b) and construct the matrix
       // P* Q = P* A P = (p_i, q_j) = (p_i, A p_j)
-      blas::cDotProduct(A_, p, make_set(q, const_cast<ColorSpinorField &>(b)));
+      blas::cDotProduct(A_, p, {q, b});
     } else {
       // linear system is not Hermitian, solve the normal system
       // compute rhs vector phi = Q* b = (q_i, b) and construct the matrix
       // Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
-      blas::cDotProduct(A_, q, make_set(q, const_cast<ColorSpinorField &>(b)));
+      blas::cDotProduct(A_, q, {q, b});
     }
 
     for (int i = 0; i < N; i++) {

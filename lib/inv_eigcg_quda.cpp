@@ -218,8 +218,7 @@ namespace quda {
     r_pre(nullptr),
     p_pre(nullptr),
     eigcg_args(nullptr),
-    profile(profile),
-    init(false)
+    profile(profile)
   {
 
     if (2 * param.n_ev >= param.m)
@@ -262,7 +261,6 @@ namespace quda {
     {
       if(Vm)  delete Vm;
 
-      delete tmpp;
       delete rp;
       delete yp;
       delete Ap;
@@ -378,8 +376,6 @@ namespace quda {
       Ap = ColorSpinorField::Create(csParam);
       p  = ColorSpinorField::Create(csParam);
 
-      tmpp = ColorSpinorField::Create(csParam);
-
       Az = ColorSpinorField::Create(csParam);
 
       if (K && param.precision_precondition != param.precision_sloppy) {
@@ -421,13 +417,12 @@ namespace quda {
 //!
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
-    ColorSpinorField &tmp = *tmpp;
 
     csParam.setPrecision(param.precision_sloppy);
     csParam.is_composite  = false;
 
     // compute initial residual
-    matSloppy(r, x, y);
+    matSloppy(r, x);
     double r2 = blas::xmyNorm(b, r);
 
     ColorSpinorField *z  = (K != nullptr) ? ColorSpinorField::Create(csParam) : rp;//
@@ -476,7 +471,7 @@ namespace quda {
     bool converged = convergence(r2, heavy_quark_res, args.global_stop, param.tol_hq);
 
     while ( !converged && k < param.maxiter ) {
-      matSloppy(*Ap, *p, tmp);  // tmp as tmp
+      matSloppy(*Ap, *p); // tmp as tmp
 
       pAp    = blas::reDotProduct(*p, *Ap);
       alpha_old_inv =  alpha_inv;
@@ -531,7 +526,7 @@ namespace quda {
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     // compute the true residuals
-    matSloppy(r, x, y);
+    matSloppy(r, x);
     param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
     param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
@@ -561,8 +556,6 @@ namespace quda {
 
     csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-    ColorSpinorField *tmpp2 = ColorSpinorField::Create(csParam);//full precision accumulator
-    ColorSpinorField &tmp2  = *tmpp2;
     ColorSpinorField *rp = ColorSpinorField::Create(csParam);//full precision residual
     ColorSpinorField &r = *rp;
 
@@ -589,7 +582,7 @@ namespace quda {
       (*K)(x, b);
       delete K;
 
-      mat(r, x, tmp2);
+      mat(r, x);
       blas::xpay(b, -1.0, r);
 
       xProj = x;
@@ -612,7 +605,6 @@ namespace quda {
     k   += Kparam.iter;
 
     delete rp;
-    delete tmpp2;
 
     if( param.precision_ritz != param.precision ) {
       delete xp_proj;
@@ -652,7 +644,7 @@ namespace quda {
      ColorSpinorField &r = *rp;
 
      //deflate initial guess ('out'-field):
-     mat(r, out, e);
+     mat(r, out);
      //
      double r2 = xmyNorm(in, r);
 
@@ -704,7 +696,7 @@ namespace quda {
        blas::xpy(e, out);
        // compute the true residuals
        blas::zero(e);
-       mat(r, out, e);
+       mat(r, out);
        //
        r2 = blas::xmyNorm(in, r);
 

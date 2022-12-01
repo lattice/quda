@@ -172,8 +172,6 @@ namespace quda {
     csParam.setPrecision(param.precision_eigensolver, QUDA_INVALID_PRECISION, true);
 
     if (deflate_compute) {
-      evecs.reserve(param.eig_param.n_conv);
-      evals.reserve(param.eig_param.n_conv);
 
       deflation_space *space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
 
@@ -186,16 +184,13 @@ namespace quda {
                     param.eig_param.n_conv);
 
         // move vectors from preserved space to local space
-        for (auto &vec : space->evecs) evecs.push_back(vec);
+        evecs = std::move(space->evecs);
 
         if (param.eig_param.n_conv != (int)space->evals.size())
           errorQuda("Preserved eigenvalues %lu does not match expected %lu", space->evals.size(), evals.size());
 
         // move vectors from preserved space to local space
-        for (auto &val : space->evals) evals.push_back(val);
-
-        space->evecs.resize(0);
-        space->evals.resize(0);
+        evals = std::move(space->evals);
 
         delete space;
         param.eig_param.preserve_deflation_space = nullptr;
@@ -204,10 +199,8 @@ namespace quda {
         deflate_compute = false;
       } else {
         // Computing the deflation space, rather than transferring, so we create space.
-        for (int i = 0; i < param.eig_param.n_conv; i++) evecs.push_back(new ColorSpinorField(csParam));
-
-        evals.resize(param.eig_param.n_conv);
-        for (int i = 0; i < param.eig_param.n_conv; i++) evals[i] = 0.0;
+        resize(evecs, param.eig_param.n_conv, csParam);
+        evals.resize(param.eig_param.n_conv, 0.0);
       }
     }
 
@@ -224,10 +217,6 @@ namespace quda {
 
         if (param.eig_param.preserve_deflation_space) {
           deflation_space *space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
-          // first ensure that any existing space is freed
-          for (auto &vec : space->evecs)
-            if (vec) delete vec;
-          space->evecs.resize(0);
           delete space;
         }
 
@@ -236,42 +225,29 @@ namespace quda {
         // if evecs size = 2x evals size then we are doing an SVD deflation
         space->svd = (evecs.size() == 2 * evals.size()) ? true : false;
 
-        space->evecs.reserve(evecs.size());
-        for (auto &vec : evecs) space->evecs.push_back(vec);
-
-        space->evals.reserve(evals.size());
-        for (auto &val : evals) space->evals.push_back(val);
+        space->evecs = std::move(evecs);
+        space->evals = std::move(evals);
 
         param.eig_param.preserve_deflation_space = space;
-      } else {
-        for (auto &vec : evecs)
-          if (vec) delete vec;
       }
 
-      evecs.resize(0);
+      evecs.clear();
+      evals.clear();
       deflate_init = false;
     }
   }
 
-  void Solver::injectDeflationSpace(std::vector<ColorSpinorField *> &defl_space)
+  void Solver::injectDeflationSpace(std::vector<ColorSpinorField> &defl_space)
   {
-    if (!evecs.empty()) errorQuda("Solver deflation space should be empty, instead size=%lu\n", defl_space.size());
-    // Create space for the eigenvalues
-    evals.resize(defl_space.size());
-    // Create space for the eigenvectors, destroy defl_space
-    for (auto &e : defl_space) { evecs.push_back(e); }
-    defl_space.resize(0);
+    if (!evecs.empty()) errorQuda("Solver deflation space should be empty, instead size=%lu\n", evecs.size());
+    evecs = std::move(defl_space); // move defl_space to evecs
   }
 
-  void Solver::extractDeflationSpace(std::vector<ColorSpinorField *> &defl_space)
+  void Solver::extractDeflationSpace(std::vector<ColorSpinorField> &defl_space)
   {
     if (!defl_space.empty())
       errorQuda("Container deflation space should be empty, instead size=%lu\n", defl_space.size());
-    // We do not care about the eigenvalues, they will be recomputed.
-    evals.resize(0);
-    // Create space for the eigenvectors, destroy evecs
-    for (auto &e : evecs) { defl_space.push_back(e); }
-    evecs.resize(0);
+    defl_space = std::move(evecs); // move evecs to defl_space
   }
 
   void Solver::extendSVDDeflationSpace()
@@ -279,14 +255,7 @@ namespace quda {
     if (!deflate_init) errorQuda("Deflation space for this solver not computed");
 
     // Double the size deflation space to accomodate for the extra singular vectors
-    // Clone from an existing vector
-    ColorSpinorParam csParam(*evecs[0]);
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    // This is the vector precision used by matResidual
-    csParam.setPrecision(param.precision_eigensolver, QUDA_INVALID_PRECISION, true);
-    for (int i = param.eig_param.n_conv; i < 2 * param.eig_param.n_conv; i++) {
-      evecs.push_back(new ColorSpinorField(csParam));
-    }
+    resize(evecs, 2 * param.eig_param.n_conv, QUDA_ZERO_FIELD_CREATE);
   }
 
   void Solver::blocksolve(ColorSpinorField &out, ColorSpinorField &in)

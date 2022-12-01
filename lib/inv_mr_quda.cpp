@@ -13,7 +13,7 @@ namespace quda
 {
 
   MR::MR(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matSloppy, matSloppy, param, profile), init(false)
+    Solver(mat, matSloppy, matSloppy, matSloppy, param, profile)
   {
     if (param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ && param.Nsteps % 2 == 1) {
       errorQuda("For multiplicative Schwarz, number of solver steps %d must be even", param.Nsteps);
@@ -29,7 +29,6 @@ namespace quda
       csParam.create = QUDA_NULL_FIELD_CREATE;
 
       r = ColorSpinorField(csParam);
-      tmp = ColorSpinorField(csParam);
 
       // now allocate sloppy fields
       csParam.setPrecision(param.precision_sloppy);
@@ -41,9 +40,6 @@ namespace quda
       if (!mixed) csParam.create = QUDA_REFERENCE_FIELD_CREATE;
       csParam.v = r.V();
       r_sloppy = ColorSpinorField(csParam);
-
-      csParam.v = tmp.V();
-      tmp_sloppy = ColorSpinorField(csParam);
 
       init = true;
     } // init
@@ -74,7 +70,7 @@ namespace quda
     double b2 = blas::norm2(b); // Save norm of b
     double r2 = 0.0;            // if zero source then we will exit immediately doing no work
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      mat(r, x, tmp);
+      mat(r, x);
       r2 = blas::xmyNorm(b, r); // r = b - Ax0
     } else {
       r2 = b2;
@@ -113,7 +109,7 @@ namespace quda
 
         while (k < param.maxiter && r2 > param.delta * param.delta) {
 
-          matSloppy(Ar, r_sloppy, tmp_sloppy);
+          matSloppy(Ar, r_sloppy);
 
           if (param.global_reduction) {
             auto Ar4 = blas::cDotProductNormAB(Ar, r_sloppy);
@@ -145,7 +141,7 @@ namespace quda
       // FIXME - add over/under relaxation in outer loop
       bool compute_true_res = param.compute_true_res || param.Nsteps > 1;
       if (compute_true_res) {
-        mat(r, x, tmp);
+        mat(r, x);
         r2 = blas::xmyNorm(b, r);
         param.true_res = sqrt(r2 / b2);
         converged = (step < param.Nsteps && r2 > stop) ? false : true;
