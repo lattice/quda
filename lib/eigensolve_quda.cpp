@@ -47,6 +47,7 @@ namespace quda
     check_interval = eig_param->check_interval;
     batched_rotate = eig_param->batched_rotate;
     block_size = eig_param->block_size;
+    ortho_block_size = eig_param->ortho_block_size;
     iter = 0;
     iter_converged = 0;
     iter_locked = 0;
@@ -65,7 +66,8 @@ namespace quda
     if (n_conv == 0) errorQuda("n_conv=0 passed to Eigensolver");
     if (n_ev_deflate > n_conv) errorQuda("deflation vecs = %d is greater than n_conv = %d", n_ev_deflate, n_conv);
     if (eig_param->eig_type == QUDA_EIG_BLK_TR_LANCZOS && block_size <= 0) errorQuda("block_size=%d must be positive", block_size);
-
+    if (ortho_block_size <= 0) errorQuda("block_size=%d must be positive", ortho_block_size);
+    
     residua.resize(n_kr, 0.0);
 
     // Part of the spectrum to be computed.
@@ -160,7 +162,8 @@ namespace quda
     bool orthed = false;
     int k = 0, kmax = 5;
     while (!orthed && k < kmax) {
-      orthonormalizeMGS(kSpace, block_size);
+      //orthonormalizeMGS(kSpace, block_size);
+      orthonormalizeHMGS(kSpace, ortho_block_size, block_size);
       if (block_size > 1) {
         logQuda(QUDA_SUMMARIZE, "Orthonormalising initial guesses with Modified Gram Schmidt, iter k=%d/5\n", (k + 1));
       } else {
@@ -382,6 +385,25 @@ namespace quda
     return orthed;
   }
 
+  void EigenSolver::orthonormalizeHMGS(std::vector<ColorSpinorField> &vecs, int h_block_size, int size)
+  {
+    for (unsigned int i = 0; i < size; i++) {
+      int array_size = h_block_size;
+      for (unsigned int j = 0; j < i; j+=array_size) {
+	if(i < h_block_size) array_size = i;
+	if(i-j < h_block_size) array_size = i-j;
+	printfQuda("Current array size = %d\n", array_size);
+	
+	std::vector<Complex> s(array_size);
+        blas::cDotProduct(s, {vecs.begin() + j, vecs.begin() + j + array_size}, vecs[i]); // <j|i> with i normalised.
+	for (auto k = 0u; k < array_size; k++) s[k] *= -1.0;
+        blas::caxpy(s, {vecs.begin() + j, vecs.begin() + j + array_size}, vecs[i]);       // i = i - proj_{j}(i) = i - <j|i> * j	
+      }
+      double norm = sqrt(blas::norm2(vecs[i]));
+      blas::ax(1.0 / norm, vecs[i]); // i/<i|i>
+    }
+  }
+  
   void EigenSolver::orthonormalizeMGS(std::vector<ColorSpinorField> &vecs, int size)
   {
     for (int i = 0; i < size; i++) {
