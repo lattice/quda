@@ -276,7 +276,7 @@ namespace quda {
 #pragma unroll
         for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
           auto W = make_tile_B<complex, true>(tile);
-          W.loadCS(Wacc, arg.dim, 1, (parity+1)&1, ghost_idx, s, k, j0);
+          W.loadCS(Wacc, arg.dim, 1, 1 - parity, ghost_idx, s, k, j0);
           UV[s].mma_nn(U, W);
         } // Fine color columns
       }   // Fine spin (tensor)
@@ -292,7 +292,7 @@ namespace quda {
 #pragma unroll
         for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
           auto W = make_tile_B<complex, false>(tile);
-          W.loadCS(Wacc, 0, 0, (parity+1)&1, y_cb, s, k, j0);
+          W.loadCS(Wacc, 0, 0, 1 - parity, y_cb, s, k, j0);
           UV[s].mma_nn(U, W);
         }  //Fine color columns
       }    // Fine Spin
@@ -351,7 +351,7 @@ namespace quda {
         auto U = make_tile_A<complex, false>(tile);
         U.load(Gacc, arg.dim, parity, x_cb, i0, k);
         // loading from V == AV, which has nSpin == 1
-        W.loadCS(Wacc, arg.dim, 1, (parity+1)&1, ghost_idx, 0, k, j0);
+        W.loadCS(Wacc, arg.dim, 1, 1 - parity, ghost_idx, 0, k, j0);
         UV[0].mma_nn(U, W);
       } // fine color columns
 
@@ -365,7 +365,7 @@ namespace quda {
         auto U = make_tile_A<complex, false>(tile);
         U.load(Gacc, arg.dim, parity, x_cb, i0, k);
         // loading from V == AV, which has nSpin == 1
-        W.loadCS(Wacc, 0, 0, (parity+1)&1, y_cb, 0, k, j0);
+        W.loadCS(Wacc, 0, 0, 1 - parity, y_cb, 0, k, j0);
         UV[0].mma_nn(U, W);
       } // fine color columns
     }
@@ -425,10 +425,11 @@ namespace quda {
         for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
           auto U = make_tile_A<complex, false>(tile);
           U.load(Gacc, arg.dim, parity, x_cb, i0, k);
-          W.loadCS(Wacc, arg.dim, 1, (parity+1)&1, ghost_idx, 0, k, j0);
+          W.loadCS(Wacc, arg.dim, 1, 1 - parity, ghost_idx, 0, k, j0);
           // store to a different component of UV depending on if we're gathering
           // from even, odd
-          UV[(parity+1)&1].mma_nn(U, W);
+          if (parity == 0) UV[1].mma_nn(U, W);
+          else             UV[0].mma_nn(U, W);
         }
       } else if (arg.dir == QUDA_BACKWARDS) {
         // loading from AV, need to be mindful of if we're loading from a "from even" or "from odd" site
@@ -438,7 +439,7 @@ namespace quda {
           U.load(Gacc, arg.dim, parity, x_cb, i0, k);
 #pragma unroll
           for (int s = 0; s < Arg::fineSpinorAV::nSpin; s++) {
-            W.loadCS(Wacc, arg.dim, 1, (parity+1)&1, ghost_idx, s, k, j0);
+            W.loadCS(Wacc, arg.dim, 1, 1 - parity, ghost_idx, s, k, j0);
             UV[s].mma_nn(U, W);
           }
         }
@@ -457,10 +458,11 @@ namespace quda {
           auto U = make_tile_A<complex, false>(tile);
           U.load(Gacc, arg.dim, parity, x_cb, i0, k);
 
-          W.loadCS(Wacc, 0, 0, (parity+1)&1, y_cb, 0, k, j0);
+          W.loadCS(Wacc, 0, 0, 1 - parity, y_cb, 0, k, j0);
           // store to a different component of UV depending on if we're gathering
           // from even, odd
-          UV[(parity+1)&1].mma_nn(U, W);
+          if (parity == 0) UV[1].mma_nn(U, W);
+          else             UV[0].mma_nn(U, W);
         }
       } else if (arg.dir == QUDA_BACKWARDS) {
         // loading from AV, need to be mindful of if we're loading from a "from even" or "from odd" site
@@ -470,7 +472,7 @@ namespace quda {
           U.load(Gacc, arg.dim, parity, x_cb, i0, k);
 #pragma unroll
           for (int s = 0; s < Arg::fineSpinorAV::nSpin; s++) {
-            W.loadCS(Wacc, 0, 0, (parity+1)&1, y_cb, s, k, j0);
+            W.loadCS(Wacc, 0, 0, 1 - parity, y_cb, s, k, j0);
             UV[s].mma_nn(U, W);
           }
         }
@@ -480,9 +482,12 @@ namespace quda {
     real uv_max = static_cast<real>(0.0);
     if (arg.dir == QUDA_FORWARDS) {
       if constexpr (Arg::compute_max) {
-        uv_max = UV[(parity+1)&1].abs_max();
+        uv_max = parity ? UV[0].abs_max() : UV[1].abs_max();
       } else {
-        UV[(parity+1)&1].saveCS(arg.UV, 0, 0, parity, x_cb, (parity+1)&1, i0, j0);
+        if (parity == 0)
+          UV[1].saveCS(arg.UV, 0, 0, parity, x_cb, 1, i0, j0);
+        else
+          UV[0].saveCS(arg.UV, 0, 0, parity, x_cb, 0, i0, j0);
       }
     } else {
 #pragma unroll
@@ -554,7 +559,7 @@ namespace quda {
 #pragma unroll
         for (int s_col=0; s_col<Arg::fineSpin; s_col++) {
           auto W = make_tile_B<complex, true>(tile);
-          W.loadCS(Wacc, arg.dim, 1, (parity+1)&1, ghost_idx, s_col, k, j0);
+          W.loadCS(Wacc, arg.dim, 1, 1 - parity, ghost_idx, s_col, k, j0);
 #pragma unroll
           for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
             // on coarse lattice, if forwards then use forwards links
@@ -575,7 +580,7 @@ namespace quda {
 #pragma unroll
         for (int s_col = 0; s_col < Arg::fineSpin; s_col++) {
           auto W = make_tile_B<complex, false>(tile);
-          W.loadCS(Wacc, 0, 0, (parity+1)&1, y_cb, s_col, k, j0);
+          W.loadCS(Wacc, 0, 0, 1 - parity, y_cb, s_col, k, j0);
 #pragma unroll
           for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
             // on coarse lattice, if forwards then use forwards links
@@ -1194,7 +1199,12 @@ namespace quda {
         auto UV = make_tile_B<complex, false>(tile);
         UV.loadCS(arg.UV, 0, 0, parity, x_cb, 0, k, j0);
 
-        vuv[s_c_row*Arg::coarseSpin+s_c_col].mma_tn(V, UV);
+        switch(s_c_row*Arg::coarseSpin+s_c_col) {
+        case 0: vuv[0].mma_tn(V, UV); break;
+        case 1: vuv[1].mma_tn(V, UV); break;
+        case 2: vuv[2].mma_tn(V, UV); break;
+        case 3: vuv[3].mma_tn(V, UV); break;
+        }
       } else {
         auto AV = make_tile_At<complex, false>(tile);
         AV.loadCS(arg.AV, 0, 0, parity, x_cb, 0, k, i0);
@@ -1203,7 +1213,12 @@ namespace quda {
         auto UV = make_tile_B<complex, false>(tile);
         UV.loadCS(arg.UV, 0, 0, parity, x_cb, 0, k, j0);
 
-        vuv[s_c_row*Arg::coarseSpin+s_c_col].mma_tn(AV, UV);
+        switch(s_c_row*Arg::coarseSpin+s_c_col) {
+        case 0: vuv[0].mma_tn(AV, UV); break;
+        case 1: vuv[1].mma_tn(AV, UV); break;
+        case 2: vuv[2].mma_tn(AV, UV); break;
+        case 3: vuv[3].mma_tn(AV, UV); break;
+        }
       }
     }
   }
@@ -1239,7 +1254,7 @@ namespace quda {
 #pragma unroll
       for (int s_c_col = 0; s_c_col < Arg::coarseSpin; s_c_col++) {
 #pragma unroll
-        for (int k = 0; k < TileType::k; k += TileType::K) { // Sum over fine color 
+        for (int k = 0; k < TileType::k; k += TileType::K) { // Sum over fine color
 
           auto V = make_tile_At<complex, false>(tile);
           V.loadCS(arg.V, 0, 0, parity, x_cb, 0, k, i0);
@@ -1248,7 +1263,12 @@ namespace quda {
           auto UV = make_tile_B<complex, false>(tile);
           UV.loadCS(arg.UV, 0, 0, parity, x_cb, s_c_col, k, j0);
 
-          vuv[s_c_row*Arg::coarseSpin+s_c_col].mma_tn(V, UV);
+          switch(s_c_row*Arg::coarseSpin+s_c_col) {
+          case 0: vuv[0].mma_tn(V, UV); break;
+          case 1: vuv[1].mma_tn(V, UV); break;
+          case 2: vuv[2].mma_tn(V, UV); break;
+          case 3: vuv[3].mma_tn(V, UV); break;
+          }
 
         } // fine spin
       } // coarse spin (fine source parity)
@@ -1256,11 +1276,11 @@ namespace quda {
     } else if (arg.dir == QUDA_FORWARDS) {
       // for forwards, we're tying together <V^\dag A | U V>, so we only need
       // one component of UV
-      int s_c_col = arg.spin_map(0, (parity+1)&1);
+      int s_c_col = arg.spin_map(0, 1 - parity);
 #pragma unroll
       for (int s_c_row = 0; s_c_row < Arg::coarseSpin; s_c_row++) {
 #pragma unroll
-        for (int k = 0; k < TileType::k; k += TileType::K) { // Sum over fine color 
+        for (int k = 0; k < TileType::k; k += TileType::K) { // Sum over fine color
 
           // for forwards, we're tying together <V^\dag A | U V>
           auto AV = make_tile_At<complex, false>(tile);
@@ -1270,7 +1290,12 @@ namespace quda {
           auto UV = make_tile_B<complex, false>(tile);
           UV.loadCS(arg.UV, 0, 0, parity, x_cb, s_c_col, k, j0);
 
-          vuv[s_c_row*Arg::coarseSpin+s_c_col].mma_tn(AV, UV);
+          switch(s_c_row*Arg::coarseSpin+s_c_col) {
+          case 0: vuv[0].mma_tn(AV, UV); break;
+          case 1: vuv[1].mma_tn(AV, UV); break;
+          case 2: vuv[2].mma_tn(AV, UV); break;
+          case 3: vuv[3].mma_tn(AV, UV); break;
+          }
 
         } // coarse spin (fine source parity)
       }
@@ -1289,7 +1314,12 @@ namespace quda {
           auto V = make_tile_B<complex, false>(tile);
           V.loadCS(arg.V, 0, 0, parity, x_cb, 0, k, j0);
 
-          vuv[s_c_row*Arg::coarseSpin+s_c_col].mma_tn(AV, V);
+          switch(s_c_row*Arg::coarseSpin+s_c_col) {
+          case 0: vuv[0].mma_tn(AV, V); break;
+          case 1: vuv[1].mma_tn(AV, V); break;
+          case 2: vuv[2].mma_tn(AV, V); break;
+          case 3: vuv[3].mma_tn(AV, V); break;
+          }
         }
       }
     }
