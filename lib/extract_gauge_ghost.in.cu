@@ -117,14 +117,31 @@ namespace quda {
     }
   };
 
+  template <int nColor>
   void extractGaugeGhostMG(const GaugeField &u, void **ghost, bool extract, int offset);
+
+  template <int...> struct IntList { };
+
+  template <int nColor, int...N>
+  void extractGaugeGhostMG(const GaugeField &u, void **ghost, bool extract, int offset, IntList<nColor, N...>)
+  {
+    if (u.Ncolor() / 2 == nColor) {
+        extractGaugeGhostMG<nColor>(u, ghost, extract, offset);
+    } else {
+      if constexpr (sizeof...(N) > 0) {
+        extractGaugeGhostMG(u, ghost, extract, offset, IntList<N...>());
+      } else {
+        errorQuda("Nc = %d has not been instantiated", u.Ncolor() / 2);
+      }
+    }
+  }
 
   void extractGaugeGhost(const GaugeField &u, void **ghost, bool extract, int offset) {
 
     // if number of colors doesn't equal three then we must have
     // coarse-gauge field
     if (u.Ncolor() != 3) {
-      extractGaugeGhostMG(u, ghost, extract, offset);
+      extractGaugeGhostMG(u, ghost, extract, offset, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
     } else {
       instantiatePrecision<GhostExtract>(u, ghost, extract, offset);
     }

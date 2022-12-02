@@ -37,7 +37,7 @@ set (QUDA_OBJS
   gauge_covdev.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
-  extract_gauge_ghost_mg.cu max_gauge.cu gauge_update_quda.cu
+  gauge_norm.cu gauge_update_quda.cu
   max_clover.cu dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
   dirac_staggered_kd.cpp dirac_clover_hasenbusch_twist.cpp
   dirac_improved_staggered.cpp dirac_improved_staggered_kd.cpp dirac_domain_wall.cpp
@@ -161,6 +161,8 @@ configure_file(prolongator.in.cpp prolongator.cpp @ONLY)
 configure_file(restrictor.in.cpp restrictor.cpp @ONLY)
 configure_file(block_orthogonalize.in.cpp block_orthogonalize.cpp @ONLY)
 configure_file(copy_gauge.in.cpp copy_gauge.cpp @ONLY)
+configure_file(extract_gauge_ghost.in.cu extract_gauge_ghost.cu @ONLY)
+configure_file(gauge_norm.in.cu gauge_norm.cu @ONLY)
 
 if(QUDA_MULTIGRID)
   string(REPLACE "," ";" QUDA_MULTIGRID_NVEC_LIST_SEMICOLON "${QUDA_MULTIGRID_NVEC_LIST}")
@@ -173,7 +175,9 @@ if(QUDA_MULTIGRID)
     list(APPEND QUDA_CU_OBJS "dslash_coarse_dagger_${QUDA_MULTIGRID_NVEC}.cu")
 
     configure_file(copy_gauge_mg.in.cu "copy_gauge_mg_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
+    configure_file(extract_gauge_ghost_mg.in.cu "extract_gauge_ghost_mg_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
     list(APPEND QUDA_CU_OBJS "copy_gauge_mg_${QUDA_MULTIGRID_NVEC}.cu")
+    list(APPEND QUDA_CU_OBJS "extract_gauge_ghost_mg_${QUDA_MULTIGRID_NVEC}.cu")
 
     configure_file(coarse_op.in.cu "coarse_op_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
     configure_file(staggered_coarse_op.in.cu "staggered_coarse_op_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
