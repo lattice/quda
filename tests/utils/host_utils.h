@@ -11,7 +11,6 @@ constexpr size_t spinor_site_size = 24;     // real numbers per wilson spinor
 constexpr size_t stag_spinor_site_size = 6; // real numbers per staggered 'spinor'
 constexpr size_t clover_site_size = 72;     // real numbers per block-diagonal clover matrix
 constexpr size_t mom_site_size = 10;        // real numbers per momentum
-constexpr size_t hw_site_size = 12;         // real numbers per half wilson
 
 extern int Z[4];
 extern int V;
@@ -175,7 +174,15 @@ int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec);
 double mom_action(void *mom, QudaPrecision prec, int len);
 
 void createMomCPU(void *mom, QudaPrecision precision);
-void createHwCPU(void *hw, QudaPrecision precision);
+
+/**
+   @brief Create four Staggered spinor fields, whose outer product is used for momentum calculations
+   @param[out] stag_for_oprod Set of four contiguous host spinor fields
+   @param[in] precision Precision of field
+   @param[in] x Full lattice volume
+   @param[in] rng RNG
+*/
+void createStagForOprodCPU(void *stag_for_oprod, QudaPrecision precision, const int *const x, quda::RNG &rng);
 
 // used by link fattening code
 int x4_from_full_index(int i);

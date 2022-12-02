@@ -1439,21 +1439,23 @@ static void printLinkElement(void *link, int X, QudaPrecision precision)
 
 int strong_check_link(void **linkA, const char *msgA, void **linkB, const char *msgB, int len, QudaPrecision prec)
 {
-  printfQuda("%s\n", msgA);
-  printLinkElement(linkA[0], 0, prec);
-  printfQuda("\n");
-  printLinkElement(linkA[0], 1, prec);
-  printfQuda("...\n");
-  printLinkElement(linkA[3], len - 1, prec);
-  printfQuda("\n");
+  if (verbosity >= QUDA_VERBOSE) {
+    printfQuda("%s\n", msgA);
+    printLinkElement(linkA[0], 0, prec);
+    printfQuda("\n");
+    printLinkElement(linkA[0], 1, prec);
+    printfQuda("...\n");
+    printLinkElement(linkA[3], len - 1, prec);
+    printfQuda("\n");
 
-  printfQuda("\n%s\n", msgB);
-  printLinkElement(linkB[0], 0, prec);
-  printfQuda("\n");
-  printLinkElement(linkB[0], 1, prec);
-  printfQuda("...\n");
-  printLinkElement(linkB[3], len - 1, prec);
-  printfQuda("\n");
+    printfQuda("\n%s\n", msgB);
+    printLinkElement(linkB[0], 0, prec);
+    printfQuda("\n");
+    printLinkElement(linkB[0], 1, prec);
+    printfQuda("...\n");
+    printLinkElement(linkB[3], len - 1, prec);
+    printfQuda("\n");
+  }
 
   int ret = compare_link(linkA, linkB, len, prec);
   return ret;
@@ -1488,27 +1490,18 @@ void createMomCPU(void *mom, QudaPrecision precision)
   return;
 }
 
-void createHwCPU(void *hw, QudaPrecision precision)
-{
-  for (int i = 0; i < V; i++) {
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      for (int dir = 0; dir < 4; dir++) {
-        double *thishw = (double *)hw;
-        for (auto k = 0lu; k < hw_site_size; k++) {
-          thishw[(4 * i + dir) * hw_site_size + k] = 1.0 * rand() / RAND_MAX;
-        }
-      }
-    } else {
-      for (int dir = 0; dir < 4; dir++) {
-        float *thishw = (float *)hw;
-        for (auto k = 0lu; k < hw_site_size; k++) {
-          thishw[(4 * i + dir) * hw_site_size + k] = 1.0 * rand() / RAND_MAX;
-        }
-      }
-    }
+void createStagForOprodCPU(void *stag_for_oprod, QudaPrecision precision, const int *const x, quda::RNG &rng) {
+  unsigned long shift = x[0] * x[1] * x[2] * x[3] * stag_spinor_site_size;
+  if (precision == QUDA_DOUBLE_PRECISION) {
+    double *dstag = (double*)stag_for_oprod;
+    // matpc: compute a full-volume spinor
+    for (int d = 0; d < 4; d++)
+      constructRandomSpinorSource(dstag + d * shift, 1, 3, QUDA_DOUBLE_PRECISION, QUDA_MAT_SOLUTION, x, 4, rng);
+  } else {
+    float *fstag = (float*)stag_for_oprod;
+    for (int d = 0; d < 4; d++)
+      constructRandomSpinorSource(fstag + d * shift, 1, 3, QUDA_SINGLE_PRECISION, QUDA_MAT_SOLUTION, x, 4, rng);
   }
-
-  return;
 }
 
 template <typename Float> int compare_mom(Float *momA, Float *momB, int len)
@@ -1560,25 +1553,28 @@ static void printMomElement(void *mom, int X, QudaPrecision precision)
 
 int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec)
 {
-  printfQuda("mom:\n");
-  printMomElement(momA, 0, prec);
-  printfQuda("\n");
-  printMomElement(momA, 1, prec);
-  printfQuda("\n");
-  printMomElement(momA, 2, prec);
-  printfQuda("\n");
-  printMomElement(momA, 3, prec);
-  printfQuda("...\n");
+  if (verbosity >= QUDA_VERBOSE)
+  {
+    printfQuda("mom:\n");
+    printMomElement(momA, 0, prec);
+    printfQuda("\n");
+    printMomElement(momA, 1, prec);
+    printfQuda("\n");
+    printMomElement(momA, 2, prec);
+    printfQuda("\n");
+    printMomElement(momA, 3, prec);
+    printfQuda("...\n");
 
-  printfQuda("\nreference mom:\n");
-  printMomElement(momB, 0, prec);
-  printfQuda("\n");
-  printMomElement(momB, 1, prec);
-  printfQuda("\n");
-  printMomElement(momB, 2, prec);
-  printfQuda("\n");
-  printMomElement(momB, 3, prec);
-  printfQuda("\n");
+    printfQuda("\nreference mom:\n");
+    printMomElement(momB, 0, prec);
+    printfQuda("\n");
+    printMomElement(momB, 1, prec);
+    printfQuda("\n");
+    printMomElement(momB, 2, prec);
+    printfQuda("\n");
+    printMomElement(momB, 3, prec);
+    printfQuda("\n");
+  }
 
   int ret;
   if (prec == QUDA_DOUBLE_PRECISION) {
