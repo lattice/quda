@@ -196,6 +196,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(eig_type, QUDA_EIG_TR_LANCZOS);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
+  P(ortho_block_size, 0);
 #else
   P(use_eigen_qr, QUDA_BOOLEAN_INVALID);
   P(use_poly_acc, QUDA_BOOLEAN_INVALID);
@@ -224,14 +225,15 @@ void printQudaEigParam(QudaEigParam *param) {
   P(eig_type, QUDA_EIG_INVALID);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
+  P(ortho_block_size, INVALID_INT);
 #endif
 
   // only need to enfore block size checking if doing a block eigen solve
-#ifdef CHECK__PARAM
+#ifdef CHECK_PARAM
   if (param->eig_type == QUDA_EIG_BLK_TR_LANCZOS)
 #endif
     P(block_size, INVALID_INT);
-
+  
 #if defined INIT_PARAM
   P(location, QUDA_CUDA_FIELD_LOCATION);
 #else

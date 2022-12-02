@@ -42,6 +42,7 @@ namespace quda
     int check_interval;
     int batched_rotate;
     int block_size;
+    int ortho_block_size;
     int iter;
     int iter_converged;
     int iter_locked;
@@ -169,6 +170,14 @@ namespace quda
     */
     void orthonormalizeMGS(std::vector<ColorSpinorField> &v, int j);
 
+    /**
+       @brief Orthonormalise input vector space v using Hybrid Modified Gram-Schmidt
+       @param[in] v Vector space
+       @param[in] i Hybrid block size
+       @param[in] j Use vectors v[0:j-1]
+    */
+    void orthonormalizeHMGS(std::vector<ColorSpinorField> &v, int i, int j);
+    
     /**
        @brief Check orthonormality of input vector space v
        @param[out] bool If all vectors are orthonormal to 1e-16 returns true,
