@@ -147,7 +147,7 @@ namespace quda {
         if constexpr (is_enabled_spin(4))
           Restrict<Float, 4, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
       } else if (in.Nspin() == 1) {
-        if constexpr (is_enabled_spin(2))
+        if constexpr (is_enabled_spin(1))
           Restrict<Float, 1, fineColor, coarseColor>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map, parity);
       } else {
         errorQuda("Unexpected nSpin = %d", in.Nspin());

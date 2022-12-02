@@ -19,7 +19,7 @@ set (QUDA_OBJS
   # cmake-format: sortable
   dirac_coarse.cpp dslash_coarse.cpp
   coarse_op.cpp coarsecoarse_op.cpp
-  coarse_op_preconditioned.cpp staggered_coarse_op.cu
+  coarse_op_preconditioned.cpp staggered_coarse_op.cpp
   eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
   eigensolve_quda.cpp quda_arpack_interface.cpp
   multigrid.cpp transfer.cpp block_orthogonalize.cpp
@@ -156,6 +156,7 @@ configure_file(dslash_coarse.in.cpp dslash_coarse.cpp @ONLY)
 configure_file(coarse_op.in.cpp coarse_op.cpp @ONLY)
 configure_file(coarsecoarse_op.in.cpp coarsecoarse_op.cpp @ONLY)
 configure_file(coarse_op_preconditioned.in.cpp coarse_op_preconditioned.cpp @ONLY)
+configure_file(staggered_coarse_op.in.cpp staggered_coarse_op.cpp @ONLY)
 configure_file(prolongator.in.cpp prolongator.cpp @ONLY)
 configure_file(restrictor.in.cpp restrictor.cpp @ONLY)
 configure_file(block_orthogonalize.in.cpp block_orthogonalize.cpp @ONLY)
@@ -171,7 +172,9 @@ if(QUDA_MULTIGRID)
     list(APPEND QUDA_CU_OBJS "dslash_coarse_dagger_${QUDA_MULTIGRID_NVEC}.cu")
 
     configure_file(coarse_op.in.cu "coarse_op_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
+    configure_file(staggered_coarse_op.in.cu "staggered_coarse_op_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
     list(APPEND QUDA_CU_OBJS "coarse_op_${QUDA_MULTIGRID_NVEC}.cu")
+    list(APPEND QUDA_CU_OBJS "staggered_coarse_op_${QUDA_MULTIGRID_NVEC}.cu")
 
     configure_file(coarse_op_preconditioned.in.cu "coarse_op_preconditioned_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
     list(APPEND QUDA_CU_OBJS "coarse_op_preconditioned_${QUDA_MULTIGRID_NVEC}.cu")
