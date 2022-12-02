@@ -262,8 +262,8 @@ namespace quda
     blas::caxpy(jth_block, {v.begin() + j, v.begin() + j + block_size}, {r.begin(), r.end()});
 
     // Orthogonalise R[0:block_size] against the Krylov space V[0:j + block_size]
-    for (int k = 0; k < 1; k++) blockOrthogonalize(v, r, j + block_size);
-
+    for (int k = 0; k < 1; k++) blockOrthogonalizeHMGS(v, r, ortho_block_size, j + block_size);
+    
     // QR decomposition via modified Gram-Schmidt
     // NB, QR via modified Gram-Schmidt is numerically unstable.
     // We perform the QR iteratively to recover numerical stability.

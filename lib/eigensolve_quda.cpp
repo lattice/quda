@@ -66,7 +66,7 @@ namespace quda
     if (n_kr == 0) errorQuda("n_kr=0 passed to Eigensolver");
     if (n_conv == 0) errorQuda("n_conv=0 passed to Eigensolver");
     if (n_ev_deflate > n_conv) errorQuda("deflation vecs = %d is greater than n_conv = %d", n_ev_deflate, n_conv);
-    if (ortho_block_size <= 0) errorQuda("block_size=%d must be positive", ortho_block_size);
+    if (ortho_block_size < 0) errorQuda("block_size=%d must be positive or zero", ortho_block_size);
 
     residua.resize(n_kr, 0.0);
 
@@ -387,12 +387,12 @@ namespace quda
 
   void EigenSolver::orthonormalizeHMGS(std::vector<ColorSpinorField> &vecs, int h_block_size, int size)
   {
-    for (unsigned int i = 0; i < size; i++) {
-      int array_size = h_block_size;
-      for (unsigned int j = 0; j < i; j+=array_size) {
-	if(i < h_block_size) array_size = i;
+    for (int i = 0; i < size; i++) {
+      auto array_size = h_block_size;
+      for (int j = 0; j < i; j+=array_size) {
+	if(i < h_block_size || h_block_size == 0) array_size = i;
 	if(i-j < h_block_size) array_size = i-j;
-	printfQuda("Current array size = %d\n", array_size);
+	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Current block size = %d\n", array_size);
 	
 	std::vector<Complex> s(array_size);
         blas::cDotProduct(s, {vecs.begin() + j, vecs.begin() + j + array_size}, vecs[i]); // <j|i> with i normalised.
@@ -404,33 +404,30 @@ namespace quda
     }
   }
   
-  void EigenSolver::orthonormalizeMGS(std::vector<ColorSpinorField> &vecs, int size)
+  // Orthogonalise r[0:] against V_[0:j]
+  void EigenSolver::blockOrthogonalizeHMGS(std::vector<ColorSpinorField> &vecs, std::vector<ColorSpinorField> &rvecs, int h_block_size, int i)
   {
-    for (int i = 0; i < size; i++) {
-      for (int j = 0; j < i; j++) {
-        Complex cnorm = blas::cDotProduct(vecs[j], vecs[i]); // <j|i> with i normalised.
-        blas::caxpy(-cnorm, vecs[j], vecs[i]);               // i = i - proj_{j}(i) = i - <j|i> * j
-      }
-      double norm = sqrt(blas::norm2(vecs[i]));
-      blas::ax(1.0 / norm, vecs[i]); // i/<i|i>
+    auto vecs_size = i;
+    auto block_array_size = h_block_size;
+    for (int j = 0; j < i; j+=block_array_size) {
+      if(i < h_block_size || h_block_size == 0) block_array_size = i;
+      if(i-j < h_block_size) block_array_size = (i-j);
+      int array_size = block_array_size * rvecs.size();
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Current block array size = %d\n", block_array_size);
+      
+      //auto array_size = vecs_size * rvecs.size();
+      std::vector<Complex> s(array_size);
+      
+      // Block dot products stored in s.
+      blas::cDotProduct(s, {vecs.begin() + j, vecs.begin() + j + block_array_size}, {rvecs.begin(), rvecs.end()});
+      
+      // Block orthogonalise
+      for (auto k = 0u; k < array_size; k++) s[k] *= -1.0;
+      blas::caxpy(s, {vecs.begin() + j, vecs.begin() + j + block_array_size}, {rvecs.begin(), rvecs.end()});
     }
   }
 
-  // Orthogonalise r[0:] against V_[0:j]
-  void EigenSolver::blockOrthogonalize(std::vector<ColorSpinorField> &vecs, std::vector<ColorSpinorField> &rvecs, int j)
-  {
-    auto vecs_size = j;
-    auto array_size = vecs_size * rvecs.size();
-    std::vector<Complex> s(array_size);
-
-    // Block dot products stored in s.
-    blas::cDotProduct(s, {vecs.begin(), vecs.begin() + vecs_size}, {rvecs.begin(), rvecs.end()});
-
-    // Block orthogonalise
-    for (auto i = 0u; i < array_size; i++) s[i] *= -1.0;
-    blas::caxpy(s, {vecs.begin(), vecs.begin() + vecs_size}, {rvecs.begin(), rvecs.end()});
-  }
-
+  
   void EigenSolver::permuteVecs(std::vector<ColorSpinorField> &kSpace, MatrixXi &mat, int size)
   {
     std::vector<int> pivots(size);

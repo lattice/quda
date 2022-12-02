@@ -155,25 +155,18 @@ namespace quda
 
     /**
        @brief Orthogonalise input vectors r against
-       vector space v using block-BLAS
+       vector space v using hybrid modified Gram-Schmidt block-BLAS
        @param[in] v Vector space
        @param[in] r Vectors to be orthogonalised
+       @param[in] i Ortho block size for Hybrid MGS (1 = modified, j = classical, 1 < i < j = hybrid)
        @param[in] j Use vectors v[0:j]
-       @param[in] s array of
     */
-    void blockOrthogonalize(std::vector<ColorSpinorField> &v, std::vector<ColorSpinorField> &r, int j);
-
-    /**
-       @brief Orthonormalise input vector space v using Modified Gram-Schmidt
+    void blockOrthogonalizeHMGS(std::vector<ColorSpinorField> &v, std::vector<ColorSpinorField> &r, int i, int j);
+    
+     /**
+       @brief Orthonormalise input vector space v using Hybrid Modified Gram-Schmidt blockBLAS
        @param[in] v Vector space
-       @param[in] j Use vectors v[0:j-1]
-    */
-    void orthonormalizeMGS(std::vector<ColorSpinorField> &v, int j);
-
-    /**
-       @brief Orthonormalise input vector space v using Hybrid Modified Gram-Schmidt
-       @param[in] v Vector space
-       @param[in] i Hybrid block size
+       @param[in] i Ortho block size for Hybrid MGS (1 = modified, j-1 = classical, 1 < i < j-1 = hybrid)
        @param[in] j Use vectors v[0:j-1]
     */
     void orthonormalizeHMGS(std::vector<ColorSpinorField> &v, int i, int j);
