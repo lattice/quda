@@ -42,23 +42,16 @@ namespace quda {
     void postTune(){ rng.restore(); }
   };
 
-  template <typename real, int Ns>
-  void spinorNoise(ColorSpinorField &src, RNG& randstates, QudaNoiseType type)
+  template <int...> struct IntList { };
+
+  template <typename real, int Ns, int Nc, int...N>
+  void spinorNoise(ColorSpinorField &src, RNG& randstates, QudaNoiseType type, IntList<Nc, N...>)
   {
-    if (src.Ncolor() == 3) {
-      SpinorNoise<real,Ns,3>(src, randstates, type);
-    } else if (src.Ncolor() == 6) {
-      SpinorNoise<real,Ns,6>(src, randstates, type);
-    } else if (src.Ncolor() == 24) {
-      SpinorNoise<real,Ns,24>(src, randstates, type);
-    } else if (src.Ncolor() == 32) {
-      SpinorNoise<real,Ns,32>(src, randstates, type);
-    } else if (src.Ncolor() == 64) {
-      SpinorNoise<real,Ns,64>(src, randstates, type);
-    } else if (src.Ncolor() == 96) {
-      SpinorNoise<real,Ns,96>(src, randstates, type);
+    if (src.Ncolor() == Nc) {
+      SpinorNoise<real, Ns, Nc>(src, randstates, type);
     } else {
-      errorQuda("nColor = %d not implemented", src.Ncolor());
+      if constexpr (sizeof...(N) > 0) spinorNoise<real, Ns>(src, randstates, type, IntList<N...>());
+      else errorQuda("nColor = %d not implemented", src.Ncolor());
     }
   }
 
@@ -70,11 +63,11 @@ namespace quda {
       errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
 
     if (src.Nspin() == 4) {
-      if constexpr (is_enabled_spin(4)) spinorNoise<real, 4>(src, randstates, type);
+      if constexpr (is_enabled_spin(4)) spinorNoise<real, 4>(src, randstates, type, IntList<3>());
     } else if (src.Nspin() == 2) {
-      if constexpr (is_enabled_spin(2)) spinorNoise<real, 2>(src, randstates, type);
+      if constexpr (is_enabled_spin(2)) spinorNoise<real, 2>(src, randstates, type, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
     } else if (src.Nspin() == 1) {
-      if constexpr (is_enabled_spin(1)) spinorNoise<real, 1>(src, randstates, type);
+      if constexpr (is_enabled_spin(1)) spinorNoise<real, 1>(src, randstates, type, IntList<3>());
     } else {
       errorQuda("Nspin = %d not implemented", src.Nspin());
     }
