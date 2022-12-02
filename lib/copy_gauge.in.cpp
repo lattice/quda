@@ -14,10 +14,26 @@ namespace quda {
   void copyGenericGaugeQuarterIn(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out, void *In,
                                  void **ghostOut, void **ghostIn, int type);
 
-  // specialized variation where we restrict different field orders supported but instantiate different colors
-  // this, as with all of the above are hacks until JIT is supported
+  template <int nColor>
   void copyGenericGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
 			  void *Out, void *In, void **ghostOut, void **ghostIn, int type);
+
+  template <int...> struct IntList { };
+
+  template <int Nc, int...N>
+  void copyGenericGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
+			  void *Out, void *In, void **ghostOut, void **ghostIn, int type, IntList<Nc, N...>)
+  {
+    if (in.Ncolor() / 2 == Nc) {
+      copyGenericGaugeMG<Nc>(out, in, location, Out, In, ghostOut, ghostIn, type);
+    } else {
+      if constexpr (sizeof...(N) > 0) {
+        copyGenericGaugeMG(out, in, location, Out, In, ghostOut, ghostIn, type, IntList<N...>());
+      } else {
+        errorQuda("Nc = %d has not been instantiated", in.Ncolor() / 2);
+      }
+    }
+  }
 
   void checkMomOrder(const GaugeField &u) {
     if (u.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
@@ -54,7 +70,7 @@ namespace quda {
       errorQuda("Field geometries %d %d do not match", out.Geometry(), in.Geometry());
 
     if (in.Ncolor() != 3) {
-      copyGenericGaugeMG(out, in, location, Out, In, ghostOut, ghostIn, type);
+      copyGenericGaugeMG(out, in, location, Out, In, ghostOut, ghostIn, type, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
     } else if (in.Precision() == QUDA_DOUBLE_PRECISION) {
       copyGenericGaugeDoubleIn(out, in, location, Out, In, ghostOut, ghostIn, type);
     } else if (in.Precision() == QUDA_SINGLE_PRECISION) {

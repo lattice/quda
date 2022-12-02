@@ -70,7 +70,7 @@ set (QUDA_OBJS
   copy_color_spinor_mg_qh.cu copy_color_spinor_mg_qq.cu
   copy_gauge_double.cu copy_gauge_single.cu
   copy_gauge_half.cu copy_gauge_quarter.cu
-  copy_gauge.cpp copy_gauge_mg.cu copy_clover.cu
+  copy_gauge.cpp copy_clover.cu
   copy_gauge_offset.cu copy_color_spinor_offset.cu copy_clover_offset.cu
   staggered_oprod.cu clover_trace_quda.cu
   hisq_paths_force_quda.cu
@@ -160,6 +160,7 @@ configure_file(staggered_coarse_op.in.cpp staggered_coarse_op.cpp @ONLY)
 configure_file(prolongator.in.cpp prolongator.cpp @ONLY)
 configure_file(restrictor.in.cpp restrictor.cpp @ONLY)
 configure_file(block_orthogonalize.in.cpp block_orthogonalize.cpp @ONLY)
+configure_file(copy_gauge.in.cpp copy_gauge.cpp @ONLY)
 
 if(QUDA_MULTIGRID)
   string(REPLACE "," ";" QUDA_MULTIGRID_NVEC_LIST_SEMICOLON "${QUDA_MULTIGRID_NVEC_LIST}")
@@ -170,6 +171,9 @@ if(QUDA_MULTIGRID)
     configure_file(dslash_coarse.in.cu "dslash_coarse_dagger_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
     list(APPEND QUDA_CU_OBJS "dslash_coarse_${QUDA_MULTIGRID_NVEC}.cu")
     list(APPEND QUDA_CU_OBJS "dslash_coarse_dagger_${QUDA_MULTIGRID_NVEC}.cu")
+
+    configure_file(copy_gauge_mg.in.cu "copy_gauge_mg_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
+    list(APPEND QUDA_CU_OBJS "copy_gauge_mg_${QUDA_MULTIGRID_NVEC}.cu")
 
     configure_file(coarse_op.in.cu "coarse_op_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
     configure_file(staggered_coarse_op.in.cu "staggered_coarse_op_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
