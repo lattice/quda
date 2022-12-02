@@ -198,7 +198,7 @@ QudaFieldLocation location_ritz = QUDA_CUDA_FIELD_LOCATION;
 QudaMemoryType mem_type_ritz = QUDA_MEMORY_DEVICE;
 
 // Parameters for the stand alone eigensolver
-int eig_ortho_block_size = 4;
+int eig_ortho_block_size = 0;
 int eig_block_size = 4;
 int eig_n_ev = 16;
 int eig_n_kr = 32;
@@ -671,7 +671,8 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Solve the gamma5 OP problem. Solve for OP then multiply by gamma_5 (default false)");
 
   opgroup->add_option("--eig-max-restarts", eig_max_restarts, "Perform n iterations of the restart in the eigensolver");
-  opgroup->add_option("--eig-ortho-block-size", eig_ortho_block_size, "The block size to use when orthonormalising vectors in hybrid modified Gram-Schmidt");
+  opgroup->add_option("--eig-ortho-block-size", eig_ortho_block_size, "The block size to use when orthonormalising vectors in hybrid modified Gram-Schmidt"
+		      "0 for always Classical, 1 for Modified, n > 1 for Hybrid)");
   opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
   opgroup->add_option(
     "--eig-n-ev-deflate", eig_n_ev_deflate,
