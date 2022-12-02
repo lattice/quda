@@ -392,7 +392,7 @@ namespace quda
       for (int j = 0; j < i; j+=array_size) {
 	if(i < h_block_size || h_block_size == 0) array_size = i;
 	if(i-j < h_block_size) array_size = i-j;
-	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Current block size = %d\n", array_size);
+	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) logQuda("Current block size = %d\n", array_size);
 	
 	std::vector<Complex> s(array_size);
         blas::cDotProduct(s, {vecs.begin() + j, vecs.begin() + j + array_size}, vecs[i]); // <j|i> with i normalised.
@@ -413,7 +413,7 @@ namespace quda
       if(i < h_block_size || h_block_size == 0) block_array_size = i;
       if(i-j < h_block_size) block_array_size = (i-j);
       int array_size = block_array_size * rvecs.size();
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Current block array size = %d\n", block_array_size);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) logQuda("Current block array size = %d\n", block_array_size);
       
       //auto array_size = vecs_size * rvecs.size();
       std::vector<Complex> s(array_size);
