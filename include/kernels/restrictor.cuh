@@ -140,7 +140,11 @@ namespace quda {
         for (int s = 0; s<Arg::fineSpin; s++) {
 #pragma unroll
           for (int v = 0; v<coarse_color_per_thread; v++) {
-            reduced[arg.spin_map(s,parity) * coarse_color_per_thread + v] += tmp[s*coarse_color_per_thread + v];
+            if (arg.spin_map(s, parity) == 0) {
+              reduced[0 * coarse_color_per_thread + v] += tmp[s*coarse_color_per_thread + v];
+            } else {
+              reduced[1 * coarse_color_per_thread + v] += tmp[s*coarse_color_per_thread + v];
+            }
           }
         }
 
