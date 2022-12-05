@@ -164,6 +164,8 @@ configure_file(copy_gauge.in.cpp copy_gauge.cpp @ONLY)
 configure_file(extract_gauge_ghost.in.cu extract_gauge_ghost.cu @ONLY)
 configure_file(gauge_norm.in.cu gauge_norm.cu @ONLY)
 configure_file(spinor_noise.in.cu spinor_noise.cu @ONLY)
+configure_file(copy_color_spinor_mg.in.hpp copy_color_spinor_mg.hpp @ONLY)
+configure_file(color_spinor_pack.in.cu color_spinor_pack.cu @ONLY)
 
 if(QUDA_MULTIGRID)
   string(REPLACE "," ";" QUDA_MULTIGRID_NVEC_LIST_SEMICOLON "${QUDA_MULTIGRID_NVEC_LIST}")
