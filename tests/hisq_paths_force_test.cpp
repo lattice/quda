@@ -26,9 +26,6 @@ cudaGaugeField *cudaMom = NULL;
 cpuGaugeField *cpuMom = NULL;
 cpuGaugeField *refMom = NULL;
 
-static QudaGaugeParam qudaGaugeParam;
-static QudaGaugeParam qudaGaugeParam_ex;
-
 QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
 
 cpuGaugeField *cpuOprod = NULL;
@@ -157,21 +154,37 @@ static void hisq_force_startup()
     rng = new quda::RNG(spinor_in, 1234);
   }
 
-  GaugeFieldParam gParam_ex;
-  GaugeFieldParam gParam;
+  QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
+  QudaGaugeParam qudaGaugeParam_ex;
 
   for (int d = 0; d < 4; d++) qudaGaugeParam.X[d] = X[d];
 
+  // need to do some thinking for recon
   qudaGaugeParam.cpu_prec = force_prec;
   qudaGaugeParam.cuda_prec = force_prec;
   qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  qudaGaugeParam.type = QUDA_WILSON_LINKS;
+  qudaGaugeParam.type = QUDA_GENERAL_LINKS;
   qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
-  qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_NO; // no need for a phase for recon 13...
   qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
   qudaGaugeParam.anisotropy = 1.0;
+  qudaGaugeParam.tadpole_coeff = 1.0;
+  qudaGaugeParam.scale = 1.0;
 
   memcpy(&qudaGaugeParam_ex, &qudaGaugeParam, sizeof(QudaGaugeParam));
+
+  int pad_size = 0;
+#ifdef MULTI_GPU
+  int x_face_size = qudaGaugeParam_ex.X[1] * qudaGaugeParam_ex.X[2] * qudaGaugeParam_ex.X[3] / 2;
+  int y_face_size = qudaGaugeParam_ex.X[0] * qudaGaugeParam_ex.X[2] * qudaGaugeParam_ex.X[3] / 2;
+  int z_face_size = qudaGaugeParam_ex.X[0] * qudaGaugeParam_ex.X[1] * qudaGaugeParam_ex.X[3] / 2;
+  int t_face_size = qudaGaugeParam_ex.X[0] * qudaGaugeParam_ex.X[1] * qudaGaugeParam_ex.X[2] / 2;
+  pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
+#endif
+  qudaGaugeParam_ex.ga_pad = 3*pad_size; // long links
+
+  GaugeFieldParam gParam_ex;
+  GaugeFieldParam gParam;
 
   // Create gauge fields
   gParam = GaugeFieldParam(qudaGaugeParam);
@@ -194,12 +207,11 @@ static void hisq_force_startup()
   } // set halo region for CPU
   cpuGauge_ex = new cpuGaugeField(gParam_ex);
 
-  createSiteLinkCPU((void **)cpuGauge->Gauge_p(), qudaGaugeParam.cpu_prec, 1);
+  createSiteLinkCPU((void **)cpuGauge->Gauge_p(), qudaGaugeParam.cpu_prec, link_recon == QUDA_RECONSTRUCT_NO ? SITELINK_PHASE_NO : SITELINK_PHASE_U1);
   copyExtendedGauge(*cpuGauge_ex, *cpuGauge, QUDA_CPU_FIELD_LOCATION);
 
   gParam_ex.location = QUDA_CUDA_FIELD_LOCATION;
   gParam_ex.reconstruct = link_recon;
-  gParam_ex.link_type = QUDA_GENERAL_LINKS;
   gParam_ex.setPrecision(prec, true);
   for (int d = 0; d < 4; d++) {
     gParam_ex.r[d] = (comm_dim_partitioned(d)) ? 2 : 0;
@@ -218,7 +230,9 @@ static void hisq_force_startup()
   gParam_ex = GaugeFieldParam(qudaGaugeParam_ex);
   gParam_ex.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
 
-  // create other fields
+  /**************************
+  * Create the force fields *
+  **************************/
   gParam.location = QUDA_CPU_FIELD_LOCATION;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.setPrecision(prec);
@@ -239,12 +253,6 @@ static void hisq_force_startup()
     gParam_ex.x[d] = gParam.x[d] + 2 * gParam_ex.r[d];
   }
   cpuForce_ex = new cpuGaugeField(gParam_ex);
-
-  // Special volume for comparing force links with the host
-  for (int d = 0; d < 4; d++) {
-    gParam_ex.r[d] = (comm_dim_partitioned(d)) ? 2 : 0;
-    gParam_ex.x[d] = gParam.x[d] + 2 * gParam_ex.r[d];
-  }
 
   // create the momentum matrix
   gParam.location = QUDA_CPU_FIELD_LOCATION;
@@ -373,6 +381,7 @@ static int hisq_force_test(bool lepage)
 {
   // float d_weight = 1.0;
   // { one, naik, three, five, seven, lepage }
+  //double d_act_path_coeff[6] = { 1., 0., 0., 0., 0., 0. };
   double d_act_path_coeff[6] = { 0.625000, -0.058479, -0.087719,
                                  0.030778, -0.007200, lepage ? -0.123113 : 0. };
 
@@ -545,7 +554,7 @@ int main(int argc, char **argv)
 
   if (prec != QUDA_DOUBLE_PRECISION && prec != QUDA_SINGLE_PRECISION)
     errorQuda("Invalid precision %d", prec);
-  if (link_recon != QUDA_RECONSTRUCT_NO)
+  if (link_recon != QUDA_RECONSTRUCT_NO && link_recon != QUDA_RECONSTRUCT_13)
     errorQuda("Invalid reconstruct %d", link_recon);
 
   // one-time setup

@@ -120,6 +120,10 @@ namespace quda
     static constexpr std::array<QudaReconstructType, 2> recon = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12};
   };
 
+  struct ReconstructHisqForce {
+    static constexpr std::array<QudaReconstructType, 2> recon = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13};
+  };
+
   struct ReconstructNone {
     static constexpr std::array<QudaReconstructType, 1> recon = {QUDA_RECONSTRUCT_NO};
   };

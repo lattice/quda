@@ -97,8 +97,16 @@ namespace quda {
     struct BaseForceArg : kernel_param<> {
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
-      using Gauge = typename gauge_mapper<real, recon>::type;
-      using Link = Matrix<complex<real>, nColor>;
+
+      // logic based on include/kernels/dslash_staggered.cuh
+      // currently messy, this will be cleaned up as part of adding recon-12 support
+      static constexpr QudaReconstructType recon_u = recon; // perhaps (recon == QUDA_RECONSTRUCT_12 ? QUDA_RECONSTRUCT_13 : recon);
+      static constexpr bool gauge_direct_load = false; // false means texture load
+      static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
+      static constexpr bool use_inphase = false; // perhaps (recon == QUDA_RECONSTRUCT_12 ? true : false);
+      static constexpr QudaStaggeredPhase phase = QUDA_STAGGERED_PHASE_NO; // perhaps (recon == QUDA_RECONSTRUCT_12 ? QUDA_STAGGERED_PHASE_MILC : QUDA_STAGGERED_PHASE_NO);
+
+      using Gauge = typename gauge_mapper<real, recon_u, 18, phase, gauge_direct_load, ghost, use_inphase>::type;
 
       const Gauge link;
       int_fastdiv X[4]; // regular grid dims
@@ -179,11 +187,11 @@ namespace quda {
       using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
-      using Gauge = typename gauge_mapper<real, recon>::type;
+      using Link = typename gauge_mapper<real, QUDA_RECONSTRUCT_NO>::type;
 
-      Gauge force;
+      Link force;
 
-      const Gauge oProd;
+      const Link oProd;
       const real coeff_one;
 
       static constexpr int overlap = 0;
@@ -248,15 +256,14 @@ namespace quda {
       using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
-      using Gauge = typename gauge_mapper<real, recon>::type;
-      using Link = Matrix<complex<real>, nColor>;
+      using Link = typename gauge_mapper<real, QUDA_RECONSTRUCT_NO>::type;
 
-      Gauge force;
-      Gauge p3;
+      Link force;
+      Link p3;
 
-      const Gauge oProd;
-      const Gauge pMu;
-      Gauge pMu_next;
+      const Link oProd;
+      const Link pMu;
+      Link pMu_next;
 
       const real coeff_three;
       const real coeff_lepage;
@@ -599,21 +606,21 @@ namespace quda {
       using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
-      using Gauge = typename gauge_mapper<real, recon>::type;
+      using Link = typename gauge_mapper<real, QUDA_RECONSTRUCT_NO>::type;
 
-      Gauge force;
-      Gauge shortP;
-      Gauge p5;
+      Link force;
+      Link shortP;
+      Link p5;
       
-      const Gauge pMu;
+      const Link pMu;
 
       // double-buffer: read pNuMu, qNuMu for side 5, middle 7
-      const Gauge pNuMu;
-      const Gauge qNuMu;
+      const Link pNuMu;
+      const Link qNuMu;
 
       // write the other pNuMu, qNuMu for next middle 5
-      Gauge pNuMu_next;
-      Gauge qNuMu_next;
+      Link pNuMu_next;
+      Link qNuMu_next;
 
       const real coeff_five;
       const real accumu_coeff_five;
@@ -622,7 +629,7 @@ namespace quda {
 
       static constexpr int overlap = 1;
 
-      AllFiveAllSevenLinkArg(GaugeField &force, GaugeField &shortP, const Gauge &pMu,
+      AllFiveAllSevenLinkArg(GaugeField &force, GaugeField &shortP, const GaugeField &pMu,
                  const GaugeField &P5, const GaugeField &pNuMu, const GaugeField &qNuMu,
                  const GaugeField &pNuMu_next, const GaugeField &qNuMu_next,
                  const GaugeField &link, const PathCoefficients<real> &act_path_coeff)
@@ -967,10 +974,10 @@ namespace quda {
       using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
-      using Gauge = typename gauge_mapper<real, recon>::type;
+      using Link = typename gauge_mapper<real, QUDA_RECONSTRUCT_NO>::type;
 
-      Gauge force;        // force output accessor
-      const Gauge oProd; // force input accessor
+      Link force;        // force output accessor
+      const Link oProd; // force input accessor
       const real coeff;
 
       static constexpr int overlap = 0;
@@ -1015,10 +1022,10 @@ namespace quda {
       using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
-      using Gauge = typename gauge_mapper<real, recon>::type;
+      using Link = typename gauge_mapper<real, QUDA_RECONSTRUCT_NO>::type;
 
-      Gauge force;
-      const Gauge oProd;
+      Link force;
+      const Link oProd;
       const real coeff;
 
       static constexpr int overlap = 0;

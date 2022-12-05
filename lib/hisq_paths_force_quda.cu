@@ -87,7 +87,7 @@ namespace quda {
       const bool has_lepage;
       unsigned int minThreads() const override { return arg.threads.x; }
 
-      unsigned int sharedBytesPerThread() const override { return sizeof(typename Arg::Link); }
+      unsigned int sharedBytesPerThread() const override { return sizeof(Matrix<complex<typename Arg::real>, Arg::nColor>); }
 
       unsigned int maxSharedBytesPerBlock() const override { return maxDynamicSharedBytesPerBlock(); }
 
@@ -254,7 +254,7 @@ namespace quda {
 
       unsigned int minThreads() const override { return arg.threads.x; }
 
-      unsigned int sharedBytesPerThread() const override { return (sig.is_forward() ? 3 : 2) * sizeof(typename Arg::Link); }
+      unsigned int sharedBytesPerThread() const override { return (sig.is_forward() ? 3 : 2) * sizeof(Matrix<complex<typename Arg::real>, Arg::nColor>); }
 
       unsigned int maxSharedBytesPerBlock() const override { return maxDynamicSharedBytesPerBlock(); }
 
@@ -501,10 +501,9 @@ namespace quda {
         }
       }
 
-      HisqStaplesForce(GaugeField &P3, GaugeField_ref &Pmu, GaugeField_ref &P5, GaugeField_ref &Pnumu, GaugeField_ref &Qnumu,
+      HisqStaplesForce(const GaugeField &link, GaugeField &P3, GaugeField_ref &Pmu, GaugeField_ref &P5, GaugeField_ref &Pnumu, GaugeField_ref &Qnumu,
                        GaugeField_ref &Pmu_next, GaugeField_ref &Pnumu_next, GaugeField_ref &Qnumu_next,
-                       GaugeField &newOprod, const GaugeField &oprod, const GaugeField &link,
-                       const double *path_coeff_array)
+                       GaugeField &newOprod, const GaugeField &oprod, const double *path_coeff_array)
       {
         PathCoefficients<real> act_path_coeff(path_coeff_array);
 
@@ -627,10 +626,10 @@ namespace quda {
       auto Pnumu_next = GaugeField::Create(gauge_param);
       auto Qnumu_next = GaugeField::Create(gauge_param);
 
-      instantiate<HisqStaplesForce, ReconstructNone>(*P3, GaugeField_ref(*Pmu),
+      instantiate<HisqStaplesForce, ReconstructHisqForce>(link, *P3, GaugeField_ref(*Pmu),
         GaugeField_ref(*P5), GaugeField_ref(*Pnumu), GaugeField_ref(*Qnumu),
         GaugeField_ref(*Pmu_next), GaugeField_ref(*Pnumu_next), GaugeField_ref(*Qnumu_next),
-        newOprod, oprod, link, path_coeff_array);
+        newOprod, oprod, path_coeff_array);
 
       delete Pmu;
       delete P3;
@@ -700,7 +699,7 @@ namespace quda {
 
     template <typename Float, int nColor, QudaReconstructType recon>
     struct HisqLongLinkForce {
-      HisqLongLinkForce(GaugeField &newOprod, const GaugeField &oldOprod, const GaugeField &link, double coeff)
+      HisqLongLinkForce(const GaugeField &link, GaugeField &newOprod, const GaugeField &oldOprod, double coeff)
       {
         LongLinkArg<Float, nColor, recon> arg(newOprod, link, oldOprod, coeff);
         HisqLongForce<decltype(arg)> longLink(arg, newOprod, link);
@@ -713,7 +712,7 @@ namespace quda {
       checkNative(link, oldOprod, newOprod);
       checkLocation(newOprod, oldOprod, link);
       checkPrecision(newOprod, link, oldOprod);
-      instantiate<HisqLongLinkForce, ReconstructNone>(newOprod, oldOprod, link, coeff);
+      instantiate<HisqLongLinkForce, ReconstructHisqForce>(link, newOprod, oldOprod, coeff);
     }
 #else
     void hisqLongLinkForce(GaugeField &, const GaugeField &, const GaugeField &, double)
@@ -775,7 +774,7 @@ namespace quda {
 
     template <typename real, int nColor, QudaReconstructType recon>
     struct HisqCompleteForce {
-      HisqCompleteForce(GaugeField &force, const GaugeField &link)
+      HisqCompleteForce(const GaugeField &link, GaugeField &force)
       {
         CompleteForceArg<real, nColor, recon> arg(force, link);
         HisqCompleteLinkForce<decltype(arg)> completeForce(arg, force, link);
@@ -788,7 +787,7 @@ namespace quda {
       checkNative(link, force);
       checkLocation(force, link);
       checkPrecision(link, force);
-      instantiate<HisqCompleteForce, ReconstructNone>(force, link);
+      instantiate<HisqCompleteForce, ReconstructHisqForce>(link, force);
     }
 #else
     void hisqCompleteForce(GaugeField &, const GaugeField &)

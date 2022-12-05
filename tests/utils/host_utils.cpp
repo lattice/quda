@@ -1280,8 +1280,7 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
     constructUnitaryGaugeField((float **)link);
   }
 
-  if (phase) {
-
+  if (phase == SITELINK_PHASE_MILC) {
     for (int i = 0; i < V; i++) {
       for (int dir = XUP; dir <= TUP; dir++) {
         int idx = i;
@@ -1348,6 +1347,44 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
           mylink[15] *= coeff;
           mylink[16] *= coeff;
           mylink[17] *= coeff;
+        }
+      }
+    }
+  } else if (phase == SITELINK_PHASE_U1) {
+    for (int i = 0; i < V; i++) {
+      for (int dir = 0; dir < 4; dir++) {
+        // rescale bottom row by random phase
+        if (precision == QUDA_DOUBLE_PRECISION) {
+          // double* mylink = (double*)link;
+          // mylink = mylink + (4*i + dir)*gauge_site_size;
+          double *mylink = (double *)link[dir];
+          mylink = mylink + i * gauge_site_size;
+
+          // create a random phase
+          double phase = 2 * M_PI * rand() / (double)RAND_MAX;
+          double cos_sin[2];
+          sincos(phase, &cos_sin[0], &cos_sin[1]);
+
+          for (int c = 0; c < 3; c++) {
+            double elem[2] = { mylink[12 + 2 * c], mylink[12 + 2 * c + 1] };
+            mylink[12 + 2 * c] = elem[0] * cos_sin[0] - elem[1] * cos_sin[1];
+            mylink[12 + 2 * c + 1] = elem[0] * cos_sin[1] + elem[1] * cos_sin[0];
+          }
+        } else {
+          // float* mylink = (float*)link;
+          // mylink = mylink + (4*i + dir)*gauge_site_size;
+          float *mylink = (float *)link[dir];
+          mylink = mylink + i * gauge_site_size;
+
+          float phase = 2 * (float)M_PI * rand() / (float)RAND_MAX;
+          float cos_sin[2];
+          sincosf(phase, &cos_sin[0], &cos_sin[1]);
+
+          for (int c = 0; c < 3; c++) {
+            float elem[2] = { mylink[12 + 2 * c], mylink[12 + 2 * c + 1] };
+            mylink[12 + 2 * c] = elem[0] * cos_sin[0] - elem[1] * cos_sin[1];
+            mylink[12 + 2 * c + 1] = elem[0] * cos_sin[1] + elem[1] * cos_sin[0];
+          }
         }
       }
     }

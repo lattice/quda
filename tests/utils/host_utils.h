@@ -153,6 +153,19 @@ int fullLatticeIndex(int i, int oddBit);
 int fullLatticeIndex(int dim[], int index, int oddBit);
 int getOddBit(int X);
 
+// Custom "sitelink" enum used to create unphased, MILC phased, or continuous U(1) phased links
+enum {
+  SITELINK_PHASE_NO = 0,    // no phase, used to create SU(3) links
+  SITELINK_PHASE_MILC = 1,  // MILC phase, used to test staggered fermions
+  SITELINK_PHASE_U1 = 2     // continuous phase, used to test reconstruct 13
+};
+
+/**
+   @brief Host implementation of creating a random set of gauge links, with optional phases
+   @param[out] link QDP-ordered gauge links
+   @param[in] precision Precision of field
+   @param[in] phase Type of phase; 0 == no additional phase, 1 == MILC phases, 2 == U(1) phase
+ */
 void createSiteLinkCPU(void **link, QudaPrecision precision, int phase);
 void su3_construct(void *mat, QudaReconstructType reconstruct, QudaPrecision precision);
 void su3_reconstruct(void *mat, int dir, int ga_idx, QudaReconstructType reconstruct, QudaPrecision precision,
