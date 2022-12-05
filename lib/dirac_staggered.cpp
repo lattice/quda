@@ -75,7 +75,7 @@ namespace quda {
 
   void DiracStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(in.Even());
 
     //even
     Dslash(tmp, in.Even(), QUDA_ODD_PARITY);
