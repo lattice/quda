@@ -428,7 +428,7 @@ namespace quda {
       }
     };
 
-    template <typename Float, int nColor, QudaReconstructType recon>
+    template <typename Float, int nColor, QudaReconstructType recon, QudaStaggeredPhase phase = QUDA_STAGGERED_PHASE_NO>
     struct HisqStaplesForce {
       using real = typename mapper<Float>::type;
 
@@ -447,7 +447,7 @@ namespace quda {
             // Out: P5, Pnumu, Qnumu
             // In: Pmu, link
             // Ignored: Pnumu_next, Qnumu_next
-            AllFiveAllSevenLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu_next, Qnumu_next, Pnumu, Qnumu, link, act_path_coeff);
+            AllFiveAllSevenLinkArg<Float, nColor, recon, phase> middleFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu_next, Qnumu_next, Pnumu, Qnumu, link, act_path_coeff);
             AllFiveAllSevenLinkForce<decltype(middleFiveLinkArg)> middleFiveLink(middleFiveLinkArg, link, sig_pair, mu_pair, dim_dir_pair::invalid_pair(), nu_pair, newOprod, P3, P5, Pnumu, Qnumu);
 
             // All 7 link, 5-link side-link
@@ -455,7 +455,7 @@ namespace quda {
             // In: P5, Qnumu_next, link
             // Out: none
             // Ignored: Pmu, Pnumu, Qnumu
-            AllFiveAllSevenLinkArg<Float, nColor, recon> allSevenSideFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, link, act_path_coeff);
+            AllFiveAllSevenLinkArg<Float, nColor, recon, phase> allSevenSideFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, link, act_path_coeff);
             AllFiveAllSevenLinkForce<decltype(allSevenSideFiveLinkArg)> allSevenSideLinkFive(allSevenSideFiveLinkArg, link, sig_pair, mu_pair, nu_pair, dim_dir_pair::invalid_pair(), newOprod, P3, P5, Pnumu_next, Qnumu_next);
           } //nu
         } else {
@@ -476,7 +476,7 @@ namespace quda {
           // Out: P5, Pnumu, Qnumu
           // In: Pmu, link
           // Ignored: Pnumu_next, Qnumu_next (since this is MiddleFive only)
-          AllFiveAllSevenLinkArg<Float, nColor, recon> middleFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu_next, Qnumu_next, Pnumu, Qnumu, link, act_path_coeff);
+          AllFiveAllSevenLinkArg<Float, nColor, recon, phase> middleFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu_next, Qnumu_next, Pnumu, Qnumu, link, act_path_coeff);
           AllFiveAllSevenLinkForce<decltype(middleFiveLinkArg)> middleFiveArg(middleFiveLinkArg, link, sig_pair, mu_pair, dim_dir_pair::invalid_pair(), nu_vals[0], newOprod, P3, P5, Pnumu, Qnumu);
 
           for (int i = 0; i < 3; i++) {
@@ -484,7 +484,7 @@ namespace quda {
             // In/out: new Oprod, P3 (called shortP), P5
             // In: Pmu, Pnumu, Qnumu, link
             // Out: Pnumu_next, Qnumu_next
-            AllFiveAllSevenLinkArg<Float, nColor, recon> allFiveAllSevenLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, link, act_path_coeff);
+            AllFiveAllSevenLinkArg<Float, nColor, recon, phase> allFiveAllSevenLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, link, act_path_coeff);
             AllFiveAllSevenLinkForce<decltype(allFiveAllSevenLinkArg)> allFiveAllSevenLink(allFiveAllSevenLinkArg, link, sig_pair, mu_pair, nu_vals[i], nu_vals[i+1], newOprod, P3, P5, Pnumu_next, Qnumu_next);
 
             std::swap(Pnumu, Pnumu_next);
@@ -496,7 +496,7 @@ namespace quda {
           // In: P5, Pnumu, Qnumu, link
           // Out: none
           // Ignored: Pmu, Pnumu_next, Qnumu_next
-          AllFiveAllSevenLinkArg<Float, nColor, recon> allSevenSideFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, link, act_path_coeff);
+          AllFiveAllSevenLinkArg<Float, nColor, recon, phase> allSevenSideFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, link, act_path_coeff);
           AllFiveAllSevenLinkForce<decltype(allSevenSideFiveLinkArg)> allSevenSideFiveLink(allSevenSideFiveLinkArg, link, sig_pair, mu_pair, nu_vals[3], dim_dir_pair::invalid_pair(), newOprod, P3, P5, Pnumu, Qnumu);
         }
       }
@@ -510,7 +510,7 @@ namespace quda {
         {
           // Out: newOprod
           // In: oprod, link
-          OneLinkArg<Float, nColor, recon> arg(newOprod, oprod, link, act_path_coeff);
+          OneLinkArg<Float, nColor, recon, phase> arg(newOprod, oprod, link, act_path_coeff);
           OneLinkForce<decltype(arg)> oneLink(arg, link, newOprod);
         }
 
@@ -529,7 +529,7 @@ namespace quda {
               // In/out: newOprod
               // Out: (first) Pmu, P3
               // In: oprod, link
-              AllThreeAllLepageLinkArg<Float, nColor, recon> middleThreeLinkArg(newOprod, P3, oprod, Pmu, Pmu, link, act_path_coeff);
+              AllThreeAllLepageLinkArg<Float, nColor, recon, phase> middleThreeLinkArg(newOprod, P3, oprod, Pmu, Pmu, link, act_path_coeff);
               AllThreeAllLepageLinkForce<decltype(middleThreeLinkArg)> middleThreeLink(middleThreeLinkArg, link, sig_pair, dim_dir_pair::invalid_pair(), mu_pair, act_path_coeff, newOprod, P3, Pmu);
 
               // All 5 and 7 link contributions
@@ -541,7 +541,7 @@ namespace quda {
               // Side 3-link, fused with Lepage all link when the lepage coeff != 0.
               // In/out: newOprod
               // In: P3, (second) Pmu, link
-              AllThreeAllLepageLinkArg<Float, nColor, recon> allLepageSideThreeLinkArg(newOprod, P3, oprod, Pmu, Pmu, link, act_path_coeff);
+              AllThreeAllLepageLinkArg<Float, nColor, recon, phase> allLepageSideThreeLinkArg(newOprod, P3, oprod, Pmu, Pmu, link, act_path_coeff);
               AllThreeAllLepageLinkForce<decltype(allLepageSideThreeLinkArg)> allLepageSideThreeLink(allLepageSideThreeLinkArg, link, sig_pair, mu_pair, dim_dir_pair::invalid_pair(), act_path_coeff, newOprod, P3, Pmu);
             }//mu
           } else {
@@ -562,7 +562,7 @@ namespace quda {
             // Out: (first) Pmu, P3
             // In: oprod, link
             // Ignored: Pmu_next
-            AllThreeAllLepageLinkArg<Float, nColor, recon> middleThreeLinkArg(newOprod, P3, oprod, Pmu, Pmu_next, link, act_path_coeff);
+            AllThreeAllLepageLinkArg<Float, nColor, recon, phase> middleThreeLinkArg(newOprod, P3, oprod, Pmu, Pmu_next, link, act_path_coeff);
             AllThreeAllLepageLinkForce<decltype(middleThreeLinkArg)> middleThreeLink(middleThreeLinkArg, link, sig_pair, dim_dir_pair::invalid_pair(), mu_vals[0], act_path_coeff, newOprod, P3, Pmu_next);
 
             // All 5 and 7 link contributions
@@ -578,7 +578,7 @@ namespace quda {
               // In/out: oProd, P3 (read + overwritten)
               // In: (first) Pmu, oProd, link
               // Out: (second) Pmu
-              AllThreeAllLepageLinkArg<Float, nColor, recon> allThreeAllLepageLinkArg(newOprod, P3, oprod, Pmu, Pmu_next, link, act_path_coeff);
+              AllThreeAllLepageLinkArg<Float, nColor, recon, phase> allThreeAllLepageLinkArg(newOprod, P3, oprod, Pmu, Pmu_next, link, act_path_coeff);
               AllThreeAllLepageLinkForce<decltype(allThreeAllLepageLinkArg)> allLepageAllThreeLink(allThreeAllLepageLinkArg, link, sig_pair, mu_vals[i], mu_vals[i+1], act_path_coeff, newOprod, P3, Pmu_next);
 
               // All 5 and 7 link contributions, as above
@@ -591,7 +591,7 @@ namespace quda {
             // In/out: newOprod
             // In: P3, (second) Pmu, link
             // Ignored: (first) Pmu, oProd
-            AllThreeAllLepageLinkArg<Float, nColor, recon> allLepageSideThreeLinkArg(newOprod, P3, oprod, Pmu, Pmu_next, link, act_path_coeff);
+            AllThreeAllLepageLinkArg<Float, nColor, recon, phase> allLepageSideThreeLinkArg(newOprod, P3, oprod, Pmu, Pmu_next, link, act_path_coeff);
             AllThreeAllLepageLinkForce<decltype(allLepageSideThreeLinkArg)> allLepageSideThreeLink(allLepageSideThreeLinkArg, link, sig_pair, mu_vals[5], dim_dir_pair::invalid_pair(), act_path_coeff, newOprod, P3, Pmu_next);
 
 
@@ -626,7 +626,7 @@ namespace quda {
       auto Pnumu_next = GaugeField::Create(gauge_param);
       auto Qnumu_next = GaugeField::Create(gauge_param);
 
-      instantiate<HisqStaplesForce, ReconstructHisqForce>(link, *P3, GaugeField_ref(*Pmu),
+      instantiateGaugeHisq<HisqStaplesForce>(link, *P3, GaugeField_ref(*Pmu),
         GaugeField_ref(*P5), GaugeField_ref(*Pnumu), GaugeField_ref(*Qnumu),
         GaugeField_ref(*Pmu_next), GaugeField_ref(*Pnumu_next), GaugeField_ref(*Qnumu_next),
         newOprod, oprod, path_coeff_array);
@@ -697,11 +697,11 @@ namespace quda {
       }
     };
 
-    template <typename Float, int nColor, QudaReconstructType recon>
+    template <typename Float, int nColor, QudaReconstructType recon, QudaStaggeredPhase phase = QUDA_STAGGERED_PHASE_NO>
     struct HisqLongLinkForce {
       HisqLongLinkForce(const GaugeField &link, GaugeField &newOprod, const GaugeField &oldOprod, double coeff)
       {
-        LongLinkArg<Float, nColor, recon> arg(newOprod, link, oldOprod, coeff);
+        LongLinkArg<Float, nColor, recon, phase> arg(newOprod, link, oldOprod, coeff);
         HisqLongForce<decltype(arg)> longLink(arg, newOprod, link);
       }
     };
@@ -712,7 +712,7 @@ namespace quda {
       checkNative(link, oldOprod, newOprod);
       checkLocation(newOprod, oldOprod, link);
       checkPrecision(newOprod, link, oldOprod);
-      instantiate<HisqLongLinkForce, ReconstructHisqForce>(link, newOprod, oldOprod, coeff);
+      instantiateGaugeHisq<HisqLongLinkForce>(link, newOprod, oldOprod, coeff);
     }
 #else
     void hisqLongLinkForce(GaugeField &, const GaugeField &, const GaugeField &, double)
@@ -772,11 +772,11 @@ namespace quda {
       }
     };
 
-    template <typename real, int nColor, QudaReconstructType recon>
+    template <typename real, int nColor, QudaReconstructType recon, QudaStaggeredPhase phase = QUDA_STAGGERED_PHASE_NO>
     struct HisqCompleteForce {
       HisqCompleteForce(const GaugeField &link, GaugeField &force)
       {
-        CompleteForceArg<real, nColor, recon> arg(force, link);
+        CompleteForceArg<real, nColor, recon, phase> arg(force, link);
         HisqCompleteLinkForce<decltype(arg)> completeForce(arg, force, link);
       }
     };
@@ -787,7 +787,7 @@ namespace quda {
       checkNative(link, force);
       checkLocation(force, link);
       checkPrecision(link, force);
-      instantiate<HisqCompleteForce, ReconstructHisqForce>(link, force);
+      instantiateGaugeHisq<HisqCompleteForce>(link, force);
     }
 #else
     void hisqCompleteForce(GaugeField &, const GaugeField &)

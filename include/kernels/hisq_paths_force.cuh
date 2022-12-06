@@ -93,20 +93,16 @@ namespace quda {
           seven(path_coeff_array[4]), lepage(path_coeff_array[5]) { }
     };
 
-    template <typename store_t, int nColor_, QudaReconstructType recon>
+    template <typename store_t, int nColor_, QudaReconstructType recon, QudaStaggeredPhase phase>
     struct BaseForceArg : kernel_param<> {
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
 
-      // logic based on include/kernels/dslash_staggered.cuh
-      // currently messy, this will be cleaned up as part of adding recon-12 support
-      static constexpr QudaReconstructType recon_u = recon; // perhaps (recon == QUDA_RECONSTRUCT_12 ? QUDA_RECONSTRUCT_13 : recon);
       static constexpr bool gauge_direct_load = false; // false means texture load
       static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
-      static constexpr bool use_inphase = false; // perhaps (recon == QUDA_RECONSTRUCT_12 ? true : false);
-      static constexpr QudaStaggeredPhase phase = QUDA_STAGGERED_PHASE_NO; // perhaps (recon == QUDA_RECONSTRUCT_12 ? QUDA_STAGGERED_PHASE_MILC : QUDA_STAGGERED_PHASE_NO);
+      static constexpr bool use_inphase = (recon == QUDA_RECONSTRUCT_13 && phase == QUDA_STAGGERED_PHASE_MILC);
 
-      using Gauge = typename gauge_mapper<real, recon_u, 18, phase, gauge_direct_load, ghost, use_inphase>::type;
+      using Gauge = typename gauge_mapper<real, recon, 18, phase, gauge_direct_load, ghost, use_inphase>::type;
 
       const Gauge link;
       int_fastdiv X[4]; // regular grid dims
@@ -182,9 +178,9 @@ namespace quda {
         arg(arg) {}
     };
 
-    template <typename store_t, int nColor_, QudaReconstructType recon>
-    struct OneLinkArg : public BaseForceArg<store_t, nColor_, recon> {
-      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
+    template <typename store_t, int nColor_, QudaReconstructType recon, QudaStaggeredPhase phase>
+    struct OneLinkArg : public BaseForceArg<store_t, nColor_, recon, phase> {
+      using BaseForceArg = BaseForceArg<store_t, nColor_, recon, phase>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
       using Link = typename gauge_mapper<real, QUDA_RECONSTRUCT_NO>::type;
@@ -251,9 +247,9 @@ namespace quda {
      *   Variables have been named to reflection dimensionality for
      *   mu_positive == true, sig_positive == true, mu_next_positive == true
      **************************************************************************/
-    template <typename store_t, int nColor_, QudaReconstructType recon>
-    struct AllThreeAllLepageLinkArg : public BaseForceArg<store_t, nColor_, recon> {
-      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
+    template <typename store_t, int nColor_, QudaReconstructType recon, QudaStaggeredPhase phase>
+    struct AllThreeAllLepageLinkArg : public BaseForceArg<store_t, nColor_, recon, phase> {
+      using BaseForceArg = BaseForceArg<store_t, nColor_, recon, phase>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
       using Link = typename gauge_mapper<real, QUDA_RECONSTRUCT_NO>::type;
@@ -601,9 +597,9 @@ namespace quda {
      *   Variables have been named to reflection dimensionality for sig,
      *   nu, and nu_next positive.
      **************************************************************************/
-    template <typename store_t, int nColor_, QudaReconstructType recon>
-    struct AllFiveAllSevenLinkArg : public BaseForceArg<store_t, nColor_, recon> {
-      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
+    template <typename store_t, int nColor_, QudaReconstructType recon, QudaStaggeredPhase phase>
+    struct AllFiveAllSevenLinkArg : public BaseForceArg<store_t, nColor_, recon, phase> {
+      using BaseForceArg = BaseForceArg<store_t, nColor_, recon, phase>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
       using Link = typename gauge_mapper<real, QUDA_RECONSTRUCT_NO>::type;
@@ -969,9 +965,9 @@ namespace quda {
       }
     };
 
-    template <typename store_t, int nColor_, QudaReconstructType recon>
-    struct CompleteForceArg : public BaseForceArg<store_t, nColor_, recon> {
-      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
+    template <typename store_t, int nColor_, QudaReconstructType recon, QudaStaggeredPhase phase>
+    struct CompleteForceArg : public BaseForceArg<store_t, nColor_, recon, phase> {
+      using BaseForceArg = BaseForceArg<store_t, nColor_, recon, phase>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
       using Link = typename gauge_mapper<real, QUDA_RECONSTRUCT_NO>::type;
@@ -1017,9 +1013,9 @@ namespace quda {
       }
     };
 
-    template <typename store_t, int nColor_, QudaReconstructType recon>
-    struct LongLinkArg : public BaseForceArg<store_t, nColor_, recon> {
-      using BaseForceArg = BaseForceArg<store_t, nColor_, recon>;
+    template <typename store_t, int nColor_, QudaReconstructType recon, QudaStaggeredPhase phase>
+    struct LongLinkArg : public BaseForceArg<store_t, nColor_, recon, phase> {
+      using BaseForceArg = BaseForceArg<store_t, nColor_, recon, phase>;
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
       using Link = typename gauge_mapper<real, QUDA_RECONSTRUCT_NO>::type;

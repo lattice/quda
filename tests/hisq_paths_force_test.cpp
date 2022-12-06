@@ -162,10 +162,11 @@ static void hisq_force_startup()
   // need to do some thinking for recon
   qudaGaugeParam.cpu_prec = force_prec;
   qudaGaugeParam.cuda_prec = force_prec;
-  qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  qudaGaugeParam.reconstruct = (link_recon == QUDA_RECONSTRUCT_12 ? QUDA_RECONSTRUCT_13 : link_recon);
   qudaGaugeParam.type = QUDA_GENERAL_LINKS;
   qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
-  qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_NO; // no need for a phase for recon 13...
+  qudaGaugeParam.staggered_phase_type = (link_recon == QUDA_RECONSTRUCT_12 ? QUDA_STAGGERED_PHASE_MILC : QUDA_STAGGERED_PHASE_NO);
+  qudaGaugeParam.staggered_phase_applied = true;
   qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
   qudaGaugeParam.anisotropy = 1.0;
   qudaGaugeParam.tadpole_coeff = 1.0;
@@ -186,7 +187,22 @@ static void hisq_force_startup()
   GaugeFieldParam gParam_ex;
   GaugeFieldParam gParam;
 
-  // Create gauge fields
+  // create device gauge field
+  gParam_ex = GaugeFieldParam(qudaGaugeParam_ex);
+  gParam_ex.location = QUDA_CUDA_FIELD_LOCATION;
+  gParam_ex.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+  gParam_ex.create = QUDA_NULL_FIELD_CREATE;
+  gParam_ex.reconstruct = (link_recon == QUDA_RECONSTRUCT_12 ? QUDA_RECONSTRUCT_13 : link_recon);
+  gParam_ex.setPrecision(force_prec, true);
+  for (int d = 0; d < 4; d++) {
+    gParam_ex.r[d] = (comm_dim_partitioned(d)) ? 2 : 0;
+    gParam_ex.x[d] = X[d] + 2 * gParam_ex.r[d];
+  } // set halo region for GPU
+  cudaGauge_ex = new cudaGaugeField(gParam_ex);
+
+  // Create the host gauge field
+  memcpy(&qudaGaugeParam_ex, &qudaGaugeParam, sizeof(QudaGaugeParam));
+
   gParam = GaugeFieldParam(qudaGaugeParam);
   gParam.location = QUDA_CPU_FIELD_LOCATION;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
@@ -207,21 +223,13 @@ static void hisq_force_startup()
   } // set halo region for CPU
   cpuGauge_ex = new cpuGaugeField(gParam_ex);
 
-  createSiteLinkCPU((void **)cpuGauge->Gauge_p(), qudaGaugeParam.cpu_prec, link_recon == QUDA_RECONSTRUCT_NO ? SITELINK_PHASE_NO : SITELINK_PHASE_U1);
+  createSiteLinkCPU((void **)cpuGauge->Gauge_p(), qudaGaugeParam.cpu_prec, link_recon == QUDA_RECONSTRUCT_13 ? SITELINK_PHASE_U1 : SITELINK_PHASE_NO);
   copyExtendedGauge(*cpuGauge_ex, *cpuGauge, QUDA_CPU_FIELD_LOCATION);
-
-  gParam_ex.location = QUDA_CUDA_FIELD_LOCATION;
-  gParam_ex.reconstruct = link_recon;
-  gParam_ex.setPrecision(prec, true);
-  for (int d = 0; d < 4; d++) {
-    gParam_ex.r[d] = (comm_dim_partitioned(d)) ? 2 : 0;
-    gParam_ex.x[d] = gParam.x[d] + 2 * gParam_ex.r[d];
-  }
-  cudaGauge_ex = new cudaGaugeField(gParam_ex);
 
   qudaGaugeParam.type = QUDA_GENERAL_LINKS;
   qudaGaugeParam.t_boundary = QUDA_PERIODIC_T;
   qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
+  qudaGaugeParam.staggered_phase_applied = false;
   memcpy(&qudaGaugeParam_ex, &qudaGaugeParam, sizeof(QudaGaugeParam));
 
   gParam = GaugeFieldParam(qudaGaugeParam);
@@ -554,7 +562,7 @@ int main(int argc, char **argv)
 
   if (prec != QUDA_DOUBLE_PRECISION && prec != QUDA_SINGLE_PRECISION)
     errorQuda("Invalid precision %d", prec);
-  if (link_recon != QUDA_RECONSTRUCT_NO && link_recon != QUDA_RECONSTRUCT_13)
+  if (link_recon != QUDA_RECONSTRUCT_NO && link_recon != QUDA_RECONSTRUCT_13 && link_recon != QUDA_RECONSTRUCT_12)
     errorQuda("Invalid reconstruct %d", link_recon);
 
   // one-time setup

@@ -120,10 +120,6 @@ namespace quda
     static constexpr std::array<QudaReconstructType, 2> recon = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12};
   };
 
-  struct ReconstructHisqForce {
-    static constexpr std::array<QudaReconstructType, 2> recon = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13};
-  };
-
   struct ReconstructNone {
     static constexpr std::array<QudaReconstructType, 1> recon = {QUDA_RECONSTRUCT_NO};
   };
@@ -443,6 +439,78 @@ namespace quda
         errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
     } else {
       errorQuda("Unsupported precision %d\n", field.Precision());
+    }
+  }
+
+  /**
+     @brief This instantiate function is used to instantiate combinations of reconstruct
+     and phase for pure-gauge routines using staggered phases
+     @param[in] U Gauge field
+     @param[in,out] args Additional arguments for kernels
+  */
+  template <template <typename, int, QudaReconstructType, QudaStaggeredPhase> class Apply, typename store_t, int nColor, typename G, typename... Args>
+  constexpr void instantiateGaugeHisq(G &U, Args &&...args)
+  {
+    if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+      if constexpr (is_enabled<QUDA_RECONSTRUCT_NO>())
+        // actual phase type doesn't matter because the phase is baked into the links
+        Apply<store_t, nColor, QUDA_RECONSTRUCT_NO, QUDA_STAGGERED_PHASE_NO>(U, args...);
+      else
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, QUDA_RECONSTRUCT_NO);
+    } else if (U.Reconstruct() == QUDA_RECONSTRUCT_13) {
+      if constexpr (is_enabled<QUDA_RECONSTRUCT_13>()) {
+        if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO)
+          Apply<store_t, nColor, QUDA_RECONSTRUCT_13, QUDA_STAGGERED_PHASE_NO>(U, args...);
+        else if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC)
+          Apply<store_t, nColor, QUDA_RECONSTRUCT_13, QUDA_STAGGERED_PHASE_MILC>(U, args...);
+        else
+          errorQuda("Unsupported staggered phase type %d\n", U.StaggeredPhase());
+      } else {
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, QUDA_RECONSTRUCT_13);
+      }
+    } else {
+      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
+    }
+  }
+
+  /**
+     @brief This instantiate function is used to instantiate the colors for various combinations
+     of reconstructs and phases for pure-gauge routines using staggered phases
+     @param[in] U Gauge field
+     @param[in,out] args Additional arguments for kernels
+  */
+  template <template <typename, int, QudaReconstructType, QudaStaggeredPhase> class Apply, typename store_t, typename G, typename... Args>
+  constexpr void instantiateGaugeHisq(G &U, Args &&... args)
+  {
+    if (U.Ncolor() == 3) {
+      instantiateGaugeHisq<Apply, store_t, 3>(U, args...);
+    } else {
+      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
+    }
+  }
+
+  /**
+     @brief This instantiate function is used to instantiate various combinations
+     of reconstructs and phases for pure-gauge routines that need to be mindful of
+     staggered phases (HISQ force, fat/long)
+     @param[in] U Gauge field
+     @param[in,out] args Any additional arguments required for the computation at hand
+  */
+  template <template <typename, int, QudaReconstructType, QudaStaggeredPhase> class Apply, typename G, typename... Args>
+  constexpr void instantiateGaugeHisq(G &U, Args &&...args)
+  {
+    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
+      if constexpr (is_enabled(QUDA_DOUBLE_PRECISION))
+        instantiateGaugeHisq<Apply, double>(U, args...);
+      else
+        errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
+    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
+      if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
+        instantiateGaugeHisq<Apply, float>(U, args...);
+      else
+        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+    } else {
+      errorQuda("Unsupported precision %d\n", U.Precision());
     }
   }
 
