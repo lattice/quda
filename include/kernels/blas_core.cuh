@@ -95,8 +95,10 @@ namespace quda
        Functor to perform the operation z = a*x + b*y
     */
     template <typename real> struct axpbyz_ : public BlasFunctor {
+#pragma omp declare target
       static constexpr memory_access<1, 1, 0, 0, 0> read{ };
       static constexpr memory_access<0, 0, 0, 0, 1> write{ };
+#pragma omp end declare target
       const real a;
       const real b;
       axpbyz_(const real &a, const real &b, const real &) : a(a), b(b) { ; }
@@ -112,8 +114,10 @@ namespace quda
        Functor to perform the operation y = a * x
     */
     template <typename real> struct axy_ : public BlasFunctor {
+#pragma omp declare target
       static constexpr memory_access<1, 0> read{ };
       static constexpr memory_access<0, 1> write{ };
+#pragma omp end declare target
       const real a;
       axy_(const real &a, const real &, const real &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &) const
@@ -128,8 +132,10 @@ namespace quda
        Functor to perform the operator y += a*x (complex-valued)
     */
     template <typename real> struct caxpy_ : public BlasFunctor {
+#pragma omp declare target
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
+#pragma omp end declare target
       const complex<real> a;
       caxpy_(const complex<real> &a, const complex<real> &, const complex<real> &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &) const
@@ -160,8 +166,10 @@ namespace quda
     }
 
     template <typename real> struct caxpby_ : public BlasFunctor {
+#pragma omp declare target
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
+#pragma omp end declare target
       const complex<real> a;
       const complex<real> b;
       caxpby_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
@@ -177,8 +185,10 @@ namespace quda
        Functor performing the operation: w[i] = a*x[i] + b*y[i] + c*z[i]
     */
     template <typename real> struct axpbypczw_ : public BlasFunctor {
+#pragma omp declare target
       static constexpr memory_access<1, 1, 1, 1> read{ };
       static constexpr memory_access<0, 0, 0, 1> write{ };
+#pragma omp end declare target
       const real a;
       const real b;
       const real c;
@@ -197,8 +207,10 @@ namespace quda
        Functor performing the operations: y[i] = a*x[i] + y[i]; x[i] = b*z[i] + c*x[i]
     */
     template <typename real> struct axpyBzpcx_ : public BlasFunctor {
+#pragma omp declare target
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
+#pragma omp end declare target
       const real a;
       const real b;
       const real c;
@@ -218,8 +230,10 @@ namespace quda
        Functor performing the operations: y[i] = a*x[i] + y[i]; x[i] = z[i] + b*x[i]
     */
     template <typename real> struct axpyZpbx_ : public BlasFunctor {
+#pragma omp declare target
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
+#pragma omp end declare target
       const real a;
       const real b;
       axpyZpbx_(const real &a, const real &b, const real &) : a(a), b(b) { ; }
@@ -238,8 +252,10 @@ namespace quda
        Functor performing the operation z[i] = x[i] + a * y[i] + b * z[i]
     */
     template <typename real> struct cxpaypbz_ : public BlasFunctor {
+#pragma omp declare target
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<0, 0, 1> write{ };
+#pragma omp end declare target
       const complex<real> a;
       const complex<real> b;
       cxpaypbz_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
@@ -258,8 +274,10 @@ namespace quda
        Functor performing the operations y[i] = a*x[i] + y[i] and x[i] = b*z[i] + x[i]
     */
     template <typename real> struct caxpyBzpx_ : public BlasFunctor {
+#pragma omp declare target
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
+#pragma omp end declare target
       const complex<real> a;
       const complex<real> b;
       caxpyBzpx_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
@@ -278,8 +296,10 @@ namespace quda
        Functor performing the operations y[i] = a*x[i] + y[i] and z[i] = b*x[i] + z[i]
     */
     template <typename real> struct caxpyBxpz_ : public BlasFunctor {
+#pragma omp declare target
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<0, 1, 1> write{ };
+#pragma omp end declare target
       const complex<real> a;
       const complex<real> b;
       caxpyBxpz_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
@@ -298,8 +318,10 @@ namespace quda
        Functor performing the operations z[i] = a*x[i] + b*y[i] + z[i] and y[i] -= b*w[i]
     */
     template <typename real> struct caxpbypzYmbw_ : public BlasFunctor {
+#pragma omp declare target
       static constexpr memory_access<1, 1, 1, 1> read{ };
       static constexpr memory_access<0, 1, 1> write{ };
+#pragma omp end declare target
       const complex<real> a;
       const complex<real> b;
       caxpbypzYmbw_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
@@ -319,8 +341,10 @@ namespace quda
        Functor performing the operation y[i] += a*b*x[i], x[i] *= a
     */
     template <typename real> struct cabxpyAx_ : public BlasFunctor {
+#pragma omp declare target
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
+#pragma omp end declare target
       const real a;
       const complex<real> b;
       cabxpyAx_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a.real()), b(b) { ; }
@@ -341,8 +365,10 @@ namespace quda
        Second performs the operator x[i] -= a*z[i]
     */
     template <typename real> struct caxpyxmaz_ : public BlasFunctor {
+#pragma omp declare target
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
+#pragma omp end declare target
       const complex<real> a;
       caxpyxmaz_(const complex<real> &a, const complex<real> &, const complex<real> &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &) const
@@ -366,8 +392,10 @@ namespace quda
     */
     template <typename real> struct caxpyxmazMR_ {
       static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::ALWAYS;
+#pragma omp declare target
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
+#pragma omp end declare target
       complex<real> a;
       double3 *Ar3;
       bool init_;
@@ -405,8 +433,10 @@ namespace quda
        Third performs the operation w[i] = z[i] + b*w[i]
     */
     template <typename real> struct tripleCGUpdate_ : public BlasFunctor {
+#pragma omp declare target
       static constexpr memory_access<1, 1, 1, 1> read{ };
       static constexpr memory_access<0, 1, 1, 1> write{ };
+#pragma omp end declare target
       const real a;
       const real b;
       tripleCGUpdate_(const real &a, const real &b, const real &) : a(a), b(b) { ; }
