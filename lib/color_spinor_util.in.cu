@@ -127,40 +127,21 @@ namespace quda {
     else errorQuda("Unsupported source type %d", sourceType);
   }
 
-  template <typename Float, int nSpin, QudaFieldOrder order, typename pack_t>
-  void genericSource(const pack_t &pack)
+  template <int...> struct IntList { };
+
+  template <typename Float, int nSpin, QudaFieldOrder order, typename pack_t, int nColor, int...N>
+  void genericSource(const pack_t &pack, IntList<nColor, N...>)
   {
     auto &a = std::get<0>(pack);
-    if (a.Ncolor() == 3) {
-      genericSource<Float,nSpin,3,order>(pack);
-#ifdef GPU_MULTIGRID
-    } else if (a.Ncolor() == 4) {
-      genericSource<Float,nSpin,4,order>(pack);
-    } else if (a.Ncolor() == 6) { // for Wilson free field
-      genericSource<Float,nSpin,6,order>(pack);
-    } else if (a.Ncolor() == 8) {
-      genericSource<Float,nSpin,8,order>(pack);
-    } else if (a.Ncolor() == 12) {
-      genericSource<Float,nSpin,12,order>(pack);
-    } else if (a.Ncolor() == 16) {
-      genericSource<Float,nSpin,16,order>(pack);
-    } else if (a.Ncolor() == 20) {
-      genericSource<Float,nSpin,20,order>(pack);
-    } else if (a.Ncolor() == 24) {
-      genericSource<Float,nSpin,24,order>(pack);
-#ifdef NSPIN4
-    } else if (a.Ncolor() == 32) {
-      genericSource<Float,nSpin,32,order>(pack);
-#endif // NSPIN4
-#ifdef NSPIN1
-    } else if (a.Ncolor() == 64) {
-      genericSource<Float,nSpin,64,order>(pack);
-    } else if (a.Ncolor() == 96) {
-      genericSource<Float,nSpin,96,order>(pack);
-#endif // NSPIN1
-#endif // GPU_MULTIGRID
+
+    if (a.Ncolor() == nColor) {
+      genericSource<Float, nSpin, nColor, order>(pack);
     } else {
-      errorQuda("Unsupported nColor=%d", a.Ncolor());
+      if constexpr (sizeof...(N) > 0) {
+        genericSource<Float, nSpin, order>(pack, IntList<N...>());
+      } else {
+        errorQuda("Unsupported nColor=%d", a.Ncolor());
+      }
     }
   }
 
@@ -168,24 +149,14 @@ namespace quda {
   void genericSource(const pack_t &pack)
   {
     auto &a = std::get<0>(pack);
+    if (!is_enabled_spin(a.Nspin())) errorQuda("nSpin=%d not enabled for this build", a.Nspin());
+
     if (a.Nspin() == 1) {
-#ifdef NSPIN1
-      genericSource<Float,1,order>(pack);
-#else
-      errorQuda("nSpin=1 not enabled for this build");
-#endif
+      if constexpr (is_enabled_spin(1)) genericSource<Float, 1, order>(pack, IntList<3>());
     } else if (a.Nspin() == 2) {
-#ifdef NSPIN2
-      genericSource<Float,2,order>(pack);
-#else
-      errorQuda("nSpin=2 not enabled for this build");
-#endif
+      //if constexpr (is_enabled_spin(2)) genericSource<Float, 2, order>(pack, IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@>());
     } else if (a.Nspin() == 4) {
-#ifdef NSPIN4
-      genericSource<Float,4,order>(pack);
-#else
-      errorQuda("nSpin=4 not enabled for this build");
-#endif
+      if constexpr (is_enabled_spin(4)) genericSource<Float, 4 ,order>(pack, IntList<3>());
     } else {
       errorQuda("Unsupported nSpin=%d", a.Nspin());
     }
@@ -378,25 +349,30 @@ namespace quda {
     }
   }
 
+  template <typename Float, int nSpin, int nColor, int...N>
+  void genericPrintVector(const ColorSpinorField &a, int parity, unsigned int x_cb, IntList<nColor, N...>)
+  {
+    if (a.Ncolor() == nColor) {
+      genericPrintVector<Float, nSpin, nColor>(a, parity, x_cb);
+    } else {
+      if constexpr (sizeof...(N) > 0) {
+        genericPrintVector<Float, nSpin, N...>(a, parity, x_cb, IntList<N...>());
+      } else {
+        errorQuda("Not supported Ncolor = %d", a.Ncolor());
+      }
+    }
+  }
+
   template <typename Float> void genericPrintVector(const ColorSpinorField &a, int parity, unsigned int x_cb)
   {
-    if (a.Ncolor() == 3) {
-      switch (a.Nspin()) {
-      case 1: genericPrintVector<Float, 1, 3>(a, parity, x_cb); break;
-      case 4: genericPrintVector<Float, 4, 3>(a, parity, x_cb); break;
-      default: errorQuda("Not supported Ncolor = %d, Nspin = %d", a.Ncolor(), a.Nspin());
-      }
+    if (!is_enabled_spin(a.Nspin())) errorQuda("Nspin = %d not enabled", a.Nspin());
+
+    if (a.Nspin() == 1) {
+      if constexpr (is_enabled_spin(1)) genericPrintVector<Float, 1>(a, parity, x_cb, IntList<3>());
     } else if (a.Nspin() == 2) {
-      switch (a.Ncolor()) {
-      case  2: genericPrintVector<Float, 2,  2>(a, parity, x_cb); break;
-      case  6: genericPrintVector<Float, 2,  6>(a, parity, x_cb); break;
-      case 24: genericPrintVector<Float, 2, 24>(a, parity, x_cb); break;
-      case 32: genericPrintVector<Float, 2, 32>(a, parity, x_cb); break;
-      case 64: genericPrintVector<Float, 2, 64>(a, parity, x_cb); break;
-      case 72: genericPrintVector<Float, 2, 72>(a, parity, x_cb); break;
-      case 96: genericPrintVector<Float, 2, 96>(a, parity, x_cb); break;
-      default: errorQuda("Not supported Ncolor = %d, Nspin = %d", a.Ncolor(), a.Nspin());
-      }
+      if constexpr (is_enabled_spin(2)) genericPrintVector<Float, 2>(a, parity, x_cb, IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@>());
+    } else if (a.Nspin() == 4) {
+      if constexpr (is_enabled_spin(4)) genericPrintVector<Float, 4>(a, parity, x_cb, IntList<3>());
     }
   }
 
