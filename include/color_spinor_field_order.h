@@ -306,6 +306,29 @@ namespace quda
       }
     };
 
+    // specialized varient for packed half precision staggered
+    template <>
+    struct AccessorCB<short, 1, 3, 1, QUDA_FLOAT2_FIELD_ORDER> {
+      int offset_cb = 0;
+      AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes() >> 1) / sizeof(complex<short>)) { }
+      AccessorCB() = default;
+      AccessorCB(const AccessorCB &) = default;
+      AccessorCB &operator=(const AccessorCB &) = default;
+
+      constexpr int index(int parity, int x_cb, int s, int c, int v, int stride) const
+      {
+        return parity * offset_cb + ((s * 3 + c) * 1 + v) * stride + x_cb;
+      }
+
+      template <int nSpinBlock>
+      __device__ __host__ inline void load(complex<short> out[3], complex<short> *in, int parity, int x_cb, int, int) const
+      {
+        using vec_t = typename VectorType<float, 4>::type;
+        vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), x_cb);
+        memcpy(out, &tmp, 3 * sizeof(complex<short>));
+      }
+    };
+
     template <typename Float, int nSpin, int nColor, int nVec>
     struct GhostAccessorCB<Float, nSpin, nColor, nVec, QUDA_FLOAT2_FIELD_ORDER> {
       int faceVolumeCB[4] = {};
@@ -802,6 +825,7 @@ namespace quda
               typename ghostFloat = storeFloat, bool disable_ghost = false, bool block_float = false>
     class FieldOrderCB : public GhostOrder<Float, nSpin_, nColor_, nVec, order, storeFloat, ghostFloat, disable_ghost>
     {
+      static_assert((block_float && nVec == 1 || !block_float), "Not supported");
       using GhostOrder = GhostOrder<Float, nSpin_, nColor_, nVec, order, storeFloat, ghostFloat, disable_ghost>;
       using norm_t = float;
 
@@ -836,7 +860,11 @@ namespace quda
         resetScale(field.Scale());
 
         if constexpr (fixed && block_float) {
-          v.norm = static_cast<norm_t *>(const_cast<void *>(field.Norm()));
+          if constexpr (nColor == 3 && nSpin == 1 && nVec == 1 && order == 2)
+            // special case where the norm is packed into the per site struct
+            v.norm = reinterpret_cast<norm_t *>(const_cast<void *>(field.V()));
+          else
+            v.norm = static_cast<norm_t *>(const_cast<void *>(field.Norm()));
           v.norm_offset = field.Bytes() / (2 * sizeof(norm_t));
         }
       }
@@ -874,10 +902,15 @@ namespace quda
 
           Float norm_ = 0.0;
           if constexpr (fixed) {
-            if constexpr (block_float)
-              norm_ = v.norm[parity * v.norm_offset + x_cb];
-            else
+            if constexpr (block_float) {
+              if constexpr (nColor == 3 && nSpin == 1 && nVec == 1)
+                // special case where the norm is packed into the per site struct
+                norm_ = v.norm[parity * v.norm_offset + 4 * x_cb + 3];
+              else
+                norm_ = v.norm[parity * v.norm_offset + x_cb];
+            } else {
               norm_ = v.scale_inv;
+            }
           }
 #pragma unroll
           for (int s = 0; s < nSpinBlock; s++) {
