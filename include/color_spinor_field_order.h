@@ -825,7 +825,7 @@ namespace quda
               typename ghostFloat = storeFloat, bool disable_ghost = false, bool block_float = false>
     class FieldOrderCB : public GhostOrder<Float, nSpin_, nColor_, nVec, order, storeFloat, ghostFloat, disable_ghost>
     {
-      static_assert((block_float && nVec == 1 || !block_float), "Not supported");
+      static_assert((block_float && nVec == 1) || !block_float, "Not supported");
       using GhostOrder = GhostOrder<Float, nSpin_, nColor_, nVec, order, storeFloat, ghostFloat, disable_ghost>;
       using norm_t = float;
 
