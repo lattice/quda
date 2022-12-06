@@ -42,6 +42,19 @@ namespace quda {
     }
   };
 
+  template <typename T, typename Arg>
+  constexpr bool is_boundary(T &coord, int d, const Arg &arg)
+  {
+    bool is_boundary = false;
+    switch (d) {
+    case 0: is_boundary = coord[0] - arg.nFace < 0; break;
+    case 1: is_boundary = coord[1] - arg.nFace < 0; break;
+    case 2: is_boundary = coord[2] - arg.nFace < 0; break;
+    case 3: is_boundary = coord[3] - arg.nFace < 0; break;
+    }
+    return is_boundary;
+  }
+
   template <typename Arg>
   inline __device__ __host__ auto computeYhat(const Arg &arg, int d, int x_cb, int parity, int i0, int j0)
   {
@@ -56,7 +69,7 @@ namespace quda {
     real yHatMax = 0.0;
 
     // first do the backwards links Y^{+\mu} * X^{-\dagger}
-    if ( arg.comm_dim[d] && (coord[d] - arg.nFace < 0) ) {
+    if (arg.comm_dim[d] && is_boundary(coord, d, arg)) {
 
       auto yHat = make_tile_C<complex,true>(arg.tile);
 
@@ -71,14 +84,14 @@ namespace quda {
         yHat.mma_nt(Y, X);
       }
 
-      if (Arg::compute_max) {
+      if constexpr (Arg::compute_max) {
         yHatMax = yHat.abs_max();
       } else {
         yHat.save(arg.Yhat, d, 1 - parity, ghost_idx, i0, j0);
       }
 
     } else {
-      const int back_idx = linkIndexM1(coord, arg.dim, d);
+      const int back_idx = linkIndexHop(coord, arg.dim, d, -arg.nFace);
 
       auto yHat = make_tile_C<complex,false>(arg.tile);
 
@@ -92,7 +105,7 @@ namespace quda {
 
         yHat.mma_nt(Y, X);
       }
-      if (Arg::compute_max) {
+      if constexpr (Arg::compute_max) {
         yHatMax = yHat.abs_max();
       } else {
         yHat.save(arg.Yhat, d, 1 - parity, back_idx, i0, j0);
@@ -112,7 +125,7 @@ namespace quda {
 
         yHat.mma_nn(X, Y);
       }
-      if (Arg::compute_max) {
+      if constexpr (Arg::compute_max) {
         yHatMax = fmax(yHatMax, yHat.abs_max());
       } else {
         yHat.save(arg.Yhat, d + 4, parity, x_cb, i0, j0);
