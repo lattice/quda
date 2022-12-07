@@ -67,7 +67,7 @@ namespace quda {
   void gaugeNoise(GaugeField &U_, RNG &rng, QudaNoiseType type)
   {
     GaugeFieldParam param(U_);
-    GaugeField *U;
+    GaugeField *U = nullptr;
     bool copy_back = false;
     if (U_.Location() == QUDA_CPU_FIELD_LOCATION || U_.Precision() < QUDA_SINGLE_PRECISION ||
         U_.Reconstruct() != QUDA_RECONSTRUCT_NO || !U_.isNative()) {
@@ -79,7 +79,7 @@ namespace quda {
       U = GaugeField::Create(param);
       copy_back = true;
     } else {
-      U->copy(U_);
+      U = &U_;
     }
 
     if (U->Precision() == QUDA_DOUBLE_PRECISION) {
