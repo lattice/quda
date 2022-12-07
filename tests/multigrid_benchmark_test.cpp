@@ -12,6 +12,7 @@
 // include because of nasty globals used in the tests
 #include <dslash_reference.h>
 #include <dirac_quda.h>
+#include <gauge_tools.h>
 #include <gtest/gtest.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -22,7 +23,6 @@ using namespace quda;
 
 std::vector<ColorSpinorField> xD, yD;
 
-cpuGaugeField *Y_h, *X_h, *Xinv_h, *Yhat_h;
 cudaGaugeField *Y_d, *X_d, *Xinv_d, *Yhat_d;
 
 int Ncolor;
@@ -56,18 +56,13 @@ void initFields(QudaPrecision prec)
   param.pc_type = QUDA_4D_PC;
 
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  param.gammaBasis = param.nSpin == 4 ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   param.create = QUDA_ZERO_FIELD_CREATE;
   param.setPrecision(prec, prec, true);
   param.location = QUDA_CUDA_FIELD_LOCATION;
 
   resize(xD, Nsrc, param);
   resize(yD, Nsrc, param);
-
-  {
-    quda::RNG rng(xD[0], 1234);
-    for (auto &yi : yD) spinorNoise(yi, rng, QUDA_NOISE_GAUSS);
-  }
 
   GaugeFieldParam gParam;
   gParam.x[0] = xdim;
@@ -85,30 +80,6 @@ void initFields(QudaPrecision prec)
   gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.nFace = 1;
-
-  gParam.geometry = QUDA_COARSE_GEOMETRY;
-  gParam.location = QUDA_CPU_FIELD_LOCATION;
-  Y_h = new cpuGaugeField(gParam);
-  Yhat_h = new cpuGaugeField(gParam);
-
-  gParam.geometry = QUDA_SCALAR_GEOMETRY;
-  gParam.nFace = 0;
-  X_h = new cpuGaugeField(gParam);
-  Xinv_h = new cpuGaugeField(gParam);
-
-  // insert random noise into the gauge fields
-  for (auto d = 0; d < 8; d++) {
-    for (auto i = 0u; i < Y_h->Length()/8; i++) {
-      ((float**)Y_h->Gauge_p())[d][i] = double(rand()) / RAND_MAX;
-      ((float**)Yhat_h->Gauge_p())[d][i] = double(rand()) / RAND_MAX;
-    }
-  }
-
-  for (auto i = 0u; i < X_h->Length(); i++) {
-    ((float**)X_h->Gauge_p())[0][i] = double(rand()) / RAND_MAX;
-    ((float**)Xinv_h->Gauge_p())[0][i] = double(rand()) / RAND_MAX;
-  }
-
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.geometry = QUDA_COARSE_GEOMETRY;
   gParam.nFace = 1;
@@ -128,27 +99,29 @@ void initFields(QudaPrecision prec)
 
   Y_d = new cudaGaugeField(gParam);
   Yhat_d = new cudaGaugeField(gParam);
-  Y_d->copy(*Y_h);
-  Yhat_d->copy(*Yhat_h);
 
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.nFace = 0;
   X_d = new cudaGaugeField(gParam);
   Xinv_d = new cudaGaugeField(gParam);
-  X_d->copy(*X_h);
-  Xinv_d->copy(*Xinv_h);
+
+  // insert random noise into the gauge fields
+  {
+    quda::RNG rng(xD[0], 1234);
+    for (auto &yi : yD) spinorNoise(yi, rng, QUDA_NOISE_GAUSS);
+
+    gaugeNoise(*Y_d, rng, QUDA_NOISE_GAUSS);
+    gaugeNoise(*Yhat_d, rng, QUDA_NOISE_GAUSS);
+    gaugeNoise(*X_d, rng, QUDA_NOISE_GAUSS);
+    gaugeNoise(*Xinv_d, rng, QUDA_NOISE_GAUSS);
+  }
 }
 
 void freeFields()
 {
   xD.clear();
   yD.clear();
-
-  delete Y_h;
-  delete X_h;
-  delete Xinv_h;
-  delete Yhat_h;
 
   delete Y_d;
   delete X_d;
@@ -190,7 +163,7 @@ TEST(multi_rhs_test, verify)
     default: errorQuda("Undefined test %d", test_type);
     }
 
-    ASSERT_EQ(blas::max_deviation(xD[i], x_ref), 0.0);
+    EXPECT_LE(blas::xmyNorm(xD[i], x_ref), 1e-6);
   }
 }
 
@@ -267,7 +240,7 @@ int main(int argc, char **argv)
   param.halo_precision = smoother_halo_prec;
   param.kappa = 1.0;
   param.dagger = QUDA_DAG_NO;
-  dirac = new DiracCoarse(param, Y_h, X_h, Xinv_h, Yhat_h, Y_d, X_d, Xinv_d, Yhat_d);
+  dirac = new DiracCoarse(param, nullptr, nullptr, nullptr, nullptr, Y_d, X_d, Xinv_d, Yhat_d);
 
   if (verify_results) {
     // Ensure gtest prints only from rank 0

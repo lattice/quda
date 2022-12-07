@@ -43,7 +43,8 @@ set (QUDA_OBJS
   dirac_improved_staggered.cpp dirac_improved_staggered_kd.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp 
-  llfat_quda.cu gauge_force.cu gauge_loop_trace.cu gauge_polyakov_loop.cu gauge_random.cu
+  llfat_quda.cu gauge_force.cu gauge_loop_trace.cu gauge_polyakov_loop.cu
+  gauge_random.cu gauge_noise.cu
   gauge_field_strength_tensor.cu clover_quda.cu 
   dslash_gamma_helper.cu dslash_clover_helper.cu
   staggered_kd_build_xinv.cu staggered_kd_reorder_xinv.cu staggered_kd_apply_xinv.cu
@@ -162,6 +163,7 @@ configure_file(restrictor.in.cpp restrictor.cpp @ONLY)
 configure_file(block_orthogonalize.in.cpp block_orthogonalize.cpp @ONLY)
 configure_file(copy_gauge.in.cpp copy_gauge.cpp @ONLY)
 configure_file(extract_gauge_ghost.in.cu extract_gauge_ghost.cu @ONLY)
+configure_file(gauge_noise.in.cu gauge_noise.cu @ONLY)
 configure_file(gauge_norm.in.cu gauge_norm.cu @ONLY)
 configure_file(spinor_noise.in.cu spinor_noise.cu @ONLY)
 configure_file(copy_color_spinor_mg.in.hpp copy_color_spinor_mg.hpp @ONLY)
