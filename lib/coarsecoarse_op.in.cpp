@@ -49,8 +49,12 @@ namespace quda {
                       const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mass, double mu, double mu_factor,
                       QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional, bool use_mma)
   {
-    IntList<@QUDA_MULTIGRID_NVEC_LIST@> fineColors;
-    CoarseCoarseOp(Y, X, T, gauge, clover, cloverInv, kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional, use_mma, fineColors);
+    if constexpr (is_enabled_multigrid()) {
+      IntList<@QUDA_MULTIGRID_NVEC_LIST@> fineColors;
+      CoarseCoarseOp(Y, X, T, gauge, clover, cloverInv, kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional, use_mma, fineColors);
+    } else {
+      errorQuda("Multigrid has not been built");
+    }
   }
 
 }

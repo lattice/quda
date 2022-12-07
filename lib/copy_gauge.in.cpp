@@ -1,4 +1,5 @@
 #include <gauge_field.h>
+#include <multigrid.h>
 
 namespace quda {
 
@@ -60,7 +61,7 @@ namespace quda {
   void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
 			void *Out, void *In, void **ghostOut, void **ghostIn, int type) {
     // do not copy the ghost zone if it does not exist
-    if (type == 0 && (in.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD || 
+    if (type == 0 && (in.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD ||
           out.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD)) type = 2;
 
     if (in.Ncolor() != out.Ncolor())
@@ -70,7 +71,11 @@ namespace quda {
       errorQuda("Field geometries %d %d do not match", out.Geometry(), in.Geometry());
 
     if (in.Ncolor() != 3) {
-      copyGenericGaugeMG(out, in, location, Out, In, ghostOut, ghostIn, type, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+      if constexpr (is_enabled_multigrid()) {
+        copyGenericGaugeMG(out, in, location, Out, In, ghostOut, ghostIn, type, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+      } else {
+        errorQuda("Multigrid has not been built");
+      }
     } else if (in.Precision() == QUDA_DOUBLE_PRECISION) {
       copyGenericGaugeDoubleIn(out, in, location, Out, In, ghostOut, ghostIn, type);
     } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
@@ -82,7 +87,7 @@ namespace quda {
     } else {
       errorQuda("Unknown precision %d", out.Precision());
     }
-  } 
- 
+  }
+
 
 } // namespace quda

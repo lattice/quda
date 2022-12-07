@@ -43,8 +43,12 @@ namespace quda {
   void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
                           const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho, bool two_pass)
   {
-    IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> fineColors;
-    BlockOrthogonalize(V, B, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs, n_block_ortho, two_pass, fineColors);
+    if constexpr (is_enabled_multigrid()) {
+      IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> fineColors;
+      BlockOrthogonalize(V, B, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs, n_block_ortho, two_pass, fineColors);
+    } else {
+      errorQuda("Multigrid has not been built");
+    }
   }
 
 }

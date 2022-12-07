@@ -40,8 +40,12 @@ namespace quda {
                 const CloverField *clover, double kappa, double mass, double mu, double mu_factor,
                 QudaDiracType dirac, QudaMatPCType matpc)
   {
-    IntList<3> fineColors;
-    CoarseOp(Y, X, T, gauge, clover, kappa, mass, mu, mu_factor, dirac, matpc, fineColors);
+    if constexpr (is_enabled_multigrid()) {
+      IntList<3> fineColors;
+      CoarseOp(Y, X, T, gauge, clover, kappa, mass, mu, mu_factor, dirac, matpc, fineColors);
+    } else {
+      errorQuda("Multigrid has not been built");
+    }
   }
 
 }

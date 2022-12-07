@@ -34,7 +34,11 @@ namespace quda {
                    double kappa, int parity, bool dslash, bool clover, bool dagger,
                    const int *commDim, QudaPrecision halo_precision)
   {
-    ApplyCoarse(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, commDim, halo_precision, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+    if constexpr (is_enabled_multigrid()) {
+      ApplyCoarse(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, commDim, halo_precision, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+    } else {
+      errorQuda("Multigrid has not been built");
+    }
   }
 
 } // namespace quda

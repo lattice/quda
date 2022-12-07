@@ -1,6 +1,6 @@
 #include <gauge_field_order.h>
 #include <extract_gauge_ghost_helper.cuh>
-#include <instantiate.h>
+#include "multigrid.h"
 
 namespace quda {
 
@@ -136,12 +136,16 @@ namespace quda {
     }
   }
 
-  void extractGaugeGhost(const GaugeField &u, void **ghost, bool extract, int offset) {
-
+  void extractGaugeGhost(const GaugeField &u, void **ghost, bool extract, int offset)
+  {
     // if number of colors doesn't equal three then we must have
     // coarse-gauge field
     if (u.Ncolor() != 3) {
-      extractGaugeGhostMG(u, ghost, extract, offset, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+      if constexpr (is_enabled_multigrid()) {
+        extractGaugeGhostMG(u, ghost, extract, offset, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+      } else {
+        errorQuda("Multigrid has not been built");
+      }
     } else {
       instantiatePrecision<GhostExtract>(u, ghost, extract, offset);
     }

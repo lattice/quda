@@ -37,10 +37,14 @@ namespace quda {
   void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge, const cudaGaugeField &longGauge,
                          const GaugeField& XinvKD, double mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
   {
-    if (gauge.Ncolor() != 3 && longGauge.Ncolor() != 3 && XinvKD.Ncolor() != 3)
-      errorQuda("Unsupported number of colors %d %d %d\n", gauge.Ncolor(), longGauge.Ncolor(), XinvKD.Ncolor());
-    IntList<3> fineColors;
-    StaggeredCoarseOp(Y, X, T, gauge, longGauge, XinvKD, mass, allow_truncation, dirac, matpc, fineColors);
+    if constexpr (is_enabled_spin(1) && is_enabled_multigrid()) {
+      if (gauge.Ncolor() != 3 && longGauge.Ncolor() != 3 && XinvKD.Ncolor() != 3)
+        errorQuda("Unsupported number of colors %d %d %d\n", gauge.Ncolor(), longGauge.Ncolor(), XinvKD.Ncolor());
+      IntList<3> fineColors;
+      StaggeredCoarseOp(Y, X, T, gauge, longGauge, XinvKD, mass, allow_truncation, dirac, matpc, fineColors);
+    } else {
+      errorQuda("Staggered Multigrid has not been built");
+    }
   }
 
 }
