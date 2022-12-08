@@ -20,7 +20,7 @@
   do {                                                                                                                 \
     int status = mpi_call;                                                                                             \
     if (status != MPI_SUCCESS) {                                                                                       \
-      char err_string[128];                                                                                            \
+      char err_string[MPI_MAX_ERROR_STRING];                                                                           \
       int err_len;                                                                                                     \
       MPI_Error_string(status, err_string, &err_len);                                                                  \
       err_string[127] = '\0';                                                                                          \
