@@ -90,8 +90,10 @@ namespace quda {
       errorQuda("Unsupported precision %d", U->Precision());      
     }
 
-    if (copy_back) U_.copy(*U);
-    delete U;
+    if (copy_back) {
+      U_.copy(*U);
+      delete U;
+    }
 
     // ensure multi-gpu consistency if required
     if (U_.GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED) {

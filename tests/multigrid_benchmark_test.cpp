@@ -226,7 +226,7 @@ int main(int argc, char **argv)
     return app->exit(e);
   }
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
-  Ncolor = nvec[0] = 0 ? 24 : nvec[0];
+  Ncolor = nvec[0] == 0 ? 24 : nvec[0];
 
   initComms(argc, argv, gridsize_from_cmdline);
   display_test_info();
