@@ -198,6 +198,10 @@ set(QUDA_ORDER_FP "8" CACHE STRING "which data order to use for Wilson, gauge (r
 set(QUDA_ORDER_SP_MG "2" CACHE STRING "which data order to use for fp32 MG fields (2, 4)")
 set(QUDA_ORDER_FP_MG "2" CACHE STRING "which data order to use for fixed-point MG fields (2, 4, 8)")
 
+set_property(CACHE QUDA_ORDER_FP PROPERTY STRINGS 4 8)
+set_property(CACHE QUDA_ORDER_SP_MG PROPERTY STRINGS 2 4)
+set_property(CACHE QUDA_ORDER_FP_MG PROPERTY STRINGS 2 4 8)
+
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
 
 # QUDA uses tiling routines to compute certain BLAS routines. The maximum allowable
