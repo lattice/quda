@@ -93,7 +93,7 @@ namespace quda
   {
     // determine which GPU this rank will use
     char *hostname = comm_hostname();
-    MPI_CHECK(MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_HANDLE));
+    MPI_CHECK(MPI_Allgather(hostname, QUDA_MAX_HOSTNAME_STRING, MPI_CHAR, hostname_recv_buf, QUDA_MAX_HOSTNAME_STRING, MPI_CHAR, MPI_COMM_HANDLE));
   }
 
   void Communicator::comm_gather_gpuid(int *gpuid_recv_buf)

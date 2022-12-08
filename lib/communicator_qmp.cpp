@@ -118,17 +118,17 @@ namespace quda
     char *hostname = comm_hostname();
 
 #ifdef USE_MPI_GATHER
-  MPI_CHECK(MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_HANDLE));
+  MPI_CHECK(MPI_Allgather(hostname, QUDA_MAX_HOSTNAME_STRING, MPI_CHAR, hostname_recv_buf, QUDA_MAX_HOSTNAME_STRING, MPI_CHAR, MPI_COMM_HANDLE));
 #else
   // Abuse reductions to emulate all-gather.  We need to copy the
   // local hostname to all other nodes
   // this isn't very scalable though
   for (int i = 0; i < comm_size(); i++) {
-    int data[128];
-    for (int j = 0; j < 128; j++) {
+    int data[QUDA_MAX_HOSTNAME_STRING];
+    for (int j = 0; j < QUDA_MAX_HOSTNAME_STRING; j++) {
       data[j] = (i == comm_rank()) ? hostname[j] : 0;
       QMP_comm_sum_int(QMP_COMM_HANDLE, data + j);
-      hostname_recv_buf[i * 128 + j] = data[j];
+      hostname_recv_buf[i * QUDA_MAX_HOSTNAME_STRING + j] = data[j];
     }
   }
 #endif
