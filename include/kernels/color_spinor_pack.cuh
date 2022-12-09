@@ -60,6 +60,7 @@ namespace quda {
 
   template <typename store_t, typename ghost_store_t, int nSpin_, int nColor_, int nDim_, QudaFieldOrder order>
   struct PackGhostArg : kernel_param<> {
+    static constexpr ThreadsSync requires_threads_sync = ThreadsSyncX;
     static constexpr bool block_float = sizeof(store_t) == QUDA_SINGLE_PRECISION && isFixed<ghost_store_t>::value;
 
     // ensure we only compile supported block-float kernels
