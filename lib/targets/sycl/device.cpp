@@ -11,6 +11,7 @@ static size_t syncStamp[Nstream];   // eventCount of last sync
 static void *argBufD[Nstream];
 static size_t argBufSizeD[Nstream];
 
+#ifdef OLDSYCL
 class mySelectorT : public sycl::device_selector {
   int operator()(const sycl::device& device) const override {
     int score = 1;
@@ -23,10 +24,23 @@ class mySelectorT : public sycl::device_selector {
   }
 };
 //static auto mySelector = sycl::default_selector();
+static auto mySelector = mySelectorT();
+#else
+int mySelectorT(const sycl::device& device) {
+  int score = 1;
+  if(device.get_info<sycl::info::device::device_type>() ==
+     sycl::info::device_type::gpu) score += 10;
+  if(!device.has(sycl::aspect::fp64)) score = -1;  // require fp64
+  printfQuda("Selector score: %2i %s\n", score,
+	     device.get_info<sycl::info::device::name>().c_str());
+  return score;
+}
+//static auto mySelector = sycl::default_selector_v;
 //static auto mySelector = sycl::host_selector();
 //static auto mySelector = sycl::cpu_selector();
 //static auto mySelector = sycl::gpu_selector();
-static auto mySelector = mySelectorT();
+static auto mySelector = mySelectorT;
+#endif
 
 void exception_handler(sycl::exception_list exceptions)
 {

@@ -303,12 +303,12 @@ void qudaHisqForce(int prec, int num_terms, int num_naik_terms, double dt, doubl
   return;
 }
 
-void qudaAsqtadForce(int, const double[], const void *const[], const void *const[4], const void *const, void *const)
+void qudaAsqtadForce(int, const double[6], const void *const[4], const void *const[4], const void *const, void *const)
 {
   errorQuda("This interface has been removed and is no longer supported");
 }
 
-void qudaComputeOprod(int, int, int, double **, double, void **, void *[])
+void qudaComputeOprod(int, int, int, double **, double, void **, void *[3])
 {
   errorQuda("This interface has been removed and is no longer supported");
 }

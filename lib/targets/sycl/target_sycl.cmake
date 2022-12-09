@@ -99,10 +99,23 @@ set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-SYCL")
 # ######################################################################################################################
 # sycl specific compile options
 
-if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xClang" OR
-   "x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xIntelLLVM")
-  #target_compile_options(quda INTERFACE -fhonor-nan-compares)
-  #target_compile_options(quda PRIVATE -fhonor-nan-compares)
+if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xClang")
+  #target_compile_options(quda PUBLIC -fhonor-nan-compares)
+  target_compile_options(quda PUBLIC -Wno-tautological-constant-compare)
+  target_compile_options(quda PRIVATE -Wno-division-by-zero)
+  target_compile_options(quda PRIVATE -Wno-sign-compare)
+  target_compile_options(quda PRIVATE -Wno-pass-failed)
+  target_compile_options(quda PRIVATE -Wno-unused-parameter)
+  #target_compile_options(quda PRIVATE -Wno-unused-but-set-variable)
+  #target_compile_options(quda PRIVATE -Wno-error)
+  target_compile_options(quda PUBLIC -fsycl)
+
+  set(SYCL_FLAGS "-mllvm -pragma-unroll-threshold=16")
+
+  set(SYCL_LINK_FLAGS -fsycl -fsycl-device-code-split=per_kernel)
+endif()
+
+if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xIntelLLVM")
   target_compile_options(quda PUBLIC -fhonor-nan-compares)
   target_compile_options(quda PUBLIC -Wno-tautological-constant-compare)
   target_compile_options(quda PRIVATE -Wno-division-by-zero)
@@ -111,8 +124,6 @@ if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xClang" OR
   target_compile_options(quda PRIVATE -Wno-unused-parameter)
   #target_compile_options(quda PRIVATE -Wno-unused-but-set-variable)
   #target_compile_options(quda PRIVATE -Wno-error)
-  #target_compile_options(quda INTERFACE -fsycl)
-  #target_compile_options(quda PRIVATE -fsycl)
   target_compile_options(quda PUBLIC -fsycl)
 
   set(SYCL_FLAGS "-mllvm -pragma-unroll-threshold=16")
