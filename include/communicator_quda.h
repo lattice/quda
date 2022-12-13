@@ -272,7 +272,7 @@ namespace quda
               continue;
 
             // if the neighbors are on the same
-            if (!strncmp(hostname, &hostname_recv_buf[128 * neighbor_rank], 128)) {
+            if (!strncmp(hostname, &hostname_recv_buf[QUDA_MAX_HOSTNAME_STRING * neighbor_rank], QUDA_MAX_HOSTNAME_STRING)) {
               int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
 
               bool can_access_peer = comm_peer2peer_possible(gpuid, neighbor_gpuid);
@@ -524,7 +524,7 @@ namespace quda
     comm_set_default_topology(topo);
 
     // determine which GPU this rank will use
-    char *hostname_recv_buf = (char *)safe_malloc(128 * comm_size());
+    char *hostname_recv_buf = (char *)safe_malloc(QUDA_MAX_HOSTNAME_STRING * comm_size());
     comm_gather_hostname(hostname_recv_buf);
 
     if (gpuid < 0) {
@@ -534,7 +534,7 @@ namespace quda
       // We initialize gpuid if it's still negative.
       gpuid = 0;
       for (int i = 0; i < comm_rank(); i++) {
-        if (!strncmp(comm_hostname(), &hostname_recv_buf[128 * i], 128)) { gpuid++; }
+        if (!strncmp(comm_hostname(), &hostname_recv_buf[QUDA_MAX_HOSTNAME_STRING * i], QUDA_MAX_HOSTNAME_STRING)) { gpuid++; }
       }
 
       if (gpuid >= device_count) {
