@@ -8,7 +8,7 @@
 namespace quda {
 
   template <typename real, int nColor>
-  class GaugeNoise : TunableKernel3D
+  class GaugeNoise : TunableKernel2D
   {
     GaugeField &U;
     RNG &rng;
@@ -17,7 +17,7 @@ namespace quda {
 
   public:
     GaugeNoise(GaugeField &U, RNG &rng, QudaNoiseType type) :
-      TunableKernel3D(U, 2 * U.Ncolor(), U.Ncolor()),
+      TunableKernel2D(U, 2),
       U(U),
       rng(rng),
       type(type)
