@@ -104,12 +104,12 @@ namespace quda
 
 #ifdef USE_FP16_HMMA_ACCUMULATE
 
-    struct MmaOperandC {
+    struct OperandC {
 
       using reg_type = unsigned;
       reg_type reg[2];
 
-      __device__ inline MmaOperandC() { zero(); }
+      __device__ inline OperandC() { zero(); }
 
       __device__ inline void zero()
       {
