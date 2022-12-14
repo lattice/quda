@@ -38,7 +38,8 @@ namespace quda
       constexpr int t_n = divide_b_no ? 1 : (Arg::N + bN - 1) / bN;
       tp.grid = dim3(arg.threads.x * t_m * t_n, 2, 4);
 
-      tp.shared_bytes = shared_memory_bytes(bM, bN, bK);
+      using mma_t = hmma_t;
+      tp.shared_bytes = shared_memory_bytes<mma_t>(bM, bN, bK);
       tp.set_max_shared_bytes = true;
 
       tunable.template launch_cuda<CalculateYhatMMA>(

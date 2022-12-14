@@ -35,7 +35,9 @@ namespace quda
       tp.block.x = 1;
       tp.block.y = block_y;
       tp.block.z = block_z;
-      constexpr int shared_bytes = shared_memory_bytes(bM, bN, bK);
+
+      using mma_t = hmma_t;
+      constexpr int shared_bytes = shared_memory_bytes<mma_t>(bM, bN, bK);
       tp.shared_bytes = shared_bytes;
 
       // TODO: Fix the split M/N.
@@ -342,7 +344,8 @@ namespace quda
       tp.block.x = 1;
       tp.block.y = block_y;
       tp.block.z = block_z;
-      constexpr int shared_bytes = shared_memory_bytes(bM, bN, bK);
+      using mma_t = hmma_t;
+      constexpr int shared_bytes = shared_memory_bytes<mma_t>(bM, bN, bK);
       tp.shared_bytes = shared_bytes;
 
       // TODO: Fix the split M/N.

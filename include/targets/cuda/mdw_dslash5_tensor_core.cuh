@@ -11,16 +11,7 @@
 #include <quda_fp16.cuh>
 
 #include <block_reduce_helper.h>
-
-#if (__COMPUTE_CAPABILITY__ < 750)
-
-#include <mma_tensor_op/hmma_m16n16k16_sm70.cuh>
-
-#else // (__COMPUTE_CAPABILITY__ < 750)
-
-#include <mma_tensor_op/hmma_m16n8k8_sm80.cuh>
-
-#endif // (__COMPUTE_CAPABILITY__ < 750)
+#include <mma_tensor_op/mma_dispatch.cuh>
 
 namespace quda
 {
@@ -371,19 +362,13 @@ namespace quda
 #endif
   }
 
-  template <int BlockDimX, int Ls, int M, int N, int M_PAD, int N_PAD, bool reload, class T>
-  __device__ inline void mma_sync_gemm(T op_a[], half *sm_a, half *sm_b, half *sm_c, const mma::WarpRegisterMapping &wrm)
+  template <class mma_t, int BlockDimX, int Ls, int M, int N, int M_PAD, int N_PAD, bool reload, class T>
+  __device__ inline void mma_sync_gemm(T op_a[], half *sm_a, half *sm_b, half *sm_c, const typename mma_t::WarpRegisterMapping &wrm)
   {
 
-#ifdef USE_FP16_HMMA_ACCUMULATE
-    using accumuate_reg_type = half;
-#else
-    using accumuate_reg_type = float;
-#endif
-
-    constexpr int tile_row_dim = M / mma::MMA_M; // number of tiles in the column dimension
-    constexpr int tile_col_dim = N / mma::MMA_N; // number of tiles in the row dimension
-    constexpr int tile_acc_dim = M / mma::MMA_K; // number of tiles in the row dimension
+    constexpr int tile_row_dim = M / mma_t::MMA_M; // number of tiles in the column dimension
+    constexpr int tile_col_dim = N / mma_t::MMA_N; // number of tiles in the row dimension
+    constexpr int tile_acc_dim = M / mma_t::MMA_K; // number of tiles in the row dimension
 
     constexpr int total_warp = BlockDimX * Ls / 32;
 
@@ -402,7 +387,7 @@ namespace quda
 #pragma unroll
     for (int c = 0; c < warp_cycle; c++) {
 
-      mma::MmaOperandC<accumuate_reg_type> op_c;
+      typename mma_t::OperandC op_c;
 
       // The logical warp assigned to each part of the matrix.
       const int logical_warp_index = warp_id * warp_cycle + c;
@@ -419,19 +404,19 @@ namespace quda
           op_a[0].template load<M_PAD>(sm_a, tile_k, warp_row, wrm);
         }
 
-        mma::MmaOperandB op_b;
-        op_b.load<N_PAD>(sm_b, tile_k, warp_col, wrm);
+        typename mma_t::OperandB op_b;
+        op_b.template load<N_PAD>(sm_b, tile_k, warp_col, wrm);
 
         if (reload) {
-          mma::gemm(op_a[0], op_b, op_c);
+          mma_t::mma(op_a[0], op_b, op_c);
         } else {
-          mma::gemm(op_a[tile_k], op_b, op_c);
+          mma_t::mma(op_a[tile_k], op_b, op_c);
         }
       }
 
       __syncthreads();
 
-      op_c.store<N_PAD>(sm_c, warp_row, warp_col, wrm);
+      op_c.template store<N_PAD>(sm_c, warp_row, warp_col, wrm);
     }
   }
 

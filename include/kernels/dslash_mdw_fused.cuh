@@ -14,12 +14,14 @@ namespace quda {
 
     constexpr int sm_m_pad_size(int m)
     {
-      return quda::mma::pad_size(m);
+      using mma_t = mma::hmma_t;
+      return mma_t::pad_size(m);
     }
 
     constexpr int sm_n_pad_size(int n)
     {
-      return quda::mma::pad_size(n);
+      using mma_t = mma::hmma_t;
+      return mma_t::pad_size(n);
     }
 
     /**
@@ -338,9 +340,10 @@ namespace quda {
         int s4_shift_base = blockIdx.x * blockDim.x; // base.
         int s4_shift, sid;
 
-        constexpr int tm_dim = M / mma::MMA_M;
-        constexpr int tn_dim = N / mma::MMA_N;
-        constexpr int tk_dim = M / mma::MMA_K;
+        using mma_t = mma::hmma_t;
+        constexpr int tm_dim = M / mma_t::MMA_M;
+        constexpr int tn_dim = N / mma_t::MMA_N;
+        constexpr int tk_dim = M / mma_t::MMA_K;
 
         constexpr int total_warp = Arg::block_dim_x * Ls >> 5;
         const int this_warp = (threadIdx.y * Arg::block_dim_x + threadIdx.x) >> 5;
@@ -350,9 +353,9 @@ namespace quda {
         constexpr int warp_cycle = total_tile / total_warp;
         const int warp_m = this_warp * warp_cycle / tn_dim;
 
-        mma::WarpRegisterMapping wrm(threadIdx.y * blockDim.x + threadIdx.x);
-        mma::MmaOperandA op_a[Arg::reload ? 1 : tk_dim];
-        mma::MmaOperandA op_a_aux[Arg::reload ? 1 : tk_dim];
+        typename mma_t::WarpRegisterMapping wrm(threadIdx.y * blockDim.x + threadIdx.x);
+        typename mma_t::OperandA op_a[Arg::reload ? 1 : tk_dim];
+        typename mma_t::OperandA op_a_aux[Arg::reload ? 1 : tk_dim];
         if (!Arg::reload) { // the data in registers can be resued.
 #pragma unroll
           for (int tile_k = 0; tile_k < tk_dim; tile_k++) { op_a[tile_k].template load<M_sm>(sm_a, tile_k, warp_m, wrm); }
@@ -404,7 +407,7 @@ namespace quda {
           load_matrix_b_vector<N_sm / 2, false>(in_vec, sm_b, scale); // acc(accumulation) = false
 
           __syncthreads();
-          mma_sync_gemm<Arg::block_dim_x, Arg::Ls, M, N, M_sm, N_sm, Arg::reload>(op_a, sm_a, sm_c, sm_c, wrm);
+          mma_sync_gemm<mma_t, Arg::block_dim_x, Arg::Ls, M, N, M_sm, N_sm, Arg::reload>(op_a, sm_a, sm_c, sm_c, wrm);
           __syncthreads();
 
           if (Arg::type == MdwfFusedDslashType::D4_D5INV_D5INVDAG) {
@@ -421,7 +424,7 @@ namespace quda {
             load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, scale, arg.m_scale); // acc = true
             if (!idle && center) { store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back, scale); }
             __syncthreads();
-            mma_sync_gemm<Arg::block_dim_x, Arg::Ls, M, N, M_sm, N_sm, Arg::reload>(op_a_aux, sm_a_black, sm_c, sm_c, wrm);
+            mma_sync_gemm<mma_t, Arg::block_dim_x, Arg::Ls, M, N, M_sm, N_sm, Arg::reload>(op_a_aux, sm_a_black, sm_c, sm_c, wrm);
             __syncthreads();
 
           } else if (Arg::type == MdwfFusedDslashType::D4DAG_D5PREDAG) {

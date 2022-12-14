@@ -4,31 +4,26 @@
 #include <quda_fp16.cuh>
 #include <array.h>
 
-// This macro determines whether or not we are using the fp16 accumulation of the MMA instruction.
-// #define USE_FP16_HMMA_ACCUMULATE
-
-constexpr QudaPrecision accumulate_precision()
-{
-#ifdef USE_FP16_HMMA_ACCUMULATE
-  return QUDA_HALF_PRECISION;
-#else
-  return QUDA_SINGLE_PRECISION;
-#endif
-}
-
 // Here we implement the architecture dependent part of MMA for Turing/Ampere (sm75/sm80, the mma.sync.m16n8k8 instruction).
 
 namespace quda
 {
   namespace mma
   {
-    __device__ __host__ constexpr int inline pad_size(int m) { return m == 192 ? 0 : 8; }
 
-    constexpr int MMA_M = 16;
-    constexpr int MMA_N = 8;
-    constexpr int MMA_K = 8;
+    template <>
+    struct mma_instruction_t <16, 8, 8, half, half2> {
 
-    constexpr int warp_size = 32;
+    static __device__ __host__ constexpr int inline pad_size(int m) { return m == 192 ? 0 : 8; }
+
+    static constexpr int MMA_M = 16;
+    static constexpr int MMA_N = 8;
+    static constexpr int MMA_K = 8;
+
+    static constexpr int warp_size = 32;
+
+    using compute_t = half;
+    using load_t = half2;
 
     struct WarpRegisterMapping {
 
@@ -43,7 +38,7 @@ namespace quda
       }
     };
 
-    struct MmaOperandA {
+    struct OperandA {
 
       unsigned reg[2];
 
@@ -76,7 +71,7 @@ namespace quda
       }
     };
 
-    struct MmaOperandB {
+    struct OperandB {
 
       unsigned reg[1];
 
@@ -101,10 +96,14 @@ namespace quda
       }
     };
 
-    template <class store_type> struct MmaOperandC {
+    template <typename real, int length> struct Structure {
+      real v[length];
+      __device__ inline const real &operator[](int i) const { return v[i]; }
+      __device__ inline real &operator[](int i) { return v[i]; }
     };
 
-    template <> struct MmaOperandC<half> {
+#if USE_FP16_HMMA_ACCUMULATE
+    struct MmaOperandC {
 
       using reg_type = unsigned;
       reg_type reg[2];
@@ -151,71 +150,17 @@ namespace quda
       }
     };
 
-    template <> struct MmaOperandC<float> {
-
-      using reg_type = float;
-      reg_type reg[4];
-
-      __device__ inline MmaOperandC() { zero(); }
-
-      __device__ inline void zero()
-      {
-#pragma unroll
-        for (int i = 0; i < 4; i++) { reg[i] = 0; }
-      }
-
-      __device__ inline void ax(float alpha)
-      {
-#pragma unroll
-        for (int i = 0; i < 4; i++) { reg[i] *= alpha; }
-      }
-
-      template <int ldc>
-      __device__ inline void store(void *smem, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
-      {
-        half2 *C = reinterpret_cast<half2 *>(smem);
-
-        int idx_strided = warp_row * MMA_M + wrm.group_id;
-        int idx_contiguous = warp_col * (MMA_N / 2) + wrm.thread_id_in_group;
-        int thread_offset_c = idx_strided * (ldc / 2) + idx_contiguous;
-
-        C[thread_offset_c] = __floats2half2_rn(reg[0], reg[1]);
-        C[thread_offset_c + 8 * (ldc / 2)] = __floats2half2_rn(reg[2], reg[3]);
-      }
-
-      template <class F> __device__ inline void abs_max(F &max)
-      {
-#pragma unroll
-        for (int i = 0; i < 4; i++) { max = fmax(max, fabsf(reg[i])); }
-      }
-    };
-
     template <class TA, class TB, class TC>
-    __device__ inline typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
-    gemm(const TA &op_a, const TB &op_b, TC &op_c)
+    static __device__ inline typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
+    mma(const TA &op_a, const TB &op_b, TC &op_c)
     {
       asm volatile("mma.sync.aligned.m16n8k8.row.col.f16.f16.f16.f16 {%0,%1}, {%2,%3}, {%4}, {%0,%1};"
                    : "+r"(op_c.reg[0]), "+r"(op_c.reg[1])
                    : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]));
     }
 
-    template <class TA, class TB, class TC>
-    __device__ inline typename std::enable_if<std::is_same<typename TC::reg_type, float>::value, void>::type
-    gemm(const TA &op_a, const TB &op_b, TC &op_c)
-    {
-      asm volatile("mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32 {%0,%1,%2,%3}, {%4,%5}, {%6}, {%0,%1,%2,%3};"
-                   : "+f"(op_c.reg[0]), "+f"(op_c.reg[1]), "+f"(op_c.reg[2]), "+f"(op_c.reg[3])
-                   : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]));
-    }
-
-    template <typename real, int length> struct Structure {
-      real v[length];
-      __device__ inline const real &operator[](int i) const { return v[i]; }
-      __device__ inline real &operator[](int i) { return v[i]; }
-    };
-
     template <int M, int N, int ldc, class TC, class GmemOperandC>
-    inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
+    static inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
     store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc, const TC &op_c_real,
                   const TC &op_c_imag)
     {
@@ -251,43 +196,8 @@ namespace quda
       }
     }
 
-    template <int M, int N, int ldc, class TC, class GmemOperandC>
-    inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, float>::value, void>::type
-    store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc, const TC &op_c_real,
-                  const TC &op_c_imag)
-    {
-      using store_type = typename GmemOperandC::store_type;
-
-      int row = warp_row + wrm.group_id;
-      int col = warp_col + wrm.thread_id_in_group * 2;
-
-      constexpr bool fixed = GmemOperandC::fixed;
-      using structure = typename VectorType<store_type, 4>::type;
-      auto ptr = reinterpret_cast<structure *>(cc.data());
-      structure s;
-
-      constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
-
-#pragma unroll
-      for (int i = 0; i < 2; i++) {
-        if (fixed) {
-          auto scale = cc.scale;
-          s.x = __half2short_rn(op_c_real.reg[i * 2 + 0] * scale);
-          s.y = __half2short_rn(op_c_imag.reg[i * 2 + 0] * scale);
-          s.z = __half2short_rn(op_c_real.reg[i * 2 + 1] * scale);
-          s.w = __half2short_rn(op_c_imag.reg[i * 2 + 1] * scale);
-        } else {
-          s.x = op_c_real.reg[i * 2 + 0];
-          s.y = op_c_imag.reg[i * 2 + 0];
-          s.z = op_c_real.reg[i * 2 + 1];
-          s.w = op_c_imag.reg[i * 2 + 1];
-        }
-        if (!check_bounds || (row + i * 8 < M && col < N)) { ptr[((row + i * 8) * ldc + col) / 2] = s; }
-      }
-    }
-
     template <int M, int N, int ldc, bool dagger, class TC, class GmemOperandC>
-    inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
+    static inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
     store_complex_atomic(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc,
                          const TC &op_c_real, const TC &op_c_imag)
     {
@@ -337,8 +247,93 @@ namespace quda
       }
     }
 
+#else
+
+    struct OperandC {
+
+      using reg_type = float;
+      reg_type reg[4];
+
+      __device__ inline OperandC() { zero(); }
+
+      __device__ inline void zero()
+      {
+#pragma unroll
+        for (int i = 0; i < 4; i++) { reg[i] = 0; }
+      }
+
+      __device__ inline void ax(float alpha)
+      {
+#pragma unroll
+        for (int i = 0; i < 4; i++) { reg[i] *= alpha; }
+      }
+
+      template <int ldc>
+      __device__ inline void store(void *smem, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
+      {
+        half2 *C = reinterpret_cast<half2 *>(smem);
+
+        int idx_strided = warp_row * MMA_M + wrm.group_id;
+        int idx_contiguous = warp_col * (MMA_N / 2) + wrm.thread_id_in_group;
+        int thread_offset_c = idx_strided * (ldc / 2) + idx_contiguous;
+
+        C[thread_offset_c] = __floats2half2_rn(reg[0], reg[1]);
+        C[thread_offset_c + 8 * (ldc / 2)] = __floats2half2_rn(reg[2], reg[3]);
+      }
+
+      template <class F> __device__ inline void abs_max(F &max)
+      {
+#pragma unroll
+        for (int i = 0; i < 4; i++) { max = fmax(max, fabsf(reg[i])); }
+      }
+    };
+
+    template <class TA, class TB, class TC>
+    static __device__ inline void
+    mma(const TA &op_a, const TB &op_b, TC &op_c)
+    {
+      asm volatile("mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32 {%0,%1,%2,%3}, {%4,%5}, {%6}, {%0,%1,%2,%3};"
+                   : "+f"(op_c.reg[0]), "+f"(op_c.reg[1]), "+f"(op_c.reg[2]), "+f"(op_c.reg[3])
+                   : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]));
+    }
+
+    template <int M, int N, int ldc, class TC, class GmemOperandC>
+    static inline __device__ void
+    store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc, const TC &op_c_real,
+                  const TC &op_c_imag)
+    {
+      using store_type = typename GmemOperandC::store_type;
+
+      int row = warp_row + wrm.group_id;
+      int col = warp_col + wrm.thread_id_in_group * 2;
+
+      constexpr bool fixed = GmemOperandC::fixed;
+      using structure = typename VectorType<store_type, 4>::type;
+      auto ptr = reinterpret_cast<structure *>(cc.data());
+      structure s;
+
+      constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
+
+#pragma unroll
+      for (int i = 0; i < 2; i++) {
+        if (fixed) {
+          auto scale = cc.scale;
+          s.x = __half2short_rn(op_c_real.reg[i * 2 + 0] * scale);
+          s.y = __half2short_rn(op_c_imag.reg[i * 2 + 0] * scale);
+          s.z = __half2short_rn(op_c_real.reg[i * 2 + 1] * scale);
+          s.w = __half2short_rn(op_c_imag.reg[i * 2 + 1] * scale);
+        } else {
+          s.x = op_c_real.reg[i * 2 + 0];
+          s.y = op_c_imag.reg[i * 2 + 0];
+          s.z = op_c_real.reg[i * 2 + 1];
+          s.w = op_c_imag.reg[i * 2 + 1];
+        }
+        if (!check_bounds || (row + i * 8 < M && col < N)) { ptr[((row + i * 8) * ldc + col) / 2] = s; }
+      }
+    }
+
     template <int M, int N, int ldc, bool dagger, class TC, class GmemOperandC>
-    inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, float>::value, void>::type
+    static inline __device__ void
     store_complex_atomic(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc,
                          const TC &op_c_real, const TC &op_c_imag)
     {
@@ -385,6 +380,10 @@ namespace quda
         }
       }
     }
+
+#endif
+
+    };
 
   } // namespace mma
 } // namespace quda

@@ -2,25 +2,65 @@
 
 #include <algorithm>
 #include <array.h>
-
-#if (__COMPUTE_CAPABILITY__ == 700)
-
-#include <mma_tensor_op/hmma_m16n16k16_sm70.cuh>
-
-#else
-
-#include <mma_tensor_op/hmma_m16n8k8_sm80.cuh>
-
-#endif
+#include <mma_tensor_op/mma_dispatch.cuh>
 
 namespace quda
 {
   namespace mma
   {
     // return the size of the shared memory needed for MMA with block shape bM, bN, bK.
+    template <class mma_t>
     constexpr int shared_memory_bytes(int bM, int bN, int bK)
     {
-      return (bM + pad_size(bM) + bN + pad_size(bN)) * bK * 2 * sizeof(half);
+      return (bM + mma_t::pad_size(bM) + bN + mma_t::pad_size(bN)) * bK * 2 * sizeof(typename mma_t::compute_t);
+    }
+
+    /**
+      @brief Defining how many elements/atoms are there in type T ...
+     */
+    template <class T> struct batch_multiple { };
+
+    /**
+      @brief ... e.g. there are 2 half's in a half2
+     */
+    template <> struct batch_multiple <half2> { static constexpr int value = 2; };
+
+    inline __device__ void zero(half2 &reg_real, half2 &reg_imag) {
+      reg_real = __half2half2(0);
+      reg_imag = __half2half2(0);
+    }
+
+    /**
+      @brief Load from global memory and store data in registers.
+     */
+    template <bool x, bool fixed, bool dagger, int ld, class T>
+    inline __device__ void convert_x(half2 &reg_real, half2 &reg_imag, complex<T> *p, int m_idx, int n_idx, float scale_inv) {
+      if (x) {
+        auto xx = p[(m_idx + 0) * ld + n_idx];
+        auto yy = p[(m_idx + 1) * ld + n_idx];
+
+        if (fixed) {
+          reg_real = __floats2half2_rn(scale_inv * xx.real(), scale_inv * yy.real());
+          auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+          reg_imag = __floats2half2_rn(scale_inv_conj * xx.imag(), scale_inv_conj * yy.imag());
+        } else {
+          reg_real = __floats2half2_rn(+xx.real(), +yy.real());
+          reg_imag = __floats2half2_rn(dagger ? -xx.imag() : +xx.imag(), dagger ? -yy.imag() : +yy.imag());
+        }
+      } else {
+        using store_type = T;
+        using store_array = typename VectorType<store_type, 4>::type;
+        store_array v = *reinterpret_cast<store_array *>(&p[n_idx * ld + m_idx]);
+
+        if (fixed) {
+          reg_real = __floats2half2_rn(scale_inv * v.x, scale_inv * v.z);
+          auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+          reg_imag = __floats2half2_rn(scale_inv_conj * v.y, scale_inv_conj * v.w);
+        } else {
+          reg_real = __floats2half2_rn(+v.x, +v.z);
+          reg_imag = __floats2half2_rn(dagger ? -v.y : +v.y, dagger ? -v.w : +v.w);
+        }
+      }
     }
 
     // A shared memory object that bakes with it a 2-d index access method.
@@ -60,19 +100,21 @@ namespace quda
      * transpose: the global memory always assumes a column-major order, transpose = true if the destination
           shared memory is row-major.
      */
-    template <int M, int N, int bM, int bN, int block_y, int block_z, bool transpose> struct GlobalMemoryLoader {
+    template <class load_t, int M, int N, int bM, int bN, int block_y, int block_z, bool transpose> struct GlobalMemoryLoader {
 
-      static constexpr int m_stride_n = block_y * 2;
+      static constexpr int batch = batch_multiple<load_t>::value;
+
+      static constexpr int m_stride_n = block_y * batch;
       static constexpr int n_stride_n = block_z * 1;
-      static constexpr int m_stride_t = block_z * 2;
+      static constexpr int m_stride_t = block_z * batch;
       static constexpr int n_stride_t = block_y * 1;
 
       static constexpr int register_count
         = std::max(((bN + n_stride_n - 1) / n_stride_n) * ((bM + m_stride_n - 1) / m_stride_n),
                    ((bN + n_stride_t - 1) / n_stride_t) * ((bM + m_stride_t - 1) / m_stride_t));
 
-      half2 reg_real[register_count];
-      half2 reg_imag[register_count];
+      load_t reg_real[register_count];
+      load_t reg_imag[register_count];
 
       /**
        * ld: leading dimension of global memory
@@ -85,10 +127,12 @@ namespace quda
         auto scale_inv = gmem.scale_inv;
         constexpr bool fixed = GmemAccessor::fixed;
 
-        constexpr int n_stride = transpose == dagger ? block_y * 1 : block_z * 1;
-        constexpr int m_stride = transpose == dagger ? block_z * 2 : block_y * 2;
-        int n_thread_offset = transpose == dagger ? threadIdx.y * 1 : threadIdx.z * 1;
-        int m_thread_offset = transpose == dagger ? threadIdx.z * 2 : threadIdx.y * 2;
+        constexpr bool x = (transpose == dagger);
+
+        constexpr int n_stride = x ? block_y * 1 : block_z * 1;
+        constexpr int m_stride = x ? block_z * batch : block_y * batch;
+        int n_thread_offset = x ? threadIdx.y * 1 : threadIdx.z * 1;
+        int m_thread_offset = x ? threadIdx.z * batch : threadIdx.y * batch;
 
         constexpr int n_dim = (bN + n_stride - 1) / n_stride;
         constexpr int m_dim = (bM + m_stride - 1) / m_stride;
@@ -111,42 +155,9 @@ namespace quda
               int m_idx = m_idx_blk + m_offset;
 
               if (!check_global_bound || (n_idx < N && m_idx < M)) {
-
-                if (transpose == dagger) {
-
-                  auto xx = p[(m_idx + 0) * ld + n_idx];
-                  auto yy = p[(m_idx + 1) * ld + n_idx];
-
-                  if (fixed) {
-                    reg_real[m * n_dim + n] = __floats2half2_rn(scale_inv * xx.real(), scale_inv * yy.real());
-                    auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
-                    reg_imag[m * n_dim + n] = __floats2half2_rn(scale_inv_conj * xx.imag(), scale_inv_conj * yy.imag());
-                  } else {
-                    reg_real[m * n_dim + n] = __floats2half2_rn(+xx.real(), +yy.real());
-                    reg_imag[m * n_dim + n]
-                      = __floats2half2_rn(dagger ? -xx.imag() : +xx.imag(), dagger ? -yy.imag() : +yy.imag());
-                  }
-
-                } else {
-
-                  using store_type = typename GmemAccessor::store_type;
-                  using store_array = typename VectorType<store_type, 4>::type;
-                  store_array v = *reinterpret_cast<store_array *>(&p[n_idx * ld + m_idx]);
-
-                  if (fixed) {
-                    reg_real[m * n_dim + n] = __floats2half2_rn(scale_inv * v.x, scale_inv * v.z);
-                    auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
-                    reg_imag[m * n_dim + n] = __floats2half2_rn(scale_inv_conj * v.y, scale_inv_conj * v.w);
-                  } else {
-                    reg_real[m * n_dim + n] = __floats2half2_rn(+v.x, +v.z);
-                    reg_imag[m * n_dim + n] = __floats2half2_rn(dagger ? -v.y : +v.y, dagger ? -v.w : +v.w);
-                  }
-                }
-
+                convert_x<x, fixed, dagger, ld>(reg_real[m * n_dim + n], reg_imag[m * n_dim + n], p, m_idx, n_idx, scale_inv);
               } else {
-
-                reg_real[m * n_dim + n] = __half2half2(0);
-                reg_imag[m * n_dim + n] = __half2half2(0);
+                zero(reg_real[m * n_dim + n], reg_imag[m * n_dim + n]);
               }
             }
           }
@@ -156,9 +167,9 @@ namespace quda
       template <bool dagger, class SmemObj> __device__ inline void r2s(SmemObj &smem_real, SmemObj &smem_imag)
       {
         constexpr int n_stride = transpose == dagger ? block_y * 1 : block_z * 1;
-        constexpr int m_stride = transpose == dagger ? block_z * 2 : block_y * 2;
+        constexpr int m_stride = transpose == dagger ? block_z * batch : block_y * batch;
         int n_thread_offset = transpose == dagger ? threadIdx.y * 1 : threadIdx.z * 1;
-        int m_thread_offset = transpose == dagger ? threadIdx.z * 2 : threadIdx.y * 2;
+        int m_thread_offset = transpose == dagger ? threadIdx.z * batch : threadIdx.y * batch;
 
         constexpr int n_dim = (bN + n_stride - 1) / n_stride;
         constexpr int m_dim = (bM + m_stride - 1) / m_stride;
@@ -182,39 +193,39 @@ namespace quda
      * Perform the complex GEMM
      * @param m, n, k the corresponding offset in the M, N, and K direction
      */
-    template <class A, class B, class C>
-    __device__ inline void zgemm(const A &smem_obj_a_real, const A &smem_obj_a_imag, const B &smem_obj_b_real,
+    template <class mma_t, class A, class B, class C>
+    __device__ inline void complex_mma(const A &smem_obj_a_real, const A &smem_obj_a_imag, const B &smem_obj_b_real,
                                  const B &smem_obj_b_imag, C &op_c_real, C &op_c_imag, int m, int n, int k,
-                                 const WarpRegisterMapping &wrm)
+                                 const typename mma_t::WarpRegisterMapping &wrm)
     {
 
-      MmaOperandA op_a_real;
+      typename mma_t::OperandA op_a_real;
       op_a_real.load(smem_obj_a_real, k, m, wrm);
-      MmaOperandA op_a_imag;
+      typename mma_t::OperandA op_a_imag;
       op_a_imag.load(smem_obj_a_imag, k, m, wrm);
 
-      MmaOperandB op_b_real;
+      typename mma_t::OperandB op_b_real;
       op_b_real.load(smem_obj_b_real, k, n, wrm);
-      MmaOperandB op_b_imag;
+      typename mma_t::OperandB op_b_imag;
       op_b_imag.load(smem_obj_b_imag, k, n, wrm);
 
-      gemm(op_a_real, op_b_real, op_c_real);
-      gemm(op_a_imag, op_b_real, op_c_imag);
-      gemm(op_a_real, op_b_imag, op_c_imag);
+      mma_t::mma(op_a_real, op_b_real, op_c_real);
+      mma_t::mma(op_a_imag, op_b_real, op_c_imag);
+      mma_t::mma(op_a_real, op_b_imag, op_c_imag);
       // negate op_imag
       op_a_imag.negate();
-      gemm(op_a_imag, op_b_imag, op_c_real);
+      mma_t::mma(op_a_imag, op_b_imag, op_c_real);
     }
 
     // A wrapper that wraps the OperandC objects, together with the various methods to loop over it
-    template <class OperandC, int warp_cycle, int tile_col_dim> struct MmaAccumulator {
+    template <class mma_t, int warp_cycle, int tile_col_dim> struct MmaAccumulator {
 
       static constexpr int size = warp_cycle;
 
-      OperandC op_c_real[warp_cycle];
-      OperandC op_c_imag[warp_cycle];
+      typename mma_t::OperandC op_c_real[warp_cycle];
+      typename mma_t::OperandC op_c_imag[warp_cycle];
 
-      WarpRegisterMapping wrm;
+      typename mma_t::WarpRegisterMapping wrm;
 
       __device__ inline MmaAccumulator(int thread_id) : wrm(thread_id) { }
 
@@ -251,7 +262,7 @@ namespace quda
 
 #pragma unroll
           for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
-            zgemm(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, op_c_real[c], op_c_imag[c],
+            complex_mma<mma_t>(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, op_c_real[c], op_c_imag[c],
                   warp_row, warp_col, tile_k, wrm);
           }
         }
@@ -266,10 +277,10 @@ namespace quda
           const int warp_row = logical_warp_index / tile_col_dim;
           const int warp_col = logical_warp_index - warp_row * tile_col_dim;
 
-          const int warp_m_offset = warp_row * MMA_M + m_offset;
-          const int warp_n_offset = warp_col * MMA_N + n_offset;
+          const int warp_m_offset = warp_row * mma_t::MMA_M + m_offset;
+          const int warp_n_offset = warp_col * mma_t::MMA_N + n_offset;
 
-          store_complex<M, N, ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real[c], op_c_imag[c]);
+          mma_t::template store_complex<M, N, ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real[c], op_c_imag[c]);
         }
       }
 
@@ -283,10 +294,10 @@ namespace quda
           const int warp_row = logical_warp_index / tile_col_dim;
           const int warp_col = logical_warp_index - warp_row * tile_col_dim;
 
-          const int warp_m_offset = warp_row * MMA_M + m_offset;
-          const int warp_n_offset = warp_col * MMA_N + n_offset;
+          const int warp_m_offset = warp_row * mma_t::MMA_M + m_offset;
+          const int warp_n_offset = warp_col * mma_t::MMA_N + n_offset;
 
-          store_complex_atomic<M, N, ldc, dagger>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real[c],
+          mma_t::template store_complex_atomic<M, N, ldc, dagger>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real[c],
                                                   op_c_imag[c]);
         }
       }
@@ -302,7 +313,7 @@ namespace quda
     };
 
     // A conceptual class that stores all the static MMA sizes.
-    template <int M_, int N_, int K_, int lda_, int ldb_, int ldc_, int bM_, int bN_, int bK_, int block_y, int block_z>
+    template <class mma_t, int M_, int N_, int K_, int lda_, int ldb_, int ldc_, int bM_, int bN_, int bK_, int block_y, int block_z>
     struct MmaConfig {
 
       static constexpr int M = M_; // the global matrix sizes
@@ -315,17 +326,17 @@ namespace quda
       static constexpr int bN = bN_;
       static constexpr int bK = bK_;
 
-      static constexpr int tile_row_dim = bM / MMA_M; // number of tiles in the column dimension
-      static constexpr int tile_col_dim = bN / MMA_N; // number of tiles in the row dimension
-      static constexpr int tile_acc_dim = bK / MMA_K; // number of tiles in the accumulate dimension
+      static constexpr int tile_row_dim = bM / mma_t::MMA_M; // number of tiles in the column dimension
+      static constexpr int tile_col_dim = bN / mma_t::MMA_N; // number of tiles in the row dimension
+      static constexpr int tile_acc_dim = bK / mma_t::MMA_K; // number of tiles in the accumulate dimension
 
-      static constexpr int smem_lda = bM + pad_size(bM); // shared memory leading dimensions
-      static constexpr int smem_ldb = bN + pad_size(bN);
+      static constexpr int smem_lda = bM + mma_t::pad_size(bM); // shared memory leading dimensions
+      static constexpr int smem_ldb = bN + mma_t::pad_size(bN);
 
       static constexpr int n_row = block_y;
       static constexpr int n_col = block_z;
 
-      static constexpr int total_warp = n_row * n_col / warp_size; // Total number of warps in the CTA
+      static constexpr int total_warp = n_row * n_col / mma_t::warp_size; // Total number of warps in the CTA
 
       static constexpr int total_tile = tile_row_dim * tile_col_dim; // Total number of tiles dividing operand C
       static constexpr int warp_cycle = total_tile / total_warp;     // Number of tiles each warp needs to calculate
@@ -334,28 +345,20 @@ namespace quda
         = false; // In our setup, specifically in the arch-dependent code, A is always column-major, while B is always row-major
       static constexpr bool b_transpose = true;
 
-      // What accumulation type we are using for the MMA, fp16 (half) or fp32 (float)
-#ifdef USE_FP16_HMMA_ACCUMULATE
-      using accumuate_reg_type = half;
-#else
-      using accumuate_reg_type = float;
-#endif
-      static_assert(bM % MMA_M == 0, "bM must be divisible by MMA_M.");
-      static_assert(bN % MMA_N == 0, "bN must be divisible by MMA_N.");
-      static_assert(bK % MMA_K == 0, "bK must be divisible by MMA_K.");
+      static_assert(bM % mma_t::MMA_M == 0, "bM must be divisible by MMA_M.");
+      static_assert(bN % mma_t::MMA_N == 0, "bN must be divisible by MMA_N.");
+      static_assert(bK % mma_t::MMA_K == 0, "bK must be divisible by MMA_K.");
 
       static_assert((tile_row_dim * tile_col_dim) % total_warp == 0,
                     "Total number of tiles should be divisible by the number of warps.");
 
-      using SmemObjA = SharedMemoryObject<half, bM, bK, 1, smem_lda>;
-      using SmemObjB = SharedMemoryObject<half, bN, bK, 1, smem_ldb>;
+      using SmemObjA = SharedMemoryObject<typename mma_t::compute_t, bM, bK, 1, smem_lda>;
+      using SmemObjB = SharedMemoryObject<typename mma_t::compute_t, bN, bK, 1, smem_ldb>;
 
-      using OperandC = MmaOperandC<accumuate_reg_type>;
+      using Accumulator = MmaAccumulator<mma_t, warp_cycle, tile_col_dim>;
 
-      using Accumulator = MmaAccumulator<OperandC, warp_cycle, tile_col_dim>;
-
-      using ALoader = GlobalMemoryLoader<M, K, bM, bK, n_row, n_col, a_transpose>;
-      using BLoader = GlobalMemoryLoader<N, K, bN, bK, n_row, n_col, b_transpose>;
+      using ALoader = GlobalMemoryLoader<typename mma_t::load_t, M, K, bM, bK, n_row, n_col, a_transpose>;
+      using BLoader = GlobalMemoryLoader<typename mma_t::load_t, N, K, bN, bK, n_row, n_col, b_transpose>;
 
       // This is the most general MMA code: bM < M, bN < N, bK < K.
       // We divide M and N, and we stream over K, which means we need to store the accumulate register for ALL tiles.
@@ -364,7 +367,7 @@ namespace quda
       {
         float max = 0;
 
-        extern __shared__ half smem_ptr[];
+        extern __shared__ typename mma_t::compute_t smem_ptr[];
 
         SmemObjA smem_obj_a_real(smem_ptr);
         SmemObjA smem_obj_a_imag(smem_obj_a_real.ptr + smem_lda * bK);
@@ -424,17 +427,17 @@ namespace quda
       {
         float max = 0;
 
-        extern __shared__ half smem_ptr[];
+        extern __shared__ typename mma_t::compute_t smem_ptr[];
 
         SmemObjA smem_obj_a_real(smem_ptr);
         SmemObjA smem_obj_a_imag(smem_obj_a_real.ptr + smem_lda * bK);
         SmemObjB smem_obj_b_real(smem_obj_a_imag.ptr + smem_lda * bK);
         SmemObjB smem_obj_b_imag(smem_obj_b_real.ptr + smem_ldb * bK);
 
-        OperandC op_c_real;
-        OperandC op_c_imag;
+        typename mma_t::OperandC op_c_real;
+        typename mma_t::OperandC op_c_imag;
 
-        WarpRegisterMapping wrm((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x);
+        typename mma_t::WarpRegisterMapping wrm((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x);
 
         ALoader a_loader;
         BLoader b_loader;
@@ -460,7 +463,7 @@ namespace quda
 
 #pragma unroll 1
           for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
-            zgemm(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, op_c_real, op_c_imag, warp_row,
+            complex_mma<mma_t>(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, op_c_real, op_c_imag, warp_row,
                   warp_col, tile_k, wrm);
           }
 
@@ -471,10 +474,10 @@ namespace quda
 
           } else {
 
-            int warp_m_offset = warp_row * MMA_M + m_offset;
-            int warp_n_offset = warp_col * MMA_N + n_offset;
+            int warp_m_offset = warp_row * mma_t::MMA_M + m_offset;
+            int warp_n_offset = warp_col * mma_t::MMA_N + n_offset;
 
-            store_complex<M, N, ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real, op_c_imag);
+            mma_t::template store_complex<M, N, ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real, op_c_imag);
           }
         }
 
@@ -490,17 +493,17 @@ namespace quda
       {
         float max = 0;
 
-        extern __shared__ half smem_ptr[];
+        extern __shared__ typename mma_t::compute_t smem_ptr[];
 
         SmemObjA smem_obj_a_real(smem_ptr);
         SmemObjA smem_obj_a_imag(smem_obj_a_real.ptr + smem_lda * bK);
         SmemObjB smem_obj_b_real(smem_obj_a_imag.ptr + smem_lda * bK);
         SmemObjB smem_obj_b_imag(smem_obj_b_real.ptr + smem_ldb * bK);
 
-        OperandC op_c_real;
-        OperandC op_c_imag;
+        typename mma_t::OperandC op_c_real;
+        typename mma_t::OperandC op_c_imag;
 
-        WarpRegisterMapping wrm((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x);
+        typename mma_t::WarpRegisterMapping wrm((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x);
 
         ALoader a_loader;
         BLoader b_loader;
@@ -531,7 +534,7 @@ namespace quda
 
 #pragma unroll 1
             for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
-              zgemm(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, op_c_real, op_c_imag, warp_row,
+              complex_mma<mma_t>(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, op_c_real, op_c_imag, warp_row,
                     warp_col, tile_k, wrm);
             }
 
@@ -542,10 +545,10 @@ namespace quda
 
             } else {
 
-              int warp_m_offset = warp_row * MMA_M + a_m;
-              int warp_n_offset = warp_col * MMA_N;
+              int warp_m_offset = warp_row * mma_t::MMA_M + a_m;
+              int warp_n_offset = warp_col * mma_t::MMA_N;
 
-              store_complex<M, N, ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real, op_c_imag);
+              mma_t::template store_complex<M, N, ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real, op_c_imag);
             }
           }
 
