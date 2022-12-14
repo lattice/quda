@@ -1,7 +1,7 @@
 #pragma once
 
 // This macro determines whether or not we are using the fp16 accumulation of the MMA instruction.
-// #define USE_FP16_HMMA_ACCUMULATE
+#define USE_FP16_HMMA_ACCUMULATE
 
 constexpr QudaPrecision accumulate_precision()
 {

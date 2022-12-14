@@ -102,7 +102,8 @@ namespace quda
       __device__ inline real &operator[](int i) { return v[i]; }
     };
 
-#if USE_FP16_HMMA_ACCUMULATE
+#ifdef USE_FP16_HMMA_ACCUMULATE
+
     struct MmaOperandC {
 
       using reg_type = unsigned;
@@ -150,19 +151,18 @@ namespace quda
       }
     };
 
-    template <class TA, class TB, class TC>
-    static __device__ inline typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
-    mma(const TA &op_a, const TB &op_b, TC &op_c)
+    static __device__ inline void
+    mma(const OperandA &op_a, const OperandB &op_b, OperandC &op_c)
     {
       asm volatile("mma.sync.aligned.m16n8k8.row.col.f16.f16.f16.f16 {%0,%1}, {%2,%3}, {%4}, {%0,%1};"
                    : "+r"(op_c.reg[0]), "+r"(op_c.reg[1])
                    : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]));
     }
 
-    template <int M, int N, int ldc, class TC, class GmemOperandC>
-    static inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
-    store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc, const TC &op_c_real,
-                  const TC &op_c_imag)
+    template <int M, int N, int ldc, class GmemOperandC>
+    static inline __device__ void
+    store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc, const OperandC &op_c_real,
+                  const OperandC &op_c_imag)
     {
       using store_type = typename GmemOperandC::store_type;
 
@@ -196,10 +196,10 @@ namespace quda
       }
     }
 
-    template <int M, int N, int ldc, bool dagger, class TC, class GmemOperandC>
-    static inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
+    template <int M, int N, int ldc, bool dagger, class GmemOperandC>
+    static inline __device__ void
     store_complex_atomic(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc,
-                         const TC &op_c_real, const TC &op_c_imag)
+                         const OperandC &op_c_real, const OperandC &op_c_imag)
     {
       using store_type = typename GmemOperandC::store_type;
 
@@ -288,19 +288,18 @@ namespace quda
       }
     };
 
-    template <class TA, class TB, class TC>
     static __device__ inline void
-    mma(const TA &op_a, const TB &op_b, TC &op_c)
+    mma(const OperandA &op_a, const OperandB &op_b, OperandC &op_c)
     {
       asm volatile("mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32 {%0,%1,%2,%3}, {%4,%5}, {%6}, {%0,%1,%2,%3};"
                    : "+f"(op_c.reg[0]), "+f"(op_c.reg[1]), "+f"(op_c.reg[2]), "+f"(op_c.reg[3])
                    : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]));
     }
 
-    template <int M, int N, int ldc, class TC, class GmemOperandC>
+    template <int M, int N, int ldc, class GmemOperandC>
     static inline __device__ void
-    store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc, const TC &op_c_real,
-                  const TC &op_c_imag)
+    store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc, const OperandC &op_c_real,
+                  const OperandC &op_c_imag)
     {
       using store_type = typename GmemOperandC::store_type;
 
@@ -332,10 +331,10 @@ namespace quda
       }
     }
 
-    template <int M, int N, int ldc, bool dagger, class TC, class GmemOperandC>
+    template <int M, int N, int ldc, bool dagger, class GmemOperandC>
     static inline __device__ void
     store_complex_atomic(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc,
-                         const TC &op_c_real, const TC &op_c_imag)
+                         const OperandC &op_c_real, const OperandC &op_c_imag)
     {
       using store_type = typename GmemOperandC::store_type;
 

@@ -15,13 +15,13 @@ namespace quda
     template <>
     struct mma_instruction_t <16, 16, 4, half, half2> {
 
-    __device__ __host__ constexpr int inline pad_size(int m) { return m == 48 ? 2 : 10; }
+    static __device__ __host__ constexpr int inline pad_size(int m) { return m == 48 ? 2 : 10; }
 
-    constexpr int MMA_M = 16;
-    constexpr int MMA_N = 16;
-    constexpr int MMA_K = 4;
+    static constexpr int MMA_M = 16;
+    static constexpr int MMA_N = 16;
+    static constexpr int MMA_K = 4;
 
-    constexpr int warp_size = 32;
+    static constexpr int warp_size = 32;
 
     using compute_t = half;
     using load_t = half2;
@@ -49,7 +49,7 @@ namespace quda
       }
     };
 
-    struct MmaOperandA {
+    struct OperandA {
 
       unsigned reg[2];
 
@@ -82,7 +82,7 @@ namespace quda
       }
     };
 
-    struct MmaOperandB {
+    struct OperandB {
 
       unsigned reg[2];
 
@@ -115,14 +115,14 @@ namespace quda
       __device__ inline real &operator[](int i) { return v[i]; }
     };
 
-#if USE_FP16_HMMA_ACCUMULATE
+#ifdef USE_FP16_HMMA_ACCUMULATE
 
     struct OperandC {
 
       using reg_type = unsigned;
       reg_type reg[4];
 
-      __device__ inline MmaOperandC() { zero(); }
+      __device__ inline OperandC() { zero(); }
 
       __device__ inline void zero()
       {
@@ -163,19 +163,18 @@ namespace quda
       }
     };
 
-    template <class TA, class TB, class TC>
-    __device__ inline typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
-    mma(const TA &op_a, const TB &op_b, TC &op_c)
+    static __device__ inline void
+    mma(const OperandA &op_a, const OperandB &op_b, OperandC &op_c)
     {
       asm("mma.sync.aligned.m8n8k4.col.row.f16.f16.f16.f16 {%0,%1,%2,%3}, {%4,%5}, {%6,%7}, {%0,%1,%2,%3};"
           : "+r"(op_c.reg[0]), "+r"(op_c.reg[1]), "+r"(op_c.reg[2]), "+r"(op_c.reg[3])
           : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
     }
 
-    template <int M, int N, int ldc, class TC, class GmemOperandC>
-    inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
-    store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc, const TC &op_c_real,
-                  const TC &op_c_imag)
+    template <int M, int N, int ldc, class GmemOperandC>
+    static inline __device__ void
+    store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc, const OperandC &op_c_real,
+                  const OperandC &op_c_imag)
     {
       using store_type = typename GmemOperandC::store_type;
 
@@ -209,10 +208,10 @@ namespace quda
       if (!check_bounds || (row < M && col < N)) { ptr_[(row * ldc + col) / 8] = s; }
     }
 
-    template <int M, int N, int ldc, bool dagger, class TC, class GmemOperandC>
-    inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
+    template <int M, int N, int ldc, bool dagger, class GmemOperandC>
+    static inline __device__ void
     store_complex_atomic(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc,
-                         const TC &op_c_real, const TC &op_c_imag)
+                         const OperandC &op_c_real, const OperandC &op_c_imag)
     {
       using store_type = typename GmemOperandC::store_type;
 
@@ -267,7 +266,7 @@ namespace quda
       using reg_type = float;
       reg_type reg[8];
 
-      __device__ inline MmaOperandC() { zero(); }
+      __device__ inline OperandC() { zero(); }
 
       __device__ inline void zero()
       {
@@ -309,9 +308,8 @@ namespace quda
       }
     };
 
-    template <class TA, class TB, class TC>
-    __device__ inline typename std::enable_if<std::is_same<typename TC::reg_type, float>::value, void>::type
-    mma(const TA &op_a, const TB &op_b, TC &op_c)
+    static __device__ inline void
+    mma(const OperandA &op_a, const OperandB &op_b, OperandC &op_c)
     {
       asm("mma.sync.aligned.m8n8k4.col.row.f32.f16.f16.f32 {%0,%1,%2,%3,%4,%5,%6,%7}, {%8,%9}, {%10,%11}, "
           "{%0,%1,%2,%3,%4,%5,%6,%7};"
@@ -320,10 +318,10 @@ namespace quda
           : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
     }
 
-    template <int M, int N, int ldc, class TC, class GmemOperandC>
-    inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, float>::value, void>::type
-    store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc, const TC &op_c_real,
-                  const TC &op_c_imag)
+    template <int M, int N, int ldc, class GmemOperandC>
+    static inline __device__ void
+    store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc, const OperandC &op_c_real,
+                  const OperandC &op_c_imag)
     {
       using store_type = typename GmemOperandC::store_type;
 
@@ -358,10 +356,10 @@ namespace quda
       }
     }
 
-    template <int M, int N, int ldc, bool dagger, class TC, class GmemOperandC>
-    inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, float>::value, void>::type
+    template <int M, int N, int ldc, bool dagger, class GmemOperandC>
+    static inline __device__ void
     store_complex_atomic(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc,
-                         const TC &op_c_real, const TC &op_c_imag)
+                         const OperandC &op_c_real, const OperandC &op_c_imag)
     {
       using store_type = typename GmemOperandC::store_type;
 
