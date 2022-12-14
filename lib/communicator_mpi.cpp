@@ -332,9 +332,9 @@ namespace quda
 
   int Communicator::comm_rank_global()
   {
-    int rank;
-    MPI_CHECK(MPI_Comm_rank(MPI_COMM_WORLD, &rank));
-    return rank;
+    static int global_rank = -1;
+    if (global_rank < 0)  { MPI_CHECK(MPI_Comm_rank(MPI_COMM_WORLD, &global_rank)); }
+    return global_rank;
   }
 
 } // namespace quda
