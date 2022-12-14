@@ -141,9 +141,8 @@ namespace quda
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          auto diff_re = abs(y[i].real()) > 0.0 ? abs(x[i].real() - y[i].real()) / abs(y[i].real()) : 0;
-          auto diff_im = abs(y[i].imag()) > 0.0 ? abs(x[i].imag() - y[i].imag()) / abs(y[i].imag()) : 0;
-          
+          auto diff_re = abs(x[i].real() - y[i].real());
+          auto diff_im = abs(x[i].imag() - y[i].imag());
           max = max > diff_re ? max : diff_re;
           max = max > diff_im ? max : diff_im;
         }
