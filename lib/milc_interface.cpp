@@ -911,33 +911,36 @@ static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, Qud
 
 static void getReconstruct(QudaReconstructType &reconstruct, QudaReconstructType &reconstruct_sloppy)
 {
-  {
+  static bool recon_queried = false;
+  static QudaReconstructType reconstruct_in = QUDA_RECONSTRUCT_INVALID;
+  static QudaReconstructType reconstruct_sloppy_in = QUDA_RECONSTRUCT_INVALID;
+  if (!recon_queried) {
     char *reconstruct_env = getenv("QUDA_MILC_HISQ_RECONSTRUCT");
     if (!reconstruct_env || strcmp(reconstruct_env, "18") == 0) {
-      reconstruct = QUDA_RECONSTRUCT_NO;
+      reconstruct_in = QUDA_RECONSTRUCT_NO;
     } else if (strcmp(reconstruct_env, "13") == 0) {
-      reconstruct = QUDA_RECONSTRUCT_13;
+      reconstruct_in = QUDA_RECONSTRUCT_13;
     } else if (strcmp(reconstruct_env, "9") == 0) {
-      reconstruct = QUDA_RECONSTRUCT_9;
+      reconstruct_in = QUDA_RECONSTRUCT_9;
     } else {
       errorQuda("QUDA_MILC_HISQ_RECONSTRUCT=%s not supported", reconstruct_env);
     }
-  }
-
-  {
     char *reconstruct_sloppy_env = getenv("QUDA_MILC_HISQ_RECONSTRUCT_SLOPPY");
     if (!reconstruct_sloppy_env) { // if env is not set, default to using outer reconstruct type
-      reconstruct_sloppy = reconstruct;
+      reconstruct_sloppy_in = reconstruct_in;
     } else if (strcmp(reconstruct_sloppy_env, "18") == 0) {
-      reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+      reconstruct_sloppy_in = QUDA_RECONSTRUCT_NO;
     } else if (strcmp(reconstruct_sloppy_env, "13") == 0) {
-      reconstruct_sloppy = QUDA_RECONSTRUCT_13;
+      reconstruct_sloppy_in = QUDA_RECONSTRUCT_13;
     } else if (strcmp(reconstruct_sloppy_env, "9") == 0) {
-      reconstruct_sloppy = QUDA_RECONSTRUCT_9;
+      reconstruct_sloppy_in = QUDA_RECONSTRUCT_9;
     } else {
       errorQuda("QUDA_MILC_HISQ_RECONSTRUCT_SLOPPY=%s not supported", reconstruct_sloppy_env);
     }
+    recon_queried = true;
   }
+  reconstruct = reconstruct_in;
+  reconstruct_sloppy = reconstruct_sloppy_in;
 }
 
 static void setGaugeParams(QudaGaugeParam &fat_param, QudaGaugeParam &long_param, const void *const longlink,
