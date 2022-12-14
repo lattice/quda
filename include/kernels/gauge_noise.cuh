@@ -23,7 +23,7 @@ namespace quda {
     real sigma; // where U = exp(sigma * H)
 
     GaugeNoiseArg(const GaugeField &U, RNGState *rng) :
-      kernel_param(dim3(U.LocalVolumeCB(), 2 * U.Ncolor(), U.Ncolor())),
+      kernel_param(dim3(U.LocalVolumeCB(), 2, 1)),
       geometry(U.Geometry()),
       U(U),
       rng(rng)
@@ -60,24 +60,24 @@ namespace quda {
     constexpr NoiseGauge(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int parity_row, int col)
+    __device__ __host__ void operator()(int x_cb, int parity)
     {
-      int parity = parity_row / Arg::nColor;
-      int row = parity_row % Arg::nColor;
-      assert(parity == 0 || parity == 1);
-
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
       for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
       int e_cb = linkIndex(x, arg.E);
 
       RNGState localState = arg.rng[parity * arg.threads.x + x_cb];
-
       for (int g = 0; g < arg.geometry; g++) {
-        if (Arg::noise == QUDA_NOISE_GAUSS) genGauss<typename Arg::real>(arg, localState, parity, e_cb, g, row, col);
-        else if (Arg::noise == QUDA_NOISE_UNIFORM) genUniform<typename Arg::real>(arg, localState, parity, e_cb, g, row, col);
-      }
+        for (int r = 0; r < Arg::nColor; r++) {
+          for (int c = 0; c < Arg::nColor; c++) {
 
+            if (Arg::noise == QUDA_NOISE_GAUSS) genGauss<typename Arg::real>(arg, localState, parity, e_cb, g, r, c);
+            else if (Arg::noise == QUDA_NOISE_UNIFORM) genUniform<typename Arg::real>(arg, localState, parity, e_cb, g, r, c);
+
+          }
+        }
+      }
       arg.rng[parity * arg.threads.x + x_cb] = localState;
     }
   };

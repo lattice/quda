@@ -174,7 +174,7 @@ namespace quda
        @param[in] v Object reference we wish to wrap
      */
     template <typename U>
-      std::enable_if_t<!is_initializer_list_v<U>, vector> make_set(U &v) { return vector(1, v); }
+    std::enable_if_t<!is_initializer_list_v<U>, vector> make_set(U &v) { return vector(1, static_cast<T&>(v)); }
 
     /**
        make_set is a helper function that creates a vector of

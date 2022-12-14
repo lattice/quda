@@ -261,8 +261,8 @@ namespace quda {
     double max(const ColorSpinorField &x);
 
     /**
-       @brief Compute the maximum relative real-valued deviation
-       between two fields.
+       @brief Compute the maximum real-valued deviation between two
+       fields.
        @param[in] x The field we want to compare
        @param[in] y The reference field to which we are comparing against
     */
