@@ -347,31 +347,58 @@ namespace quda {
   {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
-#if 0
-    if ( location == QUDA_CUDA_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision);
-    } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision);
+
+    if (in.size() != 8) {
+      if ( location == QUDA_CUDA_FIELD_LOCATION ) {
+        ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision);
+      } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
+        ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision);
+      }
+    } else {
+      ColorSpinorParam param_in(in[0]);
+      param_in.nColor = in[0].Ncolor() * in.size(); // Ask Kate why we need * in.size() here
+      param_in.nVec = in.size();
+      param_in.create = QUDA_NULL_FIELD_CREATE;
+      ColorSpinorField v_in(param_in);
+
+      BlockTranspose(v_in, in);
+
+      ColorSpinorParam param_out(out[0]);
+      param_out.nColor = out[0].Ncolor() * out.size(); // Ask Kate why we need * in.size() here
+      param_out.nVec = out.size();
+      param_out.create = QUDA_NULL_FIELD_CREATE;
+      ColorSpinorField v_out(param_out);
+
+      double sum = 0;
+      for (const auto &f: in) {
+        sum += blas::norm2(f);
+      }
+      printf("sum = %f, v = %f\n", sum, blas::norm2(v_in));
+
+      constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
+      auto create_gauge_copy = [](const cudaGaugeField &X, QudaGaugeFieldOrder order, bool copy_content) -> auto
+      {
+        GaugeField *output = nullptr;
+        if (X.Order() == order) {
+          output = const_cast<cudaGaugeField *>(&X);
+        } else {
+          GaugeFieldParam param(X);
+          param.order = order;
+          param.location = QUDA_CUDA_FIELD_LOCATION;
+          output = cudaGaugeField::Create(param);
+          if (copy_content) output->copy(X);
+        }
+        return static_cast<cudaGaugeField *>(output);
+      };
+
+      std::unique_ptr<cudaGaugeField> X_d_(create_gauge_copy(*X_d, gOrder, true));
+      std::unique_ptr<cudaGaugeField> Y_d_(create_gauge_copy(*Y_d, gOrder, true));
+
+      // ApplyCoarse
+
+      // BlockTranspose(out, v_out);
     }
-#else
-    ColorSpinorParam param(in[0]);
 
-    param.nSpin = in[0].Nspin();
-    param.nColor = in[0].Ncolor() * in.size(); // Ask Kate why we need * in.size() here
-    param.nVec = in.size();
-    param.create = QUDA_NULL_FIELD_CREATE;
-
-    ColorSpinorField v(param);
-
-    BlockTranspose(v, in);
-
-    double sum = 0;
-    for (const auto &f: in) {
-      sum += blas::norm2(f);
-    }
-
-    printf("sum = %f, v = %f\n", sum, blas::norm2(v));
-#endif
     int n = in[0].Nspin() * in[0].Ncolor();
     flops += (8 * ( 8 * n * n) - 2 * n) * (long long)in[0].VolumeCB() * in[0].SiteSubset() * in.size();
   }

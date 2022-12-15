@@ -21,7 +21,7 @@ namespace quda {
     const bAccessor B[nVec];
 
     template <typename... T>
-    BlockTransposeArg(ColorSpinorField &V, T... BB) :
+    BlockTransposeArg(ColorSpinorField &V, T&&... BB) :
       kernel_param(dim3(V.VolumeCB(), V.SiteSubset(), nVec)),
       V(V),
       B{BB...}

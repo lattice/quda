@@ -18,10 +18,10 @@ namespace quda {
       BlockTransposeArg<is_device, vFloat, vOrder, bFloat, bOrder, nSpin, nColor, nVec>;
 
     ColorSpinorField &V;
-    const cvector_ref<const ColorSpinorField> &B;
+    cvector_ref<const ColorSpinorField> &B;
 
   public:
-    BlockTranspose(ColorSpinorField &V, const cvector_ref<const ColorSpinorField> &B) :
+    BlockTranspose(ColorSpinorField &V, cvector_ref<const ColorSpinorField> &B) :
       TunableKernel3D(V, V.SiteSubset(), V.Nvec()),
       V(V),
       B(B)
@@ -97,7 +97,7 @@ namespace quda {
   } // namespace impl
 
   template <typename vFloat, typename bFloat, int nSpin, int nColor>
-  void BlockTranspose(ColorSpinorField &V, const cvector_ref<const ColorSpinorField> &B)
+  void BlockTranspose(ColorSpinorField &V, cvector_ref<const ColorSpinorField> &B)
   {
     if (V.Nvec() != static_cast<int>(B.size())) { errorQuda("V.Nvec() (=%d) != B.size() (=%d)", V.Nvec(), static_cast<int>(B.size())); }
 
@@ -111,7 +111,7 @@ namespace quda {
   }
 
   template <typename vFloat, typename bFloat, int nSpin>
-  void BlockTranspose(ColorSpinorField &V, const cvector_ref<const ColorSpinorField> &B)
+  void BlockTranspose(ColorSpinorField &V, cvector_ref<const ColorSpinorField> &B)
   {
     if (V.Ncolor() / V.Nvec() != B[0].Ncolor()) { errorQuda("V.Ncolor() / V.Nvec() (=%d) != B.Ncolor() (=%d)", V.Ncolor() / V.Nvec(), B[0].Ncolor()); }
 
@@ -125,7 +125,7 @@ namespace quda {
   }
 
   template <typename vFloat, typename bFloat>
-  void BlockTranspose(ColorSpinorField &V, const cvector_ref<const ColorSpinorField> &B)
+  void BlockTranspose(ColorSpinorField &V, cvector_ref<const ColorSpinorField> &B)
   {
     if (V.Nspin() != B[0].Nspin()) { errorQuda("V.Nspin() (=%d) != B.Nspin() (=%d)", V.Nspin(), B[0].Nspin()); }
 
@@ -140,7 +140,7 @@ namespace quda {
     }
   }
 
-  void BlockTranspose(ColorSpinorField &V, const cvector_ref<const ColorSpinorField> &B)
+  void BlockTranspose(ColorSpinorField &V, cvector_ref<const ColorSpinorField> &B)
   {
     if (!is_enabled(V.Precision()) || !is_enabled(B[0].Precision()))
       errorQuda("QUDA_PRECISION=%d does not enable required precision combination (V = %d B = %d)",
