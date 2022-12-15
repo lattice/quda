@@ -10,18 +10,18 @@ namespace quda {
 
   using namespace quda::colorspinor;
 
-  template <typename vFloat, typename bFloat, int nSpin, int nColor, int nVec>
+  template <class v_t, class b_t, typename vFloat, typename bFloat, int nSpin, int nColor, int nVec>
   class BlockTranspose : public TunableKernel3D {
 
     using real = typename mapper<vFloat>::type;
     template <bool is_device, typename vOrder, typename bOrder> using Arg =
-      BlockTransposeArg<is_device, vFloat, vOrder, bFloat, bOrder, nSpin, nColor, nVec>;
+      BlockTransposeArg<v_t, b_t, is_device, vFloat, vOrder, bFloat, bOrder, nSpin, nColor, nVec>;
 
-    ColorSpinorField &V;
-    cvector_ref<const ColorSpinorField> &B;
+    v_t &V;
+    cvector_ref<b_t> &B;
 
   public:
-    BlockTranspose(ColorSpinorField &V, cvector_ref<const ColorSpinorField> &B) :
+    BlockTranspose(v_t &V, cvector_ref<b_t> &B) :
       TunableKernel3D(V, V.SiteSubset(), V.Nvec()),
       V(V),
       B(B)
@@ -72,7 +72,11 @@ namespace quda {
         if (V.FieldOrder() == vOrder && B[0].FieldOrder() == bOrder) {
           typedef FieldOrderCB<real, nSpin, nColor, nVec, vOrder, vFloat, vFloat, disable_ghost> vAccessor;
           typedef FieldOrderCB<real, nSpin, nColor, 1, bOrder, bFloat, bFloat, disable_ghost> bAccessor;
-          launch_device_<vAccessor, bAccessor>(tp, stream, std::make_index_sequence<nVec>());
+          if constexpr (std::is_const_v<v_t>) {
+            launch_device_<const vAccessor, bAccessor>(tp, stream, std::make_index_sequence<nVec>());
+          } else {
+            launch_device_<vAccessor, const bAccessor>(tp, stream, std::make_index_sequence<nVec>());
+          }
         } else {
           errorQuda("Unsupported field order V=%d B=%d", V.FieldOrder(), B[0].FieldOrder());
         }
@@ -96,51 +100,52 @@ namespace quda {
 
   } // namespace impl
 
-  template <typename vFloat, typename bFloat, int nSpin, int nColor>
-  void BlockTranspose(ColorSpinorField &V, cvector_ref<const ColorSpinorField> &B)
+  template <class v_t, class b_t, typename vFloat, typename bFloat, int nSpin, int nColor>
+  void block_transpose(v_t &V, cvector_ref<b_t> &B)
   {
     if (V.Nvec() != static_cast<int>(B.size())) { errorQuda("V.Nvec() (=%d) != B.size() (=%d)", V.Nvec(), static_cast<int>(B.size())); }
 
     if (V.Nvec() == 8) {
-      impl::BlockTranspose<vFloat, bFloat, nSpin, nColor, 8> tranpose(V, B);
+      impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, 8> tranpose(V, B);
     } else if (V.Nvec() == 16) {
-      impl::BlockTranspose<vFloat, bFloat, nSpin, nColor, 16> tranpose(V, B);
+      impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, 16> tranpose(V, B);
     } else {
       errorQuda("Unexpected nVec = %d", V.Nvec());
     }
   }
 
-  template <typename vFloat, typename bFloat, int nSpin>
-  void BlockTranspose(ColorSpinorField &V, cvector_ref<const ColorSpinorField> &B)
+  template <class v_t, class b_t, typename vFloat, typename bFloat, int nSpin>
+  void block_transpose(v_t &V, cvector_ref<b_t> &B)
   {
     if (V.Ncolor() / V.Nvec() != B[0].Ncolor()) { errorQuda("V.Ncolor() / V.Nvec() (=%d) != B.Ncolor() (=%d)", V.Ncolor() / V.Nvec(), B[0].Ncolor()); }
 
     if (B[0].Ncolor() == 24) {
-      BlockTranspose<vFloat, bFloat, nSpin, 24>(V, B);
+      block_transpose<v_t, b_t, vFloat, bFloat, nSpin, 24>(V, B);
     } else if (B[0].Ncolor() == 32) {
-      BlockTranspose<vFloat, bFloat, nSpin, 32>(V, B);
+      block_transpose<v_t, b_t, vFloat, bFloat, nSpin, 32>(V, B);
     } else {
       errorQuda("Unexpected nColor = %d", B[0].Ncolor());
     }
   }
 
-  template <typename vFloat, typename bFloat>
-  void BlockTranspose(ColorSpinorField &V, cvector_ref<const ColorSpinorField> &B)
+  template <class v_t, class b_t, typename vFloat, typename bFloat>
+  void block_transpose(v_t &V, cvector_ref<b_t> &B)
   {
     if (V.Nspin() != B[0].Nspin()) { errorQuda("V.Nspin() (=%d) != B.Nspin() (=%d)", V.Nspin(), B[0].Nspin()); }
 
     if (V.Nspin() == 2) {
-      BlockTranspose<vFloat, bFloat, 2>(V, B);
+      block_transpose<v_t, b_t, vFloat, bFloat, 2>(V, B);
     } else if (V.Nspin() == 4) {
-      BlockTranspose<vFloat, bFloat, 4>(V, B);
+      block_transpose<v_t, b_t, vFloat, bFloat, 4>(V, B);
     } else if (V.Nspin() == 1) {
-      BlockTranspose<vFloat, bFloat, 1>(V, B);
+      block_transpose<v_t, b_t, vFloat, bFloat, 1>(V, B);
     } else {
       errorQuda("Unexpected nSpin = %d", V.Nspin());
     }
   }
 
-  void BlockTranspose(ColorSpinorField &V, cvector_ref<const ColorSpinorField> &B)
+  template <class v_t, class b_t>
+  void block_transpose(v_t &V, cvector_ref<b_t> &B)
   {
     if (!is_enabled(V.Precision()) || !is_enabled(B[0].Precision()))
       errorQuda("QUDA_PRECISION=%d does not enable required precision combination (V = %d B = %d)",
@@ -149,18 +154,26 @@ namespace quda {
     if constexpr (is_enabled_multigrid()) {
       if (V.Precision() == QUDA_DOUBLE_PRECISION && B[0].Precision() == QUDA_DOUBLE_PRECISION) {
         if constexpr (is_enabled_multigrid_double())
-          BlockTranspose<double, double>(V, B);
+          block_transpose<v_t, b_t, double, double>(V, B);
         else
           errorQuda("Double precision multigrid has not been enabled");
       } else if (V.Precision() == QUDA_SINGLE_PRECISION && B[0].Precision() == QUDA_SINGLE_PRECISION) {
         if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
-          BlockTranspose<float, float>(V, B);
+          block_transpose<v_t, b_t, float, float>(V, B);
       } else {
         errorQuda("Unsupported precision combination V=%d B=%d\n", V.Precision(), B[0].Precision());
       }
     } else {
       errorQuda("Multigrid has not been built");
     }
+  }
+
+  void BlockTransposeForward(ColorSpinorField &V, cvector_ref<const ColorSpinorField> &B) {
+    block_transpose(V, B);
+  }
+
+  void BlockTransposeBackward(const ColorSpinorField &V, cvector_ref<ColorSpinorField> &B) {
+    block_transpose(V, B);
   }
 
 } // namespace quda

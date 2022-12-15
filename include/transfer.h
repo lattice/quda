@@ -303,7 +303,9 @@ namespace quda {
   void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
                           const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho, bool two_pass);
 
-  void BlockTranspose(ColorSpinorField &V, const cvector_ref<const ColorSpinorField> &B);
+  void BlockTransposeForward(ColorSpinorField &V, const cvector_ref<const ColorSpinorField> &B);
+
+  void BlockTransposeBackward(const ColorSpinorField &V, const cvector_ref<ColorSpinorField> &B);
 
   /**
      @brief Apply the prolongation operator

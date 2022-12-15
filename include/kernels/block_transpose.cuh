@@ -9,7 +9,7 @@ namespace quda {
   /**
       Kernel argument struct
   */
-  template <bool is_device_, typename vFloat, typename vAccessor, typename bFloat, typename bAccessor, int nSpin_, int nColor_, int nVec_>
+  template <class v_t_, class b_t_, bool is_device_, typename vFloat, typename vAccessor, typename bFloat, typename bAccessor, int nSpin_, int nColor_, int nVec_>
   struct BlockTransposeArg : kernel_param<> {
     using real = typename mapper<vFloat>::type;
     static constexpr bool is_device = is_device_;
@@ -17,11 +17,13 @@ namespace quda {
     static constexpr int nColor = nColor_;
     static constexpr int nVec = nVec_;
 
+    using v_t = v_t_;
+
     vAccessor V;
-    const bAccessor B[nVec];
+    bAccessor B[nVec];
 
     template <typename... T>
-    BlockTransposeArg(ColorSpinorField &V, T&&... BB) :
+    BlockTransposeArg(v_t &V, T&&... BB) :
       kernel_param(dim3(V.VolumeCB(), V.SiteSubset(), nVec)),
       V(V),
       B{BB...}
@@ -38,7 +40,11 @@ namespace quda {
     {
       for (int color = 0; color < Arg::nColor; color++) {
         for (int spin = 0; spin < Arg::nSpin; spin++) {
-          arg.V(parity, x_cb, spin, color, nv) = arg.B[nv](parity, x_cb, spin, color);
+          if constexpr (std::is_const_v<typename Arg::v_t>) {
+            arg.B[nv](parity, x_cb, spin, color) = arg.V(parity, x_cb, spin, color, nv);
+          } else {
+            arg.V(parity, x_cb, spin, color, nv) = arg.B[nv](parity, x_cb, spin, color);
+          }
         }
       }
     }

@@ -361,7 +361,7 @@ namespace quda {
       param_in.create = QUDA_NULL_FIELD_CREATE;
       ColorSpinorField v_in(param_in);
 
-      BlockTranspose(v_in, in);
+      BlockTransposeForward(v_in, in);
 
       ColorSpinorParam param_out(out[0]);
       param_out.nColor = out[0].Ncolor() * out.size(); // Ask Kate why we need * in.size() here
@@ -373,14 +373,14 @@ namespace quda {
       for (const auto &f: in) {
         sum += blas::norm2(f);
       }
-      printf("sum = %f, v = %f\n", sum, blas::norm2(v_in));
+      printf("in sum = %f, v = %f\n", sum, blas::norm2(v_in));
 
       constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
-      auto create_gauge_copy = [](const cudaGaugeField &X, QudaGaugeFieldOrder order, bool copy_content) -> auto
+      auto create_gauge_copy = [](const GaugeField &X, QudaGaugeFieldOrder order, bool copy_content) -> auto
       {
         GaugeField *output = nullptr;
         if (X.Order() == order) {
-          output = const_cast<cudaGaugeField *>(&X);
+          output = const_cast<GaugeField *>(&X);
         } else {
           GaugeFieldParam param(X);
           param.order = order;
@@ -394,9 +394,15 @@ namespace quda {
       std::unique_ptr<cudaGaugeField> X_d_(create_gauge_copy(*X_d, gOrder, true));
       std::unique_ptr<cudaGaugeField> Y_d_(create_gauge_copy(*Y_d, gOrder, true));
 
-      // ApplyCoarse
+      // ApplyCoarse <--
 
-      // BlockTranspose(out, v_out);
+      BlockTransposeBackward(v_out, out);
+
+      sum = 0;
+      for (const auto &f: out) {
+        sum += blas::norm2(f);
+      }
+      printf("out sum = %f, v = %f\n", sum, blas::norm2(v_out));
     }
 
     int n = in[0].Nspin() * in[0].Ncolor();
