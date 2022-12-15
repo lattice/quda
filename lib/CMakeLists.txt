@@ -85,7 +85,8 @@ set (QUDA_OBJS
   deflation.cpp checksum.cu transform_reduce.cu
   dslash5_mobius_eofa.cu
   madwf_ml.cpp
-  instantiate.cpp version.cpp )
+  instantiate.cpp version.cpp
+  block_transpose.cu )
 # cmake-format: on
 
 # current workaround for nvshmem

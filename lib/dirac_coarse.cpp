@@ -2,6 +2,8 @@
 #include <multigrid.h>
 #include <tune_quda.h>
 #include <algorithm>
+#include <transfer.h>
+#include <blas_quda.h>
 
 namespace quda {
 
@@ -345,11 +347,31 @@ namespace quda {
   {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
+#if 0
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision);
     }
+#else
+    ColorSpinorParam param(in[0]);
+
+    param.nSpin = in[0].Nspin();
+    param.nColor = in[0].Ncolor() * in.size(); // Ask Kate why we need * in.size() here
+    param.nVec = in.size();
+    param.create = QUDA_NULL_FIELD_CREATE;
+
+    ColorSpinorField v(param);
+
+    BlockTranspose(v, in);
+
+    double sum = 0;
+    for (const auto &f: in) {
+      sum += blas::norm2(f);
+    }
+
+    printf("sum = %f, v = %f\n", sum, blas::norm2(v));
+#endif
     int n = in[0].Nspin() * in[0].Ncolor();
     flops += (8 * ( 8 * n * n) - 2 * n) * (long long)in[0].VolumeCB() * in[0].SiteSubset() * in.size();
   }
@@ -450,11 +472,33 @@ namespace quda {
   {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
+
+#if 1
     if ( location == QUDA_CUDA_FIELD_LOCATION) {
       ApplyCoarse(out, in, in, *Yhat_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision);
     }
+#else
+    printf("I am here!\n");
+    ColorSpinorParam param(in[0]);
+
+    param.nSpin = in[0].Nspin();
+    param.nColor = in[0].Ncolor() * in.size(); // Ask Kate why we need * in.size() here
+    param.nVec = in.size();
+    param.create = QUDA_NULL_FIELD_CREATE;
+
+    ColorSpinorField v(param);
+
+    BlockTranspose(v, in);
+
+    double sum = 0;
+    for (const auto &f: in) {
+      sum += blas::norm2(f);
+    }
+
+    printf("sum = %f, v = %f\n", sum, blas::norm2(v));
+#endif
 
     int n = in[0].Nspin() * in[0].Ncolor();
     flops += (8 * (8 * n * n) - 2 * n) * in[0].VolumeCB() * in[0].SiteSubset() * in.size();
