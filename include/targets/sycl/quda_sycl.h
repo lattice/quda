@@ -169,12 +169,13 @@ inline uint getLocalLinearId()
 #define blockDim getBlockDim()
 #define threadIdx getThreadIdx()
 
-inline void __syncthreads(void)
+inline void syncthreads(void)
 {
   //auto ndi = getNdItem();
   //ndi.barrier();
   group_barrier(getGroup());
 }
+#define __syncthreads syncthreads
 
 namespace quda {
   namespace device {

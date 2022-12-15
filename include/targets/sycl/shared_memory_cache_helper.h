@@ -43,12 +43,14 @@ namespace quda
        device::shared_memory_bank_width()) * device::shared_memory_bank_width();
 
     using atom_t = std::conditional_t<sizeof(T) % 16 == 0, int4, std::conditional_t<sizeof(T) % 8 == 0, int2, int>>;
-    //using atom_t = int;
     static_assert(sizeof(T) % 4 == 0, "Shared memory cache does not support sub-word size types");
 
     // The number of elements of type atom_t that we break T into for optimal shared-memory access
     static constexpr int n_element = sizeof(T) / sizeof(atom_t);
-    using atype = atom_t[n_element * block_size_x * block_size_y * block_size_z];
+    static constexpr int block_size = block_size_x * block_size_y * block_size_z;
+    static constexpr int max_array_len = device::shared_memory_size() / sizeof(T);
+    static constexpr int array_len = std::min(block_size, max_array_len);
+    using atype = atom_t[n_element * array_len];
 
     const dim3 block;
     const int stride;
@@ -103,12 +105,16 @@ namespace quda
       block(block),
       stride(block.x * block.y * block.z)
     {
-	auto g = getGroup();
+      auto g = getGroup();
+      auto len = g.get_local_linear_range();
+      if(len<=array_len) {
 	//auto cache = sycl::group_local_memory_for_overwrite<atype>(g);
-	//mem = sycl::group_local_memory<atype>(g);
 	mem = sycl::ext::oneapi::group_local_memory<atype>(g);
-        //return reinterpret_cast<atom_t*>(cache_.get());
-        cache_ = *mem.get();
+	//return reinterpret_cast<atom_t*>(cache_.get());
+	cache_ = *mem.get();
+      } else {
+	cache_ = nullptr;
+      }
     }
 
     /**

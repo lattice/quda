@@ -363,7 +363,7 @@ namespace quda
 #else
       auto val = myDevice.get_info<sycl::info::device::max_work_item_sizes<3>>();
 #endif
-      return val[i];
+      return val[2-i];  // reverse order, should be consistent with RANGE_{X,Y,Z}
     }
 
   //unsigned int max_grid_size(int i) { // not in portable SYCL?
