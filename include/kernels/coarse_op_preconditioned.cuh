@@ -42,19 +42,6 @@ namespace quda {
     }
   };
 
-  template <typename T, typename Arg>
-  constexpr bool is_boundary(T &coord, int d, const Arg &arg)
-  {
-    bool is_boundary = false;
-    switch (d) {
-    case 0: is_boundary = coord[0] - arg.nFace < 0; break;
-    case 1: is_boundary = coord[1] - arg.nFace < 0; break;
-    case 2: is_boundary = coord[2] - arg.nFace < 0; break;
-    case 3: is_boundary = coord[3] - arg.nFace < 0; break;
-    }
-    return is_boundary;
-  }
-
   template <typename Arg>
   inline __device__ __host__ auto computeYhat(const Arg &arg, int d, int x_cb, int parity, int i0, int j0)
   {
@@ -69,7 +56,7 @@ namespace quda {
     real yHatMax = 0.0;
 
     // first do the backwards links Y^{+\mu} * X^{-\dagger}
-    if (arg.comm_dim[d] && is_boundary(coord, d, arg)) {
+    if (arg.comm_dim[d] && is_boundary(coord, 0, d, arg)) {
 
       auto yHat = make_tile_C<complex,true>(arg.tile);
 

@@ -109,6 +109,28 @@ namespace quda {
     return (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
   }
 
+  template <typename T, typename Arg>
+  constexpr bool is_boundary(T &coord, int dim, int dir, const Arg &arg)
+  {
+    bool is_boundary = false;
+    if (dir == 0) {
+      switch (dim) { // backwards boundary
+      case 0: is_boundary = coord[0] - arg.nFace < 0; break;
+      case 1: is_boundary = coord[1] - arg.nFace < 0; break;
+      case 2: is_boundary = coord[2] - arg.nFace < 0; break;
+      case 3: is_boundary = coord[3] - arg.nFace < 0; break;
+      }
+    } else if (dir == 1) {
+      switch (dim) { // forwards boundary
+      case 0: is_boundary = coord[0] + arg.nFace >= arg.dim[0]; break;
+      case 1: is_boundary = coord[1] + arg.nFace >= arg.dim[1]; break;
+      case 2: is_boundary = coord[2] + arg.nFace >= arg.dim[2]; break;
+      case 3: is_boundary = coord[3] + arg.nFace >= arg.dim[3]; break;
+      }
+    }
+    return is_boundary;
+}
+
   /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] -1 in the mu direction
 
