@@ -342,6 +342,25 @@ namespace quda {
     flops += (8 * n * n - 2 * n) * (long long)in[0].VolumeCB() * in.size();
   }
 
+  template <class F>
+  auto create_color_spinor_copy(cvector_ref<F> &fs, QudaFieldOrder order) {
+    ColorSpinorParam param(fs[0]);
+    param.nColor = fs[0].Ncolor() * fs.size(); // Ask Kate why we need * in.size() here
+    param.nVec = fs.size();
+    param.create = QUDA_NULL_FIELD_CREATE;
+    param.fieldOrder = order;
+    return std::move(ColorSpinorField(param));
+  }
+
+  auto create_gauge_copy(const GaugeField &X, QudaGaugeFieldOrder order, bool copy_content) {
+    GaugeFieldParam param(X);
+    param.order = order;
+    param.location = QUDA_CUDA_FIELD_LOCATION;
+    auto output = std::unique_ptr<GaugeField>(cudaGaugeField::Create(param));
+    if (copy_content) { output->copy(X); }
+    return output;
+  }
+
   void DiracCoarse::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
                            QudaParity parity) const
   {
@@ -355,54 +374,19 @@ namespace quda {
         ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision);
       }
     } else {
-      ColorSpinorParam param_in(in[0]);
-      param_in.nColor = in[0].Ncolor() * in.size(); // Ask Kate why we need * in.size() here
-      param_in.nVec = in.size();
-      param_in.create = QUDA_NULL_FIELD_CREATE;
-      ColorSpinorField v_in(param_in);
+      constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      ColorSpinorField v_in = create_color_spinor_copy(in, csOrder);
+      ColorSpinorField v_out = create_color_spinor_copy(out, csOrder);
 
       BlockTransposeForward(v_in, in);
 
-      ColorSpinorParam param_out(out[0]);
-      param_out.nColor = out[0].Ncolor() * out.size(); // Ask Kate why we need * in.size() here
-      param_out.nVec = out.size();
-      param_out.create = QUDA_NULL_FIELD_CREATE;
-      ColorSpinorField v_out(param_out);
-
-      double sum = 0;
-      for (const auto &f: in) {
-        sum += blas::norm2(f);
-      }
-      printf("in sum = %f, v = %f\n", sum, blas::norm2(v_in));
-
       constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
-      auto create_gauge_copy = [](const GaugeField &X, QudaGaugeFieldOrder order, bool copy_content) -> auto
-      {
-        GaugeField *output = nullptr;
-        if (X.Order() == order) {
-          output = const_cast<GaugeField *>(&X);
-        } else {
-          GaugeFieldParam param(X);
-          param.order = order;
-          param.location = QUDA_CUDA_FIELD_LOCATION;
-          output = cudaGaugeField::Create(param);
-          if (copy_content) output->copy(X);
-        }
-        return static_cast<cudaGaugeField *>(output);
-      };
+      auto X_d_ = create_gauge_copy(*X_d, gOrder, true);
+      auto Y_d_ = create_gauge_copy(*Y_d, gOrder, true);
 
-      std::unique_ptr<cudaGaugeField> X_d_(create_gauge_copy(*X_d, gOrder, true));
-      std::unique_ptr<cudaGaugeField> Y_d_(create_gauge_copy(*Y_d, gOrder, true));
-
-      // ApplyCoarse <--
+      ApplyCoarse(v_out, v_in, v_in, *Y_d_, *X_d_, kappa, parity, true, false, dagger, commDim, halo_precision);
 
       BlockTransposeBackward(v_out, out);
-
-      sum = 0;
-      for (const auto &f: out) {
-        sum += blas::norm2(f);
-      }
-      printf("out sum = %f, v = %f\n", sum, blas::norm2(v_out));
     }
 
     int n = in[0].Nspin() * in[0].Ncolor();

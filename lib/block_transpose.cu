@@ -67,7 +67,7 @@ namespace quda {
         }
 #endif
       } else {
-        constexpr auto vOrder = colorspinor::getNative<vFloat>(nSpin);
+        constexpr auto vOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
         constexpr auto bOrder = colorspinor::getNative<bFloat>(nSpin);
         if (V.FieldOrder() == vOrder && B[0].FieldOrder() == bOrder) {
           typedef FieldOrderCB<real, nSpin, nColor, nVec, vOrder, vFloat, vFloat, disable_ghost> vAccessor;

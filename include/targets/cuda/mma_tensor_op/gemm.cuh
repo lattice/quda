@@ -218,7 +218,7 @@ namespace quda
     }
 
     // A wrapper that wraps the OperandC objects, together with the various methods to loop over it
-    template <class mma_t, int warp_cycle, int tile_col_dim> struct MmaAccumulator {
+    template <class mma_t, int warp_cycle, int tile_col_dim, int tile_acc_dim> struct MmaAccumulator {
 
       static constexpr int size = warp_cycle;
 
@@ -247,7 +247,7 @@ namespace quda
         }
       }
 
-      template <int tile_acc_dim, class SmemObjA, class SmemObjB>
+      template <class SmemObjA, class SmemObjB>
       __device__ inline void mma(const SmemObjA &smem_obj_a_real, const SmemObjA &smem_obj_a_imag,
                                  const SmemObjB &smem_obj_b_real, const SmemObjB &smem_obj_b_imag)
       {
@@ -355,7 +355,7 @@ namespace quda
       using SmemObjA = SharedMemoryObject<typename mma_t::compute_t, bM, bK, 1, smem_lda>;
       using SmemObjB = SharedMemoryObject<typename mma_t::compute_t, bN, bK, 1, smem_ldb>;
 
-      using Accumulator = MmaAccumulator<mma_t, warp_cycle, tile_col_dim>;
+      using Accumulator = MmaAccumulator<mma_t, warp_cycle, tile_col_dim, tile_acc_dim>;
 
       using ALoader = GlobalMemoryLoader<typename mma_t::load_t, M, K, bM, bK, n_row, n_col, a_transpose>;
       using BLoader = GlobalMemoryLoader<typename mma_t::load_t, N, K, bN, bK, n_row, n_col, b_transpose>;
@@ -395,7 +395,7 @@ namespace quda
             b_loader.template g2r<ldb, b_dagger>(b, n_offset, bk + bK);
           }
 
-          accumulator.template mma<tile_acc_dim>(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+          accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
 
           if (bk + bK < K) { // We have used all data in smem for this K-stage: move the data for the next K-stage
                              // to smem.
