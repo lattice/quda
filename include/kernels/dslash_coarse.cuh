@@ -196,7 +196,7 @@ namespace quda {
 
       //Backward gather - compute back offset for spinor and gauge fetch
 #pragma unroll
-      for(int d0 = thread_dim; d0 < Arg::nDim; d0 += Arg::dim_stride) {
+      for(int d0 = 0; d0 < Arg::nDim; d0 += Arg::dim_stride) {
         const int d = d0 + thread_dim;
 	const int back_idx = linkIndexHop(coord, arg.dim, d, -arg.nFace);
 
