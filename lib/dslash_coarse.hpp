@@ -187,7 +187,7 @@ namespace quda {
       halo(halo),
       color_col_stride(-1),
       use_mma(out[0].Nvec() == 8) // TODO: Pass in use_mma
-      // use_mma(false) // TODO: Pass in use_mma
+      // use_mma(false)
     {
       strcpy(aux, (std::string("policy_kernel,") + aux).c_str());
       strcat(aux, comm_dim_partitioned_string());
@@ -253,11 +253,11 @@ namespace quda {
         tp.grid = dim3(out[0].SiteSubset() * out[0].VolumeCB(), 1, 1);
         tp.set_max_shared_bytes = true;
 
+        using mma_t = typename mma::smma_dispatch<yFloat>::type;
         // TODO: Pass in nVec
-        using Arg = DslashCoarseMmaArg<dslash, clover, dagger, type, Float, yFloat, ghostFloat, Ns, Nc, nVec, block_y, block_z>;
+        using Arg = DslashCoarseMmaArg<mma_t, dslash, clover, dagger, type, Float, yFloat, ghostFloat, Ns, Nc, nVec, block_y, block_z>;
         Arg arg(out[0], inA[0], inB[0], Y, X, (Float)kappa, parity, halo);
 
-        using mma_t = mma::hmma_t;
         constexpr int shared_bytes = mma::shared_memory_bytes<mma_t>(Arg::bM, Arg::bN, Arg::bK);
         tp.shared_bytes = shared_bytes;
 

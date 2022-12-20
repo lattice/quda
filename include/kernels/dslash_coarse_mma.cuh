@@ -13,13 +13,15 @@
 
 namespace quda {
 
-  template <bool dslash_, bool clover_, bool dagger_, DslashType type_, typename Float,
+  template <class mma_t_, bool dslash_, bool clover_, bool dagger_, DslashType type_, typename Float,
             typename yFloat, typename ghostFloat, int nSpin_, int nColor_, int nVec_, int block_y_, int block_z_>
   struct DslashCoarseMmaArg : kernel_param<> {
     static constexpr bool dslash = dslash_;
     static constexpr bool clover = clover_;
     static constexpr bool dagger = dagger_;
     static constexpr DslashType type = type_;
+
+    using mma_t = mma_t_;
 
     using real = typename mapper<Float>::type;
     static constexpr int nSpin = nSpin_;
@@ -107,8 +109,6 @@ namespace quda {
     int coord[4];
     getCoordsCB(coord, x_cb, arg.dim, arg.X0h, parity);
 
-    extern __shared__ half smem_ptr[];
-
     constexpr int M = Arg::nSpin * Arg::nColor;
     constexpr int N = Arg::nVec;
     constexpr int K = Arg::nSpin * Arg::nColor;
@@ -117,7 +117,7 @@ namespace quda {
     constexpr int ldb = N;
     constexpr int ldc = N;
 
-    using mma_t = mma::hmma_t;
+    using mma_t = typename Arg::mma_t;
     using Config = mma::MmaConfig<mma_t, M, N, K, lda, ldb, ldc, Arg::bM, Arg::bN, Arg::bK, Arg::block_y, Arg::block_z>;
 
     constexpr int m_offset = 0;
@@ -126,6 +126,8 @@ namespace quda {
     static_assert(M <= Arg::bM, "Dividing M has NOT been implemented yet.\n");
     static_assert(N <= Arg::bN, "Dividing N has NOT been implemented yet.\n");
     static_assert(K <= Arg::bK, "Dividing K has NOT been implemented yet.\n");
+
+    extern __shared__ typename mma_t::compute_t smem_ptr[];
 
     typename Config::SmemObjA smem_obj_a_real(smem_ptr);
     typename Config::SmemObjA smem_obj_a_imag(smem_obj_a_real.ptr + Config::smem_lda * Arg::bK);
@@ -253,7 +255,6 @@ namespace quda {
         __syncthreads();
 
         accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
-        __syncthreads();
 #else
 #pragma unroll
         for(int color_local = 0; color_local < Mc; color_local++) {

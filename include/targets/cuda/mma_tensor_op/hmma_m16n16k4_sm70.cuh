@@ -9,11 +9,11 @@
 
 namespace quda
 {
-  namespace mma
+  namespace hmma
   {
 
     template <>
-    struct mma_instruction_t <16, 16, 4, half, half2> {
+    struct hmma_t <16, 16, 4, half, half2> {
 
     static __device__ __host__ constexpr int inline pad_size(int m) { return m == 48 ? 2 : 10; }
 

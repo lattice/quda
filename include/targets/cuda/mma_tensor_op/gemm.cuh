@@ -25,9 +25,16 @@ namespace quda
      */
     template <> struct batch_multiple <half2> { static constexpr int value = 2; };
 
+    template <> struct batch_multiple <float> { static constexpr int value = 1; };
+
     inline __device__ void zero(half2 &reg_real, half2 &reg_imag) {
       reg_real = __half2half2(0);
       reg_imag = __half2half2(0);
+    }
+
+    inline __device__ void zero(float &reg_real, float &reg_imag) {
+      reg_real = 0;
+      reg_imag = 0;
     }
 
     /**
@@ -59,6 +66,39 @@ namespace quda
         } else {
           reg_real = __floats2half2_rn(+v.x, +v.z);
           reg_imag = __floats2half2_rn(dagger ? -v.y : +v.y, dagger ? -v.w : +v.w);
+        }
+      }
+    }
+
+    /**
+      @brief Load from global memory and store data in registers.
+     */
+    template <bool x, bool fixed, bool dagger, int ld, class T>
+    inline __device__ void convert_x(float &reg_real, float &reg_imag, complex<T> *p, int m_idx, int n_idx, float scale_inv) {
+      if (x) {
+        auto xx = p[m_idx * ld + n_idx];
+
+        if (fixed) {
+          reg_real = scale_inv * xx.real();
+          auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+          reg_imag = scale_inv_conj * xx.imag();
+        } else {
+          reg_real = +xx.real();
+          reg_imag = dagger ? -xx.imag() : +xx.imag();
+        }
+      } else {
+        auto xx = p[n_idx * ld + m_idx];
+        using store_type = T;
+        using store_array = typename VectorType<store_type, 2>::type;
+        store_array v = *reinterpret_cast<store_array *>(&p[n_idx * ld + m_idx]);
+
+        if (fixed) {
+          reg_real = scale_inv * xx.real();
+          auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+          reg_imag = scale_inv_conj * xx.imag();
+        } else {
+          reg_real = xx.real();
+          reg_imag = dagger ? -xx.imag() : xx.imag();
         }
       }
     }
