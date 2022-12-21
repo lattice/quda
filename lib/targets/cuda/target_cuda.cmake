@@ -84,8 +84,6 @@ endif()
 # CUDA specific QUDA options options
 include(CMakeDependentOption)
 
-option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
-option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
 option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
 option(QUDA_JITIFY "build QUDA using Jitify" OFF)
 option(QUDA_DOWNLOAD_NVSHMEM "Download NVSHMEM" OFF)
@@ -117,8 +115,6 @@ mark_as_advanced(QUDA_JITIFY)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM_TAR)
 mark_as_advanced(QUDA_GDRCOPY_HOME)
-mark_as_advanced(QUDA_NVML)
-mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
 
@@ -357,19 +353,6 @@ if(QUDA_INTERFACE_NVTX)
   target_compile_definitions(quda PRIVATE INTERFACE_NVTX)
   target_link_libraries(quda PRIVATE CUDA::nvtx3)
 endif(QUDA_INTERFACE_NVTX)
-
-
-if(QUDA_NUMA_NVML)
-  target_compile_definitions(quda PRIVATE NUMA_NVML)
-  target_sources(quda_cpp PRIVATE numa_affinity.cpp)
-  find_package(NVML REQUIRED)
-  target_include_directories(quda PRIVATE SYSTEM NVML_INCLUDE_DIR)
-  target_link_libraries(quda PUBLIC ${NVML_LIBRARY})
-endif(QUDA_NUMA_NVML)
-
-if(QUDA_NVML)
-  target_link_libraries(quda PUBLIC ${NVML_LIBRARY})
-endif()
 
 add_subdirectory(targets/cuda)
 
