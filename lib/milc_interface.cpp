@@ -20,12 +20,7 @@
 // http://devblogs.nvidia.com/parallelforall/cuda-pro-tip-generate-custom-application-profile-timelines-nvtx/
 
 #ifdef INTERFACE_NVTX
-
-#if QUDA_NVTX_VERSION == 3
-#include "nvtx3/nvToolsExt.h"
-#else
 #include "nvToolsExt.h"
-#endif
 
 static const uint32_t colors[] = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
 static const int num_colors = sizeof(colors)/sizeof(uint32_t);

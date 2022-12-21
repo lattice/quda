@@ -355,20 +355,9 @@ endif()
 
 if(QUDA_INTERFACE_NVTX)
   target_compile_definitions(quda PRIVATE INTERFACE_NVTX)
-  set(QUDA_NVTX ON)
+  target_link_libraries(quda PRIVATE CUDA::nvtx3)
 endif(QUDA_INTERFACE_NVTX)
 
-if(QUDA_NVTX)
-  find_path(
-    NVTX3 "nvtx3/nvToolsExt.h"
-    PATHS ${CUDA_TOOLKIT_INCLUDE}
-    NO_DEFAULT_PATH)
-  if(NVTX3)
-    target_compile_definitions(quda PRIVATE QUDA_NVTX_VERSION=3)
-  else()
-    target_link_libraries(quda PUBLIC ${CUDA_nvToolsExt_LIBRARY})
-  endif(NVTX3)
-endif(QUDA_NVTX)
 
 if(QUDA_NUMA_NVML)
   target_compile_definitions(quda PRIVATE NUMA_NVML)
