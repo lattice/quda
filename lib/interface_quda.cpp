@@ -5018,27 +5018,31 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
 
     profileTMCloverForce.TPSTOP(QUDA_PROFILE_INIT);
     profileTMCloverForce.TPSTART(QUDA_PROFILE_H2D);
-    x.Even() = cpuQuarkX; // in tmLQCD-parlance this is the even part of X
+    x.Odd() = cpuQuarkX; // in tmLQCD-parlance this is the odd part of X
     profileTMCloverForce.TPSTOP(QUDA_PROFILE_H2D);
     profileTMCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
 
     printfQuda("Dslash(x.Odd(), x.Even(), QUDA_ODD_PARITY)\n");
     fflush(stdout);
-    dirac->Dslash(x.Odd(), x.Even(), QUDA_ODD_PARITY);
-    
+    dirac->Dagger(QUDA_DAG_YES);
+    gamma5(tmp, x.Odd());
+    dirac->Dslash(x.Even(), tmp, QUDA_EVEN_PARITY);
+    gamma5(x.Even(), x.Even());
+   
     // want to apply \hat Q_{-} = \hat M_{+}^\dagger \gamma_5 to get Y_o
     printfQuda("gamma5(tmp, x.Even())\n");
     fflush(stdout);
-    gamma5(tmp, x.Even());
     dirac->Dagger(QUDA_DAG_YES);
     printfQuda("M(p.Even(), tmp)\n");
     fflush(stdout);
-    dirac->M(p.Even(), tmp); // this is the even part of Y
+    dirac->M(p.Odd(), tmp); // this is the even part of Y 
+
     dirac->Dagger(QUDA_DAG_NO);
     printfQuda("Dslash(p.Odd(), p.Even(), QUDA_ODD_PARITY)\n");
     fflush(stdout);
-    dirac->Dslash(p.Odd(), p.Even(), QUDA_ODD_PARITY); // and now the odd part of Y
-     
+    dirac->Dslash(p.Even(), p.Odd(), QUDA_EVEN_PARITY); // and now the even part of Y
+    // up to here x match X in tmLQCD and p=-Y of tmLQCD
+
     profileTMCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
     profileTMCloverForce.TPSTART(QUDA_PROFILE_INIT);
   }
