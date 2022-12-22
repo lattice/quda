@@ -1,5 +1,6 @@
 #pragma once
 
+#include <assert.h>
 #include <cstdio>
 #include <iostream>
 
@@ -1075,16 +1076,14 @@ namespace quda {
 
       Complex tmp = a3 + sg2h3;
       if (tmp.x == 0 and tmp.y==0) {
+	// Making sure q is a zero matrix
 	for(int i=0; i<9; i++) {
-	  // Making sure q is a zero matrix
-	  if(q(i).x!=0 or q(i).y!=0) {
-	    errorQuda("Expected all zeros entries");
-	  }
-	  q(0)=1;
-	  q(4)=1;
-	  q(8)=1;
-	  return;
+	  assert(q(i).x==0 and q(i).y==0);
 	}
+	q(0)=1;
+	q(4)=1;
+	q(8)=1;
+	return;
       }
 
       Complex cp = exp(log((Float)0.5 * tmp) / (Float)3.0);
