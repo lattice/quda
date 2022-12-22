@@ -3,8 +3,7 @@
 #include <util_quda.h>
 #include <quda_internal.h>
 #include <quda_cuda_api.h>
-
-
+#include <nvml.h>
 
 
 static cudaDeviceProp deviceProp;
@@ -34,6 +33,16 @@ namespace quda
       int runtime_version;
       CHECK_CUDA_ERROR(cudaRuntimeGetVersion(&runtime_version));
       printfQuda("CUDA Runtime version = %d\n", runtime_version);
+
+      nvmlReturn_t result = nvmlInit();
+      if (NVML_SUCCESS != result) errorQuda("NVML Init failed with error %d", result);
+      const int length = 80;
+      char graphics_version[length];
+      result = nvmlSystemGetDriverVersion(graphics_version, length);
+      if (NVML_SUCCESS != result) errorQuda("nvmlSystemGetDriverVersion failed with error %d", result);
+      printfQuda("Graphic driver version = %s\n", graphics_version);
+      result = nvmlShutdown();
+      if (NVML_SUCCESS != result) errorQuda("NVML Shutdown failed with error %d", result);
 
       for (int i = 0; i < get_device_count(); i++) {
         CHECK_CUDA_ERROR(cudaGetDeviceProperties(&deviceProp, i));
