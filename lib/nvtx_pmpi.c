@@ -27,8 +27,8 @@ _EXTERN_C_ void pmpi_init__(MPI_Fint *ierr);
 static int in_wrapper = 0;
 #include <pthread.h>
 
-#include <nvToolsExt.h>
-#include <nvToolsExtCudaRt.h>
+#include <nvtx3/nvToolsExt.h>
+#include <nvtx3/nvToolsExtCudaRt.h>
 
 
 #include <mpi_comm_handle.h>

@@ -230,6 +230,7 @@ target_compile_options(
 
 # malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub
 target_link_libraries(quda PUBLIC CUDA::cuda_driver)
+target_link_libraries(quda PUBLIC CUDA::nvml)
 if(CUDAToolkit_FOUND)
   target_link_libraries(quda INTERFACE CUDA::cudart_static)
 endif()
@@ -328,7 +329,6 @@ if(QUDA_NVSHMEM)
   get_filename_component(NVSHMEM_LIBPATH ${NVSHMEM_LIBS} DIRECTORY)
   target_link_libraries(quda PUBLIC -L${NVSHMEM_LIBPATH} -lnvshmem)
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${NVSHMEM_INCLUDE}>)
-  target_link_libraries(quda PUBLIC CUDA::nvml)
 endif()
 
 if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")

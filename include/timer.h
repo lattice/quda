@@ -3,7 +3,7 @@
 #include <sys/time.h>
 
 #ifdef INTERFACE_NVTX
-#include "nvToolsExt.h"
+#include "nvtx3/nvToolsExt.h"
 #endif
 
 #include <quda_internal.h>
