@@ -170,7 +170,6 @@ static void hisq_force_startup()
   qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
   qudaGaugeParam.anisotropy = 1.0;
   qudaGaugeParam.tadpole_coeff = 1.0;
-  qudaGaugeParam.scale = 1.0;
 
   memcpy(&qudaGaugeParam_ex, &qudaGaugeParam, sizeof(QudaGaugeParam));
 
