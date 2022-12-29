@@ -35,47 +35,62 @@ namespace quda {
     constexpr real parity_sign(int parity) { return parity ? static_cast<real>(-1) : static_cast<real>(1); }
 
     /**
-      @brief Compute the checkerboard 1-d index for the nearest neighbor in a given direction,
-               updating the lattice coordinates in-place
-      @param[in/out] x Local coordinate, which is returned shifted
-      @param[in] X Full lattice dimensions
-      @param[in] dim Shifted dimension
-      @tparam dir Positive (1) or negative (0) direction shift
-      @return Shifted 1-d checkboard index
+      @brief Compute the extended checkerboard 1-d index
+      @param[in] e Local extended coordinate
+      @param[in] arg HISQ force argument structure
+      @tparam Arg Implicit type of argument structure
+      @return Extended 1-d checkboard index
     */
-    template <int dir>
-    __host__ __device__ int updateCoordsIndexMILC(int x[], const int_fastdiv X[], int dim) {
-      if constexpr (dir == 0) {
-        switch (dim) {
-        case 0: x[0] = (x[0] - 1 + X[0]) % X[0]; break;
-        case 1: x[1] = (x[1] - 1 + X[1]) % X[1]; break;
-        case 2: x[2] = (x[2] - 1 + X[2]) % X[2]; break;
-        case 3: x[3] = (x[3] - 1 + X[3]) % X[3]; break;
-        }
-      } else {
-        switch (dim) {
-        case 0: x[0] = (x[0] + 1 + X[0]) % X[0]; break;
-        case 1: x[1] = (x[1] + 1 + X[1]) % X[1]; break;
-        case 2: x[2] = (x[2] + 1 + X[2]) % X[2]; break;
-        case 3: x[3] = (x[3] + 1 + X[3]) % X[3]; break;
-        }
-      }
-      int idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
+    template <typename Arg>
+    __host__ __device__ inline int linkExtendedIndexMILC(int e[], const Arg &arg) {
+      int idx = (((e[3] * arg.E[2] + e[2]) * arg.E[1] + e[1]) * arg.E[0] + e[0]) >> 1;
       return idx;
     }
 
     /**
-      @brief Compute the checkerboard 1-d index for the nearest neighbor in a given direction
-      @param[in/out] x Local coordinate
-      @param[in] X Full lattice dimensions
+      @brief Compute the extended checkerboard 1-d index for the nearest neighbor in a given direction,
+               updating the lattice coordinates in-place
+      @param[in/out] e Local extended coordinate, which is returned shifted
       @param[in] dim Shifted dimension
+      @param[in] arg HISQ force argument structure
       @tparam dir Positive (1) or negative (0) direction shift
-      @return Shifted 1-d checkboard index
+      @tparam Arg Implicit type of argument structure
+      @return Shifted 1-d extended checkboard index
     */
-    template <int dir>
-    __host__ __device__ int getIndexMILC(const int x[], const int_fastdiv X[], int dim) {
-      int y[4] = {x[0], x[1], x[2], x[3]};
-      return updateCoordsIndexMILC<dir>(y, X, dim);
+    template <int dir, typename Arg>
+    __host__ __device__ inline int updateCoordExtendedIndexShiftMILC(int e[], int dim, const Arg &arg) {
+      if constexpr (dir == 0) {
+        switch (dim) {
+        case 0: e[0] = (e[0] - 1 + arg.E[0]) % arg.E[0]; break;
+        case 1: e[1] = (e[1] - 1 + arg.E[1]) % arg.E[1]; break;
+        case 2: e[2] = (e[2] - 1 + arg.E[2]) % arg.E[2]; break;
+        case 3: e[3] = (e[3] - 1 + arg.E[3]) % arg.E[3]; break;
+        }
+      } else {
+        switch (dim) {
+        case 0: e[0] = (e[0] + 1 + arg.E[0]) % arg.E[0]; break;
+        case 1: e[1] = (e[1] + 1 + arg.E[1]) % arg.E[1]; break;
+        case 2: e[2] = (e[2] + 1 + arg.E[2]) % arg.E[2]; break;
+        case 3: e[3] = (e[3] + 1 + arg.E[3]) % arg.E[3]; break;
+        }
+      }
+      int idx = (((e[3] * arg.E[2] + e[2]) * arg.E[1] + e[1]) * arg.E[0] + e[0]) >> 1;
+      return idx;
+    }
+
+    /**
+      @brief Compute the extended checkerboard 1-d index for the nearest neighbor in a given direction
+      @param[in] e Local extended coordinate
+      @param[in] dim Shifted dimension
+      @param[in] arg HISQ force argument structure
+      @tparam dir Positive (1) or negative (0) direction shift
+      @tparam Arg Implicit type of argument structure
+      @return Shifted 1-d extended checkboard index
+    */
+    template <int dir, typename Arg>
+    __host__ __device__ inline int linkExtendedIndexShiftMILC(const int e[], int dim, const Arg &arg) {
+      int f[4] = {e[0], e[1], e[2], e[3]};
+      return updateCoordExtendedIndexShiftMILC<dir>(f, dim, arg);
     }
 
     //struct for holding the fattening path coefficients
@@ -93,16 +108,22 @@ namespace quda {
           seven(path_coeff_array[4]), lepage(path_coeff_array[5]) { }
     };
 
-    template <typename store_t, int nColor_, QudaReconstructType recon, QudaStaggeredPhase phase>
+    template <typename store_t, int nColor_, QudaReconstructType recon, QudaStaggeredPhase phase_>
     struct BaseForceArg : kernel_param<> {
       using real = typename mapper<store_t>::type;
       static constexpr int nColor = nColor_;
 
-      static constexpr bool gauge_direct_load = false; // false means texture load
+      // check recon, phase combinations
+      static constexpr QudaStaggeredPhase phase = phase_;
+      static_assert((recon == QUDA_RECONSTRUCT_13 &&
+        (phase == QUDA_STAGGERED_PHASE_NO || phase == QUDA_STAGGERED_PHASE_MILC))
+        || recon == QUDA_RECONSTRUCT_NO, "Invalid reconstruct and phase combination");
+
+      static constexpr bool huge_alloc = false;
       static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
       static constexpr bool use_inphase = (recon == QUDA_RECONSTRUCT_13 && phase == QUDA_STAGGERED_PHASE_MILC);
 
-      using Gauge = typename gauge_mapper<real, recon, 18, phase, gauge_direct_load, ghost, use_inphase>::type;
+      using Gauge = typename gauge_mapper<real, recon, 18, phase, huge_alloc, ghost, use_inphase>::type;
 
       const Gauge link;
       int_fastdiv X[4]; // regular grid dims
@@ -113,6 +134,11 @@ namespace quda {
       int border[4];
       int base_idx[4]; // the offset into the extended field
       int oddness_change;
+
+      // parameters needed for the recon-12 (recon 13 + MILC phases hint) case
+      const real tboundary;           // temporal boundary condition
+      const bool is_first_time_slice; // are we on the first (global) time slice
+      const bool is_last_time_slice;  // are we on the last (global) time slice
 
       // for readability, we explicitly set the different directions
       int mu;
@@ -135,6 +161,9 @@ namespace quda {
         kernel_param(dim3(1, 2, 1)),
         link(link),
         commDim{ comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3) },
+        tboundary(link.TBoundary()),
+        is_first_time_slice(comm_coord(3) == 0 ? true : false),
+        is_last_time_slice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
         mu(-1), nu(-1), rho(-1), sig(-1), compute_lepage(-1), nu_next(-1)
       {
         for (int d=0; d<4; d++) {
@@ -212,7 +241,7 @@ namespace quda {
         getCoords(x, x_cb, arg.X, parity);
 #pragma unroll
         for (int d=0; d<4; d++) x[d] += arg.border[d];
-        int e_cb = linkIndex(x,arg.E);
+        int e_cb = linkExtendedIndexMILC(x, arg);
 
         Link w = arg.oProd(sig, e_cb, parity);
         Link force = arg.force(sig, e_cb, parity);
@@ -306,13 +335,13 @@ namespace quda {
             3 Multiplies, 1 add, 1 rescale
       */
       __device__ __host__ inline void lepage_p3(int x[4], int point_a, int parity_a, Link &force_mu) {
-        int point_b = getIndexMILC<sig_positive>(x, arg.E, arg.sig);
+        int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
         int parity_b = 1 - parity_a;
 
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_f = updateCoordsIndexMILC<mu_positive>(y, arg.E, arg.mu);
+        int point_f = updateCoordExtendedIndexShiftMILC<mu_positive>(y, arg.mu, arg);
         int parity_f = 1 - parity_a;
-        int point_e = getIndexMILC<sig_positive>(y, arg.E, arg.sig);
+        int point_e = linkExtendedIndexShiftMILC<sig_positive>(y, arg.sig, arg);
         int parity_e = parity_a;
 
         int af_link_nbr_idx = (mu_positive) ? point_a : point_f;
@@ -358,15 +387,15 @@ namespace quda {
             2 multiplies, 1 add, 1 rescale
       */
       __device__ __host__ inline void lepage_force(int x[4], int point_a, int parity_a, Link &force_mu, SharedMemoryCache<Link> &Uab_cache) {
-        int point_b = getIndexMILC<sig_positive>(x, arg.E, arg.sig);
+        int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
         int parity_b = 1 - parity_a;
 
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_d = updateCoordsIndexMILC<flip_dir(mu_positive)>(y, arg.E, arg.mu);
+        int point_d = updateCoordExtendedIndexShiftMILC<flip_dir(mu_positive)>(y, arg.mu, arg);
         int parity_d = 1 - parity_a;
-        int point_i = getIndexMILC<flip_dir(mu_positive)>(y, arg.E, arg.mu);
+        int point_i = linkExtendedIndexShiftMILC<flip_dir(mu_positive)>(y, arg.mu, arg);
         int parity_i = parity_a;
-        int point_c = getIndexMILC<sig_positive>(y, arg.E, arg.sig);
+        int point_c = linkExtendedIndexShiftMILC<sig_positive>(y, arg.sig, arg);
         int parity_c = parity_a;
 
         int da_link_nbr_idx = (mu_positive) ? point_d : point_a;
@@ -427,14 +456,14 @@ namespace quda {
       */
       __device__ __host__ inline void middle_three(int x[4], int point_a, int parity_a, SharedMemoryCache<Link> &Uab_cache)
       {
-        int point_b = getIndexMILC<sig_positive>(x, arg.E, arg.sig);
+        int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
         int parity_b = 1 - parity_a;
 
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_h = updateCoordsIndexMILC<flip_dir(mu_next_positive)>(y, arg.E, arg.mu_next);
+        int point_h = updateCoordExtendedIndexShiftMILC<flip_dir(mu_next_positive)>(y, arg.mu_next, arg);
         int parity_h = 1 - parity_a;
 
-        int point_g = getIndexMILC<sig_positive>(y, arg.E, arg.sig);
+        int point_g = linkExtendedIndexShiftMILC<sig_positive>(y, arg.sig, arg);
         int parity_g = parity_a;
 
         int ha_link_nbr_idx = mu_next_positive ? point_h : point_a;
@@ -522,7 +551,7 @@ namespace quda {
          */
 
         for (int d=0; d<4; d++) x[d] += arg.base_idx[d];
-        int e_cb = linkIndex(x,arg.E);
+        int e_cb = linkExtendedIndexMILC(x,arg);
         parity = parity ^ arg.oddness_change;
 
         int point_a = e_cb;
@@ -531,7 +560,7 @@ namespace quda {
         SharedMemoryCache<Link> Uab_cache(target::block_dim());
         // Scoped load of Uab
         {
-          int point_b = getIndexMILC<sig_positive>(x, arg.E, arg.sig);
+          int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
           int parity_b = 1 - parity;
           int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
           int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
@@ -540,7 +569,7 @@ namespace quda {
         }
 
         if constexpr (mu_positive != DIR_IGNORED) {
-          int point_d = getIndexMILC<flip_dir(mu_positive)>(x, arg.E, arg.mu);
+          int point_d = linkExtendedIndexShiftMILC<flip_dir(mu_positive)>(x, arg.mu, arg);
           int parity_d = 1 - parity;
           int da_link_nbr_idx = (mu_positive) ? point_d : point_a;
           int da_link_nbr_parity = (mu_positive) ? parity_d : parity_a;
@@ -680,13 +709,13 @@ namespace quda {
           SharedMemoryCache<Link> &Matrix_cache) {
         auto mycoeff_seven = parity_sign<typename Arg::real>(parity_a) * coeff_sign<sig_positive, typename Arg::real>(parity_a) * arg.coeff_seven;
 
-        int point_b = getIndexMILC<sig_positive>(x, arg.E, arg.sig);
+        int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
         int parity_b = 1 - parity_a;
 
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_f = updateCoordsIndexMILC<DIR_POSITIVE>(y, arg.E, arg.rho);
+        int point_f = updateCoordExtendedIndexShiftMILC<DIR_POSITIVE>(y, arg.rho, arg);
         int parity_f = 1 - parity_a;
-        int point_e = getIndexMILC<sig_positive>(y, arg.E, arg.sig);
+        int point_e = linkExtendedIndexShiftMILC<sig_positive>(y, arg.sig, arg);
         int parity_e = parity_a;
         int fe_link_nbr_idx = (sig_positive) ? point_f : point_e;
         int fe_link_nbr_parity = (sig_positive) ? parity_f : parity_e;
@@ -745,9 +774,9 @@ namespace quda {
 
 #pragma unroll
         for (int d = 0; d < 4; d++) y[d] = x[d];
-        int point_d = updateCoordsIndexMILC<DIR_NEGATIVE>(y, arg.E, arg.rho);
+        int point_d = updateCoordExtendedIndexShiftMILC<DIR_NEGATIVE>(y, arg.rho, arg);
         int parity_d = 1 - parity_a;
-        int point_c = getIndexMILC<sig_positive>(y, arg.E, arg.sig);
+        int point_c = linkExtendedIndexShiftMILC<sig_positive>(y, arg.sig, arg);
         int parity_c = parity_a;
         int dc_link_nbr_idx = (sig_positive) ? point_d : point_c;
         int dc_link_nbr_parity = (sig_positive) ? parity_d : parity_c;
@@ -791,10 +820,10 @@ namespace quda {
       */
       __device__ __host__ inline void side_five(int x[4], int point_a, int parity_a, SharedMemoryCache<Link> &Matrix_cache) {
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_h = updateCoordsIndexMILC<flip_dir(nu_positive)>(y, arg.E, arg.nu);
+        int point_h = updateCoordExtendedIndexShiftMILC<flip_dir(nu_positive)>(y, arg.nu, arg);
         int parity_h = 1 - parity_a;
 
-        int point_q = getIndexMILC<flip_dir(mu_positive)>(y, arg.E, arg.mu);
+        int point_q = linkExtendedIndexShiftMILC<flip_dir(mu_positive)>(y, arg.mu, arg);
         int parity_q = parity_a;
 
         int ha_link_nbr_idx = nu_positive ? point_h : point_a;
@@ -843,17 +872,17 @@ namespace quda {
       */
       __device__ __host__ inline void middle_five(int x[4], int point_a, int parity_a,
           SharedMemoryCache<Link> &Matrix_cache) {
-        int point_b = getIndexMILC<sig_positive>(x, arg.E, arg.sig);
+        int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
         int parity_b = 1 - parity_a;
 
         int y[4] = {x[0], x[1], x[2], x[3]};
-        int point_h = updateCoordsIndexMILC<flip_dir(nu_next_positive)>(y, arg.E, arg.nu_next);
+        int point_h = updateCoordExtendedIndexShiftMILC<flip_dir(nu_next_positive)>(y, arg.nu_next, arg);
         int parity_h = 1 - parity_a;
 
-        int point_q = getIndexMILC<flip_dir(mu_positive)>(y, arg.E, arg.mu);
+        int point_q = linkExtendedIndexShiftMILC<flip_dir(mu_positive)>(y, arg.mu, arg);
         int parity_q = parity_a;
 
-        int point_c = updateCoordsIndexMILC<sig_positive>(y, arg.E, arg.sig);
+        int point_c = updateCoordExtendedIndexShiftMILC<sig_positive>(y, arg.sig, arg);
         int parity_c = parity_a;
 
         int ha_link_nbr_idx = nu_next_positive ? point_h : point_a;
@@ -921,7 +950,7 @@ namespace quda {
         int x[4];
         getCoords(x, x_cb, arg.D, parity);
         for (int d=0; d<4; d++) x[d] += arg.base_idx[d];
-        int e_cb = linkIndex(x,arg.E);
+        int e_cb = linkExtendedIndexMILC(x, arg);
         parity = parity^arg.oddness_change;
 
         int point_a = e_cb;
@@ -938,7 +967,7 @@ namespace quda {
 
         // Scoped load of Uab
         {
-          int point_b = getIndexMILC<sig_positive>(x, arg.E, arg.sig);
+          int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
           int parity_b = 1 - parity;
           int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
           int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
@@ -997,7 +1026,7 @@ namespace quda {
         getCoords(x, x_cb, arg.X, parity);
 
         for (int d=0; d<4; d++) x[d] += arg.border[d];
-        int e_cb = linkIndex(x,arg.E);
+        int e_cb = linkExtendedIndexMILC(x, arg);
 
 #pragma unroll
         for (int sig=0; sig<4; ++sig) {
@@ -1044,12 +1073,9 @@ namespace quda {
       __device__ __host__ void operator()(int x_cb, int parity)
       {
         int x[4];
-        int dx[4] = {0,0,0,0};
-
         getCoords(x, x_cb, arg.X, parity);
-
-        for (int i=0; i<4; i++) x[i] += arg.border[i];
-        int e_cb = linkIndex(x,arg.E);
+        for (int d = 0; d < 4; d++) x[d] += arg.border[d];
+        int e_cb = linkExtendedIndexMILC(x, arg);
 
         /*
          *
@@ -1062,28 +1088,30 @@ namespace quda {
          *
          */
 
+        int y[4] = {x[0], x[1], x[2], x[3]};
         // compute the force for forward long links
 #pragma unroll
-        for (int sig=0; sig<4; sig++) {
+        for (int sig = 0; sig < 4; sig++) {
           int point_c = e_cb;
           int parity_c = parity;
 
-          dx[sig]++;
-          int point_d = linkIndexShift(x,dx,arg.E);
+          int point_d = updateCoordExtendedIndexShiftMILC<DIR_POSITIVE>(y, sig, arg);
           int parity_d = 1 - parity;
 
-          dx[sig]++;
-          int point_e = linkIndexShift(x,dx,arg.E);
+          int point_e = linkExtendedIndexShiftMILC<DIR_POSITIVE>(y, sig, arg);
           int parity_e = parity;
 
-          dx[sig] = -1;
-          int point_b = linkIndexShift(x,dx,arg.E);
+          // reset y coordinate
+          y[sig] = x[sig];
+
+          int point_b = updateCoordExtendedIndexShiftMILC<DIR_NEGATIVE>(y, sig, arg);
           int parity_b = 1 - parity;
 
-          dx[sig]--;
-          int point_a = linkIndexShift(x,dx,arg.E);
+          int point_a = linkExtendedIndexShiftMILC<DIR_NEGATIVE>(y, sig, arg);
           int parity_a = parity;
-          dx[sig] = 0;
+
+          // reset y coordinate
+          y[sig] = x[sig];
 
           Link Uab = arg.link(sig, point_a, parity_a);
           Link Ubc = arg.link(sig, point_b, parity_b);

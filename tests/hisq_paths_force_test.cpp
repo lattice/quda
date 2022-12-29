@@ -222,7 +222,9 @@ static void hisq_force_startup()
   } // set halo region for CPU
   cpuGauge_ex = new cpuGaugeField(gParam_ex);
 
-  createSiteLinkCPU((void **)cpuGauge->Gauge_p(), qudaGaugeParam.cpu_prec, link_recon == QUDA_RECONSTRUCT_13 ? SITELINK_PHASE_U1 : SITELINK_PHASE_NO);
+  auto generated_link_type = (link_recon == QUDA_RECONSTRUCT_NO ? SITELINK_PHASE_NO :
+                               (link_recon == QUDA_RECONSTRUCT_13 ? SITELINK_PHASE_U1 : SITELINK_PHASE_MILC));
+  createSiteLinkCPU((void **)cpuGauge->Gauge_p(), qudaGaugeParam.cpu_prec, generated_link_type);
   copyExtendedGauge(*cpuGauge_ex, *cpuGauge, QUDA_CPU_FIELD_LOCATION);
 
   qudaGaugeParam.type = QUDA_GENERAL_LINKS;
@@ -432,7 +434,7 @@ static int hisq_force_test(bool lepage)
 
     int res = 1;
     for (int dir = 0; dir < 4; dir++) {
-      res &= compare_floats(reinterpret_cast<void**>(cpuForce->Gauge_p())[dir], reinterpret_cast<void**>(hostVerifyForce->Gauge_p())[dir], V * gauge_site_size, 1e-5, force_prec);
+      res &= compare_floats(reinterpret_cast<void**>(cpuForce->Gauge_p())[dir], reinterpret_cast<void**>(hostVerifyForce->Gauge_p())[dir], V * gauge_site_size, getTolerance(force_prec), force_prec);
     }
 
     strong_check_link(reinterpret_cast<void**>(hostVerifyForce->Gauge_p()), "GPU results: ",
@@ -466,7 +468,7 @@ static int hisq_force_test(bool lepage)
 
       int res = 1;
       for (int dir = 0; dir < 4; dir++) {
-        res &= compare_floats(reinterpret_cast<void**>(cpuForce->Gauge_p())[dir], reinterpret_cast<void**>(hostVerifyForce->Gauge_p())[dir], V * gauge_site_size, 1e-5, force_prec);
+        res &= compare_floats(reinterpret_cast<void**>(cpuForce->Gauge_p())[dir], reinterpret_cast<void**>(hostVerifyForce->Gauge_p())[dir], V * gauge_site_size, getTolerance(force_prec), force_prec);
       }
 
       strong_check_link(reinterpret_cast<void**>(hostVerifyForce->Gauge_p()), "GPU results: ",
@@ -493,7 +495,7 @@ static int hisq_force_test(bool lepage)
 
   int accuracy_level = 3;
   if (verify_results) {
-    int res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume() * mom_site_size, 1e-5,
+    int res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume() * mom_site_size, getTolerance(force_prec),
                              force_prec);
     accuracy_level
       = strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume(), force_prec);
@@ -528,14 +530,14 @@ static void display_test_info()
 TEST(paths, verify)
 {
   int level = hisq_force_test(true);
-  int tolerance = force_prec == QUDA_SINGLE_PRECISION ? 5 : 13;
+  int tolerance = getNegLog10Tolerance(force_prec);
   ASSERT_GE(level, tolerance) << "CPU and GPU implementations do not agree";
 }
 
 TEST(paths_no_lepage, verify)
 {
   int level = hisq_force_test(false);
-  int tolerance = force_prec == QUDA_SINGLE_PRECISION ? 5 : 13;
+  int tolerance = getNegLog10Tolerance(force_prec);
   ASSERT_GE(level, tolerance) << "CPU and GPU implementations do not agree";
 }
 
@@ -561,7 +563,8 @@ int main(int argc, char **argv)
 
   if (prec != QUDA_DOUBLE_PRECISION && prec != QUDA_SINGLE_PRECISION)
     errorQuda("Invalid precision %d", prec);
-  if (link_recon != QUDA_RECONSTRUCT_NO && link_recon != QUDA_RECONSTRUCT_13 && link_recon != QUDA_RECONSTRUCT_12)
+  // FIXME: debugging recon 12
+  if (link_recon != QUDA_RECONSTRUCT_NO && link_recon != QUDA_RECONSTRUCT_13/* && link_recon != QUDA_RECONSTRUCT_12*/)
     errorQuda("Invalid reconstruct %d", link_recon);
 
   // one-time setup
