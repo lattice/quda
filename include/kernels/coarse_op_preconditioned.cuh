@@ -56,7 +56,7 @@ namespace quda {
     real yHatMax = 0.0;
 
     // first do the backwards links Y^{+\mu} * X^{-\dagger}
-    if (arg.comm_dim[d] && is_boundary(coord, 0, d, arg)) {
+    if (arg.comm_dim[d] && is_boundary(coord, d, 0, arg)) {
 
       auto yHat = make_tile_C<complex,true>(arg.tile);
 
