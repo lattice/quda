@@ -163,7 +163,10 @@ TEST(multi_rhs_test, verify)
     default: errorQuda("Undefined test %d", test_type);
     }
 
-    EXPECT_LE(blas::xmyNorm(xD[i], x_ref), 1e-6);
+    double ref_norm2 = blas::norm2(x_ref);
+    double diff_norm2 = blas::xmyNorm(xD[i], x_ref);
+    double eps = 1e-6;
+    EXPECT_LE(diff_norm2 / ref_norm2, eps * eps);
   }
 }
 
@@ -240,6 +243,7 @@ int main(int argc, char **argv)
   param.halo_precision = smoother_halo_prec;
   param.kappa = 1.0;
   param.dagger = QUDA_DAG_NO;
+  param.use_mma = mg_use_mma;
   dirac = new DiracCoarse(param, nullptr, nullptr, nullptr, nullptr, Y_d, X_d, Xinv_d, Yhat_d);
 
   if (verify_results) {

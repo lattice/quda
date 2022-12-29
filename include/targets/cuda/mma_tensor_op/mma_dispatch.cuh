@@ -1,6 +1,6 @@
 #pragma once
 
-// This macro determines whether or not we are using the fp16 accumulation of the MMA instruction.
+// Uncomment this macro to use fp16 accumulation in the HMMA instruction.
 // #define USE_FP16_HMMA_ACCUMULATE
 
 constexpr QudaPrecision accumulate_precision()
@@ -16,7 +16,7 @@ namespace quda
 {
   namespace hmma
   {
-    template <int m, int n, int k, class compute_type, class load_type> struct hmma_t { };
+    template <int m, int n, int k, class compute_t, class load_t> struct hmma_t { };
   }
 }
 
@@ -26,6 +26,8 @@ namespace quda
 #include <mma_tensor_op/hmma_m16n8k8_sm80.cuh>
 #include <mma_tensor_op/smma_m16n8_sm80.cuh>
 #endif
+
+#include <mma_tensor_op/simt.cuh>
 
 namespace quda
 {

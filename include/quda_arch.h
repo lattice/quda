@@ -8,6 +8,10 @@
 #define QUDA_MMA_AVAILABLE 1
 #endif
 
+#if __COMPUTE_CAPABILITY__ >= 800
+#define QUDA_SMMA_AVAILABLE 1
+#endif
+
 #elif defined(QUDA_TARGET_HIP)
 #include <hip/hip_runtime.h>
 

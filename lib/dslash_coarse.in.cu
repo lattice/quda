@@ -8,14 +8,14 @@ namespace quda {
   template<>
   void ApplyCoarse<dagger, coarseColor>(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                                         cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
-                                        double kappa, int parity, bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision)
+                                        double kappa, int parity, bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision, bool use_mma)
   {
     if constexpr (is_enabled_multigrid()) {
       // create a halo ndim+1 field for batched comms
       auto halo = ColorSpinorField::create_comms_batch(inA);
 
       DslashCoarseLaunch<dagger, coarseColor> Dslash(out, inA, inB, halo, Y, X, kappa, parity, dslash,
-                                                     clover, commDim, halo_precision);
+                                                     clover, commDim, halo_precision, use_mma);
 
       DslashCoarsePolicyTune<decltype(Dslash)> policy(Dslash);
       policy.apply(device::get_default_stream());

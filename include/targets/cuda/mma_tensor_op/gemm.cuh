@@ -156,6 +156,49 @@ namespace quda
       load_t reg_real[register_count];
       load_t reg_imag[register_count];
 
+      template <int ld, bool dagger, class gmem_accessor_t, class smem_accessor_t>
+      __device__ inline void g2s(const gmem_accessor_t &gmem, int m_offset, int n_offset, smem_accessor_t &smem_real, smem_accessor_t &smem_imag)
+      {
+        auto p = gmem.data();
+        auto scale_inv = gmem.scale_inv;
+        constexpr bool fixed = gmem_accessor_t::fixed;
+
+        // for each iteration, each warp loads a tile
+        int thread_id = (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
+        int warp_id = thread_id / 32;
+        int lane_id = thread_id % 32;
+        int thread_in_group = lane_id % 4;
+        int group_id = lane_id / 4;
+        constexpr int w_m = 8 * batch;
+        constexpr int w_k = 4;
+        constexpr int tile_dim_m = bM / w_m;
+        constexpr int tile_dim_k = bN / w_k;
+
+        constexpr int total_tiles = tile_dim_k * tile_dim_m;
+        constexpr int n_warp = block_y * block_z / 32;
+        static_assert(total_tiles % n_warp == 0, "total_tiles %% n_warp == 0");
+#pragma unroll
+        for (int c = 0; c < total_tiles / n_warp; c++) {
+          int warp_m = (c * n_warp + warp_id) % tile_dim_m;
+          int warp_k = (c * n_warp + warp_id) / tile_dim_m;
+
+          int smem_m_offset = warp_m * w_m + group_id * batch;
+          int smem_k_offset = warp_k * w_k + thread_in_group;
+
+          int gmem_m_offset = m_offset + smem_m_offset;
+          int gmem_k_offset = n_offset + smem_k_offset;
+
+          load_t real;
+          load_t imag;
+
+          constexpr bool x = (transpose == dagger);
+          convert_x<x, fixed, dagger, ld>(real, imag, p, gmem_m_offset, gmem_k_offset, scale_inv);
+          smem_real.vector_load(smem_m_offset, smem_k_offset, real);
+          smem_imag.vector_load(smem_m_offset, smem_k_offset, imag);
+        }
+
+      }
+
       /**
        * ld: leading dimension of global memory
        * dagger: if we need to store daggered (tranpose and hermision conjugate)
@@ -258,7 +301,7 @@ namespace quda
     }
 
     // A wrapper that wraps the OperandC objects, together with the various methods to loop over it
-    template <class mma_t, int warp_cycle, int tile_col_dim, int tile_acc_dim> struct MmaAccumulator {
+    template <class mma_t, int warp_cycle, int tile_row_dim, int tile_col_dim, int tile_acc_dim> struct MmaAccumulator {
 
       static constexpr int size = warp_cycle;
 
@@ -292,6 +335,7 @@ namespace quda
                                  const SmemObjB &smem_obj_b_real, const SmemObjB &smem_obj_b_imag)
       {
 
+        if (wrm.warp_id < tile_row_dim * tile_col_dim) {
 #pragma unroll
         for (int c = 0; c < warp_cycle; c++) {
 
@@ -306,10 +350,12 @@ namespace quda
                   warp_row, warp_col, tile_k, wrm);
           }
         }
+        }
       }
 
       template <int M, int N, int ldc, class C> __device__ inline void store(C &c_accessor, int m_offset, int n_offset)
       {
+        if (wrm.warp_id < tile_row_dim * tile_col_dim) {
 #pragma unroll
         for (int c = 0; c < warp_cycle; c++) {
 
@@ -322,11 +368,13 @@ namespace quda
 
           mma_t::template store_complex<M, N, ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real[c], op_c_imag[c]);
         }
+        }
       }
 
       template <int M, int N, int ldc, bool dagger, class C>
       __device__ inline void store_atomic(C &c_accessor, int m_offset, int n_offset)
       {
+        if (wrm.warp_id < tile_row_dim * tile_col_dim) {
 #pragma unroll
         for (int c = 0; c < warp_cycle; c++) {
 
@@ -340,14 +388,17 @@ namespace quda
           mma_t::template store_complex_atomic<M, N, ldc, dagger>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real[c],
                                                   op_c_imag[c]);
         }
+        }
       }
 
       __device__ inline void abs_max(float &max)
       {
+        if (wrm.warp_id < tile_row_dim * tile_col_dim) {
 #pragma unroll
         for (int c = 0; c < warp_cycle; c++) {
           op_c_real[c].abs_max(max);
           op_c_imag[c].abs_max(max);
+        }
         }
       }
     };
@@ -379,7 +430,7 @@ namespace quda
       static constexpr int total_warp = n_row * n_col / mma_t::warp_size; // Total number of warps in the CTA
 
       static constexpr int total_tile = tile_row_dim * tile_col_dim; // Total number of tiles dividing operand C
-      static constexpr int warp_cycle = total_tile / total_warp;     // Number of tiles each warp needs to calculate
+      static constexpr int warp_cycle = std::max(total_tile / total_warp, 1);     // Number of tiles each warp needs to calculate
 
       static constexpr bool a_transpose
         = false; // In our setup, specifically in the arch-dependent code, A is always column-major, while B is always row-major
@@ -389,13 +440,13 @@ namespace quda
       static_assert(bN % mma_t::MMA_N == 0, "bN must be divisible by MMA_N.");
       static_assert(bK % mma_t::MMA_K == 0, "bK must be divisible by MMA_K.");
 
-      static_assert((tile_row_dim * tile_col_dim) % total_warp == 0,
-                    "Total number of tiles should be divisible by the number of warps.");
+      // static_assert((tile_row_dim * tile_col_dim) % total_warp == 0,
+      //               "Total number of tiles should be divisible by the number of warps.");
 
       using SmemObjA = SharedMemoryObject<typename mma_t::compute_t, bM, bK, 1, smem_lda>;
       using SmemObjB = SharedMemoryObject<typename mma_t::compute_t, bN, bK, 1, smem_ldb>;
 
-      using Accumulator = MmaAccumulator<mma_t, warp_cycle, tile_col_dim, tile_acc_dim>;
+      using Accumulator = MmaAccumulator<mma_t, warp_cycle, tile_row_dim, tile_col_dim, tile_acc_dim>;
 
       using ALoader = GlobalMemoryLoader<typename mma_t::load_t, M, K, bM, bK, n_row, n_col, a_transpose>;
       using BLoader = GlobalMemoryLoader<typename mma_t::load_t, N, K, bN, bK, n_row, n_col, b_transpose>;

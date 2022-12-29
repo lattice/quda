@@ -367,11 +367,11 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
 
-    if (in.size() != 8) {
+    if ((in.size() != 8 && in.size() != 16) || !use_mma) {
       if ( location == QUDA_CUDA_FIELD_LOCATION ) {
-        ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision);
+        ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision, false);
       } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-        ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision);
+        ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision, false);
       }
     } else {
       constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
@@ -384,7 +384,7 @@ namespace quda {
       auto X_d_ = create_gauge_copy(*X_d, gOrder, true);
       auto Y_d_ = create_gauge_copy(*Y_d, gOrder, true);
 
-      ApplyCoarse(v_out, v_in, v_in, *Y_d_, *X_d_, kappa, parity, true, false, dagger, commDim, halo_precision);
+      ApplyCoarse(v_out, v_in, v_in, *Y_d_, *X_d_, kappa, parity, true, false, dagger, commDim, halo_precision, true);
 
       BlockTransposeBackward(v_out, out);
     }

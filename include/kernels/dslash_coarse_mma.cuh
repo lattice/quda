@@ -179,11 +179,13 @@ namespace quda {
         constexpr bool b_dagger = false;
 
         __syncthreads();
-        a_loader.template g2r<lda, a_dagger>(a, m_offset, 0); // bk = 0
-        a_loader.template r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
+        // a_loader.template g2r<lda, a_dagger>(a, m_offset, 0); // bk = 0
+        // a_loader.template r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
 
-        b_loader.template g2r<ldb, b_dagger>(b, n_offset, 0); // bk = 0
-        b_loader.template r2s<b_dagger>(smem_obj_b_real, smem_obj_b_imag);
+        // b_loader.template g2r<ldb, b_dagger>(b, n_offset, 0); // bk = 0
+        // b_loader.template r2s<b_dagger>(smem_obj_b_real, smem_obj_b_imag);
+        a_loader.template g2s<lda, a_dagger>(a, m_offset, 0, smem_obj_a_real, smem_obj_a_imag);
+        b_loader.template g2s<ldb, b_dagger>(b, n_offset, 0, smem_obj_b_real, smem_obj_b_imag);
         __syncthreads();
 
         accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
@@ -247,11 +249,13 @@ namespace quda {
         constexpr bool b_dagger = false;
 
         __syncthreads();
-        a_loader.template g2r<lda, a_dagger>(a, m_offset, 0); // bk = 0
-        a_loader.template r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
+        // a_loader.template g2r<lda, a_dagger>(a, m_offset, 0); // bk = 0
+        // a_loader.template r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
 
-        b_loader.template g2r<ldb, b_dagger>(b, n_offset, 0); // bk = 0
-        b_loader.template r2s<b_dagger>(smem_obj_b_real, smem_obj_b_imag);
+        // b_loader.template g2r<ldb, b_dagger>(b, n_offset, 0); // bk = 0
+        // b_loader.template r2s<b_dagger>(smem_obj_b_real, smem_obj_b_imag);
+        a_loader.template g2s<lda, a_dagger>(a, m_offset, 0, smem_obj_a_real, smem_obj_a_imag);
+        b_loader.template g2s<ldb, b_dagger>(b, n_offset, 0, smem_obj_b_real, smem_obj_b_imag);
         __syncthreads();
 
         accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
