@@ -27,6 +27,8 @@ namespace quda
 #include <mma_tensor_op/smma_m16n8_sm80.cuh>
 #endif
 
+#include <mma_tensor_op/smma_m16n16k4_sm70.cuh>
+
 #include <mma_tensor_op/simt.cuh>
 
 namespace quda

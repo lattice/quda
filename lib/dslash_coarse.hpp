@@ -249,6 +249,8 @@ namespace quda {
     using Arg = DslashCoarseArg<dslash, clover, dagger, type, color_stride, dim_stride, Float, yFloat, ghostFloat, Ns,
                                 Nc, native>;
 
+    // using mma_t = smma::smma_t<smma::bfloat16, 8, 1, 1>;
+    // using mma_t = smma::smma_t<smma::half, 4, 1, 1>;
     using mma_t = typename mma::smma_dispatch<yFloat>::type;
 
     void set_mma_param(TuneParam &tp, int policy) const {
@@ -290,12 +292,16 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (use_mma) {
-        if (out[0].Nvec() == 8) {
-          launch_mma<8>(tp, stream);
-        } else if (out[0].Nvec() == 16) {
-          launch_mma<16>(tp, stream);
-        } else {
-          errorQuda("nVec = %d not supported\n", out[0].Nvec());
+        switch (out[0].Nvec()) {
+          // case  8: launch_mma< 8>(tp, stream); break;
+          case 16: launch_mma<16>(tp, stream); break;
+          // case 24: launch_mma<24>(tp, stream); break;
+          // case 32: launch_mma<32>(tp, stream); break;
+          // case 40: launch_mma<40>(tp, stream); break;
+          // case 48: launch_mma<48>(tp, stream); break;
+          // case 56: launch_mma<56>(tp, stream); break;
+          // case 64: launch_mma<64>(tp, stream); break;
+          default: errorQuda("nVec = %d not supported\n", out[0].Nvec());
         }
       } else {
         color_col_stride = tp.aux.x;

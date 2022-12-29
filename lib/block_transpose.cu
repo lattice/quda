@@ -105,12 +105,16 @@ namespace quda {
   {
     if (V.Nvec() != static_cast<int>(B.size())) { errorQuda("V.Nvec() (=%d) != B.size() (=%d)", V.Nvec(), static_cast<int>(B.size())); }
 
-    if (V.Nvec() == 8) {
-      impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, 8> tranpose(V, B);
-    } else if (V.Nvec() == 16) {
-      impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, 16> tranpose(V, B);
-    } else {
-      errorQuda("Unexpected nVec = %d", V.Nvec());
+    switch (V.Nvec()) {
+      case  8: { impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor,  8> transpose(V, B); } break;
+      case 16: { impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, 16> transpose(V, B); } break;
+      case 24: { impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, 24> transpose(V, B); } break;
+      case 32: { impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, 32> transpose(V, B); } break;
+      case 40: { impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, 40> transpose(V, B); } break;
+      case 48: { impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, 48> transpose(V, B); } break;
+      case 56: { impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, 56> transpose(V, B); } break;
+      case 64: { impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, 64> transpose(V, B); } break;
+      default: errorQuda("Unexpected nVec = %d", V.Nvec());
     }
   }
 

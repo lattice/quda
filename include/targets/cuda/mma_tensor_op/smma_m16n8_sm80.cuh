@@ -49,6 +49,24 @@ namespace quda
       }
     };
 
+    template <> struct Shuffle<half, 2> {
+      static constexpr int input_vn = 2;
+
+      void __device__ inline operator()(unsigned &big, unsigned &small, float f[input_vn])
+      {
+        float f_big[input_vn];
+        float f_small[input_vn];
+
+#pragma unroll
+        for (int i = 0; i < input_vn; i++) { get_big_small<tfloat32>(f_big[i], f_small[i], f[i]); }
+
+        half2 &big_b32 = reinterpret_cast<half2 &>(big);
+        big_b32 = __floats2half2_rn(f_big[0], f_big[1]);
+        half2 &small_b32 = reinterpret_cast<half2 &>(small);
+        small_b32 = __floats2half2_rn(f_small[0], f_small[1]);
+      }
+    };
+
     template <> struct Shuffle<tfloat32, 1> {
       static constexpr int input_vn = 1;
 

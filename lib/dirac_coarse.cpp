@@ -367,7 +367,7 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
 
-    if ((in.size() != 8 && in.size() != 16) || !use_mma) {
+    if ((in.size() % 8 != 0 || in.size() > 64) || !use_mma) {
       if ( location == QUDA_CUDA_FIELD_LOCATION ) {
         ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision, false);
       } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
