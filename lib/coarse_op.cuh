@@ -835,9 +835,7 @@ namespace quda {
 
         if (type == COMPUTE_UV || type == COMPUTE_LV || type == COMPUTE_VUV || type == COMPUTE_VLV) {
           strcat(Aux, ",nFace=");
-          char nfc[2];
-          u32toa(nfc, nFace);
-          strcat(Aux, nfc);
+          u32toa(Aux + strlen(Aux) - 1, nFace);
         }
 
         // needed to break the degeneracy from staggered KD and non-KD
