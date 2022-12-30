@@ -1,12 +1,16 @@
 #pragma once
 
-#include <mma_tensor_op/smma_inst.cuh>
+#include <mma_tensor_op/mma_instruction.cuh>
 
 namespace quda
 {
 
   namespace smma
   {
+
+    using bfloat16 = mma::bfloat16;
+    using bfloat162 = mma::bfloat162;
+    using tfloat32 = mma::tfloat32;
 
     // #define QUDA_FAST_MMA_DETECT_OVERFLOW
 
@@ -324,7 +328,7 @@ namespace quda
             int b_offset = wn * OperandB::thread_count;
             int c_offset = (wn * warp_m + wm) * OperandC::thread_count;
 
-            mma_instruction_t<inst_m, inst_n, inst_k, shuffle_t, float> mma_instruction;
+            mma::mma_instruction_t<inst_m, inst_n, inst_k, shuffle_t, float> mma_instruction;
 
             if (use_intermediate_accumulator()) {
               float acc[OperandC::thread_count];

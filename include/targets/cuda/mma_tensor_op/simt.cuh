@@ -1,7 +1,5 @@
 #pragma once
 
-#include <mma_tensor_op/smma_inst.cuh>
-
 namespace quda
 {
 

@@ -5,7 +5,7 @@
 namespace quda
 {
 
-  namespace smma
+  namespace mma
   {
 
     using bfloat162 = __nv_bfloat162;
@@ -69,6 +69,6 @@ namespace quda
       }
     };
 
-  } // namespace smma
+  } // namespace mma
 
 } // namespace quda

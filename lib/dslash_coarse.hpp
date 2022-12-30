@@ -139,7 +139,7 @@ namespace quda {
       if (use_mma) {
         if (param.aux.x < 2) {
           param.aux.x++;
-          set_mma_param(param, param.aux.x);
+          set_mma_param(param);
           return true;
         } else {
           param.aux.x = 0;
@@ -154,7 +154,7 @@ namespace quda {
     {
       if (use_mma) {
         param.aux.x = 0;
-        set_mma_param(param, param.aux.x);
+        set_mma_param(param);
       } else {
         color_col_stride = 1;
         dim_threads = 1;
@@ -170,7 +170,7 @@ namespace quda {
     {
       if (use_mma) {
         param.aux.x = 0;
-        set_mma_param(param, param.aux.x);
+        set_mma_param(param);
       } else {
         color_col_stride = 1;
         dim_threads = 1;
@@ -249,11 +249,14 @@ namespace quda {
     using Arg = DslashCoarseArg<dslash, clover, dagger, type, color_stride, dim_stride, Float, yFloat, ghostFloat, Ns,
                                 Nc, native>;
 
-    // using mma_t = smma::smma_t<smma::bfloat16, 8, 1, 1>;
-    // using mma_t = smma::smma_t<smma::half, 4, 1, 1>;
+    // using mma_t = smma::smma_t<mma::bfloat16, 8, 1, 1>; // 3xBF16
+    // using mma_t = smma::smma_t<mma::tfloat32, 4, 1, 1>; // 3xTF32
+    // using mma_t = smma::smma_t<mma::half, 4, 1, 1>; // 3xFP16 - bad perf for sm80
+    // using mma_t = simt::simt_t<float, 8, 4, 1, 1>; // SIMT
+    // using mma_t = hmma::hmma_tfloat32_t<4, 1, 1>; // 1xTF32
     using mma_t = typename mma::smma_dispatch<yFloat>::type;
 
-    void set_mma_param(TuneParam &tp, int policy) const {
+    void set_mma_param(TuneParam &tp) const {
       tp.block.x = 1;
       tp.block.y = Ns * Nc / (1 << tp.aux.x);
       tp.block.z = 8;

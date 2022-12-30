@@ -20,13 +20,12 @@ namespace quda
   }
 }
 
-#if (__COMPUTE_CAPABILITY__ == 700)
 #include <mma_tensor_op/hmma_m16n16k4_sm70.cuh>
-#else
 #include <mma_tensor_op/hmma_m16n8k8_sm80.cuh>
-#include <mma_tensor_op/smma_m16n8_sm80.cuh>
-#endif
 
+#include <mma_tensor_op/hmma_tfloat32_sm80.cuh>
+
+#include <mma_tensor_op/smma_m16n8_sm80.cuh>
 #include <mma_tensor_op/smma_m16n16k4_sm70.cuh>
 
 #include <mma_tensor_op/simt.cuh>
@@ -46,12 +45,12 @@ namespace quda
 
     template <>
     struct smma_dispatch <float> {
-      using type = smma::smma_t<smma::tfloat32, 4, 1, 1>;
+      using type = smma::smma_t<mma::tfloat32, 4, 1, 1>;
     };
 
     template <>
     struct smma_dispatch <short> {
-      using type = smma::smma_t<smma::bfloat16, 8, 1, 1>;
+      using type = smma::smma_t<mma::bfloat16, 8, 1, 1>;
     };
   }
 }

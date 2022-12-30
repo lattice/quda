@@ -12,11 +12,11 @@ namespace quda
   {
 
     template <>
-    struct smma_t <half, 4, 1, 1> {
+    struct smma_t <mma::half, 4, 1, 1> {
 
       static constexpr bool use_intermediate_accumulator() { return true; };
 
-    static __device__ __host__ constexpr int inline pad_size(int m) { return 0; }
+    static __device__ __host__ constexpr int inline pad_size(int) { return 0; }
 
     static constexpr int MMA_M = 16;
     static constexpr int MMA_N = 16;
@@ -75,10 +75,11 @@ namespace quda
 
       __device__ inline void negate()
       {
-        asm volatile("neg.f16x2 %0, %0;" : "+r"(big[0]));
-        asm volatile("neg.f16x2 %0, %0;" : "+r"(big[1]));
-        asm volatile("neg.f16x2 %0, %0;" : "+r"(small[0]));
-        asm volatile("neg.f16x2 %0, %0;" : "+r"(small[1]));
+#pragma unroll
+        for (int v = 0; v < 2; v++) {
+          asm volatile("neg.f16x2 %0, %0;" : "+r"(big[v]));
+          asm volatile("neg.f16x2 %0, %0;" : "+r"(small[v]));
+        }
       }
     };
 
@@ -159,7 +160,7 @@ namespace quda
 
     static __device__ void mma(const OperandA &op_a, const OperandB &op_b, OperandC &op_c)
     {
-      mma_instruction_t<MMA_M, MMA_N, MMA_K, half, float> mma_instruction;
+      mma::mma_instruction_t<MMA_M, MMA_N, MMA_K, mma::half, float> mma_instruction;
 
       if (use_intermediate_accumulator()) {
         float acc[8];
