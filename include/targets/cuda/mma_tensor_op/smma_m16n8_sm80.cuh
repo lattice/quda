@@ -116,14 +116,14 @@ namespace quda
       using compute_t = float;
       using load_t = float;
 
-      static constexpr int input_vn = std::is_same_v<shuffle_t, bfloat16> ? 2 : 1; // input (op A/B) vector length
+      static constexpr int input_vn = std::is_same_v<shuffle_t, tfloat32> ? 1 : 2; // input (op A/B) vector length
 
       static constexpr int t_pad = input_vn % 2 == 0 ? 4 : 8;
       static constexpr int n_pad = input_vn % 2 == 0 ? 8 : 4;
 
       static __device__ __host__ constexpr int inline pad_size(int m)
       {
-        return std::is_same_v<shuffle_t, bfloat16> ? (m - 4 + 7) / 8 * 8 + 4 - m : (m - 8 + 15) / 16 * 16 + 8 - m;
+        return std::is_same_v<shuffle_t, tfloat32> ? (m - 8 + 15) / 16 * 16 + 8 - m : (m - 4 + 7) / 8 * 8 + 4 - m;
       }
 
       static constexpr int acc_pad = 8;
@@ -154,7 +154,7 @@ namespace quda
         {
 #pragma unroll
           for (int i = 0; i < warp_m * thread_count; i++) {
-            constexpr unsigned flip_bit_sign = std::is_same_v<shuffle_t, bfloat16> ? 0x80008000 : 0x80000000;
+            constexpr unsigned flip_bit_sign = std::is_same_v<shuffle_t, tfloat32> ? 0x80000000 : 0x80008000;
             big[i] ^= flip_bit_sign;
             small[i] ^= flip_bit_sign;
           }
