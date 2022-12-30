@@ -8,8 +8,7 @@ namespace quda
   namespace hmma
   {
 
-    template <int inst_k_, int warp_m_, int warp_n_>
-    struct hmma_tfloat32_t {
+    template <int inst_k_, int warp_m_, int warp_n_> struct hmma_tfloat32_t {
 
       static constexpr int warp_m = warp_m_;
       static constexpr int warp_n = warp_n_;
@@ -31,10 +30,7 @@ namespace quda
       using compute_t = float;
       using load_t = float;
 
-      static __device__ __host__ constexpr int inline pad_size(int m)
-      {
-        return (m - 8 + 15) / 16 * 16 + 8 - m;
-      }
+      static __device__ __host__ constexpr int inline pad_size(int m) { return (m - 8 + 15) / 16 * 16 + 8 - m; }
 
       struct WarpRegisterMapping {
 
@@ -224,6 +220,6 @@ namespace quda
       }
     };
 
-  } // namespace smma
+  } // namespace hmma
 
 } // namespace quda

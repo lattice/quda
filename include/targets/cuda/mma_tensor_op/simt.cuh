@@ -33,10 +33,7 @@ namespace quda
       using compute_t = T;
       using load_t = T;
 
-      static __device__ __host__ constexpr int inline pad_size(int)
-      {
-        return 0;
-      }
+      static __device__ __host__ constexpr int inline pad_size(int) { return 0; }
 
       struct WarpRegisterMapping {
 
@@ -58,9 +55,7 @@ namespace quda
         __device__ inline void negate()
         {
 #pragma unroll
-          for (int i = 0; i < warp_m; i++) {
-            reg[i] = -reg[i];
-          }
+          for (int i = 0; i < warp_m; i++) { reg[i] = -reg[i]; }
         }
 
         template <class smem_obj_t>
@@ -136,9 +131,7 @@ namespace quda
 #pragma unroll
         for (int wm = 0; wm < warp_m; wm++) {
 #pragma unroll
-          for (int wn = 0; wn < warp_n; wn++) {
-            op_c.reg[wn * warp_m + wm] += op_a.reg[wm] * op_b.reg[wn];
-          }
+          for (int wn = 0; wn < warp_n; wn++) { op_c.reg[wn * warp_m + wm] += op_a.reg[wm] * op_b.reg[wn]; }
         }
       }
 
@@ -161,9 +154,8 @@ namespace quda
             if (!check_bounds || (m < M && n < N)) {
               if (gmem_op_t::fixed) {
                 auto scale = cc.scale;
-                C[m * ldc + n]
-                  = {static_cast<store_t>(scale * op_c_real.reg[wn * warp_m + wm]),
-                    static_cast<store_t>(scale * op_c_imag.reg[wn * warp_m + wm])};
+                C[m * ldc + n] = {static_cast<store_t>(scale * op_c_real.reg[wn * warp_m + wm]),
+                                  static_cast<store_t>(scale * op_c_imag.reg[wn * warp_m + wm])};
               } else {
                 C[m * ldc + n] = {op_c_real.reg[wn * warp_m + wm], op_c_imag.reg[wn * warp_m + wm]};
               }
@@ -173,6 +165,6 @@ namespace quda
       }
     };
 
-  } // namespace smma
+  } // namespace simt
 
 } // namespace quda
