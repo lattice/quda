@@ -51,7 +51,7 @@ namespace quda
 
   size_t Communicator::comm_size(void) { return 1; }
 
-  void Communicator::comm_gather_hostname(char *hostname_recv_buf) { strncpy(hostname_recv_buf, comm_hostname(), 128); }
+  void Communicator::comm_gather_hostname(char *hostname_recv_buf) { strncpy(hostname_recv_buf, comm_hostname(), QUDA_MAX_HOSTNAME_STRING); }
 
   void Communicator::comm_gather_gpuid(int *gpuid_recv_buf) { gpuid_recv_buf[0] = comm_gpuid(); }
 
