@@ -172,7 +172,7 @@ namespace quda
                                  smem_accessor_t &smem_imag)
       {
         auto p = gmem.data();
-        auto scale_inv = gmem.scale_inv;
+        auto scale_inv = gmem.get_scale_inv();
         constexpr bool fixed = gmem_accessor_t::fixed;
 
         // for each iteration, each warp loads a tile
@@ -218,7 +218,7 @@ namespace quda
       __device__ inline void g2r(const GmemAccessor &gmem, int m_offset, int n_offset)
       {
         auto p = gmem.data();
-        auto scale_inv = gmem.scale_inv;
+        auto scale_inv = gmem.get_scale_inv();
         constexpr bool fixed = GmemAccessor::fixed;
 
         constexpr bool x = (transpose == dagger);
@@ -365,7 +365,7 @@ namespace quda
         }
       }
 
-      template <int M, int N, int ldc, class C> __device__ inline void store(C &c_accessor, int m_offset, int n_offset)
+      template <int M, int N, int ldc, bool dagger, class C, class op_t> __device__ inline void store(C &c_accessor, int m_offset, int n_offset, op_t op)
       {
         if (wrm.warp_id < tile_row_dim * tile_col_dim) {
 #pragma unroll
@@ -378,12 +378,13 @@ namespace quda
             const int warp_m_offset = warp_row * mma_t::MMA_M + m_offset;
             const int warp_n_offset = warp_col * mma_t::MMA_N + n_offset;
 
-            mma_t::template store_complex<M, N, ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real[c],
-                                                     op_c_imag[c]);
+            mma_t::template store_complex<M, N, ldc, dagger>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real[c],
+                                                     op_c_imag[c], op);
           }
         }
       }
 
+#if 0
       template <int M, int N, int ldc, bool dagger, class C>
       __device__ inline void store_atomic(C &c_accessor, int m_offset, int n_offset)
       {
@@ -403,6 +404,7 @@ namespace quda
           }
         }
       }
+#endif
 
       __device__ inline void abs_max(float &max)
       {
@@ -518,7 +520,7 @@ namespace quda
         if (compute_max_only) {
           accumulator.abs_max(max);
         } else {
-          accumulator.template store<M, N, ldc>(c, m_offset, n_offset);
+          accumulator.template store<M, N, ldc, false>(c, m_offset, n_offset, assign_t());
         }
 
         return max;
@@ -583,7 +585,7 @@ namespace quda
             int warp_m_offset = warp_row * mma_t::MMA_M + m_offset;
             int warp_n_offset = warp_col * mma_t::MMA_N + n_offset;
 
-            mma_t::template store_complex<M, N, ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real, op_c_imag);
+            mma_t::template store_complex<M, N, ldc, false>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real, op_c_imag, assign_t());
           }
         }
 
@@ -654,8 +656,8 @@ namespace quda
               int warp_m_offset = warp_row * mma_t::MMA_M + a_m;
               int warp_n_offset = warp_col * mma_t::MMA_N;
 
-              mma_t::template store_complex<M, N, ldc>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real,
-                                                       op_c_imag);
+              mma_t::template store_complex<M, N, ldc, false>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real,
+                                                       op_c_imag, assign_t());
             }
           }
 

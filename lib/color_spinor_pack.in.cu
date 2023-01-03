@@ -50,7 +50,7 @@ namespace quda {
     static constexpr bool block_float = sizeof(store_t) == QUDA_SINGLE_PRECISION && isFixed<ghost_store_t>::value;
     size_t work_items;
     int shmem;
-    static constexpr int get_max_block_float_nc(){return 96;}
+    static constexpr int get_max_block_float_nc(){return 384;}
     unsigned int sharedBytesPerBlock(const TuneParam &) const
     {
       if (block_float) {
@@ -198,7 +198,7 @@ namespace quda {
                         IntList<fineColor, N...>)
   {
     // 1 ensures we generate templates for just the fineColor with no multiplication by coarseColor
-    IntList<1, @QUDA_MULTIGRID_NVEC_LIST@> coarseColors;
+    IntList<1, @QUDA_MULTIGRID_MRHS_LIST@> coarseColors;
 
     if (!genericPackGhostC<Float, ghostFloat, Ns, native, fineColor>
         (ghost, a, parity, nFace, dagger, destination, shmem, v, coarseColors)) {

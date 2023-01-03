@@ -153,7 +153,11 @@ set(QUDA_MULTIGRID_NVEC_LIST "6,24,32" CACHE STRING "The list of null space vect
 set(QUDA_MULTIGRID_NC_NVEC_LIST "3,${QUDA_MULTIGRID_NVEC_LIST}")
 mark_as_advanced(QUDA_MULTIGRID_NVEC_LIST)
 
+set(QUDA_MULTIGRID_MRHS_LIST "8,16" CACHE STRING "The list of multi-rhs sizes that get compiled")
+mark_as_advanced(QUDA_MULTIGRID_MRHS_LIST)
+
 message(STATUS "QUDA_MULTIGRID_NVEC_LIST=${QUDA_MULTIGRID_NVEC_LIST}")
+message(STATUS "QUDA_MULTIGRID_MRHS_LIST=${QUDA_MULTIGRID_MRHS_LIST}")
 configure_file(dslash_coarse.in.cpp dslash_coarse.cpp @ONLY)
 configure_file(coarse_op.in.cpp coarse_op.cpp @ONLY)
 configure_file(coarsecoarse_op.in.cpp coarsecoarse_op.cpp @ONLY)

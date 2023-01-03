@@ -179,9 +179,9 @@ namespace quda
         }
       }
 
-      template <int M, int N, int ldc, class GmemOperandC>
+      template <int M, int N, int ldc, bool dagger, class GmemOperandC, class op_t>
       static inline __device__ void store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm,
-                                                  GmemOperandC &cc, const OperandC &op_c_real, const OperandC &op_c_imag)
+                                                  GmemOperandC &cc, const OperandC &op_c_real, const OperandC &op_c_imag, op_t op)
       {
         using store_t = typename GmemOperandC::store_type;
         using complex_t = complex<store_t>;
@@ -195,13 +195,14 @@ namespace quda
         for (int i = 0; i < 8; i++) {
           int m = row + (i % 4) / 2 * 2;
           int n = col + (i / 4) * 4 + i % 2;
+          complex_t out;
           if (GmemOperandC::fixed) {
-            auto scale = cc.scale;
-            C[m * ldc + n]
-              = {static_cast<store_t>(scale * op_c_real.reg[i]), static_cast<store_t>(scale * op_c_imag.reg[i])};
+            auto scale = cc.get_scale();
+            out = {static_cast<store_t>(scale * op_c_real.reg[i]), static_cast<store_t>(scale * op_c_imag.reg[i])};
           } else {
-            C[m * ldc + n] = {op_c_real.reg[i], op_c_imag.reg[i]};
+            out = {op_c_real.reg[i], op_c_imag.reg[i]};
           }
+          op(&C[m * ldc + n], out);
         }
       }
     };

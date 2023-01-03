@@ -251,11 +251,11 @@ namespace quda {
 
     // using mma_t = smma::smma_t<mma::bfloat16, 8, 1, 1>;  // 3xBF16
     // using mma_t = smma::smma_t<mma::tfloat32, 4, 1, 1>;  // 3xTF32
-    using mma_t = simt::simt_t<float, 8, 4, 1, 1>;       // SIMT
+    // using mma_t = simt::simt_t<float, 8, 4, 1, 1>;       // SIMT
     // using mma_t = hmma::hmma_tfloat32_t<4, 1, 1>;        // 1xTF32
     // using mma_t = mma::smma_half_t;                      // 3xFP16
     // using mma_t = mma::hmma_t;                           // 1xFP16
-    // using mma_t = typename mma::smma_dispatch<yFloat>::type;
+    using mma_t = typename mma::smma_dispatch<yFloat>::type;
 
     void set_mma_param(TuneParam &tp) const {
       tp.block.x = 1;

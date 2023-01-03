@@ -1,17 +1,5 @@
 #pragma once
 
-// Uncomment this macro to use fp16 accumulation in the HMMA instruction.
-// #define USE_FP16_HMMA_ACCUMULATE
-
-constexpr QudaPrecision accumulate_precision()
-{
-#ifdef USE_FP16_HMMA_ACCUMULATE
-  return QUDA_HALF_PRECISION;
-#else
-  return QUDA_SINGLE_PRECISION;
-#endif
-}
-
 namespace quda
 {
   namespace hmma

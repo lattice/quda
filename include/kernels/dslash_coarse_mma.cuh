@@ -10,6 +10,7 @@
 #include <dslash_quda.h>
 #include <kernels/dslash_coarse.cuh>
 #include <mma_tensor_op/gemm.cuh>
+#include <complex_quda.h>
 
 namespace quda {
 
@@ -91,15 +92,10 @@ namespace quda {
      Applies the coarse dslash on a given parity and checkerboard site index
      /out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
 
-     @param[in,out] out The result vector
-     @param[in] thread_dir Direction
      @param[in] x_cb The checkerboarded site index
-     @param[in] src_idx Which src are we working on
      @param[in] parity The site parity
-     @param[in] s_row Which spin row are acting on
-     @param[in] color_block Which color row are we acting on
-     @param[in] color_off Which color column offset are we acting on
      @param[in] arg Arguments
+     @return The result vector
    */
   template <typename Arg>
   __device__ inline auto applyDslashMma(int x_cb, int parity, const Arg &arg)
@@ -149,66 +145,32 @@ namespace quda {
 
       if (arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
         if constexpr (doHalo<Arg::type>()) {
-#if 0
           int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
-#pragma unroll
-          for(int color_local = 0; color_local < Mc; color_local++) { //Color row
-            int c_row = color_block + color_local; // global color index
-            int row = s_row * Arg::nColor + c_row;
-#pragma unroll
-            for(int s_col = 0; s_col < Arg::nSpin; s_col++) { //Spin column
-#pragma unroll
-              for(int c_col = 0; c_col < Arg::nColor; c_col += Arg::color_stride) { //Color column
-                int col = s_col * Arg::nColor + c_col + color_offset;
-                if (!Arg::dagger)
-                  out[color_local] = cmac(arg.Y(d+4, parity, x_cb, row, col),
-                      arg.halo.Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx * arg.ghostFaceCB[d], s_col, c_col+color_offset), out[color_local]);
-                else
-                  out[color_local] = cmac(arg.Y(d, parity, x_cb, row, col),
-                      arg.halo.Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx * arg.ghostFaceCB[d], s_col, c_col+color_offset), out[color_local]);
-              }
-            }
-          }
-#endif
+          auto a = arg.Y(Arg::dagger ? d : d + 4, parity, x_cb, 0, 0);
+          auto b = arg.halo.Ghost(d, 1, their_spinor_parity, ghost_idx, 0, 0, 0);
+          constexpr bool a_dagger = false;
+          constexpr bool b_dagger = false;
+
+          __syncthreads();
+          a_loader.template g2s<lda, a_dagger>(a, m_offset, 0, smem_obj_a_real, smem_obj_a_imag);
+          b_loader.template g2s<ldb, b_dagger>(b, n_offset, 0, smem_obj_b_real, smem_obj_b_imag);
+          __syncthreads();
+
+          accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
         }
       } else if constexpr (doBulk<Arg::type>()) {
-#if 1
+
         auto a = arg.Y(Arg::dagger ? d : d + 4, parity, x_cb, 0, 0);
         auto b = arg.inA(their_spinor_parity, fwd_idx, 0, 0, 0);
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = false;
 
         __syncthreads();
-        // a_loader.template g2r<lda, a_dagger>(a, m_offset, 0); // bk = 0
-        // a_loader.template r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
-
-        // b_loader.template g2r<ldb, b_dagger>(b, n_offset, 0); // bk = 0
-        // b_loader.template r2s<b_dagger>(smem_obj_b_real, smem_obj_b_imag);
         a_loader.template g2s<lda, a_dagger>(a, m_offset, 0, smem_obj_a_real, smem_obj_a_imag);
         b_loader.template g2s<ldb, b_dagger>(b, n_offset, 0, smem_obj_b_real, smem_obj_b_imag);
         __syncthreads();
 
         accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
-#else
-#pragma unroll
-        for(int color_local = 0; color_local < Mc; color_local++) { //Color row
-          int c_row = color_block + color_local; // global color index
-          int row = s_row * Arg::nColor + c_row;
-#pragma unroll
-          for(int s_col = 0; s_col < Arg::nSpin; s_col++) { //Spin column
-#pragma unroll
-            for(int c_col = 0; c_col < Arg::nColor; c_col += Arg::color_stride) { //Color column
-              int col = s_col * Arg::nColor + c_col + color_offset;
-              if (!Arg::dagger)
-                out[color_local] = cmac(arg.Y(d+4, parity, x_cb, row, col),
-                    arg.inA[src_idx](their_spinor_parity, fwd_idx, s_col, c_col+color_offset), out[color_local]);
-              else
-                out[color_local] = cmac(arg.Y(d, parity, x_cb, row, col),
-                    arg.inA[src_idx](their_spinor_parity, fwd_idx, s_col, c_col+color_offset), out[color_local]);
-            }
-          }
-        }
-#endif
       }
     } // nDim
 
@@ -219,71 +181,58 @@ namespace quda {
       const int back_idx = linkIndexM1(coord, arg.dim, d);
       if (arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
         if constexpr (doHalo<Arg::type>()) {
-#if 0
           const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
-#pragma unroll
-          for (int color_local=0; color_local<Mc; color_local++) {
-            int c_row = color_block + color_local;
-            int row = s_row * Arg::nColor + c_row;
-#pragma unroll
-            for (int s_col=0; s_col < Arg::nSpin; s_col++)
-#pragma unroll
-              for (int c_col=0; c_col < Arg::nColor; c_col += Arg::color_stride) {
-                int col = s_col * Arg::nColor + c_col + color_offset;
-                if (!Arg::dagger)
-                  out[color_local] = cmac(conj(arg.Y.Ghost(d, 1-parity, ghost_idx, col, row)),
-                      arg.halo.Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx * arg.ghostFaceCB[d], s_col, c_col+color_offset), out[color_local]);
-                else
-                  out[color_local] = cmac(conj(arg.Y.Ghost(d+4, 1-parity, ghost_idx, col, row)),
-                      arg.halo.Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx * arg.ghostFaceCB[d], s_col, c_col+color_offset), out[color_local]);
-              }
-          }
-#endif
+
+          auto a = arg.Y.Ghost(Arg::dagger ? d + 4: d, 1 - parity, ghost_idx, 0, 0);
+          auto b = arg.halo.Ghost(d, 0, their_spinor_parity, ghost_idx, 0, 0, 0);
+          constexpr bool a_dagger = true;
+          constexpr bool b_dagger = false;
+
+          __syncthreads();
+          a_loader.template g2s<lda, a_dagger>(a, m_offset, 0, smem_obj_a_real, smem_obj_a_imag);
+          b_loader.template g2s<ldb, b_dagger>(b, n_offset, 0, smem_obj_b_real, smem_obj_b_imag);
+          __syncthreads();
+
+          accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
         }
       } else if constexpr (doBulk<Arg::type>()) {
         const int gauge_idx = back_idx;
-#if 1
+
         auto a = arg.Y(Arg::dagger ? d + 4: d, 1 - parity, gauge_idx, 0, 0);
         auto b = arg.inA(their_spinor_parity, back_idx, 0, 0, 0);
         constexpr bool a_dagger = true;
         constexpr bool b_dagger = false;
 
         __syncthreads();
-        // a_loader.template g2r<lda, a_dagger>(a, m_offset, 0); // bk = 0
-        // a_loader.template r2s<a_dagger>(smem_obj_a_real, smem_obj_a_imag);
-
-        // b_loader.template g2r<ldb, b_dagger>(b, n_offset, 0); // bk = 0
-        // b_loader.template r2s<b_dagger>(smem_obj_b_real, smem_obj_b_imag);
         a_loader.template g2s<lda, a_dagger>(a, m_offset, 0, smem_obj_a_real, smem_obj_a_imag);
         b_loader.template g2s<ldb, b_dagger>(b, n_offset, 0, smem_obj_b_real, smem_obj_b_imag);
         __syncthreads();
 
         accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
-#else
-#pragma unroll
-        for(int color_local = 0; color_local < Mc; color_local++) {
-          int c_row = color_block + color_local;
-          int row = s_row * Arg::nColor + c_row;
-#pragma unroll
-          for(int s_col = 0; s_col < Arg::nSpin; s_col++)
-#pragma unroll
-            for(int c_col = 0; c_col < Arg::nColor; c_col += Arg::color_stride) {
-              int col = s_col * Arg::nColor + c_col + color_offset;
-              if (!Arg::dagger)
-                out[color_local] = cmac(conj(arg.Y(d, 1-parity, gauge_idx, col, row)),
-                    arg.inA[src_idx](their_spinor_parity, back_idx, s_col, c_col+color_offset), out[color_local]);
-              else
-                out[color_local] = cmac(conj(arg.Y(d+4, 1-parity, gauge_idx, col, row)),
-                    arg.inA[src_idx](their_spinor_parity, back_idx, s_col, c_col+color_offset), out[color_local]);
-            }
-        }
-#endif
       }
 
     } //nDim
 
     return accumulator;
   }
+
+  template <typename T> __device__ __host__ inline void fetch_add(complex<T> *addr, complex<T> val)
+  {
+    addr->real(addr->real() + val.real());
+    addr->imag(addr->imag() + val.imag());
+  }
+
+  template <typename T, int n> __device__ __host__ inline void fetch_add(array<T, n> *addr, array<T, n> val)
+  {
+    for (int i = 0; i < n; i++) { (*addr)[i] += val[i]; }
+  }
+
+  struct fetch_add_t {
+    template <class T>
+    __device__ __host__ inline void operator()(T *out, T in) {
+      fetch_add(out, in);
+    }
+  };
 
   template <typename Arg> struct CoarseDslashMma {
     const Arg &arg;
@@ -300,18 +249,18 @@ namespace quda {
 
       out.ax(-arg.kappa);
 
-      // applyClover;
+      // TODO: applyClover;
 
       constexpr int M = Arg::nSpin * Arg::nColor;
       constexpr int N = Arg::nVec;
 
       constexpr int ldc = N;
 
+      auto c = arg.out(my_spinor_parity, x_cb, 0, 0);
       if constexpr (doBulk<Arg::type>()) {
-        auto c = arg.out(my_spinor_parity, x_cb, 0, 0);
-        out.template store<M, N, ldc>(c, 0, 0);
+        out.template store<M, N, ldc, false>(c, 0, 0, assign_t());
       } else {
-        // Do +=
+        out.template store<M, N, ldc, false>(c, 0, 0, fetch_add_t());
       }
     }
   };

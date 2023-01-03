@@ -108,4 +108,11 @@ namespace quda
     target::dispatch<atomic_fetch_abs_max_impl>(addr, val);
   }
 
+  struct fetch_add_atomic_t {
+    template <class T>
+    __device__ __host__ inline void operator()(T *out, T in) {
+      atomic_fetch_add(out, in);
+    }
+  };
+
 } // namespace quda

@@ -176,9 +176,9 @@ namespace quda
         }
       }
 
-      template <int M, int N, int ldc, class gmem_op_t>
+      template <int M, int N, int ldc, bool dagger, class gmem_op_t, class op_t>
       static inline __device__ void store_complex(int m_offset, int n_offset, const WarpRegisterMapping &wrm,
-                                                  gmem_op_t &cc, const OperandC &op_c_real, const OperandC &op_c_imag)
+                                                  gmem_op_t &cc, const OperandC &op_c_real, const OperandC &op_c_imag, op_t op)
       {
         using store_t = typename gmem_op_t::store_type;
         using complex_t = complex<store_t>;
@@ -201,17 +201,19 @@ namespace quda
                 int m = m_offset + wm * inst_m + (wrm.group_id + tm * 8);
                 int n = n_offset + wn * inst_n + (wrm.thread_id_in_group * 2 + tn);
                 if (!check_bounds || (m < M && n < N)) {
+                  complex_t out;
                   if (gmem_op_t::fixed) {
-                    auto scale = cc.scale;
-                    C[m * ldc + n]
+                    auto scale = cc.get_scale();
+                    out
                       = {static_cast<store_t>(
                            scale * op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]),
                          static_cast<store_t>(
                            scale * op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)])};
                   } else {
-                    C[m * ldc + n] = {op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)],
+                    out = {op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)],
                                       op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]};
                   }
+                  op(&C[m * ldc + n], out);
                 }
               }
             }

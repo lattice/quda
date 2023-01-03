@@ -105,151 +105,6 @@ namespace quda
         __device__ inline real &operator[](int i) { return v[i]; }
       };
 
-#ifdef USE_FP16_HMMA_ACCUMULATE
-
-      struct OperandC {
-
-        using reg_type = unsigned;
-        reg_type reg[2];
-
-        __device__ inline OperandC() { zero(); }
-
-        __device__ inline void zero()
-        {
-#pragma unroll
-          for (int i = 0; i < 2; i++) { reg[i] = 0; }
-        }
-
-        __device__ inline void ax(float alpha)
-        {
-          half2 alpha_h2 = __float2half2_rn(alpha);
-#pragma unroll
-          for (int i = 0; i < 2; i++) {
-            half2 &h2 = *(reinterpret_cast<half2 *>(&(reg[i])));
-            h2 = __hmul2(alpha_h2, h2);
-          }
-        }
-
-        template <int ldc>
-        __device__ inline void store(void *smem, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
-        {
-          reg_type *C = reinterpret_cast<reg_type *>(smem);
-
-          int idx_strided = warp_row * MMA_M + wrm.group_id;
-          int idx_contiguous = warp_col * (MMA_N / 2) + wrm.thread_id_in_group;
-          int thread_offset_c = idx_strided * (ldc / 2) + idx_contiguous;
-
-          C[thread_offset_c] = reg[0];
-          C[thread_offset_c + 8 * (ldc / 2)] = reg[1];
-        }
-
-        template <class F> __device__ inline void abs_max(F &max)
-        {
-#pragma unroll
-          for (int i = 0; i < 2; i++) {
-            const half2 h2 = habs2(*(reinterpret_cast<const half2 *>(&(reg[i]))));
-            max = fmax(max, h2.x);
-            max = fmax(max, h2.y);
-          }
-        }
-      };
-
-      static __device__ inline void mma(const OperandA &op_a, const OperandB &op_b, OperandC &op_c)
-      {
-        asm volatile("mma.sync.aligned.m16n8k8.row.col.f16.f16.f16.f16 {%0,%1}, {%2,%3}, {%4}, {%0,%1};"
-                     : "+r"(op_c.reg[0]), "+r"(op_c.reg[1])
-                     : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]));
-      }
-
-      template <int M, int N, int ldc, class GmemOperandC>
-      static inline __device__ void store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm,
-                                                  GmemOperandC &cc, const OperandC &op_c_real, const OperandC &op_c_imag)
-      {
-        using store_type = typename GmemOperandC::store_type;
-
-        int row = warp_row + wrm.group_id;
-        int col = warp_col + wrm.thread_id_in_group * 2;
-
-        constexpr bool fixed = GmemOperandC::fixed;
-        using structure = typename VectorType<store_type, 4>::type;
-        auto ptr = reinterpret_cast<structure *>(cc.data());
-        structure s;
-
-        constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
-
-#pragma unroll
-        for (int i = 0; i < 2; i++) {
-          const half2 r2 = *(reinterpret_cast<const half2 *>(&(op_c_real.reg[i])));
-          const half2 i2 = *(reinterpret_cast<const half2 *>(&(op_c_imag.reg[i])));
-          if (fixed) {
-            auto scale = cc.scale;
-            s.x = __half2short_rn(__half2float(r2.x) * scale);
-            s.y = __half2short_rn(__half2float(i2.x) * scale);
-            s.z = __half2short_rn(__half2float(r2.y) * scale);
-            s.w = __half2short_rn(__half2float(i2.y) * scale);
-          } else {
-            s.x = __half2float(r2.x);
-            s.y = __half2float(i2.x);
-            s.z = __half2float(r2.y);
-            s.w = __half2float(i2.y);
-          }
-          if (!check_bounds || (row + i * 8 < M && col < N)) { ptr[((row + i * 8) * ldc + col) / 2] = s; }
-        }
-      }
-
-      template <int M, int N, int ldc, bool dagger, class GmemOperandC>
-      static inline __device__ void store_complex_atomic(int warp_row, int warp_col, const WarpRegisterMapping &wrm,
-                                                         GmemOperandC &cc, const OperandC &op_c_real,
-                                                         const OperandC &op_c_imag)
-      {
-        using store_type = typename GmemOperandC::store_type;
-
-        int row = warp_row + wrm.group_id;
-        int col = warp_col + wrm.thread_id_in_group * 2;
-
-        constexpr bool fixed = GmemOperandC::fixed;
-
-        using array = array<store_type, 2>;
-        auto ptr = reinterpret_cast<array *>(cc.data());
-
-        constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
-
-#pragma unroll
-        for (int i = 0; i < 2; i++) {
-          const half2 r2 = *(reinterpret_cast<const half2 *>(&(op_c_real.reg[i])));
-          const half2 i2 = *(reinterpret_cast<const half2 *>(&(op_c_imag.reg[i])));
-          auto scale = fixed ? cc.scale : 1.0f;
-
-          int m_index = row + 8 * i;
-          int n_index = col;
-
-          array value {0};
-          if (dagger) {
-            if (!check_bounds || (n_index < M && m_index < N)) {
-              value[0] = +static_cast<store_type>(__half2float(r2.x) * scale);
-              value[1] = -static_cast<store_type>(__half2float(i2.x) * scale);
-              atomic_fetch_add(&ptr[(n_index + 0) * ldc + m_index], value);
-
-              value[0] = +static_cast<store_type>(__half2float(r2.y) * scale);
-              value[1] = -static_cast<store_type>(__half2float(i2.y) * scale);
-              atomic_fetch_add(&ptr[(n_index + 1) * ldc + m_index], value);
-            }
-          } else {
-            if (!check_bounds || (m_index < M && n_index < N)) {
-              value[0] = +static_cast<store_type>(__half2float(r2.x) * scale);
-              value[1] = +static_cast<store_type>(__half2float(i2.x) * scale);
-              atomic_fetch_add(&ptr[m_index * ldc + (n_index + 0)], value);
-
-              value[0] = +static_cast<store_type>(__half2float(r2.y) * scale);
-              value[1] = +static_cast<store_type>(__half2float(i2.y) * scale);
-              atomic_fetch_add(&ptr[m_index * ldc + (n_index + 1)], value);
-            }
-          }
-        }
-      }
-
-#else
-
       struct OperandC {
 
         using reg_type = float;
@@ -296,90 +151,59 @@ namespace quda
                      : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]));
       }
 
-      template <int M, int N, int ldc, class GmemOperandC>
+      template <int M, int N, int ldc, bool dagger, class GmemOperandC, class op_t>
       static inline __device__ void store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm,
-                                                  GmemOperandC &cc, const OperandC &op_c_real, const OperandC &op_c_imag)
+                                                  GmemOperandC &cc, const OperandC &op_c_real, const OperandC &op_c_imag, op_t op)
       {
-        using store_type = typename GmemOperandC::store_type;
+        using store_t = typename GmemOperandC::store_type;
 
         int row = warp_row + wrm.group_id;
         int col = warp_col + wrm.thread_id_in_group * 2;
 
         constexpr bool fixed = GmemOperandC::fixed;
-        using structure = typename VectorType<store_type, 4>::type;
-        auto ptr = reinterpret_cast<structure *>(cc.data());
-        structure s;
-
         constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
 
 #pragma unroll
         for (int i = 0; i < 2; i++) {
-          if (fixed) {
-            auto scale = cc.scale;
-            s.x = __half2short_rn(op_c_real.reg[i * 2 + 0] * scale);
-            s.y = __half2short_rn(op_c_imag.reg[i * 2 + 0] * scale);
-            s.z = __half2short_rn(op_c_real.reg[i * 2 + 1] * scale);
-            s.w = __half2short_rn(op_c_imag.reg[i * 2 + 1] * scale);
-          } else {
-            s.x = op_c_real.reg[i * 2 + 0];
-            s.y = op_c_imag.reg[i * 2 + 0];
-            s.z = op_c_real.reg[i * 2 + 1];
-            s.w = op_c_imag.reg[i * 2 + 1];
-          }
-          if (!check_bounds || (row + i * 8 < M && col < N)) { ptr[((row + i * 8) * ldc + col) / 2] = s; }
-        }
-      }
-
-      template <int M, int N, int ldc, bool dagger, class GmemOperandC>
-      static inline __device__ void store_complex_atomic(int warp_row, int warp_col, const WarpRegisterMapping &wrm,
-                                                         GmemOperandC &cc, const OperandC &op_c_real,
-                                                         const OperandC &op_c_imag)
-      {
-        using store_type = typename GmemOperandC::store_type;
-
-        int row = warp_row + wrm.group_id;
-        int col = warp_col + wrm.thread_id_in_group * 2;
-
-        constexpr bool fixed = GmemOperandC::fixed;
-
-        using array = array<store_type, 2>;
-        auto ptr = reinterpret_cast<array *>(cc.data());
-
-        constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
-
-#pragma unroll
-        for (int i = 0; i < 2; i++) {
-          auto scale = fixed ? cc.scale : 1.0f;
-
-          int m_index = row + i * 8;
-          int n_index = col;
-
-          array value {0};
+          int row_index = row + i * 8;
+          int col_index = col;
           if (dagger) {
-            if (!check_bounds || (n_index < M && m_index < N)) {
-              value[0] = +static_cast<store_type>(op_c_real.reg[i * 2 + 0] * scale);
-              value[1] = -static_cast<store_type>(op_c_imag.reg[i * 2 + 0] * scale);
-              atomic_fetch_add(&ptr[(n_index + 0) * ldc + m_index], value);
-
-              value[0] = +static_cast<store_type>(op_c_real.reg[i * 2 + 1] * scale);
-              value[1] = -static_cast<store_type>(op_c_imag.reg[i * 2 + 1] * scale);
-              atomic_fetch_add(&ptr[(n_index + 1) * ldc + m_index], value);
+            using complex_t = complex<store_t>;
+            auto ptr = reinterpret_cast<complex_t *>(cc.data());
+            complex_t s;
+            if constexpr (fixed) {
+              auto scale = cc.get_scale();
+              s = {static_cast<store_t>(op_c_real.reg[i * 2 + 0] * scale), -static_cast<store_t>(op_c_imag.reg[i * 2 + 0] * scale)};
+              op(&ptr[(col_index + 0) * ldc + row_index], s);
+              s = {static_cast<store_t>(op_c_real.reg[i * 2 + 1] * scale), -static_cast<store_t>(op_c_imag.reg[i * 2 + 1] * scale)};
+              op(&ptr[(col_index + 1) * ldc + row_index], s);
+            } else {
+              s = {op_c_real.reg[i * 2 + 0], -op_c_imag.reg[i * 2 + 0]};
+              op(&ptr[(col_index + 0) * ldc + row_index], s);
+              s = {op_c_real.reg[i * 2 + 1], -op_c_imag.reg[i * 2 + 1]};
+              op(&ptr[(col_index + 1) * ldc + row_index], s);
             }
           } else {
-            if (!check_bounds || (m_index < M && n_index < N)) {
-              value[0] = +static_cast<store_type>(op_c_real.reg[i * 2 + 0] * scale);
-              value[1] = +static_cast<store_type>(op_c_imag.reg[i * 2 + 0] * scale);
-              atomic_fetch_add(&ptr[m_index * ldc + (n_index + 0)], value);
-
-              value[0] = +static_cast<store_type>(op_c_real.reg[i * 2 + 1] * scale);
-              value[1] = +static_cast<store_type>(op_c_imag.reg[i * 2 + 1] * scale);
-              atomic_fetch_add(&ptr[m_index * ldc + (n_index + 1)], value);
+            using array_t = array<store_t, 4>;
+            auto ptr = reinterpret_cast<array_t *>(cc.data());
+            array_t s;
+            if constexpr (fixed) {
+              auto scale = cc.get_scale();
+              s[0] = static_cast<store_t>(op_c_real.reg[i * 2 + 0] * scale);
+              s[1] = static_cast<store_t>(op_c_imag.reg[i * 2 + 0] * scale);
+              s[2] = static_cast<store_t>(op_c_real.reg[i * 2 + 1] * scale);
+              s[3] = static_cast<store_t>(op_c_imag.reg[i * 2 + 1] * scale);
+            } else {
+              s[0] = op_c_real.reg[i * 2 + 0];
+              s[1] = op_c_imag.reg[i * 2 + 0];
+              s[2] = op_c_real.reg[i * 2 + 1];
+              s[3] = op_c_imag.reg[i * 2 + 1];
             }
+            if (!check_bounds || (row_index < M && col_index < N)) { op(&ptr[(row_index * ldc + col_index) / 2], s); }
           }
         }
       }
 
-#endif
     };
 
   } // namespace hmma

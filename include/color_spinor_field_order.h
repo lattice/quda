@@ -476,8 +476,10 @@ namespace quda
       using store_type = storeFloat; /**< Storage type */
       complex<storeFloat> *v;        /**< Field memory address this wrapper encompasses */
       const int idx;                 /**< Index into field */
+    private:
       const Float scale;             /**< Float to fixed-point scale factor */
       const Float scale_inv;         /**< Fixed-point to float scale factor */
+    public:
       norm_t *norm;                  /**< Address of norm field (if it exists) */
       const int norm_idx;            /**< Index into norm field */
       const bool norm_write;         /**< Whether we need to write to the norm field */
@@ -573,6 +575,19 @@ namespace quda
        * @brief returns the pointer of this wrapper object
        */
       __device__ __host__ inline auto data() const { return &v[idx]; }
+
+      /**
+       * @brief returns the scale of this wrapper object
+       */
+      __device__ __host__ inline auto get_scale() const {
+        static_assert(block_float == false, "format with block_float == true should not call the get_scale method.");
+        return block_float ? static_cast<Float>(1) / norm[norm_idx] : scale;
+      }
+
+      /**
+       * @brief returns the scale of this wrapper object
+       */
+      __device__ __host__ inline auto get_scale_inv() const { return block_float ? norm[norm_idx] : scale_inv; }
 
       /**
          @brief Operator+= with complex number instance as input
