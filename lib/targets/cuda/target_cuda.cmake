@@ -47,17 +47,17 @@ set(CMAKE_CUDA_FLAGS_STRICT
     "-O3"
     CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
 set(CMAKE_CUDA_FLAGS_RELEASE
-    "-O3 ${CXX_OPT}"
+    "-O3 -Xcompiler \"${CXX_OPT}\""
     CACHE STRING "Flags used by the CUDA compiler during release builds.")
 set(CMAKE_CUDA_FLAGS_HOSTDEBUG
     "-g"
-    CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
+    CACHE STRING "Flags used by the CUDA compiler during host-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEBUG
     "-G -g -fno-inline"
-    CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
+    CACHE STRING "Flags used by the CUDA compiler during full (host+device) debug builds.")
 set(CMAKE_CUDA_FLAGS_SANITIZE
     "-g -fno-inline \"-fsanitize=address,undefined\" "
-    CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
+    CACHE STRING "Flags used by the CUDA compiler during sanitizer debug builds.")
 
 mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
 mark_as_advanced(CMAKE_CUDA_FLAGS_STRICT)
