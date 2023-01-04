@@ -131,8 +131,9 @@ namespace quda
       constexpr int flops() const { return 0; }   //! flops per element
     };
 
-    template <typename reduce_t, typename real>
-    struct MaxDeviation : public ReduceFunctor<reduce_t> {
+    template <typename real_reduce_t, typename real>
+    struct MaxDeviation : public ReduceFunctor<deviation_t<real_reduce_t>> {
+      using reduce_t = deviation_t<real_reduce_t>;
       using reducer = maximum<reduce_t>;
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<> write{ };
@@ -141,10 +142,15 @@ namespace quda
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          auto diff_re = abs(x[i].real() - y[i].real());
-          auto diff_im = abs(x[i].imag() - y[i].imag());
-          max = max > diff_re ? max : diff_re;
-          max = max > diff_im ? max : diff_im;
+          complex<real_reduce_t> diff = {abs(x[i].real() - y[i].real()), abs(x[i].imag() - y[i].imag())};
+          if (diff.real() > max.diff ) {
+            max.diff = diff.real();
+            max.ref = y[i].real();
+          }
+          if (diff.imag() > max.diff) {
+            max.diff = diff.imag();
+            max.ref = y[i].imag();
+          }
         }
       }
       constexpr int flops() const { return 0; }   //! flops per element

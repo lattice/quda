@@ -158,7 +158,8 @@ namespace quda {
 
     double max_deviation(const ColorSpinorField &x, const ColorSpinorField &y)
     {
-      return instantiateReduce<MaxDeviation, false>(0.0, 0.0, 0.0, x, y, y, y, y);
+      auto deviation = instantiateReduce<MaxDeviation, false>(0.0, 0.0, 0.0, x, y, y, y, y);
+      return deviation.diff;
     }
 
     double norm1(const ColorSpinorField &x)

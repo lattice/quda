@@ -69,6 +69,14 @@ namespace quda
     using type = float;
   };
 
+  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, deviation_t<float>>>> {
+    using type = float;
+  };
+
+  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, deviation_t<double>>>> {
+    using type = double;
+  };
+
   // pre-declaration of warp_reduce that we wish to specialize
   template <bool> struct warp_reduce;
 
