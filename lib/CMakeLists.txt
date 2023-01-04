@@ -287,22 +287,6 @@ if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_ALL)
   target_compile_definitions(quda PUBLIC BUILD_TIFR_INTERFACE)
 endif(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_ALL)
 
-if(QUDA_CONTRACT)
-  target_compile_definitions(quda PUBLIC GPU_CONTRACT)
-endif(QUDA_CONTRACT)
-
-if(QUDA_COVDEV)
-  target_compile_definitions(quda PUBLIC GPU_COVDEV)
-endif(QUDA_COVDEV)
-
-if(QUDA_LAPLACE)
-  target_compile_definitions(quda PUBLIC GPU_LAPLACE)
-endif(QUDA_LAPLACE)
-
-if(QUDA_SMEAR_GAUSS_TWOLINK)
-  target_compile_definitions(quda PUBLIC GPU_TWOLINK_GSMEAR)
-endif(QUDA_SMEAR_GAUSS_TWOLINK)
-
 # MULTI GPU AND USQCD
 if(QUDA_MPI OR QUDA_QMP)
   target_compile_definitions(quda PUBLIC MULTI_GPU)
