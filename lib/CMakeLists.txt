@@ -315,6 +315,9 @@ add_subdirectory(targets/generic)
 target_include_directories(quda PRIVATE ../include/targets/generic)
 add_subdirectory(interface)
 
+# ignore any unkown pragmas
+target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-unknown-pragmas>)
+
 # add some deifnitions that cause issues with cmake 3.7 and nvcc only to cpp files
 target_compile_definitions(quda_cpp PUBLIC -DQUDA_HASH="${HASH}")
 if(GITVERSION)
