@@ -295,7 +295,7 @@ namespace quda
   {
     size_t n = comm_size();
     std::vector<array<double, 2>> recv_buf(size * n);
-    MPI_CHECK(MPI_Allgather(data, size, 2 * MPI_DOUBLE, recv_buf.data(), size, 2 * MPI_DOUBLE, MPI_COMM_HANDLE));
+    MPI_CHECK(MPI_Allgather(data, 2 * size, MPI_DOUBLE, recv_buf.data(), 2 * size, MPI_DOUBLE, MPI_COMM_HANDLE));
 
     std::vector<array<double, 2>> recv_trans(size * n);
     for (size_t i = 0; i < n; i++) {
