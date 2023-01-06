@@ -26,7 +26,7 @@ namespace quda {
       if (p.num_paths != static_cast<int>(loop_traces.size())) errorQuda("Loop traces size %lu != number of paths %d", loop_traces.size(), p.num_paths);
 
       strcat(aux, "num_paths=");
-      u32toa(aux + strlen(aux) - 1, p.num_paths);
+      u32toa(aux + strlen(aux), p.num_paths);
 
       apply(device::get_default_stream());
     }

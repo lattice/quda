@@ -4277,7 +4277,7 @@ class App {
             // variable.clear();
             // variable.reserve(res.size());
             for(size_t i=0; i < S; i++) {
-                T temp;
+                T temp = {};
                 
                 retval &= detail::lexical_cast(res[i], temp);
                 variable[i] = temp;
