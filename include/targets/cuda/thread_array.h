@@ -13,7 +13,7 @@ namespace quda
      shared memory using the SharedMemoryCache object.
    */
   template <typename T, int n> struct thread_array {
-    SharedMemoryCache<array<T, n>, 1, 1, false, false> device_array;
+    SharedMemoryCache<array<T, n>, 1, 1, false> device_array;
     int offset;
     array<T, n> host_array;
     array<T, n> &array_;
