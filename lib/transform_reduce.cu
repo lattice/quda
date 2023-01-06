@@ -32,7 +32,7 @@ namespace quda
       m(m)
     {
       strcpy(aux, ",batch_size=");
-      u32toa(aux + strlen(aux) - 1, v.size());
+      u32toa(aux + strlen(aux), v.size());
       apply(device::get_default_stream());
     }
 

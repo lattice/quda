@@ -55,9 +55,9 @@ namespace quda {
             displacement = hop;
             strcpy(aux, aux2);
             strcat(aux, ",dir=");
-            u32toa(aux + strlen(aux) - 1, dir);
+            u32toa(aux + strlen(aux), dir);
             strcat(aux, ",displacement=");
-            u32toa(aux + strlen(aux) - 1, displacement);
+            u32toa(aux + strlen(aux), displacement);
             apply(device::get_default_stream());
           }
         }

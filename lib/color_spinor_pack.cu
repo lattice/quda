@@ -101,13 +101,13 @@ namespace quda {
       label[14] = '\0';
       strcat(aux, label);
       strcat(aux, ",nFace=");
-      u32toa(aux + strlen(aux) - 1, nFace);
+      u32toa(aux + strlen(aux), nFace);
       strcat(aux, ",spins_per_thread=");
-      u32toa(aux + strlen(aux) - 1, spins_per_thread(a));
+      u32toa(aux + strlen(aux), spins_per_thread(a));
       strcat(aux, ",colors_per_thread=");
-      u32toa(aux + strlen(aux) - 1, colors_per_thread(a));
+      u32toa(aux + strlen(aux), colors_per_thread(a));
       strcat(aux, ",shmem=");
-      u32toa(aux + strlen(aux) - 1, shmem);
+      u32toa(aux + strlen(aux), shmem);
 
       // compute number of number of work items we have to do
       // unlike the dslash kernels, we include the fifth dimension here

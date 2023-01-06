@@ -126,7 +126,7 @@ namespace quda
              (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash::aux_pack :
                                                                            Dslash::aux[arg.kernel_type]);
       strcat(aux, ",mu=");
-      u32toa(aux + strlen(aux) - 1, arg.mu);
+      u32toa(aux + strlen(aux), arg.mu);
       return TuneKey(in.VolString(), typeid(*this).name(), aux);
     }
   };
