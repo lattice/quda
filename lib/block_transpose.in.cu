@@ -22,15 +22,10 @@ namespace quda {
 
   public:
     BlockTranspose(v_t &V, cvector_ref<b_t> &B) :
-      TunableKernel3D(V, V.SiteSubset(), V.Nvec()),
+      TunableKernel3D(V, V.SiteSubset(), B.size()),
       V(V),
       B(B)
     {
-
-#ifdef QUDA_FAST_COMPILE_REDUCE
-      strcat(aux, ",fast_compile");
-#endif
-
       apply(device::get_default_stream());
     }
 
@@ -45,10 +40,10 @@ namespace quda {
     }
 #endif
 
-    template <typename vAccessor, typename bAccessor, std::size_t... S>
-    void launch_device_(const TuneParam &tp, const qudaStream_t &stream, std::index_sequence<S...>)
+    template <typename vAccessor, typename bAccessor>
+    void launch_device_(const TuneParam &tp, const qudaStream_t &stream)
     {
-      Arg<true, vAccessor, bAccessor> arg(V, B[S]...);
+      Arg<true, vAccessor, bAccessor> arg(V, B);
       launch_device<BlockTransposeKernel>(tp, stream, arg);
     }
 
@@ -73,9 +68,9 @@ namespace quda {
           typedef FieldOrderCB<real, nSpin, nColor, nVec, vOrder, vFloat, vFloat, disable_ghost> vAccessor;
           typedef FieldOrderCB<real, nSpin, nColor, 1, bOrder, bFloat, bFloat, disable_ghost> bAccessor;
           if constexpr (std::is_const_v<v_t>) {
-            launch_device_<const vAccessor, bAccessor>(tp, stream, std::make_index_sequence<nVec>());
+            launch_device_<const vAccessor, bAccessor>(tp, stream);
           } else {
-            launch_device_<vAccessor, const bAccessor>(tp, stream, std::make_index_sequence<nVec>());
+            launch_device_<vAccessor, bAccessor>(tp, stream);
           }
         } else {
           errorQuda("Unsupported field order V=%d B=%d", V.FieldOrder(), B[0].FieldOrder());
@@ -94,42 +89,58 @@ namespace quda {
 
     long long bytes() const
     {
-      return V.Bytes() + nVec * B[0].Bytes();
+      return V.Bytes() + B.size() * B[0].Bytes();
     }
   };
 
   } // namespace impl
 
+  template <int...> struct IntList { };
+
+  template <class v_t, class b_t, typename vFloat, typename bFloat, int nSpin, int nColor, int nVec, int... N>
+  void launch_span_nVec(v_t &V, cvector_ref<b_t> &B, IntList<nVec, N...>) {
+    if (V.Nvec() == nVec) {
+      impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, nVec> transpose(V, B);
+    } else {
+      IntList<N...> nVecs;
+      if constexpr (sizeof...(N) > 0) {
+        launch_span_nVec<v_t, b_t, vFloat, bFloat, nSpin, nColor>(V, B, nVecs);
+      } else {
+        errorQuda("nVec = %d not instantiated\n", V.Nvec());
+      }
+    }
+  }
+
   template <class v_t, class b_t, typename vFloat, typename bFloat, int nSpin, int nColor>
   void block_transpose(v_t &V, cvector_ref<b_t> &B)
   {
-    if (V.Nvec() != static_cast<int>(B.size())) { errorQuda("V.Nvec() (=%d) != B.size() (=%d)", V.Nvec(), static_cast<int>(B.size())); }
+    IntList<@QUDA_MULTIGRID_MRHS_LIST@> nVecs;
+    launch_span_nVec<v_t, b_t, vFloat, bFloat, nSpin, nColor>(V, B, nVecs);
+  }
 
-    switch (V.Nvec()) {
-      case  8: { impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor,  8> transpose(V, B); } break;
-      case 16: { impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, 16> transpose(V, B); } break;
-      case 24: { impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, 24> transpose(V, B); } break;
-      case 32: { impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, 32> transpose(V, B); } break;
-      case 40: { impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, 40> transpose(V, B); } break;
-      case 48: { impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, 48> transpose(V, B); } break;
-      case 56: { impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, 56> transpose(V, B); } break;
-      case 64: { impl::BlockTranspose<v_t, b_t, vFloat, bFloat, nSpin, nColor, 64> transpose(V, B); } break;
-      default: errorQuda("Unexpected nVec = %d", V.Nvec());
+  template <class v_t, class b_t, typename vFloat, typename bFloat, int nSpin, int nColor, int... N>
+  void launch_span_nColor(v_t &V, cvector_ref<b_t> &B, IntList<nColor, N...>) {
+    if (B[0].Ncolor() == nColor) {
+      block_transpose<v_t, b_t, vFloat, bFloat, nSpin, nColor>(V, B);
+    } else {
+      IntList<N...> nVecs;
+      if constexpr (sizeof...(N) > 0) {
+        launch_span_nColor<v_t, b_t, vFloat, bFloat, nSpin, nColor>(V, B, nVecs);
+      } else {
+        errorQuda("nColor = %d not instantiated\n", V.Ncolor());
+      }
     }
   }
 
   template <class v_t, class b_t, typename vFloat, typename bFloat, int nSpin>
   void block_transpose(v_t &V, cvector_ref<b_t> &B)
   {
-    if (V.Ncolor() / V.Nvec() != B[0].Ncolor()) { errorQuda("V.Ncolor() / V.Nvec() (=%d) != B.Ncolor() (=%d)", V.Ncolor() / V.Nvec(), B[0].Ncolor()); }
-
-    if (B[0].Ncolor() == 24) {
-      block_transpose<v_t, b_t, vFloat, bFloat, nSpin, 24>(V, B);
-    } else if (B[0].Ncolor() == 32) {
-      block_transpose<v_t, b_t, vFloat, bFloat, nSpin, 32>(V, B);
-    } else {
-      errorQuda("Unexpected nColor = %d", B[0].Ncolor());
+    if (V.Ncolor() / V.Nvec() != B[0].Ncolor()) {
+      errorQuda("V.Ncolor() / V.Nvec() (=%d) != B.Ncolor() (=%d)", V.Ncolor() / V.Nvec(), B[0].Ncolor());
     }
+
+    IntList<@QUDA_MULTIGRID_NVEC_LIST@> nColors;
+    launch_span_nColor<v_t, b_t, vFloat, bFloat, nSpin>(V, B, nColors);
   }
 
   template <class v_t, class b_t, typename vFloat, typename bFloat>

@@ -345,8 +345,9 @@ namespace quda {
   template <class F>
   auto create_color_spinor_copy(cvector_ref<F> &fs, QudaFieldOrder order) {
     ColorSpinorParam param(fs[0]);
-    param.nColor = fs[0].Ncolor() * fs.size(); // Ask Kate why we need * in.size() here
-    param.nVec = fs.size();
+    int nVec = (fs.size() + 7) / 8 * 8; // Make a multiple of 8
+    param.nColor = fs[0].Ncolor() * nVec; // Ask Kate why we need * in.size() here
+    param.nVec = nVec;
     param.create = QUDA_NULL_FIELD_CREATE;
     param.fieldOrder = order;
     return std::move(ColorSpinorField(param));
@@ -367,7 +368,7 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
 
-    if ((in.size() % 8 != 0 || in.size() > 64) || !use_mma) {
+    if (in.size() == 1 || !use_mma) {
       if ( location == QUDA_CUDA_FIELD_LOCATION ) {
         ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision, false);
       } else if ( location == QUDA_CPU_FIELD_LOCATION ) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <mma_tensor_op/mma_instruction.cuh>
+#include <mma_tensor_op/smma_m16n8_sm80.cuh>
 
 namespace quda
 {
@@ -30,20 +31,10 @@ namespace quda
       using compute_t = float;
       using load_t = float;
 
-      static __device__ __host__ constexpr int inline pad_size(int m) { return (m - 8 + 15) / 16 * 16 + 8 - m; }
+      using base_t = typename smma::smma_t<mma::tfloat32, inst_k, warp_m, warp_n>;
+      using WarpRegisterMapping = typename base_t::WarpRegisterMapping;
 
-      struct WarpRegisterMapping {
-
-        int warp_id;
-        int lane_id;
-        int group_id;
-        int thread_id_in_group;
-
-        __device__ WarpRegisterMapping(int thread_id) :
-          warp_id(thread_id / 32), lane_id(thread_id & 31), group_id(lane_id >> 2), thread_id_in_group(lane_id & 3)
-        {
-        }
-      };
+      static __device__ __host__ constexpr int inline pad_size(int m) { return base_t::pad_size(m); }
 
       struct OperandA {
 
@@ -114,49 +105,7 @@ namespace quda
         }
       };
 
-      struct OperandC {
-
-        static constexpr int thread_m = inst_m / 8;
-        static constexpr int thread_n = inst_n / 4;
-        static constexpr int thread_count = thread_m * thread_n;
-
-        using reg_type = float;
-        reg_type reg[warp_m * warp_n * thread_count];
-
-        __device__ inline void zero()
-        {
-#pragma unroll
-          for (int i = 0; i < warp_m * warp_n * thread_count; i++) { reg[i] = 0; }
-        }
-
-        __device__ inline OperandC() { zero(); }
-
-        __device__ inline void ax(float alpha)
-        {
-#pragma unroll
-          for (int i = 0; i < warp_m * warp_n * thread_count; i++) { reg[i] *= alpha; }
-        }
-
-        template <int ldc> __device__ void store(void *ptr, int m_offset, int n_offset, const WarpRegisterMapping &wrm)
-        {
-          reg_type *C = reinterpret_cast<reg_type *>(ptr);
-#pragma unroll
-          for (int tm = 0; tm < thread_m; tm++) {
-#pragma unroll
-            for (int tn = 0; tn < thread_n; tn++) {
-#pragma unroll
-              for (int wn = 0; wn < warp_n; wn++) {
-#pragma unroll
-                for (int wm = 0; wm < warp_m; wm++) {
-                  int m = m_offset + wm * inst_m + (wrm.group_id + tm * 8);
-                  int n = n_offset + wn * inst_n + (wrm.thread_id_in_group * 2 + tn);
-                  C[m * ldc + n] = reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)];
-                }
-              }
-            }
-          }
-        }
-      };
+      using OperandC = typename base_t::OperandC;
 
       static __device__ void mma(const OperandA &op_a, const OperandB &op_b, OperandC &op_c)
       {
@@ -180,45 +129,7 @@ namespace quda
       static inline __device__ void store_complex(int m_offset, int n_offset, const WarpRegisterMapping &wrm,
                                                   gmem_op_t &cc, const OperandC &op_c_real, const OperandC &op_c_imag, op_t op)
       {
-        using store_t = typename gmem_op_t::store_type;
-        using complex_t = complex<store_t>;
-
-        auto *C = reinterpret_cast<complex_t *>(cc.data());
-
-        constexpr int thread_m = OperandC::thread_m;
-        constexpr int thread_n = OperandC::thread_n;
-        constexpr int thread_count = OperandC::thread_count;
-
-        constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
-#pragma unroll
-        for (int tm = 0; tm < thread_m; tm++) {
-#pragma unroll
-          for (int tn = 0; tn < thread_n; tn++) {
-#pragma unroll
-            for (int wn = 0; wn < warp_n; wn++) {
-#pragma unroll
-              for (int wm = 0; wm < warp_m; wm++) {
-                int m = m_offset + wm * inst_m + (wrm.group_id + tm * 8);
-                int n = n_offset + wn * inst_n + (wrm.thread_id_in_group * 2 + tn);
-                if (!check_bounds || (m < M && n < N)) {
-                  complex_t out;
-                  if (gmem_op_t::fixed) {
-                    auto scale = cc.get_scale();
-                    out
-                      = {static_cast<store_t>(
-                           scale * op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]),
-                         static_cast<store_t>(
-                           scale * op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)])};
-                  } else {
-                    out = {op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)],
-                                      op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]};
-                  }
-                  op(&C[m * ldc + n], out);
-                }
-              }
-            }
-          }
-        }
+        base_t::template store_complex<M, N, ldc, dagger>(m_offset, n_offset, wrm, cc, op_c_real, op_c_imag, op);
       }
     };
 

@@ -18,16 +18,18 @@ namespace quda {
     static constexpr int nVec = nVec_;
 
     using v_t = v_t_;
+    using b_t = b_t_;
 
     vAccessor V;
     bAccessor B[nVec];
 
-    template <typename... T>
-    BlockTransposeArg(v_t &V, T&&... BB) :
+    BlockTransposeArg(v_t &V, cvector_ref<b_t> &B_) :
       kernel_param(dim3(V.VolumeCB(), V.SiteSubset(), nVec)),
-      V(V),
-      B{BB...}
+      V(V)
     {
+      for (auto i = 0u; i < B_.size(); i++) {
+        B[i] = bAccessor(B_[i]);
+      }
     }
   };
 

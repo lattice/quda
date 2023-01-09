@@ -315,6 +315,12 @@ namespace quda
             }
           }
         }
+
+        template <class F> __device__ inline void abs_max(F &max)
+        {
+#pragma unroll
+          for (int i = 0; i < warp_m * warp_n * thread_count; i++) { max = fmax(max, fabsf(reg[i])); }
+        }
       };
 
       static __device__ void mma(const OperandA &op_a, const OperandB &op_b, OperandC &op_c)
@@ -374,18 +380,35 @@ namespace quda
               for (int wm = 0; wm < warp_m; wm++) {
                 int m = m_offset + wm * inst_m + (wrm.group_id + tm * 8);
                 int n = n_offset + wn * inst_n + (wrm.thread_id_in_group * 2 + tn);
-                if (!check_bounds || (m < M && n < N)) {
-                  if (gmem_op_t::fixed) {
-                    auto scale = cc.get_scale();
-                    complex_t out = {static_cast<store_t>(
-                           scale * op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]),
-                         static_cast<store_t>(
-                           scale * op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)])};
-                    op(&C[m * ldc + n], out);
-                  } else {
-                    complex_t out = {op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)],
-                                      op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]};
-                    op(&C[m * ldc + n], out);
+                if constexpr (dagger) {
+                  if (!check_bounds || (m < N && n < M)) {
+                    if constexpr (gmem_op_t::fixed) {
+                      auto scale = cc.get_scale();
+                      complex_t out = {static_cast<store_t>(
+                             scale * op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]),
+                           static_cast<store_t>(
+                             -scale * op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)])};
+                      op(&C[n * ldc + m], out);
+                    } else {
+                      complex_t out = {op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)],
+                                        -op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]};
+                      op(&C[n * ldc + m], out);
+                    }
+                  }
+                } else {
+                  if (!check_bounds || (m < M && n < N)) {
+                    if constexpr (gmem_op_t::fixed) {
+                      auto scale = cc.get_scale();
+                      complex_t out = {static_cast<store_t>(
+                             scale * op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]),
+                           static_cast<store_t>(
+                             scale * op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)])};
+                      op(&C[m * ldc + n], out);
+                    } else {
+                      complex_t out = {op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)],
+                                        op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]};
+                      op(&C[m * ldc + n], out);
+                    }
                   }
                 }
               }

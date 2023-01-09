@@ -292,21 +292,28 @@ namespace quda {
       resizeVector(old_y, old_z);
     }
 
+    template <int...> struct IntList { };
+
+    template <int nVec, int... N>
+    void launch_mma_span_nVec(TuneParam &tp, const qudaStream_t &stream, IntList<nVec, N...>) {
+      if (out[0].Nvec() == nVec) {
+        launch_mma<nVec>(tp, stream);
+      } else {
+        IntList<N...> nVecs;
+        if constexpr (sizeof...(N) > 0) {
+          launch_mma_span_nVec(tp, stream, nVecs);
+        } else {
+          errorQuda("nVec = %d not instantiated\n", out[0].Nvec());
+        }
+      }
+    }
+
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (use_mma) {
-        switch (out[0].Nvec()) {
-          // case  8: launch_mma< 8>(tp, stream); break;
-          case 16: launch_mma<16>(tp, stream); break;
-          // case 24: launch_mma<24>(tp, stream); break;
-          // case 32: launch_mma<32>(tp, stream); break;
-          // case 40: launch_mma<40>(tp, stream); break;
-          // case 48: launch_mma<48>(tp, stream); break;
-          // case 56: launch_mma<56>(tp, stream); break;
-          // case 64: launch_mma<64>(tp, stream); break;
-          default: errorQuda("nVec = %d not supported\n", out[0].Nvec());
-        }
+        IntList<@QUDA_MULTIGRID_MRHS_LIST@> nVecs;
+        launch_mma_span_nVec(tp, stream, nVecs);
       } else {
         color_col_stride = tp.aux.x;
         dim_threads = tp.aux.y;

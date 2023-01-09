@@ -38,7 +38,7 @@ namespace quda
 
       real yHatMax = 0.0;
 
-      using mma_t = hmma_t;
+      using mma_t = hmma_t; // hmma::hmma_tfloat32_t<4, 1, 1>;
       using Config = MmaConfig<mma_t, Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K,
                                Arg::bM, Arg::bN, Arg::bK, Arg::block_y, Arg::block_z>;
 

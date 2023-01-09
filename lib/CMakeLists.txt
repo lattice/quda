@@ -174,6 +174,8 @@ configure_file(spinor_noise.in.cu spinor_noise.cu @ONLY)
 configure_file(copy_color_spinor_mg.in.hpp copy_color_spinor_mg.hpp @ONLY)
 configure_file(color_spinor_pack.in.cu color_spinor_pack.cu @ONLY)
 configure_file(color_spinor_util.in.cu color_spinor_util.cu @ONLY)
+configure_file(dslash_coarse.in.hpp dslash_coarse.hpp @ONLY)
+configure_file(block_transpose.in.cu block_transpose.cu @ONLY)
 
 if(QUDA_MULTIGRID)
   string(REPLACE "," ";" QUDA_MULTIGRID_NVEC_LIST_SEMICOLON "${QUDA_MULTIGRID_NVEC_LIST}")
