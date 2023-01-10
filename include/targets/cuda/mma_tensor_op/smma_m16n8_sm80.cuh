@@ -296,23 +296,25 @@ namespace quda
           for (int i = 0; i < warp_m * warp_n * thread_count; i++) { reg[i] *= alpha; }
         }
 
-        template <int ldc> __device__ void store(void *ptr, int m_offset, int n_offset, const WarpRegisterMapping &wrm)
+        template <int ldc> __device__ void store(void *ptr, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
         {
-          reg_type *C = reinterpret_cast<reg_type *>(ptr);
+          // This method is only used for the mobius preconditioner where shuffle_t = half.
+          static_assert(std::is_same_v<shuffle_t, half> == true, "This method should only be used for mobius preconditioner.");
+          static_assert(thread_n == 2, "This method should only be used for mobius preconditioner.");
+          half2 *C = reinterpret_cast<half2 *>(ptr);
 #pragma unroll
           for (int tm = 0; tm < thread_m; tm++) {
-#pragma unroll
-            for (int tn = 0; tn < thread_n; tn++) {
 #pragma unroll
               for (int wn = 0; wn < warp_n; wn++) {
 #pragma unroll
                 for (int wm = 0; wm < warp_m; wm++) {
-                  int m = m_offset + wm * inst_m + (wrm.group_id + tm * 8);
-                  int n = n_offset + wn * inst_n + (wrm.thread_id_in_group * 2 + tn);
-                  C[m * ldc + n] = reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)];
+                  int m = warp_row * mma_m + wm * inst_m + (wrm.group_id + tm * 8);
+                  int n = warp_col * mma_n + wn * inst_n + (wrm.thread_id_in_group * 2);
+                  C[(m * ldc + n) / 2] =
+                    __floats2half2_rn(reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + 0)],
+                      reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + 1)]);
                 }
               }
-            }
           }
         }
 

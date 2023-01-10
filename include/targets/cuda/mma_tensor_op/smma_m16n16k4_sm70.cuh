@@ -26,28 +26,9 @@ namespace quda
       using compute_t = float;
       using load_t = float;
 
-      struct WarpRegisterMapping {
+      using base_t = hmma::hmma_t<16, 16, 4, half, half2>;
 
-        int warp_id;
-        int row_offset; // quad_row * 8 + quad_hilo * 4
-        int col_offset; // quad_col * 8 + quad_hilo * 4
-        int quad_col;
-        int quad_thread; // 0,1,2,3
-
-        __device__ inline WarpRegisterMapping(int thread_id)
-        {
-          warp_id = thread_id >> 5;
-          int lane_id = thread_id & 31;
-          int octl_id = lane_id >> 2;
-          int quad_id = octl_id & 3;
-          int quad_row = quad_id & 1;
-          int quad_hilo = (octl_id >> 2) & 1;
-          quad_col = quad_id >> 1;
-          quad_thread = lane_id & 3;
-          row_offset = quad_row * 8 + quad_hilo * 4;
-          col_offset = quad_col * 8 + quad_hilo * 4;
-        }
-      };
+      using WarpRegisterMapping = typename base_t::WarpRegisterMapping;
 
       struct OperandA {
 
@@ -106,56 +87,7 @@ namespace quda
         }
       };
 
-      struct OperandC {
-
-        using reg_type = float;
-        reg_type reg[8];
-
-        __device__ inline OperandC() { zero(); }
-
-        __device__ inline void zero()
-        {
-#pragma unroll
-          for (int i = 0; i < 8; i++) { reg[i] = 0; }
-        }
-
-        __device__ inline void ax(float alpha)
-        {
-#pragma unroll
-          for (int i = 0; i < 8; i++) { reg[i] *= alpha; }
-        }
-
-        template <int ldc>
-        __device__ inline void store(void *smem, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
-        {
-          float *C = reinterpret_cast<float *>(smem);
-
-          const int idx_strided = warp_row * 16 + wrm.row_offset + (wrm.quad_thread % 2);
-          const int idx_contiguous = warp_col * 16 + wrm.quad_col * 8 + (wrm.quad_thread / 2) * 2;
-
-          int thread_offset_c = idx_strided * ldc + idx_contiguous;
-          C[thread_offset_c + 0] = reg[0];
-          C[thread_offset_c + 1] = reg[1];
-
-          thread_offset_c = (idx_strided + 2) * ldc + idx_contiguous;
-          C[thread_offset_c + 0] = reg[2];
-          C[thread_offset_c + 1] = reg[3];
-
-          thread_offset_c = idx_strided * ldc + (idx_contiguous + 2);
-          C[thread_offset_c + 0] = reg[4];
-          C[thread_offset_c + 1] = reg[5];
-
-          thread_offset_c = (idx_strided + 2) * ldc + (idx_contiguous + 2);
-          C[thread_offset_c + 0] = reg[6];
-          C[thread_offset_c + 1] = reg[7];
-        }
-
-        template <class F> __device__ inline void abs_max(F &max)
-        {
-#pragma unroll
-          for (int i = 0; i < 8; i++) { max = fmax(max, fabsf(reg[i])); }
-        }
-      };
+      using OperandC = typename base_t::OperandC;
 
       static __device__ void mma(const OperandA &op_a, const OperandB &op_b, OperandC &op_c)
       {
@@ -183,27 +115,7 @@ namespace quda
       static inline __device__ void store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm,
                                                   GmemOperandC &cc, const OperandC &op_c_real, const OperandC &op_c_imag, op_t op)
       {
-        using store_t = typename GmemOperandC::store_type;
-        using complex_t = complex<store_t>;
-
-        auto *C = reinterpret_cast<complex_t *>(cc.data());
-
-        const int row = warp_row + wrm.row_offset + (wrm.quad_thread % 2);
-        const int col = warp_col + wrm.quad_col * 8 + (wrm.quad_thread / 2) * 2;
-
-#pragma unroll
-        for (int i = 0; i < 8; i++) {
-          int m = row + (i % 4) / 2 * 2;
-          int n = col + (i / 4) * 4 + i % 2;
-          complex_t out;
-          if (GmemOperandC::fixed) {
-            auto scale = cc.get_scale();
-            out = {static_cast<store_t>(scale * op_c_real.reg[i]), static_cast<store_t>(scale * op_c_imag.reg[i])};
-          } else {
-            out = {op_c_real.reg[i], op_c_imag.reg[i]};
-          }
-          op(&C[m * ldc + n], out);
-        }
+        base_t::template store_complex<M, N, ldc, dagger>(warp_row, warp_col, wrm, cc, op_c_real, op_c_imag, op);
       }
     };
 

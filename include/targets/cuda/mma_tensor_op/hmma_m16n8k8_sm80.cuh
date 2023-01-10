@@ -3,6 +3,7 @@
 #include <type_traits>
 #include <quda_fp16.cuh>
 #include <array.h>
+#include <mma_tensor_op/smma_m16n8_sm80.cuh>
 
 // Here we implement the architecture dependent part of MMA for Turing/Ampere (sm75/sm80, the mma.sync.m16n8k8 instruction).
 
@@ -24,18 +25,9 @@ namespace quda
       using compute_t = half;
       using load_t = half2;
 
-      struct WarpRegisterMapping {
+      using base_t = smma::smma_t<half, 8, 1, 1>;
 
-        int warp_id;
-        int lane_id;
-        int group_id;
-        int thread_id_in_group;
-
-        __device__ WarpRegisterMapping(int thread_id) :
-          warp_id(thread_id / warp_size), lane_id(thread_id & 31), group_id(lane_id >> 2), thread_id_in_group(lane_id & 3)
-        {
-        }
-      };
+      using WarpRegisterMapping = typename base_t::WarpRegisterMapping;
 
       struct OperandA {
 
@@ -99,50 +91,7 @@ namespace quda
         }
       };
 
-      template <typename real, int length> struct Structure {
-        real v[length];
-        __device__ inline const real &operator[](int i) const { return v[i]; }
-        __device__ inline real &operator[](int i) { return v[i]; }
-      };
-
-      struct OperandC {
-
-        using reg_type = float;
-        reg_type reg[4];
-
-        __device__ inline OperandC() { zero(); }
-
-        __device__ inline void zero()
-        {
-#pragma unroll
-          for (int i = 0; i < 4; i++) { reg[i] = 0; }
-        }
-
-        __device__ inline void ax(float alpha)
-        {
-#pragma unroll
-          for (int i = 0; i < 4; i++) { reg[i] *= alpha; }
-        }
-
-        template <int ldc>
-        __device__ inline void store(void *smem, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
-        {
-          half2 *C = reinterpret_cast<half2 *>(smem);
-
-          int idx_strided = warp_row * MMA_M + wrm.group_id;
-          int idx_contiguous = warp_col * (MMA_N / 2) + wrm.thread_id_in_group;
-          int thread_offset_c = idx_strided * (ldc / 2) + idx_contiguous;
-
-          C[thread_offset_c] = __floats2half2_rn(reg[0], reg[1]);
-          C[thread_offset_c + 8 * (ldc / 2)] = __floats2half2_rn(reg[2], reg[3]);
-        }
-
-        template <class F> __device__ inline void abs_max(F &max)
-        {
-#pragma unroll
-          for (int i = 0; i < 4; i++) { max = fmax(max, fabsf(reg[i])); }
-        }
-      };
+      using OperandC = typename base_t::OperandC;
 
       static __device__ inline void mma(const OperandA &op_a, const OperandB &op_b, OperandC &op_c)
       {
@@ -155,53 +104,7 @@ namespace quda
       static inline __device__ void store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm,
                                                   GmemOperandC &cc, const OperandC &op_c_real, const OperandC &op_c_imag, op_t op)
       {
-        using store_t = typename GmemOperandC::store_type;
-
-        int row = warp_row + wrm.group_id;
-        int col = warp_col + wrm.thread_id_in_group * 2;
-
-        constexpr bool fixed = GmemOperandC::fixed;
-        constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
-
-#pragma unroll
-        for (int i = 0; i < 2; i++) {
-          int row_index = row + i * 8;
-          int col_index = col;
-          if (dagger) {
-            using complex_t = complex<store_t>;
-            auto ptr = reinterpret_cast<complex_t *>(cc.data());
-            complex_t s;
-            if constexpr (fixed) {
-              auto scale = cc.get_scale();
-              s = {static_cast<store_t>(op_c_real.reg[i * 2 + 0] * scale), -static_cast<store_t>(op_c_imag.reg[i * 2 + 0] * scale)};
-              op(&ptr[(col_index + 0) * ldc + row_index], s);
-              s = {static_cast<store_t>(op_c_real.reg[i * 2 + 1] * scale), -static_cast<store_t>(op_c_imag.reg[i * 2 + 1] * scale)};
-              op(&ptr[(col_index + 1) * ldc + row_index], s);
-            } else {
-              s = {op_c_real.reg[i * 2 + 0], -op_c_imag.reg[i * 2 + 0]};
-              op(&ptr[(col_index + 0) * ldc + row_index], s);
-              s = {op_c_real.reg[i * 2 + 1], -op_c_imag.reg[i * 2 + 1]};
-              op(&ptr[(col_index + 1) * ldc + row_index], s);
-            }
-          } else {
-            using array_t = array<store_t, 4>;
-            auto ptr = reinterpret_cast<array_t *>(cc.data());
-            array_t s;
-            if constexpr (fixed) {
-              auto scale = cc.get_scale();
-              s[0] = static_cast<store_t>(op_c_real.reg[i * 2 + 0] * scale);
-              s[1] = static_cast<store_t>(op_c_imag.reg[i * 2 + 0] * scale);
-              s[2] = static_cast<store_t>(op_c_real.reg[i * 2 + 1] * scale);
-              s[3] = static_cast<store_t>(op_c_imag.reg[i * 2 + 1] * scale);
-            } else {
-              s[0] = op_c_real.reg[i * 2 + 0];
-              s[1] = op_c_imag.reg[i * 2 + 0];
-              s[2] = op_c_real.reg[i * 2 + 1];
-              s[3] = op_c_imag.reg[i * 2 + 1];
-            }
-            if (!check_bounds || (row_index < M && col_index < N)) { op(&ptr[(row_index * ldc + col_index) / 2], s); }
-          }
-        }
+        base_t::template store_complex<M, N, ldc, dagger>(warp_row, warp_col, wrm, cc, op_c_real, op_c_imag, op);
       }
 
     };
