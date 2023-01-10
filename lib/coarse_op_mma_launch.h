@@ -36,7 +36,7 @@ namespace quda
       tp.block.y = block_y;
       tp.block.z = block_z;
 
-      using mma_t = hmma_t; // smma::smma_t<mma::tfloat32, 4, 1, 1>;
+      using mma_t = typename mma::mg_mma_dispatch_t<typename Arg::Float>::type;
       constexpr int shared_bytes = shared_memory_bytes<mma_t>(bM, bN, bK);
       tp.shared_bytes = shared_bytes;
 
@@ -344,7 +344,7 @@ namespace quda
       tp.block.x = 1;
       tp.block.y = block_y;
       tp.block.z = block_z;
-      using mma_t = hmma_t; // smma::smma_t<mma::tfloat32, 4, 1, 1>;
+      using mma_t = typename mma::mg_mma_dispatch_t<typename Arg::Float>::type;
       constexpr int shared_bytes = shared_memory_bytes<mma_t>(bM, bN, bK);
       tp.shared_bytes = shared_bytes;
 

@@ -31,10 +31,10 @@ namespace quda
     using smma_half_t = smma::smma_t<half, 8, 1, 1>;
 #endif
 
+#if (__COMPUTE_CAPABILITY__ >= 800)
     template <class T> struct smma_dispatch {
     };
 
-#if (__COMPUTE_CAPABILITY__ >= 800)
     template <> struct smma_dispatch<float> {
       using type = smma::smma_t<mma::tfloat32, 4, 1, 1>;
     };
@@ -42,7 +42,17 @@ namespace quda
     template <> struct smma_dispatch<short> {
       using type = smma::smma_t<mma::bfloat16, 8, 1, 1>;
     };
+#else
+    template <class T> struct smma_dispatch {
+      using type = smma_half_t;
+    };
 #endif
+
+    template <class T> struct mg_mma_dispatch_t {
+      using type = hmma_t;
+      // using type = smma_half_t;                     // 3xFP16
+      // using type = typename smma_dispatch<T>::type; // 3xBF16/3xTF32
+    };
 
   } // namespace mma
 } // namespace quda

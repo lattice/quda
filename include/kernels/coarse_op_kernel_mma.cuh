@@ -74,7 +74,7 @@ namespace quda
         constexpr int ldb = N;
         constexpr int ldc = N;
 
-        using mma_t = hmma_t; // smma::smma_t<mma::tfloat32, 4, 1, 1>;
+        using mma_t = typename mma::mg_mma_dispatch_t<typename Arg::Float>::type;
         using Config = MmaConfig<mma_t, M, N, K, lda, ldb, ldc, Arg::bM, Arg::bN, Arg::bK, Arg::block_y, Arg::block_z>;
 
         if (Arg::dir == QUDA_IN_PLACE) {
@@ -193,7 +193,7 @@ namespace quda
         constexpr int ldb = N;
         constexpr int ldc = N * coarseSpin;
 
-        using mma_t = hmma_t; // smma::smma_t<mma::tfloat32, 4, 1, 1>;
+        using mma_t = typename mma::mg_mma_dispatch_t<typename Arg::Float>::type;
 
         extern __shared__ typename mma_t::compute_t smem_ptr[];
 
