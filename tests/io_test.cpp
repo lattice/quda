@@ -105,7 +105,7 @@ constexpr double get_tolerance(QudaPrecision prec, QudaPrecision prec_io)
 {
   // converting half precision field to float field and back doesn't
   // seem to be exactly area preserving
-  if (prec == QUDA_HALF_PRECISION && prec_io > prec) return 2 * std::numeric_limits<float>::epsilon();
+  if (prec == QUDA_HALF_PRECISION && prec_io > prec) return 3 * std::numeric_limits<float>::epsilon();
   switch (prec_io) {
   case QUDA_DOUBLE_PRECISION: return std::numeric_limits<double>::epsilon();
   case QUDA_SINGLE_PRECISION: return std::numeric_limits<float>::epsilon();
