@@ -95,9 +95,8 @@ namespace quda
 
       static __device__ inline void mma(const OperandA &op_a, const OperandB &op_b, OperandC &op_c)
       {
-        asm volatile("mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32 {%0,%1,%2,%3}, {%4,%5}, {%6}, {%0,%1,%2,%3};"
-                     : "+f"(op_c.reg[0]), "+f"(op_c.reg[1]), "+f"(op_c.reg[2]), "+f"(op_c.reg[3])
-                     : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]));
+        mma::mma_instruction_t<MMA_M, MMA_N, MMA_K, mma::half, float> mma_instruction;
+        mma_instruction(op_c.reg, op_a.reg, op_b.reg);
       }
 
       template <int M, int N, int ldc, bool dagger, class GmemOperandC, class op_t>
