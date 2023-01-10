@@ -107,6 +107,21 @@ namespace quda {
     return v;
   }
 
+  /**
+     Container used when we want to track the reference value when
+     computing an infinity norm
+   */
+  template <typename T> struct deviation_t {
+    T diff;
+    T ref;
+  };
+
+  template <typename T> constexpr specialize<T, deviation_t<double>> zero() { return {0.0, 0.0}; }
+  template <typename T> constexpr specialize<T, deviation_t<float>> zero() { return {0.0f, 0.0f}; }
+
+  template <typename T>
+  __host__ __device__ inline bool operator>(const deviation_t<T> &a, const deviation_t<T> &b) { return a.diff > b.diff; }
+
   template <typename T> struct low {
     static constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> value() { return std::numeric_limits<T>::lowest(); }
   };
@@ -119,6 +134,10 @@ namespace quda {
       for (int i = 0; i < N; i++) v[i] = low<T>::value();
       return v;
     }
+  };
+
+  template <typename T> struct low<deviation_t<T>> {
+    static inline __host__ __device__ deviation_t<T> value() { return {low<T>::value(), low<T>::value()}; }
   };
 
   template <typename T> struct high {

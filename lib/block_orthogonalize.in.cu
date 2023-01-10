@@ -83,11 +83,9 @@ namespace quda {
       strcat(aux,",block_size=");
 
       aggregate_size = 1;
-      char geo_str[16];
       for (int d = 0; d < V.Ndim(); d++) {
         aggregate_size *= geo_bs[d];
-        i32toa(geo_str, geo_bs[d]);
-        strcat(aux, geo_str);
+        i32toa(aux + strlen(aux), geo_bs[d]);
         if (d < V.Ndim() - 1) strcat(aux, "x");
       }
 
@@ -98,14 +96,10 @@ namespace quda {
       nBlock = (V.Volume()/aggregate_size) * chiral_blocks;
 
       strcat(aux, ",n_block_ortho=");
-      char n_ortho_str[2];
-      i32toa(n_ortho_str, n_block_ortho);
-      strcat(aux, n_ortho_str);
+      i32toa(aux + strlen(aux), n_block_ortho);
       strcat(aux, ",mVec=");
-      char mvec_str[3];
       int active_x_threads = (aggregate_size / 2) * (nSpin == 1 ? 1 : V.SiteSubset());
-      i32toa(mvec_str, tile_size<nColor, nVec>(OrthoAggregates::block_mapper(active_x_threads)));
-      strcat(aux, mvec_str);
+      i32toa(aux + strlen(aux), tile_size<nColor, nVec>(OrthoAggregates::block_mapper(active_x_threads)));
 
       V.Scale(max); // by definition this is true
       apply(device::get_default_stream());

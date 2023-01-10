@@ -4,7 +4,7 @@
   do {                                                                                                                 \
     int status = mpi_call;                                                                                             \
     if (status != MPI_SUCCESS) {                                                                                       \
-      char err_string[128];                                                                                            \
+      char err_string[MPI_MAX_ERROR_STRING];                                                                           \
       int err_len;                                                                                                     \
       MPI_Error_string(status, err_string, &err_len);                                                                  \
       err_string[127] = '\0';                                                                                          \
@@ -93,7 +93,7 @@ namespace quda
   {
     // determine which GPU this rank will use
     char *hostname = comm_hostname();
-    MPI_CHECK(MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_HANDLE));
+    MPI_CHECK(MPI_Allgather(hostname, QUDA_MAX_HOSTNAME_STRING, MPI_CHAR, hostname_recv_buf, QUDA_MAX_HOSTNAME_STRING, MPI_CHAR, MPI_COMM_HANDLE));
   }
 
   void Communicator::comm_gather_gpuid(int *gpuid_recv_buf)
@@ -288,6 +288,25 @@ namespace quda
       }
 
       for (size_t i = 0; i < size; i++) { data[i] = deterministic_reduce(recv_trans.data() + i * n, n); }
+    }
+  }
+
+  void Communicator::comm_allreduce_max_array(deviation_t<double> *data, size_t size)
+  {
+    size_t n = comm_size();
+    std::vector<array<double, 2>> recv_buf(size * n);
+    MPI_CHECK(MPI_Allgather(data, size, 2 * MPI_DOUBLE, recv_buf.data(), size, 2 * MPI_DOUBLE, MPI_COMM_HANDLE));
+
+    std::vector<array<double, 2>> recv_trans(size * n);
+    for (size_t i = 0; i < n; i++) {
+      for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
+    }
+
+    for (size_t i = 0; i < size; i++) {
+      data[i] = recv_trans[i * n];
+      for (size_t j = 1; j < n; j++) {
+        data[i] = data[i].diff > recv_trans[i* n + j].diff ? data[i] : recv_trans[i * n + j];
+      }
     }
   }
 

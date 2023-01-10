@@ -1033,7 +1033,7 @@ struct DslashTestWrapper {
 
   double verify()
   {
-    double deviation;
+    double deviation = 0.0;
     if (test_split_grid) {
       for (int n = 0; n < num_src; n++) {
         auto norm_cpu = blas::norm2(spinorRef);

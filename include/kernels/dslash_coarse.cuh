@@ -131,8 +131,8 @@ namespace quda {
      @param[in] color_off Which color column offset are we acting on
      @param[in] arg Arguments
    */
-  template <int Mc, int thread_dim, typename V, typename Arg>
-  __device__ __host__ inline void applyDslash(V &out, int thread_dir, int x_cb, int src_idx, int parity, int s_row, int color_block, int color_offset, const Arg &arg)
+  template <int Mc, typename V, typename Arg>
+  __device__ __host__ inline void applyDslash(V &out, int thread_dim, int thread_dir, int x_cb, int src_idx, int parity, int s_row, int color_block, int color_offset, const Arg &arg)
   {
     const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
 
@@ -143,11 +143,11 @@ namespace quda {
 
       //Forward gather - compute fwd offset for spinor fetch
 #pragma unroll
-      for(int d = thread_dim; d < Arg::nDim; d += Arg::dim_stride) // loop over dimension
-      {
-	const int fwd_idx = linkIndexP1(coord, arg.dim, d);
+      for(int d0 = 0; d0 < Arg::nDim; d0 += Arg::dim_stride) { // loop over dimension
+        int d = d0 + thread_dim;
+	const int fwd_idx = linkIndexHop(coord, arg.dim, d, arg.nFace);
 
-	if (arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
+	if (arg.commDim[d] && is_boundary(coord, d, 1, arg) ) {
 	  if constexpr (doHalo<Arg::type>()) {
             int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
 
@@ -198,10 +198,11 @@ namespace quda {
 
       //Backward gather - compute back offset for spinor and gauge fetch
 #pragma unroll
-      for(int d = thread_dim; d < Arg::nDim; d += Arg::dim_stride)
-	{
-	const int back_idx = linkIndexM1(coord, arg.dim, d);
-	if (arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
+      for(int d0 = 0; d0 < Arg::nDim; d0 += Arg::dim_stride) {
+        const int d = d0 + thread_dim;
+	const int back_idx = linkIndexHop(coord, arg.dim, d, -arg.nFace);
+
+	if (arg.commDim[d] && is_boundary(coord, d, 0, arg)) {
 	  if constexpr (doHalo<Arg::type>()) {
             const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
 #pragma unroll
@@ -351,11 +352,7 @@ namespace quda {
       array<complex <typename Arg::real>, Mc> out{ };
 
       if (Arg::dslash) {
-        if (dim == 0)      applyDslash<Mc, 0>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
-        else if (dim == 1) applyDslash<Mc, 1>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
-        else if (dim == 2) applyDslash<Mc, 2>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
-        else if (dim == 3) applyDslash<Mc, 3>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
-
+        applyDslash<Mc>(out, dim, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
         target::dispatch<dim_collapse>(out, dir, dim, arg);
       }
 

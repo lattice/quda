@@ -55,8 +55,7 @@ namespace quda {
     {
       if (block_float) {
         auto max_block_size_x = device::max_threads_per_block() / (vector_length_y * vector_length_z);
-        auto thread_width_x = ((max_block_size_x + device::shared_memory_bank_width() - 1) /
-                               device::shared_memory_bank_width()) * device::shared_memory_bank_width();
+        auto thread_width_x = ((max_block_size_x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
         return sizeof(store_t) * thread_width_x * vector_length_y * vector_length_z;
       } else {
         return 0;
@@ -105,17 +104,13 @@ namespace quda {
       label[14] = '\0';
       strcat(aux, label);
       strcat(aux, ",nFace=");
-      u32toa(label, nFace);
-      strcat(aux, label);
+      u32toa(aux + strlen(aux) - 1, nFace);
       strcat(aux, ",spins_per_thread=");
-      u32toa(label, spins_per_thread(a));
-      strcat(aux, label);
+      u32toa(aux + strlen(aux) - 1, spins_per_thread(a));
       strcat(aux, ",colors_per_thread=");
-      u32toa(label, colors_per_thread(a));
-      strcat(aux, label);
+      u32toa(aux + strlen(aux) - 1, colors_per_thread(a));
       strcat(aux, ",shmem=");
-      u32toa(label, shmem);
-      strcat(aux, label);
+      u32toa(aux + strlen(aux) - 1, shmem);
       if (v.size()) strcat(aux, ",batched");
 
       // compute number of number of work items we have to do

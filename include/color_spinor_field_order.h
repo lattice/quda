@@ -651,6 +651,10 @@ namespace quda
       GhostOrder(const GhostOrder &) = default;
       GhostOrder(const ColorSpinorField &, int, void * const *) { }
       GhostOrder &operator=(const GhostOrder &) = default;
+
+    public:
+      /** Does this field type support ghost zones? */
+      static constexpr bool supports_ghost_zone = false;
     };
 
     template <typename store_t, typename norm_t, bool ghost_fixed, bool block_float_ghost> struct ghost_t {
@@ -688,6 +692,9 @@ namespace quda
       ghost_accessor_t ghostAccessor;
 
     public:
+      /** Does this field type support ghost zones? */
+      static constexpr bool supports_ghost_zone = true;
+
       GhostOrder() = default;
       GhostOrder(const GhostOrder &) = default;
 
@@ -845,8 +852,6 @@ namespace quda
       using norm_t = float;
 
     public:
-      /** Does this field type support ghost zones? */
-      static constexpr bool supports_ghost_zone = true;
       static constexpr bool fixed = fixed_point<Float, storeFloat>();
       static constexpr int nSpin = nSpin_;
       static constexpr int nColor = nColor_;
@@ -894,6 +899,7 @@ namespace quda
           v.scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
           v.scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
         }
+        if constexpr (GhostOrder::supports_ghost_zone) GhostOrder::resetScale(max);
       }
 
       /**
