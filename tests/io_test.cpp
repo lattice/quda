@@ -153,9 +153,9 @@ TEST_P(ColorSpinorIOTest, verify)
   for (auto i = 0u; i < v.size(); i++) {
     auto dev = blas::max_deviation(u[i], v[i]);
     if (prec == prec_io)
-      EXPECT_EQ(dev, 0.0);
+      EXPECT_EQ(dev[0], 0.0);
     else
-      EXPECT_LE(dev, get_tolerance(prec, prec_io));
+      EXPECT_LE(dev[0], get_tolerance(prec, prec_io));
   }
 
   // cleanup after ourselves and delete the dummy lattice

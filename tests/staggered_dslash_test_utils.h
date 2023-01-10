@@ -454,7 +454,7 @@ struct StaggeredDslashTestWrapper {
         if (std::isnan(spinor_out_norm)) { failed = true; }
 
         printfQuda("Results: reference = %f, QUDA = %f, L2 relative deviation = %e, max deviation = %e\n",
-                   spinor_ref_norm, spinor_out_norm, 1.0 - sqrt(spinor_out_norm / spinor_ref_norm), max_deviation);
+                   spinor_ref_norm, spinor_out_norm, 1.0 - sqrt(spinor_out_norm / spinor_ref_norm), max_deviation[0]);
         deviation = std::max(deviation, pow(10.0, -(double)(ColorSpinorField::Compare(spinorRef, vp_spinor_out[n]))));
         if (failed) { deviation = 1.0; }
       }
@@ -469,7 +469,7 @@ struct StaggeredDslashTestWrapper {
       if (std::isnan(spinor_out_norm)) { failed = true; }
 
       printfQuda("Results: reference = %f, QUDA = %f, L2 relative deviation = %e, max deviation = %e\n",
-                 spinor_ref_norm, spinor_out_norm, 1.0 - sqrt(spinor_out_norm / spinor_ref_norm), max_deviation);
+                 spinor_ref_norm, spinor_out_norm, 1.0 - sqrt(spinor_out_norm / spinor_ref_norm), max_deviation[0]);
       deviation = pow(10, -(double)(ColorSpinorField::Compare(spinorRef, spinorOut)));
       if (failed) { deviation = 1.0; }
     }

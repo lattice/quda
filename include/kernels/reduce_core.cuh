@@ -145,11 +145,11 @@ namespace quda
           complex<real_reduce_t> diff = {abs(x[i].real() - y[i].real()), abs(x[i].imag() - y[i].imag())};
           if (diff.real() > max.diff ) {
             max.diff = diff.real();
-            max.ref = y[i].real();
+            max.ref = abs(y[i].real());
           }
           if (diff.imag() > max.diff) {
             max.diff = diff.imag();
-            max.ref = y[i].imag();
+            max.ref = abs(y[i].imag());
           }
         }
       }

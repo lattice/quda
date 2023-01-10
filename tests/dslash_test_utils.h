@@ -1041,7 +1041,7 @@ struct DslashTestWrapper {
         auto max_deviation = blas::max_deviation(spinorRef, vp_spinorOut[n]);
 
         printfQuda("Results: reference = %f, QUDA = %f, L2 relative deviation = %e, max deviation = %e\n",
-                   norm_cpu, norm_cpu_quda, 1.0 - sqrt(norm_cpu_quda / norm_cpu), max_deviation);
+                   norm_cpu, norm_cpu_quda, 1.0 - sqrt(norm_cpu_quda / norm_cpu), max_deviation[0]);
         deviation = std::max(deviation, std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef, vp_spinorOut[n]))));
       }
     } else {
@@ -1050,7 +1050,7 @@ struct DslashTestWrapper {
       auto max_deviation = blas::max_deviation(spinorRef, spinorOut);
 
       printfQuda("Results: reference = %f, QUDA = %f, L2 relative deviation = %e, max deviation = %e\n",
-                 norm_cpu, norm_cpu_quda, 1.0 - sqrt(norm_cpu_quda / norm_cpu), max_deviation);
+                 norm_cpu, norm_cpu_quda, 1.0 - sqrt(norm_cpu_quda / norm_cpu), max_deviation[0]);
       deviation = std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef, spinorOut)));
     }
     return deviation;

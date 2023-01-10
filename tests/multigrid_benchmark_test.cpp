@@ -165,7 +165,7 @@ TEST(multi_rhs_test, verify)
 
     // require that each component differs by no more than 1e-4
     auto max_dev = blas::max_deviation(xD[i], x_ref);
-    EXPECT_LE(max_dev, 1e-4);
+    EXPECT_LE(max_dev[0], 1e-4);
     // require that the relative L2 norm differs by no more than 1e-5
     auto x2 = blas::norm2(x_ref);
     auto l2_dev = blas::xmyNorm(xD[i], x_ref);

@@ -266,7 +266,7 @@ namespace quda {
        @param[in] x The field we want to compare
        @param[in] y The reference field to which we are comparing against
     */
-    double max_deviation(const ColorSpinorField &x, const ColorSpinorField &y);
+    array<double, 2> max_deviation(const ColorSpinorField &x, const ColorSpinorField &y);
 
     /**
        @brief Compute the L1 norm of a field
