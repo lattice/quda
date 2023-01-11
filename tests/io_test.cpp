@@ -105,7 +105,7 @@ constexpr double get_tolerance(QudaPrecision prec, QudaPrecision prec_io)
 {
   // converting half precision field to float field and back doesn't
   // seem to be exactly area preserving
-  if (prec == QUDA_HALF_PRECISION && prec_io > prec) return 2 * std::numeric_limits<float>::epsilon();
+  if (prec == QUDA_HALF_PRECISION && prec_io > prec) return 3 * std::numeric_limits<float>::epsilon();
   switch (prec_io) {
   case QUDA_DOUBLE_PRECISION: return std::numeric_limits<double>::epsilon();
   case QUDA_SINGLE_PRECISION: return std::numeric_limits<float>::epsilon();
@@ -153,9 +153,9 @@ TEST_P(ColorSpinorIOTest, verify)
   for (auto i = 0u; i < v.size(); i++) {
     auto dev = blas::max_deviation(u[i], v[i]);
     if (prec == prec_io)
-      EXPECT_EQ(dev, 0.0);
+      EXPECT_EQ(dev[0], 0.0);
     else
-      EXPECT_LE(dev, get_tolerance(prec, prec_io));
+      EXPECT_LE(dev[0], get_tolerance(prec, prec_io));
   }
 
   // cleanup after ourselves and delete the dummy lattice

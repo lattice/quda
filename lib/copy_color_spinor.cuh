@@ -183,8 +183,9 @@ namespace quda {
     if (!is_enabled_spin(dst.Nspin())) errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
 
     switch (dst.Nspin()) {
-    case 4: if constexpr (is_enabled_spin(4)) copyGenericColorSpinor<4, Nc>(param); break;
     case 1: if constexpr (is_enabled_spin(1)) copyGenericColorSpinor<1, Nc>(param); break;
+    case 2: if constexpr (is_enabled_spin(2)) copyGenericColorSpinor<2, Nc>(param); break;
+    case 4: if constexpr (is_enabled_spin(4)) copyGenericColorSpinor<4, Nc>(param); break;
     default: errorQuda("Nspin=%d unsupported", dst.Nspin());
     }
   }

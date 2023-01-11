@@ -1,10 +1,6 @@
 #pragma once
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #include <CLI11.hpp>
-#pragma GCC diagnostic pop
-
 #include <array>
 #include <quda.h>
 

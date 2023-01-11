@@ -64,7 +64,6 @@ namespace quda
     if (n_kr == 0) errorQuda("n_kr=0 passed to Eigensolver");
     if (n_conv == 0) errorQuda("n_conv=0 passed to Eigensolver");
     if (n_ev_deflate > n_conv) errorQuda("deflation vecs = %d is greater than n_conv = %d", n_ev_deflate, n_conv);
-    if (eig_param->eig_type == QUDA_EIG_BLK_TR_LANCZOS && block_size <= 0) errorQuda("block_size=%d must be positive", block_size);
 
     residua.resize(n_kr, 0.0);
 

@@ -38,7 +38,9 @@ namespace quda
       errorQuda("Block size %d is not a factor of the compressed space %d", block_size, n_ev);
     }
 
-    if (block_size == 0) { errorQuda("Block size %d passed to block eigensolver", block_size); }
+    if (block_size <= 0) errorQuda("Block size %d passed to block eigensolver must be positive", block_size);
+
+    if (block_size > n_conv) errorQuda("block_size = %d cannot exceed n_conv = %d", block_size, n_conv);
 
     auto n_blocks = n_kr / block_size;
     block_data_length = block_size * block_size;

@@ -65,7 +65,7 @@ namespace quda {
     if (src.Nspin() == 4) {
       if constexpr (is_enabled_spin(4)) spinorNoise<real, 4>(src, randstates, type, IntList<3>());
     } else if (src.Nspin() == 2) {
-      if constexpr (is_enabled_spin(2)) spinorNoise<real, 2>(src, randstates, type, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+      if constexpr (is_enabled_spin(2)) spinorNoise<real, 2>(src, randstates, type, IntList<3, @QUDA_MULTIGRID_NVEC_LIST@>());
     } else if (src.Nspin() == 1) {
       if constexpr (is_enabled_spin(1)) spinorNoise<real, 1>(src, randstates, type, IntList<3>());
     } else {
