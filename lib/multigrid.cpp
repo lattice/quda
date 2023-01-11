@@ -877,10 +877,10 @@ namespace quda
         auto l2_deviation = sqrt(xmyNorm(tmp1, tmp2) / norm2(tmp1));
 
         logQuda(QUDA_VERBOSE,
-                "Vector %d: norms v_k = %e P^\\dagger v_k = %e (1 - P P^\\dagger) v_k = %e, L2 relative deviation = %e max deviation = %e\n",
+                "Vector %d: L2 norms v_k = %e P^\\dagger v_k = %e (1 - P P^\\dagger) v_k = %e; Deviations: L2 relative = %e, max = %e\n",
                 i, norm2(tmp1), norm2(*r_coarse), norm2(tmp2), l2_deviation, max_deviation[0]);
         if (check_deviation(l2_deviation, tol)) errorQuda("k=%d orthonormality failed: L2 relative deviation %e > %e", i, l2_deviation, tol);
-        if (check_deviation(max_deviation[0], tol)) errorQuda("k=%d orthonormality failed: abs-max deviation %e > %e", i, max_deviation[0], tol);
+        if (check_deviation(max_deviation[0], tol)) errorQuda("k=%d orthonormality failed: max deviation %e > %e", i, max_deviation[0], tol);
       }
 
       // the oblique check
@@ -948,13 +948,13 @@ namespace quda
       spinorNoise(*x_coarse, *rng, QUDA_NOISE_UNIFORM);
       transfer->P(tmp2, *x_coarse);
       transfer->R(*r_coarse, tmp2);
-      logQuda(QUDA_VERBOSE, "L2 norms %e %e (fine tmp %e) ", norm2(*x_coarse), norm2(*r_coarse), norm2(tmp2));
-
+      auto r2 = norm2(*r_coarse);
       auto max_deviation = blas::max_deviation(*r_coarse, *x_coarse);
       auto l2_deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
-      logQuda(QUDA_VERBOSE, "relative deviation = %e, max deviation = %e\n", l2_deviation, max_deviation[0]);
+      logQuda(QUDA_VERBOSE, "L2 norms %e %e (fine tmp %e); Deviations: L2 relative = %e, max = %e\n",
+              norm2(*x_coarse), r2, norm2(tmp2), l2_deviation, max_deviation[0]);
       if (check_deviation(l2_deviation, tol)) errorQuda("coarse span failed: L2 relative deviation = %e > %e", l2_deviation, tol);
-      if (check_deviation(max_deviation[0], tol)) errorQuda("coarse span failed: abs-max deviation = %e > %e", max_deviation[0], tol);
+      if (check_deviation(max_deviation[0], tol)) errorQuda("coarse span failed: max deviation = %e > %e", max_deviation[0], tol);
     }
 
     logQuda(QUDA_SUMMARIZE, "Checking 0 = (D_c - P^\\dagger D P) (native coarse operator to emulated operator)\n");
@@ -1061,13 +1061,14 @@ namespace quda
             = delta_factor * 2.0 * diracResidual->Kappa() * diracResidual->Mu() * transfer->Vectors().TwistFlavor();
           l2_deviation -= fabs(delta_a) * sqrt(norm2(*tmp_coarse) / norm2(*x_coarse));
           l2_deviation = fabs(l2_deviation);
+          max_deviation[0] -= fabs(delta_a);
         }
       }
-      logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e, relative deviation = %e absolute max deviation = %e\n",
+      logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
               norm2(*x_coarse), r_nrm, l2_deviation, max_deviation[0]);
 
       if (check_deviation(l2_deviation, tol)) errorQuda("Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
-      if (check_deviation(max_deviation[0], tol)) warningQuda("Coarse operator failed: abs-max deviation = %e > %e", max_deviation[0], tol);
+      if (check_deviation(max_deviation[0], tol)) warningQuda("Coarse operator failed: max deviation = %e > %e", max_deviation[0], tol);
     }
 
     // check the preconditioned operator construction on the lower level if applicable
@@ -1082,10 +1083,10 @@ namespace quda
       double r_nrm = norm2(r_coarse->Even());
       auto max_deviation = blas::max_deviation(r_coarse->Even(), x_coarse->Even());
       auto l2_deviation = sqrt(xmyNorm(x_coarse->Even(), r_coarse->Even()) / norm2(x_coarse->Even()));
-      logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e, relative deviation = %e max deviation = %e\n",
+      logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
               norm2(x_coarse->Even()), r_nrm, l2_deviation, max_deviation[0]);
       if (check_deviation(l2_deviation, tol)) errorQuda("Preconditioned Deo failed: L2 relative deviation = %e > %e", l2_deviation, tol);
-      if (check_deviation(max_deviation[0], tol)) errorQuda("Preconditioned Deo failed: abs-max deviation = %e > %e", max_deviation[0], tol);
+      if (check_deviation(max_deviation[0], tol)) errorQuda("Preconditioned Deo failed: max deviation = %e > %e", max_deviation[0], tol);
 
       // check Doe
       logQuda(QUDA_SUMMARIZE, "Checking Doe of preconditioned operator 0 = \\hat{D}_c - A^{-1} D_c\n");
@@ -1095,10 +1096,10 @@ namespace quda
       r_nrm = norm2(r_coarse->Odd());
       max_deviation = blas::max_deviation(r_coarse->Odd(), x_coarse->Odd());
       l2_deviation = sqrt(xmyNorm(x_coarse->Odd(), r_coarse->Odd()) / norm2(x_coarse->Odd()));
-      logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e, relative deviation = %e max deviation = %e\n",
+      logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
               norm2(x_coarse->Odd()), r_nrm, l2_deviation, max_deviation[0]);
       if (check_deviation(l2_deviation, tol)) errorQuda("Preconditioned Doe failed: L2 relative deviation = %e > %e", l2_deviation, tol);
-      if (check_deviation(max_deviation[0], tol)) errorQuda("Preconditioned Doe failed: abs-max deviation = %e > %e", max_deviation[0], tol);
+      if (check_deviation(max_deviation[0], tol)) errorQuda("Preconditioned Doe failed: max deviation = %e > %e", max_deviation[0], tol);
     }
 
     // here we check that the Hermitian conjugate operator is working
