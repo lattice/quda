@@ -193,7 +193,7 @@ namespace quda {
                         IntList<fineColor, N...>)
   {
     // 1 ensures we generate templates for just the fineColor with no multiplication by coarseColor
-    IntList<1, @QUDA_MULTIGRID_MRHS_LIST@> coarseColors;
+    IntList<1, @QUDA_MULTIGRID_MRHS_LIST@, @QUDA_MULTIGRID_NC_NVEC_LIST@> coarseColors;
 
     if (!genericPackGhostC<Float, ghostFloat, Ns, native, fineColor>
         (ghost, a, parity, nFace, dagger, destination, shmem, v, coarseColors)) {

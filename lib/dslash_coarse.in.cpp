@@ -10,7 +10,8 @@ namespace quda {
                    double kappa, int parity, bool dslash, bool clover, bool dagger,
                    const int *commDim, QudaPrecision halo_precision, bool use_mma, IntList<Nc, N...>)
   {
-    if (inA[0].Ncolor() / inA[0].Nvec() == Nc) {
+    int nColor = use_mma ? inA[0].Ncolor() / inA[0].Nvec() : inA[0].Ncolor();
+    if (nColor == Nc) {
       if (dagger)
         ApplyCoarse<true, Nc>(out, inA, inB, Y, X, kappa, parity, dslash, clover, commDim, halo_precision, use_mma);
       else
