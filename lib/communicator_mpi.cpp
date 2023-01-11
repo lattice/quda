@@ -294,10 +294,10 @@ namespace quda
   void Communicator::comm_allreduce_max_array(deviation_t<double> *data, size_t size)
   {
     size_t n = comm_size();
-    std::vector<array<double, 2>> recv_buf(size * n);
+    std::vector<deviation_t<double>> recv_buf(size * n);
     MPI_CHECK(MPI_Allgather(data, 2 * size, MPI_DOUBLE, recv_buf.data(), 2 * size, MPI_DOUBLE, MPI_COMM_HANDLE));
 
-    std::vector<array<double, 2>> recv_trans(size * n);
+    std::vector<deviation_t<double>> recv_trans(size * n);
     for (size_t i = 0; i < n; i++) {
       for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
     }
