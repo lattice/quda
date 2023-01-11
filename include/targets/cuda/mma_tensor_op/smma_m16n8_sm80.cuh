@@ -108,6 +108,18 @@ namespace quda
       static constexpr int mma_n = MMA_N;
       static constexpr int mma_k = MMA_K;
 
+      static std::string get_type_name() {
+        if constexpr (std::is_same_v<shuffle_t, tfloat32>) {
+          return ",3xtfloat32,m" + std::to_string(MMA_M) + "n" + std::to_string(MMA_N) + "k" + std::to_string(MMA_K);
+        } else if constexpr (std::is_same_v<shuffle_t, bfloat16>) {
+          return ",3xbfloat16,m" + std::to_string(MMA_M) + "n" + std::to_string(MMA_N) + "k" + std::to_string(MMA_K);
+        } else if constexpr (std::is_same_v<shuffle_t, half>) {
+          return ",3xfp16,m" + std::to_string(MMA_M) + "n" + std::to_string(MMA_N) + "k" + std::to_string(MMA_K);
+        } else {
+          return "unknown_mma_type,";
+        }
+      }
+
       static constexpr int warp_size = 32;
 
       using store_t = unsigned;

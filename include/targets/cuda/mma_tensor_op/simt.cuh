@@ -33,6 +33,10 @@ namespace quda
       using compute_t = T;
       using load_t = T;
 
+      static std::string get_type_name() {
+        return ",simt,m" + std::to_string(MMA_M) + "n" + std::to_string(MMA_N) + "k" + std::to_string(MMA_K);
+      }
+
       static __device__ __host__ constexpr int inline pad_size(int) { return 0; }
 
       struct WarpRegisterMapping {
@@ -124,6 +128,12 @@ namespace quda
             }
           }
         }
+
+        template <class F> __device__ inline void abs_max(F &max)
+        {
+#pragma unroll
+          for (int i = 0; i < warp_m * warp_n; i++) { max = fmax(max, fabsf(reg[i])); }
+        }
       };
 
       static __device__ void mma(const OperandA &op_a, const OperandB &op_b, OperandC &op_c)
@@ -151,15 +161,29 @@ namespace quda
           for (int wm = 0; wm < warp_m; wm++) {
             int m = m_offset + wrm.idx_m * warp_m + wm;
             int n = n_offset + wrm.idx_n * warp_n + wn;
-            if (!check_bounds || (m < M && n < N)) {
-              if (gmem_op_t::fixed) {
-                auto scale = cc.get_scale();
-                complex_t out = {static_cast<store_t>(scale * op_c_real.reg[wn * warp_m + wm]),
-                                  static_cast<store_t>(scale * op_c_imag.reg[wn * warp_m + wm])};
-                op(&C[m * ldc + n], out);
-              } else {
-                complex_t out = {op_c_real.reg[wn * warp_m + wm], op_c_imag.reg[wn * warp_m + wm]};
-                op(&C[m * ldc + n], out);
+            if constexpr (dagger) {
+              if (!check_bounds || (m < N && n < M)) {
+                if constexpr (gmem_op_t::fixed) {
+                  auto scale = cc.get_scale();
+                  complex_t out = {static_cast<store_t>(scale * op_c_real.reg[wn * warp_m + wm]),
+                                    -static_cast<store_t>(scale * op_c_imag.reg[wn * warp_m + wm])};
+                  op(&C[n * ldc + m], out);
+                } else {
+                  complex_t out = {op_c_real.reg[wn * warp_m + wm], -op_c_imag.reg[wn * warp_m + wm]};
+                  op(&C[n * ldc + m], out);
+                }
+              }
+            } else {
+              if (!check_bounds || (m < M && n < N)) {
+                if constexpr (gmem_op_t::fixed) {
+                  auto scale = cc.get_scale();
+                  complex_t out = {static_cast<store_t>(scale * op_c_real.reg[wn * warp_m + wm]),
+                                    static_cast<store_t>(scale * op_c_imag.reg[wn * warp_m + wm])};
+                  op(&C[m * ldc + n], out);
+                } else {
+                  complex_t out = {op_c_real.reg[wn * warp_m + wm], op_c_imag.reg[wn * warp_m + wm]};
+                  op(&C[m * ldc + n], out);
+                }
               }
             }
           }

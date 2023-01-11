@@ -47,7 +47,10 @@ namespace quda
 
       if (location == QUDA_CUDA_FIELD_LOCATION) strcat(aux, Y.MemType() == QUDA_MEMORY_MAPPED ? ",GPU-mapped" : ",GPU-device");
       strcat(aux, comm_dim_partitioned_string());
-      if (use_mma && location == QUDA_CUDA_FIELD_LOCATION) { strcat(aux, ",mma"); }
+      if (use_mma && location == QUDA_CUDA_FIELD_LOCATION) {
+        strcat(aux, ",mma");
+        strcat(aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
+      }
       if (Arg::compute_max) strcat(aux, ",compute_max");
 
       apply(device::get_default_stream());

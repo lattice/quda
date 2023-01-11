@@ -30,6 +30,10 @@ namespace quda
 
       using WarpRegisterMapping = typename base_t::WarpRegisterMapping;
 
+      static std::string get_type_name() {
+        return ",3xfp16,m" + std::to_string(MMA_M) + "n" + std::to_string(MMA_N) + "k" + std::to_string(MMA_K);
+      }
+
       struct OperandA {
 
         unsigned big[2];

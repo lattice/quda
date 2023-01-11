@@ -791,7 +791,10 @@ namespace quda {
 
       if (type == COMPUTE_UV) {
         strcat(Aux, ",computeUV");
-        if (use_mma) strcat(Aux, ",mma");
+        if (use_mma) {
+          strcat(Aux, ",mma");
+          strcat(Aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
+        }
       }
       else if (type == COMPUTE_LV) strcat(Aux, ",computeLV");
       else if (type == COMPUTE_AV)

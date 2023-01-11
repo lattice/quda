@@ -49,6 +49,10 @@ namespace quda
         }
       };
 
+      static std::string get_type_name() {
+        return ",1xfp16,m" + std::to_string(MMA_M) + "n" + std::to_string(MMA_N) + "k" + std::to_string(MMA_K);
+      }
+
       struct OperandA {
 
         unsigned reg[2];

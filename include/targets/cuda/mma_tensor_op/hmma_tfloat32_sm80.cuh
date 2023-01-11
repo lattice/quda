@@ -34,6 +34,10 @@ namespace quda
       using base_t = typename smma::smma_t<mma::tfloat32, inst_k, warp_m, warp_n>;
       using WarpRegisterMapping = typename base_t::WarpRegisterMapping;
 
+      static std::string get_type_name() {
+        return ",1xtfloat32,m" + std::to_string(MMA_M) + "n" + std::to_string(MMA_N) + "k" + std::to_string(MMA_K);
+      }
+
       static __device__ __host__ constexpr int inline pad_size(int m) { return base_t::pad_size(m); }
 
       struct OperandA {
