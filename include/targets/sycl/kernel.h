@@ -243,10 +243,10 @@ namespace quda {
       printfQuda("  Arg: %s\n", typeid(Arg).name());
       //fflush(stdout);
     }
-    if (arg.threads.x%localSize[RANGE_X] != 0) {
-      //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
-      return QUDA_ERROR;
-    }
+    //if (arg.threads.x%localSize[RANGE_X] != 0) {
+    //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
+    //return QUDA_ERROR;
+    //}
     if (globalSize[RANGE_Y] != arg.threads.y) {
       //warningQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
       return QUDA_ERROR;
