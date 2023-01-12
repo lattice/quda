@@ -49,12 +49,12 @@ namespace quda
 #endif
 
     template <class T> struct mg_mma_dispatch_t {
-      // using type = hmma_t;
+      using type = hmma_t;
       // using type = smma_half_t;                     // 3xFP16
       // using type = typename smma_dispatch<T>::type; // 3xBF16/3xTF32
       // using type = smma::smma_t<mma::tfloat32, 4, 1, 1>; // 3xTF32
       // using type = smma::smma_t<mma::bfloat32, 8, 1, 1>; // 3xBF16
-      using type = simt::simt_t<float, 8, 4, 2, 2>;
+      // using type = simt::simt_t<float, 8, 4, 2, 2>;
     };
 
   } // namespace mma

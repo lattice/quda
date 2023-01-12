@@ -195,9 +195,9 @@ namespace quda
             complex_t s;
             if constexpr (fixed) {
               auto scale = cc.get_scale();
-              s = {static_cast<store_t>(op_c_real.reg[i * 2 + 0] * scale), -static_cast<store_t>(op_c_imag.reg[i * 2 + 0] * scale)};
+              s = {round(static_cast<store_t>(op_c_real.reg[i * 2 + 0] * scale)), round(-static_cast<store_t>(op_c_imag.reg[i * 2 + 0] * scale))};
               op(&ptr[(n_index + 0) * ldc + m_index], s);
-              s = {static_cast<store_t>(op_c_real.reg[i * 2 + 1] * scale), -static_cast<store_t>(op_c_imag.reg[i * 2 + 1] * scale)};
+              s = {round(static_cast<store_t>(op_c_real.reg[i * 2 + 1] * scale)), round(-static_cast<store_t>(op_c_imag.reg[i * 2 + 1] * scale))};
               op(&ptr[(n_index + 1) * ldc + m_index], s);
             } else {
               s = {op_c_real.reg[i * 2 + 0], -op_c_imag.reg[i * 2 + 0]};
@@ -211,10 +211,10 @@ namespace quda
             array_t s;
             if constexpr (fixed) {
               auto scale = cc.get_scale();
-              s[0] = static_cast<store_t>(op_c_real.reg[i * 2 + 0] * scale);
-              s[1] = static_cast<store_t>(op_c_imag.reg[i * 2 + 0] * scale);
-              s[2] = static_cast<store_t>(op_c_real.reg[i * 2 + 1] * scale);
-              s[3] = static_cast<store_t>(op_c_imag.reg[i * 2 + 1] * scale);
+              s[0] = static_cast<store_t>(round(op_c_real.reg[i * 2 + 0] * scale));
+              s[1] = static_cast<store_t>(round(op_c_imag.reg[i * 2 + 0] * scale));
+              s[2] = static_cast<store_t>(round(op_c_real.reg[i * 2 + 1] * scale));
+              s[3] = static_cast<store_t>(round(op_c_imag.reg[i * 2 + 1] * scale));
             } else {
               s[0] = op_c_real.reg[i * 2 + 0];
               s[1] = op_c_imag.reg[i * 2 + 0];

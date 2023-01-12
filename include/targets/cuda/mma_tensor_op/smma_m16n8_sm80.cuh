@@ -12,24 +12,18 @@ namespace quda
     using bfloat162 = mma::bfloat162;
     using tfloat32 = mma::tfloat32;
 
-    // #define QUDA_FAST_MMA_DETECT_OVERFLOW
-
     template <class T> static void __device__ inline get_big_small(float &big, float &small, const float &f)
     {
       constexpr unsigned big_mask = std::is_same_v<T, bfloat16> ? 0xffff0000 : 0xffffe000;
-#ifdef QUDA_FAST_MMA_DETECT_OVERFLOW
       constexpr unsigned small_mask = std::is_same_v<T, bfloat16> ? 0x8000 : 0x1000;
-#endif
 
       const unsigned &u32 = reinterpret_cast<const unsigned &>(f);
       unsigned big_u32 = u32 & big_mask;
       big = reinterpret_cast<float &>(big_u32);
 
       small = f - big;
-#ifdef QUDA_FAST_MMA_DETECT_OVERFLOW
       unsigned &small_u32 = reinterpret_cast<unsigned &>(small);
       small_u32 += small_mask;
-#endif
     }
 
     template <class dest_t, int input_vn> struct Shuffle {
@@ -399,9 +393,9 @@ namespace quda
                     if constexpr (gmem_op_t::fixed) {
                       auto scale = cc.get_scale();
                       complex_t out = {static_cast<store_t>(
-                             scale * op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]),
+                             round(scale * op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)])),
                            static_cast<store_t>(
-                             -scale * op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)])};
+                             round(-scale * op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]))};
                       op(&C[n * ldc + m], out);
                     } else {
                       complex_t out = {op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)],
@@ -414,9 +408,9 @@ namespace quda
                     if constexpr (gmem_op_t::fixed) {
                       auto scale = cc.get_scale();
                       complex_t out = {static_cast<store_t>(
-                             scale * op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]),
+                             round(scale * op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)])),
                            static_cast<store_t>(
-                             scale * op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)])};
+                             round(scale * op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]))};
                       op(&C[m * ldc + n], out);
                     } else {
                       complex_t out = {op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)],

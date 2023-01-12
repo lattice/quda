@@ -85,7 +85,7 @@ namespace quda
             auto b = Wacc(parity, x_cb, s_col, 0, 0);
             auto c = arg.UV(parity, x_cb, s_col * fineSpin, 0, 0);
 
-            uvMax = Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, 0, 0);
+            uvMax = fmaxf(uvMax, Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, 0, 0));
           }
 
         } else if (arg.comm_dim[Arg::dim] && (coord[Arg::dim] + nFace >= arg.x_size[Arg::dim])) {
@@ -98,7 +98,7 @@ namespace quda
             auto b = Wacc.Ghost(Arg::dim, 1, (parity + 1) & 1, ghost_idx, s_col, 0, 0);
             auto c = arg.UV(parity, x_cb, s_col * fineSpin, 0, 0);
 
-            uvMax = Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, 0, 0);
+            uvMax = fmaxf(uvMax, Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, 0, 0));
           }
 
         } else {
@@ -111,7 +111,7 @@ namespace quda
             auto b = Wacc((parity + 1) & 1, y_cb, s_col, 0, 0);
             auto c = arg.UV(parity, x_cb, s_col * fineSpin, 0, 0);
 
-            uvMax = Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, 0, 0);
+            uvMax = fmaxf(uvMax, Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, 0, 0));
           }
         }
 
