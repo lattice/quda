@@ -1,7 +1,7 @@
 #pragma once
 
-#include <array>
 #include <CLI11.hpp>
+#include <array>
 #include <quda.h>
 
 // for compatibility while porting - remove later
