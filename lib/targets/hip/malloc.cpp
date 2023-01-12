@@ -460,14 +460,15 @@ namespace quda
 #ifdef HOST_ALLOC
       hipError_t err = hipFreeHost(ptr);
       if (err != hipSuccess) { errorQuda("Failed to free host memory (%s:%d in %s())\n", file, line, func); }
+      track_free(MAPPED, ptr);
 #else
       hipError_t err = hipHostUnregister(ptr);
       if (err != hipSuccess) {
         errorQuda("Failed to unregister host-mapped memory (%s:%d in %s())\n", file, line, func);
       }
+      track_free(MAPPED, ptr);
       free(ptr);
 #endif
-      track_free(MAPPED, ptr);
     } else {
       printfQuda("ERROR: Attempt to free invalid host pointer (%s:%d in %s())\n", file, line, func);
       print_trace();

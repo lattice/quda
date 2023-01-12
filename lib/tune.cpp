@@ -184,7 +184,7 @@ namespace quda
     }
   }
 
-  template <class T> struct less_significant : std::binary_function<T, T, bool> {
+  template <class T> struct less_significant {
     inline bool operator()(const T &lhs, const T &rhs)
     {
       return lhs.second.time * lhs.second.n_calls < rhs.second.time * rhs.second.n_calls;
