@@ -315,16 +315,7 @@ if(QUDA_CONTRACT)
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:contract_test> ${MPIEXEC_POSTFLAGS}
     --dim 2 4 6 8
     --gtest_output=xml:contract_test.xml)
-endif()
-
-#Smearing test
-if(QUDA_SMEAR_GAUSS_TWOLINK)
-  add_test(NAME staggered_gsmear_test
-    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gsmear_test> ${MPIEXEC_POSTFLAGS}
-    --dim 2 4 6 8
-    --test TwoLink
-    --gtest_output=xml:staggered_gsmear_test.xml)
-endif()
+endif()  
 
 # loop over Dslash policies
 if(QUDA_CTEST_SEP_DSLASH_POLICIES)
@@ -1249,6 +1240,14 @@ foreach(prec IN LISTS TEST_PRECS)
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dilution_test> ${MPIEXEC_POSTFLAGS}
                      --dim 4 6 8 10 --prec ${prec}
                      --gtest_output=xml:dilution_test_${prec}.xml)
+  endif()
+
+  if(QUDA_SMEAR_GAUSS_TWOLINK)
+    add_test(NAME staggered_gsmear_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gsmear_test> ${MPIEXEC_POSTFLAGS}
+      --dim 2 4 6 8 --prec ${prec}
+      --test TwoLink
+      --gtest_output=xml:staggered_gsmear_test_${prec}.xml)
   endif()
 
 endforeach(prec)
