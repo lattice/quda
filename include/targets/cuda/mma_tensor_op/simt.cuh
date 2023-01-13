@@ -165,8 +165,8 @@ namespace quda
               if (!check_bounds || (m < N && n < M)) {
                 if constexpr (gmem_op_t::fixed) {
                   auto scale = cc.get_scale();
-                  complex_t out = {static_cast<store_t>(scale * op_c_real.reg[wn * warp_m + wm]),
-                                    -static_cast<store_t>(scale * op_c_imag.reg[wn * warp_m + wm])};
+                  complex_t out = {f2i_round<store_t>(scale * op_c_real.reg[wn * warp_m + wm]),
+                                    f2i_round<store_t>(-scale * op_c_imag.reg[wn * warp_m + wm])};
                   op(&C[n * ldc + m], out);
                 } else {
                   complex_t out = {op_c_real.reg[wn * warp_m + wm], -op_c_imag.reg[wn * warp_m + wm]};
@@ -177,8 +177,8 @@ namespace quda
               if (!check_bounds || (m < M && n < N)) {
                 if constexpr (gmem_op_t::fixed) {
                   auto scale = cc.get_scale();
-                  complex_t out = {static_cast<store_t>(scale * op_c_real.reg[wn * warp_m + wm]),
-                                    static_cast<store_t>(scale * op_c_imag.reg[wn * warp_m + wm])};
+                  complex_t out = {f2i_round<store_t>(scale * op_c_real.reg[wn * warp_m + wm]),
+                                    f2i_round<store_t>(scale * op_c_imag.reg[wn * warp_m + wm])};
                   op(&C[m * ldc + n], out);
                 } else {
                   complex_t out = {op_c_real.reg[wn * warp_m + wm], op_c_imag.reg[wn * warp_m + wm]};

@@ -392,10 +392,9 @@ namespace quda
                   if (!check_bounds || (m < N && n < M)) {
                     if constexpr (gmem_op_t::fixed) {
                       auto scale = cc.get_scale();
-                      complex_t out = {static_cast<store_t>(
-                             round(scale * op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)])),
-                           static_cast<store_t>(
-                             round(-scale * op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]))};
+                      complex_t out = {
+                        f2i_round<store_t>(scale * op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]),
+                        f2i_round<store_t>(-scale * op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)])};
                       op(&C[n * ldc + m], out);
                     } else {
                       complex_t out = {op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)],
@@ -407,10 +406,9 @@ namespace quda
                   if (!check_bounds || (m < M && n < N)) {
                     if constexpr (gmem_op_t::fixed) {
                       auto scale = cc.get_scale();
-                      complex_t out = {static_cast<store_t>(
-                             round(scale * op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)])),
-                           static_cast<store_t>(
-                             round(scale * op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]))};
+                      complex_t out = {
+                        f2i_round<store_t>(scale * op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]),
+                        f2i_round<store_t>(scale * op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)])};
                       op(&C[m * ldc + n], out);
                     } else {
                       complex_t out = {op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)],
