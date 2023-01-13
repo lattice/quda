@@ -92,7 +92,7 @@ namespace quda
      @brief Regular float to integer round used on the host
   */
   template <bool is_device> struct f2i {
-    constexpr int operator()(float f) { return static_cast<int>(f); }
+    constexpr int operator()(float f) { return static_cast<int>(rintf(f)); }
   };
 
   /**
@@ -110,7 +110,7 @@ namespace quda
      @brief Regular double to integer round used on the host
   */
   template <bool is_device> struct d2i {
-    constexpr int operator()(double d) { return static_cast<int>(d); }
+    constexpr int operator()(double d) { return static_cast<int>(rint(d)); }
   };
 
   /**
@@ -183,15 +183,15 @@ namespace quda
   }
 
   template <class fixed_t, class float_t>
-  __device__ fixed_t f2i_round(float_t f) {
+  __device__ __host__ fixed_t f2i_round(float_t f) {
 #if 1
     if constexpr (sizeof(fixed_t) < 4) {
       return static_cast<fixed_t>(target::dispatch<f2i>(f));
     } else {
-      return static_cast<fixed_t>(round(f));
+      return static_cast<fixed_t>(rint(f));
     }
 #else
-    return static_cast<fixed_t>(round(f));
+    return static_cast<fixed_t>(rint(f));
 #endif
   }
 } // namespace quda

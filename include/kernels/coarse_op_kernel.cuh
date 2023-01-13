@@ -1367,7 +1367,7 @@ namespace quda {
   {
     if (gauge::fixed_point<real, store_t>()) {
       real scale = A.accessor.scale;
-      complex<store_t> a(round(scale * vuv.real()), round(scale * vuv.imag()));
+      complex<store_t> a(f2i_round<store_t>(scale * vuv.real()), f2i_round<store_t>(scale * vuv.imag()));
       atomic_fetch_add(Y, a);
     } else {
       atomic_fetch_add(Y, reinterpret_cast<const complex<store_t>&>(vuv));
