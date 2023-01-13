@@ -71,6 +71,11 @@ int main(int argc, char **argv)
 
   display_test_info();
 
+  if (link_recon != QUDA_RECONSTRUCT_NO) {
+    printfQuda("Error: link reconstruction is currently not supported.\n");
+    exit(0);
+  }
+
   // return result of RUN_ALL_TESTS
   int test_rc = gsmearTest();
 
