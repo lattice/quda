@@ -161,10 +161,10 @@ namespace quda
       if (!async) __syncthreads(); // only synchronize if we are not pipelining
 
       //__shared__ T storage[max_items];
-      static_assert(sizeof(T[max_items])<=device::shared_memory_size(), "Block reduce shared mem size too large");
       T *storage = nullptr;
       //if constexpr (std::is_same_v<std::tuple_element_t<0, std::tuple<BR...,void>>,void>) {
       if constexpr (sizeof...(BR) == 0) {
+	static_assert(sizeof(T[max_items])<=device::shared_memory_size(), "Block reduce shared mem size too large");
 	auto mem = sycl::ext::oneapi::group_local_memory_for_overwrite<T[max_items]>(getGroup());
 	storage = *mem.get();
       } else {

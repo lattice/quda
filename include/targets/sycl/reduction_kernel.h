@@ -76,6 +76,7 @@ namespace quda {
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
+#if 0
     if (localSize[RANGE_X] > arg.threads.x) {
       localSize[RANGE_X] = arg.threads.x;
       globalSize[RANGE_X] = arg.threads.x;
@@ -88,6 +89,7 @@ namespace quda {
 	globalSize[RANGE_X] = ((arg.threads.x+localSize[RANGE_X]-1)/localSize[RANGE_X])*localSize[RANGE_X];
       }
     }
+#endif
     host_timer_t timer;
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Reduction2D grid_stride: %s  sizeof(arg): %lu\n",
@@ -104,10 +106,10 @@ namespace quda {
       //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
     //  return QUDA_ERROR;
     //}
-    if (globalSize[RANGE_Y] != arg.threads.y) { // shouldn't happen here
+    //if (globalSize[RANGE_Y] != arg.threads.y) { // shouldn't happen here
       //warningQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
-      return QUDA_ERROR;
-    }
+    //  return QUDA_ERROR;
+    //}
     sycl::nd_range<3> ndRange{globalSize, localSize};
 #ifndef HIGH_LEVEL_REDUCTIONS
     err = launch<Reduction2DS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
@@ -180,6 +182,7 @@ namespace quda {
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
+#if 0
     if (localSize[RANGE_X] > arg.threads.x) {
       localSize[RANGE_X] = arg.threads.x;
       globalSize[RANGE_X] = arg.threads.x;
@@ -192,6 +195,7 @@ namespace quda {
 	globalSize[RANGE_X] = ((arg.threads.x+localSize[RANGE_X]-1)/localSize[RANGE_X])*localSize[RANGE_X];
       }
     }
+#endif
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       using reduce_t = typename Functor<Arg>::reduce_t;
       printfQuda("MultiReduction grid_stride: %s  sizeof(arg): %lu\n",
@@ -212,14 +216,14 @@ namespace quda {
       //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
     //  return QUDA_ERROR;
     //}
-    if (globalSize[RANGE_Y] != arg.threads.y) { // shouldn't happen here
+    //if (globalSize[RANGE_Y] != arg.threads.y) { // shouldn't happen here
       //warningQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
-      return QUDA_ERROR;
-    }
-    if (globalSize[RANGE_Z] != arg.threads.z) {
+    //  return QUDA_ERROR;
+    //}
+    //if (globalSize[RANGE_Z] != arg.threads.z) {
       //warningQuda("globalSize Z (%lu) != arg.threads.z (%i)", globalSize[RANGE_Z], arg.threads.z);
-      return QUDA_ERROR;
-    }
+    //  return QUDA_ERROR;
+    //}
     sycl::nd_range<3> ndRange{globalSize, localSize};
     err = launch<MultiReductionS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
     //err = launchX<MultiReductionS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
