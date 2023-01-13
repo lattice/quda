@@ -182,4 +182,16 @@ namespace quda
     a = i2f(b) * c;
   }
 
+  template <class fixed_t, class float_t>
+  __device__ __host__ fixed_t f2i_round(float_t f) {
+#if 1
+    if constexpr (sizeof(fixed_t) < 4) {
+      return static_cast<fixed_t>(target::dispatch<f2i>(f));
+    } else {
+      return static_cast<fixed_t>(round(f));
+    }
+#else
+    return static_cast<fixed_t>(round(f));
+#endif
+  }
 } // namespace quda
