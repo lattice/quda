@@ -293,8 +293,6 @@ namespace quda {
         // we are doing gauge field packing
         copyGauge<FloatOut,FloatIn,18>(out, in, location, Out, In, outGhost, inGhost, type);
       } else {
-        if (out.Geometry() != QUDA_VECTOR_GEOMETRY) errorQuda("Unsupported geometry %d", out.Geometry());
-
         checkMomOrder(in);
         checkMomOrder(out);
 
