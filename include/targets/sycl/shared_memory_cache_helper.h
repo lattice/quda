@@ -1,6 +1,7 @@
 #pragma once
 
 #include <target_device.h>
+#include <tunable_kernel.h>
 
 /**
    @file shared_memory_cache_helper.cuh
@@ -32,7 +33,7 @@ namespace quda
        is optionally padded to allow for access along the y and z dimensions.
    */
   template <typename T, int block_size_y = 1, int block_size_z = 1, bool pad = false, bool dynamic = true>
-  class SharedMemoryCache
+  class SharedMemoryCache : SharedMem<T>
   {
     /** maximum number of threads in x given the y and z block sizes */
     static constexpr int max_block_size_x = device::max_block_size<block_size_y, block_size_z>();
@@ -42,7 +43,8 @@ namespace quda
       ((max_block_size_x + device::shared_memory_bank_width() - 1) /
        device::shared_memory_bank_width()) * device::shared_memory_bank_width();
 
-    using atom_t = std::conditional_t<sizeof(T) % 16 == 0, int4, std::conditional_t<sizeof(T) % 8 == 0, int2, int>>;
+    //using atom_t = std::conditional_t<sizeof(T) % 16 == 0, int4, std::conditional_t<sizeof(T) % 8 == 0, int2, int>>;
+    using atom_t = T;
     static_assert(sizeof(T) % 4 == 0, "Shared memory cache does not support sub-word size types");
 
     // The number of elements of type atom_t that we break T into for optimal shared-memory access
@@ -77,6 +79,7 @@ namespace quda
       return a;
     }
 
+#if 0
     /**
        @brief Dummy instantiation for the host compiler
     */
@@ -88,8 +91,10 @@ namespace quda
        @brief Synchronize the cache when on the device
     */
     template <typename dummy> struct sync_impl<true, dummy> {
-      inline void operator()() { __syncthreads(); }
+      //inline void operator()() { __syncthreads(); }
+      inline void operator()() { this->blockSync(); }
     };
+#endif
 
   public:
     /**
@@ -101,7 +106,8 @@ namespace quda
 
        @param[in] block Block dimensions for the 3-d shared memory object
     */
-    SharedMemoryCache(dim3 block = dim3(block_size_x, block_size_y, block_size_z)) :
+    SharedMemoryCache(SharedMem<T> *smem, dim3 block = dim3(block_size_x, block_size_y, block_size_z)) :
+      SharedMem<T>(*smem),
       block(block),
       stride(block.x * block.y * block.z)
     {
@@ -109,9 +115,10 @@ namespace quda
       auto len = g.get_local_linear_range();
       if(len<=array_len) {
 	//auto cache = sycl::group_local_memory_for_overwrite<atype>(g);
-	mem = sycl::ext::oneapi::group_local_memory<atype>(g);
 	//return reinterpret_cast<atom_t*>(cache_.get());
-	cache_ = *mem.get();
+	//mem = sycl::ext::oneapi::group_local_memory<atype>(g);
+	//cache_ = *mem.get();
+	cache_ = smem->getMem();
       } else {
 	cache_ = nullptr;
       }
@@ -229,7 +236,8 @@ namespace quda
     /**
        @brief Synchronize the cache
     */
-    __device__ __host__ void sync() { target::dispatch<sync_impl>(); }
+    //__device__ __host__ void sync() { target::dispatch<sync_impl>(); }
+    __device__ __host__ void sync() { this->blockSync(); }
   };
 
 } // namespace quda

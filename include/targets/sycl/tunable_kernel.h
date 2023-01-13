@@ -42,6 +42,49 @@ namespace quda {
     TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
   };
 
+  struct BlockSync {
+    const sycl::nd_item<3> *ndi;
+    void setBlockSync(const sycl::nd_item<3> &i) { ndi = &i; }
+    BlockSync *getBlockSync() { return this; }
+    void blockSync() { sycl::group_barrier(ndi->get_group()); }
+  };
+
+  template <typename T>
+  struct SharedMem : BlockSync
+  {
+    using SharedMemT = T;
+    T *smem;
+    void setMem(T *mem) { smem = mem; }
+    T *getMem() { return smem; }
+    SharedMem<T> *getSharedMem() { return this; }
+  };
+
+  template <typename T, typename = void>
+  struct hasBlockSyncS : std::false_type { };
+  template <typename T>
+  struct hasBlockSyncS<T,decltype(std::declval<T>().getBlockSync(),(void)0)> : std::true_type { };
+  template <typename T>
+  static constexpr bool hasBlockSync = hasBlockSyncS<T>::value;
+
+  template <typename T, typename = void>
+  struct hasSharedMemS : std::false_type { };
+  template <typename T>
+  struct hasSharedMemS<T,decltype(std::declval<T>().getSharedMem(),(void)0)> : std::true_type { };
+  template <typename T>
+  static constexpr bool hasSharedMem = hasSharedMemS<T>::value;
+
+  template <typename T, typename = void>
+  struct sharedMemTypeT { using type = void; };
+  template <typename T>
+  struct sharedMemTypeT<T,decltype((typename T::SharedMemT)0,(void)0)> {
+    using type = typename T::SharedMemT;
+  };
+  template <typename T>
+  using sharedMemType = typename sharedMemTypeT<T>::type;
+
+  template <typename T>
+  static constexpr bool hasBlockOps = hasBlockSync<T>; // SharedMem also has BlockSync
+
   // kernel helpers
   inline sycl::range<3> globalRange(const TuneParam &tp) {
     sycl::range<3> r(1,1,1);
@@ -68,14 +111,28 @@ namespace quda {
     qudaError_t err = QUDA_SUCCESS;
     auto q = device::get_target_stream(stream);
     try {
-      q.submit([&](sycl::handler &h) {
-	h.parallel_for<>
-	  (ndRange,
-	   //[=](sycl::nd_item<3> ndi) {
-	   [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
-	     F f(arg, ndi);
-	   });
-      });
+      if constexpr (std::is_same_v<typename F::SharedMemT,void>) {
+	q.submit([&](sycl::handler &h) {
+	  h.parallel_for<>
+	    (ndRange,
+	     //[=](sycl::nd_item<3> ndi) {
+	     [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
+	       F f(arg, ndi);
+	     });
+	});
+      } else {  // needs shared mem
+	q.submit([&](sycl::handler &h) {
+	  sycl::range<1> smem_range(ndRange.get_local_range().size());
+	  auto la = sycl::local_accessor<typename F::SharedMemT>(smem_range, h);
+	  h.parallel_for<>
+	    (ndRange,
+	     //[=](sycl::nd_item<3> ndi) {
+	     [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
+	       typename F::SharedMemT *smem = la.get_pointer();
+	       F f(arg, ndi, smem);
+	     });
+	});
+      }
     } catch (sycl::exception const& e) {
       auto what = e.what();
       target::sycl::set_error(what, "submit", __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
@@ -91,6 +148,7 @@ namespace quda {
   std::enable_if_t<!device::use_kernel_arg<Arg>(), qudaError_t>
   launch(const qudaStream_t &stream, sycl::nd_range<3> &ndRange, const Arg &arg)
   {
+    static_assert(std::is_same_v<typename F::SharedMemT,void>);
     qudaError_t err = QUDA_SUCCESS;
     auto q = device::get_target_stream(stream);
     auto size = sizeof(arg);
@@ -122,6 +180,7 @@ namespace quda {
   qudaError_t
   launchX(const qudaStream_t &stream, sycl::nd_range<3> &ndRange, const Arg &arg)
   {
+    static_assert(std::is_same_v<typename F::SharedMemT,void>);
     qudaError_t err = QUDA_SUCCESS;
     auto q = device::get_target_stream(stream);
     auto size = sizeof(arg);
@@ -153,6 +212,7 @@ namespace quda {
   std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
   launchR(const qudaStream_t &stream, sycl::nd_range<3> &ndRange, const Arg &arg)
   {
+    static_assert(std::is_same_v<typename F::SharedMemT,void>);
     if ( sizeof(Arg) > device::max_parameter_size() ) {
       errorQuda("Kernel arg too large: %lu > %u\n", sizeof(Arg), device::max_parameter_size());
     }
@@ -192,6 +252,7 @@ namespace quda {
   std::enable_if_t<!device::use_kernel_arg<Arg>(), qudaError_t>
   launchR(const qudaStream_t &stream, sycl::nd_range<3> &ndRange, const Arg &arg)
   {
+    static_assert(std::is_same_v<typename F::SharedMemT,void>);
     qudaError_t err = QUDA_SUCCESS;
     auto q = device::get_target_stream(stream);
     auto size = sizeof(arg);

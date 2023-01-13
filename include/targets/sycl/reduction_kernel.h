@@ -25,6 +25,7 @@ namespace quda {
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   struct Reduction2DS {
+    using SharedMemT = void;
     Reduction2DS(const Arg &arg, const sycl::nd_item<3> &ndi)
     {
 #ifdef QUDA_THREADS_BLOCKED
@@ -51,6 +52,7 @@ namespace quda {
   }
   template <template <typename> class Functor, bool grid_stride = false>
   struct Reduction2DS {
+    using SharedMemT = void;
     template <typename Arg, typename R>
     static void apply(const Arg &arg, const sycl::nd_item<3> &ndi, R &reducer)
     {
@@ -192,6 +194,7 @@ namespace quda {
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   struct MultiReductionS {
+    using SharedMemT = void;
     MultiReductionS(const Arg &arg, const sycl::nd_item<3> &ndi)
     {
 #ifdef QUDA_THREADS_BLOCKED

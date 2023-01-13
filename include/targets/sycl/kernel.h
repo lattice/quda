@@ -9,6 +9,8 @@
 
 namespace quda {
 
+  ///// Kernel1D
+
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   void Kernel1DImpl(const Arg &arg, const sycl::nd_item<3> &ndi)
   {
@@ -34,6 +36,7 @@ namespace quda {
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   struct Kernel1DS {
+    using SharedMemT = void;
     Kernel1DS(const Arg &arg, const sycl::nd_item<3> &ndi)
     {
 #ifdef QUDA_THREADS_BLOCKED
@@ -83,19 +86,58 @@ namespace quda {
     return err;
   }
 
+  ///// Kernel2D
 
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  void Kernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi)
+  std::enable_if_t<!hasBlockOps<Functor<Arg>>, void>
+  Kernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi)
   {
     Functor<Arg> f(arg);
-    auto i = globalIdX;
+
     auto j = globalIdY;
     if (j >= arg.threads.y) return;
+    auto i = globalIdX;
     while (i < arg.threads.x) {
       f(i, j);
       if (grid_stride) i += globalRangeX; else break;
     }
   }
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
+  std::enable_if_t<hasBlockOps<Functor<Arg>> && !hasSharedMem<Functor<Arg>>, void>
+  Kernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi)
+  {
+    Functor<Arg> f(arg);
+    f.setBlockSync(ndi);
+
+    bool active = true;
+    auto j = globalIdY;
+    if (j >= arg.threads.y) active = false;
+    auto i = globalIdX;
+    while (i-localIdX < arg.threads.x) {
+      if (i >= arg.threads.x) active = false;
+      f.template apply<true>(i, j, active);
+      if (grid_stride) i += globalRangeX; else break;
+    }
+  }
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false, typename Smem>
+  std::enable_if_t<hasSharedMem<Functor<Arg>>, void>
+  Kernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, Smem smem)
+  {
+    Functor<Arg> f(arg);
+    f.setBlockSync(ndi);
+    f.setMem(smem);
+
+    bool active = true;
+    auto j = globalIdY;
+    if (j >= arg.threads.y) active = false;
+    auto i = globalIdX;
+    while (i-localIdX < arg.threads.x) {
+      if (i >= arg.threads.x) active = false;
+      f.template apply<true>(i, j, active);
+      if (grid_stride) i += globalRangeX; else break;
+    }
+  }
+
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   void Kernel2DImplB(const Arg &arg, const sycl::nd_item<3> &ndi)
   {
@@ -113,12 +155,14 @@ namespace quda {
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   struct Kernel2DS {
-    Kernel2DS(const Arg &arg, const sycl::nd_item<3> &ndi)
+    using SharedMemT = sharedMemType<Functor<Arg>>;
+    template <typename... T>
+    Kernel2DS(const Arg &arg, const sycl::nd_item<3> &ndi, T... smem)
     {
 #ifdef QUDA_THREADS_BLOCKED
       Kernel2DImplB<Functor,Arg,grid_stride>(arg, ndi);
 #else
-      Kernel2DImpl<Functor,Arg,grid_stride>(arg, ndi);
+      Kernel2DImpl<Functor,Arg,grid_stride>(arg, ndi, smem...);
 #endif
     }
   };
@@ -150,10 +194,10 @@ namespace quda {
       printfQuda("  Functor: %s\n", typeid(Functor<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
     }
-    if (arg.threads.x%localSize[RANGE_X] != 0) {
+    //if (arg.threads.x%localSize[RANGE_X] != 0) {
       //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
-      return QUDA_ERROR;
-    }
+    //  return QUDA_ERROR;
+    //}
     if (globalSize[RANGE_Y] != arg.threads.y) {
       //warningQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
       return QUDA_ERROR;
@@ -169,12 +213,13 @@ namespace quda {
     return err;
   }
 
+  ///// Kernel3D
 
   template <template <typename> class Functor, typename Arg, bool grid_stride>
-  void Kernel3DImpl(const Arg &arg, const sycl::nd_item<3> &ndi)
+  std::enable_if_t<!hasBlockOps<Functor<Arg>>, void>
+  Kernel3DImpl(const Arg &arg, const sycl::nd_item<3> &ndi)
   {
     Functor<Arg> f(arg);
-
     auto j = globalIdY;
     if (j >= arg.threads.y) return;
     auto k = globalIdZ;
@@ -185,6 +230,47 @@ namespace quda {
       if (grid_stride) i += globalRangeX; else break;
     }
   }
+  template <template <typename> class Functor, typename Arg, bool grid_stride>
+  std::enable_if_t<hasBlockOps<Functor<Arg>> && !hasSharedMem<Functor<Arg>>, void>
+  Kernel3DImpl(const Arg &arg, const sycl::nd_item<3> &ndi)
+  {
+    Functor<Arg> f(arg);
+    f.setBlockSync(ndi);
+
+    bool active = true;
+    auto j = globalIdY;
+    if (j >= arg.threads.y) active = false;
+    auto k = globalIdZ;
+    if (k >= arg.threads.z) active = false;
+    auto i = globalIdX;
+    while (i-localIdX < arg.threads.x) {
+      if (i >= arg.threads.x) active = false;
+      f.template apply<true>(i, j, k, active);
+      if (grid_stride) i += globalRangeX; else break;
+    }
+  }
+  template <template <typename> class Functor, typename Arg, bool grid_stride, typename Smem>
+  std::enable_if_t<hasSharedMem<Functor<Arg>>, void>
+  Kernel3DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, Smem smem)
+  {
+    Functor<Arg> f(arg);
+    f.setBlockSync(ndi);
+    f.setMem(smem);
+
+    bool active = true;
+    auto j = globalIdY;
+    if (j >= arg.threads.y) active = false;
+    auto k = globalIdZ;
+    if (k >= arg.threads.z) active = false;
+    auto i = globalIdX;
+    while (i-localIdX < arg.threads.x) {
+      if (i >= arg.threads.x) active = false;
+      f.template apply<true>(i, j, k, active);
+      if (grid_stride) i += globalRangeX; else break;
+    }
+  }
+
+
   template <template <typename> class Functor, typename Arg, bool grid_stride>
   void Kernel3DImplB(const Arg &arg, const sycl::nd_item<3> &ndi)
   {
@@ -205,12 +291,14 @@ namespace quda {
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   struct Kernel3DS {
-    Kernel3DS(const Arg &arg, const sycl::nd_item<3> &ndi)
+    using SharedMemT = sharedMemType<Functor<Arg>>;
+    template <typename... T>
+    Kernel3DS(const Arg &arg, const sycl::nd_item<3> &ndi, T... smem)
     {
 #ifdef QUDA_THREADS_BLOCKED
       Kernel3DImplB<Functor,Arg,grid_stride>(arg, ndi);
 #else
-      Kernel3DImpl<Functor,Arg,grid_stride>(arg, ndi);
+      Kernel3DImpl<Functor,Arg,grid_stride>(arg, ndi, smem...);
 #endif
     }
   };
@@ -234,6 +322,7 @@ namespace quda {
 	globalSize[RANGE_X] = ((arg.threads.x+localSize[RANGE_X]-1)/localSize[RANGE_X])*localSize[RANGE_X];
       }
     }
+    //printfQuda("Kernel3D %s\n", typeid(Functor<Arg>).name());
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Kernel3D param grid_stride: %s  sizeof(arg): %lu\n",
 		 grid_stride?"true":"false", sizeof(arg));
