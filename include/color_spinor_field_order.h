@@ -511,7 +511,8 @@ namespace quda
         if (std::is_same_v<storeFloat, theirFloat>) {
           v[idx] = complex<storeFloat>(a.real(), a.imag());
         } else {
-          v[idx] = fixed ? complex<storeFloat>(round(scale * a.real()), round(scale * a.imag())) :
+          v[idx] = fixed ? complex<storeFloat>(f2i_round<storeFloat>(scale * a.real()),
+                                               f2i_round<storeFloat>(scale * a.imag())) :
                            complex<storeFloat>(a.real(), a.imag());
         }
       }

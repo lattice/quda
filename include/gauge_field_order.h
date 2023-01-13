@@ -198,7 +198,8 @@ namespace quda {
       __device__ __host__ inline void operator=(const fieldorder_wrapper<Float, storeFloat> &a)
       {
         complex<Float> in = a;
-        v[idx] = fixed ? complex<storeFloat>(round(scale * in.real()), round(scale * in.imag())) : a.v[a.idx];
+        v[idx] = fixed ? complex<storeFloat>(f2i_round<storeFloat>(scale * in.real()),
+                                             f2i_round<storeFloat>(scale * in.imag())) : a.v[a.idx];
       }
 
       /**
@@ -209,7 +210,8 @@ namespace quda {
       __device__ __host__ inline void operator=(const fieldorder_wrapper<theirFloat, theirStoreFloat> &a)
       {
         complex<theirFloat> in = a;
-        v[idx] = fixed ? complex<storeFloat>(round(scale * in.real()), round(scale * in.imag())) :
+        v[idx] = fixed ? complex<storeFloat>(f2i_round<storeFloat>(scale * in.real()),
+                                             f2i_round<storeFloat>(scale * in.imag())) :
                          complex<storeFloat>(in.real(), in.imag());
       }
 
@@ -222,7 +224,8 @@ namespace quda {
         if constexpr (match<storeFloat, theirFloat>()) {
           v[idx] = complex<storeFloat>(a.x, a.y);
         } else {
-          v[idx] = fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+          v[idx] = fixed ? complex<storeFloat>(f2i_round<storeFloat>(scale * a.x),
+                                               f2i_round<storeFloat>(scale * a.y)) : complex<storeFloat>(a.x, a.y);
         }
       }
 
@@ -259,7 +262,8 @@ namespace quda {
         if constexpr (match<storeFloat, theirFloat>()) {
           v[idx] += complex<storeFloat>(a.x, a.y);
         } else {
-          v[idx] += fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+          v[idx] += fixed ? complex<storeFloat>(f2i_round<storeFloat>(scale * a.x),
+                                                f2i_round<storeFloat>(scale * a.y)) : complex<storeFloat>(a.x, a.y);
         }
       }
 
@@ -272,7 +276,8 @@ namespace quda {
         if constexpr (match<storeFloat, theirFloat>()) {
           v[idx] -= complex<storeFloat>(a.x, a.y);
         } else {
-          v[idx] -= fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+          v[idx] -= fixed ? complex<storeFloat>(f2i_round<storeFloat>(scale * a.x),
+                                                f2i_round<storeFloat>(scale * a.y)) : complex<storeFloat>(a.x, a.y);
         }
       }
       };
@@ -382,7 +387,7 @@ namespace quda {
         vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
-          vec2{static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))} :
+          vec2{f2i_round<storeFloat>(scale * val.real()), f2i_round<storeFloat>(scale * val.imag())} :
           vec2{static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag())};
 
         atomic_fetch_add(u2, val_);
@@ -501,7 +506,7 @@ namespace quda {
         vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
-          vec2{static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))} :
+          vec2{f2i_round<storeFloat>(scale * val.real()), f2i_round<storeFloat>(scale * val.imag())} :
           vec2{static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag())};
 
         atomic_fetch_add(u2, val_);
@@ -638,7 +643,7 @@ namespace quda {
         vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
-          vec2{static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))} :
+          vec2{f2i_round<storeFloat>(scale * val.real()), f2i_round<storeFloat>(scale * val.imag())} :
           vec2{static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag())};
 
         atomic_fetch_add(u2, val_);
