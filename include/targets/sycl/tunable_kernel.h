@@ -59,6 +59,13 @@ namespace quda {
     SharedMem<T> *getSharedMem() { return this; }
   };
 
+  template <typename T>
+  struct BlockReduction : SharedMem<T>
+  {
+    using BlockReductionT = T;
+    BlockReduction<T> *getBlockReduction() { return this; }
+  };
+
   template <typename T, typename = void>
   struct hasBlockSyncS : std::false_type { };
   template <typename T>

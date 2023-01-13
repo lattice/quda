@@ -97,11 +97,10 @@ namespace quda
   // pre-declaration of block_reduce that we wish to specialize
   template <bool> struct block_reduce;
 
-#if 1
   /**
-     @brief CUDA specialization of block_reduce, building on the warp_reduce
+     @brief SYCL specialization of block_reduce, using SYCL group reductions
   */
-  template <> struct block_reduce<true> {
+  struct block_reduceG {
     /**
        @brief Perform a block-wide reduction
        @param[in] value_ thread-local value to be reduced
@@ -114,9 +113,9 @@ namespace quda
        @param[in] r The reduction operation we want to apply
        @return The block-wide reduced value
      */
-    template <typename T, typename reducer_t, typename param_t>
+    template <typename T, typename reducer_t, typename param_t, typename... BR>
     inline T operator()(const T &value_, bool async, int batch, bool all,
-			const reducer_t &r, const param_t &)
+			const reducer_t &r, const param_t &, BR&... br)
     {
       if (!async) __syncthreads(); // only synchronize if we are not pipelining
       const int nbatch = param_t::batch_size;
@@ -134,11 +133,11 @@ namespace quda
       return result;
     }
   };
-#else
+
   /**
-     @brief CUDA specialization of block_reduce, building on the warp_reduce
+     @brief SYCL specialization of block_reduce, building on the warp_reduce
   */
-  template <> struct block_reduce<true> {
+  struct block_reduceW {
 
     template <int width_> struct warp_reduce_param {
       static constexpr int width = width_;
@@ -156,9 +155,9 @@ namespace quda
        @param[in] r The reduction operation we want to apply
        @return The block-wide reduced value
      */
-    template <typename T, typename reducer_t, typename param_t>
+    template <typename T, typename reducer_t, typename param_t, typename... BR>
     inline T operator()(const T &value_, bool async, int batch, bool all,
-			const reducer_t &r, const param_t &)
+			const reducer_t &r, const param_t &, BR&... br)
     {
       constexpr auto max_items = device::max_block_size() / device::warp_size();
       const auto thread_idx = target::thread_idx_linear<param_t::block_dim>();
@@ -176,8 +175,14 @@ namespace quda
 
       //__shared__ T storage[max_items];
       static_assert(sizeof(T[max_items])<=device::shared_memory_size(), "Block reduce shared mem size too large");
-      auto mem = sycl::ext::oneapi::group_local_memory_for_overwrite<T[max_items]>(getGroup());
-      auto storage = *mem.get();
+      T *storage = nullptr;
+      //if constexpr (std::is_same_v<std::tuple_element_t<0, std::tuple<BR...,void>>,void>) {
+      if constexpr (sizeof...(BR) == 0) {
+	auto mem = sycl::ext::oneapi::group_local_memory_for_overwrite<T[max_items]>(getGroup());
+	storage = *mem.get();
+      } else {
+	storage = (br,...).getMem();
+      }
 
       // if first thread in warp, write result to shared memory
       if (thread_idx % device::warp_size() == 0) storage[batch * warp_items + warp_idx] = value;
@@ -212,7 +217,9 @@ namespace quda
       return value;
     }
   };
-#endif
+
+  //template <> struct block_reduce<true> : block_reduceG {};
+  template <> struct block_reduce<true> : block_reduceW {};
 
 } // namespace quda
 

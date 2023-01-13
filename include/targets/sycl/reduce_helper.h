@@ -19,8 +19,8 @@ namespace quda
 {
 
   // declaration of reduce function
-  template <typename Reducer, typename Arg, typename T>
-  inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0);
+  //template <typename Reducer, typename Arg, typename T>
+  //inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0);
 
   /**
      @brief ReduceArg is the argument type that all kernel arguments
@@ -33,8 +33,8 @@ namespace quda
   template <typename T, use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE> struct ReduceArg : kernel_param<use_kernel_arg> {
     using reduce_t = T;
 
-    template <typename Reducer, typename Arg, typename I>
-    friend void reduce(Arg &, const Reducer &, const I &, const int);
+    template <typename Reducer, typename Arg, typename I, typename... BR>
+    friend void reduce(Arg &, const Reducer &, const I &, const int, BR&... br);
     qudaError_t launch_error; /** only do complete if no launch error to avoid hang */
     static constexpr unsigned int max_n_batch_block
       = 1; /** by default reductions do not support batching withing the block */
@@ -133,13 +133,13 @@ namespace quda
      which reduction this thread block corresponds to.  Typically idx
      will be constant along constant block_idx().y and block_idx().z.
   */
-  template <typename Reducer, typename Arg, typename T>
-  inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx)
+  template <typename Reducer, typename Arg, typename T, typename... BR>
+  inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx, BR&... br)
   {
     constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
     //constexpr int n_batch_block_ = n_batch_block == 1;
-    using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
-    T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
+    using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block, BR...>;
+    T aggregate = BlockReduce(br..., target::thread_idx().z).Reduce(in, r);
 
     if (target::grid_dim().x==1) {  // special case
       if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && idx < arg.threads.z) {
@@ -154,8 +154,13 @@ namespace quda
     }
 
     //__shared__ bool isLastBlockDone[n_batch_block];
-    auto glmem = sycl::ext::oneapi::group_local_memory_for_overwrite<bool[n_batch_block]>(getGroup());
-    bool *isLastBlockDone = *glmem.get();
+    bool *isLastBlockDone = nullptr;
+    if constexpr (sizeof...(BR) == 0) {
+      auto glmem = sycl::ext::oneapi::group_local_memory_for_overwrite<bool[n_batch_block]>(getGroup());
+      isLastBlockDone = *glmem.get();
+    } else {
+      isLastBlockDone = reinterpret_cast<bool*>((br,...).getMem());
+    }
     //auto &isLastBlockDone = *glmem;
     //auto isLastBlockDone = false; // all valid values of idx should finish at the same time
 
@@ -174,7 +179,11 @@ namespace quda
       //isLastBlockDone = (value == (target::grid_dim().x - 1));
     }
 
-    __syncthreads();
+    if constexpr (sizeof...(BR) == 0) {
+      __syncthreads();
+    } else {
+      (br,...).blockSync();
+    }
     bool active = false;
     if (idx < arg.threads.z) active = isLastBlockDone[idx];
     //isLastBlockDone = sycl::group_broadcast(getGroup(), isLastBlockDone);
@@ -196,7 +205,7 @@ namespace quda
 	}
       }
 
-      sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
+      sum = BlockReduce(br..., target::thread_idx().z).Reduce(sum, r);
 
       // write out the final reduced value
       //if (target::thread_idx().y * block_size_x + target::thread_idx().x == 0) {

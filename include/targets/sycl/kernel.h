@@ -51,6 +51,7 @@ namespace quda {
   qudaError_t
   Kernel1D(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
+    static_assert(!hasBlockOps<Functor<Arg>>);
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);

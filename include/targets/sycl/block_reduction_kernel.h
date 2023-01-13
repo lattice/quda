@@ -114,6 +114,7 @@ namespace quda
   BlockKernel2D(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
+    static_assert(!hasBlockOps<Transformer<Arg>>);
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);

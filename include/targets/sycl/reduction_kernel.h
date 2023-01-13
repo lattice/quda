@@ -9,10 +9,13 @@
 namespace quda {
 
 #ifndef HIGH_LEVEL_REDUCTIONS
-  template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-  void Reduction2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi)
+  template <template <typename> class Functor, typename Arg, bool grid_stride = true, typename Smem>
+  void Reduction2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, Smem smem)
   {
     Functor<Arg> t(arg);
+    BlockReduction<reduce_t> br;
+    br.setBlockSync(ndi);
+    br.setMem(smem);
     auto idx = globalIdX;
     auto j = localIdY;
     auto value = t.init();
@@ -21,17 +24,18 @@ namespace quda {
       if (grid_stride) idx += globalRangeX; else break;
     }
     // perform final inter-block reduction and write out result
-    reduce(arg, t, value);
+    reduce(arg, t, value, 0, br);
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   struct Reduction2DS {
-    using SharedMemT = void;
-    Reduction2DS(const Arg &arg, const sycl::nd_item<3> &ndi)
+    using SharedMemT = typename Functor<Arg>::reduce_t;
+    template <typename... T>
+    Reduction2DS(const Arg &arg, const sycl::nd_item<3> &ndi, T... smem)
     {
 #ifdef QUDA_THREADS_BLOCKED
       Reduction2DImpl<Functor,Arg,grid_stride>(arg, ndi);
 #else
-      Reduction2DImpl<Functor,Arg,grid_stride>(arg, ndi);
+      Reduction2DImpl<Functor,Arg,grid_stride>(arg, ndi, smem...);
 #endif
     }
   };
@@ -68,6 +72,7 @@ namespace quda {
   qudaError_t Reduction2D(const TuneParam &tp,
 			  const qudaStream_t &stream, const Arg &arg)
   {
+    static_assert(!hasBlockOps<Functor<Arg>>);
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
@@ -95,10 +100,10 @@ namespace quda {
 		 device::warp_size());
       timer.start();
     }
-    if (arg.threads.x%localSize[RANGE_X] != 0) {
+    //if (arg.threads.x%localSize[RANGE_X] != 0) {
       //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
-      return QUDA_ERROR;
-    }
+    //  return QUDA_ERROR;
+    //}
     if (globalSize[RANGE_Y] != arg.threads.y) { // shouldn't happen here
       //warningQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
       return QUDA_ERROR;
@@ -168,11 +173,14 @@ namespace quda {
 
   // MultiReduction
 
-  template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-  void MultiReductionImpl(const Arg &arg, const sycl::nd_item<3> &ndi)
+  template <template <typename> class Functor, typename Arg, bool grid_stride = true, typename Smem>
+  void MultiReductionImpl(const Arg &arg, const sycl::nd_item<3> &ndi, Smem smem)
   {
     using reduce_t = typename Functor<Arg>::reduce_t;
     Functor<Arg> t(arg);
+    BlockReduction<reduce_t> br;
+    br.setBlockSync(ndi);
+    br.setMem(smem);
 
     auto idx = globalIdX;
     auto k = localIdY;
@@ -190,17 +198,18 @@ namespace quda {
     }
 
     // perform final inter-block reduction and write out result
-    reduce(arg, t, value, j);
+    reduce(arg, t, value, j, br);
   }
-  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
+  template <template <typename> class Functor, typename Arg, bool grid_stride>
   struct MultiReductionS {
-    using SharedMemT = void;
-    MultiReductionS(const Arg &arg, const sycl::nd_item<3> &ndi)
+    using SharedMemT = typename Functor<Arg>::reduce_t;
+    template <typename... T>
+    MultiReductionS(const Arg &arg, const sycl::nd_item<3> &ndi, T... smem)
     {
 #ifdef QUDA_THREADS_BLOCKED
       MultiReductionImpl<Functor,Arg,grid_stride>(arg, ndi);
 #else
-      MultiReductionImpl<Functor,Arg,grid_stride>(arg, ndi);
+      MultiReductionImpl<Functor,Arg,grid_stride>(arg, ndi, smem...);
 #endif
     }
   };
@@ -209,6 +218,7 @@ namespace quda {
   qudaError_t
   MultiReduction(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
+    static_assert(!hasBlockOps<Functor<Arg>>);
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
@@ -240,10 +250,10 @@ namespace quda {
                  localSize.size()*sizeof(typename Functor<Arg>::reduce_t)/
 		 device::warp_size());
     }
-    if (arg.threads.x%localSize[RANGE_X] != 0) {
+    //if (arg.threads.x%localSize[RANGE_X] != 0) {
       //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
-      return QUDA_ERROR;
-    }
+    //  return QUDA_ERROR;
+    //}
     if (globalSize[RANGE_Y] != arg.threads.y) { // shouldn't happen here
       //warningQuda("globalSize Y (%lu) != arg.threads.y (%i)", globalSize[RANGE_Y], arg.threads.y);
       return QUDA_ERROR;
