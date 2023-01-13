@@ -68,12 +68,16 @@ namespace quda
        @param[in,out] arg Argument struct with required meta data
        (input/output fields, functor, etc.)
     */
-    template <typename Arg> struct MultiBlas_ {
+    //template <typename Arg> struct MultiBlas_ {
+    template <typename Arg> struct MultiBlas_ : BlockSync { // actually warp combine, don't have specific type yet
+    //template <typename Arg> struct MultiBlas_ :
+    //  std::conditional_t<Arg::Functor::write.Y||Arg::Functor::write.W,BlockSync,void> {
       const Arg &arg;
       constexpr MultiBlas_(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ inline void operator()(int i, int k, int parity)
+      template <bool allthreads = false> // true if all threads in group will enter, even if out of range
+      __device__ __host__ inline void apply(int i, int k, int parity, bool active = true)
       {
         using vec = array<complex<typename Arg::real>, Arg::n/2>;
 
@@ -87,33 +91,42 @@ namespace quda
         const int l_idx = lane_id / vector_site_width;
 
         vec x, y, z, w;
-        if (l_idx == 0 || warp_split == 1) {
-          if (arg.f.read.Y) arg.Y[k].load(y, idx, parity);
-          if (arg.f.read.W) arg.W[k].load(w, idx, parity);
-        } else {
-          y = ::quda::zero<complex<typename Arg::real>, Arg::n/2>();
-          w = ::quda::zero<complex<typename Arg::real>, Arg::n/2>();
-        }
+	if (!allthreads || active) {
+	  if (l_idx == 0 || warp_split == 1) {
+	    if (arg.f.read.Y) arg.Y[k].load(y, idx, parity);
+	    if (arg.f.read.W) arg.W[k].load(w, idx, parity);
+	  } else {
+	    y = ::quda::zero<complex<typename Arg::real>, Arg::n/2>();
+	    w = ::quda::zero<complex<typename Arg::real>, Arg::n/2>();
+	  }
 
 #pragma unroll
-        for (int l_ = 0; l_ < Arg::NXZ; l_ += warp_split) {
-          const int l = l_ + l_idx;
-          if (l < Arg::NXZ || warp_split == 1) {
-            if (arg.f.read.X) arg.X[l].load(x, idx, parity);
-            if (arg.f.read.Z) arg.Z[l].load(z, idx, parity);
+	  for (int l_ = 0; l_ < Arg::NXZ; l_ += warp_split) {
+	    const int l = l_ + l_idx;
+	    if (l < Arg::NXZ || warp_split == 1) {
+	      if (arg.f.read.X) arg.X[l].load(x, idx, parity);
+	      if (arg.f.read.Z) arg.Z[l].load(z, idx, parity);
 
-            arg.f(x, y, z, w, k, l);
-          }
-        }
+	      arg.f(x, y, z, w, k, l);
+	    }
+	  }
+	}
 
         // now combine the results across the warp if needed
         if (arg.f.write.Y) y = warp_combine<warp_split>(y);
         if (arg.f.write.W) w = warp_combine<warp_split>(w);
 
-        if (l_idx == 0 || warp_split == 1) {
-          if (arg.f.write.Y) arg.Y[k].save(y, idx, parity);
-          if (arg.f.write.W) arg.W[k].save(w, idx, parity);
-        }
+	if (!allthreads || active) {
+	  if (l_idx == 0 || warp_split == 1) {
+	    if (arg.f.write.Y) arg.Y[k].save(y, idx, parity);
+	    if (arg.f.write.W) arg.W[k].save(w, idx, parity);
+	  }
+	}
+      }
+
+      __device__ __host__ inline void operator()(int i, int k, int parity)
+      {
+	apply(i, k, parity);
       }
     };
 

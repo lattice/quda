@@ -48,25 +48,16 @@ namespace quda
     using type = float;
   };
 
-  //template <typename T, typename U> constexpr auto get_reducer(const plus<U> &) { return plus<T>(); }
-  //template <typename T, typename U> constexpr auto get_reducer(const maximum<U> &) { return maximum<T>(); }
-  //template <typename T, typename U> constexpr auto get_reducer(const minimum<U> &) { return minimum<T>(); }
-
-  //template <typename T, typename U> constexpr auto get_cg_reducer(const plus<U> &) { return cg::plus<T>(); }
-  //template <typename T, typename U> constexpr auto get_cg_reducer(const maximum<U> &) { return cg::greater<T>(); }
-  //template <typename T, typename U> constexpr auto get_cg_reducer(const minimum<U> &) { return cg::less<T>(); }
-
-
   // pre-declaration of warp_reduce that we wish to specialize
   template <bool> struct warp_reduce;
 
   /**
-     @brief CUDA specialization of warp_reduce, utilizing cooperative groups
+     @brief SYCL specialization of warp_reduce, utilizing subgroup operations
   */
   template <> struct warp_reduce<true> {
 
     /**
-       @brief Perform a warp-wide reduction using cooperative groups
+       @brief Perform a warp-wide reduction using subgroups
        @param[in] value_ thread-local value to be reduced
        @param[in] all Whether we want all threads to have visibility
        to the result (all = true) or just the first thread in the
@@ -80,12 +71,9 @@ namespace quda
       auto sg = sycl::ext::oneapi::experimental::this_sub_group();
       T value = value_;
 #pragma unroll
-      //for (int offset = device::warp_size() / 2; offset >= 1; offset /= 2) {
       for (int offset = param_t::width/2; offset >= 1; offset /= 2) {
-	//value = get_reducer<T>(r)(value, tile.shfl_down(value, offset));
 	value = r(value, sycl::shift_group_left(sg, value, offset));
       }
-      //if (all) value = tile.shfl(value, 0);
       //if (all) value = sycl::select_from_group(sg, value, 0);
       if (all) value = sycl::group_broadcast(sg, value);
       return value;
@@ -121,9 +109,8 @@ namespace quda
       const int nbatch = param_t::batch_size;
       //const int nbatch = std::min(param_t::batch_size, localRangeZ);
       auto grp = getGroup();
-      //T result;
-      T result = reducer_t::init();
-      //for(int i=0; i<batch_size; i++) {
+      T result;
+      //T result = reducer_t::init();
       for(int i=0; i<nbatch; i++) {
 	T in = (i==batch) ? value_ : reducer_t::init();
 	T out;

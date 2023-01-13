@@ -4,7 +4,7 @@
 #include <timer.h>
 #include <quda_sycl_api.h>
 
-#define HIGH_LEVEL_REDUCTIONS
+//#define HIGH_LEVEL_REDUCTIONS
 
 namespace quda {
 
@@ -13,7 +13,7 @@ namespace quda {
   void Reduction2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, Smem smem)
   {
     Functor<Arg> t(arg);
-    BlockReduction<reduce_t> br;
+    BlockReduction<typename Functor<Arg>::reduce_t> br;
     br.setBlockSync(ndi);
     br.setMem(smem);
     auto idx = globalIdX;
@@ -111,49 +111,8 @@ namespace quda {
     sycl::nd_range<3> ndRange{globalSize, localSize};
 #ifndef HIGH_LEVEL_REDUCTIONS
     err = launch<Reduction2DS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
-#if 0
-    auto q = device::get_target_stream(stream);
-    q.submit([&](sycl::handler& h) {
-      //h.parallel_for<class Reduction2D>
-      h.parallel_for
-	(ndRange,
-	 //[=](sycl::nd_item<3> ndi) {
-	 [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
-	   quda::Reduction2DImpl<Functor, Arg, grid_stride>(arg, ndi);
-	   //quda::Reduction2DImpl<Functor, Arg, false>(arg, ndi);
-	 });
-    });
-#endif
 #else
     err = launchR<Functor, Reduction2DS<Functor, grid_stride>>(stream, ndRange, arg);
-#if 0
-    auto q = device::get_target_stream(stream);
-    using reduce_t = typename Functor<Arg>::reduce_t;
-    using reducer_t = typename Functor<Arg>::reducer_t;
-    auto result_h = reinterpret_cast<reduce_t *>(quda::reducer::get_host_buffer());
-    *result_h = reducer_t::init();
-    reduce_t *result_d = result_h;
-    if (commAsyncReduction()) {
-      result_d = reinterpret_cast<reduce_t *>(quda::reducer::get_device_buffer());
-      q.memcpy(result_d, result_h, sizeof(reduce_t));
-    }
-    auto reducer_h = sycl::reduction(result_d, *result_h, reducer_t());
-    try {
-      q.submit([&](sycl::handler& h) {
-	//h.parallel_for<class Reduction2Dn>
-	h.parallel_for<>
-	  (ndRange, reducer_h,
-	   [=](sycl::nd_item<3> ndi, auto &reducer_d) {
-	     quda::Reduction2DImplN<Functor, grid_stride>(arg, ndi, reducer_d);
-	   });
-      });
-    } catch (sycl::exception const& e) {
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-	printfQuda("  Caught synchronous SYCL exception:\n  %s\n",e.what());
-      }
-      err = QUDA_ERROR;
-    }
-#endif
 #endif
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       timer.stop();
@@ -169,7 +128,6 @@ namespace quda {
     }
     return err;
   }
-
 
   // MultiReduction
 

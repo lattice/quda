@@ -172,7 +172,7 @@ namespace quda {
 
   template <bool allthreads, typename Arg, typename SMem>
   __device__ __host__ inline std::enable_if_t<!Arg::block_float, typename Arg::real>
-  compute_site_max(const Arg &, SMem, int, int, int, int, bool)
+  compute_site_max(const Arg &, int, int, int, int, SMem, bool)
   {
     return static_cast<typename Arg::real>(1.0); // dummy return for non-block float
   }
@@ -182,7 +182,7 @@ namespace quda {
   */
   template <bool allthreads, typename Arg, typename SMem>
   __device__ __host__ inline std::enable_if_t<Arg::block_float, typename Arg::real>
-  compute_site_max(const Arg &arg, SMem smem, int x_cb, int spinor_parity, int spin_block, int color_block, bool active)
+  compute_site_max(const Arg &arg, int x_cb, int spinor_parity, int spin_block, int color_block, SMem smem, bool active)
   {
     using real = typename Arg::real;
     const int Ms = spins_per_thread<Arg::nSpin>();
@@ -231,22 +231,30 @@ namespace quda {
     }
   }
 
+  template <typename Arg>
+  constexpr auto indexFromFaceIndex(int dim, int dir, int ghost_idx, int parity, const Arg &arg)
+  {
+    if (arg.nFace == 1) {
+      return indexFromFaceIndex<Arg::nDim>(dim, dir, ghost_idx, parity, 1, arg.pc_type, arg);
+    } else {
+      return indexFromFaceIndexStaggered<Arg::nDim>(dim, dir, ghost_idx, parity, 3, arg.pc_type, arg);
+    }
+  }
+#if 0
   template <bool allthreads, typename Arg>
   constexpr auto indexFromFaceIndex(int dim, int dir, int ghost_idx, int parity, const Arg &arg, bool active = true)
   {
     if (!allthreads || active) {
-      if (arg.nFace == 1) {
-	return indexFromFaceIndex<Arg::nDim>(dim, dir, ghost_idx, parity, 1, arg.pc_type, arg);
-      } else {
-	return indexFromFaceIndexStaggered<Arg::nDim>(dim, dir, ghost_idx, parity, 3, arg.pc_type, arg);
-      }
+      return indexFromFaceIndex(dim, dir, ghost_idx, parity, arg);
     } else {
       return 0;
     }
   }
+#endif
 
-  //template <typename Arg> struct GhostPacker : std::conditional<Arg::block_float,SharedMem<typename Arg::real>,void> {
-  template <typename Arg> struct GhostPacker : SharedMem<typename Arg::real> {
+  //template <typename Arg> struct GhostPacker : SharedMem<typename Arg::real> {
+  //template <typename Arg> struct GhostPacker : SharedMem<std::conditional_t<Arg::block_float,typename Arg::real,void>> {
+  template <typename Arg> struct GhostPacker : std::conditional_t<Arg::block_float,SharedMem<typename Arg::real>,NoBlockOps> {
     const Arg &arg;
     constexpr GhostPacker(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -269,8 +277,9 @@ namespace quda {
       const int dir = (ghost_idx >= arg.dc.ghostFaceCB[dim]) ? 1 : 0;
       ghost_idx -= dir * arg.dc.ghostFaceCB[dim];
 
-      int x_cb = indexFromFaceIndex<allthreads>(dim, dir, ghost_idx, parity, arg, active);
-      auto max = compute_site_max<allthreads>(arg, this->getSharedMem(), x_cb, spinor_parity, spin_block, color_block, active);
+      //int x_cb = indexFromFaceIndex<allthreads>(dim, dir, ghost_idx, parity, arg, active);
+      int x_cb = (!allthreads || active) ? indexFromFaceIndex(dim, dir, ghost_idx, parity, arg) : 0;
+      auto max = compute_site_max<allthreads>(arg, x_cb, spinor_parity, spin_block, color_block, this, active);
 
       if (!allthreads || active) {
 #pragma unroll
