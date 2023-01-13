@@ -72,6 +72,7 @@ set (QUDA_OBJS
   copy_gauge_half.cu copy_gauge_quarter.cu
   copy_gauge.cpp copy_gauge_mg.cu copy_clover.cu
   copy_gauge_offset.cu copy_color_spinor_offset.cu copy_clover_offset.cu
+  gauge_shift.cu
   staggered_oprod.cu clover_trace_quda.cu
   hisq_paths_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp

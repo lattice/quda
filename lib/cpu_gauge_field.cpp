@@ -334,6 +334,10 @@ namespace quda {
     }
   }
 
+  void cpuGaugeField::shift(const GaugeField &src, const int *dx) {
+    errorQuda("Not Implemented");
+  }
+  
   void cpuGaugeField::setGauge(void **gauge_)
   {
     if(create != QUDA_REFERENCE_FIELD_CREATE) {
