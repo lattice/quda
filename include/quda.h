@@ -1353,7 +1353,7 @@ extern "C" {
    *
    * @param[out] twolink computed two-link field
    * @param[in] inlink  the external field
-   * @param param  Contains all metadata regarding host and device
+   * @param[in] param  Contains all metadata regarding host and device
    *               storage
    */
   void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param);

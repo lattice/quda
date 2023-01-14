@@ -19,6 +19,11 @@
 
 using namespace quda;
 
+enum class gsmear_test_type {
+  TwoLink = 0,
+  GaussianSmear
+};
+
 void initExtendedField(void *sitelink_ex[4], void *sitelink[4])
 {
   int X1 = Z[0];
@@ -98,10 +103,10 @@ struct StaggeredGSmearTestWrapper { //
   QudaGaugeParam gauge_param; //
   QudaInvertParam inv_param;
   //
-  std::unique_ptr<ColorSpinorField> spinor;
-  std::unique_ptr<ColorSpinorField> spinorRef;
-  std::unique_ptr<ColorSpinorField> tmp;
-  std::unique_ptr<ColorSpinorField> tmp2;
+  ColorSpinorField spinor;
+  ColorSpinorField spinorRef;
+  ColorSpinorField tmp;
+  ColorSpinorField tmp2;
   // For loading the gauge fields
 
   int argc_copy;
@@ -258,14 +263,14 @@ struct StaggeredGSmearTestWrapper { //
 
       constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
 
-      spinor = std::make_unique<ColorSpinorField>(cs_param);
-      spinorRef = std::make_unique<ColorSpinorField>(cs_param);
-      tmp = std::make_unique<ColorSpinorField>(cs_param);
-      tmp2 = std::make_unique<ColorSpinorField>(cs_param);
+      spinor = ColorSpinorField(cs_param);
+      spinorRef = ColorSpinorField(cs_param);
+      tmp = ColorSpinorField(cs_param);
+      tmp2 = ColorSpinorField(cs_param);
 
-      spinor->Source(QUDA_RANDOM_SOURCE);
+      spinor.Source(QUDA_RANDOM_SOURCE);
 
-      *tmp = *spinor;
+      tmp = spinor;
     }
   }
 
