@@ -14,7 +14,7 @@ namespace quda {
 
   public:
     ShiftGauge(GaugeField &out, const GaugeField &in, const int * dx) :
-      TunableKernel3D(in, 2, 4),
+      TunableKernel3D(in, 2, in.Geometry()),
       out(out),
       in(in),
       dx(dx)
