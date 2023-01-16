@@ -76,6 +76,9 @@ namespace quda {
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
+    if (localSize[RANGE_X] % device::warp_size() != 0) {
+      return QUDA_ERROR;
+    }
 #if 0
     if (localSize[RANGE_X] > arg.threads.x) {
       localSize[RANGE_X] = arg.threads.x;
@@ -182,6 +185,9 @@ namespace quda {
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
+    if (localSize[RANGE_X] % device::warp_size() != 0) {
+      return QUDA_ERROR;
+    }
 #if 0
     if (localSize[RANGE_X] > arg.threads.x) {
       localSize[RANGE_X] = arg.threads.x;

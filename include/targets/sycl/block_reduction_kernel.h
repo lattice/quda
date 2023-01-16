@@ -118,6 +118,9 @@ namespace quda
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
+    if (localSize[RANGE_X] % device::warp_size() != 0) {
+      return QUDA_ERROR;
+    }
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("BlockKernel2D sizeof(arg): %lu\n", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
