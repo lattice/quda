@@ -63,7 +63,7 @@ namespace quda {
     // required for all targets
     BlockSync *getBlockSync() { return this; }
     void blockSync() {
-#ifdef SYCL_DEVICE_ONLY
+#ifdef __SYCL_DEVICE_ONLY__
       sycl::group_barrier(ndi->get_group());
 #endif
     }
