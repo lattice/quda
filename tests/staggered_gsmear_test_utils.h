@@ -13,7 +13,6 @@
 #include <host_utils.h>
 #include <command_line_params.h>
 
-#include <gsmear_test_helpers.h>
 #include <assert.h>
 #include <gtest/gtest.h>
 
@@ -128,21 +127,21 @@ struct StaggeredGSmearTestWrapper { //
       const double a = inv_param.laplace3D * 2.0 + msq;
 
       for (int i = 0; i < smear_n_steps; i++) {
-        if (i > 0) std::swap(*tmp, *spinorRef);
+        if (i > 0) std::swap(tmp, spinorRef);
 
-        quda::blas::ax(ftmp, *tmp);
-        quda::blas::axpy(a, *tmp, *tmp2);
+        quda::blas::ax(ftmp, tmp);
+        quda::blas::axpy(a, tmp, tmp2);
 
-        staggeredTwoLinkGaussianSmear(spinorRef->Even(), qdp_twolnk, (void **)cpuTwoLink->Ghost(), tmp->Even(),
+        staggeredTwoLinkGaussianSmear(spinorRef.Even(), qdp_twolnk, (void **)cpuTwoLink->Ghost(), tmp.Even(),
                                       &gauge_param, &inv_param, 0, smear_coeff, smear_t0, gauge_param.cpu_prec);
-        staggeredTwoLinkGaussianSmear(spinorRef->Odd(), qdp_twolnk, (void **)cpuTwoLink->Ghost(), tmp->Odd(),
+        staggeredTwoLinkGaussianSmear(spinorRef.Odd(), qdp_twolnk, (void **)cpuTwoLink->Ghost(), tmp.Odd(),
                                       &gauge_param, &inv_param, 1, smear_coeff, smear_t0, gauge_param.cpu_prec);
         // blas::xpay(*tmp2, -1.0, *spinorRef);
-        xpay(tmp2->Even().V(), -1.0, spinorRef->Even().V(), spinor->Even().Length(), gauge_param.cpu_prec);
-        xpay(tmp2->Odd().V(), -1.0, spinorRef->Odd().V(), spinor->Odd().Length(), gauge_param.cpu_prec);
+        xpay(tmp2.Even().V(), -1.0, spinorRef.Even().V(), spinor.Even().Length(), gauge_param.cpu_prec);
+        xpay(tmp2.Odd().V(), -1.0, spinorRef.Odd().V(), spinor.Odd().Length(), gauge_param.cpu_prec);
         //
-        memset(tmp2->Even().V(), 0, spinor->Even().Length() * gauge_param.cpu_prec);
-        memset(tmp2->Odd().V(), 0, spinor->Odd().Length() * gauge_param.cpu_prec);
+        memset(tmp2.Even().V(), 0, spinor.Even().Length() * gauge_param.cpu_prec);
+        memset(tmp2.Odd().V(), 0, spinor.Odd().Length() * gauge_param.cpu_prec);
       }
       break;
     }
@@ -292,13 +291,6 @@ struct StaggeredGSmearTestWrapper { //
       cpuTwoLink = nullptr;
     }
 
-    if (gtest_type == gsmear_test_type::GaussianSmear) {
-      tmp2.reset();
-      tmp.reset();
-      spinor.reset();
-      spinorRef.reset();
-    }
-
     freeGaugeQuda();
 
     commDimPartitionedReset();
@@ -337,7 +329,7 @@ struct StaggeredGSmearTestWrapper { //
       qsm_param.delete_2link = 0;
       qsm_param.t0 = -1;
 
-      performTwoLinkGaussianSmearNStep(spinor->V(), &qsm_param);
+      performTwoLinkGaussianSmearNStep(spinor.V(), &qsm_param);
 
       quda_gflops = qsm_param.gflops;
 
@@ -358,7 +350,7 @@ struct StaggeredGSmearTestWrapper { //
     gsmearQUDA(1);
 
     GSmearTime gsmear_time = gsmearQUDA(niter);
-    if (gtest_type == gsmear_test_type::GaussianSmear) *spinorRef = *spinor;
+    if (gtest_type == gsmear_test_type::GaussianSmear) spinorRef = spinor;
 
     if (print_metrics) {
       printfQuda("%fus per kernel call\n", 1e6 * gsmear_time.event_time / niter);
@@ -368,7 +360,7 @@ struct StaggeredGSmearTestWrapper { //
       printfQuda("GFLOPS = %f\n", gflops);
       ::testing::Test::RecordProperty("Gflops", std::to_string(gflops));
 
-      size_t ghost_bytes = gtest_type == gsmear_test_type::GaussianSmear ? spinor->GhostBytes() : 0;
+      size_t ghost_bytes = gtest_type == gsmear_test_type::GaussianSmear ? spinor.GhostBytes() : 0;
 
       if (gtest_type == gsmear_test_type::GaussianSmear) {
         ::testing::Test::RecordProperty("Halo_bidirectitonal_BW_GPU",
