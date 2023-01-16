@@ -101,9 +101,9 @@ namespace quda
        @param[in] r The reduction operation we want to apply
        @return The block-wide reduced value
      */
-    template <typename T, typename reducer_t, typename param_t, typename... BR>
+    template <typename T, typename reducer_t, typename param_t, typename ...BR>
     inline T operator()(const T &value_, bool async, int batch, bool all,
-			const reducer_t &r, const param_t &, BR&... br)
+			const reducer_t &r, const param_t &, BR *...br)
     {
       if (!async) __syncthreads(); // only synchronize if we are not pipelining
       const int nbatch = param_t::batch_size;
@@ -142,9 +142,9 @@ namespace quda
        @param[in] r The reduction operation we want to apply
        @return The block-wide reduced value
      */
-    template <typename T, typename reducer_t, typename param_t, typename... BR>
+    template <typename T, typename reducer_t, typename param_t, typename ...BR>
     inline T operator()(const T &value_, bool async, int batch, bool all,
-			const reducer_t &r, const param_t &, BR&... br)
+			const reducer_t &r, const param_t &, BR *...br)
     {
       constexpr auto max_items = device::max_block_size() / device::warp_size();
       const auto thread_idx = target::thread_idx_linear<param_t::block_dim>();
@@ -163,12 +163,12 @@ namespace quda
       //__shared__ T storage[max_items];
       T *storage = nullptr;
       //if constexpr (std::is_same_v<std::tuple_element_t<0, std::tuple<BR...,void>>,void>) {
-      if constexpr (sizeof...(BR) == 0) {
+      if constexpr (sizeof...(BR) == 0 || std::is_same_v<BR...,void>) {
 	static_assert(sizeof(T[max_items])<=device::shared_memory_size(), "Block reduce shared mem size too large");
 	auto mem = sycl::ext::oneapi::group_local_memory_for_overwrite<T[max_items]>(getGroup());
 	storage = *mem.get();
       } else {
-	storage = (br,...).getMem();
+	storage = (br,...)->getMem();
       }
 
       // if first thread in warp, write result to shared memory

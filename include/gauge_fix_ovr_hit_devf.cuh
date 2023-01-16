@@ -52,7 +52,7 @@ namespace quda {
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<Float> cache(smem);
+    SharedMemoryCacheD<Float> cache(smem);
     auto elems = cache.data();
 
     //initialize shared memory
@@ -147,7 +147,7 @@ namespace quda {
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<Float> cache(smem);
+    SharedMemoryCacheD<Float> cache(smem);
     auto elems = cache.data();
 
     //Loop over all SU(2) subroups of SU(N)
@@ -235,7 +235,7 @@ namespace quda {
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<Float> cache(smem);
+    SharedMemoryCacheD<Float> cache(smem);
     auto elems = cache.data();
 
     //Loop over all SU(2) subroups of SU(N)
@@ -333,7 +333,7 @@ namespace quda {
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<Float> cache(smem);
+    SharedMemoryCacheD<Float> cache(smem);
     auto elems = cache.data();
 
     //initialize shared memory
@@ -416,7 +416,7 @@ namespace quda {
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<Float> cache(smem);
+    SharedMemoryCacheD<Float> cache(smem);
     auto elems = cache.data();
 
     //Loop over all SU(2) subroups of SU(N)
@@ -493,7 +493,7 @@ namespace quda {
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<Float> cache(smem);
+    SharedMemoryCacheD<Float> cache(smem);
     auto elems = cache.data();
 
     //Loop over all SU(2) subroups of SU(N)

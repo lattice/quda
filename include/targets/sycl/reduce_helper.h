@@ -26,8 +26,8 @@ namespace quda
   template <typename T, use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE> struct ReduceArg : kernel_param<use_kernel_arg> {
     using reduce_t = T;
 
-    template <typename Reducer, typename Arg, typename I, typename... BR>
-    friend void reduce(Arg &, const Reducer &, const I &, const int, BR&... br);
+    template <typename Reducer, typename Arg, typename I, typename ...BR>
+    friend void reduce(Arg &, const Reducer &, const I &, const int, BR &...br);
     qudaError_t launch_error; /** only do complete if no launch error to avoid hang */
     static constexpr unsigned int max_n_batch_block
       = 1; /** by default reductions do not support batching withing the block */
@@ -123,12 +123,12 @@ namespace quda
      which reduction this thread block corresponds to.  Typically idx
      will be constant along constant block_idx().y and block_idx().z.
   */
-  template <typename Reducer, typename Arg, typename T, typename... BR>
-  inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx, BR&... br)
+  template <typename Reducer, typename Arg, typename T, typename ...BR>
+  inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx, BR &...br)
   {
     constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
     using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block, BR...>;
-    T aggregate = BlockReduce(br..., target::thread_idx().z).Reduce(in, r);
+    T aggregate = BlockReduce(&br..., target::thread_idx().z).Reduce(in, r);
 
     if (target::grid_dim().x==1) {  // special case
       if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && idx < arg.threads.z) {
@@ -185,7 +185,7 @@ namespace quda
 	}
       }
 
-      sum = BlockReduce(br..., target::thread_idx().z).Reduce(sum, r);
+      sum = BlockReduce(&br..., target::thread_idx().z).Reduce(sum, r);
 
       // write out the final reduced value
       if (active && target::thread_idx().x == 0 && target::thread_idx().y == 0) {

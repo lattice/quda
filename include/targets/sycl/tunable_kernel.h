@@ -42,6 +42,18 @@ namespace quda {
     TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
   };
 
+  // BlockOps<WarpCombine,BlockSync,SharedMem<A>,SharedMem<B>,BlockReduction<C>,
+  //          Concurrent<SharedMem<D,36>,BlockReduction<E>>
+  // hasSharedMem<BlockOps<T,U...>> = hasSharedMem<T> || hasSharedMem<U...>
+  // hasSharedMem<SharedMem<T...>> = true;
+  // sharedMemSizeFixed<BlockOps<T,U...>> = max(SharedMemSizeFixed<T>, sharedMemSizeFixed<U...>)
+  // sharedMemSizeFixed<Concurrent<T,U...>> = SharedMemSizeFixed<T> + sharedMemSizeFixed<Concurrent<U...>>)
+  // usesWarpCombine
+  // usesBlockSync
+  // usesThreadArray
+  // usesSharedMem
+  // usesBlockReducition
+
   struct NoBlockOps {};
 
   struct BlockSync {
@@ -50,7 +62,11 @@ namespace quda {
     void setBlockSync(const sycl::nd_item<3> &i) { ndi = &i; }
     // required for all targets
     BlockSync *getBlockSync() { return this; }
-    void blockSync() { sycl::group_barrier(ndi->get_group()); }
+    void blockSync() {
+#ifdef SYCL_DEVICE_ONLY
+      sycl::group_barrier(ndi->get_group());
+#endif
+    }
   };
 
   template <typename T>
@@ -61,6 +77,7 @@ namespace quda {
     T *smem;
     void setMem(T *mem) { smem = mem; }
     T *getMem() { return smem; }
+    //T *sharedMem() { return smem; }
     // required for all targets
     SharedMem<T> *getSharedMem() { return this; }
   };

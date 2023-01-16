@@ -157,7 +157,8 @@ namespace quda {
       constexpr int Ms = spins_per_thread<true, Arg::nSpin>();
       constexpr int Mc = colors_per_thread<true, Arg::nColor>();
       constexpr int color_spin_threads = (Arg::nSpin/Ms) * (Arg::nColor/Mc);
-      SharedMemoryCache<real, color_spin_threads, 2, true> cache(smem); // 2 comes from parity
+      //SharedMemoryCache<real, color_spin_threads, 2, true> cache(smem); // 2 comes from parity
+      SharedMemoryCacheD<real> cache(smem); // 2 comes from parity
       cache.save(thread_max);
       cache.sync();
       real this_site_max = static_cast<real>(0);
