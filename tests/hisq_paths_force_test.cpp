@@ -31,8 +31,6 @@ static QudaGaugeParam qudaGaugeParam;
 static QudaGaugeParam qudaGaugeParam_ex;
 static void *hw; // the array of half_wilson_vector
 
-QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
-
 cpuGaugeField *cpuOprod = NULL;
 cudaGaugeField *cudaOprod = NULL;
 cpuGaugeField *cpuLongLinkOprod = NULL;
@@ -153,7 +151,7 @@ static void hisq_force_init()
   gParam.create = QUDA_NULL_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
 
-  gParam.order = gauge_order;
+  gParam.order = QUDA_QDP_GAUGE_ORDER;
   gParam.location = QUDA_CPU_FIELD_LOCATION;
   cpuGauge = new cpuGaugeField(gParam);
 
@@ -161,18 +159,14 @@ static void hisq_force_init()
   gParam_ex.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
   gParam_ex.create = QUDA_NULL_FIELD_CREATE;
   gParam_ex.link_type = QUDA_GENERAL_LINKS;
-  gParam_ex.order = gauge_order;
+  gParam_ex.order = QUDA_QDP_GAUGE_ORDER;
   for (int d = 0; d < 4; d++) {
     gParam_ex.r[d] = R[d];
     gParam_ex.x[d] = gParam.x[d] + 2 * gParam_ex.r[d];
   } // set halo region for CPU
   cpuGauge_ex = new cpuGaugeField(gParam_ex);
 
-  if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
-    createSiteLinkCPU((void **)cpuGauge->Gauge_p(), qudaGaugeParam.cpu_prec, 1);
-  } else {
-    errorQuda("Unsupported gauge order %d", gauge_order);
-  }
+  createSiteLinkCPU((void **)cpuGauge->Gauge_p(), qudaGaugeParam.cpu_prec, 1);
 
   copyExtendedGauge(*cpuGauge_ex, *cpuGauge, QUDA_CPU_FIELD_LOCATION);
 
@@ -194,7 +188,7 @@ static void hisq_force_init()
   gParam_ex.pad = 0;
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam_ex.create = QUDA_ZERO_FIELD_CREATE;
-  gParam_ex.order = gauge_order;
+  gParam_ex.order = QUDA_QDP_GAUGE_ORDER;
   for (int d = 0; d < 4; d++) {
     gParam_ex.r[d] = R[d];
     gParam_ex.x[d] = gParam.x[d] + 2 * gParam_ex.r[d];
@@ -229,17 +223,17 @@ static void hisq_force_init()
 
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  gParam.order = gauge_order;
+  gParam.order = QUDA_QDP_GAUGE_ORDER;
   gParam.pad = 0;
   cpuOprod = new cpuGaugeField(gParam);
-  computeLinkOrderedOuterProduct(hw, cpuOprod->Gauge_p(), hw_prec, 1, gauge_order);
+  computeLinkOrderedOuterProduct(hw, cpuOprod->Gauge_p(), hw_prec, 1);
   cpuLongLinkOprod = new cpuGaugeField(gParam);
-  computeLinkOrderedOuterProduct(hw, cpuLongLinkOprod->Gauge_p(), hw_prec, 3, gauge_order);
+  computeLinkOrderedOuterProduct(hw, cpuLongLinkOprod->Gauge_p(), hw_prec, 3);
 
   gParam_ex.location = QUDA_CPU_FIELD_LOCATION;
   gParam_ex.link_type = QUDA_GENERAL_LINKS;
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
-  gParam_ex.order = gauge_order;
+  gParam_ex.order = QUDA_QDP_GAUGE_ORDER;
   for (int d = 0; d < 4; d++) {
     gParam_ex.r[d] = R[d];
     gParam_ex.x[d] = gParam.x[d] + 2 * gParam_ex.r[d];
@@ -394,10 +388,9 @@ static void display_test_info()
   printfQuda("running the following fermion force computation test:\n");
 
   printfQuda(
-    "link_precision           link_reconstruct           space_dim(x/y/z)         T_dimension       Gauge_order\n");
-  printfQuda("%s                       %s                         %d/%d/%d                  %d                %s\n",
-             get_prec_str(link_prec), get_recon_str(link_recon), xdim, ydim, zdim, tdim,
-             get_gauge_order_str(gauge_order));
+    "link_precision           link_reconstruct           space_dim(x/y/z)         T_dimension\n");
+  printfQuda("%s                       %s                         %d/%d/%d                  %d\n",
+             get_prec_str(link_prec), get_recon_str(link_recon), xdim, ydim, zdim, tdim);
 }
 
 TEST(paths, verify)
@@ -413,9 +406,6 @@ int main(int argc, char **argv)
   ::testing::InitGoogleTest(&argc, argv);
 
   auto app = make_app();
-  CLI::TransformPairs<QudaGaugeFieldOrder> gauge_order_map {{"milc", QUDA_MILC_GAUGE_ORDER},
-                                                            {"qdp", QUDA_QDP_GAUGE_ORDER}};
-  app->add_option("--gauge-order", gauge_order, "")->transform(CLI::QUDACheckedTransformer(gauge_order_map));
 
   try {
     app->parse(argc, argv);
@@ -426,7 +416,6 @@ int main(int argc, char **argv)
   initComms(argc, argv, gridsize_from_cmdline);
   initQuda(device_ordinal);
 
-  if (gauge_order == QUDA_MILC_GAUGE_ORDER) errorQuda("Multi-gpu for milc order is not supported");
   setPrecision(prec);
 
   display_test_info();
