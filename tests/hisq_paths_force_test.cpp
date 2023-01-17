@@ -387,8 +387,7 @@ static void display_test_info()
 {
   printfQuda("running the following fermion force computation test:\n");
 
-  printfQuda(
-    "link_precision           link_reconstruct           space_dim(x/y/z)         T_dimension\n");
+  printfQuda("link_precision           link_reconstruct           space_dim(x/y/z)         T_dimension\n");
   printfQuda("%s                       %s                         %d/%d/%d                  %d\n",
              get_prec_str(link_prec), get_recon_str(link_recon), xdim, ydim, zdim, tdim);
 }
