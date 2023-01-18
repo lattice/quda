@@ -320,9 +320,9 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
     if (location == QUDA_CUDA_FIELD_LOCATION) {
-      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, false, true, dagger, commDim);
+      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, use_mma);
     } else if (location == QUDA_CPU_FIELD_LOCATION) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true, dagger, commDim);
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, use_mma);
     }
     int n = in[0].Nspin() * in[0].Ncolor();
     flops += (8 * n * n - 2 * n) * (long long)in[0].VolumeCB() * in.size();
@@ -334,32 +334,12 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
     if ( location  == QUDA_CUDA_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_d, *Xinv_d, kappa, parity, false, true, dagger, commDim);
+      ApplyCoarse(out, in, in, *Y_d, *Xinv_d, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true, dagger, commDim);
+      ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, use_mma);
     }
     int n = in[0].Nspin() * in[0].Ncolor();
     flops += (8 * n * n - 2 * n) * (long long)in[0].VolumeCB() * in.size();
-  }
-
-  template <class F>
-  auto create_color_spinor_copy(cvector_ref<F> &fs, QudaFieldOrder order) {
-    ColorSpinorParam param(fs[0]);
-    int nVec = (fs.size() + 7) / 8 * 8; // Make a multiple of 8
-    param.nColor = fs[0].Ncolor() * nVec; // Ask Kate why we need * in.size() here
-    param.nVec = nVec;
-    param.create = QUDA_NULL_FIELD_CREATE;
-    param.fieldOrder = order;
-    return std::move(ColorSpinorField(param));
-  }
-
-  auto create_gauge_copy(const GaugeField &X, QudaGaugeFieldOrder order, bool copy_content) {
-    GaugeFieldParam param(X);
-    param.order = order;
-    param.location = QUDA_CUDA_FIELD_LOCATION;
-    auto output = std::unique_ptr<GaugeField>(cudaGaugeField::Create(param));
-    if (copy_content) { output->copy(X); }
-    return output;
   }
 
   void DiracCoarse::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
@@ -368,26 +348,10 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
 
-    if (in.size() == 1 || !use_mma) {
-      if ( location == QUDA_CUDA_FIELD_LOCATION ) {
-        ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision, false);
-      } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-        ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision, false);
-      }
-    } else {
-      constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-      ColorSpinorField v_in = create_color_spinor_copy(in, csOrder);
-      ColorSpinorField v_out = create_color_spinor_copy(out, csOrder);
-
-      BlockTransposeForward(v_in, in);
-
-      constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
-      auto X_d_ = create_gauge_copy(*X_d, gOrder, true);
-      auto Y_d_ = create_gauge_copy(*Y_d, gOrder, true);
-
-      ApplyCoarse(v_out, v_in, v_in, *Y_d_, *X_d_, kappa, parity, true, false, dagger, commDim, halo_precision, true);
-
-      BlockTransposeBackward(v_out, out);
+    if ( location == QUDA_CUDA_FIELD_LOCATION ) {
+      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision, use_mma);
+    } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision, use_mma);
     }
 
     int n = in[0].Nspin() * in[0].Ncolor();
@@ -402,9 +366,9 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, x, *Y_d, *X_d, kappa, parity, true, true, dagger, commDim, halo_precision);
+      ApplyCoarse(out, in, x, *Y_d, *X_d, kappa, parity, true, true, dagger, commDim, halo_precision, use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true, dagger, commDim, halo_precision);
+      ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true, dagger, commDim, halo_precision, use_mma);
     }
     int n = in[0].Nspin() * in[0].Ncolor();
     flops += (9 * (8 * n * n) - 2 * n) * (long long)in[0].VolumeCB() * in[0].SiteSubset() * in.size();
@@ -415,9 +379,9 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision);
+      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision, use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision);
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision, use_mma);
     }
     int n = in[0].Nspin()*in[0].Ncolor();
     flops += (9*(8*n*n)-2*n)*(long long)in[0].VolumeCB()*in[0].SiteSubset() * in.size();
@@ -491,32 +455,11 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
 
-#if 1
     if ( location == QUDA_CUDA_FIELD_LOCATION) {
-      ApplyCoarse(out, in, in, *Yhat_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision);
+      ApplyCoarse(out, in, in, *Yhat_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision, use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision);
+      ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision, use_mma);
     }
-#else
-    printf("I am here!\n");
-    ColorSpinorParam param(in[0]);
-
-    param.nSpin = in[0].Nspin();
-    param.nColor = in[0].Ncolor() * in.size(); // Ask Kate why we need * in.size() here
-    param.nVec = in.size();
-    param.create = QUDA_NULL_FIELD_CREATE;
-
-    ColorSpinorField v(param);
-
-    BlockTranspose(v, in);
-
-    double sum = 0;
-    for (const auto &f: in) {
-      sum += blas::norm2(f);
-    }
-
-    printf("sum = %f, v = %f\n", sum, blas::norm2(v));
-#endif
 
     int n = in[0].Nspin() * in[0].Ncolor();
     flops += (8 * (8 * n * n) - 2 * n) * in[0].VolumeCB() * in[0].SiteSubset() * in.size();

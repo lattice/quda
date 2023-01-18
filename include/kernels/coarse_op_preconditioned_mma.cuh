@@ -77,8 +77,7 @@ namespace quda
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = false;
 
-        real yHatMax_ = Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, m, n);
-        yHatMax = fmax(yHatMax, yHatMax_);
+        yHatMax = fmaxf(yHatMax, Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, m, n));
       }
 
       return yHatMax;

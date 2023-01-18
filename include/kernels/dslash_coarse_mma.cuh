@@ -137,6 +137,7 @@ namespace quda {
     typename Config::ALoader a_loader;
     typename Config::BLoader b_loader;
 
+    if constexpr (Arg::dslash) {
     //Forward gather - compute fwd offset for spinor fetch
 #pragma unroll
     for(int d = 0; d < Arg::nDim; d++) // loop over dimension
@@ -213,6 +214,29 @@ namespace quda {
 
     } //nDim
 
+    accumulator.ax(-arg.kappa);
+    }
+
+    /**
+       Applies the coarse clover matrix on a given parity and
+       checkerboard site index
+     */
+    if constexpr (doBulk<Arg::type>() && Arg::clover) {
+      const int spinor_parity = (arg.nParity == 2) ? parity : 0;
+
+      auto a = arg.X(0, parity, x_cb, 0, 0);
+      auto b = arg.inB(spinor_parity, x_cb, 0, 0);
+      constexpr bool a_dagger = Arg::dagger;
+      constexpr bool b_dagger = false;
+
+      __syncthreads();
+      a_loader.template g2s<lda, a_dagger>(a, m_offset, 0, smem_obj_a_real, smem_obj_a_imag);
+      b_loader.template g2s<ldb, b_dagger>(b, n_offset, 0, smem_obj_b_real, smem_obj_b_imag);
+      __syncthreads();
+
+      accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+    }
+
     return accumulator;
   }
 
@@ -244,18 +268,13 @@ namespace quda {
       int parity = (arg.nParity == 2) ? parity_x_cb % 2 : arg.parity;
       int x_cb = (arg.nParity == 2) ? parity_x_cb / 2 : parity_x_cb;
 
-      int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
       auto out = applyDslashMma(x_cb, parity, arg);
-
-      out.ax(-arg.kappa);
-
-      // TODO: applyClover;
 
       constexpr int M = Arg::nSpin * Arg::nColor;
       constexpr int N = Arg::nVec;
-
       constexpr int ldc = N;
 
+      int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
       auto c = arg.out(my_spinor_parity, x_cb, 0, 0);
       if constexpr (doBulk<Arg::type>()) {
         out.template store<M, N, ldc, false>(c, 0, 0, assign_t());

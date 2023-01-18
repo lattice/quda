@@ -25,6 +25,31 @@ namespace quda {
     }
   }
 
+  auto create_gauge_copy(const GaugeField &X, QudaGaugeFieldOrder order, bool copy_content) {
+    GaugeField *output;
+    if (X.Order() == order) {
+      output = const_cast<GaugeField *>(&X);
+    } else {
+      GaugeFieldParam param(X);
+      param.order = order;
+      param.location = QUDA_CUDA_FIELD_LOCATION;
+      output = static_cast<GaugeField *>(cudaGaugeField::Create(param));
+      if (copy_content) { output->copy(X); }
+    }
+    return output;
+  }
+
+  template <class F>
+  auto create_color_spinor_copy(cvector_ref<F> &fs, QudaFieldOrder order) {
+    ColorSpinorParam param(fs[0]);
+    int nVec = (fs.size() + 7) / 8 * 8; // Make a multiple of 8
+    param.nColor = fs[0].Ncolor() * nVec; // Ask Kate why we need * in.size() here
+    param.nVec = nVec;
+    param.create = QUDA_NULL_FIELD_CREATE;
+    param.fieldOrder = order;
+    return std::move(ColorSpinorField(param));
+  }
+
   //Apply the coarse Dirac matrix to a coarse grid vector
   //out(x) = M*in = X*in - kappa*\sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
   //  or
@@ -36,7 +61,28 @@ namespace quda {
                    const int *commDim, QudaPrecision halo_precision, bool use_mma)
   {
     if constexpr (is_enabled_multigrid()) {
-      ApplyCoarse(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, commDim, halo_precision, use_mma, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+      if (out.size() == 1 || !use_mma || checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
+        ApplyCoarse(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, commDim, halo_precision, false, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+      } else {
+        constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+        ColorSpinorField v_inA = create_color_spinor_copy(inA, csOrder);
+        ColorSpinorField v_inB = create_color_spinor_copy(inB, csOrder);
+        ColorSpinorField v_out = create_color_spinor_copy(out, csOrder);
+
+        if (dslash) { BlockTransposeForward(v_inA, inA); }
+        if (clover) { BlockTransposeForward(v_inB, inB); }
+
+        constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
+        auto X_ = create_gauge_copy(X, gOrder, clover);
+        auto Y_ = create_gauge_copy(Y, gOrder, dslash);
+
+        ApplyCoarse(v_out, v_inA, v_inB, *Y_, *X_, kappa, parity, dslash, clover, dagger, commDim, halo_precision, use_mma, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+
+        if (X_ != &X) { delete X_; }
+        if (Y_ != &Y) { delete Y_; }
+
+        BlockTransposeBackward(v_out, out);
+      }
     } else {
       errorQuda("Multigrid has not been built");
     }
