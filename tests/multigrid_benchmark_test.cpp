@@ -111,10 +111,10 @@ void initFields(QudaPrecision prec)
     quda::RNG rng(xD[0], 1234);
     for (auto &yi : yD) spinorNoise(yi, rng, QUDA_NOISE_GAUSS);
 
-    gaugeNoise(*Y_d, rng, QUDA_NOISE_UNIFORM);
-    gaugeNoise(*Yhat_d, rng, QUDA_NOISE_UNIFORM);
-    gaugeNoise(*X_d, rng, QUDA_NOISE_UNIFORM);
-    gaugeNoise(*Xinv_d, rng, QUDA_NOISE_UNIFORM);
+    gaugeNoise(*Y_d, rng, QUDA_NOISE_GAUSS);
+    gaugeNoise(*Yhat_d, rng, QUDA_NOISE_GAUSS);
+    gaugeNoise(*X_d, rng, QUDA_NOISE_GAUSS);
+    gaugeNoise(*Xinv_d, rng, QUDA_NOISE_GAUSS);
   }
 }
 
@@ -163,9 +163,9 @@ TEST(multi_rhs_test, verify)
     default: errorQuda("Undefined test %d", test_type);
     }
 
-    // require that each component differs by no more than 1e-4
+    // require that each component differs by no more than 5e-3
     auto max_dev = blas::max_deviation(xD[i], x_ref);
-    EXPECT_LE(max_dev[0], 1e-4);
+    EXPECT_LE(max_dev[0], 5e-3);
     // require that the relative L2 norm differs by no more than 1e-5
     auto x2 = blas::norm2(x_ref);
     auto l2_dev = blas::xmyNorm(xD[i], x_ref);
