@@ -42,7 +42,7 @@ namespace quda {
               nSrc*nParity*(dslash*Y.Bytes()*Y.VolumeCB()/(2*Y.Stride()) + clover*X.Bytes()/2)) * out.size();
     }
 
-    unsigned int sharedBytesPerThread() const { return (sizeof(complex<Float>) * colors_per_thread(Nc, dim_threads)); }
+    unsigned int sharedBytesPerThread() const { return (sizeof(complex<compute_prec<Float>>) * colors_per_thread(Nc, dim_threads)); }
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions
     unsigned int minThreads() const { return color_col_stride * X.VolumeCB(); }
 
