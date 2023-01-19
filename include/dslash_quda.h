@@ -736,6 +736,8 @@ namespace quda
      @param[in] parity parity parameter
      @param[in] dir Direction of the derivative 0,1,2,3 to omit (-1 is full 4D)
      @param[in] dagger (not used)
+     @param[in] comm_override Overrides for communication directions
+     @param[in] profile Timer used to profile operator application
   */
   void ApplyStaggeredQSmear(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0, bool compute_time_slice, int parity, int dir, 
                     bool dagger, const int *comm_override, TimeProfile &profile);                             

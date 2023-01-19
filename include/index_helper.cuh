@@ -23,7 +23,7 @@ namespace quda {
   /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] + dx[]
 
-     @param[in] y new 4-d lattice index
+     @param[out] y new 4-d lattice index
      @param[in] x original 4-d lattice index
      @param[in] dx 4-d shift index
      @param[in] X Full lattice dimensions
