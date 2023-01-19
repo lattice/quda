@@ -334,7 +334,25 @@ namespace quda {
     }
   }
 
-  void cpuGaugeField::shift(const GaugeField &src, const int *dx) { errorQuda("Not Implemented"); }
+  void cpuGaugeField::shift(const GaugeField &src, const int *dx)
+  {
+    for (int i = 0; i < this->nDim; i++) {
+      if (dx[i] != 0) break;
+      // if zero shift, we simply copy
+      if (i == this->nDim - 1) return this->copy(src);
+    }
+    if (this == &src) errorQuda("Cannot copy in itself");
+
+    checkField(src);
+
+    // TODO: check src extension (needs to be enough for shifting)
+
+    if (typeid(src) == typeid(cudaGaugeField)) {
+      errorQuda("Not Implemented");
+    } else {
+      errorQuda("Not compatible type");
+    }
+  }
 
   void cpuGaugeField::setGauge(void **gauge_)
   {

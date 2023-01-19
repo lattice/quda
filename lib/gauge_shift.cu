@@ -15,7 +15,7 @@ namespace quda
 
   public:
     ShiftGauge(GaugeField &out, const GaugeField &in, const int *dx) :
-      TunableKernel3D(in, 2, 4), out(out), in(in), dx(dx)
+      TunableKernel3D(in, 2, in.Geometry()), out(out), in(in), dx(dx)
     {
       strcat(aux, ",shift=");
       for (int i = 0; i < in.Ndim(); i++) { strcat(aux, std::to_string(dx[i]).c_str()); }
