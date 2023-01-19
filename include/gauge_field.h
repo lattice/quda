@@ -556,7 +556,7 @@ namespace quda {
      * @param[in] dx Host array of shifts to apply to the field
      */
     void shift(const GaugeField &src, const int *dx);
-    
+
     /**
        @brief Download into this field from a CPU field
        @param[in] cpu The CPU field source
@@ -700,7 +700,7 @@ namespace quda {
      * @param[in] dx Host array of shifts to apply to the field
      */
     void shift(const GaugeField &src, const int *dx);
-    
+
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
 
@@ -900,5 +900,5 @@ namespace quda {
    * @param[in] dx Host array of shifts to apply to the field
    */
   void gaugeShift(GaugeField &dst, const GaugeField &src, const int *dx);
-  
+
 } // namespace quda

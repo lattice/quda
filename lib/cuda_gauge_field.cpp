@@ -610,13 +610,14 @@ namespace quda {
     qudaDeviceSynchronize(); // include sync here for accurate host-device profiling
   }
 
-  void cudaGaugeField::shift(const GaugeField &src, const int *dx) {
-    for(int i=0; i<this->nDim; i++) {
-      if (dx[i]!=0) break;
-      if (i == this->nDim-1) return this->copy(src);
+  void cudaGaugeField::shift(const GaugeField &src, const int *dx)
+  {
+    for (int i = 0; i < this->nDim; i++) {
+      if (dx[i] != 0) break;
+      if (i == this->nDim - 1) return this->copy(src);
     }
     if (this == &src) errorQuda("Cannot copy in itself");
-    
+
     checkField(src);
 
     // TODO: check src extension (needs to be enough for shifting)
@@ -627,7 +628,7 @@ namespace quda {
       errorQuda("Not compatible type");
     }
   }
-  
+
   void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu) {
     copy(cpu);
     qudaDeviceSynchronize();
