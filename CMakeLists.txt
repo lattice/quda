@@ -412,6 +412,7 @@ if(QUDA_DOWNLOAD_EIGEN)
     DOWNLOAD_ONLY
     YES)
   target_include_directories(Eigen SYSTEM INTERFACE ${Eigen_SOURCE_DIR})
+  install(DIRECTORY ${Eigen_SOURCE_DIR}/Eigen TYPE INCLUDE)
 else()
   # fall back to using find_package
   find_package(Eigen QUIET)
