@@ -22,11 +22,28 @@ namespace quda {
 
   public:
     BlockTranspose(v_t &V, cvector_ref<b_t> &B) :
-      TunableKernel3D(V, V.SiteSubset(), B.size()),
+      TunableKernel3D(V, B.size(), V.SiteSubset() * nColor),
       V(V),
       B(B)
     {
+      if constexpr (std::is_const_v<v_t>) {
+        strcat(aux, ",v2b");
+      } else {
+        strcat(aux, ",b2v");
+      }
+      strcat(aux, ",n_rhs=");
+      char rhs_str[8];
+      i32toa(rhs_str, B.size());
+      strcat(aux, rhs_str);
+      resizeStep(B.size(), V.SiteSubset() * nColor);
       apply(device::get_default_stream());
+    }
+
+    void initTuneParam(TuneParam &param) const
+    {
+      TunableKernel3D::initTuneParam(param);
+      param.block.z = 1;
+      param.grid.z = vector_length_z;
     }
 
 #if 0
@@ -41,9 +58,10 @@ namespace quda {
 #endif
 
     template <typename vAccessor, typename bAccessor>
-    void launch_device_(const TuneParam &tp, const qudaStream_t &stream)
+    void launch_device_(TuneParam &tp, const qudaStream_t &stream)
     {
-      Arg<true, vAccessor, bAccessor> arg(V, B);
+      Arg<true, vAccessor, bAccessor> arg(V, B, tp.block.x, tp.block.y);
+      tp.set_max_shared_bytes = true;
       launch_device<BlockTransposeKernel>(tp, stream, arg);
     }
 
@@ -76,6 +94,10 @@ namespace quda {
           errorQuda("Unsupported field order V=%d B=%d", V.FieldOrder(), B[0].FieldOrder());
         }
       }
+    }
+
+    virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const {
+      return (param.block.x + 1) * param.block.y * nSpin * 2 * sizeof(real);
     }
 
     virtual unsigned int minThreads() const {
