@@ -10,6 +10,9 @@
 #include <dslash_shmem.h>
 #include <multigrid.h>
 
+#include <int_factor_array.hpp>
+#include <utility>
+
 namespace quda {
 
   template <typename Float, typename yFloat, typename ghostFloat, int Ns, int Nc, bool dslash, bool clover, bool dagger,
@@ -143,7 +146,14 @@ namespace quda {
           return true;
         } else {
           param.aux.x = 0;
-          return false;
+          if (param.aux.y < numFactors(out[0].Nvec() / 8) - 1) {
+            param.aux.y++;
+            set_mma_param(param);
+            return true;
+          } else {
+            param.aux.y = 0;
+            return false;
+          }
         }
       } else {
         return TunableKernel3D::advanceTuneParam(param);
@@ -154,6 +164,7 @@ namespace quda {
     {
       if (use_mma) {
         param.aux.x = 0;
+        param.aux.y = 0;
         set_mma_param(param);
       } else {
         color_col_stride = 1;
@@ -170,6 +181,7 @@ namespace quda {
     {
       if (use_mma) {
         param.aux.x = 0;
+        param.aux.y = 0;
         set_mma_param(param);
       } else {
         color_col_stride = 1;
@@ -262,30 +274,51 @@ namespace quda {
       tp.block.y = Ns * Nc / (1 << tp.aux.x);
       tp.block.z = 8;
 
-      tp.grid = dim3(out[0].SiteSubset() * out[0].VolumeCB(), 1, 1);
+      int bN = 8 * get_int_factor_array(out[0].Nvec() / 8)[tp.aux.y];
+      if (out[0].Nvec() % bN != 0) {
+        errorQuda("Invalid bN.");
+      }
+
+      tp.grid = dim3(out[0].SiteSubset() * out[0].VolumeCB(), 1, out[0].Nvec() / bN);
       tp.set_max_shared_bytes = true;
 
-      int shared_bytes = mma::shared_memory_bytes<mma_t>(Ns * Nc, out[0].Nvec(), Ns * Nc);
+      int shared_bytes = mma::shared_memory_bytes<mma_t>(Ns * Nc, bN, Ns * Nc);
       tp.shared_bytes = shared_bytes;
     }
 
-    template <int nVec, int block_y, int block_z>
+    template <int nVec, int bN, int block_y, int block_z>
     void launch_mma(TuneParam &tp, const qudaStream_t &stream) {
-      using Arg = DslashCoarseMmaArg<mma_t, dslash, clover, dagger, type, Float, yFloat, ghostFloat, Ns, Nc, nVec, block_y, block_z>;
+      using Arg = DslashCoarseMmaArg<mma_t, dslash, clover, dagger, type, Float, yFloat, ghostFloat, Ns, Nc, nVec, bN, block_y, block_z>;
       Arg arg(out[0], inA[0], inB[0], Y, X, (Float)kappa, parity, halo);
       launch_device<CoarseDslashMma>(tp, stream, arg);
+    }
+
+    template <int nVec, int block_y, int block_z, size_t d, size_t... Ds>
+    void launch_mma_xt(TuneParam &tp, const qudaStream_t &stream, std::index_sequence<d, Ds...>) {
+      if (tp.aux.y == d) {
+        constexpr IntFactorArray<nVec / 8> a;
+        launch_mma<nVec, a[d] * 8, block_y, block_z>(tp, stream);
+      } else {
+        if constexpr (sizeof...(Ds) > 0) {
+          launch_mma_xt<nVec, block_y, block_z>(tp, stream, std::index_sequence<Ds...>());
+        } else {
+          errorQuda("Invalid tp.aux.y.");
+        }
+      }
     }
 
     template <int nVec>
     void launch_mma(TuneParam &tp, const qudaStream_t &stream) {
       auto old_z = vector_length_z;
       auto old_y = vector_length_y;
-      resizeVector(tp.block.y, tp.block.z);
+      resizeVector(tp.block.y, tp.block.z * tp.grid.z);
+
+      std::make_index_sequence<IntFactorArray<nVec / 8>().size()> xt;
 
       switch (tp.aux.x) {
-        case 0: launch_mma<nVec, Ns * Nc / 1, 8>(tp, stream); break;
-        case 1: launch_mma<nVec, Ns * Nc / 2, 8>(tp, stream); break;
-        case 2: launch_mma<nVec, Ns * Nc / 4, 8>(tp, stream); break;
+        case 0: launch_mma_xt<nVec, Ns * Nc / 1, 8>(tp, stream, xt); break;
+        case 1: launch_mma_xt<nVec, Ns * Nc / 2, 8>(tp, stream, xt); break;
+        case 2: launch_mma_xt<nVec, Ns * Nc / 4, 8>(tp, stream, xt); break;
         default: errorQuda("tp.aux.x = %d not supported", tp.aux.x);
       }
 

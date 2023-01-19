@@ -15,7 +15,7 @@
 namespace quda {
 
   template <class mma_t_, bool dslash_, bool clover_, bool dagger_, DslashType type_, typename Float,
-            typename yFloat, typename ghostFloat, int nSpin_, int nColor_, int nVec_, int block_y_, int block_z_>
+            typename yFloat, typename ghostFloat, int nSpin_, int nColor_, int nVec_, int bN_, int block_y_, int block_z_>
   struct DslashCoarseMmaArg : kernel_param<> {
     static constexpr bool dslash = dslash_;
     static constexpr bool clover = clover_;
@@ -35,7 +35,7 @@ namespace quda {
     static constexpr int block_z = block_z_;
 
     static constexpr int bM = nSpin * nColor;
-    static constexpr int bN = nVec;
+    static constexpr int bN = bN_;
     static constexpr int bK = nSpin * nColor;
 
     static constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
@@ -98,7 +98,7 @@ namespace quda {
      @return The result vector
    */
   template <typename Arg>
-  __device__ inline auto applyDslashMma(int x_cb, int parity, const Arg &arg)
+  __device__ inline auto applyDslashMma(int x_cb, int parity, int n_offset, const Arg &arg)
   {
     const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
 
@@ -117,10 +117,9 @@ namespace quda {
     using Config = mma::MmaConfig<mma_t, M, N, K, lda, ldb, ldc, Arg::bM, Arg::bN, Arg::bK, Arg::block_y, Arg::block_z>;
 
     constexpr int m_offset = 0;
-    constexpr int n_offset = 0;
 
     static_assert(M <= Arg::bM, "Dividing M has NOT been implemented yet.\n");
-    static_assert(N <= Arg::bN, "Dividing N has NOT been implemented yet.\n");
+    // static_assert(N <= Arg::bN, "Dividing N has NOT been implemented yet.\n");
     static_assert(K <= Arg::bK, "Dividing K has NOT been implemented yet.\n");
 
     extern __shared__ typename mma_t::compute_t smem_ptr[];
@@ -265,10 +264,11 @@ namespace quda {
 
     __device__ inline void operator()(int parity_x_cb, int thread_idx_y, int thread_idx_z)
     {
+      int n_offset = target::block_idx().z * Arg::bN;
       int parity = (arg.nParity == 2) ? parity_x_cb % 2 : arg.parity;
       int x_cb = (arg.nParity == 2) ? parity_x_cb / 2 : parity_x_cb;
 
-      auto out = applyDslashMma(x_cb, parity, arg);
+      auto out = applyDslashMma(x_cb, parity, n_offset, arg);
 
       constexpr int M = Arg::nSpin * Arg::nColor;
       constexpr int N = Arg::nVec;
@@ -277,9 +277,9 @@ namespace quda {
       int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
       auto c = arg.out(my_spinor_parity, x_cb, 0, 0);
       if constexpr (doBulk<Arg::type>()) {
-        out.template store<M, N, ldc, false>(c, 0, 0, assign_t());
+        out.template store<M, N, ldc, false>(c, 0, n_offset, assign_t());
       } else {
-        out.template store<M, N, ldc, false>(c, 0, 0, fetch_add_t());
+        out.template store<M, N, ldc, false>(c, 0, n_offset, fetch_add_t());
       }
     }
   };
