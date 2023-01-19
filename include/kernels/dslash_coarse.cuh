@@ -17,6 +17,14 @@ namespace quda {
     DSLASH_FULL
   };
 
+#ifdef MULTIGRID_DSLASH_PROMOTE
+  template <typename store_t>
+  using compute_prec = double;
+#else
+  template <typename store_t>
+  using compute_prec = typename mapper<store_t>::type;
+#endif
+
   // we use two colors per thread unless we have large dim_stride, when we're aiming for maximum parallelism
   constexpr int colors_per_thread(int nColor, int dim_stride) { return (nColor % 2 == 0 && nColor <= 32 && dim_stride <= 2) ? 2 : 1; }
 
@@ -30,13 +38,13 @@ namespace quda {
     static constexpr int color_stride = color_stride_;
     static constexpr int dim_stride = dim_stride_;
 
-    using real = typename mapper<Float>::type;
+    using real = compute_prec<Float>;
     static constexpr int nSpin = nSpin_;
     static constexpr int nColor = nColor_;
     static constexpr int nDim = 4;
     static constexpr int nFace = 1;
 
-    static constexpr QudaFieldOrder csOrder = native ? colorspinor::getNative<real>(nSpin) : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    static constexpr QudaFieldOrder csOrder = native ? colorspinor::getNative<Float>(nSpin) : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     static constexpr QudaGaugeFieldOrder gOrder = native ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
 
     using G = typename colorspinor::GhostOrder<real, nSpin, nColor, 1, csOrder, Float, ghostFloat>;

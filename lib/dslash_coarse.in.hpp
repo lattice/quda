@@ -56,7 +56,7 @@ namespace quda {
       if (use_mma) {
         return 0;
       } else {
-        return (sizeof(complex<Float>) * colors_per_thread(Nc, dim_threads));
+        return (sizeof(complex<compute_prec<Float>>) * colors_per_thread(Nc, dim_threads));
       }
     }
 

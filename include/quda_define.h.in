@@ -179,6 +179,18 @@
 #undef QUDA_CLOVER_CHOLESKY_PROMOTE
 #endif
 
+#cmakedefine QUDA_MULTIGRID_DSLASH_PROMOTE
+#ifdef QUDA_MULTIGRID_DSLASH_PROMOTE
+/**
+ * @def   MULTIGRID_DSLASH_PROMOTE
+ * @brief This macro sets whether we promote the internal precision of
+ * the coarse dslash used in multigrid.  This enables reproducibility
+ * regardless of the thread granularity chosen
+ */
+#define MULTIGRID_DSLASH_PROMOTE
+#undef QUDA_CLOVER_CHOLESKY_PROMOTE
+#endif
+
 /**
  * @def QUDA_ORDER_FP
  * @brief This macro sets the data ordering for Wilson, gauge
