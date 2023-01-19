@@ -334,7 +334,7 @@ namespace quda {
     }
   }
 
-  void cpuGaugeField::shift(const GaugeField &src, const int *dx)
+  void cpuGaugeField::shift(const GaugeField &src, const array<int, 4> &dx)
   {
     for (int i = 0; i < this->nDim; i++) {
       if (dx[i] != 0) break;

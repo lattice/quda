@@ -10,11 +10,11 @@ namespace quda
   {
     GaugeField &out;
     const GaugeField &in;
-    const int *dx;
+    const array<int, 4> &dx;
     unsigned int minThreads() const { return in.VolumeCB(); }
 
   public:
-    ShiftGauge(GaugeField &out, const GaugeField &in, const int *dx) :
+    ShiftGauge(GaugeField &out, const GaugeField &in, const array<int, 4> &dx) :
       TunableKernel3D(in, 2, in.Geometry()), out(out), in(in), dx(dx)
     {
       strcat(aux, ",shift=");
@@ -36,7 +36,7 @@ namespace quda
     long long bytes() const { return in.Bytes(); }
   };
 
-  void gaugeShift(GaugeField &out, const GaugeField &in, const int *dx)
+  void gaugeShift(GaugeField &out, const GaugeField &in, const array<int, 4> &dx)
   {
     checkPrecision(in, out);
     checkLocation(in, out);

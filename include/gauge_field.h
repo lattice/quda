@@ -398,7 +398,7 @@ namespace quda {
      * @param[in] src Source from which we are shifting (extended field in case of MPI)
      * @param[in] dx Host array of shifts to apply to the field
      */
-    virtual void shift(const GaugeField &src, const int *dx) = 0;
+    virtual void shift(const GaugeField &src, const array<int, 4> &dx) = 0;
 
     /**
        @brief Compute the L1 norm of the field
@@ -555,7 +555,7 @@ namespace quda {
      * @param[in] src Source from which we are shifting (extended field in case of MPI)
      * @param[in] dx Host array of shifts to apply to the field
      */
-    void shift(const GaugeField &src, const int *dx);
+    void shift(const GaugeField &src, const array<int, 4> &dx);
 
     /**
        @brief Download into this field from a CPU field
@@ -699,7 +699,7 @@ namespace quda {
      * @param[in] src Source from which we are shifting (extended field in case of MPI)
      * @param[in] dx Host array of shifts to apply to the field
      */
-    void shift(const GaugeField &src, const int *dx);
+    void shift(const GaugeField &src, const array<int, 4> &dx);
 
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
@@ -899,6 +899,6 @@ namespace quda {
    * @param[in] srd Source from which we are shifting (extended field in case of MPI)
    * @param[in] dx Host array of shifts to apply to the field
    */
-  void gaugeShift(GaugeField &dst, const GaugeField &src, const int *dx);
+  void gaugeShift(GaugeField &dst, const GaugeField &src, const array<int, 4> &dx);
 
 } // namespace quda

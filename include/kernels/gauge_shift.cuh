@@ -24,7 +24,7 @@ namespace quda
     int border[4]; // radius of border
     int P;         // change of parity
 
-    GaugeShiftArg(GaugeField &out, const GaugeField &in, const int *dx) :
+    GaugeShiftArg(GaugeField &out, const GaugeField &in, const array<int, 4> &dx) :
       kernel_param(dim3(in.VolumeCB(), 2, in.Geometry())), out(out), in(in), geometry(in.Geometry())
     {
       P = 0;

@@ -610,7 +610,7 @@ namespace quda {
     qudaDeviceSynchronize(); // include sync here for accurate host-device profiling
   }
 
-  void cudaGaugeField::shift(const GaugeField &src, const int *dx)
+  void cudaGaugeField::shift(const GaugeField &src, const array<int, 4> &dx)
   {
     for (int i = 0; i < this->nDim; i++) {
       if (dx[i] != 0) break;
