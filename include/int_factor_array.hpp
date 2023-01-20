@@ -6,7 +6,7 @@ namespace quda {
 
   inline unsigned int numFactors(unsigned int Int) {
     unsigned int i = 0;
-    for (auto j = 1u; j <= Int; j++) { if (Int % j == 0) { i++; } }
+    for (unsigned int j = 1u; j <= Int; j++) { if (Int % j == 0) { i++; } }
     return i;
   }
 
@@ -28,7 +28,7 @@ namespace quda {
   template <unsigned int Int> constexpr unsigned int numFactors() noexcept
   {
     unsigned int i = 0;
-    for (auto j = 1; j <= Int; j++) { if (Int % j == 0) { i++; } }
+    for (unsigned int j = 1u; j <= Int; j++) { if (Int % j == 0) { i++; } }
     return i;
   }
 
