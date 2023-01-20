@@ -18,6 +18,10 @@
 #endif
 #endif
 
+#ifdef __NVCOMPILER
+#pragma diag_suppress partial_override
+#endif
+
 namespace quda {
 
   // Forward declare: MG Transfer Class
