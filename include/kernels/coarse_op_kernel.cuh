@@ -136,6 +136,11 @@ namespace quda {
     static constexpr int max_width_tiles_per_block = max_color_width_per_block / tile_width_vuv;
     static_assert(max_color_height_per_block % tile_height_vuv == 0, "max_color_height_per_block must be divisible by tile height");
     static_assert(max_color_width_per_block % tile_width_vuv == 0, "max_color_width_per_block must be divisible by tile width");
+    using StoreCoarseSharedAtomicTemp =
+      complex<storeType>[max_color_height_per_block][max_color_width_per_block][4][coarseSpin][coarseSpin];
+    using SharedMemVuv = op_SharedMemStatic<StoreCoarseSharedAtomicTemp,2>;
+    using SpecialOpsVuv = SpecialOps<op_blockSync,SharedMemVuv>;
+    //using SpecialOpsVuv = only_Concurrent<op_SharedMem<StoreCoarseSharedAtomicTemp,1>,op_SharedMem<StoreCoarseSharedAtomicTemp,1>>;
 
     /**
        @brief Constructor for CalculateYArg
@@ -1358,14 +1363,17 @@ namespace quda {
   };
 
   template <> struct storeCoarseSharedAtomic_impl<true> {
-    template <typename VUV, typename Pack, typename Arg>
-    inline __device__ void operator()(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, int parity, const Pack &pack, const Arg &arg)
+    template <typename VUV, typename Pack, typename Arg, typename O>
+    inline __device__ void operator()(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, int parity, const Pack &pack, const Arg &arg, bool active, O *ops)
     {
       using real = typename Arg::Float;
       using TileType = typename Arg::vuvTileType;
       const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
-      __shared__ complex<storeType> X[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
-      __shared__ complex<storeType> Y[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
+      //__shared__ complex<storeType> X[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
+      //__shared__ complex<storeType> Y[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
+      //typename Arg::storeCoarseSharedAtomicTemp *X = f->template getSpecialOp<Arg::SharedMemVuv>().getSharedMemPtr();
+      typename Arg::StoreCoarseSharedAtomicTemp &X = getSharedMemPtr(getSpecialOp<typename Arg::SharedMemVuv>(ops))[0];
+      typename Arg::StoreCoarseSharedAtomicTemp &Y = getSharedMemPtr(getSpecialOp<typename Arg::SharedMemVuv>(ops))[1];
 
       int x_ = coarse_x_cb % arg.aggregates_per_block;
       int tx = virtualThreadIdx(arg);
@@ -1387,7 +1395,8 @@ namespace quda {
         }
       }
 
-      __syncthreads();
+      //__syncthreads();
+      blockSync(ops);
 
 #pragma unroll
       for (int i = 0; i < TileType::M; i++) {
@@ -1416,7 +1425,8 @@ namespace quda {
         }
       }
 
-      __syncthreads();
+      //__syncthreads();
+      blockSync(ops);
 
       if (tx < Arg::coarseSpin*Arg::coarseSpin && (parity == 0 || arg.parity_flip == 1) ) {
 
@@ -1453,16 +1463,16 @@ namespace quda {
     }
   };
 
-  template <typename VUV, typename Arg>
-  __device__ __host__ void storeCoarseSharedAtomic(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, int parity, const Arg &arg)
+  template <bool allthreads, typename VUV, typename Arg, typename F>
+  __device__ __host__ void storeCoarseSharedAtomic(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, int parity, const Arg &arg, bool active, F *f)
   {
     switch (arg.dir) {
     case QUDA_BACKWARDS:
-      target::dispatch<storeCoarseSharedAtomic_impl>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, parity, Pack<QUDA_BACKWARDS>(), arg); break;
+      target::dispatch<storeCoarseSharedAtomic_impl>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, parity, Pack<QUDA_BACKWARDS>(), arg, active, f); break;
     case QUDA_FORWARDS:
-      target::dispatch<storeCoarseSharedAtomic_impl>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, parity, Pack<QUDA_FORWARDS>(), arg); break;
+      target::dispatch<storeCoarseSharedAtomic_impl>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, parity, Pack<QUDA_FORWARDS>(), arg, active, f); break;
     case QUDA_IN_PLACE:
-      target::dispatch<storeCoarseSharedAtomic_impl>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, parity, Pack<QUDA_IN_PLACE>(), arg); break;
+      target::dispatch<storeCoarseSharedAtomic_impl>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, parity, Pack<QUDA_IN_PLACE>(), arg, active, f); break;
     default:
       break;// do nothing
     }
@@ -1548,8 +1558,8 @@ namespace quda {
 
   }
 
-  template <int nFace, typename Arg>
-  __device__ __host__ void computeVUV(const Arg &arg, int parity, int x_cb, int i0, int j0, int parity_coarse_, int coarse_x_cb_)
+  template <int nFace, bool allthreads, typename Arg, typename O>
+  __device__ __host__ void computeVUV(const Arg &arg, int parity, int x_cb, int i0, int j0, int parity_coarse_, int coarse_x_cb_, bool active, O *ops)
   {
     using real = typename Arg::Float;
     constexpr int nDim = 4;
@@ -1582,7 +1592,7 @@ namespace quda {
     }
 
     if (arg.shared_atomic)
-      storeCoarseSharedAtomic(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, parity, arg);
+      storeCoarseSharedAtomic<allthreads>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, parity, arg, active, ops);
     else
       storeCoarseGlobalAtomic(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, arg);
   }
@@ -1645,7 +1655,7 @@ namespace quda {
     }
   };
 
-  template <typename Arg> struct compute_vuv {
+  template <typename Arg> struct compute_vuv : Arg::SpecialOpsVuv {
     static constexpr int nFace = 1;
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -1657,7 +1667,8 @@ namespace quda {
        @param[in] parity_c_row parity * output color row
        @param[in] c_col output coarse color column
     */
-    __device__ __host__ inline void operator()(int x_cb, int parity_c_row, int c_col)
+    template <bool allthreads = false>
+    __device__ __host__ inline void apply(int x_cb, int parity_c_row, int c_col, bool active = true)
     {
       int parity, parity_coarse, x_coarse_cb, c_row;
       target::dispatch<getIndices>(parity_coarse, x_coarse_cb, parity, x_cb, parity_c_row, c_row, c_col, arg);
@@ -1667,11 +1678,16 @@ namespace quda {
       if (c_col >= arg.vuvTile.N_tiles) return;
       if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) return;
 
-      computeVUV<nFace>(arg, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse, x_coarse_cb);
+      computeVUV<nFace, allthreads>(arg, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse, x_coarse_cb, active, this);
+    }
+
+    __device__ __host__ inline void operator()(int x_cb, int parity_c_row, int c_col)
+    {
+      apply(x_cb, parity_c_row, c_col);
     }
   };
 
-  template <typename Arg> struct compute_vlv {
+  template <typename Arg> struct compute_vlv : Arg::SpecialOpsVuv {
     static constexpr int nFace = 3;
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -1683,7 +1699,8 @@ namespace quda {
        @param[in] parity_c_row parity * output color row
        @param[in] c_col output coarse color column
     */
-    __device__ __host__ inline void operator()(int x_cb, int parity_c_row, int c_col)
+    template <bool allthreads = false>
+    __device__ __host__ inline void apply(int x_cb, int parity_c_row, int c_col, bool active = true)
     {
       int parity, parity_coarse, x_coarse_cb, c_row;
       target::dispatch<getIndices>(parity_coarse, x_coarse_cb, parity, x_cb, parity_c_row, c_row, c_col, arg);
@@ -1693,7 +1710,12 @@ namespace quda {
       if (c_col >= arg.vuvTile.N_tiles) return;
       if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) return;
 
-      computeVUV<nFace>(arg, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse, x_coarse_cb);
+      computeVUV<nFace, allthreads>(arg, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse, x_coarse_cb, active, this);
+    }
+
+    __device__ __host__ inline void operator()(int x_cb, int parity_c_row, int c_col)
+    {
+      apply(x_cb, parity_c_row, c_col);
     }
   };
 

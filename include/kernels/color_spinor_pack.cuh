@@ -151,14 +151,14 @@ namespace quda {
   };
 
   template <> struct site_max<true> {
-    template <typename Arg, typename SMem> __device__ inline auto operator()(typename Arg::real thread_max, Arg &, SMem smem)
+    template <typename Arg, typename O> __device__ inline auto operator()(typename Arg::real thread_max, Arg &, O *ops)
     {
       using real = typename Arg::real;
       constexpr int Ms = spins_per_thread<true, Arg::nSpin>();
       constexpr int Mc = colors_per_thread<true, Arg::nColor>();
       constexpr int color_spin_threads = (Arg::nSpin/Ms) * (Arg::nColor/Mc);
       //SharedMemoryCache<real, color_spin_threads, 2, true> cache(smem); // 2 comes from parity
-      SharedMemoryCacheD<real> cache(smem); // 2 comes from parity
+      SharedMemoryCacheD<real> cache(ops);
       cache.save(thread_max);
       cache.sync();
       real this_site_max = static_cast<real>(0);
@@ -253,9 +253,8 @@ namespace quda {
   }
 #endif
 
-  //template <typename Arg> struct GhostPacker : SharedMem<typename Arg::real> {
-  //template <typename Arg> struct GhostPacker : SharedMem<std::conditional_t<Arg::block_float,typename Arg::real,void>> {
-  template <typename Arg> struct GhostPacker : std::conditional_t<Arg::block_float,SharedMem<typename Arg::real>,NoBlockOps> {
+  template <typename Arg> struct GhostPacker :
+    std::conditional_t<Arg::block_float,only_SharedMemoryCache<typename Arg::real>,NoSpecialOps> {
     const Arg &arg;
     constexpr GhostPacker(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }

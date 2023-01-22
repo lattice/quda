@@ -33,7 +33,7 @@ namespace quda
        is optionally padded to allow for access along the y and z dimensions.
    */
   template <typename T>
-  class SharedMemoryCacheD : SharedMem<T>
+  class SharedMemoryCacheD : only_SharedMemoryCache<T>
   {
     static_assert(sizeof(T) % 4 == 0, "Shared memory cache does not support sub-word size types");
     const dim3 block;
@@ -59,7 +59,7 @@ namespace quda
     template <typename dummy> struct cache_dynamic<true, dummy> {
       __device__ inline atom_t *operator()(SharedMemoryCacheD<T> *t)
       {
-        return reinterpret_cast<atom_t *>(t->getMem());
+        return reinterpret_cast<atom_t *>(getSharedMemPtr(t));
       }
     };
 
@@ -98,8 +98,9 @@ namespace quda
 
        @param[in] block Block dimensions for the 3-d shared memory object
     */
-    SharedMemoryCacheD(SharedMem<T> *smem, dim3 block = target::block_dim()) :
-      SharedMem<T>(*smem),
+    template <typename O>
+    SharedMemoryCacheD(O *ops, dim3 block = target::block_dim()) :
+      only_SharedMemoryCache<T>(getSpecialOp<only_SharedMemoryCache<T>>(ops)),
       block(block),
       stride(block.x * block.y * block.z)
     {
@@ -217,7 +218,8 @@ namespace quda
     /**
        @brief Synchronize the cache
     */
-    __device__ __host__ void sync() { this->blockSync(); }
+    //__device__ __host__ void sync() { this->blockSync(); }
+    __device__ __host__ void sync() { __syncthreads(); }
   };
 
   template <typename T, int block_size_y = 1, int block_size_z = 1, bool pad = false, bool dynamic = true>

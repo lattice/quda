@@ -69,8 +69,7 @@ namespace quda
        (input/output fields, functor, etc.)
     */
     //template <typename Arg> struct MultiBlas_ {
-    template <typename Arg> struct MultiBlas_ : BlockSync { // actually warp combine, don't have specific type yet
-    //template <typename Arg> struct MultiBlas_ :
+    template <typename Arg> struct MultiBlas_ : only_warp_combine<array<complex<typename Arg::real>, Arg::n/2>> {
     //  std::conditional_t<Arg::Functor::write.Y||Arg::Functor::write.W,BlockSync,void> {
       const Arg &arg;
       constexpr MultiBlas_(const Arg &arg) : arg(arg) {}

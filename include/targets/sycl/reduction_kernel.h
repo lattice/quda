@@ -9,13 +9,13 @@
 namespace quda {
 
 #ifndef HIGH_LEVEL_REDUCTIONS
-  template <template <typename> class Functor, typename Arg, bool grid_stride = true, typename Smem>
-  void Reduction2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, Smem smem)
+  template <template <typename> class Functor, typename Arg, bool grid_stride = true>
+  void Reduction2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, char *smem)
   {
     Functor<Arg> t(arg);
-    BlockReduction<typename Functor<Arg>::reduce_t> br;
-    br.setBlockSync(ndi);
-    br.setMem(smem);
+    reduceSpecialOps<typename Functor<Arg>::reduce_t> rso;
+    rso.setNdItem(ndi);
+    rso.setSharedMem(smem);
     auto idx = globalIdX;
     auto j = localIdY;
     auto value = t.init();
@@ -24,13 +24,13 @@ namespace quda {
       if (grid_stride) idx += globalRangeX; else break;
     }
     // perform final inter-block reduction and write out result
-    reduce(arg, t, value, 0, br);
+    reduce(arg, t, value, 0, rso);
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   struct Reduction2DS {
-    using SharedMemT = typename Functor<Arg>::reduce_t;
+    using SpecialOpsT = reduceSpecialOps<typename Functor<Arg>::reduce_t>;
     template <typename... T>
-    Reduction2DS(const Arg &arg, const sycl::nd_item<3> &ndi, T... smem)
+    Reduction2DS(const Arg &arg, const sycl::nd_item<3> &ndi, T ...smem)
     {
 #ifdef QUDA_THREADS_BLOCKED
       Reduction2DImpl<Functor,Arg,grid_stride>(arg, ndi);
@@ -56,7 +56,6 @@ namespace quda {
   }
   template <template <typename> class Functor, bool grid_stride = false>
   struct Reduction2DS {
-    using SharedMemT = void;
     template <typename Arg, typename R>
     static void apply(const Arg &arg, const sycl::nd_item<3> &ndi, R &reducer)
     {
@@ -72,7 +71,7 @@ namespace quda {
   qudaError_t Reduction2D(const TuneParam &tp,
 			  const qudaStream_t &stream, const Arg &arg)
   {
-    static_assert(!hasBlockOps<Functor<Arg>>);
+    static_assert(!hasSpecialOps<Functor<Arg>>);
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
@@ -136,14 +135,14 @@ namespace quda {
 
   // MultiReduction
 
-  template <template <typename> class Functor, typename Arg, bool grid_stride = true, typename Smem>
-  void MultiReductionImpl(const Arg &arg, const sycl::nd_item<3> &ndi, Smem smem)
+  template <template <typename> class Functor, typename Arg, bool grid_stride = true, typename S>
+  void MultiReductionImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S *smem)
   {
     using reduce_t = typename Functor<Arg>::reduce_t;
     Functor<Arg> t(arg);
-    BlockReduction<reduce_t> br;
-    br.setBlockSync(ndi);
-    br.setMem(smem);
+    reduceSpecialOps<typename Functor<Arg>::reduce_t> rso;
+    rso.setNdItem(ndi);
+    rso.setSharedMem(smem);
 
     auto idx = globalIdX;
     auto k = localIdY;
@@ -161,11 +160,11 @@ namespace quda {
     }
 
     // perform final inter-block reduction and write out result
-    reduce(arg, t, value, j, br);
+    reduce(arg, t, value, j, rso);
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride>
   struct MultiReductionS {
-    using SharedMemT = typename Functor<Arg>::reduce_t;
+    using SpecialOpsT = reduceSpecialOps<typename Functor<Arg>::reduce_t>;
     template <typename... T>
     MultiReductionS(const Arg &arg, const sycl::nd_item<3> &ndi, T... smem)
     {
@@ -181,7 +180,7 @@ namespace quda {
   qudaError_t
   MultiReduction(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
-    static_assert(!hasBlockOps<Functor<Arg>>);
+    static_assert(!hasSpecialOps<Functor<Arg>>);
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);

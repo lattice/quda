@@ -99,6 +99,7 @@ namespace quda
   }
   template <template <typename> class Functor, typename Arg>
   struct BlockKernel2DS {
+    using SpecialOpsT = NoSpecialOps;
     BlockKernel2DS(const Arg &arg, const sycl::nd_item<3> &ndi)
     {
 #ifdef QUDA_THREADS_BLOCKED
@@ -114,7 +115,7 @@ namespace quda
   BlockKernel2D(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
-    static_assert(!hasBlockOps<Transformer<Arg>>);
+    static_assert(!hasSpecialOps<Transformer<Arg>>);
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
