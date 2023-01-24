@@ -1403,10 +1403,13 @@ namespace quda
         for (int i = 0; i < 2 * nDimComms; i++)
           const_cast<ColorSpinorField *>(this)->recvStart(i, device::get_default_stream(), gdr_recv);
 
-        bool sync = pack_host ? true : false; // no p2p if pack_host so we need to synchronize
+        // FIXME use events to properly synchronize streams, logic below failed when using p2p in all 4 dimensions (DGX2)
+        bool sync = true;
+        /* bool sync = true; pack_host ? true : false; // no p2p if pack_host so we need to synchronize
         // if not p2p in any direction then need to synchronize before MPI
         for (int i = 0; i < nDimComms; i++)
           if (!comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i)) sync = true;
+        */
         if (sync)
           qudaDeviceSynchronize(); // need to make sure packing and/or memcpy has finished before kicking off MPI
 
