@@ -73,7 +73,7 @@ namespace quda {
 	auto localsize = ndRange.get_local_range().size();
 	auto smemsize = sharedMemSize<typename F::SpecialOpsT>(localsize);
 	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-	  printfQuda("Allocating local mem size: %lu\n", smemsize);
+	  printfQuda("  Allocating local mem size: %lu\n", smemsize);
 	}
 	if (smemsize > device::max_dynamic_shared_memory()) {
 	  warningQuda("Local mem request too large %lu > %lu\n", smemsize, device::max_dynamic_shared_memory());
@@ -115,7 +115,6 @@ namespace quda {
   std::enable_if_t<!device::use_kernel_arg<Arg>(), qudaError_t>
   launch(const qudaStream_t &stream, sycl::nd_range<3> &ndRange, const Arg &arg)
   {
-    static_assert(!needsSharedMem<typename F::SpecialOpsT>);
     qudaError_t err = QUDA_SUCCESS;
     auto q = device::get_target_stream(stream);
     auto size = sizeof(arg);
@@ -123,15 +122,39 @@ namespace quda {
     memcpy(ph, &arg, size);
     auto p = ph;
     try {
-      q.submit([&](sycl::handler &h) {
-	h.parallel_for<>
-	  (ndRange,
-	   //[=](sycl::nd_item<3> ndi) {
-	   [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
-	     const Arg *arg2 = reinterpret_cast<const Arg*>(p);
-	     F f(*arg2, ndi);
-	   });
-      });
+      if constexpr (needsSharedMem<typename F::SpecialOpsT>) {
+	auto localsize = ndRange.get_local_range().size();
+	auto smemsize = sharedMemSize<typename F::SpecialOpsT>(localsize);
+	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+	  printfQuda("  Allocating local mem size: %lu\n", smemsize);
+	}
+	if (smemsize > device::max_dynamic_shared_memory()) {
+	  warningQuda("Local mem request too large %lu > %lu\n", smemsize, device::max_dynamic_shared_memory());
+	  return QUDA_ERROR;
+	}
+	q.submit([&](sycl::handler &h) {
+	  sycl::range<1> smem_range(smemsize);
+	  auto la = sycl::local_accessor<char>(smem_range, h);
+	  h.parallel_for<>
+	    (ndRange,
+	     //[=](sycl::nd_item<3> ndi) {
+	     [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
+	       const Arg *arg2 = reinterpret_cast<const Arg*>(p);
+	       char *smem = la.get_pointer();
+	       F f(*arg2, ndi, smem);
+	     });
+	});
+      } else {
+	q.submit([&](sycl::handler &h) {
+	  h.parallel_for<>
+	    (ndRange,
+	     //[=](sycl::nd_item<3> ndi) {
+	     [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
+	       const Arg *arg2 = reinterpret_cast<const Arg*>(p);
+	       F f(*arg2, ndi);
+	     });
+	});
+      }
     } catch (sycl::exception const& e) {
       auto what = e.what();
       target::sycl::set_error(what, "submit", __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
