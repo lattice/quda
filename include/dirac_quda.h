@@ -1828,7 +1828,8 @@ public:
      */
     DiracCoarse(const DiracParam &param,
 		cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h, cpuGaugeField *Yhat_h,
-		cudaGaugeField *Y_d=0, cudaGaugeField *X_d=0, cudaGaugeField *Xinv_d=0, cudaGaugeField *Yhat_d=0);
+		cudaGaugeField *Y_d = nullptr, cudaGaugeField *X_d = nullptr, cudaGaugeField *Xinv_d = nullptr,
+                cudaGaugeField *Yhat_d = nullptr);
 
     /**
        @param[in] dirac Another operator instance to clone from (shallow copy)
@@ -1971,6 +1972,22 @@ public:
        @param[in] gpu_setup Whether to do the setup on GPU or CPU
      */
     DiracCoarsePC(const DiracParam &param, bool gpu_setup=true);
+
+    /**
+       @param[in] param Parameters defining this operator
+       @param[in] Y_h CPU coarse link field
+       @param[in] X_h CPU coarse clover field
+       @param[in] Xinv_h CPU coarse inverse clover field
+       @param[in] Yhat_h CPU coarse preconditioned link field
+       @param[in] Y_d GPU coarse link field
+       @param[in] X_d GPU coarse clover field
+       @param[in] Xinv_d GPU coarse inverse clover field
+       @param[in] Yhat_d GPU coarse preconditioned link field
+     */
+    DiracCoarsePC(const DiracParam &param,
+                  cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h, cpuGaugeField *Yhat_h,
+                  cudaGaugeField *Y_d = nullptr, cudaGaugeField *X_d = nullptr,
+                  cudaGaugeField *Xinv_d = nullptr, cudaGaugeField *Yhat_d = nullptr);
 
     /**
        @param[in] dirac Another operator instance to clone from (shallow copy)
