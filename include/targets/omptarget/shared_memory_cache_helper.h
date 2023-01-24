@@ -29,20 +29,13 @@ namespace quda
        parameters correspond to the y and z dimensions of the block,
        respectively.  The x dimension of the block will be set
        according the maximum number of threads possible, given these
-       dimensions.  To prevent shared-memory bank conflicts this width
-       is optionally padded to allow for access along the y and z dimensions.
+       dimensions.
    */
-  template <typename T, int block_size_y = 1, int block_size_z = 1, bool pad = false, bool dynamic = true>
+  template <typename T, int block_size_y = 1, int block_size_z = 1, bool dynamic = true>
   class SharedMemoryCache
   {
     /** maximum number of threads in x given the y and z block sizes */
-    static constexpr int max_block_size_x = device::max_block_size<block_size_y, block_size_z>();
-
-    /** pad in the x dimension width if requested to ensure that it isn't a multiple of the bank width */
-    static constexpr int block_size_x = !pad ?
-      max_block_size_x :
-      ((max_block_size_x + device::shared_memory_bank_width() - 1) / device::shared_memory_bank_width())
-        * device::shared_memory_bank_width();
+    static constexpr int block_size_x = device::max_block_size<block_size_y, block_size_z>();
 
     using atom_t = std::conditional_t<sizeof(T) % 16 == 0, int4, std::conditional_t<sizeof(T) % 8 == 0, int2, int>>;
     static_assert(sizeof(T) % 4 == 0, "Shared memory cache does not support sub-word size types");

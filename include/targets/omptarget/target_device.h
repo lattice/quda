@@ -159,12 +159,6 @@ namespace quda {
     constexpr size_t max_kernel_arg_size() { return 64; }
 
     /**
-       @brief Helper function that returns the bank width of the
-       shared memory bank width on the target architecture.
-    */
-    constexpr int shared_memory_bank_width() { return 32; }
-
-    /**
        @brief Use a compile time fixed size for the shared local memory,
        until we can find a way to set it dynamically.
     */
