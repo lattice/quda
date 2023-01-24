@@ -12,15 +12,19 @@
 #include <mma_tensor_op/gemm.cuh>
 #include <complex_quda.h>
 
-namespace quda {
+namespace quda
+{
 
-  template <class mma_t_, bool dslash_, bool clover_, bool dagger_, DslashType type_, typename Float,
-            typename yFloat, typename ghostFloat, int nSpin_, int nColor_, int nVec_, int bN_, int bM_, int block_y_, int block_z_>
+  template <class mma_t_, bool dslash_, bool clover_, bool dagger_, DslashType type_, typename Float, typename yFloat,
+            typename ghostFloat, int nSpin_, int nColor_, int nVec_, int bN_, int bM_, int block_y_, int block_z_>
   struct DslashCoarseMmaArg : kernel_param<> {
     static constexpr bool dslash = dslash_;
     static constexpr bool clover = clover_;
     static constexpr bool dagger = dagger_;
     static constexpr DslashType type = type_;
+
+    static constexpr int block_dim = block_z_ * block_y_;
+    static constexpr int min_blocks = 1;
 
     using mma_t = mma_t_;
 
@@ -43,7 +47,8 @@ namespace quda {
 
     using ghost_accessor_t = typename colorspinor::GhostOrder<real, nSpin, nColor, nVec, csOrder, Float, ghostFloat>;
     // disable ghost to reduce arg size
-    using field_accessor_t = typename colorspinor::FieldOrderCB<real, nSpin, nColor, nVec, csOrder, Float, ghostFloat, true>;
+    using field_accessor_t =
+      typename colorspinor::FieldOrderCB<real, nSpin, nColor, nVec, csOrder, Float, ghostFloat, true>;
     using gauge_accessor_t = typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat>;
 
     field_accessor_t out;
@@ -54,17 +59,16 @@ namespace quda {
     const gauge_accessor_t X;
 
     const real kappa;
-    const int parity; // only use this for single parity fields
-    const int nParity; // number of parities we're working on
-    const int_fastdiv X0h; // X[0]/2
-    const int_fastdiv dim[5];   // full lattice dimensions
-    const int commDim[4]; // whether a given dimension is partitioned or not
+    const int parity;         // only use this for single parity fields
+    const int nParity;        // number of parities we're working on
+    const int_fastdiv X0h;    // X[0]/2
+    const int_fastdiv dim[5]; // full lattice dimensions
+    const int commDim[4];     // whether a given dimension is partitioned or not
     const int volumeCB;
     int ghostFaceCB[4];
 
-    DslashCoarseMmaArg(ColorSpinorField &out, const ColorSpinorField &inA,
-                    const ColorSpinorField &inB, const GaugeField &Y, const GaugeField &X,
-                    real kappa, int parity, const ColorSpinorField &halo) :
+    DslashCoarseMmaArg(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
+                       const GaugeField &Y, const GaugeField &X, real kappa, int parity, const ColorSpinorField &halo) :
       kernel_param(dim3(out.SiteSubset() * X.VolumeCB(), block_y, block_z)),
       out(out),
       inA(inA),
@@ -135,17 +139,31 @@ namespace quda {
     typename Config::BLoader b_loader;
 
     if constexpr (Arg::dslash) {
-    //Forward gather - compute fwd offset for spinor fetch
+      // Forward gather - compute fwd offset for spinor fetch
 #pragma unroll
-    for(int d = 0; d < Arg::nDim; d++) // loop over dimension
-    {
-      const int fwd_idx = linkIndexP1(coord, arg.dim, d);
+      for (int d = 0; d < Arg::nDim; d++) // loop over dimension
+      {
+        const int fwd_idx = linkIndexP1(coord, arg.dim, d);
 
-      if (arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
-        if constexpr (doHalo<Arg::type>()) {
-          int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+        if (arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d])) {
+          if constexpr (doHalo<Arg::type>()) {
+            int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+            auto a = arg.Y(Arg::dagger ? d : d + 4, parity, x_cb, 0, 0);
+            auto b = arg.halo.Ghost(d, 1, their_spinor_parity, ghost_idx, 0, 0, 0);
+            constexpr bool a_dagger = false;
+            constexpr bool b_dagger = false;
+
+            __syncthreads();
+            a_loader.template g2s<lda, a_dagger>(a, m_offset, 0, smem_obj_a_real, smem_obj_a_imag);
+            b_loader.template g2s<ldb, b_dagger>(b, n_offset, 0, smem_obj_b_real, smem_obj_b_imag);
+            __syncthreads();
+
+            accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+          }
+        } else if constexpr (doBulk<Arg::type>()) {
+
           auto a = arg.Y(Arg::dagger ? d : d + 4, parity, x_cb, 0, 0);
-          auto b = arg.halo.Ghost(d, 1, their_spinor_parity, ghost_idx, 0, 0, 0);
+          auto b = arg.inA(their_spinor_parity, fwd_idx, 0, 0, 0);
           constexpr bool a_dagger = false;
           constexpr bool b_dagger = false;
 
@@ -156,33 +174,33 @@ namespace quda {
 
           accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
         }
-      } else if constexpr (doBulk<Arg::type>()) {
+      } // nDim
 
-        auto a = arg.Y(Arg::dagger ? d : d + 4, parity, x_cb, 0, 0);
-        auto b = arg.inA(their_spinor_parity, fwd_idx, 0, 0, 0);
-        constexpr bool a_dagger = false;
-        constexpr bool b_dagger = false;
-
-        __syncthreads();
-        a_loader.template g2s<lda, a_dagger>(a, m_offset, 0, smem_obj_a_real, smem_obj_a_imag);
-        b_loader.template g2s<ldb, b_dagger>(b, n_offset, 0, smem_obj_b_real, smem_obj_b_imag);
-        __syncthreads();
-
-        accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
-      }
-    } // nDim
-
-    //Backward gather - compute back offset for spinor and gauge fetch
+      // Backward gather - compute back offset for spinor and gauge fetch
 #pragma unroll
-    for(int d = 0; d < Arg::nDim; d++)
-    {
-      const int back_idx = linkIndexM1(coord, arg.dim, d);
-      if (arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
-        if constexpr (doHalo<Arg::type>()) {
-          const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+      for (int d = 0; d < Arg::nDim; d++) {
+        const int back_idx = linkIndexM1(coord, arg.dim, d);
+        if (arg.commDim[d] && (coord[d] - arg.nFace < 0)) {
+          if constexpr (doHalo<Arg::type>()) {
+            const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
 
-          auto a = arg.Y.Ghost(Arg::dagger ? d + 4: d, 1 - parity, ghost_idx, 0, 0);
-          auto b = arg.halo.Ghost(d, 0, their_spinor_parity, ghost_idx, 0, 0, 0);
+            auto a = arg.Y.Ghost(Arg::dagger ? d + 4 : d, 1 - parity, ghost_idx, 0, 0);
+            auto b = arg.halo.Ghost(d, 0, their_spinor_parity, ghost_idx, 0, 0, 0);
+            constexpr bool a_dagger = true;
+            constexpr bool b_dagger = false;
+
+            __syncthreads();
+            a_loader.template g2s<lda, a_dagger>(a, m_offset, 0, smem_obj_a_real, smem_obj_a_imag);
+            b_loader.template g2s<ldb, b_dagger>(b, n_offset, 0, smem_obj_b_real, smem_obj_b_imag);
+            __syncthreads();
+
+            accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+          }
+        } else if constexpr (doBulk<Arg::type>()) {
+          const int gauge_idx = back_idx;
+
+          auto a = arg.Y(Arg::dagger ? d + 4 : d, 1 - parity, gauge_idx, 0, 0);
+          auto b = arg.inA(their_spinor_parity, back_idx, 0, 0, 0);
           constexpr bool a_dagger = true;
           constexpr bool b_dagger = false;
 
@@ -193,25 +211,10 @@ namespace quda {
 
           accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
         }
-      } else if constexpr (doBulk<Arg::type>()) {
-        const int gauge_idx = back_idx;
 
-        auto a = arg.Y(Arg::dagger ? d + 4: d, 1 - parity, gauge_idx, 0, 0);
-        auto b = arg.inA(their_spinor_parity, back_idx, 0, 0, 0);
-        constexpr bool a_dagger = true;
-        constexpr bool b_dagger = false;
+      } // nDim
 
-        __syncthreads();
-        a_loader.template g2s<lda, a_dagger>(a, m_offset, 0, smem_obj_a_real, smem_obj_a_imag);
-        b_loader.template g2s<ldb, b_dagger>(b, n_offset, 0, smem_obj_b_real, smem_obj_b_imag);
-        __syncthreads();
-
-        accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
-      }
-
-    } //nDim
-
-    accumulator.ax(-arg.kappa);
+      accumulator.ax(-arg.kappa);
     }
 
     /**
@@ -237,6 +240,22 @@ namespace quda {
     return accumulator;
   }
 
+  __device__ __host__ inline void fetch_add(float4 *addr, float4 val)
+  {
+    addr->x += val.x;
+    addr->y += val.y;
+    addr->z += val.z;
+    addr->w += val.w;
+  }
+
+  __device__ __host__ inline void fetch_add(short4 *addr, short4 val)
+  {
+    addr->x += val.x;
+    addr->y += val.y;
+    addr->z += val.z;
+    addr->w += val.w;
+  }
+
   template <typename T> __device__ __host__ inline void fetch_add(complex<T> *addr, complex<T> val)
   {
     addr->real(addr->real() + val.real());
@@ -249,19 +268,17 @@ namespace quda {
   }
 
   struct fetch_add_t {
-    template <class T>
-    __device__ __host__ inline void operator()(T *out, T in) {
-      fetch_add(out, in);
-    }
+    template <class T> __device__ __host__ inline void operator()(T *out, T in) { fetch_add(out, in); }
   };
 
   template <typename Arg> struct CoarseDslashMma {
     const Arg &arg;
-    constexpr CoarseDslashMma(const Arg &arg) : arg(arg) {}
+    constexpr CoarseDslashMma(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ inline void operator()(int parity_x_cb, int thread_idx_y, int thread_idx_z)
+    __device__ inline void operator()()
     {
+      int parity_x_cb = target::thread_idx().x + target::block_idx().x * target::block_dim().x;
       int n_offset = target::block_idx().z * Arg::bN;
       int m_offset = target::block_idx().y * Arg::bM;
       int parity = (arg.nParity == 2) ? parity_x_cb % 2 : arg.parity;

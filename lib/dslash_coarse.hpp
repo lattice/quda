@@ -4,14 +4,12 @@
 #include <worker.h>
 #include <tunable_nd.h>
 #include <kernels/dslash_coarse.cuh>
-#include <kernels/dslash_coarse_mma.cuh>
 #include <shmem_helper.cuh>
 #include <dslash_quda.h>
 #include <dslash_shmem.h>
 #include <multigrid.h>
 
-#include <int_factor_array.hpp>
-#include <utility>
+#include <dslash_coarse_mma.hpp>
 
 namespace quda {
 
@@ -36,56 +34,30 @@ namespace quda {
     mutable int color_col_stride;
     mutable int dim_threads;
 
-    bool use_mma;
-
     long long flops() const
     {
-      return ((dslash * 2 * nDim + clover * 1) * (8 * Ns * Nc * Ns * Nc) - 2 * Ns * Nc) * nParity
-        * static_cast<long long>(out[0].VolumeCB()) * out.size() * out[0].Nvec();
+      return ((dslash*2*nDim+clover*1)*(8*Ns*Nc*Ns*Nc)-2*Ns*Nc)*nParity*(long long)out[0].VolumeCB() * out.size();
     }
-
     long long bytes() const
     {
-      if (use_mma) {
-        return (dslash || clover) * out[0].Bytes() + dslash * 8 * inA[0].Bytes() + clover * inB[0].Bytes() +
-              nSrc * nParity * (dslash * Y.Bytes() * Y.VolumeCB() / (2 * Y.Stride()) + clover * X.Bytes() / 2);
-      } else {
-        return ((dslash||clover) * out[0].Bytes() + dslash*8*inA[0].Bytes() + clover*inB[0].Bytes() +
+      return ((dslash||clover) * out[0].Bytes() + dslash*8*inA[0].Bytes() + clover*inB[0].Bytes() +
               nSrc*nParity*(dslash*Y.Bytes()*Y.VolumeCB()/(2*Y.Stride()) + clover*X.Bytes()/2)) * out.size();
-      }
     }
 
-    unsigned int sharedBytesPerThread() const {
-      if (use_mma) {
-        return 0;
-      } else {
-        return (sizeof(complex<compute_prec<Float>>) * colors_per_thread(Nc, dim_threads));
-      }
-    }
-
+    unsigned int sharedBytesPerThread() const { return (sizeof(complex<compute_prec<Float>>) * colors_per_thread(Nc, dim_threads)); }
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions
-    unsigned int minThreads() const {
-      if (use_mma) {
-        return X.VolumeCB();
-      } else {
-        return color_col_stride * X.VolumeCB();
-      }
-    }
+    unsigned int minThreads() const { return color_col_stride * X.VolumeCB(); }
 
     /**
        @param Helper function to check that the present launch parameters are valid
     */
     bool checkParam(const TuneParam &param) const
     {
-      if (use_mma) {
-        return true;
-      } else {
-        return ((color_col_stride == 1 || minThreads() % (unsigned)device::warp_size() == 0)
-                &&                                          // active threads must be a multiple of the warp
-                (color_col_stride == 1 || param.block.x % device::warp_size() == 0) && // block must be a multiple of the warp
-                Nc % color_col_stride == 0 &&               // number of colors must be divisible by the split
-                param.grid.x < device::max_grid_size(0));   // ensure the resulting grid size valid
-      }
+      return ((color_col_stride == 1 || minThreads() % (unsigned)device::warp_size() == 0)
+              &&                                          // active threads must be a multiple of the warp
+              (color_col_stride == 1 || param.block.x % device::warp_size() == 0) && // block must be a multiple of the warp
+              Nc % color_col_stride == 0 &&               // number of colors must be divisible by the split
+              param.grid.x < device::max_grid_size(0));   // ensure the resulting grid size valid
     }
 
     bool advanceColorStride(TuneParam &param) const
@@ -138,79 +110,37 @@ namespace quda {
     bool advanceAux(TuneParam &) const { return false; }
 #endif
 
-    bool advanceTuneParam(TuneParam &param) const {
-      if (use_mma) {
-        if (param.aux.x < 2) {
-          param.aux.x++;
-          set_mma_param(param);
-          return true;
-        } else {
-          param.aux.x = 0;
-          if (param.aux.y < numFactors(out[0].Nvec() / n_atom_size) - 1) {
-            param.aux.y++;
-            set_mma_param(param);
-            return true;
-          } else {
-            param.aux.y = 0;
-            if (param.aux.z < numFactors((Ns * Nc) / m_atom_size) - 1) {
-              param.aux.z++;
-              set_mma_param(param);
-              return true;
-            } else {
-              return false;
-            }
-          }
-        }
-      } else {
-        return TunableKernel3D::advanceTuneParam(param);
-      }
-    }
-
     void initTuneParam(TuneParam &param) const
     {
-      if (use_mma) {
-        param.aux.x = 0;
-        param.aux.y = 0;
-        param.aux.z = 0;
-        set_mma_param(param);
-      } else {
-        color_col_stride = 1;
-        dim_threads = 1;
-        resizeStep(step_y, 2 * dim_threads); // 2 is forwards/backwards
-        resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / colors_per_thread(Nc, dim_threads)));
-        TunableKernel3D::initTuneParam(param);
-        param.aux = make_int4(color_col_stride, dim_threads, 1, 1);
-      }
+      color_col_stride = 1;
+      dim_threads = 1;
+      resizeStep(step_y, 2 * dim_threads); // 2 is forwards/backwards
+      resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / colors_per_thread(Nc, dim_threads)));
+      TunableKernel3D::initTuneParam(param);
+      param.aux = make_int4(color_col_stride, dim_threads, 1, 1);
     }
 
     /** sets default values for when tuning is disabled */
     void defaultTuneParam(TuneParam &param) const
     {
-      if (use_mma) {
-        param.aux.x = 0;
-        param.aux.y = 0;
-        param.aux.z = 0;
-        set_mma_param(param);
-      } else {
-        color_col_stride = 1;
-        dim_threads = 1;
-        resizeStep(step_y, 2 * dim_threads); // 2 is forwards/backwards
-        resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / colors_per_thread(Nc, dim_threads)));
-        TunableKernel3D::defaultTuneParam(param);
-        param.aux = make_int4(color_col_stride, dim_threads, 1, 1);
+      color_col_stride = 1;
+      dim_threads = 1;
+      resizeStep(step_y, 2 * dim_threads); // 2 is forwards/backwards
+      resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / colors_per_thread(Nc, dim_threads)));
+      TunableKernel3D::defaultTuneParam(param);
+      param.aux = make_int4(color_col_stride, dim_threads, 1, 1);
 
-        // ensure that the default x block size is divisible by the warpSize
-        param.block.x = device::warp_size();
-        param.grid.x = (minThreads() + param.block.x - 1) / param.block.x;
-        param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
-      }
+      // ensure that the default x block size is divisible by the warpSize
+      param.block.x = device::warp_size();
+      param.grid.x = (minThreads() + param.block.x - 1) / param.block.x;
+      param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
     }
 
   public:
     DslashCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                  cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y,
                  const GaugeField &X, double kappa, int parity, MemoryLocation *halo_location,
-                 const ColorSpinorField &halo, bool use_mma) :
+                 const ColorSpinorField &halo) :
       TunableKernel3D(out[0], out[0].SiteSubset() * out.size(), 1),
       out(out),
       inA(inA),
@@ -222,8 +152,7 @@ namespace quda {
       nParity(out[0].SiteSubset()),
       nSrc(out[0].Ndim() == 5 ? out[0].X(4) : 1),
       halo(halo),
-      color_col_stride(-1),
-      use_mma(use_mma)
+      color_col_stride(-1)
     {
       strcpy(aux, (std::string("policy_kernel,") + aux).c_str());
       strcat(aux, comm_dim_partitioned_string());
@@ -249,13 +178,10 @@ namespace quda {
         label[14] = '\0';
         strcat(aux,label);
       }
-      if (use_mma) {
-        strcat(aux, ",mma");
-      }
 
       strcat(aux, ",n_rhs=");
       char rhs_str[8];
-      i32toa(rhs_str, use_mma ? out[0].Nvec() : out.size());
+      i32toa(rhs_str, out.size());
       strcat(aux, rhs_str);
 
 #ifdef QUDA_FAST_COMPILE_DSLASH
@@ -269,166 +195,52 @@ namespace quda {
     using Arg = DslashCoarseArg<dslash, clover, dagger, type, color_stride, dim_stride, Float, yFloat, ghostFloat, Ns,
                                 Nc, native>;
 
-    // using mma_t = smma::smma_t<mma::bfloat16, 8, 1, 1>;  // 3xBF16
-    // using mma_t = smma::smma_t<mma::tfloat32, 4, 1, 1>;  // 3xTF32
-    // using mma_t = simt::simt_t<float, 8, 4, 1, 1>;       // SIMT
-    // using mma_t = hmma::hmma_tfloat32_t<4, 1, 1>;        // 1xTF32
-    // using mma_t = mma::smma_half_t;                      // 3xFP16
-    // using mma_t = mma::hmma_t;                           // 1xFP16
-    using mma_t = typename mma::smma_dispatch<yFloat>::type;
-    static constexpr int n_atom_size = mma_t::MMA_N;
-    static constexpr int m_atom_size = mma_t::MMA_M;
-
-    void set_mma_param(TuneParam &tp) const {
-      tp.block.x = 1;
-      tp.block.y = Ns * Nc / (1 << tp.aux.x);
-      tp.block.z = 8;
-
-      if (out[0].Nvec() % n_atom_size != 0) {
-        errorQuda("out[0].Nvec() %% n_atom_size != 0");
-      }
-      int bN = n_atom_size * get_int_factor_array(out[0].Nvec() / n_atom_size)[tp.aux.y];
-      if (out[0].Nvec() % bN != 0) {
-        errorQuda("Invalid bN.");
-      }
-
-      if ((Ns * Nc) % m_atom_size != 0) {
-        errorQuda("(Ns * Nc) %% m_atom_size != 0");
-      }
-      int bM = m_atom_size * get_int_factor_array((Ns * Nc) / m_atom_size)[tp.aux.z];
-      if ((Ns * Nc) % bM != 0) {
-        errorQuda("Invalid bM");
-      }
-
-      tp.grid = dim3(out[0].SiteSubset() * out[0].VolumeCB(), (Ns * Nc) / bM, out[0].Nvec() / bN);
-      tp.set_max_shared_bytes = true;
-
-      int shared_bytes = mma::shared_memory_bytes<mma_t>(bM, bN, Ns * Nc);
-      tp.shared_bytes = shared_bytes;
-    }
-
-    template <int nVec, int bN, int bM, int block_y, int block_z>
-    void launch_mma(TuneParam &tp, const qudaStream_t &stream) {
-      using Arg = DslashCoarseMmaArg<mma_t, dslash, clover, dagger, type, Float, yFloat, ghostFloat, Ns, Nc, nVec, bN, bM, block_y, block_z>;
-      Arg arg(out[0], inA[0], inB[0], Y, X, (Float)kappa, parity, halo);
-      tp.set_max_shared_bytes = true;
-      launch_device<CoarseDslashMma>(tp, stream, arg);
-    }
-
-    template <int nVec, int bN, int block_y, int block_z, size_t d, size_t... Ds>
-    void launch_mma_span_m(TuneParam &tp, const qudaStream_t &stream, std::index_sequence<d, Ds...>) {
-      if (tp.aux.z == d) {
-        constexpr IntFactorArray<(Ns * Nc) / m_atom_size> a;
-        launch_mma<nVec, bN, a[d] * m_atom_size, block_y, block_z>(tp, stream);
-      } else {
-        if constexpr (sizeof...(Ds) > 0) {
-          launch_mma_span_m<nVec, bN, block_y, block_z>(tp, stream, std::index_sequence<Ds...>());
-        } else {
-          errorQuda("Invalid tp.aux.y.");
-        }
-      }
-    }
-
-    template <int nVec, int block_y, int block_z, size_t d, size_t... Ds>
-    void launch_mma_span_n(TuneParam &tp, const qudaStream_t &stream, std::index_sequence<d, Ds...>) {
-      if (tp.aux.y == d) {
-        constexpr IntFactorArray<nVec / n_atom_size> a;
-        std::make_index_sequence<IntFactorArray<(Ns * Nc) / m_atom_size>().size()> xt;
-        launch_mma_span_m<nVec, a[d] * n_atom_size, block_y, block_z>(tp, stream, xt);
-      } else {
-        if constexpr (sizeof...(Ds) > 0) {
-          launch_mma_span_n<nVec, block_y, block_z>(tp, stream, std::index_sequence<Ds...>());
-        } else {
-          errorQuda("Invalid tp.aux.y.");
-        }
-      }
-    }
-
-    template <int nVec>
-    void launch_mma(TuneParam &tp, const qudaStream_t &stream) {
-      auto old_z = vector_length_z;
-      auto old_y = vector_length_y;
-      resizeVector(tp.block.y * tp.grid.y, tp.block.z * tp.grid.z);
-
-      std::make_index_sequence<IntFactorArray<nVec / n_atom_size>().size()> xt;
-
-      switch (tp.aux.x) {
-        case 0: launch_mma_span_n<nVec, Ns * Nc / 1, 8>(tp, stream, xt); break;
-        case 1: launch_mma_span_n<nVec, Ns * Nc / 2, 8>(tp, stream, xt); break;
-        case 2: launch_mma_span_n<nVec, Ns * Nc / 4, 8>(tp, stream, xt); break;
-        default: errorQuda("tp.aux.x = %d not supported", tp.aux.x);
-      }
-
-      resizeVector(old_y, old_z);
-    }
-
-    template <int...> struct IntList { };
-
-    template <int nVec, int... N>
-    void launch_mma_span_nVec(TuneParam &tp, const qudaStream_t &stream, IntList<nVec, N...>) {
-      if (out[0].Nvec() == nVec) {
-        launch_mma<nVec>(tp, stream);
-      } else {
-        IntList<N...> nVecs;
-        if constexpr (sizeof...(N) > 0) {
-          launch_mma_span_nVec(tp, stream, nVecs);
-        } else {
-          errorQuda("nVec = %d not instantiated\n", out[0].Nvec());
-        }
-      }
-    }
-
     void apply(const qudaStream_t &stream)
     {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (use_mma) {
-        IntList<@QUDA_MULTIGRID_MRHS_LIST@> nVecs;
-        launch_mma_span_nVec(tp, stream, nVecs);
+      const TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      color_col_stride = tp.aux.x;
+      dim_threads = tp.aux.y;
+      resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / colors_per_thread(Nc, dim_threads)));
+      if (!checkParam(tp)) errorQuda("Invalid launch param");
+
+      if (out[0].Location() == QUDA_CPU_FIELD_LOCATION) {
+        errorQuda("Not enabled");
       } else {
-        color_col_stride = tp.aux.x;
-        dim_threads = tp.aux.y;
-        resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / colors_per_thread(Nc, dim_threads)));
-        if (!checkParam(tp)) errorQuda("Invalid launch param");
+        checkNative(out[0], inA[0], inB[0], Y, X);
 
-        if (out[0].Location() == QUDA_CPU_FIELD_LOCATION) {
-          errorQuda("Not enabled");
-        } else {
-          checkNative(out[0], inA[0], inB[0], Y, X);
-
-          switch (tp.aux.y) { // dimension gather parallelisation
-            case 1:
-              switch (tp.aux.x) { // this is color_col_stride
-                case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 1>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
+        switch (tp.aux.y) { // dimension gather parallelisation
+        case 1:
+          switch (tp.aux.x) { // this is color_col_stride
+          case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 1>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
 #ifndef QUDA_FAST_COMPILE_DSLASH
-                case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 1>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
-                case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 1>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
-                case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 1>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
+          case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 1>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
+          case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 1>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
+          case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 1>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
 #endif
-                default: errorQuda("Color column stride %d not valid", static_cast<int>(tp.aux.x));
-              }
-              break;
-#ifndef QUDA_FAST_COMPILE_DSLASH
-            case 2:
-              switch (tp.aux.x) { // this is color_col_stride
-                case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 2>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
-                case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 2>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
-                case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 2>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
-                case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 2>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
-                default: errorQuda("Color column stride %d not valid", static_cast<int>(tp.aux.x));
-              }
-              break;
-            case 4:
-              switch (tp.aux.x) { // this is color_col_stride
-                case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 4>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
-                case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 4>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
-                case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 4>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
-                case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 4>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
-                default: errorQuda("Color column stride %d not valid", static_cast<int>(tp.aux.x));
-              }
-              break;
-#endif
-            default: errorQuda("Invalid dimension thread splitting %d", static_cast<int>(tp.aux.y));
+          default: errorQuda("Color column stride %d not valid", static_cast<int>(tp.aux.x));
           }
+          break;
+#ifndef QUDA_FAST_COMPILE_DSLASH
+        case 2:
+          switch (tp.aux.x) { // this is color_col_stride
+          case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 2>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
+          case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 2>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
+          case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 2>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
+          case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 2>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
+          default: errorQuda("Color column stride %d not valid", static_cast<int>(tp.aux.x));
+          }
+          break;
+        case 4:
+          switch (tp.aux.x) { // this is color_col_stride
+          case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 4>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
+          case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 4>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
+          case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 4>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
+          case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 4>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
+          default: errorQuda("Color column stride %d not valid", static_cast<int>(tp.aux.x));
+          }
+          break;
+#endif
+        default: errorQuda("Invalid dimension thread splitting %d", static_cast<int>(tp.aux.y));
         }
       }
     }
@@ -436,6 +248,19 @@ namespace quda {
     void preTune() { for (auto i = 0u; i < out.size(); i++) out[i].backup(); }
     void postTune() { for (auto i = 0u; i < out.size(); i++) out[i].restore(); }
   };
+
+  template <typename Float, typename yFloat, typename ghostFloat, int Ns, int Nc, bool dslash, bool clover, bool dagger,
+           DslashType type>
+  void dslash_coarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
+          cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y,
+          const GaugeField &X, double kappa, int parity, MemoryLocation *halo_location,
+          const ColorSpinorField &halo, bool use_mma) {
+    if (use_mma) {
+      DslashCoarseMma<Float, yFloat, ghostFloat, Ns, Nc, dslash, clover, dagger, type> d(out, inA, inB, Y, X, kappa, parity, halo_location, halo);
+    } else {
+      DslashCoarse<Float, yFloat, ghostFloat, Ns, Nc, dslash, clover, dagger, type> d(out, inA, inB, Y, X, kappa, parity, halo_location, halo);
+    }
+  }
 
   template <typename Float, typename yFloat, typename ghostFloat, bool dagger, int coarseColor>
   inline void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA, cvector_ref<const ColorSpinorField> &inB,
@@ -457,17 +282,17 @@ namespace quda {
       if (clover) {
         switch (type) {
         case DSLASH_FULL: {
-          DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, true, dagger, DSLASH_FULL> dslash(
+          dslash_coarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, true, dagger, DSLASH_FULL>(
                                                                                                                    out, inA, inB, Y, X, kappa, parity, halo_location, halo, use_mma);
           break;
         }
         case DSLASH_EXTERIOR: {
-          DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, true, dagger, DSLASH_EXTERIOR> dslash(
+          dslash_coarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, true, dagger, DSLASH_EXTERIOR>(
                                                                                                                        out, inA, inB, Y, X, kappa, parity, halo_location, halo, use_mma);
           break;
         }
         case DSLASH_INTERIOR: {
-          DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, true, dagger, DSLASH_INTERIOR> dslash(
+          dslash_coarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, true, dagger, DSLASH_INTERIOR>(
                                                                                                                        out, inA, inB, Y, X, kappa, parity, halo_location, halo, use_mma);
           break;
         }
@@ -478,17 +303,17 @@ namespace quda {
 
         switch (type) {
         case DSLASH_FULL: {
-          DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, false, dagger, DSLASH_FULL> dslash(
+          dslash_coarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, false, dagger, DSLASH_FULL>(
                                                                                                                     out, inA, inB, Y, X, kappa, parity, halo_location, halo, use_mma);
           break;
         }
         case DSLASH_EXTERIOR: {
-          DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, false, dagger, DSLASH_EXTERIOR> dslash(
+          dslash_coarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, false, dagger, DSLASH_EXTERIOR>(
                                                                                                                         out, inA, inB, Y, X, kappa, parity, halo_location, halo, use_mma);
           break;
         }
         case DSLASH_INTERIOR: {
-          DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, false, dagger, DSLASH_INTERIOR> dslash(
+          dslash_coarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, true, false, dagger, DSLASH_INTERIOR>(
                                                                                                                         out, inA, inB, Y, X, kappa, parity, halo_location, halo, use_mma);
           break;
         }
@@ -499,7 +324,7 @@ namespace quda {
 
       if (type == DSLASH_EXTERIOR) errorQuda("Cannot call halo on pure clover kernel");
       if (clover) {
-        DslashCoarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, false, true, dagger, DSLASH_FULL> dslash(
+        dslash_coarse<Float, yFloat, ghostFloat, coarseSpin, coarseColor, false, true, dagger, DSLASH_FULL>(
                                                                                                                   out, inA, inB, Y, X, kappa, parity, halo_location, halo, use_mma);
       } else {
         errorQuda("Unsupported dslash=false clover=false");

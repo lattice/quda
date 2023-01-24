@@ -183,6 +183,9 @@ namespace quda
         int group_id = lane_id / 4;
         constexpr int w_m = 8 * batch;
         constexpr int w_k = 4;
+        static_assert(bM % w_m == 0, "bM %% w_m");
+        static_assert(bN % w_k == 0, "bN %% w_k");
+
         constexpr int tile_dim_m = bM / w_m;
         constexpr int tile_dim_k = bN / w_k;
 

@@ -280,6 +280,11 @@ namespace quda {
     typedef float8 type;
   };
 
+  // single precision
+  template <> struct VectorType<int, 1>{typedef int type; };
+  template <> struct VectorType<int, 2>{typedef int2 type; };
+  template <> struct VectorType<int, 4>{typedef int4 type; };
+
   // half precision
   template <> struct VectorType<short, 1>{typedef short type; };
   template <> struct VectorType<short, 2>{typedef short2 type; };

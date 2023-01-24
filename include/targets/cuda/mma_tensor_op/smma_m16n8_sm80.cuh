@@ -11,6 +11,8 @@ namespace quda
     using bfloat16 = mma::bfloat16;
     using bfloat162 = mma::bfloat162;
     using tfloat32 = mma::tfloat32;
+    using half = mma::half;
+    using half2 = mma::half2;
 
     template <class T> static void __device__ inline get_big_small(float &big, float &small, const float &f)
     {
@@ -102,7 +104,8 @@ namespace quda
       static constexpr int mma_n = MMA_N;
       static constexpr int mma_k = MMA_K;
 
-      static std::string get_type_name() {
+      static std::string get_type_name()
+      {
         if constexpr (std::is_same_v<shuffle_t, tfloat32>) {
           return ",3xtfloat32,m" + std::to_string(MMA_M) + "n" + std::to_string(MMA_N) + "k" + std::to_string(MMA_K);
         } else if constexpr (std::is_same_v<shuffle_t, bfloat16>) {
@@ -305,22 +308,22 @@ namespace quda
         template <int ldc> __device__ void store(void *ptr, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
         {
           // This method is only used for the mobius preconditioner where shuffle_t = half.
-          static_assert(std::is_same_v<shuffle_t, half> == true, "This method should only be used for mobius preconditioner.");
+          static_assert(std::is_same_v<shuffle_t, half> == true,
+                        "This method should only be used for mobius preconditioner.");
           static_assert(thread_n == 2, "This method should only be used for mobius preconditioner.");
           half2 *C = reinterpret_cast<half2 *>(ptr);
 #pragma unroll
           for (int tm = 0; tm < thread_m; tm++) {
 #pragma unroll
-              for (int wn = 0; wn < warp_n; wn++) {
+            for (int wn = 0; wn < warp_n; wn++) {
 #pragma unroll
-                for (int wm = 0; wm < warp_m; wm++) {
-                  int m = warp_row * mma_m + wm * inst_m + (wrm.group_id + tm * 8);
-                  int n = warp_col * mma_n + wn * inst_n + (wrm.thread_id_in_group * 2);
-                  C[(m * ldc + n) / 2] =
-                    __floats2half2_rn(reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + 0)],
-                      reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + 1)]);
-                }
+              for (int wm = 0; wm < warp_m; wm++) {
+                int m = warp_row * mma_m + wm * inst_m + (wrm.group_id + tm * 8);
+                int n = warp_col * mma_n + wn * inst_n + (wrm.thread_id_in_group * 2);
+                C[(m * ldc + n) / 2] = __floats2half2_rn(reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + 0)],
+                                                         reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + 1)]);
               }
+            }
           }
         }
 
@@ -366,7 +369,8 @@ namespace quda
 
       template <int M, int N, int ldc, bool dagger, class gmem_op_t, class op_t>
       static inline __device__ void store_complex(int m_offset, int n_offset, const WarpRegisterMapping &wrm,
-                                                  gmem_op_t &cc, const OperandC &op_c_real, const OperandC &op_c_imag, op_t op)
+                                                  gmem_op_t &cc, const OperandC &op_c_real, const OperandC &op_c_imag,
+                                                  op_t op)
       {
         using store_t = typename gmem_op_t::store_type;
         using complex_t = complex<store_t>;
@@ -378,43 +382,57 @@ namespace quda
         constexpr int thread_count = OperandC::thread_count;
 
         constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
+        if constexpr (dagger) {
 #pragma unroll
-        for (int tm = 0; tm < thread_m; tm++) {
+          for (int tm = 0; tm < thread_m; tm++) {
 #pragma unroll
-          for (int tn = 0; tn < thread_n; tn++) {
+            for (int tn = 0; tn < thread_n; tn++) {
+#pragma unroll
+              for (int wn = 0; wn < warp_n; wn++) {
+#pragma unroll
+                for (int wm = 0; wm < warp_m; wm++) {
+                  int m = m_offset + wm * inst_m + (wrm.group_id + tm * 8);
+                  int n = n_offset + wn * inst_n + (wrm.thread_id_in_group * 2 + tn);
+                  if (!check_bounds || (m < N && n < M)) {
+                    int reg_index = (wn * warp_m + wm) * thread_count + tm * thread_n + tn;
+                    if constexpr (gmem_op_t::fixed) {
+                      auto scale = cc.get_scale();
+                      complex_t out = {f2i_round<store_t>(scale * op_c_real.reg[reg_index]),
+                                       f2i_round<store_t>(-scale * op_c_imag.reg[reg_index])};
+                      op(&C[n * ldc + m], out);
+                    } else {
+                      complex_t out = {op_c_real.reg[reg_index], -op_c_imag.reg[reg_index]};
+                      op(&C[n * ldc + m], out);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } else {
+#pragma unroll
+          for (int tm = 0; tm < thread_m; tm++) {
 #pragma unroll
             for (int wn = 0; wn < warp_n; wn++) {
 #pragma unroll
               for (int wm = 0; wm < warp_m; wm++) {
+                static_assert(thread_n == 2, "thread_n == 2");
                 int m = m_offset + wm * inst_m + (wrm.group_id + tm * 8);
-                int n = n_offset + wn * inst_n + (wrm.thread_id_in_group * 2 + tn);
-                if constexpr (dagger) {
-                  if (!check_bounds || (m < N && n < M)) {
-                    if constexpr (gmem_op_t::fixed) {
-                      auto scale = cc.get_scale();
-                      complex_t out = {
-                        f2i_round<store_t>(scale * op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]),
-                        f2i_round<store_t>(-scale * op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)])};
-                      op(&C[n * ldc + m], out);
-                    } else {
-                      complex_t out = {op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)],
-                                        -op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]};
-                      op(&C[n * ldc + m], out);
-                    }
-                  }
-                } else {
-                  if (!check_bounds || (m < M && n < N)) {
-                    if constexpr (gmem_op_t::fixed) {
-                      auto scale = cc.get_scale();
-                      complex_t out = {
-                        f2i_round<store_t>(scale * op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]),
-                        f2i_round<store_t>(scale * op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)])};
-                      op(&C[m * ldc + n], out);
-                    } else {
-                      complex_t out = {op_c_real.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)],
-                                        op_c_imag.reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)]};
-                      op(&C[m * ldc + n], out);
-                    }
+                int n = n_offset + wn * inst_n + (wrm.thread_id_in_group * 2);
+                if (!check_bounds || (m < M && n < N)) {
+                  using vector_t = typename VectorType<store_t, 4>::type; // array<store_t, 4>;
+                  int reg_index = (wn * warp_m + wm) * thread_count + tm * thread_n;
+                  if constexpr (gmem_op_t::fixed) {
+                    auto scale = cc.get_scale();
+                    vector_t out = {f2i_round<store_t>(scale * op_c_real.reg[reg_index + 0]),
+                                    f2i_round<store_t>(scale * op_c_imag.reg[reg_index + 0]),
+                                    f2i_round<store_t>(scale * op_c_real.reg[reg_index + 1]),
+                                    f2i_round<store_t>(scale * op_c_imag.reg[reg_index + 1])};
+                    op(reinterpret_cast<vector_t *>(&C[m * ldc + n]), out);
+                  } else {
+                    vector_t out = {op_c_real.reg[reg_index + 0], op_c_imag.reg[reg_index + 0],
+                                    op_c_real.reg[reg_index + 1], op_c_imag.reg[reg_index + 1]};
+                    op(reinterpret_cast<vector_t *>(&C[m * ldc + n]), out);
                   }
                 }
               }
