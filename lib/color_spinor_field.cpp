@@ -174,7 +174,8 @@ namespace quda
       alloc = true;
     }
 
-    if (composite_descr.is_composite && param.create != QUDA_REFERENCE_FIELD_CREATE && param.create != QUDA_GHOST_FIELD_CREATE) {
+    if (composite_descr.is_composite && param.create != QUDA_REFERENCE_FIELD_CREATE
+        && param.create != QUDA_GHOST_FIELD_CREATE) {
       ColorSpinorParam param;
       fill(param);
       param.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -841,7 +842,7 @@ namespace quda
     if (v[0].Ndim() == 5) errorQuda("Cannot batch together 5-d fields");
     ColorSpinorParam param(v[0]);
     param.nDim++;
-    param.x[param.nDim-1] = v.size();
+    param.x[param.nDim - 1] = v.size();
     param.create = QUDA_GHOST_FIELD_CREATE;
 
     // we use a custom cache key for ghost-only fields
@@ -908,7 +909,8 @@ namespace quda
     new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location() : new_location;
 
     coarseParam.fieldOrder = (new_location == QUDA_CUDA_FIELD_LOCATION) ?
-      colorspinor::getNative(new_precision, coarseParam.nSpin) : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      colorspinor::getNative(new_precision, coarseParam.nSpin) :
+      QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
     coarseParam.setPrecision(new_precision);
 
@@ -1367,8 +1369,8 @@ namespace quda
         if ((pack_host || halo_host) && comm_peer2peer_enabled_global())
           errorQuda("Cannot use zero-copy memory with peer-to-peer comms yet");
 
-        genericPackGhost(send, *this, parity, nFace, dagger,
-                         pack_destination, 0, v); // FIXME - need support for asymmetric topologies
+        genericPackGhost(send, *this, parity, nFace, dagger, pack_destination, 0,
+                         v); // FIXME - need support for asymmetric topologies
 
         size_t total_bytes = 0;
         for (int i = 0; i < nDimComms; i++)
@@ -1498,8 +1500,8 @@ namespace quda
             }
           }
         }
-        genericPackGhost(packBuffer, *this, parity, nFace, dagger, pack_destination,
-                         shmem, v); // FIXME - need support for asymmetric topologies
+        genericPackGhost(packBuffer, *this, parity, nFace, dagger, pack_destination, shmem,
+                         v); // FIXME - need support for asymmetric topologies
       }
     }
   }

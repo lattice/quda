@@ -312,13 +312,11 @@ namespace quda {
      @param[in] parity of the output fine field (if single parity output field)
    */
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		  const int *fine_to_coarse, const int * const *spin_map,
-		  int parity=QUDA_INVALID_PARITY);
+                  const int *fine_to_coarse, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
 
   template <int coarseColor, int fineColor>
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		  const int *fine_to_coarse, const int * const *spin_map,
-		  int parity=QUDA_INVALID_PARITY);
+                  const int *fine_to_coarse, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
 
   /**
      @brief Apply the restriction operator
@@ -330,14 +328,12 @@ namespace quda {
      @param[in] spin_map Spin blocking lookup table
      @param[in] parity of the input fine field (if single parity input field)
    */
-  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		const int *fine_to_coarse, const int *coarse_to_fine, const int * const *spin_map,
-		int parity=QUDA_INVALID_PARITY);
+  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, const int *fine_to_coarse,
+                const int *coarse_to_fine, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
 
   template <int coarseColor, int fineColor>
-  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		const int *fine_to_coarse, const int *coarse_to_fine, const int * const *spin_map,
-		int parity=QUDA_INVALID_PARITY);
+  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, const int *fine_to_coarse,
+                const int *coarse_to_fine, const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
 
   /**
      @brief Apply the unitary "prolongation" operator for Kahler-Dirac preconditioning

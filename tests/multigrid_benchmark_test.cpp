@@ -240,8 +240,8 @@ int main(int argc, char **argv)
   // command line options
   auto app = make_app();
   add_multigrid_option_group(app);
-  CLI::TransformPairs<int> test_type_map {{"Dslash", 0}, {"Mat", 1}, {"Clover", 2}, {"MatDag", 3}, {"MatDagMat", 4},
-                                          {"MatPC", 5}, {"MatPCDag", 6}, {"MatPCDagMatPC", 7}};
+  CLI::TransformPairs<int> test_type_map {{"Dslash", 0},    {"Mat", 1},   {"Clover", 2},   {"MatDag", 3},
+                                          {"MatDagMat", 4}, {"MatPC", 5}, {"MatPCDag", 6}, {"MatPCDagMatPC", 7}};
   app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
 
   try {
@@ -278,7 +278,7 @@ int main(int argc, char **argv)
   }
 
   // now rerun with more iterations to get accurate speed measurements
-  dirac->Flops(); // reset flops counter
+  dirac->Flops();    // reset flops counter
   dirac_pc->Flops(); // reset flops counter
 
   double secs = benchmark(test_type, niter);

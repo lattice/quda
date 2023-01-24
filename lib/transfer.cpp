@@ -155,8 +155,8 @@ namespace quda {
       param.x[0] *= 2;
     }
     param.location = location;
-    param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ?
-      colorspinor::getNative(null_precision, param.nSpin) : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ? colorspinor::getNative(null_precision, param.nSpin) :
+                                                              QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     param.setPrecision(location == QUDA_CUDA_FIELD_LOCATION ? null_precision : B[0]->Precision());
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
@@ -189,8 +189,8 @@ namespace quda {
     ColorSpinorParam param(*B[0]);
     param.create = QUDA_NULL_FIELD_CREATE;
     param.location = location;
-    param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ?
-      colorspinor::getNative(null_precision, param.nSpin) : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ? colorspinor::getNative(null_precision, param.nSpin) :
+                                                              QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     if (param.Precision() < QUDA_SINGLE_PRECISION) param.setPrecision(QUDA_SINGLE_PRECISION);
 
     if (location == QUDA_CUDA_FIELD_LOCATION) {

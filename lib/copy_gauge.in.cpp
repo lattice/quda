@@ -16,14 +16,15 @@ namespace quda {
                                  void **ghostOut, void **ghostIn, int type);
 
   template <int nColor>
-  void copyGenericGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
-			  void *Out, void *In, void **ghostOut, void **ghostIn, int type);
+  void copyGenericGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out, void *In,
+                          void **ghostOut, void **ghostIn, int type);
 
-  template <int...> struct IntList { };
+  template <int...> struct IntList {
+  };
 
-  template <int Nc, int...N>
-  void copyGenericGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
-			  void *Out, void *In, void **ghostOut, void **ghostIn, int type, IntList<Nc, N...>)
+  template <int Nc, int... N>
+  void copyGenericGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out, void *In,
+                          void **ghostOut, void **ghostIn, int type, IntList<Nc, N...>)
   {
     if (in.Ncolor() / 2 == Nc) {
       copyGenericGaugeMG<Nc>(out, in, location, Out, In, ghostOut, ghostIn, type);
@@ -61,8 +62,8 @@ namespace quda {
   void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
 			void *Out, void *In, void **ghostOut, void **ghostIn, int type) {
     // do not copy the ghost zone if it does not exist
-    if (type == 0 && (in.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD ||
-          out.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD)) type = 2;
+    if (type == 0 && (in.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD || out.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD))
+      type = 2;
 
     if (in.Ncolor() != out.Ncolor())
       errorQuda("Colors (%d,%d) do not match", out.Ncolor(), in.Ncolor());
@@ -72,7 +73,7 @@ namespace quda {
 
     if (in.Ncolor() != 3) {
       if constexpr (is_enabled_multigrid()) {
-        copyGenericGaugeMG(out, in, location, Out, In, ghostOut, ghostIn, type, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+        copyGenericGaugeMG(out, in, location, Out, In, ghostOut, ghostIn, type, IntList<@QUDA_MULTIGRID_NVEC_LIST @>());
       } else {
         errorQuda("Multigrid has not been built");
       }
@@ -88,6 +89,5 @@ namespace quda {
       errorQuda("Unknown precision %d", out.Precision());
     }
   }
-
 
 } // namespace quda

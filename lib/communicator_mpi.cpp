@@ -304,9 +304,7 @@ namespace quda
 
     for (size_t i = 0; i < size; i++) {
       data[i] = recv_trans[i * n];
-      for (size_t j = 1; j < n; j++) {
-        data[i] = data[i] > recv_trans[i* n + j] ? data[i] : recv_trans[i * n + j];
-      }
+      for (size_t j = 1; j < n; j++) { data[i] = data[i] > recv_trans[i * n + j] ? data[i] : recv_trans[i * n + j]; }
     }
   }
 

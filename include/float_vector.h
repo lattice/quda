@@ -119,8 +119,10 @@ namespace quda {
   template <typename T> constexpr specialize<T, deviation_t<double>> zero() { return {0.0, 0.0}; }
   template <typename T> constexpr specialize<T, deviation_t<float>> zero() { return {0.0f, 0.0f}; }
 
-  template <typename T>
-  __host__ __device__ inline bool operator>(const deviation_t<T> &a, const deviation_t<T> &b) { return a.diff > b.diff; }
+  template <typename T> __host__ __device__ inline bool operator>(const deviation_t<T> &a, const deviation_t<T> &b)
+  {
+    return a.diff > b.diff;
+  }
 
   template <typename T> struct low {
     static constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> value() { return std::numeric_limits<T>::lowest(); }

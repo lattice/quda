@@ -173,8 +173,10 @@ namespace quda
        This is the default base case that is for a simple object
        @param[in] v Object reference we wish to wrap
      */
-    template <typename U>
-    std::enable_if_t<!is_initializer_list_v<U>, vector> make_set(U &v) { return vector(1, static_cast<T&>(v)); }
+    template <typename U> std::enable_if_t<!is_initializer_list_v<U>, vector> make_set(U &v)
+    {
+      return vector(1, static_cast<T &>(v));
+    }
 
     /**
        make_set is a helper function that creates a vector of
@@ -192,7 +194,7 @@ namespace quda
        objects.  Used to convert a non-const set to a const set.
        @param[in] v Vector argument we wish to wrap
      */
-    template <typename U> vector make_set(vector_ref<U> &v) { return vector{v.begin(), v.end()}; }
+    template <typename U> vector make_set(vector_ref<U> &v) { return vector {v.begin(), v.end()}; }
 
     /**
        make_set is a helper function that creates a vector of
@@ -281,19 +283,16 @@ namespace quda
       for (auto i = 0u; i < vector::size(); i++) odd.push_back(operator[](i).Odd());
       return odd;
     }
-
   };
 
   template <class T> using cvector_ref = const vector_ref<T>;
-
 
   /**
      @brief Create a vector_ref of the parity subset requested.
      @param[in] in The input set
      @param[in] parity The desired parity subset
    */
-  template <class T>
-  auto make_parity_subset(T &in, QudaParity parity)
+  template <class T> auto make_parity_subset(T &in, QudaParity parity)
   {
     if (parity != QUDA_EVEN_PARITY && parity != QUDA_ODD_PARITY) errorQuda("Invalid parity %d requested", parity);
     vector_ref<typename T::value_type> out;

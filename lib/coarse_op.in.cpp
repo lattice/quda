@@ -1,10 +1,12 @@
 #include "multigrid.h"
 
-namespace quda {
+namespace quda
+{
 
-  template <int...> struct IntList { };
+  template <int...> struct IntList {
+  };
 
-  template <int fineColor, int coarseColor, int...N>
+  template <int fineColor, int coarseColor, int... N>
   void CoarseOp2(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge, const CloverField *clover,
                  double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
                  IntList<coarseColor, N...>)
@@ -20,12 +22,13 @@ namespace quda {
     }
   }
 
-  template <int fineColor, int...N>
+  template <int fineColor, int... N>
   void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge, const CloverField *clover,
-                double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, IntList<fineColor, N...>)
+                double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
+                IntList<fineColor, N...>)
   {
     if (gauge.Ncolor() == fineColor) {
-      IntList<@QUDA_MULTIGRID_NVEC_LIST@> coarseColors;
+      IntList<@QUDA_MULTIGRID_NVEC_LIST @> coarseColors;
       CoarseOp2<fineColor>(Y, X, T, gauge, clover, kappa, mass, mu, mu_factor, dirac, matpc, coarseColors);
     } else {
       if constexpr (sizeof...(N) > 0) {
@@ -36,9 +39,8 @@ namespace quda {
     }
   }
 
-  void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
-                const CloverField *clover, double kappa, double mass, double mu, double mu_factor,
-                QudaDiracType dirac, QudaMatPCType matpc)
+  void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge, const CloverField *clover,
+                double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
   {
     if constexpr (is_enabled_multigrid()) {
       IntList<3> fineColors;
@@ -48,4 +50,4 @@ namespace quda {
     }
   }
 
-}
+} // namespace quda

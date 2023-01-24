@@ -1,13 +1,14 @@
 #include "multigrid.h"
 
-namespace quda {
+namespace quda
+{
 
-  template <int...> struct IntList { };
+  template <int...> struct IntList {
+  };
 
-  template <int fineColor, int coarseColor, int...N>
+  template <int fineColor, int coarseColor, int... N>
   void Prolongate2(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-                   const int *fine_to_coarse, const int * const * spin_map, int parity,
-                   IntList<coarseColor, N...>)
+                   const int *fine_to_coarse, const int *const *spin_map, int parity, IntList<coarseColor, N...>)
   {
     if (in.Ncolor() == coarseColor) {
       if constexpr (coarseColor >= fineColor) {
@@ -24,12 +25,12 @@ namespace quda {
     }
   }
 
-  template <int fineColor, int...N>
+  template <int fineColor, int... N>
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-                  const int *fine_to_coarse, const int * const * spin_map, int parity, IntList<fineColor, N...>)
+                  const int *fine_to_coarse, const int *const *spin_map, int parity, IntList<fineColor, N...>)
   {
     if (out.Ncolor() == fineColor) {
-      IntList<@QUDA_MULTIGRID_NVEC_LIST@> coarseColors;
+      IntList<@QUDA_MULTIGRID_NVEC_LIST @> coarseColors;
       Prolongate2<fineColor>(out, in, v, fine_to_coarse, spin_map, parity, coarseColors);
     } else {
       if constexpr (sizeof...(N) > 0) {
@@ -41,14 +42,14 @@ namespace quda {
   }
 
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-                  const int *fine_to_coarse, const int * const * spin_map, int parity)
+                  const int *fine_to_coarse, const int *const *spin_map, int parity)
   {
     if constexpr (is_enabled_multigrid()) {
-      IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> fineColors;
+      IntList<@QUDA_MULTIGRID_NC_NVEC_LIST @> fineColors;
       Prolongate(out, in, v, fine_to_coarse, spin_map, parity, fineColors);
     } else {
       errorQuda("Multigrid has not been built");
     }
   }
 
-}
+} // namespace quda

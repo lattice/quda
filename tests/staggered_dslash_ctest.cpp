@@ -57,8 +57,8 @@ protected:
     auto prec = getPrecision(precision);
 
     printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
-    printfQuda("%s   %s       %s           %d       %d/%d/%d        %d \n", get_prec_str(prec), get_recon_str(link_recon),
-               get_string(dtest_type_map, dtest_type).c_str(), dagger, xdim, ydim, zdim, tdim);
+    printfQuda("%s   %s       %s           %d       %d/%d/%d        %d \n", get_prec_str(prec),
+               get_recon_str(link_recon), get_string(dtest_type_map, dtest_type).c_str(), dagger, xdim, ydim, zdim, tdim);
   }
 
 public:

@@ -511,10 +511,9 @@ namespace quda {
      @param[in] halo_precision What precision to use for the halos (if QUDA_INVALID_PRECISION, use field precision)
    */
   void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
-                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
-                   double kappa, int parity = QUDA_INVALID_PARITY,
-		   bool dslash=true, bool clover=true, bool dagger=false, const int *commDim=0,
-                   QudaPrecision halo_precision=QUDA_INVALID_PRECISION);
+                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
+                   int parity = QUDA_INVALID_PARITY, bool dslash = true, bool clover = true, bool dagger = false,
+                   const int *commDim = 0, QudaPrecision halo_precision = QUDA_INVALID_PRECISION);
 
   /**
      @brief Apply the coarse dslash stencil.  This single driver
@@ -537,9 +536,8 @@ namespace quda {
    */
   template <bool dagger, int coarseColor>
   void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
-                   cvector_ref<const ColorSpinorField> &inB,
-                   const GaugeField &Y, const GaugeField &X, double kappa, int parity,
-                   bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision);
+                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
+                   int parity, bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision);
 
   /**
      @brief Coarse operator construction from a fine-grid operator (Wilson / Clover)
@@ -658,8 +656,8 @@ namespace quda {
    */
   template <int fineColor, int coarseColor, bool mma>
   void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
-                         const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mass, double mu, double mu_factor,
-                         QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional);
+                      const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mass, double mu,
+                      double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional);
 
   /**
      @brief Calculate preconditioned coarse links and coarse clover inverse field

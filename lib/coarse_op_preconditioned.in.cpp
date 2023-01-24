@@ -1,12 +1,14 @@
 #include "multigrid.h"
 
-namespace quda {
+namespace quda
+{
 
-  template <int...> struct IntList { };
+  template <int...> struct IntList {
+  };
 
-  template <int Nc, int...N>
-  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y,
-                     const GaugeField &X, bool use_mma, IntList<Nc,N...>)
+  template <int Nc, int... N>
+  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma,
+                     IntList<Nc, N...>)
   {
     if (Y.Ncolor() / 2 == Nc) {
       calculateYhat<Nc>(Yhat, Xinv, Y, X, use_mma);
@@ -18,14 +20,13 @@ namespace quda {
       }
     }
   }
-  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y,
-                     const GaugeField &X, bool use_mma)
+  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma)
   {
     if constexpr (is_enabled_multigrid()) {
-      calculateYhat(Yhat, Xinv, Y, X, use_mma, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+      calculateYhat(Yhat, Xinv, Y, X, use_mma, IntList<@QUDA_MULTIGRID_NVEC_LIST @>());
     } else {
       errorQuda("Multigrid has not been built");
     }
   }
 
-}
+} // namespace quda

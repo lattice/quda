@@ -84,8 +84,7 @@ namespace quda {
   {
     if ( (in.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS || out.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS) && 
 	 in.Nspin() == 4) {
-      errorQuda("Dirac operator requires UKQCD basis, out = %d, in = %d",
-		out.GammaBasis(), in.GammaBasis());
+      errorQuda("Dirac operator requires UKQCD basis, out = %d, in = %d", out.GammaBasis(), in.GammaBasis());
     }
 
     if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {

@@ -168,9 +168,10 @@ namespace quda {
 
   }
 
-  template <int...> struct IntList { };
+  template <int...> struct IntList {
+  };
 
-  template <int fineColor, typename dst_t, typename src_t, typename param_t, int coarseColor, int...N>
+  template <int fineColor, typename dst_t, typename src_t, typename param_t, int coarseColor, int... N>
   bool instantiateColor(const ColorSpinorField &field, const param_t &param, IntList<coarseColor, N...>)
   {
     if (field.Ncolor() == fineColor * coarseColor) {
@@ -184,16 +185,15 @@ namespace quda {
     return false;
   }
 
-  template <typename dst_t, typename src_t, typename param_t, int fineColor, int...N>
+  template <typename dst_t, typename src_t, typename param_t, int fineColor, int... N>
   bool instantiateColor(const ColorSpinorField &field, const param_t &param, IntList<fineColor, N...>)
   {
     // 1 ensures we generate templates for just the fineColor with no multiplication by coarseColor
-    IntList<1, @QUDA_MULTIGRID_NVEC_LIST@> coarseColors;
+    IntList<1, @QUDA_MULTIGRID_NVEC_LIST @> coarseColors;
     bool success = instantiateColor<fineColor, dst_t, src_t>(field, param, coarseColors);
 
     if (!success) {
-      if constexpr (sizeof...(N) > 0)
-        success = instantiateColor<dst_t, src_t>(field, param, IntList<N...>());
+      if constexpr (sizeof...(N) > 0) success = instantiateColor<dst_t, src_t>(field, param, IntList<N...>());
     }
     return success;
   }
@@ -201,8 +201,8 @@ namespace quda {
   template <typename dst_t, typename src_t, typename param_t>
   void instantiateColor(const ColorSpinorField &field, const param_t &param)
   {
-    IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> fineColors;
-    if (!instantiateColor<dst_t, src_t> (field, param, fineColors)) {
+    IntList<@QUDA_MULTIGRID_NC_NVEC_LIST @> fineColors;
+    if (!instantiateColor<dst_t, src_t>(field, param, fineColors)) {
       errorQuda("Nc = %d has not been instantiated", field.Ncolor());
     }
   }

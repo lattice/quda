@@ -27,8 +27,7 @@ namespace quda
       errorQuda("Unexpected fine color %d doesn't match template %d", g.Ncolor() / fineSpin, fineColor);
     if (Y.Ncolor() / coarseSpin != coarseColor)
       errorQuda("Unexpected coarse color %d doesn't match template %d", Y.Ncolor() / coarseSpin, coarseColor);
-    if (T.Vectors().Nspin() != 2)
-      errorQuda("Unsupported number of fine spins %d", T.Vectors().Nspin());
+    if (T.Vectors().Nspin() != 2) errorQuda("Unsupported number of fine spins %d", T.Vectors().Nspin());
     if (T.Vectors().Nspin() / T.Spin_bs() != 2)
       errorQuda("Unsupported number of coarse spins %d", T.Vectors().Nspin() / T.Spin_bs());
 
@@ -119,8 +118,7 @@ namespace quda
       errorQuda("Unexpected fine color %d doesn't match template %d", g.Ncolor() / fineSpin, fineColor);
     if (Y.Ncolor() / coarseSpin != coarseColor)
       errorQuda("Unexpected coarse color %d doesn't match template %d", Y.Ncolor() / coarseSpin, coarseColor);
-    if (T.Vectors().Nspin() != 2)
-      errorQuda("Unsupported number of fine spins %d", T.Vectors().Nspin());
+    if (T.Vectors().Nspin() != 2) errorQuda("Unsupported number of fine spins %d", T.Vectors().Nspin());
     if (T.Vectors().Nspin() / T.Spin_bs() != 2)
       errorQuda("Unsupported number of coarse spins %d", T.Vectors().Nspin() / T.Spin_bs());
 
@@ -175,15 +173,17 @@ namespace quda
     if constexpr (is_enabled_multigrid()) {
       checkPrecision(X, Y, g, clover, cloverInv, uv, T.Vectors(X.Location()));
       checkPrecision(Xatomic, Yatomic);
-      if (!is_enabled(Y.Precision())) errorQuda("QUDA_PRECISION=%d does not enable %d precision", QUDA_PRECISION, Y.Precision());
+      if (!is_enabled(Y.Precision()))
+        errorQuda("QUDA_PRECISION=%d does not enable %d precision", QUDA_PRECISION, Y.Precision());
 
       logQuda(QUDA_SUMMARIZE, "Computing Y field......\n");
       if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
         if constexpr (is_enabled_multigrid_double()) {
           if (use_mma) errorQuda("MG-MMA does not support double precision, yet.");
           if (T.Vectors(X.Location()).Precision() == QUDA_DOUBLE_PRECISION) {
-            calculateYcoarse<use_mma, double, double, fineColor, coarseColor>
-              (Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional);
+            calculateYcoarse<use_mma, double, double, fineColor, coarseColor>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+                                                                              cloverInv, kappa, mass, mu, mu_factor,
+                                                                              dirac, matpc, need_bidirectional);
           } else {
             errorQuda("Unsupported precision %d", Y.Precision());
           }
@@ -193,8 +193,9 @@ namespace quda
       } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {
         if constexpr (is_enabled(QUDA_SINGLE_PRECISION)) {
           if (T.Vectors(X.Location()).Precision() == QUDA_SINGLE_PRECISION) {
-            calculateYcoarse<use_mma, float, float, fineColor, coarseColor>
-              (Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional);
+            calculateYcoarse<use_mma, float, float, fineColor, coarseColor>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+                                                                            cloverInv, kappa, mass, mu, mu_factor,
+                                                                            dirac, matpc, need_bidirectional);
           } else {
             errorQuda("Unsupported precision %d", T.Vectors(X.Location()).Precision());
           }
@@ -202,8 +203,9 @@ namespace quda
       } else if (Y.Precision() == QUDA_HALF_PRECISION) {
         if constexpr (is_enabled(QUDA_HALF_PRECISION)) {
           if (T.Vectors(X.Location()).Precision() == QUDA_HALF_PRECISION) {
-            calculateYcoarse<use_mma, float, short, fineColor, coarseColor>
-              (Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional);
+            calculateYcoarse<use_mma, float, short, fineColor, coarseColor>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
+                                                                            cloverInv, kappa, mass, mu, mu_factor,
+                                                                            dirac, matpc, need_bidirectional);
           } else {
             errorQuda("Unsupported precision %d", T.Vectors(X.Location()).Precision());
           }
