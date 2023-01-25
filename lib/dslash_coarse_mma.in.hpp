@@ -126,7 +126,7 @@ namespace quda {
       color_col_stride(-1)
     {
       strcpy(vol, out[0].VolString().c_str());
-      strcpy(aux, (std::string("policy_kernel,") + aux).c_str());
+      strcpy(aux, (std::string("policy_kernel,") + vol).c_str());
       strcat(aux, comm_dim_partitioned_string());
 
       switch(type) {
@@ -150,8 +150,11 @@ namespace quda {
         label[14] = '\0';
         strcat(aux,label);
       }
-        strcat(aux, ",mma");
-        strcat(aux, mma_t::get_type_name().c_str());
+      strcat(aux, ",mma");
+      strcat(aux, mma_t::get_type_name().c_str());
+
+      if (dslash) { strcat(aux, ",dslash"); }
+      if (clover) { strcat(aux, ",clover"); }
 
       strcat(aux, ",n_rhs=");
       char rhs_str[8];

@@ -719,7 +719,7 @@ namespace quda {
 
       strcat(aux, ",n_rhs=");
       char rhs_str[8];
-      i32toa(rhs_str, dslash.out.size());
+      i32toa(rhs_str, dslash.out.size() * dslash.out[0].Nvec());
       strcat(aux, rhs_str);
 
 #ifdef QUDA_FAST_COMPILE_DSLASH
