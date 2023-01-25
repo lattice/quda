@@ -36,15 +36,20 @@ namespace quda {
 
     long long flops() const
     {
-      return ((dslash*2*nDim+clover*1)*(8*Ns*Nc*Ns*Nc)-2*Ns*Nc)*nParity*(long long)out[0].VolumeCB() * out.size();
+      return ((dslash * 2 * nDim + clover * 1) * (8 * Ns * Nc * Ns * Nc) - 2 * Ns * Nc) * nParity
+        * (long long)out[0].VolumeCB() * out.size();
     }
     long long bytes() const
     {
-      return ((dslash||clover) * out[0].Bytes() + dslash*8*inA[0].Bytes() + clover*inB[0].Bytes() +
-              nSrc*nParity*(dslash*Y.Bytes()*Y.VolumeCB()/(2*Y.Stride()) + clover*X.Bytes()/2)) * out.size();
+      return ((dslash || clover) * out[0].Bytes() + dslash * 8 * inA[0].Bytes() + clover * inB[0].Bytes()
+              + nSrc * nParity * (dslash * Y.Bytes() * Y.VolumeCB() / (2 * Y.Stride()) + clover * X.Bytes() / 2))
+        * out.size();
     }
 
-    unsigned int sharedBytesPerThread() const { return (sizeof(complex<compute_prec<Float>>) * colors_per_thread(Nc, dim_threads)); }
+    unsigned int sharedBytesPerThread() const
+    {
+      return (sizeof(complex<compute_prec<Float>>) * colors_per_thread(Nc, dim_threads));
+    }
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions
     unsigned int minThreads() const { return color_col_stride * X.VolumeCB(); }
 
@@ -54,10 +59,11 @@ namespace quda {
     bool checkParam(const TuneParam &param) const
     {
       return ((color_col_stride == 1 || minThreads() % (unsigned)device::warp_size() == 0)
-              &&                                          // active threads must be a multiple of the warp
-              (color_col_stride == 1 || param.block.x % device::warp_size() == 0) && // block must be a multiple of the warp
-              Nc % color_col_stride == 0 &&               // number of colors must be divisible by the split
-              param.grid.x < device::max_grid_size(0));   // ensure the resulting grid size valid
+              && // active threads must be a multiple of the warp
+              (color_col_stride == 1 || param.block.x % device::warp_size() == 0)
+              &&                                        // block must be a multiple of the warp
+              Nc % color_col_stride == 0 &&             // number of colors must be divisible by the split
+              param.grid.x < device::max_grid_size(0)); // ensure the resulting grid size valid
     }
 
     bool advanceColorStride(TuneParam &param) const
@@ -138,9 +144,8 @@ namespace quda {
 
   public:
     DslashCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
-                 cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y,
-                 const GaugeField &X, double kappa, int parity, MemoryLocation *halo_location,
-                 const ColorSpinorField &halo) :
+                 cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
+                 int parity, MemoryLocation *halo_location, const ColorSpinorField &halo) :
       TunableKernel3D(out[0], out[0].SiteSubset() * out.size(), 1),
       out(out),
       inA(inA),
@@ -192,8 +197,8 @@ namespace quda {
     }
 
     template <int color_stride, int dim_stride, bool native = true>
-    using Arg = DslashCoarseArg<dslash, clover, dagger, type, color_stride, dim_stride, Float, yFloat, ghostFloat, Ns,
-                                Nc, native>;
+    using Arg
+      = DslashCoarseArg<dslash, clover, dagger, type, color_stride, dim_stride, Float, yFloat, ghostFloat, Ns, Nc, native>;
 
     void apply(const qudaStream_t &stream)
     {
@@ -211,11 +216,19 @@ namespace quda {
         switch (tp.aux.y) { // dimension gather parallelisation
         case 1:
           switch (tp.aux.x) { // this is color_col_stride
-          case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 1>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
+          case 1:
+            launch_device<CoarseDslash>(tp, stream, Arg<1, 1>(out, inA, inB, Y, X, (Float)kappa, parity, halo));
+            break;
 #ifndef QUDA_FAST_COMPILE_DSLASH
-          case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 1>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
-          case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 1>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
-          case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 1>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
+          case 2:
+            launch_device<CoarseDslash>(tp, stream, Arg<2, 1>(out, inA, inB, Y, X, (Float)kappa, parity, halo));
+            break;
+          case 4:
+            launch_device<CoarseDslash>(tp, stream, Arg<4, 1>(out, inA, inB, Y, X, (Float)kappa, parity, halo));
+            break;
+          case 8:
+            launch_device<CoarseDslash>(tp, stream, Arg<8, 1>(out, inA, inB, Y, X, (Float)kappa, parity, halo));
+            break;
 #endif
           default: errorQuda("Color column stride %d not valid", static_cast<int>(tp.aux.x));
           }
@@ -223,19 +236,35 @@ namespace quda {
 #ifndef QUDA_FAST_COMPILE_DSLASH
         case 2:
           switch (tp.aux.x) { // this is color_col_stride
-          case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 2>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
-          case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 2>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
-          case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 2>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
-          case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 2>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
+          case 1:
+            launch_device<CoarseDslash>(tp, stream, Arg<1, 2>(out, inA, inB, Y, X, (Float)kappa, parity, halo));
+            break;
+          case 2:
+            launch_device<CoarseDslash>(tp, stream, Arg<2, 2>(out, inA, inB, Y, X, (Float)kappa, parity, halo));
+            break;
+          case 4:
+            launch_device<CoarseDslash>(tp, stream, Arg<4, 2>(out, inA, inB, Y, X, (Float)kappa, parity, halo));
+            break;
+          case 8:
+            launch_device<CoarseDslash>(tp, stream, Arg<8, 2>(out, inA, inB, Y, X, (Float)kappa, parity, halo));
+            break;
           default: errorQuda("Color column stride %d not valid", static_cast<int>(tp.aux.x));
           }
           break;
         case 4:
           switch (tp.aux.x) { // this is color_col_stride
-          case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 4>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
-          case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 4>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
-          case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 4>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
-          case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 4>(out, inA, inB, Y, X, (Float)kappa, parity, halo)); break;
+          case 1:
+            launch_device<CoarseDslash>(tp, stream, Arg<1, 4>(out, inA, inB, Y, X, (Float)kappa, parity, halo));
+            break;
+          case 2:
+            launch_device<CoarseDslash>(tp, stream, Arg<2, 4>(out, inA, inB, Y, X, (Float)kappa, parity, halo));
+            break;
+          case 4:
+            launch_device<CoarseDslash>(tp, stream, Arg<4, 4>(out, inA, inB, Y, X, (Float)kappa, parity, halo));
+            break;
+          case 8:
+            launch_device<CoarseDslash>(tp, stream, Arg<8, 4>(out, inA, inB, Y, X, (Float)kappa, parity, halo));
+            break;
           default: errorQuda("Color column stride %d not valid", static_cast<int>(tp.aux.x));
           }
           break;
@@ -245,8 +274,14 @@ namespace quda {
       }
     }
 
-    void preTune() { for (auto i = 0u; i < out.size(); i++) out[i].backup(); }
-    void postTune() { for (auto i = 0u; i < out.size(); i++) out[i].restore(); }
+    void preTune()
+    {
+      for (auto i = 0u; i < out.size(); i++) out[i].backup();
+    }
+    void postTune()
+    {
+      for (auto i = 0u; i < out.size(); i++) out[i].restore();
+    }
   };
 
   template <typename Float, typename yFloat, typename ghostFloat, int Ns, int Nc, bool dslash, bool clover, bool dagger,
@@ -273,8 +308,7 @@ namespace quda {
     if (inA[0].FieldOrder() != out[0].FieldOrder())
       errorQuda("Field order mismatch inA = %d, out = %d", inA[0].FieldOrder(), out[0].FieldOrder());
 
-    if (inA[0].Nspin() != 2)
-      errorQuda("Unsupported number of coarse spins %d", inA[0].Nspin());
+    if (inA[0].Nspin() != 2) errorQuda("Unsupported number of coarse spins %d", inA[0].Nspin());
 
     constexpr int coarseSpin = 2;
 
@@ -353,8 +387,7 @@ namespace quda {
     DSLASH_COARSE_POLICY_DISABLED
   };
 
-  template <bool dagger, int coarseColor>
-  struct DslashCoarseLaunch {
+  template <bool dagger, int coarseColor> struct DslashCoarseLaunch {
 
     cvector_ref<ColorSpinorField> &out;
     cvector_ref<const ColorSpinorField> &inA;
@@ -446,8 +479,8 @@ namespace quda {
 
         if (dslash && comm_partitioned() && comms) {
           const int nFace = 1;
-          halo.exchangeGhost((QudaParity)(inA[0].SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace, dagger,
-                              pack_destination, halo_location, gdr_send, gdr_recv, halo_precision, shmem, inA);
+          halo.exchangeGhost((QudaParity)(inA[0].SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace,
+                             dagger, pack_destination, halo_location, gdr_send, gdr_recv, halo_precision, shmem, inA);
         }
 
         if (dslash::aux_worker) dslash::aux_worker->apply(device::get_default_stream());
@@ -503,8 +536,8 @@ namespace quda {
         if (dslash && comm_partitioned() && comms) {
           const int nFace = 1;
           shmem += 2;
-          halo.exchangeGhost((QudaParity)(inA[0].SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace, dagger,
-                              pack_destination, halo_location, gdr_send, gdr_recv, halo_precision, shmem, inA);
+          halo.exchangeGhost((QudaParity)(inA[0].SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace,
+                             dagger, pack_destination, halo_location, gdr_send, gdr_recv, halo_precision, shmem, inA);
         }
         // INTERIOR
         if (precision == QUDA_DOUBLE_PRECISION) {
@@ -771,9 +804,7 @@ namespace quda {
      param.aux = make_int4(first_active_policy, 0, 0, 0);
    }
 
-   TuneKey tuneKey() const {
-     return TuneKey(dslash.inA[0].VolString().c_str(), typeid(*this).name(), aux);
-   }
+   TuneKey tuneKey() const { return TuneKey(dslash.inA[0].VolString().c_str(), typeid(*this).name(), aux); }
 
    long long flops() const {
      int nDim = 4;
@@ -781,15 +812,18 @@ namespace quda {
      int Nc = dslash.inA[0].Ncolor() / dslash.inA[0].Nvec();
      int nParity = dslash.inA[0].SiteSubset();
      long long volumeCB = dslash.inA[0].VolumeCB();
-     return ((dslash.dslash*2*nDim+dslash.clover*1)*(8*Ns*Nc*Ns*Nc)-2*Ns*Nc)*nParity*volumeCB * dslash.out.size() * dslash.out[0].Nvec();
+     return ((dslash.dslash * 2 * nDim + dslash.clover * 1) * (8 * Ns * Nc * Ns * Nc) - 2 * Ns * Nc) * nParity
+       * volumeCB * dslash.out.size() * dslash.out[0].Nvec();
    }
 
    long long bytes() const {
      int nParity = dslash.inA[0].SiteSubset();
-     return ((dslash.dslash||dslash.clover) * dslash.out[0].Bytes() +
-             dslash.dslash*8*dslash.inA[0].Bytes() + dslash.clover*dslash.inB[0].Bytes() +
-             nParity*(dslash.dslash*dslash.Y.Bytes()*dslash.Y.VolumeCB()/(2*dslash.Y.Stride())
-                      + dslash.clover*dslash.X.Bytes()/2)) * dslash.out.size() * dslash.out[0].Nvec();
+     return ((dslash.dslash || dslash.clover) * dslash.out[0].Bytes() + dslash.dslash * 8 * dslash.inA[0].Bytes()
+             + dslash.clover * dslash.inB[0].Bytes()
+             + nParity
+               * (dslash.dslash * dslash.Y.Bytes() * dslash.Y.VolumeCB() / (2 * dslash.Y.Stride())
+                  + dslash.clover * dslash.X.Bytes() / 2))
+       * dslash.out.size() * dslash.out[0].Nvec();
      // multiply Y by volume / stride to correct for pad
    }
   };

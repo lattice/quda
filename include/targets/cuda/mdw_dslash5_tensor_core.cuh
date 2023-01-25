@@ -357,8 +357,6 @@ namespace quda
     a = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
     b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
     out[sid + 5 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
-#else
-    static_assert(QUDA_ORDER_FP == 8 || QUDA_ORDER_FP == 4, "Invalid QUDA_ORDER_FP");
 #endif
   }
 

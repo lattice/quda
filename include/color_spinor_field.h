@@ -52,9 +52,9 @@ namespace quda
     constexpr QudaFieldOrder getNative(QudaPrecision precision, int nSpin)
     {
       switch (precision) {
-      case QUDA_DOUBLE_PRECISION:  return getNative<double>(nSpin);
-      case QUDA_SINGLE_PRECISION:  return getNative<float>(nSpin);
-      case QUDA_HALF_PRECISION:    return getNative<short>(nSpin);
+      case QUDA_DOUBLE_PRECISION: return getNative<double>(nSpin);
+      case QUDA_SINGLE_PRECISION: return getNative<float>(nSpin);
+      case QUDA_HALF_PRECISION: return getNative<short>(nSpin);
       case QUDA_QUARTER_PRECISION: return getNative<int8_t>(nSpin);
       default: return QUDA_INVALID_FIELD_ORDER;
       }
@@ -477,22 +477,38 @@ namespace quda
     /**
        @brief Return pointer to the field allocation
     */
-    void *V() { if (ghost_only) errorQuda("Not defined for ghost-only field"); return v; }
+    void *V()
+    {
+      if (ghost_only) errorQuda("Not defined for ghost-only field");
+      return v;
+    }
 
     /**
        @brief Return pointer to the field allocation
     */
-    const void * V() const { if (ghost_only) errorQuda("Not defined for ghost-only field"); return v; }
+    const void *V() const
+    {
+      if (ghost_only) errorQuda("Not defined for ghost-only field");
+      return v;
+    }
 
     /**
        @brief Return pointer to the norm base pointer in the field allocation
     */
-    void *Norm() { if (ghost_only) errorQuda("Not defined for ghost-only field"); return static_cast<char *>(v) + norm_offset; }
+    void *Norm()
+    {
+      if (ghost_only) errorQuda("Not defined for ghost-only field");
+      return static_cast<char *>(v) + norm_offset;
+    }
 
     /**
        @brief Return pointer to the norm base pointer in the field allocation
     */
-    const void * Norm() const { if (ghost_only) errorQuda("Not defined for ghost-only field"); return static_cast<char *>(v) + norm_offset; }
+    const void *Norm() const
+    {
+      if (ghost_only) errorQuda("Not defined for ghost-only field");
+      return static_cast<char *>(v) + norm_offset;
+    }
 
     size_t NormOffset() const { return norm_offset; }
 

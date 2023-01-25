@@ -401,11 +401,11 @@ namespace quda {
     }
 
     int n = in[0].Nspin() * in[0].Ncolor();
-    flops += (8 * ( 8 * n * n) - 2 * n) * (long long)in[0].VolumeCB() * in[0].SiteSubset() * in.size();
+    flops += (8 * (8 * n * n) - 2 * n) * (long long)in[0].VolumeCB() * in[0].SiteSubset() * in.size();
   }
 
   void DiracCoarse::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-			       QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
+                               QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
   {
     if (k!=1.0) errorQuda("%s not supported for k!=1.0", __func__);
 
@@ -433,8 +433,8 @@ namespace quda {
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision, use_mma);
     }
-    int n = in[0].Nspin()*in[0].Ncolor();
-    flops += (9*(8*n*n)-2*n)*(long long)in[0].VolumeCB()*in[0].SiteSubset() * in.size();
+    int n = in[0].Nspin() * in[0].Ncolor();
+    flops += (9 * (8 * n * n) - 2 * n) * (long long)in[0].VolumeCB() * in[0].SiteSubset() * in.size();
   }
 
   void DiracCoarse::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
@@ -492,6 +492,13 @@ namespace quda {
     /* do nothing */
   }
 
+  DiracCoarsePC::DiracCoarsePC(const DiracParam &param, cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h,
+                               cpuGaugeField *Yhat_h, cudaGaugeField *Y_d, cudaGaugeField *X_d, cudaGaugeField *Xinv_d,
+                               cudaGaugeField *Yhat_d) :
+    DiracCoarse(param, Y_h, X_h, Xinv_h, Yhat_h, Y_d, X_d, Xinv_d, Yhat_d)
+  {
+  }
+
   DiracCoarsePC::DiracCoarsePC(const DiracCoarse &dirac, const DiracParam &param) : DiracCoarse(dirac, param)
   {
     /* do nothing */
@@ -525,7 +532,8 @@ namespace quda {
     for (auto i = 0u; i < x.size(); i++) blas::xpay(x[i], k, out[i]);
 
     int n = in[0].Nspin() * in[0].Ncolor();
-    flops += (8 * (8 * n * n) - 2 * n) * in[0].VolumeCB() * in.size(); // blas flops counted separately so only need to count dslash flops
+    flops += (8 * (8 * n * n) - 2 * n) * in[0].VolumeCB()
+      * in.size(); // blas flops counted separately so only need to count dslash flops
   }
 
   void DiracCoarsePC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const

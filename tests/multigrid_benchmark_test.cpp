@@ -130,6 +130,7 @@ void freeFields()
 }
 
 DiracCoarse *dirac;
+DiracCoarsePC *dirac_pc;
 
 TEST(multi_rhs_test, verify)
 {
@@ -147,6 +148,9 @@ TEST(multi_rhs_test, verify)
   case 2: dirac->Clover(xEven, yEven, QUDA_EVEN_PARITY); break;
   case 3: dirac->Mdag(xD, yD); break;
   case 4: dirac->MdagM(xD, yD); break;
+  case 5: dirac_pc->M(xEven, yOdd); break;
+  case 6: dirac_pc->Mdag(xEven, yOdd); break;
+  case 7: dirac_pc->MdagM(xEven, yOdd); break;
   default: errorQuda("Undefined test %d", test_type);
   }
 
@@ -160,16 +164,20 @@ TEST(multi_rhs_test, verify)
     case 2: dirac->Clover(x_ref.Even(), yD[i].Even(), QUDA_EVEN_PARITY); break;
     case 3: dirac->Mdag(x_ref, yD[i]); break;
     case 4: dirac->MdagM(x_ref, yD[i]); break;
+    case 5: dirac_pc->M(x_ref.Even(), yD[i].Odd()); break;
+    case 6: dirac_pc->Mdag(x_ref.Even(), yD[i].Odd()); break;
+    case 7: dirac_pc->MdagM(x_ref.Even(), yD[i].Odd()); break;
     default: errorQuda("Undefined test %d", test_type);
     }
 
-    // require that each component differs by no more than 5e-3
     auto max_dev = blas::max_deviation(xD[i], x_ref);
-    EXPECT_LE(max_dev[0], 5e-3);
-    // require that the relative L2 norm differs by no more than 1e-5
     auto x2 = blas::norm2(x_ref);
     auto l2_dev = blas::xmyNorm(xD[i], x_ref);
+
+    // require that the relative L2 norm differs by no more than 1e-6
     EXPECT_LE(sqrt(l2_dev / x2), 1e-6);
+    // require that each component differs by no more than 1e-3
+    EXPECT_LE(max_dev[1], 1e-3);
   }
 }
 
@@ -200,6 +208,15 @@ double benchmark(int test, const int niter)
   case 4:
     for (int i = 0; i < niter; ++i) dirac->MdagM(xD, yD);
     break;
+  case 5:
+    for (int i = 0; i < niter; ++i) dirac_pc->M(xEven, yOdd);
+    break;
+  case 6:
+    for (int i = 0; i < niter; ++i) dirac_pc->Mdag(xEven, yOdd);
+    break;
+  case 7:
+    for (int i = 0; i < niter; ++i) dirac_pc->MdagM(xEven, yOdd);
+    break;
   default: errorQuda("Undefined test %d", test);
   }
 
@@ -207,7 +224,7 @@ double benchmark(int test, const int niter)
   return device_timer.last();
 }
 
-const char *names[] = {"Dslash", "Mat", "Clover", "MatDag", "MatDagMat"};
+const char *names[] = {"Dslash", "Mat", "Clover", "MatDag", "MatDagMat", "MatPC", "MatPCDag", "MatPCDagMatPC"};
 
 int main(int argc, char **argv)
 {
@@ -223,7 +240,8 @@ int main(int argc, char **argv)
   // command line options
   auto app = make_app();
   add_multigrid_option_group(app);
-  CLI::TransformPairs<int> test_type_map {{"Dslash", 0}, {"Mat", 1}, {"Clover", 2}, {"MatDag", 3}, {"MatDagMat", 4}};
+  CLI::TransformPairs<int> test_type_map {{"Dslash", 0},    {"Mat", 1},   {"Clover", 2},   {"MatDag", 3},
+                                          {"MatDagMat", 4}, {"MatPC", 5}, {"MatPCDag", 6}, {"MatPCDagMatPC", 7}};
   app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
 
   try {
@@ -247,7 +265,9 @@ int main(int argc, char **argv)
   param.kappa = 1.0;
   param.dagger = QUDA_DAG_NO;
   param.use_mma = mg_use_mma;
+  param.matpcType = QUDA_MATPC_EVEN_EVEN;
   dirac = new DiracCoarse(param, nullptr, nullptr, nullptr, nullptr, Y_d, X_d, Xinv_d, Yhat_d);
+  dirac_pc = new DiracCoarsePC(param, nullptr, nullptr, nullptr, nullptr, Y_d, X_d, Xinv_d, Yhat_d);
 
   if (verify_results) {
     // Ensure gtest prints only from rank 0
@@ -259,14 +279,16 @@ int main(int argc, char **argv)
   }
 
   // now rerun with more iterations to get accurate speed measurements
-  dirac->Flops(); // reset flops counter
+  dirac->Flops();    // reset flops counter
+  dirac_pc->Flops(); // reset flops counter
 
   double secs = benchmark(test_type, niter);
-  double gflops = (dirac->Flops() * 1e-9) / (secs);
+  double gflops = ((test_type < 5 ? dirac->Flops() : dirac_pc->Flops()) * 1e-9) / (secs);
 
   printfQuda("Ncolor = %2d, %-31s: Gflop/s = %6.1f\n", Ncolor, names[test_type], gflops);
 
   delete dirac;
+  delete dirac_pc;
   freeFields();
 
   endQuda();

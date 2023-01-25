@@ -19,15 +19,14 @@ namespace quda {
     }
   }
 
-  template <typename T> FieldTmp<T>::FieldTmp(const FieldKey<T> &key, const typename T::param_type &param) :
-    key(key)
+  template <typename T> FieldTmp<T>::FieldTmp(const FieldKey<T> &key, const typename T::param_type &param) : key(key)
   {
     auto it = cache.find(key);
 
     if (it != cache.end() && it->second.size()) { // found an entry
       tmp = std::move(it->second.top());
       it->second.pop(); // pop the defunct object
-    } else { // no entry found, we must allocate a new field
+    } else {            // no entry found, we must allocate a new field
       tmp = T(param);
     }
   }
@@ -45,5 +44,4 @@ namespace quda {
   }
 
   template class FieldTmp<ColorSpinorField>;
-
 }

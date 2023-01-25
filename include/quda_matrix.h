@@ -67,7 +67,7 @@ namespace quda {
         __device__ __host__ inline int index(int i, int j) const { return i*N + j; }
 
       public:
-        T data[N*N] = {};
+        T data[N * N] = {};
 
         constexpr int rows() const { return N; }
         constexpr int cols() const { return N; }
@@ -296,19 +296,20 @@ namespace quda {
       }
 
       public:
-      T data[N*N] = {}; // store in real-valued array
+        T data[N * N] = {}; // store in real-valued array
 
-      constexpr int rows() const { return N; }
-      constexpr int cols() const { return N; }
-      constexpr int size() const { return N * N; }
+        constexpr int rows() const { return N; }
+        constexpr int cols() const { return N; }
+        constexpr int size() const { return N * N; }
 
-      HMatrix() = default;
-      HMatrix(const HMatrix<T, N> &) = default;
-      HMatrix(HMatrix<T, N> &&) = default;
-      HMatrix &operator=(const HMatrix<T, N> &) = default;
-      HMatrix &operator=(HMatrix<T, N> &&) = default;
+        HMatrix() = default;
+        HMatrix(const HMatrix<T, N> &) = default;
+        HMatrix(HMatrix<T, N> &&) = default;
+        HMatrix &operator=(const HMatrix<T, N> &) = default;
+        HMatrix &operator=(HMatrix<T, N> &&) = default;
 
-      __device__ __host__ inline HMatrix(const T data_[]) {
+        __device__ __host__ inline HMatrix(const T data_[])
+        {
 #pragma unroll
 	for (int i=0; i<N*N; i++) data[i] = data_[i];
       }

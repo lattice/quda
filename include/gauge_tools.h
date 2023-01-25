@@ -88,7 +88,7 @@ namespace quda
      @param seed The seed used for the RNG
      @param type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
   */
-  void gaugeNoise(GaugeField &U, unsigned long long seed , QudaNoiseType type);
+  void gaugeNoise(GaugeField &U, unsigned long long seed, QudaNoiseType type);
 
   /**
      @brief Apply APE smearing to the gauge field

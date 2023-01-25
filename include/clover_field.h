@@ -69,9 +69,9 @@ namespace quda {
     constexpr QudaCloverFieldOrder getNative(QudaPrecision precision)
     {
       switch (precision) {
-      case QUDA_DOUBLE_PRECISION:  return getNative<double>();
-      case QUDA_SINGLE_PRECISION:  return getNative<float>();
-      case QUDA_HALF_PRECISION:    return getNative<short>();
+      case QUDA_DOUBLE_PRECISION: return getNative<double>();
+      case QUDA_SINGLE_PRECISION: return getNative<float>();
+      case QUDA_HALF_PRECISION: return getNative<short>();
       case QUDA_QUARTER_PRECISION: return getNative<int8_t>();
       default: return QUDA_INVALID_CLOVER_ORDER;
       }

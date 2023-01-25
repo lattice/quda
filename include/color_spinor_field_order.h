@@ -307,8 +307,7 @@ namespace quda
     };
 
     // specialized varient for packed half precision staggered
-    template <>
-    struct AccessorCB<short, 1, 3, 1, QUDA_FLOAT2_FIELD_ORDER> {
+    template <> struct AccessorCB<short, 1, 3, 1, QUDA_FLOAT2_FIELD_ORDER> {
       int offset_cb = 0;
       AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes() >> 1) / sizeof(complex<short>)) { }
       AccessorCB() = default;
@@ -513,9 +512,9 @@ namespace quda
         if (std::is_same_v<storeFloat, theirFloat>) {
           v[idx] = complex<storeFloat>(a.real(), a.imag());
         } else {
-          v[idx] = fixed ? complex<storeFloat>(f2i_round<storeFloat>(scale * a.real()),
-                                               f2i_round<storeFloat>(scale * a.imag())) :
-                           complex<storeFloat>(a.real(), a.imag());
+          v[idx] = fixed ?
+            complex<storeFloat>(f2i_round<storeFloat>(scale * a.real()), f2i_round<storeFloat>(scale * a.imag())) :
+            complex<storeFloat>(a.real(), a.imag());
         }
       }
 
@@ -650,7 +649,7 @@ namespace quda
     protected:
       GhostOrder() = default;
       GhostOrder(const GhostOrder &) = default;
-      GhostOrder(const ColorSpinorField &, int, void * const *) { }
+      GhostOrder(const ColorSpinorField &, int, void *const *) { }
       GhostOrder &operator=(const GhostOrder &) = default;
 
     public:
@@ -699,7 +698,7 @@ namespace quda
       GhostOrder() = default;
       GhostOrder(const GhostOrder &) = default;
 
-      GhostOrder(const ColorSpinorField &field, int nFace, void * const *ghost_ = nullptr) :
+      GhostOrder(const ColorSpinorField &field, int nFace, void *const *ghost_ = nullptr) :
         nParity(field.SiteSubset()), ghostAccessor(field, nFace)
       {
         resetGhost(ghost_ ? ghost_ : field.Ghost());
@@ -783,9 +782,10 @@ namespace quda
         if constexpr (fixed && block_float_ghost) {
           errorQuda("Reduction not defined");
         } else {
-          std::vector<complex<ghostFloat>*> g{ghost[2 * dim + 0], ghost[2 * dim + 1]};
+          std::vector<complex<ghostFloat> *> g {ghost[2 * dim + 0], ghost[2 * dim + 1]};
           std::vector<typename reducer::reduce_t> result(2);
-          ::quda::transform_reduce<reducer>(location, result, g, unsigned(nParity * ghostAccessor.faceVolumeCB[dim] * nSpin * nColor * nVec), h);
+          ::quda::transform_reduce<reducer>(
+            location, result, g, unsigned(nParity * ghostAccessor.faceVolumeCB[dim] * nSpin * nColor * nVec), h);
           return result;
         }
       }
@@ -802,8 +802,8 @@ namespace quda
         commGlobalReductionPush(global);
         Float scale_inv = 1.0;
         if constexpr (fixed && !block_float_ghost) scale_inv = ghost.scale_inv;
-        auto nrm2
-          = transform_reduce<plus<double>>(dim, field.Location(), field.SiteSubset(), square_<double, ghostFloat>(scale_inv));
+        auto nrm2 = transform_reduce<plus<double>>(dim, field.Location(), field.SiteSubset(),
+                                                   square_<double, ghostFloat>(scale_inv));
         commGlobalReductionPop();
         return nrm2;
       }
@@ -867,13 +867,13 @@ namespace quda
     public:
       using real = Float;
       FieldOrderCB() = default;
-      FieldOrderCB(const FieldOrderCB&) = default;
+      FieldOrderCB(const FieldOrderCB &) = default;
 
       /**
        * Constructor for the FieldOrderCB class
        * @param field The field that we are accessing
        */
-      FieldOrderCB(const ColorSpinorField &field, int nFace = 1, void * const v_ = 0, void * const *ghost_ = 0) :
+      FieldOrderCB(const ColorSpinorField &field, int nFace = 1, void *const v_ = 0, void *const *ghost_ = 0) :
         GhostOrder(field, nFace, ghost_), volumeCB(field.VolumeCB()), accessor(field)
       {
         v.v = v_ ? static_cast<complex<storeFloat> *>(const_cast<void *>(v_)) :
@@ -890,7 +890,7 @@ namespace quda
         }
       }
 
-      FieldOrderCB &operator=(const FieldOrderCB&) = default;
+      FieldOrderCB &operator=(const FieldOrderCB &) = default;
 
       void resetScale(Float max)
       {

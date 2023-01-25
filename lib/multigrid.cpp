@@ -430,7 +430,8 @@ namespace quda
       for (int i = 0; i <= param.level; i++) {
         if ((param.mg_global.coarse_grid_solution_type[i] == QUDA_MATPC_SOLUTION
              && param.mg_global.smoother_solve_type[i] == QUDA_DIRECT_PC_SOLVE)
-            || (param.mg_global.transfer_type[i] == QUDA_TRANSFER_OPTIMIZED_KD || param.mg_global.transfer_type[i] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)) {
+            || (param.mg_global.transfer_type[i] == QUDA_TRANSFER_OPTIMIZED_KD
+                || param.mg_global.transfer_type[i] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)) {
           diracParam.need_bidirectional = QUDA_BOOLEAN_TRUE;
         }
       }
@@ -876,11 +877,13 @@ namespace quda
         auto max_deviation = blas::max_deviation(tmp2, tmp1);
         auto l2_deviation = sqrt(xmyNorm(tmp1, tmp2) / norm2(tmp1));
 
-        logQuda(QUDA_VERBOSE,
-                "Vector %d: L2 norms v_k = %e P^\\dagger v_k = %e (1 - P P^\\dagger) v_k = %e; Deviations: L2 relative = %e, max = %e\n",
-                i, norm2(tmp1), norm2(*r_coarse), norm2(tmp2), l2_deviation, max_deviation[0]);
-        if (check_deviation(l2_deviation, tol)) errorQuda("k=%d orthonormality failed: L2 relative deviation %e > %e", i, l2_deviation, tol);
-        if (check_deviation(max_deviation[0], tol)) errorQuda("k=%d orthonormality failed: max deviation %e > %e", i, max_deviation[0], tol);
+        logQuda(
+          QUDA_VERBOSE, "Vector %d: L2 norms v_k = %e P^\\dagger v_k = %e (1 - P P^\\dagger) v_k = %e; Deviations: L2 relative = %e, max = %e\n",
+          i, norm2(tmp1), norm2(*r_coarse), norm2(tmp2), l2_deviation, max_deviation[0]);
+        if (check_deviation(l2_deviation, tol))
+          errorQuda("k=%d orthonormality failed: L2 relative deviation %e > %e", i, l2_deviation, tol);
+        if (check_deviation(max_deviation[0], tol))
+          errorQuda("k=%d orthonormality failed: max deviation %e > %e", i, max_deviation[0], tol);
       }
 
       // the oblique check
@@ -941,7 +944,6 @@ namespace quda
       x_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(),
                                           param.mg_global.location[param.level + 1]);
 
-
     {
       logQuda(QUDA_SUMMARIZE, "Checking 0 = (1 - P^\\dagger P) eta_c\n");
 
@@ -950,11 +952,13 @@ namespace quda
       transfer->R(*r_coarse, tmp2);
       auto r2 = norm2(*r_coarse);
       auto max_deviation = blas::max_deviation(*r_coarse, *x_coarse);
-      auto l2_deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
-      logQuda(QUDA_VERBOSE, "L2 norms %e %e (fine tmp %e); Deviations: L2 relative = %e, max = %e\n",
-              norm2(*x_coarse), r2, norm2(tmp2), l2_deviation, max_deviation[0]);
-      if (check_deviation(l2_deviation, tol)) errorQuda("coarse span failed: L2 relative deviation = %e > %e", l2_deviation, tol);
-      if (check_deviation(max_deviation[0], tol)) errorQuda("coarse span failed: max deviation = %e > %e", max_deviation[0], tol);
+      auto l2_deviation = sqrt(xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse));
+      logQuda(QUDA_VERBOSE, "L2 norms %e %e (fine tmp %e); Deviations: L2 relative = %e, max = %e\n", norm2(*x_coarse),
+              r2, norm2(tmp2), l2_deviation, max_deviation[0]);
+      if (check_deviation(l2_deviation, tol))
+        errorQuda("coarse span failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+      if (check_deviation(max_deviation[0], tol))
+        errorQuda("coarse span failed: max deviation = %e > %e", max_deviation[0], tol);
     }
 
     logQuda(QUDA_SUMMARIZE, "Checking 0 = (D_c - P^\\dagger D P) (native coarse operator to emulated operator)\n");
@@ -980,7 +984,8 @@ namespace quda
             || diracSmoother->getDiracType() == QUDA_ASQTADPC_DIRAC)) {
       // If we're doing an optimized build with the staggered operator, we need to skip the verify on level 0
       can_verify = false;
-      logQuda(QUDA_VERBOSE, "Intentionally skipping staggered -> staggered KD verify because it's not a \"real\" coarsen\n");
+      logQuda(QUDA_VERBOSE,
+              "Intentionally skipping staggered -> staggered KD verify because it's not a \"real\" coarsen\n");
     } else if (diracSmoother->getDiracType() == QUDA_ASQTAD_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTADKD_DIRAC
                || diracSmoother->getDiracType() == QUDA_ASQTADPC_DIRAC) {
       // If we're doing anything with the asqtad operator, the long links can make verification difficult
@@ -993,8 +998,9 @@ namespace quda
         for (int d = 0; d < 4; d++) {
           if (param.mg_global.geo_block_size[param.level][d] < 3) {
             can_verify = false;
-            logQuda(QUDA_VERBOSE, "Aggregation geo_block_size[%d] = %d is less than 3, skipping verify for asqtad coarsen...\n",
-                    d, param.mg_global.geo_block_size[param.level][d]);
+            logQuda(QUDA_VERBOSE,
+                    "Aggregation geo_block_size[%d] = %d is less than 3, skipping verify for asqtad coarsen...\n", d,
+                    param.mg_global.geo_block_size[param.level][d]);
           }
         }
       }
@@ -1067,8 +1073,10 @@ namespace quda
       logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
               norm2(*x_coarse), r_nrm, l2_deviation, max_deviation[0]);
 
-      if (check_deviation(l2_deviation, tol)) errorQuda("Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
-      if (check_deviation(max_deviation[0], tol)) warningQuda("Coarse operator failed: max deviation = %e > %e", max_deviation[0], tol);
+      if (check_deviation(l2_deviation, tol))
+        errorQuda("Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+      if (check_deviation(max_deviation[0], tol))
+        warningQuda("Coarse operator failed: max deviation = %e > %e", max_deviation[0], tol);
     }
 
     // check the preconditioned operator construction on the lower level if applicable
@@ -1085,8 +1093,10 @@ namespace quda
       auto l2_deviation = sqrt(xmyNorm(x_coarse->Even(), r_coarse->Even()) / norm2(x_coarse->Even()));
       logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
               norm2(x_coarse->Even()), r_nrm, l2_deviation, max_deviation[0]);
-      if (check_deviation(l2_deviation, tol)) errorQuda("Preconditioned Deo failed: L2 relative deviation = %e > %e", l2_deviation, tol);
-      if (check_deviation(max_deviation[0], tol)) errorQuda("Preconditioned Deo failed: max deviation = %e > %e", max_deviation[0], tol);
+      if (check_deviation(l2_deviation, tol))
+        errorQuda("Preconditioned Deo failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+      if (check_deviation(max_deviation[0], tol))
+        errorQuda("Preconditioned Deo failed: max deviation = %e > %e", max_deviation[0], tol);
 
       // check Doe
       logQuda(QUDA_SUMMARIZE, "Checking Doe of preconditioned operator 0 = \\hat{D}_c - A^{-1} D_c\n");
@@ -1098,8 +1108,10 @@ namespace quda
       l2_deviation = sqrt(xmyNorm(x_coarse->Odd(), r_coarse->Odd()) / norm2(x_coarse->Odd()));
       logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
               norm2(x_coarse->Odd()), r_nrm, l2_deviation, max_deviation[0]);
-      if (check_deviation(l2_deviation, tol)) errorQuda("Preconditioned Doe failed: L2 relative deviation = %e > %e", l2_deviation, tol);
-      if (check_deviation(max_deviation[0], tol)) errorQuda("Preconditioned Doe failed: max deviation = %e > %e", max_deviation[0], tol);
+      if (check_deviation(l2_deviation, tol))
+        errorQuda("Preconditioned Doe failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+      if (check_deviation(max_deviation[0], tol))
+        errorQuda("Preconditioned Doe failed: max deviation = %e > %e", max_deviation[0], tol);
     }
 
     // here we check that the Hermitian conjugate operator is working
@@ -1113,9 +1125,11 @@ namespace quda
       }
       Complex dot = cDotProduct(tmp2.Even(), tmp1.Odd());
       double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
-      logQuda(QUDA_VERBOSE, "Smoother normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
+      logQuda(QUDA_VERBOSE,
+              "Smoother normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
               real(dot), imag(dot), deviation);
-      if (check_deviation(deviation, tol)) errorQuda("Smoother operator normality failed: deviation = %e > %e", deviation, tol);
+      if (check_deviation(deviation, tol))
+        errorQuda("Smoother operator normality failed: deviation = %e > %e", deviation, tol);
     }
 
     { // normal operator check for residual operator
@@ -1128,9 +1142,11 @@ namespace quda
       }
       Complex dot = cDotProduct(tmp1, tmp2);
       double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
-      logQuda(QUDA_VERBOSE, "Normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
+      logQuda(QUDA_VERBOSE,
+              "Normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
               real(dot), imag(dot), deviation);
-      if (check_deviation(deviation, tol)) errorQuda("Residual operator normality failed: deviation = %e > %e", deviation, tol);
+      if (check_deviation(deviation, tol))
+        errorQuda("Residual operator normality failed: deviation = %e > %e", deviation, tol);
     }
 
     // Not useful for staggered op since it's a unitary transform
@@ -1175,7 +1191,8 @@ namespace quda
             transfer->P(tmp2, *x_coarse);
             (*param.matResidual)(tmp1, tmp2);
 
-            logQuda(QUDA_SUMMARIZE, "Vector %d: norms v_k %e DP(P^dagDP)P^dag v_k %e\n", i, norm2(*param.B[i]), norm2(tmp1));
+            logQuda(QUDA_SUMMARIZE, "Vector %d: norms v_k %e DP(P^dagDP)P^dag v_k %e\n", i, norm2(*param.B[i]),
+                    norm2(tmp1));
             max_deviation = blas::max_deviation(tmp1, *param.B[i]);
             logQuda(QUDA_SUMMARIZE, "L2 relative deviation = %e, max deviation = %e\n",
                     sqrt(xmyNorm(*param.B[i], tmp1) / norm2(*param.B[i])), max_deviation[0]);

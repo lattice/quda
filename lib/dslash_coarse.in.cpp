@@ -1,11 +1,13 @@
 #include "multigrid.h"
 #include <dirac_quda.h>
 
-namespace quda {
+namespace quda
+{
 
-  template <int...> struct IntList { };
+  template <int...> struct IntList {
+  };
 
-  template <int Nc, int...N>
+  template <int Nc, int... N>
   void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                    cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
                    double kappa, int parity, bool dslash, bool clover, bool dagger,
@@ -54,8 +56,8 @@ namespace quda {
   //Apply the coarse Dirac matrix to a coarse grid vector
   //out(x) = M*in = X*in - kappa*\sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
   //  or
-  //out(x) = M^dagger*in = X^dagger*in - kappa*\sum_mu Y^\dagger_{-\mu}(x)in(x+mu) + Y_mu(x-mu)in(x-mu)
-  //Uses the kappa normalization for the Wilson operator.
+  // out(x) = M^dagger*in = X^dagger*in - kappa*\sum_mu Y^\dagger_{-\mu}(x)in(x+mu) + Y_mu(x-mu)in(x-mu)
+  // Uses the kappa normalization for the Wilson operator.
   void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                    cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
                    double kappa, int parity, bool dslash, bool clover, bool dagger,
