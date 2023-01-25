@@ -22,9 +22,11 @@ namespace quda {
         // reduce down to the first group of column-split threads
 #pragma unroll
         for (int offset = warp_size / 2; offset >= warp_size / warp_split; offset /= 2) {
-          x[i].real(x[i].real() + sycl::shift_group_left(sg, x[i].real(), offset));
-          x[i].imag(x[i].imag() + sycl::shift_group_left(sg, x[i].imag(), offset));
-          //x[i] += sycl::shift_group_left(sg, x[i], offset);
+	  x[i].real(x[i].real() + sycl::shift_group_left(sg, x[i].real(), offset));
+	  x[i].imag(x[i].imag() + sycl::shift_group_left(sg, x[i].imag(), offset));
+	  //x[i] += sycl::shift_group_left(sg, x[i], offset);
+	  //x[i].real(x[i].real() + sycl::permute_group_by_xor(sg, x[i].real(), offset));
+	  //x[i].imag(x[i].imag() + sycl::permute_group_by_xor(sg, x[i].imag(), offset));
         }
       }
 #endif

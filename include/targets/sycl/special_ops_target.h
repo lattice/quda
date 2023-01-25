@@ -82,6 +82,11 @@ namespace quda {
   inline SpecialOpsElemType<T...> *getSharedMemPtr(SpecialOps<T...> ops) { return getSharedMemPtr(&ops); }
 
   // base operation dependencies
+  struct depNone {};
+  template <> struct sharedMemSizeS<depNone> {
+    static constexpr size_t size(size_t blocksize) { return 0; }
+  };
+
   struct depFullBlock {};
   template <> struct sharedMemSizeS<depFullBlock> {
     static constexpr size_t size(size_t blocksize) { return 0; }
