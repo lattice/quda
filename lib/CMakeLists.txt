@@ -204,9 +204,17 @@ endif()
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pack>:$<TARGET_OBJECTS:quda_pack>>
                             ${QUDA_CU_OBJS})
 
+# for a develop build reduce the size by compressing the debug information
 include(CheckLinkerFlag)
 check_linker_flag(CXX "-Wl,--compress-debug-sections=zlib" QUDA_LINKER_COMPRESS)
-target_link_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_LINKER_COMPRESS}:-Wl,--compress-debug-sections=zlib>>)
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag(-gz QUDA_COMPRESS_DEBUG)
+
+if(NOT QUDA_BACKWARDS)
+  target_link_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_LINKER_COMPRESS}:-Wl,--compress-debug-sections=zlib>>)
+  target_compile_options(quda_cpp PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_COMPRESS_DEBUG}:-gz>>)
+  target_compile_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_COMPRESS_DEBUG}:-gz>>)
+endif()
 
 # set up QUDA compile options, put them before target specific options
 target_compile_options(
