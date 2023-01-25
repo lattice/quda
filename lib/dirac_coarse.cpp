@@ -23,8 +23,12 @@ namespace quda {
     Yhat_h(nullptr),
     Y_d(nullptr),
     X_d(nullptr),
+    Y_aos_d(nullptr),
+    X_aos_d(nullptr),
     Xinv_d(nullptr),
     Yhat_d(nullptr),
+    Xinv_aos_d(nullptr),
+    Yhat_aos_d(nullptr),
     enable_gpu(false),
     enable_cpu(false),
     gpu_setup(gpu_setup),
@@ -65,6 +69,21 @@ namespace quda {
     mapped(Y_d->MemType() == QUDA_MEMORY_MAPPED)
   {
 
+    constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
+
+    auto create_gauge_copy = [](const GaugeField &X) -> auto
+    {
+      GaugeFieldParam param(X);
+      param.order = gOrder;
+      auto output = static_cast<cudaGaugeField *>(cudaGaugeField::Create(param));
+      output->copy(X);
+      return output;
+    };
+
+    if (Y_d) Y_aos_d = create_gauge_copy(*Y_d);
+    if (X_d) X_aos_d = create_gauge_copy(*X_d);
+    if (Xinv_d) Xinv_aos_d = create_gauge_copy(*Xinv_d);
+    if (Yhat_d) Yhat_aos_d = create_gauge_copy(*Yhat_d);
   }
 
   DiracCoarse::DiracCoarse(const DiracCoarse &dirac, const DiracParam &param) :
@@ -83,8 +102,12 @@ namespace quda {
     Yhat_h(dirac.Yhat_h),
     Y_d(dirac.Y_d),
     X_d(dirac.X_d),
+    Y_aos_d(dirac.Y_aos_d),
+    X_aos_d(dirac.X_aos_d),
     Xinv_d(dirac.Xinv_d),
     Yhat_d(dirac.Yhat_d),
+    Xinv_aos_d(dirac.Xinv_aos_d),
+    Yhat_aos_d(dirac.Yhat_aos_d),
     enable_gpu(dirac.enable_gpu),
     enable_cpu(dirac.enable_cpu),
     gpu_setup(dirac.gpu_setup),
@@ -108,6 +131,10 @@ namespace quda {
       if (Xinv_d) delete Xinv_d;
       if (Yhat_d) delete Yhat_d;
     }
+    if (Y_aos_d) delete Y_aos_d;
+    if (X_aos_d) delete X_aos_d;
+    if (Xinv_aos_d) delete Xinv_aos_d;
+    if (Yhat_aos_d) delete Yhat_aos_d;
   }
 
   void DiracCoarse::createY(bool gpu, bool mapped) const
@@ -140,16 +167,22 @@ namespace quda {
     int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
     gParam.pad = gpu ? gParam.nFace * pad * 2 : 0; // factor of 2 since we have to store bi-directional ghost zone
 
-    if (gpu) Y_d = new cudaGaugeField(gParam);
-    else     Y_h = new cpuGaugeField(gParam);
+    if (gpu) {
+      Y_d = new cudaGaugeField(gParam);
+      gParam.order = QUDA_MILC_GAUGE_ORDER;
+      Y_aos_d = new cudaGaugeField(gParam);
+    } else     Y_h = new cpuGaugeField(gParam);
 
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     gParam.nFace = 0;
     gParam.geometry = QUDA_SCALAR_GEOMETRY;
     gParam.pad = 0;
 
-    if (gpu) X_d = new cudaGaugeField(gParam);
-    else     X_h = new cpuGaugeField(gParam);
+    if (gpu) {
+      X_d = new cudaGaugeField(gParam);
+      gParam.order = QUDA_MILC_GAUGE_ORDER;
+      X_aos_d = new cudaGaugeField(gParam);
+    } else     X_h = new cpuGaugeField(gParam);
   }
 
   void DiracCoarse::createYhat(bool gpu) const
@@ -182,7 +215,11 @@ namespace quda {
     int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
     gParam.pad = gpu ? gParam.nFace * pad * 2 : 0; // factor of 2 since we have to store bi-directional ghost zone
 
-    if (gpu) Yhat_d = new cudaGaugeField(gParam);
+    if (gpu) {
+      Yhat_d = new cudaGaugeField(gParam);
+      gParam.order = QUDA_MILC_GAUGE_ORDER;
+      Yhat_aos_d = new cudaGaugeField(gParam);
+    }
     else     Yhat_h = new cpuGaugeField(gParam);
 
     gParam.setPrecision(gpu ? X_d->Precision() : X_h->Precision());
@@ -191,7 +228,11 @@ namespace quda {
     gParam.geometry = QUDA_SCALAR_GEOMETRY;
     gParam.pad = 0;
 
-    if (gpu) Xinv_d = new cudaGaugeField(gParam);
+    if (gpu) {
+      Xinv_d = new cudaGaugeField(gParam);
+      gParam.order = QUDA_MILC_GAUGE_ORDER;
+      Xinv_aos_d = new cudaGaugeField(gParam);
+    }
     else     Xinv_h = new cpuGaugeField(gParam);
   }
 
@@ -218,20 +259,9 @@ namespace quda {
       // and one for Y, both to QUDA_MILC_GAUGE_ORDER.
       if (use_mma && dirac->isCoarse()) {
 
-        constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
+        dirac->createCoarseOp(*Y_aos_d, *X_aos_d, *transfer, kappa, mass, Mu(), MuFactor(), AllowTruncation());
 
-        GaugeFieldParam Y_param(*Y_d);
-        GaugeFieldParam X_param(*X_d);
-
-        Y_param.order = gOrder;
-        X_param.order = gOrder;
-
-        GaugeField *Y_order = cudaGaugeField::Create(Y_param);
-        GaugeField *X_order = cudaGaugeField::Create(X_param);
-
-        dirac->createCoarseOp(*Y_order, *X_order, *transfer, kappa, mass, Mu(), MuFactor(), AllowTruncation());
-
-        X_d->copy(*X_order);
+        X_d->copy(*X_aos_d);
 
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to build the preconditioned coarse clover\n");
 
@@ -240,9 +270,12 @@ namespace quda {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished building the preconditioned coarse clover\n");
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to create the preconditioned coarse op\n");
 
-        calculateYhat(*Yhat_d, *Xinv_d, *Y_order, *X_order, use_mma);
+        calculateYhat(*Yhat_d, *Xinv_d, *Y_aos_d, *X_aos_d, use_mma);
+        // TODO: we could pass in Yhat_aos_d and Xinv_aos_d directly
+        Yhat_aos_d->copy(*Yhat_d);
+        Xinv_aos_d->copy(*Xinv_d);
 
-        Y_d->copy(*Y_order);
+        Y_d->copy(*Y_aos_d);
 
         // this extra exchange shouldn't be needed, but at present the
         // copy from Y_order to Y_d doesn't preserve the
@@ -250,11 +283,11 @@ namespace quda {
         // routine)
         Y_d->exchangeGhost(QUDA_LINK_BIDIRECTIONAL);
 
-        delete Y_order;
-        delete X_order;
-
       } else {
         dirac->createCoarseOp(*Y_d, *X_d, *transfer, kappa, mass, Mu(), MuFactor(), AllowTruncation());
+
+        Y_aos_d->copy(*Y_d);
+        X_aos_d->copy(*X_d);
 
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to build the preconditioned coarse clover\n");
 
@@ -264,6 +297,9 @@ namespace quda {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to create the preconditioned coarse op\n");
 
         calculateYhat(*Yhat_d, *Xinv_d, *Y_d, *X_d, use_mma);
+        // TODO: we could pass in Yhat_aos_d and Xinv_aos_d directly
+        Yhat_aos_d->copy(*Yhat_d);
+        Xinv_aos_d->copy(*Xinv_d);
       }
     }
 
@@ -288,9 +324,13 @@ namespace quda {
       createY(true, mapped);
       createYhat(true);
       Y_d->copy(*Y_h);
+      Y_aos_d->copy(*Y_d);
       Yhat_d->copy(*Yhat_h);
+      Yhat_aos_d->copy(*Yhat_d);
       X_d->copy(*X_h);
+      X_aos_d->copy(*X_d);
       Xinv_d->copy(*Xinv_h);
+      Xinv_aos_d->copy(*Xinv_d);
       enable_gpu = true;
       init_gpu = true;
       break;
@@ -320,7 +360,9 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
     if (location == QUDA_CUDA_FIELD_LOCATION) {
-      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, use_mma);
+      auto Y = apply_mma(out, use_mma) ? Y_aos_d : Y_d;
+      auto X = apply_mma(out, use_mma) ? X_aos_d : X_d;
+      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, use_mma);
     } else if (location == QUDA_CPU_FIELD_LOCATION) {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, use_mma);
     }
@@ -334,7 +376,9 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
     if ( location  == QUDA_CUDA_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_d, *Xinv_d, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, use_mma);
+      auto Y = apply_mma(out, use_mma) ? Y_aos_d : Y_d;
+      auto X = apply_mma(out, use_mma) ? Xinv_aos_d : Xinv_d;
+      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, use_mma);
     }
@@ -349,7 +393,9 @@ namespace quda {
     initializeLazy(location);
 
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision, use_mma);
+      auto Y = apply_mma(out, use_mma) ? Y_aos_d : Y_d;
+      auto X = apply_mma(out, use_mma) ? X_aos_d : X_d;
+      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, true, false, dagger, commDim, halo_precision, use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision, use_mma);
     }
@@ -366,7 +412,9 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, x, *Y_d, *X_d, kappa, parity, true, true, dagger, commDim, halo_precision, use_mma);
+      auto Y = apply_mma(out, use_mma) ? Y_aos_d : Y_d;
+      auto X = apply_mma(out, use_mma) ? X_aos_d : X_d;
+      ApplyCoarse(out, in, x, *Y, *X, kappa, parity, true, true, dagger, commDim, halo_precision, use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true, dagger, commDim, halo_precision, use_mma);
     }
@@ -379,7 +427,9 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision, use_mma);
+      auto Y = apply_mma(out, use_mma) ? Y_aos_d : Y_d;
+      auto X = apply_mma(out, use_mma) ? X_aos_d : X_d;
+      ApplyCoarse(out, in, in, *Y, *X, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision, use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision, use_mma);
     }
@@ -456,7 +506,9 @@ namespace quda {
     initializeLazy(location);
 
     if ( location == QUDA_CUDA_FIELD_LOCATION) {
-      ApplyCoarse(out, in, in, *Yhat_d, *X_d, kappa, parity, true, false, dagger, commDim, halo_precision, use_mma);
+      auto Y = apply_mma(out, use_mma) ? Yhat_aos_d : Yhat_d;
+      auto X = apply_mma(out, use_mma) ? X_aos_d : X_d;
+      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, true, false, dagger, commDim, halo_precision, use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision, use_mma);
     }

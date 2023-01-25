@@ -1,4 +1,5 @@
 #include "multigrid.h"
+#include <dirac_quda.h>
 
 namespace quda {
 
@@ -61,7 +62,7 @@ namespace quda {
                    const int *commDim, QudaPrecision halo_precision, bool use_mma)
   {
     if constexpr (is_enabled_multigrid()) {
-      if (out.size() == 1 || !use_mma || checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
+      if (!DiracCoarse::apply_mma(out, use_mma) || checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
         ApplyCoarse(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, commDim, halo_precision, false, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
       } else {
         constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;

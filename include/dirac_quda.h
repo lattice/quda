@@ -1762,8 +1762,12 @@ public:
 
     mutable cudaGaugeField *Y_d; /** GPU copy of the coarse link field */
     mutable cudaGaugeField *X_d; /** GPU copy of the coarse clover term */
+    mutable cudaGaugeField *Y_aos_d; /** AoS GPU copy of the coarse link field */
+    mutable cudaGaugeField *X_aos_d; /** AoS GPU copy of the coarse clover term */
     mutable cudaGaugeField *Xinv_d; /** GPU copy of inverse coarse clover term */
     mutable cudaGaugeField *Yhat_d; /** GPU copy of the preconditioned coarse link field */
+    mutable cudaGaugeField *Xinv_aos_d; /** AoS GPU copy of inverse coarse clover term */
+    mutable cudaGaugeField *Yhat_aos_d; /** AoS GPU copy of the preconditioned coarse link field */
 
     /**
        @brief Initialize the coarse gauge fields.  Location is
@@ -1954,6 +1958,15 @@ public:
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
     virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
+
+    /**
+      @brief If use_mma and the batch size is larger than 1, actually apply coarse dslash with MMA
+      @param[in] f The reference field
+      #param[in] use_mma
+     */
+    static bool apply_mma(cvector_ref<ColorSpinorField> f, bool use_mma) {
+      return use_mma && (f.size() > 1);
+    }
   };
 
   /**
