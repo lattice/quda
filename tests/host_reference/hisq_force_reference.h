@@ -13,9 +13,9 @@ void color_matrix_hisq_force_reference(float eps, float weight, void *act_path_c
 
 void computeHisqOuterProduct(void *src, void *dst, QudaPrecision precision);
 
-void computeLinkOrderedOuterProduct(void *src, void *dest, QudaPrecision precision, int gauge_order);
+void computeLinkOrderedOuterProduct(void *src, void *dest, QudaPrecision precision);
 
-void computeLinkOrderedOuterProduct(void *src, void *dest, QudaPrecision precision, size_t separation, int gauge_order);
+void computeLinkOrderedOuterProduct(void *src, void *dest, QudaPrecision precision, size_t separation);
 
 #include <gauge_field.h>
 
