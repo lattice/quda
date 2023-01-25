@@ -30,7 +30,9 @@ namespace quda
                   const int *fine_to_coarse, const int *const *spin_map, int parity, IntList<fineColor, N...>)
   {
     if (out.Ncolor() == fineColor) {
-      IntList<@QUDA_MULTIGRID_NVEC_LIST @> coarseColors;
+      // clang-format off
+      IntList<@QUDA_MULTIGRID_NVEC_LIST@> coarseColors;
+      // clang-format on
       Prolongate2<fineColor>(out, in, v, fine_to_coarse, spin_map, parity, coarseColors);
     } else {
       if constexpr (sizeof...(N) > 0) {
@@ -45,7 +47,9 @@ namespace quda
                   const int *fine_to_coarse, const int *const *spin_map, int parity)
   {
     if constexpr (is_enabled_multigrid()) {
-      IntList<@QUDA_MULTIGRID_NC_NVEC_LIST @> fineColors;
+      // clang-format off
+      IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> fineColors;
+      // clang-format on
       Prolongate(out, in, v, fine_to_coarse, spin_map, parity, fineColors);
     } else {
       errorQuda("Multigrid has not been built");

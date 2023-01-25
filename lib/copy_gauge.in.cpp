@@ -73,7 +73,9 @@ namespace quda {
 
     if (in.Ncolor() != 3) {
       if constexpr (is_enabled_multigrid()) {
-        copyGenericGaugeMG(out, in, location, Out, In, ghostOut, ghostIn, type, IntList<@QUDA_MULTIGRID_NVEC_LIST @>());
+        // clang-format off
+        copyGenericGaugeMG(out, in, location, Out, In, ghostOut, ghostIn, type, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+        // clang-format on
       } else {
         errorQuda("Multigrid has not been built");
       }

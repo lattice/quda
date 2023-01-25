@@ -189,7 +189,9 @@ namespace quda {
   bool instantiateColor(const ColorSpinorField &field, const param_t &param, IntList<fineColor, N...>)
   {
     // 1 ensures we generate templates for just the fineColor with no multiplication by coarseColor
-    IntList<1, @QUDA_MULTIGRID_NVEC_LIST @> coarseColors;
+    // clang-format off
+    IntList<1, @QUDA_MULTIGRID_NVEC_LIST@> coarseColors;
+    // clang-format on
     bool success = instantiateColor<fineColor, dst_t, src_t>(field, param, coarseColors);
 
     if (!success) {
@@ -201,7 +203,9 @@ namespace quda {
   template <typename dst_t, typename src_t, typename param_t>
   void instantiateColor(const ColorSpinorField &field, const param_t &param)
   {
-    IntList<@QUDA_MULTIGRID_NC_NVEC_LIST @> fineColors;
+    // clang-format off
+    IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> fineColors;
+    // clang-format on
     if (!instantiateColor<dst_t, src_t>(field, param, fineColors)) {
       errorQuda("Nc = %d has not been instantiated", field.Ncolor());
     }

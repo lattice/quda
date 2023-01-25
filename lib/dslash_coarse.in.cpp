@@ -36,8 +36,10 @@ namespace quda
                    int parity, bool dslash, bool clover, bool dagger, const int *commDim, QudaPrecision halo_precision)
   {
     if constexpr (is_enabled_multigrid()) {
+      // clang-format off
       ApplyCoarse(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, commDim, halo_precision,
-                  IntList<@QUDA_MULTIGRID_NVEC_LIST @>());
+                  IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+      // clang-format on
     } else {
       errorQuda("Multigrid has not been built");
     }

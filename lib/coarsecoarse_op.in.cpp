@@ -41,7 +41,9 @@ namespace quda
                       IntList<fineColor, N...>)
   {
     if (gauge.Ncolor() / T.Vectors().Nspin() == fineColor) {
-      IntList<@QUDA_MULTIGRID_NVEC_LIST @> coarseColors;
+      // clang-format off
+      IntList<@QUDA_MULTIGRID_NVEC_LIST@> coarseColors;
+      // clang-format on
       CoarseCoarseOp2<fineColor>(Y, X, T, gauge, clover, cloverInv, kappa, mass, mu, mu_factor, dirac, matpc,
                                  need_bidirectional, use_mma, coarseColors);
     } else {
@@ -59,7 +61,9 @@ namespace quda
                       double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional, bool use_mma)
   {
     if constexpr (is_enabled_multigrid()) {
-      IntList<@QUDA_MULTIGRID_NVEC_LIST @> fineColors;
+      // clang-format off
+      IntList<@QUDA_MULTIGRID_NVEC_LIST@> fineColors;
+      // clang-format on
       CoarseCoarseOp(Y, X, T, gauge, clover, cloverInv, kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional,
                      use_mma, fineColors);
     } else {

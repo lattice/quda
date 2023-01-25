@@ -29,7 +29,9 @@ namespace quda
                          QudaDiracType dirac, QudaMatPCType matpc, IntList<fineColor, N...>)
   {
     if (gauge.Ncolor() == fineColor) {
-      IntList<@QUDA_MULTIGRID_NVEC_LIST @> coarseColors;
+      // clang-format off
+      IntList<@QUDA_MULTIGRID_NVEC_LIST@> coarseColors;
+      // clang-format on
       StaggeredCoarseOp2<fineColor>(Y, X, T, gauge, longGauge, XinvKD, mass, allow_truncation, dirac, matpc,
                                     coarseColors);
     } else {

@@ -23,7 +23,9 @@ namespace quda
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma)
   {
     if constexpr (is_enabled_multigrid()) {
-      calculateYhat(Yhat, Xinv, Y, X, use_mma, IntList<@QUDA_MULTIGRID_NVEC_LIST @>());
+      // clang-format off
+      calculateYhat(Yhat, Xinv, Y, X, use_mma, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+      // clang-format on
     } else {
       errorQuda("Multigrid has not been built");
     }

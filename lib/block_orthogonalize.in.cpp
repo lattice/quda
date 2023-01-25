@@ -34,7 +34,9 @@ namespace quda
                           IntList<fineColor, N...>)
   {
     if (V.Ncolor() / B.size() == fineColor) {
-      IntList<@QUDA_MULTIGRID_NVEC_LIST @> coarseColors;
+      // clang-format off
+      IntList<@QUDA_MULTIGRID_NVEC_LIST@> coarseColors;
+      // clang-format on
       BlockOrthogonalize2<fineColor>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs, n_block_ortho, two_pass,
                                      coarseColors);
     } else {
@@ -51,7 +53,9 @@ namespace quda
                           const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho, bool two_pass)
   {
     if constexpr (is_enabled_multigrid()) {
-      IntList<@QUDA_MULTIGRID_NC_NVEC_LIST @> fineColors;
+      // clang-format off
+      IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> fineColors;
+      // clang-format on
       BlockOrthogonalize(V, B, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs, n_block_ortho, two_pass, fineColors);
     } else {
       errorQuda("Multigrid has not been built");

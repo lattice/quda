@@ -28,7 +28,9 @@ namespace quda
                 IntList<fineColor, N...>)
   {
     if (gauge.Ncolor() == fineColor) {
-      IntList<@QUDA_MULTIGRID_NVEC_LIST @> coarseColors;
+      // clang-format off
+      IntList<@QUDA_MULTIGRID_NVEC_LIST@> coarseColors;
+      // clang-format on
       CoarseOp2<fineColor>(Y, X, T, gauge, clover, kappa, mass, mu, mu_factor, dirac, matpc, coarseColors);
     } else {
       if constexpr (sizeof...(N) > 0) {
