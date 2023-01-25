@@ -20,20 +20,35 @@ inline constexpr auto ms = sycl::memory_scope::device;
 
 //inline constexpr auto as = sycl::access::address_space::generic_space;
 inline constexpr auto as = sycl::access::address_space::global_space;
+inline constexpr auto asl = sycl::access::address_space::local_space;
 
-template <typename T>
 //using atomicRef = sycl::ext::oneapi::atomic_ref<T,mo,ms,as>;
+template <typename T>
 using atomicRef = sycl::atomic_ref<T,mo,ms,as>;
+template <typename T>
+using atomicRefL = sycl::atomic_ref<T,mo,ms,asl>;
 
 template <typename T>
 static inline atomicRef<T> makeAtomicRef(T *address) {
   return atomicRef<T>(*address);
 }
 
+using lfloat = std::remove_pointer_t<decltype(std::declval<sycl::local_ptr<float>>().get())>;
+using ldouble = std::remove_pointer_t<decltype(std::declval<sycl::local_ptr<double>>().get())>;
+
+static inline atomicRefL<float> makeAtomicRef(lfloat *address) {
+  return atomicRefL<float>(*address);
+}
+
+static inline atomicRefL<double> makeAtomicRef(ldouble *address) {
+  return atomicRefL<double>(*address);
+}
+
 static inline uint __float_as_uint(float x) {
   return *reinterpret_cast<uint*>(&x);
 }
 
+#if 0
 static inline int atomicAdd(int *address, int val)
 {
   auto ar = makeAtomicRef(address);
@@ -61,12 +76,26 @@ static inline double atomicAdd(double *address, double val)
   auto old = ar.fetch_add(val);
   return old;
 }
+#endif
+template <typename T, typename U>
+static inline int atomicAdd(T *address, U val)
+{
+  auto ar = makeAtomicRef(address);
+  auto old = ar.fetch_add(val);
+  return old;
+}
 
 static inline uint32_t atomicMax(uint32_t *address, uint32_t val)
 {
   auto ar = makeAtomicRef(address);
   auto old = ar.fetch_max(val);
   return old;
+}
+
+template <typename T, typename U>
+__device__ __host__ inline void atomic_fetch_add(T *addr, U val)
+{
+  atomicAdd(addr, val);
 }
 
 #include <../cuda/atomic_helper.h>

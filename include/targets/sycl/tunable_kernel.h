@@ -7,7 +7,7 @@
 #include <quda_sycl.h>
 #include <quda_sycl_api.h>
 #include <reduce_helper.h>
-#include <special_ops.h>
+#include <special_ops_target.h>
 
 namespace quda {
 
@@ -86,7 +86,7 @@ namespace quda {
 	    (ndRange,
 	     //[=](sycl::nd_item<3> ndi) {
 	     [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
-	       char *smem = la.get_pointer();
+	       auto smem = la.get_pointer();
 	       F f(arg, ndi, smem);
 	     });
 	});
@@ -140,7 +140,7 @@ namespace quda {
 	     //[=](sycl::nd_item<3> ndi) {
 	     [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
 	       const Arg *arg2 = reinterpret_cast<const Arg*>(p);
-	       char *smem = la.get_pointer();
+	       auto smem = la.get_pointer();
 	       F f(*arg2, ndi, smem);
 	     });
 	});

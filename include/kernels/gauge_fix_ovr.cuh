@@ -130,7 +130,8 @@ namespace quda {
   /**
    * @brief Perform gauge fixing with overrelaxation
    */
-  template <typename Arg> struct computeFix : only_SharedMemoryCache<typename Arg::real> {
+  //template <typename Arg> struct computeFix : only_SharedMemoryCache<typename Arg::real> {
+  template <typename Arg> struct computeFix : only_SharedMemoryCache<array<typename Arg::real,4>> {
     const Arg &arg;
     constexpr computeFix(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }

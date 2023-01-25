@@ -1372,8 +1372,13 @@ namespace quda {
       //__shared__ complex<storeType> X[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
       //__shared__ complex<storeType> Y[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
       //typename Arg::storeCoarseSharedAtomicTemp *X = f->template getSpecialOp<Arg::SharedMemVuv>().getSharedMemPtr();
-      typename Arg::StoreCoarseSharedAtomicTemp &X = getSharedMemPtr(getSpecialOp<typename Arg::SharedMemVuv>(ops))[0];
-      typename Arg::StoreCoarseSharedAtomicTemp &Y = getSharedMemPtr(getSpecialOp<typename Arg::SharedMemVuv>(ops))[1];
+      //typename Arg::StoreCoarseSharedAtomicTemp &X = getSharedMemPtr(getSpecialOp<typename Arg::SharedMemVuv>(ops))[0];
+      //typename Arg::StoreCoarseSharedAtomicTemp &Y = getSharedMemPtr(getSpecialOp<typename Arg::SharedMemVuv>(ops))[1];
+      //auto Z = getSharedMemPtr(getSpecialOp<typename Arg::SharedMemVuv>(ops));
+      //typename Arg::StoreCoarseSharedAtomicTemp X;
+      //typename Arg::StoreCoarseSharedAtomicTemp Y;
+      auto &X = getSharedMemPtr(getSpecialOp<typename Arg::SharedMemVuv>(ops))[0];
+      auto &Y = getSharedMemPtr(getSpecialOp<typename Arg::SharedMemVuv>(ops))[1];
 
       int x_ = coarse_x_cb % arg.aggregates_per_block;
       int tx = virtualThreadIdx(arg);

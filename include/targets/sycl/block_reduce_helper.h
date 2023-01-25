@@ -3,7 +3,7 @@
 #include <target_device.h>
 #include <reducer.h>
 #include <group_reduce.h>
-#include <special_ops.h>
+#include <special_ops_target.h>
 
 /**
    @file block_reduce_helper.h
@@ -152,6 +152,8 @@ namespace quda
       const auto block_size = target::block_size<param_t::block_dim>();
       const auto warp_idx = thread_idx / device::warp_size();
       const auto warp_items = (block_size + device::warp_size() - 1) / device::warp_size();
+      using opBlockSync = typename op_BlockReduce<T>::opBlockSync;
+      using opSharedMem = typename op_BlockReduce<T>::opSharedMem;
 
       // first do warp reduce
       T value = warp_reduce<true>()(value_, false, r, warp_reduce_param<device::warp_size()>());
@@ -172,12 +174,17 @@ namespace quda
 	//storage = getSpecialOp<only_SharedMemory<T>>((ops,...)).getSharedMemPtr();
 	//storage = getSpecialOp<only_BlockReduce<T>>((ops,...)).getSharedMemPtr();
 	auto brops = getDependentOps<only_BlockReduce<T>>((ops,...));
-	storage = getSharedMemPtr(getSpecialOp<only_SharedMemory<T>>(brops));  // FIXME: should be custom size: /warpsize
+	storage = getSharedMemPtr(opSharedMem()(brops));
       }
 
       // if first thread in warp, write result to shared memory
       if (thread_idx % device::warp_size() == 0) storage[batch * warp_items + warp_idx] = value;
-      __syncthreads();
+      if constexpr (sizeof...(O) == 0 || std::is_same_v<O...,void>) {
+	__syncthreads();
+      } else {
+	auto brops = getDependentOps<only_BlockReduce<T>>((ops,...));
+	blockSync(opBlockSync()(brops));
+      }
 
       // whether to use the first warp or first thread for the final reduction
       constexpr bool final_warp_reduction = true;
@@ -201,7 +208,12 @@ namespace quda
 
       if (all) {
         if (thread_idx == 0) storage[batch * warp_items + 0] = value;
-        __syncthreads();
+	if constexpr (sizeof...(O) == 0 || std::is_same_v<O...,void>) {
+	  __syncthreads();
+	} else {
+	  auto brops = getDependentOps<only_BlockReduce<T>>((ops,...));
+	  blockSync(opBlockSync()(brops));
+	}
         value = storage[batch * warp_items + 0];
       }
 

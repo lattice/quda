@@ -1,4 +1,5 @@
 #pragma once
+#include <target_device.h>
 
 namespace quda {
 
@@ -11,6 +12,11 @@ namespace quda {
 
   struct SharedMemDynamic {
     template <typename T> static constexpr size_t size(size_t blocksize) { return blocksize * sizeof(T); }
+  };
+  struct SharedMemPerWarp {
+    template <typename T> static constexpr size_t size(size_t blocksize) {
+      return ((blocksize + device::warp_size() - 1)/device::warp_size()) * sizeof(T);
+    }
   };
   template <size_t S> struct SharedMemStatic {
     template <typename T> static constexpr size_t size(size_t blocksize) { return S * sizeof(T); }
@@ -40,9 +46,18 @@ namespace quda {
   template <typename T, typename S = SharedMemDynamic> using only_SharedMemory = SpecialOps<op_SharedMemory<T,S>>;
   template <typename T, size_t S> using only_SharedMemStatic = only_SharedMemory<T,SharedMemStatic<S>>;
 
+  // getSpecialOps
+  template <typename T, typename U = void> struct getSpecialOpsS { using type = NoSpecialOps; };
+  template <typename T> struct getSpecialOpsS<T,std::conditional_t<true,void,typename T::SpecialOpsT>> {
+    using type = typename T::SpecialOpsT;
+  };
+  template <typename T> using getSpecialOps = typename getSpecialOpsS<T>::type;
+
   // hasSpecialOps
-  template <typename ...T> static constexpr bool hasSpecialOps = false;
-  template <typename ...T> static constexpr bool hasSpecialOps<SpecialOps<T...>> = true;
+  //template <typename T, typename U = void> static constexpr bool hasSpecialOps2 = false;
+  //template <typename T> static constexpr bool hasSpecialOps2<T,std::conditional_t<true,void,typename T::SpecialOpsT>> = true;
+  //template <typename ...T> static constexpr bool hasSpecialOps = (hasSpecialOps2<T> || ...);
+  template <typename T> static constexpr bool hasSpecialOps = !std::is_same_v<getSpecialOps<T>,NoSpecialOps>;
 
   // unwrapSpecialOps
   template <typename T> struct unwrapSpecialOpsS { using type = T; };
@@ -60,6 +75,14 @@ namespace quda {
 
   // hasBlockSync
   template <typename ...T> static constexpr bool hasBlockSync = hasSpecialOpType<op_blockSync,T...>;
+
+  // hasWarpCombine
+  template <typename ...T> static constexpr bool hasWarpCombine = (hasWarpCombine<T> || ...);
+  template <typename ...T> static constexpr bool hasWarpCombine<SpecialOps<T...>> = hasWarpCombine<T...>;
+  template <typename ...T> static constexpr bool hasWarpCombine<op_Sequential<T...>> = hasWarpCombine<T...>;
+  template <typename ...T> static constexpr bool hasWarpCombine<op_Concurrent<T...>> = hasWarpCombine<T...>;
+  template <typename T> static constexpr bool hasWarpCombine<op_warp_combine<T>> = true;
+  template <typename T> static constexpr bool hasWarpCombine<T> = false;
 
   // SpecialOpsType: returns SpecialOps type from a Concurrent list
   template <typename T, int n> struct SpecialOpsTypeS { using type = std::enable_if_t<n==0,T>; };
@@ -135,26 +158,5 @@ namespace quda {
 	+ sharedMemSize<std::tuple_element_t<n-1,std::tuple<T...>>>(blocksize);
     }
   };
-
-}
-
-#include <special_ops_target.h>
-
-namespace quda {
-
-  // generic tests
-  static_assert(!hasSpecialOps<NoSpecialOps>);
-  static_assert(hasSpecialOps<only_blockSync>);
-  static_assert(hasSpecialOps<only_warp_combine<float>>);
-  static_assert(hasSpecialOps<only_thread_array<float>>);
-  static_assert(hasSpecialOps<only_BlockReduce<float>>);
-  static_assert(hasSpecialOps<only_SharedMemoryCache<float>>);
-  static_assert(hasSpecialOps<only_SharedMemory<float>>);
-  static_assert(hasSpecialOps<only_SharedMemStatic<float,10>>);
-
-  static_assert(std::is_same_v<unwrapSpecialOps<only_blockSync>,op_blockSync>);
-  static_assert(std::is_same_v<unwrapSpecialOps<only_warp_combine<float>>,op_warp_combine<float>>);
-  static_assert(std::is_same_v<unwrapSpecialOps<SpecialOps<op_blockSync,op_warp_combine<float>>>,
-		op_Sequential<op_blockSync,op_warp_combine<float>>>);
 
 }

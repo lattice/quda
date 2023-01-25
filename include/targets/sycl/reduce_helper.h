@@ -149,7 +149,8 @@ namespace quda
       return;
     }
 
-    bool *isLastBlockDone = nullptr;
+    //bool *isLastBlockDone = nullptr;
+    sycl::local_ptr<bool> isLastBlockDone;
     if constexpr (sizeof...(O) == 0) {
       auto glmem = sycl::ext::oneapi::group_local_memory_for_overwrite<bool[n_batch_block]>(getGroup());
       isLastBlockDone = *glmem.get();
@@ -177,7 +178,7 @@ namespace quda
       //(ops,...).blockSync();
       //__syncthreads();
       //blockSync(getSpecialOp<only_blockSync>((&ops,...)));
-      blockSync(opBlockSync()((&ops,...)));
+      blockSync(opBlockSync()(&ops...));
     }
     bool active = false;
     if (idx < arg.threads.z) active = isLastBlockDone[target::thread_idx().z];

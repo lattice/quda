@@ -136,7 +136,7 @@ namespace quda {
   // MultiReduction
 
   template <template <typename> class Functor, typename Arg, bool grid_stride = true, typename S>
-  void MultiReductionImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S *smem)
+  void MultiReductionImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S smem)
   {
     using reduce_t = typename Functor<Arg>::reduce_t;
     Functor<Arg> t(arg);

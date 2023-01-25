@@ -1,15 +1,20 @@
 #pragma once
+#include <special_ops.h>
+#include <block_reduce_helper.h>
 
 namespace quda {
 
   // SpecialOps
   template <typename ...T>
   struct SpecialOps {
+    //using SpecialOpsT = op_Sequential<T...>;
+    using SpecialOpsT = SpecialOps<T...>;
     using SpecialOpsElemType = typename SpecialOpsElemTypeS<T...>::type;
     const sycl::nd_item<3> *ndi;
-    char *smem;
+    //char *smem;
+    sycl::local_ptr<char> smem;
     void setNdItem(const sycl::nd_item<3> &i) { ndi = &i; }
-    void setSharedMem(char *s) { smem = s;}
+    void setSharedMem(char *s) { smem = s; }
 #if 0
     SpecialOpsElemType *getSharedMemPtr() {
       static_assert(!std::is_same_v<SpecialOpsElemType,void>);
@@ -43,7 +48,7 @@ namespace quda {
     template <typename T> SpecialOpsType<U,n> operator()(T ops) { return getSpecialOp<U,n>(ops); }
   };
 
-  // getDeendentOp
+  // getDependentOp
   template <typename U, int n = 0, typename ...T>
   SpecialOpDependencies<SpecialOpsType<U,n>> getDependentOps(SpecialOps<T...> *ops) {
     static_assert(hasSpecialOpType<U,T...>);
@@ -55,41 +60,61 @@ namespace quda {
 
   // getSharedMemPtr
   template <typename ...T>
-  SpecialOpsElemType<T...> *getSharedMemPtr(SpecialOps<T...> *ops) {
+  //SpecialOpsElemType<T...> *getSharedMemPtr(SpecialOps<T...> *ops) {
+  sycl::local_ptr<SpecialOpsElemType<T...>> getSharedMemPtr(SpecialOps<T...> *ops) {
     static_assert(!std::is_same_v<SpecialOpsElemType<T...>,void>);
-    return reinterpret_cast<SpecialOpsElemType<T...>*>(ops->smem);
+    //return reinterpret_cast<SpecialOpsElemType<T...>*>(ops->smem);
+    //return reinterpret_cast<SpecialOpsElemType<T...>*>(ops->smem.get());
+    //sycl::local_ptr<SpecialOpsElemType<T...>> smem = ops->smem.get();
+    //return smem.get();
+    //auto p = ops->smem.get();
+    sycl::local_ptr<void> v(ops->smem);
+    sycl::local_ptr<SpecialOpsElemType<T...>> p(v);
+    return p;
+    //sycl::local_ptr<SpecialOpsElemType<T...>> smem;
+    //using LT = decltype(smem.get());
+    //LT pt = reinterpret_cast<LT>(p);
+    //sycl::local_ptr<SpecialOpsElemType<T...>> smem2(pt);
+    //return smem2;
+    //return reinterpret_cast<SpecialOpsElemType<T...>*>(0);
   }
   template <typename ...T>
   inline SpecialOpsElemType<T...> *getSharedMemPtr(SpecialOps<T...> ops) { return getSharedMemPtr(&ops); }
 
-  struct FullBlock {};
-  template <> struct sharedMemSizeS<FullBlock> {
+  // base operation dependencies
+  struct depFullBlock {};
+  template <> struct sharedMemSizeS<depFullBlock> {
     static constexpr size_t size(size_t blocksize) { return 0; }
   };
+
   template <typename T, typename S>
   struct depSharedMem {};
   template <typename T, typename S> struct sharedMemSizeS<depSharedMem<T,S>> {
     static constexpr size_t size(size_t blocksize) { return S().template size<T>(blocksize); }
   };
 
+  // op implementations
   struct op_blockSync : op_Base {
-    using dependencies = FullBlock;
+    using dependencies = depFullBlock;
   };
 
   template <typename T>
   struct op_warp_combine : op_Base {
-    using dependencies = FullBlock;
+    using dependencies = depFullBlock;
   };
 
   template <typename T>
   struct op_thread_array : op_Base {
-    using dependencies = FullBlock;
+    using dependencies = depFullBlock;
   };
 
   template <typename T>
   struct op_BlockReduce : op_Base {
-    //struct S { size_t operator()(size_t blocksize) { return blocksize * sizeof(T); } };  // FIXME: divide by warp size
-    using dependencies = op_Sequential<op_blockSync,op_SharedMemory<T>>;
+    using concurrentOps = op_Concurrent<op_blockSync,op_SharedMemory<T,SharedMemPerWarp>>;
+    using opBlockSync = getSpecialOpF<concurrentOps,0>;
+    using opSharedMem = getSpecialOpF<concurrentOps,1>;
+    //using specialOps = SpecialOps<concurrentOps>;
+    using dependencies = concurrentOps;
   };
 
   template <typename T>
@@ -106,7 +131,7 @@ namespace quda {
 
   // needsFullBlock
   template <typename ...T> static constexpr bool needsFullBlock = (needsFullBlock<T> || ...);
-  template <> static constexpr bool needsFullBlock<FullBlock> = true;
+  template <> static constexpr bool needsFullBlock<depFullBlock> = true;
   template <typename ...T> static constexpr bool needsFullBlock<SpecialOps<T...>> = needsFullBlock<T...>;
   template <typename ...T> static constexpr bool needsFullBlock<op_Concurrent<T...>> = needsFullBlock<T...>;
   template <typename ...T> static constexpr bool needsFullBlock<op_Sequential<T...>> = needsFullBlock<T...>;
@@ -114,12 +139,34 @@ namespace quda {
     if constexpr (std::is_base_of<op_Base,T>::value) {
       return needsFullBlock<typename T::dependencies>;
     } else {
-      return false;
+      if constexpr (hasSpecialOps<T>) {
+	return needsFullBlock<getSpecialOps<T>>;
+      } else {
+	return false;
+      }
     }
   }
   template <typename T> static constexpr bool needsFullBlock<T> = needsFullBlockF<T>();
 
   // needsSharedMem
+  template <typename ...T> static constexpr bool needsSharedMem = (needsSharedMem<T> || ...);
+  template <typename T, typename S> static constexpr bool needsSharedMem<depSharedMem<T,S>> = true;
+  template <typename ...T> static constexpr bool needsSharedMem<SpecialOps<T...>> = needsSharedMem<T...>;
+  template <typename ...T> static constexpr bool needsSharedMem<op_Concurrent<T...>> = needsSharedMem<T...>;
+  template <typename ...T> static constexpr bool needsSharedMem<op_Sequential<T...>> = needsSharedMem<T...>;
+  template <typename T> static constexpr bool needsSharedMemF() {
+    if constexpr (std::is_base_of<op_Base,T>::value) {
+      return needsSharedMem<typename T::dependencies>;
+    } else {
+      if constexpr (hasSpecialOps<T>) {
+	return needsSharedMem<getSpecialOps<T>>;
+      } else {
+	return false;
+      }
+    }
+  }
+  template <typename T> static constexpr bool needsSharedMem<T> = needsSharedMemF<T>();
+#if 0
   template <typename ...T> static constexpr bool needsSharedMem = false;
   template <typename ...T> static constexpr bool needsSharedMem<SpecialOps<T...>> = needsSharedMem<T...>;
   template <typename ...T> static constexpr bool needsSharedMem<op_Concurrent<T...>> = needsSharedMem<T...>;
@@ -128,6 +175,7 @@ namespace quda {
   template <typename T> static constexpr bool needsSharedMem<op_BlockReduce<T>> = true;
   template <typename T> static constexpr bool needsSharedMem<op_SharedMemoryCache<T>> = true;
   template <typename T, typename S> static constexpr bool needsSharedMem<op_SharedMemory<T,S>> = true;
+#endif
 
   // tests
   static_assert(needsFullBlock<only_SharedMemoryCache<float>> == true);

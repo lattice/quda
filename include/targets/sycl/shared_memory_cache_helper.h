@@ -57,13 +57,19 @@ namespace quda
        @return Shared memory pointer
      */
     template <typename dummy> struct cache_dynamic<true, dummy> {
-      __device__ inline atom_t *operator()(SharedMemoryCacheD<T> *t)
+      //__device__ inline atom_t *operator()(SharedMemoryCacheD<T> *t)
+      __device__ inline sycl::local_ptr<atom_t> operator()(SharedMemoryCacheD<T> *t)
       {
-        return reinterpret_cast<atom_t *>(getSharedMemPtr(t));
+        //return reinterpret_cast<atom_t *>(getSharedMemPtr(t).get());
+	sycl::local_ptr<void> v(t->smem);
+	sycl::local_ptr<atom_t> p(v);
+	return p;
+        //return reinterpret_cast<atom_t *>(0);
       }
     };
 
-    __device__ __host__ inline atom_t *cache()
+    //__device__ __host__ inline atom_t *cache()
+    __device__ __host__ inline sycl::local_ptr<atom_t> cache()
     {
       return target::dispatch<cache_dynamic>(this);
     }
@@ -104,12 +110,27 @@ namespace quda
       block(block),
       stride(block.x * block.y * block.z)
     {
+      //cache_ = reinterpret_cast<atom_t*>(this->smem.get());
+      //cache_ = (atom_t*)0;
     }
 
     /**
        @brief Grab the raw base address to shared memory.
     */
-    inline T* data() { return reinterpret_cast<T*>(cache()); }
+    //inline T* data() { return reinterpret_cast<T*>(cache()); }
+    //inline T* data() { return reinterpret_cast<T*>(cache().get()); }
+    //inline T* data0() { return reinterpret_cast<T*>(0); }
+    //inline T* dataX() {
+    auto data() {
+    //inline sycl::local_ptr<T> data() {
+      sycl::local_ptr<void> v(this->smem);
+      sycl::local_ptr<T> p(v);
+      //T *g = p.get();
+      //sycl::generic_ptr<T> g(p);
+      return p.get();
+      //return 0;
+      //return reinterpret_cast<T*>(cache_);
+    }
 
     /**
        @brief Save the value into the 3-d shared memory cache.
@@ -309,6 +330,18 @@ namespace quda
       } else {
 	cache_ = nullptr;
       }
+    }
+    template <typename O>
+    SharedMemoryCache(O *ops, dim3 block = target::block_dim()) :
+      block(block),
+      stride(block.x * block.y * block.z)
+    {
+      auto op = getSpecialOp<only_SharedMemoryCache<T>>(ops);
+      sycl::multi_ptr<void, sycl::access::address_space::local_space> v(op.smem);
+      decltype(mem) p(v);
+      //mem = reinterpret_cast<decltype(mem)>(v);
+      mem = p;
+      cache_ = *mem.get();
     }
 
     /**

@@ -36,7 +36,7 @@ namespace quda {
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   struct Kernel1DS {
-    using SpecialOpsT = Functor<Arg>;
+    using SpecialOpsT = getSpecialOps<Functor<Arg>>;
     Kernel1DS(const Arg &arg, const sycl::nd_item<3> &ndi)
     {
 #ifdef QUDA_THREADS_BLOCKED
@@ -96,7 +96,7 @@ namespace quda {
 
   template <template <typename> class Functor, typename Arg, bool grid_stride, typename ...S>
   std::enable_if_t<!needsFullBlock<Functor<Arg>>, void>
-  Kernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S *...smem)
+  Kernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem)
   {
     Functor<Arg> f(arg);
     if constexpr (hasSpecialOps<Functor<Arg>>) {
@@ -116,7 +116,7 @@ namespace quda {
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride, typename ...S>
   std::enable_if_t<needsFullBlock<Functor<Arg>>, void>
-  Kernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S *...smem)
+  Kernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem)
   {
     Functor<Arg> f(arg);
     if constexpr (hasSpecialOps<Functor<Arg>>) {
@@ -154,7 +154,7 @@ namespace quda {
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   struct Kernel2DS {
-    using SpecialOpsT = Functor<Arg>;
+    using SpecialOpsT = getSpecialOps<Functor<Arg>>;
     template <typename... T>
     Kernel2DS(const Arg &arg, const sycl::nd_item<3> &ndi, T... smem)
     {
@@ -221,7 +221,7 @@ namespace quda {
 
   template <template <typename> class Functor, typename Arg, bool grid_stride, typename ...S>
   std::enable_if_t<!needsFullBlock<Functor<Arg>>, void>
-  Kernel3DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S *...smem)
+  Kernel3DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem)
   {
     Functor<Arg> f(arg);
     if constexpr (hasSpecialOps<Functor<Arg>>) {
@@ -243,7 +243,7 @@ namespace quda {
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride, typename ...S>
   std::enable_if_t<needsFullBlock<Functor<Arg>>, void>
-  Kernel3DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S *...smem)
+  Kernel3DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem)
   {
     Functor<Arg> f(arg);
     if constexpr (hasSpecialOps<Functor<Arg>>) {
@@ -286,9 +286,9 @@ namespace quda {
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   struct Kernel3DS {
-    using SpecialOpsT = Functor<Arg>;
+    using SpecialOpsT = getSpecialOps<Functor<Arg>>;
     template <typename ...S>
-    Kernel3DS(const Arg &arg, const sycl::nd_item<3> &ndi, S *...smem)
+    Kernel3DS(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem)
     {
 #ifdef QUDA_THREADS_BLOCKED
       Kernel3DImplB<Functor,Arg,grid_stride>(arg, ndi);
@@ -331,6 +331,7 @@ namespace quda {
 		 str(localSize).c_str(), str(arg.threads).c_str());
       printfQuda("  Functor: %s\n", typeid(Functor<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
+      printfQuda("  SpecialOps: %s\n", typeid(getSpecialOps<Functor<Arg>>).name());
       //fflush(stdout);
     }
     //if (arg.threads.x%localSize[RANGE_X] != 0) {
