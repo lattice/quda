@@ -332,6 +332,7 @@ namespace quda {
       printfQuda("  Functor: %s\n", typeid(Functor<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
       printfQuda("  SpecialOps: %s\n", typeid(getSpecialOps<Functor<Arg>>).name());
+      printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
       //fflush(stdout);
     }
     //if (arg.threads.x%localSize[RANGE_X] != 0) {
