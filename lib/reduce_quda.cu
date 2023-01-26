@@ -159,7 +159,8 @@ namespace quda {
     array<double, 2> max_deviation(const ColorSpinorField &x, const ColorSpinorField &y)
     {
       auto deviation = instantiateReduce<MaxDeviation, false>(0.0, 0.0, 0.0, x, y, y, y, y);
-      return {deviation.diff, deviation.diff / deviation.ref};
+      // ensure that if the absolute deviation is zero, so is the relative deviation
+      return {deviation.diff, deviation.diff > 0.0 ? deviation.diff / deviation.ref : 0.0};
     }
 
     double norm1(const ColorSpinorField &x)
