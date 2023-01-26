@@ -884,7 +884,7 @@ namespace quda
         param.aux = make_int4(-1, -1, -1, -1);
         tunable.initTuneParam(param);
 
-	auto error = QUDA_SUCCESS;
+        auto error = QUDA_SUCCESS;
         const int candidate_iterations = tunable.candidate_iter();
         while (tuning && candidatetuning) {
           qudaDeviceSynchronize();
@@ -923,7 +923,7 @@ namespace quda
                          tunable.perfString(elapsed_time).c_str());
             } else {
               printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), qudaGetLastErrorString().c_str());
-	      error = QUDA_SUCCESS;
+              error = QUDA_SUCCESS;
             }
           }
           candidatetuning = tunable.advanceTuneParam(param);
@@ -931,10 +931,9 @@ namespace quda
         }
 
         if (tc.empty()) {
-	  if (error != QUDA_SUCCESS)
-	    warningQuda("Last error: %s\n", qudaGetLastErrorString().c_str());
-	  errorQuda("Auto-tuning failed for %s with %s at vol=%s", key.name, key.aux, key.volume);
-	}
+          if (error != QUDA_SUCCESS) warningQuda("Last error: %s\n", qudaGetLastErrorString().c_str());
+          errorQuda("Auto-tuning failed for %s with %s at vol=%s", key.name, key.aux, key.volume);
+        }
 
         const float min_tune_time = tunable.min_tune_time();
         const int min_tune_iterations = tunable.min_tune_iter();
