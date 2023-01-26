@@ -185,11 +185,13 @@ namespace quda
   template <class fixed_t, class float_t> __device__ __host__ fixed_t f2i_round(float_t f)
   {
 #if 1
+    fixed_t i = {};
     if constexpr (sizeof(fixed_t) < 4) {
-      return static_cast<fixed_t>(target::dispatch<f2i>(f));
+      i = static_cast<fixed_t>(target::dispatch<f2i>(f));
     } else {
-      return static_cast<fixed_t>(rint(f));
+      i = static_cast<fixed_t>(rint(f));
     }
+    return i;
 #else
     return static_cast<fixed_t>(rint(f));
 #endif
