@@ -20,7 +20,7 @@ namespace quda
     int comms_rank;        /** per process value of comm_rank() */
     int comms_rank_global; /** per process value comm_rank_global() */
     int comms_coord[4];    /** array storing {comm_coord(0), ..., comm_coord(3)} */
-    int comms_dim[4];      /**  array storing {comm_dim(0), ..., comm_dim(3)} */
+    int comms_dim[4];      /** array storing {comm_dim(0), ..., comm_dim(3)} */
 
     constexpr kernel_param() = default;
 
