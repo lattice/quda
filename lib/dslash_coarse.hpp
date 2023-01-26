@@ -32,7 +32,6 @@ namespace quda {
     mutable int color_col_stride;
     mutable int dim_threads;
 
-    constexpr bool hasBlockOps() { return true; }
     long long flops() const
     {
       return ((dslash*2*nDim+clover*1)*(8*Ns*Nc*Ns*Nc)-2*Ns*Nc)*nParity*(long long)out.VolumeCB();
@@ -46,22 +45,6 @@ namespace quda {
     unsigned int sharedBytesPerThread() const { return (sizeof(complex<Float>) * colors_per_thread(Nc, dim_threads)); }
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions
     unsigned int minThreads() const { return color_col_stride * X.VolumeCB(); }
-
-#if 0
-    bool advanceBlockDim(TuneParam &param) const
-    {
-      bool ret = true;
-      int vector_length_x = minThreads();
-      //printfQuda("vector_length_x: %i  block.x: %i\n",vector_length_x,param.block.x);
-      while(ret) {
-	ret = TunableKernel3D::advanceBlockDim(param);
-	if((vector_length_x%param.block.x==0) &&
-	   (vector_length_y%param.block.y==0) &&
-	   (vector_length_z%param.block.z==0)) break;
-      }
-      return ret;
-    }
-#endif
 
     /**
        @param Helper function to check that the present launch parameters are valid
@@ -127,22 +110,10 @@ namespace quda {
 
     void initTuneParam(TuneParam &param) const
     {
-#if 0
-      param.aux = make_int4(1,1,1,1);
-      color_col_stride = param.aux.x;
-      while(minThreads()%blockMin()!=0) {
-	color_col_stride *= 2;
-	param.aux.x = color_col_stride;
-      }
-      dim_threads = param.aux.y;
-      resizeStep(step_y, 2 * dim_threads); // 2 is forwads/backwards
-      resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / colors_per_thread(Nc, dim_threads)));
-#else
       color_col_stride = 1;
       dim_threads = 1;
       resizeStep(step_y, 2 * dim_threads); // 2 is forwards/backwards
       resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / colors_per_thread(Nc, dim_threads)));
-#endif
       TunableKernel3D::initTuneParam(param);
       param.aux = make_int4(color_col_stride, dim_threads, 1, 1);
     }

@@ -780,9 +780,6 @@ namespace quda
    */
   TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
   {
-    //if (verbosity >= QUDA_DEBUG_VERBOSE) {
-    //  printfQuda("begin tuneLaunch\n");
-    //}
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTART(QUDA_PROFILE_TOTAL);
     launchTimer.TPSTART(QUDA_PROFILE_INIT);
@@ -835,9 +832,6 @@ namespace quda
         trace_list.push_back(trace_entry);
       }
 
-      //if (verbosity >= QUDA_DEBUG_VERBOSE) {
-      //printfQuda("used tune cache\nend tuneLaunch\n");
-      //}
       return param_tuned;
     }
 
@@ -858,9 +852,6 @@ namespace quda
                    tunable.paramString(param_default).c_str());
       }
 
-      //if (verbosity >= QUDA_DEBUG_VERBOSE) {
-      //printfQuda("used default\nend tuneLaunch\n");
-      //}
       return param_default;
     } else if (!tuning) {
 
@@ -897,9 +888,6 @@ namespace quda
         const int candidate_iterations = tunable.candidate_iter();
         while (tuning && candidatetuning) {
           qudaDeviceSynchronize();
-	  //if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	  //printfQuda("tunable.checkLaunchParam\n");
-	  //}
           tunable.checkLaunchParam(param);
           if (verbosity >= QUDA_DEBUG_VERBOSE) {
             printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
@@ -911,17 +899,11 @@ namespace quda
 
           tunable.apply(stream); // do initial call in case we need to jit compile for these parameters or if policy tuning
 
-	  //if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	  //printfQuda("timer.start\n");
-	  //}
           timer.start();
           for (int i = 0; i < candidate_iterations; i++) {
             tunable.apply(stream); // calls tuneLaunch() again, which simply returns the currently active param
           }
           timer.stop();
-	  //if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	  //printfQuda("qudaDeviceSynchronize\n");
-	  //}
           qudaDeviceSynchronize();
           error = qudaGetLastError();
 
@@ -949,8 +931,7 @@ namespace quda
         }
 
         if (tc.empty()) {
-	  if (error != QUDA_SUCCESS)
-	    warningQuda("Last error: %s\n", qudaGetLastErrorString().c_str());
+	  if (error != QUDA_SUCCESS) warningQuda("Last error: %s\n", qudaGetLastErrorString().c_str());
 	  errorQuda("Auto-tuning failed for %s with %s at vol=%s", key.name, key.aux, key.volume);
 	}
 
@@ -1077,9 +1058,6 @@ namespace quda
 
     param.n_calls = profile_count ? 1 : 0;
 
-    //if (verbosity >= QUDA_DEBUG_VERBOSE) {
-    //printfQuda("end tuneLaunch\n");
-    //}
     return param;
   }
 
