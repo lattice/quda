@@ -1959,9 +1959,7 @@ public:
       @param[in] f The reference field
       #param[in] use_mma
      */
-    static bool apply_mma(cvector_ref<ColorSpinorField> f, bool use_mma) {
-      return use_mma && (f.size() > 1);
-    }
+    static bool apply_mma(cvector_ref<ColorSpinorField> f, bool use_mma);
   };
 
   /**

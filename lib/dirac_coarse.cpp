@@ -350,6 +350,10 @@ namespace quda {
     }
   }
 
+  bool DiracCoarse::apply_mma(cvector_ref<ColorSpinorField> f, bool use_mma) {
+    return (f.size() > 1) && use_mma;
+  }
+
   void DiracCoarse::createPreconditionedCoarseOp(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
     calculateYhat(Yhat, Xinv, Y, X, use_mma);
   }
