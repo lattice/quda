@@ -157,8 +157,12 @@ namespace quda {
       constexpr int Ms = spins_per_thread<true, Arg::nSpin>();
       constexpr int Mc = colors_per_thread<true, Arg::nColor>();
       constexpr int color_spin_threads = (Arg::nSpin/Ms) * (Arg::nColor/Mc);
-      //SharedMemoryCache<real, color_spin_threads, 2, true> cache(smem); // 2 comes from parity
-      SharedMemoryCacheD<real> cache(ops);
+      auto block = target::block_dim();
+      // pad the shared block size to avoid bank conflicts
+      block.x = ((block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
+      block.y = color_spin_threads; // state the y block since we know it at compile time
+      SharedMemoryCache<real> cache(block);
+      //SharedMemoryCacheD<real> cache(ops);
       cache.save(thread_max);
       cache.sync();
       real this_site_max = static_cast<real>(0);

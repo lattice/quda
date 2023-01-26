@@ -194,6 +194,7 @@ namespace quda
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, Arg::nSpin> Vector;
+
     int spinor_parity = (arg.nParity == 2) ? parity : 0;
 
     // compute where the output is located

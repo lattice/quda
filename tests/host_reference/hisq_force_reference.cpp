@@ -92,17 +92,10 @@ typedef struct {
   dsu3_vector h[2];
 } dhalf_wilson_vector;
 
-template <typename su3_matrix> su3_matrix *get_su3_matrix(int gauge_order, su3_matrix *p, int idx, int dir)
+template <typename su3_matrix> su3_matrix *get_su3_matrix(su3_matrix *p, int idx, int dir)
 {
-  if (gauge_order == QUDA_MILC_GAUGE_ORDER) {
-    return (p + 4 * idx + dir);
-  } else if (gauge_order == QUDA_QDP_GAUGE_ORDER) { // This is nasty!
-    su3_matrix *data = ((su3_matrix **)p)[dir];
-    return data + idx;
-  } else {
-    errorQuda("get_su3_matrix: unsupported ordering scheme!\n");
-  }
-  return NULL;
+  su3_matrix *data = ((su3_matrix **)p)[dir];
+  return data + idx;
 }
 
 template <typename su3_vector, typename su3_matrix> void su3_projector(su3_vector *a, su3_vector *b, su3_matrix *c)
@@ -112,7 +105,7 @@ template <typename su3_vector, typename su3_matrix> void su3_projector(su3_vecto
 }
 
 template <typename half_wilson_vector, typename su3_matrix>
-void computeLinkOrderedOuterProduct(half_wilson_vector *src, su3_matrix *dest, int gauge_order)
+void computeLinkOrderedOuterProduct(half_wilson_vector *src, su3_matrix *dest)
 {
   int dx[4];
   for (int i = 0; i < V; ++i) {
@@ -121,14 +114,14 @@ void computeLinkOrderedOuterProduct(half_wilson_vector *src, su3_matrix *dest, i
       dx[dir] = 1;
       int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
       half_wilson_vector *hw = src + nbr_idx;
-      su3_matrix *p = get_su3_matrix(gauge_order, dest, i, dir);
+      su3_matrix *p = get_su3_matrix(dest, i, dir);
       su3_projector(&(hw->h[0]), &src[i].h[0], p);
     } // dir
   }   // i
 }
 
 template <typename half_wilson_vector, typename su3_matrix>
-void computeLinkOrderedOuterProduct(half_wilson_vector *src, su3_matrix *dest, size_t nhops, int gauge_order)
+void computeLinkOrderedOuterProduct(half_wilson_vector *src, su3_matrix *dest, size_t nhops)
 {
   int dx[4];
   for (int i = 0; i < V; ++i) {
@@ -137,34 +130,33 @@ void computeLinkOrderedOuterProduct(half_wilson_vector *src, su3_matrix *dest, s
       dx[dir] = nhops;
       int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
       half_wilson_vector *hw = src + nbr_idx;
-      su3_matrix *p = get_su3_matrix(gauge_order, dest, i, dir);
+      su3_matrix *p = get_su3_matrix(dest, i, dir);
       su3_projector(&(hw->h[0]), &src[i].h[0], p);
     } // dir
   }   // i
 }
 
-void computeLinkOrderedOuterProduct(void *src, void *dst, QudaPrecision precision, int gauge_order)
+void computeLinkOrderedOuterProduct(void *src, void *dst, QudaPrecision precision)
 {
   if (precision == QUDA_SINGLE_PRECISION) {
-    computeLinkOrderedOuterProduct((fhalf_wilson_vector *)src, (fsu3_matrix *)dst, gauge_order);
+    computeLinkOrderedOuterProduct((fhalf_wilson_vector *)src, (fsu3_matrix *)dst);
   } else {
-    computeLinkOrderedOuterProduct((dhalf_wilson_vector *)src, (dsu3_matrix *)dst, gauge_order);
+    computeLinkOrderedOuterProduct((dhalf_wilson_vector *)src, (dsu3_matrix *)dst);
   }
 }
 
-void computeLinkOrderedOuterProduct(void *src, void *dst, QudaPrecision precision, size_t nhops, int gauge_order)
+void computeLinkOrderedOuterProduct(void *src, void *dst, QudaPrecision precision, size_t nhops)
 {
   if (precision == QUDA_SINGLE_PRECISION) {
-    computeLinkOrderedOuterProduct((fhalf_wilson_vector *)src, (fsu3_matrix *)dst, nhops, gauge_order);
+    computeLinkOrderedOuterProduct((fhalf_wilson_vector *)src, (fsu3_matrix *)dst, nhops);
   } else {
-    computeLinkOrderedOuterProduct((dhalf_wilson_vector *)src, (dsu3_matrix *)dst, nhops, gauge_order);
+    computeLinkOrderedOuterProduct((dhalf_wilson_vector *)src, (dsu3_matrix *)dst, nhops);
   }
 }
 
 #define RETURN_IF_ERR                                                                                                  \
   if (err) return;
 
-extern int gauge_order;
 extern int Vh;
 extern int Vh_ex;
 
@@ -464,20 +456,14 @@ int LoadStore<Real>::half_idx_conversion_normal2ex(int half_lattice_index, const
 template <class Real>
 Real LoadStore<Real>::getData(const Real *const field, int idx, int dir, int oddBit, int offset, int hfv) const
 {
-  if (gauge_order == QUDA_MILC_GAUGE_ORDER) {
-    return field[(4 * hfv * oddBit + 4 * idx + dir) * 18 + offset];
-  } else { // QDP format
-    return ((Real **)field)[dir][(hfv * oddBit + idx) * 18 + offset];
-  }
+  // QDP format
+  return ((Real **)field)[dir][(hfv * oddBit + idx) * 18 + offset];
 }
 template <class Real>
 void LoadStore<Real>::addData(Real *const field, int idx, int dir, int oddBit, int offset, Real v, int hfv) const
 {
-  if (gauge_order == QUDA_MILC_GAUGE_ORDER) {
-    field[(4 * hfv * oddBit + 4 * idx + dir) * 18 + offset] += v;
-  } else { // QDP format
-    ((Real **)field)[dir][(hfv * oddBit + idx) * 18 + offset] += v;
-  }
+  // QDP format
+  ((Real **)field)[dir][(hfv * oddBit + idx) * 18 + offset] += v;
 }
 
 template <class Real>
