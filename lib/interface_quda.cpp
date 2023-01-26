@@ -5035,12 +5035,15 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
     dirac->Dagger(QUDA_DAG_YES);
     printfQuda("M(p.Even(), tmp)\n");
     fflush(stdout);
-    dirac->M(p.Odd(), tmp); // this is the even part of Y 
+    dirac->M(p.Odd(), tmp); // this is the odd part of Y 
 
     dirac->Dagger(QUDA_DAG_NO);
     printfQuda("Dslash(p.Odd(), p.Even(), QUDA_ODD_PARITY)\n");
     fflush(stdout);
     dirac->Dslash(p.Even(), p.Odd(), QUDA_EVEN_PARITY); // and now the even part of Y
+ 
+    gamma5(p.Even(), p.Even());
+    gamma5(p.Odd(), p.Odd());
     // up to here x match X in tmLQCD and p=-Y of tmLQCD
 
     profileTMCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -5050,10 +5053,10 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
   profileTMCloverForce.TPSTOP(QUDA_PROFILE_INIT);
   profileTMCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
   
-  printfQuda("computeCloverForce(cudaForce, *gaugePrecise, quarkX, quarkP, force_coeff);\n");
-  computeCloverForce(cudaForce, *gaugePrecise, quarkX, quarkP, force_coeff);
+  printfQuda("computeCloverForce(cudaForce, *gaugePrecise, quarkP, quarkX, force_coeff);\n");
+  computeCloverForce(cudaForce, *gaugePrecise, quarkP, quarkX, force_coeff);
   printfQuda("computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8);\n");
-  computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8); 
+  // computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8); 
 
   // FIXME: these need to be checked
   std::vector< std::vector<double> > ferm_epsilon(nvector);
@@ -5063,15 +5066,15 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
     ferm_epsilon[i][1] = - 2.0 * k_csw_ov_8 * coeff[i]; 
   }
 
-  printfQuda("computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon)\n");
-  computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon);
+  // printfQuda("computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon)\n");
+  // computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon);
 
-  cudaGaugeField *oprodEx = createExtendedGauge(oprod, R, profileTMCloverForce);
+  // cudaGaugeField *oprodEx = createExtendedGauge(oprod, R, profileTMCloverForce);
 
-  printfQuda("cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_ODD_PARITY)\n");
-  cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_ODD_PARITY);
-  printfQuda("cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_EVEN_PARITY)\n");
-  cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_EVEN_PARITY);
+  // printfQuda("cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_ODD_PARITY)\n");
+  // cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_ODD_PARITY);
+  // printfQuda("cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_EVEN_PARITY)\n");
+  // cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_EVEN_PARITY);
 
   printfQuda("updateMomentum(gpuMom, -1.0, cudaForce, \"tmclover\")\n");
   updateMomentum(gpuMom, -1.0, cudaForce, "tmclover");
