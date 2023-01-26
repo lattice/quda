@@ -1,5 +1,5 @@
 # enable tests build a common library for all test utilities
-add_library(quda_test STATIC googletest/src/gtest-all.cc)
+add_library(quda_test googletest/src/gtest-all.cc)
 target_include_directories(quda_test SYSTEM PUBLIC  googletest/include googletest)
 target_link_libraries(quda_test PUBLIC Eigen)
 target_link_libraries(quda_test PUBLIC QUDA::quda)
@@ -9,6 +9,10 @@ target_compile_options(
   $<IF:$<CONFIG:RELEASE>,-w,-Wall -Wextra>
   $<$<CONFIG:STRICT>:-Werror>
 )
+if(BUILD_SHARED_LIBS)
+  install(TARGETS quda_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+
 add_subdirectory(utils)
 add_subdirectory(host_reference)
 enable_language(Fortran)
