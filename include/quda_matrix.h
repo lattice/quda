@@ -1074,11 +1074,11 @@ namespace quda {
       // if its argument (tmp) is zero and then return unity.
 
       Complex tmp = a3 + sg2h3;
-      if (tmp.real == 0 and tmp.imag == 0) {
+      if (tmp.real() == 0 and tmp.imag() == 0) {
         // Making sure q is a zero matrix
         bool iszero = true;
         for (int i = 0; i < 9; i++) {
-          if (q(i).real != 0 or q(i).imag != 0) {
+          if (q(i).real() != 0 or q(i).imag() != 0) {
             iszero = false;
             break;
           }
