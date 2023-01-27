@@ -7,21 +7,21 @@ namespace quda
   template <int...> struct IntList {
   };
 
-  template <int Nc, int... N>
+  template <bool use_mma, int Nc, int... N>
   void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                    cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
                    double kappa, int parity, bool dslash, bool clover, bool dagger,
-                   const int *commDim, QudaPrecision halo_precision, bool use_mma, IntList<Nc, N...>)
+                   const int *commDim, QudaPrecision halo_precision, IntList<Nc, N...>)
   {
     int nColor = use_mma ? inA[0].Ncolor() / inA[0].Nvec() : inA[0].Ncolor();
     if (nColor == Nc) {
       if (dagger)
-        ApplyCoarse<true, Nc>(out, inA, inB, Y, X, kappa, parity, dslash, clover, commDim, halo_precision, use_mma);
+        ApplyCoarse<true, Nc, use_mma>(out, inA, inB, Y, X, kappa, parity, dslash, clover, commDim, halo_precision);
       else
-        ApplyCoarse<false, Nc>(out, inA, inB, Y, X, kappa, parity, dslash, clover, commDim, halo_precision, use_mma);
+        ApplyCoarse<false, Nc, use_mma>(out, inA, inB, Y, X, kappa, parity, dslash, clover, commDim, halo_precision);
     } else {
       if constexpr (sizeof...(N) > 0) {
-        ApplyCoarse(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, commDim, halo_precision, use_mma, IntList<N...>());
+        ApplyCoarse<use_mma>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, commDim, halo_precision, IntList<N...>());
       } else {
         errorQuda("Nc = %d has not been instantiated", inA[0].Ncolor());
       }
@@ -65,7 +65,7 @@ namespace quda
   {
     if constexpr (is_enabled_multigrid()) {
       if (!DiracCoarse::apply_mma(out, use_mma) || checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
-        ApplyCoarse(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, commDim, halo_precision, false, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+        ApplyCoarse<false>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, commDim, halo_precision, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
       } else {
         constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
         ColorSpinorField v_inA = create_color_spinor_copy(inA, csOrder);
@@ -79,7 +79,9 @@ namespace quda
         auto X_ = create_gauge_copy(X, gOrder, clover);
         auto Y_ = create_gauge_copy(Y, gOrder, dslash);
 
-        ApplyCoarse(v_out, v_inA, v_inB, *Y_, *X_, kappa, parity, dslash, clover, dagger, commDim, halo_precision, use_mma, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+        if (Y_ != &Y) { Y_->exchangeGhost(QUDA_LINK_BIDIRECTIONAL); }
+
+        ApplyCoarse<true>(v_out, v_inA, v_inB, *Y_, *X_, kappa, parity, dslash, clover, dagger, commDim, halo_precision, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
 
         if (X_ != &X) { delete X_; }
         if (Y_ != &Y) { delete Y_; }

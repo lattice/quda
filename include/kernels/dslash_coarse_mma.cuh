@@ -143,9 +143,9 @@ namespace quda
 #pragma unroll
       for (int d = 0; d < Arg::nDim; d++) // loop over dimension
       {
-        const int fwd_idx = linkIndexP1(coord, arg.dim, d);
+        const int fwd_idx = linkIndexHop(coord, arg.dim, d, arg.nFace);
 
-        if (arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d])) {
+        if (arg.commDim[d] && is_boundary(coord, d, 1, arg)) {
           if constexpr (doHalo<Arg::type>()) {
             int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
             auto a = arg.Y(Arg::dagger ? d : d + 4, parity, x_cb, 0, 0);
@@ -179,8 +179,8 @@ namespace quda
       // Backward gather - compute back offset for spinor and gauge fetch
 #pragma unroll
       for (int d = 0; d < Arg::nDim; d++) {
-        const int back_idx = linkIndexM1(coord, arg.dim, d);
-        if (arg.commDim[d] && (coord[d] - arg.nFace < 0)) {
+        const int back_idx = linkIndexHop(coord, arg.dim, d, -arg.nFace);
+        if (arg.commDim[d] && is_boundary(coord, d, 0, arg)) {
           if constexpr (doHalo<Arg::type>()) {
             const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
 

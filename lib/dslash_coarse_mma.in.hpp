@@ -3,7 +3,7 @@
 #include <uint_to_char.h>
 #include <worker.h>
 #include <tunable_nd.h>
-// #include <kernels/dslash_coarse.cuh>
+#include <kernels/dslash_coarse.cuh>
 #include <kernels/dslash_coarse_mma.cuh>
 #include <shmem_helper.cuh>
 #include <dslash_quda.h>
@@ -18,7 +18,7 @@ namespace quda {
 
   template <typename Float, typename yFloat, typename ghostFloat, int Ns, int Nc, bool dslash, bool clover, bool dagger,
             DslashType type>
-  class DslashCoarseMma : public TunableKernel
+  class DslashCoarse <Float, yFloat, ghostFloat, Ns, Nc, dslash, clover, dagger, type, true> : public TunableKernel
   {
     static constexpr int nDim = 4;
 
@@ -108,7 +108,7 @@ namespace quda {
     }
 
   public:
-    DslashCoarseMma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
+    DslashCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                  cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y,
                  const GaugeField &X, double kappa, int parity, MemoryLocation *halo_location,
                  const ColorSpinorField &halo) :

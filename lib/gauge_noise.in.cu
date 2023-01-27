@@ -99,7 +99,7 @@ namespace quda {
     if (U_.GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED) {
       U_.exchangeExtendedGhost(U_.R());
     } else if (U_.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) {
-      U_.exchangeGhost();
+      U_.exchangeGhost(QUDA_LINK_BIDIRECTIONAL);
     }
   }
 

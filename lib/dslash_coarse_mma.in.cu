@@ -1,10 +1,11 @@
 #include <dslash_coarse.hpp>
+#include <dslash_coarse_mma.hpp>
 
 namespace quda {
 
   constexpr bool dagger = @QUDA_MULTIGRID_DAGGER@;
   constexpr int coarseColor = @QUDA_MULTIGRID_NVEC@;
-  constexpr bool use_mma = false;
+  constexpr bool use_mma = true;
 
   template<>
   void ApplyCoarse<dagger, coarseColor, use_mma>(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,

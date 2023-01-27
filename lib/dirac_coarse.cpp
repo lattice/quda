@@ -80,10 +80,16 @@ namespace quda {
       return output;
     };
 
-    if (Y_d) Y_aos_d = create_gauge_copy(*Y_d);
+    if (Y_d) {
+      Y_aos_d = create_gauge_copy(*Y_d);
+      Y_aos_d->exchangeGhost(QUDA_LINK_BIDIRECTIONAL);
+    }
     if (X_d) X_aos_d = create_gauge_copy(*X_d);
     if (Xinv_d) Xinv_aos_d = create_gauge_copy(*Xinv_d);
-    if (Yhat_d) Yhat_aos_d = create_gauge_copy(*Yhat_d);
+    if (Yhat_d) {
+      Yhat_aos_d = create_gauge_copy(*Yhat_d);
+      Yhat_aos_d->exchangeGhost(QUDA_LINK_BIDIRECTIONAL);
+    }
   }
 
   DiracCoarse::DiracCoarse(const DiracCoarse &dirac, const DiracParam &param) :
@@ -273,6 +279,7 @@ namespace quda {
         calculateYhat(*Yhat_d, *Xinv_d, *Y_aos_d, *X_aos_d, use_mma);
         // TODO: we could pass in Yhat_aos_d and Xinv_aos_d directly
         Yhat_aos_d->copy(*Yhat_d);
+        Yhat_aos_d->exchangeGhost(QUDA_LINK_BIDIRECTIONAL);
         Xinv_aos_d->copy(*Xinv_d);
 
         Y_d->copy(*Y_aos_d);
@@ -287,6 +294,7 @@ namespace quda {
         dirac->createCoarseOp(*Y_d, *X_d, *transfer, kappa, mass, Mu(), MuFactor(), AllowTruncation());
 
         Y_aos_d->copy(*Y_d);
+        Y_aos_d->exchangeGhost(QUDA_LINK_BIDIRECTIONAL);
         X_aos_d->copy(*X_d);
 
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to build the preconditioned coarse clover\n");
@@ -299,6 +307,7 @@ namespace quda {
         calculateYhat(*Yhat_d, *Xinv_d, *Y_d, *X_d, use_mma);
         // TODO: we could pass in Yhat_aos_d and Xinv_aos_d directly
         Yhat_aos_d->copy(*Yhat_d);
+        Yhat_aos_d->exchangeGhost(QUDA_LINK_BIDIRECTIONAL);
         Xinv_aos_d->copy(*Xinv_d);
       }
     }
@@ -327,6 +336,7 @@ namespace quda {
       Y_aos_d->copy(*Y_d);
       Yhat_d->copy(*Yhat_h);
       Yhat_aos_d->copy(*Yhat_d);
+      Yhat_aos_d->exchangeGhost(QUDA_LINK_BIDIRECTIONAL);
       X_d->copy(*X_h);
       X_aos_d->copy(*X_d);
       Xinv_d->copy(*Xinv_h);

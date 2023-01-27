@@ -17,6 +17,10 @@ namespace quda {
     DSLASH_FULL
   };
 
+  template <typename Float, typename yFloat, typename ghostFloat, int Ns, int Nc, bool dslash, bool clover, bool dagger,
+            DslashType type, bool use_mma>
+  class DslashCoarse { };
+
 #ifdef MULTIGRID_DSLASH_PROMOTE
   template <typename store_t>
   using compute_prec = double;

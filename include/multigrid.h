@@ -535,11 +535,11 @@ namespace quda {
      @param[in] commDim Which dimensions are partitioned?
      @param[in] halo_precision What precision to use for the halos (if QUDA_INVALID_PRECISION, use field precision)
    */
-  template <bool dagger, int coarseColor>
+  template <bool dagger, int coarseColor, bool use_mma>
   void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                    cvector_ref<const ColorSpinorField> &inB,
                    const GaugeField &Y, const GaugeField &X, double kappa, int parity,
-                   bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision, bool use_mma);
+                   bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision);
 
   /**
      @brief Coarse operator construction from a fine-grid operator (Wilson / Clover)
