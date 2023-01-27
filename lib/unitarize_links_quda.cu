@@ -55,18 +55,17 @@ namespace quda {
     if (checkLocation(outfield, infield) != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
     checkPrecision(outfield, infield);
 
-    int num_failures = 0;
     Matrix<complex<double>,3> inlink, outlink;
 
     for (unsigned int i = 0; i < infield.Volume(); ++i) {
       for (int dir=0; dir<4; ++dir){
 	if (infield.Precision() == QUDA_SINGLE_PRECISION) {
 	  copyArrayToLink(inlink, ((float*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	  if (unitarizeLinkNewton(outlink, inlink, max_iter_newton) == false ) num_failures++;
+	  unitarizeLinkNewton(outlink, inlink, max_iter_newton);
 	  copyLinkToArray(((float*)(outfield.Gauge_p()) + (i*4 + dir)*18), outlink);
 	} else if (infield.Precision() == QUDA_DOUBLE_PRECISION) {
 	  copyArrayToLink(inlink, ((double*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	  if (unitarizeLinkNewton(outlink, inlink, max_iter_newton) == false ) num_failures++;
+	  unitarizeLinkNewton(outlink, inlink, max_iter_newton);
 	  copyLinkToArray(((double*)(outfield.Gauge_p()) + (i*4 + dir)*18), outlink);
 	} // precision?
       } // dir

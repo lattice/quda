@@ -532,7 +532,7 @@ namespace quda
        @param[in] b Used for twisted mass (chiral twist factor)
        @param[in] c Used for twisted mass (flavor twist factor)
     */
-    void pack(int nFace, int parity, int dagger, const qudaStream_t &stream, MemoryLocation location[],
+    void pack(int nFace, int parity, int dagger, const qudaStream_t &stream, MemoryLocation location[2 * QUDA_MAX_DIM],
               MemoryLocation location_label, bool spin_project = true, double a = 0, double b = 0, double c = 0,
               int shmem = 0);
 
