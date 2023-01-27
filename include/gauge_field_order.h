@@ -2308,9 +2308,11 @@ namespace quda {
 
       size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
     };
+
+
     /**
          struct to define OpenQCD ordered gauge fields:
-         [volumecb][dim][parity*][row][col]
+         [volumecb][dim][parity*][row][col]  parity*: uplink/downlink (link attached to closest odd site)
       */
     template <typename Float, int length> struct OpenQCDOrder : LegacyOrder<Float, length> {
       using Accessor = OpenQCDOrder<Float, length>;
@@ -2329,38 +2331,89 @@ namespace quda {
         if constexpr (length != 18) errorQuda("Gauge length %d not supported", length);
       }
 
-      // fields are only defined for odd points
-      //      The pointer to the
-      // link variable U(x,mu) at any given *odd* point x is then
-      //   ud+8*(ix-VOLUME/2)+2*mu
-      // while
-      //   ud+8*(ix-VOLUME/2)+2*mu+1
-      // is the pointer to the link variable U(x-mu,mu), where ix denotes the label of
-      // x. All link variables that constitute the local gauge field can thus be
-      // accessed in this simple way.
-      // see https://gitlab.com/rcstar/openQxD/-/blob/master/main/README.global
-      // typedef struct
+      // For reference: https://gitlab.com/rcstar/openQxD/-/blob/master/main/README.global
+
+      // TODO: packet this function
+      // __device__ __host__ inline int QUDAtoOpenQxD(int x_cb_QUDA, int dir_QUDA, int parity_QUDA) const
       // {
-      //    complex c11,c12,c13,c21,c22,c23,c31,c32,c33;
-      // } su3;
 
-      __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, Float = 1.0) const
+      // }
+
+      // TODO: Implement ipt and iup functions
+
+
+
+      __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, Float = 1.0) const // FIXME: What's this "Float = 1.0" for ?
       {
-        if (parity == 1) { // odd points can be loaded directly
-          auto in = &gauge[(8 * x + 2 * dir) * length];
-          block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
-        } else {
-          // gauge field for even points needs to be fetched from odd points, some indexing fun
-          //   ud+8*(ix-VOLUME/2)+2*mu+1
-          // is the pointer to the link variable U(x-mu,mu),
-          // so to get U(x,mu) for even x we need to load U(ix,mu) with ix=x+mu
-          int coord[4];
-	        getCoords(coord, x, dim, 1);
-          int xmu = linkIndexP1(coord, dim, dir); // TODO: What about on boundaries?, do we need to index into them?
+        // FIX: what's x: ANS: x is the checkerboard 1-D index (cf. index_helper.cuh)
+  
+        // With ''natural'' order: lexicographical 0123 = txyz , z fastest, links 0123 = txyz in pos directions
+        
+        // Indexing fun:
+        int coord[4];                          // declare a 4D vector x0, x1, x2, x3
+	      getCoords(coord, x, dim, parity);      // from x, dim, parity obtain coordinate of the site
+        // int iy_OpenQxD = x3 + L3*x2 + L3*L2*x1 + L3*L2*L1*x0; 
+        int iy_OpenQxD = coord[2] + dim[2]*coord[1] + dim[2]*dim[1]*coord[0] + dim[0]*dim[2]*dim[1]*coord[3];       /* lexicographical index: coord0 in QUDA is x1 in OpenQxD (x)
+                                                                                                                                              coord1 in QUDA is x2 in OpenQxD (y)
+                                                                                                                                              coord2 in QUDA is x3 in OpenQxD (z)
+                                                                                                                                              coord3 in QUDA is x0 in OpenQxD (t)
+                                                                                                                    */                                             
+        int dir_OpenQxD = (dir + 1)%4;         // rotation of axes QUDA -> OpenQxD
 
-          auto in = &gauge[(8 * xmu + 2 * dir + 1) * length];
-          block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
-        }
+        // Loading as per QUDA style
+        auto in = &gauge[ (8*(iy_OpenQxD) + 2*dir_OpenQxD) * length];    // This is how they're accessed within OpenQxd (length = 18 doubles = 9 complex doubles = 1 su3dble struct)
+        block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+
+        
+
+        // if (parity == 1) { // odd points can be loaded directly
+
+        //   // Indexing fun:
+        //   int coord[4];                          // declare a 4D vector x0, x1, x2, x3
+	      //   getCoords(coord, x, dim, parity);      // from x, dim, parity obtain coordinate of the site
+        //   // int iy_OpenQxD = x3 + L3*x2 + L3*L2*x1 + L3*L2*L1*x0; 
+        //   int iy_OpenQxD = coord[2] + dim[2]*coord[1] + dim[2]*dim[1]*coord[0] + dim[0]*dim[2]*dim[1]*coord[3];       /* lexicographical index: coord0 in QUDA is x1 in OpenQxD (x)
+        //                                                                                                                                         coord1 in QUDA is x2 in OpenQxD (y)
+        //                                                                                                                                         coord2 in QUDA is x3 in OpenQxD (z)
+        //                                                                                                                                         coord3 in QUDA is x0 in OpenQxD (t)
+        //                                                                                                               */                                             
+        //   int ix_OpenQxD = ipt[iy_OpenQxD];      // ipt mapping
+        //   int dir_OpenQxD = (dir + 1)%4;         // rotation of axes QUDA -> OpenQxD
+
+
+        //   // Loading as per QUDA style
+        //   auto in = &gauge[ (8*(ix_OpenQxD - volumeCB) + 2*dir_OpenQxD)* length];    // This is how they're accessed within OpenQxd (length = 18 doubles = 9 complex doubles = 1 su3dble struct)
+        //   block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+
+        // } else if (parity ==0) {
+
+        //   // More indexing fun:
+        //   int coord[4];                          // declare a 4D vector x0, x1, x2, x3
+	      //   getCoords(coord, x, dim, parity);      // from x, dim, parity obtain coordinate of the site
+        //   // int iy_OpenQxD = x3 + L3*x2 + L3*L2*x1 + L3*L2*L1*x0; 
+        //   int iy_OpenQxD = coord[2] + dim[2]*coord[1] + dim[2]*dim[1]*coord[0] + dim[0]*dim[2]*dim[1]*coord[3];       /* lexicographical index: coord0 in QUDA is x1 in OpenQxD (x)
+        //                                                                                                                                         coord1 in QUDA is x2 in OpenQxD (y)
+        //                                                                                                                                         coord2 in QUDA is x3 in OpenQxD (z)
+        //                                                                                                                                         coord3 in QUDA is x0 in OpenQxD (t)
+        //                                                                                                                                         In OpenQxD, z runs the fastest, (txyz order)
+        //                                                                                                                                         In QUDA, I think t runs the fastest (xyzt order)
+        //                                                                                                                                                   Or should it be (zyxt ??) maybe FIXME:
+        //                                                                                                               */                                             
+        //   int ix_OpenQxD = ipt[iy_OpenQxD];      // ipt mapping
+        //   int dir_OpenQxD = (dir + 1)%4;         // rotation of axes QUDA -> OpenQxD
+
+        //   int ix_OpenQxD_shifted = iup[ix_OpenQxD][dir_OpenQxD];           // obtain neighboring index
+
+        //   // int xmu = linkIndexP1(coord, dim, dir); // Maybe for later FIXME: What about on boundaries?, do we need to index into them?
+          
+        //   // Loading as per QUDA style
+        //   auto in = &gauge[ (8*(ix_OpenQxD_shifted - volumeCB) + 2*dir_OpenQxD + 1)* length];    // This is how they're accessed within OpenQxd (length = 18 doubles = 9 complex doubles = 1 su3dble struct)
+        //   block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+
+        // } else {
+        //   std::cout << "This shouldn't happen!!: Error in parity OpenQxD Order interface" << std::endl;
+        // }
+        
       }
 
       __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity) const

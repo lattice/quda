@@ -537,7 +537,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     static_cast<GaugeField*>(new cpuGaugeField(gauge_param)) :
     static_cast<GaugeField*>(new cudaGaugeField(gauge_param));
 
-  if (in->Order() == QUDA_BQCD_GAUGE_ORDER) {
+  if (in->Order() == QUDA_BQCD_GAUGE_ORDER) { 
     static size_t checksum = SIZE_MAX;
     size_t in_checksum = in->checksum(true);
     if (in_checksum == checksum) {

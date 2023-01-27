@@ -193,7 +193,7 @@ void openQCD_qudaPlaquette(int precision, double plaq[3], void *gauge)
   // qudamilc_called<true>(__func__);
 
   QudaGaugeParam qudaGaugeParam
-    = newOpenQCDGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION); // fixme
+    = newOpenQCDGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION); // FIXME:
   // reateGaugeParamForObservables(precision, arg, phase_in);
 
   loadGaugeQuda(gauge, &qudaGaugeParam);
@@ -212,6 +212,25 @@ void openQCD_qudaPlaquette(int precision, double plaq[3], void *gauge)
   // qudamilc_called<false>(__func__);
   return;
 }
+
+// static int openQCD_index()
+// {
+//   // This function is the helper for ipt in QUDA
+
+
+//   return ix;
+// }
+
+// int openQCD_ipt(int iy)
+// {
+//   // This function computes the ipt index from iy (lexicographical index)
+//   int x0,x1,x2,x3;
+//   int k,mu,ix,iy,iz,iw;
+//   int bo[4],bs[4],ifc[8];
+
+
+
+// }
 
 // static int getLinkPadding(const int dim[4])
 // {
@@ -292,6 +311,9 @@ static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, Qud
 
   invertParam->compute_action = 0;
 }
+
+
+
 
 static void setColorSpinorParams(const int dim[4], QudaPrecision precision, ColorSpinorParam *param)
 {
