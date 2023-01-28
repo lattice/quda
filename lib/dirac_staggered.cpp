@@ -19,28 +19,6 @@ namespace quda {
     return *this;
   }
 
-  void DiracStaggered::checkParitySpinor(const ColorSpinorField &in, const ColorSpinorField &out) const
-  {
-    if (in.Ndim() != 5 || out.Ndim() != 5) {
-      errorQuda("Staggered dslash requires 5-d fermion fields");
-    }
-
-    if (in.Precision() != out.Precision()) {
-      errorQuda("Input and output spinor precisions don't match in dslash_quda");
-    }
-
-    if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
-      errorQuda("ColorSpinorFields are not single parity, in = %d, out = %d", 
-		in.SiteSubset(), out.SiteSubset());
-    }
-
-    if ((out.Volume()/out.X(4) != 2*gauge->VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
-	(out.Volume()/out.X(4) != gauge->VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-      errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), gauge->VolumeCB());
-    }
-  }
-
-
   void DiracStaggered::Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
 			      const QudaParity parity) const
   {
@@ -97,7 +75,7 @@ namespace quda {
 
   void DiracStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    auto tmp = getFieldTmp(in);
+    auto tmp = getFieldTmp(in.Even());
 
     //even
     Dslash(tmp, in.Even(), QUDA_ODD_PARITY);

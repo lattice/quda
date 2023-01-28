@@ -52,7 +52,7 @@ namespace quda {
 
         if (x_prec != y_prec) {
           strcat(aux, ",");
-          strcat(aux, y.AuxString());
+          strcat(aux, y.AuxString().c_str());
         }
 
         apply(device::get_default_stream());

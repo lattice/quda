@@ -746,7 +746,7 @@ void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app)
 
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-  auto opgroup = quda_app->add_option_group("MultiGrid", "Options controlling deflation");
+  auto opgroup = quda_app->add_option_group("MultiGrid", "Options controlling multigrid");
 
   // MWTODO: clean this up - code duplication
 

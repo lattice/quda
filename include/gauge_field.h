@@ -28,11 +28,7 @@ namespace quda {
         } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
           if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
         } else if (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
-#ifdef FLOAT8
-          if (order == QUDA_FLOAT8_GAUGE_ORDER) return true;
-#else
-          if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
-#endif
+          if (order == static_cast<QudaGaugeFieldOrder>(QUDA_ORDER_FP)) return true;
         }
       }
       return false;
@@ -178,11 +174,7 @@ namespace quda {
           order = QUDA_FLOAT2_GAUGE_ORDER;
         } else if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
                    && (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9)) {
-#ifdef FLOAT8
-          order = QUDA_FLOAT8_GAUGE_ORDER;
-#else
-          order = QUDA_FLOAT4_GAUGE_ORDER;
-#endif
+          order = static_cast<QudaGaugeFieldOrder>(QUDA_ORDER_FP);
         } else {
           order = QUDA_FLOAT4_GAUGE_ORDER;
         }

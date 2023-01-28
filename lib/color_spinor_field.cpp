@@ -4,6 +4,8 @@
 
 #include <color_spinor_field.h>
 #include <dslash_quda.h>
+#include <field_cache.h>
+#include <uint_to_char.h>
 
 static bool zeroCopy = false;
 
@@ -18,20 +20,6 @@ namespace quda
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) :
     LatticeField(param),
-    init(false),
-    alloc(false),
-    reference(false),
-    ghost_precision_allocated(QUDA_INVALID_PRECISION),
-    v(nullptr),
-    norm_offset(0),
-    ghost(),
-    ghostFace(),
-    ghost_buf {},
-    dslash_constant(nullptr),
-    bytes(0),
-    bytes_raw(0),
-    even(nullptr),
-    odd(nullptr),
     composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
     components(0)
   {
@@ -40,13 +28,16 @@ namespace quda
       v = param.v;
       norm_offset = param.norm_offset;
       reference = true;
+    } else if (param.create == QUDA_GHOST_FIELD_CREATE) {
+      ghost_only = true;
     }
 
     create(param);
 
     switch (param.create) {
     case QUDA_NULL_FIELD_CREATE:
-    case QUDA_REFERENCE_FIELD_CREATE: break; // do nothing;
+    case QUDA_REFERENCE_FIELD_CREATE:
+    case QUDA_GHOST_FIELD_CREATE: break; // do nothing;
     case QUDA_ZERO_FIELD_CREATE: zero(); break;
     case QUDA_COPY_FIELD_CREATE: copy(*param.field); break;
     default: errorQuda("Unexpected create type %d", param.create);
@@ -55,20 +46,6 @@ namespace quda
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) noexcept :
     LatticeField(field),
-    init(false),
-    alloc(false),
-    reference(false),
-    ghost_precision_allocated(QUDA_INVALID_PRECISION),
-    v(nullptr),
-    norm_offset(0),
-    ghost(),
-    ghostFace(),
-    ghost_buf {},
-    dslash_constant(nullptr),
-    bytes(0),
-    bytes_raw(0),
-    even(nullptr),
-    odd(nullptr),
     composite_descr(field.composite_descr),
     components(0)
   {
@@ -101,17 +78,6 @@ namespace quda
       copy(src);
     }
     return *this;
-  }
-
-  static bool are_compatible(ColorSpinorField &a, ColorSpinorField &b)
-  {
-    bool rtn = true;
-    if (a.Precision() != b.Precision() || a.FieldOrder() != b.FieldOrder() || a.SiteSubset() != b.SiteSubset()
-        || a.VolumeCB() != b.VolumeCB() || a.Ncolor() != b.Ncolor() || a.Nspin() != b.Nspin() || a.Nvec() != b.Nvec()
-        || a.TwistFlavor() != b.TwistFlavor())
-      rtn = false;
-
-    return rtn;
   }
 
   ColorSpinorField &ColorSpinorField::operator=(ColorSpinorField &&src)
@@ -161,7 +127,7 @@ namespace quda
     norm_offset = volumeCB * nColor * nSpin * 2 * precision; // this is the offset in bytes to start of the norm
 
     // alignment must be done on parity boundaries
-    if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER)
+    if (isNative())
       bytes = siteSubset * ALIGNMENT_ADJUST(bytes_raw / siteSubset);
     else
       bytes = bytes_raw;
@@ -190,7 +156,7 @@ namespace quda
     if (siteSubset == QUDA_FULL_SITE_SUBSET && siteOrder != QUDA_EVEN_ODD_SITE_ORDER)
       errorQuda("Subset not implemented");
 
-    if (param.create != QUDA_REFERENCE_FIELD_CREATE) {
+    if (param.create != QUDA_REFERENCE_FIELD_CREATE && param.create != QUDA_GHOST_FIELD_CREATE) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
         v = safe_malloc(bytes);
       } else if (location == QUDA_CUDA_FIELD_LOCATION) {
@@ -208,7 +174,8 @@ namespace quda
       alloc = true;
     }
 
-    if (composite_descr.is_composite && param.create != QUDA_REFERENCE_FIELD_CREATE) {
+    if (composite_descr.is_composite && param.create != QUDA_REFERENCE_FIELD_CREATE
+        && param.create != QUDA_GHOST_FIELD_CREATE) {
       ColorSpinorParam param;
       fill(param);
       param.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -240,7 +207,7 @@ namespace quda
       odd = new ColorSpinorField(param);
     }
 
-    if (isNative() && param.create != QUDA_REFERENCE_FIELD_CREATE) {
+    if (isNative() && param.create != QUDA_REFERENCE_FIELD_CREATE && param.create != QUDA_GHOST_FIELD_CREATE) {
       if (!(siteSubset == QUDA_FULL_SITE_SUBSET && composite_descr.is_composite)) {
         zeroPad();
       } else { // temporary hack for the full spinor field sets, manual zeroPad for each component:
@@ -474,7 +441,7 @@ namespace quda
 
   void ColorSpinorField::copy(const ColorSpinorField &src)
   {
-    checkField(*this, src);
+    test_compatible_weak(*this, src);
     if (Location() == src.Location()) { // H2H and D2D
 
       copyGenericColorSpinor(*this, src, Location());
@@ -725,16 +692,33 @@ namespace quda
     }
   }
 
-  void ColorSpinorField::checkField(const ColorSpinorField &a, const ColorSpinorField &b)
+  bool ColorSpinorField::are_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b)
   {
-    if (a.SiteSubset() != b.SiteSubset())
-      errorQuda("siteSubsets do not match: %d %d\n", a.SiteSubset(), b.SiteSubset());
+    return (a.SiteSubset() == b.SiteSubset() && a.VolumeCB() == b.VolumeCB() && a.Ncolor() == b.Ncolor()
+            && a.Nspin() == b.Nspin() && a.Nvec() == b.Nvec() && a.TwistFlavor() == b.TwistFlavor());
+  }
+
+  bool ColorSpinorField::are_compatible(const ColorSpinorField &a, const ColorSpinorField &b)
+  {
+    return (a.Precision() == b.Precision() && a.FieldOrder() == b.FieldOrder() && are_compatible_weak(a, b));
+  }
+
+  void ColorSpinorField::test_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b)
+  {
+    if (a.SiteSubset() != b.SiteSubset()) errorQuda("siteSubsets do not match: %d %d", a.SiteSubset(), b.SiteSubset());
     if (a.VolumeCB() != b.VolumeCB()) errorQuda("volumes do not match: %lu %lu", a.VolumeCB(), b.VolumeCB());
     if (a.Ncolor() != b.Ncolor()) errorQuda("colors do not match: %d %d", a.Ncolor(), b.Ncolor());
     if (a.Nspin() != b.Nspin()) errorQuda("spins do not match: %d %d", a.Nspin(), b.Nspin());
     if (a.Nvec() != b.Nvec()) errorQuda("nVec does not match: %d %d", a.Nvec(), b.Nvec());
     if (a.TwistFlavor() != b.TwistFlavor())
       errorQuda("twist flavors do not match: %d %d", a.TwistFlavor(), b.TwistFlavor());
+  }
+
+  void ColorSpinorField::test_compatible(const ColorSpinorField &a, const ColorSpinorField &b)
+  {
+    test_compatible_weak(a, b);
+    if (a.Precision() != b.Precision()) errorQuda("precisions do not match: %d %d", a.Precision(), b.Precision());
+    if (a.FieldOrder() != b.FieldOrder()) errorQuda("orders do not match: %d %d", a.FieldOrder(), b.FieldOrder());
   }
 
   const ColorSpinorField &ColorSpinorField::Even() const
@@ -852,6 +836,27 @@ namespace quda
     if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] = savey0;
   }
 
+  FieldTmp<ColorSpinorField> ColorSpinorField::create_comms_batch(cvector_ref<const ColorSpinorField> &v)
+  {
+    // first create a dummy ndim+1 field
+    if (v[0].Ndim() == 5) errorQuda("Cannot batch together 5-d fields");
+    ColorSpinorParam param(v[0]);
+    param.nDim++;
+    param.x[param.nDim - 1] = v.size();
+    param.create = QUDA_GHOST_FIELD_CREATE;
+
+    // we use a custom cache key for ghost-only fields
+    FieldKey<ColorSpinorField> key;
+    key.volume = v[0].VolString();
+    key.aux = v[0].AuxString();
+    char aux[32];
+    strcpy(aux, ",ghost_batch=");
+    u32toa(aux + 13, v.size());
+    key.aux += aux;
+
+    return FieldTmp<ColorSpinorField>(key, param);
+  }
+
   ColorSpinorField ColorSpinorField::create_alias(const ColorSpinorParam &param_)
   {
     if (param_.init && param_.Precision() > precision)
@@ -903,11 +908,9 @@ namespace quda
     // if new location is not set, use this->location
     new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location() : new_location;
 
-    // for GPU fields, always use native ordering to ensure coalescing
-    if (new_location == QUDA_CUDA_FIELD_LOCATION)
-      coarseParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-    else
-      coarseParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    coarseParam.fieldOrder = (new_location == QUDA_CUDA_FIELD_LOCATION) ?
+      colorspinor::getNative(new_precision, coarseParam.nSpin) :
+      QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
     coarseParam.setPrecision(new_precision);
 
@@ -1084,12 +1087,6 @@ namespace quda
     createComms(nFace, spin_project); // must call this first
 
     packGhost(nFace, (QudaParity)parity, dagger, stream, location, location_label, spin_project, a, b, c, shmem);
-  }
-
-  // FIXME reconcile with above
-  void ColorSpinorField::packGhostHost(void **ghost, const QudaParity parity, const int nFace, const int dagger) const
-  {
-    genericPackGhost(ghost, *this, parity, nFace, dagger);
   }
 
   void ColorSpinorField::sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir, const qudaStream_t &stream)
@@ -1282,7 +1279,8 @@ namespace quda
 
   void ColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger,
                                        const MemoryLocation *pack_destination_, const MemoryLocation *halo_location_,
-                                       bool gdr_send, bool gdr_recv, QudaPrecision ghost_precision_, int shmem) const
+                                       bool gdr_send, bool gdr_recv, QudaPrecision ghost_precision_, int shmem,
+                                       cvector_ref<const ColorSpinorField> v) const
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) {
       // allocate ghost buffer if not yet allocated
@@ -1297,8 +1295,7 @@ namespace quda
         ghost_buf[2 * i + 1] = fwdGhostFaceBuffer[i];
       }
 
-      packGhostHost(sendbuf, parity, nFace, dagger);
-
+      genericPackGhost(sendbuf, *this, parity, nFace, dagger, nullptr, 0, v);
       exchange(ghost_buf.data, sendbuf, nFace);
 
       host_free(sendbuf);
@@ -1372,8 +1369,8 @@ namespace quda
         if ((pack_host || halo_host) && comm_peer2peer_enabled_global())
           errorQuda("Cannot use zero-copy memory with peer-to-peer comms yet");
 
-        genericPackGhost(send, *this, parity, nFace, dagger,
-                         pack_destination); // FIXME - need support for asymmetric topologies
+        genericPackGhost(send, *this, parity, nFace, dagger, pack_destination, 0,
+                         v); // FIXME - need support for asymmetric topologies
 
         size_t total_bytes = 0;
         for (int i = 0; i < nDimComms; i++)
@@ -1503,8 +1500,8 @@ namespace quda
             }
           }
         }
-        genericPackGhost(packBuffer, *this, parity, nFace, dagger, pack_destination,
-                         shmem); // FIXME - need support for asymmetric topologies
+        genericPackGhost(packBuffer, *this, parity, nFace, dagger, pack_destination, shmem,
+                         v); // FIXME - need support for asymmetric topologies
       }
     }
   }
@@ -1595,7 +1592,7 @@ namespace quda
   int ColorSpinorField::Compare(const ColorSpinorField &a, const ColorSpinorField &b, const int tol)
   {
     if (checkLocation(a, b) == QUDA_CUDA_FIELD_LOCATION) errorQuda("device field not implemented");
-    checkField(a, b);
+    test_compatible_weak(a, b);
     return genericCompare(a, b, tol);
   }
 

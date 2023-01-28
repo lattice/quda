@@ -7,11 +7,12 @@ namespace quda {
 
   using namespace colorspinor;
 
-  template <typename real_, int nSpin_, int nColor_, QudaFieldOrder order, QudaNoiseType noise_>
+  template <typename real_, int nSpin_, int nColor_, QudaNoiseType noise_>
   struct SpinorNoiseArg : kernel_param<> {
     using real = real_;
     static constexpr int nSpin = nSpin_;
     static constexpr int nColor = nColor_;
+    static constexpr QudaFieldOrder order = colorspinor::getNative<real>(nSpin);
     static constexpr QudaNoiseType noise = noise_;
     using V = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, order>;
     V v;
