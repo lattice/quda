@@ -10,19 +10,30 @@ namespace quda {
   template <typename T, template <typename ...> typename U>
   static constexpr bool is_instance = is_instance_impl<T, U>();
 
-  struct SharedMemDynamic {
-    template <typename T> static constexpr size_t size(size_t blocksize) { return blocksize * sizeof(T); }
-  };
-  struct SharedMemPerWarp {
-    template <typename T> static constexpr size_t size(size_t blocksize) {
-      return ((blocksize + device::warp_size() - 1)/device::warp_size()) * sizeof(T);
-    }
-  };
-  template <size_t S> struct SharedMemStatic {
-    template <typename T> static constexpr size_t size(size_t blocksize) { return S * sizeof(T); }
+  struct opDimsBlock {
+    template <typename ...Arg> static constexpr dim3 dims(dim3 b, const Arg &...arg) { return b; }
   };
 
-  struct NoSpecialOps {};
+  struct opSizeBlock {
+    template <typename T, typename ...Arg> static constexpr size_t size(dim3 b, const Arg &...arg) { return b.x * b.y * b.z * sizeof(T); }
+  };
+  struct opSizeBlockDivWarp {
+    template <typename T, typename ...Arg> static constexpr size_t size(dim3 b, const Arg &...arg) {
+      return ((b.x * b.y * b.z + device::warp_size() - 1)/device::warp_size()) * sizeof(T);
+    }
+  };
+  template <size_t S> struct opSizeStatic {
+    template <typename T, typename ...Arg> static constexpr size_t size(dim3 b, const Arg &...arg) { return S * sizeof(T); }
+  };
+  template <typename D> struct opSizeDims {
+    template <typename T, typename ...Arg> static constexpr size_t size(dim3 b, const Arg &...arg) {
+      return opSizeBlock::size<T>(D::dims(b, arg...));
+    }
+  };
+
+  struct NoSpecialOps {
+    using SpecialOpsT = NoSpecialOps;
+  };
   struct op_Base {};
   template <typename ...T> struct op_Concurrent {};
   template <typename ...T> struct op_Sequential {};
@@ -33,18 +44,18 @@ namespace quda {
   template <typename T> struct op_warp_combine;
   template <typename T> struct op_thread_array;
   template <typename T> struct op_BlockReduce;
-  template <typename T> struct op_SharedMemoryCache;
-  template <typename T, typename S = SharedMemDynamic> struct op_SharedMemory;
-  template <typename T, int S> using op_SharedMemStatic = op_SharedMemory<T,SharedMemStatic<S>>;
+  template <typename T, typename D = opDimsBlock> struct op_SharedMemoryCache;
+  template <typename T, typename S = opSizeBlock> struct op_SharedMemory;
+  template <typename T, int S> using op_SharedMemStatic = op_SharedMemory<T,opSizeStatic<S>>;
 
   // only types for convenience
   using only_blockSync = SpecialOps<op_blockSync>;
   template <typename T> using only_warp_combine = SpecialOps<op_warp_combine<T>>;
   template <typename T> using only_thread_array = SpecialOps<op_thread_array<T>>;
   template <typename T> using only_BlockReduce = SpecialOps<op_BlockReduce<T>>;
-  template <typename T> using only_SharedMemoryCache = SpecialOps<op_SharedMemoryCache<T>>;
-  template <typename T, typename S = SharedMemDynamic> using only_SharedMemory = SpecialOps<op_SharedMemory<T,S>>;
-  template <typename T, size_t S> using only_SharedMemStatic = only_SharedMemory<T,SharedMemStatic<S>>;
+  template <typename T, typename D = opDimsBlock> using only_SharedMemoryCache = SpecialOps<op_SharedMemoryCache<T,D>>;
+  template <typename T, typename S = opSizeBlock> using only_SharedMemory = SpecialOps<op_SharedMemory<T,S>>;
+  template <typename T, size_t S> using only_SharedMemStatic = only_SharedMemory<T,opSizeStatic<S>>;
 
   // getSpecialOps
   template <typename T, typename U = void> struct getSpecialOpsS { using type = NoSpecialOps; };
@@ -84,6 +95,10 @@ namespace quda {
   template <typename T> static constexpr bool hasWarpCombine<op_warp_combine<T>> = true;
   template <typename T> static constexpr bool hasWarpCombine<T> = false;
 
+  // isOpSharedMemoryCache
+  template <typename T> static constexpr bool isOpSharedMemoryCache = false;
+  template <typename T, typename D> static constexpr bool isOpSharedMemoryCache<op_SharedMemoryCache<T,D>> = true;
+
   // SpecialOpsType: returns SpecialOps type from a Concurrent list
   template <typename T, int n> struct SpecialOpsTypeS { using type = std::enable_if_t<n==0,T>; };
   template <typename ...T, int n> struct SpecialOpsTypeS<op_Concurrent<T...>,n> {
@@ -97,7 +112,7 @@ namespace quda {
   template <typename T> struct SpecialOpsElemTypeS<op_warp_combine<T>> { using type = T; };
   template <typename T> struct SpecialOpsElemTypeS<op_thread_array<T>> { using type = T; };
   template <typename T> struct SpecialOpsElemTypeS<op_BlockReduce<T>> { using type = T; };
-  template <typename T> struct SpecialOpsElemTypeS<op_SharedMemoryCache<T>> { using type = T; };
+  template <typename T, typename D> struct SpecialOpsElemTypeS<op_SharedMemoryCache<T,D>> { using type = T; };
   template <typename T, typename S> struct SpecialOpsElemTypeS<op_SharedMemory<T,S>> { using type = T; };
   template <typename ...T> using SpecialOpsElemType = typename SpecialOpsElemTypeS<T...>::type;
 
@@ -126,36 +141,47 @@ namespace quda {
 
   // sharedMemSize
   template <typename ...T> struct sharedMemSizeS {
-    static constexpr size_t size(size_t blocksize) { return std::max({sharedMemSizeS<T>::size(blocksize)...}); }
+    template <typename ...Arg>
+    static constexpr size_t size(dim3 block, Arg &...arg) { return std::max({sharedMemSizeS<T>::size(block, arg...)...}); }
   };
-  template <typename ...T> static constexpr size_t sharedMemSize(size_t blocksize) { return sharedMemSizeS<T...>::size(blocksize); }
+  template <typename ...T, typename ...Arg> static constexpr size_t sharedMemSize(dim3 block, Arg &...arg) {
+    return sharedMemSizeS<T...>::size(block, arg...);
+  }
   template <typename ...T> struct sharedMemSizeS<SpecialOps<T...>> {
-    static constexpr size_t size(int blocksize) { return sharedMemSize<T...>(blocksize); }
+    template <typename ...Arg>
+    static constexpr size_t size(dim3 block, Arg &...arg) { return sharedMemSize<T...>(block, arg...); }
   };
   template <typename ...T> struct sharedMemSizeS<op_Sequential<T...>> {
-    static constexpr size_t size(int blocksize) { return sharedMemSize<T...>(blocksize); }
+    template <typename ...Arg>
+    static constexpr size_t size(dim3 block, Arg &...arg) { return sharedMemSize<T...>(block, arg...); }
   };
   template <typename ...T> struct sharedMemSizeS<op_Concurrent<T...>> {
-    static constexpr size_t size(int blocksize) { return (sharedMemSize<T>(blocksize) + ...); }
+    template <typename ...Arg>
+    static constexpr size_t size(dim3 block, Arg &...arg) { return (sharedMemSize<T>(block, arg...) + ...); }
   };
   template <typename T> struct sharedMemSizeS<T> { // T should be of op_Base
-    static constexpr size_t size(size_t blocksize) { return sharedMemSize<typename T::dependencies>(blocksize); }
+    template <typename ...Arg>
+    static constexpr size_t size(dim3 block, Arg &...arg) { return sharedMemSize<typename T::dependencies>(block, arg...); }
   };
 
   // sharedMemOffset
   template <typename T, int n> struct sharedMemOffset {
-    int operator()(int blocksize) { return 0; }
+    template <typename ...Arg>
+    int operator()(dim3 block, Arg &...arg) { return 0; }
   };
   template <typename T, int n> struct sharedMemOffset<SpecialOps<T>,n> {
-    int operator()(int blocksize) { return sharedMemOffset<T,n>()(blocksize); }
+    template <typename ...Arg>
+    int operator()(dim3 block, Arg &...arg) { return sharedMemOffset<T,n>()(block, arg...); }
   };
   template <typename ...T> struct sharedMemOffset<op_Concurrent<T...>,0> {
-    int operator()(int blocksize) { return 0; }
+    template <typename ...Arg>
+    int operator()(dim3 block, Arg &...arg) { return 0; }
   };
   template <typename ...T, int n> struct sharedMemOffset<op_Concurrent<T...>,n> {
-    int operator()(int blocksize) {
-      return sharedMemOffset<op_Concurrent<T...>,n-1>()(blocksize)
-	+ sharedMemSize<std::tuple_element_t<n-1,std::tuple<T...>>>(blocksize);
+    template <typename ...Arg>
+    int operator()(dim3 block, Arg &...arg) {
+      return sharedMemOffset<op_Concurrent<T...>,n-1>()(block, arg...)
+	+ sharedMemSize<std::tuple_element_t<n-1,std::tuple<T...>>>(block, arg...);
     }
   };
 

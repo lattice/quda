@@ -69,7 +69,7 @@ namespace quda {
 #endif
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
   qudaError_t Reduction2D(const TuneParam &tp,
-			  const qudaStream_t &stream, const Arg &arg)
+			  const qudaStream_t &stream, Arg &arg)
   {
     static_assert(!hasSpecialOps<Functor<Arg>>);
     auto err = QUDA_SUCCESS;
@@ -102,6 +102,9 @@ namespace quda {
       printfQuda("  SLM size: %lu\n",
                  localSize.size()*sizeof(typename Functor<Arg>::reduce_t)/
 		 device::warp_size());
+      printfQuda("  SpecialOps: %s\n", typeid(getSpecialOps<Functor<Arg>>).name());
+      printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
+      printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
       timer.start();
     }
     //if (arg.threads.x%localSize[RANGE_X] != 0) {
@@ -178,7 +181,7 @@ namespace quda {
 
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
   qudaError_t
-  MultiReduction(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+  MultiReduction(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
   {
     static_assert(!hasSpecialOps<Functor<Arg>>);
     auto err = QUDA_SUCCESS;
@@ -216,6 +219,9 @@ namespace quda {
       printfQuda("  SLM size: %lu\n",
                  localSize.size()*sizeof(typename Functor<Arg>::reduce_t)/
 		 device::warp_size());
+      printfQuda("  SpecialOps: %s\n", typeid(getSpecialOps<Functor<Arg>>).name());
+      printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
+      printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
     }
     //if (arg.threads.x%localSize[RANGE_X] != 0) {
       //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);

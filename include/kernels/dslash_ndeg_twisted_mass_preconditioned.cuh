@@ -37,11 +37,19 @@ namespace quda
     }
   };
 
+  template <typename Arg> using nDegTwistedMassPreconditionedCacheT =
+    ColorSpinor<typename mapper<typename Arg::Float>::type, Arg::nColor, 4>;
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct nDegTwistedMassPreconditioned : dslash_default {
+  struct nDegTwistedMassPreconditioned :
+    std::conditional_t<!dagger || Arg::asymmetric, only_SharedMemoryCache<nDegTwistedMassPreconditionedCacheT<Arg>>, NoSpecialOps>,
+    dslash_default {
 
     const Arg &arg;
-    constexpr nDegTwistedMassPreconditioned(const Arg &arg) : arg(arg) {}
+    constexpr nDegTwistedMassPreconditioned(const Arg &arg) : arg(arg) {
+      //if constexpr (!dagger || Arg::asymmetric) {
+      //this->setSharedMem(arg.la.get_pointer());
+      //}
+    }
     constexpr int twist_pack() const { return (!Arg::asymmetric && dagger) ? 2 : 0; }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
@@ -52,14 +60,13 @@ namespace quda
        - with xpay:  out(x) = M*in = x + a*(1+i*b*gamma_5 + c*tau_1)D * in
     */
 
-    template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int flavor, int parity)
+    template <KernelType mykernel_type = kernel_type, bool allthreads = false>
+    __device__ __host__ __forceinline__ void apply(int idx, int flavor, int parity, bool active = true)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
-      bool active
-        = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+      active &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
@@ -93,9 +100,10 @@ namespace quda
         Vector x = arg.out(my_flavor_idx, my_spinor_parity);
         out += x;
       }
-      
-      if (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
-        SharedMemoryCache<Vector> cache(target::block_dim());
+
+      if constexpr (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
+        //SharedMemoryCache<Vector> cache(target::block_dim());
+        SharedMemoryCache<Vector> cache(this);
         if (isComplete<mykernel_type>(arg, coord) && active) {
           // to apply the preconditioner we need to put "out" in shared memory so the other flavor can access it
           cache.save(out);
@@ -111,6 +119,12 @@ namespace quda
       }
 
       if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(my_flavor_idx, my_spinor_parity) = out;
+    }
+
+    template <KernelType mykernel_type = kernel_type>
+    __device__ __host__ __forceinline__ void operator()(int idx, int flavor, int parity)
+    {
+      apply<mykernel_type>(idx, flavor, parity);
     }
 
   };

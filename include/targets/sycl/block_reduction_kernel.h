@@ -84,7 +84,7 @@ namespace quda
      data for the kernel
      @param[in] arg Kernel argument
   */
-  template <template <typename> class Transformer, typename Arg>
+  template <template <typename> class Functor, typename Arg>
   void BlockKernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi)
   {
     const dim3 block_idx(virtual_block_idx(arg,ndi), groupIdY, groupIdZ);
@@ -94,7 +94,7 @@ namespace quda
     const unsigned int k = globalIdZ;
     if (k >= arg.threads.z) return;
 
-    Transformer<Arg> t(arg);
+    Functor<Arg> t(arg);
     t(block_idx, thread_idx);
   }
   template <template <typename> class Functor, typename Arg>
@@ -110,12 +110,12 @@ namespace quda
     }
   };
 
-  template <template <typename> class Transformer, typename Arg, bool grid_stride=false>
+  template <template <typename> class Functor, typename Arg, bool grid_stride=false>
   qudaError_t
   BlockKernel2D(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
-    static_assert(!hasSpecialOps<Transformer<Arg>>);
+    static_assert(!hasSpecialOps<Functor<Arg>>);
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
@@ -126,8 +126,11 @@ namespace quda
       printfQuda("BlockKernel2D sizeof(arg): %lu\n", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
 		 str(localSize).c_str(), str(arg.threads).c_str());
-      printfQuda("  Transformer: %s\n", typeid(Transformer<Arg>).name());
+      printfQuda("  Functor: %s\n", typeid(Functor<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
+      printfQuda("  SpecialOps: %s\n", typeid(getSpecialOps<Functor<Arg>>).name());
+      printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
+      printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
     }
     //if (arg.threads.x%localSize[RANGE_X] != 0) {
       //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
@@ -142,7 +145,7 @@ namespace quda
     //  return QUDA_ERROR;
     //}
     sycl::nd_range<3> ndRange{globalSize, localSize};
-    err = launch<BlockKernel2DS<Transformer, Arg>>(stream, ndRange, arg);
+    err = launch<BlockKernel2DS<Functor, Arg>>(stream, ndRange, arg);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("end BlockKernel2D\n");
     }

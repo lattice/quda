@@ -652,7 +652,7 @@ namespace quda
     are reserved for data packing, which may include communication to
     neighboring processes.
    */
-  template <typename Arg> struct dslash_functor {
+  template <typename Arg> struct dslash_functor : Arg::D::SpecialOpsT {
     const typename Arg::Arg &arg;
     static constexpr int nParity = Arg::nParity;
     static constexpr bool dagger = Arg::dagger;
@@ -660,9 +660,14 @@ namespace quda
     static constexpr const char *filename() { return Arg::D::filename(); }
     constexpr dslash_functor(const Arg &arg) : arg(arg.arg) { }
 
-    __forceinline__ __device__ void operator()(int, int s, int parity)
+    template <bool allthreads = false>
+    __forceinline__ __device__ void apply(int, int s, int parity, bool active = true)
     {
       typename Arg::D dslash(arg);
+      if constexpr (!std::is_same_v<typename Arg::D::SpecialOpsT,NoSpecialOps>) {
+	dslash.setNdItem(*this->ndi);
+	dslash.setSharedMem(this->smem);
+      }
       // for full fields set parity from z thread index else use arg setting
       if (nParity == 1) parity = arg.parity;
 
@@ -701,6 +706,11 @@ namespace quda
 #endif
       }
     }
-  };
+
+    __forceinline__ __device__ void operator()(int, int s, int parity)
+    {
+      apply(0, s, parity);
+    }
+};
 
 } // namespace quda

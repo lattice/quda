@@ -79,6 +79,9 @@ namespace quda {
 		 str(localSize).c_str(), str(arg.threads).c_str());
       printfQuda("  Functor: %s\n", typeid(Functor<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
+      printfQuda("  SpecialOps: %s\n", typeid(getSpecialOps<Functor<Arg>>).name());
+      printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
+      printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
     }
     //if (arg.threads.x%localSize[RANGE_X] != 0) {
       //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
@@ -168,7 +171,7 @@ namespace quda {
 
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   qudaError_t
-  Kernel2D(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+  Kernel2D(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
   {
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
@@ -197,6 +200,9 @@ namespace quda {
 		 str(localSize).c_str(), str(arg.threads).c_str());
       printfQuda("  Functor: %s\n", typeid(Functor<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
+      printfQuda("  SpecialOps: %s\n", typeid(getSpecialOps<Functor<Arg>>).name());
+      printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
+      printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
     }
     //if (arg.threads.x%localSize[RANGE_X] != 0) {
       //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
@@ -300,7 +306,7 @@ namespace quda {
 
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   qudaError_t
-  Kernel3D(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+  Kernel3D(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
   {
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
@@ -333,6 +339,7 @@ namespace quda {
       printfQuda("  Arg: %s\n", typeid(Arg).name());
       printfQuda("  SpecialOps: %s\n", typeid(getSpecialOps<Functor<Arg>>).name());
       printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
+      printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
       //fflush(stdout);
     }
     //if (arg.threads.x%localSize[RANGE_X] != 0) {

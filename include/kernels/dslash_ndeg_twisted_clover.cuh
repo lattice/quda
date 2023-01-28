@@ -35,14 +35,16 @@ namespace quda
         checkLocation(U, A);
       }
   };
-  
+
+  template <typename Arg> using nDegTwistedCloverCacheT =
+    ColorSpinor<typename mapper<typename Arg::Float>::type, Arg::nColor, 4>;
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-    struct nDegTwistedClover : dslash_default {
-    
+  struct nDegTwistedClover : only_SharedMemoryCache<nDegTwistedCloverCacheT<Arg>>, dslash_default {
+
     const Arg &arg;
     constexpr nDegTwistedClover(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
-    
+
     /**
        @brief Apply the non-degenerate twisted-clover dslash
        out(x) = M*in = a * D * in + (A(x) + i*b*gamma_5*tau_3 + c*tau_1)*x
@@ -54,17 +56,17 @@ namespace quda
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
       typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
-      
+
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                          // which dimension is thread working on (fused kernel only)
 
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
-      
+
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       const int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
-      
+
       // defined in dslash_wilson.cuh
       applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
@@ -72,11 +74,12 @@ namespace quda
         // apply the chiral and flavor twists
         // use consistent load order across s to ensure better cache locality
         Vector x = arg.x(my_flavor_idx, my_spinor_parity);
-        SharedMemoryCache<Vector> cache(target::block_dim());
+        //SharedMemoryCache<Vector> cache(target::block_dim());
+        SharedMemoryCache<Vector> cache(this);
         cache.save(x);
 
         x.toRel(); // switch to chiral basis
-        
+
         Vector tmp;
 #pragma unroll
         for (int chirality = 0; chirality < 2; chirality++) {

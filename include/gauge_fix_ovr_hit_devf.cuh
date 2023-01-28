@@ -53,10 +53,8 @@ namespace quda {
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     //SharedMemoryCache<Float> cache;
-    //SharedMemoryCache<Float> cache(ops);
-    //SharedMemoryCacheD<Float> cache(ops);
     //auto elems = cache.data();
-    SharedMemoryCacheD<array<Float,4>> cache(ops);
+    SharedMemoryCache<array<Float,4>> cache(ops);
     auto elems = &(cache.data()[0][0]);
 
     //initialize shared memory
@@ -152,9 +150,8 @@ namespace quda {
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     //SharedMemoryCache<Float> cache;
-    //SharedMemoryCacheD<Float> cache(ops);
     //auto elems = cache.data();
-    SharedMemoryCacheD<array<Float,4>> cache(ops);
+    SharedMemoryCache<array<Float,4>> cache(ops);
     auto elems = &(cache.data()[0][0]);
 
     //Loop over all SU(2) subroups of SU(N)
@@ -243,9 +240,8 @@ namespace quda {
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     //SharedMemoryCache<Float> cache;
-    //SharedMemoryCacheD<Float> cache(ops);
     //auto elems = cache.data();
-    SharedMemoryCacheD<array<Float,4>> cache(ops);
+    SharedMemoryCache<array<Float,4>> cache(ops);
     auto elems = &(cache.data()[0][0]);
 
     //Loop over all SU(2) subroups of SU(N)
@@ -344,9 +340,8 @@ namespace quda {
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     //SharedMemoryCache<Float> cache;
-    //SharedMemoryCacheD<Float> cache(ops);
     //auto elems = cache.data();
-    SharedMemoryCacheD<array<Float,4>> cache(ops);
+    SharedMemoryCache<array<Float,4>> cache(ops);
     auto elems = &(cache.data()[0][0]);
 
     //initialize shared memory
@@ -430,9 +425,8 @@ namespace quda {
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     //SharedMemoryCache<Float> cache;
-    //SharedMemoryCacheD<Float> cache(ops);
     //auto elems = cache.data();
-    SharedMemoryCacheD<array<Float,4>> cache(ops);
+    SharedMemoryCache<array<Float,4>> cache(ops);
     auto elems = &(cache.data()[0][0]);
 
     //Loop over all SU(2) subroups of SU(N)
@@ -510,9 +504,8 @@ namespace quda {
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     //SharedMemoryCache<Float> cache;
-    //SharedMemoryCacheD<Float> cache(ops);
     //auto elems = cache.data();
-    SharedMemoryCacheD<array<Float,4>> cache(ops);
+    SharedMemoryCache<array<Float,4>> cache(ops);
     auto elems = &(cache.data()[0][0]);
 
     //Loop over all SU(2) subroups of SU(N)

@@ -41,13 +41,16 @@ namespace quda
       }
   };
 
+  template <typename Arg> using nDegTwistedCloverPreconditionedCacheT =
+    ColorSpinor<typename mapper<typename Arg::Float>::type, Arg::nColor, 2>;
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-    struct nDegTwistedCloverPreconditioned : dslash_default {
-    
+  //struct nDegTwistedCloverPreconditioned : only_SharedMemoryCache<nDegTwistedCloverPreconditionedCacheT<Arg>>, dslash_default {
+  struct nDegTwistedCloverPreconditioned : dslash_default, only_SharedMemoryCache<nDegTwistedCloverPreconditionedCacheT<Arg>> {
+
     const Arg &arg;
     constexpr nDegTwistedCloverPreconditioned(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
-  
+
     /**
        @brief Apply the preconditioned twisted-clover dslash
        out(x) = M*in = a*(C + i*b*gamma_5*tau_3 + c*tau_1)/(C^2 + b^2 - c^2)*D*x ( xpay == false )
@@ -91,7 +94,8 @@ namespace quda
 
         int chirality = flavor; // relabel flavor as chirality
 
-        SharedMemoryCache<HalfVector> cache(target::block_dim());
+        //SharedMemoryCache<HalfVector> cache(target::block_dim());
+        SharedMemoryCache<HalfVector> cache(this);
 
         auto swizzle = [&](int chirality, int reverse) {
           if (chirality == 0) cache.save_y(out_chi[1], reverse);

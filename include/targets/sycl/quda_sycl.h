@@ -101,6 +101,15 @@ static inline int localId(int d) { return getNdItem().get_local_id(d); }
 #define groupIdY ::groupId(RANGE_Y)
 #define groupIdZ ::groupId(RANGE_Z)
 
+inline dim3 makeDim3(sycl::range<3> &&r)
+{
+  dim3 d;
+  d.x = r[RANGE_X];
+  d.y = r[RANGE_Y];
+  d.z = r[RANGE_Z];
+  return d;
+}
+
 inline dim3 getGridDim()
 {
   dim3 r;
@@ -130,6 +139,17 @@ inline dim3 getBlockDim()
   dim3 r;
   //#ifdef __SYCL_DEVICE_ONLY__
   auto ndi = getNdItem();
+  r.x = ndi.get_local_range(RANGE_X);
+  r.y = ndi.get_local_range(RANGE_Y);
+  r.z = ndi.get_local_range(RANGE_Z);
+  //#endif
+  return r;
+}
+
+inline dim3 getBlockDim(sycl::nd_item<3> &ndi)
+{
+  dim3 r;
+  //#ifdef __SYCL_DEVICE_ONLY__
   r.x = ndi.get_local_range(RANGE_X);
   r.y = ndi.get_local_range(RANGE_Y);
   r.z = ndi.get_local_range(RANGE_Z);
