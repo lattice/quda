@@ -70,10 +70,7 @@ namespace quda {
       if (geo_bs[d] == 0) errorQuda("Unable to block dimension %d", d);
     }
 
-    if (ndim > 4) {
-      geo_bs[4] = 1;
-      warningQuda("5th dimension block size is being set to 1. This is a benign side effect of staggered fermions");
-    }
+    if (ndim > 4) errorQuda("Number of dimensions %d not supported", ndim);
 
     this->geo_bs = new int[ndim];
     int total_block_size = 1;
@@ -158,7 +155,8 @@ namespace quda {
       param.x[0] *= 2;
     }
     param.location = location;
-    param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ? colorspinor::getNative(null_precision, param.nSpin) :
+                                                              QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     param.setPrecision(location == QUDA_CUDA_FIELD_LOCATION ? null_precision : B[0]->Precision());
 
     if (transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
@@ -191,7 +189,8 @@ namespace quda {
     ColorSpinorParam param(*B[0]);
     param.create = QUDA_NULL_FIELD_CREATE;
     param.location = location;
-    param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ? colorspinor::getNative(null_precision, param.nSpin) :
+                                                              QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     if (param.Precision() < QUDA_SINGLE_PRECISION) param.setPrecision(QUDA_SINGLE_PRECISION);
 
     if (location == QUDA_CUDA_FIELD_LOCATION) {
@@ -409,7 +408,7 @@ namespace quda {
                   output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
       }
 
-      Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map, parity);
+      Prolongate(*output, *input, *V, fine_to_coarse, spin_map, parity);
 
       flops_ += 8 * in.Ncolor() * out.Ncolor() * out.VolumeCB() * out.SiteSubset();
     } else {
@@ -472,7 +471,7 @@ namespace quda {
         errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
                   out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
 
-      Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
+      Restrict(*output, *input, *V, fine_to_coarse, coarse_to_fine, spin_map, parity);
 
       flops_ += 8 * out.Ncolor() * in.Ncolor() * in.VolumeCB() * in.SiteSubset();
     } else {

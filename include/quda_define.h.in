@@ -179,15 +179,47 @@
 #undef QUDA_CLOVER_CHOLESKY_PROMOTE
 #endif
 
-#cmakedefine QUDA_FLOAT8
-#ifdef QUDA_FLOAT8
+#cmakedefine QUDA_MULTIGRID_DSLASH_PROMOTE
+#ifdef QUDA_MULTIGRID_DSLASH_PROMOTE
 /**
- * @def FLOAT8
- * @brief This macro set whether float8-ordered fields are enabled or
- * not
+ * @def   MULTIGRID_DSLASH_PROMOTE
+ * @brief This macro sets whether we promote the internal precision of
+ * the coarse dslash used in multigrid.  This enables reproducibility
+ * regardless of the thread granularity chosen
  */
-#define FLOAT8
-#undef QUDA_FLOAT8
+#define MULTIGRID_DSLASH_PROMOTE
+#undef QUDA_CLOVER_CHOLESKY_PROMOTE
+#endif
+
+/**
+ * @def QUDA_ORDER_FP
+ * @brief This macro sets the data ordering for Wilson, gauge
+ * (recon-8/9) and clover fixed-point fields
+ */
+#define QUDA_ORDER_FP @QUDA_ORDER_FP@
+
+#ifdef __cplusplus
+static_assert(QUDA_ORDER_FP == 4 || QUDA_ORDER_FP == 8, "invalid QUDA_ORDER_FP");
+#endif
+
+/**
+ * @def QUDA_ORDER_SP
+ * @brief This macro sets the data ordering for single-precision multigrid fields
+ */
+#define QUDA_ORDER_SP_MG @QUDA_ORDER_SP_MG@
+
+#ifdef __cplusplus
+static_assert(QUDA_ORDER_SP_MG == 2 || QUDA_ORDER_SP_MG == 4, "invalid QUDA_ORDER_SP_MG");
+#endif
+
+/**
+ * @def QUDA_ORDER_FP_MG
+ * @brief This macro sets the data ordering for fixed-point multigrid fields
+ */
+#define QUDA_ORDER_FP_MG @QUDA_ORDER_FP_MG@
+
+#ifdef __cplusplus
+static_assert(QUDA_ORDER_FP_MG == 2 || QUDA_ORDER_FP_MG == 4 || QUDA_ORDER_FP_MG == 8, "invalid QUDA_ORDER_FP_MG");
 #endif
 
 /**

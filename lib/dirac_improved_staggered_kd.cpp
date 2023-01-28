@@ -31,23 +31,6 @@ namespace quda
     return *this;
   }
 
-  void DiracImprovedStaggeredKD::checkParitySpinor(const ColorSpinorField &in, const ColorSpinorField &out) const
-  {
-    if (in.Ndim() != 5 || out.Ndim() != 5) { errorQuda("Staggered dslash requires 5-d fermion fields"); }
-
-    if (in.Precision() != out.Precision()) {
-      errorQuda("Input and output spinor precisions don't match in dslash_quda");
-    }
-
-    if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET || out.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-      errorQuda("ColorSpinorFields are not full parity, in = %d, out = %d", in.SiteSubset(), out.SiteSubset());
-    }
-
-    if (out.Volume() / out.X(4) != 2 * gauge->VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-      errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), gauge->VolumeCB());
-    }
-  }
-
   void DiracImprovedStaggeredKD::Dslash(ColorSpinorField &, const ColorSpinorField &, const QudaParity) const
   {
     errorQuda("The improved staggered Kahler-Dirac operator does not have a single parity form");

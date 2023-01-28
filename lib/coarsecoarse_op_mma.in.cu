@@ -2,9 +2,14 @@
 
 namespace quda {
 
-  void CoarseCoarseOpMMA(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
-                         const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mass, double mu, double mu_factor,
-                         QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional)
+  constexpr int fineColor = @QUDA_MULTIGRID_NVEC@;
+  constexpr int coarseColor = @QUDA_MULTIGRID_NVEC2@;
+  constexpr bool use_mma = true;
+
+  template<>
+  void CoarseCoarseOp<fineColor, coarseColor, use_mma>(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
+                                                       const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mass,
+                                                       double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional)
   {
     QudaFieldLocation location = checkLocation(X, Y, gauge, clover, cloverInv);
     if (location == QUDA_CPU_FIELD_LOCATION) errorQuda("use_mma = true does not go with QUDA_CPU_FIELD_LOCATION.");
@@ -66,8 +71,8 @@ namespace quda {
     }
 
     bool constexpr use_mma = true;
-    calculateYcoarse<use_mma>(*Y_order, *X_order, *Yatomic, *Xatomic, *uv, T, *G_order, *C_order, *I_order, kappa, mass, mu,
-                              mu_factor, dirac, matpc, need_bidirectional);
+    calculateYcoarse<use_mma, fineColor, coarseColor>
+      (*Y_order, *X_order, *Yatomic, *Xatomic, *uv, T, *G_order, *C_order, *I_order, kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional);
 
     if (Yatomic != Y_order) delete Yatomic;
     if (Xatomic != X_order) delete Xatomic;

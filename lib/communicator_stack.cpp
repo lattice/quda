@@ -248,6 +248,16 @@ namespace quda
     comm_allreduce_max_array(reinterpret_cast<double *>(a.data()), 2 * a.size());
   }
 
+  template <> void comm_allreduce_max<deviation_t<double>>(deviation_t<double> &a)
+  {
+    get_current_communicator().comm_allreduce_max_array(&a, 1);
+  }
+
+  template <> void comm_allreduce_max<std::vector<deviation_t<double>>>(std::vector<deviation_t<double>> &a)
+  {
+    get_current_communicator().comm_allreduce_max_array(a.data(), a.size());
+  }
+
   void comm_allreduce_min_array(double *data, size_t size)
   {
     get_current_communicator().comm_allreduce_min_array(data, size);

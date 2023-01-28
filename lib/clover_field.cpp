@@ -350,8 +350,8 @@ namespace quda {
     return output;  // for multiple << operators.
   }
 
-  ColorSpinorParam colorSpinorParam(const CloverField &a, bool inverse) {
-
+  ColorSpinorParam colorSpinorParam(const CloverField &a, bool inverse)
+  {
     if (a.Precision() == QUDA_HALF_PRECISION)
       errorQuda("Casting a CloverField into ColorSpinorField not possible in half precision");
 
@@ -363,8 +363,7 @@ namespace quda {
     spinor_param.setPrecision(a.Precision());
     spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
     spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    spinor_param.fieldOrder = a.Precision() == QUDA_DOUBLE_PRECISION ?
-      QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+    spinor_param.fieldOrder = colorspinor::getNative(a.Precision(), a.Nspin());
     spinor_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
     spinor_param.v = (void*)a.V(inverse);
