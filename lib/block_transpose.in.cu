@@ -11,7 +11,7 @@ namespace quda {
   using namespace quda::colorspinor;
 
   template <class v_t, class b_t, typename vFloat, typename bFloat, int nSpin, int nColor, int nVec>
-  class BlockTranspose : public TunableKernel3D {
+  class BlockTranspose : public TunableKernel2D {
 
     using real = typename mapper<vFloat>::type;
     template <bool is_device, typename vOrder, typename bOrder> using Arg =
@@ -22,7 +22,7 @@ namespace quda {
 
   public:
     BlockTranspose(v_t &V, cvector_ref<b_t> &B) :
-      TunableKernel3D(V, B.size(), V.SiteSubset() * nColor),
+      TunableKernel2D(V, B.size()),
       V(V),
       B(B)
     {
@@ -35,15 +35,28 @@ namespace quda {
       char rhs_str[8];
       i32toa(rhs_str, B.size());
       strcat(aux, rhs_str);
-      resizeStep(B.size(), V.SiteSubset() * nColor);
+      resizeStep(1);
       apply(device::get_default_stream());
+    }
+
+    virtual int blockStep() const {
+      return 8;
+    }
+
+    virtual int blockMin() const {
+      return 8;
     }
 
     void initTuneParam(TuneParam &param) const
     {
-      TunableKernel3D::initTuneParam(param);
+      TunableKernel2D::initTuneParam(param);
       param.block.z = 1;
-      param.grid.z = vector_length_z;
+      param.grid.z = nColor * V.SiteSubset();
+    }
+
+    void defaultTuneParam(TuneParam &param) const
+    {
+      initTuneParam(param);
     }
 
 #if 0
@@ -62,6 +75,7 @@ namespace quda {
     {
       Arg<true, vAccessor, bAccessor> arg(V, B, tp.block.x, tp.block.y);
       tp.set_max_shared_bytes = true;
+      resize(tp.block.y * tp.grid.y); // We need a full threadblock
       launch_device<BlockTransposeKernel>(tp, stream, arg);
     }
 

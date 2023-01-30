@@ -25,10 +25,12 @@ namespace quda {
     bAccessor B[nVec];
     int_fastdiv block_y;
     int volume_cb;
+    int actual_nvec;
 
     BlockTransposeArg(v_t &V, cvector_ref<b_t> &B_, int block_x, int block_y) :
-      kernel_param(dim3((V.VolumeCB() + block_x - 1) / block_x * block_x, nVec, V.SiteSubset() * nColor)),
-      V(V), block_y(block_y), volume_cb(V.VolumeCB())
+      // We need full threadblock
+      kernel_param(dim3((V.VolumeCB() + block_x - 1) / block_x * block_x, (nVec + block_y - 1) / block_y * block_y, V.SiteSubset() * nColor)),
+      V(V), block_y(block_y), volume_cb(V.VolumeCB()), actual_nvec(B_.size())
     {
       for (auto i = 0u; i < B_.size(); i++) {
         B[i] = bAccessor(B_[i]);
@@ -41,8 +43,9 @@ namespace quda {
     constexpr BlockTransposeKernel(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb, int v, int parity_color)
+    __device__ __host__ inline void operator()(int x_cb, int)
     {
+      int parity_color = target::block_idx().z;
       int color = parity_color % Arg::nColor;
       int parity = parity_color / Arg::nColor;
       using color_spinor_t = ColorSpinor<typename Arg::real, 1, Arg::nSpin>;
@@ -57,7 +60,7 @@ namespace quda {
         {
           int v_ = thread_idx % arg.block_y;
           int x_ = thread_idx / arg.block_y;
-          if (x_ + x_offset < arg.volume_cb) {
+          if (x_ + x_offset < arg.volume_cb && v_ + v_offset < arg.actual_nvec) {
             color_spinor_t color_spinor;
 #pragma unroll
             for (int spin = 0; spin < Arg::nSpin; spin++) {
@@ -70,11 +73,11 @@ namespace quda {
         {
           int v = target::thread_idx().y;
           int x = target::thread_idx().x;
-          if (x_cb < arg.volume_cb) {
+          if (x_cb < arg.volume_cb && v + v_offset < arg.actual_nvec) {
             color_spinor_t color_spinor = cache.load(x, v);
 #pragma unroll
             for (int spin = 0; spin < Arg::nSpin; spin++) {
-              arg.B[v](parity, x_cb, spin, color) = color_spinor(spin, 0);
+              arg.B[v + v_offset](parity, x_cb, spin, color) = color_spinor(spin, 0);
             }
           }
         }
@@ -83,11 +86,11 @@ namespace quda {
         {
           int v = target::thread_idx().y;
           int x = target::thread_idx().x;
-          if (x_cb < arg.volume_cb) {
+          if (x_cb < arg.volume_cb && v + v_offset < arg.actual_nvec) {
             color_spinor_t color_spinor;
 #pragma unroll
             for (int spin = 0; spin < Arg::nSpin; spin++) {
-              color_spinor(spin, 0) = arg.B[v](parity, x_cb, spin, color);
+              color_spinor(spin, 0) = arg.B[v + v_offset](parity, x_cb, spin, color);
             }
             cache.save(color_spinor, x, v);
           }
@@ -96,7 +99,7 @@ namespace quda {
         {
           int v_ = thread_idx % arg.block_y;
           int x_ = thread_idx / arg.block_y;
-          if (x_ + x_offset < arg.volume_cb) {
+          if (x_ + x_offset < arg.volume_cb && v_ + v_offset < arg.actual_nvec) {
             color_spinor_t color_spinor = cache.load(x_, v_);
 #pragma unroll
             for (int spin = 0; spin < Arg::nSpin; spin++) {
