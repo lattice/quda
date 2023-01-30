@@ -5058,23 +5058,22 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
   printfQuda("computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8);\n");
   // computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8); 
 
-  // FIXME: these need to be checked
   std::vector< std::vector<double> > ferm_epsilon(nvector);
   for (int i = 0; i < nvector; i++) {
     ferm_epsilon[i].reserve(2);
-    ferm_epsilon[i][0] = - k_csw_ov_8 * coeff[i];
-    ferm_epsilon[i][1] = - 2.0 * k_csw_ov_8 * coeff[i]; 
+    ferm_epsilon[i][0] =  k_csw_ov_8 * coeff[i];
+    ferm_epsilon[i][1] =  k_csw_ov_8 * coeff[i];
   }
 
   // printfQuda("computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon)\n");
-  // computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon);
+  computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon);
 
-  // cudaGaugeField *oprodEx = createExtendedGauge(oprod, R, profileTMCloverForce);
+  cudaGaugeField *oprodEx = createExtendedGauge(oprod, R, profileTMCloverForce);
 
   // printfQuda("cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_ODD_PARITY)\n");
-  // cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_ODD_PARITY);
+  cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_ODD_PARITY);
   // printfQuda("cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_EVEN_PARITY)\n");
-  // cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_EVEN_PARITY);
+  cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_EVEN_PARITY);
 
   printfQuda("updateMomentum(gpuMom, -1.0, cudaForce, \"tmclover\")\n");
   updateMomentum(gpuMom, -1.0, cudaForce, "tmclover");
