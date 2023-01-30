@@ -4337,14 +4337,13 @@ void computeStaggeredForceQuda(void *h_mom, double dt, double delta, void *, voi
   qParam.nSpin = 1;
   qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  qParam.nDim = 5; // 5 since staggered mrhs
+  qParam.nDim = 4;
   qParam.pc_type = QUDA_4D_PC;
-  qParam.setPrecision(gParam.Precision());
+  qParam.setPrecision(gParam.Precision(), gParam.Precision(), true);
   qParam.pad = 0;
   for(int dir=0; dir<4; ++dir) qParam.x[dir] = gParam.x[dir];
   qParam.x[4] = 1;
   qParam.create = QUDA_NULL_FIELD_CREATE;
-  qParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
   qParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
 
   profileStaggeredForce.TPSTOP(QUDA_PROFILE_INIT);
@@ -4556,13 +4555,12 @@ void computeHISQForceQuda(void* const milc_momentum,
     qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
     qParam.nDim = 4;
     qParam.pc_type = QUDA_4D_PC;
-    qParam.setPrecision(oParam.Precision());
+    qParam.setPrecision(oParam.Precision(), oParam.Precision(), true);
     qParam.pad = 0;
     for (int dir=0; dir<4; ++dir) qParam.x[dir] = oParam.x[dir];
 
     // create the device quark field
     qParam.create = QUDA_NULL_FIELD_CREATE;
-    qParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     qParam.location = QUDA_CUDA_FIELD_LOCATION;
     ColorSpinorField cudaQuark(qParam);
 
@@ -4757,13 +4755,12 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   qParam.nDim = 4;
-  qParam.setPrecision(fParam.Precision());
+  qParam.setPrecision(fParam.Precision(), fParam.Precision(), true);
   qParam.pad = 0;
   for(int dir=0; dir<4; ++dir) qParam.x[dir] = fParam.x[dir];
 
   // create the device quark field
   qParam.create = QUDA_NULL_FIELD_CREATE;
-  qParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
   qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
   std::vector<ColorSpinorField*> quarkX, quarkP;

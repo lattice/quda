@@ -148,6 +148,13 @@ namespace quda
       return -1;
     }
 
+    template <bool query_max = false, class Arg, typename Tunable>
+    typename std::enable_if_t<!(Arg::N == 12 || Arg::N == 48 || Arg::N == 64 || Arg::N == 128 || Arg::N == 192), int>
+    launch_yhat_kernel(TuneParam &, const qudaStream_t &, Arg &, Tunable &)
+    {
+      errorQuda("MMA implementation not available for N = %d", Arg::N);
+      return -1;
+    }
 #else
 
     template <bool query_max = false, class Arg, typename Tunable>

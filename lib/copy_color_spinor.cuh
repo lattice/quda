@@ -1,7 +1,8 @@
+#include <tuple>
 #include <color_spinor_field.h>
 #include <tunable_nd.h>
 #include <kernels/copy_color_spinor.cuh>
-#include <tuple>
+#include <instantiate.h>
 
 namespace quda {
 
@@ -26,7 +27,7 @@ namespace quda {
       out(out),
       in(in)
     {
-      strcat(aux, out.AuxString());
+      strcat(aux, out.AuxString().c_str());
       if (out.GammaBasis()==in.GammaBasis()) strcat(aux, ",PreserveBasis");
       else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) strcat(aux, ",NonRelBasis");
       else if (out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) strcat(aux, ",RelBasis");
@@ -85,10 +86,6 @@ namespace quda {
     if (out.isNative()) {
       using O = typename colorspinor_mapper<FloatOut,Ns,Nc>::type;
       CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
-    } else if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && Ns == 4) {
-      // this is needed for single-precision mg for changing basis in the transfer
-      using O = typename colorspinor::FloatNOrder<FloatOut, 4, Nc, 2>;
-      CopyColorSpinor<4, Nc, O, I, param_t>(out, in, param);
     } else if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       using O = SpaceSpinorColorOrder<FloatOut, Ns, Nc>;
       CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
@@ -96,22 +93,13 @@ namespace quda {
       using O = SpaceColorSpinorOrder<FloatOut, Ns, Nc>;
       CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
     } else if (out.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
-
-#ifdef BUILD_TIFR_INTERFACE
       using O = PaddedSpaceSpinorColorOrder<FloatOut, Ns, Nc>;
-      CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
-#else
-      errorQuda("TIFR interface has not been built\n");
-#endif
-
+      if constexpr (is_enabled<QUDA_TIFR_GAUGE_ORDER>()) CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
+      else errorQuda("TIFR interface has not been built");
     } else if (out.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
-
-#ifdef BUILD_QDPJIT_INTERFACE
       using O = QDPJITDiracOrder<FloatOut, Ns, Nc>;
-      CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
-#else
-      errorQuda("QDPJIT interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_QDPJIT_GAUGE_ORDER>()) CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
+      else errorQuda("QDPJIT interface has not been built");
     } else {
       errorQuda("Order %d not defined (Ns = %d, Nc = %d, precision = %d)", out.FieldOrder(), Ns, Nc, out.Precision());
     }
@@ -126,10 +114,6 @@ namespace quda {
     if (in.isNative()) {
       using I = typename colorspinor_mapper<FloatIn, Ns, Nc>::type;
       genericCopyColorSpinor<Ns, Nc, I>(param);
-    } else if (in.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && Ns == 4) {
-      // this is needed for single-precision mg for changing basis in the transfer
-      using I = typename colorspinor::FloatNOrder<FloatIn, 4, Nc, 2>;
-      genericCopyColorSpinor<4, Nc, I>(param);
     } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       using I = SpaceSpinorColorOrder<FloatIn, Ns, Nc>;
       genericCopyColorSpinor<Ns, Nc, I>(param);
@@ -137,22 +121,13 @@ namespace quda {
       using I = SpaceColorSpinorOrder<FloatIn, Ns, Nc>;
       genericCopyColorSpinor<Ns, Nc, I>(param);
     } else if (in.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
-
-#ifdef BUILD_TIFR_INTERFACE
       using ColorSpinor = PaddedSpaceSpinorColorOrder<FloatIn, Ns, Nc>;
-      genericCopyColorSpinor<Ns, Nc, ColorSpinor>(param);
-#else
-      errorQuda("TIFR interface has not been built\n");
-#endif
-
+      if constexpr (is_enabled<QUDA_TIFR_GAUGE_ORDER>()) genericCopyColorSpinor<Ns, Nc, ColorSpinor>(param);
+      else errorQuda("TIFR interface has not been built");
     } else if (in.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
-
-#ifdef BUILD_QDPJIT_INTERFACE
       using ColorSpinor = QDPJITDiracOrder<FloatIn, Ns, Nc>;
-      genericCopyColorSpinor<Ns, Nc, ColorSpinor>(param);
-#else
-      errorQuda("QDPJIT interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_QDPJIT_GAUGE_ORDER>()) genericCopyColorSpinor<Ns, Nc, ColorSpinor>(param);
+      else errorQuda("QDPJIT interface has not been built");
     } else {
       errorQuda("Order %d not defined (Ns=%d, Nc=%d, precision = %d)", in.FieldOrder(), Ns, Nc, in.Precision());
     }
@@ -205,27 +180,13 @@ namespace quda {
                                 static_cast<dst_t*>(std::get<3>(pack)), static_cast<const src_t*>(std::get<4>(pack)));
 
     if (dst.Nspin() != src.Nspin()) errorQuda("source and destination spins must match");
+    if (!is_enabled_spin(dst.Nspin())) errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
 
-    if (dst.Nspin() == 4) {
-#if defined(NSPIN4)
-      copyGenericColorSpinor<4,Nc>(param);
-#else
-      errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
-#endif
-    } else if (dst.Nspin() == 2) {
-#if defined(NSPIN2)
-      copyGenericColorSpinor<2,Nc>(param);
-#else
-      errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
-#endif
-    } else if (dst.Nspin() == 1) {
-#if defined(NSPIN1)
-      copyGenericColorSpinor<1,Nc>(param);
-#else
-      errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
-#endif
-    } else {
-      errorQuda("Nspin=%d unsupported", dst.Nspin());
+    switch (dst.Nspin()) {
+    case 1: if constexpr (is_enabled_spin(1)) copyGenericColorSpinor<1, Nc>(param); break;
+    case 2: if constexpr (is_enabled_spin(2)) copyGenericColorSpinor<2, Nc>(param); break;
+    case 4: if constexpr (is_enabled_spin(4)) copyGenericColorSpinor<4, Nc>(param); break;
+    default: errorQuda("Nspin=%d unsupported", dst.Nspin());
     }
   }
 

@@ -1,6 +1,8 @@
 #pragma once
 #include <target_device.h>
 
+#include <target_device.h>
+
 namespace quda
 {
 

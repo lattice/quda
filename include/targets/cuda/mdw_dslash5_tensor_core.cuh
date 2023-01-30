@@ -316,7 +316,7 @@ namespace quda
     output.norm[sid] = __half2float(max_) * scale * fixedInvMaxValue<storage_type>::value;
 
     const half2 max_i_div_max2_ = __half2half2(__hdiv(fixedMaxValue<storage_type>::value, max_));
-#ifdef FLOAT8 // use float8/short8
+#if QUDA_ORDER_FP == 8 // use float8/short8
     typedef typename VectorType<storage_type, 8>::type storage_vec;
     storage_vec *out = reinterpret_cast<storage_vec *>(output.field);
     half2 a, b, c, d;
@@ -338,8 +338,7 @@ namespace quda
     c = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
     d = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
     vector_store(&out[sid + 2 * output.volumeCB], 0, __4half22integer8_rn<storage_vec>(a, b, c, d));
-#else
-
+#elif QUDA_ORDER_FP == 4
     typedef typename VectorType<storage_type, 4>::type storage_vec;
     storage_vec *out = reinterpret_cast<storage_vec *>(output.field);
     half2 a, b;
@@ -367,7 +366,6 @@ namespace quda
     a = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
     b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
     out[sid + 5 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
-
 #endif
   }
 

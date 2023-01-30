@@ -33,7 +33,13 @@ namespace quda {
 
     inline void copy(ColorSpinorField &dst, const ColorSpinorField &src)
     {
-      if (&dst == &src) return;
+      if (dst.V() == src.V()) {
+        // check the fields are equivalent else error
+        if (ColorSpinorField::are_compatible(dst, src))
+          return;
+        else
+          errorQuda("Aliasing pointers with incompatible fields");
+      }
       dst.copy(src);
     }
 
@@ -257,12 +263,12 @@ namespace quda {
     double max(const ColorSpinorField &x);
 
     /**
-       @brief Compute the maximum relative real-valued deviation
-       between two fields.
+       @brief Compute the maximum real-valued deviation between two
+       fields.
        @param[in] x The field we want to compare
        @param[in] y The reference field to which we are comparing against
     */
-    double max_deviation(const ColorSpinorField &x, const ColorSpinorField &y);
+    array<double, 2> max_deviation(const ColorSpinorField &x, const ColorSpinorField &y);
 
     /**
        @brief Compute the L1 norm of a field

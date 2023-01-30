@@ -52,7 +52,7 @@ namespace quda {
       if (u.Geometry() != QUDA_VECTOR_GEOMETRY)
         errorQuda("Unexpected geometry %d", u.Geometry());
       strcat(aux, ",3d_vol=");
-      strcat(aux, product_field.VolString());
+      strcat(aux, product_field.VolString().c_str());
 
       apply(device::get_default_stream());
     }

@@ -66,7 +66,7 @@ namespace quda {
 
         if (x_prec != y_prec) {
           strcat(aux, ",");
-          strcat(aux, y0.AuxString());
+          strcat(aux, y0.AuxString().c_str());
         }
         char NXZ_str[16];
         char NYW_str[16];
