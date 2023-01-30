@@ -27,27 +27,6 @@ namespace quda {
     return *this;
   }
 
-  void DiracImprovedStaggered::checkParitySpinor(const ColorSpinorField &in, const ColorSpinorField &out) const
-  {
-    if (in.Ndim() != 5 || out.Ndim() != 5) {
-      errorQuda("Staggered dslash requires 5-d fermion fields");
-    }
-
-    if (in.Precision() != out.Precision()) {
-      errorQuda("Input and output spinor precisions don't match in dslash_quda");
-    }
-
-    if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
-      errorQuda("ColorSpinorFields are not single parity, in = %d, out = %d", 
-		in.SiteSubset(), out.SiteSubset());
-    }
-
-    if ((out.Volume() / out.X(4) != 2 * fatGauge->VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
-        || (out.Volume() / out.X(4) != fatGauge->VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET)) {
-      errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), fatGauge->VolumeCB());
-    }
-  }
-
   void DiracImprovedStaggered::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     checkParitySpinor(in, out);

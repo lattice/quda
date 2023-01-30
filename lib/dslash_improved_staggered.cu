@@ -149,7 +149,7 @@ namespace quda
                                   const GaugeField &U, double a, const ColorSpinorField &x, int parity, bool dagger,
                                   const int *comm_override, TimeProfile &profile)
     {
-      constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
+      constexpr int nDim = 4;
       constexpr bool improved = true;
       constexpr QudaReconstructType recon_u = QUDA_RECONSTRUCT_NO;
       StaggeredArg<Float, nColor, nDim, recon_u, recon_l, improved> arg(out, in, U, L, a, x, parity, dagger,

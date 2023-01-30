@@ -17,13 +17,13 @@ endif()
 
 set (QUDA_OBJS
   # cmake-format: sortable
-  dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
-  coarse_op.cu coarsecoarse_op.cu coarsecoarse_op_mma.cu
-  coarse_op_preconditioned.cu staggered_coarse_op.cu
+  dirac_coarse.cpp dslash_coarse.cpp
+  coarse_op.cpp coarsecoarse_op.cpp
+  coarse_op_preconditioned.cpp staggered_coarse_op.cpp
   eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
   eigensolve_quda.cpp quda_arpack_interface.cpp
-  multigrid.cpp transfer.cpp block_orthogonalize.cu
-  prolongator.cu restrictor.cu staggered_prolong_restrict.cu
+  multigrid.cpp transfer.cpp block_orthogonalize.cpp
+  prolongator.cpp restrictor.cpp staggered_prolong_restrict.cu
   gauge_phase.cu timer.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
@@ -37,13 +37,14 @@ set (QUDA_OBJS
   gauge_covdev.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
-  extract_gauge_ghost_mg.cu max_gauge.cu gauge_update_quda.cu
+  gauge_norm.cu gauge_update_quda.cu
   max_clover.cu dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
   dirac_staggered_kd.cpp dirac_clover_hasenbusch_twist.cpp
   dirac_improved_staggered.cpp dirac_improved_staggered_kd.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp 
-  llfat_quda.cu staggered_two_link_quda.cu gauge_force.cu gauge_loop_trace.cu gauge_polyakov_loop.cu gauge_random.cu
+  llfat_quda.cu staggered_two_link_quda.cu gauge_force.cu gauge_loop_trace.cu gauge_polyakov_loop.cu
+  gauge_random.cu gauge_noise.cu
   gauge_field_strength_tensor.cu clover_quda.cu 
   dslash_gamma_helper.cu dslash_clover_helper.cu
   staggered_kd_build_xinv.cu staggered_kd_reorder_xinv.cu staggered_kd_apply_xinv.cu
@@ -70,7 +71,7 @@ set (QUDA_OBJS
   copy_color_spinor_mg_qh.cu copy_color_spinor_mg_qq.cu
   copy_gauge_double.cu copy_gauge_single.cu
   copy_gauge_half.cu copy_gauge_quarter.cu
-  copy_gauge.cpp copy_gauge_mg.cu copy_clover.cu
+  copy_gauge.cpp copy_clover.cu
   copy_gauge_offset.cu copy_color_spinor_offset.cu copy_clover_offset.cu
   staggered_oprod.cu clover_trace_quda.cu
   hisq_paths_force_quda.cu
@@ -142,8 +143,84 @@ if(QUDA_DIRAC_DOMAIN_WALL)
       message(FATAL_ERROR "'${QUDA_MDW_FUSED_LS}' is not a valid Ls: allowed ones are '${QUDA_MDW_FUSED_ALLOWED_LS_LIST_COMMA}'")
     endif()
     configure_file(dslash_mdw_fused.in.cu "dslash_mdw_fused_ls${QUDA_MDW_FUSED_LS}.cu" @ONLY)
-    list(APPEND QUDA_CU_OBJS "dslash_mdw_fused_ls${QUDA_MDW_FUSED_LS}.cu")
+    list(PREPEND QUDA_CU_OBJS "dslash_mdw_fused_ls${QUDA_MDW_FUSED_LS}.cu")
   endforeach()
+endif()
+
+
+set(QUDA_MULTIGRID_NVEC_LIST "6,24,32" CACHE STRING "The list of null space vector sizes that get compiled")
+set(QUDA_MULTIGRID_NC_NVEC_LIST "3,${QUDA_MULTIGRID_NVEC_LIST}")
+mark_as_advanced(QUDA_MULTIGRID_NVEC_LIST)
+
+message(STATUS "QUDA_MULTIGRID_NVEC_LIST=${QUDA_MULTIGRID_NVEC_LIST}")
+configure_file(dslash_coarse.in.cpp dslash_coarse.cpp @ONLY)
+configure_file(coarse_op.in.cpp coarse_op.cpp @ONLY)
+configure_file(coarsecoarse_op.in.cpp coarsecoarse_op.cpp @ONLY)
+configure_file(coarse_op_preconditioned.in.cpp coarse_op_preconditioned.cpp @ONLY)
+configure_file(staggered_coarse_op.in.cpp staggered_coarse_op.cpp @ONLY)
+configure_file(prolongator.in.cpp prolongator.cpp @ONLY)
+configure_file(restrictor.in.cpp restrictor.cpp @ONLY)
+configure_file(block_orthogonalize.in.cpp block_orthogonalize.cpp @ONLY)
+configure_file(copy_gauge.in.cpp copy_gauge.cpp @ONLY)
+configure_file(extract_gauge_ghost.in.cu extract_gauge_ghost.cu @ONLY)
+configure_file(gauge_noise.in.cu gauge_noise.cu @ONLY)
+configure_file(gauge_norm.in.cu gauge_norm.cu @ONLY)
+configure_file(spinor_noise.in.cu spinor_noise.cu @ONLY)
+configure_file(copy_color_spinor_mg.in.hpp copy_color_spinor_mg.hpp @ONLY)
+configure_file(color_spinor_pack.in.cu color_spinor_pack.cu @ONLY)
+configure_file(color_spinor_util.in.cu color_spinor_util.cu @ONLY)
+
+if(QUDA_MULTIGRID)
+  string(REPLACE "," ";" QUDA_MULTIGRID_NVEC_LIST_SEMICOLON "${QUDA_MULTIGRID_NVEC_LIST}")
+  foreach(QUDA_MULTIGRID_NVEC ${QUDA_MULTIGRID_NVEC_LIST_SEMICOLON})
+    configure_file(copy_gauge_mg.in.cu "copy_gauge_mg_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
+    configure_file(extract_gauge_ghost_mg.in.cu "extract_gauge_ghost_mg_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
+    list(PREPEND QUDA_CU_OBJS "copy_gauge_mg_${QUDA_MULTIGRID_NVEC}.cu")
+    list(PREPEND QUDA_CU_OBJS "extract_gauge_ghost_mg_${QUDA_MULTIGRID_NVEC}.cu")
+
+    configure_file(coarse_op.in.cu "coarse_op_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
+    configure_file(staggered_coarse_op.in.cu "staggered_coarse_op_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
+    list(PREPEND QUDA_CU_OBJS "coarse_op_${QUDA_MULTIGRID_NVEC}.cu")
+    list(PREPEND QUDA_CU_OBJS "staggered_coarse_op_${QUDA_MULTIGRID_NVEC}.cu")
+
+    configure_file(coarse_op_preconditioned.in.cu "coarse_op_preconditioned_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
+    list(PREPEND QUDA_CU_OBJS "coarse_op_preconditioned_${QUDA_MULTIGRID_NVEC}.cu")
+
+    foreach(QUDA_MULTIGRID_NVEC2 ${QUDA_MULTIGRID_NVEC_LIST_SEMICOLON})
+      if(${QUDA_MULTIGRID_NVEC2} GREATER_EQUAL ${QUDA_MULTIGRID_NVEC})
+         configure_file(coarsecoarse_op.in.cu "coarsecoarse_op_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu" @ONLY)
+         configure_file(coarsecoarse_op_mma.in.cu "coarsecoarse_op_mma_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu" @ONLY)
+         list(PREPEND QUDA_CU_OBJS "coarsecoarse_op_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
+         list(PREPEND QUDA_CU_OBJS "coarsecoarse_op_mma_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
+      endif()
+    endforeach()
+
+  endforeach()
+
+  string(REPLACE "," ";" QUDA_MULTIGRID_NC_NVEC_LIST_SEMICOLON "${QUDA_MULTIGRID_NC_NVEC_LIST}")
+  foreach(QUDA_MULTIGRID_NC_NVEC ${QUDA_MULTIGRID_NC_NVEC_LIST_SEMICOLON})
+    foreach(QUDA_MULTIGRID_NVEC2 ${QUDA_MULTIGRID_NVEC_LIST_SEMICOLON})
+      if(${QUDA_MULTIGRID_NVEC2} GREATER_EQUAL ${QUDA_MULTIGRID_NC_NVEC})
+         configure_file(prolongator.in.cu "prolongator_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu" @ONLY)
+         configure_file(restrictor.in.cu "restrictor_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu" @ONLY)
+         configure_file(block_orthogonalize.in.cu "block_orthogonalize_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu" @ONLY)
+         list(PREPEND QUDA_CU_OBJS "prolongator_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
+         list(PREPEND QUDA_CU_OBJS "restrictor_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
+         list(PREPEND QUDA_CU_OBJS "block_orthogonalize_${QUDA_MULTIGRID_NC_NVEC}_${QUDA_MULTIGRID_NVEC2}.cu")
+      endif()
+    endforeach()
+  endforeach()
+
+  # add dslash_coarse last to the list so it is compiled first
+  foreach(QUDA_MULTIGRID_NVEC ${QUDA_MULTIGRID_NVEC_LIST_SEMICOLON})
+    set(QUDA_MULTIGRID_DAGGER "false")
+    configure_file(dslash_coarse.in.cu "dslash_coarse_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
+    set(QUDA_MULTIGRID_DAGGER "true")
+    configure_file(dslash_coarse.in.cu "dslash_coarse_dagger_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
+    list(PREPEND QUDA_CU_OBJS "dslash_coarse_${QUDA_MULTIGRID_NVEC}.cu")
+    list(PREPEND QUDA_CU_OBJS "dslash_coarse_dagger_${QUDA_MULTIGRID_NVEC}.cu")
+  endforeach()
+
 endif()
 
 if(BUILD_FORTRAN_INTERFACE)
@@ -245,6 +322,12 @@ target_compile_options(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
 add_subdirectory(targets/generic)
 target_include_directories(quda PRIVATE ../include/targets/generic)
 add_subdirectory(interface)
+
+# ignore any unkown pragmas
+target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:
+  $<$<CXX_COMPILER_ID:Clang>:-Wno-unknown-pragmas>
+  $<$<CXX_COMPILER_ID:GNU>:-Wno-unknown-pragmas>
+  >)
 
 # add some deifnitions that cause issues with cmake 3.7 and nvcc only to cpp files
 target_compile_definitions(quda_cpp PUBLIC -DQUDA_HASH="${HASH}")

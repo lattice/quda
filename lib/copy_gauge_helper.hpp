@@ -28,7 +28,7 @@ namespace quda
     {
       set_ghost(is_ghost); // initial state is not ghost
       strcat(aux, ",");
-      strcat(aux, out.AuxString());
+      strcat(aux, out.AuxString().c_str());
       if (Arg::fine_grain) strcat(aux, ",fine-grained");
     }
 
@@ -64,7 +64,7 @@ namespace quda
       char aux_[TuneKey::aux_n];
       strcpy(aux_, aux);
       if (is_ghost) strcat(aux_, ",ghost");
-      return TuneKey(in.VolString(), typeid(*this).name(), aux_);
+      return TuneKey(in.VolString().c_str(), typeid(*this).name(), aux_);
     }
 
     long long flops() const { return 0; }

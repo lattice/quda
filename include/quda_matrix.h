@@ -67,14 +67,13 @@ namespace quda {
         __device__ __host__ inline int index(int i, int j) const { return i*N + j; }
 
       public:
-        T data[N*N];
+        T data[N * N] = {};
 
         constexpr int rows() const { return N; }
         constexpr int cols() const { return N; }
         constexpr int size() const { return N * N; }
 
-        __device__ __host__ inline Matrix() { setZero(this); }
-
+        Matrix() = default;
         Matrix(const Matrix<T, N> &) = default;
         Matrix(Matrix<T, N> &&) = default;
         Matrix &operator=(const Matrix<T, N> &) = default;
@@ -297,23 +296,20 @@ namespace quda {
       }
 
       public:
-      T data[N*N]; // store in real-valued array
+        T data[N * N] = {}; // store in real-valued array
 
-      constexpr int rows() const { return N; }
-      constexpr int cols() const { return N; }
-      constexpr int size() const { return N * N; }
+        constexpr int rows() const { return N; }
+        constexpr int cols() const { return N; }
+        constexpr int size() const { return N * N; }
 
-      __device__ __host__ inline HMatrix() {
-#pragma unroll
-        for (int i = 0; i < N * N; i++) data[i] = (T)0.0;
-      }
+        HMatrix() = default;
+        HMatrix(const HMatrix<T, N> &) = default;
+        HMatrix(HMatrix<T, N> &&) = default;
+        HMatrix &operator=(const HMatrix<T, N> &) = default;
+        HMatrix &operator=(HMatrix<T, N> &&) = default;
 
-      HMatrix(const HMatrix<T, N> &) = default;
-      HMatrix(HMatrix<T, N> &&) = default;
-      HMatrix &operator=(const HMatrix<T, N> &) = default;
-      HMatrix &operator=(HMatrix<T, N> &&) = default;
-
-      __device__ __host__ inline HMatrix(const T data_[]) {
+        __device__ __host__ inline HMatrix(const T data_[])
+        {
 #pragma unroll
 	for (int i=0; i<N*N; i++) data[i] = data_[i];
       }
@@ -1068,7 +1064,30 @@ namespace quda {
         - q(3) * q(1) * q(8) - q(0) * q(7) * q(5);
 
       Complex sg2h3 = sqrt(a3 * a3 - (Float)4. * a2 * a2 * a2);
-      Complex cp = exp(log((Float)0.5 * (a3 + sg2h3)) / (Float)3.0);
+
+      // If the matrix q is zero, this algorithm produces nan, instead of unity.
+      // The first invalid operation is the log hereafter. Therefore, we check
+      // if its argument (tmp) is zero and then return unity.
+
+      Complex tmp = a3 + sg2h3;
+      if (tmp.real() == 0 and tmp.imag() == 0) {
+        // Making sure q is a zero matrix
+        bool iszero = true;
+        for (int i = 0; i < 9; i++) {
+          if (q(i).real() != 0 or q(i).imag() != 0) {
+            iszero = false;
+            break;
+          }
+        }
+        if (iszero) {
+          q(0) = 1;
+          q(4) = 1;
+          q(8) = 1;
+          return;
+        }
+      }
+
+      Complex cp = exp(log((Float)0.5 * tmp) / (Float)3.0);
       Complex cm = a2 / cp;
 
       Complex r1 = exp(Complex(0.0, 1.0) * (Float)(2.0 * M_PI / 3.0));
