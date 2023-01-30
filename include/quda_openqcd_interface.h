@@ -24,6 +24,7 @@ typedef struct {
   const int *machsize; /** Machine grid size NPROC0, NPROC1, NPROC2, NPROC3*/
   const int *blksize;  /** Blocking size NPROC0_BLK, NPROC1_BLK, NPROC2_BLK, NPROC3_BLK */
   int device;          /** GPU device  number */
+  // const int *ipt;
 } openQCD_QudaLayout_t;
 
 /**
