@@ -75,7 +75,7 @@ namespace quda {
     {
       Arg<true, vAccessor, bAccessor> arg(V, B, tp.block.x, tp.block.y);
       tp.set_max_shared_bytes = true;
-      resize(tp.block.y * tp.grid.y); // We need a full threadblock
+      resizeVector(tp.block.y * tp.grid.y); // We need a full threadblock
       launch_device<BlockTransposeKernel>(tp, stream, arg);
     }
 
