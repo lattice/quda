@@ -56,7 +56,7 @@ namespace quda
     checkNative(newTwoLink, link);
     checkLocation(newTwoLink, link);
     checkPrecision(newTwoLink, link);
-    instantiate<ComputeTwoLink, WilsonReconstruct>(link, newTwoLink);
+    instantiate<ComputeTwoLink, QUDA_RECONSTRUCT_NO>(link, newTwoLink);//FIXME : enable link-12/8 reconstruction  
   }
 #else
   void computeTwoLink(GaugeField &, const GaugeField &)
