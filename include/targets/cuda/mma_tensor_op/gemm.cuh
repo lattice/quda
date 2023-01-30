@@ -191,25 +191,28 @@ namespace quda
 
         constexpr int total_tiles = tile_dim_k * tile_dim_m;
         constexpr int n_warp = block_y * block_z / 32;
-        static_assert(total_tiles % n_warp == 0, "total_tiles %% n_warp == 0");
+        constexpr int warp_cycle = (total_tiles + n_warp - 1) / n_warp;
 #pragma unroll
-        for (int c = 0; c < total_tiles / n_warp; c++) {
-          int warp_m = (c * n_warp + warp_id) % tile_dim_m;
-          int warp_k = (c * n_warp + warp_id) / tile_dim_m;
+        for (int c = 0; c < warp_cycle; c++) {
+          int logical_warp_index = c * n_warp + warp_id;
+          if (logical_warp_index < total_tiles) {
+            int warp_m = (c * n_warp + warp_id) % tile_dim_m;
+            int warp_k = (c * n_warp + warp_id) / tile_dim_m;
 
-          int smem_m_offset = warp_m * w_m + group_id * batch;
-          int smem_k_offset = warp_k * w_k + thread_in_group;
+            int smem_m_offset = warp_m * w_m + group_id * batch;
+            int smem_k_offset = warp_k * w_k + thread_in_group;
 
-          int gmem_m_offset = m_offset + smem_m_offset;
-          int gmem_k_offset = n_offset + smem_k_offset;
+            int gmem_m_offset = m_offset + smem_m_offset;
+            int gmem_k_offset = n_offset + smem_k_offset;
 
-          load_t real;
-          load_t imag;
+            load_t real;
+            load_t imag;
 
-          constexpr bool x = (transpose == dagger);
-          convert_x<x, fixed, dagger, ld>(real, imag, p, gmem_m_offset, gmem_k_offset, scale_inv);
-          smem_real.vector_load(smem_m_offset, smem_k_offset, real);
-          smem_imag.vector_load(smem_m_offset, smem_k_offset, imag);
+            constexpr bool x = (transpose == dagger);
+            convert_x<x, fixed, dagger, ld>(real, imag, p, gmem_m_offset, gmem_k_offset, scale_inv);
+            smem_real.vector_load(smem_m_offset, smem_k_offset, real);
+            smem_imag.vector_load(smem_m_offset, smem_k_offset, imag);
+          }
         }
       }
 
@@ -350,74 +353,50 @@ namespace quda
                                  const SmemObjB &smem_obj_b_real, const SmemObjB &smem_obj_b_imag)
       {
 
-        if (wrm.warp_id < tile_row_dim * tile_col_dim) {
 #pragma unroll
           for (int c = 0; c < warp_cycle; c++) {
 
             // The logical warp assigned to each part of the matrix.
             const int logical_warp_index = wrm.warp_id * warp_cycle + c;
-            const int warp_row = logical_warp_index / tile_col_dim;
-            const int warp_col = logical_warp_index - warp_row * tile_col_dim;
+            if (logical_warp_index < tile_row_dim * tile_col_dim) {
+              const int warp_row = logical_warp_index / tile_col_dim;
+              const int warp_col = logical_warp_index - warp_row * tile_col_dim;
 
 #pragma unroll
-            for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
-              complex_mma<mma_t>(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, op_c_real[c],
-                                 op_c_imag[c], warp_row, warp_col, tile_k, wrm);
+              for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
+                complex_mma<mma_t>(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, op_c_real[c],
+                                   op_c_imag[c], warp_row, warp_col, tile_k, wrm);
+              }
             }
           }
-        }
       }
 
       template <int M, int N, int ldc, bool dagger, class C, class op_t> __device__ inline void store(C &c_accessor, int m_offset, int n_offset, op_t op)
       {
-        if (wrm.warp_id < tile_row_dim * tile_col_dim) {
 #pragma unroll
           for (int c = 0; c < warp_cycle; c++) {
 
             const int logical_warp_index = wrm.warp_id * warp_cycle + c;
-            const int warp_row = logical_warp_index / tile_col_dim;
-            const int warp_col = logical_warp_index - warp_row * tile_col_dim;
+            if (logical_warp_index < tile_row_dim * tile_col_dim) {
+              const int warp_row = logical_warp_index / tile_col_dim;
+              const int warp_col = logical_warp_index - warp_row * tile_col_dim;
 
-            const int warp_m_offset = warp_row * mma_t::MMA_M + m_offset;
-            const int warp_n_offset = warp_col * mma_t::MMA_N + n_offset;
+              const int warp_m_offset = warp_row * mma_t::MMA_M + m_offset;
+              const int warp_n_offset = warp_col * mma_t::MMA_N + n_offset;
 
-            mma_t::template store_complex<M, N, ldc, dagger>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real[c],
-                                                     op_c_imag[c], op);
+              mma_t::template store_complex<M, N, ldc, dagger>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real[c],
+                                                       op_c_imag[c], op);
+            }
           }
-        }
       }
-
-#if 0
-      template <int M, int N, int ldc, bool dagger, class C>
-      __device__ inline void store_atomic(C &c_accessor, int m_offset, int n_offset)
-      {
-        if (wrm.warp_id < tile_row_dim * tile_col_dim) {
-#pragma unroll
-          for (int c = 0; c < warp_cycle; c++) {
-
-            const int logical_warp_index = wrm.warp_id * warp_cycle + c;
-            const int warp_row = logical_warp_index / tile_col_dim;
-            const int warp_col = logical_warp_index - warp_row * tile_col_dim;
-
-            const int warp_m_offset = warp_row * mma_t::MMA_M + m_offset;
-            const int warp_n_offset = warp_col * mma_t::MMA_N + n_offset;
-
-            mma_t::template store_complex_atomic<M, N, ldc, dagger>(warp_m_offset, warp_n_offset, wrm, c_accessor,
-                                                                    op_c_real[c], op_c_imag[c]);
-          }
-        }
-      }
-#endif
 
       __device__ inline void abs_max(float &max)
       {
-        if (wrm.warp_id < tile_row_dim * tile_col_dim) {
 #pragma unroll
           for (int c = 0; c < warp_cycle; c++) {
             op_c_real[c].abs_max(max);
             op_c_imag[c].abs_max(max);
           }
-        }
       }
     };
 
@@ -450,7 +429,7 @@ namespace quda
 
       static constexpr int total_tile = tile_row_dim * tile_col_dim; // Total number of tiles dividing operand C
       static constexpr int warp_cycle
-        = std::max(total_tile / total_warp, 1); // Number of tiles each warp needs to calculate
+        = (total_tile + total_warp - 1) / total_warp; // Number of tiles each warp needs to calculate
 
       static constexpr bool a_transpose
         = false; // In our setup, specifically in the arch-dependent code, A is always column-major, while B is always row-major
@@ -564,6 +543,7 @@ namespace quda
 #pragma unroll 1
         for (int c = 0; c < warp_cycle; c++) {
 
+          // TODO: Check if some of the warps are idle
           // The logical warp assigned to each part of the matrix.
           int logical_warp_index = wrm.warp_id * warp_cycle + c;
           int warp_row = logical_warp_index / tile_col_dim;
@@ -634,7 +614,7 @@ namespace quda
 
 #pragma unroll 1
           for (int c = 0; c < warp_cycle; c++) {
-
+            // TODO: Check if some of the warps are idle
             // The logical warp assigned to each part of the matrix.
             int logical_warp_index = wrm.warp_id * warp_cycle + c;
             int warp_row = logical_warp_index / tile_col_dim;
