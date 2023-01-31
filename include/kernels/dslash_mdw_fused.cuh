@@ -12,15 +12,15 @@ namespace quda {
 
 #ifdef QUDA_MMA_AVAILABLE
 
+    using mma_t = mma::hmma_t; // simt::simt_t<mma::half, 8, 4, 2, 2>;
+
     constexpr int sm_m_pad_size(int m)
     {
-      using mma_t = mma::hmma_t;
       return mma_t::pad_size(m);
     }
 
     constexpr int sm_n_pad_size(int n)
     {
-      using mma_t = mma::hmma_t;
       return mma_t::pad_size(n);
     }
 
@@ -340,7 +340,6 @@ namespace quda {
         int s4_shift_base = blockIdx.x * blockDim.x; // base.
         int s4_shift, sid;
 
-        using mma_t = mma::hmma_t;
         constexpr int tm_dim = M / mma_t::MMA_M;
         constexpr int tn_dim = N / mma_t::MMA_N;
         constexpr int tk_dim = M / mma_t::MMA_K;

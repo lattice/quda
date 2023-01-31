@@ -18,6 +18,7 @@ namespace quda
 #include <mma_tensor_op/smma_m16n16k4_sm70.cuh>
 
 #include <mma_tensor_op/simt.cuh>
+#include <mma_tensor_op/simt_half.cuh>
 
 namespace quda
 {
