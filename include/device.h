@@ -20,6 +20,11 @@ namespace quda
     int get_device_count();
 
     /**
+       @brief Get the visible devices environmental variable, e.g. CUDA_VISIBLE_DEVICES
+    */
+    char *get_visible_devices_env();
+
+    /**
        @brief Query and print to stdout device properties of all GPUs
     */
     void print_device_properties();

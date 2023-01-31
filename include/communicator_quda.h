@@ -560,7 +560,7 @@ namespace quda
              comm_dim_partitioned(2), comm_dim_partitioned(3));
 
     // if CUDA_VISIBLE_DEVICES is set, we include this information in the topology_string
-    char *device_order_env = getenv("CUDA_VISIBLE_DEVICES");
+    char *device_order_env = device::get_visible_devices_env();
     if (device_order_env) {
 
       // to ensure we have process consistency define using rank 0
