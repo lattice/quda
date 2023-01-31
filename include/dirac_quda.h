@@ -8,6 +8,7 @@
 #include <clover_field.h>
 #include <blas_quda.h>
 #include <field_cache.h>
+#include <memory>
 
 // temporary addition until multi-RHS for all Dirac operator functions
 #ifdef __CUDACC__
@@ -1751,19 +1752,19 @@ public:
     const bool allow_truncation; /** Whether or not we let coarsening drop improvements, for ex dropping long links for small aggregate sizes */
     const bool use_mma;            /** Whether to use tensor cores or not */
 
-    mutable cpuGaugeField *Y_h; /** CPU copy of the coarse link field */
-    mutable cpuGaugeField *X_h; /** CPU copy of the coarse clover term */
-    mutable cpuGaugeField *Xinv_h; /** CPU copy of the inverse coarse clover term */
-    mutable cpuGaugeField *Yhat_h; /** CPU copy of the preconditioned coarse link field */
+    mutable std::shared_ptr<cpuGaugeField> Y_h; /** CPU copy of the coarse link field */
+    mutable std::shared_ptr<cpuGaugeField> X_h; /** CPU copy of the coarse clover term */
+    mutable std::shared_ptr<cpuGaugeField> Xinv_h; /** CPU copy of the inverse coarse clover term */
+    mutable std::shared_ptr<cpuGaugeField> Yhat_h; /** CPU copy of the preconditioned coarse link field */
 
-    mutable cudaGaugeField *Y_d; /** GPU copy of the coarse link field */
-    mutable cudaGaugeField *X_d; /** GPU copy of the coarse clover term */
-    mutable cudaGaugeField *Y_aos_d; /** AoS GPU copy of the coarse link field */
-    mutable cudaGaugeField *X_aos_d; /** AoS GPU copy of the coarse clover term */
-    mutable cudaGaugeField *Xinv_d; /** GPU copy of inverse coarse clover term */
-    mutable cudaGaugeField *Yhat_d; /** GPU copy of the preconditioned coarse link field */
-    mutable cudaGaugeField *Xinv_aos_d; /** AoS GPU copy of inverse coarse clover term */
-    mutable cudaGaugeField *Yhat_aos_d; /** AoS GPU copy of the preconditioned coarse link field */
+    mutable std::shared_ptr<cudaGaugeField> Y_d; /** GPU copy of the coarse link field */
+    mutable std::shared_ptr<cudaGaugeField> X_d; /** GPU copy of the coarse clover term */
+    mutable std::shared_ptr<cudaGaugeField> Y_aos_d; /** AoS GPU copy of the coarse link field */
+    mutable std::shared_ptr<cudaGaugeField> X_aos_d; /** AoS GPU copy of the coarse clover term */
+    mutable std::shared_ptr<cudaGaugeField> Xinv_d; /** GPU copy of inverse coarse clover term */
+    mutable std::shared_ptr<cudaGaugeField> Yhat_d; /** GPU copy of the preconditioned coarse link field */
+    mutable std::shared_ptr<cudaGaugeField> Xinv_aos_d; /** AoS GPU copy of inverse coarse clover term */
+    mutable std::shared_ptr<cudaGaugeField> Yhat_aos_d; /** AoS GPU copy of the preconditioned coarse link field */
 
     /**
        @brief Initialize the coarse gauge fields.  Location is
@@ -1822,9 +1823,9 @@ public:
        @param[in] Xinv_d GPU coarse inverse clover field
        @param[in] Yhat_d GPU coarse preconditioned link field
      */
-    DiracCoarse(const DiracParam &param, cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h,
-                cpuGaugeField *Yhat_h, cudaGaugeField *Y_d = nullptr, cudaGaugeField *X_d = nullptr,
-                cudaGaugeField *Xinv_d = nullptr, cudaGaugeField *Yhat_d = nullptr);
+    DiracCoarse(const DiracParam &param, std::shared_ptr<cpuGaugeField> Y_h, std::shared_ptr<cpuGaugeField> X_h, std::shared_ptr<cpuGaugeField> Xinv_h,
+                std::shared_ptr<cpuGaugeField> Yhat_h, std::shared_ptr<cudaGaugeField> Y_d = nullptr, std::shared_ptr<cudaGaugeField> X_d = nullptr,
+                std::shared_ptr<cudaGaugeField> Xinv_d = nullptr, std::shared_ptr<cudaGaugeField> Yhat_d = nullptr);
 
     /**
        @param[in] dirac Another operator instance to clone from (shallow copy)
@@ -1985,9 +1986,9 @@ public:
        @param[in] Xinv_d GPU coarse inverse clover field
        @param[in] Yhat_d GPU coarse preconditioned link field
      */
-    DiracCoarsePC(const DiracParam &param, cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h,
-                  cpuGaugeField *Yhat_h, cudaGaugeField *Y_d = nullptr, cudaGaugeField *X_d = nullptr,
-                  cudaGaugeField *Xinv_d = nullptr, cudaGaugeField *Yhat_d = nullptr);
+    DiracCoarsePC(const DiracParam &param, std::shared_ptr<cpuGaugeField> Y_h, std::shared_ptr<cpuGaugeField> X_h, std::shared_ptr<cpuGaugeField> Xinv_h,
+                  std::shared_ptr<cpuGaugeField> Yhat_h, std::shared_ptr<cudaGaugeField> Y_d = nullptr, std::shared_ptr<cudaGaugeField> X_d = nullptr,
+                  std::shared_ptr<cudaGaugeField> Xinv_d = nullptr, std::shared_ptr<cudaGaugeField> Yhat_d = nullptr);
 
     /**
        @param[in] dirac Another operator instance to clone from (shallow copy)

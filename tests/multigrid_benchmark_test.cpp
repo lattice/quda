@@ -23,7 +23,7 @@ using namespace quda;
 
 std::vector<ColorSpinorField> xD, yD;
 
-cudaGaugeField *Y_d, *X_d, *Xinv_d, *Yhat_d;
+std::shared_ptr<cudaGaugeField> Y_d, X_d, Xinv_d, Yhat_d;
 
 int Ncolor;
 
@@ -97,14 +97,14 @@ void initFields(QudaPrecision prec)
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
 
-  Y_d = new cudaGaugeField(gParam);
-  Yhat_d = new cudaGaugeField(gParam);
+  Y_d = std::make_shared<cudaGaugeField>(gParam);
+  Yhat_d = std::make_shared<cudaGaugeField>(gParam);
 
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.nFace = 0;
-  X_d = new cudaGaugeField(gParam);
-  Xinv_d = new cudaGaugeField(gParam);
+  X_d = std::make_shared<cudaGaugeField>(gParam);
+  Xinv_d = std::make_shared<cudaGaugeField>(gParam);
 
   // insert random noise into the gauge fields
   {
@@ -123,10 +123,10 @@ void freeFields()
   xD.clear();
   yD.clear();
 
-  delete Y_d;
-  delete X_d;
-  delete Xinv_d;
-  delete Yhat_d;
+  Y_d.reset();
+  X_d.reset();
+  Xinv_d.reset();
+  Yhat_d.reset();
 }
 
 DiracCoarse *dirac;

@@ -17,18 +17,6 @@ namespace quda {
     need_bidirectional(param.need_bidirectional),
     allow_truncation(param.allow_truncation),
     use_mma(param.use_mma),
-    Y_h(nullptr),
-    X_h(nullptr),
-    Xinv_h(nullptr),
-    Yhat_h(nullptr),
-    Y_d(nullptr),
-    X_d(nullptr),
-    Y_aos_d(nullptr),
-    X_aos_d(nullptr),
-    Xinv_d(nullptr),
-    Yhat_d(nullptr),
-    Xinv_aos_d(nullptr),
-    Yhat_aos_d(nullptr),
     enable_gpu(false),
     enable_cpu(false),
     gpu_setup(gpu_setup),
@@ -39,10 +27,10 @@ namespace quda {
     initializeCoarse();
   }
 
-  DiracCoarse::DiracCoarse(const DiracParam &param, cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h,
-                           cpuGaugeField *Yhat_h, // cpu link fields
-                           cudaGaugeField *Y_d, cudaGaugeField *X_d, cudaGaugeField *Xinv_d,
-                           cudaGaugeField *Yhat_d) // gpu link field
+  DiracCoarse::DiracCoarse(const DiracParam &param, std::shared_ptr<cpuGaugeField> Y_h, std::shared_ptr<cpuGaugeField> X_h, std::shared_ptr<cpuGaugeField> Xinv_h,
+                           std::shared_ptr<cpuGaugeField> Yhat_h, // cpu link fields
+                           std::shared_ptr<cudaGaugeField> Y_d, std::shared_ptr<cudaGaugeField> X_d, std::shared_ptr<cudaGaugeField> Xinv_d,
+                           std::shared_ptr<cudaGaugeField> Yhat_d) // gpu link field
     :
     Dirac(param),
     mass(param.mass),
@@ -75,7 +63,7 @@ namespace quda {
     {
       GaugeFieldParam param(X);
       param.order = gOrder;
-      auto output = static_cast<cudaGaugeField *>(cudaGaugeField::Create(param));
+      auto output = std::shared_ptr<cudaGaugeField>(static_cast<cudaGaugeField *>(cudaGaugeField::Create(param)));
       output->copy(X);
       return output;
     };
@@ -125,22 +113,6 @@ namespace quda {
 
   DiracCoarse::~DiracCoarse()
   {
-    if (init_cpu) {
-      if (Y_h) delete Y_h;
-      if (X_h) delete X_h;
-      if (Xinv_h) delete Xinv_h;
-      if (Yhat_h) delete Yhat_h;
-    }
-    if (init_gpu) {
-      if (Y_d) delete Y_d;
-      if (X_d) delete X_d;
-      if (Xinv_d) delete Xinv_d;
-      if (Yhat_d) delete Yhat_d;
-    }
-    if (Y_aos_d) delete Y_aos_d;
-    if (X_aos_d) delete X_aos_d;
-    if (Xinv_aos_d) delete Xinv_aos_d;
-    if (Yhat_aos_d) delete Yhat_aos_d;
   }
 
   void DiracCoarse::createY(bool gpu, bool mapped) const
@@ -174,10 +146,11 @@ namespace quda {
     gParam.pad = gpu ? gParam.nFace * pad * 2 : 0; // factor of 2 since we have to store bi-directional ghost zone
 
     if (gpu) {
-      Y_d = new cudaGaugeField(gParam);
-      gParam.order = QUDA_MILC_GAUGE_ORDER;
-      Y_aos_d = new cudaGaugeField(gParam);
-    } else     Y_h = new cpuGaugeField(gParam);
+      Y_d = std::make_shared<cudaGaugeField>(gParam);
+      GaugeFieldParam milcParam(*Y_d);
+      milcParam.order = QUDA_MILC_GAUGE_ORDER;
+      Y_aos_d = std::make_shared<cudaGaugeField>(milcParam);
+    } else     Y_h = std::make_shared<cpuGaugeField>(gParam);
 
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     gParam.nFace = 0;
@@ -185,10 +158,11 @@ namespace quda {
     gParam.pad = 0;
 
     if (gpu) {
-      X_d = new cudaGaugeField(gParam);
-      gParam.order = QUDA_MILC_GAUGE_ORDER;
-      X_aos_d = new cudaGaugeField(gParam);
-    } else     X_h = new cpuGaugeField(gParam);
+      X_d = std::make_shared<cudaGaugeField>(gParam);
+      GaugeFieldParam milcParam(*X_d);
+      milcParam.order = QUDA_MILC_GAUGE_ORDER;
+      X_aos_d = std::make_shared<cudaGaugeField>(milcParam);
+    } else     X_h = std::make_shared<cpuGaugeField>(gParam);
   }
 
   void DiracCoarse::createYhat(bool gpu) const
@@ -222,11 +196,12 @@ namespace quda {
     gParam.pad = gpu ? gParam.nFace * pad * 2 : 0; // factor of 2 since we have to store bi-directional ghost zone
 
     if (gpu) {
-      Yhat_d = new cudaGaugeField(gParam);
-      gParam.order = QUDA_MILC_GAUGE_ORDER;
-      Yhat_aos_d = new cudaGaugeField(gParam);
+      Yhat_d = std::make_shared<cudaGaugeField>(gParam);
+      GaugeFieldParam milcParam(*Yhat_d);
+      milcParam.order = QUDA_MILC_GAUGE_ORDER;
+      Yhat_aos_d = std::make_shared<cudaGaugeField>(milcParam);
     }
-    else     Yhat_h = new cpuGaugeField(gParam);
+    else     Yhat_h = std::make_shared<cpuGaugeField>(gParam);
 
     gParam.setPrecision(gpu ? X_d->Precision() : X_h->Precision());
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
@@ -235,11 +210,12 @@ namespace quda {
     gParam.pad = 0;
 
     if (gpu) {
-      Xinv_d = new cudaGaugeField(gParam);
-      gParam.order = QUDA_MILC_GAUGE_ORDER;
-      Xinv_aos_d = new cudaGaugeField(gParam);
+      Xinv_d = std::make_shared<cudaGaugeField>(gParam);
+      GaugeFieldParam milcParam(*Xinv_d);
+      milcParam.order = QUDA_MILC_GAUGE_ORDER;
+      Xinv_aos_d = std::make_shared<cudaGaugeField>(milcParam);
     }
-    else     Xinv_h = new cpuGaugeField(gParam);
+    else     Xinv_h = std::make_shared<cpuGaugeField>(gParam);
   }
 
   void DiracCoarse::initializeCoarse()
@@ -506,9 +482,9 @@ namespace quda {
     /* do nothing */
   }
 
-  DiracCoarsePC::DiracCoarsePC(const DiracParam &param, cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h,
-                               cpuGaugeField *Yhat_h, cudaGaugeField *Y_d, cudaGaugeField *X_d, cudaGaugeField *Xinv_d,
-                               cudaGaugeField *Yhat_d) :
+  DiracCoarsePC::DiracCoarsePC(const DiracParam &param, std::shared_ptr<cpuGaugeField> Y_h, std::shared_ptr<cpuGaugeField> X_h, std::shared_ptr<cpuGaugeField> Xinv_h,
+                               std::shared_ptr<cpuGaugeField> Yhat_h, std::shared_ptr<cudaGaugeField> Y_d, std::shared_ptr<cudaGaugeField> X_d, std::shared_ptr<cudaGaugeField> Xinv_d,
+                               std::shared_ptr<cudaGaugeField> Yhat_d) :
     DiracCoarse(param, Y_h, X_h, Xinv_h, Yhat_h, Y_d, X_d, Xinv_d, Yhat_d)
   {
   }
