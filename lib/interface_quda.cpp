@@ -4993,7 +4993,11 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc_solve);
   Dirac *dirac = Dirac::create(diracParam);
-
+  
+  // Make sure extendedGaugeResident has the correct R
+  // TODO: In most situation, deallocation is unnecessery
+  if (extendedGaugeResident) delete extendedGaugeResident;
+  extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGaugeForce);
   cudaGaugeField &gaugeEx = *extendedGaugeResident;
 
   // create oprod and trace field
