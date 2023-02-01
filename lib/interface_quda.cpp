@@ -5022,29 +5022,23 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
     profileTMCloverForce.TPSTOP(QUDA_PROFILE_H2D);
     profileTMCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
 
-    printfQuda("Dslash(x.Odd(), x.Even(), QUDA_ODD_PARITY)\n");
-    fflush(stdout);
     dirac->Dagger(QUDA_DAG_YES);
     gamma5(tmp, x.Odd());
     dirac->Dslash(x.Even(), tmp, QUDA_EVEN_PARITY);
     gamma5(x.Even(), x.Even());
    
     // want to apply \hat Q_{-} = \hat M_{+}^\dagger \gamma_5 to get Y_o
-    printfQuda("gamma5(tmp, x.Even())\n");
-    fflush(stdout);
     dirac->Dagger(QUDA_DAG_YES);
-    printfQuda("M(p.Even(), tmp)\n");
-    fflush(stdout);
     dirac->M(p.Odd(), tmp); // this is the odd part of Y 
-
     dirac->Dagger(QUDA_DAG_NO);
-    printfQuda("Dslash(p.Odd(), p.Even(), QUDA_ODD_PARITY)\n");
-    fflush(stdout);
+
     dirac->Dslash(p.Even(), p.Odd(), QUDA_EVEN_PARITY); // and now the even part of Y
- 
+    // up to here x match X in tmLQCD and p=-Y of tmLQCD
+
+    // the gamma5 application in tmLQCD is done  inside deriv_Sb
     gamma5(p.Even(), p.Even());
     gamma5(p.Odd(), p.Odd());
-    // up to here x match X in tmLQCD and p=-Y of tmLQCD
+
 
     profileTMCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
     profileTMCloverForce.TPSTART(QUDA_PROFILE_INIT);
@@ -5053,29 +5047,28 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
   profileTMCloverForce.TPSTOP(QUDA_PROFILE_INIT);
   profileTMCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
   
-  printfQuda("computeCloverForce(cudaForce, *gaugePrecise, quarkP, quarkX, force_coeff);\n");
+  // derivative of the wilson operator it correspond to deriv_Sb(OE,...) plus  deriv_Sb(EO,...) in tmLQCD
   computeCloverForce(cudaForce, *gaugePrecise, quarkP, quarkX, force_coeff);
-  printfQuda("computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8);\n");
-  // computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8); 
+  // derivative of the determinant of the sw term, second term of (A12) in hep-lat/0112051,  sw_deriv(EE, mnl->mu) in tmLQCD
+  computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8 * 32.0 ); 
 
   std::vector< std::vector<double> > ferm_epsilon(nvector);
   for (int i = 0; i < nvector; i++) {
     ferm_epsilon[i].reserve(2);
     ferm_epsilon[i][0] =  k_csw_ov_8 * coeff[i];
-    ferm_epsilon[i][1] =  k_csw_ov_8 * coeff[i];
+    ferm_epsilon[i][1] =  k_csw_ov_8 * coeff[i]/(kappa*kappa);
   }
 
-  // printfQuda("computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon)\n");
-  computeCloverSigmaOprod(oprod, quarkX, quarkP, ferm_epsilon);
+  // derivative of pseudofermion sw term, first term term of (A12) in hep-lat/0112051,  sw_spinor_eo(EE,..) plus sw_spinor_eo(OO,..)  in tmLQCD
+  computeCloverSigmaOprod(oprod, quarkP,  quarkX, ferm_epsilon);
 
   cudaGaugeField *oprodEx = createExtendedGauge(oprod, R, profileTMCloverForce);
 
-  // printfQuda("cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_ODD_PARITY)\n");
+  // oprod = (A12) of hep-lat/0112051 
+  // compute the insertion of oprod in Fig.27 of hep-lat/0112051 
   cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_ODD_PARITY);
-  // printfQuda("cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_EVEN_PARITY)\n");
   cloverDerivative(cudaForce, gaugeEx, *oprodEx, 1.0, QUDA_EVEN_PARITY);
 
-  printfQuda("updateMomentum(gpuMom, -1.0, cudaForce, \"tmclover\")\n");
   updateMomentum(gpuMom, -1.0, cudaForce, "tmclover");
   profileTMCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
@@ -5089,6 +5082,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
     delete quarkP[i];
   }
 
+  delete oprodEx;
   delete dirac;
 
   profileTMCloverForce.TPSTOP(QUDA_PROFILE_FREE);

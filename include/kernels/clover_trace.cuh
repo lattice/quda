@@ -53,7 +53,11 @@ namespace quda {
 
         // compute the Cholesky decomposition
         Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A);
-        A = static_cast<real>(0.5) * cholesky.template invert<Mat>(); // return full inverse
+        A = static_cast<real>(0.5) * cholesky.template invert<Mat>(); // return full inverse 
+        if (Arg::twist) {       
+          Mat A0 = arg.clover_inv(x, parity, chirality);
+          A = static_cast<real>(0.5) * (A0*A); // (1 + T + imu g_5)^{-1} = (1 + T - imu g_5)/((1 + T)^2 + mu^2)
+        }
       }
 
       for (int i = 0; i < 36; ++i) A_array[chirality * 36 + i] = A.data[i];
@@ -182,7 +186,7 @@ namespace quda {
     __device__ __host__ inline void operator()(int x_cb)
     {
       // odd parity
-      cloverSigmaTraceCompute<Arg>(arg, x_cb, 1);
+      cloverSigmaTraceCompute<Arg>(arg, x_cb, 0);
     }
   };
 
