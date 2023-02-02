@@ -162,7 +162,7 @@ namespace quda
       u32toa(tslice_kernel, arg.is_t0_kernel);
       strcat(aux, tslice_kernel);
 
-      return TuneKey(in.VolString(), typeid(*this).name(), aux);
+      return TuneKey(in.VolString().c_str(), typeid(*this).name(), aux);
     }
   };
 
