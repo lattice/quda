@@ -124,7 +124,8 @@ if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xIntelLLVM")
   target_compile_options(quda PRIVATE -Wno-unused-parameter)
   #target_compile_options(quda PRIVATE -Wno-unused-but-set-variable)
   #target_compile_options(quda PRIVATE -Wno-error)
-  target_compile_options(quda PUBLIC -fsycl)
+  #target_compile_options(quda PUBLIC -fsycl)
+  target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fsycl>)
 
   set(SYCL_FLAGS "-mllvm -pragma-unroll-threshold=16")
 
