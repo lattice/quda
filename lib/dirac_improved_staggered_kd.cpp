@@ -31,23 +31,6 @@ namespace quda
     return *this;
   }
 
-  void DiracImprovedStaggeredKD::checkParitySpinor(const ColorSpinorField &in, const ColorSpinorField &out) const
-  {
-    if (in.Ndim() != 5 || out.Ndim() != 5) { errorQuda("Staggered dslash requires 5-d fermion fields"); }
-
-    if (in.Precision() != out.Precision()) {
-      errorQuda("Input and output spinor precisions don't match in dslash_quda");
-    }
-
-    if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET || out.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-      errorQuda("ColorSpinorFields are not full parity, in = %d, out = %d", in.SiteSubset(), out.SiteSubset());
-    }
-
-    if (out.Volume() / out.X(4) != 2 * gauge->VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-      errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), gauge->VolumeCB());
-    }
-  }
-
   void DiracImprovedStaggeredKD::Dslash(ColorSpinorField &, const ColorSpinorField &, const QudaParity) const
   {
     errorQuda("The improved staggered Kahler-Dirac operator does not have a single parity form");
@@ -69,50 +52,45 @@ namespace quda
 
     checkFullSpinor(out, in);
 
-    bool reset = newTmp(&tmp2, in);
+    auto tmp = getFieldTmp(in);
 
     if (dagger == QUDA_DAG_NO) {
 
       if (mass == 0.) {
-        ApplyImprovedStaggered(*tmp2, in, *fatGauge, *longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim,
+        ApplyImprovedStaggered(tmp, in, *fatGauge, *longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim,
                                profile);
         flops += 1146ll * in.Volume();
       } else {
-        ApplyImprovedStaggered(*tmp2, in, *fatGauge, *longGauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim,
+        ApplyImprovedStaggered(tmp, in, *fatGauge, *longGauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim,
                                profile);
         flops += 1158ll * in.Volume();
       }
 
-      ApplyStaggeredKahlerDiracInverse(out, *tmp2, *Xinv, false);
+      ApplyStaggeredKahlerDiracInverse(out, tmp, *Xinv, false);
       flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
 
     } else { // QUDA_DAG_YES
 
-      ApplyStaggeredKahlerDiracInverse(*tmp2, in, *Xinv, true);
+      ApplyStaggeredKahlerDiracInverse(tmp, in, *Xinv, true);
       flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
 
       if (mass == 0.) {
-        ApplyImprovedStaggered(out, *tmp2, *fatGauge, *longGauge, 0., *tmp2, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim,
+        ApplyImprovedStaggered(out, tmp, *fatGauge, *longGauge, 0., tmp, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim,
                                profile);
         flops += 1146ll * in.Volume();
       } else {
-        ApplyImprovedStaggered(out, *tmp2, *fatGauge, *longGauge, 2. * mass, *tmp2, QUDA_INVALID_PARITY, dagger,
-                               commDim, profile);
+        ApplyImprovedStaggered(out, tmp, *fatGauge, *longGauge, 2. * mass, tmp, QUDA_INVALID_PARITY, dagger, commDim,
+                               profile);
         flops += 1158ll * in.Volume();
       }
     }
-
-    deleteTmp(&tmp2, reset);
   }
 
   void DiracImprovedStaggeredKD::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    bool reset = newTmp(&tmp1, in);
-
-    M(*tmp1, in);
-    Mdag(out, *tmp1);
-
-    deleteTmp(&tmp1, reset);
+    auto tmp = getFieldTmp(in);
+    M(tmp, in);
+    Mdag(out, tmp);
   }
 
   void DiracImprovedStaggeredKD::KahlerDiracInv(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -143,19 +121,18 @@ namespace quda
     checkFullSpinor(x, b);
 
     // need to modify rhs
-    bool reset = newTmp(&tmp1, b);
-    KahlerDiracInv(*tmp1, b);
+    auto tmp = getFieldTmp(b);
+    KahlerDiracInv(tmp, b);
 
     // if we're preconditioning the Schur op, we need to rescale by the mass
     if (parent_dirac_type == QUDA_ASQTAD_DIRAC) {
-      b = *tmp1;
+      b = tmp;
     } else if (parent_dirac_type == QUDA_ASQTADPC_DIRAC) {
-      b = *tmp1;
+      b = tmp;
       blas::ax(0.5 / mass, b);
     } else
       errorQuda("Unexpected parent Dirac type %d", parent_dirac_type);
 
-    deleteTmp(&tmp1, reset);
     sol = &x;
     src = &b;
   }

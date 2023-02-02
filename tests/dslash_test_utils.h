@@ -61,8 +61,6 @@ struct DslashTestWrapper {
   // CUDA color spinor fields
   ColorSpinorField cudaSpinor;
   ColorSpinorField cudaSpinorOut;
-  ColorSpinorField tmp1;
-  ColorSpinorField tmp2;
 
   // Dirac pointers
   quda::Dirac *dirac = nullptr;
@@ -81,8 +79,8 @@ struct DslashTestWrapper {
   // Test options
   QudaParity parity = QUDA_EVEN_PARITY;
   dslash_test_type dtest_type = dslash_test_type::Dslash;
-  bool test_split_grid;
-  int num_src;
+  bool test_split_grid = false;
+  int num_src = 1;
 
   const bool transfer = false;
 
@@ -245,9 +243,9 @@ struct DslashTestWrapper {
     if (test_split_grid) {
       inv_param.num_src = num_src;
       inv_param.num_src_per_sub_partition = 1;
-      vp_spinor.resize(num_src, csParam);
-      vp_spinorOut.resize(num_src, csParam);
-      vp_spinorRef.resize(num_src, csParam);
+      resize(vp_spinor, num_src, csParam);
+      resize(vp_spinorOut, num_src, csParam);
+      resize(vp_spinorRef, num_src, csParam);
 
       std::fill(vp_spinor.begin(), vp_spinor.end(), spinor);
     }
@@ -297,14 +295,11 @@ struct DslashTestWrapper {
       printfQuda("Creating cudaSpinorOut with nParity = %d\n", csParam.siteSubset);
       cudaSpinorOut = ColorSpinorField(csParam);
 
-      tmp1 = ColorSpinorField(csParam);
-
       if (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
         csParam.x[0] /= 2;
       }
 
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      tmp2 = ColorSpinorField(csParam);
 
       printfQuda("Sending spinor field to GPU\n");
       cudaSpinor = spinor;
@@ -317,9 +312,6 @@ struct DslashTestWrapper {
 
       DiracParam diracParam;
       setDiracParam(diracParam, &inv_param, pc);
-
-      diracParam.tmp1 = &tmp1;
-      diracParam.tmp2 = &tmp2;
 
       dirac = Dirac::create(diracParam);
 
@@ -1041,20 +1033,24 @@ struct DslashTestWrapper {
 
   double verify()
   {
-    double deviation;
+    double deviation = 0.0;
     if (test_split_grid) {
       for (int n = 0; n < num_src; n++) {
-        double norm_cpu = blas::norm2(spinorRef);
-        double norm_cpu_quda = blas::norm2(vp_spinorOut[n]);
-        printfQuda("Results: CPU = %f, QUDA = %f, L2 relative deviation = %e\n", norm_cpu, norm_cpu_quda,
-                   1.0 - sqrt(norm_cpu_quda / norm_cpu));
+        auto norm_cpu = blas::norm2(spinorRef);
+        auto norm_cpu_quda = blas::norm2(vp_spinorOut[n]);
+        auto max_deviation = blas::max_deviation(spinorRef, vp_spinorOut[n]);
+
+        printfQuda("Results: reference = %f, QUDA = %f, L2 relative deviation = %e, max deviation = %e\n", norm_cpu,
+                   norm_cpu_quda, 1.0 - sqrt(norm_cpu_quda / norm_cpu), max_deviation[0]);
         deviation = std::max(deviation, std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef, vp_spinorOut[n]))));
       }
     } else {
-      double norm_cpu = blas::norm2(spinorRef);
-      double norm_cpu_quda = blas::norm2(spinorOut);
-      printfQuda("Results: CPU = %f, QUDA = %f, L2 relative deviation = %e\n", norm_cpu, norm_cpu_quda,
-                 1.0 - sqrt(norm_cpu_quda / norm_cpu));
+      auto norm_cpu = blas::norm2(spinorRef);
+      auto norm_cpu_quda = blas::norm2(spinorOut);
+      auto max_deviation = blas::max_deviation(spinorRef, spinorOut);
+
+      printfQuda("Results: reference = %f, QUDA = %f, L2 relative deviation = %e, max deviation = %e\n", norm_cpu,
+                 norm_cpu_quda, 1.0 - sqrt(norm_cpu_quda / norm_cpu), max_deviation[0]);
       deviation = std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef, spinorOut)));
     }
     return deviation;

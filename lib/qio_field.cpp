@@ -288,7 +288,7 @@ void read_spinor_field(const char *filename, void *V[], QudaPrecision precision,
   printfQuda("%s: Closed file for reading\n",__func__);
 }
 
-int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision file_prec, QudaPrecision cpu_prec,
+int write_field(QIO_Writer *outfile, int count, const void *field_out[], QudaPrecision file_prec, QudaPrecision cpu_prec,
                 QudaSiteSubset subset, QudaParity parity, int nSpin, int nColor, int len, const char *type)
 {
   // Prepare a string.
@@ -383,7 +383,7 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   return 0;
 }
 
-int write_su3_field(QIO_Writer *outfile, int count, void *field_out[],
+int write_su3_field(QIO_Writer *outfile, int count, const void *field_out[],
     QudaPrecision file_prec, QudaPrecision cpu_prec, const char* type)
 {
   return write_field(outfile, count, field_out, file_prec, cpu_prec, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 0, 3,
@@ -407,7 +407,7 @@ void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precis
 
   /* Write the gauge field record */
   printfQuda("%s: writing the gauge field\n", __func__); fflush(stdout);
-  int status = write_su3_field(outfile, 4, gauge, precision, precision, type);
+  int status = write_su3_field(outfile, 4, (const void**)gauge, precision, precision, type);
   if (status) { errorQuda("write_gauge_field failed %d\n", status); }
 
   /* Close the file */
@@ -415,7 +415,7 @@ void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precis
   printfQuda("%s: Closed file for writing\n", __func__);
 }
 
-void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
+void write_spinor_field(const char *filename, const void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
                         QudaParity parity, int nColor, int nSpin, int Nvec, int, char *[])
 {
   quda_this_node = QMP_get_node_number();

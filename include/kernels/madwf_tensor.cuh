@@ -2,7 +2,7 @@
 
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
-#include <shared_memory_cache_helper.cuh>
+#include <shared_memory_cache_helper.h>
 #include <reduce_helper.h>
 #include <kernels/madwf_transfer.cuh>
 #include <fast_intdiv.h>
@@ -63,6 +63,7 @@ namespace quda
     template <class Arg> struct Tensor5DReduce : plus<typename Arg::reduce_t> {
       using reduce_t = typename Arg::reduce_t;
       using plus<reduce_t>::operator();
+      static constexpr int reduce_block_dim = 2; // x_cb in x, parity in y
 
       const Arg &arg;
       constexpr Tensor5DReduce(const Arg &arg) : arg(arg) { }

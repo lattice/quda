@@ -129,10 +129,7 @@ namespace quda
       char sp[8];
       u32toa(sp, arg.nSpin);
       strcat(aux, ",mu=");
-      char mu[8];
-      u32toa(mu, arg.mu);
-      strcat(aux, sp);
-      strcat(aux, mu);
+      u32toa(aux + strlen(aux), arg.mu);
       return TuneKey(in.VolString(), typeid(*this).name(), aux);
     }
   };

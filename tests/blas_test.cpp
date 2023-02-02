@@ -91,7 +91,6 @@ enum class Kernel {
   axpbyzNorm,
   axpyCGNorm,
   caxpyNorm,
-  caxpyXmazNormX,
   cabxpyzAxNorm,
   cDotProduct,
   caxpyDotzy,
@@ -113,6 +112,7 @@ enum class Kernel {
   reDotProduct_block,
   cDotProductNorm_block,
   cDotProduct_block,
+  hDotProduct_block,
   caxpyXmazMR
 };
 
@@ -137,7 +137,6 @@ const std::map<Kernel, std::string> kernel_map
      {Kernel::axpbyzNorm, "axpbyzNorm"},
      {Kernel::axpyCGNorm, "axpyCGNorm"},
      {Kernel::caxpyNorm, "caxpyNorm"},
-     {Kernel::caxpyXmazNormX, "caxpyXmazNormX"},
      {Kernel::cabxpyzAxNorm, "cabxpyzAxNorm"},
      {Kernel::cDotProduct, "cDotProduct"},
      {Kernel::caxpyDotzy, "caxpyDotzy"},
@@ -159,6 +158,7 @@ const std::map<Kernel, std::string> kernel_map
      {Kernel::reDotProduct_block, "reDotProduct_block"},
      {Kernel::cDotProductNorm_block, "cDotProductNorm_block"},
      {Kernel::cDotProduct_block, "cDotProduct_block"},
+     {Kernel::hDotProduct_block, "hDotProduct_block"},
      {Kernel::caxpyXmazMR, "caxpyXmazMR"}};
 
 const int Nkernels = kernel_map.size();
@@ -284,10 +284,10 @@ private:
     yH = ColorSpinorField(param);
     zH = ColorSpinorField(param);
 
-    xmH.resize(Nsrc, param);
-    ymH.resize(Msrc, param);
-    zmH.resize(Nsrc, param);
-    wmH.resize(Msrc, param);
+    resize(xmH, Nsrc, param);
+    resize(ymH, Msrc, param);
+    resize(zmH, Nsrc, param);
+    resize(wmH, Msrc, param);
 
     vH.Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
     wH.Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
@@ -321,15 +321,15 @@ private:
 
     // create device multi-field
     param.setPrecision(prec, prec, true);
-    xmD.resize(Nsrc, param);
-    ymD.resize(Msrc, param);
-    zmD.resize(Nsrc, param);
-    wmD.resize(Msrc, param);
+    resize(xmD, Nsrc, param);
+    resize(ymD, Msrc, param);
+    resize(zmD, Nsrc, param);
+    resize(wmD, Msrc, param);
 
     param.setPrecision(prec_other, prec_other, true);
-    xmoD.resize(Nsrc, param);
-    ymoD.resize(Msrc, param);
-    zmoD.resize(Nsrc, param);
+    resize(xmoD, Nsrc, param);
+    resize(ymoD, Msrc, param);
+    resize(zmoD, Nsrc, param);
 
     // only do copy if not doing half precision with mg
     bool flag = !(param.nSpin == 2 && (prec < QUDA_SINGLE_PRECISION || prec_other < QUDA_HALF_PRECISION));
@@ -436,10 +436,6 @@ protected:
         for (int i = 0; i < niter; ++i) blas::caxpyNorm(a2, xD, yD);
         break;
 
-      case Kernel::caxpyXmazNormX:
-        for (int i = 0; i < niter; ++i) blas::caxpyXmazNormX(a2, xD, yD, zD);
-        break;
-
       case Kernel::cabxpyzAxNorm:
         for (int i = 0; i < niter; ++i) blas::cabxpyzAxNorm(a, b2, xD, yD, yD);
         break;
@@ -522,6 +518,10 @@ protected:
 
       case Kernel::cDotProduct_block:
         for (int i = 0; i < niter; ++i) blas::cDotProduct(A, xmD, ymoD);
+        break;
+
+      case Kernel::hDotProduct_block:
+        for (int i = 0; i < niter; ++i) blas::hDotProduct(A2, xmD, xmD);
         break;
 
       case Kernel::caxpyXmazMR:
@@ -719,9 +719,9 @@ protected:
       xD = xH;
       yoD = yH;
       {
-        quda::Complex d = blas::axpyCGNorm(a, xD, yoD);
-        quda::Complex h = blas::axpyCGNorm(a, xH, yH);
-        error = ERROR(yo) + fabs(d.real() - h.real()) / fabs(h.real()) + fabs(d.imag() - h.imag()) / fabs(h.imag());
+        double2 d = blas::axpyCGNorm(a, xD, yoD);
+        double2 h = blas::axpyCGNorm(a, xH, yH);
+        error = ERROR(yo) + fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y);
       }
       break;
 
@@ -732,17 +732,6 @@ protected:
         double d = blas::caxpyNorm(a, xD, yD);
         double h = blas::caxpyNorm(a, xH, yH);
         error = ERROR(y) + fabs(d - h) / fabs(h);
-      }
-      break;
-
-    case Kernel::caxpyXmazNormX:
-      xD = xH;
-      yD = yH;
-      zD = zH;
-      {
-        double d = blas::caxpyXmazNormX(a, xD, yD, zD);
-        double h = blas::caxpyXmazNormX(a, xH, yH, zH);
-        error = ERROR(y) + ERROR(x) + fabs(d - h) / fabs(h);
       }
       break;
 
@@ -1012,6 +1001,19 @@ protected:
         }
       }
       error /= Nsrc * Msrc;
+      break;
+
+    case Kernel::hDotProduct_block:
+      for (int i = 0; i < Nsrc; i++) xmD[i] = xmH[i];
+      blas::hDotProduct(A2, xmD, xmD);
+      blas::cDotProduct(B2, xmD, xmD);
+      error = 0.0;
+      for (int i = 0; i < Nsrc; i++) {
+        for (int j = 0; j < Nsrc; j++) {
+          error += std::abs(A2[i * Nsrc + j] - B2[i * Nsrc + j]) / std::abs(B2[i * Nsrc + j]);
+        }
+      }
+      error /= Nsrc * Nsrc;
       break;
 
     case Kernel::caxpyXmazMR:

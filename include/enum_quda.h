@@ -359,10 +359,11 @@ typedef enum QudaFieldOrder_s {
 } QudaFieldOrder;
 
 typedef enum QudaFieldCreate_s {
-  QUDA_NULL_FIELD_CREATE,      // create new field
-  QUDA_ZERO_FIELD_CREATE,      // create new field and zero it
-  QUDA_COPY_FIELD_CREATE,      // create copy to field
-  QUDA_REFERENCE_FIELD_CREATE, // create reference to field
+  QUDA_NULL_FIELD_CREATE,      // new field
+  QUDA_ZERO_FIELD_CREATE,      // new field and zero it
+  QUDA_COPY_FIELD_CREATE,      // copy to field
+  QUDA_REFERENCE_FIELD_CREATE, // reference to field
+  QUDA_GHOST_FIELD_CREATE,     // dummy field used only for ghost storage
   QUDA_INVALID_FIELD_CREATE = QUDA_INVALID_ENUM
 } QudaFieldCreate;
 
@@ -475,6 +476,12 @@ typedef enum QudaBoolean_s {
 // define these for backwards compatibility
 #define QUDA_BOOLEAN_NO QUDA_BOOLEAN_FALSE
 #define QUDA_BOOLEAN_YES QUDA_BOOLEAN_TRUE
+
+typedef enum QudaBLASType_s {
+  QUDA_BLAS_GEMM = 0,
+  QUDA_BLAS_LU_INV = 1,
+  QUDA_BLAS_INVALID = QUDA_INVALID_ENUM
+} QudaBLASType;
 
 typedef enum QudaBLASOperation_s {
   QUDA_BLAS_OP_N = 0, // No transpose

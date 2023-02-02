@@ -25,7 +25,6 @@ set(CMAKE_COLOR_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 # Disable gnu exentions
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CUDA_EXTENSIONS OFF)
 
 # Disable in source builds this is only a temporary fix, but for now we need it as
 # cmake will otherwise overwrite the existing makefiles.
@@ -65,7 +64,7 @@ if(BUILD_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid CMAKE_BUILD_TYPE type! Valid build types are:" "${VALID_BUILD_TYPES}")
 endif()
 
-# QUDA may be built to run using HIP or CUDA, which we call the
+# QUDA may be built to run using CUDA, HIP or SYCL, which we call the
 # Target type. By default, the target is CUDA.
 if(DEFINED ENV{QUDA_TARGET})
   set(DEFTARGET $ENV{QUDA_TARGET})
@@ -73,11 +72,11 @@ else()
   set(DEFTARGET "CUDA")
 endif()
 
-set(VALID_TARGET_TYPES CUDA HIP)
+set(VALID_TARGET_TYPES CUDA HIP SYCL)
 set(QUDA_TARGET_TYPE
   "${DEFTARGET}"
   CACHE STRING "Choose the type of target, options are: ${VALID_TARGET_TYPES}")
-set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP)
+set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP SYCL)
 
 string(TOUPPER ${QUDA_TARGET_TYPE} CHECK_TARGET_TYPE)
 list(FIND VALID_TARGET_TYPES ${CHECK_TARGET_TYPE} TARGET_TYPE_VALID)
@@ -152,12 +151,6 @@ option(QUDA_DIRAC_CLOVER_HASENBUSCH "build clover Hasenbusch twist operators" ${
 option(QUDA_DIRAC_NDEG_TWISTED_MASS "build non-degenerate twisted mass Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_NDEG_TWISTED_CLOVER "build non-degenerate twisted clover Dirac operators" ${QUDA_DIRAC_DEFAULT})
 
-# HMC gauge force routines
-option(QUDA_FORCE_GAUGE "build code for (1-loop Symanzik) gauge force" OFF)
-option(QUDA_FORCE_HISQ "build code for hisq fermion force" OFF)
-option(QUDA_GAUGE_TOOLS "build auxiliary gauge-field tools" OFF)
-
-option(QUDA_GAUGE_ALG "build gauge-fixing and pure-gauge algorithms" OFF)
 option(QUDA_CONTRACT "build code for bilinear contraction" OFF)
 option(QUDA_COVDEV "build code for covariant derivative" OFF)
 
@@ -201,7 +194,13 @@ option(QUDA_BUILD_ALL_TESTS "build tests by default" ON)
 option(QUDA_INSTALL_ALL_TESTS "install tests by default" ON)
 option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ON)
 
-option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" ON)
+set(QUDA_ORDER_FP "8" CACHE STRING "which data order to use for Wilson, gauge (recon-8/9) and clover fixed-point fields (4, 8)")
+set(QUDA_ORDER_SP_MG "2" CACHE STRING "which data order to use for fp32 MG fields (2, 4)")
+set(QUDA_ORDER_FP_MG "2" CACHE STRING "which data order to use for fixed-point MG fields (2, 4, 8)")
+
+set_property(CACHE QUDA_ORDER_FP PROPERTY STRINGS 4 8)
+set_property(CACHE QUDA_ORDER_SP_MG PROPERTY STRINGS 2 4)
+set_property(CACHE QUDA_ORDER_FP_MG PROPERTY STRINGS 2 4 8)
 
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
 
@@ -233,6 +232,8 @@ option(QUDA_CTEST_DISABLE_BENCHMARKS "Disable benchmark test" ON)
 option(QUDA_FAST_COMPILE_REDUCE "enable fast compilation in blas and reduction kernels (single warp per reduction)" OFF)
 option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in dslash kernels (~20% perf impact)" OFF)
 
+option(QUDA_ALTERNATIVE_I_TO_F "enable using alternative integer-to-float conversion" OFF)
+
 option(QUDA_OPENMP "enable OpenMP" OFF)
 set(QUDA_CXX_STANDARD
     17
@@ -242,9 +243,11 @@ set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
+option(QUDA_MULTIGRID "build multigrid solvers" OFF)
+option(QUDA_MULTIGRID_DSLASH_PROMOTE "Whether to promote the internal precision when computing the coarse dslash" OFF)
+
 # features in development
 option(QUDA_SSTEP "build s-step linear solvers" OFF)
-option(QUDA_MULTIGRID "build multigrid solvers" OFF)
 option(QUDA_BLOCKSOLVER "build block solvers" OFF)
 option(QUDA_USE_EIGEN "use EIGEN library (where optional)" ON)
 option(QUDA_DOWNLOAD_EIGEN "Download Eigen" ON)
@@ -258,14 +261,19 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 
-mark_as_advanced(QUDA_FLOAT8)
+mark_as_advanced(QUDA_ORDER_FP)
+mark_as_advanced(QUDA_ORDER_SP_MG)
+mark_as_advanced(QUDA_ORDER_FP_MG)
 mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
 mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
+
+mark_as_advanced(QUDA_ALTERNATIVE_I_TO_F)
 
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_PRECISION)
 mark_as_advanced(QUDA_RECONSTRUCT)
 mark_as_advanced(QUDA_CLOVER_CHOLESKY_PROMOTE)
+mark_as_advanced(QUDA_MULTIGRID_DSLASH_PROMOTE)
 mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
 mark_as_advanced(QUDA_CTEST_LAUNCH)
 mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
@@ -321,44 +329,44 @@ endif()
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 
 set(CMAKE_CXX_FLAGS_DEVEL
-  "-g -O3 -Wall -Wextra"
+  "-g -O3"
   CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
-  "-O3 -Werror -Wall -Wextra"
+  "-O3"
   CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE
-  "-O3 -w ${CXX_OPT} "
+  "-O3 ${CXX_OPT}"
   CACHE STRING "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG
-    "-Wall -Wextra -g"
+    "-g"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CXX_FLAGS_DEBUG
-    "-Wall -Wextra -g -fno-inline"
+    "-g -fno-inline"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CXX_FLAGS_SANITIZE
-    "-Wall -Wextra -g -fno-inline \"-fsanitize=address,undefined\""
+    "-g -fno-inline \"-fsanitize=address,undefined\""
     CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
 
 enable_language(CXX)
 
 # define C FLAGS
 set(CMAKE_C_FLAGS_DEVEL
-  "-g -O3 -Wall -Wextra"
+  "-g -O3"
   CACHE STRING "Flags used by the C compiler during regular development builds.")
 set(CMAKE_C_FLAGS_STRICT
-  "-O3 -Werror -Wall -Wextra"
+  "-O3"
   CACHE STRING "Flags used by the C compiler during strict jenkins builds.")
 set(CMAKE_C_FLAGS_RELEASE
-  "-O3 -w"
+  "-O3"
   CACHE STRING "Flags used by the C compiler during release builds.")
 set(CMAKE_C_FLAGS_HOSTDEBUG
-    "-Wall -Wextra -g"
+    "-g"
     CACHE STRING "Flags used by the C compiler during host-debug builds.")
 set(CMAKE_C_FLAGS_DEBUG
-  "-Wall -Wextra -g -fno-inline"
+  "-g -fno-inline"
   CACHE STRING "Flags used by the C compiler during full (host+device) debug builds.")
 set(CMAKE_C_FLAGS_SANITIZE
-    "-Wall -Wextra -g -fno-inline \"-fsanitize=address,undefined\""
+    "-g -fno-inline \"-fsanitize=address,undefined\""
     CACHE STRING "Flags used by the C compiler during sanitizer debug builds.")
 
 
@@ -413,6 +421,7 @@ if(QUDA_DOWNLOAD_EIGEN)
     DOWNLOAD_ONLY
     YES)
   target_include_directories(Eigen SYSTEM INTERFACE ${Eigen_SOURCE_DIR})
+  install(DIRECTORY ${Eigen_SOURCE_DIR}/Eigen TYPE INCLUDE)
 else()
   # fall back to using find_package
   find_package(Eigen QUIET)
@@ -471,6 +480,18 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif()
 
 # ######################################################################################################################
+# rpath handling before adding dependencies
+# ######################################################################################################################
+
+set(CMAKE_SKIP_BUILD_RPATH FALSE)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
+if("${isSystemDir}" STREQUAL "-1")
+    set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+endif("${isSystemDir}" STREQUAL "-1")
+
+# ######################################################################################################################
 # QMP
 # ######################################################################################################################
 if(QUDA_QMP)
@@ -504,7 +525,7 @@ if(QUDA_QIO)
   endif()
   if(QUDA_DOWNLOAD_USQCD)
     set(QUDA_QIO_TAG
-        "a5c3ae580b846130c06dc060ab822f17d6fe2171"
+        "qio3-0-0"
         CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
     mark_as_advanced(QUDA_QIO_TAG)
     CPMAddPackage(
@@ -525,7 +546,7 @@ if(QUDA_QIO)
 endif()
 
 # ######################################################################################################################
- # USQCD QDPJIT
+# USQCD QDPJIT
 # ######################################################################################################################
  if(QUDA_QDPJIT)
    if(NOT QUDA_QMP)
@@ -538,11 +559,11 @@ endif()
    set(QUDA_INTERFACE_QDPJIT ON)
  endif()
 
-####################################
+
+# ######################################################################################################################
 # ARPACK
 # ######################################################################################################################
 if(QUDA_ARPACK)
-  enable_language(Fortran)
 
   if(QUDA_MPI OR QUDA_QMP)
     set(ARPACK_MPI ON)
@@ -551,35 +572,22 @@ if(QUDA_ARPACK)
   endif()
 
   if(QUDA_DOWNLOAD_ARPACK)
-  #TODO: switch to CPM
-    include(GNUInstallDirs)
-    ExternalProject_Add(
+    CPMAddPackage(
+      NAME
       ARPACK-NG
-      GIT_REPOSITORY https://github.com/opencollab/arpack-ng.git
-      GIT_TAG 3.7.0
-      GIT_SHALLOW YES
-      PREFIX arpack-ng
-      CMAKE_ARGS -DMPI=${ARPACK_MPI} -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-      CMAKE_GENERATOR "Unix Makefiles")
-    ExternalProject_Get_Property(ARPACK-NG INSTALL_DIR)
-    set(QUDA_ARPACK_HOME ${INSTALL_DIR})
-    add_library(arpack-ng STATIC IMPORTED)
-    add_dependencies(arpack-ng ARPACK-NG)
-    find_package(BLAS REQUIRED)
-    find_package(LAPACK REQUIRED)
-    target_link_libraries(arpack-ng INTERFACE ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
-    set_target_properties(arpack-ng PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
-    set_target_properties(arpack-ng PROPERTIES IMPORTED_LOCATION
-      ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libarpack.a)
-    if(QUDA_MPI OR QUDA_QMP)
-      add_library(parpack-ng STATIC IMPORTED)
-      target_link_libraries(parpack-ng INTERFACE arpack-ng MPI::MPI_Fortran)
-      set_target_properties(parpack-ng PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
-      set_target_properties(parpack-ng PROPERTIES IMPORTED_LOCATION
-        ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libparpack.a)
+      GITHUB_REPOSITORY
+      opencollab/arpack-ng
+      GIT_TAG 3.8.0
+      OPTIONS
+      "EXAMPLES OFF ON"
+      "MPI ${ARPACK_MPI}"
+      "BLAS_openblas_LIBRARY ${OpenBLAS_LIBS}"
+    )
+    add_library(ARPACK::arpack ALIAS arpack)
+    if(ARPACK_MPI)
+      add_library(ARPACK::parpack ALIAS parpack)
     endif()
-
-  else(QUDA_DOWNLOAD_ARPACK)
+else(QUDA_DOWNLOAD_ARPACK)
     find_package(PkgConfig REQUIRED)
     # We always need the serial library
     pkg_check_modules(ARPACK QUIET arpack)
@@ -609,6 +617,7 @@ if(QUDA_OPENBLAS)
   if(QUDA_DOWNLOAD_OPENBLAS)
   #TODO: switch to CPM
     include(GNUInstallDirs)
+    include(ExternalProject)
     ExternalProject_Add(
       OPENBLAS
       GIT_REPOSITORY https://github.com/xianyi/OpenBLAS.git

@@ -1,8 +1,5 @@
 #include <multigrid_helper.cuh>
 
-// this removes ghost accessor reducing the parameter space needed
-#define DISABLE_GHOST true // do not rename this (it is both a template parameter and a macro)
-
 #include <math_helper.cuh>
 #include <color_spinor_field_order.h>
 #include <constant_kernel_arg.h> // allow for large parameter structs
@@ -149,8 +146,9 @@ namespace quda {
       }
       if (fineSpin == 1) chirality = 0; // when using staggered chirality is mapped to parity
 
-      BlockReduce<dot_t, block_size> dot_reducer{0};
-      BlockReduce<sum_t, block_size> norm_reducer{0};
+      constexpr int block_dim = 1;
+      BlockReduce<dot_t, block_dim> dot_reducer{0};
+      BlockReduce<sum_t, block_dim> norm_reducer{0};
 
       // loop over number of block orthos
       for (int n = 0; n < arg.nBlockOrtho; n++) {

@@ -16,7 +16,7 @@ namespace quda
 
   CACG::CACG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
              const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile), init(false), lambda_init(false), basis(param.ca_basis)
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile), lambda_init(false), basis(param.ca_basis)
   {
   }
 
@@ -33,8 +33,7 @@ namespace quda
     mmdag(mat.Expose()),
     mmdagSloppy(matSloppy.Expose()),
     mmdagPrecon(matPrecon.Expose()),
-    mmdagEig(matEig.Expose()),
-    init(false)
+    mmdagEig(matEig.Expose())
   {
   }
 
@@ -116,8 +115,7 @@ namespace quda
     mdagm(mat.Expose()),
     mdagmSloppy(matSloppy.Expose()),
     mdagmPrecon(matPrecon.Expose()),
-    mdagmEig(matEig.Expose()),
-    init(false)
+    mdagmEig(matEig.Expose())
   {
   }
 
@@ -200,21 +198,20 @@ namespace quda
       csParam.create = QUDA_NULL_FIELD_CREATE;
 
       if (mixed()) r = ColorSpinorField(csParam);
-      tmp = ColorSpinorField(csParam);
-      tmp2 = ColorSpinorField(csParam);
 
       // now allocate sloppy fields
       csParam.setPrecision(param.precision_sloppy);
-      tmp_sloppy = tmp.create_alias(csParam);
-      tmp2_sloppy = tmp2.create_alias(csParam);
 
-      AS.resize(param.Nkrylov, csParam);
-      Q.resize(param.Nkrylov, csParam);
-      AQ.resize(param.Nkrylov, csParam);
-      Qtmp.resize(param.Nkrylov, csParam); // only used as an intermediate for pointer swaps
-
+      AS.resize(param.Nkrylov);
+      Q.resize(param.Nkrylov);
+      AQ.resize(param.Nkrylov);
+      Qtmp.resize(param.Nkrylov); // only used as an intermediate for pointer swaps
       S.resize(param.Nkrylov);
       for (int i = 0; i < param.Nkrylov; i++) {
+        AS[i] = ColorSpinorField(csParam);
+        Q[i] = ColorSpinorField(csParam);
+        AQ[i] = ColorSpinorField(csParam);
+        Qtmp[i] = ColorSpinorField(csParam);
         // in the power basis we can alias AS[k] to S[k+1]
         S[i] = (basis == QUDA_POWER_BASIS && i > 0) ? AS[i - 1] : ColorSpinorField(csParam);
       }
@@ -438,14 +435,14 @@ namespace quda
         deflate_compute = false;
       }
       if (recompute_evals) {
-        eig_solve->computeEvals(matEig, evecs, evals);
+        eig_solve->computeEvals(evecs, evals);
         recompute_evals = false;
       }
     }
 
     // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      mat(r, x, tmp, tmp2);
+      mat(r, x);
       // r = b - Ax0
       if (!fixed_iteration) {
         r2 = blas::xmyNorm(b, r);
@@ -463,7 +460,7 @@ namespace quda
       // Deflate and add solution to accumulator
       eig_solve->deflate(x, r, evecs, evals, true);
 
-      mat(r, x, tmp, tmp2);
+      mat(r, x);
       if (!fixed_iteration) {
         r2 = blas::xmyNorm(b, r);
       } else {
@@ -483,9 +480,8 @@ namespace quda
       }
 
       // Perform 100 power iterations, normalizing every 10 mat-vecs, using r as an initial seed
-      // and Q[0]/AQ[0] as temporaries for the power iterations. tmp_sloppy/tmp2_sloppy get passed in as temporaries
-      // for matSloppy.
-      lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r, Q[0], AQ[0], 100, 10, tmp_sloppy, tmp2_sloppy);
+      // and Q[0]/AQ[0] as temporaries for the power iterations
+      lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r, Q[0], AQ[0], 100, 10);
       logQuda(QUDA_SUMMARIZE, "CA-CG Approximate lambda max = 1.1 x %e\n", lambda_max / 1.1);
 
       lambda_init = true;
@@ -551,7 +547,7 @@ namespace quda
     while (!convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
       // build up a space of size n_krylov, assumes S[0] is in place
-      computeCAKrylovSpace(matSloppy, AS, S, n_krylov, basis, m_map, b_map, tmp_sloppy, tmp2_sloppy);
+      computeCAKrylovSpace(matSloppy, AS, S, n_krylov, basis, m_map, b_map);
 
       // we can greatly simplify the workflow for fixed iterations
       if (!fixed_iteration) {
@@ -581,7 +577,7 @@ namespace quda
         // 1. Compute Q_AQ = Q^\dagger AQ and g = Q^dagger r = Q^dagger S[0]
         // 2. Solve Q_AQ alpha = g
         {
-          blas::reDotProduct(Q_AQandg, Q, make_set(AQ, S[0]));
+          blas::reDotProduct(Q_AQandg, Q, {AQ, S[0]});
           compute_alpha();
         }
 
@@ -603,7 +599,7 @@ namespace quda
         // We do compute the alpha coefficients: this is the same code as above
         // 1. Compute "Q_AQ" = S^\dagger AS and g = S^dagger r = S^dagger S[0]
         // 2. Solve "Q_AQ" alpha = g
-        blas::reDotProduct(Q_AQandg, S, make_set(AS, S[0]));
+        blas::reDotProduct(Q_AQandg, S, {AS, S[0]});
         compute_alpha();
 
         // update the solution vector
@@ -626,7 +622,7 @@ namespace quda
       if (total_iter >= param.maxiter || (r2 < stop && !l2_converge) || reliable(rNorm, maxrr, rUpdate, r2, delta)) {
 
         if ((r2 < stop || total_iter >= param.maxiter) && param.sloppy_converge) break;
-        mat(r, x, tmp, tmp2);
+        mat(r, x);
         r2 = blas::xmyNorm(b, r);
 
         if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
@@ -634,7 +630,7 @@ namespace quda
           eig_solve->deflate(x, r, evecs, evals, true);
 
           // Compute r_defl = RHS - A * LHS
-          mat(r, x, tmp, tmp2);
+          mat(r, x);
           r2 = blas::xmyNorm(b, r);
 
           maxr_deflate = sqrt(r2);
@@ -671,7 +667,7 @@ namespace quda
 
     if (param.compute_true_res) {
       // Calculate the true residual
-      mat(r, x, tmp, tmp2);
+      mat(r, x);
       double true_res = blas::xmyNorm(b, r);
       param.true_res = sqrt(true_res / b2);
       param.true_res_hq

@@ -9,7 +9,7 @@
 
 namespace quda {
 
-//UNCOMMENT THIS IF YOU WAN'T TO USE LESS MEMORY
+//UNCOMMENT THIS IF YOU WANT TO USE LESS MEMORY
 #define GAUGEFIXING_DONT_USE_GX
 //Without using the precalculation of g(x),
 //we loose some performance, because Delta(x) is written in normal lattice coordinates need for the FFTs
@@ -52,8 +52,8 @@ namespace quda {
         int x1 = (id / arg.X[0]) % arg.X[1];
         int x0 = id % arg.X[0];
 
-        int id  =  x0 + (x1 + (x2 + x3 * arg.X[2]) * arg.X[1]) * arg.X[0];
-        int id_out =  x2 + (x3 +  (x0 + x1 * arg.X[0]) * arg.X[3]) * arg.X[2];
+        int id = x0 + (x1 + (x2 + x3 * arg.X[2]) * arg.X[1]) * arg.X[0];
+        int id_out = x2 + (x3 + (x0 + x1 * arg.X[0]) * arg.X[3]) * arg.X[2];
         arg.tmp1[id_out] = arg.tmp0[id];
       }
 
@@ -63,8 +63,8 @@ namespace quda {
         int x3 = (id / arg.X[2]) % arg.X[3];
         int x2 = id % arg.X[2];
 
-        int id  =  x2 + (x3 +  (x0 + x1 * arg.X[0]) * arg.X[3]) * arg.X[2];
-        int id_out =  x0 + (x1 + (x2 + x3 * arg.X[2]) * arg.X[1]) * arg.X[0];
+        int id = x2 + (x3 + (x0 + x1 * arg.X[0]) * arg.X[3]) * arg.X[2];
+        int id_out = x0 + (x1 + (x2 + x3 * arg.X[2]) * arg.X[1]) * arg.X[0];
         arg.tmp1[id_out] = arg.tmp0[id];
       }
     }
@@ -122,10 +122,10 @@ namespace quda {
       int x3 = (id / arg.X[2]) % arg.X[3];
       int x2 = id % arg.X[2];
       //id  =  x2 + (x3 +  (x0 + x1 * arg.X[0]) * arg.X[3]) * arg.X[2];
-      Float sx = sin( (Float)x0 * M_PI / (Float)arg.X[0]);
-      Float sy = sin( (Float)x1 * M_PI / (Float)arg.X[1]);
-      Float sz = sin( (Float)x2 * M_PI / (Float)arg.X[2]);
-      Float st = sin( (Float)x3 * M_PI / (Float)arg.X[3]);
+      Float sx = quda::sinpi( (Float)x0 / (Float)arg.X[0]);
+      Float sy = quda::sinpi( (Float)x1 / (Float)arg.X[1]);
+      Float sz = quda::sinpi( (Float)x2 / (Float)arg.X[2]);
+      Float st = quda::sinpi( (Float)x3 / (Float)arg.X[3]);
       Float sinsq = sx * sx + sy * sy + sz * sz + st * st;
       Float prcfact = 0.0;
       //The FFT normalization is done here
@@ -179,6 +179,7 @@ namespace quda {
   template <typename Arg> struct FixQualityFFT : plus<typename Arg::reduce_t> {
     using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
+    static constexpr int reduce_block_dim = 2; // x_cb in x, parity in y
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr FixQualityFFT(const Arg &arg) : arg(arg) {}

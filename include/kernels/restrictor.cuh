@@ -21,8 +21,7 @@ namespace quda {
   /** 
       Kernel argument struct
   */
-  template <typename Float, typename vFloat, int fineSpin_, int fineColor_,
-	    int coarseSpin_, int coarseColor_, QudaFieldOrder order>
+  template <typename Float, typename vFloat, int fineSpin_, int fineColor_, int coarseSpin_, int coarseColor_>
   struct RestrictArg : kernel_param<> {
     using real = Float;
     static constexpr int fineSpin = fineSpin_;
@@ -30,11 +29,11 @@ namespace quda {
     static constexpr int coarseSpin = coarseSpin_;
     static constexpr int coarseColor = coarseColor_;
 
-    FieldOrderCB<Float,coarseSpin,coarseColor,1,order> out;
-    const FieldOrderCB<Float,fineSpin,fineColor,1,order> in;
-    const FieldOrderCB<Float,fineSpin,fineColor,coarseColor,order,vFloat> V;
+    FieldOrderCB<Float,coarseSpin,coarseColor,1, colorspinor::getNative<Float>(coarseSpin)> out;
+    const FieldOrderCB<Float,fineSpin,fineColor,1, colorspinor::getNative<Float>(fineSpin)> in;
+    const FieldOrderCB<Float,fineSpin,fineColor,coarseColor, colorspinor::getNative<vFloat>(fineSpin), vFloat> V;
     const int aggregate_size;    // number of sites that form a single aggregate
-    const int aggregate_size_cb; // number of checkerboard sites that form a single aggregate
+    const int_fastdiv aggregate_size_cb; // number of checkerboard sites that form a single aggregate
     const int *fine_to_coarse;
     const int *coarse_to_fine;
     const spin_mapper<fineSpin,coarseSpin> spin_map;
@@ -106,7 +105,6 @@ namespace quda {
   }
 
   template <typename Arg> struct Restrictor {
-    static constexpr unsigned block_size = Arg::block_size;
     static constexpr int coarse_color_per_thread = coarse_colors_per_thread<Arg::fineColor, Arg::coarseColor>();
     using vector = array<complex<typename Arg::real>, Arg::coarseSpin*coarse_color_per_thread>;
     const Arg &arg;
@@ -115,15 +113,16 @@ namespace quda {
 
     __device__ __host__ inline void operator()(dim3 block, dim3 thread)
     {
-      int x_coarse = block.x;
       int x_fine_offset = thread.x;
-      int coarse_color_thread = block.z * arg.block_dim.z + thread.z;
+      const int x_coarse = block.x;
+      const int coarse_color_thread = block.z * arg.block_dim.z + thread.z;
+      const int coarse_color_block = coarse_color_thread * coarse_color_per_thread;
 
       vector reduced{0};
-      if (x_fine_offset < arg.aggregate_size) {
+      while (x_fine_offset < arg.aggregate_size) {
         // all threads with x_fine_offset greater than aggregate_size_cb are second parity
         const int parity_offset = x_fine_offset >= arg.aggregate_size_cb ? 1 : 0;
-        const int x_fine_cb_offset = x_fine_offset - parity_offset * arg.aggregate_size_cb;
+        const int x_fine_cb_offset = x_fine_offset % arg.aggregate_size_cb;
         const int parity = arg.nParity == 2 ? parity_offset : arg.parity;
 
         // look-up map is ordered as (coarse-block-id + fine-point-id),
@@ -132,24 +131,30 @@ namespace quda {
         const int x_fine = arg.coarse_to_fine[x_fine_site_id];
         const int x_fine_cb = x_fine - parity * arg.in.VolumeCB();
 
-        const int coarse_color_block = coarse_color_thread * coarse_color_per_thread;
+        array<complex<typename Arg::real>, Arg::fineSpin * coarse_color_per_thread> tmp{0};
 
-        array<complex<typename Arg::real>, Arg::fineSpin*coarse_color_per_thread> tmp{0};
         rotateCoarseColor(tmp, arg, parity, x_fine_cb, coarse_color_block);
 
         // perform any local spin coarsening
 #pragma unroll
-        for (int s=0; s<Arg::fineSpin; s++) {
+        for (int s = 0; s<Arg::fineSpin; s++) {
 #pragma unroll
-          for (int v=0; v<coarse_color_per_thread; v++) {
-            reduced[arg.spin_map(s,parity)*coarse_color_per_thread+v] += tmp[s*coarse_color_per_thread+v];
+          for (int v = 0; v<coarse_color_per_thread; v++) {
+            if (arg.spin_map(s, parity) == 0) {
+              reduced[0 * coarse_color_per_thread + v] += tmp[s*coarse_color_per_thread + v];
+            } else {
+              reduced[1 * coarse_color_per_thread + v] += tmp[s*coarse_color_per_thread + v];
+            }
           }
         }
+
+        x_fine_offset += target::block_dim().x;
       }
 
-      reduced = BlockReduce<vector, block_size, 1, Arg::n_vector_z, true>(thread.z).Sum(reduced);
+      constexpr int block_dim = 1;
+      reduced = BlockReduce<vector, block_dim, Arg::n_vector_z>(thread.z).Sum(reduced);
 
-      if (x_fine_offset == 0) {
+      if (target::thread_idx().x == 0) {
         const int parity_coarse = x_coarse >= arg.out.VolumeCB() ? 1 : 0;
         const int x_coarse_cb = x_coarse - parity_coarse*arg.out.VolumeCB();
 

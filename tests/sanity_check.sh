@@ -8,7 +8,7 @@ fail_msg="*****************************Sanity check for quda failed!************
 function basic_sanity_check {
 
     echo "Performing basic sanity test:"
-    progs="staggered_dslash_test staggered_invert_test llfat_test llfat_test gauge_force_test fermion_force_test hisq_paths_force_test"
+    progs="staggered_dslash_test staggered_invert_test llfat_test llfat_test gauge_path_test fermion_force_test hisq_paths_force_test"
     precs="double"
     recons="18"
     whichtest="1"
@@ -19,7 +19,7 @@ function basic_sanity_check {
 	    continue
         fi
 
-        if [ "$prog" = "llfat_test" -o "$prog" = "gauge_force_test" -o "$prog" = "fermion_force_test" ]; then
+        if [ "$prog" = "llfat_test" -o "$prog" = "gauge_path_test" -o "$prog" = "fermion_force_test" ]; then
 	    extra_args="--verify"
         else
 	    extra_args=""
@@ -92,9 +92,9 @@ function complete_fatlink_check {
 
 }
 
-function complete_gauge_force_check {
+function complete_gauge_path_check {
     echo "Performing complete gauge force test:"    
-    prog="./gauge_force_test"
+    prog="./gauge_path_test"
     precs="double single"
     recons="18 12"
     gauge_orders="qdp milc"
@@ -238,7 +238,7 @@ for action in $*; do
     invert )
 	complete_invert_check;;
     gf )
-	complete_gauge_force_check ;;
+	complete_gauge_path_check ;;
     hf )
 	complete_hisq_force_check ;;
     all )

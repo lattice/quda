@@ -42,7 +42,12 @@ namespace quda
       using warp_reduce_t = hipcub::WarpReduce<T, param_t::width>;
       typename warp_reduce_t::TempStorage dummy_storage;
       warp_reduce_t warp_reduce(dummy_storage);
-      T value = reducer_t::do_sum ? warp_reduce.Sum(value_) : warp_reduce.Reduce(value_, r);
+      T value = {};
+      if constexpr (reducer_t::do_sum) {
+        value = warp_reduce.Sum(value_);
+      } else {
+        value = warp_reduce.Reduce(value_, r);
+      }
 
       if (all) {
         using warp_scan_t = hipcub::WarpScan<T, param_t::width>;
@@ -59,9 +64,13 @@ namespace quda
   template <bool> struct block_reduce;
 
   /**
-     @brief HIP specialization of block_reduce, utilizing hipcub::BlockReduce
+     @brief HIP specialization of block_reduce, building on the warp reduce
   */
   template <> struct block_reduce<true> {
+
+    template <int width_> struct warp_reduce_param {
+      static constexpr int width = width_;
+    };
 
     /**
        @brief Perform a block-wide reduction
@@ -78,19 +87,50 @@ namespace quda
     template <typename T, typename reducer_t, typename param_t>
     __device__ inline T operator()(const T &value_, bool async, int batch, bool all, const reducer_t &r, const param_t &)
     {
-      using block_reduce_t = hipcub::BlockReduce<T, param_t::block_size_x, hipcub::BLOCK_REDUCE_WARP_REDUCTIONS,
-                                                 param_t::block_size_y, param_t::block_size_z>;
-      __shared__ typename block_reduce_t::TempStorage storage[param_t::batch_size];
-      block_reduce_t block_reduce(storage[batch]);
+      constexpr auto max_items = device::max_block_size() / device::warp_size();
+      const auto thread_idx = target::thread_idx_linear<param_t::block_dim>();
+      const auto block_size = target::block_size<param_t::block_dim>();
+      const auto warp_idx = thread_idx / device::warp_size();
+      const auto warp_items = (block_size + device::warp_size() - 1) / device::warp_size();
+
+      // first do warp reduce
+      T value = warp_reduce<true>()(value_, false, r, warp_reduce_param<device::warp_size()>());
+
+      // now do reduction between warps
       if (!async) __syncthreads(); // only synchronize if we are not pipelining
-      T value = reducer_t::do_sum ? block_reduce.Sum(value_) : block_reduce.Reduce(value_, r);
+
+      __shared__ T storage[max_items];
+
+      // if first thread in warp, write result to shared memory
+      if (thread_idx % device::warp_size() == 0) storage[batch * warp_items + warp_idx] = value;
+      __syncthreads();
+
+      // whether to use the first warp or first thread for the final reduction
+      constexpr bool final_warp_reduction = true;
+
+      if constexpr (final_warp_reduction) { // first warp completes the reduction (requires first warp is full)
+        if (warp_idx == 0) {
+          if constexpr (max_items > device::warp_size()) { // never true for max block size 1024, warp = 32
+            value = r.init();
+            for (auto i = thread_idx; i < warp_items; i += device::warp_size())
+              value = r(storage[batch * warp_items + i], value);
+          } else { // optimized path where we know the final reduction will fit in a warp
+            value = thread_idx < warp_items ? storage[batch * warp_items + thread_idx] : r.init();
+          }
+          value = warp_reduce<true>()(value, false, r, warp_reduce_param<device::warp_size()>());
+        }
+      } else { // first thread completes the reduction
+        if (thread_idx == 0) {
+          for (unsigned int i = 1; i < warp_items; i++) value = r(storage[batch * warp_items + i], value);
+        }
+      }
 
       if (all) {
-        T &value_shared = reinterpret_cast<T &>(storage[batch]);
-        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) value_shared = value;
+        if (thread_idx == 0) storage[batch * warp_items + 0] = value;
         __syncthreads();
-        value = value_shared;
+        value = storage[batch * warp_items + 0];
       }
+
       return value;
     }
   };

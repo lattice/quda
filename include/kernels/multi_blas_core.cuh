@@ -7,15 +7,17 @@
 #include <kernel.h>
 #include <warp_collective.h>
 
-#ifndef QUDA_FAST_COMPILE_REDUCE
-#define WARP_SPLIT
-#endif
-
 namespace quda
 {
 
   namespace blas
   {
+
+#ifndef QUDA_FAST_COMPILE_REDUCE
+    constexpr bool enable_warp_split() { return false; }
+#else
+    constexpr bool enable_warp_split() { return true; }
+#endif
 
     /**
        @brief Parameter struct for generic multi-blas kernel.
@@ -43,9 +45,8 @@ namespace quda
       Functor f;
 
       template <typename V>
-      MultiBlasArg(std::vector<V> &x, std::vector<V> &y, std::vector<V> &z, std::vector<V> &w,
-                   Functor f, int NYW, int length) :
-        kernel_param(dim3(length * warp_split, NYW, x[0].get().SiteSubset())),
+      MultiBlasArg(V &x, V&y, V &z, V &w, Functor f, int NYW, int length) :
+        kernel_param(dim3(length * warp_split, NYW, x[0].SiteSubset())),
         NYW(NYW),
         f(f)
       {
@@ -61,13 +62,6 @@ namespace quda
         }
       }
     };
-
-    // strictly required pre-C++17 and can cause link errors otherwise
-    template <int warp_split_, typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
-    constexpr int MultiBlasArg<warp_split_, real_, n_, NXZ_, store_t, N, y_store_t, Ny, Functor>::NXZ;
-
-    template <int warp_split_, typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
-    constexpr int MultiBlasArg<warp_split_, real_, n_, NXZ_, store_t, N, y_store_t, Ny, Functor>::NYW_max;
 
     /**
        @brief Generic multi-blas kernel with four loads and up to four stores.

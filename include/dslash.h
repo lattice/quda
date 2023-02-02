@@ -138,16 +138,16 @@ namespace quda
         arg.setPack(true, this->packBuffer); // need to recompute for updated block_per_dir
         arg.in_pack.resetGhost(this->packBuffer);
         tp.grid.x += arg.pack_blocks;
-        arg.counter = dslash::get_shmem_sync_counter();
+        arg.counter = dslash::get_dslash_shmem_sync_counter();
       }
       if (arg.shmem > 0 && arg.kernel_type == EXTERIOR_KERNEL_ALL) {
         // if we are doing tuning we should not wait on the sync_arr to be set.
-        arg.counter = (activeTuning() && !policyTuning()) ? 2 : dslash::get_shmem_sync_counter();
+        arg.counter = (activeTuning() && !policyTuning()) ? 2 : dslash::get_dslash_shmem_sync_counter();
       }
       if (arg.shmem > 0 && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL)) {
-        arg.counter = activeTuning() ?
-          (uberTuning() && !policyTuning() ? dslash::inc_shmem_sync_counter() : dslash::get_shmem_sync_counter()) :
-          dslash::get_shmem_sync_counter();
+        arg.counter = activeTuning() ? (uberTuning() && !policyTuning() ? dslash::inc_dslash_shmem_sync_counter() :
+                                                                          dslash::get_dslash_shmem_sync_counter()) :
+                                       dslash::get_dslash_shmem_sync_counter();
         arg.exterior_blocks = ((arg.shmem & 64) && arg.exterior_dims > 0) ?
           (device::processor_count() / (2 * arg.exterior_dims)) * (2 * arg.exterior_dims * tp.aux.y) :
           0;
@@ -336,7 +336,7 @@ namespace quda
 
       // this sets the communications pattern for the packing kernel
       setPackComms(arg.commDim);
-      // strcpy(aux, in.AuxString());
+      // strcpy(aux, in.AuxString().c_str());
       fillAuxBase(app_base);
 #ifdef MULTI_GPU
       fillAux(INTERIOR_KERNEL, "policy_kernel=interior");
@@ -434,7 +434,7 @@ namespace quda
       auto aux_ = (arg.pack_blocks > 0 && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL)) ?
         aux_pack :
         ((arg.shmem > 0 && arg.kernel_type == EXTERIOR_KERNEL_ALL) ? aux_barrier : aux[arg.kernel_type]);
-      return TuneKey(in.VolString(), typeid(*this).name(), aux_);
+      return TuneKey(in.VolString().c_str(), typeid(*this).name(), aux_);
     }
 
     /**

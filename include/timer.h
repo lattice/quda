@@ -3,11 +3,7 @@
 #include <sys/time.h>
 
 #ifdef INTERFACE_NVTX
-#if QUDA_NVTX_VERSION == 3
 #include "nvtx3/nvToolsExt.h"
-#else
-#include "nvToolsExt.h"
-#endif
 #endif
 
 #include <quda_internal.h>
@@ -69,6 +65,9 @@ namespace quda {
       }
     }
 
+    /**
+       @brief Start the timer
+     */
     void start(const char *func = nullptr, const char *file = nullptr, int line = 0)
     {
       if (running) {
@@ -84,10 +83,14 @@ namespace quda {
       running = true;
     }
 
-    void stop(const char *func = nullptr, const char *file = nullptr, int line = 0)
+    /**
+       @brief Update last_interval, but doesn't stop the time or
+       increment the count.
+     */
+    void peek(const char *func = nullptr, const char *file = nullptr, int line = 0)
     {
       if (!running) {
-        printfQuda("ERROR: Cannot stop an unstarted timer (%s:%d in %s())", file ? file : "", line, func ? func : "");
+        printfQuda("ERROR: Cannot peek an unstarted timer (%s:%d in %s())", file ? file : "", line, func ? func : "");
         errorQuda("Aborting");
       }
       if (!device) {
@@ -100,6 +103,14 @@ namespace quda {
         qudaEventSynchronize(device_stop);
         last_interval = qudaEventElapsedTime(device_start, device_stop);
       }
+    }
+
+    /**
+       @brief Updates the last_interval time, stops the timer and increments the count.
+     */
+    void stop(const char *func = nullptr, const char *file = nullptr, int line = 0)
+    {
+      peek(func, file, line);
       time += last_interval;
       count++;
 
@@ -180,7 +191,7 @@ namespace quda {
 #define PUSH_RANGE(name,cid) { \
     int color_id = cid; \
     color_id = color_id%nvtx_num_colors;\
-    nvtxEventAttributes_t eventAttrib = {0}; \
+    nvtxEventAttributes_t eventAttrib = {}; \
     eventAttrib.version = NVTX_VERSION; \
     eventAttrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE; \
     eventAttrib.colorType = NVTX_COLOR_ARGB; \

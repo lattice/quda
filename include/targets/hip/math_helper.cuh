@@ -70,7 +70,7 @@ namespace quda
    * @param s pointer to the storage for the result of the sin
    * @param c pointer to the storage for the result of the cos
    *
-   * Specialization to float arguments. Device function calls CUDA intrinsic
+   * Specialization to float arguments.
    */
   template <> inline __host__ __device__ void sincos(const float &a, float *s, float *c)
   {
@@ -81,6 +81,32 @@ namespace quda
   {
     target::dispatch<sincos_impl>(a, s, c);
   }
+
+  /**
+   * @brief Combined sinpi and cospi calculation in QUDA NAMESPACE
+   * @param a the angle
+   * @param s pointer to the storage for the result of the sin
+   * @param c pointer to the storage for the result of the cos
+   */
+  template <typename T> inline __host__ __device__ void sincospi(const T& a, T *s, T *c) { quda::sincos(a * static_cast<T>(M_PI), s, c); }
+
+  /**
+   * @brief Sine pi calculation in QUDA NAMESPACE.
+   * @param a the angle
+   * @return result of the sin(a * pi)
+   *
+   * Specialization to float.
+   */
+  template <typename T> inline __host__ __device__ T sinpi(T a) { return sin(a * static_cast<T>(M_PI)); }
+
+  /**
+   * @brief Cosine pi calculation in QUDA NAMESPACE.
+   * @param a the angle
+   * @return result of the cos(a * pi)
+   *
+   * Specialization to float.
+   */
+  template <typename T> inline __host__ __device__ T cospi(T a) { return cos(a * static_cast<T>(M_PI)); }
 
   /**
    * @brief Reciprocal square root function (rsqrt)
@@ -113,107 +139,6 @@ namespace quda
   template <> inline __host__ __device__ float rsqrt(const float &a) { return target::dispatch<rsqrtf_impl>(a); }
   template <> inline __host__ __device__ double rsqrt(const double &a) { return target::dispatch<rsqrt_impl>(a); }
 
-  /**
-    Generic wrapper for Trig functions -- used in gauge field order
-   */
-  template <bool isFixed, typename T> struct Trig {
-    __device__ __host__ static T Atan2(const T &a, const T &b) { return ::atan2(a, b); }
-    __device__ __host__ static T Sin(const T &a) { return ::sin(a); }
-    __device__ __host__ static T Cos(const T &a) { return ::cos(a); }
-    __device__ __host__ static void SinCos(const T &a, T *s, T *c)
-    {
-      *s = ::sin(a);
-      *c = ::cos(a);
-    }
-  };
-
-  template <bool is_device> struct sinf_impl {
-    inline float operator()(const float &a) { return ::sinf(a); }
-  };
-  template <> struct sinf_impl<true> {
-    __device__ inline float operator()(const float &a) { return ::sinf(a); }
-  };
-
-  template <bool is_device> struct cosf_impl {
-    inline float operator()(const float &a) { return ::cosf(a); }
-  };
-  template <> struct cosf_impl<true> {
-    __device__ inline float operator()(const float &a) { return ::cosf(a); }
-  };
-
-  template <bool is_device> struct sin_impl {
-    inline double operator()(const double &a) { return ::sin(a); }
-  };
-  template <> struct sin_impl<true> {
-    __device__ inline double operator()(const double &a) { return ::sin(a); }
-  };
-
-  template <bool is_device> struct cos_impl {
-    inline double operator()(const double &a) { return ::cos(a); }
-  };
-  template <> struct cos_impl<true> {
-    __device__ inline double operator()(const double &a) { return ::cos(a); }
-  };
-
-  /**
-     Specialization of Trig functions using floats
-   */
-  template <> struct Trig<false, float> {
-    __device__ __host__ static float Atan2(const float &a, const float &b) { return ::atan2f(a, b); }
-    __device__ __host__ static float Sin(const float &a) { return target::dispatch<sinf_impl>(a); }
-    __device__ __host__ static float Cos(const float &a) { return target::dispatch<cosf_impl>(a); }
-    __device__ __host__ static void SinCos(const float &a, float *s, float *c)
-    {
-      target::dispatch<sincosf_impl>(a, s, c);
-    }
-  };
-
-  template <> struct Trig<true, float> {
-    __device__ __host__ static float Atan2(const float &a, const float &b) { return ::atan2f(a, b) / M_PI; }
-    __device__ __host__ static float Sin(const float &a)
-    {
-      return target::dispatch<sinf_impl>(a * static_cast<float>(M_PI));
-    }
-    __device__ __host__ static float Cos(const float &a)
-    {
-      return target::dispatch<cosf_impl>(a * static_cast<float>(M_PI));
-    }
-    __device__ __host__ static void SinCos(const float &a, float *s, float *c)
-    {
-      auto ampi = a * static_cast<float>(M_PI);
-      target::dispatch<sincosf_impl>(ampi, s, c);
-    }
-  };
-
-  /**
-     Specialization of Trig functions using doubles
-   */
-  template <> struct Trig<false, double> {
-    __device__ __host__ static double Atan2(const double &a, const double &b) { return ::atan2(a, b); }
-    __device__ __host__ static double Sin(const double &a) { return target::dispatch<sin_impl>(a); }
-    __device__ __host__ static double Cos(const double &a) { return target::dispatch<cos_impl>(a); }
-    __device__ __host__ static void SinCos(const double &a, double *s, double *c)
-    {
-      target::dispatch<sincos_impl>(a, s, c);
-    }
-  };
-
-  template <> struct Trig<true, double> {
-    __device__ __host__ static double Atan2(const double &a, const double &b) { return ::atan2(a, b) / M_PI; }
-    __device__ __host__ static double Sin(const double &a)
-    {
-      return target::dispatch<sin_impl>(a * static_cast<double>(M_PI));
-    }
-    __device__ __host__ static double Cos(const double &a)
-    {
-      return target::dispatch<cos_impl>(a * static_cast<double>(M_PI));
-    }
-    __device__ __host__ static void SinCos(const double &a, double *s, double *c)
-    {
-      auto ampi = a * static_cast<double>(M_PI);
-      target::dispatch<sincos_impl>(ampi, s, c);
-    }
-  };
 
   template <bool is_device> struct fpow_impl {
     template <typename real> inline real operator()(real a, int b) { return ::pow(a, b); }

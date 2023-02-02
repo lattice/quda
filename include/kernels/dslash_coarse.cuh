@@ -2,9 +2,10 @@
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <array.h>
-#include <shared_memory_cache_helper.cuh>
+#include <shared_memory_cache_helper.h>
 #include <kernel.h>
 #include <warp_collective.h>
+#include <dslash_quda.h>
 
 namespace quda {
 
@@ -14,11 +15,19 @@ namespace quda {
     DSLASH_FULL
   };
 
+#ifdef MULTIGRID_DSLASH_PROMOTE
+  template <typename store_t>
+  using compute_prec = double;
+#else
+  template <typename store_t>
+  using compute_prec = typename mapper<store_t>::type;
+#endif
+
   // we use two colors per thread unless we have large dim_stride, when we're aiming for maximum parallelism
   constexpr int colors_per_thread(int nColor, int dim_stride) { return (nColor % 2 == 0 && nColor <= 32 && dim_stride <= 2) ? 2 : 1; }
 
   template <bool dslash_, bool clover_, bool dagger_, DslashType type_, int color_stride_, int dim_stride_, typename Float,
-            typename yFloat, typename ghostFloat, int nSpin_, int nColor_, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
+            typename yFloat, typename ghostFloat, int nSpin_, int nColor_, bool native>
   struct DslashCoarseArg : kernel_param<> {
     static constexpr bool dslash = dslash_;
     static constexpr bool clover = clover_;
@@ -27,46 +36,63 @@ namespace quda {
     static constexpr int color_stride = color_stride_;
     static constexpr int dim_stride = dim_stride_;
 
-    using real = typename mapper<Float>::type;
+    using real = compute_prec<Float>;
     static constexpr int nSpin = nSpin_;
     static constexpr int nColor = nColor_;
     static constexpr int nDim = 4;
+    static constexpr int nFace = 1;
 
-    using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, csOrder, Float, ghostFloat>;
-    using G = typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat>;
+    static constexpr QudaFieldOrder csOrder = native ? colorspinor::getNative<Float>(nSpin) : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    static constexpr QudaGaugeFieldOrder gOrder = native ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_QDP_GAUGE_ORDER;
+
+    using G = typename colorspinor::GhostOrder<real, nSpin, nColor, 1, csOrder, Float, ghostFloat>;
+    // disable ghost to reduce arg size
+    using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, csOrder, Float, ghostFloat, true>;
     using GY = typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat>;
 
-    F out;
-    const F inA;
-    const F inB;
+    static constexpr unsigned int max_n_src = 64;
+    const int_fastdiv n_src;
+    F out[max_n_src];
+    F inA[max_n_src];
+    F inB[max_n_src];
+    G halo;
     const GY Y;
     const GY X;
     const real kappa;
     const int parity; // only use this for single parity fields
     const int nParity; // number of parities we're working on
-    const int nFace;  // hard code to 1 for now
     const int_fastdiv X0h; // X[0]/2
     const int_fastdiv dim[5];   // full lattice dimensions
     const int commDim[4]; // whether a given dimension is partitioned or not
     const int volumeCB;
+    int ghostFaceCB[4];
 
-    inline DslashCoarseArg(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-                           const GaugeField &Y, const GaugeField &X, real kappa, int parity) :
-      kernel_param(dim3(color_stride * X.VolumeCB(), out.SiteSubset(), 2 * dim_stride * 2 * (nColor / colors_per_thread(nColor, dim_stride)))),
-      out(const_cast<ColorSpinorField &>(out)),
-      inA(const_cast<ColorSpinorField &>(inA)),
-      inB(const_cast<ColorSpinorField &>(inB)),
+    DslashCoarseArg(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
+                    cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
+                    real kappa, int parity, const ColorSpinorField &halo) :
+      kernel_param(dim3(color_stride * X.VolumeCB(), out[0].SiteSubset() * out.size(),
+                        2 * dim_stride * 2 * (nColor / colors_per_thread(nColor, dim_stride)))),
+      n_src(out.size()),
+      halo(halo, nFace),
       Y(const_cast<GaugeField &>(Y)),
       X(const_cast<GaugeField &>(X)),
       kappa(kappa),
       parity(parity),
-      nParity(out.SiteSubset()),
-      nFace(1),
-      X0h(((3 - nParity) * out.X(0)) / 2),
-      dim {(3 - nParity) * out.X(0), out.X(1), out.X(2), out.X(3), out.Ndim() == 5 ? out.X(4) : 1},
+      nParity(out[0].SiteSubset()),
+      X0h(((3 - nParity) * out[0].X(0)) / 2),
+      dim {(3 - nParity) * out[0].X(0), out[0].X(1), out[0].X(2), out[0].X(3), out[0].Ndim() == 5 ? out[0].X(4) : 1},
       commDim {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-      volumeCB((unsigned int)out.VolumeCB() / dim[4])
-    {  }
+      volumeCB((unsigned int)out[0].VolumeCB() / dim[4])
+    {
+      if (out.size() > max_n_src) errorQuda("vector set size %lu greater than max size %d", out.size(), max_n_src);
+      for (auto i = 0u; i < out.size(); i++) {
+        this->out[i] = out[i];
+        this->inA[i] = inA[i];
+        this->inB[i] = inB[i];
+      }
+      // ghostFaceCB does not include the batch (5th) dimension at present
+      for (int i = 0; i < 4; i++) ghostFaceCB[i] = halo.getDslashConstant().ghostFaceCB[i];
+    }
   };
 
   /**
@@ -101,36 +127,35 @@ namespace quda {
      Applies the coarse dslash on a given parity and checkerboard site index
      /out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
 
-     @param out The result vector
-     @param thread_dir Direction
-     @param x_cb The checkerboarded site index
-     @param src_idx dummy for now
-     @param parity The site parity
-     @param s_row Which spin row are acting on
-     @param color_block Which color row are we acting on
-     @param color_off Which color column offset are we acting on
-     @param arg Arguments
+     @param[in,out] out The result vector
+     @param[in] thread_dir Direction
+     @param[in] x_cb The checkerboarded site index
+     @param[in] src_idx Which src are we working on
+     @param[in] parity The site parity
+     @param[in] s_row Which spin row are acting on
+     @param[in] color_block Which color row are we acting on
+     @param[in] color_off Which color column offset are we acting on
+     @param[in] arg Arguments
    */
-  template <int Mc, int thread_dim, typename V, typename Arg>
-  __device__ __host__ inline void applyDslash(V &out, int thread_dir, int x_cb, int src_idx, int parity, int s_row, int color_block, int color_offset, const Arg &arg)
+  template <int Mc, typename V, typename Arg>
+  __device__ __host__ inline void applyDslash(V &out, int thread_dim, int thread_dir, int x_cb, int src_idx, int parity, int s_row, int color_block, int color_offset, const Arg &arg)
   {
     const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
 
-    int coord[5];
+    int coord[4];
     getCoordsCB(coord, x_cb, arg.dim, arg.X0h, parity);
-    coord[4] = src_idx;
 
     if (!thread_dir || target::is_host()) {
 
       //Forward gather - compute fwd offset for spinor fetch
 #pragma unroll
-      for(int d = thread_dim; d < Arg::nDim; d += Arg::dim_stride) // loop over dimension
-      {
-	const int fwd_idx = linkIndexP1(coord, arg.dim, d);
+      for(int d0 = 0; d0 < Arg::nDim; d0 += Arg::dim_stride) { // loop over dimension
+        int d = d0 + thread_dim;
+	const int fwd_idx = linkIndexHop(coord, arg.dim, d, arg.nFace);
 
-	if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
-	  if (doHalo<Arg::type>()) {
-            int ghost_idx = ghostFaceIndex<1, 5>(coord, arg.dim, d, arg.nFace);
+	if (arg.commDim[d] && is_boundary(coord, d, 1, arg) ) {
+	  if constexpr (doHalo<Arg::type>()) {
+            int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
 
 #pragma unroll
 	    for(int color_local = 0; color_local < Mc; color_local++) { //Color row
@@ -143,15 +168,15 @@ namespace quda {
 		  int col = s_col * Arg::nColor + c_col + color_offset;
 		  if (!Arg::dagger)
                     out[color_local] = cmac(arg.Y(d+4, parity, x_cb, row, col),
-                                            arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
+                                            arg.halo.Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx * arg.ghostFaceCB[d], s_col, c_col+color_offset), out[color_local]);
 		  else
 		    out[color_local] = cmac(arg.Y(d, parity, x_cb, row, col),
-                                            arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
-		}
+                                            arg.halo.Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx * arg.ghostFaceCB[d], s_col, c_col+color_offset), out[color_local]);
+                }
 	      }
 	    }
 	  }
-	} else if (doBulk<Arg::type>()) {
+	} else if constexpr (doBulk<Arg::type>()) {
 #pragma unroll
 	  for(int color_local = 0; color_local < Mc; color_local++) { //Color row
 	    int c_row = color_block + color_local; // global color index
@@ -163,10 +188,10 @@ namespace quda {
 		int col = s_col * Arg::nColor + c_col + color_offset;
 		if (!Arg::dagger)
 		  out[color_local] = cmac(arg.Y(d+4, parity, x_cb, row, col),
-                                          arg.inA(their_spinor_parity, fwd_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
+                                          arg.inA[src_idx](their_spinor_parity, fwd_idx, s_col, c_col+color_offset), out[color_local]);
 		else
 		  out[color_local] = cmac(arg.Y(d, parity, x_cb, row, col),
-                                          arg.inA(their_spinor_parity, fwd_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
+                                          arg.inA[src_idx](their_spinor_parity, fwd_idx, s_col, c_col+color_offset), out[color_local]);
 	      }
 	    }
 	  }
@@ -179,13 +204,13 @@ namespace quda {
 
       //Backward gather - compute back offset for spinor and gauge fetch
 #pragma unroll
-      for(int d = thread_dim; d < Arg::nDim; d += Arg::dim_stride)
-	{
-	const int back_idx = linkIndexM1(coord, arg.dim, d);
-	const int gauge_idx = back_idx;
-	if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
-	  if (doHalo<Arg::type>()) {
-            const int ghost_idx = ghostFaceIndex<0, 5>(coord, arg.dim, d, arg.nFace);
+      for(int d0 = 0; d0 < Arg::nDim; d0 += Arg::dim_stride) {
+        const int d = d0 + thread_dim;
+	const int back_idx = linkIndexHop(coord, arg.dim, d, -arg.nFace);
+
+	if (arg.commDim[d] && is_boundary(coord, d, 0, arg)) {
+	  if constexpr (doHalo<Arg::type>()) {
+            const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
 #pragma unroll
 	    for (int color_local=0; color_local<Mc; color_local++) {
 	      int c_row = color_block + color_local;
@@ -197,14 +222,15 @@ namespace quda {
 		  int col = s_col * Arg::nColor + c_col + color_offset;
 		  if (!Arg::dagger)
 		    out[color_local] = cmac(conj(arg.Y.Ghost(d, 1-parity, ghost_idx, col, row)),
-                                            arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
+                                            arg.halo.Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx * arg.ghostFaceCB[d], s_col, c_col+color_offset), out[color_local]);
 		  else
 		    out[color_local] = cmac(conj(arg.Y.Ghost(d+4, 1-parity, ghost_idx, col, row)),
-                                            arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
+                                            arg.halo.Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx * arg.ghostFaceCB[d], s_col, c_col+color_offset), out[color_local]);
 		}
 	    }
 	  }
-	} else if (doBulk<Arg::type>()) {
+	} else if constexpr (doBulk<Arg::type>()) {
+          const int gauge_idx = back_idx;
 #pragma unroll
 	  for(int color_local = 0; color_local < Mc; color_local++) {
 	    int c_row = color_block + color_local;
@@ -216,10 +242,10 @@ namespace quda {
 		int col = s_col * Arg::nColor + c_col + color_offset;
 		if (!Arg::dagger)
 		  out[color_local] = cmac(conj(arg.Y(d, 1-parity, gauge_idx, col, row)),
-                                          arg.inA(their_spinor_parity, back_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
+                                          arg.inA[src_idx](their_spinor_parity, back_idx, s_col, c_col+color_offset), out[color_local]);
 		else
 		  out[color_local] = cmac(conj(arg.Y(d+4, 1-parity, gauge_idx, col, row)),
-                                          arg.inA(their_spinor_parity, back_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
+                                          arg.inA[src_idx](their_spinor_parity, back_idx, s_col, c_col+color_offset), out[color_local]);
 	      }
 	  }
 	}
@@ -255,9 +281,9 @@ namespace quda {
 	  //Factor of kappa and diagonal addition now incorporated in X
 	  int col = s_col * Arg::nColor + c_col + color_offset;
 	  if (!Arg::dagger) {
-	    out[color_local] = cmac(arg.X(0, parity, x_cb, row, col), arg.inB(spinor_parity, x_cb+src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
+	    out[color_local] = cmac(arg.X(0, parity, x_cb, row, col), arg.inB[src_idx](spinor_parity, x_cb, s_col, c_col+color_offset), out[color_local]);
 	  } else {
-	    out[color_local] = cmac(conj(arg.X(0, parity, x_cb, col, row)), arg.inB(spinor_parity, x_cb+src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
+	    out[color_local] = cmac(conj(arg.X(0, parity, x_cb, col, row)), arg.inB[src_idx](spinor_parity, x_cb, s_col, c_col+color_offset), out[color_local]);
 	  }
 	}
     }
@@ -303,7 +329,7 @@ namespace quda {
     constexpr CoarseDslash(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(int x_cb_color_offset, int parity, int sMd)
+    __device__ __host__ inline void operator()(int x_cb_color_offset, int src_parity, int sMd)
     {
       int x_cb = x_cb_color_offset;
       int color_offset = 0;
@@ -317,7 +343,8 @@ namespace quda {
         color_offset = lane_id / vector_site_width;
       }
 
-      parity = (arg.nParity == 2) ? parity : arg.parity;
+      int src_idx = src_parity % arg.n_src;
+      int parity = (arg.nParity == 2) ? (src_parity / arg.n_src) : arg.parity;
 
       // z thread dimension is (( s*(Nc/Mc) + color_block )*dim_thread_split + dim)*2 + dir
       constexpr int Mc = colors_per_thread(Arg::nColor, Arg::dim_stride);
@@ -328,15 +355,10 @@ namespace quda {
       int s = sM / (Arg::nColor/Mc);
       int color_block = (sM % (Arg::nColor/Mc)) * Mc;
 
-      constexpr int src_idx = 0;
       array<complex <typename Arg::real>, Mc> out{ };
 
       if (Arg::dslash) {
-        if (dim == 0)      applyDslash<Mc, 0>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
-        else if (dim == 1) applyDslash<Mc, 1>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
-        else if (dim == 2) applyDslash<Mc, 2>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
-        else if (dim == 3) applyDslash<Mc, 3>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
-
+        applyDslash<Mc>(out, dim, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
         target::dispatch<dim_collapse>(out, dir, dim, arg);
       }
 
@@ -353,8 +375,8 @@ namespace quda {
           int c = color_block + color_local; // global color index
           if (color_offset == 0) {
             // if not halo we just store, else we accumulate
-            if (doBulk<Arg::type>()) arg.out(my_spinor_parity, x_cb+src_idx*arg.volumeCB, s, c) = out[color_local];
-            else arg.out(my_spinor_parity, x_cb+src_idx*arg.volumeCB, s, c) += out[color_local];
+            if (doBulk<Arg::type>()) arg.out[src_idx](my_spinor_parity, x_cb, s, c) = out[color_local];
+            else arg.out[src_idx](my_spinor_parity, x_cb, s, c) += out[color_local];
           }
         }
       }

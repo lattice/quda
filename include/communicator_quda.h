@@ -1,18 +1,19 @@
 #pragma once
 
 #include <unistd.h> // for gethostname()
-#include <assert.h>
+#include <cassert>
+#include <csignal>
 #include <limits>
 #include <stack>
+#include <algorithm>
+#include <numeric>
 
 #include <quda_internal.h>
 #include <comm_quda.h>
-#include <csignal>
-
+#include <color_spinor_field.h>
+#include <field_cache.h>
 #include <comm_key.h>
-
-#include <algorithm>
-#include <numeric>
+#include <float_vector.h>
 
 #if defined(MPI_COMMS) || defined(QMP_COMMS)
 #include <mpi.h>
@@ -272,7 +273,7 @@ namespace quda
               continue;
 
             // if the neighbors are on the same
-            if (!strncmp(hostname, &hostname_recv_buf[128 * neighbor_rank], 128)) {
+            if (!strncmp(hostname, &hostname_recv_buf[QUDA_MAX_HOSTNAME_STRING * neighbor_rank], QUDA_MAX_HOSTNAME_STRING)) {
               int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
 
               bool can_access_peer = comm_peer2peer_possible(gpuid, neighbor_gpuid);
@@ -415,6 +416,8 @@ namespace quda
 
     snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1),
              comm_dim_partitioned(2), comm_dim_partitioned(3));
+
+    FieldTmp<ColorSpinorField>::destroy(); // destroy field cache since message handles can be invalid
   }
 #else
   void comm_dim_partitioned_set(int)
@@ -430,6 +433,8 @@ namespace quda
 
     snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1),
              comm_dim_partitioned(2), comm_dim_partitioned(3));
+
+    FieldTmp<ColorSpinorField>::destroy(); // destroy field cache since message handles can be invalid
   }
 
 #ifdef MULTI_GPU
@@ -520,7 +525,7 @@ namespace quda
     comm_set_default_topology(topo);
 
     // determine which GPU this rank will use
-    char *hostname_recv_buf = (char *)safe_malloc(128 * comm_size());
+    char *hostname_recv_buf = (char *)safe_malloc(QUDA_MAX_HOSTNAME_STRING * comm_size());
     comm_gather_hostname(hostname_recv_buf);
 
     if (gpuid < 0) {
@@ -530,7 +535,7 @@ namespace quda
       // We initialize gpuid if it's still negative.
       gpuid = 0;
       for (int i = 0; i < comm_rank(); i++) {
-        if (!strncmp(comm_hostname(), &hostname_recv_buf[128 * i], 128)) { gpuid++; }
+        if (!strncmp(comm_hostname(), &hostname_recv_buf[QUDA_MAX_HOSTNAME_STRING * i], QUDA_MAX_HOSTNAME_STRING)) { gpuid++; }
       }
 
       if (gpuid >= device_count) {
@@ -680,6 +685,10 @@ namespace quda
 
   ~Communicator();
 
+#if defined(QMP_COMMS) || defined(MPI_COMMS)
+  MPI_Comm get_mpi_handle() { return MPI_COMM_HANDLE; }
+#endif
+
   void comm_gather_hostname(char *hostname_recv_buf);
 
   void comm_gather_gpuid(int *gpuid_recv_buf);
@@ -745,6 +754,8 @@ namespace quda
   void comm_allreduce_sum_array(double *data, size_t size);
 
   void comm_allreduce_max_array(double *data, size_t size);
+
+  void comm_allreduce_max_array(deviation_t<double> *data, size_t size);
 
   void comm_allreduce_min_array(double *data, size_t size);
 

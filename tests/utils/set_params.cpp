@@ -135,7 +135,8 @@ void setInvertParam(QudaInvertParam &inv_param)
         inv_param.mass = 1.0 / inv_param.kappa - 8.0;
     }
   }
-  printfQuda("Kappa = %.8f Mass = %.8f\n", inv_param.kappa, inv_param.mass);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+    printfQuda("Kappa = %.8f Mass = %.8f\n", inv_param.kappa, inv_param.mass);
 
   // Use 3D or 4D laplace
   inv_param.laplace3D = laplace3D;
@@ -353,6 +354,7 @@ void setEigParam(QudaEigParam &eig_param)
 
   eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  eig_param.use_pc = eig_use_pc ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.compute_gamma5 = eig_compute_gamma5 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   if (eig_compute_svd) {

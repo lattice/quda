@@ -84,7 +84,7 @@ namespace quda
             auto b = Wacc(parity, x_cb, s_col, 0, 0);
             auto c = arg.UV(parity, x_cb, s_col * fineSpin, 0, 0);
 
-            uvMax = Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, 0, 0);
+            uvMax = fmax(uvMax, Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, 0, 0));
           }
 
         } else if (arg.comm_dim[Arg::dim] && (coord[Arg::dim] + nFace >= arg.x_size[Arg::dim])) {
@@ -97,7 +97,7 @@ namespace quda
             auto b = Wacc.Ghost(Arg::dim, 1, (parity + 1) & 1, ghost_idx, s_col, 0, 0);
             auto c = arg.UV(parity, x_cb, s_col * fineSpin, 0, 0);
 
-            uvMax = Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, 0, 0);
+            uvMax = fmax(uvMax, Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, 0, 0));
           }
 
         } else {
@@ -110,7 +110,7 @@ namespace quda
             auto b = Wacc((parity + 1) & 1, y_cb, s_col, 0, 0);
             auto c = arg.UV(parity, x_cb, s_col * fineSpin, 0, 0);
 
-            uvMax = Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, 0, 0);
+            uvMax = fmax(uvMax, Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, 0, 0));
           }
         }
 
@@ -138,7 +138,8 @@ namespace quda
           max = impl::computeUV(arg, arg.AV, parity, x_cb);
 
         if (Arg::compute_max) {
-          unsigned aggregate = BlockReduce<unsigned, 1, Arg::block_y, Arg::block_z>().Max(__float_as_uint(max));
+          constexpr int block_dim = 3;
+          unsigned aggregate = BlockReduce<unsigned, block_dim>().Max(__float_as_uint(max));
           if (threadIdx.y == 0 && threadIdx.z == 0) atomic_fetch_abs_max(arg.max_d, __uint_as_float(aggregate));
         }
       }

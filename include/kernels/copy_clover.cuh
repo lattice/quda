@@ -69,7 +69,7 @@ namespace quda {
     __device__ __host__ void operator()(int x_cb, int parity)
     {
       static_assert(Arg::Out::compressed_block == Arg::In::compressed_block, "lengths must match");
-      static constexpr int length = 2 * Arg::Out::compressed_block;
+      constexpr int length = 2 * Arg::Out::compressed_block;
       typename mapper<typename Arg::store_out_t>::type out[length];
       typename mapper<typename Arg::store_in_t>::type in[length];
       arg.in.raw_load(in, x_cb, parity);

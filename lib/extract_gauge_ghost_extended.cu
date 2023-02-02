@@ -27,7 +27,7 @@ namespace quda {
     {
       strcat(aux, extract ? ",extract" : ",inject");
       strcat(aux, ",dim=");
-      u32toa(aux + strlen(aux) - 1, dim);
+      u32toa(aux + strlen(aux), dim);
       apply(device::get_default_stream());
     }
 

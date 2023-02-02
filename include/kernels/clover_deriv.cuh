@@ -1,6 +1,7 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
+#include <thread_array.h>
 #include <kernel.h>
 
 namespace quda
@@ -37,8 +38,8 @@ namespace quda
     }
   };
 
-  template <typename Arg, int mu, int nu, typename Link>
-  __device__ __forceinline__ void computeForce(Link &force, const Arg &arg, int xIndex, int yIndex)
+  template <typename Link, typename Arg>
+  __device__ __host__ void computeForce(Link &force, const Arg &arg, int xIndex, int yIndex, int mu, int nu)
   {
     int otherparity = (1 - arg.parity);
 
@@ -51,7 +52,7 @@ namespace quda
 
       // U[mu](x) U[nu](x+mu) U[*mu](x+nu) U[*nu](x) Oprod(x)
       {
-        int d[4] = { };
+        thread_array<int, 4> d = { };
 
         // load U(x)_(+mu)
         Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), arg.parity);
@@ -90,7 +91,7 @@ namespace quda
       }
 
       {
-        int d[4] = { };
+        thread_array<int, 4> d = { };
 
         // load U(x-nu)(+nu)
         d[nu]--;
@@ -137,7 +138,7 @@ namespace quda
       getCoordsExtended(y, xIndex, arg.X, otherparity, arg.border);
 
       {
-        int d[4] = { };
+        thread_array<int, 4> d = { };
 
         // load U(x)_(+mu)
         Link U1 = arg.gauge(mu, linkIndexShift(y, d, arg.E), otherparity);
@@ -179,7 +180,7 @@ namespace quda
       // Lower leaf
       // U[nu*](x-nu) U[mu](x-nu) U[nu](x+mu-nu) Oprod(x+mu) U[*mu](x)
       {
-        int d[4] = { };
+        thread_array<int, 4> d = { };
 
         // load U(x-nu)(+nu)
         d[nu]--;
@@ -238,27 +239,10 @@ namespace quda
 
       Link force;
 
-      switch (mu) {
-      case 0:
-        computeForce<Arg, 0, 1, Link>(force, arg, x_cb, parity);
-        computeForce<Arg, 0, 2, Link>(force, arg, x_cb, parity);
-        computeForce<Arg, 0, 3, Link>(force, arg, x_cb, parity);
-        break;
-      case 1:
-        computeForce<Arg, 1, 0, Link>(force, arg, x_cb, parity);
-        computeForce<Arg, 1, 3, Link>(force, arg, x_cb, parity);
-        computeForce<Arg, 1, 2, Link>(force, arg, x_cb, parity);
-        break;
-      case 2:
-        computeForce<Arg, 2, 3, Link>(force, arg, x_cb, parity);
-        computeForce<Arg, 2, 0, Link>(force, arg, x_cb, parity);
-        computeForce<Arg, 2, 1, Link>(force, arg, x_cb, parity);
-        break;
-      case 3:
-        computeForce<Arg, 3, 2, Link>(force, arg, x_cb, parity);
-        computeForce<Arg, 3, 1, Link>(force, arg, x_cb, parity);
-        computeForce<Arg, 3, 0, Link>(force, arg, x_cb, parity);
-        break;
+#pragma unroll
+      for (int nu = 0; nu < 4; nu++) {
+        if (nu == mu) continue;
+        computeForce(force, arg, x_cb, parity, mu, nu);
       }
 
       // Write to array

@@ -10,7 +10,7 @@ namespace quda {
 
   // Summed contraction type kernels.
   //----------------------------------------------------------------------------
-  template <typename Float, int nColor> class ContractionSummed : TunableMultiReduction<1>
+  template <typename Float, int nColor> class ContractionSummed : TunableMultiReduction
   {
   protected:
     const ColorSpinorField &x;
@@ -30,7 +30,7 @@ namespace quda {
 		      const int *const source_position,
 		      const int *const mom_mode, const QudaFFTSymmType *const fft_type,
 		      const size_t s1, const size_t b1) :
-      TunableMultiReduction(x, x.X()[cType == QUDA_CONTRACT_TYPE_DR_FT_Z || cType == QUDA_CONTRACT_TYPE_OPEN_SUM_Z ? 2 : 3]),
+      TunableMultiReduction(x, 1u, x.X()[cType == QUDA_CONTRACT_TYPE_DR_FT_Z || cType == QUDA_CONTRACT_TYPE_OPEN_SUM_Z ? 2 : 3]),
       x(x),
       y(y),
       result_global(result_global),

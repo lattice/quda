@@ -56,6 +56,9 @@ namespace quda {
     /** Ghost precision */
     QudaPrecision GhostPrecision() const { return ghost_precision; }
 
+    /** indicate if the param has been initialized (created with a non trivial constructor) */
+    bool init = false;
+
     /** Number of field dimensions */
     int nDim = 4;
 
@@ -95,6 +98,7 @@ namespace quda {
       location(location),
       precision(precision),
       ghost_precision(precision),
+      init(true),
       nDim(nDim),
       pad(pad),
       siteSubset(QUDA_FULL_SITE_SUBSET),
@@ -119,6 +123,7 @@ namespace quda {
       location(QUDA_CPU_FIELD_LOCATION),
       precision(param.cpu_prec),
       ghost_precision(param.cpu_prec),
+      init(true),
       nDim(4),
       pad(0),
       siteSubset(QUDA_FULL_SITE_SUBSET),
@@ -471,13 +476,13 @@ namespace quda {
        @brief Copy constructor for creating a LatticeField from another LatticeField
        @param field Instance of LatticeField from which we are cloning
     */
-    LatticeField(const LatticeField &field);
+    LatticeField(const LatticeField &field) noexcept;
 
     /**
        @brief Move constructor for creating a LatticeField from another LatticeField
        @param field Instance of LatticeField from which we are moving
     */
-    LatticeField(LatticeField &&field);
+    LatticeField(LatticeField &&field) noexcept;
 
     /**
        @brief Constructor for creating a LatticeField from a LatticeFieldParam
@@ -773,10 +778,10 @@ namespace quda {
     virtual void scatter(int, const qudaStream_t &) { errorQuda("Not implemented"); }
 
     /** Return the volume string used by the autotuner */
-    inline const char *VolString() const { return vol_string.c_str(); }
+    auto VolString() const { return vol_string; }
 
     /** Return the aux string used by the autotuner */
-    inline const char *AuxString() const { return aux_string.c_str(); }
+    auto AuxString() const { return aux_string; }
 
     /** @brief Backs up the LatticeField */
     virtual void backup() const { errorQuda("Not implemented"); }

@@ -16,6 +16,9 @@ typedef int (*QudaCommsMap)(const int *coords, void *fdata);
 }
 #endif
 
+/** Maximum length in bytes of the host string */
+#define QUDA_MAX_HOSTNAME_STRING 128
+
 namespace quda
 {
 
@@ -203,8 +206,8 @@ namespace quda
   /**
      @brief Gather all hostnames
      @param[out] hostname_recv_buf char array of length
-     128*comm_size() that will be filled in GPU ids for all processes.
-     Each hostname is in rank order, with 128 bytes for each.
+     QUDA_MAX_HOSTNAME_STRING*comm_size() that will be filled in GPU ids for all processes.
+     Each hostname is in rank order, with QUDA_MAX_HOSTNAME_STRING bytes for each.
   */
   void comm_gather_hostname(char *hostname_recv_buf);
 

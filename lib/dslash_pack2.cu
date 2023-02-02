@@ -138,7 +138,7 @@ protected:
     void fillAux()
     {
       strcpy(aux, "policy_kernel,");
-      strcat(aux, in.AuxString());
+      strcat(aux, in.AuxString().c_str());
       char comm[5];
       for (int i = 0; i < 4; i++) comm[i] = (comm_dim_pack[i] ? '1' : '0');
       comm[4] = '\0';

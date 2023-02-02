@@ -184,7 +184,7 @@ namespace quda
     }
   }
 
-  template <class T> struct less_significant : std::binary_function<T, T, bool> {
+  template <class T> struct less_significant {
     inline bool operator()(const T &lhs, const T &rhs)
     {
       return lhs.second.time * lhs.second.n_calls < rhs.second.time * rhs.second.n_calls;
@@ -300,7 +300,6 @@ namespace quda
    */
   static void broadcastTuneCache()
   {
-#ifdef MULTI_GPU
     std::stringstream serialized;
     size_t size;
 
@@ -314,15 +313,13 @@ namespace quda
       if (comm_rank_global() == 0) {
         comm_broadcast_global(const_cast<char *>(serialized.str().c_str()), size);
       } else {
-        char *serstr = new char[size + 1];
-        comm_broadcast_global(serstr, size);
+        std::vector<char> serstr(size + 1);
+        comm_broadcast_global(serstr.data(), size);
         serstr[size] = '\0'; // null-terminate
-        serialized.str(serstr);
+        serialized.str(serstr.data());
         deserializeTuneCache(serialized);
-        delete[] serstr;
       }
     }
-#endif
   }
 
   /*
@@ -362,10 +359,7 @@ namespace quda
       warningQuda("Disabling QUDA tunecache version check");
     }
 
-#ifdef MULTI_GPU
     if (comm_rank_global() == 0) {
-#endif
-
       cache_path = resource_path;
       cache_path += "/tunecache.tsv";
       cache_file.open(cache_path.c_str());
@@ -419,10 +413,7 @@ namespace quda
       } else {
         warningQuda("Cache file not found.  All kernels will be re-tuned (if tuning is enabled).");
       }
-
-#ifdef MULTI_GPU
     }
-#endif
 
     broadcastTuneCache();
   }
@@ -443,15 +434,13 @@ namespace quda
       //       stand, the corresponding launch parameters would never get cached to disk in this situation.  This will come up if we
       //       ever support different subvolumes per GPU (as might be convenient for lattice volumes that don't divide evenly).
 
-#ifdef MULTI_GPU
     if (comm_rank_global() == 0) {
-#endif
 
       if (tunecache.size() == initial_cache_size && !error) return;
 
       // Acquire lock.  Note that this is only robust if the filesystem supports flock() semantics, which is true for
       // NFS on recent versions of linux but not Lustre by default (unless the filesystem was mounted with "-o flock").
-      lock_path = resource_path + "/tunecache.lock";
+      lock_path = resource_path + (error ? "/tunecache_error.lock" : "/tunecache.lock");
       lock_handle = open(lock_path.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0666);
       if (lock_handle == -1) {
         warningQuda("Unable to lock cache file.  Tuned launch parameters will not be cached to disk.  "
@@ -493,13 +482,11 @@ namespace quda
 
       initial_cache_size = tunecache.size();
 
-#ifdef MULTI_GPU
     } else {
       // give process 0 time to write out its tunecache if needed, but
       // doesn't cause a hang if error is not triggered on process 0
       if (error) sleep(10);
     }
-#endif
   }
 
   static bool policy_tuning = false;
@@ -532,9 +519,7 @@ namespace quda
 
     if (resource_path.empty()) return;
 
-#ifdef MULTI_GPU
     if (comm_rank_global() == 0) { // Make sure only one rank is writing to disk
-#endif
 
       // Acquire lock.  Note that this is only robust if the filesystem supports flock() semantics, which is true for
       // NFS on recent versions of linux but not Lustre by default (unless the filesystem was mounted with "-o flock").
@@ -658,10 +643,7 @@ namespace quda
       // Release lock.
       close(lock_handle);
       remove(lock_path.c_str());
-
-#ifdef MULTI_GPU
     }
-#endif
   }
 
   TuneParam::TuneParam() :
@@ -679,7 +661,9 @@ namespace quda
   int Tunable::blockStep() const { return device::warp_size(); }
   int Tunable::blockMin() const { return device::warp_size(); }
 
+#ifdef LAUNCH_TIMER
   static TimeProfile launchTimer("tuneLaunch");
+#endif
 
   /**
    * @brief Compare two TuneParams with respect to which has the lower time.
@@ -754,14 +738,13 @@ namespace quda
         push(candidate);
       }
     }
+
     /**
      * @brief Broadcast candidates among ranks to make sure policy tuning does not break.
      *
      */
     void broadcast()
     {
-#ifdef MULTI_GPU
-
       size_t size;
       std::string serialized;
       if (comm_rank_global() == 0) {
@@ -774,15 +757,13 @@ namespace quda
         if (comm_rank_global() == 0) {
           comm_broadcast_global(const_cast<char *>(serialized.c_str()), size);
         } else {
-          char *serstr = new char[size + 1];
-          comm_broadcast_global(serstr, size);
+          std::vector<char> serstr(size + 1);
+          comm_broadcast_global(serstr.data(), size);
           serstr[size] = '\0'; // null-terminate
-          std::string_view deserialized(serstr);
+          std::string_view deserialized(serstr.data());
           deserialize(deserialized);
-          delete[] serstr;
         }
       }
-#endif
     }
 
     /**
@@ -903,16 +884,17 @@ namespace quda
         param.aux = make_int4(-1, -1, -1, -1);
         tunable.initTuneParam(param);
 
+        auto error = QUDA_SUCCESS;
         const int candidate_iterations = tunable.candidate_iter();
         while (tuning && candidatetuning) {
           qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);
           if (verbosity >= QUDA_DEBUG_VERBOSE) {
-            printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
+            printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
                        static_cast<int>(param.block.x), static_cast<int>(param.block.y),
                        static_cast<int>(param.block.z), static_cast<int>(param.grid.x), static_cast<int>(param.grid.y),
                        static_cast<int>(param.grid.z), static_cast<int>(param.shared_bytes),
-                       static_cast<int>(param.aux.x), static_cast<int>(param.aux.y), static_cast<int>(param.aux.z));
+                       static_cast<int>(param.aux.x), static_cast<int>(param.aux.y), static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
           }
 
           tunable.apply(stream); // do initial call in case we need to jit compile for these parameters or if policy tuning
@@ -923,7 +905,7 @@ namespace quda
           }
           timer.stop();
           qudaDeviceSynchronize();
-          auto error = qudaGetLastError();
+          error = qudaGetLastError();
 
           if (error != QUDA_SUCCESS) { // check we don't have a sticky error
             qudaDeviceSynchronize();
@@ -941,13 +923,17 @@ namespace quda
                          tunable.perfString(elapsed_time).c_str());
             } else {
               printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), qudaGetLastErrorString().c_str());
+              error = QUDA_SUCCESS;
             }
           }
           candidatetuning = tunable.advanceTuneParam(param);
           tunable.launchError() = QUDA_SUCCESS;
         }
 
-        if (tc.empty()) { errorQuda("Auto-tuning failed for %s with %s at vol=%s", key.name, key.aux, key.volume); }
+        if (tc.empty()) {
+          if (error != QUDA_SUCCESS) warningQuda("Last error: %s\n", qudaGetLastErrorString().c_str());
+          errorQuda("Auto-tuning failed for %s with %s at vol=%s", key.name, key.aux, key.volume);
+        }
 
         const float min_tune_time = tunable.min_tune_time();
         const int min_tune_iterations = tunable.min_tune_iter();
@@ -966,13 +952,14 @@ namespace quda
           qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);
           if (verbosity >= QUDA_DEBUG_VERBOSE) {
-            printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
+            printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
                        static_cast<int>(param.block.x), static_cast<int>(param.block.y),
                        static_cast<int>(param.block.z), static_cast<int>(param.grid.x), static_cast<int>(param.grid.y),
                        static_cast<int>(param.grid.z), static_cast<int>(param.shared_bytes),
-                       static_cast<int>(param.aux.x), static_cast<int>(param.aux.y), static_cast<int>(param.aux.z));
+                       static_cast<int>(param.aux.x), static_cast<int>(param.aux.y), static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
           }
 
+          tunable.apply(stream); // do warm up call, for consistency with the candidate tuning
           timer.start();
           for (int i = 0; i < tuneiterations; i++) {
             tunable.apply(stream); // calls tuneLaunch() again, which simply returns the currently active param
@@ -1014,6 +1001,13 @@ namespace quda
           printfQuda("Tuned %s giving %s for %s with %s\n", tunable.paramString(best_param).c_str(),
                      tunable.perfString(best_time).c_str(), key.name, key.aux);
         }
+
+        auto regression_tol = 1.1;
+        if (best_time > regression_tol * tc.getBestTime() && best_time > 1e-5) {
+          warningQuda("Unexpected regression when tuning candidates for %s: (%g > %g * %g)",
+                      key.name, best_time, regression_tol, tc.getBestTime());
+        }
+
         time(&now);
         best_param.comment = "# " + tunable.perfString(best_time) + tunable.miscString(best_param);
         best_param.comment += ", tuning took " + std::to_string(tune_timer.last()) + " seconds at ";
@@ -1028,6 +1022,19 @@ namespace quda
         tunecache[key] = best_param;
       }
       if (commGlobalReduction() || policyTuning() || uberTuning()) { broadcastTuneCache(); }
+
+      {
+        static host_timer_t time_since_save;
+        if (!time_since_save.running) time_since_save.start();
+
+        const double max_time = 120; // dump the tunecache every 120 seconds
+        time_since_save.peek();
+        if (time_since_save.last() > max_time) {
+          time_since_save.stop();
+          saveTuneCache();
+          time_since_save.start();
+        }
+      }
 
       // check this process is getting the key that is expected
       if (tunecache.find(key) == tunecache.end()) {

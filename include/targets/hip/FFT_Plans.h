@@ -12,33 +12,6 @@ namespace quda
 
   using FFTPlanHandle = hipfftHandle;
 
-#ifndef GPU_GAUGE_ALG
-#define HIPFFT_SAFE_CALL(call)
-
-  inline void ApplyFFT(FFTPlanHandle &, float2 *, float2 *, int)
-  {
-    errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
-  }
-
-  inline void ApplyFFT(FFTPlanHandle &, double2 *, double2 *, int)
-  {
-    errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
-  }
-
-  inline void SetPlanFFTMany(FFTPlanHandle &, int4, int, QudaPrecision)
-  {
-    errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
-  }
-
-  inline void SetPlanFFT2DMany(FFTPlanHandle &, int4, int, QudaPrecision)
-  {
-    errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
-  }
-
-  inline void FFTDestroyPlan(FFTPlanHandle &) { errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled"); }
-
-#else
-
 /*-------------------------------------------------------------------------------*/
 #define HIPFFT_SAFE_CALL(call)                                                                                         \
   {                                                                                                                    \
@@ -113,18 +86,16 @@ namespace quda
     auto type = precision == QUDA_DOUBLE_PRECISION ? HIPFFT_Z2Z : HIPFFT_C2C;
     switch (dim) {
     case 0: {
-      int n[2] = {size.w, size.z};
+      int n[2] = {size.w, size.z}; // outer-most dimension is first
       HIPFFT_SAFE_CALL(hipfftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, type, size.x * size.y));
     } break;
     case 1: {
-      int n[2] = {size.x, size.y};
+      int n[2] = {size.y, size.x}; // outer-most dimension is first
       HIPFFT_SAFE_CALL(hipfftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, type, size.z * size.w));
     } break;
     }
   }
 
   inline void FFTDestroyPlan(FFTPlanHandle &plan) { HIPFFT_SAFE_CALL(hipfftDestroy(plan)); }
-
-#endif
 
 } // namespace quda

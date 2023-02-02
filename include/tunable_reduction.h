@@ -16,10 +16,20 @@ namespace quda
      block is two dimensional, with the y dimension typically equal to
      two and is the parity dimension.
    */
-  template <int block_size_y = 2> class TunableReduction2D : public TunableKernel
+  class TunableReduction2D : public TunableKernel
   {
   protected:
     static constexpr bool grid_stride = true;
+
+    /**
+       Number of items being reduced in x dimension: used as a heuristic for setting tuning parameters
+    */
+    const size_t n_items;
+
+    /**
+       Number of threads in y thread block
+     */
+    const unsigned int block_size_y;
 
     /**
        @brief Reduction kernels require grid-size tuning, so enable this, and
@@ -28,7 +38,14 @@ namespace quda
     */
     bool tuneGridDim() const final { return grid_stride; }
 
-    virtual unsigned int minGridSize() const { return Tunable::minGridSize(); }
+    virtual unsigned int minGridSize() const { return std::max(maxGridSize() / 32, 1u); }
+
+    virtual unsigned int maxGridSize() const
+    {
+      return std::min((n_items + device::warp_size() - 1) / device::warp_size(),
+                      static_cast<uint64_t>(TunableKernel::maxGridSize()));
+    }
+
     virtual int gridStep() const { return minGridSize(); }
 
     /**
@@ -38,32 +55,7 @@ namespace quda
        the max threads in the x dimension.
        @return Maximum block size
      */
-    virtual unsigned int maxBlockSize(const TuneParam &) const { return device::max_reduce_block_size<block_size_y>(); }
-
-    /**
-       @brief Launch reduction kernel with a given block size on the
-       device performing the reduction defined in the functor.  We
-       recursively iterate over the length of instantiated block sizes
-       until we succeed, or error out.
-       @tparam block_size_x The x-dimension block size being instantiated
-       @tparam Functor The functor that defined the reduction operation
-       @param[in] arg Kernel argument struct
-       @param[in] tp The launch parameters
-       @param[in] stream The stream on which the execution is done
-     */
-    template <int block_size_x, template <typename> class Functor, typename FunctorArg>
-    qudaError_t launch_device(FunctorArg &arg, const TuneParam &tp, const qudaStream_t &stream)
-    {
-      if (tp.block.x == block_size_x) {
-        using Arg = ReduceKernelArg<block_size_x, block_size_y, FunctorArg>;
-        return TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Reduction2D), tp, stream, Arg(arg));
-      } else if constexpr (block_size_x != device::warp_size()) {
-        return launch_device<block_size_x - device::warp_size(), Functor>(arg, tp, stream);
-      } else {
-        errorQuda("Unexpected block size %d", tp.block.x);
-      }
-      return QUDA_ERROR;
-    }
+    virtual unsigned int maxBlockSize(const TuneParam &) const { return device::max_block_size(); }
 
     /**
        @brief Launch reduction kernel on the device performing the
@@ -79,7 +71,12 @@ namespace quda
     template <template <typename> class Functor, typename T, typename Arg>
     void launch_device(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
-      arg.launch_error = launch_device<device::max_reduce_block_size<block_size_y>(), Functor>(arg, tp, stream);
+      if (tp.block.x * tp.block.y < static_cast<unsigned>(device::warp_size()))
+        errorQuda("Reduction kernels must use at least a warp of threads per block (%u %u < %u)", tp.block.x,
+                  tp.block.y, device::warp_size());
+      if (arg.threads.y != block_size_y)
+        errorQuda("Unexected y threads: received %d, expected %d", arg.threads.y, block_size_y);
+      arg.launch_error = TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Reduction2D), tp, stream, arg);
 
       if (!commAsyncReduction()) {
         std::vector<T> result_(1);
@@ -101,6 +98,8 @@ namespace quda
     template <template <typename> class Functor, typename T, typename Arg>
     void launch_host(T &result, const TuneParam &, const qudaStream_t &, Arg &arg)
     {
+      if (arg.threads.y != block_size_y)
+        errorQuda("Unexected y threads: received %d, expected %d", arg.threads.y, block_size_y);
       std::vector<T> result_(1);
       result_[0] = Reduction2D_host<Functor, Arg>(arg);
       if (!activeTuning() && commGlobalReduction()) Functor<Arg>::comm_reduce(result_);
@@ -136,19 +135,20 @@ namespace quda
     /**
        @brief Constructor for kernels that use a lattice field
        @param[in] field A lattice field instance used for metadata
+       @param[in] block_size_y Number of y threads in the block
        @param[in] location Optional overload for the location where the calculation will take place
      */
-    TunableReduction2D(const LatticeField &field, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableKernel(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location())
+    TunableReduction2D(const LatticeField &field, unsigned int block_size_y = 2,
+                       QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+      TunableKernel(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location()),
+      n_items(field.Volume()),
+      block_size_y(block_size_y)
     {
-      strcpy(vol, field.VolString());
+      strcpy(vol, field.VolString().c_str());
       strcpy(aux, compile_type_str(field, location));
-#ifdef QUDA_FAST_COMPILE_REDUCE
-      strcat(aux, "fast_compile,");
-#endif
       if (commAsyncReduction()) strcat(aux, "async,");
       strcat(aux, field.SiteSubset() == QUDA_FULL_SITE_SUBSET ? "nParity=2," : "nParity=1,");
-      strcat(aux, field.AuxString());
+      strcat(aux, field.AuxString().c_str());
     }
 
     /**
@@ -156,44 +156,31 @@ namespace quda
        @param[in] n_items Number of items being reduced
        @param[in] location Location where the calculation will take place
      */
-    TunableReduction2D(size_t n_items, QudaFieldLocation location) : TunableKernel(location)
+    TunableReduction2D(size_t n_items, QudaFieldLocation location) :
+      TunableKernel(location), n_items(n_items), block_size_y(1)
     {
       u64toa(vol, n_items);
       strcpy(aux, compile_type_str(location));
-#ifdef QUDA_FAST_COMPILE_REDUCE
-      strcat(aux, "fast_compile,");
-#endif
       if (commAsyncReduction()) strcat(aux, "async,");
     }
 
     /**
-       @brief Overload that ensures the tune param y block size is set appropriately
-       @param[in,out] param TuneParam object passed during autotuning
-     */
-    virtual bool advanceBlockDim(TuneParam &param) const
-    {
-      bool rtn = Tunable::advanceBlockDim(param);
-      param.block.y = block_size_y;
-      return rtn;
-    }
-
-    /**
-       @brief Overload that ensures the y-dimension block size is set appropriately
+       @brief Overload that sets ensures the z-dimension block size is set appropriately
        @param[in,out] param TuneParam object passed during autotuning
      */
     virtual void initTuneParam(TuneParam &param) const
     {
-      Tunable::initTuneParam(param);
+      TunableKernel::initTuneParam(param);
       param.block.y = block_size_y;
     }
 
     /**
-       @brief Overload that sets ensures the y-dimension block size is set appropriately
+       @brief Overload that sets ensures the z-dimension block size is set appropriately
        @param[in,out] param TuneParam object passed during autotuning
      */
     virtual void defaultTuneParam(TuneParam &param) const
     {
-      Tunable::defaultTuneParam(param);
+      TunableKernel::defaultTuneParam(param);
       param.block.y = block_size_y;
     }
   };
@@ -207,29 +194,13 @@ namespace quda
      contracted in the reduction.  The z thread dimension is a batch
      dimension that is not contracted in the reduction.
    */
-  template <int block_size_y = 1> class TunableMultiReduction : public TunableReduction2D<block_size_y>
+  class TunableMultiReduction : public TunableReduction2D
   {
     using Tunable::apply;
-    using TunableReduction2D<block_size_y>::location;
-    using TunableReduction2D<block_size_y>::grid_stride;
 
   protected:
     const unsigned int n_batch;           /** Reduction batch size */
     const unsigned int n_batch_block_max; /** Maximum reduction batch per thread block */
-
-    /**
-       @brief we don't want to inherit TunableReduction2D behaviour
-       here which is catered for non-block / non-batch reductions, so
-       inherit from the "grandfather"
-    */
-    virtual unsigned int minGridSize() const { return Tunable::minGridSize(); }
-
-    /**
-       @brief we don't want to inherit TunableReduction2D behaviour
-       here which is catered for non-block / non-batch reductions, so
-       inherit from the "grandfather"
-    */
-    virtual int gridStep() const { return Tunable::gridStep(); }
 
     /**
        @brief The maximum block size in the x dimension is the total number
@@ -238,21 +209,7 @@ namespace quda
        the max threads in the x dimension.
        @return Maximum block size
      */
-    unsigned int maxBlockSize(const TuneParam &) const { return device::max_multi_reduce_block_size<block_size_y>(); }
-
-    template <int block_size_x, template <typename> class Functor, typename FunctorArg>
-    qudaError_t launch(FunctorArg &arg, const TuneParam &tp, const qudaStream_t &stream)
-    {
-      if (tp.block.x == block_size_x) {
-        using Arg = ReduceKernelArg<block_size_x, block_size_y, FunctorArg>;
-        return TunableKernel::launch_device<Functor, grid_stride>(KERNEL(MultiReduction), tp, stream, Arg(arg));
-      } else if constexpr (block_size_x != device::warp_size()) {
-        return launch<block_size_x / 2, Functor>(arg, tp, stream);
-      } else {
-        errorQuda("Unexpected block size %d", tp.block.x);
-      }
-      return QUDA_ERROR;
-    }
+    unsigned int maxBlockSize(const TuneParam &) const { return device::max_block_size(); }
 
     /**
        @brief Launch multi-reduction kernel on the device performing
@@ -269,9 +226,12 @@ namespace quda
     template <template <typename> class Functor, typename T, typename Arg>
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
+      if (tp.block.x * tp.block.y < static_cast<unsigned>(device::warp_size()))
+        errorQuda("Reduction kernels must use at least a warp of threads per block (%u %u < %u)", tp.block.x,
+                  tp.block.y, device::warp_size());
       if (n_batch_block_max > Arg::max_n_batch_block)
         errorQuda("n_batch_block_max = %u greater than maximum supported %u", n_batch_block_max, Arg::max_n_batch_block);
-      arg.launch_error = launch<device::max_multi_reduce_block_size<block_size_y>(), Functor>(arg, tp, stream);
+      arg.launch_error = TunableKernel::launch_device<Functor, grid_stride>(KERNEL(MultiReduction), tp, stream, arg);
 
       if (!commAsyncReduction()) {
         arg.complete(result, stream);
@@ -327,14 +287,15 @@ namespace quda
   public:
     /**
        @brief Constructor for kernels that use a lattice field
+       @param[in] block_size_y Number of y threads in the block
        @param[in] n_batch The batch size for the multi-reduction (number of reductions we are performing)
        @param[in] n_batch_block_max Maximum batch size per block (maximum z-dimension block size)
        @param[in] field A lattice field instance used for metadata
        @param[in] location Optional overload for the location where the calculation will take place
      */
-    TunableMultiReduction(const LatticeField &field, unsigned int n_batch, unsigned int n_batch_block_max = 1u,
-                          QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableReduction2D<block_size_y>(field, location), n_batch(n_batch), n_batch_block_max(n_batch_block_max)
+    TunableMultiReduction(const LatticeField &field, unsigned int block_size_y, unsigned int n_batch,
+                          unsigned int n_batch_block_max = 1u, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+      TunableReduction2D(field, block_size_y, location), n_batch(n_batch), n_batch_block_max(n_batch_block_max)
     {
     }
 
@@ -347,7 +308,7 @@ namespace quda
      */
     TunableMultiReduction(size_t n_items, unsigned int n_batch, unsigned int n_batch_block_max,
                           QudaFieldLocation location) :
-      TunableReduction2D<block_size_y>(n_items, location), n_batch(n_batch), n_batch_block_max(n_batch_block_max)
+      TunableReduction2D(n_items, location), n_batch(n_batch), n_batch_block_max(n_batch_block_max)
     {
     }
 
@@ -362,7 +323,7 @@ namespace quda
     {
       bool rtn;
       do {
-        rtn = Tunable::advanceBlockDim(param);
+        rtn = TunableReduction2D::advanceBlockDim(param);
       } while (rtn && !is_power2(param.block.x));
 
       if (rtn) {
@@ -388,9 +349,9 @@ namespace quda
      */
     void initTuneParam(TuneParam &param) const
     {
-      Tunable::initTuneParam(param);
-      param.block = {param.block.x, 1, 1};
-      param.grid = {param.grid.x, 1, (n_batch + param.block.z - 1) / param.block.z};
+      TunableReduction2D::initTuneParam(param);
+      param.block = {param.block.x, param.block.y, 1};
+      param.grid = {param.grid.x, param.grid.y, (n_batch + param.block.z - 1) / param.block.z};
     }
 
     /**
@@ -399,9 +360,9 @@ namespace quda
      */
     void defaultTuneParam(TuneParam &param) const
     {
-      Tunable::defaultTuneParam(param);
-      param.block = {param.block.x, 1, 1};
-      param.grid = {param.grid.x, 1, (n_batch + param.block.z - 1) / param.block.z};
+      TunableReduction2D::defaultTuneParam(param);
+      param.block = {param.block.x, param.block.y, 1};
+      param.grid = {param.grid.x, param.grid.y, (n_batch + param.block.z - 1) / param.block.z};
     }
   };
 

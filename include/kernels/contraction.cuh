@@ -247,6 +247,7 @@ namespace quda
   template <typename Float, int nColor_,  int nSpin_ = 4, int reduction_dim_ = 3, typename contract_t = spinor_array>
   struct ContractionSummedArg :  public ReduceArg<contract_t>
   {
+    using reduce_t = contract_t;	  
     // This the direction we are performing reduction on. default to 3.
     static constexpr int reduction_dim = reduction_dim_; 
 
@@ -274,7 +275,7 @@ namespace quda
 			 const int source_position_in[4],
 			 const int mom_mode_in[4], const QudaFFTSymmType fft_type_in[4],
 			 const int s1, const int b1) :
-      ReduceArg<contract_t>(dim3(x.Volume()/x.X()[reduction_dim], 1, x.X()[reduction_dim]), x.X()[reduction_dim]),
+      ReduceArg<reduce_t>(dim3(x.Volume()/x.X()[reduction_dim], 1, x.X()[reduction_dim]), x.X()[reduction_dim]),
       x(x),
       y(y),
       s1(s1),
@@ -294,8 +295,11 @@ namespace quda
   };
   
   template <typename Arg> struct DegrandRossiContractFT : plus<spinor_array> {
+	  
     using reduce_t = spinor_array;
-    using plus<reduce_t>::operator();    
+    using plus<reduce_t>::operator();   
+    static constexpr int reduce_block_dim = 1; //    
+
     const Arg &arg;
     constexpr DegrandRossiContractFT(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -308,6 +312,7 @@ namespace quda
     {
       constexpr int nSpin = Arg::nSpin;
       constexpr int nColor = Arg::nColor;
+
       using real = typename Arg::real;
       using Vector = ColorSpinor<real, nColor, nSpin>;
 
@@ -380,13 +385,16 @@ namespace quda
       //result_all_channels[G_idx].y += (G_idx+t) + idx;
       //}
       
-      return plus::operator()(result_all_channels, result);
+      return operator()(result_all_channels, result);
     }
   };
 
-  template <typename Arg> struct StaggeredContractFT : plus<staggered_spinor_array> {
-    using reduce_t = staggered_spinor_array;
+  template <typename Arg> struct StaggeredContractFT : plus<typename Arg::reduce_t> {
+    using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();    
+
+    static constexpr int reduce_block_dim = 1; //
+
     const Arg &arg;
     constexpr StaggeredContractFT(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -474,7 +482,7 @@ namespace quda
       result_all_channels[0] += prop_prod.real()*phase_real - prop_prod.imag()*phase_imag;
       result_all_channels[1] += prop_prod.imag()*phase_real + prop_prod.real()*phase_imag;
 
-      return plus::operator()(result_all_channels, result);
+      return operator()(result_all_channels, result);
     }
   };
   

@@ -53,7 +53,7 @@ int gcrNkrylov = 8;
 QudaCABasis ca_basis = QUDA_CHEBYSHEV_BASIS;
 double ca_lambda_min = 0.0;
 double ca_lambda_max = -1.0;
-QudaCABasis ca_basis_precondition = QUDA_POWER_BASIS;
+QudaCABasis ca_basis_precondition = QUDA_CHEBYSHEV_BASIS;
 double ca_lambda_min_precondition = 0.0;
 double ca_lambda_max_precondition = -1.0;
 int pipeline = 0;
@@ -118,7 +118,7 @@ bool gauge_smear = false;
 
 int mg_levels = 2;
 
-int max_res_increase = 1;
+int max_res_increase = 3;
 int max_res_increase_total = 10;
 
 quda::mgarray<QudaFieldLocation> solver_location = {};
@@ -219,6 +219,7 @@ double eig_amin = 0.1;
 double eig_amax = 0.0; // If zero is passed to the solver, an estimate will be computed
 bool eig_use_normop = true;
 bool eig_use_dagger = false;
+bool eig_use_pc = false;
 bool eig_compute_svd = false;
 bool eig_compute_gamma5 = false;
 QudaEigSpectrumType eig_spectrum = QUDA_SPECTRUM_LR_EIG;
@@ -251,6 +252,7 @@ quda::mgarray<double> mg_eig_amin = {};
 quda::mgarray<double> mg_eig_amax = {};
 quda::mgarray<bool> mg_eig_use_normop = {};
 quda::mgarray<bool> mg_eig_use_dagger = {};
+quda::mgarray<bool> mg_eig_use_pc = {};
 quda::mgarray<QudaEigSpectrumType> mg_eig_spectrum = {};
 quda::mgarray<QudaEigType> mg_eig_type = {};
 quda::mgarray<QudaPrecision> mg_eig_save_prec = {};
@@ -480,7 +482,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app
     ->add_option("--ca-basis-type-precondition", ca_basis_precondition,
-                 "The basis to use for CA solvers when used as a preconditioner (default power)")
+                 "The basis to use for CA solvers when used as a preconditioner (default chebyshev)")
     ->transform(CLI::QUDACheckedTransformer(ca_basis_map));
   quda_app->add_option("--cheby-basis-eig-max-precondition", ca_lambda_max_precondition,
                        "Conservative estimate of largest eigenvalue for Chebyshev basis CA solvers when used as a "
@@ -773,9 +775,10 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->transform(CLI::QUDACheckedTransformer(eig_type_map));
 
   opgroup->add_option("--eig-use-dagger", eig_use_dagger,
-                      "Solve the Mdag  problem instead of M (MMdag if eig-use-normop == true) (default false)");
+                      "Solve the Mdag problem instead of M (MMdag if eig-use-normop == true) (default false)");
   opgroup->add_option("--eig-use-normop", eig_use_normop,
                       "Solve the MdagM problem instead of M (MMdag if eig-use-dagger == true) (default false)");
+  opgroup->add_option("--eig-use-pc", eig_use_pc, "Solve the Even-Odd preconditioned problem (default false)");
   opgroup->add_option("--eig-use-poly-acc", eig_use_poly_acc, "Use Chebyshev polynomial acceleration in the eigensolver");
 }
 
@@ -900,6 +903,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "Solve the MMdag problem instead of M (MMdag if eig-use-normop == true) (default false)");
   quda_app->add_mgoption(opgroup, "--mg-eig-use-normop", mg_eig_use_normop, CLI::Validator(),
                          "Solve the MdagM problem instead of M (MMdag if eig-use-dagger == true) (default false)");
+  quda_app->add_mgoption(opgroup, "--mg-eig-use-pc", mg_eig_use_pc, CLI::Validator(),
+                         "Solve the Even-Odd preconditioned problem (default false)");
   quda_app->add_mgoption(opgroup, "--mg-eig-use-poly-acc", mg_eig_use_poly_acc, CLI::Validator(),
                          "Use Chebyshev polynomial acceleration in the eigensolver (default true)");
   opgroup->add_option(

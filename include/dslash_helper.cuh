@@ -7,12 +7,15 @@
 #include <shmem_helper.cuh>
 #include <fast_intdiv.h>
 #include <dslash_quda.h>
+#include <dslash_shmem.h>
+#include <shmem_pack_helper.cuh>
+#include <kernel_helper.h>
 
 #if defined(_NVHPC_CUDA)
 #include <constant_kernel_arg.h>
-constexpr bool use_kernel_arg = false;
+constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_p::FALSE;
 #else
-constexpr bool use_kernel_arg = true;
+constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_p::TRUE;
 #endif
 
 #include <kernel.h>
@@ -337,8 +340,8 @@ namespace quda
       counter(0)
 #else
       shmem(shmem_),
-      counter(dslash::get_shmem_sync_counter()),
-      sync_arr(dslash::get_shmem_sync_arr()),
+      counter(dslash::get_dslash_shmem_sync_counter()),
+      sync_arr(dslash::get_dslash_shmem_sync_arr()),
       interior_done(*dslash::get_shmem_interior_done()),
       interior_count(*dslash::get_shmem_interior_count()),
       retcount_intra(dslash::get_shmem_retcount_intra()),

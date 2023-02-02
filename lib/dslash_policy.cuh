@@ -3,6 +3,7 @@
 #include <index_helper.cuh>
 #include <timer.h>
 #include <dslash_quda.h>
+#include <dslash_shmem.h>
 
 namespace quda
 {
@@ -487,7 +488,7 @@ namespace quda
         }
       }
 
-      dslash::inc_shmem_sync_counter();
+      dslash::inc_dslash_shmem_sync_counter();
       in->bufferIndex = (1 - in->bufferIndex);
       profile.TPSTOP(QUDA_PROFILE_TOTAL);
     }
@@ -2050,7 +2051,6 @@ namespace quda
 
    void postTune()
    {
-     saveTuneCache();
      dslash.postTune();
    }
   };

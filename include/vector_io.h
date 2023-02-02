@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <color_spinor_field.h>
+#include <reference_wrapper_helper.h>
 
 namespace quda
 {
@@ -12,9 +14,8 @@ namespace quda
   class VectorIO
   {
     const std::string filename;
-#ifdef HAVE_QIO
     bool parity_inflate;
-#endif
+
   public:
     /**
        Constructor for VectorIO class
@@ -28,25 +29,27 @@ namespace quda
        @brief Load vectors from filename
        @param[in] vecs The set of vectors to load
     */
-    void load(std::vector<ColorSpinorField *> &vecs);
+    void load(cvector_ref<ColorSpinorField> &vecs);
 
     /**
        @brief Load propagator (12 vecs, Chroma compliant) from filename
        @param[in] vecs The set of vectors to load
     */
-    void loadProp(std::vector<ColorSpinorField *> &vecs);
+    void loadProp(vector_ref<ColorSpinorField> &vecs);
 
     /**
        @brief Save vectors to filename
        @param[in] vecs The set of vectors to save
+       @param[in] prec Optional change of precision when saving
+       @param[in] size Optional cap to number of vectors saved
     */
-    void save(const std::vector<ColorSpinorField *> &vecs);
+    void save(cvector_ref<const ColorSpinorField> &vecs, QudaPrecision prec = QUDA_INVALID_PRECISION, uint32_t size = 0);
 
     /**
        @brief Save propagator (12 vecs, Chroma compliant) to filename
        @param[in] vecs The set of vectors to save
     */
-    void saveProp(const std::vector<ColorSpinorField *> &vecs);
+    void saveProp(cvector_ref<ColorSpinorField> &vecs);
 
     /**
        @brief Create alias pointers to a vector space of lower precision
@@ -55,7 +58,7 @@ namespace quda
        @param[in] low_prec The low precsision value
     */
 
-    void downPrec(const std::vector<ColorSpinorField *> &vecs_high_prec, std::vector<ColorSpinorField *> &vecs_low_prec,
+    void downPrec(cvector_ref<ColorSpinorField> &vecs_high_prec, vector_ref<ColorSpinorField> &vecs_low_prec,
                   const QudaPrecision save_prec);
   };
 

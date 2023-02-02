@@ -67,14 +67,13 @@ namespace quda {
         __device__ __host__ inline int index(int i, int j) const { return i*N + j; }
 
       public:
-        T data[N*N];
+        T data[N * N] = {};
 
         constexpr int rows() const { return N; }
         constexpr int cols() const { return N; }
         constexpr int size() const { return N * N; }
 
-        __device__ __host__ inline Matrix() { setZero(this); }
-
+        Matrix() = default;
         Matrix(const Matrix<T, N> &) = default;
         Matrix(Matrix<T, N> &&) = default;
         Matrix &operator=(const Matrix<T, N> &) = default;
@@ -297,23 +296,20 @@ namespace quda {
       }
 
       public:
-      T data[N*N]; // store in real-valued array
+        T data[N * N] = {}; // store in real-valued array
 
-      constexpr int rows() const { return N; }
-      constexpr int cols() const { return N; }
-      constexpr int size() const { return N * N; }
+        constexpr int rows() const { return N; }
+        constexpr int cols() const { return N; }
+        constexpr int size() const { return N * N; }
 
-      __device__ __host__ inline HMatrix() {
-#pragma unroll
-        for (int i = 0; i < N * N; i++) data[i] = (T)0.0;
-      }
+        HMatrix() = default;
+        HMatrix(const HMatrix<T, N> &) = default;
+        HMatrix(HMatrix<T, N> &&) = default;
+        HMatrix &operator=(const HMatrix<T, N> &) = default;
+        HMatrix &operator=(HMatrix<T, N> &&) = default;
 
-      HMatrix(const HMatrix<T, N> &) = default;
-      HMatrix(HMatrix<T, N> &&) = default;
-      HMatrix &operator=(const HMatrix<T, N> &) = default;
-      HMatrix &operator=(HMatrix<T, N> &&) = default;
-
-      __device__ __host__ inline HMatrix(const T data_[]) {
+        __device__ __host__ inline HMatrix(const T data_[])
+        {
 #pragma unroll
 	for (int i=0; i<N*N; i++) data[i] = data_[i];
       }
@@ -948,7 +944,10 @@ namespace quda {
       //Declarations
       using real = typename T::value_type;
 
-      real inv3 = 1.0 / 3.0;
+      constexpr real inv3 = static_cast<real>(1.0 / 3.0);
+      constexpr real inv_pi = static_cast<real>(1.0 / M_PI);
+      constexpr real inv_3pi = static_cast<real>(1.0 / (3.0 * M_PI));
+
       Matrix<T,3> temp1;
       Matrix<T,3> temp2;
       //[14] c0 = det(Q) = 1/3Tr(Q^3)
@@ -968,11 +967,19 @@ namespace quda {
       real sqrt_c1_inv3 = sqrt(c1 * inv3);
       real c0_max = 2 * (c1 * inv3 * sqrt_c1_inv3); // reuse the sqrt factor for a fast 1.5 power
 
+      //[34] Test for c0 < 0.
+      int parity = 0;
+      if(c0 < 0) {
+	c0 *= -1.0;
+	parity = 1;
+	//calculate fj with c0 > 0 and then convert all fj.
+      }
+
       //[25]
       real theta = acos(c0 / c0_max);
 
       real u_p, w_p; // u, w parameters.
-      quda::sincos(theta * inv3, &w_p, &u_p);
+      quda::sincospi(theta * inv_3pi, &w_p, &u_p);
       //[23]
       u_p *= sqrt_c1_inv3;
 
@@ -984,25 +991,18 @@ namespace quda {
       real w_sq = w_p * w_p;
       real denom_inv = static_cast<real>(1.0) / (9 * u_sq - w_sq);
       real exp_iu_re, exp_iu_im;
-      quda::sincos(u_p, &exp_iu_im, &exp_iu_re);
+      quda::sincospi(u_p * inv_pi, &exp_iu_im, &exp_iu_re);
       real exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
       real exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
-      real cos_w = cos(w_p);
+      real cos_w = cospi(w_p * inv_pi);
       real sinc_w;
 
       //[33] Added one more term to the series given in the paper.
       if (w_p < 0.05 && w_p > -0.05) {
 	//1 - 1/6 x^2 (1 - 1/20 x^2 (1 - 1/42 x^2(1 - 1/72*x^2)))
 	sinc_w = 1.0 - (w_sq/6.0)*(1 - (w_sq*0.05)*(1 - (w_sq/42.0)*(1 - (w_sq/72.0))));
-      }
-      else sinc_w = sin(w_p)/w_p;
-
-      //[34] Test for c0 < 0.
-      int parity = 0;
-      if(c0 < 0) {
-	c0 *= -1.0;
-	parity = 1;
-	//calculate fj with c0 > 0 and then convert all fj.
+      } else {
+        sinc_w = sinpi(w_p * inv_pi) / w_p;
       }
 
       //Get all the numerators for fj,
@@ -1055,7 +1055,7 @@ namespace quda {
     /**
        Direct port of the TIFR expsu3 algorithm
     */
-    template <typename Float> __device__ __host__ void expsu3(Matrix<complex<Float>, 3> &q)
+    template <typename Float> __device__ __host__ inline void expsu3(Matrix<complex<Float>, 3> &q)
     {
       typedef complex<Float> Complex;
 
@@ -1064,7 +1064,30 @@ namespace quda {
         - q(3) * q(1) * q(8) - q(0) * q(7) * q(5);
 
       Complex sg2h3 = sqrt(a3 * a3 - (Float)4. * a2 * a2 * a2);
-      Complex cp = exp(log((Float)0.5 * (a3 + sg2h3)) / (Float)3.0);
+
+      // If the matrix q is zero, this algorithm produces nan, instead of unity.
+      // The first invalid operation is the log hereafter. Therefore, we check
+      // if its argument (tmp) is zero and then return unity.
+
+      Complex tmp = a3 + sg2h3;
+      if (tmp.real() == 0 and tmp.imag() == 0) {
+        // Making sure q is a zero matrix
+        bool iszero = true;
+        for (int i = 0; i < 9; i++) {
+          if (q(i).real() != 0 or q(i).imag() != 0) {
+            iszero = false;
+            break;
+          }
+        }
+        if (iszero) {
+          q(0) = 1;
+          q(4) = 1;
+          q(8) = 1;
+          return;
+        }
+      }
+
+      Complex cp = exp(log((Float)0.5 * tmp) / (Float)3.0);
       Complex cm = a2 / cp;
 
       Complex r1 = exp(Complex(0.0, 1.0) * (Float)(2.0 * M_PI / 3.0));

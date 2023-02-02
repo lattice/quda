@@ -6,7 +6,7 @@
 #include <index_helper.cuh>
 #include <inline_ptx.h>
 #include <math_helper.cuh>
-#include <shared_memory_cache_helper.cuh>
+#include <shared_memory_cache_helper.h>
 
 #include <quda_fp16.cuh>
 
@@ -245,7 +245,7 @@ namespace quda
 
   constexpr float target_scale = 2e3;
 
-  template <int block_x, int block_y, class Vector>
+  template <class Vector>
   __device__ inline float block_wise_reduce_vector(const Vector &v)
   {
     // Find the maximum absolute value in a lane
@@ -260,13 +260,14 @@ namespace quda
     }
     warp_max[0] = fmaxf(warp_max[0], warp_max[1]);
 
-    return BlockReduce<float, block_x, block_y>().AllMax(warp_max[0]) / target_scale;
+    constexpr int block_dim = 2;
+    return BlockReduce<float, block_dim>().AllMax(warp_max[0]) / target_scale;
   }
 
   // Actually does more than the function name suggests.
   // will find the maximum absolute value among the vector, scale that, and store
   // to sm_b
-  template <int block_x, int block_y, int N_sm_d2, bool accumulate, bool store = true, class Vector>
+  template <int N_sm_d2, bool accumulate, bool store = true, class Vector>
   __device__ inline void load_matrix_b_vector(Vector &v, half2 *sm_b, float &scale, float m_scale = 1.0f)
   {
     if (accumulate) {
@@ -282,7 +283,7 @@ namespace quda
       }
     }
     if (store) {
-      scale = block_wise_reduce_vector<block_x, block_y>(v);
+      scale = block_wise_reduce_vector(v);
 #pragma unroll
       for (int spin = 0; spin < 4; spin++) {
 #pragma unroll
@@ -315,7 +316,7 @@ namespace quda
     output.norm[sid] = __half2float(max_) * scale * fixedInvMaxValue<storage_type>::value;
 
     const half2 max_i_div_max2_ = __half2half2(__hdiv(fixedMaxValue<storage_type>::value, max_));
-#ifdef FLOAT8 // use float8/short8
+#if QUDA_ORDER_FP == 8 // use float8/short8
     typedef typename VectorType<storage_type, 8>::type storage_vec;
     storage_vec *out = reinterpret_cast<storage_vec *>(output.field);
     half2 a, b, c, d;
@@ -337,8 +338,7 @@ namespace quda
     c = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
     d = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
     vector_store(&out[sid + 2 * output.volumeCB], 0, __4half22integer8_rn<storage_vec>(a, b, c, d));
-#else
-
+#elif QUDA_ORDER_FP == 4
     typedef typename VectorType<storage_type, 4>::type storage_vec;
     storage_vec *out = reinterpret_cast<storage_vec *>(output.field);
     half2 a, b;
@@ -366,7 +366,6 @@ namespace quda
     a = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
     b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
     out[sid + 5 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
-
 #endif
   }
 

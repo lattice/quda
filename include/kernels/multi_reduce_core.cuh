@@ -15,16 +15,8 @@ namespace quda
 
     /**
        @brief Return the batch block size used for multi reductions.
-       For now, we leave this at 1 unless fast-compilation is enabled,
-       since it provides negligible benefit (but substantially longer
-       tuning).  When fast-compilation is enabled, the increased batch
-       count can dramatically improve performance.
      */
-#ifndef QUDA_FAST_COMPILE_REDUCE
-    constexpr unsigned int max_n_batch_block_multi_reduce() { return 1; }
-#else
     constexpr unsigned int max_n_batch_block_multi_reduce() { return 8; }
-#endif
 
     /**
        @brief Parameter struct for generic multi-reduce blas kernel.
@@ -57,8 +49,7 @@ namespace quda
       const int nParity;
 
       template <typename V>
-      MultiReduceArg(std::vector<V> &x, std::vector<V> &y, std::vector<V> &z, std::vector<V> &w,
-                     Reducer f, int NYW, int length, int nParity) :
+      MultiReduceArg(V &x, V &y, V &z, V &w, Reducer f, int NYW, int length, int nParity) :
         // we have NYW * nParity reductions each of length NXZ
         ReduceArg<reduce_t>(dim3(length, 1, NYW), NYW),
         NYW(NYW),
@@ -93,6 +84,7 @@ namespace quda
     template <typename Arg> struct MultiReduce_ : plus<typename Arg::reduce_t> {
       using reduce_t = typename Arg::reduce_t;
       using plus<reduce_t>::operator();
+      static constexpr int reduce_block_dim = 1; // x_cb and parity are mapped to x dim
       using vec = array<complex<typename Arg::real>, Arg::n/2>;
       const Arg &arg;
       constexpr MultiReduce_(const Arg &arg) : arg(arg) {}
