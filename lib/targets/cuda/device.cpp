@@ -115,7 +115,7 @@ namespace quda
       return device_count;
     }
 
-    char *get_visible_devicse_env()
+    char *get_visible_devices_env()
     {
       return getenv("CUDA_VISIBLE_DEVICES");
     }
