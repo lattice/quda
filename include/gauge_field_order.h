@@ -2382,7 +2382,8 @@ namespace quda {
       // }
 
 /******* End of Previous version: */
-      
+
+      // TODO: even if x, dir, parity are the global indices, the conversion from global to local may run into problems      
       __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, Float = 1.0) const // FIXME: What's this "Float = 1.0" for ?
       {
         // FIX: what's x? (cf. index_helper.cuh)
@@ -2395,6 +2396,7 @@ namespace quda {
 	      getCoords(coord, x, dim, parity);      // from x, dim, parity obtain coordinate of the site
 
         // int iy_OpenQxD = x3 + L3*x2 + L3*L2*x1 + L3*L2*L1*x0; 
+        // TODO: Determine whether coord[mu] is local or global
         int iy_OpenQxD = coord[2] + dim[2]*coord[1] + dim[2]*dim[1]*coord[0] + dim[0]*dim[2]*dim[1]*coord[3];       /* lexicographical index: coord0 in QUDA is x1 in OpenQxD (x)
                                                                                                                                               coord1 in QUDA is x2 in OpenQxD (y)
                                                                                                                                               coord2 in QUDA is x3 in OpenQxD (z)
@@ -2409,7 +2411,6 @@ namespace quda {
         // auto in = &gauge[ (8*(ix_OpenQxD - volumeCB) + 2*dir_OpenQxD)* length];    // This is how they're accessed within OpenQxd (length = 18 doubles = 9 complex doubles = 1 su3dble struct)
         block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
 
-        
 
         // if (parity == 1) { // odd points can be loaded directly
 
