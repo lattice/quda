@@ -29,6 +29,9 @@ namespace quda {
 					const Arg &);
       auto f = reinterpret_cast<launcher_t>(const_cast<void *>(kernel.func));
       launch_error = f(tp, stream, arg);
+      if(launch_error!=QUDA_SUCCESS && !activeTuning()) {
+	errorQuda("Launch error: %s", qudaGetLastErrorString().c_str());
+      }
       return launch_error;
     }
 
@@ -87,7 +90,7 @@ namespace quda {
 	  h.parallel_for<>
 	    (ndRange,
 	     //[=](sycl::nd_item<3> ndi) {
-	     [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
+	     [=](sycl::nd_item<3> ndi) [[sycl::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
 	       auto smem = la.get_pointer();
 	       //arg.lmem = smem;
 	       F f(arg, ndi, smem);
@@ -98,7 +101,7 @@ namespace quda {
 	  h.parallel_for<>
 	    (ndRange,
 	     //[=](sycl::nd_item<3> ndi) {
-	     [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
+	     [=](sycl::nd_item<3> ndi) [[sycl::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
 	       F f(arg, ndi);
 	     });
 	});
@@ -143,7 +146,7 @@ namespace quda {
 	  h.parallel_for<>
 	    (ndRange,
 	     //[=](sycl::nd_item<3> ndi) {
-	     [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
+	     [=](sycl::nd_item<3> ndi) [[sycl::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
 	       Arg *arg2 = reinterpret_cast<Arg*>(p);
 	       auto smem = la.get_pointer();
 	       //arg2->lmem = smem;
@@ -155,7 +158,7 @@ namespace quda {
 	  h.parallel_for<>
 	    (ndRange,
 	     //[=](sycl::nd_item<3> ndi) {
-	     [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
+	     [=](sycl::nd_item<3> ndi) [[sycl::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
 	       const Arg *arg2 = reinterpret_cast<const Arg*>(p);
 	       F f(*arg2, ndi);
 	     });
@@ -188,7 +191,7 @@ namespace quda {
 	h.parallel_for<>
 	  (ndRange,
 	   //[=](sycl::nd_item<3> ndi) {
-	   [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
+	   [=](sycl::nd_item<3> ndi) [[sycl::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
 	     const Arg *arg2 = reinterpret_cast<const Arg*>(p);
 	     F f(*arg2, ndi);
 	   });
@@ -229,7 +232,7 @@ namespace quda {
 	h.parallel_for<>
 	  (ndRange, reducer_h,
 	   //[=](sycl::nd_item<3> ndi, auto &reducer_d) {
-	   [=](sycl::nd_item<3> ndi, auto &reducer_d) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
+	   [=](sycl::nd_item<3> ndi, auto &reducer_d) [[sycl::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
 	     F::apply(arg, ndi, reducer_d);
 	   });
       });
@@ -270,7 +273,7 @@ namespace quda {
 	h.parallel_for<>
 	  (ndRange, reducer_h,
 	   //[=](sycl::nd_item<3> ndi, auto &reducer_d) {
-	   [=](sycl::nd_item<3> ndi, auto &reducer_d) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
+	   [=](sycl::nd_item<3> ndi, auto &reducer_d) [[sycl::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
 	     const Arg *arg2 = reinterpret_cast<const Arg*>(p);
 	     F::apply(*arg2, ndi, reducer_d);
 	   });

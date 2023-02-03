@@ -84,8 +84,9 @@ namespace quda
      data for the kernel
      @param[in] arg Kernel argument
   */
-  template <template <typename> class Functor, typename Arg>
-  void BlockKernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi)
+  template <template <typename> class Functor, typename Arg, typename ...S>
+  std::enable_if_t<!needsFullBlock<Functor<Arg>>, void>
+  BlockKernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem)
   {
     const dim3 block_idx(virtual_block_idx(arg,ndi), groupIdY, groupIdZ);
     const dim3 thread_idx(localIdX, localIdY, localIdZ);
@@ -94,34 +95,61 @@ namespace quda
     const unsigned int k = globalIdZ;
     if (k >= arg.threads.z) return;
 
-    Functor<Arg> t(arg);
-    t(block_idx, thread_idx);
+    Functor<Arg> f(arg);
+    if constexpr (hasSpecialOps<Functor<Arg>>) {
+      f.setNdItem(ndi);
+    }
+    if constexpr (needsSharedMem<Functor<Arg>>) {
+      f.setSharedMem(smem...);
+    }
+    f(block_idx, thread_idx);
+  }
+  template <template <typename> class Functor, typename Arg, typename ...S>
+  std::enable_if_t<needsFullBlock<Functor<Arg>>, void>
+  BlockKernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem)
+  {
+    const dim3 block_idx(virtual_block_idx(arg,ndi), groupIdY, groupIdZ);
+    const dim3 thread_idx(localIdX, localIdY, localIdZ);
+    bool active = true;
+    const unsigned int j = globalIdY;
+    if (j >= arg.threads.y) active = false;
+    const unsigned int k = globalIdZ;
+    if (k >= arg.threads.z) active = false;
+
+    Functor<Arg> f(arg);
+    if constexpr (hasSpecialOps<Functor<Arg>>) {
+      f.setNdItem(ndi);
+    }
+    if constexpr (needsSharedMem<Functor<Arg>>) {
+      f.setSharedMem(smem...);
+    }
+    f.template apply<true>(block_idx, thread_idx, active);
   }
   template <template <typename> class Functor, typename Arg>
   struct BlockKernel2DS {
-    using SpecialOpsT = NoSpecialOps;
-    BlockKernel2DS(const Arg &arg, const sycl::nd_item<3> &ndi)
+    using SpecialOpsT = getSpecialOps<Functor<Arg>>;
+    template <typename ...S>
+    BlockKernel2DS(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem)
     {
 #ifdef QUDA_THREADS_BLOCKED
       BlockKernel2DImpl<Functor,Arg>(arg, ndi);
 #else
-      BlockKernel2DImpl<Functor,Arg>(arg, ndi);
+      BlockKernel2DImpl<Functor,Arg>(arg, ndi, smem...);
 #endif
     }
   };
 
   template <template <typename> class Functor, typename Arg, bool grid_stride=false>
   qudaError_t
-  BlockKernel2D(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+  BlockKernel2D(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
-    static_assert(!hasSpecialOps<Functor<Arg>>);
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
-    if (localSize[RANGE_X] % device::warp_size() != 0) {
-      return QUDA_ERROR;
-    }
+    //if (localSize[RANGE_X] % device::warp_size() != 0) {
+    //return QUDA_ERROR;
+    //}
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("BlockKernel2D sizeof(arg): %lu\n", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
@@ -131,6 +159,14 @@ namespace quda
       printfQuda("  SpecialOps: %s\n", typeid(getSpecialOps<Functor<Arg>>).name());
       printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
       printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
+    }
+    if (localSize[RANGE_X] % device::warp_size() != 0) {
+      if(needsFullBlock<Functor<Arg>>) {
+	std::ostringstream what;
+	what << "localSizeX (" << localSize[RANGE_X] << ") % warp_size (" << device::warp_size() << ") != 0";
+	target::sycl::set_error(what.str(), "pre-launch", __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
+	return QUDA_ERROR;
+      }
     }
     //if (arg.threads.x%localSize[RANGE_X] != 0) {
       //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);

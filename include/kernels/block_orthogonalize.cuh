@@ -81,7 +81,9 @@ namespace quda {
     }
   };
 
-  template <typename Arg> struct BlockOrtho_ {
+  template <typename Arg> struct BlockOrtho_ : SpecialOps<
+    op_BlockReduce<typename Arg::sum_t>,
+    op_BlockReduce<array<complex<typename Arg::sum_t>,tile_size<Arg::nColor,Arg::nVec,Arg::block_size>()>> > {
     const Arg &arg;
     static constexpr unsigned block_size = Arg::block_size;
     static constexpr int fineSpin = Arg::fineSpin;
@@ -124,7 +126,8 @@ namespace quda {
         for (int c = 0; c < nColor; c++) arg.V(parity, x_cb, chirality * spinBlock + s, c, i) = v(s, c);
     }
 
-    __device__ __host__ inline void operator()(dim3 block, dim3 thread)
+    template <bool allthreads = false>
+    __device__ __host__ inline void apply(dim3 block, dim3 thread, bool active = true)
     {
       int x_coarse = block.x;
       int x_fine_offset = thread.x;
@@ -147,8 +150,8 @@ namespace quda {
       if (fineSpin == 1) chirality = 0; // when using staggered chirality is mapped to parity
 
       constexpr int block_dim = 1;
-      BlockReduce<dot_t, block_dim> dot_reducer{0};
-      BlockReduce<sum_t, block_dim> norm_reducer{0};
+      BlockReduce<dot_t, block_dim> dot_reducer{this, 0};
+      BlockReduce<sum_t, block_dim> norm_reducer{this, 0};
 
       // loop over number of block orthos
       for (int n = 0; n < arg.nBlockOrtho; n++) {
@@ -204,9 +207,9 @@ namespace quda {
 #pragma unroll
               for (int i = 0; i < m; i++) dot[i] += innerProduct(v[i][tx], v[m][tx]);
             }
-            
+
             dot = dot_reducer.template AllSum<false>(dot);
-            
+
             sum_t nrm = 0.0;
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
@@ -231,6 +234,11 @@ namespace quda {
           }
         } // j
       }   // n
+    }
+
+    __device__ __host__ inline void operator()(dim3 block, dim3 thread)
+    {
+      apply(block, thread);
     }
   };
 

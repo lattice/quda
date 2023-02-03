@@ -33,15 +33,28 @@ namespace quda {
   }
   template <typename ...T> inline void blockSync(SpecialOps<T...> ops) { blockSync(&ops); }
 
+  template <typename ...T> static constexpr bool isOpConcurrent = false;
+  template <typename ...T> static constexpr bool isOpConcurrent<op_Concurrent<T...>> = true;
+
+  template <typename T, typename ...U> static constexpr int getOpIndex = 0;
+  template <typename T, typename ...U> static constexpr int getOpIndex<T,op_Concurrent<U...>> = getOpIndex<T,U...>;
+  template <typename T, typename U, typename ...V> static constexpr int getOpIndex<T, U, V...> =
+    std::is_same_v<T,U> ? 0 : (1 + getOpIndex<T,V...>);
+
   // getSpecialOp
   template <typename U, int n = 0, typename ...T>
   SpecialOpsType<U,n> getSpecialOp(const SpecialOps<T...> *ops) {
-    static_assert(hasSpecialOpType<U,T...>);
-    SpecialOpsType<U,n> s;
-    s.ndi = ops->ndi;
-    //s.smem = ops->smem + sharedMemOffset<U,n>()(ops->ndi->get_local_range());  // FIXME: need to pass arg
-    s.smem = ops->smem + sharedMemOffset<U,n>()(getBlockDim());  // FIXME: need to pass arg
-    return s;
+    if constexpr (!isOpConcurrent<U> && sizeof...(T) == 1 && isOpConcurrent<T...>) {
+      static constexpr int i = getOpIndex<U, T...>;
+      return getSpecialOp<T...,i>(ops);
+    } else {
+      static_assert(hasSpecialOpType<U,T...>);
+      SpecialOpsType<U,n> s;
+      s.ndi = ops->ndi;
+      //s.smem = ops->smem + sharedMemOffset<U,n>()(ops->ndi->get_local_range());  // FIXME: need to pass arg
+      s.smem = ops->smem + sharedMemOffset<U,n>()(getBlockDim());  // FIXME: need to pass arg
+      return s;
+    }
   }
   template <typename U, int n = 0, typename ...T>
     SpecialOpsType<U,n> getSpecialOp(SpecialOps<T...> ops) { return getSpecialOp<U,n>(&ops); }
@@ -93,6 +106,13 @@ namespace quda {
   }
   template <typename T, typename S>
   sycl::local_ptr<T> getSharedMemPtr(only_SharedMemory<T,S> ops) { return getSharedMemPtr(&ops); }
+
+  template <typename T, typename O>
+  auto SharedMemory(O *ops)
+  {
+    auto s = getSpecialOp<T>(ops);
+    return getSharedMemPtr(s);
+  }
 
   // base operation dependencies
   struct depNone {};

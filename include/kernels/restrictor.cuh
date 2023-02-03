@@ -104,14 +104,16 @@ namespace quda {
     }
   }
 
-  template <typename Arg> struct Restrictor {
+  template <typename Arg> struct Restrictor :
+    only_BlockReduce<array<complex<typename Arg::real>,Arg::coarseSpin*coarse_colors_per_thread<Arg::fineColor,Arg::coarseColor>()>> {
     static constexpr int coarse_color_per_thread = coarse_colors_per_thread<Arg::fineColor, Arg::coarseColor>();
     using vector = array<complex<typename Arg::real>, Arg::coarseSpin*coarse_color_per_thread>;
     const Arg &arg;
     constexpr Restrictor(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ inline void operator()(dim3 block, dim3 thread)
+    template <bool allthreads = false>
+    __device__ __host__ inline void apply(dim3 block, dim3 thread, bool active = true)
     {
       int x_fine_offset = thread.x;
       const int x_coarse = block.x;
@@ -152,7 +154,7 @@ namespace quda {
       }
 
       constexpr int block_dim = 1;
-      reduced = BlockReduce<vector, block_dim, Arg::n_vector_z>(thread.z).Sum(reduced);
+      reduced = BlockReduce<vector, block_dim, Arg::n_vector_z>(this, thread.z).Sum(reduced);
 
       if (target::thread_idx().x == 0) {
         const int parity_coarse = x_coarse >= arg.out.VolumeCB() ? 1 : 0;
@@ -167,6 +169,11 @@ namespace quda {
           }
         }
       }
+    }
+
+    __device__ __host__ inline void operator()(dim3 block, dim3 thread)
+    {
+      apply(block, thread);
     }
   };
 

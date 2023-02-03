@@ -56,15 +56,6 @@ namespace quda
 
   using namespace target::sycl;
 
-#if 0
-  qudaError_t qudaLaunchKernel_(const char *file, const int line,
-				const char *func, const char *kern)
-  {
-    errorQuda("qudaLaunchKernel_ %s %i %s %s\n", file, line, func, kern);
-    return QUDA_ERROR;
-  }
-#endif
-
   class QudaMem : public Tunable
   {
     void *dst;

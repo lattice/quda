@@ -13,6 +13,10 @@ namespace quda {
   struct opDimsBlock {
     template <typename ...Arg> static constexpr dim3 dims(dim3 b, const Arg &...arg) { return b; }
   };
+  template <int bx, int by, int bz>
+  struct opDimsStatic {
+    template <typename ...Arg> static constexpr dim3 dims(dim3 b, const Arg &...arg) { return dim3(bx,by,bz); }
+  };
 
   struct opSizeBlock {
     template <typename T, typename ...Arg> static constexpr size_t size(dim3 b, const Arg &...arg) { return b.x * b.y * b.z * sizeof(T); }
@@ -56,6 +60,7 @@ namespace quda {
   template <typename T, typename D = opDimsBlock> using only_SharedMemoryCache = SpecialOps<op_SharedMemoryCache<T,D>>;
   template <typename T, typename S = opSizeBlock> using only_SharedMemory = SpecialOps<op_SharedMemory<T,S>>;
   template <typename T, size_t S> using only_SharedMemStatic = only_SharedMemory<T,opSizeStatic<S>>;
+  template <typename ...T> using only_Concurrent = SpecialOps<op_Concurrent<T...>>;
 
   // getSpecialOps
   template <typename T, typename U = void> struct getSpecialOpsS { using type = NoSpecialOps; };
@@ -86,6 +91,7 @@ namespace quda {
 
   // hasBlockSync
   template <typename ...T> static constexpr bool hasBlockSync = hasSpecialOpType<op_blockSync,T...>;
+  template <typename ...T> static constexpr bool hasBlockSync<op_Concurrent<T...>> = hasSpecialOpType<op_blockSync,T...>;
 
   // hasWarpCombine
   template <typename ...T> static constexpr bool hasWarpCombine = (hasWarpCombine<T> || ...);

@@ -10,6 +10,7 @@
 #include <matrix_tile.cuh>
 #include <target_device.h>
 #include <kernel.h>
+#include <shared_memory_cache_helper.h>
 
 namespace quda {
 
@@ -136,11 +137,6 @@ namespace quda {
     static constexpr int max_width_tiles_per_block = max_color_width_per_block / tile_width_vuv;
     static_assert(max_color_height_per_block % tile_height_vuv == 0, "max_color_height_per_block must be divisible by tile height");
     static_assert(max_color_width_per_block % tile_width_vuv == 0, "max_color_width_per_block must be divisible by tile width");
-    using StoreCoarseSharedAtomicTemp =
-      complex<storeType>[max_color_height_per_block][max_color_width_per_block][4][coarseSpin][coarseSpin];
-    using SharedMemVuv = op_SharedMemStatic<StoreCoarseSharedAtomicTemp,2>;
-    using SpecialOpsVuv = SpecialOps<op_blockSync,SharedMemVuv>;
-    //using SpecialOpsVuv = only_Concurrent<op_SharedMem<StoreCoarseSharedAtomicTemp,1>,op_SharedMem<StoreCoarseSharedAtomicTemp,1>>;
 
     /**
        @brief Constructor for CalculateYArg
@@ -1392,6 +1388,19 @@ namespace quda {
   };
 
   template <> struct storeCoarseSharedAtomic_impl<true> {
+    //template <typename Arg> using SharedMemT =
+    //  complex<storeType>[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
+    template <typename Arg> using CacheT =
+      complex<storeType>[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
+    //template <typename Arg> using SharedMemOp = op_SharedMemStatic<SharedMemT<Arg>,2>;
+    //template <typename Arg> using SpecOps = SpecialOps<SharedMemOp<Arg>>;
+    //template <typename Arg> using SpecOps = only_Concurrent<op_blockSync,SharedMemOp<Arg>>;
+    //using SharedMemVuv = op_SharedMemStatic<StoreCoarseSharedAtomicTemp,2>;
+    //using SpecialOpsVuv = SpecialOps<op_blockSync,SharedMemVuv>;
+    //using SpecialOpsVuv = only_Concurrent<op_SharedMem<StoreCoarseSharedAtomicTemp,1>,op_SharedMem<StoreCoarseSharedAtomicTemp,1>>;
+    template <typename Arg> using Cache = op_SharedMemoryCache<CacheT<Arg>,opDimsStatic<2,1,1>>;
+    template <typename Arg> using SpecOps = SpecialOps<Cache<Arg>>;
+
     template <typename VUV, typename Pack, typename Arg, typename O>
     inline __device__ void operator()(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, int parity, const Pack &pack, const Arg &arg, bool active, O *ops)
     {
@@ -1406,8 +1415,13 @@ namespace quda {
       //auto Z = getSharedMemPtr(getSpecialOp<typename Arg::SharedMemVuv>(ops));
       //typename Arg::StoreCoarseSharedAtomicTemp X;
       //typename Arg::StoreCoarseSharedAtomicTemp Y;
-      auto &X = getSharedMemPtr(getSpecialOp<typename Arg::SharedMemVuv>(ops))[0];
-      auto &Y = getSharedMemPtr(getSpecialOp<typename Arg::SharedMemVuv>(ops))[1];
+      //auto &X = getSharedMemPtr(getSpecialOp<typename Arg::SharedMemVuv>(ops))[0];
+      //auto &Y = getSharedMemPtr(getSpecialOp<typename Arg::SharedMemVuv>(ops))[1];
+      SharedMemoryCache<Cache<Arg>> cache(ops);
+      auto &X = cache.data()[0];
+      auto &Y = cache.data()[1];
+      //auto &X = SharedMemory<SharedMemOp<Arg>>(ops)[0];
+      //auto &Y = SharedMemory<SharedMemOp<Arg>>(ops)[1];
 
       int x_ = coarse_x_cb % arg.aggregates_per_block;
       int tx = virtualThreadIdx(arg);
@@ -1430,7 +1444,8 @@ namespace quda {
       }
 
       //__syncthreads();
-      blockSync(ops);
+      //blockSync(ops);
+      cache.sync();
 
 #pragma unroll
       for (int i = 0; i < TileType::M; i++) {
@@ -1460,7 +1475,8 @@ namespace quda {
       }
 
       //__syncthreads();
-      blockSync(ops);
+      //blockSync(ops);
+      cache.sync();
 
       if (tx < Arg::coarseSpin*Arg::coarseSpin && (parity == 0 || arg.parity_flip == 1) ) {
 
@@ -1689,7 +1705,7 @@ namespace quda {
     }
   };
 
-  template <typename Arg> struct compute_vuv : Arg::SpecialOpsVuv {
+  template <typename Arg> struct compute_vuv : storeCoarseSharedAtomic_impl<true>::SpecOps<Arg> {
     static constexpr int nFace = 1;
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -1721,7 +1737,7 @@ namespace quda {
     }
   };
 
-  template <typename Arg> struct compute_vlv : Arg::SpecialOpsVuv {
+  template <typename Arg> struct compute_vlv : storeCoarseSharedAtomic_impl<true>::SpecOps<Arg> {
     static constexpr int nFace = 3;
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }

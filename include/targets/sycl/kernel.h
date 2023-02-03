@@ -55,9 +55,9 @@ namespace quda {
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
-    if (localSize[RANGE_X] % device::warp_size() != 0) {
-      return QUDA_ERROR;
-    }
+    //if (localSize[RANGE_X] % device::warp_size() != 0) {
+    //  return QUDA_ERROR;
+    //}
 #if 0
     if (localSize[RANGE_X] > arg.threads.x) {
       localSize[RANGE_X] = arg.threads.x;
@@ -82,6 +82,14 @@ namespace quda {
       printfQuda("  SpecialOps: %s\n", typeid(getSpecialOps<Functor<Arg>>).name());
       printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
       printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
+    }
+    if (localSize[RANGE_X] % device::warp_size() != 0) {
+      if(needsFullBlock<Functor<Arg>>) {
+	std::ostringstream what;
+	what << "localSizeX (" << localSize[RANGE_X] << ") % warp_size (" << device::warp_size() << ") != 0";
+	target::sycl::set_error(what.str(), "pre-launch", __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
+	return QUDA_ERROR;
+      }
     }
     //if (arg.threads.x%localSize[RANGE_X] != 0) {
       //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
@@ -158,8 +166,8 @@ namespace quda {
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   struct Kernel2DS {
     using SpecialOpsT = getSpecialOps<Functor<Arg>>;
-    template <typename... T>
-    Kernel2DS(const Arg &arg, const sycl::nd_item<3> &ndi, T... smem)
+    template <typename ...S>
+    Kernel2DS(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem)
     {
 #ifdef QUDA_THREADS_BLOCKED
       Kernel2DImplB<Functor,Arg,grid_stride>(arg, ndi);
@@ -176,9 +184,9 @@ namespace quda {
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
-    if (localSize[RANGE_X] % device::warp_size() != 0) {
-      return QUDA_ERROR;
-    }
+    //if (localSize[RANGE_X] % device::warp_size() != 0) {
+    //  return QUDA_ERROR;
+    //}
 #if 0
     if (localSize[RANGE_X] > arg.threads.x) {
       localSize[RANGE_X] = arg.threads.x;
@@ -203,6 +211,14 @@ namespace quda {
       printfQuda("  SpecialOps: %s\n", typeid(getSpecialOps<Functor<Arg>>).name());
       printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
       printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
+    }
+    if (localSize[RANGE_X] % device::warp_size() != 0) {
+      if(needsFullBlock<Functor<Arg>>) {
+	std::ostringstream what;
+	what << "localSizeX (" << localSize[RANGE_X] << ") % warp_size (" << device::warp_size() << ") != 0";
+	target::sycl::set_error(what.str(), "pre-launch", __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
+	return QUDA_ERROR;
+      }
     }
     //if (arg.threads.x%localSize[RANGE_X] != 0) {
       //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
@@ -311,10 +327,6 @@ namespace quda {
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);
-    if (localSize[RANGE_X] % device::warp_size() != 0) {
-      warningQuda("localSizeX (%lu) %% warp_size (%i) != 0\n", localSize[RANGE_X], device::warp_size());
-      return QUDA_ERROR;
-    }
 #if 0
     if (localSize[RANGE_X] > arg.threads.x) {
       localSize[RANGE_X] = arg.threads.x;
@@ -341,6 +353,14 @@ namespace quda {
       printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
       printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
       //fflush(stdout);
+    }
+    if (localSize[RANGE_X] % device::warp_size() != 0) {
+      if(needsFullBlock<Functor<Arg>>) {
+	std::ostringstream what;
+	what << "localSizeX (" << localSize[RANGE_X] << ") % warp_size (" << device::warp_size() << ") != 0";
+	target::sycl::set_error(what.str(), "pre-launch", __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
+	return QUDA_ERROR;
+      }
     }
     //if (arg.threads.x%localSize[RANGE_X] != 0) {
     //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
