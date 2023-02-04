@@ -15,6 +15,8 @@ namespace quda
     bool isDouble;
   } FFTPlanHandle;
 
+  inline static constexpr bool HaveFFT() { return false; }
+
   inline void ApplyFFT(FFTPlanHandle &, float2 *, float2 *, int)
   {
     errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
@@ -57,6 +59,8 @@ namespace quda
       descriptor<precision::DOUBLE,domain::COMPLEX> *d;
     };
   } FFTPlanHandle;
+
+  inline static constexpr bool HaveFFT() { return true; }
 
   /**
    * @brief Call MKL to perform a single-precision complex-to-complex
