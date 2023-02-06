@@ -536,6 +536,8 @@ extern "C" {
     int batched_rotate;
     /** For block method solvers, the block size **/
     int block_size;
+    /** For block method solvers, quit after n attempts at block orthonormalisation **/
+    int max_ortho_attempts;
 
     /** In the test function, cross check the device result against ARPACK **/
     QudaBoolean arpack_check;

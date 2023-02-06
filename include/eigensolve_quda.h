@@ -38,6 +38,7 @@ namespace quda
     bool converged;
     int restart_iter;
     int max_restarts;
+    int max_ortho_attempts;
     int check_interval;
     int batched_rotate;
     int block_size;

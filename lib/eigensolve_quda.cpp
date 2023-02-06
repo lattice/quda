@@ -44,6 +44,7 @@ namespace quda
     converged = false;
     restart_iter = 0;
     max_restarts = eig_param->max_restarts;
+    max_ortho_attempts = eig_param->max_ortho_attempts;
     check_interval = eig_param->check_interval;
     batched_rotate = eig_param->batched_rotate;
     block_size = eig_param->block_size;
@@ -157,20 +158,20 @@ namespace quda
     }
 
     bool orthed = false;
-    int k = 0, kmax = 5;
-    while (!orthed && k < kmax) {
+    int k = 0;
+    while (!orthed && k < max_ortho_attempts) {
       orthonormalizeMGS(kSpace, block_size);
       if (block_size > 1) {
-        logQuda(QUDA_SUMMARIZE, "Orthonormalising initial guesses with Modified Gram Schmidt, iter k=%d/5\n", (k + 1));
+        logQuda(QUDA_SUMMARIZE, "Orthonormalising initial guesses with Modified Gram Schmidt, iter k=%d\n", k);
       } else {
         logQuda(QUDA_SUMMARIZE, "Orthonormalising initial guess\n");
       }
       orthed = orthoCheck(kSpace, block_size);
       k++;
     }
-    if (!orthed) errorQuda("Failed to orthonormalise initial guesses");
+    if (!orthed) errorQuda("Failed to orthonormalise initial guesses with %d orthonormalisation attempts (max = %d)", k+1, max_ortho_attempts);
   }
-
+  
   void EigenSolver::checkChebyOpMax(std::vector<ColorSpinorField> &kSpace)
   {
     if (eig_param->use_poly_acc) {

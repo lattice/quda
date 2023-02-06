@@ -331,6 +331,7 @@ extern int eig_batched_rotate; // If unchanged, will be set to maximum
 extern bool eig_require_convergence;
 extern int eig_check_interval;
 extern int eig_max_restarts;
+extern int eig_max_ortho_attempts;
 extern double eig_tol;
 extern double eig_qr_tol;
 extern bool eig_use_eigen_qr;
@@ -364,6 +365,7 @@ extern quda::mgarray<int> mg_eig_batched_rotate;
 extern quda::mgarray<bool> mg_eig_require_convergence;
 extern quda::mgarray<int> mg_eig_check_interval;
 extern quda::mgarray<int> mg_eig_max_restarts;
+extern quda::mgarray<int> mg_eig_max_ortho_attempts;
 extern quda::mgarray<double> mg_eig_tol;
 extern quda::mgarray<double> mg_eig_qr_tol;
 extern quda::mgarray<bool> mg_eig_use_eigen_qr;

@@ -189,6 +189,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(qr_tol, 0.0);
   P(check_interval, 0);
   P(max_restarts, 0);
+  P(max_ortho_attempts, 10);
   P(arpack_check, QUDA_BOOLEAN_FALSE);
   P(nk, 0);
   P(np, 0);
@@ -216,6 +217,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(qr_tol, INVALID_DOUBLE);
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
+  P(max_ortho_attempts, INVALID_INT);
   P(arpack_check, QUDA_BOOLEAN_INVALID);
   P(nk, INVALID_INT);
   P(np, INVALID_INT);
