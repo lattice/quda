@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cuda/pipeline>
+
 #include <gauge_field_order.h>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
@@ -15,13 +17,16 @@
 namespace quda
 {
 
-  template <class mma_t_, bool dslash_, bool clover_, bool dagger_, DslashType type_, typename Float, typename yFloat,
+  template <class mma_t_, bool dslash_, bool clover_, bool dagger_, DslashType type_, typename Float_, typename yFloat_,
             typename ghostFloat, int nSpin_, int nColor_, int nVec_, int bN_, int bM_, int block_y_, int block_z_>
   struct DslashCoarseMmaArg : kernel_param<> {
     static constexpr bool dslash = dslash_;
     static constexpr bool clover = clover_;
     static constexpr bool dagger = dagger_;
     static constexpr DslashType type = type_;
+
+    using Float = Float_;
+    using yFloat = yFloat_;
 
     static constexpr int block_dim = block_z_ * block_y_;
     static constexpr int min_blocks = 1;
@@ -131,6 +136,11 @@ namespace quda
     typename Config::SmemObjB smem_obj_b_real(smem_obj_a_imag.ptr + Config::smem_lda * Arg::bK);
     typename Config::SmemObjB smem_obj_b_imag(smem_obj_b_real.ptr + Config::smem_ldb * Arg::bK);
 
+    using store_a_t = complex<typename Arg::yFloat>;
+    using store_b_t = complex<typename Arg::Float>;
+    store_a_t *smem_tmp_a = reinterpret_cast<store_a_t *>(smem_obj_b_imag.ptr + Config::smem_ldb * Arg::bK);
+    store_b_t *smem_tmp_b = reinterpret_cast<store_b_t *>(smem_tmp_a + (Arg::bK + 4) * (Arg::bM + 4));
+
     typename Config::Accumulator accumulator((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x);
 
     accumulator.zero();
@@ -138,27 +148,44 @@ namespace quda
     typename Config::ALoader a_loader;
     typename Config::BLoader b_loader;
 
-    if constexpr (Arg::dslash) {
-      // Forward gather - compute fwd offset for spinor fetch
-#pragma unroll
-      for (int d = 0; d < Arg::nDim; d++) // loop over dimension
-      {
-        const int fwd_idx = linkIndexHop(coord, arg.dim, d, arg.nFace);
+    cuda::pipeline<cuda::thread_scope_thread> pipe = cuda::make_pipeline();
 
-        if (arg.commDim[d] && is_boundary(coord, d, 1, arg)) {
+    bool forward_exterior[Arg::nDim];
+    bool backward_exterior[Arg::nDim];
+    int forward_idx[Arg::nDim];
+    int backward_idx[Arg::nDim];
+
+#pragma unroll
+    for (int d = 0; d < Arg::nDim; d++) // loop over dimension
+    {
+      forward_exterior[d] = arg.commDim[d] && is_boundary(coord, d, 1, arg);
+      backward_exterior[d] = arg.commDim[d] && is_boundary(coord, d, 0, arg);
+      forward_idx[d] = linkIndexHop(coord, arg.dim, d, arg.nFace);
+      backward_idx[d] = linkIndexHop(coord, arg.dim, d, -arg.nFace);
+    }
+    __syncthreads();
+
+    auto dslash_forward_producer = [&](int d, float &scale_inv_a, float &scale_inv_b) {
+
+        const int fwd_idx = forward_idx[d];
+
+        if (forward_exterior[d]) {
           if constexpr (doHalo<Arg::type>()) {
             int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+
             auto a = arg.Y(Arg::dagger ? d : d + 4, parity, x_cb, 0, 0);
             auto b = arg.halo.Ghost(d, 1, their_spinor_parity, ghost_idx, 0, 0, 0);
             constexpr bool a_dagger = false;
             constexpr bool b_dagger = false;
 
-            __syncthreads();
-            a_loader.template g2s<lda, a_dagger>(a, m_offset, 0, smem_obj_a_real, smem_obj_a_imag);
-            b_loader.template g2s<ldb, b_dagger>(b, n_offset, 0, smem_obj_b_real, smem_obj_b_imag);
-            __syncthreads();
+            using store_b_ghost_t = complex<typename decltype(b)::store_type>;
+            auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
 
-            accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+            __syncthreads();
+            pipe.producer_acquire();
+            scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, 0, smem_tmp_a, pipe);
+            scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, 0, smem_tmp_b_ghost, pipe);
+            pipe.producer_commit();
           }
         } else if constexpr (doBulk<Arg::type>()) {
 
@@ -168,19 +195,64 @@ namespace quda
           constexpr bool b_dagger = false;
 
           __syncthreads();
-          a_loader.template g2s<lda, a_dagger>(a, m_offset, 0, smem_obj_a_real, smem_obj_a_imag);
-          b_loader.template g2s<ldb, b_dagger>(b, n_offset, 0, smem_obj_b_real, smem_obj_b_imag);
-          __syncthreads();
-
-          accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+          pipe.producer_acquire();
+          scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, 0, smem_tmp_a, pipe);
+          scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, 0, smem_tmp_b, pipe);
+          pipe.producer_commit();
         }
-      } // nDim
+    };
 
-      // Backward gather - compute back offset for spinor and gauge fetch
-#pragma unroll
-      for (int d = 0; d < Arg::nDim; d++) {
-        const int back_idx = linkIndexHop(coord, arg.dim, d, -arg.nFace);
-        if (arg.commDim[d] && is_boundary(coord, d, 0, arg)) {
+    auto dslash_forward_consumer = [&](int d, float scale_inv_a, float scale_inv_b) {
+
+        if (forward_exterior[d]) {
+          if constexpr (doHalo<Arg::type>()) {
+            constexpr bool a_dagger = false;
+            constexpr bool b_dagger = false;
+
+            using a_wrapper_t = decltype(arg.Y(0, 0, 0, 0, 0));
+            using b_wrapper_t = decltype(arg.halo.Ghost(0, 0, 0, 0, 0, 0, 0));
+            using store_b_ghost_t = complex<typename b_wrapper_t::store_type>;
+            auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
+            constexpr bool a_fixed = a_wrapper_t::fixed;
+            constexpr bool b_fixed = b_wrapper_t::fixed;
+
+            pipe.consumer_wait();
+            __syncthreads();
+            a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+            b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b_ghost, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+            pipe.consumer_release();
+            __syncthreads();
+          }
+        } else if constexpr (doBulk<Arg::type>()) {
+
+          constexpr bool a_dagger = false;
+          constexpr bool b_dagger = false;
+
+          using a_wrapper_t = decltype(arg.Y(0, 0, 0, 0, 0));
+          using b_wrapper_t = decltype(arg.inA(0, 0, 0, 0, 0));
+          constexpr bool a_fixed = a_wrapper_t::fixed;
+          constexpr bool b_fixed = b_wrapper_t::fixed;
+
+          pipe.consumer_wait();
+          __syncthreads();
+          a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+          b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+          pipe.consumer_release();
+          __syncthreads();
+        }
+    };
+
+    auto dslash_forward_compute = [&](int d) {
+      if (forward_exterior[d] && doHalo<Arg::type>() || doBulk<Arg::type>()) {
+        accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+      }
+    };
+
+    auto dslash_backward_producer = [&](int d, float &scale_inv_a, float &scale_inv_b) {
+
+        const int back_idx = backward_idx[d];
+
+        if (backward_exterior[d]) {
           if constexpr (doHalo<Arg::type>()) {
             const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
 
@@ -189,12 +261,14 @@ namespace quda
             constexpr bool a_dagger = true;
             constexpr bool b_dagger = false;
 
-            __syncthreads();
-            a_loader.template g2s<lda, a_dagger>(a, m_offset, 0, smem_obj_a_real, smem_obj_a_imag);
-            b_loader.template g2s<ldb, b_dagger>(b, n_offset, 0, smem_obj_b_real, smem_obj_b_imag);
-            __syncthreads();
+            using store_b_ghost_t = complex<typename decltype(b)::store_type>;
+            auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
 
-            accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+            __syncthreads();
+            pipe.producer_acquire();
+            scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, 0, smem_tmp_a, pipe);
+            scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, 0, smem_tmp_b_ghost, pipe);
+            pipe.producer_commit();
           }
         } else if constexpr (doBulk<Arg::type>()) {
           const int gauge_idx = back_idx;
@@ -205,13 +279,81 @@ namespace quda
           constexpr bool b_dagger = false;
 
           __syncthreads();
-          a_loader.template g2s<lda, a_dagger>(a, m_offset, 0, smem_obj_a_real, smem_obj_a_imag);
-          b_loader.template g2s<ldb, b_dagger>(b, n_offset, 0, smem_obj_b_real, smem_obj_b_imag);
-          __syncthreads();
-
-          accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+          pipe.producer_acquire();
+          scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, 0, smem_tmp_a, pipe);
+          scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, 0, smem_tmp_b, pipe);
+          pipe.producer_commit();
         }
+    };
 
+    auto dslash_backward_consumer = [&](int d, float scale_inv_a, float scale_inv_b) {
+        if (backward_exterior[d]) {
+          if constexpr (doHalo<Arg::type>()) {
+            constexpr bool a_dagger = true;
+            constexpr bool b_dagger = false;
+
+            using a_wrapper_t = decltype(arg.Y.Ghost(0, 0, 0, 0, 0));
+            using b_wrapper_t = decltype(arg.halo.Ghost(0, 0, 0, 0, 0, 0, 0));
+            using store_b_ghost_t = complex<typename b_wrapper_t::store_type>;
+            auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
+            constexpr bool a_fixed = a_wrapper_t::fixed;
+            constexpr bool b_fixed = b_wrapper_t::fixed;
+
+            pipe.consumer_wait();
+            __syncthreads();
+            a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+            b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b_ghost, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+            pipe.consumer_release();
+            __syncthreads();
+          }
+        } else if constexpr (doBulk<Arg::type>()) {
+          constexpr bool a_dagger = true;
+          constexpr bool b_dagger = false;
+
+          using a_wrapper_t = decltype(arg.Y(0, 0, 0, 0, 0));
+          using b_wrapper_t = decltype(arg.inA(0, 0, 0, 0, 0));
+          constexpr bool a_fixed = a_wrapper_t::fixed;
+          constexpr bool b_fixed = b_wrapper_t::fixed;
+
+          pipe.consumer_wait();
+          __syncthreads();
+          a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+          b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+          pipe.consumer_release();
+          __syncthreads();
+        }
+    };
+
+    auto dslash_backward_compute = [&](int d) {
+      if (backward_exterior[d] && doHalo<Arg::type>() || doBulk<Arg::type>()) {
+        accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+      }
+    };
+
+    float scale_inv_a;
+    float scale_inv_b;
+
+    if constexpr (Arg::dslash) {
+      // Forward gather - compute fwd offset for spinor fetch
+      dslash_forward_producer(0, scale_inv_a, scale_inv_b);
+#pragma unroll
+      for (int d = 0; d < Arg::nDim; d++) // loop over dimension
+      {
+        dslash_forward_consumer(d, scale_inv_a, scale_inv_b);
+        if (d < 3) {
+          dslash_forward_producer(d + 1, scale_inv_a, scale_inv_b);
+        } else {
+          dslash_backward_producer(0, scale_inv_a, scale_inv_b);
+        }
+        dslash_forward_compute(d);
+      } // nDim
+
+      // Backward gather - compute back offset for spinor and gauge fetch
+#pragma unroll
+      for (int d = 0; d < Arg::nDim; d++) {
+        dslash_backward_consumer(d, scale_inv_a, scale_inv_b);
+        if (d < 3) { dslash_backward_producer(d + 1, scale_inv_a, scale_inv_b); }
+        dslash_backward_compute(d);
       } // nDim
 
       accumulator.ax(-arg.kappa);
@@ -278,7 +420,7 @@ namespace quda
 
     __device__ inline void operator()()
     {
-      int parity_x_cb = target::thread_idx().x + target::block_idx().x * target::block_dim().x;
+      int parity_x_cb = target::block_idx().x;
       int n_offset = target::block_idx().z * Arg::bN;
       int m_offset = target::block_idx().y * Arg::bM;
       int parity = (arg.nParity == 2) ? parity_x_cb % 2 : arg.parity;

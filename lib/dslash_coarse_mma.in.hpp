@@ -198,7 +198,8 @@ namespace quda {
       tp.grid = dim3(out[0].SiteSubset() * out[0].VolumeCB(), (Ns * Nc) / bM, out[0].Nvec() / bN);
       tp.set_max_shared_bytes = true;
 
-      int shared_bytes = mma::shared_memory_bytes<mma_t>(bM, bN, Ns * Nc);
+      int bK = Ns * Nc;
+      int shared_bytes = mma::shared_memory_bytes<mma_t>(bM, bN, bK) + (bM + 4) * (bK + 4) * 2 * sizeof(yFloat) + (bK + 4) * (bN + 4) * 2 * sizeof(Float);
       tp.shared_bytes = shared_bytes;
     }
 
