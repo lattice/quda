@@ -117,7 +117,7 @@ protected:
 
   virtual void SetUp()
   {
-#if defined(QUDA_TARGET_SYCL) && !defined(NATIVE_FFT_LIB)
+#if defined(QUDA_TARGET_SYCL) && !defined(QUDA_BUILD_NATIVE_FFT)
     const ::testing::TestInfo* const test_info = ::testing::UnitTest::GetInstance()->current_test_info();
     const char *name = test_info->name();
     if ( strcmp(name, "Landau_FFT")==0 || strcmp(name, "Coulomb_FFT")==0 ) {

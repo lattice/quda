@@ -452,8 +452,8 @@ namespace quda
      classed.
    */
   struct dslash_default {
-    constexpr QudaPCType pc_type() const { return QUDA_4D_PC; }
-    constexpr int twist_pack() const { return 0; }
+    static constexpr QudaPCType pc_type() { return QUDA_4D_PC; }
+    static constexpr int twist_pack() { return 0; }
   };
 
   /**
@@ -652,7 +652,9 @@ namespace quda
     are reserved for data packing, which may include communication to
     neighboring processes.
    */
-  template <typename Arg> struct dslash_functor : Arg::D::SpecialOpsT {
+//template <typename Arg> struct dslash_functor : Arg::D::SpecialOpsT {
+  template <typename Arg> struct dslash_functor : getSpecialOpsT<typename Arg::D> {
+    static_assert(!isSpecialOps<typename Arg::template P<Arg::D::pc_type()>>);
     const typename Arg::Arg &arg;
     static constexpr int nParity = Arg::nParity;
     static constexpr bool dagger = Arg::dagger;
@@ -664,9 +666,11 @@ namespace quda
     __forceinline__ __device__ void apply(int, int s, int parity, bool active = true)
     {
       typename Arg::D dslash(arg);
-      if constexpr (!std::is_same_v<typename Arg::D::SpecialOpsT,NoSpecialOps>) {
-	dslash.setNdItem(*this->ndi);
-	dslash.setSharedMem(this->smem);
+      //if constexpr (!std::is_same_v<typename Arg::D::SpecialOpsT,NoSpecialOps>) {
+      if constexpr (isSpecialOps<decltype(*this)>) {
+	//dslash.setNdItem(*this->ndi);
+	//dslash.setSharedMem(this->smem);
+	dslash.setSpecialOps(this);
       }
       // for full fields set parity from z thread index else use arg setting
       if (nParity == 1) parity = arg.parity;

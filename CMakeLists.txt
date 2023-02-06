@@ -203,6 +203,7 @@ set_property(CACHE QUDA_ORDER_SP_MG PROPERTY STRINGS 2 4)
 set_property(CACHE QUDA_ORDER_FP_MG PROPERTY STRINGS 2 4 8)
 
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
+option(QUDA_BUILD_NATIVE_FFT "build the native FFT library according to QUDA_TARGET" ON)
 
 # QUDA uses tiling routines to compute certain BLAS routines. The maximum allowable
 # tile size is governed by this number. The larger the number, the faster the routines

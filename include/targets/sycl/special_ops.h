@@ -62,6 +62,17 @@ namespace quda {
   template <typename T, size_t S> using only_SharedMemStatic = only_SharedMemory<T,opSizeStatic<S>>;
   template <typename ...T> using only_Concurrent = SpecialOps<op_Concurrent<T...>>;
 
+  // isSpecialOps
+  template <typename T> static constexpr bool isSpecialOps = false;
+  template <typename ...T> static constexpr bool isSpecialOps<SpecialOps<T...>> = true;
+
+  // getSpecialOpsT
+  template <typename T> struct getSpecialOpsTS { using type = NoSpecialOps; };
+  template <typename ...T> struct getSpecialOpsTS<SpecialOps<T...>> { using type = SpecialOps<T...>; };
+  template <typename T> using getSpecialOpsT = typename getSpecialOpsTS<T>::type;
+  //template <typename T> using getSpecialOpsT = NoSpecialOps;
+  //template <typename ...T> using getSpecialOpsT<SpecialOps<T...>> = SpecialOps<T...>;
+
   // getSpecialOps
   template <typename T, typename U = void> struct getSpecialOpsS { using type = NoSpecialOps; };
   template <typename T> struct getSpecialOpsS<T,std::conditional_t<true,void,typename T::SpecialOpsT>> {

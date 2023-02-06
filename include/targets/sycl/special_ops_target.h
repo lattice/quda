@@ -10,11 +10,16 @@ namespace quda {
     //using SpecialOpsT = op_Sequential<T...>;
     using SpecialOpsT = SpecialOps<T...>;
     using SpecialOpsElemType = typename SpecialOpsElemTypeS<T...>::type;
-    const sycl::nd_item<3> *ndi;
+    const sycl::nd_item<3> *ndi = nullptr;
     //char *smem;
-    sycl::local_ptr<char> smem;
+    sycl::local_ptr<char> smem = nullptr;
     void setNdItem(const sycl::nd_item<3> &i) { ndi = &i; }
     void setSharedMem(char *s) { smem = s; }
+    template <typename ...U> void setSpecialOps(SpecialOps<U...> *ops) {
+      static_assert(std::is_same_v<SpecialOps<T...>,SpecialOps<U...>>);
+      ndi = ops->ndi;
+      smem = ops->smem;
+    }
 #if 0
     SpecialOpsElemType *getSharedMemPtr() {
       static_assert(!std::is_same_v<SpecialOpsElemType,void>);
@@ -27,6 +32,9 @@ namespace quda {
   template <typename ...T>
   void blockSync(SpecialOps<T...> *ops) {
     static_assert(hasBlockSync<T...>);
+    //if (ops->ndi == nullptr) {
+    //  errorQuda("SpecialOps not set");
+    //}
 #ifdef __SYCL_DEVICE_ONLY__
     sycl::group_barrier(ops->ndi->get_group());
 #endif
@@ -49,6 +57,9 @@ namespace quda {
       return getSpecialOp<T...,i>(ops);
     } else {
       static_assert(hasSpecialOpType<U,T...>);
+      //if (ops->ndi == nullptr || ops->smem == nullptr) {
+      //	errorQuda("SpecialOps not set");
+      //}
       SpecialOpsType<U,n> s;
       s.ndi = ops->ndi;
       //s.smem = ops->smem + sharedMemOffset<U,n>()(ops->ndi->get_local_range());  // FIXME: need to pass arg
@@ -66,6 +77,9 @@ namespace quda {
   template <typename U, int n = 0, typename ...T>
   SpecialOpDependencies<SpecialOpsType<U,n>> getDependentOps(SpecialOps<T...> *ops) {
     static_assert(hasSpecialOpType<U,T...>);
+    //if (ops->ndi == nullptr || ops->smem == nullptr) {
+    //errorQuda("SpecialOps not set");
+    //}
     SpecialOpDependencies<SpecialOpsType<U,n>> s;
     s.ndi = ops->ndi;
     //s.smem = ops->smem + sharedMemOffset<U,n>()(ops->ndi->get_local_range());  // FIXME: need to pass arg
@@ -100,6 +114,9 @@ namespace quda {
 
   template <typename T, typename S>
   sycl::local_ptr<T> getSharedMemPtr(only_SharedMemory<T,S> *ops) {
+    //if (ops->ndi == nullptr || ops->smem == nullptr) {
+    //errorQuda("SpecialOps not set");
+    //}
     sycl::local_ptr<void> v(ops->smem);
     sycl::local_ptr<T> p(v);
     return p;
