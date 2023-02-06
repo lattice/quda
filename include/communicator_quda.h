@@ -560,30 +560,11 @@ namespace quda
              comm_dim_partitioned(2), comm_dim_partitioned(3));
 
     // if CUDA_VISIBLE_DEVICES is set, we include this information in the topology_string
-    char *device_order_env = device::get_visible_devices_env();
-    if (device_order_env) {
-
-      // to ensure we have process consistency define using rank 0
-      if (comm_rank() == 0) {
-        std::stringstream device_list_raw(device_order_env); // raw input
-        std::stringstream device_list;                       // formatted (no commas)
-
-        int device;
-        while (device_list_raw >> device) {
-          // check this is a valid policy choice
-          if (device < 0) { errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device); }
-
-          device_list << device;
-          if (device_list_raw.peek() == ',') device_list_raw.ignore();
-        }
-        snprintf(topology_string, 128, ",topo=%d%d%d%d,order=%s", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3),
-                 device_list.str().c_str());
-      }
-
-      comm_broadcast(topology_string, 128);
-    } else {
-      snprintf(topology_string, 128, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
-    }
+    char device_list_string[128] = "";
+    device::get_visible_devices_string(device_list_string, comm_rank());
+    comm_broadcast(device_list_string, 128);
+    snprintf(topology_string, 128, ",topo=%d%d%d%d,order=%s", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3),
+             device_list_string);
   }
 
   char config_string[64];

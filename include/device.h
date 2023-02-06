@@ -20,9 +20,12 @@ namespace quda
     int get_device_count();
 
     /**
-       @brief Get the visible devices environmental variable, e.g. CUDA_VISIBLE_DEVICES
+       @brief Get the visible devices string from environmental variable,
+       e.g. CUDA_VISIBLE_DEVICES=1,0,2 gives '102'
+       @param device_list_string The output string
+       @param rank The rank number
     */
-    char *get_visible_devices_env();
+    void get_visible_devices_string(char device_list_string[128], int rank);
 
     /**
        @brief Query and print to stdout device properties of all GPUs
