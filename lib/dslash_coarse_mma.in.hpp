@@ -220,7 +220,7 @@ namespace quda {
         if constexpr (sizeof...(Ds) > 0) {
           launch_mma_span_m<nVec, bN, block_y, block_z>(tp, stream, std::index_sequence<Ds...>());
         } else {
-          errorQuda("Invalid tp.aux.y.");
+          errorQuda("Invalid tp.aux.z.");
         }
       }
     }
