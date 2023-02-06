@@ -161,7 +161,7 @@ namespace quda {
     } else {
       IntList<N...> nVecs;
       if constexpr (sizeof...(N) > 0) {
-        launch_span_nColor<v_t, b_t, vFloat, bFloat, nSpin, nColor>(V, B, nVecs);
+        launch_span_nColor<v_t, b_t, vFloat, bFloat, nSpin>(V, B, nVecs);
       } else {
         errorQuda("nColor = %d not instantiated\n", V.Ncolor());
       }

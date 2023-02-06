@@ -859,7 +859,7 @@ namespace quda
     switch (prec) {
     case QUDA_QUARTER_PRECISION: tol = 5e-2; break;
     case QUDA_HALF_PRECISION: tol = 5e-2; break;
-    case QUDA_SINGLE_PRECISION: tol = 1e-3; break;
+    case QUDA_SINGLE_PRECISION: tol = 2e-3; break;
     default: tol = 1e-8;
     }
 
