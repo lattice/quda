@@ -1434,7 +1434,8 @@ struct mgInputStruct {
   QudaPrecision preconditioner_precision; // precision for near-nulls, coarse links
   QudaTransferType
     optimized_kd; // use the optimized KD operator (true), naive coarsened operator (false), or optimized dropped links (drop)
-  bool use_mma;              // accelerate setup using MMA routines
+  bool setup_use_mma[QUDA_MAX_MG_LEVEL];              // accelerate setup using MMA routines
+  bool dslash_use_mma[QUDA_MAX_MG_LEVEL];              // accelerate dslash using MMA routines
   bool allow_truncation;     // allow dropping the long links for small (less than three) aggregate directions
   bool dagger_approximation; // use the dagger approximation to Xinv, which is X^dagger
 
@@ -1522,7 +1523,6 @@ struct mgInputStruct {
     verify_results(true),
     preconditioner_precision(QUDA_HALF_PRECISION),
     optimized_kd(QUDA_TRANSFER_OPTIMIZED_KD),
-    use_mma(true),
     allow_truncation(false),
     dagger_approximation(false),
     deflate_n_ev(66),
@@ -1556,6 +1556,13 @@ struct mgInputStruct {
     geo_block_size[2][3] = 2;
 
     /* Setup */
+
+    setup_use_mma[0] = true;
+    setup_use_mma[1] = true;
+    setup_use_mma[2] = true;
+    dslash_use_mma[0] = true;
+    dslash_use_mma[1] = true;
+    dslash_use_mma[2] = true;
 
     /* level 0 -> 1 is K-D, no customization */
 
@@ -1737,11 +1744,17 @@ struct mgInputStruct {
         optimized_kd = getQudaTransferType(input_line[1].c_str());
       }
 
-    } else if (strcmp(input_line[0].c_str(), "use_mma") == 0) {
-      if (input_line.size() < 2) {
+    } else if (strcmp(input_line[0].c_str(), "setup_use_mma") == 0) {
+      if (input_line.size() < 3) {
         error_code = 1;
       } else {
-        use_mma = input_line[1][0] == 't' ? true : false;
+        setup_use_mma[atoi(input_line[1].c_str())] = input_line[2][0] == 't' ? true : false;
+      }
+    } else if (strcmp(input_line[0].c_str(), "dslash_use_mma") == 0) {
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        dslash_use_mma[atoi(input_line[1].c_str())] = input_line[2][0] == 't' ? true : false;
       }
     } else if (strcmp(input_line[0].c_str(), "allow_truncation") == 0) {
       if (input_line.size() < 2) {
@@ -2091,8 +2104,6 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels; // set from file
 
-  mg_param.use_mma = input_struct.use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
   // whether or not we allow dropping a long link when an aggregation size is smaller than 3
   mg_param.allow_truncation = input_struct.allow_truncation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
@@ -2109,6 +2120,9 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     } else {
       for (int j = 0; j < 4; j++) { mg_param.geo_block_size[i][j] = input_struct.geo_block_size[i][j]; }
     }
+
+    mg_param.setup_use_mma[i] = input_struct.setup_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    mg_param.dslash_use_mma[i] = input_struct.dslash_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
     // mg_param.use_eig_solver[i] = QUDA_BOOLEAN_FALSE; //mg_eig[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     if (i == mg_param.n_level - 1 && input_struct.nvec[i] > 0) {

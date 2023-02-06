@@ -625,6 +625,12 @@ extern "C" {
     /** Verbosity on each level of the multigrid */
     QudaVerbosity verbosity[QUDA_MAX_MG_LEVEL];
 
+    /** Setup MMA usage on each level of the multigrid */
+    QudaBoolean setup_use_mma[QUDA_MAX_MG_LEVEL];
+
+    /** Dslash MMA usage on each level of the multigrid */
+    QudaBoolean dslash_use_mma[QUDA_MAX_MG_LEVEL];
+
     /** Inverter to use in the setup phase */
     QudaInverterType setup_inv_type[QUDA_MAX_MG_LEVEL];
 
@@ -792,9 +798,6 @@ extern "C" {
 
     /** Whether or not to use the dagger approximation for the KD preconditioned operator */
     QudaBoolean staggered_kd_dagger_approximation;
-
-    /** Whether to use tensor cores (if available) */
-    QudaBoolean use_mma;
 
     /** Whether to do a full (false) or thin (true) update in the context of updateMultigridQuda */
     QudaBoolean thin_update_only;

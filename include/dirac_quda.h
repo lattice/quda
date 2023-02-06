@@ -73,7 +73,8 @@ namespace quda {
     Transfer *transfer;
     Dirac *dirac;
     bool need_bidirectional; // whether or not we need to force a bi-directional build
-    bool use_mma;            // whether to use tensor cores where applicable
+    bool setup_use_mma;            // whether to use tensor cores where applicable for setup
+    bool dslash_use_mma;            // whether to use tensor cores where applicable for dslash
     bool allow_truncation; /** whether or not we let MG coarsening drop improvements, for ex drop long links for small aggregate dimensions */
 
     bool use_mobius_fused_kernel; // Whether or not use fused kernels for Mobius
@@ -94,10 +95,11 @@ namespace quda {
       halo_precision(QUDA_INVALID_PRECISION),
       need_bidirectional(false),
 #ifdef QUDA_MMA_AVAILABLE
-      use_mma(true),
+      setup_use_mma(true),
 #else
-      use_mma(false),
+      setup_use_mma(false),
 #endif
+      dslash_use_mma(true),
       allow_truncation(false),
 #ifdef NVSHMEM_COMMS
       use_mobius_fused_kernel(false)
@@ -127,7 +129,8 @@ namespace quda {
       for (int i = 0; i < Ls; i++)
         printfQuda(
             "b_5[%d] = %e %e \t c_5[%d] = %e %e\n", i, b_5[i].real(), b_5[i].imag(), i, c_5[i].real(), c_5[i].imag());
-      printfQuda("use_mma = %d\n", use_mma);
+      printfQuda("setup_use_mma = %d\n", setup_use_mma);
+      printfQuda("dslash_use_mma = %d\n", dslash_use_mma);
       printfQuda("allow_truncation = %d\n", allow_truncation);
       printfQuda("use_mobius_fused_kernel = %s\n", use_mobius_fused_kernel ? "true" : "false");
     }
@@ -1750,7 +1753,8 @@ public:
     const Dirac *dirac; /** Parent Dirac operator */
     const bool need_bidirectional; /** Whether or not to force a bi-directional build */
     const bool allow_truncation; /** Whether or not we let coarsening drop improvements, for ex dropping long links for small aggregate sizes */
-    const bool use_mma;            /** Whether to use tensor cores or not */
+    const bool setup_use_mma;            /** Whether to use tensor cores or not */
+    const bool dslash_use_mma;            /** Whether to use tensor cores or not */
 
     mutable std::shared_ptr<cpuGaugeField> Y_h; /** CPU copy of the coarse link field */
     mutable std::shared_ptr<cpuGaugeField> X_h; /** CPU copy of the coarse clover term */

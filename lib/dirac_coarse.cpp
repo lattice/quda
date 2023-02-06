@@ -16,7 +16,8 @@ namespace quda {
     dirac(param.dirac),
     need_bidirectional(param.need_bidirectional),
     allow_truncation(param.allow_truncation),
-    use_mma(param.use_mma),
+    setup_use_mma(param.setup_use_mma),
+    dslash_use_mma(param.dslash_use_mma),
     enable_gpu(false),
     enable_cpu(false),
     gpu_setup(gpu_setup),
@@ -40,7 +41,8 @@ namespace quda {
     dirac(nullptr),
     need_bidirectional(false),
     allow_truncation(param.allow_truncation),
-    use_mma(param.use_mma),
+    setup_use_mma(param.setup_use_mma),
+    dslash_use_mma(param.dslash_use_mma),
     Y_h(Y_h),
     X_h(X_h),
     Xinv_h(Xinv_h),
@@ -89,7 +91,8 @@ namespace quda {
     dirac(param.dirac),
     need_bidirectional(param.need_bidirectional),
     allow_truncation(param.allow_truncation),
-    use_mma(param.use_mma),
+    setup_use_mma(param.setup_use_mma),
+    dslash_use_mma(param.dslash_use_mma),
     Y_h(dirac.Y_h),
     X_h(dirac.X_h),
     Xinv_h(dirac.Xinv_h),
@@ -232,14 +235,14 @@ namespace quda {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished building the preconditioned coarse clover\n");
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to create the preconditioned coarse op\n");
 
-      calculateYhat(*Yhat_h, *Xinv_h, *Y_h, *X_h, use_mma);
+      calculateYhat(*Yhat_h, *Xinv_h, *Y_h, *X_h, setup_use_mma);
 
     } else {
 
       // The following fancy copies reduce the number of gauge field
       // copies (from and to QUDA_MILC_GAUGE_ORDER) by 2: one for X
       // and one for Y, both to QUDA_MILC_GAUGE_ORDER.
-      if (use_mma && dirac->isCoarse()) {
+      if (setup_use_mma && dirac->isCoarse()) {
 
         dirac->createCoarseOp(*Y_aos_d, *X_aos_d, *transfer, kappa, mass, Mu(), MuFactor(), AllowTruncation());
 
@@ -252,7 +255,7 @@ namespace quda {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished building the preconditioned coarse clover\n");
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to create the preconditioned coarse op\n");
 
-        calculateYhat(*Yhat_d, *Xinv_d, *Y_aos_d, *X_aos_d, use_mma);
+        calculateYhat(*Yhat_d, *Xinv_d, *Y_aos_d, *X_aos_d, setup_use_mma);
         // TODO: we could pass in Yhat_aos_d and Xinv_aos_d directly
         Yhat_aos_d->copy(*Yhat_d);
         Yhat_aos_d->exchangeGhost(QUDA_LINK_BIDIRECTIONAL);
@@ -280,7 +283,7 @@ namespace quda {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished building the preconditioned coarse clover\n");
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to create the preconditioned coarse op\n");
 
-        calculateYhat(*Yhat_d, *Xinv_d, *Y_d, *X_d, use_mma);
+        calculateYhat(*Yhat_d, *Xinv_d, *Y_d, *X_d, setup_use_mma);
         // TODO: we could pass in Yhat_aos_d and Xinv_aos_d directly
         Yhat_aos_d->copy(*Yhat_d);
         Yhat_aos_d->exchangeGhost(QUDA_LINK_BIDIRECTIONAL);
@@ -341,7 +344,7 @@ namespace quda {
   }
 
   void DiracCoarse::createPreconditionedCoarseOp(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
-    calculateYhat(Yhat, Xinv, Y, X, use_mma);
+    calculateYhat(Yhat, Xinv, Y, X, setup_use_mma);
   }
 
   void DiracCoarse::Clover(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
@@ -350,11 +353,11 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
     if (location == QUDA_CUDA_FIELD_LOCATION) {
-      auto Y = apply_mma(out, use_mma) ? Y_aos_d : Y_d;
-      auto X = apply_mma(out, use_mma) ? X_aos_d : X_d;
-      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, use_mma);
+      auto Y = apply_mma(out, dslash_use_mma) ? Y_aos_d : Y_d;
+      auto X = apply_mma(out, dslash_use_mma) ? X_aos_d : X_d;
+      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, dslash_use_mma);
     } else if (location == QUDA_CPU_FIELD_LOCATION) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, use_mma);
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, dslash_use_mma);
     }
     int n = in[0].Nspin() * in[0].Ncolor();
     flops += (8 * n * n - 2 * n) * (long long)in[0].VolumeCB() * in.size();
@@ -366,11 +369,11 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
     if ( location  == QUDA_CUDA_FIELD_LOCATION ) {
-      auto Y = apply_mma(out, use_mma) ? Y_aos_d : Y_d;
-      auto X = apply_mma(out, use_mma) ? Xinv_aos_d : Xinv_d;
-      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, use_mma);
+      auto Y = apply_mma(out, dslash_use_mma) ? Y_aos_d : Y_d;
+      auto X = apply_mma(out, dslash_use_mma) ? Xinv_aos_d : Xinv_d;
+      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, dslash_use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, use_mma);
+      ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, dslash_use_mma);
     }
     int n = in[0].Nspin() * in[0].Ncolor();
     flops += (8 * n * n - 2 * n) * (long long)in[0].VolumeCB() * in.size();
@@ -383,11 +386,11 @@ namespace quda {
     initializeLazy(location);
 
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
-      auto Y = apply_mma(out, use_mma) ? Y_aos_d : Y_d;
-      auto X = apply_mma(out, use_mma) ? X_aos_d : X_d;
-      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, true, false, dagger, commDim, halo_precision, use_mma);
+      auto Y = apply_mma(out, dslash_use_mma) ? Y_aos_d : Y_d;
+      auto X = apply_mma(out, dslash_use_mma) ? X_aos_d : X_d;
+      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, true, false, dagger, commDim, halo_precision, dslash_use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision, use_mma);
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision, dslash_use_mma);
     }
 
     int n = in[0].Nspin() * in[0].Ncolor();
@@ -402,11 +405,11 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
-      auto Y = apply_mma(out, use_mma) ? Y_aos_d : Y_d;
-      auto X = apply_mma(out, use_mma) ? X_aos_d : X_d;
-      ApplyCoarse(out, in, x, *Y, *X, kappa, parity, true, true, dagger, commDim, halo_precision, use_mma);
+      auto Y = apply_mma(out, dslash_use_mma) ? Y_aos_d : Y_d;
+      auto X = apply_mma(out, dslash_use_mma) ? X_aos_d : X_d;
+      ApplyCoarse(out, in, x, *Y, *X, kappa, parity, true, true, dagger, commDim, halo_precision, dslash_use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true, dagger, commDim, halo_precision, use_mma);
+      ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true, dagger, commDim, halo_precision, dslash_use_mma);
     }
     int n = in[0].Nspin() * in[0].Ncolor();
     flops += (9 * (8 * n * n) - 2 * n) * (long long)in[0].VolumeCB() * in[0].SiteSubset() * in.size();
@@ -417,11 +420,11 @@ namespace quda {
     QudaFieldLocation location = checkLocation(out[0], in[0]);
     initializeLazy(location);
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
-      auto Y = apply_mma(out, use_mma) ? Y_aos_d : Y_d;
-      auto X = apply_mma(out, use_mma) ? X_aos_d : X_d;
-      ApplyCoarse(out, in, in, *Y, *X, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision, use_mma);
+      auto Y = apply_mma(out, dslash_use_mma) ? Y_aos_d : Y_d;
+      auto X = apply_mma(out, dslash_use_mma) ? X_aos_d : X_d;
+      ApplyCoarse(out, in, in, *Y, *X, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision, dslash_use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision, use_mma);
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision, dslash_use_mma);
     }
     int n = in[0].Nspin() * in[0].Ncolor();
     flops += (9 * (8 * n * n) - 2 * n) * (long long)in[0].VolumeCB() * in[0].SiteSubset() * in.size();
@@ -466,7 +469,7 @@ namespace quda {
     } else {
       initializeLazy(QUDA_CUDA_FIELD_LOCATION);
       CoarseCoarseOp(Y, X, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, mass, a, mu_factor, QUDA_COARSE_DIRAC,
-                     QUDA_MATPC_INVALID, need_bidirectional, use_mma);
+                     QUDA_MATPC_INVALID, need_bidirectional, setup_use_mma);
     }
   }
 
@@ -503,11 +506,11 @@ namespace quda {
     initializeLazy(location);
 
     if ( location == QUDA_CUDA_FIELD_LOCATION) {
-      auto Y = apply_mma(out, use_mma) ? Yhat_aos_d : Yhat_d;
-      auto X = apply_mma(out, use_mma) ? X_aos_d : X_d;
-      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, true, false, dagger, commDim, halo_precision, use_mma);
+      auto Y = apply_mma(out, dslash_use_mma) ? Yhat_aos_d : Yhat_d;
+      auto X = apply_mma(out, dslash_use_mma) ? X_aos_d : X_d;
+      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, true, false, dagger, commDim, halo_precision, dslash_use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision, use_mma);
+      ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision, dslash_use_mma);
     }
 
     int n = in[0].Nspin() * in[0].Ncolor();
@@ -693,7 +696,7 @@ namespace quda {
     } else {
       initializeLazy(QUDA_CUDA_FIELD_LOCATION);
       CoarseCoarseOp(Y, X, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, mass, a, -mu_factor,
-                     QUDA_COARSEPC_DIRAC, matpcType, true, use_mma);
+                     QUDA_COARSEPC_DIRAC, matpcType, true, setup_use_mma);
     }
   }
 
