@@ -280,9 +280,9 @@ namespace quda
 
   void comm_allreduce_xor(uint64_t &data) { get_current_communicator().comm_allreduce_xor(data); }
 
-  void comm_broadcast(void *data, size_t nbytes) { get_current_communicator().comm_broadcast(data, nbytes); }
+  void comm_broadcast(void *data, size_t nbytes, int root) { get_current_communicator().comm_broadcast(data, nbytes, root); }
 
-  void comm_broadcast_global(void *data, size_t nbytes) { get_default_communicator().comm_broadcast(data, nbytes); }
+  void comm_broadcast_global(void *data, size_t nbytes, int root) { get_default_communicator().comm_broadcast(data, nbytes, root); }
 
   void comm_barrier(void) { get_current_communicator().comm_barrier(); }
 

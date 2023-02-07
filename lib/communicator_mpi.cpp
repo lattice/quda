@@ -338,9 +338,9 @@ namespace quda
   }
 
   /**  broadcast from rank 0 */
-  void Communicator::comm_broadcast(void *data, size_t nbytes)
+  void Communicator::comm_broadcast(void *data, size_t nbytes, int root)
   {
-    MPI_CHECK(MPI_Bcast(data, (int)nbytes, MPI_BYTE, 0, MPI_COMM_HANDLE));
+    MPI_CHECK(MPI_Bcast(data, (int)nbytes, MPI_BYTE, root, MPI_COMM_HANDLE));
   }
 
   void Communicator::comm_barrier(void) { MPI_CHECK(MPI_Barrier(MPI_COMM_HANDLE)); }
