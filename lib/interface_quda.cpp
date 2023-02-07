@@ -6479,6 +6479,7 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   qudaMemcpy(h_result, d_result, data_bytes, qudaMemcpyDeviceToHost);
   profileContract.TPSTOP(QUDA_PROFILE_D2H);
 
+  pool_device_free(d_result);
   profileContract.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 

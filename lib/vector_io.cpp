@@ -72,7 +72,6 @@ namespace quda
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Done loading vectors\n");
   }
 
-#ifdef HAVE_QIO
   void VectorIO::loadProp(vector_ref<ColorSpinorField> &vecs)
   {
     const ColorSpinorField &v0 = vecs[0];	  
@@ -169,11 +168,7 @@ namespace quda
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Done loading vectors\n");
   }
-#else
-  void VectorIO::loadProp(vector_ref<ColorSpinorField> &) { errorQuda("\nQIO library was not built.\n"); }
-#endif
-////
-#ifdef HAVE_QIO
+
   void VectorIO::save(cvector_ref<const ColorSpinorField> &vecs, QudaPrecision prec, uint32_t size)
   {
     const ColorSpinorField &v0 = vecs[0];
@@ -238,8 +233,7 @@ namespace quda
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Done saving vectors\n");
   }
-#endif
-#ifdef HAVE_QIO
+
   void VectorIO::saveProp(cvector_ref<ColorSpinorField> &vecs)
   {
     if (vecs.size() != 12) errorQuda("Must have 12 vectors in propagator, passed %lu", vecs.size());
@@ -330,9 +324,6 @@ namespace quda
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Done saving vectors\n");
   }
-#else
-  void VectorIO::saveProp(cvector_ref<ColorSpinorField> &) { errorQuda("\nQIO library was not built.\n"); }
-#endif
 
   void VectorIO::downPrec(cvector_ref<ColorSpinorField> &vecs_high_prec,
                           vector_ref<ColorSpinorField> &vecs_low_prec, const QudaPrecision low_prec)

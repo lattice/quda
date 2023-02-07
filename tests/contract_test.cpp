@@ -113,6 +113,7 @@ int test(int contractionType, QudaPrecision test_prec)
   case 2: cType = QUDA_CONTRACT_TYPE_STAGGERED; nSpin = 1; break;
   default: errorQuda("Undefined contraction type %d\n", contractionType);
   }
+
   int my_spinor_site_size = nSpin * 3 * 2;
 
   int X[4] = {xdim, ydim, zdim, tdim};
@@ -132,12 +133,12 @@ int test(int contractionType, QudaPrecision test_prec)
   void *d_result = safe_malloc(V * nSpin*nSpin*2 * data_size);
 
   if (test_prec == QUDA_SINGLE_PRECISION) {
-    for (auto i = 0lu; i < V * spinor_site_size; i++) {
+    for (auto i = 0lu; i < V * my_spinor_site_size; i++) {
       ((float *)spinorX)[i] = rand() / (float)RAND_MAX;
       ((float *)spinorY)[i] = rand() / (float)RAND_MAX;
     }
   } else {
-    for (auto i = 0lu; i < V * spinor_site_size; i++) {
+    for (auto i = 0lu; i < V * my_spinor_site_size; i++) {
       ((double *)spinorX)[i] = rand() / (double)RAND_MAX;
       ((double *)spinorY)[i] = rand() / (double)RAND_MAX;
     }
