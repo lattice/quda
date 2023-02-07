@@ -404,7 +404,7 @@ namespace quda
     }
 
     char partition_string[16];          /** string that contains the job partitioning */
-    char topology_string[128];          /** string that contains the job topology */
+    char topology_string[256];          /** string that contains the job topology */
     char partition_override_string[16]; /** string that contains any overridden partitioning */
 
     int manual_set_partition[QUDA_MAX_DIM] = {0};
@@ -561,9 +561,12 @@ namespace quda
 
     // if CUDA_VISIBLE_DEVICES is set, we include this information in the topology_string
     char device_list_string[128] = "";
-    device::get_visible_devices_string(device_list_string, comm_rank());
+    // to ensure we have process consistency define using rank 0
+    if (comm_rank() == 0) {
+      device::get_visible_devices_string(device_list_string);
+    }
     comm_broadcast(device_list_string, 128);
-    snprintf(topology_string, 128, ",topo=%d%d%d%d,order=%s", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3),
+    snprintf(topology_string, 256, ",topo=%d%d%d%d,order=%s", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3),
              device_list_string);
   }
 

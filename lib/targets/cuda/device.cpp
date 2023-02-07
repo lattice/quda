@@ -115,26 +115,23 @@ namespace quda
       return device_count;
     }
 
-    void get_visible_devices_string(char device_list_string[128], int rank)
+    void get_visible_devices_string(char device_list_string[128])
     {
-      // to ensure we have process consistency define using rank 0
-      if (rank == 0) {
-        char *device_order_env = getenv("CUDA_VISIBLE_DEVICES");
+      char *device_order_env = getenv("CUDA_VISIBLE_DEVICES");
 
-        if (device_order_env) {
-          std::stringstream device_list_raw(device_order_env); // raw input
-          std::stringstream device_list;                       // formatted (no commas)
+      if (device_order_env) {
+        std::stringstream device_list_raw(device_order_env); // raw input
+        std::stringstream device_list;                       // formatted (no commas)
 
-          int device;
-          while (device_list_raw >> device) {
-            // check this is a valid policy choice
-            if (device < 0) { errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device); }
+        int device;
+        while (device_list_raw >> device) {
+          // check this is a valid policy choice
+          if (device < 0) { errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device); }
 
-            device_list << device;
-            if (device_list_raw.peek() == ',') device_list_raw.ignore();
-          }
-          snprintf(device_list_string, 128, "%s", device_list.str().c_str());
+          device_list << device;
+          if (device_list_raw.peek() == ',') device_list_raw.ignore();
         }
+        snprintf(device_list_string, 128, "%s", device_list.str().c_str());
       }
     }
 

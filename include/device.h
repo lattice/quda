@@ -25,7 +25,7 @@ namespace quda
        @param device_list_string The output string
        @param rank The rank number
     */
-    void get_visible_devices_string(char device_list_string[128], int rank);
+    void get_visible_devices_string(char device_list_string[128]);
 
     /**
        @brief Query and print to stdout device properties of all GPUs
