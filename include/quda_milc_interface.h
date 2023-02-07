@@ -594,6 +594,12 @@ extern "C" {
    */
   void qudaFreeGaugeField();
 
+
+  /**.     
+     Free the two-link field allocated in QUDA.
+   */
+  void qudaFreeTwoLink();
+  
   /**
    * Load the clover field and its inverse from the host.  If null
    * pointers are passed, the clover field and / or its inverse will
