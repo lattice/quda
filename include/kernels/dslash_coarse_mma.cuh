@@ -18,7 +18,7 @@ namespace quda
 {
 
   template <class mma_t_, bool dslash_, bool clover_, bool dagger_, DslashType type_, typename Float_, typename yFloat_,
-            typename ghostFloat, int nSpin_, int nColor_, int nVec_, int bN_, int bM_, int block_y_, int block_z_>
+            typename ghostFloat, int nSpin_, int nColor_, int nVec_, int bN_, int bM_, int bK_, int block_y_, int block_z_>
   struct DslashCoarseMmaArg : kernel_param<> {
     static constexpr bool dslash = dslash_;
     static constexpr bool clover = clover_;
@@ -45,7 +45,7 @@ namespace quda
 
     static constexpr int bM = bM_;
     static constexpr int bN = bN_;
-    static constexpr int bK = nSpin * nColor;
+    static constexpr int bK = bK_;
 
     static constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     static constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
@@ -127,7 +127,7 @@ namespace quda
 
     static_assert(M % Arg::bM == 0, "M %% Arg::bM != 0.\n");
     static_assert(N % Arg::bN == 0, "N %% Arg::bN != 0.\n");
-    static_assert(K <= Arg::bK, "Dividing K has NOT been implemented yet.\n");
+    static_assert(K % Arg::bK == 0, "K %% Arg::bK != 0.\n");
 
     extern __shared__ typename mma_t::compute_t smem_ptr[];
 
@@ -163,9 +163,8 @@ namespace quda
       forward_idx[d] = linkIndexHop(coord, arg.dim, d, arg.nFace);
       backward_idx[d] = linkIndexHop(coord, arg.dim, d, -arg.nFace);
     }
-    __syncthreads();
 
-    auto dslash_forward_producer = [&](int d, float &scale_inv_a, float &scale_inv_b) {
+    auto dslash_forward_producer = [&](int d, float &scale_inv_a, float &scale_inv_b, int k_offset) {
 
         const int fwd_idx = forward_idx[d];
 
@@ -183,8 +182,8 @@ namespace quda
 
             __syncthreads();
             pipe.producer_acquire();
-            scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, 0, smem_tmp_a, pipe);
-            scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, 0, smem_tmp_b_ghost, pipe);
+            scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
+            scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b_ghost, pipe);
             pipe.producer_commit();
           }
         } else if constexpr (doBulk<Arg::type>()) {
@@ -196,8 +195,8 @@ namespace quda
 
           __syncthreads();
           pipe.producer_acquire();
-          scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, 0, smem_tmp_a, pipe);
-          scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, 0, smem_tmp_b, pipe);
+          scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
+          scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b, pipe);
           pipe.producer_commit();
         }
     };
@@ -248,7 +247,7 @@ namespace quda
       }
     };
 
-    auto dslash_backward_producer = [&](int d, float &scale_inv_a, float &scale_inv_b) {
+    auto dslash_backward_producer = [&](int d, float &scale_inv_a, float &scale_inv_b, int k_offset) {
 
         const int back_idx = backward_idx[d];
 
@@ -266,8 +265,8 @@ namespace quda
 
             __syncthreads();
             pipe.producer_acquire();
-            scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, 0, smem_tmp_a, pipe);
-            scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, 0, smem_tmp_b_ghost, pipe);
+            scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
+            scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b_ghost, pipe);
             pipe.producer_commit();
           }
         } else if constexpr (doBulk<Arg::type>()) {
@@ -280,8 +279,8 @@ namespace quda
 
           __syncthreads();
           pipe.producer_acquire();
-          scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, 0, smem_tmp_a, pipe);
-          scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, 0, smem_tmp_b, pipe);
+          scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
+          scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b, pipe);
           pipe.producer_commit();
         }
     };
@@ -330,31 +329,80 @@ namespace quda
       }
     };
 
+    auto clover_producer = [&](float &scale_inv_a, float &scale_inv_b, int k_offset) {
+      const int spinor_parity = (arg.nParity == 2) ? parity : 0;
+
+      auto a = arg.X(0, parity, x_cb, 0, 0);
+      auto b = arg.inB(spinor_parity, x_cb, 0, 0);
+      constexpr bool a_dagger = Arg::dagger;
+      constexpr bool b_dagger = false;
+
+      __syncthreads();
+      pipe.producer_acquire();
+      scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
+      scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b, pipe);
+      pipe.producer_commit();
+    };
+
+    auto clover_consumer = [&](float scale_inv_a, float scale_inv_b) {
+      constexpr bool a_dagger = Arg::dagger;
+      constexpr bool b_dagger = false;
+
+      using a_wrapper_t = decltype(arg.X(0, 0, 0, 0, 0));
+      using b_wrapper_t = decltype(arg.inB(0, 0, 0, 0));
+      constexpr bool a_fixed = a_wrapper_t::fixed;
+      constexpr bool b_fixed = b_wrapper_t::fixed;
+
+      pipe.consumer_wait();
+      __syncthreads();
+      a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+      b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+      pipe.consumer_release();
+      __syncthreads();
+    };
+
+    auto clover_compute = [&]() {
+      accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+    };
+
+
     float scale_inv_a;
     float scale_inv_b;
 
     if constexpr (Arg::dslash) {
-      // Forward gather - compute fwd offset for spinor fetch
-      dslash_forward_producer(0, scale_inv_a, scale_inv_b);
-#pragma unroll
-      for (int d = 0; d < Arg::nDim; d++) // loop over dimension
-      {
-        dslash_forward_consumer(d, scale_inv_a, scale_inv_b);
-        if (d < 3) {
-          dslash_forward_producer(d + 1, scale_inv_a, scale_inv_b);
-        } else {
-          dslash_backward_producer(0, scale_inv_a, scale_inv_b);
-        }
-        dslash_forward_compute(d);
-      } // nDim
 
-      // Backward gather - compute back offset for spinor and gauge fetch
+      dslash_forward_producer(0, scale_inv_a, scale_inv_b, 0);
+
+      for (int k_offset = 0; k_offset < K; k_offset += Arg::bK) {
+
+        // Forward gather - compute fwd offset for spinor fetch
 #pragma unroll
-      for (int d = 0; d < Arg::nDim; d++) {
-        dslash_backward_consumer(d, scale_inv_a, scale_inv_b);
-        if (d < 3) { dslash_backward_producer(d + 1, scale_inv_a, scale_inv_b); }
-        dslash_backward_compute(d);
-      } // nDim
+        for (int d = 0; d < Arg::nDim; d++) // loop over dimension
+        {
+          dslash_forward_consumer(d, scale_inv_a, scale_inv_b);
+          if (d < 3) {
+            dslash_forward_producer(d + 1, scale_inv_a, scale_inv_b, k_offset);
+          } else {
+            dslash_backward_producer(0, scale_inv_a, scale_inv_b, k_offset);
+          }
+          dslash_forward_compute(d);
+        } // nDim
+
+        // Backward gather - compute back offset for spinor and gauge fetch
+#pragma unroll
+        for (int d = 0; d < Arg::nDim; d++) {
+          dslash_backward_consumer(d, scale_inv_a, scale_inv_b);
+          if (d < 3) {
+            dslash_backward_producer(d + 1, scale_inv_a, scale_inv_b, k_offset);
+          } else if (k_offset + Arg::bK < K) {
+            dslash_forward_producer(0, scale_inv_a, scale_inv_b, k_offset + Arg::bK);
+          } else if constexpr (doBulk<Arg::type>() && Arg::clover) {
+            clover_producer(scale_inv_a, scale_inv_b, 0);
+          }
+          dslash_backward_compute(d);
+        } // nDim
+
+      }
 
       accumulator.ax(-arg.kappa);
     }
@@ -364,19 +412,14 @@ namespace quda
        checkerboard site index
      */
     if constexpr (doBulk<Arg::type>() && Arg::clover) {
-      const int spinor_parity = (arg.nParity == 2) ? parity : 0;
-
-      auto a = arg.X(0, parity, x_cb, 0, 0);
-      auto b = arg.inB(spinor_parity, x_cb, 0, 0);
-      constexpr bool a_dagger = Arg::dagger;
-      constexpr bool b_dagger = false;
-
-      __syncthreads();
-      a_loader.template g2s<lda, a_dagger>(a, m_offset, 0, smem_obj_a_real, smem_obj_a_imag);
-      b_loader.template g2s<ldb, b_dagger>(b, n_offset, 0, smem_obj_b_real, smem_obj_b_imag);
-      __syncthreads();
-
-      accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+      if constexpr (!Arg::dslash) { clover_producer(scale_inv_a, scale_inv_b, 0); }
+      for (int k_offset = 0; k_offset < K; k_offset += Arg::bK) {
+        clover_consumer(scale_inv_a, scale_inv_b);
+        if (k_offset + Arg::bK < K) {
+          clover_producer(scale_inv_a, scale_inv_b, k_offset + Arg::bK);
+        }
+        clover_compute();
+      }
     }
 
     return accumulator;
