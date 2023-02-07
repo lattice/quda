@@ -11,14 +11,16 @@ namespace quda {
     GaugeField &output;
     const CloverField &clover;
     Float coeff;
+    const int parity;
     unsigned int minThreads() const { return clover.VolumeCB(); }
 
   public:
-    CloverSigmaTrace(GaugeField& output, const CloverField& clover, double coeff) :
+    CloverSigmaTrace(GaugeField& output, const CloverField& clover, double coeff, int parity) :
       TunableKernel1D(output),
       output(output),
       clover(clover),
-      coeff(static_cast<Float>(coeff))
+      coeff(static_cast<Float>(coeff)),
+      parity(parity)
     {
       apply(device::get_default_stream());
     }
@@ -27,10 +29,10 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (clover.TwistFlavor() == QUDA_TWIST_SINGLET ||
           clover.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET) {
-        CloverTraceArg<Float, nColor, true> arg(output, clover, coeff);
+        CloverTraceArg<Float, nColor, true> arg(output, clover, coeff, parity);
         launch<CloverSigmaTr>(tp, stream, arg);
       } else {
-        CloverTraceArg<Float, nColor, false> arg(output, clover, coeff);
+        CloverTraceArg<Float, nColor, false> arg(output, clover, coeff, parity);
         launch<CloverSigmaTr>(tp, stream, arg);
       }
     }
@@ -43,13 +45,13 @@ namespace quda {
   };
 
 #ifdef GPU_CLOVER_DIRAC
-  void computeCloverSigmaTrace(GaugeField& output, const CloverField& clover, double coeff)
+  void computeCloverSigmaTrace(GaugeField& output, const CloverField& clover, double coeff, int parity)
   {
     checkNative(output, clover);
-    instantiate<CloverSigmaTrace>(output, clover, coeff);
+    instantiate<CloverSigmaTrace>(output, clover, coeff, parity);
   }
 #else
-  void computeCloverSigmaTrace(GaugeField&, const CloverField&, double)
+  void computeCloverSigmaTrace(GaugeField&, const CloverField&, double, int)
   {
     errorQuda("Clover has not been built");
   }

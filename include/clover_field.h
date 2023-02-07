@@ -508,8 +508,9 @@ namespace quda {
      @param output The computed matrix field (tensor matrix field)
      @param clover The input clover field
      @param coeff  Scalar coefficient multiplying the result (e.g., stepsize)
+     @param parity The field parity we are working on
    */
-  void computeCloverSigmaTrace(GaugeField &output, const CloverField &clover, double coeff);
+  void computeCloverSigmaTrace(GaugeField &output, const CloverField &clover, double coeff, int parity);
 
   /**
      @brief Compute the derivative of the clover matrix in the direction

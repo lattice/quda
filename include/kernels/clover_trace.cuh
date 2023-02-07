@@ -21,17 +21,19 @@ namespace quda {
     const C clover_inv;
     real coeff;
     real mu2_minus_epsilon2;
+    const int parity;
 
-    CloverTraceArg(GaugeField& output, const CloverField& clover, double coeff) :
+    CloverTraceArg(GaugeField& output, const CloverField& clover, double coeff, int parity) :
       kernel_param(dim3(output.VolumeCB(), 1, 1)),
       output(output),
       clover_inv(clover, dynamic_clover ? false : true),
       coeff(coeff),
-      mu2_minus_epsilon2(clover.Mu2() - clover.Epsilon2()) {}
+      mu2_minus_epsilon2(clover.Mu2() - clover.Epsilon2()),
+      parity(parity) {}
   };
 
   template <typename Arg>
-  __device__ __host__ void cloverSigmaTraceCompute(const Arg &arg, const int x, int parity)
+  __device__ __host__ void cloverSigmaTraceCompute(const Arg &arg, const int x)
   {
     using namespace linalg; // for Cholesky
     using real = typename Arg::real;
@@ -41,7 +43,7 @@ namespace quda {
 
 #pragma unroll
     for (int chirality = 0; chirality < 2; chirality++) {
-      Mat A = arg.clover_inv(x, parity, chirality);
+      Mat A = arg.clover_inv(x, arg.parity, chirality);
 
       if (Arg::dynamic_clover) {
         A *= static_cast<real>(2.0); // factor of two is inherent to QUDA clover storage
@@ -55,7 +57,7 @@ namespace quda {
         Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A);
         A = static_cast<real>(0.5) * cholesky.template invert<Mat>(); // return full inverse 
         if (Arg::twist) {       
-          Mat A0 = arg.clover_inv(x, parity, chirality);
+          Mat A0 = arg.clover_inv(x, arg.parity, chirality);
           A = static_cast<real>(0.5) * (A0*A); // (1 + T + imu g_5)^{-1} = (1 + T - imu g_5)/((1 + T)^2 + mu^2)
         }
       }
@@ -172,7 +174,7 @@ namespace quda {
         }
 
         mat *= arg.coeff;
-        arg.output((mu-1)*mu/2 + nu, x, parity) = mat;
+        arg.output((mu-1)*mu/2 + nu, x, arg.parity) = mat;
       } // nu
     } // mu
   }
@@ -185,8 +187,7 @@ namespace quda {
 
     __device__ __host__ inline void operator()(int x_cb)
     {
-      // odd parity
-      cloverSigmaTraceCompute<Arg>(arg, x_cb, 0);
+      cloverSigmaTraceCompute<Arg>(arg, x_cb);
     }
   };
 

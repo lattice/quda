@@ -4865,8 +4865,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
     u = new cudaGaugeField(param);
     u -> copy(gaugeEx);
   }
-
-  computeCloverSigmaTrace(oprod, *cloverPrecise, 2.0*ck*multiplicity*dt);
+  computeCloverSigmaTrace(oprod, *cloverPrecise, 2.0*ck*multiplicity*dt, 1);
 
   /* Now the U dA/dU terms */
   std::vector< std::vector<double> > ferm_epsilon(nvector);
@@ -5054,7 +5053,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
   // derivative of the wilson operator it correspond to deriv_Sb(OE,...) plus  deriv_Sb(EO,...) in tmLQCD
   computeCloverForce(cudaForce, *gaugePrecise, quarkP, quarkX, force_coeff);
   // derivative of the determinant of the sw term, second term of (A12) in hep-lat/0112051,  sw_deriv(EE, mnl->mu) in tmLQCD
-  computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8 * 32.0 ); 
+  computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8 * 32.0, 0 ); 
 
   std::vector< std::vector<double> > ferm_epsilon(nvector);
   for (int i = 0; i < nvector; i++) {
