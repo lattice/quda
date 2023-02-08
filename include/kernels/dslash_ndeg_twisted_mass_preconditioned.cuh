@@ -42,6 +42,7 @@ namespace quda
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct nDegTwistedMassPreconditioned :
     std::conditional_t<!dagger || Arg::asymmetric, only_SharedMemoryCache<nDegTwistedMassPreconditionedCacheT<Arg>>, NoSpecialOps>,
+    //only_SharedMemoryCache<nDegTwistedMassPreconditionedCacheT<Arg>>,
     dslash_default {
 
     const Arg &arg;
