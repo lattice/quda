@@ -14,6 +14,7 @@ namespace quda {
 
   namespace target {
 
+#if 0
     // compile-time dispatch
     template <template <bool, typename ...> class f, typename ...Args>
     auto dispatch(Args &&... args)
@@ -22,6 +23,18 @@ namespace quda {
       return f<true>()(args...);
 #else
       return f<false>()(args...);
+#endif
+    }
+#endif
+
+    // compile-time dispatch
+    template <template <bool, typename ...> class f, typename ...Params, typename ...Args>
+    auto dispatch(Args &&...args)
+    {
+#ifdef __SYCL_DEVICE_ONLY__
+      return f<true, Params...>()(args...);
+#else
+      return f<false, Params...>()(args...);
 #endif
     }
 

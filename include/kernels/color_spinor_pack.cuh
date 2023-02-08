@@ -158,11 +158,12 @@ namespace quda {
     template <typename F>
     inline auto operator()(typename F::Arg::real thread_max, F *)
     {
+      using Arg = typename F::Arg;
       // on the host we require that both spin and color are fully thread local
-      constexpr int Ms = spins_per_thread<is_device, F::Arg::nSpin>();
-      constexpr int Mc = colors_per_thread<is_device, F::Arg::nColor>();
-      static_assert(Ms == F::Arg::nSpin, "on host spins per thread must match total spins");
-      static_assert(Mc == F::Arg::nColor, "on host colors per thread must match total colors");
+      constexpr int Ms = spins_per_thread<is_device, Arg::nSpin>();
+      constexpr int Mc = colors_per_thread<is_device, Arg::nColor>();
+      static_assert(Ms == Arg::nSpin, "on host spins per thread must match total spins");
+      static_assert(Mc == Arg::nColor, "on host colors per thread must match total colors");
       return thread_max;
     }
   };
@@ -182,20 +183,21 @@ namespace quda {
 
     template <typename F> __device__ inline auto operator()(typename F::Arg::real thread_max, F *f)
     {
-      using real = typename F::Arg::real;
-      //constexpr int Ms = spins_per_thread<true, F::Arg::nSpin>();
-      //constexpr int Mc = colors_per_thread<true, F::Arg::nColor>();
-      //constexpr int color_spin_threads = (F::Arg::nSpin/Ms) * (F::Arg::nColor/Mc);
+      using Arg = typename F::Arg;
+      using real = typename Arg::real;
+      //constexpr int Ms = spins_per_thread<true, Arg::nSpin>();
+      //constexpr int Mc = colors_per_thread<true, Arg::nColor>();
+      //constexpr int color_spin_threads = (Arg::nSpin/Ms) * (Arg::nColor/Mc);
       //auto block = target::block_dim();
       // pad the shared block size to avoid bank conflicts
       //block.x = ((block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
       //block.y = color_spin_threads; // state the y block since we know it at compile time
-      SharedMemoryCache<Cache<typename F::Arg>> cache(f);
+      SharedMemoryCache<Cache<Arg>> cache(f);
       cache.save(thread_max);
       cache.sync();
       real this_site_max = static_cast<real>(0);
 #pragma unroll
-      for (int sc = 0; sc < color_spin_threads<typename F::Arg>; sc++) {
+      for (int sc = 0; sc < color_spin_threads<Arg>; sc++) {
         auto sc_max = cache.load_y(sc);
         this_site_max = this_site_max > sc_max ? this_site_max : sc_max;
       }
@@ -222,7 +224,7 @@ namespace quda {
     const int Mc = colors_per_thread<F::Arg::nColor>();
     complex<real> thread_max = {0.0, 0.0};
 
-    if ( !allthreads || active) {
+    if (!allthreads || active) {
 #pragma unroll
       for (int spin_local=0; spin_local<Ms; spin_local++) {
 	int s = spin_block + spin_local;

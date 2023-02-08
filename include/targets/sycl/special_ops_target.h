@@ -6,10 +6,10 @@ namespace quda {
 
   // SpecialOps
   template <typename ...T>
-  struct SpecialOps {
+  struct SpecialOps : SpecialOps_Base<T...> {
     //using SpecialOpsT = op_Sequential<T...>;
-    using SpecialOpsT = SpecialOps<T...>;
-    using SpecialOpsElemType = typename SpecialOpsElemTypeS<T...>::type;
+    //using SpecialOpsT = SpecialOps<T...>;
+    //using SpecialOpsElemType = typename SpecialOpsElemTypeS<T...>::type;
     const sycl::nd_item<3> *ndi = nullptr;
     //char *smem;
     sycl::local_ptr<char> smem = nullptr;
@@ -87,8 +87,8 @@ namespace quda {
     return s;
   }
 
-#if 0
   // getSharedMemPtr
+#if 0
   template <typename ...T>
   //SpecialOpsElemType<T...> *getSharedMemPtr(SpecialOps<T...> *ops) {
   sycl::local_ptr<SpecialOpsElemType<T...>> getSharedMemPtr(SpecialOps<T...> *ops) {
@@ -152,22 +152,22 @@ namespace quda {
   };
 
   // op implementations
-  struct op_blockSync : op_Base {
+  struct op_blockSync : op_BaseT<void> {
     using dependencies = depFullBlock;
   };
 
   template <typename T>
-  struct op_warp_combine : op_Base {
+  struct op_warp_combine : op_BaseT<T> {
     using dependencies = depFullBlock;
   };
 
   template <typename T>
-  struct op_thread_array : op_Base {
+  struct op_thread_array : op_BaseT<T> {
     using dependencies = depNone;
   };
 
   template <typename T>
-  struct op_BlockReduce : op_Base {
+  struct op_BlockReduce : op_BaseT<T> {
     using concurrentOps = op_Concurrent<op_blockSync,op_SharedMemory<T,opSizeBlockDivWarp>>;
     using opBlockSync = getSpecialOpF<concurrentOps,0>;
     using opSharedMem = getSpecialOpF<concurrentOps,1>;
@@ -176,14 +176,14 @@ namespace quda {
   };
 
   template <typename T, typename D>
-  struct op_SharedMemoryCache : op_Base {
+  struct op_SharedMemoryCache : op_BaseT<T> {
     using ElemT = T;
     template <typename ...Arg> static constexpr dim3 dims(dim3 block, Arg &...arg) { return D::dims(block, arg...); }
     using dependencies = op_Sequential<op_blockSync,op_SharedMemory<T,opSizeDims<D>>>;
   };
 
   template <typename T, typename S>
-  struct op_SharedMemory : op_Base {
+  struct op_SharedMemory : op_BaseT<T> {
     using dependencies = depSharedMem<T,S>;
   };
 
@@ -197,6 +197,7 @@ namespace quda {
   template <typename ...T> static constexpr bool needsFullBlock<op_Sequential<T...>> = needsFullBlock<T...>;
   template <typename T> static constexpr bool needsFullBlockF() {
     if constexpr (std::is_base_of<op_Base,T>::value) {
+    //if constexpr (is_instance<T,op_Base>) {
       return needsFullBlock<typename T::dependencies>;
     } else {
       if constexpr (hasSpecialOps<T>) {
@@ -216,6 +217,7 @@ namespace quda {
   template <typename ...T> static constexpr bool needsSharedMem<op_Sequential<T...>> = needsSharedMem<T...>;
   template <typename T> static constexpr bool needsSharedMemF() {
     if constexpr (std::is_base_of<op_Base,T>::value) {
+    //if constexpr (is_instance<T,op_Base>) {
       return needsSharedMem<typename T::dependencies>;
     } else {
       if constexpr (hasSpecialOps<T>) {

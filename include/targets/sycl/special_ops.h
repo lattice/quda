@@ -3,23 +3,19 @@
 
 namespace quda {
 
-  template <typename, template <typename...> typename>
-  struct is_instance_impl : std::false_type {};
-  template <template <typename...> typename T, typename ...U>
-  struct is_instance_impl<T<U...>, T> : std::true_type {};
-  template <typename T, template <typename ...> typename U>
-  static constexpr bool is_instance = is_instance_impl<T, U>();
-
+  // dimensions functors for SharedMemoryCache
   struct opDimsBlock {
     template <typename ...Arg> static constexpr dim3 dims(dim3 b, const Arg &...arg) { return b; }
   };
-  template <int bx, int by, int bz>
-  struct opDimsStatic {
+  template <int bx, int by, int bz> struct opDimsStatic {
     template <typename ...Arg> static constexpr dim3 dims(dim3 b, const Arg &...arg) { return dim3(bx,by,bz); }
   };
 
+  // size functors for determining shared memory size
   struct opSizeBlock {
-    template <typename T, typename ...Arg> static constexpr size_t size(dim3 b, const Arg &...arg) { return b.x * b.y * b.z * sizeof(T); }
+    template <typename T, typename ...Arg> static constexpr size_t size(dim3 b, const Arg &...arg) {
+      return b.x * b.y * b.z * sizeof(T);
+    }
   };
   struct opSizeBlockDivWarp {
     template <typename T, typename ...Arg> static constexpr size_t size(dim3 b, const Arg &...arg) {
@@ -27,7 +23,9 @@ namespace quda {
     }
   };
   template <size_t S> struct opSizeStatic {
-    template <typename T, typename ...Arg> static constexpr size_t size(dim3 b, const Arg &...arg) { return S * sizeof(T); }
+    template <typename T, typename ...Arg> static constexpr size_t size(dim3 b, const Arg &...arg) {
+      return S * sizeof(T);
+    }
   };
   template <typename D> struct opSizeDims {
     template <typename T, typename ...Arg> static constexpr size_t size(dim3 b, const Arg &...arg) {
@@ -35,15 +33,23 @@ namespace quda {
     }
   };
 
+  // alternative to SpecialOps
   struct NoSpecialOps {
     using SpecialOpsT = NoSpecialOps;
   };
-  struct op_Base {};
-  template <typename ...T> struct op_Concurrent {};
-  template <typename ...T> struct op_Sequential {};
-
-  // forward declarations
+  // SpecialOps forward declaration and base type
   template <typename ...T> struct SpecialOps;
+  template <typename ...T> struct SpecialOps_Base {
+    using SpecialOpsT = SpecialOps<T...>;
+  };
+  template <typename ...T> struct op_Concurrent {};  // set of op types used concurrently (needs separate resources)
+  template <typename ...T> struct op_Sequential {};  // set of op types used sequentially (can share resources)
+  struct op_Base {};  // base type for other op types
+  template <typename T> struct op_BaseT : op_Base {
+    using op_ElementT = T;
+  };
+
+  // forward declarations of op types
   struct op_blockSync;
   template <typename T> struct op_warp_combine;
   template <typename T> struct op_thread_array;
@@ -62,17 +68,6 @@ namespace quda {
   template <typename T, size_t S> using only_SharedMemStatic = only_SharedMemory<T,opSizeStatic<S>>;
   template <typename ...T> using only_Concurrent = SpecialOps<op_Concurrent<T...>>;
 
-  // isSpecialOps
-  template <typename T> static constexpr bool isSpecialOps = false;
-  template <typename ...T> static constexpr bool isSpecialOps<SpecialOps<T...>> = true;
-
-  // getSpecialOpsT
-  template <typename T> struct getSpecialOpsTS { using type = NoSpecialOps; };
-  template <typename ...T> struct getSpecialOpsTS<SpecialOps<T...>> { using type = SpecialOps<T...>; };
-  template <typename T> using getSpecialOpsT = typename getSpecialOpsTS<T>::type;
-  //template <typename T> using getSpecialOpsT = NoSpecialOps;
-  //template <typename ...T> using getSpecialOpsT<SpecialOps<T...>> = SpecialOps<T...>;
-
   // getSpecialOps
   template <typename T, typename U = void> struct getSpecialOpsS { using type = NoSpecialOps; };
   template <typename T> struct getSpecialOpsS<T,std::conditional_t<true,void,typename T::SpecialOpsT>> {
@@ -80,11 +75,18 @@ namespace quda {
   };
   template <typename T> using getSpecialOps = typename getSpecialOpsS<T>::type;
 
+  // explicitSpecialOps
+  template <typename T, typename U = void> struct explicitSpecialOpsS : std::false_type {};
+  template <typename T>
+  struct explicitSpecialOpsS<T,std::conditional_t<true,void,typename T::SpecialOpsT>> : std::true_type {};
+  template <typename T> inline constexpr bool explicitSpecialOps = explicitSpecialOpsS<T>::value;
+
   // hasSpecialOps
-  //template <typename T, typename U = void> static constexpr bool hasSpecialOps2 = false;
-  //template <typename T> static constexpr bool hasSpecialOps2<T,std::conditional_t<true,void,typename T::SpecialOpsT>> = true;
-  //template <typename ...T> static constexpr bool hasSpecialOps = (hasSpecialOps2<T> || ...);
-  template <typename T> static constexpr bool hasSpecialOps = !std::is_same_v<getSpecialOps<T>,NoSpecialOps>;
+  template <typename T> inline constexpr bool hasSpecialOps = !std::is_same_v<getSpecialOps<T>,NoSpecialOps>;
+
+
+
+
 
   // unwrapSpecialOps
   template <typename T> struct unwrapSpecialOpsS { using type = T; };
@@ -137,7 +139,8 @@ namespace quda {
   template <typename T, typename Enabled = void> struct SpecialOpDependS { using deps = NoSpecialOps; };
   template <typename T> using SpecialOpDependencies = typename SpecialOpDependS<T>::deps;
   template <typename T> struct SpecialOpDependS<SpecialOps<T>> { using deps = SpecialOps<SpecialOpDependencies<T>>; };
-  template <typename T> struct SpecialOpDependS<T,std::enable_if_t<std::is_base_of<op_Base,T>::value,void>> {
+  template <typename T> struct SpecialOpDependS<T,std::enable_if_t<std::is_base_of_v<op_Base,T>,void>> {
+  //template <typename T> struct SpecialOpDependS<T,std::enable_if_t<is_instance<T,op_Base>,void>> {
     using deps = typename T::dependencies;
   };
 
@@ -152,14 +155,17 @@ namespace quda {
 
   template <typename T, typename ...U> struct SpecialOpDependS< { using deps = NoSpecialOps; }
   template <typename T> using SpecialOpDependencies<T> =
-    std::conditional_t<std::is_base_of<op_Base,T>,SpecialOps<T::dependencies>,NoSpecialOps>;
+    std::conditional_t<std::is_base_of_v<op_Base,T>,SpecialOps<T::dependencies>,NoSpecialOps>;
+  //std::conditional_t<is_instance<T,op_Base>,SpecialOps<T::dependencies>,NoSpecialOps>;
   template <typename ...T> using SpecialOpDependencies = NoSpecialOps;
 #endif
 
   // sharedMemSize
   template <typename ...T> struct sharedMemSizeS {
     template <typename ...Arg>
-    static constexpr size_t size(dim3 block, Arg &...arg) { return std::max({sharedMemSizeS<T>::size(block, arg...)...}); }
+    static constexpr size_t size(dim3 block, Arg &...arg) {
+      return std::max({sharedMemSizeS<T>::size(block, arg...)...});
+    }
   };
   template <typename ...T, typename ...Arg> static constexpr size_t sharedMemSize(dim3 block, Arg &...arg) {
     return sharedMemSizeS<T...>::size(block, arg...);
@@ -178,7 +184,9 @@ namespace quda {
   };
   template <typename T> struct sharedMemSizeS<T> { // T should be of op_Base
     template <typename ...Arg>
-    static constexpr size_t size(dim3 block, Arg &...arg) { return sharedMemSize<typename T::dependencies>(block, arg...); }
+    static constexpr size_t size(dim3 block, Arg &...arg) {
+      return sharedMemSize<typename T::dependencies>(block, arg...);
+    }
   };
 
   // sharedMemOffset

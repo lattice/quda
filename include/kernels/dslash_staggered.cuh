@@ -170,8 +170,8 @@ namespace quda
 
   // out(x) = M*in = (-D + m) * in(x-mu)
   template <int nParity, bool dummy, bool xpay, KernelType kernel_type, typename Arg>
-  struct staggered : dslash_default {
-    using SpecialOpsT = NoSpecialOps;
+  struct staggered : dslash_default, NoSpecialOps {
+
     const Arg &arg;
     constexpr staggered(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation

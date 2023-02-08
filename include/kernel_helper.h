@@ -17,13 +17,12 @@ namespace quda
 
   template <use_kernel_arg_p use_kernel_arg_ = use_kernel_arg_p::TRUE> struct kernel_param {
     static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_;
-    static constexpr bool hasBlockOps() { return false; }
     dim3 threads;          /** number of active threads required */
     int comms_rank;        /** per process value of comm_rank() */
     int comms_rank_global; /** per process value comm_rank_global() */
     int comms_coord[4];    /** array storing {comm_coord(0), ..., comm_coord(3)} */
     int comms_dim[4];      /** array storing {comm_dim(0), ..., comm_dim(3)} */
-    sycl::local_ptr<char> lmem;
+    //sycl::local_ptr<char> lmem;
     sycl::local_accessor<char,1> *la;
 
     constexpr kernel_param() = default;

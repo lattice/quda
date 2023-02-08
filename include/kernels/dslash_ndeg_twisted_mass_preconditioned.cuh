@@ -46,11 +46,7 @@ namespace quda
     dslash_default {
 
     const Arg &arg;
-    constexpr nDegTwistedMassPreconditioned(const Arg &arg) : arg(arg) {
-      //if constexpr (!dagger || Arg::asymmetric) {
-      //this->setSharedMem(arg.la.get_pointer());
-      //}
-    }
+    constexpr nDegTwistedMassPreconditioned(const Arg &arg) : arg(arg) {}
     constexpr int twist_pack() const { return (!Arg::asymmetric && dagger) ? 2 : 0; }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 

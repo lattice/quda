@@ -652,9 +652,9 @@ namespace quda
     are reserved for data packing, which may include communication to
     neighboring processes.
    */
-//template <typename Arg> struct dslash_functor : getSpecialOpsT<typename Arg::D> {
-template <typename Arg> struct dslash_functor : Arg::D::SpecialOpsT {
-    static_assert(!isSpecialOps<typename Arg::template P<Arg::D::pc_type()>>);
+  template <typename Arg> struct dslash_functor : getSpecialOps<typename Arg::D> {
+    static_assert(explicitSpecialOps<typename Arg::D>);
+    static_assert(!hasSpecialOps<typename Arg::template P<Arg::D::pc_type()>>);
     const typename Arg::Arg &arg;
     static constexpr int nParity = Arg::nParity;
     static constexpr bool dagger = Arg::dagger;
@@ -666,10 +666,7 @@ template <typename Arg> struct dslash_functor : Arg::D::SpecialOpsT {
     __forceinline__ __device__ void apply(int, int s, int parity, bool active = true)
     {
       typename Arg::D dslash(arg);
-      if constexpr (!std::is_same_v<typename Arg::D::SpecialOpsT,NoSpecialOps>) {
-      //if constexpr (isSpecialOps<decltype(*this)>) {
-	//dslash.setNdItem(*this->ndi);
-	//dslash.setSharedMem(this->smem);
+      if constexpr (hasSpecialOps<typename Arg::D>) {
 	dslash.setSpecialOps(this);
       }
       // for full fields set parity from z thread index else use arg setting
