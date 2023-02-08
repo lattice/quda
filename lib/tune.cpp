@@ -406,10 +406,8 @@ namespace quda
         cache_file.close();
         initial_cache_size = tunecache.size();
 
-        if (getVerbosity() >= QUDA_SUMMARIZE) {
-          printfQuda("Loaded %d sets of cached parameters from %s\n", static_cast<int>(initial_cache_size),
-                     cache_path.c_str());
-        }
+        logQuda(QUDA_SUMMARIZE, "Loaded %d sets of cached parameters from %s\n", static_cast<int>(initial_cache_size),
+                cache_path.c_str());
 
       } else {
         warningQuda("Cache file not found.  All kernels will be re-tuned (if tuning is enabled).");
@@ -458,9 +456,7 @@ namespace quda
       cache_path = resource_path + (error ? "/tunecache_error.tsv" : "/tunecache.tsv");
       cache_file.open(cache_path.c_str());
 
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("Saving %d sets of cached parameters to %s\n", static_cast<int>(tunecache.size()), cache_path.c_str());
-      }
+      logQuda(QUDA_SUMMARIZE, "Saving %d sets of cached parameters to %s\n", static_cast<int>(tunecache.size()), cache_path.c_str());
 
       time(&now);
       cache_file << "tunecache\t" << quda_version;
@@ -809,10 +805,8 @@ namespace quda
 
       TuneParam &param_tuned = it->second;
 
-      if (verbosity >= QUDA_DEBUG_VERBOSE) {
-        printfQuda("Launching %s with %s at vol=%s with %s\n", key.name, key.aux, key.volume,
-                   tunable.paramString(param_tuned).c_str());
-      }
+      logQuda(QUDA_DEBUG_VERBOSE, "Launching %s with %s at vol=%s with %s\n", key.name, key.aux, key.volume,
+              tunable.paramString(param_tuned).c_str());
 
 #ifdef LAUNCH_TIMER
       launchTimer.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -849,10 +843,8 @@ namespace quda
       param_default.aux = make_int4(-1, -1, -1, -1);
       tunable.defaultTuneParam(param_default);
       tunable.checkLaunchParam(param_default);
-      if (verbosity >= QUDA_DEBUG_VERBOSE) {
-        printfQuda("Launching %s with %s at vol=%s with %s (untuned)\n", key.name, key.aux, key.volume,
-                   tunable.paramString(param_default).c_str());
-      }
+      logQuda(QUDA_DEBUG_VERBOSE, "Launching %s with %s at vol=%s with %s (untuned)\n", key.name, key.aux, key.volume,
+              tunable.paramString(param_default).c_str());
 
       return param_default;
     } else if (!tuning) {
@@ -873,12 +865,10 @@ namespace quda
         active_tunable = &tunable;
         best_time = FLT_MAX;
 
-        if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PreTune %s\n", key.name);
+        logQuda(QUDA_DEBUG_VERBOSE, "PreTune %s\n", key.name);
         tunable.preTune();
 
-        if (verbosity >= QUDA_DEBUG_VERBOSE) {
-          printfQuda("Tuning %s with %s at vol=%s\n", key.name, key.aux, key.volume);
-        }
+        logQuda(QUDA_DEBUG_VERBOSE, "Tuning %s with %s at vol=%s\n", key.name, key.aux, key.volume);
 
         const auto &stream = device::get_default_stream();
         device_timer_t timer(stream);
@@ -894,13 +884,11 @@ namespace quda
         while (tuning && candidatetuning) {
           qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);
-          if (verbosity >= QUDA_DEBUG_VERBOSE) {
-            printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
-                       static_cast<int>(param.block.x), static_cast<int>(param.block.y),
-                       static_cast<int>(param.block.z), static_cast<int>(param.grid.x), static_cast<int>(param.grid.y),
-                       static_cast<int>(param.grid.z), static_cast<int>(param.shared_bytes),
-                       static_cast<int>(param.aux.x), static_cast<int>(param.aux.y), static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
-          }
+          logQuda(QUDA_DEBUG_VERBOSE, "About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
+                  static_cast<int>(param.block.x), static_cast<int>(param.block.y),
+                  static_cast<int>(param.block.z), static_cast<int>(param.grid.x), static_cast<int>(param.grid.y),
+                  static_cast<int>(param.grid.z), static_cast<int>(param.shared_bytes),
+                  static_cast<int>(param.aux.x), static_cast<int>(param.aux.y), static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
 
           tunable.apply(stream); // do initial call in case we need to jit compile for these parameters or if policy tuning
 
@@ -946,23 +934,19 @@ namespace quda
         if (policyTuning() || uberTuning()) { tc.broadcast(tune_rank); }
         const int tuneiterations
           = std::max(static_cast<int>(std::ceil(min_tune_time / tc.getBestTime())), min_tune_iterations);
-        if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
-          printfQuda("Candidate tuning finished for %s with %s. Best time %f and now continuing with %i iterations.\n",
-                     key.name, key.aux, tc.getBestTime(), tuneiterations);
-        }
+        logQuda(QUDA_DEBUG_VERBOSE, "Candidate tuning finished for %s with %s. Best time %f and now continuing with %i iterations.\n",
+                key.name, key.aux, tc.getBestTime(), tuneiterations);
 
         // we now have the candidates, now need to loop over candidates
         while (!tc.empty()) {
           param = tc.top();
           qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);
-          if (verbosity >= QUDA_DEBUG_VERBOSE) {
-            printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
-                       static_cast<int>(param.block.x), static_cast<int>(param.block.y),
-                       static_cast<int>(param.block.z), static_cast<int>(param.grid.x), static_cast<int>(param.grid.y),
-                       static_cast<int>(param.grid.z), static_cast<int>(param.shared_bytes),
-                       static_cast<int>(param.aux.x), static_cast<int>(param.aux.y), static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
-          }
+          logQuda(QUDA_DEBUG_VERBOSE, "About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
+                  static_cast<int>(param.block.x), static_cast<int>(param.block.y),
+                  static_cast<int>(param.block.z), static_cast<int>(param.grid.x), static_cast<int>(param.grid.y),
+                  static_cast<int>(param.grid.z), static_cast<int>(param.shared_bytes),
+                  static_cast<int>(param.aux.x), static_cast<int>(param.aux.y), static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
 
           tunable.apply(stream); // do warm up call, for consistency with the candidate tuning
           timer.start();
@@ -985,13 +969,11 @@ namespace quda
             best_time = elapsed_time;
             best_param = param;
           }
-          if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
-            if (error == QUDA_SUCCESS && tunable.launchError() == QUDA_SUCCESS) {
-              printfQuda("T   %s gives %s\n", tunable.paramString(param).c_str(),
-                         tunable.perfString(elapsed_time).c_str());
-            } else {
-              printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), qudaGetLastErrorString().c_str());
-            }
+          if (error == QUDA_SUCCESS && tunable.launchError() == QUDA_SUCCESS) {
+            logQuda(QUDA_DEBUG_VERBOSE, "T   %s gives %s\n", tunable.paramString(param).c_str(),
+                    tunable.perfString(elapsed_time).c_str());
+          } else {
+            logQuda(QUDA_DEBUG_VERBOSE, "    %s gives %s\n", tunable.paramString(param).c_str(), qudaGetLastErrorString().c_str());
           }
 
           tunable.launchError() = QUDA_SUCCESS;
@@ -1002,10 +984,8 @@ namespace quda
         candidatetuning = true;
         tune_timer.stop(__func__, __FILE__, __LINE__);
 
-        if (verbosity >= QUDA_VERBOSE) {
-          printfQuda("Tuned %s giving %s for %s with %s\n", tunable.paramString(best_param).c_str(),
-                     tunable.perfString(best_time).c_str(), key.name, key.aux);
-        }
+        logQuda(QUDA_VERBOSE, "Tuned %s giving %s for %s with %s\n", tunable.paramString(best_param).c_str(),
+                tunable.perfString(best_time).c_str(), key.name, key.aux);
 
         auto regression_tol = 1.1;
         if (best_time > regression_tol * tc.getBestTime() && best_time > 1e-5) {
@@ -1019,7 +999,7 @@ namespace quda
         best_param.comment += ctime(&now); // includes a newline
         best_param.time = best_time;
 
-        if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PostTune %s\n", key.name);
+        logQuda(QUDA_DEBUG_VERBOSE, "PostTune %s\n", key.name);
         tuning = true;
         tunable.postTune();
         tuning = false;
