@@ -296,25 +296,26 @@ namespace quda
   }
 
   /**
-   * Distribute the tunecache from node 0 to all other nodes.
+   * @brief Distribute the tunecache from a given rank to all other nodes.
+   * @param[in] root_rank From which global rank to do the broadcast
    */
-  static void broadcastTuneCache()
+  static void broadcastTuneCache(bool root_rank = 0)
   {
     std::stringstream serialized;
     size_t size;
 
-    if (comm_rank_global() == 0) {
+    if (comm_rank_global() == root_rank) {
       serializeTuneCache(serialized);
       size = serialized.str().length();
     }
-    comm_broadcast_global(&size, sizeof(size_t));
+    comm_broadcast_global(&size, sizeof(size_t), root_rank);
 
     if (size > 0) {
-      if (comm_rank_global() == 0) {
-        comm_broadcast_global(const_cast<char *>(serialized.str().c_str()), size);
+      if (comm_rank_global() == root_rank) {
+        comm_broadcast_global(const_cast<char *>(serialized.str().c_str()), size, root_rank);
       } else {
         std::vector<char> serstr(size + 1);
-        comm_broadcast_global(serstr.data(), size);
+        comm_broadcast_global(serstr.data(), size, root_rank);
         serstr[size] = '\0'; // null-terminate
         serialized.str(serstr.data());
         deserializeTuneCache(serialized);
@@ -740,25 +741,26 @@ namespace quda
     }
 
     /**
-     * @brief Broadcast candidates among ranks to make sure policy tuning does not break.
-     *
+     * @brief Broadcast candidates among ranks to make sure policy
+     * tuning does not break.
+     * @param[in] root_rank From which global rank to do the broadcast
      */
-    void broadcast()
+    void broadcast(int root_rank)
     {
       size_t size;
       std::string serialized;
-      if (comm_rank_global() == 0) {
+      if (comm_rank_global() == root_rank) {
         serialized = serialize();
         size = serialized.length();
       }
-      comm_broadcast_global(&size, sizeof(size_t));
+      comm_broadcast_global(&size, sizeof(size_t), root_rank);
 
       if (size > 0) {
-        if (comm_rank_global() == 0) {
-          comm_broadcast_global(const_cast<char *>(serialized.c_str()), size);
+        if (comm_rank_global() == root_rank) {
+          comm_broadcast_global(const_cast<char *>(serialized.c_str()), size, root_rank);
         } else {
           std::vector<char> serstr(size + 1);
-          comm_broadcast_global(serstr.data(), size);
+          comm_broadcast_global(serstr.data(), size, root_rank);
           serstr[size] = '\0'; // null-terminate
           std::string_view deserialized(serstr.data());
           deserialize(deserialized);
@@ -778,7 +780,7 @@ namespace quda
    * Return the optimal launch parameters for a given kernel, either
    * by retrieving them from tunecache or autotuning on the spot.
    */
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
+  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity, bool tune_rank)
   {
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTART(QUDA_PROFILE_TOTAL);
@@ -855,10 +857,13 @@ namespace quda
       return param_default;
     } else if (!tuning) {
 
-      /* As long as global reductions are not disabled, only do the
-         tuning on node 0, else do the tuning on all nodes since we
-         can't guarantee that all nodes are partaking */
-      if (comm_rank_global() == 0 || !commGlobalReduction() || policyTuning() || uberTuning()) {
+      /* Only do the tuning on the tuning rank, unless:
+         - global reductions are disabled
+         - we are policy tuning
+         - we are tuning an uber kernel
+         in which case do the tuning on all ranks since we can't
+         guarantee that all nodes are partaking */
+      if (comm_rank_global() == tune_rank || !commGlobalReduction() || policyTuning() || uberTuning()) {
         TuneParam best_param;
         TuneCandidates tc(tunable.num_candidates());
         float best_time;
@@ -938,7 +943,7 @@ namespace quda
         const float min_tune_time = tunable.min_tune_time();
         const int min_tune_iterations = tunable.min_tune_iter();
 
-        if (policyTuning() || uberTuning()) { tc.broadcast(); }
+        if (policyTuning() || uberTuning()) { tc.broadcast(tune_rank); }
         const int tuneiterations
           = std::max(static_cast<int>(std::ceil(min_tune_time / tc.getBestTime())), min_tune_iterations);
         if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
@@ -1021,7 +1026,7 @@ namespace quda
         param = best_param;
         tunecache[key] = best_param;
       }
-      if (commGlobalReduction() || policyTuning() || uberTuning()) { broadcastTuneCache(); }
+      if (commGlobalReduction() || policyTuning() || uberTuning()) { broadcastTuneCache(tune_rank); }
 
       {
         static host_timer_t time_since_save;

@@ -385,7 +385,17 @@ namespace quda {
    */
   void flushProfile();
 
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
+
+  /**
+   * @brief Launch the autotuner, returning the tuned parameters once
+   * complete, or if present in the tunecache
+   * @param[in,out] The tunable instance we wish to autotune
+   * @param[in] Whether tuning is enabled (if not then just return the
+   * default parameters specificed in tunable.defaultTuneParam()
+   * @param[in] verbosity The verbosity to use while tuning
+   * @param[in] tune_rank Which (global) rank to use (for kernel tuning).
+   */
+  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity, bool tune_rank = 0);
 
   /**
    * @brief Post an event in the trace, recording where it was posted
