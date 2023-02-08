@@ -127,7 +127,7 @@ namespace quda
                                                                            Dslash::aux[arg.kernel_type]);
       strcat(aux, ",mu=");
       u32toa(aux + strlen(aux), arg.mu);
-      return TuneKey(in.VolString(), typeid(*this).name(), aux);
+      return TuneKey(in.VolString().c_str(), typeid(*this).name(), aux);
     }
   };
 

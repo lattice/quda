@@ -1104,6 +1104,11 @@ extern "C" {
   void freeGaugeQuda(void);
 
   /**
+   * Free QUDA's internal smeared gauge field.
+   */
+  void freeGaugeSmearedQuda(void);
+  
+  /**
    * Save the gauge field to the host.
    * @param h_gauge Base pointer to host gauge field (regardless of dimensionality)
    * @param param   Contains all metadata regarding host and device storage
@@ -1342,6 +1347,16 @@ extern "C" {
 
   void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
                          double *path_coeff, QudaGaugeParam *param);
+                         
+  /**
+   * Compute two-link field
+   *
+   * @param[out] twolink computed two-link field
+   * @param[in] inlink  the external field
+   * @param[in] param  Contains all metadata regarding host and device
+   *               storage
+   */
+  void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param);
 
   /**
    * Either downloads and sets the resident momentum field, or uploads
@@ -1713,6 +1728,34 @@ extern "C" {
   void destroyDeflationQuda(void *df_instance);
 
   void setMPICommHandleQuda(void *mycomm);
+  
+  // Parameter set for quark smearing operations
+  typedef struct QudaQuarkSmearParam_s {
+    //-------------------------------------------------
+    /** Used to store information pertinent to the operator **/
+    QudaInvertParam *inv_param;
+
+    /** Number of steps to apply **/
+    int  n_steps;
+    /** The width of the Gaussian **/
+    double  width;
+    /** if nonzero then compute two-link, otherwise reuse gaugeSmeared**/
+    int compute_2link;
+    /** if nonzero then delete two-link, otherwise keep two-link for future use**/
+    int delete_2link;
+    /** Set if the input spinor is on a time slice **/
+    int t0;
+    /** Flops count for the smearing operations **/
+    int gflops;
+    
+  } QudaQuarkSmearParam;
+
+  /**
+   * Performs two-link Gaussian smearing on a given spinor (for staggered fermions).
+   * @param[in,out] h_in Input spinor field to smear
+   * @param[in] smear_param   Contains all metadata the operator which will be applied to the spinor
+   */
+  void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_param);
 
 #ifdef __cplusplus
 }
