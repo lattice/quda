@@ -250,6 +250,16 @@ namespace quda {
     }
 
     /**
+       @brief Similar to the Xpay version of Dslash, but used only by the Laplace op for 
+       smearing.
+    */    
+    virtual void SmearOp(ColorSpinorField &, const ColorSpinorField &, 
+                         const double, const double, const int, const QudaParity) const
+    {
+      errorQuda("Not implemented.");
+    }
+    
+    /**
        @brief Apply M for the dirac op. E.g. the Schur Complement operator
     */
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
@@ -1376,6 +1386,18 @@ public:
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
                         double mu_factor = 0., bool allow_truncation = false) const;
+
+    /**
+     * @brief Create two-link staggered quark smearing operator
+     *
+     * @param[out] out output smeared field
+     * @param[in] in input field 
+     * @param     a (ignored)
+     * @param     b (ignored)
+     * @param[in] t0 time-slice index
+     * @param[in] parity Parity flag
+     */
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double a, const double b, const int t0, const QudaParity parity) const;
   };
 
   // Even-odd preconditioned staggered
@@ -1601,6 +1623,18 @@ public:
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
     virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
+
+    /**
+     * @brief Create two-link staggered quark smearing operator
+     *
+     * @param[out] out output smeared field
+     * @param[in]  in input field
+     * @param     a (ignored)
+     * @param     b (ignored)
+     * @param[in] t0 time-slice index
+     * @param[in] parity Parity flag
+     */   
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double a, const double b, const int t0, const QudaParity parity) const;
   };
 
   // Even-odd preconditioned staggered

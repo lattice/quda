@@ -2720,6 +2720,13 @@ void qudaFreeGaugeField() {
     qudamilc_called<false>(__func__);
 } // qudaFreeGaugeField
 
+void qudaFreeTwoLink()
+{
+  qudamilc_called<true>(__func__);
+  freeGaugeSmearedQuda();
+  qudamilc_called<false>(__func__);
+} // qudaFreeTwoLink
+
 void qudaLoadCloverField(int external_precision, int quda_precision, QudaInvertArgs_t inv_args, void *milc_clover,
                          void *milc_clover_inv, QudaSolutionType solution_type, QudaSolveType solve_type, QudaInverterType inverter,
                          double clover_coeff, int compute_trlog, double *trlog)

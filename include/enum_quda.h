@@ -572,6 +572,12 @@ typedef enum QudaGaugeSmearType_s {
   QUDA_GAUGE_SMEAR_INVALID = QUDA_INVALID_ENUM
 } QudaGaugeSmearType;
 
+typedef enum QudaFermionSmearType_s {
+  QUDA_FERMION_SMEAR_TYPE_GAUSSIAN,
+  QUDA_FERMION_SMEAR_TYPE_WUPPERTAL,
+  QUDA_FERMION_SMEAR_TYPE_INVALID = QUDA_INVALID_ENUM
+} QudaFermionSmearType;
+
 // Allows to choose an appropriate external library
 typedef enum QudaExtLibType_s {
   QUDA_CUSOLVE_EXTLIB,
