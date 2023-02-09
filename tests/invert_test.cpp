@@ -7,6 +7,7 @@
 // QUDA headers
 #include <quda.h>
 #include <color_spinor_field.h> // convenient quark field container
+#include <quda_arch.h>
 
 // External headers
 #include <misc.h>
