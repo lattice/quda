@@ -1380,20 +1380,20 @@ namespace quda {
     static constexpr QudaDirection dir = dir_;
   };
 
-  template <bool is_device, bool allthreads> struct storeCoarseSharedAtomic_impl {
-    template <typename ...Args> void operator()(Args...)
+  template <bool is_device> struct storeCoarseSharedAtomic_impl {
+    template <bool allthreads, typename ...Args> void operator()(Args...)
     {
       errorQuda("Shared-memory atomic aggregation not supported on host");
     }
   };
 
-  template <bool allthreads> struct storeCoarseSharedAtomic_impl<true, allthreads> {
+  template <> struct storeCoarseSharedAtomic_impl<true> {
     template <typename Arg> using CacheT =
       complex<storeType>[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
     template <typename Arg> using Cache = op_SharedMemoryCache<CacheT<Arg>,opDimsStatic<2,1,1>>;
     template <typename Arg> using Ops = SpecialOps<Cache<Arg>>;
 
-    template <typename VUV, typename Pack, typename O>
+    template <bool allthreads, typename VUV, typename Pack, typename O>
     inline __device__ void operator()(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, int parity, const Pack &pack, O *ops, bool active)
     {
       using Arg = typename O::Arg;
@@ -1597,7 +1597,7 @@ namespace quda {
   template <int nFace, bool allthreads, typename O>
   __device__ __host__ void computeVUV(O *ops, int parity, int x_cb, int i0, int j0, int parity_coarse_, int coarse_x_cb_, bool active)
   {
-    using Arg = O::Arg;
+    using Arg = typename O::Arg;
     const Arg &arg = ops->arg;
     using real = typename Arg::Float;
     constexpr int nDim = 4;
@@ -1695,7 +1695,7 @@ namespace quda {
     }
   };
 
-  template <typename Arg_> struct compute_vuv : storeCoarseSharedAtomic_impl<true>::SpecOps<Arg_> {
+  template <typename Arg_> struct compute_vuv : storeCoarseSharedAtomic_impl<true>::Ops<Arg_> {
     using Arg = Arg_;
     static constexpr int nFace = 1;
     const Arg &arg;
@@ -1711,7 +1711,7 @@ namespace quda {
     template <bool allthreads = false>
     __device__ __host__ inline void apply(int x_cb, int parity_c_row, int c_col, bool active = true)
     {
-      int parity, parity_coarse, x_coarse_cb, c_row;
+      int parity=0, parity_coarse=0, x_coarse_cb=0, c_row=0;
       if(!allthreads || active)
 	target::dispatch<getIndices>(parity_coarse, x_coarse_cb, parity, x_cb, parity_c_row, c_row, c_col, arg);
 
@@ -1733,7 +1733,7 @@ namespace quda {
     }
   };
 
-  template <typename Arg_> struct compute_vlv : storeCoarseSharedAtomic_impl<true>::SpecOps<Arg_> {
+  template <typename Arg_> struct compute_vlv : storeCoarseSharedAtomic_impl<true>::Ops<Arg_> {
     using Arg = Arg_;
     static constexpr int nFace = 3;
     const Arg &arg;
@@ -1749,7 +1749,7 @@ namespace quda {
     template <bool allthreads = false>
     __device__ __host__ inline void apply(int x_cb, int parity_c_row, int c_col, bool active = true)
     {
-      int parity, parity_coarse, x_coarse_cb, c_row;
+      int parity=0, parity_coarse=0, x_coarse_cb=0, c_row=0;
       if(!allthreads || active)
 	target::dispatch<getIndices>(parity_coarse, x_coarse_cb, parity, x_cb, parity_c_row, c_row, c_col, arg);
 

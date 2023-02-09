@@ -28,13 +28,21 @@ namespace quda {
 #endif
 
     // compile-time dispatch
-    template <template <bool, typename ...> class f, typename ...Params, typename ...Args>
+    template <template <bool, typename ...> class f, auto ...Params, typename ...Args>
     auto dispatch(Args &&...args)
     {
 #ifdef __SYCL_DEVICE_ONLY__
-      return f<true, Params...>()(args...);
+      if constexpr (sizeof...(Params) == 0) {
+	return f<true>()(args...);
+      } else {
+	return f<true>().template operator()<Params...>(args...);
+      }
 #else
-      return f<false, Params...>()(args...);
+      if constexpr (sizeof...(Params) == 0) {
+	return f<false>()(args...);
+      } else {
+	return f<false>().template operator()<Params...>(args...);
+      }
 #endif
     }
 
