@@ -160,14 +160,14 @@ namespace quda
       printfQuda("  needsFullBlock: %i  needsSharedMem: %i\n", needsFullBlock<Functor<Arg>>, needsSharedMem<Functor<Arg>>);
       printfQuda("  shared_bytes: %i\n", tp.shared_bytes);
     }
-    if (localSize[RANGE_X] % device::warp_size() != 0) {
-      if(needsFullBlock<Functor<Arg>>) {
-	std::ostringstream what;
-	what << "localSizeX (" << localSize[RANGE_X] << ") % warp_size (" << device::warp_size() << ") != 0";
-	target::sycl::set_error(what.str(), "pre-launch", __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
-	return QUDA_ERROR;
-      }
-    }
+    //if (localSize[RANGE_X] % device::warp_size() != 0) {
+    //if(needsFullBlock<Functor<Arg>>) {
+    //std::ostringstream what;
+    //what << "localSizeX (" << localSize[RANGE_X] << ") % warp_size (" << device::warp_size() << ") != 0";
+    //target::sycl::set_error(what.str(), "pre-launch", __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
+    //return QUDA_ERROR;
+    //}
+    //}
     //if (arg.threads.x%localSize[RANGE_X] != 0) {
       //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
     //  return QUDA_ERROR;
