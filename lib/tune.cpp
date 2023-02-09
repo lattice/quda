@@ -299,7 +299,7 @@ namespace quda
    * @brief Distribute the tunecache from a given rank to all other nodes.
    * @param[in] root_rank From which global rank to do the broadcast
    */
-  static void broadcastTuneCache(bool root_rank = 0)
+  static void broadcastTuneCache(int32_t root_rank = 0)
   {
     std::stringstream serialized;
     size_t size;
@@ -741,7 +741,7 @@ namespace quda
      * tuning does not break.
      * @param[in] root_rank From which global rank to do the broadcast
      */
-    void broadcast(int root_rank)
+    void broadcast(int32_t root_rank)
     {
       size_t size;
       std::string serialized;
@@ -772,11 +772,28 @@ namespace quda
     float getBestTime() const { return besttime; }
   };
 
+  int32_t getTuneRank()
+  {
+    static bool init = false;
+    static uint32_t tune_rank = 0; // default is to tune on rank 0
+    static char *tune_rank_env = getenv("QUDA_TUNING_RANK");
+
+    if (!init && tune_rank_env) {
+      std::stringstream rank(tune_rank_env);
+      rank >> tune_rank;
+      if (tune_rank >= comm_size()) errorQuda("Invalid tune_rank %u (%s)", tune_rank, tune_rank_env);
+      logQuda(QUDA_SUMMARIZE, "Kernel tuning will default on rank %d\n", tune_rank);
+    }
+    init = true;
+
+    return static_cast<int32_t>(tune_rank);
+  }
+
   /**
    * Return the optimal launch parameters for a given kernel, either
    * by retrieving them from tunecache or autotuning on the spot.
    */
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity, bool tune_rank)
+  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity, int32_t tune_rank)
   {
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTART(QUDA_PROFILE_TOTAL);

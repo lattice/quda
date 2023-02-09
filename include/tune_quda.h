@@ -385,6 +385,10 @@ namespace quda {
    */
   void flushProfile();
 
+  /**
+   * @brief Return the rank on which kernel tuning is performed.
+   */
+  int32_t getTuneRank();
 
   /**
    * @brief Launch the autotuner, returning the tuned parameters once
@@ -395,7 +399,7 @@ namespace quda {
    * @param[in] verbosity The verbosity to use while tuning
    * @param[in] tune_rank Which (global) rank to use (for kernel tuning).
    */
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity, bool tune_rank = 0);
+  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity, int32_t tune_rank = getTuneRank());
 
   /**
    * @brief Post an event in the trace, recording where it was posted
