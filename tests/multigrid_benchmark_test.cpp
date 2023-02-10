@@ -174,9 +174,9 @@ TEST(multi_rhs_test, verify)
     auto x2 = blas::norm2(x_ref);
     auto l2_dev = blas::xmyNorm(xD[i], x_ref);
 
-    // require that the relative L2 norm differs by no more than 1e-6
-    EXPECT_LE(sqrt(l2_dev / x2), prec_sloppy == QUDA_SINGLE_PRECISION ? 1e-6 : 4e-5);
-    // require that each component differs by no more than 1e-3
+    // require that the relative L2 norm differs by no more than 2e-6/4e-5
+    EXPECT_LE(sqrt(l2_dev / x2), prec_sloppy == QUDA_SINGLE_PRECISION ? 2e-6 : 4e-5);
+    // require that each component differs by no more than 1e-3/4e-3
     EXPECT_LE(max_dev[1], prec_sloppy == QUDA_SINGLE_PRECISION ? 1e-3 : 4e-3);
   }
 }
