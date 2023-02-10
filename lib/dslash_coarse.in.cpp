@@ -7,6 +7,23 @@ namespace quda
   template <int...> struct IntList {
   };
 
+  template <bool dagger, int Nc, int nVec, int... N>
+  void ApplyCoarseMma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
+                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
+                   double kappa, int parity, bool dslash, bool clover,
+                   const int *commDim, QudaPrecision halo_precision, IntList<nVec, N...>)
+  {
+    if (out[0].Nvec() == nVec) {
+      ApplyCoarseMma<dagger, Nc, nVec>(out, inA, inB, Y, X, kappa, parity, dslash, clover, commDim, halo_precision);
+    } else {
+      if constexpr (sizeof...(N) > 0) {
+        ApplyCoarseMma<dagger, Nc>(out, inA, inB, Y, X, kappa, parity, dslash, clover, commDim, halo_precision, IntList<N...>());
+      } else {
+        errorQuda("nVec = %d has not been instantiated", out[0].Nvec());
+      }
+    }
+  }
+
   template <bool use_mma, int Nc, int... N>
   void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                    cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
@@ -16,9 +33,15 @@ namespace quda
     int nColor = use_mma ? inA[0].Ncolor() / inA[0].Nvec() : inA[0].Ncolor();
     if (nColor == Nc) {
       if (dagger)
-        ApplyCoarse<true, Nc, use_mma>(out, inA, inB, Y, X, kappa, parity, dslash, clover, commDim, halo_precision);
+        if constexpr (use_mma)
+          ApplyCoarseMma<true, Nc>(out, inA, inB, Y, X, kappa, parity, dslash, clover, commDim, halo_precision, IntList<@QUDA_MULTIGRID_MRHS_LIST@>());
+        else
+          ApplyCoarse<true, Nc>(out, inA, inB, Y, X, kappa, parity, dslash, clover, commDim, halo_precision);
       else
-        ApplyCoarse<false, Nc, use_mma>(out, inA, inB, Y, X, kappa, parity, dslash, clover, commDim, halo_precision);
+        if constexpr (use_mma)
+          ApplyCoarseMma<false, Nc>(out, inA, inB, Y, X, kappa, parity, dslash, clover, commDim, halo_precision, IntList<@QUDA_MULTIGRID_MRHS_LIST@>());
+        else
+          ApplyCoarse<false, Nc>(out, inA, inB, Y, X, kappa, parity, dslash, clover, commDim, halo_precision);
     } else {
       if constexpr (sizeof...(N) > 0) {
         ApplyCoarse<use_mma>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, commDim, halo_precision, IntList<N...>());

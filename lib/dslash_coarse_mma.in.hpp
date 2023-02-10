@@ -17,8 +17,8 @@
 namespace quda {
 
   template <typename Float, typename yFloat, typename ghostFloat, int Ns, int Nc, bool dslash, bool clover, bool dagger,
-            DslashType type>
-  class DslashCoarse <Float, yFloat, ghostFloat, Ns, Nc, dslash, clover, dagger, type, true> : public TunableKernel
+            DslashType type, int nVec>
+  class DslashCoarseMma : public TunableKernel
   {
     static constexpr int nDim = 4;
 
@@ -118,7 +118,7 @@ namespace quda {
     }
 
   public:
-    DslashCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
+    DslashCoarseMma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                  cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y,
                  const GaugeField &X, double kappa, int parity, MemoryLocation *halo_location,
                  const ColorSpinorField &halo) :
@@ -187,7 +187,7 @@ namespace quda {
 
     void set_mma_param(TuneParam &tp) const {
       tp.block.x = 1;
-      tp.block.y = Ns * Nc / (1 << tp.aux.x);
+      tp.block.y = Ns * Nc / ((Nc > 64 ? 2 : 1) << tp.aux.x);
       tp.block.z = 8;
 
       if (out[0].Nvec() % n_atom_size != 0) {
@@ -220,7 +220,7 @@ namespace quda {
       tp.shared_bytes = shared_bytes;
     }
 
-    template <int nVec, int bN, int bM, int bK, int block_y, int block_z>
+    template <int bN, int bM, int bK, int block_y, int block_z>
     void launch_mma(TuneParam &tp, const qudaStream_t &stream) {
       using Arg = DslashCoarseMmaArg<mma_t, dslash, clover, dagger, type, Float, yFloat, ghostFloat, Ns, Nc, nVec, bN, bM, bK, block_y, block_z>;
       Arg arg(out[0], inA[0], inB[0], Y, X, (Float)kappa, parity, halo);
@@ -228,83 +228,65 @@ namespace quda {
       launch_cuda<CoarseDslashMma>(tp, stream, arg);
     }
 
-    template <int nVec, int bN, int bM, int block_y, int block_z, size_t d, size_t... Ds>
+    template <int bN, int bM, int block_y, int block_z, size_t d, size_t... Ds>
     void launch_mma_span_k(TuneParam &tp, const qudaStream_t &stream, std::index_sequence<d, Ds...>) {
       if (tp.aux.w == d) {
         constexpr IntFactorArray<(Ns * Nc) / k_atom_size> a;
-        launch_mma<nVec, bN, bM, a[d] * k_atom_size, block_y, block_z>(tp, stream);
+        launch_mma<bN, bM, a[d] * k_atom_size, block_y, block_z>(tp, stream);
       } else {
         if constexpr (sizeof...(Ds) > 0) {
-          launch_mma_span_k<nVec, bN, bM, block_y, block_z>(tp, stream, std::index_sequence<Ds...>());
+          launch_mma_span_k<bN, bM, block_y, block_z>(tp, stream, std::index_sequence<Ds...>());
         } else {
           errorQuda("Invalid tp.aux.z.");
         }
       }
     }
 
-    template <int nVec, int bN, int block_y, int block_z, size_t d, size_t... Ds>
+    template <int bN, int block_y, int block_z, size_t d, size_t... Ds>
     void launch_mma_span_m(TuneParam &tp, const qudaStream_t &stream, std::index_sequence<d, Ds...>) {
       if (tp.aux.z == d) {
         constexpr IntFactorArray<(Ns * Nc) / m_atom_size> a;
         std::make_index_sequence<IntFactorArray<(Ns * Nc) / k_atom_size>().size()> xt;
-        launch_mma_span_k<nVec, bN, a[d] * m_atom_size, block_y, block_z>(tp, stream, xt);
+        launch_mma_span_k<bN, a[d] * m_atom_size, block_y, block_z>(tp, stream, xt);
       } else {
         if constexpr (sizeof...(Ds) > 0) {
-          launch_mma_span_m<nVec, bN, block_y, block_z>(tp, stream, std::index_sequence<Ds...>());
+          launch_mma_span_m<bN, block_y, block_z>(tp, stream, std::index_sequence<Ds...>());
         } else {
           errorQuda("Invalid tp.aux.z.");
         }
       }
     }
 
-    template <int nVec, int block_y, int block_z, size_t d, size_t... Ds>
+    template <int block_y, int block_z, size_t d, size_t... Ds>
     void launch_mma_span_n(TuneParam &tp, const qudaStream_t &stream, std::index_sequence<d, Ds...>) {
       if (tp.aux.y == d) {
         constexpr IntFactorArray<nVec / n_atom_size> a;
         std::make_index_sequence<IntFactorArray<(Ns * Nc) / m_atom_size>().size()> xt;
-        launch_mma_span_m<nVec, a[d] * n_atom_size, block_y, block_z>(tp, stream, xt);
+        launch_mma_span_m<a[d] * n_atom_size, block_y, block_z>(tp, stream, xt);
       } else {
         if constexpr (sizeof...(Ds) > 0) {
-          launch_mma_span_n<nVec, block_y, block_z>(tp, stream, std::index_sequence<Ds...>());
+          launch_mma_span_n<block_y, block_z>(tp, stream, std::index_sequence<Ds...>());
         } else {
           errorQuda("Invalid tp.aux.y.");
         }
       }
     }
 
-    template <int nVec>
     void launch_mma(TuneParam &tp, const qudaStream_t &stream) {
       std::make_index_sequence<IntFactorArray<nVec / n_atom_size>().size()> xt;
 
       switch (tp.aux.x) {
-        case 0: launch_mma_span_n<nVec, Ns * Nc / 1, 8>(tp, stream, xt); break;
-        case 1: launch_mma_span_n<nVec, Ns * Nc / 2, 8>(tp, stream, xt); break;
-        case 2: launch_mma_span_n<nVec, Ns * Nc / 4, 8>(tp, stream, xt); break;
+        case 0: launch_mma_span_n<Ns * Nc / (Nc > 64 ? 2 : 1), 8>(tp, stream, xt); break;
+        case 1: launch_mma_span_n<Ns * Nc / (Nc > 64 ? 4 : 2), 8>(tp, stream, xt); break;
+        case 2: launch_mma_span_n<Ns * Nc / (Nc > 64 ? 8 : 4), 8>(tp, stream, xt); break;
         default: errorQuda("tp.aux.x = %d not supported", tp.aux.x);
-      }
-    }
-
-    template <int...> struct IntList { };
-
-    template <int nVec, int... N>
-    void launch_mma_span_nVec(TuneParam &tp, const qudaStream_t &stream, IntList<nVec, N...>) {
-      if (out[0].Nvec() == nVec) {
-        launch_mma<nVec>(tp, stream);
-      } else {
-        IntList<N...> nVecs;
-        if constexpr (sizeof...(N) > 0) {
-          launch_mma_span_nVec(tp, stream, nVecs);
-        } else {
-          errorQuda("nVec = %d not instantiated\n", out[0].Nvec());
-        }
       }
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        IntList<@QUDA_MULTIGRID_MRHS_LIST@> nVecs;
-        launch_mma_span_nVec(tp, stream, nVecs);
+      launch_mma(tp, stream);
     }
 
   };

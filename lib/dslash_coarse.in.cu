@@ -6,8 +6,12 @@ namespace quda {
   constexpr int coarseColor = @QUDA_MULTIGRID_NVEC@;
   constexpr bool use_mma = false;
 
+  template <typename Float, typename yFloat, typename ghostFloat, int Ns, bool dslash, bool clover,
+            DslashType type>
+  using D = DslashCoarse<Float, yFloat, ghostFloat, Ns, coarseColor, dslash, clover, dagger, type>;
+
   template<>
-  void ApplyCoarse<dagger, coarseColor, use_mma>(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
+  void ApplyCoarse<dagger, coarseColor>(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                                         cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
                                         double kappa, int parity, bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision)
   {
@@ -15,7 +19,7 @@ namespace quda {
       // create a halo ndim+1 field for batched comms
       auto halo = ColorSpinorField::create_comms_batch(inA);
 
-      DslashCoarseLaunch<dagger, coarseColor, use_mma> Dslash(out, inA, inB, halo, Y, X, kappa, parity, dslash,
+      DslashCoarseLaunch<D, dagger, coarseColor, use_mma, 1> Dslash(out, inA, inB, halo, Y, X, kappa, parity, dslash,
                                                      clover, commDim, halo_precision);
 
       DslashCoarsePolicyTune<decltype(Dslash)> policy(Dslash);
