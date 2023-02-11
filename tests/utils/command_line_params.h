@@ -139,6 +139,7 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_testing_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_quark_smear_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
 {
@@ -397,6 +398,12 @@ extern double eofa_mq2;
 extern double eofa_mq3;
 
 extern QudaContractType contract_type;
+
+extern double smear_coeff;
+extern int    smear_n_steps;
+extern int    smear_t0;
+extern bool   smear_compute_two_link;
+extern bool   smear_delete_two_link;
 
 extern std::array<int, 4> grid_partition;
 
