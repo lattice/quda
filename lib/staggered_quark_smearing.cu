@@ -30,7 +30,7 @@ namespace quda
 
     void apply(const qudaStream_t &stream)
     {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity(), arg.tune_rank );
       Dslash::setParam(tp);
 
       // reset threadDimMapLower and threadDimMapUpper when t0 is given
