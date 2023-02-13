@@ -31,12 +31,16 @@ QudaPrecision prec_eigensolver = QUDA_INVALID_PRECISION;
 QudaPrecision prec_null = QUDA_INVALID_PRECISION;
 QudaPrecision prec_ritz = QUDA_INVALID_PRECISION;
 QudaVerbosity verbosity = QUDA_SUMMARIZE;
+
 std::array<int, 4> dim = {24, 24, 24, 24};
+std::array<int, 4> grid_partition = {1, 1, 1, 1};
+
 int &xdim = dim[0];
 int &ydim = dim[1];
 int &zdim = dim[2];
 int &tdim = dim[3];
 int Lsdim = 16;
+
 bool dagger = false;
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 int laplace3D = 4;
@@ -86,8 +90,6 @@ bool low_mode_check = false;
 bool oblique_proj_check = false;
 double mass = 0.1;
 double kappa = -1.0;
-quda::mass_array<double> kappa_array = {};
-quda::mass_array<double> mass_array = {};
 double mu = 0.1;
 double epsilon = 0.01;
 double m5 = -1.5;
@@ -114,7 +116,6 @@ QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 QudaSolveType solve_type = QUDA_NORMOP_PC_SOLVE;
 QudaSolutionType solution_type = QUDA_MAT_SOLUTION;
 QudaTboundary fermion_t_boundary = QUDA_ANTI_PERIODIC_T;
-bool gauge_smear = false;
 
 int mg_levels = 2;
 
@@ -263,8 +264,6 @@ bool mg_eig_preserve_deflation = false;
 double heatbath_beta_value = 6.2;
 int heatbath_warmup_steps = 10;
 int heatbath_num_steps = 10;
-int heatbath_step_start = 0;
-int heatbath_checkpoint = 5;
 int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
 bool heatbath_coldstart = false;
@@ -275,12 +274,7 @@ double eofa_mq1 = 1.0;
 double eofa_mq2 = 0.085;
 double eofa_mq3 = 1.0;
 
-// Propagator options
-quda::file_array<char[256]> prop_source_infile;
-quda::file_array<char[256]> prop_source_outfile;
-quda::file_array<char[256]> prop_sink_infile;
-quda::file_array<char[256]> prop_sink_outfile;
-quda::source_array<std::array<int, 4>> prop_source_position = {0, 0, 0, 0};
+QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
 int prop_source_smear_steps = 0;
 int prop_sink_smear_steps = 0;
@@ -322,30 +316,21 @@ bool gf_fft_autotune = false;
 
 std::array<int, 4> grid_partition = {1, 1, 1, 1};
 
+// Parameters for the (gaussian) quark smearing operator
+int    smear_n_steps = 50;
+double smear_coeff    = 0.1;
+int    smear_t0 = -1;
+bool   smear_compute_two_link = true;
+bool   smear_delete_two_link  = true;
+
 bool enable_testing = false;
 
 namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
 
-  CLI::TransformPairs<QudaBLASDataType> blas_dt_map {
-    {"C", QUDA_BLAS_DATATYPE_C}, {"Z", QUDA_BLAS_DATATYPE_Z}, {"S", QUDA_BLAS_DATATYPE_S}, {"D", QUDA_BLAS_DATATYPE_D}};
-
-  CLI::TransformPairs<QudaBLASDataOrder> blas_data_order_map {{"row", QUDA_BLAS_DATAORDER_ROW},
-                                                              {"col", QUDA_BLAS_DATAORDER_COL}};
-
-  CLI::TransformPairs<QudaBLASOperation> blas_op_map {{"N", QUDA_BLAS_OP_N}, {"T", QUDA_BLAS_OP_T}, {"C", QUDA_BLAS_OP_C}};
-
   CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
-                                                           {"open-sum-t", QUDA_CONTRACT_TYPE_OPEN_SUM_T},
-                                                           {"open-sum-z", QUDA_CONTRACT_TYPE_OPEN_SUM_Z},
-							   {"open-ft-t", QUDA_CONTRACT_TYPE_OPEN_FT_T},
-                                                           {"open-ft-z", QUDA_CONTRACT_TYPE_OPEN_FT_Z},
-                                                           {"dr", QUDA_CONTRACT_TYPE_DR},
-							   {"dr-ft-t", QUDA_CONTRACT_TYPE_DR_FT_T},
-                                                           {"dr-ft-z", QUDA_CONTRACT_TYPE_DR_FT_Z}
-
-  };
+                                                           {"dr", QUDA_CONTRACT_TYPE_DR}};
 
   CLI::TransformPairs<QudaDslashType> dslash_type_map {{"wilson", QUDA_WILSON_DSLASH},
                                                        {"clover", QUDA_CLOVER_WILSON_DSLASH},
@@ -505,6 +490,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
                        "Compute the clover inverse trace log to check for singularity (default false)");
   quda_app->add_option("--compute-fat-long", compute_fatlong,
                        "Compute the fat/long field or use random numbers (default false)");
+
   quda_app
     ->add_option("--contraction-type", contract_type,
                  "Whether to leave spin elemental open, or use a gamma basis and contract on "
@@ -624,7 +610,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--reliable-delta", reliable_delta, "Set reliable update delta factor");
   quda_app->add_option("--save-gauge", gauge_outfile,
-                       "Save gauge field \" file \" for the test (requires QIO)");
+                       "Save gauge field \" file \" for the test (requires QIO, heatbath test only)");
 
   quda_app->add_option("--solution-pipeline", solution_accumulator_pipeline,
                        "The pipeline length for fused solution accumulation (default 0, no pipelining)");
@@ -1096,18 +1082,16 @@ void add_madwf_option_group(std::shared_ptr<QUDAApp> quda_app)
 void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   // Option group for heatbath related options
-  auto opgroup = quda_app->add_option_group("heatbath", "Options controlling heatbath routines");
+  auto opgroup = quda_app->add_option_group("heatbath", "Options controlling heatbath tests");
   opgroup->add_option("--heatbath-beta", heatbath_beta_value, "Beta value used in heatbath test (default 6.2)");
   opgroup->add_option("--heatbath-coldstart", heatbath_coldstart,
-                       "Whether to use a cold or hot start in heatbath test (default false)");
+                      "Whether to use a cold or hot start in heatbath test (default false)");
   opgroup->add_option("--heatbath-num-hb-per-step", heatbath_num_heatbath_per_step,
-                       "Number of heatbath hits per heatbath step (default 5)");
+                      "Number of heatbath hits per heatbath step (default 5)");
   opgroup->add_option("--heatbath-num-or-per-step", heatbath_num_overrelax_per_step,
-                       "Number of overrelaxation hits per heatbath step (default 5)");
+                      "Number of overrelaxation hits per heatbath step (default 5)");
   opgroup->add_option("--heatbath-num-steps", heatbath_num_steps,
-		      "Number of measurement steps in heatbath test (default 10)");
-  opgroup->add_option("--heatbath-step-start", heatbath_step_start,
-                       "The number from which to start the test (default 0)");
+                      "Number of measurement steps in heatbath test (default 10)");
   opgroup->add_option("--heatbath-warmup-steps", heatbath_warmup_steps,
                        "Number of warmup steps in heatbath test (default 10)");
   opgroup->add_option("--heatbath-checkpoint", heatbath_checkpoint,
@@ -1224,4 +1208,14 @@ void add_testing_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("Testing", "Options controlling automated testing");
   opgroup->add_option("--enable-testing", enable_testing, "Enable automated testing (default false)");
+}
+
+void add_quark_smear_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup = quda_app->add_option_group("Quark smearing", "Options controlling quark smearing testing");
+  opgroup->add_option("--smear-compute-twolink", smear_compute_two_link, "Compute two link field (default true)");
+  opgroup->add_option("--smear-delete-twolink", smear_delete_two_link, "Delete two link field (default true)");
+  opgroup->add_option("--smear-coeff", smear_coeff, "Set smearing coefficient (default 0.1)");
+  opgroup->add_option("--smear-nsteps", smear_n_steps, "Number of smearing steps (default 50)");
+  opgroup->add_option("--smear-t0", smear_t0, "Index of the time slice (default -1)");
 }

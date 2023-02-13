@@ -299,9 +299,8 @@ int write_field(QIO_Writer *outfile, int count, const void *field_out[], QudaPre
   case 24: xml_record += "WilsonColorSpinorField>"; break;   // SU(3) Wilson
   default: xml_record += "MGColorSpinorField>"; break;       // MG color spinor vector
   }
-  xml_record += "\n";
-  xml_record += "<version>BETA</version>\n";
-  xml_record += "<type>" + std::string(type) + "</type>\n<info>\n";
+  xml_record += "<version>BETA</version>";
+  xml_record += "<type>" + std::string(type) + "</type><info>";
 
   // if parity+even, it's a half-x-dim even only vector
   // if parity+odd, it's a half-x-dim odd only vector
@@ -310,29 +309,28 @@ int write_field(QIO_Writer *outfile, int count, const void *field_out[], QudaPre
   // if full+full, it's a full vector with all sites filled (either a full ColorSpinorField or a GaugeField)
 
   if (subset == QUDA_PARITY_SITE_SUBSET) {
-    xml_record += "  <subset>parity</subset>\n";
+    xml_record += "<subset>parity</subset>";
   } else {
-    xml_record += "  <subset>full</subset>\n";
+    xml_record += "<subset>full</subset>";
   }
   if (parity == QUDA_EVEN_PARITY) {
-    xml_record += "    <parity>even</parity>\n";
+    xml_record += "<parity>even</parity>";
   } else if (parity == QUDA_ODD_PARITY) {
-    xml_record += "    <parity>odd</parity>\n";
+    xml_record += "<parity>odd</parity>";
   } else {
-    xml_record += "  <parity>full</parity>\n";
+    xml_record += "<parity>full</parity>";
   } // abuse/hack
 
   // A lot of this is redundant of the record info, but eh.
-  xml_record += "  <nColor>" + std::to_string(nColor) + "</nColor>\n";
-  xml_record += "  <nSpin>" + std::to_string(nSpin) + "</nSpin>\n";
-  xml_record += "</info>\n</quda";
+  xml_record += "<nColor>" + std::to_string(nColor) + "</nColor>";
+  xml_record += "<nSpin>" + std::to_string(nSpin) + "</nSpin>";
+  xml_record += "</info></quda";
   switch (len) {
   case 6: xml_record += "StaggeredColorSpinorField>"; break; // SU(3) staggered
   case 18: xml_record += "GaugeFieldFile>"; break;           // SU(3) gauge field
   case 24: xml_record += "WilsonColorSpinorField>"; break;   // SU(3) Wilson
   default: xml_record += "MGColorSpinorField>";              // MG color spinor vector
   }
-  xml_record += "\n\n";
 
   int status;
 
@@ -441,4 +439,3 @@ void write_spinor_field(const char *filename, const void *V[], QudaPrecision pre
   QIO_close_write(outfile);
   printfQuda("%s: Closed file for writing\n",__func__);
 }
-

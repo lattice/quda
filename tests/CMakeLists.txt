@@ -120,13 +120,6 @@ if(QUDA_DIRAC_STAGGERED)
     quda_checkbuildtest(contractFT_test QUDA_BUILD_ALL_TESTS)
     install(TARGETS contractFT_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
   endif()
-  
-  if(QUDA_BLOCKSOLVER)
-    add_executable(staggered_invertmsrc_test staggered_invertmsrc_test.cpp)
-    target_link_libraries(staggered_invertmsrc_test ${TEST_LIBS})
-    quda_checkbuildtest(staggered_invertmsrc_test QUDA_BUILD_ALL_TESTS)
-    install(TARGETS staggered_invertmsrc_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-  endif()
 endif()
 
 if(QUDA_DIRAC_WILSON
@@ -204,11 +197,13 @@ if(QUDA_CONTRACT)
   target_link_libraries(contract_test ${TEST_LIBS})
   quda_checkbuildtest(contract_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
 
-  add_executable(correlator_test correlator_test.cpp)
-  target_link_libraries(correlator_test ${TEST_LIBS})
-  quda_checkbuildtest(correlator_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS correlator_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+if(QUDA_SMEAR_GAUSS_TWOLINK)
+  add_executable(staggered_gsmear_test staggered_gsmear_test.cpp)
+  target_link_libraries(staggered_gsmear_test ${TEST_LIBS})
+  quda_checkbuildtest(staggered_gsmear_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS staggered_gsmear_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR}) 	
 endif()
 
 if(QUDA_DIRAC_STAGGERED)
@@ -330,7 +325,7 @@ if(QUDA_CONTRACT)
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:contract_test> ${MPIEXEC_POSTFLAGS}
     --dim 2 4 6 8
     --gtest_output=xml:contract_test.xml)
-endif()
+endif()  
 
 # loop over Dslash policies
 if(QUDA_CTEST_SEP_DSLASH_POLICIES)
@@ -1255,6 +1250,14 @@ foreach(prec IN LISTS TEST_PRECS)
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dilution_test> ${MPIEXEC_POSTFLAGS}
                      --dim 4 6 8 10 --prec ${prec}
                      --gtest_output=xml:dilution_test_${prec}.xml)
+  endif()
+
+  if(QUDA_SMEAR_GAUSS_TWOLINK)
+    add_test(NAME staggered_gsmear_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gsmear_test> ${MPIEXEC_POSTFLAGS}
+      --dim 2 4 6 8 --prec ${prec}
+      --test TwoLink
+      --gtest_output=xml:staggered_gsmear_test_${prec}.xml)
   endif()
 
 endforeach(prec)

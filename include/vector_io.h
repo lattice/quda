@@ -57,7 +57,6 @@ namespace quda
        @param[in] vecs_low_prec The set of vectors with lower precision
        @param[in] low_prec The low precsision value
     */
-
     void downPrec(cvector_ref<ColorSpinorField> &vecs_high_prec, vector_ref<ColorSpinorField> &vecs_low_prec,
                   const QudaPrecision save_prec);
   };

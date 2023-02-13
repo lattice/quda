@@ -58,42 +58,6 @@ void display_test_info()
   return;
 }
 
-#if 0
-void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
-{
-  CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map {{"ape", QUDA_GAUGE_SMEAR_APE},
-                                                                {"stout", QUDA_GAUGE_SMEAR_STOUT},
-                                                                {"ovrimp-stout", QUDA_GAUGE_SMEAR_OVRIMP_STOUT},
-                                                                {"wilson", QUDA_GAUGE_SMEAR_WILSON_FLOW},
-                                                                {"symanzik", QUDA_GAUGE_SMEAR_SYMANZIK_FLOW}};
-
-  // Option group for SU(3) related options
-  auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
-
-  opgroup
-    ->add_option(
-      "--su3-smear-type",
-      gauge_smear_type, "The type of action to use in the smearing. Options: APE, Stout, Over Improved Stout, Wilson Flow, Symanzik Flow (default stout)")
-    ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
-  ;
-  opgroup->add_option("--su3-smear-alpha", gauge_smear_alpha, "alpha coefficient for APE smearing (default 0.6)");
-
-  opgroup->add_option("--su3-smear-rho", gauge_smear_rho,
-                      "rho coefficient for Stout and Over-Improved Stout smearing (default 0.1)");
-
-  opgroup->add_option("--su3-smear-epsilon", gauge_smear_epsilon,
-                      "epsilon coefficient for Over-Improved Stout smearing or Wilson flow (default 0.1)");
-
-  opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 50)");
-
-  opgroup->add_option("--su3-measurement-interval", measurement_interval,
-                      "Measure the field energy and/or topological charge every Nth step (default 5) ");
-
-  opgroup->add_option("--su3-project", su_project,
-                      "Project smeared gauge onto su3 manifold at measurement interval (default true)");
-}
-#endif
-
 int main(int argc, char **argv)
 {
 

@@ -266,7 +266,6 @@ namespace quda
         instantiate<Apply, double>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
-#if 1      
     } else if (field.Precision() == QUDA_SINGLE_PRECISION) {
       if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
         instantiate<Apply, float>(field, args...);
@@ -282,7 +281,6 @@ namespace quda
         instantiate<Apply, int8_t>(field, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
-#endif      
     } else {
       errorQuda("Unsupported precision %d\n", field.Precision());
     }

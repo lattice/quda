@@ -23,10 +23,16 @@ namespace quda {
   // Forward declaration of all children
   class LatticeField;
 
-  class Propagator;
-
   class ColorSpinorField;
   
+  class EigValueSet;
+  class cudaEigValueSet;
+  class cpuEigValueSet;
+
+  class EigVecSet;
+  class cpuEigVecSet;
+  class cudaEigVecSet;
+
   class GaugeField;
   class cpuGaugeField;
   class cudaGaugeField;

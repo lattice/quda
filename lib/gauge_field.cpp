@@ -80,11 +80,10 @@ namespace quda {
       length = 2 * (1 << nDim) * nDim * stride * nInternal; // two comes from being full lattice
     }
 
-    if ((reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_8) &&
-	(link_type != QUDA_SU3_LINKS && link_type != QUDA_SMEARED_LINKS && link_type != QUDA_WILSON_LINKS)) {
+    if ((reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_8) && link_type != QUDA_SU3_LINKS) {
       errorQuda("Cannot request a 12/8 reconstruct type without SU(3) link type");
     }
-    
+
     if (reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13) {
       // Need to adjust the phase alignment as well.
       int half_phase_bytes

@@ -2030,52 +2030,6 @@ struct mgInputStruct {
   }
 };
 
-void qudaContractFT(int external_precision,
-		    QudaContractArgs_t *cont_args,
-		    void *const quark1, 
-		    void *const quark2, 
-		    double *corr
-		    )
-{
-  static const QudaVerbosity verbosity = getVerbosity();
-  qudamilc_called<true>(__func__, verbosity);
-  QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  ColorSpinorParam csParam;
-  { // set ColorSpinorParam block
-    csParam.nColor = 3;
-    csParam.nSpin  = 1; // Support only staggered color fields for now
-    for (int dir = 0; dir < 4; ++dir) csParam.x[dir] = localDim[dir];
-    csParam.x[4] = 1;
-    csParam.setPrecision(host_precision);
-    csParam.pad = 0;
-    csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless for staggered, but required by the code.
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    csParam.location = QUDA_CPU_FIELD_LOCATION;
-    csParam.pc_type = QUDA_4D_PC; // must be set
-  }
-
-  int const n_mom = cont_args->n_mom;
-  int * const mom_modes = cont_args->mom_modes;
-  const QudaFFTSymmType *const fft_type = cont_args->fft_type;
-  int const *source_position = cont_args->source_position;
-  
-  QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
-  int const src_colors = 1;
-  // Only one pair of color fields and one result, so only one element in the arrays
-  void *prop_array_flavor_1[1] = {quark1};
-  void *prop_array_flavor_2[1] = {quark2};
-  void *result[1] = {corr};
-
-
-  contractFTQuda(prop_array_flavor_1, prop_array_flavor_2, result, cType, &csParam, 
-		 src_colors, localDim, source_position, n_mom, mom_modes, fft_type);
-
-  qudamilc_called<false>(__func__, verbosity);
-} // qudaContractFT
-
 // Internal structure that maintains `QudaMultigridParam`,
 // `QudaInvertParam`, `QudaEigParam`s, and the traditional
 // void* returned by `newMultigridQuda`.
@@ -2855,6 +2809,13 @@ void qudaFreeGaugeField() {
   freeGaugeQuda();
     qudamilc_called<false>(__func__);
 } // qudaFreeGaugeField
+
+void qudaFreeTwoLink()
+{
+  qudamilc_called<true>(__func__);
+  freeGaugeSmearedQuda();
+  qudamilc_called<false>(__func__);
+} // qudaFreeTwoLink
 
 void qudaLoadCloverField(int external_precision, int quda_precision, QudaInvertArgs_t inv_args, void *milc_clover,
                          void *milc_clover_inv, QudaSolutionType solution_type, QudaSolveType solve_type, QudaInverterType inverter,

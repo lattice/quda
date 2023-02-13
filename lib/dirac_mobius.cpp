@@ -99,8 +99,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    // out = dslash4 * in + k*kappa_b * x
-    // note that "k" is called "a" inside of ApplyDomainWall4D
     ApplyDomainWall4D(out, in, *gauge, k, m5, b_5, c_5, x, parity, dagger, commDim, profile);
 
     flops += 1320LL * (long long)in.Volume();

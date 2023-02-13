@@ -284,11 +284,6 @@ extern "C" {
     /** Maximum size of Krylov space used by solver */
     int gcrNkrylov;
 
-    QudaBoolean gauge_smear;             /** Whether or not to perfrom gauge smearing */
-    double gauge_smear_coeff;            /** The coefficient of the gauge smearing */ 
-    int gauge_smear_steps;               /** The number of smearing steps to perform */
-    QudaGaugeSmearType gauge_smear_type; /** The type of smearing to perfrom */
-    
     /*
      * The following parameters are related to the solver
      * preconditioner, if enabled.
@@ -1109,6 +1104,11 @@ extern "C" {
   void freeGaugeQuda(void);
 
   /**
+   * Free QUDA's internal smeared gauge field.
+   */
+  void freeGaugeSmearedQuda(void);
+  
+  /**
    * Save the gauge field to the host.
    * @param h_gauge Base pointer to host gauge field (regardless of dimensionality)
    * @param param   Contains all metadata regarding host and device storage
@@ -1376,6 +1376,16 @@ extern "C" {
 
   void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
                          double *path_coeff, QudaGaugeParam *param);
+                         
+  /**
+   * Compute two-link field
+   *
+   * @param[out] twolink computed two-link field
+   * @param[in] inlink  the external field
+   * @param[in] param  Contains all metadata regarding host and device
+   *               storage
+   */
+  void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param);
 
   /**
    * Either downloads and sets the resident momentum field, or uploads
@@ -1621,40 +1631,27 @@ extern "C" {
   void copyExtendedResidentGaugeQuda(void *resident_gauge);
 
   /**
-   * Performs Gaussian smearing on a given spinor using the gauge field
+   * Performs Wuppertal smearing on a given spinor using the gauge field
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
-   * @param h_in    Input spinor field to smear
-   * @param param   Contains all metadata regarding host and device
-   *                storage and operator which will be applied to the spinor
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage and operator which will be applied to the spinor
    * @param n_steps Number of steps to apply.
-   * @param omega   The width of the Gaussian 
+   * @param alpha  Alpha coefficient for Wuppertal smearing.
+   */
+  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int n_steps, double alpha);
+
+  /**
+   * Performs gaussian smearing on a given spinor using the gauge field
+   * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage and operator which will be applied to the spinor
+   * @param n_steps Number of steps to apply.
+   * @param omega  Width of the Gaussian distribution
    */
   void performGaussianSmearNStep(void *h_in, QudaInvertParam *param, const int n_steps, const double omega);
-
-  /**
-   * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param n_steps Number of steps to apply.
-   * @param alpha  Alpha coefficient for APE smearing.
-   * @param meas_interval Measure the Q charge every Nth step
-   */
-  void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval);
-  
-  /**
-   * Performs STOUT smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param n_steps Number of steps to apply.
-   * @param rho    Rho coefficient for STOUT smearing.
-   * @param meas_interval Measure the Q charge every Nth step
-   */
-  void performSTOUTnStep(unsigned int n_steps, double rho, int meas_interval);
-
-  /**
-   * Performs Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param n_steps Number of steps to apply.
-   * @param rho    Rho coefficient for STOUT smearing.
-   * @param epsilon Epsilon coefficient for Over Improved STOUT smearing.
-   * @param meas_interval Measure the Q charge every Nth step
-   */
-  void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, int meas_interval);
 
   /**
    * Performs APE, Stout, or Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
@@ -1683,38 +1680,13 @@ extern "C" {
   void gaugeObservablesQuda(QudaGaugeObservableParam *param);
 
   /**
-   * Public function to perform color contractions of the host propagators described by the
-   * first two arguments. The contraction includes a Fourier phase and is summed over
-   * either the T or Z direction. Each input propagator has nSpin * src_nColor ColorSpinorFields components.
-   * The output result must be able to hold nSpin*nSpin * dim(T or Z) * n_mom values. 
-   * @param[in] h_prop_array_flavor_1 pointer to pointers of ColorSpinorField host data
-   * @param[in] h_prop_array_flavor_2 pointer to pointers of ColorSpinorField host data
-   * @param[out] h_result adress of host pointer to the output complex correlators in double precision
-   * @param[in] cType Which type of contraction (open, degrand-rossi, staggered, etc)
-   * @param[in] cs_param_ptr Pointer to a ColorSpinorParam meta data for
-   *            construction of ColorSpinorFields
-   * @param[in] src_colors the number of source colors for the input propagators
-   * @param[in] X spacetime data for construction of ColorSpinorFields
-   * @param[in] source_position needed in Fourier phases
-   * @param[in] n_mom number of momentum modes
-   * @param[in] mom_modes[n_mom][4] in Fourier phase
-   * @param[in] fft_type[n_mom][4] selects exp, cos, or sin FFT for each direction
-   */
-  void contractFTQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, void **h_result,
-		      const QudaContractType cType, void *cs_param_ptr, const int src_colors,
-		      const int *X, const int *const source_position,
-		      const int n_mom, const int *const mom_modes, const QudaFFTSymmType *const fft_type);
-  
-  /**
-   * Public function to perform color contractions of the host spinorfields contained
-   * inside first two arguments.
-   * @param[in] x pointer to ColorSpinorField host data
-   * @param[in] y pointer to ColorSpinorField host data
-   * @param[out] h_result adress of pointer to the nSpin*nSpin*V complex numbers of the
-   *            result correlators
-   * @param[in] cType Which type of contraction (open, degrand-rossi, staggered, etc)
+   * Public function to perform color contractions of the host spinors x and y.
+   * @param[in] x pointer to host data
+   * @param[in] y pointer to host data
+   * @param[out] result pointer to the 16 spin projections per lattice site
+   * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
    * @param[in] param meta data for construction of ColorSpinorFields.
-   * @param[in] X spacetime data for construction of ColorSpinorFields
+   * @param[in] X spacetime data for construction of ColorSpinorFields.
    */
   void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
                     const int *X);
@@ -1767,20 +1739,6 @@ extern "C" {
    */
   void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBoolean native, QudaBLASParam *param);
 
-  void make4DChiralProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
-			const int *X);
-  
-  void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
-                          const int *X);
-
-  /**
-  * Convert a 4D point source to a 5D one
-  * @param in4D_ptr    Contains 4D pointsource
-  * @param out5D_ptr   5D source is written here
-  * @param X           an int array that contains Nx Ny Nz Nt
-  */
-  void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *inv_param, QudaInvertParam *inv_param4D, const int *X, size_t spinor4D_size_in_floats);
-
   /**
    * @brief Strided Batched in-place matrix inversion via LU
    * @param[in] Ainv The array containing the A inverse matrix data
@@ -1810,6 +1768,34 @@ extern "C" {
   void destroyDeflationQuda(void *df_instance);
 
   void setMPICommHandleQuda(void *mycomm);
+  
+  // Parameter set for quark smearing operations
+  typedef struct QudaQuarkSmearParam_s {
+    //-------------------------------------------------
+    /** Used to store information pertinent to the operator **/
+    QudaInvertParam *inv_param;
+
+    /** Number of steps to apply **/
+    int  n_steps;
+    /** The width of the Gaussian **/
+    double  width;
+    /** if nonzero then compute two-link, otherwise reuse gaugeSmeared**/
+    int compute_2link;
+    /** if nonzero then delete two-link, otherwise keep two-link for future use**/
+    int delete_2link;
+    /** Set if the input spinor is on a time slice **/
+    int t0;
+    /** Flops count for the smearing operations **/
+    int gflops;
+    
+  } QudaQuarkSmearParam;
+
+  /**
+   * Performs two-link Gaussian smearing on a given spinor (for staggered fermions).
+   * @param[in,out] h_in Input spinor field to smear
+   * @param[in] smear_param   Contains all metadata the operator which will be applied to the spinor
+   */
+  void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_param);
 
 #ifdef __cplusplus
 }

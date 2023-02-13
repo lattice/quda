@@ -32,17 +32,4 @@ inline void write_spinor_field(const char *, const void *[], QudaPrecision, cons
   exit(-1);
 }
 
-inline void read_propagator_field(const char *, void *[], QudaPrecision, const int *,
-                                  QudaSiteSubset, QudaParity, int, int, int, int, char *[])
-{
-  printf("QIO support has not been enabled\n");
-  exit(-1);
-}
-inline void write_propagator_field(const char *, void *[], QudaPrecision, const int *,
-                                   QudaSiteSubset, QudaParity, int, int, int, int, char *[])
-{
-  printf("QIO support has not been enabled\n");
-  exit(-1);
-}
-
 #endif

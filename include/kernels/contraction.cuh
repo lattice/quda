@@ -5,10 +5,10 @@
 #include <quda_matrix.h>
 #include <matrix_field.h>
 #include <kernel.h>
-#include <fast_intdiv.h>
 
 namespace quda
 {
+
   static constexpr int max_contract_results = 16; // sized for nSpin**2 = 16
  
   using spinor_array = array<array<double, 2>, max_contract_results>;
@@ -490,9 +490,9 @@ namespace quda
     using real = typename mapper<Float>::type;
     int X[4];    // grid dimensions
 
-    static constexpr int nSpin = nSpin_;
+    static constexpr int nSpin = 4;
     static constexpr int nColor = nColor_;
-    static constexpr bool spin_project = spin_project_;
+    static constexpr bool spin_project = true;
     static constexpr bool spinor_direct_load = false; // false means texture load
 
     // Create a typename F for the ColorSpinorField (F for fermion)
@@ -713,28 +713,4 @@ namespace quda
       arg.s.save(A_, x_cb, parity);
     }
   };
-
-  template <typename Arg> struct StaggeredContract {
-    const Arg &arg;
-    constexpr StaggeredContract(const Arg &arg) : arg(arg) {}
-    static constexpr const char *filename() { return KERNEL_FILE; }
-
-    __device__ __host__ inline void operator()(int x_cb, int parity)
-    {
-      constexpr int nSpin = Arg::nSpin;
-      using real = typename Arg::real;
-      using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
-
-      Vector x = arg.x(x_cb, parity);
-      Vector y = arg.y(x_cb, parity);
-
-      Matrix<complex<real>, nSpin> A;
-      // Color inner product: <\phi(x)_{\mu} | \phi(y)_{\nu}> ; The Bra is conjugated
-      A(0, 0) = innerProduct(x, y, 0, 0);
-      //printf("%.7e %.7e\n",A(mu, nu).real(),A(mu, nu).imag());
-
-      arg.s.save(A, x_cb, parity);
-    }
-  };
-
 } // namespace quda
