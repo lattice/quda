@@ -6,7 +6,7 @@ namespace quda {
 
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, StaggeredTransferType transferType>
   class StaggeredProlongRestrictLaunch : public TunableKernel3D {
-    template <QudaFieldOrder order> using Arg = StaggeredProlongRestrictArg<Float,fineSpin,fineColor,coarseSpin,coarseColor,order,transferType>;
+    template <bool native> using Arg = StaggeredProlongRestrictArg<Float, fineSpin, fineColor, coarseSpin, coarseColor, transferType, native>;
 
     ColorSpinorField &out;
     const ColorSpinorField &in;
@@ -25,9 +25,9 @@ namespace quda {
       parity(parity)
     {
       strcat(vol, ",");
-      strcat(vol, coarseColorSpinorField<transferType>(in,out).VolString());
+      strcat(vol, coarseColorSpinorField<transferType>(in,out).VolString().c_str());
       strcat(aux, ",");
-      strcat(aux, coarseColorSpinorField<transferType>(in,out).AuxString());
+      strcat(aux, coarseColorSpinorField<transferType>(in,out).AuxString().c_str());
 
       apply(device::get_default_stream());
     }
@@ -36,13 +36,13 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (location == QUDA_CPU_FIELD_LOCATION) {
         if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-          launch_host<StaggeredProlongRestrict>(tp, stream, Arg<QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(out, in, fine_to_coarse, parity));
+          launch_host<StaggeredProlongRestrict>(tp, stream, Arg<false>(out, in, fine_to_coarse, parity));
         } else {
           errorQuda("Unsupported field order %d", out.FieldOrder());
         }
       } else {
-        if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-          launch<StaggeredProlongRestrict>(tp, stream, Arg<QUDA_FLOAT2_FIELD_ORDER>(out, in, fine_to_coarse, parity));
+        if (out.isNative()) {
+          launch<StaggeredProlongRestrict>(tp, stream, Arg<true>(out, in, fine_to_coarse, parity));
         } else {
           errorQuda("Unsupported field order %d", out.FieldOrder());
         }

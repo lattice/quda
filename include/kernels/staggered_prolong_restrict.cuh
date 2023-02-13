@@ -78,11 +78,18 @@ namespace quda {
   /**
       Kernel argument struct
   */
-  template <typename Float, int fineSpin, int fineColor_, int coarseSpin, int coarseColor, QudaFieldOrder order, StaggeredTransferType theTransferType>
+  template <typename Float, int fineSpin, int fineColor_, int coarseSpin, int coarseColor, StaggeredTransferType theTransferType, bool native>
   struct StaggeredProlongRestrictArg : kernel_param<> {
     static constexpr int fineColor = fineColor_;
-    FieldOrderCB<Float, StaggeredTransferOutSpin<fineSpin,coarseSpin,theTransferType>::outSpin, StaggeredTransferOutColor<fineColor,coarseColor,theTransferType>::outColor,1,order> out;
-    const FieldOrderCB<Float, StaggeredTransferInSpin<fineSpin,coarseSpin,theTransferType>::inSpin, StaggeredTransferInColor<fineColor,coarseColor,theTransferType>::inColor,1,order> in;
+    static constexpr int outSpin = StaggeredTransferOutSpin<fineSpin,coarseSpin,theTransferType>::outSpin;
+    static constexpr int inSpin = StaggeredTransferInSpin<fineSpin,coarseSpin,theTransferType>::inSpin;
+    static constexpr int outColor = StaggeredTransferOutColor<fineColor,coarseColor,theTransferType>::outColor;
+    static constexpr int inColor = StaggeredTransferInColor<fineColor,coarseColor,theTransferType>::inColor;
+    static constexpr QudaFieldOrder outOrder = native ? colorspinor::getNative<Float>(outSpin) : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    static constexpr QudaFieldOrder inOrder = native ? colorspinor::getNative<Float>(inSpin) : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+
+    FieldOrderCB<Float, outSpin, outColor, 1, outOrder> out;
+    const FieldOrderCB<Float, inSpin, inColor, 1, inOrder> in;
     const int *geo_map;  // need to make a device copy of this
     const spin_mapper<fineSpin,coarseSpin> spin_map;
     const int parity; // the parity of the output field (if single parity)

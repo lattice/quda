@@ -84,8 +84,6 @@ endif()
 # CUDA specific QUDA options options
 include(CMakeDependentOption)
 
-option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
-option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
 option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
 option(QUDA_JITIFY "build QUDA using Jitify" OFF)
 option(QUDA_DOWNLOAD_NVSHMEM "Download NVSHMEM" OFF)
@@ -117,8 +115,6 @@ mark_as_advanced(QUDA_JITIFY)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM_TAR)
 mark_as_advanced(QUDA_GDRCOPY_HOME)
-mark_as_advanced(QUDA_NVML)
-mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
 
@@ -213,6 +209,32 @@ target_compile_options(
           $<$<CONFIG:SANITIZE>:-lineinfo>
           >)
 
+# older gcc throws false warnings so disable these
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11.0)
+    target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CUDA,NVIDIA>: -Wno-unused-but-set-parameter>)
+  endif()
+
+  if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 10.0)
+    target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CUDA,NVIDIA>: -Wno-unused-but-set-variable>)
+  endif()
+endif()
+
+# older nvcc throws false warnings with respect to constexpr if code removal
+if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "11.3")
+  target_compile_options(
+    quda
+    PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
+            "SHELL:-Xcudafe --diag_suppress=607" >)
+endif()
+
+if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "11.5")
+  target_compile_options(
+    quda
+    PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
+            "SHELL: -Xcudafe --diag_suppress=177" >)
+endif()
+
 target_compile_options(
   quda 
   PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:
@@ -233,8 +255,8 @@ target_compile_options(
           >)
 
 # malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub
-# version for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake
-target_link_libraries(quda PUBLIC ${CUDA_cuda_driver_LIBRARY})
+target_link_libraries(quda PUBLIC CUDA::cuda_driver)
+target_link_libraries(quda PUBLIC CUDA::nvml)
 if(CUDAToolkit_FOUND)
   target_link_libraries(quda INTERFACE CUDA::cudart_static)
 endif()
@@ -333,7 +355,6 @@ if(QUDA_NVSHMEM)
   get_filename_component(NVSHMEM_LIBPATH ${NVSHMEM_LIBS} DIRECTORY)
   target_link_libraries(quda PUBLIC -L${NVSHMEM_LIBPATH} -lnvshmem)
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${NVSHMEM_INCLUDE}>)
-  target_link_libraries(quda PUBLIC CUDA::nvml)
 endif()
 
 if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
@@ -356,32 +377,8 @@ endif()
 
 if(QUDA_INTERFACE_NVTX)
   target_compile_definitions(quda PRIVATE INTERFACE_NVTX)
-  set(QUDA_NVTX ON)
+  target_link_libraries(quda PRIVATE CUDA::nvtx3)
 endif(QUDA_INTERFACE_NVTX)
-
-if(QUDA_NVTX)
-  find_path(
-    NVTX3 "nvtx3/nvToolsExt.h"
-    PATHS ${CUDA_TOOLKIT_INCLUDE}
-    NO_DEFAULT_PATH)
-  if(NVTX3)
-    target_compile_definitions(quda PRIVATE QUDA_NVTX_VERSION=3)
-  else()
-    target_link_libraries(quda PUBLIC ${CUDA_nvToolsExt_LIBRARY})
-  endif(NVTX3)
-endif(QUDA_NVTX)
-
-if(QUDA_NUMA_NVML)
-  target_compile_definitions(quda PRIVATE NUMA_NVML)
-  target_sources(quda_cpp PRIVATE numa_affinity.cpp)
-  find_package(NVML REQUIRED)
-  target_include_directories(quda PRIVATE SYSTEM NVML_INCLUDE_DIR)
-  target_link_libraries(quda PUBLIC ${NVML_LIBRARY})
-endif(QUDA_NUMA_NVML)
-
-if(QUDA_NVML)
-  target_link_libraries(quda PUBLIC ${NVML_LIBRARY})
-endif()
 
 add_subdirectory(targets/cuda)
 

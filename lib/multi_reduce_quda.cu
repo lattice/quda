@@ -66,7 +66,7 @@ namespace quda {
         strcat(aux, aux2);
         if (x_prec != y_prec) {
           strcat(aux, ",");
-          strcat(aux, y0.AuxString());
+          strcat(aux, y0.AuxString().c_str());
         }
 
         char NXZ_str[16];
@@ -323,9 +323,9 @@ namespace quda {
         max_tile_size = make_uint2(1, 1);
 
         strcpy(aux, nested_policy ? "nested_policy," : "policy,");
-        strcat(aux, x[0].AuxString());
+        strcat(aux, x[0].AuxString().c_str());
       	strcat(aux, ",");
-        strcat(aux, y[0].AuxString());
+        strcat(aux, y[0].AuxString().c_str());
         if (hermitian) strcat(aux, ",hermitian");
         if (Anorm) strcat(aux, ",Anorm");
 	strcat(aux,",n=");
@@ -457,7 +457,7 @@ namespace quda {
       }
 
       TuneKey tuneKey() const {
-        return TuneKey(x[0].VolString(), typeid(*this).name(), aux);
+        return TuneKey(x[0].VolString().c_str(), typeid(*this).name(), aux);
       }
 
       long long flops() const { return 0; } // FIXME
@@ -490,9 +490,9 @@ namespace quda {
         Anorm(Anorm)
       {
         strcpy(aux, "policy,");
-        strcat(aux, x[0].AuxString());
+        strcat(aux, x[0].AuxString().c_str());
         strcat(aux, ",");
-        strcat(aux, y[0].AuxString());
+        strcat(aux, y[0].AuxString().c_str());
         if (hermitian) strcat(aux, ",hermitian");
         if (Anorm) strcat(aux, ",Anorm");
         strcat(aux, ",n=");
@@ -595,7 +595,7 @@ namespace quda {
 
       void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
 
-      TuneKey tuneKey() const { return TuneKey(x[0].VolString(), typeid(*this).name(), aux); }
+      TuneKey tuneKey() const { return TuneKey(x[0].VolString().c_str(), typeid(*this).name(), aux); }
 
       long long flops() const { return 0; } // FIXME
       long long bytes() const { return 0; } // FIXME

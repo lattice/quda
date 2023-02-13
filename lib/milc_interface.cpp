@@ -20,12 +20,7 @@
 // http://devblogs.nvidia.com/parallelforall/cuda-pro-tip-generate-custom-application-profile-timelines-nvtx/
 
 #ifdef INTERFACE_NVTX
-
-#if QUDA_NVTX_VERSION == 3
 #include "nvtx3/nvToolsExt.h"
-#else
-#include "nvToolsExt.h"
-#endif
 
 static const uint32_t colors[] = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
 static const int num_colors = sizeof(colors)/sizeof(uint32_t);
@@ -340,12 +335,12 @@ void qudaHisqForce(int prec, int num_terms, int num_naik_terms, double dt, doubl
   return;
 }
 
-void qudaAsqtadForce(int, const double[], const void *const[], const void *const[4], const void *const, void *const)
+void qudaAsqtadForce(int, const double[6], const void *const[4], const void *const[4], const void *const, void *const)
 {
   errorQuda("This interface has been removed and is no longer supported");
 }
 
-void qudaComputeOprod(int, int, int, double **, double, void **, void *[])
+void qudaComputeOprod(int, int, int, double **, double, void **, void *[3])
 {
   errorQuda("This interface has been removed and is no longer supported");
 }
@@ -2730,6 +2725,13 @@ void qudaFreeGaugeField() {
   freeGaugeQuda();
     qudamilc_called<false>(__func__);
 } // qudaFreeGaugeField
+
+void qudaFreeTwoLink()
+{
+  qudamilc_called<true>(__func__);
+  freeGaugeSmearedQuda();
+  qudamilc_called<false>(__func__);
+} // qudaFreeTwoLink
 
 void qudaLoadCloverField(int external_precision, int quda_precision, QudaInvertArgs_t inv_args, void *milc_clover,
                          void *milc_clover_inv, QudaSolutionType solution_type, QudaSolveType solve_type, QudaInverterType inverter,

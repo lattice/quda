@@ -215,7 +215,7 @@ static void hisq_force_startup()
   gParam_ex.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
   gParam_ex.create = QUDA_NULL_FIELD_CREATE;
   gParam_ex.link_type = QUDA_GENERAL_LINKS;
-  gParam_ex.order = gauge_order;
+  gParam_ex.order = QUDA_QDP_GAUGE_ORDER;
   for (int d = 0; d < 4; d++) {
     gParam_ex.r[d] = R[d];
     gParam_ex.x[d] = gParam.x[d] + 2 * gParam_ex.r[d];
@@ -292,7 +292,7 @@ static void hisq_force_startup()
   gParam_ex.location = QUDA_CPU_FIELD_LOCATION;
   gParam_ex.link_type = QUDA_GENERAL_LINKS;
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
-  gParam_ex.order = gauge_order;
+  gParam_ex.order = QUDA_QDP_GAUGE_ORDER;
   for (int d = 0; d < 4; d++) {
     gParam_ex.r[d] = R[d];
     gParam_ex.x[d] = gParam.x[d] + 2 * gParam_ex.r[d];
@@ -547,6 +547,7 @@ int main(int argc, char **argv)
   ::testing::InitGoogleTest(&argc, argv);
 
   auto app = make_app();
+
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {

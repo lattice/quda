@@ -1,8 +1,8 @@
 #ifndef _HISQ_FORCE_REFERENCE_H
 #define _HISQ_FORCE_REFERENCE_H
 
-#include <enum_quda.h>
 #include <quda.h>
+#include <enum_quda.h>
 #include <gauge_field.h>
 
 /**

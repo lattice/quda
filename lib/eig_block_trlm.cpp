@@ -38,7 +38,9 @@ namespace quda
       errorQuda("Block size %d is not a factor of the compressed space %d", block_size, n_ev);
     }
 
-    if (block_size == 0) { errorQuda("Block size %d passed to block eigensolver", block_size); }
+    if (block_size <= 0) errorQuda("Block size %d passed to block eigensolver must be positive", block_size);
+
+    if (block_size > n_conv) errorQuda("block_size = %d cannot exceed n_conv = %d", block_size, n_conv);
 
     auto n_blocks = n_kr / block_size;
     block_data_length = block_size * block_size;
@@ -57,10 +59,10 @@ namespace quda
   {
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
-    if (getVerbosity() >= QUDA_VERBOSE) queryPrec(kSpace[0].Precision());
+    queryPrec(kSpace[0].Precision());
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
-      printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
+      logQuda(QUDA_VERBOSE, "Loading evecs from file name %s\n", eig_param->vec_infile);
       loadFromFile(kSpace, evals);
       return;
     }
@@ -111,9 +113,8 @@ namespace quda
       iter_locked = 0;
       for (int i = 1; i < (n_kr - num_locked); i++) {
         if (residua[i + num_locked] < epsilon * mat_norm) {
-          if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-            printfQuda("**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
-                       epsilon * mat_norm);
+          logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
+                  epsilon * mat_norm);
           iter_locked = i;
         } else {
           // Unlikely to find new locked pairs
@@ -125,8 +126,8 @@ namespace quda
       iter_converged = iter_locked;
       for (int i = iter_locked + 1; i < n_kr - num_locked; i++) {
         if (residua[i + num_locked] < tol * mat_norm) {
-          if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-            printfQuda("**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked], tol * mat_norm);
+          logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
+                  tol * mat_norm);
           iter_converged = i;
         } else {
           // Unlikely to find new converged pairs
@@ -152,20 +153,16 @@ namespace quda
       num_keep = (num_keep / block_size) * block_size;
       num_locked = (num_locked / block_size) * block_size;
 
-      if (getVerbosity() >= QUDA_VERBOSE) {
-        printfQuda("%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter + 1);
-      }
+      logQuda(QUDA_VERBOSE, "%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter + 1);
 
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-        printfQuda("iter Conv = %d\n", iter_converged);
-        printfQuda("iter Keep = %d\n", iter_keep);
-        printfQuda("iter Lock = %d\n", iter_locked);
-        printfQuda("num_converged = %d\n", num_converged);
-        printfQuda("num_keep = %d\n", num_keep);
-        printfQuda("num_locked = %d\n", num_locked);
-        for (int i = 0; i < n_kr; i++) {
-          printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
-        }
+      logQuda(QUDA_DEBUG_VERBOSE, "iter Conv = %d\n", iter_converged);
+      logQuda(QUDA_DEBUG_VERBOSE, "iter Keep = %d\n", iter_keep);
+      logQuda(QUDA_DEBUG_VERBOSE, "iter Lock = %d\n", iter_locked);
+      logQuda(QUDA_DEBUG_VERBOSE, "num_converged = %d\n", num_converged);
+      logQuda(QUDA_DEBUG_VERBOSE, "num_keep = %d\n", num_keep);
+      logQuda(QUDA_DEBUG_VERBOSE, "num_locked = %d\n", num_locked);
+      for (int i = 0; i < n_kr; i++) {
+        logQuda(QUDA_DEBUG_VERBOSE, "Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
       }
 
       // Check for convergence
@@ -188,15 +185,14 @@ namespace quda
                     n_conv, n_ev, n_kr, block_size, max_restarts);
       }
     } else {
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("BLOCK TRLM computed the requested %d vectors in %d restart steps with %d block size and "
-                   "%d BLOCKED OP*x operations.\n",
-                   n_conv, restart_iter, block_size, iter / block_size);
+      logQuda(QUDA_SUMMARIZE,
+              "BLOCK TRLM computed the requested %d vectors in %d restart steps with %d block size and "
+              "%d BLOCKED OP*x operations.\n",
+              n_conv, restart_iter, block_size, iter / block_size);
 
-        // Dump all Ritz values and residua
-        for (int i = 0; i < n_conv; i++) {
-          printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
-        }
+      // Dump all Ritz values and residua
+      for (int i = 0; i < n_conv; i++) {
+        logQuda(QUDA_SUMMARIZE, "RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
       }
 
       // Compute eigenvalues
@@ -285,7 +281,7 @@ namespace quda
     int k = 0, kmax = 3;
     while (!orthed && k < kmax) {
       // Compute R_{k}
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Orthing k = %d\n", k);
+      logQuda(QUDA_DEBUG_VERBOSE, "Orthing k = %d\n", k);
       for (int b = 0; b < block_size; b++) {
         double norm = sqrt(blas::norm2(r[b]));
         blas::ax(1.0 / norm, r[b]);

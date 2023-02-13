@@ -1,4 +1,5 @@
 #include <gauge_field.h>
+#include <multigrid.h>
 
 namespace quda {
 
@@ -14,10 +15,27 @@ namespace quda {
   void copyGenericGaugeQuarterIn(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out, void *In,
                                  void **ghostOut, void **ghostIn, int type);
 
-  // specialized variation where we restrict different field orders supported but instantiate different colors
-  // this, as with all of the above are hacks until JIT is supported
-  void copyGenericGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
-			  void *Out, void *In, void **ghostOut, void **ghostIn, int type);
+  template <int nColor>
+  void copyGenericGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out, void *In,
+                          void **ghostOut, void **ghostIn, int type);
+
+  template <int...> struct IntList {
+  };
+
+  template <int Nc, int... N>
+  void copyGenericGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out, void *In,
+                          void **ghostOut, void **ghostIn, int type, IntList<Nc, N...>)
+  {
+    if (in.Ncolor() / 2 == Nc) {
+      copyGenericGaugeMG<Nc>(out, in, location, Out, In, ghostOut, ghostIn, type);
+    } else {
+      if constexpr (sizeof...(N) > 0) {
+        copyGenericGaugeMG(out, in, location, Out, In, ghostOut, ghostIn, type, IntList<N...>());
+      } else {
+        errorQuda("Nc = %d has not been instantiated", in.Ncolor() / 2);
+      }
+    }
+  }
 
   void checkMomOrder(const GaugeField &u) {
     if (u.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
@@ -44,8 +62,8 @@ namespace quda {
   void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
 			void *Out, void *In, void **ghostOut, void **ghostIn, int type) {
     // do not copy the ghost zone if it does not exist
-    if (type == 0 && (in.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD || 
-          out.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD)) type = 2;
+    if (type == 0 && (in.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD || out.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD))
+      type = 2;
 
     if (in.Ncolor() != out.Ncolor())
       errorQuda("Colors (%d,%d) do not match", out.Ncolor(), in.Ncolor());
@@ -54,7 +72,13 @@ namespace quda {
       errorQuda("Field geometries %d %d do not match", out.Geometry(), in.Geometry());
 
     if (in.Ncolor() != 3) {
-      copyGenericGaugeMG(out, in, location, Out, In, ghostOut, ghostIn, type);
+      if constexpr (is_enabled_multigrid()) {
+        // clang-format off
+        copyGenericGaugeMG(out, in, location, Out, In, ghostOut, ghostIn, type, IntList<@QUDA_MULTIGRID_NVEC_LIST@>());
+        // clang-format on
+      } else {
+        errorQuda("Multigrid has not been built");
+      }
     } else if (in.Precision() == QUDA_DOUBLE_PRECISION) {
       copyGenericGaugeDoubleIn(out, in, location, Out, In, ghostOut, ghostIn, type);
     } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
@@ -66,7 +90,6 @@ namespace quda {
     } else {
       errorQuda("Unknown precision %d", out.Precision());
     }
-  } 
- 
+  }
 
 } // namespace quda

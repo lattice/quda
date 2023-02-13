@@ -9,6 +9,7 @@
 #define EIGEN_DONT_VECTORIZE
 #endif
 
+#include <cmath>
 #include <Eigen/Eigenvalues>
 #include <Eigen/Dense>
 #include <Eigen/LU>

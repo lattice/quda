@@ -1,5 +1,5 @@
 # enable tests build a common library for all test utilities
-add_library(quda_test STATIC googletest/src/gtest-all.cc)
+add_library(quda_test googletest/src/gtest-all.cc)
 target_include_directories(quda_test SYSTEM PUBLIC  googletest/include googletest)
 target_link_libraries(quda_test PUBLIC Eigen)
 target_link_libraries(quda_test PUBLIC QUDA::quda)
@@ -9,6 +9,10 @@ target_compile_options(
   $<IF:$<CONFIG:RELEASE>,-w,-Wall -Wextra>
   $<$<CONFIG:STRICT>:-Werror>
 )
+if(BUILD_SHARED_LIBS)
+  install(TARGETS quda_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+
 add_subdirectory(utils)
 add_subdirectory(host_reference)
 enable_language(Fortran)
@@ -189,6 +193,13 @@ if(QUDA_CONTRACT)
   install(TARGETS contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
+if(QUDA_SMEAR_GAUSS_TWOLINK)
+  add_executable(staggered_gsmear_test staggered_gsmear_test.cpp)
+  target_link_libraries(staggered_gsmear_test ${TEST_LIBS})
+  quda_checkbuildtest(staggered_gsmear_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS staggered_gsmear_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR}) 	
+endif()
+
 if(QUDA_DIRAC_STAGGERED)
   add_executable(llfat_test llfat_test.cpp)
   target_link_libraries(llfat_test ${TEST_LIBS})
@@ -308,7 +319,7 @@ if(QUDA_CONTRACT)
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:contract_test> ${MPIEXEC_POSTFLAGS}
     --dim 2 4 6 8
     --gtest_output=xml:contract_test.xml)
-endif()
+endif()  
 
 # loop over Dslash policies
 if(QUDA_CTEST_SEP_DSLASH_POLICIES)
@@ -1233,6 +1244,14 @@ foreach(prec IN LISTS TEST_PRECS)
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dilution_test> ${MPIEXEC_POSTFLAGS}
                      --dim 4 6 8 10 --prec ${prec}
                      --gtest_output=xml:dilution_test_${prec}.xml)
+  endif()
+
+  if(QUDA_SMEAR_GAUSS_TWOLINK)
+    add_test(NAME staggered_gsmear_${prec}
+      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gsmear_test> ${MPIEXEC_POSTFLAGS}
+      --dim 2 4 6 8 --prec ${prec}
+      --test TwoLink
+      --gtest_output=xml:staggered_gsmear_test_${prec}.xml)
   endif()
 
 endforeach(prec)

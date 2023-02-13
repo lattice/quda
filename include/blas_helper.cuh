@@ -355,18 +355,10 @@ namespace quda
     template <> constexpr int n_vector<float, true, 4, true>() { return 4; }
     template <> constexpr int n_vector<float, true, 1, true>() { return 2; }
 
-#ifdef FLOAT8
-    template <> constexpr int n_vector<short, true, 4, true>() { return 8; }
-#else
-    template <> constexpr int n_vector<short, true, 4, true>() { return 4; }
-#endif
+    template <> constexpr int n_vector<short, true, 4, true>() { return QUDA_ORDER_FP; }
     template <> constexpr int n_vector<short, true, 1, true>() { return 2; }
 
-#ifdef FLOAT8
-    template <> constexpr int n_vector<int8_t, true, 4, true>() { return 8; }
-#else
-    template <> constexpr int n_vector<int8_t, true, 4, true>() { return 4; }
-#endif
+    template <> constexpr int n_vector<int8_t, true, 4, true>() { return QUDA_ORDER_FP; }
     template <> constexpr int n_vector<int8_t, true, 1, true>() { return 2; }
 
     // Just use float-2/float-4 ordering on CPU when not site unrolling

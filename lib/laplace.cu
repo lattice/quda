@@ -141,10 +141,8 @@ namespace quda
              (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash::aux_pack :
                                                                            Dslash::aux[arg.kernel_type]);
       strcat(aux, ",laplace=");
-      char laplace[32];
-      u32toa(laplace, arg.dir);
-      strcat(aux, laplace);
-      return TuneKey(in.VolString(), typeid(*this).name(), aux);
+      u32toa(aux + strlen(aux), arg.dir);
+      return TuneKey(in.VolString().c_str(), typeid(*this).name(), aux);
     }
   };
 

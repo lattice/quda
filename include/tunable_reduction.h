@@ -144,11 +144,11 @@ namespace quda
       n_items(field.Volume()),
       block_size_y(block_size_y)
     {
-      strcpy(vol, field.VolString());
+      strcpy(vol, field.VolString().c_str());
       strcpy(aux, compile_type_str(field, location));
       if (commAsyncReduction()) strcat(aux, "async,");
       strcat(aux, field.SiteSubset() == QUDA_FULL_SITE_SUBSET ? "nParity=2," : "nParity=1,");
-      strcat(aux, field.AuxString());
+      strcat(aux, field.AuxString().c_str());
     }
 
     /**

@@ -6,10 +6,10 @@ namespace quda {
   /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] + dx[]
 
+     @param[in] x 4-d lattice index
+     @param[in] dx 4-d shift index
+     @param[in] X Full lattice dimensions
      @return 1-d checkerboard index
-     @param x 4-d lattice index
-     @param dx 4-d shift index
-     @param X Full lattice dimensions
    */
   template <typename I, typename J, typename K>
   __device__ __host__ inline int linkIndexShift(const I &x, const J &dx, const K &X) {
@@ -23,11 +23,11 @@ namespace quda {
   /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] + dx[]
 
+     @param[out] y new 4-d lattice index
+     @param[in] x original 4-d lattice index
+     @param[in] dx 4-d shift index
+     @param[in] X Full lattice dimensions
      @return 1-d checkerboard index
-     @param y new 4-d lattice index
-     @param x original 4-d lattice index
-     @param dx 4-d shift index
-     @param X Full lattice dimensions
    */
   template <typename I, typename J, typename K, typename L>
   __device__ __host__ inline int linkIndexShift(I &y, const J &x, const K &dx, const L &X) {
@@ -40,9 +40,9 @@ namespace quda {
   /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[]
 
+     @param[in] x 4-d lattice index
+     @param[in] X Full lattice dimensions
      @return 1-d checkerboard index
-     @param x 4-d lattice index
-     @param X Full lattice dimensions
    */
   template <typename I, typename J>
   __device__ __host__ inline int linkIndex(const I &x, const J &X) {
@@ -53,10 +53,10 @@ namespace quda {
   /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[]
 
+     @param[in] y copy of 4-d lattice index
+     @param[in] x 4-d lattice index
+     @param[in] X Full lattice dimensions
      @return 1-d checkerboard index
-     @param y copy of 4-d lattice index
-     @param x 4-d lattice index
-     @param X Full lattice dimensions
    */
   template <typename I, typename J, typename K>
   __device__ __host__ inline int linkIndex(I &y, const J &x, const K &X) {
@@ -68,11 +68,11 @@ namespace quda {
   /**
        Compute the checkerboard 1-d index from the 4-d coordinate x[] +n in the mu direction
 
+       @tparam[in] n number of hops (=/-) in the mu direction
+       @param[in] x 4-d lattice index
+       @param[in] X Full lattice dimensions
+       @param[in] mu direction in which to add n hops
        @return 1-d checkerboard index
-       @tparam n number of hops (=/-) in the mu direction
-       @param x 4-d lattice index
-       @param X Full lattice dimensions
-       @param mu direction in which to add n hops
      */
   template <typename I, int n, typename Coord>
   __device__ __host__ inline int linkIndexDn(const Coord &x, const I X[4], const int mu)
@@ -88,11 +88,11 @@ namespace quda {
   /**
      @brief Compute the checkerboard 1-d index from the 4-d coordinate x[] + nFace in the mu direction
 
-     @return 1-d checkboard index
      @param[in] x Grid coordinates
      @param[in] X Grid dimensions
      @param[in] dim Dimension of the shift
      @param[in] nFace Depth of the halo
+     @return 1-d checkboard index
   */
   template <typename I, typename Coord>
   __device__ __host__ inline auto linkIndexHop(const Coord &x, const I X[4], const int mu, int nFace)
@@ -109,26 +109,61 @@ namespace quda {
     return (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
   }
 
+  template <typename T, typename Arg>
+  constexpr bool is_boundary(T &coord, int dim, int dir, const Arg &arg)
+  {
+    bool is_boundary = false;
+    if (dir == 0) {
+      switch (dim) { // backwards boundary
+      case 0: is_boundary = coord[0] - arg.nFace < 0; break;
+      case 1: is_boundary = coord[1] - arg.nFace < 0; break;
+      case 2: is_boundary = coord[2] - arg.nFace < 0; break;
+      case 3: is_boundary = coord[3] - arg.nFace < 0; break;
+      }
+    } else if (dir == 1) {
+      switch (dim) { // forwards boundary
+      case 0: is_boundary = coord[0] + arg.nFace >= arg.dim[0]; break;
+      case 1: is_boundary = coord[1] + arg.nFace >= arg.dim[1]; break;
+      case 2: is_boundary = coord[2] + arg.nFace >= arg.dim[2]; break;
+      case 3: is_boundary = coord[3] + arg.nFace >= arg.dim[3]; break;
+      }
+    }
+    return is_boundary;
+}
+
   /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] -1 in the mu direction
 
+     @param[in] x 4-d lattice index
+     @param[in] X Full lattice dimensions
+     @param[in] mu direction in which to subtract 1
      @return 1-d checkerboard index
-     @param x 4-d lattice index
-     @param X Full lattice dimensions
-     @param mu direction in which to subtract 1
    */
   template <typename I, typename Coord> __device__ __host__ inline int linkIndexM1(const Coord &x, const I X[4], const int mu)
   {
     return linkIndexDn<I, -1>(x, X, mu);
   }
+  
+  /**
+     Compute the checkerboard 1-d index from the 4-d coordinate x[] -2 in the mu direction
+
+     @param[in] x 4-d lattice index
+     @param[in] X Full lattice dimensions
+     @param[in] mu direction in which to subtract 2
+     @return 1-d checkerboard index
+   */
+  template <typename I, typename Coord> __device__ __host__ inline int linkIndexM2(const Coord &x, const I X[4], const int mu)
+  {
+    return linkIndexDn<I, -2>(x, X, mu);
+  }  
 
   /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] -3 in the mu direction
 
+     @param[in] x 4-d lattice index
+     @param[in] X Full lattice dimensions
+     @param[in] mu direction in which to subtract 3
      @return 1-d checkerboard index
-     @param x 4-d lattice index
-     @param X Full lattice dimensions
-     @param mu direction in which to subtract 3
    */
   template <typename I, typename Coord> __device__ __host__ inline int linkIndexM3(const Coord &x, const I X[4], const int mu)
   {
@@ -138,10 +173,10 @@ namespace quda {
   /**
      Compute the full 1-d index from the 4-d coordinate x[] +1 in the mu direction
 
+     @param[in] x 4-d lattice index
+     @param[in] X Full lattice dimensions
+     @param[in] mu direction in which to add 1
      @return 1-d checkerboard index
-     @param x 4-d lattice index
-     @param X Full lattice dimensions
-     @param mu direction in which to add 1
    */
   template <typename I>
   __device__ __host__ inline int linkNormalIndexP1(const int x[], const I X[4], const int mu) {
@@ -156,23 +191,37 @@ namespace quda {
   /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] +1 in the mu direction
 
+     @param[in] x 4-d lattice index
+     @param[in] X Full lattice dimensions
+     @param[in] mu direction in which to add 1
      @return 1-d checkerboard index
-     @param x 4-d lattice index
-     @param X Full lattice dimensions
-     @param mu direction in which to add 1
    */
   template <typename I, typename Coord>
   __device__ __host__ inline int linkIndexP1(const Coord &x, const I X[4], const int mu) {
     return linkIndexDn<I, 1>(x, X, mu);
   }
+  
+ /**
+     Compute the checkerboard 1-d index from the 4-d coordinate x[] +2 in the mu direction
+
+     @param[in] x 4-d lattice index
+     @param[in] X Full lattice dimensions
+     @param[in] mu direction in which to add 2
+     @return 1-d checkerboard index
+   */
+  template <typename I, typename Coord>
+  __device__ __host__ inline int linkIndexP2(const Coord &x, const I X[4], const int mu) {
+    return linkIndexDn<I, 2>(x, X, mu);
+  }
+  
 
   /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] +3 in the mu direction
 
+     @param[in] x 4-d lattice index
+     @param[in] X Full lattice dimensions
+     @param[in] mu direction in which to add 3
      @return 1-d checkerboard index
-     @param x 4-d lattice index
-     @param X Full lattice dimensions
-     @param mu direction in which to add 3
    */
   template <typename I, typename Coord> __device__ __host__ inline int linkIndexP3(const Coord &x, const I X[4], const int mu)
   {

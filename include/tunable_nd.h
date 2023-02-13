@@ -82,9 +82,9 @@ namespace quda
     TunableKernel1D_base(const LatticeField &field, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableKernel(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location())
     {
-      strcpy(vol, field.VolString());
+      strcpy(vol, field.VolString().c_str());
       strcpy(aux, compile_type_str(field, location));
-      strcat(aux, field.AuxString());
+      strcat(aux, field.AuxString().c_str());
     }
 
     /**

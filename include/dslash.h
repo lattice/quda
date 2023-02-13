@@ -336,7 +336,7 @@ namespace quda
 
       // this sets the communications pattern for the packing kernel
       setPackComms(arg.commDim);
-      // strcpy(aux, in.AuxString());
+      // strcpy(aux, in.AuxString().c_str());
       fillAuxBase(app_base);
 #ifdef MULTI_GPU
       fillAux(INTERIOR_KERNEL, "policy_kernel=interior");
@@ -434,7 +434,7 @@ namespace quda
       auto aux_ = (arg.pack_blocks > 0 && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL)) ?
         aux_pack :
         ((arg.shmem > 0 && arg.kernel_type == EXTERIOR_KERNEL_ALL) ? aux_barrier : aux[arg.kernel_type]);
-      return TuneKey(in.VolString(), typeid(*this).name(), aux_);
+      return TuneKey(in.VolString().c_str(), typeid(*this).name(), aux_);
     }
 
     /**
