@@ -206,6 +206,9 @@ static TimeProfile profilePhase("staggeredPhaseQuda");
 //!< Profiler for contractions
 static TimeProfile profileContract("contractQuda");
 
+//!< Profiler for FT contractions
+static TimeProfile profileContractFT("contractFTQuda");
+
 //!< Profiler for GEMM and other BLAS
 static TimeProfile profileBLAS("blasQuda");
 TimeProfile &getProfileBLAS() { return profileBLAS; }
@@ -1456,6 +1459,7 @@ void endQuda(void)
     profileStaggeredForce.Print();
     profileHISQForce.Print();
     profileContract.Print();
+    profileContractFT.Print();
     profileBLAS.Print();
     profileCovDev.Print();
     profilePlaq.Print();

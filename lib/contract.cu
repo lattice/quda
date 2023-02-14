@@ -2,6 +2,7 @@
 #include <contract_quda.h>
 
 #include <tunable_nd.h>
+#include <tunable_reduction.h>
 #include <instantiate.h>
 #include <kernels/contraction.cuh>
 
@@ -145,7 +146,6 @@ namespace quda {
     errorQuda("Contraction code has not been built");
   }
 #endif
-
   //----------------------------------------------------------------------------
   
   // FIXME: Delete before merging
@@ -169,6 +169,7 @@ public:
       switch (cType) {
       case QUDA_CONTRACT_TYPE_OPEN: strcat(aux, "open,"); break;
       case QUDA_CONTRACT_TYPE_DR: strcat(aux, "degrand-rossi,"); break;
+      case QUDA_CONTRACT_TYPE_STAGGERED: strcat(aux, "staggered,"); break;
       default: errorQuda("Unexpected contraction type %d", cType);
       }
       apply(device::get_default_stream());
@@ -177,10 +178,28 @@ public:
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      ContractionArg<Float, nColor> arg(x, y, result);
-      switch (cType) {
-      case QUDA_CONTRACT_TYPE_OPEN: launch<ColorContract>(tp, stream, arg); break;
-      case QUDA_CONTRACT_TYPE_DR:   launch<DegrandRossiContract>(tp, stream, arg); break;
+
+      switch(cType) {
+      case QUDA_CONTRACT_TYPE_OPEN:
+      case QUDA_CONTRACT_TYPE_DR:
+	{
+	  constexpr int nSpin = 4;
+	  constexpr bool spin_project = true;
+	  ContractionArg<Float, nSpin, nColor, spin_project> arg(x, y, result);
+	  switch (cType) {
+	  case QUDA_CONTRACT_TYPE_OPEN: launch<ColorContract>(tp, stream, arg); break;
+	  case QUDA_CONTRACT_TYPE_DR:   launch<DegrandRossiContract>(tp, stream, arg); break;
+	  default: errorQuda("Unexpected contraction type %d", cType);
+	  }
+	}; break;
+      case QUDA_CONTRACT_TYPE_STAGGERED:
+	{
+	  constexpr int nSpin = 1;
+	  constexpr bool spin_project = false;
+	  ContractionArg<Float, nSpin, nColor, spin_project> arg(x, y, result);
+
+	  launch<StaggeredContract>(tp, stream, arg);
+	}; break;
       default: errorQuda("Unexpected contraction type %d", cType);
       }
     }
@@ -188,9 +207,9 @@ public:
     long long flops() const
     {
       if (cType == QUDA_CONTRACT_TYPE_OPEN)
-        return 16 * 3 * 6ll * x.Volume();
+        return x.Nspin()*x.Nspin() * x.Ncolor() * 6ll * x.Volume();
       else
-        return ((16 * 3 * 6ll) + (16 * (4 + 12))) * x.Volume();
+        return ((x.Nspin()*x.Nspin() * x.Ncolor() * 6ll) + (x.Nspin()*x.Nspin() * (x.Nspin() + x.Nspin()*x.Ncolor()))) * x.Volume();
     }
 
     long long bytes() const
@@ -203,9 +222,18 @@ public:
   void contractQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result, const QudaContractType cType)
   {
     checkPrecision(x, y);
-    if (x.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS || y.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
-      errorQuda("Unexpected gamma basis x=%d y=%d", x.GammaBasis(), y.GammaBasis());
-    if (x.Nspin() != 4 || y.Nspin() != 4) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
+    if(x.Nspin() != y.Nspin()) errorQuda("Contraction between unequal number of spins x=%d y=%d", x.Nspin(), y.Nspin());
+    if(x.Ncolor() != y.Ncolor()) errorQuda("Contraction between unequal number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
+    if(cType == QUDA_CONTRACT_TYPE_OPEN || cType == QUDA_CONTRACT_TYPE_DR)
+    {
+      if (x.Nspin() != 4 || y.Nspin() != 4) errorQuda("Expected four-spinors x=%d y=%d", x.Nspin(), y.Nspin());
+      if ( x.GammaBasis() != y.GammaBasis() ) errorQuda("Contracting spinors in different gamma bases x=%d y=%d", x.GammaBasis(), y.GammaBasis());
+    }
+    if(cType == QUDA_CONTRACT_TYPE_DR)
+    {
+      if (x.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS || y.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
+         errorQuda("Unexpected gamma basis x=%d y=%d", x.GammaBasis(), y.GammaBasis());
+    }
 
     instantiate<Contraction>(x, y, result, cType);
   }
@@ -215,5 +243,5 @@ public:
     errorQuda("Contraction code has not been built");
   }
 #endif
-
+  //----------------------------------------------------------------------------
 } // namespace quda
