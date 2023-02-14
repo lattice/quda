@@ -42,7 +42,7 @@ namespace quda
     int t0_face_size[4];
     int threadDimMapUpper_t0[4];
     int threadDimMapLower_t0[4];
-    int tune_rank;
+    int32_t tune_rank;
 
     StaggeredQSmearArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0,
                        bool is_t0_kernel, int parity, int dir, bool dagger, const int *comm_override) :
@@ -84,10 +84,8 @@ namespace quda
 
       // find the minimum rank for tuning
       if( is_t0_kernel ) {
-        std::vector<double> tune_rank_temp = { (double) comm_size() };
-        if( t0 >= 0 ) tune_rank_temp[0] = (double) comm_rank_global();
-        comm_allreduce_min( tune_rank_temp );
-        tune_rank = (int) tune_rank_temp[0];
+        tune_rank = ( t0 < 0 ) ? comm_size() : comm_rank_global();
+        comm_allreduce_min( tune_rank );
       }
       else {
         tune_rank = 0;
