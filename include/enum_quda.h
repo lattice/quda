@@ -583,12 +583,6 @@ typedef enum QudaContractGamma_s {
   QUDA_CONTRACT_GAMMA_INVALID = QUDA_INVALID_ENUM
 } QudaContractGamma;
 
-typedef enum QudaFermionSmearType_s {
-  QUDA_FERMION_SMEAR_TYPE_GAUSSIAN,
-  QUDA_FERMION_SMEAR_TYPE_WUPPERTAL,
-  QUDA_FERMION_SMEAR_TYPE_INVALID = QUDA_INVALID_ENUM
-} QudaFermionSmearType;
-
 typedef enum QudaGaugeSmearType_s {
   QUDA_GAUGE_SMEAR_APE,
   QUDA_GAUGE_SMEAR_STOUT,
