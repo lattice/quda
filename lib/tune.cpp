@@ -866,6 +866,16 @@ namespace quda
       return param_default;
     } else if (!tuning) {
 
+      // check the tune_rank is consistent across all ranks if doing
+      // standard kernel tuning
+      if (commGlobalReduction() && !policyTuning() && !uberTuning()) {
+        auto min = tune_rank;
+        auto max = tune_rank;
+        comm_allreduce_min(min);
+        comm_allreduce_max(max);
+        if (min != max) errorQuda("Kernerl tuning rank not consistent (this = %d, min = %d, max = %d)\n", tune_rank, min, max);
+      }
+
       /* Only do the tuning on the tuning rank, unless:
          - global reductions are disabled
          - we are policy tuning
