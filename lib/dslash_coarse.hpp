@@ -183,7 +183,7 @@ namespace quda {
       }
 
       strcat(aux, ",n_rhs=");
-      char rhs_str[8];
+      char rhs_str[16];
       i32toa(rhs_str, out.size());
       strcat(aux, rhs_str);
 
@@ -720,7 +720,7 @@ namespace quda {
       strcat(aux, dslash.inA[0].AuxString().c_str());
       strcat(aux, ",gauge_prec=");
 
-      char prec_str[8];
+      char prec_str[16];
       i32toa(prec_str, dslash.Y.Precision());
       strcat(aux, prec_str);
       strcat(aux, ",halo_prec=");
@@ -738,7 +738,7 @@ namespace quda {
 
       if (Launch::use_mma) { strcat(aux, ",mma"); }
       strcat(aux, ",n_rhs=");
-      char rhs_str[8];
+      char rhs_str[16];
       i32toa(rhs_str, dslash.out.size() * dslash.out[0].Nvec());
       strcat(aux, rhs_str);
 

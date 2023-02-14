@@ -167,7 +167,7 @@ namespace quda {
       if (clover) { strcat(aux, ",clover"); }
 
       strcat(aux, ",n_rhs=");
-      char rhs_str[8];
+      char rhs_str[16];
       i32toa(rhs_str, out[0].Nvec());
       strcat(aux, rhs_str);
 
