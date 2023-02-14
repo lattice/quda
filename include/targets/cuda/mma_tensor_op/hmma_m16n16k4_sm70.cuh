@@ -209,20 +209,20 @@ namespace quda
               op(&ptr[(n_index + 1) * ldc + m_index], s);
             }
           } else {
-            using array_t = array<store_t, 4>;
+            using array_t = typename VectorType<store_t, 4>::type; // array<store_t, 4>;
             array_t *ptr = reinterpret_cast<array_t *>(cc.data());
             array_t s;
             if constexpr (fixed) {
               auto scale = cc.get_scale();
-              s[0] = f2i_round<store_t>(op_c_real.reg[i * 2 + 0] * scale);
-              s[1] = f2i_round<store_t>(op_c_imag.reg[i * 2 + 0] * scale);
-              s[2] = f2i_round<store_t>(op_c_real.reg[i * 2 + 1] * scale);
-              s[3] = f2i_round<store_t>(op_c_imag.reg[i * 2 + 1] * scale);
+              s.x = f2i_round<store_t>(op_c_real.reg[i * 2 + 0] * scale);
+              s.y = f2i_round<store_t>(op_c_imag.reg[i * 2 + 0] * scale);
+              s.z = f2i_round<store_t>(op_c_real.reg[i * 2 + 1] * scale);
+              s.w = f2i_round<store_t>(op_c_imag.reg[i * 2 + 1] * scale);
             } else {
-              s[0] = op_c_real.reg[i * 2 + 0];
-              s[1] = op_c_imag.reg[i * 2 + 0];
-              s[2] = op_c_real.reg[i * 2 + 1];
-              s[3] = op_c_imag.reg[i * 2 + 1];
+              s.x = op_c_real.reg[i * 2 + 0];
+              s.y = op_c_imag.reg[i * 2 + 0];
+              s.z = op_c_real.reg[i * 2 + 1];
+              s.w = op_c_imag.reg[i * 2 + 1];
             }
             if (!check_bounds || (m_index < M && n_index < N)) { op(&ptr[(m_index * ldc + n_index) / 2], s); }
           }
