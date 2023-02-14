@@ -793,7 +793,7 @@ namespace quda
    * Return the optimal launch parameters for a given kernel, either
    * by retrieving them from tunecache or autotuning on the spot.
    */
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity, int32_t tune_rank)
+  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity, int32_t (*get_tune_rank)())
   {
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTART(QUDA_PROFILE_TOTAL);
@@ -866,6 +866,7 @@ namespace quda
       return param_default;
     } else if (!tuning) {
 
+      auto tune_rank = get_tune_rank();
       // check the tune_rank is consistent across all ranks if doing
       // standard kernel tuning
       if (commGlobalReduction() && !policyTuning() && !uberTuning()) {
@@ -873,7 +874,7 @@ namespace quda
         auto max = tune_rank;
         comm_allreduce_min(min);
         comm_allreduce_max(max);
-        if (min != max) errorQuda("Kernerl tuning rank not consistent (this = %d, min = %d, max = %d)\n", tune_rank, min, max);
+        if (min != max) errorQuda("Kernel tuning rank not consistent (this = %d, min = %d, max = %d)\n", tune_rank, min, max);
       }
 
       /* Only do the tuning on the tuning rank, unless:

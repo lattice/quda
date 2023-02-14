@@ -399,7 +399,7 @@ namespace quda {
    * @param[in] verbosity The verbosity to use while tuning
    * @param[in] tune_rank Which (global) rank to use (for kernel tuning).
    */
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity, int32_t tune_rank = getTuneRank());
+  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity, int32_t (*tune_rank)() = getTuneRank);
 
   /**
    * @brief Post an event in the trace, recording where it was posted

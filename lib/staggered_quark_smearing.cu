@@ -19,6 +19,22 @@
 namespace quda
 {
 
+  static int32_t t0;
+  static bool is_t0_kernel;
+
+  int32_t getTuneRankSmear()
+  {
+    int32_t tune_rank = 0;
+
+    // find the minimum rank for tuning
+    if (is_t0_kernel) {
+      tune_rank = ( t0 < 0 ) ? comm_size() : comm_rank_global();
+      comm_allreduce_min(tune_rank);
+    }
+
+    return tune_rank;
+  }
+
   template <typename Arg> class StaggeredQSmear : public Dslash<staggered_qsmear, Arg>
   {
     using Dslash = Dslash<staggered_qsmear, Arg>;
@@ -30,7 +46,7 @@ namespace quda
 
     void apply(const qudaStream_t &stream)
     {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity(), arg.tune_rank );
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity(), getTuneRankSmear);
       Dslash::setParam(tp);
 
       // reset threadDimMapLower and threadDimMapUpper when t0 is given
