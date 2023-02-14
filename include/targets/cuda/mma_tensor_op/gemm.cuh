@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <array.h>
 #include <mma_tensor_op/mma_dispatch.cuh>
-#include <cuda/pipeline>
+#include <pipeline.cuh>
 
 namespace quda
 {
@@ -218,7 +218,7 @@ namespace quda
       }
 
       template <int ld, bool dagger, class T, class gmem_accessor_t>
-      __device__ inline float g2tmp(const gmem_accessor_t &gmem, int m_offset, int n_offset, complex<T> *smem_ptr, cuda::pipeline<cuda::thread_scope_thread> &pipe)
+      __device__ inline float g2tmp(const gmem_accessor_t &gmem, int m_offset, int n_offset, complex<T> *smem_ptr, pipeline_t &pipe)
       {
         auto p = gmem.data();
 
@@ -230,15 +230,13 @@ namespace quda
             int n = thread_id / (bM / element_per_thread);
             auto dst_ptr = reinterpret_cast<float4 *>(&smem_ptr[n * (bM + 4) + m]);
             auto src_ptr = reinterpret_cast<float4 *>(&p[(n + n_offset) * ld + m + m_offset]);
-            cuda::memcpy_async(dst_ptr, src_ptr, sizeof(float4), pipe);
-            // cuda::memcpy_async(reinterpret_cast<float4 *>(&smem_ptr[n * (bM + 4) + m]), reinterpret_cast<float4 *>(&p[(n + n_offset) * ld + m + m_offset]), sizeof(float4), pipe);
+            memcpy_async(dst_ptr, src_ptr, sizeof(float4), pipe);
           } else {
             int m = thread_id / (bN / element_per_thread);
             int n = element_per_thread * (thread_id % (bN / element_per_thread));
             auto dst_ptr = reinterpret_cast<float4 *>(&smem_ptr[m * (bN + 4) + n]);
             auto src_ptr = reinterpret_cast<float4 *>(&p[(m + m_offset) * ld + n + n_offset]);
-            cuda::memcpy_async(dst_ptr, src_ptr, sizeof(float4), pipe);
-            // cuda::memcpy_async(reinterpret_cast<float4 *>(&smem_ptr[m * (bN + 4) + n]), reinterpret_cast<float4 *>(&p[(m + m_offset) * ld + n + n_offset]), sizeof(float4), pipe);
+            memcpy_async(dst_ptr, src_ptr, sizeof(float4), pipe);
           }
           thread_id += blockDim.x * blockDim.y * blockDim.z;
         }

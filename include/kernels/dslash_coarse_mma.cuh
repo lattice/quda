@@ -148,7 +148,7 @@ namespace quda
     typename Config::ALoader a_loader;
     typename Config::BLoader b_loader;
 
-    cuda::pipeline<cuda::thread_scope_thread> pipe = cuda::make_pipeline();
+    pipeline_t pipe = make_pipeline();
 
     bool forward_exterior[Arg::nDim];
     bool backward_exterior[Arg::nDim];
