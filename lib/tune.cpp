@@ -793,7 +793,7 @@ namespace quda
    * Return the optimal launch parameters for a given kernel, either
    * by retrieving them from tunecache or autotuning on the spot.
    */
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity, int32_t (*get_tune_rank)())
+  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity, std::function<int32_t()> get_tune_rank)
   {
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTART(QUDA_PROFILE_TOTAL);
