@@ -276,6 +276,20 @@ namespace quda
     for (unsigned int i = 0; i < a.size(); i++) a[i] = a_[i];
   }
 
+  template <> void comm_allreduce_max<int32_t>(int32_t &a)
+  {
+    std::vector<double> a_(1, static_cast<double>(a));
+    comm_allreduce_max_array(a_.data(), a_.size());
+    a = static_cast<int32_t>(a_[0]);
+  }
+
+  template <> void comm_allreduce_min<int32_t>(int32_t &a)
+  {
+    std::vector<double> a_(1, static_cast<double>(a));
+    comm_allreduce_min_array(a_.data(), a_.size());
+    a = static_cast<int32_t>(a_[0]);
+  }
+
   void comm_allreduce_int(int &data) { get_current_communicator().comm_allreduce_int(data); }
 
   void comm_allreduce_xor(uint64_t &data) { get_current_communicator().comm_allreduce_xor(data); }
