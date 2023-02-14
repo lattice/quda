@@ -566,8 +566,12 @@ namespace quda
       device::get_visible_devices_string(device_list_string);
     }
     comm_broadcast(device_list_string, 128);
-    snprintf(topology_string, 256, ",topo=%d%d%d%d,order=%s", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3),
-             device_list_string);
+    if (std::strlen(device_list_string) > 0) {
+      snprintf(topology_string, 256, ",topo=%d%d%d%d,order=%s", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3),
+              device_list_string);
+    } else {
+      snprintf(topology_string, 256, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
+    }
   }
 
   char config_string[64];
