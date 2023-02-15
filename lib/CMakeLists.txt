@@ -287,9 +287,13 @@ include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag(-gz QUDA_COMPRESS_DEBUG)
 
 if(NOT QUDA_BACKWARDS)
-  target_link_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_LINKER_COMPRESS}:-Wl,--compress-debug-sections=zlib>>)
-  target_compile_options(quda_cpp PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_COMPRESS_DEBUG}:-gz>>)
-  target_compile_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_COMPRESS_DEBUG}:-gz>>)
+  if(${QUDA_LINKER_COMPRESS})
+    target_link_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_LINKER_COMPRESS}:-Wl,--compress-debug-sections=zlib>>)
+  endif()
+  if(${QUDA_COMPRESS_DEBUG})
+    target_compile_options(quda_cpp PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_COMPRESS_DEBUG}:-gz>>)
+    target_compile_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_COMPRESS_DEBUG}:-gz>>)
+  endif()
 endif()
 
 # set up QUDA compile options, put them before target specific options
