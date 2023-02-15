@@ -59,17 +59,6 @@ namespace quda {
       initTuneParam(param);
     }
 
-#if 0
-    template <typename Rotator, typename Vector, std::size_t... S>
-    void launch_host_(const TuneParam &tp, const qudaStream_t &stream,
-                     const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>)
-    {
-      Arg<false, Rotator, Vector> arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
-      launch_host<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
-      if (two_pass && iter == 0 && V.Precision() < QUDA_SINGLE_PRECISION && !activeTuning()) max = Rotator(V).abs_max(V);
-    }
-#endif
-
     template <typename vAccessor, typename bAccessor>
     void launch_device_(TuneParam &tp, const qudaStream_t &stream)
     {
@@ -84,15 +73,7 @@ namespace quda {
       constexpr bool disable_ghost = true;
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (V.Location() == QUDA_CPU_FIELD_LOCATION) {
-#if 0
-        if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER && B[0]->FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-          typedef FieldOrderCB<real,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,vFloat,vFloat,disable_ghost> Rotator;
-          typedef FieldOrderCB<real,nSpin,nColor,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,bFloat,bFloat,disable_ghost> Vector;
-          launch_host_<Rotator, Vector>(tp, stream, B, std::make_index_sequence<nVec>());
-        } else {
-          errorQuda("Unsupported field order %d", V.FieldOrder());
-        }
-#endif
+        errorQuda("BlockTranspose does not support host invokation yet.");
       } else {
         constexpr auto vOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
         constexpr auto bOrder = colorspinor::getNative<bFloat>(nSpin);

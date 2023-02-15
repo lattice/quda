@@ -106,7 +106,7 @@ namespace quda
     typename std::enable_if<Arg::N == 128, int>::type launch_yhat_kernel(TuneParam &tp, const qudaStream_t &stream,
                                                                          Arg &arg, Tunable &tunable)
     {
-      if (query_max) return 1;
+      if (query_max) return 7;
       // clang-format off
       switch (tp.aux.x) {
       case 0: launch_kernel< 64,  64,  16,  32,  16,  2>(tp, stream, arg, tunable); break;
@@ -115,12 +115,12 @@ namespace quda
 #else
       case 1: launch_kernel< 32, 128, 128,  32,  16,  2>(tp, stream, arg, tunable); break;
 #endif
-      // case 2: launch_kernel<128, 128,  16,  64,   8    >(tp, stream, arg, tunable); break;
-      // case 3: launch_kernel<128, 128,  16,  32,  16    >(tp, stream, arg, tunable); break;
-      // case 4: launch_kernel<128, 128,  32,  16,  32    >(tp, stream, arg, tunable); break;
-      // case 5: launch_kernel<128, 128,  32,  64,   8    >(tp, stream, arg, tunable); break;
-      // case 6: launch_kernel<128, 128,  32,  32,  16    >(tp, stream, arg, tunable); break;
-      // case 7: launch_kernel<128, 128,  32,  32,  32    >(tp, stream, arg, tunable); break;
+      case 2: launch_kernel<128, 128,  16,  64,   8    >(tp, stream, arg, tunable); break;
+      case 3: launch_kernel<128, 128,  16,  32,  16    >(tp, stream, arg, tunable); break;
+      case 4: launch_kernel<128, 128,  32,  16,  32    >(tp, stream, arg, tunable); break;
+      case 5: launch_kernel<128, 128,  32,  64,   8    >(tp, stream, arg, tunable); break;
+      case 6: launch_kernel<128, 128,  32,  32,  16    >(tp, stream, arg, tunable); break;
+      case 7: launch_kernel<128, 128,  32,  32,  32    >(tp, stream, arg, tunable); break;
       default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 128", tp.aux.x);
       }
       // clang-format on
