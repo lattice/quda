@@ -86,7 +86,7 @@ namespace quda
        @brief Compute the tuning rank
        @return The rank on which to do kernel tuning
     */
-    int32_t getTuningRank() const {
+    int32_t getTuningRank() const override {
       int32_t tune_rank = 0;
 
       if (is_t0_kernel) { // find the minimum rank for tuning

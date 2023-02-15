@@ -1749,7 +1749,8 @@ namespace quda
   template <typename Dslash> class DslashPolicyTune : public Tunable
   {
     Dslash &dslash;
-    decltype(dslash.dslashParam) &dslashParam;
+    using Arg = std::remove_reference_t<decltype(dslash.dslashParam)>;
+    Arg &dslashParam;
     ColorSpinorField &in;
     const int volume;
     const int *ghostFace;
@@ -1970,7 +1971,7 @@ namespace quda
   private:
    void apply(const qudaStream_t &)
    {
-     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity(), std::bind(&Arg::getTuningRank, dslashParam));
 
      if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");
      if (static_cast<QudaDslashPolicy>(tp.aux.x) == QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED)  errorQuda("Requested policy is disabled");

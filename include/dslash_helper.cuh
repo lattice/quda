@@ -404,6 +404,13 @@ namespace quda
         exterior_dims = 0;
       }
     }
+
+    /**
+       @brief Default tuning rank for dslash kernels.  This can be
+       overriden if the specialized dslash kernel requires a specific rank
+       for tuning.
+    */
+    virtual int32_t getTuningRank() const { return 0; }
   };
 
   template <typename Float, int nDim> std::ostream &operator<<(std::ostream &out, const DslashArg<Float, nDim> &arg)
