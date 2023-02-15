@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <typeinfo>
 #include <map>
+#include <functional>
 
 #include <tune_key.h>
 #include <quda_internal.h>
