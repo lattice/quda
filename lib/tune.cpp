@@ -658,6 +658,23 @@ namespace quda
   int Tunable::blockStep() const { return device::warp_size(); }
   int Tunable::blockMin() const { return device::warp_size(); }
 
+  int32_t Tunable::getTuneRank() const
+  {
+    static bool init = false;
+    static uint32_t tune_rank = 0; // default is to tune on rank 0
+    static char *tune_rank_env = getenv("QUDA_TUNING_RANK");
+
+    if (!init && tune_rank_env) {
+      std::stringstream rank(tune_rank_env);
+      rank >> tune_rank;
+      if (tune_rank >= comm_size()) errorQuda("Invalid tune_rank %u (%s)", tune_rank, tune_rank_env);
+      logQuda(QUDA_SUMMARIZE, "Kernel tuning will default on rank %d\n", tune_rank);
+    }
+    init = true;
+
+    return static_cast<int32_t>(tune_rank);
+  }
+
 #ifdef LAUNCH_TIMER
   static TimeProfile launchTimer("tuneLaunch");
 #endif
@@ -772,28 +789,11 @@ namespace quda
     float getBestTime() const { return besttime; }
   };
 
-  int32_t getTuneRank()
-  {
-    static bool init = false;
-    static uint32_t tune_rank = 0; // default is to tune on rank 0
-    static char *tune_rank_env = getenv("QUDA_TUNING_RANK");
-
-    if (!init && tune_rank_env) {
-      std::stringstream rank(tune_rank_env);
-      rank >> tune_rank;
-      if (tune_rank >= comm_size()) errorQuda("Invalid tune_rank %u (%s)", tune_rank, tune_rank_env);
-      logQuda(QUDA_SUMMARIZE, "Kernel tuning will default on rank %d\n", tune_rank);
-    }
-    init = true;
-
-    return static_cast<int32_t>(tune_rank);
-  }
-
   /**
    * Return the optimal launch parameters for a given kernel, either
    * by retrieving them from tunecache or autotuning on the spot.
    */
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity, std::function<int32_t()> get_tune_rank)
+  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
   {
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTART(QUDA_PROFILE_TOTAL);
@@ -866,7 +866,7 @@ namespace quda
       return param_default;
     } else if (!tuning) {
 
-      auto tune_rank = get_tune_rank();
+      auto tune_rank = tunable.getTuneRank();
       // check the tune_rank is consistent across all ranks if doing
       // standard kernel tuning
       if (commGlobalReduction() && !policyTuning() && !uberTuning()) {

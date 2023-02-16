@@ -363,6 +363,13 @@ namespace quda {
         errorQuda("aux tuning enabled but param.aux is not initialized");
     }
 
+    /**
+     * @brief Return the rank on which kernel tuning is performed.
+     * This will default to 0, but can be globally overriden with the
+     * QUDA_TUNING_RANK environment variable.
+     */
+    virtual int32_t getTuneRank() const;
+
     qudaError_t launchError() const { return launch_error; }
     qudaError_t &launchError() { return launch_error; }
   };
@@ -387,20 +394,14 @@ namespace quda {
   void flushProfile();
 
   /**
-   * @brief Return the rank on which kernel tuning is performed.
-   */
-  int32_t getTuneRank();
-
-  /**
    * @brief Launch the autotuner, returning the tuned parameters once
    * complete, or if present in the tunecache
    * @param[in,out] The tunable instance we wish to autotune
    * @param[in] Whether tuning is enabled (if not then just return the
    * default parameters specificed in tunable.defaultTuneParam()
    * @param[in] verbosity The verbosity to use while tuning
-   * @param[in] tune_rank Which (global) rank to use (for kernel tuning).
    */
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity, std::function<int32_t()> = getTuneRank);
+  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
 
   /**
    * @brief Post an event in the trace, recording where it was posted
