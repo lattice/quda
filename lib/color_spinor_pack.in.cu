@@ -50,13 +50,13 @@ namespace quda {
     static constexpr bool block_float = sizeof(store_t) == QUDA_SINGLE_PRECISION && isFixed<ghost_store_t>::value;
     size_t work_items;
     int shmem;
-    static constexpr int get_max_block_float_nc(){return 384;}
-    unsigned int sharedBytesPerBlock(const TuneParam &) const
+    static constexpr int get_max_block_float_nc() { return 6144; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const
     {
       if (block_float) {
-        auto max_block_size_x = device::max_threads_per_block() / (vector_length_y * vector_length_z);
-        auto thread_width_x = ((max_block_size_x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
-        return sizeof(store_t) * thread_width_x * vector_length_y * vector_length_z;
+        auto thread_width_x = a.isNative() ?
+          ((param.block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size() : param.block.x;
+        return sizeof(store_t) * thread_width_x * param.block.y * param.block.z;
       } else {
         return 0;
       }
@@ -146,8 +146,8 @@ namespace quda {
       launch_<(!block_float || nColor <= get_max_block_float_nc())>(tp, stream);
     }
 
-    int blockStep() const { return block_float ? 2 : TunableKernel3D::blockStep(); }
-    int blockMin() const { return block_float ? 2 : TunableKernel3D::blockMin(); }
+    int blockStep() const { return block_float ? 1 : TunableKernel3D::blockStep(); }
+    int blockMin() const { return block_float ? 1 : TunableKernel3D::blockMin(); }
 
     long long bytes() const { return work_items * 2 * a.Nspin() * a.Ncolor() * (a.Precision() + a.GhostPrecision()); }
   };
