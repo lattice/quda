@@ -69,27 +69,29 @@ namespace quda {
     }
 
     bool advanceTuneParam(TuneParam &param) const {
-        if (param.aux.x < 2) {
-          param.aux.x++;
-          set_mma_param(param);
+
+        auto advancer = [&](int &i, int limit) -> bool {
+          if (i < limit) {
+            i++;
+            return set_mma_param(param);
+          } else {
+            return false;
+          }
+        };
+
+        if (advancer(param.aux.x, 2)) {
           return true;
         } else {
           param.aux.x = 0;
-          if (static_cast<unsigned int>(param.aux.y) < numFactors(out[0].Nvec() / n_atom_size) - 1) {
-            param.aux.y++;
-            set_mma_param(param);
+          if (advancer(param.aux.y, numFactors(out[0].Nvec() / n_atom_size) - 1)) {
             return true;
           } else {
             param.aux.y = 0;
-            if (static_cast<unsigned int>(param.aux.z) < numFactors((Ns * Nc) / m_atom_size) - 1) {
-              param.aux.z++;
-              set_mma_param(param);
+            if (advancer(param.aux.z, numFactors((Ns * Nc) / m_atom_size) - 1)) {
               return true;
             } else {
               param.aux.z = 0;
-              if (static_cast<unsigned int>(param.aux.w) < numFactors((Ns * Nc) / k_atom_size) - 1) {
-                param.aux.w++;
-                set_mma_param(param);
+              if (advancer(param.aux.w, numFactors((Ns * Nc) / k_atom_size) - 1)) {
                 return true;
               } else {
                 param.aux.w = 0;
@@ -225,7 +227,7 @@ namespace quda {
       int shared_bytes = shared_bytes_per_block(bM, bN, bK);
       tp.shared_bytes = shared_bytes;
 
-      return shared_bytes < device::dynamic_shared_memory_supremum();
+      return shared_bytes <= device::dynamic_shared_memory_supremum();
     }
 
     template <int bN, int bM, int bK, int block_y, int block_z>

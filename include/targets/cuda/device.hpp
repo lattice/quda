@@ -4,7 +4,7 @@ namespace quda {
 
   namespace device {
 
-    constexpr size_t dynamic_shared_memory_supremum() {
+    constexpr int dynamic_shared_memory_supremum() {
 #if (__COMPUTE_CAPABILITY__ < 700)
       return 48 * 1024;
 #elif (__COMPUTE_CAPABILITY__ < 750) // 700, 720
