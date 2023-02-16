@@ -14,6 +14,8 @@
 #include <utility>
 #include <tunable_kernel.h>
 
+#include <device.hpp>
+
 namespace quda {
 
   template <typename Float, typename yFloat, typename ghostFloat, int Ns, int Nc, bool dslash, bool clover, bool dagger,
@@ -185,7 +187,11 @@ namespace quda {
     static constexpr int m_atom_size = mma_t::MMA_M;
     static constexpr int k_atom_size = Ns * Nc / 2;
 
-    void set_mma_param(TuneParam &tp) const {
+    static constexpr int shared_bytes_per_block(int bM, int bN, int bK) {
+      return mma::shared_memory_bytes<mma_t>(bM, bN, bK) + (bM + 4) * (bK + 4) * 2 * sizeof(yFloat) + (bK + 4) * (bN + 4) * 2 * sizeof(Float);
+    }
+
+    bool set_mma_param(TuneParam &tp) const {
       tp.block.x = 1;
       tp.block.y = Ns * Nc / ((Nc > 64 ? 2 : 1) << tp.aux.x);
       tp.block.z = 8;
@@ -216,16 +222,23 @@ namespace quda {
       if ((Ns * Nc) % bK != 0) {
         errorQuda("Invalid bK");
       }
-      int shared_bytes = mma::shared_memory_bytes<mma_t>(bM, bN, bK) + (bM + 4) * (bK + 4) * 2 * sizeof(yFloat) + (bK + 4) * (bN + 4) * 2 * sizeof(Float);
+      int shared_bytes = shared_bytes_per_block(bM, bN, bK);
       tp.shared_bytes = shared_bytes;
+
+      return shared_bytes < device::dynamic_shared_memory_supremum();
     }
 
     template <int bN, int bM, int bK, int block_y, int block_z>
     void launch_mma(TuneParam &tp, const qudaStream_t &stream) {
-      using Arg = DslashCoarseMmaArg<mma_t, dslash, clover, dagger, type, Float, yFloat, ghostFloat, Ns, Nc, nVec, bN, bM, bK, block_y, block_z>;
-      Arg arg(out[0], inA[0], inB[0], Y, X, (Float)kappa, parity, halo);
-      tp.set_max_shared_bytes = true;
-      launch_cuda<CoarseDslashMma>(tp, stream, arg);
+      constexpr int shared_bytes = shared_bytes_per_block(bM, bN, bK);
+      if constexpr (shared_bytes <= device::dynamic_shared_memory_supremum()) {
+        using Arg = DslashCoarseMmaArg<mma_t, dslash, clover, dagger, type, Float, yFloat, ghostFloat, Ns, Nc, nVec, bN, bM, bK, block_y, block_z>;
+        Arg arg(out[0], inA[0], inB[0], Y, X, (Float)kappa, parity, halo);
+        tp.set_max_shared_bytes = true;
+        launch_cuda<CoarseDslashMma>(tp, stream, arg);
+      } else {
+        errorQuda("Using too many shared memory bytes per block: %d", shared_bytes);
+      }
     }
 
     template <int bN, int bM, int block_y, int block_z, size_t d, size_t... Ds>
