@@ -403,7 +403,7 @@ void staggeredTwoLinkGaussianSmear(sFloat *res, gFloat **twolink, gFloat **ghost
     for (int i = 0; i < Vh; i++) {
       // Get local time-slice index:
       const int local_t = i / Vsh_t;  
-      const int glob_t  = quda::comm_coord(3)*X[3]+local_t;
+      const int glob_t  = quda::comm_coord(3)*Z[3]+local_t;
 
       if (glob_t != t0) continue;
 
