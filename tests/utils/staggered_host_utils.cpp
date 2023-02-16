@@ -405,7 +405,7 @@ void staggeredTwoLinkGaussianSmear(sFloat *res, gFloat **twolink, gFloat **ghost
       const int local_t = i / Vsh_t;  
       const int glob_t  = quda::comm_coord(3)*X[3]+local_t;
 
-      if (glob_t != to) continue;
+      if (glob_t != t0) continue;
 
       int offset = stag_spinor_site_size * i;
 
