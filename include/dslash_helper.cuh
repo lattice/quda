@@ -692,15 +692,27 @@ namespace quda
         const int dslash_block_offset
           = ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) ? arg.pack_blocks : 0);
         int x_cb = (target::block_idx().x - dslash_block_offset) * target::block_dim().x + target::thread_idx().x;
-        if (x_cb >= arg.threads) return;
+        //if (x_cb >= arg.threads) return;
+        if (x_cb >= arg.threads) active = false;
 
 #ifdef QUDA_DSLASH_FAST_COMPILE
-        dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, parity);
+	if constexpr (allthreads) {
+	  dslash.template apply<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, allthreads>(x_cb, s, parity, active);
+	} else {
+	  dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, parity);
+	}
 #else
-        switch (parity) {
-        case 0: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 0); break;
-        case 1: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 1); break;
-        }
+	if constexpr (allthreads) {
+	  switch (parity) {
+	  case 0: dslash.template apply<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, allthreads>(x_cb, s, 0, active); break;
+	  case 1: dslash.template apply<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, allthreads>(x_cb, s, 1, active); break;
+	  }
+	} else {
+	  switch (parity) {
+	  case 0: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 0); break;
+	  case 1: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 1); break;
+	  }
+	}
 #endif
 #ifdef NVSHMEM_COMMS
         if (kernel_type == UBER_KERNEL) shmem_signalinterior<kernel_type>(arg);

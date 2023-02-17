@@ -50,15 +50,15 @@ namespace quda
        out(x) = M*in = a * D * in + (A(x) + i*b*gamma_5*tau_3 + c*tau_1)*x
        Note this routine only exists in xpay form.
     */
-    template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int flavor, int parity)
+    template <KernelType mykernel_type = kernel_type, bool allthreads = false>
+    __device__ __host__ __forceinline__ void apply(int idx, int flavor, int parity, bool active)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
       typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
 
-      bool active
-        = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+      active
+        &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                          // which dimension is thread working on (fused kernel only)
 
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
@@ -107,6 +107,12 @@ namespace quda
       }
 
       if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(my_flavor_idx, my_spinor_parity) = out;
+    }
+
+    template <KernelType mykernel_type = kernel_type>
+    __device__ __host__ __forceinline__ void operator()(int idx, int flavor, int parity)
+    {
+      apply(idx, flavor, parity);
     }
   };
 

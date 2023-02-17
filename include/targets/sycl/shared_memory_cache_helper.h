@@ -50,11 +50,12 @@ namespace quda
     const int stride;
     sycl::local_ptr<atom_t> cache_ptr;
 
+#if 0
     /**
        @brief This is a dummy instantiation for the host compiler
     */
     template <bool, typename dummy = void> struct cache_dynamic {
-      atom_t *operator()()
+      inline atom_t *operator()()
       {
         static atom_t *cache_;
         return reinterpret_cast<atom_t *>(cache_);
@@ -64,7 +65,6 @@ namespace quda
     template <bool is_device, typename dummy = void> struct cache_static : cache_dynamic<is_device> {
     };
 
-#if 0
     /**
        @brief This is the handle to the shared memory, dynamic specialization
        @return Shared memory pointer
@@ -145,16 +145,19 @@ namespace quda
 
        @param[in] block Block dimensions for the 3-d shared memory object
     */
+    template <typename dummy = void>
     constexpr SharedMemoryCacheImpl(dim3 block = dim3(block_size_x, block_size_y, block_size_z)) :
       block(block), stride(block.x * block.y * block.z)
     {
       static_assert(dynamic==false, "SYCL target requires SpecialOps parameter for dynamic shared memory");
       using atype = atom_t[n_element * block_size_x * block_size_y * block_size_z];
-      auto mem = sycl::ext::oneapi::group_local_memory_for_overwrite<atype>(getGroup());
-      cache_ptr = *mem.get();
+      if constexpr (std::is_same_v<dummy,void>) {
+	auto mem = sycl::ext::oneapi::group_local_memory_for_overwrite<atype>(getGroup());
+	cache_ptr = *mem.get();
+      }
     }
     template <typename S, typename ...Arg>
-    SharedMemoryCacheImpl(const only_SharedMemoryCache<T,S> &op, const Arg &...arg) :
+    inline SharedMemoryCacheImpl(const only_SharedMemoryCache<T,S> &op, const Arg &...arg) :
       block(S::dims(target::block_dim(), arg...)), stride(block.x * block.y * block.z)
     {
       sycl::local_ptr<void> v(op.smem);
@@ -162,7 +165,7 @@ namespace quda
       cache_ptr = p;
     }
     template <typename ...U>
-    SharedMemoryCacheImpl(const SpecialOps<U...> *ops) :
+    inline SharedMemoryCacheImpl(const SpecialOps<U...> *ops) :
       block(op_SharedMemoryCache<T>::dims(target::block_dim())), stride(block.x * block.y * block.z)
     {
       auto op = getSpecialOp<op_SharedMemoryCache<T>>(ops);
@@ -291,7 +294,7 @@ namespace quda
     /**
        @brief Synchronize the cache
     */
-    __device__ __host__ void sync() { target::dispatch<sync_impl>(); }
+    __device__ __host__ inline void sync() { target::dispatch<sync_impl>(); }
   };
 
   template <typename T, int block_size_y = 1, int block_size_z = 1, bool dynamic = true>
@@ -302,9 +305,9 @@ namespace quda
   template <typename O>
   class SharedMemoryCache<O, (int)(isOpSharedMemoryCache<O> ? 1 : 0), 1, true> : public SharedMemoryCacheImpl<typename O::ElemT> {
   public:
-    template <typename ...U> SharedMemoryCache(const SpecialOps<U...> *ops) :
+    template <typename ...U> inline SharedMemoryCache(const SpecialOps<U...> *ops) :
       SharedMemoryCacheImpl<typename O::ElemT>(getSpecialOp<SpecialOps<O>>(ops)) {}
-    template <typename ...U, typename Arg> SharedMemoryCache(const SpecialOps<U...> *ops, const Arg &arg) :
+    template <typename ...U, typename Arg> inline SharedMemoryCache(const SpecialOps<U...> *ops, const Arg &arg) :
       SharedMemoryCacheImpl<typename O::ElemT>(getSpecialOp<SpecialOps<O>>(ops), arg) {}
   };
 
