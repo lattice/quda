@@ -1097,7 +1097,7 @@ namespace quda
             norm_type scale = 0.0;
 #pragma unroll
             for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
-            norm_ptr[norm_offset] = scale * fixedInvMaxValue<Float>::value;
+            norm_ptr[norm_idx] = scale * fixedInvMaxValue<Float>::value;
 
             real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
 #pragma unroll
