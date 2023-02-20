@@ -80,28 +80,37 @@ using namespace quda;
 // fdata should point to 8 integers in order {BLK_NPROC0, BLK_NPROC1, BLK_NPROC2, BLK_NPROC3, NPROC0, NPROC1, NPROC2, NPROC3]
 static int rankFromCoords(const int *coords, void *fdata)
 {
-  int *BLK_NPROC = static_cast<int *>(fdata);
-  int *NPROC = BLK_NPROC + 4;
+  // For 2 ranks:
+  if (coords[3]<8)
+  {
+    return 0;
+  } else {
+    return 1;
+  }
   
-  int BLK_coords[4];
-  int local_coords[4];
+
+  // int *BLK_NPROC = static_cast<int *>(fdata);
+  // int *NPROC = BLK_NPROC + 4;
+  
+  // int BLK_coords[4];
+  // int local_coords[4];
 	
-  for (int i = 0; i < 4; i++) {
-	  // coordinate of BLK in the BLK grid
-	  BLK_coords[i] = coords[i] / BLK_NPROC[i];
-	  // local coordinate inside BLK
-	  local_coords[i] = coords[i] - BLK_coords[i]*BLK_NPROC[i];
-  }
+  // for (int i = 0; i < 4; i++) {
+	//   // coordinate of BLK in the BLK grid
+	//   BLK_coords[i] = coords[i] / BLK_NPROC[i];
+	//   // local coordinate inside BLK
+	//   local_coords[i] = coords[i] - BLK_coords[i]*BLK_NPROC[i];
+  // }
 
-  int rank = BLK_coords[0];
-  for (int i = 1; i <= 3; i++) { 
-	rank = (NPROC[i] / BLK_NPROC[i]) * rank + BLK_coords[i];
-  }
+  // int rank = BLK_coords[0];
+  // for (int i = 1; i <= 3; i++) { 
+	// rank = (NPROC[i] / BLK_NPROC[i]) * rank + BLK_coords[i];
+  // }
 
-  for (int i = 0; i <= 3; i++) { 
-	rank = BLK_NPROC[i] * rank + local_coords[i];
-  }
-  return rank;
+  // for (int i = 0; i <= 3; i++) { 
+	// rank = BLK_NPROC[i] * rank + local_coords[i];
+  // }
+  // return rank;
 }
 
 void openQCD_qudaSetLayout(openQCD_QudaLayout_t input)
@@ -128,6 +137,7 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t input)
 #else
   initCommsGridQuda(4, commsGridDim, rankFromCoords, (void *)(commsGridDim));
 #endif
+
   static int device = -1;
 #else
   static int device = input.device;
