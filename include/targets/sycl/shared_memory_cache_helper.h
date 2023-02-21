@@ -230,7 +230,7 @@ namespace quda
     /**
        @brief Synchronize the cache
     */
-    __device__ __host__ inline void sync() { __syncthreads; }
+    __device__ __host__ inline void sync() { __syncthreads(); }
   };
 
   template <typename T, int block_size_y = 1, int block_size_z = 1, bool dynamic = true>
