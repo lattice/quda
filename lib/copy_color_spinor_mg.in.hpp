@@ -12,6 +12,7 @@
 #include <color_spinor_field.h>
 #include <tunable_nd.h>
 #include <kernels/copy_color_spinor_mg.cuh>
+#include <multigrid.h>
 
 namespace quda {
 
@@ -52,8 +53,8 @@ namespace quda {
   void genericCopyColorSpinor(ColorSpinorField &out, const ColorSpinorField &in, QudaFieldLocation location,
                               FloatOut *Out, FloatIn *In)
   {
-    if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-      using O = FieldOrderCB<typename mapper<FloatOut>::type, Ns, Nc, 1, QUDA_FLOAT2_FIELD_ORDER,FloatOut>;
+    if (out.isNative()) {
+      using O = FieldOrderCB<typename mapper<FloatOut>::type, Ns, Nc, 1, colorspinor::getNative<FloatOut>(Ns), FloatOut>;
       CopySpinor<FloatOut, FloatIn, Ns, Nc, O, I>(out, in, location, Out, In);
     } else if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       using O = FieldOrderCB<typename mapper<FloatOut>::type, Ns, Nc, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,FloatOut>;
@@ -68,8 +69,8 @@ namespace quda {
   void genericCopyColorSpinor(ColorSpinorField &out, const ColorSpinorField &in, QudaFieldLocation location,
                               FloatOut *Out, FloatIn *In)
   {
-    if (in.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-      using I = FieldOrderCB<typename mapper<FloatIn>::type, Ns, Nc, 1, QUDA_FLOAT2_FIELD_ORDER,FloatIn>;
+    if (in.isNative()) {
+      using I = FieldOrderCB<typename mapper<FloatIn>::type, Ns, Nc, 1, colorspinor::getNative<FloatIn>(Ns), FloatIn>;
       genericCopyColorSpinor<FloatOut, FloatIn, Ns, Nc, I>(out, in, location, Out, In);
     } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       using I = FieldOrderCB<typename mapper<FloatIn>::type, Ns, Nc, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,FloatIn>;
@@ -167,50 +168,47 @@ namespace quda {
 
   }
 
-#ifdef GPU_STAGGERED_DIRAC
+  template <int...> struct IntList {
+  };
+
+  template <int fineColor, typename dst_t, typename src_t, typename param_t, int coarseColor, int... N>
+  bool instantiateColor(const ColorSpinorField &field, const param_t &param, IntList<coarseColor, N...>)
+  {
+    if (field.Ncolor() == fineColor * coarseColor) {
+      CopyGenericColorSpinor<fineColor * coarseColor, dst_t, src_t>(param);
+      return true;
+    } else {
+      if constexpr (sizeof...(N) > 0) {
+        return instantiateColor<fineColor, dst_t, src_t>(field, param, IntList<N...>());
+      }
+    }
+    return false;
+  }
+
+  template <typename dst_t, typename src_t, typename param_t, int fineColor, int... N>
+  bool instantiateColor(const ColorSpinorField &field, const param_t &param, IntList<fineColor, N...>)
+  {
+    // 1 ensures we generate templates for just the fineColor with no multiplication by coarseColor
+    // clang-format off
+    IntList<1, @QUDA_MULTIGRID_NVEC_LIST@> coarseColors;
+    // clang-format on
+    bool success = instantiateColor<fineColor, dst_t, src_t>(field, param, coarseColors);
+
+    if (!success) {
+      if constexpr (sizeof...(N) > 0) success = instantiateColor<dst_t, src_t>(field, param, IntList<N...>());
+    }
+    return success;
+  }
+
   template <typename dst_t, typename src_t, typename param_t>
   void instantiateColor(const ColorSpinorField &field, const param_t &param)
   {
-    switch (field.Ncolor()) {
-    case 6: CopyGenericColorSpinor<6, dst_t, src_t>(param); break;
-    case 18: CopyGenericColorSpinor<18, dst_t, src_t>(param); break;
-    case 24: CopyGenericColorSpinor<24, dst_t, src_t>(param); break;
-    case 32: CopyGenericColorSpinor<32, dst_t, src_t>(param); break;
-    case 36: CopyGenericColorSpinor<36, dst_t, src_t>(param); break;
-    case 64: CopyGenericColorSpinor<64, dst_t, src_t>(param); break;
-    case 72: CopyGenericColorSpinor<72, dst_t, src_t>(param); break;
-    case 96: CopyGenericColorSpinor<96, dst_t, src_t>(param); break;
-    case 192: CopyGenericColorSpinor<192, dst_t, src_t>(param); break;
-    case 288: CopyGenericColorSpinor<288, dst_t, src_t>(param); break;
-    case 576: CopyGenericColorSpinor<576, dst_t, src_t>(param); break;
-    case 768: CopyGenericColorSpinor<768, dst_t, src_t>(param); break;
-    case 1024: CopyGenericColorSpinor<1024, dst_t, src_t>(param); break;
-    case 1536: CopyGenericColorSpinor<1536, dst_t, src_t>(param); break;
-    case 2304: CopyGenericColorSpinor<2304, dst_t, src_t>(param); break;
-    case 4096: CopyGenericColorSpinor<4096, dst_t, src_t>(param); break;
-    case 6144: CopyGenericColorSpinor<6144, dst_t, src_t>(param); break;
-    case 9216:CopyGenericColorSpinor<9216, dst_t, src_t>(param); break;
-    default: errorQuda("Ncolors=%d not supported", field.Ncolor());
+    // clang-format off
+    IntList<@QUDA_MULTIGRID_NC_NVEC_LIST@> fineColors;
+    // clang-format on
+    if (!instantiateColor<dst_t, src_t>(field, param, fineColors)) {
+      errorQuda("Nc = %d has not been instantiated", field.Ncolor());
     }
   }
-#else // no staggered
-  template <typename dst_t, typename src_t, typename param_t>
-  void instantiateColor(const ColorSpinorField &field, const param_t &param)
-  {
-    switch (field.Ncolor()) {
-    case 6: CopyGenericColorSpinor<6, dst_t, src_t>(param); break;
-    case 18: CopyGenericColorSpinor<18, dst_t, src_t>(param); break;
-    case 24: CopyGenericColorSpinor<24, dst_t, src_t>(param); break;
-    case 32: CopyGenericColorSpinor<32, dst_t, src_t>(param); break;
-    case 36: CopyGenericColorSpinor<36, dst_t, src_t>(param); break;
-    case 72: CopyGenericColorSpinor<72, dst_t, src_t>(param); break;
-    case 96: CopyGenericColorSpinor<96, dst_t, src_t>(param); break;
-    case 576: CopyGenericColorSpinor<576, dst_t, src_t>(param); break;
-    case 768: CopyGenericColorSpinor<768, dst_t, src_t>(param); break;
-    case 1024: CopyGenericColorSpinor<1024, dst_t, src_t>(param); break;
-    default: errorQuda("Ncolors=%d not supported", field.Ncolor());
-    }
-  }
-#endif // GPU_STAGGERED_DIRAC
 
 } // namespace quda

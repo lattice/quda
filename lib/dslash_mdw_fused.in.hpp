@@ -24,13 +24,6 @@ namespace quda
     template <int...> struct IntList {
     };
 
-    void inline apply_fused_dslash_list(ColorSpinorField &, const ColorSpinorField &in, const GaugeField &,
-                                        ColorSpinorField &, const ColorSpinorField &, double, double, const Complex *,
-                                        const Complex *, bool, int, int[4], int[4], MdwfFusedDslashType, IntList<>)
-    {
-      errorQuda("Ls = %d has not been instantiated", in.X(4));
-    }
-
     template <int Ls, int... N>
     void apply_fused_dslash_list(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                                  ColorSpinorField &y, const ColorSpinorField &x, double m_f, double m_5,
@@ -40,8 +33,11 @@ namespace quda
       if (in.X(4) == Ls) {
         apply_fused_dslash_impl<Ls>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
       } else {
-        apply_fused_dslash_list(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type,
-                                IntList<N...>());
+        if constexpr (sizeof...(N) > 0)
+          apply_fused_dslash_list(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type,
+                                  IntList<N...>());
+        else
+          errorQuda("Ls = %d has not been instantiated", in.X(4));
       }
     }
 

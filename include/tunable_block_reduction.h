@@ -145,10 +145,10 @@ namespace quda
       step_z(1),
       max_block_z(max_block_z == 0 ? vector_length_z : max_block_z)
     {
-      strcpy(vol, field.VolString());
+      strcpy(vol, field.VolString().c_str());
       strcpy(aux, compile_type_str(field, location));
       if (location == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
-      strcat(aux, field.AuxString());
+      strcat(aux, field.AuxString().c_str());
     }
 
     /**

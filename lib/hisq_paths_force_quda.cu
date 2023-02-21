@@ -382,13 +382,13 @@ namespace quda {
 
       TuneKey tuneKey() const {
         std::stringstream aux;
-        aux << meta.AuxString() << comm_dim_partitioned_string() << ",threads=" << arg.threads.x;
+        aux << meta.AuxString().c_str() << comm_dim_partitioned_string() << ",threads=" << arg.threads.x;
         switch (type) {
         case FORCE_LONG_LINK: aux << ",LONG_LINK"; break;
         case FORCE_COMPLETE:  aux << ",COMPLETE";  break;
         default: errorQuda("Undefined force type %d", type);
         }
-        return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
+        return TuneKey(meta.VolString().c_str(), typeid(*this).name(), aux.str().c_str());
       }
 
       void preTune() {

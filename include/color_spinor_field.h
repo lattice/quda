@@ -4,7 +4,7 @@
 #include <quda_internal.h>
 #include <quda.h>
 #include <lattice_field.h>
-
+#include <field_cache.h>
 #include <comm_key.h>
 
 namespace quda
@@ -13,32 +13,56 @@ namespace quda
   namespace colorspinor
   {
 
-    inline bool isNative(QudaFieldOrder order, QudaPrecision precision, int nSpin, int)
+    template <typename T, int nSpin> constexpr auto getNative() { return QUDA_FLOAT2_FIELD_ORDER; }
+    template <> constexpr auto getNative<float, 4>() { return QUDA_FLOAT4_FIELD_ORDER; }
+
+    // fixed-point Wilson fields
+    template <> constexpr auto getNative<short, 4>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_FP); }
+    template <> constexpr auto getNative<int8_t, 4>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_FP); }
+
+    // fp32 multigrid fields
+    template <> constexpr auto getNative<float, 2>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_SP_MG); }
+
+    // fixed-point multigrid fields
+    template <> constexpr auto getNative<short, 2>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_FP_MG); }
+    template <> constexpr auto getNative<int8_t, 2>() { return static_cast<QudaFieldOrder>(QUDA_ORDER_FP_MG); }
+
+    template <typename T> constexpr auto getNative(int) { return QUDA_INVALID_FIELD_ORDER; }
+
+    template <> constexpr auto getNative<double>(int nSpin)
     {
-      if (precision == QUDA_DOUBLE_PRECISION) {
-        if (order == QUDA_FLOAT2_FIELD_ORDER) return true;
-      } else if (precision == QUDA_SINGLE_PRECISION) {
-        if (nSpin == 4) {
-          if (order == QUDA_FLOAT4_FIELD_ORDER) return true;
-        } else if (nSpin == 2) {
-          if (order == QUDA_FLOAT2_FIELD_ORDER) return true;
-        } else if (nSpin == 1) {
-          if (order == QUDA_FLOAT2_FIELD_ORDER) return true;
-        }
-      } else if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-        if (nSpin == 4) {
-#ifdef FLOAT8
-          if (order == QUDA_FLOAT8_FIELD_ORDER) return true;
-#else
-          if (order == QUDA_FLOAT4_FIELD_ORDER) return true;
-#endif
-        } else if (nSpin == 2) {
-          if (order == QUDA_FLOAT2_FIELD_ORDER) return true;
-        } else if (nSpin == 1) {
-          if (order == QUDA_FLOAT2_FIELD_ORDER) return true;
-        }
+      return nSpin == 1 ? getNative<double, 1>() : nSpin == 2 ? getNative<double, 2>() : getNative<double, 4>();
+    }
+
+    template <> constexpr auto getNative<float>(int nSpin)
+    {
+      return nSpin == 1 ? getNative<float, 1>() : nSpin == 2 ? getNative<float, 2>() : getNative<float, 4>();
+    }
+
+    template <> constexpr auto getNative<short>(int nSpin)
+    {
+      return nSpin == 1 ? getNative<short, 1>() : nSpin == 2 ? getNative<short, 2>() : getNative<short, 4>();
+    }
+
+    template <> constexpr auto getNative<int8_t>(int nSpin)
+    {
+      return nSpin == 1 ? getNative<int8_t, 1>() : nSpin == 2 ? getNative<int8_t, 2>() : getNative<int8_t, 4>();
+    }
+
+    constexpr QudaFieldOrder getNative(QudaPrecision precision, int nSpin)
+    {
+      switch (precision) {
+      case QUDA_DOUBLE_PRECISION: return getNative<double>(nSpin);
+      case QUDA_SINGLE_PRECISION: return getNative<float>(nSpin);
+      case QUDA_HALF_PRECISION: return getNative<short>(nSpin);
+      case QUDA_QUARTER_PRECISION: return getNative<int8_t>(nSpin);
+      default: return QUDA_INVALID_FIELD_ORDER;
       }
-      return false;
+    }
+
+    constexpr bool isNative(QudaFieldOrder order, QudaPrecision precision, int nSpin, int)
+    {
+      return order == getNative(precision, nSpin);
     }
 
   } // namespace colorspinor
@@ -147,13 +171,7 @@ namespace quda
       this->ghost_precision = (ghost_precision == QUDA_INVALID_PRECISION) ? precision : ghost_precision;
 
       // if this is a native field order, let's preserve that status, else keep the same field order
-      if (native) {
-        fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ? QUDA_FLOAT2_FIELD_ORDER :
-                                                                                        QUDA_FLOAT4_FIELD_ORDER;
-#ifdef FLOAT8
-        if (precision <= QUDA_HALF_PRECISION && nSpin == 4) fieldOrder = QUDA_FLOAT8_FIELD_ORDER;
-#endif
-      }
+      if (native) fieldOrder = colorspinor::getNative(precision, nSpin);
     }
 
     ColorSpinorParam(const ColorSpinorField &a);
@@ -204,9 +222,6 @@ namespace quda
                  && twistFlavor == QUDA_TWIST_NONDEG_DOUBLET) {
         nDim++;
         x[4] = 2; // for two flavors
-      } else if (inv_param.dslash_type == QUDA_STAGGERED_DSLASH || inv_param.dslash_type == QUDA_ASQTAD_DSLASH) {
-        nDim++;
-        x[4] = inv_param.Ls;
       } else {
         x[4] = 1;
       }
@@ -307,6 +322,7 @@ namespace quda
     bool init = false;
     bool alloc = false;     // whether we allocated memory
     bool reference = false; // whether the field is a reference or not
+    bool ghost_only = false; // whether the field is only a ghost wrapper
 
     /** Used to keep local track of allocated ghost_precision in createGhostZone */
     mutable QudaPrecision ghost_precision_allocated = QUDA_INVALID_PRECISION;
@@ -368,8 +384,6 @@ namespace quda
        @param[in] param The parameter we are filling
     */
     void fill(ColorSpinorParam &) const;
-
-    static void checkField(const ColorSpinorField &, const ColorSpinorField &);
 
     /**
        @brief Set the vol_string and aux_string for use in tuning
@@ -460,10 +474,42 @@ namespace quda
     size_t GhostNormBytes() const { return ghost_bytes; }
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
 
-    void *V() { return v; }
-    const void *V() const { return v; }
-    void *Norm() { return static_cast<char *>(v) + norm_offset; }
-    const void *Norm() const { return static_cast<char *>(v) + norm_offset; }
+    /**
+       @brief Return pointer to the field allocation
+    */
+    void *V()
+    {
+      if (ghost_only) errorQuda("Not defined for ghost-only field");
+      return v;
+    }
+
+    /**
+       @brief Return pointer to the field allocation
+    */
+    const void *V() const
+    {
+      if (ghost_only) errorQuda("Not defined for ghost-only field");
+      return v;
+    }
+
+    /**
+       @brief Return pointer to the norm base pointer in the field allocation
+    */
+    void *Norm()
+    {
+      if (ghost_only) errorQuda("Not defined for ghost-only field");
+      return static_cast<char *>(v) + norm_offset;
+    }
+
+    /**
+       @brief Return pointer to the norm base pointer in the field allocation
+    */
+    const void *Norm() const
+    {
+      if (ghost_only) errorQuda("Not defined for ghost-only field");
+      return static_cast<char *>(v) + norm_offset;
+    }
+
     size_t NormOffset() const { return norm_offset; }
 
     /**
@@ -513,9 +559,6 @@ namespace quda
                    MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label, bool spin_project,
                    double a = 0, double b = 0, double c = 0, int shmem = 0);
 
-    // fuse with above
-    void packGhostHost(void **ghost, const QudaParity parity, const int nFace, const int dagger) const;
-
     /**
        Pack the field halos in preparation for halo exchange, e.g., for Dslash
        @param[in] nFace Depth of faces
@@ -532,7 +575,7 @@ namespace quda
        @param[in] b Used for twisted mass (chiral twist factor)
        @param[in] c Used for twisted mass (flavor twist factor)
     */
-    void pack(int nFace, int parity, int dagger, const qudaStream_t &stream, MemoryLocation location[],
+    void pack(int nFace, int parity, int dagger, const qudaStream_t &stream, MemoryLocation location[2 * QUDA_MAX_DIM],
               MemoryLocation location_label, bool spin_project = true, double a = 0, double b = 0, double c = 0,
               int shmem = 0);
 
@@ -645,10 +688,14 @@ namespace quda
        @param[in] gdr_send Are we using GDR for sending
        @param[in] gdr_recv Are we using GDR for receiving
        @param[in] ghost_precision The precision used for the ghost exchange
+       @param[in] shmem The type of shmem communication (if applicable)
+       @param[in] v Vector of fields to be used for batched exchange
      */
     void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination = nullptr,
                        const MemoryLocation *halo_location = nullptr, bool gdr_send = false, bool gdr_recv = false,
-                       QudaPrecision ghost_precision = QUDA_INVALID_PRECISION, int shmem = 0) const;
+                       QudaPrecision ghost_precision = QUDA_INVALID_PRECISION, int shmem = 0,
+                       cvector_ref<const ColorSpinorField> v = {}) const;
+
     /**
       This function returns true if the field is stored in an internal
       field order, given the precision and the length of the spin
@@ -740,6 +787,13 @@ namespace quda
     void OffsetIndex(int &i, int *y) const;
 
     static ColorSpinorField *Create(const ColorSpinorParam &param) { return new ColorSpinorField(param); }
+
+    /**
+      @brief Create a dummy field used for batched communication
+      @param[in] v Vector of fields we which to batch together
+      @return Dummy (nDim+1)-dimensional field
+     */
+    static FieldTmp<ColorSpinorField> create_comms_batch(cvector_ref<const ColorSpinorField> &v);
 
     /**
        @brief Create a field that aliases this field's storage.  The
@@ -850,6 +904,39 @@ namespace quda
      */
     static int Compare(const ColorSpinorField &a, const ColorSpinorField &b, const int resolution = 1);
 
+    /**
+       @brief Check if two instances are compatible
+       @param[in] a Input field
+       @param[in] b Input field
+       @return Return true if two fields are compatible
+     */
+    static bool are_compatible(const ColorSpinorField &a, const ColorSpinorField &b);
+
+    /**
+       @brief Check if two instances are weakly compatible (precision
+       and order can differ)
+       @param[in] a Input field
+       @param[in] b Input field
+       @return Return true if two fields are compatible
+     */
+    static bool are_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b);
+
+    /**
+       @brief Test if two instances are compatible.  Throws an error
+       if test fails.
+       @param[in] a Input field
+       @param[in] b Input field
+     */
+    static void test_compatible(const ColorSpinorField &a, const ColorSpinorField &b);
+
+    /**
+       @brief Test if two instances are weakly compatible (precision
+       and order can differ).  Throws an error if test fails.
+       @param[in] a Input field
+       @param[in] b Input field
+     */
+    static void test_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b);
+
     friend std::ostream &operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
   };
@@ -919,11 +1006,14 @@ namespace quda
      @param[out] ghost Array of packed ghosts with array ordering [2*dim+dir]
      @param[in] a Input field that is being packed
      @param[in] parity Which parity are we packing
+     @param[in] nFace The depth of the face in each dimension and direction
      @param[in] dagger Is for a dagger operator (presently ignored)
-     @param[in[ location Array specifiying the memory location of each resulting ghost [2*dim+dir]
+     @param[in] destination Array specifying the memory location of each resulting ghost [2*dim+dir]
+     @param[in] shmem The shmem type to use
+     @param[in] v Vector fields to batch into ghost (if v.size() > 0)
   */
   void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity, int nFace, int dagger,
-                        MemoryLocation *destination = nullptr, int shmem = 0);
+                        MemoryLocation *destination = nullptr, int shmem = 0, cvector_ref<const ColorSpinorField> v = {});
 
   /**
      @brief pre-declaration of RNG class (defined in non-device-safe random_quda.h)

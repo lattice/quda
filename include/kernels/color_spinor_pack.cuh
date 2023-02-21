@@ -69,19 +69,27 @@ namespace quda {
     static constexpr int nDim = nDim_;
 
     using real = typename mapper<store_t>::type;
-    using Field = typename colorspinor::FieldOrderCB<real,nSpin,nColor,1,order,store_t,ghost_store_t>;
+    using G = typename colorspinor::GhostOrder<real, nSpin, nColor, 1, order, store_t, ghost_store_t>;
+    // disable ghost to reduce arg size
+    using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, order, store_t, ghost_store_t, true>;
 
-    Field field;
+    static constexpr int max_n_src = 64;
+    const int_fastdiv n_src;
+    G out;
+    F in[max_n_src];
+
     const int_fastdiv volumeCB;
     const int nFace;
     const int parity;
     const int_fastdiv nParity;
     const int dagger;
     const QudaPCType pc_type;
-    DslashConstant dc; // pre-computed dslash constants for optimized indexing
+    DslashConstant dc;
     int_fastdiv work_items;
-    int threadDimMapLower[4];
-    int threadDimMapUpper[4];
+    int_fastdiv ghostFaceCB[4] = {}; /** (non-batched) ghost face dimensions */
+    int ghostThreadsCB[4] = {};      /** (batched) ghost face thread count */
+    int threadDimMapLower[4] = {};
+    int threadDimMapUpper[4] = {};
 #ifdef NVSHMEM_COMMS
     char *packBuffer[4 * QUDA_MAX_DIM];
     int neighbor_ranks[2 * QUDA_MAX_DIM];
@@ -95,10 +103,12 @@ namespace quda {
 #endif
     int shmem = 0;
 
-    PackGhostArg(const ColorSpinorField &a, int work_items, void **ghost, int parity, int nFace, int dagger, int shmem_) :
+    PackGhostArg(const ColorSpinorField &a, int work_items, void **ghost, int parity, int nFace, int dagger, int shmem_,
+                 cvector_ref<const ColorSpinorField> &v) :
       kernel_param(
         dim3(work_items, (a.Nspin() / spins_per_thread(a)) * (a.Ncolor() / colors_per_thread(a)), a.SiteSubset())),
-      field(a, nFace, 0, ghost),
+      n_src(v.size() > 0 ? 1 : v.size()),
+      out(a, nFace, ghost),
       volumeCB(a.VolumeCB()),
       nFace(nFace),
       parity(parity),
@@ -106,8 +116,6 @@ namespace quda {
       dagger(dagger),
       pc_type(a.PCType()),
       dc(a.getDslashConstant()),
-      threadDimMapLower {},
-      threadDimMapUpper {},
 #ifdef NVSHMEM_COMMS
       counter((activeTuning() && !policyTuning()) ? 2 : dslash::inc_exchangeghost_shmem_sync_counter()),
       waitcounter(counter),
@@ -120,10 +128,12 @@ namespace quda {
       int prev = -1; // previous dimension that was partitioned
       for (int i = 0; i < 4; i++) {
         if (!comm_dim_partitioned(i)) continue;
-        // unlike the dslash kernels, we include the fifth dimension here
-        dc.ghostFaceCB[i] *= nFace * (nDim == 5 ? dc.Ls : 1);
+        // include fifth dimension but not batch dimension in face indices
+        ghostFaceCB[i] = dc.ghostFaceCB[i] * nFace * ((nDim == 5 && v.size() == 0) ? dc.Ls : 1);
+        // include fifth and batch dimensions in thread count
+        ghostThreadsCB[i] = dc.ghostFaceCB[i] * nFace * (nDim == 5 ? dc.Ls : 1);
         threadDimMapLower[i] = (prev >= 0 ? threadDimMapUpper[prev] : 0);
-        threadDimMapUpper[i] = threadDimMapLower[i] + 2 * dc.ghostFaceCB[i];
+        threadDimMapUpper[i] = threadDimMapLower[i] + 2 * ghostThreadsCB[i];
         prev = i;
       }
 #ifdef NVSHMEM_COMMS
@@ -135,6 +145,13 @@ namespace quda {
         }
       }
 #endif
+
+      if (n_src > max_n_src) errorQuda("vector set size %d greater than max size %d", (int)n_src, max_n_src);
+      if (v.size() == 0) {
+        this->in[0] = a;
+      } else {
+        for (auto i = 0u; i < v.size(); i++) this->in[i] = v[i];
+      }
     }
   };
 
@@ -175,7 +192,7 @@ namespace quda {
   };
 
   template <typename Arg> __device__ __host__ inline std::enable_if_t<!Arg::block_float, typename Arg::real>
-  compute_site_max(const Arg &, int, int, int, int)
+  compute_site_max(const Arg &, int, int, int, int, int)
   {
     return static_cast<typename Arg::real>(1.0); // dummy return for non-block float
   }
@@ -184,13 +201,12 @@ namespace quda {
      Compute the max element over the spin-color components of a given site.
   */
   template <typename Arg> __device__ __host__ inline std::enable_if_t<Arg::block_float, typename Arg::real>
-  compute_site_max(const Arg &arg, int x_cb, int spinor_parity, int spin_block, int color_block)
+  compute_site_max(const Arg &arg, int src_idx, int x_cb, int spinor_parity, int spin_block, int color_block)
   {
     using real = typename Arg::real;
     const int Ms = spins_per_thread<Arg::nSpin>();
     const int Mc = colors_per_thread<Arg::nColor>();
-    real thread_max_r = 0.0;
-    real thread_max_i = 0.0;
+    complex<real> thread_max = {0.0, 0.0};
 
 #pragma unroll
     for (int spin_local=0; spin_local<Ms; spin_local++) {
@@ -198,13 +214,13 @@ namespace quda {
 #pragma unroll
       for (int color_local=0; color_local<Mc; color_local++) {
         int c = color_block + color_local;
-        complex<real> z = arg.field(spinor_parity, x_cb, s, c);
-        thread_max_r = std::max(thread_max_r, std::abs(z.real()));
-        thread_max_i = std::max(thread_max_i, std::abs(z.imag()));
+        complex<real> z = arg.in[src_idx](spinor_parity, x_cb, s, c);
+        thread_max.real(std::max(thread_max.real(), std::abs(z.real())));
+        thread_max.imag(std::max(thread_max.imag(), std::abs(z.imag())));
       }
     }
 
-    return target::dispatch<site_max>(std::max(thread_max_r, thread_max_i), arg);
+    return target::dispatch<site_max>(std::max(thread_max.real(), thread_max.imag()), arg);
   }
 
   /**
@@ -214,7 +230,7 @@ namespace quda {
      division for the 5-d operators.
   */
   template <typename Arg>
-  constexpr int dimFromFaceIndex(int &face_idx, int tid, const Arg &arg)
+  constexpr auto dimFromFaceIndex(int &face_idx, int tid, const Arg &arg)
   {
     face_idx = tid;
     if (face_idx < arg.threadDimMapUpper[0]) {
@@ -231,13 +247,30 @@ namespace quda {
     }
   }
 
+  /**
+     @brief Determine which end of the lattice we are packing, e.g.,
+     which direction: 0 = start (backwards), 1 = end (forwards)
+     @param[in] dim Dimension we are working on
+     @param[in,out] ghost_idx The aggregate ghost index into this
+     dimension.  This will be updated stripping out the direction
+     index
+  */
   template <typename Arg>
-  constexpr auto indexFromFaceIndex(int dim, int dir, int ghost_idx, int parity, const Arg &arg)
+  constexpr auto dirFromFaceIndex(int dim, int &ghost_idx, const Arg &arg)
   {
+    int dir = (ghost_idx >= arg.ghostThreadsCB[dim]) ? 1 : 0;
+    ghost_idx -= dir * arg.ghostThreadsCB[dim];
+    return dir;
+  }
+
+  template <typename Arg>
+  constexpr auto indexFromFaceIndex(int &src_idx, int dim, int dir, int ghost_idx, int parity, const Arg &arg)
+  {
+    src_idx = ghost_idx / arg.ghostFaceCB[dim]; // this must include the fifth dimension but not the batched dimension
     if (arg.nFace == 1) {
-      return indexFromFaceIndex<Arg::nDim>(dim, dir, ghost_idx, parity, 1, arg.pc_type, arg);
+      return indexFromFaceIndex<Arg::nDim>(dim, dir, ghost_idx % arg.ghostFaceCB[dim], parity, 1, arg.pc_type, arg);
     } else {
-      return indexFromFaceIndexStaggered<Arg::nDim>(dim, dir, ghost_idx, parity, 3, arg.pc_type, arg);
+      return indexFromFaceIndexStaggered<Arg::nDim>(dim, dir, ghost_idx % arg.ghostFaceCB[dim], parity, 3, arg.pc_type, arg);
     }
   }
 
@@ -258,13 +291,11 @@ namespace quda {
 
       int ghost_idx;
       const int dim = dimFromFaceIndex<Arg>(ghost_idx, tid, arg);
+      const int dir = dirFromFaceIndex(dim, ghost_idx, arg);
 
-      // determine which end of the lattice we are packing: 0 = start, 1 = end
-      const int dir = (ghost_idx >= arg.dc.ghostFaceCB[dim]) ? 1 : 0;
-      ghost_idx -= dir * arg.dc.ghostFaceCB[dim];
-
-      int x_cb = indexFromFaceIndex(dim, dir, ghost_idx, parity, arg);
-      auto max = compute_site_max<Arg>(arg, x_cb, spinor_parity, spin_block, color_block);
+      int src_idx;
+      int x_cb = indexFromFaceIndex(src_idx, dim, dir, ghost_idx, parity, arg);
+      auto max = compute_site_max<Arg>(arg, src_idx, x_cb, spinor_parity, spin_block, color_block);
 
 #pragma unroll
       for (int spin_local=0; spin_local<Ms; spin_local++) {
@@ -272,9 +303,10 @@ namespace quda {
 #pragma unroll
         for (int color_local=0; color_local<Mc; color_local++) {
           int c = color_block + color_local;
-          arg.field.Ghost(dim, dir, spinor_parity, ghost_idx, s, c, 0, max) = arg.field(spinor_parity, x_cb, s, c);
+          arg.out.Ghost(dim, dir, spinor_parity, ghost_idx, s, c, 0, max) = arg.in[src_idx](spinor_parity, x_cb, s, c);
         }
       }
+
 #ifdef NVSHMEM_COMMS
       if (arg.shmem) shmem_signalwait(0, 0, (arg.shmem & 4), arg);
 #endif

@@ -48,7 +48,6 @@ namespace quda
      @param[in] rngstate random states
      @param[in] sigma Width of Gaussian distrubution
   */
-
   void gaugeGauss(GaugeField &U, RNG &rngstate, double epsilon);
 
   /**
@@ -65,8 +64,31 @@ namespace quda
      @param[in] seed The seed used for the RNG
      @param[in] sigma Wdith of the Gaussian distribution
   */
-
   void gaugeGauss(GaugeField &U, unsigned long long seed, double epsilon);
+
+  /**
+     @brief Generate a random noise gauge field.  This variant allows
+     the user to manage the RNG state.  Works with arbitrary colors
+     (e.g., coarse grids).  Always exectures on the device so if
+     handed a host field, the interface will handle copying to and
+     from the device.
+     @param U The gauge field
+     @param randstates Random state
+     @param type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
+  */
+  void gaugeNoise(GaugeField &U, RNG &rngstate, QudaNoiseType type);
+
+  /**
+     @brief Generate a random noise gauge field.  This variant allows
+     the user to manage the RNG state.  Works with arbitrary colors
+     (e.g., coarse grids).  Always exectures on the device so if
+     handed a host field, the interface will handle copying to and
+     from the device.
+     @param U The gauge field
+     @param seed The seed used for the RNG
+     @param type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
+  */
+  void gaugeNoise(GaugeField &U, unsigned long long seed, QudaNoiseType type);
 
   /**
      @brief Apply APE smearing to the gauge field

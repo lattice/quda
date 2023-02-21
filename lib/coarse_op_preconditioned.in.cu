@@ -5,12 +5,7 @@
 #include <tunable_nd.h>
 #include <kernels/coarse_op_preconditioned.cuh>
 #include <coarse_op_preconditioned_mma_launch.h>
-
-#if __cplusplus >= 201703L
-#define IF_CONSTEXPR if constexpr
-#else
-#define IF_CONSTEXPR if
-#endif
+#include "multigrid.h"
 
 namespace quda
 {
@@ -79,8 +74,8 @@ namespace quda
         qudaMemsetAsync(arg.max_d, 0, sizeof(typename Arg::Float), stream);
       }
 
-      IF_CONSTEXPR (location_template == QUDA_CUDA_FIELD_LOCATION) {
-        IF_CONSTEXPR (use_mma) mma::launch_yhat_kernel(tp, stream, arg, *this);
+      if constexpr (location_template == QUDA_CUDA_FIELD_LOCATION) {
+        if constexpr (use_mma) mma::launch_yhat_kernel(tp, stream, arg, *this);
         else launch_device<ComputeYhat>(tp, stream, arg);
       } else {
         launch_host<ComputeYhat>(tp, stream, arg);
@@ -294,60 +289,36 @@ namespace quda
     }
   }
 
-  // template on the number of coarse degrees of freedom
-  template <typename storeFloat, typename Float>
-  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma)
-  {
-    switch (Y.Ncolor()) {
-    case 48: calculateYhat<storeFloat, Float, 48>(Yhat, Xinv, Y, X, use_mma); break;
-#ifdef NSPIN4
-    case 12: calculateYhat<storeFloat, Float, 12>(Yhat, Xinv, Y, X, use_mma); break;
-    case 64: calculateYhat<storeFloat, Float, 64>(Yhat, Xinv, Y, X, use_mma); break;
-#endif // NSPIN4
-#ifdef NSPIN1
-    case 128: calculateYhat<storeFloat, Float, 128>(Yhat, Xinv, Y, X, use_mma); break;
-    case 192: calculateYhat<storeFloat, Float, 192>(Yhat, Xinv, Y, X, use_mma); break;
-#endif // NSPIN1
-    default: errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor()); break;
-    }
-  }
+  constexpr int Nc = @QUDA_MULTIGRID_NVEC@;
 
-  //Does the heavy lifting of creating the coarse color matrices Y
-#ifdef GPU_MULTIGRID
-  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma)
+  template <>
+  void calculateYhat<Nc>(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma)
   {
-    if (use_mma && Y.Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("MG-MMA cannot be used with CPU location fields");
-    QudaPrecision precision = checkPrecision(Xinv, Y, X);
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Yhat field......\n");
+    if constexpr (is_enabled_multigrid()) {
+      if (use_mma && Y.Location() == QUDA_CPU_FIELD_LOCATION)
+        errorQuda("MG-MMA cannot be used with CPU location fields");
+      QudaPrecision precision = checkPrecision(Xinv, Y, X, Yhat);
+      logQuda(QUDA_SUMMARIZE, "Computing Yhat field......\n");
 
-    if (precision == QUDA_DOUBLE_PRECISION) {
-#ifdef GPU_MULTIGRID_DOUBLE
-      if (Yhat.Precision() != QUDA_DOUBLE_PRECISION) errorQuda("Unsupported precision %d\n", Yhat.Precision());
-      if (use_mma) errorQuda("MG-MMA does not support double precision, yet.");
-      calculateYhat<double, double>(Yhat, Xinv, Y, X, use_mma);
-#else
-      errorQuda("Double precision multigrid has not been enabled");
-#endif
-    } else if (precision == QUDA_SINGLE_PRECISION) {
-      if (Yhat.Precision() == QUDA_SINGLE_PRECISION) {
-        calculateYhat<float, float>(Yhat, Xinv, Y, X, use_mma);
+      if (precision == QUDA_DOUBLE_PRECISION) {
+        if constexpr (is_enabled_multigrid_double()) {
+          if (use_mma) errorQuda("MG-MMA does not support double precision, yet.");
+          calculateYhat<double, double, 2 * Nc>(Yhat, Xinv, Y, X, use_mma);
+        } else {
+          errorQuda("Double precision multigrid has not been enabled");
+        }
+      } else if (precision == QUDA_SINGLE_PRECISION) {
+        calculateYhat<float, float, 2 * Nc>(Yhat, Xinv, Y, X, use_mma);
+      } else if (precision == QUDA_HALF_PRECISION) {
+        calculateYhat<short, float, 2 * Nc>(Yhat, Xinv, Y, X, use_mma);
       } else {
-        errorQuda("Unsupported precision %d\n", precision);
+        errorQuda("Unsupported precision %d", precision);
       }
-    } else if (precision == QUDA_HALF_PRECISION) {
-      if (Yhat.Precision() == QUDA_HALF_PRECISION) {
-        calculateYhat<short, float>(Yhat, Xinv, Y, X, use_mma);
-      } else {
-        errorQuda("Unsupported precision %d\n", precision);
-      }
+
+      logQuda(QUDA_SUMMARIZE, "....done computing Yhat field\n");
     } else {
-      errorQuda("Unsupported precision %d\n", precision);
+      errorQuda("Multigrid has not been built");
     }
-
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Yhat field\n");
   }
-#else
-  void calculateYhat(GaugeField &, GaugeField &, const GaugeField &, const GaugeField &, bool) { errorQuda("Multigrid has not been built"); }
-#endif
 
 } // namespace quda

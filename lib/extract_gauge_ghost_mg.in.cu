@@ -19,12 +19,12 @@ namespace quda {
       ExtractGhost<storeFloat, Nc, G>(u, Ghost, extract, offset);
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
       
-#ifdef BUILD_QDP_INTERFACE
-      using G = typename gauge::FieldOrder<Float,Nc,1,QUDA_QDP_GAUGE_ORDER,true,storeFloat>;
-      ExtractGhost<storeFloat, Nc, G>(u, Ghost, extract, offset);
-#else
-      errorQuda("QDP interface has not been built\n");
-#endif
+      if constexpr (is_enabled<QUDA_QDP_GAUGE_ORDER>()) {
+        using G = typename gauge::FieldOrder<Float,Nc,1,QUDA_QDP_GAUGE_ORDER,true,storeFloat>;
+        ExtractGhost<storeFloat, Nc, G>(u, Ghost, extract, offset);
+      } else {
+        errorQuda("QDP interface has not been built\n");
+      }
 
     } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
 
@@ -38,7 +38,8 @@ namespace quda {
 
   /** This is the template driver for extractGhost */
   template <typename Float> struct GhostExtractMG {
-    GhostExtractMG(const GaugeField &u, void **Ghost_, bool extract, int offset)
+    template <class static_color>
+    GhostExtractMG(const GaugeField &u, void **Ghost_, bool extract, int offset, static_color)
     {
       Float **Ghost = reinterpret_cast<Float**>(Ghost_);
 
@@ -48,36 +49,23 @@ namespace quda {
       if (u.LinkType() != QUDA_COARSE_LINKS)
         errorQuda("Link type %d not supported", u.LinkType());
 
-      if (u.Ncolor() == 48) {
-        extractGhostMG<Float, 48>(u, Ghost, extract, offset);
-#ifdef NSPIN4
-      } else if (u.Ncolor() == 12) { // free field Wilson
-        extractGhostMG<Float, 12>(u, Ghost, extract, offset);
-      } else if (u.Ncolor() == 64) {
-        extractGhostMG<Float, 64>(u, Ghost, extract, offset);
-#endif // NSPIN4
-#ifdef NSPIN1
-      } else if (u.Ncolor() == 128) {
-        extractGhostMG<Float, 128>(u, Ghost, extract, offset);
-      } else if (u.Ncolor() == 192) {
-        extractGhostMG<Float, 192>(u, Ghost, extract, offset);
-#endif // NSPIN1
-      } else {
-        errorQuda("Ncolor = %d not supported", u.Ncolor());
-      }
+      // factor of two from inherit spin in coarse gauge fields
+      extractGhostMG<Float, 2 * static_color::value>(u, Ghost, extract, offset);
     }
   };
 
-#ifdef GPU_MULTIGRID
-  void extractGaugeGhostMG(const GaugeField &u, void **ghost, bool extract, int offset)
+  template <int nColor> void extractGaugeGhostMG(const GaugeField &u, void **ghost, bool extract, int offset);
+
+  constexpr int nColor = @QUDA_MULTIGRID_NVEC@;
+
+  template <>
+  void extractGaugeGhostMG<nColor>(const GaugeField &u, void **ghost, bool extract, int offset)
   {
-    instantiatePrecisionMG<GhostExtractMG>(u, ghost, extract, offset);
+    if constexpr (is_enabled_multigrid()) {
+      instantiatePrecisionMG<GhostExtractMG>(u, ghost, extract, offset, std::integral_constant<int, nColor>());
+    } else {
+      errorQuda("Multigrid has not been enabled");
+    }
   }
-#else
-  void extractGaugeGhostMG(const GaugeField &, void **, bool, int)
-  {
-    errorQuda("Multigrid has not been enabled");
-  }
-#endif
 
 } // namespace quda

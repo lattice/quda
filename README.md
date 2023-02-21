@@ -266,6 +266,7 @@ Advanced Scientific Computing (PASC21) [arXiv:2104.05615[hep-lat]].
 *  Steven Gottlieb (Indiana University) 
 *  Kyriakos Hadjiyiannakou (Cyprus)
 *  Dean Howarth (Lawrence Livermore Lab, Lawrence Berkeley Lab)
+*  Hwancheol Jeong (Indiana University)
 *  Xiangyu Jiang (Chinese Academy of Sciences)
 *  Balint Joo (OLCF, Oak Ridge National Laboratory, formerly Jefferson Lab)
 *  Hyung-Jin Kim (Samsung Advanced Institute of Technology)

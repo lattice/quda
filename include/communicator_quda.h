@@ -13,6 +13,7 @@
 #include <color_spinor_field.h>
 #include <field_cache.h>
 #include <comm_key.h>
+#include <float_vector.h>
 
 #if defined(MPI_COMMS) || defined(QMP_COMMS)
 #include <mpi.h>
@@ -753,6 +754,8 @@ namespace quda
   void comm_allreduce_sum_array(double *data, size_t size);
 
   void comm_allreduce_max_array(double *data, size_t size);
+
+  void comm_allreduce_max_array(deviation_t<double> *data, size_t size);
 
   void comm_allreduce_min_array(double *data, size_t size);
 

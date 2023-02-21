@@ -298,12 +298,12 @@ void qudaHisqForce(int prec, int num_terms, int num_naik_terms, double dt, doubl
   return;
 }
 
-void qudaAsqtadForce(int, const double[], const void *const[], const void *const[4], const void *const, void *const)
+void qudaAsqtadForce(int, const double[6], const void *const[4], const void *const[4], const void *const, void *const)
 {
   errorQuda("This interface has been removed and is no longer supported");
 }
 
-void qudaComputeOprod(int, int, int, double **, double, void **, void *[])
+void qudaComputeOprod(int, int, int, double **, double, void **, void *[3])
 {
   errorQuda("This interface has been removed and is no longer supported");
 }
@@ -2719,6 +2719,13 @@ void qudaFreeGaugeField() {
   freeGaugeQuda();
     qudamilc_called<false>(__func__);
 } // qudaFreeGaugeField
+
+void qudaFreeTwoLink()
+{
+  qudamilc_called<true>(__func__);
+  freeGaugeSmearedQuda();
+  qudamilc_called<false>(__func__);
+} // qudaFreeTwoLink
 
 void qudaLoadCloverField(int external_precision, int quda_precision, QudaInvertArgs_t inv_args, void *milc_clover,
                          void *milc_clover_inv, QudaSolutionType solution_type, QudaSolveType solve_type, QudaInverterType inverter,

@@ -96,7 +96,7 @@ namespace quda {
         for (int mu = 0; mu < 4; mu++) {
           RNGState localState = arg.rng[parity * arg.threads.x + x_cb];
 
-          // generate Gaussian distributed su(n) fiueld
+          // generate Gaussian distributed su(n) field
           Link u = arg.sigma * gauss_su3<real, Link>(localState);
           if constexpr (Arg::group) {
             expsu3<real>(u);
