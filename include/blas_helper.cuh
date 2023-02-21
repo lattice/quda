@@ -233,7 +233,7 @@ namespace quda
         constexpr int M = len / N; // loop trip count
 
         if constexpr (spinor_bitpack() && n == 3 && std::is_same_v<float, store_t>) {
-          spinor_30 packed;
+          spinor_30 packed = {};
 
 #pragma unroll
           for (int i = 0; i < M; i++) {
