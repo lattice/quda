@@ -82,8 +82,8 @@ namespace quda {
   };
 
   template <typename Arg> struct BlockOrtho_ : SpecialOps<
-    op_BlockReduce<typename Arg::sum_t>,
-    op_BlockReduce<array<complex<typename Arg::sum_t>,tile_size<Arg::nColor,Arg::nVec,Arg::block_size>()>> > {
+    op_BlockReduce<array<complex<typename Arg::sum_t>,tile_size<Arg::nColor,Arg::nVec,Arg::block_size>()>>,
+    op_BlockReduce<typename Arg::sum_t> > {
     const Arg &arg;
     static constexpr unsigned block_size = Arg::block_size;
     static constexpr int fineSpin = Arg::fineSpin;
@@ -106,6 +106,9 @@ namespace quda {
     using sum_t = typename Arg::sum_t;
     using dot_t = array<complex<sum_t>, mVec>;
     using real = typename Arg::real;
+
+    using opBlockReduceDot = op_BlockReduce<dot_t>;
+    using opBlockReduceNorm = op_BlockReduce<sum_t>;
 
     constexpr BlockOrtho_(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -150,8 +153,10 @@ namespace quda {
       if (fineSpin == 1) chirality = 0; // when using staggered chirality is mapped to parity
 
       constexpr int block_dim = 1;
-      BlockReduce<dot_t, block_dim> dot_reducer{this, 0};
-      BlockReduce<sum_t, block_dim> norm_reducer{this, 0};
+      //BlockReduce<dot_t, block_dim> dot_reducer{this, 0};
+      //BlockReduce<sum_t, block_dim> norm_reducer{this, 0};
+      BlockReduce<opBlockReduceDot, block_dim> dot_reducer{this, 0};
+      BlockReduce<opBlockReduceNorm, block_dim> norm_reducer{this, 0};
 
       // loop over number of block orthos
       for (int n = 0; n < arg.nBlockOrtho; n++) {

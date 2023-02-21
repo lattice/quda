@@ -50,63 +50,13 @@ namespace quda
     const int stride;
     sycl::local_ptr<atom_t> cache_ptr;
 
-#if 0
-    /**
-       @brief This is a dummy instantiation for the host compiler
-    */
-    template <bool, typename dummy = void> struct cache_dynamic {
-      inline atom_t *operator()()
-      {
-        static atom_t *cache_;
-        return reinterpret_cast<atom_t *>(cache_);
-      }
-    };
-
-    template <bool is_device, typename dummy = void> struct cache_static : cache_dynamic<is_device> {
-    };
-
-    /**
-       @brief This is the handle to the shared memory, dynamic specialization
-       @return Shared memory pointer
-     */
-    template <typename dummy> struct cache_dynamic<true, dummy> {
-      __device__ inline sycl::local_ptr<atom_t> operator()()
-      {
-	return cache_ptr;
-      }
-    };
-
-    /**
-       @brief This is the handle to the shared memory, static specialization
-       @return Shared memory pointer
-     */
-    template <typename dummy> struct cache_static<true, dummy> {
-      __device__ inline sycl::local_ptr<atom_t> operator()()
-      {
-	return cache_ptr;
-      }
-    };
-#endif
-
-    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<dynamic_shared, atom_t *> cache()
-    {
-      //return target::dispatch<cache_dynamic>();
-      return cache_ptr;
-    }
-
-    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<!dynamic_shared, atom_t *> cache()
-    {
-      //return target::dispatch<cache_static>();
-      return cache_ptr;
-    }
-
     __device__ __host__ inline void save_detail(const T &a, int x, int y, int z)
     {
       atom_t tmp[n_element];
       memcpy(tmp, (void *)&a, sizeof(T));
       int j = (z * block.y + y) * block.x + x;
 #pragma unroll
-      for (int i = 0; i < n_element; i++) cache<dynamic>()[i * stride + j] = tmp[i];
+      for (int i = 0; i < n_element; i++) cache_ptr[i * stride + j] = tmp[i];
     }
 
     template <typename dummy = void>
@@ -115,25 +65,11 @@ namespace quda
       atom_t tmp[n_element];
       int j = (z * block.y + y) * block.x + x;
 #pragma unroll
-      for (int i = 0; i < n_element; i++) tmp[i] = cache<dynamic>()[i * stride + j];
+      for (int i = 0; i < n_element; i++) tmp[i] = cache_ptr[i * stride + j];
       T a;
       memcpy((void *)&a, tmp, sizeof(T));
       return a;
     }
-
-    /**
-       @brief Dummy instantiation for the host compiler
-    */
-    template <bool is_device, typename dummy = void> struct sync_impl {
-      void operator()() { }
-    };
-
-    /**
-       @brief Synchronize the cache when on the device
-    */
-    template <typename dummy> struct sync_impl<true, dummy> {
-      __device__ inline void operator()() { __syncthreads(); }
-    };
 
   public:
     /**
@@ -294,7 +230,7 @@ namespace quda
     /**
        @brief Synchronize the cache
     */
-    __device__ __host__ inline void sync() { target::dispatch<sync_impl>(); }
+    __device__ __host__ inline void sync() { __syncthreads; }
   };
 
   template <typename T, int block_size_y = 1, int block_size_z = 1, bool dynamic = true>

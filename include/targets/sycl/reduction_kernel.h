@@ -175,7 +175,7 @@ namespace quda {
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride>
   struct MultiReductionS {
-    using SpecialOpsT = reduceSpecialOps<typename Functor<Arg>::reduce_t>;
+    using SpecialOpsT = combineOps<getSpecialOps<Functor<Arg>>,reduceSpecialOps<typename Functor<Arg>::reduce_t>>;
     template <typename... T>
     MultiReductionS(const Arg &arg, const sycl::nd_item<3> &ndi, T... smem)
     {
@@ -191,7 +191,7 @@ namespace quda {
   qudaError_t
   MultiReduction(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
   {
-    static_assert(!hasSpecialOps<Functor<Arg>>);
+    //static_assert(!hasSpecialOps<Functor<Arg>>);
     auto err = QUDA_SUCCESS;
     auto globalSize = globalRange(tp);
     auto localSize = localRange(tp);

@@ -45,8 +45,9 @@ namespace quda
     }
   };
 
-  template <typename Arg> struct STOUT
+  template <typename Arg_> struct STOUT : SpecialOps<computeStapleOps>
   {
+    using Arg = Arg_;
     using real = typename Arg::Float;
     using Complex = complex<real>;
     using Link = Matrix<complex<real>, Arg::nColor>;
@@ -70,7 +71,8 @@ namespace quda
       Link U, Stap, Q;
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, x, X, parity, dir, Stap, Arg::stoutDim);
+      //computeStaple(arg, x, X, parity, dir, Stap, Arg::stoutDim);
+      computeStaple(this, x, X, parity, dir, Stap, Arg::stoutDim);
 
       // Get link U
       U = arg.in(dir, linkIndex(x, X), parity);
@@ -111,8 +113,9 @@ namespace quda
   //------------------------//
   // Over-Improved routines //
   //------------------------//
-  template <typename Arg> struct OvrImpSTOUT
+  template <typename Arg_> struct OvrImpSTOUT : computeStapleRectangleOps
   {
+    using Arg = Arg_;
     using real = typename Arg::Float;
     using Complex = complex<real>;
     using Link = Matrix<complex<real>, Arg::nColor>;
@@ -138,7 +141,7 @@ namespace quda
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
-      computeStapleRectangle(arg, x, X, parity, dir, Stap, Rect, Arg::stoutDim);
+      computeStapleRectangle(this, x, X, parity, dir, Stap, Rect, Arg::stoutDim);
 
       // Get link U
       U = arg.in(dir, linkIndex(x, X), parity);

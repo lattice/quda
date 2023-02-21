@@ -161,9 +161,10 @@ namespace quda {
     using dependencies = depFullBlock;
   };
 
-  template <typename T>
-  struct op_thread_array : op_BaseT<T> {
-    using dependencies = depNone;
+  template <typename T, int N>
+  struct op_thread_array : op_BaseT<T,N> {
+    //using dependencies = depNone;
+    using dependencies = op_SharedMemory<array<T,N>,opSizeBlock>;
   };
 
   template <typename T>
@@ -177,7 +178,6 @@ namespace quda {
 
   template <typename T, typename D>
   struct op_SharedMemoryCache : op_BaseT<T> {
-    using ElemT = T;
     template <typename ...Arg> static constexpr dim3 dims(dim3 block, Arg &...arg) { return D::dims(block, arg...); }
     using dependencies = op_Sequential<op_blockSync,op_SharedMemory<T,opSizeDims<D>>>;
   };
@@ -242,20 +242,20 @@ namespace quda {
     opTestHasSpecialOpType<std::tuple_element_t<n,std::tuple<T...>>,SpecialOps<T...>> &&
     opTestAllHasSpecialOpType<SpecialOps<T...>,n+1>;
 
-  using opTestC1 = op_Concurrent<op_blockSync,op_thread_array<bool>>;
-  using opTest1 = SpecialOps<op_blockSync,op_warp_combine<int>,op_thread_array<float>,op_SharedMemoryCache<float>,
+  using opTestC1 = op_Concurrent<op_blockSync,op_thread_array<bool,4>>;
+  using opTest1 = SpecialOps<op_blockSync,op_warp_combine<int>,op_thread_array<float,4>,op_SharedMemoryCache<float>,
     op_SharedMemory<double>,op_SharedMemStatic<char,100>,opTestC1>;
   static_assert(opTestAllHasSpecialOpType<opTest1>);
   static_assert(hasSpecialOpType<opTestC1,opTest1>);
-  static_assert(!hasSpecialOpType<op_thread_array<bool>,opTest1>);
+  static_assert(!hasSpecialOpType<op_thread_array<bool,4>,opTest1>);
 
   static_assert(sharedMemSize<opTest1>(dim3(0,0,0))==std::max((size_t)100,0*sizeof(double)));
-  static_assert(sharedMemSize<opTest1>(dim3(1,2,5))==std::max((size_t)100,10*sizeof(double)));
-  static_assert(sharedMemSize<opTest1>(dim3(2,5,10))==std::max((size_t)100,100*sizeof(double)));
+  static_assert(sharedMemSize<opTest1>(dim3(1,2,5))==std::max({(size_t)100,10*sizeof(double),40*sizeof(float)}));
+  static_assert(sharedMemSize<opTest1>(dim3(2,5,10))==std::max({(size_t)100,100*sizeof(double),400*sizeof(float)}));
 
 
 #if 0
-  using opTest2 = SpecialOps<op_blockSync,op_warp_combine<int>,op_thread_array<float>,
+  using opTest2 = SpecialOps<op_blockSync,op_warp_combine<int>,op_thread_array<float,4>,
 			     op_SharedMemoryCache<double>,op_SharedMemory<float>,op_SharedMemStatic<char,100>>;
   static_assert(opTestAllHasSpecialOpType<opTest1>);
    template <typename T, typename U> static constexpr bool opTestSpecialOpsType =

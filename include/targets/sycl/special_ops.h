@@ -45,14 +45,16 @@ namespace quda {
   template <typename ...T> struct op_Concurrent {};  // set of op types used concurrently (needs separate resources)
   template <typename ...T> struct op_Sequential {};  // set of op types used sequentially (can share resources)
   struct op_Base {};  // base type for other op types
-  template <typename T> struct op_BaseT : op_Base {
-    using op_ElementT = T;
+  template <typename T, int N = 0> struct op_BaseT : op_Base {
+    //using op_ElementT = T;
+    using ElemT = T;
+    static constexpr int n = N;
   };
 
   // forward declarations of op types
   struct op_blockSync;
   template <typename T> struct op_warp_combine;
-  template <typename T> struct op_thread_array;
+  template <typename T, int N> struct op_thread_array;
   template <typename T> struct op_BlockReduce;
   template <typename T, typename D = opDimsBlock> struct op_SharedMemoryCache;
   template <typename T, typename S = opSizeBlock> struct op_SharedMemory;
@@ -61,7 +63,7 @@ namespace quda {
   // only types for convenience
   using only_blockSync = SpecialOps<op_blockSync>;
   template <typename T> using only_warp_combine = SpecialOps<op_warp_combine<T>>;
-  template <typename T> using only_thread_array = SpecialOps<op_thread_array<T>>;
+  template <typename T, int N> using only_thread_array = SpecialOps<op_thread_array<T,N>>;
   template <typename T> using only_BlockReduce = SpecialOps<op_BlockReduce<T>>;
   template <typename T, typename D = opDimsBlock> using only_SharedMemoryCache = SpecialOps<op_SharedMemoryCache<T,D>>;
   template <typename T, typename S = opSizeBlock> using only_SharedMemory = SpecialOps<op_SharedMemory<T,S>>;
@@ -84,7 +86,15 @@ namespace quda {
   // hasSpecialOps
   template <typename T> inline constexpr bool hasSpecialOps = !std::is_same_v<getSpecialOps<T>,NoSpecialOps>;
 
-
+  // combineOps
+  template <typename ...T> struct combineOpsS {};
+  template <typename ...T> struct combineOpsS<NoSpecialOps,SpecialOps<T...>> {
+    using type = SpecialOps<T...>; };
+  template <typename ...T> struct combineOpsS<SpecialOps<T...>,NoSpecialOps> {
+    using type = SpecialOps<T...>; };
+  template <typename ...T, typename ...U> struct combineOpsS<SpecialOps<T...>,SpecialOps<U...>> {
+    using type = SpecialOps<T..., U...>; };
+  template <typename T, typename U> using combineOps = typename combineOpsS<T, U>::type;
 
 
 
@@ -118,6 +128,14 @@ namespace quda {
   template <typename T> static constexpr bool isOpSharedMemoryCache = false;
   template <typename T, typename D> static constexpr bool isOpSharedMemoryCache<op_SharedMemoryCache<T,D>> = true;
 
+  // isOpThreadArray
+  template <typename T> static constexpr bool isOpThreadArray = false;
+  template <typename T, int n> static constexpr bool isOpThreadArray<op_thread_array<T,n>> = true;
+
+  // isOpBlockReduce
+  template <typename T> static constexpr bool isOpBlockReduce = false;
+  template <typename T> static constexpr bool isOpBlockReduce<op_BlockReduce<T>> = true;
+
   // SpecialOpsType: returns SpecialOps type from a Concurrent list
   template <typename T, int n> struct SpecialOpsTypeS { using type = std::enable_if_t<n==0,T>; };
   template <typename ...T, int n> struct SpecialOpsTypeS<op_Concurrent<T...>,n> {
@@ -126,14 +144,14 @@ namespace quda {
   template <typename T, int n> using SpecialOpsType = SpecialOps<typename SpecialOpsTypeS<unwrapSpecialOps<T>,n>::type>;
 
   // SpecialOpsElemType: element type from corresponding op types
-  template <typename ...T> struct SpecialOpsElemTypeS { using type = void; };
-  template <typename T> struct SpecialOpsElemTypeS<SpecialOps<T>> { using type = typename SpecialOpsElemTypeS<T>::type; };
-  template <typename T> struct SpecialOpsElemTypeS<op_warp_combine<T>> { using type = T; };
-  template <typename T> struct SpecialOpsElemTypeS<op_thread_array<T>> { using type = T; };
-  template <typename T> struct SpecialOpsElemTypeS<op_BlockReduce<T>> { using type = T; };
-  template <typename T, typename D> struct SpecialOpsElemTypeS<op_SharedMemoryCache<T,D>> { using type = T; };
-  template <typename T, typename S> struct SpecialOpsElemTypeS<op_SharedMemory<T,S>> { using type = T; };
-  template <typename ...T> using SpecialOpsElemType = typename SpecialOpsElemTypeS<T...>::type;
+  //template <typename ...T> struct SpecialOpsElemTypeS { using type = void; };
+  //template <typename T> struct SpecialOpsElemTypeS<SpecialOps<T>> { using type = typename SpecialOpsElemTypeS<T>::type; };
+  //template <typename T> struct SpecialOpsElemTypeS<op_warp_combine<T>> { using type = T; };
+  //template <typename T, int N> struct SpecialOpsElemTypeS<op_thread_array<T,N>> { using type = T; };
+  //template <typename T> struct SpecialOpsElemTypeS<op_BlockReduce<T>> { using type = T; };
+  //template <typename T, typename D> struct SpecialOpsElemTypeS<op_SharedMemoryCache<T,D>> { using type = T; };
+  //template <typename T, typename S> struct SpecialOpsElemTypeS<op_SharedMemory<T,S>> { using type = T; };
+  //template <typename ...T> using SpecialOpsElemType = typename SpecialOpsElemTypeS<T...>::type;
 
   // SpecialOpDependencies: returns dependencies if type has them
   template <typename T, typename Enabled = void> struct SpecialOpDependS { using deps = NoSpecialOps; };

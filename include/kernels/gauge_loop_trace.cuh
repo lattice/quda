@@ -52,7 +52,7 @@ namespace quda {
     }
   };
 
-  template <typename Arg> struct GaugeLoop : plus<typename Arg::reduce_t>
+  template <typename Arg> struct GaugeLoop : plus<typename Arg::reduce_t>, only_thread_array<int,4>
   {
     using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
@@ -71,7 +71,8 @@ namespace quda {
       getCoords(x, x_cb, arg.X, parity);
       for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-      thread_array<int, 4> dx{0};
+      //thread_array<int, 4> dx{0};
+      thread_array<op_thread_array<int, 4>> dx{this, 0};
 
       double coeff_loop = arg.factor * arg.p.path_coeff[path_id];
       if (coeff_loop == 0) return operator()(loop_trace, value);

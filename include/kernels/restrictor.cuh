@@ -111,6 +111,7 @@ namespace quda {
     const Arg &arg;
     constexpr Restrictor(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
+    using opBlockReduce = op_BlockReduce<vector>;
 
     template <bool allthreads = false>
     __device__ __host__ inline void apply(dim3 block, dim3 thread, bool active = true)
@@ -154,7 +155,7 @@ namespace quda {
       }
 
       constexpr int block_dim = 1;
-      reduced = BlockReduce<vector, block_dim, Arg::n_vector_z>(this, thread.z).Sum(reduced);
+      reduced = BlockReduce<opBlockReduce, block_dim, Arg::n_vector_z>(this, thread.z).Sum(reduced);
 
       if (target::thread_idx().x == 0) {
         const int parity_coarse = x_coarse >= arg.out.VolumeCB() ? 1 : 0;

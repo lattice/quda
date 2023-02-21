@@ -133,9 +133,12 @@ namespace quda
   template <typename Reducer, typename Arg, typename T, typename ...O>
   inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx, O &...ops)
   {
+    constexpr bool dynamic = sizeof...(O) == 1;
     constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
-    using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block, O...>;
-    T aggregate = BlockReduce(&ops..., target::thread_idx().z).Reduce(in, r);
+    using opBlockReduce = op_BlockReduce<T>;
+    using BlockReduce = BlockReduce<std::conditional_t<dynamic,opBlockReduce,T>, Reducer::reduce_block_dim, n_batch_block>;
+    BlockReduce br(&ops..., target::thread_idx().z);
+    T aggregate = br.Reduce(in, r);
 
     if (target::grid_dim().x==1) {  // special case
       if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && idx < arg.threads.z) {
@@ -151,6 +154,7 @@ namespace quda
 
     //bool *isLastBlockDone = nullptr;
     sycl::local_ptr<bool> isLastBlockDone;
+    //SharedMemoryCache<bool, 
     if constexpr (sizeof...(O) == 0) {
       auto glmem = sycl::ext::oneapi::group_local_memory_for_overwrite<bool[n_batch_block]>(getGroup());
       isLastBlockDone = *glmem.get();
@@ -199,7 +203,8 @@ namespace quda
 	}
       }
 
-      sum = BlockReduce(&ops..., target::thread_idx().z).Reduce(sum, r);
+      //sum = BlockReduce(&ops..., target::thread_idx().z).Reduce(sum, r);
+      sum = br.Reduce(sum, r);
 
       // write out the final reduced value
       if (active && target::thread_idx().x == 0 && target::thread_idx().y == 0) {
