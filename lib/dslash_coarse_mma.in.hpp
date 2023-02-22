@@ -227,13 +227,13 @@ namespace quda {
       int shared_bytes = shared_bytes_per_block(bM, bN, bK);
       tp.shared_bytes = shared_bytes;
 
-      return shared_bytes <= device::dynamic_shared_memory_supremum();
+      return shared_bytes <= device::maximum_dynamic_shared_memory();
     }
 
     template <int bN, int bM, int bK, int block_y, int block_z>
     void launch_mma(TuneParam &tp, const qudaStream_t &stream) {
       constexpr int shared_bytes = shared_bytes_per_block(bM, bN, bK);
-      if constexpr (shared_bytes <= device::dynamic_shared_memory_supremum()) {
+      if constexpr (shared_bytes <= device::maximum_dynamic_shared_memory()) {
         using Arg = DslashCoarseMmaArg<mma_t, dslash, clover, dagger, type, Float, yFloat, ghostFloat, Ns, Nc, nVec, bN, bM, bK, block_y, block_z>;
         Arg arg(out[0], inA[0], inB[0], Y, X, (Float)kappa, parity, halo);
         tp.set_max_shared_bytes = true;

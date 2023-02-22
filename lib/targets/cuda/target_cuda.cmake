@@ -171,6 +171,12 @@ if(${CMAKE_CUDA_COMPILER_ID} MATCHES "NVHPC" AND NOT ${CMAKE_BUILD_TYPE} MATCHES
   target_compile_options(quda PRIVATE "$<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:SHELL: -gpu=nodebug" >)
 endif()
 
+set(QUDA_MAX_SHARED_MEMORY "0" CACHE STRING "Max shared memory per block")
+mark_as_advanced(QUDA_MAX_SHARED_MEMORY)
+configure_file(${CMAKE_SOURCE_DIR}/include/targets/cuda/device.in.hpp
+               ${CMAKE_BINARY_DIR}/include/targets/cuda/device.hpp @ONLY)
+install(FILES "${CMAKE_BINARY_DIR}/include/targets/cuda/device.hpp" DESTINATION include/)
+
 target_include_directories(quda SYSTEM PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:${CUDAToolkit_INCLUDE_DIRS}>)
 target_include_directories(quda SYSTEM PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:${CUDAToolkit_MATH_INCLUDE_DIR}>)
 target_include_directories(quda_cpp SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS} ${CUDAToolkit_MATH_INCLUDE_DIR})
