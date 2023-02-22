@@ -150,8 +150,14 @@ namespace quda {
   void MultiReductionImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S smem)
   {
     using reduce_t = typename Functor<Arg>::reduce_t;
-    Functor<Arg> t(arg);
-    reduceSpecialOps<typename Functor<Arg>::reduce_t> rso;
+    Functor<Arg> f(arg);
+    if constexpr (hasSpecialOps<Functor<Arg>>) {
+      f.setNdItem(ndi);
+    }
+    if constexpr (needsSharedMem<Functor<Arg>>) {
+      f.setSharedMem(smem);
+    }
+    reduceSpecialOps<reduce_t> rso;
     rso.setNdItem(ndi);
     rso.setSharedMem(smem);
 
@@ -159,19 +165,17 @@ namespace quda {
     auto k = localIdY;
     auto j = globalIdZ;
 
-    //if (j >= arg.threads.z) return;
-
-    reduce_t value = t.init();
+    reduce_t value = f.init();
 
     if (j < arg.threads.z) {
       while (idx < arg.threads.x) {
-	value = t(value, idx, k, j);
+	value = f(value, idx, k, j);
 	if (grid_stride) idx += globalRangeX; else break;
       }
     }
 
     // perform final inter-block reduction and write out result
-    reduce(arg, t, value, j, rso);
+    reduce(arg, f, value, j, rso);
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride>
   struct MultiReductionS {
