@@ -146,21 +146,17 @@ namespace quda
      @tparam batch_size Batch size of the reduction.  Threads will be
      ordered such that batch size is the slowest running index.
   */
-  template <typename T, int block_dim, int batch_size = 1, typename O = void> class BlockReduceImpl :
-    block_reduce<T, block_reduce_param<block_dim, batch_size>, O>
+  template <typename T, int block_dim, int batch_size = 1> class BlockReduce :
+    public block_reduce<T, block_dim, batch_size>
   {
-    using block_reduce_t = block_reduce<T, block_reduce_param<block_dim, batch_size>, O>;
-    //using param_t = block_reduce_param<block_dim, batch_size>;
+    using BlockReduce_t = BlockReduce<T, block_dim, batch_size>;
+    using block_reduce_t = block_reduce<T, block_dim, batch_size>;
     const int batch;
-    //O *op;
 
   public:
-    constexpr BlockReduceImpl(int batch = 0) : block_reduce_t(), batch(batch) {
-      static_assert(std::is_same_v<O,void>);
-    }
     template <typename ...U>
-    constexpr BlockReduceImpl(SpecialOps<U...> *ops, int batch = 0) : block_reduce_t(getSpecialOp<O>(ops)), batch(batch) {
-      static_assert(!std::is_same_v<O,void>);
+    constexpr BlockReduce(SpecialOps<U...> &ops, int batch = 0) : block_reduce_t(ops), batch(batch) {
+      static_assert(hasSpecialOpType<BlockReduce_t, SpecialOps<U...>>);
     }
 
     /**
@@ -258,17 +254,6 @@ namespace quda
       //return target::dispatch<block_reduce>(value, async, batch, true, r, param_t(), opBlockReduce);
       return this->apply(value, async, batch, true, r);
     }
-  };
-
-  template <typename T, int block_dim, int batch_size = 1, bool _ = true>
-  class BlockReduce : public BlockReduceImpl<T,block_dim,batch_size> {
-    using BlockReduceImpl<T, block_dim, batch_size>::BlockReduceImpl;
-  };
-
-  template <typename O, int block_dim, int batch_size>
-  class BlockReduce<O, block_dim, batch_size, (bool)isOpBlockReduce<O>> :
-    public BlockReduceImpl<typename O::ElemT,block_dim,batch_size,O> {
-    using BlockReduceImpl<typename O::ElemT, block_dim, batch_size, O>::BlockReduceImpl;
   };
 
 } // namespace quda

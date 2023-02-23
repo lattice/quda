@@ -667,7 +667,7 @@ namespace quda
     {
       typename Arg::D dslash(arg);
       if constexpr (hasSpecialOps<typename Arg::D>) {
-	dslash.setSpecialOps(this);
+	dslash.setSpecialOps(*this);
       }
       // for full fields set parity from z thread index else use arg setting
       if (nParity == 1) parity = arg.parity;

@@ -85,6 +85,7 @@ namespace quda
 
   // pre-declaration of block_reduce that we wish to specialize
   //template <bool> struct block_reduce;
+  template <typename T, int block_dim, int batch_size> class BlockReduce;
 
   /**
      @brief SYCL specialization of block_reduce, using SYCL group reductions
@@ -128,10 +129,19 @@ namespace quda
   /**
      @brief SYCL specialization of block_reduce, building on the warp_reduce
   */
-  template <typename T, typename param_t, typename O>
+#define DYNAMIC_SLM
+  template <typename T, int block_dim, int batch_size>
   struct block_reduceW {
-    SpecialOps<O> op;
-    inline block_reduceW(SpecialOps<O> &&op) : op(op) {};
+#ifdef DYNAMIC_SLM
+    using opSmem = op_SharedMemory<T,opSizeBlockDivWarp>;
+    using dependencies = op_Sequential<op_blockSync,opSmem>;
+    using dependentOps = SpecialOps<op_blockSync,opSmem>;
+#else
+#endif
+    using BlockReduce_t = BlockReduce<T, block_dim, batch_size>;
+    dependentOps ops;
+    template <typename S>
+    inline block_reduceW(S &ops) : ops(getDependentOps<BlockReduce_t>(ops)) {};
 
     template <int width_> struct warp_reduce_param {
       static constexpr int width = width_;
@@ -152,14 +162,11 @@ namespace quda
     template <typename reducer_t>
     inline T apply(const T &value_, bool async, int batch, bool all, const reducer_t &r)
     {
-      static_assert(!std::is_same_v<O,void>);
       constexpr auto max_items = device::max_block_size() / device::warp_size();
-      const auto thread_idx = target::thread_idx_linear<param_t::block_dim>();
-      const auto block_size = target::block_size<param_t::block_dim>();
+      const auto thread_idx = target::thread_idx_linear<block_dim>();
+      const auto block_size = target::block_size<block_dim>();
       const auto warp_idx = thread_idx / device::warp_size();
       const auto warp_items = (block_size + device::warp_size() - 1) / device::warp_size();
-      using opBlockSync = typename op_BlockReduce<T>::opBlockSync;
-      using opSharedMem = typename op_BlockReduce<T>::opSharedMem;
 
       // first do warp reduce
       T value = warp_reduce<true>()(value_, false, r, warp_reduce_param<device::warp_size()>());
@@ -170,27 +177,17 @@ namespace quda
       if (!async) __syncthreads(); // only synchronize if we are not pipelining
 
       //__shared__ T storage[max_items];
-      T *storage = nullptr;
-      //if constexpr (std::is_same_v<std::tuple_element_t<0, std::tuple<BR...,void>>,void>) {
-      if constexpr (std::is_same_v<O,void>) {
-	static_assert(sizeof(T[max_items])<=device::shared_memory_size(), "Block reduce shared mem size too large");
-	auto mem = sycl::ext::oneapi::group_local_memory_for_overwrite<T[max_items]>(getGroup());
-	storage = *mem.get();
-      } else {
-	//storage = getSpecialOp<only_SharedMemory<T>>((ops,...)).getSharedMemPtr();
-	//storage = getSpecialOp<only_BlockReduce<T>>((ops,...)).getSharedMemPtr();
-	auto brops = getDependentOps<only_BlockReduce<T>>(&op);
-	storage = getSharedMemPtr(opSharedMem()(brops));
-      }
+#ifdef DYNAMIC_SLM
+      auto storage = getSharedMemPtr<opSmem>(ops);
+#else
+      static_assert(sizeof(T[max_items])<=device::shared_memory_size(), "Block reduce shared mem size too large");
+      auto mem = sycl::ext::oneapi::group_local_memory_for_overwrite<T[max_items]>(getGroup());
+      auto storage = &((*mem)[0]);
+#endif
 
       // if first thread in warp, write result to shared memory
       if (thread_idx % device::warp_size() == 0) storage[batch * warp_items + warp_idx] = value;
-      if (std::is_same_v<O,void>) {
-	__syncthreads();
-      } else {
-	auto brops = getDependentOps<only_BlockReduce<T>>(&op);
-	blockSync(opBlockSync()(brops));
-      }
+      blockSync(ops);
 
       // whether to use the first warp or first thread for the final reduction
       constexpr bool final_warp_reduction = true;
@@ -214,12 +211,7 @@ namespace quda
 
       if (all) {
         if (thread_idx == 0) storage[batch * warp_items + 0] = value;
-	if constexpr (std::is_same_v<O,void>) {
-	  __syncthreads();
-	} else {
-	  auto brops = getDependentOps<only_BlockReduce<T>>(&op);
-	  blockSync(opBlockSync()(brops));
-	}
+	blockSync(ops);
         value = storage[batch * warp_items + 0];
       }
 
@@ -227,14 +219,7 @@ namespace quda
     }
   };
 
-  template <typename T, typename P, typename O>
-  struct block_reduce : block_reduceW<T,P,O> {
-    using block_reduceW<T,P,O>::block_reduceW;
-  };
-  template <typename T, typename P>
-  struct block_reduce<T,P,void> : block_reduceG<T,P> {
-    using block_reduceG<T,P>::block_reduceG;
-  };
+  template <typename T, int block_dim, int batch_size> using block_reduce = block_reduceW<T,block_dim,batch_size>;
 
 } // namespace quda
 

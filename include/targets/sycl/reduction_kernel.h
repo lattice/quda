@@ -13,7 +13,7 @@ namespace quda {
   void Reduction2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, char *smem)
   {
     Functor<Arg> f(arg);
-    reduceSpecialOps<typename Functor<Arg>::reduce_t> rso;
+    typename reduceParams<Arg,Functor<Arg>,typename Functor<Arg>::reduce_t>::Ops rso;
     rso.setNdItem(ndi);
     rso.setSharedMem(smem);
     auto idx = globalIdX;
@@ -28,7 +28,7 @@ namespace quda {
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   struct Reduction2DS {
-    using SpecialOpsT = reduceSpecialOps<typename Functor<Arg>::reduce_t>;
+    using SpecialOpsT = typename reduceParams<Arg,Functor<Arg>,typename Functor<Arg>::reduce_t>::Ops;
     template <typename... T>
     Reduction2DS(const Arg &arg, const sycl::nd_item<3> &ndi, T ...smem)
     {
@@ -158,7 +158,7 @@ namespace quda {
     if constexpr (needsSharedMem<Functor<Arg>>) {
       f.setSharedMem(smem);
     }
-    reduceSpecialOps<reduce_t> rso;
+    typename reduceParams<Arg,Functor<Arg>,typename Functor<Arg>::reduce_t>::Ops rso;
     rso.setNdItem(ndi);
     rso.setSharedMem(smem);
 
@@ -180,7 +180,8 @@ namespace quda {
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride>
   struct MultiReductionS {
-    using SpecialOpsT = combineOps<getSpecialOps<Functor<Arg>>,reduceSpecialOps<typename Functor<Arg>::reduce_t>>;
+    using SpecialOpsT = combineOps<getSpecialOps<Functor<Arg>>,
+				   typename reduceParams<Arg,Functor<Arg>,typename Functor<Arg>::reduce_t>::Ops>;
     template <typename... T>
     MultiReductionS(const Arg &arg, const sycl::nd_item<3> &ndi, T... smem)
     {

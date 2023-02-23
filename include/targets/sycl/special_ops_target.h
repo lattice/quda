@@ -15,10 +15,10 @@ namespace quda {
     sycl::local_ptr<char> smem = nullptr;
     inline void setNdItem(const sycl::nd_item<3> &i) { ndi = &i; }
     inline void setSharedMem(char *s) { smem = s; }
-    template <typename ...U> inline void setSpecialOps(SpecialOps<U...> *ops) {
+    template <typename ...U> inline void setSpecialOps(const SpecialOps<U...> &ops) {
       static_assert(std::is_same_v<SpecialOps<T...>,SpecialOps<U...>>);
-      ndi = ops->ndi;
-      smem = ops->smem;
+      ndi = ops.ndi;
+      smem = ops.smem;
     }
 #if 0
     SpecialOpsElemType *getSharedMemPtr() {
@@ -51,7 +51,7 @@ namespace quda {
 
   // getSpecialOp
   template <typename U, int n = 0, typename ...T>
-  inline SpecialOpsType<U,n> getSpecialOp(const SpecialOps<T...> *ops) {
+  inline SpecialOpsType<U,n> getSpecialOp(const SpecialOps<T...> &ops) {
     if constexpr (!isOpConcurrent<U> && sizeof...(T) == 1 && isOpConcurrent<T...>) {
       static constexpr int i = getOpIndex<U, T...>;
       return getSpecialOp<T...,i>(ops);
@@ -61,29 +61,29 @@ namespace quda {
       //	errorQuda("SpecialOps not set");
       //}
       SpecialOpsType<U,n> s;
-      s.ndi = ops->ndi;
+      s.ndi = ops.ndi;
       //s.smem = ops->smem + sharedMemOffset<U,n>()(ops->ndi->get_local_range());  // FIXME: need to pass arg
-      s.smem = ops->smem + sharedMemOffset<U,n>()(getBlockDim());  // FIXME: need to pass arg
+      s.smem = ops.smem + sharedMemOffset<U,n>()(getBlockDim());  // FIXME: need to pass arg
       return s;
     }
   }
   template <typename U, int n = 0, typename ...T>
-    inline SpecialOpsType<U,n> getSpecialOp(SpecialOps<T...> ops) { return getSpecialOp<U,n>(&ops); }
+    inline SpecialOpsType<U,n> getSpecialOp(const SpecialOps<T...> *ops) { return getSpecialOp<U,n>(*ops); }
   template <typename U, int n = 0> struct getSpecialOpF {
-    template <typename T> inline SpecialOpsType<U,n> operator()(T ops) { return getSpecialOp<U,n>(ops); }
+    template <typename T> inline SpecialOpsType<U,n> operator()(const T &ops) { return getSpecialOp<U,n>(ops); }
   };
 
   // getDependentOps
   template <typename U, int n = 0, typename ...T>
-  inline SpecialOpDependencies<SpecialOpsType<U,n>> getDependentOps(SpecialOps<T...> *ops) {
+  inline SpecialOpDependencies<SpecialOpsType<U,n>> getDependentOps(SpecialOps<T...> &ops) {
     static_assert(hasSpecialOpType<U,T...>);
     //if (ops->ndi == nullptr || ops->smem == nullptr) {
     //errorQuda("SpecialOps not set");
     //}
     SpecialOpDependencies<SpecialOpsType<U,n>> s;
-    s.ndi = ops->ndi;
+    s.ndi = ops.ndi;
     //s.smem = ops->smem + sharedMemOffset<U,n>()(ops->ndi->get_local_range());  // FIXME: need to pass arg
-    s.smem = ops->smem + sharedMemOffset<U,n>()(getBlockDim());  // FIXME: need to pass arg
+    s.smem = ops.smem + sharedMemOffset<U,n>()(getBlockDim());  // FIXME: need to pass arg
     return s;
   }
 
@@ -112,17 +112,22 @@ namespace quda {
   inline SpecialOpsElemType<T...> *getSharedMemPtr(SpecialOps<T...> ops) { return getSharedMemPtr(&ops); }
 #endif
 
-  template <typename T, typename S>
-  inline sycl::local_ptr<T> getSharedMemPtr(only_SharedMemory<T,S> *ops) {
+  template <typename T, typename S, typename O = op_SharedMemory<T,S>>
+  inline sycl::local_ptr<T> getSharedMemPtr(const only_SharedMemory<T,S> &ops) {
     //if (ops->ndi == nullptr || ops->smem == nullptr) {
     //errorQuda("SpecialOps not set");
     //}
-    sycl::local_ptr<void> v(ops->smem);
+    sycl::local_ptr<void> v(ops.smem);
     sycl::local_ptr<T> p(v);
     return p;
   }
-  template <typename T, typename S>
-  inline sycl::local_ptr<T> getSharedMemPtr(only_SharedMemory<T,S> ops) { return getSharedMemPtr(&ops); }
+  //template <typename T, typename S>
+  //inline sycl::local_ptr<T> getSharedMemPtr(only_SharedMemory<T,S> ops) { return getSharedMemPtr(&ops); }
+  template <typename O, typename T, typename U, typename ...V>
+  inline auto getSharedMemPtr(const SpecialOps<T,U,V...> &ops) {
+    SpecialOps<O> op = getSpecialOp<O>(ops);
+    return getSharedMemPtr(op);
+  }
 
   template <typename T, typename O>
   inline auto SharedMemory(O *ops)

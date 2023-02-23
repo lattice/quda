@@ -154,12 +154,14 @@ namespace quda {
   //template <typename ...T> using SpecialOpsElemType = typename SpecialOpsElemTypeS<T...>::type;
 
   // SpecialOpDependencies: returns dependencies if type has them
-  template <typename T, typename Enabled = void> struct SpecialOpDependS { using deps = NoSpecialOps; };
+  //template <typename T, typename Enabled = void> struct SpecialOpDependS { using deps = NoSpecialOps; };
+  template <typename T, typename Enabled = void> struct SpecialOpDependS { using deps = typename T::dependentOps; };
   template <typename T> using SpecialOpDependencies = typename SpecialOpDependS<T>::deps;
-  template <typename T> struct SpecialOpDependS<SpecialOps<T>> { using deps = SpecialOps<SpecialOpDependencies<T>>; };
+  //template <typename T> struct SpecialOpDependS<SpecialOps<T>> { using deps = SpecialOps<SpecialOpDependencies<T>>; };
+  template <typename T> struct SpecialOpDependS<SpecialOps<T>> { using deps = SpecialOpDependencies<T>; };
   template <typename T> struct SpecialOpDependS<T,std::enable_if_t<std::is_base_of_v<op_Base,T>,void>> {
   //template <typename T> struct SpecialOpDependS<T,std::enable_if_t<is_instance<T,op_Base>,void>> {
-    using deps = typename T::dependencies;
+    using deps = SpecialOps<typename T::dependencies>;
   };
 
 #if 0

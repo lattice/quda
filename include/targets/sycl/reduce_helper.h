@@ -26,8 +26,8 @@ namespace quda
   template <typename T, use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE> struct ReduceArg : kernel_param<use_kernel_arg> {
     using reduce_t = T;
 
-    template <typename Reducer, typename Arg, typename I, typename ...BR>
-    friend void reduce(Arg &, const Reducer &, const I &, const int, BR &...br);
+    template <typename Arg, typename Reducer, typename I, typename BR>
+    friend void reduce(Arg &, const Reducer &, const I &, const int, BR &br);
     qudaError_t launch_error; /** only do complete if no launch error to avoid hang */
     static constexpr unsigned int max_n_batch_block
       = 1; /** by default reductions do not support batching withing the block */
@@ -110,12 +110,14 @@ namespace quda
 
   };
 
-  using reduceConcurrentOps = op_Concurrent<op_blockSync,op_SharedMemory<bool>>;
-  using opBlockSync = getSpecialOpF<reduceConcurrentOps,0>;
-  using opSharedMem = getSpecialOpF<reduceConcurrentOps,1>;
-  template <typename T>
-  //using reduceSpecialOps = SpecialOps<op_blockSync,op_SharedMemory<bool>,op_BlockReduce<T>>;
-  using reduceSpecialOps = SpecialOps<op_BlockReduce<T>,reduceConcurrentOps>;
+  template <typename Arg, typename Reducer, typename T> struct reduceParams {
+    static constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
+    using BlockReduce_t = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
+    using reduceConcurrentOps = op_Concurrent<op_blockSync,op_SharedMemory<bool>>;
+    using opBlockSync = getSpecialOpF<reduceConcurrentOps,0>;
+    using opSharedMem = getSpecialOpF<reduceConcurrentOps,1>;
+    using Ops = SpecialOps<BlockReduce_t,reduceConcurrentOps>;
+  };
 
   /**
      @brief Generic reduction function that reduces block-distributed
@@ -130,14 +132,11 @@ namespace quda
      which reduction this thread block corresponds to.  Typically idx
      will be constant along constant block_idx().y and block_idx().z.
   */
-  template <typename Reducer, typename Arg, typename T, typename ...O>
-  inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx, O &...ops)
+  template <typename Arg, typename Reducer, typename T, typename O>
+  inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx, O &ops)
   {
-    constexpr bool dynamic = sizeof...(O) == 1;
-    constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
-    using opBlockReduce = op_BlockReduce<T>;
-    using BlockReduce = BlockReduce<std::conditional_t<dynamic,opBlockReduce,T>, Reducer::reduce_block_dim, n_batch_block>;
-    BlockReduce br(&ops..., target::thread_idx().z);
+    using BlockReduce_t = typename reduceParams<Arg, Reducer, T>::BlockReduce_t;
+    BlockReduce_t br(ops, target::thread_idx().z);
     T aggregate = br.Reduce(in, r);
 
     if (target::grid_dim().x==1) {  // special case
@@ -152,18 +151,13 @@ namespace quda
       return;
     }
 
-    //bool *isLastBlockDone = nullptr;
-    sycl::local_ptr<bool> isLastBlockDone;
-    //SharedMemoryCache<bool, 
-    if constexpr (sizeof...(O) == 0) {
+#if 0
       auto glmem = sycl::ext::oneapi::group_local_memory_for_overwrite<bool[n_batch_block]>(getGroup());
-      isLastBlockDone = *glmem.get();
-    } else {
-      //isLastBlockDone = getSpecialOp<only_SharedMemory<bool>>((&ops,...)).getSharedMemPtr();
-      //isLastBlockDone = reinterpret_cast<bool*>(getSharedMemPtr(getSpecialOp<only_BlockReduce<T>>((&ops,...))));
-      //isLastBlockDone = getSharedMemPtr(getSpecialOp<only_SharedMemory<bool>>((&ops,...)));
-      isLastBlockDone = getSharedMemPtr(opSharedMem()((&ops,...)));
-    }
+      auto isLastBlockDone = *glmem.get();
+#else
+      using opSharedMem = typename reduceParams<Arg, Reducer, T>::opSharedMem;
+      auto isLastBlockDone = getSharedMemPtr(opSharedMem()(ops));
+#endif
 
     if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && idx < arg.threads.z) {
       arg.partial[idx * target::grid_dim().x + target::block_idx().x] = aggregate;
@@ -176,14 +170,12 @@ namespace quda
       isLastBlockDone[target::thread_idx().z] = (value == (target::grid_dim().x - 1));
     }
 
-    if constexpr (sizeof...(O) == 0) {
-      __syncthreads();
-    } else {
-      //(ops,...).blockSync();
-      //__syncthreads();
-      //blockSync(getSpecialOp<only_blockSync>((&ops,...)));
-      blockSync(opBlockSync()(&ops...));
-    }
+#if 0
+    __syncthreads();
+#else
+    using opBlockSync = typename reduceParams<Arg, Reducer, T>::opBlockSync;
+    blockSync(opBlockSync()(ops));
+#endif
     bool active = false;
     if (idx < arg.threads.z) active = isLastBlockDone[target::thread_idx().z];
     bool anyActive = sycl::any_of_group(getGroup(), active);

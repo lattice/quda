@@ -81,9 +81,16 @@ namespace quda {
     }
   };
 
-  template <typename Arg> struct BlockOrtho_ : SpecialOps<
-    op_BlockReduce<array<complex<typename Arg::sum_t>,tile_size<Arg::nColor,Arg::nVec,Arg::block_size>()>>,
-    op_BlockReduce<typename Arg::sum_t> > {
+  template <typename Arg> struct BlockOrtho_Params {
+    static constexpr int mVec = tile_size<Arg::nColor, Arg::nVec, Arg::block_size>();
+    using dot_t = array<complex<typename Arg::sum_t>, mVec>;
+    static constexpr int block_dim = 1;
+    using BlockReduceDot = BlockReduce<dot_t, block_dim>;
+    using BlockReduceNorm = BlockReduce<typename Arg::sum_t, block_dim>;
+    using Ops = SpecialOps<BlockReduceDot,BlockReduceNorm>;
+  };
+
+  template <typename Arg> struct BlockOrtho_ : BlockOrtho_Params<Arg>::Ops {
     const Arg &arg;
     static constexpr unsigned block_size = Arg::block_size;
     static constexpr int fineSpin = Arg::fineSpin;
@@ -100,15 +107,12 @@ namespace quda {
                   "Product of n_sites_per_thread and n_threads_per_block must equal block_size");
 
     // mVec is the number of vectors to orthogonalize at once
-    static constexpr int mVec = tile_size<nColor, Arg::nVec, block_size>();
+    static constexpr int mVec = BlockOrtho_Params<Arg>::mVec;
     static_assert(Arg::nVec % mVec == 0, "mVec must be a factor of nVec");
 
     using sum_t = typename Arg::sum_t;
-    using dot_t = array<complex<sum_t>, mVec>;
+    using dot_t = typename BlockOrtho_Params<Arg>::dot_t;
     using real = typename Arg::real;
-
-    using opBlockReduceDot = op_BlockReduce<dot_t>;
-    using opBlockReduceNorm = op_BlockReduce<sum_t>;
 
     constexpr BlockOrtho_(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -152,11 +156,8 @@ namespace quda {
       }
       if (fineSpin == 1) chirality = 0; // when using staggered chirality is mapped to parity
 
-      constexpr int block_dim = 1;
-      //BlockReduce<dot_t, block_dim> dot_reducer{this, 0};
-      //BlockReduce<sum_t, block_dim> norm_reducer{this, 0};
-      BlockReduce<opBlockReduceDot, block_dim> dot_reducer{this, 0};
-      BlockReduce<opBlockReduceNorm, block_dim> norm_reducer{this, 0};
+      typename BlockOrtho_Params<Arg>::BlockReduceDot dot_reducer{*this, 0};
+      typename BlockOrtho_Params<Arg>::BlockReduceNorm norm_reducer{*this, 0};
 
       // loop over number of block orthos
       for (int n = 0; n < arg.nBlockOrtho; n++) {
