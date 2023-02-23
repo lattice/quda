@@ -336,7 +336,7 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     template <bool allthreads = false>
-    __device__ __host__ inline void apply(int x_cb_color_offset, int src_parity, int sMd, bool active = true)
+    __device__ __host__ inline void operator()(int x_cb_color_offset, int src_parity, int sMd, bool active = true)
     {
       int x_cb = x_cb_color_offset;
       int color_offset = 0;
@@ -393,11 +393,6 @@ namespace quda {
 	  }
 	}
       }
-    }
-
-    __device__ __host__ inline void operator()(int x_cb_color_offset, int parity, int sMd)
-    {
-      apply(x_cb_color_offset, parity, sMd);
     }
   };
 

@@ -35,14 +35,10 @@ namespace quda
     }
   };
 
-  //template <typename Arg>
-  //__device__ __host__ inline void computeFmunuCore(const Arg &arg, int idx, int parity, int mu, int nu)
-  template <typename Ftor>
-  __device__ __host__ inline void computeFmunuCore(const Ftor *ftor, int idx, int parity, int mu, int nu)
+  template <typename Arg>
+  __device__ __host__ inline void computeFmunuCore(const Arg &arg, int idx, int parity, int mu, int nu)
   {
-    using Arg = typename Ftor::Arg;
     using Link = Matrix<complex<typename Arg::Float>, 3>;
-    const Arg &arg = ftor->arg;
 
     int x[4];
     int X[4];
@@ -57,8 +53,7 @@ namespace quda
     { // U(x,mu) U(x+mu,nu) U[dagger](x+nu,mu) U[dagger](x,nu)
 
       // load U(x)_(+mu)
-      //thread_array<int, 4> dx = {0, 0, 0, 0};
-      thread_array<op_thread_array<int, 4>> dx = {ftor, 0, 0, 0, 0};
+      thread_array<int, 4> dx = {0, 0, 0, 0};
       Link U1 = arg.u(mu, linkIndexShift(x, dx, X), parity);
 
       // load U(x+mu)_(+nu)
@@ -81,8 +76,7 @@ namespace quda
     { // U(x,nu) U[dagger](x+nu-mu,mu) U[dagger](x-mu,nu) U(x-mu, mu)
 
       // load U(x)_(+nu)
-      //thread_array<int, 4> dx = {0, 0, 0, 0};
-      thread_array<op_thread_array<int, 4>> dx = {ftor, 0, 0, 0, 0};
+      thread_array<int, 4> dx = {0, 0, 0, 0};
       Link U1 = arg.u(nu, linkIndexShift(x, dx, X), parity);
 
       // load U(x+nu)_(-mu) = U(x+nu-mu)_(+mu)
@@ -109,8 +103,7 @@ namespace quda
     { // U[dagger](x-nu,nu) U(x-nu,mu) U(x+mu-nu,nu) U[dagger](x,mu)
 
       // load U(x)_(-nu)
-      //thread_array<int, 4> dx = {0, 0, 0, 0};
-      thread_array<op_thread_array<int, 4>> dx = {ftor, 0, 0, 0, 0};
+      thread_array<int, 4> dx = {0, 0, 0, 0};
       dx[nu]--;
       Link U1 = arg.u(nu, linkIndexShift(x, dx, X), 1 - parity);
       dx[nu]++;
@@ -137,8 +130,7 @@ namespace quda
     { // U[dagger](x-mu,mu) U[dagger](x-mu-nu,nu) U(x-mu-nu,mu) U(x-nu,nu)
 
       // load U(x)_(-mu)
-      //thread_array<int, 4> dx = {0, 0, 0, 0};
-      thread_array<op_thread_array<int, 4>> dx = {ftor, 0, 0, 0, 0};
+      thread_array<int, 4> dx = {0, 0, 0, 0};
       dx[mu]--;
       Link U1 = arg.u(mu, linkIndexShift(x, dx, X), 1 - parity);
       dx[mu]++;
@@ -182,8 +174,7 @@ namespace quda
     arg.f(munu_idx, idx, parity) = F;
   }
 
-  template <typename Arg_> struct ComputeFmunu : only_thread_array<int,4> {
-    using Arg = Arg_;
+  template <typename Arg> struct ComputeFmunu {
     const Arg &arg;
     constexpr ComputeFmunu(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
@@ -199,8 +190,7 @@ namespace quda
       case 4: mu = 3, nu = 1; break;
       case 5: mu = 3, nu = 2; break;
       }
-      //computeFmunuCore(arg, x_cb, parity, mu, nu);
-      computeFmunuCore(this, x_cb, parity, mu, nu);
+      computeFmunuCore(arg, x_cb, parity, mu, nu);
     }
   };
 

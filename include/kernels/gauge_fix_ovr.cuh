@@ -137,7 +137,7 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     template <bool allthreads = false>
-    __device__ inline void apply(int idx, int mu, bool active = true)
+    __device__ inline void operator()(int idx, int mu, bool active = true)
     {
       using real = typename Arg::real;
       using Link = Matrix<complex<real>, 3>;
@@ -229,11 +229,6 @@ namespace quda {
 	  arg.u(mu, idx1, 1 - parity) = link1;
 	}
       }
-    }
-
-    __device__ inline void operator()(int idx, int mu)
-    {
-      apply(idx, mu);
     }
   };
 

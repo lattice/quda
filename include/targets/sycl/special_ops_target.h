@@ -13,9 +13,9 @@ namespace quda {
     const sycl::nd_item<3> *ndi = nullptr;
     //char *smem;
     sycl::local_ptr<char> smem = nullptr;
-    void setNdItem(const sycl::nd_item<3> &i) { ndi = &i; }
-    void setSharedMem(char *s) { smem = s; }
-    template <typename ...U> void setSpecialOps(SpecialOps<U...> *ops) {
+    inline void setNdItem(const sycl::nd_item<3> &i) { ndi = &i; }
+    inline void setSharedMem(char *s) { smem = s; }
+    template <typename ...U> inline void setSpecialOps(SpecialOps<U...> *ops) {
       static_assert(std::is_same_v<SpecialOps<T...>,SpecialOps<U...>>);
       ndi = ops->ndi;
       smem = ops->smem;
@@ -30,7 +30,7 @@ namespace quda {
 
   // blockSync
   template <typename ...T>
-  void blockSync(SpecialOps<T...> *ops) {
+  inline void blockSync(SpecialOps<T...> *ops) {
     static_assert(hasBlockSync<T...>);
     //if (ops->ndi == nullptr) {
     //  errorQuda("SpecialOps not set");
@@ -51,7 +51,7 @@ namespace quda {
 
   // getSpecialOp
   template <typename U, int n = 0, typename ...T>
-  SpecialOpsType<U,n> getSpecialOp(const SpecialOps<T...> *ops) {
+  inline SpecialOpsType<U,n> getSpecialOp(const SpecialOps<T...> *ops) {
     if constexpr (!isOpConcurrent<U> && sizeof...(T) == 1 && isOpConcurrent<T...>) {
       static constexpr int i = getOpIndex<U, T...>;
       return getSpecialOp<T...,i>(ops);
@@ -68,14 +68,14 @@ namespace quda {
     }
   }
   template <typename U, int n = 0, typename ...T>
-    SpecialOpsType<U,n> getSpecialOp(SpecialOps<T...> ops) { return getSpecialOp<U,n>(&ops); }
+    inline SpecialOpsType<U,n> getSpecialOp(SpecialOps<T...> ops) { return getSpecialOp<U,n>(&ops); }
   template <typename U, int n = 0> struct getSpecialOpF {
-    template <typename T> SpecialOpsType<U,n> operator()(T ops) { return getSpecialOp<U,n>(ops); }
+    template <typename T> inline SpecialOpsType<U,n> operator()(T ops) { return getSpecialOp<U,n>(ops); }
   };
 
   // getDependentOps
   template <typename U, int n = 0, typename ...T>
-  SpecialOpDependencies<SpecialOpsType<U,n>> getDependentOps(SpecialOps<T...> *ops) {
+  inline SpecialOpDependencies<SpecialOpsType<U,n>> getDependentOps(SpecialOps<T...> *ops) {
     static_assert(hasSpecialOpType<U,T...>);
     //if (ops->ndi == nullptr || ops->smem == nullptr) {
     //errorQuda("SpecialOps not set");
@@ -113,7 +113,7 @@ namespace quda {
 #endif
 
   template <typename T, typename S>
-  sycl::local_ptr<T> getSharedMemPtr(only_SharedMemory<T,S> *ops) {
+  inline sycl::local_ptr<T> getSharedMemPtr(only_SharedMemory<T,S> *ops) {
     //if (ops->ndi == nullptr || ops->smem == nullptr) {
     //errorQuda("SpecialOps not set");
     //}
@@ -122,10 +122,10 @@ namespace quda {
     return p;
   }
   template <typename T, typename S>
-  sycl::local_ptr<T> getSharedMemPtr(only_SharedMemory<T,S> ops) { return getSharedMemPtr(&ops); }
+  inline sycl::local_ptr<T> getSharedMemPtr(only_SharedMemory<T,S> ops) { return getSharedMemPtr(&ops); }
 
   template <typename T, typename O>
-  auto SharedMemory(O *ops)
+  inline auto SharedMemory(O *ops)
   {
     auto s = getSpecialOp<T>(ops);
     return getSharedMemPtr(s);

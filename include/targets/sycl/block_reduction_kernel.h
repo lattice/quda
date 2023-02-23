@@ -85,7 +85,7 @@ namespace quda
      @param[in] arg Kernel argument
   */
   template <template <typename> class Functor, typename Arg, typename ...S>
-  std::enable_if_t<!needsFullBlock<Functor<Arg>>, void>
+  inline std::enable_if_t<!needsFullBlock<Functor<Arg>>, void>
   BlockKernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem)
   {
     const dim3 block_idx(virtual_block_idx(arg,ndi), groupIdY, groupIdZ);
@@ -105,7 +105,7 @@ namespace quda
     f(block_idx, thread_idx);
   }
   template <template <typename> class Functor, typename Arg, typename ...S>
-  std::enable_if_t<needsFullBlock<Functor<Arg>>, void>
+  inline std::enable_if_t<needsFullBlock<Functor<Arg>>, void>
   BlockKernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem)
   {
     const dim3 block_idx(virtual_block_idx(arg,ndi), groupIdY, groupIdZ);
@@ -123,7 +123,7 @@ namespace quda
     if constexpr (needsSharedMem<Functor<Arg>>) {
       f.setSharedMem(smem...);
     }
-    f.template apply<true>(block_idx, thread_idx, active);
+    f.template operator()<true>(block_idx, thread_idx, active);
   }
   template <template <typename> class Functor, typename Arg>
   struct BlockKernel2DS {

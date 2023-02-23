@@ -1,15 +1,17 @@
 #pragma once
 
-#define SLM
+//#define SLM
 
 namespace quda
 {
 
+  template <typename T, int n> struct thread_array : array<T, n> {};
+
+#if 0
   /**
      @brief Class that provides indexable per-thread storage.  The
-     dynamic version maps to using assigning each thread a unique
-     window of shared memory.  The static version just uses an stack
-     array.
+     shared memory version maps to assigning each thread a unique
+     window of shared memory.  The default version uses a stack array.
    */
 
   // default stack version
@@ -24,30 +26,34 @@ namespace quda
     static_assert(std::is_same_v<T,int>);
     static_assert(n==4);
     using array_t = array<T,n>;
-#ifndef SLM
-    array_t arr;
+#ifdef SLM
+    sycl::local_ptr<array_t> array_ptr;
+#else
+    array_t array_;
 #endif
-    sycl::local_ptr<array_t> array_;
     template <typename ...U, typename ...Ts>
-    thread_array(const SpecialOps<U...> *ops, Ts ...t)
+    inline thread_array(const SpecialOps<U...> *ops, Ts ...t)
     {
 #ifdef SLM
-      //int offset = (target::thread_idx().z * target::block_dim().y + target::thread_idx().y)
-      //* target::block_dim().x + target::thread_idx().x;
       int offset = target::thread_idx_linear<3>();
       auto op = getSpecialOp<op_thread_array<T,n>>(ops);
       sycl::local_ptr<void> v(op.smem);
       sycl::local_ptr<array_t> p(v);
-      array_ = &p[offset];
+      array_ptr = &p[offset];
+      (*array_ptr) = array_t { t... };
 #else
-      array_ = &arr;
+      static_assert(hasSpecialOpType<op_thread_array<T,n>,U...>);
+      array_ = array_t { t... };
 #endif
-      //if constexpr (sizeof...(Ts) != 0) {
-      (*array_) = array_t { t... };
-      //}
     }
-    T &operator[](int i) { return (*array_)[i]; }
-    const T &operator[](int i) const { return (*array_)[i]; }
+#ifdef SLM
+    inline T &operator[](int i) { return (*array_ptr)[i]; }
+    inline const T &operator[](int i) const { return (*array_ptr)[i]; }
+#else
+    inline T &operator[](int i) { return array_[i]; }
+    inline const T &operator[](int i) const { return array_[i]; }
+#endif
   };
+#endif
 
 } // namespace quda

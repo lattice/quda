@@ -1709,7 +1709,7 @@ namespace quda {
        @param[in] c_col output coarse color column
     */
     template <bool allthreads = false>
-    __device__ __host__ inline void apply(int x_cb, int parity_c_row, int c_col, bool active = true)
+    __device__ __host__ inline void operator()(int x_cb, int parity_c_row, int c_col, bool active = true)
     {
       int parity=0, parity_coarse=0, x_coarse_cb=0, c_row=0;
       if(!allthreads || active)
@@ -1725,11 +1725,6 @@ namespace quda {
       if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) active = false;
 
       computeVUV<nFace, allthreads>(this, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse, x_coarse_cb, active);
-    }
-
-    __device__ __host__ inline void operator()(int x_cb, int parity_c_row, int c_col)
-    {
-      apply(x_cb, parity_c_row, c_col);
     }
   };
 
@@ -1747,7 +1742,7 @@ namespace quda {
        @param[in] c_col output coarse color column
     */
     template <bool allthreads = false>
-    __device__ __host__ inline void apply(int x_cb, int parity_c_row, int c_col, bool active = true)
+    __device__ __host__ inline void operator()(int x_cb, int parity_c_row, int c_col, bool active = true)
     {
       int parity=0, parity_coarse=0, x_coarse_cb=0, c_row=0;
       if(!allthreads || active)
@@ -1763,11 +1758,6 @@ namespace quda {
       if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) active = false;
 
       computeVUV<nFace, allthreads>(this, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse, x_coarse_cb, active);
-    }
-
-    __device__ __host__ inline void operator()(int x_cb, int parity_c_row, int c_col)
-    {
-      apply(x_cb, parity_c_row, c_col);
     }
   };
 

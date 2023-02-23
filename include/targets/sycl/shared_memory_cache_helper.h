@@ -89,7 +89,8 @@ namespace quda
       using atype = atom_t[n_element * block_size_x * block_size_y * block_size_z];
       if constexpr (std::is_same_v<dummy,void>) {
 	auto mem = sycl::ext::oneapi::group_local_memory_for_overwrite<atype>(getGroup());
-	cache_ptr = *mem.get();
+	//cache_ptr = *mem.get();
+	cache_ptr = &((*mem)[0]);
       }
     }
     template <typename S, typename ...Arg>

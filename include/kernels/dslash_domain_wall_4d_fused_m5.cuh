@@ -65,7 +65,7 @@ namespace quda
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type, bool allthreads = false>
-    __device__ __host__ __forceinline__ void apply(int idx, int s, int parity, bool active = true)
+    __device__ __host__ __forceinline__ void operator()(int idx, int s, int parity, bool active = true)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
@@ -228,13 +228,6 @@ namespace quda
       }
       if (active) arg.out(xs, my_spinor_parity) = out;
     }
-
-    template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int s, int parity)
-    {
-      apply<mykernel_type>(idx, s, parity);
-    }
-
   };
 
 } // namespace quda

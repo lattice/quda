@@ -103,7 +103,7 @@ namespace quda
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       template <bool allthreads = false>
-      __device__ __host__ inline void apply(int x_cb, int s, int parity, bool active = true)
+      __device__ __host__ inline void operator()(int x_cb, int s, int parity, bool active = true)
       {
         using real = typename Arg::real;
         typedef ColorSpinor<real, Arg::nColor, 4> Vector;
@@ -168,11 +168,6 @@ namespace quda
 	  arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
 	}
       }
-
-      __device__ __host__ inline void operator()(int x_cb, int s, int parity)
-      {
-	apply(x_cb, s, parity);
-      }
     };
 
     /**
@@ -193,7 +188,7 @@ namespace quda
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       template <bool allthreads = false>
-      __device__ __host__ inline void apply(int x_cb, int s, int parity, bool active = true)
+      __device__ __host__ inline void operator()(int x_cb, int s, int parity, bool active = true)
       {
         using real = typename Arg::real;
         typedef ColorSpinor<real, Arg::nColor, 4> Vector;
@@ -238,11 +233,6 @@ namespace quda
 	if (!allthreads || active) {
 	  arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
 	}
-      }
-
-      __device__ __host__ inline void operator()(int x_cb, int s, int parity)
-      {
-	apply(x_cb, s, parity);
       }
     };
 

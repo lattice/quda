@@ -41,9 +41,8 @@ namespace quda
       }
     }
   };
-
-  template <typename Arg_> struct APE : SpecialOps<computeStapleOps> {
-    using Arg = Arg_;
+  
+  template <typename Arg> struct APE {
     const Arg &arg;
     constexpr APE(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
@@ -66,8 +65,7 @@ namespace quda
       int dx[4] = {0, 0, 0, 0};
       Link U, Stap, TestU, I;
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      //computeStaple(arg, x, X, parity, dir, Stap, Arg::apeDim);
-      computeStaple(this, x, X, parity, dir, Stap, Arg::apeDim);
+      computeStaple(arg, x, X, parity, dir, Stap, Arg::apeDim);
 
       // Get link U
       U = arg.in(dir, linkIndexShift(x, dx, X), parity);

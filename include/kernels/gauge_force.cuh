@@ -44,11 +44,11 @@ namespace quda {
     }
   };
 
-  template <typename Arg> struct GaugeForce : only_thread_array<int,4>
+  template <typename Arg> struct GaugeForce
   {
     const Arg &arg;
     constexpr GaugeForce(const Arg &arg) : arg(arg) {}
-    static constexpr const char *filename() { return KERNEL_FILE; }
+    static constexpr const char *filename() { return KERNEL_FILE; }    
 
     __device__ __host__ void operator()(int x_cb, int parity, int dir)
     {
@@ -62,8 +62,7 @@ namespace quda {
       // prod: current matrix product
       // accum: accumulator matrix
       Link link_prod, accum;
-      //thread_array<int, 4> dx{0};
-      thread_array<op_thread_array<int, 4>> dx{this, 0};
+      thread_array<int, 4> dx{0};
 
       for (int i=0; i<arg.p.num_paths; i++) {
         real coeff = arg.p.path_coeff[i];

@@ -210,19 +210,19 @@ namespace quda {
   // sharedMemOffset
   template <typename T, int n> struct sharedMemOffset {
     template <typename ...Arg>
-    int operator()(dim3 block, Arg &...arg) { return 0; }
+    inline int operator()(dim3 block, Arg &...arg) { return 0; }
   };
   template <typename T, int n> struct sharedMemOffset<SpecialOps<T>,n> {
     template <typename ...Arg>
-    int operator()(dim3 block, Arg &...arg) { return sharedMemOffset<T,n>()(block, arg...); }
+    inline int operator()(dim3 block, Arg &...arg) { return sharedMemOffset<T,n>()(block, arg...); }
   };
   template <typename ...T> struct sharedMemOffset<op_Concurrent<T...>,0> {
     template <typename ...Arg>
-    int operator()(dim3 block, Arg &...arg) { return 0; }
+    inline int operator()(dim3 block, Arg &...arg) { return 0; }
   };
   template <typename ...T, int n> struct sharedMemOffset<op_Concurrent<T...>,n> {
     template <typename ...Arg>
-    int operator()(dim3 block, Arg &...arg) {
+    inline int operator()(dim3 block, Arg &...arg) {
       return sharedMemOffset<op_Concurrent<T...>,n-1>()(block, arg...)
 	+ sharedMemSize<std::tuple_element_t<n-1,std::tuple<T...>>>(block, arg...);
     }

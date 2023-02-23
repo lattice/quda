@@ -130,7 +130,7 @@ namespace quda {
     }
 
     template <bool allthreads = false>
-    __device__ __host__ inline void apply(dim3 block, dim3 thread, bool active = true)
+    __device__ __host__ inline void operator()(dim3 block, dim3 thread, bool active = true)
     {
       int x_coarse = block.x;
       int x_fine_offset = thread.x;
@@ -239,11 +239,6 @@ namespace quda {
           }
         } // j
       }   // n
-    }
-
-    __device__ __host__ inline void operator()(dim3 block, dim3 thread)
-    {
-      apply(block, thread);
     }
   };
 

@@ -343,7 +343,7 @@ namespace quda
        @param[in] s Ls dimension coordinate
     */
     template <bool allthreads = false>
-      __device__ __host__ inline void apply(int x_cb, int s, int parity, bool active = true)
+    __device__ __host__ inline void operator()(int x_cb, int s, int parity, bool active = true)
     {
       using real = typename Arg::real;
       coeff_type<real, is_variable<Arg::type>::value, Arg> coeff(arg);
@@ -370,11 +370,6 @@ namespace quda
 
 	arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
       }
-    }
-
-    __device__ __host__ inline void operator()(int x_cb, int s, int parity)
-    {
-      apply(x_cb, s, parity);
     }
   };
 
@@ -603,7 +598,7 @@ namespace quda
        @param[in] s Ls dimension coordinate
     */
     template <bool allthreads = false>
-      __device__ __host__ inline void apply(int x_cb, int s, int parity, bool active = true)
+    __device__ __host__ inline void operator()(int x_cb, int s, int parity, bool active = true)
     {
       constexpr int nSpin = 4;
       using real = typename Arg::real;
@@ -629,11 +624,6 @@ namespace quda
 
 	arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
       }
-    }
-
-    __device__ __host__ inline void operator()(int x_cb, int s, int parity)
-    {
-      apply(x_cb, s, parity);
     }
   };
 

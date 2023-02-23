@@ -55,13 +55,9 @@ namespace quda
     }
   };
 
-  //template <typename Arg>
-  //__host__ __device__ inline auto computeStaple(const Arg &arg, const int *x, int parity, int dir)
-  template <typename Ftor>
-  __host__ __device__ inline auto computeStaple(const Ftor *ftor, const int *x, int parity, int dir)
+  template <typename Arg>
+  __host__ __device__ inline auto computeStaple(const Arg &arg, const int *x, int parity, int dir)
   {
-    using Arg = typename Ftor::Arg;
-    const Arg &arg = ftor->arg;
     using real = typename Arg::real;
     using Link = Matrix<complex<real>, Arg::nColor>;
     Link Stap, Rect, Z;
@@ -69,32 +65,25 @@ namespace quda
     switch (arg.wflow_type) {
     case QUDA_GAUGE_SMEAR_WILSON_FLOW :
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      //computeStaple(arg, x, arg.E, parity, dir, Stap, Arg::wflow_dim);
-      computeStaple(ftor, x, arg.E, parity, dir, Stap, Arg::wflow_dim);
+      computeStaple(arg, x, arg.E, parity, dir, Stap, Arg::wflow_dim);
       Z = Stap;
       break;
     case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW :
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
-      //computeStapleRectangle(arg, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim);
-      computeStapleRectangle(ftor, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim);
+      computeStapleRectangle(arg, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim);
       Z = (arg.coeff1x1 * Stap + arg.coeff2x1 * Rect);
       break;
     }
     return Z;
   }
 
-  //template <typename Link, typename Arg>
-  //__host__ __device__ inline auto computeW1Step(const Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
-  template <typename Link, typename F>
-  __host__ __device__ inline auto computeW1Step(const F *f, Link &U, const int *x, const int parity, const int x_cb, const int dir)
+  template <typename Link, typename Arg>
+  __host__ __device__ inline auto computeW1Step(const Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
   {
-    using Arg = typename F::Arg;
-    const Arg &arg = f->arg;
     // Compute staples and Z0
-    //Link Z0 = computeStaple(arg, x, parity, dir);
-    Link Z0 = computeStaple(f, x, parity, dir);
+    Link Z0 = computeStaple(arg, x, parity, dir);
     U = arg.in(dir, linkIndex(x, arg.E), parity);
     Z0 *= conj(U);
     arg.temp(dir, x_cb, parity) = Z0;
@@ -102,16 +91,11 @@ namespace quda
     return Z0;
   }
 
-  //template <typename Link, typename Arg>
-  //__host__ __device__ inline auto computeW2Step(const Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
-  template <typename Link, typename F>
-  __host__ __device__ inline auto computeW2Step(const F *f, Link &U, const int *x, const int parity, const int x_cb, const int dir)
+  template <typename Link, typename Arg>
+  __host__ __device__ inline auto computeW2Step(const Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
   {
-    using Arg = typename F::Arg;
-    const Arg &arg = f->arg;
     // Compute staples and Z1
-    //Link Z1 = static_cast<typename Arg::real>(8.0 / 9.0) * computeStaple(arg, x, parity, dir);
-    Link Z1 = static_cast<typename Arg::real>(8.0 / 9.0) * computeStaple(f, x, parity, dir);
+    Link Z1 = static_cast<typename Arg::real>(8.0 / 9.0) * computeStaple(arg, x, parity, dir);
     U = arg.in(dir, linkIndex(x, arg.E), parity);
     Z1 *= conj(U);
 
@@ -124,16 +108,11 @@ namespace quda
     return Z1;
   }
 
-  //template <typename Link, typename Arg>
-  //__host__ __device__ inline auto computeVtStep(const Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
-  template <typename Link, typename F>
-  __host__ __device__ inline auto computeVtStep(const F *f, Link &U, const int *x, const int parity, const int x_cb, const int dir)
+  template <typename Link, typename Arg>
+  __host__ __device__ inline auto computeVtStep(const Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
   {
-    using Arg = typename F::Arg;
-    const Arg &arg = f->arg;
     // Compute staples and Z2
-    //Link Z2 = static_cast<typename Arg::real>(3.0/4.0) * computeStaple(arg, x, parity, dir);
-    Link Z2 = static_cast<typename Arg::real>(3.0/4.0) * computeStaple(f, x, parity, dir);
+    Link Z2 = static_cast<typename Arg::real>(3.0/4.0) * computeStaple(arg, x, parity, dir);
     U = arg.in(dir, linkIndex(x, arg.E), parity);
     Z2 *= conj(U);
 
@@ -145,9 +124,8 @@ namespace quda
   }
 
   // Wilson Flow as defined in https://arxiv.org/abs/1006.4518v3
-  template <typename Arg_> struct WFlow : computeStapleOps
+  template <typename Arg> struct WFlow
   {
-    using Arg = Arg_;
     const Arg &arg;
     constexpr WFlow(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -165,9 +143,9 @@ namespace quda
 
       Link U, Z;
       switch (arg.step_type) {
-      case WFLOW_STEP_W1: Z = computeW1Step(this, U, x, parity, x_cb, dir); break;
-      case WFLOW_STEP_W2: Z = computeW2Step(this, U, x, parity, x_cb, dir); break;
-      case WFLOW_STEP_VT: Z = computeVtStep(this, U, x, parity, x_cb, dir); break;
+      case WFLOW_STEP_W1: Z = computeW1Step(arg, U, x, parity, x_cb, dir); break;
+      case WFLOW_STEP_W2: Z = computeW2Step(arg, U, x, parity, x_cb, dir); break;
+      case WFLOW_STEP_VT: Z = computeVtStep(arg, U, x, parity, x_cb, dir); break;
       }
 
       // Compute anti-hermitian projection of Z, exponentiate, update U

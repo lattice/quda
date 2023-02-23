@@ -143,7 +143,7 @@ namespace quda {
     auto i = globalIdX;
     while (i-localIdX < arg.threads.x) {
       if (i >= arg.threads.x) active = false;
-      f.template apply<true>(i, j, active);
+      f.template operator()<true>(i, j, active);
       if (grid_stride) i += globalRangeX; else break;
     }
   }
@@ -283,7 +283,7 @@ namespace quda {
     auto i = globalIdX;
     while (i-localIdX < arg.threads.x) {
       if (i >= arg.threads.x) active = false;
-      f.template apply<true>(i, j, k, active);
+      f.template operator()<true>(i, j, k, active);
       if (grid_stride) i += globalRangeX; else break;
     }
   }

@@ -131,7 +131,7 @@ namespace quda
   template <typename T, typename param_t, typename O>
   struct block_reduceW {
     SpecialOps<O> op;
-    block_reduceW(SpecialOps<O> &&op) : op(op) {};
+    inline block_reduceW(SpecialOps<O> &&op) : op(op) {};
 
     template <int width_> struct warp_reduce_param {
       static constexpr int width = width_;
@@ -152,7 +152,7 @@ namespace quda
     template <typename reducer_t>
     inline T apply(const T &value_, bool async, int batch, bool all, const reducer_t &r)
     {
-      //static_assert(!std::is_same_v<O...,void>);
+      static_assert(!std::is_same_v<O,void>);
       constexpr auto max_items = device::max_block_size() / device::warp_size();
       const auto thread_idx = target::thread_idx_linear<param_t::block_dim>();
       const auto block_size = target::block_size<param_t::block_dim>();

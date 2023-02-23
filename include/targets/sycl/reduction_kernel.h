@@ -12,19 +12,19 @@ namespace quda {
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
   void Reduction2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, char *smem)
   {
-    Functor<Arg> t(arg);
+    Functor<Arg> f(arg);
     reduceSpecialOps<typename Functor<Arg>::reduce_t> rso;
     rso.setNdItem(ndi);
     rso.setSharedMem(smem);
     auto idx = globalIdX;
     auto j = localIdY;
-    auto value = t.init();
+    auto value = f.init();
     while (idx < arg.threads.x) {
-      value = t(value, idx, j);
+      value = f(value, idx, j);
       if (grid_stride) idx += globalRangeX; else break;
     }
     // perform final inter-block reduction and write out result
-    reduce(arg, t, value, 0, rso);
+    reduce(arg, f, value, 0, rso);
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
   struct Reduction2DS {
@@ -149,6 +149,7 @@ namespace quda {
   template <template <typename> class Functor, typename Arg, bool grid_stride = true, typename S>
   void MultiReductionImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S smem)
   {
+    static_assert(!needsFullBlock<Functor<Arg>>);
     using reduce_t = typename Functor<Arg>::reduce_t;
     Functor<Arg> f(arg);
     if constexpr (hasSpecialOps<Functor<Arg>>) {

@@ -300,7 +300,7 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     template <bool allthreads = false>
-    __device__ __host__ void apply(int tid, int spin_color_block, int parity, bool active = true)
+    __device__ __host__ void operator()(int tid, int spin_color_block, int parity, bool active = true)
     {
       const int Ms = spins_per_thread<Arg::nSpin>();
       const int Mc = colors_per_thread<Arg::nColor>();
@@ -333,11 +333,6 @@ namespace quda {
 	if (arg.shmem) shmem_signalwait(0, 0, (arg.shmem & 4), arg);
 #endif
       }
-    }
-
-    __device__ __host__ inline void operator()(int tid, int spin_color_block, int parity)
-    {
-      apply(tid, spin_color_block, parity);
     }
   };
 

@@ -76,7 +76,7 @@ namespace quda
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       template <bool allthreads = false> // true if all threads in group will enter, even if out of range
-      __device__ __host__ inline void apply(int i, int k, int parity, bool active = true)
+      __device__ __host__ inline void operator()(int i, int k, int parity, bool active = true)
       {
         using vec = array<complex<typename Arg::real>, Arg::n/2>;
 
@@ -121,11 +121,6 @@ namespace quda
 	    if (arg.f.write.W) arg.W[k].save(w, idx, parity);
 	  }
 	}
-      }
-
-      __device__ __host__ inline void operator()(int i, int k, int parity)
-      {
-	apply(i, k, parity);
       }
     };
 

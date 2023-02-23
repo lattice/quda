@@ -58,7 +58,7 @@ namespace quda
     */
 
     template <KernelType mykernel_type = kernel_type, bool allthreads = false>
-    __device__ __host__ __forceinline__ void apply(int idx, int flavor, int parity, bool active = true)
+    __device__ __host__ __forceinline__ void operator()(int idx, int flavor, int parity, bool active = true)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
@@ -117,13 +117,6 @@ namespace quda
 
       if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(my_flavor_idx, my_spinor_parity) = out;
     }
-
-    template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int flavor, int parity)
-    {
-      apply<mykernel_type>(idx, flavor, parity);
-    }
-
   };
 
 } // namespace quda

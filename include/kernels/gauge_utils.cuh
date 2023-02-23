@@ -18,19 +18,11 @@ namespace quda
   // matrix+matrix = 18 floating-point ops
   // => Total number of floating point ops per function call
   // dims * (2*18 + 4*198) = dims*828
-  //template <typename Arg, typename Link, typename Int>
-  //__host__ __device__ inline void computeStaple(const Arg &arg, const int *x, const Int *X, const int parity, const int nu, Link &staple, const int dir_ignore)
-  using computeStapleThreadArray = op_thread_array<int,4>;
-  using computeStapleOps = SpecialOps<computeStapleThreadArray>;
-  template <typename Ftor, typename Link, typename Int>
-  __host__ __device__ inline void computeStaple(const Ftor *ftor, const int *x, const Int *X, const int parity,
-						const int nu, Link &staple, const int dir_ignore)
+  template <typename Arg, typename Link, typename Int>
+  __host__ __device__ inline void computeStaple(const Arg &arg, const int *x, const Int *X, const int parity, const int nu, Link &staple, const int dir_ignore)
   {
-    using Arg = typename Ftor::Arg;
-    const Arg &arg = ftor->arg;
     setZero(&staple);
-    //thread_array<int, 4> dx{};
-    thread_array<computeStapleThreadArray> dx{ ftor };
+    thread_array<int, 4> dx = { };
 #pragma unroll
     for (int mu = 0; mu < 4 ; mu++) {
       // Identify directions orthogonal to the link and
@@ -99,18 +91,13 @@ namespace quda
   // matrix+matrix = 18 floating-point ops
   // => Total number of floating point ops per function call
   // dims * (8*18 + 28*198) = dims*5688
-  using computeStapleRectangleThreadArray = op_thread_array<int,4>;
-  using computeStapleRectangleOps = SpecialOps<computeStapleRectangleThreadArray>;
-  template <typename Ftor, typename Link, typename Int>
-  __host__ __device__ inline void computeStapleRectangle(const Ftor *ftor, const int *x, const Int *X, const int parity, const int nu,
+  template <typename Arg, typename Link, typename Int>
+  __host__ __device__ inline void computeStapleRectangle(const Arg &arg, const int *x, const Int *X, const int parity, const int nu,
                                                          Link &staple, Link &rectangle, const int dir_ignore)
   {
-    using Arg = typename Ftor::Arg;
-    const Arg &arg = ftor->arg;
     setZero(&staple);
     setZero(&rectangle);
-    //thread_array<int, 4> dx = { };
-    thread_array<computeStapleRectangleThreadArray> dx = { ftor };
+    thread_array<int, 4> dx = { };
 
     for (int mu = 0; mu < 4; mu++) { // do not unroll loop to prevent register spilling
       // Identify directions orthogonal to the link.

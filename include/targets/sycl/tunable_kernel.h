@@ -86,7 +86,6 @@ namespace quda {
 	q.submit([&](sycl::handler &h) {
 	  sycl::range<1> smem_range(smemsize);
 	  auto la = sycl::local_accessor<char>(smem_range, h);
-	  arg.la = &la;
 	  h.parallel_for<>
 	    (ndRange,
 	     //[=](sycl::nd_item<3> ndi) {
@@ -142,7 +141,6 @@ namespace quda {
 	q.submit([&](sycl::handler &h) {
 	  sycl::range<1> smem_range(smemsize);
 	  auto la = sycl::local_accessor<char>(smem_range, h);
-	  arg.la = &la;
 	  h.parallel_for<>
 	    (ndRange,
 	     //[=](sycl::nd_item<3> ndi) {
