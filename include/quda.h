@@ -1104,10 +1104,10 @@ extern "C" {
   void freeGaugeQuda(void);
 
   /**
-   * Free a single type (Wilson, HISQ fat, HISQ long) of internal gauge field.
+   * Free a unique type (Wilson, HISQ fat, HISQ long, smeared) of internal gauge field.
    * @param link_type[in] Type of link type to free up
    */
-  void freeSingleGaugeQuda(QudaLinkType link_type);
+  void freeUniqueGaugeQuda(QudaLinkType link_type);
 
   /**
    * Free QUDA's internal smeared gauge field.
