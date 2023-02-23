@@ -674,10 +674,11 @@ namespace quda
 
       if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) &&
           target::block_idx().x < static_cast<unsigned int>(arg.pack_blocks)) {
-        // first few blocks do packing kernel
-        typename Arg::template P<dslash.pc_type()> packer;
-        packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
-
+	if (!allthreads || active ) {
+	  // first few blocks do packing kernel
+	  typename Arg::template P<dslash.pc_type()> packer;
+	  packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
+	}
         // we use that when running the exterior -- this is either
         // * an explicit call to the exterior when not merged with the interior or
         // * the interior with exterior_blocks > 0
@@ -692,8 +693,10 @@ namespace quda
         const int dslash_block_offset
           = ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) ? arg.pack_blocks : 0);
         int x_cb = (target::block_idx().x - dslash_block_offset) * target::block_dim().x + target::thread_idx().x;
-        //if (x_cb >= arg.threads) return;
-        if (x_cb >= arg.threads) active = false;
+	if (x_cb >= arg.threads) {
+	  if constexpr (allthreads) active = false;
+	  else return;
+	}
 
 #ifdef QUDA_DSLASH_FAST_COMPILE
 	if constexpr (allthreads) {
