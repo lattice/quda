@@ -6,11 +6,12 @@ namespace quda {
       constexpr int warp_size = device::warp_size();
       auto sg = sycl::ext::oneapi::experimental::this_sub_group();
       //const int sg_size = sg.get_local_range().size();
-#if 0
+#if 1
       // reduce down to the first group of column-split threads
 #pragma unroll
       for (int offset = warp_size / 2; offset >= warp_size / warp_split; offset /= 2) {
-	auto y = sycl::shift_group_left(sg, x, offset);
+	//auto y = sycl::shift_group_left(sg, x, offset);
+	auto y = sycl::permute_group_by_xor(sg, x, offset);
 #pragma unroll
 	for (int i = 0; i < x.size(); i++) {
 	  x[i] += y[i];

@@ -163,7 +163,8 @@ namespace quda {
 
   template <typename T>
   struct op_warp_combine : op_BaseT<T> {
-    using dependencies = depFullBlock;
+    using dependencies = depNone;
+    //using dependencies = depFullBlock;
   };
 
   template <typename T, int N>
