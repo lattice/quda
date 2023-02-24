@@ -291,18 +291,18 @@ namespace quda {
 
   template <bool is_device> struct dim_collapse {
     //template <typename T, typename Arg> void operator()(T &out, int, int, const Arg &arg)
-    template <typename T, typename F> void operator()(T &out, int, int, const F *f)
+    template <typename T, typename Ftor> void operator()(T &out, int, int, const Ftor &ftor)
     {
-      out *= -f->arg.kappa;
+      out *= -ftor.arg.kappa;
     }
   };
 
   template <> struct dim_collapse<true> {
     //template <typename T, typename Arg> __device__ __host__ inline void operator()(T &out, int dir, int dim, const Arg &arg)
-    template <typename T, typename F> __device__ __host__ inline void operator()(T &out, int dir, int dim, const F *f)
+    template <typename T, typename Ftor> __device__ __host__ inline void operator()(T &out, int dir, int dim, const Ftor &ftor)
     {
       //SharedMemoryCache<T> cache(target::block_dim());
-      SharedMemoryCache<T> cache(f);
+      SharedMemoryCache<T> cache(ftor);
       // only need to write to shared memory if not master thread
       if (dim > 0 || dir) cache.save(out);
 
@@ -311,26 +311,30 @@ namespace quda {
       if (dir == 0 && dim == 0) {
         // full split over dimension and direction
 #pragma unroll
-        for (int d=1; d < F::Arg::dim_stride; d++) { // get remaining forward gathers (if any)
+        for (int d=1; d < Ftor::Arg::dim_stride; d++) { // get remaining forward gathers (if any)
           // 4-way 1,2,3  (stride = 4)
           // 2-way 1      (stride = 2)
           out += cache.load_z(target::thread_idx().z + d * 2 + 0);
         }
 
 #pragma unroll
-        for (int d=0; d < F::Arg::dim_stride; d++) { // get all backward gathers
+        for (int d=0; d < Ftor::Arg::dim_stride; d++) { // get all backward gathers
           out += cache.load_z(target::thread_idx().z + d * 2 + 1);
         }
 
-        out *= -f->arg.kappa;
+        out *= -ftor.arg.kappa;
       }
     }
   };
 
-  template <typename Arg> using CoarseDslashCacheT =
-    array<complex<typename Arg::real>, colors_per_thread(Arg::nColor, Arg::dim_stride)>;
-  template <typename A> struct CoarseDslash : SpecialOps<op_SharedMemoryCache<CoarseDslashCacheT<A>>, op_warp_combine<CoarseDslashCacheT<A>>> {
-    using Arg = A;
+  template <typename Arg> struct CoarseDslashParams {
+    static constexpr int Mc = colors_per_thread(Arg::nColor, Arg::dim_stride);
+    using array_t = array<complex<typename Arg::real>, Mc>;
+    using Ops = SpecialOps<SharedMemoryCache<array_t>, op_warp_combine<array_t>>;
+  };
+
+  template <typename Arg_> struct CoarseDslash : CoarseDslashParams<Arg_>::Ops {
+    using Arg = Arg_;
     const Arg &arg;
     constexpr CoarseDslash(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -354,7 +358,7 @@ namespace quda {
       int parity = (arg.nParity == 2) ? (src_parity / arg.n_src) : arg.parity;
 
       // z thread dimension is (( s*(Nc/Mc) + color_block )*dim_thread_split + dim)*2 + dir
-      constexpr int Mc = colors_per_thread(Arg::nColor, Arg::dim_stride);
+      constexpr int Mc = CoarseDslashParams<Arg>::Mc;
       int dir = sMd & 1;
       int sMdim = sMd >> 1;
       int dim = sMdim % Arg::dim_stride;
@@ -362,13 +366,13 @@ namespace quda {
       int s = sM / (Arg::nColor/Mc);
       int color_block = (sM % (Arg::nColor/Mc)) * Mc;
 
-      array<complex <typename Arg::real>, Mc> out{ };
+      typename CoarseDslashParams<Arg>::array_t out{ };
 
       if (Arg::dslash) {
  	if (!allthreads || active) {
 	  applyDslash<Mc>(out, dim, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
 	}
-        target::dispatch<dim_collapse>(out, dir, dim, this);
+        target::dispatch<dim_collapse>(out, dir, dim, *this);
       }
 
       if (!allthreads || active) {

@@ -75,7 +75,7 @@ namespace quda {
 
   // getDependentOps
   template <typename U, int n = 0, typename ...T>
-  inline SpecialOpDependencies<SpecialOpsType<U,n>> getDependentOps(SpecialOps<T...> &ops) {
+  inline SpecialOpDependencies<SpecialOpsType<U,n>> getDependentOps(const SpecialOps<T...> &ops) {
     static_assert(hasSpecialOpType<U,T...>);
     //if (ops->ndi == nullptr || ops->smem == nullptr) {
     //errorQuda("SpecialOps not set");
@@ -195,44 +195,53 @@ namespace quda {
   // needsFullWarp?
 
   // needsFullBlock
-  template <typename ...T> static constexpr bool needsFullBlock = (needsFullBlock<T> || ...);
-  template <> static constexpr bool needsFullBlock<depFullBlock> = true;
-  template <typename ...T> static constexpr bool needsFullBlock<SpecialOps<T...>> = needsFullBlock<T...>;
-  template <typename ...T> static constexpr bool needsFullBlock<op_Concurrent<T...>> = needsFullBlock<T...>;
-  template <typename ...T> static constexpr bool needsFullBlock<op_Sequential<T...>> = needsFullBlock<T...>;
+  template <typename T> static constexpr bool needsFullBlock = needsFullBlock<getSpecialOps<T>>;
+  template <typename ...T> static constexpr bool needsFullBlockImpl = (needsFullBlockImpl<T> || ...);
+  template <> static constexpr bool needsFullBlockImpl<depNone> = false;
+  template <> static constexpr bool needsFullBlockImpl<depFullBlock> = true;
+  template <typename T, typename S> static constexpr bool needsFullBlockImpl<depSharedMem<T,S>> = false;
+  template <typename ...T> static constexpr bool needsFullBlockImpl<op_Concurrent<T...>> = needsFullBlockImpl<T...>;
+  template <typename ...T> static constexpr bool needsFullBlockImpl<op_Sequential<T...>> = needsFullBlockImpl<T...>;
   template <typename T> static constexpr bool needsFullBlockF() {
     if constexpr (std::is_base_of<op_Base,T>::value) {
-    //if constexpr (is_instance<T,op_Base>) {
-      return needsFullBlock<typename T::dependencies>;
+      return needsFullBlockImpl<typename T::dependencies>;
     } else {
-      if constexpr (hasSpecialOps<T>) {
-	return needsFullBlock<getSpecialOps<T>>;
-      } else {
-	return false;
-      }
+      //if constexpr (hasSpecialOps<T>) {
+      //return needsFullBlock<getSpecialOps<T>>;
+      //} else {
+      //return false;
+      return needsFullBlock<typename T::dependentOps>;
+      //}
     }
   }
-  template <typename T> static constexpr bool needsFullBlock<T> = needsFullBlockF<T>();
+  template <typename T> static constexpr bool needsFullBlockImpl<T> = needsFullBlockF<T>();
+  template <> static constexpr bool needsFullBlock<NoSpecialOps> = false;
+  template <typename ...T> static constexpr bool needsFullBlock<SpecialOps<T...>> = needsFullBlockImpl<T...>;
 
   // needsSharedMem
-  template <typename ...T> static constexpr bool needsSharedMem = (needsSharedMem<T> || ...);
-  template <typename T, typename S> static constexpr bool needsSharedMem<depSharedMem<T,S>> = true;
-  template <typename ...T> static constexpr bool needsSharedMem<SpecialOps<T...>> = needsSharedMem<T...>;
-  template <typename ...T> static constexpr bool needsSharedMem<op_Concurrent<T...>> = needsSharedMem<T...>;
-  template <typename ...T> static constexpr bool needsSharedMem<op_Sequential<T...>> = needsSharedMem<T...>;
+  template <typename T> static constexpr bool needsSharedMem = needsSharedMem<getSpecialOps<T>>;
+  template <typename ...T> static constexpr bool needsSharedMemImpl = (needsSharedMemImpl<T> || ...);
+  template <> static constexpr bool needsSharedMemImpl<depNone> = false;
+  template <> static constexpr bool needsSharedMemImpl<depFullBlock> = true;
+  template <typename T, typename S> static constexpr bool needsSharedMemImpl<depSharedMem<T,S>> = true;
+  template <typename ...T> static constexpr bool needsSharedMemImpl<op_Concurrent<T...>> = needsSharedMemImpl<T...>;
+  template <typename ...T> static constexpr bool needsSharedMemImpl<op_Sequential<T...>> = needsSharedMemImpl<T...>;
   template <typename T> static constexpr bool needsSharedMemF() {
     if constexpr (std::is_base_of<op_Base,T>::value) {
     //if constexpr (is_instance<T,op_Base>) {
-      return needsSharedMem<typename T::dependencies>;
+      return needsSharedMemImpl<typename T::dependencies>;
     } else {
-      if constexpr (hasSpecialOps<T>) {
-	return needsSharedMem<getSpecialOps<T>>;
-      } else {
-	return false;
-      }
+      //if constexpr (hasSpecialOps<T>) {
+      //return needsSharedMem<getSpecialOps<T>>;
+      //} else {
+      //return false;
+      return needsSharedMem<typename T::dependentOps>;
+      //}
     }
   }
-  template <typename T> static constexpr bool needsSharedMem<T> = needsSharedMemF<T>();
+  template <typename T> static constexpr bool needsSharedMemImpl<T> = needsSharedMemF<T>();
+  template <> static constexpr bool needsSharedMem<NoSpecialOps> = false;
+  template <typename ...T> static constexpr bool needsSharedMem<SpecialOps<T...>> = needsSharedMemImpl<T...>;
 
   // tests
   static const int opTestArg = 10;

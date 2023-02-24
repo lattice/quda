@@ -90,13 +90,15 @@ namespace quda
       }
     };
 
-    template <class Arg> struct Transfer5DCache {
+    template <class Arg> struct Transfer5DParams {
       static constexpr dim3 dims(dim3 block, const Arg &arg) {
 	return dim3(arg.Ls_out * arg.Ls_in * sizeof(typename Arg::matrix_t) / sizeof(typename Arg::real), 1, 1);
       }
-      using T = op_SharedMemoryCache<typename Arg::real, Transfer5DCache>;
+      using Cache = SharedMemoryCache<typename Arg::real, Transfer5DParams>;
+      using Ops = SpecialOps<Cache>;
     };
-    template <class Arg> struct Transfer5D : SpecialOps<typename Transfer5DCache<Arg>::T> {
+
+    template <class Arg> struct Transfer5D : Transfer5DParams<Arg>::Ops {
 
       const Arg &arg;
       constexpr Transfer5D(const Arg &arg) : arg(arg) { }
@@ -123,8 +125,7 @@ namespace quda
         const matrix_t *wm_p = arg.wm_p;
 
         int thread_idx = target::thread_idx().y * target::block_dim().x + target::thread_idx().x;
-        //SharedMemoryCache<real> cache;
-        SharedMemoryCache<typename Transfer5DCache<Arg>::T> cache(this, arg);
+        typename Transfer5DParams<Arg>::Cache cache(*this, arg);
         while (thread_idx < static_cast<int>(Ls_out * Ls_in * sizeof(matrix_t) / sizeof(real))) {
           cache.data()[thread_idx] = reinterpret_cast<const real *>(wm_p)[thread_idx];
           thread_idx += target::block_dim().y * target::block_dim().x;

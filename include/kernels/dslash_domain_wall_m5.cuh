@@ -207,13 +207,17 @@ namespace quda
     }
   };
 
-  template <typename A> using d5CacheT = ColorSpinor<typename A::real, A::nColor, mobius_m5::use_half_vector() ? 4 / 2 : 4>;
-  template <typename A> using d5Ops = op_SharedMemoryCache<d5CacheT<A>>;
-  template <bool allthreads, bool sync, bool dagger, bool shared, class Vector, class F, Dslash5Type type = F::Arg::type>
-  __device__ __host__ inline Vector d5(const F *f, const Vector &in, int parity, int x_cb, int s, bool active)
+  template <typename Arg> struct d5Params {
+    using Vec = ColorSpinor<typename Arg::real, Arg::nColor, mobius_m5::use_half_vector() ? 4 / 2 : 4>;
+    using Cache = SharedMemoryCache<Vec>;
+    using Ops = SpecialOps<Cache>;
+  };
+
+  template <bool allthreads, bool sync, bool dagger, bool shared, class Vector, class Ftor, Dslash5Type type = Ftor::Arg::type>
+  __device__ __host__ inline Vector d5(const Ftor &ftor, const Vector &in, int parity, int x_cb, int s, bool active)
   {
-    using Arg = typename F::Arg;
-    const Arg &arg = f->arg;
+    using Arg = typename Ftor::Arg;
+    const Arg &arg = ftor.arg;
     using real = typename Arg::real;
     constexpr bool is_variable = true;
     coeff_type<real, is_variable, Arg> coeff(arg);
@@ -223,8 +227,7 @@ namespace quda
     if constexpr (mobius_m5::use_half_vector()) {
       // if using shared-memory caching then load spinor field for my site into cache
       typedef ColorSpinor<real, Arg::nColor, 4 / 2> HalfVector;
-      //SharedMemoryCache<HalfVector> cache(target::block_dim());
-      SharedMemoryCache<HalfVector> cache(f);
+      SharedMemoryCache<HalfVector> cache(ftor);
 
       { // forwards direction
         constexpr int proj_dir = dagger ? +1 : -1;
@@ -279,8 +282,7 @@ namespace quda
     } else { // use_half_vector
 
       // if using shared-memory caching then load spinor field for my site into cache
-      //SharedMemoryCache<Vector> cache(target::block_dim());
-      SharedMemoryCache<Vector> cache(f);
+      SharedMemoryCache<Vector> cache(ftor);
       if (shared) {
         if (sync) { cache.sync(); }
         cache.save(in);
@@ -328,10 +330,8 @@ namespace quda
     return out;
   }
 
-  //template <typename A> using dslash5CacheT = ColorSpinor<typename A::real, A::nColor, mobius_m5::use_half_vector() ? 4 / 2 : 4>;
-  //template <typename A> struct dslash5 : only_SharedMemoryCache<dslash5CacheT<A>> {
-  template <typename A> struct dslash5 : SpecialOps<d5Ops<A>> {
-    using Arg = A;
+  template <typename Arg_> struct dslash5 : d5Params<Arg_>::Ops {
+    using Arg = Arg_;
     const Arg &arg;
     constexpr dslash5(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -352,7 +352,7 @@ namespace quda
       constexpr bool sync = false;
       constexpr bool shared = false;
 
-      Vector out = d5<allthreads, sync, Arg::dagger, shared>(this, Vector(), parity, x_cb, s, active);
+      Vector out = d5<allthreads, sync, Arg::dagger, shared>(*this, Vector(), parity, x_cb, s, active);
 
       if (!allthreads || active) {
 	if (Arg::xpay) {
@@ -388,18 +388,17 @@ namespace quda
      @param[in] x_b Checkerboarded 4-d space-time index
      @param[in] s_ Ls dimension coordinate
   */
-  template <bool allthreads, bool sync, bool dagger, bool shared, typename Vector, typename F>
-  __device__ __host__ inline Vector constantInv(const F *f, const Vector &in, int parity, int x_cb, int s_, bool active)
+  template <bool allthreads, bool sync, bool dagger, bool shared, typename Vector, typename Ftor>
+  __device__ __host__ inline Vector constantInv(const Ftor &ftor, const Vector &in, int parity, int x_cb, int s_, bool active)
   {
-    using Arg = typename F::Arg;
-    const Arg &arg = f->arg;
+    using Arg = typename Ftor::Arg;
+    const Arg &arg = ftor.arg;
     using real = typename Arg::real;
     const auto k = arg.kappa;
     const auto inv = arg.inv;
 
     // if using shared-memory caching then load spinor field for my site into cache
-    //SharedMemoryCache<Vector> cache(target::block_dim());
-    SharedMemoryCache<Vector> cache(f);
+    SharedMemoryCache<Vector> cache(ftor);
     if (shared) {
       // cache.save(arg.in(s_ * arg.volume_4d_cb + x_cb, parity));
       if (sync) { cache.sync(); }
@@ -450,11 +449,11 @@ namespace quda
      @param[in] x_b Checkerboarded 4-d space-time index
      @param[in] s_ Ls dimension coordinate
   */
-  template <bool allthreads, bool sync, bool dagger, bool shared, typename Vector, typename F>
-  __device__ __host__ inline Vector variableInv(const F *f, const Vector &in, int parity, int x_cb, int s_, bool active)
+  template <bool allthreads, bool sync, bool dagger, bool shared, typename Vector, typename Ftor>
+  __device__ __host__ inline Vector variableInv(const Ftor &ftor, const Vector &in, int parity, int x_cb, int s_, bool active)
   {
-    using Arg = typename F::Arg;
-    const Arg &arg = f->arg;
+    using Arg = typename Ftor::Arg;
+    const Arg &arg = ftor.arg;
     constexpr int nSpin = 4;
     using real = typename Arg::real;
     typedef ColorSpinor<real, Arg::nColor, nSpin / 2> HalfVector;
@@ -462,8 +461,7 @@ namespace quda
     Vector out;
 
     if constexpr (mobius_m5::use_half_vector()) {
-      //SharedMemoryCache<HalfVector> cache(target::block_dim());
-      SharedMemoryCache<HalfVector> cache(f);
+      SharedMemoryCache<HalfVector> cache(ftor);
 
       { // first do R
         constexpr int proj_dir = dagger ? -1 : +1;
@@ -526,8 +524,7 @@ namespace quda
         out += l.reconstruct(4, proj_dir);
       }
     } else { // use_half_vector
-      //SharedMemoryCache<Vector> cache(target::block_dim());
-      SharedMemoryCache<Vector> cache(f);
+      SharedMemoryCache<Vector> cache(ftor);
       if (shared) {
         if (sync) { cache.sync(); }
         cache.save(in);
@@ -582,10 +579,15 @@ namespace quda
      @brief Functor for applying the M5 inverse operator
      @param[in] arg Argument struct containing any meta data and accessors
   */
-  template <typename A> using dslash5invCacheT =
-    ColorSpinor<typename A::real, A::nColor, mobius_m5::var_inverse() && mobius_m5::use_half_vector() ? 4 / 2 : 4>;
-  template <typename A> struct dslash5inv : only_SharedMemoryCache<dslash5invCacheT<A>> {
-    using Arg = A;
+  template <typename Arg> struct dslash5invParams {
+    static constexpr int Nc = mobius_m5::var_inverse() && mobius_m5::use_half_vector() ? 4 / 2 : 4;
+    using Vec = ColorSpinor<typename Arg::real, Arg::nColor, Nc>;
+    using Cache = SharedMemoryCache<Vec>;
+    using Ops = SpecialOps<Cache>;
+  };
+
+  template <typename Arg_> struct dslash5inv : dslash5invParams<Arg_>::Ops {
+    using Arg = Arg_;
     const Arg &arg;
     constexpr dslash5inv(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -611,9 +613,9 @@ namespace quda
       }
       constexpr bool sync = false;
       if constexpr (mobius_m5::var_inverse()) { // zMobius, must call variableInv
-        out = variableInv<allthreads, sync, Arg::dagger, mobius_m5::shared()>(this, in, parity, x_cb, s, active);
+        out = variableInv<allthreads, sync, Arg::dagger, mobius_m5::shared()>(*this, in, parity, x_cb, s, active);
       } else {
-        out = constantInv<allthreads, sync, Arg::dagger, mobius_m5::shared()>(this, in, parity, x_cb, s, active);
+        out = constantInv<allthreads, sync, Arg::dagger, mobius_m5::shared()>(*this, in, parity, x_cb, s, active);
       }
 
       if (!allthreads || active) {

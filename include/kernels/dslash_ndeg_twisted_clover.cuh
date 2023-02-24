@@ -36,10 +36,15 @@ namespace quda
       }
   };
 
-  template <typename Arg> using nDegTwistedCloverCacheT =
-    ColorSpinor<typename mapper<typename Arg::Float>::type, Arg::nColor, 4>;
+  template <typename Arg> struct nDegTwistedCloverParams {
+    using real = typename mapper<typename Arg::Float>::type;
+    using Vec = ColorSpinor<real, Arg::nColor, 4>;
+    using Cache = SharedMemoryCache<Vec>;
+    using Ops = SpecialOps<Cache>;
+  };
+
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct nDegTwistedClover : only_SharedMemoryCache<nDegTwistedCloverCacheT<Arg>>, dslash_default {
+  struct nDegTwistedClover : dslash_default, nDegTwistedCloverParams<Arg>::Ops {
 
     const Arg &arg;
     constexpr nDegTwistedClover(const Arg &arg) : arg(arg) {}
@@ -51,14 +56,13 @@ namespace quda
        Note this routine only exists in xpay form.
     */
     template <KernelType mykernel_type = kernel_type, bool allthreads = false>
-    __device__ __host__ __forceinline__ void operator()(int idx, int flavor, int parity, bool active)
+    __device__ __host__ __forceinline__ void operator()(int idx, int flavor, int parity, bool active = true)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
       typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
 
-      active
-        &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+      active &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                          // which dimension is thread working on (fused kernel only)
 
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
@@ -71,8 +75,7 @@ namespace quda
       applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
       if (mykernel_type == INTERIOR_KERNEL) {
-	//SharedMemoryCache<Vector> cache(target::block_dim());
-	SharedMemoryCache<Vector> cache(this);
+	SharedMemoryCache<Vector> cache(*this);
 	Vector tmp;
 	if (!allthreads || active) {
 	  // apply the chiral and flavor twists

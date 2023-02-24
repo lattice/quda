@@ -37,13 +37,15 @@ namespace quda
     }
   };
 
-  template <typename Arg> using nDegTwistedMassPreconditionedCacheT =
-    ColorSpinor<typename mapper<typename Arg::Float>::type, Arg::nColor, 4>;
+  template <bool dagger, typename Arg> struct nDegTwistedMassPreconditionedParams {
+    using real = typename mapper<typename Arg::Float>::type;
+    using Vec = ColorSpinor<real, Arg::nColor, 4>;
+    using Cache = SharedMemoryCache<Vec>;
+    using Ops = std::conditional_t<!dagger || Arg::asymmetric, SpecialOps<Cache>, NoSpecialOps>;
+  };
+
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct nDegTwistedMassPreconditioned :
-    std::conditional_t<!dagger || Arg::asymmetric, only_SharedMemoryCache<nDegTwistedMassPreconditionedCacheT<Arg>>, NoSpecialOps>,
-    //only_SharedMemoryCache<nDegTwistedMassPreconditionedCacheT<Arg>>,
-    dslash_default {
+  struct nDegTwistedMassPreconditioned : dslash_default, nDegTwistedMassPreconditionedParams<dagger, Arg>::Ops {
 
     const Arg &arg;
     constexpr nDegTwistedMassPreconditioned(const Arg &arg) : arg(arg) {}
@@ -99,8 +101,7 @@ namespace quda
       }
 
       if constexpr (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
-        //SharedMemoryCache<Vector> cache(target::block_dim());
-        SharedMemoryCache<Vector> cache(this);
+        SharedMemoryCache<Vector> cache(*this);
         if (isComplete<mykernel_type>(arg, coord) && active) {
           // to apply the preconditioner we need to put "out" in shared memory so the other flavor can access it
           cache.save(out);

@@ -130,8 +130,7 @@ namespace quda {
   /**
    * @brief Perform gauge fixing with overrelaxation
    */
-  //template <typename Arg> struct computeFix : only_SharedMemoryCache<typename Arg::real> {
-  template <typename Arg> struct computeFix : only_SharedMemoryCache<array<typename Arg::real,4>> {
+  template <typename Arg> struct computeFix : SpecialOps<SharedMemoryCache<array<typename Arg::real,4>>> {
     const Arg &arg;
     constexpr computeFix(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -186,12 +185,12 @@ namespace quda {
         switch (Arg::type) {
           // 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
           // this implementation needs 8x more shared memory than the implementation using atomicadd
-        case 0: GaugeFixHit_NoAtomicAdd<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu, this); break;
+        case 0: GaugeFixHit_NoAtomicAdd<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu, *this); break;
           // 8 threads per lattice site, the reduction is performed by shared memory using atomicadd
-        case 1: GaugeFixHit_AtomicAdd<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu, this); break;
+        case 1: GaugeFixHit_AtomicAdd<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu, *this); break;
           // 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
           // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
-        case 2: GaugeFixHit_NoAtomicAdd_LessSM<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu, this); break;
+        case 2: GaugeFixHit_NoAtomicAdd_LessSM<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu, *this); break;
         default: break;
         }
 
@@ -215,12 +214,12 @@ namespace quda {
         switch (Arg::type) {
           // 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
           // this implementation needs 4x more shared memory than the implementation using atomicadd
-        case 3: GaugeFixHit_NoAtomicAdd<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu, this); break;
+        case 3: GaugeFixHit_NoAtomicAdd<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu, *this); break;
           // 4 threads per lattice site, the reduction is performed by shared memory using atomicadd
-        case 4: GaugeFixHit_AtomicAdd<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu, this); break;
+        case 4: GaugeFixHit_AtomicAdd<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu, *this); break;
           // 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
           // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
-        case 5: GaugeFixHit_NoAtomicAdd_LessSM<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu, this); break;
+        case 5: GaugeFixHit_NoAtomicAdd_LessSM<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu, *this); break;
         default: break;
         }
 

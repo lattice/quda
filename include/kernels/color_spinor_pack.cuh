@@ -155,10 +155,10 @@ namespace quda {
   };
 
   template <bool is_device> struct site_max {
-    template <typename F>
-    inline auto operator()(typename F::Arg::real thread_max, F *)
+    template <typename Ftor>
+    inline auto operator()(typename Ftor::Arg::real thread_max, Ftor &)
     {
-      using Arg = typename F::Arg;
+      using Arg = typename Ftor::Arg;
       // on the host we require that both spin and color are fully thread local
       constexpr int Ms = spins_per_thread<is_device, Arg::nSpin>();
       constexpr int Mc = colors_per_thread<is_device, Arg::nColor>();
@@ -174,25 +174,20 @@ namespace quda {
     template <typename Arg> static constexpr int color_spin_threads = (Arg::nSpin/Ms<Arg>) * (Arg::nColor/Mc<Arg>);
     template <typename Arg> struct CacheDims {
       template <typename ...A> static constexpr dim3 dims(dim3 b, A &...) {
-      dim3 block = b;
-      block.x = ((block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
-      block.y = color_spin_threads<Arg>; // state the y block since we know it at compile time
-      return block;
-    } };
-    template <typename Arg> using Cache = op_SharedMemoryCache<typename Arg::real, CacheDims<Arg>>;
+	dim3 block = b;
+	block.x = ((block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
+	block.y = color_spin_threads<Arg>; // state the y block since we know it at compile time
+	return block;
+      }
+    };
+    template <typename Arg> using Cache = SharedMemoryCache<typename Arg::real, CacheDims<Arg>>;
+    template <typename Arg> using Ops = SpecialOps<Cache<Arg>>;
 
-    template <typename F> __device__ inline auto operator()(typename F::Arg::real thread_max, F *f)
+    template <typename Ftor> __device__ inline auto operator()(typename Ftor::Arg::real thread_max, const Ftor &ftor)
     {
-      using Arg = typename F::Arg;
+      using Arg = typename Ftor::Arg;
       using real = typename Arg::real;
-      //constexpr int Ms = spins_per_thread<true, Arg::nSpin>();
-      //constexpr int Mc = colors_per_thread<true, Arg::nColor>();
-      //constexpr int color_spin_threads = (Arg::nSpin/Ms) * (Arg::nColor/Mc);
-      //auto block = target::block_dim();
-      // pad the shared block size to avoid bank conflicts
-      //block.x = ((block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
-      //block.y = color_spin_threads; // state the y block since we know it at compile time
-      SharedMemoryCache<Cache<Arg>> cache(f);
+      Cache<Arg> cache(ftor);
       cache.save(thread_max);
       cache.sync();
       real this_site_max = static_cast<real>(0);
@@ -205,23 +200,23 @@ namespace quda {
     }
   };
 
-  template <bool allthreads, typename F>
-  __device__ __host__ inline std::enable_if_t<!F::Arg::block_float, typename F::Arg::real>
-  compute_site_max(const F *, int, int, int, int, int, bool)
+  template <bool allthreads, typename Ftor>
+  __device__ __host__ inline std::enable_if_t<!Ftor::Arg::block_float, typename Ftor::Arg::real>
+  compute_site_max(const Ftor &, int, int, int, int, int, bool)
   {
-    return static_cast<typename F::Arg::real>(1.0); // dummy return for non-block float
+    return static_cast<typename Ftor::Arg::real>(1.0); // dummy return for non-block float
   }
 
   /**
      Compute the max element over the spin-color components of a given site.
   */
-  template <bool allthreads, typename F>
-  __device__ __host__ inline std::enable_if_t<F::Arg::block_float, typename F::Arg::real>
-  compute_site_max(const F *f, int src_idx, int x_cb, int spinor_parity, int spin_block, int color_block, bool active)
+  template <bool allthreads, typename Ftor>
+  __device__ __host__ inline std::enable_if_t<Ftor::Arg::block_float, typename Ftor::Arg::real>
+  compute_site_max(const Ftor &ftor, int src_idx, int x_cb, int spinor_parity, int spin_block, int color_block, bool active)
   {
-    using real = typename F::Arg::real;
-    const int Ms = spins_per_thread<F::Arg::nSpin>();
-    const int Mc = colors_per_thread<F::Arg::nColor>();
+    using real = typename Ftor::Arg::real;
+    const int Ms = spins_per_thread<Ftor::Arg::nSpin>();
+    const int Mc = colors_per_thread<Ftor::Arg::nColor>();
     complex<real> thread_max = {0.0, 0.0};
 
     if (!allthreads || active) {
@@ -231,14 +226,14 @@ namespace quda {
 #pragma unroll
 	for (int color_local=0; color_local<Mc; color_local++) {
 	  int c = color_block + color_local;
-	  complex<real> z = f->arg.in[src_idx](spinor_parity, x_cb, s, c);
+	  complex<real> z = ftor.arg.in[src_idx](spinor_parity, x_cb, s, c);
 	  thread_max.real(std::max(thread_max.real(), std::abs(z.real())));
 	  thread_max.imag(std::max(thread_max.imag(), std::abs(z.imag())));
 	}
       }
     }
 
-    return target::dispatch<site_max>(std::max(thread_max.real(), thread_max.imag()), f);
+    return target::dispatch<site_max>(std::max(thread_max.real(), thread_max.imag()), ftor);
   }
 
   /**
@@ -292,9 +287,9 @@ namespace quda {
     }
   }
 
-  template <typename A> struct GhostPacker :
-    std::conditional_t<A::block_float,SpecialOps<site_max<true>::Cache<A>>,NoSpecialOps> {
-    using Arg = A;
+  template <typename Arg_> struct GhostPacker :
+    std::conditional_t<Arg_::block_float, site_max<true>::Ops<Arg_>, NoSpecialOps> {
+    using Arg = Arg_;
     const Arg &arg;
     constexpr GhostPacker(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -316,7 +311,7 @@ namespace quda {
 
       int src_idx;
       int x_cb = indexFromFaceIndex(src_idx, dim, dir, ghost_idx, parity, arg);
-      auto max = compute_site_max<allthreads>(this, src_idx, x_cb, spinor_parity, spin_block, color_block, active);
+      auto max = compute_site_max<allthreads>(*this, src_idx, x_cb, spinor_parity, spin_block, color_block, active);
 
       if (!allthreads || active) {
 #pragma unroll

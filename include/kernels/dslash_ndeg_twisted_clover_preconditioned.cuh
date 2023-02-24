@@ -41,11 +41,15 @@ namespace quda
       }
   };
 
-  template <typename Arg> using nDegTwistedCloverPreconditionedCacheT =
-    ColorSpinor<typename mapper<typename Arg::Float>::type, Arg::nColor, 2>;
+  template <typename Arg> struct nDegTwistedCloverPreconditionedParams {
+    using real = typename mapper<typename Arg::Float>::type;
+    using Vec = ColorSpinor<real, Arg::nColor, 2>;
+    using Cache = SharedMemoryCache<Vec>;
+    using Ops = SpecialOps<Cache>;
+  };
+
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  //struct nDegTwistedCloverPreconditioned : only_SharedMemoryCache<nDegTwistedCloverPreconditionedCacheT<Arg>>, dslash_default {
-  struct nDegTwistedCloverPreconditioned : dslash_default, only_SharedMemoryCache<nDegTwistedCloverPreconditionedCacheT<Arg>> {
+  struct nDegTwistedCloverPreconditioned : dslash_default, nDegTwistedCloverPreconditionedParams<Arg>::Ops {
 
     const Arg &arg;
     constexpr nDegTwistedCloverPreconditioned(const Arg &arg) : arg(arg) {}
@@ -57,7 +61,7 @@ namespace quda
        out(x) = M*in = in + a*(C + i*b*gamma_5*tau_3 + c*tau_1)/(C^2 + b^2 - c^2)*D*x ( xpay == true )
     */
     template <KernelType mykernel_type = kernel_type, bool allthreads = false>
-    __device__ __host__ __forceinline__ void operator()(int idx, int flavor, int parity, bool active)
+    __device__ __host__ __forceinline__ void operator()(int idx, int flavor, int parity, bool active = true)
     {
       using namespace linalg; // for Cholesky
       typedef typename mapper<typename Arg::Float>::type real;
@@ -65,8 +69,7 @@ namespace quda
       typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
       typedef HMatrix<real, Arg::nColor * Arg::nSpin / 2> HMat;
 
-      active
-        &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+      active &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                          // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
@@ -94,8 +97,7 @@ namespace quda
 	}
 
 	int chirality = flavor; // relabel flavor as chirality
-	//SharedMemoryCache<HalfVector> cache(target::block_dim());
-	SharedMemoryCache<HalfVector> cache(this);
+	SharedMemoryCache<HalfVector> cache(*this);
 
         auto swizzle = [&](int chirality, int reverse) {
 	  if (!allthreads || active) {

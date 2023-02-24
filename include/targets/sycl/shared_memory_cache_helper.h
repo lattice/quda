@@ -3,6 +3,8 @@
 #include <target_device.h>
 #include <tunable_kernel.h>
 
+#define DYNAMIC_SLM
+
 /**
    @file shared_memory_cache_helper.h
 
@@ -31,12 +33,10 @@ namespace quda
        according the maximum number of threads possible, given these
        dimensions.
    */
-  template <typename T, int block_size_y = 1, int block_size_z = 1, bool dynamic = true>
-  class SharedMemoryCacheImpl
+  //template <typename T, int block_size_y = 1, int block_size_z = 1, bool dynamic = true>
+  template <typename T, typename D = opDimsBlock>
+  class SharedMemoryCache
   {
-    /** maximum number of threads in x given the y and z block sizes */
-    static constexpr int block_size_x = device::max_block_size<block_size_y, block_size_z>();
-
     using atom_t = std::conditional_t<sizeof(T) % 16 == 0, int4, std::conditional_t<sizeof(T) % 8 == 0, int2, int>>;
     static_assert(sizeof(T) % 4 == 0, "Shared memory cache does not support sub-word size types");
 
@@ -49,6 +49,15 @@ namespace quda
     const dim3 block;
     const int stride;
     sycl::local_ptr<atom_t> cache_ptr;
+
+#ifdef DYNAMIC_SLM
+    using opSmem = op_SharedMemory<T, opSizeDims<D>>;
+    using deps = op_Sequential<op_blockSync,opSmem>;
+    using depOps = SpecialOps<op_blockSync,opSmem>;
+#else
+#endif
+    using SharedMemoryCache_t = SharedMemoryCache<T, D>;
+    //dependentOps ops;
 
     __device__ __host__ inline void save_detail(const T &a, int x, int y, int z)
     {
@@ -72,6 +81,8 @@ namespace quda
     }
 
   public:
+    using dependencies = deps;
+    using dependentOps = depOps;
     /**
        @brief constructor for SharedMemory cache.  If no arguments are
        pass, then the dimensions are set according to the templates
@@ -81,8 +92,9 @@ namespace quda
 
        @param[in] block Block dimensions for the 3-d shared memory object
     */
+#if 0
     template <typename dummy = void>
-    constexpr SharedMemoryCacheImpl(dim3 block = dim3(block_size_x, block_size_y, block_size_z)) :
+    constexpr SharedMemoryCache(dim3 block = dim3(block_size_x, block_size_y, block_size_z)) :
       block(block), stride(block.x * block.y * block.z)
     {
       static_assert(dynamic==false, "SYCL target requires SpecialOps parameter for dynamic shared memory");
@@ -101,11 +113,13 @@ namespace quda
       sycl::local_ptr<atom_t> p(v);
       cache_ptr = p;
     }
-    template <typename ...U>
-    inline SharedMemoryCacheImpl(const SpecialOps<U...> *ops) :
-      block(op_SharedMemoryCache<T>::dims(target::block_dim())), stride(block.x * block.y * block.z)
+#endif
+    template <typename ...U, typename ...Arg>
+    inline SharedMemoryCache(const SpecialOps<U...> &ops, const Arg &...arg) :
+      block(D::dims(target::block_dim(), arg...)),
+      stride(block.x * block.y * block.z)
     {
-      auto op = getSpecialOp<op_SharedMemoryCache<T>>(ops);
+      auto op = getDependentOps<SharedMemoryCache_t>(ops);
       sycl::local_ptr<void> v(op.smem);
       sycl::local_ptr<atom_t> p(v);
       cache_ptr = p;
@@ -234,6 +248,7 @@ namespace quda
     __device__ __host__ inline void sync() { __syncthreads(); }
   };
 
+#if 0
   template <typename T, int block_size_y = 1, int block_size_z = 1, bool dynamic = true>
   class SharedMemoryCache : public SharedMemoryCacheImpl<T, block_size_y, block_size_z, dynamic> {
     using SharedMemoryCacheImpl<T, block_size_y, block_size_z, dynamic>::SharedMemoryCacheImpl;
@@ -247,5 +262,6 @@ namespace quda
     template <typename ...U, typename Arg> inline SharedMemoryCache(const SpecialOps<U...> *ops, const Arg &arg) :
       SharedMemoryCacheImpl<typename O::ElemT>(getSpecialOp<SpecialOps<O>>(ops), arg) {}
   };
+#endif
 
 } // namespace quda

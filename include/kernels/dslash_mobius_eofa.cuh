@@ -97,7 +97,8 @@ namespace quda
       @param[in] x_cb   Checkerboarded 4-d space-time index
       @param[in] s      Ls dimension coordinate
      */
-    template <typename Arg> struct eofa_dslash5 : only_SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>> {
+    template <typename Arg> struct eofa_dslash5 :
+      SpecialOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>>> {
       const Arg &arg;
       constexpr eofa_dslash5(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
@@ -108,8 +109,7 @@ namespace quda
         using real = typename Arg::real;
         typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
-        //SharedMemoryCache<Vector> cache(target::block_dim());
-        SharedMemoryCache<Vector> cache(this);
+        SharedMemoryCache<Vector> cache(*this);
 
         Vector out;
 	if (!allthreads || active) {
@@ -182,7 +182,8 @@ namespace quda
       @param[in] x_cb   Checkerboarded 4-d space-time index
       @param[in] s      Ls dimension coordinate
      */
-    template <typename Arg> struct eofa_dslash5inv : only_SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>> {
+    template <typename Arg> struct eofa_dslash5inv :
+      SpecialOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>>> {
       const Arg &arg;
       constexpr eofa_dslash5inv(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
@@ -194,8 +195,7 @@ namespace quda
         typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
         const auto sherman_morrison = arg.sherman_morrison;
-        //SharedMemoryCache<Vector> cache(target::block_dim());
-        SharedMemoryCache<Vector> cache(this);
+        SharedMemoryCache<Vector> cache(*this);
 	if (!allthreads || active) {
 	  cache.save(arg.in(s * arg.volume_4d_cb + x_cb, parity));
 	}
