@@ -202,7 +202,9 @@ namespace quda {
        the kernel arguments passed to a kernel on the target
        architecture.
     */
-    constexpr size_t max_kernel_arg_size() { return QUDA_MAX_ARGUMENT_SIZE; }
+    constexpr size_t max_kernel_arg_size() {
+      return std::max(QUDA_MAX_ARGUMENT_SIZE-8, 0);  // reserve 8 bytes for local accessor
+    }
 
     /**
        @brief Helper function that returns the bank width of the

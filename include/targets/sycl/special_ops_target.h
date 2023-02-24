@@ -222,7 +222,7 @@ namespace quda {
   template <typename T> static constexpr bool needsSharedMem = needsSharedMem<getSpecialOps<T>>;
   template <typename ...T> static constexpr bool needsSharedMemImpl = (needsSharedMemImpl<T> || ...);
   template <> static constexpr bool needsSharedMemImpl<depNone> = false;
-  template <> static constexpr bool needsSharedMemImpl<depFullBlock> = true;
+  template <> static constexpr bool needsSharedMemImpl<depFullBlock> = false;
   template <typename T, typename S> static constexpr bool needsSharedMemImpl<depSharedMem<T,S>> = true;
   template <typename ...T> static constexpr bool needsSharedMemImpl<op_Concurrent<T...>> = needsSharedMemImpl<T...>;
   template <typename ...T> static constexpr bool needsSharedMemImpl<op_Sequential<T...>> = needsSharedMemImpl<T...>;

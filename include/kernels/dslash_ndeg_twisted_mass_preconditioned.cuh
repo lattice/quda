@@ -65,7 +65,7 @@ namespace quda
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
-      active &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+      active &&= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
@@ -107,7 +107,7 @@ namespace quda
           cache.save(out);
         }
 
-        cache.sync(); // safe to sync in here since other threads will exit
+        cache.sync(); // safe to sync here since other threads will exit if allowed, or all be here
         if (isComplete<mykernel_type>(arg, coord) && active) {
           if (flavor == 0)
             out = arg.a * (out + arg.b * out.igamma(4) + arg.c * cache.load_y(1));
@@ -116,7 +116,7 @@ namespace quda
         }
       }
 
-      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(my_flavor_idx, my_spinor_parity) = out;
+      if (active) arg.out(my_flavor_idx, my_spinor_parity) = out;
     }
   };
 
