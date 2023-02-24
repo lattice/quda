@@ -90,11 +90,12 @@ namespace quda
   /**
      @brief SYCL specialization of block_reduce, using SYCL group reductions
   */
-  template <typename T, typename param_t>
+  template <typename T, int block_dim, int batch_size>
   struct block_reduceG {
-    block_reduceG() {
-      static_assert(std::is_same_v<param_t,void>);  // always fails, check for use of old version
-    };
+    using dependencies = op_Sequential<op_blockSync>;
+    using dependentOps = SpecialOps<op_blockSync>;
+    using BlockReduce_t = BlockReduce<T, block_dim, batch_size>;
+    template <typename S> inline block_reduceG(S &ops) {};
     /**
        @brief Perform a block-wide reduction
        @param[in] value_ thread-local value to be reduced
@@ -111,7 +112,7 @@ namespace quda
     inline T apply(const T &value_, bool async, int batch, bool all, const reducer_t &r)
     {
       if (!async) __syncthreads(); // only synchronize if we are not pipelining
-      const int nbatch = param_t::batch_size;
+      const int nbatch = batch_size;
       //const int nbatch = std::min(param_t::batch_size, localRangeZ);
       auto grp = getGroup();
       T result;
@@ -219,7 +220,8 @@ namespace quda
     }
   };
 
-  template <typename T, int block_dim, int batch_size> using block_reduce = block_reduceW<T,block_dim,batch_size>;
+  template <typename T, int block_dim, int batch_size> using block_reduce = block_reduceG<T,block_dim,batch_size>;
+  //template <typename T, int block_dim, int batch_size> using block_reduce = block_reduceW<T,block_dim,batch_size>;
 
 } // namespace quda
 

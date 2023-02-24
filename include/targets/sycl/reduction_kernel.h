@@ -44,18 +44,19 @@ namespace quda {
 	    typename Arg, typename R>
   void Reduction2DImplN(const Arg &arg, const sycl::nd_item<3> &ndi, R &reducer)
   {
-    Functor<Arg> t(const_cast<Arg&>(arg));
+    Functor<Arg> f(arg);
     auto idx = globalIdX;
     auto j = localIdY;
-    auto value = t.init();
+    auto value = f.init();
     while (idx < arg.threads.x) {
-      value = t(value, idx, j);
+      value = f(value, idx, j);
       if (grid_stride) idx += globalRangeX; else break;
     }
     reducer.combine(value);
   }
   template <template <typename> class Functor, bool grid_stride = false>
   struct Reduction2DS {
+    using SpecialOpsT = NoSpecialOps;
     template <typename Arg, typename R>
     static void apply(const Arg &arg, const sycl::nd_item<3> &ndi, R &reducer)
     {

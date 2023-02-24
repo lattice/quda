@@ -120,6 +120,14 @@ blockReduceMax(sycl::group<3> grp, array<T,N> &out, const array<T,N> &in)
   out = *reinterpret_cast<array<T,N>*>(&outx);
 }
 
+template <typename T>
+inline void blockReduceMax(sycl::group<3> grp, quda::deviation_t<T> &out, const quda::deviation_t<T> &in)
+{
+  auto inx = reinterpret_cast<const sycl::vec<T,2>*>(&in);
+  auto outx = sycl::reduce_over_group(grp, *inx, sycl::maximum<>());
+  out = *reinterpret_cast<quda::deviation_t<T>*>(&outx);
+}
+
 
 template <typename T>
 inline void blockReduceMin(sycl::group<3> grp, T &out, const T &in)
