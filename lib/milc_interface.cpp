@@ -447,6 +447,46 @@ void qudaMomSave(int prec, QudaMILCSiteArg_t *arg)
   qudamilc_called<false>(__func__);
 }
 
+// make a copy of the gauge field on GPU
+void qudaGaugeCopy()
+{
+  qudamilc_called<true>(__func__);
+
+  copyGaugeQuda();
+
+  qudamilc_called<false>(__func__);
+}
+
+// restore the gauge field on GPU
+void qudaGaugeRestore()
+{
+  qudamilc_called<true>(__func__);
+
+  restoreGaugeQuda();
+
+  qudamilc_called<false>(__func__);
+}
+
+// Zero out the device momentum after making a copy
+void qudaMomZero()
+{
+  qudamilc_called<true>(__func__);
+
+  momResidentZeroQuda();
+
+  qudamilc_called<false>(__func__);
+}
+
+// Restore the device momentum from its copy
+void qudaMomRestore()
+{
+  qudamilc_called<true>(__func__);
+
+  momResidentRestoreQuda();
+
+  qudamilc_called<false>(__func__);
+}
+
 double qudaMomAction(int prec, QudaMILCSiteArg_t *arg)
 {
   qudamilc_called<true>(__func__);

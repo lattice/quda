@@ -857,6 +857,15 @@ extern "C" {
   void qudaMomSave(int precision, QudaMILCSiteArg_t *arg);
 
   /**
+   * Make a device copy of the momentum and gauge fields for FGI
+   * also restore these fields
+   */
+  void qudaMomZero();
+  void qudaMomRestore();
+  void qudaGaugeCopy();
+  void qudaGaugeRestore();
+
+  /**
    * Evaluate the momentum contribution to the Hybrid Monte Carlo
    * action.  MILC convention is applied, subtracting 4.0 from each
    * momentum matrix to increase stability.

@@ -124,6 +124,7 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(use_resident_mom, 0);
   P(make_resident_gauge, 0);
   P(make_resident_mom, 0);
+  P(use_fgi, 1);// FGI: This needs to be 0, and set to 1 with MILC/QUDA interface
   P(return_result_gauge, 1);
   P(return_result_mom, 1);
   P(gauge_offset, 0);
@@ -135,6 +136,7 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(use_resident_mom, INVALID_INT);
   P(make_resident_gauge, INVALID_INT);
   P(make_resident_mom, INVALID_INT);
+  P(use_fgi, INVALID_INT);// FGI: This needs to be 0, and set to 1 with MILC/QUDA interface
   P(return_result_gauge, INVALID_INT);
   P(return_result_mom, INVALID_INT);
   P(gauge_offset, (size_t)INVALID_INT);

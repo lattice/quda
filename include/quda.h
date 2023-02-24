@@ -87,6 +87,8 @@ extern "C" {
     int return_result_gauge; /**< Return the result gauge field */
     int return_result_mom;   /**< Return the result momentum field */
 
+    int use_fgi;             /**< add FGI terms */
+
     size_t gauge_offset; /**< Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t mom_offset; /**< Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t site_size; /**< Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
@@ -1366,6 +1368,18 @@ extern "C" {
    * @param[in] param The parameters of the external field
    */
   void momResidentQuda(void *mom, QudaGaugeParam *param);
+
+  /**
+   * For the FGI HMC step
+   * make a copy of the gauge field
+   * restore the gauge field
+   * Zero out the momResident field (after making a copy)
+   * and restore the momResident field
+   */
+  void copyGaugeQuda();
+  void restoreGaugeQuda();
+  void momResidentZeroQuda();
+  void momResidentRestoreQuda();
 
   /**
    * Compute the gauge force and update the momentum field

@@ -104,6 +104,32 @@ CloverField *cloverEigensolver = nullptr;
 cudaGaugeField *momResident = nullptr;
 cudaGaugeField *extendedGaugeResident = nullptr;
 
+// These Copy fields are to support the Force Gradient Integrator
+// currently only implemented for HISQ/ASQTAD
+cudaGaugeField *gaugeCopyPrecise = nullptr;
+cudaGaugeField *gaugeCopySloppy = nullptr;
+cudaGaugeField *gaugeCopyPrecondition = nullptr;
+cudaGaugeField *gaugeCopyRefinement = nullptr;
+cudaGaugeField *gaugeCopyEigensolver = nullptr;
+cudaGaugeField *gaugeCopyExtended = nullptr;
+
+cudaGaugeField *gaugeFatCopyPrecise = nullptr;
+cudaGaugeField *gaugeFatCopySloppy = nullptr;
+cudaGaugeField *gaugeFatCopyPrecondition = nullptr;
+cudaGaugeField *gaugeFatCopyRefinement = nullptr;
+cudaGaugeField *gaugeFatCopyEigensolver = nullptr;
+cudaGaugeField *gaugeFatCopyExtended = nullptr;
+
+cudaGaugeField *gaugeLongCopyPrecise = nullptr;
+cudaGaugeField *gaugeLongCopySloppy = nullptr;
+cudaGaugeField *gaugeLongCopyPrecondition = nullptr;
+cudaGaugeField *gaugeLongCopyRefinement = nullptr;
+cudaGaugeField *gaugeLongCopyEigensolver = nullptr;
+cudaGaugeField *gaugeLongCopyExtended = nullptr;
+
+cudaGaugeField *momResidentCopy = nullptr;
+
+
 std::vector<ColorSpinorField> solutionResident;
 
 // vector of spinors used for forecasting solutions in HMC
@@ -575,6 +601,24 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
       if (gaugePrecise && !param->use_resident_gauge) delete gaugePrecise;
 
+      // FGI
+      if (param->use_fgi){
+        if (gaugeCopyRefinement != gaugeCopySloppy && gaugeCopyRefinement != gaugeCopyEigensolver && gaugeCopyRefinement)
+          delete gaugeCopyRefinement;
+
+        if (gaugeCopyPrecondition != gaugeCopySloppy && gaugeCopyPrecondition != gaugeCopyEigensolver
+            && gaugeCopyPrecondition != gaugeCopyPrecise && gaugeCopyPrecondition)
+          delete gaugeCopyPrecondition;
+
+        if (gaugeCopyEigensolver != gaugeCopySloppy && gaugeCopyEigensolver != gaugeCopyPrecise
+            && gaugeCopyEigensolver != gaugeCopyPrecondition && gaugeCopyEigensolver)
+          delete gaugeCopyEigensolver;
+
+        if (gaugeCopyPrecise != gaugeCopySloppy && gaugeCopySloppy) delete gaugeCopySloppy;
+
+        if (gaugeCopyPrecise && !param->use_resident_gauge) delete gaugeCopyPrecise;
+      }
+
       break;
     case QUDA_ASQTAD_FAT_LINKS:
       if (gaugeFatRefinement != gaugeFatSloppy && gaugeFatRefinement != gaugeFatEigensolver && gaugeFatRefinement)
@@ -591,6 +635,24 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       if (gaugeFatPrecise != gaugeFatSloppy && gaugeFatSloppy) delete gaugeFatSloppy;
 
       if (gaugeFatPrecise && !param->use_resident_gauge) delete gaugeFatPrecise;
+
+      // FGI
+      if (param->use_fgi){
+        if (gaugeFatCopyRefinement != gaugeFatCopySloppy && gaugeFatCopyRefinement != gaugeFatCopyEigensolver && gaugeFatCopyRefinement)
+          delete gaugeFatCopyRefinement;
+
+        if (gaugeFatCopyPrecondition != gaugeFatCopySloppy && gaugeFatCopyPrecondition != gaugeFatCopyEigensolver
+            && gaugeFatCopyPrecondition != gaugeFatCopyPrecise && gaugeFatCopyPrecondition)
+          delete gaugeFatCopyPrecondition;
+
+        if (gaugeFatCopyEigensolver != gaugeFatCopySloppy && gaugeFatCopyEigensolver != gaugeFatCopyPrecise
+            && gaugeFatCopyEigensolver != gaugeFatCopyPrecondition && gaugeFatCopyEigensolver)
+          delete gaugeFatCopyEigensolver;
+
+        if (gaugeFatCopyPrecise != gaugeFatCopySloppy && gaugeFatCopySloppy) delete gaugeFatCopySloppy;
+
+        if (gaugeFatCopyPrecise && !param->use_resident_gauge) delete gaugeFatCopyPrecise;
+      }
 
       break;
     case QUDA_ASQTAD_LONG_LINKS:
@@ -609,6 +671,24 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       if (gaugeLongPrecise != gaugeLongSloppy && gaugeLongSloppy) delete gaugeLongSloppy;
 
       if (gaugeLongPrecise) delete gaugeLongPrecise;
+
+      // FGI
+      if(param->use_fgi){
+        if (gaugeLongCopyRefinement != gaugeLongCopySloppy && gaugeLongCopyRefinement != gaugeLongCopyEigensolver && gaugeLongCopyRefinement)
+          delete gaugeLongCopyRefinement;
+
+        if (gaugeLongCopyPrecondition != gaugeLongCopySloppy && gaugeLongCopyPrecondition != gaugeLongCopyEigensolver
+            && gaugeLongCopyPrecondition != gaugeLongCopyPrecise && gaugeLongCopyPrecondition)
+          delete gaugeLongCopyPrecondition;
+
+        if (gaugeLongCopyEigensolver != gaugeLongCopySloppy && gaugeLongCopyEigensolver != gaugeLongCopyPrecise
+            && gaugeLongCopyEigensolver != gaugeLongCopyPrecondition && gaugeLongCopyEigensolver)
+          delete gaugeLongCopyEigensolver;
+
+        if (gaugeLongCopyPrecise != gaugeLongCopySloppy && gaugeLongCopySloppy) delete gaugeLongCopySloppy;
+
+        if (gaugeLongCopyPrecise) delete gaugeLongCopyPrecise;
+      }
 
       break;
     case QUDA_SMEARED_LINKS:
@@ -646,6 +726,9 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     profileGauge.TPSTOP(QUDA_PROFILE_H2D);
   }
 
+  // FGI
+  if (param->use_fgi) gaugeCopyPrecise = new cudaGaugeField(gauge_param);
+
   // for gaugeSmeared we are interested only in the precise version
   if (param->type == QUDA_SMEARED_LINKS) {
     gaugeSmeared = createExtendedGauge(*precise, R, profileGauge);
@@ -668,9 +751,13 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   cudaGaugeField *sloppy = nullptr;
   if (param->cuda_prec == param->cuda_prec_sloppy && param->reconstruct == param->reconstruct_sloppy) {
     sloppy = precise;
+    // FGI
+    if (param->use_fgi) gaugeCopySloppy = gaugeCopyPrecise;
   } else {
     sloppy = new cudaGaugeField(gauge_param);
     sloppy->copy(*precise);
+    // FGI
+    if (param->use_fgi) gaugeCopySloppy = new cudaGaugeField(gauge_param);
   }
 
   // switch the parameters for creating the mirror preconditioner cuda gauge field
@@ -679,12 +766,18 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   cudaGaugeField *precondition = nullptr;
   if (param->cuda_prec == param->cuda_prec_precondition && param->reconstruct == param->reconstruct_precondition) {
     precondition = precise;
+    // FGI
+    if (param->use_fgi) gaugeCopyPrecondition = gaugeCopyPrecise;
   } else if (param->cuda_prec_sloppy == param->cuda_prec_precondition
              && param->reconstruct_sloppy == param->reconstruct_precondition) {
     precondition = sloppy;
+    // FGI
+    if (param->use_fgi) gaugeCopyPrecondition = gaugeCopySloppy;
   } else {
     precondition = new cudaGaugeField(gauge_param);
     precondition->copy(*precise);
+    // FGI
+    if (param->use_fgi) gaugeCopyPrecondition = new cudaGaugeField(gauge_param);
   }
 
   // switch the parameters for creating the refinement cuda gauge field
@@ -694,9 +787,13 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   if (param->cuda_prec_sloppy == param->cuda_prec_refinement_sloppy
       && param->reconstruct_sloppy == param->reconstruct_refinement_sloppy) {
     refinement = sloppy;
+    // FGI
+    if (param->use_fgi) gaugeCopyRefinement = gaugeCopySloppy;
   } else {
     refinement = new cudaGaugeField(gauge_param);
     refinement->copy(*sloppy);
+    // FGI
+    if (param->use_fgi) gaugeCopyRefinement = new cudaGaugeField(gauge_param);
   }
 
   // switch the parameters for creating the eigensolver cuda gauge field
@@ -705,15 +802,23 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   cudaGaugeField *eigensolver = nullptr;
   if (param->cuda_prec == param->cuda_prec_eigensolver && param->reconstruct == param->reconstruct_eigensolver) {
     eigensolver = precise;
+    // FGI
+    if (param->use_fgi) gaugeCopyEigensolver = gaugeCopyPrecise;
   } else if (param->cuda_prec_precondition == param->cuda_prec_eigensolver
              && param->reconstruct_precondition == param->reconstruct_eigensolver) {
     eigensolver = precondition;
+    // FGI
+    if (param->use_fgi) gaugeCopyEigensolver = gaugeCopyPrecondition;
   } else if (param->cuda_prec_sloppy == param->cuda_prec_eigensolver
              && param->reconstruct_sloppy == param->reconstruct_eigensolver) {
     eigensolver = sloppy;
+    // FGI
+    if (param->use_fgi) gaugeCopyEigensolver = gaugeCopySloppy;
   } else {
     eigensolver = new cudaGaugeField(gauge_param);
     eigensolver->copy(*precise);
+    // FGI
+    if (param->use_fgi) gaugeCopyEigensolver = new cudaGaugeField(gauge_param);
   }
 
   profileGauge.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -724,6 +829,8 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     lat_dim_t R; // domain-overlap widths in different directions
     for (int i=0; i<4; ++i) R[i] = param->overlap*commDimPartitioned(i);
     extended = createExtendedGauge(*precondition, R, profileGauge);
+    // FGI
+    if (param->use_fgi) gaugeCopyExtended = createExtendedGauge(*gaugeCopyPrecondition, R, profileGauge);
   }
 
   switch (param->type) {
@@ -1127,6 +1234,25 @@ void freeGaugeQuda(void)
     delete extendedGaugeResident;
     extendedGaugeResident = nullptr;
   }
+
+  // FGI gauge copies
+  if (gaugeCopyPrecise) delete gaugeCopyPrecise;
+  if (gaugeCopyExtended) delete gaugeCopyExtended;
+
+  gaugeCopyPrecise = nullptr;
+  gaugeCopyExtended = nullptr;
+
+  if (gaugeLongCopyPrecise) delete gaugeLongCopyPrecise;
+  if (gaugeLongCopyExtended) delete gaugeLongCopyExtended;
+
+  gaugeLongCopyPrecise = nullptr;
+  gaugeLongCopyExtended = nullptr;
+
+  if (gaugeFatCopyPrecise) delete gaugeFatCopyPrecise;
+
+  gaugeFatCopyPrecise = nullptr;
+  gaugeFatCopyExtended = nullptr;
+
 }
 
 void freeGaugeSmearedQuda()
@@ -4280,6 +4406,12 @@ void momResidentQuda(void *mom, QudaGaugeParam *param)
     gParamMom.setPrecision(param->cuda_prec, true);
     gParamMom.create = QUDA_ZERO_FIELD_CREATE;
     momResident = new cudaGaugeField(gParamMom);
+
+    // for FGI we also want a momResidentCopy
+    if (param->use_fgi) {
+      if (momResidentCopy) delete momResidentCopy;
+      momResidentCopy = new cudaGaugeField(gParamMom);
+    }
   } else if (param->return_result_mom && !param->make_resident_mom) {
     if (!momResident) errorQuda("No resident momentum to return");
   } else {
@@ -4304,6 +4436,119 @@ void momResidentQuda(void *mom, QudaGaugeParam *param)
     delete momResident;
     momResident = nullptr;
     profileGaugeForce.TPSTOP(QUDA_PROFILE_FREE);
+
+    // if we used FGI, free memory for momResidentCopy
+    if (momResidentCopy) {
+      delete momResidentCopy;
+      momResidentCopy = nullptr;
+    }
+    profileGaugeForce.TPSTOP(QUDA_PROFILE_FREE);
+  }
+
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void copyGaugeQuda()
+{ // FGI make a copy of the precise gauge field on device
+  profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
+
+  printfQuda("DEBUG FGI: copying Precise\n");
+  gaugeCopyPrecise->copy(*gaugePrecise);
+  printfQuda("DEBUG FGI: copying Sloppy\n");
+  gaugeCopySloppy->copy(*gaugeSloppy);
+  printfQuda("DEBUG FGI: copying Precondition\n");
+  gaugeCopyPrecondition->copy(*gaugePrecondition);
+  printfQuda("DEBUG FGI: copying Refinement\n");
+  gaugeCopyRefinement->copy(*gaugeRefinement);
+  printfQuda("DEBUG FGI: copying Eigensolver\n");
+  gaugeCopyEigensolver->copy(*gaugeEigensolver);
+  printfQuda("DEBUG FGI: copying Extended\n");
+  gaugeCopyExtended->copy(*gaugeExtended);
+
+  printfQuda("DEBUG FGI: copying FatPrecise\n");
+  gaugeFatCopyPrecise->copy(*gaugeFatPrecise);
+  printfQuda("DEBUG FGI: copying FatSloppy\n");
+  gaugeFatCopySloppy->copy(*gaugeFatSloppy);
+  printfQuda("DEBUG FGI: copying FatPrecondition\n");
+  gaugeFatCopyPrecondition->copy(*gaugeFatPrecondition);
+  printfQuda("DEBUG FGI: copying FatRefinement\n");
+  gaugeFatCopyRefinement->copy(*gaugeFatRefinement);
+  printfQuda("DEBUG FGI: copying FatEigensolver\n");
+  gaugeFatCopyEigensolver->copy(*gaugeFatEigensolver);
+  printfQuda("DEBUG FGI: copying FatExtended\n");
+  gaugeFatCopyExtended->copy(*gaugeFatExtended);
+
+  printfQuda("DEBUG FGI: copying LongPrecise\n");
+  gaugeLongCopyPrecise->copy(*gaugeLongPrecise);
+  printfQuda("DEBUG FGI: copying LongSloppy\n");
+  gaugeLongCopySloppy->copy(*gaugeLongSloppy);
+  printfQuda("DEBUG FGI: copying LongPrecondition\n");
+  gaugeLongCopyPrecondition->copy(*gaugeLongPrecondition);
+  printfQuda("DEBUG FGI: copying LongRefinement\n");
+  gaugeLongCopyRefinement->copy(*gaugeLongRefinement);
+  printfQuda("DEBUG FGI: copying LongEigensolver\n");
+  gaugeLongCopyEigensolver->copy(*gaugeLongEigensolver);
+  printfQuda("DEBUG FGI: copying LongExtended\n");
+  gaugeLongCopyExtended->copy(*gaugeLongExtended);
+
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void restoreGaugeQuda()
+{ // FGI restore Gauge field
+  profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
+
+  gaugePrecise->copy(*gaugeCopyPrecise);
+  gaugeSloppy->copy(*gaugeCopySloppy);
+  gaugePrecondition->copy(*gaugeCopyPrecondition);
+  gaugeRefinement->copy(*gaugeCopyRefinement);
+  gaugeEigensolver->copy(*gaugeCopyEigensolver);
+  gaugeExtended->copy(*gaugeCopyExtended);
+
+  gaugeFatPrecise->copy(*gaugeFatCopyPrecise);
+  gaugeFatSloppy->copy(*gaugeFatCopySloppy);
+  gaugeFatPrecondition->copy(*gaugeFatCopyPrecondition);
+  gaugeFatRefinement->copy(*gaugeFatCopyRefinement);
+  gaugeFatEigensolver->copy(*gaugeFatCopyEigensolver);
+  gaugeFatExtended->copy(*gaugeFatCopyExtended);
+
+  gaugeLongPrecise->copy(*gaugeLongCopyPrecise);
+  gaugeLongSloppy->copy(*gaugeLongCopySloppy);
+  gaugeLongPrecondition->copy(*gaugeLongCopyPrecondition);
+  gaugeLongRefinement->copy(*gaugeLongCopyRefinement);
+  gaugeLongEigensolver->copy(*gaugeLongCopyEigensolver);
+  gaugeLongExtended->copy(*gaugeLongCopyExtended);
+
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void momResidentZeroQuda()
+{ // FGI This function copies the existing momResident field into momResidentCopy on device
+  // it then sets the momResident field to 0 to be used for the FGI "kick"
+  profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (momResident) {
+    // make a copy
+    momResidentCopy->copy(*momResident);
+    // zero out original momResident
+    momResident->zero();
+  } else {
+    errorQuda("No momResident to copy to momResidentCopy");
+  }
+
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void momResidentRestoreQuda()
+{ // FGI This function restores momResident from momResidentCopy
+  // It is used after the FGI step
+  profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (momResidentCopy) {
+    // restore momentum
+    momResident->copy(*momResidentCopy);
+  } else {
+    errorQuda("No momResidentCopy to push to momResident");
   }
 
   profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
