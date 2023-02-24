@@ -523,9 +523,37 @@ void initQuda(int dev)
 // possible flag to indicate we need to recompute the clover field
 static bool invalidate_clover = true;
 
-// pre-declare some cleanup utilities
-void freeUniqueSloppyGaugeUtility(cudaGaugeField*&, cudaGaugeField*&, cudaGaugeField*&, cudaGaugeField*&, cudaGaugeField*&);
-void freeUniqueGaugeUtility(cudaGaugeField*&, cudaGaugeField*&, cudaGaugeField*&, cudaGaugeField*&, cudaGaugeField*&, cudaGaugeField*&, QudaBoolean);
+// These utility functions are defined by the other "free" functions, but they
+// are declared here so they can be used in the initial cleanup phase of loadGaugeQuda
+
+/**
+ * Abstraction utility that cleans up a set of sloppy fields, typically one of Wilson,
+ * HISQ fat, or HISQ long. The utility safely frees the fields as appropriate and sets
+ * all of the pointers to nullptr.
+ * @param precise[in] Reference to the pointer of a given "precise" field, used for aliasing checks.
+ * @param sloppy[in/out] Reference to the pointer of a given "sloppy" field.
+ * @param precondition[in/out] Reference the to pointer of a given "precondition" field.
+ * @param refinement[in/out] Reference the to pointer of a given "refinement" field.
+ * @param eigensolver[in/out] Reference then to pointer of a given "eigensolver" field.
+ */
+void freeUniqueSloppyGaugeUtility(cudaGaugeField*& precise, cudaGaugeField*& sloppy, cudaGaugeField*& precondition,
+                                  cudaGaugeField*& refinement, cudaGaugeField*& eigensolver);
+
+/**
+ * Abstraction utility that cleans up the full set of sloppy fields, as well as
+ * precise (unless requested otherwise) and extended fields. The set can correspond
+ * to the internal Wilson, HISQ fat, or HISQ long fields. This utility safely frees the
+ * fields as appropriate and sets all of the pointers to nullptr.
+ * @param precise[in/out] Reference to the pointer of a given "precise" field.
+ * @param sloppy[in/out] Reference to the pointer of a given "sloppy" field.
+ * @param precondition[in/out] Reference to the pointer of a given "precondition" field.
+ * @param refinement[in/out] Reference to the pointer of a given "refinement" field.
+ * @param eigensolver[in/out] Reference to the pointer of a given "eigensolver" field.
+ * @param extended[in/out] Reference to the pointer of a given "extended" field.
+ * @param preserve_precise[in] Whether (true) or not (false) to preserve the precise field.
+ */
+void freeUniqueGaugeUtility(cudaGaugeField*& precise, cudaGaugeField*& sloppy, cudaGaugeField*& precondition,
+                            cudaGaugeField*& refinement, cudaGaugeField*& eigensolver, cudaGaugeField*& extended, QudaBoolean preserve_precise);
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
@@ -1014,6 +1042,7 @@ void freeGaugeQuda(void)
   }
 }
 
+// These utility functions are declared w/doxygen above
 void freeUniqueSloppyGaugeUtility(cudaGaugeField*& precise, cudaGaugeField*& sloppy, cudaGaugeField*& precondition,
                                   cudaGaugeField*& refinement, cudaGaugeField*& eigensolver) {
   if (refinement != sloppy && refinement != eigensolver && refinement)
