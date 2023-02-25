@@ -141,6 +141,7 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t input)
 #else
   initCommsGridQuda(4, commsGridDim, rankFromCoords, (void *)(commsGridDim));
 #endif
+
   static int device = -1;
 #else
   static int device = input.device;
