@@ -182,8 +182,8 @@ namespace quda {
 	Link link;
 	if (!allthreads || active) link = arg.u(dim, idx, parity);
 
-        //switch (Arg::type) {
-        switch (0) {
+        switch (Arg::type) {
+        //switch (0) {
           // 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
           // this implementation needs 8x more shared memory than the implementation using atomicadd
         case 0: GaugeFixHit_NoAtomicAdd<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu, *this); break;
@@ -212,8 +212,8 @@ namespace quda {
         Link link1;
 	if (!allthreads || active) link1 = arg.u(mu, idx1, 1 - parity);
 
-        //switch (Arg::type) {
-        switch (3) {
+        switch (Arg::type) {
+        //switch (3) {
           // 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
           // this implementation needs 4x more shared memory than the implementation using atomicadd
         case 3: GaugeFixHit_NoAtomicAdd<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu, *this); break;
