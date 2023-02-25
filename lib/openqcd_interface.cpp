@@ -78,8 +78,10 @@ using namespace quda;
 // template <bool start> void inline qudamilc_called(const char *func) { qudamilc_called<start>(func, getVerbosity()); }
 
 // fdata should point to 8 integers in order {BLK_NPROC0, BLK_NPROC1, BLK_NPROC2, BLK_NPROC3, NPROC0, NPROC1, NPROC2, NPROC3]
-static int rankFromCoords(const int *coords, void *fdata)
+static int rankFromCoords(const int *coords, void *fdata) // TODO:
 {
+
+  
   int *BLK_NPROC = static_cast<int *>(fdata);
   int *NPROC = BLK_NPROC + 4;
   
@@ -101,7 +103,18 @@ static int rankFromCoords(const int *coords, void *fdata)
   for (int i = 0; i <= 3; i++) { 
 	rank = BLK_NPROC[i] * rank + local_coords[i];
   }
-  return rank;
+  warningQuda("rank = %d, Coords = (%d,%d,%d,%d)\n",rank,coords[0],coords[1],coords[2],coords[3]);
+
+  //   // For 2 ranks:
+  // if (coords[3]<8)
+  // {
+  //   rank = 0;
+  // } else {
+  //   rank = 1;
+  // }
+  return coords[3];
+  // return 0; // FIXME: this function needs to be specific
+  
 }
 
 void openQCD_qudaSetLayout(openQCD_QudaLayout_t input)
@@ -318,7 +331,7 @@ static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, Qud
 static void setColorSpinorParams(const int dim[4], QudaPrecision precision, ColorSpinorParam *param)
 {
   param->nColor = 3;
-  param->nSpin = 1;
+  param->nSpin = 1; // TODO:
   param->nDim = 4;
 
   for (int dir = 0; dir < 4; ++dir) param->x[dir] = dim[dir];
@@ -326,11 +339,11 @@ static void setColorSpinorParams(const int dim[4], QudaPrecision precision, Colo
 
   param->setPrecision(precision);
   param->pad = 0;
-  param->siteSubset = QUDA_PARITY_SITE_SUBSET;
-  param->siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  param->siteSubset = QUDA_PARITY_SITE_SUBSET;   // TODO: check how to adapt this for openqxd
+  param->siteOrder = QUDA_EVEN_ODD_SITE_ORDER;   // TODO: check how to adapt this for openqxd
   param->fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  param->gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless, but required by the code.
-  param->create = QUDA_ZERO_FIELD_CREATE;
+  param->gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless, but required by the code.  // TODO:
+  param->create = QUDA_ZERO_FIELD_CREATE; // TODO: check how to adapt this for openqxd
 }
 
 #if 0
