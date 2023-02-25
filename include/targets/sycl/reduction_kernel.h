@@ -99,6 +99,7 @@ namespace quda {
 		 grid_stride?"true":"false", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
 		 str(localSize).c_str(), str(arg.threads).c_str());
+      printfQuda("  Functor: %s\n", typeid(Functor<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
       printfQuda("  SLM size: %lu\n",
                  localSize.size()*sizeof(typename Functor<Arg>::reduce_t)/
@@ -225,6 +226,7 @@ namespace quda {
 		 grid_stride?"true":"false", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
 		 str(localSize).c_str(), str(arg.threads).c_str());
+      printfQuda("  Functor: %s\n", typeid(Functor<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
       printfQuda("  reduce_t: %s\n", typeid(reduce_t).name());
       printfQuda("  Arg::max_n_batch_block: %d\n", Arg::max_n_batch_block);

@@ -220,8 +220,8 @@ namespace quda
     }
   };
 
-  template <typename T, int block_dim, int batch_size> using block_reduce = block_reduceG<T,block_dim,batch_size>;
-  //template <typename T, int block_dim, int batch_size> using block_reduce = block_reduceW<T,block_dim,batch_size>;
+  //template <typename T, int block_dim, int batch_size> using block_reduce = block_reduceG<T,block_dim,batch_size>;
+  template <typename T, int block_dim, int batch_size> using block_reduce = block_reduceW<T,block_dim,batch_size>;
 
 } // namespace quda
 

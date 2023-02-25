@@ -125,6 +125,32 @@ namespace quda
       //printfQuda("  max_constant_args: %u\n", myDevice.get_info<sycl::info::device::max_constant_args>());
       printfQuda("  Local mem size: %lu\n", myDevice.get_info<sycl::info::device::local_mem_size>());
       printfQuda("  Error correction support: %s\n", myDevice.get_info<sycl::info::device::error_correction_support>()?"true":"false");
+      auto moc = myDevice.get_info<sycl::info::device::atomic_memory_order_capabilities>();
+      printfQuda("  Atomic memory orders:");
+      for(auto mo: moc) {
+	switch(mo) {
+	case sycl::memory_order::relaxed: printfQuda(" relaxed"); break;
+	case sycl::memory_order::acquire: printfQuda(" acquire"); break;
+	case sycl::memory_order::release: printfQuda(" release"); break;
+	case sycl::memory_order::acq_rel: printfQuda(" acq_rel"); break;
+	case sycl::memory_order::seq_cst: printfQuda(" seq_cst"); break;
+	default: printfQuda(" unknown"); break;
+	}
+      }
+      printfQuda("\n");
+      auto msc = myDevice.get_info<sycl::info::device::atomic_memory_scope_capabilities>();
+      printfQuda("  Atomic memory scopes:");
+      for(auto ms: msc) {
+	switch(ms) {
+	case sycl::memory_scope::work_item: printfQuda(" work_item"); break;
+	case sycl::memory_scope::sub_group: printfQuda(" sub_group"); break;
+	case sycl::memory_scope::work_group: printfQuda(" work_group"); break;
+	case sycl::memory_scope::device: printfQuda(" device"); break;
+	case sycl::memory_scope::system: printfQuda(" system"); break;
+	default: printfQuda(" unknown"); break;
+	}
+      }
+      printfQuda("\n");
 
       bool err = false;
       auto warps = myDevice.get_info<sycl::info::device::sub_group_sizes>();
@@ -316,10 +342,12 @@ namespace quda
     bool shared_memory_atomic_supported()
     {
       //auto val = myDevice.has(sycl::aspect::int64_base_atomics);
-      // atomic_memory_scope_capabilities
-      // work_item, sub_group, work_group, device and system
       //return val;
-      return false;  // used in coarse_op, but not portable yet
+      //auto caps = myDevice.get_info<sycl::info::device::atomic_memory_scope_capabilities>;
+      // work_item, sub_group, work_group, device and system
+      //return false;  // used in coarse_op, but not portable yet
+      //return false;
+      return true;
     }
 
     size_t max_default_shared_memory() {

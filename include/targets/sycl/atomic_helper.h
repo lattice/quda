@@ -8,15 +8,14 @@
    @section Provides definitions of atomic functions that are used in QUDA.
  */
 
-//inline constexpr auto mo = sycl::memory_order::relaxed;
+inline constexpr auto mo = sycl::memory_order::relaxed;
 //inline constexpr auto mo = sycl::ext::oneapi::memory_order::acq_rel;
 //inline constexpr auto mo = memory_order::seq_cst;
-inline constexpr auto mo = sycl::memory_order::acq_rel;
+//inline constexpr auto mo = sycl::memory_order::acq_rel;
 
-//inline constexpr auto ms = sycl::ext::oneapi::memory_scope::system;
 //inline constexpr auto ms = sycl::memory_scope::system;
-//inline constexpr auto ms = sycl::ext::oneapi::memory_scope::device;
 inline constexpr auto ms = sycl::memory_scope::device;
+inline constexpr auto msg = sycl::memory_scope::work_group;
 
 //inline constexpr auto as = sycl::access::address_space::generic_space;
 inline constexpr auto as = sycl::access::address_space::global_space;
@@ -26,7 +25,7 @@ inline constexpr auto asl = sycl::access::address_space::local_space;
 template <typename T>
 using atomicRef = sycl::atomic_ref<T,mo,ms,as>;
 template <typename T>
-using atomicRefL = sycl::atomic_ref<T,mo,ms,asl>;
+using atomicRefL = sycl::atomic_ref<T,mo,msg,asl>;
 
 template <typename T>
 static inline atomicRef<T> makeAtomicRef(T *address) {
