@@ -553,7 +553,7 @@ void freeUniqueSloppyGaugeUtility(cudaGaugeField*& precise, cudaGaugeField*& slo
  * @param preserve_precise[in] Whether (true) or not (false) to preserve the precise field.
  */
 void freeUniqueGaugeUtility(cudaGaugeField*& precise, cudaGaugeField*& sloppy, cudaGaugeField*& precondition,
-                            cudaGaugeField*& refinement, cudaGaugeField*& eigensolver, cudaGaugeField*& extended, QudaBoolean preserve_precise);
+                            cudaGaugeField*& refinement, cudaGaugeField*& eigensolver, cudaGaugeField*& extended, bool preserve_precise);
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
@@ -1063,10 +1063,10 @@ void freeUniqueSloppyGaugeUtility(cudaGaugeField*& precise, cudaGaugeField*& slo
 }
 
 void freeUniqueGaugeUtility(cudaGaugeField*& precise, cudaGaugeField*& sloppy, cudaGaugeField*& precondition,
-                            cudaGaugeField*& refinement, cudaGaugeField*& eigensolver, cudaGaugeField*& extended, QudaBoolean preserve_precise) {
+                            cudaGaugeField*& refinement, cudaGaugeField*& eigensolver, cudaGaugeField*& extended, bool preserve_precise) {
   freeUniqueSloppyGaugeUtility(precise, sloppy, precondition, refinement, eigensolver);
 
-  if (precise && preserve_precise == QUDA_BOOLEAN_FALSE) {
+  if (precise && !preserve_precise) {
     delete precise;
     precise = nullptr;
   }
