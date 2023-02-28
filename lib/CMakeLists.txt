@@ -516,6 +516,10 @@ endif()
 target_compile_definitions(quda PUBLIC QUDA_PRECISION=${QUDA_PRECISION})
 target_compile_definitions(quda PUBLIC QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
 
+if(QUDA_ENABLE_MMA)
+  target_compile_definitions(quda PUBLIC QUDA_ENABLE_MMA)
+endif()
+
 if(QUDA_FAST_COMPILE_REDUCE)
   target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_REDUCE)
 endif()

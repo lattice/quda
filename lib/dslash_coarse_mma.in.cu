@@ -1,5 +1,6 @@
 #include <dslash_coarse.hpp>
 #include <dslash_coarse_mma.hpp>
+#include <quda_arch.h>
 
 namespace quda {
 
@@ -11,7 +12,7 @@ namespace quda {
             DslashType type>
   using D = DslashCoarseMma<Float, yFloat, ghostFloat, Ns, coarseColor, dslash, clover, dagger, type, nVec>;
 
-#if (@QUDA_MULTIGRID_NVEC@ == 24) || (@QUDA_MULTIGRID_NVEC@ == 32) || (@QUDA_MULTIGRID_NVEC@ == 64) || (@QUDA_MULTIGRID_NVEC@ == 96)
+#if defined(QUDA_MMA_AVAILABLE) && ((@QUDA_MULTIGRID_NVEC@ == 24) || (@QUDA_MULTIGRID_NVEC@ == 32) || (@QUDA_MULTIGRID_NVEC@ == 64) || (@QUDA_MULTIGRID_NVEC@ == 96))
 
   constexpr bool use_mma = true;
 
