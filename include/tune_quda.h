@@ -67,7 +67,23 @@ namespace quda {
     virtual unsigned int minThreads() const { return 1; }
     virtual bool tuneGridDim() const { return true; }
     virtual bool tuneAuxDim() const { return false; }
-    virtual bool tuneSharedBytes() const { return true; }
+
+    virtual bool tuneSharedBytes() const
+    {
+      static bool tune_shared = true;
+      static bool init = false;
+
+      if (!init) {
+        char *enable_shared_env = getenv("QUDA_ENABLE_TUNING_SHARED");
+        if (enable_shared_env) {
+          if (strcmp(enable_shared_env, "0") == 0) {
+            tune_shared = false;
+          }
+        }
+        init = true;
+      }
+      return tune_shared;
+    }
 
     virtual bool advanceGridDim(TuneParam &param) const
     {
