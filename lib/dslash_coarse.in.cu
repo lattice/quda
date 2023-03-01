@@ -6,8 +6,7 @@ namespace quda {
   constexpr int coarseColor = @QUDA_MULTIGRID_NVEC@;
   constexpr bool use_mma = false;
 
-  template <typename Float, typename yFloat, typename ghostFloat, int Ns, bool dslash, bool clover,
-            DslashType type>
+  template <typename Float, typename yFloat, typename ghostFloat, int Ns, bool dslash, bool clover, DslashType type>
   using D = DslashCoarse<Float, yFloat, ghostFloat, Ns, coarseColor, dslash, clover, dagger, type>;
 
   template<>
@@ -21,7 +20,7 @@ namespace quda {
 
       // Since use_mma = false, put a dummy 1 here for nVec
       DslashCoarseLaunch<D, dagger, coarseColor, use_mma, 1> Dslash(out, inA, inB, halo, Y, X, kappa, parity, dslash,
-                                                     clover, commDim, halo_precision);
+                                                                    clover, commDim, halo_precision);
 
       DslashCoarsePolicyTune<decltype(Dslash)> policy(Dslash);
       policy.apply(device::get_default_stream());

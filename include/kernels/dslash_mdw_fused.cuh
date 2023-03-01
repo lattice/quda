@@ -14,15 +14,9 @@ namespace quda {
 
     using mma_t = mma::hmma_t; // simt::simt_t<mma::half, 8, 4, 2, 2>;
 
-    constexpr int sm_m_pad_size(int m)
-    {
-      return mma_t::pad_size(m);
-    }
+    constexpr int sm_m_pad_size(int m) { return mma_t::pad_size(m); }
 
-    constexpr int sm_n_pad_size(int n)
-    {
-      return mma_t::pad_size(n);
-    }
+    constexpr int sm_n_pad_size(int n) { return mma_t::pad_size(n); }
 
     /**
       @brief Parameter structure for applying the Dslash
@@ -423,7 +417,8 @@ namespace quda {
             load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, scale, arg.m_scale); // acc = true
             if (!idle && center) { store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back, scale); }
             __syncthreads();
-            mma_sync_gemm<mma_t, Arg::block_dim_x, Arg::Ls, M, N, M_sm, N_sm, Arg::reload>(op_a_aux, sm_a_black, sm_c, sm_c, wrm);
+            mma_sync_gemm<mma_t, Arg::block_dim_x, Arg::Ls, M, N, M_sm, N_sm, Arg::reload>(op_a_aux, sm_a_black, sm_c,
+                                                                                           sm_c, wrm);
             __syncthreads();
 
           } else if (Arg::type == MdwfFusedDslashType::D4DAG_D5PREDAG) {

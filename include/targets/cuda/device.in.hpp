@@ -1,15 +1,18 @@
 #pragma once
 
-namespace quda {
+namespace quda
+{
 
-  namespace device {
+  namespace device
+  {
 
     constexpr int maximum_dynamic_shared_memory_override = @QUDA_MAX_SHARED_MEMORY@;
 
     /**
       @brief A constexpr function to returns the maximum dyanmic shared memory per block.
      */
-    constexpr int maximum_dynamic_shared_memory() {
+    constexpr int maximum_dynamic_shared_memory()
+    {
       if constexpr (maximum_dynamic_shared_memory_override > 0) {
         return maximum_dynamic_shared_memory_override;
       } else {
@@ -34,5 +37,5 @@ namespace quda {
 #endif
       }
     }
-  }
-}
+  } // namespace device
+} // namespace quda

@@ -361,7 +361,8 @@ namespace quda
   }
 
   template <class mma_t, int BlockDimX, int Ls, int M, int N, int M_PAD, int N_PAD, bool reload, class T>
-  __device__ inline void mma_sync_gemm(T op_a[], half *sm_a, half *sm_b, half *sm_c, const typename mma_t::WarpRegisterMapping &wrm)
+  __device__ inline void mma_sync_gemm(T op_a[], half *sm_a, half *sm_b, half *sm_c,
+                                       const typename mma_t::WarpRegisterMapping &wrm)
   {
 
     constexpr int tile_row_dim = M / mma_t::MMA_M; // number of tiles in the column dimension

@@ -62,10 +62,7 @@ namespace quda
   template <typename T, int m, int n, int k> using array_3d = array<array<array<T, k>, n>, m>;
 
   struct assign_t {
-    template <class T>
-    __device__ __host__ inline void operator()(T *out, T in) {
-      *out = in;
-    }
+    template <class T> __device__ __host__ inline void operator()(T *out, T in) { *out = in; }
   };
 
 } // namespace quda

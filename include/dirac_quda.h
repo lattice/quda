@@ -73,8 +73,8 @@ namespace quda {
     Transfer *transfer;
     Dirac *dirac;
     bool need_bidirectional; // whether or not we need to force a bi-directional build
-    bool setup_use_mma;            // whether to use tensor cores where applicable for setup
-    bool dslash_use_mma;            // whether to use tensor cores where applicable for dslash
+    bool setup_use_mma;      // whether to use tensor cores where applicable for setup
+    bool dslash_use_mma;     // whether to use tensor cores where applicable for dslash
     bool allow_truncation; /** whether or not we let MG coarsening drop improvements, for ex drop long links for small aggregate dimensions */
 
     bool use_mobius_fused_kernel; // Whether or not use fused kernels for Mobius
@@ -1753,20 +1753,20 @@ public:
     const Dirac *dirac; /** Parent Dirac operator */
     const bool need_bidirectional; /** Whether or not to force a bi-directional build */
     const bool allow_truncation; /** Whether or not we let coarsening drop improvements, for ex dropping long links for small aggregate sizes */
-    const bool setup_use_mma;            /** Whether to use tensor cores or not */
-    const bool dslash_use_mma;            /** Whether to use tensor cores or not */
+    const bool setup_use_mma;    /** Whether to use tensor cores or not */
+    const bool dslash_use_mma;   /** Whether to use tensor cores or not */
 
-    mutable std::shared_ptr<cpuGaugeField> Y_h; /** CPU copy of the coarse link field */
-    mutable std::shared_ptr<cpuGaugeField> X_h; /** CPU copy of the coarse clover term */
+    mutable std::shared_ptr<cpuGaugeField> Y_h;    /** CPU copy of the coarse link field */
+    mutable std::shared_ptr<cpuGaugeField> X_h;    /** CPU copy of the coarse clover term */
     mutable std::shared_ptr<cpuGaugeField> Xinv_h; /** CPU copy of the inverse coarse clover term */
     mutable std::shared_ptr<cpuGaugeField> Yhat_h; /** CPU copy of the preconditioned coarse link field */
 
-    mutable std::shared_ptr<cudaGaugeField> Y_d; /** GPU copy of the coarse link field */
-    mutable std::shared_ptr<cudaGaugeField> X_d; /** GPU copy of the coarse clover term */
-    mutable std::shared_ptr<cudaGaugeField> Y_aos_d; /** AoS GPU copy of the coarse link field */
-    mutable std::shared_ptr<cudaGaugeField> X_aos_d; /** AoS GPU copy of the coarse clover term */
-    mutable std::shared_ptr<cudaGaugeField> Xinv_d; /** GPU copy of inverse coarse clover term */
-    mutable std::shared_ptr<cudaGaugeField> Yhat_d; /** GPU copy of the preconditioned coarse link field */
+    mutable std::shared_ptr<cudaGaugeField> Y_d;        /** GPU copy of the coarse link field */
+    mutable std::shared_ptr<cudaGaugeField> X_d;        /** GPU copy of the coarse clover term */
+    mutable std::shared_ptr<cudaGaugeField> Y_aos_d;    /** AoS GPU copy of the coarse link field */
+    mutable std::shared_ptr<cudaGaugeField> X_aos_d;    /** AoS GPU copy of the coarse clover term */
+    mutable std::shared_ptr<cudaGaugeField> Xinv_d;     /** GPU copy of inverse coarse clover term */
+    mutable std::shared_ptr<cudaGaugeField> Yhat_d;     /** GPU copy of the preconditioned coarse link field */
     mutable std::shared_ptr<cudaGaugeField> Xinv_aos_d; /** AoS GPU copy of inverse coarse clover term */
     mutable std::shared_ptr<cudaGaugeField> Yhat_aos_d; /** AoS GPU copy of the preconditioned coarse link field */
 
@@ -1827,8 +1827,9 @@ public:
        @param[in] Xinv_d GPU coarse inverse clover field
        @param[in] Yhat_d GPU coarse preconditioned link field
      */
-    DiracCoarse(const DiracParam &param, std::shared_ptr<cpuGaugeField> Y_h, std::shared_ptr<cpuGaugeField> X_h, std::shared_ptr<cpuGaugeField> Xinv_h,
-                std::shared_ptr<cpuGaugeField> Yhat_h, std::shared_ptr<cudaGaugeField> Y_d = nullptr, std::shared_ptr<cudaGaugeField> X_d = nullptr,
+    DiracCoarse(const DiracParam &param, std::shared_ptr<cpuGaugeField> Y_h, std::shared_ptr<cpuGaugeField> X_h,
+                std::shared_ptr<cpuGaugeField> Xinv_h, std::shared_ptr<cpuGaugeField> Yhat_h,
+                std::shared_ptr<cudaGaugeField> Y_d = nullptr, std::shared_ptr<cudaGaugeField> X_d = nullptr,
                 std::shared_ptr<cudaGaugeField> Xinv_d = nullptr, std::shared_ptr<cudaGaugeField> Yhat_d = nullptr);
 
     /**
@@ -1991,8 +1992,9 @@ public:
        @param[in] Xinv_d GPU coarse inverse clover field
        @param[in] Yhat_d GPU coarse preconditioned link field
      */
-    DiracCoarsePC(const DiracParam &param, std::shared_ptr<cpuGaugeField> Y_h, std::shared_ptr<cpuGaugeField> X_h, std::shared_ptr<cpuGaugeField> Xinv_h,
-                  std::shared_ptr<cpuGaugeField> Yhat_h, std::shared_ptr<cudaGaugeField> Y_d = nullptr, std::shared_ptr<cudaGaugeField> X_d = nullptr,
+    DiracCoarsePC(const DiracParam &param, std::shared_ptr<cpuGaugeField> Y_h, std::shared_ptr<cpuGaugeField> X_h,
+                  std::shared_ptr<cpuGaugeField> Xinv_h, std::shared_ptr<cpuGaugeField> Yhat_h,
+                  std::shared_ptr<cudaGaugeField> Y_d = nullptr, std::shared_ptr<cudaGaugeField> X_d = nullptr,
                   std::shared_ptr<cudaGaugeField> Xinv_d = nullptr, std::shared_ptr<cudaGaugeField> Yhat_d = nullptr);
 
     /**

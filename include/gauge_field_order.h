@@ -173,9 +173,11 @@ namespace quda {
       using store_type = storeFloat;
       complex<storeFloat> *v;
       const unsigned int idx;
+
     private:
       const Float scale;
       const Float scale_inv;
+
     public:
       static constexpr bool fixed = fixed_point<Float, storeFloat>();
 

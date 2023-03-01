@@ -34,7 +34,8 @@ namespace quda
       using base_t = typename smma::smma_t<mma::tfloat32, inst_k, warp_m, warp_n>;
       using WarpRegisterMapping = typename base_t::WarpRegisterMapping;
 
-      static std::string get_type_name() {
+      static std::string get_type_name()
+      {
         return ",1xtfloat32,m" + std::to_string(MMA_M) + "n" + std::to_string(MMA_N) + "k" + std::to_string(MMA_K);
       }
 
@@ -131,7 +132,8 @@ namespace quda
 
       template <int M, int N, int ldc, bool dagger, class gmem_op_t, class op_t>
       static inline __device__ void store_complex(int m_offset, int n_offset, const WarpRegisterMapping &wrm,
-                                                  gmem_op_t &cc, const OperandC &op_c_real, const OperandC &op_c_imag, op_t op)
+                                                  gmem_op_t &cc, const OperandC &op_c_real, const OperandC &op_c_imag,
+                                                  op_t op)
       {
         base_t::template store_complex<M, N, ldc, dagger>(m_offset, n_offset, wrm, cc, op_c_real, op_c_imag, op);
       }

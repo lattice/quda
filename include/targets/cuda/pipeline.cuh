@@ -1,8 +1,8 @@
 #pragma once
 
 /** @file The wrapper here abstract the cuda::pipeline, but _only_ when
-  *     we believe it gives the better performance.
-  */
+ *     we believe it gives the better performance.
+ */
 
 #if (__COMPUTE_CAPABILITY__ >= 800) && (CUDA_VERSION >= 11080)
 #define QUDA_USE_CUDA_PIPELINE
@@ -25,7 +25,8 @@ namespace quda
     __device__ inline void consumer_release() { pipe.consumer_release(); }
   };
 
-  __device__ inline pipeline_t make_pipeline() {
+  __device__ inline pipeline_t make_pipeline()
+  {
     pipeline_t p = {cuda::make_pipeline()};
     return p;
   }
@@ -40,14 +41,15 @@ namespace quda
     __device__ inline void consumer_release() { }
   };
 
-  __device__ inline pipeline_t make_pipeline() {
+  __device__ inline pipeline_t make_pipeline()
+  {
     pipeline_t p;
     return p;
   }
 #endif
 
-  template <class T>
-  __device__ inline void memcpy_async(T *destination, T *source, size_t size, pipeline_t &pipe) {
+  template <class T> __device__ inline void memcpy_async(T *destination, T *source, size_t size, pipeline_t &pipe)
+  {
 #ifdef QUDA_USE_CUDA_PIPELINE
     cuda::memcpy_async(destination, source, size, pipe.pipe);
 #else
@@ -56,4 +58,3 @@ namespace quda
   }
 
 } // namespace quda
-

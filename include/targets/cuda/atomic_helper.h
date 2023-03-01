@@ -117,10 +117,7 @@ namespace quda
   }
 
   struct fetch_add_atomic_t {
-    template <class T>
-    __device__ __host__ inline void operator()(T *out, T in) {
-      atomic_fetch_add(out, in);
-    }
+    template <class T> __device__ __host__ inline void operator()(T *out, T in) { atomic_fetch_add(out, in); }
   };
 
 } // namespace quda

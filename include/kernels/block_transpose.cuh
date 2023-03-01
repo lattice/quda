@@ -5,12 +5,14 @@
 #include <color_spinor_field.h>
 #include <shared_memory_cache_helper.h>
 
-namespace quda {
+namespace quda
+{
 
   /**
       Kernel argument struct
   */
-  template <class v_t_, class b_t_, bool is_device_, typename vFloat, typename vAccessor, typename bFloat, typename bAccessor, int nSpin_, int nColor_, int nVec_>
+  template <class v_t_, class b_t_, bool is_device_, typename vFloat, typename vAccessor, typename bFloat,
+            typename bAccessor, int nSpin_, int nColor_, int nVec_>
   struct BlockTransposeArg : kernel_param<> {
     using real = typename mapper<vFloat>::type;
     static constexpr bool is_device = is_device_;
@@ -29,18 +31,20 @@ namespace quda {
 
     BlockTransposeArg(v_t &V, cvector_ref<b_t> &B_, int block_x, int block_y) :
       // We need full threadblock
-      kernel_param(dim3((V.VolumeCB() + block_x - 1) / block_x * block_x, (nVec + block_y - 1) / block_y * block_y, V.SiteSubset() * nColor)),
-      V(V), block_y(block_y), volume_cb(V.VolumeCB()), actual_nvec(B_.size())
+      kernel_param(dim3((V.VolumeCB() + block_x - 1) / block_x * block_x, (nVec + block_y - 1) / block_y * block_y,
+                        V.SiteSubset() * nColor)),
+      V(V),
+      block_y(block_y),
+      volume_cb(V.VolumeCB()),
+      actual_nvec(B_.size())
     {
-      for (auto i = 0u; i < B_.size(); i++) {
-        B[i] = bAccessor(B_[i]);
-      }
+      for (auto i = 0u; i < B_.size(); i++) { B[i] = bAccessor(B_[i]); }
     }
   };
 
   template <typename Arg> struct BlockTransposeKernel {
     const Arg &arg;
-    constexpr BlockTransposeKernel(const Arg &arg) : arg(arg) {}
+    constexpr BlockTransposeKernel(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**

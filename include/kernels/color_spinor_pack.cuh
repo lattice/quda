@@ -24,8 +24,10 @@ namespace quda {
 
   __host__ __device__ int spins_per_thread(int nSpin)
   {
-    if (target::is_device()) return spins_per_thread<true>(nSpin);
-    else return spins_per_thread<false>(nSpin);
+    if (target::is_device())
+      return spins_per_thread<true>(nSpin);
+    else
+      return spins_per_thread<false>(nSpin);
   }
 
   int spins_per_thread(const ColorSpinorField &a)
@@ -46,8 +48,10 @@ namespace quda {
 
   __host__ __device__ int colors_per_thread(int nColor)
   {
-    if (target::is_device()) return colors_per_thread<true>(nColor);
-    else return colors_per_thread<false>(nColor);
+    if (target::is_device())
+      return colors_per_thread<true>(nColor);
+    else
+      return colors_per_thread<false>(nColor);
   }
 
   int colors_per_thread(const ColorSpinorField &a)

@@ -28,9 +28,11 @@ namespace quda {
     initializeCoarse();
   }
 
-  DiracCoarse::DiracCoarse(const DiracParam &param, std::shared_ptr<cpuGaugeField> Y_h, std::shared_ptr<cpuGaugeField> X_h, std::shared_ptr<cpuGaugeField> Xinv_h,
+  DiracCoarse::DiracCoarse(const DiracParam &param, std::shared_ptr<cpuGaugeField> Y_h,
+                           std::shared_ptr<cpuGaugeField> X_h, std::shared_ptr<cpuGaugeField> Xinv_h,
                            std::shared_ptr<cpuGaugeField> Yhat_h, // cpu link fields
-                           std::shared_ptr<cudaGaugeField> Y_d, std::shared_ptr<cudaGaugeField> X_d, std::shared_ptr<cudaGaugeField> Xinv_d,
+                           std::shared_ptr<cudaGaugeField> Y_d, std::shared_ptr<cudaGaugeField> X_d,
+                           std::shared_ptr<cudaGaugeField> Xinv_d,
                            std::shared_ptr<cudaGaugeField> Yhat_d) // gpu link field
     :
     Dirac(param),
@@ -153,7 +155,8 @@ namespace quda {
       GaugeFieldParam milcParam(*Y_d);
       milcParam.order = QUDA_MILC_GAUGE_ORDER;
       Y_aos_d = std::make_shared<cudaGaugeField>(milcParam);
-    } else     Y_h = std::make_shared<cpuGaugeField>(gParam);
+    } else
+      Y_h = std::make_shared<cpuGaugeField>(gParam);
 
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     gParam.nFace = 0;
@@ -165,7 +168,8 @@ namespace quda {
       GaugeFieldParam milcParam(*X_d);
       milcParam.order = QUDA_MILC_GAUGE_ORDER;
       X_aos_d = std::make_shared<cudaGaugeField>(milcParam);
-    } else     X_h = std::make_shared<cpuGaugeField>(gParam);
+    } else
+      X_h = std::make_shared<cpuGaugeField>(gParam);
   }
 
   void DiracCoarse::createYhat(bool gpu) const
@@ -203,8 +207,8 @@ namespace quda {
       GaugeFieldParam milcParam(*Yhat_d);
       milcParam.order = QUDA_MILC_GAUGE_ORDER;
       Yhat_aos_d = std::make_shared<cudaGaugeField>(milcParam);
-    }
-    else     Yhat_h = std::make_shared<cpuGaugeField>(gParam);
+    } else
+      Yhat_h = std::make_shared<cpuGaugeField>(gParam);
 
     gParam.setPrecision(gpu ? X_d->Precision() : X_h->Precision());
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
@@ -217,8 +221,8 @@ namespace quda {
       GaugeFieldParam milcParam(*Xinv_d);
       milcParam.order = QUDA_MILC_GAUGE_ORDER;
       Xinv_aos_d = std::make_shared<cudaGaugeField>(milcParam);
-    }
-    else     Xinv_h = std::make_shared<cpuGaugeField>(gParam);
+    } else
+      Xinv_h = std::make_shared<cpuGaugeField>(gParam);
   }
 
   void DiracCoarse::initializeCoarse()
@@ -339,9 +343,7 @@ namespace quda {
     }
   }
 
-  bool DiracCoarse::apply_mma(cvector_ref<ColorSpinorField> f, bool use_mma) {
-    return (f.size() > 1) && use_mma;
-  }
+  bool DiracCoarse::apply_mma(cvector_ref<ColorSpinorField> f, bool use_mma) { return (f.size() > 1) && use_mma; }
 
   void DiracCoarse::createPreconditionedCoarseOp(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
     calculateYhat(Yhat, Xinv, Y, X, setup_use_mma);
@@ -355,9 +357,11 @@ namespace quda {
     if (location == QUDA_CUDA_FIELD_LOCATION) {
       auto Y = apply_mma(out, dslash_use_mma) ? Y_aos_d : Y_d;
       auto X = apply_mma(out, dslash_use_mma) ? X_aos_d : X_d;
-      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, dslash_use_mma);
+      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION,
+                  dslash_use_mma);
     } else if (location == QUDA_CPU_FIELD_LOCATION) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, dslash_use_mma);
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION,
+                  dslash_use_mma);
     }
     int n = in[0].Nspin() * in[0].Ncolor();
     flops += (8 * n * n - 2 * n) * (long long)in[0].VolumeCB() * in.size();
@@ -371,9 +375,11 @@ namespace quda {
     if ( location  == QUDA_CUDA_FIELD_LOCATION ) {
       auto Y = apply_mma(out, dslash_use_mma) ? Y_aos_d : Y_d;
       auto X = apply_mma(out, dslash_use_mma) ? Xinv_aos_d : Xinv_d;
-      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, dslash_use_mma);
+      ApplyCoarse(out, in, in, *Y, *X, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION,
+                  dslash_use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION, dslash_use_mma);
+      ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION,
+                  dslash_use_mma);
     }
     int n = in[0].Nspin() * in[0].Ncolor();
     flops += (8 * n * n - 2 * n) * (long long)in[0].VolumeCB() * in.size();
@@ -422,9 +428,11 @@ namespace quda {
     if ( location == QUDA_CUDA_FIELD_LOCATION ) {
       auto Y = apply_mma(out, dslash_use_mma) ? Y_aos_d : Y_d;
       auto X = apply_mma(out, dslash_use_mma) ? X_aos_d : X_d;
-      ApplyCoarse(out, in, in, *Y, *X, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision, dslash_use_mma);
+      ApplyCoarse(out, in, in, *Y, *X, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision,
+                  dslash_use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision, dslash_use_mma);
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision,
+                  dslash_use_mma);
     }
     int n = in[0].Nspin() * in[0].Ncolor();
     flops += (9 * (8 * n * n) - 2 * n) * (long long)in[0].VolumeCB() * in[0].SiteSubset() * in.size();
@@ -485,8 +493,10 @@ namespace quda {
     /* do nothing */
   }
 
-  DiracCoarsePC::DiracCoarsePC(const DiracParam &param, std::shared_ptr<cpuGaugeField> Y_h, std::shared_ptr<cpuGaugeField> X_h, std::shared_ptr<cpuGaugeField> Xinv_h,
-                               std::shared_ptr<cpuGaugeField> Yhat_h, std::shared_ptr<cudaGaugeField> Y_d, std::shared_ptr<cudaGaugeField> X_d, std::shared_ptr<cudaGaugeField> Xinv_d,
+  DiracCoarsePC::DiracCoarsePC(const DiracParam &param, std::shared_ptr<cpuGaugeField> Y_h,
+                               std::shared_ptr<cpuGaugeField> X_h, std::shared_ptr<cpuGaugeField> Xinv_h,
+                               std::shared_ptr<cpuGaugeField> Yhat_h, std::shared_ptr<cudaGaugeField> Y_d,
+                               std::shared_ptr<cudaGaugeField> X_d, std::shared_ptr<cudaGaugeField> Xinv_d,
                                std::shared_ptr<cudaGaugeField> Yhat_d) :
     DiracCoarse(param, Y_h, X_h, Xinv_h, Yhat_h, Y_d, X_d, Xinv_d, Yhat_d)
   {
@@ -510,7 +520,8 @@ namespace quda {
       auto X = apply_mma(out, dslash_use_mma) ? X_aos_d : X_d;
       ApplyCoarse(out, in, in, *Y, *X, kappa, parity, true, false, dagger, commDim, halo_precision, dslash_use_mma);
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision, dslash_use_mma);
+      ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision,
+                  dslash_use_mma);
     }
 
     int n = in[0].Nspin() * in[0].Ncolor();

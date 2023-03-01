@@ -55,7 +55,8 @@ namespace quda {
     {
       if (block_float) {
         auto thread_width_x = a.isNative() ?
-          ((param.block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size() : param.block.x;
+          ((param.block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size() :
+          param.block.x;
         return sizeof(store_t) * thread_width_x * param.block.y * param.block.z;
       } else {
         return 0;

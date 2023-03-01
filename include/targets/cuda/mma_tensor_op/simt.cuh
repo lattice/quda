@@ -33,7 +33,8 @@ namespace quda
       using compute_t = T;
       using load_t = T;
 
-      static std::string get_type_name() {
+      static std::string get_type_name()
+      {
         return ",simt,m" + std::to_string(MMA_M) + "n" + std::to_string(MMA_N) + "k" + std::to_string(MMA_K);
       }
 
@@ -147,7 +148,8 @@ namespace quda
 
       template <int M, int N, int ldc, bool dagger, class gmem_op_t, class op_t>
       static inline __device__ void store_complex(int m_offset, int n_offset, const WarpRegisterMapping &wrm,
-                                                  gmem_op_t &cc, const OperandC &op_c_real, const OperandC &op_c_imag, op_t op)
+                                                  gmem_op_t &cc, const OperandC &op_c_real, const OperandC &op_c_imag,
+                                                  op_t op)
       {
         using store_t = typename gmem_op_t::store_type;
         using complex_t = complex<store_t>;
@@ -166,7 +168,7 @@ namespace quda
                 if constexpr (gmem_op_t::fixed) {
                   auto scale = cc.get_scale();
                   complex_t out = {f2i_round<store_t>(scale * op_c_real.reg[wn * warp_m + wm]),
-                                    f2i_round<store_t>(-scale * op_c_imag.reg[wn * warp_m + wm])};
+                                   f2i_round<store_t>(-scale * op_c_imag.reg[wn * warp_m + wm])};
                   op(&C[n * ldc + m], out);
                 } else {
                   complex_t out = {op_c_real.reg[wn * warp_m + wm], -op_c_imag.reg[wn * warp_m + wm]};
@@ -178,7 +180,7 @@ namespace quda
                 if constexpr (gmem_op_t::fixed) {
                   auto scale = cc.get_scale();
                   complex_t out = {f2i_round<store_t>(scale * op_c_real.reg[wn * warp_m + wm]),
-                                    f2i_round<store_t>(scale * op_c_imag.reg[wn * warp_m + wm])};
+                                   f2i_round<store_t>(scale * op_c_imag.reg[wn * warp_m + wm])};
                   op(&C[m * ldc + n], out);
                 } else {
                   complex_t out = {op_c_real.reg[wn * warp_m + wm], op_c_imag.reg[wn * warp_m + wm]};

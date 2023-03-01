@@ -350,7 +350,7 @@ namespace quda
   int Communicator::comm_rank_global()
   {
     static int global_rank = -1;
-    if (global_rank < 0)  { MPI_CHECK(MPI_Comm_rank(MPI_COMM_WORLD, &global_rank)); }
+    if (global_rank < 0) { MPI_CHECK(MPI_Comm_rank(MPI_COMM_WORLD, &global_rank)); }
     return global_rank;
   }
 

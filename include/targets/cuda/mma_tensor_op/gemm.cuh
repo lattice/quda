@@ -169,7 +169,8 @@ namespace quda
       load_t reg_imag[register_count];
 
       template <int ld, bool dagger, class T, class gmem_accessor_t>
-      __device__ inline float g2tmp(const gmem_accessor_t &gmem, int m_offset, int n_offset, complex<T> *smem_ptr, pipeline_t &pipe)
+      __device__ inline float g2tmp(const gmem_accessor_t &gmem, int m_offset, int n_offset, complex<T> *smem_ptr,
+                                    pipeline_t &pipe)
       {
         auto p = gmem.data();
 
@@ -232,7 +233,8 @@ namespace quda
             load_t imag;
 
             constexpr bool x = (transpose == dagger);
-            convert_x<x, fixed, dagger, x ? bN + 4 : bM + 4>(real, imag, smem_ptr, gmem_m_offset, gmem_k_offset, scale_inv);
+            convert_x<x, fixed, dagger, x ? bN + 4 : bM + 4>(real, imag, smem_ptr, gmem_m_offset, gmem_k_offset,
+                                                             scale_inv);
             smem_real.vector_load(smem_m_offset, smem_k_offset, real);
             smem_imag.vector_load(smem_m_offset, smem_k_offset, imag);
           }
@@ -377,7 +379,7 @@ namespace quda
       {
 
 #pragma unroll 1
-              for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
+        for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
 #pragma unroll
           for (int c = 0; c < warp_cycle; c++) {
 
@@ -387,39 +389,40 @@ namespace quda
               const int warp_row = logical_warp_index / tile_col_dim;
               const int warp_col = logical_warp_index - warp_row * tile_col_dim;
 
-                complex_mma<mma_t>(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, op_c_real[c],
-                                   op_c_imag[c], warp_row, warp_col, tile_k, wrm);
-              }
+              complex_mma<mma_t>(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, op_c_real[c],
+                                 op_c_imag[c], warp_row, warp_col, tile_k, wrm);
             }
           }
+        }
       }
 
-      template <int M, int N, int ldc, bool dagger, class C, class op_t> __device__ inline void store(C &c_accessor, int m_offset, int n_offset, op_t op)
+      template <int M, int N, int ldc, bool dagger, class C, class op_t>
+      __device__ inline void store(C &c_accessor, int m_offset, int n_offset, op_t op)
       {
 #pragma unroll
-          for (int c = 0; c < warp_cycle; c++) {
+        for (int c = 0; c < warp_cycle; c++) {
 
-            const int logical_warp_index = wrm.warp_id * warp_cycle + c;
-            if (logical_warp_index < tile_row_dim * tile_col_dim) {
-              const int warp_row = logical_warp_index / tile_col_dim;
-              const int warp_col = logical_warp_index - warp_row * tile_col_dim;
+          const int logical_warp_index = wrm.warp_id * warp_cycle + c;
+          if (logical_warp_index < tile_row_dim * tile_col_dim) {
+            const int warp_row = logical_warp_index / tile_col_dim;
+            const int warp_col = logical_warp_index - warp_row * tile_col_dim;
 
-              const int warp_m_offset = warp_row * mma_t::MMA_M + m_offset;
-              const int warp_n_offset = warp_col * mma_t::MMA_N + n_offset;
+            const int warp_m_offset = warp_row * mma_t::MMA_M + m_offset;
+            const int warp_n_offset = warp_col * mma_t::MMA_N + n_offset;
 
-              mma_t::template store_complex<M, N, ldc, dagger>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real[c],
-                                                       op_c_imag[c], op);
-            }
+            mma_t::template store_complex<M, N, ldc, dagger>(warp_m_offset, warp_n_offset, wrm, c_accessor,
+                                                             op_c_real[c], op_c_imag[c], op);
           }
+        }
       }
 
       __device__ inline void abs_max(float &max)
       {
 #pragma unroll
-          for (int c = 0; c < warp_cycle; c++) {
-            op_c_real[c].abs_max(max);
-            op_c_imag[c].abs_max(max);
-          }
+        for (int c = 0; c < warp_cycle; c++) {
+          op_c_real[c].abs_max(max);
+          op_c_imag[c].abs_max(max);
+        }
       }
     };
 
@@ -591,7 +594,8 @@ namespace quda
             int warp_m_offset = warp_row * mma_t::MMA_M + m_offset;
             int warp_n_offset = warp_col * mma_t::MMA_N + n_offset;
 
-            mma_t::template store_complex<M, N, ldc, false>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real, op_c_imag, assign_t());
+            mma_t::template store_complex<M, N, ldc, false>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real,
+                                                            op_c_imag, assign_t());
           }
         }
 
@@ -663,7 +667,7 @@ namespace quda
               int warp_n_offset = warp_col * mma_t::MMA_N;
 
               mma_t::template store_complex<M, N, ldc, false>(warp_m_offset, warp_n_offset, wrm, c_accessor, op_c_real,
-                                                       op_c_imag, assign_t());
+                                                              op_c_imag, assign_t());
             }
           }
 

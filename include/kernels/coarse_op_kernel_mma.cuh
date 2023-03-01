@@ -256,8 +256,8 @@ namespace quda
 
 #pragma unroll 1
               for (int tile_k = 0; tile_k < Config::tile_acc_dim; tile_k++) {
-                complex_mma<mma_t>(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, op_c_real, op_c_imag,
-                      warp_row, warp_col, tile_k, wrm);
+                complex_mma<mma_t>(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag, op_c_real,
+                                   op_c_imag, warp_row, warp_col, tile_k, wrm);
               }
 
               int warp_m_offset = warp_row * mma_t::MMA_M + m_offset;
@@ -267,16 +267,16 @@ namespace quda
 
                 auto cc = arg.X_atomic(0, coarse_parity, coarse_x_cb, s, s_col, 0, 0);
                 constexpr bool atomic_dagger = false;
-                mma_t::template store_complex<M, N, N * fineSpin, atomic_dagger>(warp_m_offset, warp_n_offset, wrm, cc,
-                                                                        op_c_real, op_c_imag, fetch_add_atomic_t());
+                mma_t::template store_complex<M, N, N * fineSpin, atomic_dagger>(
+                  warp_m_offset, warp_n_offset, wrm, cc, op_c_real, op_c_imag, fetch_add_atomic_t());
 
               } else if (!isDiagonal) {
 
                 int dim_index = arg.dim_index % arg.Y_atomic.geometry;
                 auto cc = arg.Y_atomic(dim_index, coarse_parity, coarse_x_cb, s, s_col, 0, 0);
                 constexpr bool atomic_dagger = false;
-                mma_t::template store_complex<M, N, N * fineSpin, atomic_dagger>(warp_m_offset, warp_n_offset, wrm, cc,
-                                                                        op_c_real, op_c_imag, fetch_add_atomic_t());
+                mma_t::template store_complex<M, N, N * fineSpin, atomic_dagger>(
+                  warp_m_offset, warp_n_offset, wrm, cc, op_c_real, op_c_imag, fetch_add_atomic_t());
 
               } else {
 
@@ -288,13 +288,13 @@ namespace quda
                 if (Arg::dir == QUDA_BACKWARDS) {
                   auto cc = arg.X_atomic(0, coarse_parity, coarse_x_cb, s_col, s, 0, 0);
                   constexpr bool atomic_dagger = true;
-                  mma_t::template store_complex<M, N, N * fineSpin, atomic_dagger>(warp_m_offset, warp_n_offset, wrm, cc,
-                                                                          op_c_real, op_c_imag, fetch_add_atomic_t());
+                  mma_t::template store_complex<M, N, N * fineSpin, atomic_dagger>(
+                    warp_m_offset, warp_n_offset, wrm, cc, op_c_real, op_c_imag, fetch_add_atomic_t());
                 } else {
                   auto cc = arg.X_atomic(0, coarse_parity, coarse_x_cb, s, s_col, 0, 0);
                   constexpr bool atomic_dagger = false;
-                  mma_t::template store_complex<M, N, N * fineSpin, atomic_dagger>(warp_m_offset, warp_n_offset, wrm, cc,
-                                                                          op_c_real, op_c_imag, fetch_add_atomic_t());
+                  mma_t::template store_complex<M, N, N * fineSpin, atomic_dagger>(
+                    warp_m_offset, warp_n_offset, wrm, cc, op_c_real, op_c_imag, fetch_add_atomic_t());
                 }
 
                 if (!arg.bidirectional) {
@@ -304,8 +304,8 @@ namespace quda
                   }
                   constexpr bool atomic_dagger = false;
                   auto cc = arg.X_atomic(0, coarse_parity, coarse_x_cb, s, s_col, 0, 0);
-                  mma_t::template store_complex<M, N, N * fineSpin, atomic_dagger>(warp_m_offset, warp_n_offset, wrm, cc,
-                                                                          op_c_real, op_c_imag, fetch_add_atomic_t());
+                  mma_t::template store_complex<M, N, N * fineSpin, atomic_dagger>(
+                    warp_m_offset, warp_n_offset, wrm, cc, op_c_real, op_c_imag, fetch_add_atomic_t());
                 }
               }
             }

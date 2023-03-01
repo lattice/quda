@@ -9,7 +9,7 @@ namespace quda
   {
 
     template <int inst_m_, int inst_n_, int warp_m_, int warp_n_>
-    struct simt_t <mma::half, inst_m_, inst_n_, warp_m_, warp_n_> {
+    struct simt_t<mma::half, inst_m_, inst_n_, warp_m_, warp_n_> {
 
       static constexpr int warp_m = warp_m_; // tiling in m
       static constexpr int warp_n = warp_n_; // tiling in n
@@ -37,7 +37,8 @@ namespace quda
       using compute_t = mma::half;
       using load_t = mma::half2;
 
-      static std::string get_type_name() {
+      static std::string get_type_name()
+      {
         return ",simt_half,m" + std::to_string(MMA_M) + "n" + std::to_string(MMA_N) + "k" + std::to_string(MMA_K);
       }
 
@@ -141,7 +142,6 @@ namespace quda
           }
         }
       }
-
     };
 
   } // namespace simt

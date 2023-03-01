@@ -52,7 +52,8 @@ namespace quda
         }
       };
 
-      static std::string get_type_name() {
+      static std::string get_type_name()
+      {
         return ",1xfp16,m" + std::to_string(MMA_M) + "n" + std::to_string(MMA_N) + "k" + std::to_string(MMA_K);
       }
 
@@ -177,7 +178,8 @@ namespace quda
 
       template <int M, int N, int ldc, bool dagger, class GmemOperandC, class op_t>
       static inline __device__ void store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm,
-                                                  GmemOperandC &cc, const OperandC &op_c_real, const OperandC &op_c_imag, op_t op)
+                                                  GmemOperandC &cc, const OperandC &op_c_real,
+                                                  const OperandC &op_c_imag, op_t op)
       {
         using store_t = typename GmemOperandC::store_type;
 
@@ -198,9 +200,11 @@ namespace quda
             complex_t s;
             if constexpr (fixed) {
               auto scale = cc.get_scale();
-              s = {f2i_round<store_t>(op_c_real.reg[i * 2 + 0] * scale), f2i_round<store_t>(-op_c_imag.reg[i * 2 + 0] * scale)};
+              s = {f2i_round<store_t>(op_c_real.reg[i * 2 + 0] * scale),
+                   f2i_round<store_t>(-op_c_imag.reg[i * 2 + 0] * scale)};
               op(&ptr[(n_index + 0) * ldc + m_index], s);
-              s = {f2i_round<store_t>(op_c_real.reg[i * 2 + 1] * scale), f2i_round<store_t>(-op_c_imag.reg[i * 2 + 1] * scale)};
+              s = {f2i_round<store_t>(op_c_real.reg[i * 2 + 1] * scale),
+                   f2i_round<store_t>(-op_c_imag.reg[i * 2 + 1] * scale)};
               op(&ptr[(n_index + 1) * ldc + m_index], s);
             } else {
               s = {op_c_real.reg[i * 2 + 0], -op_c_imag.reg[i * 2 + 0]};
@@ -228,7 +232,6 @@ namespace quda
           }
         }
       }
-
     };
 
   } // namespace hmma

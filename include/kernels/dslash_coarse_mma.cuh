@@ -163,80 +163,79 @@ namespace quda
     }
 
     auto dslash_forward_producer = [&](int d, float &scale_inv_a, float &scale_inv_b, int k_offset) {
+      const int fwd_idx = forward_idx[d];
 
-        const int fwd_idx = forward_idx[d];
-
-        if (forward_exterior[d]) {
-          if constexpr (doHalo<Arg::type>()) {
-            int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
-
-            auto a = arg.Y(Arg::dagger ? d : d + 4, parity, x_cb, 0, 0);
-            auto b = arg.halo.Ghost(d, 1, their_spinor_parity, ghost_idx, 0, 0, 0);
-            constexpr bool a_dagger = false;
-            constexpr bool b_dagger = false;
-
-            using store_b_ghost_t = complex<typename decltype(b)::store_type>;
-            auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
-
-            __syncthreads();
-            pipe.producer_acquire();
-            scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
-            scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b_ghost, pipe);
-            pipe.producer_commit();
-          }
-        } else if constexpr (doBulk<Arg::type>()) {
+      if (forward_exterior[d]) {
+        if constexpr (doHalo<Arg::type>()) {
+          int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
 
           auto a = arg.Y(Arg::dagger ? d : d + 4, parity, x_cb, 0, 0);
-          auto b = arg.inA(their_spinor_parity, fwd_idx, 0, 0, 0);
+          auto b = arg.halo.Ghost(d, 1, their_spinor_parity, ghost_idx, 0, 0, 0);
           constexpr bool a_dagger = false;
           constexpr bool b_dagger = false;
+
+          using store_b_ghost_t = complex<typename decltype(b)::store_type>;
+          auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
 
           __syncthreads();
           pipe.producer_acquire();
           scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
-          scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b, pipe);
+          scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b_ghost, pipe);
           pipe.producer_commit();
         }
+      } else if constexpr (doBulk<Arg::type>()) {
+
+        auto a = arg.Y(Arg::dagger ? d : d + 4, parity, x_cb, 0, 0);
+        auto b = arg.inA(their_spinor_parity, fwd_idx, 0, 0, 0);
+        constexpr bool a_dagger = false;
+        constexpr bool b_dagger = false;
+
+        __syncthreads();
+        pipe.producer_acquire();
+        scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
+        scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b, pipe);
+        pipe.producer_commit();
+      }
     };
 
     auto dslash_forward_consumer = [&](int d, float scale_inv_a, float scale_inv_b) {
-
-        if (forward_exterior[d]) {
-          if constexpr (doHalo<Arg::type>()) {
-            constexpr bool a_dagger = false;
-            constexpr bool b_dagger = false;
-
-            using a_wrapper_t = decltype(arg.Y(0, 0, 0, 0, 0));
-            using b_wrapper_t = decltype(arg.halo.Ghost(0, 0, 0, 0, 0, 0, 0));
-            using store_b_ghost_t = complex<typename b_wrapper_t::store_type>;
-            auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
-            constexpr bool a_fixed = a_wrapper_t::fixed;
-            constexpr bool b_fixed = b_wrapper_t::fixed;
-
-            pipe.consumer_wait();
-            __syncthreads();
-            a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-            b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b_ghost, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
-            pipe.consumer_release();
-            __syncthreads();
-          }
-        } else if constexpr (doBulk<Arg::type>()) {
-
+      if (forward_exterior[d]) {
+        if constexpr (doHalo<Arg::type>()) {
           constexpr bool a_dagger = false;
           constexpr bool b_dagger = false;
 
           using a_wrapper_t = decltype(arg.Y(0, 0, 0, 0, 0));
-          using b_wrapper_t = decltype(arg.inA(0, 0, 0, 0, 0));
+          using b_wrapper_t = decltype(arg.halo.Ghost(0, 0, 0, 0, 0, 0, 0));
+          using store_b_ghost_t = complex<typename b_wrapper_t::store_type>;
+          auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
           constexpr bool a_fixed = a_wrapper_t::fixed;
           constexpr bool b_fixed = b_wrapper_t::fixed;
 
           pipe.consumer_wait();
           __syncthreads();
           a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-          b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+          b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b_ghost, scale_inv_b, smem_obj_b_real,
+                                                          smem_obj_b_imag);
           pipe.consumer_release();
           __syncthreads();
         }
+      } else if constexpr (doBulk<Arg::type>()) {
+
+        constexpr bool a_dagger = false;
+        constexpr bool b_dagger = false;
+
+        using a_wrapper_t = decltype(arg.Y(0, 0, 0, 0, 0));
+        using b_wrapper_t = decltype(arg.inA(0, 0, 0, 0, 0));
+        constexpr bool a_fixed = a_wrapper_t::fixed;
+        constexpr bool b_fixed = b_wrapper_t::fixed;
+
+        pipe.consumer_wait();
+        __syncthreads();
+        a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+        b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+        pipe.consumer_release();
+        __syncthreads();
+      }
     };
 
     auto dslash_forward_compute = [&](int d) {
@@ -246,79 +245,79 @@ namespace quda
     };
 
     auto dslash_backward_producer = [&](int d, float &scale_inv_a, float &scale_inv_b, int k_offset) {
+      const int back_idx = backward_idx[d];
 
-        const int back_idx = backward_idx[d];
+      if (backward_exterior[d]) {
+        if constexpr (doHalo<Arg::type>()) {
+          const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
 
-        if (backward_exterior[d]) {
-          if constexpr (doHalo<Arg::type>()) {
-            const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
-
-            auto a = arg.Y.Ghost(Arg::dagger ? d + 4 : d, 1 - parity, ghost_idx, 0, 0);
-            auto b = arg.halo.Ghost(d, 0, their_spinor_parity, ghost_idx, 0, 0, 0);
-            constexpr bool a_dagger = true;
-            constexpr bool b_dagger = false;
-
-            using store_b_ghost_t = complex<typename decltype(b)::store_type>;
-            auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
-
-            __syncthreads();
-            pipe.producer_acquire();
-            scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
-            scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b_ghost, pipe);
-            pipe.producer_commit();
-          }
-        } else if constexpr (doBulk<Arg::type>()) {
-          const int gauge_idx = back_idx;
-
-          auto a = arg.Y(Arg::dagger ? d + 4 : d, 1 - parity, gauge_idx, 0, 0);
-          auto b = arg.inA(their_spinor_parity, back_idx, 0, 0, 0);
+          auto a = arg.Y.Ghost(Arg::dagger ? d + 4 : d, 1 - parity, ghost_idx, 0, 0);
+          auto b = arg.halo.Ghost(d, 0, their_spinor_parity, ghost_idx, 0, 0, 0);
           constexpr bool a_dagger = true;
           constexpr bool b_dagger = false;
+
+          using store_b_ghost_t = complex<typename decltype(b)::store_type>;
+          auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
 
           __syncthreads();
           pipe.producer_acquire();
           scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
-          scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b, pipe);
+          scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b_ghost, pipe);
           pipe.producer_commit();
         }
+      } else if constexpr (doBulk<Arg::type>()) {
+        const int gauge_idx = back_idx;
+
+        auto a = arg.Y(Arg::dagger ? d + 4 : d, 1 - parity, gauge_idx, 0, 0);
+        auto b = arg.inA(their_spinor_parity, back_idx, 0, 0, 0);
+        constexpr bool a_dagger = true;
+        constexpr bool b_dagger = false;
+
+        __syncthreads();
+        pipe.producer_acquire();
+        scale_inv_a = a_loader.template g2tmp<lda, a_dagger>(a, m_offset, k_offset, smem_tmp_a, pipe);
+        scale_inv_b = b_loader.template g2tmp<ldb, b_dagger>(b, n_offset, k_offset, smem_tmp_b, pipe);
+        pipe.producer_commit();
+      }
     };
 
     auto dslash_backward_consumer = [&](int d, float scale_inv_a, float scale_inv_b) {
-        if (backward_exterior[d]) {
-          if constexpr (doHalo<Arg::type>()) {
-            constexpr bool a_dagger = true;
-            constexpr bool b_dagger = false;
-
-            using a_wrapper_t = decltype(arg.Y.Ghost(0, 0, 0, 0, 0));
-            using b_wrapper_t = decltype(arg.halo.Ghost(0, 0, 0, 0, 0, 0, 0));
-            using store_b_ghost_t = complex<typename b_wrapper_t::store_type>;
-            auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
-            constexpr bool a_fixed = a_wrapper_t::fixed;
-            constexpr bool b_fixed = b_wrapper_t::fixed;
-
-            pipe.consumer_wait();
-            __syncthreads();
-            a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-            b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b_ghost, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
-            pipe.consumer_release();
-            __syncthreads();
-          }
-        } else if constexpr (doBulk<Arg::type>()) {
+      if (backward_exterior[d]) {
+        if constexpr (doHalo<Arg::type>()) {
           constexpr bool a_dagger = true;
           constexpr bool b_dagger = false;
 
-          using a_wrapper_t = decltype(arg.Y(0, 0, 0, 0, 0));
-          using b_wrapper_t = decltype(arg.inA(0, 0, 0, 0, 0));
+          using a_wrapper_t = decltype(arg.Y.Ghost(0, 0, 0, 0, 0));
+          using b_wrapper_t = decltype(arg.halo.Ghost(0, 0, 0, 0, 0, 0, 0));
+          using store_b_ghost_t = complex<typename b_wrapper_t::store_type>;
+          auto smem_tmp_b_ghost = reinterpret_cast<store_b_ghost_t *>(smem_tmp_b);
           constexpr bool a_fixed = a_wrapper_t::fixed;
           constexpr bool b_fixed = b_wrapper_t::fixed;
 
           pipe.consumer_wait();
           __syncthreads();
           a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
-          b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+          b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b_ghost, scale_inv_b, smem_obj_b_real,
+                                                          smem_obj_b_imag);
           pipe.consumer_release();
           __syncthreads();
         }
+      } else if constexpr (doBulk<Arg::type>()) {
+        constexpr bool a_dagger = true;
+        constexpr bool b_dagger = false;
+
+        using a_wrapper_t = decltype(arg.Y(0, 0, 0, 0, 0));
+        using b_wrapper_t = decltype(arg.inA(0, 0, 0, 0, 0));
+        constexpr bool a_fixed = a_wrapper_t::fixed;
+        constexpr bool b_fixed = b_wrapper_t::fixed;
+
+        pipe.consumer_wait();
+        __syncthreads();
+        a_loader.template tmp2s<lda, a_dagger, a_fixed>(smem_tmp_a, scale_inv_a, smem_obj_a_real, smem_obj_a_imag);
+        b_loader.template tmp2s<ldb, b_dagger, b_fixed>(smem_tmp_b, scale_inv_b, smem_obj_b_real, smem_obj_b_imag);
+        pipe.consumer_release();
+        __syncthreads();
+      }
     };
 
     auto dslash_backward_compute = [&](int d) {
@@ -359,10 +358,7 @@ namespace quda
       __syncthreads();
     };
 
-    auto clover_compute = [&]() {
-      accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
-    };
-
+    auto clover_compute = [&]() { accumulator.mma(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag); };
 
     float scale_inv_a;
     float scale_inv_b;
@@ -399,7 +395,6 @@ namespace quda
           }
           dslash_backward_compute(d);
         } // nDim
-
       }
 
       accumulator.ax(-arg.kappa);
@@ -413,9 +408,7 @@ namespace quda
       if constexpr (!Arg::dslash) { clover_producer(scale_inv_a, scale_inv_b, 0); }
       for (int k_offset = 0; k_offset < K; k_offset += Arg::bK) {
         clover_consumer(scale_inv_a, scale_inv_b);
-        if (k_offset + Arg::bK < K) {
-          clover_producer(scale_inv_a, scale_inv_b, k_offset + Arg::bK);
-        }
+        if (k_offset + Arg::bK < K) { clover_producer(scale_inv_a, scale_inv_b, k_offset + Arg::bK); }
         clover_compute();
       }
     }
