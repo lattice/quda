@@ -1045,18 +1045,27 @@ void freeGaugeQuda(void)
 // These utility functions are declared w/doxygen above
 void freeUniqueSloppyGaugeUtility(cudaGaugeField*& precise, cudaGaugeField*& sloppy, cudaGaugeField*& precondition,
                                   cudaGaugeField*& refinement, cudaGaugeField*& eigensolver) {
-  if (refinement != sloppy && refinement != eigensolver && refinement)
-    delete refinement;
-  refinement = nullptr;
+  // In theory, we're checking for aliasing and freeing fields in the opposite order
+  // from which they were allocated... but in any case, we're doing an all-to-all
+  // checking of aliasing, so it doesn't really matter if the order matches.
 
-  if (precondition != sloppy && precondition != precise && precondition != eigensolver && precondition)
-    delete precondition;
-  precondition = nullptr;
-
-  if (eigensolver != sloppy && eigensolver != precise && eigensolver)
+  // The last field to get allocated is the eigensolver
+  if (eigensolver != refinement && eigensolver != precondition && eigensolver != sloppy &&
+      eigensolver != precise && eigensolver)
     delete eigensolver;
   eigensolver = nullptr;
 
+  // Second to last: refinement
+  if (refinement != precondition && refinement != sloppy && refinement != precise && refinement)
+    delete refinement;
+  refinement = nullptr;
+
+  // Third to last: precondition
+  if (precondition != sloppy && precondition != precise && precondition)
+    delete precondition;
+  precondition = nullptr;
+
+  // Fourth to last: sloppy
   if (sloppy != precise && sloppy)
     delete sloppy;
   sloppy = nullptr;
