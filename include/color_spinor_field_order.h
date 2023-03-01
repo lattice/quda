@@ -580,12 +580,12 @@ namespace quda
        * @brief returns the scale of this wrapper object
        */
       __device__ __host__ inline auto get_scale() const {
-        static_assert(block_float == false, "format with block_float == true should not call the get_scale method.");
+        static_assert(block_float == false, "Orders with block_float == true should not call the get_scale method.");
         return block_float ? static_cast<Float>(1) / norm[norm_idx] : scale;
       }
 
       /**
-       * @brief returns the scale of this wrapper object
+       * @brief returns the scale_inv of this wrapper object
        */
       __device__ __host__ inline auto get_scale_inv() const { return block_float ? norm[norm_idx] : scale_inv; }
 

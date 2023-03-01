@@ -546,6 +546,25 @@ namespace quda {
                    const GaugeField &Y, const GaugeField &X, double kappa, int parity,
                    bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision);
 
+  /**
+     @brief Apply the coarse dslash stencil with MMA.  This single driver
+     accounts for all variations with and without the clover field,
+     with and without dslash, and both single and full parity fields
+     This template function requires that the dagger and number of
+     colors templates have been instantiated.
+     @param[out] out The result vector
+     @param[in] inA The first input vector
+     @param[in] inB The second input vector
+     @param[in] Y Coarse link field
+     @param[in] X Coarse clover field
+     @param[in] kappa Scaling parameter
+     @param[in] parity Parity of the field (if single parity)
+     @param[in] dslash Are we applying dslash?
+     @param[in] clover Are we applying clover?
+     @param[in] dagger Apply dagger operator?
+     @param[in] commDim Which dimensions are partitioned?
+     @param[in] halo_precision What precision to use for the halos (if QUDA_INVALID_PRECISION, use field precision)
+   */
   template <bool dagger, int coarseColor, int nVec>
   void ApplyCoarseMma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                    cvector_ref<const ColorSpinorField> &inB,

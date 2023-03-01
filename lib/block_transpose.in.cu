@@ -4,6 +4,12 @@
 #include <reference_wrapper_helper.h>
 #include <kernels/block_transpose.cuh>
 
+/**
+  @file BlockTranspose does the transpose between the two different orders of batched colorspinor fields:
+    - B: nVec -> spatial/N -> spin/color -> N, where N is for that in floatN
+    - V: spatial -> spin/color -> nVec
+ */
+
 namespace quda {
 
   namespace impl {

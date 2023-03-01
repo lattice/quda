@@ -43,6 +43,12 @@ namespace quda {
     constexpr BlockTransposeKernel(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
+    /**
+      @brief Transpose between the two different orders of batched colorspinor fields:
+        - B: nVec -> spatial/N -> spin/color -> N, where N is for that in floatN
+        - V: spatial -> spin/color -> nVec
+        The transpose uses shared memory to avoid strided memory accesses.
+     */
     __device__ __host__ inline void operator()(int x_cb, int)
     {
       int parity_color = target::block_idx().z;

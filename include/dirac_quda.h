@@ -1962,7 +1962,8 @@ public:
     /**
       @brief If use_mma and the batch size is larger than 1, actually apply coarse dslash with MMA
       @param[in] f The reference field
-      #param[in] use_mma
+      @param[in] use_mma If the MMA option is turned on
+      @return Whether or not we should apply MMA for the coarse dslash
      */
     static bool apply_mma(cvector_ref<ColorSpinorField> f, bool use_mma);
   };

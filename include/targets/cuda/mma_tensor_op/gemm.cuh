@@ -168,55 +168,6 @@ namespace quda
       load_t reg_real[register_count];
       load_t reg_imag[register_count];
 
-      template <int ld, bool dagger, class gmem_accessor_t, class smem_accessor_t>
-      __device__ inline void g2s(const gmem_accessor_t &gmem, int m_offset, int n_offset, smem_accessor_t &smem_real,
-                                 smem_accessor_t &smem_imag)
-      {
-        auto p = gmem.data();
-        auto scale_inv = gmem.get_scale_inv();
-        constexpr bool fixed = gmem_accessor_t::fixed;
-
-        // for each iteration, each warp loads a tile
-        int thread_id = (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
-        int warp_id = thread_id / 32;
-        int lane_id = thread_id % 32;
-        int thread_in_group = lane_id % 4;
-        int group_id = lane_id / 4;
-        constexpr int w_m = 8 * batch;
-        constexpr int w_k = 4;
-        static_assert(bM % w_m == 0, "bM %% w_m");
-        static_assert(bN % w_k == 0, "bN %% w_k");
-
-        constexpr int tile_dim_m = bM / w_m;
-        constexpr int tile_dim_k = bN / w_k;
-
-        constexpr int total_tiles = tile_dim_k * tile_dim_m;
-        constexpr int n_warp = block_y * block_z / 32;
-        constexpr int warp_cycle = (total_tiles + n_warp - 1) / n_warp;
-#pragma unroll
-        for (int c = 0; c < warp_cycle; c++) {
-          int logical_warp_index = c * n_warp + warp_id;
-          if (logical_warp_index < total_tiles) {
-            int warp_m = (c * n_warp + warp_id) % tile_dim_m;
-            int warp_k = (c * n_warp + warp_id) / tile_dim_m;
-
-            int smem_m_offset = warp_m * w_m + group_id * batch;
-            int smem_k_offset = warp_k * w_k + thread_in_group;
-
-            int gmem_m_offset = m_offset + smem_m_offset;
-            int gmem_k_offset = n_offset + smem_k_offset;
-
-            load_t real;
-            load_t imag;
-
-            constexpr bool x = (transpose == dagger);
-            convert_x<x, fixed, dagger, ld>(real, imag, p, gmem_m_offset, gmem_k_offset, scale_inv);
-            smem_real.vector_load(smem_m_offset, smem_k_offset, real);
-            smem_imag.vector_load(smem_m_offset, smem_k_offset, imag);
-          }
-        }
-      }
-
       template <int ld, bool dagger, class T, class gmem_accessor_t>
       __device__ inline float g2tmp(const gmem_accessor_t &gmem, int m_offset, int n_offset, complex<T> *smem_ptr, pipeline_t &pipe)
       {

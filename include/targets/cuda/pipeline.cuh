@@ -5,13 +5,14 @@
   */
 
 #if (__COMPUTE_CAPABILITY__ >= 800) && (CUDA_VERSION >= 11080)
+#define QUDA_USE_CUDA_PIPELINE
 #include <cuda/pipeline>
 #endif
 
 namespace quda
 {
 
-#if (__COMPUTE_CAPABILITY__ >= 800) && (CUDA_VERSION >= 11080)
+#ifdef QUDA_USE_CUDA_PIPELINE
   struct pipeline_t {
     cuda::pipeline<cuda::thread_scope_thread> pipe;
 
@@ -47,7 +48,7 @@ namespace quda
 
   template <class T>
   __device__ inline void memcpy_async(T *destination, T *source, size_t size, pipeline_t &pipe) {
-#if (__COMPUTE_CAPABILITY__ >= 800) && (CUDA_VERSION >= 11080)
+#ifdef QUDA_USE_CUDA_PIPELINE
     cuda::memcpy_async(destination, source, size, pipe.pipe);
 #else
     *destination = *source;
