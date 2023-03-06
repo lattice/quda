@@ -592,13 +592,13 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   // free any current gauge field before new allocations to reduce memory overhead
   switch (param->type) {
     case QUDA_WILSON_LINKS:
-      freeUniqueGaugeUtility(gaugePrecise, gaugeSloppy, gaugePrecondition, gaugeRefinement, gaugeEigensolver, gaugeExtended, param->use_resident_gauge == 0 ? false : true);
+      freeUniqueGaugeUtility(gaugePrecise, gaugeSloppy, gaugePrecondition, gaugeRefinement, gaugeEigensolver, gaugeExtended, param->use_resident_gauge);
       break;
     case QUDA_ASQTAD_FAT_LINKS:
-      freeUniqueGaugeUtility(gaugeFatPrecise, gaugeFatSloppy, gaugeFatPrecondition, gaugeFatRefinement, gaugeFatEigensolver, gaugeFatExtended, param->use_resident_gauge == 0 ? false : true);
+      freeUniqueGaugeUtility(gaugeFatPrecise, gaugeFatSloppy, gaugeFatPrecondition, gaugeFatRefinement, gaugeFatEigensolver, gaugeFatExtended, param->use_resident_gauge);
       break;
     case QUDA_ASQTAD_LONG_LINKS:
-      freeUniqueGaugeUtility(gaugeLongPrecise, gaugeLongSloppy, gaugeLongPrecondition, gaugeLongRefinement, gaugeLongEigensolver, gaugeLongExtended, param->use_resident_gauge == 0 ? false : true);
+      freeUniqueGaugeUtility(gaugeLongPrecise, gaugeLongSloppy, gaugeLongPrecondition, gaugeLongRefinement, gaugeLongEigensolver, gaugeLongExtended, param->use_resident_gauge);
       break;
     case QUDA_SMEARED_LINKS:
       freeUniqueGaugeQuda(QUDA_SMEARED_LINKS);
