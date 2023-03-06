@@ -523,24 +523,8 @@ void initQuda(int dev)
 // possible flag to indicate we need to recompute the clover field
 static bool invalidate_clover = true;
 
-// These utility functions are defined below, but are declared here so they can be used
-// in the various flavors of publicly exposed "load" and "free" functions
-
-/**
- * Abstraction utility that loads a set of sloppy fields, typically one of Wilson,
- * HISQ fat, or HISQ long. The utility checks and makes sure all fields have already
- * been freed, and is smart enough to alias fields as appropriate.
- * @param precise[in] Pointer to an existing "precise" field, used as a base.
- * @param sloppy[out] Reference to the pointer of a given "sloppy" field.
- * @param precondition[out] Reference the to pointer of a given "precondition" field.
- * @param refinement[out] Reference the to pointer of a given "refinement" field.
- * @param eigensolver[out] Reference then to pointer of a given "eigensolver" field.
- * @param prec[in] Desired precisions of the sloppy, etc, fields, in order matching the arguments.
- * @param recon[in] Desired reconstructs of the sloppy, etc, fields, in order matching the arguments.
- */
-void loadUniqueSloppyGaugeUtility(cudaGaugeField* precise, cudaGaugeField*& sloppy, cudaGaugeField*& precondition,
-       cudaGaugeField*& refinement, cudaGaugeField*& eigensolver, const std::array<QudaPrecision, 4>& prec,
-       const std::array<QudaReconstructType, 4>& recon);
+// These utility functions are defined by the other "free" functions, but they
+// are declared here so they can be used in the initial cleanup phase of loadGaugeQuda
 
 /**
  * Abstraction utility that cleans up a set of sloppy fields, typically one of Wilson,
@@ -1333,90 +1317,6 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
       gaugeLongEigensolver = new cudaGaugeField(gauge_param);
       gaugeLongEigensolver->copy(*gaugeLongPrecise);
     }
-  }
-}
-
-/**
- * Helper that checks if a given field has a precision and reconstruct value matching a GaugeFieldParam
- * @param field[in] Reference gauge field
- * @param param[in] Reference gauge field param
- * @return Whether or not the precision and the reconstruct values of the field and gauge field param agree
- */
-bool check_prec_recon_matches(const GaugeField& field, const GaugeFieldParam& param) {
-  return (field.Precision() == param.Precision() && field.Reconstruct() == param.reconstruct);
-}
-
-void loadUniqueSloppyGaugeUtility(cudaGaugeField* precise, cudaGaugeField*& sloppy, cudaGaugeField*& precondition,
-       cudaGaugeField*& refinement, cudaGaugeField*& eigensolver, const std::array<QudaPrecision, 4>& prec,
-       const std::array<QudaReconstructType, 4>& recon) {
-  if (precise == nullptr)
-    errorQuda("Precise field does not exist");
-
-  GaugeFieldParam gauge_param(*precise);
-  gauge_param.create = QUDA_NULL_FIELD_CREATE;
-
-  // switch the parameters for creating the mirror sloppy cuda gauge field
-  gauge_param.reconstruct = recon[0];
-  gauge_param.setPrecision(prec[0], true);
-
-  if (sloppy) errorQuda("Sloppy field already exists");
-
-  if (check_prec_recon_matches(*precise, gauge_param)) {
-    sloppy = precise;
-  } else {
-    sloppy = new cudaGaugeField(gauge_param);
-    sloppy->copy(*precise);
-  }
-
-  // switch the parameters for creating the mirror preconditioner cuda gauge field
-  gauge_param.reconstruct = recon[1];
-  gauge_param.setPrecision(prec[1], true);
-
-  if (precondition) errorQuda("Precondition field already exists");
-
-  if (check_prec_recon_matches(*sloppy, gauge_param)) {
-    precondition = sloppy;
-  } else if (check_prec_recon_matches(*precise, gauge_param)) {
-    precondition = precise;
-  } else {
-    precondition = new cudaGaugeField(gauge_param);
-    precondition->copy(*precise);
-  }
-
-  // switch the parameters for creating the mirror refinement cuda gauge field
-  gauge_param.reconstruct = recon[2];
-  gauge_param.setPrecision(prec[2], true);
-
-  if (refinement) errorQuda("Refinement field already exists");
-
-  if (check_prec_recon_matches(*precondition, gauge_param)) {
-    refinement = precondition;
-  } else if (check_prec_recon_matches(*sloppy, gauge_param)) {
-    refinement = sloppy;
-  } else if (check_prec_recon_matches(*precise, gauge_param)) {
-    refinement = precise;
-  } else {
-    refinement = new cudaGaugeField(gauge_param);
-    refinement->copy(*precise);
-  }
-
-  // switch the parameters for creating the mirror eigensolver cuda gauge field
-  gauge_param.reconstruct = recon[3];
-  gauge_param.setPrecision(prec[3], true);
-
-  if (eigensolver) errorQuda("Eigensolver field already exists");
-
-  if (check_prec_recon_matches(*refinement, gauge_param)) {
-    eigensolver = refinement;
-  } else if (check_prec_recon_matches(*precondition, gauge_param)) {
-    eigensolver = precondition;
-  } else if (check_prec_recon_matches(*sloppy, gauge_param)) {
-    eigensolver = sloppy;
-  } else if (check_prec_recon_matches(*precise, gauge_param)) {
-    eigensolver = precise;
-  } else {
-    eigensolver = new cudaGaugeField(gauge_param);
-    eigensolver->copy(*precise);
   }
 }
 
