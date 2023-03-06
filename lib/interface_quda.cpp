@@ -666,20 +666,59 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   // creating sloppy fields isn't really compute, but it is work done on the gpu
   profileGauge.TPSTART(QUDA_PROFILE_COMPUTE);
 
-  // Create pointers to store fields in
+  // switch the parameters for creating the mirror sloppy cuda gauge field
+  gauge_param.reconstruct = param->reconstruct_sloppy;
+  gauge_param.setPrecision(param->cuda_prec_sloppy, true);
   cudaGaugeField *sloppy = nullptr;
+  if (param->cuda_prec == param->cuda_prec_sloppy && param->reconstruct == param->reconstruct_sloppy) {
+    sloppy = precise;
+  } else {
+    sloppy = new cudaGaugeField(gauge_param);
+    sloppy->copy(*precise);
+  }
+
+  // switch the parameters for creating the mirror preconditioner cuda gauge field
+  gauge_param.reconstruct = param->reconstruct_precondition;
+  gauge_param.setPrecision(param->cuda_prec_precondition, true);
   cudaGaugeField *precondition = nullptr;
+  if (param->cuda_prec == param->cuda_prec_precondition && param->reconstruct == param->reconstruct_precondition) {
+    precondition = precise;
+  } else if (param->cuda_prec_sloppy == param->cuda_prec_precondition
+             && param->reconstruct_sloppy == param->reconstruct_precondition) {
+    precondition = sloppy;
+  } else {
+    precondition = new cudaGaugeField(gauge_param);
+    precondition->copy(*precise);
+  }
+
+  // switch the parameters for creating the refinement cuda gauge field
+  gauge_param.reconstruct = param->reconstruct_refinement_sloppy;
+  gauge_param.setPrecision(param->cuda_prec_refinement_sloppy, true);
   cudaGaugeField *refinement = nullptr;
+  if (param->cuda_prec_sloppy == param->cuda_prec_refinement_sloppy
+      && param->reconstruct_sloppy == param->reconstruct_refinement_sloppy) {
+    refinement = sloppy;
+  } else {
+    refinement = new cudaGaugeField(gauge_param);
+    refinement->copy(*sloppy);
+  }
+
+  // switch the parameters for creating the eigensolver cuda gauge field
+  gauge_param.reconstruct = param->reconstruct_eigensolver;
+  gauge_param.setPrecision(param->cuda_prec_eigensolver, true);
   cudaGaugeField *eigensolver = nullptr;
-
-  std::array<QudaPrecision, 4> prec_arr = { param->cuda_prec_sloppy, param->cuda_prec_precondition,
-    param->cuda_prec_refinement_sloppy, param->cuda_prec_eigensolver };
-
-  std::array<QudaReconstructType, 4> recon_arr = { param->reconstruct_sloppy, param->reconstruct_precondition,
-    param->reconstruct_refinement_sloppy, param->reconstruct_eigensolver };
-
-  loadUniqueSloppyGaugeUtility(precise, sloppy, precondition, refinement, eigensolver,
-                               prec_arr, recon_arr);
+  if (param->cuda_prec == param->cuda_prec_eigensolver && param->reconstruct == param->reconstruct_eigensolver) {
+    eigensolver = precise;
+  } else if (param->cuda_prec_precondition == param->cuda_prec_eigensolver
+             && param->reconstruct_precondition == param->reconstruct_eigensolver) {
+    eigensolver = precondition;
+  } else if (param->cuda_prec_sloppy == param->cuda_prec_eigensolver
+             && param->reconstruct_sloppy == param->reconstruct_eigensolver) {
+    eigensolver = sloppy;
+  } else {
+    eigensolver = new cudaGaugeField(gauge_param);
+    eigensolver->copy(*precise);
+  }
 
   profileGauge.TPSTOP(QUDA_PROFILE_COMPUTE);
 
@@ -1094,23 +1133,207 @@ void freeGaugeSmearedQuda()
 
 void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *recon)
 {
-  std::array<QudaPrecision, 4> prec_arr = { prec[0], prec[1], prec[2], prec[3] };
-  std::array<QudaReconstructType, 4> recon_arr = { recon[0], recon[1], recon[2], recon[3] };
-
   // first do SU3 links (if they exist)
-  if (gaugePrecise)
-    loadUniqueSloppyGaugeUtility(gaugePrecise, gaugeSloppy, gaugePrecondition, gaugeRefinement,
-                                 gaugeEigensolver, prec_arr, recon_arr);
+  if (gaugePrecise) {
+    GaugeFieldParam gauge_param(*gaugePrecise);
+    // switch the parameters for creating the mirror sloppy cuda gauge field
+
+    gauge_param.reconstruct = recon[0];
+    gauge_param.setPrecision(prec[0], true);
+
+    if (gaugeSloppy) errorQuda("gaugeSloppy already exists");
+
+    if (gauge_param.Precision() == gaugePrecise->Precision() && gauge_param.reconstruct == gaugePrecise->Reconstruct()) {
+      gaugeSloppy = gaugePrecise;
+    } else {
+      gaugeSloppy = new cudaGaugeField(gauge_param);
+      gaugeSloppy->copy(*gaugePrecise);
+    }
+
+    // switch the parameters for creating the mirror preconditioner cuda gauge field
+    gauge_param.reconstruct = recon[1];
+    gauge_param.setPrecision(prec[1], true);
+
+    if (gaugePrecondition) errorQuda("gaugePrecondition already exists");
+
+    if (gauge_param.Precision() == gaugePrecise->Precision() && gauge_param.reconstruct == gaugePrecise->Reconstruct()) {
+      gaugePrecondition = gaugePrecise;
+    } else if (gauge_param.Precision() == gaugeSloppy->Precision()
+               && gauge_param.reconstruct == gaugeSloppy->Reconstruct()) {
+      gaugePrecondition = gaugeSloppy;
+    } else {
+      gaugePrecondition = new cudaGaugeField(gauge_param);
+      gaugePrecondition->copy(*gaugePrecise);
+    }
+
+    // switch the parameters for creating the mirror refinement cuda gauge field
+    gauge_param.reconstruct = recon[2];
+    gauge_param.setPrecision(prec[2], true);
+
+    if (gaugeRefinement) errorQuda("gaugeRefinement already exists");
+
+    if (gauge_param.Precision() == gaugeSloppy->Precision() && gauge_param.reconstruct == gaugeSloppy->Reconstruct()) {
+      gaugeRefinement = gaugeSloppy;
+    } else {
+      gaugeRefinement = new cudaGaugeField(gauge_param);
+      gaugeRefinement->copy(*gaugeSloppy);
+    }
+
+    // switch the parameters for creating the mirror eigensolver cuda gauge field
+    gauge_param.reconstruct = recon[3];
+    gauge_param.setPrecision(prec[3], true);
+
+    if (gaugeEigensolver) errorQuda("gaugeEigensolver already exists");
+
+    if (gauge_param.Precision() == gaugePrecise->Precision() && gauge_param.reconstruct == gaugePrecise->Reconstruct()) {
+      gaugeEigensolver = gaugePrecise;
+    } else if (gauge_param.Precision() == gaugeSloppy->Precision()
+               && gauge_param.reconstruct == gaugeSloppy->Reconstruct()) {
+      gaugeEigensolver = gaugeSloppy;
+    } else if (gauge_param.Precision() == gaugePrecondition->Precision()
+               && gauge_param.reconstruct == gaugePrecondition->Reconstruct()) {
+      gaugeEigensolver = gaugePrecondition;
+    } else {
+      gaugeEigensolver = new cudaGaugeField(gauge_param);
+      gaugeEigensolver->copy(*gaugePrecise);
+    }
+  }
 
   // fat links (if they exist)
-  if (gaugeFatPrecise)
-    loadUniqueSloppyGaugeUtility(gaugeFatPrecise, gaugeFatSloppy, gaugeFatPrecondition,
-                                 gaugeFatRefinement, gaugeFatEigensolver, prec_arr, recon_arr);
+  if (gaugeFatPrecise) {
+    GaugeFieldParam gauge_param(*gaugeFatPrecise);
+    // switch the parameters for creating the mirror sloppy cuda gauge field
+
+    gauge_param.setPrecision(prec[0], true);
+
+    if (gaugeFatSloppy) errorQuda("gaugeFatSloppy already exists");
+
+    if (gauge_param.Precision() == gaugeFatPrecise->Precision()
+        && gauge_param.reconstruct == gaugeFatPrecise->Reconstruct()) {
+      gaugeFatSloppy = gaugeFatPrecise;
+    } else {
+      gaugeFatSloppy = new cudaGaugeField(gauge_param);
+      gaugeFatSloppy->copy(*gaugeFatPrecise);
+    }
+
+    // switch the parameters for creating the mirror preconditioner cuda gauge field
+    gauge_param.setPrecision(prec[1], true);
+
+    if (gaugeFatPrecondition) errorQuda("gaugeFatPrecondition already exists\n");
+
+    if (gauge_param.Precision() == gaugeFatPrecise->Precision()
+        && gauge_param.reconstruct == gaugeFatPrecise->Reconstruct()) {
+      gaugeFatPrecondition = gaugeFatPrecise;
+    } else if (gauge_param.Precision() == gaugeFatSloppy->Precision()
+               && gauge_param.reconstruct == gaugeFatSloppy->Reconstruct()) {
+      gaugeFatPrecondition = gaugeFatSloppy;
+    } else {
+      gaugeFatPrecondition = new cudaGaugeField(gauge_param);
+      gaugeFatPrecondition->copy(*gaugeFatPrecise);
+    }
+
+    // switch the parameters for creating the mirror refinement cuda gauge field
+    gauge_param.setPrecision(prec[2], true);
+
+    if (gaugeFatRefinement) errorQuda("gaugeFatRefinement already exists\n");
+
+    if (gauge_param.Precision() == gaugeFatSloppy->Precision()
+        && gauge_param.reconstruct == gaugeFatSloppy->Reconstruct()) {
+      gaugeFatRefinement = gaugeFatSloppy;
+    } else {
+      gaugeFatRefinement = new cudaGaugeField(gauge_param);
+      gaugeFatRefinement->copy(*gaugeFatSloppy);
+    }
+
+    // switch the parameters for creating the mirror eigensolver cuda gauge field
+    gauge_param.setPrecision(prec[3], true);
+
+    if (gaugeFatEigensolver) errorQuda("gaugeFatEigensolver already exists");
+
+    if (gauge_param.Precision() == gaugeFatPrecise->Precision()
+        && gauge_param.reconstruct == gaugeFatPrecise->Reconstruct()) {
+      gaugeFatEigensolver = gaugeFatPrecise;
+    } else if (gauge_param.Precision() == gaugeFatSloppy->Precision()
+               && gauge_param.reconstruct == gaugeFatSloppy->Reconstruct()) {
+      gaugeFatEigensolver = gaugeFatSloppy;
+    } else if (gauge_param.Precision() == gaugeFatPrecondition->Precision()
+               && gauge_param.reconstruct == gaugeFatPrecondition->Reconstruct()) {
+      gaugeFatEigensolver = gaugeFatPrecondition;
+    } else {
+      gaugeFatEigensolver = new cudaGaugeField(gauge_param);
+      gaugeFatEigensolver->copy(*gaugeFatPrecise);
+    }
+  }
 
   // long links (if they exist)
-  if (gaugeLongPrecise)
-    loadUniqueSloppyGaugeUtility(gaugeLongPrecise, gaugeLongSloppy, gaugeLongPrecondition,
-                                 gaugeLongRefinement, gaugeLongEigensolver, prec_arr, recon_arr);
+  if (gaugeLongPrecise) {
+    GaugeFieldParam gauge_param(*gaugeLongPrecise);
+    // switch the parameters for creating the mirror sloppy cuda gauge field
+
+    gauge_param.reconstruct = recon[0];
+    gauge_param.setPrecision(prec[0], true);
+
+    if (gaugeLongSloppy) errorQuda("gaugeLongSloppy already exists");
+
+    if (gauge_param.Precision() == gaugeLongPrecise->Precision()
+        && gauge_param.reconstruct == gaugeLongPrecise->Reconstruct()) {
+      gaugeLongSloppy = gaugeLongPrecise;
+    } else {
+      gaugeLongSloppy = new cudaGaugeField(gauge_param);
+      gaugeLongSloppy->copy(*gaugeLongPrecise);
+    }
+
+    // switch the parameters for creating the mirror preconditioner cuda gauge field
+    gauge_param.reconstruct = recon[1];
+    gauge_param.setPrecision(prec[1], true);
+
+    if (gaugeLongPrecondition) errorQuda("gaugeLongPrecondition already exists\n");
+
+    if (gauge_param.Precision() == gaugeLongPrecise->Precision()
+        && gauge_param.reconstruct == gaugeLongPrecise->Reconstruct()) {
+      gaugeLongPrecondition = gaugeLongPrecise;
+    } else if (gauge_param.Precision() == gaugeLongSloppy->Precision()
+               && gauge_param.reconstruct == gaugeLongSloppy->Reconstruct()) {
+      gaugeLongPrecondition = gaugeLongSloppy;
+    } else {
+      gaugeLongPrecondition = new cudaGaugeField(gauge_param);
+      gaugeLongPrecondition->copy(*gaugeLongPrecise);
+    }
+
+    // switch the parameters for creating the mirror refinement cuda gauge field
+    gauge_param.reconstruct = recon[2];
+    gauge_param.setPrecision(prec[2], true);
+
+    if (gaugeLongRefinement) errorQuda("gaugeLongRefinement already exists\n");
+
+    if (gauge_param.Precision() == gaugeLongSloppy->Precision()
+        && gauge_param.reconstruct == gaugeLongSloppy->Reconstruct()) {
+      gaugeLongRefinement = gaugeLongSloppy;
+    } else {
+      gaugeLongRefinement = new cudaGaugeField(gauge_param);
+      gaugeLongRefinement->copy(*gaugeLongSloppy);
+    }
+
+    // switch the parameters for creating the mirror eigensolver cuda gauge field
+    gauge_param.reconstruct = recon[3];
+    gauge_param.setPrecision(prec[3], true);
+
+    if (gaugeLongEigensolver) errorQuda("gaugePrecondition already exists");
+
+    if (gauge_param.Precision() == gaugeLongPrecise->Precision()
+        && gauge_param.reconstruct == gaugeLongPrecise->Reconstruct()) {
+      gaugeLongEigensolver = gaugeLongPrecise;
+    } else if (gauge_param.Precision() == gaugeLongSloppy->Precision()
+               && gauge_param.reconstruct == gaugeLongSloppy->Reconstruct()) {
+      gaugeLongEigensolver = gaugeLongSloppy;
+    } else if (gauge_param.Precision() == gaugeLongPrecondition->Precision()
+               && gauge_param.reconstruct == gaugeLongPrecondition->Reconstruct()) {
+      gaugeLongEigensolver = gaugeLongPrecondition;
+    } else {
+      gaugeLongEigensolver = new cudaGaugeField(gauge_param);
+      gaugeLongEigensolver->copy(*gaugeLongPrecise);
+    }
+  }
 }
 
 /**
