@@ -126,9 +126,17 @@ void init(int argc, char **argv)
   
   if (inv_multigrid) {
     setQudaMgSolveTypes();
-    setMultigridInvertParam(inv_param);
+    setMultigridInvertParam(inv_param);    
     // Set sub structures
     mg_param.invert_param = &mg_inv_param;
+    // Check for smeared gauge
+    if (inv_smear) {
+      setGaugeSmearParam(smear_param);
+      mg_inv_param.smear_param = &smear_param;
+    } else {
+      mg_inv_param.smear_param = nullptr;
+    }
+    
     for (int i = 0; i < mg_levels; i++) {
       if (mg_eig[i]) {
         mg_eig_param[i] = newQudaEigParam();
@@ -150,13 +158,14 @@ void init(int argc, char **argv)
   } else {
     inv_param.eig_param = nullptr;
   }
-
+  
   if (inv_smear) {
     setGaugeSmearParam(smear_param);
     inv_param.smear_param = &smear_param;
   } else {
     inv_param.smear_param = nullptr;
   }
+
   
   // set parameters for the reference Dslash, and prepare fields to be loaded
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH

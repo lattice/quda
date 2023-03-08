@@ -2767,6 +2767,11 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // Check that the gauge field is valid
   cudaGaugeField *cudaGauge = checkGauge(inv_param);
 
+  // Smear the gauge field if requested
+  profileEigensolve.TPSTOP(QUDA_PROFILE_TOTAL);
+  swapPreciseGaugeWithSmeared(inv_param->smear_param);
+  profileEigensolve.TPSTART(QUDA_PROFILE_TOTAL);
+  
   // Set all timing statistics to zero
   inv_param->secs = 0;
   inv_param->gflops = 0;
@@ -2894,6 +2899,8 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   delete dPre;
   profileEigensolve.TPSTOP(QUDA_PROFILE_FREE);
 
+  restorePreciseGaugeFromSmeared(inv_param->smear_param);
+  
   popVerbosity();
 
   // cache is written out even if a long benchmarking job gets interrupted
@@ -2906,12 +2913,17 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   : profile(profile) {
   profile.TPSTART(QUDA_PROFILE_INIT);
   QudaInvertParam *param = mg_param.invert_param;
-  // set whether we are going use native or generic blas
+  // set whether we are going to use native or generic blas
   blas_lapack::set_native(param->native_blas_lapack);
 
   checkMultigridParam(&mg_param);
   cudaGaugeField *cudaGauge = checkGauge(param);
 
+  // Smear the gauge field if requested
+  profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+  swapPreciseGaugeWithSmeared(param->smear_param);
+  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
+  
   // check MG params (needs to go somewhere else)
   if (mg_param.n_level > QUDA_MAX_MG_LEVEL)
     errorQuda("Requested MG levels %d greater than allowed maximum %d", mg_param.n_level, QUDA_MAX_MG_LEVEL);
@@ -2981,6 +2993,8 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   mg = new MG(*mgParam, profile);
   mgParam->updateInvertParam(*param);
 
+  restorePreciseGaugeFromSmeared(param->smear_param);
+  
   // cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache();
   profile.TPSTOP(QUDA_PROFILE_INIT);

@@ -20,6 +20,7 @@
 QudaGaugeParam gauge_param;
 QudaInvertParam eig_inv_param;
 QudaEigParam eig_param;
+QudaGaugeSmearParam smear_param;
 
 // if "--enable-testing true" is passed, we run the tests defined in here
 #include <eigensolve_test_gtest.hpp>
@@ -76,13 +77,20 @@ void init(int argc, char **argv)
   //------------------------------------------------------
   gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
-
+  smear_param = newQudaGaugeSmearParam();
+  
   // Though no inversions are performed, the inv_param
   // structure contains all the information we need to
   // construct the dirac operator.
   eig_inv_param = newQudaInvertParam();
-  setInvertParam(eig_inv_param);
-
+  setInvertParam(eig_inv_param);  
+  if (inv_smear) {
+    setGaugeSmearParam(smear_param);
+    eig_inv_param.smear_param = &smear_param;
+  } else {
+    eig_inv_param.smear_param = nullptr;
+  }
+  
   eig_param = newQudaEigParam();
   // We encapsualte the inv_param structure inside the
   // eig_param structure
@@ -229,6 +237,7 @@ int main(int argc, char **argv)
   // Parse command line options
   auto app = make_app();
   add_eigen_option_group(app);
+  add_su3_option_group(app);
   add_madwf_option_group(app);
   add_comms_option_group(app);
   add_testing_option_group(app);
