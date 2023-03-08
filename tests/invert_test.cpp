@@ -20,6 +20,7 @@ QudaMultigridParam mg_param;
 QudaInvertParam mg_inv_param;
 QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
 QudaEigParam eig_param;
+QudaGaugeSmearParam smear_param;
 
 // if --enable-testing true is passed, we run the tests defined in here
 #include <invert_test_gtest.hpp>
@@ -121,7 +122,8 @@ void init(int argc, char **argv)
   mg_param = newQudaMultigridParam();
   mg_inv_param = newQudaInvertParam();
   eig_param = newQudaEigParam();
-
+  smear_param = newQudaGaugeSmearParam();
+  
   if (inv_multigrid) {
     setQudaMgSolveTypes();
     setMultigridInvertParam(inv_param);
@@ -149,6 +151,13 @@ void init(int argc, char **argv)
     inv_param.eig_param = nullptr;
   }
 
+  if (inv_smear) {
+    setGaugeSmearParam(smear_param);
+    inv_param.smear_param = &smear_param;
+  } else {
+    inv_param.smear_param = nullptr;
+  }
+  
   // set parameters for the reference Dslash, and prepare fields to be loaded
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
       || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
@@ -341,6 +350,7 @@ int main(int argc, char **argv)
   auto app = make_app();
   add_eigen_option_group(app);
   add_deflation_option_group(app);
+  add_su3_option_group(app);
   add_eofa_option_group(app);
   add_madwf_option_group(app);
   add_multigrid_option_group(app);

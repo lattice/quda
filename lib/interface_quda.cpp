@@ -94,7 +94,11 @@ cudaGaugeField *gaugeLongRefinement = nullptr;
 cudaGaugeField *gaugeLongEigensolver = nullptr;
 cudaGaugeField *gaugeLongExtended = nullptr;
 
+// Holds the smeared gauge
 cudaGaugeField *gaugeSmeared = nullptr;
+
+// Temp gauge for switching gauges
+cudaGaugeField *gaugeTemp = nullptr;
 
 CloverField *cloverPrecise = nullptr;
 CloverField *cloverSloppy = nullptr;
@@ -536,6 +540,41 @@ void initQuda(int dev)
 // field.  Set by loadGaugeQuda and consumed by loadCloverQuda as one
 // possible flag to indicate we need to recompute the clover field
 static bool invalidate_clover = true;
+
+// QUDA internal functions to manage smeared gauge fields during inversion
+//------------------------------------------------------------------------
+bool gauge_is_smeared = false;
+
+void swapPreciseGaugeWithSmeared(QudaGaugeSmearParam *smear_param) {
+  if (smear_param) {
+    if(!gauge_is_smeared) {
+      // Perform gauge smearing
+      int n_obs = smear_param->n_steps / smear_param->meas_interval + 1;
+      QudaGaugeObservableParam *obs_param = new QudaGaugeObservableParam[n_obs];
+      for (int i = 0; i < n_obs; i++) {
+	obs_param[i] = newQudaGaugeObservableParam();
+	obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
+	obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
+      }
+      performGaugeSmearQuda(smear_param, obs_param);
+      GaugeFieldParam gauge_param(*gaugePrecise);
+      profileGaugeSmear.TPSTART(QUDA_PROFILE_TOTAL);
+      gaugeTemp = createExtendedGauge(*gaugePrecise, R, profileGaugeSmear);
+      profileGaugeSmear.TPSTOP(QUDA_PROFILE_TOTAL);
+      gauge_is_smeared = true;
+    }
+    
+    // Copy the precise gauge field, restore after the solve
+    gaugePrecise->copy(*gaugeSmeared);
+  }
+}
+
+void restorePreciseGaugeFromSmeared(QudaGaugeSmearParam *smear_param) {
+  if (smear_param) {
+    gaugePrecise->copy(*gaugeTemp);
+  }
+}
+//------------------------------------------------------------------------
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
@@ -1131,9 +1170,12 @@ void freeGaugeQuda(void)
   gaugeFatPrecise = nullptr;
   gaugeFatExtended = nullptr;
 
-  if (gaugeSmeared) delete gaugeSmeared;
-
+  if (gaugeSmeared != nullptr) delete gaugeSmeared;
+  if (gaugeTemp != nullptr) delete gaugeTemp;
+  
   gaugeSmeared = nullptr;
+  gaugeTemp = nullptr;
+  
   // Need to merge extendedGaugeResident and gaugeFatPrecise/gaugePrecise
   if (extendedGaugeResident) {
     delete extendedGaugeResident;
@@ -3193,23 +3235,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   // check the gauge fields have been created
   cudaGaugeField *cudaGauge = checkGauge(param);
-  cudaGaugeField *gaugeTemp = nullptr;
   
-  // Smear the gauge field
-  if (param->smear_param->smear_gauge == QUDA_BOOLEAN_TRUE) {
-    profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
-
-    QudaGaugeObservableParam obs_param = newQudaGaugeObservableParam();
-    performGaugeSmearQuda(param->smear_param, &obs_param);
-    
-    // Copy the gauge field, restore after the solve
-    GaugeFieldParam gParam(*gaugeSmeared);
-    gaugeTemp = new cudaGaugeField(gParam);
-    gaugeTemp->copy(*gaugePrecise);
-    gaugePrecise->copy(*gaugeSmeared);
-    profileInvert.TPSTART(QUDA_PROFILE_TOTAL);    
-  }
-
+  // Smear the gauge field if requested
+  profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+  swapPreciseGaugeWithSmeared(param->smear_param);
+  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
+  
   // It was probably a bad design decision to encode whether the system is even/odd preconditioned (PC) in
   // solve_type and solution_type, rather than in separate members of QudaInvertParam.  We're stuck with it
   // for now, though, so here we factorize everything for convenience.
@@ -3557,10 +3588,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete dPre;
   delete dEig;
 
-  if (param->smear_param->smear_gauge == QUDA_BOOLEAN_TRUE) {
-    gaugePrecise->copy(*gaugeTemp);
-    delete gaugeTemp;
-  }
+  restorePreciseGaugeFromSmeared(param->smear_param);
   
   profileInvert.TPSTOP(QUDA_PROFILE_FREE);
 

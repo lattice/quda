@@ -32,7 +32,6 @@ extern "C" {
     double rho;           /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
     unsigned int meas_interval;    /**< Perform the requested measurements on the gauge field at this interval */
     QudaGaugeSmearType smear_type; /**< The smearing type to perform */    
-    QudaBoolean smear_gauge;       /**< If true, perform smearing with the given parameters */
   } QudaGaugeSmearParam;
   
   /**

@@ -4,7 +4,12 @@
 #include "misc.h"
 
 void setGaugeSmearParam(QudaGaugeSmearParam &smear_param) {
-
+  smear_param.alpha = gauge_smear_alpha;
+  smear_param.rho = gauge_smear_rho;
+  smear_param.epsilon = gauge_smear_epsilon;
+  smear_param.n_steps = gauge_smear_steps;
+  smear_param.meas_interval = measurement_interval;
+  smear_param.smear_type = gauge_smear_type;
 }
 
 void setGaugeParam(QudaGaugeParam &gauge_param)
@@ -182,14 +187,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   }
 
   // Gauge smear param
-  setGaugeSmearParam(*inv_param.smear_param);
-  /*
-  inv_param.gauge_smear = (gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
-  inv_param.gauge_smear_type = gauge_smear_type;
-  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_STOUT) inv_param.gauge_smear_coeff = stout_smear_rho;
-  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_APE) inv_param.gauge_smear_coeff = ape_smear_rho;
-  inv_param.gauge_smear_steps = gauge_smear_steps;
-  */  
+  //setGaugeSmearParam(*inv_param.smear_param);
 
   // General parameter setup
   inv_param.inv_type = inv_type;
@@ -981,14 +979,7 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
   // Gauge smear param
-  setGaugeSmearParam(*inv_param.smear_param);
-  /*
-  inv_param.gauge_smear = (gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
-  inv_param.gauge_smear_type = gauge_smear_type;
-  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_STOUT) inv_param.gauge_smear_coeff = stout_smear_rho;
-  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_APE) inv_param.gauge_smear_coeff = ape_smear_rho;
-  inv_param.gauge_smear_steps = gauge_smear_steps;
-  */
+  //setGaugeSmearParam(*inv_param.smear_param);
   
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
