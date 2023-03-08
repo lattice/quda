@@ -24,6 +24,17 @@
 extern "C" {
 #endif
 
+  typedef struct QudaGaugeSmearParam_s {
+    size_t struct_size;   /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
+    unsigned int n_steps; /**< The total number of smearing steps to perform. */
+    double epsilon;       /**< Serves as one of the coefficients in Over Improved Stout smearing, or as the step size in Wilson/Symanzik flow */
+    double alpha;         /**< The single coefficient used in APE smearing */
+    double rho;           /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
+    unsigned int meas_interval;    /**< Perform the requested measurements on the gauge field at this interval */
+    QudaGaugeSmearType smear_type; /**< The smearing type to perform */    
+    QudaBoolean smear_gauge;       /**< If true, perform smearing with the given parameters */
+  } QudaGaugeSmearParam;
+  
   /**
    * Parameters having to do with the gauge field or the
    * interpretation of the gauge field by various Dirac operators
@@ -284,6 +295,9 @@ extern "C" {
     /** Maximum size of Krylov space used by solver */
     int gcrNkrylov;
 
+    /**< container to hold smearing parameters */
+    QudaGaugeSmearParam *smear_param; 
+    
     /*
      * The following parameters are related to the solver
      * preconditioner, if enabled.
@@ -825,17 +839,6 @@ extern "C" {
                                  be removed; this was needed for the Polyakov loop calculation when called through MILC,
                                  with the underlying issue documented https://github.com/lattice/quda/issues/1315 */
   } QudaGaugeObservableParam;
-
-  typedef struct QudaGaugeSmearParam_s {
-    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
-    unsigned int n_steps; /**< The total number of smearing steps to perform. */
-    double epsilon;       /**< Serves as one of the coefficients in Over Improved Stout smearing, or as the step size in
-                             Wilson/Symanzik flow */
-    double alpha;         /**< The single coefficient used in APE smearing */
-    double rho; /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
-    unsigned int meas_interval;    /**< Perform the requested measurements on the gauge field at this interval */
-    QudaGaugeSmearType smear_type; /**< The smearing type to perform */
-  } QudaGaugeSmearParam;
 
   typedef struct QudaBLASParam_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
@@ -1691,6 +1694,14 @@ extern "C" {
   void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
                     const int *X);
 
+  /**
+   * DMH: to do
+   */
+  void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void **result,
+		      const QudaContractType cType, void *cs_param_ptr, const int src_colors,
+		      const int *X, const int *const source_position,
+		      const int n_mom, const int *const mom_modes, const QudaFFTSymmType *const fft_type);
+  
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
    * @param[in,out] gauge, gauge field to be fixed

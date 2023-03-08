@@ -291,3 +291,6 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param);
 void setGaugeParam(QudaGaugeParam &gauge_param);
 void setWilsonGaugeParam(QudaGaugeParam &gauge_param);
 void setStaggeredGaugeParam(QudaGaugeParam &gauge_param);
+
+// Smear param types
+void setGaugeSmearParam(QudaGaugeSmearParam &smear_param);

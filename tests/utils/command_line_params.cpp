@@ -274,7 +274,7 @@ double eofa_mq1 = 1.0;
 double eofa_mq2 = 0.085;
 double eofa_mq3 = 1.0;
 
-QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
+//QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
 int prop_source_smear_steps = 0;
 int prop_sink_smear_steps = 0;
@@ -285,16 +285,14 @@ int prop_n_sources = 1;
 QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
 
 // SU(3) smearing options
-double stout_smear_rho = 0.1;
-double stout_smear_epsilon = -0.25;
-double ape_smear_rho = 0.6;
+double gauge_smear_rho = 0.1;
+double gauge_smear_epsilon = 1.0;
+double gauge_smear_alpha = 0.6;
 int gauge_smear_steps = 5;
-double wflow_epsilon = 0.01;
-int wflow_steps = 100;
 QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
 int measurement_interval = 5;
 QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
-QudaFermionSmearType prop_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
+QudaFermionSmearType fermion_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
 
 // contract options
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_DR_FT_T;
@@ -314,7 +312,7 @@ double gf_tolerance = 1e-6;
 bool gf_theta_condition = false;
 bool gf_fft_autotune = false;
 
-std::array<int, 4> grid_partition = {1, 1, 1, 1};
+//std::array<int, 4> grid_partition = {1, 1, 1, 1};
 
 // Parameters for the (gaussian) quark smearing operator
 int    smear_n_steps = 50;
@@ -436,10 +434,13 @@ namespace
     {"SR", QUDA_SPECTRUM_SR_EIG}, {"LR", QUDA_SPECTRUM_LR_EIG}, {"SM", QUDA_SPECTRUM_SM_EIG},
     {"LM", QUDA_SPECTRUM_LM_EIG}, {"SI", QUDA_SPECTRUM_SI_EIG}, {"LI", QUDA_SPECTRUM_LI_EIG}};
 
+  CLI::TransformPairs<QudaWFlowType> wflow_type_map {{"wilson", QUDA_WFLOW_TYPE_WILSON},
+                                                     {"symanzik", QUDA_WFLOW_TYPE_SYMANZIK}};
+  
   CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map {{"ape", QUDA_GAUGE_SMEAR_APE},
                                                                 {"stout", QUDA_GAUGE_SMEAR_STOUT},
                                                                 {"ovr-imp-stout", QUDA_GAUGE_SMEAR_OVRIMP_STOUT}};
-
+  
   CLI::TransformPairs<QudaFermionSmearType> fermion_smear_type_map {{"gaussian", QUDA_FERMION_SMEAR_TYPE_GAUSSIAN},
                                                                     {"wuppertal", QUDA_FERMION_SMEAR_TYPE_WUPPERTAL}};
 
@@ -1031,30 +1032,25 @@ void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
 
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-  CLI::TransformPairs<QudaWFlowType> wflow_type_map {{"wilson", QUDA_WFLOW_TYPE_WILSON},
-                                                     {"symanzik", QUDA_WFLOW_TYPE_SYMANZIK}};
 
   // Option group for SU(3) related options
   auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
-  opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
+  opgroup->add_option("--su3-smear-alpha", gauge_smear_alpha, "alpha coefficient for APE smearing (default 0.6)");
 
-  opgroup->add_option("--su3-stout-rho", stout_smear_rho,
-                      "rho coefficient for Stout and Over-Improved Stout smearing (default 0.08)");
+  opgroup->add_option("--su3-smear-rho", gauge_smear_rho,
+                      "rho coefficient for Stout and Over-Improved Stout smearing (default 0.1)");
 
-  opgroup->add_option("--su3-stout-epsilon", stout_smear_epsilon,
-                      "epsilon coefficient for Over-Improved Stout smearing (default -0.25)");
-
-  opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 50)");
-
-  opgroup->add_option("--su3-wflow-epsilon", wflow_epsilon, "The step size in the Runge-Kutta integrator (default 0.01)");
-
-  opgroup->add_option("--su3-wflow-steps", wflow_steps,
-                      "The number of steps in the Runge-Kutta integrator (default 100)");
+  opgroup->add_option("--su3-smear-epsilon", gauge_smear_epsilon,
+                      "epsilon coefficient for Over-Improved Stout smearing and step size for Wilson flow (default 1.0)");
+  
+  opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 10)");
 
   opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
-    ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
-  ;
-
+    ->transform(CLI::QUDACheckedTransformer(wflow_type_map));  
+  
+  opgroup->add_option("--su3-smear-type", gauge_smear_type, "The type of smearing to use (default stout)")
+    ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
+  
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and topological charge every Nth step (default 5) ");
 }
@@ -1094,10 +1090,12 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Number of measurement steps in heatbath test (default 10)");
   opgroup->add_option("--heatbath-warmup-steps", heatbath_warmup_steps,
                        "Number of warmup steps in heatbath test (default 10)");
-  opgroup->add_option("--heatbath-checkpoint", heatbath_checkpoint,
-                       "Number of measurement steps in heatbath before checkpointing (default 5)");
+  // DMH
+  //opgroup->add_option("--heatbath-checkpoint", heatbath_checkpoint,
+  //"Number of measurement steps in heatbath before checkpointing (default 5)");
 }
 
+/*
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
 
@@ -1149,6 +1147,7 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--prop-save-prec", prop_save_prec, "Precision with which to save propagators (default single)")
     ->transform(prec_transform);
 }
+*/
 
 void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
@@ -1166,11 +1165,13 @@ void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "Compute the open flavor correlators (default false)");
     opgroup->add_option("--correlator-file-affix", correlator_file_affix, "Additional string to put into the correlator file name");
 
+    /*
     quda_app->add_massoption(opgroup, "--kappa-array", kappa_array, CLI::Validator(),
 			     "set the Nth<INT> kappa value<FLOAT> of the Dirac operator)");
     
     quda_app->add_massoption(opgroup, "--mass-array", kappa_array, CLI::Validator(),
 			     "set the Nth<INT> mass value<FLOAT> of the Dirac operator)");
+    */
 }
 
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)

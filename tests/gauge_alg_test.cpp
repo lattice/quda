@@ -38,6 +38,16 @@ bool gauge_store;
 
 void *host_gauge[4];
 
+int gf_gauge_dir = 4;
+int gf_maxiter = 10000;
+int gf_verbosity_interval = 100;
+double gf_ovr_relaxation_boost = 1.5;
+double gf_fft_alpha = 0.8;
+int gf_reunit_interval = 10;
+double gf_tolerance = 1e-6;
+bool gf_theta_condition = false;
+bool gf_fft_autotune = false;
+
 void display_test_info()
 {
   printfQuda("running the following test:\n");

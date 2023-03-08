@@ -1087,12 +1087,14 @@ void printQudaGaugeSmearParam(QudaGaugeSmearParam *param)
   P(alpha, 0.0);
   P(rho, 0.0);
   P(epsilon, 0.0);
+  P(smear_gauge, QUDA_BOOLEAN_FALSE);
 #else
   P(n_steps, (unsigned int)INVALID_INT);
   P(meas_interval, (unsigned int)INVALID_INT);
   P(alpha, INVALID_DOUBLE);
   P(rho, INVALID_DOUBLE);
   P(epsilon, INVALID_DOUBLE);
+  P(smear_gauge, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM

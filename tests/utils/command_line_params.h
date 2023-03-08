@@ -127,6 +127,7 @@ public:
     return opt;
   }
 
+  /*
   // Add option to parse multiple point source locations
   template <typename T>
   CLI::Option *add_psoption(CLI::Option_group *group, std::string option_name,
@@ -164,7 +165,7 @@ public:
     group->add_option(opt);
     return opt;
   }
-
+  
   // Add option to parse multiple files.
   template <typename T>
   CLI::Option *add_fileoption(CLI::Option_group *group, std::string option_name,
@@ -235,6 +236,7 @@ public:
     group->add_option(opt);
     return opt;
   }
+  */
 };
 
 std::shared_ptr<QUDAApp> make_app(std::string app_description = "QUDA internal test", std::string app_name = "");
@@ -505,6 +507,16 @@ extern double eofa_mq2;
 extern double eofa_mq3;
 
 extern QudaContractType contract_type;
+
+// SU(3) smearing options
+extern double gauge_smear_rho;
+extern double gauge_smear_epsilon;
+extern double gauge_smear_alpha;
+extern int gauge_smear_steps;
+extern QudaWFlowType wflow_type;
+extern int measurement_interval;
+extern QudaGaugeSmearType gauge_smear_type;
+extern QudaFermionSmearType prop_smear_type;
 
 extern double smear_coeff;
 extern int    smear_n_steps;

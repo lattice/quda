@@ -3196,13 +3196,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   cudaGaugeField *gaugeTemp = nullptr;
   
   // Smear the gauge field
-  if (param->gauge_smear == QUDA_BOOLEAN_TRUE) {
-    profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);    
-    switch(param->gauge_smear_type) {
-    case QUDA_GAUGE_SMEAR_APE: performAPEnStep(param->gauge_smear_steps, param->gauge_smear_coeff, 1); break;
-    case QUDA_GAUGE_SMEAR_STOUT: performSTOUTnStep(param->gauge_smear_steps, param->gauge_smear_coeff, 1); break;
-    default: errorQuda("Unsupported smear type %d", param->gauge_smear_type);
-    }
+  if (param->smear_param->smear_gauge == QUDA_BOOLEAN_TRUE) {
+    profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+
+    QudaGaugeObservableParam obs_param = newQudaGaugeObservableParam();
+    performGaugeSmearQuda(param->smear_param, &obs_param);
+    
     // Copy the gauge field, restore after the solve
     GaugeFieldParam gParam(*gaugeSmeared);
     gaugeTemp = new cudaGaugeField(gParam);
@@ -3558,11 +3557,11 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   delete dPre;
   delete dEig;
 
-  if (param->gauge_smear == QUDA_BOOLEAN_TRUE) {
+  if (param->smear_param->smear_gauge == QUDA_BOOLEAN_TRUE) {
     gaugePrecise->copy(*gaugeTemp);
     delete gaugeTemp;
   }
-
+  
   profileInvert.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
@@ -5931,6 +5930,7 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
   profileWuppertal.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+#if 0
 void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double omega)
 {
   if (!initialized) errorQuda("QUDA not initialized");
@@ -6009,7 +6009,7 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_TOTAL);
   saveTuneCache();
 }
- 
+#endif 
 
 void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_param)
 {
