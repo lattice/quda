@@ -10,6 +10,11 @@
 #include <color_spinor_field.h>
 #include <dslash_quda.h>
 #include <invert_quda.h>
+// #include "../../openQxD-devel/include/su3.h"
+// #include "../../openQxD-devel/include/flags.h"
+// #include "../../openQxD-devel/include/utils.h"
+// #include "../../openQxD-devel/include/lattice.h"
+// #include "../../openQxD-devel/include/global.h"
 
 // #include <string.h>
 
@@ -77,44 +82,50 @@ using namespace quda;
 
 // template <bool start> void inline qudamilc_called(const char *func) { qudamilc_called<start>(func, getVerbosity()); }
 
-// fdata should point to 8 integers in order {BLK_NPROC0, BLK_NPROC1, BLK_NPROC2, BLK_NPROC3, NPROC0, NPROC1, NPROC2, NPROC3]
-static int rankFromCoords(const int *coords, void *fdata) // TODO:
+
+static int safe_mod(int x,int y)
 {
+   if (x>=0)
+      return x%y;
+   else
+      return (y-(abs(x)%y))%y;
+}
 
-  
-  int *BLK_NPROC = static_cast<int *>(fdata);
-  int *NPROC = BLK_NPROC + 4;
-  
-  int BLK_coords[4];
-  int local_coords[4];
+
+// fdata should point to 4 integers in order {NPROC0, NPROC1, NPROC2, NPROC3}
+// coords is the 4D cartesian coordinate of a rank.
+static int rankFromCoords(const int *coords, void *fdata) // TODO:
+{ 
+  int *NPROC = static_cast<int *>(fdata);
+  // int *NPROC = BLK_NPROC + 4;
 	
-  for (int i = 0; i < 4; i++) {
-	  // coordinate of BLK in the BLK grid
-	  BLK_coords[i] = coords[i] / BLK_NPROC[i];
-	  // local coordinate inside BLK
-	  local_coords[i] = coords[i] - BLK_coords[i]*BLK_NPROC[i];
-  }
+  int ib;
+  int n0_OpenQxD;
+  int n1_OpenQxD;
+  int n2_OpenQxD;
+  int n3_OpenQxD;
+  // int NPROC0_OpenQxD;
+  int NPROC1_OpenQxD;
+  int NPROC2_OpenQxD;
+  int NPROC3_OpenQxD;
 
-  int rank = BLK_coords[0];
-  for (int i = 1; i <= 3; i++) { 
-	rank = (NPROC[i] / BLK_NPROC[i]) * rank + BLK_coords[i];
-  }
+  n0_OpenQxD=coords[3];
+  n1_OpenQxD=coords[0];
+  n2_OpenQxD=coords[1];
+  n3_OpenQxD=coords[2];
 
-  for (int i = 0; i <= 3; i++) { 
-	rank = BLK_NPROC[i] * rank + local_coords[i];
-  }
-  warningQuda("rank = %d, Coords = (%d,%d,%d,%d)\n",rank,coords[0],coords[1],coords[2],coords[3]);
+  // NPROC0_OpenQxD=NPROC[3];
+  NPROC1_OpenQxD=NPROC[0];
+  NPROC2_OpenQxD=NPROC[1];
+  NPROC3_OpenQxD=NPROC[2];
 
-  //   // For 2 ranks:
-  // if (coords[3]<8)
-  // {
-  //   rank = 0;
-  // } else {
-  //   rank = 1;
-  // }
-  return coords[3];
-  // return 0; // FIXME: this function needs to be specific
   
+  ib=n0_OpenQxD;
+  ib=ib*NPROC1_OpenQxD+n1_OpenQxD;
+  ib=ib*NPROC2_OpenQxD+n2_OpenQxD;
+  ib=ib*NPROC3_OpenQxD+n3_OpenQxD;
+  printf("Coords are: %d,%d,%d,%d \n Rank is: %d \n\n",coords[0],coords[1],coords[2],coords[3],ib);
+  return ib;
 }
 
 void openQCD_qudaSetLayout(openQCD_QudaLayout_t input)
@@ -158,6 +169,7 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t input)
   openQCD_qudaSetLayout(input.layout);
   initialized = true;
   // qudamilc_called<false>(__func__);
+  // geometry(); // Establish helper indexes from openQxD
 }
 
 void openQCD_qudaFinalize() { endQuda(); }
@@ -333,7 +345,7 @@ static void setColorSpinorParams(const int dim[4], QudaPrecision precision, Colo
 {
   param->nColor = 3;
   param->nSpin = 1; // TODO:
-  param->nDim = 4;
+  param->nDim = 4; // TODO: check how to adapt this for openqxd
 
   for (int dir = 0; dir < 4; ++dir) param->x[dir] = dim[dir];
   param->x[0] /= 2;
