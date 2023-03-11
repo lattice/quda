@@ -42,6 +42,11 @@ namespace quda
       return launch_error;
     }
 
+    template <typename Arg, size_t arg_size = sizeof(Arg)> void check_arg_size(Arg&)
+    {
+      static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
+    }
+
     template <template <typename> class Functor, bool grid_stride, typename Arg>
     std::enable_if_t<!device::use_kernel_arg<Arg>(), qudaError_t>
     launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
@@ -50,7 +55,7 @@ namespace quda
       // note we do the copy to constant memory after the kernel has been compiled in launch_jitify
       launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg);
 #else
-      static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
+      check_arg_size(arg);
       qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);
       launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(&arg));
 #endif
