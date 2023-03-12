@@ -10,6 +10,7 @@ void setGaugeSmearParam(QudaGaugeSmearParam &smear_param) {
   smear_param.n_steps = gauge_smear_steps;
   smear_param.meas_interval = measurement_interval;
   smear_param.smear_type = gauge_smear_type;
+  smear_param.struct_size = sizeof(smear_param);
 }
 
 void setGaugeParam(QudaGaugeParam &gauge_param)
@@ -39,7 +40,8 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.ga_pad = 0;
   gauge_param.mom_ga_pad = 0;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-
+  gauge_param.smear_gauge = gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  
   gauge_param.struct_size = sizeof(gauge_param);
 }
 
@@ -71,7 +73,8 @@ void setWilsonGaugeParam(QudaGaugeParam &gauge_param)
   pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
 #endif
   gauge_param.ga_pad = pad_size;
-
+  gauge_param.smear_gauge = gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  
   gauge_param.struct_size = sizeof(gauge_param);
 }
 
@@ -115,7 +118,8 @@ void setStaggeredGaugeParam(QudaGaugeParam &gauge_param)
   pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
 #endif
   gauge_param.ga_pad = pad_size;
-
+  gauge_param.smear_gauge = gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  
   gauge_param.struct_size = sizeof(gauge_param);
 }
 

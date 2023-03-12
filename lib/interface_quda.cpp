@@ -666,30 +666,29 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   // low prec aliases and operators.
   cudaGaugeField *working = new cudaGaugeField(gauge_param);;
   
-  if (param->smear_param) {
-    if(!gaugeSmeared) {
-            
-      // Create a copy of the precise field
-      GaugeFieldParam gauge_param(*precise);
-      profileGaugeSmear.TPSTART(QUDA_PROFILE_TOTAL);
-      working = createExtendedGauge(*precise, R, profileGaugeSmear);
-      profileGaugeSmear.TPSTOP(QUDA_PROFILE_TOTAL);
-            
-      int n_obs = param->smear_param->n_steps / param->smear_param->meas_interval + 1;
-      QudaGaugeObservableParam *obs_param = new QudaGaugeObservableParam[n_obs];
-      for (int i = 0; i < n_obs; i++) {
-	obs_param[i] = newQudaGaugeObservableParam();
-	obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
-	obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
-      }
-      
-      // Perform gauge smearing. This will take a copy of gaugePrecise
-      // and smear it into gaugeSmeared
-      gaugePrecise = precise;
-      performGaugeSmearQuda(param->smear_param, obs_param);
-      gaugePrecise = nullptr;
-      working->copy(*gaugeSmeared);
+  if (param->smear_gauge) {
+    if(gaugeSmeared) delete gaugeSmeared;
+    
+    // Create a copy of the precise field
+    GaugeFieldParam gauge_param(*precise);
+    profileGaugeSmear.TPSTART(QUDA_PROFILE_TOTAL);
+    working = createExtendedGauge(*precise, R, profileGaugeSmear);
+    profileGaugeSmear.TPSTOP(QUDA_PROFILE_TOTAL);
+    
+    int n_obs = param->smear_param->n_steps / param->smear_param->meas_interval + 1;
+    QudaGaugeObservableParam *obs_param = new QudaGaugeObservableParam[n_obs];
+    for (int i = 0; i < n_obs; i++) {
+      obs_param[i] = newQudaGaugeObservableParam();
+      obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
+      obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
     }
+    
+    // Perform gauge smearing. This will take a copy of gaugePrecise
+    // and smear it into gaugeSmeared
+    gaugePrecise = precise;
+    performGaugeSmearQuda(param->smear_param, obs_param);
+    gaugePrecise = nullptr;
+    working->copy(*gaugeSmeared);
   } else {
     working->copy(*precise);
   }

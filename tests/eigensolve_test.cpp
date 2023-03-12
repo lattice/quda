@@ -81,10 +81,7 @@ void init(int argc, char **argv)
     smear_param = newQudaGaugeSmearParam();
     setGaugeSmearParam(smear_param);
     gauge_param.smear_param = &smear_param;
-  } else {
-    gauge_param.smear_param = nullptr;
   }
-
   
   // Though no inversions are performed, the inv_param
   // structure contains all the information we need to

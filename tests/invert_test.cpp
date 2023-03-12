@@ -121,8 +121,6 @@ void init(int argc, char **argv)
     smear_param = newQudaGaugeSmearParam();
     setGaugeSmearParam(smear_param);
     gauge_param.smear_param = &smear_param;
-  } else {
-    gauge_param.smear_param = nullptr;
   }
   
   inv_param = newQudaInvertParam();

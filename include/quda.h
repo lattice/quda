@@ -31,7 +31,7 @@ extern "C" {
     double alpha;         /**< The single coefficient used in APE smearing */
     double rho;           /**< Serves as one of the coefficients used in Over Improved Stout smearing, or as the single coefficient used in Stout */
     unsigned int meas_interval;    /**< Perform the requested measurements on the gauge field at this interval */
-    QudaGaugeSmearType smear_type; /**< The smearing type to perform */    
+    QudaGaugeSmearType smear_type; /**< The smearing type to perform */
   } QudaGaugeSmearParam;
   
   /**
@@ -102,6 +102,7 @@ extern "C" {
     size_t site_size; /**< Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
 
     QudaGaugeSmearParam *smear_param; /**< container to hold smearing parameters */
+    QudaBoolean smear_gauge; /**< if true, smear the gauge when loaded into QUDA */    
   } QudaGaugeParam;
 
 
@@ -296,9 +297,6 @@ extern "C" {
     /** Maximum size of Krylov space used by solver */
     int gcrNkrylov;
 
-    /**< container to hold smearing parameters */
-    QudaGaugeSmearParam *smear_param; 
-    
     /*
      * The following parameters are related to the solver
      * preconditioner, if enabled.
