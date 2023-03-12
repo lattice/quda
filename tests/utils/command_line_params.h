@@ -316,7 +316,7 @@ extern quda::mgarray<std::string> mg_vec_outfile;
 extern QudaInverterType inv_type;
 extern bool inv_deflate;
 extern bool inv_multigrid;
-extern bool inv_smear;
+extern bool gauge_smear;
 extern QudaInverterType precon_type;
 extern QudaSchwarzType precon_schwarz_type;
 extern QudaAcceleratorType precon_accelerator_type;

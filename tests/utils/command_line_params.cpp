@@ -69,7 +69,7 @@ quda::mgarray<std::string> mg_vec_outfile;
 QudaInverterType inv_type;
 bool inv_deflate = false;
 bool inv_multigrid = false;
-bool inv_smear = false;
+bool gauge_smear = false;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 QudaSchwarzType precon_schwarz_type = QUDA_INVALID_SCHWARZ;
 QudaAcceleratorType precon_accelerator_type = QUDA_INVALID_ACCELERATOR;
@@ -519,7 +519,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(inverter_type_map));
   quda_app->add_option("--inv-deflate", inv_deflate, "Deflate the inverter using the eigensolver (default false)");
   quda_app->add_option("--inv-multigrid", inv_multigrid, "Precondition the inverter using multigrid (default false)");
-  quda_app->add_option("--inv-smear", inv_smear, "Smear the gauge prior to inversion (default false)");
+  quda_app->add_option("--gauge-smear", gauge_smear, "Smear the gauge prior to dirac operator construction (default false)");
   quda_app->add_option("--kappa", kappa, "Kappa of Dirac operator (default 0.12195122... [equiv to mass])");
   quda_app->add_option(
     "--laplace3D", laplace3D,
