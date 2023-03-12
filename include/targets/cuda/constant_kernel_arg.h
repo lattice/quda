@@ -14,6 +14,8 @@
    instantiation correctly.
  */
 
+#ifndef QUDA_LARGE_KERNEL_ARG
+
 namespace quda
 {
 
@@ -50,5 +52,7 @@ namespace quda
     }
 
   } // namespace device
+
+#endif
 
 } // namespace quda
