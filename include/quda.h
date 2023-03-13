@@ -1633,6 +1633,20 @@ extern "C" {
   void copyExtendedResidentGaugeQuda(void *resident_gauge);
 
   /**
+   * Performs gaussian/Wuppertal smearing on a given spinor using the gauge field
+   * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
+   * @param h_in   Input spinor field
+   * @param h_out  Output spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage and operator which will be applied to the spinor
+   * @param n_steps Number of steps to apply.
+   * @param coeff  Width of the Gaussian distribution
+   * @param smear_type Gaussian/Wuppertal smearing
+   */
+  void performFermionSmearQuda(void *h_out, void *h_in, QudaInvertParam *param, const int n_steps, const double coeff, const QudaFermionSmearType smear_type);
+
+  /**
+   * LEGACY
    * Performs Wuppertal smearing on a given spinor using the gauge field
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
    * @param h_out  Result spinor field
@@ -1645,16 +1659,18 @@ extern "C" {
   void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int n_steps, double alpha);
 
   /**
+   * LEGACY
    * Performs gaussian smearing on a given spinor using the gauge field
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
    * @param h_in   Input spinor field
+   * @param h_out  Output spinor field
    * @param param  Contains all metadata regarding host and device
    *               storage and operator which will be applied to the spinor
    * @param n_steps Number of steps to apply.
    * @param omega  Width of the Gaussian distribution
    */
-  void performGaussianSmearNStep(void *h_in, QudaInvertParam *param, const int n_steps, const double omega);
-
+  void performGaussianSmearNStep(void *h_out, void *h_in, QudaInvertParam *param, const int n_steps, const double omega);
+  
   /**
    * Performs APE, Stout, or Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
    * @param[in] smear_param Parameter struct that defines the computation parameters

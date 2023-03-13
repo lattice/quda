@@ -174,11 +174,8 @@ static TimeProfile profileHISQForce("computeHISQForceQuda");
 //!<Profiler for plaqQuda
 static TimeProfile profilePlaq("plaqQuda");
 
-//!< Profiler for wuppertalQuda
-static TimeProfile profileWuppertal("wuppertalQuda");
-
-//!< Profiler for gaussianSmearQuda
-static TimeProfile profileGaussianSmear("gaussianSmearQuda");
+//!< Profiler for fermionSmearQuda
+static TimeProfile profileFermionSmear("fermionSmearQuda");
 
 //!<Profiler for gaussQuda
 static TimeProfile profileGauss("gaussQuda");
@@ -595,7 +592,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       if (gaugePrecise && !param->use_resident_gauge) delete gaugePrecise;
 
       break;
-    case QUDA_ASQTAD_FAT_LINKS:
+  case QUDA_ASQTAD_FAT_LINKS:
       if (gaugeFatRefinement != gaugeFatSloppy && gaugeFatRefinement != gaugeFatEigensolver && gaugeFatRefinement)
         delete gaugeFatRefinement;
 
@@ -1489,8 +1486,7 @@ void endQuda(void)
     profilePlaq.Print();
     profileGaugeObs.Print();
     profileGaugeSmear.Print();
-    profileGaussianSmear.Print();
-    profileWuppertal.Print();
+    profileFermionSmear.Print();
     profileWFlow.Print();
     profileProject.Print();
     profilePhase.Print();
@@ -4436,15 +4432,15 @@ void computeKSLinkQuda(void *fatlink, void *longlink, void *ulink, void *inlink,
 
 void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
 {
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
+  profileFermionSmear.TPSTART(QUDA_PROFILE_TOTAL);
+  profileFermionSmear.TPSTART(QUDA_PROFILE_INIT);
 
   checkGaugeParam(param);
 
   GaugeFieldParam gParam(*param, inlink, QUDA_GENERAL_LINKS);
   gParam.gauge     = twolink;
   cpuGaugeField cpuTwoLink(gParam);  // create the host twolink
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
+  profileFermionSmear.TPSTOP(QUDA_PROFILE_INIT);
 
   cudaGaugeField *cudaInLinkEx = nullptr;
 
@@ -4458,18 +4454,18 @@ void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
     gParam.setPrecision(param->cuda_prec, true);
     gParam.create = QUDA_NULL_FIELD_CREATE;
     cudaGaugeField *cudaInLink = new cudaGaugeField(gParam);
-    profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
+    profileFermionSmear.TPSTOP(QUDA_PROFILE_INIT);
 
-    cudaInLink->loadCPUField(cpuInLink, profileGaussianSmear);
+    cudaInLink->loadCPUField(cpuInLink, profileFermionSmear);
     //
-    cudaInLinkEx = createExtendedGauge(*cudaInLink, R, profileGaussianSmear);
+    cudaInLinkEx = createExtendedGauge(*cudaInLink, R, profileFermionSmear);
     //
-    profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
+    profileFermionSmear.TPSTART(QUDA_PROFILE_FREE);
     delete cudaInLink;
-    profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
+    profileFermionSmear.TPSTOP(QUDA_PROFILE_FREE);
 
   } else {
-    cudaInLinkEx = createExtendedGauge(*gaugeWorking, R, profileGaussianSmear);
+    cudaInLinkEx = createExtendedGauge(*gaugeWorking, R, profileFermionSmear);
   }
 
   GaugeFieldParam gsParam(*gaugeWorking);
@@ -4482,31 +4478,31 @@ void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
   gsParam.nFace         = 3;
   gsParam.pad           = gsParam.pad*gsParam.nFace;
 
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
+  profileFermionSmear.TPSTART(QUDA_PROFILE_INIT);
 
   if(gaugeSmeared != nullptr) delete gaugeSmeared;
   gaugeSmeared = new cudaGaugeField(gsParam);
 
   
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
+  profileFermionSmear.TPSTOP(QUDA_PROFILE_INIT);
 
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
+  profileFermionSmear.TPSTART(QUDA_PROFILE_COMPUTE);
 
   computeTwoLink(*gaugeSmeared, *cudaInLinkEx);
   gaugeSmeared->exchangeGhost();
 
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileFermionSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
   //
-  gaugeSmeared->saveCPUField(cpuTwoLink, profileGaussianSmear);
+  gaugeSmeared->saveCPUField(cpuTwoLink, profileFermionSmear);
 
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
+  profileFermionSmear.TPSTART(QUDA_PROFILE_FREE);
   
   delete gaugeSmeared;
   gaugeSmeared = nullptr;
   delete cudaInLinkEx;
 
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_TOTAL);
+  profileFermionSmear.TPSTOP(QUDA_PROFILE_FREE);
+  profileFermionSmear.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* path_length,
@@ -5860,92 +5856,25 @@ void copyExtendedResidentGaugeQuda(void *resident_gauge)
   static_cast<GaugeField *>(resident_gauge)->copy(*extendedGaugeResident);
 }
 
-void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int n_steps, double alpha)
-{
-  profileWuppertal.TPSTART(QUDA_PROFILE_TOTAL);
-
-  if (gaugeWorking == nullptr) errorQuda("Gauge field must be loaded");
-
-  pushVerbosity(inv_param->verbosity);
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
-
-  cudaGaugeField *precise = nullptr;
-
-  if (gaugeSmeared != nullptr) {
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Wuppertal smearing done with gaugeSmeared\n");
-    GaugeFieldParam gParam(*gaugeWorking);
-    gParam.create = QUDA_NULL_FIELD_CREATE;
-    precise = new cudaGaugeField(gParam);
-    copyExtendedGauge(*precise, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-    precise->exchangeGhost();
-  } else {
-    if (getVerbosity() >= QUDA_VERBOSE)
-      printfQuda("Wuppertal smearing done with gaugeWorking\n");
-    precise = gaugeWorking;
-  }
-
-  ColorSpinorParam cpuParam(h_in, *inv_param, precise->X(), false, inv_param->input_location);
-  ColorSpinorField in_h(cpuParam);
-
-  ColorSpinorParam cudaParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
-  ColorSpinorField in(cudaParam);
-  in = in_h;
-
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(in_h);
-    double gpu = blas::norm2(in);
-    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
-  }
-
-  cudaParam.create = QUDA_NULL_FIELD_CREATE;
-  ColorSpinorField out(cudaParam);
-  int parity = 0;
-
-  // Computes out(x) = 1/(1+6*alpha)*(in(x) + alpha*\sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)))
-  double a = alpha / (1. + 6. * alpha);
-  double b = 1. / (1. + 6. * alpha);
-
-  for (unsigned int i = 0; i < n_steps; i++) {
-    if (i) in = out;
-    ApplyLaplace(out, in, *precise, 3, a, b, in, parity, false, nullptr, profileWuppertal);
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      double norm = blas::norm2(out);
-      printfQuda("Step %d, vector norm %e\n", i, norm);
-    }
-  }
-
-  cpuParam.v = h_out;
-  cpuParam.location = inv_param->output_location;
-  ColorSpinorField out_h(cpuParam);
-  out_h = out;
-
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(out_h);
-    double gpu = blas::norm2(out);
-    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
-  }
-
-  if (gaugeSmeared != nullptr)
-    delete precise;
-
-  popVerbosity();
-
-  profileWuppertal.TPSTOP(QUDA_PROFILE_TOTAL);
+void performGaussianSmearNStep(void *h_out, void *h_in, QudaInvertParam *param, const int n_steps, const double omega){
+  performFermionSmearQuda(h_out, h_in, param, n_steps, omega, QUDA_FERMION_SMEAR_TYPE_GAUSSIAN);
 }
 
-void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double omega)
+void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int n_steps, double alpha) {
+  performFermionSmearQuda(h_out, h_in, param, n_steps, alpha, QUDA_FERMION_SMEAR_TYPE_WUPPERTAL);
+}
+
+void performFermionSmearQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, const int n_steps, const double coeff, const QudaFermionSmearType smear_type)
 {
   if(n_steps == 0) return;
   if (!initialized) errorQuda("QUDA not initialized");
   
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
+  profileFermionSmear.TPSTART(QUDA_PROFILE_TOTAL);
+  profileFermionSmear.TPSTART(QUDA_PROFILE_INIT);
 
   if (gaugeWorking == nullptr) errorQuda("Gauge field must be loaded");
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printQudaInvertParam(inv_param); }
-
-  //cudaGaugeField *gauge_ptr = nullptr;
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     printfQuda("Gaussian smearing done with %s\n", gaugeSmeared == nullptr ? "gaugePrecise" : "gaugeSmeared");
@@ -5956,13 +5885,16 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int
 
   // Create device side ColorSpinorField vectors and to pass to the
   // compute function.
-  ColorSpinorParam cpuParam(h_in, *inv_param, gaugeWorking->X(), QUDA_MAT_SOLUTION, inv_param->input_location);
-  cpuParam.nSpin = 4;
-  // QUDA style pointer for host data.
-  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+  ColorSpinorParam cpuInParam(h_in, *inv_param, gaugeWorking->X(), QUDA_MAT_SOLUTION, inv_param->input_location);
+  cpuInParam.nSpin = 4;
+  ColorSpinorParam cpuOutParam(h_out, *inv_param, gaugeWorking->X(), QUDA_MAT_SOLUTION, inv_param->input_location);
+  cpuOutParam.nSpin = 4;
+  // QUDA style pointers for host data.
+  ColorSpinorField *in_h = ColorSpinorField::Create(cpuInParam);
+  ColorSpinorField *out_h = ColorSpinorField::Create(cpuOutParam);
 
   // Device side data.
-  ColorSpinorParam cudaParam(cpuParam);
+  ColorSpinorParam cudaParam(cpuInParam);
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaParam.setPrecision(inv_param->cuda_prec, inv_param->cuda_prec, true);
@@ -5980,45 +5912,57 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int
   createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
   Dirac &dirac = *d;
   DiracM laplace_op(dirac);
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
+  profileFermionSmear.TPSTOP(QUDA_PROFILE_INIT);
 
   // Copy host data to device
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_H2D);
+  profileFermionSmear.TPSTART(QUDA_PROFILE_H2D);
   *in = *in_h;
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_H2D);
+  profileFermionSmear.TPSTOP(QUDA_PROFILE_H2D);
 
   // Scale up the source to prevent underflow
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
+  profileFermionSmear.TPSTART(QUDA_PROFILE_COMPUTE);
   blas::ax(1e6, *in);
 
-  double alpha = - (omega * omega) / (4 * n_steps);  
-  double a = -alpha;
-  double b = (6.0*alpha + 1.0);  
-
+  double alpha=0, a=0, b=0;
+  switch (smear_type) { 
+  case QUDA_FERMION_SMEAR_TYPE_GAUSSIAN:
+    alpha = - (coeff * coeff) / (4 * n_steps);  
+    a = -alpha;
+    b = (6.0*alpha + 1.0);  
+    break;
+  case QUDA_FERMION_SMEAR_TYPE_WUPPERTAL:
+    a = coeff / (1.0 + 6.0 * coeff);
+    b = 1.0 / (1.0 + 6.0 * coeff);
+    break;
+  default: errorQuda("Unknown fermion smeearing type %d", smear_type);
+  }
+  
   for (int i = 0; i < n_steps; i++) {
     if (i > 0) std::swap(in, out);
-    // The SmearOp computes:
+    // The Gaussian SmearOp computes:
     // out(x) = b * in(x) - a * \sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
     // Which gives the use finer control over the operation than DslashXpay and
     // allows us to omit a vector rescaling.
+    // The Wuppertal SmearOp computes:
+    // out(x) = 1/(1+6*alpha)*(in(x) + alpha*\sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)))
     laplace_op.Expose()->SmearOp(*out, *in, a, b);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       double norm = blas::norm2(*out);
       printfQuda("Step %d, vector norm %e\n", i, norm);
     }
   }
-
+  
   // Normalise the source
   double nout = blas::norm2(*out);
   blas::ax(1.0 / sqrt(nout), *out);
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileFermionSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // Copy device data to host.
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_D2H);
-  *in_h = *out;
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_D2H);  
+  profileFermionSmear.TPSTART(QUDA_PROFILE_D2H);
+  *out_h = *out;
+  profileFermionSmear.TPSTOP(QUDA_PROFILE_D2H);  
 
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
+  profileFermionSmear.TPSTART(QUDA_PROFILE_FREE);
   delete temp1;
   delete temp2;
   delete out;
@@ -6027,20 +5971,21 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int
   delete d;
   delete dSloppy;
   delete dPre;
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
+  profileFermionSmear.TPSTOP(QUDA_PROFILE_FREE);
   
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_TOTAL);
+  profileFermionSmear.TPSTOP(QUDA_PROFILE_TOTAL);
   saveTuneCache();
 }
 
-void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_param)
+
+void performTwoLinkFermionSmearNStep(void *h_in, QudaQuarkSmearParam *smear_param)
 {
   if(smear_param->n_steps == 0) return;
   
   QudaInvertParam *inv_param = smear_param->inv_param;
   
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
+  profileFermionSmear.TPSTART(QUDA_PROFILE_TOTAL);
+  profileFermionSmear.TPSTART(QUDA_PROFILE_INIT);
 
   if (gaugeWorking == nullptr) errorQuda("Gauge field must be loaded");
     
@@ -6126,16 +6071,16 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
   
   Dirac &dirac = *d;
   DiracM qsmear_op(dirac);
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
+  profileFermionSmear.TPSTOP(QUDA_PROFILE_INIT);
 
   // Copy host data to device
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_H2D);
+  profileFermionSmear.TPSTART(QUDA_PROFILE_H2D);
   in = in_h;
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_H2D);
+  profileFermionSmear.TPSTOP(QUDA_PROFILE_H2D);
 
   const double ftmp    = -(smear_param->width*smear_param->width)/(4.0*smear_param->n_steps*4.0);  /* Extra 4 to compensate for stride 2 */
   // Scale up the source to prevent underflow
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
+  profileFermionSmear.TPSTART(QUDA_PROFILE_COMPUTE);
   
   const double msq     = 1. / ftmp;  
   const double a       = inv_param->laplace3D * 2.0 + msq;
@@ -6154,14 +6099,14 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
     blas::zero(temp1);
   }
 
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileFermionSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // Copy device data to host.
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_D2H);
+  profileFermionSmear.TPSTART(QUDA_PROFILE_D2H);
   in_h = out;
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_D2H);
+  profileFermionSmear.TPSTOP(QUDA_PROFILE_D2H);
 
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
+  profileFermionSmear.TPSTART(QUDA_PROFILE_FREE);
 
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished 2link Gaussian smearing.\n");
 
@@ -6175,8 +6120,8 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
     gaugeSmeared = nullptr;
   }
 
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_TOTAL);
+  profileFermionSmear.TPSTOP(QUDA_PROFILE_FREE);
+  profileFermionSmear.TPSTOP(QUDA_PROFILE_TOTAL);
   saveTuneCache();
 }
 
