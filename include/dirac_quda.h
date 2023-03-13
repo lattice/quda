@@ -250,14 +250,25 @@ namespace quda {
     }
 
     /**
+       @brief Similar to the Xpay version of Dslash, but used only by the staggered op for 
+       smearing.
+    */    
+    virtual void SmearStaggeredOp(ColorSpinorField &, const ColorSpinorField &, 
+				  const int, const QudaParity) const
+    {
+      errorQuda("Not implemented.");
+    }
+
+    /**
        @brief Similar to the Xpay version of Dslash, but used only by the Laplace op for 
        smearing.
     */    
     virtual void SmearOp(ColorSpinorField &, const ColorSpinorField &, 
-                         const double, const double, const int, const QudaParity) const
+			 const double, const double) const
     {
       errorQuda("Not implemented.");
     }
+
     
     /**
        @brief Apply M for the dirac op. E.g. the Schur Complement operator
@@ -1392,12 +1403,10 @@ public:
      *
      * @param[out] out output smeared field
      * @param[in] in input field 
-     * @param     a (ignored)
-     * @param     b (ignored)
      * @param[in] t0 time-slice index
      * @param[in] parity Parity flag
      */
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double a, const double b, const int t0, const QudaParity parity) const;
+    void SmearStaggeredOp(ColorSpinorField &out, const ColorSpinorField &in, const int t0, const QudaParity parity) const;
   };
 
   // Even-odd preconditioned staggered
@@ -1629,12 +1638,10 @@ public:
      *
      * @param[out] out output smeared field
      * @param[in]  in input field
-     * @param     a (ignored)
-     * @param     b (ignored)
      * @param[in] t0 time-slice index
      * @param[in] parity Parity flag
      */   
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double a, const double b, const int t0, const QudaParity parity) const;
+    void SmearStaggeredOp(ColorSpinorField &out, const ColorSpinorField &in, const int t0, const QudaParity parity) const;
   };
 
   // Even-odd preconditioned staggered
@@ -2137,6 +2144,8 @@ public:
 			     const QudaSolutionType) const;
     virtual bool hermitian() const { return true; }
 
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double a, const double b) const;
+    
     virtual QudaDiracType getDiracType() const { return QUDA_GAUGE_LAPLACE_DIRAC; }
   };
 

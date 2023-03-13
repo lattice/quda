@@ -299,6 +299,3 @@ std::string getContractName(testing::TestParamInfo<::testing::tuple<int, int>> p
 
 // Instantiate all test cases: prec 3==double, 2==float; contractType 2==staggered_FT
 INSTANTIATE_TEST_SUITE_P(QUDA, ContractionTest, Combine(Range(2, 3), Range(2, NcontractType)), getContractName);
-
-
-

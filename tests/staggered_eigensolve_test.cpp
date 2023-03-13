@@ -65,6 +65,7 @@ int main(int argc, char **argv)
 
   auto app = make_app();
   add_eigen_option_group(app);
+  add_su3_option_group(app);
   CLI::TransformPairs<int> test_type_map {{"full", 0}, {"even", 3}, {"odd", 4}};
   app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
 
@@ -95,6 +96,13 @@ int main(int argc, char **argv)
   // Set QUDA internal parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setStaggeredGaugeParam(gauge_param);
+  QudaGaugeSmearParam smear_param;
+  if (gauge_smear) {
+    smear_param = newQudaGaugeSmearParam();
+    setGaugeSmearParam(smear_param);
+    gauge_param.smear_param = &smear_param;
+  }
+  
   // Though no inversions are performed, the inv_param
   // structure contains all the information we need to
   // construct the dirac operator. We encapsualte the

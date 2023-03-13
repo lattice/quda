@@ -107,6 +107,7 @@ int main(int argc, char **argv)
   setQudaDefaultMgTestParams();
   // Parse command line options
   auto app = make_app();
+  add_su3_option_group(app);
   add_eigen_option_group(app);
   add_deflation_option_group(app);
   add_multigrid_option_group(app);
@@ -160,6 +161,13 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
   setStaggeredGaugeParam(gauge_param);
+  QudaGaugeSmearParam smear_param;
+  if (gauge_smear) {
+    smear_param = newQudaGaugeSmearParam();
+    setGaugeSmearParam(smear_param);
+    gauge_param.smear_param = &smear_param;
+  }
+
   if (!inv_multigrid) setStaggeredInvertParam(inv_param);
 
   QudaInvertParam mg_inv_param = newQudaInvertParam();

@@ -662,18 +662,15 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     profileGauge.TPSTOP(QUDA_PROFILE_H2D);
   }
   // The gauge field is now held in `precise` on the device
+
+  // Create a working gauge field.
   // Use this field (after any gauge adjustments) to create
   // low prec aliases and operators.
   cudaGaugeField *working = new cudaGaugeField(gauge_param);;
+  working = createExtendedGauge(*precise, R, profileGaugeSmear);
   
-  if (param->smear_gauge) {
+  if (param->smear_gauge == QUDA_BOOLEAN_TRUE) {
     if(gaugeSmeared) delete gaugeSmeared;
-    
-    // Create a copy of the precise field
-    GaugeFieldParam gauge_param(*precise);
-    profileGaugeSmear.TPSTART(QUDA_PROFILE_TOTAL);
-    working = createExtendedGauge(*precise, R, profileGaugeSmear);
-    profileGaugeSmear.TPSTOP(QUDA_PROFILE_TOTAL);
     
     int n_obs = param->smear_param->n_steps / param->smear_param->meas_interval + 1;
     QudaGaugeObservableParam *obs_param = new QudaGaugeObservableParam[n_obs];
@@ -690,7 +687,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     gaugePrecise = nullptr;
     working->copy(*gaugeSmeared);
   } else {
-    working->copy(*precise);
+    //working->copy(*precise);
   }
     
   // creating sloppy fields isn't really compute, but it is work done on the gpu
@@ -1156,6 +1153,7 @@ void freeGaugeQuda(void)
   gaugeLongExtended = nullptr;
 
   if (gaugeFatPrecise) delete gaugeFatPrecise;
+  if (gaugeFatExtended) delete gaugeFatExtended;
 
   gaugeFatPrecise = nullptr;
   gaugeFatExtended = nullptr;
@@ -5935,18 +5933,30 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
   profileWuppertal.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-#if 0
 void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double omega)
 {
+  if(n_steps == 0) return;
   if (!initialized) errorQuda("QUDA not initialized");
+  
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
+
+  if (gaugeWorking == nullptr) errorQuda("Gauge field must be loaded");
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printQudaInvertParam(inv_param); }
 
+  //cudaGaugeField *gauge_ptr = nullptr;
+
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    printfQuda("Gaussian smearing done with %s\n", gaugeSmeared == nullptr ? "gaugePrecise" : "gaugeSmeared");
+  }
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printQudaInvertParam(inv_param); }
+  
   checkInvertParam(inv_param);
 
   // Create device side ColorSpinorField vectors and to pass to the
   // compute function.
-  ColorSpinorParam cpuParam(h_in, *inv_param, gauge_ptr->X(), QUDA_MAT_SOLUTION, inv_param->input_location);
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugeWorking->X(), QUDA_MAT_SOLUTION, inv_param->input_location);
   cpuParam.nSpin = 4;
   // QUDA style pointer for host data.
   ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
@@ -5977,30 +5987,38 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int
   *in = *in_h;
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_H2D);
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, precise->X(), false, inv_param->input_location);
-  ColorSpinorField in_h(cpuParam);
+  // Scale up the source to prevent underflow
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
+  blas::ax(1e6, *in);
 
-  ColorSpinorParam cudaParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
-  ColorSpinorField in(cudaParam);
-  in = in_h;
+  double alpha = - (omega * omega) / (4 * n_steps);  
+  double a = -alpha;
+  double b = (6.0*alpha + 1.0);  
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(in_h);
-    double gpu = blas::norm2(in);
-    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
+  for (int i = 0; i < n_steps; i++) {
+    if (i > 0) std::swap(in, out);
+    // The SmearOp computes:
+    // out(x) = b * in(x) - a * \sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
+    // Which gives the use finer control over the operation than DslashXpay and
+    // allows us to omit a vector rescaling.
+    laplace_op.Expose()->SmearOp(*out, *in, a, b);
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      double norm = blas::norm2(*out);
+      printfQuda("Step %d, vector norm %e\n", i, norm);
+    }
   }
 
-  cudaParam.create = QUDA_NULL_FIELD_CREATE;
-  ColorSpinorField out(cudaParam);
-  int parity = 0;
-                                
+  // Normalise the source
+  double nout = blas::norm2(*out);
+  blas::ax(1.0 / sqrt(nout), *out);
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
+
   // Copy device data to host.
   profileGaussianSmear.TPSTART(QUDA_PROFILE_D2H);
   *in_h = *out;
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_D2H);
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_D2H);  
 
   profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
-  if (gaugeSmeared != nullptr) delete gauge_ptr;
   delete temp1;
   delete temp2;
   delete out;
@@ -6009,12 +6027,11 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int
   delete d;
   delete dSloppy;
   delete dPre;
-
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
+  
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_TOTAL);
   saveTuneCache();
 }
-#endif 
 
 void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_param)
 {
@@ -6128,7 +6145,7 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
     blas::ax(ftmp, in);
     blas::axpy(a, in, temp1);
     
-    qsmear_op.Expose()->SmearOp(out, in, a, 0.0, smear_param->t0, parity);
+    qsmear_op.Expose()->SmearStaggeredOp(out, in, smear_param->t0, parity);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       double norm = blas::norm2(out);
       printfQuda("Step %d, vector norm %e\n", i, norm);

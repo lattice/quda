@@ -91,6 +91,8 @@ bool low_mode_check = false;
 bool oblique_proj_check = false;
 double mass = 0.1;
 double kappa = -1.0;
+quda::mass_array<double> kappa_array = {};
+quda::mass_array<double> mass_array = {};
 double mu = 0.1;
 double epsilon = 0.01;
 double m5 = -1.5;
@@ -275,16 +277,6 @@ double eofa_mq1 = 1.0;
 double eofa_mq2 = 0.085;
 double eofa_mq3 = 1.0;
 
-//QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
-
-int prop_source_smear_steps = 0;
-int prop_sink_smear_steps = 0;
-double prop_source_smear_coeff = 2.0;
-double prop_sink_smear_coeff = 2.0;
-bool prop_read_sources = false;
-int prop_n_sources = 1;
-QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
-
 // SU(3) smearing options
 double gauge_smear_rho = 0.1;
 double gauge_smear_epsilon = 1.0;
@@ -293,7 +285,6 @@ int gauge_smear_steps = 5;
 QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
 int measurement_interval = 5;
 QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_STOUT;
-QudaFermionSmearType fermion_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
 
 // contract options
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_DR_FT_T;
@@ -301,6 +292,22 @@ std::array<int,4> momentum = {0, 0, 0, 0};
 char correlator_file_affix[256] = "";
 char correlator_save_dir[256] = ".";
 bool open_flavor = false;
+
+// Propagator options
+quda::file_array<char[256]> prop_source_infile;
+quda::file_array<char[256]> prop_source_outfile;
+quda::file_array<char[256]> prop_sink_infile;
+quda::file_array<char[256]> prop_sink_outfile;
+quda::source_array<std::array<int, 4>> prop_source_position = {0, 0, 0, 0};
+
+int prop_source_smear_steps = 0;
+int prop_sink_smear_steps = 0;
+double prop_source_smear_coeff = 2.0;
+double prop_sink_smear_coeff = 2.0;
+bool prop_read_sources = false;
+int prop_n_sources = 1;
+QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
+QudaFermionSmearType prop_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
 
 // GF Options
 int gf_gauge_dir = 4;
@@ -1097,7 +1104,7 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
   //"Number of measurement steps in heatbath before checkpointing (default 5)");
 }
 
-/*
+
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
 
@@ -1149,7 +1156,7 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--prop-save-prec", prop_save_prec, "Precision with which to save propagators (default single)")
     ->transform(prec_transform);
 }
-*/
+
 
 void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
@@ -1167,13 +1174,11 @@ void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "Compute the open flavor correlators (default false)");
     opgroup->add_option("--correlator-file-affix", correlator_file_affix, "Additional string to put into the correlator file name");
 
-    /*
     quda_app->add_massoption(opgroup, "--kappa-array", kappa_array, CLI::Validator(),
 			     "set the Nth<INT> kappa value<FLOAT> of the Dirac operator)");
     
     quda_app->add_massoption(opgroup, "--mass-array", kappa_array, CLI::Validator(),
 			     "set the Nth<INT> mass value<FLOAT> of the Dirac operator)");
-    */
 }
 
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)

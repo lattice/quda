@@ -250,8 +250,8 @@ void invert_and_contract(void **prop_array_ptr_1, void **prop_array_ptr_2,
     }
     
     memset(correlation_function_sum, 0, corr_param.corr_size_in_bytes); // zero out the result array
-    //contractFTQuda(prop_array_ptr_1, prop_array_ptr_2, &correlation_function_sum, contract_type,
-    //               (void *)&cs_param, gauge_param.X, source_pos, momentum.begin());
+    contractFTQuda(prop_array_ptr_1, prop_array_ptr_2, &correlation_function_sum, contract_type,
+                   (void *)&cs_param, gauge_param.X, source_pos, momentum.begin());
 
     //! Print and save correlators for this source
     if (comm_rank() == 0) print_correlators(correlation_function_sum, corr_param, n);
@@ -302,14 +302,15 @@ int main(int argc, char **argv)
 
   initQuda(device_ordinal);
 
-  //! Wrap global parameters in C structs. First some default parameters are set using new*Param(), then set*Param(&myparam)
-  //! is used to set the values inside of the struct to the globally set parameters which came from the cmd line.
-  //! Invert parameters
+  // Wrap global parameters in C structs. First some default parameters are set using new*Param(), then
+  // set*Param(&myparam) is used to set the values inside of the struct to the globally set parameters which came
+  // from the cmd line.
+  // Invert parameters
   QudaInvertParam inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaEigParam mg_eig_param[mg_levels];
-  //QudaEigParam eig_param = newQudaEigParam();
+  QudaGaugeSmearParam smear_param;
   if (inv_multigrid) {
     setQudaMgSolveTypes();
     setMultigridInvertParam(inv_param);
@@ -356,6 +357,11 @@ int main(int argc, char **argv)
   //! Gauge parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
+  if (gauge_smear) {
+    smear_param = newQudaGaugeSmearParam();
+    setGaugeSmearParam(smear_param);
+    gauge_param.smear_param = &smear_param;
+  }
 
   //! Set lattice dimensions
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
