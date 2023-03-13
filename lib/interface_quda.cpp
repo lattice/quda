@@ -100,6 +100,9 @@ cudaGaugeField *gaugeLongExtended = nullptr;
 // Holds the smeared gauge
 cudaGaugeField *gaugeSmeared = nullptr;
 
+// Holds the Two Link gauge
+cudaGaugeField *gaugeTwoLink = nullptr;
+
 CloverField *cloverWorking = nullptr;
 CloverField *cloverPrecise = nullptr;
 CloverField *cloverSloppy = nullptr;
@@ -664,7 +667,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   // Use this field (after any gauge adjustments) to create
   // low prec aliases and operators.
   cudaGaugeField *working = new cudaGaugeField(gauge_param);;
-  working = createExtendedGauge(*precise, R, profileGaugeSmear);
+  //working = createExtendedGauge(*precise, R, profileGaugeSmear);
   
   if (param->smear_gauge == QUDA_BOOLEAN_TRUE) {
     if(gaugeSmeared) delete gaugeSmeared;
@@ -684,7 +687,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     gaugePrecise = nullptr;
     working->copy(*gaugeSmeared);
   } else {
-    //working->copy(*precise);
+    working->copy(*precise);
   }
     
   // creating sloppy fields isn't really compute, but it is work done on the gpu
@@ -4440,10 +4443,9 @@ void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
   GaugeFieldParam gParam(*param, inlink, QUDA_GENERAL_LINKS);
   gParam.gauge     = twolink;
   cpuGaugeField cpuTwoLink(gParam);  // create the host twolink
-  profileFermionSmear.TPSTOP(QUDA_PROFILE_INIT);
-
   cudaGaugeField *cudaInLinkEx = nullptr;
-
+  profileFermionSmear.TPSTOP(QUDA_PROFILE_INIT);
+  
   if(inlink) {
     gParam.link_type = param->type;
     gParam.gauge     = inlink;
@@ -4455,21 +4457,18 @@ void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
     gParam.create = QUDA_NULL_FIELD_CREATE;
     cudaGaugeField *cudaInLink = new cudaGaugeField(gParam);
     profileFermionSmear.TPSTOP(QUDA_PROFILE_INIT);
-
+    
     cudaInLink->loadCPUField(cpuInLink, profileFermionSmear);
-    //
     cudaInLinkEx = createExtendedGauge(*cudaInLink, R, profileFermionSmear);
-    //
+
     profileFermionSmear.TPSTART(QUDA_PROFILE_FREE);
     delete cudaInLink;
     profileFermionSmear.TPSTOP(QUDA_PROFILE_FREE);
-
   } else {
     cudaInLinkEx = createExtendedGauge(*gaugeWorking, R, profileFermionSmear);
   }
-
+  
   GaugeFieldParam gsParam(*gaugeWorking);
-
   gsParam.create        = QUDA_NULL_FIELD_CREATE;
   gsParam.link_type     = QUDA_ASQTAD_LONG_LINKS;
   gsParam.reconstruct   = QUDA_RECONSTRUCT_NO;
@@ -4477,34 +4476,28 @@ void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
   gsParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   gsParam.nFace         = 3;
   gsParam.pad           = gsParam.pad*gsParam.nFace;
-
-  profileFermionSmear.TPSTART(QUDA_PROFILE_INIT);
-
-  if(gaugeSmeared != nullptr) delete gaugeSmeared;
-  gaugeSmeared = new cudaGaugeField(gsParam);
-
   
+  profileFermionSmear.TPSTART(QUDA_PROFILE_INIT);
+  if(gaugeTwoLink != nullptr) delete gaugeTwoLink;
+  gaugeTwoLink = new cudaGaugeField(gsParam);
   profileFermionSmear.TPSTOP(QUDA_PROFILE_INIT);
 
   profileFermionSmear.TPSTART(QUDA_PROFILE_COMPUTE);
-
-  computeTwoLink(*gaugeSmeared, *cudaInLinkEx);
-  gaugeSmeared->exchangeGhost();
-
+  computeTwoLink(*gaugeTwoLink, *cudaInLinkEx);
+  gaugeTwoLink->exchangeGhost();
   profileFermionSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
-  //
-  gaugeSmeared->saveCPUField(cpuTwoLink, profileFermionSmear);
-
-  profileFermionSmear.TPSTART(QUDA_PROFILE_FREE);
   
-  delete gaugeSmeared;
-  gaugeSmeared = nullptr;
-  delete cudaInLinkEx;
+  gaugeTwoLink->saveCPUField(cpuTwoLink, profileFermionSmear);
 
+  profileFermionSmear.TPSTART(QUDA_PROFILE_FREE);  
+  delete gaugeTwoLink;
+  gaugeTwoLink = nullptr;
+  delete cudaInLinkEx;
   profileFermionSmear.TPSTOP(QUDA_PROFILE_FREE);
+  
   profileFermionSmear.TPSTOP(QUDA_PROFILE_TOTAL);
 }
-
+ 
 int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* path_length,
 			  double* loop_coeff, int num_paths, int max_length, double eb3, QudaGaugeParam* qudaGaugeParam)
 {
@@ -5978,7 +5971,7 @@ void performFermionSmearQuda(void *h_out, void *h_in, QudaInvertParam *inv_param
 }
 
 
-void performTwoLinkFermionSmearNStep(void *h_in, QudaQuarkSmearParam *smear_param)
+void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_param)
 {
   if(smear_param->n_steps == 0) return;
   
@@ -6010,9 +6003,9 @@ void performTwoLinkFermionSmearNStep(void *h_in, QudaQuarkSmearParam *smear_para
     
     cudaGaugeField *two_link_ext = createExtendedGauge(*gaugeWorking, R, profileGauge);//aux field
     
-    computeTwoLink(*gaugeSmeared, *two_link_ext);
+    computeTwoLink(*gaugeWorking, *two_link_ext);
     
-    gaugeSmeared->exchangeGhost();
+    gaugeWorking->exchangeGhost();
     
     delete two_link_ext;   
   }
@@ -6025,7 +6018,7 @@ void performTwoLinkFermionSmearNStep(void *h_in, QudaQuarkSmearParam *smear_para
   
   // Create device side ColorSpinorField vectors and to pass to the
   // compute function.
-  const lat_dim_t X = gaugeSmeared->X();
+  const lat_dim_t X = gaugeWorking->X();
   
   inv_param->dslash_type = QUDA_ASQTAD_DSLASH;
   
@@ -6052,7 +6045,7 @@ void performTwoLinkFermionSmearNStep(void *h_in, QudaQuarkSmearParam *smear_para
   diracParam.type      = QUDA_ASQTAD_DIRAC;
   diracParam.matpcType = inv_param->matpc_type;
   diracParam.dagger    = inv_param->dagger;
-  diracParam.gauge     = gaugeSmeared;
+  diracParam.gauge     = gaugeWorking;
   diracParam.fatGauge  = gaugeFatPrecise;
   diracParam.longGauge = gaugeLongPrecise;
   diracParam.clover = cloverPrecise;
@@ -6114,10 +6107,9 @@ void performTwoLinkFermionSmearNStep(void *h_in, QudaQuarkSmearParam *smear_para
 
   smear_param->gflops = dirac.Flops();
 
-  if( smear_param->delete_2link != 0 )
-  {
-    delete gaugeSmeared;
-    gaugeSmeared = nullptr;
+  if( smear_param->delete_2link != 0 ) {
+    //delete gaugeSmeared;
+    //gaugeSmeared = nullptr;
   }
 
   profileFermionSmear.TPSTOP(QUDA_PROFILE_FREE);

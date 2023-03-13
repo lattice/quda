@@ -100,6 +100,7 @@ struct StaggeredGSmearTestWrapper { //
   GaugeField *cpuTwoLink = nullptr;
 
   QudaGaugeParam gauge_param; //
+  QudaGaugeSmearParam smear_param; //
   QudaInvertParam inv_param;
   //
   ColorSpinorField spinor;
@@ -170,6 +171,12 @@ struct StaggeredGSmearTestWrapper { //
     inv_param = newQudaInvertParam();
 
     setStaggeredGaugeParam(gauge_param);
+    if (gauge_smear) {
+      smear_param = newQudaGaugeSmearParam();
+      setGaugeSmearParam(smear_param);
+      gauge_param.smear_param = &smear_param;
+    }
+
     setStaggeredInvertParam(inv_param);
 
     auto prec = getPrecision(precision);
@@ -193,6 +200,11 @@ struct StaggeredGSmearTestWrapper { //
     inv_param = newQudaInvertParam();
 
     setStaggeredGaugeParam(gauge_param);
+    if (gauge_smear) {
+      smear_param = newQudaGaugeSmearParam();
+      setGaugeSmearParam(smear_param);
+      gauge_param.smear_param = &smear_param;
+    }
     setStaggeredInvertParam(inv_param);
 
     init();
@@ -306,7 +318,7 @@ struct StaggeredGSmearTestWrapper { //
     comm_barrier();
     device_timer.start();
 
-    printfQuda("running test in %d iters.", niter);
+    printfQuda("running test in %d iters.\n", niter);
 
     // smearing parameters
     switch (gtest_type) {
