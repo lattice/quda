@@ -53,6 +53,6 @@ namespace quda
 
   } // namespace device
 
-#endif
-
 } // namespace quda
+
+#endif
