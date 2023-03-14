@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <quda_arch.h>
 
 // tuple containing parameters for Schwarz solver
 using schwarz_t = ::testing::tuple<QudaSchwarzType, QudaInverterType, QudaPrecision>;
