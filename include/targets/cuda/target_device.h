@@ -191,14 +191,20 @@ namespace quda
     constexpr size_t max_constant_size() { return 32764; }
 
     /**
+       @brief Helper function that returns the default max kernel arg
+       size when QUDA_LARGE_KERNEL_ARG is not enabled.
+     */
+    constexpr size_t max_kernel_arg_legacy_size() { return 4096; }
+
+    /**
        @brief Helper function that returns the maximum static size of
        the kernel arguments passed to a kernel on the target
        architecture.
     */
 #ifdef QUDA_LARGE_KERNEL_ARG
-    constexpr size_t max_kernel_arg_size() { return 32764; }
+    constexpr size_t max_kernel_arg_size() { return max_constant_size(); }
 #else
-    constexpr size_t max_kernel_arg_size() { return 4096; }
+    constexpr size_t max_kernel_arg_size() { return max_kernel_arg_legacy_size(); }
 #endif
 
     /**
