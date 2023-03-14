@@ -1140,11 +1140,13 @@ void freeGaugeQuda(void)
   if (gaugeExtended) delete gaugeExtended;
   if (gaugeSmeared) delete gaugeSmeared;
   if (gaugeWorking) delete gaugeWorking;
+  if (gaugeTwoLink) delete gaugeTwoLink;
   
   gaugePrecise = nullptr;
   gaugeExtended = nullptr;
   gaugeSmeared = nullptr;
   gaugeWorking = nullptr;
+  gaugeTwoLink = nullptr;
   
   if (gaugeLongPrecise) delete gaugeLongPrecise;
   if (gaugeLongExtended) delete gaugeLongExtended;
@@ -5984,13 +5986,12 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
     
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
-  if ( gaugeSmeared == nullptr || smear_param->compute_2link != 0 ) {
+  if (gaugeTwoLink == nullptr || smear_param->compute_2link != 0) {
   
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gaussian smearing done with gaugeSmeared\n");
-    if ( gaugeSmeared != nullptr) delete gaugeSmeared;
+    if (gaugeTwoLink != nullptr) delete gaugeTwoLink;
     
     GaugeFieldParam gParam(*gaugeWorking);
-    //
     gParam.create        = QUDA_NULL_FIELD_CREATE;
     gParam.reconstruct   = QUDA_RECONSTRUCT_NO;
     gParam.setPrecision(inv_param->cuda_prec, true);
@@ -5998,14 +5999,13 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
     gParam.nFace = 3; // FIXME: need a QudaLinkType with nFace=2.
     gParam.pad = gParam.pad*gParam.nFace;
-    //
-    gaugeSmeared = new cudaGaugeField(gParam);
+    gaugeTwoLink = new cudaGaugeField(gParam);
     
     cudaGaugeField *two_link_ext = createExtendedGauge(*gaugeWorking, R, profileGauge);//aux field
     
-    computeTwoLink(*gaugeWorking, *two_link_ext);
+    computeTwoLink(*gaugeTwoLink, *two_link_ext);
     
-    gaugeWorking->exchangeGhost();
+    gaugeTwoLink->exchangeGhost();
     
     delete two_link_ext;   
   }
@@ -6018,7 +6018,7 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
   
   // Create device side ColorSpinorField vectors and to pass to the
   // compute function.
-  const lat_dim_t X = gaugeWorking->X();
+  const lat_dim_t X = gaugeTwoLink->X();
   
   inv_param->dslash_type = QUDA_ASQTAD_DSLASH;
   
@@ -6035,17 +6035,15 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
   ColorSpinorField in(cudaParam);
   ColorSpinorField out(cudaParam);
   ColorSpinorField temp1(cudaParam);
- 
-
+  
   // Create the smearing operator
   //------------------------------------------------------
-  Dirac *d       = nullptr;
+  Dirac *d = nullptr;
   DiracParam diracParam;
-  //
   diracParam.type      = QUDA_ASQTAD_DIRAC;
   diracParam.matpcType = inv_param->matpc_type;
   diracParam.dagger    = inv_param->dagger;
-  diracParam.gauge     = gaugeWorking;
+  diracParam.gauge     = gaugeTwoLink;
   diracParam.fatGauge  = gaugeFatPrecise;
   diracParam.longGauge = gaugeLongPrecise;
   diracParam.clover = cloverPrecise;
@@ -6054,12 +6052,10 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
   diracParam.m5     = inv_param->m5;
   diracParam.mu     = inv_param->mu;
   diracParam.laplace3D = inv_param->laplace3D;
-
   for (int i=0; i<4; i++) diracParam.commDim[i] = 1;   // comms are always on
 
   if (diracParam.gauge->Precision() != inv_param->cuda_prec)
     errorQuda("Gauge precision %d does not match requested precision %d\n", diracParam.gauge->Precision(), inv_param->cuda_prec);
-  //
   d = Dirac::create(diracParam); // create the Dirac operator
   
   Dirac &dirac = *d;
@@ -6091,28 +6087,24 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
     blas::xpay(temp1, -1.0, out);
     blas::zero(temp1);
   }
-
   profileFermionSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
-
+  
   // Copy device data to host.
   profileFermionSmear.TPSTART(QUDA_PROFILE_D2H);
   in_h = out;
   profileFermionSmear.TPSTOP(QUDA_PROFILE_D2H);
 
-  profileFermionSmear.TPSTART(QUDA_PROFILE_FREE);
-
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished 2link Gaussian smearing.\n");
-
-  delete d;
-
+  
+  profileFermionSmear.TPSTART(QUDA_PROFILE_FREE);
   smear_param->gflops = dirac.Flops();
-
+  delete d;  
   if( smear_param->delete_2link != 0 ) {
-    //delete gaugeSmeared;
-    //gaugeSmeared = nullptr;
+    delete gaugeTwoLink;
+    gaugeTwoLink = nullptr;
   }
-
   profileFermionSmear.TPSTOP(QUDA_PROFILE_FREE);
+  
   profileFermionSmear.TPSTOP(QUDA_PROFILE_TOTAL);
   saveTuneCache();
 }
