@@ -489,6 +489,7 @@ void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_Quda
   qudamilc_called<false>(__func__, verbosity);
 } // qudaDslash
 #endif
+
 // void* openQCD_qudaCreateGaugeField(void *gauge, int geometry, int precision)
 // {
 //   qudamilc_called<true>(__func__);

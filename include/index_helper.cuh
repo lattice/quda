@@ -2,6 +2,10 @@
 
 #include <enum_quda.h>
 
+// TODO: The ipt functions can be incorporated here (so no reordering needed in OpenQXD side)
+// OpenQxD helpers:
+// #include "../../openQxD-devel/include/lattice.h"
+
 namespace quda {
   /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] + dx[]
@@ -1058,3 +1062,24 @@ namespace quda {
   }
 
 } // namespace quda
+
+// namespace OpenQxD_Helpers {
+//     /**
+//      Compute the 4-d spatial index from the checkerboarded 1-d index
+//      at parity parity.  Wrapper around getCoordsCB.
+
+//      @param[out] x Computed spatial index
+//      @param[in] cb_index 1-d checkerboarded index
+//      @param[in] X Full lattice dimensions
+//      @param[in] X0h Half of x-dim lattice dimension
+//      @param[in] parity Site parity
+//      @return Full linear lattice index
+//    */
+//   template <typename Coord, typename I> __device__ __host__ inline int getCoords(Coord &x, int cb_index, const I &X, int parity)
+//   {
+//     return getCoordsCB(x, cb_index, X, X[0] >> 1, parity);
+//   }
+
+
+// }
+

@@ -356,6 +356,7 @@ typedef enum QudaFieldOrder_s {
   QUDA_QDPJIT_FIELD_ORDER,                  // QDP field ordering (complex-color-spin-spacetime)
   QUDA_QOP_DOMAIN_WALL_FIELD_ORDER,         // QOP domain-wall ordering
   QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER, // TIFR RHMC ordering
+  QUDA_OPENQCD_FIELD_ORDER,                 // OPENQCD geometry ordering (at the moment lexicographical w/ rotation zyxt = x3x2x1x0 |-> xyzt x0x1x2x3 ) 
   QUDA_INVALID_FIELD_ORDER = QUDA_INVALID_ENUM
 } QudaFieldOrder;
 
@@ -370,7 +371,7 @@ typedef enum QudaFieldCreate_s {
 typedef enum QudaGammaBasis_s {
   QUDA_DEGRAND_ROSSI_GAMMA_BASIS,
   QUDA_UKQCD_GAMMA_BASIS,
-  QUDA_CHIRAL_GAMMA_BASIS,
+  QUDA_CHIRAL_GAMMA_BASIS, // check ?  TODO: use this for quda ?
   QUDA_INVALID_GAMMA_BASIS = QUDA_INVALID_ENUM
 } QudaGammaBasis;
 

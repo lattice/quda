@@ -1493,7 +1493,7 @@ namespace quda
       size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
     };
 
-    template <typename Float, int Ns, int Nc> struct SpaceSpinorColorOrder {
+    template <typename Float, int Ns, int Nc> struct SpaceSpinorColorOrder { // TODO: check how to adapt this for openqxd
       using Accessor = SpaceSpinorColorOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
@@ -1679,6 +1679,55 @@ namespace quda
       int volumeCB;
       int nParity;
       QDPJITDiracOrder(const ColorSpinorField &a, int = 1, Float *field_ = 0, float * = 0) :
+        field(field_ ? field_ : (Float *)a.V()), volumeCB(a.VolumeCB()), nParity(a.SiteSubset())
+      {
+      }
+
+      __device__ __host__ inline void load(complex v[Ns * Nc], int x, int parity = 0) const
+      {
+        for (int s = 0; s < Ns; s++) {
+          for (int c = 0; c < Nc; c++) {
+            v[s * Nc + c] = complex(field[(((0 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x],
+                                    field[(((1 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x]);
+          }
+        }
+      }
+
+      __device__ __host__ inline void save(const complex v[Ns * Nc], int x, int parity = 0) const
+      {
+        for (int s = 0; s < Ns; s++) {
+          for (int c = 0; c < Nc; c++) {
+            field[(((0 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x] = v[s * Nc + c].real();
+            field[(((1 * Nc + c) * Ns + s) * 2 + (1 - parity)) * volumeCB + x] = v[s * Nc + c].imag();
+          }
+        }
+      }
+
+      /**
+         @brief This accessor routine returns a colorspinor_wrapper to this object,
+         allowing us to overload various operators for manipulating at
+         the site level interms of matrix operations.
+         @param[in] x_cb Checkerboarded space-time index we are requesting
+         @param[in] parity Parity we are requesting
+         @return Instance of a colorspinor_wrapper that curries in access to
+         this field at the above coordinates.
+      */
+      __device__ __host__ inline auto operator()(int x_cb, int parity) const
+      {
+        return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
+      }
+
+      size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
+    };
+
+    template <typename Float, int Ns, int Nc> struct OpenQCDDiracOrder { // TODO: implement this accessor corrrectly
+      using Accessor = OpenQCDDiracOrder<Float, Ns, Nc>;
+      using real = typename mapper<Float>::type;
+      using complex = complex<real>;
+      Float *field;
+      int volumeCB;
+      int nParity;
+      OpenQCDDiracOrder(const ColorSpinorField &a, int = 1, Float *field_ = 0, float * = 0) :
         field(field_ ? field_ : (Float *)a.V()), volumeCB(a.VolumeCB()), nParity(a.SiteSubset())
       {
       }

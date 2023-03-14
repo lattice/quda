@@ -24,7 +24,9 @@
 #include <aos.h>
 #include <transform_reduce.h>
 
-// #include "global.h"
+// TODO: The ipt functions can be incorporated here (so no reordering needed in OpenQXD side)
+// OpenQxD helpers:
+// #include "../../openQxD-devel/include/lattice.h"
 
 
 namespace quda {
@@ -2329,8 +2331,8 @@ namespace quda {
       OpenQCDOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
         LegacyOrder<Float, length>(u, ghost_),
         gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
-        volumeCB(u.VolumeCB()),
-        dim {u.X()[0], u.X()[1], u.X()[2], u.X()[3]}
+        volumeCB(u.VolumeCB()), // NOTE: Volume and VolumeCB refer to the global lattice, if VolumeLocal, then local lattice
+        dim {u.X()[0], u.X()[1], u.X()[2], u.X()[3]} // GLOBAL dimensions
       {
         if constexpr (length != 18) errorQuda("Gauge length %d not supported", length);
       }
@@ -2388,7 +2390,7 @@ namespace quda {
       {
         // FIX: what's x? (cf. index_helper.cuh)
   
-        // With ''natural'' order: lexicographical 0123 = txyz , z fastest, links 0123 = txyz in pos directions
+        // With ''natural'' order: lexicographical 0123 = txyz , t fastest, links 0123 = txyz in pos directions
         
         // Indexing fun:
         int coord[4];                          // declare a 4D vector x0, x1, x2, x3 = (xyzt), t fastest (ix = x0 + x1 * L0 + ...)
@@ -2407,7 +2409,7 @@ namespace quda {
 
 
         // Loading as per QUDA style
-        auto in = &gauge[ (4*(iy_OpenQxD) + dir_OpenQxD) * length];    // This is how they're accessed within OpenQxd (length = 18 doubles = 9 complex doubles = 1 su3dble struct)
+        auto in = &gauge[ (4*iy_OpenQxD + dir_OpenQxD) * length];    // This is how they're accessed within OpenQxd (length = 18 doubles = 9 complex doubles = 1 su3dble struct)
         // auto in = &gauge[ (8*(ix_OpenQxD - volumeCB) + 2*dir_OpenQxD)* length];    // This is how they're accessed within OpenQxd (length = 18 doubles = 9 complex doubles = 1 su3dble struct)
         block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
 
