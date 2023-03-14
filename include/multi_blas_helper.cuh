@@ -207,14 +207,15 @@ namespace quda
       using SpinorZ = SpinorX;
       using SpinorW = SpinorX;
 
-      constexpr auto arg_known_size = (sizeof(kernel_param<>)                                        // kernel_param parent
+      constexpr auto arg_known_size_naive = (sizeof(kernel_param<>)                                  // kernel_param parent
 				       + sizeof(SpinorX[NXZ])                                        // SpinorX array
 				       + (Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ *)) // SpinorZ array
 				       + sizeof(Functor)                                             // functor
 				       + (!Functor::use_w ? sizeof(SpinorW *) : 0)                   // subtract pointer if not using W
 				       + (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
-                                       + 12                                                          // alignment guard
 				       );
+      constexpr auto align_factor = 16;
+      constexpr auto arg_known_size = ((arg_known_size_naive + align_factor - 1) / align_factor) * align_factor;
 
       constexpr auto yw_size = (sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0));
       constexpr auto min_size = arg_known_size + min_YW_size() * yw_size;
@@ -261,14 +262,15 @@ namespace quda
       size_t spinor_z_size = spinor_x_size;
       size_t spinor_w_size = spinor_x_size;
 
-      const auto arg_known_size = (sizeof(kernel_param<>)                                        // kernel_param parent
+      const auto arg_known_size_naive = (sizeof(kernel_param<>)                                  // kernel_param parent
 				   + (NXZ * spinor_x_size)                                       // SpinorX array
 				   + (Functor::use_z ? NXZ * spinor_z_size : sizeof(void *))     // SpinorZ array (else dummy pointer)
 				   + sizeof(Functor)                                             // functor
 				   + (!Functor::use_w ? sizeof(void *) : 0)                      // subtract dummy pointer if not using W
 				   + (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
-                                   + 12                                                          // alignment guard
                                    );
+      const auto align_factor = 16;
+      const auto arg_known_size = ((arg_known_size_naive + align_factor - 1) / align_factor) * align_factor;
 
       const auto yw_size = (spinor_y_size + (Functor::use_w ? spinor_w_size : 0));
       const auto min_size = arg_known_size + min_YW_size() * yw_size;
