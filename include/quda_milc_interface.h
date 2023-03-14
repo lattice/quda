@@ -129,6 +129,19 @@ extern "C" {
     double flops; /* Return value */
     double dtime; /* Return value */
   } QudaContractArgs_t;
+
+  /**
+   * Parameters for two-link Gaussian quark smearing.
+   */
+  typedef struct {
+    int n_steps; /** Number of steps to apply **/
+    double width; /** The width of the Gaussian **/
+    int compute_2link; /** if nonzero then compute two-link, otherwise reuse gaugeSmeared **/
+    int delete_2link; /** if nonzero then delete two-link, otherwise keep two-link for future use **/
+    int t0; /** Set if the input spinor is on a time slice **/
+    int laplaceDim; /** Dimension of Laplacian **/
+  } QudaTwoLinkQuarkSmearArgs_t;
+
   
   /**
    * Optional: Set the MPI Comm Handle if it is not MPI_COMM_WORLD
@@ -1127,7 +1140,7 @@ extern "C" {
    * @param[in,out] parameters for the contraction, including FT specification
    * @param[in] local storage of color spinor field.  three complex values * number of sites on node
    * @param[in] local storage of color spinor field.  three complex values * number of sites on node
-e   * @param[out] hadron correlator  Flattened double array as though [n_mom][nt][2] for 2 = re,im. 
+   * @param[out] hadron correlator  Flattened double array as though [n_mom][nt][2] for 2 = re,im. 
    */
   void qudaContractFT(int external_precision,
 		      QudaContractArgs_t *cont_args,
@@ -1136,8 +1149,20 @@ e   * @param[out] hadron correlator  Flattened double array as though [n_mom][nt
 		      double *corr
 		      );
 
+  /**
+   * @brief Perform two-link Gaussian smearing on a given spinor (for staggered fermions).
+   * @param[in] external_precision  Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param[in] quda_precision  Precision for QUDA to use (2 - double, 1 - single)
+   * @param[in] h_gauge  Host gauge field
+   * @param[in,out] source  Spinor field to smear
+   * @param[in] qsmear_args  Struct setting some smearing metadata
+   */
+  void qudaTwoLinkGaussianSmear(int external_precision, int quda_precision, void * h_gauge, void * source,
+                                QudaTwoLinkQuarkSmearArgs_t qsmear_args);
+  
+  
   /* The below declarations are for removed functions from prior versions of QUDA. */
-
+  
   /**
    * Note this interface function has been removed.  This stub remains
    * for compatibility only.
