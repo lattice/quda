@@ -3079,8 +3079,7 @@ void qudaTwoLinkGaussianSmear( int external_precision, int quda_precision, void 
   
   setGaugeParams( gaugeParam, gaugeParam, nullptr, dim, cpu_prec, cuda_prec, cuda_prec_sloppy, tadpole, naik_epsilon );
 
-  gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  //gaugeParam.reconstruct = QUDA_RECONSTRUCT_12; // not working for now
+  gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO; // need to fix
   gaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
   
   gaugeParam.ga_pad = getLinkPadding( dim );
