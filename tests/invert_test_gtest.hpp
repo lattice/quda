@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <quda_arch.h>
 
 // tuple containing parameters for Schwarz solver
 using schwarz_t = ::testing::tuple<QudaSchwarzType, QudaInverterType, QudaPrecision>;
@@ -205,6 +206,7 @@ INSTANTIATE_TEST_SUITE_P(MultiShiftEvenOdd, InvertTest,
                                  no_schwarz),
                          gettestname);
 
+#ifdef QUDA_MMA_AVAILABLE
 // Schwarz-preconditioned normal solves
 INSTANTIATE_TEST_SUITE_P(SchwarzNormal, InvertTest,
                          Combine(Values(QUDA_PCG_INVERTER),
@@ -216,6 +218,7 @@ INSTANTIATE_TEST_SUITE_P(SchwarzNormal, InvertTest,
                                          Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER),
                                          Values(QUDA_HALF_PRECISION, QUDA_QUARTER_PRECISION))),
                          gettestname);
+#endif
 
 // Schwarz-preconditioned direct solves
 INSTANTIATE_TEST_SUITE_P(SchwarzEvenOdd, InvertTest,
