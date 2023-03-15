@@ -30,15 +30,27 @@ set_property(CACHE QUDA_MAX_SHARED_MEMORY_SIZE PROPERTY STRINGS 36864 40960 4505
 target_compile_definitions(quda PUBLIC QUDA_MAX_SHARED_MEMORY_SIZE=${QUDA_MAX_SHARED_MEMORY_SIZE})
 message(STATUS "Using maximum shared memory size: ${QUDA_MAX_SHARED_MEMORY_SIZE}")
 
+option(QUDA_OMPTARGET_JIT "Build OpenMP target backend with JIT" OFF)
+mark_as_advanced(QUDA_OMPTARGET_JIT)
+
 # ######################################################################################################################
 # define omptarget flags
-#set(QUDA_OMPTARGET_FLAGS -fiopenmp -fopenmp-targets=spir64_gen -fopenmp-version=51 "SHELL:-mllvm -pragma-unroll-threshold=16" "SHELL:-mllvm -vpo-paropt-simulate-get-num-threads-in-target=false")
-set(QUDA_OMPTARGET_FLAGS -fiopenmp -fopenmp-targets=spir64_gen -fopenmp-version=51 "SHELL:-mllvm -vpo-paropt-simulate-get-num-threads-in-target=false")
+
+if(QUDA_OMPTARGET_JIT)
+    set(QUDA_OMPTARGET_FLAGS -fiopenmp -fopenmp-targets=spir64 -fopenmp-version=51 "SHELL:-mllvm -vpo-paropt-simulate-get-num-threads-in-target=false")
+else()
+    #set(QUDA_OMPTARGET_FLAGS -fiopenmp -fopenmp-targets=spir64_gen -fopenmp-version=51 "SHELL:-mllvm -pragma-unroll-threshold=16" "SHELL:-mllvm -vpo-paropt-simulate-get-num-threads-in-target=false")
+    set(QUDA_OMPTARGET_FLAGS -fiopenmp -fopenmp-targets=spir64_gen -fopenmp-version=51 "SHELL:-mllvm -vpo-paropt-simulate-get-num-threads-in-target=false")
+endif()
 message(STATUS "Using OpenMP target flags: ${QUDA_OMPTARGET_FLAGS}")
 
 # QUDA_HASH for tunecache
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cxx_version=${CMAKE_CXX_COMPILER_VERSION})
-set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-omptarget:${QUDA_GPU_ARCH}")
+if(QUDA_OMPTARGET_JIT)
+    set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-omptarget:JIT")
+else()
+    set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-omptarget:${QUDA_GPU_ARCH}")
+endif()
 
 # ######################################################################################################################
 # omptarget specific compile options
@@ -63,7 +75,11 @@ target_compile_options(
 
 target_compile_options(quda PRIVATE ${QUDA_OMPTARGET_FLAGS})
 
-target_link_options(quda PRIVATE ${QUDA_OMPTARGET_FLAGS} -Xopenmp-target-backend "-device ${QUDA_GPU_ARCH}")
+if(QUDA_OMPTARGET_JIT)
+    target_link_options(quda PRIVATE ${QUDA_OMPTARGET_FLAGS})
+else()
+    target_link_options(quda PRIVATE ${QUDA_OMPTARGET_FLAGS} -Xopenmp-target-backend "-device ${QUDA_GPU_ARCH}")
+endif()
 
 set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES LANGUAGE CXX)
 set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES COMPILE_FLAGS "-x c++")
@@ -73,7 +89,7 @@ set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES COMPILE_FLAGS "-x c++")
 
 set(OMPTARGET_MKL_LIBRARY "-lmkl_sycl -lmkl_intel_ilp64 -lmkl_core -lmkl_intel_thread")
 
-if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
+if(QUDA_BUILD_NATIVE_LAPACK)
   target_compile_definitions(quda PRIVATE MKL_ILP64)
   target_link_libraries(quda PUBLIC ${OMPTARGET_MKL_LIBRARY})
 endif()
