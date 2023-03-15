@@ -827,7 +827,7 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     }
     break;
   case QUDA_TWOLINK_LINKS:
-    if(gaugeSmeared) {
+    if(gaugeTwoLink) {
       gauge_param.create = QUDA_NULL_FIELD_CREATE;
       gauge_param.reconstruct = param->reconstruct;
       gauge_param.setPrecision(param->cuda_prec, true);
