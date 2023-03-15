@@ -847,7 +847,7 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   cudaGauge->saveCPUField(cpuGauge);
   profileGauge.TPSTOP(QUDA_PROFILE_D2H);
 
-  if (param->type == QUDA_SMEARED_LINKS || param->type == QUDA_TWOLINK_LINK) { delete cudaGauge; }
+  if (param->type == QUDA_SMEARED_LINKS || param->type == QUDA_TWOLINK_LINKS) { delete cudaGauge; }
   
   profileGauge.TPSTOP(QUDA_PROFILE_TOTAL);
 }
