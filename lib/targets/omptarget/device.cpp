@@ -35,6 +35,7 @@ struct DeviceProp{
 
 static void getDeviceProperties(DeviceProp*p,int dev)
 {
+  constexpr int max_threads = quda::device::max_block_size();
   int m = 0;
 
   if(dev>=0 && dev<=omp_get_num_devices())
@@ -43,8 +44,9 @@ static void getDeviceProperties(DeviceProp*p,int dev)
     p->name = omphostname;
 
   p->id = dev;
-  #pragma omp target device(dev) map(from:m)
-  m = omp_get_num_procs();
+  #pragma omp target teams device(dev) thread_limit(max_threads) map(from:m)
+  if(omp_get_team_num()==0)
+    m = omp_get_num_procs();
   p->num_procs = m;
 
 /*
@@ -54,7 +56,7 @@ static void getDeviceProperties(DeviceProp*p,int dev)
 */
   p->max_teams = QUDA_OMP_MAX_TEAMS;
 
-  #pragma omp target teams device(dev) map(from:m)
+  #pragma omp target teams device(dev) thread_limit(max_threads) map(from:m)
   if(omp_get_team_num()==0)
     m = omp_get_max_threads();
   p->max_threads= m;

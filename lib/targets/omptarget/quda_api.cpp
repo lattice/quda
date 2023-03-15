@@ -91,8 +91,9 @@ namespace quda
       static inline int
       ompMemset(void *p, unsigned char b, std::size_t s)
       {
+        constexpr int max_threads = device::max_block_size();
         unsigned char *c = reinterpret_cast<unsigned char *>(p);
-      #pragma omp target teams distribute parallel for simd is_device_ptr(c)
+      #pragma omp target teams distribute parallel for simd thread_limit(max_threads) is_device_ptr(c)
         for(std::size_t i=0;i<s;++i) c[i] = b;
         return 0;
       }
@@ -106,8 +107,9 @@ namespace quda
       static inline int
       ompMemset2D(void *p, size_t pitch, unsigned char b, size_t w, size_t h)
       {
+        constexpr int max_threads = device::max_block_size();
         unsigned char *c = reinterpret_cast<unsigned char *>(p);
-      #pragma omp target teams distribute parallel for simd is_device_ptr(c) collapse(2)
+      #pragma omp target teams distribute parallel for simd thread_limit(max_threads) is_device_ptr(c) collapse(2)
         for(std::size_t i=0;i<h;++i)
           for(std::size_t j=0;j<w;++j)
             c[j+i*pitch] = b;
