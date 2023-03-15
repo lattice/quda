@@ -787,6 +787,7 @@ namespace quda
 
     TuneKey key = tunable.tuneKey();
     if (use_managed_memory()) strcat(key.aux, ",managed");
+    if (tunable.use_constant_memory()) strcat(key.aux, ",cmem");
     last_key = key;
 
 #ifdef LAUNCH_TIMER
