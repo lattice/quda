@@ -814,14 +814,32 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   case QUDA_ASQTAD_FAT_LINKS: cudaGauge = gaugeFatPrecise; break;
   case QUDA_ASQTAD_LONG_LINKS: cudaGauge = gaugeLongPrecise; break;
   case QUDA_SMEARED_LINKS:
-    gauge_param.create = QUDA_NULL_FIELD_CREATE;
-    gauge_param.reconstruct = param->reconstruct;
-    gauge_param.setPrecision(param->cuda_prec, true);
-    gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-    gauge_param.pad = param->ga_pad;
-    cudaGauge = new cudaGaugeField(gauge_param);
-    copyExtendedGauge(*cudaGauge, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    if(gaugeSmeared) {
+      gauge_param.create = QUDA_NULL_FIELD_CREATE;
+      gauge_param.reconstruct = param->reconstruct;
+      gauge_param.setPrecision(param->cuda_prec, true);
+      gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+      gauge_param.pad = param->ga_pad;
+      cudaGauge = new cudaGaugeField(gauge_param);
+      copyExtendedGauge(*cudaGauge, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    } else {
+      errorQuda("Requested to save gaugeSmeared, but gaugeSmeared does not exist");
+    }
     break;
+  case QUDA_TWOLINK_LINKS:
+    if(gaugeSmeared) {
+      gauge_param.create = QUDA_NULL_FIELD_CREATE;
+      gauge_param.reconstruct = param->reconstruct;
+      gauge_param.setPrecision(param->cuda_prec, true);
+      gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+      gauge_param.pad = param->ga_pad;
+      cudaGauge = new cudaGaugeField(gauge_param);
+      copyExtendedGauge(*cudaGauge, *gaugeTwoLink, QUDA_CUDA_FIELD_LOCATION);
+    } else {
+      errorQuda("Requested to save gaugeTwoLink, but gaugeTwoLink does not exist");
+    }
+    break;
+      
   default: errorQuda("Invalid gauge type");
   }
 
@@ -829,8 +847,8 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   cudaGauge->saveCPUField(cpuGauge);
   profileGauge.TPSTOP(QUDA_PROFILE_D2H);
 
-  if (param->type == QUDA_SMEARED_LINKS) { delete cudaGauge; }
-
+  if (param->type == QUDA_SMEARED_LINKS || param->type == QUDA_TWOLINK_LINK) { delete cudaGauge; }
+  
   profileGauge.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
