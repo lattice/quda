@@ -1115,6 +1115,11 @@ extern "C" {
    * Free QUDA's internal smeared gauge field.
    */
   void freeGaugeSmearedQuda(void);
+
+  /**
+   * Free QUDA's internal two-link gauge field.
+   */
+  void freeGaugeTwoLinkQuda(void);
   
   /**
    * Save the gauge field to the host.

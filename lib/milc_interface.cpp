@@ -2859,7 +2859,7 @@ void qudaFreeGaugeField() {
 void qudaFreeTwoLink()
 {
   qudamilc_called<true>(__func__);
-  freeGaugeSmearedQuda();
+  freeGaugeTwoLinkQuda();
   qudamilc_called<false>(__func__);
 } // qudaFreeTwoLink
 
