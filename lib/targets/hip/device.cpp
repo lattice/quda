@@ -67,7 +67,7 @@ namespace quda
         int device;
         while (device_list_raw >> device) {
           // check this is a valid policy choice
-          if (device < 0) { errorQuda("Invalid HIP_VISIBLE_DEVICE ordinal %d", device); }
+          if (device < 0) { errorQuda("Invalid HIP_VISIBLE_DEVICES ordinal %d", device); }
 
           device_list << device;
           if (device_list_raw.peek() == ',') device_list_raw.ignore();
