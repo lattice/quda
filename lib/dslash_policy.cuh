@@ -2020,7 +2020,7 @@ namespace quda
      param.aux.z = 0;
    }
 
-   TuneKey tuneKey() const {
+   TuneKey tuneKey() const override {
      KernelType kernel_type = dslashParam.kernel_type;
      dslashParam.kernel_type = KERNEL_POLICY;
      TuneKey key = dslash.tuneKey();

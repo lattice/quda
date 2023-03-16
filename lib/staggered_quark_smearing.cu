@@ -145,7 +145,7 @@ namespace quda
       return bytes_;
     }
 
-    TuneKey tuneKey() const
+    TuneKey tuneKey() const override
     {
       // add laplace transverse dir to the key
       char aux[TuneKey::aux_n];

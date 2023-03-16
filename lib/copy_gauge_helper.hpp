@@ -59,7 +59,7 @@ namespace quda
         launch<CopyGhost_, enable_host>(tp, stream, arg);
     }
 
-    TuneKey tuneKey() const
+    TuneKey tuneKey() const override
     {
       char aux_[TuneKey::aux_n];
       strcpy(aux_, aux);

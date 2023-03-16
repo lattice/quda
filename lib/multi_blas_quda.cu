@@ -86,7 +86,7 @@ namespace quda {
         blas::flops += flops();
       }
 
-      TuneKey tuneKey() const { return TuneKey(vol, typeid(f).name(), aux); }
+      TuneKey tuneKey() const override { return TuneKey(vol, typeid(f).name(), aux); }
 
       template <typename Arg> void Launch(const TuneParam &tp, const qudaStream_t &stream, Arg &&arg)
       {

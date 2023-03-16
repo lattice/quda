@@ -166,7 +166,7 @@ namespace quda {
       qudaDeviceSynchronize();
     }
 
-    TuneKey tuneKey() const
+    TuneKey tuneKey() const override
     {
       std::string aux2 = std::string(aux) + ",dim=" + dim_str[arg.face] + ",geo_dir=" + dim_str[arg.dir] +
         (arg.pack ? ",extract" : ",insert");

@@ -246,7 +246,7 @@ namespace quda
 
     bool advanceTuneParam(TuneParam &) const { return false; }
 
-    TuneKey tuneKey() const
+    TuneKey tuneKey() const override
     {
       char vol[128];
       strcpy(vol, "bytes=");

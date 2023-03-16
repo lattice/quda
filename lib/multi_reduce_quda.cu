@@ -102,7 +102,7 @@ namespace quda {
         blas::flops += flops();
       }
 
-      TuneKey tuneKey() const { return TuneKey(vol, typeid(r).name(), aux); }
+      TuneKey tuneKey() const override { return TuneKey(vol, typeid(r).name(), aux); }
 
       template <int NXZ> void compute(const qudaStream_t &stream)
       {
@@ -456,7 +456,7 @@ namespace quda {
         param.aux.w = 0;
       }
 
-      TuneKey tuneKey() const {
+      TuneKey tuneKey() const override {
         return TuneKey(x[0].VolString().c_str(), typeid(*this).name(), aux);
       }
 
@@ -595,7 +595,7 @@ namespace quda {
 
       void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
 
-      TuneKey tuneKey() const { return TuneKey(x[0].VolString().c_str(), typeid(*this).name(), aux); }
+      TuneKey tuneKey() const override { return TuneKey(x[0].VolString().c_str(), typeid(*this).name(), aux); }
 
       long long flops() const { return 0; } // FIXME
       long long bytes() const { return 0; } // FIXME
