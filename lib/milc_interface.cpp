@@ -220,6 +220,7 @@ static QudaGaugeParam newMILCGaugeParam(const int* dim, QudaPrecision prec, Quda
 }
 
 static  void invalidateGaugeQuda() {
+  printfQuda("QUDA_MILC_INTERFACE: Invalidating QUDA gauge\n");
   qudamilc_called<true>(__func__);
   freeGaugeQuda();
   invalidate_quda_gauge = true;
@@ -241,7 +242,7 @@ void qudaLoadKSLink(int prec, QudaFatLinkArgs_t, const double act_path_coeff[6],
 
   computeKSLinkQuda(fatlink, longlink, nullptr, inlink, const_cast<double*>(act_path_coeff), &param);
 
-  // requires loadGaugeQuda to be called in subequent solver
+  // requires loadGaugeQuda to be called in subsequent solver
   invalidateGaugeQuda();
 
   // this flags that we are using QUDA to create the HISQ links
@@ -260,7 +261,7 @@ void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t, const double act_path_c
 
   computeKSLinkQuda(fatlink, nullptr, ulink, inlink, const_cast<double*>(act_path_coeff), &param);
 
-  // requires loadGaugeQuda to be called in subequent solver
+  // requires loadGaugeQuda to be called in subsequent solver
   invalidateGaugeQuda();
 
   // this flags that we are using QUDA to create the HISQ links
@@ -1136,10 +1137,13 @@ void qudaMultishiftInvert(int external_precision, int quda_precision, int num_of
   setColorSpinorParams(localDim, host_precision, &csParam);
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
-  if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
-
+  if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();  
+  printfQuda("qudaMultishiftInvert: canReuseResidentGauge = %s\n", canReuseResidentGauge(&invertParam) ? "true" : "false");
+  printfQuda("qudaMultishiftInvert: num_iters == -1 %s\n", *num_iters == 1 ? "true" : "false");
+  
   // set the solver
   if (invalidate_quda_gauge || !create_quda_gauge) {
+    printfQuda("qudaMultishiftInvert: Calling loadGaugeQuda. invalidate_quda_gauge = %s, create_quda_gauge = %s\n", invalidate_quda_gauge ? "true" : "false", create_quda_gauge ? "true" : "false");
     loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
     if (longlink != nullptr) loadGaugeQuda(const_cast<void *>(longlink), &long_param);
     invalidate_quda_gauge = false;
@@ -1163,7 +1167,7 @@ void qudaMultishiftInvert(int external_precision, int quda_precision, int num_of
     final_fermilab_residual[i] = invertParam.true_res_hq_offset[i];
   } // end loop over number of offsets
 
-  if (!create_quda_gauge) invalidateGaugeQuda();
+  //if (!create_quda_gauge) invalidateGaugeQuda();
 
   qudamilc_called<false>(__func__, verbosity);
 } // qudaMultiShiftInvert
@@ -1227,6 +1231,7 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
   if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
 
   if (invalidate_quda_gauge || !create_quda_gauge) {
+    printfQuda("qudaInvert: Calling loadGaugeQuda. invalidate_quda_gauge = %s, create_quda_gauge = %s\n", invalidate_quda_gauge ? "true" : "false", create_quda_gauge ? "true" : "false");
     loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
     if (longlink != nullptr) loadGaugeQuda(const_cast<void *>(longlink), &long_param);
     invalidate_quda_gauge = false;
@@ -1280,6 +1285,7 @@ void qudaDslash(int external_precision, int quda_precision, QudaInvertArgs_t inv
   if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
 
   if (invalidate_quda_gauge || !create_quda_gauge) {
+    printfQuda("qudaDslash: Calling loadGaugeQuda. invalidate_quda_gauge = %s, create_quda_gauge = %s\n", invalidate_quda_gauge ? "true" : "false", create_quda_gauge ? "true" : "false");
     loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
     if (longlink != nullptr) loadGaugeQuda(const_cast<void *>(longlink), &long_param);
     invalidate_quda_gauge = false;
@@ -1342,6 +1348,7 @@ void qudaInvertMsrc(int external_precision, int quda_precision, double mass, Qud
   if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
 
   if (invalidate_quda_gauge || !create_quda_gauge) {
+    printfQuda("qudaInvertMsrc: Calling loadGaugeQuda. invalidate_quda_gauge = %s, create_quda_gauge = %s\n", invalidate_quda_gauge ? "true" : "false", create_quda_gauge ? "true" : "false");
     loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
     if (longlink != nullptr) loadGaugeQuda(const_cast<void *>(longlink), &long_param);
     invalidate_quda_gauge = false;
@@ -1439,6 +1446,7 @@ void qudaEigCGInvert(int external_precision, int quda_precision, double mass, Qu
   if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
 
   if ((invalidate_quda_gauge || !create_quda_gauge) && (rhs_idx == 0)) { // do this for the first RHS
+    printfQuda("qudaEigCGInvert: Calling loadGaugeQuda. invalidate_quda_gauge = %s, create_quda_gauge = %s\n", invalidate_quda_gauge ? "true" : "false", create_quda_gauge ? "true" : "false");
     loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
     if (longlink != nullptr) loadGaugeQuda(const_cast<void *>(longlink), &long_param);
     invalidate_quda_gauge = false;
@@ -2439,6 +2447,7 @@ void *qudaMultigridCreate(int external_precision, int quda_precision, double mas
   invalidateGaugeQuda();
 
   if (invalidate_quda_gauge || !create_quda_gauge) {
+    printfQuda("qudaMultigridCreate: Calling loadGaugeQuda. invalidate_quda_gauge = %s, create_quda_gauge = %s\n", invalidate_quda_gauge ? "true" : "false", create_quda_gauge ? "true" : "false");
     loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
     if (longlink != nullptr) loadGaugeQuda(const_cast<void *>(longlink), &long_param);
     invalidate_quda_gauge = false;
@@ -2529,10 +2538,12 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
   }
 
   if (invalidate_quda_gauge || !create_quda_gauge || invalidate_quda_mg) {
+    printfQuda("qudaInvertMG: Calling loadGaugeQuda. invalidate_quda_gauge = %s, create_quda_gauge = %s, invalidate_quda_mg = %s\n",
+	       invalidate_quda_gauge ? "true" : "false", create_quda_gauge ? "true" : "false", invalidate_quda_mg ? "true" : "false");
     loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
     if (longlink != nullptr) loadGaugeQuda(const_cast<void *>(longlink), &long_param);
     invalidate_quda_gauge = false;
-
+    
     // FIXME: hack to reset gaugeFatPrecise (see interface_quda.cpp), etc.
     // Solution is to have a version of this that _only_
     // rebuilds the Dirac matrices, I believe.
