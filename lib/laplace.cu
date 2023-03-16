@@ -134,15 +134,11 @@ namespace quda
     }
     
     TuneKey tuneKey() const override
-    {
-      // add laplace transverse dir to the key
-      char aux[TuneKey::aux_n];
-      strcpy(aux,
-             (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash::aux_pack :
-                                                                           Dslash::aux[arg.kernel_type]);
-      strcat(aux, ",laplace=");
-      u32toa(aux + strlen(aux), arg.dir);
-      return TuneKey(in.VolString().c_str(), typeid(*this).name(), aux);
+    { // add laplace transverse dir to the key
+      auto key = Dslash::tuneKey();
+      strcat(key.aux, ",laplace=");
+      u32toa(key.aux + strlen(key.aux), arg.dir);
+      return key;
     }
   };
 

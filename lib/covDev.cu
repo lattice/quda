@@ -119,15 +119,11 @@ namespace quda
     }
 
     TuneKey tuneKey() const override
-    {
-      // add mu to the key
-      char aux[TuneKey::aux_n];
-      strcpy(aux,
-             (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash::aux_pack :
-                                                                           Dslash::aux[arg.kernel_type]);
-      strcat(aux, ",mu=");
-      u32toa(aux + strlen(aux), arg.mu);
-      return TuneKey(in.VolString().c_str(), typeid(*this).name(), aux);
+    { // add mu to the key
+      auto key = Dslash::tuneKey();
+      strcat(key.aux, ",mu=");
+      u32toa(key.aux + strlen(key.aux), arg.mu);
+      return key;
     }
   };
 
