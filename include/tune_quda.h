@@ -232,7 +232,6 @@ namespace quda {
 
       TuneKey key = tuneKey();
       if (use_managed_memory()) strcat(key.aux, ",managed");
-      if (use_constant_memory()) strcat(key.aux, ",cmem");
       // if key is present in cache then already tuned
       return getTuneCache().find(key) != getTuneCache().end();
     }
@@ -244,12 +243,6 @@ namespace quda {
     virtual void apply(const qudaStream_t &stream) = 0;
     virtual void preTune() { }
     virtual void postTune() { }
-
-    /**
-       @brief Returns if the tunable object in question uses explicit
-       constant memory.
-     */
-    virtual bool use_constant_memory() { return device::use_constant_memory_arg<>::value; }
 
     /**
      * @brief Number of iterations used in the 1st phase of tuning, i.e. finding the candidates for the 2nd phase/
