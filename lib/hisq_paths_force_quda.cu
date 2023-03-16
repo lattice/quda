@@ -39,15 +39,22 @@ namespace quda {
         arg.sig = sig;
         arg.mu = mu;
 
-        strcat(aux, (std::string(comm_dim_partitioned_string()) + "threads=" + std::to_string(arg.threads.x)).c_str());
-        if (type == FORCE_MIDDLE_LINK || type == FORCE_LEPAGE_MIDDLE_LINK)
-          strcat(aux, (std::string(",sig=") + std::to_string(arg.sig) +
-                       std::string(",mu=") + std::to_string(arg.mu) +
-                       std::string(",pMu=") + std::to_string(arg.p_mu) +
-                       std::string(",q_mu=") + std::to_string(arg.q_mu) +
-                       std::string(",q_prev=") + std::to_string(arg.q_prev)).c_str());
-        else if (type != FORCE_ONE_LINK)
-          strcat(aux, (std::string(",mu=") + std::to_string(arg.mu)).c_str()); // no sig dependence needed for side link
+        strcat(aux, comm_dim_partitioned_string());
+        if (type == FORCE_MIDDLE_LINK || type == FORCE_LEPAGE_MIDDLE_LINK) {
+          strcat(aux, ",sig=");
+          u32toa(aux + strlen(aux), arg.sig);
+          strcat(aux, ",mu=");
+          u32toa(aux + strlen(aux), arg.mu);
+          strcat(aux, ",pMu=");
+          u32toa(aux + strlen(aux), arg.p_mu);
+          strcat(aux, ",q_mu=");
+          u32toa(aux + strlen(aux), arg.q_mu);
+          strcat(aux, ",q_prev=");
+          u32toa(aux + strlen(aux), arg.q_prev);
+        } else if (type != FORCE_ONE_LINK) {
+          strcat(aux, ",mu=");
+          u32toa(aux + strlen(aux), arg.mu);
+        }
 
         switch (type) {
         case FORCE_ONE_LINK:           strcat(aux, ",ONE_LINK");           break;
@@ -366,6 +373,12 @@ namespace quda {
         meta(meta),
         type(type)
       {
+        strcat(aux, comm_dim_partitioned_string());
+        switch (type) {
+        case FORCE_LONG_LINK: strcat(aux, ",LONG_LINK"); break;
+        case FORCE_COMPLETE:  strcat(aux, ",COMPLETE");  break;
+        default: errorQuda("Undefined force type %d", type);
+        }
         arg.sig = sig;
         arg.mu = mu;
         apply(device::get_default_stream());
@@ -378,17 +391,6 @@ namespace quda {
         case FORCE_COMPLETE:  launch<CompleteForce>(tp, stream, arg); break;
         default: errorQuda("Undefined force type %d", type);
         }
-      }
-
-      TuneKey tuneKey() const {
-        std::stringstream aux;
-        aux << meta.AuxString().c_str() << comm_dim_partitioned_string() << ",threads=" << arg.threads.x;
-        switch (type) {
-        case FORCE_LONG_LINK: aux << ",LONG_LINK"; break;
-        case FORCE_COMPLETE:  aux << ",COMPLETE";  break;
-        default: errorQuda("Undefined force type %d", type);
-        }
-        return TuneKey(meta.VolString().c_str(), typeid(*this).name(), aux.str().c_str());
       }
 
       void preTune() {
