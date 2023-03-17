@@ -396,7 +396,7 @@ namespace quda
 	
 	std::vector<Complex> s(array_size);
         blas::cDotProduct(s, {vecs.begin() + j, vecs.begin() + j + array_size}, vecs[i]); // <j|i> with i normalised.
-	for (auto k = 0u; k < array_size; k++) s[k] *= -1.0;
+	for (auto k = 0; k < array_size; k++) s[k] *= -1.0;
         blas::caxpy(s, {vecs.begin() + j, vecs.begin() + j + array_size}, vecs[i]);       // i = i - proj_{j}(i) = i - <j|i> * j	
       }
       double norm = sqrt(blas::norm2(vecs[i]));
@@ -407,7 +407,6 @@ namespace quda
   // Orthogonalise r[0:] against V_[0:j]
   void EigenSolver::blockOrthogonalizeHMGS(std::vector<ColorSpinorField> &vecs, std::vector<ColorSpinorField> &rvecs, int h_block_size, int i)
   {
-    auto vecs_size = i;
     auto block_array_size = h_block_size;
     for (int j = 0; j < i; j+=block_array_size) {
       if(i < h_block_size || h_block_size == 0) block_array_size = i;
@@ -415,14 +414,13 @@ namespace quda
       int array_size = block_array_size * rvecs.size();
       logQuda(QUDA_DEBUG_VERBOSE, "Current block array size = %d\n", block_array_size);
       
-      //auto array_size = vecs_size * rvecs.size();
       std::vector<Complex> s(array_size);
       
       // Block dot products stored in s.
       blas::cDotProduct(s, {vecs.begin() + j, vecs.begin() + j + block_array_size}, {rvecs.begin(), rvecs.end()});
       
       // Block orthogonalise
-      for (auto k = 0u; k < array_size; k++) s[k] *= -1.0;
+      for (auto k = 0; k < array_size; k++) s[k] *= -1.0;
       blas::caxpy(s, {vecs.begin() + j, vecs.begin() + j + block_array_size}, {rvecs.begin(), rvecs.end()});
     }
   }
