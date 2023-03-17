@@ -122,17 +122,6 @@ namespace quda
      */
     unsigned int max_blocks_per_processor();
 
-    /**
-       @brief This helper template class indicated if the present
-       compilation unit has explicit constant memory usage enabled.
-       This is the default "false" specialization, and can be
-       overriden if we include "constant_kernel_arg.h" in our kernel
-       functor file.
-    */
-    template <bool = true> struct use_constant_memory_arg {
-      static constexpr bool value = false;
-    };
-
     namespace profile
     {
 

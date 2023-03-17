@@ -12,6 +12,9 @@
    instantiation correctly.
  */
 
+// set a preprocessor flag that we have included constant_kernel_arg.h
+#define QUDA_USE_CONSTANT_MEMORY
+
 namespace quda
 {
 
@@ -40,16 +43,6 @@ namespace quda
     {
       return qudaGetSymbolAddress(buffer);
     }
-
-    /**
-       @brief This helper template class indicates if the present
-       compilation unit has explicit constant memory usage enabled.
-       This is the "true" specialization which is enabled when this
-       header is included.
-    */
-    template <> struct use_constant_memory_arg<true> {
-      static constexpr bool value = true;
-    };
 
   } // namespace device
 
