@@ -432,73 +432,46 @@ namespace quda {
     struct HisqStaplesForce {
       using real = typename mapper<Float>::type;
 
-      template <bool low_memory>
       void hisqFiveSeven(GaugeField &newOprod, GaugeField &P3, GaugeField_ref &P5, GaugeField_ref &Pnumu, GaugeField_ref &Qnumu,
                          GaugeField_ref &Pnumu_next, GaugeField_ref &Qnumu_next, const GaugeField &Pmu,
                          const GaugeField &link, const PathCoefficients<real> &act_path_coeff, dim_dir_pair sig_pair, dim_dir_pair mu_pair) {
-        if constexpr (low_memory) {
-          for (int nu = 0; nu < 8; nu++) {
-            auto nu_pair = dim_dir_pair::make_pair(nu);
 
-            if (nu_pair.dim == sig_pair.dim || nu_pair.dim == mu_pair.dim) continue;
-
-            // 5-link: middle link
-            // In/out: newOprod
-            // Out: P5, Pnumu, Qnumu
-            // In: Pmu, link
-            // Ignored: Pnumu_next, Qnumu_next
-            AllFiveAllSevenLinkArg<Float, nColor, recon, phase> middleFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu_next, Qnumu_next, Pnumu, Qnumu, link, act_path_coeff);
-            AllFiveAllSevenLinkForce<decltype(middleFiveLinkArg)> middleFiveLink(middleFiveLinkArg, link, sig_pair, mu_pair, dim_dir_pair::invalid_pair(), nu_pair, newOprod, P3, P5, Pnumu, Qnumu);
-
-            // All 7 link, 5-link side-link
-            // In/out: newOprod, P3 (called shortP)
-            // In: P5, Qnumu_next, link
-            // Out: none
-            // Ignored: Pmu, Pnumu, Qnumu
-            AllFiveAllSevenLinkArg<Float, nColor, recon, phase> allSevenSideFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, link, act_path_coeff);
-            AllFiveAllSevenLinkForce<decltype(allSevenSideFiveLinkArg)> allSevenSideLinkFive(allSevenSideFiveLinkArg, link, sig_pair, mu_pair, nu_pair, dim_dir_pair::invalid_pair(), newOprod, P3, P5, Pnumu_next, Qnumu_next);
-          } //nu
-        } else {
-          // optimized, more fused path
-          // Uses a "double buffer" for Pnumu/Qnumu
-
-          // unroll the nu loop
-          std::vector<dim_dir_pair> nu_vals;
-          nu_vals.reserve(4);
-          for (int nu = 0; nu < 8; nu++) {
-            auto nu_pair = dim_dir_pair::make_pair(nu);
-            if (nu_pair.dim == sig_pair.dim || nu_pair.dim == mu_pair.dim) continue;
-            nu_vals.emplace_back(nu_pair);
-          }
-
-          // first: just MiddleFiveLink
-          // In/out: newOprod
-          // Out: P5, Pnumu, Qnumu
-          // In: Pmu, link
-          // Ignored: Pnumu_next, Qnumu_next (since this is MiddleFive only)
-          AllFiveAllSevenLinkArg<Float, nColor, recon, phase> middleFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu_next, Qnumu_next, Pnumu, Qnumu, link, act_path_coeff);
-          AllFiveAllSevenLinkForce<decltype(middleFiveLinkArg)> middleFiveArg(middleFiveLinkArg, link, sig_pair, mu_pair, dim_dir_pair::invalid_pair(), nu_vals[0], newOprod, P3, P5, Pnumu, Qnumu);
-
-          for (int i = 0; i < 3; i++) {
-            // next: fully fused kernels
-            // In/out: new Oprod, P3 (called shortP), P5
-            // In: Pmu, Pnumu, Qnumu, link
-            // Out: Pnumu_next, Qnumu_next
-            AllFiveAllSevenLinkArg<Float, nColor, recon, phase> allFiveAllSevenLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, link, act_path_coeff);
-            AllFiveAllSevenLinkForce<decltype(allFiveAllSevenLinkArg)> allFiveAllSevenLink(allFiveAllSevenLinkArg, link, sig_pair, mu_pair, nu_vals[i], nu_vals[i+1], newOprod, P3, P5, Pnumu_next, Qnumu_next);
-
-            std::swap(Pnumu, Pnumu_next);
-            std::swap(Qnumu, Qnumu_next);
-          }
-
-          // last: just SideFiveAllSevenLink
-          // In/out: newOprod, P3 (called shortP)
-          // In: P5, Pnumu, Qnumu, link
-          // Out: none
-          // Ignored: Pmu, Pnumu_next, Qnumu_next
-          AllFiveAllSevenLinkArg<Float, nColor, recon, phase> allSevenSideFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, link, act_path_coeff);
-          AllFiveAllSevenLinkForce<decltype(allSevenSideFiveLinkArg)> allSevenSideFiveLink(allSevenSideFiveLinkArg, link, sig_pair, mu_pair, nu_vals[3], dim_dir_pair::invalid_pair(), newOprod, P3, P5, Pnumu, Qnumu);
+        // unroll the nu loop
+        std::vector<dim_dir_pair> nu_vals;
+        nu_vals.reserve(4);
+        for (int nu = 0; nu < 8; nu++) {
+          auto nu_pair = dim_dir_pair::make_pair(nu);
+          if (nu_pair.dim == sig_pair.dim || nu_pair.dim == mu_pair.dim) continue;
+          nu_vals.emplace_back(nu_pair);
         }
+
+        // first: just MiddleFiveLink
+        // In/out: newOprod
+        // Out: P5, Pnumu, Qnumu
+        // In: Pmu, link
+        // Ignored: Pnumu_next, Qnumu_next (since this is MiddleFive only)
+        AllFiveAllSevenLinkArg<Float, nColor, recon, phase> middleFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu_next, Qnumu_next, Pnumu, Qnumu, link, act_path_coeff);
+        AllFiveAllSevenLinkForce<decltype(middleFiveLinkArg)> middleFiveArg(middleFiveLinkArg, link, sig_pair, mu_pair, dim_dir_pair::invalid_pair(), nu_vals[0], newOprod, P3, P5, Pnumu, Qnumu);
+
+        for (int i = 0; i < 3; i++) {
+          // next: fully fused kernels
+          // In/out: new Oprod, P3 (called shortP), P5
+          // In: Pmu, Pnumu, Qnumu, link
+          // Out: Pnumu_next, Qnumu_next
+          AllFiveAllSevenLinkArg<Float, nColor, recon, phase> allFiveAllSevenLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, link, act_path_coeff);
+          AllFiveAllSevenLinkForce<decltype(allFiveAllSevenLinkArg)> allFiveAllSevenLink(allFiveAllSevenLinkArg, link, sig_pair, mu_pair, nu_vals[i], nu_vals[i+1], newOprod, P3, P5, Pnumu_next, Qnumu_next);
+
+          std::swap(Pnumu, Pnumu_next);
+          std::swap(Qnumu, Qnumu_next);
+        }
+
+        // last: just SideFiveAllSevenLink
+        // In/out: newOprod, P3 (called shortP)
+        // In: P5, Pnumu, Qnumu, link
+        // Out: none
+        // Ignored: Pmu, Pnumu_next, Qnumu_next
+        AllFiveAllSevenLinkArg<Float, nColor, recon, phase> allSevenSideFiveLinkArg(newOprod, P3, Pmu, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, link, act_path_coeff);
+        AllFiveAllSevenLinkForce<decltype(allSevenSideFiveLinkArg)> allSevenSideFiveLink(allSevenSideFiveLinkArg, link, sig_pair, mu_pair, nu_vals[3], dim_dir_pair::invalid_pair(), newOprod, P3, P5, Pnumu, Qnumu);
       }
 
       HisqStaplesForce(const GaugeField &link, GaugeField &P3, GaugeField_ref &Pmu, GaugeField_ref &P5, GaugeField_ref &Pnumu, GaugeField_ref &Qnumu,
@@ -514,88 +487,54 @@ namespace quda {
           OneLinkForce<decltype(arg)> oneLink(arg, link, newOprod);
         }
 
-        constexpr bool low_memory_path = false;
-
         for (int sig = 0; sig < 8; sig++) {
           auto sig_pair = dim_dir_pair::make_pair(sig);
 
-          if constexpr (low_memory_path) {
-            for (int mu = 0; mu < 8; mu++) {
-              auto mu_pair = dim_dir_pair::make_pair(mu);
+          // unroll the mu loop
+          std::vector<dim_dir_pair> mu_vals;
+          mu_vals.reserve(6);
+          for (int mu = 0; mu < 8; mu++) {
+            auto mu_pair = dim_dir_pair::make_pair(mu);
+            if (sig_pair.dim == mu_pair.dim) continue;
+            mu_vals.emplace_back(mu_pair);
+          }
 
-              if (sig_pair.dim == mu_pair.dim) continue;
+          // 3-link: middle link only
+          // In/out: newOprod
+          // Out: (first) Pmu, P3
+          // In: oprod, link
+          // Ignored: Pmu_next
+          AllThreeAllLepageLinkArg<Float, nColor, recon, phase> middleThreeLinkArg(newOprod, P3, oprod, Pmu, Pmu_next, link, act_path_coeff);
+          AllThreeAllLepageLinkForce<decltype(middleThreeLinkArg)> middleThreeLink(middleThreeLinkArg, link, sig_pair, dim_dir_pair::invalid_pair(), mu_vals[0], act_path_coeff, newOprod, P3, Pmu_next);
 
-              // 3-link: middle link
-              // In/out: newOprod
-              // Out: (first) Pmu, P3
-              // In: oprod, link
-              AllThreeAllLepageLinkArg<Float, nColor, recon, phase> middleThreeLinkArg(newOprod, P3, oprod, Pmu, Pmu, link, act_path_coeff);
-              AllThreeAllLepageLinkForce<decltype(middleThreeLinkArg)> middleThreeLink(middleThreeLinkArg, link, sig_pair, dim_dir_pair::invalid_pair(), mu_pair, act_path_coeff, newOprod, P3, Pmu);
+          // All 5 and 7 link contributions
+          // In/out: newOprod, P3
+          // In: Pmu, link
+          // Internal only: P5, Pnumu, Qnumu, and the double-buffer flavors
+          hisqFiveSeven(newOprod, P3, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, Pmu_next, link, act_path_coeff, sig_pair, mu_vals[0]);
 
-              // All 5 and 7 link contributions
-              // In/out: newOprod, P3
-              // In: Pmu, link
-              // Internal only: P5, Pnumu, Qnumu, and the double-buffer flavors
-              hisqFiveSeven<low_memory_path>(newOprod, P3, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, Pmu, link, act_path_coeff, sig_pair, mu_pair);
-
-              // Side 3-link, fused with Lepage all link when the lepage coeff != 0.
-              // In/out: newOprod
-              // In: P3, (second) Pmu, link
-              AllThreeAllLepageLinkArg<Float, nColor, recon, phase> allLepageSideThreeLinkArg(newOprod, P3, oprod, Pmu, Pmu, link, act_path_coeff);
-              AllThreeAllLepageLinkForce<decltype(allLepageSideThreeLinkArg)> allLepageSideThreeLink(allLepageSideThreeLinkArg, link, sig_pair, mu_pair, dim_dir_pair::invalid_pair(), act_path_coeff, newOprod, P3, Pmu);
-            }//mu
-          } else {
-            // optimized, more fused path
-            // Uses a "double buffer" for Pmu
-
-            // unroll the mu loop
-            std::vector<dim_dir_pair> mu_vals;
-            mu_vals.reserve(6);
-            for (int mu = 0; mu < 8; mu++) {
-              auto mu_pair = dim_dir_pair::make_pair(mu);
-              if (sig_pair.dim == mu_pair.dim) continue;
-              mu_vals.emplace_back(mu_pair);
-            }
-
-            // 3-link: middle link only
-            // In/out: newOprod
-            // Out: (first) Pmu, P3
-            // In: oprod, link
-            // Ignored: Pmu_next
-            AllThreeAllLepageLinkArg<Float, nColor, recon, phase> middleThreeLinkArg(newOprod, P3, oprod, Pmu, Pmu_next, link, act_path_coeff);
-            AllThreeAllLepageLinkForce<decltype(middleThreeLinkArg)> middleThreeLink(middleThreeLinkArg, link, sig_pair, dim_dir_pair::invalid_pair(), mu_vals[0], act_path_coeff, newOprod, P3, Pmu_next);
-
-            // All 5 and 7 link contributions
-            // In/out: newOprod, P3
-            // In: Pmu, link
-            // Internal only: P5, Pnumu, Qnumu, and the double-buffer flavors
-            hisqFiveSeven<low_memory_path>(newOprod, P3, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, Pmu_next, link, act_path_coeff, sig_pair, mu_vals[0]);
-
-            for (int i = 0; i < 5; i++) {
-              std::swap(Pmu, Pmu_next);
-
-              // Fully fused 3-link and Lepage contributions (when Lepage coeff != 0.)
-              // In/out: oProd, P3 (read + overwritten)
-              // In: (first) Pmu, oProd, link
-              // Out: (second) Pmu
-              AllThreeAllLepageLinkArg<Float, nColor, recon, phase> allThreeAllLepageLinkArg(newOprod, P3, oprod, Pmu, Pmu_next, link, act_path_coeff);
-              AllThreeAllLepageLinkForce<decltype(allThreeAllLepageLinkArg)> allLepageAllThreeLink(allThreeAllLepageLinkArg, link, sig_pair, mu_vals[i], mu_vals[i+1], act_path_coeff, newOprod, P3, Pmu_next);
-
-              // All 5 and 7 link contributions, as above
-              hisqFiveSeven<low_memory_path>(newOprod, P3, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, Pmu_next, link, act_path_coeff, sig_pair, mu_vals[i+1]);
-            }
-
+          for (int i = 0; i < 5; i++) {
             std::swap(Pmu, Pmu_next);
 
-            // Side 3-link, fused with Lepage all link when the lepage coeff != 0.
-            // In/out: newOprod
-            // In: P3, (second) Pmu, link
-            // Ignored: (first) Pmu, oProd
-            AllThreeAllLepageLinkArg<Float, nColor, recon, phase> allLepageSideThreeLinkArg(newOprod, P3, oprod, Pmu, Pmu_next, link, act_path_coeff);
-            AllThreeAllLepageLinkForce<decltype(allLepageSideThreeLinkArg)> allLepageSideThreeLink(allLepageSideThreeLinkArg, link, sig_pair, mu_vals[5], dim_dir_pair::invalid_pair(), act_path_coeff, newOprod, P3, Pmu_next);
+            // Fully fused 3-link and Lepage contributions (when Lepage coeff != 0.)
+            // In/out: oProd, P3 (read + overwritten)
+            // In: (first) Pmu, oProd, link
+            // Out: (second) Pmu
+            AllThreeAllLepageLinkArg<Float, nColor, recon, phase> allThreeAllLepageLinkArg(newOprod, P3, oprod, Pmu, Pmu_next, link, act_path_coeff);
+            AllThreeAllLepageLinkForce<decltype(allThreeAllLepageLinkArg)> allLepageAllThreeLink(allThreeAllLepageLinkArg, link, sig_pair, mu_vals[i], mu_vals[i+1], act_path_coeff, newOprod, P3, Pmu_next);
 
-
+            // All 5 and 7 link contributions, as above
+            hisqFiveSeven(newOprod, P3, P5, Pnumu, Qnumu, Pnumu_next, Qnumu_next, Pmu_next, link, act_path_coeff, sig_pair, mu_vals[i+1]);
           }
+
+          std::swap(Pmu, Pmu_next);
+
+          // Side 3-link, fused with Lepage all link when the lepage coeff != 0.
+          // In/out: newOprod
+          // In: P3, (second) Pmu, link
+          // Ignored: (first) Pmu, oProd
+          AllThreeAllLepageLinkArg<Float, nColor, recon, phase> allLepageSideThreeLinkArg(newOprod, P3, oprod, Pmu, Pmu_next, link, act_path_coeff);
+          AllThreeAllLepageLinkForce<decltype(allLepageSideThreeLinkArg)> allLepageSideThreeLink(allLepageSideThreeLinkArg, link, sig_pair, mu_vals[5], dim_dir_pair::invalid_pair(), act_path_coeff, newOprod, P3, Pmu_next);
         }//sig
       }
     };
