@@ -291,9 +291,6 @@ namespace quda {
       bool hermitian;
       bool Anorm;
 
-      unsigned int sharedBytesPerThread() const { return 0; }
-      unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-
       int NYW_max;
       uint2 max_tile_size;
 
@@ -477,9 +474,6 @@ namespace quda {
       Vy &y;
       bool hermitian;
       bool Anorm;
-
-      unsigned int sharedBytesPerThread() const { return 0; }
-      unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
     public:
       TransposeTune(std::vector<T> &result, Vx &x, Vy &y, bool hermitian, bool Anorm = false) :

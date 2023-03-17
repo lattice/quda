@@ -58,10 +58,10 @@ namespace quda {
     virtual long long bytes() const { return 0; }
 
     // the minimum number of shared bytes per thread
-    virtual unsigned int sharedBytesPerThread() const = 0;
+    virtual unsigned int sharedBytesPerThread() const { return 0; }
 
     // the minimum number of shared bytes per thread block
-    virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const = 0;
+    virtual unsigned int sharedBytesPerBlock(const TuneParam &) const{ return 0; }
 
     // override this if a specific thread count is required (e.g., if not grid size tuning)
     virtual unsigned int minThreads() const { return 1; }

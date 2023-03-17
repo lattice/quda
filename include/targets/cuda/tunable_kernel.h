@@ -41,9 +41,6 @@ namespace quda
   protected:
     QudaFieldLocation location;
 
-    virtual unsigned int sharedBytesPerThread() const { return 0; }
-    virtual unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-
     template <template <typename> class Functor, bool grid_stride, typename Arg>
     std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
     launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
@@ -108,7 +105,7 @@ namespace quda
       if (this->location == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
     }
 
-    virtual bool advanceTuneParam(TuneParam &param) const
+    virtual bool advanceTuneParam(TuneParam &param) const override
     {
       return location == QUDA_CPU_FIELD_LOCATION ? false : Tunable::advanceTuneParam(param);
     }
