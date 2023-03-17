@@ -650,7 +650,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   if (param->use_resident_gauge) {
     if(gaugePrecise == nullptr) errorQuda("No resident gauge field");
     // copy rather than point at to ensure that the padded region is filled in
-    printfQuda("QUDA: Using resident gauge field\n");
     precise->copy(*gaugePrecise);
     precise->exchangeGhost();
     freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
@@ -658,7 +657,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   } else {
     profileGauge.TPSTOP(QUDA_PROFILE_INIT);
     profileGauge.TPSTART(QUDA_PROFILE_H2D);
-    printfQuda("QUDA: Using new gauge field\n");
     precise->copy(*in);
     profileGauge.TPSTOP(QUDA_PROFILE_H2D);
   }
@@ -745,7 +743,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   switch (param->type) {
     case QUDA_WILSON_LINKS:
-      printfQuda("Making Wilson links\n");
       gaugePrecise = precise;
       gaugeSloppy = sloppy;
       gaugePrecondition = precondition;
@@ -755,7 +752,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       if(param->overlap) gaugeExtended = extended;
       break;
     case QUDA_ASQTAD_FAT_LINKS:
-      printfQuda("Making Fat links\n");
       gaugeFatPrecise = precise;
       gaugeFatSloppy = sloppy;
       gaugeFatPrecondition = precondition;
@@ -764,12 +760,10 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
       if(param->overlap){
         if(gaugeFatExtended) errorQuda("Extended gauge fat field already allocated");
-	printfQuda("Making Fat Extended links\n");
 	gaugeFatExtended = extended;
       }
       break;
     case QUDA_ASQTAD_LONG_LINKS:
-      printfQuda("Making Long links\n");
       gaugeLongPrecise = precise;
       gaugeLongSloppy = sloppy;
       gaugeLongPrecondition = precondition;
@@ -778,7 +772,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
       if(param->overlap){
         if(gaugeLongExtended) errorQuda("Extended gauge long field already allocated");
-	printfQuda("Making Long Extended links\n");
    	gaugeLongExtended = extended;
       }
       break;
@@ -1413,6 +1406,37 @@ void endQuda(void)
 
   if(momResident) delete momResident;
 
+  // Delete MILC FGI fields
+  //----------------------------------------------------------
+  if(momResidentCopy) delete momResidentCopy;
+  // Wilson Links
+  //----------------------------------------------------------
+  if (gaugeCopyPrecise) delete gaugeCopyPrecise;
+  if (gaugeCopySloppy) delete gaugeCopySloppy;
+  if (gaugeCopyPrecondition) delete gaugeCopyPrecondition;
+  if (gaugeCopyRefinement) delete gaugeCopyRefinement;
+  if (gaugeCopyExtended) delete gaugeCopyExtended;
+  if (extendedGaugeCopyResident) delete extendedGaugeCopyResident;
+  //----------------------------------------------------------
+  
+  // Fat Links
+  //----------------------------------------------------------
+  if (gaugeFatCopyPrecise) delete gaugeFatCopyPrecise;
+  if (gaugeFatCopySloppy) delete gaugeFatCopySloppy;
+  if (gaugeFatCopyPrecondition) delete gaugeFatCopyPrecondition;
+  if (gaugeFatCopyRefinement) delete gaugeFatCopyRefinement;
+  if (gaugeFatCopyExtended) delete gaugeFatCopyExtended;
+  //----------------------------------------------------------
+
+  // Long Links
+  //----------------------------------------------------------
+  if (gaugeLongCopyPrecise) delete gaugeLongCopyPrecise;
+  if (gaugeLongCopySloppy) delete gaugeLongCopySloppy;
+  if (gaugeLongCopyPrecondition) delete gaugeLongCopyPrecondition;
+  if (gaugeLongCopyRefinement) delete gaugeLongCopyRefinement;
+  if (gaugeLongCopyExtended) delete gaugeLongCopyExtended;
+  //----------------------------------------------------------
+  
   LatticeField::freeGhostBuffer();
   ColorSpinorField::freeGhostBuffer();
   FieldTmp<ColorSpinorField>::destroy();
@@ -4341,14 +4365,12 @@ void copyGaugeQuda()
 
   // Wilson Links
   //----------------------------------------------------------
-  printfQuda("QUDA_MILC_INTERFACE: QUDA copying Wilson Links\n");
   if(gaugePrecise) {
     if(!gaugeCopyPrecise) {
       GaugeFieldParam gauge_param(*gaugePrecise);
       gaugeCopyPrecise = new cudaGaugeField(gauge_param);
     }
     gaugeCopyPrecise->copy(*gaugePrecise);
-    //gaugeCopyPrecise->exchangeGhost();
   }
 
   if(gaugeSloppy) {
@@ -4357,7 +4379,6 @@ void copyGaugeQuda()
       gaugeCopySloppy = new cudaGaugeField(gauge_param);
     }
     gaugeCopySloppy->copy(*gaugeSloppy);
-    //gaugeCopySloppy->exchangeGhost();
   }
 
   if(gaugePrecondition) {
@@ -4366,7 +4387,6 @@ void copyGaugeQuda()
       gaugeCopyPrecondition = new cudaGaugeField(gauge_param);
     }
     gaugeCopyPrecondition->copy(*gaugePrecondition);
-    //gaugeCopyPrecondition->exchangeGhost();
   }
 
   if(gaugeRefinement) {
@@ -4375,7 +4395,6 @@ void copyGaugeQuda()
       gaugeCopyRefinement = new cudaGaugeField(gauge_param);
     }
     gaugeCopyRefinement->copy(*gaugeRefinement);
-    //gaugeCopyRefinement->exchangeGhost();
   }
   
   if(gaugeExtended) {
@@ -4385,12 +4404,10 @@ void copyGaugeQuda()
     }
     copyExtendedGauge(*gaugeCopyExtended, *gaugeExtended, QUDA_CUDA_FIELD_LOCATION);
   }
-
   //----------------------------------------------------------
 
   // Fat Links
   //----------------------------------------------------------
-  printfQuda("QUDA_MILC_INTERFACE: QUDA: copying Fat Links\n");
   if(gaugeFatPrecise) {
     if(!gaugeFatCopyPrecise) {
       GaugeFieldParam gauge_param(*gaugeFatPrecise);
@@ -4398,7 +4415,6 @@ void copyGaugeQuda()
     }
     gaugeFatCopyPrecise->copy(*gaugeFatPrecise);
     gaugeFatCopyPrecise->exchangeGhost();
-    // Checksum
   }
 
   if(gaugeFatSloppy) {
@@ -4435,12 +4451,10 @@ void copyGaugeQuda()
     }
     copyExtendedGauge(*gaugeFatCopyExtended, *gaugeFatExtended, QUDA_CUDA_FIELD_LOCATION);
   }
-  
   //----------------------------------------------------------
   
   // Long Links
   //----------------------------------------------------------
-  printfQuda("QUDA_MILC_INTERFACE: QUDA: copying Long Links\n");
   if(gaugeLongPrecise) {
     if(!gaugeLongCopyPrecise) {
       GaugeFieldParam gauge_param(*gaugeLongPrecise);
@@ -4503,29 +4517,15 @@ void restoreGaugeQuda()
 
   // Wilson Links
   //----------------------------------------------------------
-  printfQuda("QUDA_MILC_INTERFACE: QUDA: restore Wilson Links\n");
-  if(gaugePrecise) {
-    gaugePrecise->copy(*gaugeCopyPrecise);
-    //gaugePrecise->exchangeGhost();
-  }  
-  if(gaugeSloppy) {
-    gaugeSloppy->copy(*gaugeCopySloppy);
-    //gaugeSloppy->exchangeGhost();
-  }
-  if(gaugePrecondition) {
-    gaugePrecondition->copy(*gaugeCopyPrecondition);
-    //gaugePrecondition->exchangeGhost();
-  }
-  if(gaugeRefinement) {
-    gaugeRefinement->copy(*gaugeCopyRefinement);
-    //gaugeRefinement->exchangeGhost();
-  }
+  if(gaugePrecise) gaugePrecise->copy(*gaugeCopyPrecise);
+  if(gaugeSloppy) gaugeSloppy->copy(*gaugeCopySloppy);
+  if(gaugePrecondition) gaugePrecondition->copy(*gaugeCopyPrecondition);
+  if(gaugeRefinement) gaugeRefinement->copy(*gaugeCopyRefinement);
   if(gaugeExtended) copyExtendedGauge(*gaugeCopyExtended, *gaugeExtended, QUDA_CUDA_FIELD_LOCATION);
   //----------------------------------------------------------
 
   // Fat Links
   //----------------------------------------------------------
-  printfQuda("QUDA_MILC_INTERFACE: QUDA: restore Fat Links\n");
   if(gaugeFatPrecise) {
     gaugeFatPrecise->copy(*gaugeFatCopyPrecise);
     gaugeFatPrecise->exchangeGhost();
@@ -4547,7 +4547,6 @@ void restoreGaugeQuda()
 
   // Long Links
   //----------------------------------------------------------
-  printfQuda("QUDA_MILC_INTERFACE: QUDA: restore Long Links\n");
   if(gaugeLongPrecise) {
     gaugeLongPrecise->copy(*gaugeLongCopyPrecise);
     gaugeLongPrecise->exchangeGhost();
@@ -4569,37 +4568,6 @@ void restoreGaugeQuda()
 
   if(extendedGaugeResident) copyExtendedGauge(*extendedGaugeCopyResident, *extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
   
-  /*
-  // Delete fields
-  //----------------------------------------------------------
-  // Wilson Links
-  //----------------------------------------------------------
-  delete gaugeCopyPrecise;
-  delete gaugeCopySloppy;
-  delete gaugeCopyPrecondition;
-  delete gaugeCopyRefinement;
-  //delete gaugeCopyExtended;
-  //----------------------------------------------------------
-
-  // Fat Links
-  //----------------------------------------------------------
-  delete gaugeFatCopyPrecise;
-  delete gaugeFatCopySloppy;
-  delete gaugeFatCopyPrecondition;
-  delete gaugeFatCopyRefinement;
-  delete gaugeFatCopyExtended;
-  //----------------------------------------------------------
-
-  // Long Links
-  //----------------------------------------------------------
-  delete gaugeLongCopyPrecise;
-  delete gaugeLongCopySloppy;
-  delete gaugeLongCopyPrecondition;
-  delete gaugeLongCopyRefinement;
-  delete gaugeLongCopyExtended;
-  //----------------------------------------------------------
-  */
-  
   profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
@@ -4609,7 +4577,6 @@ void momResidentZeroQuda()
   profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
 
   if (momResident) {
-    printfQuda("QUDA_MILC_INTERFACE: QUDA: copying momentum\n");
     if (!momResidentCopy) {
       GaugeFieldParam gauge_param(*momResident);
       momResidentCopy = new cudaGaugeField(gauge_param);
@@ -4617,11 +4584,10 @@ void momResidentZeroQuda()
     
     // make a copy
     momResidentCopy->copy(*momResident);
-    //momResidentCopy->exchangeGhost();
     // zero out original momResident
     momResident->zero();
   } else {
-    errorQuda("QUDA_MILC_INTERFACE: QUDA: No momResident to copy to momResidentCopy");
+    errorQuda("No momResident to copy to momResidentCopy");
   }
 
   profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
@@ -4633,12 +4599,10 @@ void momResidentRestoreQuda()
   profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
 
   if (momResidentCopy) {
-    printfQuda("QUDA_MILC_INTERFACE: QUDA: restoring momentum\n");
     // restore momentum
     momResident->copy(*momResidentCopy);
-    //momResident->exchangeGhost();
   } else {
-    errorQuda("QUDA_MILC_INTERFACE: QUDA: No momResidentCopy to push to momResident");
+    errorQuda("No momResidentCopy to push to momResident");
   }
 
   profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
