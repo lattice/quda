@@ -84,6 +84,12 @@ endif()
 # CUDA specific QUDA options options
 include(CMakeDependentOption)
 
+if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "12.1")
+  # large arg support requires CUDA 12.1
+  option(QUDA_LARGE_KERNEL_ARG "enable large kernel arg support" OFF)
+  mark_as_advanced(QUDA_LARGE_KERNEL_ARG)
+endif()
+
 option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
 option(QUDA_JITIFY "build QUDA using Jitify" OFF)
 option(QUDA_DOWNLOAD_NVSHMEM "Download NVSHMEM" OFF)

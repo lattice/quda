@@ -133,9 +133,6 @@ message(STATUS "QUDA target: ${QUDA_TARGET_TYPE}")
 # ######################################################################################################################
 
 # build options
-option(QUDA_LARGE_KERNEL_ARG "enable large kernel arg support" OFF)
-mark_as_advanced(QUDA_LARGE_KERNEL_ARG)
-
 option(QUDA_DIRAC_DEFAULT_OFF "default value for QUDA_DIRAC_<TYPE> setting" $ENV{QUDA_DIRAC_DEFAULT_OFF})
 mark_as_advanced(QUDA_DIRAC_DEFAULT_OFF)
 if(QUDA_DIRAC_DEFAULT_OFF)
