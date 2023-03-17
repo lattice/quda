@@ -220,8 +220,8 @@ static QudaGaugeParam newMILCGaugeParam(const int* dim, QudaPrecision prec, Quda
 }
 
 static  void invalidateGaugeQuda() {
-  printfQuda("QUDA_MILC_INTERFACE: Invalidating QUDA gauge\n");
   qudamilc_called<true>(__func__);
+  printfQuda("invalidateGaugeQuda: Calling freeGaugeQuda\n");
   freeGaugeQuda();
   invalidate_quda_gauge = true;
   have_resident_gauge = false;
@@ -739,6 +739,7 @@ void qudaGaugeLoopTracePhased(int precision, double *traces, int **input_path_bu
   QudaGaugeParam qudaGaugeParam = createGaugeParamForObservables(precision, arg, phase_in);
   void *gauge = arg->site ? arg->site : arg->link;
 
+  printfQuda("qudaGaugeLoopTracePhased: Calling loadGaugeQuda\n");
   loadGaugeQuda(gauge, &qudaGaugeParam);
 
   QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
@@ -764,6 +765,7 @@ void qudaPlaquettePhased(int precision, double plaq[3], QudaMILCSiteArg_t *arg, 
   QudaGaugeParam qudaGaugeParam = createGaugeParamForObservables(precision, arg, phase_in);
   void *gauge = arg->site ? arg->site : arg->link;
 
+  printfQuda("qudaPlaquettePhased: Calling loadGaugeQuda\n");
   loadGaugeQuda(gauge, &qudaGaugeParam);
 
   QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
@@ -789,6 +791,7 @@ void qudaPolyakovLoopPhased(int precision, double ploop[2], int dir, QudaMILCSit
   QudaGaugeParam qudaGaugeParam = createGaugeParamForObservables(precision, arg, phase_in);
   void *gauge = arg->site ? arg->site : arg->link;
 
+  printfQuda("qudaPolyakovLoopPhased: Calling loadGaugeQuda\n");
   loadGaugeQuda(gauge, &qudaGaugeParam);
 
   QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
@@ -815,6 +818,7 @@ void qudaGaugeMeasurementsPhased(int precision, double plaq[3], double ploop[2],
   QudaGaugeParam qudaGaugeParam = createGaugeParamForObservables(precision, arg, phase_in);
   void *gauge = arg->site ? arg->site : arg->link;
 
+  printfQuda("qudaGaugeMeasurementsPhased: Calling loadGaugeQuda\n");
   loadGaugeQuda(gauge, &qudaGaugeParam);
 
   QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
@@ -1167,7 +1171,7 @@ void qudaMultishiftInvert(int external_precision, int quda_precision, int num_of
     final_fermilab_residual[i] = invertParam.true_res_hq_offset[i];
   } // end loop over number of offsets
 
-  //if (!create_quda_gauge) invalidateGaugeQuda();
+  if (!create_quda_gauge) invalidateGaugeQuda();
 
   qudamilc_called<false>(__func__, verbosity);
 } // qudaMultiShiftInvert
@@ -1446,7 +1450,7 @@ void qudaEigCGInvert(int external_precision, int quda_precision, double mass, Qu
   if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
 
   if ((invalidate_quda_gauge || !create_quda_gauge) && (rhs_idx == 0)) { // do this for the first RHS
-    printfQuda("qudaEigCGInvert: Calling loadGaugeQuda. invalidate_quda_gauge = %s, create_quda_gauge = %s\n", invalidate_quda_gauge ? "true" : "false", create_quda_gauge ? "true" : "false");
+    printfQuda("qudaEigCGInvert: Calling loadGaugeQuda. invalidate_quda_gauge = %s, create_quda_gauge = %s, rhs_idx = %d\n", invalidate_quda_gauge ? "true" : "false", create_quda_gauge ? "true" : "false", rhs_idx);
     loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
     if (longlink != nullptr) loadGaugeQuda(const_cast<void *>(longlink), &long_param);
     invalidate_quda_gauge = false;
@@ -2760,6 +2764,7 @@ void qudaLoadGaugeField(int external_precision,
   QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
   setGaugeParams(qudaGaugeParam, localDim, inv_args, external_precision, quda_precision);
 
+  printfQuda("qudaLoadGaugeField: Calling loadGaugeQuda\n");
   loadGaugeQuda(const_cast<void *>(milc_link), &qudaGaugeParam);
   qudamilc_called<false>(__func__);
 } // qudaLoadGaugeField
@@ -2767,7 +2772,8 @@ void qudaLoadGaugeField(int external_precision,
 
 void qudaFreeGaugeField() {
     qudamilc_called<true>(__func__);
-  freeGaugeQuda();
+    printfQuda("qudaFreeGaugeField: Calling freeGaugeQuda\n");
+    freeGaugeQuda();
     qudamilc_called<false>(__func__);
 } // qudaFreeGaugeField
 
