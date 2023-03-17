@@ -63,17 +63,17 @@ namespace quda {
         launch<OneLinkTerm>(tp, stream, arg);
       }
 
-      void preTune() { force.backup(); }
-      void postTune() { force.restore(); }
+      void preTune() override { force.backup(); }
+      void postTune() override { force.restore(); }
 
-      long long flops() const {
+      long long flops() const override {
         // all four directions are handled in one kernel
         long long adds_per_site = 4ll;
         long long rescales_per_site = 4ll;
         return 2 * arg.threads.x * ( 18ll * adds_per_site + 18ll * rescales_per_site );
       }
 
-      long long bytes() const { return 2*4*arg.threads.x*( arg.oProd.Bytes() + 2*arg.force.Bytes() ); }
+      long long bytes() const override { return 2*4*arg.threads.x*( arg.oProd.Bytes() + 2*arg.force.Bytes() ); }
     };
 
     template <typename Arg> class AllThreeAllLepageLinkForce : public TunableKernel2D {
@@ -171,19 +171,19 @@ namespace quda {
         instantiate(sig, mu, mu_next, tp, stream);
       }
 
-      void preTune() {
+      void preTune() override {
         force.backup();
         p3.backup();
         pMu_next.backup();
       }
 
-      void postTune() {
+      void postTune() override {
         force.restore();
         p3.restore();
         pMu_next.restore();
       }
 
-      long long flops() const {
+      long long flops() const override {
         long long multiplies_per_site = 0ll;
         long long adds_per_site = 0ll;
         long long rescales_per_site = 0ll;
@@ -214,7 +214,7 @@ namespace quda {
         return 2 * arg.threads.x * (198ll * multiplies_per_site + 18ll * adds_per_site + 18ll * rescales_per_site);
       }
 
-      long long bytes() const {
+      long long bytes() const override {
         long long bytes_per_site = ( arg.link.Bytes() );
         // Three link side link, all Lepage
         if (mu.is_valid()) {
@@ -360,7 +360,7 @@ namespace quda {
         instantiate(sig, mu, nu, nu_next, tp, stream);
       }
 
-      void preTune() {
+      void preTune() override {
         force.backup();
         shortP.backup();
         p5.backup();
@@ -368,7 +368,7 @@ namespace quda {
         qNuMu_next.backup();
       }
 
-      void postTune() {
+      void postTune() override {
         force.restore();
         shortP.restore();
         p5.restore();
@@ -376,7 +376,7 @@ namespace quda {
         qNuMu_next.restore();
       }
 
-      long long flops() const {
+      long long flops() const override {
         long long multiplies_per_site = 0ll;
         long long adds_per_site = 0ll;
         long long rescales_per_site = 0ll;
@@ -406,7 +406,7 @@ namespace quda {
         return 2*arg.threads.x*(198ll * multiplies_per_site + 18ll * adds_per_site + 18ll * rescales_per_site);
       }
 
-      long long bytes() const {
+      long long bytes() const override {
         long long bytes_per_site = arg.link.Bytes();
         if (sig.is_forward()) bytes_per_site += 2 * arg.force.Bytes();
 
@@ -676,15 +676,15 @@ namespace quda {
         launch<LongLink>(tp, stream, arg);
       }
 
-      void preTune() {
+      void preTune() override {
         force.backup();
       }
 
-      void postTune() {
+      void postTune() override {
         force.restore();
       }
 
-      long long flops() const {
+      long long flops() const override {
         // all 4 directions
         long long multiplies_per_site = 4ll * 6ll;
         long long adds_per_site = 4ll * 3ll;
@@ -692,7 +692,7 @@ namespace quda {
         return 2 * arg.threads.x * (198ll * multiplies_per_site + 18ll * adds_per_site + 18ll * rescales_per_site);
       }
 
-      long long bytes() const {
+      long long bytes() const override {
         return 4 * 2 * arg.threads.x * (2 * arg.force.Bytes() + 4 * arg.link.Bytes() + 3 * arg.oProd.Bytes());
       }
     };
@@ -750,15 +750,15 @@ namespace quda {
         launch<CompleteForce>(tp, stream, arg);
       }
 
-      void preTune() {
+      void preTune() override {
         force.backup();
       }
 
-      void postTune() {
+      void postTune() override {
         force.restore();
       }
 
-      long long flops() const {
+      long long flops() const override {
         // all 4 directions
         int multiplies_per_site = 4ll;
         int rescales_per_site = 4ll;
@@ -767,7 +767,7 @@ namespace quda {
         return 2ll * arg.threads.x * (198ll * multiplies_per_site + 18ll * rescales_per_site + 23ll * antiherm_per_site);
       }
 
-      long long bytes() const {
+      long long bytes() const override {
         return 4*2*arg.threads.x*(arg.force.Bytes() + arg.link.Bytes() + arg.oProd.Bytes());
       }
     };
