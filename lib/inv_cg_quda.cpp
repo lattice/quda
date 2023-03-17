@@ -710,7 +710,6 @@ namespace quda {
     ColorSpinorField &p = *pp;
     ColorSpinorField &Ap = *App;
     ColorSpinorField &rnew = *rnewp;
-    //ColorSpinorField &tmp = *tmpp;
     ColorSpinorField &rSloppy = *rSloppyp;
     ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
 

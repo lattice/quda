@@ -117,10 +117,10 @@ protected:
 
   virtual void SetUp()
   {
-#ifndef QUDA_BUILD_NATIVE_FFT  // skip FFT tests if FFT not available
-    const ::testing::TestInfo* const test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+#ifndef QUDA_BUILD_NATIVE_FFT // skip FFT tests if FFT not available
+    const ::testing::TestInfo *const test_info = ::testing::UnitTest::GetInstance()->current_test_info();
     const char *name = test_info->name();
-    if ( strcmp(name, "Landau_FFT")==0 || strcmp(name, "Coulomb_FFT")==0 ) {
+    if (strcmp(name, "Landau_FFT") == 0 || strcmp(name, "Coulomb_FFT") == 0) {
       execute = false;
       GTEST_SKIP();
     }

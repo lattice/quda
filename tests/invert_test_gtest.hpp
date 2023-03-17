@@ -109,7 +109,13 @@ bool skip_test(test_t param)
   // Skip if the inverter does not support batched update and batched update is greater than one
   if (!support_solution_accumulator_pipeline(inverter_type) && solution_accumulator_pipeline > 1) return true;
   // MdagMLocal only support for Mobius at present
-  if (is_normal_solve(param) && ::testing::get<0>(schwarz_param) != QUDA_INVALID_SCHWARZ && dslash_type != QUDA_MOBIUS_DWF_DSLASH) return true;
+  if (is_normal_solve(param) && ::testing::get<0>(schwarz_param) != QUDA_INVALID_SCHWARZ) {
+#ifdef QUDA_MMA_AVAILABLE
+    if (dslash_type != QUDA_MOBIUS_DWF_DSLASH) return true;
+#else
+    return true;
+#endif
+  }
 
   return false;
 }
@@ -206,7 +212,6 @@ INSTANTIATE_TEST_SUITE_P(MultiShiftEvenOdd, InvertTest,
                                  no_schwarz),
                          gettestname);
 
-#ifdef QUDA_MMA_AVAILABLE
 // Schwarz-preconditioned normal solves
 INSTANTIATE_TEST_SUITE_P(SchwarzNormal, InvertTest,
                          Combine(Values(QUDA_PCG_INVERTER),
@@ -218,7 +223,6 @@ INSTANTIATE_TEST_SUITE_P(SchwarzNormal, InvertTest,
                                          Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER),
                                          Values(QUDA_HALF_PRECISION, QUDA_QUARTER_PRECISION))),
                          gettestname);
-#endif
 
 // Schwarz-preconditioned direct solves
 INSTANTIATE_TEST_SUITE_P(SchwarzEvenOdd, InvertTest,
