@@ -408,6 +408,8 @@ int main(int argc, char **argv)
 
   initQuda(device_ordinal);
 
+  setVerbosity(verbosity);
+
   display_test_info();
 
   gauge_force_test();

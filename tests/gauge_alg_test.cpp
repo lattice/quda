@@ -117,6 +117,14 @@ protected:
 
   virtual void SetUp()
   {
+#ifndef QUDA_BUILD_NATIVE_FFT // skip FFT tests if FFT not available
+    const ::testing::TestInfo *const test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+    const char *name = test_info->name();
+    if (strcmp(name, "Landau_FFT") == 0 || strcmp(name, "Coulomb_FFT") == 0) {
+      execute = false;
+      GTEST_SKIP();
+    }
+#endif
     if (execute) {
       setVerbosity(verbosity);
       param = newQudaGaugeParam();
@@ -247,9 +255,8 @@ protected:
       a0.stop();
       printfQuda("Time -> %.6f s\n", a0.last());
     }
-    // If we performed a specific instance, switch off the
-    // Google testing.
-    if (test_type != 0) execute = false;
+    // Reset execute.  If we performed a specific instance, switch off the Google testing.
+    execute = (test_type == 0);
   }
 
   virtual void run_ovr()
