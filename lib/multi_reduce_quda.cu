@@ -22,7 +22,7 @@ namespace quda {
       T &result;
       QudaFieldLocation location;
 
-      virtual bool advanceSharedBytes(TuneParam &param) const
+      virtual bool advanceSharedBytes(TuneParam &param) const override
       {
         TuneParam next(param);
         advanceBlockDim(next); // to get next blockDim
@@ -175,7 +175,7 @@ namespace quda {
         compute<1>(stream);
       }
 
-      void apply(const qudaStream_t &stream)
+      void apply(const qudaStream_t &stream) override
       {
         constexpr int pow2_max = max_NXZ_power2(true);
         if (NXZ <= pow2_max && is_power2(NXZ)) instantiatePow2<pow2_max>(stream);
@@ -183,7 +183,7 @@ namespace quda {
         else errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);
       }
 
-      void preTune()
+      void preTune() override
       {
         for (int i = 0; i < NYW; ++i) {
           if (r.write.X) x[i].backup();
@@ -193,7 +193,7 @@ namespace quda {
         }
       }
 
-      void postTune()
+      void postTune() override
       {
         for (int i = 0; i < NYW; ++i) {
           if (r.write.X) x[i].restore();
@@ -203,12 +203,12 @@ namespace quda {
         }
       }
 
-      long long flops() const
+      long long flops() const override
       {
         return NYW * NXZ * r.flops() * x[0].Length();
       }
 
-      long long bytes() const
+      long long bytes() const override
       {
         // X and Z reads are repeated (and hopefully cached) across NYW
         // each Y and W read/write is done once
