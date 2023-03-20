@@ -28,7 +28,7 @@ namespace quda
   public:
     Laplace(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
-    void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
@@ -47,7 +47,7 @@ namespace quda
       }
     }
 
-    long long flops() const
+    long long flops() const override
     {
       int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(3) matrix-vector flops
       int num_mv_multiply = in.Nspin() == 4 ? 2 : 1;
@@ -93,7 +93,7 @@ namespace quda
       return flops_;
     }
 
-    virtual long long bytes() const
+    virtual long long bytes() const override
     {
       int gauge_bytes = arg.reconstruct * in.Precision();
       int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);

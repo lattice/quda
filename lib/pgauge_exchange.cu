@@ -51,7 +51,7 @@ namespace quda {
     GaugeField &U;
     GaugeFixUnPackArg<Float, recon> arg;
     const char *dim_str[4] = { "0", "1", "2", "3" };
-    unsigned int minThreads() const { return arg.threads.x; }
+    unsigned int minThreads() const override { return arg.threads.x; }
 
     PGaugeExchanger(GaugeField& U, const int dir, const int parity) :
       TunableKernel1D(U),
@@ -173,13 +173,13 @@ namespace quda {
       return TuneKey(vol, typeid(*this).name(), aux2.c_str());
     }
 
-    void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t &stream) override
     {
       auto tp = tuneLaunch(*this, getTuning(), getVerbosity());
       launch<unpacker>(tp, stream, arg);
     }
 
-    long long bytes() const { return 2 * U.SurfaceCB(arg.face) * U.Reconstruct() * U.Precision(); }
+    long long bytes() const override { return 2 * U.SurfaceCB(arg.face) * U.Reconstruct() * U.Precision(); }
   };
 
   void PGaugeExchange(GaugeField& U, const int dir, const int parity)
