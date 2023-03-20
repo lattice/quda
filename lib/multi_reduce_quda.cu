@@ -390,7 +390,7 @@ namespace quda {
 
       virtual ~TileSizeTune() { setPolicyTuning(false); }
 
-      void apply(const qudaStream_t &) {
+      void apply(const qudaStream_t &) override {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         // tp.aux.x is where the tile size is stored. "tp" is the tuning struct.
@@ -401,7 +401,7 @@ namespace quda {
       }
 
       // aux.x is the tile size
-      bool advanceAux(TuneParam &param) const
+      bool advanceAux(TuneParam &param) const override
       {
         // for 1-d reductions we don't do any tuning and just use the largest tile
         if (x.size() == 1 || y.size() == 1) {
@@ -430,9 +430,9 @@ namespace quda {
         }
       }
 
-      bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
+      bool advanceTuneParam(TuneParam &param) const override { return advanceAux(param); }
 
-      void initTuneParam(TuneParam &param) const  {
+      void initTuneParam(TuneParam &param) const override {
         Tunable::initTuneParam(param);
         if (x.size() == 1 || y.size() == 1) {
           param.aux.x = max_tile_size.x;
@@ -445,7 +445,7 @@ namespace quda {
         param.aux.w = 0;
       }
 
-      void defaultTuneParam(TuneParam &param) const  {
+      void defaultTuneParam(TuneParam &param) const override {
         Tunable::defaultTuneParam(param); // default is max tile size
         param.aux.x = max_tile_size.x;
         param.aux.y = max_tile_size.y;
@@ -457,11 +457,10 @@ namespace quda {
         return TuneKey(x[0].VolString().c_str(), typeid(*this).name(), aux);
       }
 
-      long long flops() const { return 0; } // FIXME
-      long long bytes() const { return 0; } // FIXME
+      long long bytes() const override { return 0; } // FIXME
 
-      void preTune() { } // FIXME - use write to determine what needs to be saved
-      void postTune() { } // FIXME - use write to determine what needs to be saved
+      void preTune() override { } // FIXME - use write to determine what needs to be saved
+      void postTune() override { } // FIXME - use write to determine what needs to be saved
     };
 
     template <template <typename ...> class ReducerDiagonal,
@@ -537,7 +536,7 @@ namespace quda {
 
       virtual ~TransposeTune() { setPolicyTuning(false); }
 
-      void apply(const qudaStream_t &)
+      void apply(const qudaStream_t &) override
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
@@ -559,7 +558,7 @@ namespace quda {
         }
       }
 
-      bool advanceAux(TuneParam &param) const
+      bool advanceAux(TuneParam &param) const override
       {
         if (x.size() == 1 || y.size() == 1) {
           return false;
@@ -574,9 +573,9 @@ namespace quda {
         }
       }
 
-      bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
+      bool advanceTuneParam(TuneParam &param) const override { return advanceAux(param); }
 
-      void initTuneParam(TuneParam &param) const
+      void initTuneParam(TuneParam &param) const override
       {
         Tunable::initTuneParam(param);
         if (x.size() == 1)
@@ -587,15 +586,14 @@ namespace quda {
           param.aux = make_int4(0, 0, 0, 0); // default is not to transpose
       }
 
-      void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
+      void defaultTuneParam(TuneParam &param) const override { initTuneParam(param); }
 
       TuneKey tuneKey() const override { return TuneKey(x[0].VolString().c_str(), typeid(*this).name(), aux); }
 
-      long long flops() const { return 0; } // FIXME
-      long long bytes() const { return 0; } // FIXME
+      long long bytes() const override { return 0; } // FIXME
 
-      void preTune() {}  // FIXME - use write to determine what needs to be saved
-      void postTune() {} // FIXME - use write to determine what needs to be saved
+      void preTune() override {}  // FIXME - use write to determine what needs to be saved
+      void postTune() override {} // FIXME - use write to determine what needs to be saved
     };
 
     void reDotProduct(std::vector<double> &result, cvector_ref<const ColorSpinorField> &x,
