@@ -1247,11 +1247,23 @@ foreach(prec IN LISTS TEST_PRECS)
   endif()
 
   if(QUDA_SMEAR_GAUSS_TWOLINK)
-    add_test(NAME staggered_gsmear_${prec}
-      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gsmear_test> ${MPIEXEC_POSTFLAGS}
-      --dim 2 4 6 8 --prec ${prec}
-      --test TwoLink
-      --gtest_output=xml:staggered_gsmear_test_${prec}.xml)
+    set(KERNEL_TYPE TwoLink GaussianSmear)
+    foreach(kerneltp IN LISTS KERNEL_TYPE)
+      if(${kerneltp} STREQUAL "TwoLink")
+	set(laplace3D 4)
+	set(smear_t0 -1)
+      elseif(${kerneltp} STREQUAL "GaussianSmear")
+	set(laplace3D 3)
+	set(smear_t0 1)
+      endif()	    
+      add_test(NAME staggered_gsmear_${kerneltp}_${prec}
+        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gsmear_test> ${MPIEXEC_POSTFLAGS}
+        --dim 2 4 6 8 --prec ${prec}
+        --test ${kerneltp}
+	--laplace3D ${laplace3D}
+	--smear-t0 ${smear_t0}
+        --gtest_output=xml:staggered_gsmear_test_${kerneltp}_${prec}.xml)
+    endforeach(kerneltp)
   endif()
 
 endforeach(prec)
