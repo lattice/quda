@@ -1493,8 +1493,9 @@ namespace quda
       size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
     };
 
-// Use this template as openqxd for now  TODO:
-    template <typename Float, int Ns, int Nc> struct SpaceSpinorColorOrder { // TODO: check how to adapt this for openqxd
+    // Use this template as openqxd for now  TODO:
+    template <typename Float, int Ns, int Nc>
+    struct SpaceSpinorColorOrder { // TODO: check how to adapt this for openqxd
       using Accessor = SpaceSpinorColorOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
@@ -1722,11 +1723,10 @@ namespace quda
       size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
     };
 
-#if 0
-    // Custom accessor for OpenQCD arrays
+    // Use this template as openqxd for now  TODO:
     template <typename Float, int Ns, int Nc>
-    struct OpenQCDDiracOrder { // TODO: USE: check how to adapt this for openqxd
-      using Accessor = SpaceSpinorColorOrder<Float, Ns, Nc>;
+    struct OpenQCDDiracOrder { // TODO: check how to adapt this for openqxd
+      using Accessor = OpenQCDDiracOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       static const int length = 2 * Ns * Nc;
@@ -1736,7 +1736,7 @@ namespace quda
       int volumeCB;
       int faceVolumeCB[4];
       int nParity;
-      SpaceSpinorColorOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, float * = 0, Float **ghost_ = 0) :
+      OpenQCDDiracOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, float * = 0, Float **ghost_ = 0) :
         field(field_ ? field_ : (Float *)a.V()),
         offset(a.Bytes() / (2 * sizeof(Float))),
         volumeCB(a.VolumeCB()),
@@ -1776,7 +1776,7 @@ namespace quda
         return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
       }
 
-      // __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dim, int dir, int parity = 0) const // TODO: do we need this for openqxd?
+      // __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dim, int dir, int parity = 0) const
       // {
       //   for (int s = 0; s < Ns; s++) {
       //     for (int c = 0; c < Nc; c++) {
@@ -1787,7 +1787,7 @@ namespace quda
       //   }
       // }
 
-      // __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dim, int dir, int parity = 0) const // TODO: do we need this for openqxd?
+      // __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dim, int dir, int parity = 0) const
       // {
       //   for (int s = 0; s < Ns; s++) {
       //     for (int c = 0; c < Nc; c++) {
@@ -1798,8 +1798,7 @@ namespace quda
       // }
 
       size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
-    };
-#endif //openQCDDiracOrder
+    }; // openQCDDiracOrder
 
   } // namespace colorspinor
 

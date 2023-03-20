@@ -82,23 +82,21 @@ using namespace quda;
 
 // template <bool start> void inline qudamilc_called(const char *func) { qudamilc_called<start>(func, getVerbosity()); }
 
-
-static int safe_mod(int x,int y)
+static int safe_mod(int x, int y)
 {
-   if (x>=0)
-      return x%y;
-   else
-      return (y-(abs(x)%y))%y;
+  if (x >= 0)
+    return x % y;
+  else
+    return (y - (abs(x) % y)) % y;
 }
-
 
 // fdata should point to 4 integers in order {NPROC0, NPROC1, NPROC2, NPROC3}
 // coords is the 4D cartesian coordinate of a rank.
 static int rankFromCoords(const int *coords, void *fdata) // TODO:
-{ 
+{
   int *NPROC = static_cast<int *>(fdata);
   // int *NPROC = BLK_NPROC + 4;
-	
+
   int ib;
   int n0_OpenQxD;
   int n1_OpenQxD;
@@ -109,22 +107,21 @@ static int rankFromCoords(const int *coords, void *fdata) // TODO:
   int NPROC2_OpenQxD;
   int NPROC3_OpenQxD;
 
-  n0_OpenQxD=coords[3];
-  n1_OpenQxD=coords[0];
-  n2_OpenQxD=coords[1];
-  n3_OpenQxD=coords[2];
+  n0_OpenQxD = coords[3];
+  n1_OpenQxD = coords[0];
+  n2_OpenQxD = coords[1];
+  n3_OpenQxD = coords[2];
 
   // NPROC0_OpenQxD=NPROC[3];
-  NPROC1_OpenQxD=NPROC[0];
-  NPROC2_OpenQxD=NPROC[1];
-  NPROC3_OpenQxD=NPROC[2];
+  NPROC1_OpenQxD = NPROC[0];
+  NPROC2_OpenQxD = NPROC[1];
+  NPROC3_OpenQxD = NPROC[2];
 
-  
-  ib=n0_OpenQxD;
-  ib=ib*NPROC1_OpenQxD+n1_OpenQxD;
-  ib=ib*NPROC2_OpenQxD+n2_OpenQxD;
-  ib=ib*NPROC3_OpenQxD+n3_OpenQxD;
-  printf("Coords are: %d,%d,%d,%d \n Rank is: %d \n\n",coords[0],coords[1],coords[2],coords[3],ib);
+  ib = n0_OpenQxD;
+  ib = ib * NPROC1_OpenQxD + n1_OpenQxD;
+  ib = ib * NPROC2_OpenQxD + n2_OpenQxD;
+  ib = ib * NPROC3_OpenQxD + n3_OpenQxD;
+  printf("Coords are: %d,%d,%d,%d \n Rank is: %d \n\n", coords[0], coords[1], coords[2], coords[3], ib);
   return ib;
 }
 
@@ -169,7 +166,7 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t input)
   openQCD_qudaSetLayout(input.layout);
   initialized = true;
   // qudamilc_called<false>(__func__);
-  // geometry(); // TODO: Establish helper indexes from openQxD?? 
+  // geometry(); // TODO: Establish helper indexes from openQxD??
 }
 
 void openQCD_qudaFinalize() { endQuda(); }
@@ -185,12 +182,11 @@ void *qudaAllocateManaged(size_t bytes) { return managed_malloc(bytes); }
 void qudaFreeManaged(void *ptr) { managed_free(ptr); }
 #endif
 
-
 static int getLinkPadding(const int dim[4])
 {
-  int padding = MAX(dim[1]*dim[2]*dim[3]/2, dim[0]*dim[2]*dim[3]/2);
-  padding = MAX(padding, dim[0]*dim[1]*dim[3]/2);
-  padding = MAX(padding, dim[0]*dim[1]*dim[2]/2);
+  int padding = MAX(dim[1] * dim[2] * dim[3] / 2, dim[0] * dim[2] * dim[3] / 2);
+  padding = MAX(padding, dim[0] * dim[1] * dim[3] / 2);
+  padding = MAX(padding, dim[0] * dim[1] * dim[2] / 2);
   return padding;
 }
 
@@ -243,7 +239,6 @@ void openQCD_qudaPlaquette(int precision, double plaq[3], void *gauge)
 // {
 //   // This function is the helper for ipt in QUDA
 
-
 //   return ix;
 // }
 
@@ -253,8 +248,6 @@ void openQCD_qudaPlaquette(int precision, double plaq[3], void *gauge)
 //   int x0,x1,x2,x3;
 //   int k,mu,ix,iy,iz,iw;
 //   int bo[4],bs[4],ifc[8];
-
-
 
 // }
 
@@ -338,25 +331,69 @@ static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, Qud
   invertParam->compute_action = 0;
 }
 
-
-
-
 static void setColorSpinorParams(const int dim[4], QudaPrecision precision, ColorSpinorParam *param)
 {
   param->nColor = 3;
   param->nSpin = 1; // TODO:
-  param->nDim = 4; // TODO: check how to adapt this for openqxd
+  param->nDim = 4;  // TODO: check how to adapt this for openqxd
 
   for (int dir = 0; dir < 4; ++dir) param->x[dir] = dim[dir];
   param->x[0] /= 2;
 
   param->setPrecision(precision);
   param->pad = 0;
-  param->siteSubset = QUDA_PARITY_SITE_SUBSET;   // TODO: check how to adapt this for openqxd
-  param->siteOrder = QUDA_EVEN_ODD_SITE_ORDER;   // TODO: check how to adapt this for openqxd
+  param->siteSubset = QUDA_PARITY_SITE_SUBSET; // TODO: check how to adapt this for openqxd
+  param->siteOrder = QUDA_EVEN_ODD_SITE_ORDER; // TODO: check how to adapt this for openqxd
   param->fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   param->gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless, but required by the code.  // TODO:
-  param->create = QUDA_ZERO_FIELD_CREATE; // TODO: check how to adapt this for openqxd
+  param->create = QUDA_ZERO_FIELD_CREATE;             // TODO: check how to adapt this for openqxd
+}
+
+void setGaugeParams(QudaGaugeParam &qudaGaugeParam, const int dim[4], openQCD_QudaInvertArgs_t &inv_args,
+                    int external_precision, int quda_precision)
+{
+
+  const QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  const QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision_sloppy;
+
+  switch (inv_args.mixed_precision) {
+  case 2: device_precision_sloppy = QUDA_HALF_PRECISION; break;
+  case 1: device_precision_sloppy = QUDA_SINGLE_PRECISION; break;
+  default: device_precision_sloppy = device_precision;
+  }
+
+  for (int dir = 0; dir < 4; ++dir) qudaGaugeParam.X[dir] = dim[dir];
+
+  qudaGaugeParam.anisotropy = 1.0;
+  qudaGaugeParam.type = QUDA_WILSON_LINKS;
+  qudaGaugeParam.gauge_order = QUDA_OPENQCD_GAUGE_ORDER;
+
+  // Check the boundary conditions
+  // Can't have twisted or anti-periodic boundary conditions in the spatial
+  // directions with 12 reconstruct at the moment.
+  bool trivial_phase = true;
+  for (int dir = 0; dir < 3; ++dir) {
+    if (inv_args.boundary_phase[dir] != 0) trivial_phase = false;
+  }
+  if (inv_args.boundary_phase[3] != 0 && inv_args.boundary_phase[3] != 1) trivial_phase = false;
+
+  if (trivial_phase) {
+    qudaGaugeParam.t_boundary = (inv_args.boundary_phase[3]) ? QUDA_ANTI_PERIODIC_T : QUDA_PERIODIC_T;
+    qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
+    qudaGaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
+  } else {
+    qudaGaugeParam.t_boundary = QUDA_PERIODIC_T;
+    qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    qudaGaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+  }
+
+  qudaGaugeParam.cpu_prec = host_precision;
+  qudaGaugeParam.cuda_prec = device_precision;
+  qudaGaugeParam.cuda_prec_sloppy = device_precision_sloppy;
+  qudaGaugeParam.cuda_prec_precondition = device_precision_sloppy;
+  qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  // qudaGaugeParam.ga_pad = getLinkPadding(dim);
 }
 
 #if 0
@@ -440,22 +477,37 @@ void openQCD_qudaInvert(int external_precision, int quda_precision, double mass,
   qudamilc_called<false>(__func__, verbosity);
 } // qudaInvert
 #endif
-#if 0
-void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_QudaInvertArgs_t inv_args, const void *const fatlink,
-                const void *const longlink, void *src, void *dst, int *num_iters)
+// #if 0
+void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_QudaInvertArgs_t inv_args, void *src,
+                        void *dst, void *gauge)
 {
   static const QudaVerbosity verbosity = getVerbosity();
-  qudamilc_called<true>(__func__, verbosity);
 
-  // static const QudaVerbosity verbosity = getVerbosity();
+  QudaGaugeParam qudaGaugeParam
+    = newOpenQCDGaugeParam(localDim, (quda_precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
+
+  loadGaugeQuda(gauge, &qudaGaugeParam);
+
+
+  // QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
+  // obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
+  // obsParam.remove_staggered_phase = QUDA_BOOLEAN_FALSE; //
+  // phase_in ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  // gaugeObservablesQuda(&obsParam);
+
+  // Let MILC apply its own Nc normalization
+  // plaq[0] = obsParam.plaquette[0];
+  // plaq[1] = obsParam.plaquette[1];
+  // plaq[2] = obsParam.plaquette[2];
+
+  // qudamilc_called<false>(__func__);
+  // return;
+
+
+
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision_sloppy = device_precision;
-
-  QudaGaugeParam fat_param = newQudaGaugeParam();
-  QudaGaugeParam long_param = newQudaGaugeParam();
-  setGaugeParams(fat_param, long_param, longlink, localDim, host_precision, device_precision, device_precision_sloppy,
-                 inv_args.tadpole, inv_args.naik_epsilon);
 
   QudaInvertParam invertParam = newQudaInvertParam();
 
@@ -469,34 +521,33 @@ void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_Quda
   setColorSpinorParams(localDim, host_precision, &csParam);
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
-  if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
+  // if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
 
-  if (invalidate_quda_gauge || !create_quda_gauge) {
-    loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
-    if (longlink != nullptr) loadGaugeQuda(const_cast<void *>(longlink), &long_param);
-    invalidate_quda_gauge = false;
-  }
+  // if (invalidate_quda_gauge || !create_quda_gauge) {
+  //   loadGaugeQuda(gauge, &qudaGaugeParam);
+  //   invalidate_quda_gauge = false;
+  // }
 
-  if (longlink == nullptr) invertParam.dslash_type = QUDA_STAGGERED_DSLASH;
+  invertParam.dslash_type = QUDA_WILSON_DSLASH;
 
-  int src_offset = getColorVectorOffset(other_parity, false, localDim);
-  int dst_offset = getColorVectorOffset(local_parity, false, localDim);
+  // int src_offset = getColorVectorOffset(other_parity, false, localDim);
+  // int dst_offset = getColorVectorOffset(local_parity, false, localDim);
 
-  dslashQuda(static_cast<char *>(dst) + dst_offset * host_precision,
-             static_cast<char *>(src) + src_offset * host_precision, &invertParam, local_parity);
+  dslashQuda(static_cast<char *>(dst), static_cast<char *>(src), &invertParam, local_parity);
 
-  if (!create_quda_gauge) invalidateGaugeQuda();
+  // if (!create_quda_gauge) invalidateGaugeQuda();
 
-  qudamilc_called<false>(__func__, verbosity);
+  // qudamilc_called<false>(__func__, verbosity);// TODO: remove? (This is from MILC)
 } // qudaDslash
-#endif
+// #endif
 
 // void* openQCD_qudaCreateGaugeField(void *gauge, int geometry, int precision)
 // {
 //   qudamilc_called<true>(__func__);
 //   QudaPrecision qudaPrecision = (precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
 //   QudaGaugeParam qudaGaugeParam
-//     = newMILCGaugeParam(localDim, qudaPrecision, (geometry == 1) ? QUDA_GENERAL_LINKS : QUDA_SU3_LINKS); // TODO: change MILC to openQCD
+//     = newMILCGaugeParam(localDim, qudaPrecision, (geometry == 1) ? QUDA_GENERAL_LINKS : QUDA_SU3_LINKS); // TODO:
+//     change MILC to openQCD
 //   qudamilc_called<false>(__func__);
 //   return createGaugeFieldQuda(gauge, geometry, &qudaGaugeParam);
 // }
@@ -505,9 +556,8 @@ void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_Quda
 // {
 //   qudamilc_called<true>(__func__);
 //   cudaGaugeField *cudaGauge = reinterpret_cast<cudaGaugeField *>(inGauge);
-//   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim, cudaGauge->Precision(), QUDA_GENERAL_LINKS); // TODO: change MILC to openQCD
-//   saveGaugeFieldQuda(gauge, inGauge, &qudaGaugeParam);
-//   qudamilc_called<false>(__func__);
+//   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim, cudaGauge->Precision(), QUDA_GENERAL_LINKS); // TODO:
+//   change MILC to openQCD saveGaugeFieldQuda(gauge, inGauge, &qudaGaugeParam); qudamilc_called<false>(__func__);
 // }
 
 // void qudaDestroyGaugeField(void *gauge)
@@ -519,53 +569,6 @@ void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_Quda
 
 // void setInvertParam(QudaInvertParam &invertParam, openQCD_QudaInvertArgs_t &inv_args, int external_precision,
 //                     int quda_precision, double kappa, double reliable_delta);
-
-void setGaugeParams(QudaGaugeParam &qudaGaugeParam, const int dim[4], openQCD_QudaInvertArgs_t &inv_args,
-                    int external_precision, int quda_precision)
-{
-
-  const QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  const QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  QudaPrecision device_precision_sloppy;
-
-  switch (inv_args.mixed_precision) {
-  case 2: device_precision_sloppy = QUDA_HALF_PRECISION; break;
-  case 1: device_precision_sloppy = QUDA_SINGLE_PRECISION; break;
-  default: device_precision_sloppy = device_precision;
-  }
-
-  for (int dir = 0; dir < 4; ++dir) qudaGaugeParam.X[dir] = dim[dir];
-
-  qudaGaugeParam.anisotropy = 1.0;
-  qudaGaugeParam.type = QUDA_WILSON_LINKS;
-  qudaGaugeParam.gauge_order = QUDA_OPENQCD_GAUGE_ORDER;
-
-  // Check the boundary conditions
-  // Can't have twisted or anti-periodic boundary conditions in the spatial
-  // directions with 12 reconstruct at the moment.
-  bool trivial_phase = true;
-  for (int dir = 0; dir < 3; ++dir) {
-    if (inv_args.boundary_phase[dir] != 0) trivial_phase = false;
-  }
-  if (inv_args.boundary_phase[3] != 0 && inv_args.boundary_phase[3] != 1) trivial_phase = false;
-
-  if (trivial_phase) {
-    qudaGaugeParam.t_boundary = (inv_args.boundary_phase[3]) ? QUDA_ANTI_PERIODIC_T : QUDA_PERIODIC_T;
-    qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
-    qudaGaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_12;
-  } else {
-    qudaGaugeParam.t_boundary = QUDA_PERIODIC_T;
-    qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    qudaGaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-  }
-
-  qudaGaugeParam.cpu_prec = host_precision;
-  qudaGaugeParam.cuda_prec = device_precision;
-  qudaGaugeParam.cuda_prec_sloppy = device_precision_sloppy;
-  qudaGaugeParam.cuda_prec_precondition = device_precision_sloppy;
-  qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  // qudaGaugeParam.ga_pad = getLinkPadding(dim);
-}
 
 void setInvertParam(QudaInvertParam &invertParam, openQCD_QudaInvertArgs_t &inv_args, int external_precision,
                     int quda_precision, double kappa, double reliable_delta)

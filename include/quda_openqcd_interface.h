@@ -99,7 +99,8 @@ void openQCD_qudaFinalize(void);
 typedef struct {
   // TODO: work out what we want to expose here
   int max_iter; /** Maximum number of iterations */
-  QudaParity evenodd; /** Which parity are we working on ? (options are QUDA_EVEN_PARITY, QUDA_ODD_PARITY, QUDA_INVALID_PARITY */
+  QudaParity
+    evenodd; /** Which parity are we working on ? (options are QUDA_EVEN_PARITY, QUDA_ODD_PARITY, QUDA_INVALID_PARITY */
   int mixed_precision;          /** Whether to use mixed precision or not (1 - yes, 0 - no) */
   double boundary_phase[4];     /** Boundary conditions */
   int make_resident_solution;   /** Make the solution resident and don't copy back */
@@ -118,14 +119,11 @@ typedef struct {
  * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
  * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
  * @param inv_args Struct setting some solver metadata
- * @param milc_fatlink Fat-link field on the host
- * @param milc_longlink Long-link field on the host
  * @param source Right-hand side source field
  * @param solution Solution spinor field
  */
-void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_QudaInvertArgs_t inv_args,
-                        const void *const milc_fatlink, const void *const milc_longlink, void *source, void *solution,
-                        int *num_iters);
+void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_QudaInvertArgs_t inv_args, void *source,
+                        void *solution, void *gauge);
 
 /**
  * Solve Ax=b for an improved staggered operator. All fields are fields
