@@ -169,7 +169,7 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t input)
   openQCD_qudaSetLayout(input.layout);
   initialized = true;
   // qudamilc_called<false>(__func__);
-  // geometry(); // Establish helper indexes from openQxD
+  // geometry(); // TODO: Establish helper indexes from openQxD?? 
 }
 
 void openQCD_qudaFinalize() { endQuda(); }
@@ -439,7 +439,8 @@ void openQCD_qudaInvert(int external_precision, int quda_precision, double mass,
 
   qudamilc_called<false>(__func__, verbosity);
 } // qudaInvert
-
+#endif
+#if 0
 void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_QudaInvertArgs_t inv_args, const void *const fatlink,
                 const void *const longlink, void *src, void *dst, int *num_iters)
 {
@@ -495,7 +496,7 @@ void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_Quda
 //   qudamilc_called<true>(__func__);
 //   QudaPrecision qudaPrecision = (precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
 //   QudaGaugeParam qudaGaugeParam
-//     = newMILCGaugeParam(localDim, qudaPrecision, (geometry == 1) ? QUDA_GENERAL_LINKS : QUDA_SU3_LINKS);
+//     = newMILCGaugeParam(localDim, qudaPrecision, (geometry == 1) ? QUDA_GENERAL_LINKS : QUDA_SU3_LINKS); // TODO: change MILC to openQCD
 //   qudamilc_called<false>(__func__);
 //   return createGaugeFieldQuda(gauge, geometry, &qudaGaugeParam);
 // }
@@ -504,7 +505,7 @@ void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_Quda
 // {
 //   qudamilc_called<true>(__func__);
 //   cudaGaugeField *cudaGauge = reinterpret_cast<cudaGaugeField *>(inGauge);
-//   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim, cudaGauge->Precision(), QUDA_GENERAL_LINKS);
+//   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim, cudaGauge->Precision(), QUDA_GENERAL_LINKS); // TODO: change MILC to openQCD
 //   saveGaugeFieldQuda(gauge, inGauge, &qudaGaugeParam);
 //   qudamilc_called<false>(__func__);
 // }
@@ -623,3 +624,5 @@ void openQCD_qudaFreeGaugeField()
   freeGaugeQuda();
   // qudamilc_called<false>(__func__);
 } // qudaFreeGaugeField
+
+// TODO: OpenQCDMultigridPack functions a la MILC (cf. milc_interface.cpp)
