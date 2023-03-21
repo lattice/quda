@@ -68,7 +68,7 @@ struct StaggeredDslashTestWrapper {
   // In the HISQ case, we include building fat/long links in this unit test
   void *qdp_fatlink_cpu[4] = {nullptr, nullptr, nullptr, nullptr};
   void *qdp_longlink_cpu[4] = {nullptr, nullptr, nullptr, nullptr};
-  void **ghost_fatlink_cpu, **ghost_longlink_cpu;
+  void **ghost_fatlink_cpu = nullptr, **ghost_longlink_cpu = nullptr;
 
   QudaParity parity = QUDA_EVEN_PARITY;
 

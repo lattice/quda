@@ -43,8 +43,9 @@ namespace quda
 
       CHECK_HIP_ERROR(hipSetDevice(dev));
 
-      CHECK_HIP_ERROR(hipDeviceSetCacheConfig(hipFuncCachePreferL1));
-      // hipDeviceSetSharedMemConfig(hipSharedMemBankSizeEightByte);
+      // FIXME: Commenting this out now until it is fixed in a newer ROCm as it seems
+      // Broken in recent ROCms. I am not sure it does anything anyway on RedTeam
+      // CHECK_HIP_ERROR(hipDeviceSetCacheConfig(hipFuncCachePreferL1));
       CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProp, dev));
 
       device_id = dev;
