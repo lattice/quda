@@ -73,7 +73,13 @@ namespace quda {
         return 2 * arg.threads.x * ( 18ll * adds_per_site + 18ll * rescales_per_site );
       }
 
-      long long bytes() const override { return 2*4*arg.threads.x*( arg.oProd.Bytes() + 2*arg.force.Bytes() ); }
+      long long bytes() const override {
+        long long bytes_per_site = 4ll * (arg.oProd.Bytes() + 2 * arg.force.Bytes());
+
+        //printfQuda("ONE LINK BYTES %llu\n", bytes_per_site);
+
+        return 2 * arg.threads.x* bytes_per_site;
+      }
     };
 
     template <typename Arg> class AllThreeAllLepageLinkForce : public TunableKernel2D {
@@ -237,6 +243,9 @@ namespace quda {
         // logic correction
         if (mu_next.is_invalid() && !has_lepage)
           bytes_per_site -= ( arg.link.Bytes() );
+
+        //printfQuda("THREE LINK %c LEPAGE BYTES %llu\n", has_lepage ? 'y' : 'n', bytes_per_site);
+
         return 2 * arg.threads.x * bytes_per_site;
       }
     };
@@ -423,6 +432,8 @@ namespace quda {
           bytes_per_site += 3 * arg.link.Bytes() + arg.pMu.Bytes() + arg.p5.Bytes() +
                             arg.pNuMu_next.Bytes() + arg.qNuMu_next.Bytes();
         }
+
+        //printfQuda("FIVESEVEN LINK BYTES %llu\n", bytes_per_site);
 
         return 2 * arg.threads.x * bytes_per_site;
       }
@@ -632,7 +643,9 @@ namespace quda {
       }
 
       long long bytes() const override {
-        return 4 * 2 * arg.threads.x * (2 * arg.force.Bytes() + 4 * arg.link.Bytes() + 3 * arg.oProd.Bytes());
+        long long bytes_per_site = 4ll * (2 * arg.force.Bytes() + 4 * arg.link.Bytes() + 3 * arg.oProd.Bytes());
+        //printfQuda("LONG LINK BYTES %llu\n", bytes_per_site);
+        return 2 * arg.threads.x * bytes_per_site;
       }
     };
 
@@ -699,15 +712,18 @@ namespace quda {
 
       long long flops() const override {
         // all 4 directions
-        int multiplies_per_site = 4ll;
-        int rescales_per_site = 4ll;
-        int antiherm_per_site = 4ll;
+        long long multiplies_per_site = 4ll;
+        long long rescales_per_site = 4ll;
+        long long antiherm_per_site = 4ll;
+
         // the flops counts for antiherm_per_site assumes the rescale by 1/2 is fused into the coefficient rescale
         return 2ll * arg.threads.x * (198ll * multiplies_per_site + 18ll * rescales_per_site + 23ll * antiherm_per_site);
       }
 
       long long bytes() const override {
-        return 4*2*arg.threads.x*(arg.force.Bytes() + arg.link.Bytes() + arg.oProd.Bytes());
+        long long bytes_per_site = 4ll * (arg.force.Bytes() + arg.link.Bytes() + arg.oProd.Bytes());
+        //printfQuda("COMPLETE LINK BYTES %llu\n", bytes_per_site);
+        return 2 * arg.threads.x * bytes_per_site;
       }
     };
 

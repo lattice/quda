@@ -52,69 +52,81 @@ static void setPrecision(QudaPrecision precision)
   return;
 }
 
-void total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, double *io, double *flops)
+void total_staple_io_flops(QudaPrecision prec, bool has_lepage,
+                            long long &staples_io, long long &staples_flops,
+                            long long &long_io, long long &long_flops,
+                            long long &complete_io, long long &complete_flops)
 {
   // TO DO: update me with new counts in hisq kernel core file
 
   // total IO counting for the middle/side/all link kernels
   // Explanation about these numbers can be founed in the corresponding kernel functions in
   // the hisq kernel core file
-  int linksize = prec * recon;
-  int cmsize = prec * 18;
+  long long cmsize = prec * 18ll;
 
-  int matrix_mul_flops = 198;
-  int matrix_add_flops = 18;
+  // FLOPS for matrix multiply, matrix add, matrix rescale, and anti-Hermitian projection
+  long long matrix_flops[4] = { 198ll, 18ll, 18ll, 23ll };
 
-  // { 3-link sig pos, 3-link sig neg, 5-link sig pos, 5-link sig neg,
-  //     Lepage sig pos, Lepage sig neg }
-  int num_calls_middle_link[6] = {24, 24, 96, 96, 24, 24};
-  int middle_link_data_io[6][2] = {{3, 6}, {3, 4}, {3, 7}, {3, 5}, {3, 5}, {3, 2}};
-  int middle_link_data_flops[6][2] = {{3, 1}, {2, 0}, {4, 1}, {3, 0}, {4, 1}, {2, 0}};
+  // fully fused all directions
+  int one_link_io = 12;
+  int one_link_flops[4] = { 0, 4, 4, 0 };
 
-  // is Lepage side link ever counted?
-  // { 5-link side, 3-link side }
-  int num_calls_side_link[2] = {192, 48};
-  int side_link_data_io[2][2] = {{1, 6}, {0, 3}};
-  int side_link_data_flops[2][2] = {{2, 2}, {0, 1}};
+  // the 2s are for forwards and backwards
+  int three_link_io[2] = { 264, 192 };
+  int three_link_flops[2][4] = { {96, 48, 48, 0}, {48, 24, 24, 0} };
+  int three_lepage_link_io[2] = { 508, 364 };
+  int three_lepage_link_flops[2][4] = { {288, 120, 120, 0}, {192, 72, 72, 0} };
+  int five_seven_link_io[2] = { 3048, 2616 };
+  int five_seven_link_flops[2][4] = { {1920, 864, 864, 0}, {1440, 576, 576, 0} };
 
-  // { 7-link all sig pos, 7-link all sig neg }
-  int num_calls_all_link[2] = {192, 192};
-  int all_link_data_io[2][2] = {{3, 8}, {3, 6}};
-  int all_link_data_flops[2][2] = {{6, 3}, {4, 2}};
+  // Compute the bytes loaded/stored
+  staples_io = one_link_io + five_seven_link_io[0] + five_seven_link_io[1];
+  if (has_lepage)
+    staples_io += three_lepage_link_io[0] + three_lepage_link_io[1];
+  else
+    staples_io += three_link_io[0] + three_link_io[1];
+  staples_io *= cmsize * V;
 
-  double total_io = 0;
-  for (int i = 0; i < 6; i++) {
-    total_io += num_calls_middle_link[i] * (middle_link_data_io[i][0] * linksize + middle_link_data_io[i][1] * cmsize);
+  // Compute the total number of bytes
+  staples_flops = 0;
+  // multiply/add/rescale/antiherm-proj
+  for (int i = 0; i < 4; i++) {
+    staples_flops += one_link_flops[i] * matrix_flops[i];
+    // forwards vs backwards
+    for (int d = 0; d < 2; d++) {
+      staples_flops += five_seven_link_flops[d][i] * matrix_flops[i];
+      if (has_lepage)
+        staples_flops += three_lepage_link_flops[d][i] * matrix_flops[i];
+      else
+        staples_flops += three_link_flops[d][i] * matrix_flops[i];
+    }
+  }
+  staples_flops *= V;
+
+  printfQuda("staples flop/byte = %.4f lepage %c\n", static_cast<double>(staples_flops) / static_cast<double>(staples_io), has_lepage ? 'y' : 'n');
+
+  // the long link is only computed during the first part of the chain rule,
+  // which is also when the Lepage term is included
+  long_io = 0;
+  long_flops = 0;
+  if (has_lepage) {
+    long_io = 36 * cmsize * V;
+
+    int long_link_flops[4] = {24, 12, 4, 0};
+    for (int i = 0; i < 4; i++)
+      long_flops += long_link_flops[i] * matrix_flops[i];
+    long_flops *= V;
+
+    printfQuda("long flop/byte = %.4f\n", static_cast<double>(long_flops) / static_cast<double>(long_io));
   }
 
-  for (int i = 0; i < 2; i++) {
-    total_io += num_calls_side_link[i] * (side_link_data_io[i][0] * linksize + side_link_data_io[i][1] * cmsize);
-  }
-  for (int i = 0; i < 2; i++) {
-    total_io += num_calls_all_link[i] * (all_link_data_io[i][0] * linksize + all_link_data_io[i][1] * cmsize);
-  }
-  total_io *= V;
-
-  double total_flops = 0;
-  for (int i = 0; i < 6; i++) {
-    total_flops += num_calls_middle_link[i]
-      * (middle_link_data_flops[i][0] * matrix_mul_flops + middle_link_data_flops[i][1] * matrix_add_flops);
-  }
-
-  for (int i = 0; i < 2; i++) {
-    total_flops += num_calls_side_link[i]
-      * (side_link_data_flops[i][0] * matrix_mul_flops + side_link_data_flops[i][1] * matrix_add_flops);
-  }
-  for (int i = 0; i < 2; i++) {
-    total_flops += num_calls_all_link[i]
-      * (all_link_data_flops[i][0] * matrix_mul_flops + all_link_data_flops[i][1] * matrix_add_flops);
-  }
-  total_flops *= V;
-
-  *io = total_io;
-  *flops = total_flops;
-
-  printfQuda("flop/byte =%.1f\n", total_flops / total_io);
+  // In both cases, the force complete routine is called
+  complete_io = 12 * cmsize * V;
+  int complete_link_flops[4] = {4, 0, 4, 4};
+  complete_flops = 0;
+  for (int i = 0; i < 4; i++)
+    complete_flops += complete_link_flops[i] * matrix_flops[i];
+  printfQuda("complete flop/byte = %.4f\n", static_cast<double>(complete_flops) / static_cast<double>(complete_io));
   return;
 }
 
@@ -397,7 +409,7 @@ static int hisq_force_test(bool lepage)
   quda::host_timer_t host_timer;
 
   double host_time_sec = 0.0;
-  double staples_time_sec = 0.0;
+  double staple_time_sec = 0.0;
   double long_time_sec = 0.0;
   double complete_time_sec = 0.0;
 
@@ -420,7 +432,7 @@ static int hisq_force_test(bool lepage)
   fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
   qudaDeviceSynchronize();
   host_timer.stop();
-  staples_time_sec = host_timer.last();
+  staple_time_sec = host_timer.last();
 
   if (verify_results) {
     host_timer.start();
@@ -501,17 +513,31 @@ static int hisq_force_test(bool lepage)
       = strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume(), force_prec);
     logQuda(QUDA_SUMMARIZE, "Test (lepage coeff %e) %s\n", d_act_path_coeff[5], (1 == res) ? "PASSED" : "FAILED");
   }
-  double total_io;
-  double total_flops;
-  total_staple_io_flops(force_prec, link_recon, &total_io, &total_flops);
+  long long staple_io, staple_flops, long_io, long_flops, complete_io, complete_flops;
+  total_staple_io_flops(force_prec, lepage, staple_io, staple_flops, long_io, long_flops, complete_io, complete_flops);
 
-  float perf_flops = total_flops / (staples_time_sec) * 1e-9;
-  float perf = total_io / (staples_time_sec) * 1e-9;
-  printfQuda("Staples time: %.2f ms, perf = %.2f GFLOPS, achieved bandwidth= %.2f GB/s\n", staples_time_sec * 1e3,
-             perf_flops, perf);
-  printfQuda("Staples time : %g ms\t LongLink time : %g ms\t Completion time : %g ms\n",
-             staples_time_sec * 1e3, long_time_sec * 1e3, complete_time_sec * 1e3);
-  printfQuda("Host time : %g ms\n", host_time_sec * 1e3);
+  {
+    double perf_flops = static_cast<double>(staple_flops) / (staple_time_sec) * 1e-9;
+    double perf = static_cast<double>(staple_io) / (staple_time_sec) * 1e-9;
+    printfQuda("Staples time: %.6f ms, perf = %.6f GFLOPS, achieved bandwidth= %.6f GB/s, Lepage %c\n", staple_time_sec * 1e3,
+               perf_flops, perf, lepage ? 'y' : 'n');
+  }
+
+  if (lepage) {
+    double perf_flops = static_cast<double>(long_flops) / (long_time_sec) * 1e-9;
+    double perf = static_cast<double>(long_io) / (long_time_sec) * 1e-9;
+    printfQuda("LongLink time: %.6f ms, perf = %.6f GFLOPS, achieved bandwidth= %.6f GB/s\n", long_time_sec * 1e3,
+               perf_flops, perf);
+  }
+
+  {
+    double perf_flops = static_cast<double>(complete_flops) / (complete_time_sec) * 1e-9;
+    double perf = static_cast<double>(complete_io) / (complete_time_sec) * 1e-9;
+    printfQuda("Completion time: %.6f ms, perf = %.6f GFLOPS, achieved bandwidth= %.6f GB/s\n", complete_time_sec * 1e3,
+               perf_flops, perf);
+  }
+
+  printfQuda("Host time : %g ms, Lepage %c\n", host_time_sec * 1e3, lepage ? 'y' : 'n');
 
   return accuracy_level;
 }
