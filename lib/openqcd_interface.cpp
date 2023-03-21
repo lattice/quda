@@ -489,22 +489,6 @@ void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_Quda
   loadGaugeQuda(gauge, &qudaGaugeParam);
 
 
-  // QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
-  // obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
-  // obsParam.remove_staggered_phase = QUDA_BOOLEAN_FALSE; //
-  // phase_in ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  // gaugeObservablesQuda(&obsParam);
-
-  // Let MILC apply its own Nc normalization
-  // plaq[0] = obsParam.plaquette[0];
-  // plaq[1] = obsParam.plaquette[1];
-  // plaq[2] = obsParam.plaquette[2];
-
-  // qudamilc_called<false>(__func__);
-  // return;
-
-
-
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision_sloppy = device_precision;
@@ -520,24 +504,13 @@ void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_Quda
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
 
-  // dirty hack to invalidate the cached gauge field without breaking interface compatability
-  // if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
-
-  // if (invalidate_quda_gauge || !create_quda_gauge) {
-  //   loadGaugeQuda(gauge, &qudaGaugeParam);
-  //   invalidate_quda_gauge = false;
-  // }
-
   invertParam.dslash_type = QUDA_WILSON_DSLASH;
 
-  // int src_offset = getColorVectorOffset(other_parity, false, localDim);
-  // int dst_offset = getColorVectorOffset(local_parity, false, localDim);
+  dslashQuda(dst,src, &invertParam, local_parity);
 
-  dslashQuda(static_cast<char *>(dst), static_cast<char *>(src), &invertParam, local_parity);
+// TODO: need save??
 
-  // if (!create_quda_gauge) invalidateGaugeQuda();
-
-  // qudamilc_called<false>(__func__, verbosity);// TODO: remove? (This is from MILC)
+  return;
 } // qudaDslash
 // #endif
 

@@ -1493,7 +1493,6 @@ namespace quda
       size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
     };
 
-    // Use this template as openqxd for now  TODO:
     template <typename Float, int Ns, int Nc>
     struct SpaceSpinorColorOrder { // TODO: check how to adapt this for openqxd
       using Accessor = SpaceSpinorColorOrder<Float, Ns, Nc>;
@@ -1724,8 +1723,7 @@ namespace quda
     };
 
     // Use this template as openqxd for now  TODO:
-    template <typename Float, int Ns, int Nc>
-    struct OpenQCDDiracOrder { // TODO: check how to adapt this for openqxd
+    template <typename Float, int Ns, int Nc> struct OpenQCDDiracOrder { // TODO: check how to adapt this for openqxd
       using Accessor = OpenQCDDiracOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
@@ -1736,12 +1734,15 @@ namespace quda
       int volumeCB;
       int faceVolumeCB[4];
       int nParity;
+      const int dim[4];
+
       OpenQCDDiracOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, float * = 0, Float **ghost_ = 0) :
         field(field_ ? field_ : (Float *)a.V()),
         offset(a.Bytes() / (2 * sizeof(Float))),
         volumeCB(a.VolumeCB()),
-        nParity(a.SiteSubset())
-      {
+        nParity(a.SiteSubset()),
+        dim {a.X()[0], a.X()[1], a.X()[2], a.X()[3]} // GLOBAL dimensions
+      { // TODO: IS THIS NEEDED??
         for (int i = 0; i < 4; i++) {
           ghost[2 * i] = ghost_ ? ghost_[2 * i] : 0;
           ghost[2 * i + 1] = ghost_ ? ghost_[2 * i + 1] : 0;
@@ -1751,8 +1752,25 @@ namespace quda
 
       __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const // TODO: adapt to openqxd
       {
-        auto in = &field[(parity * volumeCB + x) * length];
+
+        /* INDEXING */
+
+        int coord[4]; // declare a 4D vector x0, x1, x2, x3 = (xyzt), t fastest (ix = x0 + x1 * L0 + ...)
+        getCoords(coord, x, dim, parity); // from x, dim, parity obtain coordinate of the site
+
+        /* lexicographical index: coord0 in QUDA is x1 in OpenQxD (x)
+        coord1 in QUDA is x2 in OpenQxD (y)
+        coord2 in QUDA is x3 in OpenQxD (z)
+        coord3 in QUDA is x0 in OpenQxD (t)
+        */
+        int iy_OpenQxD = coord[2] + dim[2] * coord[1] + dim[2] * dim[1] * coord[0] + dim[0] * dim[2] * dim[1] * coord[3];
+        // int dir_OpenQxD = (dir + 1) % 4; // rotation of axes QUDA -> OpenQxD
+
+        // Loading as per QUDA style
+        auto in = &field[(4 * iy_OpenQxD) * length]; // This is how they're accessed within OpenQxd (length = 24 doubles
+                                                     // = 12 complex doubles = 4 spinor x 3 colors)
         block_load<complex, length / 2>(v, reinterpret_cast<const complex *>(in));
+        /* END OF INDEXING */
       }
 
       __device__ __host__ inline void save(const complex v[length / 2], int x,
