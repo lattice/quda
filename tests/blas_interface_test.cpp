@@ -7,9 +7,7 @@
 
 #include <inttypes.h>
 
-#include <util_quda.h>
-#include <host_utils.h>
-#include <command_line_params.h>
+#include <test.h>
 #include <blas_reference.h>
 #include <misc.h>
 
@@ -318,122 +316,94 @@ double lu_inv_test(test_t test_param)
 
   return deviation;
 }
-void add_blas_interface_option_group(std::shared_ptr<QUDAApp> quda_app)
-{
-  CLI::TransformPairs<QudaBLASDataType> blas_dt_map {
-    {"C", QUDA_BLAS_DATATYPE_C}, {"Z", QUDA_BLAS_DATATYPE_Z}, {"S", QUDA_BLAS_DATATYPE_S}, {"D", QUDA_BLAS_DATATYPE_D}};
 
-  CLI::TransformPairs<QudaBLASDataOrder> blas_data_order_map {{"row", QUDA_BLAS_DATAORDER_ROW},
-                                                              {"col", QUDA_BLAS_DATAORDER_COL}};
+struct blas_interface_test : quda_test {
 
-  CLI::TransformPairs<QudaBLASOperation> blas_op_map {{"N", QUDA_BLAS_OP_N}, {"T", QUDA_BLAS_OP_T}, {"C", QUDA_BLAS_OP_C}};
+  void add_command_line_group(std::shared_ptr<QUDAApp> app) const override
+  {
+    quda_test::add_command_line_group(app);
 
-  CLI::TransformPairs<QudaBLASType> blas_type_map {{"gemm", QUDA_BLAS_GEMM}, {"lu-inv", QUDA_BLAS_LU_INV}};
+    CLI::TransformPairs<QudaBLASDataType> blas_dt_map {
+      {"C", QUDA_BLAS_DATATYPE_C}, {"Z", QUDA_BLAS_DATATYPE_Z}, {"S", QUDA_BLAS_DATATYPE_S}, {"D", QUDA_BLAS_DATATYPE_D}};
 
-  // Option group for BLAS test related options
-  auto opgroup = quda_app->add_option_group("BLAS Interface", "Options controlling BLAS interface tests");
+    CLI::TransformPairs<QudaBLASDataOrder> blas_data_order_map {{"row", QUDA_BLAS_DATAORDER_ROW},
+                                                                {"col", QUDA_BLAS_DATAORDER_COL}};
+    CLI::TransformPairs<QudaBLASOperation> blas_op_map {{"N", QUDA_BLAS_OP_N}, {"T", QUDA_BLAS_OP_T}, {"C", QUDA_BLAS_OP_C}};
 
-  opgroup
-    ->add_option("--blas-data-type", blas_data_type,
-                 "Whether to use single(S), double(D), and/or complex(C/Z) data types (default C)")
-    ->transform(CLI::QUDACheckedTransformer(blas_dt_map));
+    CLI::TransformPairs<QudaBLASType> blas_type_map {{"gemm", QUDA_BLAS_GEMM}, {"lu-inv", QUDA_BLAS_LU_INV}};
 
-  opgroup
-    ->add_option("--blas-test-type", blas_test_type,
-                 "Whether to perform the GEMM test or LU Inversion test (default GEMM)")
-    ->transform(CLI::QUDACheckedTransformer(blas_type_map));
+    // Option group for BLAS test related options
+    auto opgroup = app->add_option_group("BLAS Interface", "Options controlling BLAS interface tests");
 
-  opgroup
-    ->add_option("--blas-data-order", blas_data_order, "Whether data is in row major or column major order (default row)")
-    ->transform(CLI::QUDACheckedTransformer(blas_data_order_map));
+    opgroup
+      ->add_option("--blas-data-type", blas_data_type,
+                   "Whether to use single(S), double(D), and/or complex(C/Z) data types (default C)")
+      ->transform(CLI::QUDACheckedTransformer(blas_dt_map));
 
-  opgroup
-    ->add_option(
-      "--blas-gemm-trans-a", blas_gemm_trans_a,
-      "Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
-    ->transform(CLI::QUDACheckedTransformer(blas_op_map));
+    opgroup
+      ->add_option("--blas-test-type", blas_test_type,
+                   "Whether to perform the GEMM test or LU Inversion test (default GEMM)")
+      ->transform(CLI::QUDACheckedTransformer(blas_type_map));
 
-  opgroup
-    ->add_option(
-      "--blas-gemm-trans-b", blas_gemm_trans_b,
-      "Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
-    ->transform(CLI::QUDACheckedTransformer(blas_op_map));
+    opgroup
+      ->add_option("--blas-data-order", blas_data_order, "Whether data is in row major or column major order (default row)")
+      ->transform(CLI::QUDACheckedTransformer(blas_data_order_map));
 
-  opgroup
-    ->add_option("--blas-gemm-alpha", blas_gemm_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")
-    ->expected(2);
+    opgroup
+      ->add_option(
+                   "--blas-gemm-trans-a", blas_gemm_trans_a,
+                   "Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
+      ->transform(CLI::QUDACheckedTransformer(blas_op_map));
 
-  opgroup
-    ->add_option("--blas-gemm-beta", blas_gemm_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")
-    ->expected(2);
+    opgroup
+      ->add_option(
+                   "--blas-gemm-trans-b", blas_gemm_trans_b,
+                   "Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
+      ->transform(CLI::QUDACheckedTransformer(blas_op_map));
 
-  opgroup
-    ->add_option("--blas-gemm-mnk", blas_gemm_mnk,
-                 "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")
-    ->expected(3);
+    opgroup
+      ->add_option("--blas-gemm-alpha", blas_gemm_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")
+      ->expected(2);
 
-  opgroup
-    ->add_option("--blas-gemm-leading-dims", blas_gemm_leading_dims,
-                 "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128) ")
-    ->expected(3);
+    opgroup
+      ->add_option("--blas-gemm-beta", blas_gemm_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")
+      ->expected(2);
 
-  opgroup
-    ->add_option("--blas-gemm-offsets", blas_gemm_offsets, "Set the offsets for GEMM matrices A, B, and C (default 0 0 0)")
-    ->expected(3);
+    opgroup
+      ->add_option("--blas-gemm-mnk", blas_gemm_mnk,
+                   "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")
+      ->expected(3);
 
-  opgroup
-    ->add_option("--blas-gemm-strides", blas_gemm_strides, "Set the strides for GEMM matrices A, B, and C (default 1 1 1)")
-    ->expected(3);
+    opgroup
+      ->add_option("--blas-gemm-leading-dims", blas_gemm_leading_dims,
+                   "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128) ")
+      ->expected(3);
 
-  opgroup->add_option("--blas-batch", blas_batch, "Set the number of batches for GEMM or LU inversion (default 16)");
+    opgroup
+      ->add_option("--blas-gemm-offsets", blas_gemm_offsets, "Set the offsets for GEMM matrices A, B, and C (default 0 0 0)")
+      ->expected(3);
 
-  opgroup->add_option("--blas-lu-inv-mat-size", blas_lu_inv_mat_size,
-                      "Set the size of the square matrix to invert via LU (default 128)");
-}
+    opgroup
+      ->add_option("--blas-gemm-strides", blas_gemm_strides, "Set the strides for GEMM matrices A, B, and C (default 1 1 1)")
+      ->expected(3);
+
+    opgroup->add_option("--blas-batch", blas_batch, "Set the number of batches for GEMM or LU inversion (default 16)");
+
+    opgroup->add_option("--blas-lu-inv-mat-size", blas_lu_inv_mat_size,
+                        "Set the size of the square matrix to invert via LU (default 128)");
+  }
+
+  blas_interface_test(int argc, char **argv) : quda_test("BLAS Interface Test", argc, argv) {}
+};
 
 int main(int argc, char **argv)
 {
-  // Start Google Test Suite
-  //-----------------------------------------------------------------------------
-  ::testing::InitGoogleTest(&argc, argv);
-
-  // QUDA initialise
-  //-----------------------------------------------------------------------------
-  // command line options
-  auto app = make_app();
-  add_blas_interface_option_group(app);
-  add_comms_option_group(app);
-  add_testing_option_group(app);
-  try {
-    app->parse(argc, argv);
-  } catch (const CLI::ParseError &e) {
-    return app->exit(e);
-  }
-
-  // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
-  initComms(argc, argv, gridsize_from_cmdline);
-
-  // Ensure gtest prints only from rank 0
-  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
-  if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-
-  // call srand() with a rank-dependent seed
-  initRand();
-  setQudaPrecisions();
-  setVerbosity(verbosity);
-
-  // initialize the QUDA library
-  initQuda(device_ordinal);
-  int X[4] = {xdim, ydim, zdim, tdim};
-  setDims(X);
-  //-----------------------------------------------------------------------------
+  blas_interface_test test(argc, argv);
+  test.init();
 
   int result = 0;
   if (enable_testing) {
-    // Run full set of test if we're doing a verification run
-    ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
-    if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-    result = RUN_ALL_TESTS();
+    result = test.execute();
     if (result) warningQuda("Google tests for QUDA BLAS failed.");
   } else {
     // Perform the BLAS op specified by the command line
@@ -458,14 +428,6 @@ int main(int argc, char **argv)
     default: errorQuda("Unknown QUDA BLAS test type %d\n", blas_test_type);
     }
   }
-
-  //-----------------------------------------------------------------------------
-
-  // finalize the QUDA library
-  endQuda();
-
-  // finalize the communications layer
-  finalizeComms();
 
   return result;
 }
