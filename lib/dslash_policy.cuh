@@ -1755,8 +1755,8 @@ namespace quda
     const int *ghostFace;
     TimeProfile &profile;
 
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    bool tuneAuxDim() const { return true; }   // Do tune the aux dimensions.
+    bool tuneGridDim() const override { return false; } // Don't tune the grid dimensions.
+    bool tuneAuxDim() const override { return true; }   // Do tune the aux dimensions.
 
   public:
     DslashPolicyTune(
@@ -1966,7 +1966,7 @@ namespace quda
    virtual ~DslashPolicyTune() { setPolicyTuning(false); }
 
   private:
-   void apply(const qudaStream_t &)
+   void apply(const qudaStream_t &) override
    {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
@@ -1985,7 +1985,7 @@ namespace quda
    }
 
    // Find the best dslash policy
-   bool advanceAux(TuneParam &param) const
+   bool advanceAux(TuneParam &param) const override
    {
      while ((unsigned)param.aux.x < policies.size()-1) {
        param.aux.x++;
@@ -2002,16 +2002,16 @@ namespace quda
      return false;
    }
 
-   bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
+   bool advanceTuneParam(TuneParam &param) const override { return advanceAux(param); }
 
-   void initTuneParam(TuneParam &param) const  {
+   void initTuneParam(TuneParam &param) const override {
      Tunable::initTuneParam(param);
      param.aux.x = first_active_policy;
      param.aux.y = first_active_p2p_policy;
      param.aux.z = 0;
    }
 
-   void defaultTuneParam(TuneParam &param) const  {
+   void defaultTuneParam(TuneParam &param) const override {
      Tunable::defaultTuneParam(param);
      param.aux.x = first_active_policy;
      param.aux.y = first_active_p2p_policy;
@@ -2029,7 +2029,7 @@ namespace quda
      return key;
    }
 
-   long long flops() const {
+   long long flops() const override {
      KernelType kernel_type = dslashParam.kernel_type;
      dslashParam.kernel_type = KERNEL_POLICY;
      long long flops_ = dslash.flops();
@@ -2037,7 +2037,7 @@ namespace quda
      return flops_;
    }
 
-   long long bytes() const {
+   long long bytes() const override {
      KernelType kernel_type = dslashParam.kernel_type;
      dslashParam.kernel_type = KERNEL_POLICY;
      long long bytes_ = dslash.bytes();
@@ -2045,12 +2045,9 @@ namespace quda
      return bytes_;
    }
 
-   void preTune() { dslash.preTune(); }
+   void preTune() override { dslash.preTune(); }
 
-   void postTune()
-   {
-     dslash.postTune();
-   }
+   void postTune() override { dslash.postTune(); }
   };
 
   } // namespace dslash
