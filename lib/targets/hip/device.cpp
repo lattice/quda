@@ -41,7 +41,7 @@ namespace quda
 
       CHECK_HIP_ERROR(hipSetDevice(dev));
 
-      CHECK_HIP_ERROR(hipDeviceSetCacheConfig(hipFuncCachePreferL1));
+      // CHECK_HIP_ERROR(hipDeviceSetCacheConfig(hipFuncCachePreferL1));
       // hipDeviceSetSharedMemConfig(hipSharedMemBankSizeEightByte);
       CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProp, dev));
     }
