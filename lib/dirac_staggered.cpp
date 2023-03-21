@@ -123,7 +123,7 @@ namespace quda {
     bool is_time_slice = t0 >= 0 && t0 < comm_dim(3)*in.X(3) ? true : false;
     if( is_time_slice && laplace3D > 3 )
     {
-      warningQuda( "t0 will be ignored for d>3 dimensional Laplacian." );
+      if (getVerbosity() == QUDA_DEBUG_VERBOSE) warningQuda( "t0 will be ignored for d>3 dimensional Laplacian." );
       is_time_slice = false;
     }
 
