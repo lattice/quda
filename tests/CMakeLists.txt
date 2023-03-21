@@ -164,6 +164,11 @@ if(QUDA_QIO)
   install(TARGETS io_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
+add_executable(tune_test tune_test.cpp)
+target_link_libraries(tune_test ${TEST_LIBS})
+quda_checkbuildtest(tune_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS tune_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 add_executable(plaq_test plaq_test.cpp)
 target_link_libraries(plaq_test ${TEST_LIBS})
 quda_checkbuildtest(plaq_test QUDA_BUILD_ALL_TESTS)
@@ -1262,3 +1267,7 @@ if(QUDA_QIO)
                    --dim 4 6 8 10
                    --gtest_output=xml:io_test.xml)
 endif()
+
+add_test(NAME tune_test
+         COMMAND  ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:tune_test> ${MPIEXEC_POSTFLAGS}
+                   --gtest_output=xml:tune_test.xml)
