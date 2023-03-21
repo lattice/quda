@@ -15,6 +15,13 @@ namespace quda
     void init(int dev);
 
     /**
+       @brief Initialize this thread to be able to use the device
+       presently initalized for this process.  This will error out if
+       init() has not previously been called.
+     */
+    void init_thread();
+
+    /**
        @brief Get number of devices present on node
     */
     int get_device_count();

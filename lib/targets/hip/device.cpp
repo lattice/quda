@@ -18,6 +18,8 @@ namespace quda
 
     static bool initialized = false;
 
+    static int device_id = -1;
+
     void init(int dev)
     {
       if (initialized) return;
@@ -44,6 +46,14 @@ namespace quda
       CHECK_HIP_ERROR(hipDeviceSetCacheConfig(hipFuncCachePreferL1));
       // hipDeviceSetSharedMemConfig(hipSharedMemBankSizeEightByte);
       CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProp, dev));
+
+      device_id = dev;
+    }
+
+    void init_thread()
+    {
+      if (device_id == -1) errorQuda("No HIP device has been initialized for this process");
+      CHECK_CUDA_ERROR(hipSetDevice(device_id));
     }
 
     int get_device_count()

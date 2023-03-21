@@ -21,6 +21,8 @@ namespace quda
 
     static bool initialized = false;
 
+    static int device_id = -1;
+
     void init(int dev)
     {
       if (initialized) return;
@@ -99,10 +101,17 @@ namespace quda
       CHECK_CUDA_ERROR(cudaSetDevice(dev));
 #endif
 
-
       CHECK_CUDA_ERROR(cudaDeviceSetCacheConfig(cudaFuncCachePreferL1));
       //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
       // cudaGetDeviceProperties(&deviceProp, dev);
+
+      device_id = dev;
+    }
+
+    void init_thread()
+    {
+      if (device_id == -1) errorQuda("No CUDA device has been initialized for this process");
+      CHECK_CUDA_ERROR(cudaSetDevice(device_id));
     }
 
     int get_device_count()
