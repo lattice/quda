@@ -71,7 +71,10 @@ namespace quda {
     bool advanceAux(TuneParam &param) const
     {
       param.aux.x = (param.aux.x + 1) % 6;
-       // mu must be contained in the block, types 0, 1, 2 have mu = 8 and 3, 4, 5 have mu = 4
+      if (!device::shared_memory_atomic_supported()) { // 1, 4 use shared memory atomics
+	if(param.aux.x == 1 || param.aux.x == 4) param.aux.x++;
+      }
+      // mu must be contained in the block, types 0, 1, 2 have mu = 8 and 3, 4, 5 have mu = 4
       TunableKernel2D::resizeVector(param.aux.x < 3 ? 8 : 4);
       TunableKernel2D::resizeStep(param.aux.x < 3 ? 8 : 4);
       TunableKernel2D::initTuneParam(param);
