@@ -120,6 +120,7 @@ void setQudaDefaultMgTestParams()
     mg_eig_spectrum[i] = QUDA_SPECTRUM_SR_EIG;
     mg_eig_check_interval[i] = 5;
     mg_eig_max_restarts[i] = 100;
+    mg_eig_max_ortho_attempts[i] = 10;
     mg_eig_use_normop[i] = QUDA_BOOLEAN_FALSE;
     mg_eig_use_dagger[i] = QUDA_BOOLEAN_FALSE;
     mg_eig_use_poly_acc[i] = QUDA_BOOLEAN_TRUE;

@@ -817,7 +817,7 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(opgroup, "--mg-eig-max-restarts", mg_eig_max_restarts, CLI::PositiveNumber,
                          "Perform a maximun of n restarts in eigensolver (default 100)");
 
-  quda_app->add_mgoption(opgroup, "--mg-eig-max-restarts", mg_eig_max_ortho_attempts, CLI::PositiveNumber,
+  quda_app->add_mgoption(opgroup, "--mg-eig-max-ortho-attempts", mg_eig_max_ortho_attempts, CLI::PositiveNumber,
 			 "Perform n iterations of Gram-Schmidt orthonormalisation in the Block TRLM eigensolver (default 10)");
   quda_app->add_mgoption(
     opgroup, "--mg-eig-use-eigen-qr", mg_eig_use_eigen_qr, CLI::Validator(),
