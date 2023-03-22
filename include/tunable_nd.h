@@ -80,23 +80,14 @@ namespace quda
        @param[in] location Optional overload for the location where the calculation will take place
      */
     TunableKernel1D_base(const LatticeField &field, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableKernel(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location())
-    {
-      strcpy(vol, field.VolString().c_str());
-      strcpy(aux, compile_type_str(field, location));
-      strcat(aux, field.AuxString().c_str());
-    }
+      TunableKernel(field, location) {}
 
     /**
        @brief Constructor for kernels that have a problem size only
        @param[in] field A lattice field instance used for metadata
        @param[in] location Location where the calculation will take place
      */
-    TunableKernel1D_base(size_t n_items, QudaFieldLocation location) : TunableKernel(location)
-    {
-      u64toa(vol, n_items);
-      strcpy(aux, compile_type_str(location));
-    }
+    TunableKernel1D_base(size_t n_items, QudaFieldLocation location) : TunableKernel(n_items, location) {}
   };
 
   /**

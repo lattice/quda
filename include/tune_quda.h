@@ -58,10 +58,10 @@ namespace quda {
     virtual long long bytes() const { return 0; }
 
     // the minimum number of shared bytes per thread
-    virtual unsigned int sharedBytesPerThread() const = 0;
+    virtual unsigned int sharedBytesPerThread() const { return 0; }
 
     // the minimum number of shared bytes per thread block
-    virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const = 0;
+    virtual unsigned int sharedBytesPerBlock(const TuneParam &) const{ return 0; }
 
     // override this if a specific thread count is required (e.g., if not grid size tuning)
     virtual unsigned int minThreads() const { return 1; }
@@ -258,7 +258,7 @@ namespace quda {
 
   public:
     Tunable() : launch_error(QUDA_SUCCESS) { aux[0] = '\0'; }
-    virtual ~Tunable() { }
+    virtual ~Tunable() = default;
     virtual TuneKey tuneKey() const = 0;
     virtual void apply(const qudaStream_t &stream) = 0;
     virtual void preTune() { }
@@ -405,7 +405,17 @@ namespace quda {
    */
   void flushProfile();
 
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
+  /**
+     @brief Launch the autotuner.  If the tunable instance has already
+     been tuned, the launch parameters will be returned immediately.
+     If not, autotuner will commence, if enabled, else default launch
+     parameters will be returned.
+     @param[in,out] tunable The instance tunable we are tuning
+     @param[in] enabled Is autotuning enabled?
+     @param[in] verbosity What verbosity to use during tuning?
+     @retrun The tuned launch parameters
+   */
+  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled = getTuning(), QudaVerbosity verbosity = getVerbosity());
 
   /**
    * @brief Post an event in the trace, recording where it was posted

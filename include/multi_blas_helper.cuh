@@ -43,7 +43,7 @@ namespace quda
     template <bool multi_1d = false, typename Arg, typename T> std::enable_if_t<multi_1d, void>
     set_param(Arg &arg, char select, const T &h)
     {
-      const auto N = std::max(arg.NXZ, arg.NYW);
+      const auto N = std::max(arg.NXZ, arg.f.NYW);
       if (h.size() != (size_t)N) errorQuda("coefficient size %lu does not match expected %lu", h.size(), (size_t)N);
       using coeff_t = typename decltype(arg.f)::coeff_t;
       coeff_t *buf_arg = nullptr;
@@ -71,10 +71,10 @@ namespace quda
     set_param(Arg &arg, char select, const T &h)
     {
       using coeff_t = typename decltype(arg.f)::coeff_t;
-      if (arg.NXZ * arg.NYW * sizeof(coeff_t) > max_array_size())
-        errorQuda("Requested parameter size %lu larger than max %lu", arg.NXZ * arg.NYW * sizeof(coeff_t), max_array_size());
-      if (h.size() != (size_t)(arg.NXZ * arg.NYW))
-        errorQuda("coefficient size %lu does not match expected %lu * %lu", h.size(), (size_t)arg.NXZ, (size_t)arg.NYW);
+      if (arg.NXZ * arg.f.NYW * sizeof(coeff_t) > max_array_size())
+        errorQuda("Requested parameter size %lu larger than max %lu", arg.NXZ * arg.f.NYW * sizeof(coeff_t), max_array_size());
+      if (h.size() != (size_t)(arg.NXZ * arg.f.NYW))
+        errorQuda("coefficient size %lu does not match expected %lu * %lu", h.size(), (size_t)arg.NXZ, (size_t)arg.f.NYW);
 
       coeff_t *host = nullptr;
       switch (select) {
@@ -85,7 +85,7 @@ namespace quda
       }
 
       for (int i = 0; i < arg.NXZ; i++)
-        for (int j = 0; j < arg.NYW; j++) host[arg.NYW * i + j] = coeff_t(h[arg.NYW * i + j]);
+        for (int j = 0; j < arg.f.NYW; j++) host[arg.f.NYW * i + j] = coeff_t(h[arg.f.NYW * i + j]);
     }
 
     /**
@@ -207,15 +207,15 @@ namespace quda
       using SpinorZ = SpinorX;
       using SpinorW = SpinorX;
 
-      constexpr auto arg_known_size = (sizeof(kernel_param<>)                                        // kernel_param parent
-				       + sizeof(int)                                                 // NYW parameter
+      constexpr auto arg_known_size_naive = (sizeof(kernel_param<>)                                  // kernel_param parent
 				       + sizeof(SpinorX[NXZ])                                        // SpinorX array
 				       + (Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ *)) // SpinorZ array
 				       + sizeof(Functor)                                             // functor
-				       + sizeof(dim3)                                                // threads parameter
 				       + (!Functor::use_w ? sizeof(SpinorW *) : 0)                   // subtract pointer if not using W
 				       + (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
 				       );
+      constexpr auto align_factor = 16;
+      constexpr auto arg_known_size = ((arg_known_size_naive + align_factor - 1) / align_factor) * align_factor;
 
       constexpr auto yw_size = (sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0));
       constexpr auto min_size = arg_known_size + min_YW_size() * yw_size;
@@ -262,15 +262,15 @@ namespace quda
       size_t spinor_z_size = spinor_x_size;
       size_t spinor_w_size = spinor_x_size;
 
-      const auto arg_known_size = (sizeof(kernel_param<>)                                        // kernel_param parent
-				   + sizeof(int)                                                 // NYW parameter
+      const auto arg_known_size_naive = (sizeof(kernel_param<>)                                  // kernel_param parent
 				   + (NXZ * spinor_x_size)                                       // SpinorX array
 				   + (Functor::use_z ? NXZ * spinor_z_size : sizeof(void *))     // SpinorZ array (else dummy pointer)
 				   + sizeof(Functor)                                             // functor
-				   + sizeof(dim3)                                                // threads parameter
 				   + (!Functor::use_w ? sizeof(void *) : 0)                      // subtract dummy pointer if not using W
 				   + (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
-				   );
+                                   );
+      const auto align_factor = 16;
+      const auto arg_known_size = ((arg_known_size_naive + align_factor - 1) / align_factor) * align_factor;
 
       const auto yw_size = (spinor_y_size + (Functor::use_w ? spinor_w_size : 0));
       const auto min_size = arg_known_size + min_YW_size() * yw_size;

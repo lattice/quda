@@ -353,6 +353,10 @@ if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
   target_compile_definitions(quda PRIVATE NATIVE_LAPACK_LIB)
 endif()
 
+if(${QUDA_BUILD_NATIVE_FFT} STREQUAL "ON")
+  target_compile_definitions(quda PRIVATE NATIVE_FFT_LIB)
+endif()
+
 if(QUDA_BLOCKSOLVER)
   target_compile_definitions(quda PRIVATE BLOCKSOLVER)
 endif()

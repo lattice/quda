@@ -138,18 +138,12 @@ namespace quda
      */
     TunableBlock2D(const LatticeField &field, bool tune_block_x, unsigned int vector_length_z,
                    unsigned int max_block_z = 0, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableKernel(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location()),
+      TunableKernel(field, location),
       field(field),
       tune_block_x(tune_block_x),
       vector_length_z(vector_length_z),
       step_z(1),
-      max_block_z(max_block_z == 0 ? vector_length_z : max_block_z)
-    {
-      strcpy(vol, field.VolString().c_str());
-      strcpy(aux, compile_type_str(field, location));
-      if (location == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
-      strcat(aux, field.AuxString().c_str());
-    }
+      max_block_z(max_block_z == 0 ? vector_length_z : max_block_z) {}
 
     /**
        @brief Derived specialization for autotuning the batch size
