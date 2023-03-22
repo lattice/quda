@@ -3,6 +3,9 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
+#include <stdio.h>
+#include <assert.h>
+#include <memory.h>
 
 #include <quda_openqcd_interface.h>
 #include <quda.h>
@@ -10,6 +13,7 @@
 #include <color_spinor_field.h>
 #include <dslash_quda.h>
 #include <invert_quda.h>
+
 // #include "../../openQxD-devel/include/su3.h"
 // #include "../../openQxD-devel/include/flags.h"
 // #include "../../openQxD-devel/include/utils.h"
@@ -206,6 +210,7 @@ static QudaGaugeParam newOpenQCDGaugeParam(const int *dim, QudaPrecision prec)
   gParam.tadpole_coeff = 1.0;
   gParam.scale = 0;
   gParam.ga_pad = getLinkPadding(dim);
+  gParam.return_result_gauge = 1;
 
   return gParam;
 }
@@ -231,7 +236,21 @@ void openQCD_qudaPlaquette(int precision, double plaq[3], void *gauge)
   plaq[1] = obsParam.plaquette[1];
   plaq[2] = obsParam.plaquette[2];
 
-  // qudamilc_called<false>(__func__);
+  saveGaugeQuda(gauge, &qudaGaugeParam);
+
+  return;
+}
+
+void openQCD_gaugeloadsave(int precision, void *gauge)
+{
+
+  QudaGaugeParam qudaGaugeParam
+    = newOpenQCDGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION); // FIXME:
+
+  loadGaugeQuda(gauge, &qudaGaugeParam);
+
+  saveGaugeQuda(gauge, &qudaGaugeParam);
+
   return;
 }
 
@@ -488,7 +507,6 @@ void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_Quda
 
   loadGaugeQuda(gauge, &qudaGaugeParam);
 
-
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision_sloppy = device_precision;
@@ -506,9 +524,11 @@ void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_Quda
 
   invertParam.dslash_type = QUDA_WILSON_DSLASH;
 
-  dslashQuda(dst,src, &invertParam, local_parity);
+  dslashQuda(dst, src, &invertParam, local_parity);
 
-// TODO: need save??
+  // TODO: need save??
+
+  // saveGaugeQuda(gauge, &qudaGaugeParam);
 
   return;
 } // qudaDslash

@@ -1767,7 +1767,7 @@ namespace quda
         // int dir_OpenQxD = (dir + 1) % 4; // rotation of axes QUDA -> OpenQxD
 
         // Loading as per QUDA style
-        auto in = &field[(4 * iy_OpenQxD) * length]; // This is how they're accessed within OpenQxd (length = 24 doubles
+        auto in = &field[iy_OpenQxD * length]; // This is how they're accessed within OpenQxd (length = 24 doubles
                                                      // = 12 complex doubles = 4 spinor x 3 colors)
         block_load<complex, length / 2>(v, reinterpret_cast<const complex *>(in));
         /* END OF INDEXING */
@@ -1776,7 +1776,15 @@ namespace quda
       __device__ __host__ inline void save(const complex v[length / 2], int x,
                                            int parity = 0) const // TODO: adapt to openqxd
       {
-        auto out = &field[(parity * volumeCB + x) * length];
+        /* INDEXING */
+        int coord[4]; // declare a 4D vector x0, x1, x2, x3 = (xyzt), t fastest (ix = x0 + x1 * L0 + ...)
+        getCoords(coord, x, dim, parity); // from x, dim, parity obtain coordinate of the site
+
+        int iy_OpenQxD = coord[2] + dim[2] * coord[1] + dim[2] * dim[1] * coord[0] + dim[0] * dim[2] * dim[1] * coord[3];
+        // int dir_OpenQxD = (dir + 1) % 4; // rotation of axes QUDA -> OpenQxD
+
+        // Loading as per QUDA style
+        auto out = &field[iy_OpenQxD * length];
         block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
       }
 

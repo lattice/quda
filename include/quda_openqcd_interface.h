@@ -163,6 +163,8 @@ void openQCD_qudaLoadGaugeField(int external_precision, int quda_precision, open
 
 void openQCD_qudaPlaquette(int precision, double plaq[3], void *gauge);
 
+void openQCD_gaugeloadsave(int precision, void *gauge);
+
 // int openQCD_ipt(int iy);
 
 /**
