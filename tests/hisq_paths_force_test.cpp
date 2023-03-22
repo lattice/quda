@@ -13,8 +13,6 @@
 #include <timer.h>
 #include <gtest/gtest.h>
 
-#define TDIFF(a, b) (b.tv_sec - a.tv_sec + 0.000001 * (b.tv_usec - a.tv_usec))
-
 using namespace quda;
 
 cpuGaugeField *cpuGauge = NULL;
@@ -52,7 +50,20 @@ static void setPrecision(QudaPrecision precision)
   return;
 }
 
-void total_staple_io_flops(QudaPrecision prec, bool has_lepage,
+/**
+  @brief Compute the aggregate bytes and flops for various components within the HISQ force
+
+  @param[in] prec Input precision
+  @param[in] recon Gauge link reconstruct
+  @param[in] has_lepage Whether or not there is a Lepage contribution
+  @param[out] staples_io Bytes streamed for the force contribution from HISQ staples
+  @param[out] staples_flops FLOPS for the force contribution from HISQ staples
+  @param[out] long_io Bytes streamed for the force contribution from the HISQ long link
+  @param[out] long_flops FLOPS for the force contribution from the HISQ long link
+  @param[out] complete_io Bytes streamed for the force contribution from the force completion
+  @param[out] complete_flops FLOPS for the force contribution from the force completion
+*/
+void total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, bool has_lepage,
                             long long &staples_io, long long &staples_flops,
                             long long &long_io, long long &long_flops,
                             long long &complete_io, long long &complete_flops)
@@ -62,30 +73,38 @@ void total_staple_io_flops(QudaPrecision prec, bool has_lepage,
   // total IO counting for the middle/side/all link kernels
   // Explanation about these numbers can be founed in the corresponding kernel functions in
   // the hisq kernel core file
+  long long linksize = prec * recon;
   long long cmsize = prec * 18ll;
 
   // FLOPS for matrix multiply, matrix add, matrix rescale, and anti-Hermitian projection
   long long matrix_flops[4] = { 198ll, 18ll, 18ll, 23ll };
 
   // fully fused all directions
-  int one_link_io = 12;
+  int one_link_io[2] = { 0, 12 }; // no links, 12 color matrices
   int one_link_flops[4] = { 0, 4, 4, 0 };
 
-  // the 2s are for forwards and backwards
-  int three_link_io[2] = { 264, 192 };
-  int three_link_flops[2][4] = { {96, 48, 48, 0}, {48, 24, 24, 0} };
-  int three_lepage_link_io[2] = { 508, 364 };
+  // The outer (left-most) [2] is for forwards/backwards
+
+  // The inner (right-most) [2] is for link vs color matrix
+  int three_link_io[2][2] = { {72, 192}, {48, 144} };
+  int three_lepage_link_io[2][2] = { {220, 288}, {172, 192} };
+  int five_seven_link_io[2][2] = { {1176, 1872}, {1176, 1440} };
+
+  // The inner (right-most) [4] corresponds to multiply/add/rescale/projection
+  int three_link_flops[2][4] = { {96, 48, 48, 0}, {48, 24, 24, 0} };  
   int three_lepage_link_flops[2][4] = { {288, 120, 120, 0}, {192, 72, 72, 0} };
-  int five_seven_link_io[2] = { 3048, 2616 };
   int five_seven_link_flops[2][4] = { {1920, 864, 864, 0}, {1440, 576, 576, 0} };
 
   // Compute the bytes loaded/stored
-  staples_io = one_link_io + five_seven_link_io[0] + five_seven_link_io[1];
-  if (has_lepage)
-    staples_io += three_lepage_link_io[0] + three_lepage_link_io[1];
-  else
-    staples_io += three_link_io[0] + three_link_io[1];
-  staples_io *= cmsize * V;
+  long long staples_io_parts[2] = { 0ll, 0ll };
+  for (int m = 0; m < 2; m++) {
+    staples_io_parts[m] = one_link_io[m] + five_seven_link_io[0][m] + five_seven_link_io[1][m];
+    if (has_lepage)
+      staples_io_parts[m] += three_lepage_link_io[0][m] + three_lepage_link_io[1][m];
+    else
+      staples_io_parts[m] += three_link_io[0][m] + three_link_io[1][m];
+  }
+  staples_io = (staples_io_parts[0] * linksize + staples_io_parts[1] * cmsize) * V;
 
   // Compute the total number of bytes
   staples_flops = 0;
@@ -110,7 +129,7 @@ void total_staple_io_flops(QudaPrecision prec, bool has_lepage,
   long_io = 0;
   long_flops = 0;
   if (has_lepage) {
-    long_io = 36 * cmsize * V;
+    long_io = (16 * linksize + 20 * cmsize) * V;
 
     int long_link_flops[4] = {24, 12, 4, 0};
     for (int i = 0; i < 4; i++)
@@ -121,7 +140,7 @@ void total_staple_io_flops(QudaPrecision prec, bool has_lepage,
   }
 
   // In both cases, the force complete routine is called
-  complete_io = 12 * cmsize * V;
+  complete_io = (4 * linksize + 8 * cmsize) * V;
   int complete_link_flops[4] = {4, 0, 4, 4};
   complete_flops = 0;
   for (int i = 0; i < 4; i++)
@@ -514,7 +533,7 @@ static int hisq_force_test(bool lepage)
     logQuda(QUDA_SUMMARIZE, "Test (lepage coeff %e) %s\n", d_act_path_coeff[5], (1 == res) ? "PASSED" : "FAILED");
   }
   long long staple_io, staple_flops, long_io, long_flops, complete_io, complete_flops;
-  total_staple_io_flops(force_prec, lepage, staple_io, staple_flops, long_io, long_flops, complete_io, complete_flops);
+  total_staple_io_flops(force_prec, link_recon, lepage, staple_io, staple_flops, long_io, long_flops, complete_io, complete_flops);
 
   {
     double perf_flops = static_cast<double>(staple_flops) / (staple_time_sec) * 1e-9;

@@ -74,11 +74,9 @@ namespace quda {
       }
 
       long long bytes() const override {
-        long long bytes_per_site = 4ll * (arg.oProd.Bytes() + 2 * arg.force.Bytes());
-
-        //printfQuda("ONE LINK BYTES %llu\n", bytes_per_site);
-
-        return 2 * arg.threads.x* bytes_per_site;
+        long long link_bytes_per_site = 0ll;
+        long long cm_bytes_per_site = 4ll * (arg.oProd.Bytes() + 2 * arg.force.Bytes());
+        return 2 * arg.threads.x * (link_bytes_per_site + cm_bytes_per_site);
       }
     };
 
@@ -221,32 +219,37 @@ namespace quda {
       }
 
       long long bytes() const override {
-        long long bytes_per_site = ( arg.link.Bytes() );
+        long long link_bytes_per_site = arg.link.Bytes();
+        long long cm_bytes_per_site = 0ll;
+
         // Three link side link, all Lepage
         if (mu.is_valid()) {
-          bytes_per_site += ( arg.p3.Bytes() + 2 * arg.force.Bytes() );
+          cm_bytes_per_site += arg.p3.Bytes() + 2 * arg.force.Bytes();
           if (has_lepage) {
-            bytes_per_site += ( 5 * arg.link.Bytes() + 2 * arg.pMu.Bytes() );
+            link_bytes_per_site += 5 * arg.link.Bytes();
+            cm_bytes_per_site += 2 * arg.pMu.Bytes();
             if (sig.is_forward()) {
-              bytes_per_site += ( arg.link.Bytes() + 2 * arg.force.Bytes() );
+              link_bytes_per_site += arg.link.Bytes();
+              cm_bytes_per_site += 2 * arg.force.Bytes();
             }
           }
         }
         // Three link middle link
         if (mu_next.is_valid()) {
-          bytes_per_site += ( arg.link.Bytes() + arg.oProd.Bytes() + arg.pMu_next.Bytes() + arg.p3.Bytes() );
+          link_bytes_per_site += arg.link.Bytes();
+          cm_bytes_per_site += arg.oProd.Bytes() + arg.pMu_next.Bytes() + arg.p3.Bytes();
           if (sig.is_forward()) {
-            bytes_per_site += ( arg.link.Bytes() + 2 * arg.force.Bytes() );
+            link_bytes_per_site += arg.link.Bytes();
+            cm_bytes_per_site += 2 * arg.force.Bytes();
           }
         }
 
         // logic correction
-        if (mu_next.is_invalid() && !has_lepage)
-          bytes_per_site -= ( arg.link.Bytes() );
+        if (mu_next.is_invalid() && !has_lepage) {
+          link_bytes_per_site -= arg.link.Bytes();
+        }
 
-        //printfQuda("THREE LINK %c LEPAGE BYTES %llu\n", has_lepage ? 'y' : 'n', bytes_per_site);
-
-        return 2 * arg.threads.x * bytes_per_site;
+        return 2 * arg.threads.x * (link_bytes_per_site + cm_bytes_per_site);
       }
     };
 
@@ -416,26 +419,27 @@ namespace quda {
       }
 
       long long bytes() const override {
-        long long bytes_per_site = arg.link.Bytes();
-        if (sig.is_forward()) bytes_per_site += 2 * arg.force.Bytes();
+        long long link_bytes_per_site = arg.link.Bytes();
+        long long cm_bytes_per_site = 0ll;
+        if (sig.is_forward()) cm_bytes_per_site += 2 * arg.force.Bytes();
 
         // SideFiveAllSeven contribution
         if (nu.is_valid()) {
-          bytes_per_site += 8 * arg.link.Bytes() + 2 * arg.qNuMu.Bytes() + 2 * arg.pNuMu.Bytes() +
+          link_bytes_per_site += 8 * arg.link.Bytes();
+          cm_bytes_per_site += 2 * arg.qNuMu.Bytes() + 2 * arg.pNuMu.Bytes() +
                             arg.p5.Bytes() + 2 * arg.shortP.Bytes() + 4 * arg.force.Bytes();
           if (sig.is_forward())
-            bytes_per_site += arg.qNuMu.Bytes() + arg.pNuMu.Bytes();
+            cm_bytes_per_site += arg.qNuMu.Bytes() + arg.pNuMu.Bytes();
         }
 
         // MiddleFive contribution
         if (nu_next.is_valid()) {
-          bytes_per_site += 3 * arg.link.Bytes() + arg.pMu.Bytes() + arg.p5.Bytes() +
+          link_bytes_per_site += 3 * arg.link.Bytes();
+          cm_bytes_per_site += arg.pMu.Bytes() + arg.p5.Bytes() +
                             arg.pNuMu_next.Bytes() + arg.qNuMu_next.Bytes();
         }
 
-        //printfQuda("FIVESEVEN LINK BYTES %llu\n", bytes_per_site);
-
-        return 2 * arg.threads.x * bytes_per_site;
+        return 2 * arg.threads.x * (link_bytes_per_site + cm_bytes_per_site);
       }
     };
 
@@ -643,9 +647,9 @@ namespace quda {
       }
 
       long long bytes() const override {
-        long long bytes_per_site = 4ll * (2 * arg.force.Bytes() + 4 * arg.link.Bytes() + 3 * arg.oProd.Bytes());
-        //printfQuda("LONG LINK BYTES %llu\n", bytes_per_site);
-        return 2 * arg.threads.x * bytes_per_site;
+        long long link_bytes_per_site = 4ll * (4 * arg.link.Bytes());
+        long long cm_bytes_per_site = 4ll * (2 * arg.force.Bytes() + 3 * arg.oProd.Bytes());
+        return 2 * arg.threads.x * (link_bytes_per_site + cm_bytes_per_site);
       }
     };
 
@@ -721,9 +725,9 @@ namespace quda {
       }
 
       long long bytes() const override {
-        long long bytes_per_site = 4ll * (arg.force.Bytes() + arg.link.Bytes() + arg.oProd.Bytes());
-        //printfQuda("COMPLETE LINK BYTES %llu\n", bytes_per_site);
-        return 2 * arg.threads.x * bytes_per_site;
+        long long link_bytes_per_site = 4ll * arg.link.Bytes();
+        long long cm_bytes_per_site = 4ll * (arg.force.Bytes() + arg.oProd.Bytes());
+        return 2 * arg.threads.x * (link_bytes_per_site + cm_bytes_per_site);
       }
     };
 
