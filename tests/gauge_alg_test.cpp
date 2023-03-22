@@ -346,7 +346,7 @@ TEST_F(GaugeAlgTest, Coulomb_FFT)
 
 struct gauge_alg_test : quda_test {
 
-  void display_info()
+  void display_info() const override
   {
     quda_test::display_info();
 
@@ -363,7 +363,7 @@ struct gauge_alg_test : quda_test {
                tdim, Lsdim);
   }
 
-  void add_command_line_group(std::shared_ptr<QUDAApp> app)
+  void add_command_line_group(std::shared_ptr<QUDAApp> app) const override
   {
     quda_test::add_command_line_group(app);
     add_gaugefix_option_group(app);
