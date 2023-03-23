@@ -354,19 +354,19 @@ static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, Qud
 static void setColorSpinorParams(const int dim[4], QudaPrecision precision, ColorSpinorParam *param)
 {
   param->nColor = 3;
-  param->nSpin = 1; // TODO:
+  param->nSpin = 4; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
   param->nDim = 4;  // TODO: check how to adapt this for openqxd
 
   for (int dir = 0; dir < 4; ++dir) param->x[dir] = dim[dir];
-  param->x[0] /= 2;
+  param->x[0] /= 2;  // FIXME:
 
   param->setPrecision(precision);
   param->pad = 0;
-  param->siteSubset = QUDA_PARITY_SITE_SUBSET; // TODO: check how to adapt this for openqxd
-  param->siteOrder = QUDA_EVEN_ODD_SITE_ORDER; // TODO: check how to adapt this for openqxd
-  param->fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  param->gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless, but required by the code.  // TODO:
-  param->create = QUDA_ZERO_FIELD_CREATE;             // TODO: check how to adapt this for openqxd
+  param->siteSubset = QUDA_FULL_SITE_SUBSET; // FIXME: check how to adapt this for openqxd
+  param->siteOrder = QUDA_EVEN_ODD_SITE_ORDER; // FIXME: check how to adapt this for openqxd
+  param->fieldOrder = QUDA_OPENQCD_FIELD_ORDER; // FIXME:
+  param->gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless, but required by the code.  // // FIXME::
+  param->create = QUDA_ZERO_FIELD_CREATE;             // // FIXME:: check how to adapt this for openqxd ?? created -0 in weird places
 }
 
 void setGaugeParams(QudaGaugeParam &qudaGaugeParam, const int dim[4], openQCD_QudaInvertArgs_t &inv_args,
