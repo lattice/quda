@@ -1873,7 +1873,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   profileDslash.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-#if 0
+// #if 0
 void dslashQudaTest(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
 {
   profileDslash.TPSTART(QUDA_PROFILE_TOTAL);
@@ -1933,13 +1933,13 @@ void dslashQudaTest(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPar
   if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH && inv_param->dagger) {
     cudaParam.create = QUDA_NULL_FIELD_CREATE;
     ColorSpinorField tmp1(cudaParam);
-    ((DiracTwistedCloverPC *)dirac)->TwistCloverInv(tmp1, in, (parity + 1) % 2); // apply the clover-twist
-    dirac->Dslash(out, tmp1, parity);                                            // apply the operator
+    // ((DiracTwistedCloverPC *)dirac)->TwistCloverInv(tmp1, in, (parity + 1) % 2); // // DO NOT APPLY the clover-twist
+    // dirac->Dslash(out, tmp1, parity);                                            // DO NOT APPLY OPERATOR
   } else if (inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH
              || inv_param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
-    dirac->Dslash4(out, in, parity);
+    // dirac->Dslash4(out, in, parity); // DO NOT APPLY OPERATOR
   } else {
-    dirac->Dslash(out, in, parity); // apply the operator
+    // dirac->Dslash(out, in, parity); // DO NOT APPLY OPERATOR
   }
   profileDslash.TPSTOP(QUDA_PROFILE_COMPUTE);
 
@@ -1957,7 +1957,7 @@ void dslashQudaTest(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPar
   popVerbosity();
   profileDslash.TPSTOP(QUDA_PROFILE_TOTAL);
 }
-#endif
+// #endif
 
 void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
