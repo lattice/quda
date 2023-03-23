@@ -168,9 +168,6 @@ namespace quda
     const char *file;
     const char *line;
 
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-
   public:
     inline QudaMem(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const qudaStream_t &stream,
                    bool async, const char *func, const char *file, const char *line) :
@@ -235,7 +232,7 @@ namespace quda
       apply(stream);
     }
 
-    inline void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t &stream) override
     {
       if (!active_tuning) tuneLaunch(*this, getTuning(), getVerbosity());
 
@@ -308,9 +305,9 @@ namespace quda
       }
     }
 
-    bool advanceTuneParam(TuneParam &) const { return false; }
+    bool advanceTuneParam(TuneParam &) const override { return false; }
 
-    TuneKey tuneKey() const
+    TuneKey tuneKey() const override
     {
       char vol[128];
       strcpy(vol, "bytes=");
@@ -318,8 +315,7 @@ namespace quda
       return TuneKey(vol, name, aux);
     }
 
-    long long flops() const { return 0; }
-    long long bytes() const { return kind == cudaMemcpyDeviceToDevice ? 2 * count : count; }
+    long long bytes() const override { return kind == cudaMemcpyDeviceToDevice ? 2 * count : count; }
   };
 
   void qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const char *func, const char *file,
