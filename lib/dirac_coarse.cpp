@@ -476,8 +476,12 @@ namespace quda {
                      QUDA_MATPC_INVALID, need_bidirectional);
     } else {
       initializeLazy(QUDA_CUDA_FIELD_LOCATION);
+      if (Y.Order() != X.Order()) {
+        errorQuda("Y/X order mismatch in createCoarseOp: %d %d\n", Y.Order(), X.Order());
+      }
+      bool use_mma = Y.Order() == QUDA_MILC_GAUGE_ORDER;
       CoarseCoarseOp(Y, X, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, mass, a, mu_factor, QUDA_COARSE_DIRAC,
-                     QUDA_MATPC_INVALID, need_bidirectional, setup_use_mma);
+                     QUDA_MATPC_INVALID, need_bidirectional, use_mma);
     }
   }
 
@@ -706,8 +710,12 @@ namespace quda {
                      QUDA_COARSEPC_DIRAC, matpcType, true);
     } else {
       initializeLazy(QUDA_CUDA_FIELD_LOCATION);
+      if (Y.Order() != X.Order()) {
+        errorQuda("Y/X order mismatch in createCoarseOp: %d %d\n", Y.Order(), X.Order());
+      }
+      bool use_mma = Y.Order() == QUDA_MILC_GAUGE_ORDER;
       CoarseCoarseOp(Y, X, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, mass, a, -mu_factor,
-                     QUDA_COARSEPC_DIRAC, matpcType, true, setup_use_mma);
+                     QUDA_COARSEPC_DIRAC, matpcType, true, use_mma);
     }
   }
 
