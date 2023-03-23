@@ -2355,7 +2355,6 @@ namespace quda
         if constexpr (length != 18) errorQuda("Gauge length %d not supported", length);
       }
 
-
       // TODO: make this function
       // __device__ __host__ inline int QUDAtoOpenQxD(int x_cb_QUDA, int dir_QUDA, int parity_QUDA) const
       // TODO: Implement ipt and iup functions
@@ -2363,40 +2362,52 @@ namespace quda
 
       // }
 
+      /* ORIGINAL */
 
-      __device__ __host__ inline void load(complex v[9], int x, int dir, int parity,
-                                           Float = 1.0) const 
+#if 0
+      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
+      {
+        auto in = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
+        block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+      }
+
+      __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
+      {
+        auto out = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
+        block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+      }
+#endif
+
+      /*****************/
+
+      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, Float = 1.0) const
       {
         // With ''natural'' order: lexicographical 0123 = txyz , t fastest, links 0123 = txyz in pos directions
 
         // Indexing fun:
         int coord[4]; // declare a 4D vector x0, x1, x2, x3 = (xyzt), t fastest (ix = x0 + x1 * L0 + ...)
-
         getCoords(coord, x, dim, parity); // from x, dim, parity obtain coordinate of the site
 
         // int iy_OpenQxD = x3 + L3*x2 + L3*L2*x1 + L3*L2*L1*x0;
-        // TODO: Determine whether coord[mu] is local or global
-        int iy_OpenQxD = coord[2] + dim[2] * coord[1] + dim[2] * dim[1] * coord[0] + dim[0] * dim[2] * dim[1] * coord[3]; 
+        int iy_OpenQxD = coord[2] + dim[2] * coord[1] + dim[2] * dim[1] * coord[0] + dim[0] * dim[2] * dim[1] * coord[3];
         /* lexicographical index: coord0 in QUDA is x1 in OpenQxD (x)
-                                                                           coord1 in QUDA is x2 in OpenQxD (y)
-                                                                           coord2 in QUDA is x3 in OpenQxD (z)
-                                                                           coord3 in QUDA is x0 in OpenQxD (t)
-                                                 */
+                                  coord1 in QUDA is x2 in OpenQxD (y)
+                                  coord2 in QUDA is x3 in OpenQxD (z)
+                                  coord3 in QUDA is x0 in OpenQxD (t) */
         // int ix_OpenQxD = ipt[iy_OpenQxD];
-        int dir_OpenQxD = (dir + 1) % 4; // rotation of axes QUDA -> OpenQxD
+
+        int dir_OpenQxD = (dir) % 4; // rotation of axes QUDA -> OpenQxD
 
         // Loading as per QUDA style
-        auto in
-          = &gauge[(4 * iy_OpenQxD + dir_OpenQxD) * length]; // This is how they're accessed within OpenQxd (length = 18
-                                                             // doubles = 9 complex doubles = 1 su3dble struct)
+        auto in = &gauge[(4 * iy_OpenQxD + dir_OpenQxD) * length]; 
+          // This is how they're accessed within OpenQxd (length = 18
+          // doubles = 9 complex doubles = 1 su3dble struct)
         // auto in = &gauge[ (8*(ix_OpenQxD - volumeCB) + 2*dir_OpenQxD)* length];    // This is how they're accessed
         // within OpenQxd (length = 18 doubles = 9 complex doubles = 1 su3dble struct)
         block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
-
-        
       }
 
-      __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity) const
+      __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
       {
         // Indexing fun:
         int coord[4]; // declare a 4D vector x0, x1, x2, x3 = (xyzt), t fastest (ix = x0 + x1 * L0 + ...)

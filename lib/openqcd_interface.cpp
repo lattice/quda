@@ -210,7 +210,8 @@ static QudaGaugeParam newOpenQCDGaugeParam(const int *dim, QudaPrecision prec)
   gParam.tadpole_coeff = 1.0;
   gParam.scale = 0;
   gParam.ga_pad = getLinkPadding(dim);
-  gParam.return_result_gauge = 1;
+  
+  // gParam.return_result_gauge = 1; //?
 
   return gParam;
 }
