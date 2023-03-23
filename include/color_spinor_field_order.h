@@ -1494,7 +1494,7 @@ namespace quda
     };
 
     template <typename Float, int Ns, int Nc>
-    struct SpaceSpinorColorOrder { // TODO: check how to adapt this for openqxd
+    struct SpaceSpinorColorOrder { 
       using Accessor = SpaceSpinorColorOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
@@ -1722,8 +1722,9 @@ namespace quda
       size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
     };
 
-    // Use this template as openqxd for now  TODO:
-    template <typename Float, int Ns, int Nc> struct OpenQCDDiracOrder { // TODO: check how to adapt this for openqxd
+     
+// Based on ''SpaceSpinorColorOrder'' TODO:
+    template <typename Float, int Ns, int Nc> struct OpenQCDDiracOrder { 
       using Accessor = OpenQCDDiracOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
@@ -1750,38 +1751,34 @@ namespace quda
         }
       }
 
-      __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const // TODO: adapt to openqxd
-      {
-
-        /* INDEXING */
-
-        int coord[4]; // declare a 4D vector x0, x1, x2, x3 = (xyzt), t fastest (ix = x0 + x1 * L0 + ...)
-        getCoords(coord, x, dim, parity); // from x, dim, parity obtain coordinate of the site
-
-        /* lexicographical index: coord0 in QUDA is x1 in OpenQxD (x)
+/* lexicographical index: coord0 in QUDA is x1 in OpenQxD (x)
         coord1 in QUDA is x2 in OpenQxD (y)
         coord2 in QUDA is x3 in OpenQxD (z)
         coord3 in QUDA is x0 in OpenQxD (t)
         */
+      __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
+      {
+
+        /* INDEXING */
+        int coord[4]; // declare a 4D vector x0, x1, x2, x3 = (xyzt), t fastest (ix = x0 + x1 * L0 + ...)
+        getCoords(coord, x, dim, parity); // from x, dim, parity obtain coordinate of the site
+
         int iy_OpenQxD = coord[2] + dim[2] * coord[1] + dim[2] * dim[1] * coord[0] + dim[0] * dim[2] * dim[1] * coord[3];
-        // int dir_OpenQxD = (dir + 1) % 4; // rotation of axes QUDA -> OpenQxD
 
         // Loading as per QUDA style
         auto in = &field[iy_OpenQxD * length]; // This is how they're accessed within OpenQxd (length = 24 doubles
                                                      // = 12 complex doubles = 4 spinor x 3 colors)
         block_load<complex, length / 2>(v, reinterpret_cast<const complex *>(in));
-        /* END OF INDEXING */
       }
 
       __device__ __host__ inline void save(const complex v[length / 2], int x,
-                                           int parity = 0) const // TODO: adapt to openqxd
+                                           int parity = 0) const
       {
         /* INDEXING */
         int coord[4]; // declare a 4D vector x0, x1, x2, x3 = (xyzt), t fastest (ix = x0 + x1 * L0 + ...)
         getCoords(coord, x, dim, parity); // from x, dim, parity obtain coordinate of the site
 
         int iy_OpenQxD = coord[2] + dim[2] * coord[1] + dim[2] * dim[1] * coord[0] + dim[0] * dim[2] * dim[1] * coord[3];
-        // int dir_OpenQxD = (dir + 1) % 4; // rotation of axes QUDA -> OpenQxD
 
         // Loading as per QUDA style
         auto out = &field[iy_OpenQxD * length];

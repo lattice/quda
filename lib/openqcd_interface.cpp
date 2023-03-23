@@ -211,7 +211,7 @@ static QudaGaugeParam newOpenQCDGaugeParam(const int *dim, QudaPrecision prec)
   gParam.scale = 0;
   gParam.ga_pad = getLinkPadding(dim);
   
-  // gParam.return_result_gauge = 1; //?
+  // gParam.return_result_gauge = 1; // I think this is not needed ?
 
   return gParam;
 }

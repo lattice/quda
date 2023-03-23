@@ -2396,7 +2396,7 @@ namespace quda
                                   coord3 in QUDA is x0 in OpenQxD (t) */
         // int ix_OpenQxD = ipt[iy_OpenQxD];
 
-        int dir_OpenQxD = (dir) % 4; // rotation of axes QUDA -> OpenQxD
+        int dir_OpenQxD = (dir + 1) % 4; // rotation of axes QUDA -> OpenQxD
 
         // Loading as per QUDA style
         auto in = &gauge[(4 * iy_OpenQxD + dir_OpenQxD) * length]; 
