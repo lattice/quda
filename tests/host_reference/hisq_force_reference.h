@@ -11,9 +11,8 @@
    @param[out] dest Pointer to an appropriately sized output outer product field
    @param[in] precision Precision of data (single or double)
    @param[in] separation Offset for outer product (1 for fat links, 3 for long links)
-   @param[in] gauge_order Data layout of the destination outer product field, either QDP or MILC order
 */
-void computeLinkOrderedOuterProduct(void *src, void *dest, QudaPrecision precision, size_t separation, int gauge_order);
+void computeLinkOrderedOuterProduct(void *src, void *dest, QudaPrecision precision, size_t separation);
 
 /**
    @brief Compute the force contribution from the fat links, CPU version

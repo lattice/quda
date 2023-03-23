@@ -39,7 +39,7 @@ namespace quda {
       Arg &arg;
       const GaugeField &force;
       const GaugeField &link;
-      unsigned int minThreads() const { return arg.threads.x; }
+      unsigned int minThreads() const override { return arg.threads.x; }
 
     public:
       OneLinkForce(Arg &arg, const GaugeField &link, const GaugeField &force) :
@@ -57,7 +57,7 @@ namespace quda {
         apply(device::get_default_stream());
       }
 
-      void apply(const qudaStream_t &stream)
+      void apply(const qudaStream_t &stream) override
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         launch<OneLinkTerm>(tp, stream, arg);
@@ -168,7 +168,7 @@ namespace quda {
         else instantiate<DIR_NEGATIVE>(mu, mu_next, tp, stream);
       }
 
-      void apply(const qudaStream_t &stream)
+      void apply(const qudaStream_t &stream) override
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         tp.set_max_shared_bytes = true; // maximize the shared memory pool
@@ -365,7 +365,7 @@ namespace quda {
         else instantiate<DIR_NEGATIVE>(mu, nu, nu_next, tp, stream);
       }
 
-      void apply(const qudaStream_t &stream)
+      void apply(const qudaStream_t &stream) override
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         tp.set_max_shared_bytes = true; // maximize the shared memory pool
@@ -607,7 +607,7 @@ namespace quda {
       Arg &arg;
       GaugeField &force;
       const GaugeField &meta;
-      unsigned int minThreads() const { return arg.threads.x; }
+      unsigned int minThreads() const override { return arg.threads.x; }
 
     public:
       HisqLongForce(Arg &arg, GaugeField &force, const GaugeField &meta) :
@@ -625,7 +625,7 @@ namespace quda {
         apply(device::get_default_stream());
       }
 
-      void apply(const qudaStream_t &stream) {
+      void apply(const qudaStream_t &stream) override {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         launch<LongLink>(tp, stream, arg);
       }
@@ -683,7 +683,7 @@ namespace quda {
       Arg &arg;
       GaugeField &force;
       const GaugeField &meta;
-      unsigned int minThreads() const { return arg.threads.x; }
+      unsigned int minThreads() const override { return arg.threads.x; }
 
     public:
       HisqCompleteLinkForce(Arg &arg, GaugeField &force, const GaugeField &meta) :
@@ -701,7 +701,7 @@ namespace quda {
         apply(device::get_default_stream());
       }
 
-      void apply(const qudaStream_t &stream) {
+      void apply(const qudaStream_t &stream) override {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         launch<CompleteForce>(tp, stream, arg);
       }
