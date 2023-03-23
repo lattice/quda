@@ -106,6 +106,18 @@ namespace quda
       return device_count;
     }
 
+    void get_visible_devices_string(char device_list_string[128])
+    {
+      char *device_order_env = getenv("ZE_AFFINITY_MASK");
+      char *omptarget_devices = getenv("LIBOMPTARGET_DEVICES");
+      if(omptarget_devices && device_order_env)
+        snprintf(device_list_string, sizeof(device_list_string), "%s%s", omptarget_devices, device_order_env);
+      else if(omptarget_devices)
+        snprintf(device_list_string, sizeof(device_list_string), "%s", omptarget_devices);
+      else if(device_order_env)
+        snprintf(device_list_string, sizeof(device_list_string), "%s", device_order_env);
+    }
+
     void print_device_properties()
     {
       DeviceProp dp;

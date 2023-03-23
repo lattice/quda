@@ -14,6 +14,9 @@
    instantiation correctly.
  */
 
+// set a preprocessor flag that we have included constant_kernel_arg.h
+#define QUDA_USE_CONSTANT_MEMORY
+
 namespace quda
 {
 
