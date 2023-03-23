@@ -250,6 +250,7 @@ typedef enum QudaDiracFieldOrder_s {
   QUDA_CPS_WILSON_DIRAC_ORDER,  // odd-even, color inside spin
   QUDA_LEX_DIRAC_ORDER,         // lexicographical order, color inside spin
   QUDA_TIFR_PADDED_DIRAC_ORDER, // padded z dimension for TIFR RHMC code
+  QUDA_OPENQCD_DIRAC_ORDER,     // openqcd
   QUDA_INVALID_DIRAC_ORDER = QUDA_INVALID_ENUM
 } QudaDiracFieldOrder;
 

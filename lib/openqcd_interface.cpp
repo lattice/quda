@@ -322,9 +322,9 @@ static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, Qud
   invertParam->solution_type = QUDA_MATPC_SOLUTION;
   invertParam->solve_type = QUDA_DIRECT_PC_SOLVE;
   invertParam->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // not used, but required by the code.
-  invertParam->dirac_order = QUDA_DIRAC_ORDER;
+  invertParam->dirac_order = QUDA_OPENQCD_DIRAC_ORDER;
 
-  invertParam->dslash_type = QUDA_ASQTAD_DSLASH;
+  invertParam->dslash_type = QUDA_WILSON_DSLASH; // FIXME: OR THIS; QUDA_ASQTAD_DSLASH;
   invertParam->Ls = 1;
   invertParam->gflops = 0.0;
 
@@ -533,6 +533,45 @@ void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_Quda
 
   return;
 } // qudaDslash
+
+#if 0
+void openQCD_qudaDslashTest(int external_precision, int quda_precision, openQCD_QudaInvertArgs_t inv_args, void *src,
+                        void *dst, void *gauge)
+{
+  static const QudaVerbosity verbosity = getVerbosity();
+
+  QudaGaugeParam qudaGaugeParam
+    = newOpenQCDGaugeParam(localDim, (quda_precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
+
+  loadGaugeQuda(gauge, &qudaGaugeParam);
+
+  QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision_sloppy = device_precision;
+
+  QudaInvertParam invertParam = newQudaInvertParam();
+
+  QudaParity local_parity = inv_args.evenodd;
+  QudaParity other_parity = local_parity == QUDA_EVEN_PARITY ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY;
+
+  setInvertParams(host_precision, device_precision, device_precision_sloppy, 0.0, 0, 0, 0, 0.0, local_parity, verbosity,
+                  QUDA_CG_INVERTER, &invertParam);
+
+  ColorSpinorParam csParam;
+  setColorSpinorParams(localDim, host_precision, &csParam);
+
+  invertParam.dslash_type = QUDA_WILSON_DSLASH;
+
+  dslashQudaTest(dst, src, &invertParam, local_parity);
+
+  // TODO: need save??
+
+  // saveGaugeQuda(gauge, &qudaGaugeParam);
+
+  return;
+} // qudaDslashTest
+#endif
+
 // #endif
 
 // void* openQCD_qudaCreateGaugeField(void *gauge, int geometry, int precision)
@@ -594,7 +633,7 @@ void setInvertParam(QudaInvertParam &invertParam, openQCD_QudaInvertArgs_t &inv_
   invertParam.cuda_prec = device_precision;
   invertParam.cuda_prec_sloppy = device_precision_sloppy;
   invertParam.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  invertParam.dirac_order = QUDA_DIRAC_ORDER;
+  invertParam.dirac_order = QUDA_OPENQCD_DIRAC_ORDER;
   invertParam.clover_cpu_prec = host_precision;
   invertParam.clover_cuda_prec = device_precision;
   invertParam.clover_cuda_prec_sloppy = device_precision_sloppy;

@@ -1256,6 +1256,18 @@ void dumpMultigridQuda(void *mg_instance, QudaMultigridParam *param);
  */
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity);
 
+#if 0
+/**
+ * Apply the Dslash operator (D_{eo} or D_{oe}).
+ * @param h_out  Result spinor field
+ * @param h_in   Input spinor field
+ * @param param  Contains all metadata regarding host and device
+ *               storage
+ * @param parity The destination parity of the field
+ */
+void dslashQudaTest(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity);
+#endif
+
 /**
  * @brief Perform the solve like @dslashQuda but for multiple rhs by spliting the comm grid into
  * sub-partitions: each sub-partition does one or more rhs'.
