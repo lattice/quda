@@ -162,15 +162,15 @@ namespace quda
        @param[in] j Use vectors v[0:j]
     */
     void blockOrthogonalizeHMGS(std::vector<ColorSpinorField> &v, std::vector<ColorSpinorField> &r, int i, int j);
-    
-     /**
-       @brief Orthonormalise input vector space v using Hybrid Modified Gram-Schmidt blockBLAS
-       @param[in] v Vector space
-       @param[in] i Ortho block size for Hybrid MGS (1 = modified, j-1 = classical, 1 < i < j-1 = hybrid)
-       @param[in] j Use vectors v[0:j-1]
-    */
+
+    /**
+      @brief Orthonormalise input vector space v using Hybrid Modified Gram-Schmidt blockBLAS
+      @param[in] v Vector space
+      @param[in] i Ortho block size for Hybrid MGS (1 = modified, j-1 = classical, 1 < i < j-1 = hybrid)
+      @param[in] j Use vectors v[0:j-1]
+   */
     void orthonormalizeHMGS(std::vector<ColorSpinorField> &v, int i, int j);
-    
+
     /**
        @brief Check orthonormality of input vector space v
        @param[out] bool If all vectors are orthonormal to 1e-16 returns true,

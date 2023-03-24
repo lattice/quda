@@ -233,7 +233,7 @@ void printQudaEigParam(QudaEigParam *param) {
   if (param->eig_type == QUDA_EIG_BLK_TR_LANCZOS)
 #endif
     P(block_size, INVALID_INT);
-  
+
 #if defined INIT_PARAM
   P(location, QUDA_CUDA_FIELD_LOCATION);
 #else

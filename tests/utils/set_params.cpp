@@ -781,7 +781,7 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   mg_eig_param.check_interval = mg_eig_check_interval[level];
   mg_eig_param.max_restarts = mg_eig_max_restarts[level];
   mg_eig_param.max_ortho_attempts = mg_eig_max_ortho_attempts[level];
-  
+
   mg_eig_param.compute_svd = QUDA_BOOLEAN_FALSE;
   mg_eig_param.compute_gamma5 = QUDA_BOOLEAN_FALSE;
   mg_eig_param.use_norm_op = mg_eig_use_normop[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;

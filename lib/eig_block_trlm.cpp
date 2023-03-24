@@ -263,7 +263,7 @@ namespace quda
 
     // Orthogonalise R[0:block_size] against the Krylov space V[0:j + block_size]
     for (int k = 0; k < 1; k++) blockOrthogonalizeHMGS(v, r, ortho_block_size, j + block_size);
-    
+
     // QR decomposition via modified Gram-Schmidt
     // NB, QR via modified Gram-Schmidt is numerically unstable.
     // We perform the QR iteratively to recover numerical stability.
@@ -304,8 +304,8 @@ namespace quda
       k++;
     }
 
-    if(!orthed) errorQuda("Block TRLM unable to orthonormalise the block residual after %d iterations", k+1);
-    
+    if (!orthed) errorQuda("Block TRLM unable to orthonormalise the block residual after %d iterations", k + 1);
+
     // Prepare next step.
     // v_{j+1} = r
     for (int b = 0; b < block_size; b++) v[j + block_size + b] = r[b];
@@ -434,7 +434,7 @@ namespace quda
     // the convergence condition
     double beta_sum = 0;
     for (int i = 0; i < block_data_length; i++) beta_sum += fabs(block_beta[n_kr * block_size - block_data_length + i]);
-    
+
     for (int i = 0; i < blocks; i++) {
       for (int b = 0; b < block_size; b++) {
         idx = b * (block_size + 1);
