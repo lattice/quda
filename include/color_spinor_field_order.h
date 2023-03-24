@@ -1737,7 +1737,7 @@ namespace quda
 
       OpenQCDDiracOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, float * = 0, Float **ghost_ = 0) :
         field(field_ ? field_ : (Float *)a.V()),
-        offset(a.Bytes() / (2 * sizeof(Float))),
+        // offset(a.Bytes() / (2 * sizeof(Float))),
         volumeCB(a.VolumeCB()),
         nParity(QUDA_FULL_SITE_SUBSET),              // => nParity = 2
         dim {a.X()[0], a.X()[1], a.X()[2], a.X()[3]} // GLOBAL dimensions
@@ -1818,7 +1818,7 @@ namespace quda
       //   }
       // }
 
-      size_t Bytes() const { return Nc * Ns * 2 * sizeof(Float); } // FIXME: ??
+      size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); } // FIXME: ??
     }; // openQCDDiracOrder
 
   } // namespace colorspinor

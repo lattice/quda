@@ -1931,8 +1931,8 @@ void dslashQudaTest(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPar
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
   if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH && inv_param->dagger) {
-    cudaParam.create = QUDA_NULL_FIELD_CREATE;
-    ColorSpinorField tmp1(cudaParam);
+    // cudaParam.create = QUDA_NULL_FIELD_CREATE;
+    // ColorSpinorField tmp1(cudaParam);
     // ((DiracTwistedCloverPC *)dirac)->TwistCloverInv(tmp1, in, (parity + 1) % 2); // // DO NOT APPLY the clover-twist
     // dirac->Dslash(out, tmp1, parity);                                            // DO NOT APPLY OPERATOR
   } else if (inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH
