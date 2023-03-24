@@ -419,7 +419,7 @@ namespace quda
       blas::cDotProduct(s, {vecs.begin() + j, vecs.begin() + j + block_array_size}, {rvecs.begin(), rvecs.end()});
 
       // Block orthogonalise
-      for (auto k = 0; k < array_size; k++) s[k] *= -1.0;
+      for (auto k = 0u; k < array_size; k++) s[k] *= -1.0;
       blas::caxpy(s, {vecs.begin() + j, vecs.begin() + j + block_array_size}, {rvecs.begin(), rvecs.end()});
     }
   }
