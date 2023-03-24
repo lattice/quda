@@ -3,6 +3,7 @@
 #include <device.h>
 #include <tune_quda.h>
 #include <target_device.h>
+#include <lattice_field.h>
 #include <kernel_helper.h>
 #include <quda_sycl.h>
 #include <quda_sycl_api.h>
@@ -11,14 +12,24 @@
 
 namespace quda {
 
+  /**
+     @brief This helper function indicates if the present
+     compilation unit has explicit constant memory usage enabled.
+  */
+  static bool use_constant_memory()
+  {
+#ifdef QUDA_USE_CONSTANT_MEMORY
+    return true;
+#else
+    return false;
+#endif
+  }
+
   class TunableKernel : public Tunable
   {
 
   protected:
     QudaFieldLocation location;
-
-    virtual unsigned int sharedBytesPerThread() const { return 0; }
-    virtual unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
     template <template <typename> class Functor, bool grid_stride, typename Arg>
     qudaError_t
@@ -36,14 +47,30 @@ namespace quda {
     }
 
   public:
-    TunableKernel(QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) : location(location) { }
+    TunableKernel(const LatticeField &field, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+      location(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location())
+    {
+      strcpy(vol, field.VolString().c_str());
+      strcpy(aux, compile_type_str(field, location));
+      if (this->location == QUDA_CUDA_FIELD_LOCATION && use_constant_memory()) strcat(aux, "cmem,");
+      if (this->location == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
+      strcat(aux, field.AuxString().c_str());
+    }
 
-    virtual bool advanceTuneParam(TuneParam &param) const
+    TunableKernel(size_t n_items, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) : location(location)
+    {
+      u64toa(vol, n_items);
+      strcpy(aux, compile_type_str(location));
+      if (location == QUDA_CUDA_FIELD_LOCATION && use_constant_memory()) strcat(aux, "cmem,");
+      if (this->location == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
+    }
+
+    virtual bool advanceTuneParam(TuneParam &param) const override
     {
       return location == QUDA_CPU_FIELD_LOCATION ? false : Tunable::advanceTuneParam(param);
     }
 
-    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
+    TuneKey tuneKey() const override { return TuneKey(vol, typeid(*this).name(), aux); }
   };
 
   // kernel helpers

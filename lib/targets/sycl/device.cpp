@@ -175,6 +175,15 @@ namespace quda
       return device_count;
     }
 
+    void get_visible_devices_string(char device_list_string[128])
+    {
+      char *device_order_env = getenv("SYCL_DEVICE_FILTER");
+      if(device_order_env[0] == '\0') {
+	device_order_env = getenv("ONEAPI_DEVICE_SELECTOR");
+      }
+      snprintf(device_list_string, 128, "%s", device_order_env);
+    }
+
     void print_device_properties()
     {
       auto p = sycl::platform(mySelector);
