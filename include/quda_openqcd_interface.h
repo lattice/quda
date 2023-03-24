@@ -110,6 +110,7 @@ typedef struct {
                                     HISQ fermions since the tadpole factor is
                                     baked into the links during their construction */
   double naik_epsilon;          /** Naik epsilon parameter (HISQ fermions only).*/
+  QudaDslashType  dslash_type;
 } openQCD_QudaInvertArgs_t;
 
 /**
@@ -124,21 +125,6 @@ typedef struct {
  */
 void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_QudaInvertArgs_t inv_args, void *source,
                         void *solution, void *gauge);
-
-#if 0 
-/**
- * Apply the improved staggered operator to a field. All fields
- * passed and returned are host (CPU) field in MILC order.
- *
- * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
- * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
- * @param inv_args Struct setting some solver metadata
- * @param source Right-hand side source field
- * @param solution Solution spinor field
- */
-void openQCD_qudaDslashTest(int external_precision, int quda_precision, openQCD_QudaInvertArgs_t inv_args, void *source,
-                        void *solution, void *gauge);
-#endif
 
 
 /**

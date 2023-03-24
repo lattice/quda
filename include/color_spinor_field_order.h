@@ -1726,7 +1726,7 @@ namespace quda
       using Accessor = OpenQCDDiracOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
-      static const int length = 2 * Ns * Nc;
+      static const int length = 2 * Ns * Nc; // 12 complex (2 floats) numbers per spinor color field
       Float *field;
       size_t offset;
       Float *ghost[8];
@@ -1739,14 +1739,15 @@ namespace quda
         field(field_ ? field_ : (Float *)a.V()),
         offset(a.Bytes() / (2 * sizeof(Float))),
         volumeCB(a.VolumeCB()),
-        nParity(QUDA_FULL_SITE_SUBSET),
+        nParity(QUDA_FULL_SITE_SUBSET),              // => nParity = 2
         dim {a.X()[0], a.X()[1], a.X()[2], a.X()[3]} // GLOBAL dimensions
-      {                                              // TODO: IS THIS NEEDED??
+      {                                              // TODO: ARE GHOSTS NEEDED??
         for (int i = 0; i < 4; i++) {
           ghost[2 * i] = ghost_ ? ghost_[2 * i] : 0;
           ghost[2 * i + 1] = ghost_ ? ghost_[2 * i + 1] : 0;
           faceVolumeCB[i] = a.SurfaceCB(i) * nFace;
         }
+        if constexpr (length != 24) errorQuda("Spinor field length %d not supported", length);
       }
 
       /* lexicographical index: coord0 in QUDA is x1 in OpenQxD (x)
@@ -1817,7 +1818,7 @@ namespace quda
       //   }
       // }
 
-      size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
+      size_t Bytes() const { return Nc * Ns * 2 * sizeof(Float); } // FIXME: ??
     }; // openQCDDiracOrder
 
   } // namespace colorspinor

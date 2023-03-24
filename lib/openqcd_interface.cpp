@@ -358,7 +358,7 @@ static void setColorSpinorParams(const int dim[4], QudaPrecision precision, Colo
   param->nDim = 4;  // TODO: check how to adapt this for openqxd
 
   for (int dir = 0; dir < 4; ++dir) param->x[dir] = dim[dir];
-  param->x[0] /= 2;  // FIXME:
+  // param->x[0] /= 2;  // FIXME: ??
 
   param->setPrecision(precision);
   param->pad = 0;
@@ -517,13 +517,15 @@ void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_Quda
   QudaParity local_parity = inv_args.evenodd;
   QudaParity other_parity = local_parity == QUDA_EVEN_PARITY ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY;
 
+  /* setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, QudaPrecision cuda_prec_sloppy,
+                            double mass, double target_residual, double target_residual_hq, int maxiter,
+                            double reliable_delta, QudaParity parity, QudaVerbosity verbosity,
+                            QudaInverterType inverter, QudaInvertParam *invertParam) */
   setInvertParams(host_precision, device_precision, device_precision_sloppy, 0.0, 0, 0, 0, 0.0, local_parity, verbosity,
                   QUDA_CG_INVERTER, &invertParam);
 
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
-
-  invertParam.dslash_type = QUDA_WILSON_DSLASH;
 
   // dslashQuda(dst, src, &invertParam, local_parity);
   dslashQudaTest(dst, src, &invertParam, local_parity);
@@ -582,7 +584,7 @@ void setInvertParam(QudaInvertParam &invertParam, openQCD_QudaInvertArgs_t &inv_
 
   static const QudaVerbosity verbosity = getVerbosity();
 
-  invertParam.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
+  invertParam.dslash_type = QUDA_WILSON_DSLASH;
   invertParam.kappa = kappa;
   invertParam.dagger = QUDA_DAG_NO;
   invertParam.mass_normalization = QUDA_KAPPA_NORMALIZATION;

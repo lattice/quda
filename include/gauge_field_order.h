@@ -2438,7 +2438,7 @@ namespace quda
          @brief This accessor routine returns a gauge_wrapper to this object,
          allowing us to overload various operators for manipulating at
          the site level interms of matrix operations.
-         @param[in] dir Which dimension are we requesting
+         @param[in] dim Which dimension are we requesting  // FIXME: dim is a typo for dir!
          @param[in] x_cb Checkerboarded space-time index we are requesting
          @param[in] parity Parity we are requesting
          @return Instance of a gauge_wrapper that curries in access to
