@@ -362,8 +362,9 @@ static void setColorSpinorParams(const int dim[4], QudaPrecision precision, Colo
 
   param->setPrecision(precision);
   param->pad = 0;
-  param->siteSubset = QUDA_FULL_SITE_SUBSET;          // FIXME: check how to adapt this for openqxd
-  param->siteOrder = QUDA_EVEN_ODD_SITE_ORDER;        // FIXME: check how to adapt this for openqxd // EVEN-ODD is only about inner ordering in quda
+  param->siteSubset = QUDA_FULL_SITE_SUBSET; // FIXME: check how to adapt this for openqxd
+  param->siteOrder
+    = QUDA_EVEN_ODD_SITE_ORDER; // FIXME: check how to adapt this for openqxd // EVEN-ODD is only about inner ordering in quda
   param->fieldOrder = QUDA_OPENQCD_FIELD_ORDER;       // FIXME:
   param->gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless, but required by the code.  // // FIXME::
   param->create = QUDA_ZERO_FIELD_CREATE; // // FIXME:: check how to adapt this for openqxd ?? created -0 in weird places

@@ -1741,8 +1741,8 @@ namespace quda
         volumeCB(a.VolumeCB()),
         nParity(a.SiteSubset()),
         dim {a.X(0), a.X(1), a.X(2), a.X(3)}
-        // dim {a.X()[0], a.X()[1], a.X()[2], a.X()[3]} // GLOBAL dimensions
-      {                                              // TODO: ARE GHOSTS NEEDED??
+      // dim {a.X()[0], a.X()[1], a.X()[2], a.X()[3]} // GLOBAL dimensions
+      { // TODO: ARE GHOSTS NEEDED??
         // for (int i = 0; i < 4; i++) {
         //   ghost[2 * i] = ghost_ ? ghost_[2 * i] : 0;
         //   ghost[2 * i + 1] = ghost_ ? ghost_[2 * i + 1] : 0;
@@ -1750,7 +1750,6 @@ namespace quda
         // }
         if constexpr (length != 24) errorQuda("Spinor field length %d not supported", length);
       }
-
 
       /**
        @brief Convert from 1-dimensional index to the n-dimensional
@@ -1760,7 +1759,7 @@ namespace quda
     */
       // __device__ __host__ inline void LatticeIndexOpenQCD(int y[4], int i) const
       // {
-      //   // if (siteSubset == QUDA_FULL_SITE_SUBSET) 
+      //   // if (siteSubset == QUDA_FULL_SITE_SUBSET)
       //   x[0] /= 2;
 
       //   for (int d = 0; d < 4; d++) {
@@ -1775,12 +1774,9 @@ namespace quda
       //   parity = parity & 1;
       //   x[0] *= 2; // restore x[0]
       //   // }
-        
+
       //   y[0] = 2 * y[0] + parity; // compute the full x coordinate
       // }
-
-
-
 
       /* lexicographical index: coord0 in QUDA is x1 in OpenQxD (x)
               coord1 in QUDA is x2 in OpenQxD (y)
@@ -1799,8 +1795,8 @@ namespace quda
         // Loading as per QUDA style
         auto in = &field[iy_OpenQxD * length]; // This is how they're accessed within OpenQxd (length = 24 doubles
                                                // = 12 complex doubles = 4 spinor x 3 colors)
-                                               // 
-        printf("Loading site iy: %d with field value %.10e \n",iy_OpenQxD,field[iy_OpenQxD * length]);
+                                               //
+        printf("Loading site iy: %d with field value %.10e \n", iy_OpenQxD, field[iy_OpenQxD * length]);
         block_load<complex, length / 2>(v, reinterpret_cast<const complex *>(in));
       }
 
@@ -1855,7 +1851,7 @@ namespace quda
       // }
 
       size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); } // FIXME: ??
-    }; // openQCDDiracOrder
+    };                                                                                  // openQCDDiracOrder
 
   } // namespace colorspinor
 

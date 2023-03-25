@@ -110,7 +110,7 @@ typedef struct {
                                     HISQ fermions since the tadpole factor is
                                     baked into the links during their construction */
   double naik_epsilon;          /** Naik epsilon parameter (HISQ fermions only).*/
-  QudaDslashType  dslash_type;
+  QudaDslashType dslash_type;
 } openQCD_QudaInvertArgs_t;
 
 /**
@@ -125,7 +125,6 @@ typedef struct {
  */
 void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_QudaInvertArgs_t inv_args, void *source,
                         void *solution, void *gauge);
-
 
 /**
  * Solve Ax=b for an improved staggered operator. All fields are fields

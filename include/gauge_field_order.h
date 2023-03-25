@@ -2399,9 +2399,9 @@ namespace quda
         int dir_OpenQxD = (dir + 1) % 4; // rotation of axes QUDA -> OpenQxD
 
         // Loading as per QUDA style
-        auto in = &gauge[(4 * iy_OpenQxD + dir_OpenQxD) * length]; 
-          // This is how they're accessed within OpenQxd (length = 18
-          // doubles = 9 complex doubles = 1 su3dble struct)
+        auto in = &gauge[(4 * iy_OpenQxD + dir_OpenQxD) * length];
+        // This is how they're accessed within OpenQxd (length = 18
+        // doubles = 9 complex doubles = 1 su3dble struct)
         // auto in = &gauge[ (8*(ix_OpenQxD - volumeCB) + 2*dir_OpenQxD)* length];    // This is how they're accessed
         // within OpenQxd (length = 18 doubles = 9 complex doubles = 1 su3dble struct)
         block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
