@@ -236,7 +236,7 @@ void openQCD_gaugeloadsave(int precision, void *gauge)
 {
 
   QudaGaugeParam qudaGaugeParam
-    = newOpenQCDGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION); // FIXME:
+    = newOpenQCDGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
 
   loadGaugeQuda(gauge, &qudaGaugeParam);
 
@@ -249,17 +249,20 @@ void openQCD_gaugeload(int precision, void *gauge)
 {
 
   QudaGaugeParam qudaGaugeParam
-    = newOpenQCDGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION); // FIXME:
+    = newOpenQCDGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
 
   loadGaugeQuda(gauge, &qudaGaugeParam);
 
   return;
 }
 
-void openQCD_gaugesave(QudaGaugeParam *qudaGaugeParam, void *gauge)
+void openQCD_gaugesave(int precision, void *gauge)
 {
 
-  saveGaugeQuda(gauge, qudaGaugeParam);
+  QudaGaugeParam qudaGaugeParam
+    = newOpenQCDGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
+
+  saveGaugeQuda(gauge, &qudaGaugeParam);
 
   return;
 }
