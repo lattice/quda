@@ -11,13 +11,6 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 
-// #include "../../openQxD-devel/include/su3.h"
-// #include "../../openQxD-devel/include/flags.h"
-// #include "../../openQxD-devel/include/utils.h"
-// #include "../../openQxD-devel/include/lattice.h"
-// #include "../../openQxD-devel/include/global.h"
-
-// #include <string.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
@@ -83,13 +76,13 @@ using namespace quda;
 
 // template <bool start> void inline qudamilc_called(const char *func) { qudamilc_called<start>(func, getVerbosity()); }
 
-static int safe_mod(int x, int y)
-{
-  if (x >= 0)
-    return x % y;
-  else
-    return (y - (abs(x) % y)) % y;
-}
+// static int safe_mod(int x, int y)
+// {
+//   if (x >= 0)
+//     return x % y;
+//   else
+//     return (y - (abs(x) % y)) % y;
+// }
 
 // fdata should point to 4 integers in order {NPROC0, NPROC1, NPROC2, NPROC3}
 // coords is the 4D cartesian coordinate of a rank.
@@ -167,7 +160,7 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t input)
   openQCD_qudaSetLayout(input.layout);
   initialized = true;
   // qudamilc_called<false>(__func__);
-  // geometry(); // TODO: Establish helper indexes from openQxD??
+  // geometry_openQxD(); // TODO: in the future establish ipt and other helper indexes from openQxD?
 }
 
 void openQCD_qudaFinalize() { endQuda(); }
@@ -252,29 +245,25 @@ void openQCD_gaugeloadsave(int precision, void *gauge)
   return;
 }
 
-// static int openQCD_index()
-// {
-//   // This function is the helper for ipt in QUDA
+void openQCD_gaugeload(int precision, void *gauge)
+{
 
-//   return ix;
-// }
+  QudaGaugeParam qudaGaugeParam
+    = newOpenQCDGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION); // FIXME:
 
-// int openQCD_ipt(int iy)
-// {
-//   // This function computes the ipt index from iy (lexicographical index)
-//   int x0,x1,x2,x3;
-//   int k,mu,ix,iy,iz,iw;
-//   int bo[4],bs[4],ifc[8];
+  loadGaugeQuda(gauge, &qudaGaugeParam);
 
-// }
+  return;
+}
 
-// static int getLinkPadding(const int dim[4])
-// {
-//   int padding = MAX(dim[1] * dim[2] * dim[3] / 2, dim[0] * dim[2] * dim[3] / 2);
-//   padding = MAX(padding, dim[0] * dim[1] * dim[3] / 2);
-//   padding = MAX(padding, dim[0] * dim[1] * dim[2] / 2);
-//   return padding;
-// }
+void openQCD_gaugesave(QudaGaugeParam *qudaGaugeParam, void *gauge)
+{
+
+  saveGaugeQuda(gauge, qudaGaugeParam);
+
+  return;
+}
+
 
 // set the params for the single mass solver
 static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, QudaPrecision cuda_prec_sloppy,
