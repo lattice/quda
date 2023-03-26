@@ -11,7 +11,6 @@
  *  also.
  */
 
-#include "enum_quda.h"
 #include <limits>
 #include <register_traits.h>
 #include <convert.h>
@@ -1737,11 +1736,11 @@ namespace quda
 
       OpenQCDDiracOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, float * = 0, Float **ghost_ = 0) :
         field(field_ ? field_ : (Float *)a.V()),
-        offset(a.Bytes() / (2 * sizeof(Float))),
+        offset(a.Bytes() / (2 * sizeof(Float))),  // TODO: What's this for??
         volumeCB(a.VolumeCB()),
         nParity(a.SiteSubset()),
         dim {a.X(0), a.X(1), a.X(2), a.X(3)}
-      // dim {a.X()[0], a.X()[1], a.X()[2], a.X()[3]} // GLOBAL dimensions
+      // dim {a.X()[0], a.X()[1], a.X()[2], a.X()[3]} // GLOBAL dimensions??
       { // TODO: ARE GHOSTS NEEDED??
         // for (int i = 0; i < 4; i++) {
         //   ghost[2 * i] = ghost_ ? ghost_[2 * i] : 0;
