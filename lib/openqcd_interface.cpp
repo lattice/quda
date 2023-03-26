@@ -3,9 +3,6 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
-#include <stdio.h>
-#include <assert.h>
-#include <memory.h>
 
 #include <quda_openqcd_interface.h>
 #include <quda.h>
@@ -351,6 +348,7 @@ static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, Qud
   invertParam->compute_action = 0;
 }
 
+// FIXME:
 static void setColorSpinorParams(const int dim[4], QudaPrecision precision, ColorSpinorParam *param)
 {
   param->nColor = 3;
@@ -358,7 +356,7 @@ static void setColorSpinorParams(const int dim[4], QudaPrecision precision, Colo
   param->nDim = 4;  // TODO: check how to adapt this for openqxd
 
   for (int dir = 0; dir < 4; ++dir) param->x[dir] = dim[dir];
-  // param->x[0] /= 2;  // for staggered sites only?
+  // param->x[0] /= 2;  // for staggered sites only FIXME:?
 
   param->setPrecision(precision);
   param->pad = 0;
@@ -418,6 +416,7 @@ void setGaugeParams(QudaGaugeParam &qudaGaugeParam, const int dim[4], openQCD_Qu
 }
 
 // #if 0
+/* FIXME: This function is buggy: */
 void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_QudaInvertArgs_t inv_args, void *src,
                         void *dst, void *gauge)
 {
@@ -449,6 +448,9 @@ void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_Quda
 
   // dslashQuda(dst, src, &invertParam, local_parity);
   dslashQudaTest(dst, src, &invertParam, local_parity);
+
+  // Original: 
+  // dslashQuda(static_cast<char *>(dst), static_cast<char *>(src), &invertParam, local_parity);
 
   // TODO: need save??
 
