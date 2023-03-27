@@ -575,15 +575,21 @@ static void display_test_info()
 TEST(paths, verify)
 {
   int level = hisq_force_test(true);
-  int tolerance = getNegLog10Tolerance(force_prec);
-  ASSERT_GE(level, tolerance) << "CPU and GPU implementations do not agree";
+  // prevent tests from failing when verify is set to false
+  if (verify_results) {
+    int tolerance = getNegLog10Tolerance(force_prec);
+    ASSERT_GE(level, tolerance) << "CPU and GPU implementations do not agree";
+  }
 }
 
 TEST(paths_no_lepage, verify)
 {
   int level = hisq_force_test(false);
-  int tolerance = getNegLog10Tolerance(force_prec);
-  ASSERT_GE(level, tolerance) << "CPU and GPU implementations do not agree";
+  // prevent tests from failing when verify is set to false
+  if (verify_results) {
+    int tolerance = getNegLog10Tolerance(force_prec);
+    ASSERT_GE(level, tolerance) << "CPU and GPU implementations do not agree";
+  }
 }
 
 int main(int argc, char **argv)
