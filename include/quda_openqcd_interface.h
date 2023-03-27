@@ -124,6 +124,7 @@ void openQCD_qudaInvert(int external_precision, int quda_precision, double mass,
  */
 
 void openQCD_qudaPlaquette(int precision, double plaq[3], void *gauge);
+void openQCD_qudaPlaquetteOnly(int precision, double plaq[3]);
 void openQCD_gaugeloadsave(int precision, void *gauge);
 void openQCD_gaugeload(int precision, void *gauge);
 void openQCD_gaugesave(int precision, void *gauge);

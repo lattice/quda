@@ -376,6 +376,31 @@ void openQCD_qudaPlaquette(int precision, double plaq[3], void *gauge)
   return;
 }
 
+
+void openQCD_qudaPlaquetteOnly(int precision, double plaq[3])
+{
+
+  // QudaGaugeParam qudaGaugeParam
+  //   = newOpenQCDGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
+
+  // loadGaugeQuda(gauge, &qudaGaugeParam);
+
+  QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
+  obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
+  obsParam.remove_staggered_phase = QUDA_BOOLEAN_FALSE; //
+  gaugeObservablesQuda(&obsParam);
+
+  // Note different Nc normalization!
+  plaq[0] = obsParam.plaquette[0];
+  plaq[1] = obsParam.plaquette[1];
+  plaq[2] = obsParam.plaquette[2];
+
+  // saveGaugeQuda(gauge, &qudaGaugeParam);
+
+  return;
+}
+
+
 void openQCD_gaugeloadsave(int precision, void *gauge)
 {
 
