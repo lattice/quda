@@ -436,6 +436,12 @@ namespace quda
       } else {
         errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, QUDA_RECONSTRUCT_13);
       }
+    } else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
+      if constexpr (is_enabled<QUDA_RECONSTRUCT_12>()) {
+        errorQuda("QUDA_RECONSTRUCT=%d has not been implemented for HISQ gauge routines yet.", QUDA_RECONSTRUCT_12);
+      } else {
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable %d\n", QUDA_RECONSTRUCT, QUDA_RECONSTRUCT_12);
+      }
     } else {
       errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
     }
