@@ -48,11 +48,7 @@ namespace quda {
         force(force),
         link(link)
       {
-        char aux2[16];
         strcat(aux, comm_dim_partitioned_string());
-        strcat(aux, ",threads=");
-        u32toa(aux2, arg.threads.x);
-        strcat(aux, aux2);
 
         apply(device::get_default_stream());
       }
@@ -117,9 +113,6 @@ namespace quda {
 
         char aux2[16];
         strcat(aux, comm_dim_partitioned_string());
-        strcat(aux, ",threads=");
-        u32toa(aux2, arg.threads.x);
-        strcat(aux, aux2);
         strcat(aux, ",sig=");
         strcat(aux, sig.is_forward() ? "+" : "-");
         u32toa(aux2, sig.dim);
@@ -305,9 +298,6 @@ namespace quda {
 
         char aux2[16];
         strcat(aux, comm_dim_partitioned_string());
-        strcat(aux, ",threads=");
-        u32toa(aux2, arg.threads.x);
-        strcat(aux, aux2);
         strcat(aux, ",sig=");
         strcat(aux, sig.is_forward() ? "+" : "-");
         u32toa(aux2, sig.dim);
@@ -616,11 +606,7 @@ namespace quda {
         force(force),
         meta(meta)
       {
-        char aux2[16];
         strcat(aux, comm_dim_partitioned_string());
-        strcat(aux, ",threads=");
-        u32toa(aux2, arg.threads.x);
-        strcat(aux, aux2);
 
         apply(device::get_default_stream());
       }
@@ -692,11 +678,7 @@ namespace quda {
         force(force),
         meta(meta)
       {
-        char aux2[16];
         strcat(aux, comm_dim_partitioned_string());
-        strcat(aux, ",threads=");
-        u32toa(aux2, arg.threads.x);
-        strcat(aux, aux2);
 
         apply(device::get_default_stream());
       }
