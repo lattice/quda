@@ -177,9 +177,13 @@ namespace quda
 
     void get_visible_devices_string(char device_list_string[128])
     {
+      char default_list[] = "";
       char *device_order_env = getenv("SYCL_DEVICE_FILTER");
-      if(device_order_env[0] == '\0') {
+      if(device_order_env == nullptr) {
 	device_order_env = getenv("ONEAPI_DEVICE_SELECTOR");
+      }
+      if(device_order_env == nullptr) {
+	device_order_env = default_list;
       }
       snprintf(device_list_string, 128, "%s", device_order_env);
     }
