@@ -3,14 +3,6 @@
 #include <enum_quda.h>
 #include <quda.h>
 
-// TODO: (later) The ipt and other functions can be incorporated here (so no reordering needed in OpenQXD side)
-// OpenQxD helpers:
-// #include "../../openQxD-devel/include/su3.h"
-// #include "../../openQxD-devel/include/flags.h"
-// #include "../../openQxD-devel/include/utils.h"
-// #include "../../openQxD-devel/include/lattice.h"
-// #include "../../openQxD-devel/include/global.h"
-
 /**
  * @file    quda_openqcd_interface.h
  *
@@ -32,7 +24,7 @@ typedef struct {
   const int *machsize; /** Machine grid size NPROC0, NPROC1, NPROC2, NPROC3*/             // FIXME:
   const int *blksize; /** Blocking size NPROC0_BLK, NPROC1_BLK, NPROC2_BLK, NPROC3_BLK */ // FIXME:
   int device;                                                                             /** GPU device number */
-  // const int *ipt;
+  // const int *ipt; // TODO: IN THE FUTURE
 } openQCD_QudaLayout_t;
 
 /**
@@ -50,47 +42,18 @@ typedef struct {
  */
 void openQCD_qudaInit(openQCD_QudaInitArgs_t input);
 
-// /**
-//  * Set set the local dimensions and machine topology for QUDA to use
-//  *
-//  * @param layout Struct defining local dimensions and machine topology
-//  */
-// void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout);
+/**
+ * Set set the local dimensions and machine topology for QUDA to use
+ *
+ * @param layout Struct defining local dimensions and machine topology
+ */
+void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout);
 
 /**
  * Destroy the QUDA context.
  */
 void openQCD_qudaFinalize(void);
 
-#if 0
-// leave that here for now
-  /**
-   * Allocate pinned memory suitable for CPU-GPU transfers
-   * @param bytes The size of the requested allocation
-   * @return Pointer to allocated memory
-  */
-  void* openQCD_qudaAllocatePinned(size_t bytes);
-
-  /**
-   * Free pinned memory
-   * @param ptr Pointer to memory to be free
-   */
-  void openQCD_qudaFreePinned(void *ptr);
-
-  /**
-   * Allocate managed memory to reduce CPU-GPU transfers
-   * @param bytes The size of the requested allocation
-   * @return Pointer to allocated memory
-   */
-  void *openQCD_qudaAllocateManaged(size_t bytes);
-
-  /**
-   * Free managed memory
-   * @param ptr Pointer to memory to be free
-   */
-  void openQCD_qudaFreeManaged(void *ptr);
-
-#endif
 
 /**
  * Parameters related to linear solvers.
@@ -159,16 +122,11 @@ void openQCD_qudaInvert(int external_precision, int quda_precision, double mass,
  * @param inv_args Meta data
  * @param milc_link Base pointer to host gauge field (regardless of dimensionality)
  */
-void openQCD_qudaLoadGaugeField(int external_precision, int quda_precision, openQCD_QudaInvertArgs_t inv_args,
-                                const void *milc_link);
 
 void openQCD_qudaPlaquette(int precision, double plaq[3], void *gauge);
-
 void openQCD_gaugeloadsave(int precision, void *gauge);
 void openQCD_gaugeload(int precision, void *gauge);
 void openQCD_gaugesave(int precision, void *gauge);
-
-// int openQCD_ipt(int iy);
 
 /**
    Free the gauge field allocated in QUDA.

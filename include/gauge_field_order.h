@@ -2361,9 +2361,9 @@ namespace quda {
         // TODO: Determine whether coord[mu] is local or global
         int iy_OpenQxD = coord[2] + dim[2] * coord[1] + dim[2] * dim[1] * coord[0] + dim[0] * dim[2] * dim[1] * coord[3]; 
         /* lexicographical index: coord0 in QUDA is x1 in OpenQxD (x)
-                                                                           coord1 in QUDA is x2 in OpenQxD (y)
-                                                                           coord2 in QUDA is x3 in OpenQxD (z)
-                                                                           coord3 in QUDA is x0 in OpenQxD (t)
+            coord1 in QUDA is x2 in OpenQxD (y)
+            coord2 in QUDA is x3 in OpenQxD (z)
+            coord3 in QUDA is x0 in OpenQxD (t)
                                                  */
         // int ix_OpenQxD = ipt[iy_OpenQxD];
         int dir_OpenQxD = (dir + 1) % 4; // rotation of axes QUDA -> OpenQxD

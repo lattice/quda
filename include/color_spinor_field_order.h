@@ -1795,7 +1795,7 @@ namespace quda
         auto in = &field[iy_OpenQxD * length]; // This is how they're accessed within OpenQxd (length = 24 doubles
                                                // = 12 complex doubles = 4 spinor x 3 colors)
                                                //
-        printf("Loading site iy: %d with field value %.10e \n", iy_OpenQxD, field[iy_OpenQxD * length]);
+        // printf("Loading site iy: %d with field value %.10e \n", iy_OpenQxD, field[iy_OpenQxD * length]);
         block_load<complex, length / 2>(v, reinterpret_cast<const complex *>(in));
       }
 
