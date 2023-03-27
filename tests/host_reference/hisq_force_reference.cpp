@@ -84,7 +84,7 @@ typedef struct {
   double space;
 } danti_hermitmat;
 
-template <typename su3_matrix> su3_matrix *get_su3_matrix(int gauge_order, su3_matrix *p, int idx, int dir)
+template <typename su3_matrix> su3_matrix *get_su3_matrix(su3_matrix *p, int idx, int dir)
 {
   su3_matrix *data = ((su3_matrix **)p)[dir];
   return data + idx;
@@ -97,7 +97,7 @@ template <typename su3_vector, typename su3_matrix> void su3_projector(su3_vecto
 }
 
 template <typename su3_vector, typename su3_matrix>
-void computeLinkOrderedOuterProduct(su3_vector *src, su3_matrix *dest, size_t nhops, int gauge_order)
+void computeLinkOrderedOuterProduct(su3_vector *src, su3_matrix *dest, size_t nhops)
 {
   int dx[4];
   for (int i = 0; i < V; ++i) {
@@ -106,18 +106,18 @@ void computeLinkOrderedOuterProduct(su3_vector *src, su3_matrix *dest, size_t nh
       dx[dir] = nhops;
       int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
       su3_vector *hw = src + nbr_idx;
-      su3_matrix *p = get_su3_matrix(gauge_order, dest, i, dir);
+      su3_matrix *p = get_su3_matrix(dest, i, dir);
       su3_projector(hw, &src[i], p);
     } // dir
   }   // i
 }
 
-void computeLinkOrderedOuterProduct(void *src, void *dst, QudaPrecision precision, size_t nhops, int gauge_order)
+void computeLinkOrderedOuterProduct(void *src, void *dst, QudaPrecision precision, size_t nhops)
 {
   if (precision == QUDA_SINGLE_PRECISION) {
-    computeLinkOrderedOuterProduct((fsu3_vector *)src, (fsu3_matrix *)dst, nhops, gauge_order);
+    computeLinkOrderedOuterProduct((fsu3_vector *)src, (fsu3_matrix *)dst, nhops);
   } else {
-    computeLinkOrderedOuterProduct((dsu3_vector *)src, (dsu3_matrix *)dst, nhops, gauge_order);
+    computeLinkOrderedOuterProduct((dsu3_vector *)src, (dsu3_matrix *)dst, nhops);
   }
 }
 
