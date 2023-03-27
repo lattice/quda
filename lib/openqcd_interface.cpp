@@ -439,6 +439,7 @@ void openQCD_gaugesave(int precision, void *gauge)
 void openQCD_qudaFreeGaugeField()
 {
   freeGaugeQuda();
+  return;
 } // qudaFreeGaugeField
 
 
