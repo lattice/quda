@@ -255,24 +255,7 @@ inline int getReconstructNibble(QudaReconstructType recon)
 }
 
 /**
-  @brief Return a reasonable expected tolerance for a given precision
-  @param[in] prec Precision
-  @return Reasonable expected tolerance
-*/
-inline double getTolerance(QudaPrecision prec)
-{
-  switch (prec) {
-  case QUDA_QUARTER_PRECISION: return 1e-1;
-  case QUDA_HALF_PRECISION: return 1e-3;
-  case QUDA_SINGLE_PRECISION: return 1e-4;
-  case QUDA_DOUBLE_PRECISION: return 1e-11;
-  case QUDA_INVALID_PRECISION: return 1.0;
-  }
-  return 1.0;
-}
-
-/**
-  @brief Return the negative exponent of the tolerances defined in `getTolerance` above
+  @brief Return the negative exponent of a reasonable expected tolerance for a given precision
   @param[in] prec Precision
   @return Exponent of the base-10 reasonably expected tolerance
 */
@@ -286,6 +269,17 @@ inline int getNegLog10Tolerance(QudaPrecision prec)
   case QUDA_INVALID_PRECISION: return 0;
   }
   return 0;
+}
+
+/**
+  @brief Return the expected tolerance for a given precision consistent with the
+    integer values in getNegLog10Tolerance.
+  @param[in] prec Precision
+  @return Reasonable expected tolerance
+*/
+inline double getTolerance(QudaPrecision prec)
+{
+  return pow(10, -getNegLog10Tolerance(prec));
 }
 
 
