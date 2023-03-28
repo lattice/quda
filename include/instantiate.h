@@ -418,7 +418,7 @@ namespace quda
   */
   template <template <typename, int, QudaReconstructType, QudaStaggeredPhase> class Apply, typename store_t, int nColor,
             typename G, typename... Args>
-  constexpr void instantiateGaugeHisq(G &U, Args &&...args)
+  constexpr void instantiateGaugeStaggered(G &U, Args &&...args)
   {
     if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
       if constexpr (is_enabled<QUDA_RECONSTRUCT_NO>())
@@ -456,10 +456,10 @@ namespace quda
   */
   template <template <typename, int, QudaReconstructType, QudaStaggeredPhase> class Apply, typename store_t, typename G,
             typename... Args>
-  constexpr void instantiateGaugeHisq(G &U, Args &&...args)
+  constexpr void instantiateGaugeStaggered(G &U, Args &&...args)
   {
     if (U.Ncolor() == 3) {
-      instantiateGaugeHisq<Apply, store_t, 3>(U, args...);
+      instantiateGaugeStaggered<Apply, store_t, 3>(U, args...);
     } else {
       errorQuda("Unsupported number of colors %d\n", U.Ncolor());
     }
@@ -473,16 +473,16 @@ namespace quda
      @param[in,out] args Any additional arguments required for the computation at hand
   */
   template <template <typename, int, QudaReconstructType, QudaStaggeredPhase> class Apply, typename G, typename... Args>
-  constexpr void instantiateGaugeHisq(G &U, Args &&...args)
+  constexpr void instantiateGaugeStaggered(G &U, Args &&...args)
   {
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
       if constexpr (is_enabled(QUDA_DOUBLE_PRECISION))
-        instantiateGaugeHisq<Apply, double>(U, args...);
+        instantiateGaugeStaggered<Apply, double>(U, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
     } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
       if constexpr (is_enabled(QUDA_SINGLE_PRECISION))
-        instantiateGaugeHisq<Apply, float>(U, args...);
+        instantiateGaugeStaggered<Apply, float>(U, args...);
       else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
     } else {

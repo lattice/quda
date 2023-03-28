@@ -598,7 +598,7 @@ namespace quda {
 	}
       }
       return result;
-  }
+    }
 
   template<class T>
     __device__ __host__ inline

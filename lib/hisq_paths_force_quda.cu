@@ -570,7 +570,7 @@ namespace quda {
       auto Pnumu_next = GaugeField::Create(gauge_param);
       auto Qnumu_next = GaugeField::Create(gauge_param);
 
-      instantiateGaugeHisq<HisqStaplesForce>(link, *P3, GaugeField_ref(*Pmu),
+      instantiateGaugeStaggered<HisqStaplesForce>(link, *P3, GaugeField_ref(*Pmu),
         GaugeField_ref(*P5), GaugeField_ref(*Pnumu), GaugeField_ref(*Qnumu),
         GaugeField_ref(*Pmu_next), GaugeField_ref(*Pnumu_next), GaugeField_ref(*Qnumu_next),
         newOprod, oprod, path_coeff_array);
@@ -654,7 +654,7 @@ namespace quda {
       checkNative(link, oldOprod, newOprod);
       checkLocation(newOprod, oldOprod, link);
       checkPrecision(newOprod, link, oldOprod);
-      instantiateGaugeHisq<HisqLongLinkForce>(link, newOprod, oldOprod, coeff);
+      instantiateGaugeStaggered<HisqLongLinkForce>(link, newOprod, oldOprod, coeff);
     }
 #else
     void hisqLongLinkForce(GaugeField &, const GaugeField &, const GaugeField &, double)
@@ -728,7 +728,7 @@ namespace quda {
       checkNative(link, force);
       checkLocation(force, link);
       checkPrecision(link, force);
-      instantiateGaugeHisq<HisqCompleteForce>(link, force);
+      instantiateGaugeStaggered<HisqCompleteForce>(link, force);
     }
 #else
     void hisqCompleteForce(GaugeField &, const GaugeField &)
