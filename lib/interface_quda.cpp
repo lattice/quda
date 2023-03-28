@@ -4549,16 +4549,6 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   profileHISQForce.TPSTART(QUDA_PROFILE_INIT);
 
-  // create the device outer-product field
-  GaugeFieldParam oParam(*gParam, nullptr, QUDA_GENERAL_LINKS);
-  oParam.location = QUDA_CUDA_FIELD_LOCATION;
-  oParam.nFace = 0;
-  oParam.create = QUDA_ZERO_FIELD_CREATE;
-  oParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-  cudaGaugeField *stapleOprod = new cudaGaugeField(oParam);
-  cudaGaugeField *oneLinkOprod = new cudaGaugeField(oParam);
-  cudaGaugeField *naikOprod = new cudaGaugeField(oParam);
-
   {
     // default settings for the unitarization
     const double unitarize_eps = 1e-14;
@@ -4572,48 +4562,43 @@ void computeHISQForceQuda(void* const milc_momentum,
     setUnitarizeForceConstants(unitarize_eps, hisq_force_filter, max_det_error, allow_svd, svd_only, svd_rel_err, svd_abs_err);
   }
 
-  double act_path_coeff[6] = {0,1,level2_coeff[2],level2_coeff[3],level2_coeff[4],level2_coeff[5]};
-  // You have to look at the MILC routine to understand the following
-  // Basically, I have already absorbed the one-link coefficient
+  // Save input reconstruct type (applied to W and U fields) and set
+  // the reconstruct type to QUDA_RECONSTRUCT_NO
+  QudaReconstructType cuda_link_recon = gParam->reconstruct;
+  gParam->reconstruct = QUDA_RECONSTRUCT_NO;
 
-  GaugeFieldParam param(*gParam, milc_momentum, QUDA_ASQTAD_MOM_LINKS);
-  //param.nFace = 0;
-  param.location = QUDA_CPU_FIELD_LOCATION;
-  param.order  = QUDA_MILC_GAUGE_ORDER;
-  param.reconstruct = QUDA_RECONSTRUCT_10;
-  param.ghostExchange =  QUDA_GHOST_EXCHANGE_NO;
-  cpuGaugeField* cpuMom = (!gParam->use_resident_mom) ? new cpuGaugeField(param) : nullptr;
+  // Create a copy of the setup for the gauge links
+  QudaGaugeParam gParam_field;
+  memcpy(&gParam_field, gParam, sizeof(QudaGaugeParam));
 
-  param.link_type = QUDA_GENERAL_LINKS;
-  param.reconstruct = QUDA_RECONSTRUCT_NO;
-  param.gauge = (void*)w_link;
-  cpuGaugeField cpuWLink(param);
-  param.gauge = (void*)v_link;
-  cpuGaugeField cpuVLink(param);
-  param.gauge = (void*)u_link;
-  cpuGaugeField cpuULink(param);
-
-  param.create = QUDA_ZERO_FIELD_CREATE;
-  param.order  = QUDA_FLOAT2_GAUGE_ORDER;
-  param.link_type = QUDA_ASQTAD_MOM_LINKS;
-  param.reconstruct = QUDA_RECONSTRUCT_10;
-  GaugeFieldParam momParam(param);
-
-  param.create = QUDA_ZERO_FIELD_CREATE;
-  param.link_type = QUDA_GENERAL_LINKS;
-  param.setPrecision(gParam->cpu_prec, true);
-
-  lat_dim_t R = {2 * comm_dim_partitioned(0), 2 * comm_dim_partitioned(1), 2 * comm_dim_partitioned(2),
-                 2 * comm_dim_partitioned(3)};
-  for (int dir=0; dir<4; ++dir) {
-    param.x[dir] += 2*R[dir];
-    param.r[dir] = R[dir];
+  // Check reconstruct
+  if (cuda_link_recon == QUDA_RECONSTRUCT_9) {
+    warningQuda("Attempting to use recon 9 for HISQ force. Resetting to 13...");
+    cuda_link_recon = QUDA_RECONSTRUCT_13;
   }
 
-  param.reconstruct = QUDA_RECONSTRUCT_NO;
-  param.create = QUDA_ZERO_FIELD_CREATE;
-  param.setPrecision(gParam->cpu_prec);
-  param.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+  if (cuda_link_recon != QUDA_RECONSTRUCT_NO && cuda_link_recon != QUDA_RECONSTRUCT_13)
+    errorQuda("Invalid reconstruct %d", cuda_link_recon);
+
+  logQuda(QUDA_VERBOSE, "Reconstruct type for HISQ force: %d\n", cuda_link_recon);
+
+  // create the device outer-product field
+  GaugeFieldParam oParam(*gParam);
+  oParam.location = QUDA_CUDA_FIELD_LOCATION;
+  oParam.nFace = 0;
+  oParam.create = QUDA_ZERO_FIELD_CREATE;
+  oParam.link_type = QUDA_GENERAL_LINKS;
+  oParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  oParam.setPrecision(gParam->cpu_prec, true);
+  oParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+
+  cudaGaugeField *stapleOprod = new cudaGaugeField(oParam);
+  cudaGaugeField *oneLinkOprod = new cudaGaugeField(oParam);
+  cudaGaugeField *naikOprod = new cudaGaugeField(oParam);
+
+  double act_path_coeff[6] = {0, 1, level2_coeff[2], level2_coeff[3], level2_coeff[4], level2_coeff[5]};
+  // You have to look at the MILC routine to understand the following
+  // Basically, I have already absorbed the one-link coefficient
 
   profileHISQForce.TPSTOP(QUDA_PROFILE_INIT);
 
@@ -4690,49 +4675,144 @@ void computeHISQForceQuda(void* const milc_momentum,
   }
 
   profileHISQForce.TPSTART(QUDA_PROFILE_INIT);
-  param.location = QUDA_CUDA_FIELD_LOCATION;
-  cudaGaugeField* cudaInForce = new cudaGaugeField(param);
+
+  // Compute the pad size
+  int pad_size = 0;
+#ifdef MULTI_GPU
+  int x_face_size = gParam->X[1] * gParam->X[2] * gParam->X[3] / 2;
+  int y_face_size = gParam->X[0] * gParam->X[2] * gParam->X[3] / 2;
+  int z_face_size = gParam->X[0] * gParam->X[1] * gParam->X[3] / 2;
+  int t_face_size = gParam->X[0] * gParam->X[1] * gParam->X[2] / 2;
+  pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
+#endif
+
+  // Copy outer product fields into input force fields
+  oParam.create = QUDA_NULL_FIELD_CREATE;
+  oParam.nFace = 1;
+  oParam.pad = pad_size;
+  oParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+  lat_dim_t R = {2 * comm_dim_partitioned(0), 2 * comm_dim_partitioned(1), 2 * comm_dim_partitioned(2),
+                 2 * comm_dim_partitioned(3)};
+  for (int dir = 0; dir < 4; ++dir) {
+    oParam.x[dir] += 2 * R[dir];
+    oParam.r[dir] = R[dir];
+  }
+
+  cudaGaugeField *cudaInForce = new cudaGaugeField(oParam);
   copyExtendedGauge(*cudaInForce, *stapleOprod, QUDA_CUDA_FIELD_LOCATION);
   delete stapleOprod;
 
-  cudaGaugeField* cudaOutForce = new cudaGaugeField(param);
+  cudaGaugeField *cudaOutForce = new cudaGaugeField(oParam);
   copyExtendedGauge(*cudaOutForce, *oneLinkOprod, QUDA_CUDA_FIELD_LOCATION);
   delete oneLinkOprod;
 
-  cudaGaugeField* cudaGauge = new cudaGaugeField(param);
+  // Create CPU momentum fields, prepare GPU momentum param
+  GaugeFieldParam param(*gParam);
+  param.location = QUDA_CPU_FIELD_LOCATION;
+  param.create = QUDA_REFERENCE_FIELD_CREATE;
+  param.order = QUDA_MILC_GAUGE_ORDER;
+  param.link_type = QUDA_ASQTAD_MOM_LINKS;
+  param.reconstruct = QUDA_RECONSTRUCT_10;
+  param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  param.gauge = milc_momentum;
+  cpuGaugeField *cpuMom = (!gParam->use_resident_mom) ? new cpuGaugeField(param) : nullptr;
+
+  param.location = QUDA_CUDA_FIELD_LOCATION;
+  param.create = QUDA_ZERO_FIELD_CREATE;
+  param.order = QUDA_FLOAT2_GAUGE_ORDER;
+  GaugeFieldParam momParam(param);
+
+  // Create CPU W, V, and U fields
+  gParam_field.type = QUDA_GENERAL_LINKS;
+  gParam_field.t_boundary = QUDA_ANTI_PERIODIC_T;
+  gParam_field.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
+  gParam_field.staggered_phase_applied = true;
+  gParam_field.gauge_fix = QUDA_GAUGE_FIXED_NO;
+
+  GaugeFieldParam wParam(gParam_field);
+  wParam.location = QUDA_CPU_FIELD_LOCATION;
+  wParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  wParam.order = QUDA_MILC_GAUGE_ORDER;
+  wParam.link_type = QUDA_GENERAL_LINKS;
+  wParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  wParam.gauge = (void *)w_link;
+  cpuGaugeField cpuWLink(wParam);
+
+  GaugeFieldParam vParam(wParam);
+  vParam.gauge = (void *)v_link;
+  cpuGaugeField cpuVLink(vParam);
+
+  GaugeFieldParam uParam(vParam);
+  uParam.gauge = (void *)u_link;
+  cpuGaugeField cpuULink(uParam);
+
+  // Load the W field, which contains U(3) matrices, to the device
+  gParam_field.ga_pad = 3 * pad_size;
+  wParam = GaugeFieldParam(gParam_field);
+  for (int dir = 0; dir < 4; dir++) {
+    wParam.x[dir] += 2 * R[dir];
+    wParam.r[dir] = R[dir];
+  }
+  wParam.location = QUDA_CUDA_FIELD_LOCATION;
+  wParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+  wParam.reconstruct = cuda_link_recon;
+  wParam.create = QUDA_NULL_FIELD_CREATE;
+  wParam.setPrecision(gParam->cpu_prec, true);
+
+  cudaGaugeField *cudaWLink = new cudaGaugeField(wParam);
   profileHISQForce.TPSTOP(QUDA_PROFILE_INIT);
 
-  cudaGauge->loadCPUField(cpuWLink, profileHISQForce);
+  cudaWLink->loadCPUField(cpuWLink, profileHISQForce);
+  cudaWLink->exchangeExtendedGhost(cudaWLink->R(), profileHISQForce);
 
-  cudaInForce->exchangeExtendedGhost(R,profileHISQForce,true);
-  cudaGauge->exchangeExtendedGhost(R,profileHISQForce,true);
-  cudaOutForce->exchangeExtendedGhost(R,profileHISQForce,true);
+  cudaInForce->exchangeExtendedGhost(R, profileHISQForce);
+  cudaWLink->exchangeExtendedGhost(cudaWLink->R(), profileHISQForce);
+  cudaOutForce->exchangeExtendedGhost(R, profileHISQForce);
 
+  // Compute level two term
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  hisqStaplesForce(*cudaOutForce, *cudaInForce, *cudaGauge, act_path_coeff);
+  hisqStaplesForce(*cudaOutForce, *cudaInForce, *cudaWLink, act_path_coeff);
   qudaDeviceSynchronize();
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // Load naik outer product
   copyExtendedGauge(*cudaInForce, *naikOprod, QUDA_CUDA_FIELD_LOCATION);
-  cudaInForce->exchangeExtendedGhost(R,profileHISQForce,true);
+  cudaInForce->exchangeExtendedGhost(cudaWLink->R(), profileHISQForce);
   delete naikOprod;
 
-  // Compute Naik three-link term
+  // Compute Naik three-link term contribution
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  hisqLongLinkForce(*cudaOutForce, *cudaInForce, *cudaGauge, act_path_coeff[1]);
+  hisqLongLinkForce(*cudaOutForce, *cudaInForce, *cudaWLink, act_path_coeff[1]);
   qudaDeviceSynchronize();
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-  cudaOutForce->exchangeExtendedGhost(R,profileHISQForce,true);
+  cudaOutForce->exchangeExtendedGhost(R, profileHISQForce);
 
-  // load v-link
-  cudaGauge->loadCPUField(cpuVLink, profileHISQForce);
-  cudaGauge->exchangeExtendedGhost(R,profileHISQForce,true);
+  // Load the V field, which contains general matrices, to the device
+  profileHISQForce.TPSTART(QUDA_PROFILE_FREE);
+  delete cudaWLink;
+  profileHISQForce.TPSTOP(QUDA_PROFILE_FREE);
+  profileHISQForce.TPSTART(QUDA_PROFILE_INIT);
+  for (int dir = 0; dir < 4; ++dir) {
+    vParam.x[dir] += 2 * R[dir];
+    vParam.r[dir] = R[dir];
+  }
+  vParam.location = QUDA_CUDA_FIELD_LOCATION;
+  vParam.link_type = QUDA_GENERAL_LINKS;
+  vParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  vParam.create = QUDA_NULL_FIELD_CREATE;
+  vParam.setPrecision(gParam->cpu_prec, true);
+  vParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+  vParam.pad = 3 * pad_size;
+  cudaGaugeField *cudaVLink = new cudaGaugeField(vParam);
+  profileHISQForce.TPSTOP(QUDA_PROFILE_INIT);
+
+  cudaVLink->loadCPUField(cpuVLink, profileHISQForce);
+  cudaVLink->exchangeExtendedGhost(cudaVLink->R(), profileHISQForce);
 
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
   *num_failures_h = 0;
-  unitarizeForce(*cudaInForce, *cudaOutForce, *cudaGauge, num_failures_d);
+  unitarizeForce(*cudaInForce, *cudaOutForce, *cudaVLink, num_failures_d);
 
   if (*num_failures_h>0) errorQuda("Error in the unitarization component of the hisq fermion force: %d failures\n", *num_failures_h);
 
@@ -4740,22 +4820,44 @@ void computeHISQForceQuda(void* const milc_momentum,
   qudaDeviceSynchronize();
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-  // read in u-link
-  cudaGauge->loadCPUField(cpuULink, profileHISQForce);
-  cudaGauge->exchangeExtendedGhost(R, profileHISQForce, true);
+  // Load the U field, which contains U(3) matrices, to the device
+  // TODO: in theory these should just be SU(3) matrices with MILC phases?
+  profileHISQForce.TPSTART(QUDA_PROFILE_FREE);
+  delete cudaVLink;
+  profileHISQForce.TPSTOP(QUDA_PROFILE_FREE);
+  profileHISQForce.TPSTART(QUDA_PROFILE_INIT);
+  for (int dir = 0; dir < 4; ++dir) {
+    uParam.x[dir] += 2 * R[dir];
+    uParam.r[dir] = R[dir];
+  }
+  uParam.location = QUDA_CUDA_FIELD_LOCATION;
+  uParam.link_type = QUDA_GENERAL_LINKS;
+  uParam.reconstruct = cuda_link_recon;
+  uParam.create = QUDA_NULL_FIELD_CREATE;
+  uParam.setPrecision(gParam->cpu_prec, true);
+  uParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+  uParam.pad = 3 * pad_size;
+  cudaGaugeField *cudaULink = new cudaGaugeField(uParam);
+  profileHISQForce.TPSTOP(QUDA_PROFILE_INIT);
+
+  cudaULink->loadCPUField(cpuULink, profileHISQForce);
+  cudaULink->exchangeExtendedGhost(cudaULink->R(), profileHISQForce);
 
   // Compute Fat7-staple term
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  hisqStaplesForce(*cudaOutForce, *cudaInForce, *cudaGauge, fat7_coeff);
+  hisqStaplesForce(*cudaOutForce, *cudaInForce, *cudaULink, fat7_coeff);
   qudaDeviceSynchronize();
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
+  profileHISQForce.TPSTART(QUDA_PROFILE_FREE);
   delete cudaInForce;
-  momParam.location = QUDA_CUDA_FIELD_LOCATION;
+  profileHISQForce.TPSTOP(QUDA_PROFILE_FREE);
+  profileHISQForce.TPSTART(QUDA_PROFILE_INIT);
   cudaGaugeField* cudaMom = new cudaGaugeField(momParam);
+  profileHISQForce.TPSTOP(QUDA_PROFILE_INIT);
 
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  hisqCompleteForce(*cudaOutForce, *cudaGauge);
+  hisqCompleteForce(*cudaOutForce, *cudaULink);
 
   if (gParam->use_resident_mom) {
     if (!momResident) errorQuda("No resident momentum field to use");
@@ -4781,7 +4883,7 @@ void computeHISQForceQuda(void* const milc_momentum,
   }
   if (cudaMom) delete cudaMom;
   delete cudaOutForce;
-  delete cudaGauge;
+  delete cudaULink;
   profileHISQForce.TPSTOP(QUDA_PROFILE_FREE);
 
   profileHISQForce.TPSTOP(QUDA_PROFILE_TOTAL);
