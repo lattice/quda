@@ -21,7 +21,8 @@ void computeLinkOrderedOuterProduct(void *src, void *dest, QudaPrecision precisi
    @param[in] link Gauge field links
    @param[out] newOprod Force accumulated with fat link contributions
 */
-void hisqStaplesForceCPU(const double *path_coeff, quda::cpuGaugeField &oprod, quda::cpuGaugeField &link, quda::cpuGaugeField *newOprod);
+void hisqStaplesForceCPU(const double *path_coeff, quda::cpuGaugeField &oprod, quda::cpuGaugeField &link,
+                         quda::cpuGaugeField *newOprod);
 
 /**
    @brief Compute the force contribution from the long link, CPU version
@@ -30,7 +31,8 @@ void hisqStaplesForceCPU(const double *path_coeff, quda::cpuGaugeField &oprod, q
    @param[in] link Gauge field links
    @param[out] newOprod Force accumulated with fat link contributions
 */
-void hisqLongLinkForceCPU(double coeff, quda::cpuGaugeField &oprod, quda::cpuGaugeField &link, quda::cpuGaugeField *newOprod);
+void hisqLongLinkForceCPU(double coeff, quda::cpuGaugeField &oprod, quda::cpuGaugeField &link,
+                          quda::cpuGaugeField *newOprod);
 
 /**
    @brief Accumulate the force contributions into the momentum field, CPU version

@@ -157,9 +157,9 @@ int getOddBit(int X);
 
 // Custom "sitelink" enum used to create unphased, MILC phased, or continuous U(1) phased links
 enum {
-  SITELINK_PHASE_NO = 0,    // no phase, used to create SU(3) links
-  SITELINK_PHASE_MILC = 1,  // MILC phase, used to test staggered fermions
-  SITELINK_PHASE_U1 = 2     // continuous phase, used to test reconstruct 13
+  SITELINK_PHASE_NO = 0,   // no phase, used to create SU(3) links
+  SITELINK_PHASE_MILC = 1, // MILC phase, used to test staggered fermions
+  SITELINK_PHASE_U1 = 2    // continuous phase, used to test reconstruct 13
 };
 
 /**
@@ -277,11 +277,7 @@ inline int getNegLog10Tolerance(QudaPrecision prec)
   @param[in] prec Precision
   @return Reasonable expected tolerance
 */
-inline double getTolerance(QudaPrecision prec)
-{
-  return pow(10, -getNegLog10Tolerance(prec));
-}
-
+inline double getTolerance(QudaPrecision prec) { return pow(10, -getNegLog10Tolerance(prec)); }
 
 /**
   @brief Check if the std::string has a size smaller than the limit: if yes, copy it to a C-string;

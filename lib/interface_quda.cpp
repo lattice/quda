@@ -4596,7 +4596,7 @@ void computeHISQForceQuda(void* const milc_momentum,
   cudaGaugeField *oneLinkOprod = new cudaGaugeField(oParam);
   cudaGaugeField *naikOprod = new cudaGaugeField(oParam);
 
-  double act_path_coeff[6] = {0,1,level2_coeff[2],level2_coeff[3],level2_coeff[4],level2_coeff[5]};
+  double act_path_coeff[6] = {0, 1, level2_coeff[2], level2_coeff[3], level2_coeff[4], level2_coeff[5]};
   // You have to look at the MILC routine to understand the following
   // Basically, I have already absorbed the one-link coefficient
 
@@ -4698,11 +4698,11 @@ void computeHISQForceQuda(void* const milc_momentum,
     oParam.r[dir] = R[dir];
   }
 
-  cudaGaugeField* cudaInForce = new cudaGaugeField(oParam);
+  cudaGaugeField *cudaInForce = new cudaGaugeField(oParam);
   copyExtendedGauge(*cudaInForce, *stapleOprod, QUDA_CUDA_FIELD_LOCATION);
   delete stapleOprod;
 
-  cudaGaugeField* cudaOutForce = new cudaGaugeField(oParam);
+  cudaGaugeField *cudaOutForce = new cudaGaugeField(oParam);
   copyExtendedGauge(*cudaOutForce, *oneLinkOprod, QUDA_CUDA_FIELD_LOCATION);
   delete oneLinkOprod;
 
@@ -4710,16 +4710,16 @@ void computeHISQForceQuda(void* const milc_momentum,
   GaugeFieldParam param(*gParam);
   param.location = QUDA_CPU_FIELD_LOCATION;
   param.create = QUDA_REFERENCE_FIELD_CREATE;
-  param.order  = QUDA_MILC_GAUGE_ORDER;
+  param.order = QUDA_MILC_GAUGE_ORDER;
   param.link_type = QUDA_ASQTAD_MOM_LINKS;
   param.reconstruct = QUDA_RECONSTRUCT_10;
-  param.ghostExchange =  QUDA_GHOST_EXCHANGE_NO;
+  param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   param.gauge = milc_momentum;
-  cpuGaugeField* cpuMom = (!gParam->use_resident_mom) ? new cpuGaugeField(param) : nullptr;
+  cpuGaugeField *cpuMom = (!gParam->use_resident_mom) ? new cpuGaugeField(param) : nullptr;
 
   param.location = QUDA_CUDA_FIELD_LOCATION;
   param.create = QUDA_ZERO_FIELD_CREATE;
-  param.order  = QUDA_FLOAT2_GAUGE_ORDER;
+  param.order = QUDA_FLOAT2_GAUGE_ORDER;
   GaugeFieldParam momParam(param);
 
   // Create CPU W, V, and U fields
@@ -4735,15 +4735,15 @@ void computeHISQForceQuda(void* const milc_momentum,
   wParam.order = QUDA_MILC_GAUGE_ORDER;
   wParam.link_type = QUDA_GENERAL_LINKS;
   wParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  wParam.gauge = (void*)w_link;
+  wParam.gauge = (void *)w_link;
   cpuGaugeField cpuWLink(wParam);
 
   GaugeFieldParam vParam(wParam);
-  vParam.gauge = (void*)v_link;
+  vParam.gauge = (void *)v_link;
   cpuGaugeField cpuVLink(vParam);
 
   GaugeFieldParam uParam(vParam);
-  uParam.gauge = (void*)u_link;
+  uParam.gauge = (void *)u_link;
   cpuGaugeField cpuULink(uParam);
 
   // Load the W field, which contains U(3) matrices, to the device
@@ -4759,15 +4759,15 @@ void computeHISQForceQuda(void* const milc_momentum,
   wParam.create = QUDA_NULL_FIELD_CREATE;
   wParam.setPrecision(gParam->cpu_prec, true);
 
-  cudaGaugeField* cudaWLink = new cudaGaugeField(wParam);
+  cudaGaugeField *cudaWLink = new cudaGaugeField(wParam);
   profileHISQForce.TPSTOP(QUDA_PROFILE_INIT);
 
   cudaWLink->loadCPUField(cpuWLink, profileHISQForce);
   cudaWLink->exchangeExtendedGhost(cudaWLink->R(), profileHISQForce);
 
-  cudaInForce->exchangeExtendedGhost(R,profileHISQForce);
+  cudaInForce->exchangeExtendedGhost(R, profileHISQForce);
   cudaWLink->exchangeExtendedGhost(cudaWLink->R(), profileHISQForce);
-  cudaOutForce->exchangeExtendedGhost(R,profileHISQForce);
+  cudaOutForce->exchangeExtendedGhost(R, profileHISQForce);
 
   // Compute level two term
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -4786,14 +4786,14 @@ void computeHISQForceQuda(void* const milc_momentum,
   qudaDeviceSynchronize();
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-  cudaOutForce->exchangeExtendedGhost(R,profileHISQForce);
+  cudaOutForce->exchangeExtendedGhost(R, profileHISQForce);
 
   // Load the V field, which contains general matrices, to the device
   profileHISQForce.TPSTART(QUDA_PROFILE_FREE);
   delete cudaWLink;
   profileHISQForce.TPSTOP(QUDA_PROFILE_FREE);
   profileHISQForce.TPSTART(QUDA_PROFILE_INIT);
-  for (int dir=0; dir<4; ++dir) {
+  for (int dir = 0; dir < 4; ++dir) {
     vParam.x[dir] += 2 * R[dir];
     vParam.r[dir] = R[dir];
   }
@@ -4826,7 +4826,7 @@ void computeHISQForceQuda(void* const milc_momentum,
   delete cudaVLink;
   profileHISQForce.TPSTOP(QUDA_PROFILE_FREE);
   profileHISQForce.TPSTART(QUDA_PROFILE_INIT);
-  for (int dir=0; dir<4; ++dir) {
+  for (int dir = 0; dir < 4; ++dir) {
     uParam.x[dir] += 2 * R[dir];
     uParam.r[dir] = R[dir];
   }

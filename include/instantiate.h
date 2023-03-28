@@ -416,7 +416,8 @@ namespace quda
      @param[in] U Gauge field
      @param[in,out] args Additional arguments for kernels
   */
-  template <template <typename, int, QudaReconstructType, QudaStaggeredPhase> class Apply, typename store_t, int nColor, typename G, typename... Args>
+  template <template <typename, int, QudaReconstructType, QudaStaggeredPhase> class Apply, typename store_t, int nColor,
+            typename G, typename... Args>
   constexpr void instantiateGaugeHisq(G &U, Args &&...args)
   {
     if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
@@ -453,8 +454,9 @@ namespace quda
      @param[in] U Gauge field
      @param[in,out] args Additional arguments for kernels
   */
-  template <template <typename, int, QudaReconstructType, QudaStaggeredPhase> class Apply, typename store_t, typename G, typename... Args>
-  constexpr void instantiateGaugeHisq(G &U, Args &&... args)
+  template <template <typename, int, QudaReconstructType, QudaStaggeredPhase> class Apply, typename store_t, typename G,
+            typename... Args>
+  constexpr void instantiateGaugeHisq(G &U, Args &&...args)
   {
     if (U.Ncolor() == 3) {
       instantiateGaugeHisq<Apply, store_t, 3>(U, args...);

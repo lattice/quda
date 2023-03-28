@@ -1389,7 +1389,7 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
           sincos(phase, &cos_sin[0], &cos_sin[1]);
 
           for (int c = 0; c < 3; c++) {
-            double elem[2] = { mylink[12 + 2 * c], mylink[12 + 2 * c + 1] };
+            double elem[2] = {mylink[12 + 2 * c], mylink[12 + 2 * c + 1]};
             mylink[12 + 2 * c] = elem[0] * cos_sin[0] - elem[1] * cos_sin[1];
             mylink[12 + 2 * c + 1] = elem[0] * cos_sin[1] + elem[1] * cos_sin[0];
           }
@@ -1404,7 +1404,7 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
           sincosf(phase, &cos_sin[0], &cos_sin[1]);
 
           for (int c = 0; c < 3; c++) {
-            float elem[2] = { mylink[12 + 2 * c], mylink[12 + 2 * c + 1] };
+            float elem[2] = {mylink[12 + 2 * c], mylink[12 + 2 * c + 1]};
             mylink[12 + 2 * c] = elem[0] * cos_sin[0] - elem[1] * cos_sin[1];
             mylink[12 + 2 * c + 1] = elem[0] * cos_sin[1] + elem[1] * cos_sin[0];
           }
@@ -1550,15 +1550,16 @@ void createMomCPU(void *mom, QudaPrecision precision)
   return;
 }
 
-void createStagForOprodCPU(void *stag_for_oprod, QudaPrecision precision, const int *const x, quda::RNG &rng) {
+void createStagForOprodCPU(void *stag_for_oprod, QudaPrecision precision, const int *const x, quda::RNG &rng)
+{
   unsigned long shift = x[0] * x[1] * x[2] * x[3] * stag_spinor_site_size;
   if (precision == QUDA_DOUBLE_PRECISION) {
-    double *dstag = (double*)stag_for_oprod;
+    double *dstag = (double *)stag_for_oprod;
     // matpc: compute a full-volume spinor
     for (int d = 0; d < 4; d++)
       constructRandomSpinorSource(dstag + d * shift, 1, 3, QUDA_DOUBLE_PRECISION, QUDA_MAT_SOLUTION, x, 4, rng);
   } else {
-    float *fstag = (float*)stag_for_oprod;
+    float *fstag = (float *)stag_for_oprod;
     for (int d = 0; d < 4; d++)
       constructRandomSpinorSource(fstag + d * shift, 1, 3, QUDA_SINGLE_PRECISION, QUDA_MAT_SOLUTION, x, 4, rng);
   }
@@ -1613,8 +1614,7 @@ static void printMomElement(void *mom, int X, QudaPrecision precision)
 
 int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec)
 {
-  if (verbosity >= QUDA_VERBOSE)
-  {
+  if (verbosity >= QUDA_VERBOSE) {
     printfQuda("mom:\n");
     printMomElement(momA, 0, prec);
     printfQuda("\n");

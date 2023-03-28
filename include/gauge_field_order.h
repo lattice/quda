@@ -1178,7 +1178,10 @@ namespace quda {
         const real scale;
         const real scale_inv;
 
-        Reconstruct(const GaugeField &u) : reconstruct_12(u), scale(u.Scale() == 0 ? 1.0 : u.Scale()), scale_inv(1.0 / scale) {}
+        Reconstruct(const GaugeField &u) :
+          reconstruct_12(u), scale(u.Scale() == 0 ? 1.0 : u.Scale()), scale_inv(1.0 / scale)
+        {
+        }
 
         __device__ __host__ inline void Pack(real out[12], const complex in[9]) const { reconstruct_12.Pack(out, in); }
 
@@ -1399,7 +1402,10 @@ namespace quda {
         const real scale;
         const real scale_inv;
 
-        Reconstruct(const GaugeField &u) : reconstruct_8(u), scale(u.Scale() == 0 ? 1.0 : u.Scale()), scale_inv(1.0 / scale) {}
+        Reconstruct(const GaugeField &u) :
+          reconstruct_8(u), scale(u.Scale() == 0 ? 1.0 : u.Scale()), scale_inv(1.0 / scale)
+        {
+        }
 
         __device__ __host__ inline real getPhase(const complex in[9]) const
         {

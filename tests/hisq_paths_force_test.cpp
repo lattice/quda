@@ -63,10 +63,9 @@ static void setPrecision(QudaPrecision precision)
   @param[out] complete_io Bytes streamed for the force contribution from the force completion
   @param[out] complete_flops FLOPS for the force contribution from the force completion
 */
-void total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, bool has_lepage,
-                            long long &staples_io, long long &staples_flops,
-                            long long &long_io, long long &long_flops,
-                            long long &complete_io, long long &complete_flops)
+void total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, bool has_lepage, long long &staples_io,
+                           long long &staples_flops, long long &long_io, long long &long_flops, long long &complete_io,
+                           long long &complete_flops)
 {
   // TO DO: update me with new counts in hisq kernel core file
 
@@ -77,26 +76,26 @@ void total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, bool h
   long long cmsize = prec * 18ll;
 
   // FLOPS for matrix multiply, matrix add, matrix rescale, and anti-Hermitian projection
-  long long matrix_flops[4] = { 198ll, 18ll, 18ll, 23ll };
+  long long matrix_flops[4] = {198ll, 18ll, 18ll, 23ll};
 
   // fully fused all directions
-  int one_link_io[2] = { 0, 12 }; // no links, 12 color matrices
-  int one_link_flops[4] = { 0, 4, 4, 0 };
+  int one_link_io[2] = {0, 12}; // no links, 12 color matrices
+  int one_link_flops[4] = {0, 4, 4, 0};
 
   // The outer (left-most) [2] is for forwards/backwards
 
   // The inner (right-most) [2] is for link vs color matrix
-  int three_link_io[2][2] = { {72, 192}, {48, 144} };
-  int three_lepage_link_io[2][2] = { {220, 288}, {172, 192} };
-  int five_seven_link_io[2][2] = { {1176, 1872}, {1176, 1440} };
+  int three_link_io[2][2] = {{72, 192}, {48, 144}};
+  int three_lepage_link_io[2][2] = {{220, 288}, {172, 192}};
+  int five_seven_link_io[2][2] = {{1176, 1872}, {1176, 1440}};
 
   // The inner (right-most) [4] corresponds to multiply/add/rescale/projection
-  int three_link_flops[2][4] = { {96, 48, 48, 0}, {48, 24, 24, 0} };  
-  int three_lepage_link_flops[2][4] = { {288, 120, 120, 0}, {192, 72, 72, 0} };
-  int five_seven_link_flops[2][4] = { {1920, 864, 864, 0}, {1440, 576, 576, 0} };
+  int three_link_flops[2][4] = {{96, 48, 48, 0}, {48, 24, 24, 0}};
+  int three_lepage_link_flops[2][4] = {{288, 120, 120, 0}, {192, 72, 72, 0}};
+  int five_seven_link_flops[2][4] = {{1920, 864, 864, 0}, {1440, 576, 576, 0}};
 
   // Compute the bytes loaded/stored
-  long long staples_io_parts[2] = { 0ll, 0ll };
+  long long staples_io_parts[2] = {0ll, 0ll};
   for (int m = 0; m < 2; m++) {
     staples_io_parts[m] = one_link_io[m] + five_seven_link_io[0][m] + five_seven_link_io[1][m];
     if (has_lepage)
@@ -122,7 +121,8 @@ void total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, bool h
   }
   staples_flops *= V;
 
-  printfQuda("staples flop/byte = %.4f lepage %c\n", static_cast<double>(staples_flops) / static_cast<double>(staples_io), has_lepage ? 'y' : 'n');
+  printfQuda("staples flop/byte = %.4f lepage %c\n",
+             static_cast<double>(staples_flops) / static_cast<double>(staples_io), has_lepage ? 'y' : 'n');
 
   // the long link is only computed during the first part of the chain rule,
   // which is also when the Lepage term is included
@@ -132,8 +132,7 @@ void total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, bool h
     long_io = (16 * linksize + 20 * cmsize) * V;
 
     int long_link_flops[4] = {24, 12, 4, 0};
-    for (int i = 0; i < 4; i++)
-      long_flops += long_link_flops[i] * matrix_flops[i];
+    for (int i = 0; i < 4; i++) long_flops += long_link_flops[i] * matrix_flops[i];
     long_flops *= V;
 
     printfQuda("long flop/byte = %.4f\n", static_cast<double>(long_flops) / static_cast<double>(long_io));
@@ -143,8 +142,7 @@ void total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, bool h
   complete_io = (4 * linksize + 8 * cmsize) * V;
   int complete_link_flops[4] = {4, 0, 4, 4};
   complete_flops = 0;
-  for (int i = 0; i < 4; i++)
-    complete_flops += complete_link_flops[i] * matrix_flops[i];
+  for (int i = 0; i < 4; i++) complete_flops += complete_link_flops[i] * matrix_flops[i];
   printfQuda("complete flop/byte = %.4f\n", static_cast<double>(complete_flops) / static_cast<double>(complete_io));
   return;
 }
@@ -196,7 +194,8 @@ static void hisq_force_startup()
   qudaGaugeParam.reconstruct = (link_recon == QUDA_RECONSTRUCT_12 ? QUDA_RECONSTRUCT_13 : link_recon);
   qudaGaugeParam.type = QUDA_GENERAL_LINKS;
   qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
-  qudaGaugeParam.staggered_phase_type = (link_recon == QUDA_RECONSTRUCT_12 ? QUDA_STAGGERED_PHASE_MILC : QUDA_STAGGERED_PHASE_NO);
+  qudaGaugeParam.staggered_phase_type
+    = (link_recon == QUDA_RECONSTRUCT_12 ? QUDA_STAGGERED_PHASE_MILC : QUDA_STAGGERED_PHASE_NO);
   qudaGaugeParam.staggered_phase_applied = true;
   qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
   qudaGaugeParam.anisotropy = 1.0;
@@ -212,7 +211,7 @@ static void hisq_force_startup()
   int t_face_size = qudaGaugeParam_ex.X[0] * qudaGaugeParam_ex.X[1] * qudaGaugeParam_ex.X[2] / 2;
   pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
 #endif
-  qudaGaugeParam_ex.ga_pad = 3*pad_size; // long links
+  qudaGaugeParam_ex.ga_pad = 3 * pad_size; // long links
 
   GaugeFieldParam gParam_ex;
   GaugeFieldParam gParam;
@@ -253,8 +252,9 @@ static void hisq_force_startup()
   } // set halo region for CPU
   cpuGauge_ex = new cpuGaugeField(gParam_ex);
 
-  auto generated_link_type = (link_recon == QUDA_RECONSTRUCT_NO ? SITELINK_PHASE_NO :
-                               (link_recon == QUDA_RECONSTRUCT_13 ? SITELINK_PHASE_U1 : SITELINK_PHASE_MILC));
+  auto generated_link_type = (link_recon == QUDA_RECONSTRUCT_NO ?
+                                SITELINK_PHASE_NO :
+                                (link_recon == QUDA_RECONSTRUCT_13 ? SITELINK_PHASE_U1 : SITELINK_PHASE_MILC));
   createSiteLinkCPU((void **)cpuGauge->Gauge_p(), qudaGaugeParam.cpu_prec, generated_link_type);
   copyExtendedGauge(*cpuGauge_ex, *cpuGauge, QUDA_CPU_FIELD_LOCATION);
 
@@ -271,8 +271,8 @@ static void hisq_force_startup()
   gParam_ex.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
 
   /**************************
-  * Create the force fields *
-  **************************/
+   * Create the force fields *
+   **************************/
   gParam.location = QUDA_CPU_FIELD_LOCATION;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.setPrecision(prec);
@@ -306,11 +306,11 @@ static void hisq_force_startup()
   refMom = new cpuGaugeField(gParam);
 
   /**********************************
-  * Create the outer product fields *
-  **********************************/
+   * Create the outer product fields *
+   **********************************/
 
   // Create four full-volume random spinor fields
-  void* stag_for_oprod = safe_malloc(4 * cpuGauge->Volume() * stag_spinor_site_size * force_prec);
+  void *stag_for_oprod = safe_malloc(4 * cpuGauge->Volume() * stag_spinor_site_size * force_prec);
 
   // Allocate the outer product fields and populate them with the random spinor fields
   gParam.link_type = QUDA_GENERAL_LINKS;
@@ -343,8 +343,8 @@ static void hisq_force_startup()
   host_free(stag_for_oprod);
 
   /**************************
-  * Create remaining fields *
-  ***************************/
+   * Create remaining fields *
+   ***************************/
   gParam_ex.location = QUDA_CUDA_FIELD_LOCATION;
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam_ex.setPrecision(prec, true);
@@ -373,8 +373,8 @@ static void hisq_force_startup()
   cudaMom = new cudaGaugeField(gParam);
 
   /********************************************************************
-  * Copy to and exchange gauge and outer product fields on the device *
-  ********************************************************************/
+   * Copy to and exchange gauge and outer product fields on the device *
+   ********************************************************************/
   cpuGauge_ex->exchangeExtendedGhost(R, true);
   cudaGauge_ex->loadCPUField(*cpuGauge);
   cudaGauge_ex->exchangeExtendedGhost(cudaGauge_ex->R());
@@ -388,8 +388,8 @@ static void hisq_force_startup()
   cudaLongLinkOprod_ex->exchangeExtendedGhost(cudaLongLinkOprod_ex->R());
 
   /**********************
-  * Do a little cleanup *
-  **********************/
+   * Do a little cleanup *
+   **********************/
   delete rng;
 }
 
@@ -421,9 +421,8 @@ static int hisq_force_test(bool lepage)
 {
   // float d_weight = 1.0;
   // { one, naik, three, five, seven, lepage }
-  //double d_act_path_coeff[6] = { 1., 0., 0., 0., 0., 0. };
-  double d_act_path_coeff[6] = { 0.625000, -0.058479, -0.087719,
-                                 0.030778, -0.007200, lepage ? -0.123113 : 0. };
+  // double d_act_path_coeff[6] = { 1., 0., 0., 0., 0., 0. };
+  double d_act_path_coeff[6] = {0.625000, -0.058479, -0.087719, 0.030778, -0.007200, lepage ? -0.123113 : 0.};
 
   quda::host_timer_t host_timer;
 
@@ -433,8 +432,8 @@ static int hisq_force_test(bool lepage)
   double complete_time_sec = 0.0;
 
   /********************************
-  * Zero momenta and force fields *
-  ********************************/
+   * Zero momenta and force fields *
+   ********************************/
   cpuForce->zero();
   cpuForce_ex->zero();
   cpuMom->zero();
@@ -445,8 +444,8 @@ static int hisq_force_test(bool lepage)
   cudaMom->zero();
 
   /**************************************
-  * Force contribution from the staples *
-  **************************************/
+   * Force contribution from the staples *
+   **************************************/
   host_timer.start();
   fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
   qudaDeviceSynchronize();
@@ -465,18 +464,21 @@ static int hisq_force_test(bool lepage)
 
     int res = 1;
     for (int dir = 0; dir < 4; dir++) {
-      res &= compare_floats(reinterpret_cast<void**>(cpuForce->Gauge_p())[dir], reinterpret_cast<void**>(hostVerifyForce->Gauge_p())[dir], V * gauge_site_size, getTolerance(force_prec), force_prec);
+      res &= compare_floats(reinterpret_cast<void **>(cpuForce->Gauge_p())[dir],
+                            reinterpret_cast<void **>(hostVerifyForce->Gauge_p())[dir], V * gauge_site_size,
+                            getTolerance(force_prec), force_prec);
     }
 
-    strong_check_link(reinterpret_cast<void**>(hostVerifyForce->Gauge_p()), "GPU results: ",
-                      reinterpret_cast<void**>(cpuForce->Gauge_p()), "CPU reference results:", V, force_prec);
-    logQuda(QUDA_SUMMARIZE, "Lepage %s staples force test %s\n\n", lepage ? "enabled" : "disabled", (1 == res) ? "PASSED" : "FAILED");
-
+    strong_check_link(reinterpret_cast<void **>(hostVerifyForce->Gauge_p()),
+                      "GPU results: ", reinterpret_cast<void **>(cpuForce->Gauge_p()), "CPU reference results:", V,
+                      force_prec);
+    logQuda(QUDA_SUMMARIZE, "Lepage %s staples force test %s\n\n", lepage ? "enabled" : "disabled",
+            (1 == res) ? "PASSED" : "FAILED");
   }
 
   /*****************************************
-  * Force contribution from the long links *
-  ******************************************/
+   * Force contribution from the long links *
+   ******************************************/
 
   // Only compute the long link when also computing the Lepage term
   // This is consistent with the chain rule for HISQ
@@ -499,11 +501,14 @@ static int hisq_force_test(bool lepage)
 
       int res = 1;
       for (int dir = 0; dir < 4; dir++) {
-        res &= compare_floats(reinterpret_cast<void**>(cpuForce->Gauge_p())[dir], reinterpret_cast<void**>(hostVerifyForce->Gauge_p())[dir], V * gauge_site_size, getTolerance(force_prec), force_prec);
+        res &= compare_floats(reinterpret_cast<void **>(cpuForce->Gauge_p())[dir],
+                              reinterpret_cast<void **>(hostVerifyForce->Gauge_p())[dir], V * gauge_site_size,
+                              getTolerance(force_prec), force_prec);
       }
 
-      strong_check_link(reinterpret_cast<void**>(hostVerifyForce->Gauge_p()), "GPU results: ",
-                        reinterpret_cast<void**>(cpuForce->Gauge_p()), "CPU reference results:", V, force_prec);
+      strong_check_link(reinterpret_cast<void **>(hostVerifyForce->Gauge_p()),
+                        "GPU results: ", reinterpret_cast<void **>(cpuForce->Gauge_p()), "CPU reference results:", V,
+                        force_prec);
       logQuda(QUDA_SUMMARIZE, "Long link force test %s\n\n", (1 == res) ? "PASSED" : "FAILED");
     }
   }
@@ -526,32 +531,32 @@ static int hisq_force_test(bool lepage)
 
   int accuracy_level = 3;
   if (verify_results) {
-    int res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume() * mom_site_size, getTolerance(force_prec),
-                             force_prec);
-    accuracy_level
-      = strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume(), force_prec);
+    int res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume() * mom_site_size,
+                             getTolerance(force_prec), force_prec);
+    accuracy_level = strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume(), force_prec);
     logQuda(QUDA_SUMMARIZE, "Test (lepage coeff %e) %s\n", d_act_path_coeff[5], (1 == res) ? "PASSED" : "FAILED");
   }
   long long staple_io, staple_flops, long_io, long_flops, complete_io, complete_flops;
-  total_staple_io_flops(force_prec, link_recon, lepage, staple_io, staple_flops, long_io, long_flops, complete_io, complete_flops);
+  total_staple_io_flops(force_prec, link_recon, lepage, staple_io, staple_flops, long_io, long_flops, complete_io,
+                        complete_flops);
 
   {
-    double perf_flops = static_cast<double>(staple_flops) / (staple_time_sec) * 1e-9;
-    double perf = static_cast<double>(staple_io) / (staple_time_sec) * 1e-9;
-    printfQuda("Staples time: %.6f ms, perf = %.6f GFLOPS, achieved bandwidth= %.6f GB/s, Lepage %c\n", staple_time_sec * 1e3,
-               perf_flops, perf, lepage ? 'y' : 'n');
+    double perf_flops = static_cast<double>(staple_flops) / (staple_time_sec)*1e-9;
+    double perf = static_cast<double>(staple_io) / (staple_time_sec)*1e-9;
+    printfQuda("Staples time: %.6f ms, perf = %.6f GFLOPS, achieved bandwidth= %.6f GB/s, Lepage %c\n",
+               staple_time_sec * 1e3, perf_flops, perf, lepage ? 'y' : 'n');
   }
 
   if (lepage) {
-    double perf_flops = static_cast<double>(long_flops) / (long_time_sec) * 1e-9;
-    double perf = static_cast<double>(long_io) / (long_time_sec) * 1e-9;
+    double perf_flops = static_cast<double>(long_flops) / (long_time_sec)*1e-9;
+    double perf = static_cast<double>(long_io) / (long_time_sec)*1e-9;
     printfQuda("LongLink time: %.6f ms, perf = %.6f GFLOPS, achieved bandwidth= %.6f GB/s\n", long_time_sec * 1e3,
                perf_flops, perf);
   }
 
   {
-    double perf_flops = static_cast<double>(complete_flops) / (complete_time_sec) * 1e-9;
-    double perf = static_cast<double>(complete_io) / (complete_time_sec) * 1e-9;
+    double perf_flops = static_cast<double>(complete_flops) / (complete_time_sec)*1e-9;
+    double perf = static_cast<double>(complete_io) / (complete_time_sec)*1e-9;
     printfQuda("Completion time: %.6f ms, perf = %.6f GFLOPS, achieved bandwidth= %.6f GB/s\n", complete_time_sec * 1e3,
                perf_flops, perf);
   }
@@ -613,10 +618,9 @@ int main(int argc, char **argv)
 
   display_test_info();
 
-  if (prec != QUDA_DOUBLE_PRECISION && prec != QUDA_SINGLE_PRECISION)
-    errorQuda("Invalid precision %d", prec);
+  if (prec != QUDA_DOUBLE_PRECISION && prec != QUDA_SINGLE_PRECISION) errorQuda("Invalid precision %d", prec);
   // FIXME: debugging recon 12
-  if (link_recon != QUDA_RECONSTRUCT_NO && link_recon != QUDA_RECONSTRUCT_13/* && link_recon != QUDA_RECONSTRUCT_12*/)
+  if (link_recon != QUDA_RECONSTRUCT_NO && link_recon != QUDA_RECONSTRUCT_13 /* && link_recon != QUDA_RECONSTRUCT_12*/)
     errorQuda("Invalid reconstruct %d", link_recon);
 
   // one-time setup

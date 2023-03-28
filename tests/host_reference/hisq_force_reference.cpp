@@ -1197,7 +1197,8 @@ void doHisqStaplesForceCPU(const int dim[4], PathCoefficients<double> staple_coe
 #undef Qmu
 #undef Qnumu
 
-void hisqStaplesForceCPU(const double *path_coeff, quda::cpuGaugeField &oprod, quda::cpuGaugeField &link, quda::cpuGaugeField *newOprod)
+void hisqStaplesForceCPU(const double *path_coeff, quda::cpuGaugeField &oprod, quda::cpuGaugeField &link,
+                         quda::cpuGaugeField *newOprod)
 {
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
@@ -1301,7 +1302,8 @@ void computeLongLinkField(const int dim[4], const Real *const oprod, const Real 
   }
 }
 
-void hisqLongLinkForceCPU(double coeff, quda::cpuGaugeField &oprod, quda::cpuGaugeField &link, quda::cpuGaugeField *newOprod)
+void hisqLongLinkForceCPU(double coeff, quda::cpuGaugeField &oprod, quda::cpuGaugeField &link,
+                          quda::cpuGaugeField *newOprod)
 {
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
@@ -1369,8 +1371,7 @@ void hisqCompleteForceCPU(quda::cpuGaugeField &oprod, quda::cpuGaugeField &link,
     if (precision == QUDA_SINGLE_PRECISION) {
       completeForceField<float>(X_, (float *)oprod.Gauge_p(), (float *)link.Gauge_p(), sig, (float *)mom->Gauge_p());
     } else if (precision == QUDA_DOUBLE_PRECISION) {
-      completeForceField<double>(X_, (double *)oprod.Gauge_p(), (double *)link.Gauge_p(), sig,
-                                 (double *)mom->Gauge_p());
+      completeForceField<double>(X_, (double *)oprod.Gauge_p(), (double *)link.Gauge_p(), sig, (double *)mom->Gauge_p());
     } else {
       errorQuda("Unrecognised precision\n");
     }
