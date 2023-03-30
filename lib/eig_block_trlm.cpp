@@ -263,7 +263,7 @@ namespace quda
     blas::caxpy(jth_block, {v.begin() + j, v.begin() + j + block_size}, {r.begin(), r.end()});
 
     // Orthogonalise R[0:block_size] against the Krylov space V[0:j + block_size]
-    for (int k = 0; k < 1; k++) blockOrthogonalize(v, r, j + block_size);
+    for (int k = 0; k < 1; k++) blockOrthogonalizeHMGS(v, r, ortho_block_size, j + block_size);
 
     // QR decomposition via modified Gram-Schmidt
     // NB, QR via modified Gram-Schmidt is numerically unstable.
@@ -279,10 +279,10 @@ namespace quda
 
     // Column major order
     bool orthed = false;
-    int k = 0, kmax = 3;
-    while (!orthed && k < kmax) {
+    int k = 0;
+    while (!orthed && k < max_ortho_attempts) {
       // Compute R_{k}
-      logQuda(QUDA_DEBUG_VERBOSE, "Orthing k = %d\n", k);
+      logQuda(QUDA_DEBUG_VERBOSE, "Orthonormalisation attempt k = %d\n", k);
       for (int b = 0; b < block_size; b++) {
         double norm = sqrt(blas::norm2(r[b]));
         blas::ax(1.0 / norm, r[b]);
@@ -304,6 +304,8 @@ namespace quda
       orthed = orthoCheck(r, block_size);
       k++;
     }
+
+    if (!orthed) errorQuda("Block TRLM unable to orthonormalise the block residual after %d iterations", k + 1);
 
     // Prepare next step.
     // v_{j+1} = r
@@ -429,11 +431,15 @@ namespace quda
     for (int i = 0; i < dim; i++)
       for (int j = 0; j < dim; j++) block_ritz_mat[dim * i + j] = eigensolver.eigenvectors().col(i)[j];
 
+    // Use Sum of all beta values in the final block for
+    // the convergence condition
+    double beta_sum = 0;
+    for (int i = 0; i < block_data_length; i++) beta_sum += fabs(block_beta[n_kr * block_size - block_data_length + i]);
+
     for (int i = 0; i < blocks; i++) {
       for (int b = 0; b < block_size; b++) {
         idx = b * (block_size + 1);
-        residua[i * block_size + b + num_locked] = std::abs(block_beta[n_kr * block_size - block_data_length + idx]
-                                                            * block_ritz_mat[dim * (i * block_size + b + 1) - 1]);
+        residua[i * block_size + b + num_locked] = fabs(beta_sum * block_ritz_mat[dim * (i * block_size + b + 1) - 1]);
       }
     }
 
