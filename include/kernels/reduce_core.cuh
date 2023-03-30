@@ -117,10 +117,8 @@ namespace quda
     template <typename reduce_t, typename real>
     struct Max : public ReduceFunctor<reduce_t> {
       using reducer = maximum<reduce_t>;
-#pragma omp declare target
       static constexpr memory_access<1> read{ };
       static constexpr memory_access<> write{ };
-#pragma omp end declare target
       Max(const real &, const real &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &max, T &x, T &, T &, T &, T &) const
       {
@@ -137,10 +135,8 @@ namespace quda
     struct MaxDeviation : public ReduceFunctor<deviation_t<real_reduce_t>> {
       using reduce_t = deviation_t<real_reduce_t>;
       using reducer = maximum<reduce_t>;
-#pragma omp declare target
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<> write{ };
-#pragma omp end declare target
       MaxDeviation(const real &, const real &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &max, T &x, T &y, T &, T &, T &) const
       {
@@ -170,10 +166,8 @@ namespace quda
 
     template <typename reduce_t, typename real>
     struct Norm1 : public ReduceFunctor<reduce_t> {
-#pragma omp declare target
       static constexpr memory_access<1> read{ };
       static constexpr memory_access<> write{ };
-#pragma omp end declare target
       Norm1(const real &, const real &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &, T &, T &, T &) const
       {
@@ -194,10 +188,8 @@ namespace quda
 
     template <typename reduce_t, typename real>
     struct Norm2 : public ReduceFunctor<reduce_t> {
-#pragma omp declare target
       static constexpr memory_access<1> read{ };
       static constexpr memory_access<> write{ };
-#pragma omp end declare target
       Norm2(const real &, const real &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &, T &, T &, T &) const
       {
@@ -219,10 +211,8 @@ namespace quda
 
     template <typename reduce_t, typename real>
     struct Dot : public ReduceFunctor<reduce_t> {
-#pragma omp declare target
       static constexpr memory_access<1,1> read{ };
       static constexpr memory_access<> write{ };
-#pragma omp end declare target
       Dot(const real &, const real &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
       {
@@ -238,10 +228,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct axpbyzNorm2 : public ReduceFunctor<reduce_t> {
-#pragma omp declare target
       static constexpr memory_access<1, 1, 0> read{ };
       static constexpr memory_access<0, 0, 1> write{ };
-#pragma omp end declare target
       const real a;
       const real b;
       axpbyzNorm2(const real &a, const real &b) : a(a), b(b) { ; }
@@ -262,10 +250,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct AxpyReDot : public ReduceFunctor<reduce_t> {
-#pragma omp declare target
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
-#pragma omp end declare target
       const real a;
       AxpyReDot(const real &a, const real &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
@@ -285,10 +271,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct caxpyNorm2 : public ReduceFunctor<reduce_t> {
-#pragma omp declare target
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
-#pragma omp end declare target
       const complex<real> a;
       caxpyNorm2(const complex<real> &a, const complex<real> &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
@@ -310,10 +294,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct cabxpyzaxnorm : public ReduceFunctor<reduce_t> {
-#pragma omp declare target
       static constexpr memory_access<1, 1, 0> read{ };
       static constexpr memory_access<1, 0, 1> write{ };
-#pragma omp end declare target
       const real a;
       const complex<real> b;
       cabxpyzaxnorm(const complex<real> &a, const complex<real> &b) : a(a.real()), b(b) { ; }
@@ -345,10 +327,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct Cdot : public ReduceFunctor<array<real_reduce_t, 2>> {
       using reduce_t = array<real_reduce_t, 2>;
-#pragma omp declare target
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<> write{ };
-#pragma omp end declare target
       Cdot(const complex<real> &, const complex<real> &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
       {
@@ -366,10 +346,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct caxpydotzy : public ReduceFunctor<array<real_reduce_t, 2>> {
       using reduce_t = array<real_reduce_t, 2>;
-#pragma omp declare target
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
-#pragma omp end declare target
       const complex<real> a;
       caxpydotzy(const complex<real> &a, const complex<real> &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &) const
@@ -400,10 +378,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct CdotNormAB : public ReduceFunctor<array<real_reduce_t, 4>> {
       using reduce_t = array<real_reduce_t, 4>;
-#pragma omp declare target
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<> write{ };
-#pragma omp end declare target
       CdotNormAB(const real &, const real &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
       {
@@ -433,10 +409,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct caxpbypzYmbwcDotProductUYNormY_ : public ReduceFunctor<array<real_reduce_t, 3>> {
       using reduce_t = array<real_reduce_t, 3>;
-#pragma omp declare target
       static constexpr memory_access<1, 1, 1, 1, 1> read{ };
       static constexpr memory_access<0, 1, 1> write{ };
-#pragma omp end declare target
       const complex<real> a;
       const complex<real> b;
       caxpbypzYmbwcDotProductUYNormY_(const complex<real> &a, const complex<real> &b) : a(a), b(b) { ; }
@@ -462,10 +436,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct axpyCGNorm2 : public ReduceFunctor<array<real_reduce_t, 2>> {
       using reduce_t = array<real_reduce_t, 2>;
-#pragma omp declare target
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
-#pragma omp end declare target
       const real a;
       axpyCGNorm2(const real &a, const real &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
@@ -496,10 +468,8 @@ namespace quda
       using reducer = plus<reduce_t>;
       static constexpr bool site_unroll = true;
 
-#pragma omp declare target
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<> write{ };
-#pragma omp end declare target
       reduce_t aux;
       HeavyQuarkResidualNorm_(const real &, const real &) : aux {} { ; }
 
@@ -545,10 +515,8 @@ namespace quda
       using reducer = plus<reduce_t>;
       static constexpr bool site_unroll = true;
 
-#pragma omp declare target
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<> write{ };
-#pragma omp end declare target
       reduce_t aux;
       xpyHeavyQuarkResidualNorm_(const real &, const real &) : aux {} { ; }
 
@@ -587,10 +555,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct tripleCGReduction_ : public ReduceFunctor<array<real_reduce_t, 3>> {
       using reduce_t = array<real_reduce_t, 3>;
-#pragma omp declare target
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<> write{ };
-#pragma omp end declare target
       tripleCGReduction_(const real &, const real &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &, T &) const
       {
@@ -614,10 +580,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct quadrupleCGReduction_ : public ReduceFunctor<array<real_reduce_t, 4>> {
       using reduce_t = array<real_reduce_t, 4>;
-#pragma omp declare target
       static constexpr memory_access<1, 1, 1, 1> read{ };
       static constexpr memory_access<> write{ };
-#pragma omp end declare target
       quadrupleCGReduction_(const real &, const real &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &) const
       {
@@ -642,10 +606,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct quadrupleCG3InitNorm_ : public ReduceFunctor<reduce_t> {
-#pragma omp declare target
       static constexpr memory_access<1, 1, 0, 0, 1> read{ };
       static constexpr memory_access<1, 1, 1, 1> write{ };
-#pragma omp end declare target
       const real a;
       quadrupleCG3InitNorm_(const real &a, const real &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, T &v) const
@@ -674,10 +636,8 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct quadrupleCG3UpdateNorm_ : public ReduceFunctor<reduce_t> {
-#pragma omp declare target
       static constexpr memory_access<1, 1, 1, 1, 1> read{ };
       static constexpr memory_access<1, 1, 1, 1> write{ };
-#pragma omp end declare target
       const real a;
       const real b;
       quadrupleCG3UpdateNorm_(const real &a, const real &b) : a(a), b(b) { ; }

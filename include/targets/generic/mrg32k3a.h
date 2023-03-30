@@ -117,10 +117,8 @@ namespace quda
       constexpr auto a2sq = squaremodarray<maxpower2>(a2, static_cast<uint64_t>(m2));
 
       // device copies of a1sq and a2sq
-#pragma omp declare target
       __device__ constexpr auto a1sq_d = a1sq;
       __device__ constexpr auto a2sq_d = a2sq;
-#pragma omp end declare target
 
       // default functor for grabbing the appropriate a1sq
       template <bool is_device> struct get_a1sq {
