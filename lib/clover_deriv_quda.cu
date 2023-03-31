@@ -13,11 +13,6 @@ namespace quda {
     int parity;
     unsigned int minThreads() const { return gauge.LocalVolumeCB(); }
 
-    unsigned int sharedBytesPerThread() const
-    {
-      return gauge.Ncolor() * gauge.Ncolor() * 2 * sizeof(typename mapper<Float>::type);
-    }
-
   public:
     DerivativeClover(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff, int parity) :
       TunableKernel3D(gauge, 2, 4),

@@ -38,11 +38,10 @@ namespace quda
     }
   };
 
- template <typename Link, typename LinkCache, typename Arg>
-  __device__ __host__ void computeForce(LinkCache &force_cache, const Arg &arg, int xIndex, int yIndex, int mu, int nu)
+  template <typename Link, typename Arg>
+  __device__ __host__ void computeForce(Link &force_total, const Arg &arg, int xIndex, int yIndex, int mu, int nu)
   {
-    int otherparity = (1 - arg.parity);
-
+    const int otherparity = (1 - arg.parity);
     const int tidx = mu > nu ? (mu - 1) * mu / 2 + nu : (nu - 1) * nu / 2 + mu;
 
     if (yIndex == 0) { // do "this" force
@@ -79,9 +78,8 @@ namespace quda
         Link Oprod2 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), arg.parity);
         force += U1 * U2 * Oprod2 * conj(U3) * conj(U4);
 
-        if (nu < mu) force = force_cache.load() - force;
-        else force = force_cache.load() + force;
-        force_cache.save(force);
+        if (nu < mu) force_total -= force;
+        else force_total += force;
       }
 
       {
@@ -117,9 +115,8 @@ namespace quda
         Link Oprod4 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), arg.parity);
         force += Oprod4 * conj(U1) * U2 * U3 * conj(U4);
 
-        if (nu < mu) force = force_cache.load() + force;
-        else force = force_cache.load() - force;
-        force_cache.save(force);
+        if (nu < mu) force_total += force;
+        else force_total -= force;
       }
 
     } else { // else do other force
@@ -157,9 +154,8 @@ namespace quda
         Link Oprod4 = arg.oprod(tidx, linkIndexShift(y, d, arg.E), arg.parity);
         force += U1 * Oprod4 * U2 * conj(U3) * conj(U4);
 
-        if (nu < mu) force = force_cache.load() - force;
-        else force = force_cache.load() + force;
-        force_cache.save(force);
+        if (nu < mu) force_total -= force;
+        else force_total += force;
       }
 
       // Lower leaf
@@ -197,9 +193,8 @@ namespace quda
         Link Oprod2 = arg.oprod(tidx, linkIndexShift(y, d, arg.E), arg.parity);
         force += conj(U1) * Oprod2 * U2 * U3 * conj(U4);
 
-        if (nu < mu) force = force_cache.load() + force;
-        else force = force_cache.load() - force;
-        force_cache.save(force);
+        if (nu < mu) force_total += force;
+        else force_total -= force;
       }
     }
 
@@ -217,21 +212,16 @@ namespace quda
       using Complex = complex<real>;
       using Link = Matrix<Complex, 3>;
 
-      SharedMemoryCache<Link> force_cache(target::block_dim());
-      {
-        Link force;
-        force_cache.save(force);
-      }
+      Link force;
 
 #pragma unroll
       for (int nu = 0; nu < 4; nu++) {
         if (nu == mu) continue;
-        computeForce<Link>(force_cache, arg, x_cb, parity, mu, nu);
+        computeForce(force, arg, x_cb, parity, mu, nu);
       }
 
       // Write to array
       Link F = arg.force(mu, x_cb, parity == 0 ? arg.parity : 1 - arg.parity);
-      Link force = force_cache.load();
       F += arg.coeff * force;
       arg.force(mu, x_cb, parity == 0 ? arg.parity : 1 - arg.parity) = F;
     }
