@@ -17,11 +17,14 @@ namespace quda {
     const QudaGaugeSmearType wflow_type;
     const WFlowStepType step_type;
 
-    bool tuneSharedBytes() const { return false; }
     unsigned int minThreads() const { return in.LocalVolumeCB(); }
-    unsigned int maxBlockSize(const TuneParam &) const { return 32; }
-    int blockStep() const { return 8; }
-    int blockMin() const { return 8; }
+    unsigned int maxSharedBytesPerBlock() const { return maxDynamicSharedBytesPerBlock(); }
+
+    unsigned int sharedBytesPerThread() const
+    {
+      // use SharedMemoryCache if using Symanzik improvement for two Link fields
+      return wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW ? 2 * in.Ncolor() * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type) : 0;
+    }
 
   public:
     GaugeWFlowStep(GaugeField &out, GaugeField &temp, const GaugeField &in, const double epsilon, const QudaGaugeSmearType wflow_type, const WFlowStepType step_type) :
@@ -55,6 +58,7 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      tp.set_max_shared_bytes = wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW ? true :false;
 
       switch (wflow_type) {
       case QUDA_GAUGE_SMEAR_WILSON_FLOW:
