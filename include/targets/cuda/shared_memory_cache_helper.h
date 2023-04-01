@@ -31,9 +31,16 @@ namespace quda
        according the maximum number of threads possible, given these
        dimensions.
    */
-  template <typename T, int block_size_y = 1, int block_size_z = 1, bool dynamic = true>
+  template <typename T, int block_size_y_ = 1, int block_size_z_ = 1, bool dynamic_ = true>
   class SharedMemoryCache
   {
+  public:
+    using value_type = T;
+    static constexpr int block_size_y = block_size_y_;
+    static constexpr int block_size_z = block_size_z_;
+    static constexpr bool dynamic = dynamic_;
+
+  private:
     /** maximum number of threads in x given the y and z block sizes */
     static constexpr int block_size_x = device::max_block_size<block_size_y, block_size_z>();
 
@@ -45,12 +52,13 @@ namespace quda
 
     const dim3 block;
     const int stride;
+    const unsigned int offset = 0; // dynamic offset in bytes
 
     /**
        @brief This is a dummy instantiation for the host compiler
     */
     template <bool, typename dummy = void> struct cache_dynamic {
-      atom_t *operator()()
+      atom_t *operator()(unsigned)
       {
         static atom_t *cache_;
         return reinterpret_cast<atom_t *>(cache_);
@@ -65,10 +73,10 @@ namespace quda
        @return Shared memory pointer
      */
     template <typename dummy> struct cache_dynamic<true, dummy> {
-      __device__ inline atom_t *operator()()
+      __device__ inline atom_t *operator()(unsigned int offset)
       {
         extern __shared__ int cache_[];
-        return reinterpret_cast<atom_t *>(cache_);
+        return reinterpret_cast<atom_t *>(reinterpret_cast<char*>(cache_) + offset);
       }
     };
 
@@ -84,12 +92,22 @@ namespace quda
       }
     };
 
-    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<dynamic_shared, atom_t *> cache()
+    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<dynamic_shared, atom_t*> cache()
     {
-      return target::dispatch<cache_dynamic>();
+      return target::dispatch<cache_dynamic>(offset);
     }
 
-    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<!dynamic_shared, atom_t *> cache()
+    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<!dynamic_shared, atom_t*> cache()
+    {
+      return target::dispatch<cache_static>();
+    }
+
+    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<dynamic_shared, atom_t const *> cache() const
+    {
+      return target::dispatch<cache_dynamic>(offset);
+    }
+
+    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<!dynamic_shared, atom_t const *> cache() const
     {
       return target::dispatch<cache_static>();
     }
@@ -103,7 +121,7 @@ namespace quda
       for (int i = 0; i < n_element; i++) cache<dynamic>()[i * stride + j] = tmp[i];
     }
 
-    __device__ __host__ inline T load_detail(int x, int y, int z)
+    __device__ __host__ inline T load_detail(int x, int y, int z) const
     {
       atom_t tmp[n_element];
       int j = (z * block.y + y) * block.x + x;
@@ -137,9 +155,12 @@ namespace quda
        constructor.
 
        @param[in] block Block dimensions for the 3-d shared memory object
+       @param[in] thread_offset "Perceived" offset from dynamic shared
+       memory base pointer (used when we have multiple caches in
+       scope).  Need to include block size to actual offset.
     */
-    constexpr SharedMemoryCache(dim3 block = dim3(block_size_x, block_size_y, block_size_z)) :
-      block(block), stride(block.x * block.y * block.z)
+    constexpr SharedMemoryCache(dim3 block = dim3(block_size_x, block_size_y, block_size_z), unsigned int thread_offset = 0) :
+      block(block), stride(block.x * block.y * block.z), offset(stride * thread_offset)
     {
     }
 
@@ -207,7 +228,7 @@ namespace quda
        @param[in] z The z index to use
        @return The value at coordinates (x,y,z)
      */
-    __device__ __host__ inline T load(int x = -1, int y = -1, int z = -1)
+    __device__ __host__ inline T load(int x = -1, int y = -1, int z = -1) const
     {
       auto tid = target::thread_idx();
       x = (x == -1) ? tid.x : x;
@@ -221,7 +242,7 @@ namespace quda
        @param[in] x The x index to use
        @return The value at coordinates (x,y,z)
     */
-    __device__ __host__ inline T load_x(int x = -1)
+    __device__ __host__ inline T load_x(int x = -1) const
     {
       auto tid = target::thread_idx();
       x = (x == -1) ? tid.x : x;
@@ -233,7 +254,7 @@ namespace quda
        @param[in] y The y index to use
        @return The value at coordinates (x,y,z)
     */
-    __device__ __host__ inline T load_y(int y = -1)
+    __device__ __host__ inline T load_y(int y = -1) const
     {
       auto tid = target::thread_idx();
       y = (y == -1) ? tid.y : y;
@@ -245,7 +266,7 @@ namespace quda
        @param[in] z The z index to use
        @return The value at coordinates (x,y,z)
     */
-    __device__ __host__ inline T load_z(int z = -1)
+    __device__ __host__ inline T load_z(int z = -1) const
     {
       auto tid = target::thread_idx();
       z = (z == -1) ? tid.z : z;
@@ -256,6 +277,67 @@ namespace quda
        @brief Synchronize the cache
     */
     __device__ __host__ void sync() { target::dispatch<sync_impl>(); }
+
+    /**
+       @brief Cast operator to allow cache objects to be used where T
+       is expected
+     */
+    __device__ __host__ operator T() const { return load(); }
+
+    /**
+       @brief Assignment operator to allow cache objects to be used on
+       the lhs where T is otherwise expected.
+     */
+    __device__ __host__ void operator=(const T& src) { save(src); }
+  };
+
+  // Convenience overloads to allow SharedMemoryCache objects to appear in simple expressions
+
+  template <typename T, int by, int bz, bool dynamic>
+  __device__ __host__ inline T operator+(const SharedMemoryCache<T, by, bz, dynamic> &a, const T &b)
+  {
+    return static_cast<const T&>(a) + b;
+  }
+
+  template <typename T, int by, int bz, bool dynamic>
+  __device__ __host__ inline T operator+(const T &a, const SharedMemoryCache<T, by, bz, dynamic> &b)
+  {
+    return a + static_cast<const T&>(b);
+  }
+
+  template <typename T, int by, int bz, bool dynamic>
+  __device__ __host__ inline T operator-(const SharedMemoryCache<T, by, bz, dynamic> &a, const T &b)
+  {
+    return static_cast<const T&>(a) - b;
+  }
+
+  template <typename T, int by, int bz, bool dynamic>
+  __device__ __host__ inline T operator-(const T &a, const SharedMemoryCache<T, by, bz, dynamic> &b)
+  {
+    return a - static_cast<const T&>(b);
+  }
+
+  template <typename T, int by, int bz, bool dynamic>
+  __device__ __host__ inline auto operator+=(SharedMemoryCache<T, by, bz, dynamic> &a, const T &b)
+  {
+    a.save(static_cast<const T&>(a) + b);
+    return a;
+  }
+
+  template <typename T, int by, int bz, bool dynamic>
+  __device__ __host__ inline auto operator-=(SharedMemoryCache<T, by, bz, dynamic> &a, const T &b)
+  {
+    a.save(static_cast<const T&>(a) - b);
+    return a;
+  }
+
+  /**
+     @brief Uniform helper for exposing type T, whether we are dealing
+     with an instance of T or SharedMemoryCache<T>
+   */
+  template <class T, class enable = void> struct get_type { using type = T; };
+  template <class T> struct get_type<T, std::enable_if_t<std::is_same_v<T, SharedMemoryCache<typename T::value_type, T::block_size_y, T::block_size_z, T::dynamic> >>> {
+    using type = typename T::value_type;
   };
 
 } // namespace quda
