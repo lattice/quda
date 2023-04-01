@@ -58,7 +58,6 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      tp.set_max_shared_bytes = wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW ? true :false;
 
       switch (wflow_type) {
       case QUDA_GAUGE_SMEAR_WILSON_FLOW:
@@ -75,6 +74,7 @@ namespace quda {
         }
         break;
       case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW:
+        tp.set_max_shared_bytes = true;
         switch (step_type) {
         case WFLOW_STEP_W1:
           launch<WFlow>(tp, stream, Arg<QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, WFLOW_STEP_W1>(out, temp, in, epsilon));
