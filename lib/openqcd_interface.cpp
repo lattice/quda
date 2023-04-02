@@ -488,14 +488,77 @@ void openQCD_qudaDslash(int external_precision, int quda_precision, openQCD_Quda
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
 
-  // dslashQuda(dst, src, &invertParam, local_parity);
-  dslashQudaTest(dst, src, &invertParam, local_parity);
-
-  // Original: TODO: is cast necessary?
-  // dslashQuda(static_cast<char *>(dst), static_cast<char *>(src), &invertParam, local_parity);
+  dslashQuda(static_cast<char *>(dst), static_cast<char *>(src), &invertParam, local_parity);
 
   return;
-} // qudaDslash
+} // openQCD_qudaDslash
+
+#if 0 // FIXME:
+void openQCD_qudaDslashNoLoads(int external_precision, int quda_precision, openQCD_QudaInvertArgs_t inv_args, void *src,
+                        void *dst, void *gauge)
+{
+  static const QudaVerbosity verbosity = getVerbosity();
+
+  QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision_sloppy = device_precision;
+
+  QudaInvertParam invertParam = newQudaInvertParam();
+
+  QudaParity local_parity = inv_args.evenodd;
+  QudaParity other_parity = local_parity == QUDA_EVEN_PARITY ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY;
+
+  /* For reference:
+  setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, QudaPrecision cuda_prec_sloppy,
+                            double mass, double target_residual, double target_residual_hq, int maxiter,
+                            double reliable_delta, QudaParity parity, QudaVerbosity verbosity,
+                            QudaInverterType inverter, QudaInvertParam *invertParam) */
+  setInvertParams(host_precision, device_precision, device_precision_sloppy, 0.0, 0, 0, 0, 0.0, local_parity, verbosity,
+                  QUDA_CG_INVERTER, &invertParam);
+
+  ColorSpinorParam csParam;
+  setColorSpinorParams(localDim, host_precision, &csParam);
+
+  dslashQudaNoLoads(static_cast<char *>(dst), static_cast<char *>(src), &invertParam, local_parity);
+
+  return;
+} // openQCD_qudaDslash
+#endif
+
+void openQCD_colorspinorloadsave(int external_precision, int quda_precision, openQCD_QudaInvertArgs_t inv_args, void *src,
+                        void *dst, void *gauge)
+{
+  static const QudaVerbosity verbosity = getVerbosity();
+
+  QudaGaugeParam qudaGaugeParam
+    = newOpenQCDGaugeParam(localDim, (quda_precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
+
+  loadGaugeQuda(gauge, &qudaGaugeParam);
+
+  QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision_sloppy = device_precision;
+
+  QudaInvertParam invertParam = newQudaInvertParam();
+
+  QudaParity local_parity = inv_args.evenodd;
+  QudaParity other_parity = local_parity == QUDA_EVEN_PARITY ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY;
+
+  /* For reference:
+  setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, QudaPrecision cuda_prec_sloppy,
+                            double mass, double target_residual, double target_residual_hq, int maxiter,
+                            double reliable_delta, QudaParity parity, QudaVerbosity verbosity,
+                            QudaInverterType inverter, QudaInvertParam *invertParam) */
+  setInvertParams(host_precision, device_precision, device_precision_sloppy, 0.0, 0, 0, 0, 0.0, local_parity, verbosity,
+                  QUDA_CG_INVERTER, &invertParam);
+
+  ColorSpinorParam csParam;
+  setColorSpinorParams(localDim, host_precision, &csParam);
+
+  dslashQudaTest(static_cast<char *>(dst), static_cast<char *>(src), &invertParam, local_parity);
+
+  return;
+} // openQCD_colorspinorloadsave
 
 #if 0
 void openQCD_qudaInvert(int external_precision, int quda_precision, double mass, openQCD_QudaInvertArgs_t inv_args,

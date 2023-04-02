@@ -1906,6 +1906,91 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   profileDslash.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+#if 0 // FIXME:
+void dslashQudaNoLoads(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
+{
+  profileDslash.TPSTART(QUDA_PROFILE_TOTAL);
+  profileDslash.TPSTART(QUDA_PROFILE_INIT);
+
+  const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+
+  if ((!gaugePrecise && inv_param->dslash_type != QUDA_ASQTAD_DSLASH)
+      || ((!gaugeFatPrecise || !gaugeLongPrecise) && inv_param->dslash_type == QUDA_ASQTAD_DSLASH))
+    errorQuda("Gauge field not allocated");
+  if (cloverPrecise == nullptr && ((inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) || (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH)))
+    errorQuda("Clover field not allocated");
+
+  pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+  ColorSpinorParam cpuParam(h_in, *inv_param, gauge.X(), true, inv_param->input_location);
+  ColorSpinorField in_h(cpuParam);
+  ColorSpinorParam cudaParam(cpuParam, *inv_param, QUDA_CUDA_FIELD_LOCATION);
+
+  cpuParam.v = h_out;
+  cpuParam.location = inv_param->output_location;
+  ColorSpinorField out_h(cpuParam);
+
+  ColorSpinorField in(cudaParam);
+  ColorSpinorField out(cudaParam);
+
+  bool pc = true;
+  DiracParam diracParam;
+  setDiracParam(diracParam, inv_param, pc);
+
+  profileDslash.TPSTOP(QUDA_PROFILE_INIT);
+
+  profileDslash.TPSTART(QUDA_PROFILE_H2D);
+  in = in_h;
+  profileDslash.TPSTOP(QUDA_PROFILE_H2D);
+
+  profileDslash.TPSTART(QUDA_PROFILE_COMPUTE);
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
+
+  if (inv_param->mass_normalization == QUDA_KAPPA_NORMALIZATION &&
+      (inv_param->dslash_type == QUDA_STAGGERED_DSLASH ||
+       inv_param->dslash_type == QUDA_ASQTAD_DSLASH) )
+    blas::ax(1.0/(2.0*inv_param->mass), in);
+
+  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
+    if (parity == QUDA_EVEN_PARITY) {
+      parity = QUDA_ODD_PARITY;
+    } else {
+      parity = QUDA_EVEN_PARITY;
+    }
+    blas::ax(gauge.Anisotropy(), in);
+  }
+
+  Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
+  if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH && inv_param->dagger) {
+    cudaParam.create = QUDA_NULL_FIELD_CREATE;
+    ColorSpinorField tmp1(cudaParam);
+    ((DiracTwistedCloverPC*) dirac)->TwistCloverInv(tmp1, in, (parity+1)%2); // apply the clover-twist
+    dirac->Dslash(out, tmp1, parity); // apply the operator
+  } else if (inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH
+             || inv_param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+    dirac->Dslash4(out, in, parity);
+  } else {
+    dirac->Dslash(out, in, parity); // apply the operator
+  }
+  profileDslash.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileDslash.TPSTART(QUDA_PROFILE_D2H);
+  out_h = out;
+  profileDslash.TPSTOP(QUDA_PROFILE_D2H);
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
+
+  profileDslash.TPSTART(QUDA_PROFILE_FREE);
+  delete dirac; // clean up
+
+  profileDslash.TPSTOP(QUDA_PROFILE_FREE);
+
+  popVerbosity();
+  profileDslash.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+#endif
 
 // #if 0
 void dslashQudaTest(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)

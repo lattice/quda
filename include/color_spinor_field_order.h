@@ -1739,8 +1739,7 @@ namespace quda
         offset(a.Bytes() / (2 * sizeof(Float))),  // TODO: What's this for??
         volumeCB(a.VolumeCB()),
         nParity(a.SiteSubset()),
-        dim {a.X(0), a.X(1), a.X(2), a.X(3)}
-      // dim {a.X()[0], a.X()[1], a.X()[2], a.X()[3]} // GLOBAL dimensions??
+        dim {a.X()[0], a.X()[1], a.X()[2], a.X()[3]} // GLOBAL dimensions??
       { // TODO: ARE GHOSTS NEEDED??
         // for (int i = 0; i < 4; i++) {
         //   ghost[2 * i] = ghost_ ? ghost_[2 * i] : 0;
@@ -1802,16 +1801,16 @@ namespace quda
       __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0) const
       {
         /* INDEXING */
-        // int coord[4]; // declare a 4D vector x0, x1, x2, x3 = (xyzt), t fastest (ix = x0 + x1 * L0 + ...)
-        // getCoords(coord, x, dim, parity); // from x, dim, parity obtain coordinate of the site
+        int coord[4]; // declare a 4D vector x0, x1, x2, x3 = (xyzt), t fastest (ix = x0 + x1 * L0 + ...)
+        getCoords(coord, x, dim, parity); // from x, dim, parity obtain coordinate of the site
 
-        // int iy_OpenQxD = coord[2] + dim[2] * coord[1] + dim[2] * dim[1] * coord[0] + dim[0] * dim[2] * dim[1] * coord[3];
+        int iy_OpenQxD = coord[2] + dim[2] * coord[1] + dim[2] * dim[1] * coord[0] + dim[0] * dim[2] * dim[1] * coord[3];
 
-        // // Loading as per QUDA style
-        // auto out = &field[iy_OpenQxD * length];
+        // Loading as per QUDA style
+        auto out = &field[iy_OpenQxD * length];
         // printf("Saving site iy: %d with field value %.10e \n",iy_OpenQxD,field[iy_OpenQxD * length]);
 
-        // block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+        block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
       }
 
       /**
@@ -1849,8 +1848,8 @@ namespace quda
       //   }
       // }
 
-      size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); } // FIXME: ??
-    };                                                                                  // openQCDDiracOrder
+      size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
+    }; // openQCDDiracOrder
 
   } // namespace colorspinor
 
@@ -1930,6 +1929,9 @@ namespace quda
   template <typename T, int Ns, int Nc> struct colorspinor_order_mapper<T, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, Ns, Nc> {
     typedef colorspinor::SpaceSpinorColorOrder<T, Ns, Nc> type;
   };
+  // template <typename T, int Ns, int Nc> struct colorspinor_order_mapper<T, QUDA_OPENQCD_FIELD_ORDER, Ns, Nc> {
+  //   typedef colorspinor::OpenQCDDiracOrder<T, Ns, Nc> type;
+  // }; // TODO: ?
   template <typename T, int Ns, int Nc> struct colorspinor_order_mapper<T, QUDA_FLOAT2_FIELD_ORDER, Ns, Nc> {
     typedef colorspinor::FloatNOrder<T, Ns, Nc, 2> type;
   };

@@ -232,7 +232,7 @@ namespace quda
       } else if (inv_param.dirac_order == QUDA_OPENQCD_DIRAC_ORDER) {
         fieldOrder = QUDA_OPENQCD_FIELD_ORDER;
         siteOrder
-          = QUDA_EVEN_ODD_SITE_ORDER; // FIXME: SHOULD THIS BE LEXICOGRAPHICAL, OR IN QUDA_OPENQCD_FIELD_ORDER THIS WORKS OUT ALREADY ???
+          = QUDA_EVEN_ODD_SITE_ORDER; // FIXME: SHOULD THIS BE LEXICOGRAPHICAL?, OR VIA FULL IMPLEMENTATION VIA IPT ARRAY IN QUDA
       } else {
         errorQuda("Dirac order %d not supported", inv_param.dirac_order);
       }

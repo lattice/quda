@@ -116,8 +116,9 @@ namespace quda {
     } else if (out.FieldOrder() == QUDA_OPENQCD_FIELD_ORDER) {
 
 #ifdef BUILD_OPENQCD_INTERFACE
-      using O = OpenQCDDiracOrder<FloatOut, Ns, Nc>;          // TODO: Seems OK
-      CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param); // TODO: Seems OK
+      // using O = OpenQCDDiracOrder<FloatOut, Ns, Nc>; // TODO: Seems OK      
+      using O = SpaceSpinorColorOrder<FloatOut, Ns, Nc>; // FIXME: This is a test
+      CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
 #else
       errorQuda("OpenQCD interface has not been built\n");
 #endif
@@ -167,8 +168,9 @@ namespace quda {
     } else if (in.FieldOrder() == QUDA_OPENQCD_FIELD_ORDER) {
 
 #ifdef BUILD_OPENQCD_INTERFACE
-      using ColorSpinor = OpenQCDDiracOrder<FloatIn, Ns, Nc>; // TODO: Seems OK
-      genericCopyColorSpinor<Ns, Nc, ColorSpinor>(param);     // TODO: Seems OK
+      // using ColorSpinor = OpenQCDDiracOrder<FloatIn, Ns, Nc>; // TODO: Seems OK
+      using ColorSpinor = SpaceSpinorColorOrder<FloatIn, Ns, Nc>; // FIXME: This is a test
+      genericCopyColorSpinor<Ns, Nc, ColorSpinor>(param);
 #else
       errorQuda("OpenQCD interface has not been built\n");
 #endif
