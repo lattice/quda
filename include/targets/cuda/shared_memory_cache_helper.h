@@ -65,9 +65,6 @@ namespace quda
       }
     };
 
-    template <bool is_device, typename dummy = void> struct cache_static : cache_dynamic<is_device> {
-    };
-
     /**
        @brief This is the handle to the shared memory, dynamic specialization
        @return Shared memory pointer
@@ -81,11 +78,22 @@ namespace quda
     };
 
     /**
+       @brief This is a dummy instantiation for the host compiler
+    */
+    template <bool is_device, typename dummy = void> struct cache_static {
+      atom_t *operator()()
+      {
+        static atom_t *cache_;
+        return reinterpret_cast<atom_t *>(cache_);
+      }
+    };
+
+    /**
        @brief This is the handle to the shared memory, static specialization
        @return Shared memory pointer
      */
     template <typename dummy> struct cache_static<true, dummy> {
-      __device__ inline atom_t *operator()(unsigned = 0)
+      __device__ inline atom_t *operator()()
       {
         static __shared__ atom_t cache_[n_element * block_size_x * block_size_y * block_size_z];
         return reinterpret_cast<atom_t *>(cache_);
@@ -97,14 +105,14 @@ namespace quda
       return target::dispatch<cache_dynamic>(offset);
     }
 
-    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<!dynamic_shared, atom_t*> cache()
-    {
-      return target::dispatch<cache_static>();
-    }
-
     template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<dynamic_shared, atom_t const *> cache() const
     {
       return target::dispatch<cache_dynamic>(offset);
+    }
+
+    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<!dynamic_shared, atom_t*> cache()
+    {
+      return target::dispatch<cache_static>();
     }
 
     template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<!dynamic_shared, atom_t const *> cache() const
