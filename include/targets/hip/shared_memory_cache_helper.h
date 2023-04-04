@@ -85,7 +85,7 @@ namespace quda
        @return Shared memory pointer
      */
     template <typename dummy> struct cache_static<true, dummy> {
-      __device__ inline atom_t *operator()()
+      __device__ inline atom_t *operator()(unsigned = 0)
       {
         static __shared__ atom_t cache_[n_element * block_size_x * block_size_y * block_size_z];
         return reinterpret_cast<atom_t *>(cache_);
