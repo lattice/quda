@@ -18,7 +18,9 @@ namespace quda {
     const WFlowStepType step_type;
 
     unsigned int minThreads() const { return in.LocalVolumeCB(); }
-    unsigned int maxSharedBytesPerBlock() const { return maxDynamicSharedBytesPerBlock(); }
+    unsigned int maxSharedBytesPerBlock() const {
+      return wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW ? maxDynamicSharedBytesPerBlock() : TunableKernel3D::maxSharedBytesPerBlock();
+    }
 
     unsigned int sharedBytesPerThread() const
     {
