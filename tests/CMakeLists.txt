@@ -47,7 +47,7 @@ endif()
 
 # define tests
 add_executable(c_interface_test c_interface_test.c)
-target_link_libraries(c_interface_test ${TEST_LIBS})
+target_link_libraries(c_interface_test ${TEST_LIBS} "-lstdc++")
 quda_checkbuildtest(c_interface_test QUDA_BUILD_ALL_TESTS)
 
 # if we build with QDP JIT the tests cannot run anyway
