@@ -92,27 +92,17 @@ namespace quda
       }
     };
 
-    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<dynamic_shared, atom_t*> cache()
+    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<dynamic_shared, atom_t *> cache() const
     {
       return target::dispatch<cache_dynamic>(offset);
     }
 
-    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<!dynamic_shared, atom_t*> cache()
+    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<!dynamic_shared, atom_t *> cache() const
     {
       return target::dispatch<cache_static>();
     }
 
-    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<dynamic_shared, atom_t const *> cache() const
-    {
-      return target::dispatch<cache_dynamic>(offset);
-    }
-
-    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<!dynamic_shared, atom_t const *> cache() const
-    {
-      return target::dispatch<cache_static>();
-    }
-
-    __device__ __host__ inline void save_detail(const T &a, int x, int y, int z)
+    __device__ __host__ inline void save_detail(const T &a, int x, int y, int z) const
     {
       atom_t tmp[n_element];
       memcpy(tmp, (void *)&a, sizeof(T));
@@ -167,7 +157,7 @@ namespace quda
     /**
        @brief Grab the raw base address to shared memory.
     */
-    __device__ __host__ inline T *data() { return reinterpret_cast<T *>(cache<dynamic>()); }
+    __device__ __host__ inline auto data() const { return reinterpret_cast<T *>(cache<dynamic>()); }
 
     /**
        @brief Save the value into the 3-d shared memory cache.
@@ -176,7 +166,7 @@ namespace quda
        @param[in] y The y index to use
        @param[in] z The z index to use
      */
-    __device__ __host__ inline void save(const T &a, int x = -1, int y = -1, int z = -1)
+    __device__ __host__ inline void save(const T &a, int x = -1, int y = -1, int z = -1) const
     {
       auto tid = target::thread_idx();
       x = (x == -1) ? tid.x : x;
@@ -190,7 +180,7 @@ namespace quda
        @param[in] a The value to store in the shared memory cache
        @param[in] x The x index to use
      */
-    __device__ __host__ inline void save_x(const T &a, int x = -1)
+    __device__ __host__ inline void save_x(const T &a, int x = -1) const
     {
       auto tid = target::thread_idx();
       x = (x == -1) ? tid.x : x;
@@ -202,7 +192,7 @@ namespace quda
        @param[in] a The value to store in the shared memory cache
        @param[in] y The y index to use
      */
-    __device__ __host__ inline void save_y(const T &a, int y = -1)
+    __device__ __host__ inline void save_y(const T &a, int y = -1) const
     {
       auto tid = target::thread_idx();
       y = (y == -1) ? tid.y : y;
@@ -214,7 +204,7 @@ namespace quda
        @param[in] a The value to store in the shared memory cache
        @param[in] z The z index to use
      */
-    __device__ __host__ inline void save_z(const T &a, int z = -1)
+    __device__ __host__ inline void save_z(const T &a, int z = -1) const
     {
       auto tid = target::thread_idx();
       z = (z == -1) ? tid.z : z;
@@ -276,7 +266,7 @@ namespace quda
     /**
        @brief Synchronize the cache
     */
-    __device__ __host__ void sync() { target::dispatch<sync_impl>(); }
+    __device__ __host__ void sync() const { target::dispatch<sync_impl>(); }
 
     /**
        @brief Cast operator to allow cache objects to be used where T
@@ -288,7 +278,7 @@ namespace quda
        @brief Assignment operator to allow cache objects to be used on
        the lhs where T is otherwise expected.
      */
-    __device__ __host__ void operator=(const T& src) { save(src); }
+    __device__ __host__ void operator=(const T &src) const { save(src); }
   };
 
 } // namespace quda
