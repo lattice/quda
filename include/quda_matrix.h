@@ -668,33 +668,24 @@ namespace quda {
       return uinv;
     }
 
-
-
-  template<class T, int N>
-   __device__ __host__ inline void setIdentity(Matrix<T,N>* m)
-  {
+    template <class T, int N> __device__ __host__ inline void setIdentity(Matrix<T, N> *m)
+    {
 #pragma unroll
-    for (int i=0; i<N; ++i){
-      (*m)(i,i) = 1;
+      for (int i = 0; i < N; ++i) {
+        (*m)(i, i) = 1;
 #pragma unroll
-      for (int j=i+1; j<N; ++j){
-        (*m)(i,j) = (*m)(j,i) = {};
+        for (int j = i + 1; j < N; ++j) { (*m)(i, j) = (*m)(j, i) = {}; }
       }
     }
-  }
 
-  template<class T, int N>
-  __device__ __host__ inline void setZero(Matrix<T,N>* m)
-  {
+    template <class T, int N> __device__ __host__ inline void setZero(Matrix<T, N> *m)
+    {
 #pragma unroll
-    for (int i=0; i<N; ++i){
+      for (int i = 0; i < N; ++i) {
 #pragma unroll
-      for (int j=0; j<N; ++j){
-        (*m)(i,j) = {};
+        for (int j = 0; j < N; ++j) { (*m)(i, j) = {}; }
       }
     }
-  }
-
 
   template<typename Complex,int N>
     __device__ __host__ inline void makeAntiHerm(Matrix<Complex,N> &m) {

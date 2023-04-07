@@ -31,8 +31,7 @@ namespace quda
        according the maximum number of threads possible, given these
        dimensions.
    */
-  template <typename T, int block_size_y_ = 1, int block_size_z_ = 1, bool dynamic_ = true>
-  class SharedMemoryCache
+  template <typename T, int block_size_y_ = 1, int block_size_z_ = 1, bool dynamic_ = true> class SharedMemoryCache
   {
   public:
     using value_type = T;
@@ -73,7 +72,7 @@ namespace quda
       __device__ inline atom_t *operator()(unsigned int offset)
       {
         extern __shared__ int cache_[];
-        return reinterpret_cast<atom_t *>(reinterpret_cast<char*>(cache_) + offset);
+        return reinterpret_cast<atom_t *>(reinterpret_cast<char *>(cache_) + offset);
       }
     };
 
@@ -157,7 +156,8 @@ namespace quda
        memory base pointer (used when we have multiple caches in
        scope).  Need to include block size to actual offset.
     */
-    constexpr SharedMemoryCache(dim3 block = dim3(block_size_x, block_size_y, block_size_z), unsigned int thread_offset = 0) :
+    constexpr SharedMemoryCache(dim3 block = dim3(block_size_x, block_size_y, block_size_z),
+                                unsigned int thread_offset = 0) :
       block(block), stride(block.x * block.y * block.z), offset(stride * thread_offset)
     {
     }
