@@ -65,9 +65,6 @@ namespace quda
       }
     };
 
-    template <bool is_device, typename dummy = void> struct cache_static : cache_dynamic<is_device> {
-    };
-
     /**
        @brief This is the handle to the shared memory, dynamic specialization
        @return Shared memory pointer
@@ -77,6 +74,17 @@ namespace quda
       {
         extern __shared__ int cache_[];
         return reinterpret_cast<atom_t *>(reinterpret_cast<char*>(cache_) + offset);
+      }
+    };
+
+    /**
+       @brief This is a dummy instantiation for the host compiler
+    */
+    template <bool is_device, typename dummy = void> struct cache_static {
+      atom_t *operator()()
+      {
+        static atom_t *cache_;
+        return reinterpret_cast<atom_t *>(cache_);
       }
     };
 
