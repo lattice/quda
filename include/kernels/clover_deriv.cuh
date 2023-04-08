@@ -39,10 +39,9 @@ namespace quda
   };
 
   template <typename Link, typename Arg>
-  __device__ __host__ void computeForce(Link &force, const Arg &arg, int xIndex, int yIndex, int mu, int nu)
+  __device__ __host__ void computeForce(Link &force_total, const Arg &arg, int xIndex, int yIndex, int mu, int nu)
   {
-    int otherparity = (1 - arg.parity);
-
+    const int otherparity = (1 - arg.parity);
     const int tidx = mu > nu ? (mu - 1) * mu / 2 + nu : (nu - 1) * nu / 2 + mu;
 
     if (yIndex == 0) { // do "this" force
@@ -72,22 +71,15 @@ namespace quda
 
         // load Oprod
         Link Oprod1 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), arg.parity);
-
-        if (nu < mu)
-          force -= U1 * U2 * conj(U3) * conj(U4) * Oprod1;
-        else
-          force += U1 * U2 * conj(U3) * conj(U4) * Oprod1;
+        Link force = U1 * U2 * conj(U3) * conj(U4) * Oprod1;
 
         d[mu]++;
         d[nu]++;
         Link Oprod2 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), arg.parity);
-        d[mu]--;
-        d[nu]--;
+        force += U1 * U2 * Oprod2 * conj(U3) * conj(U4);
 
-        if (nu < mu)
-          force -= U1 * U2 * Oprod2 * conj(U3) * conj(U4);
-        else
-          force += U1 * U2 * Oprod2 * conj(U3) * conj(U4);
+        if (nu < mu) force_total -= force;
+        else force_total += force;
       }
 
       {
@@ -116,20 +108,15 @@ namespace quda
         d[mu]++;
         d[nu]--;
         Link Oprod1 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), arg.parity);
+        Link force = conj(U1) * U2 * Oprod1 * U3 * conj(U4);
+
         d[mu]--;
         d[nu]++;
-
-        if (nu < mu)
-          force += conj(U1) * U2 * Oprod1 * U3 * conj(U4);
-        else
-          force -= conj(U1) * U2 * Oprod1 * U3 * conj(U4);
-
         Link Oprod4 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), arg.parity);
+        force += Oprod4 * conj(U1) * U2 * U3 * conj(U4);
 
-        if (nu < mu)
-          force += Oprod4 * conj(U1) * U2 * U3 * conj(U4);
-        else
-          force -= Oprod4 * conj(U1) * U2 * U3 * conj(U4);
+        if (nu < mu) force_total += force;
+        else force_total -= force;
       }
 
     } else { // else do other force
@@ -159,22 +146,16 @@ namespace quda
         // load opposite parity Oprod
         d[nu]++;
         Link Oprod3 = arg.oprod(tidx, linkIndexShift(y, d, arg.E), arg.parity);
-        d[nu]--;
-
-        if (nu < mu)
-          force -= U1 * U2 * conj(U3) * Oprod3 * conj(U4);
-        else
-          force += U1 * U2 * conj(U3) * Oprod3 * conj(U4);
+        Link force = U1 * U2 * conj(U3) * Oprod3 * conj(U4);
 
         // load Oprod(x+mu)
+        d[nu]--;
         d[mu]++;
         Link Oprod4 = arg.oprod(tidx, linkIndexShift(y, d, arg.E), arg.parity);
-        d[mu]--;
+        force += U1 * Oprod4 * U2 * conj(U3) * conj(U4);
 
-        if (nu < mu)
-          force -= U1 * Oprod4 * U2 * conj(U3) * conj(U4);
-        else
-          force += U1 * Oprod4 * U2 * conj(U3) * conj(U4);
+        if (nu < mu) force_total -= force;
+        else force_total += force;
       }
 
       // Lower leaf
@@ -205,21 +186,15 @@ namespace quda
         // load Oprod(x+mu)
         d[mu]++;
         Link Oprod1 = arg.oprod(tidx, linkIndexShift(y, d, arg.E), arg.parity);
+        Link force = conj(U1) * U2 * U3 * Oprod1 * conj(U4);
+
         d[mu]--;
-
-        if (nu < mu)
-          force += conj(U1) * U2 * U3 * Oprod1 * conj(U4);
-        else
-          force -= conj(U1) * U2 * U3 * Oprod1 * conj(U4);
-
         d[nu]--;
         Link Oprod2 = arg.oprod(tidx, linkIndexShift(y, d, arg.E), arg.parity);
-        d[nu]++;
+        force += conj(U1) * Oprod2 * U2 * U3 * conj(U4);
 
-        if (nu < mu)
-          force += conj(U1) * Oprod2 * U2 * U3 * conj(U4);
-        else
-          force -= conj(U1) * Oprod2 * U2 * U3 * conj(U4);
+        if (nu < mu) force_total += force;
+        else force_total -= force;
       }
     }
 
