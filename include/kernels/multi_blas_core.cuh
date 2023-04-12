@@ -41,13 +41,11 @@ namespace quda
       static constexpr int n = n_;
       static constexpr int NXZ = NXZ_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Functor>();
-      const int NYW;
       Functor f;
 
       template <typename V>
       MultiBlasArg(V &x, V&y, V &z, V &w, Functor f, int NYW, int length) :
         kernel_param(dim3(length * warp_split, NYW, x[0].SiteSubset())),
-        NYW(NYW),
         f(f)
       {
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);

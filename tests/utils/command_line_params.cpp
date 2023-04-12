@@ -202,6 +202,7 @@ QudaFieldLocation location_ritz = QUDA_CUDA_FIELD_LOCATION;
 QudaMemoryType mem_type_ritz = QUDA_MEMORY_DEVICE;
 
 // Parameters for the stand alone eigensolver
+int eig_ortho_block_size = 0;
 int eig_block_size = 4;
 int eig_n_ev = 16;
 int eig_n_kr = 32;
@@ -211,6 +212,7 @@ int eig_batched_rotate = 0; // If unchanged, will be set to maximum
 bool eig_require_convergence = true;
 int eig_check_interval = 10;
 int eig_max_restarts = 1000;
+int eig_max_ortho_attempts = 10;
 double eig_tol = 1e-6;
 double eig_qr_tol = 1e-11;
 bool eig_use_eigen_qr = true;
@@ -236,6 +238,7 @@ QudaPrecision eig_save_prec = QUDA_DOUBLE_PRECISION;
 // The coarsest grid params are for deflation,
 // all others are for PR vectors.
 quda::mgarray<bool> mg_eig = {};
+quda::mgarray<int> mg_eig_ortho_block_size = {};
 quda::mgarray<int> mg_eig_block_size = {};
 quda::mgarray<int> mg_eig_n_ev_deflate = {};
 quda::mgarray<int> mg_eig_n_ev = {};
@@ -244,6 +247,7 @@ quda::mgarray<int> mg_eig_batched_rotate = {};
 quda::mgarray<bool> mg_eig_require_convergence = {};
 quda::mgarray<int> mg_eig_check_interval = {};
 quda::mgarray<int> mg_eig_max_restarts = {};
+quda::mgarray<int> mg_eig_max_ortho_attempts = {};
 quda::mgarray<double> mg_eig_tol = {};
 quda::mgarray<double> mg_eig_qr_tol = {};
 quda::mgarray<bool> mg_eig_use_eigen_qr = {};
@@ -688,6 +692,12 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Solve the gamma5 OP problem. Solve for OP then multiply by gamma_5 (default false)");
 
   opgroup->add_option("--eig-max-restarts", eig_max_restarts, "Perform n iterations of the restart in the eigensolver");
+  opgroup->add_option(
+    "--eig-max-ortho-attempts", eig_max_restarts,
+    "Perform n iterations of Gram-Schmidt orthonormalisation in the Block TRLM eigensolver (default 10)");
+  opgroup->add_option("--eig-ortho-block-size", eig_ortho_block_size,
+                      "The block size to use when orthonormalising vectors in hybrid modified Gram-Schmidt"
+                      "0 for always Classical, 1 for Modified, n > 1 for Hybrid)");
   opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
   opgroup->add_option(
     "--eig-n-ev-deflate", eig_n_ev_deflate,
@@ -819,9 +829,15 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                        "If the multigrid operator is updated, preserve generated deflation space (default = false)");
   quda_app->add_mgoption(opgroup, "--mg-eig-max-restarts", mg_eig_max_restarts, CLI::PositiveNumber,
                          "Perform a maximun of n restarts in eigensolver (default 100)");
+
+  quda_app->add_mgoption(
+    opgroup, "--mg-eig-max-ortho-attempts", mg_eig_max_ortho_attempts, CLI::PositiveNumber,
+    "Perform n iterations of Gram-Schmidt orthonormalisation in the Block TRLM eigensolver (default 10)");
   quda_app->add_mgoption(
     opgroup, "--mg-eig-use-eigen-qr", mg_eig_use_eigen_qr, CLI::Validator(),
     "Use Eigen to eigensolve the upper Hessenberg in IRAM, else use QUDA's QR code. (default true)");
+  quda_app->add_mgoption(opgroup, "--mg-eig-ortho-block-size", mg_eig_ortho_block_size, CLI::Validator(),
+                         "The block size to use when orthonormalising vectors in hybrid modified Gram-Schmidt");
   quda_app->add_mgoption(opgroup, "--mg-eig-block-size", mg_eig_block_size, CLI::Validator(),
                          "The block size to use in the block variant eigensolver");
   quda_app->add_mgoption(opgroup, "--mg-eig-n-ev", mg_eig_n_ev, CLI::Validator(),

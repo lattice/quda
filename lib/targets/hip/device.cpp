@@ -67,6 +67,30 @@ namespace quda
       return device_count;
     }
 
+    void get_visible_devices_string(char device_list_string[128])
+    {
+      char *device_order_env = getenv("ROCR_VISIBLE_DEVICES");
+
+      if (!device_order_env) {
+        device_order_env = getenv("HIP_VISIBLE_DEVICES");
+      }
+
+      if (device_order_env) {
+        std::stringstream device_list_raw(device_order_env); // raw input
+        std::stringstream device_list;                       // formatted (no commas)
+
+        int device;
+        while (device_list_raw >> device) {
+          // check this is a valid policy choice
+          if (device < 0) { errorQuda("Invalid ROCR/HIP_VISIBLE_DEVICES ordinal %d", device); }
+
+          device_list << device;
+          if (device_list_raw.peek() == ',') device_list_raw.ignore();
+        }
+        snprintf(device_list_string, 128, "%s", device_list.str().c_str());
+      }
+    }
+
     void create_context()
     {
       streams = new hipStream_t[Nstream];

@@ -5,6 +5,7 @@
 
 namespace quda
 {
+
   // This function gets stap = S_{mu,nu} i.e., the staple of length 3.
   //
   // |- > -|                /- > -/                /- > -
@@ -18,10 +19,12 @@ namespace quda
   // matrix+matrix = 18 floating-point ops
   // => Total number of floating point ops per function call
   // dims * (2*18 + 4*198) = dims*828
-  template <typename Arg, typename Link, typename Int>
-  __host__ __device__ inline void computeStaple(const Arg &arg, const int *x, const Int *X, const int parity, const int nu, Link &staple, const int dir_ignore)
+  template <typename Arg, typename Staple, typename Int>
+  __host__ __device__ inline void computeStaple(const Arg &arg, const int *x, const Int *X, const int parity, const int nu, Staple &staple, const int dir_ignore)
   {
-    setZero(&staple);
+    using Link = typename get_type<Staple>::type;
+    staple = Link();
+
     thread_array<int, 4> dx = { };
 #pragma unroll
     for (int mu = 0; mu < 4 ; mu++) {
@@ -91,14 +94,15 @@ namespace quda
   // matrix+matrix = 18 floating-point ops
   // => Total number of floating point ops per function call
   // dims * (8*18 + 28*198) = dims*5688
-  template <typename Arg, typename Link, typename Int>
+  template <typename Arg, typename Staple, typename Rectangle, typename Int>
   __host__ __device__ inline void computeStapleRectangle(const Arg &arg, const int *x, const Int *X, const int parity, const int nu,
-                                                         Link &staple, Link &rectangle, const int dir_ignore)
+                                                         Staple &staple, Rectangle &rectangle, const int dir_ignore)
   {
-    setZero(&staple);
-    setZero(&rectangle);
-    thread_array<int, 4> dx = { };
+    using Link = typename get_type<Staple>::type;
+    staple = Link();
+    rectangle = Link();
 
+    thread_array<int, 4> dx = { };
     for (int mu = 0; mu < 4; mu++) { // do not unroll loop to prevent register spilling
       // Identify directions orthogonal to the link.
       // Over-Improved stout is usually done for topological

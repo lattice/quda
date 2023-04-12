@@ -124,6 +124,26 @@ namespace quda
       return device_count;
     }
 
+    void get_visible_devices_string(char device_list_string[128])
+    {
+      char *device_order_env = getenv("CUDA_VISIBLE_DEVICES");
+
+      if (device_order_env) {
+        std::stringstream device_list_raw(device_order_env); // raw input
+        std::stringstream device_list;                       // formatted (no commas)
+
+        int device;
+        while (device_list_raw >> device) {
+          // check this is a valid policy choice
+          if (device < 0) { errorQuda("Invalid CUDA_VISIBLE_DEVICES ordinal %d", device); }
+
+          device_list << device;
+          if (device_list_raw.peek() == ',') device_list_raw.ignore();
+        }
+        snprintf(device_list_string, 128, "%s", device_list.str().c_str());
+      }
+    }
+
     void print_device_properties()
     {
       for (int device = 0; device < get_device_count(); device++) {
