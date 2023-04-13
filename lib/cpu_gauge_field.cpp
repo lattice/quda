@@ -420,7 +420,8 @@ namespace quda {
       for (int d = 0; d < 4; d++) { std::memcpy(p[d], &dst_buffer[d * dbytes], dbytes); }
     } else if (Order() == QUDA_CPS_WILSON_GAUGE_ORDER || Order() == QUDA_MILC_GAUGE_ORDER
                || Order() == QUDA_MILC_SITE_GAUGE_ORDER || Order() == QUDA_BQCD_GAUGE_ORDER
-               || Order() == QUDA_TIFR_GAUGE_ORDER || Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+               || Order() == QUDA_TIFR_GAUGE_ORDER || Order() == QUDA_TIFR_PADDED_GAUGE_ORDER
+               || Order() == QUDA_OPENQCD_GAUGE_ORDER) {
       void *p = Gauge_p();
       size_t bytes = Bytes();
       std::memcpy(p, buffer, bytes);

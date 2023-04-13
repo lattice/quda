@@ -153,11 +153,9 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t input)
 {
   if (initialized) return;
   setVerbosityQuda(input.verbosity, "", stdout);
-  // qudamilc_called<true>(__func__);
   openQCD_qudaSetLayout(input.layout);
   initialized = true;
-  // qudamilc_called<false>(__func__);
-  // geometry_openQxD(); // TODO: in the future establish ipt and other helper indexes from openQxD?
+  // geometry_openQxD(); // TODO: in the future establish ipt and other helper indexes from openQxD
 }
 
 void openQCD_qudaFinalize() { endQuda(); }

@@ -116,7 +116,7 @@ namespace quda {
     } else if (out.FieldOrder() == QUDA_OPENQCD_FIELD_ORDER) {
 
 #ifdef BUILD_OPENQCD_INTERFACE
-      // using O = OpenQCDDiracOrder<FloatOut, Ns, Nc>; // TODO: Seems OK      
+      // using O = OpenQCDDiracOrder<FloatOut, Ns, Nc>; // TODO: NOT working      
       using O = SpaceSpinorColorOrder<FloatOut, Ns, Nc>; // FIXME: This is a test
       CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
 #else
