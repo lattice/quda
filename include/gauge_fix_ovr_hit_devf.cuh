@@ -52,8 +52,11 @@ namespace quda {
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<array<Float,4>> cache(ftor);
-    auto elems = &((*cache.data())[0]);
+    //SharedMemoryCache<array<Float,4>> cache(ftor);
+    //auto elems = &((*cache.data())[0]);
+    SharedMemoryCache<Float> cache(ftor);
+    //auto elems = cache.data();
+    Float *elems = cache.data();
 
     //initialize shared memory
     if (mu < 4) elems[mu * blockSize + tid] = 0.0;
@@ -73,13 +76,13 @@ namespace quda {
       if (mu < gauge_dir || (mu >= 4 && mu < (gauge_dir + 4))) {
         //Retrieve the four SU(2) parameters...
         // a0
-        atomic_fetch_add(elems + tid, (link(p,p)).x + (link(q,q)).x); //a0
+        atomic_add_local(elems + tid, (link(p,p)).x + (link(q,q)).x); //a0
         // a1
-        atomic_fetch_add(elems + tid + blockSize, (link(p,q).y + link(q,p).y) * asq); //a1
+        atomic_add_local(elems + tid + blockSize, (link(p,q).y + link(q,p).y) * asq); //a1
         // a2
-        atomic_fetch_add(elems + tid + blockSize * 2, (link(p,q).x - link(q,p).x) * asq); //a2
+        atomic_add_local(elems + tid + blockSize * 2, (link(p,q).x - link(q,p).x) * asq); //a2
         // a3
-        atomic_fetch_add(elems + tid + blockSize * 3, (link(p,p).y - link(q,q).y) * asq); //a3
+        atomic_add_local(elems + tid + blockSize * 3, (link(p,p).y - link(q,q).y) * asq); //a3
       } //FLOP per lattice site = gauge_dir * 2 * (4 + 7) = gauge_dir * 22
 
       cache.sync();
@@ -147,8 +150,11 @@ namespace quda {
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<array<Float,4>> cache(ftor);
-    auto elems = &((*cache.data())[0]);
+    //SharedMemoryCache<array<Float,4>> cache(ftor);
+    //auto elems = &((*cache.data())[0]);
+    SharedMemoryCache<Float> cache(ftor);
+    //auto elems = cache.data();
+    Float *elems = cache.data();
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
@@ -235,8 +241,11 @@ namespace quda {
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<array<Float,4>> cache(ftor);
-    auto elems = &((*cache.data())[0]);
+    //SharedMemoryCache<array<Float,4>> cache(ftor);
+    //auto elems = &((*cache.data())[0]);
+    SharedMemoryCache<Float> cache(ftor);
+    //auto elems = cache.data();
+    Float *elems = cache.data();
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
@@ -333,8 +342,11 @@ namespace quda {
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<array<Float,4>> cache(ftor);
-    auto elems = &((*cache.data())[0]);
+    //SharedMemoryCache<array<Float,4>> cache(ftor);
+    //auto elems = &((*cache.data())[0]);
+    SharedMemoryCache<Float> cache(ftor);
+    //auto elems = cache.data();
+    Float *elems = cache.data();
 
     //initialize shared memory
     if (mu < 4) elems[mu * blockSize + tid] = 0.0;
@@ -349,13 +361,13 @@ namespace quda {
       if (mu < gauge_dir) {
         //Retrieve the four SU(2) parameters...
         // a0
-        atomic_fetch_add(elems + tid, (link1(p,p)).x + (link1(q,q)).x + (link(p,p)).x + (link(q,q)).x); //a0
+        atomic_add_local(elems + tid, (link1(p,p)).x + (link1(q,q)).x + (link(p,p)).x + (link(q,q)).x); //a0
         // a1
-        atomic_fetch_add(elems + tid + blockSize, (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y)); //a1
+        atomic_add_local(elems + tid + blockSize, (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y)); //a1
         // a2
-        atomic_fetch_add(elems + tid + blockSize * 2, (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x)); //a2
+        atomic_add_local(elems + tid + blockSize * 2, (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x)); //a2
         // a3
-        atomic_fetch_add(elems + tid + blockSize * 3, (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y)); //a3
+        atomic_add_local(elems + tid + blockSize * 3, (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y)); //a3
       }
       cache.sync();
       if (mu == 0) {
@@ -416,8 +428,11 @@ namespace quda {
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<array<Float,4>> cache(ftor);
-    auto elems = &((*cache.data())[0]);
+    //SharedMemoryCache<array<Float,4>> cache(ftor);
+    //auto elems = &((*cache.data())[0]);
+    SharedMemoryCache<Float> cache(ftor);
+    //auto elems = cache.data();
+    Float *elems = cache.data();
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
@@ -493,8 +508,11 @@ namespace quda {
     auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
-    SharedMemoryCache<array<Float,4>> cache(ftor);
-    auto elems = &((*cache.data())[0]);
+    //SharedMemoryCache<array<Float,4>> cache(ftor);
+    //auto elems = &((*cache.data())[0]);
+    SharedMemoryCache<Float> cache(ftor);
+    //auto elems = cache.data();
+    Float *elems = cache.data();
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll

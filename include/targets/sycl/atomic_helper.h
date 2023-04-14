@@ -32,6 +32,12 @@ static inline atomicRef<T> makeAtomicRef(T *address) {
   return atomicRef<T>(*address);
 }
 
+template <typename T>
+static inline atomicRefL<T> makeAtomicRefL(T *address) {
+  return atomicRefL<T>(*address);
+}
+
+#if 0
 using lfloat = std::remove_pointer_t<decltype(std::declval<sycl::local_ptr<float>>().get())>;
 using ldouble = std::remove_pointer_t<decltype(std::declval<sycl::local_ptr<double>>().get())>;
 
@@ -42,6 +48,15 @@ static inline atomicRefL<float> makeAtomicRef(lfloat *address) {
 static inline atomicRefL<double> makeAtomicRef(ldouble *address) {
   return atomicRefL<double>(*address);
 }
+
+static inline atomicRefL<float> makeAtomicRefL(lfloat *address) {
+  return atomicRefL<float>(*address);
+}
+
+static inline atomicRefL<double> makeAtomicRefL(ldouble *address) {
+  return atomicRefL<double>(*address);
+}
+#endif
 
 static inline uint __float_as_uint(float x) {
   return *reinterpret_cast<uint*>(&x);
@@ -95,6 +110,13 @@ template <typename T, typename U>
 __device__ __host__ inline void atomic_fetch_add(T *addr, U val)
 {
   atomicAdd(addr, val);
+}
+
+template <typename T, typename U>
+__device__ __host__ inline void atomic_add_local(T *addr, U val)
+{
+  auto ar = makeAtomicRefL(addr);
+  ar += val;
 }
 
 #include <../cuda/atomic_helper.h>
