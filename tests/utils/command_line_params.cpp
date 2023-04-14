@@ -1062,10 +1062,12 @@ void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--gf-reunit-interval", gf_reunit_interval,
                       "Reunitarise the gauge field every N steps (default 10)");
   opgroup->add_option("--gf-tol", gf_tolerance, "The tolerance of the gauge fixing quality (default 1e-6)");
-  opgroup->add_option("--gf-theta-condition", gf_theta_condition,
-                      "Use the theta value to determine the gauge fixing if true. If false, use the delta value (default false)");
-  opgroup->add_option("--gf-fft-autotune", gf_fft_autotune,
-                      "In the FFT method, automatically adjust the alpha parameter if the quality begins to diverge (default false)");
+  opgroup->add_option(
+    "--gf-theta-condition", gf_theta_condition,
+    "Use the theta value to determine the gauge fixing if true. If false, use the delta value (default false)");
+  opgroup->add_option(
+    "--gf-fft-autotune", gf_fft_autotune,
+    "In the FFT method, automatically adjust the alpha parameter if the quality begins to diverge (default false)");
 }
 
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)

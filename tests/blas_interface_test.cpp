@@ -328,7 +328,8 @@ struct blas_interface_test : quda_test {
 
     CLI::TransformPairs<QudaBLASDataOrder> blas_data_order_map {{"row", QUDA_BLAS_DATAORDER_ROW},
                                                                 {"col", QUDA_BLAS_DATAORDER_COL}};
-    CLI::TransformPairs<QudaBLASOperation> blas_op_map {{"N", QUDA_BLAS_OP_N}, {"T", QUDA_BLAS_OP_T}, {"C", QUDA_BLAS_OP_C}};
+    CLI::TransformPairs<QudaBLASOperation> blas_op_map {
+      {"N", QUDA_BLAS_OP_N}, {"T", QUDA_BLAS_OP_T}, {"C", QUDA_BLAS_OP_C}};
 
     CLI::TransformPairs<QudaBLASType> blas_type_map {{"gemm", QUDA_BLAS_GEMM}, {"lu-inv", QUDA_BLAS_LU_INV}};
 
@@ -346,23 +347,25 @@ struct blas_interface_test : quda_test {
       ->transform(CLI::QUDACheckedTransformer(blas_type_map));
 
     opgroup
-      ->add_option("--blas-data-order", blas_data_order, "Whether data is in row major or column major order (default row)")
+      ->add_option("--blas-data-order", blas_data_order,
+                   "Whether data is in row major or column major order (default row)")
       ->transform(CLI::QUDACheckedTransformer(blas_data_order_map));
 
     opgroup
       ->add_option(
-                   "--blas-gemm-trans-a", blas_gemm_trans_a,
-                   "Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
+        "--blas-gemm-trans-a", blas_gemm_trans_a,
+        "Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
       ->transform(CLI::QUDACheckedTransformer(blas_op_map));
 
     opgroup
       ->add_option(
-                   "--blas-gemm-trans-b", blas_gemm_trans_b,
-                   "Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
+        "--blas-gemm-trans-b", blas_gemm_trans_b,
+        "Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
       ->transform(CLI::QUDACheckedTransformer(blas_op_map));
 
     opgroup
-      ->add_option("--blas-gemm-alpha", blas_gemm_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")
+      ->add_option("--blas-gemm-alpha", blas_gemm_alpha_re_im,
+                   "Set the complex value of alpha for GEMM (default {1.0,0.0}")
       ->expected(2);
 
     opgroup
@@ -380,11 +383,13 @@ struct blas_interface_test : quda_test {
       ->expected(3);
 
     opgroup
-      ->add_option("--blas-gemm-offsets", blas_gemm_offsets, "Set the offsets for GEMM matrices A, B, and C (default 0 0 0)")
+      ->add_option("--blas-gemm-offsets", blas_gemm_offsets,
+                   "Set the offsets for GEMM matrices A, B, and C (default 0 0 0)")
       ->expected(3);
 
     opgroup
-      ->add_option("--blas-gemm-strides", blas_gemm_strides, "Set the strides for GEMM matrices A, B, and C (default 1 1 1)")
+      ->add_option("--blas-gemm-strides", blas_gemm_strides,
+                   "Set the strides for GEMM matrices A, B, and C (default 1 1 1)")
       ->expected(3);
 
     opgroup->add_option("--blas-batch", blas_batch, "Set the number of batches for GEMM or LU inversion (default 16)");
@@ -393,7 +398,7 @@ struct blas_interface_test : quda_test {
                         "Set the size of the square matrix to invert via LU (default 128)");
   }
 
-  blas_interface_test(int argc, char **argv) : quda_test("BLAS Interface Test", argc, argv) {}
+  blas_interface_test(int argc, char **argv) : quda_test("BLAS Interface Test", argc, argv) { }
 };
 
 int main(int argc, char **argv)

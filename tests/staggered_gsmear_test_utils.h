@@ -132,7 +132,7 @@ struct StaggeredGSmearTestWrapper { //
                                       &gauge_param, &inv_param, 0, smear_coeff, smear_t0, gauge_param.cpu_prec);
         staggeredTwoLinkGaussianSmear(spinorRef.Odd(), qdp_twolnk, (void **)cpuTwoLink->Ghost(), tmp.Odd(),
                                       &gauge_param, &inv_param, 1, smear_coeff, smear_t0, gauge_param.cpu_prec);
-	
+
         // blas::xpay(*tmp2, -1.0, *spinorRef);
         xpay(tmp2.Even().V(), -1.0, spinorRef.Even().V(), spinor.Even().Length(), gauge_param.cpu_prec);
         xpay(tmp2.Odd().V(), -1.0, spinorRef.Odd().V(), spinor.Odd().Length(), gauge_param.cpu_prec);
@@ -259,15 +259,15 @@ struct StaggeredGSmearTestWrapper { //
 
       constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
 
-      spinor     = ColorSpinorField(cs_param);
-      spinorRef  = ColorSpinorField(cs_param);
-      tmp        = ColorSpinorField(cs_param);
-      tmp2       = ColorSpinorField(cs_param);
+      spinor = ColorSpinorField(cs_param);
+      spinorRef = ColorSpinorField(cs_param);
+      tmp = ColorSpinorField(cs_param);
+      tmp2 = ColorSpinorField(cs_param);
 
       spinor.Source(QUDA_RANDOM_SOURCE);
 
       tmp = spinor;
-    }    
+    }
   }
 
   void end()
@@ -293,7 +293,7 @@ struct StaggeredGSmearTestWrapper { //
     commDimPartitionedReset();
   }
 
-  GSmearTime gsmearQUDA(int niter) 
+  GSmearTime gsmearQUDA(int niter)
   {
     GSmearTime gsmear_time;
 
@@ -310,30 +310,30 @@ struct StaggeredGSmearTestWrapper { //
       host_timer.start();
 
       switch (gtest_type) {
-        case gsmear_test_type::TwoLink: {
-          computeTwoLinkQuda((void *)milc_twolnk, nullptr, &gauge_param);
-          quda_gflops = 2 * 4 * 198ll * V; // i.e. : 2 mat-mat prods, 4 dirs, Nc*(Nc*(8*NC-2)) flops per mat-mat
-          break;
-        }
-        case gsmear_test_type::GaussianSmear: {
-          QudaQuarkSmearParam qsm_param;
-          qsm_param.inv_param = &inv_param;
+      case gsmear_test_type::TwoLink: {
+        computeTwoLinkQuda((void *)milc_twolnk, nullptr, &gauge_param);
+        quda_gflops = 2 * 4 * 198ll * V; // i.e. : 2 mat-mat prods, 4 dirs, Nc*(Nc*(8*NC-2)) flops per mat-mat
+        break;
+      }
+      case gsmear_test_type::GaussianSmear: {
+        QudaQuarkSmearParam qsm_param;
+        qsm_param.inv_param = &inv_param;
 
-          double omega = 2.0;
-          qsm_param.n_steps = smear_n_steps;
-          qsm_param.width = -1.0 * omega * omega / (4 * smear_n_steps);
+        double omega = 2.0;
+        qsm_param.n_steps = smear_n_steps;
+        qsm_param.width = -1.0 * omega * omega / (4 * smear_n_steps);
 
-          qsm_param.compute_2link = smear_compute_two_link;
-          qsm_param.delete_2link = smear_delete_two_link;
-          qsm_param.t0 = smear_t0;
+        qsm_param.compute_2link = smear_compute_two_link;
+        qsm_param.delete_2link = smear_delete_two_link;
+        qsm_param.t0 = smear_t0;
 
-          performTwoLinkGaussianSmearNStep(spinor.V(), &qsm_param);
+        performTwoLinkGaussianSmearNStep(spinor.V(), &qsm_param);
 
-          quda_gflops = qsm_param.gflops;
+        quda_gflops = qsm_param.gflops;
 
-          break;
-        }
-        default: errorQuda("Test type not defined");
+        break;
+      }
+      default: errorQuda("Test type not defined");
       }
 
       host_timer.stop();
@@ -344,7 +344,7 @@ struct StaggeredGSmearTestWrapper { //
       if (i > 0 && i < niter) {
         gsmear_time.cpu_min = std::min(gsmear_time.cpu_min, host_timer.last());
         gsmear_time.cpu_max = std::max(gsmear_time.cpu_max, host_timer.last());
-      }      
+      }
     }
 
     device_timer.stop();
@@ -385,8 +385,7 @@ struct StaggeredGSmearTestWrapper { //
           "Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate "
           "message size %lu bytes\n",
           1.0e-9 * 2 * ghost_bytes * niter / gsmear_time.event_time,
-          1.0e-9 * 2 * ghost_bytes * niter / gsmear_time.cpu_time, 
-	  1.0e-9 * 2 * ghost_bytes / gsmear_time.cpu_max,
+          1.0e-9 * 2 * ghost_bytes * niter / gsmear_time.cpu_time, 1.0e-9 * 2 * ghost_bytes / gsmear_time.cpu_max,
           1.0e-9 * 2 * ghost_bytes / gsmear_time.cpu_min, 2 * ghost_bytes);
       }
     }

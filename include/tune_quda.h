@@ -76,9 +76,7 @@ namespace quda {
       if (!init) {
         char *enable_shared_env = getenv("QUDA_ENABLE_TUNING_SHARED");
         if (enable_shared_env) {
-          if (strcmp(enable_shared_env, "0") == 0) {
-            tune_shared = false;
-          }
+          if (strcmp(enable_shared_env, "0") == 0) { tune_shared = false; }
         }
         init = true;
       }

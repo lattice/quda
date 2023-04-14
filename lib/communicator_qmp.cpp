@@ -357,7 +357,7 @@ void Communicator::comm_broadcast(void *data, size_t nbytes, int root)
 {
   // break out of QMP since it can only broadcast from rank 0
   MPI_CHECK(MPI_Bcast(data, (int)nbytes, MPI_BYTE, root, MPI_COMM_HANDLE));
-  //QMP_CHECK(QMP_comm_broadcast(QMP_COMM_HANDLE, data, nbytes));
+  // QMP_CHECK(QMP_comm_broadcast(QMP_COMM_HANDLE, data, nbytes));
 }
 
 void Communicator::comm_barrier(void) { QMP_CHECK(QMP_comm_barrier(QMP_COMM_HANDLE)); }

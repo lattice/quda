@@ -374,7 +374,7 @@ struct gauge_alg_test : quda_test {
     app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
   }
 
-  gauge_alg_test(int argc, char **argv) : quda_test("Gauge Alg Test", argc, argv) {}
+  gauge_alg_test(int argc, char **argv) : quda_test("Gauge Alg Test", argc, argv) { }
 };
 
 int main(int argc, char **argv)
@@ -392,9 +392,7 @@ int main(int argc, char **argv)
   // If no gauge is passed, we generate a quenched field on the device.
   if (gauge_load) {
     printfQuda("Loading gauge field from host\n");
-    for (int dir = 0; dir < 4; dir++) {
-      host_gauge[dir].resize(V * gauge_site_size * host_gauge_data_type_size);
-    }
+    for (int dir = 0; dir < 4; dir++) { host_gauge[dir].resize(V * gauge_site_size * host_gauge_data_type_size); }
     void *h_gauge[] = {host_gauge[0].data(), host_gauge[1].data(), host_gauge[2].data(), host_gauge[3].data()};
     constructHostGaugeField(h_gauge, gauge_param, argc, argv);
   }

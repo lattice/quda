@@ -771,13 +771,13 @@ constexpr CommKey default_comm_key = {1, 1, 1, 1};
 
 void push_communicator(const CommKey &split_key);
 
-  /**
-     @brief Broadcast from the root rank of the default communicator
-     @param[in,out] data The data to be read from on the root rank, and
-     written to on all other ranks
-     @param[in] nbytes The size in bytes of data to be broadcast
-     @param[in] root The process that will be broadcasting
-  */
-  void comm_broadcast_global(void *data, size_t nbytes, int root = 0);
+/**
+   @brief Broadcast from the root rank of the default communicator
+   @param[in,out] data The data to be read from on the root rank, and
+   written to on all other ranks
+   @param[in] nbytes The size in bytes of data to be broadcast
+   @param[in] root The process that will be broadcasting
+*/
+void comm_broadcast_global(void *data, size_t nbytes, int root = 0);
 
 } // namespace quda

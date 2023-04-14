@@ -23,8 +23,7 @@ struct quda_test {
     add_testing_option_group(app);
   }
 
-  quda_test(const std::string &test_name, int argc, char **argv) :
-    argc(argc), argv(argv), test_name(test_name) {}
+  quda_test(const std::string &test_name, int argc, char **argv) : argc(argc), argv(argv), test_name(test_name) { }
 
   void init()
   {
@@ -51,7 +50,7 @@ struct quda_test {
     setVerbosity(verbosity);
     setQudaPrecisions(); // Set values for precisions via the command line
 
-    initRand();  // call srand() with a rank-dependent seed
+    initRand(); // call srand() with a rank-dependent seed
 
     int X[4] = {xdim, ydim, zdim, tdim};
     setDims(X);
@@ -70,5 +69,4 @@ struct quda_test {
     endQuda();
     finalizeComms();
   }
-
 };

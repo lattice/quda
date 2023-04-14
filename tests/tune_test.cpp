@@ -12,7 +12,7 @@
  */
 
 using namespace quda;
-constexpr auto test_timeout_secs = std::chrono::seconds(10); // Set a timeout of 1 second
+constexpr auto test_timeout_secs = std::chrono::seconds(10);   // Set a timeout of 1 second
 constexpr auto non_tune_rank_sleep = std::chrono::seconds(20); // Non-tuning processes sleep time longer than above
 
 struct TuneRankTest : public Tunable, ::testing::TestWithParam<int> {
@@ -29,7 +29,10 @@ struct TuneRankTest : public Tunable, ::testing::TestWithParam<int> {
   bool advanceTuneParam(TuneParam &) const override { return false; }
   unsigned int sharedBytesPerThread() const override { return 0; }
   unsigned int sharedBytesPerBlock(const TuneParam &) const override { return 0; }
-  TuneKey tuneKey() const override { return TuneKey(std::to_string(comm_size()).c_str(), typeid(*this).name(), std::to_string(tune_rank).c_str()); }
+  TuneKey tuneKey() const override
+  {
+    return TuneKey(std::to_string(comm_size()).c_str(), typeid(*this).name(), std::to_string(tune_rank).c_str());
+  }
   int32_t getTuneRank() const override { return tune_rank; }
 
   void apply(const qudaStream_t &) override

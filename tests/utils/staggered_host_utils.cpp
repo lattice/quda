@@ -381,9 +381,8 @@ void computeTwoLinkCPU(void **twolink, void **sitelink, QudaGaugeParam *qudaGaug
 
 #ifdef MULTI_GPU
 template <typename sFloat, typename gFloat>
-void staggeredTwoLinkGaussianSmear(sFloat *res, gFloat **twolink, gFloat **ghostTwolink,
-                              sFloat *spinorField, sFloat **fwd_nbr_spinor,
-                              sFloat **back_nbr_spinor, int t0, int oddBit)
+void staggeredTwoLinkGaussianSmear(sFloat *res, gFloat **twolink, gFloat **ghostTwolink, sFloat *spinorField,
+                                   sFloat **fwd_nbr_spinor, sFloat **back_nbr_spinor, int t0, int oddBit)
 {
   for (auto i = 0lu; i < Vh * stag_spinor_site_size; i++) res[i] = 0.0;
 
@@ -402,8 +401,8 @@ void staggeredTwoLinkGaussianSmear(sFloat *res, gFloat **twolink, gFloat **ghost
   {
     for (int i = 0; i < Vh; i++) {
       // Get local time-slice index:
-      const int local_t = i / Vsh_t;  
-      const int glob_t  = quda::comm_coord(3)*Z[3]+local_t;
+      const int local_t = i / Vsh_t;
+      const int glob_t = quda::comm_coord(3) * Z[3] + local_t;
 
       if (glob_t != t0) continue;
 
@@ -438,7 +437,10 @@ void staggeredTwoLinkGaussianSmear(sFloat *res, gFloat **twolink, gFloat **ghost
   return;
 }
 
-void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk[], void** ghost_twolnk,  quda::ColorSpinorField &in, QudaGaugeParam* /*qudaGaugeParam*/, QudaInvertParam* /*inv_param*/, const int oddBit, const double /*width*/, const int t0, QudaPrecision prec)
+void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk[], void **ghost_twolnk,
+                                   quda::ColorSpinorField &in, QudaGaugeParam * /*qudaGaugeParam*/,
+                                   QudaInvertParam * /*inv_param*/, const int oddBit, const double /*width*/,
+                                   const int t0, QudaPrecision prec)
 {
   QudaParity otherparity = QUDA_INVALID_PARITY;
   if (oddBit == QUDA_EVEN_PARITY) {
@@ -457,13 +459,13 @@ void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk
 
   if (prec == QUDA_DOUBLE_PRECISION) {
     {
-      staggeredTwoLinkGaussianSmear((double *)out.V(), (double **)qdp_twolnk, (double **)ghost_twolnk,
-                                    (double *)in.V(), (double **)fwd_nbr_spinor, (double **)back_nbr_spinor, t0,  oddBit);
+      staggeredTwoLinkGaussianSmear((double *)out.V(), (double **)qdp_twolnk, (double **)ghost_twolnk, (double *)in.V(),
+                                    (double **)fwd_nbr_spinor, (double **)back_nbr_spinor, t0, oddBit);
     } 
   } else {
     {
-      staggeredTwoLinkGaussianSmear((float *)out.V(), (float **)qdp_twolnk, (float **)ghost_twolnk,
-                                    (float *)in.V(), (float **)fwd_nbr_spinor, (float **)back_nbr_spinor, t0, oddBit);
+      staggeredTwoLinkGaussianSmear((float *)out.V(), (float **)qdp_twolnk, (float **)ghost_twolnk, (float *)in.V(),
+                                    (float **)fwd_nbr_spinor, (float **)back_nbr_spinor, t0, oddBit);
     }
   }
   return;

@@ -456,7 +456,8 @@ namespace quda
       cache_path = resource_path + (error ? "/tunecache_error.tsv" : "/tunecache.tsv");
       cache_file.open(cache_path.c_str());
 
-      logQuda(QUDA_SUMMARIZE, "Saving %d sets of cached parameters to %s\n", static_cast<int>(tunecache.size()), cache_path.c_str());
+      logQuda(QUDA_SUMMARIZE, "Saving %d sets of cached parameters to %s\n", static_cast<int>(tunecache.size()),
+              cache_path.c_str());
 
       time(&now);
       cache_file << "tunecache\t" << quda_version;
@@ -874,7 +875,8 @@ namespace quda
         auto max = tune_rank;
         comm_allreduce_min(min);
         comm_allreduce_max(max);
-        if (min != max) errorQuda("Kernel tuning rank not consistent (this = %d, min = %d, max = %d)\n", tune_rank, min, max);
+        if (min != max)
+          errorQuda("Kernel tuning rank not consistent (this = %d, min = %d, max = %d)\n", tune_rank, min, max);
       }
 
       /* Only do the tuning on the tuning rank, unless:
@@ -912,11 +914,12 @@ namespace quda
         while (tuning && candidatetuning) {
           qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);
-          logQuda(QUDA_DEBUG_VERBOSE, "About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
-                  static_cast<int>(param.block.x), static_cast<int>(param.block.y),
-                  static_cast<int>(param.block.z), static_cast<int>(param.grid.x), static_cast<int>(param.grid.y),
-                  static_cast<int>(param.grid.z), static_cast<int>(param.shared_bytes),
-                  static_cast<int>(param.aux.x), static_cast<int>(param.aux.y), static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
+          logQuda(QUDA_DEBUG_VERBOSE,
+                  "About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
+                  static_cast<int>(param.block.x), static_cast<int>(param.block.y), static_cast<int>(param.block.z),
+                  static_cast<int>(param.grid.x), static_cast<int>(param.grid.y), static_cast<int>(param.grid.z),
+                  static_cast<int>(param.shared_bytes), static_cast<int>(param.aux.x), static_cast<int>(param.aux.y),
+                  static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
 
           tunable.apply(stream); // do initial call in case we need to jit compile for these parameters or if policy tuning
 
@@ -962,7 +965,8 @@ namespace quda
         if (policyTuning() || uberTuning()) { tc.broadcast(tune_rank); }
         const int tuneiterations
           = std::max(static_cast<int>(std::ceil(min_tune_time / tc.getBestTime())), min_tune_iterations);
-        logQuda(QUDA_DEBUG_VERBOSE, "Candidate tuning finished for %s with %s. Best time %f and now continuing with %i iterations.\n",
+        logQuda(QUDA_DEBUG_VERBOSE,
+                "Candidate tuning finished for %s with %s. Best time %f and now continuing with %i iterations.\n",
                 key.name, key.aux, tc.getBestTime(), tuneiterations);
 
         // we now have the candidates, now need to loop over candidates
@@ -970,11 +974,12 @@ namespace quda
           param = tc.top();
           qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);
-          logQuda(QUDA_DEBUG_VERBOSE, "About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
-                  static_cast<int>(param.block.x), static_cast<int>(param.block.y),
-                  static_cast<int>(param.block.z), static_cast<int>(param.grid.x), static_cast<int>(param.grid.y),
-                  static_cast<int>(param.grid.z), static_cast<int>(param.shared_bytes),
-                  static_cast<int>(param.aux.x), static_cast<int>(param.aux.y), static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
+          logQuda(QUDA_DEBUG_VERBOSE,
+                  "About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d,%d)\n",
+                  static_cast<int>(param.block.x), static_cast<int>(param.block.y), static_cast<int>(param.block.z),
+                  static_cast<int>(param.grid.x), static_cast<int>(param.grid.y), static_cast<int>(param.grid.z),
+                  static_cast<int>(param.shared_bytes), static_cast<int>(param.aux.x), static_cast<int>(param.aux.y),
+                  static_cast<int>(param.aux.z), static_cast<int>(param.aux.w));
 
           tunable.apply(stream); // do warm up call, for consistency with the candidate tuning
           timer.start();
@@ -1001,7 +1006,8 @@ namespace quda
             logQuda(QUDA_DEBUG_VERBOSE, "T   %s gives %s\n", tunable.paramString(param).c_str(),
                     tunable.perfString(elapsed_time).c_str());
           } else {
-            logQuda(QUDA_DEBUG_VERBOSE, "    %s gives %s\n", tunable.paramString(param).c_str(), qudaGetLastErrorString().c_str());
+            logQuda(QUDA_DEBUG_VERBOSE, "    %s gives %s\n", tunable.paramString(param).c_str(),
+                    qudaGetLastErrorString().c_str());
           }
 
           tunable.launchError() = QUDA_SUCCESS;

@@ -118,11 +118,10 @@ struct dilution_test : quda_test {
   {
     quda_test::display_info();
     printfQuda("prec    S_dimension T_dimension Ls_dimension\n");
-    printfQuda("%6s   %3d/%3d/%3d     %3d         %2d\n",
-               get_prec_str(prec), xdim, ydim, zdim, tdim, Lsdim);
+    printfQuda("%6s   %3d/%3d/%3d     %3d         %2d\n", get_prec_str(prec), xdim, ydim, zdim, tdim, Lsdim);
   }
 
-  dilution_test(int argc, char **argv) : quda_test("Dilution Test", argc, argv) {}
+  dilution_test(int argc, char **argv) : quda_test("Dilution Test", argc, argv) { }
 };
 
 int main(int argc, char **argv)
