@@ -1263,7 +1263,7 @@ foreach(prec IN LISTS TEST_PRECS)
       endif()	    
       add_test(NAME staggered_gsmear_${kerneltp}_${prec}
         COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gsmear_test> ${MPIEXEC_POSTFLAGS}
-        --dim 2 4 6 8 --prec ${prec}
+        --dim 6 8 10 12 --prec ${prec}
         --test ${kerneltp}
 	--laplace3D ${laplace3D}
 	--smear-t0 ${smear_t0}
