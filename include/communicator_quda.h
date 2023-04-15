@@ -751,8 +751,14 @@ namespace quda
 
   void comm_allreduce_xor(uint64_t &data);
 
-  /**  broadcast from rank 0 */
-  void comm_broadcast(void *data, size_t nbytes);
+  /**
+     @brief Broadcast from the root rank
+     @param[in,out] data The data to be read from on the root rank, and
+     written to on all other ranks
+     @param[in] nbytes The size in bytes of data to be broadcast
+     @param[in] root The process that will be broadcasting
+  */
+  void comm_broadcast(void *data, size_t nbytes, int root = 0);
 
   void comm_barrier(void);
 
@@ -765,7 +771,13 @@ constexpr CommKey default_comm_key = {1, 1, 1, 1};
 
 void push_communicator(const CommKey &split_key);
 
-/** @brief These routine broadcast the data according to the default communicator */
-void comm_broadcast_global(void *data, size_t nbytes);
+/**
+   @brief Broadcast from the root rank of the default communicator
+   @param[in,out] data The data to be read from on the root rank, and
+   written to on all other ranks
+   @param[in] nbytes The size in bytes of data to be broadcast
+   @param[in] root The process that will be broadcasting
+*/
+void comm_broadcast_global(void *data, size_t nbytes, int root = 0);
 
 } // namespace quda

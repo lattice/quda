@@ -393,6 +393,16 @@ extern int heatbath_num_heatbath_per_step;
 extern int heatbath_num_overrelax_per_step;
 extern bool heatbath_coldstart;
 
+extern int gf_gauge_dir;
+extern int gf_maxiter;
+extern int gf_verbosity_interval;
+extern double gf_ovr_relaxation_boost;
+extern double gf_fft_alpha;
+extern int gf_reunit_interval;
+extern double gf_tolerance;
+extern bool gf_theta_condition;
+extern bool gf_fft_autotune;
+
 extern int eofa_pm;
 extern double eofa_shift;
 extern double eofa_mq1;

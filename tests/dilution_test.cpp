@@ -5,26 +5,9 @@
 #include <instantiate.h>
 
 // External headers
+#include <test.h>
 #include <misc.h>
-#include <host_utils.h>
-#include <command_line_params.h>
 #include <dslash_reference.h>
-
-#include <gtest/gtest.h>
-
-void display_test_info()
-{
-  printfQuda("running the following test:\n");
-  printfQuda("prec    prec_sloppy   matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension "
-             "Ls_dimension   dslash_type  normalization\n");
-  printfQuda("%6s   %6s          %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
-             get_prec_str(prec), get_prec_str(prec_sloppy), get_matpc_str(matpc_type), get_recon_str(link_recon),
-             get_recon_str(link_recon_sloppy), get_solve_str(solve_type), xdim, ydim, zdim, tdim, Lsdim,
-             get_dslash_str(dslash_type), get_mass_normalization_str(normalization));
-  printfQuda("Grid partition info:     X  Y  Z  T\n");
-  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
-             dimPartitioned(3));
-}
 
 using test_t = ::testing::tuple<QudaSiteSubset, QudaDilutionType, int>;
 
@@ -130,35 +113,20 @@ INSTANTIATE_TEST_SUITE_P(StaggeredParity, DilutionTest,
                            return get_dilution_type_str(::testing::get<1>(param.param));
                          });
 
-int main(int argc, char **argv)
-{
-  ::testing::InitGoogleTest(&argc, argv);
-  // Parse command line options
-  auto app = make_app();
-  add_comms_option_group(app);
-  add_testing_option_group(app);
-  try {
-    app->parse(argc, argv);
-  } catch (const CLI::ParseError &e) {
-    return app->exit(e);
+struct dilution_test : quda_test {
+  void display_info() const override
+  {
+    quda_test::display_info();
+    printfQuda("prec    S_dimension T_dimension Ls_dimension\n");
+    printfQuda("%6s   %3d/%3d/%3d     %3d         %2d\n", get_prec_str(prec), xdim, ydim, zdim, tdim, Lsdim);
   }
 
-  // Set values for precisions via the command line.
-  setQudaPrecisions();
+  dilution_test(int argc, char **argv) : quda_test("Dilution Test", argc, argv) { }
+};
 
-  // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
-  initComms(argc, argv, gridsize_from_cmdline);
-
-  // Initialize the QUDA library
-  initQuda(device_ordinal);
-
-  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
-  if (quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-  int result = RUN_ALL_TESTS();
-
-  // finalize the QUDA library
-  endQuda();
-  finalizeComms();
-
-  return result;
+int main(int argc, char **argv)
+{
+  dilution_test test(argc, argv);
+  test.init();
+  return test.execute();
 }

@@ -1749,7 +1749,8 @@ namespace quda
   template <typename Dslash> class DslashPolicyTune : public Tunable
   {
     Dslash &dslash;
-    decltype(dslash.dslashParam) &dslashParam;
+    using Arg = std::remove_reference_t<decltype(dslash.dslashParam)>;
+    Arg &dslashParam;
     ColorSpinorField &in;
     const int volume;
     const int *ghostFace;
@@ -1757,6 +1758,8 @@ namespace quda
 
     bool tuneGridDim() const override { return false; } // Don't tune the grid dimensions.
     bool tuneAuxDim() const override { return true; }   // Do tune the aux dimensions.
+    unsigned int sharedBytesPerThread() const override { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const override { return 0; }
 
   public:
     DslashPolicyTune(
@@ -2048,6 +2051,8 @@ namespace quda
    void preTune() override { dslash.preTune(); }
 
    void postTune() override { dslash.postTune(); }
+
+   int32_t getTuneRank() const override { return dslash.getTuneRank(); }
   };
 
   } // namespace dslash
