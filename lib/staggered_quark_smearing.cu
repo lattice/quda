@@ -164,6 +164,21 @@ namespace quda
 
       return TuneKey(in.VolString().c_str(), typeid(*this).name(), aux);
     }
+
+    /**
+       @brief Compute the tuning rank
+       @return The rank on which to do kernel tuning
+    */
+    int32_t getTuneRank() const override {
+      int32_t tune_rank = 0;
+
+      if (arg.is_t0_kernel) { // find the minimum rank for tuning
+        tune_rank = ( arg.t0 < 0 ) ? comm_size() : comm_rank_global();
+        comm_allreduce_min(tune_rank);
+      }
+
+      return tune_rank;
+    }
   };
 
   template <typename Float, int nColor, QudaReconstructType recon> struct StaggeredQSmearApply {

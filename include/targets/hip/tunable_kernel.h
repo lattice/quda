@@ -75,7 +75,7 @@ namespace quda
     {
       strcpy(vol, field.VolString().c_str());
       strcpy(aux, compile_type_str(field, location));
-      if (this->location == QUDA_CUDA_FIELD_LOCATION && device::use_constant_memory_arg<>::value) strcat(aux, "cmem,");
+      if (this->location == QUDA_CUDA_FIELD_LOCATION && use_constant_memory()) strcat(aux, "cmem,");
       if (this->location == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
       strcat(aux, field.AuxString().c_str());
     }
@@ -84,7 +84,7 @@ namespace quda
     {
       u64toa(vol, n_items);
       strcpy(aux, compile_type_str(location));
-      if (location == QUDA_CUDA_FIELD_LOCATION && device::use_constant_memory_arg<>::value) strcat(aux, "cmem,");
+      if (location == QUDA_CUDA_FIELD_LOCATION && use_constant_memory()) strcat(aux, "cmem,");
       if (this->location == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
     }
 

@@ -10,6 +10,7 @@
 #include <dslash_shmem.h>
 #include <shmem_pack_helper.cuh>
 #include <kernel_helper.h>
+#include <tune_quda.h>
 
 #if defined(_NVHPC_CUDA)
 #include <constant_kernel_arg.h>

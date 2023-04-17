@@ -6,6 +6,7 @@
 #include <su3_project.cuh>
 #include <kernels/gauge_utils.cuh>
 #include <kernel.h>
+#include <local_memory.h>
 
 namespace quda
 {
@@ -111,11 +112,27 @@ namespace quda
   //------------------------//
   // Over-Improved routines //
   //------------------------//
-  template <typename Arg> struct OvrImpSTOUT
-  {
+#if 0
+  template <typename Arg> struct OvrImpSTOUTOps {
     using real = typename Arg::Float;
     using Complex = complex<real>;
     using Link = Matrix<complex<real>, Arg::nColor>;
+    using StapCacheT = SharedMemoryCache<Link>;
+    using RectCacheT = SharedMemoryCacheOffset<Link,StapCacheT>;
+    using Ops = SpecialOps<StapCacheT,RectCacheT>;
+  };
+  template <typename Arg_> struct OvrImpSTOUT : OvrImpSTOUTOps<Arg_>::Ops
+#endif
+
+  template <typename Arg_> struct OvrImpSTOUT
+  {
+    using Arg = Arg_;
+    using real = typename Arg::Float;
+    using Complex = complex<real>;
+    using Link = Matrix<complex<real>, Arg::nColor>;
+    //using StapCacheT = SharedMemoryCache<Link>;
+    //using RectCacheT = SharedMemoryCacheOffset<Link,StapCacheT>;
+    //using Ops = SpecialOps<StapCacheT,RectCacheT>;
 
     const Arg &arg;
     constexpr OvrImpSTOUT(const Arg &arg) : arg(arg) {}
@@ -133,7 +150,13 @@ namespace quda
         X[dr] += 2 * arg.border[dr];
       }
 
-      Link U, Stap, Rect, Q;
+      Link U, Q;
+      //SharedMemoryCache<Link> Stap(target::block_dim());
+      //SharedMemoryCache<Link> Rect(target::block_dim(), sizeof(Link));
+      //StapCacheT Stap(*this);
+      //RectCacheT Rect(*this);
+      LocalMemory<Link> Stap{};
+      LocalMemory<Link,decltype(Stap)> Rect{};
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
@@ -146,7 +169,7 @@ namespace quda
       // Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
       //-------------------------------------------------------------------
       // Compute \rho * staple_coeff * S - \rho * rectangle_coeff * R
-      Q = ((arg.staple_coeff * Stap) - (arg.rectangle_coeff * Rect)) * conj(U);
+      Q = ((arg.staple_coeff * static_cast<const Link &>(Stap)) - (arg.rectangle_coeff * static_cast<const Link &>(Rect))) * conj(U);
       // Compute \Q_{mu} = i/2[Omega_{mu}^dag - Omega_{mu}
       //                      - 1/3 Tr(Omega_{mu}^dag - Omega_{mu})]
       makeHerm(Q);

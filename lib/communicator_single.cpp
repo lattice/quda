@@ -93,7 +93,7 @@ namespace quda
 
   void Communicator::comm_allreduce_xor(uint64_t &) { }
 
-  void Communicator::comm_broadcast(void *, size_t) { }
+  void Communicator::comm_broadcast(void *, size_t, int) { }
 
   void Communicator::comm_barrier(void) { }
 

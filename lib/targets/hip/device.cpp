@@ -18,6 +18,8 @@ namespace quda
 
     static bool initialized = false;
 
+    static int device_id = -1;
+
     void init(int dev)
     {
       if (initialized) return;
@@ -45,6 +47,14 @@ namespace quda
       // Broken in recent ROCms. I am not sure it does anything anyway on RedTeam
       // CHECK_HIP_ERROR(hipDeviceSetCacheConfig(hipFuncCachePreferL1));
       CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProp, dev));
+
+      device_id = dev;
+    }
+
+    void init_thread()
+    {
+      if (device_id == -1) errorQuda("No HIP device has been initialized for this process");
+      CHECK_CUDA_ERROR(hipSetDevice(device_id));
     }
 
     int get_device_count()

@@ -14,6 +14,7 @@
 
 namespace quda
 {
+  struct offNone {};
 
   /**
      @brief Class which wraps around a shared memory cache for type T,
@@ -34,7 +35,7 @@ namespace quda
        dimensions.
    */
   //template <typename T, int block_size_y = 1, int block_size_z = 1, bool dynamic = true>
-  template <typename T, typename D = opDimsBlock>
+  template <typename T, typename D = opDimsBlock, typename O = offNone>
   class SharedMemoryCache
   {
     using atom_t = std::conditional_t<sizeof(T) % 16 == 0, int4, std::conditional_t<sizeof(T) % 8 == 0, int2, int>>;
@@ -56,7 +57,7 @@ namespace quda
     using depOps = SpecialOps<op_blockSync,opSmem>;
 #else
 #endif
-    using SharedMemoryCache_t = SharedMemoryCache<T, D>;
+    using SharedMemoryCache_t = SharedMemoryCache<T, D, O>;
     //dependentOps ops;
 
     __device__ __host__ inline void save_detail(const T &a, int x, int y, int z)
@@ -248,6 +249,9 @@ namespace quda
     __device__ __host__ inline void sync() { __syncthreads(); }
   };
 
+  template <typename T, typename O = offNone>
+  using SharedMemoryCacheOffset = SharedMemoryCache<T,opDimsBlock,O>;
+
 #if 0
   template <typename T, int block_size_y = 1, int block_size_z = 1, bool dynamic = true>
   class SharedMemoryCache : public SharedMemoryCacheImpl<T, block_size_y, block_size_z, dynamic> {
@@ -265,3 +269,6 @@ namespace quda
 #endif
 
 } // namespace quda
+
+// include overloads
+#include "../generic/shared_memory_cache_helper.h"

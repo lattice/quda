@@ -99,19 +99,24 @@ namespace quda
 	int chirality = flavor; // relabel flavor as chirality
 	SharedMemoryCache<HalfVector> cache(*this);
 
-        auto swizzle = [&](int chirality, int reverse) {
+        enum swizzle_direction {
+          FORWARDS = 0,
+          BACKWARDS = 1
+        };
+
+        auto swizzle = [&](HalfVector x[2], int chirality, swizzle_direction dir) {
 	  if (!allthreads || active) {
-	    if (chirality == 0) cache.save_y(out_chi[1], reverse);
-	    else                cache.save_y(out_chi[0], 1 - reverse);
+	    if (chirality == 0) cache.save_y(x[1], dir);
+	    else                cache.save_y(x[0], 1 - dir);
 	  }
           cache.sync();
 	  if (!allthreads || active) {
-	    if (chirality == 0) out_chi[1] = cache.load_y(1 - reverse);
-	    else                out_chi[0] = cache.load_y(reverse);
+	    if (chirality == 0) x[1] = cache.load_y(1 - dir);
+	    else                x[0] = cache.load_y(dir);
 	  }
         };
 
-        swizzle(chirality, 0); // apply the flavor-chirality swizzle between threads
+        swizzle(out_chi, chirality, FORWARDS); // apply the flavor-chirality swizzle between threads
 
 	if (active) {
 	  // load in the clover matrix
@@ -144,7 +149,7 @@ namespace quda
 	  }
 	}
 
-        swizzle(chirality, 1); // undo the flavor-chirality swizzle
+        swizzle(out_chi, chirality, BACKWARDS); // undo the flavor-chirality swizzle
 	if (active) {
 	  Vector tmp = out_chi[0].chiral_reconstruct(0) + out_chi[1].chiral_reconstruct(1);
 	  tmp.toNonRel(); // switch back to non-chiral basis

@@ -27,12 +27,15 @@ class mySelectorT : public sycl::device_selector {
 static auto mySelector = mySelectorT();
 #else
 int mySelectorT(const sycl::device& device) {
+  //printf("mySelectorT\n");
   int score = 1;
   if(device.get_info<sycl::info::device::device_type>() ==
      sycl::info::device_type::gpu) score += 10;
+  //printf("device.has\n");
   if(!device.has(sycl::aspect::fp64)) score = -1;  // require fp64
-  printfQuda("Selector score: %2i %s\n", score,
-	     device.get_info<sycl::info::device::name>().c_str());
+  //printfQuda("Selector score: %2i %s\n", score,
+  //     device.get_info<sycl::info::device::name>().c_str());
+  //printf("end\n");
   return score;
 }
 //static auto mySelector = sycl::default_selector_v;
@@ -167,11 +170,20 @@ namespace quda
 
     }
 
+    void init_thread()
+    {
+    }
+
     int get_device_count()
     {
+      //printf("get_device_count\n");
       auto p = sycl::platform(mySelector);
+      //auto p = sycl::platform();
+      //printf("p.get_devices\n");
       auto ds = p.get_devices();
+      //printf("ds.size\n");
       auto device_count = ds.size();
+      //printf("device_count %zu\n", device_count);
       return device_count;
     }
 

@@ -44,7 +44,7 @@ bool getRankVerbosity() {
       if (rank_list.peek() == ',') rank_list.ignore();
     }
   } else if (!init) {
-    rank_verbosity = comm_rank_global() == 0 ? true : false; // default is process 0 only
+    rank_verbosity = comm_rank() == 0 ? true : false; // default is process 0 only
   }
   init = true;
 
