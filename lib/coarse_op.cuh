@@ -804,7 +804,10 @@ namespace quda {
       else if (type == COMPUTE_KV)                 strcat(Aux, ",computeKV");
       else if (type == COMPUTE_VUV) {
         strcat(Aux, ",computeVUV");
-        if (use_mma) strcat(Aux, ",MMA");
+        if (use_mma) {
+          strcat(Aux, ",mma");
+          strcat(Aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
+        }
       }
       else if (type == COMPUTE_VLV) strcat(Aux, ",computeVLV");
       else if (type == COMPUTE_COARSE_CLOVER)

@@ -18,7 +18,8 @@ namespace quda
   namespace mma
   {
 
-    template <typename Arg, int dim_, QudaDirection dir_, int bM_, int bN_, int bK_, int block_y_, int block_z_, int min_blocks_ = 1>
+    template <typename Arg, int dim_, QudaDirection dir_, int bM_, int bN_, int bK_, int block_y_, int block_z_,
+              int min_blocks_ = 1>
     struct mmaArg : Arg {
       static constexpr int dim = dim_;
       static constexpr QudaDirection dir = dir_;
@@ -46,7 +47,8 @@ namespace quda
         Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
        */
       template <typename Wtype, typename Arg>
-      __device__ __host__ inline auto computeUV(Arg &arg, const Wtype &Wacc, int parity, int x_cb)
+      __device__ __host__ inline auto computeUV(Arg &arg, const Wtype &Wacc, int parity, int x_cb, int m_offset,
+                                                int n_offset)
       {
         using real = typename Arg::Float;
         constexpr int fineSpin = Arg::fineSpin;
@@ -85,7 +87,8 @@ namespace quda
             auto b = Wacc(parity, x_cb, s_col, 0, 0);
             auto c = arg.UV(parity, x_cb, s_col * fineSpin, 0, 0);
 
-            uvMax = fmax(uvMax, Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, 0, 0));
+            uvMax = fmax(
+              uvMax, Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, m_offset, n_offset));
           }
 
         } else if (arg.comm_dim[Arg::dim] && (coord[Arg::dim] + nFace >= arg.x_size[Arg::dim])) {
@@ -98,7 +101,8 @@ namespace quda
             auto b = Wacc.Ghost(Arg::dim, 1, (parity + 1) & 1, ghost_idx, s_col, 0, 0);
             auto c = arg.UV(parity, x_cb, s_col * fineSpin, 0, 0);
 
-            uvMax = fmax(uvMax, Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, 0, 0));
+            uvMax = fmax(
+              uvMax, Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, m_offset, n_offset));
           }
 
         } else {
@@ -111,7 +115,8 @@ namespace quda
             auto b = Wacc((parity + 1) & 1, y_cb, s_col, 0, 0);
             auto c = arg.UV(parity, x_cb, s_col * fineSpin, 0, 0);
 
-            uvMax = fmax(uvMax, Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, 0, 0));
+            uvMax = fmax(
+              uvMax, Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, m_offset, n_offset));
           }
         }
 
@@ -127,16 +132,32 @@ namespace quda
 
       __device__ __forceinline__ void operator()()
       {
-        int x_cb = blockDim.x * blockIdx.x + threadIdx.x;
-        if (x_cb >= arg.fineVolumeCB) return;
+        int index_x = blockDim.x * blockIdx.x + threadIdx.x;
         int parity = blockIdx.y;
+
+        constexpr int M = Arg::uvTileType::m * Arg::fineSpin;
+        constexpr int N = Arg::uvTileType::n;
+        constexpr int K = Arg::uvTileType::k;
+
+        constexpr bool divide_b_no = Arg::bM < M && Arg::bK >= K && Arg::bN == N;
+
+        constexpr int t_m = divide_b_no ? 1 : (Arg::uvTileType::m * Arg::fineSpin + Arg::bM - 1) / Arg::bM;
+        constexpr int t_n = divide_b_no ? 1 : (Arg::uvTileType::n + Arg::bN - 1) / Arg::bN;
+
+        int x_cb = index_x / (t_m * t_n);
+        if (x_cb >= arg.fineVolumeCB) return;
+
+        int mn = index_x % (t_m * t_n);
+
+        int n_offset = (mn % t_n) * Arg::bN;
+        int m_offset = (mn / t_n) * Arg::bM;
 
         using real = typename Arg::Float;
         real max = 0.0;
         if (Arg::dir == QUDA_FORWARDS || Arg::dir == QUDA_IN_PLACE) // only for preconditioned clover is V != AV
-          max = impl::computeUV(arg, arg.V, parity, x_cb);
+          max = impl::computeUV(arg, arg.V, parity, x_cb, m_offset, n_offset);
         else
-          max = impl::computeUV(arg, arg.AV, parity, x_cb);
+          max = impl::computeUV(arg, arg.AV, parity, x_cb, m_offset, n_offset);
 
         if (Arg::compute_max) {
           constexpr int block_dim = 3;
@@ -149,8 +170,7 @@ namespace quda
     namespace impl
     {
 
-      template <typename Arg>
-      __device__ void computeVUV(Arg &arg, int parity, int x_cb)
+      template <typename Arg> __device__ void computeVUV(Arg &arg, int parity, int x_cb, int m_offset, int n_offset)
       {
         constexpr int fineSpin = Arg::fineSpin;
         constexpr int coarseSpin = Arg::coarseSpin;
@@ -199,11 +219,6 @@ namespace quda
 
         using Config = MmaConfig<mma_t, M, N, K, lda, ldb, ldc, Arg::bM, Arg::bN, Arg::bK, Arg::block_y, Arg::block_z>;
 
-        constexpr int m_offset = 0;
-        constexpr int n_offset = 0;
-
-        static_assert(M <= Arg::bM, "Dividing M has NOT been implemented yet.\n");
-        static_assert(N <= Arg::bN, "Dividing N has NOT been implemented yet.\n");
         static_assert(K <= Arg::bK, "Dividing K has NOT been implemented yet.\n");
 
         typename Config::SmemObjA smem_obj_a_real(smem_ptr);
@@ -322,11 +337,21 @@ namespace quda
 
       __device__ __forceinline__ void operator()()
       {
-        int x_cb = blockDim.x * blockIdx.x + threadIdx.x;
-        if (x_cb >= arg.fineVolumeCB) return;
+        int index_x = blockDim.x * blockIdx.x + threadIdx.x;
         int parity = blockIdx.y;
 
-        impl::computeVUV(arg, parity, x_cb);
+        constexpr int t_m = (Arg::vuvTileType::m + Arg::bM - 1) / Arg::bM;
+        constexpr int t_n = (Arg::vuvTileType::n + Arg::bN - 1) / Arg::bN;
+
+        int x_cb = index_x / (t_m * t_n);
+        if (x_cb >= arg.fineVolumeCB) return;
+
+        int mn = index_x % (t_m * t_n);
+
+        int n_offset = (mn % t_n) * Arg::bN;
+        int m_offset = (mn / t_n) * Arg::bM;
+
+        impl::computeVUV(arg, parity, x_cb, m_offset, n_offset);
       }
     };
 
