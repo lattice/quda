@@ -156,6 +156,9 @@ mark_as_advanced(QUDA_MULTIGRID_NVEC_LIST)
 set(QUDA_MULTIGRID_MRHS_LIST "16" CACHE STRING "The list of multi-rhs sizes that get compiled")
 mark_as_advanced(QUDA_MULTIGRID_MRHS_LIST)
 
+option(QUDA_MULTIGRID_SETUP_USE_SMMA ON)
+mark_as_advanced(QUDA_MULTIGRID_SETUP_USE_SMMA)
+
 message(STATUS "QUDA_MULTIGRID_NVEC_LIST=${QUDA_MULTIGRID_NVEC_LIST}")
 message(STATUS "QUDA_MULTIGRID_MRHS_LIST=${QUDA_MULTIGRID_MRHS_LIST}")
 configure_file(dslash_coarse.in.cpp dslash_coarse.cpp @ONLY)
@@ -518,6 +521,10 @@ target_compile_definitions(quda PUBLIC QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
 
 if(QUDA_ENABLE_MMA)
   target_compile_definitions(quda PUBLIC QUDA_ENABLE_MMA)
+endif()
+
+if(QUDA_MULTIGRID_SETUP_USE_SMMA)
+  target_compile_definitions(quda PUBLIC QUDA_MULTIGRID_SETUP_USE_SMMA)
 endif()
 
 if(QUDA_FAST_COMPILE_REDUCE)

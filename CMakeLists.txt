@@ -224,6 +224,9 @@ set(QUDA_RECONSTRUCT
 option(QUDA_ENABLE_MMA "Enabling using tensor core" ON)
 mark_as_advanced(QUDA_ENABLE_MMA)
 
+option(QUDA_MULTIGRID_SETUP_USE_SMMA "Enabling using SMMA (3xTF32/3xBF16/3xFP16) for multigrid setup" ON)
+mark_as_advanced(QUDA_MULTIGRID_SETUP_USE_SMMA)
+
 option(QUDA_CLOVER_DYNAMIC "Dynamically invert the clover term" ON)
 option(QUDA_CLOVER_RECONSTRUCT "set to ON to enable compressed clover storage (requires QUDA_CLOVER_DYNAMIC)" ON)
 option(QUDA_CLOVER_CHOLESKY_PROMOTE "Whether to promote the internal precision when inverting the clover term" ON)
