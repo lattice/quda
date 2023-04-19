@@ -54,7 +54,7 @@ namespace quda
     void init_thread()
     {
       if (device_id == -1) errorQuda("No HIP device has been initialized for this process");
-      CHECK_CUDA_ERROR(hipSetDevice(device_id));
+      CHECK_HIP_ERROR(hipSetDevice(device_id));
     }
 
     int get_device_count()
