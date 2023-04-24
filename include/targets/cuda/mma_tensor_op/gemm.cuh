@@ -4,6 +4,7 @@
 #include <array.h>
 #include <mma_tensor_op/mma_dispatch.cuh>
 #include <pipeline.cuh>
+#include <register_traits.h>
 
 namespace quda
 {
@@ -14,23 +15,6 @@ namespace quda
     {
       return (bM + mma_t::pad_size(bM) + bN + mma_t::pad_size(bN)) * bK * 2 * sizeof(typename mma_t::compute_t);
     }
-
-    /**
-      @brief Defining how many elements/atoms are there in type T ...
-     */
-    template <class T> struct batch_multiple {
-    };
-
-    /**
-      @brief ... e.g. there are 2 half's in a half2
-     */
-    template <> struct batch_multiple<half2> {
-      static constexpr int value = 2;
-    };
-
-    template <> struct batch_multiple<float> {
-      static constexpr int value = 1;
-    };
 
     inline __device__ void zero(half2 &reg_real, half2 &reg_imag)
     {

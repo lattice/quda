@@ -99,7 +99,7 @@ namespace quda {
 #else
       setup_use_mma(false),
 #endif
-      dslash_use_mma(true),
+      dslash_use_mma(false),
       allow_truncation(false),
 #ifdef NVSHMEM_COMMS
       use_mobius_fused_kernel(false)

@@ -323,4 +323,21 @@ namespace quda {
   template<> struct AllocType<true> { typedef size_t type; };
   template<> struct AllocType<false> { typedef int type; };
 
+  /**
+    @brief Defining how many elements/atoms are there in type T ...
+   */
+  template <class T> struct batch_multiple {
+  };
+
+  /**
+    @brief ... e.g. there are 2 half's in a half2
+   */
+  template <> struct batch_multiple<half2> {
+    static constexpr int value = 2;
+  };
+
+  template <> struct batch_multiple<float> {
+    static constexpr int value = 1;
+  };
+
 } // namespace quda

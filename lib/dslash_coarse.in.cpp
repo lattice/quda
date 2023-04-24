@@ -73,7 +73,7 @@ namespace quda
   {
     ColorSpinorParam param(fs[0]);
     int nVec = (fs.size() + 7) / 8 * 8;   // Make a multiple of 8
-    param.nColor = fs[0].Ncolor() * nVec; // Ask Kate why we need * in.size() here
+    param.nColor = fs[0].Ncolor() * nVec;
     param.nVec = nVec;
     param.create = QUDA_NULL_FIELD_CREATE;
     param.fieldOrder = order;

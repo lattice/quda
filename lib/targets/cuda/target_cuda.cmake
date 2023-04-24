@@ -171,7 +171,7 @@ if(${CMAKE_CUDA_COMPILER_ID} MATCHES "NVHPC" AND NOT ${CMAKE_BUILD_TYPE} MATCHES
   target_compile_options(quda PRIVATE "$<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:SHELL: -gpu=nodebug" >)
 endif()
 
-set(QUDA_MAX_SHARED_MEMORY "0" CACHE STRING "Max shared memory per block")
+set(QUDA_MAX_SHARED_MEMORY "0" CACHE STRING "Max shared memory per block, 0 corresponds to architecture default")
 mark_as_advanced(QUDA_MAX_SHARED_MEMORY)
 configure_file(${CMAKE_SOURCE_DIR}/include/targets/cuda/device.in.hpp
                ${CMAKE_BINARY_DIR}/include/targets/cuda/device.hpp @ONLY)
