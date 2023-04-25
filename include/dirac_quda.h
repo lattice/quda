@@ -1755,6 +1755,7 @@ public:
     const bool allow_truncation; /** Whether or not we let coarsening drop improvements, for ex dropping long links for small aggregate sizes */
     const bool setup_use_mma;    /** Whether to use tensor cores or not */
     const bool dslash_use_mma;   /** Whether to use tensor cores or not */
+    const bool need_aos_gauge_copy; // Whether or not we need an AoS copy of the gauge fields
 
     mutable std::shared_ptr<cpuGaugeField> Y_h;    /** CPU copy of the coarse link field */
     mutable std::shared_ptr<cpuGaugeField> X_h;    /** CPU copy of the coarse clover term */
