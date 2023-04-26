@@ -44,12 +44,14 @@ else()
 endif()
 message(STATUS "Using OpenMP target flags: ${QUDA_OMPTARGET_FLAGS}")
 
+string(REPLACE " " "" QUDA_GPU_ARCH_STRIP "${QUDA_GPU_ARCH}")
+
 # QUDA_HASH for tunecache
-set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cxx_version=${CMAKE_CXX_COMPILER_VERSION})
+set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH_STRIP},cxx_version=${CMAKE_CXX_COMPILER_VERSION})
 if(QUDA_OMPTARGET_JIT)
     set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-omptarget:JIT")
 else()
-    set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-omptarget:${QUDA_GPU_ARCH}")
+    set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-omptarget:${QUDA_GPU_ARCH_STRIP}")
 endif()
 
 # ######################################################################################################################
