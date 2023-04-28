@@ -284,7 +284,7 @@ extern "C" {
                       void* dst,
                       int spin,
                       int taste,
-                      int reloadGaugeField);
+                      int *reloadGaugeField);
   /**
    * Apply the improved staggered operator to a field. All fields
    * passed and returned are host (CPU) field in MILC order.

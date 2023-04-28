@@ -83,6 +83,7 @@ template <bool start> void inline qudamilc_called(const char *func, QudaVerbosit
     } else {
       printfQuda("QUDA_MILC_INTERFACE: %s (return) \n", func);
     }
+    fflush(stdout);
   }
 #endif
 }
@@ -1307,7 +1308,7 @@ void qudaShift(int external_precision, int quda_precision, const void *const lin
 } // qudaShift
 
 void qudaSpinTaste(int external_precision, int quda_precision, const void *const links,
-               void* src, void* dst, int spin, int taste, int reloadGaugeField)
+               void* src, void* dst, int spin, int taste, int *reloadGaugeField)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
