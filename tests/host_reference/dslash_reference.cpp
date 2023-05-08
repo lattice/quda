@@ -743,10 +743,14 @@ double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, dou
 }
 
 double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorField &ref, quda::ColorSpinorField &in,
-                                quda::ColorSpinorField &out, double mass, void *qdp_fatlink[], void *qdp_longlink[],
-                                void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param,
-                                QudaInvertParam &inv_param, int shift)
+                                quda::ColorSpinorField &out, double mass, quda::GaugeField &fatlink, quda::GaugeField &longlink,
+                                QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, int shift)
 {
+  void *qdp_fatlink[] = {fatlink.data(0), fatlink.data(1), fatlink.data(2), fatlink.data(3)};
+  void *qdp_longlink[] = {longlink.data(0), longlink.data(1), longlink.data(2), longlink.data(3)};
+  void *ghost_fatlink[] = {fatlink.Ghost()[0].data(), fatlink.Ghost()[1].data(), fatlink.Ghost()[2].data(), fatlink.Ghost()[3].data()};
+  void *ghost_longlink[] = {longlink.Ghost()[0].data(), longlink.Ghost()[1].data(), longlink.Ghost()[2].data(), longlink.Ghost()[3].data()};
+
   switch (test_type) {
   case 0: // full parity solution, full parity system
   case 1: // full parity solution, solving EVEN EVEN prec system

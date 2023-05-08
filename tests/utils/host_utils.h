@@ -155,6 +155,7 @@ int fullLatticeIndex(int dim[], int index, int oddBit);
 int getOddBit(int X);
 
 void createSiteLinkCPU(void *const *const link, QudaPrecision precision, int phase);
+void createSiteLinkCPU(quda::GaugeField &u, QudaPrecision precision, int phase);
 void su3_construct(void *mat, QudaReconstructType reconstruct, QudaPrecision precision);
 void su3_reconstruct(void *mat, int dir, int ga_idx, QudaReconstructType reconstruct, QudaPrecision precision,
                      QudaGaugeParam *param);

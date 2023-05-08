@@ -1376,6 +1376,12 @@ void createSiteLinkCPU(void *const *link, QudaPrecision precision, int phase)
   return;
 }
 
+void createSiteLinkCPU(quda::GaugeField &u, QudaPrecision precision, int phase)
+{
+  void *link[] = {u.data(0), u.data(1), u.data(2), u.data(3)};
+  createSiteLinkCPU(link, precision, phase);
+}
+
 template <typename Float> int compareLink(Float **linkA, Float **linkB, int len)
 {
   const int fail_check = 16;

@@ -183,8 +183,16 @@ namespace quda {
     // for 5-dimensional fields, we only communicate in the space-time dimensions
     nDimComms = nDim == 5 ? 4 : nDim;
 
+    // if the memory location isn't set, use field location to set it
     mem_type = param.mem_type;
-
+    if (mem_type == QUDA_MEMORY_INVALID) {
+      mem_type = location == QUDA_CUDA_FIELD_LOCATION ? QUDA_MEMORY_DEVICE : QUDA_MEMORY_HOST;
+      logQuda(QUDA_DEBUG_VERBOSE, "setting default memory type mem_type %d\n", mem_type);
+    } else if (mem_type == QUDA_MEMORY_DEVICE && location == QUDA_CPU_FIELD_LOCATION) {
+      mem_type = QUDA_MEMORY_HOST;
+    } else if (mem_type == QUDA_MEMORY_HOST && location == QUDA_CUDA_FIELD_LOCATION) {
+      mem_type = QUDA_MEMORY_DEVICE;
+    }
     setTuningString();
   }
 

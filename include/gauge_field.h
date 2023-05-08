@@ -195,9 +195,8 @@ namespace quda {
   class GaugeField : public LatticeField {
 
   protected:
-    void *gauge; /** The gauge field allocation */
-    void *gauge_h; /** Mapped-memory pointer when allocating on the host */
-    void **gauge_qdp; /** Array of pointers to each subset (QDP order) */
+    quda_ptr gauge; /** The gauge field allocation */
+    array<quda_ptr, 8> gauge_array; /** Array of pointers to each subset (e.g., QDP or QDPJITorder) */
       size_t bytes;        // bytes allocated per full field
       size_t phase_offset; // offset in bytes to gauge phases - useful to keep track of texture alignment
       size_t phase_bytes;  // bytes needed to store the phases
@@ -221,7 +220,7 @@ namespace quda {
 
       QudaFieldCreate create; // used to determine the type of field created
 
-      mutable void *ghost[2 * QUDA_MAX_DIM]; // stores the ghost zone of the gauge field (non-native fields only)
+      mutable array<quda_ptr, 2 * QUDA_MAX_DIM> ghost; // stores the ghost zone of the gauge field (non-native fields only)
 
       mutable int ghostFace[QUDA_MAX_DIM]; // the size of each face
 
@@ -272,6 +271,11 @@ namespace quda {
          @brief Set the vol_string and aux_string for use in tuning
       */
       void setTuningString();
+
+    /**
+       @brief Initialize the padded region to 0
+     */
+    void zeroPad();
 
   public:
     GaugeField(const GaugeFieldParam &param);
@@ -372,28 +376,55 @@ namespace quda {
 
     /**
        @brief Return base pointer to the gauge field allocation.
-       @tparam T Optional type to cast the pointer to.
+       @tparam T Optional type to cast the pointer to (default is void*).
        @return Base pointer to the gauge field allocation
      */
-    template <typename T = void*> auto data() const
+    template <typename T = void*>
+    std::enable_if_t<std::is_pointer_v<T> && !std::is_pointer_v<typename std::remove_pointer<T>::type>, T> data() const
     {
-      static_assert(std::is_pointer_v<T>, "data() requires a pointer cast type");
+      if (is_pointer_array(order))
+        errorQuda("Non dim-array ordered field requested but order is %d", order);
+      return reinterpret_cast<T>(gauge.data());
+    }
 
-      using U = typename std::remove_pointer<T>::type;
-      if constexpr (std::is_pointer_v<U>) {
-        if (!is_pointer_array(order)) errorQuda("Dim-array ordered field requested but order is %d", order);
-        return reinterpret_cast<T>(gauge_qdp);
-      } else {
-        if (is_pointer_array(order) && !std::is_same_v<T, void*>) errorQuda("Non dim-array ordered field requested but order is %d", order);
-        return reinterpret_cast<T>(gauge);
-      }
+    /**
+       @brief Return base pointer to the gauge field allocation
+       specified by the array index.  This is for geometry-array
+       ordered fields, e.g., QDP or QDPJIT.
+
+       @tparam T Optional type to cast the pointer to (default is void*)
+       @param[in] d Dimension index when the allocation is an array type
+       @return Base pointer to the gauge field allocation
+     */
+    template <typename T = void*> auto data(unsigned int d) const
+    {
+      static_assert(std::is_pointer_v<T> && !std::is_pointer_v<typename std::remove_pointer<T>::type>, "data() requires a pointer cast type");
+      if (d >= (unsigned)geometry) errorQuda("Invalid array index %d for geometry %d field", d, geometry);
+      if (!is_pointer_array(order)) errorQuda("Dim-array ordered field requested but order is %d", order);
+      return reinterpret_cast<T>(gauge_array[d].data());
+    }
+
+    /**
+       @brief Return array of pointers to the per dimension gauge field allocation(s).
+       @tparam T Optional type to cast the pointer to (default is
+       void*).  this is for geometry-array ordered fields, e.g., QDP
+       or QDPJIT.
+       @return Array of pointers to the gauge field allocations
+     */
+    template <typename T = void*>
+    std::enable_if_t<std::is_pointer_v<T> && !std::is_pointer_v<typename std::remove_pointer<T>::type>, array<T, QUDA_MAX_DIM>> data_array() const
+    {
+      if (!is_pointer_array(order)) errorQuda("Dim-array ordered field requested but order is %d", order);
+      array<T, QUDA_MAX_DIM> u = {};
+      for (auto d = 0; d < geometry; d++) u[d] = static_cast<T>(gauge_array[d]);
+      return u;
     }
 
     virtual int full_dim(int d) const { return x[d]; }
 
-    auto Ghost() const {
+    auto& Ghost() const {
       if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
-      return (void * const *)ghost;
+      return ghost;
     }
 
     /**
@@ -486,16 +517,8 @@ namespace quda {
 
   class cudaGaugeField : public GaugeField {
 
-  private:
-
-    /**
-       @brief Initialize the padded region to 0
-     */
-    void zeroPad();
-
   public:
     cudaGaugeField(const GaugeFieldParam &);
-    virtual ~cudaGaugeField();
 
     /**
        @brief Exchange the ghost and store store in the padded region
@@ -621,8 +644,6 @@ namespace quda {
       @param[in] the host buffer to copy from.
     */
     virtual void copy_from_buffer(void *buffer);
-
-    void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
   };
 
   class cpuGaugeField : public GaugeField {
@@ -640,7 +661,6 @@ namespace quda {
        extended.
     */
     cpuGaugeField(const GaugeFieldParam &param);
-    virtual ~cpuGaugeField();
 
     /**
        @brief Exchange the ghost and store store in the padded region
@@ -695,8 +715,6 @@ namespace quda {
       @param[in] the host buffer to copy from.
     */
     virtual void copy_from_buffer(void *buffer);
-
-    void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
   };
 
   /**

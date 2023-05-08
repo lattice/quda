@@ -26,7 +26,7 @@ quda::cpuGaugeField *cpuReference = NULL;
 static QudaGaugeParam gaugeParam;
 
 // Create a field of links that are not su3_matrices
-void createNoisyLinkCPU(void *const *field, QudaPrecision prec, int seed)
+void createNoisyLinkCPU(quda::GaugeField &field, QudaPrecision prec, int seed)
 {
   createSiteLinkCPU(field, prec, 0);
 
@@ -34,10 +34,10 @@ void createNoisyLinkCPU(void *const *field, QudaPrecision prec, int seed)
   for (int dir = 0; dir < 4; ++dir) {
     for (int i = 0; i < V * 18; ++i) {
       if (prec == QUDA_DOUBLE_PRECISION) {
-        double *ptr = ((double **)field)[dir] + i;
+        double *ptr = field.data<double*>(dir) + i;
         *ptr += (rand() - RAND_MAX / 2.0) / (20.0 * RAND_MAX);
       } else if (prec == QUDA_SINGLE_PRECISION) {
-        float *ptr = ((float **)field)[dir] + i;
+        float *ptr = field.data<float *>(dir) + i;
         *ptr += (rand() - RAND_MAX / 2.0) / (20.0 * RAND_MAX);
       }
     }
@@ -77,8 +77,8 @@ static void hisq_force_init()
   seed += quda::comm_rank();
 #endif
 
-  createNoisyLinkCPU(cpuFatLink->data<void *const *>(), gaugeParam.cpu_prec, seed);
-  createNoisyLinkCPU(cpuOprod->data<void *const *>(), gaugeParam.cpu_prec, seed + 1);
+  createNoisyLinkCPU(*cpuFatLink, gaugeParam.cpu_prec, seed);
+  createNoisyLinkCPU(*cpuOprod, gaugeParam.cpu_prec, seed + 1);
 
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.setPrecision(gaugeParam.cuda_prec, true);
@@ -142,7 +142,7 @@ TEST(hisq_force_unitarize, verify)
 
   double accuracy = prec == QUDA_DOUBLE_PRECISION ? 1e-10 : 1e-5;
   for (int dir = 0; dir < 4; ++dir) {
-    res[dir] = compare_floats(cpuReference->data<void *const *>()[dir], cpuResult->data<void *const *>()[dir],
+    res[dir] = compare_floats(cpuReference->data<void *>(dir), cpuResult->data<void *>(dir),
                               cpuReference->Volume() * gauge_site_size, accuracy, gaugeParam.cpu_prec);
 
     quda::comm_allreduce_int(res[dir]);

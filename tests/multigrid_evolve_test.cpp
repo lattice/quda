@@ -35,13 +35,13 @@ void setReunitarizationConsts()
   setUnitarizeLinksConstants(unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
 }
 
-void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge)
+void CallUnitarizeLinks(quda::GaugeField &gauge)
 {
   using namespace quda;
   int *num_failures_dev = (int *)device_malloc(sizeof(int));
   int num_failures;
   qudaMemset(num_failures_dev, 0, sizeof(int));
-  unitarizeLinks(*cudaInGauge, num_failures_dev);
+  unitarizeLinks(gauge, num_failures_dev);
 
   qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), qudaMemcpyDeviceToHost);
   if (num_failures > 0) errorQuda("Error in the unitarization\n");
@@ -219,12 +219,13 @@ int main(int argc, char **argv)
   {
     using namespace quda;
     GaugeFieldParam gParam(gauge_param);
+    gParam.location = QUDA_CUDA_FIELD_LOCATION;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     gParam.create = QUDA_NULL_FIELD_CREATE;
     gParam.link_type = gauge_param.type;
     gParam.reconstruct = gauge_param.reconstruct;
     gParam.setPrecision(gParam.Precision(), true);
-    cudaGaugeField *gauge = new cudaGaugeField(gParam);
+    cudaGaugeField gauge(gParam);
 
     int pad = 0;
     lat_dim_t y;
@@ -239,15 +240,15 @@ int main(int argc, char **argv)
     gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParamEx.t_boundary = gParam.t_boundary;
     gParamEx.nFace = 1;
-    for (int dir = 0; dir < 4; ++dir) gParamEx.r[dir] = R[dir];
-    cudaGaugeField *gaugeEx = new cudaGaugeField(gParamEx);
+    gParamEx.r = R;
+    cudaGaugeField gaugeEx(gParamEx);
 
     QudaGaugeObservableParam obs_param = newQudaGaugeObservableParam();
     obs_param.compute_plaquette = QUDA_BOOLEAN_TRUE;
     obs_param.compute_qcharge = QUDA_BOOLEAN_TRUE;
 
     // CURAND random generator initialization
-    RNG *randstates = new RNG(*gauge, 1234);
+    RNG randstates(gauge, 1234);
     int nsteps = 10;
     int nhbsteps = 1;
     int novrsteps = 1;
@@ -255,22 +256,22 @@ int main(int argc, char **argv)
     double beta_value = 6.2;
 
     if (link_recon != QUDA_RECONSTRUCT_8 && coldstart)
-      InitGaugeField(*gaugeEx);
+      InitGaugeField(gaugeEx);
     else
-      InitGaugeField(*gaugeEx, *randstates);
+      InitGaugeField(gaugeEx, randstates);
     // Reunitarization setup
     setReunitarizationConsts();
 
     // Do a series of Heatbath updates
-    Monte(*gaugeEx, *randstates, beta_value, 100 * nhbsteps, 100 * novrsteps);
+    Monte(gaugeEx, randstates, beta_value, 100 * nhbsteps, 100 * novrsteps);
 
     // Copy into regular field
-    copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
+    copyExtendedGauge(gauge, gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
     // load the gauge field from gauge
-    gauge_param.gauge_order = gauge->Order();
+    gauge_param.gauge_order = gauge.Order();
     gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
-    loadGaugeQuda(gauge->data(), &gauge_param);
+    loadGaugeQuda(gauge.data(), &gauge_param);
     gaugeObservablesQuda(&obs_param);
 
     // Demonstrate MG evolution on an evolving gauge field
@@ -311,14 +312,14 @@ int main(int argc, char **argv)
 
     for (int step = 1; step < nsteps; ++step) {
       freeGaugeQuda();
-      Monte(*gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
+      Monte(gaugeEx, randstates, beta_value, nhbsteps, novrsteps);
 
       // Reunitarize gauge links
       CallUnitarizeLinks(gaugeEx);
 
       // Copy into regular field
-      copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
-      loadGaugeQuda(gauge->data(), &gauge_param);
+      copyExtendedGauge(gauge, gaugeEx, QUDA_CUDA_FIELD_LOCATION);
+      loadGaugeQuda(gauge.data(), &gauge_param);
 
       if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         constructHostCloverField(clover, clover_inv, inv_param);
@@ -382,9 +383,9 @@ int main(int argc, char **argv)
     CallUnitarizeLinks(gaugeEx);
 
     // copy into regular field
-    copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
+    copyExtendedGauge(gauge, gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
-    loadGaugeQuda(gauge->data(), &gauge_param);
+    loadGaugeQuda(gauge.data(), &gauge_param);
     // Recompute Gauge Observables
     gaugeObservablesQuda(&obs_param);
 
@@ -447,12 +448,8 @@ int main(int argc, char **argv)
     // free the multigrid solver
     if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
 
-    delete gauge;
-    delete gaugeEx;
     // Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
-
-    delete randstates;
   }
 
   // stop the timer

@@ -34,8 +34,6 @@ std::unique_ptr<ColorSpinorField> tmp;
 
 void *links[4];
 
-void **ghostLink;
-
 QudaParity parity = QUDA_EVEN_PARITY;
 
 GaugeCovDev *dirac;
@@ -97,7 +95,6 @@ void init(int argc, char **argv)
   GaugeFieldParam cpuParam(gauge_param, links);
   cpuParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuLink = new cpuGaugeField(cpuParam);
-  ghostLink = cpuLink->Ghost();
 
   printfQuda("Links sending...");
   loadGaugeQuda(links, &gauge_param);
@@ -166,9 +163,9 @@ void covdevRef(int mu)
   // compare to dslash reference implementation
   printfQuda("Calculating reference implementation...");
 #ifdef MULTI_GPU
-  mat_mg4dir(*spinorRef, links, ghostLink, *spinor, dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
+  mat_mg4dir(*spinorRef, *cpuLink, *spinor, dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
 #else
-  mat(spinorRef->V(), links, spinor->V(), dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
+  mat(spinorRef->V(), *cpuLink, spinor->V(), dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
 #endif
   printfQuda("done.\n");
 }

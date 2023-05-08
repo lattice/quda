@@ -169,7 +169,7 @@ static void hisq_force_init()
   cpuGauge_ex = new cpuGaugeField(gParam_ex);
 
   if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
-    createSiteLinkCPU(cpuGauge->data<void *const *>(), qudaGaugeParam.cpu_prec, 1);
+    createSiteLinkCPU(*cpuGauge, qudaGaugeParam.cpu_prec, 1);
   } else {
     errorQuda("Unsupported gauge order %d", gauge_order);
   }

@@ -364,8 +364,7 @@ int main(int argc, char **argv)
 
     for (int k = 0; k < Nsrc; k++) {
       if (verify_results)
-        verifyStaggeredInversion(*tmp, *ref, *in[k], *out[k], mass, qdp_fatlink, qdp_longlink, (void **)cpuFat->Ghost(),
-                                 (void **)cpuLong->Ghost(), gauge_param, inv_param, 0);
+        verifyStaggeredInversion(*tmp, *ref, *in[k], *out[k], mass, *cpuFat, *cpuLong, gauge_param, inv_param, 0);
     }
     break;
 
@@ -405,8 +404,7 @@ int main(int argc, char **argv)
 
       for (int i = 0; i < multishift; i++) {
         printfQuda("%dth solution: mass=%f, ", i, masses[i]);
-        verifyStaggeredInversion(*tmp, *ref, *in[k], *qudaOutArray[i], masses[i], qdp_fatlink, qdp_longlink,
-                                 (void **)cpuFat->Ghost(), (void **)cpuLong->Ghost(), gauge_param, inv_param, i);
+        verifyStaggeredInversion(*tmp, *ref, *in[k], *qudaOutArray[i], masses[i], *cpuFat, *cpuLong, gauge_param, inv_param, i);
       }
     }
 

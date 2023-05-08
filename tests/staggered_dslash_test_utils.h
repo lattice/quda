@@ -71,8 +71,8 @@ struct StaggeredDslashTestWrapper {
   // In the HISQ case, we include building fat/long links in this unit test
   void *qdp_fatlink_cpu[4] = {nullptr, nullptr, nullptr, nullptr};
   void *qdp_longlink_cpu[4] = {nullptr, nullptr, nullptr, nullptr};
-  void *const *ghost_fatlink_cpu;
-  void *const *ghost_longlink_cpu;
+  void **ghost_fatlink_cpu;
+  void **ghost_longlink_cpu;
 
   QudaParity parity = QUDA_EVEN_PARITY;
 
@@ -225,14 +225,14 @@ struct StaggeredDslashTestWrapper {
     GaugeFieldParam cpuFatParam(gauge_param, milc_fatlink_cpu);
     cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
     cpuFat = new cpuGaugeField(cpuFatParam);
-    ghost_fatlink_cpu = cpuFat->Ghost();
+    for (int i = 0; i < 4; i++) ghost_fatlink_cpu[i] = cpuFat->Ghost()[i].data();
 
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
       gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
       GaugeFieldParam cpuLongParam(gauge_param, milc_longlink_cpu);
       cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
       cpuLong = new cpuGaugeField(cpuLongParam);
-      ghost_longlink_cpu = cpuLong ? cpuLong->Ghost() : nullptr;
+      for (int i = 0; i < 4; i++) ghost_longlink_cpu[i] = cpuLong ? cpuLong->Ghost()[i].data() : nullptr;
     }
 #endif
 

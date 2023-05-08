@@ -2662,7 +2662,7 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
     //but if not sufficient device memory, then the user may choose mapped type of memory
     ritzParam.mem_type = eig_param.mem_type_ritz;
   } else { //host location
-    ritzParam.mem_type = QUDA_MEMORY_PINNED;
+    ritzParam.mem_type = QUDA_MEMORY_HOST_PINNED;
   }
 
   int ritzVolume = 1;

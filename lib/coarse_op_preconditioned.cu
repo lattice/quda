@@ -187,8 +187,7 @@ namespace quda
     } else if (X.Location() == QUDA_CPU_FIELD_LOCATION && X.Order() == QUDA_QDP_GAUGE_ORDER) {
       const cpuGaugeField *X_h = static_cast<const cpuGaugeField*>(&X);
       cpuGaugeField *Xinv_h = static_cast<cpuGaugeField*>(&Xinv);
-      blas::flops += invert(Xinv_h->data<void *const *>()[0], X_h->data<void *const *>()[0], n, X_h->Volume(),
-                            X.Precision(), X.Location());
+      blas::flops += invert(Xinv_h->data<void *>(0), X_h->data<void *>(0), n, X_h->Volume(), X.Precision(), X.Location());
     } else {
       errorQuda("Unsupported location=%d and order=%d", X.Location(), X.Order());
     }

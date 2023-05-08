@@ -193,7 +193,7 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, cons
   } // 4-d volume
 }
 
-void covdev_dslash_mg4dir(ColorSpinorField &out, void **link, void **ghostLink, const ColorSpinorField &in, int oddBit,
+void covdev_dslash_mg4dir(ColorSpinorField &out, const GaugeField &link, const ColorSpinorField &in, int oddBit,
                           int daggerBit, int mu, QudaPrecision sPrecision, QudaPrecision gPrecision)
 {
   QudaParity otherparity = QUDA_INVALID_PARITY;
@@ -208,32 +208,38 @@ void covdev_dslash_mg4dir(ColorSpinorField &out, void **link, void **ghostLink, 
 
   in.exchangeGhost(otherparity, nFace, daggerBit);
 
+  void *data[4] = {link.data(0), link.data(1), link.data(2), link.data(3)};
+  void *ghostLink[4] = {link.Ghost()[0].data(), link.Ghost()[1].data(), link.Ghost()[2].data(), link.Ghost()[3].data()};
+
   if (sPrecision == QUDA_DOUBLE_PRECISION) {
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
-      covdevReference_mg4dir((double *)out.V(), (double **)link, (double **)ghostLink, in, oddBit, daggerBit, mu);
+      covdevReference_mg4dir((double *)out.V(), reinterpret_cast<double**>(data), (double **)ghostLink, in, oddBit, daggerBit, mu);
     } else {
-      covdevReference_mg4dir((double *)out.V(), (float **)link, (float **)ghostLink, in, oddBit, daggerBit, mu);
+      covdevReference_mg4dir((double *)out.V(), reinterpret_cast<float**>(data), (float **)ghostLink, in, oddBit, daggerBit, mu);
     }
   } else {
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
-      covdevReference_mg4dir((float *)out.V(), (double **)link, (double **)ghostLink, in, oddBit, daggerBit, mu);
+      covdevReference_mg4dir((float *)out.V(), reinterpret_cast<double**>(data), (double **)ghostLink, in, oddBit, daggerBit, mu);
     } else {
-      covdevReference_mg4dir((float *)out.V(), (float **)link, (float **)ghostLink, in, oddBit, daggerBit, mu);
+      covdevReference_mg4dir((float *)out.V(), reinterpret_cast<float**>(data), (float **)ghostLink, in, oddBit, daggerBit, mu);
     }
   }
 }
 
 template <typename sFloat, typename gFloat>
-void Mat_mg4dir(ColorSpinorField &out, gFloat **link, gFloat **ghostLink, const ColorSpinorField &in, int daggerBit,
-                int mu)
+void Mat_mg4dir(ColorSpinorField &out, const GaugeField &link, const ColorSpinorField &in, int daggerBit, int mu)
 {
+  void *data[4] = {link.data(0), link.data(1), link.data(2), link.data(3)};
+  void *ghostLink[4] = {link.Ghost()[0].data(), link.Ghost()[1].data(), link.Ghost()[2].data(), link.Ghost()[3].data()};
+
   const int nFace = 1;
   {
     auto &inEven = in.Even();
     auto &outOdd = out.Odd();
 
     inEven.exchangeGhost(QUDA_EVEN_PARITY, nFace, daggerBit);
-    covdevReference_mg4dir(reinterpret_cast<sFloat *>(outOdd.V()), link, ghostLink, in.Even(), 1, daggerBit, mu);
+    covdevReference_mg4dir(reinterpret_cast<sFloat *>(outOdd.V()), reinterpret_cast<gFloat**>(data),
+                           reinterpret_cast<gFloat**>(ghostLink), in.Even(), 1, daggerBit, mu);
   }
 
   {
@@ -241,29 +247,30 @@ void Mat_mg4dir(ColorSpinorField &out, gFloat **link, gFloat **ghostLink, const 
     auto &outEven = out.Even();
 
     inOdd.exchangeGhost(QUDA_ODD_PARITY, nFace, daggerBit);
-    covdevReference_mg4dir(reinterpret_cast<sFloat *>(outEven.V()), link, ghostLink, in.Odd(), 0, daggerBit, mu);
+    covdevReference_mg4dir(reinterpret_cast<sFloat *>(outEven.V()), reinterpret_cast<gFloat**>(data),
+                           reinterpret_cast<gFloat**>(ghostLink), in.Odd(), 0, daggerBit, mu);
   }
 }
 
-void mat_mg4dir(ColorSpinorField &out, void **link, void **ghostLink, const ColorSpinorField &in, int dagger_bit,
+void mat_mg4dir(ColorSpinorField &out, const GaugeField &link, const ColorSpinorField &in, int dagger_bit,
                 int mu, QudaPrecision sPrecision, QudaPrecision gPrecision)
 {
   if (sPrecision == QUDA_DOUBLE_PRECISION) {
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
-      Mat_mg4dir<double, double>(out, (double **)link, (double **)ghostLink, in, dagger_bit, mu);
+      Mat_mg4dir<double, double>(out, link, in, dagger_bit, mu);
     } else {
-      Mat_mg4dir<double, float>(out, (float **)link, (float **)ghostLink, in, dagger_bit, mu);
+      Mat_mg4dir<double, float>(out, link, in, dagger_bit, mu);
     }
   } else {
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
-      Mat_mg4dir<float, double>(out, (double **)link, (double **)ghostLink, in, dagger_bit, mu);
+      Mat_mg4dir<float, double>(out, link, in, dagger_bit, mu);
     } else {
-      Mat_mg4dir<float, float>(out, (float **)link, (float **)ghostLink, in, dagger_bit, mu);
+      Mat_mg4dir<float, float>(out, link, in, dagger_bit, mu);
     }
   }
 }
 
-void matdagmat_mg4dir(ColorSpinorField &out, void **link, void **ghostLink, const ColorSpinorField &in, int dagger_bit,
+void matdagmat_mg4dir(ColorSpinorField &out, const GaugeField &link, const ColorSpinorField &in, int dagger_bit,
                       int mu, QudaPrecision sPrecision, QudaPrecision gPrecision, ColorSpinorField &tmp,
                       QudaParity parity)
 {
@@ -279,9 +286,9 @@ void matdagmat_mg4dir(ColorSpinorField &out, void **link, void **ghostLink, cons
     errorQuda("full parity not supported");
   }
 
-  covdev_dslash_mg4dir(tmp, link, ghostLink, in, otherparity, dagger_bit, mu, sPrecision, gPrecision);
+  covdev_dslash_mg4dir(tmp, link, in, otherparity, dagger_bit, mu, sPrecision, gPrecision);
 
-  covdev_dslash_mg4dir(out, link, ghostLink, tmp, parity, dagger_bit, mu, sPrecision, gPrecision);
+  covdev_dslash_mg4dir(out, link, tmp, parity, dagger_bit, mu, sPrecision, gPrecision);
 }
 
 #endif

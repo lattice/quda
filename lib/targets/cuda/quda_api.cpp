@@ -376,6 +376,16 @@ namespace quda
     QudaMem set(ptr, value, count, device::get_default_stream(), false, func, file, line);
   }
 
+  void qudaMemset_(quda_ptr &ptr, int value, size_t count, const char *func, const char *file, const char *line)
+  {
+    if (count == 0) return;
+    if (ptr.is_device()) {
+      QudaMem set(ptr.data(), value, count, device::get_default_stream(), false, func, file, line);
+    } else {
+      memset(ptr.data(), value, count);
+    }
+  }
+
   void qudaMemsetAsync_(void *ptr, int value, size_t count, const qudaStream_t &stream, const char *func,
                         const char *file, const char *line)
   {
@@ -388,6 +398,17 @@ namespace quda
   {
     cudaError_t error = cudaMemset2D(ptr, pitch, value, width, height);
     set_runtime_error(error, __func__, func, file, line);
+  }
+
+  void qudaMemset2D_(quda_ptr &ptr, size_t offset, size_t pitch, int value, size_t width, size_t height, const char *func,
+                     const char *file, const char *line)
+  {
+    if (ptr.is_device()) {
+      cudaError_t error = cudaMemset2D(static_cast<char*>(ptr.data()) + offset, pitch, value, width, height);
+      set_runtime_error(error, __func__, func, file, line);
+    } else {
+      for (auto i = 0u; i < height; i++) memset(static_cast<char*>(ptr.data()) + offset + i * pitch, value, width);
+    }
   }
 
   void qudaMemset2DAsync_(void *ptr, size_t pitch, int value, size_t width, size_t height, const qudaStream_t &stream,

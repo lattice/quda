@@ -764,7 +764,7 @@ void dw_dslash(void *out, void *const *gauge, void *in, int oddBit, int daggerBi
   GaugeFieldParam gauge_field_param(gauge_param, (void **)gauge);
   gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuGaugeField cpu(gauge_field_param);
-  void **ghostGauge = (void **)cpu.Ghost();
+  void *ghostGauge[4] = {cpu.Ghost()[0].data(), cpu.Ghost()[1].data(), cpu.Ghost()[2].data(), cpu.Ghost()[3].data()};
 
   // Get spinor ghost fields
   // First wrap the input spinor into a ColorSpinorField
@@ -831,7 +831,7 @@ void dslash_4_4d(void *out, void *const *gauge, void *in, int oddBit, int dagger
   GaugeFieldParam gauge_field_param(gauge_param, (void **)gauge);
   gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuGaugeField cpu(gauge_field_param);
-  void **ghostGauge = (void **)cpu.Ghost();
+  void *ghostGauge[4] = {cpu.Ghost()[0].data(), cpu.Ghost()[1].data(), cpu.Ghost()[2].data(), cpu.Ghost()[3].data()};
 
   // Get spinor ghost fields
   // First wrap the input spinor into a ColorSpinorField
@@ -1357,7 +1357,7 @@ void mdw_mdagm_local(void *out, void *const *gauge, void *in, double _Complex *k
   QudaGaugeParam padded_gauge_param(gauge_param);
   for (int d = 0; d < 4; d++) { padded_gauge_param.X[d] += 2 * R[d]; }
 
-  auto padded_gauge_p = padded_gauge->data<void *const *>();
+  void *padded_gauge_p[] = {padded_gauge->data(0), padded_gauge->data(1), padded_gauge->data(2), padded_gauge->data(3)};
 
   // Extend these global variables then restore them
   int V5_old = V5;

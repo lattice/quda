@@ -2,6 +2,7 @@
 
 #include <host_utils.h>
 #include <comm_quda.h>
+#include <gauge_field.h>
 
 template <typename Float> static inline void sum(Float *dst, Float *a, Float *b, int cnt)
 {
@@ -107,9 +108,8 @@ double verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *s
                                  void *clover_inv);
 
 double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorField &ref, quda::ColorSpinorField &in,
-                                quda::ColorSpinorField &out, double mass, void *qdp_fatlink[], void *qdp_longlink[],
-                                void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param,
-                                QudaInvertParam &inv_param, int shift);
+                                quda::ColorSpinorField &out, double mass, quda::GaugeField &fatlink, quda::GaugeField &longlink,
+                                QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, int shift);
 
 // i represents a "half index" into an even or odd "half lattice".
 // when oddBit={0,1} the half lattice is {even,odd}.

@@ -405,9 +405,11 @@ void gauge_force_reference_dir(void *refMom, int dir, double eb3, void *const *s
   host_free(staple);
 }
 
-void gauge_force_reference(void *refMom, double eb3, void *const *const sitelink, QudaPrecision prec, int ***path_dir,
+void gauge_force_reference(void *refMom, double eb3, quda::GaugeField &u, QudaPrecision prec, int ***path_dir,
                            int *length, void *loop_coeff, int num_paths, bool compute_force)
 {
+  void *sitelink[] = {u.data(0), u.data(1), u.data(2), u.data(3)};
+
   // created extended field
   quda::lat_dim_t R;
   for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
@@ -419,8 +421,9 @@ void gauge_force_reference(void *refMom, double eb3, void *const *const sitelink
   auto qdp_ex = quda::createExtendedGauge((void **)sitelink, param, R);
   lattice_t lat(*qdp_ex);
 
+  void *sitelink_ex[] = {qdp_ex->data(0), qdp_ex->data(1), qdp_ex->data(2), qdp_ex->data(3)};
   for (int dir = 0; dir < 4; dir++) {
-    gauge_force_reference_dir(refMom, dir, eb3, sitelink, qdp_ex->data<void *const *>(), prec, path_dir[dir], length,
+    gauge_force_reference_dir(refMom, dir, eb3, sitelink, sitelink_ex, prec, path_dir[dir], length,
                               loop_coeff, num_paths, lat, compute_force);
   }
 

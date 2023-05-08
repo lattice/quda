@@ -356,7 +356,7 @@ namespace quda {
         scale_inv(static_cast<Float>(1.0))
       {
         for (int d = 0; d < U.Geometry(); d++)
-          u[d] = gauge_ ? static_cast<complex<storeFloat> **>(gauge_)[d] : U.data<complex<storeFloat> *const *>()[d];
+          u[d] = gauge_ ? static_cast<complex<storeFloat> **>(gauge_)[d] : U.data<complex<storeFloat> *>(d);
         resetScale(U.Scale());
       }
 
@@ -427,12 +427,12 @@ namespace quda {
       {
         for (int d=0; d<4; d++) {
 	  ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
-	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d]));
+	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d].data()));
 	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 
 	  ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
 	    ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
-	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4]));
+	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4].data()));
 	  ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 	}
 
@@ -548,12 +548,12 @@ namespace quda {
       {
         for (int d=0; d<4; d++) {
 	  ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
-	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d]));
+	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d].data()));
 	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 
 	  ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
 	    ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
-	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4]));
+	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4].data()));
 	  ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 	}
 
@@ -1753,8 +1753,8 @@ namespace quda {
         using store_t = Float;
         using real = typename mapper<Float>::type;
         using complex = complex<real>;
-        Float *ghost[QUDA_MAX_DIM];
-        int faceVolumeCB[QUDA_MAX_DIM];
+        Float *ghost[QUDA_MAX_DIM] = {};
+        int faceVolumeCB[QUDA_MAX_DIM] = {};
         const int volumeCB;
         const int stride;
         const int geometry;
@@ -1769,9 +1769,11 @@ namespace quda {
           if (geometry == QUDA_COARSE_GEOMETRY)
             errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
 
-          for (int i = 0; i < 4; i++) {
-            ghost[i] = (ghost_) ? ghost_[i] : (Float *)(u.Ghost()[i]);
-            faceVolumeCB[i] = u.SurfaceCB(i) * u.Nface(); // face volume equals surface * depth
+          if (u.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) {
+            for (int i = 0; i < 4; i++) {
+              ghost[i] = (ghost_) ? ghost_[i] : (Float *)(u.Ghost()[i].data());
+              faceVolumeCB[i] = u.SurfaceCB(i) * u.Nface(); // face volume equals surface * depth
+            }
           }
         }
 
@@ -1831,7 +1833,7 @@ namespace quda {
     QDPOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
       : LegacyOrder<Float,length>(u, ghost_), volumeCB(u.VolumeCB())
     {
-      for (int i = 0; i < 4; i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *const *>()[i];
+      for (int i = 0; i < 4; i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *>(i);
     }
 
         __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
@@ -1877,7 +1879,7 @@ namespace quda {
     QDPJITOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
       : LegacyOrder<Float,length>(u, ghost_), volumeCB(u.VolumeCB())
     {
-      for (int i = 0; i < 4; i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *const *>()[i];
+      for (int i = 0; i < 4; i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : u.data<Float *>(i);
     }
 
         __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const

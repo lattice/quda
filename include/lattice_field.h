@@ -72,7 +72,7 @@ namespace quda {
 
     QudaSiteSubset siteSubset = QUDA_INVALID_SITE_SUBSET;
 
-    QudaMemoryType mem_type = QUDA_MEMORY_DEVICE;
+    QudaMemoryType mem_type = QUDA_MEMORY_INVALID;
 
     /** The type of ghost exchange to be done with this field */
     QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
@@ -104,7 +104,7 @@ namespace quda {
       nDim(nDim),
       pad(pad),
       siteSubset(QUDA_FULL_SITE_SUBSET),
-      mem_type(QUDA_MEMORY_DEVICE),
+      mem_type(location == QUDA_CUDA_FIELD_LOCATION ? QUDA_MEMORY_DEVICE : QUDA_MEMORY_HOST),
       ghostExchange(ghostExchange),
       scale(1.0)
     {
@@ -128,7 +128,7 @@ namespace quda {
       nDim(4),
       pad(0),
       siteSubset(QUDA_FULL_SITE_SUBSET),
-      mem_type(QUDA_MEMORY_DEVICE),
+      mem_type(QUDA_MEMORY_HOST),
       ghostExchange(QUDA_GHOST_EXCHANGE_NO),
       scale(param.scale)
     {

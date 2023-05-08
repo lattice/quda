@@ -908,9 +908,7 @@ namespace quda
     coarseParam.setPrecision(new_precision);
 
     // set where we allocate the field
-    coarseParam.mem_type = (new_mem_type != QUDA_MEMORY_INVALID) ?
-      new_mem_type :
-      (new_location == QUDA_CUDA_FIELD_LOCATION ? QUDA_MEMORY_DEVICE : QUDA_MEMORY_PINNED);
+    coarseParam.mem_type = new_mem_type;
 
     return new ColorSpinorField(coarseParam);
   }
@@ -941,9 +939,7 @@ namespace quda
     }
 
     // set where we allocate the field
-    fineParam.mem_type = (new_mem_type != QUDA_MEMORY_INVALID) ?
-      new_mem_type :
-      (new_location == QUDA_CUDA_FIELD_LOCATION ? QUDA_MEMORY_DEVICE : QUDA_MEMORY_PINNED);
+    fineParam.mem_type = new_mem_type;
 
     return new ColorSpinorField(fineParam);
   }

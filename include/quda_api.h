@@ -3,6 +3,7 @@
 #include <quda_define.h>
 #include <string>
 #include <enum_quda.h>
+#include <malloc_quda.h>
 
 /**
    @file quda_api.h
@@ -64,6 +65,14 @@ namespace quda
                            const char *file, const char *line);
 
   /**
+     @brief Heterogenous memset function
+     @param[out] ptr Heterogeneous pointer
+     @param[in] value Value to set for each byte of specified memory
+     @param[in] count Size in bytes to set
+   */
+  void qudaMemset_(quda_ptr &ptr, int value, size_t count, const char *func, const char *file, const char *line);
+
+  /**
      @brief Wrapper around cudaMemset or driver API equivalent
      @param[out] ptr Starting address pointer
      @param[in] value Value to set for each byte of specified memory
@@ -72,15 +81,15 @@ namespace quda
   void qudaMemset_(void *ptr, int value, size_t count, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around cudaMemset2D or driver API equivalent
-     @param[out] ptr Starting address pointer
+     @brief Heterogenous memset2d function
+     @param[out] ptr Heterogeneous pointer
+     @param[in] offset Offset shift in bytes from the base pointer
      @param[in] Pitch in bytes
      @param[in] value Value to set for each byte of specified memory
      @param[in] width Width in bytes
      @param[in] height Height in bytes
    */
-  void qudaMemset2D_(void *ptr, size_t pitch, int value, size_t width, size_t height, const char *func,
-                     const char *file, const char *line);
+  void qudaMemset2D_(quda_ptr &ptr, size_t offset, size_t pitch, int value, size_t width, size_t height, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaMemsetAsync or driver API equivalent
@@ -224,8 +233,8 @@ namespace quda
 #define qudaMemset(ptr, value, count)                                                                                  \
   ::quda::qudaMemset_(ptr, value, count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
-#define qudaMemset2D(ptr, pitch, value, width, height)                                                                 \
-  ::quda::qudaMemset2D_(ptr, pitch, value, width, height, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+#define qudaMemset2D(ptr, offset, pitch, value, width, height)          \
+  ::quda::qudaMemset2D_(ptr, offset, pitch, value, width, height, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
 #define qudaMemsetAsync(ptr, value, count, stream)                                                                     \
   ::quda::qudaMemsetAsync_(ptr, value, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
