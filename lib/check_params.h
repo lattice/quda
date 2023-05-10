@@ -189,12 +189,14 @@ void printQudaEigParam(QudaEigParam *param) {
   P(qr_tol, 0.0);
   P(check_interval, 0);
   P(max_restarts, 0);
+  P(max_ortho_attempts, 10);
   P(arpack_check, QUDA_BOOLEAN_FALSE);
   P(nk, 0);
   P(np, 0);
   P(eig_type, QUDA_EIG_TR_LANCZOS);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
+  P(ortho_block_size, 0);
 #else
   P(use_eigen_qr, QUDA_BOOLEAN_INVALID);
   P(use_poly_acc, QUDA_BOOLEAN_INVALID);
@@ -216,16 +218,18 @@ void printQudaEigParam(QudaEigParam *param) {
   P(qr_tol, INVALID_DOUBLE);
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
+  P(max_ortho_attempts, INVALID_INT);
   P(arpack_check, QUDA_BOOLEAN_INVALID);
   P(nk, INVALID_INT);
   P(np, INVALID_INT);
   P(eig_type, QUDA_EIG_INVALID);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
+  P(ortho_block_size, INVALID_INT);
 #endif
 
   // only need to enfore block size checking if doing a block eigen solve
-#ifdef CHECK__PARAM
+#ifdef CHECK_PARAM
   if (param->eig_type == QUDA_EIG_BLK_TR_LANCZOS)
 #endif
     P(block_size, INVALID_INT);
@@ -1026,14 +1030,32 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
 #ifdef INIT_PARAM
   P(su_project, QUDA_BOOLEAN_FALSE);
   P(compute_plaquette, QUDA_BOOLEAN_FALSE);
+  P(compute_polyakov_loop, QUDA_BOOLEAN_FALSE);
+  P(compute_gauge_loop_trace, QUDA_BOOLEAN_FALSE);
+  P(traces, nullptr);
+  P(input_path_buff, nullptr);
+  P(path_length, nullptr);
+  P(loop_coeff, nullptr);
+  P(num_paths, INVALID_INT);
+  P(max_length, INVALID_INT);
+  P(factor, INVALID_DOUBLE);
   P(compute_qcharge, QUDA_BOOLEAN_FALSE);
   P(compute_qcharge_density, QUDA_BOOLEAN_FALSE);
   P(qcharge_density, nullptr);
+  P(remove_staggered_phase, QUDA_BOOLEAN_FALSE);
 #else
   P(su_project, QUDA_BOOLEAN_INVALID);
   P(compute_plaquette, QUDA_BOOLEAN_INVALID);
+  P(compute_polyakov_loop, QUDA_BOOLEAN_INVALID);
+  P(compute_gauge_loop_trace, QUDA_BOOLEAN_INVALID);
+  if (param->compute_gauge_loop_trace == QUDA_BOOLEAN_TRUE) {
+    P(num_paths, INVALID_INT);
+    P(max_length, INVALID_INT);
+    P(factor, INVALID_DOUBLE);
+  }
   P(compute_qcharge, QUDA_BOOLEAN_INVALID);
   P(compute_qcharge_density, QUDA_BOOLEAN_INVALID);
+  P(remove_staggered_phase, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM
@@ -1120,6 +1142,8 @@ void printQudaBLASParam(QudaBLASParam *param)
   P(batch_count, 1);
   P(data_type, QUDA_BLAS_DATATYPE_S);
   P(data_order, QUDA_BLAS_DATAORDER_ROW);
+  P(blas_type, QUDA_BLAS_INVALID);
+  P(inv_mat_size, INVALID_INT);
 #else
   P(trans_a, QUDA_BLAS_OP_INVALID);
   P(trans_b, QUDA_BLAS_OP_INVALID);
@@ -1138,6 +1162,8 @@ void printQudaBLASParam(QudaBLASParam *param)
   P(batch_count, INVALID_INT);
   P(data_type, QUDA_BLAS_DATATYPE_INVALID);
   P(data_order, QUDA_BLAS_DATAORDER_INVALID);
+  P(blas_type, QUDA_BLAS_INVALID);
+  P(inv_mat_size, INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM

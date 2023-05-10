@@ -20,7 +20,7 @@
   do {                                                                                                                 \
     int status = mpi_call;                                                                                             \
     if (status != MPI_SUCCESS) {                                                                                       \
-      char err_string[128];                                                                                            \
+      char err_string[MPI_MAX_ERROR_STRING];                                                                           \
       int err_len;                                                                                                     \
       MPI_Error_string(status, err_string, &err_len);                                                                  \
       err_string[127] = '\0';                                                                                          \
@@ -118,17 +118,17 @@ namespace quda
     char *hostname = comm_hostname();
 
 #ifdef USE_MPI_GATHER
-  MPI_CHECK(MPI_Allgather(hostname, 128, MPI_CHAR, hostname_recv_buf, 128, MPI_CHAR, MPI_COMM_HANDLE));
+  MPI_CHECK(MPI_Allgather(hostname, QUDA_MAX_HOSTNAME_STRING, MPI_CHAR, hostname_recv_buf, QUDA_MAX_HOSTNAME_STRING, MPI_CHAR, MPI_COMM_HANDLE));
 #else
   // Abuse reductions to emulate all-gather.  We need to copy the
   // local hostname to all other nodes
   // this isn't very scalable though
   for (int i = 0; i < comm_size(); i++) {
-    int data[128];
-    for (int j = 0; j < 128; j++) {
+    int data[QUDA_MAX_HOSTNAME_STRING];
+    for (int j = 0; j < QUDA_MAX_HOSTNAME_STRING; j++) {
       data[j] = (i == comm_rank()) ? hostname[j] : 0;
       QMP_comm_sum_int(QMP_COMM_HANDLE, data + j);
-      hostname_recv_buf[i * 128 + j] = data[j];
+      hostname_recv_buf[i * QUDA_MAX_HOSTNAME_STRING + j] = data[j];
     }
   }
 #endif
@@ -318,6 +318,23 @@ void Communicator::comm_allreduce_sum_array(double *data, size_t size)
   }
 }
 
+void Communicator::comm_allreduce_max_array(deviation_t<double> *data, size_t size)
+{
+  size_t n = comm_size();
+  std::vector<deviation_t<double>> recv_buf(size * n);
+  MPI_CHECK(MPI_Allgather(data, 2 * size, MPI_DOUBLE, recv_buf.data(), 2 * size, MPI_DOUBLE, MPI_COMM_HANDLE));
+
+  std::vector<deviation_t<double>> recv_trans(size * n);
+  for (size_t i = 0; i < n; i++) {
+    for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
+  }
+
+  for (size_t i = 0; i < size; i++) {
+    data[i] = recv_trans[i * n];
+    for (size_t j = 1; j < n; j++) { data[i] = data[i] > recv_trans[i * n + j] ? data[i] : recv_trans[i * n + j]; }
+  }
+}
+
 void Communicator::comm_allreduce_max_array(double *data, size_t size)
 {
   for (size_t i = 0; i < size; i++) { QMP_CHECK(QMP_comm_max_double(QMP_COMM_HANDLE, data + i)); }
@@ -336,9 +353,11 @@ void Communicator::comm_allreduce_xor(uint64_t &data)
   QMP_CHECK(QMP_comm_xor_ulong(QMP_COMM_HANDLE, reinterpret_cast<unsigned long *>(&data)));
 }
 
-void Communicator::comm_broadcast(void *data, size_t nbytes)
+void Communicator::comm_broadcast(void *data, size_t nbytes, int root)
 {
-  QMP_CHECK(QMP_comm_broadcast(QMP_COMM_HANDLE, data, nbytes));
+  // break out of QMP since it can only broadcast from rank 0
+  MPI_CHECK(MPI_Bcast(data, (int)nbytes, MPI_BYTE, root, MPI_COMM_HANDLE));
+  // QMP_CHECK(QMP_comm_broadcast(QMP_COMM_HANDLE, data, nbytes));
 }
 
 void Communicator::comm_barrier(void) { QMP_CHECK(QMP_comm_barrier(QMP_COMM_HANDLE)); }

@@ -330,10 +330,11 @@
 #define QUDA_INVALID_FIELD_ORDER QUDA_INVALID_ENUM
   
 #define QudaFieldCreate integer(4)
-#define QUDA_NULL_FIELD_CREATE 0 // create new field
-#define QUDA_ZERO_FIELD_CREATE 1 // create new field and zero it
-#define QUDA_COPY_FIELD_CREATE 2 // create copy to field
-#define QUDA_REFERENCE_FIELD_CREATE 3 // create reference to field
+#define QUDA_NULL_FIELD_CREATE 0      // new field
+#define QUDA_ZERO_FIELD_CREATE 1      // new field and zero it
+#define QUDA_COPY_FIELD_CREATE 2      // copy to field
+#define QUDA_REFERENCE_FIELD_CREATE 3 // reference to field
+#define QUDA_GHOST_FIELD_CREATE 4     // dummy field used only for ghost storage
 #define QUDA_INVALID_FIELD_CREATE QUDA_INVALID_ENUM
 
 #define QudaGammaBasis integer(4)
@@ -505,6 +506,12 @@
 #define QUDA_GAUGE_SMEAR_WILSON_FLOW 3
 #define QUDA_GAUGE_SMEAR_SYMANZIK_FLOW 4
 #define QUDA_GAUGE_SMEAR_INVALID QUDA_INVALID_ENUM
+
+#define QudaFermionSmearType integer(4)
+#define QUDA_FERMION_SMEAR_TYPE_GAUSSIAN 0
+#define QUDA_FERMION_SMEAR_TYPE_WUPPERTAL 1
+#define QUDA_FERMION_SMEAR_TYPE_INVALID QUDA_INVALID_ENUM
+
 
 #define QudaExtLibType integer(4)
 #define QUDA_CUSOLVE_EXTLIB 0

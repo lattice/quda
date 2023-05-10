@@ -55,20 +55,19 @@ namespace quda {
     if (checkLocation(outfield, infield) != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
     checkPrecision(outfield, infield);
 
-    int num_failures = 0;
     Matrix<complex<double>,3> inlink, outlink;
 
     for (unsigned int i = 0; i < infield.Volume(); ++i) {
       for (int dir=0; dir<4; ++dir){
 	if (infield.Precision() == QUDA_SINGLE_PRECISION) {
           copyArrayToLink(inlink, infield.data<float *>() + (i * 4 + dir) * 18); // order of arguments?
-          if (unitarizeLinkNewton(outlink, inlink, max_iter_newton) == false ) num_failures++;
-          copyLinkToArray(outfield.data<float *>() + (i * 4 + dir) * 18, outlink);
-        } else if (infield.Precision() == QUDA_DOUBLE_PRECISION) {
-          copyArrayToLink(inlink, infield.data<double *>() + (i * 4 + dir) * 18); // order of arguments?
-          if (unitarizeLinkNewton(outlink, inlink, max_iter_newton) == false ) num_failures++;
-          copyLinkToArray(outfield.data<double *>() + (i * 4 + dir) * 18, outlink);
-        } // precision?
+          unitarizeLinkNewton(outlink, inlink, max_iter_newton);
+	  copyLinkToArray(outfield.data<float *>() + (i * 4 + dir) * 18, outlink);
+	} else if (infield.Precision() == QUDA_DOUBLE_PRECISION) {
+	  copyArrayToLink(inlink, infield.data<double *>() + (i * 4 + dir) * 18); // order of arguments?
+          unitarizeLinkNewton(outlink, inlink, max_iter_newton);
+	  copyLinkToArray(outfield.data<double*>() + (i * 4 + dir) * 18, outlink);
+	} // precision?
       } // dir
     }   // loop over volume
   }

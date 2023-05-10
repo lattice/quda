@@ -117,7 +117,7 @@ namespace quda {
     } else if (out.Order() == QUDA_TIFR_GAUGE_ORDER) {
 
 #ifdef BUILD_TIFR_INTERFACE
-      copyGauge<FloatOut, FloatIn, length>, fine_grain()>(TIFROrder<FloatOut, length>(out, Out, outGhost), inOrder, out, in, location, type);
+      copyGauge<FloatOut, FloatIn, length, fine_grain()>(TIFROrder<FloatOut, length>(out, Out, outGhost), inOrder, out, in, location, type);
 #else
       errorQuda("TIFR interface has not been built\n");
 #endif
@@ -293,8 +293,6 @@ namespace quda {
         // we are doing gauge field packing
         copyGauge<FloatOut,FloatIn,18>(out, in, location, Out, In, outGhost, inGhost, type);
       } else {
-        if (out.Geometry() != QUDA_VECTOR_GEOMETRY) errorQuda("Unsupported geometry %d", out.Geometry());
-
         checkMomOrder(in);
         checkMomOrder(out);
 

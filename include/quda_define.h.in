@@ -29,6 +29,134 @@
 #undef QUDA_HETEROGENEOUS_ATOMIC
 #endif
 
+#cmakedefine QUDA_LARGE_KERNEL_ARG
+
+#cmakedefine QUDA_DIRAC_NDEG_TWISTED_CLOVER
+#ifdef QUDA_DIRAC_NDEG_TWISTED_CLOVER
+/**
+ * @def   GPU_NDEG_TWISTED_CLOVER_DIRAC
+ * @brief This macro is set when we have ndeg-TMC fermions enabled
+ */
+#define GPU_NDEG_TWISTED_CLOVER_DIRAC
+#endif
+
+#cmakedefine QUDA_DIRAC_NDEG_TWISTED_MASS
+#if defined(QUDA_DIRAC_NDEG_TWISTED_MASS) || defined(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+/**
+ * @def   GPU_NDEG_TWISTED_MASS_DIRAC
+ * @brief This macro is set when we have ndeg-TM fermions enabled
+ */
+#define GPU_NDEG_TWISTED_MASS_DIRAC
+#endif
+
+#cmakedefine QUDA_DIRAC_CLOVER_HASENBUSCH
+#ifdef QUDA_DIRAC_CLOVER_HASENBUSCH
+/**
+ * @def   GPU_CLOVER_HASENBUSCH_TWIST
+ * @brief This macro is set when we have clover Hasenbusch fermions enabled
+ */
+#define GPU_CLOVER_HASENBUSCH_TWIST
+#endif
+
+#cmakedefine QUDA_DIRAC_TWISTED_CLOVER
+#if defined(QUDA_DIRAC_TWISTED_CLOVER) || defined(QUDA_DIRAC_CLOVER_HASENBUSCH) || defined(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+/**
+ * @def   GPU_TWISTED_CLOVER_DIRAC
+ * @brief This macro is set when we have TMC fermions enabled
+ */
+#define GPU_TWISTED_CLOVER_DIRAC
+#endif
+
+#cmakedefine QUDA_DIRAC_CLOVER
+#if defined(QUDA_DIRAC_CLOVER) || defined(QUDA_DIRAC_TWISTED_CLOVER)
+/**
+ * @def   GPU_CLOVER_DIRAC
+ * @brief This macro is set when we have clover fermions enabled
+ */
+#define GPU_CLOVER_DIRAC
+#endif
+
+#cmakedefine QUDA_DIRAC_TWISTED_MASS
+#if defined(QUDA_DIRAC_TWISTED_MASS) || defined(QUDA_DIRAC_TWISTED_CLOVER)
+/**
+ * @def   GPU_TWISTED_MASS_DIRAC
+ * @brief This macro is set when we have TM fermions enabled
+ */
+#define GPU_TWISTED_MASS_DIRAC
+#endif
+
+#cmakedefine QUDA_DIRAC_WILSON
+#if defined(QUDA_DIRAC_WILSON) || defined(QUDA_DIRAC_CLOVER) || defined(QUDA_DIRAC_TWSITED_MASS)
+/**
+ * @def   GPU_WILSON_DIRAC
+ * @brief This macro is set when we kave Wilson fermions enabled
+ */
+#define GPU_WILSON_DIRAC
+#endif
+
+#cmakedefine QUDA_DIRAC_DOMAIN_WALL
+#ifdef QUDA_DIRAC_DOMAIN_WALL
+/**
+ * @def   GPU_DOMAIN_WALL_DIRAC
+ * @brief This macro is set when we have DWF fermions enabled
+ */
+#define GPU_DOMAIN_WALL_DIRAC
+#endif
+
+#cmakedefine QUDA_DIRAC_STAGGERED
+#ifdef QUDA_DIRAC_STAGGERED
+/**
+ * @def   GPU_STAGGERED_DIRAC
+ * @brief This macro is set when we have staggered fermions enabled
+ */
+#define GPU_STAGGERED_DIRAC
+#endif
+
+#cmakedefine QUDA_LAPLACE
+#ifdef QUDA_LAPLACE
+/**
+ * @def   GPU_LAPLACE
+ * @brief This macro is set when we have the Laplace operator enabled
+ */
+#define GPU_LAPLACE
+#endif
+
+#cmakedefine QUDA_COVDEV
+#ifdef QUDA_COVDEV
+/**
+ * @def   GPU_COVDEV
+ * @brief This macro is set when we have the covariant derivative enabled
+ */
+#define GPU_COVDEV
+#endif
+
+#cmakedefine QUDA_CONTRACT
+#ifdef QUDA_CONTRACT
+/**
+ * @def   GPU_CONTRACT
+ * @brief This macro is set when we have contractions enabled
+ */
+#define GPU_CONTRACT
+#endif
+
+#cmakedefine QUDA_SMEAR_GAUSS_TWOLINK
+#ifdef QUDA_SMEAR_GAUSS_TWOLINK
+/**
+ * @def   GPU_TWOLINK_GSMEAR
+ * @brief This macro is set when we have the two link smearing enabled
+ */
+#define GPU_TWOLINK_GSMEAR
+#endif
+
+#cmakedefine QUDA_MULTIGRID
+#ifdef QUDA_MULTIGRID
+/**
+ * @def   GPU_MULTIGRID
+ * @brief This macro is set when we have multigrid enabled
+ */
+#define GPU_MULTIGRID
+#endif
+
 #cmakedefine QUDA_CLOVER_DYNAMIC
 #ifdef QUDA_CLOVER_DYNAMIC
 /**
@@ -62,16 +190,54 @@
 #undef QUDA_CLOVER_CHOLESKY_PROMOTE
 #endif
 
-#cmakedefine QUDA_FLOAT8
-#ifdef QUDA_FLOAT8
+#cmakedefine QUDA_MULTIGRID_DSLASH_PROMOTE
+#ifdef QUDA_MULTIGRID_DSLASH_PROMOTE
 /**
- * @def FLOAT8
- * @brief This macro set whether float8-ordered fields are enabled or
- * not
+ * @def   MULTIGRID_DSLASH_PROMOTE
+ * @brief This macro sets whether we promote the internal precision of
+ * the coarse dslash used in multigrid.  This enables reproducibility
+ * regardless of the thread granularity chosen
  */
-#define FLOAT8
-#undef QUDA_FLOAT8
+#define MULTIGRID_DSLASH_PROMOTE
+#undef QUDA_CLOVER_CHOLESKY_PROMOTE
 #endif
+
+/**
+ * @def QUDA_ORDER_FP
+ * @brief This macro sets the data ordering for Wilson, gauge
+ * (recon-8/9) and clover fixed-point fields
+ */
+#define QUDA_ORDER_FP @QUDA_ORDER_FP@
+
+#ifdef __cplusplus
+static_assert(QUDA_ORDER_FP == 4 || QUDA_ORDER_FP == 8, "invalid QUDA_ORDER_FP");
+#endif
+
+/**
+ * @def QUDA_ORDER_SP
+ * @brief This macro sets the data ordering for single-precision multigrid fields
+ */
+#define QUDA_ORDER_SP_MG @QUDA_ORDER_SP_MG@
+
+#ifdef __cplusplus
+static_assert(QUDA_ORDER_SP_MG == 2 || QUDA_ORDER_SP_MG == 4, "invalid QUDA_ORDER_SP_MG");
+#endif
+
+/**
+ * @def QUDA_ORDER_FP_MG
+ * @brief This macro sets the data ordering for fixed-point multigrid fields
+ */
+#define QUDA_ORDER_FP_MG @QUDA_ORDER_FP_MG@
+
+#ifdef __cplusplus
+static_assert(QUDA_ORDER_FP_MG == 2 || QUDA_ORDER_FP_MG == 4 || QUDA_ORDER_FP_MG == 8, "invalid QUDA_ORDER_FP_MG");
+#endif
+
+/**
+ * @def QUDA_BUILD_NATIVE_FFT
+ * @brief This macro is set by CMake if the native FFT library is used
+ */
+#cmakedefine QUDA_BUILD_NATIVE_FFT @QUDA_BUILD_NATIVE_FFT@
 
 /**
  * @def QUDA_TARGET_CUDA
@@ -85,6 +251,12 @@
  */
 #cmakedefine QUDA_TARGET_HIP @QUDA_TARGET_HIP@
 
-#if !defined(QUDA_TARGET_CUDA) && !defined(QUDA_TARGET_HIP)
+/**
+ * @def QUDA_TARGET_SYCL
+ * @brief This macro is set by CMake if the SYCL Build target is selected
+ */
+#cmakedefine QUDA_TARGET_SYCL @QUDA_TARGET_SYCL@
+
+#if !defined(QUDA_TARGET_CUDA) && !defined(QUDA_TARGET_HIP) && !defined(QUDA_TARGET_SYCL)
 #error "No QUDA_TARGET selected"
 #endif

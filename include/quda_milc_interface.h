@@ -594,6 +594,12 @@ extern "C" {
    */
   void qudaFreeGaugeField();
 
+
+  /**.     
+     Free the two-link field allocated in QUDA.
+   */
+  void qudaFreeTwoLink();
+  
   /**
    * Load the clover field and its inverse from the host.  If null
    * pointers are passed, the clover field and / or its inverse will
@@ -727,6 +733,71 @@ extern "C" {
    */
   void qudaGaugeForcePhased(int precision, int num_loop_types, double milc_loop_coeff[3], double eb3,
                             QudaMILCSiteArg_t *arg, int phase_in);
+
+  /**
+   * Compute the real traces of gauge loops, with direct application to computing the gauge
+   * action.  All fields here are CPU fields in MILC order, and their precisions should
+   * match.
+   *
+   * @param[in] precision The precision of the field (2 - double, 1 - single)
+   * @param[out] traces A pre-allocated buffer for computed traces of length 2 x num_paths to encode real and imaginary
+   * @param[in] input_path_buf A double pointer of length num_paths x max_length containing loop paths
+   * @param[in] path_length An array of length num_paths containing the lengths of each loop
+   * @param[in] loop_coeff Coefficients for each individual loop
+   * @param[in] num_paths The total number of paths that are computed
+   * @param[in] max_length The maximum length across all loop paths
+   * @param[in] factor An overall multiplicative factor applied to all traces
+   * @param[in] arg Metadata for MILC's internal site struct array
+   * @param[in] phase_in whether staggered phases are applied
+   */
+  void qudaGaugeLoopTracePhased(int precision, double *traces, int **input_path_buf, int *path_length, double *loop_coeff,
+                                int num_paths, int max_length, double factor, QudaMILCSiteArg_t *arg, int phase_in);
+
+  /**
+   * Compute the total, spatial, and temporal plaquette. All fields here are CPU fields in
+   * MILC order, and their precisions should match
+   *
+   * @param[in] precision The precision of the field (2 - double, 1 - single)
+   * @param[out] plaq Storage for the total, spatial, and temporal plaquette
+   * @param[in] arg Metadata for MILC's internal site struct array
+   * @param[in] phase_in whether staggered phases are applied
+   */
+  void qudaPlaquettePhased(int precision, double plaq[3], QudaMILCSiteArg_t *arg, int phase_in);
+
+  /**
+   * Compute the real and imaginary parts of the Polyakov loop in a given direction. All fields here are
+   * CPU fields in MILC order, and their precisions should match
+   *
+   * @param[in] precision The precision of the field (2 - double, 1 - single)
+   * @param[out] ploop Storage for the output Polyakov loop
+   * @param[in] dir Direction of the Polyakov loop (0 - x, 1 - y, 2 - z, 3 - t)
+   * @param[in] arg Metadata for MILC's internal site struct array
+   * @param[in] phase_in whether staggered phases are applied
+   */
+  void qudaPolyakovLoopPhased(int precision, double ploop[2], int dir, QudaMILCSiteArg_t *arg, int phase_in);
+
+  /**
+   * Compute the plaquette, temporal Polyakov loop, and real traces of gauge loops in one go. The
+   * gauge loop traces have a direct application to computing the gauge action. All fields here
+   * are CPU fields in MILC order, and their precisions should match.
+   *
+   * @param[in] precision The precision of the field (2 - double, 1 - single)
+   * @param[out] plaq Storage for the total, spatial, and temporal plaquette
+   * @param[out] ploop Storage for the output Polyakov loop
+   * @param[in] Direction of the Polyakov loop (0 - x, 1 - y, 2 - z, 3 - t)
+   * @param[out] traces A pre-allocated buffer for computed traces of length 2 x num_paths to encode real and imaginary
+   * @param[in] input_path_buf A double pointer of length num_paths x max_length containing loop paths
+   * @param[in] path_length An array of length num_paths containing the lengths of each loop
+   * @param[in] loop_coeff Coefficients for each individual loop
+   * @param[in] num_paths The total number of paths that are computed
+   * @param[in] max_length The maximum length across all loop paths
+   * @param[in] factor An overall multiplicative factor applied to all traces
+   * @param[in] arg Metadata for MILC's internal site struct array
+   * @param[in] phase_in whether staggered phases are applied
+   */
+  void qudaGaugeMeasurementsPhased(int precision, double plaq[3], double ploop[2], int dir, double *traces,
+                                   int **input_path_buf, int *path_length, double *loop_coeff, int num_paths,
+                                   int max_length, double factor, QudaMILCSiteArg_t *arg, int phase_in);
 
   /**
    * Evolve the gauge field by step size dt, using the momentum field
@@ -962,16 +1033,9 @@ extern "C" {
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in,out] milc_sitelink, MILC gauge field to be fixed
    */
-  void qudaGaugeFixingOVR( const int precision,
-    const unsigned int gauge_dir,
-    const int Nsteps,
-    const int verbose_interval,
-    const double relax_boost,
-    const double tolerance,
-    const unsigned int reunit_interval,
-    const unsigned int stopWtheta,
-    void* milc_sitelink
-    );
+  void qudaGaugeFixingOVR(int precision, unsigned int gauge_dir, int Nsteps, int verbose_interval, double relax_boost,
+                          double tolerance, unsigned int reunit_interval, unsigned int stopWtheta,
+                          QudaMILCSiteArg_t *arg);
 
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.

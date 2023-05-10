@@ -1,5 +1,7 @@
 #pragma once
 
+#include <quda_api.h>
+
 namespace quda
 {
 
@@ -13,9 +15,23 @@ namespace quda
     void init(int dev);
 
     /**
+       @brief Initialize this thread to be able to use the device
+       presently initalized for this process.  This will error out if
+       init() has not previously been called.
+     */
+    void init_thread();
+
+    /**
        @brief Get number of devices present on node
     */
     int get_device_count();
+
+    /**
+       @brief Get the visible devices string from environmental variable,
+       e.g. CUDA_VISIBLE_DEVICES=1,0,2 gives '102'
+       @param device_list_string The output string
+    */
+    void get_visible_devices_string(char device_list_string[128]);
 
     /**
        @brief Query and print to stdout device properties of all GPUs

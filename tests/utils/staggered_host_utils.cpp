@@ -13,6 +13,8 @@
 #include <host_utils.h>
 #include <command_line_params.h>
 
+#include <dslash_reference.h>
+
 #include <qio_field.h>
 
 #define XUP 0
@@ -323,6 +325,156 @@ void computeLongLinkCPU(void **longlink, void **sitelink, QudaPrecision prec, vo
     }
   } // if(longlink)
 }
+
+template <typename su3_matrix>
+void computeTwoLinkCPU(void **twolink, su3_matrix **sitelinkEx)
+{
+  int E[4];
+  for (int dir = 0; dir < 4; ++dir) E[dir] = Z[dir] + 4;
+  const int extended_volume = E[3] * E[2] * E[1] * E[0];
+
+  for (int t = 0; t < Z[3]; ++t) {
+    for (int z = 0; z < Z[2]; ++z) {
+      for (int y = 0; y < Z[1]; ++y) {
+        for (int x = 0; x < Z[0]; ++x) {
+          const int oddBit = (x + y + z + t) & 1;
+          int little_index = ((((t * Z[2] + z) * Z[1] + y) * Z[0] + x) / 2) + oddBit * Vh;
+          int large_index
+            = (((((t + 2) * E[2] + (z + 2)) * E[1] + (y + 2)) * E[0] + x + 2) / 2) + oddBit * (extended_volume / 2);
+
+          for (int dir = XUP; dir <= TUP; ++dir) {
+            int dx[4] = {0, 0, 0, 0};
+            su3_matrix *llink = ((su3_matrix *)twolink[dir]) + little_index;
+            dx[dir] = 1;
+            int nbr_index = neighborIndexFullLattice(E, large_index, dx);
+            llfat_mult_su3_nn(sitelinkEx[dir] + large_index, sitelinkEx[dir] + nbr_index, llink);
+          }
+        } // x
+      }   // y
+    }     // z
+  }       // t
+  return;
+}
+
+void computeTwoLinkCPU(void **twolink, void **sitelink, QudaGaugeParam *qudaGaugeParam)
+{
+  quda::lat_dim_t R = {2,2,2,2};
+
+  quda::lat_dim_t X={qudaGaugeParam->X[0], qudaGaugeParam->X[1], qudaGaugeParam->X[2], qudaGaugeParam->X[3]}; 
+
+  exchange_cpu_sitelink_ex(X, R, sitelink, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam->cpu_prec, 0, 4);
+
+  switch (qudaGaugeParam->cpu_prec) {
+  case QUDA_DOUBLE_PRECISION:
+    computeTwoLinkCPU((void **)twolink, (su3_matrix<double> **)sitelink);
+    break;
+
+  case QUDA_SINGLE_PRECISION:
+    computeTwoLinkCPU((void **)twolink, (su3_matrix<float> **)sitelink);
+    break;
+  default:
+    fprintf(stderr, "ERROR: unsupported precision(%d)\n", qudaGaugeParam->cpu_prec);
+    exit(1);
+    break;
+  }
+}
+
+#ifdef MULTI_GPU
+template <typename sFloat, typename gFloat>
+void staggeredTwoLinkGaussianSmear(sFloat *res, gFloat **twolink, gFloat **ghostTwolink, sFloat *spinorField,
+                                   sFloat **fwd_nbr_spinor, sFloat **back_nbr_spinor, int t0, int oddBit)
+{
+  for (auto i = 0lu; i < Vh * stag_spinor_site_size; i++) res[i] = 0.0;
+
+  gFloat *twolinkEven[4], *twolinkOdd[4];
+
+  gFloat *ghostTwolinkEven[4], *ghostTwolinkOdd[4];
+
+  for (int dir = 0; dir < 4; dir++) {
+    twolinkEven[dir] = twolink[dir];
+    twolinkOdd[dir]  = twolink[dir] + Vh * gauge_site_size;
+
+    ghostTwolinkEven[dir] = ghostTwolink ? ghostTwolink[dir] : nullptr;
+    ghostTwolinkOdd[dir]  = ghostTwolink ? ghostTwolink[dir] + 3 * (faceVolume[dir] / 2) * gauge_site_size : nullptr;
+  }
+
+  {
+    for (int i = 0; i < Vh; i++) {
+      // Get local time-slice index:
+      const int local_t = i / Vsh_t;
+      const int glob_t = quda::comm_coord(3) * Z[3] + local_t;
+
+      if (glob_t != t0) continue;
+
+      int offset = stag_spinor_site_size * i;
+
+      for (int dir = 0; dir < 8; dir++) {
+
+        const int nFace = 3;//3->2??
+        gFloat *twolnk = 
+          gaugeLink_mg4dir(i, dir, oddBit, twolinkEven, twolinkOdd, ghostTwolinkEven, ghostTwolinkOdd, 3, 2);//?
+          
+        sFloat *second_neighbor_spinor = 
+          spinorNeighbor_5d_mgpu<QUDA_4D_PC>(i, dir, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 2, nFace,
+                                             stag_spinor_site_size);
+       
+        sFloat gaugedSpinor[stag_spinor_site_size];
+
+        if (dir % 2 == 0) {
+        
+          su3Mul(gaugedSpinor, twolnk, second_neighbor_spinor);
+          sum(&res[offset], &res[offset], gaugedSpinor, stag_spinor_site_size);
+         
+        } else {
+          su3Tmul(gaugedSpinor,twolnk, second_neighbor_spinor);
+          
+          sum(&res[offset], &res[offset], gaugedSpinor, stag_spinor_site_size);
+          
+        }
+      }
+    } // 4-d volume
+  }   // right-hand-side
+  return;
+}
+
+void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk[], void **ghost_twolnk,
+                                   quda::ColorSpinorField &in, QudaGaugeParam * /*qudaGaugeParam*/,
+                                   QudaInvertParam * /*inv_param*/, const int oddBit, const double /*width*/,
+                                   const int t0, QudaPrecision prec)
+{
+  QudaParity otherparity = QUDA_INVALID_PARITY;
+  if (oddBit == QUDA_EVEN_PARITY) {
+    otherparity = QUDA_ODD_PARITY;
+  } else if (oddBit == QUDA_ODD_PARITY) {
+    otherparity = QUDA_EVEN_PARITY;
+  } else {
+    errorQuda("ERROR: full parity not supported in function %s", __FUNCTION__);
+  }
+  const int nFace = 3;
+
+  in.exchangeGhost(otherparity, nFace, 0/*daggerBit*/);
+
+  void **fwd_nbr_spinor = in.fwdGhostFaceBuffer;
+  void **back_nbr_spinor = in.backGhostFaceBuffer;
+
+  if (prec == QUDA_DOUBLE_PRECISION) {
+    {
+      staggeredTwoLinkGaussianSmear((double *)out.V(), (double **)qdp_twolnk, (double **)ghost_twolnk, (double *)in.V(),
+                                    (double **)fwd_nbr_spinor, (double **)back_nbr_spinor, t0, oddBit);
+    } 
+  } else {
+    {
+      staggeredTwoLinkGaussianSmear((float *)out.V(), (float **)qdp_twolnk, (float **)ghost_twolnk, (float *)in.V(),
+                                    (float **)fwd_nbr_spinor, (float **)back_nbr_spinor, t0, oddBit);
+    }
+  }
+  return;
+}
+#else
+void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &, void **, void** ,  quda::ColorSpinorField&, QudaGaugeParam* , QudaInvertParam* , const int , const double , const int , QudaPrecision )
+{}
+#endif
+
 
 // Compute the full HISQ stencil on the CPU.
 // If "eps_naik" is 0, there's no naik correction,
@@ -667,11 +819,10 @@ void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *cs_param, const Q
   // Lattice vector spacetime/colour/spin/parity properties
   cs_param->nColor = 3;
   cs_param->nSpin = 1;
-  cs_param->nDim = 5;
+  cs_param->nDim = 4;
   for (int d = 0; d < 4; d++) cs_param->x[d] = gauge_param->X[d];
   bool pc = isPCSolution(inv_param->solution_type);
   if (pc) cs_param->x[0] /= 2;
-  cs_param->x[4] = 1;
   cs_param->pc_type = QUDA_4D_PC;
   cs_param->siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
 

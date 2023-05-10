@@ -142,7 +142,7 @@ namespace quda
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ inline void operator()(int idx, int s, int parity)
+    __device__ __host__ __forceinline__ void operator()(int idx, int s, int parity)
     {
       using real = typename mapper<typename Arg::Float>::type;
       using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;

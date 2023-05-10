@@ -4,6 +4,7 @@
 #include <quda_fp16.cuh>
 #include <array.h>
 #include <trove/ptr.h>
+#include <convert.h>
 
 // This macro determines whether or not we are using the fp16 accumulation of the MMA instruction.
 // #define USE_FP16_HMMA_ACCUMULATE
@@ -259,10 +260,10 @@ namespace quda
         const half2 i2 = *(reinterpret_cast<const half2 *>(&(op_c_imag.reg[i])));
         if (fixed) {
           auto scale = cc.scale;
-          s[i * 4 + 0] = __half2short_rn(__half2float(r2.x) * scale);
-          s[i * 4 + 1] = __half2short_rn(__half2float(i2.x) * scale);
-          s[i * 4 + 2] = __half2short_rn(__half2float(r2.y) * scale);
-          s[i * 4 + 3] = __half2short_rn(__half2float(i2.y) * scale);
+          s[i * 4 + 0] = f2i_round<store_type>(__half2float(r2.x) * scale);
+          s[i * 4 + 1] = f2i_round<store_type>(__half2float(i2.x) * scale);
+          s[i * 4 + 2] = f2i_round<store_type>(__half2float(r2.y) * scale);
+          s[i * 4 + 3] = f2i_round<store_type>(__half2float(i2.y) * scale);
         } else {
           s[i * 4 + 0] = __half2float(r2.x);
           s[i * 4 + 1] = __half2float(i2.x);
@@ -297,10 +298,10 @@ namespace quda
 
         if (fixed) {
           auto scale = cc.scale;
-          s[0] = static_cast<store_type>(op_c_real.reg[i * 2 + 0] * scale);
-          s[1] = static_cast<store_type>(op_c_imag.reg[i * 2 + 0] * scale);
-          s[2] = static_cast<store_type>(op_c_real.reg[i * 2 + 1] * scale);
-          s[3] = static_cast<store_type>(op_c_imag.reg[i * 2 + 1] * scale);
+          s[0] = f2i_round<store_type>(op_c_real.reg[i * 2 + 0] * scale);
+          s[1] = f2i_round<store_type>(op_c_imag.reg[i * 2 + 0] * scale);
+          s[2] = f2i_round<store_type>(op_c_real.reg[i * 2 + 1] * scale);
+          s[3] = f2i_round<store_type>(op_c_imag.reg[i * 2 + 1] * scale);
         } else {
           s[0] = op_c_real.reg[i * 2 + 0];
           s[1] = op_c_imag.reg[i * 2 + 0];
@@ -322,6 +323,7 @@ namespace quda
       const int col = warp_col + wrm.quad_col * 8;
 
       constexpr bool fixed = GmemOperandC::fixed;
+      static_assert(fixed, "This method should only be called with a fixed type");
 
       using array = array<store_type, 2>;
       auto ptr = reinterpret_cast<array *>(cc.data());
@@ -340,22 +342,22 @@ namespace quda
         array value{0};
         if (dagger) {
           if (!check_bounds || (n_index < M && m_index < N)) {
-            value[0] = +static_cast<store_type>(__half2float(r2.x) * scale);
-            value[1] = -static_cast<store_type>(__half2float(i2.x) * scale);
+            value[0] = f2i_round<store_type>(__half2float(r2.x) * scale);
+            value[1] = f2i_round<store_type>(-__half2float(i2.x) * scale);
             atomic_fetch_add(&ptr[(n_index + 0) * ldc + m_index], value);
 
-            value[0] = +static_cast<store_type>(__half2float(r2.y) * scale);
-            value[1] = -static_cast<store_type>(__half2float(i2.y) * scale);
+            value[0] = f2i_round<store_type>(__half2float(r2.y) * scale);
+            value[1] = f2i_round<store_type>(-__half2float(i2.y) * scale);
             atomic_fetch_add(&ptr[(n_index + 1) * ldc + m_index], value);
           }
         } else {
           if (!check_bounds || (m_index < M && n_index < N)) {
-            value[0] = +static_cast<store_type>(__half2float(r2.x) * scale);
-            value[1] = +static_cast<store_type>(__half2float(i2.x) * scale);
+            value[0] = f2i_round<store_type>(__half2float(r2.x) * scale);
+            value[1] = f2i_round<store_type>(__half2float(i2.x) * scale);
             atomic_fetch_add(&ptr[m_index * ldc + (n_index + 0)], value);
 
-            value[0] = +static_cast<store_type>(__half2float(r2.y) * scale);
-            value[1] = +static_cast<store_type>(__half2float(i2.y) * scale);
+            value[0] = f2i_round<store_type>(__half2float(r2.y) * scale);
+            value[1] = f2i_round<store_type>(__half2float(i2.y) * scale);
             atomic_fetch_add(&ptr[m_index * ldc + (n_index + 1)], value);
           }
         }
@@ -373,6 +375,7 @@ namespace quda
       const int col = warp_col + wrm.quad_col * 8 + (wrm.quad_thread / 2) * 2;
 
       constexpr bool fixed = GmemOperandC::fixed;
+      static_assert(fixed, "This method should only be called with a fixed type");
 
       using array = array<store_type, 2>;
       auto ptr = reinterpret_cast<array *>(cc.data());
@@ -389,22 +392,22 @@ namespace quda
         auto scale = fixed ? cc.scale : 1.0f;
         if (dagger) {
           if (!check_bounds || (n_index < M && m_index < N)) {
-            value[0] = +static_cast<store_type>(round(op_c_real.reg[i * 2 + 0] * scale));
-            value[1] = -static_cast<store_type>(round(op_c_imag.reg[i * 2 + 0] * scale));
+            value[0] = f2i_round<store_type>(op_c_real.reg[i * 2 + 0] * scale);
+            value[1] = f2i_round<store_type>(-op_c_imag.reg[i * 2 + 0] * scale);
             atomic_fetch_add(&ptr[(n_index + 0) * ldc + m_index], value);
 
-            value[0] = +static_cast<store_type>(round(op_c_real.reg[i * 2 + 1] * scale));
-            value[1] = -static_cast<store_type>(round(op_c_imag.reg[i * 2 + 1] * scale));
+            value[0] = f2i_round<store_type>(op_c_real.reg[i * 2 + 1] * scale);
+            value[1] = f2i_round<store_type>(-op_c_imag.reg[i * 2 + 1] * scale);
             atomic_fetch_add(&ptr[(n_index + 1) * ldc + m_index], value);
           }
         } else {
           if (!check_bounds || (m_index < M && n_index < N)) {
-            value[0] = +static_cast<store_type>(round(op_c_real.reg[i * 2 + 0] * scale));
-            value[1] = +static_cast<store_type>(round(op_c_imag.reg[i * 2 + 0] * scale));
+            value[0] = f2i_round<store_type>(op_c_real.reg[i * 2 + 0] * scale);
+            value[1] = f2i_round<store_type>(op_c_imag.reg[i * 2 + 0] * scale);
             atomic_fetch_add(&ptr[m_index * ldc + (n_index + 0)], value);
 
-            value[0] = +static_cast<store_type>(round(op_c_real.reg[i * 2 + 1] * scale));
-            value[1] = +static_cast<store_type>(round(op_c_imag.reg[i * 2 + 1] * scale));
+            value[0] = f2i_round<store_type>(op_c_real.reg[i * 2 + 1] * scale);
+            value[1] = f2i_round<store_type>(op_c_imag.reg[i * 2 + 1] * scale);
             atomic_fetch_add(&ptr[m_index * ldc + (n_index + 1)], value);
           }
         }

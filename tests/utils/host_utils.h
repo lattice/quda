@@ -11,7 +11,6 @@ constexpr size_t spinor_site_size = 24;     // real numbers per wilson spinor
 constexpr size_t stag_spinor_site_size = 6; // real numbers per staggered 'spinor'
 constexpr size_t clover_site_size = 72;     // real numbers per block-diagonal clover matrix
 constexpr size_t mom_site_size = 10;        // real numbers per momentum
-constexpr size_t hw_site_size = 12;         // real numbers per half wilson
 
 extern int Z[4];
 extern int V;
@@ -59,6 +58,8 @@ void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugePara
 void computeLongLinkCPU(void **longlink, void **sitelink, QudaPrecision prec, void *act_path_coeff);
 void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **sitelink,
                          void *qudaGaugeParamPtr, double **act_path_coeffs, double eps_naik);
+void computeTwoLinkCPU(void **twolink, void **sitelink, QudaGaugeParam *gauge_param);
+void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk[], void** ghost_twolnk,  quda::ColorSpinorField &in, QudaGaugeParam *qudaGaugeParam, QudaInvertParam *inv_param, const int oddBit, const double width, const int t0, QudaPrecision prec);
 template <typename Float>
 void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type);
 void applyGaugeFieldScaling_long(void **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type,
@@ -140,8 +141,8 @@ void coordinate_from_shrinked_index(int coordinate[4], int shrinked_index, const
 int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1);
 int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1);
 
-int neighborIndex(int dim[], int index, int oddBit, int dx[]);
-int neighborIndexFullLattice(int dim[], int index, int dx[]);
+int neighborIndex(int dim[4], int index, int oddBit, int dx[4]);
+int neighborIndexFullLattice(int dim[4], int index, int dx[4]);
 
 int neighborIndex_mg(int i, int oddBit, int dx4, int dx3, int dx2, int dx1);
 int neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1);
@@ -151,11 +152,25 @@ void printGaugeElement(void *gauge, int X, QudaPrecision precision);
 template <typename Float> void printVector(Float *v);
 
 int fullLatticeIndex(int i, int oddBit);
-int fullLatticeIndex(int dim[], int index, int oddBit);
+int fullLatticeIndex(int dim[4], int index, int oddBit);
 int getOddBit(int X);
 
+// Custom "sitelink" enum used to create unphased, MILC phased, or continuous U(1) phased links
+enum {
+  SITELINK_PHASE_NO = 0,   // no phase, used to create SU(3) links
+  SITELINK_PHASE_MILC = 1, // MILC phase, used to test staggered fermions
+  SITELINK_PHASE_U1 = 2    // continuous phase, used to test reconstruct 13
+};
+
+/**
+   @brief Host implementation of creating a random set of gauge links, with optional phases
+   @param[out] link QDP-ordered gauge links
+   @param[in] precision Precision of field
+   @param[in] phase Type of phase; 0 == no additional phase, 1 == MILC phases, 2 == U(1) phase
+ */
 void createSiteLinkCPU(void *const *const link, QudaPrecision precision, int phase);
 void createSiteLinkCPU(quda::GaugeField &u, QudaPrecision precision, int phase);
+
 void su3_construct(void *mat, QudaReconstructType reconstruct, QudaPrecision precision);
 void su3_reconstruct(void *mat, int dir, int ga_idx, QudaReconstructType reconstruct, QudaPrecision precision,
                      QudaGaugeParam *param);
@@ -163,6 +178,7 @@ void su3_reconstruct(void *mat, int dir, int ga_idx, QudaReconstructType reconst
 void compare_spinor(void *spinor_cpu, void *spinor_gpu, int len, QudaPrecision precision);
 void strong_check(void *spinor, void *spinorGPU, int len, QudaPrecision precision);
 int compare_floats(void *a, void *b, int len, double epsilon, QudaPrecision precision);
+double compare_floats_v2(void *a, void *b, int len, double epsilon, QudaPrecision precision);
 
 void check_gauge(void **, void **, double epsilon, QudaPrecision precision);
 
@@ -176,7 +192,15 @@ int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec);
 double mom_action(void *mom, QudaPrecision prec, int len);
 
 void createMomCPU(void *mom, QudaPrecision precision);
-void createHwCPU(void *hw, QudaPrecision precision);
+
+/**
+   @brief Create four Staggered spinor fields, whose outer product is used for momentum calculations
+   @param[out] stag_for_oprod Set of four contiguous host spinor fields
+   @param[in] precision Precision of field
+   @param[in] x Full lattice volume
+   @param[in] rng RNG
+*/
+void createStagForOprodCPU(void *stag_for_oprod, QudaPrecision precision, const int *const x, quda::RNG &rng);
 
 // used by link fattening code
 int x4_from_full_index(int i);
@@ -232,17 +256,30 @@ inline int getReconstructNibble(QudaReconstructType recon)
   }
 }
 
-inline double getTolerance(QudaPrecision prec)
+/**
+  @brief Return the negative exponent of a reasonable expected tolerance for a given precision
+  @param[in] prec Precision
+  @return Exponent of the base-10 reasonably expected tolerance
+*/
+inline int getNegLog10Tolerance(QudaPrecision prec)
 {
   switch (prec) {
-  case QUDA_QUARTER_PRECISION: return 1e-1;
-  case QUDA_HALF_PRECISION: return 1e-3;
-  case QUDA_SINGLE_PRECISION: return 1e-4;
-  case QUDA_DOUBLE_PRECISION: return 1e-11;
-  case QUDA_INVALID_PRECISION: return 1.0;
+  case QUDA_QUARTER_PRECISION: return 1;
+  case QUDA_HALF_PRECISION: return 3;
+  case QUDA_SINGLE_PRECISION: return 4;
+  case QUDA_DOUBLE_PRECISION: return 11;
+  case QUDA_INVALID_PRECISION: return 0;
   }
-  return 1.0;
+  return 0;
 }
+
+/**
+  @brief Return the expected tolerance for a given precision consistent with the
+    integer values in getNegLog10Tolerance.
+  @param[in] prec Precision
+  @return Reasonable expected tolerance
+*/
+inline double getTolerance(QudaPrecision prec) { return pow(10, -getNegLog10Tolerance(prec)); }
 
 /**
   @brief Check if the std::string has a size smaller than the limit: if yes, copy it to a C-string;

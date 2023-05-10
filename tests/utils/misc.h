@@ -14,6 +14,7 @@ const char *get_verbosity_str(QudaVerbosity);
 const char *get_matpc_str(QudaMatPCType);
 const char *get_solution_str(QudaSolutionType);
 const char *get_solve_str(QudaSolveType);
+const char *get_schwarz_str(QudaSchwarzType);
 const char *get_dslash_str(QudaDslashType type);
 const char *get_flavor_str(QudaTwistFlavorType type);
 const char *get_solver_str(QudaInverterType type);
@@ -24,6 +25,7 @@ const char *get_memory_type_str(QudaMemoryType type);
 const char *get_contract_str(QudaContractType type);
 const char *get_gauge_smear_str(QudaGaugeSmearType type);
 std::string get_dilution_type_str(QudaDilutionType type);
+const char *get_blas_type_str(QudaBLASType type);
 
 #define XUP 0
 #define YUP 1

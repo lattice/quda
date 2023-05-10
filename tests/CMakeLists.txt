@@ -1,9 +1,18 @@
 # enable tests build a common library for all test utilities
-add_library(quda_test STATIC googletest/src/gtest-all.cc)
+add_library(quda_test googletest/src/gtest-all.cc)
 target_include_directories(quda_test SYSTEM PUBLIC  googletest/include googletest)
 target_link_libraries(quda_test PUBLIC Eigen)
 target_link_libraries(quda_test PUBLIC QUDA::quda)
 set_target_properties(quda_test PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_options(
+  quda_test PUBLIC
+  $<IF:$<CONFIG:RELEASE>,-w,-Wall -Wextra>
+  $<$<CONFIG:STRICT>:-Werror>
+)
+if(BUILD_SHARED_LIBS)
+  install(TARGETS quda_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+
 add_subdirectory(utils)
 add_subdirectory(host_reference)
 enable_language(Fortran)
@@ -14,11 +23,15 @@ endif()
 
 set(TEST_LIBS quda_test)
 
+# custom target for building all tests (useful if QUDA_BUILD_ALL_TESTS is OFF)
+add_custom_target(all_tests)
+
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   if(NOT ${qudabuildtests})
     set_property(TARGET ${mytarget} PROPERTY EXCLUDE_FROM_ALL 1)
     set(QUDA_EXCLUDE_FROM_INSTALL "EXCLUDE_FROM_ALL")
   endif()
+  add_dependencies(all_tests ${mytarget})
 endmacro()
 
 if(NOT ${QUDA_INSTALL_ALL_TESTS})
@@ -34,7 +47,7 @@ endif()
 
 # define tests
 add_executable(c_interface_test c_interface_test.c)
-target_link_libraries(c_interface_test ${TEST_LIBS})
+target_link_libraries(c_interface_test ${TEST_LIBS} "-lstdc++")
 quda_checkbuildtest(c_interface_test QUDA_BUILD_ALL_TESTS)
 
 # if we build with QDP JIT the tests cannot run anyway
@@ -144,6 +157,18 @@ if(QUDA_BUILD_NATIVE_LAPACK)
   install(TARGETS blas_interface_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
+if(QUDA_QIO)
+  add_executable(io_test io_test.cpp)
+  target_link_libraries(io_test ${TEST_LIBS})
+  quda_checkbuildtest(io_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS io_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
+add_executable(tune_test tune_test.cpp)
+target_link_libraries(tune_test ${TEST_LIBS})
+quda_checkbuildtest(tune_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS tune_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 add_executable(plaq_test plaq_test.cpp)
 target_link_libraries(plaq_test ${TEST_LIBS})
 quda_checkbuildtest(plaq_test QUDA_BUILD_ALL_TESTS)
@@ -173,6 +198,13 @@ if(QUDA_CONTRACT)
   install(TARGETS contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
+if(QUDA_SMEAR_GAUSS_TWOLINK)
+  add_executable(staggered_gsmear_test staggered_gsmear_test.cpp)
+  target_link_libraries(staggered_gsmear_test ${TEST_LIBS})
+  quda_checkbuildtest(staggered_gsmear_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS staggered_gsmear_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR}) 	
+endif()
+
 if(QUDA_DIRAC_STAGGERED)
   add_executable(llfat_test llfat_test.cpp)
   target_link_libraries(llfat_test ${TEST_LIBS})
@@ -200,10 +232,10 @@ if(QUDA_DIRAC_STAGGERED)
   install(TARGETS hisq_unitarize_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
-add_executable(gauge_force_test gauge_force_test.cpp)
-target_link_libraries(gauge_force_test ${TEST_LIBS})
-quda_checkbuildtest(gauge_force_test QUDA_BUILD_ALL_TESTS)
-install(TARGETS gauge_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+add_executable(gauge_path_test gauge_path_test.cpp)
+target_link_libraries(gauge_path_test ${TEST_LIBS})
+quda_checkbuildtest(gauge_path_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS gauge_path_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 add_executable(gauge_alg_test gauge_alg_test.cpp)
 target_link_libraries(gauge_alg_test ${TEST_LIBS})
@@ -271,16 +303,18 @@ endif()
 if(QUDA_BUILD_NATIVE_LAPACK)
   add_test(NAME blas_interface_test
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_interface_test> ${MPIEXEC_POSTFLAGS}
-    --blas-mnk 64 64 64
-    --blas-leading-dims 128 128 128
-    --blas-offsets 16 16 16
+    --blas-gemm-mnk 64 64 64
+    --blas-gemm-leading-dims 128 128 128
+    --blas-gemm-offsets 16 16 16
+    --blas-gemm-alpha 1.0 2.0
+    --blas-gemm-beta -3.0 1.5
+    --blas-gemm-trans-a T
+    --blas-gemm-trans-b C
+    --blas-lu-inv-mat-size 96
     --blas-data-type Z
     --blas-data-order row
     --blas-batch 20
-    --blas-alpha 1.0 2.0
-    --blas-beta -3.0 1.5
-    --blas-trans-a T
-    --blas-trans-b C
+    --enable-testing true
     --gtest_output=xml:blas_interface_test.xml)
 endif()
 
@@ -290,7 +324,7 @@ if(QUDA_CONTRACT)
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:contract_test> ${MPIEXEC_POSTFLAGS}
     --dim 2 4 6 8
     --gtest_output=xml:contract_test.xml)
-endif()
+endif()  
 
 # loop over Dslash policies
 if(QUDA_CTEST_SEP_DSLASH_POLICIES)
@@ -1181,10 +1215,10 @@ endforeach(prec)
   
 foreach(prec IN LISTS TEST_PRECS)
 
-  add_test(NAME gauge_force_${prec}
-           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_force_test> ${MPIEXEC_POSTFLAGS}
+  add_test(NAME gauge_path_${prec}
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_path_test> ${MPIEXEC_POSTFLAGS}
                    --dim 2 4 6 8 --prec ${prec}
-                   --gtest_output=xml:gauge_force_test_${prec}.xml)
+                   --gtest_output=xml:gauge_path_test_${prec}.xml)
 
   if(QUDA_DIRAC_STAGGERED)
     add_test(NAME unitarize_link_${prec}
@@ -1208,7 +1242,7 @@ foreach(prec IN LISTS TEST_PRECS)
   add_test(NAME gauge_alg_${prec}
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg_test> ${MPIEXEC_POSTFLAGS}
                    --dim 4 6 8 10 --prec ${prec}
-                   --gtest_output=xml:gauge_arg_test_${prec}.xml)
+                   --gtest_output=xml:gauge_alg_test_${prec}.xml)
 
   if (TARGET dilution_test)
     add_test(NAME dilution_test_${prec}
@@ -1217,4 +1251,35 @@ foreach(prec IN LISTS TEST_PRECS)
                      --gtest_output=xml:dilution_test_${prec}.xml)
   endif()
 
+  if(QUDA_SMEAR_GAUSS_TWOLINK)
+    set(KERNEL_TYPE TwoLink GaussianSmear)
+    foreach(kerneltp IN LISTS KERNEL_TYPE)
+      if(${kerneltp} STREQUAL "TwoLink")
+	set(laplace3D 4)
+	set(smear_t0 -1)
+      elseif(${kerneltp} STREQUAL "GaussianSmear")
+	set(laplace3D 3)
+	set(smear_t0 1)
+      endif()	    
+      add_test(NAME staggered_gsmear_${kerneltp}_${prec}
+        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gsmear_test> ${MPIEXEC_POSTFLAGS}
+        --dim 6 8 10 12 --prec ${prec}
+        --test ${kerneltp}
+	--laplace3D ${laplace3D}
+	--smear-t0 ${smear_t0}
+        --gtest_output=xml:staggered_gsmear_test_${kerneltp}_${prec}.xml)
+    endforeach(kerneltp)
+  endif()
+
 endforeach(prec)
+
+if(QUDA_QIO)
+  add_test(NAME io_test
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:io_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 4 6 8 10
+                   --gtest_output=xml:io_test.xml)
+endif()
+
+add_test(NAME tune_test
+         COMMAND  ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:tune_test> ${MPIEXEC_POSTFLAGS}
+                   --gtest_output=xml:tune_test.xml)

@@ -5,6 +5,7 @@
 #include <convert.h>
 #include <float_vector.h>
 #include <array.h>
+#include <math_helper.cuh>
 
 //#define QUAD_SUM
 #ifdef QUAD_SUM
@@ -354,18 +355,10 @@ namespace quda
     template <> constexpr int n_vector<float, true, 4, true>() { return 4; }
     template <> constexpr int n_vector<float, true, 1, true>() { return 2; }
 
-#ifdef FLOAT8
-    template <> constexpr int n_vector<short, true, 4, true>() { return 8; }
-#else
-    template <> constexpr int n_vector<short, true, 4, true>() { return 4; }
-#endif
+    template <> constexpr int n_vector<short, true, 4, true>() { return QUDA_ORDER_FP; }
     template <> constexpr int n_vector<short, true, 1, true>() { return 2; }
 
-#ifdef FLOAT8
-    template <> constexpr int n_vector<int8_t, true, 4, true>() { return 8; }
-#else
-    template <> constexpr int n_vector<int8_t, true, 4, true>() { return 4; }
-#endif
+    template <> constexpr int n_vector<int8_t, true, 4, true>() { return QUDA_ORDER_FP; }
     template <> constexpr int n_vector<int8_t, true, 1, true>() { return 2; }
 
     // Just use float-2/float-4 ordering on CPU when not site unrolling
@@ -428,12 +421,12 @@ namespace quda
 
     template <template <typename...> class Functor,
               template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
-              bool mixed, typename T, typename x_store_t, typename V, typename... Args>
-    constexpr std::enable_if_t<mixed, void> instantiate(const T &a, const T &b, const T &c, V &x_, V &y_,
+              bool mixed, typename T, typename x_store_t, typename Vx, typename Vy, typename... Args>
+    constexpr std::enable_if_t<mixed, void> instantiate(const T &a, const T &b, const T &c, Vx &x_, Vy &y_,
                                                         Args &&... args)
     {
-      unwrap_t<V> &x(x_);
-      unwrap_t<V> &y(y_);
+      unwrap_t<Vx> &x(x_);
+      unwrap_t<Vy> &y(y_);
 
       if (y.Precision() < x.Precision()) errorQuda("Y precision %d not supported", y.Precision());
 

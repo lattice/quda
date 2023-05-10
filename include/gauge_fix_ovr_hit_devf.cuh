@@ -3,7 +3,7 @@
 #include <quda_internal.h>
 #include <quda_matrix.h>
 #include <atomic_helper.h>
-#include <shared_memory_cache_helper.cuh>
+#include <shared_memory_cache_helper.h>
 
 namespace quda {
 

@@ -33,7 +33,7 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-      typename Arg<>::reduce_t result;
+      typename Arg<>::reduce_t result{};
       if (!density) {
         Arg<false> arg(Fmunu, static_cast<Float*>(qdensity));
         launch<qCharge>(result, tp, stream, arg);

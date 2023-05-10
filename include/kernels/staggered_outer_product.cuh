@@ -58,7 +58,6 @@ namespace quda {
       using matrix = Matrix<complex<typename Arg::real>, Arg::nColor>;
       using vector = ColorSpinor<typename Arg::real, Arg::nColor, 1>;
 
-      matrix result;
       const vector x = arg.inA(x_cb, 0);
 
 #pragma unroll
@@ -68,9 +67,9 @@ namespace quda {
         const int first_nbr_idx = neighborIndex(x_cb, shift, arg.partitioned, arg.parity, arg.X);
         if (first_nbr_idx >= 0) {
           const vector y = arg.inB(first_nbr_idx, 0);
-          result = outerProduct(y, x);
+          matrix result = outerProduct(y, x);
           matrix tempA = arg.U(dim, x_cb, arg.parity);
-          result = tempA + result*arg.coeff[0];
+          result = tempA + result * arg.coeff[0];
 
           arg.U(dim, x_cb, arg.parity) = result;
 
@@ -79,9 +78,9 @@ namespace quda {
             const int third_nbr_idx = neighborIndex(x_cb, shift, arg.partitioned, arg.parity, arg.X);
             if (third_nbr_idx >= 0) {
               const vector z = arg.inB(third_nbr_idx, 0);
-              result = outerProduct(z, x);
+              matrix result = outerProduct(z, x);
               matrix tempB = arg.L(dim, x_cb, arg.parity);
-              result = tempB + result*arg.coeff[1];
+              result = tempB + result * arg.coeff[1];
               arg.L(dim, x_cb, arg.parity) = result;
             }
           }
@@ -100,22 +99,26 @@ namespace quda {
       using matrix = Matrix<complex<typename Arg::real>, Arg::nColor>;
       using vector = ColorSpinor<typename Arg::real, Arg::nColor, 1>;
 
-      matrix result;
-
-      auto &out = (arg.displacement == 1) ? arg.U : arg.L;
       auto coeff = (arg.displacement == 1) ? arg.coeff[0] : arg.coeff[1];
 
       int x[4];
       coordsFromIndexExterior(x, x_cb, arg.X, Arg::dim, arg.displacement, arg.parity);
       const unsigned int bulk_cb_idx = ((((x[3]*arg.X[2] + x[2])*arg.X[1] + x[1])*arg.X[0] + x[0]) >> 1);
 
-      matrix inmatrix = out(Arg::dim, bulk_cb_idx, arg.parity);
       const vector a = arg.inA(bulk_cb_idx, 0);
       const vector b = arg.inB.Ghost(Arg::dim, 1, x_cb, 0);
 
-      result = outerProduct(b, a);
-      result = inmatrix + result*coeff;
-      out(Arg::dim, bulk_cb_idx, arg.parity) = result;
+      if (arg.displacement == 1) {
+        matrix inmatrix = arg.U(Arg::dim, bulk_cb_idx, arg.parity);
+        matrix result = outerProduct(b, a);
+        result = inmatrix + result * coeff;
+        arg.U(Arg::dim, bulk_cb_idx, arg.parity) = result;
+      } else {
+        matrix inmatrix = arg.L(Arg::dim, bulk_cb_idx, arg.parity);
+        matrix result = outerProduct(b, a);
+        result = inmatrix + result * coeff;
+        arg.L(Arg::dim, bulk_cb_idx, arg.parity) = result;
+      }
     }
   };
 
