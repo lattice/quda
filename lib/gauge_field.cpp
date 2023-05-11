@@ -302,6 +302,454 @@ namespace quda {
     staggeredPhaseApplied = false;
   }
 
+  void GaugeField::createComms(const lat_dim_t &R, bool no_comms_fill, bool bidir)
+  {
+    allocateGhostBuffer(R, no_comms_fill, bidir); // allocate the ghost buffer if not yet allocated
+
+    // ascertain if this instance needs it comms buffers to be updated
+    bool comms_reset = ghost_field_reset || // FIXME add send buffer check
+      (my_face_h[0] != ghost_pinned_send_buffer_h[0]) || (my_face_h[1] != ghost_pinned_send_buffer_h[1])
+      || (from_face_h[0] != ghost_pinned_recv_buffer_h[0]) || (from_face_h[1] != ghost_pinned_recv_buffer_h[1])
+      || ghost_bytes != ghost_bytes_old; // ghost buffer has been resized (e.g., bidir to unidir)
+
+    if (!initComms || comms_reset) LatticeField::createComms(no_comms_fill);
+
+    if (ghost_field_reset) destroyIPCComms();
+    createIPCComms();
+  }
+
+  void GaugeField::allocateGhostBuffer(const lat_dim_t &R, bool no_comms_fill, bool bidir) const
+  {
+    createGhostZone(R, no_comms_fill, bidir);
+    LatticeField::allocateGhostBuffer(ghost_bytes);
+  }
+
+  void GaugeField::recvStart(int dim, int dir)
+  {
+    if (!comm_dim_partitioned(dim)) return;
+
+    // receive from neighboring the processor
+    if (comm_peer2peer_enabled(1 - dir, dim)) {
+      comm_start(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+    } else if (comm_gdr_enabled()) {
+      comm_start(mh_recv_rdma[bufferIndex][dim][1 - dir]);
+    } else {
+      comm_start(mh_recv[bufferIndex][dim][1 - dir]);
+    }
+  }
+
+  void GaugeField::sendStart(int dim, int dir, const qudaStream_t &stream)
+  {
+    if (!comm_dim_partitioned(dim)) return;
+
+    if (!comm_peer2peer_enabled(dir, dim)) {
+      if (comm_gdr_enabled()) {
+        comm_start(mh_send_rdma[bufferIndex][dim][dir]);
+      } else {
+        comm_start(mh_send[bufferIndex][dim][dir]);
+      }
+    } else { // doing peer-to-peer
+
+      void *ghost_dst
+        = static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][(dir + 1) % 2];
+
+      qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
+
+      // record the event
+      qudaEventRecord(ipcCopyEvent[bufferIndex][dim][dir], stream);
+      // send to the neighboring processor
+      comm_start(mh_send_p2p[bufferIndex][dim][dir]);
+    }
+  }
+
+  void GaugeField::commsComplete(int dim, int dir)
+  {
+    if (!comm_dim_partitioned(dim)) return;
+
+    if (comm_peer2peer_enabled(1 - dir, dim)) {
+      comm_wait(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+      qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][dim][1 - dir]);
+    } else if (comm_gdr_enabled()) {
+      comm_wait(mh_recv_rdma[bufferIndex][dim][1 - dir]);
+    } else {
+      comm_wait(mh_recv[bufferIndex][dim][1 - dir]);
+    }
+
+    if (comm_peer2peer_enabled(dir, dim)) {
+      comm_wait(mh_send_p2p[bufferIndex][dim][dir]);
+      qudaEventSynchronize(ipcCopyEvent[bufferIndex][dim][dir]);
+    } else if (comm_gdr_enabled()) {
+      comm_wait(mh_send_rdma[bufferIndex][dim][dir]);
+    } else {
+      comm_wait(mh_send[bufferIndex][dim][dir]);
+    }
+  }
+
+  // This does the exchange of the forwards boundary gauge field ghost zone and places
+  // it into the ghost array of the next node
+  void GaugeField::exchangeGhost(QudaLinkDirection link_direction)
+  {
+    if (ghostExchange != QUDA_GHOST_EXCHANGE_PAD)
+      errorQuda("Cannot call exchangeGhost with ghostExchange=%d", ghostExchange);
+    if (geometry != QUDA_VECTOR_GEOMETRY && geometry != QUDA_COARSE_GEOMETRY)
+      errorQuda("Invalid geometry=%d", geometry);
+    if ((link_direction == QUDA_LINK_BIDIRECTIONAL || link_direction == QUDA_LINK_FORWARDS)
+        && geometry != QUDA_COARSE_GEOMETRY)
+      errorQuda("Cannot request exchange of forward links on non-coarse geometry");
+    if (nFace == 0) errorQuda("nFace = 0");
+
+    if (location == QUDA_CUDA_FIELD_LOCATION) {
+      const int dir = 1; // sending forwards only
+      const lat_dim_t R = {nFace, nFace, nFace, nFace};
+      const bool no_comms_fill = true; // dslash kernels presently require this
+      const bool bidir = false;        // communication is only ever done in one direction at once
+      createComms(R, true, bidir); // always need to allocate space for non-partitioned dimension for copyGenericGauge
+
+      // loop over backwards and forwards links
+      const QudaLinkDirection directions[] = {QUDA_LINK_BACKWARDS, QUDA_LINK_FORWARDS};
+      for (int link_dir = 0; link_dir < 2; link_dir++) {
+        if (!(link_direction == QUDA_LINK_BIDIRECTIONAL || link_direction == directions[link_dir])) continue;
+
+        void *send_d[2 * QUDA_MAX_DIM] = {};
+        void *recv_d[2 * QUDA_MAX_DIM] = {};
+
+        size_t offset = 0;
+        for (int d = 0; d < nDim; d++) {
+          recv_d[d] = static_cast<char *>(ghost_recv_buffer_d[bufferIndex]) + offset;
+          if (bidir) offset += ghost_face_bytes_aligned[d];
+          send_d[d] = static_cast<char *>(ghost_send_buffer_d[bufferIndex]) + offset;
+          offset += ghost_face_bytes_aligned[d];
+        }
+
+        extractGaugeGhost(*this, send_d, true, link_dir * nDim); // get the links into contiguous buffers
+        qudaDeviceSynchronize(); // synchronize before issuing mem copies in different streams - could replace with event post and wait
+
+        // issue receive preposts and host-to-device copies if needed
+        for (int dim = 0; dim < nDim; dim++) {
+          if (!comm_dim_partitioned(dim)) continue;
+          recvStart(dim, dir); // prepost the receive
+          if (!comm_peer2peer_enabled(dir, dim) && !comm_gdr_enabled()) {
+            qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
+                            ghost_face_bytes[dim], qudaMemcpyDeviceToHost, device::get_stream(2 * dim + dir));
+          }
+        }
+
+        // if gdr enabled then synchronize
+        if (comm_gdr_enabled()) qudaDeviceSynchronize();
+
+        // if the sending direction is not peer-to-peer then we need to synchronize before we start sending
+        for (int dim = 0; dim < nDim; dim++) {
+          if (!comm_dim_partitioned(dim)) continue;
+          if (!comm_peer2peer_enabled(dir, dim) && !comm_gdr_enabled())
+            qudaStreamSynchronize(device::get_stream(2 * dim + dir));
+          sendStart(dim, dir, device::get_stream(2 * dim + dir)); // start sending
+        }
+
+        // complete communication and issue host-to-device copies if needed
+        for (int dim = 0; dim < nDim; dim++) {
+          if (!comm_dim_partitioned(dim)) continue;
+          commsComplete(dim, dir);
+          if (!comm_peer2peer_enabled(1 - dir, dim) && !comm_gdr_enabled()) {
+            qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][1 - dir],
+                            from_face_dim_dir_h[bufferIndex][dim][1 - dir], ghost_face_bytes[dim],
+                            qudaMemcpyHostToDevice, device::get_stream(2 * dim + dir));
+          }
+        }
+
+        qudaDeviceSynchronize(); // synchronize before issuing kernels / copies in default stream - could replace with event post and wait
+
+        // fill in the halos for non-partitioned dimensions
+        for (int dim = 0; dim < nDim; dim++) {
+          if (!comm_dim_partitioned(dim) && no_comms_fill) {
+            qudaMemcpy(recv_d[dim], send_d[dim], ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
+          }
+        }
+
+        if (isNative()) {
+          copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 0, 0, 0, recv_d, 1 + 2 * link_dir); // 1, 3
+        } else {
+          // copy from receive buffer into ghost array
+          for (int dim = 0; dim < nDim; dim++)
+            qudaMemcpy(ghost[dim + link_dir * nDim].data(), recv_d[dim], ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
+        }
+
+        bufferIndex = 1 - bufferIndex;
+      } // link_dir
+
+      qudaDeviceSynchronize();
+    } else { // cpu field
+      void *send[2 * QUDA_MAX_DIM];
+      for (int d = 0; d < nDim; d++) {
+        send[d] = safe_malloc(nFace * surface[d] * nInternal * precision);
+        if (geometry == QUDA_COARSE_GEOMETRY) send[d + 4] = safe_malloc(nFace * surface[d] * nInternal * precision);
+      }
+
+      void *ghost_[2 * QUDA_MAX_DIM];
+      for (auto i = 0; i < geometry; i++) ghost_[i] = ghost[i].data();
+
+      // get the links into contiguous buffers
+      if (link_direction == QUDA_LINK_BACKWARDS || link_direction == QUDA_LINK_BIDIRECTIONAL) {
+        extractGaugeGhost(*this, send, true);
+
+        // communicate between nodes
+        exchange(ghost_, send, QUDA_FORWARDS);
+      }
+
+      // repeat if requested and links are bi-directional
+      if (link_direction == QUDA_LINK_FORWARDS || link_direction == QUDA_LINK_BIDIRECTIONAL) {
+        extractGaugeGhost(*this, send, true, nDim);
+        exchange(ghost_ + nDim, send + nDim, QUDA_FORWARDS);
+      }
+
+      for (int d = 0; d < geometry; d++) host_free(send[d]);
+    }
+  }
+
+  // This does the opposite of exchangeGhost and sends back the ghost
+  // zone to the node from which it came and injects it back into the
+  // field
+  void GaugeField::injectGhost(QudaLinkDirection link_direction)
+  {
+    if (ghostExchange != QUDA_GHOST_EXCHANGE_PAD)
+      errorQuda("Cannot call exchangeGhost with ghostExchange=%d", ghostExchange);
+    if (geometry != QUDA_VECTOR_GEOMETRY && geometry != QUDA_COARSE_GEOMETRY)
+      errorQuda("Invalid geometry=%d", geometry);
+    if (link_direction != QUDA_LINK_BACKWARDS) errorQuda("Invalid link_direction = %d", link_direction);
+    if (nFace == 0) errorQuda("nFace = 0");
+
+    if (location == QUDA_CUDA_FIELD_LOCATION) {
+      const int dir = 0; // sending backwards only
+      const lat_dim_t R = {nFace, nFace, nFace, nFace};
+      const bool no_comms_fill = false; // injection never does no_comms_fill
+      const bool bidir = false;         // communication is only ever done in one direction at once
+      createComms(R, true, bidir); // always need to allocate space for non-partitioned dimension for copyGenericGauge
+
+      // loop over backwards and forwards links (forwards links never sent but leave here just in case)
+      const QudaLinkDirection directions[] = {QUDA_LINK_BACKWARDS, QUDA_LINK_FORWARDS};
+      for (int link_dir = 0; link_dir < 2; link_dir++) {
+        if (!(link_direction == QUDA_LINK_BIDIRECTIONAL || link_direction == directions[link_dir])) continue;
+
+        void *send_d[2 * QUDA_MAX_DIM] = {};
+        void *recv_d[2 * QUDA_MAX_DIM] = {};
+
+        size_t offset = 0;
+        for (int d = 0; d < nDim; d++) {
+          // send backwards is first half of each ghost_send_buffer
+          send_d[d] = static_cast<char *>(ghost_send_buffer_d[bufferIndex]) + offset;
+          if (bidir) offset += ghost_face_bytes_aligned[d];
+          // receive from forwards is the second half of each ghost_recv_buffer
+          recv_d[d] = static_cast<char *>(ghost_recv_buffer_d[bufferIndex]) + offset;
+          offset += ghost_face_bytes_aligned[d];
+        }
+
+        if (isNative()) { // copy from padded region in gauge field into send buffer
+          copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 0, 0, send_d, 0, 1 + 2 * link_dir);
+        } else { // copy from receive buffer into ghost array
+          for (int dim = 0; dim < nDim; dim++)
+            qudaMemcpy(send_d[dim], ghost[dim + link_dir * nDim].data(), ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
+        }
+        qudaDeviceSynchronize(); // need to synchronize before issueing copies in different streams - could replace with event post and wait
+
+        // issue receive preposts and host-to-device copies if needed
+        for (int dim = 0; dim < nDim; dim++) {
+          if (!comm_dim_partitioned(dim)) continue;
+          recvStart(dim, dir); // prepost the receive
+          if (!comm_peer2peer_enabled(dir, dim) && !comm_gdr_enabled()) {
+            qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
+                            ghost_face_bytes[dim], qudaMemcpyDeviceToHost, device::get_stream(2 * dim + dir));
+          }
+        }
+
+        // if gdr enabled then synchronize
+        if (comm_gdr_enabled()) qudaDeviceSynchronize();
+
+        // if the sending direction is not peer-to-peer then we need to synchronize before we start sending
+        for (int dim = 0; dim < nDim; dim++) {
+          if (!comm_dim_partitioned(dim)) continue;
+          if (!comm_peer2peer_enabled(dir, dim) && !comm_gdr_enabled())
+            qudaStreamSynchronize(device::get_stream(2 * dim + dir));
+          sendStart(dim, dir, device::get_stream(2 * dim + dir)); // start sending
+        }
+
+        // complete communication and issue host-to-device copies if needed
+        for (int dim = 0; dim < nDim; dim++) {
+          if (!comm_dim_partitioned(dim)) continue;
+          commsComplete(dim, dir);
+          if (!comm_peer2peer_enabled(1 - dir, dim) && !comm_gdr_enabled()) {
+            qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][1 - dir],
+                            from_face_dim_dir_h[bufferIndex][dim][1 - dir], ghost_face_bytes[dim],
+                            qudaMemcpyHostToDevice, device::get_stream(2 * dim + dir));
+          }
+        }
+
+        qudaDeviceSynchronize(); // synchronize before issuing kernel / copies in default stream - could replace with event post and wait
+
+        // fill in the halos for non-partitioned dimensions
+        for (int dim = 0; dim < nDim; dim++) {
+          if (!comm_dim_partitioned(dim) && no_comms_fill) {
+            qudaMemcpy(recv_d[dim], send_d[dim], ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
+          }
+        }
+
+        // get the links into contiguous buffers
+        extractGaugeGhost(*this, recv_d, false, link_dir * nDim);
+
+        bufferIndex = 1 - bufferIndex;
+      } // link_dir
+
+      qudaDeviceSynchronize();
+    } else {
+      void *recv[QUDA_MAX_DIM];
+      for (int d = 0; d < nDim; d++) recv[d] = safe_malloc(nFace * surface[d] * nInternal * precision);
+
+      void *ghost_[] = {ghost[0].data(), ghost[1].data(), ghost[2].data(), ghost[3].data(),
+                        ghost[4].data(), ghost[5].data(), ghost[6].data(), ghost[7].data()};
+
+      // communicate between nodes
+      exchange(recv, ghost_, QUDA_BACKWARDS);
+
+      // get the links into contiguous buffers
+      extractGaugeGhost(*this, recv, false);
+
+      for (int d = 0; d < QUDA_MAX_DIM; d++) host_free(recv[d]);
+    }
+  }
+
+  void GaugeField::exchangeExtendedGhost(const lat_dim_t &R, bool no_comms_fill)
+  {
+    if (location == QUDA_CUDA_FIELD_LOCATION) {
+      const int b = bufferIndex;
+      void *send_d[QUDA_MAX_DIM], *recv_d[QUDA_MAX_DIM];
+
+      createComms(R, no_comms_fill);
+
+      size_t offset = 0;
+      for (int dim = 0; dim < nDim; dim++) {
+        if (!(comm_dim_partitioned(dim) || (no_comms_fill && R[dim]))) continue;
+        send_d[dim] = static_cast<char *>(ghost_send_buffer_d[b]) + offset;
+        recv_d[dim] = static_cast<char *>(ghost_recv_buffer_d[b]) + offset;
+
+        // silence cuda-memcheck initcheck errors that arise since we
+        // have an oversized ghost buffer when doing the extended exchange
+        qudaMemsetAsync(send_d[dim], 0, 2 * ghost_face_bytes_aligned[dim], device::get_default_stream());
+        offset += 2 * ghost_face_bytes_aligned[dim]; // factor of two from fwd/back
+      }
+
+      for (int dim = 0; dim < nDim; dim++) {
+        if (!(comm_dim_partitioned(dim) || (no_comms_fill && R[dim]))) continue;
+
+        // extract into a contiguous buffer
+        extractExtendedGaugeGhost(*this, dim, R, send_d, true);
+
+        if (comm_dim_partitioned(dim)) {
+          qudaDeviceSynchronize(); // synchronize before issuing mem copies in different streams - could replace with event post and wait
+
+          for (int dir = 0; dir < 2; dir++) recvStart(dim, dir);
+
+          for (int dir = 0; dir < 2; dir++) {
+            // issue host-to-device copies if needed
+            if (!comm_peer2peer_enabled(dir, dim) && !comm_gdr_enabled()) {
+              qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
+                              ghost_face_bytes[dim], qudaMemcpyDeviceToHost, device::get_stream(dir));
+            }
+          }
+
+          // if either direction is not peer-to-peer then we need to synchronize
+          if (!comm_peer2peer_enabled(0, dim) || !comm_peer2peer_enabled(1, dim)) qudaDeviceSynchronize();
+
+          for (int dir = 0; dir < 2; dir++) sendStart(dim, dir, device::get_stream(dir));
+          for (int dir = 0; dir < 2; dir++) commsComplete(dim, dir);
+
+          for (int dir = 0; dir < 2; dir++) {
+            // issue host-to-device copies if needed
+            if (!comm_peer2peer_enabled(dir, dim) && !comm_gdr_enabled()) {
+              qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][dir], from_face_dim_dir_h[bufferIndex][dim][dir],
+                              ghost_face_bytes[dim], qudaMemcpyHostToDevice, device::get_stream(dir));
+            }
+          }
+
+        } else { // if just doing a local exchange to fill halo then need to swap faces
+          qudaMemcpy(from_face_dim_dir_d[b][dim][1], my_face_dim_dir_d[b][dim][0], ghost_face_bytes[dim],
+                     qudaMemcpyDeviceToDevice);
+          qudaMemcpy(from_face_dim_dir_d[b][dim][0], my_face_dim_dir_d[b][dim][1], ghost_face_bytes[dim],
+                     qudaMemcpyDeviceToDevice);
+        }
+
+        // inject back into the gauge field
+        // need to synchronize the copy streams before rejoining the compute stream - could replace with event post and wait
+        qudaDeviceSynchronize();
+        extractExtendedGaugeGhost(*this, dim, R, recv_d, false);
+      }
+
+      bufferIndex = 1 - bufferIndex;
+      qudaDeviceSynchronize();
+    } else {
+      void *send[QUDA_MAX_DIM];
+      void *recv[QUDA_MAX_DIM];
+      size_t bytes[QUDA_MAX_DIM];
+      // store both parities and directions in each
+      for (int d = 0; d < nDim; d++) {
+        if (!(comm_dim_partitioned(d) || (no_comms_fill && R[d]))) continue;
+        bytes[d] = surface[d] * R[d] * geometry * nInternal * precision;
+        send[d] = safe_malloc(2 * bytes[d]);
+        recv[d] = safe_malloc(2 * bytes[d]);
+      }
+
+      for (int d = 0; d < nDim; d++) {
+        if (!(comm_dim_partitioned(d) || (no_comms_fill && R[d]))) continue;
+        // extract into a contiguous buffer
+        extractExtendedGaugeGhost(*this, d, R, send, true);
+
+        if (comm_dim_partitioned(d)) {
+          // do the exchange
+          MsgHandle *mh_recv_back;
+          MsgHandle *mh_recv_fwd;
+          MsgHandle *mh_send_fwd;
+          MsgHandle *mh_send_back;
+
+          mh_recv_back = comm_declare_receive_relative(recv[d], d, -1, bytes[d]);
+          mh_recv_fwd = comm_declare_receive_relative(((char *)recv[d]) + bytes[d], d, +1, bytes[d]);
+          mh_send_back = comm_declare_send_relative(send[d], d, -1, bytes[d]);
+          mh_send_fwd = comm_declare_send_relative(((char *)send[d]) + bytes[d], d, +1, bytes[d]);
+
+          comm_start(mh_recv_back);
+          comm_start(mh_recv_fwd);
+          comm_start(mh_send_fwd);
+          comm_start(mh_send_back);
+
+          comm_wait(mh_send_fwd);
+          comm_wait(mh_send_back);
+          comm_wait(mh_recv_back);
+          comm_wait(mh_recv_fwd);
+
+          comm_free(mh_send_fwd);
+          comm_free(mh_send_back);
+          comm_free(mh_recv_back);
+          comm_free(mh_recv_fwd);
+        } else {
+          memcpy(static_cast<char *>(recv[d]) + bytes[d], send[d], bytes[d]);
+          memcpy(recv[d], static_cast<char *>(send[d]) + bytes[d], bytes[d]);
+        }
+
+        // inject back into the gauge field
+        extractExtendedGaugeGhost(*this, d, R, recv, false);
+      }
+
+      for (int d = 0; d < nDim; d++) {
+        if (!(comm_dim_partitioned(d) || (no_comms_fill && R[d]))) continue;
+        host_free(send[d]);
+        host_free(recv[d]);
+      }
+    }
+  }
+
+  void GaugeField::exchangeExtendedGhost(const lat_dim_t &R, TimeProfile &profile, bool no_comms_fill)
+  {
+    profile.TPSTART(QUDA_PROFILE_COMMS);
+    exchangeExtendedGhost(R, no_comms_fill);
+    profile.TPSTOP(QUDA_PROFILE_COMMS);
+  }
+
   void GaugeField::exchange(void **ghost_link, void **link_sendbuf, QudaDirection dir) const
   {
     MsgHandle *mh_send[4];
@@ -594,6 +1042,46 @@ namespace quda {
       delete[] backup_h;
     }
     backed_up = false;
+  }
+
+  void GaugeField::copy_to_buffer(void *buffer) const
+  {
+    if (location == QUDA_CUDA_FIELD_LOCATION) {
+      qudaMemcpy(buffer, data(), Bytes(), qudaMemcpyDeviceToHost);
+    } else {
+      if (is_pointer_array(order)) {
+        char *dst_buffer = reinterpret_cast<char *>(buffer);
+        for (int d = 0; d < site_dim; d++) {
+          std::memcpy(&dst_buffer[d * bytes / site_dim], gauge_array[d].data(), bytes / site_dim);
+        }
+      } else if (Order() == QUDA_CPS_WILSON_GAUGE_ORDER || Order() == QUDA_MILC_GAUGE_ORDER
+                 || Order() == QUDA_MILC_SITE_GAUGE_ORDER || Order() == QUDA_BQCD_GAUGE_ORDER
+                 || Order() == QUDA_TIFR_GAUGE_ORDER || Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+        std::memcpy(buffer, data(), Bytes());
+      } else {
+        errorQuda("Unsupported order = %d", Order());
+      }
+    }
+  }
+
+  void GaugeField::copy_from_buffer(void *buffer)
+  {
+    if (location == QUDA_CUDA_FIELD_LOCATION) {
+      qudaMemcpy(data(), buffer, Bytes(), qudaMemcpyHostToDevice);
+    } else {
+      if (is_pointer_array(order)) {
+        const char *dst_buffer = reinterpret_cast<const char *>(buffer);
+        for (int d = 0; d < site_dim; d++) {
+          std::memcpy(gauge_array[d].data(), &dst_buffer[d * bytes / site_dim], bytes / site_dim);
+        }
+      } else if (Order() == QUDA_CPS_WILSON_GAUGE_ORDER || Order() == QUDA_MILC_GAUGE_ORDER
+                 || Order() == QUDA_MILC_SITE_GAUGE_ORDER || Order() == QUDA_BQCD_GAUGE_ORDER
+                 || Order() == QUDA_TIFR_GAUGE_ORDER || Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+        std::memcpy(data(), buffer, Bytes());
+      } else {
+        errorQuda("Unsupported order = %d", Order());
+      }
+    }
   }
 
 } // namespace quda

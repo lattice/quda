@@ -273,8 +273,64 @@ namespace quda {
     GaugeField(const GaugeFieldParam &param);
     virtual ~GaugeField();
 
-    virtual void exchangeGhost(QudaLinkDirection = QUDA_LINK_BACKWARDS) = 0;
-    virtual void injectGhost(QudaLinkDirection = QUDA_LINK_BACKWARDS) = 0;
+    /**
+       @brief Create the communication handlers and buffers
+       @param[in] R The thickness of the extended region in each dimension
+       @param[in] no_comms_fill Do local exchange to fill out the extended
+       region in non-partitioned dimensions
+       @param[in] bidir Whether to allocate communication buffers to
+       allow for simultaneous bi-directional exchange.  If false, then
+       the forwards and backwards buffers will alias (saving memory).
+    */
+    void createComms(const lat_dim_t &R, bool no_comms_fill, bool bidir = true);
+
+    /**
+       @brief Allocate the ghost buffers
+       @param[in] R The thickness of the extended region in each dimension
+       @param[in] no_comms_fill Do local exchange to fill out the extended
+       @param[in] bidir Is this a bi-directional exchange - if not
+       then we alias the fowards and backwards offsetss
+       region in non-partitioned dimensions
+    */
+    void allocateGhostBuffer(const lat_dim_t &R, bool no_comms_fill, bool bidir = true) const;
+
+    /**
+       @brief Start the receive communicators
+       @param[in] dim The communication dimension
+       @param[in] dir The communication direction (0=backwards, 1=forwards)
+    */
+    void recvStart(int dim, int dir);
+
+    /**
+       @brief Start the sending communicators
+       @param[in] dim The communication dimension
+       @param[in] dir The communication direction (0=backwards, 1=forwards)
+       @param[in] stream_p Pointer to CUDA stream to post the
+       communication in (if 0, then use null stream)
+    */
+    void sendStart(int dim, int dir, const qudaStream_t &stream_p);
+
+    /**
+       @brief Wait for communication to complete
+       @param[in] dim The communication dimension
+       @param[in] dir The communication direction (0=backwards, 1=forwards)
+    */
+    void commsComplete(int dim, int dir);
+
+    /**
+       @brief Exchange the ghost and store store in the padded region
+       @param[in] link_direction Which links are we exchanging: this
+       flag only applies to bi-directional coarse-link fields
+     */
+    void exchangeGhost(QudaLinkDirection link_direction = QUDA_LINK_BACKWARDS);
+
+    /**
+       @brief The opposite of exchangeGhost: take the ghost zone on x,
+       send to node x-1, and inject back into the field
+       @param[in] link_direction Which links are we injecting: this
+       flag only applies to bi-directional coarse-link fields
+     */
+    void injectGhost(QudaLinkDirection link_direction = QUDA_LINK_BACKWARDS);
 
     size_t Length() const { return length; }
     int Ncolor() const { return nColor; }
@@ -323,7 +379,7 @@ namespace quda {
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimensions
     */
-    virtual void exchangeExtendedGhost(const lat_dim_t &R, bool no_comms_fill = false) = 0;
+    void exchangeExtendedGhost(const lat_dim_t &R, bool no_comms_fill = false);
 
     /**
        @brief This routine will populate the border / halo region
@@ -334,7 +390,7 @@ namespace quda {
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimensions
     */
-    virtual void exchangeExtendedGhost(const lat_dim_t &R, TimeProfile &profile, bool no_comms_fill = false) = 0;
+    void exchangeExtendedGhost(const lat_dim_t &R, TimeProfile &profile, bool no_comms_fill = false);
 
     void checkField(const LatticeField &) const;
 
@@ -505,91 +561,25 @@ namespace quda {
        @brief Restores the GaugeField
     */
     void restore() const;
+
+    /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+    */
+    void copy_to_buffer(void *buffer) const;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+    */
+    void copy_from_buffer(void *buffer);
   };
 
-  class cudaGaugeField : public GaugeField {
+  class cudaGaugeField : public GaugeField
+  {
 
   public:
     cudaGaugeField(const GaugeFieldParam &);
-
-    /**
-       @brief Exchange the ghost and store store in the padded region
-       @param[in] link_direction Which links are we exchanging: this
-       flag only applies to bi-directional coarse-link fields
-     */
-    void exchangeGhost(QudaLinkDirection link_direction = QUDA_LINK_BACKWARDS);
-
-    /**
-       @brief The opposite of exchangeGhost: take the ghost zone on x,
-       send to node x-1, and inject back into the field
-       @param[in] link_direction Which links are we injecting: this
-       flag only applies to bi-directional coarse-link fields
-     */
-    void injectGhost(QudaLinkDirection link_direction = QUDA_LINK_BACKWARDS);
-
-    /**
-       @brief Create the communication handlers and buffers
-       @param[in] R The thickness of the extended region in each dimension
-       @param[in] no_comms_fill Do local exchange to fill out the extended
-       region in non-partitioned dimensions
-       @param[in] bidir Whether to allocate communication buffers to
-       allow for simultaneous bi-directional exchange.  If false, then
-       the forwards and backwards buffers will alias (saving memory).
-    */
-    void createComms(const lat_dim_t &R, bool no_comms_fill, bool bidir = true);
-
-    /**
-       @brief Allocate the ghost buffers
-       @param[in] R The thickness of the extended region in each dimension
-       @param[in] no_comms_fill Do local exchange to fill out the extended
-       @param[in] bidir Is this a bi-directional exchange - if not
-       then we alias the fowards and backwards offsetss
-       region in non-partitioned dimensions
-    */
-    void allocateGhostBuffer(const lat_dim_t &R, bool no_comms_fill, bool bidir = true) const;
-
-    /**
-       @brief Start the receive communicators
-       @param[in] dim The communication dimension
-       @param[in] dir The communication direction (0=backwards, 1=forwards)
-    */
-    void recvStart(int dim, int dir);
-
-    /**
-       @brief Start the sending communicators
-       @param[in] dim The communication dimension
-       @param[in] dir The communication direction (0=backwards, 1=forwards)
-       @param[in] stream_p Pointer to CUDA stream to post the
-       communication in (if 0, then use null stream)
-    */
-    void sendStart(int dim, int dir, const qudaStream_t &stream_p);
-
-    /**
-       @brief Wait for communication to complete
-       @param[in] dim The communication dimension
-       @param[in] dir The communication direction (0=backwards, 1=forwards)
-    */
-    void commsComplete(int dim, int dir);
-
-    /**
-       @brief This does routine will populate the border / halo region of a
-       gauge field that has been created using copyExtendedGauge.
-       @param R The thickness of the extended region in each dimension
-       @param no_comms_fill Do local exchange to fill out the extended
-       region in non-partitioned dimensions
-    */
-    void exchangeExtendedGhost(const lat_dim_t &R, bool no_comms_fill = false);
-
-    /**
-       @brief This does routine will populate the border / halo region
-       of a gauge field that has been created using copyExtendedGauge.
-       Overloaded variant that will start and stop a comms profile.
-       @param R The thickness of the extended region in each dimension
-       @param profile TimeProfile intance which will record the time taken
-       @param no_comms_fill Do local exchange to fill out the extended
-       region in non-partitioned dimensions
-    */
-    void exchangeExtendedGhost(const lat_dim_t &R, TimeProfile &profile, bool no_comms_fill = false);
 
     /**
      * Generic gauge field copy
@@ -624,18 +614,6 @@ namespace quda {
        @param[in] profile Time profile to record the transfer
     */
     void saveCPUField(cpuGaugeField &cpu, TimeProfile &profile) const;
-
-    /**
-      @brief Copy all contents of the field to a host buffer.
-      @param[in] the host buffer to copy to.
-    */
-    virtual void copy_to_buffer(void *buffer) const;
-
-    /**
-      @brief Copy all contents of the field from a host buffer to this field.
-      @param[in] the host buffer to copy from.
-    */
-    virtual void copy_from_buffer(void *buffer);
   };
 
   class cpuGaugeField : public GaugeField {
@@ -655,58 +633,10 @@ namespace quda {
     cpuGaugeField(const GaugeFieldParam &param);
 
     /**
-       @brief Exchange the ghost and store store in the padded region
-       @param[in] link_direction Which links are we extracting: this
-       flag only applies to bi-directional coarse-link fields
-     */
-    void exchangeGhost(QudaLinkDirection link_direction = QUDA_LINK_BACKWARDS);
-
-    /**
-       @brief The opposite of exchangeGhost: take the ghost zone on x,
-       send to node x-1, and inject back into the field
-       @param[in] link_direction Which links are we injecting: this
-       flag only applies to bi-directional coarse-link fields
-     */
-    void injectGhost(QudaLinkDirection link_direction = QUDA_LINK_BACKWARDS);
-
-    /**
-       @brief This does routine will populate the border / halo region of a
-       gauge field that has been created using copyExtendedGauge.
-
-       @param R The thickness of the extended region in each dimension
-       @param no_comms_fill Do local exchange to fill out the extended
-       region in non-partitioned dimenions
-    */
-    void exchangeExtendedGhost(const lat_dim_t &R, bool no_comms_fill = false);
-
-    /**
-       @brief This does routine will populate the border / halo region
-       of a gauge field that has been created using copyExtendedGauge.
-       Overloaded variant that will start and stop a comms profile.
-       @param R The thickness of the extended region in each dimension
-       @param profile TimeProfile intance which will record the time taken
-       @param no_comms_fill Do local exchange to fill out the extended
-       region in non-partitioned dimensions
-    */
-    void exchangeExtendedGhost(const lat_dim_t &R, TimeProfile &profile, bool no_comms_fill = false);
-
-    /**
      * Generic gauge field copy
      * @param[in] src Source from which we are copying
      */
     void copy(const GaugeField &src);
-
-    /**
-      @brief Copy all contents of the field to a host buffer.
-      @param[in] the host buffer to copy to.
-    */
-    virtual void copy_to_buffer(void *buffer) const;
-
-    /**
-      @brief Copy all contents of the field from a host buffer to this field.
-      @param[in] the host buffer to copy from.
-    */
-    virtual void copy_from_buffer(void *buffer);
   };
 
   /**
