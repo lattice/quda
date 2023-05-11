@@ -496,7 +496,7 @@ namespace quda {
      * Generic gauge field copy
      * @param[in] src Source from which we are copying
      */
-    virtual void copy(const GaugeField &src) = 0;
+    void copy(const GaugeField &src);
 
     /**
        @brief Compute the L1 norm of the field
@@ -582,12 +582,6 @@ namespace quda {
     cudaGaugeField(const GaugeFieldParam &);
 
     /**
-     * Generic gauge field copy
-     * @param[in] src Source from which we are copying
-     */
-    void copy(const GaugeField &src);
-
-    /**
        @brief Download into this field from a CPU field
        @param[in] cpu The CPU field source
     */
@@ -618,7 +612,6 @@ namespace quda {
 
   class cpuGaugeField : public GaugeField {
 
-    friend void cudaGaugeField::copy(const GaugeField &cpu);
     friend void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu);
     friend void cudaGaugeField::saveCPUField(cpuGaugeField &cpu) const;
 
@@ -631,12 +624,6 @@ namespace quda {
        extended.
     */
     cpuGaugeField(const GaugeFieldParam &param);
-
-    /**
-     * Generic gauge field copy
-     * @param[in] src Source from which we are copying
-     */
-    void copy(const GaugeField &src);
   };
 
   /**

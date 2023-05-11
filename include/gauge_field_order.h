@@ -422,25 +422,26 @@ namespace quda {
     template <typename Float, int nColor, bool native_ghost, typename storeFloat>
     struct GhostAccessor<Float, nColor, QUDA_QDP_GAUGE_ORDER, native_ghost, storeFloat> {
       using wrapper = fieldorder_wrapper<Float, storeFloat>;
-      complex<storeFloat> *ghost[8];
-      unsigned int ghostOffset[8];
-      Float scale;
-      Float scale_inv;
+      complex<storeFloat> *ghost[8] = {};
+      unsigned int ghostOffset[8] = {};
+      Float scale = static_cast<Float>(1.0);
+      Float scale_inv = static_cast<Float>(1.0);
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
 
-      GhostAccessor(const GaugeField &U, void * = nullptr, void **ghost_ = nullptr) :
-        scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
+      GhostAccessor(const GaugeField &U, void * = nullptr, void **ghost_ = nullptr)
       {
-        for (int d=0; d<4; d++) {
-	  ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
-	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d].data()));
-	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+        if (U.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) {
+          for (int d=0; d<4; d++) {
+            ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
+              static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d].data()));
+            ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 
-	  ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
-	    ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
-	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4].data()));
-	  ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
-	}
+            ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
+              ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
+              static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4].data()));
+            ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+          }
+        }
 
 	resetScale(U.Scale());
       }
@@ -543,25 +544,26 @@ namespace quda {
     template <typename Float, int nColor, bool native_ghost, typename storeFloat>
     struct GhostAccessor<Float, nColor, QUDA_MILC_GAUGE_ORDER, native_ghost, storeFloat> {
       using wrapper = fieldorder_wrapper<Float, storeFloat>;
-      complex<storeFloat> *ghost[8];
-      unsigned int ghostOffset[8];
-      Float scale;
-      Float scale_inv;
+      complex<storeFloat> *ghost[8] = {};
+      unsigned int ghostOffset[8] = {};
+      Float scale = static_cast<Float>(1.0);
+      Float scale_inv = static_cast<Float>(1.0);
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
 
-      GhostAccessor(const GaugeField &U, void * = nullptr, void **ghost_ = nullptr) :
-        scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
+      GhostAccessor(const GaugeField &U, void * = nullptr, void **ghost_ = nullptr)
       {
-        for (int d=0; d<4; d++) {
-	  ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
-	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d].data()));
-	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+        if (U.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) {
+          for (int d=0; d<4; d++) {
+            ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
+              static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d].data()));
+            ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 
-	  ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
-	    ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
-	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4].data()));
-	  ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
-	}
+            ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
+              ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
+              static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4].data()));
+            ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+          }
+        }
 
 	resetScale(U.Scale());
       }
@@ -674,26 +676,26 @@ namespace quda {
     template <typename Float, int nColor, bool native_ghost, typename storeFloat>
     struct GhostAccessor<Float, nColor, QUDA_FLOAT2_GAUGE_ORDER, native_ghost, storeFloat> {
       using wrapper = fieldorder_wrapper<Float, storeFloat>;
-      complex<storeFloat> *ghost[8];
+      complex<storeFloat> *ghost[8] = {};
       const int volumeCB;
-      unsigned int ghostVolumeCB[8];
-      Float scale;
-      Float scale_inv;
+      unsigned int ghostVolumeCB[8] = {};
+      Float scale = static_cast<Float>(1.0);
+      Float scale_inv = static_cast<Float>(1.0);
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
       Accessor<Float, nColor, QUDA_FLOAT2_GAUGE_ORDER, storeFloat> accessor;
 
       GhostAccessor(const GaugeField &U, void *gauge_, void **ghost_ = 0) :
         volumeCB(U.VolumeCB()),
-        scale(static_cast<Float>(1.0)),
-        scale_inv(static_cast<Float>(1.0)),
         accessor(U, gauge_, ghost_)
       {
         if constexpr (!native_ghost) assert(ghost_ != nullptr);
-        for (int d = 0; d < 4; d++) {
-          ghost[d] = !native_ghost ? static_cast<complex<storeFloat>*>(ghost_[d]) : nullptr;
-	  ghostVolumeCB[d] = U.Nface()*U.SurfaceCB(d);
-	  ghost[d+4] = !native_ghost && U.Geometry() == QUDA_COARSE_GEOMETRY? static_cast<complex<storeFloat>*>(ghost_[d+4]) : nullptr;
-	  ghostVolumeCB[d+4] = U.Nface()*U.SurfaceCB(d);
+        if (U.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) {
+          for (int d = 0; d < 4; d++) {
+            ghost[d] = !native_ghost ? static_cast<complex<storeFloat>*>(ghost_[d]) : nullptr;
+            ghostVolumeCB[d] = U.Nface()*U.SurfaceCB(d);
+            ghost[d+4] = !native_ghost && U.Geometry() == QUDA_COARSE_GEOMETRY? static_cast<complex<storeFloat>*>(ghost_[d+4]) : nullptr;
+            ghostVolumeCB[d+4] = U.Nface()*U.SurfaceCB(d);
+          }
         }
         resetScale(U.Scale());
       }
