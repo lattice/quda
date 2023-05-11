@@ -211,6 +211,9 @@ namespace quda {
       if (create == QUDA_REFERENCE_FIELD_CREATE && (geometry == QUDA_VECTOR_GEOMETRY || geometry == QUDA_COARSE_GEOMETRY)) {
         exchangeGhost(geometry == QUDA_VECTOR_GEOMETRY ? QUDA_LINK_BACKWARDS : QUDA_LINK_BIDIRECTIONAL);
       }
+
+    // compute the fat link max now in case it is needed later (i.e., for half precision)
+    if (param.compute_fat_link_max) fat_link_max = this->abs_max();
   }
 
   GaugeField::~GaugeField() { }

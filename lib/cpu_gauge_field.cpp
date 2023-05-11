@@ -7,11 +7,6 @@
 
 namespace quda {
 
-  cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) :
-    GaugeField(param)
-  {
-    // compute the fat link max now in case it is needed later (i.e., for half precision)
-    if (param.compute_fat_link_max) fat_link_max = this->abs_max();
-  }
+  cpuGaugeField::cpuGaugeField(const GaugeFieldParam &param) : GaugeField(param) {}
 
 } // namespace quda

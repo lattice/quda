@@ -376,15 +376,15 @@ static void hisq_force_startup()
    * Copy to and exchange gauge and outer product fields on the device *
    ********************************************************************/
   cpuGauge_ex->exchangeExtendedGhost(R, true);
-  cudaGauge_ex->loadCPUField(*cpuGauge);
+  cudaGauge_ex->copy(*cpuGauge);
   cudaGauge_ex->exchangeExtendedGhost(cudaGauge_ex->R());
 
   cpuOprod_ex->exchangeExtendedGhost(R, true);
-  cudaOprod_ex->loadCPUField(*cpuOprod);
+  cudaOprod_ex->copy(*cpuOprod);
   cudaOprod_ex->exchangeExtendedGhost(cudaOprod_ex->R());
 
   cpuLongLinkOprod_ex->exchangeExtendedGhost(R, true);
-  cudaLongLinkOprod_ex->loadCPUField(*cpuLongLinkOprod);
+  cudaLongLinkOprod_ex->copy(*cpuLongLinkOprod);
   cudaLongLinkOprod_ex->exchangeExtendedGhost(cudaLongLinkOprod_ex->R());
 
   /**********************
@@ -460,7 +460,7 @@ static int hisq_force_test(bool lepage)
 
     copyExtendedGauge(*cpuForce, *cpuForce_ex, QUDA_CPU_FIELD_LOCATION);
     copyExtendedGauge(*cudaForce, *cudaForce_ex, QUDA_CUDA_FIELD_LOCATION);
-    cudaForce->saveCPUField(*hostVerifyForce);
+    hostVerifyForce->copy(*cudaForce);
 
     int res = 1;
     for (int dir = 0; dir < 4; dir++) {
@@ -497,7 +497,7 @@ static int hisq_force_test(bool lepage)
 
       copyExtendedGauge(*cpuForce, *cpuForce_ex, QUDA_CPU_FIELD_LOCATION);
       copyExtendedGauge(*cudaForce, *cudaForce_ex, QUDA_CUDA_FIELD_LOCATION);
-      cudaForce->saveCPUField(*hostVerifyForce);
+      hostVerifyForce->copy(*cudaForce);
 
       int res = 1;
       for (int dir = 0; dir < 4; dir++) {
@@ -526,7 +526,7 @@ static int hisq_force_test(bool lepage)
     host_timer.stop();
     host_time_sec += host_timer.last();
 
-    cudaMom->saveCPUField(*cpuMom);
+    cpuMom->copy(*cudaMom);
   }
 
   int accuracy_level = 3;

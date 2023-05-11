@@ -116,12 +116,12 @@ void packTest()
     cudaGaugeField cudaCpsGauge(cpsParam);
 
     host_timer.start();
-    cudaCpsGauge.loadCPUField(cpsCpuGauge);
+    cudaCpsGauge.copy(cpsCpuGauge);
     host_timer.stop();
     printfQuda("CPS Gauge send time = %e seconds\n", host_timer.last());
 
     host_timer.start();
-    cudaCpsGauge.saveCPUField(cpsCpuGauge);
+    cpuCpuGauge.copy(cudaCpsGauge);
     host_timer.stop();
     printfQuda("CPS Gauge restore time = %e seconds\n", host_timer.last());
   }
@@ -140,12 +140,12 @@ void packTest()
     cudaGaugeField cudaQdpGauge(qdpParam);
 
     host_timer.start();
-    cudaQdpGauge.loadCPUField(qdpCpuGauge);
+    cudaQdpGauge.copy(qdpCpuGauge);
     host_timer.stop();
     printfQuda("QDP Gauge send time = %e seconds\n", host_timer.last());
 
     host_timer.start();
-    cudaQdpGauge.saveCPUField(qdpCpuGauge);
+    qdpCpuGauge.copy(cudaQdpGauge);
     host_timer.stop();
     printfQuda("QDP Gauge restore time = %e seconds\n", host_timer.last());
   }

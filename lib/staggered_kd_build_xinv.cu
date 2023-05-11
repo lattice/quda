@@ -193,7 +193,7 @@ namespace quda {
         tmp_U = std::make_unique<cpuGaugeField>(gf_param);
 
         //Copy the cuda gauge field to the cpu
-        gauge.saveCPUField(reinterpret_cast<cpuGaugeField&>(*tmp_U));
+        tmp_U.get()->copy(gauge);
 
       } else if (location == QUDA_CUDA_FIELD_LOCATION) {
 

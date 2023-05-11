@@ -581,39 +581,9 @@ namespace quda {
   public:
     cudaGaugeField(const GaugeFieldParam &);
 
-    /**
-       @brief Download into this field from a CPU field
-       @param[in] cpu The CPU field source
-    */
-    void loadCPUField(const cpuGaugeField &cpu);
-
-    /**
-       @brief Download into this field from a CPU field.  Overloaded
-       variant that includes profiling
-       @param[in] cpu The CPU field source
-       @param[in] profile Time profile to record the transfer
-    */
-    void loadCPUField(const cpuGaugeField &cpu, TimeProfile &profile);
-
-    /**
-       @brief Upload from this field into a CPU field
-       @param[out] cpu The CPU field source
-    */
-    void saveCPUField(cpuGaugeField &cpu) const;
-
-    /**
-       @brief Upload from this field into a CPU field.  Overloaded
-       variant that includes profiling.
-       @param[out] cpu The CPU field source
-       @param[in] profile Time profile to record the transfer
-    */
-    void saveCPUField(cpuGaugeField &cpu, TimeProfile &profile) const;
   };
 
   class cpuGaugeField : public GaugeField {
-
-    friend void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu);
-    friend void cudaGaugeField::saveCPUField(cpuGaugeField &cpu) const;
 
   public:
     /**

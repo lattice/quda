@@ -40,7 +40,7 @@ const double unittol = (prec == QUDA_DOUBLE_PRECISION) ? 1e-10 : 1e-6;
 TEST(unitarization, verify)
 {
   unitarizeLinksCPU(*cpuULink, *cpuFatLink);
-  cudaULink->saveCPUField(*cudaResult);
+  cudaResult->copy(*cudaULink);
 
   int res = compare_floats(cudaResult->data(), cpuULink->data(), 4 * cudaResult->Volume() * gauge_site_size, unittol,
                            cpu_prec);
@@ -151,7 +151,7 @@ static int unitarize_link_test(int &test_rc)
 
     computeKSLinkQuda(fatlink, NULL, NULL, inlink, act_path_coeff, &qudaGaugeParam);
 
-    cudaFatLink->loadCPUField(*cpuFatLink);
+    cudaFatLink->copy(*cpuFatLink);
   }
 
   quda::setUnitarizeLinksConstants(unitarize_eps, max_allowed_error, reunit_allow_svd, reunit_svd_only, svd_rel_error,

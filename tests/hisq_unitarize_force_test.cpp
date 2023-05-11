@@ -89,8 +89,8 @@ static void hisq_force_init()
 
   gParam.order = QUDA_QDP_GAUGE_ORDER;
 
-  cudaFatLink->loadCPUField(*cpuFatLink);
-  cudaOprod->loadCPUField(*cpuOprod);
+  cudaFatLink->copy(*cpuFatLink);
+  cudaOprod->copy(*cpuOprod);
 }
 
 static void hisq_force_end()
@@ -135,7 +135,7 @@ TEST(hisq_force_unitarize, verify)
     quda::fermion_force::unitarizeForceCPU(*cpuResult, *cpuOprod, *cpuFatLink);
   }
 
-  cudaResult->saveCPUField(*cpuReference);
+  cpuReference->copy(*cudaResult);
 
   printfQuda("Comparing CPU and GPU results\n");
   int res[4];
