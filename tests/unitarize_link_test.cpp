@@ -32,8 +32,8 @@ static double max_allowed_error = 1e-11;
 
 static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
-quda::cpuGaugeField *cpuFatLink, *cpuULink, *cudaResult;
-quda::cudaGaugeField *cudaFatLink, *cudaULink;
+quda::GaugeField *cpuFatLink, *cpuULink, *cudaResult;
+quda::GaugeField *cudaFatLink, *cudaULink;
 
 const double unittol = (prec == QUDA_DOUBLE_PRECISION) ? 1e-10 : 1e-6;
 
@@ -124,21 +124,21 @@ static int unitarize_link_test(int &test_rc)
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
   gParam.gauge = fatlink;
   gParam.location = QUDA_CPU_FIELD_LOCATION;
-  cpuFatLink = new quda::cpuGaugeField(gParam);
+  cpuFatLink = new quda::GaugeField(gParam);
 
   gParam.create = QUDA_ZERO_FIELD_CREATE;
-  cpuULink = new quda::cpuGaugeField(gParam);
+  cpuULink = new quda::GaugeField(gParam);
 
   gParam.create = QUDA_ZERO_FIELD_CREATE;
-  cudaResult = new quda::cpuGaugeField(gParam);
+  cudaResult = new quda::GaugeField(gParam);
 
   gParam.pad = 0;
   gParam.create = QUDA_NULL_FIELD_CREATE;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.setPrecision(prec, true);
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
-  cudaFatLink = new quda::cudaGaugeField(gParam);
-  cudaULink = new quda::cudaGaugeField(gParam);
+  cudaFatLink = new quda::GaugeField(gParam);
+  cudaULink = new quda::GaugeField(gParam);
 
   { // create fat links
     double act_path_coeff[6];

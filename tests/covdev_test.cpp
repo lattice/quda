@@ -25,7 +25,7 @@ using namespace quda;
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
 
-cpuGaugeField *cpuLink = nullptr;
+GaugeField *cpuLink = nullptr;
 
 std::unique_ptr<ColorSpinorField> spinor, spinorOut, spinorRef;
 std::unique_ptr<ColorSpinorField> cudaSpinor, cudaSpinorOut;
@@ -94,7 +94,7 @@ void init(int argc, char **argv)
   // cpuLink is only used for ghost allocation
   GaugeFieldParam cpuParam(gauge_param, links);
   cpuParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  cpuLink = new cpuGaugeField(cpuParam);
+  cpuLink = new GaugeField(cpuParam);
 
   printfQuda("Links sending...");
   loadGaugeQuda(links, &gauge_param);

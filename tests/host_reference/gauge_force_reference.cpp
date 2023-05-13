@@ -9,6 +9,7 @@
 #include "host_utils.h"
 #include "misc.h"
 #include "gauge_force_reference.h"
+#include "timer.h"
 
 extern int Z[4];
 extern int V;
@@ -491,6 +492,8 @@ void gauge_force_reference(void *refMom, double eb3, quda::GaugeField &u, int **
   param.t_boundary = QUDA_PERIODIC_T;
 
   auto qdp_ex = quda::createExtendedGauge((void **)sitelink, param, R);
+  //quda::TimeProfile dummy("blah");
+  //auto qdp_ex = quda::createExtendedGauge(u, R, dummy);
   lattice_t lat(*qdp_ex);
 
   void *sitelink_ex[] = {qdp_ex->data(0), qdp_ex->data(1), qdp_ex->data(2), qdp_ex->data(3)};

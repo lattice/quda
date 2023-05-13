@@ -225,11 +225,11 @@ int main(int argc, char **argv)
     gParam.link_type = gauge_param.type;
     gParam.reconstruct = gauge_param.reconstruct;
     gParam.setPrecision(gParam.Precision(), true);
-    cudaGaugeField gauge(gParam);
+    GaugeField gauge(gParam);
 
     int pad = 0;
-    lat_dim_t y;
-    lat_dim_t R;
+    lat_dim_t y = {};
+    lat_dim_t R = {};
     for (int dir = 0; dir < 4; ++dir)
       if (comm_dim_partitioned(dir)) R[dir] = 2;
     for (int dir = 0; dir < 4; ++dir) y[dir] = gauge_param.X[dir] + 2 * R[dir];
@@ -241,7 +241,8 @@ int main(int argc, char **argv)
     gParamEx.t_boundary = gParam.t_boundary;
     gParamEx.nFace = 1;
     gParamEx.r = R;
-    cudaGaugeField gaugeEx(gParamEx);
+
+    GaugeField gaugeEx(gParamEx);
 
     QudaGaugeObservableParam obs_param = newQudaGaugeObservableParam();
     obs_param.compute_plaquette = QUDA_BOOLEAN_TRUE;

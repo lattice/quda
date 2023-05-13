@@ -256,7 +256,7 @@ namespace quda {
 
   void GaugeField::createGhostZone(const lat_dim_t &R, bool no_comms_fill, bool bidir) const
   {
-    if (typeid(*this) == typeid(cpuGaugeField)) return;
+    if (location == QUDA_CPU_FIELD_LOCATION) return;
 
     // if this is not a bidirectional exchange then we are doing a
     // scalar exchange, e.g., only the link matrix in the direcion we
@@ -288,26 +288,14 @@ namespace quda {
 
     if (phase != QUDA_STAGGERED_PHASE_INVALID) staggeredPhaseType = phase;
     applyGaugePhase(*this);
-    if (ghostExchange==QUDA_GHOST_EXCHANGE_PAD) {
-      if (typeid(*this)==typeid(cudaGaugeField)) {
-	static_cast<cudaGaugeField&>(*this).exchangeGhost();
-      } else {
-	static_cast<cpuGaugeField&>(*this).exchangeGhost();
-      }
-    }
+    if (ghostExchange==QUDA_GHOST_EXCHANGE_PAD) exchangeGhost();
     staggeredPhaseApplied = true;
   }
 
   void GaugeField::removeStaggeredPhase() {
     if (!staggeredPhaseApplied) errorQuda("No staggered phases to remove");
     applyGaugePhase(*this);
-    if (ghostExchange==QUDA_GHOST_EXCHANGE_PAD) {
-      if (typeid(*this)==typeid(cudaGaugeField)) {
-	static_cast<cudaGaugeField&>(*this).exchangeGhost();
-      } else {
-	static_cast<cpuGaugeField&>(*this).exchangeGhost();
-      }
-    }
+    if (ghostExchange==QUDA_GHOST_EXCHANGE_PAD) exchangeGhost();
     staggeredPhaseApplied = false;
   }
 
@@ -1144,27 +1132,15 @@ namespace quda {
     return Checksum(*this, mini);
   }
 
-  GaugeField* GaugeField::Create(const GaugeFieldParam &param) {
-
-    GaugeField *field = nullptr;
-    if (param.location == QUDA_CPU_FIELD_LOCATION) {
-      field = new cpuGaugeField(param);
-    } else if (param.location== QUDA_CUDA_FIELD_LOCATION) {
-      field = new cudaGaugeField(param);
-    } else {
-      errorQuda("Invalid field location %d", param.location);
-    }
-
-    return field;
-  }
+  GaugeField* GaugeField::Create(const GaugeFieldParam &param) { return new GaugeField(param); }
 
   // helper for creating extended gauge fields
-  cudaGaugeField *createExtendedGauge(cudaGaugeField &in, const lat_dim_t &R, TimeProfile &profile,
-                                      bool redundant_comms, QudaReconstructType recon)
+  GaugeField *createExtendedGauge(GaugeField &in, const lat_dim_t &R, TimeProfile &profile,
+                                  bool redundant_comms, QudaReconstructType recon)
   {
     profile.TPSTART(QUDA_PROFILE_INIT);
     GaugeFieldParam gParamEx(in);
-    gParamEx.location = QUDA_CUDA_FIELD_LOCATION;
+    //gParamEx.location = QUDA_CUDA_FIELD_LOCATION;
     gParamEx.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
     gParamEx.pad = 0;
     gParamEx.nFace = 1;
@@ -1177,10 +1153,10 @@ namespace quda {
     if (recon != QUDA_RECONSTRUCT_INVALID) gParamEx.reconstruct = recon;
     gParamEx.setPrecision(gParamEx.Precision(), true);
 
-    auto *out = new cudaGaugeField(gParamEx);
+    auto *out = new GaugeField(gParamEx);
 
     // copy input field into the extended device gauge field
-    copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION);
+    copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION); // wrong location if both fields cpu
 
     profile.TPSTOP(QUDA_PROFILE_INIT);
 
@@ -1191,10 +1167,10 @@ namespace quda {
   }
 
   // helper for creating extended (cpu) gauge fields
-  cpuGaugeField *createExtendedGauge(void **gauge, QudaGaugeParam &gauge_param, const lat_dim_t &R)
+  GaugeField *createExtendedGauge(void **gauge, QudaGaugeParam &gauge_param, const lat_dim_t &R)
   {
     GaugeFieldParam gauge_field_param(gauge_param, gauge);
-    cpuGaugeField cpu(gauge_field_param);
+    GaugeField cpu(gauge_field_param);
 
     gauge_field_param.location = QUDA_CPU_FIELD_LOCATION;
     gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
@@ -1203,7 +1179,7 @@ namespace quda {
       gauge_field_param.x[d] += 2 * R[d];
       gauge_field_param.r[d] = R[d];
     }
-    cpuGaugeField *padded_cpu = new cpuGaugeField(gauge_field_param);
+    GaugeField *padded_cpu = new GaugeField(gauge_field_param);
 
     copyExtendedGauge(*padded_cpu, cpu, QUDA_CPU_FIELD_LOCATION);
     padded_cpu->exchangeExtendedGhost(R, true); // Do comm to fill halo = true

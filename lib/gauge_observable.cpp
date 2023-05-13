@@ -66,7 +66,7 @@ namespace quda
     tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
     tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-    cudaGaugeField gaugeFmunu(tensorParam);
+    GaugeField gaugeFmunu(tensorParam);
     profile.TPSTOP(QUDA_PROFILE_INIT);
 
     profile.TPSTART(QUDA_PROFILE_COMPUTE);

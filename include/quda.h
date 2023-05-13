@@ -62,7 +62,7 @@ extern "C" {
 
     QudaGaugeFixed gauge_fix; /**< Whether the input gauge field is in the axial gauge or not */
 
-    int ga_pad;       /**< The pad size that the cudaGaugeField will use (default=0) */
+    int ga_pad;       /**< The pad size that native GaugeFields will use (default=0) */
 
     int site_ga_pad;  /**< Used by link fattening and the gauge and fermion forces */
 
@@ -1488,7 +1488,7 @@ extern "C" {
   void  saveGaugeFieldQuda(void* outGauge, void* inGauge, QudaGaugeParam* param);
 
   /**
-   * Reinterpret gauge as a pointer to cudaGaugeField and call destructor.
+   * Reinterpret gauge as a pointer to a GaugeField and call destructor.
    *
    * @param gauge Gauge field to be freed
    */

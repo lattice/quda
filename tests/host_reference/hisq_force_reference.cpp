@@ -1197,8 +1197,8 @@ void doHisqStaplesForceCPU(const int dim[4], PathCoefficients<double> staple_coe
 #undef Qmu
 #undef Qnumu
 
-void hisqStaplesForceCPU(const double *path_coeff, quda::cpuGaugeField &oprod, quda::cpuGaugeField &link,
-                         quda::cpuGaugeField *newOprod)
+void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda::GaugeField &link,
+                         quda::GaugeField *newOprod)
 {
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
@@ -1301,8 +1301,8 @@ void computeLongLinkField(const int dim[4], const Real *const oprod, const Real 
   }
 }
 
-void hisqLongLinkForceCPU(double coeff, quda::cpuGaugeField &oprod, quda::cpuGaugeField &link,
-                          quda::cpuGaugeField *newOprod)
+void hisqLongLinkForceCPU(double coeff, quda::GaugeField &oprod, quda::GaugeField &link,
+                          quda::GaugeField *newOprod)
 {
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
@@ -1360,7 +1360,7 @@ void completeForceField(const int dim[4], const Real *const oprod, const Real *c
   for (int site = 0; site < half_volume; ++site) { completeForceSite<Real, 1>(site, dim, oprod, link, sig, ls, mom); }
 }
 
-void hisqCompleteForceCPU(quda::cpuGaugeField &oprod, quda::cpuGaugeField &link, quda::cpuGaugeField *mom)
+void hisqCompleteForceCPU(quda::GaugeField &oprod, quda::GaugeField &link, quda::GaugeField *mom)
 {
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];

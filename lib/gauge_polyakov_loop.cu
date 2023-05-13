@@ -164,14 +164,14 @@ namespace quda {
       // as a function of the number of ranks in the `t` dimension
       gParam.setPrecision(QUDA_DOUBLE_PRECISION);
 
-      std::unique_ptr<GaugeField> product_field = std::make_unique<cudaGaugeField>(gParam);
+      std::unique_ptr<GaugeField> product_field = std::make_unique<GaugeField>(gParam);
       GaugeField& product_field_ref = reinterpret_cast<GaugeField&>(*product_field.get());
 
       // Create the field we reduce into
       x[3] = comm_dim(3);
       gParam.x = x;
       gParam.create = QUDA_NULL_FIELD_CREATE;
-      condensed_field = std::make_unique<cudaGaugeField>(gParam);
+      condensed_field = std::make_unique<GaugeField>(gParam);
       GaugeField& condensed_field_ref = reinterpret_cast<GaugeField&>(*condensed_field.get());
       profile.TPSTOP(QUDA_PROFILE_INIT);
 

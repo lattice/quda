@@ -575,27 +575,6 @@ namespace quda {
     void copy_from_buffer(void *buffer);
   };
 
-  class cudaGaugeField : public GaugeField
-  {
-
-  public:
-    cudaGaugeField(const GaugeFieldParam &);
-
-  };
-
-  class cpuGaugeField : public GaugeField {
-
-  public:
-    /**
-       @brief Constructor for cpuGaugeField from a GaugeFieldParam
-       @param[in,out] param Parameter struct - note that in the case
-       that we are wrapping host-side extended fields, this param is
-       modified for subsequent creation of fields that are not
-       extended.
-    */
-    cpuGaugeField(const GaugeFieldParam &param);
-  };
-
   /**
      @brief This is a debugging function, where we cast a gauge field
      into a spinor field so we can compute its L1 norm.
@@ -666,8 +645,8 @@ namespace quda {
      @param recon The reconsturction type
      @return the pointer to the extended gauge field
   */
-  cudaGaugeField *createExtendedGauge(cudaGaugeField &in, const lat_dim_t &R, TimeProfile &profile,
-                                      bool redundant_comms = false, QudaReconstructType recon = QUDA_RECONSTRUCT_INVALID);
+  GaugeField *createExtendedGauge(GaugeField &in, const lat_dim_t &R, TimeProfile &profile,
+                                  bool redundant_comms = false, QudaReconstructType recon = QUDA_RECONSTRUCT_INVALID);
 
   /**
      This function is used for creating an exteneded (cpu) gauge field from the input,
@@ -676,7 +655,7 @@ namespace quda {
      @param R By how many do we want to extend the gauge field in each direction
      @return the pointer to the extended gauge field
   */
-  cpuGaugeField *createExtendedGauge(void **gauge, QudaGaugeParam &gauge_param, const lat_dim_t &R);
+  GaugeField *createExtendedGauge(void **gauge, QudaGaugeParam &gauge_param, const lat_dim_t &R);
 
   /**
      This function is used for  extracting the gauge ghost zone from a

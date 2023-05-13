@@ -33,10 +33,10 @@ namespace quda {
     initializeCoarse();
   }
 
-  DiracCoarse::DiracCoarse(const DiracParam &param, cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h,
-                           cpuGaugeField *Yhat_h, // cpu link fields
-                           cudaGaugeField *Y_d, cudaGaugeField *X_d, cudaGaugeField *Xinv_d,
-                           cudaGaugeField *Yhat_d) // gpu link field
+  DiracCoarse::DiracCoarse(const DiracParam &param, GaugeField *Y_h, GaugeField *X_h, GaugeField *Xinv_h,
+                           GaugeField *Yhat_h, // cpu link fields
+                           GaugeField *Y_d, GaugeField *X_d, GaugeField *Xinv_d,
+                           GaugeField *Yhat_d) // gpu link field
     :
     Dirac(param),
     mass(param.mass),
@@ -138,16 +138,16 @@ namespace quda {
     int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
     gParam.pad = gpu ? gParam.nFace * pad * 2 : 0; // factor of 2 since we have to store bi-directional ghost zone
 
-    if (gpu) Y_d = new cudaGaugeField(gParam);
-    else     Y_h = new cpuGaugeField(gParam);
+    if (gpu) Y_d = new GaugeField(gParam);
+    else     Y_h = new GaugeField(gParam);
 
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     gParam.nFace = 0;
     gParam.geometry = QUDA_SCALAR_GEOMETRY;
     gParam.pad = 0;
 
-    if (gpu) X_d = new cudaGaugeField(gParam);
-    else     X_h = new cpuGaugeField(gParam);
+    if (gpu) X_d = new GaugeField(gParam);
+    else     X_h = new GaugeField(gParam);
   }
 
   void DiracCoarse::createYhat(bool gpu) const
@@ -180,8 +180,8 @@ namespace quda {
     int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
     gParam.pad = gpu ? gParam.nFace * pad * 2 : 0; // factor of 2 since we have to store bi-directional ghost zone
 
-    if (gpu) Yhat_d = new cudaGaugeField(gParam);
-    else     Yhat_h = new cpuGaugeField(gParam);
+    if (gpu) Yhat_d = new GaugeField(gParam);
+    else     Yhat_h = new GaugeField(gParam);
 
     gParam.setPrecision(gpu ? X_d->Precision() : X_h->Precision());
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
@@ -189,8 +189,8 @@ namespace quda {
     gParam.geometry = QUDA_SCALAR_GEOMETRY;
     gParam.pad = 0;
 
-    if (gpu) Xinv_d = new cudaGaugeField(gParam);
-    else     Xinv_h = new cpuGaugeField(gParam);
+    if (gpu) Xinv_d = new GaugeField(gParam);
+    else     Xinv_h = new GaugeField(gParam);
   }
 
   void DiracCoarse::initializeCoarse()
@@ -224,8 +224,8 @@ namespace quda {
         Y_param.order = gOrder;
         X_param.order = gOrder;
 
-        GaugeField *Y_order = cudaGaugeField::Create(Y_param);
-        GaugeField *X_order = cudaGaugeField::Create(X_param);
+        GaugeField *Y_order = GaugeField::Create(Y_param);
+        GaugeField *X_order = GaugeField::Create(X_param);
 
         dirac->createCoarseOp(*Y_order, *X_order, *transfer, kappa, mass, Mu(), MuFactor(), AllowTruncation());
 
@@ -438,9 +438,9 @@ namespace quda {
     /* do nothing */
   }
 
-  DiracCoarsePC::DiracCoarsePC(const DiracParam &param, cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h,
-                               cpuGaugeField *Yhat_h, cudaGaugeField *Y_d, cudaGaugeField *X_d, cudaGaugeField *Xinv_d,
-                               cudaGaugeField *Yhat_d) :
+  DiracCoarsePC::DiracCoarsePC(const DiracParam &param, GaugeField *Y_h, GaugeField *X_h, GaugeField *Xinv_h,
+                               GaugeField *Yhat_h, GaugeField *Y_d, GaugeField *X_d, GaugeField *Xinv_d,
+                               GaugeField *Yhat_d) :
     DiracCoarse(param, Y_h, X_h, Xinv_h, Yhat_h, Y_d, X_d, Xinv_d, Yhat_d)
   {
   }

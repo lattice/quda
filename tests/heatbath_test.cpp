@@ -110,7 +110,7 @@ int main(int argc, char **argv)
     gParam.link_type = gauge_param.type;
     gParam.reconstruct = gauge_param.reconstruct;
     gParam.setPrecision(gParam.Precision(), true);
-    cudaGaugeField *gauge = new cudaGaugeField(gParam);
+    GaugeField *gauge = new GaugeField(gParam);
 
     int pad = 0;
     lat_dim_t y;
@@ -126,7 +126,7 @@ int main(int argc, char **argv)
     gParamEx.t_boundary = gParam.t_boundary;
     gParamEx.nFace = 1;
     for (int dir = 0; dir < 4; ++dir) gParamEx.r[dir] = R[dir];
-    cudaGaugeField *gaugeEx = new cudaGaugeField(gParamEx);
+    GaugeField *gaugeEx = new GaugeField(gParamEx);
     // CURAND random generator initialization
     RNG *randstates = new RNG(*gauge, 1234);
 

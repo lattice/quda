@@ -306,8 +306,8 @@ namespace quda {
   constexpr int coarseColor = @QUDA_MULTIGRID_NVEC@;
 
   template <>
-  void StaggeredCoarseOp<fineColor, coarseColor>(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
-                                                 const cudaGaugeField &longGauge, const GaugeField &XinvKD, double mass,
+  void StaggeredCoarseOp<fineColor, coarseColor>(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
+                                                 const GaugeField &longGauge, const GaugeField &XinvKD, double mass,
                                                  bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
   {
     QudaPrecision precision = checkPrecision(T.Vectors(X.Location()), X, Y);
@@ -351,11 +351,11 @@ namespace quda {
       gf_param.nFace = 1;
       gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
 
-      tmp_U = std::make_unique<cpuGaugeField>(gf_param);
+      tmp_U = std::make_unique<GaugeField>(gf_param);
       need_tmp_U = true;
 
       //Copy the cuda gauge field to the cpu
-      gauge.saveCPUField(reinterpret_cast<cpuGaugeField&>(*tmp_U));
+      tmp_U.get()->copy(gauge);
 
             // Create either a real or a dummy L field
       GaugeFieldParam lgf_param(longGauge.X(), precision, QUDA_RECONSTRUCT_NO, pad, longGauge.Geometry());
@@ -373,12 +373,12 @@ namespace quda {
       lgf_param.nFace = 3;
       lgf_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
 
-      tmp_L = std::make_unique<cpuGaugeField>(lgf_param);
+      tmp_L = std::make_unique<GaugeField>(lgf_param);
       need_tmp_L = true;
 
       //Copy the cuda gauge field to the cpu
       if (dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)
-        longGauge.saveCPUField(reinterpret_cast<cpuGaugeField&>(*tmp_L));
+        tmp_L.get()->copy(longGauge);
 
       // Create either a real or a dummy Xinv field
       GaugeFieldParam xgf_param(XinvKD.X(), precision, QUDA_RECONSTRUCT_NO, pad, XinvKD.Geometry());
@@ -400,7 +400,7 @@ namespace quda {
       xgf_param.nFace = 0;
       xgf_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
 
-      tmp_Xinv = std::make_unique<cpuGaugeField>(xgf_param);
+      tmp_Xinv = std::make_unique<GaugeField>(xgf_param);
       need_tmp_Xinv = true;
 
       //Copy the cuda gauge field to the cpu
@@ -419,7 +419,7 @@ namespace quda {
         lgf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
         lgf_param.setPrecision(lgf_param.Precision());
         lgf_param.create = QUDA_NULL_FIELD_CREATE;
-        tmp_L = std::make_unique<cudaGaugeField>(lgf_param);
+        tmp_L = std::make_unique<GaugeField>(lgf_param);
         need_tmp_L = true;
       } else if ((dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) && longGauge.Reconstruct() != QUDA_RECONSTRUCT_NO) {
         // create a copy of the gauge field with no reconstruction
@@ -427,7 +427,7 @@ namespace quda {
         lgf_param.reconstruct = QUDA_RECONSTRUCT_NO;
         lgf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
         lgf_param.setPrecision(lgf_param.Precision());
-        tmp_L = std::make_unique<cudaGaugeField>(lgf_param);
+        tmp_L = std::make_unique<GaugeField>(lgf_param);
 
         tmp_L->copy(longGauge);
         tmp_L->exchangeGhost();
@@ -443,7 +443,7 @@ namespace quda {
         xgf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
         xgf_param.setPrecision(xgf_param.Precision());
         xgf_param.create = QUDA_NULL_FIELD_CREATE;
-        tmp_Xinv = std::make_unique<cudaGaugeField>(xgf_param);
+        tmp_Xinv = std::make_unique<GaugeField>(xgf_param);
         need_tmp_Xinv = true;
       }
       // no need to worry about XinvKD's reconstruct
@@ -454,7 +454,7 @@ namespace quda {
         gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
         gf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
         gf_param.setPrecision(gf_param.Precision());
-        tmp_U = std::make_unique<cudaGaugeField>(gf_param);
+        tmp_U = std::make_unique<GaugeField>(gf_param);
         need_tmp_U = true;
 
         tmp_U->copy(gauge);

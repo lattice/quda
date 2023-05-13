@@ -12,16 +12,16 @@
 #include <sys/time.h>
 #include <gtest/gtest.h>
 
-quda::cudaGaugeField *cudaFatLink = NULL;
-quda::cpuGaugeField *cpuFatLink = NULL;
+quda::GaugeField *cudaFatLink = NULL;
+quda::GaugeField *cpuFatLink = NULL;
 
-quda::cudaGaugeField *cudaOprod = NULL;
-quda::cpuGaugeField *cpuOprod = NULL;
+quda::GaugeField *cudaOprod = NULL;
+quda::GaugeField *cpuOprod = NULL;
 
-quda::cudaGaugeField *cudaResult = NULL;
-quda::cpuGaugeField *cpuResult = NULL;
+quda::GaugeField *cudaResult = NULL;
+quda::GaugeField *cpuResult = NULL;
 
-quda::cpuGaugeField *cpuReference = NULL;
+quda::GaugeField *cpuReference = NULL;
 
 static QudaGaugeParam gaugeParam;
 
@@ -66,10 +66,10 @@ static void hisq_force_init()
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.anisotropy = 1;
 
-  cpuFatLink = new quda::cpuGaugeField(gParam);
-  cpuOprod = new quda::cpuGaugeField(gParam);
-  cpuResult = new quda::cpuGaugeField(gParam);
-  cpuReference = new quda::cpuGaugeField(gParam);
+  cpuFatLink = new quda::GaugeField(gParam);
+  cpuOprod = new quda::GaugeField(gParam);
+  cpuResult = new quda::GaugeField(gParam);
+  cpuReference = new quda::GaugeField(gParam);
 
   // create "gauge fields"
   int seed = 0;
@@ -83,9 +83,9 @@ static void hisq_force_init()
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.setPrecision(gaugeParam.cuda_prec, true);
 
-  cudaFatLink = new quda::cudaGaugeField(gParam);
-  cudaOprod = new quda::cudaGaugeField(gParam);
-  cudaResult = new quda::cudaGaugeField(gParam);
+  cudaFatLink = new quda::GaugeField(gParam);
+  cudaOprod = new quda::GaugeField(gParam);
+  cudaResult = new quda::GaugeField(gParam);
 
   gParam.order = QUDA_QDP_GAUGE_ORDER;
 

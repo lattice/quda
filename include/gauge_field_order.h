@@ -430,17 +430,17 @@ namespace quda {
 
       GhostAccessor(const GaugeField &U, void * = nullptr, void **ghost_ = nullptr)
       {
-        if (U.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) {
-          for (int d=0; d<4; d++) {
-            ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
-              static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d].data()));
-            ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+        for (int d=0; d<4; d++) {
+          ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
+            U.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD ?
+            static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d].data())) : nullptr;
+          ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 
-            ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
-              ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
-              static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4].data()));
-            ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
-          }
+          ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
+            ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
+            U.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD ?
+            static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4].data())) : nullptr;
+          ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
         }
 
 	resetScale(U.Scale());
@@ -552,17 +552,16 @@ namespace quda {
 
       GhostAccessor(const GaugeField &U, void * = nullptr, void **ghost_ = nullptr)
       {
-        if (U.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) {
-          for (int d=0; d<4; d++) {
-            ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
-              static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d].data()));
-            ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+        for (int d=0; d<4; d++) {
+          ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
+            U.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD ? static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d].data())) : nullptr;
+          ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 
-            ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
-              ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
-              static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4].data()));
-            ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
-          }
+          ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
+            ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
+            U.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD ?
+            static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4].data())) : nullptr;
+          ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
         }
 
 	resetScale(U.Scale());
@@ -689,13 +688,11 @@ namespace quda {
         accessor(U, gauge_, ghost_)
       {
         if constexpr (!native_ghost) assert(ghost_ != nullptr);
-        if (U.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) {
-          for (int d = 0; d < 4; d++) {
-            ghost[d] = !native_ghost ? static_cast<complex<storeFloat>*>(ghost_[d]) : nullptr;
-            ghostVolumeCB[d] = U.Nface()*U.SurfaceCB(d);
-            ghost[d+4] = !native_ghost && U.Geometry() == QUDA_COARSE_GEOMETRY? static_cast<complex<storeFloat>*>(ghost_[d+4]) : nullptr;
-            ghostVolumeCB[d+4] = U.Nface()*U.SurfaceCB(d);
-          }
+        for (int d = 0; d < 4; d++) {
+          ghost[d] = !native_ghost ? static_cast<complex<storeFloat>*>(ghost_[d]) : nullptr;
+          ghostVolumeCB[d] = U.Nface()*U.SurfaceCB(d);
+          ghost[d+4] = !native_ghost && U.Geometry() == QUDA_COARSE_GEOMETRY? static_cast<complex<storeFloat>*>(ghost_[d+4]) : nullptr;
+          ghostVolumeCB[d+4] = U.Nface()*U.SurfaceCB(d);
         }
         resetScale(U.Scale());
       }
@@ -1752,7 +1749,7 @@ namespace quda {
 
       /**
          @brief The LegacyOrder defines the ghost zone storage and ordering for
-         all cpuGaugeFields, which use the same ghost zone storage.
+         all non-native fields, which use the same ghost zone storage.
       */
       template <typename Float, int length_> struct LegacyOrder {
         static constexpr int length = length_;
@@ -1776,11 +1773,10 @@ namespace quda {
           if (geometry == QUDA_COARSE_GEOMETRY)
             errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
 
-          if (u.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) {
-            for (int i = 0; i < 4; i++) {
-              ghost[i] = (ghost_) ? ghost_[i] : (Float *)(u.Ghost()[i].data());
-              faceVolumeCB[i] = u.SurfaceCB(i) * u.Nface(); // face volume equals surface * depth
-            }
+          for (int i = 0; i < 4; i++) {
+            ghost[i] = (ghost_) ? ghost_[i] :
+              u.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD ? (Float *)(u.Ghost()[i].data()) : nullptr;
+            faceVolumeCB[i] = u.SurfaceCB(i) * u.Nface(); // face volume equals surface * depth
           }
         }
 

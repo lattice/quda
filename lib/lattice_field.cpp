@@ -613,7 +613,7 @@ namespace quda {
       const ColorSpinorField &csField = static_cast<const ColorSpinorField&>(*this);
       if (csField.FieldOrder() == 2 || csField.FieldOrder() == 4)
 	return static_cast<int>(csField.FieldOrder());
-    } else if (typeid(*this) == typeid(const cudaGaugeField)) {
+    } else if (typeid(*this) == typeid(const GaugeField)) {
       const GaugeField &gField = static_cast<const GaugeField&>(*this);
       if (gField.Order() == 2 || gField.Order() == 4)
 	return static_cast<int>(gField.Order());

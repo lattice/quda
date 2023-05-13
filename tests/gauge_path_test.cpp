@@ -128,13 +128,13 @@ void gauge_force_test(bool compute_force = true)
   param.create = QUDA_NULL_FIELD_CREATE;
   param.order = QUDA_QDP_GAUGE_ORDER;
   param.location = QUDA_CPU_FIELD_LOCATION;
-  quda::cpuGaugeField U_qdp(param);
+  quda::GaugeField U_qdp(param);
 
   // fills the gauge field with random numbers
   createSiteLinkCPU(U_qdp, gauge_param.cpu_prec, 0);
 
   param.order = QUDA_MILC_GAUGE_ORDER;
-  quda::cpuGaugeField U_milc(param);
+  quda::GaugeField U_milc(param);
   if (gauge_order == QUDA_MILC_GAUGE_ORDER) U_milc.copy(U_qdp);
   if (compute_force) {
     param.reconstruct = QUDA_RECONSTRUCT_10;
@@ -143,11 +143,11 @@ void gauge_force_test(bool compute_force = true)
     param.reconstruct = QUDA_RECONSTRUCT_NO;
   }
   param.create = QUDA_ZERO_FIELD_CREATE;
-  quda::cpuGaugeField Mom_milc(param);
-  quda::cpuGaugeField Mom_ref_milc(param);
+  quda::GaugeField Mom_milc(param);
+  quda::GaugeField Mom_ref_milc(param);
 
   param.order = QUDA_QDP_GAUGE_ORDER;
-  quda::cpuGaugeField Mom_qdp(param);
+  quda::GaugeField Mom_qdp(param);
 
   // initialize some data in cpuMom
   if (compute_force) {
@@ -260,13 +260,13 @@ void gauge_loop_test()
   param.create = QUDA_NULL_FIELD_CREATE;
   param.order = QUDA_QDP_GAUGE_ORDER;
   param.location = QUDA_CPU_FIELD_LOCATION;
-  quda::cpuGaugeField U_qdp(param);
+  quda::GaugeField U_qdp(param);
 
   // fills the gauge field with random numbers
   createSiteLinkCPU(U_qdp, gauge_param.cpu_prec, 0);
 
   param.order = QUDA_MILC_GAUGE_ORDER;
-  quda::cpuGaugeField U_milc(param);
+  quda::GaugeField U_milc(param);
   if (gauge_order == QUDA_MILC_GAUGE_ORDER) U_milc.copy(U_qdp);
 
   void *sitelink = nullptr;

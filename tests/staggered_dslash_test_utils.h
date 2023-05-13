@@ -52,8 +52,8 @@ struct StaggeredDslashTestWrapper {
   void *milc_fatlink_gpu;
   void *milc_longlink_gpu;
 
-  cpuGaugeField *cpuFat = nullptr;
-  cpuGaugeField *cpuLong = nullptr;
+  GaugeField *cpuFat = nullptr;
+  GaugeField *cpuLong = nullptr;
 
   ColorSpinorField spinor;
   ColorSpinorField spinorOut;
@@ -204,14 +204,14 @@ struct StaggeredDslashTestWrapper {
     gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
     GaugeFieldParam cpuFatParam(gauge_param, milc_fatlink_cpu);
     cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-    cpuFat = new cpuGaugeField(cpuFatParam);
+    cpuFat = new GaugeField(cpuFatParam);
     for (int i = 0; i < 4; i++) ghost_fatlink_cpu[i] = cpuFat->Ghost()[i].data();
 
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
       gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
       GaugeFieldParam cpuLongParam(gauge_param, milc_longlink_cpu);
       cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-      cpuLong = new cpuGaugeField(cpuLongParam);
+      cpuLong = new GaugeField(cpuLongParam);
       for (int i = 0; i < 4; i++) ghost_longlink_cpu[i] = cpuLong ? cpuLong->Ghost()[i].data() : nullptr;
     }
 #endif

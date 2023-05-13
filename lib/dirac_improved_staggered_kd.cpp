@@ -154,8 +154,8 @@ namespace quda
     // Should we support "preparing" and "reconstructing"?
   }
 
-  void DiracImprovedStaggeredKD::updateFields(cudaGaugeField *, cudaGaugeField *fat_gauge_in,
-                                              cudaGaugeField *long_gauge_in, CloverField *)
+  void DiracImprovedStaggeredKD::updateFields(GaugeField *, GaugeField *fat_gauge_in,
+                                              GaugeField *long_gauge_in, CloverField *)
   {
     Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
     fatGauge = fat_gauge_in;

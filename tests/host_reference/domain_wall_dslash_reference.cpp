@@ -763,7 +763,7 @@ void dw_dslash(void *out, void *const *gauge, void *in, int oddBit, int daggerBi
 {
   GaugeFieldParam gauge_field_param(gauge_param, (void **)gauge);
   gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  cpuGaugeField cpu(gauge_field_param);
+  GaugeField cpu(gauge_field_param);
   void *ghostGauge[4] = {cpu.Ghost()[0].data(), cpu.Ghost()[1].data(), cpu.Ghost()[2].data(), cpu.Ghost()[3].data()};
 
   // Get spinor ghost fields
@@ -830,7 +830,7 @@ void dslash_4_4d(void *out, void *const *gauge, void *in, int oddBit, int dagger
 {
   GaugeFieldParam gauge_field_param(gauge_param, (void **)gauge);
   gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  cpuGaugeField cpu(gauge_field_param);
+  GaugeField cpu(gauge_field_param);
   void *ghostGauge[4] = {cpu.Ghost()[0].data(), cpu.Ghost()[1].data(), cpu.Ghost()[2].data(), cpu.Ghost()[3].data()};
 
   // Get spinor ghost fields
@@ -1318,7 +1318,7 @@ void mdw_mdagm_local(void *out, void *const *gauge, void *in, double _Complex *k
   lat_dim_t R;
   for (int d = 0; d < 4; d++) { R[d] = comm_dim_partitioned(d) ? 2 : 0; }
 
-  cpuGaugeField *padded_gauge = createExtendedGauge((void **)gauge, gauge_param, R);
+  GaugeField *padded_gauge = createExtendedGauge((void **)gauge, gauge_param, R);
 
   int padded_V = 1;
   int W[4];

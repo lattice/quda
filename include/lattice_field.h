@@ -34,9 +34,6 @@ namespace quda {
   class cudaEigVecSet;
 
   class GaugeField;
-  class cpuGaugeField;
-  class cudaGaugeField;
-
   class CloverField;
 
   enum class QudaOffsetCopyMode { COLLECT, DISPERSE };

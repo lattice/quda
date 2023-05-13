@@ -173,17 +173,17 @@ namespace quda {
       gf_param.nFace = 1;
       gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
 
-      U = new cpuGaugeField(gf_param);
+      U = new GaugeField(gf_param);
 
       //Copy the cuda gauge field to the cpu
-      static_cast<const cudaGaugeField&>(gauge).saveCPUField(*static_cast<cpuGaugeField*>(U));
+      U->copy(gauge);
     } else if (location == QUDA_CUDA_FIELD_LOCATION && gauge.Reconstruct() != QUDA_RECONSTRUCT_NO) {
       //Create a copy of the gauge field with no reconstruction, required for fine-grained access
       GaugeFieldParam gf_param(gauge);
       gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
       gf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
       gf_param.setPrecision(gf_param.Precision());
-      U = new cudaGaugeField(gf_param);
+      U = new GaugeField(gf_param);
 
       U->copy(gauge);
     }
