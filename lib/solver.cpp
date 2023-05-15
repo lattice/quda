@@ -241,6 +241,7 @@ namespace quda {
   {
     if (!evecs.empty()) errorQuda("Solver deflation space should be empty, instead size=%lu\n", evecs.size());
     evecs = std::move(defl_space); // move defl_space to evecs
+    evals.resize(defl_space.size()); // create space for the eigenvalues
   }
 
   void Solver::extractDeflationSpace(std::vector<ColorSpinorField> &defl_space)
