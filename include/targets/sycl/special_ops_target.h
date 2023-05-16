@@ -7,6 +7,7 @@ namespace quda {
   // SpecialOps
   template <typename ...T>
   struct SpecialOps : SpecialOps_Base<T...> {
+  //struct SpecialOpsTarget<T...> {
     //using SpecialOpsT = op_Sequential<T...>;
     //using SpecialOpsT = SpecialOps<T...>;
     //using SpecialOpsElemType = typename SpecialOpsElemTypeS<T...>::type;

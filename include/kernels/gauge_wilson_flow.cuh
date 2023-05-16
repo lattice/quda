@@ -4,7 +4,7 @@
 #include <kernels/gauge_utils.cuh>
 #include <su3_project.cuh>
 #include <kernel.h>
-#include <local_memory.h>
+#include <thread_local_cache.h>
 
 namespace quda
 {
@@ -61,8 +61,8 @@ namespace quda
   struct computeStapleOps {
     using real = typename Arg::real;
     using Link = Matrix<complex<real>, Arg::nColor>;
-    using StapOp = SharedMemoryCache<Link>;
-    using RectOp = SharedMemoryCacheOffset<Link,StapOp>;
+    using StapOp = ThreadLocalCache<Link>;
+    using RectOp = ThreadLocalCache<Link,StapOp>;
     using Ops = SpecialOps<StapOp,RectOp>;
   };
 
@@ -90,8 +90,8 @@ namespace quda
       //SharedMemoryCache<Link> Rect(target::block_dim(), sizeof(Link)); // offset to ensure non-overlapping allocations
       //typename computeStapleOps<Arg>::StapOp Stap(ftor);
       //typename computeStapleOps<Arg>::RectOp Rect(ftor);
-      LocalMemory<Link> Stap{ftor};
-      LocalMemory<Link,decltype(Stap)> Rect{ftor};
+      ThreadLocalCache<Link> Stap{ftor};
+      ThreadLocalCache<Link,decltype(Stap)> Rect{ftor};
       computeStapleRectangle(arg, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim);
       Z = arg.coeff1x1 * static_cast<const Link &>(Stap) + arg.coeff2x1 * static_cast<const Link &>(Rect);
       break;
@@ -159,8 +159,8 @@ namespace quda
   }
 
   // Wilson Flow as defined in https://arxiv.org/abs/1006.4518v3
-  //template <typename Arg_> struct WFlow : computeStapleOps<Arg_>::Ops
-  template <typename Arg_> struct WFlow
+  //template <typename Arg_> struct WFlow
+  template <typename Arg_> struct WFlow : computeStapleOps<Arg_>::Ops
   {
     using Arg = Arg_;
     const Arg &arg;

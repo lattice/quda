@@ -4,8 +4,7 @@
 #include <index_helper.cuh>
 #include <gauge_field_order.h>
 #include <kernel.h>
-//#include <shared_memory_cache_helper.h>
-#include <local_memory.h>
+#include <thread_local_cache.h>
 
 namespace quda {
 
@@ -387,7 +386,7 @@ namespace quda {
           Flops:
             2 multiplies, 1 add, 1 rescale
       */
-      __device__ __host__ inline void lepage_force(int x[4], int point_a, int parity_a, Link &force_mu, LocalMemory<Link> &Uab_cache) {
+      __device__ __host__ inline void lepage_force(int x[4], int point_a, int parity_a, Link &force_mu, ThreadLocalCache<Link> &Uab_cache) {
         int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
         int parity_b = 1 - parity_a;
 
@@ -455,7 +454,7 @@ namespace quda {
           Flops:
             2 multiplies, 1 add, 1 rescale
       */
-      __device__ __host__ inline void middle_three(int x[4], int point_a, int parity_a, LocalMemory<Link> &Uab_cache)
+      __device__ __host__ inline void middle_three(int x[4], int point_a, int parity_a, ThreadLocalCache<Link> &Uab_cache)
       {
         int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
         int parity_b = 1 - parity_a;
@@ -559,7 +558,7 @@ namespace quda {
         int parity_a = parity;
 
         //SharedMemoryCache<Link> Uab_cache(target::block_dim());
-        LocalMemory<Link> Uab_cache{};
+        ThreadLocalCache<Link> Uab_cache{};
         // Scoped load of Uab
         {
           int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
@@ -638,7 +637,7 @@ namespace quda {
       Link force;
       Link shortP;
       Link p5;
-      
+
       const Link pMu;
 
       // double-buffer: read pNuMu, qNuMu for side 5, middle 7
@@ -707,9 +706,9 @@ namespace quda {
           Flops:
             4 multiplies, 2 adds, 2 rescales
       */
-      //__device__ __host__ inline void all_link(int x[4], int point_a, int parity_a, LocalMemory<Link> &Matrix_cache) {
+      //__device__ __host__ inline void all_link(int x[4], int point_a, int parity_a, ThreadLocalCache<Link> &Matrix_cache) {
       template <int N>
-      __device__ __host__ inline void all_link(int x[4], int point_a, int parity_a, LocalMemory<array<Link,N>> &Matrix_cache) {
+      __device__ __host__ inline void all_link(int x[4], int point_a, int parity_a, ThreadLocalCache<array<Link,N>> &Matrix_cache) {
         auto mycoeff_seven = parity_sign<typename Arg::real>(parity_a) * coeff_sign<sig_positive, typename Arg::real>(parity_a) * arg.coeff_seven;
 
         int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
@@ -829,9 +828,9 @@ namespace quda {
           Flops:
             2 multiplies, 2 adds, 2 rescales
       */
-      //__device__ __host__ inline void side_five(int x[4], int point_a, int parity_a, LocalMemory<Link> &Matrix_cache) {
+      //__device__ __host__ inline void side_five(int x[4], int point_a, int parity_a, ThreadLocalCache<Link> &Matrix_cache) {
       template <int N>
-      __device__ __host__ inline void side_five(int x[4], int point_a, int parity_a, LocalMemory<array<Link,N>> &Matrix_cache) {
+      __device__ __host__ inline void side_five(int x[4], int point_a, int parity_a, ThreadLocalCache<array<Link,N>> &Matrix_cache) {
         int y[4] = {x[0], x[1], x[2], x[3]};
         int point_h = updateCoordExtendedIndexShiftMILC<flip_dir(nu_positive)>(y, arg.nu, arg);
         int parity_h = 1 - parity_a;
@@ -885,10 +884,10 @@ namespace quda {
             1 multiply, 1 add, 1 rescale
       */
       //__device__ __host__ inline void middle_five(int x[4], int point_a, int parity_a,
-      //    LocalMemory<Link> &Matrix_cache) {
+      //    ThreadLocalCache<Link> &Matrix_cache) {
       template <int N>
       __device__ __host__ inline void middle_five(int x[4], int point_a, int parity_a,
-						  LocalMemory<array<Link,N>> &Matrix_cache) {
+						  ThreadLocalCache<array<Link,N>> &Matrix_cache) {
         int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
         int parity_b = 1 - parity_a;
 
@@ -975,13 +974,13 @@ namespace quda {
 
         int point_a = e_cb;
         int parity_a = parity;
-        
+
         // calculate p5_sig
         //auto block_dim = target::block_dim();
         //block_dim.z = (sig_positive ? 3 : 2);
-        //LocalMemory<Link> Matrix_cache(block_dim);
+        //ThreadLocalCache<Link> Matrix_cache(block_dim);
 	constexpr int cacheLen = sig_positive ? 3 : 2;
-        LocalMemory<array<Link,cacheLen>> Matrix_cache{};
+        ThreadLocalCache<array<Link,cacheLen>> Matrix_cache{};
         if constexpr (sig_positive) {
           Link force_sig = arg.force(arg.sig, point_a, parity_a);
           //Matrix_cache.save_z(force_sig, 2);

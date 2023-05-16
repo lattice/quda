@@ -10,6 +10,7 @@ static size_t eventCount[Nstream];  // counts event recording and stream syncs
 static size_t syncStamp[Nstream];   // eventCount of last sync
 static void *argBufD[Nstream];
 static size_t argBufSizeD[Nstream];
+static bool print = false;
 
 #ifdef OLDSYCL
 class mySelectorT : public sycl::device_selector {
@@ -33,8 +34,10 @@ int mySelectorT(const sycl::device& device) {
      sycl::info::device_type::gpu) score += 10;
   //printf("device.has\n");
   if(!device.has(sycl::aspect::fp64)) score = -1;  // require fp64
-  //printfQuda("Selector score: %2i %s\n", score,
-  //     device.get_info<sycl::info::device::name>().c_str());
+  if(print) {
+    printfQuda("Selector score: %2i %s\n", score,
+	       device.get_info<sycl::info::device::name>().c_str());
+  }
   //printf("end\n");
   return score;
 }
@@ -68,6 +71,7 @@ namespace quda
     {
       if (initialized) return;
       initialized = true;
+      print = true;
       //{
       //auto dh = sycl::device(sycl::host_selector());
       //printfQuda("Name: %s\n", dh.get_info<sycl::info::device::name>().c_str());
@@ -78,7 +82,9 @@ namespace quda
       auto ps = sycl::platform::get_platforms();
       printfQuda("SYCL platforms available:\n");
       for(auto p: ps) {
-	printfQuda("  %s\n", p.get_info<sycl::info::platform::name>().c_str());
+	printfQuda("  %s %s %s\n", p.get_info<sycl::info::platform::name>().c_str(),
+		   p.get_info<sycl::info::platform::vendor>().c_str(),
+		   p.get_info<sycl::info::platform::version>().c_str());
       }
 
       auto p = sycl::platform(mySelector);

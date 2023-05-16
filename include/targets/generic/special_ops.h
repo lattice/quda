@@ -3,6 +3,14 @@
 
 namespace quda {
 
+  /**
+     @brief Uniform helper for exposing type T, whether we are dealing
+     with an instance of T or SharedMemoryCache<T>
+   */
+  template <typename T, typename enable = void> struct get_type {
+    using type = T;
+  };
+
   // dimensions functors for SharedMemoryCache
   struct opDimsBlock {
     template <typename ...Arg> static constexpr dim3 dims(dim3 b, const Arg &...arg) { return b; }
@@ -42,6 +50,27 @@ namespace quda {
   template <typename ...T> struct SpecialOps_Base {
     using SpecialOpsT = SpecialOps<T...>;
   };
+  //template <typename ...T> struct SpecialOps : SpecialOpsTarget<T...> {
+  //  using SpecialOpsT = SpecialOps<T...>;
+  //};
+
+  // hasSpecialOp: checks if first type matches any of the op
+  // <op, SpecialOps<ops...>>
+  template <typename T, typename U> static constexpr bool hasSpecialOp = false;
+  template <typename T, typename ...U>
+  static constexpr bool hasSpecialOp<T,SpecialOps<U...>> = ( std::is_same_v<T,U> || ... );
+
+  //template <typename T, typename Ops> void checkSpecialOps() { static_assert(hasSpecialOp<T,Ops>); }
+  template <typename T, typename Ops> void checkSpecialOps(const Ops &ops) {
+    static_assert(hasSpecialOp<T,typename Ops::SpecialOpsT>);
+  }
+
+
+
+
+
+  // OLD
+
   template <typename ...T> struct op_Concurrent {};  // set of op types used concurrently (needs separate resources)
   template <typename ...T> struct op_Sequential {};  // set of op types used sequentially (can share resources)
   struct op_Base {};  // base type for other op types
@@ -50,6 +79,8 @@ namespace quda {
     using ElemT = T;
     static constexpr int n = N;
   };
+
+
 
   // forward declarations of op types
   struct op_blockSync;

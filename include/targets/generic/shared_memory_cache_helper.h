@@ -69,16 +69,11 @@ namespace quda
     return conj(static_cast<const T &>(a));
   }
 
-  /**
-     @brief Uniform helper for exposing type T, whether we are dealing
-     with an instance of T or SharedMemoryCache<T>
-   */
-  template <typename T, typename enable = void> struct get_type {
-    using type = T;
-  };
-  template <typename T>
-  struct get_type<
-    //T, std::enable_if_t<std::is_same_v<T, SharedMemoryCache<typename T::value_type, T::block_size_y, T::block_size_z, T::dynamic>>>> {
+  //template <typename T> struct get_type<
+  //T, std::enable_if_t<std::is_same_v<T, SharedMemoryCache<typename T::value_type, T::block_size_y, T::block_size_z, T::dynamic>>>> {
+  //using type = typename T::value_type;
+  //};
+  template <typename T> struct get_type<
     T, std::enable_if_t<std::is_same_v<T, SharedMemoryCache<typename T::value_type, typename T::D>>>> {
     using type = typename T::value_type;
   };

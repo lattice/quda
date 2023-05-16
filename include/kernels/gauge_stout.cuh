@@ -6,7 +6,7 @@
 #include <su3_project.cuh>
 #include <kernels/gauge_utils.cuh>
 #include <kernel.h>
-#include <local_memory.h>
+#include <thread_local_cache.h>
 
 namespace quda
 {
@@ -155,8 +155,8 @@ namespace quda
       //SharedMemoryCache<Link> Rect(target::block_dim(), sizeof(Link));
       //StapCacheT Stap(*this);
       //RectCacheT Rect(*this);
-      LocalMemory<Link> Stap{};
-      LocalMemory<Link,decltype(Stap)> Rect{};
+      ThreadLocalCache<Link> Stap{};
+      ThreadLocalCache<Link,decltype(Stap)> Rect{};
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:

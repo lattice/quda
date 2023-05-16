@@ -1,8 +1,7 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
 #include <quda_matrix.h>
-//#include <shared_memory_cache_helper.h>
-#include <local_memory.h>
+#include <thread_local_cache.h>
 #include <thread_array.h>
 
 namespace quda

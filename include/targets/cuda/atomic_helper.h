@@ -37,7 +37,7 @@ namespace quda
 {
 
   template <bool is_device> struct atomic_fetch_add_impl {
-    template <typename T, typename U> inline void operator()(T *addr, U val)
+    template <typename T> inline void operator()(T *addr, T val)
     {
 #pragma omp atomic update
       *addr += val;
@@ -45,7 +45,7 @@ namespace quda
   };
 
   template <> struct atomic_fetch_add_impl<true> {
-    template <typename T, typename U> __device__ inline void operator()(T *addr, U val) { atomicAdd(addr, val); }
+    template <typename T> __device__ inline void operator()(T *addr, T val) { atomicAdd(addr, val); }
   };
 
   /**
@@ -54,7 +54,7 @@ namespace quda
      updating atomically
      @param[in] val The value we summing to the value at addr
   */
-  template <typename T, typename U> __device__ __host__ inline void atomic_fetch_add(T *addr, U val)
+  template <typename T> __device__ __host__ inline void atomic_fetch_add(T *addr, T val)
   {
     target::dispatch<atomic_fetch_add_impl>(addr, val);
   }
