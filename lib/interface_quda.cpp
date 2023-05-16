@@ -3945,14 +3945,14 @@ void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
 
   checkGaugeParam(param);
 
-  GaugeFieldParam gParam(*param, inlink, QUDA_GENERAL_LINKS);
-  gParam.gauge     = twolink;
+  GaugeFieldParam gParam(*param, inlink, QUDA_ASQTAD_LONG_LINKS);
+  gParam.gauge = twolink;
   GaugeField cpuTwoLink(gParam);  // create the host twolink
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
 
   GaugeField *cudaInLinkEx = nullptr;
 
-  if(inlink) {
+  if (inlink) {
     gParam.link_type = param->type;
     gParam.gauge     = inlink;
     GaugeField cpuInLink(gParam);    // create the host sitelink
@@ -3961,19 +3961,13 @@ void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
     gParam.reconstruct = param->reconstruct;
     gParam.setPrecision(param->cuda_prec, true);
     gParam.create = QUDA_NULL_FIELD_CREATE;
-    GaugeField *cudaInLink = new GaugeField(gParam);
+    GaugeField cudaInLink(gParam);
     profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
 
     profileGaussianSmear.TPSTART(QUDA_PROFILE_H2D);
-    cudaInLink->copy(cpuInLink);
+    cudaInLink.copy(cpuInLink);
     profileGaussianSmear.TPSTOP(QUDA_PROFILE_H2D);
-    //
-    cudaInLinkEx = createExtendedGauge(*cudaInLink, R, profileGaussianSmear);
-    //
-    profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
-    delete cudaInLink;
-    profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
-
+    cudaInLinkEx = createExtendedGauge(cudaInLink, R, profileGaussianSmear);
   } else {
     cudaInLinkEx = createExtendedGauge(*gaugePrecise, R, profileGaussianSmear);
   }
@@ -3992,7 +3986,6 @@ void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
 
   freeUniqueGaugeQuda(QUDA_SMEARED_LINKS);
   gaugeSmeared = new GaugeField(gsParam);
-
   
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
 
@@ -4006,7 +3999,6 @@ void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
   profileGaussianSmear.TPSTART(QUDA_PROFILE_D2H);
   cpuTwoLink.copy(*gaugeSmeared);
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_D2H);
-
   profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
 
   freeUniqueGaugeQuda(QUDA_SMEARED_LINKS);
