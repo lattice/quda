@@ -2270,17 +2270,27 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // Construct vectors
   //------------------------------------------------------
   // Create host wrappers around application vector set
-  ColorSpinorParam cpuParam(host_evecs[0], *inv_param, cudaGauge->X(), inv_param->solution_type,
+  ColorSpinorParam cpuParam(nullptr, *inv_param, cudaGauge->X(), inv_param->solution_type,
                             inv_param->input_location);
 
   int n_eig = eig_param->n_conv;
   if (eig_param->compute_svd) n_eig *= 2;
   std::vector<ColorSpinorField> host_evecs_(n_eig);
-  cpuParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  for (int i = 0; i < n_eig; i++) {
-    cpuParam.v = host_evecs[i];
-    host_evecs_[i] = ColorSpinorField(cpuParam);
+
+  if (host_evecs) {
+    cpuParam.create = QUDA_REFERENCE_FIELD_CREATE;
+    for (int i = 0; i < n_eig; i++) {
+      cpuParam.v = host_evecs[i];
+      host_evecs_[i] = ColorSpinorField(cpuParam);
+    }
+  }else {
+    cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+    for (int i = 0; i < n_eig; i++) {
+      host_evecs_[i] = ColorSpinorField(cpuParam);
+    }
   }
+
+  
 
   // Create device side ColorSpinorField vector space to pass to the
   // compute function. Download any user supplied data as an initial guess.
