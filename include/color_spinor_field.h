@@ -121,18 +121,13 @@ namespace quda
     }
   };
 
-  class ColorSpinorParam : public LatticeFieldParam
-  {
-
-  public:
+  struct ColorSpinorParam : public LatticeFieldParam {
     int nColor = 0; // Number of colors of the field
     int nSpin = 0;  // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
     int nVec = 1;   // number of packed vectors (for multigrid transfer operator)
 
     QudaTwistFlavorType twistFlavor = QUDA_TWIST_INVALID; // used by twisted mass
-
     QudaSiteOrder siteOrder = QUDA_INVALID_SITE_ORDER; // defined for full fields
-
     QudaFieldOrder fieldOrder = QUDA_INVALID_FIELD_ORDER; // Float, Float2, Float4 etc.
     QudaGammaBasis gammaBasis = QUDA_INVALID_GAMMA_BASIS;
     QudaFieldCreate create = QUDA_INVALID_FIELD_CREATE;
@@ -179,7 +174,6 @@ namespace quda
     ColorSpinorParam() = default;
 
     // used to create cpu params
-
     ColorSpinorParam(void *V, QudaInvertParam &inv_param, const lat_dim_t &X, const bool pc_solution,
                      QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION) :
       LatticeFieldParam(4, X, 0, location, inv_param.cpu_prec),
@@ -188,20 +182,12 @@ namespace quda
              || inv_param.dslash_type == QUDA_LAPLACE_DSLASH) ?
               1 :
               4),
-      nVec(1),
       twistFlavor(inv_param.twist_flavor),
-      siteOrder(QUDA_INVALID_SITE_ORDER),
-      fieldOrder(QUDA_INVALID_FIELD_ORDER),
       gammaBasis(inv_param.gamma_basis),
       create(QUDA_REFERENCE_FIELD_CREATE),
       pc_type(inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH ? QUDA_5D_PC : QUDA_4D_PC),
-      v(V),
-      is_composite(false),
-      composite_dim(0),
-      is_component(false),
-      component_id(0)
+      v(V)
     {
-
       if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
       for (int d = 0; d < nDim; d++) x[d] = X[d];
 

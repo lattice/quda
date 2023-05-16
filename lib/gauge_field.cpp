@@ -5,67 +5,100 @@
 
 namespace quda {
 
-  GaugeFieldParam::GaugeFieldParam(const GaugeField &u) :
-    LatticeFieldParam(u),
-    nColor(u.Ncolor()),
-    nFace(u.Nface()),
-    reconstruct(u.Reconstruct()),
-    order(u.Order()),
-    fixed(u.GaugeFixed()),
-    link_type(u.LinkType()),
-    t_boundary(u.TBoundary()),
-    anisotropy(u.Anisotropy()),
-    tadpole(u.Tadpole()),
-    gauge(NULL),
-    create(QUDA_NULL_FIELD_CREATE),
-    geometry(u.Geometry()),
-    compute_fat_link_max(false),
-    staggeredPhaseType(u.StaggeredPhase()),
-    staggeredPhaseApplied(u.StaggeredPhaseApplied()),
-    i_mu(u.iMu()),
-    site_offset(u.SiteOffset()),
-    site_size(u.SiteSize())
-  { }
+  GaugeFieldParam::GaugeFieldParam(const GaugeField &u) : LatticeFieldParam(u) { u.fill(*this); }
 
-  GaugeField::GaugeField(const GaugeFieldParam &param) :
-    LatticeField(param),
-    gauge(),
-    gauge_array {},
-    bytes(0),
-    phase_offset(0),
-    phase_bytes(0),
-    nColor(param.nColor),
-    nFace(param.nFace),
-    geometry(param.geometry),
-    site_dim(1),
-    reconstruct(param.reconstruct),
-    nInternal(reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2),
-    order(param.order),
-    fixed(param.fixed),
-    link_type(param.link_type),
-    t_boundary(param.t_boundary),
-    anisotropy(param.anisotropy),
-    tadpole(param.tadpole),
-    fat_link_max(link_type == QUDA_ASQTAD_FAT_LINKS ? 0.0 : 1.0),
-    create(param.create),
-    staggeredPhaseType(param.staggeredPhaseType),
-    staggeredPhaseApplied(param.staggeredPhaseApplied),
-    i_mu(param.i_mu),
-    site_offset(param.site_offset),
-    site_size(param.site_size)
+  GaugeField::GaugeField(const GaugeFieldParam &param) : LatticeField(param)
   {
-    if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Unexpected siteSubset %d", siteSubset);
-    if (order == QUDA_NATIVE_GAUGE_ORDER) errorQuda("Invalid gauge order %d", order);
-    if (ghost_precision != precision) ghost_precision = precision; // gauge fields require matching precision
+    create(param);
 
-    if (link_type != QUDA_COARSE_LINKS && nColor != 3)
-      errorQuda("nColor must be 3, not %d for this link type", nColor);
-    if (nDim != 4)
-      errorQuda("Number of dimensions must be 4 not %d", nDim);
-    if (link_type != QUDA_WILSON_LINKS && anisotropy != 1.0)
+    switch (param.create) {
+    case QUDA_NULL_FIELD_CREATE:
+    case QUDA_REFERENCE_FIELD_CREATE: break; // do nothing
+    case QUDA_ZERO_FIELD_CREATE: zero(); break;
+    case QUDA_COPY_FIELD_CREATE: copy(*param.field); break;
+    default: errorQuda("ERROR: create type(%d) not supported yet", param.create);
+    }
+  }
+
+  GaugeField::GaugeField(const GaugeField &u) noexcept : LatticeField(u)
+  {
+    GaugeFieldParam param;
+    u.fill(param);
+    param.create = QUDA_COPY_FIELD_CREATE;
+    create(param);
+    copy(u);
+  }
+
+  GaugeField::GaugeField(GaugeField &&u) noexcept : LatticeField(std::move(u)) { move(std::move(u)); }
+
+  GaugeField &GaugeField::operator=(const GaugeField &src)
+  {
+    if (&src != this) {
+      if (!init) { // keep current attributes unless unset
+        LatticeField::operator=(src);
+        GaugeFieldParam param;
+        src.fill(param);
+        param.create = QUDA_COPY_FIELD_CREATE;
+        create(param);
+      }
+
+      copy(src);
+    }
+    return *this;
+  }
+
+  GaugeField &GaugeField::operator=(GaugeField &&src)
+  {
+    if (&src != this) {
+      // if field not already initialized then move the field
+      if (!init) {
+        LatticeField::operator=(std::move(src));
+        move(std::move(src));
+      } else {
+        // we error if the field is not compatible with this
+        errorQuda("Moving to already created field");
+      }
+    }
+    return *this;
+  }
+
+  void GaugeField::create(const GaugeFieldParam &param)
+  {
+    if (param.siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Unexpected siteSubset %d", param.siteSubset);
+    if (param.order == QUDA_NATIVE_GAUGE_ORDER) errorQuda("Invalid gauge order %d", param.order);
+    if (param.GhostPrecision() != param.Precision())
+      errorQuda("Ghost precision %d doesn't match field precision %d", param.GhostPrecision(), param.Precision());
+    if (param.link_type != QUDA_COARSE_LINKS && param.nColor != 3)
+      errorQuda("nColor must be 3, not %d for this link type", param.nColor);
+    if (param.nDim != 4) errorQuda("Number of dimensions must be 4 not %d", param.nDim);
+    if (param.link_type != QUDA_WILSON_LINKS && param.anisotropy != 1.0)
       errorQuda("Anisotropy only supported for Wilson links");
-    if (link_type != QUDA_WILSON_LINKS && fixed == QUDA_GAUGE_FIXED_YES)
+    if (param.link_type != QUDA_WILSON_LINKS && param.fixed == QUDA_GAUGE_FIXED_YES)
       errorQuda("Temporal gauge fixing only supported for Wilson links");
+    if ((param.reconstruct == QUDA_RECONSTRUCT_12 || param.reconstruct == QUDA_RECONSTRUCT_8)
+        && param.link_type != QUDA_SU3_LINKS)
+      errorQuda("Cannot request a 12/8 reconstruct type without SU(3) link type");
+    if (param.reconstruct == QUDA_RECONSTRUCT_10 && param.link_type != QUDA_ASQTAD_MOM_LINKS)
+      errorQuda("10-reconstruction only supported with momentum links");
+
+    nColor = param.nColor;
+    nFace = param.nFace;
+    geometry = param.geometry;
+    reconstruct = param.reconstruct;
+    nInternal = reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2;
+    order = param.order;
+    fixed = param.fixed;
+    link_type = param.link_type;
+    t_boundary = param.t_boundary;
+    anisotropy = param.anisotropy;
+    tadpole = param.tadpole;
+    fat_link_max = link_type == QUDA_ASQTAD_FAT_LINKS ? 0.0 : 1.0;
+    staggeredPhaseType = param.staggeredPhaseType;
+    staggeredPhaseApplied = param.staggeredPhaseApplied;
+    i_mu = param.i_mu;
+    site_offset = param.site_offset;
+    site_size = param.site_size;
+
     if (geometry == QUDA_SCALAR_GEOMETRY) {
       real_length = volume*nInternal;
       length = 2*stride*nInternal; // two comes from being full lattice
@@ -81,18 +114,6 @@ namespace quda {
     } else if (geometry == QUDA_KDINVERSE_GEOMETRY) {
       real_length = (1 << nDim) * volume * nInternal;
       length = 2 * (1 << nDim) * nDim * stride * nInternal; // two comes from being full lattice
-    }
-
-    if ((reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_8) && link_type != QUDA_SU3_LINKS) {
-      errorQuda("Cannot request a 12/8 reconstruct type without SU(3) link type");
-    }
-
-    if (reconstruct == QUDA_RECONSTRUCT_10 && link_type != QUDA_ASQTAD_MOM_LINKS) {
-      errorQuda("10-reconstruction only supported with momentum links");
-    }
-
-    if (create != QUDA_NULL_FIELD_CREATE && create != QUDA_ZERO_FIELD_CREATE && create != QUDA_REFERENCE_FIELD_CREATE) {
-      errorQuda("ERROR: create type(%d) not supported yet\n", create);
     }
 
     switch (geometry) {
@@ -147,9 +168,8 @@ namespace quda {
     }
 
     if (isNative()) {
-      if (create != QUDA_REFERENCE_FIELD_CREATE) {
+      if (param.create != QUDA_REFERENCE_FIELD_CREATE) {
         gauge = std::move(quda_ptr(mem_type, bytes));
-        if (create == QUDA_ZERO_FIELD_CREATE) qudaMemset(gauge, 0, bytes);
       } else {
         gauge = std::move(quda_ptr(param.gauge, mem_type));
       }
@@ -157,13 +177,12 @@ namespace quda {
 
       size_t nbytes = volume * nInternal * precision;
       for (int d = 0; d < site_dim; d++) {
-        if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
+        if (param.create != QUDA_REFERENCE_FIELD_CREATE) {
           gauge_array[d] = std::move(quda_ptr(mem_type, nbytes));
-          if (create == QUDA_ZERO_FIELD_CREATE) qudaMemset(gauge_array[d], 0, nbytes);
-        } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
+        } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
           gauge_array[d] = std::move(quda_ptr(static_cast<void **>(param.gauge)[d], mem_type));
         } else {
-          errorQuda("Unsupported creation type %d", create);
+          errorQuda("Unsupported creation type %d", param.create);
         }
       }
 
@@ -172,17 +191,16 @@ namespace quda {
 	       order == QUDA_TIFR_PADDED_GAUGE_ORDER || order == QUDA_MILC_SITE_GAUGE_ORDER) {
       // does not support device
 
-      if (order == QUDA_MILC_SITE_GAUGE_ORDER && create != QUDA_REFERENCE_FIELD_CREATE) {
-	errorQuda("MILC site gauge order only supported for reference fields");
+      if (order == QUDA_MILC_SITE_GAUGE_ORDER && param.create != QUDA_REFERENCE_FIELD_CREATE) {
+        errorQuda("MILC site gauge order only supported for reference fields");
       }
 
-      if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
+      if (param.create != QUDA_REFERENCE_FIELD_CREATE) {
         gauge = std::move(quda_ptr(mem_type, bytes));
-        if (create == QUDA_ZERO_FIELD_CREATE) qudaMemset(gauge, 0, bytes);
-      } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
+      } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
         gauge = std::move(quda_ptr(param.gauge, mem_type));
       } else {
-	errorQuda("Unsupported creation type %d", create);
+        errorQuda("Unsupported creation type %d", param.create);
       }
 
     } else {
@@ -200,15 +218,17 @@ namespace quda {
           if (geometry == QUDA_COARSE_GEOMETRY) qudaMemset(ghost[i + 4], 0, nbytes);
         }
       } else {
-        if (create != QUDA_ZERO_FIELD_CREATE) zeroPad();
+        if (param.create != QUDA_ZERO_FIELD_CREATE) zeroPad();
       }
     }
 
+    init = true;
     setTuningString();
 
     // exchange the boundaries if a non-trivial field
     if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD)
-      if (create == QUDA_REFERENCE_FIELD_CREATE && (geometry == QUDA_VECTOR_GEOMETRY || geometry == QUDA_COARSE_GEOMETRY)) {
+      if (param.create == QUDA_REFERENCE_FIELD_CREATE
+          && (geometry == QUDA_VECTOR_GEOMETRY || geometry == QUDA_COARSE_GEOMETRY)) {
         exchangeGhost(geometry == QUDA_VECTOR_GEOMETRY ? QUDA_LINK_BACKWARDS : QUDA_LINK_BIDIRECTIONAL);
       }
 
@@ -216,7 +236,70 @@ namespace quda {
     if (param.compute_fat_link_max) fat_link_max = this->abs_max();
   }
 
-  GaugeField::~GaugeField() { }
+  void GaugeField::move(GaugeField &&src)
+  {
+    gauge = std::exchange(src.gauge, {});
+    gauge_array = std::exchange(src.gauge_array, {});
+    bytes = std::exchange(src.bytes, 0);
+    phase_offset = std::exchange(src.phase_offset, 0);
+    phase_bytes = std::exchange(src.phase_bytes, 0);
+    length = std::exchange(src.length, 0);
+    real_length = std::exchange(src.real_length, 0);
+    nColor = std::exchange(src.nColor, 0);
+    nFace = std::exchange(src.nFace, 0);
+    geometry = std::exchange(src.geometry, QUDA_INVALID_GEOMETRY);
+    site_dim = std::exchange(src.site_dim, 0);
+    reconstruct = std::exchange(src.reconstruct, QUDA_RECONSTRUCT_INVALID);
+    nInternal = std::exchange(src.nInternal, 0);
+    order = std::exchange(src.order, QUDA_INVALID_GAUGE_ORDER);
+    fixed = std::exchange(src.fixed, QUDA_GAUGE_FIXED_INVALID);
+    link_type = std::exchange(src.link_type, QUDA_INVALID_LINKS);
+    t_boundary = std::exchange(src.t_boundary, QUDA_INVALID_T_BOUNDARY);
+    anisotropy = std::exchange(src.anisotropy, 0.0);
+    tadpole = std::exchange(src.tadpole, 0.0);
+    fat_link_max = std::exchange(src.fat_link_max, 0.0);
+    ghost = std::exchange(src.ghost, {});
+    ghostFace = std::exchange(src.ghostFace, {});
+    staggeredPhaseType = std::exchange(src.staggeredPhaseType, QUDA_STAGGERED_PHASE_INVALID);
+    staggeredPhaseApplied = std::exchange(src.staggeredPhaseApplied, false);
+    i_mu = std::exchange(src.i_mu, 0.0);
+    site_offset = std::exchange(src.site_offset, 0);
+    site_size = std::exchange(src.site_size, 0);
+  }
+
+  void GaugeField::fill(GaugeFieldParam &param) const
+  {
+    LatticeField::fill(param);
+    param.gauge = nullptr;
+    param.nColor = nColor;
+    param.nFace = nFace;
+    param.reconstruct = reconstruct;
+    param.order = order;
+    param.fixed = fixed;
+    param.link_type = link_type;
+    param.t_boundary = t_boundary;
+    param.anisotropy = anisotropy;
+    param.tadpole = tadpole;
+    param.create = QUDA_NULL_FIELD_CREATE;
+    param.geometry = geometry;
+    param.compute_fat_link_max = false;
+    param.staggeredPhaseType = staggeredPhaseType;
+    param.staggeredPhaseApplied = staggeredPhaseApplied;
+    param.i_mu = i_mu;
+    param.site_offset = site_offset;
+    param.site_size = site_size;
+  }
+
+  void GaugeField::setTuningString()
+  {
+    LatticeField::setTuningString();
+    std::stringstream aux_ss;
+    aux_ss << "vol=" << volume << "stride=" << stride << "precision=" << precision << "geometry=" << geometry
+           << "Nc=" << nColor;
+    if (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) aux_ss << "r=" << r[0] << r[1] << r[2] << r[3];
+    aux_string = aux_ss.str();
+    if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
+  }
 
   void GaugeField::zeroPad()
   {
@@ -230,28 +313,6 @@ namespace quda {
         qudaMemset2D(gauge, parity * (bytes / 2) + volumeCB * order * precision, pitch, 0, pad_bytes, Npad);
       }
     }
-#if 0
-    if (location == QUDA_CUDA_FIELD_LOCATION) {
-      for (int parity = 0; parity < 2; parity++) {
-        qudaMemset2D(data<char *>() + parity * (bytes / 2) + volumeCB * order * precision, pitch, 0, pad_bytes, Npad);
-      }
-    } else {
-      for (int parity = 0; parity < 2; parity++)
-          for (int p = 0; p < Npad; p++)
-            memset(data<char *>() + parity * (bytes / 2) + (volumeCB + p * stride) * order * precision, 0, pad_bytes);
-      }
-    }
-#endif
-  }
-
-  void GaugeField::setTuningString() {
-    LatticeField::setTuningString();
-    std::stringstream aux_ss;
-    aux_ss << "vol=" << volume << "stride=" << stride << "precision=" << precision << "geometry=" << geometry
-           << "Nc=" << nColor;
-    if (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) aux_ss << "r=" << r[0] << r[1] << r[2] << r[3];
-    aux_string = aux_ss.str();
-    if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
   }
 
   void GaugeField::createGhostZone(const lat_dim_t &R, bool no_comms_fill, bool bidir) const

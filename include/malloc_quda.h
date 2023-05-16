@@ -197,7 +197,7 @@ namespace quda {
 
   public:
     quda_ptr() = default;
-
+    quda_ptr(quda_ptr &&) = default;
     quda_ptr &operator=(quda_ptr &&);
 
     /**
