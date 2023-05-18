@@ -47,10 +47,7 @@ namespace quda
       }
     };
 
-    __device__ __host__ inline T * cache() const
-    {
-      return target::dispatch<cache_dynamic>(offset);
-    }
+    __device__ __host__ inline T *cache() const { return target::dispatch<cache_dynamic>(offset); }
 
     __device__ __host__ inline void save_detail(const T &a) const
     {
@@ -64,23 +61,23 @@ namespace quda
       return cache()[j];
     }
 
-  public:
-    static constexpr unsigned int get_offset() {
-      if constexpr(std::is_same_v<O,void>) {
-	return 0;
-      } else {
-	return O::size();
-      }
+    static constexpr unsigned int get_offset(dim3 block)
+    {
+      unsigned int o = 0;
+      if constexpr (!std::is_same_v<O, void>) { o = O::shared_mem_size(block); }
+      return o;
     }
 
-    static constexpr unsigned int size() {
-      return get_offset() + target::block_size<3>() * sizeof(T);
+  public:
+    static constexpr unsigned int shared_mem_size(dim3 block)
+    {
+      return get_offset(block) + block.x * block.y * block.z * sizeof(T);
     }
 
     /**
        @brief Constructor for ThreadLocalCache.
     */
-    constexpr ThreadLocalCache() : offset(get_offset()) {}
+    constexpr ThreadLocalCache() : offset(get_offset(target::block_dim())) { }
 
     /**
        @brief Grab the raw base address to this cache.
@@ -91,19 +88,13 @@ namespace quda
        @brief Save the value into the thread local cache.
        @param[in] a The value to store in the thread local cache
      */
-    __device__ __host__ inline void save(const T &a) const
-    {
-      save_detail(a);
-    }
+    __device__ __host__ inline void save(const T &a) const { save_detail(a); }
 
     /**
        @brief Load a value from the thread local cache
        @return The value at the linear thread index
      */
-    __device__ __host__ inline T &load() const
-    {
-      return load_detail();
-    }
+    __device__ __host__ inline T &load() const { return load_detail(); }
 
     /**
        @brief Cast operator to allow cache objects to be used where T
@@ -123,7 +114,7 @@ namespace quda
        @brief Subscripting operator returning reference to allow cache objects
        to assign to a subscripted element.
      */
-    __device__ __host__ auto& operator[](int i) { return load()[i]; }
+    __device__ __host__ auto &operator[](int i) { return load()[i]; }
   };
 
 } // namespace quda
