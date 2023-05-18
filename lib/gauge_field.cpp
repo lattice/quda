@@ -227,8 +227,7 @@ namespace quda {
 
     // exchange the boundaries if a non-trivial field
     if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD)
-      if (param.create == QUDA_REFERENCE_FIELD_CREATE
-          && (geometry == QUDA_VECTOR_GEOMETRY || geometry == QUDA_COARSE_GEOMETRY)) {
+      if (param.create == QUDA_REFERENCE_FIELD_CREATE && (geometry == QUDA_VECTOR_GEOMETRY || geometry == QUDA_COARSE_GEOMETRY)) {
         exchangeGhost(geometry == QUDA_VECTOR_GEOMETRY ? QUDA_LINK_BACKWARDS : QUDA_LINK_BIDIRECTIONAL);
       }
 
@@ -939,6 +938,13 @@ namespace quda {
 
   void GaugeField::copy(const GaugeField &src)
   {
+    auto &profile = getProfile();
+    if (src.Location() == QUDA_CUDA_FIELD_LOCATION && location == QUDA_CPU_FIELD_LOCATION) {
+      profile.TPSTART(QUDA_PROFILE_D2H);
+    } else if (src.Location() == QUDA_CPU_FIELD_LOCATION && location == QUDA_CUDA_FIELD_LOCATION) {
+      profile.TPSTART(QUDA_PROFILE_H2D);
+    }
+
     if (this == &src) return;
 
     checkField(src);
@@ -1104,7 +1110,12 @@ namespace quda {
     staggeredPhaseApplied = src.StaggeredPhaseApplied();
     staggeredPhaseType = src.StaggeredPhase();
 
-    qudaDeviceSynchronize(); // include sync here for accurate host-device profiling
+    if (src.Location() != location) qudaDeviceSynchronize(); // include sync here for accurate host-device profiling
+    if (src.Location() == QUDA_CUDA_FIELD_LOCATION && location == QUDA_CPU_FIELD_LOCATION) {
+      profile.TPSTOP(QUDA_PROFILE_D2H);
+    } else if (src.Location() == QUDA_CPU_FIELD_LOCATION && location == QUDA_CUDA_FIELD_LOCATION) {
+      profile.TPSTOP(QUDA_PROFILE_H2D);
+    }
   }
 
   std::ostream& operator<<(std::ostream& output, const GaugeFieldParam& param)
@@ -1195,11 +1206,19 @@ namespace quda {
 
   GaugeField* GaugeField::Create(const GaugeFieldParam &param) { return new GaugeField(param); }
 
+  GaugeField GaugeField::create_alias(const GaugeFieldParam &param_)
+  {
+    if (param_.init && param_.Precision() > precision)
+      errorQuda("Cannot create an alias to source with lower precision than the alias");
+    GaugeFieldParam param = param_.init ? param_ : GaugeFieldParam(*this);
+    param.create = QUDA_REFERENCE_FIELD_CREATE;
+    return GaugeField(param);
+  }
+
   // helper for creating extended gauge fields
   GaugeField *createExtendedGauge(GaugeField &in, const lat_dim_t &R, TimeProfile &profile,
                                   bool redundant_comms, QudaReconstructType recon)
   {
-    profile.TPSTART(QUDA_PROFILE_INIT);
     GaugeFieldParam gParamEx(in);
     //gParamEx.location = QUDA_CUDA_FIELD_LOCATION;
     gParamEx.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
@@ -1218,8 +1237,6 @@ namespace quda {
 
     // copy input field into the extended device gauge field
     copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION); // wrong location if both fields cpu
-
-    profile.TPSTOP(QUDA_PROFILE_INIT);
 
     // now fill up the halos
     out->exchangeExtendedGhost(R, profile, redundant_comms);

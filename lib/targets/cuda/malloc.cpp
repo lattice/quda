@@ -7,6 +7,7 @@
 #include <quda_internal.h>
 #include <device.h>
 #include <shmem_helper.cuh>
+#include "timer.h"
 
 #ifdef USE_QDPJIT
 #include "qdp_cache.h"
@@ -795,6 +796,7 @@ namespace quda
     size(size),
     pool(pool)
   {
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
     if (pool && (type != QUDA_MEMORY_DEVICE && type != QUDA_MEMORY_HOST_PINNED && type != QUDA_MEMORY_HOST))
       errorQuda("Memory pool not available for memory type %d", type);
 
@@ -823,11 +825,13 @@ namespace quda
       default: errorQuda("Unknown memory type %d", type);
       }
     }
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
   }
 
   quda_ptr::quda_ptr(void *ptr, QudaMemoryType type) :
     type(type)
   {
+    getProfile().TPSTART(QUDA_PROFILE_INIT);
     switch (type) {
     case QUDA_MEMORY_DEVICE:
     case QUDA_MEMORY_DEVICE_PINNED:
@@ -845,6 +849,7 @@ namespace quda
       break;
     default: errorQuda("Unsupported memory type %d", type);
     }
+    getProfile().TPSTOP(QUDA_PROFILE_INIT);
   }
 
   quda_ptr& quda_ptr::operator=(quda_ptr &&other)
@@ -861,6 +866,8 @@ namespace quda
 
   quda_ptr::~quda_ptr()
   {
+    getProfile().TPSTART(QUDA_PROFILE_FREE);
+
     if (size > 0) {
       switch (type) {
       case QUDA_MEMORY_DEVICE:        pool ? pool_device_free(device) : device_free(device); break;
@@ -874,6 +881,8 @@ namespace quda
 
     device = nullptr;
     host = nullptr;
+
+    getProfile().TPSTOP(QUDA_PROFILE_FREE);
   }
 
   bool quda_ptr::is_device() const

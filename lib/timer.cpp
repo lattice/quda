@@ -1,3 +1,4 @@
+#include <stack>
 #include <quda_internal.h>
 #include <timer.h>
 
@@ -113,4 +114,25 @@ namespace quda {
     }
   }
 
+  static std::stack<TimeProfile*> tpstack;
+
+  void pushProfile(TimeProfile &profile)
+  {
+    profile.TPSTART(QUDA_PROFILE_TOTAL);
+    tpstack.push(&profile);
+  }
+
+  void popProfile()
+  {
+    if (tpstack.empty()) errorQuda("popProfile() called with empty stack");
+    auto &profile = *(tpstack.top());
+    tpstack.pop();
+    profile.TPSTOP(QUDA_PROFILE_TOTAL);
+  }
+
+  TimeProfile& getProfile()
+  {
+    if (tpstack.empty()) return dummy;
+    return *(tpstack.top());
+  }
 }

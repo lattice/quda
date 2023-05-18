@@ -296,6 +296,12 @@ namespace quda {
 
   static TimeProfile dummy("dummy");
 
+  void pushProfile(TimeProfile &profile);
+
+  void popProfile();
+
+  TimeProfile& getProfile();
+
 } // namespace quda
 
 #undef PUSH_RANGE

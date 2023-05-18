@@ -40,11 +40,11 @@ namespace quda {
     int nColor = 3;
     int nFace = 0;
 
-    QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO;
     QudaGaugeFieldOrder order = QUDA_INVALID_GAUGE_ORDER;
     QudaGaugeFixed fixed = QUDA_GAUGE_FIXED_NO;
     QudaLinkType link_type = QUDA_WILSON_LINKS;
     QudaTboundary t_boundary = QUDA_INVALID_T_BOUNDARY;
+    QudaReconstructType reconstruct = QUDA_RECONSTRUCT_NO;
 
     double anisotropy = 1.0;
     double tadpole = 1.0;
@@ -95,6 +95,9 @@ namespace quda {
       fixed(param.gauge_fix),
       link_type(link_type_ != QUDA_INVALID_LINKS ? link_type_ : param.type),
       t_boundary(param.t_boundary),
+      // if we have momentum field and not using TIFR field, then we always have recon-10
+      reconstruct(link_type == QUDA_ASQTAD_MOM_LINKS && order != QUDA_TIFR_GAUGE_ORDER && order != QUDA_TIFR_PADDED_GAUGE_ORDER ?
+                  QUDA_RECONSTRUCT_10 : QUDA_RECONSTRUCT_NO),
       anisotropy(param.anisotropy),
       tadpole(param.tadpole_coeff),
       gauge(h_gauge),
@@ -555,6 +558,16 @@ namespace quda {
        @return Pointer to allcoated gauge field
     */
     static GaugeField* Create(const GaugeFieldParam &param);
+
+    /**
+       @brief Create a field that aliases this field's storage.  The
+       alias field can use a different precision than this field,
+       though it cannot be greater.  This functionality is useful for
+       the case where we have multiple temporaries in different
+       precisions, but do not need them simultaneously.  Use this functionality with caution.
+       @param[in] param Parameters for the alias field
+    */
+    GaugeField create_alias(const GaugeFieldParam &param = GaugeFieldParam());
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch

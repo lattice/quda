@@ -2,6 +2,7 @@
 #include <tunable_nd.h>
 #include <instantiate.h>
 #include <kernels/staggered_outer_product.cuh>
+#include "timer.h"
 
 namespace quda {
 
@@ -106,6 +107,7 @@ namespace quda {
 #ifdef GPU_STAGGERED_DIRAC
   void computeStaggeredOprod(GaugeField *out[], ColorSpinorField& in, const double coeff[], int nFace)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (nFace == 1) {
       computeStaggeredOprod(*out[0], *out[0], in.Even(), in.Odd(), 0, coeff, nFace);
       double coeff_[2] = {-coeff[0],0.0}; // need to multiply by -1 on odd sites
@@ -116,6 +118,7 @@ namespace quda {
     } else {
       errorQuda("Invalid nFace=%d", nFace);
     }
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 #else // GPU_STAGGERED_DIRAC not defined
   void computeStaggeredOprod(GaugeField *[], ColorSpinorField &, const double [], int)
