@@ -333,8 +333,8 @@ static void hisq_force_startup()
 
   // initialize the CPU outer product fields and exchange once
   createStagForOprodCPU(stag_for_oprod, force_prec, qudaGaugeParam.X, *rng);
-  computeLinkOrderedOuterProduct(stag_for_oprod, cpuOprod->data(), force_prec, 1);
-  computeLinkOrderedOuterProduct(stag_for_oprod, cpuLongLinkOprod->data(), force_prec, 3);
+  computeLinkOrderedOuterProduct(stag_for_oprod, *cpuOprod, force_prec, 1);
+  computeLinkOrderedOuterProduct(stag_for_oprod, *cpuLongLinkOprod, force_prec, 3);
 
   copyExtendedGauge(*cpuOprod_ex, *cpuOprod, QUDA_CPU_FIELD_LOCATION);
   copyExtendedGauge(*cpuLongLinkOprod_ex, *cpuLongLinkOprod, QUDA_CPU_FIELD_LOCATION);
@@ -469,9 +469,7 @@ static int hisq_force_test(bool lepage)
                             getTolerance(force_prec), force_prec);
     }
 
-    strong_check_link(reinterpret_cast<void **>(hostVerifyForce->data()),
-                      "GPU results: ", reinterpret_cast<void **>(cpuForce->data()), "CPU reference results:", V,
-                      force_prec);
+    strong_check_link(*hostVerifyForce, "GPU result:", *cpuForce, "CPU reference results:");
     logQuda(QUDA_SUMMARIZE, "Lepage %s staples force test %s\n\n", lepage ? "enabled" : "disabled",
             (1 == res) ? "PASSED" : "FAILED");
   }
@@ -506,9 +504,7 @@ static int hisq_force_test(bool lepage)
                               getTolerance(force_prec), force_prec);
       }
 
-      strong_check_link(reinterpret_cast<void **>(hostVerifyForce->data()),
-                        "GPU results: ", reinterpret_cast<void **>(cpuForce->data()), "CPU reference results:", V,
-                        force_prec);
+      strong_check_link(*hostVerifyForce, "GPU results: ", *cpuForce, "CPU reference results:");
       logQuda(QUDA_SUMMARIZE, "Long link force test %s\n\n", (1 == res) ? "PASSED" : "FAILED");
     }
   }

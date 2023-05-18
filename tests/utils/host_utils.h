@@ -183,6 +183,7 @@ double compare_floats_v2(void *a, void *b, int len, double epsilon, QudaPrecisio
 void check_gauge(void **, void **, double epsilon, QudaPrecision precision);
 
 int strong_check_link(void **linkA, const char *msgA, void **linkB, const char *msgB, int len, QudaPrecision prec);
+int strong_check_link(const quda::GaugeField &linkA, const std::string &msgA, const quda::GaugeField &linkB, const std::string &msgB);
 int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec);
 
 /**

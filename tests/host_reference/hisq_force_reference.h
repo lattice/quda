@@ -8,11 +8,11 @@
 /**
    @brief Compute a staggered spinor outer product for some offset, CPU version
    @param[in] src Pointer to an appropriately sized host staggered spinor field
-   @param[out] dest Pointer to an appropriately sized output outer product field
+   @param[out] dest Reference to a gauge field for the outer product
    @param[in] precision Precision of data (single or double)
    @param[in] separation Offset for outer product (1 for fat links, 3 for long links)
 */
-void computeLinkOrderedOuterProduct(void *src, void *dest, QudaPrecision precision, size_t separation);
+void computeLinkOrderedOuterProduct(void *src, quda::GaugeField &dest, QudaPrecision precision, size_t separation);
 
 /**
    @brief Compute the force contribution from the fat links, CPU version

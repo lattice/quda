@@ -1225,9 +1225,7 @@ foreach(prec IN LISTS TEST_PRECS)
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:unitarize_link_test> ${MPIEXEC_POSTFLAGS}
                      --dim 2 4 6 8 --prec ${prec}
                      --gtest_output=xml:unitarize_link_test_${prec}.xml)
-  endif()
 
-  if(QUDA_FORCE_HISQ)
     add_test(NAME hisq_paths_force_${prec}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_paths_force_test> ${MPIEXEC_POSTFLAGS}
                      --dim 2 4 6 8 --prec ${prec}
