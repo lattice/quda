@@ -65,15 +65,16 @@ namespace quda {
       }
     }
 
+    int ref_count = 0;
+
     /**
        @brief Start the timer
      */
-    void start(const char *func = nullptr, const char *file = nullptr, int line = 0)
+    void start(const char * = nullptr, const char * = nullptr, int = 0)
     {
-      if (running) {
-        printfQuda("ERROR: Cannot start an already running timer (%s:%d in %s())", file ? file : "", line,
-                   func ? func : "");
-        errorQuda("Aborting");
+      if (running) { // if the timer has already started, we increment the ref counter and return
+        ref_count++;
+        return;
       }
       if (!device) {
         gettimeofday(&host_start, NULL);
@@ -110,6 +111,10 @@ namespace quda {
      */
     void stop(const char *func = nullptr, const char *file = nullptr, int line = 0)
     {
+      if (ref_count > 0) {
+        ref_count--;
+        return;
+      }
       peek(func, file, line);
       time += last_interval;
       count++;
@@ -271,6 +276,8 @@ namespace quda {
     }
 
     void Stop_(const char *func, const char *file, int line, QudaProfileType idx) {
+      if (idx == QUDA_PROFILE_COMPUTE || idx == QUDA_PROFILE_H2D || idx == QUDA_PROFILE_D2H)
+        qudaDeviceSynchronize(); // ensure accurate profiling
       profile[idx].stop(func, file, line);
       POP_RANGE
 

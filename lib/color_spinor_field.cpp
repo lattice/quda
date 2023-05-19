@@ -482,7 +482,6 @@ namespace quda
             pool_device_free(buffer);
         }
       }
-      qudaDeviceSynchronize(); // include sync here for accurate host-device profiling
 
     } else if (Location() == QUDA_CPU_FIELD_LOCATION && src.Location() == QUDA_CUDA_FIELD_LOCATION) { // D2H
 

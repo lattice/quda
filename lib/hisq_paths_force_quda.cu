@@ -547,6 +547,7 @@ namespace quda {
 #ifdef GPU_STAGGERED_DIRAC
     void hisqStaplesForce(GaugeField &newOprod, const GaugeField &oprod, const GaugeField &link, const double path_coeff_array[6])
     {
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       checkNative(link, oprod, newOprod);
       checkLocation(newOprod, oprod, link);
       checkPrecision(oprod, link, newOprod);
@@ -557,32 +558,24 @@ namespace quda {
       gauge_param.geometry = QUDA_SCALAR_GEOMETRY;
       gauge_param.setPrecision(gauge_param.Precision(), true);
 
-      auto P3 = GaugeField::Create(gauge_param);
-
-      auto Pmu = GaugeField::Create(gauge_param);
-      auto P5 = GaugeField::Create(gauge_param);
-      auto Pnumu = GaugeField::Create(gauge_param);
-      auto Qnumu = GaugeField::Create(gauge_param);
+      auto P3 = GaugeField(gauge_param);
+      auto Pmu = GaugeField(gauge_param);
+      auto P5 = GaugeField(gauge_param);
+      auto Pnumu = GaugeField(gauge_param);
+      auto Qnumu = GaugeField(gauge_param);
 
       // need double buffers for these fields to fuse "side link" terms with
       // subsequent "middle link" terms in a different direction
-      auto Pmu_next = GaugeField::Create(gauge_param);
-      auto Pnumu_next = GaugeField::Create(gauge_param);
-      auto Qnumu_next = GaugeField::Create(gauge_param);
+      auto Pmu_next = GaugeField(gauge_param);
+      auto Pnumu_next = GaugeField(gauge_param);
+      auto Qnumu_next = GaugeField(gauge_param);
 
-      instantiateGaugeStaggered<HisqStaplesForce>(link, *P3, GaugeField_ref(*Pmu),
-        GaugeField_ref(*P5), GaugeField_ref(*Pnumu), GaugeField_ref(*Qnumu),
-        GaugeField_ref(*Pmu_next), GaugeField_ref(*Pnumu_next), GaugeField_ref(*Qnumu_next),
+      instantiateGaugeStaggered<HisqStaplesForce>(link, P3, GaugeField_ref(Pmu),
+        GaugeField_ref(P5), GaugeField_ref(Pnumu), GaugeField_ref(Qnumu),
+        GaugeField_ref(Pmu_next), GaugeField_ref(Pnumu_next), GaugeField_ref(Qnumu_next),
         newOprod, oprod, path_coeff_array);
 
-      delete Pmu;
-      delete P3;
-      delete P5;
-      delete Pnumu;
-      delete Qnumu;
-      delete Pmu_next;
-      delete Pnumu_next;
-      delete Qnumu_next;
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     }
 #else
     void hisqStaplesForce(GaugeField &, const GaugeField &, const GaugeField &, const double[6])
@@ -651,10 +644,12 @@ namespace quda {
 #ifdef GPU_STAGGERED_DIRAC
     void hisqLongLinkForce(GaugeField &newOprod, const GaugeField &oldOprod, const GaugeField &link, double coeff)
     {
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       checkNative(link, oldOprod, newOprod);
       checkLocation(newOprod, oldOprod, link);
       checkPrecision(newOprod, link, oldOprod);
       instantiateGaugeStaggered<HisqLongLinkForce>(link, newOprod, oldOprod, coeff);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     }
 #else
     void hisqLongLinkForce(GaugeField &, const GaugeField &, const GaugeField &, double)
@@ -725,10 +720,12 @@ namespace quda {
 #ifdef GPU_STAGGERED_DIRAC
     void hisqCompleteForce(GaugeField &force, const GaugeField &link)
     {
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       checkNative(link, force);
       checkLocation(force, link);
       checkPrecision(link, force);
       instantiateGaugeStaggered<HisqCompleteForce>(link, force);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     }
 #else
     void hisqCompleteForce(GaugeField &, const GaugeField &)

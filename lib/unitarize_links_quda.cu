@@ -141,8 +141,10 @@ namespace quda {
 
   void unitarizeLinks(GaugeField& out, const GaugeField &in, int* fails)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     checkPrecision(out, in);
     instantiate<UnitarizeLinks, ReconstructNo12>(out, in, fails);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
   void unitarizeLinks(GaugeField &links, int* fails) { unitarizeLinks(links, links, fails); }
@@ -182,11 +184,13 @@ namespace quda {
 
   void projectSU3(GaugeField &u, double tol, int *fails)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     // check the the field doesn't have staggered phases applied
     if (u.StaggeredPhaseApplied())
       errorQuda("Cannot project gauge field with staggered phases applied");
 
     instantiate<ProjectSU3>(u, tol, fails);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
 } // namespace quda

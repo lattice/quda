@@ -995,6 +995,7 @@ namespace quda {
             } else {
               errorQuda("Ghost copy not supported here");
             }
+            qudaDeviceSynchronize(); // synchronize to ensure visibility on the host
           } else {
             void *buffer = create_gauge_buffer(bytes, order, geometry);
             size_t ghost_bytes[8];
@@ -1110,7 +1111,6 @@ namespace quda {
     staggeredPhaseApplied = src.StaggeredPhaseApplied();
     staggeredPhaseType = src.StaggeredPhase();
 
-    if (src.Location() != location) qudaDeviceSynchronize(); // include sync here for accurate host-device profiling
     if (src.Location() == QUDA_CUDA_FIELD_LOCATION && location == QUDA_CPU_FIELD_LOCATION) {
       profile.TPSTOP(QUDA_PROFILE_D2H);
     } else if (src.Location() == QUDA_CPU_FIELD_LOCATION && location == QUDA_CUDA_FIELD_LOCATION) {

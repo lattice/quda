@@ -257,8 +257,6 @@ namespace quda {
         pool_device_free(packClover);
       }
     }
-
-    qudaDeviceSynchronize();
   }
 
   void CloverField::copy(const CloverField &src)

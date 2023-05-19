@@ -72,7 +72,9 @@ namespace quda {
 
     copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
     in.exchangeExtendedGhost(in.R(), false);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeSTOUT>(out, in, false, rho);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     out.exchangeExtendedGhost(out.R(), false);
   }
 
@@ -84,7 +86,9 @@ namespace quda {
 
     copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
     in.exchangeExtendedGhost(in.R(), false);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeSTOUT>(out, in, true, rho, epsilon);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     out.exchangeExtendedGhost(out.R(), false);
   }
 

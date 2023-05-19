@@ -2,7 +2,6 @@
 #include <tunable_nd.h>
 #include <instantiate.h>
 #include <kernels/staggered_outer_product.cuh>
-#include "timer.h"
 
 namespace quda {
 

@@ -389,8 +389,10 @@ namespace quda {
   void gaugeFixingFFT(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double alpha,
                       const int autotune, const double tolerance, const int stopWtheta)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (comm_partitioned()) errorQuda("Gauge Fixing with FFTs in multi-GPU support NOT implemented yet!");
     instantiate<GaugeFixingFFT>(data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
 }
