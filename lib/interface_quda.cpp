@@ -3826,9 +3826,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
 
 void computeKSLinkQuda(void *fatlink, void *longlink, void *ulink, void *inlink, double *path_coeff, QudaGaugeParam *param)
 {
-  profileFatLink.TPSTART(QUDA_PROFILE_TOTAL);
-  profileFatLink.TPSTART(QUDA_PROFILE_INIT);
-
+  pushProfile(profileFatLink);
   checkGaugeParam(param);
 
   GaugeFieldParam gParam(*param, fatlink, QUDA_GENERAL_LINKS);
@@ -3848,16 +3846,11 @@ void computeKSLinkQuda(void *fatlink, void *longlink, void *ulink, void *inlink,
   gParam.setPrecision(param->cuda_prec, true);
   gParam.create = QUDA_NULL_FIELD_CREATE;
   GaugeField *cudaInLink = new GaugeField(gParam);
-  profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
 
-  profileFatLink.TPSTART(QUDA_PROFILE_H2D);
   cudaInLink->copy(cpuInLink);
-  profileFatLink.TPSTOP(QUDA_PROFILE_H2D);
   GaugeField *cudaInLinkEx = createExtendedGauge(*cudaInLink, R, profileFatLink);
 
-  profileFatLink.TPSTART(QUDA_PROFILE_FREE);
   delete cudaInLink;
-  profileFatLink.TPSTOP(QUDA_PROFILE_FREE);
 
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
@@ -3866,40 +3859,14 @@ void computeKSLinkQuda(void *fatlink, void *longlink, void *ulink, void *inlink,
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
 
   if (longlink) {
-    profileFatLink.TPSTART(QUDA_PROFILE_INIT);
-    GaugeField *cudaLongLink = new GaugeField(gParam);
-    profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
-
-    profileFatLink.TPSTART(QUDA_PROFILE_COMPUTE);
-    longKSLink(cudaLongLink, *cudaInLinkEx, path_coeff);
-    profileFatLink.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-    profileFatLink.TPSTART(QUDA_PROFILE_D2H);
-    cpuLongLink.copy(*cudaLongLink);
-    profileFatLink.TPSTOP(QUDA_PROFILE_D2H);
-
-    profileFatLink.TPSTART(QUDA_PROFILE_FREE);
-    delete cudaLongLink;
-    profileFatLink.TPSTOP(QUDA_PROFILE_FREE);
+    GaugeField longLink(gParam);
+    longKSLink(longLink, *cudaInLinkEx, path_coeff);
+    cpuLongLink.copy(longLink);
   }
 
-  profileFatLink.TPSTART(QUDA_PROFILE_INIT);
-  GaugeField *cudaFatLink = new GaugeField(gParam);
-  profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
-
-  profileFatLink.TPSTART(QUDA_PROFILE_COMPUTE);
-  fatKSLink(cudaFatLink, *cudaInLinkEx, path_coeff);
-  profileFatLink.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-  if (fatlink) {
-    profileFatLink.TPSTART(QUDA_PROFILE_D2H);
-    cpuFatLink.copy(*cudaFatLink);
-    profileFatLink.TPSTOP(QUDA_PROFILE_D2H);
-  }
-
-  profileFatLink.TPSTART(QUDA_PROFILE_FREE);
-  delete cudaInLinkEx;
-  profileFatLink.TPSTOP(QUDA_PROFILE_FREE);
+  GaugeField fatLink(gParam);
+  fatKSLink(fatLink, *cudaInLinkEx, path_coeff);
+  if (fatlink) cpuFatLink.copy(fatLink);
 
   if (ulink) {
     const double unitarize_eps = 1e-14;
@@ -3911,42 +3878,28 @@ void computeKSLinkQuda(void *fatlink, void *longlink, void *ulink, void *inlink,
     quda::setUnitarizeLinksConstants(unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error,
                                      svd_abs_error);
 
-    GaugeField *cudaUnitarizedLink = new GaugeField(gParam);
+    GaugeField unitarizedLink(gParam);
 
-    profileFatLink.TPSTART(QUDA_PROFILE_COMPUTE);
     *num_failures_h = 0;
-    quda::unitarizeLinks(*cudaUnitarizedLink, *cudaFatLink, num_failures_d); // unitarize on the gpu
+    quda::unitarizeLinks(unitarizedLink, fatLink, num_failures_d); // unitarize on the gpu
     if (*num_failures_h > 0)
       errorQuda("Error in unitarization component of the hisq fattening: %d failures", *num_failures_h);
-    profileFatLink.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-    profileFatLink.TPSTART(QUDA_PROFILE_D2H);
-    cpuUnitarizedLink.copy(*cudaUnitarizedLink);
-    profileFatLink.TPSTOP(QUDA_PROFILE_D2H);
-
-    profileFatLink.TPSTART(QUDA_PROFILE_FREE);
-    delete cudaUnitarizedLink;
-    profileFatLink.TPSTOP(QUDA_PROFILE_FREE);
+    cpuUnitarizedLink.copy(unitarizedLink);
   }
 
-  profileFatLink.TPSTART(QUDA_PROFILE_FREE);
-  delete cudaFatLink;
-  profileFatLink.TPSTOP(QUDA_PROFILE_FREE);
-
-  profileFatLink.TPSTOP(QUDA_PROFILE_TOTAL);
+  delete cudaInLinkEx;
+  popProfile();
 }
 
 void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
 {
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
-
+  pushProfile(profileGaussianSmear);
   checkGaugeParam(param);
 
   GaugeFieldParam gParam(*param, inlink, QUDA_ASQTAD_LONG_LINKS);
   gParam.gauge = twolink;
   GaugeField cpuTwoLink(gParam);  // create the host twolink
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
 
   GaugeField *cudaInLinkEx = nullptr;
 
@@ -3962,9 +3915,7 @@ void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
     GaugeField cudaInLink(gParam);
     profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
 
-    profileGaussianSmear.TPSTART(QUDA_PROFILE_H2D);
     cudaInLink.copy(cpuInLink);
-    profileGaussianSmear.TPSTOP(QUDA_PROFILE_H2D);
     cudaInLinkEx = createExtendedGauge(cudaInLink, R, profileGaussianSmear);
   } else {
     cudaInLinkEx = createExtendedGauge(*gaugePrecise, R, profileGaussianSmear);
@@ -3980,30 +3931,18 @@ void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
   gsParam.nFace         = 3;
   gsParam.pad           = gsParam.pad*gsParam.nFace;
 
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
-
   freeUniqueGaugeQuda(QUDA_SMEARED_LINKS);
   gaugeSmeared = new GaugeField(gsParam);
   
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
-
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
-
   computeTwoLink(*gaugeSmeared, *cudaInLinkEx);
   gaugeSmeared->exchangeGhost();
 
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_D2H);
   cpuTwoLink.copy(*gaugeSmeared);
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_D2H);
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
 
   freeUniqueGaugeQuda(QUDA_SMEARED_LINKS);
   delete cudaInLinkEx;
 
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_TOTAL);
+  popProfile();
 }
 
 int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* path_length,
@@ -4017,11 +3956,11 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   GaugeField cpuSiteLink = !qudaGaugeParam->use_resident_gauge ? GaugeField(gParam) : GaugeField();
 
   if (qudaGaugeParam->use_resident_gauge && !gaugePrecise) errorQuda("No resident gauge field to use");
+  gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.create = QUDA_COPY_FIELD_CREATE;
   gParam.field = &cpuSiteLink;
   gParam.reconstruct = qudaGaugeParam->reconstruct;
   gParam.setPrecision(qudaGaugeParam->cuda_prec, true);
-  gParam.location = QUDA_CUDA_FIELD_LOCATION;
   GaugeField cudaSiteLink = qudaGaugeParam->use_resident_gauge ? gaugePrecise->create_alias() : GaugeField(gParam);
 
   GaugeFieldParam gParamMom(*qudaGaugeParam, mom, QUDA_ASQTAD_MOM_LINKS);
@@ -4099,36 +4038,27 @@ int computeGaugePathQuda(void *out, void *siteLink, int ***input_path_buf, int *
 
   GaugeFieldParam gParam(*qudaGaugeParam, siteLink);
   gParam.location = QUDA_CPU_FIELD_LOCATION;
-  GaugeField *cpuSiteLink = (!qudaGaugeParam->use_resident_gauge) ? new GaugeField(gParam) : nullptr;
+  GaugeField cpuSiteLink = !qudaGaugeParam->use_resident_gauge ? GaugeField(gParam) : GaugeField();
 
-  GaugeField *cudaSiteLink = nullptr;
-
-  if (qudaGaugeParam->use_resident_gauge) {
-    if (!gaugePrecise) errorQuda("No resident gauge field to use");
-    cudaSiteLink = gaugePrecise;
-  } else {
-    gParam.location = QUDA_CUDA_FIELD_LOCATION;
-    gParam.create = QUDA_NULL_FIELD_CREATE;
-    gParam.reconstruct = qudaGaugeParam->reconstruct;
-    gParam.setPrecision(qudaGaugeParam->cuda_prec, true);
-
-    cudaSiteLink = new GaugeField(gParam);
-    cudaSiteLink->copy(*cpuSiteLink);
-  }
+  if (qudaGaugeParam->use_resident_gauge && !gaugePrecise) errorQuda("No resident gauge field to use");
+  gParam.location = QUDA_CUDA_FIELD_LOCATION;
+  gParam.create = QUDA_COPY_FIELD_CREATE;
+  gParam.field  = &cpuSiteLink;
+  gParam.reconstruct = qudaGaugeParam->reconstruct;
+  gParam.setPrecision(qudaGaugeParam->cuda_prec, true);
+  GaugeField cudaSiteLink = qudaGaugeParam->use_resident_gauge ? gaugePrecise->create_alias() : GaugeField(gParam);
 
   GaugeFieldParam gParamOut(*qudaGaugeParam, out);
   gParamOut.location = QUDA_CPU_FIELD_LOCATION;
-  GaugeField *cpuOut = new GaugeField(gParamOut);
+  GaugeField cpuOut = GaugeField(gParamOut);
   gParamOut.location = QUDA_CUDA_FIELD_LOCATION;
-  gParamOut.create = qudaGaugeParam->overwrite_gauge ? QUDA_ZERO_FIELD_CREATE : QUDA_NULL_FIELD_CREATE;
+  gParamOut.create = qudaGaugeParam->overwrite_gauge ? QUDA_ZERO_FIELD_CREATE : QUDA_COPY_FIELD_CREATE;
+  gParamOut.field = &cpuOut;
   gParamOut.reconstruct = QUDA_RECONSTRUCT_NO;
   gParamOut.setPrecision(qudaGaugeParam->cuda_prec, true);
-  GaugeField *cudaOut = new GaugeField(gParamOut);
-  if (!qudaGaugeParam->overwrite_gauge) {
-    cudaOut->copy(*cpuOut);
-  }
+  GaugeField cudaOut(gParamOut);
 
-  GaugeField *cudaGauge = createExtendedGauge(*cudaSiteLink, R, profileGaugePath);
+  GaugeField *cudaGauge = createExtendedGauge(cudaSiteLink, R, profileGaugePath);
   // apply / remove phase as appropriate
   if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
 
@@ -4145,24 +4075,19 @@ int computeGaugePathQuda(void *out, void *siteLink, int ***input_path_buf, int *
   for (int d = 0; d < 4; d++) { input_path_v[d] = input_path_buf[d]; }
 
   // actually do the computation
-  gaugePath(*cudaOut, *cudaGauge, eb3, input_path_v, path_length_v, loop_coeff_v, num_paths, max_length);
+  gaugePath(cudaOut, *cudaGauge, eb3, input_path_v, path_length_v, loop_coeff_v, num_paths, max_length);
 
-  cpuOut->copy(*cudaOut);
+  cpuOut.copy(cudaOut);
 
   if (qudaGaugeParam->make_resident_gauge) {
-    if (gaugePrecise && gaugePrecise != cudaSiteLink) freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
-    gaugePrecise = cudaSiteLink;
+    if (gaugePrecise && !qudaGaugeParam->use_resident_gauge) freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
+    gaugePrecise = new GaugeField();
+    std::exchange(*gaugePrecise, cudaSiteLink);
     if (extendedGaugeResident) delete extendedGaugeResident;
     extendedGaugeResident = cudaGauge;
   } else {
-    delete cudaSiteLink;
     delete cudaGauge;
   }
-
-  delete cudaOut;
-
-  if (cpuSiteLink) delete cpuSiteLink;
-  if (cpuOut) delete cpuOut;
 
   popProfile();
   return 0;

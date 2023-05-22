@@ -53,10 +53,12 @@ namespace quda
 #if defined(GPU_STAGGERED_DIRAC) && defined(GPU_TWOLINK_GSMEAR)
   void computeTwoLink(GaugeField &newTwoLink, const GaugeField &link)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     checkNative(newTwoLink, link);
     checkLocation(newTwoLink, link);
     checkPrecision(newTwoLink, link);
     instantiate<ComputeTwoLink, ReconstructNone>(link, newTwoLink);//FIXME : enable link-12/8 reconstruction  
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 #else
   void computeTwoLink(GaugeField &, const GaugeField &)
