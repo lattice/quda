@@ -22,15 +22,22 @@ namespace quda
     using offset_type = O; // type of object that may also use shared memory at the same which is created before this one
 
   private:
+    using atom_t = std::conditional_t<sizeof(T) % 16 == 0, int4, std::conditional_t<sizeof(T) % 8 == 0, int2, int>>;
+    static_assert(sizeof(T) % 4 == 0, "Shared memory cache does not support sub-word size types");
+
+    // The number of elements of type atom_t that we break T into for optimal shared-memory access
+    static constexpr int n_element = sizeof(T) / sizeof(atom_t);
+
+    const int stride;
     const unsigned int offset = 0; // dynamic offset in bytes
 
     /**
        @brief This is a dummy instantiation for the host compiler
     */
     template <bool, typename dummy = void> struct cache_dynamic {
-      T *operator()(unsigned)
+      atom_t *operator()(unsigned)
       {
-        static T *cache_;
+        static atom_t *cache_;
         return cache_;
       }
     };
@@ -40,25 +47,33 @@ namespace quda
        @return Shared memory pointer
      */
     template <typename dummy> struct cache_dynamic<true, dummy> {
-      __device__ inline T *operator()(unsigned int offset)
+      __device__ inline atom_t *operator()(unsigned int offset)
       {
         extern __shared__ int cache_[];
-        return reinterpret_cast<T *>(reinterpret_cast<char *>(cache_) + offset);
+        return reinterpret_cast<atom_t *>(reinterpret_cast<char *>(cache_) + offset);
       }
     };
 
-    __device__ __host__ inline T *cache() const { return target::dispatch<cache_dynamic>(offset); }
+    __device__ __host__ inline atom_t *cache() const { return target::dispatch<cache_dynamic>(offset); }
 
     __device__ __host__ inline void save_detail(const T &a) const
     {
+      atom_t tmp[n_element];
+      memcpy(tmp, (void *)&a, sizeof(T));
       int j = target::thread_idx_linear<3>();
-      cache()[j] = a;
+#pragma unroll
+      for (int i = 0; i < n_element; i++) cache()[i * stride + j] = tmp[i];
     }
 
     __device__ __host__ inline T &load_detail() const
     {
+      atom_t tmp[n_element];
       int j = target::thread_idx_linear<3>();
-      return cache()[j];
+#pragma unroll
+      for (int i = 0; i < n_element; i++) tmp[i] = cache()[i * stride + j];
+      T a;
+      memcpy((void *)&a, tmp, sizeof(T));
+      return a;
     }
 
     static constexpr unsigned int get_offset(dim3 block)
@@ -77,7 +92,7 @@ namespace quda
     /**
        @brief Constructor for ThreadLocalCache.
     */
-    constexpr ThreadLocalCache() : offset(get_offset(target::block_dim())) { }
+    constexpr ThreadLocalCache() : stride(target::block_size<3>()), offset(get_offset(target::block_dim())) { }
 
     /**
        @brief Grab the raw base address to this cache.
