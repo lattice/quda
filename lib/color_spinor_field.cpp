@@ -442,6 +442,13 @@ namespace quda
   void ColorSpinorField::copy(const ColorSpinorField &src)
   {
     test_compatible_weak(*this, src);
+
+    if (src.Location() == QUDA_CUDA_FIELD_LOCATION && location == QUDA_CPU_FIELD_LOCATION) {
+      getProfile().TPSTART(QUDA_PROFILE_D2H);
+    } else if (src.Location() == QUDA_CPU_FIELD_LOCATION && location == QUDA_CUDA_FIELD_LOCATION) {
+      getProfile().TPSTART(QUDA_PROFILE_H2D);
+    }
+
     if (Location() == src.Location()) { // H2H and D2D
 
       copyGenericColorSpinor(*this, src, Location());
@@ -524,6 +531,12 @@ namespace quda
       }
 
       qudaDeviceSynchronize(); // need to sync before data can be used on CPU
+    }
+
+    if (src.Location() == QUDA_CUDA_FIELD_LOCATION && location == QUDA_CPU_FIELD_LOCATION) {
+      getProfile().TPSTOP(QUDA_PROFILE_D2H);
+    } else if (src.Location() == QUDA_CPU_FIELD_LOCATION && location == QUDA_CUDA_FIELD_LOCATION) {
+      getProfile().TPSTOP(QUDA_PROFILE_H2D);
     }
   }
 

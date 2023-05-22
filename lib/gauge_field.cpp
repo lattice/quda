@@ -938,14 +938,13 @@ namespace quda {
 
   void GaugeField::copy(const GaugeField &src)
   {
-    auto &profile = getProfile();
-    if (src.Location() == QUDA_CUDA_FIELD_LOCATION && location == QUDA_CPU_FIELD_LOCATION) {
-      profile.TPSTART(QUDA_PROFILE_D2H);
-    } else if (src.Location() == QUDA_CPU_FIELD_LOCATION && location == QUDA_CUDA_FIELD_LOCATION) {
-      profile.TPSTART(QUDA_PROFILE_H2D);
-    }
-
     if (this == &src) return;
+
+    if (src.Location() == QUDA_CUDA_FIELD_LOCATION && location == QUDA_CPU_FIELD_LOCATION) {
+      getProfile().TPSTART(QUDA_PROFILE_D2H);
+    } else if (src.Location() == QUDA_CPU_FIELD_LOCATION && location == QUDA_CUDA_FIELD_LOCATION) {
+      getProfile().TPSTART(QUDA_PROFILE_H2D);
+    }
 
     checkField(src);
 
@@ -1112,9 +1111,9 @@ namespace quda {
     staggeredPhaseType = src.StaggeredPhase();
 
     if (src.Location() == QUDA_CUDA_FIELD_LOCATION && location == QUDA_CPU_FIELD_LOCATION) {
-      profile.TPSTOP(QUDA_PROFILE_D2H);
+      getProfile().TPSTOP(QUDA_PROFILE_D2H);
     } else if (src.Location() == QUDA_CPU_FIELD_LOCATION && location == QUDA_CUDA_FIELD_LOCATION) {
-      profile.TPSTOP(QUDA_PROFILE_H2D);
+      getProfile().TPSTOP(QUDA_PROFILE_H2D);
     }
   }
 

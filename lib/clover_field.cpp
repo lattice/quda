@@ -184,6 +184,12 @@ namespace quda {
 
   void CloverField::copy(const CloverField &src, bool is_inverse)
   {
+    if (src.Location() == QUDA_CUDA_FIELD_LOCATION && location == QUDA_CPU_FIELD_LOCATION) {
+      getProfile().TPSTART(QUDA_PROFILE_D2H);
+    } else if (src.Location() == QUDA_CPU_FIELD_LOCATION && location == QUDA_CUDA_FIELD_LOCATION) {
+      getProfile().TPSTART(QUDA_PROFILE_H2D);
+    }
+
     // special case where we wish to make a copy of the inverse field when dynamic_inverse is enabled
     static bool dynamic_inverse_copy = false;
     if (is_inverse && clover::dynamic_inverse() && V(true) && !src.V(true) && !dynamic_inverse_copy) {
@@ -256,6 +262,12 @@ namespace quda {
 
         pool_device_free(packClover);
       }
+    }
+
+    if (src.Location() == QUDA_CUDA_FIELD_LOCATION && location == QUDA_CPU_FIELD_LOCATION) {
+      getProfile().TPSTOP(QUDA_PROFILE_D2H);
+    } else if (src.Location() == QUDA_CPU_FIELD_LOCATION && location == QUDA_CUDA_FIELD_LOCATION) {
+      getProfile().TPSTOP(QUDA_PROFILE_H2D);
     }
   }
 

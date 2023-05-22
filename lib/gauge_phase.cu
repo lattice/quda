@@ -45,9 +45,11 @@ namespace quda {
 
   void applyGaugePhase(GaugeField &u)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugePhase_, ReconstructNone>(u);
     // ensure that ghosts are updated if needed
     if (u.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) u.exchangeGhost();
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
 } // namespace quda
