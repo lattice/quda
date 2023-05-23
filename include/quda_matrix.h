@@ -668,95 +668,24 @@ namespace quda {
       return uinv;
     }
 
-
-
-  template<class T, int N>
-    __device__ __host__ inline
-    void setIdentity(Matrix<T,N>* m){
-
+    template <class T, int N> __device__ __host__ inline void setIdentity(Matrix<T, N> *m)
+    {
 #pragma unroll
-      for (int i=0; i<N; ++i){
-        (*m)(i,i) = 1;
+      for (int i = 0; i < N; ++i) {
+        (*m)(i, i) = 1;
 #pragma unroll
-        for (int j=i+1; j<N; ++j){
-          (*m)(i,j) = (*m)(j,i) = 0;
-        }
+        for (int j = i + 1; j < N; ++j) { (*m)(i, j) = (*m)(j, i) = {}; }
       }
     }
 
-
-  template<int N>
-    __device__ __host__ inline
-    void setIdentity(Matrix<float2,N>* m){
-
+    template <class T, int N> __device__ __host__ inline void setZero(Matrix<T, N> *m)
+    {
 #pragma unroll
-      for (int i=0; i<N; ++i){
-        (*m)(i,i) = make_float2(1,0);
+      for (int i = 0; i < N; ++i) {
 #pragma unroll
-        for (int j=i+1; j<N; ++j){
-          (*m)(i,j) = (*m)(j,i) = make_float2(0.,0.);
-        }
+        for (int j = 0; j < N; ++j) { (*m)(i, j) = {}; }
       }
     }
-
-
-  template<int N>
-    __device__ __host__ inline
-    void setIdentity(Matrix<double2,N>* m){
-
-#pragma unroll
-      for (int i=0; i<N; ++i){
-        (*m)(i,i) = make_double2(1,0);
-#pragma unroll
-        for (int j=i+1; j<N; ++j){
-          (*m)(i,j) = (*m)(j,i) = make_double2(0.,0.);
-        }
-      }
-    }
-
-
-  // Need to write more generic code for this!
-  template<class T, int N>
-    __device__ __host__ inline
-    void setZero(Matrix<T,N>* m){
-
-#pragma unroll
-      for (int i=0; i<N; ++i){
-#pragma unroll
-        for (int j=0; j<N; ++j){
-          (*m)(i,j) = 0;
-        }
-      }
-    }
-
-
-  template<int N>
-    __device__ __host__ inline
-    void setZero(Matrix<float2,N>* m){
-
-#pragma unroll
-      for (int i=0; i<N; ++i){
-#pragma unroll
-        for (int j=0; j<N; ++j){
-          (*m)(i,j) = make_float2(0.,0.);
-        }
-      }
-    }
-
-
-  template<int N>
-    __device__ __host__ inline
-    void setZero(Matrix<double2,N>* m){
-
-#pragma unroll
-      for (int i=0; i<N; ++i){
-#pragma unroll
-        for (int j=0; j<N; ++j){
-          (*m)(i,j) = make_double2(0.,0.);
-        }
-      }
-    }
-
 
   template<typename Complex,int N>
     __device__ __host__ inline void makeAntiHerm(Matrix<Complex,N> &m) {

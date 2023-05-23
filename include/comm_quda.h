@@ -398,7 +398,16 @@ namespace quda
 
   void comm_allreduce_int(int &data);
   void comm_allreduce_xor(uint64_t &data);
-  void comm_broadcast(void *data, size_t nbytes);
+
+  /**
+     @brief Broadcast from the root rank
+     @param[in,out] data The data to be read from on the root rank, and
+     written to on all other ranks
+     @param[in] nbytes The size in bytes of data to be broadcast
+     @param[in] root The process that will be broadcasting
+  */
+  void comm_broadcast(void *data, size_t nbytes, int root = 0);
+
   void comm_barrier(void);
   void comm_abort(int status);
   void comm_abort_(int status);

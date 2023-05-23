@@ -1,9 +1,9 @@
 #pragma once
 
 #include <iostream>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <algorithm>
 
 #include <quda.h>
@@ -106,10 +106,6 @@ struct StaggeredGSmearTestWrapper { //
   ColorSpinorField spinorRef;
   ColorSpinorField tmp;
   ColorSpinorField tmp2;
-  // For loading the gauge fields
-
-  int argc_copy;
-  char **argv_copy;
 
   void staggeredGSmearRef()
   {
@@ -136,6 +132,7 @@ struct StaggeredGSmearTestWrapper { //
                                       &gauge_param, &inv_param, 0, smear_coeff, smear_t0, gauge_param.cpu_prec);
         staggeredTwoLinkGaussianSmear(spinorRef.Odd(), qdp_twolnk, (void **)cpuTwoLink->Ghost(), tmp.Odd(),
                                       &gauge_param, &inv_param, 1, smear_coeff, smear_t0, gauge_param.cpu_prec);
+
         // blas::xpay(*tmp2, -1.0, *spinorRef);
         xpay(tmp2.Even().V(), -1.0, spinorRef.Even().V(), spinor.Even().Length(), gauge_param.cpu_prec);
         xpay(tmp2.Odd().V(), -1.0, spinorRef.Odd().V(), spinor.Odd().Length(), gauge_param.cpu_prec);
@@ -164,7 +161,7 @@ struct StaggeredGSmearTestWrapper { //
     has_been_called = true;
   }
 
-  void init_ctest(int precision, QudaReconstructType link_recon_)
+  void init_ctest(int argc, char **argv, int precision, QudaReconstructType link_recon_)
   {
     gauge_param = newQudaGaugeParam();
     inv_param = newQudaInvertParam();
@@ -184,10 +181,10 @@ struct StaggeredGSmearTestWrapper { //
 
     link_recon = link_recon_;
 
-    init();
+    init(argc, argv);
   }
 
-  void init_test()
+  void init_test(int argc, char **argv)
   {
     gauge_param = newQudaGaugeParam();
     inv_param = newQudaInvertParam();
@@ -195,10 +192,10 @@ struct StaggeredGSmearTestWrapper { //
     setStaggeredGaugeParam(gauge_param);
     setStaggeredInvertParam(inv_param);
 
-    init();
+    init(argc, argv);
   }
 
-  void init()
+  void init(int argc, char **argv)
   {
     inv_param.split_grid[0] = grid_partition[0];
     inv_param.split_grid[1] = grid_partition[1];
@@ -220,7 +217,7 @@ struct StaggeredGSmearTestWrapper { //
 
     gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
-    constructHostGaugeField(qdp_inlink, gauge_param, argc_copy, argv_copy);
+    constructHostGaugeField(qdp_inlink, gauge_param, argc, argv);
     initExtendedField(qdp_inlink_ex, qdp_inlink);
     // Prepare two link field:
     if (verify_results or (gtest_type == gsmear_test_type::GaussianSmear and smear_compute_two_link == false))
@@ -296,7 +293,7 @@ struct StaggeredGSmearTestWrapper { //
     commDimPartitionedReset();
   }
 
-  GSmearTime gsmearQUDA(int niter) // niter
+  GSmearTime gsmearQUDA(int niter)
   {
     GSmearTime gsmear_time;
 
@@ -308,34 +305,46 @@ struct StaggeredGSmearTestWrapper { //
 
     printfQuda("running test in %d iters.", niter);
 
-    // smearing parameters
-    switch (gtest_type) {
-    case gsmear_test_type::TwoLink: {
-      printfQuda("Doing two link in QUDA\n");
-      computeTwoLinkQuda((void *)milc_twolnk, nullptr, &gauge_param);
-      quda_gflops = 2 * 4 * 198ll * V; // i.e. : 2 mat-mat prods, 4 dirs, Nc*(Nc*(8*NC-2)) flops per mat-mat
-      break;
-    }
-    case gsmear_test_type::GaussianSmear: {
-      printfQuda("Doing gaussian smearing in QUDA\n");
-      QudaQuarkSmearParam qsm_param;
-      qsm_param.inv_param = &inv_param;
+    for (int i = 0; i < niter; i++) {
 
-      double omega = 2.0;
-      qsm_param.n_steps = 50;
-      qsm_param.width = -1.0 * omega * omega / (4 * smear_n_steps);
+      host_timer.start();
 
-      qsm_param.compute_2link = 1;
-      qsm_param.delete_2link = 0;
-      qsm_param.t0 = -1;
+      switch (gtest_type) {
+      case gsmear_test_type::TwoLink: {
+        computeTwoLinkQuda((void *)milc_twolnk, nullptr, &gauge_param);
+        quda_gflops = 2 * 4 * 198ll * V; // i.e. : 2 mat-mat prods, 4 dirs, Nc*(Nc*(8*NC-2)) flops per mat-mat
+        break;
+      }
+      case gsmear_test_type::GaussianSmear: {
+        QudaQuarkSmearParam qsm_param;
+        qsm_param.inv_param = &inv_param;
 
-      performTwoLinkGaussianSmearNStep(spinor.V(), &qsm_param);
+        double omega = 2.0;
+        qsm_param.n_steps = smear_n_steps;
+        qsm_param.width = -1.0 * omega * omega / (4 * smear_n_steps);
 
-      quda_gflops = qsm_param.gflops;
+        qsm_param.compute_2link = smear_compute_two_link;
+        qsm_param.delete_2link = smear_delete_two_link;
+        qsm_param.t0 = smear_t0;
 
-      break;
-    }
-    default: errorQuda("Test type not defined");
+        performTwoLinkGaussianSmearNStep(spinor.V(), &qsm_param);
+
+        quda_gflops = qsm_param.gflops;
+
+        break;
+      }
+      default: errorQuda("Test type not defined");
+      }
+
+      host_timer.stop();
+
+      gsmear_time.cpu_time += host_timer.last();
+
+      // skip first and last iterations since they may skew these metrics if comms are not synchronous
+      if (i > 0 && i < niter) {
+        gsmear_time.cpu_min = std::min(gsmear_time.cpu_min, host_timer.last());
+        gsmear_time.cpu_max = std::max(gsmear_time.cpu_max, host_timer.last());
+      }
     }
 
     device_timer.stop();
@@ -350,6 +359,7 @@ struct StaggeredGSmearTestWrapper { //
     gsmearQUDA(1);
 
     GSmearTime gsmear_time = gsmearQUDA(niter);
+
     if (gtest_type == gsmear_test_type::GaussianSmear) spinorRef = spinor;
 
     if (print_metrics) {
