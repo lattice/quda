@@ -415,7 +415,7 @@ namespace quda {
 
         Link Ow = mu_positive ? (conj(Ucb) * Oc) : (Ucb * Oc);
         {
-          Link Uab = Uab_cache.load();
+          Link Uab = Uab_cache;
           Link Oy = sig_positive ? Uab * Ow : conj(Uab) * Ow;
           Link Ox = mu_positive ? (Oy * Uid) : (Uid * conj(Oy));
           auto mycoeff_lepage = -coeff_sign<sig_positive, typename Arg::real>(parity_a)*coeff_sign<mu_positive, typename Arg::real>(parity_a)*arg.coeff_lepage;
@@ -489,7 +489,7 @@ namespace quda {
         arg.pMu_next(0, point_b, parity_b) = Oz;
         {
           // scoped Uab load
-          Link Uab = Uab_cache.load();
+          Link Uab = Uab_cache;
           if constexpr (!sig_positive) Uab = conj(Uab);
           arg.p3(0, point_a, parity_a) = Uab * Oz;
         }
@@ -737,7 +737,7 @@ namespace quda {
           UbeOeOf = Ube * OeOf;
 
           // Cache Ube to below
-          Matrix_cache[1] = Ube;
+          Matrix_cache.save(Ube, 1);
         }
 
         // Take care of force_sig --- contribution from the negative rho direction
@@ -745,7 +745,7 @@ namespace quda {
         if constexpr (sig_positive) {
           Link force_sig = Matrix_cache[2];
           force_sig = mm_add(mycoeff_seven * UbeOeOf, conj(Uaf), force_sig);
-          Matrix_cache[2] = force_sig;
+          Matrix_cache.save(force_sig, 2);
         }
 
         // Compute the force_rho --- contribution from the negative rho direction
@@ -790,7 +790,7 @@ namespace quda {
         Link Oz = Ucb * Ob;
         Link Oy = (sig_positive ? Udc : conj(Udc)) * Oz;
         p5_sig = mm_add(arg.accumu_coeff_seven * conj(Uda), Oy, p5_sig);
-        Matrix_cache[1] = p5_sig;
+        Matrix_cache.save(p5_sig, 1);
 
         // When sig is positive, compute the force_sig contribution from the
         // positive rho direction
@@ -800,7 +800,7 @@ namespace quda {
           Link Oz = conj(Ucb) * Oc;
           Link force_sig = Matrix_cache[2];
           force_sig = mm_add(mycoeff_seven * Oz, Od * Uda, force_sig);
-          Matrix_cache[2] = force_sig;
+          Matrix_cache.save(force_sig, 2);
         }
 
       }
@@ -922,7 +922,7 @@ namespace quda {
         if constexpr (sig_positive) {
           Link force_sig = Matrix_cache[2];
           force_sig = mm_add(arg.coeff_five * Ow, Ox, force_sig);
-          Matrix_cache[2] = force_sig;
+          Matrix_cache.save(force_sig, 2);
         }
       }
 
@@ -961,11 +961,11 @@ namespace quda {
 
         // calculate p5_sig
 	constexpr int cacheLen = sig_positive ? 3 : 2;
-        ThreadLocalCache<array<Link,cacheLen>> Matrix_cache{};
+        ThreadLocalCache<Link,cacheLen> Matrix_cache{};
 
         if constexpr (sig_positive) {
           Link force_sig = arg.force(arg.sig, point_a, parity_a);
-          Matrix_cache[2] = force_sig;
+          Matrix_cache.save(force_sig, 2);
         }
 
         // Scoped load of Uab
@@ -975,7 +975,7 @@ namespace quda {
           int ab_link_nbr_idx = (sig_positive) ? point_a : point_b;
           int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
           Link Uab = arg.link(arg.sig, ab_link_nbr_idx, ab_link_nbr_parity);
-          Matrix_cache[0] = Uab;
+          Matrix_cache.save(Uab, 0);
         }
 
         // accumulate into P5, force_sig

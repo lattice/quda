@@ -73,7 +73,7 @@ namespace quda
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
       ThreadLocalCache<Link> Stap{};
-      ThreadLocalCache<Link,decltype(Stap)> Rect{}; // offset by Stap type to ensure non-overlapping allocations
+      ThreadLocalCache<Link,0,decltype(Stap)> Rect{}; // offset by Stap type to ensure non-overlapping allocations
       computeStapleRectangle(arg, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim);
       Z = arg.coeff1x1 * static_cast<const Link &>(Stap) + arg.coeff2x1 * static_cast<const Link &>(Rect);
       break;
