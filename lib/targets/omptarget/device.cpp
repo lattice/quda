@@ -72,6 +72,8 @@ namespace quda
 
     static bool initialized = false;
 
+    static int device_id = -1;
+
     void print_device(DeviceProp dp)
     {
       int dev = dp.id;
@@ -93,6 +95,14 @@ namespace quda
         print_device(deviceProp);
       }
       omp_set_default_device(dev);
+
+      device_id = dev;
+    }
+
+    void init_thread()
+    {
+      if (device_id == -1) errorQuda("No OMP device has been initialized for this process");
+      omp_set_default_device(device_id);
     }
 
     int get_device_count()
