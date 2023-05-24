@@ -5457,8 +5457,6 @@ void copyExtendedResidentGaugeQuda(void *resident_gauge)
 
 void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int n_steps, double alpha)
 {
-  profileWuppertal.TPSTART(QUDA_PROFILE_TOTAL);
-
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
 
   pushVerbosity(inv_param->verbosity);
@@ -5500,9 +5498,16 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
   double a = alpha / (1. + 6. * alpha);
   double b = 1. / (1. + 6. * alpha);
 
+  int comm_dim[4] = {};
+  // only switch on comms needed for directions with a derivative
+  for (int i = 0; i < 4; i++) {
+    comm_dim[i] = comm_dim_partitioned(i);
+    if (i == 3) comm_dim[i] = 0;
+  }
+
   for (unsigned int i = 0; i < n_steps; i++) {
     if (i) in = out;
-    ApplyLaplace(out, in, *precise, 3, a, b, in, parity, false, nullptr, profileWuppertal);
+    ApplyLaplace(out, in, *precise, 3, a, b, in, parity, false, comm_dim, profileWuppertal);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       double norm = blas::norm2(out);
       printfQuda("Step %d, vector norm %e\n", i, norm);
@@ -5524,8 +5529,6 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
     delete precise;
 
   popVerbosity();
-
-  profileWuppertal.TPSTOP(QUDA_PROFILE_TOTAL);
 }
  
 
