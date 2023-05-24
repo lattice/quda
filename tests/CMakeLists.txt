@@ -165,7 +165,7 @@ if(QUDA_QIO)
 endif()
 
 add_executable(tune_test tune_test.cpp)
-target_link_libraries(tune_test ${TEST_LIBS})
+target_link_libraries(tune_test ${TEST_LIBS} "-Wl,--unresolved-symbols=ignore-all")
 quda_checkbuildtest(tune_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS tune_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
