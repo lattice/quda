@@ -6,26 +6,27 @@
    @file thread_local_cache.h
 
    Thread local cache object which may use shared memory for optimization.
+   The storage can be a single object or an array of objects.
  */
 
 namespace quda
 {
 
   /**
-     @brief Class for threads to store a unique value which can use
+     @brief Class for threads to store a unique value, or array of values, which can use
      shared memory for optimization purposes.
    */
   template <typename T, int N_ = 0, typename O = void> class ThreadLocalCache
   {
   public:
     using value_type = T;
-    using offset_type = O; // type of object that may also use shared memory at the same which is created before this one
-    static constexpr int N = N_;
-    static constexpr int len = std::max(1,N);
+    using offset_type = O; // type of object that may also use shared memory at the same time and is located before this one
+    static constexpr int N = N_; // size of array, 0 means to behave like T instead of array<T, 1>
+    static constexpr int len = std::max(1,N); // actual number of elements to store
 
   private:
     using atom_t = std::conditional_t<sizeof(T) % 16 == 0, int4, std::conditional_t<sizeof(T) % 8 == 0, int2, int>>;
-    static_assert(sizeof(T) % 4 == 0, "Shared memory cache does not support sub-word size types");
+    static_assert(sizeof(T) % 4 == 0, "Thread local cache does not support sub-word size types");
 
     // The number of elements of type atom_t that we break T into for optimal shared-memory access
     static constexpr int n_element = sizeof(T) / sizeof(atom_t);
@@ -102,7 +103,7 @@ namespace quda
     __device__ __host__ inline auto data() const { return reinterpret_cast<T *>(cache()); }
 
     /**
-       @brief Save the value into the thread local cache.
+       @brief Save the value into the thread local cache.  Used when N==0 so cache acts like single object.
        @param[in] a The value to store in the thread local cache
      */
     __device__ __host__ inline void save(const T &a) const {
@@ -111,14 +112,15 @@ namespace quda
     }
 
     /**
-       @brief Save the value into the thread local cache.
+       @brief Save the value into an element of the thread local cache.
        @param[in] a The value to store in the thread local cache
+       @param[in] k The index to use
      */
     __device__ __host__ inline void save(const T &a, const int k) const { save_detail(a, k); }
 
     /**
-       @brief Load a value from the thread local cache
-       @return The value at the linear thread index
+       @brief Load a value from the thread local cache.  Used when N==0 so cache acts like single object.
+       @return The value stored in the thread local cache
      */
     __device__ __host__ inline T load() const {
       static_assert(N == 0);
@@ -126,34 +128,35 @@ namespace quda
     }
 
     /**
-       @brief Load a value from the thread local cache
-       @return The value at the linear thread index
+       @brief Load a value from an element of the thread local cache
+       @param[in] k The index to use
+       @return The value stored in the thread local cache at that index
      */
     __device__ __host__ inline T load(const int k) const { return load_detail(k); }
 
     /**
-       @brief Cast operator to allow cache objects to be used where T
-       is expected
+       @brief Cast operator to allow cache objects to be used where T is expected (when N==0).
      */
     __device__ __host__ operator T() const {
       static_assert(N == 0);
-      return load(0);
+      return load();
     }
 
     /**
        @brief Assignment operator to allow cache objects to be used on
-       the lhs where T is otherwise expected.
+       the lhs where T is otherwise expected (when N==0).
      */
     __device__ __host__ void operator=(const T &src) const {
       static_assert(N == 0);
-      save(src, 0);
+      save(src);
     }
 
     /**
-       @brief Subscripting operator returning reference to allow cache objects
-       to assign to a subscripted element.
+       @brief Subscripting operator returning value at index for convenience.
+       @param[in] i The index to use
+       @return The value stored in the thread local cache at that index
      */
-    __device__ __host__ auto operator[](int i) { return load(i); }
+    __device__ __host__ T operator[](int i) { return load(i); }
   };
 
 } // namespace quda
