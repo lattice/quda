@@ -740,7 +740,7 @@ namespace quda {
       strcat(aux, dslash.inA[0].AuxString().c_str());
       strcat(aux, ",gauge_prec=");
 
-      char prec_str[8];
+      char prec_str[16];
       i32toa(prec_str, dslash.Y.Precision());
       strcat(aux, prec_str);
       strcat(aux, ",halo_prec=");

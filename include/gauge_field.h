@@ -599,7 +599,7 @@ namespace quda {
     */
     void copy_from_buffer(void *buffer);
 
-    friend class GaugeFieldParam;
+    friend struct GaugeFieldParam;
   };
 
   /**

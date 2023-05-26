@@ -905,7 +905,7 @@ namespace quda
     static void test_compatible_weak(const ColorSpinorField &a, const ColorSpinorField &b);
 
     friend std::ostream &operator<<(std::ostream &out, const ColorSpinorField &);
-    friend class ColorSpinorParam;
+    friend struct ColorSpinorParam;
   };
 
   /**
