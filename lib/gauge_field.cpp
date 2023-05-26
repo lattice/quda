@@ -897,7 +897,8 @@ namespace quda {
     }
   }
 
-  void *create_gauge_buffer(size_t bytes, QudaGaugeFieldOrder order, QudaFieldGeometry geometry) {
+  void *create_gauge_buffer(size_t bytes, QudaGaugeFieldOrder order, QudaFieldGeometry geometry)
+  {
     if (order == QUDA_QDP_GAUGE_ORDER) {
       void **buffer = new void*[geometry];
       for (int d=0; d<geometry; d++) buffer[d] = pool_device_malloc(bytes/geometry);
@@ -905,11 +906,10 @@ namespace quda {
     } else {
       return pool_device_malloc(bytes);
     }
-
   }
 
-  void **create_ghost_buffer(size_t bytes[], QudaGaugeFieldOrder order, QudaFieldGeometry geometry) {
-
+  void **create_ghost_buffer(size_t bytes[], QudaGaugeFieldOrder order, QudaFieldGeometry geometry)
+  {
     if (order > 4) {
       void **buffer = new void*[geometry];
       for (int d=0; d<geometry; d++) buffer[d] = pool_device_malloc(bytes[d]);
@@ -917,10 +917,10 @@ namespace quda {
     } else {
       return 0;
     }
-
   }
 
-  void free_gauge_buffer(void *buffer, QudaGaugeFieldOrder order, QudaFieldGeometry geometry) {
+  void free_gauge_buffer(void *buffer, QudaGaugeFieldOrder order, QudaFieldGeometry geometry)
+  {
     if (order == QUDA_QDP_GAUGE_ORDER) {
       for (int d=0; d<geometry; d++) pool_device_free(((void**)buffer)[d]);
       delete []((void**)buffer);
@@ -929,7 +929,8 @@ namespace quda {
     }
   }
 
-  void free_ghost_buffer(void **buffer, QudaGaugeFieldOrder order, QudaFieldGeometry geometry) {
+  void free_ghost_buffer(void **buffer, QudaGaugeFieldOrder order, QudaFieldGeometry geometry)
+  {
     if (order > 4) {
       for (int d=0; d<geometry; d++) pool_device_free(buffer[d]);
       delete []buffer;
@@ -1281,39 +1282,34 @@ namespace quda {
 
   void GaugeField::backup() const
   {
-    if (backed_up) errorQuda("Gauge field already backed up");
+    if (backup_h.size()) errorQuda("Gauge field already backed up");
 
     if (order == QUDA_QDP_GAUGE_ORDER) {
-      char **buffer = new char *[geometry];
+      backup_h.resize(geometry);
       for (int d = 0; d < geometry; d++) {
-        buffer[d] = new char[bytes / geometry];
-        qudaMemcpy(buffer[d], gauge_array[d].data(), bytes / geometry, qudaMemcpyDefault);
+        backup_h[d] = std::move(quda_ptr(QUDA_MEMORY_HOST, bytes / geometry));
+        qudaMemcpy(backup_h[d], gauge_array[d], bytes / geometry, qudaMemcpyDefault);
       }
-      backup_h = reinterpret_cast<char *>(buffer);
     } else {
-      backup_h = new char[bytes];
-      qudaMemcpy(backup_h, gauge.data(), bytes, qudaMemcpyDefault);
+      backup_h.resize(1);
+      backup_h[0] = std::move(quda_ptr(QUDA_MEMORY_HOST, bytes));
+      qudaMemcpy(backup_h[0], gauge, bytes, qudaMemcpyDefault);
     }
-
-    backed_up = true;
   }
 
   void GaugeField::restore() const
   {
-    if (!backed_up) errorQuda("Cannot restore since not backed up");
+    if (!backup_h.size()) errorQuda("Cannot restore since not backed up");
 
     if (order == QUDA_QDP_GAUGE_ORDER) {
-      char **buffer = reinterpret_cast<char **>(backup_h);
       for (int d = 0; d < geometry; d++) {
-        qudaMemcpy(gauge_array[d].data(), buffer[d], bytes / geometry, qudaMemcpyDefault);
-        delete[] buffer[d];
+        qudaMemcpy(gauge_array[d], backup_h[d], bytes / geometry, qudaMemcpyDefault);
       }
-      delete[] buffer;
     } else {
-      qudaMemcpy(gauge.data(), backup_h, bytes, qudaMemcpyDefault);
-      delete[] backup_h;
+      qudaMemcpy(gauge, backup_h[0], bytes, qudaMemcpyDefault);
     }
-    backed_up = false;
+
+    backup_h.resize(0);
   }
 
   void GaugeField::copy_to_buffer(void *buffer) const

@@ -329,8 +329,7 @@ namespace quda
 
     size_t length = 0; // length including pads, but not norm zone
 
-    void *v = nullptr;      // the field elements
-    void *v_h = nullptr;    // the field elements
+    quda_ptr v = {};        // the field elements
     size_t norm_offset = 0; /** offset to the norm (if applicable) */
 
     // multi-GPU parameters
@@ -463,37 +462,19 @@ namespace quda
     /**
        @brief Return pointer to the field allocation
     */
-    void *V()
+    void *V() const
     {
       if (ghost_only) errorQuda("Not defined for ghost-only field");
-      return v;
-    }
-
-    /**
-       @brief Return pointer to the field allocation
-    */
-    const void *V() const
-    {
-      if (ghost_only) errorQuda("Not defined for ghost-only field");
-      return v;
+      return v.data();
     }
 
     /**
        @brief Return pointer to the norm base pointer in the field allocation
     */
-    void *Norm()
+    void *Norm() const
     {
       if (ghost_only) errorQuda("Not defined for ghost-only field");
-      return static_cast<char *>(v) + norm_offset;
-    }
-
-    /**
-       @brief Return pointer to the norm base pointer in the field allocation
-    */
-    const void *Norm() const
-    {
-      if (ghost_only) errorQuda("Not defined for ghost-only field");
-      return static_cast<char *>(v) + norm_offset;
+      return static_cast<char *>(v.data()) + norm_offset;
     }
 
     size_t NormOffset() const { return norm_offset; }

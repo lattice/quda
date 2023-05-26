@@ -178,9 +178,10 @@ namespace quda {
     int nColor = 0;
     int nSpin = 0;
 
-    void *clover = nullptr;
-    void *cloverInv = nullptr;
+    quda_ptr clover = {};
+    quda_ptr cloverInv = {};
 
+    bool inverse = false;
     double diagonal = 0.0;
     array<double, 2> max = {};
 
@@ -213,12 +214,15 @@ namespace quda {
 
   public:
     CloverField(const CloverFieldParam &param);
-    virtual ~CloverField();
 
     static CloverField *Create(const CloverFieldParam &param);
 
-    void* V(bool inverse=false) { return inverse ? cloverInv : clover; }
-    const void* V(bool inverse=false) const { return inverse ? cloverInv : clover; }
+    void *V(bool inverse = false) const { return inverse ? cloverInv.data() : clover.data(); }
+
+    /**
+       @return whether the inverse is explicitly been allocated
+     */
+    bool Inverse() const { return inverse; }
 
     /**
        @return diagonal scaling factor applied to the identity
@@ -406,10 +410,6 @@ namespace quda {
     */
     void copy_from_buffer(void *buffer);
 
-    friend class DiracClover;
-    friend class DiracCloverPC;
-    friend class DiracTwistedClover;
-    friend class DiracTwistedCloverPC;
   };
 
   /**

@@ -460,9 +460,7 @@ namespace quda {
       }
     }
 
-    mutable char *backup_h = nullptr;
-    mutable char *backup_norm_h = nullptr;
-    mutable bool backed_up = false;
+    mutable std::vector<quda_ptr> backup_h = {};
 
   public:
     /**

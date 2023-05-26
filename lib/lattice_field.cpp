@@ -29,17 +29,13 @@ namespace quda {
     volume(1),
     localVolume(1),
     pad(param.pad),
-    total_bytes(0),
     nDim(param.nDim),
     location(param.location),
     precision(param.Precision()),
     ghost_precision(param.GhostPrecision()),
-    ghost_precision_reset(false),
     scale(param.scale),
     siteSubset(param.siteSubset),
     ghostExchange(param.ghostExchange),
-    ghost_bytes(0),
-    ghost_bytes_old(0),
     ghost_face_bytes {},
     ghost_face_bytes_aligned {},
     ghost_offset(),
@@ -59,11 +55,7 @@ namespace quda {
     mh_send {},
     mh_recv_rdma {},
     mh_send_rdma {},
-    initComms(false),
-    mem_type(param.mem_type),
-    backup_h(nullptr),
-    backup_norm_h(nullptr),
-    backed_up(false)
+    mem_type(param.mem_type)
   {
     create(param);
   }
@@ -75,18 +67,14 @@ namespace quda {
     localVolumeCB(field.localVolumeCB),
     stride(field.stride),
     pad(field.pad),
-    total_bytes(0),
     nDim(field.nDim),
     location(field.location),
     precision(field.precision),
     ghost_precision(field.ghost_precision),
-    ghost_precision_reset(false),
     scale(field.scale),
     siteSubset(field.siteSubset),
     ghostExchange(field.ghostExchange),
     nDimComms(field.nDimComms),
-    ghost_bytes(0),
-    ghost_bytes_old(0),
     ghost_face_bytes {},
     ghost_face_bytes_aligned {},
     ghost_offset(),
@@ -106,11 +94,7 @@ namespace quda {
     mh_send {},
     mh_recv_rdma {},
     mh_send_rdma {},
-    initComms(false),
-    mem_type(field.mem_type),
-    backup_h(nullptr),
-    backup_norm_h(nullptr),
-    backed_up(false)
+    mem_type(field.mem_type)
   {
     LatticeFieldParam param;
     field.fill(param);
@@ -247,9 +231,7 @@ namespace quda {
     vol_string = std::exchange(src.vol_string, {});
     aux_string = std::exchange(src.aux_string, {});
     mem_type = std::exchange(src.mem_type, QUDA_MEMORY_INVALID);
-    backup_h = std::exchange(src.backup_h, nullptr);
-    backup_norm_h = std::exchange(src.backup_norm_h, nullptr);
-    backed_up = std::exchange(src.backed_up, false);
+    backup_h = std::exchange(src.backup_h, {});
   }
 
   void LatticeField::fill(LatticeFieldParam &param) const

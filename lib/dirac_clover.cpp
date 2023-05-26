@@ -105,7 +105,7 @@ namespace quda {
     DiracClover(param)
   {
     // For the preconditioned operator, we need to check that the inverse of the clover term is present
-    if (!clover->cloverInv && !clover::dynamic_inverse()) errorQuda("Clover inverse required for DiracCloverPC");
+    if (!clover->Inverse() && !clover::dynamic_inverse()) errorQuda("Clover inverse required for DiracCloverPC");
   }
 
   DiracCloverPC::DiracCloverPC(const DiracCloverPC &dirac) : DiracClover(dirac) { }

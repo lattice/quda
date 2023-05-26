@@ -23,15 +23,6 @@ namespace quda
     composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
     components(0)
   {
-    // this must come before create
-    if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
-      v = param.v;
-      norm_offset = param.norm_offset;
-      reference = true;
-    } else if (param.create == QUDA_GHOST_FIELD_CREATE) {
-      ghost_only = true;
-    }
-
     create(param);
 
     switch (param.create) {
@@ -157,21 +148,13 @@ namespace quda
       errorQuda("Subset not implemented");
 
     if (param.create != QUDA_REFERENCE_FIELD_CREATE && param.create != QUDA_GHOST_FIELD_CREATE) {
-      if (location == QUDA_CPU_FIELD_LOCATION) {
-        v = safe_malloc(bytes);
-      } else if (location == QUDA_CUDA_FIELD_LOCATION) {
-        switch (mem_type) {
-        case QUDA_MEMORY_DEVICE: v = pool_device_malloc(bytes); break;
-        case QUDA_MEMORY_MAPPED:
-          v_h = mapped_malloc(bytes);
-          v = get_mapped_device_pointer(v_h);
-          break;
-        default: errorQuda("Unsupported memory type %d", mem_type);
-        }
-      } else {
-        errorQuda("Unexpected field location %d", location);
-      }
+      v = std::move(quda_ptr(mem_type, bytes));
       alloc = true;
+    } else  if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
+      v = std::move(quda_ptr(param.v, mem_type));
+      reference = true;
+    } else if (param.create == QUDA_GHOST_FIELD_CREATE) {
+      ghost_only = true;
     }
 
     if (composite_descr.is_composite && param.create != QUDA_REFERENCE_FIELD_CREATE
@@ -186,7 +169,7 @@ namespace quda
       components.reserve(composite_descr.dim);
       for (int cid = 0; cid < composite_descr.dim; cid++) {
         param.component_id = cid;
-        param.v = static_cast<void *>(static_cast<char *>(v) + cid * bytes / composite_descr.dim);
+        param.v = static_cast<void *>(static_cast<char *>(v.data()) + cid * bytes / composite_descr.dim);
         components.push_back(new ColorSpinorField(param));
       }
     }
@@ -203,7 +186,7 @@ namespace quda
       param.is_component = composite_descr.is_component;
       param.component_id = composite_descr.id;
       even = new ColorSpinorField(param);
-      param.v = static_cast<char *>(v) + bytes / 2;
+      param.v = static_cast<char *>(v.data()) + bytes / 2;
       odd = new ColorSpinorField(param);
     }
 
@@ -231,10 +214,10 @@ namespace quda
       size_t subset_bytes_raw = bytes_raw / siteSubset;
       for (int subset = 0; subset < siteSubset; subset++) {
         if (location == QUDA_CUDA_FIELD_LOCATION)
-          qudaMemsetAsync(static_cast<char *>(v) + subset_bytes_raw + subset_bytes * subset, 0,
+          qudaMemsetAsync(static_cast<char *>(v.data()) + subset_bytes_raw + subset_bytes * subset, 0,
                           subset_bytes - subset_bytes_raw, device::get_default_stream());
         else
-          memset(static_cast<char *>(v) + subset_bytes_raw + subset_bytes * subset, 0, subset_bytes - subset_bytes_raw);
+          memset(static_cast<char *>(v.data()) + subset_bytes_raw + subset_bytes * subset, 0, subset_bytes - subset_bytes_raw);
       }
     }
   }
@@ -252,8 +235,7 @@ namespace quda
     pc_type = std::exchange(src.pc_type, QUDA_PC_INVALID);
     suggested_parity = std::exchange(src.suggested_parity, QUDA_INVALID_PARITY);
     length = std::exchange(src.length, 0);
-    v = std::exchange(src.v, nullptr);
-    v_h = std::exchange(src.v_h, nullptr);
+    v = std::exchange(src.v, {});
     norm_offset = std::exchange(src.norm_offset, 0);
     ghost = std::exchange(src.ghost, {});
     ghostFace = std::exchange(src.ghostFace, {});
@@ -274,18 +256,7 @@ namespace quda
   void ColorSpinorField::destroy()
   {
     if (alloc) {
-      if (location == QUDA_CPU_FIELD_LOCATION) {
-        host_free(v);
-      } else { // device field
-        switch (mem_type) {
-        case QUDA_MEMORY_DEVICE: pool_device_free(v); break;
-        case QUDA_MEMORY_MAPPED: host_free(v_h); break;
-        default: errorQuda("Unsupported memory type %d", mem_type);
-        }
-      }
       alloc = false;
-      v = nullptr;
-      v_h = nullptr;
 
       if (composite_descr.is_composite) {
         CompositeColorSpinorField::iterator vec;
@@ -432,11 +403,7 @@ namespace quda
 
   void ColorSpinorField::zero()
   {
-    if (Location() == QUDA_CUDA_FIELD_LOCATION) {
-      qudaMemsetAsync(v, 0, bytes, device::get_default_stream());
-    } else {
-      memset(v, '\0', bytes);
-    }
+    qudaMemsetAsync(v, 0, bytes, device::get_default_stream());
   }
 
   void ColorSpinorField::copy(const ColorSpinorField &src)
@@ -459,7 +426,7 @@ namespace quda
         void *buffer = pool_pinned_malloc(bytes);
         memset(buffer, 0, bytes); // FIXME (temporary?) bug fix for padding
         copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, 0);
-        qudaMemcpy(v, buffer, bytes, qudaMemcpyDefault);
+        qudaMemcpy(v.data(), buffer, bytes, qudaMemcpyDefault);
         pool_pinned_free(buffer);
 
       } else { // reorder on device
@@ -467,7 +434,7 @@ namespace quda
         if (src.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
           // special case where we use mapped memory to read/write directly from application's array
           void *src_d = get_mapped_device_pointer(src.V());
-          copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, v, src_d);
+          copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, v.data(), src_d);
         } else {
           void *Src = nullptr, *buffer = nullptr;
           if (!zeroCopy) {
@@ -494,7 +461,7 @@ namespace quda
 
       if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // reorder on the host
         void *buffer = pool_pinned_malloc(bytes);
-        qudaMemcpy(buffer, v, bytes, qudaMemcpyDefault);
+        qudaMemcpy(buffer, v.data(), bytes, qudaMemcpyDefault);
         copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, 0, buffer);
         pool_pinned_free(buffer);
 
@@ -502,7 +469,7 @@ namespace quda
 
         if (FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
           // special case where we use zero-copy memory to read/write directly from application's array
-          void *dest_d = get_mapped_device_pointer(v);
+          void *dest_d = get_mapped_device_pointer(v.data());
           copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, dest_d, src.V());
         } else {
           void *dst = nullptr, *buffer = nullptr;
@@ -517,10 +484,10 @@ namespace quda
           copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, dst, 0);
 
           if (!zeroCopy) {
-            qudaMemcpy(v, dst, Bytes(), qudaMemcpyDefault);
+            qudaMemcpy(v.data(), dst, Bytes(), qudaMemcpyDefault);
           } else {
             qudaDeviceSynchronize();
-            memcpy(v, buffer, bytes);
+            memcpy(v.data(), buffer, bytes);
           }
 
           if (zeroCopy)
@@ -545,7 +512,7 @@ namespace quda
   {
     LatticeField::fill(param);
     param.field = const_cast<ColorSpinorField *>(this);
-    param.v = v;
+    param.v = v.data();
     param.nColor = nColor;
     param.nSpin = nSpin;
     param.nVec = nVec;
@@ -1516,49 +1483,29 @@ namespace quda
 
   void ColorSpinorField::backup() const
   {
-    if (backed_up) errorQuda("ColorSpinorField already backed up");
-
-    backup_h = new char[bytes];
-    if (Location() == QUDA_CUDA_FIELD_LOCATION) {
-      qudaMemcpy(backup_h, v, bytes, qudaMemcpyDefault);
-    } else {
-      memcpy(backup_h, v, bytes);
-    }
-
-    backed_up = true;
+    if (backup_h.size()) errorQuda("ColorSpinorField already backed up");
+    backup_h.resize(1);
+    backup_h[0] = std::move(quda_ptr(QUDA_MEMORY_HOST, bytes));
+    qudaMemcpy(backup_h[0], v, bytes, qudaMemcpyDefault);
   }
 
   void ColorSpinorField::restore() const
   {
-    if (!backed_up) errorQuda("Cannot restore since not backed up");
-
-    if (Location() == QUDA_CUDA_FIELD_LOCATION) {
-      qudaMemcpy(v, backup_h, bytes, qudaMemcpyDefault);
-      delete[] backup_h;
-    } else {
-      memcpy(v, backup_h, bytes);
-      delete[] backup_h;
-    }
-
-    backed_up = false;
+    if (!backup_h.size()) errorQuda("Cannot restore since not backed up");
+    qudaMemcpy(v, backup_h[0], bytes, qudaMemcpyDefault);
+    backup_h.resize(0);
   }
 
   void ColorSpinorField::copy_to_buffer(void *buffer) const
   {
-    if (Location() == QUDA_CUDA_FIELD_LOCATION) {
-      qudaMemcpy(buffer, v, bytes, qudaMemcpyDeviceToHost);
-    } else {
-      std::memcpy(buffer, v, bytes);
-    }
+    quda_ptr buf(buffer, QUDA_MEMORY_HOST);
+    qudaMemcpy(buf, v, bytes, qudaMemcpyDefault);
   }
 
   void ColorSpinorField::copy_from_buffer(void *buffer)
   {
-    if (Location() == QUDA_CUDA_FIELD_LOCATION) {
-      qudaMemcpy(v, buffer, bytes, qudaMemcpyHostToDevice);
-    } else {
-      std::memcpy(v, buffer, bytes);
-    }
+    quda_ptr buf(buffer, QUDA_MEMORY_HOST);
+    qudaMemcpy(v, buf, bytes, qudaMemcpyDefault);
   }
 
   void ColorSpinorField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
@@ -1566,7 +1513,7 @@ namespace quda
     if (Location() == QUDA_CUDA_FIELD_LOCATION) {
       // conditionals based on destructor
       if (is_prefetch_enabled() && alloc && mem_type == QUDA_MEMORY_DEVICE)
-        qudaMemPrefetchAsync(v, bytes, mem_space, stream);
+        qudaMemPrefetchAsync(v.data(), bytes, mem_space, stream);
     }
   }
 
@@ -1607,7 +1554,7 @@ namespace quda
   std::ostream &operator<<(std::ostream &out, const ColorSpinorField &a)
   {
     out << "location = " << a.Location() << std::endl;
-    out << "v = " << a.v << std::endl;
+    out << "v = " << a.v.data() << std::endl;
     out << "alloc = " << a.alloc << std::endl;
     out << "reference = " << a.reference << std::endl;
     out << "init = " << a.init << std::endl;
