@@ -44,6 +44,16 @@ namespace quda
                    const char *line);
 
   /**
+     @brief Wrapper around cudaMemcpy or driver API equivalent
+     @param[out] dst Destination pointer
+     @param[in] src Source pointer
+     @param[in] count Size of transfer
+     @param[in] kind Type of memory copy
+  */
+  void qudaMemcpy_(const quda_ptr &dst, const quda_ptr &src, size_t count, qudaMemcpyKind kind, const char *func, const char *file,
+                   const char *line);
+
+  /**
      @brief Wrapper around cudaMemcpyAsync or driver API equivalent
      @param[out] dst Destination pointer
      @param[in] src Source pointer
@@ -99,6 +109,16 @@ namespace quda
      @param[in] stream Stream to issue memset
    */
   void qudaMemsetAsync_(void *ptr, int value, size_t count, const qudaStream_t &stream, const char *func,
+                        const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaMemsetAsync or driver API equivalent
+     @param[out] ptr Starting address pointer
+     @param[in] value Value to set for each byte of specified memory
+     @param[in] count Size in bytes to set
+     @param[in] stream Stream to issue memset
+   */
+  void qudaMemsetAsync_(quda_ptr &ptr, int value, size_t count, const qudaStream_t &stream, const char *func,
                         const char *file, const char *line);
 
   /**
