@@ -5,6 +5,8 @@
 #include <array.h>
 #include <trove/ptr.h>
 #include <mma_tensor_op/mma_instruction.cuh>
+#include <tune_key.h>
+#include <uint_to_char.h>
 
 // Here we implement the architecture dependent part of MMA for Volta (sm70, the mma.sync.m8n8k4 instruction).
 
@@ -54,7 +56,13 @@ namespace quda
 
       static std::string get_type_name()
       {
-        return ",1xfp16,m" + std::to_string(MMA_M) + "n" + std::to_string(MMA_N) + "k" + std::to_string(MMA_K);
+        char s[TuneKey::aux_n] = ",1xfp16,m";
+        i32toa(s + strlen(s), MMA_M);
+        strcat(s, "n");
+        i32toa(s + strlen(s), MMA_N);
+        strcat(s, "k");
+        i32toa(s + strlen(s), MMA_K);
+        return s;
       }
 
       struct OperandA {

@@ -31,7 +31,13 @@ namespace quda
 
       static std::string get_type_name()
       {
-        return ",1xfp16,m" + std::to_string(MMA_M) + "n" + std::to_string(MMA_N) + "k" + std::to_string(MMA_K);
+        char s[TuneKey::aux_n] = ",1xfp16,m";
+        i32toa(s + strlen(s), MMA_M);
+        strcat(s, "n");
+        i32toa(s + strlen(s), MMA_N);
+        strcat(s, "k");
+        i32toa(s + strlen(s), MMA_K);
+        return s;
       }
 
       struct OperandA {

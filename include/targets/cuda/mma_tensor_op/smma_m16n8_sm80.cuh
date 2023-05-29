@@ -1,6 +1,8 @@
 #pragma once
 
 #include <mma_tensor_op/mma_instruction.cuh>
+#include <tune_key.h>
+#include <uint_to_char.h>
 
 namespace quda
 {
@@ -106,15 +108,22 @@ namespace quda
 
       static std::string get_type_name()
       {
+        char s[TuneKey::aux_n];
         if constexpr (std::is_same_v<shuffle_t, tfloat32>) {
-          return ",3xtfloat32,m" + std::to_string(MMA_M) + "n" + std::to_string(MMA_N) + "k" + std::to_string(MMA_K);
+          strcpy(s, ",3xtfloat32,m");
         } else if constexpr (std::is_same_v<shuffle_t, bfloat16>) {
-          return ",3xbfloat16,m" + std::to_string(MMA_M) + "n" + std::to_string(MMA_N) + "k" + std::to_string(MMA_K);
+          strcpy(s, ",3xbfloat16,m");
         } else if constexpr (std::is_same_v<shuffle_t, half>) {
-          return ",3xfp16,m" + std::to_string(MMA_M) + "n" + std::to_string(MMA_N) + "k" + std::to_string(MMA_K);
+          strcpy(s, ",3xfp16,m");
         } else {
-          return "unknown_mma_type,";
+          strcpy(s, "unknown_mma_type,m");
         }
+        i32toa(s + strlen(s), MMA_M);
+        strcat(s, "n");
+        i32toa(s + strlen(s), MMA_N);
+        strcat(s, "k");
+        i32toa(s + strlen(s), MMA_K);
+        return s;
       }
 
       static constexpr int warp_size = 32;

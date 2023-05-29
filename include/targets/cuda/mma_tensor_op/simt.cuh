@@ -1,5 +1,8 @@
 #pragma once
 
+#include <tune_key.h>
+#include <uint_to_char.h>
+
 namespace quda
 {
 
@@ -35,7 +38,13 @@ namespace quda
 
       static std::string get_type_name()
       {
-        return ",simt,m" + std::to_string(MMA_M) + "n" + std::to_string(MMA_N) + "k" + std::to_string(MMA_K);
+        char s[TuneKey::aux_n] = ",simt,m";
+        i32toa(s + strlen(s), MMA_M);
+        strcat(s, "n");
+        i32toa(s + strlen(s), MMA_N);
+        strcat(s, "k");
+        i32toa(s + strlen(s), MMA_K);
+        return s;
       }
 
       static __device__ __host__ constexpr int inline pad_size(int) { return 0; }
