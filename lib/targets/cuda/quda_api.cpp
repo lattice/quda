@@ -407,29 +407,15 @@ namespace quda
     }
   }
 
-  void qudaMemset2D_(void *ptr, size_t pitch, int value, size_t width, size_t height, const char *func,
-                     const char *file, const char *line)
-  {
-    cudaError_t error = cudaMemset2D(ptr, pitch, value, width, height);
-    set_runtime_error(error, __func__, func, file, line);
-  }
-
-  void qudaMemset2D_(quda_ptr &ptr, size_t offset, size_t pitch, int value, size_t width, size_t height, const char *func,
-                     const char *file, const char *line)
+  void qudaMemset2DAsync_(quda_ptr &ptr, size_t offset, size_t pitch, int value, size_t width, size_t height,
+                          const qudaStream_t &stream, const char *func, const char *file, const char *line)
   {
     if (ptr.is_device()) {
-      cudaError_t error = cudaMemset2D(static_cast<char*>(ptr.data()) + offset, pitch, value, width, height);
+      cudaError_t error = cudaMemset2DAsync(static_cast<char*>(ptr.data()) + offset, pitch, value, width, height, get_stream(stream));
       set_runtime_error(error, __func__, func, file, line);
     } else {
       for (auto i = 0u; i < height; i++) memset(static_cast<char*>(ptr.data()) + offset + i * pitch, value, width);
     }
-  }
-
-  void qudaMemset2DAsync_(void *ptr, size_t pitch, int value, size_t width, size_t height, const qudaStream_t &stream,
-                          const char *func, const char *file, const char *line)
-  {
-    cudaError_t error = cudaMemset2DAsync(ptr, pitch, value, width, height, get_stream(stream));
-    set_runtime_error(error, __func__, func, file, line);
   }
 
   void qudaMemPrefetchAsync_(void *ptr, size_t count, QudaFieldLocation mem_space, const qudaStream_t &stream,

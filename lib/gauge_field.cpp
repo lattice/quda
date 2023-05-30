@@ -309,7 +309,7 @@ namespace quda {
     size_t pitch = stride * order * precision;
     if (pad_bytes) {
       for (int parity = 0; parity < 2; parity++) {
-        qudaMemset2D(gauge, parity * (bytes / 2) + volumeCB * order * precision, pitch, 0, pad_bytes, Npad);
+        qudaMemset2DAsync(gauge, parity * (bytes / 2) + volumeCB * order * precision, pitch, 0, pad_bytes, Npad, device::get_default_stream());
       }
     }
   }
@@ -863,15 +863,6 @@ namespace quda {
       comm_wait(mh_recv[i]);
     }
 
-    if (Location() == QUDA_CUDA_FIELD_LOCATION) {
-      for (int i=0; i<nDimComms; i++) {
-	if (!comm_dim_partitioned(i)) continue;
-        qudaMemcpy(ghost_link[i], receive[i], bytes[i], qudaMemcpyHostToDevice);
-        pool_pinned_free(send[i]);
-	pool_pinned_free(receive[i]);
-      }
-    }
-
     for (int i=0; i<nDimComms; i++) {
       if (!comm_dim_partitioned(i)) continue;
       comm_free(mh_send[i]);
@@ -1178,26 +1169,24 @@ namespace quda {
   }
 
   // Return the L2 norm squared of the gauge field
-  double norm2(const GaugeField &a) {
-    ColorSpinorField *b = ColorSpinorField::Create(colorSpinorParam(a));
-    double nrm2 = blas::norm2(*b);
-    delete b;
-    return nrm2;
+  double norm2(const GaugeField &a)
+  {
+    ColorSpinorField b(colorSpinorParam(a));
+    return blas::norm2(b);
   }
 
   // Return the L1 norm of the gauge field
-  double norm1(const GaugeField &a) {
-    ColorSpinorField *b = ColorSpinorField::Create(colorSpinorParam(a));
-    double nrm1 = blas::norm1(*b);
-    delete b;
-    return nrm1;
+  double norm1(const GaugeField &a)
+  {
+    ColorSpinorField b(colorSpinorParam(a));
+    return blas::norm1(b);
   }
 
   // Scale the gauge field by the constant a
-  void ax(const double &a, GaugeField &u) {
-    ColorSpinorField *b = ColorSpinorField::Create(colorSpinorParam(u));
-    blas::ax(a, *b);
-    delete b;
+  void ax(const double &a, GaugeField &u)
+  {
+    ColorSpinorField b(colorSpinorParam(u));
+    blas::ax(a, b);
   }
 
   uint64_t GaugeField::checksum(bool mini) const {

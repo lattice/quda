@@ -186,7 +186,7 @@ namespace quda
       param.is_component = composite_descr.is_component;
       param.component_id = composite_descr.id;
       even = new ColorSpinorField(param);
-      param.v = static_cast<char *>(v.data()) + bytes / 2;
+      param.v = !ghost_only ? static_cast<char *>(v.data()) + bytes / 2 : nullptr;
       odd = new ColorSpinorField(param);
     }
 
@@ -208,17 +208,12 @@ namespace quda
 
   void ColorSpinorField::zeroPad()
   {
+    if (!isNative()) return;
     // zero the region added for alignment reasons
     if (bytes != bytes_raw) {
       size_t subset_bytes = bytes / siteSubset;
       size_t subset_bytes_raw = bytes_raw / siteSubset;
-      for (int subset = 0; subset < siteSubset; subset++) {
-        if (location == QUDA_CUDA_FIELD_LOCATION)
-          qudaMemsetAsync(static_cast<char *>(v.data()) + subset_bytes_raw + subset_bytes * subset, 0,
-                          subset_bytes - subset_bytes_raw, device::get_default_stream());
-        else
-          memset(static_cast<char *>(v.data()) + subset_bytes_raw + subset_bytes * subset, 0, subset_bytes - subset_bytes_raw);
-      }
+      qudaMemset2DAsync(v, subset_bytes_raw, subset_bytes, 0, subset_bytes - subset_bytes_raw, siteSubset, device::get_default_stream());
     }
   }
 
@@ -512,7 +507,7 @@ namespace quda
   {
     LatticeField::fill(param);
     param.field = const_cast<ColorSpinorField *>(this);
-    param.v = v.data();
+    param.v = !ghost_only ? v.data() : nullptr;
     param.nColor = nColor;
     param.nSpin = nSpin;
     param.nVec = nVec;

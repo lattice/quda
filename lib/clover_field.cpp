@@ -337,19 +337,17 @@ namespace quda {
   }
 
   // Return the L2 norm squared of the clover field
-  double norm2(const CloverField &a, bool inverse) {
-    ColorSpinorField *b = ColorSpinorField::Create(colorSpinorParam(a, inverse));
-    double nrm2 = blas::norm2(*b);
-    delete b;
-    return nrm2;
+  double norm2(const CloverField &a, bool inverse)
+  {
+    ColorSpinorField b(colorSpinorParam(a, inverse));
+    return blas::norm2(b);
   }
 
   // Return the L1 norm of the clover field
-  double norm1(const CloverField &a, bool inverse) {
-    ColorSpinorField *b = ColorSpinorField::Create(colorSpinorParam(a, inverse));
-    double nrm1 = blas::norm1(*b);
-    delete b;
-    return nrm1;
+  double norm1(const CloverField &a, bool inverse)
+  {
+    ColorSpinorField b(colorSpinorParam(a, inverse));
+    return blas::norm1(b);
   }
 
 } // namespace quda
