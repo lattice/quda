@@ -227,8 +227,14 @@ namespace quda {
     // Detect whether this is a pure double solve or not; informs the necessity of some stability checks
     bool is_pure_double = (param.precision == QUDA_DOUBLE_PRECISION && param.precision_sloppy == QUDA_DOUBLE_PRECISION);
 
+    // Determine whether or not we're doing a heavy quark residual
+    const bool use_heavy_quark_res =
+      (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+    bool heavy_quark_restart = false;
+
     // whether to select alternative reliable updates
-    bool alternative_reliable = param.use_alternative_reliable;
+    // if we're computing the heavy quark residual, force "traditional" reliable updates
+    bool alternative_reliable = use_heavy_quark_res ? param.use_alternative_reliable : false;
     /**
       When CG is used as a preconditioner, and we disable the `advanced features`, these features are turned off:
       - Reliable updates
@@ -355,10 +361,6 @@ namespace quda {
       beta = r2 / r2_old;
       blas::xpayz(rSloppy, beta, x_update_batch.get_current_field(), x_update_batch.get_current_field());
     }
-
-    const bool use_heavy_quark_res =
-      (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
-    bool heavy_quark_restart = false;
 
     if (!param.is_preconditioner) {
       profile.TPSTOP(QUDA_PROFILE_INIT);
