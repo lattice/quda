@@ -73,10 +73,10 @@ namespace quda {
           Spinor B_shift = arg.inB(nbr_idx, 0);
           Spinor D_shift = arg.inD(nbr_idx, 0);
 
-          B_shift = (B_shift.project(dim,1)).reconstruct(dim,1);
+          B_shift = (B_shift.project(dim,-1)).reconstruct(dim,-1);
           Link result = outerProdSpinTrace(B_shift,A);
 
-          D_shift = (D_shift.project(dim,-1)).reconstruct(dim,-1);
+          D_shift = (D_shift.project(dim,1)).reconstruct(dim,1);
           result += outerProdSpinTrace(D_shift,C);
 
           Link temp = arg.force(dim, x_cb, arg.parity);
