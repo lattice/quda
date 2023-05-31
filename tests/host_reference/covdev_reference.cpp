@@ -82,32 +82,31 @@ void covdev_dslash(void *res, void **link, void *spinorField, int oddBit, int da
   }
 }
 
-template <typename sFloat, typename gFloat> void Mat(sFloat *out, gFloat **link, sFloat *in, int daggerBit, int mu)
+template <typename sFloat, typename gFloat>
+void Mat(ColorSpinorField &out, const GaugeField &link, const ColorSpinorField &in, int daggerBit, int mu)
 {
-  sFloat *inEven = in;
-  sFloat *inOdd = in + Vh * spinor_site_size;
-  sFloat *outEven = out;
-  sFloat *outOdd = out + Vh * spinor_site_size;
-
   // full dslash operator
-  covdevReference(outOdd, link, inEven, 1, daggerBit, mu);
-  covdevReference(outEven, link, inOdd, 0, daggerBit, mu);
+  void *data[4] = {link.data(0), link.data(1), link.data(2), link.data(3)};
+  covdevReference(reinterpret_cast<sFloat *>(out.Odd().V()), reinterpret_cast<gFloat **>(data),
+                  reinterpret_cast<sFloat *>(in.Even().V()), 1, daggerBit, mu);
+  covdevReference(reinterpret_cast<sFloat *>(out.Even().V()), reinterpret_cast<gFloat **>(data),
+                  reinterpret_cast<sFloat *>(in.Odd().V()), 0, daggerBit, mu);
 }
 
-void mat(void *out, void **link, void *in, int dagger_bit, int mu, QudaPrecision sPrecision, QudaPrecision gPrecision)
+void mat(ColorSpinorField &out, const GaugeField &link, const ColorSpinorField &in, int dagger_bit, int mu)
 {
 
-  if (sPrecision == QUDA_DOUBLE_PRECISION) {
-    if (gPrecision == QUDA_DOUBLE_PRECISION) {
-      Mat((double *)out, (double **)link, (double *)in, dagger_bit, mu);
+  if (checkPrecision(in, out) == QUDA_DOUBLE_PRECISION) {
+    if (link.Precision() == QUDA_DOUBLE_PRECISION) {
+      Mat<double, double>(out, link, in, dagger_bit, mu);
     } else {
-      Mat((double *)out, (float **)link, (double *)in, dagger_bit, mu);
+      Mat<double, float>(out, link, in, dagger_bit, mu);
     }
   } else {
-    if (gPrecision == QUDA_DOUBLE_PRECISION) {
-      Mat((float *)out, (double **)link, (float *)in, dagger_bit, mu);
+    if (link.Precision() == QUDA_DOUBLE_PRECISION) {
+      Mat<float, double>(out, link, in, dagger_bit, mu);
     } else {
-      Mat((float *)out, (float **)link, (float *)in, dagger_bit, mu);
+      Mat<float, float>(out, link, in, dagger_bit, mu);
     }
   }
 }
@@ -252,17 +251,16 @@ void Mat_mg4dir(ColorSpinorField &out, const GaugeField &link, const ColorSpinor
   }
 }
 
-void mat_mg4dir(ColorSpinorField &out, const GaugeField &link, const ColorSpinorField &in, int dagger_bit,
-                int mu, QudaPrecision sPrecision, QudaPrecision gPrecision)
+void mat_mg4dir(ColorSpinorField &out, const GaugeField &link, const ColorSpinorField &in, int dagger_bit, int mu)
 {
-  if (sPrecision == QUDA_DOUBLE_PRECISION) {
-    if (gPrecision == QUDA_DOUBLE_PRECISION) {
+  if (checkPrecision(in, out) == QUDA_DOUBLE_PRECISION) {
+    if (link.Precision() == QUDA_DOUBLE_PRECISION) {
       Mat_mg4dir<double, double>(out, link, in, dagger_bit, mu);
     } else {
       Mat_mg4dir<double, float>(out, link, in, dagger_bit, mu);
     }
   } else {
-    if (gPrecision == QUDA_DOUBLE_PRECISION) {
+    if (link.Precision() == QUDA_DOUBLE_PRECISION) {
       Mat_mg4dir<float, double>(out, link, in, dagger_bit, mu);
     } else {
       Mat_mg4dir<float, float>(out, link, in, dagger_bit, mu);
