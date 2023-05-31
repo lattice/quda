@@ -1542,8 +1542,6 @@ public:
     bool apply_mat; //! Whether to compute q = Ap or assume it is provided
     bool hermitian; //! Whether A is hermitian or not
 
-    TimeProfile &profile;
-
     /**
        @brief Solve the equation A p_k psi_k = q_k psi_k = b by minimizing the
        residual and using Eigen's SVD algorithm for numerical stability
@@ -1562,7 +1560,7 @@ public:
        @param apply_mat Whether to apply the operator in place or assume q already contains this
        @profile Timing profile to use
     */
-    MinResExt(const DiracMatrix &mat, bool orthogonal, bool apply_mat, bool hermitian, TimeProfile &profile = dummy);
+    MinResExt(const DiracMatrix &mat, bool orthogonal, bool apply_mat, bool hermitian);
 
     /**
        @param x The optimum for the solution vector.

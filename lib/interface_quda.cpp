@@ -2898,7 +2898,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       bool orthogonal = true;
       bool apply_mat = false;
       bool hermitian = false;
-      MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
+      MinResExt mre(m, orthogonal, apply_mat, hermitian);
       mre(*out, *in, basis, Ap);
 
       profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
@@ -2933,7 +2933,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       bool orthogonal = true;
       bool apply_mat = false;
       bool hermitian = true;
-      MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
+      MinResExt mre(m, orthogonal, apply_mat, hermitian);
       mre(*out, *in, basis, Ap);
 
       profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
@@ -3712,7 +3712,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
           bool orthogonal = false;
           bool apply_mat = true;
           bool hermitian = true;
-	  MinResExt mre(*m, orthogonal, apply_mat, hermitian, profileMulti);
+	  MinResExt mre(*m, orthogonal, apply_mat, hermitian);
           mre(x[i], b, z, q);
         }
 
