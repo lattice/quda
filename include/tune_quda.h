@@ -17,7 +17,7 @@
 
 namespace quda {
 
-  class TuneParam {
+  struct TuneParam {
 
   public:
     dim3 block;
@@ -35,15 +35,9 @@ namespace quda {
     TuneParam(TuneParam &&) = default;
     TuneParam &operator=(const TuneParam &) = default;
     TuneParam &operator=(TuneParam &&) = default;
-
-    friend std::ostream& operator<<(std::ostream& output, const TuneParam& param) {
-      output << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-      output << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
-      output << "shared_bytes=" << param.shared_bytes;
-      output << ", aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
-      return output;
-    }
   };
+
+  std::ostream &operator<<(std::ostream &, const TuneParam &);
 
   /**
    * @brief Returns a reference to the tunecache map
@@ -68,20 +62,7 @@ namespace quda {
     virtual bool tuneGridDim() const { return true; }
     virtual bool tuneAuxDim() const { return false; }
 
-    virtual bool tuneSharedBytes() const
-    {
-      static bool tune_shared = true;
-      static bool init = false;
-
-      if (!init) {
-        char *enable_shared_env = getenv("QUDA_ENABLE_TUNING_SHARED");
-        if (enable_shared_env) {
-          if (strcmp(enable_shared_env, "0") == 0) { tune_shared = false; }
-        }
-        init = true;
-      }
-      return tune_shared;
-    }
+    virtual bool tuneSharedBytes() const;
 
     virtual bool advanceGridDim(TuneParam &param) const
     {
@@ -239,16 +220,7 @@ namespace quda {
        @brief Whether the present instance has already been tuned or not
        @return True if tuned, false if not
     */
-    bool tuned()
-    {
-      // not tuning is equivalent to already tuned
-      if (!getTuning()) return true;
-
-      TuneKey key = tuneKey();
-      if (use_managed_memory()) strcat(key.aux, ",managed");
-      // if key is present in cache then already tuned
-      return getTuneCache().find(key) != getTuneCache().end();
-    }
+    bool tuned() const;
 
   public:
     Tunable() : launch_error(QUDA_SUCCESS) { aux[0] = '\0'; }
@@ -287,24 +259,9 @@ namespace quda {
      */
     virtual float min_tune_time() const { return 1e-3; }
 
-    virtual std::string paramString(const TuneParam &param) const
-    {
-      std::stringstream ps;
-      ps << param;
-      return ps.str();
-    }
-
-    virtual std::string perfString(float time) const
-    {
-      float gflops = flops() / (1e9 * time);
-      float gbytes = bytes() / (1e9 * time);
-      std::stringstream ss;
-      ss << std::setiosflags(std::ios::fixed) << std::setprecision(2) << gflops << " Gflop/s, ";
-      ss << gbytes << " GB/s";
-      return ss.str();
-    }
-
-    virtual std::string miscString(const TuneParam &) const { return std::string(); }
+    virtual std::string paramString(const TuneParam &param) const;
+    virtual std::string perfString(float time) const;
+    virtual std::string miscString(const TuneParam &) const;
 
     virtual void initTuneParam(TuneParam &param) const
     {

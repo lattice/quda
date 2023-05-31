@@ -2,10 +2,6 @@
 
 #include <sys/time.h>
 
-#ifdef INTERFACE_NVTX
-#include "nvtx3/nvToolsExt.h"
-#endif
-
 #include <quda_internal.h>
 #include <util_quda.h>
 #include <device.h>
@@ -191,70 +187,25 @@ namespace quda {
     QUDA_PROFILE_COUNT  /**< The total number of timers we have.  Must be last enum type. */
   };
 
-#ifdef INTERFACE_NVTX
-
-#define PUSH_RANGE(name,cid) { \
-    int color_id = cid; \
-    color_id = color_id%nvtx_num_colors;\
-    nvtxEventAttributes_t eventAttrib = {}; \
-    eventAttrib.version = NVTX_VERSION; \
-    eventAttrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE; \
-    eventAttrib.colorType = NVTX_COLOR_ARGB; \
-    eventAttrib.color = nvtx_colors[color_id]; \
-    eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII; \
-    eventAttrib.message.ascii = name; \
-    eventAttrib.category = cid;\
-    nvtxRangePushEx(&eventAttrib); \
-}
-#define POP_RANGE nvtxRangePop();
-#else
-#define PUSH_RANGE(name,cid)
-#define POP_RANGE
-#endif
-
   class TimeProfile {
     std::string fname;  /**< Which function are we profiling */
 #ifdef INTERFACE_NVTX
     static const uint32_t nvtx_colors[];// = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
     static const int nvtx_num_colors;// = sizeof(nvtx_colors)/sizeof(uint32_t);
 #endif
-    host_timer_t profile[QUDA_PROFILE_COUNT];
+    array<host_timer_t, QUDA_PROFILE_COUNT> profile;
     static std::string pname[];
 
     bool switchOff;
     bool use_global;
 
-    // global timer
-    static host_timer_t global_profile[QUDA_PROFILE_COUNT];
-    static bool global_switchOff[QUDA_PROFILE_COUNT];
-    static int global_total_level[QUDA_PROFILE_COUNT]; // zero initialize
-
-    static void StopGlobal(const char *func, const char *file, int line, QudaProfileType idx) {
-
-      global_total_level[idx]--;
-      if (global_total_level[idx] == 0) global_profile[idx].stop(func, file, line);
-
-      // switch off total timer if we need to
-      if (global_switchOff[idx]) {
-        global_total_level[idx]--;
-        if (global_total_level[idx] == 0) global_profile[idx].stop(func, file, line);
-        global_switchOff[idx] = false;
-      }
-    }
-
-    static void StartGlobal(const char *func, const char *file, int line, QudaProfileType idx) {
-      // if total timer isn't running, then start it running
-      if (!global_profile[idx].running) {
-        global_profile[idx].start(func, file, line);
-        global_total_level[idx]++;
-        global_switchOff[idx] = true;
-      }
-
-      if (global_total_level[idx] == 0) global_profile[idx].start(func, file, line);
-      global_total_level[idx]++;
-    }
+    static void StopGlobal(const char *func, const char *file, int line, QudaProfileType idx);
+    static void StartGlobal(const char *func, const char *file, int line, QudaProfileType idx);
 
   public:
+    TimeProfile() = default;
+    TimeProfile(const TimeProfile &) = default;
+
     TimeProfile(std::string fname) : fname(fname), switchOff(false), use_global(true) { ; }
 
     TimeProfile(std::string fname, bool use_global) : fname(fname), switchOff(false), use_global(use_global) { ; }
@@ -262,32 +213,8 @@ namespace quda {
     /**< Print out the profile information */
     void Print();
 
-    void Start_(const char *func, const char *file, int line, QudaProfileType idx)
-    {
-      // if total timer isn't running, then start it running
-      if (!profile[QUDA_PROFILE_TOTAL].running && idx != QUDA_PROFILE_TOTAL) {
-        profile[QUDA_PROFILE_TOTAL].start(func, file, line);
-        switchOff = true;
-      }
-
-      profile[idx].start(func, file, line);
-      PUSH_RANGE(fname.c_str(),idx)
-	if (use_global) StartGlobal(func,file,line,idx);
-    }
-
-    void Stop_(const char *func, const char *file, int line, QudaProfileType idx) {
-      if (idx == QUDA_PROFILE_COMPUTE || idx == QUDA_PROFILE_H2D || idx == QUDA_PROFILE_D2H)
-        qudaDeviceSynchronize(); // ensure accurate profiling
-      profile[idx].stop(func, file, line);
-      POP_RANGE
-
-      // switch off total timer if we need to
-      if (switchOff && idx != QUDA_PROFILE_TOTAL) {
-        profile[QUDA_PROFILE_TOTAL].stop(func, file, line);
-        switchOff = false;
-      }
-      if (use_global) StopGlobal(func,file,line,idx);
-    }
+    void Start_(const char *func, const char *file, int line, QudaProfileType idx);
+    void Stop_(const char *func, const char *file, int line, QudaProfileType idx);
 
     void Reset_(const char *func, const char *file, int line) {
       for (int idx = 0; idx < QUDA_PROFILE_COUNT; idx++) profile[idx].reset(func, file, line);
@@ -301,8 +228,6 @@ namespace quda {
 
   };
 
-  static TimeProfile dummy("dummy");
-
   void pushProfile(TimeProfile &profile);
 
   void popProfile();
@@ -310,9 +235,6 @@ namespace quda {
   TimeProfile& getProfile();
 
 } // namespace quda
-
-#undef PUSH_RANGE
-#undef POP_RANGE
 
 #define TPSTART(idx) Start_(__func__, __FILE__, __LINE__, idx)
 #define TPSTOP(idx) Stop_(__func__, __FILE__, __LINE__, idx)
