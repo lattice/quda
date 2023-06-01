@@ -111,7 +111,7 @@ namespace quda
       {}
 
       data_t(const ColorSpinorField &x) :
-        spinor(static_cast<store_t *>(const_cast<ColorSpinorField &>(x).V())),
+        spinor(x.data<store_t *>()),
         stride(x.VolumeCB()),
         cb_offset(x.Bytes() / (2 * sizeof(store_t) * N))
       {}
@@ -141,8 +141,8 @@ namespace quda
       {}
 
       data_t(const ColorSpinorField &x) :
-        spinor(static_cast<store_t *>(const_cast<ColorSpinorField &>(x).V())),
-        norm(static_cast<norm_t *>(const_cast<ColorSpinorField &>(x).Norm())),
+        spinor(x.data<store_t *>()),
+        norm(static_cast<norm_t *>(x.Norm())),
         stride(x.VolumeCB()),
         cb_offset(x.Bytes() / (2 * sizeof(store_t) * N)),
         cb_norm_offset(x.Bytes() / (2 * sizeof(norm_t)))

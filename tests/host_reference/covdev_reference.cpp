@@ -87,10 +87,10 @@ void Mat(ColorSpinorField &out, const GaugeField &link, const ColorSpinorField &
 {
   // full dslash operator
   void *data[4] = {link.data(0), link.data(1), link.data(2), link.data(3)};
-  covdevReference(reinterpret_cast<sFloat *>(out.Odd().V()), reinterpret_cast<gFloat **>(data),
-                  reinterpret_cast<sFloat *>(in.Even().V()), 1, daggerBit, mu);
-  covdevReference(reinterpret_cast<sFloat *>(out.Even().V()), reinterpret_cast<gFloat **>(data),
-                  reinterpret_cast<sFloat *>(in.Odd().V()), 0, daggerBit, mu);
+  covdevReference(reinterpret_cast<sFloat *>(out.Odd().data()), reinterpret_cast<gFloat **>(data),
+                  reinterpret_cast<sFloat *>(in.Even().data()), 1, daggerBit, mu);
+  covdevReference(reinterpret_cast<sFloat *>(out.Even().data()), reinterpret_cast<gFloat **>(data),
+                  reinterpret_cast<sFloat *>(in.Odd().data()), 0, daggerBit, mu);
 }
 
 void mat(ColorSpinorField &out, const GaugeField &link, const ColorSpinorField &in, int dagger_bit, int mu)
@@ -178,7 +178,7 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, cons
     int offset = spinor_site_size * sid;
 
     gFloat *lnk = gaugeLink_mg4dir(sid, mu, oddBit, linkEven, linkOdd, ghostLinkEven, ghostLinkOdd, 1, 1);
-    const sFloat *spinor = spinorNeighbor_mg4dir(sid, mu, oddBit, static_cast<const sFloat *>(in.V()), fwd_nbr_spinor,
+    const sFloat *spinor = spinorNeighbor_mg4dir(sid, mu, oddBit, static_cast<const sFloat *>(in.data()), fwd_nbr_spinor,
                                                  back_nbr_spinor, 1, 1);
 
     sFloat gaugedSpinor[spinor_site_size];
@@ -212,15 +212,15 @@ void covdev_dslash_mg4dir(ColorSpinorField &out, const GaugeField &link, const C
 
   if (sPrecision == QUDA_DOUBLE_PRECISION) {
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
-      covdevReference_mg4dir((double *)out.V(), reinterpret_cast<double**>(data), (double **)ghostLink, in, oddBit, daggerBit, mu);
+      covdevReference_mg4dir((double *)out.data(), reinterpret_cast<double**>(data), (double **)ghostLink, in, oddBit, daggerBit, mu);
     } else {
-      covdevReference_mg4dir((double *)out.V(), reinterpret_cast<float**>(data), (float **)ghostLink, in, oddBit, daggerBit, mu);
+      covdevReference_mg4dir((double *)out.data(), reinterpret_cast<float**>(data), (float **)ghostLink, in, oddBit, daggerBit, mu);
     }
   } else {
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
-      covdevReference_mg4dir((float *)out.V(), reinterpret_cast<double**>(data), (double **)ghostLink, in, oddBit, daggerBit, mu);
+      covdevReference_mg4dir((float *)out.data(), reinterpret_cast<double**>(data), (double **)ghostLink, in, oddBit, daggerBit, mu);
     } else {
-      covdevReference_mg4dir((float *)out.V(), reinterpret_cast<float**>(data), (float **)ghostLink, in, oddBit, daggerBit, mu);
+      covdevReference_mg4dir((float *)out.data(), reinterpret_cast<float**>(data), (float **)ghostLink, in, oddBit, daggerBit, mu);
     }
   }
 }
@@ -237,7 +237,7 @@ void Mat_mg4dir(ColorSpinorField &out, const GaugeField &link, const ColorSpinor
     auto &outOdd = out.Odd();
 
     inEven.exchangeGhost(QUDA_EVEN_PARITY, nFace, daggerBit);
-    covdevReference_mg4dir(reinterpret_cast<sFloat *>(outOdd.V()), reinterpret_cast<gFloat**>(data),
+    covdevReference_mg4dir(reinterpret_cast<sFloat *>(outOdd.data()), reinterpret_cast<gFloat**>(data),
                            reinterpret_cast<gFloat**>(ghostLink), in.Even(), 1, daggerBit, mu);
   }
 
@@ -246,7 +246,7 @@ void Mat_mg4dir(ColorSpinorField &out, const GaugeField &link, const ColorSpinor
     auto &outEven = out.Even();
 
     inOdd.exchangeGhost(QUDA_ODD_PARITY, nFace, daggerBit);
-    covdevReference_mg4dir(reinterpret_cast<sFloat *>(outEven.V()), reinterpret_cast<gFloat**>(data),
+    covdevReference_mg4dir(reinterpret_cast<sFloat *>(outEven.data()), reinterpret_cast<gFloat**>(data),
                            reinterpret_cast<gFloat**>(ghostLink), in.Odd(), 0, daggerBit, mu);
   }
 }

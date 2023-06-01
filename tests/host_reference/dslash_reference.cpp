@@ -766,10 +766,10 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
                     QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
 
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      xpay(out.V(), kappa, ref.V(), ref.Length(), gauge_param.cpu_prec);
-      ax(0.5 / kappa, ref.V(), ref.Length(), gauge_param.cpu_prec);
+      xpay(out.data(), kappa, ref.data(), ref.Length(), gauge_param.cpu_prec);
+      ax(0.5 / kappa, ref.data(), ref.Length(), gauge_param.cpu_prec);
     } else {
-      axpy(2 * mass, out.V(), ref.V(), ref.Length(), gauge_param.cpu_prec);
+      axpy(2 * mass, out.data(), ref.data(), ref.Length(), gauge_param.cpu_prec);
     }
     break;
 
@@ -791,9 +791,9 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
     len = Vh;
   }
 
-  mxpy(in.V(), ref.V(), len * stag_spinor_site_size, inv_param.cpu_prec);
-  double nrm2 = norm_2(ref.V(), len * stag_spinor_site_size, inv_param.cpu_prec);
-  double src2 = norm_2(in.V(), len * stag_spinor_site_size, inv_param.cpu_prec);
+  mxpy(in.data(), ref.data(), len * stag_spinor_site_size, inv_param.cpu_prec);
+  double nrm2 = norm_2(ref.data(), len * stag_spinor_site_size, inv_param.cpu_prec);
+  double src2 = norm_2(in.data(), len * stag_spinor_site_size, inv_param.cpu_prec);
   double hqr = sqrt(quda::blas::HeavyQuarkResidualNorm(out, ref).z);
   double l2r = sqrt(nrm2 / src2);
 

@@ -462,10 +462,10 @@ namespace quda
     /**
        @brief Return pointer to the field allocation
     */
-    void *V() const
+    template <typename T = void *> auto data() const
     {
       if (ghost_only) errorQuda("Not defined for ghost-only field");
-      return v.data();
+      return reinterpret_cast<T>(v.data());
     }
 
     /**

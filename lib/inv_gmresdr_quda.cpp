@@ -282,7 +282,7 @@ namespace quda {
         blas::zero(Vm->Component(i));
     }
 
-    if (Zm->V() != Vm->V()) {
+    if (Zm->data() != Vm->data()) {
       std::vector<ColorSpinorField *> z(Zm->Components());
       std::vector<ColorSpinorField *> vk(args.Vkp1->Components().begin(), args.Vkp1->Components().begin() + args.k);
 

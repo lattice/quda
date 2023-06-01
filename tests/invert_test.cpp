@@ -248,7 +248,7 @@ std::vector<double> solve(test_t param)
       // Allocate memory and set pointers
       for (int n = 0; n < Nsrc; n++) {
         out_multishift[n * multishift + i] = quda::ColorSpinorField(cs_param);
-        _hp_multi_x[n][i] = out_multishift[n * multishift + i].V();
+        _hp_multi_x[n][i] = out_multishift[n * multishift + i].data();
       }
     }
   }
@@ -273,9 +273,9 @@ std::vector<double> solve(test_t param)
       if (inv_deflate) eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
       // Perform QUDA inversions
       if (multishift > 1) {
-        invertMultiShiftQuda(_hp_multi_x[i].data(), in[i].V(), &inv_param);
+        invertMultiShiftQuda(_hp_multi_x[i].data(), in[i].data(), &inv_param);
       } else {
-        invertQuda(out[i].V(), in[i].V(), &inv_param);
+        invertQuda(out[i].data(), in[i].data(), &inv_param);
       }
 
       time[i] = inv_param.secs;
@@ -292,8 +292,8 @@ std::vector<double> solve(test_t param)
     std::vector<void *> _hp_x(Nsrc);
     std::vector<void *> _hp_b(Nsrc);
     for (int i = 0; i < Nsrc; i++) {
-      _hp_x[i] = out[i].V();
-      _hp_b[i] = in[i].V();
+      _hp_x[i] = out[i].data();
+      _hp_b[i] = in[i].data();
     }
     // Run split grid
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
@@ -326,7 +326,7 @@ std::vector<double> solve(test_t param)
   // Perform host side verification of inversion if requested
   if (verify_results) {
     for (int i = 0; i < Nsrc; i++) {
-      res[i] = verifyInversion(out[i].V(), _hp_multi_x[i].data(), in[i].V(), check.V(), gauge_param, inv_param,
+      res[i] = verifyInversion(out[i].data(), _hp_multi_x[i].data(), in[i].data(), check.data(), gauge_param, inv_param,
                                gauge.data(), clover.data(), clover_inv.data());
     }
   }

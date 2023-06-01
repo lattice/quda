@@ -22,7 +22,7 @@ namespace quda {
       Xinv(Xinv),
       dagger(dagger)
     {
-      if (out.V() == in.V()) errorQuda("Spinor fields cannot alias");
+      if (out.data() == in.data()) errorQuda("Spinor fields cannot alias");
       if (in.Nspin() != 1 || out.Nspin() != 1) errorQuda("Unsupported nSpin=%d %d", out.Nspin(), in.Nspin());
       if (Xinv.Geometry() != QUDA_KDINVERSE_GEOMETRY)
         errorQuda("Unsupported gauge geometry %d , expected %d for Xinv", Xinv.Geometry(), QUDA_KDINVERSE_GEOMETRY);

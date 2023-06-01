@@ -335,7 +335,7 @@ int main(int argc, char **argv)
     if (!use_split_grid) {
       for (int k = 0; k < Nsrc; k++) {
         if (inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-        invertQuda(out[k]->V(), in[k]->V(), &inv_param);
+        invertQuda(out[k]->data(), in[k]->data(), &inv_param);
         time[k] = inv_param.secs;
         gflops[k] = inv_param.gflops / inv_param.secs;
         iter[k] = inv_param.iter;
@@ -346,8 +346,8 @@ int main(int argc, char **argv)
       std::vector<void *> _hp_x(Nsrc);
       std::vector<void *> _hp_b(Nsrc);
       for (int k = 0; k < Nsrc; k++) {
-        _hp_x[k] = out[k]->V();
-        _hp_b[k] = in[k]->V();
+        _hp_x[k] = out[k]->data();
+        _hp_b[k] = in[k]->data();
       }
       inv_param.num_src = Nsrc;
       inv_param.num_src_per_sub_partition = Nsrc / num_sub_partition;
@@ -389,12 +389,12 @@ int main(int argc, char **argv)
       inv_param.tol_hq_offset[i] = inv_param.tol_hq;
       // Allocate memory and set pointers
       qudaOutArray[i] = ColorSpinorField::Create(cs_param);
-      outArray[i] = qudaOutArray[i]->V();
+      outArray[i] = qudaOutArray[i]->data();
     }
 
     for (int k = 0; k < Nsrc; k++) {
       quda::spinorNoise(*in[k], *rng, QUDA_NOISE_UNIFORM);
-      invertMultiShiftQuda((void **)outArray, in[k]->V(), &inv_param);
+      invertMultiShiftQuda((void **)outArray, in[k]->data(), &inv_param);
 
       time[k] = inv_param.secs;
       gflops[k] = inv_param.gflops / inv_param.secs;

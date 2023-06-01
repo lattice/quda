@@ -428,17 +428,17 @@ namespace quda
 
         if (src.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
           // special case where we use mapped memory to read/write directly from application's array
-          void *src_d = get_mapped_device_pointer(src.V());
+          void *src_d = get_mapped_device_pointer(src.data());
           copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, v.data(), src_d);
         } else {
           void *Src = nullptr, *buffer = nullptr;
           if (!zeroCopy) {
             buffer = pool_device_malloc(src.Bytes());
             Src = buffer;
-            qudaMemcpy(Src, src.V(), src.Bytes(), qudaMemcpyDefault);
+            qudaMemcpy(Src, src.data(), src.Bytes(), qudaMemcpyDefault);
           } else {
             buffer = pool_pinned_malloc(src.Bytes());
-            memcpy(buffer, src.V(), src.Bytes());
+            memcpy(buffer, src.data(), src.Bytes());
             Src = get_mapped_device_pointer(buffer);
           }
 
@@ -465,7 +465,7 @@ namespace quda
         if (FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
           // special case where we use zero-copy memory to read/write directly from application's array
           void *dest_d = get_mapped_device_pointer(v.data());
-          copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, dest_d, src.V());
+          copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, dest_d, src.data());
         } else {
           void *dst = nullptr, *buffer = nullptr;
           if (!zeroCopy) {
@@ -837,7 +837,7 @@ namespace quda
       errorQuda("Cannot create an alias to source with lower precision than the alias");
     ColorSpinorParam param = param_.init ? param_ : ColorSpinorParam(*this);
     param.create = QUDA_REFERENCE_FIELD_CREATE;
-    param.v = V();
+    param.v = data();
 
     return ColorSpinorField(param);
   }
@@ -848,7 +848,7 @@ namespace quda
       errorQuda("Cannot create an alias to source with lower precision than the alias");
     ColorSpinorParam param(param_);
     param.create = QUDA_REFERENCE_FIELD_CREATE;
-    param.v = V();
+    param.v = data();
 
     return new ColorSpinorField(param);
   }

@@ -413,7 +413,7 @@ namespace quda {
      */
     inline void operator()(DslashCoarsePolicy policy)
     {
-      if (inA[0].V() == out[0].V()) errorQuda("Aliasing pointers");
+      if (inA[0].data() == out[0].data()) errorQuda("Aliasing pointers");
 
       // check all precisions match
       QudaPrecision precision = checkPrecision(out[0], inA[0], inB[0]);

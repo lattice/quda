@@ -3322,7 +3322,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
         || param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) { printfQuda("Split grid loading clover field...\n"); }
       if (collected_clover) {
-        loadCloverQuda(collected_clover->V(false), collected_clover->V(true), param);
+        loadCloverQuda(collected_clover->data(false), collected_clover->data(true), param);
       } else {
         loadCloverQuda(nullptr, nullptr, param);
       }
@@ -3330,7 +3330,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     }
 
     for (int n = 0; n < param->num_src_per_sub_partition; n++) {
-      op(_collect_x[n]->V(), _collect_b[n]->V(), param, args...);
+      op(_collect_x[n]->data(), _collect_b[n]->data(), param, args...);
     }
 
     profileInvertMultiSrc.TPSTART(QUDA_PROFILE_TOTAL);

@@ -39,7 +39,7 @@ namespace quda {
       X0h(out.X()[0]/2),
       volumeCB(in.VolumeCB())
     {
-      if (in.V() == out.V()) errorQuda("Aliasing pointers");
+      if (in.data() == out.data()) errorQuda("Aliasing pointers");
       checkOrder(out, in); // check all orders match
       checkPrecision(out, in, xInv); // check all precisions match
       checkLocation(out, in, xInv);

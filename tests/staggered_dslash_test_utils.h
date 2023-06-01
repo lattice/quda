@@ -103,9 +103,9 @@ struct StaggeredDslashTestWrapper {
       staggeredDslash(spinorRef.Odd(), qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
                       spinor.Even(), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
       if (dslash_type == QUDA_LAPLACE_DSLASH) {
-        xpay(spinor.V(), kappa, spinorRef.V(), spinor.Length(), gauge_param.cpu_prec);
+        xpay(spinor.data(), kappa, spinorRef.data(), spinor.Length(), gauge_param.cpu_prec);
       } else {
-        axpy(2 * mass, spinor.V(), spinorRef.V(), spinor.Length(), gauge_param.cpu_prec);
+        axpy(2 * mass, spinor.data(), spinorRef.data(), spinor.Length(), gauge_param.cpu_prec);
       }
       break;
     default: errorQuda("Test type %d not defined", static_cast<int>(dtest_type));
@@ -364,8 +364,8 @@ struct StaggeredDslashTestWrapper {
       std::vector<void *> _hp_x(inv_param.num_src);
       std::vector<void *> _hp_b(inv_param.num_src);
       for (int i = 0; i < inv_param.num_src; i++) {
-        _hp_x[i] = vp_spinor_out[i].V();
-        _hp_b[i] = vp_spinor[i].V();
+        _hp_x[i] = vp_spinor_out[i].data();
+        _hp_b[i] = vp_spinor[i].data();
       }
       dslashMultiSrcStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, parity, milc_fatlink_gpu, milc_longlink_gpu,
                                   &gauge_param);

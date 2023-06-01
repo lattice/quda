@@ -197,7 +197,7 @@ namespace quda {
     for (int i = 0; i < cf_param.nDim; i++) cf_param.x[i] = clover ? clover->X()[i] : 0;
 
     // only create inverse if not doing dynamic clover and one already exists
-    cf_param.inverse = !clover::dynamic_inverse() && clover && clover->V(true);
+    cf_param.inverse = !clover::dynamic_inverse() && clover && clover->Inverse();
     cf_param.clover = nullptr;
     cf_param.cloverInv = nullptr;
     cf_param.create = QUDA_NULL_FIELD_CREATE;

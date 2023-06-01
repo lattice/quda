@@ -217,7 +217,10 @@ namespace quda {
 
     static CloverField *Create(const CloverFieldParam &param);
 
-    void *V(bool inverse = false) const { return inverse ? cloverInv.data() : clover.data(); }
+    template <typename T = void *> auto data(bool inverse = false) const
+    {
+      return inverse ? reinterpret_cast<T>(cloverInv.data()) : reinterpret_cast<T>(clover.data());
+    }
 
     /**
        @return whether the inverse is explicitly been allocated

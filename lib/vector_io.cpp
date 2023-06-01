@@ -52,7 +52,7 @@ namespace quda
       std::vector<void *> V(Nvec * Ls);
       for (int i = 0; i < Nvec; i++) {
         auto &v = create_tmp ? tmp[i] : vecs[i];
-        for (int j = 0; j < Ls; j++) { V[i * Ls + j] = static_cast<char *>(v.V()) + j * stride; }
+        for (int j = 0; j < Ls; j++) { V[i * Ls + j] = v.data<char *>() + j * stride; }
       }
 
       read_spinor_field(filename.c_str(), V.data(), v0.Precision(), v0.X(), v0.SiteSubset(),
@@ -125,7 +125,7 @@ namespace quda
       std::vector<const void *> V(Nvec * Ls);
       for (int i = 0; i < Nvec; i++) {
         auto &v = create_tmp ? tmp[i] : vecs[i];
-        for (int j = 0; j < Ls; j++) { V[i * Ls + j] = static_cast<const char *>(v.V()) + j * stride; }
+        for (int j = 0; j < Ls; j++) { V[i * Ls + j] = v.data<const char *>() + j * stride; }
       }
 
       write_spinor_field(filename.c_str(), V.data(), save_prec, v0.X(), v0.SiteSubset(),

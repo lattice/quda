@@ -38,7 +38,7 @@ namespace quda
       bool mixed = param.precision != param.precision_sloppy;
 
       if (!mixed) csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-      csParam.v = r.V();
+      csParam.v = r.data();
       r_sloppy = ColorSpinorField(csParam);
 
       init = true;

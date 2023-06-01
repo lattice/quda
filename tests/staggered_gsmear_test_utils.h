@@ -134,11 +134,11 @@ struct StaggeredGSmearTestWrapper { //
                                       &gauge_param, &inv_param, 1, smear_coeff, smear_t0, gauge_param.cpu_prec);
 
         // blas::xpay(*tmp2, -1.0, *spinorRef);
-        xpay(tmp2.Even().V(), -1.0, spinorRef.Even().V(), spinor.Even().Length(), gauge_param.cpu_prec);
-        xpay(tmp2.Odd().V(), -1.0, spinorRef.Odd().V(), spinor.Odd().Length(), gauge_param.cpu_prec);
+        xpay(tmp2.Even().data(), -1.0, spinorRef.Even().data(), spinor.Even().Length(), gauge_param.cpu_prec);
+        xpay(tmp2.Odd().data(), -1.0, spinorRef.Odd().data(), spinor.Odd().Length(), gauge_param.cpu_prec);
         //
-        memset(tmp2.Even().V(), 0, spinor.Even().Length() * gauge_param.cpu_prec);
-        memset(tmp2.Odd().V(), 0, spinor.Odd().Length() * gauge_param.cpu_prec);
+        memset(tmp2.Even().data(), 0, spinor.Even().Length() * gauge_param.cpu_prec);
+        memset(tmp2.Odd().data(), 0, spinor.Odd().Length() * gauge_param.cpu_prec);
       }
       break;
     }
@@ -327,7 +327,7 @@ struct StaggeredGSmearTestWrapper { //
         qsm_param.delete_2link = smear_delete_two_link;
         qsm_param.t0 = smear_t0;
 
-        performTwoLinkGaussianSmearNStep(spinor.V(), &qsm_param);
+        performTwoLinkGaussianSmearNStep(spinor.data(), &qsm_param);
 
         quda_gflops = qsm_param.gflops;
 

@@ -115,7 +115,7 @@ namespace quda {
   }
 
   void Dirac::checkSpinorAlias(const ColorSpinorField &a, const ColorSpinorField &b) const {
-    if (a.V() == b.V()) errorQuda("Aliasing pointers");
+    if (a.data() == b.data()) errorQuda("Aliasing pointers");
   }
 
   // Dirac operator factory

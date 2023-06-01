@@ -462,12 +462,12 @@ void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk
 
   if (prec == QUDA_DOUBLE_PRECISION) {
     {
-      staggeredTwoLinkGaussianSmear((double *)out.V(), (double **)qdp_twolnk, (double **)ghost, (double *)in.V(),
+      staggeredTwoLinkGaussianSmear((double *)out.data(), (double **)qdp_twolnk, (double **)ghost, (double *)in.data(),
                                     (double **)fwd_nbr_spinor, (double **)back_nbr_spinor, t0, oddBit);
     } 
   } else {
     {
-      staggeredTwoLinkGaussianSmear((float *)out.V(), (float **)qdp_twolnk, (float **)ghost, (float *)in.V(),
+      staggeredTwoLinkGaussianSmear((float *)out.data(), (float **)qdp_twolnk, (float **)ghost, (float *)in.data(),
                                     (float **)fwd_nbr_spinor, (float **)back_nbr_spinor, t0, oddBit);
     }
   }

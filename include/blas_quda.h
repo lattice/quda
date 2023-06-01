@@ -33,7 +33,7 @@ namespace quda {
 
     inline void copy(ColorSpinorField &dst, const ColorSpinorField &src)
     {
-      if (dst.V() == src.V()) {
+      if (dst.data() == src.data()) {
         // check the fields are equivalent else error
         if (ColorSpinorField::are_compatible(dst, src))
           return;

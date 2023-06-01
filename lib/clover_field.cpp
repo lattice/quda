@@ -170,7 +170,7 @@ namespace quda {
     if (is_inverse && !src.Inverse() && !dynamic_inverse_copy)
       errorQuda("Source field's is_inverse=%d component does not exist", is_inverse);
 
-    auto src_v = dynamic_inverse_copy ? src.V(false) : src.V(is_inverse);
+    auto src_v = dynamic_inverse_copy ? src.data(false) : src.data(is_inverse);
 
     // if we copying to a reconstruction field, we must find the overall scale factor to allow us to reconstruct
     if (Reconstruct()) {
@@ -192,7 +192,7 @@ namespace quda {
         void *packClover = pool_pinned_malloc(bytes);
 
         copyGenericClover(*this, src, is_inverse, QUDA_CPU_FIELD_LOCATION, packClover, src_v);
-        qudaMemcpy(V(is_inverse), packClover, bytes, qudaMemcpyHostToDevice);
+        qudaMemcpy(data(is_inverse), packClover, bytes, qudaMemcpyHostToDevice);
 
         pool_pinned_free(packClover);
       } else if (reorder_location() == QUDA_CUDA_FIELD_LOCATION && src.Location() == QUDA_CPU_FIELD_LOCATION) {
@@ -217,7 +217,7 @@ namespace quda {
         void *packClover = pool_device_malloc(bytes);
 
         copyGenericClover(*this, src, is_inverse, QUDA_CUDA_FIELD_LOCATION, packClover, src_v);
-        qudaMemcpy(V(is_inverse), packClover, bytes, qudaMemcpyDeviceToHost);
+        qudaMemcpy(data(is_inverse), packClover, bytes, qudaMemcpyDeviceToHost);
 
         pool_device_free(packClover);
       }
@@ -331,7 +331,7 @@ namespace quda {
     spinor_param.fieldOrder = colorspinor::getNative(a.Precision(), a.Nspin());
     spinor_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
-    spinor_param.v = a.V(inverse);
+    spinor_param.v = a.data(inverse);
     spinor_param.location = a.Location();
     return spinor_param;
   }
