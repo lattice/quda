@@ -644,17 +644,7 @@ namespace quda
     }
   }
 
-  TuneParam::TuneParam() :
-    block(device::warp_size(), 1, 1),
-    grid(1, 1, 1),
-    shared_bytes(0),
-    set_max_shared_bytes(false),
-    aux(),
-    time(FLT_MAX),
-    n_calls(0)
-  {
-    aux = make_int4(1, 1, 1, 1);
-  }
+  TuneParam::TuneParam() : block(device::warp_size(), 1, 1) { }
 
   std::ostream &operator<<(std::ostream &output, const TuneParam &param)
   {

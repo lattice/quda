@@ -18,17 +18,15 @@
 namespace quda {
 
   struct TuneParam {
-
-  public:
-    dim3 block;
+    dim3 block = {1, 1, 1};
     dim3 grid;
-    unsigned int shared_bytes;
-    bool set_max_shared_bytes; // whether to opt in to max shared bytes per thread block
-    int4 aux; // free parameter that can be used as an arbitrary autotuning dimension outside of launch parameters
+    unsigned int shared_bytes = 0;
+    bool set_max_shared_bytes = false; // whether to opt in to max shared bytes per thread block
+    int4 aux = {1, 1, 1, 1}; // free parameter that can be used as an arbitrary autotuning dimension outside of launch parameters
 
     std::string comment;
-    float time;
-    long long n_calls;
+    float time = FLT_MAX;
+    long long n_calls = 0;
 
     TuneParam();
     TuneParam(const TuneParam &) = default;

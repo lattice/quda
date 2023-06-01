@@ -23,7 +23,7 @@ enum qudaMemcpyKind {
 namespace quda
 {
 
-  class TuneParam;
+  struct TuneParam;
 
   struct qudaStream_t {
     int idx;
