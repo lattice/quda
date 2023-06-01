@@ -148,10 +148,10 @@ namespace quda
       errorQuda("Subset not implemented");
 
     if (param.create != QUDA_REFERENCE_FIELD_CREATE && param.create != QUDA_GHOST_FIELD_CREATE) {
-      v = std::move(quda_ptr(mem_type, bytes));
+      v = quda_ptr(mem_type, bytes);
       alloc = true;
     } else  if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
-      v = std::move(quda_ptr(param.v, mem_type));
+      v = quda_ptr(param.v, mem_type);
       reference = true;
     } else if (param.create == QUDA_GHOST_FIELD_CREATE) {
       ghost_only = true;
@@ -1480,7 +1480,7 @@ namespace quda
   {
     if (backup_h.size()) errorQuda("ColorSpinorField already backed up");
     backup_h.resize(1);
-    backup_h[0] = std::move(quda_ptr(QUDA_MEMORY_HOST, bytes));
+    backup_h[0] = quda_ptr(QUDA_MEMORY_HOST, bytes);
     qudaMemcpy(backup_h[0], v, bytes, qudaMemcpyDefault);
   }
 

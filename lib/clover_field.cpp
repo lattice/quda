@@ -72,18 +72,18 @@ namespace quda {
 
     if (bytes) {
       if (create != QUDA_REFERENCE_FIELD_CREATE) {
-        clover = std::move(quda_ptr(mem_type, bytes));
+        clover = quda_ptr(mem_type, bytes);
       } else {
-        clover = std::move(quda_ptr(param.clover, mem_type));
+        clover = quda_ptr(param.clover, mem_type);
       }
 
       total_bytes += bytes;
 
       if (inverse) {
         if (create != QUDA_REFERENCE_FIELD_CREATE) {
-          cloverInv = std::move(quda_ptr(mem_type, bytes));
+          cloverInv = quda_ptr(mem_type, bytes);
         } else {
-          cloverInv = std::move(quda_ptr(param.cloverInv, mem_type));
+          cloverInv = quda_ptr(param.cloverInv, mem_type);
         }
 
         total_bytes += bytes;
@@ -114,7 +114,7 @@ namespace quda {
   {
     if (backup_h.size()) errorQuda("Already allocated host backup");
     backup_h.resize(2);
-    for (auto &b : backup_h) b = std::move(quda_ptr(QUDA_MEMORY_HOST, bytes));
+    for (auto &b : backup_h) b = quda_ptr(QUDA_MEMORY_HOST, bytes);
 
     backup(false);
     if (inverse) backup(true);

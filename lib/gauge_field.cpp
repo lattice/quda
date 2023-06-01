@@ -169,18 +169,18 @@ namespace quda {
 
     if (isNative()) {
       if (param.create != QUDA_REFERENCE_FIELD_CREATE) {
-        gauge = std::move(quda_ptr(mem_type, bytes));
+        gauge = quda_ptr(mem_type, bytes);
       } else {
-        gauge = std::move(quda_ptr(param.gauge, mem_type));
+        gauge = quda_ptr(param.gauge, mem_type);
       }
     } else if (is_pointer_array(order)) {
 
       size_t nbytes = volume * nInternal * precision;
       for (int d = 0; d < site_dim; d++) {
         if (param.create != QUDA_REFERENCE_FIELD_CREATE) {
-          gauge_array[d] = std::move(quda_ptr(mem_type, nbytes));
+          gauge_array[d] = quda_ptr(mem_type, nbytes);
         } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
-          gauge_array[d] = std::move(quda_ptr(static_cast<void **>(param.gauge)[d], mem_type));
+          gauge_array[d] = quda_ptr(static_cast<void **>(param.gauge)[d], mem_type);
         } else {
           errorQuda("Unsupported creation type %d", param.create);
         }
@@ -196,9 +196,9 @@ namespace quda {
       }
 
       if (param.create != QUDA_REFERENCE_FIELD_CREATE) {
-        gauge = std::move(quda_ptr(mem_type, bytes));
+        gauge = quda_ptr(mem_type, bytes);
       } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
-        gauge = std::move(quda_ptr(param.gauge, mem_type));
+        gauge = quda_ptr(param.gauge, mem_type);
       } else {
         errorQuda("Unsupported creation type %d", param.create);
       }
@@ -211,8 +211,8 @@ namespace quda {
       if (!isNative()) {
         for (int i=0; i<nDim; i++) {
           size_t nbytes = nFace * surface[i] * nInternal * precision;
-          ghost[i] = std::move(quda_ptr(mem_type, nbytes));
-          if (geometry == QUDA_COARSE_GEOMETRY) ghost[i+4] = std::move(quda_ptr(mem_type, nbytes));
+          ghost[i] = quda_ptr(mem_type, nbytes);
+          if (geometry == QUDA_COARSE_GEOMETRY) ghost[i+4] = quda_ptr(mem_type, nbytes);
 
           qudaMemset(ghost[i], 0, nbytes);
           if (geometry == QUDA_COARSE_GEOMETRY) qudaMemset(ghost[i + 4], 0, nbytes);
@@ -1276,12 +1276,12 @@ namespace quda {
     if (order == QUDA_QDP_GAUGE_ORDER) {
       backup_h.resize(geometry);
       for (int d = 0; d < geometry; d++) {
-        backup_h[d] = std::move(quda_ptr(QUDA_MEMORY_HOST, bytes / geometry));
+        backup_h[d] = quda_ptr(QUDA_MEMORY_HOST, bytes / geometry);
         qudaMemcpy(backup_h[d], gauge_array[d], bytes / geometry, qudaMemcpyDefault);
       }
     } else {
       backup_h.resize(1);
-      backup_h[0] = std::move(quda_ptr(QUDA_MEMORY_HOST, bytes));
+      backup_h[0] = quda_ptr(QUDA_MEMORY_HOST, bytes);
       qudaMemcpy(backup_h[0], gauge, bytes, qudaMemcpyDefault);
     }
   }
