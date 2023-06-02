@@ -3,7 +3,7 @@
 #include <quda_define.h>
 #include <string>
 #include <enum_quda.h>
-#include <malloc_quda.h>
+#include <quda_ptr.h>
 
 /**
    @file quda_api.h
