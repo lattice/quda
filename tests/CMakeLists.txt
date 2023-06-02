@@ -221,6 +221,11 @@ target_link_libraries(gauge_path_test ${TEST_LIBS})
 quda_checkbuildtest(gauge_path_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS gauge_path_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+add_executable(TMCloverForce_test TMCloverForce_test.cpp)
+target_link_libraries(TMCloverForce_test ${TEST_LIBS})
+quda_checkbuildtest(TMCloverForce_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS TMCloverForce_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 add_executable(gauge_alg_test gauge_alg_test.cpp)
 target_link_libraries(gauge_alg_test ${TEST_LIBS})
 quda_checkbuildtest(gauge_alg_test QUDA_BUILD_ALL_TESTS)
@@ -1204,6 +1209,11 @@ foreach(prec IN LISTS TEST_PRECS)
                    --dim 2 4 6 8 --prec ${prec}
                    --gtest_output=xml:gauge_path_test_${prec}.xml)
 
+  add_test(NAME TMCloverForce_test_${prec}
+           COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:TMCloverForce_test> ${MPIEXEC_POSTFLAGS}
+                   --dim 2 4 6 8 --prec ${prec}
+                   --gtest_output=xml:TMCloverForce_test_${prec}.xml)
+        
   if(QUDA_DIRAC_STAGGERED)
     add_test(NAME unitarize_link_${prec}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:unitarize_link_test> ${MPIEXEC_POSTFLAGS}
