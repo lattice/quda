@@ -1,3 +1,4 @@
+#include <utility>
 #include "quda_ptr.h"
 #include "util_quda.h"
 #include "timer.h"
