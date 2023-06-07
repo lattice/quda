@@ -21,6 +21,8 @@ namespace quda
 
     static bool initialized = false;
 
+    static int device_id = -1;
+
     void init(int dev)
     {
       if (initialized) return;
@@ -99,10 +101,17 @@ namespace quda
       CHECK_CUDA_ERROR(cudaSetDevice(dev));
 #endif
 
-
       CHECK_CUDA_ERROR(cudaDeviceSetCacheConfig(cudaFuncCachePreferL1));
       //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
       // cudaGetDeviceProperties(&deviceProp, dev);
+
+      device_id = dev;
+    }
+
+    void init_thread()
+    {
+      if (device_id == -1) errorQuda("No CUDA device has been initialized for this process");
+      CHECK_CUDA_ERROR(cudaSetDevice(device_id));
     }
 
     int get_device_count()
@@ -113,6 +122,26 @@ namespace quda
         if (device_count == 0) errorQuda("No CUDA devices found");
       }
       return device_count;
+    }
+
+    void get_visible_devices_string(char device_list_string[128])
+    {
+      char *device_order_env = getenv("CUDA_VISIBLE_DEVICES");
+
+      if (device_order_env) {
+        std::stringstream device_list_raw(device_order_env); // raw input
+        std::stringstream device_list;                       // formatted (no commas)
+
+        int device;
+        while (device_list_raw >> device) {
+          // check this is a valid policy choice
+          if (device < 0) { errorQuda("Invalid CUDA_VISIBLE_DEVICES ordinal %d", device); }
+
+          device_list << device;
+          if (device_list_raw.peek() == ',') device_list_raw.ignore();
+        }
+        snprintf(device_list_string, 128, "%s", device_list.str().c_str());
+      }
     }
 
     void print_device_properties()

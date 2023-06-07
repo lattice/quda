@@ -28,7 +28,7 @@ namespace quda
   public:
     CovDev(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
-    void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
@@ -40,7 +40,7 @@ namespace quda
       Dslash::template instantiate<packShmem, nParity, xpay>(tp, stream);
     }
 
-    long long flops() const
+    long long flops() const override
     {
       int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(3) matrix-vector flops
       int num_mv_multiply = in.Nspin();
@@ -79,7 +79,7 @@ namespace quda
       return flops_;
     }
 
-    long long bytes() const
+    long long bytes() const override
     {
       int gauge_bytes = arg.reconstruct * in.Precision();
       int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() +
@@ -118,16 +118,12 @@ namespace quda
       return bytes_;
     }
 
-    TuneKey tuneKey() const
-    {
-      // add mu to the key
-      char aux[TuneKey::aux_n];
-      strcpy(aux,
-             (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash::aux_pack :
-                                                                           Dslash::aux[arg.kernel_type]);
-      strcat(aux, ",mu=");
-      u32toa(aux + strlen(aux), arg.mu);
-      return TuneKey(in.VolString(), typeid(*this).name(), aux);
+    TuneKey tuneKey() const override
+    { // add mu to the key
+      auto key = Dslash::tuneKey();
+      strcat(key.aux, ",mu=");
+      u32toa(key.aux + strlen(key.aux), arg.mu);
+      return key;
     }
   };
 

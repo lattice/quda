@@ -47,7 +47,7 @@ endif()
 
 # define tests
 add_executable(c_interface_test c_interface_test.c)
-target_link_libraries(c_interface_test ${TEST_LIBS})
+target_link_libraries(c_interface_test ${TEST_LIBS} "-lstdc++")
 quda_checkbuildtest(c_interface_test QUDA_BUILD_ALL_TESTS)
 
 # if we build with QDP JIT the tests cannot run anyway
@@ -164,6 +164,11 @@ if(QUDA_QIO)
   install(TARGETS io_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
+add_executable(tune_test tune_test.cpp)
+target_link_libraries(tune_test ${TEST_LIBS})
+quda_checkbuildtest(tune_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS tune_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 add_executable(plaq_test plaq_test.cpp)
 target_link_libraries(plaq_test ${TEST_LIBS})
 quda_checkbuildtest(plaq_test QUDA_BUILD_ALL_TESTS)
@@ -191,6 +196,13 @@ if(QUDA_CONTRACT)
   target_link_libraries(contract_test ${TEST_LIBS})
   quda_checkbuildtest(contract_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
+if(QUDA_SMEAR_GAUSS_TWOLINK)
+  add_executable(staggered_gsmear_test staggered_gsmear_test.cpp)
+  target_link_libraries(staggered_gsmear_test ${TEST_LIBS})
+  quda_checkbuildtest(staggered_gsmear_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS staggered_gsmear_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR}) 	
 endif()
 
 if(QUDA_DIRAC_STAGGERED)
@@ -312,7 +324,7 @@ if(QUDA_CONTRACT)
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:contract_test> ${MPIEXEC_POSTFLAGS}
     --dim 2 4 6 8
     --gtest_output=xml:contract_test.xml)
-endif()
+endif()  
 
 # loop over Dslash policies
 if(QUDA_CTEST_SEP_DSLASH_POLICIES)
@@ -1239,6 +1251,26 @@ foreach(prec IN LISTS TEST_PRECS)
                      --gtest_output=xml:dilution_test_${prec}.xml)
   endif()
 
+  if(QUDA_SMEAR_GAUSS_TWOLINK)
+    set(KERNEL_TYPE TwoLink GaussianSmear)
+    foreach(kerneltp IN LISTS KERNEL_TYPE)
+      if(${kerneltp} STREQUAL "TwoLink")
+	set(laplace3D 4)
+	set(smear_t0 -1)
+      elseif(${kerneltp} STREQUAL "GaussianSmear")
+	set(laplace3D 3)
+	set(smear_t0 1)
+      endif()	    
+      add_test(NAME staggered_gsmear_${kerneltp}_${prec}
+        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gsmear_test> ${MPIEXEC_POSTFLAGS}
+        --dim 6 8 10 12 --prec ${prec}
+        --test ${kerneltp}
+	--laplace3D ${laplace3D}
+	--smear-t0 ${smear_t0}
+        --gtest_output=xml:staggered_gsmear_test_${kerneltp}_${prec}.xml)
+    endforeach(kerneltp)
+  endif()
+
 endforeach(prec)
 
 if(QUDA_QIO)
@@ -1247,3 +1279,7 @@ if(QUDA_QIO)
                    --dim 4 6 8 10
                    --gtest_output=xml:io_test.xml)
 endif()
+
+add_test(NAME tune_test
+         COMMAND  ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:tune_test> ${MPIEXEC_POSTFLAGS}
+                   --gtest_output=xml:tune_test.xml)

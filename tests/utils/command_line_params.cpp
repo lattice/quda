@@ -31,12 +31,16 @@ QudaPrecision prec_eigensolver = QUDA_INVALID_PRECISION;
 QudaPrecision prec_null = QUDA_INVALID_PRECISION;
 QudaPrecision prec_ritz = QUDA_INVALID_PRECISION;
 QudaVerbosity verbosity = QUDA_SUMMARIZE;
+
 std::array<int, 4> dim = {24, 24, 24, 24};
+std::array<int, 4> grid_partition = {1, 1, 1, 1};
+
 int &xdim = dim[0];
 int &ydim = dim[1];
 int &zdim = dim[2];
 int &tdim = dim[3];
 int Lsdim = 16;
+
 bool dagger = false;
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 int laplace3D = 4;
@@ -194,6 +198,7 @@ QudaFieldLocation location_ritz = QUDA_CUDA_FIELD_LOCATION;
 QudaMemoryType mem_type_ritz = QUDA_MEMORY_DEVICE;
 
 // Parameters for the stand alone eigensolver
+int eig_ortho_block_size = 0;
 int eig_block_size = 4;
 int eig_n_ev = 16;
 int eig_n_kr = 32;
@@ -203,6 +208,7 @@ int eig_batched_rotate = 0; // If unchanged, will be set to maximum
 bool eig_require_convergence = true;
 int eig_check_interval = 10;
 int eig_max_restarts = 1000;
+int eig_max_ortho_attempts = 10;
 double eig_tol = 1e-6;
 double eig_qr_tol = 1e-11;
 bool eig_use_eigen_qr = true;
@@ -228,6 +234,7 @@ QudaPrecision eig_save_prec = QUDA_DOUBLE_PRECISION;
 // The coarsest grid params are for deflation,
 // all others are for PR vectors.
 quda::mgarray<bool> mg_eig = {};
+quda::mgarray<int> mg_eig_ortho_block_size = {};
 quda::mgarray<int> mg_eig_block_size = {};
 quda::mgarray<int> mg_eig_n_ev_deflate = {};
 quda::mgarray<int> mg_eig_n_ev = {};
@@ -236,6 +243,7 @@ quda::mgarray<int> mg_eig_batched_rotate = {};
 quda::mgarray<bool> mg_eig_require_convergence = {};
 quda::mgarray<int> mg_eig_check_interval = {};
 quda::mgarray<int> mg_eig_max_restarts = {};
+quda::mgarray<int> mg_eig_max_ortho_attempts = {};
 quda::mgarray<double> mg_eig_tol = {};
 quda::mgarray<double> mg_eig_qr_tol = {};
 quda::mgarray<bool> mg_eig_use_eigen_qr = {};
@@ -260,6 +268,16 @@ int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
 bool heatbath_coldstart = false;
 
+int gf_gauge_dir = 4;
+int gf_maxiter = 10000;
+int gf_verbosity_interval = 100;
+double gf_ovr_relaxation_boost = 1.5;
+double gf_fft_alpha = 0.8;
+int gf_reunit_interval = 10;
+double gf_tolerance = 1e-6;
+bool gf_theta_condition = false;
+bool gf_fft_autotune = false;
+
 int eofa_pm = 1;
 double eofa_shift = -1.2345;
 double eofa_mq1 = 1.0;
@@ -268,7 +286,12 @@ double eofa_mq3 = 1.0;
 
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
-std::array<int, 4> grid_partition = {1, 1, 1, 1};
+// Parameters for the (gaussian) quark smearing operator
+int    smear_n_steps = 50;
+double smear_coeff    = 0.1;
+int    smear_t0 = -1;
+bool   smear_compute_two_link = true;
+bool   smear_delete_two_link  = true;
 
 bool enable_testing = false;
 
@@ -665,6 +688,12 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Solve the gamma5 OP problem. Solve for OP then multiply by gamma_5 (default false)");
 
   opgroup->add_option("--eig-max-restarts", eig_max_restarts, "Perform n iterations of the restart in the eigensolver");
+  opgroup->add_option(
+    "--eig-max-ortho-attempts", eig_max_restarts,
+    "Perform n iterations of Gram-Schmidt orthonormalisation in the Block TRLM eigensolver (default 10)");
+  opgroup->add_option("--eig-ortho-block-size", eig_ortho_block_size,
+                      "The block size to use when orthonormalising vectors in hybrid modified Gram-Schmidt"
+                      "0 for always Classical, 1 for Modified, n > 1 for Hybrid)");
   opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
   opgroup->add_option(
     "--eig-n-ev-deflate", eig_n_ev_deflate,
@@ -796,9 +825,15 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                        "If the multigrid operator is updated, preserve generated deflation space (default = false)");
   quda_app->add_mgoption(opgroup, "--mg-eig-max-restarts", mg_eig_max_restarts, CLI::PositiveNumber,
                          "Perform a maximun of n restarts in eigensolver (default 100)");
+
+  quda_app->add_mgoption(
+    opgroup, "--mg-eig-max-ortho-attempts", mg_eig_max_ortho_attempts, CLI::PositiveNumber,
+    "Perform n iterations of Gram-Schmidt orthonormalisation in the Block TRLM eigensolver (default 10)");
   quda_app->add_mgoption(
     opgroup, "--mg-eig-use-eigen-qr", mg_eig_use_eigen_qr, CLI::Validator(),
     "Use Eigen to eigensolve the upper Hessenberg in IRAM, else use QUDA's QR code. (default true)");
+  quda_app->add_mgoption(opgroup, "--mg-eig-ortho-block-size", mg_eig_ortho_block_size, CLI::Validator(),
+                         "The block size to use when orthonormalising vectors in hybrid modified Gram-Schmidt");
   quda_app->add_mgoption(opgroup, "--mg-eig-block-size", mg_eig_block_size, CLI::Validator(),
                          "The block size to use in the block variant eigensolver");
   quda_app->add_mgoption(opgroup, "--mg-eig-n-ev", mg_eig_n_ev, CLI::Validator(),
@@ -1007,6 +1042,30 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Number of warmup steps in heatbath test (default 10)");
 }
 
+void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  // Option group for gauge fixing related options
+  auto opgroup = quda_app->add_option_group("gaugefix", "Options controlling gauge fixing tests");
+  opgroup->add_option("--gf-dir", gf_gauge_dir,
+                      "The orthogonal direction of the gauge fixing, 3=Coulomb, 4=Landau. (default 4)");
+  opgroup->add_option("--gf-maxiter", gf_maxiter,
+                      "The maximun number of gauge fixing iterations to be applied (default 10000) ");
+  opgroup->add_option("--gf-verbosity-interval", gf_verbosity_interval,
+                      "Print the gauge fixing progress every N steps (default 100)");
+  opgroup->add_option("--gf-ovr-relaxation-boost", gf_ovr_relaxation_boost,
+                      "The overrelaxation boost parameter for the overrelaxation method (default 1.5)");
+  opgroup->add_option("--gf-fft-alpha", gf_fft_alpha, "The Alpha parameter in the FFT method (default 0.8)");
+  opgroup->add_option("--gf-reunit-interval", gf_reunit_interval,
+                      "Reunitarise the gauge field every N steps (default 10)");
+  opgroup->add_option("--gf-tol", gf_tolerance, "The tolerance of the gauge fixing quality (default 1e-6)");
+  opgroup->add_option(
+    "--gf-theta-condition", gf_theta_condition,
+    "Use the theta value to determine the gauge fixing if true. If false, use the delta value (default false)");
+  opgroup->add_option(
+    "--gf-fft-autotune", gf_fft_autotune,
+    "In the FFT method, automatically adjust the alpha parameter if the quality begins to diverge (default false)");
+}
+
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup
@@ -1018,4 +1077,14 @@ void add_testing_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("Testing", "Options controlling automated testing");
   opgroup->add_option("--enable-testing", enable_testing, "Enable automated testing (default false)");
+}
+
+void add_quark_smear_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup = quda_app->add_option_group("Quark smearing", "Options controlling quark smearing testing");
+  opgroup->add_option("--smear-compute-twolink", smear_compute_two_link, "Compute two link field (default true)");
+  opgroup->add_option("--smear-delete-twolink", smear_delete_two_link, "Delete two link field (default true)");
+  opgroup->add_option("--smear-coeff", smear_coeff, "Set smearing coefficient (default 0.1)");
+  opgroup->add_option("--smear-nsteps", smear_n_steps, "Number of smearing steps (default 50)");
+  opgroup->add_option("--smear-t0", smear_t0, "Index of the time slice (default -1)");
 }

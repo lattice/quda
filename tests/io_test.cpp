@@ -3,16 +3,12 @@
 
 #include <instantiate.h>
 #include <color_spinor_field.h>
-#include <util_quda.h>
 #include <misc.h>
-#include <host_utils.h>
-#include <command_line_params.h>
 #include <qio_field.h> // for QIO routines
 #include <vector_io.h>
 #include <blas_quda.h>
 #include <quda.h>
-
-#include <gtest/gtest.h>
+#include <test.h>
 
 // tuple types: precision
 using gauge_test_t = ::testing::tuple<QudaPrecision>;
@@ -33,11 +29,9 @@ TEST_P(GaugeIOTest, verify)
   setWilsonGaugeParam(gauge_param);
 
   gauge_param.cpu_prec = ::testing::get<0>(param);
-  gauge_param.cuda_prec = gauge_param.cpu_prec;
   if (!quda::is_enabled(gauge_param.cpu_prec)) GTEST_SKIP();
-
+  gauge_param.cuda_prec = gauge_param.cpu_prec;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
-  setDims(gauge_param.X);
 
   // Allocate host side memory for the gauge field.
   //----------------------------------------------------------------------------
@@ -164,35 +158,9 @@ TEST_P(ColorSpinorIOTest, verify)
 
 int main(int argc, char **argv)
 {
-  // initialize google test, includes command line options
-  ::testing::InitGoogleTest(&argc, argv);
-  // return code for google test
-  int test_rc = 0;
-
-  auto app = make_app();
-  try {
-    app->parse(argc, argv);
-  } catch (const CLI::ParseError &e) {
-    return app->exit(e);
-  }
-
-  // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
-  initComms(argc, argv, gridsize_from_cmdline);
-  initQuda(device_ordinal);
-
-  setVerbosity(verbosity);
-
-  // call srand() with a rank-dependent seed
-  initRand();
-
-  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
-  if (::quda::comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-  test_rc = RUN_ALL_TESTS();
-
-  endQuda();
-  finalizeComms();
-
-  return test_rc;
+  quda_test test("IO Test", argc, argv);
+  test.init();
+  return test.execute();
 }
 
 using ::testing::Combine;

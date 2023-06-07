@@ -681,8 +681,6 @@ namespace quda {
 
    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
    bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
-   unsigned int sharedBytesPerThread() const { return 0; }
-   unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
    static constexpr bool enable_coarse_shmem_overlap = Launch::enable_coarse_shmem_overlap();
 
  public:

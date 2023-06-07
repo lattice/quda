@@ -58,16 +58,30 @@ namespace quda {
     virtual long long bytes() const { return 0; }
 
     // the minimum number of shared bytes per thread
-    virtual unsigned int sharedBytesPerThread() const = 0;
+    virtual unsigned int sharedBytesPerThread() const { return 0; }
 
     // the minimum number of shared bytes per thread block
-    virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const = 0;
+    virtual unsigned int sharedBytesPerBlock(const TuneParam &) const{ return 0; }
 
     // override this if a specific thread count is required (e.g., if not grid size tuning)
     virtual unsigned int minThreads() const { return 1; }
     virtual bool tuneGridDim() const { return true; }
     virtual bool tuneAuxDim() const { return false; }
-    virtual bool tuneSharedBytes() const { return true; }
+
+    virtual bool tuneSharedBytes() const
+    {
+      static bool tune_shared = true;
+      static bool init = false;
+
+      if (!init) {
+        char *enable_shared_env = getenv("QUDA_ENABLE_TUNING_SHARED");
+        if (enable_shared_env) {
+          if (strcmp(enable_shared_env, "0") == 0) { tune_shared = false; }
+        }
+        init = true;
+      }
+      return tune_shared;
+    }
 
     virtual bool advanceGridDim(TuneParam &param) const
     {
@@ -238,7 +252,7 @@ namespace quda {
 
   public:
     Tunable() : launch_error(QUDA_SUCCESS) { aux[0] = '\0'; }
-    virtual ~Tunable() { }
+    virtual ~Tunable() = default;
     virtual TuneKey tuneKey() const = 0;
     virtual void apply(const qudaStream_t &stream) = 0;
     virtual void preTune() { }
@@ -362,6 +376,13 @@ namespace quda {
         errorQuda("aux tuning enabled but param.aux is not initialized");
     }
 
+    /**
+     * @brief Return the rank on which kernel tuning is performed.
+     * This will default to 0, but can be globally overriden with the
+     * QUDA_TUNING_RANK environment variable.
+     */
+    virtual int32_t getTuneRank() const;
+
     qudaError_t launchError() const { return launch_error; }
     qudaError_t &launchError() { return launch_error; }
   };
@@ -385,7 +406,18 @@ namespace quda {
    */
   void flushProfile();
 
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
+  /**
+   * @brief Launch the autotuner.  If the tunable instance has already
+   * been tuned, the launch parameters will be returned immediately.
+   * If not, autotuner will commence, if enabled, else default launch
+   * parameters will be returned.
+   * @param[in,out] tunable The instance tunable we are tuning
+   * @param[in] Whether tuning is enabled (if not then just return the
+   * default parameters specificed in Tunable::defaultTuneParam()
+   * @param[in] verbosity What verbosity to use during tuning?
+   * @return The tuned launch parameters
+   */
+  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled = getTuning(), QudaVerbosity verbosity = getVerbosity());
 
   /**
    * @brief Post an event in the trace, recording where it was posted

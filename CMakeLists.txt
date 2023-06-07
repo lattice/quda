@@ -157,6 +157,8 @@ option(QUDA_COVDEV "build code for covariant derivative" OFF)
 option(QUDA_LAPLACE "build laplace operator" OFF)
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
 
+option(QUDA_SMEAR_GAUSS_TWOLINK "build code for two-link Gaussian smearing" OFF)
+
 # Multi-GPU options
 option(QUDA_QMP "build the QMP multi-GPU code" OFF)
 option(QUDA_MPI "build the MPI multi-GPU code" OFF)
@@ -203,6 +205,7 @@ set_property(CACHE QUDA_ORDER_SP_MG PROPERTY STRINGS 2 4)
 set_property(CACHE QUDA_ORDER_FP_MG PROPERTY STRINGS 2 4 8)
 
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
+option(QUDA_BUILD_NATIVE_FFT "build the native FFT library according to QUDA_TARGET" ON)
 
 # QUDA uses tiling routines to compute certain BLAS routines. The maximum allowable
 # tile size is governed by this number. The larger the number, the faster the routines
@@ -315,6 +318,10 @@ endif()
 
 if(QUDA_NVSHMEM AND NOT (QUDA_QMP OR QUDA_MPI))
   message(SEND_ERROR "Specifying QUDA_NVSHMEM requires either QUDA_QMP or QUDA_MPI.")
+endif()
+
+if(QUDA_SMEAR_GAUSS_TWOLINK AND NOT QUDA_DIRAC_STAGGERED)
+  message(SEND_ERROR "Specifying QUDA_SMEAR_GAUSS_TWOLINK requires QUDA_DIRAC_STAGGERED.")
 endif()
 
 # COMPILER FLAGS Linux: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Mac: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Power:
@@ -451,26 +458,28 @@ endif()
 if(QUDA_MPI OR QUDA_QMP)
   # if we are using MPI and no MPI_<LANG>_COMPILER was specified on the command line
   # check for MPICXX and MPICC environment variables
-  if((NOT MPI_CXX_COMPILER) AND DEFINED ENV{MPICXX})
-    set(MPI_CXX_COMPILER $ENV{MPICXX})
-    set(mpimessage True)
-    message(STATUS "Found environment variable MPICXX. Using it for MPI detection: $ENV{MPICXX}")
-  endif()
-  if((NOT MPI_C_COMPILER) AND DEFINED ENV{MPICC})
-    message(STATUS "Found environment variable MPICC. Using it for MPI detection: $ENV{MPICC}")
-    set(MPI_C_COMPILER $ENV{MPICC})
-    set(mpimessage True)
-  endif()
-  # I think we don't use that at all but
-  if((NOT MPI_Fortran_COMPILER) AND DEFINED ENV{MPIFORT})
-    message(STATUS "Found environment variable MPIFORT. Using it for MPI detection: $ENV{MPIFORT}")
-    set(MPI_Fortran_COMPILER $ENV{MPIFORT})
-    set(mpimessage True)
-  endif()
-  if(mpimessage)
-    message(
-      "Found MPIFORT/MPICC/MPICXX environment variables. If this is not what you want please use -DMPI_<LANG>_COMPILER and consult the cmake FindMPI documentation."
-      )
+  if( NOT QUDA_SPACK_BUILD )
+    if((NOT MPI_CXX_COMPILER) AND DEFINED ENV{MPICXX})
+      set(MPI_CXX_COMPILER $ENV{MPICXX})
+      set(mpimessage True)
+      message(STATUS "Found environment variable MPICXX. Using it for MPI detection: $ENV{MPICXX}")
+    endif()
+    if((NOT MPI_C_COMPILER) AND DEFINED ENV{MPICC})
+      message(STATUS "Found environment variable MPICC. Using it for MPI detection: $ENV{MPICC}")
+      set(MPI_C_COMPILER $ENV{MPICC})
+      set(mpimessage True)
+    endif()
+    # I think we don't use that at all but
+    if((NOT MPI_Fortran_COMPILER) AND DEFINED ENV{MPIFORT})
+      message(STATUS "Found environment variable MPIFORT. Using it for MPI detection: $ENV{MPIFORT}")
+      set(MPI_Fortran_COMPILER $ENV{MPIFORT})
+      set(mpimessage True)
+    endif()
+    if(mpimessage)
+      message(
+        "Found MPIFORT/MPICC/MPICXX environment variables. If this is not what you want please use -DMPI_<LANG>_COMPILER and consult the cmake FindMPI documentation."
+        )
+    endif()
   endif()
   find_package(MPI REQUIRED)
 endif()

@@ -227,6 +227,40 @@ static  void invalidateGaugeQuda() {
   qudamilc_called<false>(__func__);
 }
 
+static void getReconstruct(QudaReconstructType &reconstruct, QudaReconstructType &reconstruct_sloppy)
+{
+  static bool recon_queried = false;
+  static QudaReconstructType reconstruct_in = QUDA_RECONSTRUCT_INVALID;
+  static QudaReconstructType reconstruct_sloppy_in = QUDA_RECONSTRUCT_INVALID;
+  if (!recon_queried) {
+    char *reconstruct_env = getenv("QUDA_MILC_HISQ_RECONSTRUCT");
+    if (!reconstruct_env || strcmp(reconstruct_env, "18") == 0) {
+      reconstruct_in = QUDA_RECONSTRUCT_NO;
+    } else if (strcmp(reconstruct_env, "13") == 0) {
+      reconstruct_in = QUDA_RECONSTRUCT_13;
+    } else if (strcmp(reconstruct_env, "9") == 0) {
+      reconstruct_in = QUDA_RECONSTRUCT_9;
+    } else {
+      errorQuda("QUDA_MILC_HISQ_RECONSTRUCT=%s not supported", reconstruct_env);
+    }
+    char *reconstruct_sloppy_env = getenv("QUDA_MILC_HISQ_RECONSTRUCT_SLOPPY");
+    if (!reconstruct_sloppy_env) { // if env is not set, default to using outer reconstruct type
+      reconstruct_sloppy_in = reconstruct_in;
+    } else if (strcmp(reconstruct_sloppy_env, "18") == 0) {
+      reconstruct_sloppy_in = QUDA_RECONSTRUCT_NO;
+    } else if (strcmp(reconstruct_sloppy_env, "13") == 0) {
+      reconstruct_sloppy_in = QUDA_RECONSTRUCT_13;
+    } else if (strcmp(reconstruct_sloppy_env, "9") == 0) {
+      reconstruct_sloppy_in = QUDA_RECONSTRUCT_9;
+    } else {
+      errorQuda("QUDA_MILC_HISQ_RECONSTRUCT_SLOPPY=%s not supported", reconstruct_sloppy_env);
+    }
+    recon_queried = true;
+  }
+  reconstruct = reconstruct_in;
+  reconstruct_sloppy = reconstruct_sloppy_in;
+}
+
 void qudaLoadKSLink(int prec, QudaFatLinkArgs_t, const double act_path_coeff[6], void *inlink, void *fatlink,
                     void *longlink)
 {
@@ -277,6 +311,9 @@ void qudaHisqForce(int prec, int num_terms, int num_naik_terms, double dt, doubl
   qudamilc_called<true>(__func__);
 
   QudaGaugeParam gParam = newMILCGaugeParam(localDim, (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, QUDA_GENERAL_LINKS);
+
+  // Use to specify the reconstruct for the HISQ force calculation
+  getReconstruct(gParam.reconstruct, gParam.reconstruct_sloppy);
 
   if (!invalidate_quda_mom) {
     gParam.use_resident_mom = true;
@@ -901,37 +938,6 @@ static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, Qud
     invertParam->offset[i] = offset[i];
     invertParam->tol_offset[i] = target_residual_offset[i];
     invertParam->tol_hq_offset[i] = target_residual_hq_offset[i];
-  }
-}
-
-static void getReconstruct(QudaReconstructType &reconstruct, QudaReconstructType &reconstruct_sloppy)
-{
-  {
-    char *reconstruct_env = getenv("QUDA_MILC_HISQ_RECONSTRUCT");
-    if (!reconstruct_env || strcmp(reconstruct_env, "18") == 0) {
-      reconstruct = QUDA_RECONSTRUCT_NO;
-    } else if (strcmp(reconstruct_env, "13") == 0) {
-      reconstruct = QUDA_RECONSTRUCT_13;
-    } else if (strcmp(reconstruct_env, "9") == 0) {
-      reconstruct = QUDA_RECONSTRUCT_9;
-    } else {
-      errorQuda("QUDA_MILC_HISQ_RECONSTRUCT=%s not supported", reconstruct_env);
-    }
-  }
-
-  {
-    char *reconstruct_sloppy_env = getenv("QUDA_MILC_HISQ_RECONSTRUCT_SLOPPY");
-    if (!reconstruct_sloppy_env) { // if env is not set, default to using outer reconstruct type
-      reconstruct_sloppy = reconstruct;
-    } else if (strcmp(reconstruct_sloppy_env, "18") == 0) {
-      reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-    } else if (strcmp(reconstruct_sloppy_env, "13") == 0) {
-      reconstruct_sloppy = QUDA_RECONSTRUCT_13;
-    } else if (strcmp(reconstruct_sloppy_env, "9") == 0) {
-      reconstruct_sloppy = QUDA_RECONSTRUCT_9;
-    } else {
-      errorQuda("QUDA_MILC_HISQ_RECONSTRUCT_SLOPPY=%s not supported", reconstruct_sloppy_env);
-    }
   }
 }
 
@@ -2733,6 +2739,13 @@ void qudaFreeGaugeField() {
   freeGaugeQuda();
     qudamilc_called<false>(__func__);
 } // qudaFreeGaugeField
+
+void qudaFreeTwoLink()
+{
+  qudamilc_called<true>(__func__);
+  freeGaugeSmearedQuda();
+  qudamilc_called<false>(__func__);
+} // qudaFreeTwoLink
 
 void qudaLoadCloverField(int external_precision, int quda_precision, QudaInvertArgs_t inv_args, void *milc_clover,
                          void *milc_clover_inv, QudaSolutionType solution_type, QudaSolveType solve_type, QudaInverterType inverter,
