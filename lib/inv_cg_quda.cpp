@@ -712,15 +712,12 @@ namespace quda {
     ColorSpinorField &rSloppy = *rSloppyp;
     ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
 
-    const double uhigh = precisionEpsilon(); // solver precision
-
-    double beta = 0;
-
     // for detecting HQ residual stalls
     // let |r2/b2| drop to epsilon tolerance * 1e-30, semi-arbitrarily, but
     // with the intent of letting the solve grind as long as possible before
     // triggering a `NaN`. Ignored for pure double solves because if
     // pure double has stability issues, bigger problems are at hand.
+    const double uhigh = precisionEpsilon(); // solver precision
     const double hq_res_stall_check = is_pure_double ? 0. : uhigh * uhigh * 1e-60;
 
     // compute initial residual
@@ -750,15 +747,17 @@ namespace quda {
 
     double stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
 
-    double heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
-    double heavy_quark_res_old = heavy_quark_res;   // heavy quark residual
-    const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
+    // compute the initial heavy quark residual
+    double hq_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
-    double alpha, pAp;
+    double alpha, beta, sigma, pAp;
+
+    // Whether or not we also need to compute the L2 norm
+    const bool L2_required = param.residual_type & (QUDA_L2_RELATIVE_RESIDUAL | QUDA_L2_ABSOLUTE_RESIDUAL);
 
     // set L2breakdown to be immediately true if we aren't requesting an L2 norm, alternatively,
-    // it only gets set to true after the L2 norm has "stalled out"
-    bool L2breakdown = !(param.residual_type & (QUDA_L2_RELATIVE_RESIDUAL | QUDA_L2_ABSOLUTE_RESIDUAL));
+    // it only gets set to true after some heuristics suggest the L2 norm has "stalled out"
+    bool L2breakdown = !L2_required;
     const double L2breakdown_eps = 100. * uhigh;
 
 
@@ -768,27 +767,58 @@ namespace quda {
 
     int k = 0;
 
-    PrintStats("CG", k, r2, b2, heavy_quark_res);
+    PrintStats("CG", k, r2, b2, hq_res);
 
-    bool converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
+    bool converged = convergence(r2, hq_res, stop, param.tol_hq);
 
+    // Various parameters related to restarts
+
+    // Trackers for the L2 norm:
+    //  rNorm: current iterated |r|
+    // r0Norm: computed |r| at the last reliable update
     double rNorm = sqrt(r2);
     double r0Norm = rNorm;
-    double maxrx = rNorm;
-    double maxrr = rNorm;
-    bool updateX = false;
-    bool updateR = false;
-    int steps_since_reliable = 1;
-    int rUpdate = 0;
 
+    // If the computed |r| goes above r0Norm between reliable updates,
+    // update this ceiling. This goes into "R" type reliable updates.
+    double maxrx = L2breakdown ? hq_res : rNorm;
+    double maxrr = L2breakdown ? hq_res : rNorm;
+
+    // Trigger for explicitly counting residual updates and checking for L2breakdown
+    bool updateX = false;
+
+    // idk
+    bool updateR = false;
+
+    // count the number of times the computed residual has jumped above
+    // the previously computed residual, so long as the L2 norm hasn't
+    // broken down
     int resIncrease = 0;
+
+    // count the total number of residual increases has increased independent of resetting
     int resIncreaseTotal = 0;
+
+    // Trackers for the HQ residual
+    // hq0Res: computed HQ residual at the last reliable updated
+    double hq0Res = hq_res;
+
+    // count the number of times the computed hq residual has jumped above
+    // the previously computed residual
     int hqresIncrease = 0;
+
+    // count the total number of times a heavy quark restart has been triggered
+    // THIS NEEDS TO BE FIXED: IT CAN DEPEND ON ONLY THE COMPUTED L2 NORM DROPPING
+    // AFTER L2 BREAKDOWN!
     int hqresRestartTotal = 0;
+
+    // Count the steps since a reliable update and the total number of reliable updates.
+    // The steps since a reliable update is also used to make sure final convergence is
+    // based on the computed residual and not the iterated residual.
+    int rUpdate = 0;
+    int steps_since_reliable = 1;
 
     while ( !converged && k < param.maxiter ) {
       matSloppy(Ap, p);
-      double sigma;
 
       r2_old = r2;
 
@@ -800,117 +830,170 @@ namespace quda {
       auto cg_norm = blas::axpyCGNorm(-alpha, Ap, rSloppy);
       r2 = cg_norm.x;  // (r_new, r_new)
       sigma = cg_norm.y >= 0.0 ? cg_norm.y : r2;  // use r2 if (r_k+1, r_k+1-r_k) breaks
-
-      // reliable update conditions
       rNorm = sqrt(r2);
 
-      // from reliable_updates.h
-      if (rNorm > maxrx) maxrx = rNorm;
-      if (rNorm > maxrr) maxrr = rNorm;
-      updateX = (rNorm < param.delta * r0Norm && r0Norm <= maxrx);
-      updateR = ((rNorm < param.delta * maxrr && r0Norm <= maxrr) || updateX);
+      // If the iterated norm has dropped by more than a factor of delta, trigger
+      // an update.
 
-      if (updateX)
-        logQuda(QUDA_VERBOSE, "Triggered updateX via `(rNorm < param.delta * r0Norm && r0Norm <= maxrx)`\n");
+      // L2 based reliable update
+      if (!L2breakdown && (L2_required || convergenceL2(r2, hq_res, stop, param.tol_hq))) {
+        // if the iterated residual norm has gone above the most recent "baseline" norm,
+        // update the baseline norm.
+        if (rNorm > maxrx) maxrx = rNorm;
+        if (rNorm > maxrr) maxrr = rNorm;
 
-      if (updateR)
-        logQuda(QUDA_VERBOSE, "Triggered updateR via `((rNorm < param.delta * maxrr && r0Norm <= maxrr) || updateX)`\n");
+        // Has the iterated norm dropped by a factor of delta from the last computed norm?
+        updateX = (rNorm < param.delta * r0Norm && r0Norm <= maxrx);
+
+        // Has the iterated norm dropped by a factor of delta relative to the largest the
+        // iterated norm has been since the last update?
+        updateR = ((rNorm < param.delta * maxrr && r0Norm <= maxrr) || updateX);
+
+        if (updateX)
+          logQuda(QUDA_VERBOSE, "Triggered L2 updateX via `(rNorm < param.delta * r0Norm && r0Norm <= maxrx)`\n");
+
+        if (updateR)
+          logQuda(QUDA_VERBOSE, "Triggered L2 updateR via `((rNorm < param.delta * maxrr && r0Norm <= maxrr) || updateX)`\n");
+      } else {
+        // hqresidual based reliable update
+        if (hq_res > maxrx) maxrx = hq_res;
+        if (hq_res > maxrr) maxrr = hq_res;
+
+        // I'm making the decision to use `param.delta` for the hq_res check because
+        // in some regards it's an L2-esque norm...
+
+        // Has the iterated heavy quark residual dropped by a factor of delta^2 from the last
+        // computed norm?
+        updateX = (hq_res < param.delta * param.delta * hq0Res && r0Norm <= maxrx);
+
+        // Has the iterated heavy quark residual dropped by a factor of delta relative
+        // to the largest the iterated norm has been since the last update?
+        updateR = ((hq_res < param.delta * param.delta * maxrr && hq0Res <= maxrr) || updateX);
+
+        if (updateX)
+          logQuda(QUDA_VERBOSE, "Triggered HQ updateX via `(hq_res < param.delta * hq0Res && hq0Res <= maxrx)`\n");
+
+        if (updateR)
+          logQuda(QUDA_VERBOSE, "Triggered HQ updateR via `((hq_res < param.delta * maxrr && hq0Res <= maxrr) || updateX)`\n");
+      }
 
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
-      if (convergence(r2, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol) {
+      if (convergence(r2, hq_res, stop, param.tol_hq) && param.delta >= param.tol) {
         updateX = true;
         logQuda(QUDA_VERBOSE, "Triggered updateX via convergence && delta > tol check\n");
       }
 
-      if (L2breakdown
-          && (convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq) || (r2 / b2) < hq_res_stall_check)
-          && param.delta >= param.tol) {
+      // force a reliable update based on the HQ residual if L2 breakdown has already happened
+      if (L2breakdown && (convergenceHQ(r2, hq_res, stop, param.tol_hq) || (r2 / b2) < hq_res_stall_check) &&
+          param.delta >= param.tol) {
         updateX = true;
         logQuda(QUDA_VERBOSE, "Triggered updateX via L2breakdown condition\n");
       }
 
       if (!(updateR || updateX)) {
+        // No reliable update needed
+
         beta = sigma / r2_old;  // use the alternative beta computation
 
         blas::axpyZpbx(alpha, p, xSloppy, rSloppy, beta);
 
-        if (k % heavy_quark_check == 0) {
+        if (k % param.heavy_quark_check == 0) {
           if (&x != &xSloppy) {
             blas::copy(tmp, y);
-            heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
+            hq_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
           } else {
             blas::copy(r, rSloppy);
-            heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
+            hq_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
           }
         }
 
         steps_since_reliable++;
 
       } else {
+        // We're performing a reliable update:
 
-
+        // Accumulate p into x, accumulate x into the total solution y, explicitly recompute the residual vector
         blas::axpy(alpha, p, xSloppy);
-
         blas::copy(x, xSloppy); // no op when these pointers alias
 
         blas::xpy(x, y);
         mat(r, y);
         r2 = blas::xmyNorm(b, r);
+        hq_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
+
+        // reset the L2 reliable update baseline
+        rNorm = sqrt(r2);
 
         blas::copy(rSloppy, r); // no op when these pointers alias
         blas::zero(xSloppy);
 
-        rNorm = sqrt(r2);
-        maxrr = rNorm;
-        maxrx = rNorm;
+        // check for L2 convergence
+        if (!L2breakdown && L2_required && convergenceL2(r2, hq_res, stop, param.tol_hq))
+          L2breakdown = true;
 
-        // calculate new reliable HQ resididual
-        heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
+        // Reset the reliable update baseline
+        if (!L2breakdown) {
+          maxrr = rNorm;
+          maxrx = rNorm;
+        } else {
+          maxrr = hq_res;
+          maxrx = hq_res;
+
+          // Increment the total number of HQ restarts
+          hqresRestartTotal++;
+
+          // set that we're doing a heavy quark restart
+          heavy_quark_restart = true;
+
+          warningQuda("CG: Restarting without reliable updates for heavy-quark residual (total #inc %i)",
+                      hqresRestartTotal);
+
+          if (hqresRestartTotal > param.max_hq_res_restart_total) {
+            warningQuda("CG: solver exiting due to too many heavy quark residual restarts (%i/%i)", hqresRestartTotal,
+                        param.max_hq_res_restart_total);
+            break;
+          }
+        }
 
         // break-out check if we have reached the limit of the precision
-        if (sqrt(r2) > r0Norm && updateX && !L2breakdown) { // reuse r0Norm for this
+        // we're reusing r0Norm for this check
+        if (rNorm > r0Norm && updateX && !L2breakdown) {
           resIncrease++;
           resIncreaseTotal++;
           warningQuda("new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
                       sqrt(r2), r0Norm, resIncreaseTotal);
 
-          if (sqrt(r2) < L2breakdown_eps
-                || resIncrease > param.max_res_increase
-                || resIncreaseTotal > param.max_res_increase_total
-                || r2 < stop) {
+          if (rNorm < L2breakdown_eps || resIncrease > param.max_res_increase
+                || resIncreaseTotal > param.max_res_increase_total || r2 < stop) {
             L2breakdown = true;
-            warningQuda("L2 breakdown %e, %e", sqrt(r2), L2breakdown_eps);
+            warningQuda("L2 breakdown %e, %e", rNorm, L2breakdown_eps);
+
+            // we now switch over to reliable updates based on hq values
+            // hq0Res is set below
+            maxrr = hq_res;
+            maxrx = hq_res;
+
           }
         } else {
           resIncrease = 0;
         }
 
         // if L2 broke down already we turn off reliable updates and restart the CG
-        if (L2breakdown) {
-          hqresRestartTotal++; // count the number of heavy quark restarts we've done
-          warningQuda("CG: Restarting without reliable updates for heavy-quark residual (total #inc %i)",
-                      hqresRestartTotal);
-          heavy_quark_restart = true;
+        if (hq_res > hq0Res && updateX && L2breakdown) {
+          // count the number of consecutive increases
+          hqresIncrease++;
 
-          if (heavy_quark_res > heavy_quark_res_old) { // check if new hq residual is greater than previous
-            hqresIncrease++;                           // count the number of consecutive increases
-            warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e",
-                        heavy_quark_res, heavy_quark_res_old);
-            // break out if we do not improve here anymore
-            if (hqresIncrease > param.max_hq_res_increase) {
-              warningQuda("CG: solver exiting due to too many heavy quark residual norm increases (%i/%i)", hqresIncrease,
-                          param.max_hq_res_increase);
-              break;
-            }
-          } else {
-            hqresIncrease = 0;
+          warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e",
+                        hq_res, hq0Res);
+
+          // break out if we do not improve here anymore
+          if (hqresIncrease > param.max_hq_res_increase) {
+            warningQuda("CG: solver exiting due to too many heavy quark residual norm increases (%i/%i)", hqresIncrease,
+                        param.max_hq_res_increase);
+            break;
           }
-        }
-
-        if (hqresRestartTotal > param.max_hq_res_restart_total) {
-          warningQuda("CG: solver exiting due to too many heavy quark residual restarts (%i/%i)", hqresRestartTotal,
-                      param.max_hq_res_restart_total);
-          break;
+        } else {
+          hqresIncrease = 0;
         }
 
         if (heavy_quark_restart) {
@@ -932,22 +1015,22 @@ namespace quda {
         r0Norm = sqrt(r2);
         rUpdate++;
 
-        heavy_quark_res_old = heavy_quark_res;
+        hq0Res = hq_res;
       }
 
       k++;
 
-      PrintStats("CG", k, r2, b2, heavy_quark_res);
+      PrintStats("CG", k, r2, b2, hq_res);
       // check convergence, if convergence is satisfied we only need to check that we had a reliable update for the heavy quarks recently
-      converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
+      converged = convergence(r2, hq_res, stop, param.tol_hq);
 
       // check for recent enough reliable updates of the HQ residual if we use it
-        // L2 is converged or precision maxed out for L2
-        bool L2done = L2breakdown or convergenceL2(r2, heavy_quark_res, stop, param.tol_hq);
-        // HQ is converged and if we do reliable update the HQ residual has been calculated using a reliable update
-        bool HQdone = (steps_since_reliable == 0 && param.delta > 0)
-          && convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq);
-        converged = L2done && HQdone;
+
+      // L2 is converged or precision maxed out for L2
+      bool L2done = L2breakdown || convergenceL2(r2, hq_res, stop, param.tol_hq);
+      // HQ is converged and if we do reliable update the HQ residual has been calculated using a reliable update
+      bool HQdone = (steps_since_reliable == 0 && param.delta > 0) && convergenceHQ(r2, hq_res, stop, param.tol_hq);
+      converged = L2done && HQdone;
 
     }
 
