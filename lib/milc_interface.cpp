@@ -93,12 +93,15 @@ void qudaSetMPICommHandle(void *mycomm) { setMPICommHandleQuda(mycomm); }
 
 void qudaInit(QudaInitArgs_t input)
 {
+  // Calling qudamilc_called with QUDA_SUMMARIZE hand-baked in is intentional:
+  // if the default verbosity is QUDA_VERBOSE or greater, the printfQuda
+  // inside qudamilc_called will barf because qudaSetLayout hasn't been called yet.
   if (initialized) return;
   setVerbosityQuda(input.verbosity, "", stdout);
-  qudamilc_called<true>(__func__);
+  qudamilc_called<true>(__func__, QUDA_SUMMARIZE);
   qudaSetLayout(input.layout);
   initialized = true;
-  qudamilc_called<false>(__func__);
+  qudamilc_called<false>(__func__, QUDA_SUMMARIZE);
 }
 
 void qudaFinalize()
