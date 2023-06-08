@@ -159,9 +159,7 @@ namespace quda {
       Y_d = std::make_shared<cudaGaugeField>(gParam);
       GaugeFieldParam milcParam(*Y_d);
       milcParam.order = QUDA_MILC_GAUGE_ORDER;
-      if (need_aos_gauge_copy) {
-        Y_aos_d = std::make_shared<cudaGaugeField>(milcParam);
-      }
+      if (need_aos_gauge_copy) { Y_aos_d = std::make_shared<cudaGaugeField>(milcParam); }
     } else
       Y_h = std::make_shared<cpuGaugeField>(gParam);
 
@@ -174,9 +172,7 @@ namespace quda {
       X_d = std::make_shared<cudaGaugeField>(gParam);
       GaugeFieldParam milcParam(*X_d);
       milcParam.order = QUDA_MILC_GAUGE_ORDER;
-      if (need_aos_gauge_copy) {
-        X_aos_d = std::make_shared<cudaGaugeField>(milcParam);
-      }
+      if (need_aos_gauge_copy) { X_aos_d = std::make_shared<cudaGaugeField>(milcParam); }
     } else
       X_h = std::make_shared<cpuGaugeField>(gParam);
   }
@@ -215,9 +211,7 @@ namespace quda {
       Yhat_d = std::make_shared<cudaGaugeField>(gParam);
       GaugeFieldParam milcParam(*Yhat_d);
       milcParam.order = QUDA_MILC_GAUGE_ORDER;
-      if (need_aos_gauge_copy) {
-        Yhat_aos_d = std::make_shared<cudaGaugeField>(milcParam);
-      }
+      if (need_aos_gauge_copy) { Yhat_aos_d = std::make_shared<cudaGaugeField>(milcParam); }
     } else
       Yhat_h = std::make_shared<cpuGaugeField>(gParam);
 
@@ -231,9 +225,7 @@ namespace quda {
       Xinv_d = std::make_shared<cudaGaugeField>(gParam);
       GaugeFieldParam milcParam(*Xinv_d);
       milcParam.order = QUDA_MILC_GAUGE_ORDER;
-      if (need_aos_gauge_copy) {
-        Xinv_aos_d = std::make_shared<cudaGaugeField>(milcParam);
-      }
+      if (need_aos_gauge_copy) { Xinv_aos_d = std::make_shared<cudaGaugeField>(milcParam); }
     } else
       Xinv_h = std::make_shared<cpuGaugeField>(gParam);
   }
@@ -334,22 +326,16 @@ namespace quda {
       createY(true, mapped);
       createYhat(true);
       Y_d->copy(*Y_h);
-      if (need_aos_gauge_copy) {
-        Y_aos_d->copy(*Y_d);
-      }
+      if (need_aos_gauge_copy) { Y_aos_d->copy(*Y_d); }
       Yhat_d->copy(*Yhat_h);
       if (need_aos_gauge_copy) {
         Yhat_aos_d->copy(*Yhat_d);
         Yhat_aos_d->exchangeGhost(QUDA_LINK_BIDIRECTIONAL);
       }
       X_d->copy(*X_h);
-      if (need_aos_gauge_copy) {
-        X_aos_d->copy(*X_d);
-      }
+      if (need_aos_gauge_copy) { X_aos_d->copy(*X_d); }
       Xinv_d->copy(*Xinv_h);
-      if (need_aos_gauge_copy) {
-        Xinv_aos_d->copy(*Xinv_d);
-      }
+      if (need_aos_gauge_copy) { Xinv_aos_d->copy(*Xinv_d); }
       enable_gpu = true;
       init_gpu = true;
       break;
@@ -502,9 +488,7 @@ namespace quda {
                      QUDA_MATPC_INVALID, need_bidirectional);
     } else {
       initializeLazy(QUDA_CUDA_FIELD_LOCATION);
-      if (Y.Order() != X.Order()) {
-        errorQuda("Y/X order mismatch in createCoarseOp: %d %d\n", Y.Order(), X.Order());
-      }
+      if (Y.Order() != X.Order()) { errorQuda("Y/X order mismatch in createCoarseOp: %d %d\n", Y.Order(), X.Order()); }
       bool use_mma = Y.Order() == QUDA_MILC_GAUGE_ORDER;
       CoarseCoarseOp(Y, X, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, mass, a, mu_factor, QUDA_COARSE_DIRAC,
                      QUDA_MATPC_INVALID, need_bidirectional, use_mma);
@@ -736,9 +720,7 @@ namespace quda {
                      QUDA_COARSEPC_DIRAC, matpcType, true);
     } else {
       initializeLazy(QUDA_CUDA_FIELD_LOCATION);
-      if (Y.Order() != X.Order()) {
-        errorQuda("Y/X order mismatch in createCoarseOp: %d %d\n", Y.Order(), X.Order());
-      }
+      if (Y.Order() != X.Order()) { errorQuda("Y/X order mismatch in createCoarseOp: %d %d\n", Y.Order(), X.Order()); }
       bool use_mma = Y.Order() == QUDA_MILC_GAUGE_ORDER;
       CoarseCoarseOp(Y, X, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, mass, a, -mu_factor,
                      QUDA_COARSEPC_DIRAC, matpcType, true, use_mma);

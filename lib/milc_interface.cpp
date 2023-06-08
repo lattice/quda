@@ -1755,7 +1755,7 @@ struct mgInputStruct {
         if (input_line[1][0] == 't') {
           for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
             setup_use_mma[i] = true;
-            dslash_use_mma[i] = true;  
+            dslash_use_mma[i] = true;
           }
         } else {
           for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
