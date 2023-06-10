@@ -1,4 +1,4 @@
-name: amd-build-ci
+name: rocm-build-ci
 run-name: ${{ github.actor }} is kicking off a ROCm build
 on: pull_request
 jobs:
