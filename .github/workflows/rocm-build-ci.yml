@@ -27,7 +27,6 @@ jobs:
             -DQUDA_DIRAC_TWISTED_CLOVER=OFF \
             -DQUDA_DIRAC_WILSON=ON \
             -DQUDA_CLOVER_DYNAMIC=ON \
-            -DQUDA_FORCE_HISQ=ON \
             -DQUDA_QDPJIT=OFF \
             -DQUDA_INTERFACE_QDPJIT=OFF \
             -DQUDA_INTERFACE_MILC=ON \
@@ -38,9 +37,8 @@ jobs:
             -DQUDA_DOWNLOAD_USQCD=ON \
             -DQUDA_OPENMP=OFF \
             -DQUDA_MULTIGRID=ON \
-            -DQUDA_MAX_MULTI_BLAS_N=9 \
             -DQUDA_DOWNLOAD_EIGEN=ON \
-            -DQUDA_PRECISION=8 \
+            -DQUDA_PRECISION=14 \
             -DCMAKE_INSTALL_PREFIX=${INSTALLROOT} \
             -DCMAKE_BUILD_TYPE="DEBUG" \
             -DCMAKE_CXX_COMPILER="${ROCM_PATH}/llvm/bin/clang++" \
