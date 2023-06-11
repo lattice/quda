@@ -40,7 +40,7 @@ jobs:
             -DQUDA_DOWNLOAD_EIGEN=ON \
             -DQUDA_PRECISION=14 \
             -DCMAKE_INSTALL_PREFIX=${INSTALLROOT} \
-            -DCMAKE_BUILD_TYPE="RELEASE" \
+            -DCMAKE_BUILD_TYPE="DEVEL" \
             -DCMAKE_CXX_COMPILER="${ROCM_PATH}/llvm/bin/clang++" \
             -DCMAKE_C_COMPILER="${ROCM_PATH}/llvm/bin/clang" \
             -DCMAKE_HIP_COMPILER="${ROCM_PATH}/llvm/bin/clang++" \
