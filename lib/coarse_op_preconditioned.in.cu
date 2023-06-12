@@ -106,9 +106,8 @@ namespace quda
           return true;
         }
         return false;
-      } else {
-        return false;
       }
+      return false;
     }
 
     bool advanceTuneParam(TuneParam &param) const
