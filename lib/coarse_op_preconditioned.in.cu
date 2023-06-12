@@ -50,7 +50,9 @@ namespace quda
       if constexpr (use_mma) {
         if (location == QUDA_CUDA_FIELD_LOCATION) {
           strcat(aux, ",mma");
+#ifdef QUDA_ENABLE_MMA
           strcat(aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
+#endif
         }
       }
       if (Arg::compute_max) strcat(aux, ",compute_max");

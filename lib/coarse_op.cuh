@@ -793,7 +793,9 @@ namespace quda {
         strcat(Aux, ",computeUV");
         if constexpr (use_mma) {
           strcat(Aux, ",mma");
+#ifdef QUDA_ENABLE_MMA
           strcat(Aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
+#endif
         }
       }
       else if (type == COMPUTE_LV) strcat(Aux, ",computeLV");
@@ -806,7 +808,9 @@ namespace quda {
         strcat(Aux, ",computeVUV");
         if constexpr (use_mma) {
           strcat(Aux, ",mma");
+#ifdef QUDA_ENABLE_MMA
           strcat(Aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
+#endif
         }
       }
       else if (type == COMPUTE_VLV) strcat(Aux, ",computeVLV");
