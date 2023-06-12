@@ -791,7 +791,7 @@ namespace quda {
 
       if (type == COMPUTE_UV) {
         strcat(Aux, ",computeUV");
-        if (use_mma) {
+        if constexpr (use_mma) {
           strcat(Aux, ",mma");
           strcat(Aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
         }
@@ -804,7 +804,7 @@ namespace quda {
       else if (type == COMPUTE_KV)                 strcat(Aux, ",computeKV");
       else if (type == COMPUTE_VUV) {
         strcat(Aux, ",computeVUV");
-        if (use_mma) {
+        if constexpr (use_mma) {
           strcat(Aux, ",mma");
           strcat(Aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
         }
