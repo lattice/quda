@@ -287,54 +287,6 @@ if(${QUDA_TARGET_TYPE} STREQUAL "SYCL")
   include(targets/sycl/target_sycl.cmake)
 endif()
 
-if((${QUDA_TARGET_TYPE} STREQUAL "CUDA") AND (${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 70))
-  set(MRHS_MMA_ENABLED 1)
-else()
-  set(MRHS_MMA_ENABLED 0)
-endif()
-
-if(${MRHS_MMA_ENABLED})
-  set(QUDA_MULTIGRID_MRHS_DEFAULT_LIST "16")
-else()
-  set(QUDA_MULTIGRID_MRHS_DEFAULT_LIST "")
-endif()
-set(QUDA_MULTIGRID_MRHS_LIST ${QUDA_MULTIGRID_MRHS_DEFAULT_LIST} CACHE STRING "The list of multi-rhs sizes that get compiled")
-mark_as_advanced(QUDA_MULTIGRID_MRHS_LIST)
-message(STATUS "QUDA_MULTIGRID_MRHS_LIST=${QUDA_MULTIGRID_MRHS_LIST}")
-
-if(QUDA_MULTIGRID)
-  string(REPLACE "," ";" QUDA_MULTIGRID_MRHS_LIST_SEMICOLON "${QUDA_MULTIGRID_MRHS_LIST}")
-
-  if((${QUDA_COMPUTE_CAPABILITY} LESS 80) AND (${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 70))
-    set(MRHS_ATOM 16)
-  endif()
-
-  if(${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 80)
-    set(MRHS_ATOM 8)
-  endif()
-
-  # add dslash_coarse last to the list so it is compiled first
-  foreach(QUDA_MULTIGRID_NVEC ${QUDA_MULTIGRID_NVEC_LIST_SEMICOLON})
-    foreach(QUDA_MULTIGRID_MRHS ${QUDA_MULTIGRID_MRHS_LIST_SEMICOLON})
-
-      math(EXPR MRHS_MODULO "${QUDA_MULTIGRID_MRHS} % ${MRHS_ATOM}")
-
-      if(${MRHS_MMA_ENABLED} AND (${QUDA_MULTIGRID_MRHS} GREATER 0) AND (${QUDA_MULTIGRID_MRHS} LESS_EQUAL 64) AND (${MRHS_MODULO} EQUAL 0))
-        set(QUDA_MULTIGRID_DAGGER "false")
-        configure_file(dslash_coarse_mma.in.cu "dslash_coarse_mma_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu" @ONLY)
-        list(PREPEND QUDA_CU_OBJS "dslash_coarse_mma_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu")
-        set(QUDA_MULTIGRID_DAGGER "true")
-        configure_file(dslash_coarse_mma.in.cu "dslash_coarse_mma_dagger_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu" @ONLY)
-        list(PREPEND QUDA_CU_OBJS "dslash_coarse_mma_dagger_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu")
-      else()
-        message(SEND_ERROR "MRHS not supported:" "${QUDA_MULTIGRID_MRHS}")
-      endif()
-
-    endforeach()
-  endforeach()
-
-endif()
-
 # make one library
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pack>:$<TARGET_OBJECTS:quda_pack>>
                             ${QUDA_CU_OBJS})
