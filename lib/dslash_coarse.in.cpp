@@ -72,7 +72,7 @@ namespace quda
   template <class F> auto create_color_spinor_copy(cvector_ref<F> &fs, QudaFieldOrder order)
   {
     ColorSpinorParam param(fs[0]);
-    int nVec = (fs.size() + 7) / 8 * 8;   // Make a multiple of 8
+    int nVec = (fs.size() + 7) / 8 * 8; // Make a multiple of 8
     param.nColor = fs[0].Ncolor() * nVec;
     param.nVec = nVec;
     param.create = QUDA_NULL_FIELD_CREATE;

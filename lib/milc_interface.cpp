@@ -93,12 +93,15 @@ void qudaSetMPICommHandle(void *mycomm) { setMPICommHandleQuda(mycomm); }
 
 void qudaInit(QudaInitArgs_t input)
 {
+  // Calling qudamilc_called with QUDA_SUMMARIZE hand-baked in is intentional:
+  // if the default verbosity is QUDA_VERBOSE or greater, the printfQuda
+  // inside qudamilc_called will barf because qudaSetLayout hasn't been called yet.
   if (initialized) return;
   setVerbosityQuda(input.verbosity, "", stdout);
-  qudamilc_called<true>(__func__);
+  qudamilc_called<true>(__func__, QUDA_SUMMARIZE);
   qudaSetLayout(input.layout);
   initialized = true;
-  qudamilc_called<false>(__func__);
+  qudamilc_called<false>(__func__, QUDA_SUMMARIZE);
 }
 
 void qudaFinalize()
@@ -1510,6 +1513,9 @@ struct mgInputStruct {
       mg_vec_outfile[i][0] = 0;
       for (int d = 0; d < 4; d++) { geo_block_size[i][d] = 2; }
 
+      setup_use_mma[i] = true;
+      dslash_use_mma[i] = true;
+
       coarse_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
       coarse_solver[i] = QUDA_GCR_INVERTER;
       coarse_solver_tol[i] = 0.25;
@@ -1562,13 +1568,6 @@ struct mgInputStruct {
     geo_block_size[2][3] = 2;
 
     /* Setup */
-
-    setup_use_mma[0] = true;
-    setup_use_mma[1] = true;
-    setup_use_mma[2] = true;
-    dslash_use_mma[0] = true;
-    dslash_use_mma[1] = true;
-    dslash_use_mma[2] = true;
 
     /* level 0 -> 1 is K-D, no customization */
 
@@ -1749,18 +1748,21 @@ struct mgInputStruct {
       } else {
         optimized_kd = getQudaTransferType(input_line[1].c_str());
       }
-
-    } else if (strcmp(input_line[0].c_str(), "setup_use_mma") == 0) {
-      if (input_line.size() < 3) {
+    } else if (strcmp(input_line[0].c_str(), "use_mma") == 0) {
+      if (input_line.size() < 2) {
         error_code = 1;
       } else {
-        setup_use_mma[atoi(input_line[1].c_str())] = input_line[2][0] == 't' ? true : false;
-      }
-    } else if (strcmp(input_line[0].c_str(), "dslash_use_mma") == 0) {
-      if (input_line.size() < 3) {
-        error_code = 1;
-      } else {
-        dslash_use_mma[atoi(input_line[1].c_str())] = input_line[2][0] == 't' ? true : false;
+        if (input_line[1][0] == 't') {
+          for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
+            setup_use_mma[i] = true;
+            dslash_use_mma[i] = true;
+          }
+        } else {
+          for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
+            setup_use_mma[i] = false;
+            dslash_use_mma[i] = false;
+          }
+        }
       }
     } else if (strcmp(input_line[0].c_str(), "allow_truncation") == 0) {
       if (input_line.size() < 2) {
