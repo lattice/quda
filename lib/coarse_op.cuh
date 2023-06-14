@@ -793,7 +793,7 @@ namespace quda {
         strcat(Aux, ",computeUV");
         if constexpr (use_mma) {
           strcat(Aux, ",mma");
-#ifdef QUDA_ENABLE_MMA
+#ifdef QUDA_MMA_AVAILABLE
           strcat(Aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
 #endif
         }
@@ -808,7 +808,7 @@ namespace quda {
         strcat(Aux, ",computeVUV");
         if constexpr (use_mma) {
           strcat(Aux, ",mma");
-#ifdef QUDA_ENABLE_MMA
+#ifdef QUDA_MMA_AVAILABLE
           strcat(Aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
 #endif
         }

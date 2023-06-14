@@ -7,6 +7,7 @@ namespace quda
   template <int...> struct IntList {
   };
 
+#if defined(QUDA_MMA_AVAILABLE)
   template <bool dagger, int Nc, int nVec, int... N>
   void ApplyCoarseMma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                       cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
@@ -24,6 +25,16 @@ namespace quda
       }
     }
   }
+ #else
+  template <bool dagger, int Nc, int nVec, int... N>
+  void ApplyCoarseMma(cvector_ref<ColorSpinorField> &, cvector_ref<const ColorSpinorField> &,
+                      cvector_ref<const ColorSpinorField> &, const GaugeField &, const GaugeField &, double,
+                      int, bool, bool, const int *, QudaPrecision,
+                      IntList<nVec, N...>)
+  {
+    errorQuda("MMA not instantiated");
+  }
+ #endif
 
   template <bool use_mma, int Nc, int... N>
   void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,

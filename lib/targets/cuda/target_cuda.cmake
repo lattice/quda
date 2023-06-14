@@ -195,33 +195,34 @@ if(QUDA_MULTIGRID)
 
   string(REPLACE "," ";" QUDA_MULTIGRID_MRHS_LIST_SEMICOLON "${QUDA_MULTIGRID_MRHS_LIST}")
 
-  if((${QUDA_COMPUTE_CAPABILITY} LESS 80) AND (${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 70))
-    set(MRHS_ATOM 16)
-  endif()
+  if(${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 70)
 
-  if(${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 80)
-    set(MRHS_ATOM 8)
-  endif()
+    if(${QUDA_COMPUTE_CAPABILITY} EQUAL 70)
+      set(MRHS_ATOM 16)
+    else()
+      set(MRHS_ATOM 8)
+    endif()
 
-  # add dslash_coarse last to the list so it is compiled first
-  foreach(QUDA_MULTIGRID_NVEC ${QUDA_MULTIGRID_NVEC_LIST_SEMICOLON})
-    foreach(QUDA_MULTIGRID_MRHS ${QUDA_MULTIGRID_MRHS_LIST_SEMICOLON})
+    # add dslash_coarse last to the list so it is compiled first
+    foreach(QUDA_MULTIGRID_NVEC ${QUDA_MULTIGRID_NVEC_LIST_SEMICOLON})
+      foreach(QUDA_MULTIGRID_MRHS ${QUDA_MULTIGRID_MRHS_LIST_SEMICOLON})
 
-      math(EXPR MRHS_MODULO "${QUDA_MULTIGRID_MRHS} % ${MRHS_ATOM}")
+        math(EXPR MRHS_MODULO "${QUDA_MULTIGRID_MRHS} % ${MRHS_ATOM}")
 
-      if(${MRHS_MMA_ENABLED} AND (${QUDA_MULTIGRID_MRHS} GREATER 0) AND (${QUDA_MULTIGRID_MRHS} LESS_EQUAL 64) AND (${MRHS_MODULO} EQUAL 0))
-        set(QUDA_MULTIGRID_DAGGER "false")
-        configure_file(dslash_coarse_mma.in.cu "dslash_coarse_mma_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu" @ONLY)
-        list(PREPEND QUDA_CU_OBJS "dslash_coarse_mma_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu")
-        set(QUDA_MULTIGRID_DAGGER "true")
-        configure_file(dslash_coarse_mma.in.cu "dslash_coarse_mma_dagger_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu" @ONLY)
-        list(PREPEND QUDA_CU_OBJS "dslash_coarse_mma_dagger_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu")
-      else()
-        message(SEND_ERROR "MRHS not supported:" "${QUDA_MULTIGRID_MRHS}")
-      endif()
+        if((${QUDA_MULTIGRID_MRHS} GREATER 0) AND (${QUDA_MULTIGRID_MRHS} LESS_EQUAL 64) AND (${MRHS_MODULO} EQUAL 0))
+          set(QUDA_MULTIGRID_DAGGER "false")
+          configure_file(dslash_coarse_mma.in.cu "dslash_coarse_mma_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu" @ONLY)
+          list(PREPEND QUDA_CU_OBJS "dslash_coarse_mma_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu")
+          set(QUDA_MULTIGRID_DAGGER "true")
+          configure_file(dslash_coarse_mma.in.cu "dslash_coarse_mma_dagger_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu" @ONLY)
+          list(PREPEND QUDA_CU_OBJS "dslash_coarse_mma_dagger_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu")
+        else()
+          message(SEND_ERROR "MRHS not supported:" "${QUDA_MULTIGRID_MRHS}")
+        endif()
 
+      endforeach()
     endforeach()
-  endforeach()
+  endif()
 
 endif()
 
