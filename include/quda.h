@@ -447,6 +447,10 @@ extern "C" {
     /** Whether to use fused kernels for mobius */
     QudaBoolean use_mobius_fused_kernel;
 
+    /** Parameters for distance preconditioning */
+    double alpha;
+    int source_time;
+
   } QudaInvertParam;
 
   // Parameter set for solving eigenvalue problems.

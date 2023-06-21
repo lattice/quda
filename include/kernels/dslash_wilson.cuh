@@ -35,6 +35,8 @@ namespace quda
     const F x;    /** input vector when doing xpay */
     const G U;    /** the gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
+    const real alpha;
+    const int source_time;
 
     WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
               const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
@@ -44,7 +46,9 @@ namespace quda
       in_pack(in),
       x(x),
       U(U),
-      a(a)
+      a(a),
+      alpha(in.Alpha()),
+      source_time(in.SourceTime())
     {
       if (in.V() == out.V()) errorQuda("Aliasing pointers");
       checkOrder(out, in, x);        // check all orders match
@@ -95,13 +99,25 @@ namespace quda
           Link U = arg.U(d, gauge_idx, gauge_parity);
           HalfVector in = arg.in.Ghost(d, 1, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
-          out += (U * in).reconstruct(d, proj_dir);
+          if (arg.source_time != -1 && d == 3) {
+            const real denom = cosh(arg.alpha * ((coord[3] - arg.source_time + arg.dim[3]) % arg.dim[3] - arg.dim[3] / 2));
+            const real ratio = cosh(arg.alpha * ((coord[3] - arg.source_time + 1 + arg.dim[3]) % arg.dim[3] - arg.dim[3] / 2)) / denom;
+            out += ratio * (U * in).reconstruct(d, proj_dir);
+          } else {
+            out += (U * in).reconstruct(d, proj_dir);
+          }
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, gauge_parity);
           Vector in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
-          out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          if (arg.source_time != -1 && d == 3) {
+            const real denom = cosh(arg.alpha * ((coord[3] - arg.source_time + arg.dim[3]) % arg.dim[3] - arg.dim[3] / 2));
+            const real ratio = cosh(arg.alpha * ((coord[3] - arg.source_time + 1 + arg.dim[3]) % arg.dim[3] - arg.dim[3] / 2)) / denom;
+            out += ratio * (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          } else {
+            out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          }
         }
       }
 
@@ -121,13 +137,25 @@ namespace quda
           Link U = arg.U.Ghost(d, gauge_ghost_idx, 1 - gauge_parity);
           HalfVector in = arg.in.Ghost(d, 0, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
-          out += (conj(U) * in).reconstruct(d, proj_dir);
+          if (arg.source_time != -1 && d == 3) {
+            const real denom = cosh(arg.alpha * ((coord[3] - arg.source_time + arg.dim[3]) % arg.dim[3] - arg.dim[3] / 2));
+            const real ratio = cosh(arg.alpha * ((coord[3] - arg.source_time - 1 + arg.dim[3]) % arg.dim[3] - arg.dim[3] / 2)) / denom;
+            out += ratio * (conj(U) * in).reconstruct(d, proj_dir);
+          } else {
+            out += (conj(U) * in).reconstruct(d, proj_dir);
+          }
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
           Vector in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
-          out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          if (arg.source_time != -1 && d == 3) {
+            const real denom = cosh(arg.alpha * ((coord[3] - arg.source_time + arg.dim[3]) % arg.dim[3] - arg.dim[3] / 2));
+            const real ratio = cosh(arg.alpha * ((coord[3] - arg.source_time - 1 + arg.dim[3]) % arg.dim[3] - arg.dim[3] / 2)) / denom;
+            out += ratio * (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          } else {
+            out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          }
         }
       }
     } // nDim
