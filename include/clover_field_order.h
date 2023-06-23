@@ -312,7 +312,7 @@ namespace quda {
       static constexpr int N = nColor * nSpin / 2;
       reconstruct_t<Float, N * N, clover::reconstruct()> recon;
       FloatNAccessor(const CloverField &A, bool inverse = false) :
-        a(A.data<Float *>(inverse)),
+        a(A.Bytes() ? A.data<Float *>(inverse) : nullptr),
         stride(A.VolumeCB()),
         offset_cb(A.Bytes() / (2 * sizeof(Float))),
         compressed_block_size(A.compressed_block_size()),
@@ -403,7 +403,9 @@ namespace quda {
       const int N = nSpin * nColor / 2;
       const complex<Float> zero;
       Accessor(const CloverField &A, bool inverse = false) :
-        a(A.data<Float *>(inverse)), offset_cb(A.Bytes() / (2 * sizeof(Float))), zero(complex<Float>(0.0, 0.0))
+        a(A.Bytes() ? A.data<Float *>(inverse) : nullptr),
+        offset_cb(A.Bytes() / (2 * sizeof(Float))),
+        zero(complex<Float>(0.0, 0.0))
       {
       }
 
