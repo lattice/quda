@@ -789,6 +789,17 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(verbosity[i], QUDA_INVALID_VERBOSITY);
 #endif
 #ifdef INIT_PARAM
+#ifdef QUDA_MMA_AVAILABLE
+    P(setup_use_mma[i], QUDA_BOOLEAN_TRUE);
+#else
+    P(setup_use_mma[i], QUDA_BOOLEAN_FALSE);
+#endif
+    P(dslash_use_mma[i], QUDA_BOOLEAN_FALSE);
+#else
+    P(setup_use_mma[i], QUDA_BOOLEAN_INVALID);
+    P(dslash_use_mma[i], QUDA_BOOLEAN_INVALID);
+#endif
+#ifdef INIT_PARAM
     P(setup_inv_type[i], QUDA_BICGSTAB_INVERTER);
 #else
     P(setup_inv_type[i], QUDA_INVALID_INVERTER);
@@ -972,16 +983,6 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #elif defined(PRINT_PARAM)
   P(gflops, INVALID_DOUBLE);
   P(secs, INVALID_DOUBLE);
-#endif
-
-#ifdef INIT_PARAM
-#ifdef QUDA_MMA_AVAILABLE
-  P(use_mma, QUDA_BOOLEAN_TRUE);
-#else
-  P(use_mma, QUDA_BOOLEAN_FALSE);
-#endif
-#else
-  P(use_mma, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM

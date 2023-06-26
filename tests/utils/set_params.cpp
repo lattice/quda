@@ -426,6 +426,8 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     for (int j = 4; j < QUDA_MAX_DIM; j++) mg_param.geo_block_size[i][j] = 1;
     mg_param.use_eig_solver[i] = mg_eig[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.verbosity[i] = mg_verbosity[i];
+    mg_param.setup_use_mma[i] = mg_setup_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    mg_param.dslash_use_mma[i] = mg_dslash_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.setup_inv_type[i] = setup_inv[i];
     mg_param.num_setup_iter[i] = num_setup_iter[i];
     mg_param.setup_tol[i] = setup_tol[i];
@@ -590,7 +592,6 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
-  mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   // Whether or not to use thin restarts in the evolve tests
   mg_param.thin_update_only = mg_evolve_thin_updates ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
@@ -1009,8 +1010,6 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
-  mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
   // whether or not to allow dropping the long links for aggregation dimensions smaller than 3
   mg_param.allow_truncation = mg_allow_truncation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
@@ -1027,6 +1026,8 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     }
     mg_param.use_eig_solver[i] = mg_eig[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.verbosity[i] = mg_verbosity[i];
+    mg_param.setup_use_mma[i] = mg_setup_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    mg_param.dslash_use_mma[i] = mg_dslash_use_mma[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.setup_inv_type[i] = setup_inv[i];
     mg_param.num_setup_iter[i] = num_setup_iter[i];
     mg_param.setup_tol[i] = setup_tol[i];
