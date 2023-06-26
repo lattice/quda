@@ -38,7 +38,7 @@ namespace quda {
   void unitarizeLinks(GaugeField &outfield, const GaugeField &infield, int *fails);
   void unitarizeLinks(GaugeField &outfield, int *fails);
 
-  bool isUnitary(const cpuGaugeField& field, double max_error);
+  bool isUnitary(const GaugeField &field, double max_error);
 
 } // namespace quda
 

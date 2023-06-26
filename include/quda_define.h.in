@@ -29,6 +29,8 @@
 #undef QUDA_HETEROGENEOUS_ATOMIC
 #endif
 
+#cmakedefine QUDA_LARGE_KERNEL_ARG
+
 #cmakedefine QUDA_DIRAC_NDEG_TWISTED_CLOVER
 #ifdef QUDA_DIRAC_NDEG_TWISTED_CLOVER
 /**
@@ -230,6 +232,12 @@ static_assert(QUDA_ORDER_SP_MG == 2 || QUDA_ORDER_SP_MG == 4, "invalid QUDA_ORDE
 #ifdef __cplusplus
 static_assert(QUDA_ORDER_FP_MG == 2 || QUDA_ORDER_FP_MG == 4 || QUDA_ORDER_FP_MG == 8, "invalid QUDA_ORDER_FP_MG");
 #endif
+
+/**
+ * @def QUDA_BUILD_NATIVE_FFT
+ * @brief This macro is set by CMake if the native FFT library is used
+ */
+#cmakedefine QUDA_BUILD_NATIVE_FFT @QUDA_BUILD_NATIVE_FFT@
 
 /**
  * @def QUDA_TARGET_CUDA

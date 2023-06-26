@@ -446,6 +446,7 @@ extern QudaFieldLocation location_ritz;
 extern QudaMemoryType mem_type_ritz;
 
 // Parameters for the stand alone eigensolver
+extern int eig_ortho_block_size;
 extern int eig_block_size;
 extern int eig_n_ev;
 extern int eig_n_kr;
@@ -455,6 +456,7 @@ extern int eig_batched_rotate; // If unchanged, will be set to maximum
 extern bool eig_require_convergence;
 extern int eig_check_interval;
 extern int eig_max_restarts;
+extern int eig_max_ortho_attempts;
 extern double eig_tol;
 extern double eig_qr_tol;
 extern bool eig_use_eigen_qr;
@@ -480,6 +482,7 @@ extern QudaPrecision eig_save_prec;
 // The coarsest grid params are for deflation,
 // all others are for PR vectors.
 extern quda::mgarray<bool> mg_eig;
+extern quda::mgarray<int> mg_eig_ortho_block_size;
 extern quda::mgarray<int> mg_eig_block_size;
 extern quda::mgarray<int> mg_eig_n_ev_deflate;
 extern quda::mgarray<int> mg_eig_n_ev;
@@ -488,6 +491,7 @@ extern quda::mgarray<int> mg_eig_batched_rotate;
 extern quda::mgarray<bool> mg_eig_require_convergence;
 extern quda::mgarray<int> mg_eig_check_interval;
 extern quda::mgarray<int> mg_eig_max_restarts;
+extern quda::mgarray<int> mg_eig_max_ortho_attempts;
 extern quda::mgarray<double> mg_eig_tol;
 extern quda::mgarray<double> mg_eig_qr_tol;
 extern quda::mgarray<bool> mg_eig_use_eigen_qr;
@@ -511,6 +515,16 @@ extern int heatbath_num_steps;
 extern int heatbath_num_heatbath_per_step;
 extern int heatbath_num_overrelax_per_step;
 extern bool heatbath_coldstart;
+
+extern int gf_gauge_dir;
+extern int gf_maxiter;
+extern int gf_verbosity_interval;
+extern double gf_ovr_relaxation_boost;
+extern double gf_fft_alpha;
+extern int gf_reunit_interval;
+extern double gf_tolerance;
+extern bool gf_theta_condition;
+extern bool gf_fft_autotune;
 
 extern int eofa_pm;
 extern double eofa_shift;

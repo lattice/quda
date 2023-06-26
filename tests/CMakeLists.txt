@@ -47,7 +47,7 @@ endif()
 
 # define tests
 add_executable(c_interface_test c_interface_test.c)
-target_link_libraries(c_interface_test ${TEST_LIBS})
+target_link_libraries(c_interface_test ${TEST_LIBS} "-lstdc++")
 quda_checkbuildtest(c_interface_test QUDA_BUILD_ALL_TESTS)
 
 # if we build with QDP JIT the tests cannot run anyway
@@ -169,6 +169,11 @@ if(QUDA_QIO)
   quda_checkbuildtest(io_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS io_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
+
+add_executable(tune_test tune_test.cpp)
+target_link_libraries(tune_test ${TEST_LIBS})
+quda_checkbuildtest(tune_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS tune_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 add_executable(plaq_test plaq_test.cpp)
 target_link_libraries(plaq_test ${TEST_LIBS})
@@ -1258,11 +1263,23 @@ foreach(prec IN LISTS TEST_PRECS)
   endif()
 
   if(QUDA_SMEAR_GAUSS_TWOLINK)
-    add_test(NAME staggered_gsmear_${prec}
-      COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gsmear_test> ${MPIEXEC_POSTFLAGS}
-      --dim 2 4 6 8 --prec ${prec}
-      --test TwoLink
-      --gtest_output=xml:staggered_gsmear_test_${prec}.xml)
+    set(KERNEL_TYPE TwoLink GaussianSmear)
+    foreach(kerneltp IN LISTS KERNEL_TYPE)
+      if(${kerneltp} STREQUAL "TwoLink")
+	set(laplace3D 4)
+	set(smear_t0 -1)
+      elseif(${kerneltp} STREQUAL "GaussianSmear")
+	set(laplace3D 3)
+	set(smear_t0 1)
+      endif()	    
+      add_test(NAME staggered_gsmear_${kerneltp}_${prec}
+        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gsmear_test> ${MPIEXEC_POSTFLAGS}
+        --dim 6 8 10 12 --prec ${prec}
+        --test ${kerneltp}
+	--laplace3D ${laplace3D}
+	--smear-t0 ${smear_t0}
+        --gtest_output=xml:staggered_gsmear_test_${kerneltp}_${prec}.xml)
+    endforeach(kerneltp)
   endif()
 
 endforeach(prec)
@@ -1273,3 +1290,7 @@ if(QUDA_QIO)
                    --dim 4 6 8 10
                    --gtest_output=xml:io_test.xml)
 endif()
+
+add_test(NAME tune_test
+         COMMAND  ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:tune_test> ${MPIEXEC_POSTFLAGS}
+                   --gtest_output=xml:tune_test.xml)

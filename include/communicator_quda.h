@@ -404,7 +404,7 @@ namespace quda
     }
 
     char partition_string[16];          /** string that contains the job partitioning */
-    char topology_string[128];          /** string that contains the job topology */
+    char topology_string[256];          /** string that contains the job topology */
     char partition_override_string[16]; /** string that contains any overridden partitioning */
 
     int manual_set_partition[QUDA_MAX_DIM] = {0};
@@ -560,29 +560,17 @@ namespace quda
              comm_dim_partitioned(2), comm_dim_partitioned(3));
 
     // if CUDA_VISIBLE_DEVICES is set, we include this information in the topology_string
-    char *device_order_env = getenv("CUDA_VISIBLE_DEVICES");
-    if (device_order_env) {
-
-      // to ensure we have process consistency define using rank 0
-      if (comm_rank() == 0) {
-        std::stringstream device_list_raw(device_order_env); // raw input
-        std::stringstream device_list;                       // formatted (no commas)
-
-        int device;
-        while (device_list_raw >> device) {
-          // check this is a valid policy choice
-          if (device < 0) { errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device); }
-
-          device_list << device;
-          if (device_list_raw.peek() == ',') device_list_raw.ignore();
-        }
-        snprintf(topology_string, 128, ",topo=%d%d%d%d,order=%s", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3),
-                 device_list.str().c_str());
-      }
-
-      comm_broadcast(topology_string, 128);
+    char device_list_string[128] = "";
+    // to ensure we have process consistency define using rank 0
+    if (comm_rank() == 0) {
+      device::get_visible_devices_string(device_list_string);
+    }
+    comm_broadcast(device_list_string, 128);
+    if (std::strlen(device_list_string) > 0) {
+      snprintf(topology_string, 256, ",topo=%d%d%d%d,order=%s", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3),
+              device_list_string);
     } else {
-      snprintf(topology_string, 128, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
+      snprintf(topology_string, 256, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
     }
   }
 
@@ -763,8 +751,14 @@ namespace quda
 
   void comm_allreduce_xor(uint64_t &data);
 
-  /**  broadcast from rank 0 */
-  void comm_broadcast(void *data, size_t nbytes);
+  /**
+     @brief Broadcast from the root rank
+     @param[in,out] data The data to be read from on the root rank, and
+     written to on all other ranks
+     @param[in] nbytes The size in bytes of data to be broadcast
+     @param[in] root The process that will be broadcasting
+  */
+  void comm_broadcast(void *data, size_t nbytes, int root = 0);
 
   void comm_barrier(void);
 
@@ -777,7 +771,13 @@ constexpr CommKey default_comm_key = {1, 1, 1, 1};
 
 void push_communicator(const CommKey &split_key);
 
-/** @brief These routine broadcast the data according to the default communicator */
-void comm_broadcast_global(void *data, size_t nbytes);
+/**
+   @brief Broadcast from the root rank of the default communicator
+   @param[in,out] data The data to be read from on the root rank, and
+   written to on all other ranks
+   @param[in] nbytes The size in bytes of data to be broadcast
+   @param[in] root The process that will be broadcasting
+*/
+void comm_broadcast_global(void *data, size_t nbytes, int root = 0);
 
 } // namespace quda

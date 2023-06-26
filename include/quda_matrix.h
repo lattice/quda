@@ -543,21 +543,49 @@ namespace quda {
       return result;
     }
 
-  template<class T, int N>
-    __device__ __host__ inline Matrix<T,N> operator *=(Matrix<T,N> & a, const Matrix<T,N>& b){
+    /**
+       @brief Specialization of complex matrix multiplication
+       accumulation (a * b + c) that will issue optimal fma instructions
+     */
+    template <template <typename> class complex, typename T, int N>
+    __device__ __host__ inline Matrix<complex<T>, N>
+    mm_add(const Matrix<complex<T>, N> &a, const Matrix<complex<T>, N> &b, const Matrix<complex<T>, N> &c)
+    {
+      Matrix<complex<T>, N> result;
+#pragma unroll
+      for (int i = 0; i < N; i++) {
+#pragma unroll
+        for (int k = 0; k < N; k++) {
+          result(i, k).real(c(i, k).real() + a(i, 0).real() * b(0, k).real());
+          result(i, k).real(result(i, k).real() - a(i, 0).imag() * b(0, k).imag());
+          result(i, k).imag(c(i, k).imag() + a(i, 0).real() * b(0, k).imag());
+          result(i, k).imag(result(i, k).imag() + a(i, 0).imag() * b(0, k).real());
+#pragma unroll
+          for (int j = 1; j < N; j++) {
+            result(i, k).real(result(i, k).real() + a(i, j).real() * b(j, k).real());
+            result(i, k).real(result(i, k).real() - a(i, j).imag() * b(j, k).imag());
+            result(i, k).imag(result(i, k).imag() + a(i, j).real() * b(j, k).imag());
+            result(i, k).imag(result(i, k).imag() + a(i, j).imag() * b(j, k).real());
+          }
+        }
+      }
+      return result;
+    }
 
-    Matrix<T,N> c = a;
-    a = c*b;
-    return a;
-  }
+    template <class T, int N> __device__ __host__ inline Matrix<T, N> operator*=(Matrix<T, N> &a, const Matrix<T, N> &b)
+    {
 
+      Matrix<T, N> c = a;
+      a = c * b;
+      return a;
+    }
 
-  // This is so that I can multiply real and complex matrice
-  template <class T, class U, int N>
-  __device__ __host__ inline Matrix<typename PromoteTypeId<T, U>::type, N> operator*(const Matrix<T, N> &a,
-                                                                                     const Matrix<U, N> &b)
-  {
-    Matrix<typename PromoteTypeId<T, U>::type, N> result;
+    // This is so that I can multiply real and complex matrice
+    template <class T, class U, int N>
+    __device__ __host__ inline Matrix<typename PromoteTypeId<T, U>::type, N> operator*(const Matrix<T, N> &a,
+                                                                                       const Matrix<U, N> &b)
+    {
+      Matrix<typename PromoteTypeId<T, U>::type, N> result;
 #pragma unroll
       for (int i=0; i<N; i++) {
 #pragma unroll
@@ -570,7 +598,7 @@ namespace quda {
 	}
       }
       return result;
-  }
+    }
 
   template<class T>
     __device__ __host__ inline
@@ -640,95 +668,24 @@ namespace quda {
       return uinv;
     }
 
-
-
-  template<class T, int N>
-    __device__ __host__ inline
-    void setIdentity(Matrix<T,N>* m){
-
+    template <class T, int N> __device__ __host__ inline void setIdentity(Matrix<T, N> *m)
+    {
 #pragma unroll
-      for (int i=0; i<N; ++i){
-        (*m)(i,i) = 1;
+      for (int i = 0; i < N; ++i) {
+        (*m)(i, i) = 1;
 #pragma unroll
-        for (int j=i+1; j<N; ++j){
-          (*m)(i,j) = (*m)(j,i) = 0;
-        }
+        for (int j = i + 1; j < N; ++j) { (*m)(i, j) = (*m)(j, i) = {}; }
       }
     }
 
-
-  template<int N>
-    __device__ __host__ inline
-    void setIdentity(Matrix<float2,N>* m){
-
+    template <class T, int N> __device__ __host__ inline void setZero(Matrix<T, N> *m)
+    {
 #pragma unroll
-      for (int i=0; i<N; ++i){
-        (*m)(i,i) = make_float2(1,0);
+      for (int i = 0; i < N; ++i) {
 #pragma unroll
-        for (int j=i+1; j<N; ++j){
-          (*m)(i,j) = (*m)(j,i) = make_float2(0.,0.);
-        }
+        for (int j = 0; j < N; ++j) { (*m)(i, j) = {}; }
       }
     }
-
-
-  template<int N>
-    __device__ __host__ inline
-    void setIdentity(Matrix<double2,N>* m){
-
-#pragma unroll
-      for (int i=0; i<N; ++i){
-        (*m)(i,i) = make_double2(1,0);
-#pragma unroll
-        for (int j=i+1; j<N; ++j){
-          (*m)(i,j) = (*m)(j,i) = make_double2(0.,0.);
-        }
-      }
-    }
-
-
-  // Need to write more generic code for this!
-  template<class T, int N>
-    __device__ __host__ inline
-    void setZero(Matrix<T,N>* m){
-
-#pragma unroll
-      for (int i=0; i<N; ++i){
-#pragma unroll
-        for (int j=0; j<N; ++j){
-          (*m)(i,j) = 0;
-        }
-      }
-    }
-
-
-  template<int N>
-    __device__ __host__ inline
-    void setZero(Matrix<float2,N>* m){
-
-#pragma unroll
-      for (int i=0; i<N; ++i){
-#pragma unroll
-        for (int j=0; j<N; ++j){
-          (*m)(i,j) = make_float2(0.,0.);
-        }
-      }
-    }
-
-
-  template<int N>
-    __device__ __host__ inline
-    void setZero(Matrix<double2,N>* m){
-
-#pragma unroll
-      for (int i=0; i<N; ++i){
-#pragma unroll
-        for (int j=0; j<N; ++j){
-          (*m)(i,j) = make_double2(0.,0.);
-        }
-      }
-    }
-
 
   template<typename Complex,int N>
     __device__ __host__ inline void makeAntiHerm(Matrix<Complex,N> &m) {

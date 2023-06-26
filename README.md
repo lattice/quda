@@ -287,6 +287,8 @@ Advanced Scientific Computing (PASC21) [arXiv:2104.05615[hep-lat]].
 *  Evan Weinberg (NVIDIA)
 *  Frank Winter (Jefferson Lab)
 *  Yi-Bo Yang (Chinese Academy of Sciences)
+*  Anthony Grebe (Fermilab)
+*  Michael Wagman (Fermilab)
 
 
 Portions of this software were developed at the Innovative Systems Lab,

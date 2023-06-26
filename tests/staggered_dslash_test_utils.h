@@ -79,8 +79,8 @@ struct StaggeredDslashTestWrapper {
   char **argv_copy;
 
   // Split grid options
-  int num_src;
-  int test_split_grid;
+  bool test_split_grid = false;
+  int num_src = 1;
 
   void staggeredDslashRef()
   {
@@ -154,7 +154,6 @@ struct StaggeredDslashTestWrapper {
 
     num_src = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
     test_split_grid = num_src > 1;
-
     if (test_split_grid) { dtest_type = dslash_test_type::Dslash; }
 
     inv_param.dagger = dagger ? QUDA_DAG_YES : QUDA_DAG_NO;

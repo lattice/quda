@@ -15,7 +15,7 @@ namespace quda
     GaugeField &out;
     const GaugeField &in;
 
-    unsigned int minThreads() const { return size; }
+    unsigned int minThreads() const override { return size; }
 
   public:
     CopyGauge(Arg &arg, GaugeField &out, const GaugeField &in, QudaFieldLocation location) :
@@ -48,7 +48,7 @@ namespace quda
       resizeVector(vector_length_y, (is_ghost ? in.Ndim() : in.Geometry()) * 2); // only resizing z component
     }
 
-    void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       arg.threads.x = size;
@@ -59,7 +59,7 @@ namespace quda
         launch<CopyGhost_, enable_host>(tp, stream, arg);
     }
 
-    TuneKey tuneKey() const
+    TuneKey tuneKey() const override
     {
       char aux_[TuneKey::aux_n];
       strcpy(aux_, aux);
@@ -67,8 +67,7 @@ namespace quda
       return TuneKey(in.VolString().c_str(), typeid(*this).name(), aux_);
     }
 
-    long long flops() const { return 0; }
-    long long bytes() const
+    long long bytes() const override
     {
       auto sites = 4 * in.VolumeCB();
       if (is_ghost) {
