@@ -272,7 +272,9 @@ namespace quda {
           qudaDeviceSynchronize();
           comm_barrier();
           for (int b=0; b<2; b++) {
+#ifndef MNNVL_COMMS
             device_comms_pinned_free(ghost_recv_buffer_d[b]);
+#endif
             device_comms_pinned_free(ghost_send_buffer_d[b]);
             host_free(ghost_pinned_send_buffer_h[b]);
             host_free(ghost_pinned_recv_buffer_h[b]);
@@ -282,10 +284,12 @@ namespace quda {
 
       if (ghost_bytes > 0) {
         for (int b = 0; b < 2; ++b) {
+#ifndef MNNVL_COMMS
           // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
           ghost_recv_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
           // silence any false cuda-memcheck initcheck errors
           qudaMemset(ghost_recv_buffer_d[b], 0, ghost_bytes);
+#endif
 
           // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
           ghost_send_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
@@ -321,9 +325,11 @@ namespace quda {
     if (!initGhostFaceBuffer) return;
 
     for (int b=0; b<2; b++) {
+#ifndef MNNVL_COMMS
       // free receive buffer
       if (ghost_recv_buffer_d[b]) device_comms_pinned_free(ghost_recv_buffer_d[b]);
       ghost_recv_buffer_d[b] = nullptr;
+#endif
 
       // free send buffer
       if (ghost_send_buffer_d[b]) device_comms_pinned_free(ghost_send_buffer_d[b]);
@@ -459,6 +465,7 @@ namespace quda {
     if ( initIPCComms && !ghost_field_reset ) return;
 
     if (!initComms) errorQuda("Can only be called after create comms");
+#ifndef MNNVL_COMMS
     if ((!ghost_recv_buffer_d[0] || !ghost_recv_buffer_d[1]) && comm_size() > 1)
       errorQuda("ghost_field appears not to be allocated");
 
@@ -468,6 +475,25 @@ namespace quda {
       // get remote events
       comm_create_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
     }
+#else
+    for (int b = 0; b < 2; b++) {
+      // set remote send buffer to ghost receive buffers on neighboring processes
+      ghost_recv_buffer_d[b] = comm_create_local_neighbor_memory(ghost_remote_send_buffer_d[b], ghost_bytes);
+      from_face_d[b] = ghost_recv_buffer_d[b];
+    }
+
+    // Update the receive buffers
+    for (int i=0; i<nDimComms; i++) {
+      if (!commDimPartitioned(i) && no_comms_fill == false) continue;
+
+      for (int dir = 0; dir < 2; dir++) {
+        for (int b = 0; b < 2; ++b) {
+          from_face_dim_dir_d[b][i][dir] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][dir];
+        } // loop over b
+      }   // loop over direction
+    } // loop over dimension
+  }
+#endif
 
     // Create message handles for IPC synchronization
     for (int dim = 0; dim < 4; ++dim) {
@@ -501,8 +527,12 @@ namespace quda {
     comm_barrier();
 
     for (int b = 0; b < 2; b++) {
+#ifndef MNNVL_COMMS
       comm_destroy_neighbor_memory(ghost_remote_send_buffer_d[b]);
       comm_destroy_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
+#else
+      comm_destroy_local_neighbor_memory(ghost_recv_buffer_d[b], ghost_remote_send_buffer_d[b]);
+#endif
     }
 
     for (int dim=0; dim<4; ++dim) {

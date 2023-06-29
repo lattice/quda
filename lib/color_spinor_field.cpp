@@ -1173,8 +1173,12 @@ namespace quda
         qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
       } // remote_write
 
+#ifndef MNNVL_COMMS
         // record the event
       qudaEventRecord(ipcCopyEvent[bufferIndex][dim][dir], stream);
+#else
+      qudaStreamSynchronize(stream);
+#endif
       // send to the processor in the -1 direction
       comm_start(mh_send_p2p[bufferIndex][dim][dir]);
     }
@@ -1245,7 +1249,9 @@ namespace quda
     // first wait on send to "dir"
     if (comm_peer2peer_enabled(dir, dim)) {
       comm_wait(mh_send_p2p[bufferIndex][dim][dir]);
+#ifndef MNNVL_COMMS
       qudaEventSynchronize(ipcCopyEvent[bufferIndex][dim][dir]);
+#endif
     } else if (gdr_send) {
       comm_wait(mh_send_rdma[bufferIndex][dim][dir]);
     } else {
@@ -1255,7 +1261,9 @@ namespace quda
     // second wait on receive from "1 - dir"
     if (comm_peer2peer_enabled(1 - dir, dim)) {
       comm_wait(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+#ifndef MNNVL_COMMS
       qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][dim][1 - dir]);
+#endif
     } else if (gdr_recv) {
       comm_wait(mh_recv_rdma[bufferIndex][dim][1 - dir]);
     } else {
@@ -1437,7 +1445,9 @@ namespace quda
                 if (comms_complete[2 * dim + dir]) {
                   comms_done++;
                   if (comm_peer2peer_enabled(1 - dir, dim))
+#ifndef MNNVL_COMMS
                     qudaStreamWaitEvent(device::get_default_stream(), ipcRemoteCopyEvent[bufferIndex][dim][1 - dir], 0);
+#endif
                 }
               }
             }
@@ -1474,7 +1484,9 @@ namespace quda
           if (!comm_dim_partitioned(dim)) continue;
           for (int dir = 0; dir < 2; dir++) {
             if (comm_peer2peer_enabled(dir, dim))
+#ifndef MNNVL_COMMS
               qudaStreamWaitEvent(device::get_default_stream(), ipcCopyEvent[bufferIndex][dim][dir], 0);
+#endif
           }
         }
       } else {
