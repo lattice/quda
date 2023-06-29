@@ -84,7 +84,7 @@ void init(int argc, char **argv)
   } else {
     setDims(gauge_param.X);
   }
-  
+
   // Allocate host side memory for the gauge field.
   //----------------------------------------------------------------------------
   gauge_.resize(4 * V * gauge_site_size * host_gauge_data_type_size);
@@ -92,9 +92,9 @@ void init(int argc, char **argv)
 
   constructHostGaugeField(gauge.data(), gauge_param, argc, argv);
   // Load the gauge field to the device
-  
+
   loadGaugeQuda(gauge.data(), &gauge_param);
-  
+
   // Allocate host side memory for clover terms if needed.
   //----------------------------------------------------------------------------
   // Allocate space on the host (always best to allocate and free in the same scope)
@@ -107,7 +107,6 @@ void init(int argc, char **argv)
   } else {
     errorQuda("dslash type ( dslash_type = %d ) must have the clover", dslash_type);
   }
-  
 }
 // The same function is used to test computePath.
 // If compute_force is false then a path is computed
@@ -118,6 +117,7 @@ void TMCloverForce_test()
   QudaGaugeParam gauge_param = newQudaGaugeParam();
 
   setGaugeParam(gauge_param);
+  // setWilsonGaugeParam(gauge_param);
 
   gauge_param.gauge_order = gauge_order;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
@@ -175,7 +175,7 @@ void TMCloverForce_test()
   quda::cpuGaugeField Mom_qdp(param);
 
   // initialize some data in cpuMom
-  createMomCPU(Mom_ref_milc.Gauge_p(), gauge_param.cpu_prec);
+  createMomCPU(Mom_ref_milc.Gauge_p(), gauge_param.cpu_prec, 0.0);
   if (gauge_order == QUDA_MILC_GAUGE_ORDER) Mom_milc.copy(Mom_ref_milc);
   if (gauge_order == QUDA_QDP_GAUGE_ORDER) Mom_qdp.copy(Mom_ref_milc);
 
@@ -227,13 +227,13 @@ void TMCloverForce_test()
       spinorNoise(out_multishift[n * multishift + i], rng, QUDA_NOISE_GAUSS);
       in[n][i] = out_multishift[n * multishift + i].V();
       ////////////my init
-      double *vin=(double*)in[0][0];
-      
-      (*vin)=1;
-      for (int x=1;x<4*4*4*2*24;x++){
-        vin++;
-        (*vin)=0;
-      }
+      // double *vin=(double*)in[0][0];
+
+      // (*vin)=1;
+      // for (int x=1;x<4*4*4*2*24;x++){
+      //   vin++;
+      //   (*vin)=0;
+      // }
       ////////////////////////
     }
   }
@@ -293,6 +293,7 @@ void TMCloverForce_test()
   force_deviation = std::abs(action_quda - action_ref) / std::abs(action_ref);
   logQuda(QUDA_VERBOSE, "QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref,
           force_deviation);
+  printfQuda("QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref, force_deviation);
   // }
 
   double perf = 1.0 * niter * flops * V / (time_sec * 1e+9);

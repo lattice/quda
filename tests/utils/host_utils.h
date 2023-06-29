@@ -174,7 +174,7 @@ int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec);
  */
 double mom_action(void *mom, QudaPrecision prec, int len);
 
-void createMomCPU(void *mom, QudaPrecision precision);
+void createMomCPU(void *mom, QudaPrecision precision, double max_val = 1.0);
 void createHwCPU(void *hw, QudaPrecision precision);
 
 // used by link fattening code

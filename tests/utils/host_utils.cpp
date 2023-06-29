@@ -1459,7 +1459,7 @@ int strong_check_link(void **linkA, const char *msgA, void **linkB, const char *
   return ret;
 }
 
-void createMomCPU(void *mom, QudaPrecision precision)
+void createMomCPU(void *mom, QudaPrecision precision, double max_val)
 {
   size_t gSize = (precision == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   void *temp = safe_malloc(4 * V * gauge_site_size * gSize);
@@ -1469,7 +1469,7 @@ void createMomCPU(void *mom, QudaPrecision precision)
       for (int dir = 0; dir < 4; dir++) {
         double *thismom = (double *)mom;
         for (auto k = 0lu; k < mom_site_size; k++) {
-          thismom[(4 * i + dir) * mom_site_size + k] = 1.0 * rand() / RAND_MAX;
+          thismom[(4 * i + dir) * mom_site_size + k] = max_val * rand() / RAND_MAX;
           if (k == mom_site_size - 1) thismom[(4 * i + dir) * mom_site_size + k] = 0.0;
         }
       }
@@ -1477,7 +1477,7 @@ void createMomCPU(void *mom, QudaPrecision precision)
       for (int dir = 0; dir < 4; dir++) {
         float *thismom = (float *)mom;
         for (auto k = 0lu; k < mom_site_size; k++) {
-          thismom[(4 * i + dir) * mom_site_size + k] = 1.0 * rand() / RAND_MAX;
+          thismom[(4 * i + dir) * mom_site_size + k] = max_val * rand() / RAND_MAX;
           if (k == mom_site_size - 1) thismom[(4 * i + dir) * mom_site_size + k] = 0.0;
         }
       }
