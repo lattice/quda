@@ -484,7 +484,7 @@ namespace quda {
 
     // Update the receive buffers
     for (int i=0; i<nDimComms; i++) {
-      if (!commDimPartitioned(i) && no_comms_fill == false) continue;
+      if (!commDimPartitioned(i)) continue;
 
       for (int dir = 0; dir < 2; dir++) {
         for (int b = 0; b < 2; ++b) {
@@ -492,7 +492,6 @@ namespace quda {
         } // loop over b
       }   // loop over direction
     } // loop over dimension
-  }
 #endif
 
     // Create message handles for IPC synchronization

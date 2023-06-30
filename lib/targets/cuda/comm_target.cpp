@@ -3,6 +3,7 @@
 #include <quda_cuda_api.h>
 #include <algorithm>
 #include <shmem_helper.cuh>
+#include <cstring>
 
 namespace quda
 {
@@ -46,7 +47,7 @@ namespace quda
     return std::max(accessRank[0], accessRank[1]);
   }
 
-  void *map_device_ptr_from_handle(CUmemGenericAllocationHandle handle, size_t bytes) {
+  void *map_device_ptr_from_handle(CUmemGenericAllocationHandle handle, size_t bytes, int device) {
     // reserve / map its allocation (we could also map into one huge range)
     CUdeviceptr dptr;
     CU_CHECK(cuMemAddressReserve(&dptr, bytes, 0, 0, 0));
@@ -59,7 +60,7 @@ namespace quda
     access_desc.location.id = (int)device;
     access_desc.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
     CU_CHECK(cuMemSetAccess(dptr, bytes, &access_desc, 1));
-    return static_cast<void *>(dptr);
+    return (void *)dptr;
   }
 
   void *comm_create_local_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, size_t bytes)
@@ -67,6 +68,16 @@ namespace quda
     // Allocate local memory handle
     CUdevice device;
     CU_CHECK(cuCtxGetDevice(&device));
+
+    int devAttr = -1;
+    CU_CHECK(cuDeviceGetAttribute(&devAttr, CU_DEVICE_ATTRIBUTE_VIRTUAL_ADDRESS_MANAGEMENT_SUPPORTED, device));
+    if (devAttr == 0) {
+        printf("Device %d does not support the CUDA VMM APis, fabric cannot be used", (int)device);
+    }
+    CU_CHECK(cuDeviceGetAttribute(&devAttr, CU_DEVICE_ATTRIBUTE_HANDLE_TYPE_FABRIC_SUPPORTED, device));
+    if (devAttr == 0) {
+        printf("Device %d does not support the CUDA fabric handles, fabric cannot be used", (int)device);
+    }
 
     size_t granularity = 0;
     CUmemAllocationProp prop;
@@ -116,7 +127,7 @@ namespace quda
       }
     }
 
-    void *local_ptr = map_device_ptr_from_handle(this_handle, sz_align);
+    void *local_ptr = map_device_ptr_from_handle(this_handle, sz_align, device);
 
     // open the remote memory handles and set the send ghost pointers
     for (int dim = 0; dim < 4; ++dim) {
@@ -131,7 +142,7 @@ namespace quda
         // import handle
         CU_CHECK(cuMemImportFromShareableHandle(&handle, &remote_handle[dim][dir], CU_MEM_HANDLE_TYPE_FABRIC));
         // map to pointer
-        remote[dim][dir] = map_device_ptr_from_handle(handle, sz_align);
+        remote[dim][dir] = map_device_ptr_from_handle(handle, sz_align, device);
         CU_CHECK(cuMemRelease(handle));
       }
       if (num_dir == 1) remote[dim][1] = remote[dim][0];
@@ -145,7 +156,7 @@ namespace quda
     CUdeviceptr alloc_ptr;
     size_t sz;
     // get the original allocation from the pointer
-    CU_CHECK(cuMemGetAddressRange(&alloc_ptr, &sz, static_cast<CUdeviceptr>(ptr)));
+    CU_CHECK(cuMemGetAddressRange(&alloc_ptr, &sz, (CUdeviceptr)ptr));
     // release the data
     CU_CHECK(cuMemUnmap(alloc_ptr, sz));
     CU_CHECK(cuMemAddressFree(alloc_ptr, sz));

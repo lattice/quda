@@ -1444,10 +1444,11 @@ namespace quda
                   2 * dim + dir, device::get_default_stream(), gdr_send, gdr_recv);
                 if (comms_complete[2 * dim + dir]) {
                   comms_done++;
-                  if (comm_peer2peer_enabled(1 - dir, dim))
+                  if (comm_peer2peer_enabled(1 - dir, dim)) {
 #ifndef MNNVL_COMMS
                     qudaStreamWaitEvent(device::get_default_stream(), ipcRemoteCopyEvent[bufferIndex][dim][1 - dir], 0);
 #endif
+		  }
                 }
               }
             }
@@ -1483,10 +1484,11 @@ namespace quda
         for (int dim = 0; dim < nDimComms; dim++) {
           if (!comm_dim_partitioned(dim)) continue;
           for (int dir = 0; dir < 2; dir++) {
-            if (comm_peer2peer_enabled(dir, dim))
+            if (comm_peer2peer_enabled(dir, dim)) {
 #ifndef MNNVL_COMMS
               qudaStreamWaitEvent(device::get_default_stream(), ipcCopyEvent[bufferIndex][dim][dir], 0);
 #endif
+	    }
           }
         }
       } else {

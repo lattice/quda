@@ -300,6 +300,7 @@ namespace quda
 
             } // on the same node
 #else
+            int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
             peer2peer_enabled[dir][dim] = true;
             printf("MNNVL Peer-to-peer enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d\n",
                    comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
