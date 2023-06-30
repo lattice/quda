@@ -589,6 +589,21 @@ namespace quda {
     static Solver *create(SolverParam &param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
                           const DiracMatrix &matPrecon, const DiracMatrix &matEig, TimeProfile &profile);
 
+
+    /**
+    * @brief Set parameters for the inner solver
+    * @param inner[out] Parameters for the preconditioner solver
+    * @param outer[in] Parameters from the outer solver
+    */
+    virtual void fillInnerSolverParam(SolverParam &inner, const SolverParam &outer);
+
+    /**
+    * @brief Extract parameters determined while running the preconditioned solve
+    * @param outer[out] Parameters for outer solver which also maintains preconditioned solver info
+    * @param inner[in] Parameters from the preconditioned solver
+    */
+    virtual void extractInnerSolverParam(SolverParam &outer, const SolverParam &inner);
+
     /**
        @brief Set the solver L2 stopping condition
        @param[in] Desired solver tolerance

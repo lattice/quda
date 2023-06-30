@@ -21,42 +21,6 @@ namespace quda {
     return ds + 0.000001*dus;
   }
 
-  // set the required parameters for the inner solver
-  void fillInnerSolveParam(SolverParam &inner, const SolverParam &outer) {
-    inner.tol = outer.tol_precondition;
-    inner.delta = 1e-20; // no reliable updates within the inner solver
-  
-    inner.precision = outer.precision_sloppy;
-    inner.precision_sloppy = outer.precision_precondition;
-
-    inner.residual_type = QUDA_L2_RELATIVE_RESIDUAL;
-  
-    inner.iter = 0;
-    inner.gflops = 0;
-    inner.secs = 0;
-
-    inner.inv_type_precondition = QUDA_INVALID_INVERTER;
-    inner.is_preconditioner = true; // tell inner solver it is a preconditioner
-    inner.pipeline = true;
-
-    inner.schwarz_type = outer.schwarz_type;
-    inner.global_reduction = inner.schwarz_type == QUDA_INVALID_SCHWARZ ? true : false;
-
-    inner.use_init_guess = QUDA_USE_INIT_GUESS_NO;
-
-    inner.maxiter = outer.maxiter_precondition;
-    if (outer.inv_type_precondition == QUDA_CA_GCR_INVERTER) {
-      inner.Nkrylov = inner.maxiter / outer.precondition_cycle;
-    } else {
-      inner.Nsteps = outer.precondition_cycle;
-    }
-
-    inner.verbosity_precondition = outer.verbosity_precondition;
-
-    inner.compute_true_res = false;
-    inner.sloppy_converge = true;
-  }
-
   void GCR::computeBeta(std::vector<Complex> &beta, std::vector<ColorSpinorField> &Ap, int i, int N, int k)
   {
     std::vector<Complex> Beta(N, 0.0);
@@ -150,7 +114,7 @@ namespace quda {
     beta(n_krylov * n_krylov),
     gamma(n_krylov)
   {
-    fillInnerSolveParam(Kparam, param);
+    fillInnerSolverParam(Kparam, param);
 
     if (param.inv_type_precondition == QUDA_CG_INVERTER) // inner CG solver
       K = new CG(matSloppy, matPrecon, matPrecon, matEig, Kparam, profile);
@@ -179,10 +143,12 @@ namespace quda {
     beta(n_krylov * n_krylov),
     gamma(n_krylov)
   {
+    fillInnerSolverParam(Kparam, param);
   }
 
   GCR::~GCR() {
     profile.TPSTART(QUDA_PROFILE_FREE);
+    extractInnerSolverParam(param, Kparam);
     if (K && param.inv_type_precondition != QUDA_MG_INVERTER) delete K;
     destroyDeflationSpace();
     profile.TPSTOP(QUDA_PROFILE_FREE);
