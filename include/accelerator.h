@@ -57,6 +57,8 @@ namespace quda
 
     virtual bool hermitian() { return base_solver->hermitian(); }
 
+    virtual QudaInverterType getInverterType() const noexcept final { return base_solver->getInverterType(); }
+
     /**
      * @brief Train the underlying accelerate parameter.
      * @param null Solver to solve for null vectors.

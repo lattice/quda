@@ -572,6 +572,11 @@ namespace quda {
     virtual bool hermitian() = 0;
 
     /**
+       @return The inverter type
+     */
+    virtual QudaInverterType getInverterType() const noexcept = 0;
+
+    /**
        @brief Generic solver setup and parameter checking
        @param[in] x Solution vector
        @param[in] b Source vector
@@ -785,6 +790,8 @@ namespace quda {
     void blocksolve(ColorSpinorField& out, ColorSpinorField& in);
 
     virtual bool hermitian() { return true; } /** CG is only for Hermitian systems */
+
+    virtual QudaInverterType getInverterType() const noexcept override { return QUDA_CG_INVERTER; }
   };
 
   class CGNE : public CG
@@ -818,6 +825,8 @@ namespace quda {
     ColorSpinorField &get_residual();
 
     virtual bool hermitian() { return false; } /** CGNE is for any system */
+
+    virtual QudaInverterType getInverterType() const noexcept final { return QUDA_CGNE_INVERTER; }
   };
 
   class CGNR : public CG
@@ -850,6 +859,8 @@ namespace quda {
     ColorSpinorField &get_residual();
 
     virtual bool hermitian() { return false; } /** CGNR is for any system */
+
+    virtual QudaInverterType getInverterType() const noexcept final { return QUDA_CGNR_INVERTER; }
   };
 
   class CG3 : public Solver
@@ -868,6 +879,8 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
     virtual bool hermitian() { return true; } /** CG is only for Hermitian systems */
+
+    virtual QudaInverterType getInverterType() const noexcept override { return QUDA_CG3_INVERTER; }
   };
 
   class CG3NE : public CG3
@@ -900,6 +913,8 @@ namespace quda {
     ColorSpinorField &get_residual();
 
     virtual bool hermitian() { return false; } /** CG3NE is for any system */
+
+    virtual QudaInverterType getInverterType() const noexcept final { return QUDA_CG3NE_INVERTER; }
   };
 
   class CG3NR : public CG3
@@ -931,6 +946,8 @@ namespace quda {
     ColorSpinorField &get_residual();
 
     virtual bool hermitian() { return false; } /** CG3NR is for any system */
+
+    virtual QudaInverterType getInverterType() const noexcept final { return QUDA_CG3NR_INVERTER; }
   };
 
   class PreconCG : public Solver {
@@ -982,6 +999,8 @@ namespace quda {
                                    int collect_miniter, double collect_tol);
 
     virtual bool hermitian() { return true; } /** PCG is only Hermitian system */
+
+    virtual QudaInverterType getInverterType() const noexcept final { return QUDA_PCG_INVERTER; }
   };
 
 
@@ -1001,6 +1020,8 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
     virtual bool hermitian() { return false; } /** BiCGStab is for any linear system */
+
+    virtual QudaInverterType getInverterType() const noexcept final { return QUDA_BICGSTAB_INVERTER; }
   };
 
   /**
@@ -1106,6 +1127,8 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
     virtual bool hermitian() { return false; } /** BiCGStab is for any linear system */
+
+    virtual QudaInverterType getInverterType() const noexcept final { return QUDA_BICGSTABL_INVERTER; }
   };
 
   class GCR : public Solver {
@@ -1165,6 +1188,8 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
     virtual bool hermitian() { return false; } /** GCR is for any linear system */
+
+    virtual QudaInverterType getInverterType() const noexcept final { return QUDA_GCR_INVERTER; }
   };
 
   class MR : public Solver {
@@ -1194,6 +1219,8 @@ namespace quda {
     ColorSpinorField &get_residual();
 
     bool hermitian() { return false; } /** MR is for any linear system */
+
+    virtual QudaInverterType getInverterType() const noexcept final { return QUDA_MR_INVERTER; }
   };
 
   /**
@@ -1264,6 +1291,8 @@ namespace quda {
     ColorSpinorField &get_residual();
 
     virtual bool hermitian() { return true; } /** CG is only for Hermitian systems */
+
+    virtual QudaInverterType getInverterType() const noexcept override { return QUDA_CA_CG_INVERTER; }
   };
 
   class CACGNE : public CACG {
@@ -1295,7 +1324,9 @@ namespace quda {
     */
     ColorSpinorField &get_residual();
 
-    virtual bool hermitian() { return false; } /** CGNE is for any linear system */
+    virtual bool hermitian() { return false; } /** CA-CGNE is for any linear system */
+
+    virtual QudaInverterType getInverterType() const noexcept final { return QUDA_CA_CGNE_INVERTER; }
   };
 
   class CACGNR : public CACG
@@ -1327,7 +1358,9 @@ namespace quda {
     */
     ColorSpinorField &get_residual();
 
-    virtual bool hermitian() { return false; } /** CGNE is for any linear system */
+    virtual bool hermitian() { return false; } /** CA-CGNR is for any linear system */
+
+    virtual QudaInverterType getInverterType() const noexcept final { return QUDA_CA_CGNR_INVERTER; }
   };
 
   /**
@@ -1382,6 +1415,8 @@ namespace quda {
     ColorSpinorField &get_residual();
 
     virtual bool hermitian() { return false; } /** GCR is for any linear system */
+
+    virtual QudaInverterType getInverterType() const noexcept final { return QUDA_CA_GCR_INVERTER; }
   };
 
   // Steepest descent solver used as a preconditioner
@@ -1398,6 +1433,8 @@ namespace quda {
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
       virtual bool hermitian() { return false; } /** SD is for any linear system */
+
+      virtual QudaInverterType getInverterType() const noexcept final { return QUDA_SD_INVERTER; }
   };
 
   class PreconditionedSolver : public Solver
@@ -1448,6 +1485,8 @@ public:
     Solver &ExposeSolver() const { return *solver; }
 
     virtual bool hermitian() { return solver->hermitian(); } /** Use the inner solver */
+
+    virtual QudaInverterType getInverterType() const noexcept override { return solver->getInverterType(); }
   };
 
   class MultiShiftSolver {
@@ -1566,6 +1605,7 @@ public:
 
     /**
        @param x The optimum for the solution vector.
+       
        @param b The source vector in the equation to be solved. This is not preserved.
        @param p The basis vectors in which we are building the guess
        @param q The basis vectors multiplied by A
@@ -1624,6 +1664,8 @@ public:
   void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
   bool hermitian() { return true; } // EigCG is only for Hermitian systems
+
+  virtual QudaInverterType getInverterType() const noexcept final { return QUDA_INC_EIGCG_INVERTER; }
   };
 
 //forward declaration
@@ -1671,6 +1713,8 @@ public:
     void UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels);
 
     bool hermitian() { return false; } // GMRESDR for any linear system
+
+    virtual QudaInverterType getInverterType() const noexcept final { return QUDA_GMRESDR_INVERTER; }
  };
 
  /**

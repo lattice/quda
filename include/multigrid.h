@@ -378,6 +378,11 @@ namespace quda {
     bool hermitian() { return false; };
 
     /**
+       @return Is an MG inverter
+      */
+    virtual QudaInverterType getInverterType() const noexcept final { return QUDA_MG_INVERTER; }
+
+    /**
        @brief This method resets the solver, e.g., when a parameter has changed such as the mass.
        @param Whether we are refreshing the null-space components or just updating the operators
      */
