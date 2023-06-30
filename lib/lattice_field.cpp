@@ -479,6 +479,7 @@ namespace quda {
     for (int b = 0; b < 2; b++) {
       // set remote send buffer to ghost receive buffers on neighboring processes
       ghost_recv_buffer_d[b] = comm_create_local_neighbor_memory(ghost_remote_send_buffer_d[b], ghost_bytes);
+      comm_create_local_event(ipcCopyEvent[b]);
       from_face_d[b] = ghost_recv_buffer_d[b];
     }
 
@@ -531,6 +532,7 @@ namespace quda {
       comm_destroy_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
 #else
       comm_destroy_local_neighbor_memory(ghost_recv_buffer_d[b], ghost_remote_send_buffer_d[b]);
+      comm_destroy_local_event(ipcCopyEvent[b]);
 #endif
     }
 

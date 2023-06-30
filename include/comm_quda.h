@@ -281,6 +281,8 @@ namespace quda
   void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
                                   array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
 
+  void comm_create_local_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
+
   /**
      @brief Destroy the coupled events
      @param[out] remote Array of remote events to neighboring processes
@@ -288,6 +290,8 @@ namespace quda
    */
   void comm_destroy_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
                                    array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
+
+  void comm_destroy_local_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local);
 
   /**
      @brief Returns true if any peer-to-peer capability is present on

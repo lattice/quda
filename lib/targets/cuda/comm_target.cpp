@@ -261,6 +261,33 @@ void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
 void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &) { }
 #endif
 
+void comm_create_local_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
+{
+  for (int dim = 0; dim < 4; ++dim) {
+    if (comm_dim(dim) == 1) continue;
+    for (int dir = 0; dir < 2; ++dir) {
+      if (comm_peer2peer_enabled(dir, dim)) {
+        cudaEvent_t event;
+        CHECK_CUDA_ERROR(cudaEventCreate(&event, cudaEventDisableTiming | cudaEventInterprocess));
+        local[dim][dir].event = reinterpret_cast<void *>(event);
+      } else {
+        local[dim][dir].event = nullptr;
+      }
+    }
+  }
+}
+
+void comm_destroy_local_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
+{
+  for (int dim = 0; dim < 4; ++dim) {
+    if (comm_dim(dim) == 1) continue;
+    for (int dir = 0; dir < 2; dir++) {
+      cudaEvent_t &event = reinterpret_cast<cudaEvent_t &>(local[dim][dir].event);
+      if (comm_peer2peer_enabled(dir, dim)) CHECK_CUDA_ERROR(cudaEventDestroy(event));
+    }
+  } // iterate over dim
+}
+
 void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
                                 array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
 {

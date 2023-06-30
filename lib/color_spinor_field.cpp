@@ -1173,14 +1173,12 @@ namespace quda
         qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
       } // remote_write
 
-#ifndef MNNVL_COMMS
-        // record the event
+      // record the event
       qudaEventRecord(ipcCopyEvent[bufferIndex][dim][dir], stream);
-#else
-      qudaStreamSynchronize(stream);
-#endif
+#ifndef MNNVL_COMMS
       // send to the processor in the -1 direction
       comm_start(mh_send_p2p[bufferIndex][dim][dir]);
+#endif
     }
   }
 
@@ -1192,6 +1190,8 @@ namespace quda
 
   static bool complete_recv[QUDA_MAX_DIM][2] = {};
   static bool complete_send[QUDA_MAX_DIM][2] = {};
+  static bool p2p_stream_complete[QUDA_MAX_DIM][2] = {};
+  static bool p2p_signal_sent[QUDA_MAX_DIM][2] = {};
 
   int ColorSpinorField::commsQuery(int d, const qudaStream_t &, bool gdr_send, bool gdr_recv)
   {
@@ -1207,7 +1207,22 @@ namespace quda
 
     // first query send to backwards
     if (comm_peer2peer_enabled(dir, dim)) {
+#ifndef MNNVL_COMMS
       if (!complete_send[dim][dir]) complete_send[dim][dir] = comm_query(mh_send_p2p[bufferIndex][dim][dir]);
+#else
+      if (!complete_send[dim][dir]) {
+        if (p2p_stream_complete[dim][dir] || qudaEventQuery(ipcCopyEvent[bufferIndex][dim][dir])) {
+          if (!p2p_stream_complete[dim][dir]) p2p_stream_complete[dim][dir] = true;
+          if (!p2p_signal_sent[dim][dir]) {
+            comm_start(mh_send_p2p[bufferIndex][dim][dir]);
+            p2p_signal_sent[dim][dir] = true;
+          }
+          complete_send[dim][dir] = comm_query(mh_send_p2p[bufferIndex][dim][dir]);
+        } else {
+          complete_send[dim][dir] = false;
+        }
+      }
+#endif
     } else if (gdr_send) {
       if (!complete_send[dim][dir]) complete_send[dim][dir] = comm_query(mh_send_rdma[bufferIndex][dim][dir]);
     } else {
@@ -1228,13 +1243,15 @@ namespace quda
     if (complete_recv[dim][1 - dir] && complete_send[dim][dir]) {
       complete_send[dim][dir] = false;
       complete_recv[dim][1 - dir] = false;
+      p2p_signal_sent[dim][dir] = false;
+      p2p_stream_complete[dim][dir] = false;
       return 1;
     } else {
       return 0;
     }
   }
 
-  void ColorSpinorField::commsWait(int d, const qudaStream_t &, bool gdr_send, bool gdr_recv)
+  void ColorSpinorField::commsWait(int d, const qudaStream_t &stream, bool gdr_send, bool gdr_recv)
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
     // note this is scatter centric, so dir=0 (1) is send backwards
@@ -1248,9 +1265,13 @@ namespace quda
 
     // first wait on send to "dir"
     if (comm_peer2peer_enabled(dir, dim)) {
-      comm_wait(mh_send_p2p[bufferIndex][dim][dir]);
 #ifndef MNNVL_COMMS
+      comm_wait(mh_send_p2p[bufferIndex][dim][dir]);
       qudaEventSynchronize(ipcCopyEvent[bufferIndex][dim][dir]);
+#else
+      qudaEventSynchronize(ipcCopyEvent[bufferIndex][dim][dir]);
+      comm_start(mh_send_p2p[bufferIndex][dim][dir]);
+      comm_wait(mh_send_p2p[bufferIndex][dim][dir]);
 #endif
     } else if (gdr_send) {
       comm_wait(mh_send_rdma[bufferIndex][dim][dir]);
