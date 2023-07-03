@@ -589,6 +589,20 @@ namespace quda {
     static Solver *create(SolverParam &param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
                           const DiracMatrix &matPrecon, const DiracMatrix &matEig, TimeProfile &profile);
 
+    /**
+      @brief Create a preconditioning solver given the operators and parameters.
+        Currently only a few solvers are instantiated, and only the MADWF accelerator is currently supported.
+      @param[in] mat the "fine" matrix, generally outer matPrecon
+      @param[in] matSloppy the "sloppy" matrix, generally outer matPrecon
+      @param[in] matPrecon the preconditioner
+      @param[in] matEig the eigen-space operator that is to be used to construct the solver
+      @param[in] param the outer solver param
+      @param[in] Kparam the inner solver param
+      @param[in] profile the timer profile
+      @return the created preconditioning solver, decorated by std::shared_ptr
+    */
+    std::shared_ptr<Solver> createPreconditioner(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig, 
+                                                 SolverParam &param, SolverParam &Kparam, TimeProfile &profile);
 
     /**
     * @brief Set parameters for the inner solver
@@ -603,6 +617,16 @@ namespace quda {
     * @param inner[in] Parameters from the preconditioned solver
     */
     virtual void extractInnerSolverParam(SolverParam &outer, const SolverParam &inner);
+
+    /**
+      @brief Wrap an external, existing, unmanaged preconditioner in a custom `std::shared_ptr` that
+        doesn't deallocate when it falls out of scope. This is a temporary WAR for how MG solvers
+        are managed and should be removed when they themselves are passed around via shared_ptr or
+        potentially directly by reference.
+        @param[in] K the externally allocated preconditioner
+        @return the external preconditioner wrapped in a non-deallocating std::shared_ptr
+     */
+    std::shared_ptr<Solver> wrapExternalPreconditioner(const Solver& K);
 
     /**
        @brief Set the solver L2 stopping condition
@@ -1151,7 +1175,7 @@ namespace quda {
   private:
     const DiracMdagM matMdagM; // used by the eigensolver
 
-    Solver *K;
+    std::shared_ptr<Solver> K;
     SolverParam Kparam; // parameters for preconditioner solve
 
     /**

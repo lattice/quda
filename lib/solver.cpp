@@ -2,6 +2,8 @@
 #include <invert_quda.h>
 #include <multigrid.h>
 #include <eigensolve_quda.h>
+#include <accelerator.h>
+#include <madwf_ml.h> // For MADWF
 #include <cmath>
 #include <limits>
 
@@ -155,6 +157,37 @@ namespace quda {
     return solver;
   }
 
+  // preconditioner solver factory
+  std::shared_ptr<Solver> Solver::createPreconditioner(const DiracMatrix& mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
+                                                SolverParam &param, SolverParam &Kparam, TimeProfile &profile)
+  {
+    Solver *K = nullptr;
+    if (param.accelerator_type_precondition == QUDA_MADWF_ACCELERATOR) {
+      if (param.inv_type_precondition == QUDA_CG_INVERTER) {
+        K = new AcceleratedSolver<MadwfAcc, CG>(mat, matSloppy, matPrecon, matEig, Kparam, profile);
+      } else if (param.inv_type_precondition == QUDA_CA_CG_INVERTER) {
+        K = new AcceleratedSolver<MadwfAcc, CACG>(mat, matSloppy, matPrecon, matEig, Kparam, profile);
+      } else { // unknown preconditioner
+        errorQuda("Unknown inner solver %d for MADWF", param.inv_type_precondition);
+      }
+    } else {
+      if (param.inv_type_precondition == QUDA_CG_INVERTER) {
+        K = new CG(mat, matSloppy, matPrecon, matEig, Kparam, profile);
+      } else if (param.inv_type_precondition == QUDA_CA_CG_INVERTER) {
+        K = new CACG(mat, matSloppy, matPrecon, matEig, Kparam, profile);
+      } else if (param.inv_type_precondition == QUDA_MR_INVERTER) {
+        K = new MR(mat, matSloppy, Kparam, profile);
+      } else if (param.inv_type_precondition == QUDA_SD_INVERTER) {
+        K = new SD(mat, Kparam, profile);
+      } else if (param.inv_type_precondition == QUDA_CA_GCR_INVERTER) {
+        K = new CAGCR(mat, matSloppy, matPrecon, matEig, Kparam, profile);
+      } else if (param.inv_type_precondition != QUDA_INVALID_INVERTER) { // unknown preconditioner
+        errorQuda("Unknown inner solver %d", param.inv_type_precondition);
+      }
+    }
+    return std::shared_ptr<Solver>(K);
+  }
+
   // set the required parameters for the inner solver
   void Solver::fillInnerSolverParam(SolverParam &inner, const SolverParam &outer) {
     inner.tol = outer.tol_precondition;
@@ -205,6 +238,12 @@ namespace quda {
     if ((outer.inv_type_precondition == QUDA_CA_CG_INVERTER || outer.inv_type_precondition == QUDA_CA_GCR_INVERTER) && outer.ca_basis_precondition == QUDA_CHEBYSHEV_BASIS) {
       outer.ca_lambda_max_precondition = inner.ca_lambda_max;
     }
+  }
+
+  // preconditioner solver wrapper
+  std::shared_ptr<Solver> Solver::wrapExternalPreconditioner(const Solver& K)
+  {
+    return std::shared_ptr<Solver>(&const_cast<Solver&>(K), [](Solver*) { });
   }
 
   void Solver::constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat)

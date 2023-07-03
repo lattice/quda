@@ -11,7 +11,6 @@
 #include <util_quda.h>
 #include <reliable_updates.h>
 
-#include <invert_preconditioner.h>
 #include <invert_x_update.h>
 
 namespace quda
@@ -28,7 +27,7 @@ namespace quda
     // so we explicily set this here.
     Kparam.deflate = false;
 
-    K = create_preconditioner(matPrecon, matEig, param, Kparam, profile);
+    K = createPreconditioner(matPrecon, matPrecon, matPrecon, matEig, param, Kparam, profile);
   }
 
   PreconCG::~PreconCG()

@@ -116,27 +116,17 @@ namespace quda {
   {
     fillInnerSolverParam(Kparam, param);
 
-    if (param.inv_type_precondition == QUDA_CG_INVERTER) // inner CG solver
-      K = new CG(matSloppy, matPrecon, matPrecon, matEig, Kparam, profile);
-    else if (param.inv_type_precondition == QUDA_BICGSTAB_INVERTER) // inner BiCGstab solver
-      K = new BiCGstab(matSloppy, matPrecon, matPrecon, matEig, Kparam, profile);
-    else if (param.inv_type_precondition == QUDA_MR_INVERTER) // inner MR solver
-      K = new MR(matSloppy, matPrecon, Kparam, profile);
-    else if (param.inv_type_precondition == QUDA_SD_INVERTER) // inner SD solver
-      K = new SD(matSloppy, Kparam, profile);
-    else if (param.inv_type_precondition == QUDA_CA_GCR_INVERTER) // inner CA-GCR solver
-      K = new CAGCR(matSloppy, matPrecon, matPrecon, matEig, Kparam, profile);
-    else if (param.inv_type_precondition == QUDA_INVALID_INVERTER) // unsupported
-      K = NULL;
-    else 
-      errorQuda("Unsupported preconditioner %d\n", param.inv_type_precondition);
+    // Preconditioners do not need a deflation space (for now?) so we explicily set this here.
+    Kparam.deflate = false;
+
+    K = createPreconditioner(matSloppy, matPrecon, matPrecon, matEig, param, Kparam, profile);
   }
 
-  GCR::GCR(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+  GCR::GCR(const DiracMatrix &mat, Solver &K_, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
            const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
     Solver(mat, matSloppy, matPrecon, matEig, param, profile),
     matMdagM(matEig.Expose()),
-    K(&K),
+    K(nullptr),
     Kparam(param),
     n_krylov(param.Nkrylov),
     alpha(n_krylov),
@@ -144,12 +134,13 @@ namespace quda {
     gamma(n_krylov)
   {
     fillInnerSolverParam(Kparam, param);
+    K = wrapExternalPreconditioner(K_);
   }
 
   GCR::~GCR() {
     profile.TPSTART(QUDA_PROFILE_FREE);
     extractInnerSolverParam(param, Kparam);
-    if (K && param.inv_type_precondition != QUDA_MG_INVERTER) delete K;
+
     destroyDeflationSpace();
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
