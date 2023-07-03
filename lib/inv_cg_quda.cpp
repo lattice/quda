@@ -238,7 +238,6 @@ namespace quda {
     if (use_heavy_quark_res) errorQuda("The \"vanilla\" CG solver does not support HQ residual solves");
 
     // whether to select alternative reliable updates
-    // if we're computing the heavy quark residual, force "traditional" reliable updates
     bool alternative_reliable = param.use_alternative_reliable;
     /**
       When CG is used as a preconditioner, and we disable the `advanced features`, these features are turned off:
