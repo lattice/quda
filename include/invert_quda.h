@@ -792,7 +792,7 @@ namespace quda {
      * @param out Solution-vector.
      * @param in Right-hand side.
      */
-    void hqsolve(ColorSpinorField& out, ColorSpinorField& in);
+    void hqsolve(ColorSpinorField &out, ColorSpinorField &in);
   };
 
   class CGNE : public CG

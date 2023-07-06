@@ -120,14 +120,14 @@ mark_as_advanced(QUDA_INTERFACE_NVTX)
 
 # ######################################################################################################################
 # CUDA specific variables
-string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
+string(REGEX REPLACE sm_ "" QUDA_COMPUTE_CAPABILITY ${QUDA_GPU_ARCH})
 if(${CMAKE_BUILD_TYPE} STREQUAL "RELEASE")
   set(QUDA_GPU_ARCH_SUFFIX real)
 endif()
 if(QUDA_GPU_ARCH_SUFFIX)
-  set(CMAKE_CUDA_ARCHITECTURES "${COMP_CAP}-${QUDA_GPU_ARCH_SUFFIX}")
+  set(CMAKE_CUDA_ARCHITECTURES "${QUDA_COMPUTE_CAPABILITY}-${QUDA_GPU_ARCH_SUFFIX}")
 else()
-  set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
+  set(CMAKE_CUDA_ARCHITECTURES ${QUDA_COMPUTE_CAPABILITY})
 endif()
 
 set_target_properties(quda PROPERTIES CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES})
@@ -170,6 +170,67 @@ endif(QUDA_VERBOSE_BUILD)
 if(${CMAKE_CUDA_COMPILER_ID} MATCHES "NVHPC" AND NOT ${CMAKE_BUILD_TYPE} MATCHES "DEBUG")
   target_compile_options(quda PRIVATE "$<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:SHELL: -gpu=nodebug" >)
 endif()
+
+if((${QUDA_TARGET_TYPE} STREQUAL "CUDA") AND (${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 70))
+  set(MRHS_MMA_ENABLED 1)
+else()
+  set(MRHS_MMA_ENABLED 0)
+endif()
+
+if(${MRHS_MMA_ENABLED})
+  set(QUDA_MULTIGRID_MRHS_DEFAULT_LIST "16")
+else()
+  set(QUDA_MULTIGRID_MRHS_DEFAULT_LIST "")
+endif()
+set(QUDA_MULTIGRID_MRHS_LIST ${QUDA_MULTIGRID_MRHS_DEFAULT_LIST} CACHE STRING "The list of multi-rhs sizes that get compiled")
+mark_as_advanced(QUDA_MULTIGRID_MRHS_LIST)
+message(STATUS "QUDA_MULTIGRID_MRHS_LIST=${QUDA_MULTIGRID_MRHS_LIST}")
+
+if(QUDA_MULTIGRID)
+  option(QUDA_ENABLE_MMA "Enabling using tensor core" ON)
+  mark_as_advanced(QUDA_ENABLE_MMA)
+
+  option(QUDA_MULTIGRID_SETUP_USE_SMMA "Enabling using SMMA (3xTF32/3xBF16/3xFP16) for multigrid setup" ON)
+  mark_as_advanced(QUDA_MULTIGRID_SETUP_USE_SMMA)
+
+  string(REPLACE "," ";" QUDA_MULTIGRID_MRHS_LIST_SEMICOLON "${QUDA_MULTIGRID_MRHS_LIST}")
+
+  if(${QUDA_COMPUTE_CAPABILITY} GREATER_EQUAL 70)
+
+    if(${QUDA_COMPUTE_CAPABILITY} EQUAL 70)
+      set(MRHS_ATOM 16)
+    else()
+      set(MRHS_ATOM 8)
+    endif()
+
+    # add dslash_coarse last to the list so it is compiled first
+    foreach(QUDA_MULTIGRID_NVEC ${QUDA_MULTIGRID_NVEC_LIST_SEMICOLON})
+      foreach(QUDA_MULTIGRID_MRHS ${QUDA_MULTIGRID_MRHS_LIST_SEMICOLON})
+
+        math(EXPR MRHS_MODULO "${QUDA_MULTIGRID_MRHS} % ${MRHS_ATOM}")
+
+        if((${QUDA_MULTIGRID_MRHS} GREATER 0) AND (${QUDA_MULTIGRID_MRHS} LESS_EQUAL 64) AND (${MRHS_MODULO} EQUAL 0))
+          set(QUDA_MULTIGRID_DAGGER "false")
+          configure_file(dslash_coarse_mma.in.cu "dslash_coarse_mma_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu" @ONLY)
+          list(PREPEND QUDA_CU_OBJS "dslash_coarse_mma_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu")
+          set(QUDA_MULTIGRID_DAGGER "true")
+          configure_file(dslash_coarse_mma.in.cu "dslash_coarse_mma_dagger_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu" @ONLY)
+          list(PREPEND QUDA_CU_OBJS "dslash_coarse_mma_dagger_${QUDA_MULTIGRID_NVEC}_${QUDA_MULTIGRID_MRHS}.cu")
+        else()
+          message(SEND_ERROR "MRHS not supported:" "${QUDA_MULTIGRID_MRHS}")
+        endif()
+
+      endforeach()
+    endforeach()
+  endif()
+
+endif()
+
+set(QUDA_MAX_SHARED_MEMORY "0" CACHE STRING "Max shared memory per block, 0 corresponds to architecture default")
+mark_as_advanced(QUDA_MAX_SHARED_MEMORY)
+configure_file(${CMAKE_SOURCE_DIR}/include/targets/cuda/device.in.hpp
+               ${CMAKE_BINARY_DIR}/include/targets/cuda/device.hpp @ONLY)
+install(FILES "${CMAKE_BINARY_DIR}/include/targets/cuda/device.hpp" DESTINATION include/)
 
 target_include_directories(quda SYSTEM PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:${CUDAToolkit_INCLUDE_DIRS}>)
 target_include_directories(quda SYSTEM PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:${CUDAToolkit_MATH_INCLUDE_DIR}>)
@@ -332,7 +393,7 @@ if(QUDA_NVSHMEM)
   set_target_properties(nvshmem_lib PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS OFF)
   set_target_properties(nvshmem_lib PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES CUDA)
 
-  # set_target_properties(quda_pack PROPERTIES CUDA_ARCHITECTURES ${COMP_CAP})
+  # set_target_properties(quda_pack PROPERTIES CUDA_ARCHITECTURES ${QUDA_COMPUTE_CAPABILITY})
   target_include_directories(quda_pack PRIVATE dslash_core)
   target_include_directories(quda_pack SYSTEM PRIVATE ../include/externals)
   target_include_directories(quda_pack PRIVATE .)
@@ -340,7 +401,7 @@ if(QUDA_NVSHMEM)
   target_compile_definitions(quda_pack PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFINITIONS>)
   target_include_directories(quda_pack PRIVATE $<TARGET_PROPERTY:quda,INCLUDE_DIRECTORIES>)
   target_compile_options(quda_pack PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
-  if((${COMP_CAP} LESS "70"))
+  if((${QUDA_COMPUTE_CAPABILITY} LESS "70"))
     message(SEND_ERROR "QUDA_NVSHMEM=ON requires at least QUDA_GPU_ARCH=sm_70")
   endif()
   set_target_properties(quda_pack PROPERTIES CUDA_SEPARABLE_COMPILATION ON)

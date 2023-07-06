@@ -47,7 +47,14 @@ namespace quda
 
       if (location == QUDA_CUDA_FIELD_LOCATION) strcat(aux, Y.MemType() == QUDA_MEMORY_MAPPED ? ",GPU-mapped" : ",GPU-device");
       strcat(aux, comm_dim_partitioned_string());
-      if (use_mma && location == QUDA_CUDA_FIELD_LOCATION) { strcat(aux, ",mma"); }
+      if constexpr (use_mma) {
+        if (location == QUDA_CUDA_FIELD_LOCATION) {
+          strcat(aux, ",mma");
+#ifdef QUDA_MMA_AVAILABLE
+          strcat(aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
+#endif
+        }
+      }
       if (Arg::compute_max) strcat(aux, ",compute_max");
 
       apply(device::get_default_stream());
@@ -91,7 +98,7 @@ namespace quda
 
     bool advanceAux(TuneParam &param) const
     {
-      if (use_mma) {
+      if constexpr (use_mma) {
         constexpr bool query_max = true;
         int max = mma::launch_yhat_kernel<query_max>(param, device::get_default_stream(), arg, *this);
         if (param.aux.x < max) {
@@ -99,9 +106,8 @@ namespace quda
           return true;
         }
         return false;
-      } else {
-        return false;
       }
+      return false;
     }
 
     bool advanceTuneParam(TuneParam &param) const

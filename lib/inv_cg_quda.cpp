@@ -225,8 +225,7 @@ namespace quda {
     if (Np < 0 || Np > 16) errorQuda("Invalid value %d for solution_accumulator_pipeline\n", Np);
 
     // Determine whether or not we're doing a heavy quark residual
-    const bool use_heavy_quark_res =
-      (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+    const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
     if (use_heavy_quark_res) {
       hqsolve(x, b);
@@ -236,11 +235,9 @@ namespace quda {
 
     // This check is pointless in the current version of the code, but it's being proactively added
     // just in case HQ residual solves are split into a separate file
-    if (use_heavy_quark_res)
-      errorQuda("The \"vanilla\" CG solver does not support HQ residual solves");
+    if (use_heavy_quark_res) errorQuda("The \"vanilla\" CG solver does not support HQ residual solves");
 
     // whether to select alternative reliable updates
-    // if we're computing the heavy quark residual, force "traditional" reliable updates
     bool alternative_reliable = param.use_alternative_reliable;
     /**
       When CG is used as a preconditioner, and we disable the `advanced features`, these features are turned off:
@@ -580,21 +577,20 @@ namespace quda {
   }
 
   // Separate HQ residual codepath
-  void CG::hqsolve(ColorSpinorField &x, ColorSpinorField &b) {
+  void CG::hqsolve(ColorSpinorField &x, ColorSpinorField &b)
+  {
 
     logQuda(QUDA_VERBOSE, "Performing a HQ CG solve\n");
 
     // Verbose errors: HQ solves won't support deflation, pipelining
-    if (param.deflate)
-      errorQuda("HQ solves don't support deflation");
-    if (param.is_preconditioner)
-      errorQuda("HQ solves cannot be preconditioners");
+    if (param.deflate) errorQuda("HQ solves don't support deflation");
+    if (param.is_preconditioner) errorQuda("HQ solves cannot be preconditioners");
 
     // Non-terminal errors: HQ solves don't support advanced reliable updates
     if (param.use_alternative_reliable)
-      logQuda(QUDA_SUMMARIZE, "HQ solves don't support alternative reliable updates, reverting to traditional reliable updates\n");
-    if (param.pipeline)
-      logQuda(QUDA_SUMMARIZE, "HQ solves don't support pipelining, disabling...");
+      logQuda(QUDA_SUMMARIZE,
+              "HQ solves don't support alternative reliable updates, reverting to traditional reliable updates\n");
+    if (param.pipeline) logQuda(QUDA_SUMMARIZE, "HQ solves don't support pipelining, disabling...");
 
     profile.TPSTART(QUDA_PROFILE_INIT);
 
@@ -625,7 +621,7 @@ namespace quda {
       csParam.setPrecision(param.precision_sloppy);
       pp = ColorSpinorField::Create(csParam);
       App = ColorSpinorField::Create(csParam);
-      if(param.precision != param.precision_sloppy) {
+      if (param.precision != param.precision_sloppy) {
         rSloppyp = ColorSpinorField::Create(csParam);
         xSloppyp = ColorSpinorField::Create(csParam);
       } else {
@@ -671,7 +667,7 @@ namespace quda {
 
     blas::zero(x);
     if (&x != &xSloppy) blas::zero(xSloppy);
-    blas::copy(rSloppy,r);
+    blas::copy(rSloppy, r);
     blas::copy(p, rSloppy);
 
     double r2_old = 0.0;
@@ -679,7 +675,7 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_INIT);
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
-    double stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
+    double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
     // compute the initial heavy quark residual
     double hq_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
@@ -693,7 +689,6 @@ namespace quda {
     // it only gets set to true after some heuristics suggest the L2 norm has "stalled out"
     bool L2breakdown = !L2_required;
     const double L2breakdown_eps = 100. * uhigh;
-
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -753,7 +748,7 @@ namespace quda {
     int rUpdate = 0;
     int steps_since_reliable = 1;
 
-    while ( !converged && k < param.maxiter ) {
+    while (!converged && k < param.maxiter) {
       matSloppy(Ap, p);
 
       r2_old = r2;
@@ -764,8 +759,8 @@ namespace quda {
 
       // here we are deploying the alternative beta computation
       auto cg_norm = blas::axpyCGNorm(-alpha, Ap, rSloppy);
-      r2 = cg_norm.x;  // (r_new, r_new)
-      sigma = cg_norm.y >= 0.0 ? cg_norm.y : r2;  // use r2 if (r_k+1, r_k+1-r_k) breaks
+      r2 = cg_norm.x;                            // (r_new, r_new)
+      sigma = cg_norm.y >= 0.0 ? cg_norm.y : r2; // use r2 if (r_k+1, r_k+1-r_k) breaks
       rNorm = sqrt(r2);
 
       // If the iterated norm has dropped by more than a factor of delta, trigger
@@ -787,12 +782,6 @@ namespace quda {
         // Has the iterated norm dropped by a factor of delta relative to the largest the
         // iterated norm has been since the last update?
         updateR = ((rNorm < param.delta * maxrr && r0Norm <= maxrr) || updateX);
-
-        if (updateX)
-          logQuda(QUDA_VERBOSE, "Triggered L2 updateX via `(rNorm < param.delta * r0Norm && r0Norm <= maxrx)`\n");
-
-        if (updateR)
-          logQuda(QUDA_VERBOSE, "Triggered L2 updateR via `((rNorm < param.delta * maxrr && r0Norm <= maxrr) || updateX)`\n");
       } else {
         // hqresidual based reliable update
         if (hq_res > maxrx) maxrx = hq_res;
@@ -808,31 +797,20 @@ namespace quda {
         // Has the iterated heavy quark residual dropped by a factor of delta relative
         // to the largest the iterated norm has been since the last update?
         updateR = ((hq_res < param.delta * param.delta * maxrr && hq0Res <= maxrr) || updateX);
-
-        if (updateX)
-          logQuda(QUDA_VERBOSE, "Triggered HQ updateX via `(hq_res < param.delta * hq0Res && hq0Res <= maxrx)`\n");
-
-        if (updateR)
-          logQuda(QUDA_VERBOSE, "Triggered HQ updateR via `((hq_res < param.delta * maxrr && hq0Res <= maxrr) || updateX)`\n");
       }
 
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
-      if (convergence(r2, hq_res, stop, param.tol_hq) && param.delta >= param.tol) {
-        updateX = true;
-        logQuda(QUDA_VERBOSE, "Triggered updateX via convergence && delta > tol check\n");
-      }
+      if (convergence(r2, hq_res, stop, param.tol_hq) && param.delta >= param.tol) updateX = true;
 
       // force a reliable update based on the HQ residual if L2 breakdown has already happened
-      if (L2breakdown && (convergenceHQ(r2, hq_res, stop, param.tol_hq) || (r2 / b2) < hq_res_stall_check) &&
-          param.delta >= param.tol) {
+      if (L2breakdown && (convergenceHQ(r2, hq_res, stop, param.tol_hq) || (r2 / b2) < hq_res_stall_check)
+          && param.delta >= param.tol)
         updateX = true;
-        logQuda(QUDA_VERBOSE, "Triggered updateX via L2breakdown condition\n");
-      }
 
       if (!(updateR || updateX)) {
         // No reliable update needed
 
-        beta = sigma / r2_old;  // use the alternative beta computation
+        beta = sigma / r2_old; // use the alternative beta computation
 
         blas::axpyZpbx(alpha, p, xSloppy, rSloppy, beta);
 
@@ -866,8 +844,7 @@ namespace quda {
 
         // Check and see if we're "done" with the L2 norm. This could be because
         // we were already done with it, we never needed it, or the L2 norm has finally converged.
-        if (!L2breakdown && convergenceL2(r2, hq_res, stop, param.tol_hq))
-          L2breakdown = true;
+        if (!L2breakdown && convergenceL2(r2, hq_res, stop, param.tol_hq)) L2breakdown = true;
 
         // Depending on if we're still grinding on the L2 norm or if we've moved along to just
         // the HQ norm, we reset the baselines for reliable updates that get used on the
@@ -915,14 +892,15 @@ namespace quda {
           resIncreaseTotal++;
 
           // ...tell the world about it too.
-          warningQuda("new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-                      sqrt(r2), r0Norm, resIncreaseTotal);
+          warningQuda(
+            "new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+            sqrt(r2), r0Norm, resIncreaseTotal);
 
           // If the norm is ridiculously small in magnitude, we've exceeded the maximums on various
           // ways we keep track of residual increases, or the L2 norm converged, we say "we're good here"
           // and move over to the HQ residual norm.
           if (rNorm < L2breakdown_eps || resIncrease > param.max_res_increase
-                || resIncreaseTotal > param.max_res_increase_total || r2 < stop) {
+              || resIncreaseTotal > param.max_res_increase_total || r2 < stop) {
             L2breakdown = true;
             warningQuda("L2 breakdown %e, %e", rNorm, L2breakdown_eps);
 
@@ -930,7 +908,6 @@ namespace quda {
             // from the L2 norm over to the HQ residual.
             maxrr = hq_res;
             maxrx = hq_res;
-
           }
         } else {
           // This variable counts the number of times in a row the computed residual has gone up,
@@ -945,8 +922,8 @@ namespace quda {
           hqresIncrease++;
 
           // Tell the world about it
-          warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e",
-                        hq_res, hq0Res);
+          warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e", hq_res,
+                      hq0Res);
 
           // And if it's increased too many times in a row, flunk out of the solve.
           if (hqresIncrease > param.max_hq_res_increase) {
@@ -1001,7 +978,6 @@ namespace quda {
       // HQ is converged and if we do reliable update the HQ residual has been calculated using a reliable update
       bool HQdone = (steps_since_reliable == 0 && param.delta > 0) && convergenceHQ(r2, hq_res, stop, param.tol_hq);
       converged = L2done && HQdone;
-
     }
 
     blas::copy(x, xSloppy);
@@ -1035,7 +1011,6 @@ namespace quda {
     matPrecon.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-
   }
 
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)

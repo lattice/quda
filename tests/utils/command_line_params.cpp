@@ -134,6 +134,8 @@ quda::mgarray<int> n_block_ortho = {};
 quda::mgarray<bool> block_ortho_two_pass = {};
 quda::mgarray<double> mu_factor = {};
 quda::mgarray<QudaVerbosity> mg_verbosity = {};
+quda::mgarray<bool> mg_setup_use_mma = {};
+quda::mgarray<bool> mg_dslash_use_mma = {};
 quda::mgarray<QudaInverterType> setup_inv = {};
 quda::mgarray<QudaSolveType> coarse_solve_type = {};
 quda::mgarray<QudaSolveType> smoother_solve_type = {};
@@ -173,12 +175,6 @@ QudaTransferType staggered_transfer_type = QUDA_TRANSFER_OPTIMIZED_KD;
 
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
-
-#ifdef QUDA_MMA_AVAILABLE
-bool mg_use_mma = true;
-#else
-bool mg_use_mma = false;
-#endif
 
 bool mg_allow_truncation = false;
 bool mg_staggered_kd_dagger_approximation = false;
@@ -1032,13 +1028,13 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "The smoother tolerance to use for each multigrid (default 0.25)");
   quda_app->add_mgoption(opgroup, "--mg-solve-location", solver_location, CLI::QUDACheckedTransformer(field_location_map),
                          "The location where the multigrid solver will run (default cuda)");
-
+  quda_app->add_mgoption(opgroup, "--mg-setup-use-mma", mg_setup_use_mma, CLI::Validator(),
+                         "Whether multigrid setup should use mma (default to true when supported)");
+  quda_app->add_mgoption(opgroup, "--mg-dslash-use-mma", mg_dslash_use_mma, CLI::Validator(),
+                         "Whether multigrid dslash should use mma (default to false)");
   quda_app->add_mgoption(opgroup, "--mg-verbosity", mg_verbosity, CLI::QUDACheckedTransformer(verbosity_map),
                          "The verbosity to use on each level of the multigrid (default summarize)");
 
-  opgroup->add_option(
-    "--mg-use-mma", mg_use_mma,
-    "Use tensor-core to accelerate multigrid (default = true on Volta or later with CUDA >=10.1, otherwise false)");
 }
 
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
