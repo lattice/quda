@@ -831,6 +831,14 @@ namespace quda {
     virtual bool hermitian() { return true; } /** CG is only for Hermitian systems */
 
     virtual QudaInverterType getInverterType() const noexcept override { return QUDA_CG_INVERTER; }
+
+  protected:
+    /**
+     * @brief Separate codepath for performing a "simpler" CG solve when a heavy quark residual is requested.
+     * @param out Solution-vector.
+     * @param in Right-hand side.
+     */
+    void hqsolve(ColorSpinorField &out, ColorSpinorField &in);
   };
 
   class CGNE : public CG
