@@ -9,6 +9,7 @@
 #include "host_utils.h"
 #include "misc.h"
 #include "quda.h"
+#include "CloverForce_reference.h"
 #include <dirac_quda.h>
 #include <domain_wall_dslash_reference.h>
 #include <dslash_reference.h>
@@ -115,32 +116,33 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
   Gamma5_host((double *)p.Odd().V(), (double *)p.Odd().V(), p.Odd().VolumeCB());
 
   // check
-  int T = qParam.x[3];
-  int LX = qParam.x[0] * 2;
-  int LY = qParam.x[1];
-  int LZ = qParam.x[2];
-  load_half = p.Odd();
+  // int T = qParam.x[3];
+  // int LX = qParam.x[0] * 2;
+  // int LY = qParam.x[1];
+  // int LZ = qParam.x[2];
+  // load_half = p.Odd();
   // printf("reference  (%d %d %d %d)\n",T,LX,LY,LZ);
-  for (int x0 = 0; x0 < T; x0++) {
-    for (int x1 = 0; x1 < LX; x1++) {
-      for (int x2 = 0; x2 < LY; x2++) {
-        for (int x3 = 0; x3 < LZ; x3++) {
-          const int q_eo_idx = (x1 + LX * x2 + LY * LX * x3 + LZ * LY * LX * x0) / 2;
-          const int oddBit = (x0 + x1 + x2 + x3) & 1;
-          if (oddBit == 1) {
-            for (int q_spin = 0; q_spin < 4; q_spin++) {
-              for (int col = 0; col < 3; col++) {
-                printf("MARCOreference  (%d %d %d %d),  %d %d,    %g  %g\n", x0, x1, x2, x3, q_spin, col,
-                       ((double *)load_half.V())[24 * q_eo_idx + 6 * q_spin + 2 * col + 0],
-                       ((double *)load_half.V())[24 * q_eo_idx + 6 * q_spin + 2 * col + 1]);
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-  // dirac-M
-  // tmc_mat(spinorRef.V(), hostGauge, hostClover, spinor.V(), inv_param.kappa, inv_param.mu,
-  //               inv_param.twist_flavor, inv_param.dagger, inv_param.cpu_prec, gauge_param);
+  // for (int x0 = 0; x0 < T; x0++) {
+  //   for (int x1 = 0; x1 < LX; x1++) {
+  //     for (int x2 = 0; x2 < LY; x2++) {
+  //       for (int x3 = 0; x3 < LZ; x3++) {
+  //         const int q_eo_idx = (x1 + LX * x2 + LY * LX * x3 + LZ * LY * LX * x0) / 2;
+  //         const int oddBit = (x0 + x1 + x2 + x3) & 1;
+  //         if (oddBit == 1) {
+  //           for (int q_spin = 0; q_spin < 4; q_spin++) {
+  //             for (int col = 0; col < 3; col++) {
+  //               printf("MARCOreference  (%d %d %d %d),  %d %d,    %g  %g\n", x0, x1, x2, x3, q_spin, col,
+  //                      ((double *)load_half.V())[24 * q_eo_idx + 6 * q_spin + 2 * col + 0],
+  //                      ((double *)load_half.V())[24 * q_eo_idx + 6 * q_spin + 2 * col + 1]);
+  //             }
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
+  double force_coeff=coeff[0];
+  // FIXME: invert x,p here and in the device version
+  CloverForce_reference(h_mom,  gauge,  p, x,  force_coeff );
+  
 }
