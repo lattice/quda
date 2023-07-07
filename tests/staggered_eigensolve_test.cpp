@@ -20,10 +20,10 @@
 void display_test_info()
 {
   printfQuda("running the following test:\n");
-  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon test_type  S_dimension T_dimension\n");
-  printfQuda("%s   %s             %s            %s            %s         %d/%d/%d          %d \n", get_prec_str(prec),
+  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension\n");
+  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d \n", get_prec_str(prec),
              get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy),
-             get_staggered_test_type(test_type), xdim, ydim, zdim, tdim);
+             xdim, ydim, zdim, tdim);
 
   printfQuda("\n   Eigensolver parameters\n");
   printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
@@ -60,13 +60,11 @@ void display_test_info()
 
 int main(int argc, char **argv)
 {
-  // Set a default
-  solve_type = QUDA_INVALID_SOLVE;
+  // Set defaults
+  setQudaStaggeredDefaultInvTestParams();
 
   auto app = make_app();
   add_eigen_option_group(app);
-  CLI::TransformPairs<int> test_type_map {{"full", 0}, {"even", 3}, {"odd", 4}};
-  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
 
   try {
     app->parse(argc, argv);
@@ -80,15 +78,10 @@ int main(int argc, char **argv)
   // Set values for precisions via the command line.
   setQudaPrecisions();
 
-  // Only these fermions are supported in this file. Ensure a reasonable default,
   // ensure that the default is improved staggered
   if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
-    printfQuda("dslash_type %s not supported, defaulting to %s\n", get_dslash_str(dslash_type),
-               get_dslash_str(QUDA_ASQTAD_DSLASH));
-    dslash_type = QUDA_ASQTAD_DSLASH;
+    errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   }
-
-  setQudaStaggeredEigTestParams();
 
   display_test_info();
 
@@ -165,10 +158,8 @@ int main(int argc, char **argv)
 
   // QUDA eigensolver test
   //----------------------------------------------------------------------------
-  switch (test_type) {
-  case 0: // full parity solution
-  case 3: // even
-  case 4: // odd
+  if ((solve_type == QUDA_DIRECT_SOLVE && solution_type == QUDA_MAT_SOLUTION) ||
+    (solve_type == QUDA_DIRECT_PC_SOLVE && solution_type == QUDA_MATPC_SOLUTION)) {
     // This function returns the host_evecs and host_evals pointers, populated with
     // the requested data, at the requested prec. All the information needed to
     // perfom the solve is in the eig_param container.
@@ -180,11 +171,9 @@ int main(int argc, char **argv)
     time += (double)clock();
 
     printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", time / CLOCKS_PER_SEC);
-    break;
-
-  default: errorQuda("Unsupported test type");
-
-  } // switch
+  } else {
+    errorQuda("Unsupported combination of solve_type %s and solution_type %s", get_solve_str(solve_type), get_solution_str(solution_type));
+  }
 
   // Deallocate host memory
   for (int i = 0; i < eig_n_conv; i++) host_free(host_evecs[i]);

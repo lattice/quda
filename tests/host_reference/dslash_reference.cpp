@@ -747,11 +747,7 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
                                 void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param,
                                 QudaInvertParam &inv_param, int shift)
 {
-  switch (test_type) {
-  case 0: // full parity solution, full parity system
-  case 1: // full parity solution, solving EVEN EVEN prec system
-  case 2: // full parity solution, solving ODD ODD prec system
-
+  if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
     // In QUDA, the full staggered operator has the sign convention
     // {{m, -D_eo},{-D_oe,m}}, while the CPU verify function does not
     // have the minus sign. Passing in QUDA_DAG_YES solves this
@@ -767,17 +763,19 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
     } else {
       axpy(2 * mass, out.V(), ref.V(), ref.Length(), gauge_param.cpu_prec);
     }
-    break;
+  } else if (inv_param.solution_type == QUDA_MATPC_SOLUTION) {
 
-  case 3: // even parity solution, solving EVEN system
-  case 4: // odd parity solution, solving ODD system
-  case 5: // multi mass CG, even parity solution, solving EVEN system
-  case 6: // multi mass CG, odd parity solution, solving ODD system
+    QudaParity parity = QUDA_INVALID_PARITY;
+    switch (inv_param.matpc_type) {
+      case QUDA_MATPC_EVEN_EVEN: parity = QUDA_EVEN_PARITY; break;
+      case QUDA_MATPC_ODD_ODD: parity = QUDA_ODD_PARITY; break;
+      default: errorQuda("Unexpected matpc_type %s", get_matpc_str(inv_param.matpc_type)); break;
+    }
 
     staggeredMatDagMat(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, out, mass, 0, inv_param.cpu_prec,
-                       gauge_param.cpu_prec, tmp,
-                       (test_type == 3 || test_type == 5) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY, dslash_type);
-    break;
+                       gauge_param.cpu_prec, tmp, parity, dslash_type);
+  } else {
+    errorQuda("Unexpected solution_type %s", get_solution_str(inv_param.solution_type));
   }
 
   int len = 0;
