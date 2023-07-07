@@ -2,6 +2,8 @@
 #include <invert_quda.h>
 #include <multigrid.h>
 #include <eigensolve_quda.h>
+#include <accelerator.h>
+#include <madwf_ml.h> // For MADWF
 #include <cmath>
 #include <limits>
 
@@ -50,7 +52,7 @@ namespace quda {
   {
     Solver *solver = nullptr;
 
-    if (param.preconditioner && param.inv_type != QUDA_GCR_INVERTER)
+    if (param.preconditioner && param.inv_type != QUDA_GCR_INVERTER && param.inv_type != QUDA_PCG_INVERTER)
       errorQuda("Explicit preconditoner not supported for %d solver", param.inv_type);
 
     if (param.preconditioner && param.inv_type_precondition != QUDA_MG_INVERTER)
@@ -102,7 +104,14 @@ namespace quda {
       break;
     case QUDA_PCG_INVERTER:
       report("PCG");
-      solver = new PreconCG(mat, matSloppy, matPrecon, matEig, param, profile);
+      if (param.preconditioner) {
+        Solver *mg = param.mg_instance ? static_cast<MG*>(param.preconditioner) : static_cast<multigrid_solver*>(param.preconditioner)->mg;
+        // FIXME dirty hack to ensure that preconditioner precision set in interface isn't used in the outer GCR-MG solver
+        if (!param.mg_instance) param.precision_precondition = param.precision_sloppy;
+        solver = new PreconCG(mat, *(mg), matSloppy, matPrecon, matEig, param, profile);
+      } else {
+        solver = new PreconCG(mat, matSloppy, matPrecon, matEig, param, profile);
+      }
       break;
     case QUDA_BICGSTABL_INVERTER:
       report("BICGSTABL");
@@ -153,6 +162,95 @@ namespace quda {
 
     if (!mat.hermitian() && solver->hermitian()) errorQuda("Cannot solve non-Hermitian system with Hermitian solver");
     return solver;
+  }
+
+  // preconditioner solver factory
+  std::shared_ptr<Solver> Solver::createPreconditioner(const DiracMatrix& mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
+                                                SolverParam &param, SolverParam &Kparam, TimeProfile &profile)
+  {
+    Solver *K = nullptr;
+    if (param.accelerator_type_precondition == QUDA_MADWF_ACCELERATOR) {
+      if (param.inv_type_precondition == QUDA_CG_INVERTER) {
+        K = new AcceleratedSolver<MadwfAcc, CG>(mat, matSloppy, matPrecon, matEig, Kparam, profile);
+      } else if (param.inv_type_precondition == QUDA_CA_CG_INVERTER) {
+        K = new AcceleratedSolver<MadwfAcc, CACG>(mat, matSloppy, matPrecon, matEig, Kparam, profile);
+      } else { // unknown preconditioner
+        errorQuda("Unknown inner solver %d for MADWF", param.inv_type_precondition);
+      }
+    } else {
+      if (param.inv_type_precondition == QUDA_CG_INVERTER) {
+        K = new CG(mat, matSloppy, matPrecon, matEig, Kparam, profile);
+      } else if (param.inv_type_precondition == QUDA_CA_CG_INVERTER) {
+        K = new CACG(mat, matSloppy, matPrecon, matEig, Kparam, profile);
+      } else if (param.inv_type_precondition == QUDA_MR_INVERTER) {
+        K = new MR(mat, matSloppy, Kparam, profile);
+      } else if (param.inv_type_precondition == QUDA_SD_INVERTER) {
+        K = new SD(mat, Kparam, profile);
+      } else if (param.inv_type_precondition == QUDA_CA_GCR_INVERTER) {
+        K = new CAGCR(mat, matSloppy, matPrecon, matEig, Kparam, profile);
+      } else if (param.inv_type_precondition != QUDA_INVALID_INVERTER) { // unknown preconditioner
+        errorQuda("Unknown inner solver %d", param.inv_type_precondition);
+      }
+    }
+    return std::shared_ptr<Solver>(K);
+  }
+
+  // set the required parameters for the inner solver
+  void Solver::fillInnerSolverParam(SolverParam &inner, const SolverParam &outer) {
+    inner.tol = outer.tol_precondition;
+    inner.delta = 1e-20; // no reliable updates within the inner solver
+
+    inner.precision
+      = ((outer.inv_type_precondition == QUDA_CG_INVERTER || outer.inv_type_precondition == QUDA_CA_CG_INVERTER || outer.inv_type_precondition == QUDA_MG_INVERTER)
+         && !outer.precondition_no_advanced_feature) ?
+      outer.precision_sloppy :
+      outer.precision_precondition;
+    inner.precision_sloppy = outer.precision_precondition;
+
+    // this sets a fixed iteration count if we're using the MR solver
+    inner.residual_type = (outer.inv_type_precondition == QUDA_MR_INVERTER) ? QUDA_INVALID_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
+
+    inner.iter = 0;
+    inner.gflops = 0;
+    inner.secs = 0;
+
+    inner.inv_type_precondition = QUDA_INVALID_INVERTER;
+    inner.is_preconditioner = true; // tell inner solver it is a preconditioner
+    inner.pipeline = true;
+
+    inner.schwarz_type = outer.schwarz_type;
+    inner.global_reduction = inner.schwarz_type == QUDA_INVALID_SCHWARZ ? true : false;
+
+    inner.use_init_guess = QUDA_USE_INIT_GUESS_NO;
+
+    inner.maxiter = outer.maxiter_precondition;
+    if (outer.inv_type_precondition == QUDA_CA_GCR_INVERTER || outer.inv_type_precondition == QUDA_CA_CG_INVERTER) {
+      inner.Nkrylov = inner.maxiter / outer.precondition_cycle;
+      inner.ca_basis = outer.ca_basis_precondition;
+      inner.ca_lambda_min = outer.ca_lambda_min_precondition;
+      inner.ca_lambda_max = outer.ca_lambda_max_precondition;
+    } else {
+      inner.Nsteps = outer.precondition_cycle;
+    }
+
+    inner.verbosity_precondition = outer.verbosity_precondition;
+
+    inner.compute_true_res = false;
+    inner.sloppy_converge = true;
+  }
+
+  void Solver::extractInnerSolverParam(SolverParam &outer, const SolverParam &inner)
+  {
+    // extract a_max, which may have been determined via power iterations
+    if ((outer.inv_type_precondition == QUDA_CA_CG_INVERTER || outer.inv_type_precondition == QUDA_CA_GCR_INVERTER) && outer.ca_basis_precondition == QUDA_CHEBYSHEV_BASIS) {
+      outer.ca_lambda_max_precondition = inner.ca_lambda_max;
+    }
+  }
+
+  // preconditioner solver wrapper
+  std::shared_ptr<Solver> Solver::wrapExternalPreconditioner(const Solver& K)
+  {
+    return std::shared_ptr<Solver>(&const_cast<Solver&>(K), [](Solver*) { });
   }
 
   void Solver::constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat)
