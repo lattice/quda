@@ -4,12 +4,12 @@
 #include <string.h>
 #include <type_traits>
 
+#include "CloverForce_reference.h"
 #include "TMCloverForce_reference.h"
 #include "gauge_field.h"
 #include "host_utils.h"
 #include "misc.h"
 #include "quda.h"
-#include "CloverForce_reference.h"
 #include <dirac_quda.h>
 #include <domain_wall_dslash_reference.h>
 #include <dslash_reference.h>
@@ -43,6 +43,10 @@ void Gamma5_host_UKQCD(double *out, double *in, const int V)
     }
   }
 }
+template <typename Float> void add_mom(Float *a, Float *b, int len, double coeff)
+{
+  for (int i = 0; i < len; i++) { a[i] += coeff * b[i]; }
+}
 
 void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector, std::array<void *, 4> gauge,
                              std::vector<char> clover, std::vector<char> clover_inv, QudaGaugeParam *gauge_param,
@@ -65,7 +69,6 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
   if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) { qParam.pc_type = QUDA_5D_PC; }
   for (int dir = 0; dir < 4; ++dir) qParam.x[dir] = gauge_param->X[dir];
 
-  
   qParam.location = QUDA_CPU_FIELD_LOCATION;
   qParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   // qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
@@ -120,7 +123,7 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
   // int LX = qParam.x[0] * 2;
   // int LY = qParam.x[1];
   // int LZ = qParam.x[2];
-  // load_half = p.Odd();
+  // load_half = p.Even();
   // printf("reference  (%d %d %d %d)\n",T,LX,LY,LZ);
   // for (int x0 = 0; x0 < T; x0++) {
   //   for (int x1 = 0; x1 < LX; x1++) {
@@ -128,7 +131,7 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
   //       for (int x3 = 0; x3 < LZ; x3++) {
   //         const int q_eo_idx = (x1 + LX * x2 + LY * LX * x3 + LZ * LY * LX * x0) / 2;
   //         const int oddBit = (x0 + x1 + x2 + x3) & 1;
-  //         if (oddBit == 1) {
+  //         if (oddBit == 0) {
   //           for (int q_spin = 0; q_spin < 4; q_spin++) {
   //             for (int col = 0; col < 3; col++) {
   //               printf("MARCOreference  (%d %d %d %d),  %d %d,    %g  %g\n", x0, x1, x2, x3, q_spin, col,
@@ -141,8 +144,20 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
   //     }
   //   }
   // }
-  double force_coeff=coeff[0];
+  double force_coeff = coeff[0];
+  quda::GaugeFieldParam momparam(*gauge_param);
+  momparam.create = QUDA_NULL_FIELD_CREATE;
+  momparam.order = QUDA_QDP_GAUGE_ORDER;
+  momparam.location = QUDA_CPU_FIELD_LOCATION;
+  momparam.order = QUDA_MILC_GAUGE_ORDER;
+  momparam.reconstruct = QUDA_RECONSTRUCT_10;
+  momparam.link_type = QUDA_ASQTAD_MOM_LINKS;
+  momparam.create = QUDA_ZERO_FIELD_CREATE;
+  quda::cpuGaugeField mom(momparam);
+  createMomCPU(mom.Gauge_p(), gauge_param->cpu_prec, 0.0);
+  void *refmom = mom.Gauge_p();
   // FIXME: invert x,p here and in the device version
-  CloverForce_reference(h_mom,  gauge,  p, x,  force_coeff );
-  
+  CloverForce_reference(refmom, gauge, p, x, force_coeff);
+
+  add_mom((double *)h_mom, (double *)mom.Gauge_p(), 4 * V * mom_site_size, -1.0);
 }
