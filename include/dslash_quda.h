@@ -743,6 +743,22 @@ namespace quda
                     bool dagger, const int *comm_override, TimeProfile &profile);                             
 
   /**
+     @brief Apply the local (improved) staggered dslash operator to a color-spinor field as part of Mlocal
+     @param[out] out Result color-spinor field
+     @param[in] in Input color-spinor field
+     @param[in] U Gauge-Link (1-link or fat-link)
+     @param[in] L Long-links for asqtad
+     @param[in] a xpay parameter (set to 0.0 for non-xpay version)
+     @param[in] x Vector field we "pay" into
+     @param[in] parity parity parameter
+     @param[in] improved whether to apply to standard-staggered (false) or asqtad (true) operator
+     @param[in] type whether we're applying step 1 (D x), step 2 (4 m^2 - D^2), or step 3 (local "clovers")
+  */
+  void ApplyLocalStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField& U,
+                           const GaugeField &L, double a, const ColorSpinorField &x, int parity,
+                           bool improved, QudaStaggeredLocalType step);
+
+  /**
      @brief Apply the (improved) staggered Kahler-Dirac inverse block to a color-spinor field.
      @param[out] out Result color-spinor field
      @param[in] in Input color-spinor field

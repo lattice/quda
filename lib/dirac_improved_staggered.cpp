@@ -209,6 +209,59 @@ namespace quda {
     DslashXpay(out, tmp, parity, in, 4 * mass * mass);
   }
 
+  // Apply the local version of M, book-keeping terms that hop out then in
+  void DiracImprovedStaggeredPC::MLocal(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    /*checkSpinorAlias(in, out);
+
+    auto tmp = getFieldTmp(in);
+
+    // Determine parity of first dslash (even -> D_oe; odd -> D_eo)
+    QudaParity parity = QUDA_INVALID_PARITY;
+    QudaParity other_parity = QUDA_INVALID_PARITY;
+    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+      parity = QUDA_EVEN_PARITY;
+      other_parity = QUDA_ODD_PARITY;
+    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+      parity = QUDA_ODD_PARITY;
+      other_parity = QUDA_EVEN_PARITY;
+    } else {
+      errorQuda("Invalid matpcType(%d) in function\n", matpcType);
+    }
+
+    // Apply D_oe [D_eo]
+    ApplyLocalStaggered(tmp, in, *fatGauge, *longGauge, 0.0, in, other_parity, true, QUDA_STAGGERED_LOCAL_STEP1);
+
+    // apply -D_eo [-D_oe] + 4 m^2
+    ApplyLocalStaggered(out, tmp, *fatGauge, *longGauge, 4. * mass * mass, in, parity, true, QUDA_STAGGERED_LOCAL_STEP2);
+
+    // apply boundary "clover" terms
+    ApplyLocalStaggered(out, in, *fatGauge, *longGauge, 0., in, parity, true, QUDA_STAGGERED_LOCAL_CLOVER);*/
+
+    auto tmp = getFieldTmp(in);
+
+    QudaParity parity = QUDA_INVALID_PARITY;
+    QudaParity other_parity = QUDA_INVALID_PARITY;
+    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+      parity = QUDA_EVEN_PARITY;
+      other_parity = QUDA_ODD_PARITY;
+    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+      parity = QUDA_ODD_PARITY;
+      other_parity = QUDA_EVEN_PARITY;
+    } else {
+      errorQuda("Invalid matpcType(%d) in function\n", matpcType);
+    }
+
+    // Convention note: Dslash applies D_eo, DslashXpay applies 4m^2 - D_oe!
+    // Note the minus sign convention in the Xpay version.
+    // This applies equally for the e <-> o permutation.
+
+    checkParitySpinor(in, out);
+
+    ApplyStaggered(tmp, in, *fatGauge, 0., in, other_parity, dagger, commDim, profile);
+    ApplyStaggered(out, tmp, *fatGauge, 4 * mass * mass, in, parity, dagger, commDim, profile);
+  }
+
   void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &, const ColorSpinorField &) const
   {
     errorQuda("MdagM is no longer defined for DiracImprovedStaggeredPC. Use M instead");

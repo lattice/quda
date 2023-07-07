@@ -120,9 +120,6 @@ int main(int argc, char **argv)
   }
   setVerbosity(verbosity);
 
-  // override default solver types if test_type is set to something besides the default
-  setQudaStaggeredDefaultInvTestParams();
-
   if (inv_deflate && inv_multigrid) {
     printfQuda("Error: Cannot use both deflation and multigrid preconditioners on top level solve.\n");
     exit(0);

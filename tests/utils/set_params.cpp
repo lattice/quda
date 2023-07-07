@@ -938,11 +938,15 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
 
   inv_param.Nsteps = 10;
 
+
   // domain decomposition preconditioner parameters
   inv_param.inv_type_precondition = precon_type;
+
+  inv_param.schwarz_type = precon_schwarz_type;
+  inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = tol_precondition;
   inv_param.maxiter_precondition = maxiter_precondition;
-  inv_param.verbosity_precondition = QUDA_SILENT;
+  inv_param.verbosity_precondition = verbosity_precondition;
   inv_param.cuda_prec_precondition = prec_precondition;
   inv_param.cuda_prec_eigensolver = prec_eigensolver;
 

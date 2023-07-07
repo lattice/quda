@@ -201,6 +201,36 @@ namespace quda {
     DslashXpay(out, tmp, parity, in, 4 * mass * mass);
   }
 
+  // Apply the local version of M, book-keeping terms that hop out then in
+  void DiracStaggeredPC::MLocal(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    checkSpinorAlias(in, out);
+
+    auto tmp = getFieldTmp(in);
+
+    // Determine parity of first dslash (even -> D_oe; odd -> D_eo)
+    QudaParity parity = QUDA_INVALID_PARITY;
+    QudaParity other_parity = QUDA_INVALID_PARITY;
+    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+      parity = QUDA_EVEN_PARITY;
+      other_parity = QUDA_ODD_PARITY;
+    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+      parity = QUDA_ODD_PARITY;
+      other_parity = QUDA_EVEN_PARITY;
+    } else {
+      errorQuda("Invalid matpcType(%d) in function\n", matpcType);
+    }
+
+    // Apply D_oe [D_eo]; second "gauge" is a dummy value for the long links
+    ApplyLocalStaggered(tmp, in, *gauge, *gauge, 0.0, in, other_parity, false, QUDA_STAGGERED_LOCAL_STEP1);
+
+    // apply -D_eo [-D_oe] + 4 m^2
+    ApplyLocalStaggered(out, tmp, *gauge, *gauge, 4. * mass * mass, in, parity, false, QUDA_STAGGERED_LOCAL_STEP2);
+
+    // apply boundary "clover" terms
+    ApplyLocalStaggered(out, in, *gauge, *gauge, 0., in, parity, false, QUDA_STAGGERED_LOCAL_CLOVER);
+  }
+
   void DiracStaggeredPC::MdagM(ColorSpinorField &, const ColorSpinorField &) const
   {
     errorQuda("MdagM is no longer defined for DiracStaggeredPC. Use M instead.\n");

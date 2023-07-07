@@ -435,6 +435,14 @@ typedef enum QudaTwistGamma5Type_s {
   QUDA_TWIST_GAMMA5_INVALID = QUDA_INVALID_ENUM
 } QudaTwistGamma5Type;
 
+// this can probably become an internal enum
+typedef enum QudaStaggeredLocalType_s {
+  QUDA_STAGGERED_LOCAL_STEP1,
+  QUDA_STAGGERED_LOCAL_STEP2,
+  QUDA_STAGGERED_LOCAL_CLOVER,
+  QUDA_STAGGERED_LOCAL_INVALID = QUDA_INVALID_ENUM
+} QudaStaggeredLocalType;
+
 typedef enum QudaUseInitGuess_s {
   QUDA_USE_INIT_GUESS_NO,
   QUDA_USE_INIT_GUESS_YES,
