@@ -95,7 +95,7 @@ template <typename sFloat, typename gFloat> void outerProdSpinTrace(gFloat *gaug
       gauge[j * 6 + i * 2 + 0] = x[0 * 6 + j * 2 + 0] * y[0 * 6 + i * 2 + 0];
       gauge[j * 6 + i * 2 + 0] += x[0 * 6 + j * 2 + 1] * y[0 * 6 + i * 2 + 1];
       gauge[j * 6 + i * 2 + 1] = x[0 * 6 + j * 2 + 1] * y[0 * 6 + i * 2 + 0];
-      gauge[j * 6 + i * 2 + 1] += -x[0 * 6 + j * 2 + 0] * y[0 * 6 + i * 2 + 1];
+      gauge[j * 6 + i * 2 + 1] -= x[0 * 6 + j * 2 + 0] * y[0 * 6 + i * 2 + 1];
       // trace over spin (manual unroll for perf)
       // out(j, i).real(a(0, j).real() * b(0, i).real());
       // out(j, i).real(out(j, i).real() + a(0, j).imag() * b(0, i).imag());
@@ -107,7 +107,7 @@ template <typename sFloat, typename gFloat> void outerProdSpinTrace(gFloat *gaug
         gauge[j * 6 + i * 2 + 0] += x[s * 6 + j * 2 + 0] * y[s * 6 + i * 2 + 0];
         gauge[j * 6 + i * 2 + 0] += x[s * 6 + j * 2 + 1] * y[s * 6 + i * 2 + 1];
         gauge[j * 6 + i * 2 + 1] += x[s * 6 + j * 2 + 1] * y[s * 6 + i * 2 + 0];
-        gauge[j * 6 + i * 2 + 1] -= -x[s * 6 + j * 2 + 0] * y[s * 6 + i * 2 + 1];
+        gauge[j * 6 + i * 2 + 1] -= x[s * 6 + j * 2 + 0] * y[s * 6 + i * 2 + 1];
         //   out(j,i).real( out(j,i).real() + a(s,j).real() * b(s,i).real() );
         //   out(j,i).real( out(j,i).real() + a(s,j).imag() * b(s,i).imag() );
         //   out(j,i).imag( out(j,i).imag() + a(s,j).imag() * b(s,i).real() );
@@ -139,7 +139,7 @@ template <typename gFloat> void accum_su3_to_anti_hermitian(gFloat *mom, gFloat 
   mom[8] += gauge[2 * 6 + 2 * 2 + 1] - temp;
   // of diag
   mom[0] += (gauge[0 * 6 + 1 * 2 + 0] - gauge[1 * 6 + 0 * 2 + 0]) * 0.5;
-  mom[1] += (gauge[0 * 6 + 1 * 2 + 1] + gauge[0 * 6 + 1 * 2 + 1]) * 0.5;
+  mom[1] += (gauge[0 * 6 + 1 * 2 + 1] + gauge[1 * 6 + 0 * 2 + 1]) * 0.5;
   mom[2] += (gauge[0 * 6 + 2 * 2 + 0] - gauge[2 * 6 + 0 * 2 + 0]) * 0.5;
   mom[3] += (gauge[0 * 6 + 2 * 2 + 1] + gauge[2 * 6 + 0 * 2 + 1]) * 0.5;
   mom[4] += (gauge[1 * 6 + 2 * 2 + 0] - gauge[2 * 6 + 1 * 2 + 0]) * 0.5;
@@ -168,29 +168,39 @@ void CloverForce_kernel_host(std::array<void *, 4> gauge, void *h_mom, quda::Col
     // ghostGaugeOdd[dir] = ghostGauge[dir] + (faceVolume[dir] / 2) * gauge_site_size;
   }
   for (int i = 0; i < Vh; i++) {
-    // for (int dir = 0; dir < 8; dir += 2) { // figer cross that are the forward direction
-    for (int dir = 0; dir < 1; dir += 2) { // figer cross that are the forward direction
+    for (int dir = 0; dir < 8; dir += 2) { // figer cross that are the forward direction
       // load the gauge
       gFloat **gaugeField = (parity ? gaugeOdd : gaugeEven);
       gFloat *gauge = &gaugeField[dir / 2][i * (3 * 3 * 2)];
       // load spinor and project
       const sFloat *spinor = spinorNeighbor_mg4dir(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
       sFloat projectedSpinor[spinor_site_size];
-      int projIdx = 2 * (dir / 2); //+ (dir + daggerBit) % 2;
+      int projIdx = 2 * (dir / 2) +1; //+ (dir + daggerBit) % 2;
       multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
-
+      // printf("host x=%d d=%d  B=(%g,%g)(%g,%g)(%g,%g)-(%g,%g)(%g,%g)(%g,%g)-(%g,%g)(%g,%g)(%g,%g)-(%g,%g)(%g,%g)(%g,%g) \n",i,dir
+      //   ,projectedSpinor[0 * (6) + 0 * (2) + 0],projectedSpinor[0 * (6) + 0 * (2) + 1]
+      //   ,projectedSpinor[0 * (6) + 1 * (2) + 0],projectedSpinor[0 * (6) + 1 * (2) + 1]
+      //   ,projectedSpinor[0 * (6) + 2 * (2) + 0],projectedSpinor[0 * (6) + 2 * (2) + 1]
+      //   ,projectedSpinor[1 * (6) + 0 * (2) + 0],projectedSpinor[1 * (6) + 0 * (2) + 1]
+      //   ,projectedSpinor[1 * (6) + 1 * (2) + 0],projectedSpinor[1 * (6) + 1 * (2) + 1]
+      //   ,projectedSpinor[1 * (6) + 2 * (2) + 0],projectedSpinor[1 * (6) + 2 * (2) + 1]
+      //   ,projectedSpinor[2 * (6) + 0 * (2) + 0],projectedSpinor[2 * (6) + 0 * (2) + 1]
+      //   ,projectedSpinor[2 * (6) + 1 * (2) + 0],projectedSpinor[2 * (6) + 1 * (2) + 1]
+      //   ,projectedSpinor[2 * (6) + 2 * (2) + 0],projectedSpinor[2 * (6) + 2 * (2) + 1]
+      //   ,projectedSpinor[3 * (6) + 0 * (2) + 0],projectedSpinor[3 * (6) + 0 * (2) + 1]
+      //   ,projectedSpinor[3 * (6) + 1 * (2) + 0],projectedSpinor[3 * (6) + 1 * (2) + 1]
+      //   ,projectedSpinor[3 * (6) + 2 * (2) + 0],projectedSpinor[3 * (6) + 2 * (2) + 1]   
+      // );
       gFloat oprod[gauge_site_size];
       sFloat *A = (sFloat *)inA.V();
+      // sFloat *B = (sFloat *)inB.V();
       outerProdSpinTrace(oprod, projectedSpinor, &A[i * spinor_site_size]);
-      // even if the spinor is projected do the full operation
-      //   for (int s = 0; s < 4; s++) {
-      //       su3Mul(&gaugedSpinor[s * (3 * 2)], gauge, &projectedSpinor[s * (3 * 2)]);
-      //   }
-      //   sum(&h_mom[i * mom_site_size], &res[i * spinor_site_size], gaugedSpinor, spinor_site_size);
+      // outerProdSpinTrace(oprod, &B[i * spinor_site_size], &A[i * spinor_site_size]);
       gFloat force[gauge_site_size];
       for (int j = 0; j < gauge_site_size; j++) force[j] = 0;
       accum_su3xsu3(force, gauge, oprod, force_coeff);
-      gFloat *mom = (gFloat *)h_mom + (4 * i + dir) * mom_site_size;
+      int mu=(dir / 2);
+      gFloat *mom = (gFloat *)h_mom + (4 * i + mu) * mom_site_size;
       accum_su3_to_anti_hermitian(mom, force);
     }
   }
