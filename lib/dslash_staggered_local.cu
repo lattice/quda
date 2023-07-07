@@ -3,7 +3,7 @@
 #include <dslash_quda.h>
 #include <tunable_nd.h>
 #include <instantiate_dslash.h>
-//#include <kernels/dslash_staggered_local.cuh>
+#include <kernels/dslash_staggered_local.cuh>
 
 namespace quda {
 
@@ -63,13 +63,13 @@ namespace quda {
         case QUDA_STAGGERED_LOCAL_CLOVER: strcat(aux, ",clover"); break;
         default: errorQuda("Unexpected staggered local type %d", step); break;
       }
-      //apply(device::get_default_stream());
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
     {
       (void)stream;
-      /*TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (step == QUDA_STAGGERED_LOCAL_STEP1) {
         LocalStaggeredArg<Float, nColor, reconstruct_u, reconstruct_l, improved, QUDA_STAGGERED_LOCAL_STEP1, phase> arg(out, in, U, L, a, x, parity);
         launch<LocalStaggeredApply>(tp, stream, arg);
@@ -81,7 +81,7 @@ namespace quda {
         launch<LocalStaggeredApply>(tp, stream, arg);
       } else {
         errorQuda("Invalid staggered local type %d", step);
-      }*/
+      }
     }
 
     void preTune() { if (step == QUDA_STAGGERED_LOCAL_CLOVER) out.backup(); }

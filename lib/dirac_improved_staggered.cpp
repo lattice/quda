@@ -212,7 +212,7 @@ namespace quda {
   // Apply the local version of M, book-keeping terms that hop out then in
   void DiracImprovedStaggeredPC::MLocal(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    /*checkSpinorAlias(in, out);
+    checkParitySpinor(in, out);
 
     auto tmp = getFieldTmp(in);
 
@@ -236,30 +236,7 @@ namespace quda {
     ApplyLocalStaggered(out, tmp, *fatGauge, *longGauge, 4. * mass * mass, in, parity, true, QUDA_STAGGERED_LOCAL_STEP2);
 
     // apply boundary "clover" terms
-    ApplyLocalStaggered(out, in, *fatGauge, *longGauge, 0., in, parity, true, QUDA_STAGGERED_LOCAL_CLOVER);*/
-
-    auto tmp = getFieldTmp(in);
-
-    QudaParity parity = QUDA_INVALID_PARITY;
-    QudaParity other_parity = QUDA_INVALID_PARITY;
-    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      parity = QUDA_EVEN_PARITY;
-      other_parity = QUDA_ODD_PARITY;
-    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-      parity = QUDA_ODD_PARITY;
-      other_parity = QUDA_EVEN_PARITY;
-    } else {
-      errorQuda("Invalid matpcType(%d) in function\n", matpcType);
-    }
-
-    // Convention note: Dslash applies D_eo, DslashXpay applies 4m^2 - D_oe!
-    // Note the minus sign convention in the Xpay version.
-    // This applies equally for the e <-> o permutation.
-
-    checkParitySpinor(in, out);
-
-    ApplyStaggered(tmp, in, *fatGauge, 0., in, other_parity, dagger, commDim, profile);
-    ApplyStaggered(out, tmp, *fatGauge, 4 * mass * mass, in, parity, dagger, commDim, profile);
+    ApplyLocalStaggered(out, in, *fatGauge, *longGauge, 0., in, parity, true, QUDA_STAGGERED_LOCAL_CLOVER);
   }
 
   void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &, const ColorSpinorField &) const
