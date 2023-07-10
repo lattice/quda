@@ -88,9 +88,9 @@ template <typename sFloat, typename gFloat> void outerProdSpinTrace(gFloat *gaug
 {
 
   // outer product over color
-#pragma unroll
+
   for (int i = 0; i < 3; i++) {
-#pragma unroll
+
     for (int j = 0; j < 3; j++) {
       gauge[j * 6 + i * 2 + 0] = x[0 * 6 + j * 2 + 0] * y[0 * 6 + i * 2 + 0];
       gauge[j * 6 + i * 2 + 0] += x[0 * 6 + j * 2 + 1] * y[0 * 6 + i * 2 + 1];
@@ -102,7 +102,6 @@ template <typename sFloat, typename gFloat> void outerProdSpinTrace(gFloat *gaug
       // out(j, i).imag(a(0, j).imag() * b(0, i).real());
       // out(j, i).imag(out(j, i).imag() - a(0, j).real() * b(0, i).imag());
 
-#pragma unroll
       for (int s = 1; s < 4; s++) {
         gauge[j * 6 + i * 2 + 0] += x[s * 6 + j * 2 + 0] * y[s * 6 + i * 2 + 0];
         gauge[j * 6 + i * 2 + 0] += x[s * 6 + j * 2 + 1] * y[s * 6 + i * 2 + 1];
@@ -148,59 +147,43 @@ template <typename gFloat> void accum_su3_to_anti_hermitian(gFloat *mom, gFloat 
 
 template <typename sFloat, typename gFloat>
 void CloverForce_kernel_host(std::array<void *, 4> gauge, void *h_mom, quda::ColorSpinorField &inA,
-                             quda::ColorSpinorField &inB, quda::ColorSpinorField &inC, quda::ColorSpinorField &inD,
-                             int parity, double force_coeff)
+                             quda::ColorSpinorField &inB, int projSign, int parity, double force_coeff)
 {
 
   gFloat **gaugeFull = (gFloat **)gauge.data();
-  sFloat **backSpinor = (sFloat **)inB.fwdGhostFaceBuffer;
-  sFloat **fwdSpinor = (sFloat **)inB.backGhostFaceBuffer;
+  sFloat **backSpinor = (sFloat **)inB.backGhostFaceBuffer;
+  sFloat **fwdSpinor = (sFloat **)inB.fwdGhostFaceBuffer;
   sFloat *spinorField = (sFloat *)inB.V();
 
   gFloat *gaugeEven[4], *gaugeOdd[4];
-  gFloat *ghostGaugeEven[4], *ghostGaugeOdd[4];
+  
+  sFloat *A = (sFloat *)inA.V();
 
   for (int dir = 0; dir < 4; dir++) {
     gaugeEven[dir] = gaugeFull[dir];
     gaugeOdd[dir] = gaugeFull[dir] + Vh * gauge_site_size;
-    // we do not need gauge ghost
-    // ghostGaugeEven[dir] = ghostGauge[dir];
-    // ghostGaugeOdd[dir] = ghostGauge[dir] + (faceVolume[dir] / 2) * gauge_site_size;
   }
+
   for (int i = 0; i < Vh; i++) {
-    for (int dir = 0; dir < 8; dir += 2) { // figer cross that are the forward direction
+    // loop over the forward directions
+    for (int dir = 0; dir < 8; dir += 2) { 
       // load the gauge
       gFloat **gaugeField = (parity ? gaugeOdd : gaugeEven);
       gFloat *gauge = &gaugeField[dir / 2][i * (3 * 3 * 2)];
-      // load spinor and project
+      // load shifted spinor and project
       const sFloat *spinor = spinorNeighbor_mg4dir(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
       sFloat projectedSpinor[spinor_site_size];
-      int projIdx = 2 * (dir / 2) +1; //+ (dir + daggerBit) % 2;
+      int projIdx = 2 * (dir / 2) + (projSign + 1) / 2; //+ (dir + daggerBit) % 2;
       multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
-      // printf("host x=%d d=%d  B=(%g,%g)(%g,%g)(%g,%g)-(%g,%g)(%g,%g)(%g,%g)-(%g,%g)(%g,%g)(%g,%g)-(%g,%g)(%g,%g)(%g,%g) \n",i,dir
-      //   ,projectedSpinor[0 * (6) + 0 * (2) + 0],projectedSpinor[0 * (6) + 0 * (2) + 1]
-      //   ,projectedSpinor[0 * (6) + 1 * (2) + 0],projectedSpinor[0 * (6) + 1 * (2) + 1]
-      //   ,projectedSpinor[0 * (6) + 2 * (2) + 0],projectedSpinor[0 * (6) + 2 * (2) + 1]
-      //   ,projectedSpinor[1 * (6) + 0 * (2) + 0],projectedSpinor[1 * (6) + 0 * (2) + 1]
-      //   ,projectedSpinor[1 * (6) + 1 * (2) + 0],projectedSpinor[1 * (6) + 1 * (2) + 1]
-      //   ,projectedSpinor[1 * (6) + 2 * (2) + 0],projectedSpinor[1 * (6) + 2 * (2) + 1]
-      //   ,projectedSpinor[2 * (6) + 0 * (2) + 0],projectedSpinor[2 * (6) + 0 * (2) + 1]
-      //   ,projectedSpinor[2 * (6) + 1 * (2) + 0],projectedSpinor[2 * (6) + 1 * (2) + 1]
-      //   ,projectedSpinor[2 * (6) + 2 * (2) + 0],projectedSpinor[2 * (6) + 2 * (2) + 1]
-      //   ,projectedSpinor[3 * (6) + 0 * (2) + 0],projectedSpinor[3 * (6) + 0 * (2) + 1]
-      //   ,projectedSpinor[3 * (6) + 1 * (2) + 0],projectedSpinor[3 * (6) + 1 * (2) + 1]
-      //   ,projectedSpinor[3 * (6) + 2 * (2) + 0],projectedSpinor[3 * (6) + 2 * (2) + 1]   
-      // );
+
       gFloat oprod[gauge_site_size];
-      sFloat *A = (sFloat *)inA.V();
-      // sFloat *B = (sFloat *)inB.V();
       outerProdSpinTrace(oprod, projectedSpinor, &A[i * spinor_site_size]);
-      // outerProdSpinTrace(oprod, &B[i * spinor_site_size], &A[i * spinor_site_size]);
+
       gFloat force[gauge_site_size];
-      for (int j = 0; j < gauge_site_size; j++) force[j] = 0;
+      for (size_t j = 0; j < gauge_site_size; j++) force[j] = 0;
       accum_su3xsu3(force, gauge, oprod, force_coeff);
-      int mu=(dir / 2);
-      gFloat *mom = (gFloat *)h_mom + (4 * i + mu) * mom_site_size;
+      int mu = (dir / 2);
+      gFloat *mom = (gFloat *)h_mom + (4 * (i + Vh * parity) + mu) * mom_site_size;
       accum_su3_to_anti_hermitian(mom, force);
     }
   }
@@ -210,19 +193,17 @@ void CloverForce_reference(void *h_mom, std::array<void *, 4> gauge, quda::Color
                            quda::ColorSpinorField &p, double force_coeff)
 {
   int dag = 1;
-  for (int parity = 0; parity < 1; parity++) {
+  for (int parity = 0; parity < 2; parity++) {
     quda::ColorSpinorField &inA = (parity & 1) ? p.Odd() : p.Even();
     quda::ColorSpinorField &inB = (parity & 1) ? x.Even() : x.Odd();
     quda::ColorSpinorField &inC = (parity & 1) ? x.Odd() : x.Even();
     quda::ColorSpinorField &inD = (parity & 1) ? p.Even() : p.Odd();
 
     static constexpr int nFace = 1;
-    inB.exchangeGhost((QudaParity)(1- parity), nFace, dag);
-    //   exchangeGhost(inB, parity, dag);
-    inD.exchangeGhost((QudaParity)(1 - parity), nFace, 1 - dag);
-    //   exchangeGhost(inD, parity, 1 - dag);
-
-    //   instantiate<CloverForce, ReconstructNo12>(U, force, inA, inB, inC, inD, parity, coeff[i]);
-    CloverForce_kernel_host<double, double>(gauge, h_mom, inA, inB, inC, inD, parity, force_coeff);
+    // every time that exchange ghost is called fwdGhostFaceBuffer becomes the Ghost of the last spinor called
+    inB.exchangeGhost((QudaParity)(1 - parity), nFace, dag);
+    CloverForce_kernel_host<double, double>(gauge, h_mom, inA, inB, 1, parity, force_coeff);
+    inD.exchangeGhost((QudaParity)(1- parity), nFace, 1-dag);
+    CloverForce_kernel_host<double, double>(gauge, h_mom, inC, inD, -1, parity, force_coeff);
   }
 }

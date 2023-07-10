@@ -52,7 +52,8 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
                              std::vector<char> clover, std::vector<char> clover_inv, QudaGaugeParam *gauge_param,
                              QudaInvertParam *inv_param)
 {
-
+  nvector++; 
+  nvector--; 
   quda::ColorSpinorParam qParam;
   // constructWilsonTestSpinorParam(&qParam, inv_param, gauge_param);
   ///
@@ -134,9 +135,11 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
   //         if (oddBit == 0) {
   //           for (int q_spin = 0; q_spin < 4; q_spin++) {
   //             for (int col = 0; col < 3; col++) {
+  //               if(getRankVerbosity()){
   //               printf("MARCOreference  (%d %d %d %d),  %d %d,    %g  %g\n", x0, x1, x2, x3, q_spin, col,
   //                      ((double *)load_half.V())[24 * q_eo_idx + 6 * q_spin + 2 * col + 0],
   //                      ((double *)load_half.V())[24 * q_eo_idx + 6 * q_spin + 2 * col + 1]);
+  //               }
   //             }
   //           }
   //         }
