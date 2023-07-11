@@ -88,6 +88,12 @@ void setQudaDefaultMgTestParams()
   // We give here some default values
   for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
     mg_verbosity[i] = QUDA_SUMMARIZE;
+#ifdef QUDA_MMA_AVAILABLE
+    mg_setup_use_mma[i] = true;
+#else
+    mg_setup_use_mma[i] = false;
+#endif
+    mg_dslash_use_mma[i] = false;
     setup_inv[i] = QUDA_BICGSTAB_INVERTER;
     num_setup_iter[i] = 1;
     setup_tol[i] = 5e-6;
