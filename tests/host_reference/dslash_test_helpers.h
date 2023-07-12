@@ -11,7 +11,8 @@ enum class dslash_test_type {
   M5,
   M5inv,
   Dslash4pre,
-  MatPCDagMatPCLocal
+  MatPCDagMatPCLocal,
+  MatPCLocal
 };
 
 /**

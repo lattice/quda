@@ -33,19 +33,32 @@ template <typename Float> void display_link_internal(Float *link)
 // if daggerBit is zero: perform ordinary dslash operator
 // if daggerBit is one:  perform hermitian conjugate of dslash
 template <typename sFloat, typename gFloat>
-#ifdef MULTI_GPU
-void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, gFloat **ghostFatlink,
-                              gFloat **ghostLonglink, sFloat *spinorField, sFloat **fwd_nbr_spinor,
-                              sFloat **back_nbr_spinor, int oddBit, int daggerBit, QudaDslashType dslash_type)
-#else
-void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, gFloat **, gFloat **, sFloat *spinorField,
-                              sFloat **, sFloat **, int oddBit, int daggerBit, QudaDslashType dslash_type)
-#endif
+void staggeredDslashReference(void *res_, void **fatlink_, void **longlink_, void **ghostFatlink_,
+                              void **ghostLonglink_, void *spinorField_, void **fwd_nbr_spinor_,
+                              void **back_nbr_spinor_, int oddBit, int daggerBit, QudaDslashType dslash_type)
 {
+  auto res = reinterpret_cast<sFloat*>(res_);
+  auto fatlink = reinterpret_cast<gFloat**>(fatlink_);
+  auto longlink = reinterpret_cast<gFloat**>(longlink_);
+  auto spinorField = reinterpret_cast<sFloat*>(spinorField_);
+#ifdef MULTI_GPU
+  auto ghostFatlink = reinterpret_cast<gFloat**>(ghostFatlink_);
+  auto ghostLonglink = reinterpret_cast<gFloat**>(ghostLonglink_);
+  auto fwd_nbr_spinor = reinterpret_cast<sFloat**>(fwd_nbr_spinor_);
+  auto back_nbr_spinor = reinterpret_cast<sFloat**>(back_nbr_spinor_);
+#else
+  (void)ghostFatlink_;
+  (void)ghostLonglink_;
+  (void)fwd_nbr_spinor_;
+  (void)back_nbr_spinor_;
+#endif
+
   for (auto i = 0lu; i < Vh * stag_spinor_site_size; i++) res[i] = 0.0;
 
-  gFloat *fatlinkEven[4], *fatlinkOdd[4];
-  gFloat *longlinkEven[4], *longlinkOdd[4];
+  gFloat *fatlinkEven[4];
+  gFloat *fatlinkOdd[4];
+  gFloat *longlinkEven[4];
+  gFloat *longlinkOdd[4];
 
 #ifdef MULTI_GPU
   gFloat *ghostFatlinkEven[4], *ghostFatlinkOdd[4];
@@ -57,7 +70,6 @@ void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, 
     fatlinkOdd[dir] = fatlink[dir] + Vh * gauge_site_size;
     longlinkEven[dir] = longlink[dir];
     longlinkOdd[dir] = longlink[dir] + Vh * gauge_site_size;
-
 #ifdef MULTI_GPU
     ghostFatlinkEven[dir] = ghostFatlink[dir];
     ghostFatlinkOdd[dir] = ghostFatlink[dir] + (faceVolume[dir] / 2) * gauge_site_size;
@@ -138,28 +150,25 @@ void staggeredDslash(ColorSpinorField &out, void **fatlink, void **longlink, voi
 
   in.exchangeGhost(otherparity, nFace, daggerBit);
 
+  void *in_spinor = const_cast<void*>(in.V());
   void **fwd_nbr_spinor = in.fwdGhostFaceBuffer;
   void **back_nbr_spinor = in.backGhostFaceBuffer;
 
   if (sPrecision == QUDA_DOUBLE_PRECISION) {
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
-      staggeredDslashReference((double *)out.V(), (double **)fatlink, (double **)longlink, (double **)ghost_fatlink,
-                               (double **)ghost_longlink, (double *)in.V(), (double **)fwd_nbr_spinor,
-                               (double **)back_nbr_spinor, oddBit, daggerBit, dslash_type);
+      staggeredDslashReference<double, double>(out.V(), fatlink, longlink, ghost_fatlink, ghost_longlink,
+        in_spinor, fwd_nbr_spinor, back_nbr_spinor, oddBit, daggerBit, dslash_type);
     } else {
-      staggeredDslashReference((double *)out.V(), (float **)fatlink, (float **)longlink, (float **)ghost_fatlink,
-                               (float **)ghost_longlink, (double *)in.V(), (double **)fwd_nbr_spinor,
-                               (double **)back_nbr_spinor, oddBit, daggerBit, dslash_type);
+      staggeredDslashReference<double, float>(out.V(), fatlink, longlink, ghost_fatlink, ghost_longlink,
+        in_spinor, fwd_nbr_spinor, back_nbr_spinor, oddBit, daggerBit, dslash_type);
     }
   } else {
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
-      staggeredDslashReference((float *)out.V(), (double **)fatlink, (double **)longlink, (double **)ghost_fatlink,
-                               (double **)ghost_longlink, (float *)in.V(), (float **)fwd_nbr_spinor,
-                               (float **)back_nbr_spinor, oddBit, daggerBit, dslash_type);
+      staggeredDslashReference<float, double>(out.V(), fatlink, longlink, ghost_fatlink, ghost_longlink,
+        in_spinor, fwd_nbr_spinor, back_nbr_spinor, oddBit, daggerBit, dslash_type);
     } else {
-      staggeredDslashReference((float *)out.V(), (float **)fatlink, (float **)longlink, (float **)ghost_fatlink,
-                               (float **)ghost_longlink, (float *)in.V(), (float **)fwd_nbr_spinor,
-                               (float **)back_nbr_spinor, oddBit, daggerBit, dslash_type);
+      staggeredDslashReference<float, float>(out.V(), fatlink, longlink, ghost_fatlink, ghost_longlink,
+        in_spinor, fwd_nbr_spinor, back_nbr_spinor, oddBit, daggerBit, dslash_type);
     }
   }
 }

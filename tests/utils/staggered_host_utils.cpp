@@ -26,65 +26,19 @@ template <typename T> using complex = std::complex<T>;
 
 // Staggered gauge field utils
 //------------------------------------------------------
-void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longlink_cpu, void **qdp_longlink_gpu,
-                                            void **qdp_fatlink_cpu, void **qdp_fatlink_gpu, QudaGaugeParam &gauge_param,
-                                            int argc, char **argv, bool &gauge_loaded)
-{
-  // load a field WITHOUT PHASES
-  if (latfile.size() > 0) {
-    if (!gauge_loaded) {
-      read_gauge_field(latfile.c_str(), qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-      if (dslash_type != QUDA_LAPLACE_DSLASH) {
-        applyGaugeFieldScaling_long(qdp_inlink, Vh, &gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
-      }
-      gauge_loaded = true;
-    } // else it's already been loaded
-  } else {
-    int construct_type = (unit_gauge) ? 0 : 1;
-    if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      constructQudaGaugeField(qdp_inlink, construct_type, gauge_param.cpu_prec, &gauge_param);
-    } else {
-      constructFatLongGaugeField(qdp_inlink, qdp_longlink_cpu, construct_type, gauge_param.cpu_prec, &gauge_param,
-                                 compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
-    }
-  }
-
-  // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you
-  // "compute" the fat/long links or not.
-  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
-    for (int dir = 0; dir < 4; dir++) {
-      memcpy(qdp_fatlink_gpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
-      memcpy(qdp_fatlink_cpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
-      memset(qdp_longlink_gpu[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
-      memset(qdp_longlink_cpu[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
-    }
-  } else {
-    // QUDA_ASQTAD_DSLASH
-    if (compute_fatlong) {
-      computeFatLongGPUandCPU(qdp_fatlink_gpu, qdp_longlink_gpu, qdp_fatlink_cpu, qdp_longlink_cpu, qdp_inlink,
-                              gauge_param, host_gauge_data_type_size, n_naiks, eps_naik);
-    } else {
-      // Not computing FatLong
-      for (int dir = 0; dir < 4; dir++) {
-        memcpy(qdp_fatlink_gpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
-        memcpy(qdp_fatlink_cpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
-        memcpy(qdp_longlink_gpu[dir], qdp_longlink_cpu[dir], V * gauge_site_size * host_gauge_data_type_size);
-      }
-    }
-  }
-}
-
 void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink,
-                                      QudaGaugeParam &gauge_param, int argc, char **argv)
+                                      QudaGaugeParam &gauge_param, int argc, char **argv, bool &gauge_loaded)
 {
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
   if (latfile.size() > 0) {
-    // load in the command line supplied gauge field using QIO and LIME
-    read_gauge_field(latfile.c_str(), qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    if (dslash_type != QUDA_LAPLACE_DSLASH) {
-      applyGaugeFieldScaling_long(qdp_inlink, Vh, &gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
-    }
+    if (!gauge_loaded) {
+      // load in the command line supplied gauge field using QIO and LIME
+      read_gauge_field(latfile.c_str(), qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+      if (dslash_type != QUDA_LAPLACE_DSLASH) {
+        applyGaugeFieldScaling_long(qdp_inlink, Vh, &gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
+      }
+    } // else gauge already loaded
   } else {
     int construct_type = (unit_gauge) ? 0 : 1;
     if (dslash_type == QUDA_LAPLACE_DSLASH) {

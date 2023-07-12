@@ -125,7 +125,9 @@ int main(int argc, char **argv)
   milc_fatlink = safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
   milc_longlink = safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
-  constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv);
+  // needed b/c other tests call this routine multiple times and we can at least avoid reloading the gauge field
+  bool gauge_loaded = false;
+  constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv, gauge_loaded);
 
   // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
   double plaq[3];
