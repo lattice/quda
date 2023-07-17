@@ -747,15 +747,20 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
                                 void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param,
                                 QudaInvertParam &inv_param, int shift)
 {
+#ifdef MULTI_GPU
+  bool use_ghost_zone = true;
+#else
+  bool use_ghost_zone = false;
+#endif
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
     // In QUDA, the full staggered operator has the sign convention
     // {{m, -D_eo},{-D_oe,m}}, while the CPU verify function does not
     // have the minus sign. Passing in QUDA_DAG_YES solves this
     // discrepancy.
     staggeredDslash(ref.Even(), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, out.Odd(), QUDA_EVEN_PARITY,
-                    QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
+                    QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type, use_ghost_zone);
     staggeredDslash(ref.Odd(), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, out.Even(), QUDA_ODD_PARITY,
-                    QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
+                    QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type, use_ghost_zone);
 
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
       xpay(out.V(), kappa, ref.V(), ref.Length(), gauge_param.cpu_prec);
@@ -773,7 +778,7 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
     }
 
     staggeredMatDagMat(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, out, mass, 0, inv_param.cpu_prec,
-                       gauge_param.cpu_prec, tmp, parity, dslash_type);
+                       gauge_param.cpu_prec, tmp, parity, dslash_type, use_ghost_zone);
   } else {
     errorQuda("Unexpected solution_type %s", get_solution_str(inv_param.solution_type));
   }

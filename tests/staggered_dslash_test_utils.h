@@ -55,6 +55,10 @@ struct StaggeredDslashTestWrapper {
   cpuGaugeField *cpuFat = nullptr;
   cpuGaugeField *cpuLong = nullptr;
 
+  // extended fields for MatPCLocal
+  cpuGaugeField *cpuFatPadded = nullptr;
+  cpuGaugeField *cpuLongPadded = nullptr;
+
   ColorSpinorField spinor;
   ColorSpinorField spinorOut;
   ColorSpinorField spinorRef;
@@ -82,25 +86,26 @@ struct StaggeredDslashTestWrapper {
   bool test_split_grid = false;
   int num_src = 1;
 
+  // Whether or not we need the ghost zones
+  bool need_ghost_zone = false;
+
   void staggeredDslashRef()
   {
     // compare to dslash reference implementation
     printfQuda("Calculating reference implementation...");
     switch (dtest_type) {
     case dslash_test_type::Dslash:
-      staggeredDslash(spinorRef, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, spinor,
-                      parity, dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
+      staggeredDslash(spinorRef, cpuFat, cpuLong, spinor, parity, dagger, dslash_type, need_ghost_zone);
       break;
     case dslash_test_type::MatPC:
-      staggeredMatDagMat(spinorRef, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, spinor,
-                         mass, 0, inv_param.cpu_prec, gauge_param.cpu_prec, tmpCpu, parity, dslash_type);
+      staggeredMatDagMat(spinorRef, cpuFat, cpuLong, spinor, mass, 0, tmpCpu, parity, dslash_type, need_ghost_zone);
       break;
     case dslash_test_type::Mat:
       // the !dagger is to reconcile the QUDA convention of D_stag = {{ 2m, -D_{eo}}, -D_{oe}, 2m}} vs the host convention without the minus signs
-      staggeredDslash(spinorRef.Even(), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
-                      spinor.Odd(), QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
-      staggeredDslash(spinorRef.Odd(), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
-                      spinor.Even(), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
+      staggeredDslash(spinorRef.Even(), cpuFat, cpuLong, spinor.Odd(), QUDA_EVEN_PARITY,
+                      !dagger, dslash_type, need_ghost_zone);
+      staggeredDslash(spinorRef.Odd(), cpuFat, cpuLong,  spinor.Even(), QUDA_ODD_PARITY,
+                      !dagger, dslash_type, need_ghost_zone);
       if (dslash_type == QUDA_LAPLACE_DSLASH) {
         xpay(spinor.V(), kappa, spinorRef.V(), spinor.Length(), gauge_param.cpu_prec);
       } else {
@@ -158,6 +163,10 @@ struct StaggeredDslashTestWrapper {
     test_split_grid = num_src > 1;
     if (test_split_grid) { dtest_type = dslash_test_type::Dslash; }
 
+#ifdef MULTI_GPU
+    need_ghost_zone = dtest_type != dslash_test_type::MatPCLocal;
+#endif
+
     inv_param.dagger = dagger ? QUDA_DAG_YES : QUDA_DAG_NO;
 
     setDims(gauge_param.X);
@@ -169,7 +178,6 @@ struct StaggeredDslashTestWrapper {
 
     for (int dir = 0; dir < 4; dir++) {
       qdp_inlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-
       qdp_fatlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
       qdp_longlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
     }
@@ -194,10 +202,7 @@ struct StaggeredDslashTestWrapper {
     loadGaugeQuda(qdp_fatlink, &gauge_param);
 
     gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
-
-#ifdef MULTI_GPU
     gauge_param.ga_pad *= 3;
-#endif
 
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
       gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
@@ -209,22 +214,20 @@ struct StaggeredDslashTestWrapper {
       loadGaugeQuda(qdp_longlink, &gauge_param);
     }
 
-#ifdef MULTI_GPU
     gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
     gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
     GaugeFieldParam cpuFatParam(gauge_param, qdp_fatlink);
-    cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+    cpuFatParam.ghostExchange = need_ghost_zone ? QUDA_GHOST_EXCHANGE_PAD : QUDA_GHOST_EXCHANGE_NO;
     cpuFat = new cpuGaugeField(cpuFatParam);
-    ghost_fatlink = cpuFat->Ghost();
+    ghost_fatlink = need_ghost_zone ? cpuFat->Ghost() : nullptr;
 
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
       gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
       GaugeFieldParam cpuLongParam(gauge_param, qdp_longlink);
-      cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+      cpuLongParam.ghostExchange = need_ghost_zone ? QUDA_GHOST_EXCHANGE_PAD : QUDA_GHOST_EXCHANGE_NO;
       cpuLong = new cpuGaugeField(cpuLongParam);
-      ghost_longlink = cpuLong ? cpuLong->Ghost() : nullptr;
+      ghost_longlink = (cpuLong && need_ghost_zone) ? cpuLong->Ghost() : nullptr;
     }
-#endif
 
     ColorSpinorParam csParam;
     csParam.nColor = 3;
