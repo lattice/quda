@@ -216,7 +216,9 @@ struct StaggeredDslashTestWrapper {
       loadGaugeQuda(qdp_longlink, &gauge_param);
     }
 
-    gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
+    // Setting the type to QUDA_GENERAL_LINKS is seemingly necessary to get MatPCLocal going for the
+    // ASQTAD operator
+    gauge_param.type = QUDA_GENERAL_LINKS;
     gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
     GaugeFieldParam cpuFatParam(gauge_param, qdp_fatlink);
     cpuFatParam.ghostExchange = need_ghost_zone ? QUDA_GHOST_EXCHANGE_PAD : QUDA_GHOST_EXCHANGE_NO;
@@ -237,7 +239,6 @@ struct StaggeredDslashTestWrapper {
     }
 
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
-      gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
       GaugeFieldParam cpuLongParam(gauge_param, qdp_longlink);
       cpuLongParam.ghostExchange = need_ghost_zone ? QUDA_GHOST_EXCHANGE_PAD : QUDA_GHOST_EXCHANGE_NO;
       cpuLong = new cpuGaugeField(cpuLongParam);
