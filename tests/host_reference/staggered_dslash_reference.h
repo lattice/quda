@@ -30,3 +30,9 @@ void staggeredMatDagMat(ColorSpinorField &out, cpuGaugeField *fatlink, cpuGaugeF
                         const ColorSpinorField &in, double mass, int dagger_bit, ColorSpinorField &tmp,
                         QudaParity parity, QudaDslashType dslash_type, bool use_ghost);
 
+// Local operator routine that handles creating "extended" ColorSpinorFields, injecting/extracting
+// spinor values, etc
+void staggeredMatDagMatLocal(ColorSpinorField &out, cpuGaugeField *fatlink, cpuGaugeField *longlink,
+                        const ColorSpinorField &in, double mass, int dagger_bit,
+                        QudaParity parity, QudaDslashType dslash_type);
+

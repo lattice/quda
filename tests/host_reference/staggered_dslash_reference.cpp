@@ -64,22 +64,26 @@ void staggeredDslashReference(void *res_, void **fatlink_, void **longlink_, voi
     fatlinkEven[dir] = fatlink[dir];
     fatlinkOdd[dir] = fatlink[dir] + Vh * gauge_site_size;
 
-    if (use_ghost && ghostFatlink != nullptr) {
-      ghostFatlinkEven[dir] = ghostFatlink[dir];
-      ghostFatlinkOdd[dir] = ghostFatlink[dir] + (faceVolume[dir] / 2) * gauge_site_size;
-    } else {
-      errorQuda("Expected a ghost buffer for fat links");
+    if (use_ghost) {
+      if (ghostFatlink != nullptr) {
+        ghostFatlinkEven[dir] = ghostFatlink[dir];
+        ghostFatlinkOdd[dir] = ghostFatlink[dir] + (faceVolume[dir] / 2) * gauge_site_size;
+      } else {
+        errorQuda("Expected a ghost buffer for fat links");
+      }
     }
 
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
       longlinkEven[dir] = longlink[dir];
       longlinkOdd[dir] = longlink[dir] + Vh * gauge_site_size;
 
-      if (use_ghost && ghostLonglink != nullptr) {
-        ghostLonglinkEven[dir] = ghostLonglink[dir];
-        ghostLonglinkOdd[dir] = ghostLonglink[dir] + 3 * (faceVolume[dir] / 2) * gauge_site_size;
-      } else {
-        errorQuda("Expected a ghost buffer for long links");
+      if (use_ghost) {
+        if (ghostLonglink != nullptr) {
+          ghostLonglinkEven[dir] = ghostLonglink[dir];
+          ghostLonglinkOdd[dir] = ghostLonglink[dir] + 3 * (faceVolume[dir] / 2) * gauge_site_size;
+        } else {
+          errorQuda("Expected a ghost buffer for long links");
+        }
       }
     }
   }
@@ -230,5 +234,141 @@ void staggeredMatDagMat(ColorSpinorField &out, cpuGaugeField *fatlink, cpuGaugeF
     staggeredMatDagMat(out, (void**)fatlink->Gauge_p(), nullptr, fatlink->Ghost(), nullptr, in,
                        mass, dagger_bit, out.Precision(), fatlink->Precision(), tmp, parity,
                        dslash_type, use_ghost);
+}
+
+void staggeredMatDagMatLocal(ColorSpinorField &out, cpuGaugeField *fatlink, cpuGaugeField *longlink,
+                        const ColorSpinorField &in, double mass, int dagger_bit,
+                        QudaParity parity, QudaDslashType dslash_type) {
+  // Construct R
+  //int face_depth = (dslash_type == QUDA_ASQTAD_DSLASH) ? 3 : 1;
+  // extended fields may be broken in the context of an odd number of directions being padded an odd distance?
+  int face_depth = (dslash_type == QUDA_ASQTAD_DSLASH) ? 4 : 2;
+  int R[4] = { face_depth * comm_dim_partitioned(0), face_depth * comm_dim_partitioned(1),
+               face_depth * comm_dim_partitioned(2), face_depth * comm_dim_partitioned(3) };
+
+  // compute a parity switch bit (only for odd R values...)
+  //int odd_bit = (comm_dim_partitioned(0) + comm_dim_partitioned(1) + comm_dim_partitioned(2) + comm_dim_partitioned(3)) & 1;
+  int odd_bit = 0;
+  int parity_bit = (parity == QUDA_EVEN_PARITY) ? 0 : 1;
+  int extended_parity_bit = parity_bit ^ odd_bit;
+
+  // We need to "hack" the proper values for Vh, etc, in
+  int padded_V = 1;
+  int W[4];
+  int Z_int[4];
+  for (int d = 0; d < 4; d++) {
+    W[d] = Z[d] + 2 * R[d];
+    Z_int[d] = Z[d];
+    padded_V *= Z[d] + 2 * R[d];
+  }
+  int padded_Vh = padded_V / 2;
+
+  char *in_alias = (char*)in.V();
+  char *out_alias = (char*)out.V();
+
+  // Allocate an extended spinor, zero it out
+  ColorSpinorParam csParam(in);
+  for (int d = 0; d < 4; d++)
+    csParam.x[d] = W[d];
+  csParam.x[0] /= 2;
+  csParam.create = QUDA_ZERO_FIELD_CREATE;
+
+  int precision = in.Precision();
+
+  ColorSpinorField padded_in(csParam);
+  ColorSpinorField padded_out(csParam);
+  ColorSpinorField padded_tmp(csParam);
+
+  char *padded_in_alias = (char*)padded_in.V();
+  char *padded_out_alias = (char*)padded_out.V();
+
+  // Inject the input spinor into the padded spinor
+  for (int t_c = 0; t_c < Z[3]; t_c++) {
+    for (int z_c = 0; z_c < Z[2]; z_c++) {
+      for (int y_c = 0; y_c < Z[1]; y_c++) {
+        for (int xh_c = 0; xh_c < (Z[0] / 2); xh_c++) {
+          // get the flat interior coordinate
+          int x_c = 2 * xh_c;
+          x_c += (parity_bit + y_c + z_c + t_c) & 1;
+          int index_cb_4d = (((t_c * Z[2] + z_c) * Z[1] + y_c) * Z[0] + x_c) >> 1;
+
+          // get the flat padded coordinate
+          int x_padded_c = x_c + R[0];
+          int y_padded_c = y_c + R[1];
+          int z_padded_c = z_c + R[2];
+          int t_padded_c = t_c + R[3];
+          int index_padded_cb_4d = (((t_padded_c * W[2] + z_padded_c) * W[1] + y_padded_c) * W[0] + x_padded_c) >> 1;
+
+          // copy data
+          memcpy(&padded_in_alias[stag_spinor_site_size * precision * index_padded_cb_4d],
+                 &in_alias[stag_spinor_site_size * precision * index_cb_4d], stag_spinor_site_size * precision);
+        }
+      }
+    }
+  }
+
+  /*for (int index_cb_4d = 0; index_cb_4d < Vh; index_cb_4d++) {
+    // calculate padded_index_cb_4d
+    int x[4];
+    coordinate_from_shrinked_index(x, index_cb_4d, Z_int, R, parity);
+    int padded_index_cb_4d = index_4d_cb_from_coordinate_4d(x, W);
+    // copy data
+    memcpy(&padded_in_alias[stag_spinor_site_size * precision * padded_index_cb_4d],
+           &in_alias[stag_spinor_site_size * precision * index_cb_4d], stag_spinor_site_size * precision);
+  }*/
+
+  // Backup V, etc, variables; restore them later
+  int V_old = V;   V = padded_V;
+  int Vh_old = Vh; Vh = padded_Vh;
+  int Z_old[4];
+  for (int d = 0; d < 4; d++) {
+    Z_old[d] = Z[d];
+    Z[d] = W[d];
+  }
+
+  // Apply the staggered operator
+  staggeredMatDagMat(padded_out, fatlink, longlink, padded_in, mass, dagger_bit, padded_tmp,
+                     extended_parity_bit ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY, dslash_type, false);
+
+  // Restore V, etc
+  V = V_old; Vh = Vh_old;
+  for (int d = 0; d < 4; d++) { Z[d] = Z_old[d]; }
+
+  // Extract the padded output spinor, place it into the proper output spinor
+  for (int t_c = 0; t_c < Z[3]; t_c++) {
+    for (int z_c = 0; z_c < Z[2]; z_c++) {
+      for (int y_c = 0; y_c < Z[1]; y_c++) {
+        for (int xh_c = 0; xh_c < (Z[0] / 2); xh_c++) {
+          // get the flat interior coordinate
+          int x_c = 2 * xh_c;
+          x_c += (parity_bit + y_c + z_c + t_c) & 1;
+          int index_cb_4d = (((t_c * Z[2] + z_c) * Z[1] + y_c) * Z[0] + x_c) >> 1;
+
+          // get the flat padded coordinate
+          int x_padded_c = x_c + R[0];
+          int y_padded_c = y_c + R[1];
+          int z_padded_c = z_c + R[2];
+          int t_padded_c = t_c + R[3];
+          int index_padded_cb_4d = (((t_padded_c * W[2] + z_padded_c) * W[1] + y_padded_c) * W[0] + x_padded_c) >> 1;
+
+          // copy data
+          memcpy(&out_alias[stag_spinor_site_size * precision * index_cb_4d],
+                 &padded_out_alias[stag_spinor_site_size * precision * index_padded_cb_4d], stag_spinor_site_size * precision);
+        }
+      }
+    }
+  }
+
+  /*for (int index_cb_4d = 0; index_cb_4d < Vh; index_cb_4d++) {
+    // calculate padded_index_cb_4d
+    int x[4];
+    coordinate_from_shrinked_index(x, index_cb_4d, Z_int, R, parity);
+    int padded_index_cb_4d = index_4d_cb_from_coordinate_4d(x, W);
+    // copy data
+    memcpy(&out_alias[stag_spinor_site_size * precision * index_cb_4d],
+           &padded_out_alias[stag_spinor_site_size * precision * padded_index_cb_4d],
+           stag_spinor_site_size * precision);
+  }*/
+
 }
 

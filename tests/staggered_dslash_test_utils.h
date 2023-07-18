@@ -113,7 +113,7 @@ struct StaggeredDslashTestWrapper {
       }
       break;
     case dslash_test_type::MatPCLocal:
-      errorQuda("Test type %d does not have a host verify yet", static_cast<int>(dtest_type));
+      staggeredMatDagMatLocal(spinorRef, cpuFatPadded, cpuLongPadded, spinor, mass, 0, parity, dslash_type);
       break;
     default: errorQuda("Test type %d not defined", static_cast<int>(dtest_type));
     }
@@ -185,10 +185,12 @@ struct StaggeredDslashTestWrapper {
     // for some inexplicable reason, gauge_param.gauge_order needs to equal QUDA_MILC_GAUGE_ORDER
     // going into this routine, otherwise something goes awry further down
     bool gauge_loaded = false;
+    gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
     constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv, gauge_loaded);
     gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
 
     gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
+
     if (dslash_type == QUDA_STAGGERED_DSLASH) {
       gauge_param.reconstruct = gauge_param.reconstruct_sloppy = (link_recon == QUDA_RECONSTRUCT_12) ?
                                              QUDA_RECONSTRUCT_13 :
@@ -221,13 +223,40 @@ struct StaggeredDslashTestWrapper {
     cpuFat = new cpuGaugeField(cpuFatParam);
     ghost_fatlink = need_ghost_zone ? cpuFat->Ghost() : nullptr;
 
+    // if we're testing the MatPCLocal operator, create an extended field as a cheap way to
+    // emulate the local operator
+    if (dtest_type == dslash_test_type::MatPCLocal) {
+      // fat links
+      //int face_depth = (dslash_type == QUDA_ASQTAD_DSLASH) ? 3 : 1;
+      // extended field may be broken for odd number of partitioned fields, odd halo?
+      int face_depth = (dslash_type == QUDA_ASQTAD_DSLASH) ? 4 : 2;
+      const lat_dim_t R = { face_depth * comm_dim_partitioned(0), face_depth * comm_dim_partitioned(1),
+                            face_depth * comm_dim_partitioned(2), face_depth * comm_dim_partitioned(3)  };
+
+      cpuFatPadded = createExtendedGauge((void**)cpuFat->Gauge_p(), gauge_param, R);
+    }
+
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
       gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
       GaugeFieldParam cpuLongParam(gauge_param, qdp_longlink);
       cpuLongParam.ghostExchange = need_ghost_zone ? QUDA_GHOST_EXCHANGE_PAD : QUDA_GHOST_EXCHANGE_NO;
       cpuLong = new cpuGaugeField(cpuLongParam);
-      ghost_longlink = (cpuLong && need_ghost_zone) ? cpuLong->Ghost() : nullptr;
+      ghost_longlink = need_ghost_zone ? cpuLong->Ghost() : nullptr;
+
+      // if we're testing the MatPCLocal operator, create an extended field as a cheap way to
+      // emulate the local operator
+      if (dtest_type == dslash_test_type::MatPCLocal) {
+        // fat links
+        //int face_depth = 3;
+        // extended field may be broken for odd number of partitioned fields, odd halo?
+        int face_depth = 4;
+        const lat_dim_t R = { face_depth * comm_dim_partitioned(0), face_depth * comm_dim_partitioned(1),
+		              face_depth * comm_dim_partitioned(2), face_depth * comm_dim_partitioned(3)  };
+
+        cpuLongPadded = createExtendedGauge((void**)cpuLong->Gauge_p(), gauge_param, R);
+      }
     }
+
 
     ColorSpinorParam csParam;
     csParam.nColor = 3;
@@ -309,6 +338,16 @@ struct StaggeredDslashTestWrapper {
     }
 
     freeGaugeQuda();
+
+    if (cpuFatPadded) {
+      delete cpuFatPadded;
+      cpuFatPadded = nullptr;
+    }
+
+    if (cpuLongPadded) {
+      delete cpuLongPadded;
+      cpuLongPadded = nullptr;
+    }
 
     if (cpuFat) {
       delete cpuFat;
