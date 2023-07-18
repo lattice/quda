@@ -294,6 +294,7 @@ struct doubledouble {
   __device__ __host__ doubledouble& operator=(const double &head) {
     this->a.y = head;
     this->a.x = 0.0;
+    return *this;
   }
 
   __device__ doubledouble& operator+=(const doubledouble &a) {
