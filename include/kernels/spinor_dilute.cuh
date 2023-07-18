@@ -18,7 +18,7 @@ namespace quda {
     case QUDA_DILUTION_COLOR: return nColor;
     case QUDA_DILUTION_SPIN_COLOR: return nSpin * nColor;
     case QUDA_DILUTION_SPIN_COLOR_EVEN_ODD: return nSpin * nColor * 2;
-    default: return 1;
+    default: return 128;
     }
   }
 
@@ -28,10 +28,15 @@ namespace quda {
     static constexpr int nSpin = nSpin_;
     static constexpr int nColor = nColor_;
     static constexpr QudaDilutionType type = type_;
-    static constexpr int dilution_size = get_size<nSpin, nColor>(type);
+    static constexpr int max_dilution_size = get_size<nSpin, nColor>(type);
     using V = typename colorspinor_mapper<store_t, nSpin, nColor>::type;
-    V v[dilution_size];
+    int dilution_size;
+    V v[max_dilution_size];
     V src;
+    int nParity;
+    lat_dim_t dims = {};
+    lat_dim_t dilution_block_dims = {};
+    lat_dim_t dilution_block_grid = {};
 
     /**
        @brief Constructor for the dilution arg
@@ -39,13 +44,35 @@ namespace quda {
        @param src The source vector we are diluting
      */
     template <std::size_t... S>
-    SpinorDiluteArg(std::vector<ColorSpinorField> &v, const ColorSpinorField &src, std::index_sequence<S...>) :
+    SpinorDiluteArg(std::vector<ColorSpinorField> &v, const ColorSpinorField &src, const lat_dim_t &dilution_block_dims,
+                    std::index_sequence<S...>) :
       kernel_param(dim3(src.VolumeCB(), src.SiteSubset(), 1)),
-      v{v[S]...},
-      src(src)
+      dilution_size(v.size()),
+      src(src),
+      nParity(src.SiteSubset()),
+      dims(static_cast<const LatticeField&>(src).X()),
+      dilution_block_dims(dilution_block_dims)
     {
+      for (auto i = 0u; i < v.size(); i++) this->v[i] = V(v[i]);
+      if (nParity == 1) { // dimensions need to be full-field
+        this->dims[0] *= 2;
+        this->dilution_block_dims[0] *= 2;
+      }
+      for (auto i = 0; i < src.Ndim() && type == QUDA_DILUTION_BLOCK; i++)
+        dilution_block_grid[i] = (dims[i] * comms_dim[i]) / this->dilution_block_dims[i];
     }
   };
+
+  template <typename coord_t, typename Arg>
+  __device__ __host__ void getCoordsGlobal(coord_t &coords, int x_cb, int parity, const Arg &arg)
+  {
+    getCoords(coords, x_cb, arg.dims, parity);
+
+    // first 4 dimensions are potentially distributed so include global offsets
+    for (int i = 0; i < 4; i++) {
+      coords[i] += arg.comms_coord[i] * arg.dims[i]; // global coordinate
+    }
+  }
 
   /**
      Functor for diluting the src vector
@@ -78,16 +105,30 @@ namespace quda {
       using vector = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
       vector src = arg.src(x_cb, parity);
 
-      for (int i = 0; i < Arg::dilution_size; i++) {
-        vector v;
+      if (Arg::type == QUDA_DILUTION_BLOCK) {
+        lat_dim_t coords;
+        getCoordsGlobal(coords, x_cb, parity, arg);
 
-        for (int s = 0; s < Arg::nSpin; s++) {
-          for (int c = 0; c < Arg::nColor; c++) {
-            v(s, c) = write_source(i, s, c, parity) ? src(s, c) : complex<typename Arg::real>(0.0, 0.0);
-          }
+        lat_dim_t block_coords;
+        for (int i = 0; i < coords.size(); i++) block_coords[i] = coords[i] / arg.dilution_block_dims[i];
+        int block_idx = ((block_coords[3] * arg.dilution_block_grid[2] + block_coords[2]) * arg.dilution_block_grid[1] + block_coords[1])
+          * arg.dilution_block_grid[0] + block_coords[0]; 
+
+        for (int i = 0; i < arg.dilution_size; i++) {
+          arg.v[i](x_cb, parity) = i == block_idx ? src : vector();
         }
+      } else {
+        for (int i = 0; i < Arg::max_dilution_size; i++) { // for these types max = actual size
+          vector v;
 
-        arg.v[i](x_cb, parity) = v;
+          for (int s = 0; s < Arg::nSpin; s++) {
+            for (int c = 0; c < Arg::nColor; c++) {
+              v(s, c) = write_source(i, s, c, parity) ? src(s, c) : complex<typename Arg::real>(0.0, 0.0);
+            }
+          }
+
+          arg.v[i](x_cb, parity) = v;
+        }
       }
     }
 
