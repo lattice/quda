@@ -339,7 +339,7 @@ set(CMAKE_CXX_FLAGS_DEVEL
   "-g -O3"
   CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
-  "-O3"
+  "-Os"
   CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE
   "-O3 ${CXX_OPT}"
@@ -361,7 +361,7 @@ set(CMAKE_C_FLAGS_DEVEL
   "-g -O3"
   CACHE STRING "Flags used by the C compiler during regular development builds.")
 set(CMAKE_C_FLAGS_STRICT
-  "-O3"
+  "-Os"
   CACHE STRING "Flags used by the C compiler during strict jenkins builds.")
 set(CMAKE_C_FLAGS_RELEASE
   "-O3"

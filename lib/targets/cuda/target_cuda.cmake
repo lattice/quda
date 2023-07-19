@@ -242,6 +242,7 @@ target_include_directories(quda PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/cuda
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/targets/cuda>
                                        $<INSTALL_INTERFACE:include/targets/cuda>)
 target_include_directories(quda SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/cuda/externals)
+target_include_directories(quda_cpp SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/cuda/externals)
 
 # Specific config dependent warning suppressions and lineinfo forwarding
 
@@ -257,7 +258,9 @@ target_compile_options(
           -Wreorder
           $<$<CXX_COMPILER_ID:Clang>:
           -Xcompiler=-Wno-unused-function
-          -Xcompiler=-Wno-unknown-pragmas>
+          -Xcompiler=-Wno-unknown-pragmas
+          -Xcompiler=-Wno-error=pass-failed
+          -Xcompiler=-Wno-error=unneeded-internal-declaration>
           $<$<CXX_COMPILER_ID:GNU>:
           -Xcompiler=-Wno-unknown-pragmas>
           $<$<CONFIG:DEVEL>:-Xptxas

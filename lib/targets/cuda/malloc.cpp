@@ -482,6 +482,7 @@ namespace quda
   void host_free_(const char *func, const char *file, int line, void *ptr)
   {
     if (!ptr) { errorQuda("Attempt to free NULL host pointer (%s:%d in %s())\n", file, line, func); }
+    track_free(MAPPED, ptr);
     if (alloc[HOST].count(ptr)) {
       track_free(HOST, ptr);
       free(ptr);

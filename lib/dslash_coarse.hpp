@@ -669,10 +669,12 @@ namespace quda {
 
   static inline void enable_policy(DslashCoarsePolicy p) { policies[static_cast<std::size_t>(p)] = p; }
 
+#if 0
   static inline void disable_policy(DslashCoarsePolicy p)
   {
     policies[static_cast<std::size_t>(p)] = DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED;
   }
+#endif
 
   template <typename Launch>
   class DslashCoarsePolicyTune : public Tunable {
