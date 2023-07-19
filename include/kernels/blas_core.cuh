@@ -369,19 +369,19 @@ namespace quda
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<1, 1> write{ };
       complex<real> a;
-      double3 *Ar3;
+      array<device_reduce_t, 3> *Ar3;
       bool init_;
       caxpyxmazMR_(const real &a, const real &, const real &) :
         a(a),
-        Ar3(static_cast<double3 *>(reducer::get_device_buffer())),
+        Ar3(static_cast<array<device_reduce_t, 3>*>(reducer::get_device_buffer())),
         init_(false)
       { ; }
 
       __device__ __host__ void init()
       {
         if (!init_) {
-          double3 result = *Ar3;
-          a = a.real() * complex<real>((real)result.x, (real)result.y) * ((real)1.0 / (real)result.z);
+          auto result = *Ar3;
+          a = a.real() * complex<real>((real)result[0], (real)result[1]) / (real)result[2];
           init_ = true;
         }
       }
