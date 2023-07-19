@@ -3,8 +3,6 @@
 using namespace quda;
 
 // For loading the gauge fields
-int argc_copy;
-char **argv_copy;
 bool ctest_all_partitions = false;
 
 using ::testing::Bool;
@@ -77,7 +75,7 @@ public:
     }
     updateR();
 
-    dslash_test_wrapper.init_ctest(argc_copy, argv_copy, prec, recon);
+    dslash_test_wrapper.init_ctest(prec, recon);
     display_test_info(prec, recon);
   }
 
@@ -123,14 +121,6 @@ int main(int argc, char **argv)
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
-
-  // The 'SetUp()' method of the Google Test class from which DslashTest
-  // in derived has no arguments, but QUDA's implementation requires the
-  // use of argc and argv to set up the test via the function 'init'.
-  // As a workaround, we declare argc_copy and argv_copy as global pointers
-  // so that they are visible inside the 'init' function.
-  argc_copy = argc;
-  argv_copy = argv;
 
   // Ensure gtest prints only from rank 0
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();

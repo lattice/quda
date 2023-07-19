@@ -78,10 +78,6 @@ struct StaggeredDslashTestWrapper {
 
   Dirac *dirac;
 
-  // For loading the gauge fields
-  int argc_copy;
-  char **argv_copy;
-
   // Split grid options
   bool test_split_grid = false;
   int num_src = 1;
@@ -119,7 +115,7 @@ struct StaggeredDslashTestWrapper {
     }
   }
 
-  void init_ctest(int argc, char **argv, int precision, QudaReconstructType link_recon_)
+  void init_ctest(int precision, QudaReconstructType link_recon_)
   {
     gauge_param = newQudaGaugeParam();
     inv_param = newQudaInvertParam();
@@ -138,10 +134,10 @@ struct StaggeredDslashTestWrapper {
 
     link_recon = link_recon_;
 
-    init(argc, argv);
+    init();
   }
 
-  void init_test(int argc, char **argv)
+  void init_test()
   {
     gauge_param = newQudaGaugeParam();
     inv_param = newQudaInvertParam();
@@ -149,10 +145,10 @@ struct StaggeredDslashTestWrapper {
     setStaggeredGaugeParam(gauge_param);
     setStaggeredInvertParam(inv_param);
 
-    init(argc, argv);
+    init();
   }
 
-  void init(int argc, char **argv)
+  void init()
   {
     inv_param.split_grid[0] = grid_partition[0];
     inv_param.split_grid[1] = grid_partition[1];
@@ -186,7 +182,7 @@ struct StaggeredDslashTestWrapper {
     // going into this routine, otherwise something goes awry further down
     bool gauge_loaded = false;
     gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
-    constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv, gauge_loaded);
+    constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, 0, nullptr, gauge_loaded);
     gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
 
     gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;

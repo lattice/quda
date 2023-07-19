@@ -2,9 +2,6 @@
 
 using namespace quda;
 
-int argc_copy;
-char **argv_copy;
-
 class StaggeredDslashTest : public ::testing::Test
 {
 protected:
@@ -26,7 +23,7 @@ public:
 
   virtual void SetUp()
   {
-    dslash_test_wrapper.init_test(argc_copy, argv_copy);
+    dslash_test_wrapper.init_test();
     display_test_info();
   }
 
@@ -74,14 +71,6 @@ int main(int argc, char **argv)
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
-
-  // The 'SetUp()' method of the Google Test class from which DslashTest
-  // in derived has no arguments, but QUDA's implementation requires the
-  // use of argc and argv to set up the test via the function 'init'.
-  // As a workaround, we declare argc_copy and argv_copy as global pointers
-  // so that they are visible inside the 'init' function.
-  argc_copy = argc;
-  argv_copy = argv;
 
   // Ensure gtest prints only from rank 0
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
