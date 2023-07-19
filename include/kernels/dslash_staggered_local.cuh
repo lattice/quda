@@ -124,12 +124,13 @@ namespace quda
         }
 
         // improved - forward direction
-        if (arg.improved && (!arg.is_partitioned[d] || (coord[d] + 3) < arg.dim[d]))
-        {
-          const int fwd3_idx = linkIndexP3(coord, arg.dim, d);
-          const Link L = arg.L(d, coord.x_cb, arg.parity);
-          const Vector in = arg.in(fwd3_idx, their_spinor_parity);
-          out = mv_add(L, in, out);
+        if constexpr (arg.improved) {
+          if (!arg.is_partitioned[d] || (coord[d] + 3) < arg.dim[d]) {
+            const int fwd3_idx = linkIndexP3(coord, arg.dim, d);
+            const Link L = arg.L(d, coord.x_cb, arg.parity);
+            const Vector in = arg.in(fwd3_idx, their_spinor_parity);
+            out = mv_add(L, in, out);
+          }
         }
 
         // standard - backward direction
@@ -143,18 +144,218 @@ namespace quda
         }
 
         // improved - backward direction
-        if (arg.improved && (!arg.is_partitioned[d] || (coord[d] - 3) >= 0))
-        {
-          const int back3_idx = linkIndexM3(coord, arg.dim, d);
-          const int gauge_idx = back3_idx;
-          const Link L = arg.L(d, gauge_idx, 1 - arg.parity);
-          const Vector in = arg.in(back3_idx, their_spinor_parity);
-          out = mv_add(conj(L), -in, out);
+        if constexpr (arg.improved) {
+          if (!arg.is_partitioned[d] || (coord[d] - 3) >= 0) {
+            const int back3_idx = linkIndexM3(coord, arg.dim, d);
+            const int gauge_idx = back3_idx;
+            const Link L = arg.L(d, gauge_idx, 1 - arg.parity);
+            const Vector in = arg.in(back3_idx, their_spinor_parity);
+            out = mv_add(conj(L), -in, out);
+          }
         }
 
       } // dimension
 
       return out;
+    }
+
+    /**
+       @brief Applies the clover portion of the local dslash, which is D_{oe} for parity even and D_{eo} for parity odd. Assumes is_partitioned is true.
+       @param[in,out] out Accumulated output
+       @param[in] coord Precomputed Coord structure
+       @return Accumulated output ColorVector
+    */
+    template <int d>
+    __device__ __host__ void cloverDslashDirection(Vector &out, const Coord<nDim> &coord) const {
+      static_assert(Arg::step == QUDA_STAGGERED_LOCAL_CLOVER, "cloverDslash called for a local argument struct");
+      // to be updated if we implement a full-parity version
+      constexpr int my_spinor_parity = 0;
+
+      // helper lambda for getting U
+      auto getU = [=] (int d_, int x_cb_, int parity_, int sign_) -> Link {
+        return arg.improved ? arg.U(d_, x_cb_, parity_) : arg.U(d_, x_cb_, parity_, StaggeredPhase(coord, d_, sign_, arg));
+      };
+
+      // helper lambda for getting U from ghost zone
+      auto getUGhost = [=] (int d_, int ghost_idx_, int parity_, int sign_) -> Link {
+        return arg.improved ? arg.U.Ghost(d_, ghost_idx_, parity_) : arg.U.Ghost(d_, ghost_idx_, parity_, StaggeredPhase(coord, d_, sign_, arg));
+      };
+
+      // the "in" vector at out's site --- this gets reused many times so (for now) we stick it in registers
+      Vector in = arg.in(coord.x_cb, my_spinor_parity);
+
+      // standard - forward direction
+      if ((coord[d] + 1) >= arg.dim[d]) {
+        // perform backwards (from previous pass) -- gathering to "X"
+        Vector accum;
+
+        // backwards - standard (gather from X - 1, to X)
+        {
+          const Link U = getU(d, coord.x_cb, arg.parity, +1);
+          accum = mv_add(conj(U), -in, accum);
+        }
+
+        // backwards -- improved (gather from X - 3, to X)
+        if constexpr (arg.improved) {
+          const int back2_idx = linkIndexM2(coord, arg.dim, d);
+          const int gauge_idx = back2_idx;
+          const Link L = arg.L(d, gauge_idx, arg.parity);
+          const Vector in_L = arg.in(back2_idx, my_spinor_parity);
+          accum = mv_add(conj(L), -in_L, accum);
+        }
+
+        // forwards - standard (gather from X, to X - 1)
+        {
+          const Link U = getU(d, coord.x_cb, arg.parity, +1);
+          out = mv_add(U, accum, out);
+        }
+      }
+
+      // improved - forward direction
+      if constexpr (arg.improved) {
+	if ((coord[d] + 3) >= arg.dim[d]) {
+          // perform backwards (from previous pass) -- gathering to ["X", "X+1", "X+2"]
+          Vector accum;
+
+          // backwards - standard (gather from X - 1, to X)
+          if ((coord[d] + 3) == arg.dim[d]) {
+            const int fwd2_idx = linkIndexP2(coord, arg.dim, d);
+            const int gauge_idx = fwd2_idx;
+            const Link U = getU(d, gauge_idx, arg.parity, +1);
+            const Vector in_U = arg.in(fwd2_idx, my_spinor_parity);
+            accum = mv_add(conj(U), -in_U, accum);
+          }
+
+          // backwards - improved (gather from ["X-3","X-2","X-1"] to ["X","X+1","X+2"])
+          {
+            const Link L = arg.L(d, coord.x_cb, arg.parity);
+            accum = mv_add(conj(L), -in, accum);
+          }
+
+          // forwards - improved (gather from ["X", "X+1", "X+2"] to ["X-3","X-2","X-1"])
+          {
+            const Link L = arg.L(d, coord.x_cb, arg.parity);
+            out = mv_add(L, accum, out);
+          }
+        }
+      }
+
+      // everything is awful, so let's really break this up
+      if (coord[d] == 0) {
+        // first bit: gather from site [-1]
+
+        // two contributions: one from self [0], one from forward [2]
+        Vector accum;
+
+        // contribution from self
+        {
+          const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+          const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1);
+          accum = mv_add(U, in, accum);
+        }
+
+        // contribution from [2]
+        if constexpr (arg.improved) {
+          const int fwd2_idx = linkIndexP2(coord, arg.dim, d);
+          const Vector in_L = arg.in(fwd2_idx, my_spinor_parity);
+
+          // need some special sauce to get the index for the ghost L
+          // we only need a few specific components of Coord<nDim>
+          int coord_copy[nDim];
+#pragma unroll
+          for (int d_ = 0; d_ < nDim; d_++)
+            coord_copy[d_] = coord[d_];
+          coord_copy[d] = 2;
+          const int ghost_idx = ghostFaceIndexStaggered<0>(coord_copy, arg.dim, d, 1);
+          const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
+
+          accum = mv_add(L, in_L, accum);
+        }
+
+        // and now, let's gather what we accumulated at [-1]
+        {
+          const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+          const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1);
+          out = mv_add(conj(U), -accum, out);
+        }
+
+        // second bit: gather from site [-3]
+
+        // one contribution: one from self [0]
+        accum = Vector();
+
+        // contribution from self
+        if constexpr (arg.improved) {
+          const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+          const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
+          accum = mv_add(L, in, accum);
+        }
+
+        // and now, let's gather what we accumulated at [-3]
+        if constexpr (arg.improved) {
+          const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+          const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
+          out = mv_add(conj(L), -accum, out);
+        }
+      }
+
+      if constexpr (arg.improved) {
+        if (coord[d] == 1) {
+          // surprisingly easy: we only need to do the hop out/hop in by three for the "self"
+
+          // first bit: gather from site [-2]
+
+          // one contribution: one from self
+          Vector accum;
+
+          // contribution from self
+          {
+            const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+            const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
+            accum = mv_add(L, in, accum);
+          }
+
+          // second bit: gather what we accumulated at [-2] to [1]
+          {
+            const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+            const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
+            out = mv_add(conj(L), -accum, out);
+          }
+        }
+
+        if (coord[d] == 2) {
+          // first bit: gather from site [-1]
+
+          // two contributions: one from self, one from [0]
+          Vector accum;
+
+          // contribution from self:
+          {
+            const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+            const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
+            accum = mv_add(L, in, accum);
+          }
+
+          // contribution from [0]
+          {
+            const int bak2_idx = linkIndexM2(coord, arg.dim, d);
+            Vector in = arg.in(bak2_idx, my_spinor_parity);
+            auto coord_copy = coord;
+            coord_copy[d] = 0;
+            const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord_copy, arg.dim, d, 1);
+            const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1);
+
+            accum = mv_add(U, in, accum);
+          }
+
+          // second bit: gather what we accumulated at [-1] to [2]
+          {
+            const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+            const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
+            out = mv_add(conj(L), -accum, out);
+          }
+        }
+      }
     }
 
     /**
@@ -175,255 +376,11 @@ namespace quda
       coord.X = getCoords(coord, x_cb, arg.dim, arg.parity);
       coord.s = 0;
 
-      // helper lambda for getting U
-      auto getU = [&] (int d_, int x_cb_, int parity_, int sign_) -> Link {
-        return arg.improved ? arg.U(d_, x_cb_, parity_) : arg.U(d_, x_cb_, parity_, StaggeredPhase(coord, d_, sign_, arg));
-      };
-
       if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_CLOVER) {
-
-        // helper lambda for getting U from ghost zone
-        auto getUGhost = [&] (int d_, int ghost_idx_, int parity_, int sign_) -> Link {
-          return arg.improved ? arg.U.Ghost(d_, ghost_idx_, parity_) : arg.U.Ghost(d_, ghost_idx_, parity_, StaggeredPhase(coord, d_, sign_, arg));
-        };
-
-        // the "in" vector at out's site --- this gets reused many times so (for now) we stick it in registers
-        Vector in = arg.in(x_cb, my_spinor_parity);
-
-#pragma unroll
-        for (int d = 0; d < nDim; d++) {
-
-          // standard - forward direction
-          if (arg.is_partitioned[d] && (coord[d] + 1) >= arg.dim[d]) {
-            // perform backwards (from previous pass) -- gathering to "X"
-            Vector accum; 
-
-            // backwards - standard (gather from X - 1, to X)
-            {
-              const Link U = getU(d, x_cb, arg.parity, +1);
-              accum = mv_add(conj(U), -in, accum);
-            }
-
-            // backwards -- improved (gather from X - 3, to X)
-            if (arg.improved) {
-              const int back2_idx = linkIndexM2(coord, arg.dim, d);
-              const int gauge_idx = back2_idx;
-              const Link L = arg.L(d, gauge_idx, arg.parity);
-              const Vector in_L = arg.in(back2_idx, my_spinor_parity);
-              accum = mv_add(conj(L), -in_L, accum);
-            }
-
-            // forwards - standard (gather from X, to X - 1)
-            {
-              const Link U = getU(d, x_cb, arg.parity, +1);
-              out = mv_add(U, accum, out);
-            }
-          }
-
-          // improved - forward direction
-          if (arg.improved && arg.is_partitioned[d] && (coord[d] + 3) >= arg.dim[d]) {
-            // perform backwards (from previous pass) -- gathering to ["X", "X+1", "X+2"]
-            Vector accum;
-
-            // backwards - standard (gather from X - 1, to X)
-            if ((coord[d] + 3) == arg.dim[d]) {
-              const int fwd2_idx = linkIndexP2(coord, arg.dim, d);
-              const int gauge_idx = fwd2_idx;
-              const Link U = getU(d, gauge_idx, arg.parity, +1);
-              const Vector in_U = arg.in(fwd2_idx, my_spinor_parity);
-              accum = mv_add(conj(U), -in_U, accum);
-            }
-
-            // backwards - improved (gather from ["X-3","X-2","X-1"] to ["X","X+1","X+2"])
-            {
-              const Link L = arg.L(d, x_cb, arg.parity);
-              accum = mv_add(conj(L), -in, accum);
-            }
-
-            // forwards - improved (gather from ["X", "X+1", "X+2"] to ["X-3","X-2","X-1"])
-            {
-              const Link L = arg.L(d, x_cb, arg.parity);
-              out = mv_add(L, accum, out);
-            }
-          }
-
-          // everything is awful, so let's really break this up
-          if (arg.is_partitioned[d] && coord[d] == 0) {
-            // first bit: gather from site [-1]
-
-            // two contributions: one from self [0], one from forward [2]
-            Vector accum;
-
-            // contribution from self
-            {
-              const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-              const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1);
-              accum = mv_add(U, in, accum);
-            }
-
-            // contribution from [2]
-            if (arg.improved) {
-              const int fwd2_idx = linkIndexP2(coord, arg.dim, d);
-              const Vector in_L = arg.in(fwd2_idx, my_spinor_parity);
-
-              // need some special sauce to get the index for the ghost L
-              auto coord_copy = coord;
-              coord_copy[d] = 2;
-              const int ghost_idx = ghostFaceIndexStaggered<0>(coord_copy, arg.dim, d, 1);
-              const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
-
-              accum = mv_add(L, in_L, accum);
-            }
-
-            // and now, let's gather what we accumulated at [-1]
-            {
-              const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-              const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1);
-              out = mv_add(conj(U), -accum, out);
-            }
-
-            // second bit: gather from site [-3]
-
-            // one contribution: one from self [0]
-            accum = Vector();
-
-            // contribution from self
-            if (arg.improved) {
-              const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-              const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
-              accum = mv_add(L, in, accum);
-            }
-
-            // and now, let's gather what we accumulated at [-3]
-            if (arg.improved) {
-              const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-              const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
-              out = mv_add(conj(L), -accum, out);
-            }
-          }
-
-          if (arg.improved && arg.is_partitioned[d] && coord[d] == 1) {
-            // surprisingly easy: we only need to do the hop out/hop in by three for the "self"
-
-            // first bit: gather from site [-2]
-
-            // one contribution: one from self
-            Vector accum;
-
-            // contribution from self
-            {
-              const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-              const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
-              accum = mv_add(L, in, accum);
-            }
-
-            // second bit: gather what we accumulated at [-2] to [1]
-            {
-              const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-              const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
-              out = mv_add(conj(L), -accum, out);
-            }
-          }
-
-          if (arg.improved && arg.is_partitioned[d] && coord[d] == 2) {
-            // first bit: gather from site [-1]
-
-            // two contributions: one from self, one from [0]
-            Vector accum;
-
-            // contribution from self:
-            {
-              const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-              const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
-              accum = mv_add(L, in, accum);
-            }
-
-            // contribution from [0]
-            {
-              const int bak2_idx = linkIndexM2(coord, arg.dim, d);
-              Vector in = arg.in(bak2_idx, my_spinor_parity);
-              auto coord_copy = coord;
-              coord_copy[d] = 0;
-              const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord_copy, arg.dim, d, 1);
-              const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1);
-
-              accum = mv_add(U, in, accum);
-            }
-
-            // second bit: gather what we accumulated at [-1] to [2]
-            {
-              const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-              const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
-              out = mv_add(conj(L), -accum, out);
-            }
-          }
-
-          /*
-          // standard - backward direction
-          if (arg.is_partitioned[d] && (coord[d] - 1) < 0) {
-            // perform forwards (from previous pass) -- gathering to "-1"
-            Vector accum;
-
-            // forwards - standard (gather from 0, to -1)
-            {
-              const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-              // last arg, direction, is always -1 --- it only effects getting the t boundary condition sign
-              const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1); // link is in ghost zone
-              accum = mv_add(U, in, accum);
-            }
-
-            // forwards -- improved (gather from 2, to -1)
-            if (arg.improved) {
-              // when updating replace arg.nFace with 1 here
-              const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-              const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
-              const int fwd2_idx = linkIndexP2(coord, arg.dim, d);
-              const Vector in_L = arg.in(fwd2_idx, my_spinor_parity);
-              accum = mv_add(L, in_L, accum);
-            }
-
-            // backwards - standard (gather from -1, to 0)
-            {
-              const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-              const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1); // link is in ghost zone
-              out = mv_add(conj(U), -accum, out);
-            }
-          }
-
-          // improved - backward direction 
-          if (arg.improved && arg.is_partitioned[d] && (coord[d] - 3) < arg.dim[d]) {
-            // perform forwards (from previous pass) -- gathering to ["0", "1", "2"]
-            Vector accum;
-
-            // forwards - standard (gather from 0, to -1)
-            if (coord[d] == 2) {
-              const int back2_idx = linkIndexM2(coord, arg.dim, d);
-              Coord<nDim> coord_copy = coord;
-              coord_copy[d] -= 2; // need to properly update coord
-              const int ghost_idx = ghostFaceIndexStaggered<0>(coord_copy, arg.dim, d, 1);
-              // last arg, direction, is always -1 --- it only effects getting the t boundary condition sign
-              const Link U = getUGhost(d, ghost_idx, 1 - arg.parity, -1);
-              const Vector in_U = arg.in(back2_idx, my_spinor_parity);
-              accum = mv_add(U, in_U, accum);
-            }
-
-            // forwards - improved (gather from ["0","1","2"] to ["-3","-2","-1"])
-            {
-              const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-              const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
-              accum = mv_add(L, in, accum);
-            }
-
-            // backwards - improved (gather from ["-3", "-2", "-1"] to ["0","1","2"])
-            {
-              const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-              const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
-              out = mv_add(conj(L), -accum, out);
-            }
-          }*/
-
-        } // dimension
-
+        if (arg.is_partitioned[0]) cloverDslashDirection<0>(out, coord);
+        if (arg.is_partitioned[1]) cloverDslashDirection<1>(out, coord);
+        if (arg.is_partitioned[2]) cloverDslashDirection<2>(out, coord);
+        if (arg.is_partitioned[3]) cloverDslashDirection<3>(out, coord);
       } else {
         out = localDslash(coord);
       } // is clover
