@@ -223,6 +223,51 @@ namespace quda {
   */
   __device__ __host__ inline float fdividef(float a, float b) { return target::dispatch<fdividef_impl>(a, b); }
 
+
+  template <bool is_device> struct dmul_rn_impl {
+    inline double operator()(double a, double b) { return a * b; }
+  };
+#ifdef QUDA_CUDA_CC
+  template <> struct dmul_rn_impl<true> {
+    __device__ inline double operator()(double a, double b) { return ::__dmul_rn(a, b); }
+  };
+#endif
+
+  /**
+     @brief IEEE double precision multiplication
+  */
+  __device__ __host__ inline double dmul_rn(double a, double b) { return target::dispatch<dmul_rn_impl>(a, b); }
+
+
+  template <bool is_device> struct dadd_rn_impl {
+    inline double operator()(double a, double b) { return a + b; }
+  };
+#ifdef QUDA_CUDA_CC
+  template <> struct dadd_rn_impl<true> {
+    __device__ inline double operator()(double a, double b) { return ::__dadd_rn(a, b); }
+  };
+#endif
+
+  /**
+     @brief IEEE double precision addition
+  */
+  __device__ __host__ inline double dadd_rn(double a, double b) { return target::dispatch<dadd_rn_impl>(a, b); }
+
+
+  template <bool is_device> struct fma_rn_impl {
+    inline double operator()(double a, double b, double c) { return std::fma(a, b, c); }
+  };
+#ifdef QUDA_CUDA_CC
+  template <> struct fma_rn_impl<true> {
+    __device__ inline double operator()(double a, double b, double c) { return ::__fma_rn(a, b, c); }
+  };
+#endif
+
+  /**
+     @brief IEEE double precision fused multiply add
+  */
+  __device__ __host__ inline double fma_rn(double a, double b, double c) { return target::dispatch<fma_rn_impl>(a, b, c); }
+
 }
 
 #undef QUDA_CUDA_CC

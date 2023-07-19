@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <type_traits>
 #include <quda_arch.h> // for double2 / float2
+#include "dbldbl.h"
 
 namespace quda {
   namespace gauge {
@@ -427,10 +428,10 @@ public:
       return *this;
     }
 
-  __host__ __device__ inline ValueType real() const;
-  __host__ __device__ inline ValueType imag() const;
-  __host__ __device__ inline void real(ValueType);
-  __host__ __device__ inline void imag(ValueType);
+    constexpr ValueType real() const;
+    constexpr ValueType imag() const;
+    __host__ __device__ inline void real(ValueType);
+    __host__ __device__ inline void imag(ValueType);
 };
 
 template <> struct complex<float> : public float2 {
@@ -617,25 +618,25 @@ public:
     real(real() + z.real());
     imag(imag() + z.imag());
     return *this;
-    }
+  }
 
-    __host__ __device__ inline complex<short> &operator-=(const complex<short> &z)
-    {
-      real(real()-z.real());
-      imag(imag()-z.imag());
-      return *this;
-    }
+  __host__ __device__ inline complex<short> &operator-=(const complex<short> &z)
+  {
+    real(real() - z.real());
+    imag(imag() - z.imag());
+    return *this;
+  }
 
-    constexpr short real() const { return x; }
-    constexpr short imag() const { return y; }
-    __host__ __device__ inline void real(short re) { x = re; }
-    __host__ __device__ inline void imag(short im) { y = im; }
+  constexpr short real() const { return x; }
+  constexpr short imag() const { return y; }
+  __host__ __device__ inline void real(short re) { x = re; }
+  __host__ __device__ inline void imag(short im) { y = im; }
 
-    // cast operators
-    template <typename T> inline __host__ __device__ operator complex<T>() const
-    {
-      return complex<T>(static_cast<T>(real()), static_cast<T>(imag())); }
-
+  // cast operators
+  template <typename T> inline __host__ __device__ operator complex<T>() const
+  {
+    return complex<T>(static_cast<T>(real()), static_cast<T>(imag()));
+  }
 };
 
 template<>
@@ -653,25 +654,62 @@ public:
     real(real() + z.real());
     imag(imag() + z.imag());
     return *this;
-    }
+  }
 
-    __host__ __device__ inline complex<int> &operator-=(const complex<int> &z)
-    {
-      real(real()-z.real());
-      imag(imag()-z.imag());
-      return *this;
-    }
+  __host__ __device__ inline complex<int> &operator-=(const complex<int> &z)
+  {
+    real(real() - z.real());
+    imag(imag() - z.imag());
+    return *this;
+  }
 
-    constexpr int real() const { return x; }
-    constexpr int imag() const { return y; }
-    __host__ __device__ inline void real(int re) { x = re; }
-    __host__ __device__ inline void imag(int im) { y = im; }
+  constexpr int real() const { return x; }
+  constexpr int imag() const { return y; }
+  __host__ __device__ inline void real(int re) { x = re; }
+  __host__ __device__ inline void imag(int im) { y = im; }
 
-    // cast operators
-    template <typename T> inline __host__ __device__ operator complex<T>() const
-    {
-      return complex<T>(static_cast<T>(real()), static_cast<T>(imag())); }
+  // cast operators
+  template <typename T> inline __host__ __device__ operator complex<T>() const
+  {
+    return complex<T>(static_cast<T>(real()), static_cast<T>(imag()));
+  }
+};
 
+template <> struct complex<doubledouble> : public doubledouble2 {
+public:
+  typedef doubledouble value_type;
+
+  complex<doubledouble>() = default;
+
+  constexpr complex<doubledouble>(const doubledouble &re, const doubledouble &im = doubledouble()) :
+    doubledouble2 {re, im}
+  {
+  }
+
+  __host__ __device__ inline complex<doubledouble> &operator+=(const complex<doubledouble> &z)
+  {
+    real(real() + z.real());
+    imag(imag() + z.imag());
+    return *this;
+  }
+
+  __host__ __device__ inline complex<doubledouble> &operator-=(const complex<doubledouble> &z)
+  {
+    real(real() - z.real());
+    imag(imag() - z.imag());
+    return *this;
+  }
+
+  constexpr doubledouble real() const { return x; }
+  constexpr doubledouble imag() const { return y; }
+  __host__ __device__ inline void real(doubledouble re) { x = re; }
+  __host__ __device__ inline void imag(doubledouble im) { y = im; }
+
+  // cast operators
+  template <typename T> inline __host__ __device__ operator complex<T>() const
+  {
+    return complex<T>(static_cast<T>(real()), static_cast<T>(imag()));
+  }
 };
 
   // Binary arithmetic operations

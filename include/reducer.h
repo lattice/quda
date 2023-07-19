@@ -84,7 +84,7 @@ namespace quda
     using reduce_t = T;
     using reducer_t = plus<T>;
     template <typename U> static inline void comm_reduce(std::vector<U> &a) { comm_allreduce_sum(a); }
-    __device__ __host__ static inline T init() { return zero<T>(); }
+    __device__ __host__ static inline T init() { return T{}; }
     __device__ __host__ static inline T apply(T a, T b) { return a + b; }
     __device__ __host__ inline T operator()(T a, T b) const { return apply(a, b); }
   };

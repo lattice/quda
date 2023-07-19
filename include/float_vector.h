@@ -12,6 +12,7 @@
 #include <array.h>
 #include <limits>
 #include <type_traits>
+#include "dbldbl.h"
 
 namespace quda {
 
@@ -44,69 +45,6 @@ namespace quda {
     return c;
   }
 
-  template <typename T> constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> zero() { return static_cast<T>(0); }
-  template <typename T> constexpr std::enable_if_t<std::is_same_v<T, complex<typename T::value_type>>, T> zero()
-  {
-    return static_cast<T>(0);
-  }
-
-  template <typename T, typename U> using specialize = std::enable_if_t<std::is_same_v<T, U>, U>;
-
-  template <typename T> constexpr specialize<T, double2> zero() { return double2 {0.0, 0.0}; }
-  template <typename T> constexpr specialize<T, double3> zero() { return double3 {0.0, 0.0, 0.0}; }
-  template <typename T> constexpr specialize<T, double4> zero() { return double4 {0.0, 0.0, 0.0, 0.0}; }
-
-  template <typename T> constexpr specialize<T, float2> zero() { return float2 {0.0f, 0.0f}; }
-  template <typename T> constexpr specialize<T, float3> zero() { return float3 {0.0f, 0.0f, 0.0f}; }
-  template <typename T> constexpr specialize<T, float4> zero() { return float4 {0.0f, 0.0f, 0.0f, 0.0f}; }
-
-#ifdef QUAD_SUM
-  template <typename T> __device__ __host__ inline specialize<T, doubledouble> zero() { return doubledouble(); }
-  template <typename T> __device__ __host__ inline specialize<T, doubledouble2> zero() { return doubledouble2(); }
-  template <typename T> __device__ __host__ inline specialize<T, doubledouble3> zero() { return doubledouble3(); }
-#endif
-
-  template <typename T, int n> __device__ __host__ inline array<T, n> zero()
-  {
-    array<T, n> v;
-#pragma unroll
-    for (int i = 0; i < n; i++) v[i] = zero<T>();
-    return v;
-  }
-
-  // array of arithmetic types specialization
-  template <typename T>
-  __device__ __host__ inline std::enable_if_t<
-    std::is_same_v<T, array<typename T::value_type, T::N>> && std::is_arithmetic_v<typename T::value_type>, T>
-  zero()
-  {
-    return zero<typename T::value_type, T::N>();
-  }
-
-  // array of array specialization
-  template <typename T>
-  __device__ __host__ inline std::enable_if_t<
-    std::is_same_v<T, array<array<typename T::value_type::value_type, T::value_type::N>, T::N>>, T>
-  zero()
-  {
-    T v;
-#pragma unroll
-    for (int i = 0; i < v.size(); i++) v[i] = zero<typename T::value_type>();
-    return v;
-  }
-
-  // array of complex specialization
-  template <typename T>
-  __device__
-    __host__ inline std::enable_if_t<std::is_same_v<T, array<complex<typename T::value_type::value_type>, T::N>>, T>
-    zero()
-  {
-    T v;
-#pragma unroll
-    for (int i = 0; i < v.size(); i++) v[i] = zero<typename T::value_type>();
-    return v;
-  }
-
   /**
      Container used when we want to track the reference value when
      computing an infinity norm
@@ -114,10 +52,14 @@ namespace quda {
   template <typename T> struct deviation_t {
     T diff;
     T ref;
-  };
 
-  template <typename T> constexpr specialize<T, deviation_t<double>> zero() { return {0.0, 0.0}; }
-  template <typename T> constexpr specialize<T, deviation_t<float>> zero() { return {0.0f, 0.0f}; }
+    template <typename U> constexpr deviation_t<T> &operator=(const deviation_t<U> &other)
+    {
+      diff = other.diff;
+      ref = other.ref;
+      return *this;
+    }
+  };
 
   template <typename T> __host__ __device__ inline bool operator>(const deviation_t<T> &a, const deviation_t<T> &b)
   {
@@ -126,6 +68,10 @@ namespace quda {
 
   template <typename T> struct low {
     static constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> value() { return std::numeric_limits<T>::lowest(); }
+  };
+
+  template <> struct low<doubledouble> {
+    static constexpr doubledouble value() { return std::numeric_limits<double>::lowest(); }
   };
 
   template <typename T, int N> struct low<array<T, N>> {
@@ -144,6 +90,10 @@ namespace quda {
 
   template <typename T> struct high {
     static constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> value() { return std::numeric_limits<T>::max(); }
+  };
+
+  template <> struct high<doubledouble> {
+    static constexpr doubledouble value() { return std::numeric_limits<double>::max(); }
   };
 
   template <typename T> struct RealType {
