@@ -24,6 +24,12 @@ namespace quda
 
     array<T, n> &operator=(const array<T, n> &) = default;
     array<T, n> &operator=(array<T, n> &&) = default;
+
+    template <typename U> constexpr array<T, n> &operator=(const array<U, n> &other)
+    {
+      for (int i = 0; i < n; i++) data[i] = other[i];
+      return *this;
+    }
   };
 
   template <typename T, int n> std::ostream &operator<<(std::ostream &output, const array<T, n> &a)
