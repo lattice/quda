@@ -76,10 +76,110 @@ namespace quda {
     }
 
     long long flops() const {
-      return 0ll; // FIXME
+      int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(3) matrix-vector flops
+      int mv_add_flops = 8 * in.Ncolor() * in.Ncolor(); // SU(3) vector += matrix-vector flops
+      int num_dir = 2 * 4;
+      int xpay_flops = 2 * 2 * in.Ncolor();
+      long long sites = in.Volume();
+
+      long long flops_ = 0;
+
+      // compute the flops for the full volume, then subtract/add boundary effects
+      flops_ = (mv_flops + (num_dir - 1) * mv_add_flops) * sites; // one-hop links
+      if (improved) flops_ += num_dir * mv_add_flops * sites; // long links
+      if (xpay) flops_ += xpay_flops * sites;
+
+      // don't assume we have the ghost face sites precomputed in the spinor
+      long long ghost_sites[4] = { in.X()[1] * in.X()[2] * in.X()[3],
+                                   in.X()[0] * in.X()[2] * in.X()[3],
+                                   in.X()[0] * in.X()[1] * in.X()[3],
+                                   in.X()[0] * in.X()[1] * in.X()[2] };
+
+      for (int d = 0; d < 4; d++) {
+        if (comm_dim_partitioned(d)) {
+          if (!xpay) {
+            // for each face, subtract off an appropriate number of flops
+
+            // subtract off forward/backwards fat link flops
+            flops_ -= 2 * mv_add_flops * ghost_sites[d];
+
+            // subtract off three "slices" worth of forward/backwards long link flops
+            if (improved)
+              flops_ -= 3 * 2 * mv_add_flops * ghost_sites[d];
+          } else {
+            // for each face, add on the "clover" flops contribution
+
+            // add on the fat link contribution to the depth-1 term
+            flops_ += 2 * mv_flops * ghost_sites[d];
+            // add on improved contributions
+            if (improved) {
+              // add on the long link contribution to the depth-1 term
+              flops_ += 2 * mv_add_flops * ghost_sites[d];
+
+              // add on the long link contribution to the depth-1,2,3 term
+              flops_ += 3 * 2 * mv_flops * ghost_sites[d];
+
+              // add on the fat link contribution to the depth-3 term
+              flops_ += 2 * mv_add_flops * ghost_sites[d];
+            } // improved
+          } // xpay
+        } // partitioned
+      } // dimension
+
+      return flops_;
     }
+
     long long bytes() const {
-      return 0ll; // FIXME
+      int fat_gauge_bytes = (improved ? 2 * in.Ncolor() * in.Ncolor() : reconstruct_u) * in.Precision();
+      int long_gauge_bytes = (improved ? reconstruct_l : 0) * in.Precision();
+      bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char));
+      int spinor_bytes = 2 * in.Ncolor() + isFixed ? sizeof(float) : 0;
+      int num_dir = 2 * 4;
+      long long sites = in.Volume();
+
+      long long bytes_ = 0;
+
+      // compute the bytes for the full volume, then subtract/add boundary effects
+      bytes_ = (fat_gauge_bytes + spinor_bytes) * num_dir * sites;
+      if (improved) bytes_ += long_gauge_bytes * num_dir * sites;
+      if (xpay) bytes_ += spinor_bytes * sites;
+
+      // don't assume we have the ghost face sites precomputed in the spinor
+      long long ghost_sites[4] = { in.X()[1] * in.X()[2] * in.X()[3],
+                                   in.X()[0] * in.X()[2] * in.X()[3],
+                                   in.X()[0] * in.X()[1] * in.X()[3],
+                                   in.X()[0] * in.X()[1] * in.X()[2] };
+      for (int d = 0; d < 4; d++) {
+        if (comm_dim_partitioned(d)) {
+          if (!xpay) {
+            // for each face, subtract off an appropriate number of bytes
+
+            // subtract off forward/backwards fat link bytes
+            bytes_ -= 2 * (fat_gauge_bytes + spinor_bytes) * ghost_sites[d];
+            // subtract off three "slices" worth of forward/backwards long link bytes
+            if (improved)
+              bytes_ -= 3 * 2 * (long_gauge_bytes + spinor_bytes) * ghost_sites[d];
+          } else {
+            // for each face, correct for the "clover" bytes contribution
+
+            // amusingly, we save some bytes on the fat link contribution to the depth-1 term
+            // this is because we don't have to load anything extra, and we already have "x"
+            bytes_ -= 2 * spinor_bytes * ghost_sites[d];
+            // add on improved contributions
+            if (improved) {
+              // we can subtract off more extra things because we already have "x"
+              bytes_ -= 3 * 2 * spinor_bytes * ghost_sites[d];
+
+              // add on the lonk link contribution to the depth-1,2,3 term
+              bytes_ += 3 * 2 * (long_gauge_bytes + spinor_bytes) * ghost_sites[d];
+
+              // add on the fat link contribution to the depth-3 term
+              bytes_ += 2 * (fat_gauge_bytes + spinor_bytes) * ghost_sites[d];
+            } // improved
+          } // xpay
+        } // partitioned
+      } // dimension
+      return bytes_;
     }
   };
 
