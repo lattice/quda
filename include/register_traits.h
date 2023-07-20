@@ -316,7 +316,6 @@ namespace quda {
   template <> struct get_scalar<doubledouble> { using type = doubledouble; };
   template <> struct get_scalar<doubledouble2> { using type = doubledouble; };
   template <class T, int n> struct get_scalar<array<T, n>> { using type = typename get_scalar<T>::type; };
-  template <class T> struct get_scalar<deviation_t<T>> { using type = typename get_scalar<T>::type; };
 
   template <class T> using get_scalar_t = typename get_scalar<T>::type;
 

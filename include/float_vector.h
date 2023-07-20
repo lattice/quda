@@ -61,6 +61,8 @@ namespace quda {
     }
   };
 
+  template <class T> struct get_scalar<deviation_t<T>> { using type = typename get_scalar<T>::type; };
+
   template <typename T> __host__ __device__ inline bool operator>(const deviation_t<T> &a, const deviation_t<T> &b)
   {
     return a.diff > b.diff;
