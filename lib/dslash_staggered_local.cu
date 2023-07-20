@@ -60,7 +60,6 @@ namespace quda {
       switch (step) {
         case QUDA_STAGGERED_LOCAL_STEP1: strcat(aux, ",step1"); break;
         case QUDA_STAGGERED_LOCAL_STEP2: strcat(aux, ",step2"); break;
-        case QUDA_STAGGERED_LOCAL_CLOVER: strcat(aux, ",clover"); break;
         default: errorQuda("Unexpected staggered local type %d", step); break;
       }
       apply(device::get_default_stream());
@@ -76,16 +75,11 @@ namespace quda {
       } else if (step == QUDA_STAGGERED_LOCAL_STEP2) {
         LocalStaggeredArg<Float, nColor, reconstruct_u, reconstruct_l, improved, QUDA_STAGGERED_LOCAL_STEP2, phase> arg(out, in, U, L, a, x, parity);
         launch<LocalStaggeredApply>(tp, stream, arg);
-      } else if (step == QUDA_STAGGERED_LOCAL_CLOVER) {
-        LocalStaggeredArg<Float, nColor, reconstruct_u, reconstruct_l, improved, QUDA_STAGGERED_LOCAL_CLOVER, phase> arg(out, in, U, L, a, x, parity);
-        launch<LocalStaggeredApply>(tp, stream, arg);
       } else {
         errorQuda("Invalid staggered local type %d", step);
       }
     }
 
-    void preTune() { if (step == QUDA_STAGGERED_LOCAL_CLOVER) out.backup(); }
-    void postTune() { if (step == QUDA_STAGGERED_LOCAL_CLOVER) out.restore(); }
     long long flops() const {
       return 0ll; // FIXME
     }

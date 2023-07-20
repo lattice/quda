@@ -234,9 +234,6 @@ namespace quda {
 
     // apply -D_eo [-D_oe] + 4 m^2
     ApplyLocalStaggered(out, tmp, *fatGauge, *longGauge, 4. * mass * mass, in, parity, true, QUDA_STAGGERED_LOCAL_STEP2);
-
-    // apply boundary "clover" terms
-    ApplyLocalStaggered(out, in, *fatGauge, *longGauge, 0., in, parity, true, QUDA_STAGGERED_LOCAL_CLOVER);
   }
 
   void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &, const ColorSpinorField &) const

@@ -223,21 +223,38 @@ namespace quda
     }
 
     /**
-       @brief Applies step 1 and 2 of the local dslash, which is D_{oe} for parity even and D_{eo} for parity odd
-       @param[in] coord Precomputed Coord structure
-       @return Accumulated output ColorVector
+       @brief Driver to apply the full local dslash
+       @param[in] x_cb input coordinate
     */
-    __device__ __host__ Vector localDslash(const Coord<nDim> &coord) const {
-      static_assert(Arg::step != QUDA_STAGGERED_LOCAL_CLOVER, "localDslash called for a clover argument struct");
+    __device__ __host__ void operator()(int x_cb, int) {
+      constexpr int nDim = 4;
+      Coord<nDim> coord;
+
       // to be updated if we implement a full-parity version
+      constexpr int my_spinor_parity = 0;
       constexpr int their_spinor_parity = 0;
 
       Vector out;
+
+      // Get coordinates
+      coord.x_cb = x_cb;
+      coord.X = getCoords(coord, x_cb, arg.dim, arg.parity);
+      coord.s = 0;
 
       // helper lambda for getting U
       auto getU = [&] (int d_, int x_cb_, int parity_, int sign_) -> Link {
         return arg.improved ? arg.U(d_, x_cb_, parity_) : arg.U(d_, x_cb_, parity_, StaggeredPhase(coord, d_, sign_, arg));
       };
+
+      // helper lambda for getting U from ghost zone
+      auto getUGhost = [=] (int d_, int ghost_idx_, int parity_, int sign_) -> Link {
+        return arg.improved ? arg.U.Ghost(d_, ghost_idx_, parity_) : arg.U.Ghost(d_, ghost_idx_, parity_, StaggeredPhase(coord, d_, sign_, arg));
+      };
+
+      // input vector at my own site; this only needs to get loaded for clover components of step 2
+      Vector x;
+      if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_STEP2)
+        x = arg.x(coord.x_cb, my_spinor_parity);
 
 #pragma unroll
       for (int d = 0; d < nDim; d++) {
@@ -247,8 +264,19 @@ namespace quda
         {
           const int fwd_idx = linkIndexP1(coord, arg.dim, d);
           const Link U = getU(d, coord.x_cb, arg.parity, +1);
-          Vector in = arg.in(fwd_idx, their_spinor_parity);
+          const Vector in = arg.in(fwd_idx, their_spinor_parity);
           out = mv_add(U, in, out);
+        } else {
+          if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_STEP2) {
+            // Load the U link once for the "self" contribution
+            const Link U = getU(d, coord.x_cb, arg.parity, +1);
+
+            // perform backwards (from previous pass) -- gathering to "X"
+            const Vector in = fatLinkForwardContribution(coord, U, x, d);
+
+            // forwards - standard (gather from X, to X - 1)
+            out = mv_add(U, in, out);
+          }
         }
 
         // improved - forward direction
@@ -258,6 +286,17 @@ namespace quda
             const Link L = arg.L(d, coord.x_cb, arg.parity);
             const Vector in = arg.in(fwd3_idx, their_spinor_parity);
             out = mv_add(L, in, out);
+          } else {
+            if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_STEP2) {
+              // Load the L link once for the "self" contribution
+              const Link L = arg.L(d, coord.x_cb, arg.parity);
+
+              // perform backwards (from previous pass) -- gathering to ["X", "X+1", "X+2"]
+              const Vector in = longLinkForwardContribution(coord, L, x, d);
+
+              // forwards - improved (gather from ["X", "X+1", "X+2"] to ["X-3","X-2","X-1"])
+              out = mv_add(L, in, out);
+            }
           }
         }
 
@@ -267,8 +306,20 @@ namespace quda
           const int back_idx = linkIndexM1(coord, arg.dim, d);
           const int gauge_idx = back_idx;
           const Link U = getU(d, gauge_idx, 1 - arg.parity, -1);
-          Vector in = arg.in(back_idx, their_spinor_parity);
+          const Vector in = arg.in(back_idx, their_spinor_parity);
           out = mv_add(conj(U), -in, out);
+        } else {
+          if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_STEP2) {
+            // Load the U link once for the "self" contribution
+            const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+            const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1);
+
+            // first bit: gather from site [-1]
+            const Vector in = fatLinkBackwardContribution(coord, U, x, d);
+
+            // and now, let's gather what we accumulated at [-1]
+            out = mv_add(conj(U), -in, out);
+          }
         }
 
         // improved - backward direction
@@ -279,131 +330,28 @@ namespace quda
             const Link L = arg.L(d, gauge_idx, 1 - arg.parity);
             const Vector in = arg.in(back3_idx, their_spinor_parity);
             out = mv_add(conj(L), -in, out);
+          } else {
+            if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_STEP2) {
+              // Load the L link once for the "self" contribution
+              const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+              const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
+
+              // second bit: gather from site [-3]
+              const Vector in = longLinkBackwardContribution(coord, L, x, d);
+
+              // and now, let's gather what we accumulated at [-3]
+              out = mv_add(conj(L), -in, out);
+            }
           }
         }
 
       } // dimension
 
-      return out;
-    }
-
-    /**
-       @brief Applies the clover portion of the local dslash, which is D_{oe} for parity even and D_{eo} for parity odd. Assumes is_partitioned is true.
-       @param[in,out] out Accumulated output
-       @param[in] coord Precomputed Coord structure
-       @param[in] d Dimension of gather
-       @return Accumulated output ColorVector
-    */
-    __device__ __host__ void cloverDslashDirection(Vector &out, const Coord<nDim> &coord, int d) const {
-      static_assert(Arg::step == QUDA_STAGGERED_LOCAL_CLOVER, "cloverDslash called for a local argument struct");
-      // to be updated if we implement a full-parity version
-      constexpr int my_spinor_parity = 0;
-
-      // helper lambda for getting U
-      auto getU = [=] (int d_, int x_cb_, int parity_, int sign_) -> Link {
-        return arg.improved ? arg.U(d_, x_cb_, parity_) : arg.U(d_, x_cb_, parity_, StaggeredPhase(coord, d_, sign_, arg));
-      };
-
-      // helper lambda for getting U from ghost zone
-      auto getUGhost = [=] (int d_, int ghost_idx_, int parity_, int sign_) -> Link {
-        return arg.improved ? arg.U.Ghost(d_, ghost_idx_, parity_) : arg.U.Ghost(d_, ghost_idx_, parity_, StaggeredPhase(coord, d_, sign_, arg));
-      };
-
-      // the "in" vector at out's site --- this gets reused many times so (for now) we stick it in registers
-      Vector in = arg.in(coord.x_cb, my_spinor_parity);
-
-      // standard - forward direction
-      if (arg.is_partitioned[d] && (coord[d] + 1) >= arg.dim[d]) {
-        // Load the U link once for the "self" contribution
-        const Link U = getU(d, coord.x_cb, arg.parity, +1);
-
-        // perform backwards (from previous pass) -- gathering to "X"
-        Vector accum = fatLinkForwardContribution(coord, U, in, d);
-
-        // forwards - standard (gather from X, to X - 1)
-        out = mv_add(U, accum, out);
-      }
-
-      // improved - forward direction
-      if constexpr (Arg::improved) {
-	if (arg.is_partitioned[d] && (coord[d] + 3) >= arg.dim[d]) {
-          // Load the L link once for the "self" contribution
-          const Link L = arg.L(d, coord.x_cb, arg.parity);
-
-          // perform backwards (from previous pass) -- gathering to ["X", "X+1", "X+2"]
-          Vector accum = longLinkForwardContribution(coord, L, in, d);
-
-          // forwards - improved (gather from ["X", "X+1", "X+2"] to ["X-3","X-2","X-1"])
-          out = mv_add(L, accum, out);
-        }
-      }
-
-      // standard - backward direction
-      if (arg.is_partitioned[d] && coord[d] == 0) {
-        // Load the U link once for the "self" contribution
-        const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-        const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1);
-
-        // first bit: gather from site [-1]
-        Vector accum = fatLinkBackwardContribution(coord, U, in, d);
-
-        // and now, let's gather what we accumulated at [-1]
-        out = mv_add(conj(U), -accum, out);
-      }
-
-      // improved - backward direction
-      if constexpr (Arg::improved) {
-        if (arg.is_partitioned[d] && coord[d] < 3) {
-          const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-          const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
-
-          // second bit: gather from site [-3]
-          Vector accum = longLinkBackwardContribution(coord, L, in, d);
-
-          // and now, let's gather what we accumulated at [-3]
-          out = mv_add(conj(L), -accum, out);
-        }
-      }
-    }
-
-    /**
-       @brief Driver to apply the full local dslash
-       @param[in] x_cb input coordinate
-    */
-    __device__ __host__ void operator()(int x_cb, int) {
-      constexpr int nDim = 4;
-      Coord<nDim> coord;
-
-      // to be updated if we implement a full-parity version
-      constexpr int my_spinor_parity = 0;
-
-      Vector out;
-
-      // Get coordinates
-      coord.x_cb = x_cb;
-      coord.X = getCoords(coord, x_cb, arg.dim, arg.parity);
-      coord.s = 0;
-
-      if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_CLOVER) {
-#pragma unroll
-        for (int d = 0; d < nDim; d++)
-          cloverDslashDirection(out, coord, d);
-      } else {
-        out = localDslash(coord);
-      } // is clover
-
       if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_STEP2) {
-        Vector x = arg.x(coord.x_cb, my_spinor_parity);
         out = arg.a * x - out;
       }
 
-      if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_CLOVER) {
-        Vector partial_out = arg.out(coord.x_cb, my_spinor_parity);
-        out = partial_out - out;
-      }
-
       arg.out(coord.x_cb, my_spinor_parity) = out;
-
     }
   };
 
