@@ -14,7 +14,7 @@ namespace quda {
    * @brief container to pass parameters for the gauge fixing quality kernel
    */
   template <typename store_t, QudaReconstructType recon_, int gauge_dir_>
-  struct GaugeFixQualityOVRArg : public ReduceArg<array<double, 2>> {
+  struct GaugeFixQualityOVRArg : public ReduceArg<array<device_reduce_t, 2>> {
     using real = typename mapper<store_t>::type;
     static constexpr QudaReconstructType recon = recon_;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
@@ -23,7 +23,7 @@ namespace quda {
     int X[4]; // grid dimensions
     int border[4];
     Gauge data;
-    reduce_t result;
+    array<double, 2> result;
 
     GaugeFixQualityOVRArg(const GaugeField &data) :
       ReduceArg<reduce_t>(dim3(data.LocalVolumeCB(), 2, 1), 1, true), // reset = true

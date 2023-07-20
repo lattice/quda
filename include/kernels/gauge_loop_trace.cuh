@@ -18,9 +18,8 @@ namespace quda {
   constexpr unsigned int max_n_batch_block_loop_trace() { return 8; }
 
   template <typename store_t, int nColor_, QudaReconstructType recon_>
-  struct GaugeLoopTraceArg : public ReduceArg<array<double, 2>>  {
+  struct GaugeLoopTraceArg : public ReduceArg<array<device_reduce_t, 2>>  {
     using real = typename mapper<store_t>::type;
-    using reduce_t = array<double, 2>;
     static constexpr unsigned int max_n_batch_block = max_n_batch_block_loop_trace();
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;

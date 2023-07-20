@@ -107,7 +107,7 @@ namespace quda {
     const GaugeField &force;
     GaugeField &mom;
     double coeff;
-    typename Arg::reduce_t force_max;
+    array<double, 2> force_max;
 
   public:
     UpdateMom(const GaugeField &force, GaugeField &mom, double coeff, const char *fname) :

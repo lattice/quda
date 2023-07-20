@@ -9,7 +9,7 @@
 namespace quda {
 
   template <typename Float_, int nColor_, QudaReconstructType recon_>
-  struct GaugePlaqArg : public ReduceArg<array<double, 2>> {
+  struct GaugePlaqArg : public ReduceArg<array<device_reduce_t, 2>> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");

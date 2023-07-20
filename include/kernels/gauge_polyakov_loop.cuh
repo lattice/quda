@@ -166,7 +166,7 @@ namespace quda {
   };
 
   template <typename store_t, int nColor_, QudaReconstructType recon_>
-  struct GaugePolyakovLoopTraceArg : public ReduceArg<array<double, 2>> {
+  struct GaugePolyakovLoopTraceArg : public ReduceArg<array<device_reduce_t, 2>> {
     using real = typename mapper<store_t>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");

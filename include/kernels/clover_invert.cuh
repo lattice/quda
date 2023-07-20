@@ -7,7 +7,7 @@
 namespace quda
 {
 
-  template <typename store_t_, bool twist_> struct CloverInvertArg : public ReduceArg<array<double, 2>> {
+  template <typename store_t_, bool twist_> struct CloverInvertArg : public ReduceArg<array<device_reduce_t, 2>> {
     using store_t = store_t_;
     using real = typename mapper<store_t>::type;
     static constexpr bool twist = twist_;

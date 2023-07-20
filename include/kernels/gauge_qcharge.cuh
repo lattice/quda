@@ -7,7 +7,7 @@ namespace quda
 {
 
   template <typename Float_, int nColor_, QudaReconstructType recon_, bool density_ = false> struct QChargeArg :
-    public ReduceArg<array<double, 3>>
+    public ReduceArg<array<device_reduce_t, 3>>
   {
     using Float = Float_;
     static constexpr int nColor = nColor_;
@@ -43,7 +43,7 @@ namespace quda
       constexpr real n_inv = static_cast<real>(1.0 / Arg::nColor);
 
       reduce_t E_local{0, 0, 0};
-      double &Q = E_local[2];
+      device_reduce_t &Q = E_local[2];
 
       // Load the field-strength tensor from global memory
       //F0 = F[Y,X], F1 = F[Z,X], F2 = F[Z,Y],
