@@ -230,10 +230,10 @@ namespace quda {
     }
 
     // Apply D_oe [D_eo]
-    ApplyLocalStaggered(tmp, in, *fatGauge, *longGauge, 0.0, in, other_parity, true, QUDA_STAGGERED_LOCAL_STEP1);
+    ApplyLocalStaggered(tmp, in, *fatGauge, *longGauge, 0.0, in, other_parity, true, false);
 
     // apply -D_eo [-D_oe] + 4 m^2
-    ApplyLocalStaggered(out, tmp, *fatGauge, *longGauge, 4. * mass * mass, in, parity, true, QUDA_STAGGERED_LOCAL_STEP2);
+    ApplyLocalStaggered(out, tmp, *fatGauge, *longGauge, 4. * mass * mass, in, parity, true, false);
   }
 
   void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &, const ColorSpinorField &) const

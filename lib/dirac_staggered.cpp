@@ -222,10 +222,10 @@ namespace quda {
     }
 
     // Apply D_oe [D_eo]; second "gauge" is a dummy value for the long links
-    ApplyLocalStaggered(tmp, in, *gauge, *gauge, 0.0, in, other_parity, false, QUDA_STAGGERED_LOCAL_STEP1);
+    ApplyLocalStaggered(tmp, in, *gauge, *gauge, 0.0, in, other_parity, false, false);
 
     // apply -D_eo [-D_oe] + 4 m^2
-    ApplyLocalStaggered(out, tmp, *gauge, *gauge, 4. * mass * mass, in, parity, false, QUDA_STAGGERED_LOCAL_STEP2);
+    ApplyLocalStaggered(out, tmp, *gauge, *gauge, 4. * mass * mass, in, parity, false, false);
   }
 
   void DiracStaggeredPC::MdagM(ColorSpinorField &, const ColorSpinorField &) const

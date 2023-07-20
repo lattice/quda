@@ -17,13 +17,13 @@ namespace quda {
     const ColorSpinorField &x;
     double a;
     int parity;
-    QudaStaggeredLocalType step;
+    bool xpay;
     unsigned int minThreads() const { return out.VolumeCB(); }
 
   public:
     LocalStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField& U,
                    const GaugeField &L, double a, const ColorSpinorField &x, int parity,
-                   QudaStaggeredLocalType step) :
+                   bool xpay) :
       TunableKernel2D(out, 1),
       out(out),
       in(in),
@@ -32,7 +32,7 @@ namespace quda {
       x(x),
       a(a),
       parity(parity),
-      step(step)
+      xpay(xpay)
     {
       checkPrecision(out, in, U, L, x);
       checkLocation(out, in, U, L, x);
@@ -57,11 +57,8 @@ namespace quda {
         strcat(aux, recon);
       }
       strcat(aux, parity == QUDA_EVEN_PARITY ? ",even" : ",odd");
-      switch (step) {
-        case QUDA_STAGGERED_LOCAL_STEP1: strcat(aux, ",step1"); break;
-        case QUDA_STAGGERED_LOCAL_STEP2: strcat(aux, ",step2"); break;
-        default: errorQuda("Unexpected staggered local type %d", step); break;
-      }
+      if (xpay)
+        strcat(aux, ",xpay");
       apply(device::get_default_stream());
     }
 
@@ -69,14 +66,12 @@ namespace quda {
     {
       (void)stream;
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (step == QUDA_STAGGERED_LOCAL_STEP1) {
-        LocalStaggeredArg<Float, nColor, reconstruct_u, reconstruct_l, improved, QUDA_STAGGERED_LOCAL_STEP1, phase> arg(out, in, U, L, a, x, parity);
-        launch<LocalStaggeredApply>(tp, stream, arg);
-      } else if (step == QUDA_STAGGERED_LOCAL_STEP2) {
-        LocalStaggeredArg<Float, nColor, reconstruct_u, reconstruct_l, improved, QUDA_STAGGERED_LOCAL_STEP2, phase> arg(out, in, U, L, a, x, parity);
+      if (xpay) {
+        LocalStaggeredArg<Float, nColor, reconstruct_u, reconstruct_l, improved, true, phase> arg(out, in, U, L, a, x, parity);
         launch<LocalStaggeredApply>(tp, stream, arg);
       } else {
-        errorQuda("Invalid staggered local type %d", step);
+        LocalStaggeredArg<Float, nColor, reconstruct_u, reconstruct_l, improved, false, phase> arg(out, in, U, L, a, x, parity);
+        launch<LocalStaggeredApply>(tp, stream, arg);
       }
     }
 
@@ -92,7 +87,7 @@ namespace quda {
   struct applyLocalStaggered {
     applyLocalStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField& L,
                            const GaugeField &U, double a, const ColorSpinorField &x, int parity,
-                           bool improved, QudaStaggeredLocalType step) {
+                           bool improved, bool xpay) {
       // Template on improved, unimproved, as well as different phase types for unimproved
       if (improved) {
         constexpr bool improved = true;
@@ -100,7 +95,7 @@ namespace quda {
         constexpr QudaReconstructType recon_u = QUDA_RECONSTRUCT_NO;
         constexpr QudaReconstructType recon_l = recon;
 
-        LocalStaggered<Float, nColor, recon_u, recon_l, improved>(out, in, U, L, a, x, parity, step);
+        LocalStaggered<Float, nColor, recon_u, recon_l, improved>(out, in, U, L, a, x, parity, xpay);
       } else {
         if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC || (U.LinkType() == QUDA_GENERAL_LINKS && U.Reconstruct() == QUDA_RECONSTRUCT_NO)) {
 #ifdef BUILD_MILC_INTERFACE
@@ -109,7 +104,7 @@ namespace quda {
           constexpr QudaReconstructType recon_u = recon;
           constexpr QudaReconstructType recon_l = QUDA_RECONSTRUCT_NO; // ignored
 
-          LocalStaggered<Float, nColor, recon_u, recon_l, improved, QUDA_STAGGERED_PHASE_MILC>(out, in, U, L, a, x, parity, step);
+          LocalStaggered<Float, nColor, recon_u, recon_l, improved, QUDA_STAGGERED_PHASE_MILC>(out, in, U, L, a, x, parity, xpay);
 #else
           errorQuda("MILC interface has not been built so MILC phase staggered fermions not enabled");
 #endif // BUILD_MILC_INTERFACE
@@ -120,7 +115,7 @@ namespace quda {
           constexpr QudaReconstructType recon_u = recon;
           constexpr QudaReconstructType recon_l = QUDA_RECONSTRUCT_NO; // ignored
 
-          LocalStaggered<Float, nColor, recon_u, recon_l, improved, QUDA_STAGGERED_PHASE_TIFR>(out, in, U, L, a, x, parity, step);
+          LocalStaggered<Float, nColor, recon_u, recon_l, improved, QUDA_STAGGERED_PHASE_TIFR>(out, in, U, L, a, x, parity, xpay);
 #else
           errorQuda("TIFR interface has not been built so TIFR phase taggered fermions not enabled");
 #endif // BUILD_TIFR_INTERFACE
@@ -135,15 +130,15 @@ namespace quda {
   // Apply a piece of the local staggered operator to a colorspinor field
   void ApplyLocalStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField& U,
                            const GaugeField &L, double a, const ColorSpinorField &x, int parity,
-                           bool improved, QudaStaggeredLocalType step)
+                           bool improved, bool xpay)
   {
     // swizzle L and U to template on reconstruct
     // For naive staggered, U and L both alias to the fine gauge field
-    instantiate<applyLocalStaggered, StaggeredReconstruct>(out, in, L, U, a, x, parity, improved, step);
+    instantiate<applyLocalStaggered, StaggeredReconstruct>(out, in, L, U, a, x, parity, improved, xpay);
   }
 #else
   void ApplyLocalStaggered(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
-			const GaugeField &, double, const ColorSpinorField &, int, bool, QudaStaggeredLocalType)
+			const GaugeField &, double, const ColorSpinorField &, int, bool, bool)
   {
     errorQuda("Staggered dslash has not been built");
   }

@@ -13,7 +13,7 @@ namespace quda
      @brief Parameter structure for driving the local Staggered Dslash operator
   */
   template <typename Float, int nColor_, QudaReconstructType reconstruct_u_,
-            QudaReconstructType reconstruct_l_, bool improved_, QudaStaggeredLocalType step_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC>
+            QudaReconstructType reconstruct_l_, bool improved_, bool xpay_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC>
   struct LocalStaggeredArg : kernel_param<> {
     typedef typename mapper<Float>::type real;
 
@@ -51,7 +51,7 @@ namespace quda
     const bool is_first_time_slice; /** are we on the first (global) time slice */
     const bool is_last_time_slice; /** are we on the last (global) time slice */
     static constexpr bool improved = improved_; /** whether or not we're applying the improved operator */
-    static constexpr QudaStaggeredLocalType step = step_; /** which step of the local staggered dslash we're applying */
+    static constexpr bool xpay = xpay_; /** whether or not we're applying the xpay (includes clover) version */
 
     LocalStaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a,
                  const ColorSpinorField &x, int parity) :
@@ -253,7 +253,7 @@ namespace quda
 
       // input vector at my own site; this only needs to get loaded for clover components of step 2
       Vector x;
-      if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_STEP2)
+      if constexpr (Arg::xpay)
         x = arg.x(coord.x_cb, my_spinor_parity);
 
 #pragma unroll
@@ -267,7 +267,7 @@ namespace quda
           const Vector in = arg.in(fwd_idx, their_spinor_parity);
           out = mv_add(U, in, out);
         } else {
-          if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_STEP2) {
+          if constexpr (Arg::xpay) {
             // Load the U link once for the "self" contribution
             const Link U = getU(d, coord.x_cb, arg.parity, +1);
 
@@ -287,7 +287,7 @@ namespace quda
             const Vector in = arg.in(fwd3_idx, their_spinor_parity);
             out = mv_add(L, in, out);
           } else {
-            if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_STEP2) {
+            if constexpr (Arg::xpay) {
               // Load the L link once for the "self" contribution
               const Link L = arg.L(d, coord.x_cb, arg.parity);
 
@@ -309,7 +309,7 @@ namespace quda
           const Vector in = arg.in(back_idx, their_spinor_parity);
           out = mv_add(conj(U), -in, out);
         } else {
-          if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_STEP2) {
+          if constexpr (Arg::xpay) {
             // Load the U link once for the "self" contribution
             const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
             const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1);
@@ -331,7 +331,7 @@ namespace quda
             const Vector in = arg.in(back3_idx, their_spinor_parity);
             out = mv_add(conj(L), -in, out);
           } else {
-            if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_STEP2) {
+            if constexpr (Arg::xpay) {
               // Load the L link once for the "self" contribution
               const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
               const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
@@ -347,7 +347,7 @@ namespace quda
 
       } // dimension
 
-      if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_STEP2) {
+      if constexpr (Arg::xpay) {
         out = arg.a * x - out;
       }
 
