@@ -322,10 +322,23 @@ struct doubledouble {
 
   __device__ __host__ void print() const { printf("scalar: %16.14e + %16.14e\n", head(), tail()); }
 
-  constexpr operator double() const { return head(); }
+  explicit constexpr operator double() const { return head(); }
+  explicit constexpr operator float() const { return static_cast<float>(head()); }
+  explicit constexpr operator int() const { return static_cast<int>(head()); }
 };
 
-__device__ __host__  inline bool operator>(const doubledouble &a, const doubledouble &b) {
+__device__ __host__ inline doubledouble sqrt(const doubledouble &a) { return doubledouble(sqrt_dbldbl(a.a)); }
+
+__device__ __host__ inline doubledouble operator-(const doubledouble &a) { return doubledouble(neg_dbldbl(a.a)); }
+
+__device__ __host__ inline doubledouble abs(const doubledouble &a) { return (a.head() < 0 ? -a : a); }
+
+__device__ __host__ inline bool isinf(const doubledouble &a) { return isinf(a.head()); }
+
+__device__ __host__ inline bool isnan(const doubledouble &a) { return isnan(a.head()); }
+
+__device__ __host__  inline bool operator>(const doubledouble &a, const doubledouble &b)
+{
   if (a.head() > b.head()) {
     return true;
   } else if (a.head() == b.head() && a.tail() > b.tail()) {
@@ -333,6 +346,47 @@ __device__ __host__  inline bool operator>(const doubledouble &a, const doubledo
   } else {
     return false;
   }
+}
+
+__device__ __host__  inline bool operator>=(const doubledouble &a, const doubledouble &b)
+{
+  if (a.head() >= b.head()) {
+    return true;
+  } else if (a.head() == b.head() && a.tail() >= b.tail()) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+__device__ __host__  inline bool operator<(const doubledouble &a, const doubledouble &b)
+{
+  if (a.head() < b.head()) {
+    return true;
+  } else if (a.head() == b.head() && a.tail() < b.tail()) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+__device__ __host__  inline bool operator<=(const doubledouble &a, const doubledouble &b)
+{
+  if (a.head() <= b.head()) {
+    return true;
+  } else if (a.head() == b.head() && a.tail() <= b.tail()) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+__device__ __host__  inline bool operator==(const doubledouble &a, const doubledouble &b) {
+  return (a.head() == b.head() && a.tail() == b.tail());
+}
+
+__device__ __host__  inline bool operator!=(const doubledouble &a, const doubledouble &b) {
+  return !(a == b);
 }
 
 __device__ __host__  inline bool operator>(const doubledouble &a, const double &b) {
