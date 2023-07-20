@@ -493,7 +493,7 @@ namespace quda
       {
         sum[0] += aux[0];
         sum[1] += aux[1];
-        sum[2] += (aux[0] > 0.0) ? (aux[1] / aux[0]) : static_cast<real>(1.0);
+        sum[2] += (aux[0] > 0.0) ? (aux[1] / aux[0]) : static_cast<real_reduce_t>(1.0);
       }
 
       constexpr int flops() const { return 4; }   //! undercounts since it excludes the per-site division
@@ -540,7 +540,7 @@ namespace quda
       {
         sum[0] += aux[0];
         sum[1] += aux[1];
-        sum[2] += (aux[0] > 0.0) ? (aux[1] / aux[0]) : static_cast<real>(1.0);
+        sum[2] += (aux[0] > 0.0) ? (aux[1] / aux[0]) : static_cast<real_reduce_t>(1.0);
       }
 
       constexpr int flops() const { return 5; }
