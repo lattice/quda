@@ -240,7 +240,7 @@ namespace quda
 #endif
 
     if (is_prefetch_enabled()) qudaMemPrefetchAsync(ptr, size, QUDA_CUDA_FIELD_LOCATION, device::get_default_stream());
-    _malloc(DEVICE, a, ptr);
+    track_malloc(DEVICE, a, ptr);
 #ifdef HOST_DEBUG
     cudaMemset(ptr, 0xff, size);
 #endif
@@ -267,7 +267,7 @@ namespace quda
     if (err != CUDA_SUCCESS) {
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
-    _malloc(DEVICE_PINNED, a, ptr);
+    track_malloc(DEVICE_PINNED, a, ptr);
 #ifdef HOST_DEBUG
     cudaMemset(ptr, 0xff, size);
 #endif
@@ -286,7 +286,7 @@ namespace quda
 
     void *ptr = malloc(size);
     if (!ptr) { errorQuda("Failed to allocate host memory of size %zu (%s:%d in %s())\n", size, file, line, func); }
-    _malloc(HOST, a, ptr);
+    track_malloc(HOST, a, ptr);
 #ifdef HOST_DEBUG
     memset(ptr, 0xff, size);
 #endif
@@ -311,7 +311,7 @@ namespace quda
     if (err != cudaSuccess) {
       errorQuda("Failed to register pinned memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
-    _malloc(PINNED, a, ptr);
+    track_malloc(PINNED, a, ptr);
 #ifdef HOST_DEBUG
     memset(ptr, 0xff, a.base_size);
 #endif
