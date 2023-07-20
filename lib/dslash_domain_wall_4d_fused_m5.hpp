@@ -131,7 +131,7 @@ namespace quda
 
     template <Dslash5Type dslash5_type_impl, Dslash5Type... N>
     inline DomainWall4DApplyFusedM5(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                                    double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                                    double m_5, const complex_t *b_5, const complex_t *c_5, const ColorSpinorField &x,
                                     ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
                                     Dslash5TypeList<dslash5_type_impl, N...>, TimeProfile &profile)
     {

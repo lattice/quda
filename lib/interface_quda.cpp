@@ -1477,11 +1477,11 @@ namespace quda {
       }
       diracParam.type = pc ? QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC : QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC;
       diracParam.Ls = inv_param->Ls;
-      if (sizeof(Complex) != sizeof(double _Complex)) {
+      if (sizeof(complex_t) != sizeof(double _Complex)) {
         errorQuda("Irreconcilable difference between interface and internal complex number conventions");
       }
-      memcpy(diracParam.b_5, inv_param->b_5, sizeof(Complex) * inv_param->Ls);
-      memcpy(diracParam.c_5, inv_param->c_5, sizeof(Complex) * inv_param->Ls);
+      memcpy(diracParam.b_5, inv_param->b_5, sizeof(complex_t) * inv_param->Ls);
+      memcpy(diracParam.c_5, inv_param->c_5, sizeof(complex_t) * inv_param->Ls);
       diracParam.eofa_shift = inv_param->eofa_shift;
       diracParam.eofa_pm = inv_param->eofa_pm;
       diracParam.mq1 = inv_param->mq1;
@@ -1493,11 +1493,11 @@ namespace quda {
 	errorQuda("Length of Ls dimension %d greater than QUDA_MAX_DWF_LS %d", inv_param->Ls, QUDA_MAX_DWF_LS);
       diracParam.type = pc ? QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC : QUDA_MOBIUS_DOMAIN_WALL_DIRAC;
       diracParam.Ls = inv_param->Ls;
-      if (sizeof(Complex) != sizeof(double _Complex)) {
+      if (sizeof(complex_t) != sizeof(double _Complex)) {
         errorQuda("Irreconcilable difference between interface and internal complex number conventions");
       }
-      memcpy(diracParam.b_5, inv_param->b_5, sizeof(Complex) * inv_param->Ls);
-      memcpy(diracParam.c_5, inv_param->c_5, sizeof(Complex) * inv_param->Ls);
+      memcpy(diracParam.b_5, inv_param->b_5, sizeof(complex_t) * inv_param->Ls);
+      memcpy(diracParam.c_5, inv_param->c_5, sizeof(complex_t) * inv_param->Ls);
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
         printfQuda("Printing b_5 and c_5 values\n");
         for (int i = 0; i < diracParam.Ls; i++) {
@@ -2276,7 +2276,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   }
 
   // Simple vector for eigenvalues.
-  std::vector<Complex> evals(eig_param->n_conv, 0.0);
+  std::vector<complex_t> evals(eig_param->n_conv, 0.0);
   //------------------------------------------------------
 
   // Sanity checks for operator/eigensolver compatibility.
@@ -2336,7 +2336,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // Transfer Eigenpairs back to host if using GPU eigensolver. The copy
   // will automatically rotate from device UKQCD gamma basis to the
   // host side gamma basis.
-  for (int i = 0; i < eig_param->n_conv; i++) { memcpy(host_evals + i, &evals[i], sizeof(Complex)); }
+  for (int i = 0; i < eig_param->n_conv; i++) { memcpy(host_evals + i, &evals[i], sizeof(complex_t)); }
   if (!(eig_param->arpack_check)) {
     for (int i = 0; i < n_eig; i++) host_evecs_[i] = kSpace[i];
   }
@@ -3009,7 +3009,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
 
   if (param->compute_action) {
-    Complex action = blas::cDotProduct(b, x);
+    auto action = blas::cDotProduct(b, x);
     param->action[0] = action.real();
     param->action[1] = action.imag();
   }
@@ -3751,7 +3751,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   for (int i = 0; i < param->num_offset; i++) param->offset[i] = unscaled_shifts[i];
 
   if (param->compute_action) {
-    Complex action(0);
+    complex_t action(0);
     for (int i = 0; i < param->num_offset; i++) action += param->residue[i] * blas::cDotProduct(b, x[i]);
     param->action[0] = action.real();
     param->action[1] = action.imag();

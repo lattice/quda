@@ -180,7 +180,7 @@ namespace quda {
     static const int value = 1;
   };
 
-  template <> struct vec_length<Complex> {
+  template <> struct vec_length<complex_t> {
     static const int value = 2;
   };
   template <> struct vec_length<complex<double>> {

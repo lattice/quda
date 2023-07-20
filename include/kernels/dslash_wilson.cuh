@@ -36,9 +36,9 @@ namespace quda
     const G U;    /** the gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
 
-    WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+    WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a,
               const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim>(out, in, U, x, parity, dagger, a != 0.0 ? true : false, 1, spin_project, comm_override),
+      DslashArg<Float, nDim>(out, in, U, x, parity, dagger, a != real_t(0.0) ? true : false, 1, spin_project, comm_override),
       out(out),
       in(in),
       in_pack(in),

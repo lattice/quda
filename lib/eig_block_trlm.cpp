@@ -16,6 +16,9 @@
 
 namespace quda
 {
+
+  using MatrixXc = Matrix<complex_t, Dynamic, Dynamic>;
+
   // Thick Restarted Block Lanczos Method constructor
   BLKTRLM::BLKTRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
     TRLM(mat, eig_param, profile)
@@ -46,8 +49,8 @@ namespace quda
     block_data_length = block_size * block_size;
     auto arrow_mat_array_size = block_data_length * n_blocks;
     // Tridiagonal/Arrow matrix
-    block_alpha.resize(arrow_mat_array_size, 0.0);
-    block_beta.resize(arrow_mat_array_size, 0.0);
+    block_alpha.resize(arrow_mat_array_size, real_t(0.0));
+    block_beta.resize(arrow_mat_array_size, real_t(0.0));
 
     // Temp storage used in blockLanczosStep
     jth_block.resize(block_data_length);
@@ -55,7 +58,7 @@ namespace quda
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
-  void BLKTRLM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals)
+  void BLKTRLM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals)
   {
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
@@ -83,8 +86,8 @@ namespace quda
     checkChebyOpMax(kSpace);
 
     // Convergence and locking criteria
-    double mat_norm = 0.0;
-    double epsilon = setEpsilon(kSpace[0].Precision());
+    real_t mat_norm = 0.0;
+    real_t epsilon = setEpsilon(kSpace[0].Precision());
 
     // Print Eigensolver params
     printEigensolverSetup();
@@ -107,14 +110,14 @@ namespace quda
 
       // mat_norm is updated.
       for (int i = num_locked; i < n_kr; i++)
-        if (fabs(alpha[i]) > mat_norm) mat_norm = fabs(alpha[i]);
+        if (abs(alpha[i]) > mat_norm) mat_norm = abs(alpha[i]);
 
       // Locking check
       iter_locked = 0;
       for (int i = 1; i < (n_kr - num_locked); i++) {
         if (residua[i + num_locked] < epsilon * mat_norm) {
-          logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
-                  epsilon * mat_norm);
+          logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i, double(residua[i + num_locked]),
+                  double(epsilon * mat_norm));
           iter_locked = i;
         } else {
           // Unlikely to find new locked pairs
@@ -126,8 +129,8 @@ namespace quda
       iter_converged = iter_locked;
       for (int i = iter_locked + 1; i < n_kr - num_locked; i++) {
         if (residua[i + num_locked] < tol * mat_norm) {
-          logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
-                  tol * mat_norm);
+          logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i, double(residua[i + num_locked]),
+                  double(tol * mat_norm));
           iter_converged = i;
         } else {
           // Unlikely to find new converged pairs
@@ -162,7 +165,7 @@ namespace quda
       logQuda(QUDA_DEBUG_VERBOSE, "num_keep = %d\n", num_keep);
       logQuda(QUDA_DEBUG_VERBOSE, "num_locked = %d\n", num_locked);
       for (int i = 0; i < n_kr; i++) {
-        logQuda(QUDA_DEBUG_VERBOSE, "Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
+        logQuda(QUDA_DEBUG_VERBOSE, "Ritz[%d] = %.16e residual[%d] = %.16e\n", i, double(alpha[i]), i, double(residua[i]));
       }
 
       // Check for convergence
@@ -192,7 +195,7 @@ namespace quda
 
       // Dump all Ritz values and residua
       for (int i = 0; i < n_conv; i++) {
-        logQuda(QUDA_SUMMARIZE, "RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
+        logQuda(QUDA_SUMMARIZE, "RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, double(alpha[i]), 0.0, double(residua[i]));
       }
 
       // Compute eigenvalues
@@ -223,7 +226,7 @@ namespace quda
 
     if (j - start > 0) {
       int blocks = (j - start) / block_size;
-      std::vector<Complex> beta_(blocks * block_data_length);
+      std::vector<complex_t> beta_(blocks * block_data_length);
 
       // Switch beta block order from COLUMN to ROW major
       // This switches the block from upper to lower triangular
@@ -245,7 +248,7 @@ namespace quda
 
     // a_j = v_j^dag * r
     // Block dot products stored in alpha_block.
-    std::vector<Complex> block_alpha_(block_size);
+    std::vector<complex_t> block_alpha_(block_size);
     blas::cDotProduct(block_alpha_, {v.begin() + j, v.begin() + j + block_size}, {r.begin(), r.end()});
     for (auto i = 0u; i < block_alpha_.size(); i++) block_alpha[arrow_offset + i] = block_alpha_[i];
 
@@ -254,7 +257,7 @@ namespace quda
     for (int b = 0; b < block_size; b++) {
       for (int c = 0; c < block_size; c++) {
         idx = b * block_size + c;
-        jth_block[idx] = -1.0 * block_alpha[arrow_offset + idx];
+        jth_block[idx] = -block_alpha[arrow_offset + idx];
       }
     }
 
@@ -283,12 +286,12 @@ namespace quda
       // Compute R_{k}
       logQuda(QUDA_DEBUG_VERBOSE, "Orthonormalisation attempt k = %d\n", k);
       for (int b = 0; b < block_size; b++) {
-        double norm = sqrt(blas::norm2(r[b]));
+        auto norm = sqrt(blas::norm2(r[b]));
         blas::ax(1.0 / norm, r[b]);
         jth_block[b * (block_size + 1)] = norm;
         for (int c = b + 1; c < block_size; c++) {
 
-          Complex cnorm = blas::cDotProduct(r[b], r[c]);
+          complex_t cnorm = blas::cDotProduct(r[b], r[c]);
           blas::caxpy(-cnorm, r[b], r[c]);
 
           idx = c * block_size + b;
@@ -325,9 +328,9 @@ namespace quda
     } else {
       // Compute BetaNew_ac = (R_k)_ab * Beta_bc
       // Use Eigen, it's neater
-      MatrixXcd betaN = MatrixXcd::Zero(block_size, block_size);
-      MatrixXcd beta = MatrixXcd::Zero(block_size, block_size);
-      MatrixXcd Rk = MatrixXcd::Zero(block_size, block_size);
+      MatrixXc betaN = MatrixXc::Zero(block_size, block_size);
+      MatrixXc beta = MatrixXc::Zero(block_size, block_size);
+      MatrixXc Rk = MatrixXc::Zero(block_size, block_size);
       int idx = 0;
 
       // Populate matrices
@@ -365,7 +368,7 @@ namespace quda
     int num_locked_offset = (num_locked / block_size) * block_data_length;
 
     // Eigen objects
-    MatrixXcd T = MatrixXcd::Zero(dim, dim);
+    MatrixXc T = MatrixXc::Zero(dim, dim);
     block_ritz_mat.resize(dim * dim);
     int idx = 0;
 
@@ -420,7 +423,7 @@ namespace quda
     }
 
     // Eigensolve the arrow matrix
-    SelfAdjointEigenSolver<MatrixXcd> eigensolver;
+    SelfAdjointEigenSolver<MatrixXc> eigensolver;
     eigensolver.compute(T);
 
     // Populate the alpha array with eigenvalues
@@ -432,13 +435,13 @@ namespace quda
 
     // Use Sum of all beta values in the final block for
     // the convergence condition
-    double beta_sum = 0;
-    for (int i = 0; i < block_data_length; i++) beta_sum += fabs(block_beta[n_kr * block_size - block_data_length + i]);
+    real_t beta_sum = 0;
+    for (int i = 0; i < block_data_length; i++) beta_sum += abs(block_beta[n_kr * block_size - block_data_length + i]);
 
     for (int i = 0; i < blocks; i++) {
       for (int b = 0; b < block_size; b++) {
         idx = b * (block_size + 1);
-        residua[i * block_size + b + num_locked] = fabs(beta_sum * block_ritz_mat[dim * (i * block_size + b + 1) - 1]);
+        residua[i * block_size + b + num_locked] = abs(beta_sum * block_ritz_mat[dim * (i * block_size + b + 1) - 1]);
       }
     }
 
@@ -451,7 +454,7 @@ namespace quda
     int dim = n_kr - num_locked;
 
     // Multi-BLAS friendly array to store part of Ritz matrix we want
-    std::vector<Complex> ritz_mat_keep(dim * iter_keep);
+    std::vector<complex_t> ritz_mat_keep(dim * iter_keep);
     for (int j = 0; j < dim; j++) {
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = block_ritz_mat[i * dim + j]; }
     }
@@ -463,9 +466,9 @@ namespace quda
 
     // Compute new r blocks
     // Use Eigen, it's neater
-    MatrixXcd beta = MatrixXcd::Zero(block_size, block_size);
-    MatrixXcd ri = MatrixXcd::Zero(block_size, block_size);
-    MatrixXcd ritzi = MatrixXcd::Zero(block_size, block_size);
+    MatrixXc beta = MatrixXc::Zero(block_size, block_size);
+    MatrixXc ri = MatrixXc::Zero(block_size, block_size);
+    MatrixXc ritzi = MatrixXc::Zero(block_size, block_size);
     int blocks = iter_keep / block_size;
     int idx = 0;
     int beta_offset = n_kr * block_size - block_data_length;

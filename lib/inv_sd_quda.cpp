@@ -45,13 +45,12 @@ namespace quda {
     zero(*r), zero(x);
     double r2 = xmyNorm(b,*r);
     double alpha=0.; 
-    double3 rAr;
 
     int k=0;
     while (k < param.maxiter - 1) {
       mat(*Ar, *r);
-      rAr = cDotProductNormA(*r, *Ar);
-      alpha = rAr.z/rAr.x;
+      auto rAr = cDotProductNormA(*r, *Ar);
+      alpha = rAr[2]/rAr[0];
       axpy(alpha, *r, x);
       axpy(-alpha, *Ar, *r);
 
@@ -63,8 +62,8 @@ namespace quda {
       ++k;
     }
 
-    rAr = cDotProductNormA(*r, *Ar);
-    alpha = rAr.z/rAr.x;
+    auto rAr = cDotProductNormA(*r, *Ar);
+    alpha = rAr[2] / rAr[0];
     axpy(alpha, *r, x);
     if(getVerbosity() >= QUDA_VERBOSE){
       axpy(-alpha, *Ar, *r);

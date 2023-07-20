@@ -794,7 +794,7 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
   mxpy(in.data(), ref.data(), len * stag_spinor_site_size, inv_param.cpu_prec);
   double nrm2 = norm_2(ref.data(), len * stag_spinor_site_size, inv_param.cpu_prec);
   double src2 = norm_2(in.data(), len * stag_spinor_site_size, inv_param.cpu_prec);
-  double hqr = sqrt(quda::blas::HeavyQuarkResidualNorm(out, ref).z);
+  double hqr = sqrt(quda::blas::HeavyQuarkResidualNorm(out, ref)[2]);
   double l2r = sqrt(nrm2 / src2);
 
   if (multishift == 1) {

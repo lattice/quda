@@ -1123,7 +1123,7 @@ namespace quda
       } else {
         diracSmoother->MdagM(tmp2.Even(), tmp1.Odd());
       }
-      Complex dot = cDotProduct(tmp2.Even(), tmp1.Odd());
+      complex_t dot = cDotProduct(tmp2.Even(), tmp1.Odd());
       double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
       logQuda(QUDA_VERBOSE,
               "Smoother normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
@@ -1140,7 +1140,7 @@ namespace quda
         // staggered preconditioned op.
         diracResidual->M(tmp2, tmp1);
       }
-      Complex dot = cDotProduct(tmp1, tmp2);
+      complex_t dot = cDotProduct(tmp1, tmp2);
       double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
       logQuda(QUDA_VERBOSE,
               "Normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
@@ -1501,7 +1501,7 @@ namespace quda
       if(param.mg_global.pre_orthonormalize) {
         for(int i=0; i<(int)B.size(); i++) {
           for (int j=0; j<i; j++) {
-            Complex alpha = cDotProduct(*B[j], *B[i]);// <j,i>
+            complex_t alpha = cDotProduct(*B[j], *B[i]);// <j,i>
             caxpy(-alpha, *B[j], *B[i]); // i-<j,i>j
           }
           double nrm2 = norm2(*B[i]);
@@ -1536,7 +1536,7 @@ namespace quda
       if (param.mg_global.post_orthonormalize) {
         for(int i=0; i<(int)B.size(); i++) {
           for (int j=0; j<i; j++) {
-            Complex alpha = cDotProduct(*B[j], *B[i]);// <j,i>
+            complex_t alpha = cDotProduct(*B[j], *B[i]);// <j,i>
             caxpy(-alpha, *B[j], *B[i]); // i-<j,i>j
           }
           double nrm2 = norm2(*B[i]);
@@ -1780,7 +1780,7 @@ namespace quda
     // This is the vector precision used by matResidual
     csParam.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION, true);
 
-    std::vector<Complex> evals(n_conv, 0.0);
+    std::vector<complex_t> evals(n_conv, 0.0);
     std::vector<ColorSpinorField> B_evecs(n_conv);
     for (auto &b : B_evecs) b = ColorSpinorField(csParam);
 

@@ -235,7 +235,7 @@ namespace quda
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
     double heavy_quark_res = 0.0;                               // heavy quark residual
-    if (use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNorm(x, r).z);
+    if (use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNorm(x, r)[2]);
 
     double beta = 0.0;
     double pAp;
@@ -282,9 +282,9 @@ namespace quda
       double sigma;
       // alternative reliable updates,
       if (alternative_reliable) {
-        double3 pAppp = blas::cDotProductNormA(x_update_batch.get_current_field(), Ap);
-        pAp = pAppp.x;
-        ru.update_ppnorm(pAppp.z);
+        auto pAppp = blas::cDotProductNormA(x_update_batch.get_current_field(), Ap);
+        pAp = pAppp[0];
+        ru.update_ppnorm(pAppp[2]);
       } else {
         pAp = reDotProduct(x_update_batch.get_current_field(), Ap);
       }
@@ -293,9 +293,9 @@ namespace quda
       auto cg_norm = axpyCGNorm(-x_update_batch.get_current_alpha(), Ap, r_sloppy);
       // r --> r - alpha*A*p
       r2_old = r2;
-      r2 = cg_norm.x;
+      r2 = cg_norm[0];
 
-      sigma = cg_norm.y >= 0.0 ? cg_norm.y : r2; // use r2 if (r_k+1, r_k-1 - r_k) breaks
+      sigma = cg_norm[1] >= 0.0 ? cg_norm[1] : r2; // use r2 if (r_k+1, r_k-1 - r_k) breaks
 
       if (K) rMinvr_old = rMinvr;
 

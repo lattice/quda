@@ -49,14 +49,14 @@ namespace quda {
        @param[in] x input vector
        @param[out] y output vector
     */
-    void axy(double a, const ColorSpinorField &x, ColorSpinorField &y);
+    void axy(real_t a, const ColorSpinorField &x, ColorSpinorField &y);
 
     /**
        @brief Apply the rescale operation x = a * x
        @param[in] a scalar multiplier
        @param[in] x input vector
     */
-    inline void ax(double a, ColorSpinorField &x) { axy(a, x, x); }
+    inline void ax(real_t a, ColorSpinorField &x) { axy(a, x, x); }
 
     /**
        @brief Apply the operation z = a * x + b * y
@@ -66,7 +66,7 @@ namespace quda {
        @param[in] y input vector
        @param[out] z output vector
     */
-    void axpbyz(double a, const ColorSpinorField &x, double b, const ColorSpinorField &y, ColorSpinorField &z);
+    void axpbyz(real_t a, const ColorSpinorField &x, real_t b, const ColorSpinorField &y, ColorSpinorField &z);
 
     /**
        @brief Apply the operation y += x
@@ -88,7 +88,7 @@ namespace quda {
        @param[in] x input vector
        @param[in,out] y update vector
     */
-    inline void axpy(double a, const ColorSpinorField &x, ColorSpinorField &y) { axpbyz(a, x, 1.0, y, y); }
+    inline void axpy(real_t a, const ColorSpinorField &x, ColorSpinorField &y) { axpbyz(a, x, 1.0, y, y); }
 
     /**
        @brief Apply the operation y = a * x + b * y
@@ -97,7 +97,7 @@ namespace quda {
        @param[in] b scalar multiplier
        @param[in,out] y update vector
     */
-    inline void axpby(double a, const ColorSpinorField &x, double b, ColorSpinorField &y) { axpbyz(a, x, b, y, y); }
+    inline void axpby(real_t a, const ColorSpinorField &x, real_t b, ColorSpinorField &y) { axpbyz(a, x, b, y, y); }
 
     /**
        @brief Apply the operation y = x + a * y
@@ -105,7 +105,7 @@ namespace quda {
        @param[in] a scalar multiplier
        @param[in,out] y update vector
     */
-    inline void xpay(const ColorSpinorField &x, double a, ColorSpinorField &y) { axpbyz(1.0, x, a, y, y); }
+    inline void xpay(const ColorSpinorField &x, real_t a, ColorSpinorField &y) { axpbyz(1.0, x, a, y, y); }
 
     /**
        @brief Apply the operation z = x + a * y
@@ -114,7 +114,7 @@ namespace quda {
        @param[in] y update vector
        @param[out] z output vector
     */
-    inline void xpayz(const ColorSpinorField &x, double a, const ColorSpinorField &y, ColorSpinorField &z) { axpbyz(1.0, x, a, y, z); }
+    inline void xpayz(const ColorSpinorField &x, real_t a, const ColorSpinorField &y, ColorSpinorField &z) { axpbyz(1.0, x, a, y, z); }
 
     /**
        @brief Apply the operation y = a * x + y, x = z + b * x
@@ -124,7 +124,7 @@ namespace quda {
        @param[in] z input vector
        @param[in] b scalar multiplier
     */
-    void axpyZpbx(double a, ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &z, double b);
+    void axpyZpbx(real_t a, ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &z, real_t b);
 
     /**
        @brief Apply the operation y = a * x + y, x = b * z + c * x
@@ -135,7 +135,7 @@ namespace quda {
        @param[in] z input vector
        @param[in] c scalar multiplier
     */
-    void axpyBzpcx(double a, ColorSpinorField& x, ColorSpinorField& y, double b, const ColorSpinorField& z, double c);
+    void axpyBzpcx(real_t a, ColorSpinorField& x, ColorSpinorField& y, real_t b, const ColorSpinorField& z, real_t c);
 
     /**
        @brief Apply the operation w = a * x + b * y + c * z
@@ -147,8 +147,8 @@ namespace quda {
        @param[in] z input vector
        @param[out] w output vector
     */
-    void axpbypczw(double a, const ColorSpinorField &x, double b, const ColorSpinorField &y,
-                   double c, const ColorSpinorField &z, ColorSpinorField &w);
+    void axpbypczw(real_t a, const ColorSpinorField &x, real_t b, const ColorSpinorField &y,
+                   real_t c, const ColorSpinorField &z, ColorSpinorField &w);
 
     /**
        @brief Apply the operation y = a * x + b * y
@@ -158,7 +158,7 @@ namespace quda {
        @param[in] y input vector
        @param[out] z output vector
     */
-    void caxpby(const Complex &a, const ColorSpinorField &x, const Complex &b, ColorSpinorField &y);
+    void caxpby(const complex_t &a, const ColorSpinorField &x, const complex_t &b, ColorSpinorField &y);
 
     /**
        @brief Apply the operation y += a * x
@@ -166,7 +166,7 @@ namespace quda {
        @param[in] x input vector
        @param[in] y update vector
     */
-    void caxpy(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y);
+    void caxpy(const complex_t &a, const ColorSpinorField &x, ColorSpinorField &y);
 
     /**
        @brief Apply the operation z = x + a * y + b * z
@@ -176,8 +176,8 @@ namespace quda {
        @param[in] b scalar multiplier
        @param[in,out] z update vector
     */
-    void cxpaypbz(const ColorSpinorField &x, const Complex &a, const ColorSpinorField &y,
-                  const Complex &b, ColorSpinorField &z);
+    void cxpaypbz(const ColorSpinorField &x, const complex_t &a, const ColorSpinorField &y,
+                  const complex_t &b, ColorSpinorField &z);
 
     /**
        @brief Apply the operation z += a * x + b * y, y-= b * w
@@ -188,7 +188,7 @@ namespace quda {
        @param[in,out] z update vector
        @param[in] w input vector
     */
-    void caxpbypzYmbw(const Complex &a, const ColorSpinorField &x, const Complex &b, ColorSpinorField &y,
+    void caxpbypzYmbw(const complex_t &a, const ColorSpinorField &x, const complex_t &b, ColorSpinorField &y,
                       ColorSpinorField &z, const ColorSpinorField &w);
 
     /**
@@ -199,8 +199,8 @@ namespace quda {
        @param[in] b scalar multiplier
        @param[in] z input vector
     */
-    void caxpyBzpx(const Complex &a, ColorSpinorField &x, ColorSpinorField &y,
-                   const Complex &b, const ColorSpinorField &z);
+    void caxpyBzpx(const complex_t &a, ColorSpinorField &x, ColorSpinorField &y,
+                   const complex_t &b, const ColorSpinorField &z);
 
     /**
        @brief Apply the operation y += a * x, z += b * x
@@ -210,8 +210,8 @@ namespace quda {
        @param[in] b scalar multiplier
        @param[in,out] z update vector
     */
-    void caxpyBxpz(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y,
-                   const Complex &b, ColorSpinorField &z);
+    void caxpyBxpz(const complex_t &a, const ColorSpinorField &x, ColorSpinorField &y,
+                   const complex_t &b, ColorSpinorField &z);
 
     /**
        @brief Apply the operation y += a * b * x, x = a * x
@@ -220,7 +220,7 @@ namespace quda {
        @param[in,out] x update vector
        @param[in,out] y update vector
     */
-    void cabxpyAx(double a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y);
+    void cabxpyAx(real_t a, const complex_t &b, ColorSpinorField &x, ColorSpinorField &y);
 
     /**
        @brief Apply the operation y += a * x, x -= a * z
@@ -229,7 +229,7 @@ namespace quda {
        @param[in,out] y update vector
        @param[in] z input vector
     */
-    void caxpyXmaz(const Complex &a, ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &z);
+    void caxpyXmaz(const complex_t &a, ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &z);
 
     /**
        @brief Apply the operation y += a * x, x = x - a * z.  Special
@@ -240,7 +240,7 @@ namespace quda {
        @param[in,out] y update vector
        @param[in] z input vector
     */
-    void caxpyXmazMR(const double &a, ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &z);
+    void caxpyXmazMR(const real_t &a, ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &z);
 
     /**
        @brief Apply the operation y += a * w, z -= a * x, w = z + b * w
@@ -251,7 +251,7 @@ namespace quda {
        @param[in,out] z update vector
        @param[in,out] w update vector
     */
-    void tripleCGUpdate(double a, double b, const ColorSpinorField &x,
+    void tripleCGUpdate(real_t a, real_t b, const ColorSpinorField &x,
 			ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w);
 
     // reduction kernels - defined in reduce_quda.cu
@@ -260,7 +260,7 @@ namespace quda {
        @brief Compute the maximum absolute real element of a field
        @param[in] a The field we are reducing
     */
-    double max(const ColorSpinorField &x);
+    real_t max(const ColorSpinorField &x);
 
     /**
        @brief Compute the maximum real-valued deviation between two
@@ -268,19 +268,19 @@ namespace quda {
        @param[in] x The field we want to compare
        @param[in] y The reference field to which we are comparing against
     */
-    array<double, 2> max_deviation(const ColorSpinorField &x, const ColorSpinorField &y);
+    array<real_t, 2> max_deviation(const ColorSpinorField &x, const ColorSpinorField &y);
 
     /**
        @brief Compute the L1 norm of a field
        @param[in] x The field we are reducing
     */
-    double norm1(const ColorSpinorField &x);
+    real_t norm1(const ColorSpinorField &x);
 
     /**
        @brief Compute the L2 norm (||x||^2) of a field
        @param[in] x The field we are reducing
     */
-    double norm2(const ColorSpinorField &x);
+    real_t norm2(const ColorSpinorField &x);
 
     /**
        @brief Compute y += a * x and then (x, y)
@@ -288,14 +288,14 @@ namespace quda {
        @param[in] x input vector
        @param[in,out] y update vector
     */
-    double axpyReDot(double a, const ColorSpinorField &x, ColorSpinorField &y);
+    real_t axpyReDot(real_t a, const ColorSpinorField &x, ColorSpinorField &y);
 
     /**
        @brief Compute the real-valued inner product (x, y)
        @param[in] x input vector
        @param[in] y input vector
     */
-    double reDotProduct(const ColorSpinorField &x, const ColorSpinorField &y);
+    real_t reDotProduct(const ColorSpinorField &x, const ColorSpinorField &y);
 
     /**
        @brief Compute z = a * x + b * y and then ||z||^2
@@ -305,7 +305,7 @@ namespace quda {
        @param[in] y input vector
        @param[in,out] z update vector
     */
-    double axpbyzNorm(double a, const ColorSpinorField &x, double b, const ColorSpinorField &y, ColorSpinorField &z);
+    real_t axpbyzNorm(real_t a, const ColorSpinorField &x, real_t b, const ColorSpinorField &y, ColorSpinorField &z);
 
     /**
        @brief Compute y += a * x and then ||y||^2
@@ -313,38 +313,38 @@ namespace quda {
        @param[in] x input vector
        @param[in,out] y update vector
     */
-    inline double axpyNorm(double a, const ColorSpinorField &x, ColorSpinorField &y) { return axpbyzNorm(a, x, 1.0, y, y); }
+    inline real_t axpyNorm(real_t a, const ColorSpinorField &x, ColorSpinorField &y) { return axpbyzNorm(a, x, 1.0, y, y); }
 
     /**
        @brief Compute y -= x and then ||y||^2
        @param[in] x input vector
        @param[in,out] y update vector
     */
-    inline double xmyNorm(const ColorSpinorField &x, ColorSpinorField &y) { return axpbyzNorm(1.0, x, -1.0, y, y); }
+    inline real_t xmyNorm(const ColorSpinorField &x, ColorSpinorField &y) { return axpbyzNorm(1.0, x, -1.0, y, y); }
 
     /**
        @brief Compute the complex-valued inner product (x, y)
        @param[in] x input vector
        @param[in] y input vector
     */
-    Complex cDotProduct(const ColorSpinorField &x, const ColorSpinorField &y);
+    complex_t cDotProduct(const ColorSpinorField &x, const ColorSpinorField &y);
 
     /**
        @brief Return complex-valued inner product (x,y), ||x||^2 and ||y||^2
        @param[in] x input vector
        @param[in] y input vector
     */
-    double4 cDotProductNormAB(const ColorSpinorField &x, const ColorSpinorField &y);
+    array<real_t, 4> cDotProductNormAB(const ColorSpinorField &x, const ColorSpinorField &y);
 
     /**
        @brief Return complex-valued inner product (x,y) and ||x||^2
        @param[in] x input vector
        @param[in] y input vector
      */
-    inline double3 cDotProductNormA(const ColorSpinorField &x, const ColorSpinorField &y)
+    inline array<real_t, 3> cDotProductNormA(const ColorSpinorField &x, const ColorSpinorField &y)
     {
       auto a4 = cDotProductNormAB(x, y);
-      return make_double3(a4.x, a4.y, a4.z);
+      return {a4[0], a4[1], a4[2]};
     }
 
     /**
@@ -352,10 +352,10 @@ namespace quda {
        @param[in] x input vector
        @param[in] y input vector
      */
-    inline double3 cDotProductNormB(const ColorSpinorField &x, const ColorSpinorField &y)
+    inline array<real_t, 3> cDotProductNormB(const ColorSpinorField &x, const ColorSpinorField &y)
     {
       auto a4 = cDotProductNormAB(x, y);
-      return make_double3(a4.x, a4.y, a4.w);
+      return {a4[0], a4[1], a4[2]};
     }
 
     /**
@@ -369,7 +369,7 @@ namespace quda {
        @param[in] w input vector
        @param[in] v input vector
     */
-    double3 caxpbypzYmbwcDotProductUYNormY(const Complex &a, const ColorSpinorField &x, const Complex &b,
+    array<real_t, 3> caxpbypzYmbwcDotProductUYNormY(const complex_t &a, const ColorSpinorField &x, const complex_t &b,
                                            ColorSpinorField &y, ColorSpinorField &z,
                                            const ColorSpinorField &w, const ColorSpinorField &u);
 
@@ -379,7 +379,7 @@ namespace quda {
        @param[in] x input vector
        @param[in,out] y update vector
     */
-    double caxpyNorm(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y);
+    real_t caxpyNorm(const complex_t &a, const ColorSpinorField &x, ColorSpinorField &y);
 
     /**
        @brief Compute z = a * b * x + y, x = a * x, and then ||x||^2
@@ -389,7 +389,7 @@ namespace quda {
        @param[in] y input vector
        @param[in,out] z update vector
     */
-    double cabxpyzAxNorm(double a, const Complex &b, ColorSpinorField &x, const ColorSpinorField &y,
+    real_t cabxpyzAxNorm(real_t a, const complex_t &b, ColorSpinorField &x, const ColorSpinorField &y,
                          ColorSpinorField &z);
 
     /**
@@ -399,7 +399,7 @@ namespace quda {
        @param[in,out] y update vector
        @param[in] z input vector
     */
-    Complex caxpyDotzy(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y,
+    complex_t caxpyDotzy(const complex_t &a, const ColorSpinorField &x, ColorSpinorField &y,
 		       const ColorSpinorField &z);
 
     /**
@@ -409,7 +409,7 @@ namespace quda {
        @param[in] x input vector
        @param[in,out] y update vector
     */
-    double2 axpyCGNorm(double a, const ColorSpinorField &x, ColorSpinorField &y);
+    array<real_t, 2> axpyCGNorm(real_t a, const ColorSpinorField &x, ColorSpinorField &y);
 
     /**
        @brief Computes ||x||^2, ||r||^2 and the MILC/FNAL heavy quark
@@ -417,7 +417,7 @@ namespace quda {
        @param[in] x input vector
        @param[in] r input vector (residual vector)
     */
-    double3 HeavyQuarkResidualNorm(const ColorSpinorField &x, const ColorSpinorField &r);
+    array<real_t, 3> HeavyQuarkResidualNorm(const ColorSpinorField &x, const ColorSpinorField &r);
 
     /**
        @brief Computes y += x, ||y||^2, ||r||^2 and the MILC/FNAL heavy quark
@@ -426,7 +426,7 @@ namespace quda {
        @param[in,out] y update vector
        @param[in] r input vector (residual vector)
     */
-    double3 xpyHeavyQuarkResidualNorm(const ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &r);
+    array<real_t, 3> xpyHeavyQuarkResidualNorm(const ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &r);
 
     /**
        @brief Computes ||x||^2, ||y||^2, and real-valued inner product (y, z)
@@ -434,7 +434,7 @@ namespace quda {
        @param[in] y input vector
        @param[in] z input vector
     */
-    double3 tripleCGReduction(const ColorSpinorField &x, const ColorSpinorField &y, const ColorSpinorField &z);
+    array<real_t, 3> tripleCGReduction(const ColorSpinorField &x, const ColorSpinorField &y, const ColorSpinorField &z);
 
     /**
        @brief Computes ||x||^2, ||y||^2, the real-valued inner product (y, z), and ||z||^2
@@ -442,7 +442,7 @@ namespace quda {
        @param[in] y input vector
        @param[in] z input vector
     */
-    double4 quadrupleCGReduction(const ColorSpinorField &x, const ColorSpinorField &y, const ColorSpinorField &z);
+    array<real_t, 4> quadrupleCGReduction(const ColorSpinorField &x, const ColorSpinorField &y, const ColorSpinorField &z);
 
     /**
        @brief Computes z = x, w = y, x += a * y, y -= a * v and ||y||^2
@@ -453,7 +453,7 @@ namespace quda {
        @param[in,out] w update vector
        @param[in] v input vector
     */
-    double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y,
+    real_t quadrupleCG3InitNorm(real_t a, ColorSpinorField &x, ColorSpinorField &y,
                                 ColorSpinorField &z, ColorSpinorField &w, const ColorSpinorField &v);
 
     /**
@@ -468,7 +468,7 @@ namespace quda {
        @param[in,out] w update vector
        @param[in] v input vector
     */
-    double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y,
+    real_t quadrupleCG3UpdateNorm(real_t a, real_t b, ColorSpinorField &x, ColorSpinorField &y,
                                   ColorSpinorField &z, ColorSpinorField &w, const ColorSpinorField &v);
 
     // multi-blas kernels - defined in multi_blas.cu
@@ -477,7 +477,7 @@ namespace quda {
        @brief Compute the block "axpy" with over the set of
               ColorSpinorFields.  E.g., it computes y = x * a + y
               The dimensions of a can be rectangular, e.g., the width of x and y need not be same.
-       @tparam T The type of a coefficients (double or Complex)
+       @tparam T The type of a coefficients (real_t or complex_t)
        @param a[in] Matrix of real coefficients
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
@@ -493,7 +493,7 @@ namespace quda {
 
        Where 'a' must be a square, upper triangular matrix.
 
-       @tparam T The type of a coefficients (double or Complex)
+       @tparam T The type of a coefficients (real_t or complex_t)
        @param a[in] Matrix of coefficients
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
@@ -509,7 +509,7 @@ namespace quda {
 
        Where 'a' must be a square, lower triangular matrix.
 
-       @tparam T The type of a coefficients (double or Complex)
+       @tparam T The type of a coefficients (real_t or complex_t)
        @param a[in] Matrix of coefficients
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
@@ -530,7 +530,7 @@ namespace quda {
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void caxpy(const std::vector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
+    void caxpy(const std::vector<complex_t> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
 
     /**
        @brief Compute the block "caxpy_U" with over the set of
@@ -544,7 +544,7 @@ namespace quda {
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void caxpy_U(const std::vector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
+    void caxpy_U(const std::vector<complex_t> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
 
     /**
        @brief Compute the block "caxpy_L" with over the set of
@@ -558,7 +558,7 @@ namespace quda {
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void caxpy_L(const std::vector<Complex> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
+    void caxpy_L(const std::vector<complex_t> &a, cvector_ref<const ColorSpinorField> &x, cvector_ref<ColorSpinorField> &y);
 
     /**
        @brief Compute the block "axpyz" with over the set of
@@ -575,7 +575,7 @@ namespace quda {
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void axpyz(const std::vector<double> &a, cvector_ref<const ColorSpinorField> &x,
+    void axpyz(const std::vector<real_t> &a, cvector_ref<const ColorSpinorField> &x,
                cvector_ref<const ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z);
 
     /**
@@ -591,7 +591,7 @@ namespace quda {
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void axpyz_U(const std::vector<double> &a, cvector_ref<const ColorSpinorField> &x,
+    void axpyz_U(const std::vector<real_t> &a, cvector_ref<const ColorSpinorField> &x,
                  cvector_ref<const ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z);
 
     /**
@@ -607,7 +607,7 @@ namespace quda {
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void axpyz_L(const std::vector<double> &a, cvector_ref<const ColorSpinorField> &x,
+    void axpyz_L(const std::vector<real_t> &a, cvector_ref<const ColorSpinorField> &x,
                  cvector_ref<const ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z);
 
     /**
@@ -625,7 +625,7 @@ namespace quda {
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void caxpyz(const std::vector<Complex> &a, cvector_ref<const ColorSpinorField> &x,
+    void caxpyz(const std::vector<complex_t> &a, cvector_ref<const ColorSpinorField> &x,
                 cvector_ref<const ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z);
 
     /**
@@ -641,7 +641,7 @@ namespace quda {
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void caxpyz_U(const std::vector<Complex> &a, cvector_ref<const ColorSpinorField> &x,
+    void caxpyz_U(const std::vector<complex_t> &a, cvector_ref<const ColorSpinorField> &x,
                   cvector_ref<const ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z);
 
     /**
@@ -657,7 +657,7 @@ namespace quda {
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void caxpyz_L(const std::vector<Complex> &a, cvector_ref<const ColorSpinorField> &x,
+    void caxpyz_L(const std::vector<complex_t> &a, cvector_ref<const ColorSpinorField> &x,
                   cvector_ref<const ColorSpinorField> &y, cvector_ref<ColorSpinorField> &z);
 
     /**
@@ -678,9 +678,9 @@ namespace quda {
        @param z[in] input ColorSpinorField
        @param c[in] Array of coefficients
     */
-    void axpyBzpcx(const std::vector<double> &a, cvector_ref<ColorSpinorField> &x,
-                   cvector_ref<ColorSpinorField> &y, const std::vector<double> &b, ColorSpinorField &z,
-                   const std::vector<double> &c);
+    void axpyBzpcx(const std::vector<real_t> &a, cvector_ref<ColorSpinorField> &x,
+                   cvector_ref<ColorSpinorField> &y, const std::vector<real_t> &b, ColorSpinorField &z,
+                   const std::vector<real_t> &c);
 
     /**
        @brief Compute the vectorized "caxpyBxpz" over the set of
@@ -699,8 +699,8 @@ namespace quda {
        @param b[in] Array of coefficients
        @param z[in,out] input ColorSpinorField
     */
-    void caxpyBxpz(const std::vector<Complex> &a, cvector_ref<const ColorSpinorField> &x, ColorSpinorField &y,
-                   const std::vector<Complex> &b, ColorSpinorField &z);
+    void caxpyBxpz(const std::vector<complex_t> &a, cvector_ref<const ColorSpinorField> &x, ColorSpinorField &y,
+                   const std::vector<complex_t> &b, ColorSpinorField &z);
 
     // multi-reduce kernels - defined in multi_reduce.cu
 
@@ -711,7 +711,7 @@ namespace quda {
        @param a[in] set of input ColorSpinorFields
        @param b[in] set of input ColorSpinorFields
     */
-    void reDotProduct(std::vector<double> &result, cvector_ref<const ColorSpinorField> &a,
+    void reDotProduct(std::vector<real_t> &result, cvector_ref<const ColorSpinorField> &a,
                       cvector_ref<const ColorSpinorField> &b);
 
     /**
@@ -721,7 +721,7 @@ namespace quda {
        @param a[in] set of input ColorSpinorFields
        @param b[in] set of input ColorSpinorFields
     */
-    void cDotProduct(std::vector<Complex> &result, cvector_ref<const ColorSpinorField> &a,
+    void cDotProduct(std::vector<complex_t> &result, cvector_ref<const ColorSpinorField> &a,
                      cvector_ref<const ColorSpinorField> &b);
 
     /**
@@ -734,7 +734,7 @@ namespace quda {
        @param a[in] set of input ColorSpinorFields
        @param b[in] set of input ColorSpinorFields
     */
-    void hDotProduct(std::vector<Complex> &result, cvector_ref<const ColorSpinorField> &a,
+    void hDotProduct(std::vector<complex_t> &result, cvector_ref<const ColorSpinorField> &a,
                      cvector_ref<const ColorSpinorField> &b);
 
     /**
@@ -749,47 +749,47 @@ namespace quda {
         @param a[in] set of input ColorSpinorFields
         @param b[in] set of input ColorSpinorFields
      */
-    void hDotProduct_Anorm(std::vector<Complex> &result, cvector_ref<const ColorSpinorField> &a,
+    void hDotProduct_Anorm(std::vector<complex_t> &result, cvector_ref<const ColorSpinorField> &a,
                            cvector_ref<const ColorSpinorField> &b);
 
     // compatibility wrappers until we switch to
     // std::vector<ColorSpinorField> and
     // std::vector<std::reference_wrapper<...>> more broadly
 
-    void axpy(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y);
-    void axpy(const double *a, ColorSpinorField &x, ColorSpinorField &y);
-    void axpy_U(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y);
-    void axpy_U(const double *a, ColorSpinorField &x, ColorSpinorField &y);
-    void axpy_L(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y);
-    void axpy_L(const double *a, ColorSpinorField &x, ColorSpinorField &y);
-    void caxpy(const Complex *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y);
-    void caxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y);
-    void caxpy_U(const Complex *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y);
-    void caxpy_U(const Complex *a, ColorSpinorField &x, ColorSpinorField &y);
-    void caxpy_L(const Complex *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y);
-    void caxpy_L(const Complex *a, ColorSpinorField &x, ColorSpinorField &y);
-    void axpyz(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
+    void axpy(const real_t *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y);
+    void axpy(const real_t *a, ColorSpinorField &x, ColorSpinorField &y);
+    void axpy_U(const real_t *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y);
+    void axpy_U(const real_t *a, ColorSpinorField &x, ColorSpinorField &y);
+    void axpy_L(const real_t *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y);
+    void axpy_L(const real_t *a, ColorSpinorField &x, ColorSpinorField &y);
+    void caxpy(const complex_t *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y);
+    void caxpy(const complex_t *a, ColorSpinorField &x, ColorSpinorField &y);
+    void caxpy_U(const complex_t *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y);
+    void caxpy_U(const complex_t *a, ColorSpinorField &x, ColorSpinorField &y);
+    void caxpy_L(const complex_t *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y);
+    void caxpy_L(const complex_t *a, ColorSpinorField &x, ColorSpinorField &y);
+    void axpyz(const real_t *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                std::vector<ColorSpinorField *> &z);
-    void axpyz(const double *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
-    void axpyz_U(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
+    void axpyz(const real_t *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+    void axpyz_U(const real_t *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                  std::vector<ColorSpinorField *> &z);
-    void axpyz_L(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
+    void axpyz_L(const real_t *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                  std::vector<ColorSpinorField *> &z);
-    void caxpyz(const Complex *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
+    void caxpyz(const complex_t *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                 std::vector<ColorSpinorField *> &z);
-    void caxpyz(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
-    void caxpyz_U(const Complex *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
+    void caxpyz(const complex_t *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+    void caxpyz_U(const complex_t *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                   std::vector<ColorSpinorField *> &z);
-    void caxpyz_L(const Complex *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
+    void caxpyz_L(const complex_t *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                   std::vector<ColorSpinorField *> &z);
-    void axpyBzpcx(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
-                   const double *b, ColorSpinorField &z, const double *c);
-    void caxpyBxpz(const Complex *a_, std::vector<ColorSpinorField *> &x_, ColorSpinorField &y_, const Complex *b_,
+    void axpyBzpcx(const real_t *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
+                   const real_t *b, ColorSpinorField &z, const real_t *c);
+    void caxpyBxpz(const complex_t *a_, std::vector<ColorSpinorField *> &x_, ColorSpinorField &y_, const complex_t *b_,
                    ColorSpinorField &z_);
 
-    void reDotProduct(double *result, std::vector<ColorSpinorField *> &a, std::vector<ColorSpinorField *> &b);
-    void cDotProduct(Complex *result, std::vector<ColorSpinorField *> &a, std::vector<ColorSpinorField *> &b);
-    void hDotProduct(Complex *result, std::vector<ColorSpinorField *> &a, std::vector<ColorSpinorField *> &b);
+    void reDotProduct(real_t *result, std::vector<ColorSpinorField *> &a, std::vector<ColorSpinorField *> &b);
+    void cDotProduct(complex_t *result, std::vector<ColorSpinorField *> &a, std::vector<ColorSpinorField *> &b);
+    void hDotProduct(complex_t *result, std::vector<ColorSpinorField *> &a, std::vector<ColorSpinorField *> &b);
 
   } // namespace blas
 

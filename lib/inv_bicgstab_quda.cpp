@@ -196,7 +196,7 @@ namespace quda {
 
     const bool use_heavy_quark_res =
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
-    double heavy_quark_res = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
+    real_t heavy_quark_res = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r)[2]) : real_t(0.0);
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
     double delta = param.delta;
@@ -204,14 +204,14 @@ namespace quda {
     int k = 0;
     int rUpdate = 0;
 
-    Complex rho(1.0, 0.0);
-    Complex rho0 = rho;
-    Complex alpha(1.0, 0.0);
-    Complex omega(1.0, 0.0);
-    Complex beta;
+    complex_t rho(1.0, 0.0);
+    complex_t rho0 = rho;
+    complex_t alpha(1.0, 0.0);
+    complex_t omega(1.0, 0.0);
+    complex_t beta;
 
-    double3 rho_r2;
-    double3 omega_t2;
+    array<real_t, 3> rho_r2;
+    array<real_t, 3> omega_t2;
 
     double rNorm = sqrt(r2);
     //double r0Norm = rNorm;
@@ -240,7 +240,7 @@ namespace quda {
 
       matSloppy(v, p);
 
-      Complex r0v;
+      complex_t r0v;
       if (param.pipeline) {
 	r0v = blas::cDotProduct(r0, v);
 	if (k>0) rho = blas::cDotProduct(r0, r);
@@ -259,11 +259,11 @@ namespace quda {
       if (param.pipeline) {
 	// omega = (t, r) / (t, t)
 	omega_t2 = blas::cDotProductNormA(t, rSloppy);
-	Complex tr = Complex(omega_t2.x, omega_t2.y);
-	double t2 = omega_t2.z;
+	complex_t tr = complex_t(omega_t2[0], omega_t2[1]);
+	real_t t2 = omega_t2[2];
 	omega = tr / t2;
-	double s2 = blas::norm2(rSloppy);
-	Complex r0t = blas::cDotProduct(r0, t);
+	real_t s2 = blas::norm2(rSloppy);
+	complex_t r0t = blas::cDotProduct(r0, t);
 	beta = -r0t / r0v;
 	r2 = s2 - real(omega * conj(tr)) ;
 
@@ -272,7 +272,7 @@ namespace quda {
       } else {
 	// omega = (t, r) / (t, t)
 	omega_t2 = blas::cDotProductNormA(t, rSloppy);
-	omega = Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);
+	omega = complex_t(omega_t2[0] / omega_t2[2], omega_t2[1] / omega_t2[2]);
       }
 
       if (param.pipeline && !updateR) {
@@ -284,17 +284,17 @@ namespace quda {
 	//x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
 	rho_r2 = blas::caxpbypzYmbwcDotProductUYNormY(alpha, p, omega, rSloppy, xSloppy, t, r0);
 	rho0 = rho;
-	rho = Complex(rho_r2.x, rho_r2.y);
-	r2 = rho_r2.z;
+	rho = complex_t(rho_r2[0], rho_r2[1]);
+	r2 = rho_r2[2];
       }
 
       if (use_heavy_quark_res && k%heavy_quark_check==0) {
         if (&x != &xSloppy) {
            blas::copy(tmp,y);
-           heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
+           heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy)[2]);
         } else {
            blas::copy(r, rSloppy);
-           heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
+           heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r)[2]);
         }
       }
 
@@ -364,7 +364,7 @@ namespace quda {
       // Calculate the true residual
       mat(r, x);
       param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
-      param.true_res_hq = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
+      param.true_res_hq = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r)[2]) : 0.0;
 
       PrintSummary("BiCGstab", k, r2, b2, stop, param.tol_hq);
     }

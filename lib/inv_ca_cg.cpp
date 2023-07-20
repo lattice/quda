@@ -98,9 +98,9 @@ namespace quda
 
       double r2;
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-        double3 h3 = blas::HeavyQuarkResidualNorm(x, xp);
-        r2 = h3.y;
-        param.true_res_hq = sqrt(h3.z);
+        auto h3 = blas::HeavyQuarkResidualNorm(x, xp);
+        r2 = h3[1];
+        param.true_res_hq = sqrt(h3[2]);
       } else {
         r2 = blas::norm2(xp);
       }
@@ -168,9 +168,9 @@ namespace quda
       if (param.compute_true_res) {
         double r2;
         if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-          double3 h3 = blas::HeavyQuarkResidualNorm(x, br);
-          r2 = h3.y;
-          param.true_res_hq = sqrt(h3.z);
+          auto h3 = blas::HeavyQuarkResidualNorm(x, br);
+          r2 = h3[1];
+          param.true_res_hq = sqrt(h3[2]);
         } else {
           r2 = blas::norm2(br);
         }
@@ -516,7 +516,7 @@ namespace quda
     const int maxResIncreaseTotal = param.max_res_increase_total;
 
     double heavy_quark_res = 0.0; // heavy quark residual
-    if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+    if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
 
     int resIncrease = 0;
     int resIncreaseTotal = 0;
@@ -638,7 +638,7 @@ namespace quda
 
         blas::copy(S[0], r);
 
-        if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+        if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
 
         // break-out check if we have reached the limit of the precision
         if (r2 > r2_old) {
@@ -671,7 +671,7 @@ namespace quda
       double true_res = blas::xmyNorm(b, r);
       param.true_res = sqrt(true_res / b2);
       param.true_res_hq
-        = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? sqrt(blas::HeavyQuarkResidualNorm(x, r).z) : 0.0;
+        = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]) : 0.0;
     }
 
     if (!param.is_preconditioner) {

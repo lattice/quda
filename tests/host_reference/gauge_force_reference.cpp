@@ -505,7 +505,7 @@ void gauge_force_reference(void *refMom, double eb3, quda::GaugeField &u, int **
   delete qdp_ex;
 }
 
-void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::Complex> &loop_traces,
+void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::complex_t> &loop_traces,
                                 double factor, int **input_path, int *length, double *path_coeff, int num_paths)
 {
   void *sitelink[] = {u.data(0), u.data(1), u.data(2), u.data(3)};
@@ -538,7 +538,7 @@ void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::Complex> 
 
   quda::comm_allreduce_sum(loop_tr_dbl);
 
-  for (int i = 0; i < num_paths; i++) loop_traces[i] = quda::Complex(loop_tr_dbl[2 * i], loop_tr_dbl[2 * i + 1]);
+  for (int i = 0; i < num_paths; i++) loop_traces[i] = quda::complex_t(loop_tr_dbl[2 * i], loop_tr_dbl[2 * i + 1]);
 
   delete qdp_ex;
 }

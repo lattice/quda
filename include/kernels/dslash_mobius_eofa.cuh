@@ -53,7 +53,7 @@ namespace quda
       eofa_coeff<real> coeff;
 
       Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double m_f_,
-                 const double m_5_, const Complex */*b_5_*/, const Complex */*c_5_*/, double a_, double inv_, double kappa_,
+                 const double m_5_, const complex_t */*b_5_*/, const complex_t */*c_5_*/, double a_, double inv_, double kappa_,
                  const double *eofa_u, const double *eofa_x, const double *eofa_y, double sherman_morrison_) :
         kernel_param(dim3(in.VolumeCB() / in.X(4), in.X(4), in.SiteSubset())),
         out(out),

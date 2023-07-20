@@ -14,8 +14,8 @@ namespace quda
     const ColorSpinorField &x;
     double m_f;
     double m_5;
-    const Complex *b_5;
-    const Complex *c_5;
+    const complex_t *b_5;
+    const complex_t *c_5;
     double a;
     bool dagger;
     bool xpay;
@@ -93,7 +93,7 @@ namespace quda
 
   public:
     Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
-            double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type) :
+            double m_5, const complex_t *b_5, const complex_t *c_5, double a, bool dagger, Dslash5Type type) :
       TunableKernel3D(in, in.X(4), in.SiteSubset()),
       out(out),
       in(in),
@@ -169,7 +169,7 @@ namespace quda
   // out = Dslash5*in
 #ifdef GPU_DOMAIN_WALL_DIRAC
   void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
-                    double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type)
+                    double m_5, const complex_t *b_5, const complex_t *c_5, double a, bool dagger, Dslash5Type type)
   {
     if (in.PCType() != QUDA_4D_PC) errorQuda("Only 4-d preconditioned fields are supported");
     checkLocation(out, in, x); // check all locations match
@@ -177,7 +177,7 @@ namespace quda
   }
 #else
   void ApplyDslash5(ColorSpinorField &, const ColorSpinorField &, const ColorSpinorField &, double,
-                    double, const Complex *, const Complex *, double, bool, Dslash5Type)
+                    double, const complex_t *, const complex_t *, double, bool, Dslash5Type)
   {
     errorQuda("Domain wall dslash has not been built");
   }

@@ -52,7 +52,7 @@ namespace quda {
     }
   };
 
-  void gaugeLoopTrace(const GaugeField& u, std::vector<Complex>& loop_traces, double factor, std::vector<int**>& input_path,
+  void gaugeLoopTrace(const GaugeField& u, std::vector<complex_t>& loop_traces, double factor, std::vector<int**>& input_path,
 		 std::vector<int>& length, std::vector<double>& path_coeff, int num_paths, int path_max_length)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
@@ -63,7 +63,7 @@ namespace quda {
     // gauge field must be passed as first argument so we peel off its reconstruct type
     instantiate<GaugeLoopTrace, ReconstructNo12>(u, tr_array, factor, p);
 
-    for (auto i = 0u; i < tr_array.size(); i++) { loop_traces[i] = Complex(tr_array[i][0], tr_array[i][1]); }
+    for (auto i = 0u; i < tr_array.size(); i++) { loop_traces[i] = complex_t(tr_array[i][0], tr_array[i][1]); }
 
     p.free();
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);

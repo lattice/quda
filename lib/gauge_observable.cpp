@@ -41,13 +41,13 @@ namespace quda
       for (int d = 0; d < 1; d++) { input_path_v[d] = param.input_path_buff; }
 
       // prepare trace storage
-      std::vector<Complex> loop_traces(param.num_paths);
+      std::vector<complex_t> loop_traces(param.num_paths);
 
       // actually do the computation
       gaugeLoopTrace(u, loop_traces, param.factor, input_path_v, path_length_v, loop_coeff_v, param.num_paths,
                      param.max_length);
 
-      for (int i = 0; i < param.num_paths; i++) { memcpy(param.traces + i, &loop_traces[i], sizeof(Complex)); }
+      for (int i = 0; i < param.num_paths; i++) { memcpy(param.traces + i, &loop_traces[i], sizeof(complex_t)); }
     }
 
     // no point constructing Fmunu unless we are going to use it

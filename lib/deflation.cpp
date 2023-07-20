@@ -10,8 +10,8 @@ namespace quda
   using namespace blas;
   using DynamicStride = Stride<Dynamic, Dynamic>;
 
-  static auto pinned_allocator = [] (size_t bytes ) { return static_cast<Complex*>(pool_pinned_malloc(bytes)); };
-  static auto pinned_deleter   = [] (Complex *hptr) { pool_pinned_free(hptr); };
+  static auto pinned_allocator = [] (size_t bytes ) { return static_cast<complex_t*>(pool_pinned_malloc(bytes)); };
+  static auto pinned_deleter   = [] (complex_t *hptr) { pool_pinned_free(hptr); };
 
   Deflation::Deflation(DeflationParam &param, TimeProfile &profile) :
     param(param),
@@ -83,7 +83,7 @@ namespace quda
     const int n_evs_to_print = param.cur_dim;
     if (n_evs_to_print == 0) errorQuda("Incorrect size of current deflation space");
 
-    std::unique_ptr<Complex, decltype(pinned_deleter) > projm( pinned_allocator(param.ld*param.cur_dim * sizeof(Complex)), pinned_deleter);
+    std::unique_ptr<complex_t, decltype(pinned_deleter) > projm( pinned_allocator(param.ld*param.cur_dim * sizeof(complex_t)), pinned_deleter);
 
 if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
       Map<MatrixXcd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
@@ -104,10 +104,10 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
       blas::caxpy(&projm.get()[i * param.ld], rv, res); // multiblas
       *r_sloppy = *r;
       param.matDeflation(*Av_sloppy, *r_sloppy);
-      double3 dotnorm = cDotProductNormA(*r_sloppy, *Av_sloppy);
-      double eval = dotnorm.x / dotnorm.z;
+      auto dotnorm = cDotProductNormA(*r_sloppy, *Av_sloppy);
+      double eval = dotnorm[0] / dotnorm[2];
       blas::xpay(*Av_sloppy, -eval, *r_sloppy);
-      double relerr = sqrt(norm2(*r_sloppy) / dotnorm.z);
+      double relerr = sqrt(norm2(*r_sloppy) / dotnorm[2]);
       printfQuda("Eigenvalue %d: %1.12e Residual: %1.12e\n", i + 1, eval, relerr);
     }
   }
@@ -120,7 +120,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
 
     if(param.cur_dim == 0) return;//nothing to do
 
-    std::unique_ptr<Complex[] > vec(new Complex[param.ld]);
+    std::unique_ptr<complex_t[] > vec(new complex_t[param.ld]);
 
     double check_nrm2 = norm2(b);
 
@@ -184,7 +184,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
     const int cdot_pipeline_length  = 4;
 
     for (int i = first_idx; i < (first_idx + n_ev); i++) {
-      std::unique_ptr<Complex[]> alpha(new Complex[i]);
+      std::unique_ptr<complex_t[]> alpha(new complex_t[i]);
 
       ColorSpinorField *accum = param.eig_global.cuda_prec_ritz != QUDA_DOUBLE_PRECISION ? r : &param.RV->Component(i);
       *accum = param.RV->Component(i);
@@ -246,10 +246,10 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
     }
 
     std::unique_ptr<double[]> evals(new double[param.cur_dim]);
-    std::unique_ptr<Complex, decltype(pinned_deleter)> projm(
-      pinned_allocator(param.ld * param.cur_dim * sizeof(Complex)), pinned_deleter);
+    std::unique_ptr<complex_t, decltype(pinned_deleter)> projm(
+      pinned_allocator(param.ld * param.cur_dim * sizeof(complex_t)), pinned_deleter);
 
-    memcpy(projm.get(), param.matProj, param.ld * param.cur_dim * sizeof(Complex));
+    memcpy(projm.get(), param.matProj, param.ld * param.cur_dim * sizeof(complex_t));
 
     if (param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB) {
       Map<MatrixXcd, Unaligned, DynamicStride> projm_(projm.get(), param.cur_dim, param.cur_dim,
@@ -298,10 +298,10 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
       if (do_residual_check) { // if tol=0.0 then disable relative residual norm check
         *r_sloppy = *r;
         param.matDeflation(*Av_sloppy, *r_sloppy);
-        double3 dotnorm = cDotProductNormA(*r_sloppy, *Av_sloppy);
-        double eval = dotnorm.x / dotnorm.z;
+        auto dotnorm = cDotProductNormA(*r_sloppy, *Av_sloppy);
+        auto eval = dotnorm[0] / dotnorm[2];
         blas::xpay(*Av_sloppy, -eval, *r_sloppy);
-        relerr = sqrt(norm2(*r_sloppy) / dotnorm.z);
+        relerr = sqrt(norm2(*r_sloppy) / dotnorm[2]);
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Eigenvalue: %1.12e Residual: %1.12e\n", eval, relerr);
       }
 

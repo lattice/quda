@@ -16,6 +16,9 @@
 
 namespace quda
 {
+
+  using MatrixX = Matrix<real_t, Dynamic, Dynamic>;
+
   // Thick Restarted Lanczos Method constructor
   TRLM::TRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
     EigenSolver(mat, eig_param, profile)
@@ -37,7 +40,7 @@ namespace quda
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
-  void TRLM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals)
+  void TRLM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals)
   {
     // Override any user input for block size.
     block_size = 1;
@@ -64,8 +67,8 @@ namespace quda
     checkChebyOpMax(kSpace);
 
     // Convergence and locking criteria
-    double mat_norm = 0.0;
-    double epsilon = setEpsilon(kSpace[0].Precision());
+    real_t mat_norm = 0.0;
+    real_t epsilon = setEpsilon(kSpace[0].Precision());
 
     // Print Eigensolver params
     printEigensolverSetup();
@@ -88,14 +91,14 @@ namespace quda
 
       // mat_norm is updated.
       for (int i = num_locked; i < n_kr; i++)
-        if (fabs(alpha[i]) > mat_norm) mat_norm = fabs(alpha[i]);
+        if (abs(alpha[i]) > mat_norm) mat_norm = abs(alpha[i]);
 
       // Locking check
       iter_locked = 0;
       for (int i = 1; i < (n_kr - num_locked); i++) {
         if (residua[i + num_locked] < epsilon * mat_norm) {
-          logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
-                  epsilon * mat_norm);
+          logQuda(QUDA_DEBUG_VERBOSE, "**** Locking %d resid=%+.6e condition=%.6e ****\n", i, double(residua[i + num_locked]),
+                  double(epsilon * mat_norm));
           iter_locked = i;
         } else {
           // Unlikely to find new locked pairs
@@ -107,8 +110,8 @@ namespace quda
       iter_converged = iter_locked;
       for (int i = iter_locked + 1; i < n_kr - num_locked; i++) {
         if (residua[i + num_locked] < tol * mat_norm) {
-          logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
-                  tol * mat_norm);
+          logQuda(QUDA_DEBUG_VERBOSE, "**** Converged %d resid=%+.6e condition=%.6e ****\n", i, double(residua[i + num_locked]),
+                  double(tol * mat_norm));
           iter_converged = i;
         } else {
           // Unlikely to find new converged pairs
@@ -135,7 +138,7 @@ namespace quda
       logQuda(QUDA_DEBUG_VERBOSE, "num_keep = %d\n", num_keep);
       logQuda(QUDA_DEBUG_VERBOSE, "num_locked = %d\n", num_locked);
       for (int i = 0; i < n_kr; i++) {
-        logQuda(QUDA_DEBUG_VERBOSE, "Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
+        logQuda(QUDA_DEBUG_VERBOSE, "Ritz[%d] = %.16e residual[%d] = %.16e\n", i, double(alpha[i]), i, double(residua[i]));
       }
 
       // Check for convergence
@@ -167,7 +170,7 @@ namespace quda
 
       // Dump all Ritz values and residua if using Chebyshev
       for (int i = 0; i < n_conv && eig_param->use_poly_acc; i++) {
-        logQuda(QUDA_SUMMARIZE, "RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
+        logQuda(QUDA_SUMMARIZE, "RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, double(alpha[i]), 0.0, double(residua[i]));
       }
 
       // Compute eigenvalues/singular values
@@ -198,7 +201,7 @@ namespace quda
     int start = (j > num_keep) ? j - 1 : 0;
 
     if (j - start > 0) {
-      std::vector<double> beta_ = {beta.begin() + start, beta.begin() + j};
+      std::vector<real_t> beta_ = {beta.begin() + start, beta.begin() + j};
       for (auto & bi : beta_) bi = -bi;
 
       // r = r - b_{j-1} * v_{j-1}
@@ -250,7 +253,7 @@ namespace quda
     int arrow_pos = num_keep - num_locked;
 
     // Eigen objects
-    MatrixXd A = MatrixXd::Zero(dim, dim);
+    MatrixX A = MatrixX::Zero(dim, dim);
     ritz_mat.resize(dim * dim, 0.0);
 
     // Invert the spectrum due to chebyshev
@@ -284,7 +287,7 @@ namespace quda
     }
 
     // Eigensolve the arrow matrix
-    SelfAdjointEigenSolver<MatrixXd> eigensolver;
+    SelfAdjointEigenSolver<MatrixX> eigensolver;
     eigensolver.compute(A);
 
     // repopulate ritz matrix
@@ -292,7 +295,7 @@ namespace quda
       for (int j = 0; j < dim; j++) ritz_mat[dim * i + j] = eigensolver.eigenvectors().col(i)[j];
 
     for (int i = 0; i < dim; i++) {
-      residua[i + num_locked] = fabs(beta[n_kr - 1] * eigensolver.eigenvectors().col(i)[dim - 1]);
+      residua[i + num_locked] = abs(beta[n_kr - 1] * eigensolver.eigenvectors().col(i)[dim - 1]);
       // Update the alpha array
       alpha[i + num_locked] = eigensolver.eigenvalues()[i];
     }
@@ -311,7 +314,7 @@ namespace quda
     int dim = n_kr - num_locked;
 
     // Multi-BLAS friendly array to store part of Ritz matrix we want
-    std::vector<double> ritz_mat_keep(dim * iter_keep);
+    std::vector<real_t> ritz_mat_keep(dim * iter_keep);
     for (int j = 0; j < dim; j++) {
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j]; }
     }

@@ -113,8 +113,8 @@ namespace quda
 
           if (param.global_reduction) {
             auto Ar4 = blas::cDotProductNormAB(Ar, r_sloppy);
-            Complex alpha = Complex(Ar4.x, Ar4.y) / Ar4.z;
-            r2 = Ar4.w;
+            auto alpha = complex_t(Ar4[0], Ar4[1]) / Ar4[2];
+            r2 = Ar4[3];
             PrintStats("MR (inner)", iter, r2, b2, 0.0);
 
             // x += omega*alpha*r, r -= omega*alpha*Ar, r2 = blas::norm2(r)

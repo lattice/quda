@@ -260,3 +260,6 @@ static_assert(QUDA_ORDER_FP_MG == 2 || QUDA_ORDER_FP_MG == 4 || QUDA_ORDER_FP_MG
 #if !defined(QUDA_TARGET_CUDA) && !defined(QUDA_TARGET_HIP) && !defined(QUDA_TARGET_SYCL)
 #error "No QUDA_TARGET selected"
 #endif
+
+#cmakedefine QUDA_SCALAR_TYPE @QUDA_SCALAR_TYPE@
+#cmakedefine QUDA_REDUCTION_TYPE @QUDA_REDUCTION_TYPE@

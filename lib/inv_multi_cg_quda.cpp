@@ -298,8 +298,8 @@ namespace quda {
       r2_old_array[0] = r2_old;
 
       auto cg_norm = blas::axpyCGNorm(-alpha[j_low], Ap, r_sloppy);
-      r2[0] = cg_norm.x;
-      double zn = cg_norm.y;
+      r2[0] = cg_norm[0];
+      double zn = cg_norm[1];
 
       // reliable update conditions
       rNorm[0] = sqrt(r2[0]);
@@ -370,7 +370,7 @@ namespace quda {
 
 	// explicitly restore the orthogonality of the gradient vector
 	for (int j=0; j<num_offset_now; j++) {
-          Complex rp = blas::cDotProduct(r_sloppy, p[j]) / (r2[0]);
+          auto rp = blas::cDotProduct(r_sloppy, p[j]) / (r2[0]);
           blas::caxpy(-rp, r_sloppy, p[j]);
         }
 
@@ -462,7 +462,7 @@ namespace quda {
           }
           double true_res = blas::xmyNorm(b, r);
           param.true_res_offset[i] = sqrt(true_res / b2);
-          param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(x[i], r).z);
+          param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(x[i], r)[2]);
         } else {
           param.true_res_offset[i] = std::numeric_limits<double>::infinity();
           param.true_res_hq_offset[i] = std::numeric_limits<double>::infinity();

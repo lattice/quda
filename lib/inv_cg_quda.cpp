@@ -125,9 +125,9 @@ namespace quda {
 
       double r2;
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-        double3 h3 = blas::HeavyQuarkResidualNorm(x, xp);
-        r2 = h3.y;
-        param.true_res_hq = sqrt(h3.z);
+        auto h3 = blas::HeavyQuarkResidualNorm(x, xp);
+        r2 = h3[1];
+        param.true_res_hq = sqrt(h3[2]);
       } else {
         r2 = blas::norm2(xp);
       }
@@ -195,9 +195,9 @@ namespace quda {
       if (param.compute_true_res) {
         double r2;
         if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-          double3 h3 = blas::HeavyQuarkResidualNorm(x, br);
-          r2 = h3.y;
-          param.true_res_hq = sqrt(h3.z);
+          auto h3 = blas::HeavyQuarkResidualNorm(x, br);
+          r2 = h3[1];
+          param.true_res_hq = sqrt(h3[2]);
         } else {
           r2 = blas::norm2(br);
         }
@@ -350,7 +350,7 @@ namespace quda {
     double r2_old = 0.0;
     if (r2_old_init != 0.0 and p_init) {
       r2_old = r2_old_init;
-      Complex rp = blas::cDotProduct(rSloppy, x_update_batch.get_current_field()) / (r2);
+      auto rp = blas::cDotProduct(rSloppy, x_update_batch.get_current_field()) / (r2);
       blas::caxpy(-rp, rSloppy, x_update_batch.get_current_field());
       beta = r2 / r2_old;
       blas::xpayz(rSloppy, beta, x_update_batch.get_current_field(), x_update_batch.get_current_field());
@@ -371,7 +371,7 @@ namespace quda {
     double heavy_quark_res_old = 0.0;  // heavy quark residual
 
     if (use_heavy_quark_res) {
-      heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+      heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
       heavy_quark_res_old = heavy_quark_res;   // heavy quark residual
     }
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
@@ -420,14 +420,14 @@ namespace quda {
       if (advanced_feature && param.pipeline) {
         double Ap2;
         if(alternative_reliable){
-          double4 quadruple = blas::quadrupleCGReduction(rSloppy, Ap, x_update_batch.get_current_field());
-          r2 = quadruple.x;
-          Ap2 = quadruple.y;
-          pAp = quadruple.z;
-          ru.update_ppnorm(quadruple.w);
+          auto quadruple = blas::quadrupleCGReduction(rSloppy, Ap, x_update_batch.get_current_field());
+          r2 = quadruple[0];
+          Ap2 = quadruple[1];
+          pAp = quadruple[2];
+          ru.update_ppnorm(quadruple[3]);
         } else {
-          double3 triplet = blas::tripleCGReduction(rSloppy, Ap, x_update_batch.get_current_field());
-          r2 = triplet.x; Ap2 = triplet.y; pAp = triplet.z;
+          auto triplet = blas::tripleCGReduction(rSloppy, Ap, x_update_batch.get_current_field());
+          r2 = triplet[0]; Ap2 = triplet[1]; pAp = triplet[2];
         }
         r2_old = r2;
         x_update_batch.get_current_alpha() = r2 / pAp;
@@ -444,9 +444,9 @@ namespace quda {
 
         // alternative reliable updates,
         if (advanced_feature && alternative_reliable) {
-          double3 pAppp = blas::cDotProductNormA(x_update_batch.get_current_field(), Ap);
-          pAp = pAppp.x;
-          ru.update_ppnorm(pAppp.z);
+          auto pAppp = blas::cDotProductNormA(x_update_batch.get_current_field(), Ap);
+          pAp = pAppp[0];
+          ru.update_ppnorm(pAppp[2]);
         } else {
           pAp = blas::reDotProduct(x_update_batch.get_current_field(), Ap);
         }
@@ -455,8 +455,8 @@ namespace quda {
 
         // here we are deploying the alternative beta computation
         auto cg_norm = blas::axpyCGNorm(-x_update_batch.get_current_alpha(), Ap, rSloppy);
-        r2 = cg_norm.x;  // (r_new, r_new)
-        sigma = cg_norm.y >= 0.0 ? cg_norm.y : r2;  // use r2 if (r_k+1, r_k+1-r_k) breaks
+        r2 = cg_norm[0];  // (r_new, r_new)
+        sigma = cg_norm[1] >= 0.0 ? cg_norm[1] : r2;  // use r2 if (r_k+1, r_k+1-r_k) breaks
       }
 
       // reliable update conditions
@@ -502,10 +502,10 @@ namespace quda {
         if (use_heavy_quark_res && k % heavy_quark_check == 0) {
           if (&x != &xSloppy) {
             blas::copy(tmp, y);
-            heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
+            heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy)[2]);
           } else {
             blas::copy(r, rSloppy);
-            heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
+            heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r)[2]);
           }
         }
 
@@ -539,7 +539,7 @@ namespace quda {
         if (advanced_feature) { ru.update_norm(r2, y); }
 
         // calculate new reliable HQ resididual
-        if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
+        if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r)[3]);
 
         if (advanced_feature) {
           if (ru.reliable_break(r2, stop, L2breakdown, L2breakdown_eps)) { break; }
@@ -557,7 +557,7 @@ namespace quda {
           heavy_quark_restart = false;
         } else {
           // explicitly restore the orthogonality of the gradient vector
-          Complex rp = blas::cDotProduct(rSloppy, x_update_batch.get_current_field()) / (r2);
+          auto rp = blas::cDotProduct(rSloppy, x_update_batch.get_current_field()) / (r2);
           blas::caxpy(-rp, rSloppy, x_update_batch.get_current_field());
 
           beta = r2 / r2_old;
@@ -619,7 +619,7 @@ namespace quda {
       // compute the true residuals
       mat(r, x);
       param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
-      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r)[3]);
     }
 
     PrintSummary("CG", k, r2, b2, stop, param.tol_hq);
@@ -759,7 +759,7 @@ namespace quda {
     MatrixXcd C = MatrixXcd::Zero(param.num_src, param.num_src);
     MatrixXcd S = MatrixXcd::Identity(param.num_src, param.num_src);
     MatrixXcd pAp = MatrixXcd::Identity(param.num_src, param.num_src);
-    quda::Complex *AC = new quda::Complex[param.num_src * param.num_src];
+    complex_t *AC = new complex_t[param.num_src * param.num_src];
 
 #ifdef MWVERBOSE
     MatrixXcd pTp = MatrixXcd::Identity(param.num_src, param.num_src);
@@ -947,7 +947,7 @@ namespace quda {
     for (int i = 0; i < param.num_src; i++) {
       mat(r.Component(i), x.Component(i));
       param.true_res = sqrt(blas::xmyNorm(b.Component(i), r.Component(i)) / b2[i]);
-      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i)).z);
+      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i))[3]);
       param.true_res_offset[i] = param.true_res;
       param.true_res_hq_offset[i] = param.true_res_hq;
 
@@ -1107,7 +1107,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   for(int i = 0; i < param.num_src; i++){
     stop[i] = stopping(param.tol, b2[i], param.residual_type);  // stopping condition of solver
     if (use_heavy_quark_res) {
-      heavy_quark_res[i] = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i)).z);
+      heavy_quark_res[i] = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i))[3]);
       heavy_quark_res_old[i] = heavy_quark_res[i];   // heavy quark residual
     }
   }
@@ -1361,12 +1361,12 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         if (&x != &xSloppy) {
           blas::copy(tmp, y);   //  FIXME: check whether copy works here
           for(int i=0; i<param.num_src; i++){
-            heavy_quark_res[i] = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy.Component(i), tmp.Component(i), rSloppy.Component(i)).z);
+            heavy_quark_res[i] = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy.Component(i), tmp.Component(i), rSloppy.Component(i))[3]);
           }
         } else {
           blas::copy(r, rSloppy);  //  FIXME: check whether copy works here
           for(int i=0; i<param.num_src; i++){
-            heavy_quark_res[i] = sqrt(blas::xpyHeavyQuarkResidualNorm(x.Component(i), y.Component(i), r.Component(i)).z);
+            heavy_quark_res[i] = sqrt(blas::xpyHeavyQuarkResidualNorm(x.Component(i), y.Component(i), r.Component(i))[3]);
           }
         }
       }
@@ -1397,7 +1397,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       // calculate new reliable HQ resididual
       if (use_heavy_quark_res){
         for(int i=0; i<param.num_src; i++){
-          heavy_quark_res[i] = sqrt(blas::HeavyQuarkResidualNorm(y.Component(i), r.Component(i)).z);
+          heavy_quark_res[i] = sqrt(blas::HeavyQuarkResidualNorm(y.Component(i), r.Component(i))[3]);
         }
       }
 
@@ -1516,7 +1516,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   for(int i=0; i<param.num_src; i++){
     mat(r.Component(i), x.Component(i));
     param.true_res = sqrt(blas::xmyNorm(b.Component(i), r.Component(i)) / b2[i]);
-    param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i)).z);
+    param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i))[3]);
     param.true_res_offset[i] = param.true_res;
     param.true_res_hq_offset[i] = param.true_res_hq;
 

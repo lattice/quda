@@ -12,7 +12,7 @@ namespace quda
     template <>
     void apply_fused_dslash_impl<Ls>(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                                      ColorSpinorField &y, const ColorSpinorField &x, double m_f, double m_5,
-                                     const Complex *b_5, const Complex *c_5, bool dagger, int parity, int shift[4],
+                                     const complex_t *b_5, const complex_t *c_5, bool dagger, int parity, int shift[4],
                                      int halo_shift[4], MdwfFusedDslashType type)
     {
       checkLocation(out, in); // check all locations match
@@ -22,8 +22,8 @@ namespace quda
 #else
     template <>
     void apply_fused_dslash_impl<Ls>(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
-                                     ColorSpinorField &, const ColorSpinorField &, double, double, const Complex *,
-                                     const Complex *, bool, int, int[4], int[4], MdwfFusedDslashType)
+                                     ColorSpinorField &, const ColorSpinorField &, double, double, const complex_t *,
+                                     const complex_t *, bool, int, int[4], int[4], MdwfFusedDslashType)
     {
       errorQuda("Domain wall dslash with tensor cores has not been built");
     }

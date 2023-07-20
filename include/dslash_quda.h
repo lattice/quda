@@ -577,41 +577,41 @@ namespace quda
   */
 
   void ApplyDomainWall4D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
-                         const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
+                         const complex_t *b_5, const complex_t *c_5, const ColorSpinorField &x, int parity, bool dagger,
                          const int *comm_override, TimeProfile &profile);
 
   void ApplyDomainWall4DM5inv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                              double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                              double m_5, const complex_t *b_5, const complex_t *c_5, const ColorSpinorField &x,
                               ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
                               TimeProfile &profile);
 
   void ApplyDomainWall4DM5pre(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                              double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                              double m_5, const complex_t *b_5, const complex_t *c_5, const ColorSpinorField &x,
                               ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
                               TimeProfile &profile);
 
   void ApplyDomainWall4DM5invM5pre(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                                   double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                                   double m_5, const complex_t *b_5, const complex_t *c_5, const ColorSpinorField &x,
                                    ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
                                    TimeProfile &profile);
 
   void ApplyDomainWall4DM5preM5inv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                                   double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                                   double m_5, const complex_t *b_5, const complex_t *c_5, const ColorSpinorField &x,
                                    ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
                                    TimeProfile &profile);
 
   void ApplyDomainWall4DM5invM5inv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                                   double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                                   double m_5, const complex_t *b_5, const complex_t *c_5, const ColorSpinorField &x,
                                    ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
                                    TimeProfile &profile);
 
   void ApplyDomainWall4DM5mob(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                              double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                              double m_5, const complex_t *b_5, const complex_t *c_5, const ColorSpinorField &x,
                               ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
                               TimeProfile &profile);
 
   void ApplyDomainWall4DM5preM5mob(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                                   double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                                   double m_5, const complex_t *b_5, const complex_t *c_5, const ColorSpinorField &x,
                                    ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
                                    TimeProfile &profile);
   /**
@@ -630,13 +630,13 @@ namespace quda
      @param[in] type Type of dslash we are applying
   */
   void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
-                    double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type);
+                    double m_5, const complex_t *b_5, const complex_t *c_5, double a, bool dagger, Dslash5Type type);
 
   // The EOFA stuff
   namespace mobius_eofa
   {
     void apply_dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
-                       double m_5, const Complex *b_5, const Complex *c_5, double a, int eofa_pm, double inv,
+                       double m_5, const complex_t *b_5, const complex_t *c_5, double a, int eofa_pm, double inv,
                        double kappa, const double *eofa_u, const double *eofa_x, const double *eofa_y,
                        double sherman_morrison, bool dagger, Dslash5Type type);
   }

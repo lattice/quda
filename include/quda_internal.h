@@ -50,10 +50,24 @@
 #include <device.h>
 #include <array.h>
 #include "timer.h"
+#include "dbldbl.h"
 
 namespace quda {
 
-  using Complex = std::complex<double>;
+  /**
+     Precision of scalar real variables on the host
+  */
+  using real_t = QUDA_SCALAR_TYPE;
+
+  /**
+     Precision of scalar complex variables on the host
+  */
+  using complex_t = std::complex<real_t>;
+
+  /**
+     Sum reduction type
+  */
+  using device_reduce_t = QUDA_REDUCTION_TYPE;
 
   /**
      Array object type used to storing lattice dimensions

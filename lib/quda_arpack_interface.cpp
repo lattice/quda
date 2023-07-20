@@ -28,7 +28,7 @@ namespace quda
   void arpackErrorHelpNAUPD();
   void arpackErrorHelpNEUPD();
 
-  void arpack_solve(std::vector<ColorSpinorField> &h_evecs, std::vector<Complex> &h_evals, const DiracMatrix &mat,
+  void arpack_solve(std::vector<ColorSpinorField> &h_evecs, std::vector<complex_t> &h_evals, const DiracMatrix &mat,
                     QudaEigParam *eig_param, TimeProfile &profile)
   {
     // Create Eigensolver object for member function use
@@ -105,23 +105,23 @@ namespace quda
     double tol_ = eig_param->tol;
 
     // ARPACK workspace
-    Complex I(0.0, 1.0);
-    std::vector<Complex> resid_(ldv_);
+    complex_t I(0.0, 1.0);
+    std::vector<complex_t> resid_(ldv_);
 
     // Use initial guess?
     if (info_ > 0) {
       for (int a = 0; a < ldv_; a++) resid_[a] = drand48();
     }
 
-    Complex sigma_ = 0.0;
-    std::vector<Complex> w_workd_(3 * ldv_);
-    std::vector<Complex> w_workl_(lworkl_);
-    std::vector<Complex> w_workev_(2 * n_kr_);
+    complex_t sigma_ = 0.0;
+    std::vector<complex_t> w_workd_(3 * ldv_);
+    std::vector<complex_t> w_workl_(lworkl_);
+    std::vector<complex_t> w_workev_(2 * n_kr_);
     std::vector<double> w_rwork_(n_kr_);
     std::vector<int> select_(n_kr_);
 
-    std::vector<Complex> h_evecs_(n_kr_ * ldv_);
-    std::vector<Complex> h_evals_(n_ev_);
+    std::vector<complex_t> h_evecs_(n_kr_ * ldv_);
+    std::vector<complex_t> h_evals_(n_ev_);
 
     // create container wrapping the vectors returned from ARPACK
     ColorSpinorParam param(h_evecs[0]);
@@ -350,7 +350,7 @@ namespace quda
 
     // Sort the eigenvalues. To do this we use the QUDA EigenSolver method, which
     // requires transferring data to std::vector arrays.
-    std::vector<Complex> evals(nconv, 0.0);
+    std::vector<complex_t> evals(nconv, 0.0);
     std::vector<int> arpack_index(nconv, 0.0);
     for (int i = 0; i < nconv; i++) {
       evals[i] = h_evals_[i];
@@ -411,7 +411,7 @@ namespace quda
 	// d_v2 = M*v = lambda_measured * v
 	mat(d_v2, d_v);
 	// d_v = ||lambda_measured*v - lambda_arpack*v||
-	blas::caxpby(Complex {1.0, 0.0}, d_v2, -evals[i], d_v);
+	blas::caxpby(complex_t {1.0, 0.0}, d_v2, -evals[i], d_v);
 	double L2norm = blas::norm2(d_v);
 	profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
@@ -538,7 +538,7 @@ namespace quda
 
 #else
 
-  void arpack_solve(std::vector<ColorSpinorField> &, std::vector<Complex> &, const DiracMatrix &, QudaEigParam *,
+  void arpack_solve(std::vector<ColorSpinorField> &, std::vector<complex_t> &, const DiracMatrix &, QudaEigParam *,
                     TimeProfile &)
   {
     errorQuda("(P)ARPACK has not been enabled for this build");

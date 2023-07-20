@@ -9,8 +9,8 @@ namespace quda {
 
   DiracMobius::DiracMobius(const DiracParam &param) : DiracDomainWall(param), zMobius(false)
   {
-    memcpy(b_5, param.b_5, sizeof(Complex) * param.Ls);
-    memcpy(c_5, param.c_5, sizeof(Complex) * param.Ls);
+    memcpy(b_5, param.b_5, sizeof(complex_t) * param.Ls);
+    memcpy(c_5, param.c_5, sizeof(complex_t) * param.Ls);
 
     double b = b_5[0].real();
     double c = c_5[0].real();

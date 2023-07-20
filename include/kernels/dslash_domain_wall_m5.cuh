@@ -110,25 +110,25 @@ namespace quda
 
     coeff_5<real> coeff; // constant buffer used for Mobius coefficients for CPU kernel
 
-    void compute_coeff_mobius_pre(const Complex *b_5, const Complex *c_5)
+    void compute_coeff_mobius_pre(const complex_t *b_5, const complex_t *c_5)
     {
       // out = (b + c * D5) * in
       for (int s = 0; s < Ls; s++) {
         coeff.beta[s] = b_5[s];
-        coeff.alpha[s] = 0.5 * c_5[s]; // 0.5 from gamma matrices
+        coeff.alpha[s] = 0.5 * complex<double>(c_5[s]); // 0.5 from gamma matrices
         // xpay
-        coeff.a[s] = 0.5 / (b_5[s] * (m_5 + 4.0) + 1.0);
+        coeff.a[s] = 0.5 / (complex<double>(b_5[s]) * (m_5 + 4.0) + 1.0);
         coeff.a[s] *= coeff.a[s] * static_cast<real>(a); // kappa_b * kappa_b * a
       }
     }
 
-    void compute_coeff_mobius(const Complex *b_5, const Complex *c_5)
+    void compute_coeff_mobius(const complex_t *b_5, const complex_t *c_5)
     {
       // out = (1 + kappa * D5) * in
       for (int s = 0; s < Ls; s++) {
-        coeff.kappa[s] = 0.5 * (c_5[s] * (m_5 + 4.0) - 1.0) / (b_5[s] * (m_5 + 4.0) + 1.0); // 0.5 from gamma matrices
+        coeff.kappa[s] = 0.5 * (complex<double>(c_5[s]) * (m_5 + 4.0) - 1.0) / (complex<double>(b_5[s]) * (m_5 + 4.0) + 1.0); // 0.5 from gamma matrices
         // axpy
-        coeff.a[s] = 0.5 / (b_5[s] * (m_5 + 4.0) + 1.0);
+        coeff.a[s] = 0.5 / (complex<double>(b_5[s]) * (m_5 + 4.0) + 1.0);
         coeff.a[s] *= coeff.a[s] * static_cast<real>(a); // kappa_b * kappa_b * a
       }
     }
@@ -139,33 +139,33 @@ namespace quda
       inv = 0.5 / (1.0 + std::pow(kappa, (int)Ls) * m_f);
     }
 
-    void compute_coeff_m5inv_mobius(const Complex *b_5, const Complex *c_5)
+    void compute_coeff_m5inv_mobius(const complex_t *b_5, const complex_t *c_5)
     {
       // out = (1 + kappa * D5)^-1 * in = M5inv * in
-      kappa = -(c_5[0].real() * (4.0 + m_5) - 1.0) / (b_5[0].real() * (4.0 + m_5) + 1.0); // kappa = kappa_b / kappa_c
+      kappa = -(double(c_5[0].real()) * (4.0 + m_5) - 1.0) / (double(b_5[0].real()) * (4.0 + m_5) + 1.0); // kappa = kappa_b / kappa_c
       inv = 0.5 / (1.0 + std::pow(kappa, (int)Ls) * m_f);                                 // 0.5 from gamma matrices
-      a *= pow(0.5 / (b_5[0].real() * (m_5 + 4.0) + 1.0), 2);                             // kappa_b * kappa_b * a
+      a *= pow(0.5 / (double(b_5[0].real()) * (m_5 + 4.0) + 1.0), 2);                             // kappa_b * kappa_b * a
     }
 
-    void compute_coeff_m5inv_zmobius(const Complex *b_5, const Complex *c_5)
+    void compute_coeff_m5inv_zmobius(const complex_t *b_5, const complex_t *c_5)
     {
       // out = (1 + kappa * D5)^-1 * in = M5inv * in
       // Similar to mobius convention, but variadic across 5th dim
       complex<real> k = 1.0;
       for (int s = 0; s < Ls; s++) {
-        coeff.kappa[s] = -(c_5[s] * (4.0 + m_5) - 1.0) / (b_5[s] * (4.0 + m_5) + 1.0);
+        coeff.kappa[s] = -(complex<double>(c_5[s]) * (4.0 + m_5) - 1.0) / (complex<double>(b_5[s]) * (4.0 + m_5) + 1.0);
         k *= coeff.kappa[s];
       }
       coeff.inv = static_cast<real>(0.5) / (static_cast<real>(1.0) + k * m_f);
 
       for (int s = 0; s < Ls; s++) { // axpy coefficients
-        coeff.a[s] = 0.5 / (b_5[s] * (m_5 + 4.0) + 1.0);
+        coeff.a[s] = 0.5 / (complex<double>(b_5[s]) * (m_5 + 4.0) + 1.0);
         coeff.a[s] *= coeff.a[s] * static_cast<real>(a);
       }
     }
 
-    Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f, double m_5,
-               const Complex *b_5, const Complex *c_5, double a_) :
+    Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, real_t m_f, real_t m_5,
+               const complex_t *b_5, const complex_t *c_5, real_t a_) :
       kernel_param(dim3(in.VolumeCB() / in.X(4), in.X(4), in.SiteSubset())),
       out(out),
       in(in),

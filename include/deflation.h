@@ -28,7 +28,7 @@ namespace quda {
     DiracMatrix &matDeflation;
 
     /** Host  projection matrix (e.g. eigCG VH A V) */
-    Complex *matProj; 
+    complex_t *matProj;
 
     /** projection matrix leading dimension */
     int ld;
@@ -56,7 +56,7 @@ namespace quda {
         tot_dim      = param.np;
         ld           = ((tot_dim+15) / 16) * tot_dim;
         //allocate deflation resources:
-        matProj = static_cast<Complex *>(pool_pinned_malloc(ld * tot_dim * sizeof(Complex)));
+        matProj = static_cast<complex_t *>(pool_pinned_malloc(ld * tot_dim * sizeof(complex_t)));
         invRitzVals  = new double[tot_dim];
 
         //Check that RV is a composite field:

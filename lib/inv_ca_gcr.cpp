@@ -66,10 +66,10 @@ namespace quda
     } // init
   }
 
-  void CAGCR::solve(std::vector<Complex> &psi_, std::vector<ColorSpinorField> &q, ColorSpinorField &b)
+  void CAGCR::solve(std::vector<complex_t> &psi_, std::vector<ColorSpinorField> &q, ColorSpinorField &b)
   {
-    typedef Matrix<Complex, Dynamic, Dynamic> matrix;
-    typedef Matrix<Complex, Dynamic, 1> vector;
+    typedef Matrix<complex_t, Dynamic, Dynamic> matrix;
+    typedef Matrix<complex_t, Dynamic, 1> vector;
 
     const int N = q.size();
     vector phi(N), psi(N);
@@ -80,7 +80,7 @@ namespace quda
     // compute rhs vector phi = Q* b = (q_i, b)
 
     // Construct the matrix Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
-    std::vector<Complex> A_(N * (N + 1));
+    std::vector<complex_t> A_(N * (N + 1));
 
     blas::cDotProduct(A_, q, {q, b});
     for (int i = 0; i < N; i++) {
@@ -90,12 +90,12 @@ namespace quda
 #else
     // two reductions but uses the Hermitian block dot product
     // compute rhs vector phi = Q* b = (q_i, b)
-    std::vector<Complex> phi_(N);
+    std::vector<complex_t> phi_(N);
     blas::cDotProduct(phi_, q, b);
     for (int i = 0; i < N; i++) phi(i) = phi_[i];
 
     // Construct the matrix Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
-    std::vector<Complex> A_(N * N);
+    std::vector<complex_t> A_(N * N);
     blas::hDotProduct(A_, q, q);
     for (int i = 0; i < N; i++)
       for (int j = 0; j < N; j++) A(i, j) = A_[i * N + j];
@@ -262,7 +262,7 @@ namespace quda
     const int maxResIncreaseTotal = param.max_res_increase_total;
 
     double heavy_quark_res = 0.0; // heavy quark residual
-    if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+    if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
 
     int resIncrease = 0;
     int resIncreaseTotal = 0;
@@ -326,7 +326,7 @@ namespace quda
           maxr_deflate = sqrt(r2);
         }
 
-        if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+        if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
 
         // break-out check if we have reached the limit of the precision
         if (r2 > r2_old) {
@@ -371,7 +371,7 @@ namespace quda
       double true_res = blas::xmyNorm(b, r);
       param.true_res = sqrt(true_res / b2);
       param.true_res_hq
-        = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? sqrt(blas::HeavyQuarkResidualNorm(x, r).z) : 0.0;
+        = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]) : 0.0;
     }
 
     if (!param.is_preconditioner) {

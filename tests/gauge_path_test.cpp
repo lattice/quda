@@ -315,7 +315,7 @@ void gauge_loop_test()
   // 6 loops of length 4, 12 loops of length 6 + 18 paths worth of traces and rescales
   int flops = (4 * 6 + 6 * 12) * 198 + 18 * 8;
 
-  std::vector<quda::Complex> traces_ref(num_paths);
+  std::vector<quda::complex_t> traces_ref(num_paths);
 
   if (verify_results) {
     gauge_loop_trace_reference(U_qdp, traces_ref, scale_factor, trace_path_p,
@@ -334,7 +334,7 @@ void gauge_loop_test()
 
     // Second check: we can reconstruct the plaquette from the first six loops we calculated
     double plaq_factor = 1. / (V * U_qdp.Ncolor() * quda::comm_size());
-    std::vector<quda::Complex> plaq_components(6);
+    std::vector<quda::complex_t> plaq_components(6);
     for (int i = 0; i < 6; i++) plaq_components[i] = traces_ref[i] / trace_loop_coeff_d[i] / scale_factor * plaq_factor;
 
     double plaq_loop[3];

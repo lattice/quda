@@ -150,14 +150,14 @@ namespace quda {
       instantiate<axy_, Blas, false>(a, 0.0, 0.0, x, y, y, y, y);
     }
 
-    void caxpy(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y)
+    void caxpy(const complex_t &a, const ColorSpinorField &x, ColorSpinorField &y)
     {
-      instantiate<caxpy_, Blas, true>(a, Complex(0.0), Complex(0.0), x, y, x, x, y);
+      instantiate<caxpy_, Blas, true>(a, complex_t(0.0), complex_t(0.0), x, y, x, x, y);
     }
 
-    void caxpby(const Complex &a, const ColorSpinorField &x, const Complex &b, ColorSpinorField &y)
+    void caxpby(const complex_t &a, const ColorSpinorField &x, const complex_t &b, ColorSpinorField &y)
     {
-      instantiate<caxpby_, Blas, false>(a, b, Complex(0.0), x, y, x, x, y);
+      instantiate<caxpby_, Blas, false>(a, b, complex_t(0.0), x, y, x, x, y);
     }
 
     void axpbypczw(double a, const ColorSpinorField &x, double b, const ColorSpinorField &y,
@@ -166,10 +166,10 @@ namespace quda {
       instantiate<axpbypczw_, Blas, false>(a, b, c, x, y, z, w, y);
     }
 
-    void cxpaypbz(const ColorSpinorField &x, const Complex &a, const ColorSpinorField &y,
-                  const Complex &b, ColorSpinorField &z)
+    void cxpaypbz(const ColorSpinorField &x, const complex_t &a, const ColorSpinorField &y,
+                  const complex_t &b, ColorSpinorField &z)
     {
-      instantiate<cxpaypbz_, Blas, false>(a, b, Complex(0.0), x, y, z, x, y);
+      instantiate<cxpaypbz_, Blas, false>(a, b, complex_t(0.0), x, y, z, x, y);
     }
 
     void axpyBzpcx(double a, ColorSpinorField& x, ColorSpinorField& y, double b, const ColorSpinorField& z, double c)
@@ -182,32 +182,32 @@ namespace quda {
       instantiate<axpyZpbx_, Blas, true>(a, b, 0.0, x, y, z, x, y);
     }
 
-    void caxpyBzpx(const Complex &a, ColorSpinorField &x, ColorSpinorField &y,
-                   const Complex &b, const ColorSpinorField &z)
+    void caxpyBzpx(const complex_t &a, ColorSpinorField &x, ColorSpinorField &y,
+                   const complex_t &b, const ColorSpinorField &z)
     {
-      instantiate<caxpyBzpx_, Blas, true>(a, b, Complex(0.0), x, y, z, x, y);
+      instantiate<caxpyBzpx_, Blas, true>(a, b, complex_t(0.0), x, y, z, x, y);
     }
 
-    void caxpyBxpz(const Complex &a, const ColorSpinorField &x, ColorSpinorField &y,
-                   const Complex &b, ColorSpinorField &z)
+    void caxpyBxpz(const complex_t &a, const ColorSpinorField &x, ColorSpinorField &y,
+                   const complex_t &b, ColorSpinorField &z)
     {
-      instantiate<caxpyBxpz_, Blas, true>(a, b, Complex(0.0), x, y, z, x, y);
+      instantiate<caxpyBxpz_, Blas, true>(a, b, complex_t(0.0), x, y, z, x, y);
     }
 
-    void caxpbypzYmbw(const Complex &a, const ColorSpinorField &x, const Complex &b,
+    void caxpbypzYmbw(const complex_t &a, const ColorSpinorField &x, const complex_t &b,
                       ColorSpinorField &y, ColorSpinorField &z, const ColorSpinorField &w)
     {
-      instantiate<caxpbypzYmbw_, Blas, false>(a, b, Complex(0.0), x, y, z, w, y);
+      instantiate<caxpbypzYmbw_, Blas, false>(a, b, complex_t(0.0), x, y, z, w, y);
     }
 
-    void cabxpyAx(double a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y)
+    void cabxpyAx(double a, const complex_t &b, ColorSpinorField &x, ColorSpinorField &y)
     {
-      instantiate<cabxpyAx_, Blas, false>(Complex(a), b, Complex(0.0), x, y, x, x, y);
+      instantiate<cabxpyAx_, Blas, false>(complex_t(a), b, complex_t(0.0), x, y, x, x, y);
     }
 
-    void caxpyXmaz(const Complex &a, ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &z)
+    void caxpyXmaz(const complex_t &a, ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &z)
     {
-      instantiate<caxpyxmaz_, Blas, false>(a, Complex(0.0), Complex(0.0), x, y, z, x, y);
+      instantiate<caxpyxmaz_, Blas, false>(a, complex_t(0.0), complex_t(0.0), x, y, z, x, y);
     }
 
     void caxpyXmazMR(const double &a, ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &z)

@@ -12,7 +12,7 @@ namespace quda {
     class MultiReduce : public TunableMultiReduction
     {
       using real = typename mapper<y_store_t>::type;
-      using host_reduce_t = typename Reducer<double, real>::reduce_t;
+      using host_reduce_t = typename Reducer<real_t, real>::reduce_t;
       const int NXZ;
       const int NYW;
       Reducer<device_reduce_t, real> r;
@@ -596,14 +596,14 @@ namespace quda {
       void postTune() override {} // FIXME - use write to determine what needs to be saved
     };
 
-    void reDotProduct(std::vector<double> &result, cvector_ref<const ColorSpinorField> &x,
+    void reDotProduct(std::vector<real_t> &result, cvector_ref<const ColorSpinorField> &x,
                       cvector_ref<const ColorSpinorField> &y)
     {
       auto &x0 = x[0];
       auto &y0 = y[0];
 
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
-      std::vector<double> result_tmp(x.size() * y.size(), 0.0);
+      std::vector<real_t> result_tmp(x.size() * y.size(), 0.0);
 
       if (x.size() == 1) {
         auto NYW_max = y0.Precision() == QUDA_DOUBLE_PRECISION ?
@@ -615,7 +615,7 @@ namespace quda {
         multiReduce_recurse<multiDot, multiDot>(result_tmp, x, y, x, x, 0, 0, false, max_tile_size);
       } else if (y.size() == 1 && x0.Precision() == y0.Precision()) {
 
-        std::vector<double> result_trans(x.size() * y.size());
+        std::vector<real_t> result_trans(x.size() * y.size());
 
         // swap (x<->y and w<-z> when doing transpose calculation)
         auto NXZ_max = x0.Precision() == QUDA_DOUBLE_PRECISION ?
@@ -633,9 +633,9 @@ namespace quda {
           for (unsigned int i = 0; i < ylen; i++) result_tmp[i * xlen + j] = result_trans[j * ylen + i];
 
       } else if (x0.Precision() == y0.Precision()) {
-        TransposeTune<multiDot, multiDot, double, decltype(x), decltype(y)>(result_tmp, x, y, false);
+        TransposeTune<multiDot, multiDot, real_t, decltype(x), decltype(y)>(result_tmp, x, y, false);
       } else {
-        TileSizeTune<multiDot, multiDot, double, decltype(x), decltype(y)>(result_tmp, x, y, x, x, false);
+        TileSizeTune<multiDot, multiDot, real_t, decltype(x), decltype(y)>(result_tmp, x, y, x, x, false);
       }
 
       // do a single multi-node reduction only once we have computed all local dot products
@@ -647,14 +647,14 @@ namespace quda {
       result = transpose(result_tmp, y.size(), x.size());
     }
 
-    void cDotProduct(std::vector<Complex> &result, cvector_ref<const ColorSpinorField> &x,
+    void cDotProduct(std::vector<complex_t> &result, cvector_ref<const ColorSpinorField> &x,
                       cvector_ref<const ColorSpinorField> &y)
     {
       auto &x0 = x[0];
       auto &y0 = y[0];
 
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
-      std::vector<Complex> result_tmp(x.size() * y.size(), 0.0);
+      std::vector<complex_t> result_tmp(x.size() * y.size(), 0.0);
 
       if (x.size() == 1) {
         auto NYW_max = y0.Precision() == QUDA_DOUBLE_PRECISION ?
@@ -666,7 +666,7 @@ namespace quda {
         multiReduce_recurse<multiCdot, multiCdot>(result_tmp, x, y, x, x, 0, 0, false, max_tile_size);
       } else if (y.size() == 1 && x0.Precision() == y0.Precision()) {
 
-        std::vector<Complex> result_trans(x.size() * y.size());
+        std::vector<complex_t> result_trans(x.size() * y.size());
 
         // swap (x<->y and w<-z> when doing transpose calculation)
         auto NXZ_max = x0.Precision() == QUDA_DOUBLE_PRECISION ?
@@ -684,9 +684,9 @@ namespace quda {
           for (unsigned int i = 0; i < ylen; i++) result_tmp[i * xlen + j] = conj(result_trans[j * ylen + i]);
         }
       } else if (x0.Precision() == y0.Precision()) {
-        TransposeTune<multiCdot, multiCdot, Complex, decltype(x), decltype(y)>(result_tmp, x, y, false);
+        TransposeTune<multiCdot, multiCdot, complex_t, decltype(x), decltype(y)>(result_tmp, x, y, false);
       } else {
-        TileSizeTune<multiCdot, multiCdot, Complex, decltype(x), decltype(y)>(result_tmp, x, y, x, x, false);
+        TileSizeTune<multiCdot, multiCdot, complex_t, decltype(x), decltype(y)>(result_tmp, x, y, x, x, false);
       }
 
       // do a single multi-node reduction only once we have computed all local dot products
@@ -698,14 +698,14 @@ namespace quda {
       result = transpose(result_tmp, y.size(), x.size());
     }
 
-    void hDotProduct(std::vector<Complex> &result, cvector_ref<const ColorSpinorField> &x,
+    void hDotProduct(std::vector<complex_t> &result, cvector_ref<const ColorSpinorField> &x,
                      cvector_ref<const ColorSpinorField> &y)
     {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block dot product on non-square inputs");
 
-      std::vector<Complex> result_tmp(x.size() * y.size(), 0.0);
-      TileSizeTune<multiCdot, multiCdot, Complex, decltype(x), decltype(y)>(result_tmp, x, y, x, x, true, false); // last false is b/c L2 norm
+      std::vector<complex_t> result_tmp(x.size() * y.size(), 0.0);
+      TileSizeTune<multiCdot, multiCdot, complex_t, decltype(x), decltype(y)>(result_tmp, x, y, x, x, true, false); // last false is b/c L2 norm
 
       // do a single multi-node reduction only once we have computed all local dot products
       comm_allreduce_sum(result_tmp); // FIXME - could optimize this for Hermiticity as well
@@ -723,14 +723,14 @@ namespace quda {
     }
 
     // for (p, Ap) norms in CG which are Hermitian.
-    void hDotProduct_Anorm(std::vector<Complex> &result, cvector_ref<const ColorSpinorField> &x,
+    void hDotProduct_Anorm(std::vector<complex_t> &result, cvector_ref<const ColorSpinorField> &x,
                      cvector_ref<const ColorSpinorField> &y)
     {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block A-norm dot product on non-square inputs");
 
-      std::vector<Complex> result_tmp(x.size() * y.size(), 0.0);
-      TileSizeTune<multiCdot, multiCdot, Complex, decltype(x), decltype(y)>(result_tmp, x, y, x, x, true, true); // last true is b/c A norm
+      std::vector<complex_t> result_tmp(x.size() * y.size(), 0.0);
+      TileSizeTune<multiCdot, multiCdot, complex_t, decltype(x), decltype(y)>(result_tmp, x, y, x, x, true, true); // last true is b/c A norm
 
       // do a single multi-node reduction only once we have computed all local dot products
       comm_allreduce_sum(result_tmp);
@@ -747,37 +747,37 @@ namespace quda {
           result[i * y.size() + j] = conj(result[j * x.size() + i]);
     }
 
-    void reDotProduct(double *result, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y)
+    void reDotProduct(real_t *result, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y)
     {
-      std::vector<double> result_(x.size() * y.size());
+      std::vector<real_t> result_(x.size() * y.size());
       vector_ref<const ColorSpinorField> x_;
       for (auto &xi : x) x_.push_back(*xi);
       vector_ref<const ColorSpinorField> y_;
       for (auto &yi : y) y_.push_back(*yi);
       reDotProduct(result_, std::move(x_), std::move(y_));
-      memcpy(result, result_.data(), x.size() * y.size() * sizeof(double));
+      memcpy(result, result_.data(), x.size() * y.size() * sizeof(real_t));
     }
 
-    void cDotProduct(Complex *result, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y)
+    void cDotProduct(complex_t *result, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y)
     {
-      std::vector<Complex> result_(x.size() * y.size());
+      std::vector<complex_t> result_(x.size() * y.size());
       vector_ref<const ColorSpinorField> x_;
       for (auto &xi : x) x_.push_back(*xi);
       vector_ref<const ColorSpinorField> y_;
       for (auto &yi : y) y_.push_back(*yi);
       cDotProduct(result_, std::move(x_), std::move(y_));
-      memcpy(result, result_.data(), x.size() * y.size() * sizeof(Complex));
+      memcpy(result, result_.data(), x.size() * y.size() * sizeof(complex_t));
     }
 
-    void hDotProduct(Complex *result, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y)
+    void hDotProduct(complex_t *result, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y)
     {
-      std::vector<Complex> result_(x.size() * y.size());
+      std::vector<complex_t> result_(x.size() * y.size());
       vector_ref<const ColorSpinorField> x_;
       for (auto &xi : x) x_.push_back(*xi);
       vector_ref<const ColorSpinorField> y_;
       for (auto &yi : y) y_.push_back(*yi);
       hDotProduct(result_, std::move(x_), std::move(y_));
-      memcpy(result, result_.data(), x.size() * y.size() * sizeof(Complex));
+      memcpy(result, result_.data(), x.size() * y.size() * sizeof(complex_t));
     }
 
   } // namespace blas

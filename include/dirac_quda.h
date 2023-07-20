@@ -39,8 +39,8 @@ namespace quda {
     double mass;
     double m5; // used by domain wall only
     int Ls;    // used by domain wall and twisted mass
-    Complex b_5[QUDA_MAX_DWF_LS]; // used by mobius domain wall only
-    Complex c_5[QUDA_MAX_DWF_LS]; // used by mobius domain wall only
+    complex_t b_5[QUDA_MAX_DWF_LS]; // used by mobius domain wall only
+    complex_t c_5[QUDA_MAX_DWF_LS]; // used by mobius domain wall only
 
     // The EOFA parameters. See the description in InvertParam
     double eofa_shift;
@@ -125,7 +125,7 @@ namespace quda {
       for (int i=0; i<QUDA_MAX_DIM; i++) printfQuda("commDim[%d] = %d\n", i, commDim[i]);
       for (int i = 0; i < Ls; i++)
         printfQuda(
-            "b_5[%d] = %e %e \t c_5[%d] = %e %e\n", i, b_5[i].real(), b_5[i].imag(), i, c_5[i].real(), c_5[i].imag());
+                   "b_5[%d] = %e %e \t c_5[%d] = %e %e\n", i, static_cast<double>(b_5[i].real()), static_cast<double>(b_5[i].imag()), i, static_cast<double>(c_5[i].real()), static_cast<double>(c_5[i].imag()));
       printfQuda("use_mma = %d\n", use_mma);
       printfQuda("allow_truncation = %d\n", allow_truncation);
       printfQuda("use_mobius_fused_kernel = %s\n", use_mobius_fused_kernel ? "true" : "false");
@@ -924,8 +924,8 @@ namespace quda {
 
   protected:
     //Mobius coefficients
-      Complex b_5[QUDA_MAX_DWF_LS];
-      Complex c_5[QUDA_MAX_DWF_LS];
+      complex_t b_5[QUDA_MAX_DWF_LS];
+      complex_t c_5[QUDA_MAX_DWF_LS];
 
       /**
          Whether we are using classical Mobius with constant real-valued

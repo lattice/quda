@@ -12,11 +12,11 @@ namespace quda
 
   /* Solve the equation A p_k psi_k = b by minimizing the residual and
      using Eigen's SVD algorithm for numerical stability */
-  void MinResExt::solve(std::vector<Complex> &psi_, std::vector<ColorSpinorField> &p, std::vector<ColorSpinorField> &q,
+  void MinResExt::solve(std::vector<complex_t> &psi_, std::vector<ColorSpinorField> &p, std::vector<ColorSpinorField> &q,
                         const ColorSpinorField &b, bool hermitian)
   {
-    typedef Matrix<Complex, Dynamic, Dynamic> matrix;
-    typedef Matrix<Complex, Dynamic, 1> vector;
+    typedef Matrix<complex_t, Dynamic, Dynamic> matrix;
+    typedef Matrix<complex_t, Dynamic, 1> vector;
 
     const int N = q.size();
     vector phi(N), psi(N);
@@ -25,7 +25,7 @@ namespace quda
     // form the a Nx(N+1) matrix using only a single reduction - this
     // presently requires forgoing the matrix symmetry, but the improvement is well worth it
 
-    std::vector<Complex> A_(N * (N + 1));
+    std::vector<complex_t> A_(N * (N + 1));
 
     if (hermitian) {
       // linear system is Hermitian, solve directly
@@ -93,7 +93,7 @@ namespace quda
         if (!apply_mat) blas::ax(1 / sqrt(p2), q[i]);
 
         if (i + 1 < N) {
-          std::vector<Complex> alpha(N - (i + 1));
+          std::vector<complex_t> alpha(N - (i + 1));
           blas::cDotProduct(alpha, {p[i]}, {p.begin() + i + 1, p.end()});
           for (auto &a : alpha) a = -a;
           blas::caxpy(alpha, {p[i]}, {p.begin() + i + 1, p.end()});
@@ -111,7 +111,7 @@ namespace quda
       for (int i = 0; i < N; i++) mat(q[i], p[i]);
 
     // Solution coefficient vectors
-    std::vector<Complex> alpha(N);
+    std::vector<complex_t> alpha(N);
 
     if (b.Precision() != p[0].Precision()) { // need to make a sloppy copy of b
       ColorSpinorParam param(b);

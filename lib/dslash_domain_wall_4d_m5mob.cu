@@ -12,7 +12,7 @@ namespace quda
   // ... and then m5
 #ifdef GPU_DOMAIN_WALL_DIRAC
   void ApplyDomainWall4DM5mob(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                              double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                              double m_5, const complex_t *b_5, const complex_t *c_5, const ColorSpinorField &x,
                               ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
                               TimeProfile &profile)
   {
@@ -22,7 +22,7 @@ namespace quda
   }
 #else
   void ApplyDomainWall4DM5mob(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double,
-                              double, const Complex *, const Complex *, const ColorSpinorField &,
+                              double, const complex_t *, const complex_t *, const ColorSpinorField &,
                               ColorSpinorField &, int, bool, const int *, double, TimeProfile &)
   {
     errorQuda("Domain-wall dslash has not been built");

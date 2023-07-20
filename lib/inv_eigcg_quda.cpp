@@ -32,7 +32,7 @@ namespace quda {
    using RealVector      = VectorXd;
 
 //special types needed for compatibility with QUDA blas:
-   using RowMajorDenseMatrix = Matrix<Complex, Dynamic, Dynamic, RowMajor>;
+   using RowMajorDenseMatrix = Matrix<complex_t, Dynamic, Dynamic, RowMajor>;
 
    static int max_eigcg_cycles = 4;//how many eigcg cycles do we allow?
 
@@ -84,7 +84,7 @@ namespace quda {
      }
 
      // method for constructing Lanczos matrix :
-     inline void SetLanczos(Complex diag_val, Complex offdiag_val)
+     inline void SetLanczos(complex_t diag_val, complex_t offdiag_val)
      {
        if (run_residual_correction) return;
 
@@ -121,7 +121,7 @@ namespace quda {
      {
        Tm.setZero();
 
-       auto s = std::make_unique<Complex[]>(2 * k);
+       auto s = std::make_unique<complex_t[]>(2 * k);
 
        for (int i = 0; i < 2 * k; i++) Tm(i, i) = Tmvals(i); //??
 
@@ -298,7 +298,7 @@ namespace quda {
     std::vector<ColorSpinorField*> v2k(args.V2k->Components());
 
     RowMajorDenseMatrix Alpha(args.ritzVecs.topLeftCorner(args.m, 2*args.k));
-    blas::caxpy( static_cast<Complex*>(Alpha.data()), vm , v2k);
+    blas::caxpy( static_cast<complex_t*>(Alpha.data()), vm , v2k);
 
     for(int i = 0; i < 2*args.k; i++)  blas::copy(Vm->Component(i), args.V2k->Component(i));
 
@@ -451,7 +451,7 @@ namespace quda {
 
     double heavy_quark_res = 0.0;  // heavy quark res idual
 
-    if (use_heavy_quark_res)  heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+    if (use_heavy_quark_res)  heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
 
     double pAp;
     double alpha=1.0, alpha_inv=1.0, beta=0.0, alpha_old_inv = 1.0;
@@ -528,7 +528,7 @@ namespace quda {
     // compute the true residuals
     matSloppy(r, x);
     param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
-    param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+    param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
 
     PrintSummary("eigCG", k, r2, b2, args.global_stop, param.tol_hq);
 
@@ -701,7 +701,7 @@ namespace quda {
        r2 = blas::xmyNorm(in, r);
 
        param.true_res = sqrt(r2 / b2);
-       param.true_res_hq = sqrt(HeavyQuarkResidualNorm(out,r).z);
+       param.true_res_hq = sqrt(HeavyQuarkResidualNorm(out,r)[2]);
        PrintSummary( !dcg_cycle ? "EigCG:" : "DCG (correction cycle):", iters, r2, b2, stop, param.tol_hq);
 
        if( getVerbosity() >= QUDA_VERBOSE ) { 

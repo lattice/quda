@@ -106,9 +106,9 @@ namespace quda {
 
       double r2;
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-        double3 h3 = blas::HeavyQuarkResidualNorm(x, xp);
-        r2 = h3.y;
-        param.true_res_hq = sqrt(h3.z);
+        auto h3 = blas::HeavyQuarkResidualNorm(x, xp);
+        r2 = h3[1];
+        param.true_res_hq = sqrt(h3[2]);
       } else {
         r2 = blas::norm2(xp);
       }
@@ -175,9 +175,9 @@ namespace quda {
       if (param.compute_true_res) {
         double r2;
         if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-          double3 h3 = blas::HeavyQuarkResidualNorm(x, br);
-          r2 = h3.y;
-          param.true_res_hq = sqrt(h3.z);
+          auto h3 = blas::HeavyQuarkResidualNorm(x, br);
+          r2 = h3[1];
+          param.true_res_hq = sqrt(h3[2]);
         } else {
           r2 = blas::norm2(br);
         }
@@ -292,7 +292,7 @@ namespace quda {
     blas::copy(rS, r);
 
     if (use_heavy_quark_res) {
-      heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+      heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
       heavy_quark_res_old = heavy_quark_res;
     }
 
@@ -356,9 +356,9 @@ namespace quda {
         heavy_quark_res_old = heavy_quark_res;
         if (mixed_precision) {
           blas::copy(tmpS,y);
-          heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xS, tmpS, rS).z);
+          heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xS, tmpS, rS)[2]);
         } else {
-          heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(xS, rS).z);
+          heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(xS, rS)[2]);
         }
       }
 
@@ -386,7 +386,7 @@ namespace quda {
           r2 = blas::xmyNorm(b, r);
           param.true_res = sqrt(r2 / b2);
           if (use_heavy_quark_res) {
-            heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
+            heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r)[2]);
             param.true_res_hq = heavy_quark_res;
           }
           rNorm = sqrt(r2);
@@ -398,7 +398,7 @@ namespace quda {
             blas::copy(rS, r);
             blas::axpy(-1., xS, xS_old);
             // we preserve the orthogonality between the previous residual and the new
-            Complex rr_old = blas::cDotProduct(rS, rS_old);
+            complex_t rr_old = blas::cDotProduct(rS, rS_old);
             r2_old = blas::caxpyNorm(-rr_old/r2, rS, rS_old);
             blas::zero(xS);
           }
@@ -448,7 +448,7 @@ namespace quda {
           // we update sloppy and old fields
           if (!convergence(r2, heavy_quark_res, stop, param.tol_hq)) {
             // we preserve the orthogonality between the previous residual and the new
-            Complex rr_old = blas::cDotProduct(rS, rS_old);
+            complex_t rr_old = blas::cDotProduct(rS, rS_old);
             r2_old = blas::caxpyNorm(-rr_old/r2, rS, rS_old);
           }
         }
@@ -486,7 +486,7 @@ namespace quda {
     if (!mixed_precision && param.compute_true_res) {
       mat(r, x);
       param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
-      if (use_heavy_quark_res) param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+      if (use_heavy_quark_res) param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
     }
 
     PrintSummary("CG3", k, r2, b2, stop, param.tol_hq);

@@ -17,8 +17,8 @@ namespace quda
       const ColorSpinorField &x;
       double m_f;
       double m_5;
-      const Complex *b_5;
-      const Complex *c_5;
+      const complex_t *b_5;
+      const complex_t *c_5;
       double a;
       bool eofa_pm;
       double inv;
@@ -84,7 +84,7 @@ namespace quda
 
     public:
       Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double m_f,
-              const double m_5, const Complex *b_5, const Complex *c_5, double a, bool eofa_pm, double inv,
+              const double m_5, const complex_t *b_5, const complex_t *c_5, double a, bool eofa_pm, double inv,
               double kappa, const double *eofa_u, const double *eofa_x, const double *eofa_y,
               double sherman_morrison, bool dagger, Dslash5Type type) :
         TunableKernel3D(in, in.X(4), in.SiteSubset()),
@@ -171,7 +171,7 @@ namespace quda
     // out = Dslash5*in
 #ifdef GPU_DOMAIN_WALL_DIRAC
     void apply_dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
-                       double m_5, const Complex *b_5, const Complex *c_5, double a, int eofa_pm, double inv,
+                       double m_5, const complex_t *b_5, const complex_t *c_5, double a, int eofa_pm, double inv,
                        double kappa, const double *eofa_u, const double *eofa_x, const double *eofa_y,
                        double sherman_morrison, bool dagger, Dslash5Type type)
     {
@@ -181,7 +181,7 @@ namespace quda
     }
 #else
     void apply_dslash5(ColorSpinorField &, const ColorSpinorField &, const ColorSpinorField &, double,
-                       double, const Complex *, const Complex *, double, int, double,
+                       double, const complex_t *, const complex_t *, double, int, double,
                        double, const double *, const double *, const double *, double, bool, Dslash5Type)
     {
       errorQuda("Mobius EOFA dslash has not been built");

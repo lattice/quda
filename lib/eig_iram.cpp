@@ -16,6 +16,8 @@
 
 namespace quda
 {
+  using MatrixXc = Matrix<complex_t, Dynamic, Dynamic>;
+
   // Implicitly Restarted Arnoldi Method constructor
   IRAM::IRAM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
     EigenSolver(mat, eig_param, profile)
@@ -28,9 +30,9 @@ namespace quda
     Qmat.resize(n_kr);
     Rmat.resize(n_kr);
     for (int i = 0; i < n_kr; i++) {
-      upperHess[i].resize(n_kr, 0.0);
-      Qmat[i].resize(n_kr, 0.0);
-      Rmat[i].resize(n_kr, 0.0);
+      upperHess[i].resize(n_kr, real_t(0.0));
+      Qmat[i].resize(n_kr, real_t(0.0));
+      Rmat[i].resize(n_kr, real_t(0.0));
     }
 
     if (eig_param->qr_tol == 0) { eig_param->qr_tol = eig_param->tol * 1e-2; }
@@ -40,7 +42,7 @@ namespace quda
 
   // Arnoldi Member functions
   //---------------------------------------------------------------------------
-  void IRAM::arnoldiStep(std::vector<ColorSpinorField> &v, std::vector<ColorSpinorField> &r, double &beta, int j)
+  void IRAM::arnoldiStep(std::vector<ColorSpinorField> &v, std::vector<ColorSpinorField> &r, real_t &beta, int j)
   {
     beta = sqrt(blas::norm2(r[0]));
     if (j > 0) upperHess[j][j - 1] = beta;
@@ -52,7 +54,7 @@ namespace quda
     // r_{j} = M * v_{j};
     mat(r[0], v[j]);
 
-    double beta_pre = sqrt(blas::norm2(r[0]));
+    real_t beta_pre = sqrt(blas::norm2(r[0]));
 
     // Compute the j-th residual corresponding
     // to the j step factorization.
@@ -61,14 +63,14 @@ namespace quda
     // r_{j} <-  M * v_{j} - V_{j} * w_{j}
 
     // H_{j,i}_j = v_i^dag * r
-    std::vector<Complex> tmp(j + 1);
+    std::vector<complex_t> tmp(j + 1);
     blas::cDotProduct(tmp, {v.begin(), v.begin() + j + 1}, r);
 
     // Orthogonalise r_{j} against V_{j}.
     // r = r - H_{j,i} * v_j
     for (int i = 0; i < j + 1; i++) tmp[i] *= -1.0;
     blas::caxpy(tmp, {v.begin(), v.begin() + j + 1}, r);
-    for (int i = 0; i < j + 1; i++) upperHess[i][j] = -1.0 * tmp[i];
+    for (int i = 0; i < j + 1; i++) upperHess[i][j] = -tmp[i];
 
     // Re-orthogonalization / Iterative refinement phase
     // Maximum 100 tries.
@@ -92,8 +94,8 @@ namespace quda
     beta = sqrt(blas::norm2(r[0]));
     while (beta < 0.717 * beta_pre && orth_iter < orth_iter_max) {
 
-      logQuda(QUDA_DEBUG_VERBOSE, "beta = %e > 0.717*beta_pre = %e: Reorthogonalise at step %d, iter %d\n", beta,
-              0.717 * beta_pre, j, orth_iter);
+      logQuda(QUDA_DEBUG_VERBOSE, "beta = %e > 0.717*beta_pre = %e: Reorthogonalise at step %d, iter %d\n",
+              double(beta), 0.717 * double(beta_pre), j, orth_iter);
 
       beta_pre = beta;
 
@@ -116,60 +118,60 @@ namespace quda
   void IRAM::rotateBasis(std::vector<ColorSpinorField> &kSpace, int keep)
   {
     // Multi-BLAS friendly array to store the part of the rotation matrix
-    std::vector<Complex> Qmat_keep(n_kr * keep, 0.0);
+    std::vector<complex_t> Qmat_keep(n_kr * keep, real_t(0.0));
     for (int j = 0; j < n_kr; j++)
       for (int i = 0; i < keep; i++) { Qmat_keep[j * keep + i] = Qmat[j][i]; }
 
     rotateVecs(kSpace, Qmat_keep, n_kr, n_kr, keep, 0, profile);
   }
 
-  void IRAM::reorder(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals,
+  void IRAM::reorder(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals,
                      const QudaEigSpectrumType spec_type)
   {
     int n = n_kr;
-    std::vector<std::tuple<Complex, double, ColorSpinorField>> array(n);
+    std::vector<std::tuple<complex_t, real_t, ColorSpinorField>> array(n);
     for (int i = 0; i < n; i++) array[i] = std::make_tuple(evals[i], residua[i], std::move(kSpace[i]));
 
     switch (spec_type) {
     case QUDA_SPECTRUM_LM_EIG:
       std::sort(array.begin(), array.begin() + n,
-                [](const std::tuple<Complex, double, ColorSpinorField> &a,
-                   const std::tuple<Complex, double, ColorSpinorField> &b) {
+                [](const std::tuple<complex_t, real_t, ColorSpinorField> &a,
+                   const std::tuple<complex_t, real_t, ColorSpinorField> &b) {
                   return (abs(std::get<0>(a)) > abs(std::get<0>(b)));
                 });
       break;
     case QUDA_SPECTRUM_SM_EIG:
       std::sort(array.begin(), array.begin() + n,
-                [](const std::tuple<Complex, double, ColorSpinorField> &a,
-                   const std::tuple<Complex, double, ColorSpinorField> &b) {
+                [](const std::tuple<complex_t, real_t, ColorSpinorField> &a,
+                   const std::tuple<complex_t, real_t, ColorSpinorField> &b) {
                   return (abs(std::get<0>(a)) < abs(std::get<0>(b)));
                 });
       break;
     case QUDA_SPECTRUM_LR_EIG:
       std::sort(array.begin(), array.begin() + n,
-                [](const std::tuple<Complex, double, ColorSpinorField> &a,
-                   const std::tuple<Complex, double, ColorSpinorField> &b) {
+                [](const std::tuple<complex_t, real_t, ColorSpinorField> &a,
+                   const std::tuple<complex_t, real_t, ColorSpinorField> &b) {
                   return (std::get<0>(a).real() > std::get<0>(b).real());
                 });
       break;
     case QUDA_SPECTRUM_SR_EIG:
       std::sort(array.begin(), array.begin() + n,
-                [](const std::tuple<Complex, double, ColorSpinorField> &a,
-                   const std::tuple<Complex, double, ColorSpinorField> &b) {
+                [](const std::tuple<complex_t, real_t, ColorSpinorField> &a,
+                   const std::tuple<complex_t, real_t, ColorSpinorField> &b) {
                   return (std::get<0>(a).real() < std::get<0>(b).real());
                 });
       break;
     case QUDA_SPECTRUM_LI_EIG:
       std::sort(array.begin(), array.begin() + n,
-                [](const std::tuple<Complex, double, ColorSpinorField> &a,
-                   const std::tuple<Complex, double, ColorSpinorField> &b) {
+                [](const std::tuple<complex_t, real_t, ColorSpinorField> &a,
+                   const std::tuple<complex_t, real_t, ColorSpinorField> &b) {
                   return (std::get<0>(a).imag() > std::get<0>(b).imag());
                 });
       break;
     case QUDA_SPECTRUM_SI_EIG:
       std::sort(array.begin(), array.begin() + n,
-                [](const std::tuple<Complex, double, ColorSpinorField> &a,
-                   const std::tuple<Complex, double, ColorSpinorField> &b) {
+                [](const std::tuple<complex_t, real_t, ColorSpinorField> &a,
+                   const std::tuple<complex_t, real_t, ColorSpinorField> &b) {
                   return (std::get<0>(a).imag() < std::get<0>(b).imag());
                 });
       break;
@@ -184,13 +186,13 @@ namespace quda
     }
   }
 
-  void IRAM::qrShifts(const std::vector<Complex> evals, const int num_shifts)
+  void IRAM::qrShifts(const std::vector<complex_t> evals, const int num_shifts)
   {
     // This isn't really Eigen, but it's morally equivalent
     profile.TPSTART(QUDA_PROFILE_HOST_COMPUTE);
 
     // Reset Q to the identity, copy upper Hessenberg
-    MatrixXcd UHcopy = MatrixXcd::Zero(n_kr, n_kr);
+    MatrixXc UHcopy = MatrixXc::Zero(n_kr, n_kr);
     for (int i = 0; i < n_kr; i++) {
       for (int j = 0; j < n_kr; j++) {
         if (i == j)
@@ -214,18 +216,18 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_HOST_COMPUTE);
   }
 
-  void IRAM::qrIteration(std::vector<std::vector<Complex>> &Q, std::vector<std::vector<Complex>> &R)
+  void IRAM::qrIteration(std::vector<std::vector<complex_t>> &Q, std::vector<std::vector<complex_t>> &R)
   {
-    Complex T11, T12, T21, T22, U1, U2;
-    double dV;
+    complex_t T11, T12, T21, T22, U1, U2;
+    real_t dV;
 
-    double tol = eig_param->qr_tol;
+    real_t tol = eig_param->qr_tol;
 
     // Allocate the rotation matrices.
-    std::vector<Complex> R11(n_kr - 1, 0.0);
-    std::vector<Complex> R12(n_kr - 1, 0.0);
-    std::vector<Complex> R21(n_kr - 1, 0.0);
-    std::vector<Complex> R22(n_kr - 1, 0.0);
+    std::vector<complex_t> R11(n_kr - 1, real_t {0.0});
+    std::vector<complex_t> R12(n_kr - 1, real_t {0.0});
+    std::vector<complex_t> R21(n_kr - 1, real_t {0.0});
+    std::vector<complex_t> R22(n_kr - 1, real_t {0.0});
 
     for (int i = 0; i < n_kr - 1; i++) {
 
@@ -263,7 +265,7 @@ namespace quda
 #pragma omp parallel for schedule(static, 32)
 #endif
       for (int j = i + 1; j < n_kr; j++) {
-        Complex temp = R[i][j];
+        complex_t temp = R[i][j];
         R[i][j] -= (T11 * temp + T12 * R[i + 1][j]);
         R[i + 1][j] -= (T21 * temp + T22 * R[i + 1][j]);
       }
@@ -280,7 +282,7 @@ namespace quda
 #pragma omp for schedule(static, 32) nowait
 #endif
           for (int i = 0; i < j + 2; i++) {
-            Complex temp = R[i][j];
+            complex_t temp = R[i][j];
             R[i][j] -= (R11[j] * temp + R12[j] * R[i][j + 1]);
             R[i][j + 1] -= (R21[j] * temp + R22[j] * R[i][j + 1]);
           }
@@ -288,7 +290,7 @@ namespace quda
 #pragma omp for schedule(static, 32) nowait
 #endif
           for (int i = 0; i < n_kr; i++) {
-            Complex temp = Q[i][j];
+            complex_t temp = Q[i][j];
             Q[i][j] -= (R11[j] * temp + R12[j] * Q[i][j + 1]);
             Q[i][j + 1] -= (R21[j] * temp + R22[j] * Q[i][j + 1]);
           }
@@ -299,29 +301,29 @@ namespace quda
     }
   }
 
-  void IRAM::eigensolveFromUpperHess(std::vector<Complex> &evals, const double beta)
+  void IRAM::eigensolveFromUpperHess(std::vector<complex_t> &evals, const real_t beta)
   {
     if (eig_param->use_eigen_qr) {
       profile.TPSTART(QUDA_PROFILE_EIGENQR);
       // Construct the upper Hessenberg matrix
-      MatrixXcd Q = MatrixXcd::Identity(n_kr, n_kr);
-      MatrixXcd R = MatrixXcd::Zero(n_kr, n_kr);
+      MatrixXc Q = MatrixXc::Identity(n_kr, n_kr);
+      MatrixXc R = MatrixXc::Zero(n_kr, n_kr);
       for (int i = 0; i < n_kr; i++) {
         for (int j = 0; j < n_kr; j++) { R(i, j) = upperHess[i][j]; }
       }
 
       // QR the upper Hessenberg matrix
-      Eigen::ComplexSchur<MatrixXcd> schurUH;
+      Eigen::ComplexSchur<MatrixXc> schurUH;
       schurUH.computeFromHessenberg(R, Q);
       profile.TPSTOP(QUDA_PROFILE_EIGENQR);
 
       profile.TPSTART(QUDA_PROFILE_EIGENEV);
       // Extract the upper triangular matrix, eigensolve, then
       // get the eigenvectors of the upper Hessenberg
-      MatrixXcd matUpper = MatrixXcd::Zero(n_kr, n_kr);
+      MatrixXc matUpper = MatrixXc::Zero(n_kr, n_kr);
       matUpper = schurUH.matrixT().triangularView<Eigen::Upper>();
       matUpper.conservativeResize(n_kr, n_kr);
-      Eigen::ComplexEigenSolver<MatrixXcd> eigenSolver(matUpper);
+      Eigen::ComplexEigenSolver<MatrixXc> eigenSolver(matUpper);
       Q = schurUH.matrixU() * eigenSolver.eigenvectors();
 
       // Update eigenvalues, residuia, and the Q matrix
@@ -346,11 +348,11 @@ namespace quda
 
       // This is about as high as one cat get in double without causing
       // the Arnoldi to compute more restarts.
-      double tol = eig_param->qr_tol;
+      real_t tol = eig_param->qr_tol;
       int max_iter = 100000;
       int iter = 0;
 
-      Complex temp, discriminant, sol1, sol2, eval;
+      complex_t temp, discriminant, sol1, sol2, eval;
       for (int i = n_kr - 2; i >= 0; i--) {
         while (iter < max_iter) {
           if (abs(Rmat[i + 1][i]) < tol) {
@@ -361,11 +363,11 @@ namespace quda
             // Compute the 2 eigenvalues via the quadratic formula
             //----------------------------------------------------
             // The discriminant
-            temp = (Rmat[i][i] - Rmat[i + 1][i + 1]) * (Rmat[i][i] - Rmat[i + 1][i + 1]) / 4.0;
+            temp = (Rmat[i][i] - Rmat[i + 1][i + 1]) * (Rmat[i][i] - Rmat[i + 1][i + 1]) / real_t(4.0);
             discriminant = sqrt(Rmat[i + 1][i] * Rmat[i][i + 1] + temp);
 
             // Reuse temp
-            temp = (Rmat[i][i] + Rmat[i + 1][i + 1]) / 2.0;
+            temp = (Rmat[i][i] + Rmat[i + 1][i + 1]) / real_t(2.0);
 
             sol1 = temp - Rmat[i + 1][i + 1] + discriminant;
             sol2 = temp - Rmat[i + 1][i + 1] - discriminant;
@@ -392,8 +394,8 @@ namespace quda
       // Compute the eigevectors of the origial upper Hessenberg
       // This is now very cheap because the input matrix to Eigen
       // is upper triangular.
-      MatrixXcd Q = MatrixXcd::Zero(n_kr, n_kr);
-      MatrixXcd R = MatrixXcd::Zero(n_kr, n_kr);
+      MatrixXc Q = MatrixXc::Zero(n_kr, n_kr);
+      MatrixXc R = MatrixXc::Zero(n_kr, n_kr);
       for (int i = 0; i < n_kr; i++) {
         for (int j = 0; j < n_kr; j++) {
           Q(i, j) = Qmat[i][j];
@@ -401,10 +403,10 @@ namespace quda
         }
       }
 
-      MatrixXcd matUpper = MatrixXcd::Zero(n_kr, n_kr);
+      MatrixXc matUpper = MatrixXc::Zero(n_kr, n_kr);
       matUpper = R.triangularView<Eigen::Upper>();
       matUpper.conservativeResize(n_kr, n_kr);
-      Eigen::ComplexEigenSolver<MatrixXcd> eigenSolver(matUpper);
+      Eigen::ComplexEigenSolver<MatrixXc> eigenSolver(matUpper);
       Q *= eigenSolver.eigenvectors();
 
       // Update eigenvalues, residuia, and the Q matrix
@@ -419,7 +421,7 @@ namespace quda
     }
   }
 
-  void IRAM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<Complex> &evals)
+  void IRAM::operator()(std::vector<ColorSpinorField> &kSpace, std::vector<complex_t> &evals)
   {
     // Override any user input for block size.
     block_size = 1;
@@ -447,9 +449,9 @@ namespace quda
     mat(r[0], kSpace[0]);
 
     // Convergence criteria
-    double epsilon = setEpsilon(kSpace[0].Precision());
-    double epsilon23 = pow(epsilon, 2.0 / 3.0);
-    double beta = 0.0;
+    auto epsilon = setEpsilon(kSpace[0].Precision());
+    real_t epsilon23 = pow(epsilon, 2.0 / 3.0);
+    real_t beta = 0.0;
 
     // Print Eigensolver params
     printEigensolverSetup();
@@ -484,10 +486,11 @@ namespace quda
       iter_converged = 0;
       for (int i = 0; i < n_ev; i++) {
         int idx = n_kr - 1 - i;
-        double rtemp = std::max(epsilon23, abs(evals[idx]));
+        auto rtemp = std::max(epsilon23, abs(evals[idx]));
         if (residua[idx] < tol * rtemp) {
           iter_converged++;
-          logQuda(QUDA_DEBUG_VERBOSE, "residuum[%d] = %e, condition = %e\n", i, residua[idx], tol * abs(evals[idx]));
+          logQuda(QUDA_DEBUG_VERBOSE, "residuum[%d] = %e, condition = %e\n", i, double(residua[idx]),
+                  double(tol * abs(evals[idx])));
         } else {
           // Unlikely to find new converged eigenvalues
           break;

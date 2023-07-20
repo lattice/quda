@@ -515,7 +515,7 @@ namespace quda {
     bool deflate_compute;   /** If true, instruct the solver to create a deflation space. */
     bool recompute_evals;   /** If true, instruct the solver to recompute evals from an existing deflation space. */
     std::vector<ColorSpinorField> evecs; /** Holds the eigenvectors. */
-    std::vector<Complex> evals;          /** Holds the eigenvalues. */
+    std::vector<complex_t> evals;        /** Holds the eigenvalues. */
 
     bool mixed() { return param.precision != param.precision_sloppy; }
 
@@ -1019,10 +1019,10 @@ namespace quda {
     int pipeline; // pipelining factor for legacyGramSchmidt
 
     // Various coefficients and params needed on each iteration.
-    Complex rho0, rho1, alpha, omega, beta;           // Various coefficients for the BiCG part of BiCGstab-L.
-    std::vector<Complex> gamma, gamma_prime, gamma_prime_prime; // Parameters for MR part of BiCGstab-L. (L+1) length.
-    std::vector<Complex> tau; // Parameters for MR part of BiCGstab-L. Tech. modified Gram-Schmidt coeffs. (L+1)x(L+1) length.
-    std::vector<double> sigma; // Parameters for MR part of BiCGstab-L. Tech. the normalization part of Gram-Scmidt. (L+1) length.
+    complex_t rho0, rho1, alpha, omega, beta;           // Various coefficients for the BiCG part of BiCGstab-L.
+    std::vector<complex_t> gamma, gamma_prime, gamma_prime_prime; // Parameters for MR part of BiCGstab-L. (L+1) length.
+    std::vector<complex_t> tau; // Parameters for MR part of BiCGstab-L. Tech. modified Gram-Schmidt coeffs. (L+1)x(L+1) length.
+    std::vector<real_t> sigma; // Parameters for MR part of BiCGstab-L. Tech. the normalization part of Gram-Scmidt. (L+1) length.
 
     ColorSpinorField r_full; //! Full precision residual.
     ColorSpinorField y;      //! Full precision temporary.
@@ -1121,8 +1121,8 @@ namespace quda {
      */
     int n_krylov;
 
-    std::vector<Complex> alpha;
-    std::vector<Complex> beta;
+    std::vector<complex_t> alpha;
+    std::vector<complex_t> beta;
     std::vector<double> gamma;
 
     /**
@@ -1136,12 +1136,12 @@ namespace quda {
     std::vector<ColorSpinorField> p;  // GCR direction vectors
     std::vector<ColorSpinorField> Ap; // mat * direction vectors
 
-    void computeBeta(std::vector<Complex> &beta, std::vector<ColorSpinorField> &Ap, int i, int N, int k);
-    void updateAp(std::vector<Complex> &beta, std::vector<ColorSpinorField> &Ap, int begin, int size, int k);
-    void orthoDir(std::vector<Complex> &beta, std::vector<ColorSpinorField> &Ap, int k, int pipeline);
-    void backSubs(const std::vector<Complex> &alpha, const std::vector<Complex> &beta, const std::vector<double> &gamma,
-                  std::vector<Complex> &delta, int n);
-    void updateSolution(ColorSpinorField &x, const std::vector<Complex> &alpha, const std::vector<Complex> &beta,
+    void computeBeta(std::vector<complex_t> &beta, std::vector<ColorSpinorField> &Ap, int i, int N, int k);
+    void updateAp(std::vector<complex_t> &beta, std::vector<ColorSpinorField> &Ap, int begin, int size, int k);
+    void orthoDir(std::vector<complex_t> &beta, std::vector<ColorSpinorField> &Ap, int k, int pipeline);
+    void backSubs(const std::vector<complex_t> &alpha, const std::vector<complex_t> &beta, const std::vector<double> &gamma,
+                  std::vector<complex_t> &delta, int n);
+    void updateSolution(ColorSpinorField &x, const std::vector<complex_t> &alpha, const std::vector<complex_t> &beta,
                         std::vector<double> &gamma, int k, std::vector<ColorSpinorField> &p);
 
     /**
@@ -1346,7 +1346,7 @@ namespace quda {
     bool lambda_init;  // whether or not lambda_max has been initialized
     QudaCABasis basis; // CA basis
 
-    std::vector<Complex> alpha; // Solution coefficient vectors
+    std::vector<complex_t> alpha; // Solution coefficient vectors
 
     ColorSpinorField r;
 
@@ -1367,7 +1367,7 @@ namespace quda {
        @param[in] q Search direction vectors with the operator applied
        @param[in] b Source vector against which we are solving
     */
-    void solve(std::vector<Complex> &psi, std::vector<ColorSpinorField> &q, ColorSpinorField &b);
+    void solve(std::vector<complex_t> &psi, std::vector<ColorSpinorField> &q, ColorSpinorField &b);
 
   public:
     CAGCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
@@ -1550,7 +1550,7 @@ public:
        @param[in] q Search direction vectors with the operator applied
        @param[in] hermitian Whether the linear system is Hermitian or not
     */
-    void solve(std::vector<Complex> &psi_, std::vector<ColorSpinorField> &p, std::vector<ColorSpinorField> &q,
+    void solve(std::vector<complex_t> &psi_, std::vector<ColorSpinorField> &p, std::vector<ColorSpinorField> &q,
                const ColorSpinorField &b, bool hermitian);
 
   public:
@@ -1678,7 +1678,7 @@ public:
  struct deflation_space : public Object {
    bool svd;                            /** Whether this space is for an SVD deflaton */
    std::vector<ColorSpinorField> evecs; /** Container for the eigenvectors */
-   std::vector<Complex> evals;          /** The eigenvalues */
+   std::vector<complex_t> evals;          /** The eigenvalues */
  };
 
  /**

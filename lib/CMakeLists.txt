@@ -490,6 +490,16 @@ if(QUDA_BACKWARDS)
   target_link_libraries(quda PUBLIC ${BACKWARD_LIBRARIES})
 endif()
 
+set(QUDA_SCALAR_TYPE
+    double
+    CACHE STRING "set the host scalar coefficient type (double, doubledouble)")
+set_property(CACHE QUDA_SCALAR_TYPE PROPERTY STRINGS double doubledouble)
+
+set(QUDA_REDUCTION_TYPE
+    double
+    CACHE STRING "set the reduction computation type (double, doubledouble)")
+set_property(CACHE QUDA_REDUCTION_TYPE PROPERTY STRINGS double doubledouble)
+
 configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)
 install(FILES "${CMAKE_BINARY_DIR}/include/quda_define.h" DESTINATION include/)
 

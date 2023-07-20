@@ -346,17 +346,17 @@ private:
 protected:
   double benchmark(Kernel kernel, const int niter)
   {
-    double a = 1.0, b = 2.0, c = 3.0;
-    quda::Complex a2, b2;
-    std::vector<quda::Complex> A(Nsrc * Msrc);
-    std::vector<quda::Complex> B(Nsrc * Msrc);
-    std::vector<quda::Complex> C(Nsrc * Msrc);
-    std::vector<quda::Complex> A2(Nsrc * Nsrc); // for the block cDotProductNorm test
-    std::vector<double> Ar(Nsrc * Msrc);
-    std::vector<double> A2r(Nsrc * Nsrc);
-    std::vector<double> A1r(Nsrc);
-    std::vector<double> B1r(Nsrc);
-    std::vector<double> C1r(Nsrc);
+    quda::real_t a = 1.0, b = 2.0, c = 3.0;
+    quda::complex_t a2, b2;
+    std::vector<quda::complex_t> A(Nsrc * Msrc);
+    std::vector<quda::complex_t> B(Nsrc * Msrc);
+    std::vector<quda::complex_t> C(Nsrc * Msrc);
+    std::vector<quda::complex_t> A2(Nsrc * Nsrc); // for the block cDotProductNorm test
+    std::vector<quda::real_t> Ar(Nsrc * Msrc);
+    std::vector<quda::real_t> A2r(Nsrc * Nsrc);
+    std::vector<quda::real_t> A1r(Nsrc);
+    std::vector<quda::real_t> B1r(Nsrc);
+    std::vector<quda::real_t> C1r(Nsrc);
 
     device_timer_t timer;
     timer.start();
@@ -540,37 +540,37 @@ protected:
 
 #define ERROR(a) fabs(blas::norm2(a##D) - blas::norm2(a##H)) / blas::norm2(a##H)
 
-  double test(Kernel kernel)
+  quda::real_t test(Kernel kernel)
   {
     // all host fields are double precision, so the "other" fields just alias the regular fields
     ColorSpinorField &yoH = yH;
     ColorSpinorField &zoH = zH;
 
-    double a = M_PI, b = M_PI * exp(1.0), c = sqrt(M_PI);
-    quda::Complex a2(a, b), b2(b, -c), c2(a + b, c * a);
-    double error = 0;
-    std::vector<quda::Complex> A(Nsrc * Msrc);
-    std::vector<quda::Complex> B(Nsrc * Msrc);
-    std::vector<quda::Complex> C(Nsrc * Msrc);
-    std::vector<double> Ar(Nsrc * Msrc);
-    std::vector<double> Br(Nsrc * Msrc);
-    std::vector<double> Cr(Nsrc * Msrc);
+    quda::real_t  a = M_PI, b = M_PI * exp(1.0), c = sqrt(M_PI);
+    quda::complex_t a2(a, b), b2(b, -c), c2(a + b, c * a);
+    quda::real_t error = 0;
+    std::vector<quda::complex_t> A(Nsrc * Msrc);
+    std::vector<quda::complex_t> B(Nsrc * Msrc);
+    std::vector<quda::complex_t> C(Nsrc * Msrc);
+    std::vector<quda::real_t> Ar(Nsrc * Msrc);
+    std::vector<quda::real_t> Br(Nsrc * Msrc);
+    std::vector<quda::real_t> Cr(Nsrc * Msrc);
 
     // for norm multi-reduce tests
-    std::vector<quda::Complex> A2(Nsrc * Nsrc);
-    std::vector<quda::Complex> B2(Nsrc * Nsrc);
-    std::vector<double> A2r(Nsrc * Nsrc);
-    std::vector<double> B2r(Nsrc * Nsrc);
+    std::vector<quda::complex_t> A2(Nsrc * Nsrc);
+    std::vector<quda::complex_t> B2(Nsrc * Nsrc);
+    std::vector<quda::real_t> A2r(Nsrc * Nsrc);
+    std::vector<quda::real_t> B2r(Nsrc * Nsrc);
 
     // for 1-d multi-blas
-    std::vector<double> A1r(Nsrc);
-    std::vector<double> B1r(Nsrc);
-    std::vector<double> C1r(Nsrc);
+    std::vector<quda::real_t> A1r(Nsrc);
+    std::vector<quda::real_t> B1r(Nsrc);
+    std::vector<quda::real_t> C1r(Nsrc);
 
     for (int i = 0; i < Nsrc * Msrc; i++) {
-      A[i] = a2 * (1.0 * ((i / (double)Nsrc) + i)) + b2 * (1.0 * i) + c2 * (1.0 * (0.5 * Nsrc * Msrc - i));
-      B[i] = a2 * (1.0 * ((i / (double)Nsrc) + i)) - b2 * (M_PI * i) + c2 * (1.0 * (0.5 * Nsrc * Msrc - i));
-      C[i] = a2 * (1.0 * ((M_PI / (double)Nsrc) + i)) + b2 * (1.0 * i) + c2 * (1.0 * (0.5 * Nsrc * Msrc - i));
+      A[i] = a2 * (1.0 * ((i / (quda::real_t)Nsrc) + i)) + b2 * (1.0 * i) + c2 * (1.0 * (0.5 * Nsrc * Msrc - i));
+      B[i] = a2 * (1.0 * ((i / (quda::real_t)Nsrc) + i)) - b2 * (M_PI * i) + c2 * (1.0 * (0.5 * Nsrc * Msrc - i));
+      C[i] = a2 * (1.0 * ((M_PI / (quda::real_t)Nsrc) + i)) + b2 * (1.0 * i) + c2 * (1.0 * (0.5 * Nsrc * Msrc - i));
       Ar[i] = A[i].real();
       Br[i] = B[i].real();
       Cr[i] = C[i].real();
@@ -709,8 +709,8 @@ protected:
       xD = xH;
       yD = yH;
       {
-        double d = blas::axpbyzNorm(a, xD, b, yD, zD);
-        double h = blas::axpbyzNorm(a, xH, b, yH, zH);
+        auto d = blas::axpbyzNorm(a, xD, b, yD, zD);
+        auto h = blas::axpbyzNorm(a, xH, b, yH, zH);
         error = ERROR(z) + fabs(d - h) / fabs(h);
       }
       break;
@@ -719,9 +719,9 @@ protected:
       xD = xH;
       yoD = yH;
       {
-        double2 d = blas::axpyCGNorm(a, xD, yoD);
-        double2 h = blas::axpyCGNorm(a, xH, yH);
-        error = ERROR(yo) + fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y);
+        auto d = blas::axpyCGNorm(a, xD, yoD);
+        auto h = blas::axpyCGNorm(a, xH, yH);
+        error = ERROR(yo) + fabs(d[0] - h[0]) / fabs(h[0]) + fabs(d[1] - h[1]) / fabs(h[1]);
       }
       break;
 
@@ -729,8 +729,8 @@ protected:
       xD = xH;
       yD = yH;
       {
-        double d = blas::caxpyNorm(a, xD, yD);
-        double h = blas::caxpyNorm(a, xH, yH);
+        auto d = blas::caxpyNorm(a, xD, yD);
+        auto h = blas::caxpyNorm(a, xH, yH);
         error = ERROR(y) + fabs(d - h) / fabs(h);
       }
       break;
@@ -739,8 +739,8 @@ protected:
       xD = xH;
       yD = yH;
       {
-        double d = blas::cabxpyzAxNorm(a, b2, xD, yD, yD);
-        double h = blas::cabxpyzAxNorm(a, b2, xH, yH, yH);
+        auto d = blas::cabxpyzAxNorm(a, b2, xD, yD, yD);
+        auto h = blas::cabxpyzAxNorm(a, b2, xH, yH, yH);
         error = ERROR(x) + ERROR(y) + fabs(d - h) / fabs(h);
       }
       break;
@@ -756,8 +756,8 @@ protected:
       yD = yH;
       zD = zH;
       {
-        quda::Complex d = blas::caxpyDotzy(a, xD, yD, zD);
-        quda::Complex h = blas::caxpyDotzy(a, xH, yH, zH);
+        quda::complex_t d = blas::caxpyDotzy(a, xD, yD, zD);
+        quda::complex_t h = blas::caxpyDotzy(a, xH, yH, zH);
         error = ERROR(y) + abs(d - h) / abs(h);
       }
       break;
@@ -770,8 +770,8 @@ protected:
         auto dot = blas::cDotProduct(xH, yH);
         auto x2 = blas::norm2(xH);
         auto y2 = blas::norm2(yH);
-        error = abs(Complex(d.x - dot.real(), d.y - dot.imag())) / abs(dot) + fabs(d.z - x2) / fabs(x2)
-          + fabs(d.w - y2) / fabs(y2);
+        error = abs(complex_t(d[0] - dot.real(), d[1] - dot.imag())) / abs(dot) + fabs(d[2] - x2) / fabs(x2)
+          + fabs(d[3] - y2) / fabs(y2);
       }
       break;
 
@@ -782,10 +782,10 @@ protected:
       wD = wH;
       vD = vH;
       {
-        double3 d = blas::caxpbypzYmbwcDotProductUYNormY(a2, xD, b2, yD, zD, wD, vD);
-        double3 h = blas::caxpbypzYmbwcDotProductUYNormY(a2, xH, b2, yH, zH, wH, vH);
-        error = ERROR(z) + ERROR(y) + abs(Complex(d.x - h.x, d.y - h.y)) / abs(Complex(h.x, h.y))
-          + fabs(d.z - h.z) / fabs(h.z);
+        auto d = blas::caxpbypzYmbwcDotProductUYNormY(a2, xD, b2, yD, zD, wD, vD);
+        auto h = blas::caxpbypzYmbwcDotProductUYNormY(a2, xH, b2, yH, zH, wH, vH);
+        error = ERROR(z) + ERROR(y) + abs(complex_t(d[0] - h[0], d[1] - h[1])) / abs(complex_t(h[0], h[1]))
+          + fabs(d[2] - h[2]) / fabs(h[2]);
       }
       break;
 
@@ -793,9 +793,9 @@ protected:
       xD = xH;
       yD = yH;
       {
-        double3 d = blas::HeavyQuarkResidualNorm(xD, yD);
-        double3 h = blas::HeavyQuarkResidualNorm(xH, yH);
-        error = fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z);
+        auto d = blas::HeavyQuarkResidualNorm(xD, yD);
+        auto h = blas::HeavyQuarkResidualNorm(xH, yH);
+        error = fabs(d[0] - h[0]) / fabs(h[0]) + fabs(d[1] - h[1]) / fabs(h[1]) + fabs(d[2] - h[2]) / fabs(h[2]);
       }
       break;
 
@@ -804,9 +804,9 @@ protected:
       yD = yH;
       zD = zH;
       {
-        double3 d = blas::xpyHeavyQuarkResidualNorm(xD, yD, zD);
-        double3 h = blas::xpyHeavyQuarkResidualNorm(xH, yH, zH);
-        error = ERROR(y) + fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z);
+        auto d = blas::xpyHeavyQuarkResidualNorm(xD, yD, zD);
+        auto h = blas::xpyHeavyQuarkResidualNorm(xH, yH, zH);
+        error = ERROR(y) + fabs(d[0] - h[0]) / fabs(h[0]) + fabs(d[1] - h[1]) / fabs(h[1]) + fabs(d[2] - h[2]) / fabs(h[2]);
       }
       break;
 
@@ -815,9 +815,9 @@ protected:
       yD = yH;
       zD = zH;
       {
-        double3 d = blas::tripleCGReduction(xD, yD, zD);
-        double3 h = make_double3(blas::norm2(xH), blas::norm2(yH), blas::reDotProduct(yH, zH));
-        error = fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z);
+        auto d = blas::tripleCGReduction(xD, yD, zD);
+        auto h = array<quda::real_t, 3>{blas::norm2(xH), blas::norm2(yH), blas::reDotProduct(yH, zH)};
+        error = fabs(d[0] - h[0]) / fabs(h[0]) + fabs(d[1] - h[1]) / fabs(h[1]) + fabs(d[2] - h[2]) / fabs(h[2]);
       }
       break;
 
@@ -837,8 +837,8 @@ protected:
       xD = xH;
       yD = yH;
       {
-        double d = blas::axpyReDot(a, xD, yD);
-        double h = blas::axpyReDot(a, xH, yH);
+        auto d = blas::axpyReDot(a, xD, yD);
+        auto h = blas::axpyReDot(a, xH, yH);
         error = ERROR(y) + fabs(d - h) / fabs(h);
       }
       break;
@@ -1032,8 +1032,8 @@ protected:
       wD = yH;
       zD = zH;
       {
-        double3 Ar3 = blas::cDotProductNormA(zD, vD);
-        auto alpha = Complex(Ar3.x, Ar3.y) / Ar3.z;
+        auto Ar3 = blas::cDotProductNormA(zD, vD);
+        auto alpha = complex_t(Ar3[0], Ar3[1]) / Ar3[2];
         blas::caxpyXmaz(a * alpha, vD, wD, zD);
       }
       xH = vD;
@@ -1047,6 +1047,7 @@ protected:
     default: errorQuda("Undefined blas kernel %s\n", kernel_map.at(kernel).c_str());
     }
 
+    printfQuda("error = %16e\n", error);
     return error;
   }
 
@@ -1126,17 +1127,17 @@ TEST_P(BlasTest, verify)
 
   // certain tests will fail to run for coarse grids so mark these as
   // failed without running
-  double deviation = test(kernel);
+  auto deviation = test(kernel);
   // printfQuda("%-35s error = %e\n", names[kernel], deviation);
-  double tol_x
+  auto tol_x
     = (prec_pair.first == QUDA_DOUBLE_PRECISION ?
          1e-12 :
          (prec_pair.first == QUDA_SINGLE_PRECISION ? 1e-6 : (prec_pair.first == QUDA_HALF_PRECISION ? 1e-4 : 1e-2)));
-  double tol_y
+  auto tol_y
     = (prec_pair.second == QUDA_DOUBLE_PRECISION ?
          1e-12 :
          (prec_pair.second == QUDA_SINGLE_PRECISION ? 1e-6 : (prec_pair.second == QUDA_HALF_PRECISION ? 1e-4 : 1e-2)));
-  double tol = std::max(tol_x, tol_y);
+  auto tol = std::max(tol_x, tol_y);
   tol = is_copy(kernel) ? 5e-2 : tol; // use different tolerance for copy
   EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
   EXPECT_EQ(false, std::isnan(deviation)) << "Nan has propagated into the result";
@@ -1156,10 +1157,10 @@ TEST_P(BlasTest, benchmark)
   quda::blas::flops = 0;
   quda::blas::bytes = 0;
 
-  double secs = benchmark(kernel, niter);
+  auto secs = benchmark(kernel, niter);
 
-  double gflops = (quda::blas::flops * 1e-9) / (secs);
-  double gbytes = quda::blas::bytes / (secs * 1e9);
+  auto gflops = (quda::blas::flops * 1e-9) / (secs);
+  auto gbytes = quda::blas::bytes / (secs * 1e9);
   RecordProperty("Gflops", std::to_string(gflops));
   RecordProperty("GBs", std::to_string(gbytes));
   printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", kernel_map.at(kernel).c_str(), gflops, gbytes);

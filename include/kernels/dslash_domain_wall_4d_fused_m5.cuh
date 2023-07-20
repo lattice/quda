@@ -40,16 +40,16 @@ namespace quda
 
     bool fuse_m5inv_m5pre;
 
-    DomainWall4DFusedM5Arg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
-                           const Complex *b_5, const Complex *c_5, bool xpay, const ColorSpinorField &x,
-                           ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f) :
+    DomainWall4DFusedM5Arg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a, real_t m_5,
+                           const complex_t *b_5, const complex_t *c_5, bool xpay, const ColorSpinorField &x,
+                           ColorSpinorField &y, int parity, bool dagger, const int *comm_override, real_t m_f) :
       DomainWall4DArg(out, in, U, a, m_5, b_5, c_5, xpay, x, parity, dagger, comm_override),
       Dslash5Arg(out, in, x, m_f, m_5, b_5, c_5, a),
       y(y)
     {
       for (int s = 0; s < Ls; s++) {
-        auto kappa_b_s = 0.5 / (b_5[s] * (m_5 + 4.0) + 1.0);
-        a_5[s] = a * kappa_b_s * kappa_b_s;
+        auto kappa_b_s = real_t(0.5) / (b_5[s] * (real_t(m_5) + real_t(4.0)) + real_t(1.0));
+        a_5[s] = static_cast<complex<real>>(a * kappa_b_s * kappa_b_s);
       }; // 4-d Mobius
     }
   };

@@ -91,7 +91,7 @@ namespace quda {
       const bool comm[4];
 
       FusedDslashArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
-                     const ColorSpinorField &x, double m_f_, double m_5_, const Complex *b_5, const Complex *c_5,
+                     const ColorSpinorField &x, double m_f_, double m_5_, const complex_t *b_5, const complex_t *c_5,
                      int parity, int shift_[4], int halo_shift_[4]) :
         out(out),
         in(in),
