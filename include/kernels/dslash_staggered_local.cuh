@@ -99,10 +99,10 @@ namespace quda
        @param[in] coord Precomputed coordinate structure
        @param[in] U Fat link for self-contribution
        @param[in] in "In" vector at the output site
+       @param[in] d Dimension of gather
        @return Accumulated ColorVector for a "ghost" site
     */
-    template <int d>
-    __device__ __host__ Vector fatLinkForwardContribution(const Coord<nDim> &coord, const Link &U, const Vector &in) const {
+    __device__ __host__ Vector fatLinkForwardContribution(const Coord<nDim> &coord, const Link &U, const Vector &in, int d) const {
       // to be updated if we implement a full-parity version
       constexpr int my_spinor_parity = 0;
 
@@ -126,10 +126,10 @@ namespace quda
        @param[in] coord Precomputed coordinate structure
        @param[in] L Long link for self-contribution
        @param[in] in "In" vector at the output site
+       @param[in] d Dimension of gather
        @return Accumulated ColorVector for a "ghost" site
     */
-    template <int d>
-    __device__ __host__ Vector longLinkForwardContribution(const Coord<nDim> &coord, const Link &L, const Vector &in) const {
+    __device__ __host__ Vector longLinkForwardContribution(const Coord<nDim> &coord, const Link &L, const Vector &in, int d) const {
       static_assert(Arg::improved, "Long link contribution function called for unimproved staggered operator");
 
       // to be updated if we implement a full-parity version
@@ -156,10 +156,10 @@ namespace quda
        @param[in] coord Precomputed coordinate structure
        @param[in] U Fat link for self contribution
        @param[in] in "In" vector at the output site
+       @param[in] d Dimension of gather
        @return Accumulated ColorVector for a "ghost" site
     */
-    template <int d>
-    __device__ __host__ Vector fatLinkBackwardContribution(const Coord<nDim> &coord, const Link &U, const Vector &in) const {
+    __device__ __host__ Vector fatLinkBackwardContribution(const Coord<nDim> &coord, const Link &U, const Vector &in, int d) const {
       // to be updated if we implement a full-parity version
       constexpr int my_spinor_parity = 0;
 
@@ -192,10 +192,10 @@ namespace quda
        @param[in] coord Precomputed coordinate structure
        @param[in] L Long link for self contribution
        @param[in] in "In" vector at the output site
+       @param[in] d Dimension of gather
        @return Accumulated ColorVector for a "ghost" site
     */
-    template <int d>
-    __device__ __host__ Vector longLinkBackwardContribution(const Coord<nDim> &coord, const Link &L, const Vector &in) const {
+    __device__ __host__ Vector longLinkBackwardContribution(const Coord<nDim> &coord, const Link &L, const Vector &in, int d) const {
       static_assert(Arg::improved, "Long link contribution function called for unimproved staggered operator");
 
       // for if we ever do a full parity version
@@ -252,7 +252,7 @@ namespace quda
         }
 
         // improved - forward direction
-        if constexpr (arg.improved) {
+        if constexpr (Arg::improved) {
           if (!arg.is_partitioned[d] || (coord[d] + 3) < arg.dim[d]) {
             const int fwd3_idx = linkIndexP3(coord, arg.dim, d);
             const Link L = arg.L(d, coord.x_cb, arg.parity);
@@ -272,7 +272,7 @@ namespace quda
         }
 
         // improved - backward direction
-        if constexpr (arg.improved) {
+        if constexpr (Arg::improved) {
           if (!arg.is_partitioned[d] || (coord[d] - 3) >= 0) {
             const int back3_idx = linkIndexM3(coord, arg.dim, d);
             const int gauge_idx = back3_idx;
@@ -291,10 +291,10 @@ namespace quda
        @brief Applies the clover portion of the local dslash, which is D_{oe} for parity even and D_{eo} for parity odd. Assumes is_partitioned is true.
        @param[in,out] out Accumulated output
        @param[in] coord Precomputed Coord structure
+       @param[in] d Dimension of gather
        @return Accumulated output ColorVector
     */
-    template <int d>
-    __device__ __host__ void cloverDslashDirection(Vector &out, const Coord<nDim> &coord) const {
+    __device__ __host__ void cloverDslashDirection(Vector &out, const Coord<nDim> &coord, int d) const {
       static_assert(Arg::step == QUDA_STAGGERED_LOCAL_CLOVER, "cloverDslash called for a local argument struct");
       // to be updated if we implement a full-parity version
       constexpr int my_spinor_parity = 0;
@@ -313,12 +313,12 @@ namespace quda
       Vector in = arg.in(coord.x_cb, my_spinor_parity);
 
       // standard - forward direction
-      if ((coord[d] + 1) >= arg.dim[d]) {
+      if (arg.is_partitioned[d] && (coord[d] + 1) >= arg.dim[d]) {
         // Load the U link once for the "self" contribution
         const Link U = getU(d, coord.x_cb, arg.parity, +1);
 
         // perform backwards (from previous pass) -- gathering to "X"
-        Vector accum = fatLinkForwardContribution<d>(coord, U, in);
+        Vector accum = fatLinkForwardContribution(coord, U, in, d);
 
         // forwards - standard (gather from X, to X - 1)
         out = mv_add(U, accum, out);
@@ -326,12 +326,12 @@ namespace quda
 
       // improved - forward direction
       if constexpr (Arg::improved) {
-	if ((coord[d] + 3) >= arg.dim[d]) {
+	if (arg.is_partitioned[d] && (coord[d] + 3) >= arg.dim[d]) {
           // Load the L link once for the "self" contribution
           const Link L = arg.L(d, coord.x_cb, arg.parity);
 
           // perform backwards (from previous pass) -- gathering to ["X", "X+1", "X+2"]
-          Vector accum = longLinkForwardContribution<d>(coord, L, in);
+          Vector accum = longLinkForwardContribution(coord, L, in, d);
 
           // forwards - improved (gather from ["X", "X+1", "X+2"] to ["X-3","X-2","X-1"])
           out = mv_add(L, accum, out);
@@ -339,13 +339,13 @@ namespace quda
       }
 
       // standard - backward direction
-      if (coord[d] == 0) {
+      if (arg.is_partitioned[d] && coord[d] == 0) {
         // Load the U link once for the "self" contribution
         const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
         const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1);
 
         // first bit: gather from site [-1]
-        Vector accum = fatLinkBackwardContribution<d>(coord, U, in);
+        Vector accum = fatLinkBackwardContribution(coord, U, in, d);
 
         // and now, let's gather what we accumulated at [-1]
         out = mv_add(conj(U), -accum, out);
@@ -353,14 +353,12 @@ namespace quda
 
       // improved - backward direction
       if constexpr (Arg::improved) {
-        Vector accum;
-
-        if (coord[d] < 3) {
+        if (arg.is_partitioned[d] && coord[d] < 3) {
           const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
           const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
 
           // second bit: gather from site [-3]
-          accum = longLinkBackwardContribution<d>(coord, L, in);
+          Vector accum = longLinkBackwardContribution(coord, L, in, d);
 
           // and now, let's gather what we accumulated at [-3]
           out = mv_add(conj(L), -accum, out);
@@ -387,10 +385,9 @@ namespace quda
       coord.s = 0;
 
       if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_CLOVER) {
-        if (arg.is_partitioned[0]) cloverDslashDirection<0>(out, coord);
-        if (arg.is_partitioned[1]) cloverDslashDirection<1>(out, coord);
-        if (arg.is_partitioned[2]) cloverDslashDirection<2>(out, coord);
-        if (arg.is_partitioned[3]) cloverDslashDirection<3>(out, coord);
+#pragma unroll
+        for (int d = 0; d < nDim; d++)
+          cloverDslashDirection(out, coord, d);
       } else {
         out = localDslash(coord);
       } // is clover
