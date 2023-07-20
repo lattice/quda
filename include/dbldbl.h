@@ -306,6 +306,17 @@ struct doubledouble {
     this->a = sub_dbldbl(this->a, a.a);
     return *this;
   }
+
+  __device__ __host__ void operator*=(const doubledouble &a)
+  {
+    this->a = mul_dbldbl(this->a, a.a);
+  }
+
+  __device__ __host__ void operator/=(const doubledouble &a)
+  {
+    this->a = div_dbldbl(this->a, a.a);
+  }
+
   constexpr double head() const { return a.y; }
   constexpr double tail() const { return a.x; }
 
