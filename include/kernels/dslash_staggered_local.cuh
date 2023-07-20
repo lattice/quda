@@ -95,6 +95,134 @@ namespace quda
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**
+       @brief Computes the contribution to a "ghost" site needed for the forwards 1-hop link on the axpy step.
+       @param[in] coord Precomputed coordinate structure
+       @param[in] U Fat link for self-contribution
+       @param[in] in "In" vector at the output site
+       @return Accumulated ColorVector for a "ghost" site
+    */
+    template <int d>
+    __device__ __host__ Vector fatLinkForwardContribution(const Coord<nDim> &coord, const Link &U, const Vector &in) const {
+      // to be updated if we implement a full-parity version
+      constexpr int my_spinor_parity = 0;
+
+      // contribution from [X - 1] (self)
+      Vector accum = -conj(U) * in;
+
+      // contribution from [X - 3]
+      if constexpr (Arg::improved) {
+        const int back2_idx = linkIndexM2(coord, arg.dim, d);
+        const int gauge_idx = back2_idx;
+        const Link L = arg.L(d, gauge_idx, arg.parity);
+        const Vector in_L = arg.in(back2_idx, my_spinor_parity);
+        accum = mv_add(conj(L), -in_L, accum);
+      }
+
+      return accum;
+    }
+
+    /**
+       @brief Computes the contribution to a "ghost" site needed for the forwards 3-hop link on the axpy step.
+       @param[in] coord Precomputed coordinate structure
+       @param[in] L Long link for self-contribution
+       @param[in] in "In" vector at the output site
+       @return Accumulated ColorVector for a "ghost" site
+    */
+    template <int d>
+    __device__ __host__ Vector longLinkForwardContribution(const Coord<nDim> &coord, const Link &L, const Vector &in) const {
+      static_assert(Arg::improved, "Long link contribution function called for unimproved staggered operator");
+
+      // to be updated if we implement a full-parity version
+      constexpr int my_spinor_parity = 0;
+
+      // contribution from [X - 1, X - 2, or X - 3] (self)
+      Vector accum = -conj(L) * in;
+
+      // contribution from [X - 1]
+      if ((coord[d] + 3) == arg.dim[d]) {
+        const int fwd2_idx = linkIndexP2(coord, arg.dim, d);
+        const int gauge_idx = fwd2_idx;
+        // we do not need the "StaggeredPhase" because there's a guarantee this is the improved operator
+        const Link U = arg.U(d, gauge_idx, arg.parity);
+        const Vector in_U = arg.in(fwd2_idx, my_spinor_parity);
+        accum = mv_add(conj(U), -in_U, accum);
+      }
+
+      return accum;
+    }
+
+    /**
+       @brief Computes the contribution to a "ghost" site needed for the backwards 1-hop link on the axpy step
+       @param[in] coord Precomputed coordinate structure
+       @param[in] U Fat link for self contribution
+       @param[in] in "In" vector at the output site
+       @return Accumulated ColorVector for a "ghost" site
+    */
+    template <int d>
+    __device__ __host__ Vector fatLinkBackwardContribution(const Coord<nDim> &coord, const Link &U, const Vector &in) const {
+      // to be updated if we implement a full-parity version
+      constexpr int my_spinor_parity = 0;
+
+      // contribution from [0] (self)
+      Vector accum = U * in;
+
+      // contribution from [2]
+      if constexpr (Arg::improved) {
+        const int fwd2_idx = linkIndexP2(coord, arg.dim, d);
+        const Vector in_L = arg.in(fwd2_idx, my_spinor_parity);
+
+        // need some special sauce to get the index for the ghost L
+        // we only need a few specific components of Coord<nDim>
+        int coord_copy[nDim];
+#pragma unroll
+        for (int d_ = 0; d_ < nDim; d_++)
+          coord_copy[d_] = coord[d_];
+        coord_copy[d] = 2;
+        const int ghost_idx = ghostFaceIndexStaggered<0>(coord_copy, arg.dim, d, 1);
+        const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
+
+        accum = mv_add(L, in_L, accum);
+      }
+
+      return accum;
+    }
+
+    /**
+       @brief Computes the self-contribution to a "ghost" site needed for the backwards 3-hop link on the axpy step
+       @param[in] coord Precomputed coordinate structure
+       @param[in] L Long link for self contribution
+       @param[in] in "In" vector at the output site
+       @return Accumulated ColorVector for a "ghost" site
+    */
+    template <int d>
+    __device__ __host__ Vector longLinkBackwardContribution(const Coord<nDim> &coord, const Link &L, const Vector &in) const {
+      static_assert(Arg::improved, "Long link contribution function called for unimproved staggered operator");
+
+      // for if we ever do a full parity version
+      constexpr int my_spinor_parity = 0;
+
+      // contribution from self [0, 1, or 2]
+      Vector accum = L * in;
+
+      // contibution from [0]
+      if (coord[d] == 2) {
+        const int bak2_idx = linkIndexM2(coord, arg.dim, d);
+        Vector in_U = arg.in(bak2_idx, my_spinor_parity);
+
+        // need some special sauce to get the index for the ghost L
+        // we only need a few specific components of Coord<nDim>
+        auto coord_copy = coord;
+        coord_copy[d] = 0;
+        const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord_copy, arg.dim, d, 1);
+        // we do not need an extra "StaggeredPhase" argument because there's a guarantee that this is the improved operator
+        const Link U = arg.U.Ghost(d, ghost_idx2, 1 - arg.parity);
+        accum = mv_add(U, in_U, accum);
+      }
+
+      return accum;
+    }
+
+    /**
        @brief Applies step 1 and 2 of the local dslash, which is D_{oe} for parity even and D_{eo} for parity odd
        @param[in] coord Precomputed Coord structure
        @return Accumulated output ColorVector
@@ -186,174 +314,56 @@ namespace quda
 
       // standard - forward direction
       if ((coord[d] + 1) >= arg.dim[d]) {
+        // Load the U link once for the "self" contribution
+        const Link U = getU(d, coord.x_cb, arg.parity, +1);
+
         // perform backwards (from previous pass) -- gathering to "X"
-        Vector accum;
-
-        // backwards - standard (gather from X - 1, to X)
-        {
-          const Link U = getU(d, coord.x_cb, arg.parity, +1);
-          accum = mv_add(conj(U), -in, accum);
-        }
-
-        // backwards -- improved (gather from X - 3, to X)
-        if constexpr (arg.improved) {
-          const int back2_idx = linkIndexM2(coord, arg.dim, d);
-          const int gauge_idx = back2_idx;
-          const Link L = arg.L(d, gauge_idx, arg.parity);
-          const Vector in_L = arg.in(back2_idx, my_spinor_parity);
-          accum = mv_add(conj(L), -in_L, accum);
-        }
+        Vector accum = fatLinkForwardContribution<d>(coord, U, in);
 
         // forwards - standard (gather from X, to X - 1)
-        {
-          const Link U = getU(d, coord.x_cb, arg.parity, +1);
-          out = mv_add(U, accum, out);
-        }
+        out = mv_add(U, accum, out);
       }
 
       // improved - forward direction
-      if constexpr (arg.improved) {
+      if constexpr (Arg::improved) {
 	if ((coord[d] + 3) >= arg.dim[d]) {
+          // Load the L link once for the "self" contribution
+          const Link L = arg.L(d, coord.x_cb, arg.parity);
+
           // perform backwards (from previous pass) -- gathering to ["X", "X+1", "X+2"]
-          Vector accum;
-
-          // backwards - standard (gather from X - 1, to X)
-          if ((coord[d] + 3) == arg.dim[d]) {
-            const int fwd2_idx = linkIndexP2(coord, arg.dim, d);
-            const int gauge_idx = fwd2_idx;
-            const Link U = getU(d, gauge_idx, arg.parity, +1);
-            const Vector in_U = arg.in(fwd2_idx, my_spinor_parity);
-            accum = mv_add(conj(U), -in_U, accum);
-          }
-
-          // backwards - improved (gather from ["X-3","X-2","X-1"] to ["X","X+1","X+2"])
-          {
-            const Link L = arg.L(d, coord.x_cb, arg.parity);
-            accum = mv_add(conj(L), -in, accum);
-          }
+          Vector accum = longLinkForwardContribution<d>(coord, L, in);
 
           // forwards - improved (gather from ["X", "X+1", "X+2"] to ["X-3","X-2","X-1"])
-          {
-            const Link L = arg.L(d, coord.x_cb, arg.parity);
-            out = mv_add(L, accum, out);
-          }
+          out = mv_add(L, accum, out);
         }
       }
 
-      // everything is awful, so let's really break this up
+      // standard - backward direction
       if (coord[d] == 0) {
+        // Load the U link once for the "self" contribution
+        const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+        const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1);
+
         // first bit: gather from site [-1]
-
-        // two contributions: one from self [0], one from forward [2]
-        Vector accum;
-
-        // contribution from self
-        {
-          const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-          const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1);
-          accum = mv_add(U, in, accum);
-        }
-
-        // contribution from [2]
-        if constexpr (arg.improved) {
-          const int fwd2_idx = linkIndexP2(coord, arg.dim, d);
-          const Vector in_L = arg.in(fwd2_idx, my_spinor_parity);
-
-          // need some special sauce to get the index for the ghost L
-          // we only need a few specific components of Coord<nDim>
-          int coord_copy[nDim];
-#pragma unroll
-          for (int d_ = 0; d_ < nDim; d_++)
-            coord_copy[d_] = coord[d_];
-          coord_copy[d] = 2;
-          const int ghost_idx = ghostFaceIndexStaggered<0>(coord_copy, arg.dim, d, 1);
-          const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
-
-          accum = mv_add(L, in_L, accum);
-        }
+        Vector accum = fatLinkBackwardContribution<d>(coord, U, in);
 
         // and now, let's gather what we accumulated at [-1]
-        {
-          const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-          const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1);
-          out = mv_add(conj(U), -accum, out);
-        }
-
-        // second bit: gather from site [-3]
-
-        // one contribution: one from self [0]
-        accum = Vector();
-
-        // contribution from self
-        if constexpr (arg.improved) {
-          const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-          const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
-          accum = mv_add(L, in, accum);
-        }
-
-        // and now, let's gather what we accumulated at [-3]
-        if constexpr (arg.improved) {
-          const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-          const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
-          out = mv_add(conj(L), -accum, out);
-        }
+        out = mv_add(conj(U), -accum, out);
       }
 
-      if constexpr (arg.improved) {
-        if (coord[d] == 1) {
-          // surprisingly easy: we only need to do the hop out/hop in by three for the "self"
+      // improved - backward direction
+      if constexpr (Arg::improved) {
+        Vector accum;
 
-          // first bit: gather from site [-2]
+        if (coord[d] < 3) {
+          const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+          const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
 
-          // one contribution: one from self
-          Vector accum;
+          // second bit: gather from site [-3]
+          accum = longLinkBackwardContribution<d>(coord, L, in);
 
-          // contribution from self
-          {
-            const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-            const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
-            accum = mv_add(L, in, accum);
-          }
-
-          // second bit: gather what we accumulated at [-2] to [1]
-          {
-            const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-            const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
-            out = mv_add(conj(L), -accum, out);
-          }
-        }
-
-        if (coord[d] == 2) {
-          // first bit: gather from site [-1]
-
-          // two contributions: one from self, one from [0]
-          Vector accum;
-
-          // contribution from self:
-          {
-            const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-            const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
-            accum = mv_add(L, in, accum);
-          }
-
-          // contribution from [0]
-          {
-            const int bak2_idx = linkIndexM2(coord, arg.dim, d);
-            Vector in = arg.in(bak2_idx, my_spinor_parity);
-            auto coord_copy = coord;
-            coord_copy[d] = 0;
-            const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord_copy, arg.dim, d, 1);
-            const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1);
-
-            accum = mv_add(U, in, accum);
-          }
-
-          // second bit: gather what we accumulated at [-1] to [2]
-          {
-            const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-            const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
-            out = mv_add(conj(L), -accum, out);
-          }
+          // and now, let's gather what we accumulated at [-3]
+          out = mv_add(conj(L), -accum, out);
         }
       }
     }
