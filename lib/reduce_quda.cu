@@ -101,7 +101,7 @@ namespace quda {
           using host_store_t = typename host_type_mapper<store_t>::type;
           using host_y_store_t = typename host_type_mapper<y_store_t>::type;
           using host_real_t = typename mapper<host_y_store_t>::type;
-          Reducer<double, host_real_t> r_(a, b);
+          Reducer<device_reduce_t, host_real_t> r_(a, b);
 
           // redefine site_unroll with host_store types to ensure we have correct N/Ny/M values
           constexpr bool site_unroll = !std::is_same<host_store_t, host_y_store_t>::value || isFixed<host_store_t>::value || decltype(r)::site_unroll;
