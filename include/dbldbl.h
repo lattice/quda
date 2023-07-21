@@ -337,6 +337,8 @@ __device__ __host__ inline bool isinf(const doubledouble &a) { return isinf(a.he
 
 __device__ __host__ inline bool isnan(const doubledouble &a) { return isnan(a.head()); }
 
+__device__ __host__ inline bool isfinite(const doubledouble &a) { return isfinite(a.head()); }
+
 __device__ __host__  inline bool operator>(const doubledouble &a, const doubledouble &b)
 {
   if (a.head() > b.head()) {
