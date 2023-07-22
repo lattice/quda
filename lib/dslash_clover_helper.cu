@@ -59,9 +59,9 @@ namespace quda {
     ColorSpinorField &out;
     const ColorSpinorField &in;
     const CloverField &clover;
-    double kappa;
-    double mu;
-    double epsilon;
+    real_t kappa;
+    real_t mu;
+    real_t epsilon;
     int parity;
     bool inverse;
     int dagger;
@@ -75,7 +75,7 @@ namespace quda {
 
   public:
     TwistClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
-                double kappa, double mu, double epsilon, int parity, int dagger, QudaTwistGamma5Type twist) :
+                real_t kappa, real_t mu, real_t epsilon, int parity, int dagger, QudaTwistGamma5Type twist) :
       TunableKernel3D(in, in.TwistFlavor(), in.SiteSubset()),
       out(out),
       in(in),
@@ -129,13 +129,13 @@ namespace quda {
 #ifdef GPU_TWISTED_CLOVER_DIRAC
   //Apply the twisted-clover matrix field to a colorspinor field
   void ApplyTwistClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
-			double kappa, double mu, double epsilon, int parity, int dagger, QudaTwistGamma5Type twist)
+			real_t kappa, real_t mu, real_t epsilon, int parity, int dagger, QudaTwistGamma5Type twist)
   {
     instantiate<TwistClover>(out, in, clover, kappa, mu, epsilon, parity, dagger, twist);
   }
 #else
   void ApplyTwistClover(ColorSpinorField &, const ColorSpinorField &, const CloverField &,
-			double, double, double, int, int, QudaTwistGamma5Type)
+			real_t, real_t, real_t, int, int, QudaTwistGamma5Type)
   {
     errorQuda("Twisted-clover dslash has not been built");
   }

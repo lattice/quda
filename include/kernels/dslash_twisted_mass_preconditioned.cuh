@@ -15,7 +15,7 @@ namespace quda
     real a_inv;      /** inverse scaling factor - used to allow early xpay inclusion */
     real b_inv;      /** inverse twist factor - used to allow early xpay inclusion */
 
-    TwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b, bool xpay,
+    TwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a, real_t b, bool xpay,
                    const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
       a(a),

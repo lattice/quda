@@ -8,8 +8,8 @@ namespace quda {
 
   template<>
   void CoarseCoarseOp<fineColor, coarseColor, use_mma>(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
-                                                       const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mass,
-                                                       double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional)
+                                                       const GaugeField &clover, const GaugeField &cloverInv, real_t kappa, real_t mass,
+                                                       real_t mu, real_t mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional)
   {
     QudaFieldLocation location = checkLocation(X, Y, gauge, clover, cloverInv);
     if (location == QUDA_CPU_FIELD_LOCATION) errorQuda("use_mma = true does not go with QUDA_CPU_FIELD_LOCATION.");

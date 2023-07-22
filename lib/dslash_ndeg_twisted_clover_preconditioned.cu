@@ -99,7 +99,7 @@ namespace quda
     
     inline NdegTwistedCloverPreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in,
                                                 const GaugeField &U, const CloverField &A,
-                                                double a, double b, double c, bool xpay,
+                                                real_t a, real_t b, real_t c, bool xpay,
                                                 const ColorSpinorField &x, int parity, bool dagger,
                                                 const int *comm_override, TimeProfile &profile)
     {
@@ -114,7 +114,7 @@ namespace quda
 #ifdef GPU_NDEG_TWISTED_CLOVER_DIRAC
   void ApplyNdegTwistedCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in,
                                             const GaugeField &U, const CloverField &A,
-                                            double a, double b, double c, bool xpay,
+                                            real_t a, real_t b, real_t c, bool xpay,
                                             const ColorSpinorField &x, int parity, bool dagger,
                                             const int *comm_override, TimeProfile &profile)
   {
@@ -122,7 +122,7 @@ namespace quda
   }
 #else
   void ApplyNdegTwistedCloverPreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, const CloverField &,
-                                            double, double, double, bool, const ColorSpinorField &, int, bool,
+                                            real_t, real_t, real_t, bool, const ColorSpinorField &, int, bool,
                                             const int *, TimeProfile &)
   {
     errorQuda("Non-degenerate preconditioned twisted-clover dslash has not been built");

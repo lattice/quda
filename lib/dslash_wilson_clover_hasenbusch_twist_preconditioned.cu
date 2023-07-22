@@ -117,7 +117,7 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverHasenbuschTwistPCNoClovInvApply {
 
     inline WilsonCloverHasenbuschTwistPCNoClovInvApply(ColorSpinorField &out, const ColorSpinorField &in,
-                                                       const GaugeField &U, const CloverField &A, double a, double b,
+                                                       const GaugeField &U, const CloverField &A, real_t a, real_t b,
                                                        const ColorSpinorField &x, int parity, bool dagger,
                                                        const int *comm_override, TimeProfile &profile)
     {
@@ -136,7 +136,7 @@ namespace quda
   // Uses the kappa normalization for the Wilson operator.
 #ifdef GPU_CLOVER_HASENBUSCH_TWIST
   void ApplyWilsonCloverHasenbuschTwistPCNoClovInv(ColorSpinorField &out, const ColorSpinorField &in,
-                                                   const GaugeField &U, const CloverField &A, double a, double b,
+                                                   const GaugeField &U, const CloverField &A, real_t a, real_t b,
                                                    const ColorSpinorField &x, int parity, bool dagger,
                                                    const int *comm_override, TimeProfile &profile)
   {
@@ -145,7 +145,7 @@ namespace quda
   }
 #else
   void ApplyWilsonCloverHasenbuschTwistPCNoClovInv(ColorSpinorField &, const ColorSpinorField &,
-                                                   const GaugeField &, const CloverField &, double, double,
+                                                   const GaugeField &, const CloverField &, real_t, real_t,
                                                    const ColorSpinorField &, int, bool, const int *, TimeProfile &)
   {
     errorQuda("Clover Hasenbusch Twist dslash has not been built");
@@ -264,7 +264,7 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverHasenbuschTwistPCClovInvApply {
 
     inline WilsonCloverHasenbuschTwistPCClovInvApply(ColorSpinorField &out, const ColorSpinorField &in,
-                                                     const GaugeField &U, const CloverField &A, double kappa, double mu,
+                                                     const GaugeField &U, const CloverField &A, real_t kappa, real_t mu,
                                                      const ColorSpinorField &x, int parity, bool dagger,
                                                      const int *comm_override, TimeProfile &profile)
     {
@@ -282,7 +282,7 @@ namespace quda
   // Uses the kappa normalization for the Wilson operator.
 #ifdef GPU_CLOVER_HASENBUSCH_TWIST
   void ApplyWilsonCloverHasenbuschTwistPCClovInv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                                 const CloverField &A, double a, double b, const ColorSpinorField &x,
+                                                 const CloverField &A, real_t a, real_t b, const ColorSpinorField &x,
                                                  int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
     instantiate<WilsonCloverHasenbuschTwistPCClovInvApply>(out, in, U, A, a, b, x, parity, dagger, comm_override,
@@ -290,7 +290,7 @@ namespace quda
   }
 #else
   void ApplyWilsonCloverHasenbuschTwistPCClovInv(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
-                                                 const CloverField &, double, double, const ColorSpinorField &,
+                                                 const CloverField &, real_t, real_t, const ColorSpinorField &,
                                                  int, bool, const int *, TimeProfile &)
   {
     errorQuda("Clover Hasenbusch Twist dslash has not been built");

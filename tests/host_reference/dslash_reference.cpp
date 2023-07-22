@@ -794,18 +794,18 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
   mxpy(in.data(), ref.data(), len * stag_spinor_site_size, inv_param.cpu_prec);
   double nrm2 = norm_2(ref.data(), len * stag_spinor_site_size, inv_param.cpu_prec);
   double src2 = norm_2(in.data(), len * stag_spinor_site_size, inv_param.cpu_prec);
-  double hqr = sqrt(quda::blas::HeavyQuarkResidualNorm(out, ref)[2]);
+  auto hqr = sqrt(quda::blas::HeavyQuarkResidualNorm(out, ref)[2]);
   double l2r = sqrt(nrm2 / src2);
 
   if (multishift == 1) {
     printfQuda("Residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, QUDA = %9.6e, "
                "host = %9.6e\n",
-               inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
+               inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, double(hqr));
   } else {
     printfQuda("Shift %2d residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, "
                "QUDA = %9.6e, host = %9.6e\n",
                shift, inv_param.tol_offset[shift], inv_param.true_res_offset[shift], l2r,
-               inv_param.tol_hq_offset[shift], inv_param.true_res_hq_offset[shift], hqr);
+               inv_param.tol_hq_offset[shift], inv_param.true_res_hq_offset[shift], double(hqr));
     // Empirical: if the cpu residue is more than 1 order the target accuracy, then it fails to converge
     if (sqrt(nrm2 / src2) > 10 * inv_param.tol_offset[shift]) {
       printfQuda("Shift %2d has empirically failed to converge\n", shift);

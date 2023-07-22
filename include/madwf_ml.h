@@ -82,7 +82,7 @@ namespace quda
 
     MadwfParam param;
 
-    double mu;
+    real_t mu;
 
     ColorSpinorField forward_tmp;
     ColorSpinorField backward_tmp;
@@ -106,7 +106,7 @@ namespace quda
       @param[out] out the output vector
       @param[in] in the input vector
     */
-    double cost(const DiracMatrix &ref, Solver &base, ColorSpinorField &out, const ColorSpinorField &in);
+    real_t cost(const DiracMatrix &ref, Solver &base, ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
       @brief Save the current parameter to disk

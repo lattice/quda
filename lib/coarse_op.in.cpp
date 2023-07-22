@@ -8,7 +8,7 @@ namespace quda
 
   template <int fineColor, int coarseColor, int... N>
   void CoarseOp2(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge, const CloverField *clover,
-                 double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
+                 real_t kappa, real_t mass, real_t mu, real_t mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
                  IntList<coarseColor, N...>)
   {
     if (Y.Ncolor() / 2 == coarseColor) {
@@ -24,7 +24,7 @@ namespace quda
 
   template <int fineColor, int... N>
   void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge, const CloverField *clover,
-                double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
+                real_t kappa, real_t mass, real_t mu, real_t mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
                 IntList<fineColor, N...>)
   {
     if (gauge.Ncolor() == fineColor) {
@@ -42,7 +42,7 @@ namespace quda
   }
 
   void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge, const CloverField *clover,
-                double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
+                real_t kappa, real_t mass, real_t mu, real_t mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
   {
     if constexpr (is_enabled_multigrid()) {
       IntList<3> fineColors;

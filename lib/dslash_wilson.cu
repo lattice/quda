@@ -37,7 +37,7 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonApply {
 
-    inline WilsonApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+    inline WilsonApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a,
                        const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
@@ -52,13 +52,13 @@ namespace quda
   // out(x) = M*in = - a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   // Uses the a normalization for the Wilson operator.
 #ifdef GPU_WILSON_DIRAC
-  void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+  void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a,
                    const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
     instantiate<WilsonApply, WilsonReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
   }
 #else
-  void ApplyWilson(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double,
+  void ApplyWilson(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, real_t,
                    const ColorSpinorField &, int, bool, const int *, TimeProfile &)
   {
     errorQuda("Wilson dslash has not been built");

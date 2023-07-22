@@ -8,7 +8,7 @@ namespace quda
 
   template <int Nc, int... N>
   void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
-                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
+                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, real_t kappa,
                    int parity, bool dslash, bool clover, bool dagger, const int *commDim, QudaPrecision halo_precision,
                    IntList<Nc, N...>)
   {
@@ -32,7 +32,7 @@ namespace quda
   // out(x) = M^dagger*in = X^dagger*in - kappa*\sum_mu Y^\dagger_{-\mu}(x)in(x+mu) + Y_mu(x-mu)in(x-mu)
   // Uses the kappa normalization for the Wilson operator.
   void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
-                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
+                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, real_t kappa,
                    int parity, bool dslash, bool clover, bool dagger, const int *commDim, QudaPrecision halo_precision)
   {
     if constexpr (is_enabled_multigrid()) {

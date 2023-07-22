@@ -11,9 +11,9 @@ namespace quda
   //   i.e. out(x) = M*in = in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   // ... and then m5pre
 #ifdef GPU_DOMAIN_WALL_DIRAC
-  void ApplyDomainWall4DM5pre(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                              double m_5, const complex_t *b_5, const complex_t *c_5, const ColorSpinorField &x,
-                              ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
+  void ApplyDomainWall4DM5pre(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a,
+                              real_t m_5, const complex_t *b_5, const complex_t *c_5, const ColorSpinorField &x,
+                              ColorSpinorField &y, int parity, bool dagger, const int *comm_override, real_t m_f,
                               TimeProfile &profile)
   {
     auto dummy_list = Dslash5TypeList<Dslash5Type::DSLASH5_MOBIUS_PRE>();
@@ -21,9 +21,9 @@ namespace quda
                                           dummy_list, profile);
   }
 #else
-  void ApplyDomainWall4DM5pre(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double,
-                              double, const complex_t *, const complex_t *, const ColorSpinorField &,
-                              ColorSpinorField &, int, bool, const int *, double, TimeProfile &)
+  void ApplyDomainWall4DM5pre(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, real_t,
+                              real_t, const complex_t *, const complex_t *, const ColorSpinorField &,
+                              ColorSpinorField &, int, bool, const int *, real_t, TimeProfile &)
   {
     errorQuda("Domain-wall dslash has not been built");
   }

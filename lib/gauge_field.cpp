@@ -880,8 +880,8 @@ namespace quda {
       if (g.nFace != nFace) errorQuda("nFace does not match %d %d", nFace, g.nFace);
       if (g.fixed != fixed) errorQuda("fixed does not match %d %d", fixed, g.fixed);
       if (g.t_boundary != t_boundary) errorQuda("t_boundary does not match %d %d", t_boundary, g.t_boundary);
-      if (g.anisotropy != anisotropy) errorQuda("anisotropy does not match %e %e", anisotropy, g.anisotropy);
-      if (g.tadpole != tadpole) errorQuda("tadpole does not match %e %e", tadpole, g.tadpole);
+      if (g.anisotropy != anisotropy) errorQuda("anisotropy does not match %e %e", double(anisotropy), double(g.anisotropy));
+      if (g.tadpole != tadpole) errorQuda("tadpole does not match %e %e", double(tadpole), double(g.tadpole));
     }
     catch(std::bad_cast &e) {
       errorQuda("Failed to cast reference to GaugeField");
@@ -1121,9 +1121,9 @@ namespace quda {
     output << "order = " << param.order << std::endl;
     output << "fixed = " << param.fixed << std::endl;
     output << "link_type = " << param.link_type << std::endl;
-    output << "t_boundary = " << param.t_boundary << std::endl;
-    output << "anisotropy = " << param.anisotropy << std::endl;
-    output << "tadpole = " << param.tadpole << std::endl;
+    output << "t_boundary = " << double(param.t_boundary) << std::endl;
+    output << "anisotropy = " << double(param.anisotropy) << std::endl;
+    output << "tadpole = " << double(param.tadpole) << std::endl;
     output << "create = " << param.create << std::endl;
     output << "geometry = " << param.geometry << std::endl;
     output << "staggeredPhaseType = " << param.staggeredPhaseType << std::endl;
@@ -1169,21 +1169,21 @@ namespace quda {
   }
 
   // Return the L2 norm squared of the gauge field
-  double norm2(const GaugeField &a)
+  real_t norm2(const GaugeField &a)
   {
     ColorSpinorField b(colorSpinorParam(a));
     return blas::norm2(b);
   }
 
   // Return the L1 norm of the gauge field
-  double norm1(const GaugeField &a)
+  real_t norm1(const GaugeField &a)
   {
     ColorSpinorField b(colorSpinorParam(a));
     return blas::norm1(b);
   }
 
   // Scale the gauge field by the constant a
-  void ax(const double &a, GaugeField &u)
+  void ax(const real_t &a, GaugeField &u)
   {
     ColorSpinorField b(colorSpinorParam(u));
     blas::ax(a, b);

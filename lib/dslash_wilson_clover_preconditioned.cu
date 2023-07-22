@@ -110,7 +110,7 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverPreconditionedApply {
 
     inline WilsonCloverPreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-        const CloverField &A, double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+        const CloverField &A, real_t a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
         TimeProfile &profile)
     {
       constexpr int nDim = 4;
@@ -126,14 +126,14 @@ namespace quda
   // Uses the kappa normalization for the Wilson operator.
 #ifdef GPU_CLOVER_DIRAC
   void ApplyWilsonCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-      const CloverField &A, double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+      const CloverField &A, real_t a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
       TimeProfile &profile)
   {
     instantiate<WilsonCloverPreconditionedApply>(out, in, U, A, a, x, parity, dagger, comm_override, profile);
   }
 #else
   void ApplyWilsonCloverPreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
-                                       const CloverField &, double, const ColorSpinorField &, int, bool, const int *,
+                                       const CloverField &, real_t, const ColorSpinorField &, int, bool, const int *,
                                        TimeProfile &)
   {
     errorQuda("Clover dslash has not been built");

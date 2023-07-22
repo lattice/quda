@@ -40,7 +40,7 @@ protected:
   QudaGaugeParam param;
   Timer<false> a0, a1;
   GaugeField *U;
-  double3 plaq;
+  array<real_t, 3> plaq;
 
   void SetReunitarizationConsts()
   {
@@ -53,21 +53,21 @@ protected:
     setUnitarizeLinksConstants(unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
   }
 
-  bool comparePlaquette(double3 a, double3 b)
+  bool comparePlaquette(array<real_t, 3> &a, array<real_t, 3> &b)
   {
-    auto a0 = std::abs(a.x - b.x);
-    auto a1 = std::abs(a.y - b.y);
-    auto a2 = std::abs(a.z - b.z);
-    double prec_val = 1.0e-5;
+    auto a0 = abs(a[0] - b[0]);
+    auto a1 = abs(a[1] - b[1]);
+    auto a2 = abs(a[2] - b[2]);
+    real_t prec_val = 1.0e-5;
     if (prec == QUDA_DOUBLE_PRECISION) prec_val = gf_tolerance * 1e2;
     return ((a0 < prec_val) && (a1 < prec_val) && (a2 < prec_val));
   }
 
-  bool CheckDeterminant(double2 detu)
+  bool CheckDeterminant(complex_t &detu)
   {
-    double prec_val = 5e-8;
+    real_t prec_val = 5e-8;
     if (prec == QUDA_DOUBLE_PRECISION) prec_val = gf_tolerance * 1e2;
-    return (std::abs(1.0 - detu.x) < prec_val && std::abs(detu.y) < prec_val);
+    return (abs(real_t(1.0) - detu.real()) < prec_val && abs(detu.imag()) < prec_val);
   }
 
   virtual void SetUp()
@@ -116,7 +116,7 @@ protected:
         int nhbsteps = heatbath_num_heatbath_per_step;
         int novrsteps = heatbath_num_overrelax_per_step;
         bool coldstart = heatbath_coldstart;
-        double beta_value = heatbath_beta_value;
+        real_t beta_value = heatbath_beta_value;
         a1.start();
 
         if (coldstart)
@@ -134,7 +134,7 @@ protected:
           qudaDeviceSynchronize();
           if (*num_failures_h > 0) errorQuda("Error in the unitarization (%d errors)", *num_failures_h);
           plaq = plaquette(*U);
-          printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+          printfQuda("Plaq:    %.16e, %.16e, %.16e\n", double(plaq[0]), double(plaq[1]), double(plaq[2]));
         }
 
         a1.stop();
@@ -178,7 +178,7 @@ protected:
         if (*num_failures_h > 0) errorQuda("Error in the unitarization (%d errors)", *num_failures_h);
 
         plaq = plaquette(*U);
-        printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+        printfQuda("Plaq:    %.16e, %.16e, %.16e\n", double(plaq[0]), double(plaq[1]), double(plaq[2]));
       }
 
       // If a specific test type is requested, perfrom it now and then
@@ -201,8 +201,8 @@ protected:
     if (execute) {
       auto detu = getLinkDeterminant(*U);
       auto tru = getLinkTrace(*U);
-      printfQuda("Det: %.16e:%.16e\n", detu.x, detu.y);
-      printfQuda("Tr: %.16e:%.16e\n", tru.x / 3.0, tru.y / 3.0);
+      printfQuda("Det: %.16e:%.16e\n", double(detu.real()), double(detu.imag()));
+      printfQuda("Tr: %.16e:%.16e\n", double(tru.real()) / 3.0, double(tru.imag()) / 3.0);
 
       delete U;
       // Release all temporary memory used for data exchange between GPUs in multi-GPU mode
@@ -221,8 +221,8 @@ protected:
       gaugeFixingOVR(*U, gf_gauge_dir, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance,
                      gf_reunit_interval, gf_theta_condition);
       auto plaq_gf = plaquette(*U);
-      printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-      printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+      printfQuda("Plaq:    %.16e, %.16e, %.16e\n", double(plaq[0]), double(plaq[1]), double(plaq[2]));
+      printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", double(plaq_gf[0]), double(plaq_gf[1]), double(plaq_gf[2]));
       ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
       // Save if output string is specified
       if (gauge_store) save_gauge();
@@ -237,8 +237,8 @@ protected:
                        gf_theta_condition);
 
         auto plaq_gf = plaquette(*U);
-        printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-        printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+        printfQuda("Plaq:    %.16e, %.16e, %.16e\n", double(plaq[0]), double(plaq[1]), double(plaq[2]));
+        printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", double(plaq_gf[0]), double(plaq_gf[1]), double(plaq_gf[2]));
         ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
         // Save if output string is specified
         if (gauge_store) save_gauge();
@@ -295,8 +295,8 @@ TEST_F(GaugeAlgTest, Landau_Overrelaxation)
     gaugeFixingOVR(*U, 4, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval,
                    gf_theta_condition);
     auto plaq_gf = plaquette(*U);
-    printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-    printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+    printfQuda("Plaq:    %.16e, %.16e, %.16e\n", double(plaq[0]), double(plaq[1]), double(plaq[2]));
+    printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", double(plaq_gf[0]), double(plaq_gf[1]), double(plaq_gf[2]));
     ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
   }
 }
@@ -308,8 +308,8 @@ TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
     gaugeFixingOVR(*U, 3, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval,
                    gf_theta_condition);
     auto plaq_gf = plaquette(*U);
-    printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-    printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+    printfQuda("Plaq:    %.16e, %.16e, %.16e\n", double(plaq[0]), double(plaq[1]), double(plaq[2]));
+    printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", double(plaq_gf[0]), double(plaq_gf[1]), double(plaq_gf[2]));
     ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
   }
 }
@@ -322,8 +322,8 @@ TEST_F(GaugeAlgTest, Landau_FFT)
       gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
                      gf_theta_condition);
       auto plaq_gf = plaquette(*U);
-      printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-      printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+      printfQuda("Plaq:    %.16e, %.16e, %.16e\n", double(plaq[0]), double(plaq[1]), double(plaq[2]));
+      printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", double(plaq_gf[0]), double(plaq_gf[1]), double(plaq_gf[2]));
       ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
     }
   }
@@ -337,8 +337,8 @@ TEST_F(GaugeAlgTest, Coulomb_FFT)
       gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
                      gf_theta_condition);
       auto plaq_gf = plaquette(*U);
-      printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-      printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+      printfQuda("Plaq:    %.16e, %.16e, %.16e\n", double(plaq[0]), double(plaq[1]), double(plaq[2]));
+      printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", double(plaq_gf[0]), double(plaq_gf[1]), double(plaq_gf[2]));
       ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
     }
   }

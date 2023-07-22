@@ -23,7 +23,7 @@ namespace quda {
     GaugeField& Y;
     GaugeField& X;
     const GaugeField& g;
-    double mass;
+    real_t mass;
 
     const int nDim = 4;
 
@@ -41,7 +41,7 @@ namespace quda {
     unsigned int minThreads() const { return g.VolumeCB(); }
 
   public:
-    CalculateStaggeredY(GaugeField &Y, GaugeField &X, const GaugeField &g, const double mass) :
+    CalculateStaggeredY(GaugeField &Y, GaugeField &X, const GaugeField &g, const real_t mass) :
       TunableKernel3D(g, fineColor*fineColor, 2),
       Y(Y),
       X(X),
@@ -69,9 +69,9 @@ namespace quda {
 
       // reset scales as appropriate
       if constexpr (sizeof(Float) < QUDA_SINGLE_PRECISION) {
-        double max_scale = g.abs_max();
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Global U_max = %e\n", max_scale);
-        X.Scale(max_scale > 2.0*mass ? max_scale : 2.0*mass);
+        auto max_scale = g.abs_max();
+        logQuda(QUDA_VERBOSE, "Global U_max = %e\n", double(max_scale));
+        X.Scale(max_scale > 2.0 * mass ? max_scale : 2.0 * mass);
         Y.Scale(max_scale);
       }
 
@@ -79,12 +79,10 @@ namespace quda {
 
       apply(device::get_default_stream());
 
-        if (getVerbosity() >= QUDA_VERBOSE) {
-        for (int d = 0; d < nDim; d++) printfQuda("Y2[%d] = %e\n", 4+d, Y.norm2( 4+d ));
-        for (int d = 0; d < nDim; d++) printfQuda("Y2[%d] = %e\n", d, Y.norm2( d ));
-      }
+      for (int d = 0; d < nDim; d++) logQuda(QUDA_VERBOSE, "Y2[%d] = %e\n", 4+d, double(Y.norm2( 4+d )));
+      for (int d = 0; d < nDim; d++) logQuda(QUDA_VERBOSE, "Y2[%d] = %e\n", d, double(Y.norm2( d )));
 
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X.norm2(0));
+      logQuda(QUDA_VERBOSE, "X2 = %e\n", double(X.norm2(0)));
     }
 
     void apply(const qudaStream_t &stream)
@@ -108,7 +106,7 @@ namespace quda {
   template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin, int uvSpin>
   void aggregateStaggeredY(GaugeField &Y, GaugeField &X,
                         const Transfer &T, const GaugeField &g, const GaugeField &l, const GaugeField &XinvKD,
-                        double mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
+                        real_t mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
   {
     // Actually create the temporaries like UV, etc.
     auto location = Y.Location();
@@ -142,9 +140,9 @@ namespace quda {
 
     // Moving along to the build
 
-    const double kappa = -1.; // cancels a minus sign factor for kappa w/in the dslash application
-    const double mu_dummy = 0.; 
-    const double mu_factor_dummy = 0.;
+    const real_t kappa = -1.; // cancels a minus sign factor for kappa w/in the dslash application
+    const real_t mu_dummy = 0.; 
+    const real_t mu_factor_dummy = 0.;
     constexpr bool use_mma = false;
     
     bool need_bidirectional = false;
@@ -234,7 +232,7 @@ namespace quda {
   // template on UV spin, which can be 1 for the non-KD ops but needs to be 2 for the KD op
   template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin>
   void aggregateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
-                           const GaugeField &XinvKD, double mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
+                           const GaugeField &XinvKD, real_t mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
   {
     if (dirac == QUDA_STAGGERED_DIRAC || dirac == QUDA_STAGGEREDPC_DIRAC || dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC) {
       // uvSpin == 1
@@ -251,7 +249,7 @@ namespace quda {
   // and actual aggregation
   template <typename Float, typename vFloat, int fineColor, int coarseColor>
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
-                           const GaugeField &XinvKD, double mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
+                           const GaugeField &XinvKD, real_t mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
   {
     if (T.Vectors(X.Location()).Nspin() != 1) errorQuda("Unsupported number of spins %d", T.Vectors(X.Location()).Nspin());
     constexpr int fineSpin = 1;
@@ -273,7 +271,7 @@ namespace quda {
 
   template <int fineColor, int coarseColor>
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
-                           const GaugeField &XinvKD, double mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
+                           const GaugeField &XinvKD, real_t mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
   {
     if constexpr (is_enabled_multigrid() && is_enabled_spin(1)) {
       logQuda(QUDA_SUMMARIZE, "Computing Y field......\n");
@@ -307,7 +305,7 @@ namespace quda {
 
   template <>
   void StaggeredCoarseOp<fineColor, coarseColor>(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
-                                                 const GaugeField &longGauge, const GaugeField &XinvKD, double mass,
+                                                 const GaugeField &longGauge, const GaugeField &XinvKD, real_t mass,
                                                  bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
   {
     QudaPrecision precision = checkPrecision(T.Vectors(X.Location()), X, Y);

@@ -15,7 +15,7 @@ namespace quda {
     unsigned int minThreads() const { return arg.threads.x; }
 
   public:
-    ComputeClover(CloverField &clover, const GaugeField& f, double coeff) :
+    ComputeClover(CloverField &clover, const GaugeField& f, real_t coeff) :
       TunableKernel2D(clover, 2),
       arg(clover, f, coeff),
       meta(f)
@@ -35,7 +35,7 @@ namespace quda {
   };
 
 #ifdef GPU_CLOVER_DIRAC
-  void computeClover(CloverField &clover, const GaugeField& f, double coeff)
+  void computeClover(CloverField &clover, const GaugeField& f, real_t coeff)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (clover.Precision() < QUDA_SINGLE_PRECISION) errorQuda("Cannot use fixed-point precision here");
@@ -44,7 +44,7 @@ namespace quda {
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 #else
-  void computeClover(CloverField &, const GaugeField &, double)
+  void computeClover(CloverField &, const GaugeField &, real_t)
   {
     errorQuda("Clover has not been built");
   }

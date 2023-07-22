@@ -11,7 +11,7 @@ namespace quda
     real a; /** xpay scale facotor */
     real b; /** this is the twist factor */
 
-    TwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
+    TwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a, real_t b,
                    const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
       a(a),

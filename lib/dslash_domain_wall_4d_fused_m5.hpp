@@ -130,9 +130,9 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct DomainWall4DApplyFusedM5 {
 
     template <Dslash5Type dslash5_type_impl, Dslash5Type... N>
-    inline DomainWall4DApplyFusedM5(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                                    double m_5, const complex_t *b_5, const complex_t *c_5, const ColorSpinorField &x,
-                                    ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
+    inline DomainWall4DApplyFusedM5(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a,
+                                    real_t m_5, const complex_t *b_5, const complex_t *c_5, const ColorSpinorField &x,
+                                    ColorSpinorField &y, int parity, bool dagger, const int *comm_override, real_t m_f,
                                     Dslash5TypeList<dslash5_type_impl, N...>, TimeProfile &profile)
     {
 #ifdef NVSHMEM_COMMS

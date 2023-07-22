@@ -83,7 +83,7 @@ namespace quda {
     Float alpha;
     int volume;
 
-    GaugeFixArg(GaugeField &data, double alpha) :
+    GaugeFixArg(GaugeField &data, real_t alpha) :
       kernel_param(dim3(data.VolumeCB(), 2, 1)),
       data(data),
       alpha(static_cast<Float>(alpha)),
@@ -159,7 +159,7 @@ namespace quda {
     int_fastdiv X[4];     // grid dimensions
     Gauge data;
     complex<real> *delta;
-    array<double, 2> result;
+    array<real_t, 2> result;
     int volume;
 
     GaugeFixQualityFFTArg(const GaugeField &data, complex<real> *delta) :
@@ -172,8 +172,8 @@ namespace quda {
       for (int dir = 0; dir < 4; dir++) X[dir] = data.X()[dir];
     }
 
-    double getAction() { return result[0]; }
-    double getTheta() { return result[1]; }
+    real_t getAction() { return result[0]; }
+    real_t getTheta() { return result[1]; }
   };
 
   template <typename Arg> struct FixQualityFFT : plus<typename Arg::reduce_t> {

@@ -34,10 +34,10 @@ namespace quda
 
     bool alternative_reliable;
 
-    double u;
-    double uhigh;
-    double Anorm;
-    double delta;
+    real_t u;
+    real_t uhigh;
+    real_t Anorm;
+    real_t delta;
 
     // this parameter determines how many consective reliable update
     // residual increases we tolerate before terminating the solver,
@@ -55,23 +55,23 @@ namespace quda
 
     const ReliableUpdatesParams params;
 
-    const double deps;
-    static constexpr double dfac = 1.1;
-    double d_new = 0;
-    double d = 0;
-    double dinit = 0;
-    double xNorm = 0;
-    double xnorm = 0;
-    double pnorm = 0;
-    double ppnorm = 0;
-    double delta;
-    double beta = 0.0;
+    const real_t deps;
+    static constexpr real_t dfac = 1.1;
+    real_t d_new = 0;
+    real_t d = 0;
+    real_t dinit = 0;
+    real_t xNorm = 0;
+    real_t xnorm = 0;
+    real_t pnorm = 0;
+    real_t ppnorm = 0;
+    real_t delta;
+    real_t beta = 0.0;
 
-    double rNorm;
-    double r0Norm;
-    double maxrx;
-    double maxrr;
-    double maxr_deflate; // The maximum residual since the last deflation
+    real_t rNorm;
+    real_t r0Norm;
+    real_t maxrx;
+    real_t maxrr;
+    real_t maxr_deflate; // The maximum residual since the last deflation
 
     int resIncrease = 0;
     int resIncreaseTotal = 0;
@@ -90,7 +90,7 @@ namespace quda
       @param params the parameters
       @param r2 the residual norm squared
      */
-    ReliableUpdates(ReliableUpdatesParams params, double r2) :
+    ReliableUpdates(ReliableUpdatesParams params, real_t r2) :
       params(params),
       deps(sqrt(params.u)),
       delta(params.delta),
@@ -110,23 +110,23 @@ namespace quda
     /**
       @brief Update the norm squared for p (thus ppnorm)
      */
-    void update_ppnorm(double ppnorm_) { ppnorm = ppnorm_; }
+    void update_ppnorm(real_t ppnorm_) { ppnorm = ppnorm_; }
 
     /**
       @brief Update the norm for r (thus rNorm)
      */
-    void update_rNorm(double rNorm_) { rNorm = rNorm_; }
+    void update_rNorm(real_t rNorm_) { rNorm = rNorm_; }
 
     /**
       @brief Update maxr_deflate
      */
-    void update_maxr_deflate(double r2) { maxr_deflate = sqrt(r2); }
+    void update_maxr_deflate(real_t r2) { maxr_deflate = sqrt(r2); }
 
     /**
       @brief Evaluate whether a reliable update is needed
       @param r2_old the old residual norm squared
      */
-    void evaluate(double r2_old)
+    void evaluate(real_t r2_old)
     {
       if (params.alternative_reliable) {
         // alternative reliable updates
@@ -155,7 +155,7 @@ namespace quda
       @brief Accumulate the estimate for error - used when reliable update is not performed
       @param alpha the alpha that is used in CG to update the solution vector x, given p
      */
-    void accumulate_norm(double alpha)
+    void accumulate_norm(real_t alpha)
     {
       // accumulate norms
       if (params.alternative_reliable) {
@@ -164,7 +164,7 @@ namespace quda
         xnorm = sqrt(pnorm);
         d_new = d + params.u * rNorm + params.uhigh * params.Anorm * xnorm;
         if (steps_since_reliable == 0 && getVerbosity() >= QUDA_DEBUG_VERBOSE)
-          printfQuda("New dnew: %e (r %e , y %e)\n", d_new, params.u * rNorm, params.uhigh * params.Anorm * xnorm);
+          printfQuda("New dnew: %e (r %e , y %e)\n", double(d_new), double(params.u * rNorm), double(params.uhigh * params.Anorm * xnorm));
       }
       steps_since_reliable++;
     }
@@ -174,18 +174,18 @@ namespace quda
       @param r2 the residual norm squared
       @param y2 the solution vector norm squared
      */
-    void update_norm(double r2, ColorSpinorField &y)
+    void update_norm(real_t r2, ColorSpinorField &y)
     {
       // update_norms
       if (params.alternative_reliable) {
-        double y2 = blas::norm2(y);
+        real_t y2 = blas::norm2(y);
         dinit = params.uhigh * (sqrt(r2) + params.Anorm * sqrt(y2));
         d = d_new;
         xnorm = 0; // sqrt(norm2(x));
         pnorm = 0; // pnorm + alpha * sqrt(norm2(p));
         if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-          printfQuda("New dinit: %e (r %e , y %e)\n", dinit, params.uhigh * sqrt(r2),
-                     params.uhigh * params.Anorm * sqrt(y2));
+          printfQuda("New dinit: %e (r %e , y %e)\n", double(dinit), double(params.uhigh * sqrt(r2)),
+                     double(params.uhigh * params.Anorm * sqrt(y2)));
         d_new = dinit;
       } else {
         rNorm = sqrt(r2);
@@ -201,20 +201,20 @@ namespace quda
       @param[in/out] L2breakdown whether or not L2 breakdown
       @param L2breakdown_eps L2 breakdown epsilon
      */
-    bool reliable_break(double r2, double stop, bool &L2breakdown, double L2breakdown_eps)
+    bool reliable_break(real_t r2, real_t stop, bool &L2breakdown, real_t L2breakdown_eps)
     {
       // break-out check if we have reached the limit of the precision
       if (sqrt(r2) > r0Norm && updateX and not L2breakdown) { // reuse r0Norm for this
         resIncrease++;
         resIncreaseTotal++;
         warningQuda("new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-                    sqrt(r2), r0Norm, resIncreaseTotal);
+                    double(sqrt(r2)), double(r0Norm), resIncreaseTotal);
 
         if ((params.use_heavy_quark_res and sqrt(r2) < L2breakdown_eps) or resIncrease > params.maxResIncrease
             or resIncreaseTotal > params.maxResIncreaseTotal or r2 < stop) {
           if (params.use_heavy_quark_res) {
             L2breakdown = true;
-            warningQuda("L2 breakdown %e, %e", sqrt(r2), L2breakdown_eps);
+            warningQuda("L2 breakdown %e, %e", double(sqrt(r2)), double(L2breakdown_eps));
           } else {
             if (resIncrease > params.maxResIncrease or resIncreaseTotal > params.maxResIncreaseTotal or r2 < stop) {
               warningQuda("solver exiting due to too many true residual norm increases");
@@ -235,7 +235,7 @@ namespace quda
       @param heavy_quark_res_old the old heavy quark residual
       @param[in/out] heavy_quark_restart whether should restart the heavy quark
      */
-    bool reliable_heavy_quark_break(bool L2breakdown, double heavy_quark_res, double heavy_quark_res_old,
+    bool reliable_heavy_quark_break(bool L2breakdown, real_t heavy_quark_res, real_t heavy_quark_res_old,
                                     bool &heavy_quark_restart)
     {
       if (params.use_heavy_quark_res and L2breakdown) {
@@ -248,7 +248,7 @@ namespace quda
         if (heavy_quark_res > heavy_quark_res_old) { // check if new hq residual is greater than previous
           hqresIncrease++;                           // count the number of consecutive increases
           warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e",
-                      heavy_quark_res, heavy_quark_res_old);
+                      double(heavy_quark_res), double(heavy_quark_res_old));
           // break out if we do not improve here anymore
           if (hqresIncrease > params.hqmaxresIncrease) {
             warningQuda("CG: solver exiting due to too many heavy quark residual norm increases (%i/%i)", hqresIncrease,
@@ -272,7 +272,7 @@ namespace quda
       @brief Reset the counters - after a reliable update has been performed
       @param r2 residual norm squared
     */
-    void reset(double r2)
+    void reset(real_t r2)
     {
       steps_since_reliable = 0;
       r0Norm = sqrt(r2);

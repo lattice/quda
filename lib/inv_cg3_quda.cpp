@@ -77,7 +77,7 @@ namespace quda {
     create(x, b);
 
     const int iter0 = param.iter;
-    double b2 = param.compute_true_res ? blas::norm2(b) : 0.0;
+    real_t b2 = param.compute_true_res ? blas::norm2(b) : 0.0;
 
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       // compute initial residual
@@ -104,7 +104,7 @@ namespace quda {
       mmdag.Expose()->M(xp, x);
       blas::xpay(b, -1.0, xp); // xp now holds the residual
 
-      double r2;
+      real_t r2;
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
         auto h3 = blas::HeavyQuarkResidualNorm(x, xp);
         r2 = h3[1];
@@ -155,7 +155,7 @@ namespace quda {
     create(x, b);
 
     const int iter0 = param.iter;
-    double b2 = 0.0;
+    real_t b2 = 0.0;
     if (param.compute_true_res) {
       b2 = blas::norm2(b);
       if (b2 == 0.0) { // compute initial residual vector
@@ -173,7 +173,7 @@ namespace quda {
       blas::xpay(b, -1.0, br); // br now holds the residual
 
       if (param.compute_true_res) {
-        double r2;
+        real_t r2;
         if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
           auto h3 = blas::HeavyQuarkResidualNorm(x, br);
           r2 = h3[1];
@@ -197,7 +197,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source    
-    double b2 = blas::norm2(b);
+    real_t b2 = blas::norm2(b);
     if(b2 == 0 &&
        (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO || param.use_init_guess == QUDA_USE_INIT_GUESS_NO)){
       profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -242,7 +242,7 @@ namespace quda {
     ColorSpinorField &xS_old = *xS_oldp;
     ColorSpinorField &tmpS = *tmpSp;
 
-    double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+    auto stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
     const bool use_heavy_quark_res =
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
@@ -258,8 +258,8 @@ namespace quda {
     // these are only used if we use the heavy_quark_res
     const int hqmaxresIncrease = maxResIncrease + 1;
     int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
-    double heavy_quark_res = 0.0; // heavy quark residual
-    double heavy_quark_res_old = 0.0;  // heavy quark residual
+    real_t heavy_quark_res = 0.0; // heavy quark residual
+    real_t heavy_quark_res_old = 0.0;  // heavy quark residual
     int hqresIncrease = 0;
     bool L2breakdown = false;
 
@@ -271,7 +271,7 @@ namespace quda {
     blas::flops = 0;
 
     // compute initial residual depending on whether we have an initial guess or not
-    double r2;
+    real_t r2;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x);
       r2 = blas::xmyNorm(b, r);
@@ -300,24 +300,25 @@ namespace quda {
     if (convergence(r2, heavy_quark_res, stop, param.tol_hq)) return;
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
-    double r2_old = r2;
-    double rNorm  = sqrt(r2);
-    double r0Norm = rNorm;
-    double maxrx  = rNorm;
-    double maxrr  = rNorm;
-    double delta  = param.delta;
+    real_t r2_old = r2;
+    real_t rNorm  = sqrt(r2);
+    real_t r0Norm = rNorm;
+    real_t maxrx  = rNorm;
+    real_t maxrr  = rNorm;
+    real_t delta  = param.delta;
     bool restart = false;
 
     int k = 0;
     PrintStats("CG3", k, r2, b2, heavy_quark_res);
-    double rho = 1.0, gamma = 1.0;
+    real_t rho = 1.0;
+    real_t gamma = 1.0;
 
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter) {
 
       matSloppy(ArS, rS);
-      double gamma_old = gamma;
-      double rAr = blas::reDotProduct(rS,ArS);
-      gamma = r2/rAr;
+      real_t gamma_old = gamma;
+      real_t rAr = blas::reDotProduct(rS,ArS);
+      gamma = r2 / rAr;
       
       // CG3 step
       if (k == 0 || restart) { // First iteration
@@ -410,7 +411,7 @@ namespace quda {
           resIncreaseTotal++;
           warningQuda(
             "CG3: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-            sqrt(r2), r0Norm, resIncreaseTotal);
+            double(sqrt(r2)), double(r0Norm), resIncreaseTotal);
           if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
             if (use_heavy_quark_res) {
               L2breakdown = true;
@@ -432,7 +433,8 @@ namespace quda {
           L2breakdown = false;
           if (heavy_quark_res > heavy_quark_res_old) {
             hqresIncrease++;
-            warningQuda("CG3: new reliable HQ residual norm %e is greater than previous reliable residual norm %e", heavy_quark_res, heavy_quark_res_old);
+            warningQuda("CG3: new reliable HQ residual norm %e is greater than previous reliable residual norm %e",
+                        double(heavy_quark_res), double(heavy_quark_res_old));
             // break out if we do not improve here anymore
             if (hqresIncrease > hqmaxresIncrease) {
               warningQuda("CG3: solver exiting due to too many heavy quark residual norm increases");
@@ -458,8 +460,8 @@ namespace quda {
           resIncrease++;
           resIncreaseTotal++;
           warningQuda(
-            "CG3: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-            sqrt(r2), r0Norm, resIncreaseTotal);
+                      "CG3: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+                      double(sqrt(r2)), double(r0Norm), resIncreaseTotal);
           if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
               warningQuda("CG3: solver exiting due to too many true residual norm increases");
               break;

@@ -38,7 +38,7 @@ namespace quda
     const real b; /** used by Wuppetal smearing kernel */
     int dir;      /** The direction from which to omit the derivative */
 
-    LaplaceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a, double b,
+    LaplaceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, real_t a, real_t b,
                const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       DslashArg<Float, nDim>(out, in, U, x, parity, dagger, a != 0.0 ? true : false, 1, false, comm_override),
       out(out),

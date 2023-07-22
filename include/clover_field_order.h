@@ -316,7 +316,7 @@ namespace quda {
         stride(A.VolumeCB()),
         offset_cb(A.Bytes() / (2 * sizeof(Float))),
         compressed_block_size(A.compressed_block_size()),
-        recon(A.Diagonal())
+        recon(double(A.Diagonal()))
       {
       }
 
@@ -616,7 +616,7 @@ namespace quda {
 	void *backup_h; //! host memory for backing up the field when tuning
 
         FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_ = nullptr) :
-          recon(clover.Diagonal()),
+          recon(double(clover.Diagonal())),
           nrm(clover.max_element(is_inverse)
               / (2 * (isFixed<Float>::value ? fixedMaxValue<Float>::value : 1))), // factor of two in normalization
           nrm_inv(1.0 / nrm),

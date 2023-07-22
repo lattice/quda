@@ -15,21 +15,21 @@ namespace quda
       ColorSpinorField &out;
       const ColorSpinorField &in;
       const ColorSpinorField &x;
-      double m_f;
-      double m_5;
+      real_t m_f;
+      real_t m_5;
       const complex_t *b_5;
       const complex_t *c_5;
-      double a;
+      real_t a;
       bool eofa_pm;
-      double inv;
-      double kappa;
-      const double *eofa_u;
-      const double *eofa_x;
-      const double *eofa_y;
+      real_t inv;
+      real_t kappa;
+      const real_t *eofa_u;
+      const real_t *eofa_x;
+      const real_t *eofa_y;
       bool dagger;
       bool xpay;
       Dslash5Type type;
-      double sherman_morrison;
+      real_t sherman_morrison;
 
       static constexpr bool shared = true; // whether to use shared memory cache blocking for M5inv
 
@@ -83,10 +83,10 @@ namespace quda
       }
 
     public:
-      Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double m_f,
-              const double m_5, const complex_t *b_5, const complex_t *c_5, double a, bool eofa_pm, double inv,
-              double kappa, const double *eofa_u, const double *eofa_x, const double *eofa_y,
-              double sherman_morrison, bool dagger, Dslash5Type type) :
+      Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const real_t m_f,
+              const real_t m_5, const complex_t *b_5, const complex_t *c_5, real_t a, bool eofa_pm, real_t inv,
+              real_t kappa, const real_t *eofa_u, const real_t *eofa_x, const real_t *eofa_y,
+              real_t sherman_morrison, bool dagger, Dslash5Type type) :
         TunableKernel3D(in, in.X(4), in.SiteSubset()),
         out(out),
         in(in),
@@ -170,19 +170,19 @@ namespace quda
     // Apply the 5th dimension dslash operator to a colorspinor field
     // out = Dslash5*in
 #ifdef GPU_DOMAIN_WALL_DIRAC
-    void apply_dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
-                       double m_5, const complex_t *b_5, const complex_t *c_5, double a, int eofa_pm, double inv,
-                       double kappa, const double *eofa_u, const double *eofa_x, const double *eofa_y,
-                       double sherman_morrison, bool dagger, Dslash5Type type)
+    void apply_dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, real_t m_f,
+                       real_t m_5, const complex_t *b_5, const complex_t *c_5, real_t a, int eofa_pm, real_t inv,
+                       real_t kappa, const real_t *eofa_u, const real_t *eofa_x, const real_t *eofa_y,
+                       real_t sherman_morrison, bool dagger, Dslash5Type type)
     {
       checkLocation(out, in, x); // check all locations match
       instantiate<Dslash5>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y,
                            sherman_morrison, dagger, type);
     }
 #else
-    void apply_dslash5(ColorSpinorField &, const ColorSpinorField &, const ColorSpinorField &, double,
-                       double, const complex_t *, const complex_t *, double, int, double,
-                       double, const double *, const double *, const double *, double, bool, Dslash5Type)
+    void apply_dslash5(ColorSpinorField &, const ColorSpinorField &, const ColorSpinorField &, real_t,
+                       real_t, const complex_t *, const complex_t *, real_t, int, real_t,
+                       real_t, const real_t *, const real_t *, const real_t *, real_t, bool, Dslash5Type)
     {
       errorQuda("Mobius EOFA dslash has not been built");
     }

@@ -61,7 +61,7 @@ namespace quda {
   }
 
   void DiracTwistedMass::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity,
-      const ColorSpinorField &x, const double &k) const
+      const ColorSpinorField &x, const real_t &k) const
   {
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
@@ -121,13 +121,13 @@ namespace quda {
     // do nothing
   }
 
-  void DiracTwistedMass::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double,
-                                        double mu, double mu_factor, bool) const
+  void DiracTwistedMass::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t,
+                                        real_t mu, real_t mu_factor, bool) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Wilson-type operators only support aggregation coarsening");
 
-    double a = 2.0 * kappa * mu;
+    real_t a = 2.0 * kappa * mu;
     CloverField *c = nullptr;
     CoarseOp(Y, X, T, *gauge, c, kappa, mass, a, mu_factor, QUDA_TWISTED_MASS_DIRAC, QUDA_MATPC_INVALID);
   }
@@ -168,17 +168,17 @@ namespace quda {
       errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-      double a = -2.0 * kappa * mu; // for inverse twist
-      double b = 1.0 / (1.0 + a * a);
+      real_t a = -2.0 * kappa * mu; // for inverse twist
+      real_t b = 1.0 / (1.0 + a * a);
 
       bool asymmetric
           = (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) && dagger;
       ApplyTwistedMassPreconditioned(out, in, *gauge, b, a, false, in, parity, dagger, asymmetric, commDim, profile);
       flops += 1392ll * in.Volume(); // flops numbers are approximate since they will vary depending on the dagger or not
-    } else {//TWIST doublet :
-      double a = 2.0 * kappa * mu;
-      double b = 2.0 * kappa * epsilon;
-      double c = 1.0 / (1.0 + a * a - b * b);
+    } else {//TWIST real_tt :
+      real_t a = 2.0 * kappa * mu;
+      real_t b = 2.0 * kappa * epsilon;
+      real_t c = 1.0 / (1.0 + a * a - b * b);
 
       bool asymmetric
           = (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) && dagger;
@@ -190,7 +190,7 @@ namespace quda {
 
   // xpay version of the above
   void DiracTwistedMassPC::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-				      const ColorSpinorField &x, const double &k) const
+				      const ColorSpinorField &x, const real_t &k) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
@@ -200,17 +200,17 @@ namespace quda {
       errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
 
     if(in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-      double a = -2.0 * kappa * mu; // for inverse twist
-      double b = k / (1.0 + a * a);
+      real_t a = -2.0 * kappa * mu; // for inverse twist
+      real_t b = k / (1.0 + a * a);
       // asymmetric should never be true here since we never need to apply 1 + k * A^{-1} D^\dagger
       bool asymmetric
           = (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) && dagger;
       ApplyTwistedMassPreconditioned(out, in, *gauge, b, a, true, x, parity, dagger, asymmetric, commDim, profile);
       flops += 1416ll * in.Volume(); // flops numbers are approximate since they will vary depending on the dagger or not
-    } else {//TWIST_DOUBLET:
-      double a = 2.0 * kappa * mu;
-      double b = 2.0 * kappa * epsilon;
-      double c = 1.0 / (1.0 + a * a - b * b);
+    } else {//TWIST_REAL_TT:
+      real_t a = 2.0 * kappa * mu;
+      real_t b = 2.0 * kappa * epsilon;
+      real_t c = 1.0 / (1.0 + a * a - b * b);
 
       bool asymmetric
           = (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) && dagger;
@@ -223,7 +223,7 @@ namespace quda {
 
   void DiracTwistedMassPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    double kappa2 = -kappa*kappa;
+    real_t kappa2 = -kappa*kappa;
     auto tmp = getFieldTmp(in);
 
     bool symmetric =(matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
@@ -286,12 +286,12 @@ namespace quda {
         errorQuda("MatPCType %d not valid for DiracTwistedMassPC", matpcType);
       }
 
-    } else { // doublet:
+    } else { // real_tt:
 
       // repurpose the preconditioned dslash as a vectorized operator: 1+kappa*D
-      double mu_ = mu;
+      real_t mu_ = mu;
       mu = 0.0;
-      double epsilon_ = epsilon;
+      real_t epsilon_ = epsilon;
       epsilon = 0.0;
 
       // we desire solution to full system
@@ -314,7 +314,7 @@ namespace quda {
       mu = mu_;
       epsilon = epsilon_;
 
-    } // end of doublet
+    } // end of real_tt
 
     if (symmetric) TwistInv(*src, tmp);
 
@@ -343,9 +343,9 @@ namespace quda {
         errorQuda("MatPCType %d not valid for DiracTwistedMassPC", matpcType);
       }
     } else { // twist doublet:
-      double mu_ = mu;
+      real_t mu_ = mu;
       mu = 0.0;
-      double epsilon_ = epsilon;
+      real_t epsilon_ = epsilon;
       epsilon = 0.0;
 
       if (matpcType == QUDA_MATPC_EVEN_EVEN ||  matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
@@ -365,13 +365,13 @@ namespace quda {
     TwistInv(odd_bit ? x.Even() : x.Odd(), tmp);
   }
 
-  void DiracTwistedMassPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double,
-                                          double mu, double mu_factor, bool) const
+  void DiracTwistedMassPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t,
+                                          real_t mu, real_t mu_factor, bool) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Wilson-type operators only support aggregation coarsening");
 
-    double a = -2.0 * kappa * mu;
+    real_t a = -2.0 * kappa * mu;
     CloverField *c = nullptr;
     CoarseOp(Y, X, T, *gauge, c, kappa, mass, a, -mu_factor, QUDA_TWISTED_MASSPC_DIRAC, matpcType);
   }

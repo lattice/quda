@@ -71,10 +71,10 @@ namespace quda
     Mdag(out, tmp);
   }
 
-  void DiracCloverHasenbuschTwist::createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double, double, double,
-                                                  double, bool) const
+  void DiracCloverHasenbuschTwist::createCoarseOp(GaugeField &, GaugeField &, const Transfer &, real_t, real_t, real_t,
+                                                  real_t, bool) const
   {
-    // double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
+    // real_t a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     // CoarseOp(Y, X, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
     errorQuda("Not Yet Implemented");
   }
@@ -109,7 +109,7 @@ namespace quda
   // xpay version of the above
   void DiracCloverHasenbuschTwistPC::DslashXpayTwistClovInv(ColorSpinorField &out, const ColorSpinorField &in,
                                                             const QudaParity parity, const ColorSpinorField &x,
-                                                            const double &k, const double &b) const
+                                                            const real_t &k, const real_t &b) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
@@ -123,7 +123,7 @@ namespace quda
   // xpay version of the above
   void DiracCloverHasenbuschTwistPC::DslashXpayTwistNoClovInv(ColorSpinorField &out, const ColorSpinorField &in,
                                                               const QudaParity parity, const ColorSpinorField &x,
-                                                              const double &k, const double &b) const
+                                                              const real_t &k, const real_t &b) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
@@ -137,7 +137,7 @@ namespace quda
   // Apply the even-odd preconditioned clover-improved Dirac operator
   void DiracCloverHasenbuschTwistPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    double kappa2 = -kappa * kappa;
+    real_t kappa2 = -kappa * kappa;
     auto tmp = getFieldTmp(in);
 
     bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
@@ -183,10 +183,10 @@ namespace quda
     Mdag(out, tmp);
   }
 
-  void DiracCloverHasenbuschTwistPC::createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double, double,
-                                                    double, double, bool) const
+  void DiracCloverHasenbuschTwistPC::createCoarseOp(GaugeField &, GaugeField &, const Transfer &, real_t, real_t,
+                                                    real_t, real_t, bool) const
   {
-    // double a = - 2.0 * kappa * mu * T.Vectors().TwistFlavor();
+    // real_t a = - 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     // CoarseOp(Y, X, T, *gauge, &clover, kappa, a, -mu_factor,QUDA_CLOVERPC_DIRAC, matpcType);
     errorQuda("Not yet implemented\n");
   }

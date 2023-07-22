@@ -18,8 +18,8 @@ namespace quda
     real b_inv;      /** inverse chiral twist factor - used to allow early xpay inclusion */
     real c_inv;      /** inverse flavor twist factor - used to allow early xpay inclusion */
 
-    NdegTwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
-                       double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+    NdegTwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a, real_t b,
+                       real_t c, bool xpay, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
       a(a),
       b(dagger ? -b : b), // if dagger flip the chiral twist

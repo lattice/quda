@@ -98,13 +98,13 @@ namespace quda {
     bool inverse = true;       /** Whether to create the inverse clover field */
     void *clover = nullptr;    /** Pointer to the clover field */
     void *cloverInv = nullptr; /** Pointer to the clover inverse field */
-    double csw = 0.0;          /** C_sw clover coefficient */
-    double coeff = 0.0;        /** Overall clover coefficient */
+    real_t csw = 0.0;          /** C_sw clover coefficient */
+    real_t coeff = 0.0;        /** Overall clover coefficient */
     QudaTwistFlavorType twist_flavor = QUDA_TWIST_INVALID; /** Twisted-mass flavor type */
     bool twisted = false;                                  /** Whether to create twisted mass clover */
-    double mu2 = 0.0;                                      /** Chiral twisted mass term */
-    double epsilon2 = 0.0;                                 /** Flavor twisted mass term */
-    double rho = 0.0;                                      /** Hasenbusch rho term */
+    real_t mu2 = 0.0;                                      /** Chiral twisted mass term */
+    real_t epsilon2 = 0.0;                                 /** Flavor twisted mass term */
+    real_t rho = 0.0;                                      /** Hasenbusch rho term */
 
     QudaCloverFieldOrder order = QUDA_INVALID_CLOVER_ORDER; /** Field order */
     QudaFieldCreate create = QUDA_INVALID_FIELD_CREATE;     /** Creation type */
@@ -182,20 +182,20 @@ namespace quda {
     quda_ptr cloverInv = {};
 
     bool inverse = false;
-    double diagonal = 0.0;
-    array<double, 2> max = {};
+    real_t diagonal = 0.0;
+    array<real_t, 2> max = {};
 
-    double csw = 0.0;
-    double coeff = 0.0;
+    real_t csw = 0.0;
+    real_t coeff = 0.0;
     QudaTwistFlavorType twist_flavor = QUDA_TWIST_INVALID;
-    double mu2 = 0.0;      // chiral twisted mass squared
-    double epsilon2 = 0.0; // flavour twisted mass squared
-    double rho = 0.0;
+    real_t mu2 = 0.0;      // chiral twisted mass squared
+    real_t epsilon2 = 0.0; // flavour twisted mass squared
+    real_t rho = 0.0;
 
     QudaCloverFieldOrder order = QUDA_INVALID_CLOVER_ORDER;
     QudaFieldCreate create = QUDA_INVALID_FIELD_CREATE;
 
-    mutable array<double, 2> trlog = {};
+    mutable array<real_t, 2> trlog = {};
 
     /**
        @brief Set the vol_string and aux_string for use in tuning
@@ -230,12 +230,12 @@ namespace quda {
     /**
        @return diagonal scaling factor applied to the identity
     */
-    double Diagonal() const { return diagonal; }
+    real_t Diagonal() const { return diagonal; }
 
     /**
        @return set diagonal scaling factor applied to the identity
     */
-    void Diagonal(double diagonal) { this->diagonal = diagonal; }
+    void Diagonal(real_t diagonal) { this->diagonal = diagonal; }
 
     /**
        @return max element in the clover field for fixed-point scaling
@@ -296,12 +296,12 @@ namespace quda {
     /**
        @return Csw coefficient (does not include kappa)
     */
-    double Csw() const { return csw; }
+    real_t Csw() const { return csw; }
 
     /**
        @return Clover coefficient (explicitly includes kappa)
     */
-    double Coeff() const { return coeff; }
+    real_t Coeff() const { return coeff; }
 
     /**
        @return If the clover field is associated with twisted-clover fermions and which flavor type thereof
@@ -311,24 +311,24 @@ namespace quda {
     /**
        @return mu^2 factor baked into inverse clover field (for twisted-clover inverse)
     */
-    double Mu2() const { return mu2; }
+    real_t Mu2() const { return mu2; }
 
     /**
        @return epsilon^2 factor baked into inverse clover field (for non-deg twisted-clover inverse)
     */
-    double Epsilon2() const { return epsilon2; }
+    real_t Epsilon2() const { return epsilon2; }
 
     /**
        @return rho factor backed into the clover field, (for real
        diagonal additive Hasenbusch), e.g., A + rho
     */
-    double Rho() const { return rho; }
+    real_t Rho() const { return rho; }
 
     /**
        @brief Bakes in the rho factor into the clover field, (for real
        diagonal additive Hasenbusch), e.g., A + rho
     */
-    void setRho(double rho);
+    void setRho(real_t rho) { this->rho = rho; }
 
     /**
        @brief Copy into this CloverField from CloverField src
@@ -348,25 +348,25 @@ namespace quda {
        @brief Compute the L1 norm of the field
        @return L1 norm
      */
-    double norm1(bool inverse = false) const;
+    real_t norm1(bool inverse = false) const;
 
     /**
        @brief Compute the L2 norm squared of the field
        @return L2 norm squared
      */
-    double norm2(bool inverse = false) const;
+    real_t norm2(bool inverse = false) const;
 
     /**
        @brief Compute the absolute maximum of the field (Linfinity norm)
        @return Absolute maximum value
      */
-    double abs_max(bool inverse = false) const;
+    real_t abs_max(bool inverse = false) const;
 
     /**
        @brief Compute the absolute minimum of the field
        @return Absolute minimum value
      */
-    double abs_min(bool inverse = false) const;
+    real_t abs_min(bool inverse = false) const;
 
     /**
        @brief Backs up the CloverField
@@ -421,7 +421,7 @@ namespace quda {
      @param a The clover field that we want the norm of
      @return The L1 norm of the gauge field
   */
-  double norm1(const CloverField &u, bool inverse=false);
+  real_t norm1(const CloverField &u, bool inverse=false);
 
   /**
      This is a debugging function, where we cast a clover field into a
@@ -429,7 +429,7 @@ namespace quda {
      @param a The clover field that we want the norm of
      @return The L2 norm squared of the gauge field
   */
-  double norm2(const CloverField &a, bool inverse=false);
+  real_t norm2(const CloverField &a, bool inverse=false);
 
   /**
      @brief Driver for computing the clover field from the field
@@ -438,7 +438,7 @@ namespace quda {
      @param[in] fmunu Field strength tensor
      @param[in] coefft Clover coefficient
   */
-  void computeClover(CloverField &clover, const GaugeField &fmunu, double coeff);
+  void computeClover(CloverField &clover, const GaugeField &fmunu, real_t coeff);
 
   /**
      @brief This generic function is used for copying the clover field where
@@ -482,7 +482,7 @@ namespace quda {
    */
   void computeCloverForce(GaugeField& force, const GaugeField& U,
 			  std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &p,
-			  std::vector<double> &coeff);
+			  std::vector<real_t> &coeff);
   /**
      @brief Compute the outer product from the solver solution fields
      arising from the diagonal term of the fermion bilinear in
@@ -496,7 +496,7 @@ namespace quda {
   void computeCloverSigmaOprod(GaugeField& oprod,
 			       std::vector<ColorSpinorField*> &x,
 			       std::vector<ColorSpinorField*> &p,
-			       std::vector< std::vector<double> > &coeff);
+			       std::vector< std::vector<real_t> > &coeff);
   /**
      @brief Compute the matrix tensor field necessary for the force calculation from
      the clover trace action.  This computes a tensor field [mu,nu].
@@ -505,7 +505,7 @@ namespace quda {
      @param clover The input clover field
      @param coeff  Scalar coefficient multiplying the result (e.g., stepsize)
    */
-  void computeCloverSigmaTrace(GaugeField &output, const CloverField &clover, double coeff);
+  void computeCloverSigmaTrace(GaugeField &output, const CloverField &clover, real_t coeff);
 
   /**
      @brief Compute the derivative of the clover matrix in the direction
@@ -518,7 +518,7 @@ namespace quda {
      @param coeff Multiplicative coefficient (e.g., clover coefficient)
      @param parity The field parity we are working on
    */
-  void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff, QudaParity parity);
+  void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, real_t coeff, QudaParity parity);
 
   /**
     @brief This function is used for copying from a source clover field to a destination clover field

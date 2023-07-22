@@ -450,11 +450,11 @@ struct StaggeredDslashTestWrapper {
 
         bool failed = false;
         // Catching nans is weird.
-        if (std::isnan(spinor_ref_norm)) { failed = true; }
-        if (std::isnan(spinor_out_norm)) { failed = true; }
+        if (isnan(spinor_ref_norm)) { failed = true; }
+        if (isnan(spinor_out_norm)) { failed = true; }
 
         printfQuda("Results: reference = %f, QUDA = %f, L2 relative deviation = %e, max deviation = %e\n",
-                   spinor_ref_norm, spinor_out_norm, 1.0 - sqrt(spinor_out_norm / spinor_ref_norm), max_deviation[0]);
+                   double(spinor_ref_norm), double(spinor_out_norm), double(real_t(1.0) - sqrt(spinor_out_norm / spinor_ref_norm)), double(max_deviation[0]));
         deviation = std::max(deviation, pow(10.0, -(double)(ColorSpinorField::Compare(spinorRef, vp_spinor_out[n]))));
         if (failed) { deviation = 1.0; }
       }
@@ -465,11 +465,12 @@ struct StaggeredDslashTestWrapper {
 
       bool failed = false;
       // Catching nans is weird.
-      if (std::isnan(spinor_ref_norm)) { failed = true; }
-      if (std::isnan(spinor_out_norm)) { failed = true; }
+      if (isnan(spinor_ref_norm)) { failed = true; }
+      if (isnan(spinor_out_norm)) { failed = true; }
 
       printfQuda("Results: reference = %f, QUDA = %f, L2 relative deviation = %e, max deviation = %e\n",
-                 spinor_ref_norm, spinor_out_norm, 1.0 - sqrt(spinor_out_norm / spinor_ref_norm), max_deviation[0]);
+                 double(spinor_ref_norm), double(spinor_out_norm),
+                 double(real_t(1.0) - sqrt(spinor_out_norm / spinor_ref_norm)), double(max_deviation[0]));
       deviation = pow(10, -(double)(ColorSpinorField::Compare(spinorRef, spinorOut)));
       if (failed) { deviation = 1.0; }
     }

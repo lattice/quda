@@ -99,7 +99,7 @@ namespace quda
       static constexpr memory_access<0, 0, 0, 0, 1> write{ };
       const real a;
       const real b;
-      axpbyz_(const real &a, const real &b, const real &) : a(a), b(b) { ; }
+      axpbyz_(const real_t &a, const real_t &b, const real_t &) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &v) const
       {
 #pragma unroll
@@ -115,7 +115,7 @@ namespace quda
       static constexpr memory_access<1, 0> read{ };
       static constexpr memory_access<0, 1> write{ };
       const real a;
-      axy_(const real &a, const real &, const real &) : a(a) { ; }
+      axy_(const real_t &a, const real_t &, const real_t &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &) const
       {
 #pragma unroll
@@ -182,7 +182,7 @@ namespace quda
       const real a;
       const real b;
       const real c;
-      axpbypczw_(const real &a, const real &b, const real &c) : a(a), b(b), c(c) { ; }
+      axpbypczw_(const real_t &a, const real_t &b, const real_t &c) : a(a), b(b), c(c) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &) const
       {
 #pragma unroll
@@ -202,7 +202,7 @@ namespace quda
       const real a;
       const real b;
       const real c;
-      axpyBzpcx_(const real &a, const real &b, const real &c) : a(a), b(b), c(c) { ; }
+      axpyBzpcx_(const real_t &a, const real_t &b, const real_t &c) : a(a), b(b), c(c) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &) const
       {
 #pragma unroll
@@ -222,7 +222,7 @@ namespace quda
       static constexpr memory_access<1, 1> write{ };
       const real a;
       const real b;
-      axpyZpbx_(const real &a, const real &b, const real &) : a(a), b(b) { ; }
+      axpyZpbx_(const real_t &a, const real_t &b, const real_t &) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &) const
       {
 #pragma unroll
@@ -371,8 +371,8 @@ namespace quda
       complex<real> a;
       array<device_reduce_t, 3> *Ar3;
       bool init_;
-      caxpyxmazMR_(const real &a, const real &, const real &) :
-        a(a),
+      caxpyxmazMR_(const real_t &a, const real_t &, const real_t &) :
+        a(real(a)),
         Ar3(static_cast<array<device_reduce_t, 3>*>(reducer::get_device_buffer())),
         init_(false)
       { ; }
@@ -409,7 +409,7 @@ namespace quda
       static constexpr memory_access<0, 1, 1, 1> write{ };
       const real a;
       const real b;
-      tripleCGUpdate_(const real &a, const real &b, const real &) : a(a), b(b) { ; }
+      tripleCGUpdate_(const real_t &a, const real_t &b, const real_t &) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &) const
       {
 #pragma unroll

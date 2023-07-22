@@ -851,10 +851,10 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   bool clover_update = false;
   // If either of the clover params have changed, trigger a recompute
-  double csw_old = cloverPrecise ? cloverPrecise->Csw() : 0.0;
-  double coeff_old = cloverPrecise ? cloverPrecise->Coeff() : 0.0;
-  double rho_old = cloverPrecise ? cloverPrecise->Rho() : 0.0;
-  double mu2_old = cloverPrecise ? cloverPrecise->Mu2() : 0.0;
+  auto csw_old = cloverPrecise ? cloverPrecise->Csw() : 0.0;
+  auto coeff_old = cloverPrecise ? cloverPrecise->Coeff() : 0.0;
+  auto rho_old = cloverPrecise ? cloverPrecise->Rho() : 0.0;
+  auto mu2_old = cloverPrecise ? cloverPrecise->Mu2() : 0.0;
   if (!cloverPrecise || invalidate_clover || inv_param->clover_coeff != coeff_old || inv_param->clover_csw != csw_old
       || inv_param->clover_csw != csw_old || inv_param->clover_rho != rho_old
       || 4 * inv_param->kappa * inv_param->kappa * inv_param->mu * inv_param->mu != mu2_old)
@@ -897,8 +897,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     if ((!h_clovinv || inv_param->compute_clover_inverse) && !clover::dynamic_inverse()) {
       cloverInvert(*cloverPrecise, inv_param->compute_clover_trlog);
       if (inv_param->compute_clover_trlog) {
-        inv_param->trlogA[0] = cloverPrecise->TrLog()[0];
-        inv_param->trlogA[1] = cloverPrecise->TrLog()[1];
+        inv_param->trlogA[0] = double(cloverPrecise->TrLog()[0]);
+        inv_param->trlogA[1] = double(cloverPrecise->TrLog()[1]);
       }
     }
   } else {
@@ -1448,7 +1448,7 @@ namespace quda {
 
   void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
   {
-    double kappa = inv_param->kappa;
+    real_t kappa = inv_param->kappa;
     if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
       kappa *= gaugePrecise->Anisotropy();
     }
@@ -1501,8 +1501,9 @@ namespace quda {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
         printfQuda("Printing b_5 and c_5 values\n");
         for (int i = 0; i < diracParam.Ls; i++) {
-          printfQuda("fromQUDA diracParam: b5[%d] = %f + i%f, c5[%d] = %f + i%f\n", i, diracParam.b_5[i].real(),
-              diracParam.b_5[i].imag(), i, diracParam.c_5[i].real(), diracParam.c_5[i].imag());
+          printfQuda("fromQUDA diracParam: b5[%d] = %f + i%f, c5[%d] = %f + i%f\n",
+                     i, double(diracParam.b_5[i].real()), double(diracParam.b_5[i].imag()),
+                     i, double(diracParam.c_5[i].real()), double(diracParam.c_5[i].imag()));
           // printfQuda("fromQUDA inv_param: b5[%d] = %f %f c5[%d] = %f %f\n", i, inv_param->b_5[i], i,
           // inv_param->c_5[i] ); printfQuda("fromQUDA creal: b5[%d] = %f %f c5[%d] = %f %f \n", i,
           // creal(inv_param->b_5[i]), cimag(inv_param->b_5[i]), i, creal(inv_param->c_5[i]), cimag(inv_param->c_5[i]) );
@@ -1736,7 +1737,7 @@ namespace quda {
 
     logQuda(QUDA_DEBUG_VERBOSE, "Mass rescale: Kappa is: %g\n", kappa);
     logQuda(QUDA_DEBUG_VERBOSE, "Mass rescale: mass normalization: %d\n", param.mass_normalization);
-    logQuda(QUDA_DEBUG_VERBOSE, "Mass rescale: norm of source in = %g\n", blas::norm2(b));
+    logQuda(QUDA_DEBUG_VERBOSE, "Mass rescale: norm of source in = %g\n", double(blas::norm2(b)));
 
     // staggered dslash uses mass normalization internally
     if (param.dslash_type == QUDA_ASQTAD_DSLASH || param.dslash_type == QUDA_STAGGERED_DSLASH) {
@@ -1800,7 +1801,7 @@ namespace quda {
         errorQuda("Solution type %d not supported", param.solution_type);
     }
 
-    logQuda(QUDA_DEBUG_VERBOSE, "Mass rescale: norm of source out = %g\n", blas::norm2(b));
+    logQuda(QUDA_DEBUG_VERBOSE, "Mass rescale: norm of source out = %g\n", double(blas::norm2(b)));
   }
 }
 
@@ -1841,7 +1842,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
   profileDslash.TPSTART(QUDA_PROFILE_COMPUTE);
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("In CPU %e CUDA %e\n", double(blas::norm2(in_h)), double(blas::norm2(in)));
 
   if (inv_param->mass_normalization == QUDA_KAPPA_NORMALIZATION &&
       (inv_param->dslash_type == QUDA_STAGGERED_DSLASH ||
@@ -1873,7 +1874,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
   out_h = out;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Out CPU %e CUDA %e\n", double(blas::norm2(out_h)), double(blas::norm2(out)));
 
   profileDslash.TPSTART(QUDA_PROFILE_FREE);
   delete dirac; // clean up
@@ -1906,7 +1907,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   ColorSpinorField in(cudaParam);
   in = in_h;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("In CPU %e CUDA %e\n", double(blas::norm2(in_h)), double(blas::norm2(in)));
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
@@ -1938,7 +1939,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   ColorSpinorField out_h(cpuParam);
   out_h = out;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Out CPU %e CUDA %e\n", double(blas::norm2(out_h)), double(blas::norm2(out)));
 
   popVerbosity();
 }
@@ -1967,7 +1968,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   ColorSpinorField in(cudaParam);
   in = in_h;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("In CPU %e CUDA %e\n", double(blas::norm2(in_h)), double(blas::norm2(in)));
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   ColorSpinorField out(cudaParam);
@@ -2001,7 +2002,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   ColorSpinorField out_h(cpuParam);
   out_h = out;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Out CPU %e CUDA %e\n", double(blas::norm2(out_h)), double(blas::norm2(out)));
 
   popVerbosity();
 }
@@ -2148,7 +2149,7 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   ColorSpinorField in(cudaParam);
   in = in_h;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("In CPU %e CUDA %e\n", blas::norm2(in_h), blas::norm2(in));
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("In CPU %e CUDA %e\n", double(blas::norm2(in_h)), double(blas::norm2(in)));
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   ColorSpinorField out(cudaParam);
@@ -2175,7 +2176,7 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   ColorSpinorField out_h(cpuParam);
   out_h = out;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Out CPU %e CUDA %e\n", blas::norm2(out_h), blas::norm2(out));
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Out CPU %e CUDA %e\n", double(blas::norm2(out_h)), double(blas::norm2(out)));
 
   popVerbosity();
 }
@@ -2276,7 +2277,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   }
 
   // Simple vector for eigenvalues.
-  std::vector<complex_t> evals(eig_param->n_conv, 0.0);
+  std::vector<complex_t> evals(eig_param->n_conv, real_t(0.0));
   //------------------------------------------------------
 
   // Sanity checks for operator/eigensolver compatibility.
@@ -2783,23 +2784,23 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   profileInvert.TPSTART(QUDA_PROFILE_PREAMBLE);
 
-  double nb = blas::norm2(b);
+  real_t nb = blas::norm2(b);
   if (nb==0.0) errorQuda("Source has zero norm");
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    printfQuda("Source: CPU = %g, CUDA copy = %g\n", blas::norm2(h_b), nb);
+    printfQuda("Source: CPU = %g, CUDA copy = %g\n", double(blas::norm2(h_b)), double(nb));
     if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      printfQuda("Initial guess: CPU = %g, CUDA copy = %g\n", blas::norm2(h_x), blas::norm2(x));
+      printfQuda("Initial guess: CPU = %g, CUDA copy = %g\n", double(blas::norm2(h_x)), double(blas::norm2(x)));
     }
   } else if (getVerbosity() >= QUDA_VERBOSE) {
-    printfQuda("Source: %g\n", nb);
-    if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { printfQuda("Initial guess: %g\n", blas::norm2(x)); }
+    printfQuda("Source: %g\n", double(nb));
+    if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { printfQuda("Initial guess: %g\n", double(blas::norm2(x))); }
   }
 
   // rescale the source and solution vectors to help prevent the onset of underflow
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
-    blas::ax(1.0 / sqrt(nb), b);
-    blas::ax(1.0 / sqrt(nb), x);
+    blas::ax(rsqrt(nb), b);
+    blas::ax(rsqrt(nb), x);
   }
 
   massRescale(b, *param, false);
@@ -2807,15 +2808,15 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   dirac.prepare(in, out, x, b, param->solution_type);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
-    double nin = blas::norm2(*in);
-    double nout = blas::norm2(*out);
-    printfQuda("Prepared source = %g\n", nin);
-    printfQuda("Prepared solution = %g\n", nout);
+    auto nin = blas::norm2(*in);
+    auto nout = blas::norm2(*out);
+    printfQuda("Prepared source = %g\n", double(nin));
+    printfQuda("Prepared solution = %g\n", double(nout));
   }
 
   if (getVerbosity() >= QUDA_VERBOSE) {
-    double nin = blas::norm2(*in);
-    printfQuda("Prepared source post mass rescale = %g\n", nin);
+    auto nin = blas::norm2(*in);
+    printfQuda("Prepared source post mass rescale = %g\n", double(nin));
   }
 
   // solution_type specifies *what* system is to be solved.
@@ -2963,7 +2964,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     solverParam.updateInvertParam(*param);
   }
 
-  if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Solution = %g\n", blas::norm2(x)); }
+  if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Solution = %g\n", double(blas::norm2(x))); }
 
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
   if (param->chrono_make_resident) {
@@ -3010,14 +3011,14 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   if (param->compute_action) {
     auto action = blas::cDotProduct(b, x);
-    param->action[0] = action.real();
-    param->action[1] = action.imag();
+    param->action[0] = double(action.real());
+    param->action[1] = double(action.imag());
   }
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    printfQuda("Reconstructed solution: CUDA = %g, CPU copy = %g\n", blas::norm2(x), blas::norm2(h_x));
+    printfQuda("Reconstructed solution: CUDA = %g, CPU copy = %g\n", double(blas::norm2(x)), double(blas::norm2(h_x)));
   } else if (getVerbosity() >= QUDA_VERBOSE) {
-    printfQuda("Reconstructed solution: %g\n", blas::norm2(x));
+    printfQuda("Reconstructed solution: %g\n", double(blas::norm2(x)));
   }
   profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
@@ -3531,7 +3532,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   dirac.prefetch(QUDA_CUDA_FIELD_LOCATION);
   diracSloppy.prefetch(QUDA_CUDA_FIELD_LOCATION);
 
-  std::vector<double> r2_old(param->num_offset);
+  std::vector<real_t> r2_old(param->num_offset);
 
   // Grab the dimension array of the input gauge field.
   const auto X = (param->dslash_type == QUDA_ASQTAD_DSLASH) ? gaugeFatPrecise->X() : gaugePrecise->X();
@@ -3586,13 +3587,13 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
   profileMulti.TPSTART(QUDA_PROFILE_PREAMBLE);
 
   // Check source norms
-  double nb = blas::norm2(b);
+  real_t nb = blas::norm2(b);
   if (nb==0.0) errorQuda("Source has zero norm");
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    printfQuda("Source: CPU = %g, CUDA copy = %g\n", blas::norm2(h_b), nb);
+    printfQuda("Source: CPU = %g, CUDA copy = %g\n", double(blas::norm2(h_b)), double(nb));
   } else if (getVerbosity() >= QUDA_VERBOSE) {
-    printfQuda("Source: %g\n", nb);
+    printfQuda("Source: %g\n", double(nb));
   }
 
   // rescale the source vector to help prevent the onset of underflow
@@ -3752,9 +3753,9 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
 
   if (param->compute_action) {
     complex_t action(0);
-    for (int i = 0; i < param->num_offset; i++) action += param->residue[i] * blas::cDotProduct(b, x[i]);
-    param->action[0] = action.real();
-    param->action[1] = action.imag();
+    for (int i = 0; i < param->num_offset; i++) action += real_t(param->residue[i]) * blas::cDotProduct(b, x[i]);
+    param->action[0] = double(action.real());
+    param->action[1] = double(action.imag());
   }
 
   for(int i=0; i < param->num_offset; i++) {
@@ -3762,7 +3763,7 @@ void invertMultiShiftQuda(void **hp_x, void *hp_b, QudaInvertParam *param)
       blas::ax(sqrt(nb), x[i]);
     }
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution %d = %g\n", i, blas::norm2(x[i]));
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution %d = %g\n", i, double(blas::norm2(x[i])));
 
     if (!param->make_resident_solution) *h_x[i] = x[i];
   }
@@ -3950,7 +3951,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
 
   // wrap 1-d arrays in std::vector
   std::vector<int> path_length_v(num_paths);
-  std::vector<double> loop_coeff_v(num_paths);
+  std::vector<real_t> loop_coeff_v(num_paths);
   for (int i = 0; i < num_paths; i++) {
     path_length_v[i] = path_length[i];
     loop_coeff_v[i] = loop_coeff[i];
@@ -4029,7 +4030,7 @@ int computeGaugePathQuda(void *out, void *siteLink, int ***input_path_buf, int *
 
   // wrap 1-d arrays in a std::vector
   std::vector<int> path_length_v(num_paths);
-  std::vector<double> loop_coeff_v(num_paths);
+  std::vector<real_t> loop_coeff_v(num_paths);
   for (int i = 0; i < num_paths; i++) {
     path_length_v[i] = path_length[i];
     loop_coeff_v[i] = loop_coeff[i];
@@ -4686,7 +4687,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
 
   profileCloverForce.TPSTOP(QUDA_PROFILE_INIT);
 
-  std::vector<double> force_coeff(nvector);
+  std::vector<real_t> force_coeff(nvector);
   // loop over different quark fields
   for(int i=0; i<nvector; i++){
     ColorSpinorField &x = *(quarkX[i]);
@@ -4736,7 +4737,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   computeCloverSigmaTrace(oprod, *cloverPrecise, 2.0*ck*multiplicity*dt);
 
   /* Now the U dA/dU terms */
-  std::vector< std::vector<double> > ferm_epsilon(nvector);
+  std::vector< std::vector<real_t> > ferm_epsilon(nvector);
   for (int shift = 0; shift < nvector; shift++) {
     ferm_epsilon[shift].reserve(2);
     ferm_epsilon[shift][0] = 2.0*ck*coeff[shift]*dt;
@@ -4970,10 +4971,10 @@ void plaqQuda(double plaq[3])
   GaugeField *data = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gaugePrecise, R, profilePlaq);
   extendedGaugeResident = data;
 
-  double3 plaq3 = quda::plaquette(*data);
-  plaq[0] = plaq3.x;
-  plaq[1] = plaq3.y;
-  plaq[2] = plaq3.z;
+  auto plaq3 = quda::plaquette(*data);
+  plaq[0] = double(plaq3[0]);
+  plaq[1] = double(plaq3[1]);
+  plaq[2] = double(plaq3[2]);
 
   popProfile();
 }
@@ -5059,9 +5060,9 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
   in = in_h;
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(in_h);
-    double gpu = blas::norm2(in);
-    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
+    auto cpu = blas::norm2(in_h);
+    auto gpu = blas::norm2(in);
+    printfQuda("In CPU %e CUDA %e\n", double(cpu), double(gpu));
   }
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
@@ -5076,8 +5077,8 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
     if (i) in = out;
     ApplyLaplace(out, in, *precise, 3, a, b, in, parity, false, nullptr, profileWuppertal);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      double norm = blas::norm2(out);
-      printfQuda("Step %d, vector norm %e\n", i, norm);
+      auto norm = blas::norm2(out);
+      printfQuda("Step %d, vector norm %e\n", i, double(norm));
     }
   }
 
@@ -5087,9 +5088,9 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
   out_h = out;
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    double cpu = blas::norm2(out_h);
-    double gpu = blas::norm2(out);
-    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
+    auto cpu = blas::norm2(out_h);
+    auto gpu = blas::norm2(out);
+    printfQuda("Out CPU %e CUDA %e\n", double(cpu), double(gpu));
   }
 
   if (gaugeSmeared != nullptr)
@@ -5211,8 +5212,8 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaQuarkSmearParam *smear_par
     
     qsmear_op.Expose()->SmearOp(out, in, a, 0.0, smear_param->t0, parity);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      double norm = blas::norm2(out);
-      printfQuda("Step %d, vector norm %e\n", i, norm);
+      real_t norm = blas::norm2(out);
+      printfQuda("Step %d, vector norm %e\n", i, double(norm));
     }
     blas::xpay(temp1, -1.0, out);
     blas::zero(temp1);

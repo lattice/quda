@@ -149,7 +149,7 @@ namespace quda
 
   void PreconCG::solve_and_collect(ColorSpinorField &x, ColorSpinorField &b,
                                    cvector_ref<ColorSpinorField> &v_r,
-                                   int collect_miniter, double collect_tol)
+                                   int collect_miniter, real_t collect_tol)
   {
     if (K) K->train_param(*this, b);
 
@@ -160,7 +160,7 @@ namespace quda
     // whether to select alternative reliable updates
     bool alternative_reliable = param.use_alternative_reliable;
 
-    double b2 = blas::norm2(b);
+    real_t b2 = blas::norm2(b);
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0 && param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
@@ -186,7 +186,7 @@ namespace quda
       }
     }
 
-    double Anorm = 0;
+    real_t Anorm = 0;
 
     // for alternative reliable updates
     if (alternative_reliable) {
@@ -196,7 +196,7 @@ namespace quda
     }
 
     // compute initial residual
-    double r2 = 0.0;
+    real_t r2 = 0.0;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       // Compute r = b - A * x
       mat(r, x);
@@ -233,16 +233,16 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_INIT);
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
-    double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
-    double heavy_quark_res = 0.0;                               // heavy quark residual
+    real_t stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+    real_t heavy_quark_res = 0.0;                               // heavy quark residual
     if (use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNorm(x, r)[2]);
 
-    double beta = 0.0;
-    double pAp;
-    double rMinvr = 0;
-    double rMinvr_old = 0.0;
-    double r_new_Minvr_old = 0.0;
-    double r2_old = 0;
+    real_t beta = 0.0;
+    real_t pAp;
+    real_t rMinvr = 0;
+    real_t rMinvr_old = 0.0;
+    real_t r_new_Minvr_old = 0.0;
+    real_t r2_old = 0;
     r2 = norm2(r);
 
     if (K) rMinvr = reDotProduct(r_sloppy, minvr_sloppy);
@@ -279,7 +279,7 @@ namespace quda
 
       matSloppy(Ap, x_update_batch.get_current_field());
 
-      double sigma;
+      real_t sigma;
       // alternative reliable updates,
       if (alternative_reliable) {
         auto pAppp = blas::cDotProductNormA(x_update_batch.get_current_field(), Ap);
@@ -308,7 +308,7 @@ namespace quda
 
       if (collect > 0 && k > collect_miniter && r2 < collect_tol * collect_tol * b2) {
         v_r[v_r.size() - collect] = r_sloppy;
-        logQuda(QUDA_VERBOSE, "Collecting r %2d: r2 / b2 = %12.8e, k = %5d\n", collect, sqrt(r2 / b2), k);
+        logQuda(QUDA_VERBOSE, "Collecting r %2d: r2 / b2 = %12.8e, k = %5d\n", collect, double(sqrt(r2 / b2)), k);
         collect--;
       }
 
@@ -370,7 +370,7 @@ namespace quda
         zero(x_sloppy);
 
         bool L2breakdown = false;
-        double L2breakdown_eps = 0;
+        real_t L2breakdown_eps = 0;
         if (ru.reliable_break(r2, stop, L2breakdown, L2breakdown_eps)) { break; }
 
         ru.update_norm(r2, y);
@@ -394,7 +394,7 @@ namespace quda
         } else {                        // standard CG - no preconditioning
 
           // explicitly restore the orthogonality of the gradient vector
-          double rp = reDotProduct(r_sloppy, x_update_batch.get_current_field()) / (r2);
+          real_t rp = reDotProduct(r_sloppy, x_update_batch.get_current_field()) / (r2);
           axpy(-rp, r_sloppy, x_update_batch.get_current_field());
 
           beta = r2 / r2_old;
@@ -436,7 +436,7 @@ namespace quda
 
     // compute the true residual
     mat(r, x);
-    double true_res = xmyNorm(b, r);
+    real_t true_res = xmyNorm(b, r);
     param.true_res = sqrt(true_res / b2);
 
     // reset the flops counters

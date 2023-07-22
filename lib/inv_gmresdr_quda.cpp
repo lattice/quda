@@ -29,20 +29,19 @@ namespace quda {
   using namespace std;
 
   using DynamicStride = Stride<Dynamic, Dynamic>;
-
-  using DenseMatrix = MatrixXcd;
-  using VectorSet = MatrixXcd;
-  using Vector = VectorXcd;
+  using DenseMatrix = Matrix<complex_t, Dynamic, Dynamic>;
+  using VectorSet = Matrix<complex_t, Dynamic, Dynamic>;
+  using Vector = Matrix<complex_t, Dynamic, 1>;
 
   // special types needed for compatibility with QUDA blas:
   using RowMajorDenseMatrix = Matrix<complex_t, Dynamic, Dynamic, RowMajor>;
 
   struct SortedEvals {
 
-    double _val;
+    real_t _val;
     int _idx;
 
-    SortedEvals(double val, int idx) : _val(val), _idx(idx) {};
+    SortedEvals(real_t val, int idx) : _val(val), _idx(idx) {};
     static bool SelectSmall(SortedEvals v1, SortedEvals v2) { return (v1._val < v2._val); }
   };
 
@@ -97,10 +96,9 @@ namespace quda {
     DenseMatrix cH = args.H.block(0, 0, args.m, args.m).adjoint();
     DenseMatrix Gk = args.H.block(0, 0, args.m, args.m);
 
-    VectorSet harVecs = MatrixXcd::Zero(args.m, args.m);
-    Vector harVals = VectorXcd::Zero(args.m);
-
-    Vector em = VectorXcd::Zero(args.m);
+    VectorSet harVecs = VectorSet::Zero(args.m, args.m);
+    Vector harVals = Vector::Zero(args.m);
+    Vector em = Vector::Zero(args.m);
 
     em(args.m - 1) = norm(args.H(args.m, args.m - 1));
     Gk.col(args.m - 1) += cH.colPivHouseholderQr().solve(em);
@@ -126,7 +124,7 @@ namespace quda {
   template <> void ComputeEta<libtype::eigen_lib>(GMResDRArgs &args)
   {
 
-    Map<VectorXcd, Unaligned> c_(args.c, args.m + 1);
+    Map<Vector, Unaligned> c_(args.c, args.m + 1);
     args.eta = args.H.jacobiSvd(ComputeThinU | ComputeThinV).solve(c_);
 
     return;
@@ -239,8 +237,8 @@ namespace quda {
 
     blas::caxpy(static_cast<complex_t *>(args.eta.data()), Z_, x_);
 
-    VectorXcd minusHeta = -(args.H * args.eta);
-    Map<VectorXcd, Unaligned> c_(args.c, args.m + 1);
+    Vector minusHeta = -(args.H * args.eta);
+    Map<Vector, Unaligned> c_(args.c, args.m + 1);
     c_ += minusHeta;
 
     blas::caxpy(static_cast<complex_t *>(minusHeta.data()), V_, r_);
@@ -257,9 +255,9 @@ namespace quda {
       errorQuda("Library type %d is currently not supported.\n", param.extlib_type);
     }
 
-    DenseMatrix Qkp1(MatrixXcd::Identity((args.m + 1), (args.k + 1)));
+    DenseMatrix Qkp1(DenseMatrix::Identity((args.m + 1), (args.k + 1)));
 
-    HouseholderQR<MatrixXcd> qr(args.ritzVecs);
+    HouseholderQR<DenseMatrix> qr(args.ritzVecs);
     Qkp1.applyOnTheLeft(qr.householderQ());
 
     DenseMatrix Res = Qkp1.adjoint() * args.H * Qkp1.topLeftCorner(args.m, args.k);
@@ -315,7 +313,7 @@ namespace quda {
 
     std::unique_ptr<complex_t[]> givensH((do_givens) ? new complex_t[(args.m + 1) * args.m] : nullptr);
     std::unique_ptr<complex_t[]> cn((do_givens) ? new complex_t[args.m] : nullptr);
-    std::unique_ptr<double[]> sn((do_givens) ? new double[args.m] : nullptr);
+    std::unique_ptr<real_t[]> sn((do_givens) ? new real_t[args.m] : nullptr);
 
     complex_t c0 = args.c[0];
 
@@ -337,7 +335,7 @@ namespace quda {
       args.H(0, j) = cDotProduct(Vm->Component(0), Vm->Component(j + 1));
       caxpy(-args.H(0, j), Vm->Component(0), Vm->Component(j + 1));
 
-      complex_t h0 = do_givens ? args.H(0, j) : 0.0;
+      complex_t h0 = do_givens ? args.H(0, j) : complex_t(0.0);
 
       for (int i = 1; i <= j; i++) {
         args.H(i, j) = cDotProduct(Vm->Component(i), Vm->Component(j + 1));
@@ -352,7 +350,7 @@ namespace quda {
       args.H(j + 1, j) = complex_t(sqrt(norm2(Vm->Component(j + 1))), 0.0);
       blas::ax(1.0 / args.H(j + 1, j).real(), Vm->Component(j + 1));
       if (do_givens) {
-        double inv_denom = 1.0 / sqrt(norm(h0) + norm(args.H(j + 1, j)));
+        real_t inv_denom = rsqrt(norm(h0) + norm(args.H(j + 1, j)));
         cn[j] = h0 * inv_denom;
         sn[j] = args.H(j + 1, j).real() * inv_denom;
         givensH[j * (args.m + 1) + j] = conj(cn[j]) * h0 + sn[j] * args.H(j + 1, j);
@@ -365,7 +363,7 @@ namespace quda {
     }
 
     if (do_givens) {
-      Map<MatrixXcd, Unaligned, DynamicStride> givensH_(givensH.get(), args.m, args.m, DynamicStride(args.m + 1, 1));
+      Map<DenseMatrix, Unaligned, DynamicStride> givensH_(givensH.get(), args.m, args.m, DynamicStride(args.m + 1, 1));
       memcpy(args.eta.data(), args.c, args.m * sizeof(complex_t));
       memset((void *)args.c, 0, (args.m + 1) * sizeof(complex_t));
       args.c[0] = c0;
@@ -388,8 +386,8 @@ namespace quda {
   {
     profile.TPSTART(QUDA_PROFILE_INIT);
 
-    const double tol_threshold     = 1.2;
-    const double det_max_deviation = 0.4;
+    const real_t tol_threshold     = 1.2;
+    const real_t det_max_deviation = 0.4;
 
     ColorSpinorField *ep = nullptr;
 
@@ -446,16 +444,16 @@ namespace quda {
 
     int tot_iters = 0;
 
-    double normb = norm2( b );
-    double stop  = param.tol*param.tol* normb;  
+    real_t normb = norm2( b );
+    real_t stop  = param.tol*param.tol* normb;  
 
     mat(r, x);
     
-    double r2 = xmyNorm(b, r);
-    double b2 = r2;
+    real_t r2 = xmyNorm(b, r);
+    real_t b2 = r2;
     args.c[0] = complex_t(sqrt(r2), 0.0);
 
-    printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", r2, sqrt(normb), param.tol);
+    printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", double(r2), double(sqrt(normb)), double(param.tol));
 
     rSloppy = r;
 
@@ -473,7 +471,7 @@ namespace quda {
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
-    double heavy_quark_res = 0.0;  
+    real_t heavy_quark_res = 0.0;  
     if (use_heavy_quark_res)  heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
 
 
@@ -488,7 +486,7 @@ namespace quda {
       r2 = norm2(rSloppy);
 
       bool do_clean_restart = false;
-      double ext_r2 = 1.0;
+      real_t ext_r2 = 1.0;
 
       if ((restart_idx + 1) % check_interval) {
         mat(y, e);
@@ -510,8 +508,8 @@ namespace quda {
         complex_t detGm = Gm.determinant();
 
         PrintStats("FGMResDR:", tot_iters, r2, b2, heavy_quark_res);
-        printfQuda("\nCheck cycle %d, true residual squared %1.15e, Gramm det : (%le, %le)\n", restart_idx, ext_r2,
-                   detGm.real(), detGm.imag());
+        printfQuda("\nCheck cycle %d, true residual squared %1.15e, Gramm det : (%le, %le)\n", restart_idx,
+                   double(ext_r2), double(detGm.real()), double(detGm.imag()));
 
         Gm.setZero();
 
@@ -525,7 +523,7 @@ namespace quda {
 
       } else {
 
-        printfQuda("\nClean restart for cycle %d, true residual squared %1.15e\n", restart_idx, ext_r2);
+        printfQuda("\nClean restart for cycle %d, true residual squared %1.15e\n", restart_idx, double(ext_r2));
         args.ResetArgs();
 
         // update solution:
@@ -568,7 +566,6 @@ namespace quda {
     param.rhs_idx += 1;
 
     if (ep) delete ep;
-    return;
   }
 
 } // namespace quda

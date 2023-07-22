@@ -71,7 +71,7 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct TwistedMassPreconditionedApply {
 
     inline TwistedMassPreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-        double a, double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric,
+        real_t a, real_t b, bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric,
         const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
@@ -95,16 +95,16 @@ namespace quda
     out = x + A^{-1} D * in = x + a*(1 + i*b*gamma_5)*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   */
 #ifdef GPU_TWISTED_MASS_DIRAC
-  void ApplyTwistedMassPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-      double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric,
+  void ApplyTwistedMassPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a,
+      real_t b, bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric,
       const int *comm_override, TimeProfile &profile)
   {
     instantiate<TwistedMassPreconditionedApply>(
         out, in, U, a, b, xpay, x, parity, dagger, asymmetric, comm_override, profile);
   }
 #else
-  void ApplyTwistedMassPreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double,
-                                      double, bool, const ColorSpinorField &, int, bool, bool, const int *, TimeProfile &)
+  void ApplyTwistedMassPreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, real_t,
+                                      real_t, bool, const ColorSpinorField &, int, bool, bool, const int *, TimeProfile &)
   {
     errorQuda("Twisted-mass dslash has not been built");
   }

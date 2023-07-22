@@ -20,7 +20,7 @@ namespace quda
     const real a; /** xpay scale factor */
 
     WilsonCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-                    double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+                    real_t a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
       A(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
       a(a)

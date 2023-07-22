@@ -49,7 +49,7 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct TwistedMassApply {
 
-    inline TwistedMassApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
+    inline TwistedMassApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a, real_t b,
                             const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                             TimeProfile &profile)
     {
@@ -65,14 +65,14 @@ namespace quda
   // out(x) = M*in = (1 + i*b*gamma_5)*in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   // Uses the kappa normalization for the Wilson operator, with a = -kappa.
 #ifdef GPU_TWISTED_MASS_DIRAC
-  void ApplyTwistedMass(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
+  void ApplyTwistedMass(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a, real_t b,
                         const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                         TimeProfile &profile)
   {
     instantiate<TwistedMassApply>(out, in, U, a, b, x, parity, dagger, comm_override, profile);
   }
 #else
-  void ApplyTwistedMass(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double, double,
+  void ApplyTwistedMass(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, real_t, real_t,
                         const ColorSpinorField &, int, bool, const int *, TimeProfile &)
   {
     errorQuda("Twisted-mass dslash has not been built");

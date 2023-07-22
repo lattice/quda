@@ -22,7 +22,7 @@ namespace quda {
     int X[4]; // grid dimensions
     real coeff;
     
-    CloverArg(CloverField &clover, const GaugeField &f, double coeff) :
+    CloverArg(CloverField &clover, const GaugeField &f, real_t coeff) :
       kernel_param(dim3(f.VolumeCB(), 2, 1)),
       clover(clover, 0),
       f(f),

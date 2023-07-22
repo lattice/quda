@@ -14,7 +14,7 @@ namespace quda {
     unsigned int minThreads() const { return clover.VolumeCB(); }
 
   public:
-    CloverSigmaTrace(GaugeField& output, const CloverField& clover, double coeff) :
+    CloverSigmaTrace(GaugeField& output, const CloverField& clover, real_t coeff) :
       TunableKernel1D(output),
       output(output),
       clover(clover),
@@ -33,13 +33,13 @@ namespace quda {
   };
 
 #ifdef GPU_CLOVER_DIRAC
-  void computeCloverSigmaTrace(GaugeField& output, const CloverField& clover, double coeff)
+  void computeCloverSigmaTrace(GaugeField& output, const CloverField& clover, real_t coeff)
   {
     checkNative(output, clover);
     instantiate<CloverSigmaTrace>(output, clover, coeff);
   }
 #else
-  void computeCloverSigmaTrace(GaugeField&, const CloverField&, double)
+  void computeCloverSigmaTrace(GaugeField&, const CloverField&, real_t)
   {
     errorQuda("Clover has not been built");
   }

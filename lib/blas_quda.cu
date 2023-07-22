@@ -140,14 +140,14 @@ namespace quda {
       }
     };
 
-    void axpbyz(double a, const ColorSpinorField &x, double b, const ColorSpinorField &y, ColorSpinorField &z)
+    void axpbyz(real_t a, const ColorSpinorField &x, real_t b, const ColorSpinorField &y, ColorSpinorField &z)
     {
-      instantiate<axpbyz_, Blas, true>(a, b, 0.0, x, y, x, x, z);
+      instantiate<axpbyz_, Blas, true>(a, b, real_t(0.0), x, y, x, x, z);
     }
 
-    void axy(double a, const ColorSpinorField &x, ColorSpinorField &y)
+    void axy(real_t a, const ColorSpinorField &x, ColorSpinorField &y)
     {
-      instantiate<axy_, Blas, false>(a, 0.0, 0.0, x, y, y, y, y);
+      instantiate<axy_, Blas, false>(a, real_t(0.0), real_t(0.0), x, y, y, y, y);
     }
 
     void caxpy(const complex_t &a, const ColorSpinorField &x, ColorSpinorField &y)
@@ -160,8 +160,8 @@ namespace quda {
       instantiate<caxpby_, Blas, false>(a, b, complex_t(0.0), x, y, x, x, y);
     }
 
-    void axpbypczw(double a, const ColorSpinorField &x, double b, const ColorSpinorField &y,
-                   double c, const ColorSpinorField &z, ColorSpinorField &w)
+    void axpbypczw(real_t a, const ColorSpinorField &x, real_t b, const ColorSpinorField &y,
+                   real_t c, const ColorSpinorField &z, ColorSpinorField &w)
     {
       instantiate<axpbypczw_, Blas, false>(a, b, c, x, y, z, w, y);
     }
@@ -172,14 +172,14 @@ namespace quda {
       instantiate<cxpaypbz_, Blas, false>(a, b, complex_t(0.0), x, y, z, x, y);
     }
 
-    void axpyBzpcx(double a, ColorSpinorField& x, ColorSpinorField& y, double b, const ColorSpinorField& z, double c)
+    void axpyBzpcx(real_t a, ColorSpinorField& x, ColorSpinorField& y, real_t b, const ColorSpinorField& z, real_t c)
     {
       instantiate<axpyBzpcx_, Blas, true>(a, b, c, x, y, z, x, y);
     }
 
-    void axpyZpbx(double a, ColorSpinorField& x, ColorSpinorField& y, const ColorSpinorField& z, double b)
+    void axpyZpbx(real_t a, ColorSpinorField& x, ColorSpinorField& y, const ColorSpinorField& z, real_t b)
     {
-      instantiate<axpyZpbx_, Blas, true>(a, b, 0.0, x, y, z, x, y);
+      instantiate<axpyZpbx_, Blas, true>(a, b, real_t(0.0), x, y, z, x, y);
     }
 
     void caxpyBzpx(const complex_t &a, ColorSpinorField &x, ColorSpinorField &y,
@@ -200,7 +200,7 @@ namespace quda {
       instantiate<caxpbypzYmbw_, Blas, false>(a, b, complex_t(0.0), x, y, z, w, y);
     }
 
-    void cabxpyAx(double a, const complex_t &b, ColorSpinorField &x, ColorSpinorField &y)
+    void cabxpyAx(real_t a, const complex_t &b, ColorSpinorField &x, ColorSpinorField &y)
     {
       instantiate<cabxpyAx_, Blas, false>(complex_t(a), b, complex_t(0.0), x, y, x, x, y);
     }
@@ -210,19 +210,19 @@ namespace quda {
       instantiate<caxpyxmaz_, Blas, false>(a, complex_t(0.0), complex_t(0.0), x, y, z, x, y);
     }
 
-    void caxpyXmazMR(const double &a, ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &z)
+    void caxpyXmazMR(const real_t &a, ColorSpinorField &x, ColorSpinorField &y, const ColorSpinorField &z)
     {
       if (!commAsyncReduction())
 	errorQuda("This kernel requires asynchronous reductions to be set");
       if (x.Location() == QUDA_CPU_FIELD_LOCATION)
 	errorQuda("This kernel cannot be run on CPU fields");
-      instantiate<caxpyxmazMR_, Blas, false>(a, 0.0, 0.0, x, y, z, y, y);
+      instantiate<caxpyxmazMR_, Blas, false>(a, real_t(0.0), real_t(0.0), x, y, z, y, y);
     }
 
-    void tripleCGUpdate(double a, double b, const ColorSpinorField &x, ColorSpinorField &y,
+    void tripleCGUpdate(real_t a, real_t b, const ColorSpinorField &x, ColorSpinorField &y,
                         ColorSpinorField &z, ColorSpinorField &w)
     {
-      instantiate<tripleCGUpdate_, Blas, true>(a, b, 0.0, x, y, z, w, y);
+      instantiate<tripleCGUpdate_, Blas, true>(a, b, real_t(0.0), x, y, z, w, y);
     }
 
   } // namespace blas

@@ -67,8 +67,8 @@ namespace quda
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
     }
 
-    double b2 = blas::norm2(b); // Save norm of b
-    double r2 = 0.0;            // if zero source then we will exit immediately doing no work
+    real_t b2 = blas::norm2(b); // Save norm of b
+    real_t r2 = 0.0;            // if zero source then we will exit immediately doing no work
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x);
       r2 = blas::xmyNorm(b, r); // r = b - Ax0
@@ -80,7 +80,7 @@ namespace quda
     blas::copy(r_sloppy, r);
 
     // if invalid residual then convergence is set by iteration count only
-    double stop = param.residual_type == QUDA_INVALID_RESIDUAL ? 0.0 : b2 * param.tol * param.tol;
+    real_t stop = param.residual_type == QUDA_INVALID_RESIDUAL ? 0.0 : b2 * param.tol * param.tol;
 
     int iter = 0;
     int step = 0;
@@ -90,7 +90,7 @@ namespace quda
     while (!converged) {
 
       int k = 0;
-      double scale = 1.0;
+      real_t scale = 1.0;
       if ((node_parity + step) % 2 == 0 && param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ) {
         // for multiplicative Schwarz we alternate updates depending on node parity
       } else {
@@ -98,7 +98,7 @@ namespace quda
         commGlobalReductionPush(param.global_reduction); // use local reductions for DD solver
 
         blas::zero(x_sloppy); // can get rid of this for a special first update kernel
-        double c2 = param.global_reduction == QUDA_BOOLEAN_TRUE ? r2 : blas::norm2(r); // c2 holds the initial r2
+        real_t c2 = param.global_reduction == QUDA_BOOLEAN_TRUE ? r2 : blas::norm2(r); // c2 holds the initial r2
         scale = c2 > 0.0 ? sqrt(c2) : 1.0;
 
         // domain-wise normalization of the initial residual to prevent underflow

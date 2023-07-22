@@ -247,7 +247,7 @@ namespace quda
 
   void MG::resetStaggeredKD(GaugeField *gauge_in, GaugeField *fat_gauge_in, GaugeField *long_gauge_in,
                             GaugeField *gauge_sloppy_in, GaugeField *fat_gauge_sloppy_in,
-                            GaugeField *long_gauge_sloppy_in, double mass)
+                            GaugeField *long_gauge_sloppy_in, real_t mass)
   {
     if (param.level != 0) errorQuda("The staggered KD operator can only be updated from level 0");
 
@@ -830,9 +830,9 @@ namespace quda
     return flops;
   }
 
-  bool check_deviation(double deviation, double tol)
+  bool check_deviation(real_t deviation, real_t tol)
   {
-    return (deviation > tol || std::isnan(deviation) || std::isinf(deviation));
+    return (deviation > tol || isnan(deviation) || isinf(deviation));
   }
 
   /**
@@ -879,11 +879,11 @@ namespace quda
 
         logQuda(
           QUDA_VERBOSE, "Vector %d: L2 norms v_k = %e P^\\dagger v_k = %e (1 - P P^\\dagger) v_k = %e; Deviations: L2 relative = %e, max = %e\n",
-          i, norm2(tmp1), norm2(*r_coarse), norm2(tmp2), l2_deviation, max_deviation[0]);
+          i, double(norm2(tmp1)), double(norm2(*r_coarse)), double(norm2(tmp2)), double(l2_deviation), double(max_deviation[0]));
         if (check_deviation(l2_deviation, tol))
-          errorQuda("k=%d orthonormality failed: L2 relative deviation %e > %e", i, l2_deviation, tol);
+          errorQuda("k=%d orthonormality failed: L2 relative deviation %e > %e", i, double(l2_deviation), double(tol));
         if (check_deviation(max_deviation[0], tol))
-          errorQuda("k=%d orthonormality failed: max deviation %e > %e", i, max_deviation[0], tol);
+          errorQuda("k=%d orthonormality failed: max deviation %e > %e", i, double(max_deviation[0]), double(tol));
       }
 
       // the oblique check
@@ -902,8 +902,8 @@ namespace quda
           transfer->P(tmp2, *x_coarse);
           (*param.matResidual)(tmp1, tmp2);
           tmp2 = *(param.B[i]);
-          logQuda(QUDA_SUMMARIZE, "Vector %d: norms %e %e\n", i, norm2(*param.B[i]), norm2(tmp1));
-          logQuda(QUDA_SUMMARIZE, "relative residual = %e\n", sqrt(xmyNorm(tmp2, tmp1) / norm2(*param.B[i])));
+          logQuda(QUDA_SUMMARIZE, "Vector %d: norms %e %e\n", i, double(norm2(*param.B[i])), double(norm2(tmp1)));
+          logQuda(QUDA_SUMMARIZE, "relative residual = %e\n", double(sqrt(xmyNorm(tmp2, tmp1) / norm2(*param.B[i]))));
         }
         sprintf(prefix, "MG level %d (%s): ", param.level + 1,
                 param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
@@ -953,12 +953,12 @@ namespace quda
       auto r2 = norm2(*r_coarse);
       auto max_deviation = blas::max_deviation(*r_coarse, *x_coarse);
       auto l2_deviation = sqrt(xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse));
-      logQuda(QUDA_VERBOSE, "L2 norms %e %e (fine tmp %e); Deviations: L2 relative = %e, max = %e\n", norm2(*x_coarse),
-              r2, norm2(tmp2), l2_deviation, max_deviation[0]);
+      logQuda(QUDA_VERBOSE, "L2 norms %e %e (fine tmp %e); Deviations: L2 relative = %e, max = %e\n", double(norm2(*x_coarse)),
+              double(r2), double(norm2(tmp2)), double(l2_deviation), double(max_deviation[0]));
       if (check_deviation(l2_deviation, tol))
-        errorQuda("coarse span failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+        errorQuda("coarse span failed: L2 relative deviation = %e > %e", double(l2_deviation), double(tol));
       if (check_deviation(max_deviation[0], tol))
-        errorQuda("coarse span failed: max deviation = %e > %e", max_deviation[0], tol);
+        errorQuda("coarse span failed: max deviation = %e > %e", double(max_deviation[0]), double(tol));
     }
 
     logQuda(QUDA_SUMMARIZE, "Checking 0 = (D_c - P^\\dagger D P) (native coarse operator to emulated operator)\n");
@@ -1009,8 +1009,8 @@ namespace quda
     if (can_verify) {
 
       if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
-        double kappa = diracResidual->Kappa();
-        double mass = diracResidual->Mass();
+        auto kappa = diracResidual->Kappa();
+        auto mass = diracResidual->Mass();
         if (param.level == 0) {
           if (tmp1.Nspin() == 4) {
             diracSmoother->DslashXpay(tmp2.Even(), tmp1.Odd(), QUDA_EVEN_PARITY, tmp1.Even(), -kappa);
@@ -1054,29 +1054,29 @@ namespace quda
       setOutputPrefix(prefix);
 #endif
 
-      double r_nrm = norm2(*r_coarse);
+      auto r_nrm = norm2(*r_coarse);
       auto max_deviation = blas::max_deviation(*r_coarse, *x_coarse);
       auto l2_deviation = sqrt(xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse));
 
       if (diracResidual->Mu() != 0.0) {
         // When the mu is shifted on the coarse level; we can compute exactly the error we introduce in the check:
         //  it is given by 2*kappa*delta_mu || tmp_coarse ||; where tmp_coarse is the random vector generated for the test
-        double delta_factor = param.mg_global.mu_factor[param.level + 1] - param.mg_global.mu_factor[param.level];
+        auto delta_factor = param.mg_global.mu_factor[param.level + 1] - param.mg_global.mu_factor[param.level];
         if (fabs(delta_factor) > tol) {
-          double delta_a
+          auto delta_a
             = delta_factor * 2.0 * diracResidual->Kappa() * diracResidual->Mu() * transfer->Vectors().TwistFlavor();
-          l2_deviation -= fabs(delta_a) * sqrt(norm2(*tmp_coarse) / norm2(*x_coarse));
-          l2_deviation = fabs(l2_deviation);
-          max_deviation[0] -= fabs(delta_a);
+          l2_deviation -= abs(delta_a) * sqrt(norm2(*tmp_coarse) / norm2(*x_coarse));
+          l2_deviation = abs(l2_deviation);
+          max_deviation[0] -= abs(delta_a);
         }
       }
       logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
-              norm2(*x_coarse), r_nrm, l2_deviation, max_deviation[0]);
+              double(norm2(*x_coarse)), double(r_nrm), double(l2_deviation), double(max_deviation[0]));
 
       if (check_deviation(l2_deviation, tol))
-        errorQuda("Coarse operator failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+        errorQuda("Coarse operator failed: L2 relative deviation = %e > %e", double(l2_deviation), double(tol));
       if (check_deviation(max_deviation[0], tol))
-        warningQuda("Coarse operator failed: max deviation = %e > %e", max_deviation[0], tol);
+        warningQuda("Coarse operator failed: max deviation = %e > %e", double(max_deviation[0]), double(tol));
     }
 
     // check the preconditioned operator construction on the lower level if applicable
@@ -1088,15 +1088,15 @@ namespace quda
       static_cast<DiracCoarse *>(diracCoarseResidual)->Dslash(r_coarse->Even(), tmp_coarse->Odd(), QUDA_EVEN_PARITY);
       static_cast<DiracCoarse *>(diracCoarseResidual)->CloverInv(x_coarse->Even(), r_coarse->Even(), QUDA_EVEN_PARITY);
       static_cast<DiracCoarsePC *>(diracCoarseSmoother)->Dslash(r_coarse->Even(), tmp_coarse->Odd(), QUDA_EVEN_PARITY);
-      double r_nrm = norm2(r_coarse->Even());
+      auto r_nrm = norm2(r_coarse->Even());
       auto max_deviation = blas::max_deviation(r_coarse->Even(), x_coarse->Even());
       auto l2_deviation = sqrt(xmyNorm(x_coarse->Even(), r_coarse->Even()) / norm2(x_coarse->Even()));
       logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
-              norm2(x_coarse->Even()), r_nrm, l2_deviation, max_deviation[0]);
+              double(norm2(x_coarse->Even())), double(r_nrm), double(l2_deviation), double(max_deviation[0]));
       if (check_deviation(l2_deviation, tol))
-        errorQuda("Preconditioned Deo failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+        errorQuda("Preconditioned Deo failed: L2 relative deviation = %e > %e", double(l2_deviation), double(tol));
       if (check_deviation(max_deviation[0], tol))
-        errorQuda("Preconditioned Deo failed: max deviation = %e > %e", max_deviation[0], tol);
+        errorQuda("Preconditioned Deo failed: max deviation = %e > %e", double(max_deviation[0]), double(tol));
 
       // check Doe
       logQuda(QUDA_SUMMARIZE, "Checking Doe of preconditioned operator 0 = \\hat{D}_c - A^{-1} D_c\n");
@@ -1107,11 +1107,11 @@ namespace quda
       max_deviation = blas::max_deviation(r_coarse->Odd(), x_coarse->Odd());
       l2_deviation = sqrt(xmyNorm(x_coarse->Odd(), r_coarse->Odd()) / norm2(x_coarse->Odd()));
       logQuda(QUDA_VERBOSE, "L2 norms: Emulated = %e, Native = %e; Deviations: L2 relative = %e, max = %e\n",
-              norm2(x_coarse->Odd()), r_nrm, l2_deviation, max_deviation[0]);
+              double(norm2(x_coarse->Odd())), double(r_nrm), double(l2_deviation), double(max_deviation[0]));
       if (check_deviation(l2_deviation, tol))
-        errorQuda("Preconditioned Doe failed: L2 relative deviation = %e > %e", l2_deviation, tol);
+        errorQuda("Preconditioned Doe failed: L2 relative deviation = %e > %e", double(l2_deviation), double(tol));
       if (check_deviation(max_deviation[0], tol))
-        errorQuda("Preconditioned Doe failed: max deviation = %e > %e", max_deviation[0], tol);
+        errorQuda("Preconditioned Doe failed: max deviation = %e > %e", double(max_deviation[0]), double(tol));
     }
 
     // here we check that the Hermitian conjugate operator is working
@@ -1123,13 +1123,13 @@ namespace quda
       } else {
         diracSmoother->MdagM(tmp2.Even(), tmp1.Odd());
       }
-      complex_t dot = cDotProduct(tmp2.Even(), tmp1.Odd());
-      double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
+      auto dot = cDotProduct(tmp2.Even(), tmp1.Odd());
+      auto deviation = abs(dot.imag()) / abs(dot.real());
       logQuda(QUDA_VERBOSE,
               "Smoother normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
-              real(dot), imag(dot), deviation);
+              double(dot.real()), double(dot.imag()), double(deviation));
       if (check_deviation(deviation, tol))
-        errorQuda("Smoother operator normality failed: deviation = %e > %e", deviation, tol);
+        errorQuda("Smoother operator normality failed: deviation = %e > %e", double(deviation), double(tol));
     }
 
     { // normal operator check for residual operator
@@ -1140,13 +1140,13 @@ namespace quda
         // staggered preconditioned op.
         diracResidual->M(tmp2, tmp1);
       }
-      complex_t dot = cDotProduct(tmp1, tmp2);
-      double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
+      auto dot = cDotProduct(tmp1, tmp2);
+      auto deviation = abs(dot.imag()) / abs(dot.real());
       logQuda(QUDA_VERBOSE,
               "Normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
-              real(dot), imag(dot), deviation);
+              double(dot.real()), double(dot.imag()), double(deviation));
       if (check_deviation(deviation, tol))
-        errorQuda("Residual operator normality failed: deviation = %e > %e", deviation, tol);
+        errorQuda("Residual operator normality failed: deviation = %e > %e", double(deviation), double(tol));
     }
 
     // Not useful for staggered op since it's a unitary transform
@@ -1168,13 +1168,13 @@ namespace quda
           // Prolong r_coarse, place result in tmp2
           transfer->P(tmp2, *r_coarse);
 
-          printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e PP^dag v_k = %e\n", i, norm2(*param.B[i]),
-                     norm2(*r_coarse), norm2(tmp2));
+          printfQuda("Vector %d: norms v_k = %e P^dag v_k = %e PP^dag v_k = %e\n", i, double(norm2(*param.B[i])),
+                     double(norm2(*r_coarse)), double(norm2(tmp2)));
 
           // Compare v_k and PP^dag v_k.
           auto max_deviation = blas::max_deviation(tmp2, *param.B[i]);
           auto l2_deviation = sqrt(xmyNorm(*param.B[i], tmp2) / norm2(*param.B[i]));
-          printfQuda("L2 relative deviation = %e max deviation = %e\n", l2_deviation, max_deviation[0]);
+          printfQuda("L2 relative deviation = %e max deviation = %e\n", double(l2_deviation), double(max_deviation[0]));
 
           if (param.mg_global.run_oblique_proj_check) {
 
@@ -1191,11 +1191,11 @@ namespace quda
             transfer->P(tmp2, *x_coarse);
             (*param.matResidual)(tmp1, tmp2);
 
-            logQuda(QUDA_SUMMARIZE, "Vector %d: norms v_k %e DP(P^dagDP)P^dag v_k %e\n", i, norm2(*param.B[i]),
-                    norm2(tmp1));
+            logQuda(QUDA_SUMMARIZE, "Vector %d: norms v_k %e DP(P^dagDP)P^dag v_k %e\n", i, double(norm2(*param.B[i])),
+                    double(norm2(tmp1)));
             max_deviation = blas::max_deviation(tmp1, *param.B[i]);
             logQuda(QUDA_SUMMARIZE, "L2 relative deviation = %e, max deviation = %e\n",
-                    sqrt(xmyNorm(*param.B[i], tmp1) / norm2(*param.B[i])), max_deviation[0]);
+                    double(sqrt(xmyNorm(*param.B[i], tmp1) / norm2(*param.B[i]))), double(max_deviation[0]));
           }
 
           sprintf(prefix, "MG level %d (%s): ", param.level + 1,
@@ -1238,13 +1238,13 @@ namespace quda
     if ( inner_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE)
       errorQuda("For this coarse grid solution type, a preconditioned smoother is required");
 
-    if ( debug ) printfQuda("entering V-cycle with x2=%e, r2=%e\n", norm2(x), norm2(b));
+    if ( debug ) printfQuda("entering V-cycle with x2=%e, r2=%e\n", double(norm2(x)), double(norm2(b)));
 
     if (param.level < param.Nlevel-1) {
       //transfer->setTransferGPU(false); // use this to force location of transfer (need to check if still works for multi-level)
 
       // do the pre smoothing
-      if (debug) printfQuda("pre-smoothing b2=%e site subset %d\n", norm2(b), b.SiteSubset());
+      if (debug) printfQuda("pre-smoothing b2=%e site subset %d\n", double(norm2(b)), b.SiteSubset());
 
       ColorSpinorField *out=nullptr, *in=nullptr;
 
@@ -1278,7 +1278,7 @@ namespace quda
         (*param.matResidual)(residual, x);
         axpby(1.0, b, -1.0, residual);
       }
-      double r2 = debug ? norm2(residual) : 0.0;
+      auto r2 = debug ? norm2(residual) : real_t(0.0);
 
       // We need this to ensure that the coarse level has been created.
       // e.g. in case of iterative setup with MG we use just pre- and post-smoothing at the first iteration.
@@ -1286,19 +1286,19 @@ namespace quda
 
         // restrict to the coarse grid
         transfer->R(*r_coarse, residual);
-        if ( debug ) printfQuda("after pre-smoothing x2 = %e, r2 = %e, r_coarse2 = %e\n", norm2(x), r2, norm2(*r_coarse));
+        if ( debug ) printfQuda("after pre-smoothing x2 = %e, r2 = %e, r_coarse2 = %e\n", double(norm2(x)), double(r2), double(norm2(*r_coarse)));
 
         // recurse to the next lower level
         (*coarse_solver)(*x_coarse, *r_coarse);
-        if (debug) printfQuda("after coarse solve x_coarse2 = %e r_coarse2 = %e\n", norm2(*x_coarse), norm2(*r_coarse));
+        if (debug) printfQuda("after coarse solve x_coarse2 = %e r_coarse2 = %e\n", double(norm2(*x_coarse)), double(norm2(*r_coarse)));
 
         // prolongate back to this grid
         ColorSpinorField &x_coarse_2_fine = inner_solution_type == QUDA_MAT_SOLUTION ? *r : r->Even(); // define according to inner solution type
         transfer->P(x_coarse_2_fine, *x_coarse); // repurpose residual storage
         xpy(x_coarse_2_fine, solution); // sum to solution FIXME - sum should be done inside the transfer operator
         if ( debug ) {
-          printfQuda("Prolongated coarse solution y2 = %e\n", norm2(*r));
-          printfQuda("after coarse-grid correction x2 = %e, r2 = %e\n", norm2(x), norm2(*r));
+          printfQuda("Prolongated coarse solution y2 = %e\n", double(norm2(*r)));
+          printfQuda("after coarse-grid correction x2 = %e, r2 = %e\n", double(norm2(x)), double(norm2(*r)));
         }
       }
 
@@ -1335,8 +1335,8 @@ namespace quda
     // FIXME on subset check
     if (debug && b.SiteSubset() == r->SiteSubset()) {
       (*param.matResidual)(*r, x);
-      double r2 = xmyNorm(b, *r);
-      printfQuda("leaving V-cycle with x2=%e, r2=%e\n", norm2(x), r2);
+      auto r2 = xmyNorm(b, *r);
+      printfQuda("leaving V-cycle with x2=%e, r2=%e\n", double(norm2(x)), double(r2));
     }
 
     popOutputPrefix();
@@ -1504,8 +1504,8 @@ namespace quda
             complex_t alpha = cDotProduct(*B[j], *B[i]);// <j,i>
             caxpy(-alpha, *B[j], *B[i]); // i-<j,i>j
           }
-          double nrm2 = norm2(*B[i]);
-          if (nrm2 > 1e-16) ax(1.0 /sqrt(nrm2), *B[i]);// i/<i,i>
+          auto nrm2 = norm2(*B[i]);
+          if (nrm2 > 1e-16) ax(rsqrt(nrm2), *B[i]);// i/<i,i>
           else errorQuda("\nCannot normalize %u vector\n", i);
         }
       }
@@ -1520,15 +1520,15 @@ namespace quda
           zero(b);
         }
 
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", norm2(x));
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial rhs = %g\n", norm2(b));
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", double(norm2(x)));
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial rhs = %g\n", double(norm2(b)));
 
         ColorSpinorField *out=nullptr, *in=nullptr;
         diracSmoother->prepare(in, out, x, b, QUDA_MAT_SOLUTION);
         (*solve)(*out, *in);
         diracSmoother->reconstruct(x, b, QUDA_MAT_SOLUTION);
 
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution = %g\n", norm2(x));
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution = %g\n", double(norm2(x)));
         *B[i] = x;
       }
 
@@ -1539,9 +1539,9 @@ namespace quda
             complex_t alpha = cDotProduct(*B[j], *B[i]);// <j,i>
             caxpy(-alpha, *B[j], *B[i]); // i-<j,i>j
           }
-          double nrm2 = norm2(*B[i]);
-          if (sqrt(nrm2) > 1e-16) ax(1.0/sqrt(nrm2), *B[i]);// i/<i,i>
-          else errorQuda("\nCannot normalize %u vector (nrm=%e)\n", i, sqrt(nrm2));
+          auto nrm2 = norm2(*B[i]);
+          if (sqrt(nrm2) > 1e-16) ax(rsqrt(nrm2), *B[i]);// i/<i,i>
+          else errorQuda("\nCannot normalize %u vector (nrm=%e)\n", i, double(sqrt(nrm2)));
         }
       }
 
@@ -1753,8 +1753,8 @@ namespace quda
     // global orthonormalization of the generated null-space vectors
     if(param.mg_global.post_orthonormalize) {
       for(int i=0; i<(int)B.size(); i++) {
-        double nrm2 = norm2(*B[i]);
-        if (nrm2 > 1e-16) ax(1.0 /sqrt(nrm2), *B[i]);// i/<i,i>
+        auto nrm2 = norm2(*B[i]);
+        if (nrm2 > 1e-16) ax(rsqrt(nrm2), *B[i]);// i/<i,i>
         else errorQuda("\nCannot normalize %u vector\n", i);
       }
     }
@@ -1780,7 +1780,7 @@ namespace quda
     // This is the vector precision used by matResidual
     csParam.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION, true);
 
-    std::vector<complex_t> evals(n_conv, 0.0);
+    std::vector<complex_t> evals(n_conv, real_t(0.0));
     std::vector<ColorSpinorField> B_evecs(n_conv);
     for (auto &b : B_evecs) b = ColorSpinorField(csParam);
 

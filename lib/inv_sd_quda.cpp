@@ -40,11 +40,11 @@ namespace quda {
       init = true;
     }
 
-    double b2 = norm2(b);
+    real_t b2 = norm2(b);
 
     zero(*r), zero(x);
-    double r2 = xmyNorm(b,*r);
-    double alpha=0.; 
+    real_t r2 = xmyNorm(b,*r);
+    real_t alpha=0.; 
 
     int k=0;
     while (k < param.maxiter - 1) {
@@ -56,7 +56,7 @@ namespace quda {
 
       if(getVerbosity() >= QUDA_VERBOSE){
         r2 = norm2(*r);
-        printfQuda("Steepest Descent: %d iterations, |r| = %e, |r|/|b| = %e\n", k, sqrt(r2), sqrt(r2/b2));
+        printfQuda("Steepest Descent: %d iterations, |r| = %e, |r|/|b| = %e\n", k, double(sqrt(r2)), double(sqrt(r2/b2)));
       }
 
       ++k;
@@ -68,15 +68,15 @@ namespace quda {
     if(getVerbosity() >= QUDA_VERBOSE){
       axpy(-alpha, *Ar, *r);
       r2 = norm2(*r);
-      printfQuda("Steepest Descent: %d iterations, |r| = %e, |r|/|b| = %e\n", k, sqrt(r2), sqrt(r2/b2));
+      printfQuda("Steepest Descent: %d iterations, |r| = %e, |r|/|b| = %e\n", k, double(sqrt(r2)), double(sqrt(r2/b2)));
       ++k;
     }
 
     if(getVerbosity() >= QUDA_DEBUG_VERBOSE){
       // Compute the true residual
       mat(*r, x);
-      double true_r2 = xmyNorm(b,*r);
-      printfQuda("Steepest Descent: %d iterations, accumulated |r| = %e, true |r| = %e,  |r|/|b| = %e\n", k, sqrt(r2), sqrt(true_r2), sqrt(true_r2/b2));
+      real_t true_r2 = xmyNorm(b,*r);
+      printfQuda("Steepest Descent: %d iterations, accumulated |r| = %e, true |r| = %e,  |r|/|b| = %e\n", k, double(sqrt(r2)), double(sqrt(true_r2)), double(sqrt(true_r2/b2)));
     } // >= QUDA_DEBUG_VERBOSITY
 
     commGlobalReductionPop();

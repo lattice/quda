@@ -63,9 +63,9 @@ protected:
     const int parity;
     const int nParity;
     int work_items;
-    const double a;
-    const double b;
-    const double c;
+    const real_t a;
+    const real_t b;
+    const real_t c;
     int twist; // only has meaning for nSpin=4
 #ifdef NVSHMEM_COMMS
     const int shmem;
@@ -169,8 +169,8 @@ protected:
     }
 
 public:
-  Pack(void *ghost[], const ColorSpinorField &in, MemoryLocation location, int nFace, bool dagger, int parity, double a,
-       double b, double c,
+  Pack(void *ghost[], const ColorSpinorField &in, MemoryLocation location, int nFace, bool dagger, int parity, real_t a,
+       real_t b, real_t c,
 #ifdef NVSHMEM_COMMS
        int shmem) :
 #else
@@ -371,7 +371,7 @@ public:
 
   template <typename Float, int nColor> struct GhostPack {
     GhostPack(const ColorSpinorField &in, void *ghost[], MemoryLocation location, int nFace, bool dagger, int parity,
-              bool spin_project, double a, double b, double c, int shmem, const qudaStream_t &stream)
+              bool spin_project, real_t a, real_t b, real_t c, int shmem, const qudaStream_t &stream)
     {
       if (spin_project) {
         Pack<Float, nColor, true> pack(ghost, in, location, nFace, dagger, parity, a, b, c, shmem);
@@ -385,7 +385,7 @@ public:
 
   // Pack the ghost for the Dslash operator
   void PackGhost(void *ghost[2 * QUDA_MAX_DIM], const ColorSpinorField &in, MemoryLocation location, int nFace,
-                 bool dagger, int parity, bool spin_project, double a, double b, double c, int shmem,
+                 bool dagger, int parity, bool spin_project, real_t a, real_t b, real_t c, int shmem,
                  const qudaStream_t &stream)
   {
     int nDimPack = 0;

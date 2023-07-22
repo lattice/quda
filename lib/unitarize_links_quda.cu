@@ -73,7 +73,7 @@ namespace quda {
   }
 
   // CPU function which checks that the gauge field is unitary
-  bool isUnitary(const GaugeField& field, double max_error)
+  bool isUnitary(const GaugeField& field, real_t max_error)
   {
     if (field.Location() != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
     Matrix<complex<double>,3> link, identity;
@@ -87,7 +87,7 @@ namespace quda {
         } else {
 	  errorQuda("Unsupported precision\n");
 	}
-	if (link.isUnitary(max_error) == false) {
+	if (link.isUnitary(double(max_error)) == false) {
 	  printf("Unitarity failure\n");
 	  printf("site index = %u,\t direction = %d\n", i, dir);
 	  printLink(link);
@@ -157,7 +157,7 @@ namespace quda {
     unsigned int minThreads() const { return u.VolumeCB(); }
 
   public:
-    ProjectSU3(GaugeField &u, double tol, int *fails) :
+    ProjectSU3(GaugeField &u, real_t tol, int *fails) :
       TunableKernel3D(u, 2, 4),
       u(u),
       tol(tol),
@@ -182,7 +182,7 @@ namespace quda {
     long long bytes() const { return 2 * u.Bytes(); }
   };
 
-  void projectSU3(GaugeField &u, double tol, int *fails)
+  void projectSU3(GaugeField &u, real_t tol, int *fails)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     // check the the field doesn't have staggered phases applied

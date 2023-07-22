@@ -161,11 +161,11 @@ void packTest()
   host_timer.stop();
   printfQuda("Spinor receive time = %e seconds\n", host_timer.last());
 
-  double spinor_norm = blas::norm2(*spinor);
-  double cuda_spinor_norm = blas::norm2(*cudaSpinor);
-  double spinor2_norm = blas::norm2(*spinor2);
+  auto spinor_norm = blas::norm2(*spinor);
+  auto cuda_spinor_norm = blas::norm2(*cudaSpinor);
+  auto spinor2_norm = blas::norm2(*spinor2);
 
-  printfQuda("Norm check: CPU = %e, CUDA = %e, CPU = %e\n", spinor_norm, cuda_spinor_norm, spinor2_norm);
+  printfQuda("Norm check: CPU = %e, CUDA = %e, CPU = %e\n", double(spinor_norm), double(cuda_spinor_norm), double(spinor2_norm));
 
   ColorSpinorField::Compare(*spinor, *spinor2, 1);
 }

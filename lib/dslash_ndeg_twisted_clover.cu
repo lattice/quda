@@ -76,8 +76,8 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct NdegTwistedCloverApply {
     
     inline NdegTwistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                  const CloverField &A, double a,
-                                  double b, double c, const ColorSpinorField &x, int parity, bool dagger,
+                                  const CloverField &A, real_t a,
+                                  real_t b, real_t c, const ColorSpinorField &x, int parity, bool dagger,
                                   const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
@@ -91,15 +91,15 @@ namespace quda
 
 #ifdef GPU_NDEG_TWISTED_CLOVER_DIRAC
   void ApplyNdegTwistedClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-                              double a, double b,
-                              double c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+                              real_t a, real_t b,
+                              real_t c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                               TimeProfile &profile)
   {
     instantiate<NdegTwistedCloverApply>(out, in, U, A, a, b, c, x, parity, dagger, comm_override, profile);
   }
 #else
   void ApplyNdegTwistedClover(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, const CloverField &,
-                              double, double, double, const ColorSpinorField &, int, bool, const int *,
+                              real_t, real_t, real_t, const ColorSpinorField &, int, bool, const int *,
                               TimeProfile &)
   {
     errorQuda("Non-degenerate twisted-clover dslash has not been built");

@@ -59,7 +59,7 @@ namespace quda {
 
   void GCR::computeBeta(std::vector<complex_t> &beta, std::vector<ColorSpinorField> &Ap, int i, int N, int k)
   {
-    std::vector<complex_t> Beta(N, 0.0);
+    std::vector<complex_t> Beta(N, real_t(0.0));
     blas::cDotProduct(Beta, {Ap.begin() + i, Ap.begin() + i + N}, Ap[k]); // vectorized dot product
 
 #if 0
@@ -119,7 +119,7 @@ namespace quda {
   }
 
   void GCR::backSubs(const std::vector<complex_t> &alpha, const std::vector<complex_t> &beta,
-                     const std::vector<double> &gamma, std::vector<complex_t> &delta, int n)
+                     const std::vector<real_t> &gamma, std::vector<complex_t> &delta, int n)
   {
     for (int k=n-1; k>=0;k--) {
       delta[k] = alpha[k];
@@ -129,7 +129,7 @@ namespace quda {
   }
 
   void GCR::updateSolution(ColorSpinorField &x, const std::vector<complex_t> &alpha, const std::vector<complex_t> &beta,
-                           std::vector<double> &gamma, int k, std::vector<ColorSpinorField> &p)
+                           std::vector<real_t> &gamma, int k, std::vector<ColorSpinorField> &p)
   {
     std::vector<complex_t> delta(k);
 
@@ -261,8 +261,8 @@ namespace quda {
       }
     }
 
-    double b2 = blas::norm2(b);  // norm sq of source
-    double r2;                // norm sq of residual
+    real_t b2 = blas::norm2(b);  // norm sq of source
+    real_t r2;                // norm sq of residual
 
     // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
@@ -299,7 +299,7 @@ namespace quda {
       }
     }
 
-    double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+    real_t stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
@@ -310,7 +310,7 @@ namespace quda {
     const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
     const int maxResIncreaseTotal = param.max_res_increase_total;
 
-    double heavy_quark_res = 0.0; // heavy quark residual
+    real_t heavy_quark_res = 0.0; // heavy quark residual
     if(use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x,r)[2]);
 
     int resIncrease = 0;
@@ -325,8 +325,8 @@ namespace quda {
 
     int total_iter = 0;
     int restart = 0;
-    double r2_old = r2;
-    double maxr_deflate = sqrt(r2);
+    real_t r2_old = r2;
+    real_t maxr_deflate = sqrt(r2);
     bool l2_converge = false;
 
     int pipeline = param.pipeline;
@@ -398,7 +398,7 @@ namespace quda {
           resIncrease++;
           resIncreaseTotal++;
           warningQuda("GCR: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-        	      sqrt(r2), sqrt(r2_old), resIncreaseTotal);
+        	      double(sqrt(r2)), double(sqrt(r2_old)), resIncreaseTotal);
           if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
             warningQuda("GCR: solver exiting due to too many true residual norm increases");
             break;
@@ -441,7 +441,7 @@ namespace quda {
     if (param.compute_true_res) {
       // Calculate the true residual
       mat(r, x);
-      double true_res = blas::xmyNorm(b, r);
+      real_t true_res = blas::xmyNorm(b, r);
       param.true_res = sqrt(true_res / b2);
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL)
 	param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r)[2]);

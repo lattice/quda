@@ -53,8 +53,8 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct NdegTwistedMassApply {
 
-    inline NdegTwistedMassApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                                double b, double c, const ColorSpinorField &x, int parity, bool dagger,
+    inline NdegTwistedMassApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a,
+                                real_t b, real_t c, const ColorSpinorField &x, int parity, bool dagger,
                                 const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
@@ -66,15 +66,15 @@ namespace quda
   };
 
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
-  void ApplyNdegTwistedMass(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
-                            double c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+  void ApplyNdegTwistedMass(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a, real_t b,
+                            real_t c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                             TimeProfile &profile)
   {
     instantiate<NdegTwistedMassApply>(out, in, U, a, b, c, x, parity, dagger, comm_override, profile);
   }
 #else
-  void ApplyNdegTwistedMass(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double, double,
-                            double, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+  void ApplyNdegTwistedMass(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, real_t, real_t,
+                            real_t, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
   {
     errorQuda("Non-degenerate twisted-mass dslash has not been built");
   }

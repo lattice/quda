@@ -16,13 +16,13 @@ namespace quda {
     GaugeField &oprod;
     const std::vector<ColorSpinorField*> &inA;
     const std::vector<ColorSpinorField*> &inB;
-    const std::vector<std::vector<double>> &coeff;
+    const std::vector<std::vector<real_t>> &coeff;
     unsigned int minThreads() const { return oprod.VolumeCB(); }
 
   public:
     CloverSigmaOprod(GaugeField &oprod, const std::vector<ColorSpinorField*> &inA,
                      const std::vector<ColorSpinorField*> &inB,
-                     const std::vector<std::vector<double>> &coeff) :
+                     const std::vector<std::vector<real_t>> &coeff) :
       TunableKernel3D(oprod, 2, 6),
       oprod(oprod),
       inA(inA),
@@ -59,14 +59,14 @@ namespace quda {
 
 #ifdef GPU_CLOVER_DIRAC
   void computeCloverSigmaOprod(GaugeField& oprod, std::vector<ColorSpinorField*> &x,
-			       std::vector<ColorSpinorField*> &p, std::vector<std::vector<double> > &coeff)
+			       std::vector<ColorSpinorField*> &p, std::vector<std::vector<real_t> > &coeff)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (x.size() > MAX_NVECTOR) {
       // divide and conquer
       std::vector<ColorSpinorField*> x0(x.begin(), x.begin()+x.size()/2);
       std::vector<ColorSpinorField*> p0(p.begin(), p.begin()+p.size()/2);
-      std::vector<std::vector<double> > coeff0(coeff.begin(), coeff.begin()+coeff.size()/2);
+      std::vector<std::vector<real_t> > coeff0(coeff.begin(), coeff.begin()+coeff.size()/2);
       for (unsigned int i=0; i<coeff0.size(); i++) {
 	coeff0[i].reserve(2); coeff0[i][0] = coeff[i][0]; coeff0[i][1] = coeff[i][1];
       }
@@ -74,7 +74,7 @@ namespace quda {
 
       std::vector<ColorSpinorField*> x1(x.begin()+x.size()/2, x.end());
       std::vector<ColorSpinorField*> p1(p.begin()+p.size()/2, p.end());
-      std::vector<std::vector<double> > coeff1(coeff.begin()+coeff.size()/2, coeff.end());
+      std::vector<std::vector<real_t> > coeff1(coeff.begin()+coeff.size()/2, coeff.end());
       for (unsigned int i=0; i<coeff1.size(); i++) {
 	coeff1[i].reserve(2); coeff1[i][0] = coeff[coeff.size()/2 + i][0]; coeff1[i][1] = coeff[coeff.size()/2 + i][1];
       }
@@ -88,7 +88,7 @@ namespace quda {
   }
 #else // GPU_CLOVER_DIRAC not defined
   void computeCloverSigmaOprod(GaugeField &, std::vector<ColorSpinorField*> &,
-			       std::vector<ColorSpinorField*> &, std::vector<std::vector<double> > &)
+			       std::vector<ColorSpinorField*> &, std::vector<std::vector<real_t> > &)
   {
     errorQuda("Clover Dirac operator has not been built!");
   }

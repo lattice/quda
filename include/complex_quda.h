@@ -125,6 +125,7 @@ namespace quda
 
   __host__ __device__ inline float conj(float x) { return x; }
   __host__ __device__ inline double conj(double x) { return x; }
+  __host__ __device__ inline doubledouble conj(doubledouble x) { return x; }
 
   template <typename ValueType> struct complex;
   //template <> struct complex<float>;

@@ -136,11 +136,6 @@ namespace quda {
 
   CloverField *CloverField::Create(const CloverFieldParam &param) { return new CloverField(param); }
 
-  void CloverField::setRho(double rho_)
-  {
-    rho = rho_;
-  }
-
   void CloverField::copy(const CloverField &src, bool is_inverse)
   {
     if (src.Location() == QUDA_CUDA_FIELD_LOCATION && location == QUDA_CPU_FIELD_LOCATION) {
@@ -304,12 +299,12 @@ namespace quda {
     output << "inverse = "   << param.inverse << std::endl;
     output << "clover = "    << param.clover << std::endl;
     output << "cloverInv = " << param.cloverInv << std::endl;
-    output << "csw = "       << param.csw << std::endl;
-    output << "coeff = " << param.coeff << std::endl;
+    output << "csw = "       << double(param.csw) << std::endl;
+    output << "coeff = " << double(param.coeff) << std::endl;
     output << "twist_flavor = " << param.twist_flavor << std::endl;
-    output << "mu2 = " << param.mu2 << std::endl;
-    output << "epsilon2 = " << param.epsilon2 << std::endl;
-    output << "rho = " << param.rho << std::endl;
+    output << "mu2 = " << double(param.mu2) << std::endl;
+    output << "epsilon2 = " << double(param.epsilon2) << std::endl;
+    output << "rho = " << double(param.rho) << std::endl;
     output << "order = " << param.order << std::endl;
     output << "create = " << param.create << std::endl;
     return output;  // for multiple << operators.
@@ -337,14 +332,14 @@ namespace quda {
   }
 
   // Return the L2 norm squared of the clover field
-  double norm2(const CloverField &a, bool inverse)
+  real_t norm2(const CloverField &a, bool inverse)
   {
     ColorSpinorField b(colorSpinorParam(a, inverse));
     return blas::norm2(b);
   }
 
   // Return the L1 norm of the clover field
-  double norm1(const CloverField &a, bool inverse)
+  real_t norm1(const CloverField &a, bool inverse)
   {
     ColorSpinorField b(colorSpinorParam(a, inverse));
     return blas::norm1(b);

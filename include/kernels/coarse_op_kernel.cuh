@@ -164,7 +164,7 @@ namespace quda {
     CalculateYArg(coarseGauge &Y, coarseGauge &X,
       coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
       fineSpinorUV &UV, fineSpinorAV &AV, const fineGauge &U, const fineGauge &L, const fineGauge &K, const fineSpinorV &V,
-      const fineClover &C, const fineClover &Cinv, const ColorSpinorField &v, double kappa, double mass, double mu, double mu_factor,
+      const fineClover &C, const fineClover &Cinv, const ColorSpinorField &v, real_t kappa, real_t mass, real_t mu, real_t mu_factor,
       const int *x_size_, const int *xc_size_, int spin_bs_,
       const int *fine_to_coarse, const int *coarse_to_fine, bool bidirectional)
       : Y(Y), X(X), Y_atomic(Y_atomic), X_atomic(X_atomic),

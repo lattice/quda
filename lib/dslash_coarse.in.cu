@@ -8,7 +8,7 @@ namespace quda {
   template<>
   void ApplyCoarse<dagger, coarseColor>(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                                         cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X,
-                                        double kappa, int parity, bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision)
+                                        real_t kappa, int parity, bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision)
   {
     if constexpr (is_enabled_multigrid()) {
       // create a halo ndim+1 field for batched comms

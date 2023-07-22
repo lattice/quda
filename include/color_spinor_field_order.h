@@ -687,7 +687,7 @@ namespace quda
         nParity(field.SiteSubset()), ghostAccessor(field, nFace)
       {
         resetGhost(ghost_ ? ghost_ : field.Ghost());
-        resetScale(field.Scale());
+        resetScale(double(field.Scale()));
       }
 
       GhostOrder &operator=(const GhostOrder &) = default;
@@ -862,7 +862,7 @@ namespace quda
         GhostOrder(field, nFace, ghost_), volumeCB(field.VolumeCB()), accessor(field)
       {
         v.v = v_ ? static_cast<complex<storeFloat> *>(const_cast<void *>(v_)) : field.data<complex<storeFloat> *>();
-        resetScale(field.Scale());
+        resetScale(double(field.Scale()));
 
         if constexpr (fixed && block_float) {
           if constexpr (nColor == 3 && nSpin == 1 && nVec == 1 && order == 2)

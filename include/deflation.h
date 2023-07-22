@@ -22,7 +22,7 @@ namespace quda {
     ColorSpinorField *RV;  
     
     /** Inverse Ritz values*/
-    double *invRitzVals;
+    real_t *invRitzVals;
 
      /** The Dirac operator to use for spinor deflation operation */
     DiracMatrix &matDeflation;
@@ -57,7 +57,7 @@ namespace quda {
         ld           = ((tot_dim+15) / 16) * tot_dim;
         //allocate deflation resources:
         matProj = static_cast<complex_t *>(pool_pinned_malloc(ld * tot_dim * sizeof(complex_t)));
-        invRitzVals  = new double[tot_dim];
+        invRitzVals  = new real_t[tot_dim];
 
         //Check that RV is a composite field:
         if(RV->IsComposite() == false) errorQuda("\nRitz vectors must be contained in a composite field.\n");
@@ -128,7 +128,7 @@ namespace quda {
        @param tol : keep all eigenvectors with residual norm less then tol
        @param max_n_ev : keep the lowest max_n_ev eigenvectors (conservative)
      */
-    void reduce(double tol, int max_n_ev);
+    void reduce(real_t tol, int max_n_ev);
 
     /**
        This applies deflation operation on a given spinor vector(s)

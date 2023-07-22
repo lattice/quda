@@ -52,9 +52,9 @@ namespace quda
 
       eofa_coeff<real> coeff;
 
-      Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double m_f_,
-                 const double m_5_, const complex_t */*b_5_*/, const complex_t */*c_5_*/, double a_, double inv_, double kappa_,
-                 const double *eofa_u, const double *eofa_x, const double *eofa_y, double sherman_morrison_) :
+      Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const real_t m_f_,
+                 const real_t m_5_, const complex_t */*b_5_*/, const complex_t */*c_5_*/, real_t a_, real_t inv_, real_t kappa_,
+                 const real_t *eofa_u, const real_t *eofa_x, const real_t *eofa_y, real_t sherman_morrison_) :
         kernel_param(dim3(in.VolumeCB() / in.X(4), in.X(4), in.SiteSubset())),
         out(out),
         in(in),
@@ -76,13 +76,13 @@ namespace quda
 
         switch (type) {
         case Dslash5Type::M5_EOFA:
-          for (int s = 0; s < Ls; s++) { coeff.u[s] = eofa_u[s]; }
+          for (int s = 0; s < Ls; s++) { coeff.u[s] = real(eofa_u[s]); }
           break;
         case Dslash5Type::M5INV_EOFA:
           for (int s = 0; s < Ls; s++) {
-            coeff.u[s] = eofa_u[s];
-            coeff.x[s] = eofa_x[s];
-            coeff.y[s] = eofa_y[s];
+            coeff.u[s] = real(eofa_u[s]);
+            coeff.x[s] = real(eofa_x[s]);
+            coeff.y[s] = real(eofa_y[s]);
           }
           break;
         default: errorQuda("Unexpected EOFA Dslash5Type %d", static_cast<int>(type));

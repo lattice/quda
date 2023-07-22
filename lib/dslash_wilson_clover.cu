@@ -65,7 +65,7 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverApply {
 
     inline WilsonCloverApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-        double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+        real_t a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       WilsonCloverArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, 0.0, x, parity, dagger, comm_override);
@@ -78,7 +78,7 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverWithTwistApply {
 
     inline WilsonCloverWithTwistApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                      const CloverField &A, double a, double b, const ColorSpinorField &x, int parity,
+                                      const CloverField &A, real_t a, real_t b, const ColorSpinorField &x, int parity,
                                       bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
@@ -94,13 +94,13 @@ namespace quda
   // Uses the kappa normalization for the Wilson operator.
 #ifdef GPU_CLOVER_DIRAC
   void ApplyWilsonClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-      double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+      real_t a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
     instantiate<WilsonCloverApply>(out, in, U, A, a, x, parity, dagger, comm_override, profile);
   }
 #else
   void ApplyWilsonClover(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, const CloverField &,
-                         double, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+                         real_t, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
   {
     errorQuda("Clover dslash has not been built");
   }

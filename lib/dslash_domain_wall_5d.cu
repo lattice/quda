@@ -65,11 +65,11 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct DomainWall5DApply {
 
-    inline DomainWall5DApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-        double m_f, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+    inline DomainWall5DApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a,
+        real_t m_f, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 5;
-      DomainWall5DArg<Float, nColor, nDim, recon> arg(out, in, U, a, m_f, a != 0.0, x, parity, dagger, comm_override);
+      DomainWall5DArg<Float, nColor, nDim, recon> arg(out, in, U, a, m_f, a != real_t(0.0), x, parity, dagger, comm_override);
       DomainWall5D<decltype(arg)> dwf(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
@@ -79,13 +79,13 @@ namespace quda
   // Apply the 4-d preconditioned domain-wall Dslash operator
   // out(x) = M*in = in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
 #ifdef GPU_DOMAIN_WALL_DIRAC
-  void ApplyDomainWall5D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_f,
+  void ApplyDomainWall5D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a, real_t m_f,
       const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
     instantiate<DomainWall5DApply>(out, in, U, a, m_f, x, parity, dagger, comm_override, profile);
   }
 #else
-  void ApplyDomainWall5D(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double, double,
+  void ApplyDomainWall5D(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, real_t, real_t,
                          const ColorSpinorField &, int, bool, const int *, TimeProfile &)
   {
     errorQuda("Domain-wall dslash has not been built");

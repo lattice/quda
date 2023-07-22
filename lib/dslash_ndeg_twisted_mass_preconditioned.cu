@@ -95,7 +95,7 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct NdegTwistedMassPreconditionedApply {
 
     inline NdegTwistedMassPreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-        double a, double b, double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric,
+        real_t a, real_t b, real_t c, bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric,
         const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
@@ -118,7 +118,7 @@ namespace quda
   // Uses the kappa normalization for the Wilson operator, with a = -kappa.
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
   void ApplyNdegTwistedMassPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-      double a, double b, double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric,
+      real_t a, real_t b, real_t c, bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric,
       const int *comm_override, TimeProfile &profile)
   {
     instantiate<NdegTwistedMassPreconditionedApply>(
@@ -126,7 +126,7 @@ namespace quda
   }
 #else
   void ApplyNdegTwistedMassPreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
-                                          double, double, double, bool, const ColorSpinorField &, int, bool, bool,
+                                          real_t, real_t, real_t, bool, const ColorSpinorField &, int, bool, bool,
                                           const int *, TimeProfile &)
   {
     errorQuda("Non-degenerate preconditioned twisted-mass dslash has not been built");

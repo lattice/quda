@@ -44,16 +44,16 @@ namespace quda {
     ColorSpinorField &out;
     const ColorSpinorField &in;
     int d;
-    double kappa;
-    double mu;
-    double epsilon;
+    real_t kappa;
+    real_t mu;
+    real_t epsilon;
     int dagger;
     QudaTwistGamma5Type type;
     unsigned int minThreads() const { return in.VolumeCB() / (in.Ndim() == 5 ? in.X(4) : 1); }
 
   public:
-    TwistGammaApply(ColorSpinorField &out, const ColorSpinorField &in, int d, double kappa, double mu,
-                    double epsilon, int dagger, QudaTwistGamma5Type type) :
+    TwistGammaApply(ColorSpinorField &out, const ColorSpinorField &in, int d, real_t kappa, real_t mu,
+                    real_t epsilon, int dagger, QudaTwistGamma5Type type) :
       TunableKernel2D(in, in.SiteSubset()),
       out(out),
       in(in),
@@ -83,12 +83,12 @@ namespace quda {
   //Apply the Gamma matrix to a colorspinor field
   //out(x) = gamma_d*in
 #ifdef GPU_TWISTED_MASS_DIRAC
-  void ApplyTwistGamma(ColorSpinorField &out, const ColorSpinorField &in, int d, double kappa, double mu, double epsilon, int dagger, QudaTwistGamma5Type type)
+  void ApplyTwistGamma(ColorSpinorField &out, const ColorSpinorField &in, int d, real_t kappa, real_t mu, real_t epsilon, int dagger, QudaTwistGamma5Type type)
   {
     instantiate<TwistGammaApply>(out, in, d, kappa, mu, epsilon, dagger, type);
   }
 #else
-  void ApplyTwistGamma(ColorSpinorField &, const ColorSpinorField &, int, double, double, double, int, QudaTwistGamma5Type)
+  void ApplyTwistGamma(ColorSpinorField &, const ColorSpinorField &, int, real_t, real_t, real_t, int, QudaTwistGamma5Type)
   {
     errorQuda("Twisted mass dslash has not been built");
   }

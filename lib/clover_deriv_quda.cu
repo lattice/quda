@@ -9,12 +9,12 @@ namespace quda {
     GaugeField &force;
     GaugeField &gauge;
     GaugeField &oprod;
-    double coeff;
+    real_t coeff;
     int parity;
     unsigned int minThreads() const { return gauge.LocalVolumeCB(); }
 
   public:
-    DerivativeClover(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff, int parity) :
+    DerivativeClover(GaugeField &force, GaugeField &gauge, GaugeField &oprod, real_t coeff, int parity) :
       TunableKernel3D(gauge, 2, 4),
       force(force),
       gauge(gauge),
@@ -42,7 +42,7 @@ namespace quda {
   };
 
   template<typename Float>
-  void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff, int parity)
+  void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, real_t coeff, int parity)
   {
     if (oprod.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Force field does not support reconstruction");
     if (force.Order() != oprod.Order()) errorQuda("Force and Oprod orders must match");
@@ -64,7 +64,7 @@ namespace quda {
   }
 
 #if defined(GPU_CLOVER_DIRAC) && (QUDA_PRECISION & 8)
-  void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff, QudaParity parity)
+  void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, real_t coeff, QudaParity parity)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     assert(oprod.Geometry() == QUDA_TENSOR_GEOMETRY);
@@ -83,7 +83,7 @@ namespace quda {
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 #else
-  void cloverDerivative(GaugeField &, GaugeField &, GaugeField &, double, QudaParity)
+  void cloverDerivative(GaugeField &, GaugeField &, GaugeField &, real_t, QudaParity)
   {
 #ifdef GPU_CLOVER_DIRAC
     errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);

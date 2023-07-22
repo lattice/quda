@@ -14,7 +14,7 @@ namespace quda {
 
     GaugeField &X;
     const GaugeField &g;
-    double mass;
+    real_t mass;
 
     const int nDim = 4;
 
@@ -35,7 +35,7 @@ namespace quda {
     unsigned int minThreads() const { return g.VolumeCB(); }
 
   public:
-    CalculateStaggeredKDBlock(const GaugeField &g, GaugeField &X, double mass) :
+    CalculateStaggeredKDBlock(const GaugeField &g, GaugeField &X, real_t mass) :
       TunableKernel3D(g, fineColor*fineColor, 2),
       X(X),
       g(g),
@@ -57,8 +57,8 @@ namespace quda {
 
       // reset scales as appropriate
       if constexpr (sizeof(Float) < QUDA_SINGLE_PRECISION) {
-        double max_scale = g.abs_max();
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Global U_max = %e\n", max_scale);
+        auto max_scale = g.abs_max();
+        logQuda(QUDA_VERBOSE, "Global U_max = %e\n", double(max_scale));
         X.Scale(max_scale > 2.0*mass ? max_scale : 2.0*mass);
       }
 
@@ -92,14 +92,14 @@ namespace quda {
      @param g[in] fine gauge field (fat links for asqtad)
      @param mass[in] Mass of staggered fermion
    */
-  void calculateStaggeredKDBlock(GaugeField &X, const GaugeField &g, const double mass)
+  void calculateStaggeredKDBlock(GaugeField &X, const GaugeField &g, const real_t mass)
   {
     // Instantiate based on precision, number of colors
     // need to swizzle `g` to the first argument to get the right fine nColor
     instantiate<CalculateStaggeredKDBlock>(g, X, mass);
   }
 #else
-  void calculateStaggeredKDBlock(GaugeField &, const GaugeField &, const double)
+  void calculateStaggeredKDBlock(GaugeField &, const GaugeField &, const real_t)
   {
     errorQuda("Staggered fermion multigrid support has not been built");
   }
@@ -113,7 +113,7 @@ namespace quda {
      @param mass[in] Mass of staggered fermion
      @param dagger_approximation[in] Whether or not to use the dagger approximation, using the dagger of X instead of Xinv
    */
-  void BuildStaggeredKahlerDiracInverse(GaugeField &Xinv, const GaugeField &gauge, const double mass, const bool dagger_approximation)
+  void BuildStaggeredKahlerDiracInverse(GaugeField &Xinv, const GaugeField &gauge, const real_t mass, const bool dagger_approximation)
   {
     using namespace blas_lapack;
     auto invert = use_native() ? native::BatchInvertMatrix : generic::BatchInvertMatrix;
@@ -215,11 +215,11 @@ namespace quda {
     GaugeField& X = *tmp_X;
 
     // Step 4: Calculate X from U
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing the KD block on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
+    logQuda(QUDA_VERBOSE, "Computing the KD block on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
 
     calculateStaggeredKDBlock(X, U, mass);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X.norm2(0));
+    logQuda(QUDA_VERBOSE, "X2 = %e\n", double(X.norm2(0)));
 
     // Step 5: Calculate Xinv
     if (dagger_approximation) {
@@ -244,7 +244,7 @@ namespace quda {
         blas::flops += invert(xInvMilcOrder->data(), X.data(), n, X.Volume(), X.Precision(), X.Location());
       }
 
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("xInvMilcOrder = %e\n", xInvMilcOrder->norm2(0));
+      logQuda(QUDA_VERBOSE, "xInvMilcOrder = %e\n", double(xInvMilcOrder->norm2(0)));
 
     }
 
@@ -252,15 +252,13 @@ namespace quda {
     // last two parameters: dagger approximation, mass (which becomes a scale in the dagger approx)
     ReorderStaggeredKahlerDiracInverse(Xinv, *xInvMilcOrder, dagger_approximation, mass);
 
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      if (dagger_approximation) printfQuda("Using the dagger approximation to Xinv\n");
-      printfQuda("xInvKdGeometry = %e\n", Xinv.norm2());
-    }
+    if (dagger_approximation) logQuda(QUDA_VERBOSE, "Using the dagger approximation to Xinv\n");
+    logQuda(QUDA_VERBOSE, "xInvKdGeometry = %e\n", double(Xinv.norm2()));
   }
 
 
   // Allocates and calculates the inverse KD block, returning Xinv
-  std::shared_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const GaugeField &gauge, const double mass, const bool dagger_approximation)
+  std::shared_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const GaugeField &gauge, const real_t mass, const bool dagger_approximation)
   {
     GaugeFieldParam gParam(gauge);
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;

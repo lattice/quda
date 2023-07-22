@@ -36,7 +36,7 @@ namespace quda {
   }
 
   void DiracImprovedStaggered::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-      const ColorSpinorField &x, const double &k) const
+      const ColorSpinorField &x, const real_t &k) const
   {    
     checkParitySpinor(in, out);
 
@@ -107,7 +107,7 @@ namespace quda {
     // do nothing
   }
   
-  void DiracImprovedStaggered::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double, const double,
+  void DiracImprovedStaggered::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const real_t, const real_t,
                              const int t0, const QudaParity parity) const
   {
     checkSpinorAlias(in, out);
@@ -138,8 +138,8 @@ namespace quda {
     flops += ( laplace3D > 3 ? 570ll : 426ll ) * ( in.Volume() / ( is_time_slice ? in.X(3) : 1 ) );
   }  
 
-  void DiracImprovedStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass,
-                                              double, double, bool allow_truncation) const
+  void DiracImprovedStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t, real_t mass,
+                                              real_t, real_t, bool allow_truncation) const
   {
     if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD || T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
       errorQuda("The optimized improved Kahler-Dirac operator is not built through createCoarseOp");
@@ -284,8 +284,8 @@ namespace quda {
     }
   }
 
-  void DiracImprovedStaggeredPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass,
-                                                double, double, bool allow_truncation) const
+  void DiracImprovedStaggeredPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t, real_t mass,
+                                                real_t, real_t, bool allow_truncation) const
   {
     if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD || T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
       errorQuda("The optimized improved Kahler-Dirac operator is not built through createCoarseOp");

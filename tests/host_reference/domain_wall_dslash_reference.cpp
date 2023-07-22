@@ -551,9 +551,9 @@ void dslashReference_5th_inv(sFloat *res, sFloat *spinorField, int, int daggerBi
 
 template <typename sComplex> sComplex cpow(const sComplex &x, int y)
 {
-  static_assert(sizeof(sComplex) == sizeof(complex_t), "C and C++ complex type sizes do not match");
+  static_assert(sizeof(sComplex) == sizeof(std::complex<double>), "C and C++ complex type sizes do not match");
   // note that C++ standard explicitly calls out that casting between C and C++ complex is legal
-  auto x_ = reinterpret_cast<const complex_t &>(x);
+  auto x_ = reinterpret_cast<const std::complex<double> &>(x);
   auto z_ = std::pow(x_, y);
   sComplex z = reinterpret_cast<sComplex &>(z_);
   return z;

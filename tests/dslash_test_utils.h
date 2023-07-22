@@ -304,9 +304,9 @@ struct DslashTestWrapper {
       printfQuda("Sending spinor field to GPU\n");
       cudaSpinor = spinor;
 
-      double cpu_norm = blas::norm2(spinor);
-      double cuda_norm = blas::norm2(cudaSpinor);
-      printfQuda("Source: CPU = %e, CUDA = %e\n", cpu_norm, cuda_norm);
+      auto cpu_norm = blas::norm2(spinor);
+      auto cuda_norm = blas::norm2(cudaSpinor);
+      printfQuda("Source: CPU = %e, CUDA = %e\n", double(cpu_norm), double(cuda_norm));
 
       bool pc = (dtest_type != dslash_test_type::Mat && dtest_type != dslash_test_type::MatDagMat);
 
@@ -316,8 +316,8 @@ struct DslashTestWrapper {
       dirac = Dirac::create(diracParam);
 
     } else {
-      double cpu_norm = blas::norm2(spinor);
-      printfQuda("Source: CPU = %e\n", cpu_norm);
+      auto cpu_norm = blas::norm2(spinor);
+      printfQuda("Source: CPU = %e\n", double(cpu_norm));
     }
   }
 
@@ -1040,8 +1040,8 @@ struct DslashTestWrapper {
         auto norm_cpu_quda = blas::norm2(vp_spinorOut[n]);
         auto max_deviation = blas::max_deviation(spinorRef, vp_spinorOut[n]);
 
-        printfQuda("Results: reference = %f, QUDA = %f, L2 relative deviation = %e, max deviation = %e\n", norm_cpu,
-                   norm_cpu_quda, 1.0 - sqrt(norm_cpu_quda / norm_cpu), max_deviation[0]);
+        printfQuda("Results: reference = %f, QUDA = %f, L2 relative deviation = %e, max deviation = %e\n", double(norm_cpu),
+                   double(norm_cpu_quda), double(real_t(1.0) - sqrt(norm_cpu_quda / norm_cpu)), double(max_deviation[0]));
         deviation = std::max(deviation, std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef, vp_spinorOut[n]))));
       }
     } else {
@@ -1049,8 +1049,8 @@ struct DslashTestWrapper {
       auto norm_cpu_quda = blas::norm2(spinorOut);
       auto max_deviation = blas::max_deviation(spinorRef, spinorOut);
 
-      printfQuda("Results: reference = %f, QUDA = %f, L2 relative deviation = %e, max deviation = %e\n", norm_cpu,
-                 norm_cpu_quda, 1.0 - sqrt(norm_cpu_quda / norm_cpu), max_deviation[0]);
+      printfQuda("Results: reference = %f, QUDA = %f, L2 relative deviation = %e, max deviation = %e\n", double(norm_cpu),
+                 double(norm_cpu_quda), double(real_t(1.0) - sqrt(norm_cpu_quda / norm_cpu)), double(max_deviation[0]));
       deviation = std::pow(10, -(double)(ColorSpinorField::Compare(spinorRef, spinorOut)));
     }
     return deviation;

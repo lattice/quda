@@ -45,7 +45,7 @@ namespace quda {
 
   // Modification for the 4D preconditioned domain wall operator
   void DiracDomainWall4D::Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-      const ColorSpinorField &x, const double &k) const
+      const ColorSpinorField &x, const real_t &k) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -57,7 +57,7 @@ namespace quda {
   }
 
   void DiracDomainWall4D::Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-                                      const double &k) const
+                                      const real_t &k) const
   {
     checkDWF(out, in);
     checkParitySpinor(in, out);
@@ -138,7 +138,7 @@ namespace quda {
   }
 
   void DiracDomainWall4DPC::M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-                                      const double &b) const
+                                      const real_t &b) const
   {
     checkDWF(out, in);
     checkParitySpinor(in, out);
@@ -154,7 +154,7 @@ namespace quda {
   void DiracDomainWall4DPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-    double kappa2 = kappa5*kappa5;
+    auto kappa2 = kappa5*kappa5;
     auto tmp = getFieldTmp(in);
 
     int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;

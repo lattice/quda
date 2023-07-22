@@ -9,14 +9,14 @@ namespace quda {
   template<typename Float, int nColor, QudaReconstructType recon>
   class GaugeLoopTrace : public TunableMultiReduction {
     const GaugeField &u;
-    using reduce_t = array<double, 2>;
+    using reduce_t = array<real_t, 2>;
     std::vector<reduce_t>& loop_traces;
-    double factor;
+    real_t factor;
     const paths<1> p;
 
   public:
     // max block size of 8 is arbitrary for now
-    GaugeLoopTrace(const GaugeField &u, std::vector<reduce_t> &loop_traces, double factor, const paths<1>& p) :
+    GaugeLoopTrace(const GaugeField &u, std::vector<reduce_t> &loop_traces, real_t factor, const paths<1>& p) :
       TunableMultiReduction(u, 2u, p.num_paths, 8),
       u(u),
       loop_traces(loop_traces),
@@ -52,13 +52,13 @@ namespace quda {
     }
   };
 
-  void gaugeLoopTrace(const GaugeField& u, std::vector<complex_t>& loop_traces, double factor, std::vector<int**>& input_path,
-		 std::vector<int>& length, std::vector<double>& path_coeff, int num_paths, int path_max_length)
+  void gaugeLoopTrace(const GaugeField& u, std::vector<complex_t>& loop_traces, real_t factor, std::vector<int**>& input_path,
+		 std::vector<int>& length, std::vector<real_t>& path_coeff, int num_paths, int path_max_length)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     paths<1> p(input_path, length, path_coeff, num_paths, path_max_length);
 
-    std::vector<array<double, 2>> tr_array(loop_traces.size());
+    std::vector<array<real_t, 2>> tr_array(loop_traces.size());
 
     // gauge field must be passed as first argument so we peel off its reconstruct type
     instantiate<GaugeLoopTrace, ReconstructNo12>(u, tr_array, factor, p);

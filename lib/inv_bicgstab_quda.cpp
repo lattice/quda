@@ -37,7 +37,7 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta) {
+  int reliable(real_t &rNorm, real_t &maxrx, real_t &maxrr, const real_t &r2, const real_t &delta) {
     // reliable updates
     rNorm = sqrt(r2);
     if (rNorm > maxrx) maxrx = rNorm;
@@ -78,8 +78,8 @@ namespace quda {
 
     ColorSpinorField *x_sloppy, *r_sloppy, *r_0;
 
-    double b2 = blas::norm2(b); // norm sq of source
-    double r2;               // norm sq of residual
+    real_t b2 = blas::norm2(b); // norm sq of source
+    real_t r2;               // norm sq of residual
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
@@ -192,14 +192,14 @@ namespace quda {
     SolverParam solve_param_inner(param);
     fillInnerSolveParam(solve_param_inner, param);
 
-    double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+    auto stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
     const bool use_heavy_quark_res =
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
-    real_t heavy_quark_res = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r)[2]) : real_t(0.0);
+    auto heavy_quark_res = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r)[2]) : real_t(0.0);
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
-    double delta = param.delta;
+    real_t delta = param.delta;
 
     int k = 0;
     int rUpdate = 0;
@@ -213,10 +213,10 @@ namespace quda {
     array<real_t, 3> rho_r2;
     array<real_t, 3> omega_t2;
 
-    double rNorm = sqrt(r2);
+    real_t rNorm = sqrt(r2);
     //double r0Norm = rNorm;
-    double maxrr = rNorm;
-    double maxrx = rNorm;
+    real_t maxrr = rNorm;
+    real_t maxrx = rNorm;
 
     PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
 
@@ -232,8 +232,8 @@ namespace quda {
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
       printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, tmp2=%e r0=%e t2=%e\n",
-		 blas::norm2(x), blas::norm2(rSloppy), blas::norm2(v), blas::norm2(p),
-		 blas::norm2(tmp), blas::norm2(r0), blas::norm2(t));
+		 double(blas::norm2(x)), double(blas::norm2(rSloppy)), double(blas::norm2(v)),
+                 double(blas::norm2(p)), double(blas::norm2(tmp)), double(blas::norm2(r0)), double(blas::norm2(t)));
 
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) &&
 	    k < param.maxiter) {
@@ -332,8 +332,8 @@ namespace quda {
       PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
 	printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, tmp2=%e r0=%e t2=%e\n",
-		   blas::norm2(x), blas::norm2(rSloppy), blas::norm2(v), blas::norm2(p),
-		   blas::norm2(tmp), blas::norm2(r0), blas::norm2(t));
+		   double(blas::norm2(x)), double(blas::norm2(rSloppy)), double(blas::norm2(v)), double(blas::norm2(p)),
+		   double(blas::norm2(tmp)), double(blas::norm2(r0)), double(blas::norm2(t)));
 
       // update p
       if (!param.pipeline || updateR) {// need to update if not pipeline or did a reliable update
@@ -364,7 +364,7 @@ namespace quda {
       // Calculate the true residual
       mat(r, x);
       param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
-      param.true_res_hq = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r)[2]) : 0.0;
+      param.true_res_hq = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r)[2]) : real_t(0.0);
 
       PrintSummary("BiCGstab", k, r2, b2, stop, param.tol_hq);
     }

@@ -121,7 +121,7 @@ namespace quda {
     int nu_post;
 
     /** Tolerance to use for the solver / smoother (if applicable) */
-    double smoother_tol;
+    real_t smoother_tol;
 
     /** Multigrid cycle type */
     QudaMultigridCycleType cycle_type;
@@ -384,7 +384,7 @@ namespace quda {
      */
     void resetStaggeredKD(GaugeField *gauge_in, GaugeField *fat_gauge_in, GaugeField *long_gauge_in,
                           GaugeField *gauge_sloppy_in, GaugeField *fat_gauge_sloppy_in,
-                          GaugeField *long_gauge_sloppy_in, double mass);
+                          GaugeField *long_gauge_sloppy_in, real_t mass);
 
     /**
        @brief Dump the null-space vectors to disk.  Will recurse dumping all levels.
@@ -511,7 +511,7 @@ namespace quda {
      @param[in] halo_precision What precision to use for the halos (if QUDA_INVALID_PRECISION, use field precision)
    */
   void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
-                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
+                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, real_t kappa,
                    int parity = QUDA_INVALID_PARITY, bool dslash = true, bool clover = true, bool dagger = false,
                    const int *commDim = 0, QudaPrecision halo_precision = QUDA_INVALID_PRECISION);
 
@@ -536,7 +536,7 @@ namespace quda {
    */
   template <bool dagger, int coarseColor>
   void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
-                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
+                   cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, real_t kappa,
                    int parity, bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision);
 
   /**
@@ -556,7 +556,7 @@ namespace quda {
      even-odd preconditioned and we coarsen the full operator.
    */
   void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge, const CloverField *clover,
-                double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
+                real_t kappa, real_t mass, real_t mu, real_t mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      @brief Coarse operator construction from a fine-grid operator
@@ -578,7 +578,7 @@ namespace quda {
    */
   template <int fineColor, int coarseColor>
   void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge, const CloverField *clover,
-                double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
+                real_t kappa, real_t mass, real_t mu, real_t mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      @brief Coarse operator construction from a fine-grid operator (Staggered)
@@ -596,12 +596,12 @@ namespace quda {
      For staggered, should always be QUDA_MATPC_INVALID.
    */
   void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
-                         const GaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
+                         const GaugeField &longGauge, const GaugeField &XinvKD, real_t mass, bool allow_truncation,
                          QudaDiracType dirac, QudaMatPCType matpc);
 
   template <int fineColor, int coarseColor>
   void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
-                         const GaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
+                         const GaugeField &longGauge, const GaugeField &XinvKD, real_t mass, bool allow_truncation,
                          QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
@@ -626,7 +626,7 @@ namespace quda {
      @param use_mma[in] Whether or not use MMA (tensor core) to do the calculation, default to false
    */
   void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge, const GaugeField &clover,
-                      const GaugeField &cloverInv, double kappa, double mass, double mu, double mu_factor,
+                      const GaugeField &cloverInv, real_t kappa, real_t mass, real_t mu, real_t mu_factor,
                       QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional, bool use_mma = false);
 
   /**
@@ -656,8 +656,8 @@ namespace quda {
    */
   template <int fineColor, int coarseColor, bool mma>
   void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
-                      const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mass, double mu,
-                      double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional);
+                      const GaugeField &clover, const GaugeField &cloverInv, real_t kappa, real_t mass, real_t mu,
+                      real_t mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional);
 
   /**
      @brief Calculate preconditioned coarse links and coarse clover inverse field

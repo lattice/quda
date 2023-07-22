@@ -81,7 +81,7 @@ namespace quda {
     lat_dim_t r = {};
 
     /** For fixed-point fields that need a global scaling factor */
-    double scale = 1.0;
+    real_t scale = 1.0;
 
     /**
        @brief Default constructor for LatticeFieldParam
@@ -217,7 +217,7 @@ namespace quda {
     mutable bool ghost_precision_reset = false;
 
     /** For fixed-point fields that need a global scaling factor */
-    double scale = 0.0;
+    real_t scale = 0.0;
 
     /** Whether the field is full or single parity */
     QudaSiteSubset siteSubset = QUDA_INVALID_SITE_SUBSET;
@@ -666,13 +666,13 @@ namespace quda {
     /**
        @return The global scaling factor for a fixed-point field
     */
-    double Scale() const { return scale; }
+    real_t Scale() const { return scale; }
 
     /**
        @brief Set the scale factor for a fixed-point field
        @param[in] scale_ The new scale factor
     */
-    void Scale(double scale_) { scale = scale_; }
+    void Scale(real_t scale_) { scale = scale_; }
 
     /**
        @return Field subset type

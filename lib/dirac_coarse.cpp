@@ -355,7 +355,7 @@ namespace quda {
   }
 
   void DiracCoarse::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                               QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
+                               QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
     if (k!=1.0) errorQuda("%s not supported for k!=1.0", __func__);
 
@@ -408,13 +408,13 @@ namespace quda {
   }
 
   //Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
-  void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
-                                   double mu_factor, bool) const
+  void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t, real_t mu,
+                                   real_t mu_factor, bool) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Coarse operators only support aggregation coarsening");
 
-    double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
+    real_t a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
       initializeLazy(QUDA_CPU_FIELD_LOCATION);
       CoarseCoarseOp(Y, X, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, mass, a, mu_factor, QUDA_COARSE_DIRAC,
@@ -468,7 +468,7 @@ namespace quda {
   }
 
   void DiracCoarsePC::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                                 QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
+                                 QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const
   {
     // FIXME emulated for now
     Dslash(out, in, parity);
@@ -632,13 +632,13 @@ namespace quda {
   //Make the coarse operator one level down.  For the preconditioned
   //operator we are coarsening the Yhat links, not the Y links.  We
   //pass the fine clover fields, though they are actually ignored.
-  void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
-                                     double mu_factor, bool) const
+  void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t, real_t mu,
+                                     real_t mu_factor, bool) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Coarse operators only support aggregation coarsening");
 
-    double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
+    real_t a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
       initializeLazy(QUDA_CPU_FIELD_LOCATION);
       CoarseCoarseOp(Y, X, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, mass, a, -mu_factor,

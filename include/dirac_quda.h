@@ -35,19 +35,19 @@ namespace quda {
 
   public:
     QudaDiracType type;
-    double kappa;
-    double mass;
-    double m5; // used by domain wall only
+    real_t kappa;
+    real_t mass;
+    real_t m5; // used by domain wall only
     int Ls;    // used by domain wall and twisted mass
     complex_t b_5[QUDA_MAX_DWF_LS]; // used by mobius domain wall only
     complex_t c_5[QUDA_MAX_DWF_LS]; // used by mobius domain wall only
 
     // The EOFA parameters. See the description in InvertParam
-    double eofa_shift;
+    real_t eofa_shift;
     int eofa_pm;
-    double mq1;
-    double mq2;
-    double mq3;
+    real_t mq1;
+    real_t mq2;
+    real_t mq3;
 
     QudaMatPCType matpcType;
     QudaDagType dagger;
@@ -58,10 +58,10 @@ namespace quda {
     CloverField *clover;
     GaugeField *xInvKD; // used for the Kahler-Dirac operator only
 
-    double mu; // used by twisted mass only
-    double mu_factor; // used by multigrid only
-    double epsilon; //2nd tm parameter (used by twisted mass only)
-    double tm_rho;  // "rho"-type Hasenbusch mass used for twisted clover (like regular rho but
+    real_t mu; // used by twisted mass only
+    real_t mu_factor; // used by multigrid only
+    real_t epsilon; //2nd tm parameter (used by twisted mass only)
+    real_t tm_rho;  // "rho"-type Hasenbusch mass used for twisted clover (like regular rho but
                     // applied like a twisted mass and ignored in the inverse)
 
     int commDim[QUDA_MAX_DIM]; // whether to do comms or not
@@ -111,16 +111,16 @@ namespace quda {
     void print() {
       printfQuda("Printing DslashParam\n");
       printfQuda("type = %d\n", type);
-      printfQuda("kappa = %g\n", kappa);
-      printfQuda("mass = %g\n", mass);
+      printfQuda("kappa = %g\n", double(kappa));
+      printfQuda("mass = %g\n", double(mass));
       printfQuda("laplace3D = %d\n", laplace3D);
-      printfQuda("m5 = %g\n", m5);
+      printfQuda("m5 = %g\n", double(m5));
       printfQuda("Ls = %d\n", Ls);
       printfQuda("matpcType = %d\n", matpcType);
       printfQuda("dagger = %d\n", dagger);
-      printfQuda("mu = %g\n", mu);
-      printfQuda("tm_rho = %g\n", tm_rho);
-      printfQuda("epsilon = %g\n", epsilon);
+      printfQuda("mu = %g\n", double(mu));
+      printfQuda("tm_rho = %g\n", double(tm_rho));
+      printfQuda("epsilon = %g\n", double(epsilon));
       printfQuda("halo_precision = %d\n", halo_precision);
       for (int i=0; i<QUDA_MAX_DIM; i++) printfQuda("commDim[%d] = %d\n", i, commDim[i]);
       for (int i = 0; i < Ls; i++)
@@ -165,8 +165,8 @@ namespace quda {
 
   protected:
     GaugeField *gauge;
-    double kappa;
-    double mass;
+    real_t kappa;
+    real_t mass;
     int laplace3D;
     QudaMatPCType matpcType;
     mutable QudaDagType dagger; // mutable to simplify implementation of Mdag
@@ -238,13 +238,13 @@ namespace quda {
        @brief Xpay version of Dslash
     */
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                            const ColorSpinorField &x, const double &k) const = 0;
+                            const ColorSpinorField &x, const real_t &k) const = 0;
 
     /**
        @brief Xpay version of Dslash
     */
     virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const
     {
       for (auto i = 0u; i < in.size(); i++) DslashXpay(out[i], in[i], parity, x[i], k);
     }
@@ -254,7 +254,7 @@ namespace quda {
        smearing.
     */    
     virtual void SmearOp(ColorSpinorField &, const ColorSpinorField &, 
-                         const double, const double, const int, const QudaParity) const
+                         const real_t, const real_t, const int, const QudaParity) const
     {
       errorQuda("Not implemented.");
     }
@@ -367,7 +367,7 @@ namespace quda {
     */
     virtual bool hasSpecialMG() const { return false; }
 
-    void setMass(double mass){ this->mass = mass;}
+    void setMass(real_t mass){ this->mass = mass;}
 
     // Dirac operator factory
     /**
@@ -378,22 +378,22 @@ namespace quda {
     /**
        @brief accessor for Kappa (mass parameter)
     */
-    double Kappa() const { return kappa; }
+    real_t Kappa() const { return kappa; }
 
     /**
        @brief accessor for Mass (in case of a factor of 2 for staggered)
     */
-    virtual double Mass() const { return mass; } // in case of factor of 2 convention for staggered
+    virtual real_t Mass() const { return mass; } // in case of factor of 2 convention for staggered
 
     /**
        @brief accessor for twist parameter -- overrride can return better value
     */
-    virtual double Mu() const { return 0.; }
+    virtual real_t Mu() const { return 0.; }
 
     /**
        @brief accessor for mu factoo for MG/ -- override can return a better value
     */
-    virtual double MuFactor() const { return 0.; }
+    virtual real_t MuFactor() const { return 0.; }
 
     /**
        @brief accessor for if we let MG coarsening drop we can drop improvements, for ex long links for small aggregation dimensions
@@ -491,7 +491,7 @@ namespace quda {
      * @param allow_truncation [in] whether or not we let coarsening drop improvements, for ex dropping long links for
      * small aggregate sizes
      */
-    virtual void createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double, double, double, double, bool) const
+    virtual void createCoarseOp(GaugeField &, GaugeField &, const Transfer &, real_t, real_t, real_t, real_t, bool) const
     {errorQuda("Not implemented");}
 
     QudaPrecision HaloPrecision() const { return halo_precision; }
@@ -523,7 +523,7 @@ namespace quda {
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                            const ColorSpinorField &x, const double &k) const;
+                            const ColorSpinorField &x, const real_t &k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -552,8 +552,8 @@ namespace quda {
      * @param kappa Kappa parameter for the coarse operator
      * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for Wilson operator
      */
-    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0.,
-                                double mu = 0., double mu_factor = 0., bool allow_truncation = false) const;
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t mass = 0.,
+                                real_t mu = 0., real_t mu_factor = 0., bool allow_truncation = false) const;
   };
 
   // Even-odd preconditioned Wilson
@@ -597,7 +597,7 @@ namespace quda {
     void Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
 
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-			    const ColorSpinorField &x, const double &k) const;
+			    const ColorSpinorField &x, const real_t &k) const;
 
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -642,8 +642,8 @@ namespace quda {
      * @param mass Mass parameter for the coarse operator (hard coded to 0 when CoarseOp is called)
      * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for clover operator
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0., double mu = 0.,
-                        double mu_factor = 0., bool allow_truncation = false) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t mass = 0., real_t mu = 0.,
+                        real_t mu_factor = 0., bool allow_truncation = false) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -674,7 +674,7 @@ namespace quda {
 
     // out = x + k A_pp^{-1} D_p\bar{p}
     void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                    const ColorSpinorField &x, const double &k) const;
+                    const ColorSpinorField &x, const real_t &k) const;
 
     // Can implement: M as e.g. :  i) tmp_e = A^{-1}_ee D_eo in_o  (Dslash)
     //                            ii) out_o = in_o + A_oo^{-1} D_oe tmp_e (AXPY)
@@ -704,8 +704,8 @@ namespace quda {
      * @param mass Mass parameter for the coarse operator (set to zero)
      * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for clover operator
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0., double mu = 0.,
-                        double mu_factor = 0., bool allow_truncation = false) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t mass = 0., real_t mu = 0.,
+                        real_t mu_factor = 0., bool allow_truncation = false) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -730,7 +730,7 @@ namespace quda {
   {
 
   protected:
-    double mu;
+    real_t mu;
 
   public:
     DiracCloverHasenbuschTwist(const DiracParam &param);
@@ -753,15 +753,15 @@ namespace quda {
      * @param mass Mass parameter for the coarse operator (hard coded to 0 when CoarseOp is called)
      * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for clover
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0., double mu = 0.,
-                        double mu_factor = 0., bool allow_truncation = false) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t mass = 0., real_t mu = 0.,
+                        real_t mu_factor = 0., bool allow_truncation = false) const;
   };
 
   // Even-odd preconditioned clover
   class DiracCloverHasenbuschTwistPC : public DiracCloverPC
   {
   protected:
-    double mu;
+    real_t mu;
 
   public:
     DiracCloverHasenbuschTwistPC(const DiracParam &param);
@@ -779,11 +779,11 @@ namespace quda {
 
     // out = (1 +/- ig5 mu A)x  + k A^{-1} D in
     void DslashXpayTwistClovInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                                const ColorSpinorField &x, const double &k, const double &b) const;
+                                const ColorSpinorField &x, const real_t &k, const real_t &b) const;
 
     // out = ( 1+/- i g5 mu A) x - D in
     void DslashXpayTwistNoClovInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                                  const ColorSpinorField &x, const double &k, const double &b) const;
+                                  const ColorSpinorField &x, const real_t &k, const real_t &b) const;
 
     // Can implement: M as e.g. :  i) tmp_e = A^{-1}_ee D_eo in_o  (Dslash)
     //                            ii) out_o = in_o + A_oo^{-1} D_oe tmp_e (AXPY)
@@ -807,16 +807,16 @@ namespace quda {
      * @param mass Mass parameter for the coarse operator (set to zero)
      * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for clover hasenbusch
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0., double mu = 0.,
-                        double mu_factor = 0., bool allow_truncation = false) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t mass = 0., real_t mu = 0.,
+                        real_t mu_factor = 0., bool allow_truncation = false) const;
   };
 
   // Full domain wall
   class DiracDomainWall : public DiracWilson {
 
   protected:
-    double m5;
-    double kappa5;
+    real_t m5;
+    real_t kappa5;
     int Ls; // length of the fifth dimension
 
     /**
@@ -832,7 +832,7 @@ namespace quda {
 
     void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                    const ColorSpinorField &x, const double &k) const;
+                    const ColorSpinorField &x, const real_t &k) const;
 
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -882,8 +882,8 @@ namespace quda {
     void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     void Dslash5(ColorSpinorField &out, const ColorSpinorField &in) const;
     void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in,
-		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
-    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const;
+		     const QudaParity parity, const ColorSpinorField &x, const real_t &k) const;
+    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const real_t &k) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -906,7 +906,7 @@ namespace quda {
     DiracDomainWall4DPC &operator=(const DiracDomainWall4DPC &dirac);
 
     void M5inv(ColorSpinorField &out, const ColorSpinorField &in) const;
-    void M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const;
+    void M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const real_t &k) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -934,9 +934,9 @@ namespace quda {
       */
       bool zMobius;
 
-      double mobius_kappa_b;
-      double mobius_kappa_c;
-      double mobius_kappa;
+      real_t mobius_kappa_b;
+      real_t mobius_kappa_c;
+      real_t mobius_kappa;
 
       /**
         @brief Check whether the input and output are valid 5D fields. If zMobius, we require that they
@@ -955,11 +955,11 @@ namespace quda {
       void Dslash5(ColorSpinorField &out, const ColorSpinorField &in) const;
 
       void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                       const ColorSpinorField &x, const double &k) const;
+                       const ColorSpinorField &x, const real_t &k) const;
       void Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-                          const double &k) const;
+                          const real_t &k) const;
       void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-                       const double &k) const;
+                       const real_t &k) const;
 
       virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
       virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -985,20 +985,20 @@ namespace quda {
     DiracMobiusPC& operator=(const DiracMobiusPC &dirac);
 
     void M5inv(ColorSpinorField &out, const ColorSpinorField &in) const;
-    void M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const;
+    void M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const real_t &k) const;
 
     void Dslash4M5invM5pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     void Dslash4M5preM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     void Dslash4M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                          const ColorSpinorField &x, const double &a) const;
+                          const ColorSpinorField &x, const real_t &a) const;
     void Dslash4M5preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                          const ColorSpinorField &x, const double &a) const;
+                          const ColorSpinorField &x, const real_t &a) const;
     void Dslash4XpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                          const ColorSpinorField &x, const double &a) const;
+                          const ColorSpinorField &x, const real_t &a) const;
     void Dslash4M5preXpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                               const ColorSpinorField &x, const double &a) const;
+                               const ColorSpinorField &x, const real_t &a) const;
     void Dslash4M5invXpayM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                               const ColorSpinorField &x, const double &a, ColorSpinorField &y) const;
+                               const ColorSpinorField &x, const real_t &a, ColorSpinorField &y) const;
 
     void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1019,16 +1019,16 @@ namespace quda {
 
   protected:
     // The EOFA parameters
-    double m5inv_fac = 0.;
-    double sherman_morrison_fac = 0.;
-    double eofa_shift;
+    real_t m5inv_fac = 0.;
+    real_t sherman_morrison_fac = 0.;
+    real_t eofa_shift;
     int eofa_pm;
-    double mq1;
-    double mq2;
-    double mq3;
-    double eofa_u[QUDA_MAX_DWF_LS];
-    double eofa_x[QUDA_MAX_DWF_LS];
-    double eofa_y[QUDA_MAX_DWF_LS];
+    real_t mq1;
+    real_t mq2;
+    real_t mq3;
+    real_t eofa_u[QUDA_MAX_DWF_LS];
+    real_t eofa_x[QUDA_MAX_DWF_LS];
+    real_t eofa_y[QUDA_MAX_DWF_LS];
 
     /**
       @brief Check whether the input and output are valid 5D fields, and we require that they
@@ -1040,7 +1040,7 @@ namespace quda {
     DiracMobiusEofa(const DiracParam &param);
 
     void m5_eofa(ColorSpinorField &out, const ColorSpinorField &in) const;
-    void m5_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double a = -1.) const;
+    void m5_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, real_t a = -1.) const;
 
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -1061,7 +1061,7 @@ namespace quda {
 
     void m5inv_eofa(ColorSpinorField &out, const ColorSpinorField &in) const;
     void m5inv_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-                         double a = -1.) const;
+                         real_t a = -1.) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -1082,12 +1082,12 @@ namespace quda {
   class DiracTwistedMass : public DiracWilson {
 
   protected:
-      mutable double mu;
-      mutable double epsilon;
+      mutable real_t mu;
+      mutable real_t epsilon;
       void twistedApply(ColorSpinorField &out, const ColorSpinorField &in, const QudaTwistGamma5Type twistType) const;
       virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity) const;
       virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity,
-          const ColorSpinorField &x, const double &k) const;
+          const ColorSpinorField &x, const real_t &k) const;
 
   public:
     DiracTwistedMass(const DiracTwistedMass &dirac);
@@ -1108,7 +1108,7 @@ namespace quda {
 
     virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_MASS_DIRAC; }
 
-    double Mu() const { return mu; }
+    real_t Mu() const { return mu; }
 
     /**
      * @brief Create the coarse twisted-mass operator
@@ -1130,8 +1130,8 @@ namespace quda {
      * @param mu_factor multiplicative factor for the mu parameter
      * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for twisted mass
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
-                        double mu_factor = 0., bool allow_trunation = false) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t mass, real_t mu,
+                        real_t mu_factor = 0., bool allow_trunation = false) const;
   };
 
   // Even-odd preconditioned twisted mass
@@ -1148,7 +1148,7 @@ namespace quda {
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                            const ColorSpinorField &x, const double &k) const;
+                            const ColorSpinorField &x, const real_t &k) const;
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1173,17 +1173,17 @@ namespace quda {
      * @param mu_factor multiplicative factor for the mu parameter
      * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for twisted mass
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
-                        double mu_factor = 0., bool allow_truncation = false) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t mass, real_t mu,
+                        real_t mu_factor = 0., bool allow_truncation = false) const;
   };
 
   // Full twisted mass with a clover term
   class DiracTwistedClover : public DiracWilson {
 
   protected:
-    double mu;
-    double epsilon;
-    double tm_rho;
+    real_t mu;
+    real_t epsilon;
+    real_t tm_rho;
     CloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void twistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, const QudaTwistGamma5Type twistType,
@@ -1199,7 +1199,7 @@ namespace quda {
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-        const ColorSpinorField &x, const double &k) const;
+        const ColorSpinorField &x, const real_t &k) const;
 
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -1212,7 +1212,7 @@ namespace quda {
 
     virtual QudaDiracType getDiracType() const { return QUDA_TWISTED_CLOVER_DIRAC; }
 
-    double Mu() const { return mu; }
+    real_t Mu() const { return mu; }
 
     /**
      *  @brief Update the internal gauge, fat gauge, long gauge, clover field pointer as appropriate.
@@ -1249,8 +1249,8 @@ namespace quda {
      * @param mu_factor multiplicative factor for the mu parameter
      * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for twisted clover
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
-                        double mu_factor = 0., bool allow_truncation = false) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t mass, real_t mu,
+                        real_t mu_factor = 0., bool allow_truncation = false) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -1277,19 +1277,19 @@ public:
     void TwistCloverInv(ColorSpinorField &out, const ColorSpinorField &in, const int parity) const;
 
     /**
-       @brief Convenience wrapper for single/doublet
+       @brief Convenience wrapper for single/real_tt
      */
     void WilsonDslash(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity) const;
 
     /**
-       @brief Convenience wrapper for single/doublet
+       @brief Convenience wrapper for single/real_tt
      */
     void WilsonDslashXpay(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity,
-                          const ColorSpinorField &x, double k) const;
+                          const ColorSpinorField &x, real_t k) const;
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-        const ColorSpinorField &x, const double &k) const;
+        const ColorSpinorField &x, const real_t &k) const;
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1316,8 +1316,8 @@ public:
      * @param mu_factor multiplicative factor for the mu parameter
      * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for twisted clover
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
-                        double mu_factor = 0., bool allow_truncation = false) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t mass, real_t mu,
+                        real_t mu_factor = 0., bool allow_truncation = false) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -1344,7 +1344,7 @@ public:
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                            const ColorSpinorField &x, const double &k) const;
+                            const ColorSpinorField &x, const real_t &k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1384,8 +1384,8 @@ public:
      * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
      * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for staggered
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
-                        double mu_factor = 0., bool allow_truncation = false) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t mass, real_t mu = 0.,
+                        real_t mu_factor = 0., bool allow_truncation = false) const;
 
     /**
      * @brief Create two-link staggered quark smearing operator
@@ -1397,7 +1397,7 @@ public:
      * @param[in] t0 time-slice index
      * @param[in] parity Parity flag
      */
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double a, const double b, const int t0, const QudaParity parity) const;
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const real_t a, const real_t b, const int t0, const QudaParity parity) const;
   };
 
   // Even-odd preconditioned staggered
@@ -1445,8 +1445,8 @@ public:
      * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
      * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for staggered
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
-                        double mu_factor = 0., bool allow_truncation = false) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t mass, real_t mu = 0.,
+                        real_t mu_factor = 0., bool allow_truncation = false) const;
   };
 
   // Kahler-Dirac preconditioned staggered
@@ -1468,7 +1468,7 @@ public:
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                            const ColorSpinorField &x, const double &k) const;
+                            const ColorSpinorField &x, const real_t &k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1518,8 +1518,8 @@ public:
      * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
      * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for staggered
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
-                        double mu_factor = 0., bool allow_truncation = false) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t mass, real_t mu = 0.,
+                        real_t mu_factor = 0., bool allow_truncation = false) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -1548,7 +1548,7 @@ public:
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                            const ColorSpinorField &x, const double &k) const;
+                            const ColorSpinorField &x, const real_t &k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1612,8 +1612,8 @@ public:
      * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
      * @param allow_truncation [in] whether or not we let coarsening drop improvements, dropping long links here
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
-                        double mu_factor, bool allow_truncation) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t mass, real_t mu,
+                        real_t mu_factor, bool allow_truncation) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -1634,7 +1634,7 @@ public:
      * @param[in] t0 time-slice index
      * @param[in] parity Parity flag
      */   
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double a, const double b, const int t0, const QudaParity parity) const;
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const real_t a, const real_t b, const int t0, const QudaParity parity) const;
   };
 
   // Even-odd preconditioned staggered
@@ -1682,8 +1682,8 @@ public:
      * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
      * @param allow_truncation [in] whether or not we let coarsening drop improvements, dropping long links here
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
-                        double mu_factor, bool allow_truncation) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t mass, real_t mu,
+                        real_t mu_factor, bool allow_truncation) const;
   };
 
   // Kahler-Dirac preconditioned staggered
@@ -1704,7 +1704,7 @@ public:
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                            const ColorSpinorField &x, const double &k) const;
+                            const ColorSpinorField &x, const real_t &k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1754,8 +1754,8 @@ public:
      * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
      * @param allow_truncation [in] whether or not we let coarsening drop improvements, dropping long for asqtad
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
-                        double mu_factor, bool allow_truncation) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t mass, real_t mu,
+                        real_t mu_factor, bool allow_truncation) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -1776,9 +1776,9 @@ public:
   class DiracCoarse : public Dirac {
 
   protected:
-    double mass;
-    double mu;
-    double mu_factor;
+    real_t mass;
+    real_t mu;
+    real_t mu_factor;
     const Transfer *transfer; /** restrictor / prolongator defined here */
     const Dirac *dirac; /** Parent Dirac operator */
     const bool need_bidirectional; /** Whether or not to force a bi-directional build */
@@ -1829,9 +1829,9 @@ public:
     void createYhat(bool gpu = true) const;
 
   public:
-    double Mass() const { return mass; }
-    double Mu() const { return mu; }
-    double MuFactor() const { return mu_factor; }
+    real_t Mass() const { return mass; }
+    real_t Mu() const { return mu; }
+    real_t MuFactor() const { return mu_factor; }
     bool AllowTruncation() const { return allow_truncation; }
 
     /**
@@ -1904,10 +1904,10 @@ public:
        @param[in] k scalar multiplier
      */
     virtual void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
-                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, double k) const;
+                            QudaParity parity, cvector_ref<const ColorSpinorField> &x, real_t k) const;
 
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                            const ColorSpinorField &x, const double &k) const
+                            const ColorSpinorField &x, const real_t &k) const
     {
       DslashXpay(cvector_ref<ColorSpinorField> {out}, cvector_ref<const ColorSpinorField> {in}, parity,
                  cvector_ref<const ColorSpinorField> {x}, k);
@@ -1962,8 +1962,8 @@ public:
      * @param mu_factor multiplicative factor for the mu parameter
      * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for coarse op
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
-                        double mu_factor = 0., bool allow_truncation = false) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t mass, real_t mu,
+                        real_t mu_factor = 0., bool allow_truncation = false) const;
 
     /**
      * @brief Create the precondtioned coarse operator
@@ -2042,10 +2042,10 @@ public:
        @param[in] k scalar multiplier
      */
     void DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in, QudaParity parity,
-                    cvector_ref<const ColorSpinorField> &x, double k) const;
+                    cvector_ref<const ColorSpinorField> &x, real_t k) const;
 
     void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                    const ColorSpinorField &x, const double &k) const
+                    const ColorSpinorField &x, const real_t &k) const
     {
       DslashXpay(cvector_ref<ColorSpinorField> {out}, cvector_ref<const ColorSpinorField> {in}, parity,
                  cvector_ref<const ColorSpinorField> {x}, k);
@@ -2096,8 +2096,8 @@ public:
      * @param mu_factor multiplicative factor for the mu parameter
      * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for coarse op
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
-                        double mu_factor = 0., bool allow_truncation = false) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t kappa, real_t mass, real_t mu,
+                        real_t mu_factor = 0., bool allow_truncation = false) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -2126,7 +2126,7 @@ public:
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
-			    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+			    const QudaParity parity, const ColorSpinorField &x, const real_t &k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -2184,7 +2184,7 @@ public:
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
-			    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+			    const QudaParity parity, const ColorSpinorField &x, const real_t &k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -2281,7 +2281,7 @@ public:
     const Dirac *Expose() const { return dirac; }
 
     //! Shift term added onto operator (M/M^dag M/M M^dag + shift)
-    double shift;
+    real_t shift;
   };
 
   class DiracM : public DiracMatrix

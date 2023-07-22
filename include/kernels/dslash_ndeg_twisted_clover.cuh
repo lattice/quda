@@ -21,8 +21,8 @@ namespace quda
     real c; /** this is the flavor twist factor */
     
   NdegTwistedCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                       const CloverField &A, double a, double b,
-                       double c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+                       const CloverField &A, real_t a, real_t b,
+                       real_t c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
       A(A, false),
       a(a),

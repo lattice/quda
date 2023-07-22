@@ -49,7 +49,7 @@ namespace quda
 
     const real dagger_scale;
 
-    StaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a,
+    StaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, real_t a,
                  const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       DslashArg<Float, nDim>(out, in, U, x, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, spin_project,
                              comm_override),

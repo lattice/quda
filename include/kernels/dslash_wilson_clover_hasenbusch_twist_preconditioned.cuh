@@ -22,7 +22,7 @@ namespace quda
     real b;
 
     WilsonCloverHasenbuschTwistPCArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                     const CloverField &A_, double a_, double b_, const ColorSpinorField &x, int parity,
+                                     const CloverField &A_, real_t a_, real_t b_, const ColorSpinorField &x, int parity,
                                      bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, a_, x, parity, dagger, comm_override),
       A(A_, false),

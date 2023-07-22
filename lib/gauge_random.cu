@@ -13,20 +13,20 @@ namespace quda {
   {
     GaugeField &U;
     RNG &rng;
-    Float sigma;
+    real_t sigma;
     bool group;
     unsigned int minThreads() const { return U.VolumeCB(); }
 
   public:
-    GaugeGauss(GaugeField &U, RNG &rng, double sigma) :
+    GaugeGauss(GaugeField &U, RNG &rng, real_t sigma) :
       TunableKernel2D(U, 2),
       U(U),
       rng(rng),
-      sigma(static_cast<Float>(sigma)),
+      sigma(sigma),
       group(U.LinkType() == QUDA_SU3_LINKS)
     {
       if (group) {
-        logQuda(QUDA_SUMMARIZE, "Creating Gaussian distributed Lie group field with sigma = %e\n", sigma);
+        logQuda(QUDA_SUMMARIZE, "Creating Gaussian distributed Lie group field with sigma = %e\n", double(sigma));
       } else {
         logQuda(QUDA_SUMMARIZE, "Creating Gaussian distributed Lie algebra field\n");
       }
@@ -50,7 +50,7 @@ namespace quda {
     void postTune() { rng.restore(); }
   };
 
-  void gaugeGauss(GaugeField &U, RNG &rng, double sigma)
+  void gaugeGauss(GaugeField &U, RNG &rng, real_t sigma)
   {
     if (!U.isNative()) errorQuda("Order %d with %d reconstruct not supported", U.Order(), U.Reconstruct());
     if (U.LinkType() != QUDA_SU3_LINKS && U.LinkType() != QUDA_MOMENTUM_LINKS)
@@ -70,7 +70,7 @@ namespace quda {
     getProfile().TPSTOP(QUDA_PROFILE_COMMS);
   }
 
-  void gaugeGauss(GaugeField &U, unsigned long long seed, double sigma)
+  void gaugeGauss(GaugeField &U, unsigned long long seed, real_t sigma)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMMS);
     RNG randstates(U, seed);

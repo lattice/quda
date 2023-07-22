@@ -146,7 +146,7 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon_l> struct ImprovedStaggeredApply {
 
     inline ImprovedStaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &L,
-                                  const GaugeField &U, double a, const ColorSpinorField &x, int parity, bool dagger,
+                                  const GaugeField &U, real_t a, const ColorSpinorField &x, int parity, bool dagger,
                                   const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
@@ -162,7 +162,7 @@ namespace quda
 
 #ifdef GPU_STAGGERED_DIRAC
   void ApplyImprovedStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                              const GaugeField &L, double a, const ColorSpinorField &x, int parity, bool dagger,
+                              const GaugeField &L, real_t a, const ColorSpinorField &x, int parity, bool dagger,
                               const int *comm_override, TimeProfile &profile)
   {
     for (int i = 0; i < 4; i++) {
@@ -178,7 +178,7 @@ namespace quda
   }
 #else
   void ApplyImprovedStaggered(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
-                              const GaugeField &, double, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+                              const GaugeField &, real_t, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
   {
     errorQuda("Staggered dslash has not been built");
   }

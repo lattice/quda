@@ -153,39 +153,39 @@ namespace quda {
 
     real_t max(const ColorSpinorField &x)
     {
-      return instantiateReduce<Max, false>(0.0, 0.0, 0.0, x, x, x, x, x);
+      return instantiateReduce<Max, false>(real_t(0.0), real_t(0.0), real_t(0.0), x, x, x, x, x);
     }
 
     array<real_t, 2> max_deviation(const ColorSpinorField &x, const ColorSpinorField &y)
     {
-      auto deviation = instantiateReduce<MaxDeviation, false>(0.0, 0.0, 0.0, x, y, y, y, y);
+      auto deviation = instantiateReduce<MaxDeviation, false>(real_t(0.0), real_t(0.0), real_t(0.0), x, y, y, y, y);
       // ensure that if the absolute deviation is zero, so is the relative deviation
-      return {deviation.diff, deviation.diff > 0.0 ? deviation.diff / deviation.ref : 0.0};
+      return {deviation.diff, deviation.diff > real_t(0.0) ? deviation.diff / deviation.ref : real_t(0.0)};
     }
 
     real_t norm1(const ColorSpinorField &x)
     {
-      return instantiateReduce<Norm1, false>(0.0, 0.0, 0.0, x, x, x, x, x);
+      return instantiateReduce<Norm1, false>(real_t(0.0), real_t(0.0), real_t(0.0), x, x, x, x, x);
     }
 
     real_t norm2(const ColorSpinorField &x)
     {
-      return instantiateReduce<Norm2, false>(0.0, 0.0, 0.0, x, x, x, x, x);
+      return instantiateReduce<Norm2, false>(real_t(0.0), real_t(0.0), real_t(0.0), x, x, x, x, x);
     }
 
     real_t reDotProduct(const ColorSpinorField &x, const ColorSpinorField &y)
     {
-      return instantiateReduce<Dot, false>(0.0, 0.0, 0.0, x, y, x, x, x);
+      return instantiateReduce<Dot, false>(real_t(0.0), real_t(0.0), real_t(0.0), x, y, x, x, x);
     }
 
     real_t axpbyzNorm(real_t a, const ColorSpinorField &x, real_t b, const ColorSpinorField &y, ColorSpinorField &z)
     {
-      return instantiateReduce<axpbyzNorm2, false>(a, b, 0.0, x, y, z, x, x);
+      return instantiateReduce<axpbyzNorm2, false>(a, b, real_t(0.0), x, y, z, x, x);
     }
 
     real_t axpyReDot(real_t a, const ColorSpinorField &x, ColorSpinorField &y)
     {
-      return instantiateReduce<AxpyReDot, false>(a, 0.0, 0.0, x, y, x, x, x);
+      return instantiateReduce<AxpyReDot, false>(a, real_t(0.0), real_t(0.0), x, y, x, x, x);
     }
 
     real_t caxpyNorm(const complex_t &a, const ColorSpinorField &x, ColorSpinorField &y)
@@ -200,7 +200,7 @@ namespace quda {
 
     complex_t cDotProduct(const ColorSpinorField &x, const ColorSpinorField &y)
     {
-      auto cdot = instantiateReduce<Cdot, false>(0.0, 0.0, 0.0, x, y, x, x, x);
+      auto cdot = instantiateReduce<Cdot, false>(real_t(0.0), real_t(0.0), real_t(0.0), x, y, x, x, x);
       return complex_t(cdot[0], cdot[1]);
     }
 
@@ -212,7 +212,7 @@ namespace quda {
 
     array<real_t, 4> cDotProductNormAB(const ColorSpinorField &x, const ColorSpinorField &y)
     {
-      auto ab = instantiateReduce<CdotNormAB, false>(0.0, 0.0, 0.0, x, y, x, x, x);
+      auto ab = instantiateReduce<CdotNormAB, false>(real_t(0.0), real_t(0.0), real_t(0.0), x, y, x, x, x);
       return {ab[0], ab[1], ab[2], ab[3]};
     }
 
@@ -226,7 +226,7 @@ namespace quda {
 
     array<real_t, 2> axpyCGNorm(real_t a, const ColorSpinorField &x, ColorSpinorField &y)
     {
-      auto cg_norm = instantiateReduce<axpyCGNorm2, true>(a, 0.0, 0.0, x, y, x, x, x);
+      auto cg_norm = instantiateReduce<axpyCGNorm2, true>(a, real_t(0.0), real_t(0.0), x, y, x, x, x);
       return {cg_norm[0], cg_norm[1]};
     }
 
@@ -234,7 +234,7 @@ namespace quda {
     {
       // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
       if (x.Ncolor() != 3) return {0.0, 0.0, 0.0};
-      auto rtn = instantiateReduce<HeavyQuarkResidualNorm_, false>(0.0, 0.0, 0.0, x, r, r, r, r);
+      auto rtn = instantiateReduce<HeavyQuarkResidualNorm_, false>(real_t(0.0), real_t(0.0), real_t(0.0), x, r, r, r, r);
       rtn[2] /= (x.Volume()*comm_size());
       return {rtn[0], rtn[1], rtn[2]};
     }
@@ -243,33 +243,33 @@ namespace quda {
     {
       // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
       if (x.Ncolor()!=3) return {0.0, 0.0, 0.0};
-      auto rtn = instantiateReduce<xpyHeavyQuarkResidualNorm_, false>(0.0, 0.0, 0.0, x, y, r, r, r);
+      auto rtn = instantiateReduce<xpyHeavyQuarkResidualNorm_, false>(real_t(0.0), real_t(0.0), real_t(0.0), x, y, r, r, r);
       rtn[2] /= (x.Volume()*comm_size());
       return {rtn[0], rtn[1], rtn[2]};
     }
 
     array<real_t, 3> tripleCGReduction(const ColorSpinorField &x, const ColorSpinorField &y, const ColorSpinorField &z)
     {
-      auto rtn = instantiateReduce<tripleCGReduction_, false>(0.0, 0.0, 0.0, x, y, z, x, x);
+      auto rtn = instantiateReduce<tripleCGReduction_, false>(real_t(0.0), real_t(0.0), real_t(0.0), x, y, z, x, x);
       return {rtn[0], rtn[1], rtn[2]};
     }
 
     array<real_t, 4> quadrupleCGReduction(const ColorSpinorField &x, const ColorSpinorField &y, const ColorSpinorField &z)
     {
-      auto red = instantiateReduce<quadrupleCGReduction_, false>(0.0, 0.0, 0.0, x, y, z, x, x);
+      auto red = instantiateReduce<quadrupleCGReduction_, false>(real_t(0.0), real_t(0.0), real_t(0.0), x, y, z, x, x);
       return {red[0], red[1], red[2], red[3]};
     }
 
     real_t quadrupleCG3InitNorm(real_t a, ColorSpinorField &x, ColorSpinorField &y,
                                 ColorSpinorField &z, ColorSpinorField &w, const ColorSpinorField &v)
     {
-      return instantiateReduce<quadrupleCG3InitNorm_, false>(a, 0.0, 0.0, x, y, z, w, v);
+      return instantiateReduce<quadrupleCG3InitNorm_, false>(a, real_t(0.0), real_t(0.0), x, y, z, w, v);
     }
 
     real_t quadrupleCG3UpdateNorm(real_t a, real_t b, ColorSpinorField &x, ColorSpinorField &y,
                                   ColorSpinorField &z, ColorSpinorField &w, const ColorSpinorField &v)
     {
-      return instantiateReduce<quadrupleCG3UpdateNorm_, false>(a, b, 0.0, x, y, z, w, v);
+      return instantiateReduce<quadrupleCG3UpdateNorm_, false>(a, b, real_t(0.0), x, y, z, w, v);
     }
 
   } // namespace blas

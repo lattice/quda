@@ -111,7 +111,7 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct TwistedCloverPreconditionedApply {
 
     inline TwistedCloverPreconditionedApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-        const CloverField &C, double a, double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
+        const CloverField &C, real_t a, real_t b, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
         const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
@@ -129,14 +129,14 @@ namespace quda
   */
 #ifdef GPU_TWISTED_CLOVER_DIRAC
   void ApplyTwistedCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-      const CloverField &C, double a, double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
+      const CloverField &C, real_t a, real_t b, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
       const int *comm_override, TimeProfile &profile)
   {
     instantiate<TwistedCloverPreconditionedApply>(out, in, U, C, a, b, xpay, x, parity, dagger, comm_override, profile);
   }
 #else
   void ApplyTwistedCloverPreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
-                                        const CloverField &, double, double, bool, const ColorSpinorField &, int, bool,
+                                        const CloverField &, real_t, real_t, bool, const ColorSpinorField &, int, bool,
                                         const int *, TimeProfile &)
   {
     errorQuda("Twisted-clover dslash has not been built");

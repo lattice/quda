@@ -29,7 +29,7 @@ namespace quda {
     }
 
   public:
-    GaugeWFlowStep(GaugeField &out, GaugeField &temp, const GaugeField &in, const double epsilon, const QudaGaugeSmearType wflow_type, const WFlowStepType step_type) :
+    GaugeWFlowStep(GaugeField &out, GaugeField &temp, const GaugeField &in, const real_t epsilon, const QudaGaugeSmearType wflow_type, const WFlowStepType step_type) :
       TunableKernel3D(in, 2, wflow_dim),
       out(out),
       temp(temp),
@@ -125,7 +125,7 @@ namespace quda {
     }
   }; // GaugeWFlowStep
 
-  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, const double epsilon, const QudaGaugeSmearType smear_type)
+  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, const real_t epsilon, const QudaGaugeSmearType smear_type)
   {
     checkPrecision(out, temp, in);
     checkReconstruct(out, in);

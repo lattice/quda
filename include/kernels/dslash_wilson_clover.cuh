@@ -21,7 +21,7 @@ namespace quda
     const real b; /** chiral twist factor (twisted-clover only) */
 
     WilsonCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-                    double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+                    real_t a, real_t b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
       A(A, false),
       a(a),

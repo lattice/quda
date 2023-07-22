@@ -13,11 +13,11 @@ namespace quda {
   template <typename Float, int nColor, QudaReconstructType recon>
   class CalcFunc : TunableReduction2D {
     const GaugeField &u;
-    array<double, 2> &result;
+    complex_t &result;
     const compute_type type;
 
   public:
-    CalcFunc(const GaugeField &u, array<double, 2> &result, compute_type type) :
+    CalcFunc(const GaugeField &u, complex_t &result, compute_type type) :
       TunableReduction2D(u),
       u(u),
       result(result),
@@ -30,15 +30,16 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      array<real_t, 2> det_trace = {};
       if (type == compute_type::determinant) {
         KernelArg<Float, nColor, recon, compute_type::determinant> arg(u);
-        launch<DetTrace>(result, tp, stream, arg);
+        launch<DetTrace>(det_trace, tp, stream, arg);
       } else {
         KernelArg<Float, nColor, recon, compute_type::trace> arg(u);
-        launch<DetTrace>(result, tp, stream, arg);
+        launch<DetTrace>(det_trace, tp, stream, arg);
       }
 
-      for (int i = 0; i < 2; i++) result[i] /= (double)(4*u.LocalVolume()*comm_size());
+      result = complex_t(det_trace[0], det_trace[1]) / (real_t)(4*u.LocalVolume()*comm_size());
     }
 
     long long flops() const {
@@ -50,18 +51,18 @@ namespace quda {
     long long bytes() const { return u.Bytes(); }
   };
 
-  double2 getLinkDeterminant(GaugeField& data)
+  complex_t getLinkDeterminant(GaugeField& data)
   {
-    array<double, 2> det{0.0, 0.0};
+    complex_t det{0.0, 0.0};
     instantiate<CalcFunc>(data, det, compute_type::determinant);
-    return make_double2(det[0], det[1]);
+    return det;
   }
 
-  double2 getLinkTrace(GaugeField& data)
+  complex_t getLinkTrace(GaugeField& data)
   {
-    array<double, 2> tr{0.0, 0.0};
+    complex_t tr{0.0, 0.0};
     instantiate<CalcFunc>(data, tr, compute_type::trace);
-    return make_double2(tr[0], tr[1]);
+    return tr;
   }
 
 } // namespace quda

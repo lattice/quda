@@ -115,9 +115,9 @@ void init(int argc, char **argv)
   printfQuda("Sending spinor field to GPU\n");
   *cudaSpinor = *spinor;
 
-  double spinor_norm2 = blas::norm2(*spinor);
-  double cuda_spinor_norm2 = blas::norm2(*cudaSpinor);
-  printfQuda("Source CPU = %f, CUDA=%f\n", spinor_norm2, cuda_spinor_norm2);
+  auto spinor_norm2 = blas::norm2(*spinor);
+  auto cuda_spinor_norm2 = blas::norm2(*cudaSpinor);
+  printfQuda("Source CPU = %f, CUDA=%f\n", double(spinor_norm2), double(cuda_spinor_norm2));
 
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   tmp = std::make_unique<ColorSpinorField>(csParam);
@@ -243,12 +243,12 @@ int main(int argc, char **argv)
           = niter * cudaSpinor->Nspin() * (8 * nColor - 2) * nColor * (long long)cudaSpinor->Volume();
         printfQuda("GFLOPS = %f\n", 1.0e-9 * flops / secs);
 
-        double spinor_ref_norm2 = blas::norm2(*spinorRef);
-        double spinor_out_norm2 = blas::norm2(*spinorOut);
+        auto spinor_ref_norm2 = blas::norm2(*spinorRef);
+        auto spinor_out_norm2 = blas::norm2(*spinorOut);
 
-        double cuda_spinor_out_norm2 = blas::norm2(*cudaSpinorOut);
-        printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", muCuda, spinor_ref_norm2, cuda_spinor_out_norm2,
-                   spinor_out_norm2);
+        auto cuda_spinor_out_norm2 = blas::norm2(*cudaSpinorOut);
+        printfQuda("Results mu = %d: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", muCuda, double(spinor_ref_norm2), double(cuda_spinor_out_norm2),
+                   double(spinor_out_norm2));
 
         if (verify_results) {
           ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();

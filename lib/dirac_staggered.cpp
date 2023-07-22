@@ -30,7 +30,7 @@ namespace quda {
 
   void DiracStaggered::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
 				  const QudaParity parity, const ColorSpinorField &x,
-				  const double &k) const
+				  const real_t &k) const
   {    
     checkParitySpinor(in, out);
 
@@ -103,8 +103,8 @@ namespace quda {
     // do nothing
   }
 
-  void DiracStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass, double,
-                                      double, bool) const
+  void DiracStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t, real_t mass, real_t,
+                                      real_t, bool) const
   {
     if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD || T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
       errorQuda("The optimized Kahler-Dirac operator is not built through createCoarseOp");
@@ -115,7 +115,7 @@ namespace quda {
     StaggeredCoarseOp(Y, X, T, *gauge, *gauge, *gauge, mass, allow_truncation, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);
   }
   
-  void DiracStaggered::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double, const double,
+  void DiracStaggered::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const real_t, const real_t,
                              const int t0, const QudaParity parity) const
   {
     checkSpinorAlias(in, out);
@@ -284,8 +284,8 @@ namespace quda {
 
   }
 
-  void DiracStaggeredPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass, double,
-                                        double, bool) const
+  void DiracStaggeredPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, real_t, real_t mass, real_t,
+                                        real_t, bool) const
   {
     if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD || T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
       errorQuda("The optimized Kahler-Dirac operator is not built through createCoarseOp");

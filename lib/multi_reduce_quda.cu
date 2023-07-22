@@ -654,7 +654,7 @@ namespace quda {
       auto &y0 = y[0];
 
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
-      std::vector<complex_t> result_tmp(x.size() * y.size(), 0.0);
+      std::vector<complex_t> result_tmp(x.size() * y.size(), real_t(0.0));
 
       if (x.size() == 1) {
         auto NYW_max = y0.Precision() == QUDA_DOUBLE_PRECISION ?
@@ -704,7 +704,7 @@ namespace quda {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block dot product on non-square inputs");
 
-      std::vector<complex_t> result_tmp(x.size() * y.size(), 0.0);
+      std::vector<complex_t> result_tmp(x.size() * y.size(), real_t(0.0));
       TileSizeTune<multiCdot, multiCdot, complex_t, decltype(x), decltype(y)>(result_tmp, x, y, x, x, true, false); // last false is b/c L2 norm
 
       // do a single multi-node reduction only once we have computed all local dot products
@@ -729,7 +729,7 @@ namespace quda {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block A-norm dot product on non-square inputs");
 
-      std::vector<complex_t> result_tmp(x.size() * y.size(), 0.0);
+      std::vector<complex_t> result_tmp(x.size() * y.size(), real_t(0.0));
       TileSizeTune<multiCdot, multiCdot, complex_t, decltype(x), decltype(y)>(result_tmp, x, y, x, x, true, true); // last true is b/c A norm
 
       // do a single multi-node reduction only once we have computed all local dot products

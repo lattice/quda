@@ -96,7 +96,7 @@ namespace quda {
     create(x, b);
 
     const int iter0 = param.iter;
-    double b2 = param.compute_true_res ? blas::norm2(b) : 0.0;
+    auto b2 = param.compute_true_res ? blas::norm2(b) : real_t(0.0);
 
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       // compute initial residual
@@ -123,7 +123,7 @@ namespace quda {
       mmdag.Expose()->M(xp, x);
       blas::xpay(b, -1.0, xp); // xp now holds the residual
 
-      double r2;
+      real_t r2;
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
         auto h3 = blas::HeavyQuarkResidualNorm(x, xp);
         r2 = h3[1];
@@ -175,10 +175,10 @@ namespace quda {
     create(x, b);
 
     const int iter0 = param.iter;
-    double b2 = 0.0;
+    real_t b2 = 0.0;
     if (param.compute_true_res) {
       b2 = blas::norm2(b);
-      if (b2 == 0.0) { // compute initial residual vector
+      if (b2 == real_t(0.0)) { // compute initial residual vector
         mdagm.Expose()->M(br, x);
         b2 = blas::norm2(br);
       }
@@ -193,7 +193,7 @@ namespace quda {
       blas::xpay(b, -1.0, br); // br now holds the residual
 
       if (param.compute_true_res) {
-        double r2;
+        real_t r2;
         if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
           auto h3 = blas::HeavyQuarkResidualNorm(x, br);
           r2 = h3[1];
@@ -207,7 +207,7 @@ namespace quda {
     }
   }
 
-  void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, double r2_old_init)
+  void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, real_t r2_old_init)
   {
     if (param.is_preconditioner) commGlobalReductionPush(param.global_reduction);
 
@@ -240,7 +240,7 @@ namespace quda {
 
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
 
-    double b2 = blas::norm2(b);
+    real_t b2 = blas::norm2(b);
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0 && param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
@@ -300,8 +300,8 @@ namespace quda {
     const double u = precisionEpsilon(param.precision_sloppy);
     const double uhigh = precisionEpsilon(); // solver precision
 
-    double Anorm = 0;
-    double beta = 0;
+    real_t Anorm = 0;
+    real_t beta = 0;
 
     // for alternative reliable updates
     if (advanced_feature && alternative_reliable) {
@@ -318,7 +318,7 @@ namespace quda {
     const double hq_res_stall_check = is_pure_double ? 0. : uhigh * uhigh * 1e-60;
 
     // compute initial residual
-    double r2 = 0.0;
+    real_t r2 = 0.0;
     if (advanced_feature && param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       // Compute r = b - A * x
       mat(r, x);
@@ -347,7 +347,7 @@ namespace quda {
     csParam.create = QUDA_NULL_FIELD_CREATE;
     XUpdateBatch x_update_batch(Np, p_init ? *p_init : rSloppy, csParam);
 
-    double r2_old = 0.0;
+    real_t r2_old = 0.0;
     if (r2_old_init != 0.0 and p_init) {
       r2_old = r2_old_init;
       auto rp = blas::cDotProduct(rSloppy, x_update_batch.get_current_field()) / (r2);
@@ -365,10 +365,10 @@ namespace quda {
       profile.TPSTART(QUDA_PROFILE_PREAMBLE);
     }
 
-    double stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
+    auto stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
 
-    double heavy_quark_res = 0.0;  // heavy quark res idual
-    double heavy_quark_res_old = 0.0;  // heavy quark residual
+    real_t heavy_quark_res = 0.0;  // heavy quark res idual
+    real_t heavy_quark_res_old = 0.0;  // heavy quark residual
 
     if (use_heavy_quark_res) {
       heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
@@ -377,7 +377,7 @@ namespace quda {
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
     auto alpha = std::make_unique<double[]>(Np);
-    double pAp;
+    real_t pAp;
 
     // set this to true if maxResIncrease has been exceeded but when we use heavy quark residual we still want to continue the CG
     // only used if we use the heavy_quark_res
@@ -414,11 +414,11 @@ namespace quda {
 
     while ( !converged && k < param.maxiter ) {
       matSloppy(Ap, x_update_batch.get_current_field());
-      double sigma;
+      real_t sigma;
 
       bool breakdown = false;
       if (advanced_feature && param.pipeline) {
-        double Ap2;
+        real_t Ap2;
         if(alternative_reliable){
           auto quadruple = blas::quadrupleCGReduction(rSloppy, Ap, x_update_batch.get_current_field());
           r2 = quadruple[0];
@@ -539,7 +539,7 @@ namespace quda {
         if (advanced_feature) { ru.update_norm(r2, y); }
 
         // calculate new reliable HQ resididual
-        if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r)[3]);
+        if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r)[2]);
 
         if (advanced_feature) {
           if (ru.reliable_break(r2, stop, L2breakdown, L2breakdown_eps)) { break; }
@@ -619,7 +619,7 @@ namespace quda {
       // compute the true residuals
       mat(r, x);
       param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
-      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r)[3]);
+      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
     }
 
     PrintSummary("CG", k, r2, b2, stop, param.tol_hq);
@@ -947,7 +947,7 @@ namespace quda {
     for (int i = 0; i < param.num_src; i++) {
       mat(r.Component(i), x.Component(i));
       param.true_res = sqrt(blas::xmyNorm(b.Component(i), r.Component(i)) / b2[i]);
-      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i))[3]);
+      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i))[2]);
       param.true_res_offset[i] = param.true_res;
       param.true_res_hq_offset[i] = param.true_res_hq;
 
@@ -1107,7 +1107,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   for(int i = 0; i < param.num_src; i++){
     stop[i] = stopping(param.tol, b2[i], param.residual_type);  // stopping condition of solver
     if (use_heavy_quark_res) {
-      heavy_quark_res[i] = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i))[3]);
+      heavy_quark_res[i] = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i))[2]);
       heavy_quark_res_old[i] = heavy_quark_res[i];   // heavy quark residual
     }
   }
@@ -1361,12 +1361,12 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         if (&x != &xSloppy) {
           blas::copy(tmp, y);   //  FIXME: check whether copy works here
           for(int i=0; i<param.num_src; i++){
-            heavy_quark_res[i] = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy.Component(i), tmp.Component(i), rSloppy.Component(i))[3]);
+            heavy_quark_res[i] = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy.Component(i), tmp.Component(i), rSloppy.Component(i))[2]);
           }
         } else {
           blas::copy(r, rSloppy);  //  FIXME: check whether copy works here
           for(int i=0; i<param.num_src; i++){
-            heavy_quark_res[i] = sqrt(blas::xpyHeavyQuarkResidualNorm(x.Component(i), y.Component(i), r.Component(i))[3]);
+            heavy_quark_res[i] = sqrt(blas::xpyHeavyQuarkResidualNorm(x.Component(i), y.Component(i), r.Component(i))[2]);
           }
         }
       }
@@ -1397,7 +1397,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
       // calculate new reliable HQ resididual
       if (use_heavy_quark_res){
         for(int i=0; i<param.num_src; i++){
-          heavy_quark_res[i] = sqrt(blas::HeavyQuarkResidualNorm(y.Component(i), r.Component(i))[3]);
+          heavy_quark_res[i] = sqrt(blas::HeavyQuarkResidualNorm(y.Component(i), r.Component(i))[2]);
         }
       }
 
@@ -1516,7 +1516,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   for(int i=0; i<param.num_src; i++){
     mat(r.Component(i), x.Component(i));
     param.true_res = sqrt(blas::xmyNorm(b.Component(i), r.Component(i)) / b2[i]);
-    param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i))[3]);
+    param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i))[2]);
     param.true_res_offset[i] = param.true_res;
     param.true_res_hq_offset[i] = param.true_res_hq;
 

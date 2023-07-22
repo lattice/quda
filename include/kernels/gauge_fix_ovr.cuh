@@ -23,7 +23,7 @@ namespace quda {
     int X[4]; // grid dimensions
     int border[4];
     Gauge data;
-    array<double, 2> result;
+    array<real_t, 2> result;
 
     GaugeFixQualityOVRArg(const GaugeField &data) :
       ReduceArg<reduce_t>(dim3(data.LocalVolumeCB(), 2, 1), 1, true), // reset = true
@@ -36,8 +36,8 @@ namespace quda {
       }
     }
 
-    double getAction(){ return result[0]; }
-    double getTheta(){ return result[1]; }
+    auto getAction(){ return result[0]; }
+    auto getTheta(){ return result[1]; }
   };
 
   template <typename Arg> struct FixQualityOVR : plus<typename Arg::reduce_t> {
@@ -113,7 +113,7 @@ namespace quda {
     int border[4];
     int *borderpoints[2];
 
-    GaugeFixArg(const GaugeField &u, const double relax_boost, int parity, int *borderpoints[2], unsigned threads) :
+    GaugeFixArg(const GaugeField &u, const real_t relax_boost, int parity, int *borderpoints[2], unsigned threads) :
       kernel_param(dim3(threads, type < 3 ? 8 : 4, 1)),
       u(u),
       relax_boost(static_cast<real>(relax_boost)),

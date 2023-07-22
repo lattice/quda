@@ -49,7 +49,7 @@ namespace quda {
   }
 
   void GaugeCovDev::DslashXpay(ColorSpinorField &, const ColorSpinorField &, const QudaParity, const ColorSpinorField &,
-                               const double &) const
+                               const real_t &) const
   {
     //do nothing
   }

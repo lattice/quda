@@ -77,9 +77,9 @@ int trace_path[][6] {{0, 1, 7, 6},       {0, 2, 7, 5},       {0, 3, 7, 4},      
 
 static int force_check;
 static int path_check;
-static double force_deviation;
-static double loop_deviation;
-static double plaq_deviation;
+static quda::real_t force_deviation;
+static quda::real_t loop_deviation;
+static quda::real_t plaq_deviation;
 
 // The same function is used to test computePath.
 // If compute_force is false then a path is computed
@@ -215,9 +215,9 @@ void gauge_force_test(bool compute_force = true)
     logQuda(QUDA_VERBOSE, "\nComputing momentum action\n");
     auto action_quda = momActionQuda(mom, &gauge_param);
     auto action_ref = mom_action(refmom, gauge_param.cpu_prec, 4 * V);
-    force_deviation = std::abs(action_quda - action_ref) / std::abs(action_ref);
-    logQuda(QUDA_VERBOSE, "QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref,
-            force_deviation);
+    force_deviation = abs(action_quda - action_ref) / abs(action_ref);
+    logQuda(QUDA_VERBOSE, "QUDA action = %e, reference = %e relative deviation = %e\n",
+            action_quda, action_ref, double(force_deviation));
   }
 
   double perf = 1.0 * niter * flops * V / (time_sec * 1e+9);
@@ -285,8 +285,7 @@ void gauge_loop_test()
   loadGaugeQuda(sitelink, &gauge_param);
 
   // storage for traces
-  using double_complex = double _Complex;
-  std::vector<double_complex> traces(num_paths);
+  std::vector<double _Complex> traces(num_paths);
   double scale_factor = 2.0;
 
   // compute various observables
@@ -323,32 +322,33 @@ void gauge_loop_test()
 
     loop_deviation = 0;
     for (int i = 0; i < num_paths; i++) {
-      double *t_ptr = (double *)(&traces[i]);
-      std::complex<double> traces_(t_ptr[0], t_ptr[1]);
-      auto diff = std::abs(traces_ref[i] - traces_);
-      auto norm = std::abs(traces_ref[i]);
+      quda::real_t *t_ptr = (quda::real_t*)(&traces[i]);
+      quda::complex_t traces_(t_ptr[0], t_ptr[1]);
+      auto diff = abs(traces_ref[i] - traces_);
+      auto norm = abs(traces_ref[i]);
       loop_deviation += diff / norm;
-      logQuda(QUDA_VERBOSE, "Loop %d QUDA trace %e + I %e Reference trace %e + I %e Deviation %e\n", i, traces_.real(),
-              traces_.imag(), traces_ref[i].real(), traces_ref[i].imag(), diff / norm);
+      logQuda(QUDA_VERBOSE, "Loop %d QUDA trace %e + I %e Reference trace %e + I %e Deviation %e\n", i,
+              double(traces_.real()), double(traces_.imag()), double(traces_ref[i].real()),
+              double(traces_ref[i].imag()), double(diff / norm));
     }
 
     // Second check: we can reconstruct the plaquette from the first six loops we calculated
     double plaq_factor = 1. / (V * U_qdp.Ncolor() * quda::comm_size());
     std::vector<quda::complex_t> plaq_components(6);
-    for (int i = 0; i < 6; i++) plaq_components[i] = traces_ref[i] / trace_loop_coeff_d[i] / scale_factor * plaq_factor;
+    for (int i = 0; i < 6; i++) plaq_components[i] = traces_ref[i] / quda::real_t(trace_loop_coeff_d[i]) / quda::real_t(scale_factor) * quda::real_t(plaq_factor);
 
-    double plaq_loop[3];
+    quda::real_t plaq_loop[3];
     // spatial: xy, xz, yz
-    plaq_loop[1] = ((plaq_components[0] + plaq_components[1] + plaq_components[3]) / 3.).real();
+    plaq_loop[1] = ((plaq_components[0] + plaq_components[1] + plaq_components[3]) / quda::real_t(3.)).real();
     // temporal: xt, yt, zt
-    plaq_loop[2] = ((plaq_components[2] + plaq_components[4] + plaq_components[5]) / 3.).real();
+    plaq_loop[2] = ((plaq_components[2] + plaq_components[4] + plaq_components[5]) / quda::real_t(3.)).real();
     plaq_loop[0] = 0.5 * (plaq_loop[1] + plaq_loop[2]);
 
-    plaq_deviation = std::abs(obsParam.plaquette[0] - plaq_loop[0]) / std::abs(obsParam.plaquette[0]);
+    plaq_deviation = abs(obsParam.plaquette[0] - plaq_loop[0]) / abs(obsParam.plaquette[0]);
     logQuda(QUDA_VERBOSE,
             "Plaquette loop space %e time %e total %e ; plaqQuda space %e time %e total %e ; deviation %e\n",
-            plaq_loop[0], plaq_loop[1], plaq_loop[2], obsParam.plaquette[0], obsParam.plaquette[1],
-            obsParam.plaquette[2], plaq_deviation);
+            double(plaq_loop[0]), double(plaq_loop[1]), double(plaq_loop[2]), obsParam.plaquette[0], obsParam.plaquette[1],
+            obsParam.plaquette[2], double(plaq_deviation));
   }
 
   double perf = 1.0 * niter * flops * V / (host_timer.last() * 1e+9);

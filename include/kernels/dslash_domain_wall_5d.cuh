@@ -14,7 +14,7 @@ namespace quda
     real a;   /** xpay scale factor */
     real m_f; /** fermion mass parameter */
 
-    DomainWall5DArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_f,
+    DomainWall5DArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a, real_t m_f,
                     bool xpay, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, xpay ? a : 0.0, x, parity, dagger, comm_override),
       Ls(in.X(4)),

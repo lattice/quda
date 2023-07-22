@@ -34,7 +34,7 @@ namespace quda {
 
   void GaugeLaplace::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
 			       const QudaParity parity, const ColorSpinorField &x,
-			       const double &k) const
+			       const real_t &k) const
   {
     checkSpinorAlias(in, out);
 
@@ -92,7 +92,7 @@ namespace quda {
 
   void GaugeLaplacePC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    double kappa2 = -kappa*kappa;
+    auto kappa2 = -kappa*kappa;
     auto tmp = getFieldTmp(in);
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {

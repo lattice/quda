@@ -43,7 +43,7 @@ namespace quda {
     QudaTwistGamma5Type twist;
 
     CloverArg(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
-	      int parity, real kappa=0.0, real mu=0.0, real epsilon = 0.0,
+	      int parity, real_t kappa=0.0, real_t mu=0.0, real_t epsilon = 0.0,
 	      bool dagger = false, QudaTwistGamma5Type twist = QUDA_TWIST_GAMMA5_INVALID) :
       kernel_param(dim3(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? in.VolumeCB()/2 : in.VolumeCB(),
                         in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? 2 : 1, in.SiteSubset())),
@@ -58,20 +58,20 @@ namespace quda {
       checkLocation(out, in, clover);
       if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
         if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-          a = 2.0 * kappa * mu;
+          a = real(2.0 * kappa * mu);
           b = 1.0;
         } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-          a = -2.0 * kappa * mu;
+          a = -real(2.0 * kappa * mu);
           b = 1.0 / (1.0 + a*a);
         }
         if (dagger) a *= -1.0;
       } else if (doublet) {
         if (twist == QUDA_TWIST_GAMMA5_DIRECT){
-          a = 2.0 * kappa * mu;
-          b = -2.0 * kappa * epsilon;
+          a = real(2.0 * kappa * mu);
+          b = -real(2.0 * kappa * epsilon);
         } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-          a = -2.0 * kappa * mu;
-          b = 2.0 * kappa * epsilon;
+          a = -real(2.0 * kappa * mu);
+          b = real(2.0 * kappa * epsilon);
         }
         if (dagger) a *= -1.0;
       }

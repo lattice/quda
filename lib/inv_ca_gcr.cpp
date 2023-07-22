@@ -149,8 +149,8 @@ namespace quda
 
     // compute b2, but only if we need to
     bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
-    double b2 = !fixed_iteration ? blas::norm2(b) : 1.0;
-    double r2 = 0.0; // if zero source then we will exit immediately doing no work
+    real_t b2 = !fixed_iteration ? blas::norm2(b) : 1.0;
+    real_t r2 = 0.0; // if zero source then we will exit immediately doing no work
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
@@ -224,8 +224,7 @@ namespace quda
       // Perform 100 power iterations, normalizing every 10 mat-vecs, using r_ as an initial seed
       // and q[0]/q[1] as temporaries for the power iterations. Technically illegal if n_krylov == 1, but in that case lambda_max isn't used anyway.
       lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r, q[0], q[1], 100, 10);
-      logQuda(QUDA_SUMMARIZE, "CA-GCR Approximate lambda max = 1.1 x %e\n", lambda_max / 1.1);
-
+      logQuda(QUDA_SUMMARIZE, "CA-GCR Approximate lambda max = 1.1 x %e\n", double(lambda_max / 1.1));
       lambda_init = true;
 
       if (!param.is_preconditioner) {
@@ -235,8 +234,8 @@ namespace quda
     }
 
     // Factors which map linear operator onto [-1,1]
-    double m_map = 2. / (lambda_max - lambda_min);
-    double b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
+    real_t m_map = 2. / (lambda_max - lambda_min);
+    real_t b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
@@ -251,7 +250,7 @@ namespace quda
       }
     }
 
-    double stop = !fixed_iteration ? stopping(param.tol, b2, param.residual_type) : 0.0; // stopping condition of solver
+    real_t stop = !fixed_iteration ? stopping(param.tol, b2, param.residual_type) : 0.0; // stopping condition of solver
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
@@ -261,7 +260,7 @@ namespace quda
     const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
     const int maxResIncreaseTotal = param.max_res_increase_total;
 
-    double heavy_quark_res = 0.0; // heavy quark residual
+    real_t heavy_quark_res = 0.0; // heavy quark residual
     if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]);
 
     int resIncrease = 0;
@@ -274,8 +273,8 @@ namespace quda
     }
     int total_iter = 0;
     int restart = 0;
-    double r2_old = r2;
-    double maxr_deflate = sqrt(r2);
+    real_t r2_old = r2;
+    real_t maxr_deflate = sqrt(r2);
     bool l2_converge = false;
 
     blas::copy(p[0], r); // no op if uni-precision
@@ -334,7 +333,7 @@ namespace quda
           resIncreaseTotal++;
           warningQuda(
             "CA-GCR: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-            sqrt(r2), sqrt(r2_old), resIncreaseTotal);
+            double(sqrt(r2)), double(sqrt(r2_old)), resIncreaseTotal);
           if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
             warningQuda("CA-GCR: solver exiting due to too many true residual norm increases");
             break;
@@ -368,7 +367,7 @@ namespace quda
     if (param.compute_true_res) {
       // Calculate the true residual
       mat(r, x);
-      double true_res = blas::xmyNorm(b, r);
+      real_t true_res = blas::xmyNorm(b, r);
       param.true_res = sqrt(true_res / b2);
       param.true_res_hq
         = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? sqrt(blas::HeavyQuarkResidualNorm(x, r)[2]) : 0.0;

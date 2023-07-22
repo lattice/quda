@@ -29,7 +29,7 @@ namespace quda {
 
     const Gauge u;
 
-    const double factor; // overall scaling factor for all loops
+    const real factor; // overall scaling factor for all loops
     static constexpr int nParity = 2; // always true for gauge fields
     int X[4]; // the regular volume parameters
     int E[4]; // the extended volume parameters
@@ -37,7 +37,7 @@ namespace quda {
 
     const paths<1> p;
 
-    GaugeLoopTraceArg(const GaugeField &u, double factor, const paths<1> &p) :
+    GaugeLoopTraceArg(const GaugeField &u, real_t factor, const paths<1> &p) :
       ReduceArg<reduce_t>(dim3(u.LocalVolumeCB(), 2, p.num_paths), p.num_paths),
       u(u),
       factor(factor),
@@ -72,7 +72,7 @@ namespace quda {
 
       thread_array<int, 4> dx{0};
 
-      double coeff_loop = arg.factor * arg.p.path_coeff[path_id];
+      auto coeff_loop = arg.factor * arg.p.path_coeff[path_id];
       if (coeff_loop == 0) return operator()(loop_trace, value);
 
       const int* path = arg.p.input_path[0] + path_id * arg.p.max_length;

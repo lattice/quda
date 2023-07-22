@@ -18,7 +18,7 @@ namespace quda {
     int *buffer;
     int count;
 
-    paths(std::vector<int**>& input_path, std::vector<int>& length_h, std::vector<double>& path_coeff_h, int num_paths, int max_length) :
+    paths(std::vector<int**>& input_path, std::vector<int>& length_h, std::vector<real_t>& path_coeff_h, int num_paths, int max_length) :
       num_paths(num_paths),
       max_length(max_length),
       count(0)
@@ -52,8 +52,9 @@ namespace quda {
       // length array
       memcpy(path_h + dim * num_paths * max_length, length_h.data(), num_paths*sizeof(int));
 
-      // path_coeff array
-      memcpy(path_h + dim * num_paths * max_length + num_paths + pad, path_coeff_h.data(), num_paths*sizeof(double));
+      // path_coeff array (copy and convert if needed)
+      double *path_coeff_ = reinterpret_cast<double*>(path_h + dim * num_paths * max_length + num_paths + pad);
+      for (auto i = 0; i < num_paths; i++) path_coeff_[i] = double(path_coeff_h[i]);
 
       qudaMemcpy(buffer, path_h, bytes, qudaMemcpyHostToDevice);
       host_free(path_h);

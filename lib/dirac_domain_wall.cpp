@@ -58,7 +58,7 @@ namespace quda {
 
   void DiracDomainWall::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
 				   const QudaParity parity, const ColorSpinorField &x,
-				   const double &k) const
+				   const real_t &k) const
   {
     checkDWF(out, in);
     checkParitySpinor(in, out);
@@ -140,7 +140,7 @@ namespace quda {
   void DiracDomainWallPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkDWF(out, in);
-    double kappa2 = -kappa5*kappa5;
+    auto kappa2 = -kappa5*kappa5;
     auto tmp = getFieldTmp(in);
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {

@@ -374,7 +374,7 @@ namespace quda {
   // Code to check for reliable updates, copied from inv_bicgstab_quda.cpp
   // Technically, there are ways to check both 'x' and 'r' for reliable updates...
   // the current status in BiCGstab is to just look for reliable updates in 'r'.
-  int BiCGstabL::reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta) {
+  int BiCGstabL::reliable(real_t &rNorm, real_t &maxrx, real_t &maxrr, const real_t &r2, const real_t &delta) {
     // reliable updates
     rNorm = sqrt(r2);
     if (rNorm > maxrx) maxrx = rNorm;
@@ -555,7 +555,7 @@ namespace quda {
     alpha = 0.0;
     omega = 1.0;
 
-    double stop = !fixed_iteration ? stopping(param.tol, b2, param.residual_type) : 0.0; // stopping condition of solver.
+    real_t stop = !fixed_iteration ? stopping(param.tol, b2, param.residual_type) : real_t(0.0); // stopping condition of solver.
 
     const bool use_heavy_quark_res =
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
@@ -601,7 +601,7 @@ namespace quda {
 
         // for i = 0 .. j, u[i] = r[i] - beta*u[i]
         // All but i = j is hidden in Dslash auxillary work (overlapping comms and compute).
-        blas::caxpby(1.0, r[j], -beta, u[j]);
+        blas::caxpby(real_t(1.0), r[j], -beta, u[j]);
         if (j > 0)
         {
           dslash::aux_worker = &bicgstabl_update;

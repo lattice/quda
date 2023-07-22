@@ -23,7 +23,7 @@ namespace quda {
     unsigned int minThreads() const { return U.LocalVolumeCB(); }
 
   public:
-    GaugeHB(GaugeField &U, double beta, RNG &rng, int mu, int parity, bool heatbath) :
+    GaugeHB(GaugeField &U, real_t beta, RNG &rng, int mu, int parity, bool heatbath) :
       TunableKernel1D(U),
       U(U),
       beta(static_cast<Float>(beta)),
@@ -101,7 +101,7 @@ namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType recon>
   struct MonteAlg {
-    MonteAlg(GaugeField& data, RNG &rngstate, Float Beta, int nhb, int nover)
+    MonteAlg(GaugeField& data, RNG &rngstate, real_t Beta, int nhb, int nover)
     {
       host_timer_t timer;
       double hb_time = 0.0, ovr_time = 0.0;
@@ -149,9 +149,9 @@ namespace quda {
    * @param[in] nhb number of heatbath steps
    * @param[in] nover number of overrelaxation steps
    */
-  void Monte(GaugeField& data, RNG &rngstate, double Beta, int nhb, int nover)
+  void Monte(GaugeField& data, RNG &rngstate, real_t Beta, int nhb, int nover)
   {
-    instantiate<MonteAlg>(data, rngstate, (float)Beta, nhb, nover);
+    instantiate<MonteAlg>(data, rngstate, Beta, nhb, nover);
   }
 
 }

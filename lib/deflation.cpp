@@ -9,6 +9,9 @@ namespace quda
 
   using namespace blas;
   using DynamicStride = Stride<Dynamic, Dynamic>;
+  using MatrixXc = Matrix<complex_t, Dynamic, Dynamic>;
+  using VectorXc = Matrix<complex_t, Dynamic, 1>;
+  using VectorX = Matrix<real_t, Dynamic, 1>;
 
   static auto pinned_allocator = [] (size_t bytes ) { return static_cast<complex_t*>(pool_pinned_malloc(bytes)); };
   static auto pinned_deleter   = [] (complex_t *hptr) { pool_pinned_free(hptr); };
@@ -86,10 +89,10 @@ namespace quda
     std::unique_ptr<complex_t, decltype(pinned_deleter) > projm( pinned_allocator(param.ld*param.cur_dim * sizeof(complex_t)), pinned_deleter);
 
 if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
-      Map<MatrixXcd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
-      Map<MatrixXcd, Unaligned, DynamicStride> evecs_(projm.get(), param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
+      Map<MatrixXc, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
+      Map<MatrixXc, Unaligned, DynamicStride> evecs_(projm.get(), param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
 
-      SelfAdjointEigenSolver<MatrixXcd> es_projm( projm_ );
+      SelfAdjointEigenSolver<MatrixXc> es_projm( projm_ );
       evecs_.block(0, 0, param.cur_dim, param.cur_dim) = es_projm.eigenvectors();
     } else {
       errorQuda("Library type %d is currently not supported", param.eig_global.extlib_type);
@@ -105,10 +108,10 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
       *r_sloppy = *r;
       param.matDeflation(*Av_sloppy, *r_sloppy);
       auto dotnorm = cDotProductNormA(*r_sloppy, *Av_sloppy);
-      double eval = dotnorm[0] / dotnorm[2];
+      auto eval = dotnorm[0] / dotnorm[2];
       blas::xpay(*Av_sloppy, -eval, *r_sloppy);
-      double relerr = sqrt(norm2(*r_sloppy) / dotnorm[2]);
-      printfQuda("Eigenvalue %d: %1.12e Residual: %1.12e\n", i + 1, eval, relerr);
+      auto relerr = sqrt(norm2(*r_sloppy) / dotnorm[2]);
+      printfQuda("Eigenvalue %d: %1.12e Residual: %1.12e\n", i + 1, double(eval), double(relerr));
     }
   }
 
@@ -122,9 +125,9 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
 
     std::unique_ptr<complex_t[] > vec(new complex_t[param.ld]);
 
-    double check_nrm2 = norm2(b);
+    auto check_nrm2 = norm2(b);
 
-    printfQuda("\nSource norm (gpu): %1.15e, curr deflation space dim = %d\n", sqrt(check_nrm2), param.cur_dim);
+    printfQuda("\nSource norm (gpu): %1.15e, curr deflation space dim = %d\n", double(sqrt(check_nrm2)), param.cur_dim);
 
     ColorSpinorField *b_sloppy = param.RV->Precision() != b.Precision() ? r_sloppy : &b;
     *b_sloppy = b;
@@ -137,11 +140,11 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
 
     if (!param.use_inv_ritz) {
       if (param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB) {
-        Map<MatrixXcd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim,
+        Map<MatrixXc, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim,
                                                         DynamicStride(param.ld, 1));
-        Map<VectorXcd, Unaligned> vec_(vec.get(), param.cur_dim);
+        Map<VectorXc, Unaligned> vec_(vec.get(), param.cur_dim);
 
-        VectorXcd vec2_(param.cur_dim);
+        VectorXc vec2_(param.cur_dim);
         vec2_ = projm_.fullPivHouseholderQr().solve(vec_);
         vec_ = vec2_;
       } else {
@@ -157,7 +160,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
     blas::caxpy(vec.get(), rv_, out_); //multiblas
 
     check_nrm2 = norm2(x);
-    printfQuda("\nDeflated guess spinor norm (gpu): %1.15e\n", sqrt(check_nrm2));
+    printfQuda("\nDeflated guess spinor norm (gpu): %1.15e\n", double(sqrt(check_nrm2)));
   }
 
   void Deflation::increment(ColorSpinorField &Vm, int n_ev)
@@ -238,24 +241,24 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
     printfQuda("\nNew curr deflation space dim = %d\n", param.cur_dim);
   }
 
-  void Deflation::reduce(double tol, int max_n_ev)
+  void Deflation::reduce(real_t tol, int max_n_ev)
   {
     if (param.cur_dim < max_n_ev) {
       printf("\nToo big number of eigenvectors was requested, switched to maximum available number %d\n", param.cur_dim);
       max_n_ev = param.cur_dim;
     }
 
-    std::unique_ptr<double[]> evals(new double[param.cur_dim]);
+    std::unique_ptr<real_t[]> evals(new real_t[param.cur_dim]);
     std::unique_ptr<complex_t, decltype(pinned_deleter)> projm(
       pinned_allocator(param.ld * param.cur_dim * sizeof(complex_t)), pinned_deleter);
 
     memcpy(projm.get(), param.matProj, param.ld * param.cur_dim * sizeof(complex_t));
 
     if (param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB) {
-      Map<MatrixXcd, Unaligned, DynamicStride> projm_(projm.get(), param.cur_dim, param.cur_dim,
-                                                      DynamicStride(param.ld, 1));
-      Map<VectorXd, Unaligned> evals_(evals.get(), param.cur_dim);
-      SelfAdjointEigenSolver<MatrixXcd> es(projm_);
+      Map<MatrixXc, Unaligned, DynamicStride> projm_(projm.get(), param.cur_dim, param.cur_dim,
+                                                     DynamicStride(param.ld, 1));
+      Map<VectorX, Unaligned> evals_(evals.get(), param.cur_dim);
+      SelfAdjointEigenSolver<MatrixXc> es(projm_);
       projm_ = es.eigenvectors();
       evals_ = es.eigenvalues();
     } else {
@@ -265,7 +268,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
     // reset projection matrix, now we will use inverse ritz values when deflate an initial guess:
     param.use_inv_ritz = true;
     for (int i = 0; i < param.cur_dim; i++) {
-      if (fabs(evals[i]) > 1e-16) {
+      if (abs(evals[i]) > 1e-16) {
         param.invRitzVals[i] = 1.0 / evals[i];
       } else {
         errorQuda("Cannot invert Ritz value");
@@ -283,7 +286,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
     std::unique_ptr<ColorSpinorField> buff(ColorSpinorField::Create(csParam));
 
     int idx = 0;
-    double relerr = 0.0;
+    real_t relerr = 0.0;
     bool do_residual_check = (tol != 0.0);
 
     while ((relerr < tol) && (idx < max_n_ev)) {
@@ -302,7 +305,7 @@ if( param.eig_global.extlib_type == QUDA_EIGEN_EXTLIB ) {
         auto eval = dotnorm[0] / dotnorm[2];
         blas::xpay(*Av_sloppy, -eval, *r_sloppy);
         relerr = sqrt(norm2(*r_sloppy) / dotnorm[2]);
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Eigenvalue: %1.12e Residual: %1.12e\n", eval, relerr);
+        logQuda(QUDA_VERBOSE, "Eigenvalue: %1.12e Residual: %1.12e\n", double(eval), double(relerr));
       }
 
       idx++;

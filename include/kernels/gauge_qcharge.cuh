@@ -42,8 +42,8 @@ namespace quda
       constexpr real q_norm = static_cast<real>(-1.0 / (4*M_PI*M_PI));
       constexpr real n_inv = static_cast<real>(1.0 / Arg::nColor);
 
-      reduce_t E_local{0, 0, 0};
-      device_reduce_t &Q = E_local[2];
+      array<double, 3> E_local{0, 0, 0};
+      auto &Q = E_local[2];
 
       // Load the field-strength tensor from global memory
       //F0 = F[Y,X], F1 = F[Z,X], F2 = F[Z,Y],
@@ -78,7 +78,7 @@ namespace quda
       Q = Q_idx * q_norm;
       if (Arg::density) arg.qDensity[x_cb + parity * arg.threads.x] = Q;
 
-      return operator()(E, E_local);
+      return operator()(E, {E_local[0], E_local[1], E_local[2]});
     }
 
   };

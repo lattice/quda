@@ -14,7 +14,7 @@ namespace quda {
 
     GaugeField &fineXinv;
     const GaugeField &coarseXinv;
-    double scale;
+    real_t scale;
 
     long long flops() const {
       if (dagger_approximation) {
@@ -36,7 +36,7 @@ namespace quda {
     unsigned int minThreads() const { return fineXinv.VolumeCB(); }
 
   public:
-    CalculateStaggeredGeometryReorder(GaugeField& fineXinv, const GaugeField& coarseXinv, const double scale) :
+    CalculateStaggeredGeometryReorder(GaugeField& fineXinv, const GaugeField& coarseXinv, const real_t scale) :
       TunableKernel3D(fineXinv, QUDA_KDINVERSE_GEOMETRY, 2),
       fineXinv(fineXinv),
       coarseXinv(coarseXinv),
@@ -78,24 +78,24 @@ namespace quda {
 
   template<typename Float, int fineColor>
   struct calculateStaggeredGeometryReorder {
-    calculateStaggeredGeometryReorder(GaugeField &fineXinv, const GaugeField &coarseXinv, const bool dagger_approximation, const double mass) {
+    calculateStaggeredGeometryReorder(GaugeField &fineXinv, const GaugeField &coarseXinv, const bool dagger_approximation, const real_t mass) {
       // template on dagger approximation
       if (dagger_approximation)  {
         // Approximate the inverse with the dagger, multiplied by a rescale factor which
         // makes the norm of the dagger max equal the norm of the inverse in the free field
-        double xinv_max_abs = coarseXinv.abs_max(0);
-        double scale = 1. / (4. * (xinv_max_abs * xinv_max_abs + mass * mass));
+        auto xinv_max_abs = coarseXinv.abs_max(0);
+        auto scale = 1. / (4. * (xinv_max_abs * xinv_max_abs + mass * mass));
 
         // reset scales as appropriate
         if constexpr (sizeof(Float) < QUDA_SINGLE_PRECISION) {
-          double max_scale = xinv_max_abs * scale;
-          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Global xInv_max = %e\n", max_scale);
+          auto max_scale = xinv_max_abs * scale;
+          logQuda(QUDA_VERBOSE, "Global xInv_max = %e\n", double(max_scale));
 
           fineXinv.Scale(max_scale);
         }
         CalculateStaggeredGeometryReorder<Float,fineColor,true>(fineXinv, coarseXinv, scale);
       } else {
-        double scale = 1.;
+        real_t scale = 1.;
         CalculateStaggeredGeometryReorder<Float,fineColor,false>(fineXinv, coarseXinv, scale);
       }
     }
@@ -110,12 +110,12 @@ namespace quda {
      @param dagger_approximation[in] Whether or not to apply the dagger approximation
      @param mass[in] Mass of staggered fermion (used for dagger approximation only)
    */
-  void ReorderStaggeredKahlerDiracInverse(GaugeField &fineXinv, const GaugeField &coarseXinv, const bool dagger_approximation, const double mass) {
+  void ReorderStaggeredKahlerDiracInverse(GaugeField &fineXinv, const GaugeField &coarseXinv, const bool dagger_approximation, const real_t mass) {
     // Instantiate based on precision, number of colors
     instantiate<calculateStaggeredGeometryReorder>(fineXinv, coarseXinv, dagger_approximation, mass);
   }
 #else
-  void ReorderStaggeredKahlerDiracInverse(GaugeField &, const GaugeField &, const bool, const double) {
+  void ReorderStaggeredKahlerDiracInverse(GaugeField &, const GaugeField &, const bool, const real_t) {
     errorQuda("Staggered fermion support has not been built");
   }
 #endif

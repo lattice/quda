@@ -25,7 +25,7 @@ namespace quda {
   public:
     CloverForce(const GaugeField &U, GaugeField &force, const ColorSpinorField& inA,
                 const ColorSpinorField& inB, const ColorSpinorField& inC, const ColorSpinorField& inD,
-                int parity, double coeff) :
+                int parity, real_t coeff) :
       TunableKernel1D(force),
       force(force),
       U(U),
@@ -134,7 +134,7 @@ namespace quda {
 
 #ifdef GPU_CLOVER_DIRAC
   void computeCloverForce(GaugeField &force, const GaugeField &U, std::vector<ColorSpinorField *> &x,
-                          std::vector<ColorSpinorField *> &p, std::vector<double> &coeff)
+                          std::vector<ColorSpinorField *> &p, std::vector<real_t> &coeff)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     checkNative(*x[0], *p[0], force, U);
@@ -164,7 +164,7 @@ namespace quda {
   }
 #else // GPU_CLOVER_DIRAC not defined
   void computeCloverForce(GaugeField &, const GaugeField &, std::vector<ColorSpinorField *> &,
-                          std::vector<ColorSpinorField *> &, std::vector<double> &)
+                          std::vector<ColorSpinorField *> &, std::vector<real_t> &)
   {
     errorQuda("Clover Dirac operator has not been built!");
   }

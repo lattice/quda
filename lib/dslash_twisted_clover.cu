@@ -65,7 +65,7 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct TwistedCloverApply {
 
     inline TwistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                              const CloverField &C, double a, double b, const ColorSpinorField &x, int parity,
+                              const CloverField &C, real_t a, real_t b, const ColorSpinorField &x, int parity,
                               bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
@@ -81,14 +81,14 @@ namespace quda
   // Uses the kappa normalization for the Wilson operator, with a = -kappa.
 #ifdef GPU_TWISTED_CLOVER_DIRAC
   void ApplyTwistedClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &C,
-                          double a, double b, const ColorSpinorField &x, int parity, bool dagger,
+                          real_t a, real_t b, const ColorSpinorField &x, int parity, bool dagger,
                           const int *comm_override, TimeProfile &profile)
   {
     instantiate<TwistedCloverApply>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
   }
 #else
   void ApplyTwistedClover(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, const CloverField &,
-                          double, double, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+                          real_t, real_t, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
   {
     errorQuda("Twisted-clover dslash has not been built");
   }

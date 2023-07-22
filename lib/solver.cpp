@@ -200,7 +200,7 @@ namespace quda {
       } else {
         // Computing the deflation space, rather than transferring, so we create space.
         resize(evecs, param.eig_param.n_conv, csParam);
-        evals.resize(param.eig_param.n_conv, 0.0);
+        evals.resize(param.eig_param.n_conv, real_t(0.0));
       }
     }
 
@@ -267,13 +267,13 @@ namespace quda {
     }
   }
 
-  double Solver::stopping(double tol, double b2, QudaResidualType residual_type)
+  real_t Solver::stopping(real_t tol, real_t b2, QudaResidualType residual_type)
   {
-    double stop=0.0;
+    real_t stop=0.0;
     if ( (residual_type & QUDA_L2_ABSOLUTE_RESIDUAL) &&
 	 (residual_type & QUDA_L2_RELATIVE_RESIDUAL) ) {
       // use the most stringent stopping condition
-      double lowest = (b2 < 1.0) ? b2 : 1.0;
+      real_t lowest = (b2 < 1.0) ? b2 : 1.0;
       stop = lowest*tol*tol;
     } else if (residual_type & QUDA_L2_ABSOLUTE_RESIDUAL) {
       stop = tol*tol;
@@ -284,19 +284,19 @@ namespace quda {
     return stop;
   }
 
-  bool Solver::convergence(double r2, double hq2, double r2_tol, double hq_tol) {
+  bool Solver::convergence(real_t r2, real_t hq2, real_t r2_tol, real_t hq_tol) {
 
     // check the heavy quark residual norm if necessary
     if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-      if (std::isnan(hq2) || std::isinf(hq2))
-        errorQuda("Solver appears to have diverged with heavy quark residual %9.6e", hq2);
+      if (isnan(hq2) || isinf(hq2))
+        errorQuda("Solver appears to have diverged with heavy quark residual %9.6e", double(hq2));
 
       if (hq2 > hq_tol) return false;
     }
 
     // check the L2 relative residual norm if necessary
     if ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) || (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) {
-      if (std::isnan(r2) || std::isinf(r2)) errorQuda("Solver appears to have diverged with residual %9.6e", r2);
+      if (isnan(r2) || isinf(r2)) errorQuda("Solver appears to have diverged with residual %9.6e", double(r2));
 
       if (r2 > r2_tol) return false;
     }
@@ -304,12 +304,12 @@ namespace quda {
     return true;
   }
 
-  bool Solver::convergenceHQ(double, double hq2, double, double hq_tol)
+  bool Solver::convergenceHQ(real_t, real_t hq2, real_t, real_t hq_tol)
   {
     // check the heavy quark residual norm if necessary
     if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-      if (std::isnan(hq2) || std::isinf(hq2))
-        errorQuda("Solver appears to have diverged with heavy quark residual %9.6e", hq2);
+      if (isnan(hq2) || isinf(hq2))
+        errorQuda("Solver appears to have diverged with heavy quark residual %9.6e", double(hq2));
 
       if (hq2 > hq_tol) return false;
     }
@@ -317,11 +317,11 @@ namespace quda {
     return true;
   }
 
-  bool Solver::convergenceL2(double r2, double, double r2_tol, double)
+  bool Solver::convergenceL2(real_t r2, real_t, real_t r2_tol, real_t)
   {
     // check the L2 relative residual norm if necessary
     if ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) || (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) {
-      if (std::isnan(r2) || std::isinf(r2)) errorQuda("Solver appears to have diverged with residual %9.6e", r2);
+      if (isnan(r2) || isinf(r2)) errorQuda("Solver appears to have diverged with residual %9.6e", double(r2));
 
       if (r2 > r2_tol) return false;
     }
@@ -329,40 +329,40 @@ namespace quda {
     return true;
   }
 
-  void Solver::PrintStats(const char* name, int k, double r2, double b2, double hq2) {
+  void Solver::PrintStats(const char* name, int k, real_t r2, real_t b2, real_t hq2) {
     if (getVerbosity() >= QUDA_VERBOSE) {
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
-        printfQuda("%s: %5d iterations, <r,r> = %9.6e, |r|/|b| = %9.6e, heavy-quark residual = %9.6e\n", name, k, r2,
-                   sqrt(r2 / b2), hq2);
+        printfQuda("%s: %5d iterations, <r,r> = %9.6e, |r|/|b| = %9.6e, heavy-quark residual = %9.6e\n", name, k, double(r2),
+                   double(sqrt(r2 / b2)), double(hq2));
       } else {
-        printfQuda("%s: %5d iterations, <r,r> = %9.6e, |r|/|b| = %9.6e\n", name, k, r2, sqrt(r2 / b2));
+        printfQuda("%s: %5d iterations, <r,r> = %9.6e, |r|/|b| = %9.6e\n", name, k, double(r2), double(sqrt(r2 / b2)));
       }
     }
 
-    if (std::isnan(r2) || std::isinf(r2)) errorQuda("Solver appears to have diverged");
+    if (isnan(r2) || isinf(r2)) errorQuda("Solver appears to have diverged");
   }
 
-  void Solver::PrintSummary(const char *name, int k, double r2, double b2,
-                            double r2_tol, double hq_tol) {
+  void Solver::PrintSummary(const char *name, int k, real_t r2, real_t b2,
+                            real_t r2_tol, real_t hq_tol) {
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       if (param.compute_true_res) {
 	if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
           printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e, true = %9.6e "
                      "(requested = %9.6e), heavy-quark residual = %9.6e (requested = %9.6e)\n",
-                     name, k, sqrt(r2 / b2), param.true_res, sqrt(r2_tol / b2), param.true_res_hq, hq_tol);
+                     name, k, double(sqrt(r2 / b2)), double(param.true_res), double(sqrt(r2_tol / b2)), double(param.true_res_hq), double(hq_tol));
         } else {
           printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e, true = %9.6e "
                      "(requested = %9.6e)\n",
-                     name, k, sqrt(r2 / b2), param.true_res, sqrt(r2_tol / b2));
+                     name, k, double(sqrt(r2 / b2)), double(param.true_res), double(sqrt(r2_tol / b2)));
         }
       } else {
 	if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
           printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e "
                      "(requested = %9.6e), heavy-quark residual = %9.6e (requested = %9.6e)\n",
-                     name, k, sqrt(r2 / b2), sqrt(r2_tol / b2), param.true_res_hq, hq_tol);
+                     name, k, double(sqrt(r2 / b2)), double(sqrt(r2_tol / b2)), double(param.true_res_hq), double(hq_tol));
         } else {
           printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %9.6e (requested = %9.6e)\n",
-                     name, k, sqrt(r2 / b2), sqrt(r2_tol / b2));
+                     name, k, double(sqrt(r2 / b2)), double(sqrt(r2_tol / b2)));
         }
       }
     }
@@ -389,13 +389,13 @@ namespace quda {
       errorQuda("Precision mismatch %d %d", checkPrecision(x[0], b), param.precision);
   }
 
-  bool MultiShiftSolver::convergence(const std::vector<double> &r2, const std::vector<double> &r2_tol, int n) const
+  bool MultiShiftSolver::convergence(const std::vector<real_t> &r2, const std::vector<real_t> &r2_tol, int n) const
   {
     // check the L2 relative residual norm if necessary
     if ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) || (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) {
       for (int i = 0; i < n; i++) {
-        if (std::isnan(r2[i]) || std::isinf(r2[i]))
-          errorQuda("Multishift solver appears to have diverged on shift %d with residual %9.6e", i, r2[i]);
+        if (isnan(r2[i]) || isinf(r2[i]))
+          errorQuda("Multishift solver appears to have diverged on shift %d with residual %9.6e", i, double(r2[i]));
 
         if (r2[i] > r2_tol[i] && r2_tol[i] != 0.0) return false;
       }

@@ -363,7 +363,7 @@ namespace quda {
       {
         for (int d = 0; d < U.Geometry(); d++)
           u[d] = gauge_ ? static_cast<complex<storeFloat> **>(gauge_)[d] : U.data<complex<storeFloat> *>(d);
-        resetScale(U.Scale());
+        resetScale(double(U.Scale()));
       }
 
       void resetScale(Float max)
@@ -443,7 +443,7 @@ namespace quda {
           ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
         }
 
-	resetScale(U.Scale());
+	resetScale(double(U.Scale()));
       }
 
       void resetScale(Float max)
@@ -478,7 +478,7 @@ namespace quda {
         scale(static_cast<Float>(1.0)),
         scale_inv(static_cast<Float>(1.0))
       {
-        resetScale(U.Scale());
+        resetScale(double(U.Scale()));
       }
 
       void resetScale(Float max)
@@ -564,7 +564,7 @@ namespace quda {
           ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
         }
 
-	resetScale(U.Scale());
+	resetScale(double(U.Scale()));
       }
 
       void resetScale(Float max)
@@ -617,7 +617,7 @@ namespace quda {
         scale(static_cast<Float>(1.0)),
         scale_inv(static_cast<Float>(1.0))
       {
-	resetScale(U.Scale());
+	resetScale(double(U.Scale()));
       }
 
       void resetScale(Float max)
@@ -694,7 +694,7 @@ namespace quda {
           ghost[d+4] = !native_ghost && U.Geometry() == QUDA_COARSE_GEOMETRY? static_cast<complex<storeFloat>*>(ghost_[d+4]) : nullptr;
           ghostVolumeCB[d+4] = U.Nface()*U.SurfaceCB(d);
         }
-        resetScale(U.Scale());
+        resetScale(double(U.Scale()));
       }
 
       void resetScale(Float max)
@@ -1256,7 +1256,7 @@ namespace quda {
 
         // scale factor is set when using recon-9
         Reconstruct(const GaugeField &u, real scale = 1.0) :
-          anisotropy(u.Anisotropy() * scale, 1.0 / (u.Anisotropy() * scale)),
+          anisotropy(Float(u.Anisotropy() * scale), Float(1.0 / (u.Anisotropy() * scale))),
           tBoundary(static_cast<real>(u.TBoundary()) * scale, 1.0 / (static_cast<real>(u.TBoundary()) * scale)),
           firstTimeSliceBound(u.VolumeCB()),
           lastTimeSliceBound((u.X()[3] - 1) * u.X()[0] * u.X()[1] * u.X()[2] / 2),
@@ -2187,7 +2187,7 @@ namespace quda {
         LegacyOrder<Float, length>(u, ghost_),
         gauge(gauge_ ? gauge_ : u.data<Float *>()),
         volumeCB(u.VolumeCB()),
-        scale(u.Scale()),
+        scale(real(u.Scale())),
         scale_inv(1.0 / scale)
       {
         if constexpr (length != 18) errorQuda("Gauge length %d not supported", length);

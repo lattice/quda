@@ -47,7 +47,7 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon_u> struct StaggeredApply {
 
 #if defined(BUILD_MILC_INTERFACE) || defined(BUILD_TIFR_INTERFACE)
-    StaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+    StaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a,
                    const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                    TimeProfile &profile)
     {
@@ -82,7 +82,7 @@ namespace quda
       }
     }
 #else
-    StaggeredApply(ColorSpinorField &, const ColorSpinorField &, const GaugeField &U, double,
+    StaggeredApply(ColorSpinorField &, const ColorSpinorField &, const GaugeField &U, real_t,
                    const ColorSpinorField &, int, bool, const int *, TimeProfile &)
     {
       errorQuda("Unsupported combination of staggered phase type %d gauge link type %d and reconstruct %d", U.StaggeredPhase(), U.LinkType(), U.Reconstruct());
@@ -91,13 +91,13 @@ namespace quda
   };
 
 #ifdef GPU_STAGGERED_DIRAC
-  void ApplyStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+  void ApplyStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a,
                       const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
     instantiate<StaggeredApply, StaggeredReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
   }
 #else
-  void ApplyStaggered(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,  double,
+  void ApplyStaggered(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, real_t,
                       const ColorSpinorField &, int, bool, const int *, TimeProfile &)
   {
     errorQuda("Staggered dslash has not been built");

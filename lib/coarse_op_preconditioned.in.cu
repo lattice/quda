@@ -220,7 +220,7 @@ namespace quda
         // XXX: This doesn't work for double precision since hard-coded to single precision
         using gCoarseInv = gauge::FieldOrder<float, N, 1, gOrder_milc, use_native_ghosts, float>;
 
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", Xinv_aos->norm2(0));
+        logQuda(QUDA_VERBOSE, "Xinv = %e\n", double(Xinv_aos->norm2(0)));
 
         if (Yhat.Precision() == QUDA_HALF_PRECISION || Yhat.Precision() == QUDA_QUARTER_PRECISION) {
           CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarseInv, N, 4, 2, true, true>
@@ -243,7 +243,7 @@ namespace quda
         // use spin-ignorant accessor to make multiplication simpler
         using gCoarse = typename gauge::FieldOrder<Float, N, 1, gOrder, true, storeFloat>;
         using gPreconditionedCoarse = typename gauge::FieldOrder<Float, N, 1, gOrder, true, storeFloat>;
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", Xinv.norm2(0));
+        logQuda(QUDA_VERBOSE, "Xinv = %e\n", double(Xinv.norm2(0)));
 
         if (Yhat.Precision() == QUDA_HALF_PRECISION || Yhat.Precision() == QUDA_QUARTER_PRECISION) {
           CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarse, N, 4, 2, true, false>
@@ -265,11 +265,9 @@ namespace quda
     // links and not overwrite the backwards ghost
     Yhat.exchangeGhost(QUDA_LINK_FORWARDS);
 
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      for (int d = 0; d < 8; d++)
-        printfQuda("Yhat[%d] = %e (%e < %e x %e)\n", d, Yhat.norm2(d), Yhat.abs_max(d), Y.abs_max(d), Xinv.abs_max(0));
-    }
-
+    for (int d = 0; d < 8; d++)
+      logQuda(QUDA_VERBOSE, "Yhat[%d] = %e (%e < %e x %e)\n", d, double(Yhat.norm2(d)),
+              double(Yhat.abs_max(d)), double(Y.abs_max(d)), double(Xinv.abs_max(0)));
   }
 
   template <typename storeFloat, typename Float, int N>

@@ -38,8 +38,8 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct DomainWall4DApply {
 
-    inline DomainWall4DApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                             double m_5, const complex_t *b_5, const complex_t *c_5, const ColorSpinorField &x, int parity,
+    inline DomainWall4DApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a,
+                             real_t m_5, const complex_t *b_5, const complex_t *c_5, const ColorSpinorField &x, int parity,
                              bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
@@ -54,14 +54,14 @@ namespace quda
   // Apply the 4-d preconditioned domain-wall Dslash operator
   // out(x) = M*in = in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
 #if defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_NDEG_TWISTED_CLOVER_DIRAC)
-  void ApplyDomainWall4D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
+  void ApplyDomainWall4D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, real_t a, real_t m_5,
                          const complex_t *b_5, const complex_t *c_5, const ColorSpinorField &x, int parity, bool dagger,
                          const int *comm_override, TimeProfile &profile)
   {
     instantiate<DomainWall4DApply>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, profile);
   }
 #else
-  void ApplyDomainWall4D(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double, double,
+  void ApplyDomainWall4D(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, real_t, real_t,
                          const complex_t *, const complex_t *, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
   {
     errorQuda("Domain-wall dslash has not been built");

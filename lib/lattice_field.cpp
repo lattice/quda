@@ -617,7 +617,7 @@ namespace quda {
     output << "pad = " << param.pad << std::endl;
     output << "precision = " << param.Precision() << std::endl;
     output << "ghost_precision = " << param.GhostPrecision() << std::endl;
-    output << "scale = " << param.scale << std::endl;
+    output << "scale = " << double(param.scale) << std::endl;
 
     output << "ghostExchange = " << param.ghostExchange << std::endl;
     for (int i=0; i<param.nDim; i++) {

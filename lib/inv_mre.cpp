@@ -88,7 +88,7 @@ namespace quda
     // Orthonormalise the vector basis
     if (orthogonal) {
       for (int i = 0; i < N; i++) {
-        double p2 = blas::norm2(p[i]);
+        real_t p2 = blas::norm2(p[i]);
         blas::ax(1 / sqrt(p2), p[i]);
         if (!apply_mat) blas::ax(1 / sqrt(p2), q[i]);
 
@@ -130,7 +130,7 @@ namespace quda
       ColorSpinorField r(b);
       for (auto &a : alpha) a = -a;
       blas::caxpy(alpha, q, r);
-      printfQuda("MinResExt: N = %d, |res| / |src| = %e\n", N, sqrt(blas::norm2(r) / blas::norm2(b)));
+      printfQuda("MinResExt: N = %d, |res| / |src| = %e\n", N, double(sqrt(blas::norm2(r)) / double(blas::norm2(b))));
     }
 
     if (!running) getProfile().TPSTOP(QUDA_PROFILE_CHRONO);
