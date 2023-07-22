@@ -82,7 +82,7 @@ namespace quda
        @param[out] result The reduction result is copied here
        @param[in] stream The stream on which we the reduction is being done
      */
-    template <typename host_t, typename device_t = host_t>
+    template <typename host_t>
     void complete(std::vector<host_t> &result, const qudaStream_t stream = device::get_default_stream())
     {
       if (launch_error == QUDA_ERROR) return; // kernel launch failed so return
@@ -93,10 +93,11 @@ namespace quda
 
       // copy back result element by element and convert if necessary to host reduce type
       // unit size here may differ from system_atomic_t size, e.g., if doing double-double
-      const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
-      if (result.size() != (unsigned)n_element)
-        errorQuda("result vector length %lu does not match n_reduce %d", result.size(), n_element);
-      for (int i = 0; i < n_element; i++) result[i] = reinterpret_cast<device_t *>(result_h)[i];
+      const int n_element_in = n_reduce * sizeof(T) / sizeof(get_scalar_t<T>);
+      const int n_element_out = result.size() * sizeof(host_t) / sizeof(get_scalar_t<host_t>);
+      if (n_element_in != n_element_out) errorQuda("output elements %d does not match input %d", n_element_out, n_element_in);
+      for (auto i = 0; i < n_element_in; i++) reinterpret_cast<get_scalar_t<host_t>*>(&result[0])[i] =
+                                                static_cast<get_scalar_t<host_t>>(reinterpret_cast<get_scalar_t<T>*>(result_h)[i]);
     }
   };
 
