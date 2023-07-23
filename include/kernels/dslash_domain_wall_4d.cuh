@@ -18,9 +18,9 @@ namespace quda
       Ls(in.X(4))
     {
       if (b_5 == nullptr || c_5 == nullptr)
-        for (int s = 0; s < Ls; s++) a_5[s] = Float(a); // 4-d Shamir
+        for (int s = 0; s < Ls; s++) a_5[s] = real(a); // 4-d Shamir
       else
-        for (int s = 0; s < Ls; s++) a_5[s] = complex<Float>(real_t(0.5) * a / (b_5[s] * (m_5 + real_t(4.0)) + real_t(1.0))); // 4-d Mobius
+        for (int s = 0; s < Ls; s++) a_5[s] = complex<real>(real_t(0.5) * a / (b_5[s] * (m_5 + real_t(4.0)) + real_t(1.0))); // 4-d Mobius
     }
   };
 

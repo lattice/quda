@@ -24,8 +24,8 @@ namespace quda
       const GaugeField &U;
       ColorSpinorField &y;
       const ColorSpinorField &x;
-      double m_f;
-      double m_5;
+      real_t m_f;
+      real_t m_5;
       const complex_t *b_5;
       const complex_t *c_5;
       int parity;
@@ -132,7 +132,7 @@ namespace quda
 
     public:
       FusedDslash(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
-                  const ColorSpinorField &x, double m_f, double m_5, const complex_t *b_5, const complex_t *c_5,
+                  const ColorSpinorField &x, real_t m_f, real_t m_5, const complex_t *b_5, const complex_t *c_5,
                   bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type) :
         TunableGridStrideKernel2D(in, x.X(4)),
         out(out),

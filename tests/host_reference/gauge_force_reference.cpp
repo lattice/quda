@@ -522,7 +522,7 @@ void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::complex_t
   lattice_t lat(*qdp_ex);
   void *sitelink_ex[] = {qdp_ex->data(0), qdp_ex->data(1), qdp_ex->data(2), qdp_ex->data(3)};
 
-  std::vector<double> loop_tr_dbl(2 * num_paths);
+  std::vector<quda::real_t> loop_tr_dbl(2 * num_paths);
 
   for (int i = 0; i < num_paths; i++) {
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {

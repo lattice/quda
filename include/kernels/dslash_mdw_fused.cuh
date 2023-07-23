@@ -91,7 +91,7 @@ namespace quda {
       const bool comm[4];
 
       FusedDslashArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
-                     const ColorSpinorField &x, double m_f_, double m_5_, const complex_t *b_5, const complex_t *c_5,
+                     const ColorSpinorField &x, real_t m_f_, real_t m_5_, const complex_t *b_5, const complex_t *c_5,
                      int parity, int shift_[4], int halo_shift_[4]) :
         out(out),
         in(in),
@@ -120,8 +120,8 @@ namespace quda {
 
         if (b_5[0] != b_5[1] || b_5[0].imag() != 0) { errorQuda("zMobius is NOT supported yet.\n"); }
 
-        b = b_5[0].real();
-        c = c_5[0].real();
+        b = double(b_5[0].real());
+        c = double(c_5[0].real());
         kappa = -(c * (4. + m_5) - 1.) / (b * (4. + m_5) + 1.); // This is actually -kappa in my(Jiqun Tu) notes.
 
         if (kappa * kappa < 1e-6) { small_kappa = true; }
