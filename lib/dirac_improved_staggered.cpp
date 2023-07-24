@@ -233,7 +233,7 @@ namespace quda {
     ApplyLocalStaggered(tmp, in, *fatGauge, *longGauge, 0.0, in, other_parity, true, false);
 
     // apply -D_eo [-D_oe] + 4 m^2
-    ApplyLocalStaggered(out, tmp, *fatGauge, *longGauge, 4. * mass * mass, in, parity, true, false);
+    ApplyLocalStaggered(out, tmp, *fatGauge, *longGauge, 4. * mass * mass, in, parity, true, true);
   }
 
   void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &, const ColorSpinorField &) const
