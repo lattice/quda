@@ -787,8 +787,8 @@ namespace quda
         commGlobalReductionPush(global);
         Float scale_inv = 1.0;
         if constexpr (fixed && !block_float_ghost) scale_inv = ghost.scale_inv;
-        auto nrm2 = transform_reduce<plus<double>>(dim, field.Location(), field.SiteSubset(),
-                                                   square_<double, ghostFloat>(scale_inv));
+        real_t nrm2 = real_t(transform_reduce<plus<device_reduce_t>>(dim, field.Location(), field.SiteSubset(),
+                                                                     square_<double, ghostFloat>(scale_inv)));
         commGlobalReductionPop();
         return nrm2;
       }
@@ -805,8 +805,8 @@ namespace quda
         commGlobalReductionPush(global);
         Float scale_inv = 1.0;
         if constexpr (fixed && !block_float_ghost) scale_inv = ghost.scale_inv;
-        auto absmax = transform_reduce<maximum<Float>>(field.Location(), field.SiteSubset(),
-                                                       abs_max_<Float, ghostFloat>(scale_inv));
+        real_t absmax = real_t(transform_reduce<maximum<Float>>(field.Location(), field.SiteSubset(),
+                                                                abs_max_<Float, ghostFloat>(scale_inv)));
         commGlobalReductionPop();
         return absmax;
       }
@@ -1006,8 +1006,8 @@ namespace quda
         commGlobalReductionPush(global);
         Float scale_inv = 1.0;
         if constexpr (fixed && !block_float) scale_inv = v.scale_inv;
-        auto nrm2
-          = transform_reduce<plus<double>>(field.Location(), field.SiteSubset(), square_<double, storeFloat>(scale_inv));
+        real_t nrm2 = real_t(transform_reduce<plus<device_reduce_t>>(field.Location(), field.SiteSubset(),
+                                                                     square_<double, storeFloat>(scale_inv)));
         commGlobalReductionPop();
         return nrm2;
       }
@@ -1023,8 +1023,8 @@ namespace quda
         commGlobalReductionPush(global);
         Float scale_inv = 1.0;
         if constexpr (fixed && !block_float) scale_inv = v.scale_inv;
-        auto absmax = transform_reduce<maximum<Float>>(field.Location(), field.SiteSubset(),
-                                                       abs_max_<Float, storeFloat>(scale_inv));
+        auto absmax = real_t(transform_reduce<maximum<Float>>(field.Location(), field.SiteSubset(),
+                                                              abs_max_<Float, storeFloat>(scale_inv)));
         commGlobalReductionPop();
         return absmax;
       }

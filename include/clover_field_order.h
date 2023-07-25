@@ -291,9 +291,9 @@ namespace quda {
          @tparam helper The helper functor which acts as the transformer
          in transform_reduce
       */
-      template <typename reducer, typename helper> constexpr double transform_reduce(QudaFieldLocation, helper) const
+      template <typename reducer, typename helper> constexpr auto transform_reduce(QudaFieldLocation, helper) const
       {
-        return 0.0;
+        return real_t(0.0);
       }
     };
 
@@ -361,7 +361,7 @@ namespace quda {
          in transform_reduce
        */
       template <typename reducer, typename helper>
-      __host__ double transform_reduce(QudaFieldLocation location, helper h) const
+      auto transform_reduce(QudaFieldLocation location, helper h) const
       {
         // just use offset_cb, since factor of two from parity is equivalent to complexity
         return ::quda::transform_reduce<reducer>(location, reinterpret_cast<const complex<Float> *>(a), offset_cb, h);
@@ -438,7 +438,7 @@ namespace quda {
          in transform_reduce
        */
       template <typename reducer, typename helper>
-      __host__ double transform_reduce(QudaFieldLocation location, helper h) const
+      auto transform_reduce(QudaFieldLocation location, helper h) const
       {
         return ::quda::transform_reduce<reducer>(location, reinterpret_cast<complex<Float> *>(a), offset_cb, h);
       }
@@ -516,11 +516,10 @@ namespace quda {
 	 * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
 	 * @return L1 norm
 	 */
-        __host__ double norm1(int = -1, bool global = true) const
+        auto norm1(int = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double nrm1
-            = accessor.scale() * accessor.template transform_reduce<plus<double>>(location, abs_<double, Float>());
+          real_t nrm1 = real_t(accessor.scale() * accessor.template transform_reduce<plus<device_reduce_t>>(location, abs_<double, Float>()));
           commGlobalReductionPop();
           return nrm1;
         }
@@ -530,11 +529,11 @@ namespace quda {
          * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
          * @return L1 norm
          */
-        __host__ double norm2(int = -1, bool global = true) const
+        auto norm2(int = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double nrm2 = accessor.scale() * accessor.scale()
-            * accessor.template transform_reduce<plus<double>>(location, square_<double, Float>());
+          real_t nrm2 = real_t(accessor.scale() * accessor.scale()
+                               * accessor.template transform_reduce<plus<device_reduce_t>>(location, square_<double, Float>()));
           commGlobalReductionPop();
           return nrm2;
         }
@@ -544,11 +543,10 @@ namespace quda {
          * @param[in] dim Which dimension we are taking the Linfinity norm of (dummy for clover)
          * @return Linfinity norm
          */
-        __host__ double abs_max(int = -1, bool global = true) const
+        auto abs_max(int = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double absmax
-            = accessor.scale() * accessor.template transform_reduce<maximum<Float>>(location, abs_max_<Float, Float>());
+          real_t absmax = real_t(accessor.scale() * accessor.template transform_reduce<maximum<Float>>(location, abs_max_<Float, Float>()));
           commGlobalReductionPop();
           return absmax;
         }
@@ -558,11 +556,10 @@ namespace quda {
          * @param[in] dim Which dimension we are taking the minimum abs of (dummy for clover)
          * @return Minimum norm
          */
-        __host__ double abs_min(int = -1, bool global = true) const
+        auto abs_min(int = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double absmin
-            = accessor.scale() * accessor.template transform_reduce<minimum<Float>>(location, abs_min_<Float, Float>());
+          real_t absmin = real_t(accessor.scale() * accessor.template transform_reduce<minimum<Float>>(location, abs_min_<Float, Float>()));
           commGlobalReductionPop();
           return absmin;
         }

@@ -404,7 +404,7 @@ namespace quda {
          in transform_reduce
        */
       template <typename reducer, typename helper>
-      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
+      auto transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {
         if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
         int lower = (dim == -1) ? 0 : dim;
@@ -523,12 +523,11 @@ namespace quda {
          in transform_reduce
        */
       template <typename reducer, typename helper>
-      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
+      auto transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {
         if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
         auto count = (dim == -1 ? geometry : 1) * volumeCB * nColor * nColor; // items per parity
-        auto init = reducer::init();
-        std::vector<decltype(init)> result = {init, init};
+        std::vector<typename reducer::reduce_t> result = {reducer::init(), reducer::init()};
         std::vector<decltype(u)> v
           = {u + 0 * volumeCB * geometry * nColor * nColor, u + 1 * volumeCB * geometry * nColor * nColor};
         if (dim == -1) {
@@ -659,13 +658,12 @@ namespace quda {
          in transform_reduce
        */
       template <typename reducer, typename helper>
-      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
+      auto transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {
         if (dim >= geometry) errorQuda("Requested dimension %d exceeds dimensionality of the field %d", dim, geometry);
         auto start = (dim == -1) ? 0 : dim;
         auto count = (dim == -1 ? geometry : 1) * stride * nColor * nColor;
-        auto init = reducer::init();
-        std::vector<decltype(init)> result = {init, init};
+        std::vector<typename reducer::reduce_t> result = {reducer::init(), reducer::init()};
         std::vector<decltype(u)> v = {u + 0 * offset_cb + start * count, u + 1 * offset_cb + start * count};
         ::quda::transform_reduce<reducer>(location, result, v, count, h);
         return reducer::apply(result[0], result[1]);
@@ -878,10 +876,10 @@ namespace quda {
 	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
 	 * @return L1 norm
 	 */
-	__host__ double norm1(int dim=-1, bool global=true) const {
+	__host__ real_t norm1(int dim=-1, bool global=true) const {
           commGlobalReductionPush(global);
-          double nrm1 = accessor.template transform_reduce<plus<double>>(location, dim,
-                                                                         abs_<double, storeFloat>(accessor.scale_inv));
+          real_t nrm1 = real_t(accessor.template transform_reduce<plus<device_reduce_t>>
+                               (location, dim, abs_<double, storeFloat>(accessor.scale_inv)));
           commGlobalReductionPop();
           return nrm1;
         }
@@ -891,11 +889,11 @@ namespace quda {
          * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
          * @return L2 norm squared
          */
-        __host__ double norm2(int dim = -1, bool global = true) const
+        __host__ real_t norm2(int dim = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double nrm2 = accessor.template transform_reduce<plus<double>>(
-            location, dim, square_<double, storeFloat>(accessor.scale_inv));
+          real_t nrm2 = real_t(accessor.template transform_reduce<plus<device_reduce_t>>
+                               (location, dim, square_<double, storeFloat>(accessor.scale_inv)));
           commGlobalReductionPop();
           return nrm2;
         }
@@ -905,11 +903,11 @@ namespace quda {
          * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
          * @return Linfinity norm
          */
-        __host__ double abs_max(int dim = -1, bool global = true) const
+        __host__ real_t abs_max(int dim = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double absmax = accessor.template transform_reduce<maximum<Float>>(
-            location, dim, abs_max_<Float, storeFloat>(accessor.scale_inv));
+          real_t absmax = real_t(accessor.template transform_reduce<maximum<Float>>
+                                 (location, dim, abs_max_<Float, storeFloat>(accessor.scale_inv)));
           commGlobalReductionPop();
           return absmax;
         }
@@ -919,10 +917,10 @@ namespace quda {
          * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
          * @return Minimum norm
          */
-        __host__ double abs_min(int dim = -1, bool global = true) const
+        __host__ real_t abs_min(int dim = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double absmin = accessor.template transform_reduce<minimum<Float>>(
+          real_t absmin = accessor.template transform_reduce<minimum<Float>>(
             location, dim, abs_min_<Float, storeFloat>(accessor.scale_inv));
           commGlobalReductionPop();
           return absmin;
