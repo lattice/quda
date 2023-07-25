@@ -44,37 +44,28 @@ namespace quda
    */
   template <typename T, typename Enable = void> struct atomic_type;
 
-  template <> struct atomic_type<device_reduce_t> {
-    using type = device_reduce_t;
+  template <> struct atomic_type<doubledouble> {
+    using type = double; // must break up 128-bit types into doubles
+  };
+
+  template <> struct atomic_type<double> {
+    using type = double;
   };
 
   template <> struct atomic_type<float> {
     using type = float;
   };
 
-  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<device_reduce_t, T::N>>>> {
-    using type = device_reduce_t;
+  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, complex<typename T::value_type>>>> {
+    using type = typename atomic_type<typename T::value_type>::type;
   };
 
-  template <typename T>
-  struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<array<device_reduce_t, T::value_type::N>, T::N>>>> {
-    using type = device_reduce_t;
+  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<typename T::value_type, T::N>>>> {
+    using type = typename atomic_type<typename T::value_type>::type;
   };
 
-  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<complex<double>, T::N>>>> {
-    using type = double;
-  };
-
-  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<complex<float>, T::N>>>> {
-    using type = float;
-  };
-
-  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, deviation_t<float>>>> {
-    using type = float;
-  };
-
-  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, deviation_t<double>>>> {
-    using type = double;
+  template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, deviation_t<typename T::value_type>>>> {
+    using type = typename atomic_type<typename T::value_type>::type;
   };
 
   // pre-declaration of warp_reduce that we wish to specialize

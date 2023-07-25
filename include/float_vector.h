@@ -50,6 +50,8 @@ namespace quda {
      computing an infinity norm
    */
   template <typename T> struct deviation_t {
+    using value_type = T;
+
     T diff;
     T ref;
 
