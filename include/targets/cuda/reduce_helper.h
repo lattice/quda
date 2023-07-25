@@ -133,10 +133,11 @@ namespace quda
 
       // copy back result element by element and convert if necessary to host reduce type
       // unit size here may differ from system_atomic_t size, e.g., if doing double-double
-      const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
-      if (result.size() != (unsigned)n_element)
-        errorQuda("result vector length %lu does not match n_reduce %d", result.size(), n_element);
-      for (int i = 0; i < n_element; i++) result[i] = reinterpret_cast<device_t *>(result_h)[i];
+      const int n_element_in = n_reduce * sizeof(T) / sizeof(get_scalar_t<T>);
+      const int n_element_out = result.size() * sizeof(host_t) / sizeof(get_scalar_t<host_t>);
+      if (n_element_in != n_element_out) errorQuda("output elements %d does not match input %d", n_element_out, n_element_in);
+      for (auto i = 0; i < n_element_in; i++) reinterpret_cast<get_scalar_t<host_t>*>(&result[0])[i] =
+                                                static_cast<get_scalar_t<host_t>>(reinterpret_cast<get_scalar_t<T>*>(result_h)[i]);
 
       if (!reset) {
         consumed = true;
@@ -174,21 +175,32 @@ namespace quda
       constexpr bool coalesced_write = true;
 #endif
       if constexpr (coalesced_write) {
-        static_assert(n <= device::warp_size(), "reduction array is greater than warp size");
-        auto mask = __ballot_sync(0xffffffff, tid < n);
-        if (tid < n) {
+        if (tid < device::warp_size()) { // only first warp takes part in write
+
           atomic_t sum_tmp[n];
           memcpy(sum_tmp, &sum, sizeof(sum));
 
-          atomic_t s = sum_tmp[0];
+          constexpr auto m = (n + device::warp_size() - 1) / device::warp_size();
 #pragma unroll
-          for (int i = 1; i < n; i++) {
-            auto si = __shfl_sync(mask, sum_tmp[i], 0);
-            if (i == tid) s = si;
-          }
+          for (auto j = 0; j < m; j++) {
 
-          s = (s == init_value<atomic_t>()) ? terminate_value<atomic_t>() : s;
-          arg.result_d[n * idx + tid].store(s, cuda::std::memory_order_relaxed);
+            auto t = j * device::warp_size() + tid; // effective thread index
+            atomic_t s = sum_tmp[j * device::warp_size()];
+            auto mask = __ballot_sync(0xffffffff, t < n);
+
+            if (t < n) {
+#pragma unroll
+              for (auto i = 1; i < device::warp_size(); i++) {
+                if (j * device::warp_size() + i < n) {
+                  auto si = __shfl_sync(mask, sum_tmp[j * device::warp_size() + i], 0);
+                  if (i == tid) s = si; // j * device::warp_size() cancels out on both sides
+                }
+              }
+
+              s = (s == init_value<atomic_t>()) ? terminate_value<atomic_t>() : s;
+              arg.result_d[n * idx + t].store(s, cuda::std::memory_order_relaxed);
+            }
+          }
         }
       } else {
         // write out the final reduced value
