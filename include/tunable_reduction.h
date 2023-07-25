@@ -57,6 +57,21 @@ namespace quda
      */
     virtual unsigned int maxBlockSize(const TuneParam &) const { return device::max_block_size(); }
 
+    template <typename T, typename U>
+    void copy(T &out, const U &in)
+    {
+      using out_t = typename T::value_type;
+      using in_t = typename U::value_type;
+
+      // copy back result element by element and convert if necessary to host reduce type
+      // unit size here may differ from system_atomic_t size, e.g., if doing double-double
+      const int n_element_in = in.size() * sizeof(in_t) / sizeof(get_scalar_t<in_t>);
+      const int n_element_out = out.size() * sizeof(out_t) / sizeof(get_scalar_t<out_t>);
+      if (n_element_in != n_element_out) errorQuda("output elements %d does not match input %d", n_element_out, n_element_in);
+      for (auto i = 0; i < n_element_in; i++) reinterpret_cast<get_scalar_t<out_t>*>(&out[0])[i] =
+                                                static_cast<get_scalar_t<out_t>>(reinterpret_cast<const get_scalar_t<in_t>*>(&in[0])[i]);
+    }
+
     /**
        @brief Launch reduction kernel on the device performing the
        reduction defined in the functor.  After the local computation
@@ -79,10 +94,11 @@ namespace quda
       arg.launch_error = TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Reduction2D), tp, stream, arg);
 
       if (!commAsyncReduction()) {
-        std::vector<T> result_(1);
-        arg.complete(result_, stream);
+        auto result_ = arg.complete(stream);
         if (!activeTuning() && commGlobalReduction()) Functor<Arg>::comm_reduce(result_);
-        result = result_[0];
+        std::vector<T> result_out(1);
+        copy(result_out, result_);
+        result = result_out[0];
       }
     }
 
@@ -100,9 +116,11 @@ namespace quda
     {
       if (arg.threads.y != block_size_y)
         errorQuda("Unexected y threads: received %d, expected %d", arg.threads.y, block_size_y);
+
+      auto result_host = Reduction2D_host<Functor, Arg>(arg);
+      if (!activeTuning() && commGlobalReduction()) Functor<Arg>::comm_reduce(result_host);
       std::vector<T> result_(1);
-      result_[0] = Reduction2D_host<Functor, Arg>(arg);
-      if (!activeTuning() && commGlobalReduction()) Functor<Arg>::comm_reduce(result_);
+      copy(result_, result_host);
       result = result_[0];
     }
 
@@ -228,8 +246,9 @@ namespace quda
       arg.launch_error = TunableKernel::launch_device<Functor, grid_stride>(KERNEL(MultiReduction), tp, stream, arg);
 
       if (!commAsyncReduction()) {
-        arg.complete(result, stream);
-        if (!activeTuning() && commGlobalReduction()) Functor<Arg>::comm_reduce(result);
+        auto result_ = arg.complete(stream);
+        if (!activeTuning() && commGlobalReduction()) Functor<Arg>::comm_reduce(result_);
+        copy(result, result_);
       }
     }
 
@@ -249,8 +268,8 @@ namespace quda
         errorQuda("n_batch_block_max = %u greater than maximum supported %u", n_batch_block_max, Arg::max_n_batch_block);
 
       auto value = MultiReduction_host<Functor, Arg>(arg);
-      for (int j = 0; j < (int)arg.threads.z; j++) result[j] = value[j];
-      if (!activeTuning() && commGlobalReduction()) Functor<Arg>::comm_reduce(result);
+      if (!activeTuning() && commGlobalReduction()) Functor<Arg>::comm_reduce(value);
+      copy(result, value);
     }
 
     /**

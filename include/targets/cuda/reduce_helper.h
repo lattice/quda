@@ -120,34 +120,30 @@ namespace quda
        @param[out] result The reduction result is copied here
        @param[in] stream The stream on which we the reduction is being done
      */
-    template <typename host_t, typename device_t = host_t>
-    void complete(std::vector<host_t> &result, const qudaStream_t = device::get_default_stream())
+    auto complete(const qudaStream_t = device::get_default_stream())
     {
-      if (launch_error == QUDA_ERROR) return; // kernel launch failed so return
-      if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
+      std::vector<T> result(n_reduce);
       if (consumed) errorQuda("Cannot call complete more than once for each construction");
-
-      for (int i = 0; i < n_reduce * n_item; i++) {
-        while (result_h[i].load(cuda::std::memory_order_relaxed) == init_value<system_atomic_t>()) { }
-      }
-
-      // copy back result element by element and convert if necessary to host reduce type
-      // unit size here may differ from system_atomic_t size, e.g., if doing double-double
-      const int n_element_in = n_reduce * sizeof(T) / sizeof(get_scalar_t<T>);
-      const int n_element_out = result.size() * sizeof(host_t) / sizeof(get_scalar_t<host_t>);
-      if (n_element_in != n_element_out) errorQuda("output elements %d does not match input %d", n_element_out, n_element_in);
-      for (auto i = 0; i < n_element_in; i++) reinterpret_cast<get_scalar_t<host_t>*>(&result[0])[i] =
-                                                static_cast<get_scalar_t<host_t>>(reinterpret_cast<get_scalar_t<T>*>(result_h)[i]);
-
-      if (!reset) {
-        consumed = true;
-      } else {
-        // reset the atomic counter - this allows multiple calls to complete with ReduceArg construction
+      if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
+      if (launch_error != QUDA_ERROR) {
         for (int i = 0; i < n_reduce * n_item; i++) {
-          result_h[i].store(init_value<system_atomic_t>(), cuda::std::memory_order_relaxed);
+          while (result_h[i].load(cuda::std::memory_order_relaxed) == init_value<system_atomic_t>()) { }
         }
-        cuda::std::atomic_thread_fence(cuda::std::memory_order_release);
+
+        memcpy(result.data(), result_h, n_reduce * sizeof(T));
+
+        if (!reset) {
+          consumed = true;
+        } else {
+          // reset the atomic counter - this allows multiple calls to complete with ReduceArg construction
+          for (int i = 0; i < n_reduce * n_item; i++) {
+            result_h[i].store(init_value<system_atomic_t>(), cuda::std::memory_order_relaxed);
+          }
+          cuda::std::atomic_thread_fence(cuda::std::memory_order_release);
+        }
       }
+
+      return result;
     }
   };
 
