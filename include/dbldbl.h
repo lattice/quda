@@ -462,3 +462,9 @@ __device__ __host__ inline doubledouble2 operator+(const doubledouble2 &a, const
 
 __device__ __host__ inline doubledouble3 operator+(const doubledouble3 &a, const doubledouble3 &b)
 { return doubledouble3(a.x + b.x, a.y + b.y, a.z + b.z); }
+
+inline std::ostream &operator<<(std::ostream &output, const doubledouble &a)
+{
+  output << "{" << a.head() << ", " << a.tail() << "}";
+  return output;
+}
