@@ -179,7 +179,8 @@ namespace quda
 
 #undef CHECK_MH
 
-  void comm_allreduce_sum_array(double *data, size_t size)
+  template <typename T>
+  void comm_allreduce_sum_array(T *data, size_t size)
   {
     get_current_communicator().comm_allreduce_sum_array(data, size);
   }
@@ -189,39 +190,56 @@ namespace quda
     comm_allreduce_sum_array(a.data(), a.size());
   }
 
-  template <> void comm_allreduce_sum<std::vector<double2>>(std::vector<double2> &a)
+  template <> void comm_allreduce_sum<std::vector<doubledouble>>(std::vector<doubledouble> &a)
   {
-    comm_allreduce_sum_array(reinterpret_cast<double *>(a.data()), 2 * a.size());
+    comm_allreduce_sum_array(a.data(), a.size());
   }
 
-  template <> void comm_allreduce_sum<std::vector<std::complex<double>>>(std::vector<std::complex<double>> &a)
+  template <> void comm_allreduce_sum<std::vector<complex_t>>(std::vector<complex_t> &a)
   {
-    comm_allreduce_sum_array(reinterpret_cast<double *>(a.data()), 2 * a.size());
+    comm_allreduce_sum_array(reinterpret_cast<real_t *>(a.data()), 2 * a.size());
   }
 
-  template <> void comm_allreduce_sum<std::vector<array<double, 2>>>(std::vector<array<double, 2>> &a)
+  template <> void comm_allreduce_sum<std::vector<array<device_reduce_t, 2>>>(std::vector<array<device_reduce_t, 2>> &a)
   {
-    comm_allreduce_sum_array(reinterpret_cast<double *>(a.data()), 2 * a.size());
+    comm_allreduce_sum_array(reinterpret_cast<device_reduce_t *>(a.data()), 2 * a.size());
   }
 
-  template <> void comm_allreduce_sum<std::vector<array<double, 3>>>(std::vector<array<double, 3>> &a)
+  template <> void comm_allreduce_sum<std::vector<array<device_reduce_t, 3>>>(std::vector<array<device_reduce_t, 3>> &a)
   {
-    comm_allreduce_sum_array(reinterpret_cast<double *>(a.data()), 3 * a.size());
+    comm_allreduce_sum_array(reinterpret_cast<device_reduce_t *>(a.data()), 3 * a.size());
   }
 
-  template <> void comm_allreduce_sum<std::vector<array<double, 4>>>(std::vector<array<double, 4>> &a)
+  template <> void comm_allreduce_sum<std::vector<array<device_reduce_t, 4>>>(std::vector<array<device_reduce_t, 4>> &a)
   {
-    comm_allreduce_sum_array(reinterpret_cast<double *>(a.data()), 4 * a.size());
+    comm_allreduce_sum_array(reinterpret_cast<device_reduce_t *>(a.data()), 4 * a.size());
   }
 
-  template <> void comm_allreduce_sum<double>(double &a) { comm_allreduce_sum_array(&a, 1); }
+  template <> void comm_allreduce_sum<double>(double &a)
+  {
+    get_current_communicator().comm_allreduce_sum_array(&a, 1);
+  }
 
-  void comm_allreduce_max_array(double *data, size_t size)
+  template <> void comm_allreduce_sum<doubledouble>(doubledouble &a)
+  {
+    get_current_communicator().comm_allreduce_sum_array(&a, 1);
+  }
+
+  template <typename T>
+  void comm_allreduce_max_array(T *data, size_t size)
   {
     get_current_communicator().comm_allreduce_max_array(data, size);
   }
 
-  template <> void comm_allreduce_max<double>(double &a) { comm_allreduce_max_array(&a, 1); }
+  template <> void comm_allreduce_max<doubledouble>(doubledouble &a)
+  {
+    comm_allreduce_max_array(&a, 1);
+  }
+
+  template <> void comm_allreduce_max<double>(double &a)
+  {
+    comm_allreduce_max_array(&a, 1);
+  }
 
   template <> void comm_allreduce_max<float>(float &a)
   {
@@ -243,17 +261,17 @@ namespace quda
     for (unsigned int i = 0; i < a.size(); i++) a[i] = a_[i];
   }
 
-  template <> void comm_allreduce_max<std::vector<array<double, 2>>>(std::vector<array<double, 2>> &a)
+  template <> void comm_allreduce_max<std::vector<array<device_reduce_t, 2>>>(std::vector<array<device_reduce_t, 2>> &a)
   {
-    comm_allreduce_max_array(reinterpret_cast<double *>(a.data()), 2 * a.size());
+    comm_allreduce_max_array(reinterpret_cast<device_reduce_t *>(a.data()), 2 * a.size());
   }
 
-  template <> void comm_allreduce_max<deviation_t<double>>(deviation_t<double> &a)
+  template <> void comm_allreduce_max<deviation_t<device_reduce_t>>(deviation_t<device_reduce_t> &a)
   {
     get_current_communicator().comm_allreduce_max_array(&a, 1);
   }
 
-  template <> void comm_allreduce_max<std::vector<deviation_t<double>>>(std::vector<deviation_t<double>> &a)
+  template <> void comm_allreduce_max<std::vector<deviation_t<device_reduce_t>>>(std::vector<deviation_t<device_reduce_t>> &a)
   {
     get_current_communicator().comm_allreduce_max_array(a.data(), a.size());
   }

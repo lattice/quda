@@ -299,7 +299,8 @@ void Communicator::comm_wait(MsgHandle *mh) { QMP_CHECK(QMP_wait(mh->handle)); }
 
 int Communicator::comm_query(MsgHandle *mh) { return (QMP_is_complete(mh->handle) == QMP_TRUE); }
 
-void Communicator::comm_allreduce_sum_array(double *data, size_t size)
+template <>
+void Communicator::comm_allreduce_sum_array<double>(double *data, size_t size)
 {
   if (!comm_deterministic_reduce()) {
     QMP_CHECK(QMP_comm_sum_double_array(QMP_COMM_HANDLE, data, size));
@@ -314,11 +315,28 @@ void Communicator::comm_allreduce_sum_array(double *data, size_t size)
       for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
     }
 
-    for (size_t i = 0; i < size; i++) { data[i] = deterministic_reduce(recv_trans.data() + i * n, n); }
+    for (size_t i = 0; i < size; i++) { data[i] = deterministic_sum_reduce(recv_trans.data() + i * n, n); }
   }
 }
 
-void Communicator::comm_allreduce_max_array(deviation_t<double> *data, size_t size)
+template <>
+void Communicator::comm_allreduce_sum_array<doubledouble>(doubledouble *data, size_t size)
+{
+  // we need to break out of QMP for doubledouble
+  size_t n = comm_size();
+  std::vector<doubledouble> recv_buf(size * n);
+  MPI_CHECK(MPI_Allgather(data, size, MPI_DOUBLE_COMPLEX, recv_buf.data(), size, MPI_DOUBLE_COMPLEX, MPI_COMM_HANDLE));
+
+  std::vector<doubledouble> recv_trans(size * n);
+  for (size_t i = 0; i < n; i++) {
+    for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
+  }
+
+  for (size_t i = 0; i < size; i++) { data[i] = deterministic_sum_reduce(recv_trans.data() + i * n, n); }
+}
+
+template <>
+void Communicator::comm_allreduce_max_array<deviation_t<double>>(deviation_t<double> *data, size_t size)
 {
   size_t n = comm_size();
   std::vector<deviation_t<double>> recv_buf(size * n);
@@ -335,12 +353,50 @@ void Communicator::comm_allreduce_max_array(deviation_t<double> *data, size_t si
   }
 }
 
-void Communicator::comm_allreduce_max_array(double *data, size_t size)
+template <>
+void Communicator::comm_allreduce_max_array<deviation_t<doubledouble>>(deviation_t<doubledouble> *data, size_t size)
+{
+  size_t n = comm_size();
+  std::vector<deviation_t<doubledouble>> recv_buf(size * n);
+  MPI_CHECK(MPI_Allgather(data, 2 * size, MPI_DOUBLE_COMPLEX, recv_buf.data(), 2 * size, MPI_DOUBLE_COMPLEX, MPI_COMM_HANDLE));
+
+  std::vector<deviation_t<doubledouble>> recv_trans(size * n);
+  for (size_t i = 0; i < n; i++) {
+    for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
+  }
+
+  for (size_t i = 0; i < size; i++) {
+    data[i] = recv_trans[i * n];
+    for (size_t j = 1; j < n; j++) { data[i] = data[i] > recv_trans[i * n + j] ? data[i] : recv_trans[i * n + j]; }
+  }
+}
+
+template<>
+void Communicator::comm_allreduce_max_array<double>(double *data, size_t size)
 {
   for (size_t i = 0; i < size; i++) { QMP_CHECK(QMP_comm_max_double(QMP_COMM_HANDLE, data + i)); }
 }
 
-void Communicator::comm_allreduce_min_array(double *data, size_t size)
+template <>
+void Communicator::comm_allreduce_max_array<doubledouble>(doubledouble *data, size_t size)
+{
+  size_t n = comm_size();
+  std::vector<doubledouble> recv_buf(size * n);
+  MPI_CHECK(MPI_Allgather(data, size, MPI_DOUBLE_COMPLEX, recv_buf.data(), size, MPI_DOUBLE_COMPLEX, MPI_COMM_HANDLE));
+
+  std::vector<doubledouble> recv_trans(size * n);
+  for (size_t i = 0; i < n; i++) {
+    for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
+  }
+
+  for (size_t i = 0; i < size; i++) {
+    data[i] = recv_trans[i * n];
+    for (size_t j = 1; j < n; j++) { data[i] = data[i] > recv_trans[i * n + j] ? data[i] : recv_trans[i * n + j]; }
+  }
+}
+
+template <>
+void Communicator::comm_allreduce_min_array<double>(double *data, size_t size)
 {
   for (size_t i = 0; i < size; i++) { QMP_CHECK(QMP_comm_min_double(QMP_COMM_HANDLE, data + i)); }
 }

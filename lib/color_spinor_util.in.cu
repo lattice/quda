@@ -252,7 +252,7 @@ namespace quda {
         FieldOrderCB<oFloat,Ns,Nc,1,order> A(a);
 	FieldOrderCB<iFloat,Ns,Nc,1,order> B(b);
 
-        double rescale = 1.0 / A.abs_max(a);
+        auto rescale = 1.0 / A.abs_max(a);
 
         auto a_(a), b_(b);
         blas::ax(rescale, a_);
@@ -266,7 +266,7 @@ namespace quda {
         FieldOrderCB<oFloat,Ns,Nc,1,order> A(a);
 	FieldOrderCB<iFloat,Ns,Nc,1,order> B(b);
 
-        double rescale = 1.0 / A.abs_max(a);
+        auto rescale = 1.0 / A.abs_max(a);
 
         auto a_(a), b_(b);
         blas::ax(rescale, a_);
