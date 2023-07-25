@@ -55,8 +55,8 @@ namespace quda {
 
     template <typename U> constexpr deviation_t<T> &operator=(const deviation_t<U> &other)
     {
-      diff = other.diff;
-      ref = other.ref;
+      diff = T(other.diff);
+      ref = T(other.ref);
       return *this;
     }
   };
