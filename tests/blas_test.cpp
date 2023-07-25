@@ -298,7 +298,6 @@ private:
     for (int i = 0; i < Msrc; i++) { ymH[i].Source(QUDA_RANDOM_SOURCE, 0, 0, 0); }
     // Now set the parameters for the device fields
 
-    if (param.nSpin == 4) param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     param.create = QUDA_ZERO_FIELD_CREATE;
 
     QudaPrecision prec = prec_pair.first;
@@ -653,7 +652,7 @@ protected:
       zD = zH;
       blas::axpyBzpcx(a, xD, yoD, b, zD, c);
       blas::axpyBzpcx(a, xH, yH, b, zH, c);
-      error = ERROR(x) + ERROR(yo);
+      error = std::max(ERROR(x), ERROR(yo));
       break;
 
     case Kernel::axpyZpbx:
@@ -662,7 +661,7 @@ protected:
       zD = zH;
       blas::axpyZpbx(a, xD, yoD, zD, b);
       blas::axpyZpbx(a, xH, yH, zH, b);
-      error = ERROR(x) + ERROR(yo);
+      error = std::max(ERROR(x), ERROR(yo));
       break;
 
     case Kernel::caxpbypzYmbw:
@@ -672,7 +671,7 @@ protected:
       wD = wH;
       blas::caxpbypzYmbw(a2, xD, b2, yD, zD, wD);
       blas::caxpbypzYmbw(a2, xH, b2, yH, zH, wH);
-      error = ERROR(z) + ERROR(y);
+      error = std::max(ERROR(z), ERROR(y));
       break;
 
     case Kernel::cabxpyAx:
@@ -680,7 +679,7 @@ protected:
       yD = yH;
       blas::cabxpyAx(a, b2, xD, yD);
       blas::cabxpyAx(a, b2, xH, yH);
-      error = ERROR(y) + ERROR(x);
+      error = std::max(ERROR(y), ERROR(x));
       break;
 
     case Kernel::caxpyXmaz:
@@ -690,7 +689,7 @@ protected:
       {
         blas::caxpyXmaz(a, xD, yD, zD);
         blas::caxpyXmaz(a, xH, yH, zH);
-        error = ERROR(y) + ERROR(x);
+        error = std::max(ERROR(y), ERROR(x));
       }
       break;
 
@@ -711,7 +710,7 @@ protected:
       {
         auto d = blas::axpbyzNorm(a, xD, b, yD, zD);
         auto h = blas::axpbyzNorm(a, xH, b, yH, zH);
-        error = ERROR(z) + abs(d - h) / abs(h);
+        error = std::max(ERROR(z), abs(d - h) / abs(h));
       }
       break;
 
@@ -721,7 +720,7 @@ protected:
       {
         auto d = blas::axpyCGNorm(a, xD, yoD);
         auto h = blas::axpyCGNorm(a, xH, yH);
-        error = ERROR(yo) + abs(d[0] - h[0]) / abs(h[0]) + abs(d[1] - h[1]) / abs(h[1]);
+        error = std::max({ERROR(yo), abs(d[0] - h[0]) / abs(h[0]), abs(d[1] - h[1]) / abs(h[1])});
       }
       break;
 
@@ -731,7 +730,7 @@ protected:
       {
         auto d = blas::caxpyNorm(a, xD, yD);
         auto h = blas::caxpyNorm(a, xH, yH);
-        error = ERROR(y) + abs(d - h) / abs(h);
+        error = std::max(ERROR(y), abs(d - h) / abs(h));
       }
       break;
 
@@ -741,7 +740,7 @@ protected:
       {
         auto d = blas::cabxpyzAxNorm(a, b2, xD, yD, yD);
         auto h = blas::cabxpyzAxNorm(a, b2, xH, yH, yH);
-        error = ERROR(x) + ERROR(y) + abs(d - h) / abs(h);
+        error = std::max({ERROR(x), ERROR(y), abs(d - h) / abs(h)});
       }
       break;
 
@@ -758,7 +757,7 @@ protected:
       {
         quda::complex_t d = blas::caxpyDotzy(a, xD, yD, zD);
         quda::complex_t h = blas::caxpyDotzy(a, xH, yH, zH);
-        error = ERROR(y) + abs(d - h) / abs(h);
+        error = std::max(ERROR(y), abs(d - h) / abs(h));
       }
       break;
 
@@ -770,8 +769,8 @@ protected:
         auto dot = blas::cDotProduct(xH, yH);
         auto x2 = blas::norm2(xH);
         auto y2 = blas::norm2(yH);
-        error = abs(complex_t(d[0] - dot.real(), d[1] - dot.imag())) / abs(dot) + abs(d[2] - x2) / abs(x2)
-          + abs(d[3] - y2) / abs(y2);
+        error = std::max({abs(complex_t(d[0] - dot.real(), d[1] - dot.imag())) / abs(dot),
+            abs(d[2] - x2) / abs(x2), abs(d[3] - y2) / abs(y2)});
       }
       break;
 
@@ -784,8 +783,8 @@ protected:
       {
         auto d = blas::caxpbypzYmbwcDotProductUYNormY(a2, xD, b2, yD, zD, wD, vD);
         auto h = blas::caxpbypzYmbwcDotProductUYNormY(a2, xH, b2, yH, zH, wH, vH);
-        error = ERROR(z) + ERROR(y) + abs(complex_t(d[0] - h[0], d[1] - h[1])) / abs(complex_t(h[0], h[1]))
-          + abs(d[2] - h[2]) / abs(h[2]);
+        error = std::max({ERROR(z), ERROR(y), abs(complex_t(d[0] - h[0], d[1] - h[1])) / abs(complex_t(h[0], h[1])),
+            abs(d[2] - h[2]) / abs(h[2])});
       }
       break;
 
@@ -795,7 +794,7 @@ protected:
       {
         auto d = blas::HeavyQuarkResidualNorm(xD, yD);
         auto h = blas::HeavyQuarkResidualNorm(xH, yH);
-        error = abs(d[0] - h[0]) / abs(h[0]) + abs(d[1] - h[1]) / abs(h[1]) + abs(d[2] - h[2]) / abs(h[2]);
+        error = std::max({abs(d[0] - h[0]) / abs(h[0]), abs(d[1] - h[1]) / abs(h[1]), abs(d[2] - h[2]) / abs(h[2])});
       }
       break;
 
@@ -806,7 +805,7 @@ protected:
       {
         auto d = blas::xpyHeavyQuarkResidualNorm(xD, yD, zD);
         auto h = blas::xpyHeavyQuarkResidualNorm(xH, yH, zH);
-        error = ERROR(y) + abs(d[0] - h[0]) / abs(h[0]) + abs(d[1] - h[1]) / abs(h[1]) + abs(d[2] - h[2]) / abs(h[2]);
+        error = std::max({ERROR(y), abs(d[0] - h[0]) / abs(h[0]), abs(d[1] - h[1]) / abs(h[1]), abs(d[2] - h[2]) / abs(h[2])});
       }
       break;
 
@@ -817,7 +816,7 @@ protected:
       {
         auto d = blas::tripleCGReduction(xD, yD, zD);
         auto h = array<quda::real_t, 3>{blas::norm2(xH), blas::norm2(yH), blas::reDotProduct(yH, zH)};
-        error = abs(d[0] - h[0]) / abs(h[0]) + abs(d[1] - h[1]) / abs(h[1]) + abs(d[2] - h[2]) / abs(h[2]);
+        error = std::max({abs(d[0] - h[0]) / abs(h[0]), abs(d[1] - h[1]) / abs(h[1]), abs(d[2] - h[2]) / abs(h[2])});
       }
       break;
 
@@ -829,7 +828,7 @@ protected:
       {
         blas::tripleCGUpdate(a, b, xD, yD, zD, wD);
         blas::tripleCGUpdate(a, b, xH, yH, zH, wH);
-        error = ERROR(y) + ERROR(z) + ERROR(w);
+        error = std::max({ERROR(y), ERROR(z), ERROR(w)});
       }
       break;
 
@@ -839,7 +838,7 @@ protected:
       {
         auto d = blas::axpyReDot(a, xD, yD);
         auto h = blas::axpyReDot(a, xH, yH);
-        error = ERROR(y) + abs(d - h) / abs(h);
+        error = std::max(ERROR(y), abs(d - h) / abs(h));
       }
       break;
 
@@ -850,7 +849,7 @@ protected:
       {
         blas::caxpyBxpz(a, xD, yD, b2, zD);
         blas::caxpyBxpz(a, xH, yH, b2, zH);
-        error = ERROR(x) + ERROR(z);
+        error = std::max(ERROR(x), ERROR(z));
       }
       break;
 
@@ -861,7 +860,7 @@ protected:
       {
         blas::caxpyBzpx(a, xD, yD, b2, zD);
         blas::caxpyBzpx(a, xH, yH, b2, zH);
-        error = ERROR(x) + ERROR(z);
+        error = std::max(ERROR(x), ERROR(z));
       }
       break;
 
@@ -876,9 +875,8 @@ protected:
 
       error = 0;
       for (int i = 0; i < Msrc; i++) {
-        error += abs(blas::norm2(ymoD[i]) - blas::norm2(ymH[i])) / blas::norm2(ymH[i]);
+        error = std::max(error, abs(blas::norm2(ymoD[i]) - blas::norm2(ymH[i])) / blas::norm2(ymH[i]));
       }
-      error /= Msrc;
       break;
 
     case Kernel::caxpy_block:
@@ -891,9 +889,8 @@ protected:
       }
       error = 0;
       for (int i = 0; i < Msrc; i++) {
-        error += abs(blas::norm2((ymoD[i])) - blas::norm2(ymH[i])) / blas::norm2(ymH[i]);
+        error = std::max(error, abs(blas::norm2(ymoD[i]) - blas::norm2(ymH[i])) / blas::norm2(ymH[i]));
       }
-      error /= Msrc;
       break;
 
     case Kernel::axpyz_block:
@@ -907,9 +904,8 @@ protected:
       }
       error = 0;
       for (int i = 0; i < Msrc; i++) {
-        error += abs(blas::norm2((wmD[i])) - blas::norm2(wmH[i])) / blas::norm2(wmH[i]);
+        error = std::max(error, abs(blas::norm2(wmD[i]) - blas::norm2(wmH[i])) / blas::norm2(wmH[i]));
       }
-      error /= Msrc;
       break;
 
     case Kernel::caxpyz_block:
@@ -923,9 +919,8 @@ protected:
       }
       error = 0;
       for (int i = 0; i < Msrc; i++) {
-        error += abs(blas::norm2((wmD[i])) - blas::norm2(wmH[i])) / blas::norm2(wmH[i]);
+        error = std::max(error, abs(blas::norm2(wmD[i]) - blas::norm2(wmH[i])) / blas::norm2(wmH[i]));
       }
-      error /= Msrc;
       break;
 
     case Kernel::axpyBzpcx_block:
@@ -941,10 +936,9 @@ protected:
 
       error = 0;
       for (int i = 0; i < Nsrc; i++) {
-        error += abs(blas::norm2((xmD[i])) - blas::norm2(xmH[i])) / blas::norm2(xmH[i]);
-        error += abs(blas::norm2((zmoD[i])) - blas::norm2(zmH[i])) / blas::norm2(zmH[i]);
+        error = std::max(error, abs(blas::norm2((xmD[i])) - blas::norm2(xmH[i])) / blas::norm2(xmH[i]));
+        error = std::max(error, abs(blas::norm2((zmoD[i])) - blas::norm2(zmH[i])) / blas::norm2(zmH[i]));
       }
-      error /= Nsrc;
       break;
 
     case Kernel::reDotProductNorm_block:
@@ -954,10 +948,9 @@ protected:
       for (int i = 0; i < Nsrc; i++) {
         for (int j = 0; j < Nsrc; j++) {
           B2r[i * Nsrc + j] = blas::reDotProduct(xmD[i], xmD[j]);
-          error += abs(A2[i * Nsrc + j] - B2[i * Nsrc + j]) / abs(B2r[i * Nsrc + j]);
+          error = std::max(error, abs(A2[i * Nsrc + j] - B2[i * Nsrc + j]) / abs(B2r[i * Nsrc + j]));
         }
       }
-      error /= Nsrc * Nsrc;
       break;
 
     case Kernel::reDotProduct_block:
@@ -969,10 +962,9 @@ protected:
       for (int i = 0; i < Nsrc; i++) {
         for (int j = 0; j < Msrc; j++) {
           Br[i * Msrc + j] = blas::reDotProduct(xmD[i], ymD[j]);
-          error += abs(Ar[i * Msrc + j] - Br[i * Msrc + j]) / abs(Br[i * Msrc + j]);
+          error = std::max(error, abs(Ar[i * Msrc + j] - Br[i * Msrc + j]) / abs(Br[i * Msrc + j]));
         }
       }
-      error /= Nsrc * Msrc;
       break;
 
     case Kernel::cDotProductNorm_block:
@@ -982,10 +974,9 @@ protected:
       for (int i = 0; i < Nsrc; i++) {
         for (int j = 0; j < Nsrc; j++) {
           B2[i * Nsrc + j] = blas::cDotProduct(xmD[i], xmD[j]);
-          error += abs(A2[i * Nsrc + j] - B2[i * Nsrc + j]) / abs(B2[i * Nsrc + j]);
+          error = std::max(error, abs(A2[i * Nsrc + j] - B2[i * Nsrc + j]) / abs(B2[i * Nsrc + j]));
         }
       }
-      error /= Nsrc * Nsrc;
       break;
 
     case Kernel::cDotProduct_block:
@@ -997,10 +988,9 @@ protected:
       for (int i = 0; i < Nsrc; i++) {
         for (int j = 0; j < Msrc; j++) {
           B[i * Msrc + j] = blas::cDotProduct(xmD[i], ymD[j]);
-          error += abs(A[i * Msrc + j] - B[i * Msrc + j]) / abs(B[i * Msrc + j]);
+          error = std::max(error, abs(A[i * Msrc + j] - B[i * Msrc + j]) / abs(B[i * Msrc + j]));
         }
       }
-      error /= Nsrc * Msrc;
       break;
 
     case Kernel::hDotProduct_block:
@@ -1010,10 +1000,9 @@ protected:
       error = 0.0;
       for (int i = 0; i < Nsrc; i++) {
         for (int j = 0; j < Nsrc; j++) {
-          error += abs(A2[i * Nsrc + j] - B2[i * Nsrc + j]) / abs(B2[i * Nsrc + j]);
+          error = std::max(error, abs(A2[i * Nsrc + j] - B2[i * Nsrc + j]) / abs(B2[i * Nsrc + j]));
         }
       }
-      error /= Nsrc * Nsrc;
       break;
 
     case Kernel::caxpyXmazMR:
@@ -1041,7 +1030,7 @@ protected:
 
       commGlobalReductionPop(); // restore global reductions
 
-      error = ERROR(x) + ERROR(y);
+      error = std::max(ERROR(x), ERROR(y));
       break;
 
     default: errorQuda("Undefined blas kernel %s\n", kernel_map.at(kernel).c_str());
@@ -1127,7 +1116,7 @@ TEST_P(BlasTest, verify)
   // certain tests will fail to run for coarse grids so mark these as
   // failed without running
   auto deviation = test(kernel);
-  // printfQuda("%-35s error = %e\n", names[kernel], deviation);
+  logQuda(QUDA_VERBOSE, "%-35s error = %e\n", kernel_map.at(kernel).c_str(), double(deviation));
   auto tol_x
     = (prec_pair.first == QUDA_DOUBLE_PRECISION ?
          1e-12 :
