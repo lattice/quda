@@ -9,7 +9,7 @@ namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType reconstruct_u,
             QudaReconstructType reconstruct_l, bool improved, QudaStaggeredPhase phase = QUDA_STAGGERED_PHASE_MILC>
-  class LocalStaggered : public TunableKernel2D {
+  class LocalStaggered : public TunableKernel3D {
     ColorSpinorField &out;
     const ColorSpinorField &in;
     const GaugeField &U;
@@ -24,7 +24,7 @@ namespace quda {
     LocalStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField& U,
                    const GaugeField &L, double a, const ColorSpinorField &x, int parity,
                    bool xpay) :
-      TunableKernel2D(out, 1),
+      TunableKernel3D(out, 1, out.SiteSubset()),
       out(out),
       in(in),
       U(U),
@@ -36,8 +36,8 @@ namespace quda {
     {
       checkPrecision(out, in, U, L, x);
       checkLocation(out, in, U, L, x);
-      if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET || x.SiteSubset() != QUDA_PARITY_SITE_SUBSET)
-        errorQuda("Unsupported site subset %d %d %d, expected %d", in.SiteSubset(), out.SiteSubset(), x.SiteSubset(), QUDA_PARITY_SITE_SUBSET);
+      if (in.SiteSubset() != out.SiteSubset() || in.SiteSubset() != x.SiteSubset())
+        errorQuda("Site subsets %d %d %d do not agree", in.SiteSubset(), out.SiteSubset(), x.SiteSubset());
       if (in.Nspin() != 1 || out.Nspin() != 1 || x.Nspin() != 1) errorQuda("Unsupported nSpin=%d %d %d", out.Nspin(), in.Nspin(), x.Nspin());
 
       strcat(aux, ",LocalStaggered");
