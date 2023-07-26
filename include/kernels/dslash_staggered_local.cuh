@@ -13,7 +13,7 @@ namespace quda
      @brief Parameter structure for driving the local Staggered Dslash operator
   */
   template <typename Float, int nColor_, QudaReconstructType reconstruct_u_,
-            QudaReconstructType reconstruct_l_, bool improved_, bool xpay_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC>
+            QudaReconstructType reconstruct_l_, bool improved_, bool boundary_clover_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC>
   struct LocalStaggeredArg : kernel_param<> {
     typedef typename mapper<Float>::type real;
 
@@ -45,6 +45,7 @@ namespace quda
     bool is_partitioned[nDim]; /** Whether or not a dimension is partitioned */
 
     const real a; /** xpay scale factor */
+    const bool xpay; /** whether or not we're applying the xpay version */
     const int nParity; /** number of parities we're working on */
     const int parity; /** which parity we're acting on (for nParity == 1) */
 
@@ -52,10 +53,10 @@ namespace quda
     const bool is_first_time_slice; /** are we on the first (global) time slice */
     const bool is_last_time_slice; /** are we on the last (global) time slice */
     static constexpr bool improved = improved_; /** whether or not we're applying the improved operator */
-    static constexpr bool xpay = xpay_; /** whether or not we're applying the xpay (includes clover) version */
+    static constexpr bool boundary_clover = boundary_clover_; /** whether or not we're applying the boundary clover terms */
 
     LocalStaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a,
-                 const ColorSpinorField &x, int parity) :
+                 const ColorSpinorField &x, int parity, bool xpay) :
       kernel_param(dim3(out.VolumeCB(), 1, out.SiteSubset())),
       out(out),
       in(in),
@@ -63,6 +64,7 @@ namespace quda
       U(U),
       L(L),
       a(a),
+      xpay(xpay),
       nParity(out.SiteSubset()),
       parity(parity),
       tboundary(U.TBoundary()),
@@ -241,7 +243,7 @@ namespace quda
 
       // input vector at my own site; this only needs to get loaded for clover components of step 2
       Vector x;
-      if constexpr (Arg::xpay)
+      if (Arg::boundary_clover || arg.xpay)
         x = arg.x(coord.x_cb, spinor_parity);
 
 #pragma unroll
@@ -255,7 +257,7 @@ namespace quda
           const Vector in = arg.in(fwd_idx, their_spinor_parity);
           out = mv_add(U, in, out);
         } else {
-          if constexpr (Arg::xpay) {
+          if constexpr (Arg::boundary_clover) {
             // Load the U link once for the "self" contribution
             const Link U = getU(d, x_cb, gauge_parity, +1);
 
@@ -275,7 +277,7 @@ namespace quda
             const Vector in = arg.in(fwd3_idx, their_spinor_parity);
             out = mv_add(L, in, out);
           } else {
-            if constexpr (Arg::xpay) {
+            if constexpr (Arg::boundary_clover) {
               // Load the L link once for the "self" contribution
               const Link L = arg.L(d, x_cb, gauge_parity);
 
@@ -297,7 +299,7 @@ namespace quda
           const Vector in = arg.in(back_idx, their_spinor_parity);
           out = mv_add(conj(U), -in, out);
         } else {
-          if constexpr (Arg::xpay) {
+          if constexpr (Arg::boundary_clover) {
             // Load the U link once for the "self" contribution
             const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
             const Link U = getUGhost(d, ghost_idx2, 1 - gauge_parity, -1);
@@ -319,7 +321,7 @@ namespace quda
             const Vector in = arg.in(back3_idx, their_spinor_parity);
             out = mv_add(conj(L), -in, out);
           } else {
-            if constexpr (Arg::xpay) {
+            if constexpr (Arg::boundary_clover) {
               // Load the L link once for the "self" contribution
               const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
               const Link L = arg.L.Ghost(d, ghost_idx, 1 - gauge_parity);
@@ -335,7 +337,7 @@ namespace quda
 
       } // dimension
 
-      if constexpr (Arg::xpay) {
+      if (arg.xpay) {
         out = arg.a * x - out;
       }
 

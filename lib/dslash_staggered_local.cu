@@ -17,13 +17,14 @@ namespace quda {
     const ColorSpinorField &x;
     double a;
     int parity;
+    bool boundary_clover;
     bool xpay;
     unsigned int minThreads() const { return out.VolumeCB(); }
 
   public:
     LocalStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField& U,
                    const GaugeField &L, double a, const ColorSpinorField &x, int parity,
-                   bool xpay) :
+                   bool boundary_clover, bool xpay) :
       TunableKernel3D(out, 1, out.SiteSubset()),
       out(out),
       in(in),
@@ -32,6 +33,7 @@ namespace quda {
       x(x),
       a(a),
       parity(parity),
+      boundary_clover(boundary_clover),
       xpay(xpay)
     {
       checkPrecision(out, in, U, L, x);
@@ -57,6 +59,8 @@ namespace quda {
         strcat(aux, recon);
       }
       strcat(aux, parity == QUDA_EVEN_PARITY ? ",even" : ",odd");
+      if (boundary_clover)
+        strcat(aux, ",clover");
       if (xpay)
         strcat(aux, ",xpay");
       apply(device::get_default_stream());
@@ -66,11 +70,11 @@ namespace quda {
     {
       (void)stream;
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (xpay) {
-        LocalStaggeredArg<Float, nColor, reconstruct_u, reconstruct_l, improved, true, phase> arg(out, in, U, L, a, x, parity);
+      if (boundary_clover) {
+        LocalStaggeredArg<Float, nColor, reconstruct_u, reconstruct_l, improved, true, phase> arg(out, in, U, L, a, x, parity, xpay);
         launch<LocalStaggeredApply>(tp, stream, arg);
       } else {
-        LocalStaggeredArg<Float, nColor, reconstruct_u, reconstruct_l, improved, false, phase> arg(out, in, U, L, a, x, parity);
+        LocalStaggeredArg<Float, nColor, reconstruct_u, reconstruct_l, improved, false, phase> arg(out, in, U, L, a, x, parity, xpay);
         launch<LocalStaggeredApply>(tp, stream, arg);
       }
     }
@@ -87,7 +91,7 @@ namespace quda {
       // compute the flops for the full volume, then subtract/add boundary effects
       flops_ = (mv_flops + (num_dir - 1) * mv_add_flops) * sites; // one-hop links
       if (improved) flops_ += num_dir * mv_add_flops * sites; // long links
-      if (xpay) flops_ += xpay_flops * sites;
+      if (xpay || boundary_clover) flops_ += xpay_flops * sites;
 
       // don't assume we have the ghost face sites precomputed in the spinor
       long long ghost_sites[4] = { in.X()[1] * in.X()[2] * in.X()[3],
@@ -97,7 +101,7 @@ namespace quda {
 
       for (int d = 0; d < 4; d++) {
         if (comm_dim_partitioned(d)) {
-          if (!xpay) {
+          if (!boundary_clover) {
             // for each face, subtract off an appropriate number of flops
 
             // subtract off forward/backwards fat link flops
@@ -142,7 +146,7 @@ namespace quda {
       // compute the bytes for the full volume, then subtract/add boundary effects
       bytes_ = (fat_gauge_bytes + spinor_bytes) * num_dir * sites;
       if (improved) bytes_ += long_gauge_bytes * num_dir * sites;
-      if (xpay) bytes_ += spinor_bytes * sites;
+      if (xpay || boundary_clover) bytes_ += spinor_bytes * sites;
 
       // don't assume we have the ghost face sites precomputed in the spinor
       long long ghost_sites[4] = { in.X()[1] * in.X()[2] * in.X()[3],
@@ -151,7 +155,7 @@ namespace quda {
                                    in.X()[0] * in.X()[1] * in.X()[2] };
       for (int d = 0; d < 4; d++) {
         if (comm_dim_partitioned(d)) {
-          if (!xpay) {
+          if (!boundary_clover) {
             // for each face, subtract off an appropriate number of bytes
 
             // subtract off forward/backwards fat link bytes
@@ -187,7 +191,7 @@ namespace quda {
   struct applyLocalStaggered {
     applyLocalStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField& L,
                            const GaugeField &U, double a, const ColorSpinorField &x, int parity,
-                           bool improved, bool xpay) {
+                           bool improved, bool boundary_clover, bool xpay) {
       // Template on improved, unimproved, as well as different phase types for unimproved
       if (improved) {
         constexpr bool improved = true;
@@ -195,7 +199,7 @@ namespace quda {
         constexpr QudaReconstructType recon_u = QUDA_RECONSTRUCT_NO;
         constexpr QudaReconstructType recon_l = recon;
 
-        LocalStaggered<Float, nColor, recon_u, recon_l, improved>(out, in, U, L, a, x, parity, xpay);
+        LocalStaggered<Float, nColor, recon_u, recon_l, improved>(out, in, U, L, a, x, parity, boundary_clover, xpay);
       } else {
         if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC || (U.LinkType() == QUDA_GENERAL_LINKS && U.Reconstruct() == QUDA_RECONSTRUCT_NO)) {
 #ifdef BUILD_MILC_INTERFACE
@@ -204,7 +208,7 @@ namespace quda {
           constexpr QudaReconstructType recon_u = recon;
           constexpr QudaReconstructType recon_l = QUDA_RECONSTRUCT_NO; // ignored
 
-          LocalStaggered<Float, nColor, recon_u, recon_l, improved, QUDA_STAGGERED_PHASE_MILC>(out, in, U, L, a, x, parity, xpay);
+          LocalStaggered<Float, nColor, recon_u, recon_l, improved, QUDA_STAGGERED_PHASE_MILC>(out, in, U, L, a, x, parity, boundary_clover, xpay);
 #else
           errorQuda("MILC interface has not been built so MILC phase staggered fermions not enabled");
 #endif // BUILD_MILC_INTERFACE
@@ -215,7 +219,7 @@ namespace quda {
           constexpr QudaReconstructType recon_u = recon;
           constexpr QudaReconstructType recon_l = QUDA_RECONSTRUCT_NO; // ignored
 
-          LocalStaggered<Float, nColor, recon_u, recon_l, improved, QUDA_STAGGERED_PHASE_TIFR>(out, in, U, L, a, x, parity, xpay);
+          LocalStaggered<Float, nColor, recon_u, recon_l, improved, QUDA_STAGGERED_PHASE_TIFR>(out, in, U, L, a, x, parity, boundary_clover, xpay);
 #else
           errorQuda("TIFR interface has not been built so TIFR phase taggered fermions not enabled");
 #endif // BUILD_TIFR_INTERFACE
@@ -230,15 +234,15 @@ namespace quda {
   // Apply a piece of the local staggered operator to a colorspinor field
   void ApplyLocalStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField& U,
                            const GaugeField &L, double a, const ColorSpinorField &x, int parity,
-                           bool improved, bool xpay)
+                           bool improved, bool boundary_clover, bool xpay)
   {
     // swizzle L and U to template on reconstruct
     // For naive staggered, U and L both alias to the fine gauge field
-    instantiate<applyLocalStaggered, StaggeredReconstruct>(out, in, L, U, a, x, parity, improved, xpay);
+    instantiate<applyLocalStaggered, StaggeredReconstruct>(out, in, L, U, a, x, parity, improved, boundary_clover, xpay);
   }
 #else
   void ApplyLocalStaggered(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
-			const GaugeField &, double, const ColorSpinorField &, int, bool, bool)
+			const GaugeField &, double, const ColorSpinorField &, int, bool, bool, bool)
   {
     errorQuda("Staggered dslash has not been built");
   }

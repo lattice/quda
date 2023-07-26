@@ -752,11 +752,12 @@ namespace quda
      @param[in] x Vector field we "pay" into
      @param[in] parity parity parameter
      @param[in] improved whether to apply to standard-staggered (false) or asqtad (true) operator
+     @param[in] boundary_clover whether or not we're applying the boundary clover
      @param[in] xpay whether or not we're applying the xpay form
   */
   void ApplyLocalStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField& U,
                            const GaugeField &L, double a, const ColorSpinorField &x, int parity,
-                           bool improved, bool xpay);
+                           bool improved, bool boundary_clover, bool xpay);
 
   /**
      @brief Apply the (improved) staggered Kahler-Dirac inverse block to a color-spinor field.

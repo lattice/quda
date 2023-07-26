@@ -97,10 +97,10 @@ namespace quda {
     auto tmp = getFieldTmp(in);
 
     // Apply D
-    ApplyLocalStaggered(tmp, in, *fatGauge, *longGauge, 0.0, in, QUDA_INVALID_PARITY, true, false);
+    ApplyLocalStaggered(tmp, in, *fatGauge, *longGauge, 0.0, in, QUDA_INVALID_PARITY, true, false, false);
 
     // Apply -D + 4 m^2
-    ApplyLocalStaggered(out, tmp, *fatGauge, *longGauge, 4. * mass * mass, in, QUDA_INVALID_PARITY, true, true);
+    ApplyLocalStaggered(out, tmp, *fatGauge, *longGauge, 4. * mass * mass, in, QUDA_INVALID_PARITY, true, true, true);
   }
 
   void DiracImprovedStaggered::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
@@ -243,10 +243,10 @@ namespace quda {
     }
 
     // Apply D_oe [D_eo]
-    ApplyLocalStaggered(tmp, in, *fatGauge, *longGauge, 0.0, in, other_parity, true, false);
+    ApplyLocalStaggered(tmp, in, *fatGauge, *longGauge, 0.0, in, other_parity, true, false, false);
 
     // apply -D_eo [-D_oe] + 4 m^2
-    ApplyLocalStaggered(out, tmp, *fatGauge, *longGauge, 4. * mass * mass, in, parity, true, true);
+    ApplyLocalStaggered(out, tmp, *fatGauge, *longGauge, 4. * mass * mass, in, parity, true, true, true);
   }
 
   void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &, const ColorSpinorField &) const
