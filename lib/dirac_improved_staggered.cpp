@@ -90,6 +90,21 @@ namespace quda {
     DslashXpay(out.Odd(), tmp, QUDA_ODD_PARITY, in.Odd(), 4 * mass * mass);
   }
 
+  void DiracImprovedStaggered::MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    checkFullSpinor(in, out);
+
+    auto tmp = getFieldTmp(in.Even());
+
+    // Apply D_oe then D_eo + 4 m^2
+    ApplyLocalStaggered(tmp, in.Even(), *fatGauge, *longGauge, 0.0, in.Even(), QUDA_ODD_PARITY, true, false);
+    ApplyLocalStaggered(out.Even(), tmp, *fatGauge, *longGauge, 4. * mass * mass, in.Even(), QUDA_EVEN_PARITY, true, true);
+
+    // Apply D_eo then D_oe + 4 m^2
+    ApplyLocalStaggered(tmp, in.Odd(), *fatGauge, *longGauge, 0.0, in.Odd(), QUDA_EVEN_PARITY, true, false);
+    ApplyLocalStaggered(out.Odd(), tmp, *fatGauge, *longGauge, 4. * mass * mass, in.Odd(), QUDA_ODD_PARITY, true, true);
+  }
+
   void DiracImprovedStaggered::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 			       ColorSpinorField &x, ColorSpinorField &b, 
 			       const QudaSolutionType solType) const
