@@ -288,7 +288,7 @@ namespace quda
     };
 
     /**
-       double cabxpyzAxNorm(float a, complex b, float *x, float *y, float *z){}
+       cabxpyzAxNorm(float a, complex b, float *x, float *y, float *z){}
        First performs the operation z[i] = y[i] + a*b*x[i]
        Second performs x[i] *= a
        Third returns the norm of x
@@ -340,7 +340,7 @@ namespace quda
     };
 
     /**
-       double caxpyDotzyCuda(float a, float *x, float *y, float *z, n){}
+       caxpyDotzyCuda(float a, float *x, float *y, float *z, n){}
        First performs the operation y[i] = a*x[i] + y[i]
        Second returns the dot product (z,y)
     */
@@ -548,9 +548,9 @@ namespace quda
     };
 
     /**
-       double3 tripleCGReduction(V x, V y, V z){}
+       tripleCGReduction(V x, V y, V z){}
        First performs the operation norm2(x)
-       Second performs the operatio norm2(y)
+       Second performs the operation norm2(y)
        Third performs the operation dotPropduct(y,z)
     */
     template <typename real_reduce_t, typename real>
@@ -572,9 +572,9 @@ namespace quda
     };
 
     /**
-       double4 quadrupleCGReduction(V x, V y, V z){}
+       quadrupleCGReduction(V x, V y, V z){}
        First performs the operation norm2(x)
-       Second performs the operatio norm2(y)
+       Second performs the operation norm2(y)
        Third performs the operation dotPropduct(y,z)
        Fourth performs the operation norm(z)
     */
@@ -598,7 +598,7 @@ namespace quda
     };
 
     /**
-       double quadrupleCG3InitNorm(d a, d b, V x, V y, V z, V w, V v){}
+       quadrupleCG3InitNorm(d a, d b, V x, V y, V z, V w, V v){}
         z = x;
         w = y;
         x += a*y;
@@ -626,7 +626,7 @@ namespace quda
     };
 
     /**
-       double quadrupleCG3UpdateNorm(d gamma, d rho, V x, V y, V z, V w, V v){}
+       quadrupleCG3UpdateNorm(d gamma, d rho, V x, V y, V z, V w, V v){}
         tmpx = x;
         tmpy = y;
         x = b*(x + a*y) + (1-b)*z;
