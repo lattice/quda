@@ -959,6 +959,11 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.ca_lambda_min = ca_lambda_min;
   inv_param.ca_lambda_max = ca_lambda_max;
 
+  // Set preconditioner CA info
+  inv_param.ca_basis_precondition = ca_basis_precondition;
+  inv_param.ca_lambda_min_precondition = ca_lambda_min_precondition;
+  inv_param.ca_lambda_max_precondition = ca_lambda_max_precondition;
+
   inv_param.solution_type = solution_type;
   inv_param.solve_type = solve_type;
   inv_param.matpc_type = matpc_type;
