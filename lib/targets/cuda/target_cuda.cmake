@@ -3,8 +3,6 @@
 set(CMAKE_CUDA_EXTENSIONS OFF)
 
 find_package(CUDAToolkit REQUIRED)
-include(CheckLanguage)
-check_language(CUDA)
 
 set(QUDA_TARGET_CUDA ON)
 
