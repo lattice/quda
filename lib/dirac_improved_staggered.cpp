@@ -94,15 +94,13 @@ namespace quda {
   {
     checkFullSpinor(in, out);
 
-    auto tmp = getFieldTmp(in.Even());
+    auto tmp = getFieldTmp(in);
 
-    // Apply D_oe then D_eo + 4 m^2
-    ApplyLocalStaggered(tmp, in.Even(), *fatGauge, *longGauge, 0.0, in.Even(), QUDA_ODD_PARITY, true, false);
-    ApplyLocalStaggered(out.Even(), tmp, *fatGauge, *longGauge, 4. * mass * mass, in.Even(), QUDA_EVEN_PARITY, true, true);
+    // Apply D
+    ApplyLocalStaggered(tmp, in, *fatGauge, *longGauge, 0.0, in, QUDA_INVALID_PARITY, true, false);
 
-    // Apply D_eo then D_oe + 4 m^2
-    ApplyLocalStaggered(tmp, in.Odd(), *fatGauge, *longGauge, 0.0, in.Odd(), QUDA_EVEN_PARITY, true, false);
-    ApplyLocalStaggered(out.Odd(), tmp, *fatGauge, *longGauge, 4. * mass * mass, in.Odd(), QUDA_ODD_PARITY, true, true);
+    // Apply -D + 4 m^2
+    ApplyLocalStaggered(out, tmp, *fatGauge, *longGauge, 4. * mass * mass, in, QUDA_INVALID_PARITY, true, true);
   }
 
   void DiracImprovedStaggered::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
