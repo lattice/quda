@@ -413,8 +413,43 @@ int main(int argc, char **argv)
     } else if (multishift > 1) {
       if (use_split_grid) { errorQuda("Multishift currently doesn't support split grid.\n"); }
 
-       // Quark masses
+      // Quark masses and tolerances
       std::vector<double> masses(multishift);
+      if (multishift_masses.size() == 0) {
+        // generate some masses, set a default uniform tolerance
+        for (int i = 0; i < multishift; i++)
+          masses[i] = mass + i * i * 0.01;
+      } else {
+        // take the input values
+        if (static_cast<unsigned long>(multishift) != multishift_masses.size())
+          errorQuda("Multishift mass count %d does not agree with number of masses passed in %lu\n", multishift, multishift_masses.size());
+        std::copy(multishift_masses.begin(), multishift_masses.end(), masses.begin());
+      }
+
+      std::vector<double> tols(multishift);
+      if (multishift_tols.size() == 0) {
+        // Set a default uniform tolerance
+        for (int i = 0; i < multishift; i++)
+          tols[i] = inv_param.tol;
+      } else {
+        // take the input values
+        if (static_cast<unsigned long>(multishift) != multishift_tols.size())
+          errorQuda("Multishift tolerance count %d does not agree with number of masses passed in %lu\n", multishift, multishift_tols.size());
+        std::copy(multishift_tols.begin(), multishift_tols.end(), tols.begin());
+      }
+
+      std::vector<double> tols_hq(multishift);
+      if (multishift_tols_hq.size() == 0) {
+        // Set a default uniform tolerance
+        for (int i = 0; i < multishift; i++)
+          tols_hq[i] = inv_param.tol_hq;
+      } else {
+        // take the input values
+        if (static_cast<unsigned long>(multishift) != multishift_tols_hq.size())
+          errorQuda("Multishift hq tolerance count %d does not agree with number of masses passed in %lu\n", multishift, multishift_tols_hq.size());
+        std::copy(multishift_tols_hq.begin(), multishift_tols_hq.end(), tols_hq.begin());
+      }
+
       // Host array for solutions
       void **outArray = (void **)safe_malloc(multishift * sizeof(void *));
       // QUDA host array for internal checks and malloc
@@ -423,13 +458,12 @@ int main(int argc, char **argv)
 
       inv_param.num_offset = multishift;
       for (int i = 0; i < multishift; i++) {
-        // Set masses and offsets
-        masses[i] = 0.06 + i * i * 0.01;
+        logQuda(QUDA_VERBOSE, "Multishift mass %d = %e ; tolerance %e ; hq tolerance %e\n", i, masses[i], tols[i], tols_hq[i]);
+        // Construct offsets
         inv_param.offset[i] = 4 * masses[i] * masses[i];
-        // Set tolerances for the heavy quarks, these can be set independently
-        // (functions of i) if desired
-        inv_param.tol_offset[i] = inv_param.tol;
-        inv_param.tol_hq_offset[i] = inv_param.tol_hq;
+        // Set tolerances for the heavy quarks, these can be set independently if desired
+        inv_param.tol_offset[i] = tols[i];
+        inv_param.tol_hq_offset[i] = tols_hq[i];
         // Allocate memory and set pointers
         qudaOutArray[i] = std::make_unique<ColorSpinorField>(cs_param);
         outArray[i] = qudaOutArray[i]->V();
