@@ -104,6 +104,8 @@ namespace quda
        @param[in] U Fat link for self-contribution
        @param[in] in "In" vector at the output site
        @param[in] d Dimension of gather
+       @param[in] gauge_parity parity of gauge field at input coordinate
+       @param[in] spinor_parity pairty of spinor field at input coordinate
        @return Accumulated ColorVector for a "ghost" site
     */
     __device__ __host__ Vector fatLinkForwardContribution(const Coord<nDim> &coord, const Link &U, const Vector &in, int d, int gauge_parity, int spinor_parity) const {
@@ -128,6 +130,8 @@ namespace quda
        @param[in] L Long link for self-contribution
        @param[in] in "In" vector at the output site
        @param[in] d Dimension of gather
+       @param[in] gauge_parity parity of gauge field at input coordinate
+       @param[in] spinor_parity pairty of spinor field at input coordinate
        @return Accumulated ColorVector for a "ghost" site
     */
     __device__ __host__ Vector longLinkForwardContribution(const Coord<nDim> &coord, const Link &L, const Vector &in, int d, int gauge_parity, int spinor_parity) const {
@@ -154,6 +158,8 @@ namespace quda
        @param[in] U Fat link for self contribution
        @param[in] in "In" vector at the output site
        @param[in] d Dimension of gather
+       @param[in] gauge_parity parity of gauge field at input coordinate
+       @param[in] spinor_parity pairty of spinor field at input coordinate
        @return Accumulated ColorVector for a "ghost" site
     */
     __device__ __host__ Vector fatLinkBackwardContribution(const Coord<nDim> &coord, const Link &U, const Vector &in, int d, int gauge_parity, int spinor_parity) const {
@@ -187,6 +193,8 @@ namespace quda
        @param[in] L Long link for self contribution
        @param[in] in "In" vector at the output site
        @param[in] d Dimension of gather
+       @param[in] gauge_parity parity of gauge field at input coordinate
+       @param[in] spinor_parity pairty of spinor field at input coordinate
        @return Accumulated ColorVector for a "ghost" site
     */
     __device__ __host__ Vector longLinkBackwardContribution(const Coord<nDim> &coord, const Link &L, const Vector &in, int d, int gauge_parity, int spinor_parity) const {
@@ -214,7 +222,8 @@ namespace quda
 
     /**
        @brief Driver to apply the full local dslash
-       @param[in] x_cb input coordinate
+       @param[in] x_cb input checkerboard index
+       @param[in] parity input parity
     */
     __device__ __host__ void operator()(int x_cb, int, int parity) {
       constexpr int nDim = 4;

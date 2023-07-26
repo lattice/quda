@@ -73,6 +73,16 @@ namespace quda {
     }
   }
 
+  // Local staggered operator
+  void DiracStaggered::MLocal(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    checkFullSpinor(in, out);
+
+    // Apply -D + 4 m^2
+    // unimproved, no clover, xpay
+    ApplyLocalStaggered(out, in, *gauge, *gauge, 2. * mass, in, QUDA_INVALID_PARITY, false, false, true);
+  }
+
   void DiracStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     auto tmp = getFieldTmp(in.Even());

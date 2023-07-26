@@ -2936,8 +2936,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
     }
 
-    // if using a Schwarz preconditioner with a staggered-type Schur operator then we must use the DiracMLocal operator
-    if ((dirac.getDiracType() == QUDA_STAGGEREDPC_DIRAC || dirac.getDiracType() == QUDA_ASQTADPC_DIRAC) && param->inv_type_precondition != QUDA_INVALID_INVERTER && param->schwarz_type != QUDA_INVALID_SCHWARZ) {
+    // if using a Schwarz preconditioner the (improved) staggered regular or PC operator then we must use the DiracMLocal operator
+    if (param->inv_type_precondition != QUDA_INVALID_INVERTER && param->schwarz_type != QUDA_INVALID_SCHWARZ) {
       DiracMLocal mPreLocal(diracPre);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPreLocal, mEig, profileInvert);
       (*solve)(*out, *in);

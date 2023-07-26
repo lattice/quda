@@ -1370,6 +1370,7 @@ public:
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
+    virtual void MLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
@@ -1578,6 +1579,7 @@ public:
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
+    virtual void MLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
