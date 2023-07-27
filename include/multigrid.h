@@ -344,6 +344,9 @@ namespace quda {
     /** Wrapper for the sloppy smoothing coarse grid operator */
     DiracMatrix *matCoarseSmootherSloppy;
 
+    /** Wrapper for the preconditioner coarse grid operator (for Schwarz preconditioned solves); uses diracCoarseSmootherSloppy */
+    DiracMatrix *matCoarseSmootherPrecondition;
+
     /** Parallel hyper-cubic random number generator for generating null-space vectors */
     RNG *rng;
 

@@ -47,6 +47,7 @@ namespace quda
     matCoarseResidual(nullptr),
     matCoarseSmoother(nullptr),
     matCoarseSmootherSloppy(nullptr),
+    matCoarseSmootherPrecondition(nullptr),
     rng(nullptr)
   {
     sprintf(prefix, "MG level %d (%s): ", param.level, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
@@ -403,10 +404,10 @@ namespace quda
     if (diracCoarseSmootherSloppy) delete diracCoarseSmootherSloppy;
 
     // custom setup for the staggered KD ops
-    if (param.level == 0
+    bool is_kd_setup = (param.level == 0
         && (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD
-            || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)) {
-
+            || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG));
+    if (is_kd_setup) {
       createOptimizedKdDirac();
 
     } else {
@@ -473,9 +474,12 @@ namespace quda
     if (matCoarseResidual) delete matCoarseResidual;
     if (matCoarseSmoother) delete matCoarseSmoother;
     if (matCoarseSmootherSloppy) delete matCoarseSmootherSloppy;
+    if (matCoarseSmootherPrecondition) delete matCoarseSmootherPrecondition;
     matCoarseResidual = new DiracM(*diracCoarseResidual);
     matCoarseSmoother = new DiracM(*diracCoarseSmoother);
     matCoarseSmootherSloppy = new DiracM(*diracCoarseSmootherSloppy);
+    if (is_kd_setup)
+      matCoarseSmootherPrecondition = new DiracMLocal(*diracCoarseSmootherSloppy);
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Coarse Dirac operator done\n");
 
@@ -703,7 +707,36 @@ namespace quda
       param_coarse_solver->precision_sloppy = param_coarse_solver->precision;
       param_coarse_solver->precision_precondition = param_coarse_solver->precision_sloppy;
 
-      if (param.mg_global.coarse_grid_solution_type[param.level + 1] == QUDA_MATPC_SOLUTION) {
+      // break everything for KD --- expose support for a Schwarz solve on the coarsest level for tests
+      bool is_kd_setup = ((param.level == 0)
+        && (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD
+            || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG));
+
+      // very dirty hack --- use the CG3 inverter as a "cheat code" to use the GCR+Schwarz solve
+      if (is_kd_setup && param.level == param.Nlevel - 2 && param_coarse_solver->inv_type == QUDA_CG3_INVERTER) {
+        printfQuda("Using CG3 trick to expose GCR + CA-GCR Schwarz lower level KD solve\n");
+        param_coarse_solver->precision = r_coarse->Precision();
+        param_coarse_solver->precision_sloppy = param.mg_global.invert_param->cuda_prec_sloppy;
+        param_coarse_solver->precision_precondition = param.mg_global.invert_param->cuda_prec_precondition;
+        param_coarse_solver->Nkrylov = (param.mg_global.coarse_solver_ca_basis_size[param.level+1] > 8) ? 32 : (4 * param.mg_global.coarse_solver_ca_basis_size[param.level+1]);
+        // we can create an interior preconditioner
+        param_coarse_solver->inv_type = QUDA_GCR_INVERTER;
+        param_coarse_solver->inv_type_precondition = QUDA_CA_GCR_INVERTER;
+        param_coarse_solver->schwarz_type = QUDA_ADDITIVE_SCHWARZ;
+        param_coarse_solver->tol_precondition = 1e-4;
+        param_coarse_solver->maxiter_precondition = param.mg_global.coarse_solver_ca_basis_size[param.level+1];
+        param_coarse_solver->ca_basis_precondition = param.mg_global.coarse_solver_ca_basis[param.level+1];
+        param_coarse_solver->ca_lambda_min_precondition = param.mg_global.coarse_solver_ca_lambda_min[param.level+1];
+        param_coarse_solver->ca_lambda_max_precondition = param.mg_global.coarse_solver_ca_lambda_max[param.level+1];
+
+        Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmootherSloppy,
+                                        *matCoarseSmootherPrecondition, *matCoarseSmootherPrecondition, profile);
+        sprintf(coarse_prefix, "MG level %d (%s): ", param.level + 1,
+                param.mg_global.location[param.level + 1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
+        coarse_solver = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, profile,
+                                                 coarse_prefix);
+
+      } else if (param.mg_global.coarse_grid_solution_type[param.level + 1] == QUDA_MATPC_SOLUTION) {
         Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother,
                                         *matCoarseSmoother, *matCoarseSmoother, profile);
         sprintf(coarse_prefix, "MG level %d (%s): ", param.level + 1,
@@ -772,6 +805,7 @@ namespace quda
         delete B_coarse;
       }
       if (transfer) delete transfer;
+      if (matCoarseSmootherPrecondition) delete matCoarseSmootherPrecondition;
       if (matCoarseSmootherSloppy) delete matCoarseSmootherSloppy;
       if (diracCoarseSmootherSloppy) delete diracCoarseSmootherSloppy;
       if (matCoarseSmoother) delete matCoarseSmoother;

@@ -1499,6 +1499,8 @@ public:
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
+    virtual void MLocal(ColorSpinorField &out, const ColorSpinorField &in) const final;
+
     void KahlerDiracInv(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
@@ -1739,6 +1741,8 @@ public:
                             const ColorSpinorField &x, const double &k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void MLocal(ColorSpinorField &out, const ColorSpinorField &in) const final;
 
     void KahlerDiracInv(ColorSpinorField &out, const ColorSpinorField &in) const;
 
