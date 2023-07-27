@@ -7,7 +7,7 @@ void write_gauge_field(const char *filename, void *gauge[], QudaPrecision prec, 
 void read_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
                        QudaParity parity, int nColor, int nSpin, int Nvec, int argc, char *argv[]);
 void write_spinor_field(const char *filename, const void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
-                        QudaParity parity, int nColor, int nSpin, int Nvec, int argc, char *argv[]);
+                        QudaParity parity, int nColor, int nSpin, int Nvec, int argc, char *argv[], bool partfile = false);
 #else
 inline void read_gauge_field(const char *, void *[], QudaPrecision, const int *, int, char *[])
 {
@@ -26,7 +26,7 @@ inline void read_spinor_field(const char *, void *[], QudaPrecision, const int *
   exit(-1);
 }
 inline void write_spinor_field(const char *, const void *[], QudaPrecision, const int *, QudaSiteSubset, QudaParity, int, int,
-                               int, int, char *[])
+                               int, int, char *[], bool)
 {
   printf("QIO support has not been enabled\n");
   exit(-1);
