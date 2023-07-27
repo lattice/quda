@@ -97,7 +97,7 @@ namespace quda
 
     // Apply -D + 4 m^2
     // improved, no clover, xpay
-    ApplyLocalStaggered(tmp, in, *gauge, *gauge, 2. * mass, in, QUDA_INVALID_PARITY, true, false, true);
+    ApplyLocalStaggered(tmp, in, *fatGauge, *longGauge, 2. * mass, in, QUDA_INVALID_PARITY, true, false, true);
     ApplyStaggeredKahlerDiracInverse(out, tmp, *Xinv, false);
 
     // flops += ...
