@@ -585,6 +585,9 @@ extern "C" {
         MILC I/O) */
     QudaBoolean io_parity_inflate;
 
+    /** Whether to save eigenvectors in QIO singlefile or partfile format */
+    QudaBoolean partfile;
+
     /** The Gflops rate of the eigensolver setup */
     double gflops;
 
@@ -778,6 +781,9 @@ extern "C" {
 
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[QUDA_MAX_MG_LEVEL][256];
+
+    /** Whether to store the null-space vectors in singlefile or partfile format */
+    QudaBoolean mg_vec_partfile[QUDA_MAX_MG_LEVEL];
 
     /** Whether to use and initial guess during coarse grid deflation */
     QudaBoolean coarse_guess;

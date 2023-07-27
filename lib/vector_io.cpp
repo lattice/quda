@@ -6,9 +6,10 @@
 namespace quda
 {
 
-  VectorIO::VectorIO(const std::string &filename, bool parity_inflate) :
+  VectorIO::VectorIO(const std::string &filename, bool parity_inflate, bool partfile) :
     filename(filename),
-    parity_inflate(parity_inflate)
+    parity_inflate(parity_inflate),
+    partfile(partfile)
   {
     if (strcmp(filename.c_str(), "") == 0)
       errorQuda("No eigenspace input file defined (filename = %s, parity_inflate = %d", filename.c_str(), parity_inflate);
@@ -114,7 +115,12 @@ namespace quda
       }
     }
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Start saving %d vectors to %s\n", Nvec, filename.c_str());
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
+      if (partfile)
+        printfQuda("Start saving %d vectors to %s in PARTFILE format\n", Nvec, filename.c_str());
+      else
+        printfQuda("Start saving %d vectors to %s in SINGLEFILE format\n", Nvec, filename.c_str());
+    }
 
     if (v0.Ndim() == 4 || v0.Ndim() == 5) {
       // since QIO routines presently assume we have 4-d fields, we need to convert to array of 4-d fields
@@ -129,7 +135,7 @@ namespace quda
       }
 
       write_spinor_field(filename.c_str(), V.data(), save_prec, v0.X(), v0.SiteSubset(),
-                         spinor_parity, v0.Ncolor(), v0.Nspin(), Nvec * Ls, 0, nullptr);
+                         spinor_parity, v0.Ncolor(), v0.Nspin(), Nvec * Ls, 0, nullptr, partfile);
     } else {
       errorQuda("Unexpected field dimension %d", v0.Ndim());
     }
