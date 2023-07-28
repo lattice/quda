@@ -224,7 +224,7 @@ namespace quda {
 
     // reduce over all processes
     for (int i=0; i<N; i++) comm_allreduce_int(iter[i]);
-    for (int f=0; f<fail_check; f++) comm_allreduce_int(fail[f]);
+    for (int f=0; f<fail_check; f++) comm_allreduce_sum(fail[f]);
 
     for (int i = 0; i < N; i++) printfQuda("%d fails = %lu\n", i, iter[i]);
 
