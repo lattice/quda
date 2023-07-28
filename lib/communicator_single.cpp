@@ -81,13 +81,26 @@ namespace quda
 
   int Communicator::comm_query(MsgHandle *) { return 1; }
 
-  void Communicator::comm_allreduce_sum_array(double *, size_t) { }
+  template <>
+  void Communicator::comm_allreduce_sum_array<double>(double *, size_t) { }
 
-  void Communicator::comm_allreduce_max_array(deviation_t<double> *, size_t) { }
+  template <>
+  void Communicator::comm_allreduce_sum_array<doubledouble>(doubledouble *, size_t) { }
 
-  void Communicator::comm_allreduce_max_array(double *, size_t) { }
+  template <>
+  void Communicator::comm_allreduce_max_array<deviation_t<double>>(deviation_t<double> *, size_t) { }
 
-  void Communicator::comm_allreduce_min_array(double *, size_t) { }
+  template <>
+  void Communicator::comm_allreduce_max_array<deviation_t<doubledouble>>(deviation_t<doubledouble> *, size_t) { }
+
+  template<>
+  void Communicator::comm_allreduce_max_array<double>(double *, size_t) { }
+
+  template <>
+  void Communicator::comm_allreduce_max_array<doubledouble>(doubledouble *, size_t) { }
+
+  template <>
+  void Communicator::comm_allreduce_min_array<double>(double *, size_t) { }
 
   void Communicator::comm_allreduce_int(int &) { }
 
