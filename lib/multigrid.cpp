@@ -676,6 +676,7 @@ namespace quda
           vec_outfile += "_defl_";
           vec_outfile += std::to_string(param.mg_global.n_vec[param.level + 1]);
           strcpy(param_coarse_solver->eig_param.vec_outfile, vec_outfile.c_str());
+          param_coarse_solver->eig_param.partfile = param.mg_global.mg_vec_partfile[param.level + 1];
         }
       }
 
