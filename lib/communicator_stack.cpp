@@ -216,9 +216,7 @@ namespace quda
 
   template <> void comm_allreduce_sum<double>(double &a) { comm_allreduce_sum_array(&a, 1); }
 
-  template <> void comm_allreduce_sum<size_t>(size_t &a) {
-    get_current_communicator().comm_allreduce_sum(a);
-  }
+  template <> void comm_allreduce_sum<size_t>(size_t &a) { get_current_communicator().comm_allreduce_sum(a); }
 
   void comm_allreduce_max_array(double *data, size_t size)
   {
