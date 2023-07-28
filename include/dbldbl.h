@@ -392,7 +392,7 @@ __device__ __host__  inline bool operator!=(const doubledouble &a, const doubled
 }
 
 __device__ __host__  inline bool operator>(const doubledouble &a, const double &b) {
-  return a.head() > b;
+  return a.head() > b || (a.head() == b && a.tail() > 0);
 }
 
 __device__ __host__  inline doubledouble operator+(const doubledouble &a, const doubledouble &b) {
@@ -409,14 +409,6 @@ __device__ __host__ inline doubledouble operator*(const doubledouble &a, const d
 
 __device__ __host__ inline doubledouble operator/(const doubledouble &a, const doubledouble &b) {
   return doubledouble(div_dbldbl(a.a,b.a));
-}
-
-__device__ __host__ inline doubledouble add_double_to_doubledouble(const double &a, const double &b) {
-  return doubledouble(add_double_to_dbldbl(a,b));
-}
-
-__device__ __host__ inline doubledouble mul_double_to_doubledouble(const double &a, const double &b) {
-  return doubledouble(mul_double_to_dbldbl(a,b));
 }
 
 struct doubledouble2 {
@@ -437,31 +429,8 @@ struct doubledouble2 {
   __device__ __host__ void print() const { printf("vec2: (%16.14e + %16.14e) (%16.14e + %16.14e)\n", x.head(), x.tail(), y.head(), y.tail()); }
 };
 
-struct doubledouble3 {
-  doubledouble x;
-  doubledouble y;
-  doubledouble z;
-
-  doubledouble3() = default;
-  constexpr doubledouble3(const doubledouble3 &a) = default;
-  constexpr doubledouble3(const double3 &a) : x(a.x), y(a.y), z(a.z) { }
-  constexpr doubledouble3(const doubledouble &x, const doubledouble &y, const doubledouble &z) : x(x), y(y), z(z) { }
-
-  __device__ __host__ doubledouble3& operator+=(const doubledouble3 &a) {
-    x += a.x;
-    y += a.y;
-    z += a.z;
-    return *this;
-  }
-
-  __device__ __host__ void print() const { printf("vec3: (%16.14e + %16.14e) (%16.14e + %16.14e) (%16.14e + %16.14e)\n", x.head(), x.tail(), y.head(), y.tail(), z.head(), z.tail()); }
-};
-
 __device__ __host__ inline doubledouble2 operator+(const doubledouble2 &a, const doubledouble2 &b)
 { return doubledouble2(a.x + b.x, a.y + b.y); }
-
-__device__ __host__ inline doubledouble3 operator+(const doubledouble3 &a, const doubledouble3 &b)
-{ return doubledouble3(a.x + b.x, a.y + b.y, a.z + b.z); }
 
 inline std::ostream &operator<<(std::ostream &output, const doubledouble &a)
 {
