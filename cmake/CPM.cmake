@@ -15,7 +15,13 @@ if(NOT (EXISTS ${CPM_DOWNLOAD_LOCATION}))
   file(DOWNLOAD
        https://github.com/cpm-cmake/CPM.cmake/releases/download/v${CPM_DOWNLOAD_VERSION}/CPM.cmake
        ${CPM_DOWNLOAD_LOCATION}
+       STATUS status LOG log
   )
+  list(GET status 0 rc)
+  if (${rc})
+    list(GET status 1 msg)
+    message(WARNING "CPM.cmake download failed with message: ${msg}\n${log}")
+  endif()
 endif()
 
 include(${CPM_DOWNLOAD_LOCATION})
