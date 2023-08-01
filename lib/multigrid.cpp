@@ -1159,16 +1159,18 @@ namespace quda
       } else {
         diracSmoother->MdagM(tmp2.Even(), tmp1.Odd());
       }
+      auto r_nrm = norm2(tmp1.Odd());
       Complex dot = cDotProduct(tmp2.Even(), tmp1.Odd());
       double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
       logQuda(QUDA_VERBOSE,
-              "Smoother normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
-              real(dot), imag(dot), deviation);
+              "Smoother normal operator test (eta^dag M^dag M eta): L2 Norm of eta = %e , real=%e imag=%e, relative imaginary deviation=%e\n",
+              r_nrm, real(dot), imag(dot), deviation);
       if (check_deviation(deviation, tol))
         errorQuda("Smoother operator normality failed: deviation = %e > %e", deviation, tol);
     }
 
-    { // normal operator check for residual operator
+    // normal operator check for residual operator
+    {
       logQuda(QUDA_SUMMARIZE, "Checking normality of residual operator\n");
       if (tmp2.Nspin() != 1 || tmp2.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
         diracResidual->MdagM(tmp2, tmp1);
@@ -1176,11 +1178,12 @@ namespace quda
         // staggered preconditioned op.
         diracResidual->M(tmp2, tmp1);
       }
+      auto r_nrm = norm2(tmp1);
       Complex dot = cDotProduct(tmp1, tmp2);
       double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
       logQuda(QUDA_VERBOSE,
-              "Normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
-              real(dot), imag(dot), deviation);
+              "Normal operator test (eta^dag M^dag M eta): L2 Norm of eta = %e , real=%e imag=%e, relative imaginary deviation=%e\n",
+              r_nrm, real(dot), imag(dot), deviation);
       if (check_deviation(deviation, tol))
         errorQuda("Residual operator normality failed: deviation = %e > %e", deviation, tol);
     }
