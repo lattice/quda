@@ -375,7 +375,7 @@ namespace quda {
     /**
        @return MG can solve non-Hermitian systems
      */
-    bool hermitian() { return false; };
+    bool hermitian() const noexcept final { return false; };
 
     /**
        @return Is an MG inverter

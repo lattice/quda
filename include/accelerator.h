@@ -55,7 +55,7 @@ namespace quda
       }
     }
 
-    virtual bool hermitian() { return base_solver->hermitian(); }
+    virtual bool hermitian() const noexcept final { return base_solver->hermitian(); }
 
     virtual QudaInverterType getInverterType() const noexcept final { return base_solver->getInverterType(); }
 
