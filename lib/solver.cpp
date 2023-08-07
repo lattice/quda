@@ -200,12 +200,20 @@ namespace quda {
     inner.tol = outer.tol_precondition;
     inner.delta = 1e-20; // no reliable updates within the inner solver
 
-    inner.precision
-      = ((outer.inv_type_precondition == QUDA_CG_INVERTER || outer.inv_type_precondition == QUDA_CA_CG_INVERTER || outer.inv_type_precondition == QUDA_MG_INVERTER)
+    // different solvers assume different behavior
+    if (outer.inv_type == QUDA_GCR_INVERTER) {
+      inner.precision = outer.precision_sloppy;
+      inner.precision_sloppy = outer.precision_precondition;
+    } else if (outer.inv_type == QUDA_PCG_INVERTER) {
+      inner.precision
+        = ((outer.inv_type_precondition == QUDA_CG_INVERTER || outer.inv_type_precondition == QUDA_CA_CG_INVERTER || outer.inv_type == QUDA_MG_INVERTER)
          && !outer.precondition_no_advanced_feature) ?
       outer.precision_sloppy :
       outer.precision_precondition;
-    inner.precision_sloppy = outer.precision_precondition;
+      inner.precision_sloppy = outer.precision_precondition;
+    } else {
+      errorQuda("Unexpected preconditioned solver %d", outer.inv_type);
+    }
 
     // this sets a fixed iteration count if we're using the MR solver
     inner.residual_type = (outer.inv_type_precondition == QUDA_MR_INVERTER) ? QUDA_INVALID_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
