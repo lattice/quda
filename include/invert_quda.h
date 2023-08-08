@@ -952,7 +952,7 @@ namespace quda {
     CG3NE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
           TimeProfile &profile);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     /**
        @return Return the residual vector from the prior solve
