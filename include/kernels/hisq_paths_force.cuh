@@ -559,7 +559,7 @@ namespace quda {
         int point_a = e_cb;
         int parity_a = parity;
 
-        ThreadLocalCache<Link> Uab_cache{};
+        ThreadLocalCache<Link> Uab_cache;
         // Scoped load of Uab
         {
           int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
@@ -961,7 +961,7 @@ namespace quda {
 
         // calculate p5_sig
 	constexpr int cacheLen = sig_positive ? 3 : 2;
-        ThreadLocalCache<Link,cacheLen> Matrix_cache{};
+        ThreadLocalCache<Link,cacheLen> Matrix_cache;
 
         if constexpr (sig_positive) {
           Link force_sig = arg.force(arg.sig, point_a, parity_a);

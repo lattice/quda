@@ -1,8 +1,8 @@
 #pragma once
 
+#include <helpers.h>
 #include <target_device.h>
 #include <shared_memory_helper.h>
-#include <shared_memory_cache_helper.h>
 
 /**
    @file thread_local_cache.h
@@ -14,25 +14,19 @@
 namespace quda
 {
 
-  template <typename T>
-  using atom_t = std::conditional_t<sizeof(T) % 16 == 0, int4, std::conditional_t<sizeof(T) % 8 == 0, int2, int>>;
-
-  template <int N> struct SizeStatic {
-    static constexpr unsigned int size() { return N; }
-  };
-
   /**
      @brief Class for threads to store a unique value, or array of values, which can use
      shared memory for optimization purposes.
    */
-  template <typename T, int N_ = 0, typename O = void> class ThreadLocalCache : SharedMemory<atom_t<T>, SizeStatic<N_>, O>
+  template <typename T, int N_ = 0, typename O = void> class ThreadLocalCache :
+    SharedMemory<atom_t<T>, SizePerThread<std::max(1,N_)*sizeof(T)/sizeof(atom_t<T>)>, O>
   {
   public:
     using value_type = T;
-    using offset_type = O; // type of object that may also use shared memory at the same time and is located before this one
     static constexpr int N = N_; // size of array, 0 means to behave like T instead of array<T, 1>
+    using offset_type = O; // type of object that may also use shared memory at the same time and is located before this one
     static constexpr int len = std::max(1,N); // actual number of elements to store
-    using Smem = SharedMemory<atom_t<T>, SizeStatic<N>, O>;
+    using Smem = SharedMemory<atom_t<T>, SizePerThread<std::max(1,N_)*sizeof(T)/sizeof(atom_t<T>)>, O>;
 
   private:
     using atom_t = atom_t<T>;
@@ -65,23 +59,15 @@ namespace quda
       return a;
     }
 
-    static constexpr unsigned int get_offset(dim3 block)
-    {
-      unsigned int o = 0;
-      if constexpr (!std::is_same_v<O, void>) { o = O::shared_mem_size(block); }
-      return o;
-    }
-
   public:
-    static constexpr unsigned int shared_mem_size(dim3 block)
-    {
-      return get_offset(block) + len * block.x * block.y * block.z * sizeof(T);
-    }
+    using Smem::shared_mem_size;
 
     /**
        @brief Constructor for ThreadLocalCache.
     */
-    constexpr ThreadLocalCache() : stride(target::block_size<3>()) {}
+    constexpr ThreadLocalCache() : stride(target::block_size<3>()) {
+      static_assert(shared_mem_size(dim3{8,8,8})==Smem::get_offset(dim3{8,8,8})+SizePerThread<len>::size(dim3{8,8,8})*sizeof(T));
+    }
 
     /**
        @brief Save the value into the thread local cache.  Used when N==0 so cache acts like single object.

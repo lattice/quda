@@ -166,6 +166,13 @@ namespace quda {
     }
   };
 
+  struct DimsPadX {
+    static constexpr dim3 dims(dim3 block) {
+      block.x = ((block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
+      return block;
+    }
+  };
+
   template <> struct site_max<true> {
     template <typename Arg> __device__ inline auto operator()(typename Arg::real thread_max, Arg &)
     {
@@ -173,11 +180,12 @@ namespace quda {
       constexpr int Ms = spins_per_thread<true, Arg::nSpin>();
       constexpr int Mc = colors_per_thread<true, Arg::nColor>();
       constexpr int color_spin_threads = (Arg::nSpin/Ms) * (Arg::nColor/Mc);
-      auto block = target::block_dim();
+      //auto block = target::block_dim();
       // pad the shared block size to avoid bank conflicts
-      block.x = ((block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
-      block.y = color_spin_threads; // state the y block since we know it at compile time
-      SharedMemoryCache<real> cache(block);
+      //block.x = ((block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
+      //block.y = color_spin_threads; // state the y block since we know it at compile time
+      //SharedMemoryCache<real> cache(block);
+      SharedMemoryCache<real, DimsPadX> cache;
       cache.save(thread_max);
       cache.sync();
       real this_site_max = static_cast<real>(0);
