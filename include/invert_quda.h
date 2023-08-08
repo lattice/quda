@@ -869,7 +869,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual();
+    ColorSpinorField &get_residual() override;
 
     virtual bool hermitian() const final { return false; } /** CGNE is for any system */
 
@@ -903,7 +903,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual();
+    ColorSpinorField &get_residual() override;
 
     virtual bool hermitian() const final { return false; } /** CGNR is for any system */
 
@@ -957,7 +957,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual();
+    ColorSpinorField &get_residual() override;
 
     virtual bool hermitian() const final { return false; } /** CG3NE is for any system */
 
@@ -1056,7 +1056,7 @@ namespace quda {
        @param collect_tol maxiter tolerance start from which the r vectors are to be collected
     */
     virtual void solve_and_collect(ColorSpinorField &out, ColorSpinorField &in, cvector_ref<ColorSpinorField> &v_r,
-                                   int collect_miniter, double collect_tol);
+                                   int collect_miniter, double collect_tol) override;
 
     virtual bool hermitian() const override { return true; } /** PCG is only Hermitian system */
 
@@ -1348,7 +1348,7 @@ namespace quda {
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual();
+    ColorSpinorField &get_residual() override;
 
     virtual bool hermitian() const override { return true; } /** CG is only for Hermitian systems */
 
