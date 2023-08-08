@@ -375,7 +375,12 @@ namespace quda {
     /**
        @return MG can solve non-Hermitian systems
      */
-    bool hermitian() { return false; };
+    bool hermitian() const final { return false; };
+
+    /**
+       @return Is an MG inverter
+      */
+    virtual QudaInverterType getInverterType() const final { return QUDA_MG_INVERTER; }
 
     /**
        @brief This method resets the solver, e.g., when a parameter has changed such as the mass.

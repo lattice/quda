@@ -831,7 +831,9 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
   inv_param.mass = mass;
 
   // outer solver parameters
-  inv_param.inv_type = QUDA_GCR_INVERTER;
+  if (inv_type != QUDA_GCR_INVERTER && inv_type != QUDA_PCG_INVERTER)
+    errorQuda("Invalid outer MG inverter %d\n", inv_type);
+  inv_param.inv_type = inv_type;
   inv_param.tol = tol;
   inv_param.maxiter = niter;
   inv_param.reliable_delta = reliable_delta;
@@ -1209,7 +1211,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
-  inv_param.inv_type = QUDA_GCR_INVERTER;
+  inv_param.inv_type = inv_type;
   inv_param.tol = 1e-10;
   inv_param.maxiter = 1000;
   inv_param.reliable_delta = reliable_delta;
