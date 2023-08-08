@@ -826,7 +826,7 @@ namespace quda {
      */
     void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init);
 
-    void blocksolve(ColorSpinorField& out, ColorSpinorField& in);
+    void blocksolve(ColorSpinorField& out, ColorSpinorField& in) override;
 
     virtual bool hermitian() const noexcept override { return true; } /** CG is only for Hermitian systems */
 
@@ -864,7 +864,7 @@ namespace quda {
     CGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
          SolverParam &param, TimeProfile &profile);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     /**
        @return Return the residual vector from the prior solve
@@ -898,7 +898,7 @@ namespace quda {
     CGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
          SolverParam &param, TimeProfile &profile);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     /**
        @return Return the residual vector from the prior solve
@@ -923,7 +923,7 @@ namespace quda {
         TimeProfile &profile);
     virtual ~CG3();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     virtual bool hermitian() const noexcept override { return true; } /** CG is only for Hermitian systems */
 
@@ -1042,7 +1042,7 @@ namespace quda {
 
     virtual ~PreconCG();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in)
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override
     {
       this->solve_and_collect(out, in, cvector_ref<ColorSpinorField>(), 0, 0);
     }
@@ -1077,7 +1077,7 @@ namespace quda {
              const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
     virtual ~BiCGstab();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     virtual bool hermitian() const noexcept override { return false; } /** BiCGStab is for any linear system */
 
@@ -1184,7 +1184,7 @@ namespace quda {
               TimeProfile &profile);
     virtual ~BiCGstabL();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     virtual bool hermitian() const noexcept override { return false; } /** BiCGStab is for any linear system */
 
@@ -1245,7 +1245,7 @@ namespace quda {
         const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
     virtual ~GCR();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     virtual bool hermitian() const noexcept override { return false; } /** GCR is for any linear system */
 
@@ -1271,12 +1271,12 @@ namespace quda {
   public:
     MR(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual();
+    ColorSpinorField &get_residual() override;
 
     virtual bool hermitian() const noexcept override { return false; } /** MR is for any linear system */
 
@@ -1343,7 +1343,7 @@ namespace quda {
          SolverParam &param, TimeProfile &profile);
     virtual ~CACG();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     /**
        @return Return the residual vector from the prior solve
@@ -1377,12 +1377,12 @@ namespace quda {
     CACGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
            const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual();
+    ColorSpinorField &get_residual() override;
 
     virtual bool hermitian() const noexcept final { return false; } /** CA-CGNE is for any linear system */
 
@@ -1411,12 +1411,12 @@ namespace quda {
     CACGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
            const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual();
+    ColorSpinorField &get_residual() override;
 
     virtual bool hermitian() const noexcept final { return false; } /** CA-CGNR is for any linear system */
 
@@ -1467,12 +1467,12 @@ namespace quda {
           SolverParam &param, TimeProfile &profile);
     virtual ~CAGCR();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual();
+    ColorSpinorField &get_residual() override;
 
     virtual bool hermitian() const noexcept override { return false; } /** GCR is for any linear system */
 
@@ -1490,7 +1490,7 @@ namespace quda {
       SD(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
       virtual ~SD();
 
-      void operator()(ColorSpinorField &out, ColorSpinorField &in);
+      void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
       virtual bool hermitian() const noexcept override { return false; } /** SD is for any linear system */
 
@@ -1515,7 +1515,7 @@ public:
 
     virtual ~PreconditionedSolver() { delete solver; }
 
-    void operator()(ColorSpinorField &x, ColorSpinorField &b) {
+    void operator()(ColorSpinorField &x, ColorSpinorField &b) override {
       pushOutputPrefix(prefix);
 
       QudaSolutionType solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
