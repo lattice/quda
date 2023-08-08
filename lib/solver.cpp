@@ -105,7 +105,8 @@ namespace quda {
     case QUDA_PCG_INVERTER:
       report("PCG");
       if (param.preconditioner) {
-        Solver *mg = param.mg_instance ? static_cast<MG*>(param.preconditioner) : static_cast<multigrid_solver*>(param.preconditioner)->mg;
+        Solver *mg = param.mg_instance ? static_cast<MG *>(param.preconditioner) :
+                                         static_cast<multigrid_solver *>(param.preconditioner)->mg;
         // FIXME dirty hack to ensure that preconditioner precision set in interface isn't used in the outer GCR-MG solver
         if (!param.mg_instance) param.precision_precondition = param.precision_sloppy;
         solver = new PreconCG(mat, *(mg), matSloppy, matPrecon, matEig, param, profile);
@@ -165,8 +166,9 @@ namespace quda {
   }
 
   // preconditioner solver factory
-  std::shared_ptr<Solver> Solver::createPreconditioner(const DiracMatrix& mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
-                                                SolverParam &param, SolverParam &Kparam, TimeProfile &profile)
+  std::shared_ptr<Solver> Solver::createPreconditioner(const DiracMatrix &mat, const DiracMatrix &matSloppy,
+                                                       const DiracMatrix &matPrecon, const DiracMatrix &matEig,
+                                                       SolverParam &param, SolverParam &Kparam, TimeProfile &profile)
   {
     Solver *K = nullptr;
     if (param.accelerator_type_precondition == QUDA_MADWF_ACCELERATOR) {
@@ -196,7 +198,8 @@ namespace quda {
   }
 
   // set the required parameters for the inner solver
-  void Solver::fillInnerSolverParam(SolverParam &inner, const SolverParam &outer) {
+  void Solver::fillInnerSolverParam(SolverParam &inner, const SolverParam &outer)
+  {
     inner.tol = outer.tol_precondition;
     inner.delta = 1e-20; // no reliable updates within the inner solver
 
@@ -205,18 +208,19 @@ namespace quda {
       inner.precision = outer.precision_sloppy;
       inner.precision_sloppy = outer.precision_precondition;
     } else if (outer.inv_type == QUDA_PCG_INVERTER) {
-      inner.precision
-        = ((outer.inv_type_precondition == QUDA_CG_INVERTER || outer.inv_type_precondition == QUDA_CA_CG_INVERTER || outer.inv_type == QUDA_MG_INVERTER)
-         && !outer.precondition_no_advanced_feature) ?
-      outer.precision_sloppy :
-      outer.precision_precondition;
+      inner.precision = ((outer.inv_type_precondition == QUDA_CG_INVERTER
+                          || outer.inv_type_precondition == QUDA_CA_CG_INVERTER || outer.inv_type == QUDA_MG_INVERTER)
+                         && !outer.precondition_no_advanced_feature) ?
+        outer.precision_sloppy :
+        outer.precision_precondition;
       inner.precision_sloppy = outer.precision_precondition;
     } else {
       errorQuda("Unexpected preconditioned solver %d", outer.inv_type);
     }
 
     // this sets a fixed iteration count if we're using the MR solver
-    inner.residual_type = (outer.inv_type_precondition == QUDA_MR_INVERTER) ? QUDA_INVALID_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
+    inner.residual_type
+      = (outer.inv_type_precondition == QUDA_MR_INVERTER) ? QUDA_INVALID_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
 
     inner.iter = 0;
     inner.gflops = 0;
@@ -250,15 +254,16 @@ namespace quda {
   void Solver::extractInnerSolverParam(SolverParam &outer, const SolverParam &inner)
   {
     // extract a_max, which may have been determined via power iterations
-    if ((outer.inv_type_precondition == QUDA_CA_CG_INVERTER || outer.inv_type_precondition == QUDA_CA_GCR_INVERTER) && outer.ca_basis_precondition == QUDA_CHEBYSHEV_BASIS) {
+    if ((outer.inv_type_precondition == QUDA_CA_CG_INVERTER || outer.inv_type_precondition == QUDA_CA_GCR_INVERTER)
+        && outer.ca_basis_precondition == QUDA_CHEBYSHEV_BASIS) {
       outer.ca_lambda_max_precondition = inner.ca_lambda_max;
     }
   }
 
   // preconditioner solver wrapper
-  std::shared_ptr<Solver> Solver::wrapExternalPreconditioner(const Solver& K)
+  std::shared_ptr<Solver> Solver::wrapExternalPreconditioner(const Solver &K)
   {
-    return std::shared_ptr<Solver>(&const_cast<Solver&>(K), [](Solver*) { });
+    return std::shared_ptr<Solver>(&const_cast<Solver &>(K), [](Solver *) {});
   }
 
   void Solver::constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat)

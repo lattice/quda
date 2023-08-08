@@ -601,21 +601,22 @@ namespace quda {
       @param[in] profile the timer profile
       @return the created preconditioning solver, decorated by std::shared_ptr
     */
-    std::shared_ptr<Solver> createPreconditioner(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig, 
+    std::shared_ptr<Solver> createPreconditioner(const DiracMatrix &mat, const DiracMatrix &matSloppy,
+                                                 const DiracMatrix &matPrecon, const DiracMatrix &matEig,
                                                  SolverParam &param, SolverParam &Kparam, TimeProfile &profile);
 
     /**
-    * @brief Set parameters for the inner solver
-    * @param inner[out] Parameters for the preconditioner solver
-    * @param outer[in] Parameters from the outer solver
-    */
+     * @brief Set parameters for the inner solver
+     * @param inner[out] Parameters for the preconditioner solver
+     * @param outer[in] Parameters from the outer solver
+     */
     virtual void fillInnerSolverParam(SolverParam &inner, const SolverParam &outer);
 
     /**
-    * @brief Extract parameters determined while running the preconditioned solve
-    * @param outer[out] Parameters for outer solver which also maintains preconditioned solver info
-    * @param inner[in] Parameters from the preconditioned solver
-    */
+     * @brief Extract parameters determined while running the preconditioned solve
+     * @param outer[out] Parameters for outer solver which also maintains preconditioned solver info
+     * @param inner[in] Parameters from the preconditioned solver
+     */
     virtual void extractInnerSolverParam(SolverParam &outer, const SolverParam &inner);
 
     /**
@@ -626,7 +627,7 @@ namespace quda {
         @param[in] K the externally allocated preconditioner
         @return the external preconditioner wrapped in a non-deallocating std::shared_ptr
      */
-    std::shared_ptr<Solver> wrapExternalPreconditioner(const Solver& K);
+    std::shared_ptr<Solver> wrapExternalPreconditioner(const Solver &K);
 
     /**
        @brief Set the solver L2 stopping condition
@@ -812,9 +813,7 @@ namespace quda {
      * @param out Solution vector.
      * @param in Right-hand side.
      */
-    void operator()(ColorSpinorField &out, ColorSpinorField &in) override {
-      (*this)(out, in, nullptr, 0.0);
-    };
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override { (*this)(out, in, nullptr, 0.0); };
 
     /**
      * @brief Solve re-using an initial Krylov space defined by an initial r2_old_init and search direction p_init.
@@ -826,7 +825,7 @@ namespace quda {
      */
     void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init);
 
-    void blocksolve(ColorSpinorField& out, ColorSpinorField& in) override;
+    void blocksolve(ColorSpinorField &out, ColorSpinorField &in) override;
 
     virtual bool hermitian() const override { return true; } /** CG is only for Hermitian systems */
 
@@ -1028,15 +1027,15 @@ namespace quda {
              const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
 
     /**
-    * @brief Preconditioned CG supporting a pre-existing preconditioner K.
-    * @param mat mat Fine (outer) Dirac matrix
-    * @param K Preconditioner
-    * @param matSloppy Sloppy precision Dirac matrix
-    * @param matPrecon Preconditioner precision Dirac matrix
-    * @param matEig Deflation precision Dirac matrix
-    * @param param Solver parameters
-    * @param profile Timing profile
-    */
+     * @brief Preconditioned CG supporting a pre-existing preconditioner K.
+     * @param mat mat Fine (outer) Dirac matrix
+     * @param K Preconditioner
+     * @param matSloppy Sloppy precision Dirac matrix
+     * @param matPrecon Preconditioner precision Dirac matrix
+     * @param matEig Deflation precision Dirac matrix
+     * @param param Solver parameters
+     * @param profile Timing profile
+     */
     PreconCG(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
              const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
 
@@ -1515,7 +1514,8 @@ public:
 
     virtual ~PreconditionedSolver() { delete solver; }
 
-    void operator()(ColorSpinorField &x, ColorSpinorField &b) override {
+    void operator()(ColorSpinorField &x, ColorSpinorField &b) override
+    {
       pushOutputPrefix(prefix);
 
       QudaSolutionType solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
@@ -1665,7 +1665,7 @@ public:
 
     /**
        @param x The optimum for the solution vector.
-       
+
        @param b The source vector in the equation to be solved. This is not preserved.
        @param p The basis vectors in which we are building the guess
        @param q The basis vectors multiplied by A

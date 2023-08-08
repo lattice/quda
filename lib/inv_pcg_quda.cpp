@@ -30,7 +30,7 @@ namespace quda
     K = createPreconditioner(matPrecon, matPrecon, matPrecon, matEig, param, Kparam, profile);
   }
 
-  PreconCG::PreconCG(const DiracMatrix &mat, Solver& K_, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+  PreconCG::PreconCG(const DiracMatrix &mat, Solver &K_, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
                      const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
     Solver(mat, matSloppy, matPrecon, matEig, param, profile), K(nullptr), Kparam(param)
   {
@@ -380,7 +380,7 @@ namespace quda
 
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matEig.flops()) * 1e-9;
-    if (K) gflops += K->flops()*1e-9;
+    if (K) gflops += K->flops() * 1e-9;
     param.gflops = gflops;
     param.iter += k;
 
