@@ -7,7 +7,7 @@ namespace quda
   using atom_t = std::conditional_t<sizeof(T) % 16 == 0, int4, std::conditional_t<sizeof(T) % 8 == 0, int2, int>>;
 
   template <int N> struct SizeStatic {
-    static constexpr unsigned int size(dim3 block) {
+    static constexpr unsigned int size(dim3) {
       return N;
     }
   };
