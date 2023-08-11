@@ -191,7 +191,7 @@ namespace quda {
   int compareSpinor(const U &u, const V &v, const int tol)
   {
     int fail_check = 16*tol;
-    std::vector<int> fail(fail_check);
+    std::vector<size_t> fail(fail_check);
     for (int f=0; f<fail_check; f++) fail[f] = 0;
 
     int N = 2*u.Nspin()*u.Ncolor();
@@ -224,9 +224,9 @@ namespace quda {
 
     // reduce over all processes
     for (int i=0; i<N; i++) comm_allreduce_int(iter[i]);
-    for (int f=0; f<fail_check; f++) comm_allreduce_int(fail[f]);
+    for (int f = 0; f < fail_check; f++) comm_allreduce_sum(fail[f]);
 
-    for (int i=0; i<N; i++) printfQuda("%d fails = %d\n", i, iter[i]);
+    for (int i = 0; i < N; i++) printfQuda("%d fails = %d\n", i, iter[i]);
 
     int accuracy_level =0;
     for (int f=0; f<fail_check; f++) {
@@ -235,8 +235,8 @@ namespace quda {
 
     size_t total = u.Nparity()*u.VolumeCB()*N*comm_size();
     for (int f=0; f<fail_check; f++) {
-      printfQuda("%e Failures: %d / %lu  = %e\n", pow(10.0,-(f+1)/(double)tol),
-		 fail[f], total, fail[f] / (double)total);
+      printfQuda("%e Failures: %lu / %lu  = %e\n", pow(10.0, -(f + 1) / (double)tol), fail[f], total,
+                 fail[f] / (double)total);
     }
 
     return accuracy_level;
