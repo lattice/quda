@@ -8,9 +8,7 @@ namespace quda
 {
 
   VectorIO::VectorIO(const std::string &filename, bool parity_inflate, bool partfile) :
-    filename(filename),
-    parity_inflate(parity_inflate),
-    partfile(partfile)
+    filename(filename), parity_inflate(parity_inflate), partfile(partfile)
   {
     if (strcmp(filename.c_str(), "") == 0)
       errorQuda("No eigenspace input file defined (filename = %s, parity_inflate = %d", filename.c_str(), parity_inflate);
@@ -146,8 +144,8 @@ namespace quda
       quda::host_timer_t host_timer;
       host_timer.start(); // start the timer
 
-      write_spinor_field(filename.c_str(), V.data(), save_prec, v0.X(), v0.SiteSubset(),
-                         spinor_parity, v0.Ncolor(), v0.Nspin(), Nvec * Ls, 0, nullptr, partfile);
+      write_spinor_field(filename.c_str(), V.data(), save_prec, v0.X(), v0.SiteSubset(), spinor_parity, v0.Ncolor(),
+                         v0.Nspin(), Nvec * Ls, 0, nullptr, partfile);
 
       host_timer.stop(); // stop the timer
       logQuda(QUDA_SUMMARIZE, "Time spent saving vectors to %s = %g secs\n", filename.c_str(), host_timer.last());

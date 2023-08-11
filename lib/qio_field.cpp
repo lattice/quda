@@ -413,8 +413,9 @@ void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precis
   printfQuda("%s: Closed file for writing\n", __func__);
 }
 
-void write_spinor_field(const char *filename, const void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
-                        QudaParity parity, int nColor, int nSpin, int Nvec, int, char *[], bool partfile)
+void write_spinor_field(const char *filename, const void *V[], QudaPrecision precision, const int *X,
+                        QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin, int Nvec, int, char *[],
+                        bool partfile)
 {
   quda_this_node = QMP_get_node_number();
 

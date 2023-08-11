@@ -187,8 +187,8 @@ INSTANTIATE_TEST_SUITE_P(Gauge, GaugeIOTest, Combine(Values(QUDA_DOUBLE_PRECISIO
 INSTANTIATE_TEST_SUITE_P(Full, ColorSpinorIOTest,
                          Combine(Values(QUDA_FULL_SITE_SUBSET), Values(false),
                                  Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION),
-                                 Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(1, 2, 4), Values(false, true),
-                                 Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION)),
+                                 Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(1, 2, 4),
+                                 Values(false, true), Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION)),
                          [](testing::TestParamInfo<cs_test_t> param) {
                            std::string name;
                            name += get_prec_str(::testing::get<2>(param.param)) + std::string("_");
@@ -203,8 +203,8 @@ INSTANTIATE_TEST_SUITE_P(Full, ColorSpinorIOTest,
 INSTANTIATE_TEST_SUITE_P(Parity, ColorSpinorIOTest,
                          Combine(Values(QUDA_PARITY_SITE_SUBSET), Values(false, true),
                                  Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION),
-                                 Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(1, 2, 4), Values(false, true),
-                                 Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION)),
+                                 Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(1, 2, 4),
+                                 Values(false, true), Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION)),
                          [](testing::TestParamInfo<cs_test_t> param) {
                            std::string name;
                            if (::testing::get<1>(param.param)) name += std::string("inflate_");
