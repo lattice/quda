@@ -155,8 +155,9 @@ TEST_P(ColorSpinorIOTest, verify)
   }
 
   // cleanup after ourselves and delete the dummy lattice
-  if (partfile) {
+  if (partfile && ::quda::comm_size() > 1) {
     // each rank created its own file, we need to generate the custom filename
+    // an exception is single-rank runs where QIO skips appending the volume string
     char volstr[9];
     sprintf(volstr, ".vol%04d", ::quda::comm_rank());
     std::string part_filename = std::string(file) + volstr;
