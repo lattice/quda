@@ -15,27 +15,26 @@ namespace quda
   template <typename T, int n, typename O = void>
   class thread_array : SharedMemory<array<T,n>, SizePerThread<1>, O>
   {
-    int offset;
     using Smem = SharedMemory<array<T,n>, SizePerThread<1>, O>;
     constexpr Smem smem() const { return *dynamic_cast<const Smem*>(this); }
-    array<T,n> &data() const { return smem()[offset]; }
+    array<T, n> &array_;
 
   public:
-    __device__ __host__ constexpr thread_array()
+    __device__ __host__ constexpr thread_array() :
+      array_(smem()[target::thread_idx_linear<3>()])
     {
-      offset = target::thread_idx_linear<3>();
-      data() = array<T, n>(); // call default constructor
+      array_ = array<T, n>(); // call default constructor
     }
 
     template <typename... Ts>
-    __device__ __host__ constexpr thread_array(T first, const Ts... other)
+    __device__ __host__ constexpr thread_array(T first, const Ts... other) :
+      array_(smem()[target::thread_idx_linear<3>()])
     {
-      offset = target::thread_idx_linear<3>();
-      data() = array<T, n> {first, other...};
+      array_ = array<T, n> {first, other...};
     }
 
-    __device__ __host__ T &operator[](int i) { return data()[i]; }
-    __device__ __host__ const T &operator[](int i) const { return data()[i]; }
+    __device__ __host__ T &operator[](int i) { return array_[i]; }
+    __device__ __host__ const T &operator[](int i) const { return array_[i]; }
   };
 
 } // namespace quda
