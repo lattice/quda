@@ -23,7 +23,7 @@ typedef struct {
   const int *latsize; /** Local lattice dimensions L0, L1, L2, L3 */                      // FIXME:
   const int *machsize; /** Machine grid size NPROC0, NPROC1, NPROC2, NPROC3*/             // FIXME:
   const int *blksize; /** Blocking size NPROC0_BLK, NPROC1_BLK, NPROC2_BLK, NPROC3_BLK */ // FIXME:
-  int device;                                                                             /** GPU device number */
+  int device; /** GPU device number */
   // const int *ipt; // TODO: IN THE FUTURE
 } openQCD_QudaLayout_t;
 
@@ -33,6 +33,10 @@ typedef struct {
 typedef struct {
   QudaVerbosity verbosity;     /** How verbose QUDA should be (QUDA_SILENT, QUDA_VERBOSE or QUDA_SUMMARIZE) */
   openQCD_QudaLayout_t layout; /** Layout for QUDA to use */
+  FILE *logfile;
+  /*void (*reorder_gauge)(void *gauge);
+  int VOLUME;
+  int sizeof_su3_dble;*/
 } openQCD_QudaInitArgs_t;      // passed to the initialization struct
 
 /**
@@ -140,10 +144,11 @@ void openQCD_qudaInvert(int external_precision, int quda_precision, double mass,
  */
 
 void openQCD_qudaPlaquette(int precision, double plaq[3], void *gauge);
-void openQCD_qudaPlaquetteOnly(int precision, double plaq[3]);
+void openQCD_qudaPlaquetteOnly(double plaq[3]);
 void openQCD_gaugeloadsave(int precision, void *gauge);
 void openQCD_gaugeload(int precision, void *gauge);
 void openQCD_gaugesave(int precision, void *gauge);
+void openQCD_qudaFreeGaugeField(void);
 
 /**
    Free the gauge field allocated in QUDA.

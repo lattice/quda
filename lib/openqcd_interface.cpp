@@ -47,6 +47,7 @@ static const int num_colors = sizeof(colors) / sizeof(uint32_t);
 #endif
 
 static bool initialized = false;
+static openQCD_QudaInitArgs_t input;
 static int commsGridDim[4];
 static int localDim[4];
 
@@ -112,28 +113,38 @@ static int rankFromCoords(const int *coords, void *fdata) // TODO:
   ib = ib * NPROC1_OpenQxD + n1_OpenQxD;
   ib = ib * NPROC2_OpenQxD + n2_OpenQxD;
   ib = ib * NPROC3_OpenQxD + n3_OpenQxD;
-  printf("Coords are: %d,%d,%d,%d \n Rank is: %d \n\n", coords[0], coords[1], coords[2], coords[3], ib);
+
+  printfQuda("Coords are: %d,%d,%d,%d, Rank is: %d \n", coords[0], coords[1], coords[2], coords[3], ib);
   return ib;
 }
 
-void openQCD_qudaSetLayout(openQCD_QudaLayout_t input)
+void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout)
 {
   int local_dim[4];
-  for (int dir = 0; dir < 4; ++dir) { local_dim[dir] = input.latsize[dir]; }
+  for (int dir = 0; dir < 4; ++dir) {
+    local_dim[dir] = layout.latsize[dir];
+  }
+
 #ifdef MULTI_GPU
-  for (int dir = 0; dir < 4; ++dir) { local_dim[dir] /= input.machsize[dir]; }
+  for (int dir = 0; dir < 4; ++dir) {
+    local_dim[dir] /= layout.machsize[dir];
+  }
 #endif
   for (int dir = 0; dir < 4; ++dir) {
     if (local_dim[dir] % 2 != 0) {
-      printf("Error: Odd lattice dimensions are not supported\n");
+      printfQuda("Error: Odd lattice dimensions are not supported\n");
       exit(1);
     }
   }
   // TODO: do we need to track this here
-  for (int dir = 0; dir < 4; ++dir) localDim[dir] = local_dim[dir];
+  for (int dir = 0; dir < 4; ++dir) {
+    localDim[dir] = local_dim[dir];
+  }
 
 #ifdef MULTI_GPU
-  for (int dir = 0; dir < 4; ++dir) commsGridDim[dir] = input.machsize[dir];
+  for (int dir = 0; dir < 4; ++dir) {
+    commsGridDim[dir] = layout.machsize[dir];
+  }
 // TODO: would we ever want to run with QMP COMMS?
 #ifdef QMP_COMMS
   initCommsGridQuda(4, commsGridDim, nullptr, nullptr);
@@ -143,22 +154,26 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t input)
 
   static int device = -1;
 #else
-  static int device = input.device;
+  static int device = layout.device;
 #endif
 
   initQuda(device);
 }
 
-void openQCD_qudaInit(openQCD_QudaInitArgs_t input)
+void openQCD_qudaInit(openQCD_QudaInitArgs_t in)
 {
   if (initialized) return;
-  setVerbosityQuda(input.verbosity, "", stdout);
-  openQCD_qudaSetLayout(input.layout);
+  setVerbosityQuda(in.verbosity, "QUDA: ", in.logfile);
+  openQCD_qudaSetLayout(in.layout);
+
+  input = in;
   initialized = true;
   // geometry_openQxD(); // TODO: in the future establish ipt and other helper indexes from openQxD
 }
 
-void openQCD_qudaFinalize() { endQuda(); }
+void openQCD_qudaFinalize() {
+  endQuda();
+}
 
 
 static int getLinkPadding(const int dim[4])
@@ -347,13 +362,15 @@ static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, Qud
  * 
  *******************************************/
 
-/* 
- * GAUGE FIELDS 
+/**
+ * @brief         Calculate the plaquette, given gauge fields
+ *
+ * @param[in]     precision  The precision
+ * @param[out]    plaq       The plaquette
+ * @param[in,out] gauge      The gauge fields in correct order
  */
-
 void openQCD_qudaPlaquette(int precision, double plaq[3], void *gauge)
 {
-
   QudaGaugeParam qudaGaugeParam
     = newOpenQCDGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
 
@@ -375,14 +392,13 @@ void openQCD_qudaPlaquette(int precision, double plaq[3], void *gauge)
 }
 
 
-void openQCD_qudaPlaquetteOnly(int precision, double plaq[3])
+/**
+ * @brief      Calculate the plaquette
+ *
+ * @param[out] plaq  The plaquette
+ */
+void openQCD_qudaPlaquetteOnly(double plaq[3])
 {
-
-  // QudaGaugeParam qudaGaugeParam
-  //   = newOpenQCDGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
-
-  // loadGaugeQuda(gauge, &qudaGaugeParam);
-
   QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
   obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
   obsParam.remove_staggered_phase = QUDA_BOOLEAN_FALSE; //
@@ -393,39 +409,58 @@ void openQCD_qudaPlaquetteOnly(int precision, double plaq[3])
   plaq[1] = obsParam.plaquette[1];
   plaq[2] = obsParam.plaquette[2];
 
-  // saveGaugeQuda(gauge, &qudaGaugeParam);
-
   return;
 }
 
 
+/**
+ * @brief         Load and save the gauge fields
+ *
+ * @param[in]     precision  The precision
+ * @param[in,out] gauge      The gauge fields
+ */
 void openQCD_gaugeloadsave(int precision, void *gauge)
 {
-
   QudaGaugeParam qudaGaugeParam
     = newOpenQCDGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
 
   loadGaugeQuda(gauge, &qudaGaugeParam);
-
   saveGaugeQuda(gauge, &qudaGaugeParam);
 
   return;
 }
 
+
+/**
+ * @brief      Load the gauge fields from host to quda
+ *
+ * @param[in]  precision  The precision
+ * @param[in]  gauge      The gauge fields (in lexicographical order)
+ */
 void openQCD_gaugeload(int precision, void *gauge)
 {
-
   QudaGaugeParam qudaGaugeParam
     = newOpenQCDGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
+
+  /*printfQuda("input.VOLUME = %d\n", input.VOLUME);
+  printfQuda("input.sizeof_su3_dble = %d\n", input.sizeof_su3_dble);*/
+  /*buffer = malloc(4*VOLUME*sizeof(su3_dble));*/
+  /*input.reorder_gauge();*/
 
   loadGaugeQuda(gauge, &qudaGaugeParam);
 
   return;
 }
 
+
+/**
+ * @brief      Save the gauge fields from quda to host
+ *
+ * @param[in]  precision  The precision
+ * @param[out] gauge      The gauge fields
+ */
 void openQCD_gaugesave(int precision, void *gauge)
 {
-
   QudaGaugeParam qudaGaugeParam
     = newOpenQCDGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
 
@@ -438,7 +473,7 @@ void openQCD_qudaFreeGaugeField()
 {
   freeGaugeQuda();
   return;
-} // qudaFreeGaugeField
+}
 
 
 /* 
