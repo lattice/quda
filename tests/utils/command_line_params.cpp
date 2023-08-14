@@ -66,6 +66,7 @@ int test_type = 0;
 quda::mgarray<int> nvec = {};
 quda::mgarray<std::string> mg_vec_infile;
 quda::mgarray<std::string> mg_vec_outfile;
+quda::mgarray<bool> mg_vec_partfile = {};
 QudaInverterType inv_type;
 bool inv_deflate = false;
 bool inv_multigrid = false;
@@ -229,6 +230,7 @@ std::string eig_vec_infile;
 std::string eig_vec_outfile;
 bool eig_io_parity_inflate = false;
 QudaPrecision eig_save_prec = QUDA_DOUBLE_PRECISION;
+bool eig_partfile = false;
 
 // Parameters for the MG eigensolver.
 // The coarsest grid params are for deflation,
@@ -708,13 +710,14 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
     "--eig-require-convergence",
     eig_require_convergence, "If true, the solver will error out if convergence is not attained. If false, a warning will be given (default true)");
   opgroup->add_option("--eig-save-vec", eig_vec_outfile, "Save eigenvectors to <file> (requires QIO)");
-  opgroup->add_option("--eig-load-vec", eig_vec_infile, "Load eigenvectors to <file> (requires QIO)")
-    ->check(CLI::ExistingFile);
+  opgroup->add_option("--eig-load-vec", eig_vec_infile, "Load eigenvectors to <file> (requires QIO)");
   opgroup
     ->add_option("--eig-save-prec", eig_save_prec,
                  "If saving eigenvectors, use this precision to save. No-op if eig-save-prec is greater than or equal "
                  "to precision of eigensolver (default = double)")
     ->transform(prec_transform);
+  opgroup->add_option("--eig-save-partfile", eig_partfile,
+                      "If saving eigenvectors, save in partfile format instead of singlefile (default false)");
 
   opgroup->add_option(
     "--eig-io-parity-inflate", eig_io_parity_inflate,
@@ -884,6 +887,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "Load the vectors <file> for the multigrid_test (requires QIO)");
   quda_app->add_mgoption(opgroup, "--mg-save-vec", mg_vec_outfile, CLI::Validator(),
                          "Save the generated null-space vectors <file> from the multigrid_test (requires QIO)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-save-partfile", mg_vec_partfile, CLI::Validator(),
+    "Whether to save near-null vectors as partfile instead of singlefile (default false; singlefile)");
 
   quda_app
     ->add_mgoption("--mg-eig-save-prec", mg_eig_save_prec, CLI::Validator(),

@@ -157,6 +157,9 @@ namespace quda {
     /** Filename for where to load/store the null space */
     char filename[100];
 
+    /** Whether to save in partfile format (true) or singlefile (false) */
+    bool mg_vec_partfile;
+
     /** Whether or not this is a staggered solve or not */
     QudaTransferType transfer_type;
 
@@ -193,6 +196,7 @@ namespace quda {
       smoother_solve_type(param.smoother_solve_type[level]),
       location(param.location[level]),
       setup_location(param.setup_location[level]),
+      mg_vec_partfile(param.mg_vec_partfile[level]),
       transfer_type(param.transfer_type[level]),
       setup_use_mma(param.setup_use_mma[level] == QUDA_BOOLEAN_TRUE),
       dslash_use_mma(param.dslash_use_mma[level] == QUDA_BOOLEAN_TRUE)
@@ -230,6 +234,7 @@ namespace quda {
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
       location(param.mg_global.location[level]),
       setup_location(param.mg_global.setup_location[level]),
+      mg_vec_partfile(param.mg_global.mg_vec_partfile[level]),
       transfer_type(param.mg_global.transfer_type[level]),
       setup_use_mma(param.mg_global.setup_use_mma[level] == QUDA_BOOLEAN_TRUE),
       dslash_use_mma(param.mg_global.dslash_use_mma[level] == QUDA_BOOLEAN_TRUE)
