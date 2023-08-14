@@ -660,24 +660,16 @@ namespace quda {
     }
   };
 
-  static bool dslash_init = false;
-  static std::vector<DslashCoarsePolicy> policies(static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED), DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED);
-  static int first_active_policy=static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED);
-
-  // string used as a tunekey to ensure we retune if the dslash policy env changes
-  static char policy_string[TuneKey::aux_n];
-
-  static inline void enable_policy(DslashCoarsePolicy p) { policies[static_cast<std::size_t>(p)] = p; }
-
-#if 0
-  static inline void disable_policy(DslashCoarsePolicy p)
-  {
-    policies[static_cast<std::size_t>(p)] = DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED;
-  }
-#endif
-
   template <typename Launch>
   class DslashCoarsePolicyTune : public Tunable {
+
+    static inline bool dslash_init = false;
+    static inline int first_active_policy = static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED);
+    // string used as a tunekey to ensure we retune if the dslash policy env changes
+    static inline char policy_string[TuneKey::aux_n] = {};
+    static inline std::vector<DslashCoarsePolicy> policies = {static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED), DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED};
+
+    static void enable_policy(DslashCoarsePolicy p) { policies[static_cast<std::size_t>(p)] = p; }
 
    Launch &dslash;
 
@@ -686,7 +678,7 @@ namespace quda {
    static constexpr bool enable_coarse_shmem_overlap = Launch::enable_coarse_shmem_overlap();
 
  public:
-   inline DslashCoarsePolicyTune(Launch &dslash) : dslash(dslash)
+   DslashCoarsePolicyTune(Launch &dslash) : dslash(dslash)
    {
       if (!dslash_init) {
 

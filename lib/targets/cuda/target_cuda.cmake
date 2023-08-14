@@ -257,8 +257,8 @@ target_compile_options(
           $<$<CXX_COMPILER_ID:Clang>:
           -Xcompiler=-Wno-unused-function
           -Xcompiler=-Wno-unknown-pragmas
-          -Xcompiler=-Wno-error=pass-failed
-          -Xcompiler=-Wno-error=unneeded-internal-declaration>
+          -Xcompiler=-mllvm\ -unroll-count=4
+          >
           $<$<CXX_COMPILER_ID:GNU>:
           -Xcompiler=-Wno-unknown-pragmas>
           $<$<CONFIG:DEVEL>:-Xptxas
