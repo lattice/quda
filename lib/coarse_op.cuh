@@ -7,11 +7,6 @@
 
 namespace quda {
 
-  // For coarsening un-preconditioned operators we use uni-directional
-  // coarsening to reduce the set up code.  For debugging we can force
-  // bi-directional coarsening.
-  static bool bidirectional_debug = false;
-
   enum ComputeType {
     COMPUTE_UV,
     COMPUTE_LV,
@@ -983,6 +978,10 @@ namespace quda {
                   double mu_factor, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional,
                   const int *fine_to_coarse, const int *coarse_to_fine)
   {
+    // For coarsening un-preconditioned operators we use uni-directional
+    // coarsening to reduce the set up code.  For debugging we can force
+    // bi-directional coarsening.
+    static bool bidirectional_debug = false;
 
     // sanity checks
     if (matpc == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc == QUDA_MATPC_ODD_ODD_ASYMMETRIC)

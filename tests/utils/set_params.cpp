@@ -1384,6 +1384,7 @@ void setDeflationParam(QudaEigParam &df_param)
   safe_strcpy(df_param.vec_infile, eig_vec_infile, 256, "eig_vec_infile");
   safe_strcpy(df_param.vec_outfile, eig_vec_outfile, 256, "eig_vec_outfile");
   df_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  df_param.partfile = eig_partfile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 }
 
 void setQudaStaggeredDefaultInvTestParams()
