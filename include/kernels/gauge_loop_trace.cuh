@@ -64,8 +64,6 @@ namespace quda {
     {
       using Link = typename Arg::Link;
 
-      array<double, 2> loop_trace = {};
-
       int x[4] = {0, 0, 0, 0};
       getCoords(x, x_cb, arg.X, parity);
       for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
@@ -73,7 +71,7 @@ namespace quda {
       thread_array<int, 4> dx{0};
 
       auto coeff_loop = arg.factor * arg.p.path_coeff[path_id];
-      if (coeff_loop == 0) return operator()(value, loop_trace);
+      if (coeff_loop == 0) return value;
 
       const int* path = arg.p.input_path[0] + path_id * arg.p.max_length;
 
@@ -83,9 +81,7 @@ namespace quda {
       // compute trace
       auto trace = getTrace(link_prod);
 
-      loop_trace[0] = coeff_loop * trace.real();
-      loop_trace[1] = coeff_loop * trace.imag();
-
+      array<double, 2> loop_trace = {coeff_loop * trace.real(), coeff_loop * trace.imag()};
       return operator()(value, loop_trace);
     }
   };
