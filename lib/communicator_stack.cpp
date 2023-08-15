@@ -298,7 +298,12 @@ namespace quda
     get_current_communicator().comm_allreduce_max_array(&a, 1);
   }
 
-  template <> void comm_allreduce_max<std::vector<deviation_t<comm_reduce_t>>>(std::vector<deviation_t<comm_reduce_t>> &a)
+  template <> void comm_allreduce_max<std::vector<deviation_t<double>>>(std::vector<deviation_t<double>> &a)
+  {
+    get_current_communicator().comm_allreduce_max_array(a.data(), a.size());
+  }
+
+  template <> void comm_allreduce_max<std::vector<deviation_t<doubledouble>>>(std::vector<deviation_t<doubledouble>> &a)
   {
     get_current_communicator().comm_allreduce_max_array(a.data(), a.size());
   }
