@@ -14,6 +14,7 @@
 #include <field_cache.h>
 #include <comm_key.h>
 #include <float_vector.h>
+#include "reducer.h"
 
 #if defined(MPI_COMMS) || defined(QMP_COMMS)
 #include <mpi.h>

@@ -56,7 +56,7 @@ namespace quda {
       for (int mu = 0; mu < 4; mu++) {
         Matrix<complex<typename Arg::real>, Arg::nColor> U = arg.u(mu, linkIndex(x, X), parity);
         auto local = Arg::type == compute_type::determinant ? getDeterminant(U) : getTrace(U);
-        value = operator()(value, reduce_t{local.real(), local.imag()});
+        value = operator()(value, array<double, 2>{local.real(), local.imag()});
       }
 
       return value;

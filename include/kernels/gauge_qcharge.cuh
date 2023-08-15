@@ -78,7 +78,7 @@ namespace quda
       Q = Q_idx * q_norm;
       if (Arg::density) arg.qDensity[x_cb + parity * arg.threads.x] = Q;
 
-      return operator()(E, {E_local[0], E_local[1], E_local[2]});
+      return operator()(E, E_local);
     }
 
   };

@@ -212,7 +212,7 @@ namespace quda {
       using HighPrecLink = typename Arg::HighPrecLink;
 
       HighPrecLink polyloop;
-      reduce_t ploop{0, 0};
+      array<double, 2> ploop = {};
 
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
@@ -235,7 +235,7 @@ namespace quda {
       ploop[0] = tr.real();
       ploop[1] = tr.imag();
 
-      return operator()(ploop, value);
+      return operator()(value, ploop);
     }
 
   };

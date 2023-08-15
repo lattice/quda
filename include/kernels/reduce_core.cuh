@@ -2,12 +2,15 @@
 
 #include <color_spinor_field_order.h>
 #include <blas_helper.cuh>
+#include "float_vector.h"
 #include <reduce_helper.h>
 #include <array.h>
 #include <reduction_kernel.h>
 
 namespace quda
 {
+
+  using compute_t = double;
 
   namespace blas
   {
@@ -104,7 +107,6 @@ namespace quda
     struct ReduceFunctor {
       static constexpr use_kernel_arg_p use_kernel_arg = use_kernel_arg_p::TRUE;
       using reduce_t = reduce_t_;
-      using reducer = plus<reduce_t>;
       static constexpr bool site_unroll = site_unroll_;
 
       //! pre-computation routine called before the "M-loop"
@@ -115,8 +117,8 @@ namespace quda
     };
 
     template <typename, typename real>
-    struct Max : public ReduceFunctor<double> { // FIXME - hardcode to double for now
-      using reduce_t = double;// FIXME - hardcode to double for now
+    struct Max : public ReduceFunctor<compute_t> {
+      using reduce_t = compute_t;
       using reducer = maximum<reduce_t>;
       static constexpr memory_access<1> read{ };
       static constexpr memory_access<> write{ };
@@ -132,9 +134,9 @@ namespace quda
       constexpr int flops() const { return 0; }   //! flops per element
     };
 
-    template <typename real_reduce_t, typename real>
-    struct MaxDeviation : public ReduceFunctor<deviation_t<real_reduce_t>> {
-      using reduce_t = deviation_t<real_reduce_t>;
+    template <typename, typename real>
+    struct MaxDeviation : public ReduceFunctor<deviation_t<compute_t>> {
+      using reduce_t = deviation_t<compute_t>;
       using reducer = maximum<reduce_t>;
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<> write{ };
@@ -143,7 +145,7 @@ namespace quda
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          complex<real_reduce_t> diff = {abs(x[i].real() - y[i].real()), abs(x[i].imag() - y[i].imag())};
+          complex<compute_t> diff = {abs(x[i].real() - y[i].real()), abs(x[i].imag() - y[i].imag())};
           if (diff.real() > max.diff ) {
             max.diff = diff.real();
             max.ref = abs(y[i].real());
@@ -160,20 +162,21 @@ namespace quda
     /**
        Return the L1 norm of x
     */
-    template <typename reduce_t, typename T> __device__ __host__ reduce_t norm1_(const complex<T> &a)
+    template <typename reduce_t, typename T> __device__ __host__ auto norm1_(const complex<T> &a)
     {
-      return static_cast<reduce_t>(sqrt(a.real() * a.real() + a.imag() * a.imag()));
+      return reduce_t(sqrt(a.real() * a.real() + a.imag() * a.imag()));
     }
 
     template <typename reduce_t, typename real>
     struct Norm1 : public ReduceFunctor<reduce_t> {
+      using reducer = plus<reduce_t>;
       static constexpr memory_access<1> read{ };
       static constexpr memory_access<> write{ };
       Norm1(const real_t &, const real_t &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &, T &, T &, T &) const
       {
 #pragma unroll
-        for (int i=0; i < x.size(); i++) sum += norm1_<reduce_t, real>(x[i]);
+        for (int i=0; i < x.size(); i++) sum = reducer::apply(sum, norm1_<compute_t, real>(x[i]));
       }
       constexpr int flops() const { return 2; }   //! flops per element
     };
@@ -181,21 +184,22 @@ namespace quda
     /**
        Return the L2 norm of x
     */
-    template <typename reduce_t, typename T> __device__ __host__ void norm2_(reduce_t &sum, const complex<T> &a)
+    template <typename reduce_t, typename T> __device__ __host__ auto norm2_(const complex<T> &a)
     {
-      sum += static_cast<reduce_t>(a.real()) * static_cast<reduce_t>(a.real());
-      sum += static_cast<reduce_t>(a.imag()) * static_cast<reduce_t>(a.imag());
+      auto n = reduce_t(a.real()) * reduce_t(a.real());
+      return fma(reduce_t(a.imag()), reduce_t(a.imag()), n);
     }
 
     template <typename reduce_t, typename real>
     struct Norm2 : public ReduceFunctor<reduce_t> {
+      using reducer = plus<reduce_t>;
       static constexpr memory_access<1> read{ };
       static constexpr memory_access<> write{ };
       Norm2(const real_t &, const real_t &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &, T &, T &, T &) const
       {
 #pragma unroll
-        for (int i = 0; i < x.size(); i++) norm2_<reduce_t, real>(sum, x[i]);
+        for (int i = 0; i < x.size(); i++) sum = reducer::apply(sum, norm2_<compute_t>(x[i]));
       }
       constexpr int flops() const { return 2; }   //! flops per element
     };
@@ -204,21 +208,22 @@ namespace quda
        Return the real dot product of x and y
     */
     template <typename reduce_t, typename T>
-    __device__ __host__ void dot_(reduce_t &sum, const complex<T> &a, const complex<T> &b)
+    __device__ __host__ auto dot_(const complex<T> &a, const complex<T> &b)
     {
-      sum += static_cast<reduce_t>(a.real()) * static_cast<reduce_t>(b.real());
-      sum += static_cast<reduce_t>(a.imag()) * static_cast<reduce_t>(b.imag());
+      auto d = reduce_t(a.real()) * reduce_t(b.real());
+      return fma(reduce_t(a.imag()), reduce_t(b.imag()), d);
     }
 
     template <typename reduce_t, typename real>
     struct Dot : public ReduceFunctor<reduce_t> {
+      using reducer = plus<reduce_t>;
       static constexpr memory_access<1,1> read{ };
       static constexpr memory_access<> write{ };
       Dot(const real_t &, const real_t &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
       {
 #pragma unroll
-        for (int i = 0; i < x.size(); i++) dot_<reduce_t, real>(sum, x[i], y[i]);
+        for (int i = 0; i < x.size(); i++) sum = reducer::apply(sum, dot_<compute_t, real>(x[i], y[i]));
       }
       constexpr int flops() const { return 2; }   //! flops per element
     };
@@ -229,6 +234,7 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct axpbyzNorm2 : public ReduceFunctor<reduce_t> {
+      using reducer = plus<reduce_t>;
       static constexpr memory_access<1, 1, 0> read{ };
       static constexpr memory_access<0, 0, 1> write{ };
       const real a;
@@ -239,7 +245,7 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
           z[i] = a * x[i] + b * y[i];
-          norm2_<reduce_t, real>(sum, z[i]);
+          sum = reducer::apply(sum, norm2_<compute_t>(z[i]));
         }
       }
       constexpr int flops() const { return 4; }   //! flops per element
@@ -251,6 +257,7 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct AxpyReDot : public ReduceFunctor<reduce_t> {
+      using reducer = plus<reduce_t>;
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
       const real a;
@@ -260,7 +267,7 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
           y[i] += a * x[i];
-          dot_<reduce_t, real>(sum, x[i], y[i]);
+          sum = reducer::apply(sum, dot_<compute_t, real>(x[i], y[i]));
         }
       }
       constexpr int flops() const { return 4; }   //! flops per element
@@ -272,6 +279,7 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct caxpyNorm2 : public ReduceFunctor<reduce_t> {
+      using reducer = plus<reduce_t>;
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
       const complex<real> a;
@@ -281,7 +289,7 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
           y[i] = cmac(a, x[i], y[i]);
-          norm2_<reduce_t, real>(sum, y[i]);
+          sum = reducer::apply(sum, norm2_<compute_t>(y[i]));
         }
       }
       constexpr int flops() const { return 6; }   //! flops per element
@@ -295,6 +303,7 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct cabxpyzaxnorm : public ReduceFunctor<reduce_t> {
+      using reducer = plus<reduce_t>;
       static constexpr memory_access<1, 1, 0> read{ };
       static constexpr memory_access<1, 0, 1> write{ };
       const real a;
@@ -306,7 +315,7 @@ namespace quda
         for (int i = 0; i < x.size(); i++) {
           x[i] *= a;
           z[i] = cmac(b, x[i], y[i]);
-          norm2_<reduce_t, real>(sum, z[i]);
+          sum = reducer::apply(sum, norm2_<compute_t>(z[i]));
         }
       }
       constexpr int flops() const { return 10; }  //! flops per element
@@ -316,25 +325,28 @@ namespace quda
        Returns complex-valued dot product of x and y
     */
     template <typename reduce_t, typename T>
-    __device__ __host__ void cdot_(reduce_t &sum, const complex<T> &a, const complex<T> &b)
+    __device__ __host__ auto cdot_(const complex<T> &a, const complex<T> &b)
     {
       using scalar_t = typename reduce_t::value_type;
-      sum[0] += static_cast<scalar_t>(a.real()) * static_cast<scalar_t>(b.real());
-      sum[0] += static_cast<scalar_t>(a.imag()) * static_cast<scalar_t>(b.imag());
-      sum[1] += static_cast<scalar_t>(a.real()) * static_cast<scalar_t>(b.imag());
-      sum[1] -= static_cast<scalar_t>(a.imag()) * static_cast<scalar_t>(b.real());
+      auto r = scalar_t(a.real()) * scalar_t(b.real());
+      r = fma(scalar_t(a.imag()), scalar_t(b.imag()), r);
+      auto i = scalar_t(a.real()) * scalar_t(b.imag());
+      i = fma(-scalar_t(a.imag()) , scalar_t(b.real()), i);
+      return reduce_t{r, i};
     }
 
     template <typename real_reduce_t, typename real>
     struct Cdot : public ReduceFunctor<array<real_reduce_t, 2>> {
       using reduce_t = array<real_reduce_t, 2>;
+      using compute_t = array<compute_t, 2>;
+      using reducer = plus<reduce_t>;
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<> write{ };
       Cdot(const complex_t &, const complex_t &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
       {
 #pragma unroll
-        for (int i = 0; i < x.size(); i++) cdot_<reduce_t, real>(sum, x[i], y[i]);
+        for (int i = 0; i < x.size(); i++) sum = reducer::apply(sum, cdot_<compute_t, real>(x[i], y[i]));
       }
       constexpr int flops() const { return 4; }   //! flops per element
     };
@@ -347,6 +359,8 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct caxpydotzy : public ReduceFunctor<array<real_reduce_t, 2>> {
       using reduce_t = array<real_reduce_t, 2>;
+      using compute_t = array<compute_t, 2>;
+      using reducer = plus<reduce_t>;
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
       const complex<real> a;
@@ -356,7 +370,7 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
           y[i] = cmac(a, x[i], y[i]);
-          cdot_<reduce_t, real>(sum, z[i], y[i]);
+          sum = reducer::apply(sum, cdot_<compute_t, real>(z[i], y[i]));
         }
       }
       constexpr int flops() const { return 8; }   //! flops per element
@@ -367,25 +381,27 @@ namespace quda
        Returns the norm of x
     */
     template <typename reduce_t, typename InputType>
-    __device__ __host__ void cdotNormAB_(reduce_t &sum, const InputType &a, const InputType &b)
+    __device__ __host__ reduce_t cdotNormAB_(const InputType &a, const InputType &b)
     {
       using real = typename InputType::value_type;
       using scalar = typename reduce_t::value_type;
-      cdot_<reduce_t, real>(sum, a, b);
-      norm2_<scalar, real>(sum[2], a);
-      norm2_<scalar, real>(sum[3], b);
+      auto cdot = cdot_<reduce_t, real>(a, b);
+      return {cdot[0], cdot[1], norm2_<scalar>(a), norm2_<scalar, real>(b)};
     }
 
     template <typename real_reduce_t, typename real>
     struct CdotNormAB : public ReduceFunctor<array<real_reduce_t, 4>> {
       using reduce_t = array<real_reduce_t, 4>;
+      using reducer = plus<reduce_t>;
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<> write{ };
       CdotNormAB(const real_t &, const real_t &) { ; }
       template <typename T> __device__ __host__ void operator()(reduce_t &sum, T &x, T &y, T &, T &, T &) const
       {
 #pragma unroll
-        for (int i = 0; i < x.size(); i++) cdotNormAB_<reduce_t>(sum, x[i], y[i]);
+        for (int i = 0; i < x.size(); i++) {
+          sum = reducer::apply(sum, cdotNormAB_<array<compute_t, 4>>(x[i], y[i]));
+        }
       }
       constexpr int flops() const { return 8; }   //! flops per element
     };
@@ -395,12 +411,12 @@ namespace quda
        Returns the norm of y
     */
     template <typename reduce_t, typename InputType>
-    __device__ __host__ void cdotNormB_(reduce_t &sum, const InputType &a, const InputType &b)
+    __device__ __host__ reduce_t cdotNormB_(const InputType &a, const InputType &b)
     {
       using real = typename InputType::value_type;
       using scalar = typename reduce_t::value_type;
-      cdot_<reduce_t, real>(sum, a, b);
-      norm2_<scalar, real>(sum[2], b);
+      auto cdot = cdot_<reduce_t, real>(a, b);
+      return {cdot[0], cdot[1], norm2_<scalar>(b)};
     }
 
     /**
@@ -410,6 +426,7 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct caxpbypzYmbwcDotProductUYNormY_ : public ReduceFunctor<array<real_reduce_t, 3>> {
       using reduce_t = array<real_reduce_t, 3>;
+      using reducer = plus<reduce_t>;
       static constexpr memory_access<1, 1, 1, 1, 1> read{ };
       static constexpr memory_access<0, 1, 1> write{ };
       const complex<real> a;
@@ -422,7 +439,7 @@ namespace quda
           y[i] = cmac(a, x[i], y[i]);
           y[i] = cmac(b, z[i], y[i]);
           z[i] = cmac(-b, w[i], z[i]);
-          cdotNormB_<reduce_t>(sum, v[i], z[i]);
+          sum = reducer::apply(sum, cdotNormB_<array<compute_t, 3>>(v[i], z[i]));
         }
       }
       constexpr int flops() const { return 18; }  //! flops per element
@@ -437,6 +454,7 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct axpyCGNorm2 : public ReduceFunctor<array<real_reduce_t, 2>> {
       using reduce_t = array<real_reduce_t, 2>;
+      using reducer = plus<reduce_t>;
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<0, 1> write{ };
       const real a;
@@ -446,8 +464,7 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
           auto y_new = y[i] + a * x[i];
-          norm2_<real_reduce_t, real>(sum[0], y_new);
-          dot_<real_reduce_t, real>(sum[1], y_new, y_new - y[i]);
+          sum = reducer::apply(sum, array<compute_t, 2>{norm2_<compute_t>(y_new), dot_<compute_t>(y_new, y_new - y[i])});
           y[i] = y_new;
         }
       }
@@ -471,30 +488,21 @@ namespace quda
 
       static constexpr memory_access<1, 1> read{ };
       static constexpr memory_access<> write{ };
-      reduce_t aux;
+      array<compute_t, 2> aux;
       HeavyQuarkResidualNorm_(const real_t &, const real_t &) : aux {} { ; }
 
-      __device__ __host__ void pre()
-      {
-        aux[0] = 0;
-        aux[1] = 0;
-      }
+      __device__ __host__ void pre() { aux = {}; }
 
       template <typename T> __device__ __host__ void operator()(reduce_t &, T &x, T &y, T &, T &, T &)
       {
 #pragma unroll
-        for (int i = 0; i < x.size(); i++) {
-          norm2_<real_reduce_t, real>(aux[0], x[i]);
-          norm2_<real_reduce_t, real>(aux[1], y[i]);
-        }
+        for (int i = 0; i < x.size(); i++) aux = plus<array<compute_t, 2>>::apply(aux, {norm2_<compute_t>(x[i]), norm2_<compute_t>(y[i])});
       }
 
       //! sum the solution and residual norms, and compute the heavy-quark norm
       __device__ __host__ void post(reduce_t &sum)
       {
-        sum[0] += aux[0];
-        sum[1] += aux[1];
-        sum[2] += (aux[0] > 0.0) ? (aux[1] / aux[0]) : static_cast<real_reduce_t>(1.0);
+        sum = reducer::apply(sum, array<compute_t, 3>{aux[0], aux[1], (aux[0] > 0.0) ? (aux[1] / aux[0]) : compute_t(1.0)});
       }
 
       constexpr int flops() const { return 4; }   //! undercounts since it excludes the per-site division
@@ -518,30 +526,21 @@ namespace quda
 
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<> write{ };
-      reduce_t aux;
+      array<compute_t, 2> aux;
       xpyHeavyQuarkResidualNorm_(const real_t &, const real_t &) : aux {} { ; }
 
-      __device__ __host__ void pre()
-      {
-        aux[0] = 0;
-        aux[1] = 0;
-      }
+      __device__ __host__ void pre() { aux = {}; }
 
       template <typename T> __device__ __host__ void operator()(reduce_t &, T &x, T &y, T &z, T &, T &)
       {
 #pragma unroll
-        for (int i = 0; i < x.size(); i++) {
-          norm2_<real_reduce_t, real>(aux[0], x[i] + y[i]);
-          norm2_<real_reduce_t, real>(aux[1], z[i]);
-        }
+        for (int i = 0; i < x.size(); i++) aux = plus<array<compute_t, 2>>::apply(aux, {norm2_<compute_t>(x[i] + y[i]), norm2_<compute_t>(z[i])});
       }
 
       //! sum the solution and residual norms, and compute the heavy-quark norm
       __device__ __host__ void post(reduce_t &sum)
       {
-        sum[0] += aux[0];
-        sum[1] += aux[1];
-        sum[2] += (aux[0] > 0.0) ? (aux[1] / aux[0]) : static_cast<real_reduce_t>(1.0);
+        sum = reducer::apply(sum, array<compute_t, 3>{aux[0], aux[1], (aux[0] > 0.0) ? (aux[1] / aux[0]) : compute_t(1.0)});
       }
 
       constexpr int flops() const { return 5; }
@@ -556,6 +555,7 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct tripleCGReduction_ : public ReduceFunctor<array<real_reduce_t, 3>> {
       using reduce_t = array<real_reduce_t, 3>;
+      using reducer = plus<reduce_t>;
       static constexpr memory_access<1, 1, 1> read{ };
       static constexpr memory_access<> write{ };
       tripleCGReduction_(const real_t &, const real_t &) { ; }
@@ -563,9 +563,7 @@ namespace quda
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          norm2_<real_reduce_t, real>(sum[0], x[i]);
-          norm2_<real_reduce_t, real>(sum[1], y[i]);
-          dot_<real_reduce_t, real>(sum[2], y[i], z[i]);
+          sum = reducer::apply(sum, array<compute_t, 3>{norm2_<compute_t>(x[i]), norm2_<compute_t>(y[i]), dot_<compute_t>(y[i], z[i])});
         }
       }
       constexpr int flops() const { return 6; }   //! flops per element
@@ -581,6 +579,7 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct quadrupleCGReduction_ : public ReduceFunctor<array<real_reduce_t, 4>> {
       using reduce_t = array<real_reduce_t, 4>;
+      using reducer = plus<reduce_t>;
       static constexpr memory_access<1, 1, 1, 1> read{ };
       static constexpr memory_access<> write{ };
       quadrupleCGReduction_(const real_t &, const real_t &) { ; }
@@ -588,10 +587,8 @@ namespace quda
       {
 #pragma unroll
         for (int i = 0; i < x.size(); i++) {
-          norm2_<real_reduce_t, real>(sum[0], x[i]);
-          norm2_<real_reduce_t, real>(sum[1], y[i]);
-          dot_<real_reduce_t, real>(sum[2], y[i], z[i]);
-          norm2_<real_reduce_t, real>(sum[3], w[i]);
+          sum = reducer::apply(sum, array<compute_t, 4>{norm2_<compute_t>(x[i]), norm2_<compute_t>(y[i]),
+                                                        dot_<compute_t>(y[i], z[i]), norm2_<compute_t>(w[i])});
         }
       }
       constexpr int flops() const { return 8; }   //! flops per element
@@ -607,6 +604,7 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct quadrupleCG3InitNorm_ : public ReduceFunctor<reduce_t> {
+      using reducer = plus<reduce_t>;
       static constexpr memory_access<1, 1, 0, 0, 1> read{ };
       static constexpr memory_access<1, 1, 1, 1> write{ };
       const real a;
@@ -619,7 +617,7 @@ namespace quda
           w[i] = y[i];
           x[i] += a * y[i];
           y[i] -= a * v[i];
-          norm2_<reduce_t, real>(sum, y[i]);
+          sum = reducer::apply(sum, norm2_<compute_t, real>(y[i]));
         }
       }
       constexpr int flops() const { return 6; }   //! flops per element check if it's right
@@ -637,6 +635,7 @@ namespace quda
     */
     template <typename reduce_t, typename real>
     struct quadrupleCG3UpdateNorm_ : public ReduceFunctor<reduce_t> {
+      using reducer = plus<reduce_t>;
       static constexpr memory_access<1, 1, 1, 1, 1> read{ };
       static constexpr memory_access<1, 1, 1, 1> write{ };
       const real a;
@@ -652,7 +651,7 @@ namespace quda
           y[i] = b * (y[i] - a * v[i]) + ((real)1.0 - b) * w[i];
           z[i] = tmpx;
           w[i] = tmpy;
-          norm2_<reduce_t, real>(sum, y[i]);
+          sum = reducer::apply(sum, norm2_<compute_t, real>(y[i]));
         }
       }
       constexpr int flops() const { return 16; }  //! flops per element check if it's right

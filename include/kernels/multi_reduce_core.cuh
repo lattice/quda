@@ -10,6 +10,8 @@
 namespace quda
 {
 
+  using compute_t = double;
+
   namespace blas
   {
 
@@ -142,10 +144,10 @@ namespace quda
        Return the real dot product of x and y
     */
     template <typename reduce_t, typename T>
-    __device__ __host__ void dot_(reduce_t &sum, const complex<T> &a, const complex<T> &b)
+    __device__ __host__ auto dot_(const complex<T> &a, const complex<T> &b)
     {
-      sum += static_cast<reduce_t>(a.real()) * static_cast<reduce_t>(b.real());
-      sum += static_cast<reduce_t>(a.imag()) * static_cast<reduce_t>(b.imag());
+      auto d = reduce_t(a.real()) * reduce_t(b.real());
+      return fma(reduce_t(a.imag()), reduce_t(b.imag()), d);
     }
 
     template <typename reduce_t, typename real>
@@ -159,7 +161,7 @@ namespace quda
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &, int, int) const
       {
 #pragma unroll
-        for (int k=0; k < x.size(); k++) dot_<reduce_t, real>(sum, x[k], y[k]);
+        for (int k=0; k < x.size(); k++) sum = plus<reduce_t>::apply(sum, dot_<compute_t>(x[k], y[k]));
       }
 
       constexpr int flops() const { return 2; }   //! flops per element
@@ -169,13 +171,14 @@ namespace quda
        Returns complex-valued dot product of x and y
     */
     template <typename reduce_t, typename T>
-    __device__ __host__ void cdot_(reduce_t &sum, const complex<T> &a, const complex<T> &b)
+    __device__ __host__ auto cdot_(const complex<T> &a, const complex<T> &b)
     {
-      using scalar = typename reduce_t::value_type;
-      sum[0] += static_cast<scalar>(a.real()) * static_cast<scalar>(b.real());
-      sum[0] += static_cast<scalar>(a.imag()) * static_cast<scalar>(b.imag());
-      sum[1] += static_cast<scalar>(a.real()) * static_cast<scalar>(b.imag());
-      sum[1] -= static_cast<scalar>(a.imag()) * static_cast<scalar>(b.real());
+      using scalar_t = typename reduce_t::value_type;
+      auto r = scalar_t(a.real()) * scalar_t(b.real());
+      r = fma(scalar_t(a.imag()), scalar_t(b.imag()), r);
+      auto i = scalar_t(a.real()) * scalar_t(b.imag());
+      i = fma(-scalar_t(a.imag()) , scalar_t(b.real()), i);
+      return reduce_t{r, i};
     }
 
     template <typename real_reduce_t, typename real>
@@ -190,7 +193,7 @@ namespace quda
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &, int, int) const
       {
 #pragma unroll
-        for (int k=0; k < x.size(); k++) cdot_<reduce_t, real>(sum, x[k], y[k]);
+        for (int k=0; k < x.size(); k++) sum = plus<reduce_t>::apply(sum, cdot_<array<compute_t, 2>>(x[k], y[k]));
       }
 
       constexpr int flops() const { return 4; }   //! flops per element
@@ -209,7 +212,7 @@ namespace quda
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {
-          cdot_<reduce_t, real>(sum, x[k], y[k]);
+          sum = plus<reduce_t>::apply(sum, cdot_<reduce_t>(x[k], y[k]));
           if (i == j) w[k] = y[k];
         }
       }

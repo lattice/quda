@@ -23,13 +23,12 @@ namespace quda
   template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
   __forceinline__ __device__ void Reduction2D_impl(const Arg &arg)
   {
-    using reduce_t = typename Transformer<Arg>::reduce_t;
     Transformer<Arg> t(arg);
 
     auto idx = threadIdx.x + blockIdx.x * blockDim.x;
     auto j = threadIdx.y;
 
-    reduce_t value = t.init();
+    auto value = t.init();
 
     while (idx < arg.threads.x) {
       value = t(value, idx, j);
@@ -97,7 +96,6 @@ namespace quda
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
   __forceinline__ __device__ void MultiReduction_impl(const Arg &arg)
   {
-    using reduce_t = typename Functor<Arg>::reduce_t;
     Functor<Arg> t(arg);
 
     auto idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -106,7 +104,7 @@ namespace quda
 
     if (j >= arg.threads.z) return;
 
-    reduce_t value = t.init();
+    auto value = t.init();
 
     while (idx < arg.threads.x) {
       value = t(value, idx, k, j);

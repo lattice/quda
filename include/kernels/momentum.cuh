@@ -56,7 +56,7 @@ namespace quda {
   };
 
   template<typename Float_, int nColor_, QudaReconstructType recon_>
-  struct UpdateMomArg : ReduceArg<array<device_reduce_t, 2>>
+  struct UpdateMomArg : ReduceArg<array<QUDA_REDUCTION_TYPE, 2>>
   {
     using Float = Float_;
     static constexpr int nColor = nColor_;
@@ -109,7 +109,7 @@ namespace quda {
         makeAntiHerm(f);
 
         // compute force norms
-        norm = operator()(reduce_t{f.L1(), f.L2()}, norm);
+        norm = operator()(norm, {f.L1(), f.L2()});
 
         m = m + arg.coeff * f;
 

@@ -85,6 +85,17 @@ namespace quda
       result_h = static_cast<decltype(result_h)>(reducer::get_host_buffer());
       count = reducer::get_count<count_t>();
 
+      if constexpr (is_rfa<get_scalar_t<T>>::value) {
+        static bool init = false;
+        if (!init) {
+          reproducible::RFA_bins<typename get_scalar_t<T>::ftype> bins;
+          bins.initialize_bins();
+          memcpy(reproducible::bin_host_buffer, &bins, sizeof(bins));
+          cudaMemcpyToSymbol(reproducible::bin_device_buffer, &bins, sizeof(bins), 0, cudaMemcpyHostToDevice);
+          init = true;
+        }
+      }
+
       if (!commAsyncReduction()) {
         // initialize the result buffer so we can test for completion
         for (int i = 0; i < n_reduce * n_item; i++) {
@@ -130,7 +141,7 @@ namespace quda
           while (result_h[i].load(cuda::std::memory_order_relaxed) == init_value<system_atomic_t>()) { }
         }
 
-        memcpy(result.data(), result_h, n_reduce * sizeof(T));
+        memcpy(reinterpret_cast<void*>(result.data()), reinterpret_cast<void*>(result_h), n_reduce * sizeof(T));
 
         if (!reset) {
           consumed = true;

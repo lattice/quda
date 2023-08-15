@@ -336,6 +336,46 @@ void Communicator::comm_allreduce_sum_array<doubledouble>(doubledouble *data, si
 }
 
 template <>
+void Communicator::comm_allreduce_sum_array<rfa_t<reduction_t>>(rfa_t<reduction_t> *data, size_t size)
+{
+  {
+    static bool init = false;
+    if (!init) {
+      reproducible::RFA_bins<reduction_t> bins;
+      bins.initialize_bins();
+            memcpy(reproducible::bin_host_buffer, &bins, sizeof(bins));
+            init = true;
+    }
+  }
+
+  // we need to break out of QMP for doubledouble
+  size_t n = comm_size();
+  std::vector<rfa_t<reduction_t>> recv_buf(size * n);
+  static_assert(sizeof(rfa_t<reduction_t>) % (2 * sizeof(double)) == 0);
+  auto gather_size = size * sizeof(rfa_t<reduction_t>) / (2 * sizeof(double));
+  MPI_CHECK(MPI_Allgather(data, gather_size, MPI_DOUBLE_COMPLEX,
+                          recv_buf.data(), gather_size, MPI_DOUBLE_COMPLEX, MPI_COMM_HANDLE));
+
+  std::vector<rfa_t<reduction_t>> recv_trans(size * n);
+  for (size_t i = 0; i < n; i++) {
+    for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
+  }
+
+  for (size_t i = 0; i < size; i++) {
+    data[i] = 0.0;
+    for (size_t j = 0; j < n; j++) {
+      data[i] += recv_trans[i * n + j];
+    }
+  }
+}
+
+template <>
+void Communicator::comm_allreduce_max_array<rfa_t<reduction_t>>(rfa_t<reduction_t> *, size_t)
+{
+  errorQuda("This is a bug I need to fix - this function should not exist");
+}
+
+template <>
 void Communicator::comm_allreduce_max_array<deviation_t<double>>(deviation_t<double> *data, size_t size)
 {
   size_t n = comm_size();

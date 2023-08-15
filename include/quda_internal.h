@@ -55,19 +55,19 @@
 namespace quda {
 
   /**
-     Precision of scalar real variables on the host
+     Scalar real variable type on the host
   */
   using real_t = QUDA_SCALAR_TYPE;
 
   /**
-     Precision of scalar complex variables on the host
+     Scalar complex variable type on the host
   */
   using complex_t = std::complex<real_t>;
 
   /**
-     Sum reduction type
+     Underlying type to use for reductions
   */
-  using device_reduce_t = QUDA_REDUCTION_TYPE;
+  using reduction_t = QUDA_REDUCTION_TYPE;
 
   /**
      Array object type used to storing lattice dimensions

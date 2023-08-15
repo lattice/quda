@@ -492,13 +492,25 @@ endif()
 
 set(QUDA_SCALAR_TYPE
     double
-    CACHE STRING "set the host scalar coefficient type (double, doubledouble)")
-set_property(CACHE QUDA_SCALAR_TYPE PROPERTY STRINGS double doubledouble)
+    CACHE STRING "set the host scalar coefficient type (double, doubledouble, __float128)")
+set_property(CACHE QUDA_SCALAR_TYPE PROPERTY STRINGS double doubledouble __float128)
 
 set(QUDA_REDUCTION_TYPE
     double
     CACHE STRING "set the reduction computation type (double, doubledouble)")
 set_property(CACHE QUDA_REDUCTION_TYPE PROPERTY STRINGS double doubledouble)
+
+set(QUDA_REDUCTION_ALGORITHM
+    NAIVE
+    CACHE STRING "set the reduction algorithm (NAIVE, KAHAN, REPRODUCIBLE)")
+set_property(CACHE QUDA_REDUCTION_ALGORITHM PROPERTY STRINGS NAIVE KAHAN REPRODUCIBLE)
+if(${QUDA_REDUCTION_ALGORITHM} STREQUAL "NAIVE")
+  set(QUDA_REDUCTION_ALGORITHM_NAIVE 1)
+elseif(${QUDA_REDUCTION_ALGORITHM} STREQUAL "KAHAN")
+  set(QUDA_REDUCTION_ALGORITHM_KAHAN 1)
+elseif(${QUDA_REDUCTION_ALGORITHM} STREQUAL "REPRODUCIBLE")
+  set(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE 1)
+endif()
 
 configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)
 install(FILES "${CMAKE_BINARY_DIR}/include/quda_define.h" DESTINATION include/)

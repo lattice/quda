@@ -56,6 +56,16 @@ namespace quda
       result_h = static_cast<decltype(result_h)>(reducer::get_host_buffer());
       count = reducer::get_count<count_t>();
 
+      if constexpr (is_rfa<get_scalar_t<T>>::value) {
+        static bool init = false;
+        if (!init) {
+          reproducible::RFA_bins<typename get_scalar_t<T>::ftype> bins;
+          bins.initialize_bins();
+          memcpy(reproducible::bin_host_buffer, &bins, sizeof(bins));
+          cudaMemcpyToSymbol(reproducible::bin_device_buffer, &bins, sizeof(bins), 0, cudaMemcpyHostToDevice);
+          init = true;
+        }
+      }
       if (commAsyncReduction()) result_d = partial;
     }
 

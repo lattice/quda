@@ -57,7 +57,7 @@ namespace quda
   template <typename reducer, typename T, typename count_t, typename transformer>
   typename reducer::reduce_t transform_reduce(QudaFieldLocation location, const T *v, count_t n_items, transformer h)
   {
-    std::vector<typename reducer::reduce_t> result = {0.0};
+    std::vector<typename reducer::reduce_t> result = {};
     std::vector<const T *> v_ = {v};
     transform_reduce<reducer>(location, result, v_, n_items, h, identity());
     return result[0];
@@ -72,7 +72,7 @@ namespace quda
   template <typename reducer, typename T, typename count_t>
   typename reducer::reduce_t reduce(QudaFieldLocation location, const T *v, count_t n_items)
   {
-    std::vector<typename reducer::reduce_t> result = {0.0};
+    std::vector<typename reducer::reduce_t> result = {};
     std::vector<const T *> v_ = {v};
     transform_reduce<reducer>(location, result, v_, n_items, identity());
     return result[0];

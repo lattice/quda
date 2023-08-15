@@ -411,6 +411,13 @@ __device__ __host__ inline doubledouble operator/(const doubledouble &a, const d
   return doubledouble(div_dbldbl(a.a,b.a));
 }
 
+/**
+   @brief This isn't really an fma for double-double, but just
+   provides a convenient overload to ensure that when using native
+   floating point types that we consistently use an fma.
+*/
+__device__ __host__ inline doubledouble fma(const doubledouble &a, const doubledouble &b, const doubledouble &c) { return a * b + c; }
+
 struct doubledouble2 {
   doubledouble x;
   doubledouble y;

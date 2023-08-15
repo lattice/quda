@@ -11,7 +11,8 @@
  */
 
 // whether to use cooperative groups (or cub)
-#if !(_NVHPC_CUDA || (defined(__clang__) && defined(__CUDA__))) // neither nvc++ or clang-cuda yet support CG
+#if !(_NVHPC_CUDA || (defined(__clang__) && defined(__CUDA__))) && !defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE) // neither nvc++ or clang-cuda yet support CG
+// FIXME add CG support for reproducible reductions (can't naively break up the operation)
 #define USE_CG
 #endif
 
@@ -58,6 +59,10 @@ namespace quda
 
   template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, complex<typename T::value_type>>>> {
     using type = typename atomic_type<typename T::value_type>::type;
+  };
+
+  template <typename T> struct atomic_type<T, std::enable_if_t<is_rfa<T>::value>> {
+    using type = typename T::ftype;
   };
 
   template <typename T> struct atomic_type<T, std::enable_if_t<std::is_same_v<T, array<typename T::value_type, T::N>>>> {

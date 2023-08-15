@@ -55,6 +55,18 @@ namespace quda {
           strcat(aux, y.AuxString().c_str());
         }
 
+#ifdef QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE
+        {
+          static bool init = false;
+          if (!init) {
+            reproducible::RFA_bins<reduction_t> bins;
+            bins.initialize_bins();
+            memcpy(reproducible::bin_host_buffer, &bins, sizeof(bins));
+            cudaMemcpyToSymbol(reproducible::bin_device_buffer, &bins, sizeof(bins), 0, cudaMemcpyHostToDevice);
+            init = true;
+          }
+        }
+#endif
         apply(device::get_default_stream());
 
         blas::bytes += bytes();

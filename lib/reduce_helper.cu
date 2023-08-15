@@ -68,7 +68,7 @@ namespace quda
         using system_atomic_t = device_reduce_t;
         size_t n_reduce = bytes / sizeof(system_atomic_t);
         auto *atomic_buf = reinterpret_cast<system_atomic_t *>(h_reduce);
-        for (size_t i = 0; i < n_reduce; i++) new (atomic_buf + i) system_atomic_t {0}; // placement new constructor
+        for (size_t i = 0; i < n_reduce; i++) new (atomic_buf + i) system_atomic_t {}; // placement new constructor
 
         allocated_bytes = bytes;
       }

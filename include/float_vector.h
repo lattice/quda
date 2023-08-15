@@ -13,8 +13,17 @@
 #include <limits>
 #include <type_traits>
 #include "dbldbl.h"
+#include "reproducible_floating_accumulator.hpp"
 
 namespace quda {
+
+#if defined(QUDA_REDUCTION_ALGORITHM_NAIVE)
+  using device_reduce_t = reduction_t;
+#elif defined(QUDA_REDUCTION_ALGORITHM_KAHAN)
+  using device_reduce_t = kahan_t<reduction_t>;
+#elif defined(QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE)
+  using device_reduce_t = rfa_t<reduction_t>;
+#endif
 
   __host__ __device__ inline double2 operator+(const double2 &x, const double2 &y)
   {
@@ -35,6 +44,15 @@ namespace quda {
   {
     return make_float2(x.x + y.x, x.y + y.y);
   }
+
+#ifdef QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE
+  __host__ __device__ inline device_reduce_t operator+(const device_reduce_t &x, const device_reduce_t &y)
+  {
+    device_reduce_t z = x;
+    z.operator+=(y);
+    return z;
+  }
+#endif
 
   template <typename T, int n>
   __device__ __host__ inline array<T, n> operator+(const array<T, n> &a, const array<T, n> &b)

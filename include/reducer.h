@@ -3,8 +3,8 @@
 #include "complex_quda.h"
 #include "quda_constants.h"
 #include "quda_api.h"
-#include <math_helper.cuh>
-#include <float_vector.h>
+#include "math_helper.cuh"
+#include "float_vector.h"
 #include "comm_quda.h"
 #include "fast_intdiv.h"
 
@@ -73,7 +73,7 @@ namespace quda
   /**
      plus reducer, used for conventional sum reductions
    */
-  template <typename T> struct plus {
+  template <typename T, class Enable = void> struct plus {
     static constexpr bool do_sum = true;
     using reduce_t = T;
     using reducer_t = plus<T>;
@@ -81,6 +81,66 @@ namespace quda
     __device__ __host__ static inline T init() { return T{}; }
     __device__ __host__ static inline T apply(T a, T b) { return a + b; }
     __device__ __host__ inline T operator()(T a, T b) const { return apply(a, b); }
+
+    template <class U>
+    __device__ __host__ static inline std::enable_if_t<std::is_same_v<U, array<typename U::value_type, U::N>>, T> apply(T a, const U &b)
+    {
+#pragma unroll
+      for (int i = 0; i < T::N; i++) a[i].operator+=(b[i]);
+      return a;
+    }
+    template <class U>
+    __device__ __host__ inline std::enable_if_t<std::is_same_v<U, array<typename U::value_type, U::N>>, T> operator()(T a, const U &b) const { return apply(a, b); }
+  };
+
+  /**
+     plus reducer, specialized for reproducible sum reductions
+   */
+  template <class T>
+  struct plus<T, std::enable_if_t<std::is_same_v<T, rfa_t<typename T::ftype>>>> {
+    static constexpr bool do_sum = true;
+    using reduce_t = T;
+    using reducer_t = plus<T>;
+    template <typename U> static inline void comm_reduce(std::vector<U> &a) { comm_allreduce_sum(a); }
+    __device__ __host__ static inline T init() { return reduce_t(); }
+    // rfa_t + rfa_t
+    // FIXME - should we use references here?
+    __device__ __host__ static inline T apply(T a, T b) { a.operator+=(b); return a; }
+    __device__ __host__ inline T operator()(T a, T b) const { return apply(a, b); }
+
+    __device__ __host__ static inline T apply(T a, typename T::ftype b) { a.operator+=(b); return a; }
+    __device__ __host__ inline T operator()(T a, typename T::ftype b) const { return apply(a, b); }
+  };
+
+  /**
+     plus reducer, specialized for arrays of reproducible sum reductions
+   */
+  template <class T>
+  struct plus<T, std::enable_if_t<std::is_same_v<T, array<rfa_t<typename T::value_type::ftype>, T::N>>>>
+  {
+    static constexpr bool do_sum = true;
+    using reduce_t = T;
+    using reducer_t = plus<T>;
+    template <typename U> static inline void comm_reduce(std::vector<U> &a) { comm_allreduce_sum(a); }
+    __device__ __host__ static inline T init() { return reduce_t{}; }
+    // rfa_t + rfa_t
+    // FIXME - should we use references here?
+    __device__ __host__ static inline T apply(T a, T b)
+    {
+#pragma unroll
+      for (int i = 0; i < T::N; i++) a[i].operator+=(b[i]);
+      return a;
+    }
+    __device__ __host__ inline T operator()(T a, T b) const { return apply(a, b); }
+
+    __device__ __host__ static inline T apply(T a, const array<typename T::value_type::ftype, T::N> &b)
+    {
+#pragma unroll
+      for (int i = 0; i < T::N; i++) a[i].operator+=(b[i]);
+      return a;
+    }
+
+    __device__ __host__ inline T operator()(T a, const array<typename T::value_type::ftype, T::N> &b) const { return apply(a, b); }
   };
 
   /**

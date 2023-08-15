@@ -64,7 +64,7 @@ namespace quda {
     {
       using Link = typename Arg::Link;
 
-      reduce_t loop_trace{0, 0};
+      array<double, 2> loop_trace = {};
 
       int x[4] = {0, 0, 0, 0};
       getCoords(x, x_cb, arg.X, parity);
@@ -73,7 +73,7 @@ namespace quda {
       thread_array<int, 4> dx{0};
 
       auto coeff_loop = arg.factor * arg.p.path_coeff[path_id];
-      if (coeff_loop == 0) return operator()(loop_trace, value);
+      if (coeff_loop == 0) return operator()(value, loop_trace);
 
       const int* path = arg.p.input_path[0] + path_id * arg.p.max_length;
 
@@ -86,7 +86,7 @@ namespace quda {
       loop_trace[0] = coeff_loop * trace.real();
       loop_trace[1] = coeff_loop * trace.imag();
 
-      return operator()(loop_trace, value);
+      return operator()(value, loop_trace);
     }
   };
 

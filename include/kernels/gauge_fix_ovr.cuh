@@ -53,7 +53,7 @@ namespace quda {
      */
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t data{0, 0};
+      array<double, 2> data = {};
       using Link = Matrix<complex<typename Arg::real>, 3>;
 
       int X[4];
@@ -93,7 +93,7 @@ namespace quda {
       //35
       //T=36*gauge_dir+65
 
-      return operator()(data, value);
+      return operator()(value, data);
     }
   };
 

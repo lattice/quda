@@ -1208,9 +1208,9 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
   {
     complex<real> w;
     w.x = x.real() * y.real();
-    w.x -= x.imag() * y.imag();
+    w.x = fma(-x.imag(), y.imag(), w.x);
     w.y = x.imag() * y.real();
-    w.y += x.real() * y.imag();
+    w.y = fma(x.real(), y.imag(), w.y);
     return w;
   }
 
@@ -1218,10 +1218,10 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
   __host__ __device__ inline complex<real> cmac(const complex<real> &x, const complex<real> &y, const complex<real> &z)
   {
     complex<real> w = z;
-    w.x += x.real() * y.real();
-    w.x -= x.imag() * y.imag();
-    w.y += x.imag() * y.real();
-    w.y += x.real() * y.imag();
+    w.x = fma( x.real(), y.real(), w.x);
+    w.x = fma(-x.imag(), y.imag(), w.x);
+    w.y = fma( x.imag(), y.real(), w.y);
+    w.y = fma( x.real(), y.imag(), w.y);
     return w;
   }
 
@@ -1236,10 +1236,10 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
     complex<real> X = x;
     complex<real> Y = y;
     complex<real> Z = z;
-    Z.real(Z.real() + X.real() * Y.real());
-    Z.real(Z.real() - X.imag() * Y.imag());
-    Z.imag(Z.imag() + X.imag() * Y.real());
-    Z.imag(Z.imag() + X.real() * Y.imag());
+    Z.real(fma( X.real(), Y.real(), Z.real()));
+    Z.real(fma(-X.imag(), Y.imag(), Z.real()));
+    Z.imag(fma( X.imag(), Y.real(), Z.imag()));
+    Z.imag(fma( X.real(), Y.imag(), Z.imag()));
     return Z;
   }
 
