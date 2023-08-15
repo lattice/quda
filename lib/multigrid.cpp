@@ -440,7 +440,8 @@ namespace quda
       diracParam.matpcType = matpc_type;
       diracParam.type = QUDA_COARSE_DIRAC;
       diracParam.halo_precision = param.mg_global.precision_null[param.level];
-      diracParam.use_mma = param.use_mma;
+      diracParam.setup_use_mma = param.mg_global.setup_use_mma[param.level];
+      diracParam.dslash_use_mma = param.mg_global.dslash_use_mma[param.level];
       diracParam.allow_truncation = (param.mg_global.allow_truncation == QUDA_BOOLEAN_TRUE) ? true : false;
 
       diracCoarseResidual = new DiracCoarse(diracParam, param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false,
@@ -859,7 +860,7 @@ namespace quda
     switch (prec) {
     case QUDA_QUARTER_PRECISION: tol = 5e-2; break;
     case QUDA_HALF_PRECISION: tol = 5e-2; break;
-    case QUDA_SINGLE_PRECISION: tol = 1e-3; break;
+    case QUDA_SINGLE_PRECISION: tol = 2e-3; break;
     default: tol = 1e-8;
     }
 

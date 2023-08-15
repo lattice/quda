@@ -744,6 +744,8 @@ namespace quda
 
   template <typename T> void comm_allreduce_max_array(T *data, size_t size);
 
+  void comm_allreduce_sum(size_t &a);
+
   template <typename T> void comm_allreduce_min_array(T *data, size_t size);
 
   void comm_allreduce_int(int &data);

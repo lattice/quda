@@ -84,9 +84,10 @@ namespace quda
   template <>
   void Communicator::comm_allreduce_sum_array<rfa_t<double>>(rfa_t<double> *, size_t) { }
 
+  void Communicator::comm_allreduce_sum(size_t &) { }
+
   template <>
   void Communicator::comm_allreduce_sum_array<double>(double *, size_t) { }
-
   template <>
   void Communicator::comm_allreduce_sum_array<doubledouble>(doubledouble *, size_t) { }
 

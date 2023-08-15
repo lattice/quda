@@ -225,7 +225,7 @@ namespace quda
     get_current_communicator().comm_allreduce_sum_array(&a, 1);
   }
 
-  template <> void comm_allreduce_sum<double>(double &a)
+   template <> void comm_allreduce_sum<double>(double &a)
   {
     get_current_communicator().comm_allreduce_sum_array(&a, 1);
   }
@@ -233,6 +233,11 @@ namespace quda
   template <> void comm_allreduce_sum<doubledouble>(doubledouble &a)
   {
     get_current_communicator().comm_allreduce_sum_array(&a, 1);
+  }
+
+  template <> void comm_allreduce_sum<size_t>(size_t &a)
+  {
+    get_current_communicator().comm_allreduce_sum(a);
   }
 
   template <typename T>

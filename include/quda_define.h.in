@@ -9,7 +9,7 @@
  * @brief This macro sets the target GPU architecture, which is
  * defined on both host and device.
  */
-#define __COMPUTE_CAPABILITY__ @COMP_CAP@0
+#define __COMPUTE_CAPABILITY__ @QUDA_COMPUTE_CAPABILITY@0
 
 /**
  * @def   MAX_MULTI_BLAS_N

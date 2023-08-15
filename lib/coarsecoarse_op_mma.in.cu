@@ -43,7 +43,7 @@ namespace quda {
         output = new GaugeField(param);
         if (copy_content) output->copy(X);
       }
-      return static_cast<GaugeField *>(output);
+      return output;
     };
 
     auto Y_order = create_gauge_copy(Y, gOrder, false);

@@ -369,6 +369,14 @@ void Communicator::comm_allreduce_sum_array<rfa_t<reduction_t>>(rfa_t<reduction_
   }
 }
 
+void Communicator::comm_allreduce_sum(size_t &a)
+{
+  if (sizeof(size_t) != sizeof(uint64_t)) {
+    errorQuda("sizeof(size_t) != sizeof(uint64_t): %lu != %lu\n", sizeof(size_t), sizeof(uint64_t));
+  }
+  QMP_CHECK(QMP_comm_sum_uint64_t(QMP_COMM_HANDLE, reinterpret_cast<uint64_t *>(&a)));
+}
+
 template <>
 void Communicator::comm_allreduce_max_array<rfa_t<reduction_t>>(rfa_t<reduction_t> *, size_t)
 {

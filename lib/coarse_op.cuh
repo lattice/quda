@@ -791,7 +791,12 @@ namespace quda {
 
       if (type == COMPUTE_UV) {
         strcat(Aux, ",computeUV");
-        if (use_mma) strcat(Aux, ",mma");
+        if constexpr (use_mma) {
+          strcat(Aux, ",mma");
+#ifdef QUDA_MMA_AVAILABLE
+          strcat(Aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
+#endif
+        }
       }
       else if (type == COMPUTE_LV) strcat(Aux, ",computeLV");
       else if (type == COMPUTE_AV)
@@ -801,7 +806,12 @@ namespace quda {
       else if (type == COMPUTE_KV)                 strcat(Aux, ",computeKV");
       else if (type == COMPUTE_VUV) {
         strcat(Aux, ",computeVUV");
-        if (use_mma) strcat(Aux, ",MMA");
+        if constexpr (use_mma) {
+          strcat(Aux, ",mma");
+#ifdef QUDA_MMA_AVAILABLE
+          strcat(Aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
+#endif
+        }
       }
       else if (type == COMPUTE_VLV) strcat(Aux, ",computeVLV");
       else if (type == COMPUTE_COARSE_CLOVER)

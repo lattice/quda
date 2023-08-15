@@ -173,8 +173,12 @@ namespace quda {
       using store_type = storeFloat;
       complex<storeFloat> *v;
       const unsigned int idx;
+
+    private:
       const Float scale;
       const Float scale_inv;
+
+    public:
       static constexpr bool fixed = fixed_point<Float, storeFloat>();
 
       /**
@@ -244,6 +248,16 @@ namespace quda {
        * @brief returns the pointer of this wrapper object
        */
       __device__ __host__ inline auto data() const { return &v[idx]; }
+
+      /**
+       * @brief returns the scale of this wrapper object
+       */
+      __device__ __host__ inline auto get_scale() const { return scale; }
+
+      /**
+       * @brief returns the scale_inv of this wrapper object
+       */
+      __device__ __host__ inline auto get_scale_inv() const { return scale_inv; }
 
       /**
          @brief negation operator
