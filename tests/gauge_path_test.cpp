@@ -322,8 +322,7 @@ void gauge_loop_test()
 
     loop_deviation = 0;
     for (int i = 0; i < num_paths; i++) {
-      quda::real_t *t_ptr = (quda::real_t*)(&traces[i]);
-      quda::complex_t traces_(t_ptr[0], t_ptr[1]);
+      quda::complex_t traces_(static_cast<std::complex<double>>(traces[i]).real(), static_cast<std::complex<double>>(traces[i]).imag());
       auto diff = abs(traces_ref[i] - traces_);
       auto norm = abs(traces_ref[i]);
       loop_deviation += diff / norm;
