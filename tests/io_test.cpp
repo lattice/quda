@@ -25,6 +25,9 @@ public:
 // test write/read of a gauge field yields identical lattice
 TEST_P(GaugeIOTest, verify)
 {
+  using namespace quda;
+  if (!is_enabled(prec)) GTEST_SKIP();
+
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
 
