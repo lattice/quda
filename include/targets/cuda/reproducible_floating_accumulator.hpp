@@ -46,7 +46,7 @@
 //#endif
 
 // disable zero checks
-#define DISABLE_ZERO
+//#define DISABLE_ZERO
 
 // disable nan / infinity checks
 #define DISABLE_NANINF
