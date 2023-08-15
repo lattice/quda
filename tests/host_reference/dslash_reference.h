@@ -221,7 +221,6 @@ Float *spinorNeighbor_5d(int i, int dir, int oddBit, Float *spinorField, int nei
   return &spinorField[j * site_size];
 }
 
-#ifdef MULTI_GPU
 inline int x4_mg(int i, int oddBit)
 {
   int Y = fullLatticeIndex(i, oddBit);
@@ -554,4 +553,3 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
   return &spinorField[j * site_size];
 }
 
-#endif // MULTI_GPU
