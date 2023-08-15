@@ -42,13 +42,13 @@ namespace quda
     // this parameter determines how many consective reliable update
     // residual increases we tolerate before terminating the solver,
     // i.e., how long do we want to keep trying to converge
-    int maxResIncrease; //  check if we reached the limit of our tolerance
-    int maxResIncreaseTotal;
+    int maxResIncrease = 0; //  check if we reached the limit of our tolerance
+    int maxResIncreaseTotal = 0;
 
     bool use_heavy_quark_res;
 
-    int hqmaxresIncrease;
-    int hqmaxresRestartTotal; // this limits the number of heavy quark restarts we can do
+    int hqmaxresIncrease = 0;
+    int hqmaxresRestartTotal = 0; // this limits the number of heavy quark restarts we can do
   };
 
   struct ReliableUpdates {
