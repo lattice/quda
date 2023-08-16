@@ -90,9 +90,10 @@ void init(int argc, char **argv)
   gauge_.resize(4 * V * gauge_site_size * host_gauge_data_type_size);
   for (int i = 0; i < 4; i++) gauge[i] = gauge_.data() + i * V * gauge_site_size * host_gauge_data_type_size;
 
+  printfQuda("Randomizing gauge fields... ");
   constructHostGaugeField(gauge.data(), gauge_param, argc, argv);
-  // Load the gauge field to the device
 
+  printfQuda("Sending gauge field to GPU\n");
   loadGaugeQuda(gauge.data(), &gauge_param);
 
   // Allocate host side memory for clover terms if needed.
@@ -101,7 +102,17 @@ void init(int argc, char **argv)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     clover.resize(V * clover_site_size * host_clover_data_type_size);
     clover_inv.resize(V * clover_site_size * host_spinor_data_type_size);
-    constructHostCloverField(clover.data(), clover_inv.data(), inv_param);
+    // constructHostCloverField(clover.data(), clover_inv.data(), inv_param);
+    if (compute_clover)
+        printfQuda("Computing clover field on GPU\n");
+      else {
+        printfQuda("Sending clover field to GPU\n");
+        constructHostCloverField(clover.data(), clover_inv.data(), inv_param);
+      }
+      inv_param.compute_clover = compute_clover;
+      inv_param.return_clover = compute_clover;
+      inv_param.compute_clover_inverse = true;
+      inv_param.return_clover_inverse = true;
     // Load the clover terms to the device
     loadCloverQuda(clover.data(), clover_inv.data(), &inv_param);
   } else {
@@ -194,7 +205,7 @@ void TMCloverForce_test()
 
   // inv_param = newQudaInvertParam();
   // setInvertParam(inv_param);
-  
+
   // inv_param.compute_clover = 1;
   // inv_param.compute_clover_inverse = 1;
   // inv_param.clover_csw=0;
@@ -227,13 +238,15 @@ void TMCloverForce_test()
       spinorNoise(out_multishift[n * multishift + i], rng, QUDA_NOISE_GAUSS);
       in[n][i] = out_multishift[n * multishift + i].V();
       ////////////my init
-      // double *vin=(double*)in[0][0];
-
-      // (*vin)=1;
-      // for (int x=1;x<4*4*4*2*24;x++){
+      // double *vin = (double *)in[0][0];
+      // for (int x = 0; x < 2 * 4 * 4 * 2 * 24; x++) {
+      //   (*vin) = 0;
       //   vin++;
-      //   (*vin)=0;
       // }
+      // vin = (double *)in[0][0];
+      // if (getRankVerbosity()) {
+      //   (*vin) = 1;
+      // } 
       ////////////////////////
     }
   }
@@ -242,11 +255,7 @@ void TMCloverForce_test()
   void *h_gauge = nullptr;
   if (getTuning() == QUDA_TUNE_YES) {
     computeTMCloverForceQuda(mom, in[0].data(), coeff, 1, h_gauge, &gauge_param, &inv_param);
-    // if (compute_force)
-    //   computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3,
-    //                         &gauge_param);
-    // else
-    //   computeGaugePathQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);
+    
   }
   printf("Device function computed\n");
   quda::host_timer_t host_timer;
@@ -259,11 +268,6 @@ void TMCloverForce_test()
     host_timer.start();
     computeTMCloverForceQuda(mom, in[0].data(), coeff, 1, h_gauge, &gauge_param, &inv_param);
 
-    // if (compute_force)
-    //   computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3,
-    //                         &gauge_param);
-    // else
-    //   computeGaugePathQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);
     host_timer.stop();
     time_sec += host_timer.last();
   }
@@ -277,8 +281,7 @@ void TMCloverForce_test()
   int *check_out = true ? &force_check : &path_check;
   if (verify_results) {
     // TODO: add reference func
-    // gauge_force_reference(refmom, eb3, (void **)U_qdp.Gauge_p(), gauge_param.cpu_prec, input_path_buf, length,
-    //                       loop_coeff, num_paths, compute_force);
+    
     TMCloverForce_reference(refmom, in[0].data(), coeff, 1, gauge, clover, clover_inv, &gauge_param, &inv_param);
     *check_out
       = compare_floats(Mom_milc.Gauge_p(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec), gauge_param.cpu_prec);
@@ -286,7 +289,6 @@ void TMCloverForce_test()
     strong_check_mom(Mom_milc.Gauge_p(), refmom, 4 * V, gauge_param.cpu_prec);
   }
 
-  // if (compute_force) {
   logQuda(QUDA_VERBOSE, "\nComputing momentum action\n");
   auto action_quda = momActionQuda(mom, &gauge_param);
   auto action_ref = mom_action(refmom, gauge_param.cpu_prec, 4 * V);
@@ -294,7 +296,6 @@ void TMCloverForce_test()
   logQuda(QUDA_VERBOSE, "QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref,
           force_deviation);
   printfQuda("QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref, force_deviation);
-  // }
 
   double perf = 1.0 * niter * flops * V / (time_sec * 1e+9);
   // if (compute_force) {
@@ -339,6 +340,9 @@ static void display_test_info()
              "%s           %d\n",
              get_prec_str(prec), get_recon_str(link_recon), xdim, ydim, zdim, tdim, get_gauge_order_str(gauge_order),
              niter);
+  printfQuda("Grid partition info:     X  Y  Z  T\n");
+  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
+               dimPartitioned(3));
 }
 
 int main(int argc, char **argv)
