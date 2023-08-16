@@ -14,7 +14,7 @@ namespace quda {
   // these helper functions return the thread coarseness, with both
   // constexpr variants (to be called from parallel regions) and
   // run-time variants (to be called from host serial code)
-  template <bool is_device, int nSpin> constexpr int spins_per_thread()
+  template <bool is_device> constexpr int spins_per_thread(int nSpin)
   {
     if (is_device)
       return (nSpin == 1) ? 1 : 2;
@@ -22,40 +22,44 @@ namespace quda {
       return nSpin;
   }
 
-  template <int nSpin> __host__ __device__ int spins_per_thread()
+  __host__ __device__ int spins_per_thread(int nSpin)
   {
-    if (target::is_device()) return spins_per_thread<true, nSpin>();
-    else return spins_per_thread<false, nSpin>();
+    if (target::is_device())
+      return spins_per_thread<true>(nSpin);
+    else
+      return spins_per_thread<false>(nSpin);
   }
 
   int spins_per_thread(const ColorSpinorField &a)
   {
     if (a.Location() == QUDA_CUDA_FIELD_LOCATION)
-      return (a.Nspin() == 1) ? 1 : 2;
+      return spins_per_thread<true>(a.Nspin());
     else
-      return a.Nspin();
+      return spins_per_thread<false>(a.Nspin());
   }
 
-  template <bool is_device, int nColor> constexpr int colors_per_thread()
+  template <bool is_device> constexpr int colors_per_thread(int nColor)
   {
     if (is_device)
-      return (nColor % 2 == 0) ? 2 : 1;
+      return (nColor > 128 && nColor % 8 == 0) ? 8 : (nColor > 32 && nColor % 4 == 0) ? 4 : (nColor % 2 == 0) ? 2 : 1;
     else
       return nColor;
   }
 
-  template <int nColor> __host__ __device__ int colors_per_thread()
+  __host__ __device__ int colors_per_thread(int nColor)
   {
-    if (target::is_device()) return colors_per_thread<true, nColor>();
-    else return colors_per_thread<false, nColor>();
+    if (target::is_device())
+      return colors_per_thread<true>(nColor);
+    else
+      return colors_per_thread<false>(nColor);
   }
 
   int colors_per_thread(const ColorSpinorField &a)
   {
     if (a.Location() == QUDA_CUDA_FIELD_LOCATION)
-      return (a.Ncolor() % 2 == 0) ? 2 : 1;
+      return colors_per_thread<true>(a.Ncolor());
     else
-      return a.Ncolor();
+      return colors_per_thread<false>(a.Ncolor());
   }
 
   template <typename store_t, typename ghost_store_t, int nSpin_, int nColor_, int nDim_, QudaFieldOrder order>
@@ -72,6 +76,7 @@ namespace quda {
     // disable ghost to reduce arg size
     using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, order, store_t, ghost_store_t, true>;
 
+    static constexpr bool is_native = order <= 8;
     static constexpr int max_n_src = 64;
     const int_fastdiv n_src;
     G out;
@@ -160,8 +165,8 @@ namespace quda {
     {
       using Arg = typename Ftor::Arg;
       // on the host we require that both spin and color are fully thread local
-      constexpr int Ms = spins_per_thread<is_device, Arg::nSpin>();
-      constexpr int Mc = colors_per_thread<is_device, Arg::nColor>();
+      constexpr int Ms = spins_per_thread<is_device>(Arg::nSpin);
+      constexpr int Mc = colors_per_thread<is_device>(Arg::nColor);
       static_assert(Ms == Arg::nSpin, "on host spins per thread must match total spins");
       static_assert(Mc == Arg::nColor, "on host colors per thread must match total colors");
       return thread_max;
@@ -169,13 +174,13 @@ namespace quda {
   };
 
   template <> struct site_max<true> {
-    template <typename Arg> static constexpr int Ms = spins_per_thread<true, Arg::nSpin>();
-    template <typename Arg> static constexpr int Mc = colors_per_thread<true, Arg::nColor>();
+    template <typename Arg> static constexpr int Ms = spins_per_thread<true>(Arg::nSpin);
+    template <typename Arg> static constexpr int Mc = colors_per_thread<true>(Arg::nColor);
     template <typename Arg> static constexpr int color_spin_threads = (Arg::nSpin/Ms<Arg>) * (Arg::nColor/Mc<Arg>);
     template <typename Arg> struct CacheDims {
       template <typename ...A> static constexpr dim3 dims(dim3 b, A &...) {
 	dim3 block = b;
-	block.x = ((block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
+	if (Arg::is_native) block.x = ((block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
 	block.y = color_spin_threads<Arg>; // state the y block since we know it at compile time
 	return block;
       }
@@ -215,8 +220,8 @@ namespace quda {
   compute_site_max(const Ftor &ftor, int src_idx, int x_cb, int spinor_parity, int spin_block, int color_block, bool active)
   {
     using real = typename Ftor::Arg::real;
-    const int Ms = spins_per_thread<Ftor::Arg::nSpin>();
-    const int Mc = colors_per_thread<Ftor::Arg::nColor>();
+    const int Ms = spins_per_thread(Ftor::Arg::nSpin);
+    const int Mc = colors_per_thread(Ftor::Arg::nColor);
     complex<real> thread_max = {0.0, 0.0};
 
     if (!allthreads || active) {
@@ -297,8 +302,8 @@ namespace quda {
     template <bool allthreads = false>
     __device__ __host__ void operator()(int tid, int spin_color_block, int parity, bool active = true)
     {
-      const int Ms = spins_per_thread<Arg::nSpin>();
-      const int Mc = colors_per_thread<Arg::nColor>();
+      const int Ms = spins_per_thread(Arg::nSpin);
+      const int Mc = colors_per_thread(Arg::nColor);
 
       if (arg.nParity == 1) parity = arg.parity;
       const int spinor_parity = (arg.nParity == 2) ? parity : 0;

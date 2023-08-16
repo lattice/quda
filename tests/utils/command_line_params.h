@@ -202,6 +202,7 @@ extern int test_type;
 extern quda::mgarray<int> nvec;
 extern quda::mgarray<std::string> mg_vec_infile;
 extern quda::mgarray<std::string> mg_vec_outfile;
+extern quda::mgarray<bool> mg_vec_partfile;
 extern QudaInverterType inv_type;
 extern bool inv_deflate;
 extern bool inv_multigrid;
@@ -265,6 +266,8 @@ extern quda::mgarray<int> n_block_ortho;
 extern quda::mgarray<bool> block_ortho_two_pass;
 extern quda::mgarray<double> mu_factor;
 extern quda::mgarray<QudaVerbosity> mg_verbosity;
+extern quda::mgarray<bool> mg_setup_use_mma;
+extern quda::mgarray<bool> mg_dslash_use_mma;
 extern quda::mgarray<QudaInverterType> setup_inv;
 extern quda::mgarray<QudaSolveType> coarse_solve_type;
 extern quda::mgarray<QudaSolveType> smoother_solve_type;
@@ -301,7 +304,6 @@ extern bool mg_evolve_thin_updates;
 extern QudaTransferType staggered_transfer_type;
 
 extern quda::mgarray<std::array<int, 4>> geo_block_size;
-extern bool mg_use_mma;
 extern bool mg_allow_truncation;
 extern bool mg_staggered_kd_dagger_approximation;
 
@@ -354,6 +356,7 @@ extern std::string eig_vec_infile;
 extern std::string eig_vec_outfile;
 extern bool eig_io_parity_inflate;
 extern QudaPrecision eig_save_prec;
+extern bool eig_partfile;
 
 // Parameters for the MG eigensolver.
 // The coarsest grid params are for deflation,
