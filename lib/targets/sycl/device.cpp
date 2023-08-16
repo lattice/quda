@@ -366,7 +366,8 @@ namespace quda
 
     bool managed_memory_supported()
     {
-      auto val = myDevice.has(sycl::aspect::usm_restricted_shared_allocations);
+      //auto val = myDevice.has(sycl::aspect::usm_restricted_shared_allocations);
+      auto val = true;
       return val;
     }
 
