@@ -171,27 +171,32 @@ namespace quda {
     }
   };
 
-  template <bool is_native>
-  struct DimsPadX {
-    static constexpr dim3 dims(dim3 block) {
-      if (is_native) block.x = ((block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
-      return block;
-    }
-  };
-
   template <> struct site_max<true> {
+    template <typename Arg>
+    struct DimsPadX {
+      static constexpr int Ms = spins_per_thread<true>(Arg::nSpin);
+      static constexpr int Mc = colors_per_thread<true>(Arg::nColor);
+      static constexpr int color_spin_threads = (Arg::nSpin/Ms) * (Arg::nColor/Mc);
+      static constexpr dim3 dims(dim3 block) {
+	if (Arg::is_native) block.x = ((block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
+	block.y = color_spin_threads; // state the y block since we know it at compile time
+	return block;
+      }
+    };
+
     template <typename Arg> __device__ inline auto operator()(typename Arg::real thread_max, Arg &)
     {
       using real = typename Arg::real;
-      constexpr int Ms = spins_per_thread<true>(Arg::nSpin);
-      constexpr int Mc = colors_per_thread<true>(Arg::nColor);
-      constexpr int color_spin_threads = (Arg::nSpin/Ms) * (Arg::nColor/Mc);
+      //constexpr int Ms = spins_per_thread<true>(Arg::nSpin);
+      //constexpr int Mc = colors_per_thread<true>(Arg::nColor);
+      //constexpr int color_spin_threads = (Arg::nSpin/Ms) * (Arg::nColor/Mc);
+      constexpr int color_spin_threads = DimsPadX<Arg>::color_spin_threads;
       //auto block = target::block_dim();
       // pad the shared block size to avoid bank conflicts for native ordering
       //if (Arg::is_native) block.x = ((block.x + device::warp_size() - 1) / device::warp_size()) * device::warp_size();
       //block.y = color_spin_threads; // state the y block since we know it at compile time
       //SharedMemoryCache<real> cache(block);
-      SharedMemoryCache<real, DimsPadX<Arg::is_native>> cache;
+      SharedMemoryCache<real, DimsPadX<Arg>> cache;
       cache.save(thread_max);
       cache.sync();
       real this_site_max = static_cast<real>(0);

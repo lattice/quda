@@ -56,6 +56,9 @@ namespace quda
     // The number of elements of type atom_t that we break T into for optimal shared-memory access
     static constexpr int n_element = sizeof(T) / sizeof(atom_t);
 
+    // used to avoid instantiation of load functions if unused, in case T is not a valid return type (e.g. C array)
+    template <typename dummy = void> using maybeT = std::conditional_t<std::is_same_v<dummy,void>,T,void>;
+
     const dim3 block;
     const int stride;
 
@@ -70,7 +73,8 @@ namespace quda
       for (int i = 0; i < n_element; i++) smem()[i * stride + j] = tmp[i];
     }
 
-    __device__ __host__ inline T load_detail(int x, int y, int z) const
+    template <typename dummy = void>
+    __device__ __host__ inline maybeT<dummy> load_detail(int x, int y, int z) const
     {
       atom_t tmp[n_element];
       int j = (z * block.y + y) * block.x + x;
@@ -182,7 +186,8 @@ namespace quda
        @param[in] z The z index to use
        @return The value at coordinates (x,y,z)
      */
-    __device__ __host__ inline T load(int x = -1, int y = -1, int z = -1) const
+    template <typename dummy = void>
+    __device__ __host__ inline maybeT<dummy> load(int x = -1, int y = -1, int z = -1) const
     {
       auto tid = target::thread_idx();
       x = (x == -1) ? tid.x : x;
@@ -196,7 +201,8 @@ namespace quda
        @param[in] x The x index to use
        @return The value at coordinates (x,y,z)
     */
-    __device__ __host__ inline T load_x(int x = -1) const
+    template <typename dummy = void>
+    __device__ __host__ inline maybeT<dummy> load_x(int x = -1) const
     {
       auto tid = target::thread_idx();
       x = (x == -1) ? tid.x : x;
@@ -208,7 +214,8 @@ namespace quda
        @param[in] y The y index to use
        @return The value at coordinates (x,y,z)
     */
-    __device__ __host__ inline T load_y(int y = -1) const
+    template <typename dummy = void>
+    __device__ __host__ inline maybeT<dummy> load_y(int y = -1) const
     {
       auto tid = target::thread_idx();
       y = (y == -1) ? tid.y : y;
@@ -220,7 +227,8 @@ namespace quda
        @param[in] z The z index to use
        @return The value at coordinates (x,y,z)
     */
-    __device__ __host__ inline T load_z(int z = -1) const
+    template <typename dummy = void>
+    __device__ __host__ inline maybeT<dummy> load_z(int z = -1) const
     {
       auto tid = target::thread_idx();
       z = (z == -1) ? tid.z : z;
@@ -236,7 +244,8 @@ namespace quda
        @brief Cast operator to allow cache objects to be used where T
        is expected
      */
-    __device__ __host__ operator T() const { return load(); }
+    template <typename dummy = void>
+    __device__ __host__ operator maybeT<dummy>() const { return load(); }
 
     /**
        @brief Assignment operator to allow cache objects to be used on

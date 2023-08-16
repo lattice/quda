@@ -31,6 +31,13 @@ namespace quda
     }
   };
 
+  template <int x, int y, int z>
+  struct DimsStatic {
+    static constexpr dim3 dims(dim3 block) {
+      return dim3(x,y,z);
+    }
+  };
+
   /**
      @brief Uniform helper for exposing type T, whether we are dealing
      with an instance of T or some wrapper of T
