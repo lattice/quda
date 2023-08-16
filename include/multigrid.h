@@ -157,11 +157,17 @@ namespace quda {
     /** Filename for where to load/store the null space */
     char filename[100];
 
+    /** Whether to save in partfile format (true) or singlefile (false) */
+    bool mg_vec_partfile;
+
     /** Whether or not this is a staggered solve or not */
     QudaTransferType transfer_type;
 
-    /** Whether to use tensor cores (if available) */
-    bool use_mma;
+    /** Whether to use tensor cores (if available) for setup */
+    bool setup_use_mma;
+
+    /** Whether to use tensor cores (if available) for dslash */
+    bool dslash_use_mma;
 
     /**
        This is top level instantiation done when we start creating the multigrid operator.
@@ -190,8 +196,10 @@ namespace quda {
       smoother_solve_type(param.smoother_solve_type[level]),
       location(param.location[level]),
       setup_location(param.setup_location[level]),
+      mg_vec_partfile(param.mg_vec_partfile[level]),
       transfer_type(param.transfer_type[level]),
-      use_mma(param.use_mma == QUDA_BOOLEAN_TRUE)
+      setup_use_mma(param.setup_use_mma[level] == QUDA_BOOLEAN_TRUE),
+      dslash_use_mma(param.dslash_use_mma[level] == QUDA_BOOLEAN_TRUE)
     {
       // set the block size
       for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
@@ -226,8 +234,10 @@ namespace quda {
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
       location(param.mg_global.location[level]),
       setup_location(param.mg_global.setup_location[level]),
+      mg_vec_partfile(param.mg_global.mg_vec_partfile[level]),
       transfer_type(param.mg_global.transfer_type[level]),
-      use_mma(param.use_mma)
+      setup_use_mma(param.mg_global.setup_use_mma[level] == QUDA_BOOLEAN_TRUE),
+      dslash_use_mma(param.mg_global.dslash_use_mma[level] == QUDA_BOOLEAN_TRUE)
     {
       // set the block size
       for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
@@ -370,7 +380,12 @@ namespace quda {
     /**
        @return MG can solve non-Hermitian systems
      */
-    bool hermitian() { return false; };
+    bool hermitian() const final { return false; };
+
+    /**
+       @return Is an MG inverter
+      */
+    virtual QudaInverterType getInverterType() const final { return QUDA_MG_INVERTER; }
 
     /**
        @brief This method resets the solver, e.g., when a parameter has changed such as the mass.
@@ -513,7 +528,7 @@ namespace quda {
   void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                    cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
                    int parity = QUDA_INVALID_PARITY, bool dslash = true, bool clover = true, bool dagger = false,
-                   const int *commDim = 0, QudaPrecision halo_precision = QUDA_INVALID_PRECISION);
+                   const int *commDim = 0, QudaPrecision halo_precision = QUDA_INVALID_PRECISION, bool use_mma = false);
 
   /**
      @brief Apply the coarse dslash stencil.  This single driver
@@ -538,6 +553,30 @@ namespace quda {
   void ApplyCoarse(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
                    cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
                    int parity, bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision);
+
+  /**
+     @brief Apply the coarse dslash stencil with MMA.  This single driver
+     accounts for all variations with and without the clover field,
+     with and without dslash, and both single and full parity fields
+     This template function requires that the dagger and number of
+     colors templates have been instantiated.
+     @param[out] out The result vector
+     @param[in] inA The first input vector
+     @param[in] inB The second input vector
+     @param[in] Y Coarse link field
+     @param[in] X Coarse clover field
+     @param[in] kappa Scaling parameter
+     @param[in] parity Parity of the field (if single parity)
+     @param[in] dslash Are we applying dslash?
+     @param[in] clover Are we applying clover?
+     @param[in] dagger Apply dagger operator?
+     @param[in] commDim Which dimensions are partitioned?
+     @param[in] halo_precision What precision to use for the halos (if QUDA_INVALID_PRECISION, use field precision)
+   */
+  template <bool dagger, int coarseColor, int nVec>
+  void ApplyCoarseMma(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &inA,
+                      cvector_ref<const ColorSpinorField> &inB, const GaugeField &Y, const GaugeField &X, double kappa,
+                      int parity, bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision);
 
   /**
      @brief Coarse operator construction from a fine-grid operator (Wilson / Clover)

@@ -585,6 +585,9 @@ extern "C" {
         MILC I/O) */
     QudaBoolean io_parity_inflate;
 
+    /** Whether to save eigenvectors in QIO singlefile or partfile format */
+    QudaBoolean partfile;
+
     /** The Gflops rate of the eigensolver setup */
     double gflops;
 
@@ -628,6 +631,12 @@ extern "C" {
 
     /** Verbosity on each level of the multigrid */
     QudaVerbosity verbosity[QUDA_MAX_MG_LEVEL];
+
+    /** Setup MMA usage on each level of the multigrid */
+    QudaBoolean setup_use_mma[QUDA_MAX_MG_LEVEL];
+
+    /** Dslash MMA usage on each level of the multigrid */
+    QudaBoolean dslash_use_mma[QUDA_MAX_MG_LEVEL];
 
     /** Inverter to use in the setup phase */
     QudaInverterType setup_inv_type[QUDA_MAX_MG_LEVEL];
@@ -773,6 +782,9 @@ extern "C" {
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[QUDA_MAX_MG_LEVEL][256];
 
+    /** Whether to store the null-space vectors in singlefile or partfile format */
+    QudaBoolean mg_vec_partfile[QUDA_MAX_MG_LEVEL];
+
     /** Whether to use and initial guess during coarse grid deflation */
     QudaBoolean coarse_guess;
 
@@ -796,9 +808,6 @@ extern "C" {
 
     /** Whether or not to use the dagger approximation for the KD preconditioned operator */
     QudaBoolean staggered_kd_dagger_approximation;
-
-    /** Whether to use tensor cores (if available) */
-    QudaBoolean use_mma;
 
     /** Whether to do a full (false) or thin (true) update in the context of updateMultigridQuda */
     QudaBoolean thin_update_only;

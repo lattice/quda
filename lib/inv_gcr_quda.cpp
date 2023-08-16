@@ -21,42 +21,6 @@ namespace quda {
     return ds + 0.000001*dus;
   }
 
-  // set the required parameters for the inner solver
-  void fillInnerSolveParam(SolverParam &inner, const SolverParam &outer) {
-    inner.tol = outer.tol_precondition;
-    inner.delta = 1e-20; // no reliable updates within the inner solver
-  
-    inner.precision = outer.precision_sloppy;
-    inner.precision_sloppy = outer.precision_precondition;
-
-    inner.residual_type = QUDA_L2_RELATIVE_RESIDUAL;
-  
-    inner.iter = 0;
-    inner.gflops = 0;
-    inner.secs = 0;
-
-    inner.inv_type_precondition = QUDA_INVALID_INVERTER;
-    inner.is_preconditioner = true; // tell inner solver it is a preconditioner
-    inner.pipeline = true;
-
-    inner.schwarz_type = outer.schwarz_type;
-    inner.global_reduction = inner.schwarz_type == QUDA_INVALID_SCHWARZ ? true : false;
-
-    inner.use_init_guess = QUDA_USE_INIT_GUESS_NO;
-
-    inner.maxiter = outer.maxiter_precondition;
-    if (outer.inv_type_precondition == QUDA_CA_GCR_INVERTER) {
-      inner.Nkrylov = inner.maxiter / outer.precondition_cycle;
-    } else {
-      inner.Nsteps = outer.precondition_cycle;
-    }
-
-    inner.verbosity_precondition = outer.verbosity_precondition;
-
-    inner.compute_true_res = false;
-    inner.sloppy_converge = true;
-  }
-
   void GCR::computeBeta(std::vector<Complex> &beta, std::vector<ColorSpinorField> &Ap, int i, int N, int k)
   {
     std::vector<Complex> Beta(N, 0.0);
@@ -150,40 +114,33 @@ namespace quda {
     beta(n_krylov * n_krylov),
     gamma(n_krylov)
   {
-    fillInnerSolveParam(Kparam, param);
+    fillInnerSolverParam(Kparam, param);
 
-    if (param.inv_type_precondition == QUDA_CG_INVERTER) // inner CG solver
-      K = new CG(matSloppy, matPrecon, matPrecon, matEig, Kparam, profile);
-    else if (param.inv_type_precondition == QUDA_BICGSTAB_INVERTER) // inner BiCGstab solver
-      K = new BiCGstab(matSloppy, matPrecon, matPrecon, matEig, Kparam, profile);
-    else if (param.inv_type_precondition == QUDA_MR_INVERTER) // inner MR solver
-      K = new MR(matSloppy, matPrecon, Kparam, profile);
-    else if (param.inv_type_precondition == QUDA_SD_INVERTER) // inner SD solver
-      K = new SD(matSloppy, Kparam, profile);
-    else if (param.inv_type_precondition == QUDA_CA_GCR_INVERTER) // inner CA-GCR solver
-      K = new CAGCR(matSloppy, matPrecon, matPrecon, matEig, Kparam, profile);
-    else if (param.inv_type_precondition == QUDA_INVALID_INVERTER) // unsupported
-      K = NULL;
-    else 
-      errorQuda("Unsupported preconditioner %d\n", param.inv_type_precondition);
+    // Preconditioners do not need a deflation space (for now?) so we explicily set this here.
+    Kparam.deflate = false;
+
+    K = createPreconditioner(matSloppy, matPrecon, matPrecon, matEig, param, Kparam, profile);
   }
 
-  GCR::GCR(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+  GCR::GCR(const DiracMatrix &mat, Solver &K_, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
            const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
     Solver(mat, matSloppy, matPrecon, matEig, param, profile),
     matMdagM(matEig.Expose()),
-    K(&K),
+    K(nullptr),
     Kparam(param),
     n_krylov(param.Nkrylov),
     alpha(n_krylov),
     beta(n_krylov * n_krylov),
     gamma(n_krylov)
   {
+    fillInnerSolverParam(Kparam, param);
+    K = wrapExternalPreconditioner(K_);
   }
 
   GCR::~GCR() {
     profile.TPSTART(QUDA_PROFILE_FREE);
-    if (K && param.inv_type_precondition != QUDA_MG_INVERTER) delete K;
+    extractInnerSolverParam(param, Kparam);
+
     destroyDeflationSpace();
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
