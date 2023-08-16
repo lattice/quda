@@ -941,13 +941,13 @@ namespace quda {
         // we "reset" the solve in a different way.
         if (heavy_quark_restart) {
           // If we're in the HQ residual part of the solve, we just do a hard CG restart.
-          logQuda(QUDA_SUMMARIZE, "HQ restart == hard CG restart\n");
+          logQuda(QUDA_DEBUG_VERBOSE, "HQ restart == hard CG restart\n");
           blas::copy(p, rSloppy);
           heavy_quark_restart = false;
         } else {
           // If we're still in the L2 norm part of the solve, we explicitly restore
           // the orthogonality of the gradient vector, recompute beta, update `p`, and carry on with our lives.
-          logQuda(QUDA_SUMMARIZE, "Regular restart == explicit gradient vector re-orthogonalization\n");
+          logQuda(QUDA_DEBUG_VERBOSE, "Regular restart == explicit gradient vector re-orthogonalization\n");
           Complex rp = blas::cDotProduct(rSloppy, p) / (r2);
           blas::caxpy(-rp, rSloppy, p);
 

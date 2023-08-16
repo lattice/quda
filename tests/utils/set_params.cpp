@@ -193,10 +193,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.ca_lambda_max = ca_lambda_max;
   inv_param.tol = tol;
   inv_param.tol_restart = tol_restart;
-  if (tol_hq == 0 && tol == 0) {
-    errorQuda("qudaInvert: requesting zero residual\n");
-    exit(1);
-  }
+  if (tol_hq == 0 && tol == 0)  errorQuda("qudaInvert: requesting zero residual");
 
   // require both L2 relative and heavy quark residual to determine convergence
   inv_param.residual_type = static_cast<QudaResidualType_s>(0);
@@ -844,10 +841,7 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
 
   inv_param.Ls = 1;
 
-  if (tol_hq == 0 && tol == 0) {
-    errorQuda("qudaInvert: requesting zero residual\n");
-    exit(1);
-  }
+  if (tol_hq == 0 && tol == 0) errorQuda("qudaInvert: requesting zero residual");
 
   // require both L2 relative and heavy quark residual to determine convergence
   inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);

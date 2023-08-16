@@ -177,7 +177,7 @@ void init(int argc, char **argv)
   }
 }
 
-std::vector<double> solve(test_t param)
+std::vector<std::array<double,2>> solve(test_t param)
 {
   inv_param.inv_type = ::testing::get<0>(param);
   inv_param.solution_type = ::testing::get<1>(param);
@@ -193,6 +193,8 @@ std::vector<double> solve(test_t param)
   inv_param.inv_type_precondition  = ::testing::get<1>(schwarz_param);
   inv_param.cuda_prec_precondition = ::testing::get<2>(schwarz_param);
   inv_param.clover_cuda_prec_precondition = ::testing::get<2>(schwarz_param);
+
+  inv_param.residual_type = ::testing::get<7>(param);
 
   // reset lambda_max if we're doing a testing loop to ensure correct lambma_max
   if (enable_testing) inv_param.ca_lambda_max = -1.0;
@@ -322,7 +324,7 @@ std::vector<double> solve(test_t param)
   // Compute performance statistics
   if (Nsrc > 1 && !use_split_grid) performanceStats(time, gflops, iter);
 
-  std::vector<double> res(Nsrc);
+  std::vector<std::array<double,2>> res(Nsrc);
   // Perform host side verification of inversion if requested
   if (verify_results) {
     for (int i = 0; i < Nsrc; i++) {
@@ -409,7 +411,8 @@ int main(int argc, char **argv)
     result = RUN_ALL_TESTS();
   } else {
     solve(test_t {inv_type, solution_type, solve_type, prec_sloppy, multishift, solution_accumulator_pipeline,
-                  schwarz_t {precon_schwarz_type, inv_multigrid ? QUDA_MG_INVERTER : precon_type, prec_precondition} } );
+                  schwarz_t {precon_schwarz_type, inv_multigrid ? QUDA_MG_INVERTER : precon_type, prec_precondition},
+                  inv_param.residual_type} );
   }
 
   // finalize the QUDA library
