@@ -231,8 +231,8 @@ std::vector<std::array<double, 2>> solve(test_t param)
   // Vector construct END
   //-----------------------------------------------------------------------------------
 
-  // Quark masses
-  std::vector<double> masses(multishift);
+  // Shifts
+  std::vector<double> shifts(multishift);
 
   // QUDA invert test BEGIN
   //----------------------------------------------------------------------------
@@ -240,9 +240,11 @@ std::vector<std::array<double, 2>> solve(test_t param)
     if (use_split_grid) { errorQuda("Split grid does not work with multishift yet."); }
     inv_param.num_offset = multishift;
 
-    // Consistency check for masses, tols, tols_hq size if we're setting custom values
-    if (multishift_masses.size() != 0 && multishift_masses.size() != static_cast<unsigned long>(multishift))
-      errorQuda("Multishift mass count %d does not agree with number of masses passed in %lu\n", multishift, multishift_masses.size());
+    // Consistency check for shifts, tols, tols_hq size if we're setting custom values
+    if (multishift_masses.size() != 0)
+      errorQuda("Multishift masses are not supported for Wilson-type fermions");
+    if (multishift_shifts.size() != 0 && multishift_shifts.size() != static_cast<unsigned long>(multishift))
+      errorQuda("Multishift shift count %d does not agree with number of shifts passed in %lu\n", multishift, multishift_shifts.size());
     if (multishift_tols.size() != 0 && multishift_tols.size() != static_cast<unsigned long>(multishift))
       errorQuda("Multishift tolerance count %d does not agree with number of masses passed in %lu\n", multishift, multishift_tols.size());
     if (multishift_tols_hq.size() != 0 && multishift_tols_hq.size() != static_cast<unsigned long>(multishift))
@@ -250,8 +252,8 @@ std::vector<std::array<double, 2>> solve(test_t param)
 
     // Copy offsets and tolerances into inv_param; copy data pointers
     for (int i = 0; i < multishift; i++) {
-      masses[i] = (multishift_masses.size() == 0 ? (mass + i * i * 0.01) : multishift_masses[i]);
-      inv_param.offset[i] = 4 * masses[i] * masses[i];
+      shifts[i] = (multishift_shifts.size() == 0 ? (i * i * 0.01) : multishift_shifts[i]);
+      inv_param.offset[i] = shifts[i];
       inv_param.tol_offset[i] = (multishift_tols.size() == 0 ? inv_param.tol : multishift_tols[i]);
       inv_param.tol_hq_offset[i] = (multishift_tols_hq.size() == 0 ? inv_param.tol_hq : multishift_tols_hq[i]);
 
