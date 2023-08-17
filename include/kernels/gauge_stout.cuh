@@ -156,7 +156,7 @@ namespace quda
       //StapCacheT Stap(*this);
       //RectCacheT Rect(*this);
       ThreadLocalCache<Link> Stap{};
-      ThreadLocalCache<Link,decltype(Stap)> Rect{};
+      ThreadLocalCache<Link,0,decltype(Stap)> Rect{};
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:

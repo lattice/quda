@@ -1,15 +1,8 @@
 #pragma once
 #include <target_device.h>
+#include <helpers.h>
 
 namespace quda {
-
-  /**
-     @brief Uniform helper for exposing type T, whether we are dealing
-     with an instance of T or SharedMemoryCache<T>
-   */
-  template <typename T, typename enable = void> struct get_type {
-    using type = T;
-  };
 
   // dimensions functors for SharedMemoryCache
   struct opDimsBlock {

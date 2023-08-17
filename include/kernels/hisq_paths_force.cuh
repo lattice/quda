@@ -708,7 +708,7 @@ namespace quda {
       */
       //__device__ __host__ inline void all_link(int x[4], int point_a, int parity_a, ThreadLocalCache<Link> &Matrix_cache) {
       template <int N>
-      __device__ __host__ inline void all_link(int x[4], int point_a, int parity_a, ThreadLocalCache<array<Link,N>> &Matrix_cache) {
+      __device__ __host__ inline void all_link(int x[4], int point_a, int parity_a, ThreadLocalCache<Link,N> &Matrix_cache) {
         auto mycoeff_seven = parity_sign<typename Arg::real>(parity_a) * coeff_sign<sig_positive, typename Arg::real>(parity_a) * arg.coeff_seven;
 
         int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
@@ -830,7 +830,7 @@ namespace quda {
       */
       //__device__ __host__ inline void side_five(int x[4], int point_a, int parity_a, ThreadLocalCache<Link> &Matrix_cache) {
       template <int N>
-      __device__ __host__ inline void side_five(int x[4], int point_a, int parity_a, ThreadLocalCache<array<Link,N>> &Matrix_cache) {
+      __device__ __host__ inline void side_five(int x[4], int point_a, int parity_a, ThreadLocalCache<Link,N> &Matrix_cache) {
         int y[4] = {x[0], x[1], x[2], x[3]};
         int point_h = updateCoordExtendedIndexShiftMILC<flip_dir(nu_positive)>(y, arg.nu, arg);
         int parity_h = 1 - parity_a;
@@ -887,7 +887,7 @@ namespace quda {
       //    ThreadLocalCache<Link> &Matrix_cache) {
       template <int N>
       __device__ __host__ inline void middle_five(int x[4], int point_a, int parity_a,
-						  ThreadLocalCache<array<Link,N>> &Matrix_cache) {
+						  ThreadLocalCache<Link,N> &Matrix_cache) {
         int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
         int parity_b = 1 - parity_a;
 
@@ -980,7 +980,8 @@ namespace quda {
         //block_dim.z = (sig_positive ? 3 : 2);
         //ThreadLocalCache<Link> Matrix_cache(block_dim);
 	constexpr int cacheLen = sig_positive ? 3 : 2;
-        ThreadLocalCache<array<Link,cacheLen>> Matrix_cache{};
+        //ThreadLocalCache<array<Link,cacheLen>> Matrix_cache{};
+        ThreadLocalCache<Link,cacheLen> Matrix_cache{};
         if constexpr (sig_positive) {
           Link force_sig = arg.force(arg.sig, point_a, parity_a);
           //Matrix_cache.save_z(force_sig, 2);

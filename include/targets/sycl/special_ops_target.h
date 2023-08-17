@@ -131,7 +131,7 @@ namespace quda {
   }
 
   template <typename T, typename O>
-  inline auto SharedMemory(O *ops)
+  inline auto getSharedMemory(O *ops)
   {
     auto s = getSpecialOp<T>(ops);
     return getSharedMemPtr(s);

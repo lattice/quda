@@ -1,5 +1,11 @@
 #pragma once
 
+#if 1
+
+#include <../generic/shared_memory_cache_helper.h>
+
+#else
+
 #include <target_device.h>
 #include <tunable_kernel.h>
 
@@ -270,5 +276,4 @@ namespace quda
 
 } // namespace quda
 
-// include overloads
-#include "../generic/shared_memory_cache_helper.h"
+#endif

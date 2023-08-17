@@ -62,7 +62,7 @@ namespace quda
     using real = typename Arg::real;
     using Link = Matrix<complex<real>, Arg::nColor>;
     using StapOp = ThreadLocalCache<Link>;
-    using RectOp = ThreadLocalCache<Link,StapOp>;
+    using RectOp = ThreadLocalCache<Link,0,StapOp>;
     using Ops = SpecialOps<StapOp,RectOp>;
   };
 
@@ -91,7 +91,7 @@ namespace quda
       //typename computeStapleOps<Arg>::StapOp Stap(ftor);
       //typename computeStapleOps<Arg>::RectOp Rect(ftor);
       ThreadLocalCache<Link> Stap{ftor};
-      ThreadLocalCache<Link,decltype(Stap)> Rect{ftor};
+      ThreadLocalCache<Link,0,decltype(Stap)> Rect{ftor};
       computeStapleRectangle(arg, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim);
       Z = arg.coeff1x1 * static_cast<const Link &>(Stap) + arg.coeff2x1 * static_cast<const Link &>(Rect);
       break;

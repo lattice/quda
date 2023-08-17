@@ -1,5 +1,10 @@
 #pragma once
+
+#if 1
+
 #include "../generic/thread_local_cache.h"
+
+#else
 
 namespace quda
 {
@@ -14,3 +19,5 @@ namespace quda
   };
 
 }
+
+#endif
