@@ -11,19 +11,19 @@
 #include <command_line_params.h>
 
 // Overload for workflows without multishift
-double verifyInversion(void *spinorOut, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param,
-                       QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv)
+std::array<double, 2> verifyInversion(void *spinorOut, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param,
+                                      QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv)
 {
   void **spinorOutMulti = nullptr;
   return verifyInversion(spinorOut, spinorOutMulti, spinorIn, spinorCheck, gauge_param, inv_param, gauge, clover,
                          clover_inv);
 }
 
-double verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck,
-                       QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover,
-                       void *clover_inv)
+std::array<double, 2> verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck,
+                                      QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge,
+                                      void *clover, void *clover_inv)
 {
-  double res = std::numeric_limits<double>::max();
+  std::array<double, 2> res = {std::numeric_limits<double>::max(), std::numeric_limits<double>::max()};
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
       || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     res = verifyDomainWallTypeInversion(spinorOut, spinorOutMulti, spinorIn, spinorCheck, gauge_param, inv_param, gauge,
@@ -38,9 +38,9 @@ double verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, v
   return res;
 }
 
-double verifyDomainWallTypeInversion(void *spinorOut, void **, void *spinorIn, void *spinorCheck,
-                                     QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *,
-                                     void *)
+std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **, void *spinorIn, void *spinorCheck,
+                                                    QudaGaugeParam &gauge_param, QudaInvertParam &inv_param,
+                                                    void **gauge, void *, void *)
 {
   if (multishift > 1) errorQuda("Multishift not supported");
 
@@ -165,12 +165,13 @@ double verifyDomainWallTypeInversion(void *spinorOut, void **, void *spinorIn, v
   printfQuda("Residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, QUDA = %9.6e\n",
              inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
 
-  return l2r;
+  return {l2r, inv_param.tol_hq};
+  ;
 }
 
-double verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck,
-                                 QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover,
-                                 void *clover_inv)
+std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn,
+                                                void *spinorCheck, QudaGaugeParam &gauge_param,
+                                                QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv)
 {
   int vol
     = (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION ? V : Vh);
@@ -411,7 +412,7 @@ double verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *s
       inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
   }
 
-  return l2r_max;
+  return {l2r_max, inv_param.tol_hq};
 }
 
 double verifyWilsonTypeEigenvector(void *spinor, double _Complex lambda, int i, QudaGaugeParam &gauge_param,
