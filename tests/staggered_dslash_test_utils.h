@@ -74,10 +74,6 @@ struct StaggeredDslashTestWrapper {
 
   Dirac *dirac;
 
-  // For loading the gauge fields
-  int argc_copy;
-  char **argv_copy;
-
   // Split grid options
   bool test_split_grid = false;
   int num_src = 1;
@@ -111,7 +107,7 @@ struct StaggeredDslashTestWrapper {
     }
   }
 
-  void init_ctest(int argc, char **argv, int precision, QudaReconstructType link_recon_)
+  void init_ctest(int precision, QudaReconstructType link_recon_)
   {
     gauge_param = newQudaGaugeParam();
     inv_param = newQudaInvertParam();
@@ -131,10 +127,10 @@ struct StaggeredDslashTestWrapper {
 
     link_recon = link_recon_;
 
-    init(argc, argv);
+    init();
   }
 
-  void init_test(int argc, char **argv)
+  void init_test()
   {
     gauge_param = newQudaGaugeParam();
     inv_param = newQudaInvertParam();
@@ -142,10 +138,10 @@ struct StaggeredDslashTestWrapper {
     setStaggeredGaugeParam(gauge_param);
     setStaggeredInvertParam(inv_param);
 
-    init(argc, argv);
+    init();
   }
 
-  void init(int argc, char **argv)
+  void init()
   {
     inv_param.split_grid[0] = grid_partition[0];
     inv_param.split_grid[1] = grid_partition[1];
@@ -187,7 +183,7 @@ struct StaggeredDslashTestWrapper {
 
     bool gauge_loaded = false;
     constructStaggeredHostDeviceGaugeField(qdp_inlink, qdp_longlink_cpu, qdp_longlink_gpu, qdp_fatlink_cpu,
-                                           qdp_fatlink_gpu, gauge_param, argc, argv, gauge_loaded);
+                                           qdp_fatlink_gpu, gauge_param, 0, nullptr, gauge_loaded);
 
     // Alright, we've created all the void** links.
     // Create the void* pointers
