@@ -140,8 +140,8 @@ TEST_P(InvertTest, verify)
     tol *= 10;
 
   for (auto rsd : solve(GetParam())) {
-    if (res_t & QUDA_L2_RELATIVE_RESIDUAL) EXPECT_LE(rsd[0], tol);
-    if (res_t & QUDA_HEAVY_QUARK_RESIDUAL) EXPECT_LE(rsd[1], tol_hq);
+    if (res_t & QUDA_L2_RELATIVE_RESIDUAL) { EXPECT_LE(rsd[0], tol); }
+    if (res_t & QUDA_HEAVY_QUARK_RESIDUAL) { EXPECT_LE(rsd[1], tol_hq); }
   }
 }
 
