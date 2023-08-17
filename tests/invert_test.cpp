@@ -239,14 +239,22 @@ std::vector<std::array<double, 2>> solve(test_t param)
   if (multishift > 1) {
     if (use_split_grid) { errorQuda("Split grid does not work with multishift yet."); }
     inv_param.num_offset = multishift;
+
+    // Consistency check for masses, tols, tols_hq size if we're setting custom values
+    if (multishift_masses.size() != 0 && multishift_masses.size() != static_cast<unsigned long>(multishift))
+      errorQuda("Multishift mass count %d does not agree with number of masses passed in %lu\n", multishift, multishift_masses.size());
+    if (multishift_tols.size() != 0 && multishift_tols.size() != static_cast<unsigned long>(multishift))
+      errorQuda("Multishift tolerance count %d does not agree with number of masses passed in %lu\n", multishift, multishift_tols.size());
+    if (multishift_tols_hq.size() != 0 && multishift_tols_hq.size() != static_cast<unsigned long>(multishift))
+      errorQuda("Multishift hq tolerance count %d does not agree with number of masses passed in %lu\n", multishift, multishift_tols_hq.size());
+
+    // Copy offsets and tolerances into inv_param; copy data pointers
     for (int i = 0; i < multishift; i++) {
-      // Set masses and offsets
-      masses[i] = 0.06 + i * i * 0.01;
+      masses[i] = (multishift_masses.size() == 0 ? (mass + i * i * 0.01) : multishift_masses[i]);
       inv_param.offset[i] = 4 * masses[i] * masses[i];
-      // Set tolerances for the heavy quarks, these can be set independently
-      // (functions of i) if desired
-      inv_param.tol_offset[i] = inv_param.tol;
-      inv_param.tol_hq_offset[i] = inv_param.tol_hq;
+      inv_param.tol_offset[i] = (multishift_tols.size() == 0 ? inv_param.tol : multishift_tols[i]);
+      inv_param.tol_hq_offset[i] = (multishift_tols_hq.size() == 0 ? inv_param.tol_hq : multishift_tols_hq[i]);
+
       // Allocate memory and set pointers
       for (int n = 0; n < Nsrc; n++) {
         out_multishift[n * multishift + i] = quda::ColorSpinorField(cs_param);
