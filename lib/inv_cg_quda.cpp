@@ -834,13 +834,15 @@ namespace quda {
         blas::copy(x, xSloppy); // no op when these pointers alias
         blas::xpy(x, y);
         mat(r, y);
-        blas::copy(rSloppy, r); // no op when these pointers alias
-        blas::zero(xSloppy);
 
         // Recompute the exact residual and heavy quark residual
         r2 = blas::xmyNorm(b, r);
         rNorm = sqrt(r2);
         hq_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
+
+        // Copy and update fields
+        blas::copy(rSloppy, r); // no op when these pointers alias
+        blas::zero(xSloppy);
 
         // Check and see if we're "done" with the L2 norm. This could be because
         // we were already done with it, we never needed it, or the L2 norm has finally converged.
