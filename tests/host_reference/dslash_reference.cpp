@@ -20,8 +20,8 @@ std::array<double, 2> verifyInversion(void *spinorOut, void *spinorIn, void *spi
 }
 
 std::array<double, 2> verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck,
-                                      QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover,
-                                      void *clover_inv)
+                                      QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge,
+                                      void *clover, void *clover_inv)
 {
   std::array<double, 2> res = {std::numeric_limits<double>::max(), std::numeric_limits<double>::max()};
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
@@ -39,8 +39,8 @@ std::array<double, 2> verifyInversion(void *spinorOut, void **spinorOutMulti, vo
 }
 
 std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **, void *spinorIn, void *spinorCheck,
-                                                    QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *,
-                                                    void *)
+                                                    QudaGaugeParam &gauge_param, QudaInvertParam &inv_param,
+                                                    void **gauge, void *, void *)
 {
   if (multishift > 1) errorQuda("Multishift not supported");
 
@@ -165,12 +165,13 @@ std::array<double, 2> verifyDomainWallTypeInversion(void *spinorOut, void **, vo
   printfQuda("Residuals: (L2 relative) tol %9.6e, QUDA = %9.6e, host = %9.6e; (heavy-quark) tol %9.6e, QUDA = %9.6e\n",
              inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
 
-  return {l2r, inv_param.tol_hq};;
+  return {l2r, inv_param.tol_hq};
+  ;
 }
 
-std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck,
-                                                QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover,
-                                                void *clover_inv)
+std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn,
+                                                void *spinorCheck, QudaGaugeParam &gauge_param,
+                                                QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv)
 {
   int vol
     = (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION ? V : Vh);

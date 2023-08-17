@@ -193,7 +193,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.ca_lambda_max = ca_lambda_max;
   inv_param.tol = tol;
   inv_param.tol_restart = tol_restart;
-  if (tol_hq == 0 && tol == 0)  errorQuda("qudaInvert: requesting zero residual");
+  if (tol_hq == 0 && tol == 0) errorQuda("qudaInvert: requesting zero residual");
 
   // require both L2 relative and heavy quark residual to determine convergence
   inv_param.residual_type = static_cast<QudaResidualType_s>(0);

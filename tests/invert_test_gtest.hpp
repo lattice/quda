@@ -4,7 +4,8 @@
 // tuple containing parameters for Schwarz solver
 using schwarz_t = ::testing::tuple<QudaSchwarzType, QudaInverterType, QudaPrecision>;
 
-using test_t = ::testing::tuple<QudaInverterType, QudaSolutionType, QudaSolveType, QudaPrecision, int, int, schwarz_t, QudaResidualType>;
+using test_t
+  = ::testing::tuple<QudaInverterType, QudaSolutionType, QudaSolveType, QudaPrecision, int, int, schwarz_t, QudaResidualType>;
 
 class InvertTest : public ::testing::TestWithParam<test_t>
 {
@@ -187,84 +188,59 @@ auto no_heavy_quark = Values(QUDA_L2_RELATIVE_RESIDUAL);
 
 // preconditioned normal solves
 INSTANTIATE_TEST_SUITE_P(NormalEvenOdd, InvertTest,
-                         Combine(normal_solvers,
-                                 Values(QUDA_MATPCDAG_MATPC_SOLUTION, QUDA_MAT_SOLUTION),
+                         Combine(normal_solvers, Values(QUDA_MATPCDAG_MATPC_SOLUTION, QUDA_MAT_SOLUTION),
                                  Values(QUDA_NORMOP_PC_SOLVE), sloppy_precisions, Values(1),
-                                 solution_accumulator_pipelines,
-                                 no_schwarz,
-                                 no_heavy_quark),
+                                 solution_accumulator_pipelines, no_schwarz, no_heavy_quark),
                          gettestname);
 
 // full system normal solve
 INSTANTIATE_TEST_SUITE_P(NormalFull, InvertTest,
-                         Combine(normal_solvers, Values(QUDA_MATDAG_MAT_SOLUTION),
-                                 Values(QUDA_NORMOP_SOLVE),
-                                 sloppy_precisions, Values(1),
-                                 solution_accumulator_pipelines,
-                                 no_schwarz,
-                                 no_heavy_quark),
+                         Combine(normal_solvers, Values(QUDA_MATDAG_MAT_SOLUTION), Values(QUDA_NORMOP_SOLVE),
+                                 sloppy_precisions, Values(1), solution_accumulator_pipelines, no_schwarz, no_heavy_quark),
                          gettestname);
 
 // preconditioned direct solves
 INSTANTIATE_TEST_SUITE_P(EvenOdd, InvertTest,
                          Combine(direct_solvers, Values(QUDA_MATPC_SOLUTION, QUDA_MAT_SOLUTION),
                                  Values(QUDA_DIRECT_PC_SOLVE), sloppy_precisions, Values(1),
-                                 solution_accumulator_pipelines,
-                                 no_schwarz,
-                                 no_heavy_quark),
+                                 solution_accumulator_pipelines, no_schwarz, no_heavy_quark),
                          gettestname);
 
 // full system direct solve
 INSTANTIATE_TEST_SUITE_P(Full, InvertTest,
-                         Combine(direct_solvers, Values(QUDA_MAT_SOLUTION),
-                                 Values(QUDA_DIRECT_SOLVE),
-                                 sloppy_precisions, Values(1), solution_accumulator_pipelines,
-                                 no_schwarz,
-                                 no_heavy_quark),
+                         Combine(direct_solvers, Values(QUDA_MAT_SOLUTION), Values(QUDA_DIRECT_SOLVE), sloppy_precisions,
+                                 Values(1), solution_accumulator_pipelines, no_schwarz, no_heavy_quark),
                          gettestname);
 
 // preconditioned multi-shift solves
 INSTANTIATE_TEST_SUITE_P(MultiShiftEvenOdd, InvertTest,
                          Combine(Values(QUDA_CG_INVERTER), Values(QUDA_MATPCDAG_MATPC_SOLUTION),
                                  Values(QUDA_NORMOP_PC_SOLVE), sloppy_precisions, Values(10),
-                                 solution_accumulator_pipelines,
-                                 no_schwarz,
-                                 no_heavy_quark),
+                                 solution_accumulator_pipelines, no_schwarz, no_heavy_quark),
                          gettestname);
 
 // Schwarz-preconditioned normal solves
 INSTANTIATE_TEST_SUITE_P(SchwarzNormal, InvertTest,
-                         Combine(Values(QUDA_PCG_INVERTER),
-                                 Values(QUDA_MATPCDAG_MATPC_SOLUTION),
-                                 Values(QUDA_NORMOP_PC_SOLVE), sloppy_precisions,
-                                 Values(1),
+                         Combine(Values(QUDA_PCG_INVERTER), Values(QUDA_MATPCDAG_MATPC_SOLUTION),
+                                 Values(QUDA_NORMOP_PC_SOLVE), sloppy_precisions, Values(1),
                                  solution_accumulator_pipelines,
-                                 Combine(Values(QUDA_ADDITIVE_SCHWARZ),
-                                         Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER),
+                                 Combine(Values(QUDA_ADDITIVE_SCHWARZ), Values(QUDA_CG_INVERTER, QUDA_CA_CG_INVERTER),
                                          Values(QUDA_HALF_PRECISION, QUDA_QUARTER_PRECISION)),
                                  no_heavy_quark),
                          gettestname);
 
 // Schwarz-preconditioned direct solves
 INSTANTIATE_TEST_SUITE_P(SchwarzEvenOdd, InvertTest,
-                         Combine(Values(QUDA_GCR_INVERTER),
-                                 Values(QUDA_MATPC_SOLUTION),
-                                 Values(QUDA_DIRECT_PC_SOLVE), sloppy_precisions,
-                                 Values(1),
-                                 solution_accumulator_pipelines,
-                                 Combine(Values(QUDA_ADDITIVE_SCHWARZ),
-                                         Values(QUDA_MR_INVERTER, QUDA_CA_GCR_INVERTER),
+                         Combine(Values(QUDA_GCR_INVERTER), Values(QUDA_MATPC_SOLUTION), Values(QUDA_DIRECT_PC_SOLVE),
+                                 sloppy_precisions, Values(1), solution_accumulator_pipelines,
+                                 Combine(Values(QUDA_ADDITIVE_SCHWARZ), Values(QUDA_MR_INVERTER, QUDA_CA_GCR_INVERTER),
                                          Values(QUDA_HALF_PRECISION, QUDA_QUARTER_PRECISION)),
                                  no_heavy_quark),
                          gettestname);
 
 // Heavy-Quark preconditioned solves
 INSTANTIATE_TEST_SUITE_P(HeavyQuarkEvenOdd, InvertTest,
-                         Combine(Values(QUDA_CG_INVERTER),
-                                 Values(QUDA_MATPC_SOLUTION),
-                                 Values(QUDA_NORMOP_PC_SOLVE), sloppy_precisions,
-                                 Values(1),
-                                 solution_accumulator_pipelines,
-                                 no_schwarz,
+                         Combine(Values(QUDA_CG_INVERTER), Values(QUDA_MATPC_SOLUTION), Values(QUDA_NORMOP_PC_SOLVE),
+                                 sloppy_precisions, Values(1), solution_accumulator_pipelines, no_schwarz,
                                  Values(QUDA_L2_RELATIVE_RESIDUAL | QUDA_HEAVY_QUARK_RESIDUAL, QUDA_HEAVY_QUARK_RESIDUAL)),
                          gettestname);
