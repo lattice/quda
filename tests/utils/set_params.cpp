@@ -937,9 +937,11 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
 
   // domain decomposition preconditioner parameters
   inv_param.inv_type_precondition = precon_type;
+  inv_param.schwarz_type = precon_schwarz_type;
+  inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = tol_precondition;
   inv_param.maxiter_precondition = maxiter_precondition;
-  inv_param.verbosity_precondition = QUDA_SILENT;
+  inv_param.verbosity_precondition = verbosity_precondition;
   inv_param.cuda_prec_precondition = prec_precondition;
   inv_param.cuda_prec_eigensolver = prec_eigensolver;
 
@@ -951,6 +953,11 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.ca_basis = ca_basis;
   inv_param.ca_lambda_min = ca_lambda_min;
   inv_param.ca_lambda_max = ca_lambda_max;
+
+  // Set preconditioner CA info
+  inv_param.ca_basis_precondition = ca_basis_precondition;
+  inv_param.ca_lambda_min_precondition = ca_lambda_min_precondition;
+  inv_param.ca_lambda_max_precondition = ca_lambda_max_precondition;
 
   inv_param.solution_type = solution_type;
   inv_param.solve_type = solve_type;
