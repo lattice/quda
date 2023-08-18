@@ -75,16 +75,19 @@ void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longli
 }
 
 void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink,
-                                      QudaGaugeParam &gauge_param, int argc, char **argv)
+                                      QudaGaugeParam &gauge_param, int argc, char **argv, bool &gauge_loaded)
 {
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
   if (latfile.size() > 0) {
-    // load in the command line supplied gauge field using QIO and LIME
-    read_gauge_field(latfile.c_str(), qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    if (dslash_type != QUDA_LAPLACE_DSLASH) {
-      applyGaugeFieldScaling_long(qdp_inlink, Vh, &gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
-    }
+    if (!gauge_loaded) {
+      // load in the command line supplied gauge field using QIO and LIME
+      read_gauge_field(latfile.c_str(), qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+      if (dslash_type != QUDA_LAPLACE_DSLASH) {
+        applyGaugeFieldScaling_long(qdp_inlink, Vh, &gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
+      }
+      gauge_loaded = true;
+    } // else gauge already loaded
   } else {
     int construct_type = (unit_gauge) ? 0 : 1;
     if (dslash_type == QUDA_LAPLACE_DSLASH) {

@@ -26,8 +26,12 @@ void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fat
                          void **qdp_inlink, QudaGaugeParam &gauge_param_in, double **act_path_coeffs, double eps_naik,
                          size_t gSize, int n_naiks)
 {
-  // since a lot of intermediaries can be general matrices, override the recon in `gauge_param_in`
+  // Intermediates can be general matrices, so override the reconstruct.
+  // Similarly, gauge links can only be built in single or double, so upscale the build precision
+  // if neccessary.
   auto gauge_param = gauge_param_in;
+  if (gauge_param.cuda_prec < QUDA_SINGLE_PRECISION)
+    gauge_param.cuda_prec = QUDA_SINGLE_PRECISION;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO; // probably irrelevant
 

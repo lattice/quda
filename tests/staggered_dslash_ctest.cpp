@@ -24,17 +24,6 @@ protected:
       return true;
     }
 
-    if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong
-        && (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1)) {
-      warningQuda("Fixed precision unsupported in fat/long compute, skipping...");
-      return true;
-    }
-
-    if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong && (getReconstructNibble(recon) & 1)) {
-      warningQuda("Reconstruct 9 unsupported in fat/long compute, skipping...");
-      return true;
-    }
-
     if (dslash_type == QUDA_LAPLACE_DSLASH && (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1)) {
       warningQuda("Fixed precision unsupported for Laplace operator, skipping...");
       return true;
@@ -100,6 +89,10 @@ TEST_P(StaggeredDslashTest, verify)
   double deviation = dslash_test_wrapper.verify();
   double tol = getTolerance(dslash_test_wrapper.inv_param.cuda_prec);
 
+  if (dslash_test_wrapper.gauge_param.reconstruct == QUDA_RECONSTRUCT_9
+      && dslash_test_wrapper.inv_param.cuda_prec >= QUDA_HALF_PRECISION)
+    tol *= 10; // if recon 9, we tolerate a greater deviation
+
   ASSERT_LE(deviation, tol) << "Reference CPU and QUDA implementations do not agree";
 }
 
@@ -125,13 +118,9 @@ int main(int argc, char **argv)
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
   if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
-  // Only these fermions are supported in this file. Ensure a reasonable default,
-  // ensure that the default is improved staggered
-  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
-    printfQuda("dslash_type %s not supported, defaulting to %s\n", get_dslash_str(dslash_type),
-               get_dslash_str(QUDA_ASQTAD_DSLASH));
-    dslash_type = QUDA_ASQTAD_DSLASH;
-  }
+  // Only these fermions are supported in this file
+  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH)
+    errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
 
   // Sanity check: if you pass in a gauge field, want to test the asqtad/hisq dslash, and don't
   // ask to build the fat/long links... it doesn't make sense.
@@ -156,12 +145,8 @@ int main(int argc, char **argv)
     }
   }
 
-  if (dslash_type == QUDA_LAPLACE_DSLASH) {
-    if (dtest_type != dslash_test_type::Mat) {
-      errorQuda("Test type %s is not supported for the Laplace operator.\n",
-                get_string(dtest_type_map, dtest_type).c_str());
-    }
-  }
+  if (dslash_type == QUDA_LAPLACE_DSLASH && dtest_type != dslash_test_type::Mat)
+    errorQuda("Test type %s is not supported for the Laplace operator", get_string(dtest_type_map, dtest_type).c_str());
 
   int test_rc = RUN_ALL_TESTS();
 

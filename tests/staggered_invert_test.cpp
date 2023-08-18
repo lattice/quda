@@ -234,7 +234,9 @@ int main(int argc, char **argv)
   // For load, etc
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
-  constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv);
+  // Dummy arg needed because other tests load the gauge field more than once
+  bool gauge_loaded = false;
+  constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, 0, nullptr, gauge_loaded);
   // Reorder gauge fields to MILC order
   reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
   reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
