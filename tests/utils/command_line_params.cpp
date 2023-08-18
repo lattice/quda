@@ -86,6 +86,7 @@ std::string madwf_param_outfile;
 
 int precon_schwarz_cycle = 1;
 int multishift = 1;
+std::vector<double> multishift_shifts = {};
 std::vector<double> multishift_masses = {};
 std::vector<double> multishift_tols = {};
 std::vector<double> multishift_tols_hq = {};
@@ -510,9 +511,12 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     "--multishift", multishift,
     "Whether to do a multi-shift solver test or not. Default is 1 (single mass)"
     "If a value N > 1 is passed, heavier masses will be constructed and the multi-shift solver will be called");
-    quda_app->add_option(
+  quda_app->add_option(
+    "--multishift-shifts", multishift_shifts,
+    "List of shifts to use in a multi-shift solve; ignored for staggered-type fermions. Default is (i * i * 0.01)");
+  quda_app->add_option(
     "--multishift-masses", multishift_masses,
-    "List of masses to use in a multi-shift solve; this will override the value of mass. Default is (mass + i * i * 0.01)");
+    "List of masses to use in a multi-shift solve; this will override the value of mass; ignored for Wilson-type fermions. Default is (mass + i * i * 0.01)");
   quda_app->add_option(
     "--multishift-tols", multishift_tols,
     "List of tolerances to use in a multi-shift solve. Default is to uniformly use the input tolerance");

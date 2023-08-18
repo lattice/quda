@@ -222,6 +222,7 @@ extern std::string madwf_param_outfile;
 
 extern int precon_schwarz_cycle;
 extern int multishift;
+extern std::vector<double> multishift_shifts;
 extern std::vector<double> multishift_masses;
 extern std::vector<double> multishift_tols;
 extern std::vector<double> multishift_tols_hq;

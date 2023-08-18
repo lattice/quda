@@ -380,6 +380,8 @@ int main(int argc, char **argv)
     std::vector<double> masses(multishift);
 
     // Consistency check for masses, tols, tols_hq size if we're setting custom values
+    if (multishift_shifts.size() != 0)
+      errorQuda("Multishift shifts are not supported for Wilson-type fermions");
     if (multishift_masses.size() != 0 && multishift_masses.size() != static_cast<unsigned long>(multishift))
       errorQuda("Multishift mass count %d does not agree with number of masses passed in %lu\n", multishift, multishift_masses.size());
     if (multishift_tols.size() != 0 && multishift_tols.size() != static_cast<unsigned long>(multishift))
