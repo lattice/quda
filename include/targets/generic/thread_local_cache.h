@@ -27,6 +27,7 @@ namespace quda
     using offset_type = O; // type of object that may also use shared memory at the same time and is located before this one
     static constexpr int len = std::max(1,N); // actual number of elements to store
     using Smem = SharedMemory<atom_t<T>, SizePerThread<std::max(1,N_)*sizeof(T)/sizeof(atom_t<T>)>, O>;
+    using Smem::shared_mem_size;
 
   private:
     using atom_t = atom_t<T>;
@@ -37,7 +38,8 @@ namespace quda
 
     const int stride;
 
-    constexpr Smem smem() const { return *dynamic_cast<const Smem*>(this); }
+    //constexpr Smem smem() const { return *dynamic_cast<const Smem*>(this); }
+    using Smem::smem;
 
     __device__ __host__ inline void save_detail(const T &a, const int k) const
     {
@@ -60,8 +62,6 @@ namespace quda
     }
 
   public:
-    using Smem::shared_mem_size;
-
     /**
        @brief Constructor for ThreadLocalCache.
     */

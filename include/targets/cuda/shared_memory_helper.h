@@ -75,6 +75,8 @@ namespace quda
     constexpr SharedMemory() : data(cache(get_offset(target::block_dim()))),
 			       size(S::size(target::block_dim())) {}
 
+    constexpr auto smem() const { return *this; }
+
     /**
        @brief Subscripting operator returning a reference to element.
        @param[in] i The index to use.

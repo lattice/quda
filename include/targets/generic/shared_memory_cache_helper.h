@@ -48,6 +48,7 @@ namespace quda
     using dims_type = D;
     using offset_type = O; // type of object that may also use shared memory at the same time and is located before this one
     using Smem = SharedMemory<atom_t<T>, SizeDims<D,sizeof(T)/sizeof(atom_t<T>)>, O>;
+    using Smem::shared_mem_size;
 
   private:
     using atom_t = atom_t<T>;
@@ -62,7 +63,10 @@ namespace quda
     const dim3 block;
     const int stride;
 
-    constexpr Smem smem() const { return *dynamic_cast<const Smem*>(this); }
+    //constexpr Smem smem() const { return *dynamic_cast<const Smem*>(this); }
+    using Smem::smem;
+    //constexpr Smem smem() const { return Smem::smem(); }
+    //constexpr Smem smem() const { return *Smem::smemp(); }
 
     __device__ __host__ inline void save_detail(const T &a, int x, int y, int z) const
     {
@@ -100,8 +104,6 @@ namespace quda
     };
 
   public:
-    using Smem::shared_mem_size;
-
     /**
        @brief constructor for SharedMemory cache.  If no arguments are
        pass, then the dimensions are set according to the templates

@@ -16,8 +16,10 @@ namespace quda
   class thread_array : SharedMemory<array<T,n>, SizePerThread<1>, O>
   {
     using Smem = SharedMemory<array<T,n>, SizePerThread<1>, O>;
-    constexpr Smem smem() const { return *dynamic_cast<const Smem*>(this); }
     array<T, n> &array_;
+
+    //constexpr Smem smem() const { return *dynamic_cast<const Smem*>(this); }
+    using Smem::smem;
 
   public:
     __device__ __host__ constexpr thread_array() :
