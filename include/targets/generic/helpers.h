@@ -33,7 +33,7 @@ namespace quda
 
   template <int x, int y, int z>
   struct DimsStatic {
-    static constexpr dim3 dims(dim3 block) {
+    static constexpr dim3 dims(dim3) {
       return dim3(x,y,z);
     }
   };
