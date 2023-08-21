@@ -363,14 +363,16 @@ static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, Qud
  *******************************************/
 
 
-void openQCD_qudaPlaquette(double plaq[3])
+double openQCD_qudaPlaquette(void)
 {
+  double plaq[3];
+
   if (!qudaState.gauge_loaded) {
     errorQuda("Gauge field not loaded into QUDA, cannot calculate plaquette. Call openQCD_gaugeload() first.");
-    return;
+    return 0.0;
   }
 
-  QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
+  /*QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
   obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
   obsParam.remove_staggered_phase = QUDA_BOOLEAN_FALSE;
   gaugeObservablesQuda(&obsParam);
@@ -378,9 +380,16 @@ void openQCD_qudaPlaquette(double plaq[3])
   // Note different Nc normalization!
   plaq[0] = obsParam.plaquette[0];
   plaq[1] = obsParam.plaquette[1];
-  plaq[2] = obsParam.plaquette[2];
+  plaq[2] = obsParam.plaquette[2];*/
 
-  return;
+  plaqQuda(plaq);
+
+/*  plaq[1] *= 3.0;
+  plaq[2] *= 3.0;
+  plaq[0] *= 3.0;*/
+
+  // Note different Nc normalization wrt openQCD!
+  return 3.0*plaq[0];
 }
 
 

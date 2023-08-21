@@ -161,9 +161,10 @@ void openQCD_qudaInvert(int external_precision, int quda_precision, double mass,
 /**
  * @brief      Calculate the plaquette
  *
- * @param[out] plaq  array to store the 3 plaquette values
+ * @return     plaquette value
+ * @see        https://github.com/lattice/quda/wiki/Gauge-Measurements#wilson-plaquette-action
  */
-void openQCD_qudaPlaquette(double plaq[3]);
+double openQCD_qudaPlaquette(void);
 
 
 /**
