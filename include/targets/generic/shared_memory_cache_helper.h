@@ -48,7 +48,6 @@ namespace quda
     using dims_type = D;
     using offset_type = O; // type of object that may also use shared memory at the same time and is located before this one
     using Smem = SharedMemory<atom_t<T>, SizeDims<D,sizeof(T)/sizeof(atom_t<T>)>, O>;
-    using Smem::smem;
     using Smem::shared_mem_size;
     using opSmem = op_SharedMemory<T, SizeSmem<Smem>>;
     using dependencies = opSmem;
@@ -66,6 +65,8 @@ namespace quda
 
     const dim3 block;
     const int stride;
+
+    using Smem::smem;
 
     __device__ __host__ inline void save_detail(const T &a, int x, int y, int z) const
     {
