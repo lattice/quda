@@ -249,10 +249,11 @@ namespace quda {
     // Trace over remaining bits
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugePolyakovLoopTrace>(G, loop);
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+
     // We normalize by the 3-d volume, times the 4-d communications dim to cancel out redundant counting
     auto vol3d = u.LocalVolume() * comm_dim(0) * comm_dim(1) * comm_dim(2) * comm_dim(3) / (u.X()[3] - 2 * u.R()[3]);
     return {loop[0] / vol3d, loop[1] / vol3d};
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
 } // namespace quda
