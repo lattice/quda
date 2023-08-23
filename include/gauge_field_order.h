@@ -2315,102 +2315,64 @@ namespace quda {
     };
 
 
-/**
-         struct to define OpenQCD ordered gauge fields:
-         [volumecb][dim][parity*][row][col]  parity*: uplink/downlink (link attached to closest odd site)
-      */
+    /**
+     * struct to define order of gauge fields in OpenQCD
+     */
     template <typename Float, int length> struct OpenQCDOrder : LegacyOrder<Float, length> {
+
       using Accessor = OpenQCDOrder<Float, length>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
+
       Float *gauge;
       const int volumeCB;
-      // int ipt;
       static constexpr int Nc = 3;
-      const int dim[4];
+      const int L[4];
+
       OpenQCDOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
         LegacyOrder<Float, length>(u, ghost_),
-        gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
-        volumeCB(
-          u.VolumeCB()), // NOTE: Volume and VolumeCB refer to the global lattice, if VolumeLocal, then local lattice
-        dim {u.X()[0], u.X()[1], u.X()[2], u.X()[3]} // GLOBAL dimensions
+        gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()), // pointer to the gauge field on CPU
+        volumeCB(u.VolumeCB()), // Volume and VolumeCB refer to the global lattice, if VolumeLocal, then local lattice
+        L {u.X()[0], u.X()[1], u.X()[2], u.X()[3]} // initialized dim with *local* lattice dimensions
       {
-        if constexpr (length != 18) errorQuda("Gauge length %d not supported", length);
+        if constexpr (length != 18) {
+          errorQuda("Gauge field length %d not supported", length);
+        }
       }
 
-
-      // TODO: make this function
-      // __device__ __host__ inline int QUDAtoOpenQxD(int x_cb_QUDA, int dir_QUDA, int parity_QUDA) const
-      // TODO: Implement ipt and iup functions
-      // {
-
-      // }
-
-
-      __device__ __host__ inline void load(complex v[9], int x, int dir, int parity,
-                                           Float = 1.0) const 
-      {
-        // With ''natural'' order: lexicographical 0123 = txyz , t fastest, links 0123 = txyz in pos directions
-
-        // Indexing fun:
-        int coord[4]; // declare a 4D vector x0, x1, x2, x3 = (xyzt), t fastest (ix = x0 + x1 * L0 + ...)
-
-        getCoords(coord, x, dim, parity); // from x, dim, parity obtain coordinate of the site
-
-        // int iy_OpenQxD = x3 + L3*x2 + L3*L2*x1 + L3*L2*L1*x0;
-        // TODO: Determine whether coord[mu] is local or global
-        int iy_OpenQxD = coord[2] + dim[2] * coord[1] + dim[2] * dim[1] * coord[0] + dim[0] * dim[2] * dim[1] * coord[3]; 
-        /* lexicographical index: coord0 in QUDA is x1 in OpenQxD (x)
-            coord1 in QUDA is x2 in OpenQxD (y)
-            coord2 in QUDA is x3 in OpenQxD (z)
-            coord3 in QUDA is x0 in OpenQxD (t)
-                                                 */
-        // int ix_OpenQxD = ipt[iy_OpenQxD];
-        int dir_OpenQxD = (dir + 1) % 4; // rotation of axes QUDA -> OpenQxD
-
-        // Loading as per QUDA style
-        auto in
-          = &gauge[(4 * iy_OpenQxD + dir_OpenQxD) * length]; // This is how they're accessed within OpenQxd (length = 18
-                                                             // doubles = 9 complex doubles = 1 su3dble struct)
-        // auto in = &gauge[ (8*(ix_OpenQxD - volumeCB) + 2*dir_OpenQxD)* length];    // This is how they're accessed
-        // within OpenQxd (length = 18 doubles = 9 complex doubles = 1 su3dble struct)
-        block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
-
-        
+      /**
+       * @brief      Gets the offset in Floats from the base pointer of the gauge fields.
+       *
+       * @param[in]  x       Checkerboard index coming from quda
+       * @param[in]  dir     The direction coming from quda
+       * @param[in]  parity  The parity coming from quda
+       *
+       * @return     The offset.
+       */
+      __device__ __host__ inline int getGaugeOffset(int x, int dir, int parity) const {
+        int coord[4];
+        getCoords(coord, x, L, parity);
+        int idx = coord[3] + L[3]*coord[2] + L[3]*L[2]*coord[1] + L[3]*L[2]*L[1]*coord[0];
+        return (4*idx + dir)*length;
       }
 
-      __device__ __host__ inline void save(const complex v[9], int x, int dir, int parity) const
+      __device__ __host__ inline void load(complex v[length/2], int x, int dir, int parity, Float = 1.0) const 
       {
-        // Indexing fun:
-        int coord[4]; // declare a 4D vector x0, x1, x2, x3 = (xyzt), t fastest (ix = x0 + x1 * L0 + ...)
+        auto in = &gauge[getGaugeOffset(x, dir, parity)];
+        block_load<complex, length/2>(v, reinterpret_cast<complex *>(in));
+      }
 
-        getCoords(coord, x, dim, parity); // from x, dim, parity obtain coordinate of the site
-
-        // int iy_OpenQxD = x3 + L3*x2 + L3*L2*x1 + L3*L2*L1*x0;
-        // TODO: Determine whether coord[mu] is local or global
-        /* lexicographical index: coord0 in QUDA is x1 in OpenQxD (x)
-                                                                         coord1 in QUDA is x2 in OpenQxD (y)
-                                                                         coord2 in QUDA is x3 in OpenQxD (z)
-                                                                         coord3 in QUDA is x0 in OpenQxD (t)
-                                               */
-        int iy_OpenQxD = coord[2] + dim[2] * coord[1] + dim[2] * dim[1] * coord[0] + dim[0] * dim[2] * dim[1] * coord[3];
-
-        // int ix_OpenQxD = ipt[iy_OpenQxD];
-        int dir_OpenQxD = (dir + 1) % 4; // rotation of axes QUDA -> OpenQxD
-
-        // Loading as per QUDA style
-        // This is how they're accessed within OpenQxd (length = 18
-        // doubles = 9 complex doubles = 1 su3dble struct)
-        auto out = &gauge[(4 * iy_OpenQxD + dir_OpenQxD) * length];
-        // within OpenQxd (length = 18 doubles = 9 complex doubles = 1 su3dble struct)
-        block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+      __device__ __host__ inline void save(const complex v[length/2], int x, int dir, int parity) const
+      {
+        auto out = &gauge[getGaugeOffset(x, dir, parity)];
+        block_store<complex, length/2>(reinterpret_cast<complex *>(out), v);
       }
 
       /**
          @brief This accessor routine returns a gauge_wrapper to this object,
          allowing us to overload various operators for manipulating at
          the site level interms of matrix operations.
-         @param[in] dir Which dimension are we requesting
+         @param[in] dim Which dimension are we requesting
          @param[in] x_cb Checkerboarded space-time index we are requesting
          @param[in] parity Parity we are requesting
          @return Instance of a gauge_wrapper that curries in access to
@@ -2423,9 +2385,10 @@ namespace quda {
 
       size_t Bytes() const
       {
-        return Nc * Nc * 2 * sizeof(Float);
-      } //  Double => Float = 1.0 => 1 byte per float, 18 floats per complex 3x3 matrix
-    };
+        return 2*Nc*Nc*sizeof(Float);
+      }
+    }; // class OpenQCDOrder
+
   } // namespace gauge
 
   
