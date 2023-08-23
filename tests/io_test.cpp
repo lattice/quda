@@ -74,7 +74,7 @@ TEST_P(GaugeIOTest, verify)
   for (int dir = 0; dir < 4; dir++) { host_free(gauge[dir]); }
 }
 
-using cs_test_t = ::testing::tuple<QudaSiteSubset, bool, QudaPrecision, QudaPrecision, int, QudaFieldLocation>;
+using cs_test_t = ::testing::tuple<QudaSiteSubset, bool, QudaPrecision, QudaPrecision, int, bool, QudaFieldLocation>;
 
 class ColorSpinorIOTest : public ::testing::TestWithParam<cs_test_t>
 {
@@ -84,6 +84,7 @@ protected:
   QudaPrecision prec;
   QudaPrecision prec_io;
   int nSpin;
+  bool partfile;
   QudaFieldLocation location;
 
 public:
@@ -93,7 +94,8 @@ public:
     prec(::testing::get<2>(GetParam())),
     prec_io(::testing::get<3>(GetParam())),
     nSpin(::testing::get<4>(GetParam())),
-    location(::testing::get<5>(GetParam()))
+    partfile(::testing::get<5>(GetParam())),
+    location(::testing::get<6>(GetParam()))
   {
   }
 };
@@ -142,7 +144,7 @@ TEST_P(ColorSpinorIOTest, verify)
 
   auto file = "dummy.cs";
 
-  VectorIO io(file, inflate);
+  VectorIO io(file, inflate, partfile);
 
   io.save({v.begin(), v.end()}, prec_io, n_vector);
   io.load(u);
@@ -156,7 +158,16 @@ TEST_P(ColorSpinorIOTest, verify)
   }
 
   // cleanup after ourselves and delete the dummy lattice
-  if (::quda::comm_rank() == 0 && remove(file) != 0) errorQuda("Error deleting file");
+  if (partfile && ::quda::comm_size() > 1) {
+    // each rank created its own file, we need to generate the custom filename
+    // an exception is single-rank runs where QIO skips appending the volume string
+    char volstr[9];
+    sprintf(volstr, ".vol%04d", ::quda::comm_rank());
+    std::string part_filename = std::string(file) + volstr;
+    if (remove(part_filename.c_str()) != 0) errorQuda("Error deleting file");
+  } else {
+    if (::quda::comm_rank() == 0 && remove(file) != 0) errorQuda("Error deleting file");
+  }
 }
 
 int main(int argc, char **argv)
@@ -180,13 +191,14 @@ INSTANTIATE_TEST_SUITE_P(Full, ColorSpinorIOTest,
                          Combine(Values(QUDA_FULL_SITE_SUBSET), Values(false),
                                  Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION),
                                  Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(1, 2, 4),
-                                 Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION)),
+                                 Values(false, true), Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION)),
                          [](testing::TestParamInfo<cs_test_t> param) {
                            std::string name;
                            name += get_prec_str(::testing::get<2>(param.param)) + std::string("_");
                            name += get_prec_str(::testing::get<3>(param.param)) + std::string("_");
                            name += std::string("spin") + std::to_string(::testing::get<4>(param.param));
-                           name += ::testing::get<5>(param.param) == QUDA_CUDA_FIELD_LOCATION ? "_device" : "_host";
+                           name += ::testing::get<5>(param.param) ? "_singlefile" : "_partfile";
+                           name += ::testing::get<6>(param.param) == QUDA_CUDA_FIELD_LOCATION ? "_device" : "_host";
                            return name;
                          });
 
@@ -195,13 +207,14 @@ INSTANTIATE_TEST_SUITE_P(Parity, ColorSpinorIOTest,
                          Combine(Values(QUDA_PARITY_SITE_SUBSET), Values(false, true),
                                  Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION),
                                  Values(QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION), Values(1, 2, 4),
-                                 Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION)),
+                                 Values(false, true), Values(QUDA_CUDA_FIELD_LOCATION, QUDA_CPU_FIELD_LOCATION)),
                          [](testing::TestParamInfo<cs_test_t> param) {
                            std::string name;
                            if (::testing::get<1>(param.param)) name += std::string("inflate_");
                            name += get_prec_str(::testing::get<2>(param.param)) + std::string("_");
                            name += get_prec_str(::testing::get<3>(param.param)) + std::string("_");
                            name += std::string("spin") + std::to_string(::testing::get<4>(param.param));
-                           name += ::testing::get<5>(param.param) == QUDA_CUDA_FIELD_LOCATION ? "_device" : "_host";
+                           name += ::testing::get<5>(param.param) ? "_singlefile" : "_partfile";
+                           name += ::testing::get<6>(param.param) == QUDA_CUDA_FIELD_LOCATION ? "_device" : "_host";
                            return name;
                          });

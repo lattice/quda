@@ -672,6 +672,7 @@ namespace quda
           vec_outfile += "_defl_";
           vec_outfile += std::to_string(param.mg_global.n_vec[param.level + 1]);
           strcpy(param_coarse_solver->eig_param.vec_outfile, vec_outfile.c_str());
+          param_coarse_solver->eig_param.partfile = param.mg_global.mg_vec_partfile[param.level + 1];
         }
       }
 
@@ -1382,7 +1383,7 @@ namespace quda
       vec_outfile += std::to_string(param.level);
       vec_outfile += "_nvec_";
       vec_outfile += std::to_string(param.mg_global.n_vec[param.level]);
-      VectorIO io(vec_outfile);
+      VectorIO io(vec_outfile, false, param.mg_global.mg_vec_partfile[param.level]);
       vector_ref<const ColorSpinorField> B_ref;
       for (auto i = 0u; i < B.size(); i++) B_ref.push_back(*B[i]);
       io.save(std::move(B_ref));
