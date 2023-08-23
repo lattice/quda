@@ -101,8 +101,20 @@ template <class ftype> struct RFA_bins
   }
 };
 
+template <> struct RFA_bins<doubledouble>
+{
+  static constexpr doubledouble dummy = {};
+  constexpr const doubledouble& operator[](int) const { return dummy; }
+};
 
-static char bin_host_buffer[sizeof(RFA_bins<double>)];
+  }
+
+  namespace reducer {
+    reproducible::RFA_bins<reduction_t>& get_rfa_bins();
+  }
+
+  namespace reproducible {
+
 #ifdef __CUDACC__
 __constant__ static char bin_device_buffer[sizeof(RFA_bins<double>)];
 #endif
@@ -122,7 +134,7 @@ public:
   static constexpr int FOLD = FOLD_;
 
 private:
-  array<ftype, 2*FOLD> data = {0};
+  array<ftype, 2*FOLD> data = {};
 
   ///Floating-point precision bin width
   static constexpr int BIN_WIDTH = std::is_same_v<ftype, double> ? 40 : 13;
@@ -153,15 +165,12 @@ private:
   ///Return a binned floating-point reference bin
   __host__ __device__ inline const ftype* binned_bins(const int x) const
   {
-#if 1
 #ifdef __CUDA_ARCH__ // must be arch not CC here
     return &reinterpret_cast<RFA_bins<ftype>&>(bin_device_buffer)[x];
 #else
-    return &reinterpret_cast<RFA_bins<ftype>&>(bin_host_buffer)[x];
+    return &reducer::get_rfa_bins()[x];
 #endif
-#else
-    return &bins[x];
-#endif
+    //return &bins[x];
   }
 
   ///Get the bit representation of a float
@@ -890,12 +899,6 @@ private:
 
   template <> struct get_scalar<rfa_t<double>> { using type = rfa_t<double>; };
 
-  //template <class T> constexpr std::enable_if_t<!std::is_same_v<T, rfa_t<typename T::ftype>>, bool> is_rfa() { return false; }
-#if 0
-  template <class T> constexpr bool is_rfa() { return false; }
-  template <> constexpr std::enable_if_t<std::is_same_v<T, rfa_t<typename T::ftype>>, bool>
-  is_rfa<rfa_t<typename T::ftype>>() { return true; }
-#endif
   template <class T, class Enable = void>
   struct is_rfa {
     static constexpr bool value = false;

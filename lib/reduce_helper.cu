@@ -28,6 +28,20 @@ namespace quda
     static int allocated_n_reduce = 0;
     static bool init_event = false;
 
+#ifdef QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE
+    static bool init_rfa = false;
+    static reproducible::RFA_bins<reduction_t> bins;
+
+    reproducible::RFA_bins<reduction_t>& get_rfa_bins()
+    {
+      if (!init_rfa) {
+        bins.initialize_bins();
+        init_rfa = true;
+      }
+      return bins;
+    }
+#endif
+
     template <typename T>
     struct init_reduce : public TunableKernel1D {
       T *reduce_count;

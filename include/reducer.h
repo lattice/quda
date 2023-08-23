@@ -93,6 +93,7 @@ namespace quda
     __device__ __host__ inline std::enable_if_t<std::is_same_v<U, array<typename U::value_type, U::N>>, T> operator()(T a, const U &b) const { return apply(a, b); }
   };
 
+#ifdef QUDA_REDUCTION_ALGORITHM_REPRODUCIBLE
   /**
      plus reducer, specialized for reproducible sum reductions
    */
@@ -142,6 +143,7 @@ namespace quda
 
     __device__ __host__ inline T operator()(T a, const array<typename T::value_type::ftype, T::N> &b) const { return apply(a, b); }
   };
+#endif
 
   /**
      maximum reducer, used for max reductions
