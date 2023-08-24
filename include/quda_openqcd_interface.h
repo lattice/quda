@@ -20,31 +20,34 @@ extern "C" {
  * Parameters related to problem size and machine topology.
  */
 typedef struct {
-  const int *latsize; /** Local lattice dimensions L0, L1, L2, L3 */
-  const int *machsize; /** Machine grid size NPROC0, NPROC1, NPROC2, NPROC3*/
-  const int *blksize; /** Blocking size NPROC0_BLK, NPROC1_BLK, NPROC2_BLK, NPROC3_BLK */
-  int device; /** GPU device number */
-  // const int *ipt; // TODO: IN THE FUTURE
+  const int *latsize;   /** Local lattice dimensions L0, L1, L2, L3 */
+  const int *machsize;  /** Machine grid size NPROC0, NPROC1, NPROC2, NPROC3*/
+  const int *blksize;   /** Blocking size NPROC0_BLK, NPROC1_BLK, NPROC2_BLK, NPROC3_BLK */
+  int device;           /** GPU device number */
 } openQCD_QudaLayout_t;
 
 /**
  * Parameters used to create a QUDA context.
  */
 typedef struct {
-  QudaVerbosity verbosity;     /** How verbose QUDA should be (QUDA_SILENT, QUDA_VERBOSE or QUDA_SUMMARIZE) */
-  openQCD_QudaLayout_t layout; /** Layout for QUDA to use */
-  FILE *logfile;
-  int volume; /* VOLUME */
-  int sizeof_su3_dble; /* sizeof(su3_dble) */
+  QudaVerbosity verbosity;      /** How verbose QUDA should be (QUDA_SILENT, QUDA_VERBOSE or QUDA_SUMMARIZE) */
+  openQCD_QudaLayout_t layout;  /** Layout for QUDA to use */
+  FILE *logfile;                /** log file handler */
+  void *gauge;                  /** base pointer to the gauge fields */
+  int volume;                   /** VOLUME */
+  int sizeof_su3_dble;          /** sizeof(su3_dble) */
+  int sizeof_spinor_dble;       /** sizeof(spinor_dble) */
   void (*reorder_gauge_openqcd_to_quda)(void *in, void *out);
   void (*reorder_gauge_quda_to_openqcd)(void *in, void *out);
-} openQCD_QudaInitArgs_t;      // passed to the initialization struct
+  void (*reorder_spinor_openqcd_to_quda)(void *in, void *out);
+  void (*reorder_spinor_quda_to_openqcd)(void *in, void *out);
+} openQCD_QudaInitArgs_t;
 
 
 typedef struct {
-  int initialized;
-  int gauge_loaded;
-  int dslash_setup;
+  int initialized;    /** Whether openQCD_qudaInit() was called or not */
+  int gauge_loaded;   /** Whether openQCD_gaugeload() was called or not */
+  int dslash_setup;   /** Whether openQCD_qudaSetDslashOptions() was called or not */
 } openQCD_QudaState_t;
 
 
@@ -98,6 +101,7 @@ typedef struct {
  */
 void openQCD_qudaSetDslashOptions(double kappa, double mu);
 
+double openQCD_qudaNorm(void *h_in);
 
 /**
  * @brief      Apply the Wilson-Clover Dirac operator to a field. All fields
@@ -159,9 +163,11 @@ void openQCD_qudaInvert(int external_precision, int quda_precision, double mass,
                         double *const final_rel_resid, int *num_iters);
 
 /**
- * @brief      Calculate the plaquette
+ * @brief      Wrapper for the plaquette. We could call plaqQuda() directly in
+ *             openQCD, but we have to make sure manually that the gauge field
+ *             is loaded
  *
- * @return     plaquette value
+ * @return     Plaquette value
  * @see        https://github.com/lattice/quda/wiki/Gauge-Measurements#wilson-plaquette-action
  */
 double openQCD_qudaPlaquette(void);
@@ -170,19 +176,17 @@ double openQCD_qudaPlaquette(void);
 /**
  * @brief      Load the gauge fields from host to quda
  *
- * @param[in]  precision  The precision
  * @param[in]  gauge      The gauge fields (in openqcd order)
  */
-void openQCD_gaugeload(int precision, void *gauge);
+void openQCD_gaugeload(void *gauge);
 
 
 /**
  * @brief      Save the gauge fields from quda to host
  *
- * @param[in]  precision  The precision
  * @param[out] gauge      The gauge fields (will be stored in openqcd order)
  */
-void openQCD_gaugesave(int precision, void *gauge);
+void openQCD_gaugesave(void *gauge);
 
 
 /**

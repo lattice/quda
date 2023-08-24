@@ -2341,7 +2341,10 @@ namespace quda {
       }
 
       /**
-       * @brief      Gets the offset in Floats from the base pointer of the gauge fields.
+       * @brief      Gets the offset in Floats from the openQCD base pointer of
+       *             the gauge fields. At this point, fields are reorder with a
+       *             xyzt-lexicographical spacetime index, so nothing special to
+       *             do here.
        *
        * @param[in]  x       Checkerboard index coming from quda
        * @param[in]  dir     The direction coming from quda

@@ -1720,97 +1720,53 @@ namespace quda
       size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
     };
 
-    // Based on ''SpaceSpinorColorOrder'' TODO:
+    /**
+     * struct to define order of spinor fields in OpenQCD
+     */
     template <typename Float, int Ns, int Nc> struct OpenQCDDiracOrder {
+
       using Accessor = OpenQCDDiracOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
-      static const int length = 2 * Ns * Nc; // 12 complex (2 floats) numbers per spinor color field
+
+      static const int length = 2*Ns*Nc; // 12 complex (2 floats) numbers per spinor color field
       Float *field;
       size_t offset;
       Float *ghost[8];
       int volumeCB;
       int faceVolumeCB[4];
       int nParity;
-      const int dim[4];
+      const int L[4];
 
       OpenQCDDiracOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, float * = 0, Float **ghost_ = 0) :
         field(field_ ? field_ : (Float *)a.V()),
         offset(a.Bytes() / (2 * sizeof(Float))),  // TODO: What's this for??
         volumeCB(a.VolumeCB()),
         nParity(a.SiteSubset()),
-        dim {a.X()[0], a.X()[1], a.X()[2], a.X()[3]} // GLOBAL dimensions??
-      { // TODO: ARE GHOSTS NEEDED??
-        // for (int i = 0; i < 4; i++) {
-        //   ghost[2 * i] = ghost_ ? ghost_[2 * i] : 0;
-        //   ghost[2 * i + 1] = ghost_ ? ghost_[2 * i + 1] : 0;
-        //   faceVolumeCB[i] = a.SurfaceCB(i) * nFace;
-        // }
-        if constexpr (length != 24) errorQuda("Spinor field length %d not supported", length);
+        L {a.X()[0], a.X()[1], a.X()[2], a.X()[3]} // local dimensions
+      {
+        if constexpr (length != 24) {
+          errorQuda("Spinor field length %d not supported", length);
+        }
       }
 
-      /**
-       @brief Convert from 1-dimensional index to the n-dimensional
-       spatial index.  With full fields, we assume that the field is
-       even-odd ordered.  The lattice coordinates that are computed
-       here are full-field coordinates.
-    */
-      // __device__ __host__ inline void LatticeIndexOpenQCD(int y[4], int i) const
-      // {
-      //   // if (siteSubset == QUDA_FULL_SITE_SUBSET)
-      //   x[0] /= 2;
-
-      //   for (int d = 0; d < 4; d++) {
-      //     y[d] = i % x[d];
-      //     i /= x[d];
-      //   }
-      //   int parity = i; // parity is the slowest running dimension
-
-      //   // convert into the full-field lattice coordinate
-      //   // if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-      //   for (int d = 1; d < nDim; d++) parity += y[d];
-      //   parity = parity & 1;
-      //   x[0] *= 2; // restore x[0]
-      //   // }
-
-      //   y[0] = 2 * y[0] + parity; // compute the full x coordinate
-      // }
-
-      /* lexicographical index: coord0 in QUDA is x1 in OpenQxD (x)
-              coord1 in QUDA is x2 in OpenQxD (y)
-              coord2 in QUDA is x3 in OpenQxD (z)
-              coord3 in QUDA is x0 in OpenQxD (t)
-              */
-      __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
-      {
-
-        /* INDEXING */
-        int coord[4]; // declare a 4D vector x0, x1, x2, x3 = (xyzt), t fastest (ix = x0 + x1 * L0 + ...)
-        getCoords(coord, x, dim, parity); // from x, dim, parity obtain coordinate of the site
-
-        int iy_OpenQxD = coord[2] + dim[2] * coord[1] + dim[2] * dim[1] * coord[0] + dim[0] * dim[2] * dim[1] * coord[3];
-
-        // Loading as per QUDA style
-        auto in = &field[iy_OpenQxD * length]; // This is how they're accessed within OpenQxd (length = 24 doubles
-                                               // = 12 complex doubles = 4 spinor x 3 colors)
-                                               //
-        // printf("Loading site iy: %d with field value %.10e \n", iy_OpenQxD, field[iy_OpenQxD * length]);
-        block_load<complex, length / 2>(v, reinterpret_cast<const complex *>(in));
+      __device__ __host__ inline int getSpinorOffset(int x, int parity) const {
+        int coord[4];
+        getCoords(coord, x, L, parity);
+        int idx = coord[3] + L[3]*coord[2] + L[3]*L[2]*coord[1] + L[3]*L[2]*L[1]*coord[0];
+        return idx*length;
       }
 
-      __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0) const
+      __device__ __host__ inline void load(complex v[length/2], int x, int parity = 0) const
       {
-        /* INDEXING */
-        int coord[4]; // declare a 4D vector x0, x1, x2, x3 = (xyzt), t fastest (ix = x0 + x1 * L0 + ...)
-        getCoords(coord, x, dim, parity); // from x, dim, parity obtain coordinate of the site
+        auto in = &field[getSpinorOffset(x, parity)];
+        block_load<complex, length/2>(v, reinterpret_cast<const complex *>(in));
+      }
 
-        int iy_OpenQxD = coord[2] + dim[2] * coord[1] + dim[2] * dim[1] * coord[0] + dim[0] * dim[2] * dim[1] * coord[3];
-
-        // Loading as per QUDA style
-        auto out = &field[iy_OpenQxD * length];
-        // printf("Saving site iy: %d with field value %.10e \n",iy_OpenQxD,field[iy_OpenQxD * length]);
-
-        block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+      __device__ __host__ inline void save(const complex v[length/2], int x, int parity = 0) const
+      {
+        auto out = &field[getSpinorOffset(x, parity)];
+        block_store<complex, length/2>(reinterpret_cast<complex *>(out), v);
       }
 
       /**
@@ -1827,28 +1783,10 @@ namespace quda
         return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
       }
 
-      // __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dim, int dir, int parity = 0) const
-      // {
-      //   for (int s = 0; s < Ns; s++) {
-      //     for (int c = 0; c < Nc; c++) {
-      //       v[s * Nc + c]
-      //         = complex(ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Ns + s) * Nc + c) * 2 + 0],
-      //                   ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Ns + s) * Nc + c) * 2 + 1]);
-      //     }
-      //   }
-      // }
-
-      // __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dim, int dir, int parity = 0) const
-      // {
-      //   for (int s = 0; s < Ns; s++) {
-      //     for (int c = 0; c < Nc; c++) {
-      //       ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Ns + s) * Nc + c) * 2 + 0] = v[s * Nc + c].real();
-      //       ghost[2 * dim + dir][(((parity * faceVolumeCB[dim] + x) * Ns + s) * Nc + c) * 2 + 1] = v[s * Nc + c].imag();
-      //     }
-      //   }
-      // }
-
-      size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
+      size_t Bytes() const
+      {
+        return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float);
+      }
     }; // openQCDDiracOrder
 
   } // namespace colorspinor

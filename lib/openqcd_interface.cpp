@@ -157,12 +157,11 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout)
 void openQCD_qudaInit(openQCD_QudaInitArgs_t in)
 {
   if (qudaState.initialized) return;
-  setVerbosityQuda(in.verbosity, "QUDA: ", in.logfile);
-  openQCD_qudaSetLayout(in.layout);
-
   input = in;
+
+  setVerbosityQuda(input.verbosity, "QUDA: ", input.logfile);
+  openQCD_qudaSetLayout(input.layout);
   qudaState.initialized = true;
-  // geometry_openQxD(); // TODO: in the future establish ipt and other helper indexes from openQxD
 }
 
 void openQCD_qudaFinalize() {
@@ -185,17 +184,21 @@ static int getLinkPadding(const int dim[4])
  *******************************************/
 
 /**
- * @brief      OPENQCD GAUGE PARAMS
+ * @brief      Initialize gauge param struct
  *             
  * @param[in]  dim   dimensions
  * @param[in]  prec  precision
  *
- * @return     The quda gauge parameter.
+ * @return     The quda gauge parameter struct.
  */
 static QudaGaugeParam newOpenQCDGaugeParam(const int *dim, QudaPrecision prec)
 {
   QudaGaugeParam gParam = newQudaGaugeParam();
-  for (int dir = 0; dir < 4; ++dir) gParam.X[dir] = dim[dir];
+
+  for (int dir = 0; dir < 4; ++dir) {
+    gParam.X[dir] = dim[dir];
+  }
+
   gParam.cuda_prec_sloppy = gParam.cpu_prec = gParam.cuda_prec = prec;
   gParam.type = QUDA_SU3_LINKS;
 
@@ -207,12 +210,13 @@ static QudaGaugeParam newOpenQCDGaugeParam(const int *dim, QudaPrecision prec)
   gParam.anisotropy = 1.0;
   gParam.tadpole_coeff = 1.0;
   gParam.scale = 0;
-  gParam.ga_pad = getLinkPadding(dim);
+  gParam.ga_pad = getLinkPadding(dim); /* Why this? */
 
   return gParam;
 }
 
-void setGaugeParams(QudaGaugeParam &qudaGaugeParam, const int dim[4], openQCD_QudaInvertArgs_t &inv_args,
+
+/*void setGaugeParams(QudaGaugeParam &qudaGaugeParam, const int dim[4], openQCD_QudaInvertArgs_t &inv_args,
                     int external_precision, int quda_precision)
 {
 
@@ -257,7 +261,7 @@ void setGaugeParams(QudaGaugeParam &qudaGaugeParam, const int dim[4], openQCD_Qu
   qudaGaugeParam.cuda_prec_precondition = device_precision_sloppy;
   qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
   // qudaGaugeParam.ga_pad = getLinkPadding(dim);
-}
+}*/
 
 
 /* PARAMS FOR SPINOR FIELDS */
@@ -281,7 +285,7 @@ static void setColorSpinorParams(const int dim[4], QudaPrecision precision, Colo
 
 
 /* PARAMS FOR DSLASH AND INVERSION */
-static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, QudaPrecision cuda_prec_sloppy,
+/*static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, QudaPrecision cuda_prec_sloppy,
                             double mass, double target_residual, double target_residual_hq, int maxiter,
                             double reliable_delta, QudaParity parity, QudaVerbosity verbosity,
                             QudaInverterType inverter)
@@ -351,7 +355,7 @@ static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, Qud
 
   invertParam.compute_action = 0;
 }
-
+*/
 
 
 
@@ -393,56 +397,35 @@ double openQCD_qudaPlaquette(void)
 }
 
 
-void openQCD_gaugeload(int precision, void *gauge)
+void openQCD_gaugeload(void *gauge)
 {
-  void *buffer;
+  QudaGaugeParam qudaGaugeParam = newOpenQCDGaugeParam(localDim, QUDA_DOUBLE_PRECISION);
 
-  QudaGaugeParam qudaGaugeParam
-    = newOpenQCDGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
-
-  buffer = malloc(4*input.volume*input.sizeof_su3_dble);
+  void* buffer = malloc(4*input.volume*input.sizeof_su3_dble);
   input.reorder_gauge_openqcd_to_quda(gauge, buffer);
+  input.gauge = gauge;
   loadGaugeQuda(buffer, &qudaGaugeParam);
   free(buffer);
 
   qudaState.gauge_loaded = true;
-
-  return;
 }
 
 
-void openQCD_gaugesave(int precision, void *gauge)
+void openQCD_gaugesave(void *gauge)
 {
-  void *buffer;
+  QudaGaugeParam qudaGaugeParam = newOpenQCDGaugeParam(localDim, QUDA_DOUBLE_PRECISION);
 
-  QudaGaugeParam qudaGaugeParam
-    = newOpenQCDGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
-
-  buffer = malloc(4*input.volume*input.sizeof_su3_dble);
+  void* buffer = malloc(4*input.volume*input.sizeof_su3_dble);
   saveGaugeQuda(buffer, &qudaGaugeParam);
   input.reorder_gauge_quda_to_openqcd(buffer, gauge);
   free(buffer);
-
-  return;
 }
 
 void openQCD_qudaFreeGaugeField(void)
 {
   freeGaugeQuda();
   qudaState.gauge_loaded = false;
-  return;
 }
-
-
-/* 
- * SPINOR FIELDS 
- */
-
-
-/* 
- * SPINOR AND GAUGE FIELDS 
- */
-
 
 void openQCD_qudaSetDslashOptions(double kappa, double mu)
 {
@@ -478,8 +461,34 @@ void openQCD_qudaSetDslashOptions(double kappa, double mu)
 }
 
 
+double openQCD_qudaNorm(void *h_in)
+{
+  lat_dim_t X;
+
+  for (int i = 0; i<4; i++) {
+    X[i] = localDim[i];
+  }
+
+  QudaInvertParam sParam = newQudaInvertParam();
+  sParam.dirac_order = QUDA_OPENQCD_DIRAC_ORDER;
+  sParam.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  sParam.cpu_prec = QUDA_DOUBLE_PRECISION;
+  sParam.cuda_prec = QUDA_DOUBLE_PRECISION;
+
+  ColorSpinorParam cpuParam(h_in, sParam, X, false, QUDA_CPU_FIELD_LOCATION);
+  ColorSpinorField in_h(cpuParam);
+  ColorSpinorParam cudaParam(cpuParam, sParam, QUDA_CUDA_FIELD_LOCATION);
+  ColorSpinorField in(cudaParam);
+  in = in_h;
+
+  return blas::norm2(in);
+}
+
+
 void openQCD_qudaDslash(void *src, void *dst)
 {
+  void *buffer1, *buffer2;
+
   if (!qudaState.gauge_loaded) {
     errorQuda("Gauge field not loaded into QUDA, cannot apply Dslash. Call openQCD_gaugeload() first.");
     return;
@@ -490,7 +499,15 @@ void openQCD_qudaDslash(void *src, void *dst)
     return;
   }
 
-  dslashQuda(static_cast<char *>(dst), static_cast<char *>(src), &invertParam, QUDA_EVEN_PARITY);
+  buffer1 = malloc(input.volume*input.sizeof_spinor_dble);
+  buffer2 = malloc(input.volume*input.sizeof_spinor_dble);
+
+  input.reorder_spinor_openqcd_to_quda(src, buffer1);
+  MatQuda(static_cast<char *>(buffer2), static_cast<char *>(buffer1), &invertParam);
+  input.reorder_spinor_quda_to_openqcd(buffer2, dst);
+
+  free(buffer1);
+  free(buffer2);
 
   return;
 }
@@ -499,7 +516,7 @@ void openQCD_qudaDslash(void *src, void *dst)
 void openQCD_colorspinorloadsave(int external_precision, int quda_precision, openQCD_QudaInvertArgs_t inv_args, void *src,
                         void *dst, void *gauge)
 {
-  static const QudaVerbosity verbosity = getVerbosity();
+  //static const QudaVerbosity verbosity = getVerbosity();
 
   QudaGaugeParam qudaGaugeParam
     = newOpenQCDGaugeParam(localDim, (quda_precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION);
@@ -507,13 +524,13 @@ void openQCD_colorspinorloadsave(int external_precision, int quda_precision, ope
   loadGaugeQuda(gauge, &qudaGaugeParam);
 
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  QudaPrecision device_precision_sloppy = device_precision;
+  //QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  //QudaPrecision device_precision_sloppy = device_precision;
 
   QudaInvertParam invertParam = newQudaInvertParam();
 
   QudaParity local_parity = inv_args.evenodd;
-  QudaParity other_parity = local_parity == QUDA_EVEN_PARITY ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY;
+  //QudaParity other_parity = local_parity == QUDA_EVEN_PARITY ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY;
 
   /* For reference:
   setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, QudaPrecision cuda_prec_sloppy,
