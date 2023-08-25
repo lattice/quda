@@ -485,10 +485,64 @@ double openQCD_qudaNorm(void *h_in)
 }
 
 
+void openQCD_qudaGamma(int dir, void *openQCD_in, void *openQCD_out)
+{
+  lat_dim_t X;
+
+  for (int i = 0; i<4; i++) {
+    X[i] = localDim[i];
+  }
+
+  // sets up the necessary parameters
+  QudaInvertParam sParam = newQudaInvertParam();
+  sParam.dirac_order = QUDA_OPENQCD_DIRAC_ORDER;
+  sParam.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  sParam.cpu_prec = QUDA_DOUBLE_PRECISION;
+  sParam.cuda_prec = QUDA_DOUBLE_PRECISION;
+
+  // creates a field on the CPU
+  ColorSpinorParam cpuParam(openQCD_in, sParam, X, false, QUDA_CPU_FIELD_LOCATION);
+  ColorSpinorField in_h(cpuParam);
+
+  // creates a field on the GPU with the same parameter set as the CPU field
+  ColorSpinorParam cudaParam(cpuParam, sParam, QUDA_CUDA_FIELD_LOCATION);
+  ColorSpinorField in(cudaParam);
+
+  // transfer the CPU field to GPU
+  in = in_h;
+
+  // creates a zero-field on the GPU
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+  ColorSpinorField out(cudaParam);
+
+  // gamma5 runs within QUDA using QUDA fields
+  if (dir == 5 || dir == 4) {
+    gamma5(out, in);
+  } else if (dir == 0) {
+    gamma0(out, in);
+  } else if (dir == 1) {
+    gamma1(out, in);
+  } else if (dir == 2) {
+    gamma2(out, in);
+  } else if (dir == 3) {
+    gamma3(out, in);
+  } else {
+    errorQuda("Unknown gamma: %d\n", dir);
+  }
+
+  // creates a field on the CPU
+  cpuParam.v = openQCD_out;
+  cpuParam.location = QUDA_CPU_FIELD_LOCATION;
+  ColorSpinorField out_h(cpuParam);
+
+  // transfer the GPU field back to CPU
+  out_h = out;
+}
+
+
 void openQCD_qudaDslash(void *src, void *dst)
 {
-  void *buffer1, *buffer2;
-
   if (!qudaState.gauge_loaded) {
     errorQuda("Gauge field not loaded into QUDA, cannot apply Dslash. Call openQCD_gaugeload() first.");
     return;
@@ -499,15 +553,8 @@ void openQCD_qudaDslash(void *src, void *dst)
     return;
   }
 
-  buffer1 = malloc(input.volume*input.sizeof_spinor_dble);
-  buffer2 = malloc(input.volume*input.sizeof_spinor_dble);
-
-  input.reorder_spinor_openqcd_to_quda(src, buffer1);
-  MatQuda(static_cast<char *>(buffer2), static_cast<char *>(buffer1), &invertParam);
-  input.reorder_spinor_quda_to_openqcd(buffer2, dst);
-
-  free(buffer1);
-  free(buffer2);
+  MatQuda(static_cast<char *>(dst), static_cast<char *>(src), &invertParam);
+  /*dslashQuda(static_cast<char *>(dst), static_cast<char *>(src), &invertParam, QUDA_ODD_PARITY);*/
 
   return;
 }

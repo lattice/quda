@@ -101,7 +101,17 @@ typedef struct {
  */
 void openQCD_qudaSetDslashOptions(double kappa, double mu);
 
+
+/**
+ * @brief      Norm square on QUDA.
+ *
+ * @param[in]  h_in  Input field (from openQCD)
+ *
+ * @return     The norm
+ */
 double openQCD_qudaNorm(void *h_in);
+
+void openQCD_qudaGamma(int dir, void *openQCD_in, void *openQCD_out);
 
 /**
  * @brief      Apply the Wilson-Clover Dirac operator to a field. All fields
