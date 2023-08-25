@@ -1737,24 +1737,108 @@ namespace quda
       int faceVolumeCB[4];
       int nParity;
       const int L[4];
+      const int rank;
 
-      OpenQCDDiracOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, float * = 0, Float **ghost_ = 0) :
+      OpenQCDDiracOrder(const ColorSpinorField &a, int = 1, Float *field_ = 0, float * = 0) :
         field(field_ ? field_ : (Float *)a.V()),
         offset(a.Bytes() / (2 * sizeof(Float))),  // TODO: What's this for??
         volumeCB(a.VolumeCB()),
         nParity(a.SiteSubset()),
-        L {a.X()[0], a.X()[1], a.X()[2], a.X()[3]} // local dimensions
+        L {a.X()[0], a.X()[1], a.X()[2], a.X()[3]}, // local dimensions (xyzt)
+        rank(comm_rank())
       {
         if constexpr (length != 24) {
           errorQuda("Spinor field length %d not supported", length);
         }
       }
 
-      __device__ __host__ inline int getSpinorOffset(int x, int parity) const {
-        int coord[4];
-        getCoords(coord, x, L, parity);
-        int idx = coord[3] + L[3]*coord[2] + L[3]*L[2]*coord[1] + L[3]*L[2]*L[1]*coord[0];
-        return idx*length;
+
+     /**
+      * @brief      Pure function to return ipt[iy], where
+      *             iy=x3+L3*x2+L2*L3*x1+L1*L2*L3*x0 without accessing the
+      *             ipt-array, but calculating the index on the fly. Notice that
+      *             xi and Li are in openQCD (txyz) convention. If they come
+      *             from QUDA, you have to rotate them first.
+      *
+      * @param[in]  x     Carthesian local lattice corrdinates, 0 <= x[i] < Li
+      *
+      * @return     ipt[x3+L3*x2+L2*L3*x1+L1*L2*L3*x0] = the local flat index of
+      *             openQCD
+      */
+      __device__ __host__ inline int ipt(int *x) const
+      {
+        int xb[4], xn[4], ib, in, is, cbs[4], mu, L_[4];
+
+        rotate_coords(L, L_);
+
+        /* cache_block */
+        for (mu=1;mu<4;mu++) {
+          if ((L[mu]%4)==0) {
+            cbs[mu]=4;
+          } else if ((L[mu]%3)==0) {
+            cbs[mu]=3;
+          } else if ((L[mu]%2)==0) {
+            cbs[mu]=2;
+          } else {
+            cbs[mu]=1;
+          }
+        }
+
+        xb[0] = x[0];
+        xb[1] = x[1] % cbs[1];
+        xb[2] = x[2] % cbs[2];
+        xb[3] = x[3] % cbs[3];
+
+        xn[1] = x[1]/cbs[1];
+        xn[2] = x[2]/cbs[2];
+        xn[3] = x[3]/cbs[3];
+
+        /**
+         * This is essentially what cbix[...] does.
+         * Notice integer division; truncated towards zero, i.e. 5/2=2
+         */
+        ib = (xb[3] + cbs[3]*xb[2] + cbs[2]*cbs[3]*xb[1] + cbs[1]*cbs[2]*cbs[3]*xb[0])/2;
+
+        in = xn[3] + (L_[3]/cbs[3])*xn[2] + (L_[3]/cbs[3])*(L_[2]/cbs[2])*xn[1];
+        is = x[0] + x[1] + x[2] + x[3];
+
+        return ib + (L_[0]*cbs[1]*cbs[2]*cbs[3]*in)/2 + (is%2)*(L_[0]*L_[1]*L_[2]*L_[3]/2);
+      }
+
+      /**
+       * @brief      Rotate corrdinates (xyzt -> txyz)
+       *
+       * @param[in]  x_quda     Carthesian local lattice coordinates in quda
+       *                        convention (xyzt)
+       * @param[out] x_openQCD  Carthesian local lattice coordinates in openQCD
+       *                        convention (txyz)
+       */
+      __device__ __host__ inline void rotate_coords(const int *x_quda, int *x_openQCD) const
+      {
+        x_openQCD[1] = x_quda[0];
+        x_openQCD[2] = x_quda[1];
+        x_openQCD[3] = x_quda[2];
+        x_openQCD[0] = x_quda[3];
+      }
+
+      /**
+       * @brief      Gets the offset in Floats from the openQCD base pointer to
+       *             the spinor field.
+       *
+       * @param[in]  x       Checkerboard index coming from quda
+       * @param[in]  parity  The parity coming from quda
+       *
+       * @return     The offset.
+       */
+      __device__ __host__ inline int getSpinorOffset(int x, int parity) const
+      {
+        int coord_quda[4], coord_openQCD[4];
+
+        /* coord_quda contains xyzt local Carthesian corrdinates */
+        getCoords(coord_quda, x, L, parity);
+        rotate_coords(coord_quda, coord_openQCD); /* xyzt -> txyz */
+
+        return ipt(coord_openQCD)*length;
       }
 
       __device__ __host__ inline void load(complex v[length/2], int x, int parity = 0) const
