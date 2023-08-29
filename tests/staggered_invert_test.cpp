@@ -306,25 +306,20 @@ int main(int argc, char **argv)
   std::vector<double> gflops(Nsrc);
   std::vector<int> iter(Nsrc);
 
-  // Pointers for tests 5 and 6
-  // Quark masses
-  std::vector<double> masses(multishift);
-  // Host array for solutions
-  void **outArray = (void **)safe_malloc(multishift * sizeof(void *));
-  // QUDA host array for internal checks and malloc
-  std::vector<ColorSpinorField *> qudaOutArray(multishift);
-
+  // Pointers for split grid tests
   std::vector<quda::ColorSpinorField *> _h_b(Nsrc, nullptr);
   std::vector<quda::ColorSpinorField *> _h_x(Nsrc, nullptr);
 
   // QUDA invert test
   //----------------------------------------------------------------------------
-  switch (test_type) {
-  case 0: // full parity solution, full parity system
-  case 1: // full parity solution, solving EVEN EVEN prec system
-  case 2: // full parity solution, solving ODD ODD prec system
-  case 3: // even parity solution, solving EVEN system
-  case 4: // odd parity solution, solving ODD system
+
+  if (test_type >= 0 && test_type <= 4) {
+    // case 0: // full parity solution, full parity system
+    // case 1: // full parity solution, solving EVEN EVEN prec system
+    // case 2: // full parity solution, solving ODD ODD prec system
+    // case 3: // even parity solution, solving EVEN system
+    // case 4: // odd parity solution, solving ODD system
+
     if (multishift != 1) {
       printfQuda("Multishift not supported for test %d\n", test_type);
       exit(0);
@@ -366,35 +361,50 @@ int main(int argc, char **argv)
       if (verify_results)
         verifyStaggeredInversion(*tmp, *ref, *in[k], *out[k], mass, *cpuFat, *cpuLong, gauge_param, inv_param, 0);
     }
-    break;
+  } else if (test_type == 5 || test_type == 6) {
+    // case 5: // multi mass CG, even parity solution, solving EVEN system
+    // case 6: // multi mass CG, odd parity solution, solving ODD system
 
-  case 5: // multi mass CG, even parity solution, solving EVEN system
-  case 6: // multi mass CG, odd parity solution, solving ODD system
+    if (use_split_grid)
+      errorQuda("Multishift currently doesn't support split grid.\n");
 
-    if (use_split_grid) { errorQuda("Multishift currently doesn't support split grid.\n"); }
-
-    if (multishift < 2) {
-      printfQuda("Multishift inverter requires more than one shift, multishift = %d\n", multishift);
-      exit(0);
-    }
+    if (multishift < 2)
+      errorQuda("Multishift inverter requires more than one shift, multishift = %d\n", multishift);
 
     inv_param.num_offset = multishift;
+
+    // Prepare vectors for masses
+    std::vector<double> masses(multishift);
+
+    // Consistency check for masses, tols, tols_hq size if we're setting custom values
+    if (multishift_shifts.size() != 0)
+      errorQuda("Multishift shifts are not supported for Wilson-type fermions");
+    if (multishift_masses.size() != 0 && multishift_masses.size() != static_cast<unsigned long>(multishift))
+      errorQuda("Multishift mass count %d does not agree with number of masses passed in %lu\n", multishift, multishift_masses.size());
+    if (multishift_tols.size() != 0 && multishift_tols.size() != static_cast<unsigned long>(multishift))
+      errorQuda("Multishift tolerance count %d does not agree with number of masses passed in %lu\n", multishift, multishift_tols.size());
+    if (multishift_tols_hq.size() != 0 && multishift_tols_hq.size() != static_cast<unsigned long>(multishift))
+      errorQuda("Multishift hq tolerance count %d does not agree with number of masses passed in %lu\n", multishift, multishift_tols_hq.size());
+
+    // Allocate storage of output arrays
+    std::vector<void*> outArray(multishift);
+    std::vector<ColorSpinorField> qudaOutArray(multishift, cs_param);
+
+    // Copy offsets and tolerances into inv_param; copy data pointers into outArray
     for (int i = 0; i < multishift; i++) {
-      // Set masses and offsets
-      masses[i] = 0.06 + i * i * 0.01;
+      masses[i] = (multishift_masses.size() == 0 ? (mass + i * i * 0.01) : multishift_masses[i]);
       inv_param.offset[i] = 4 * masses[i] * masses[i];
-      // Set tolerances for the heavy quarks, these can be set independently
-      // (functions of i) if desired
-      inv_param.tol_offset[i] = inv_param.tol;
-      inv_param.tol_hq_offset[i] = inv_param.tol_hq;
-      // Allocate memory and set pointers
-      qudaOutArray[i] = ColorSpinorField::Create(cs_param);
-      outArray[i] = qudaOutArray[i]->data();
+      inv_param.tol_offset[i] = (multishift_tols.size() == 0 ? inv_param.tol : multishift_tols[i]);
+      inv_param.tol_hq_offset[i] = (multishift_tols_hq.size() == 0 ? inv_param.tol_hq : multishift_tols_hq[i]);
+
+      outArray[i] = qudaOutArray[i].data();
+
+      logQuda(QUDA_VERBOSE, "Multishift mass %d = %e ; tolerance %e ; hq tolerance %e\n", i, masses[i], inv_param.tol_offset[i], inv_param.tol_hq_offset[i]);
     }
 
     for (int k = 0; k < Nsrc; k++) {
       quda::spinorNoise(*in[k], *rng, QUDA_NOISE_UNIFORM);
-      invertMultiShiftQuda((void **)outArray, in[k]->data(), &inv_param);
+      invertMultiShiftQuda((void **)outArray.data(), in[k]->data(), &inv_param);
 
       time[k] = inv_param.secs;
       gflops[k] = inv_param.gflops / inv_param.secs;
@@ -404,15 +414,11 @@ int main(int argc, char **argv)
 
       for (int i = 0; i < multishift; i++) {
         printfQuda("%dth solution: mass=%f, ", i, masses[i]);
-        verifyStaggeredInversion(*tmp, *ref, *in[k], *qudaOutArray[i], masses[i], *cpuFat, *cpuLong, gauge_param, inv_param, i);
+        verifyStaggeredInversion(*tmp, *ref, *in[k], qudaOutArray[i], masses[i], *cpuFat, *cpuLong, gauge_param, inv_param, i);
       }
     }
-
-    for (int i = 0; i < multishift; i++) delete qudaOutArray[i];
-    break;
-
-  default: errorQuda("Unsupported test type");
-
+  } else {
+    errorQuda("Unsupported test type");
   } // switch
 
   // Compute timings
@@ -446,7 +452,6 @@ int main(int argc, char **argv)
   for (auto out_vec : out) { delete out_vec; }
   delete ref;
   delete tmp;
-  host_free(outArray);
 
   if (use_split_grid) {
     for (auto p : _h_b) { delete p; }
