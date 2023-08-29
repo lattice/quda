@@ -83,6 +83,8 @@ namespace quda
 
   void Communicator::comm_allreduce_sum_array(double *, size_t) { }
 
+  void Communicator::comm_allreduce_sum(size_t &) { }
+
   void Communicator::comm_allreduce_max_array(deviation_t<double> *, size_t) { }
 
   void Communicator::comm_allreduce_max_array(double *, size_t) { }
@@ -93,7 +95,7 @@ namespace quda
 
   void Communicator::comm_allreduce_xor(uint64_t &) { }
 
-  void Communicator::comm_broadcast(void *, size_t) { }
+  void Communicator::comm_broadcast(void *, size_t, int) { }
 
   void Communicator::comm_barrier(void) { }
 

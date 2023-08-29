@@ -6,9 +6,6 @@
 #include <quda_internal.h>
 #include <gauge_field.h>
 
-#include <comm_quda.h>
-#include <host_utils.h>
-#include <command_line_params.h>
 #include <misc.h>
 #include <timer.h>
 #include <gauge_tools.h>
@@ -19,8 +16,7 @@
 #include <unitarization_links.h>
 
 #include <qio_field.h>
-
-#include <gtest/gtest.h>
+#include <test.h>
 
 using namespace quda;
 
@@ -36,55 +32,15 @@ bool execute = true;
 bool gauge_load;
 bool gauge_store;
 
-void *host_gauge[4];
-
-int gf_gauge_dir = 4;
-int gf_maxiter = 10000;
-int gf_verbosity_interval = 100;
-double gf_ovr_relaxation_boost = 1.5;
-double gf_fft_alpha = 0.8;
-int gf_reunit_interval = 10;
-double gf_tolerance = 1e-6;
-bool gf_theta_condition = false;
-bool gf_fft_autotune = false;
-
-void display_test_info()
-{
-  printfQuda("running the following test:\n");
-
-  switch (test_type) {
-  case 0: printfQuda("\n Google testing\n"); break;
-  case 1: printfQuda("\nOVR gauge fix\n"); break;
-  case 2: printfQuda("\nFFT gauge fix\n"); break;
-  default: errorQuda("Undefined test type %d given", test_type);
-  }
-
-  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
-  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(prec),
-             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
-             tdim, Lsdim);
-
-  printfQuda("Grid partition info:     X  Y  Z  T\n");
-  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
-             dimPartitioned(3));
-}
+std::array<std::vector<char>, 4> host_gauge;
 
 class GaugeAlgTest : public ::testing::Test
 {
 protected:
   QudaGaugeParam param;
-
   Timer<false> a0, a1;
-  double2 detu;
-  double3 plaq;
   GaugeField *U;
-  int nsteps;
-  int nhbsteps;
-  int novrsteps;
-  bool coldstart;
-  double beta_value;
-
-  bool unit_test;
+  double3 plaq;
 
   void SetReunitarizationConsts()
   {
@@ -99,10 +55,9 @@ protected:
 
   bool comparePlaquette(double3 a, double3 b)
   {
-    double a0, a1, a2;
-    a0 = std::abs(a.x - b.x);
-    a1 = std::abs(a.y - b.y);
-    a2 = std::abs(a.z - b.z);
+    auto a0 = std::abs(a.x - b.x);
+    auto a1 = std::abs(a.y - b.y);
+    auto a2 = std::abs(a.z - b.z);
     double prec_val = 1.0e-5;
     if (prec == QUDA_DOUBLE_PRECISION) prec_val = gf_tolerance * 1e2;
     return ((a0 < prec_val) && (a1 < prec_val) && (a2 < prec_val));
@@ -117,6 +72,14 @@ protected:
 
   virtual void SetUp()
   {
+#ifndef QUDA_BUILD_NATIVE_FFT // skip FFT tests if FFT not available
+    const ::testing::TestInfo *const test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+    const char *name = test_info->name();
+    if (strcmp(name, "Landau_FFT") == 0 || strcmp(name, "Coulomb_FFT") == 0) {
+      execute = false;
+      GTEST_SKIP();
+    }
+#endif
     if (execute) {
       setVerbosity(verbosity);
       param = newQudaGaugeParam();
@@ -149,11 +112,11 @@ protected:
 
         RNG randstates(*U, 1234);
 
-        nsteps = heatbath_num_steps;
-        nhbsteps = heatbath_num_heatbath_per_step;
-        novrsteps = heatbath_num_overrelax_per_step;
-        coldstart = heatbath_coldstart;
-        beta_value = heatbath_beta_value;
+        int nsteps = heatbath_num_steps;
+        int nhbsteps = heatbath_num_heatbath_per_step;
+        int novrsteps = heatbath_num_overrelax_per_step;
+        bool coldstart = heatbath_coldstart;
+        double beta_value = heatbath_beta_value;
         a1.start();
 
         if (coldstart)
@@ -181,7 +144,8 @@ protected:
         // If a field is loaded, create a device field and copy
         printfQuda("Copying gauge field from host\n");
         param.location = QUDA_CPU_FIELD_LOCATION;
-        GaugeFieldParam gauge_field_param(param, host_gauge);
+        void *h_gauge[] = {host_gauge[0].data(), host_gauge[1].data(), host_gauge[2].data(), host_gauge[3].data()};
+        GaugeFieldParam gauge_field_param(param, h_gauge);
         gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
         GaugeField *host = GaugeField::Create(gauge_field_param);
 
@@ -235,8 +199,8 @@ protected:
   virtual void TearDown()
   {
     if (execute) {
-      detu = getLinkDeterminant(*U);
-      double2 tru = getLinkTrace(*U);
+      auto detu = getLinkDeterminant(*U);
+      auto tru = getLinkTrace(*U);
       printfQuda("Det: %.16e:%.16e\n", detu.x, detu.y);
       printfQuda("Tr: %.16e:%.16e\n", tru.x / 3.0, tru.y / 3.0);
 
@@ -247,9 +211,8 @@ protected:
       a0.stop();
       printfQuda("Time -> %.6f s\n", a0.last());
     }
-    // If we performed a specific instance, switch off the
-    // Google testing.
-    if (test_type != 0) execute = false;
+    // Reset execute.  If we performed a specific instance, switch off the Google testing.
+    execute = (test_type == 0);
   }
 
   virtual void run_ovr()
@@ -320,7 +283,7 @@ protected:
 TEST_F(GaugeAlgTest, Generation)
 {
   if (execute && !gauge_load) {
-    detu = getLinkDeterminant(*U);
+    auto detu = getLinkDeterminant(*U);
     ASSERT_TRUE(CheckDeterminant(detu));
   }
 }
@@ -381,60 +344,46 @@ TEST_F(GaugeAlgTest, Coulomb_FFT)
   }
 }
 
-void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
-{
-  // Option group for gauge fixing related options
-  auto opgroup = quda_app->add_option_group("gaugefix", "Options controlling gauge fixing tests");
-  opgroup->add_option("--gf-dir", gf_gauge_dir,
-                      "The orthogonal direction of the gauge fixing, 3=Coulomb, 4=Landau. (default 4)");
-  opgroup->add_option("--gf-maxiter", gf_maxiter,
-                      "The maximun number of gauge fixing iterations to be applied (default 10000) ");
-  opgroup->add_option("--gf-verbosity-interval", gf_verbosity_interval,
-                      "Print the gauge fixing progress every N steps (default 100)");
-  opgroup->add_option("--gf-ovr-relaxation-boost", gf_ovr_relaxation_boost,
-                      "The overrelaxation boost parameter for the overrelaxation method (default 1.5)");
-  opgroup->add_option("--gf-fft-alpha", gf_fft_alpha, "The Alpha parameter in the FFT method (default 0.8)");
-  opgroup->add_option("--gf-reunit-interval", gf_reunit_interval,
-                      "Reunitarise the gauge field every N steps (default 10)");
-  opgroup->add_option("--gf-tol", gf_tolerance, "The tolerance of the gauge fixing quality (default 1e-6)");
-  opgroup->add_option(
-    "--gf-theta-condition", gf_theta_condition,
-    "Use the theta value to determine the gauge fixing if true. If false, use the delta value (default false)");
-  opgroup->add_option(
-    "--gf-fft-autotune", gf_fft_autotune,
-    "In the FFT method, automatically adjust the alpha parameter if the quality begins to diverge (default false)");
-}
+struct gauge_alg_test : quda_test {
+
+  void display_info() const override
+  {
+    quda_test::display_info();
+
+    switch (test_type) {
+    case 0: printfQuda("\n Google testing\n"); break;
+    case 1: printfQuda("\nOVR gauge fix\n"); break;
+    case 2: printfQuda("\nFFT gauge fix\n"); break;
+    default: errorQuda("Undefined test type %d given", test_type);
+    }
+
+    printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
+    printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(prec),
+               get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
+               tdim, Lsdim);
+  }
+
+  void add_command_line_group(std::shared_ptr<QUDAApp> app) const override
+  {
+    quda_test::add_command_line_group(app);
+    add_gaugefix_option_group(app);
+    add_heatbath_option_group(app);
+
+    test_type = 0;
+    CLI::TransformPairs<int> test_type_map {{"Google", 0}, {"OVR", 1}, {"FFT", 2}};
+    app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+  }
+
+  gauge_alg_test(int argc, char **argv) : quda_test("Gauge Alg Test", argc, argv) { }
+};
 
 int main(int argc, char **argv)
 {
-  // initalize google test, includes command line options
-  ::testing::InitGoogleTest(&argc, argv);
-
-  // command line options
-  auto app = make_app();
-  add_gaugefix_option_group(app);
-  add_heatbath_option_group(app);
-
-  test_type = 0;
-  CLI::TransformPairs<int> test_type_map {{"Google", 0}, {"OVR", 1}, {"FFT", 2}};
-  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
-  try {
-    app->parse(argc, argv);
-  } catch (const CLI::ParseError &e) {
-    return app->exit(e);
-  }
-
-  // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
-  initComms(argc, argv, gridsize_from_cmdline);
+  gauge_alg_test test(argc, argv);
+  test.init();
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
-  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
-
   setWilsonGaugeParam(gauge_param);
-  setDims(gauge_param.X);
-
-  display_test_info();
 
   gauge_load = (latfile.size() > 0);
   gauge_store = (gauge_outfile.size() > 0);
@@ -443,33 +392,10 @@ int main(int argc, char **argv)
   // If no gauge is passed, we generate a quenched field on the device.
   if (gauge_load) {
     printfQuda("Loading gauge field from host\n");
-    for (int dir = 0; dir < 4; dir++) {
-      host_gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-    }
-    constructHostGaugeField(host_gauge, gauge_param, argc, argv);
+    for (int dir = 0; dir < 4; dir++) { host_gauge[dir].resize(V * gauge_site_size * host_gauge_data_type_size); }
+    void *h_gauge[] = {host_gauge[0].data(), host_gauge[1].data(), host_gauge[2].data(), host_gauge[3].data()};
+    constructHostGaugeField(h_gauge, gauge_param, argc, argv);
   }
 
-  // call srand() with a rank-dependent seed
-  initRand();
-
-  // initialize the QUDA library
-  initQuda(device_ordinal);
-
-  // Ensure gtest prints only from rank 0
-  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
-  if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-
-  // return code for google test
-  int test_rc = RUN_ALL_TESTS();
-
-  if (gauge_load) {
-    // release memory
-    for (int dir = 0; dir < 4; dir++) host_free(host_gauge[dir]);
-  }
-
-  endQuda();
-
-  finalizeComms();
-
-  return test_rc;
+  return test.execute(); // run tests
 }

@@ -28,7 +28,7 @@ namespace quda
   public:
     StaggeredQSmear(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) { }
 
-    void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
@@ -55,7 +55,7 @@ namespace quda
       }
     }
 
-    long long flops() const
+    long long flops() const override
     {
       int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(3) matrix-vector flops
       int num_mv_multiply = in.Nspin() == 4 ? 2 : 1;
@@ -101,7 +101,7 @@ namespace quda
       return flops_;
     }
 
-    virtual long long bytes() const
+    virtual long long bytes() const override
     {
       int gauge_bytes = arg.reconstruct * in.Precision();
       int spinor_bytes
@@ -145,7 +145,7 @@ namespace quda
       return bytes_;
     }
 
-    TuneKey tuneKey() const
+    TuneKey tuneKey() const override
     {
       // add laplace transverse dir to the key
       char aux[TuneKey::aux_n];
@@ -163,6 +163,21 @@ namespace quda
       strcat(aux, tslice_kernel);
 
       return TuneKey(in.VolString().c_str(), typeid(*this).name(), aux);
+    }
+
+    /**
+       @brief Compute the tuning rank
+       @return The rank on which to do kernel tuning
+    */
+    int32_t getTuneRank() const override {
+      int32_t tune_rank = 0;
+
+      if (arg.is_t0_kernel) { // find the minimum rank for tuning
+        tune_rank = ( arg.t0 < 0 ) ? comm_size() : comm_rank_global();
+        comm_allreduce_min(tune_rank);
+      }
+
+      return tune_rank;
     }
   };
 

@@ -18,6 +18,8 @@ namespace quda
 
     static bool initialized = false;
 
+    static int device_id = -1;
+
     void init(int dev)
     {
       if (initialized) return;
@@ -45,6 +47,14 @@ namespace quda
       // Broken in recent ROCms. I am not sure it does anything anyway on RedTeam
       // CHECK_HIP_ERROR(hipDeviceSetCacheConfig(hipFuncCachePreferL1));
       CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProp, dev));
+
+      device_id = dev;
+    }
+
+    void init_thread()
+    {
+      if (device_id == -1) errorQuda("No HIP device has been initialized for this process");
+      CHECK_HIP_ERROR(hipSetDevice(device_id));
     }
 
     int get_device_count()
@@ -55,6 +65,30 @@ namespace quda
         if (device_count == 0) errorQuda("No HIP devices found");
       }
       return device_count;
+    }
+
+    void get_visible_devices_string(char device_list_string[128])
+    {
+      char *device_order_env = getenv("ROCR_VISIBLE_DEVICES");
+
+      if (!device_order_env) {
+        device_order_env = getenv("HIP_VISIBLE_DEVICES");
+      }
+
+      if (device_order_env) {
+        std::stringstream device_list_raw(device_order_env); // raw input
+        std::stringstream device_list;                       // formatted (no commas)
+
+        int device;
+        while (device_list_raw >> device) {
+          // check this is a valid policy choice
+          if (device < 0) { errorQuda("Invalid ROCR/HIP_VISIBLE_DEVICES ordinal %d", device); }
+
+          device_list << device;
+          if (device_list_raw.peek() == ',') device_list_raw.ignore();
+        }
+        snprintf(device_list_string, 128, "%s", device_list.str().c_str());
+      }
     }
 
     void create_context()

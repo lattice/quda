@@ -318,6 +318,14 @@ void Communicator::comm_allreduce_sum_array(double *data, size_t size)
   }
 }
 
+void Communicator::comm_allreduce_sum(size_t &a)
+{
+  if (sizeof(size_t) != sizeof(uint64_t)) {
+    errorQuda("sizeof(size_t) != sizeof(uint64_t): %lu != %lu\n", sizeof(size_t), sizeof(uint64_t));
+  }
+  QMP_CHECK(QMP_comm_sum_uint64_t(QMP_COMM_HANDLE, reinterpret_cast<uint64_t *>(&a)));
+}
+
 void Communicator::comm_allreduce_max_array(deviation_t<double> *data, size_t size)
 {
   size_t n = comm_size();
@@ -353,9 +361,11 @@ void Communicator::comm_allreduce_xor(uint64_t &data)
   QMP_CHECK(QMP_comm_xor_ulong(QMP_COMM_HANDLE, reinterpret_cast<unsigned long *>(&data)));
 }
 
-void Communicator::comm_broadcast(void *data, size_t nbytes)
+void Communicator::comm_broadcast(void *data, size_t nbytes, int root)
 {
-  QMP_CHECK(QMP_comm_broadcast(QMP_COMM_HANDLE, data, nbytes));
+  // break out of QMP since it can only broadcast from rank 0
+  MPI_CHECK(MPI_Bcast(data, (int)nbytes, MPI_BYTE, root, MPI_COMM_HANDLE));
+  // QMP_CHECK(QMP_comm_broadcast(QMP_COMM_HANDLE, data, nbytes));
 }
 
 void Communicator::comm_barrier(void) { QMP_CHECK(QMP_comm_barrier(QMP_COMM_HANDLE)); }
