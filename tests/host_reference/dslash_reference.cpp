@@ -744,8 +744,7 @@ double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, dou
 }
 
 double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorField &ref, quda::ColorSpinorField &in,
-                                quda::ColorSpinorField &out, double mass, void *qdp_fatlink[], void *qdp_longlink[],
-                                void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param,
+                                quda::ColorSpinorField &out, double mass, quda::GaugeField &fat_link, quda::GaugeField &long_link, QudaGaugeParam &gauge_param,
                                 QudaInvertParam &inv_param, int shift)
 {
   switch (test_type) {
@@ -757,10 +756,8 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
     // {{m, -D_eo},{-D_oe,m}}, while the CPU verify function does not
     // have the minus sign. Passing in QUDA_DAG_YES solves this
     // discrepancy.
-    staggeredDslash(ref.Even(), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, out.Odd(), QUDA_EVEN_PARITY,
-                    QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
-    staggeredDslash(ref.Odd(), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, out.Even(), QUDA_ODD_PARITY,
-                    QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
+    staggeredDslash(ref.Even(), fat_link, long_link, out.Odd(), QUDA_EVEN_PARITY, QUDA_DAG_YES, dslash_type);
+    staggeredDslash(ref.Odd(), fat_link, long_link, out.Even(), QUDA_ODD_PARITY, QUDA_DAG_YES, dslash_type);
 
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
       xpay(out.V(), kappa, ref.V(), ref.Length(), gauge_param.cpu_prec);
@@ -775,8 +772,7 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
   case 5: // multi mass CG, even parity solution, solving EVEN system
   case 6: // multi mass CG, odd parity solution, solving ODD system
 
-    staggeredMatDagMat(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, out, mass, 0, inv_param.cpu_prec,
-                       gauge_param.cpu_prec, tmp,
+    staggeredMatDagMat(ref, fat_link, long_link, out, mass, 0, tmp,
                        (test_type == 3 || test_type == 5) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY, dslash_type);
     break;
   }

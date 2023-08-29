@@ -261,12 +261,14 @@ int main(int argc, char **argv)
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.location = QUDA_CPU_FIELD_LOCATION;
 
-  GaugeFieldParam cpuFatParam(gauge_param, milc_fatlink);
+  GaugeFieldParam cpuFatParam(gauge_param, qdp_fatlink);
+  cpuFatParam.order = QUDA_QDP_GAUGE_ORDER;
   cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuFat = GaugeField::Create(cpuFatParam);
 
   gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
-  GaugeFieldParam cpuLongParam(gauge_param, milc_longlink);
+  GaugeFieldParam cpuLongParam(gauge_param, qdp_longlink);
+  cpuLongParam.order = QUDA_QDP_GAUGE_ORDER;
   cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuLong = GaugeField::Create(cpuLongParam);
 
@@ -361,8 +363,7 @@ int main(int argc, char **argv)
 
     for (int k = 0; k < Nsrc; k++) {
       if (verify_results)
-        verifyStaggeredInversion(*tmp, *ref, *in[k], *out[k], mass, qdp_fatlink, qdp_longlink, (void **)cpuFat->Ghost(),
-                                 (void **)cpuLong->Ghost(), gauge_param, inv_param, 0);
+        verifyStaggeredInversion(*tmp, *ref, *in[k], *out[k], mass, *cpuFat, *cpuLong, gauge_param, inv_param, 0);
     }
   } else if (test_type == 5 || test_type == 6) {
     // case 5: // multi mass CG, even parity solution, solving EVEN system
@@ -417,8 +418,7 @@ int main(int argc, char **argv)
 
       for (int i = 0; i < multishift; i++) {
         printfQuda("%dth solution: mass=%f, ", i, masses[i]);
-        verifyStaggeredInversion(*tmp, *ref, *in[k], qudaOutArray[i], masses[i], qdp_fatlink, qdp_longlink,
-                                 (void **)cpuFat->Ghost(), (void **)cpuLong->Ghost(), gauge_param, inv_param, i);
+        verifyStaggeredInversion(*tmp, *ref, *in[k], qudaOutArray[i], masses[i], *cpuFat, *cpuLong, gauge_param, inv_param, i);
       }
     }
   } else {

@@ -109,8 +109,7 @@ std::array<double, 2> verifyWilsonTypeInversion(void *spinorOut, void **spinorOu
                                                 QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv);
 
 double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorField &ref, quda::ColorSpinorField &in,
-                                quda::ColorSpinorField &out, double mass, void *qdp_fatlink[], void *qdp_longlink[],
-                                void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param,
+                                quda::ColorSpinorField &out, double mass, quda::GaugeField &fat_link, quda::GaugeField &long_link, QudaGaugeParam &gauge_param,
                                 QudaInvertParam &inv_param, int shift);
 
 // i represents a "half index" into an even or odd "half lattice".

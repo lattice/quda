@@ -82,19 +82,15 @@ struct StaggeredDslashTestWrapper {
     printfQuda("Calculating reference implementation...");
     switch (dtest_type) {
     case dslash_test_type::Dslash:
-      staggeredDslash(spinorRef, qdp_fatlink, qdp_longlink, (void**)cpuFat->Ghost(), (void**)cpuLong->Ghost(), spinor,
-                      parity, dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
+      staggeredDslash(spinorRef, *cpuFat, *cpuLong, spinor, parity, dagger, dslash_type);
       break;
     case dslash_test_type::MatPC:
-      staggeredMatDagMat(spinorRef, qdp_fatlink, qdp_longlink, (void**)cpuFat->Ghost(), (void**)cpuLong->Ghost(), spinor,
-                         mass, 0, inv_param.cpu_prec, gauge_param.cpu_prec, tmpCpu, parity, dslash_type);
+      staggeredMatDagMat(spinorRef, *cpuFat, *cpuLong, spinor, mass, 0, tmpCpu, parity, dslash_type);
       break;
     case dslash_test_type::Mat:
       // the !dagger is to reconcile the QUDA convention of D_stag = {{ 2m, -D_{eo}}, -D_{oe}, 2m}} vs the host convention without the minus signs
-      staggeredDslash(spinorRef.Even(), qdp_fatlink, qdp_longlink, (void**)cpuFat->Ghost(), (void**)cpuLong->Ghost(),
-                      spinor.Odd(), QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
-      staggeredDslash(spinorRef.Odd(), qdp_fatlink, qdp_longlink, (void**)cpuFat->Ghost(), (void**)cpuLong->Ghost(),
-                      spinor.Even(), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
+      staggeredDslash(spinorRef.Even(), *cpuFat, *cpuLong, spinor.Odd(), QUDA_EVEN_PARITY, !dagger, dslash_type);
+      staggeredDslash(spinorRef.Odd(), *cpuFat, *cpuLong, spinor.Even(), QUDA_ODD_PARITY, !dagger, dslash_type);
       if (dslash_type == QUDA_LAPLACE_DSLASH) {
         xpay(spinor.V(), kappa, spinorRef.V(), spinor.Length(), gauge_param.cpu_prec);
       } else {
@@ -184,12 +180,14 @@ struct StaggeredDslashTestWrapper {
     gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
     gauge_param.location = QUDA_CPU_FIELD_LOCATION;
 
-    GaugeFieldParam cpuFatParam(gauge_param, milc_fatlink);
+    GaugeFieldParam cpuFatParam(gauge_param, qdp_fatlink);
+    cpuFatParam.order = QUDA_QDP_GAUGE_ORDER;
     cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
     cpuFat = GaugeField::Create(cpuFatParam);
 
     gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
-    GaugeFieldParam cpuLongParam(gauge_param, milc_longlink);
+    GaugeFieldParam cpuLongParam(gauge_param, qdp_longlink);
+    cpuLongParam.order = QUDA_QDP_GAUGE_ORDER;
     cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
     cpuLong = GaugeField::Create(cpuLongParam);
 

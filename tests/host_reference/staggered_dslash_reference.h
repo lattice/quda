@@ -11,16 +11,13 @@ using namespace quda;
 
 void setDims(int *);
 
-template <typename sFloat, typename gFloat>
-void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, gFloat **ghostFatlink,
-                              gFloat **ghostLonglink, sFloat *spinorField, sFloat **fwd_nbr_spinor,
-                              sFloat **back_nbr_spinor, int oddBit, int daggerBit, int nSrc, QudaDslashType dslash_type);
+template <typename real_t>
+void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, real_t **ghostFatlink,
+                              real_t **ghostLonglink, real_t *spinorField, real_t **fwd_nbr_spinor,
+                              real_t **back_nbr_spinor, int oddBit, int daggerBit, int nSrc, QudaDslashType dslash_type);
 
-void staggeredDslash(ColorSpinorField &out, void **fatlink, void **longlink, void **ghost_fatlink,
-                     void **ghost_longlink, const ColorSpinorField &in, int oddBit, int daggerBit,
-                     QudaPrecision sPrecision, QudaPrecision gPrecision, QudaDslashType dslash_type);
+void staggeredDslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link, const ColorSpinorField &in, int oddBit, int daggerBit,
+                     QudaDslashType dslash_type);
 
-void staggeredMatDagMat(ColorSpinorField &out, void **fatlink, void **longlink, void **ghost_fatlink,
-                        void **ghost_longlink, const ColorSpinorField &in, double mass, int dagger_bit,
-                        QudaPrecision sPrecision, QudaPrecision gPrecision, ColorSpinorField &tmp, QudaParity parity,
-                        QudaDslashType dslash_type);
+void staggeredMatDagMat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link, const ColorSpinorField &in, double mass, int dagger_bit,
+                        ColorSpinorField &tmp, QudaParity parity, QudaDslashType dslash_type);
