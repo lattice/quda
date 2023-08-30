@@ -82,20 +82,13 @@ struct StaggeredDslashTestWrapper {
     printfQuda("Calculating reference implementation...");
     switch (dtest_type) {
     case dslash_test_type::Dslash:
-      staggeredDslash(spinorRef, *cpuFat, *cpuLong, spinor, parity, dagger, dslash_type);
+      stag_dslash(spinorRef, *cpuFat, *cpuLong, spinor, parity, dagger, dslash_type);
       break;
     case dslash_test_type::MatPC:
-      staggeredMatDagMat(spinorRef, *cpuFat, *cpuLong, spinor, mass, 0, tmpCpu, parity, dslash_type);
+      stag_matpc(spinorRef, *cpuFat, *cpuLong, spinor, mass, 0, tmpCpu, parity, dslash_type);
       break;
     case dslash_test_type::Mat:
-      // the !dagger is to reconcile the QUDA convention of D_stag = {{ 2m, -D_{eo}}, -D_{oe}, 2m}} vs the host convention without the minus signs
-      staggeredDslash(spinorRef.Even(), *cpuFat, *cpuLong, spinor.Odd(), QUDA_EVEN_PARITY, !dagger, dslash_type);
-      staggeredDslash(spinorRef.Odd(), *cpuFat, *cpuLong, spinor.Even(), QUDA_ODD_PARITY, !dagger, dslash_type);
-      if (dslash_type == QUDA_LAPLACE_DSLASH) {
-        xpay(spinor.V(), kappa, spinorRef.V(), spinor.Length(), gauge_param.cpu_prec);
-      } else {
-        axpy(2 * mass, spinor.V(), spinorRef.V(), spinor.Length(), gauge_param.cpu_prec);
-      }
+      stag_mat(spinorRef, *cpuFat, *cpuLong, spinor, mass, dagger, dslash_type);
       break;
     default: errorQuda("Test type %d not defined", static_cast<int>(dtest_type));
     }

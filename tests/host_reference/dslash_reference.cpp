@@ -747,24 +747,17 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
                                 quda::ColorSpinorField &out, double mass, quda::GaugeField &fat_link, quda::GaugeField &long_link, QudaGaugeParam &gauge_param,
                                 QudaInvertParam &inv_param, int shift)
 {
+  int dagger = inv_param.dagger == QUDA_DAG_YES ? 1 : 0;
+
   switch (test_type) {
   case 0: // full parity solution, full parity system
   case 1: // full parity solution, solving EVEN EVEN prec system
   case 2: // full parity solution, solving ODD ODD prec system
+    stag_mat(ref, fat_link, long_link, out, mass, dagger, dslash_type);
 
-    // In QUDA, the full staggered operator has the sign convention
-    // {{m, -D_eo},{-D_oe,m}}, while the CPU verify function does not
-    // have the minus sign. Passing in QUDA_DAG_YES solves this
-    // discrepancy.
-    staggeredDslash(ref.Even(), fat_link, long_link, out.Odd(), QUDA_EVEN_PARITY, QUDA_DAG_YES, dslash_type);
-    staggeredDslash(ref.Odd(), fat_link, long_link, out.Even(), QUDA_ODD_PARITY, QUDA_DAG_YES, dslash_type);
-
-    if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      xpay(out.V(), kappa, ref.V(), ref.Length(), gauge_param.cpu_prec);
-      ax(0.5 / kappa, ref.V(), ref.Length(), gauge_param.cpu_prec);
-    } else {
-      axpy(2 * mass, out.V(), ref.V(), ref.Length(), gauge_param.cpu_prec);
-    }
+    // exact reason for this tbd, this isn't needed in the dslash test...
+    if (dslash_type == QUDA_LAPLACE_DSLASH)
+      ax(0.5 / kappa, ref.V(), ref.Length(), ref.Precision());
     break;
 
   case 3: // even parity solution, solving EVEN system
@@ -772,8 +765,8 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
   case 5: // multi mass CG, even parity solution, solving EVEN system
   case 6: // multi mass CG, odd parity solution, solving ODD system
 
-    staggeredMatDagMat(ref, fat_link, long_link, out, mass, 0, tmp,
-                       (test_type == 3 || test_type == 5) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY, dslash_type);
+    stag_matpc(ref, fat_link, long_link, out, mass, 0, tmp,
+               (test_type == 3 || test_type == 5) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY, dslash_type);
     break;
   }
 

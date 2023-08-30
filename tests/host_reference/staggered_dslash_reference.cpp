@@ -123,8 +123,8 @@ void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, 
   } // 4-d volume
 }
 
-void staggeredDslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
-                     const ColorSpinorField &in, int oddBit, int daggerBit, QudaDslashType dslash_type)
+void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
+                 const ColorSpinorField &in, int oddBit, int daggerBit, QudaDslashType dslash_type)
 {
   // assert sPrecision and gPrecision must be the same
   if (in.Precision() != fat_link.Precision()) { errorQuda("The spinor precision and gauge precision are not the same"); }
@@ -157,8 +157,33 @@ void staggeredDslash(ColorSpinorField &out, const GaugeField &fat_link, const Ga
   }
 }
 
-void staggeredMatDagMat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link, const ColorSpinorField &in, double mass, int dagger_bit,
-                        ColorSpinorField &tmp, QudaParity parity, QudaDslashType dslash_type)
+void stag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link,
+              const ColorSpinorField &in, double mass, int daggerBit, QudaDslashType dslash_type)
+{
+  // assert sPrecision and gPrecision must be the same
+  if (in.Precision() != fat_link.Precision()) { errorQuda("The spinor precision and gauge precision are not the same"); }
+
+  // assert we have full-parity spinors
+  if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET || in.SiteSubset() != QUDA_FULL_SITE_SUBSET)
+    errorQuda("Unexpected site subsets for stag_mat, out %d in %d", out.SiteSubset(), in.SiteSubset());
+
+  // In QUDA, the full staggered operator has the sign convention
+  // {{m, -D_eo},{-D_oe,m}}, while the CPU verify function does not
+  // have the minus sign. Inverting the expected dagger convention
+  // solves this discrepancy.
+  stag_dslash(out.Even(), fat_link, long_link, in.Odd(), QUDA_EVEN_PARITY, 1 - daggerBit, dslash_type);
+  stag_dslash(out.Odd(), fat_link, long_link, in.Even(), QUDA_ODD_PARITY, 1 - daggerBit, dslash_type);
+
+  if (dslash_type == QUDA_LAPLACE_DSLASH) {
+    double kappa = 1.0 / (8 + mass);
+    xpay((void*)in.V(), kappa, out.V(), out.Length(), out.Precision());
+  } else {
+    axpy(2 * mass, (void*)in.V(), out.V(), out.Length(), out.Precision());
+  }
+}
+
+void stag_matpc(ColorSpinorField &out, const GaugeField &fat_link, const GaugeField &long_link, const ColorSpinorField &in, double mass, int,
+                ColorSpinorField &tmp, QudaParity parity, QudaDslashType dslash_type)
 {
   // assert sPrecision and gPrecision must be the same
   if (in.Precision() != fat_link.Precision()) { errorQuda("The spinor precision and gauge precison are not the same"); }
@@ -172,9 +197,9 @@ void staggeredMatDagMat(ColorSpinorField &out, const GaugeField &fat_link, const
     errorQuda("full parity not supported in function");
   }
 
-  staggeredDslash(tmp, fat_link, long_link, in, otherparity, dagger_bit, dslash_type);
-
-  staggeredDslash(out, fat_link, long_link, tmp, parity, dagger_bit, dslash_type);
+  // dagger bit does not matter
+  stag_dslash(tmp, fat_link, long_link, in, otherparity, 0, dslash_type);
+  stag_dslash(out, fat_link, long_link, tmp, parity, 0, dslash_type);
 
   double msq_x4 = mass * mass * 4;
   if (in.Precision() == QUDA_DOUBLE_PRECISION) {
