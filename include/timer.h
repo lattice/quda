@@ -229,10 +229,21 @@ namespace quda {
 
   };
 
-  void pushProfile(TimeProfile &profile);
+  /**
+     @brief Container that we use for pushing a profile onto the
+     profile stack.  While this object is in scope it will exist on
+     the profile stack, and be popped when its destructor is called.
+   */
+  struct pushProfile {
+    TimeProfile &profile;
+    pushProfile(TimeProfile &profile);
+    virtual ~pushProfile();
+  };
 
-  void popProfile();
-
+  /**
+     @brief Return a reference to the present profile at the top of
+     the stack
+   */
   TimeProfile& getProfile();
 
 } // namespace quda

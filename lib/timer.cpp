@@ -202,16 +202,17 @@ namespace quda {
 
   static std::stack<TimeProfile*> tpstack;
 
-  void pushProfile(TimeProfile &profile)
+  pushProfile::pushProfile(TimeProfile &profile) : profile(profile)
   {
     profile.TPSTART(QUDA_PROFILE_TOTAL);
     tpstack.push(&profile);
   }
 
-  void popProfile()
+  pushProfile::~pushProfile()
   {
     if (tpstack.empty()) errorQuda("popProfile() called with empty stack");
     auto &profile = *(tpstack.top());
+    if (&(this->profile) != &profile) errorQuda("Popped profile is not the expected one");
     tpstack.pop();
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
