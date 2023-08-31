@@ -24,10 +24,12 @@ using namespace quda;
 
 dslash_test_type dtest_type = dslash_test_type::Dslash;
 CLI::TransformPairs<dslash_test_type> dtest_type_map {
-  {"Dslash", dslash_test_type::Dslash}, {"MatPC", dslash_test_type::MatPC}, {"Mat", dslash_test_type::Mat}
-  // left here for completeness but not support in staggered dslash test
+  {"Dslash", dslash_test_type::Dslash},
+  {"MatPC", dslash_test_type::MatPC},
+  {"Mat", dslash_test_type::Mat},
+  {"MatDagMat", dslash_test_type::MatDagMat},
+  // left here for completeness but not supported in staggered dslash test
   // {"MatPCDagMatPC", dslash_test_type::MatPCDagMatPC},
-  // {"MatDagMat", dslash_test_type::MatDagMat},
   // {"M5", dslash_test_type::M5},
   // {"M5inv", dslash_test_type::M5inv},
   // {"Dslash4pre", dslash_test_type::Dslash4pre}
@@ -89,6 +91,10 @@ struct StaggeredDslashTestWrapper {
       break;
     case dslash_test_type::Mat:
       stag_mat(spinorRef, *cpuFat, *cpuLong, spinor, mass, dagger, dslash_type);
+      break;
+    case dslash_test_type::MatDagMat:
+      stag_mat(tmpCpu, *cpuFat, *cpuLong, spinor, mass, dagger, dslash_type);
+      stag_mat(spinorRef, *cpuFat, *cpuLong, tmpCpu, mass, 1 - dagger, dslash_type);
       break;
     default: errorQuda("Test type %d not defined", static_cast<int>(dtest_type));
     }
@@ -205,7 +211,7 @@ struct StaggeredDslashTestWrapper {
 
     csParam.setPrecision(inv_param.cpu_prec);
     csParam.pad = 0;
-    if (dtest_type != dslash_test_type::Mat && dslash_type != QUDA_LAPLACE_DSLASH) {
+    if (dtest_type != dslash_test_type::Mat && dtest_type != dslash_test_type::MatDagMat) {
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
       csParam.x[0] /= 2;
       inv_param.solution_type = QUDA_MATPC_SOLUTION;
@@ -334,6 +340,7 @@ struct StaggeredDslashTestWrapper {
           case dslash_test_type::Dslash: dirac->Dslash(cudaSpinorOut, cudaSpinor, parity); break;
           case dslash_test_type::MatPC: dirac->M(cudaSpinorOut, cudaSpinor); break;
           case dslash_test_type::Mat: dirac->M(cudaSpinorOut, cudaSpinor); break;
+          case dslash_test_type::MatDagMat: dirac->MdagM(cudaSpinorOut, cudaSpinor); break;
           default: errorQuda("Test type %d not defined on staggered dslash", static_cast<int>(dtest_type));
           }
         }

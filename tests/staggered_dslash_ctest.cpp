@@ -20,14 +20,11 @@ protected:
     QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
 
     if ((QUDA_PRECISION & getPrecision(::testing::get<0>(GetParam()))) == 0
-        || (QUDA_RECONSTRUCT & getReconstructNibble(recon)) == 0) {
+        || (QUDA_RECONSTRUCT & getReconstructNibble(recon)) == 0)
       return true;
-    }
 
-    if (dslash_type == QUDA_LAPLACE_DSLASH && (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1)) {
-      warningQuda("Fixed precision unsupported for Laplace operator, skipping...");
+    if (dslash_type == QUDA_LAPLACE_DSLASH && (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1))
       return true;
-    }
 
     const std::array<bool, 16> partition_enabled {true, true, true,  false,  true,  false, false, false,
                                                   true, false, false, false, true, false, true, true};
@@ -102,6 +99,10 @@ int main(int argc, char **argv)
 {
   // initalize google test
   ::testing::InitGoogleTest(&argc, argv);
+
+  // override the default dslash from Wilson
+  dslash_type = QUDA_ASQTAD_DSLASH;
+
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
   app->add_option("--all-partitions", ctest_all_partitions, "Test all instead of reduced combination of partitions");
