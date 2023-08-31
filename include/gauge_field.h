@@ -289,6 +289,12 @@ namespace quda {
     GaugeField &operator=(GaugeField &&field);
 
     /**
+       @brief Returns if the object is empty (not initialized)
+       @return true if the object has been allocated, otherwise false
+    */
+    bool empty() const { return init; }
+
+    /**
        @brief Create the communication handlers and buffers
        @param[in] R The thickness of the extended region in each dimension
        @param[in] no_comms_fill Do local exchange to fill out the extended

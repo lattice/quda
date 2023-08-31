@@ -3835,7 +3835,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
 
   GaugeField cpuMom = !qudaGaugeParam->use_resident_mom ? GaugeField(gParamMom) : GaugeField();
 
-  if (qudaGaugeParam->use_resident_mom && !momResident.Volume()) errorQuda("No resident momentum field to use");
+  if (qudaGaugeParam->use_resident_mom && momResident.empty()) errorQuda("No resident momentum field to use");
   gParamMom.location = QUDA_CUDA_FIELD_LOCATION;
   gParamMom.create = qudaGaugeParam->overwrite_mom ? QUDA_ZERO_FIELD_CREATE : QUDA_COPY_FIELD_CREATE;
   gParamMom.field = &cpuMom;
@@ -4017,7 +4017,7 @@ void createCloverQuda(QudaInvertParam* invertParam)
   GaugeFieldParam tensorParam(gaugePrecise->X(), ex->Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
   tensorParam.location = QUDA_CUDA_FIELD_LOCATION;
   tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  tensorParam.setPrecision(tensorParam.Precision(), true);
   tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   GaugeField Fmunu(tensorParam);
   computeFmunu(Fmunu, *ex);
@@ -4039,7 +4039,7 @@ void* createGaugeFieldQuda(void* gauge, int geometry, QudaGaugeParam* param)
   GaugeField *cpuGauge = nullptr;
   if (gauge) cpuGauge = new GaugeField(gParam);
 
-  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gParam.setPrecision(gParam.Precision(), true);
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   auto* cudaGauge = new GaugeField(gParam);
 
@@ -4087,8 +4087,8 @@ void computeStaggeredForceQuda(void *h_mom, double dt, double delta, void *, voi
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParam.create = QUDA_COPY_FIELD_CREATE;
   gParam.field = &cpuMom;
-  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
+  gParam.setPrecision(gParam.Precision(), true);
   GaugeField cudaMom = gauge_param->use_resident_mom ? momResident.create_alias() : GaugeField(gParam);
 
   // create temporary field for quark-field outer product
@@ -4355,7 +4355,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   param.location = QUDA_CUDA_FIELD_LOCATION;
   param.create = QUDA_ZERO_FIELD_CREATE;
-  param.order = QUDA_FLOAT2_GAUGE_ORDER;
+  param.setPrecision(param.Precision(), true);
   GaugeFieldParam momParam(param);
 
   // Create CPU W, V, and U fields
@@ -4504,14 +4504,14 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   // create the device momentum field
   fParam.location = QUDA_CUDA_FIELD_LOCATION;
   fParam.create = QUDA_ZERO_FIELD_CREATE;
-  fParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  fParam.setPrecision(fParam.Precision(), true);
   GaugeField cudaMom(fParam);
 
   // create the device force field
   fParam.link_type = QUDA_GENERAL_LINKS;
   fParam.create = QUDA_ZERO_FIELD_CREATE;
-  fParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   fParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  fParam.setPrecision(fParam.Precision(), true);
   GaugeField cudaForce(fParam);
 
   ColorSpinorParam qParam;
@@ -4662,9 +4662,9 @@ void updateGaugeFieldQuda(void* gauge, void* momentum, double dt, int conj_mom, 
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.create = QUDA_COPY_FIELD_CREATE;
   gParam.field = &cpuMom;
-  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
+  gParam.setPrecision(gParam.Precision(), true);
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.pad = 0;
   GaugeField cudaMom = param->use_resident_mom ? momResident.create_alias() : GaugeField(gParam);
@@ -4672,6 +4672,7 @@ void updateGaugeFieldQuda(void* gauge, void* momentum, double dt, int conj_mom, 
   if (param->use_resident_gauge && !gaugePrecise) errorQuda("No resident gauge field allocated");
   gParam.link_type = QUDA_SU3_LINKS;
   gParam.reconstruct = param->reconstruct;
+  gParam.setPrecision(gParam.Precision(), true);
   gParam.field = &cpuGauge;
   GaugeField u_in = param->use_resident_gauge ? gaugePrecise->create_alias() : GaugeField(gParam);
   gParam.create = QUDA_NULL_FIELD_CREATE;
@@ -4709,8 +4710,8 @@ void projectSU3Quda(void *gauge_h, double tol, QudaGaugeParam *param)
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.create = QUDA_COPY_FIELD_CREATE;
   gParam.field = &cpuGauge;
-  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.reconstruct = param->reconstruct;
+  gParam.setPrecision(gParam.Precision(), true);
   GaugeField cudaGauge = param->use_resident_gauge ? gaugePrecise->create_alias() : GaugeField(gParam);
 
   *num_failures_h = 0;
@@ -4747,8 +4748,8 @@ void staggeredPhaseQuda(void *gauge_h, QudaGaugeParam *param)
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.create = QUDA_COPY_FIELD_CREATE;
   gParam.field = &cpuGauge;
-  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.reconstruct = param->reconstruct;
+  gParam.setPrecision(gParam.Precision(), true);
   GaugeField cudaGauge = param->use_resident_gauge ? gaugePrecise->create_alias() : GaugeField(gParam);
 
   *num_failures_h = 0;
