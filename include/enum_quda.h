@@ -372,7 +372,8 @@ typedef enum QudaFieldCreate_s {
 typedef enum QudaGammaBasis_s {
   QUDA_DEGRAND_ROSSI_GAMMA_BASIS,
   QUDA_UKQCD_GAMMA_BASIS,
-  QUDA_CHIRAL_GAMMA_BASIS, // check ?  TODO: use this for quda ?
+  QUDA_CHIRAL_GAMMA_BASIS,
+  QUDA_OPENQCD_GAMMA_BASIS,
   QUDA_INVALID_GAMMA_BASIS = QUDA_INVALID_ENUM
 } QudaGammaBasis;
 

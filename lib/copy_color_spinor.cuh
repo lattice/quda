@@ -32,6 +32,8 @@ namespace quda {
       else if (out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) strcat(aux, ",RelBasis");
       else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) strcat(aux, ",ChiralToNonRelBasis");
       else if (out.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) strcat(aux, ",NonRelToChiralBasis");
+      else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_OPENQCD_GAMMA_BASIS) strcat(aux, ",ReverseOpenqcdBasis");
+      else if (out.GammaBasis() == QUDA_OPENQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) strcat(aux, ",OpenqcdBasis");
       else errorQuda("Basis change from %d to %d not supported", in.GammaBasis(), out.GammaBasis());
 
       apply(device::get_default_stream());
@@ -60,6 +62,10 @@ namespace quda {
         launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<ChiralToNonRelBasis>(out, in, Out_, In_));
       } else if (out.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) {
         launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<NonRelToChiralBasis>(out, in, Out_, In_));
+      } else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_OPENQCD_GAMMA_BASIS) {
+        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<ReverseOpenqcdBasis>(out, in, Out_, In_));
+      } else if (out.GammaBasis() == QUDA_OPENQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) {
+        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<OpenqcdBasis>(out, in, Out_, In_));
       } else {
         errorQuda("Unexpected basis change from %d to %d", in.GammaBasis(), out.GammaBasis());
       }

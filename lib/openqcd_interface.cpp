@@ -279,7 +279,7 @@ static void setColorSpinorParams(const int dim[4], QudaPrecision precision, Colo
   param->siteSubset = QUDA_FULL_SITE_SUBSET; // FIXME: check how to adapt this for openqxd
   param->siteOrder = QUDA_EVEN_ODD_SITE_ORDER; // FIXME: check how to adapt this for openqxd // EVEN-ODD is only about inner ordering in quda
   param->fieldOrder = QUDA_OPENQCD_FIELD_ORDER;       // FIXME:
-  param->gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless, but required by the code.  // // FIXME::
+  param->gammaBasis = QUDA_OPENQCD_GAMMA_BASIS; // meaningless, but required by the code.  // // FIXME::
   param->create = QUDA_ZERO_FIELD_CREATE; // // FIXME:: check how to adapt this for openqxd ?? created -0 in weird places
 }
 
@@ -449,7 +449,7 @@ void openQCD_qudaSetDslashOptions(double kappa, double mu)
   invertParam.cuda_prec = QUDA_DOUBLE_PRECISION;               /**< The precision used by the QUDA solver */
 
   invertParam.dirac_order = QUDA_OPENQCD_DIRAC_ORDER;       /**< The order of the input and output fermion fields */
-  invertParam.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;    /**< Gamma basis of the input and output host fields */
+  invertParam.gamma_basis = QUDA_OPENQCD_GAMMA_BASIS;    /**< Gamma basis of the input and output host fields */
 
   invertParam.verbosity = verbosity;               /**< The verbosity setting to use in the solver */
   invertParam.compute_action = 0;
@@ -471,7 +471,7 @@ double openQCD_qudaNorm(void *h_in)
 
   QudaInvertParam sParam = newQudaInvertParam();
   sParam.dirac_order = QUDA_OPENQCD_DIRAC_ORDER;
-  sParam.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  sParam.gamma_basis = QUDA_OPENQCD_GAMMA_BASIS;
   sParam.cpu_prec = QUDA_DOUBLE_PRECISION;
   sParam.cuda_prec = QUDA_DOUBLE_PRECISION;
 
@@ -485,6 +485,15 @@ double openQCD_qudaNorm(void *h_in)
 }
 
 
+/**
+ * @brief Applies Dirac matrix to spinor.
+ * 
+ *     openQCD_out = gamma[dir] * openQCD_in
+ * 
+ * @param dir Dirac index, 0 <= dir <= 5
+ * @param openQCD_in of type spinor_dble[NSPIN]
+ * @param openQCD_out of type spinor_dble[NSPIN]
+ */
 void openQCD_qudaGamma(int dir, void *openQCD_in, void *openQCD_out)
 {
   lat_dim_t X;
@@ -496,7 +505,7 @@ void openQCD_qudaGamma(int dir, void *openQCD_in, void *openQCD_out)
   // sets up the necessary parameters
   QudaInvertParam sParam = newQudaInvertParam();
   sParam.dirac_order = QUDA_OPENQCD_DIRAC_ORDER;
-  sParam.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  sParam.gamma_basis = QUDA_OPENQCD_GAMMA_BASIS;
   sParam.cpu_prec = QUDA_DOUBLE_PRECISION;
   sParam.cuda_prec = QUDA_DOUBLE_PRECISION;
 
@@ -733,7 +742,7 @@ void setInvertParam(QudaInvertParam &invertParam, openQCD_QudaInvertArgs_t &inv_
   invertParam.cpu_prec = host_precision;
   invertParam.cuda_prec = device_precision;
   invertParam.cuda_prec_sloppy = device_precision_sloppy;
-  invertParam.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  invertParam.gamma_basis = QUDA_OPENQCD_GAMMA_BASIS;
   invertParam.dirac_order = QUDA_OPENQCD_DIRAC_ORDER;
   invertParam.clover_cpu_prec = host_precision;
   invertParam.clover_cuda_prec = device_precision;

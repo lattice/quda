@@ -26,10 +26,11 @@ namespace quda {
     Gamma(const Gamma &g) = default;
 
     __device__ __host__ inline int getcol(int row) const {
-      if (basis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
+      if (basis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS ||
+	  	  basis == QUDA_OPENQCD_GAMMA_BASIS) {
 	switch(dir) {
-	case 0:
-	case 1:
+	case 0: /* gamma1 */
+	case 1: /* gamma2 */
 	  switch(row) {
 	  case 0: return 3;
 	  case 1: return 2;
@@ -37,8 +38,8 @@ namespace quda {
 	  case 3: return 0;
 	  }
 	  break;
-	case 2:
-	case 3:
+	case 2: /* gamma3 */
+	case 3: /* gamma0 */
 	  switch(row) {
 	  case 0: return 2;
 	  case 1: return 3;
@@ -46,7 +47,7 @@ namespace quda {
 	  case 3: return 1;
 	  }
 	  break;
-	case 4:
+	case 4: /* gamma5 */
 	  switch(row) {
 	  case 0: return 0;
 	  case 1: return 1;
@@ -201,7 +202,61 @@ namespace quda {
 	  }
 	  break;
 	}
-      }
+      } else if (basis == QUDA_OPENQCD_GAMMA_BASIS) {
+	switch(dir) {
+	case 0: /* gamma1 */
+	  switch(row) {
+	  case 0:
+	  case 1:
+	    return -I;
+	  case 2:
+	  case 3:
+	    return I;
+	  }
+	  break;
+	case 1: /* gamma2 */
+	  switch(row) {
+	  case 0:
+	  case 3:
+	    return -1;
+	  case 1:
+	  case 2:
+	    return 1;
+	  }
+	  break;
+	case 2: /* gamma3 */
+	  switch(row) {
+	  case 0:
+	  case 3:
+	    return -I;
+	  case 1:
+	  case 2:
+	    return I;
+	  }
+	  break;
+	case 3: /* gamma0 */
+	  switch(row) {
+	  case 0:
+	  case 1:
+	  case 2:
+	  case 3:
+	    return -1;
+	  }
+	  break;
+	case 4: /* gamma5 */
+	  switch(row) {
+	  case 0:
+	  case 1:
+	    return 1;
+	  case 2:
+	  case 3:
+	    return -1;
+	  }
+	  break;
+	}
+	  }
+
+
       return 0;
     }
 
@@ -283,7 +338,40 @@ namespace quda {
 	  }
 	  break;
 	}
-      }
+      } else if (basis == QUDA_OPENQCD_GAMMA_BASIS) {
+	switch(dir) {
+	case 0: /* gamma1 */
+	  switch(row) {
+	  case 0: case 1: return complex<ValueType>(a.imag(), -a.real()); //  I
+	  case 2: case 3: return complex<ValueType>(-a.imag(), a.real()); // -I
+	  }
+	  break;
+	case 1: /* gamma2 */
+	  switch(row) {
+	  case 0: case 3: return -a;
+	  case 1: case 2: return a;
+          }
+          break;
+	case 2: /* gamma3 */
+	  switch(row) {
+	  case 0: case 3: return complex<ValueType>(a.imag(), -a.real()); //  I
+	  case 1: case 2: return complex<ValueType>(-a.imag(), a.real()); // -I
+          }
+          break;
+	case 3: /* gamma0 */
+	  switch(row) {
+	  case 0: case 1: case 2: case 3: return -a;
+          }
+          break;
+	case 4: /* gamma5 */
+	  switch(row) {
+	  case 0: case 1: return a;
+	  case 2: case 3: return -a;
+	  }
+	  break;
+	}
+	  }
+
       return a;
     }
 
