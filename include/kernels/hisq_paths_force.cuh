@@ -538,7 +538,6 @@ namespace quda {
          * The "extra" low point corresponds to the Lepage contribution to the
          * force_mu term.
          *
-         *
          *            sig
          *         F        E
          *          |      |

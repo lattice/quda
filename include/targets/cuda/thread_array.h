@@ -7,6 +7,7 @@
 #else
 
 #include <array.h>
+
 namespace quda
 {
   template <typename T, int n> struct thread_array : array<T, n> {};

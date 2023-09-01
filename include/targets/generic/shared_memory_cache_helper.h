@@ -11,46 +11,38 @@
    sharing data between threads in a thread block.
  */
 
-/**
-   @file shared_memory_cache_helper.h
-   @brief Convenience overloads to allow SharedMemoryCache objects to
-   appear in simple expressions.  The actual implementation of
-   SharedMemoryCache is target specific, and located in e.g.,
-   include/targets/cuda/shared_memory_cache_helper.h, etc.
- */
-
 namespace quda
 {
 
   /**
      @brief Class which wraps around a shared memory cache for type T,
      where each thread in the thread block stores a unique value in
-     the cache which any other thread can access.
+     the cache which any other thread can access.  The data is stored
+     in a coalesced order with element size atom_t<T>.
 
-     This accessor supports both explicit run-time block size and
-     compile-time sizing.
+     The dimensions of the cache is determined by a call to
+     D::dims(target::block_dim()), and D defaults to having dimensions
+     equal to the block dimensions.
 
-     * For run-time block size, the constructor should be initialied
-       with the desired block size.
-
-     * For compile-time block size, no arguments should be passed to
-       the constructor, and then the second and third template
-       parameters correspond to the y and z dimensions of the block,
-       respectively.  The x dimension of the block will be set
-       according the maximum number of threads possible, given these
-       dimensions.
+     A byte offset into the shared memory region can be specified with
+     the type O, and is given by
+     O::shared_mem_size(target::block_dim()) if O is not void.
    */
   template <typename T, typename D = DimsBlock, typename O = void>
   class SharedMemoryCache : SharedMemory<atom_t<T>, SizeDims<D,sizeof(T)/sizeof(atom_t<T>)>, O>
   {
+    using Smem = SharedMemory<atom_t<T>, SizeDims<D,sizeof(T)/sizeof(atom_t<T>)>, O>;
+
   public:
     using value_type = T;
     using dims_type = D;
-    using offset_type = O; // type of object that may also use shared memory at the same time and is located before this one
-    using Smem = SharedMemory<atom_t<T>, SizeDims<D,sizeof(T)/sizeof(atom_t<T>)>, O>;
+    using offset_type = O;
     using Smem::shared_mem_size;
 
   private:
+    const dim3 block;
+    const int stride;
+    using Smem::sharedMem;
     using atom_t = atom_t<T>;
     static_assert(sizeof(T) % 4 == 0, "Shared memory cache does not support sub-word size types");
 
@@ -60,21 +52,13 @@ namespace quda
     // used to avoid instantiation of load functions if unused, in case T is not a valid return type (e.g. C array)
     template <typename dummy = void> using maybeT = std::conditional_t<std::is_same_v<dummy,void>,T,void>;
 
-    const dim3 block;
-    const int stride;
-
-    //constexpr Smem smem() const { return *dynamic_cast<const Smem*>(this); }
-    using Smem::smem;
-    //constexpr Smem smem() const { return Smem::smem(); }
-    //constexpr Smem smem() const { return *Smem::smemp(); }
-
     __device__ __host__ inline void save_detail(const T &a, int x, int y, int z) const
     {
       atom_t tmp[n_element];
       memcpy(tmp, (void *)&a, sizeof(T));
       int j = (z * block.y + y) * block.x + x;
 #pragma unroll
-      for (int i = 0; i < n_element; i++) smem()[i * stride + j] = tmp[i];
+      for (int i = 0; i < n_element; i++) sharedMem()[i * stride + j] = tmp[i];
     }
 
     template <typename dummy = void>
@@ -83,7 +67,7 @@ namespace quda
       atom_t tmp[n_element];
       int j = (z * block.y + y) * block.x + x;
 #pragma unroll
-      for (int i = 0; i < n_element; i++) tmp[i] = smem()[i * stride + j];
+      for (int i = 0; i < n_element; i++) tmp[i] = sharedMem()[i * stride + j];
       T a;
       memcpy((void *)&a, tmp, sizeof(T));
       return a;
@@ -105,28 +89,20 @@ namespace quda
 
   public:
     /**
-       @brief constructor for SharedMemory cache.  If no arguments are
-       pass, then the dimensions are set according to the templates
-       block_size_y and block_size_z, together with the derived
-       block_size_x.  Otherwise use the block sizes passed into the
-       constructor.
-
-       @param[in] block Block dimensions for the 3-d shared memory object
-       @param[in] thread_offset "Perceived" offset from dynamic shared
-       memory base pointer (used when we have multiple caches in
-       scope).  Need to include block size to actual offset.
+       @brief Constructor for SharedMemoryCache.
     */
     constexpr SharedMemoryCache() :
       block(D::dims(target::block_dim())), stride(block.x * block.y * block.z)
     {
-      static_assert(shared_mem_size(dim3{8,8,8})==Smem::get_offset(dim3{8,8,8})+SizeDims<D>::size(dim3{8,8,8})*sizeof(T));
+      // sanity check
+      static_assert(shared_mem_size(dim3{32,16,8})==Smem::get_offset(dim3{32,16,8})+SizeDims<D>::size(dim3{32,16,8})*sizeof(T));
     }
 
     /**
        @brief Grab the raw base address to shared memory.
     */
     __device__ __host__ inline auto data() const {
-      return reinterpret_cast<T *>(&smem()[0]);
+      return reinterpret_cast<T *>(&sharedMem()[0]);
     }
 
     /**
@@ -302,11 +278,10 @@ namespace quda
 
   /**
      @brief Uniform helper for exposing type T, whether we are dealing
-     with an instance of T or SharedMemoryCache<T>
+     with an instance of T or SharedMemoryCache<T,D,O>
    */
   template <class T>
-  struct get_type<
-    T, std::enable_if_t<std::is_same_v<T, SharedMemoryCache<typename T::value_type, typename T::dims_type, typename T::offset_type>>>> {
+  struct get_type<T, std::enable_if_t<std::is_same_v<T, SharedMemoryCache<typename T::value_type, typename T::dims_type, typename T::offset_type>>>> {
     using type = typename T::value_type;
   };
 
