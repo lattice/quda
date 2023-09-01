@@ -13,16 +13,14 @@ namespace quda
      The offset into the shared memory region is determined from the
      type O.
    */
-  template <typename T, int n, typename O = void>
-  class thread_array : SharedMemory<array<T,n>, SizePerThread<1>, O>
+  template <typename T, int n, typename O = void> class thread_array : SharedMemory<array<T, n>, SizePerThread<1>, O>
   {
-    using Smem = SharedMemory<array<T,n>, SizePerThread<1>, O>;
+    using Smem = SharedMemory<array<T, n>, SizePerThread<1>, O>;
     using Smem::sharedMem;
     array<T, n> &array_;
 
   public:
-    __device__ __host__ constexpr thread_array() :
-      array_(sharedMem()[target::thread_idx_linear<3>()])
+    __device__ __host__ constexpr thread_array() : array_(sharedMem()[target::thread_idx_linear<3>()])
     {
       array_ = array<T, n>(); // call default constructor
     }

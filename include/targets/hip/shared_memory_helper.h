@@ -50,10 +50,7 @@ namespace quda
       }
     };
 
-    __device__ __host__ inline T *cache(unsigned int offset) const
-    {
-      return target::dispatch<cache_dynamic>(offset);
-    }
+    __device__ __host__ inline T *cache(unsigned int offset) const { return target::dispatch<cache_dynamic>(offset); }
 
   public:
     /**
@@ -69,15 +66,12 @@ namespace quda
     /**
        @brief Shared memory size in bytes.
     */
-    static constexpr unsigned int shared_mem_size(dim3 block)
-    {
-      return get_offset(block) + S::size(block)*sizeof(T);
-    }
+    static constexpr unsigned int shared_mem_size(dim3 block) { return get_offset(block) + S::size(block) * sizeof(T); }
 
     /**
        @brief Constructor for SharedMemory object.
     */
-    constexpr SharedMemory() : data(cache(get_offset(target::block_dim()))) {}
+    constexpr SharedMemory() : data(cache(get_offset(target::block_dim()))) { }
 
     /**
        @brief Return this SharedMemory object.

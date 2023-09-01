@@ -10,7 +10,8 @@
 
 namespace quda
 {
-  template <typename T, int n> struct thread_array : array<T, n> {};
-}
+  template <typename T, int n> struct thread_array : array<T, n> {
+  };
+} // namespace quda
 
 #endif
