@@ -113,10 +113,13 @@ namespace quda
   template <typename Arg, typename Reducer, typename T> struct reduceParams {
     static constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
     using BlockReduce_t = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
-    using reduceConcurrentOps = op_Concurrent<op_blockSync,op_SharedMemory<bool>>;
-    using opBlockSync = getSpecialOpF<reduceConcurrentOps,0>;
-    using opSharedMem = getSpecialOpF<reduceConcurrentOps,1>;
-    using Ops = SpecialOps<BlockReduce_t,reduceConcurrentOps>;
+    //using reduceConcurrentOps = op_Concurrent<op_blockSync,op_SharedMemory<bool>>;
+    //using opBlockSync = getSpecialOpF<reduceConcurrentOps,0>;
+    //using opSharedMem = getSpecialOpF<reduceConcurrentOps,1>;
+    //using Ops = SpecialOps<BlockReduce_t,reduceConcurrentOps>;
+    using opBlockSync = op_blockSync;
+    using opSharedMem = op_SharedMemory<bool>;
+    using Ops = SpecialOps<BlockReduce_t,opBlockSync,opSharedMem>;
   };
 
   /**
@@ -156,7 +159,8 @@ namespace quda
       auto isLastBlockDone = *glmem.get();
 #else
       using opSharedMem = typename reduceParams<Arg, Reducer, T>::opSharedMem;
-      auto isLastBlockDone = getSharedMemPtr(opSharedMem()(ops));
+      //auto isLastBlockDone = getSharedMemPtr(opSharedMem()(ops));
+      auto isLastBlockDone = getSharedMemPtr<opSharedMem>(ops);
 #endif
 
     if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && idx < arg.threads.z) {
@@ -173,8 +177,9 @@ namespace quda
 #if 0
     __syncthreads();
 #else
-    using opBlockSync = typename reduceParams<Arg, Reducer, T>::opBlockSync;
-    blockSync(opBlockSync()(ops));
+    //using opBlockSync = typename reduceParams<Arg, Reducer, T>::opBlockSync;
+    //blockSync(opBlockSync()(ops));
+    blockSync(ops);
 #endif
     bool active = false;
     if (idx < arg.threads.z) active = isLastBlockDone[target::thread_idx().z];

@@ -32,12 +32,17 @@ namespace quda {
     QudaFieldLocation location;
 
     template <template <typename> class Functor, bool grid_stride, typename Arg>
-    qudaError_t
-    launch_device(const kernel_t &kernel, const TuneParam &tp,
-		  const qudaStream_t &stream, const Arg &arg)
+    inline qudaError_t
+    launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      using launcher_t = qudaError_t(*)(const TuneParam &, const qudaStream_t &,
-					const Arg &);
+      auto smemsize = sharedMemSize<getSpecialOps<Functor<Arg>>>(tp.block);
+      if (smemsize < tp.shared_bytes) {
+	warningQuda("Shared bytes mismatch kernel: %zu  tp: %i\n", smemsize, tp.shared_bytes);
+      }
+      if (smemsize > tp.shared_bytes) {
+	errorQuda("Shared bytes mismatch kernel: %zu  tp: %i\n", smemsize, tp.shared_bytes);
+      }
+      using launcher_t = qudaError_t(*)(const TuneParam &, const qudaStream_t &, const Arg &);
       auto f = reinterpret_cast<launcher_t>(const_cast<void *>(kernel.func));
       launch_error = f(tp, stream, arg);
       if(launch_error!=QUDA_SUCCESS && !activeTuning()) {
@@ -87,6 +92,64 @@ namespace quda {
     r[RANGE_Y] = tp.block.y;
     r[RANGE_Z] = tp.block.z;
     return r;
+  }
+
+  template <typename F, typename Arg>
+  std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
+  launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+  {
+    if ( sizeof(Arg) > device::max_parameter_size() ) {
+      errorQuda("Kernel arg too large: %lu > %u\n", sizeof(Arg), device::max_parameter_size());
+    }
+    qudaError_t err = QUDA_SUCCESS;
+    auto globalSize = globalRange(tp);
+    auto localSize = localRange(tp);
+    sycl::nd_range<3> ndRange{globalSize, localSize};
+    auto q = device::get_target_stream(stream);
+    try {
+      if constexpr (needsSharedMem<typename F::SpecialOpsT>) {
+	//auto localsize = ndRange.get_local_range().size();
+	auto block = makeDim3(ndRange.get_local_range());
+	//auto smemsize = sharedMemSize<typename F::SpecialOpsT>(block, arg);
+	auto smemsize = sharedMemSize<typename F::SpecialOpsT>(block);
+	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+	  printfQuda("  Allocating local mem size: %lu\n", smemsize);
+	}
+	if (smemsize > device::max_dynamic_shared_memory()) {
+	  warningQuda("Local mem request too large %lu > %lu\n", smemsize, device::max_dynamic_shared_memory());
+	  return QUDA_ERROR;
+	}
+	q.submit([&](sycl::handler &h) {
+	  sycl::range<1> smem_range(smemsize);
+	  auto la = sycl::local_accessor<char>(smem_range, h);
+	  h.parallel_for<>
+	    (ndRange,
+	     //[=](sycl::nd_item<3> ndi) {
+	     [=](sycl::nd_item<3> ndi) [[sycl::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
+	       auto smem = la.get_pointer();
+	       //arg.lmem = smem;
+	       F f(arg, ndi, smem);
+	     });
+	});
+      } else { // no shared mem
+	q.submit([&](sycl::handler &h) {
+	  h.parallel_for<>
+	    (ndRange,
+	     //[=](sycl::nd_item<3> ndi) {
+	     [=](sycl::nd_item<3> ndi) [[sycl::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
+	       F f(arg, ndi);
+	     });
+	});
+      }
+    } catch (sycl::exception const& e) {
+      auto what = e.what();
+      target::sycl::set_error(what, "submit", __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+	printfQuda("  Caught synchronous SYCL exception:\n  %s\n",e.what());
+      }
+      err = QUDA_ERROR;
+    }
+    return err;
   }
 
   template <typename F, typename Arg>

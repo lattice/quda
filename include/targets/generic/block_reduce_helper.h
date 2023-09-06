@@ -154,6 +154,8 @@ namespace quda
     const int batch;
 
   public:
+    //using block_reduce_t::shared_mem_size;
+
     template <typename ...U>
     constexpr BlockReduce(SpecialOps<U...> &ops, int batch = 0) : block_reduce_t(ops), batch(batch) {
       static_assert(hasSpecialOpType<BlockReduce_t, SpecialOps<U...>>);

@@ -205,6 +205,7 @@ namespace quda {
 #endif
 
   // sharedMemSize
+#if 0
   template <typename ...T> struct sharedMemSizeS {
     template <typename ...Arg>
     static constexpr size_t size(dim3 block, Arg &...arg) {
@@ -232,6 +233,23 @@ namespace quda {
       return sharedMemSize<typename T::dependencies>(block, arg...);
     }
   };
+#else
+  template <typename T> struct sharedMemSizeS {
+    template <typename ...Arg>
+    static constexpr size_t size(dim3 block, Arg &...arg) {
+      return 0;
+    }
+  };
+  template <typename ...T> struct sharedMemSizeS<SpecialOps<T...>> {
+    template <typename ...Arg>
+    static constexpr size_t size(dim3 block, Arg &...arg) {
+      return std::max({T::shared_mem_size(block, arg...)...});
+    }
+  };
+  template <typename T, typename ...Arg> static constexpr size_t sharedMemSize(dim3 block, Arg &...arg) {
+    return sharedMemSizeS<T>::size(block, arg...);
+  }
+#endif
 
   // sharedMemOffset
   template <typename T, int n> struct sharedMemOffset {

@@ -137,6 +137,10 @@ namespace quda
     using opSmem = op_SharedMemory<T,opSizeBlockDivWarp>;
     using dependencies = op_Sequential<op_blockSync,opSmem>;
     using dependentOps = SpecialOps<op_blockSync,opSmem>;
+    template <typename ...Arg>
+    static constexpr size_t shared_mem_size(dim3 block, Arg &...arg) {
+      return opSizeBlockDivWarp::size<T>(block, arg...);
+    }
 #else
 #endif
     using BlockReduce_t = BlockReduce<T, block_dim, batch_size>;

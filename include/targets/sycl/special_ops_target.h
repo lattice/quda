@@ -160,12 +160,16 @@ namespace quda {
   // op implementations
   struct op_blockSync : op_BaseT<void> {
     using dependencies = depFullBlock;
+    template <typename ...Arg>
+    static constexpr size_t shared_mem_size(dim3 block, Arg &...arg) { return 0; }
   };
 
   template <typename T>
   struct op_warp_combine : op_BaseT<T> {
     using dependencies = depNone;
     //using dependencies = depFullBlock;
+    template <typename ...Arg>
+    static constexpr size_t shared_mem_size(dim3 block, Arg &...arg) { return 0; }
   };
 
   template <typename T, int N>
@@ -192,6 +196,8 @@ namespace quda {
   template <typename T, typename S>
   struct op_SharedMemory : op_BaseT<T> {
     using dependencies = depSharedMem<T,S>;
+    template <typename ...Arg>
+    static constexpr size_t shared_mem_size(dim3 block, Arg &...arg) { return S::template size<T>(block, arg...); }
   };
 
   // needsFullWarp?
@@ -221,6 +227,7 @@ namespace quda {
   template <typename ...T> static constexpr bool needsFullBlock<SpecialOps<T...>> = needsFullBlockImpl<T...>;
 
   // needsSharedMem
+#if 1
   template <typename T> static constexpr bool needsSharedMem = needsSharedMem<getSpecialOps<T>>;
   template <typename ...T> static constexpr bool needsSharedMemImpl = (needsSharedMemImpl<T> || ...);
   template <> static constexpr bool needsSharedMemImpl<depNone> = false;
@@ -244,8 +251,12 @@ namespace quda {
   template <typename T> static constexpr bool needsSharedMemImpl<T> = needsSharedMemF<T>();
   template <> static constexpr bool needsSharedMem<NoSpecialOps> = false;
   template <typename ...T> static constexpr bool needsSharedMem<SpecialOps<T...>> = needsSharedMemImpl<T...>;
+#else
+  //template <typename T> static constexpr bool needsSharedMem() { return T::shared_mem_size(
+#endif
 
   // tests
+#if 0
   static const int opTestArg = 10;
   static_assert(needsFullBlock<only_SharedMemoryCache<float>> == true);
   static_assert(sharedMemSize<only_SharedMemoryCache<float>>(dim3(2,3,4))==24*sizeof(float));
@@ -268,7 +279,7 @@ namespace quda {
   static_assert(sharedMemSize<opTest1>(dim3(0,0,0))==std::max((size_t)100,0*sizeof(double)));
   static_assert(sharedMemSize<opTest1>(dim3(1,2,5))==std::max({(size_t)100,10*sizeof(double),40*sizeof(float)}));
   static_assert(sharedMemSize<opTest1>(dim3(2,5,10))==std::max({(size_t)100,100*sizeof(double),400*sizeof(float)}));
-
+#endif
 
 #if 0
   using opTest2 = SpecialOps<op_blockSync,op_warp_combine<int>,op_thread_array<float,4>,

@@ -95,8 +95,9 @@ namespace quda {
       //warningQuda("arg.threads.x (%i) %% localSize X (%lu) != 0", arg.threads.x, localSize[RANGE_X]);
     //  return QUDA_ERROR;
     //}
-    sycl::nd_range<3> ndRange{globalSize, localSize};
-    err = launch<Kernel1DS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
+    //sycl::nd_range<3> ndRange{globalSize, localSize};
+    //err = launch<Kernel1DS<Functor, Arg, grid_stride>>(stream, ndRange, arg);
+    err = launch<Kernel1DS<Functor, Arg, grid_stride>>(tp, stream, arg);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("end Kernel1D\n");
     }

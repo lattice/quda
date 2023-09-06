@@ -29,14 +29,14 @@ namespace quda
     const unsigned int size;  // number of elements of type T
 
   public:
-    static constexpr unsigned int get_offset(dim3 block)
+    static constexpr size_t get_offset(dim3 block)
     {
       unsigned int o = 0;
       if constexpr (!std::is_same_v<O, void>) { o = O::shared_mem_size(block); }
       return o;
     }
 
-    static constexpr unsigned int shared_mem_size(dim3 block)
+    static constexpr size_t shared_mem_size(dim3 block)
     {
       return get_offset(block) + S::size(block)*sizeof(T);
     }
