@@ -11,6 +11,7 @@
 namespace quda
 {
   template <typename T, int n> struct thread_array : array<T, n> {
+    static constexpr unsigned int shared_mem_size(dim3 block) { return 0; }
   };
 } // namespace quda
 

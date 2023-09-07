@@ -135,7 +135,8 @@ namespace quda
       }
 
       Link U, Q;
-      ThreadLocalCache<Link> Stap;
+      //ThreadLocalCache<Link> Stap;
+      ThreadLocalCache<Link,0,computeStapleRectangleOps> Stap;
       ThreadLocalCache<Link,0,decltype(Stap)> Rect; // offset by Stap type to ensure non-overlapping allocations
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,

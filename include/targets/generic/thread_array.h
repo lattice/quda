@@ -20,6 +20,8 @@ namespace quda
     array<T, n> &array_;
 
   public:
+    using Smem::shared_mem_size;
+
     __device__ __host__ constexpr thread_array() : array_(sharedMem()[target::thread_idx_linear<3>()])
     {
       array_ = array<T, n>(); // call default constructor
