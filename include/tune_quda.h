@@ -150,6 +150,13 @@ namespace quda {
       }
     }
 
+    auto setSharedBytes(TuneParam &param) const
+    {
+      int nthreads = param.block.x * param.block.y * param.block.z;
+      param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
+      return param.shared_bytes;
+    }
+
     virtual bool advanceBlockDim(TuneParam &param) const
     {
       const unsigned int max_threads = maxBlockSize(param);
@@ -157,14 +164,12 @@ namespace quda {
       bool ret;
 
       param.block.x += blockStep();
-      int nthreads = param.block.x * param.block.y * param.block.z;
-      param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
+      setSharedBytes(param);
 
       if (param.block.x > max_threads || param.shared_bytes > max_shared
           || param.block.x * param.block.y * param.block.z > device::max_threads_per_block()) {
         resetBlockDim(param);
-        int nthreads = param.block.x * param.block.y * param.block.z;
-        param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
+        setSharedBytes(param);
         ret = false;
       } else {
         ret = true;
@@ -214,8 +219,7 @@ namespace quda {
 	if (param.shared_bytes > max_shared) {
 	  TuneParam next(param);
 	  advanceBlockDim(next); // to get next blockDim
-	  int nthreads = next.block.x * next.block.y * next.block.z;
-          param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(next));
+          param.shared_bytes = setSharedBytes(next);
           return false;
 	} else {
 	  return true;
@@ -325,8 +329,7 @@ namespace quda {
 
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
       }
-      int nthreads = param.block.x*param.block.y*param.block.z;
-      param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
+      setSharedBytes(param);
     }
 
     /** sets default values for when tuning is disabled */

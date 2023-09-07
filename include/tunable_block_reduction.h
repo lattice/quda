@@ -162,12 +162,18 @@ namespace quda
         return true;
       } else { // block.x (spacetime) was reset
 
+        auto next = param;
+        next.block.z += step_z;
+        auto shared_bytes = setSharedBytes(next);
+
         // we can advance spin/block-color since this is valid
         if (param.block.z < vector_length_z && param.block.z < device::max_threads_per_block_dim(2)
             && param.block.x * param.block.y * (param.block.z + step_z) <= device::max_threads_per_block()
-            && ((param.block.z + step_z) <= max_block_z)) {
+            && ((param.block.z + step_z) <= max_block_z)
+            && shared_bytes <= this->maxSharedBytesPerBlock()) {
           param.block.z += step_z;
           param.grid.z = (vector_length_z + param.block.z - 1) / param.block.z;
+          param.shared_bytes = shared_bytes;
           return true;
         } else { // we have run off the end so let's reset
           param.block.z = step_z;
