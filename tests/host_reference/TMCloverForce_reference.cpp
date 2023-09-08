@@ -13,6 +13,7 @@
 #include <dirac_quda.h>
 #include <domain_wall_dslash_reference.h>
 #include <dslash_reference.h>
+#include <timer.h>
 #include <wilson_dslash_reference.h>
 
 void Gamma5_host(double *out, double *in, const int V)
@@ -158,6 +159,7 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
   quda::cpuGaugeField mom(momparam);
   createMomCPU(mom.Gauge_p(), gauge_param->cpu_prec, 0.0);
   void *refmom = mom.Gauge_p();
+
   // FIXME: invert x,p here and in the device version
   CloverForce_reference(refmom, gauge, p, x, force_coeff);
 
@@ -167,65 +169,69 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
   momparam.order = QUDA_QDP_GAUGE_ORDER;
   momparam.geometry = QUDA_TENSOR_GEOMETRY;
 
-  // quda::GaugeFieldParam gParamMom(*gauge_param, h_mom, QUDA_ASQTAD_MOM_LINKS);
-
-  // gParamMom.link_type = QUDA_GENERAL_LINKS;
-  // gParamMom.create = QUDA_ZERO_FIELD_CREATE;
-  // gParamMom.order = QUDA_FLOAT2_GAUGE_ORDER;
-  // gParamMom.reconstruct = QUDA_RECONSTRUCT_NO;
-  // gParamMom.location = QUDA_CPU_FIELD_LOCATION;
-  // gParamMom.geometry = QUDA_TENSOR_GEOMETRY;
   // quda::cudaGaugeField oprod(gParamMom);
   // quda::cpuGaugeField oprod(momparam);
-  std::array<void *, 6> oprod; // like a gauge field
-  std::vector<char> oprod_;
-  for (int i = 0; i < 6; i++) {
-    oprod_.resize(sizeof(double) * (V * 6 * gauge_site_size * host_gauge_data_type_size));
-    oprod[i] = oprod_.data() + i * V * gauge_site_size * host_gauge_data_type_size;
-  }
-  double k_csw_ov_8 = inv_param->kappa * inv_param->clover_csw / 8.0;
-  size_t twist_flavor=inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH ? inv_param->twist_flavor : QUDA_TWIST_NO;
-  double mu2=twist_flavor != QUDA_TWIST_NO ? 4. * inv_param->kappa * inv_param->kappa * inv_param->mu * inv_param->mu : 0.0;
-  double eps2 = twist_flavor == QUDA_TWIST_NONDEG_DOUBLET ?
-                 4.0 * inv_param->kappa * inv_param->kappa * inv_param->epsilon * inv_param->epsilon :
-                 0.0;
-
-
-  // computeCloverSigmaTrace_reference(oprod.Gauge_p(), clover_inv.data(), k_csw_ov_8 * 32.0, 0);
-  computeCloverSigmaTrace_reference(oprod.data(), clover.data(), k_csw_ov_8 * 32.0, 0, mu2, eps2);
-  // int T = qParam.x[3];
-  // int LX = qParam.x[0] * 2;
-  // int LY = qParam.x[1];
-  // int LZ = qParam.x[2];
-  // printf("HERE\n");
-  // double **h_tmp= (double**) oprod.Gauge_p();
-  // double *h_tmp = (double *)malloc(sizeof(double) * (T * LX * LY * LZ * 6 * 9 * 2));
-  // oprod.copy_to_buffer(h_tmp);
-  // for (int x0 = 0; x0 < T; x0++) {
-  //   for (int x1 = 0; x1 < LX; x1++) {
-  //     for (int x2 = 0; x2 < LY; x2++) {
-  //       for (int x3 = 0; x3 < LZ; x3++) {
-  //         int j = x1 + LX * x2 + LY * LX * x3 + LZ * LY * LX * x0;
-  //         int oddBit = (x0 + x1 + x2 + x3) & 1;
-  //         if (oddBit == 0) {
-  //           int quda_idx = 18 * (oddBit * (T + LX + LY + LZ) / 2 + j / 2);
-  //           for (int munu = 0; munu < 6; munu++) {
-  //             for (int i = 0; i < 9; i++) {
-  //               if (getRankVerbosity()) {
-  //                 double *tmp = (double *)oprod[munu];
-  //                 printf("MARCOreference  (%d %d %d %d),  %d %d,    %g  %g\n", x0, x1, x2, x3, munu, i,
-  //                        tmp[(0 + i * 2 + quda_idx)], tmp[(1 + i * 2 + quda_idx)]
-  //                        //  h_tmp[munu][(0+i*2+quda_idx)], h_tmp[munu][(1+i*2+quda_idx) ]
-  //                        //  h_tmp[munu + 6 * (0 + i * 2 + quda_idx)], h_tmp[munu + 6 * (1 + i * 2 + quda_idx)]
-  //                 );
-  //               }
-  //             }
-  //           }
-  //         }
-  //       }
-  //     }
-  //   }
+  // std::array<void *, 6> oprod; // like a gauge field
+  // std::vector<char> oprod_;
+  // for (int i = 0; i < 6; i++) {
+  //   oprod_.resize(sizeof(double) * (V * 6 * gauge_site_size * host_gauge_data_type_size));
+  //   oprod[i] = oprod_.data() + i * V * gauge_site_size * host_gauge_data_type_size;
   // }
+  void *oprod;
+  std::vector<char> oprod_;
+  oprod_.resize(sizeof(double) * (V * 6 * gauge_site_size * host_gauge_data_type_size));
+  oprod = oprod_.data();
+
+  double k_csw_ov_8 = inv_param->kappa * inv_param->clover_csw / 8.0;
+  size_t twist_flavor = inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH ? inv_param->twist_flavor : QUDA_TWIST_NO;
+  double mu2
+    = twist_flavor != QUDA_TWIST_NO ? 4. * inv_param->kappa * inv_param->kappa * inv_param->mu * inv_param->mu : 0.0;
+  double eps2 = twist_flavor == QUDA_TWIST_NONDEG_DOUBLET ?
+    4.0 * inv_param->kappa * inv_param->kappa * inv_param->epsilon * inv_param->epsilon :
+    0.0;
+
+  // computeCloverSigmaTrace_reference(oprod.Gauge_p(), clover_inv.data(), k_csw_ov_8 * 32.0, 0, mu2, eps2);
+  computeCloverSigmaTrace_reference(oprod, clover.data(), k_csw_ov_8 * 32.0, 0, mu2, eps2);
+
+  // create extended field
+  quda::GaugeFieldParam gParamMom(*gauge_param, h_mom, QUDA_ASQTAD_MOM_LINKS);
+  gParamMom.link_type = QUDA_GENERAL_LINKS;
+  gParamMom.create = QUDA_ZERO_FIELD_CREATE;
+  gParamMom.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gParamMom.reconstruct = QUDA_RECONSTRUCT_NO;
+  gParamMom.geometry = QUDA_TENSOR_GEOMETRY;
+  quda::cudaGaugeField cudaOprod(gParamMom);
+  cudaOprod.copy_from_buffer(oprod);
+
+  quda::lat_dim_t R;
+  for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
+  quda::TimeProfile profile_host("profile_host");
+  quda::cudaGaugeField *cudaOprodEx = createExtendedGauge(cudaOprod, R, profile_host);
+
+  int ghostFace[4];
+  int ghost_size = 0;
+  for (int i = 0; i < 4; i++) {
+    ghostFace[i] = 0;
+    if (quda::comm_dim_partitioned(i)) {
+      ghostFace[i] = 1;
+      for (int j = 0; j < 4; j++) {
+        if (i == j)
+          continue;
+        else if (j == 0)
+          ghostFace[i] *= qParam.x[j] * 2;
+        else
+          ghostFace[i] *= qParam.x[j];
+      }
+    }
+    ghost_size += 2 * R[i] * ghostFace[i];
+  }
+  std::vector<char> oprod_ex_;
+  oprod_ex_.resize(sizeof(double) * ((V + ghost_size) * 6 * gauge_site_size * host_gauge_data_type_size));
+  void *oprod_ex = oprod_ex_.data();
+  cudaOprodEx->copy_to_buffer(oprod_ex);
+
+  cloverDerivative_reference(refmom, gauge.data(), oprod_ex, 1.0, QUDA_ODD_PARITY, *gauge_param);
+  cloverDerivative_reference(refmom, gauge.data(), oprod_ex, 1.0, QUDA_EVEN_PARITY, *gauge_param);
 
   add_mom((double *)h_mom, (double *)mom.Gauge_p(), 4 * V * mom_site_size, -1.0);
 }

@@ -4,8 +4,7 @@
 #include <string.h>
 #include <type_traits>
 
-#include "quda.h"
-#include "gauge_field.h"
+
 #include "host_utils.h"
 #include "misc.h"
 #include "gauge_force_reference.h"
@@ -110,25 +109,7 @@ struct danti_hermitmat {
   double space;
 };
 
-// convenience struct for passing around lattice meta data
-struct lattice_t {
-  int n_color;
-  size_t volume;
-  size_t volume_ex;
-  int x[4];
-  int r[4];
-  int e[4];
 
-  lattice_t(const quda::GaugeField &lat) : n_color(lat.Ncolor()), volume(1), volume_ex(lat.Volume())
-  {
-    for (int d = 0; d < 4; d++) {
-      x[d] = lat.X()[d] - 2 * lat.R()[d];
-      r[d] = lat.R()[d];
-      e[d] = lat.X()[d];
-      volume *= x[d];
-    }
-  };
-};
 
 extern int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1);
 

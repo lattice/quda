@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "gauge_force_reference.h"
 #include "misc.h"
 #include <color_spinor_field.h> // convenient quark field container
 #include <command_line_params.h>
@@ -133,19 +134,63 @@ template <typename gFloat> void accum_su3xsu3(gFloat *mom, gFloat *gauge, gFloat
   }
 }
 
-template <typename gFloat> void accum_su3_to_anti_hermitian(gFloat *mom, gFloat *gauge)
+template <typename gFloat> void mult_su3xsu3(gFloat *mom, gFloat *gauge, gFloat *oprod, double coeff)
+{
+  for (size_t i = 0; i < gauge_site_size; i++) mom[i] = 0;
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      for (int k = 0; k < 3; k++) {
+        mom[j * 6 + i * 2 + 0] += coeff * gauge[j * 6 + k * 2 + 0] * oprod[k * 6 + i * 2 + 0];
+        mom[j * 6 + i * 2 + 0] -= coeff * gauge[j * 6 + k * 2 + 1] * oprod[k * 6 + i * 2 + 1];
+        mom[j * 6 + i * 2 + 1] += coeff * gauge[j * 6 + k * 2 + 1] * oprod[k * 6 + i * 2 + 0];
+        mom[j * 6 + i * 2 + 1] += coeff * gauge[j * 6 + k * 2 + 0] * oprod[k * 6 + i * 2 + 1];
+      }
+    }
+  }
+}
+
+template <typename gFloat> void mult_su3xsu3dag(gFloat *mom, gFloat *gauge, gFloat *oprod, double coeff)
+{
+  for (size_t i = 0; i < gauge_site_size; i++) mom[i] = 0;
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      for (int k = 0; k < 3; k++) {
+        mom[j * 6 + i * 2 + 0] += coeff * gauge[j * 6 + k * 2 + 0] * oprod[i * 6 + k * 2 + 0];
+        mom[j * 6 + i * 2 + 0] += coeff * gauge[j * 6 + k * 2 + 1] * oprod[i * 6 + k * 2 + 1];
+        mom[j * 6 + i * 2 + 1] += coeff * gauge[j * 6 + k * 2 + 1] * oprod[i * 6 + k * 2 + 0];
+        mom[j * 6 + i * 2 + 1] -= coeff * gauge[j * 6 + k * 2 + 0] * oprod[i * 6 + k * 2 + 1];
+      }
+    }
+  }
+}
+template <typename gFloat> void mult_dagsu3xsu3(gFloat *mom, gFloat *gauge, gFloat *oprod, double coeff)
+{
+  for (size_t i = 0; i < gauge_site_size; i++) mom[i] = 0;
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      for (int k = 0; k < 3; k++) {
+        mom[j * 6 + i * 2 + 0] += coeff * gauge[k * 6 + j * 2 + 0] * oprod[k * 6 + i * 2 + 0];
+        mom[j * 6 + i * 2 + 0] += coeff * gauge[k * 6 + j * 2 + 1] * oprod[k * 6 + i * 2 + 1];
+        mom[j * 6 + i * 2 + 1] -= coeff * gauge[k * 6 + j * 2 + 1] * oprod[k * 6 + i * 2 + 0];
+        mom[j * 6 + i * 2 + 1] += coeff * gauge[k * 6 + j * 2 + 0] * oprod[k * 6 + i * 2 + 1];
+      }
+    }
+  }
+}
+
+template <typename gFloat> void accum_su3_to_anti_hermitian(gFloat *mom, gFloat *gauge, int sign = 1)
 {
   auto temp = (gauge[0 * 6 + 0 * 2 + 1] + gauge[1 * 6 + 1 * 2 + 1] + gauge[2 * 6 + 2 * 2 + 1]) * 0.33333333333333333;
-  mom[6] += gauge[0 * 6 + 0 * 2 + 1] - temp;
-  mom[7] += gauge[1 * 6 + 1 * 2 + 1] - temp;
-  mom[8] += gauge[2 * 6 + 2 * 2 + 1] - temp;
+  mom[6] += sign * (gauge[0 * 6 + 0 * 2 + 1] - temp);
+  mom[7] += sign * (gauge[1 * 6 + 1 * 2 + 1] - temp);
+  mom[8] += sign * (gauge[2 * 6 + 2 * 2 + 1] - temp);
   // of diag
-  mom[0] += (gauge[0 * 6 + 1 * 2 + 0] - gauge[1 * 6 + 0 * 2 + 0]) * 0.5;
-  mom[1] += (gauge[0 * 6 + 1 * 2 + 1] + gauge[1 * 6 + 0 * 2 + 1]) * 0.5;
-  mom[2] += (gauge[0 * 6 + 2 * 2 + 0] - gauge[2 * 6 + 0 * 2 + 0]) * 0.5;
-  mom[3] += (gauge[0 * 6 + 2 * 2 + 1] + gauge[2 * 6 + 0 * 2 + 1]) * 0.5;
-  mom[4] += (gauge[1 * 6 + 2 * 2 + 0] - gauge[2 * 6 + 1 * 2 + 0]) * 0.5;
-  mom[5] += (gauge[1 * 6 + 2 * 2 + 1] + gauge[2 * 6 + 1 * 2 + 1]) * 0.5;
+  mom[0] += sign * (gauge[0 * 6 + 1 * 2 + 0] - gauge[1 * 6 + 0 * 2 + 0]) * 0.5;
+  mom[1] += sign * (gauge[0 * 6 + 1 * 2 + 1] + gauge[1 * 6 + 0 * 2 + 1]) * 0.5;
+  mom[2] += sign * (gauge[0 * 6 + 2 * 2 + 0] - gauge[2 * 6 + 0 * 2 + 0]) * 0.5;
+  mom[3] += sign * (gauge[0 * 6 + 2 * 2 + 1] + gauge[2 * 6 + 0 * 2 + 1]) * 0.5;
+  mom[4] += sign * (gauge[1 * 6 + 2 * 2 + 0] - gauge[2 * 6 + 1 * 2 + 0]) * 0.5;
+  mom[5] += sign * (gauge[1 * 6 + 2 * 2 + 1] + gauge[2 * 6 + 1 * 2 + 1]) * 0.5;
 }
 
 template <typename sFloat, typename gFloat>
@@ -211,14 +256,14 @@ void CloverForce_reference(void *h_mom, std::array<void *, 4> gauge, quda::Color
   }
 }
 template <typename cFloat>
-void cloverSigmaTraceCompute_host(cFloat **oprod, cFloat *clover, double coeff, int parity, double mu2, double eps2)
+void cloverSigmaTraceCompute_host(cFloat *oprod, cFloat *clover, double coeff, int parity, double mu2, double eps2)
 {
   int nSpin = 4;
   int nColor = 3;
   int N = nColor * nSpin / 2;
   int chiralBlock = N + 2 * (N - 1) * N / 2;
 
-  cFloat *oprodEven[6], *oprodOdd[6];
+  // cFloat *oprodEven[6], *oprodOdd[6];
   // cFloat *A_array; //[72];
   cFloat A_array[72];
   typedef Eigen::Matrix<std::complex<cFloat>, 3, 3> Matrix3c;
@@ -236,10 +281,7 @@ void cloverSigmaTraceCompute_host(cFloat **oprod, cFloat *clover, double coeff, 
       // (                                  ----         L[12=3N-6]   L[13]      )
       // (                                               ----         L[14=4N-10])
       // (                                                            ----       )
-      // cFloat *D = &clover[((parity * Vh + i) * 2 + chirality) * chiralBlock];
-      // std::complex<cFloat> *L = reinterpret_cast<std::complex<cFloat> *>(&D[N]);
 
-      // A_array = &clover[((parity * Vh + i) * 2 + chirality) * chiralBlock];
       for (int j = 0; j < 36; j++)
         A_array[chirality * 36 + j] = clover[((parity * Vh + i) * 2 + chirality) * chiralBlock + j];
 
@@ -277,7 +319,6 @@ void cloverSigmaTraceCompute_host(cFloat **oprod, cFloat *clover, double coeff, 
           A_array[chirality * 36 + 6 + id * 2 + 1] = A(row, col).imag();
         }
       }
-
     }
     for (int mu = 0; mu < 4; mu++) {
       for (int nu = 0; nu < mu; nu++) {
@@ -287,13 +328,9 @@ void cloverSigmaTraceCompute_host(cFloat **oprod, cFloat *clover, double coeff, 
         // (oprod[1]  oprod[2]  ---          )
         // (oprod[3]  oprod[4]  oprod[5]  ---)
         // the full lexicographic index of oprod is
-        // (mu - 1) * mu / 2 + nu + 6*( re/im + (row_color+ col_color*Ncolor)*2 + quda_idx)
-        // quda_idx = 18*(oddBit*(T+LX+LY+LZ)/2+x/2)
-        // x = x1 + LX*x2 + LY*LX*x3 + LZ*LY*LX*x0;
-        oprodEven[(mu - 1) * mu / 2 + nu] = oprod[(mu - 1) * mu / 2 + nu];
-        oprodOdd[(mu - 1) * mu / 2 + nu] = oprod[(mu - 1) * mu / 2 + nu] + Vh * gauge_site_size;
-        cFloat **oprod_eo = (parity ? oprodOdd : oprodEven);
-        cFloat *out_munu = &oprod_eo[(mu - 1) * mu / 2 + nu][i * (3 * 3 * 2)];
+        // = reim + 2 * (x_eo / 2 + (V/2) * (color + 9 * (munu + parity * 6)))
+        // munu = (mu - 1) * mu / 2 + nu
+        // color = col_color+ row_color*Ncolor
 
         Matrix3c mat = Matrix3c::Zero();
         // quda::Matrix<quda::complex<cFloat>, 3> mat;
@@ -402,10 +439,13 @@ void cloverSigmaTraceCompute_host(cFloat **oprod, cFloat *clover, double coeff, 
         mat *= coeff;
         // arg.output((mu-1)*mu/2 + nu, x, arg.parity) = mat;
 
-        for (int ci = 0; ci < nColor; ci++) {
-          for (int cj = 0; cj < nColor; cj++) {
-            out_munu[ci * nColor * 2 + cj * 2 + 0] = mat(ci, cj).real();
-            out_munu[ci * nColor * 2 + cj * 2 + 1] = mat(ci, cj).imag();
+        int munu = (mu - 1) * mu / 2 + nu;
+        for (int ci = 0; ci < nColor; ci++) {//row
+          for (int cj = 0; cj < nColor; cj++) {//col
+            int color = ci * nColor + cj;
+            int id = 2 * (i + Vh * (color + 9 * (munu + parity * 6)));
+            oprod[id + 0] = mat(ci, cj).real();
+            oprod[id + 1] = mat(ci, cj).imag();
           }
         }
 
@@ -417,6 +457,406 @@ void cloverSigmaTraceCompute_host(cFloat **oprod, cFloat *clover, double coeff, 
 void computeCloverSigmaTrace_reference(void *oprod, void *clover, double coeff, int parity, double mu2, double eps2)
 {
 
-  // here call the appropriate template function according to gauge_precision
-  cloverSigmaTraceCompute_host((double **)oprod, (double *)clover, coeff, parity, mu2, eps2);
+  // FIXME: here call the appropriate template function according to gauge_precision
+  cloverSigmaTraceCompute_host((double *)oprod, (double *)clover, coeff, parity, mu2, eps2);
+}
+template <typename gFloat>
+void get_su3FromOprod(gFloat *oprod_out, gFloat *oprod, int munu, size_t nbr_idx, const lattice_t &lat)
+{
+
+  int x_cb = nbr_idx % (lat.volume_ex / 2);
+  int OddBit = nbr_idx / (lat.volume_ex / 2);
+
+  for (int i = 0; i < 3; i++) {   // col 
+    for (int j = 0; j < 3; j++) { // row 
+      int color = i + j * 3;
+      int id = 2 * (x_cb + (lat.volume_ex / 2) * (color + 9 * (munu + OddBit * 6)));
+      oprod_out[j * 6 + i * 2 + 0] = oprod[id + 0];
+      oprod_out[j * 6 + i * 2 + 1] = oprod[id + 1];
+    }
+  }
+}
+
+template <typename gFloat>
+void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *oprod_, int i,
+                            int yIndex, int parity, int mu, int nu)
+{
+  gFloat *oprod = (gFloat *)oprod_;
+
+  int acc_parity = yIndex == 0 ? parity : 1 - parity;
+  gFloat *mom = (gFloat *)h_mom_ + (4 * (i + Vh * acc_parity) + mu) * mom_site_size;
+
+  gFloat **gaugeFull_ex = (gFloat **)gauge_ex;
+ 
+  int otherparity = (1 - parity);
+  const int tidx = mu > nu ? (mu - 1) * mu / 2 + nu : (nu - 1) * nu / 2 + mu;
+  gFloat su3tmp1[gauge_site_size], su3tmp2[gauge_site_size];
+
+  if (yIndex == 0) { // do "this" force
+
+    // int x[4];
+    // getCoordsExtended(x, xIndex, arg.X, arg.parity, arg.border);
+
+    // U[mu](x) U[nu](x+mu) U[*mu](x+nu) U[*nu](x) Oprod(x)
+    {
+      int d[4] = {0, 0, 0, 0};
+      int nbr_idx;
+      int eo_full_id = i + parity * Vh * gauge_site_size;
+      // load U(x)_(+mu)
+      // Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), arg.parity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat *U1 = gaugeFull_ex[mu] + nbr_idx * (3 * 3 * 2);
+
+      // load U(x+mu)_(+nu)
+      d[mu]++;
+      // Link U2 = arg.gauge(nu, linkIndexShift(x, d, arg.E), otherparity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat *U2 = gaugeFull_ex[nu] + nbr_idx * (3 * 3 * 2);
+      d[mu]--;
+
+      // load U(x+nu)_(+mu)
+      d[nu]++;
+      // Link U3 = arg.gauge(mu, linkIndexShift(x, d, arg.E), otherparity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat *U3 = gaugeFull_ex[mu] + nbr_idx * (3 * 3 * 2);
+      d[nu]--;
+
+      // load U(x)_(+nu)
+      // Link U4 = arg.gauge(nu, linkIndexShift(x, d, arg.E), arg.parity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat *U4 = gaugeFull_ex[nu] + nbr_idx * (3 * 3 * 2);
+
+      // load Oprod
+      // Link Oprod1 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), arg.parity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat Oprod1[gauge_site_size];
+      get_su3FromOprod(Oprod1, oprod, tidx, nbr_idx, lat);
+
+      // if (nu < mu)
+      //   force -= U1 * U2 * conj(U3) * conj(U4) * Oprod1;
+      // else
+      //   force += U1 * U2 * conj(U3) * conj(U4) * Oprod1;
+      mult_dagsu3xsu3(su3tmp1, U4, Oprod1, 1);
+      mult_dagsu3xsu3(su3tmp2, U3, su3tmp1, 1);
+      mult_su3xsu3(su3tmp1, U2, su3tmp2, 1);
+      mult_su3xsu3(su3tmp2, U1, su3tmp1, 1);
+      if (nu < mu)
+        accum_su3_to_anti_hermitian(mom, su3tmp2, -1);
+      else
+        accum_su3_to_anti_hermitian(mom, su3tmp2);
+
+      d[mu]++;
+      d[nu]++;
+      // Link Oprod2 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), arg.parity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat Oprod2[gauge_site_size];
+      get_su3FromOprod(Oprod2, oprod, tidx, nbr_idx, lat);
+      d[mu]--;
+      d[nu]--;
+
+      // if (nu < mu)
+      //   force -= U1 * U2 * Oprod2 * conj(U3) * conj(U4);
+      // else
+      //   force += U1 * U2 * Oprod2 * conj(U3) * conj(U4);
+      mult_su3xsu3(su3tmp1, U4, U3, 1);
+      mult_su3xsu3dag(su3tmp2, Oprod2, su3tmp1, 1);
+      mult_su3xsu3(su3tmp1, U2, su3tmp2, 1);
+      mult_su3xsu3(su3tmp2, U1, su3tmp1, 1);
+      if (nu < mu)
+        accum_su3_to_anti_hermitian(mom, su3tmp2, -1);
+      else
+        accum_su3_to_anti_hermitian(mom, su3tmp2);
+    }
+
+    {
+      int d[4] = {0, 0, 0, 0};
+      int nbr_idx;
+      int eo_full_id = i + parity * Vh * gauge_site_size;
+
+      // load U(x-nu)(+nu)
+      d[nu]--;
+      // Link U1 = arg.gauge(nu, linkIndexShift(x, d, arg.E), otherparity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat *U1 = gaugeFull_ex[nu] + nbr_idx * (3 * 3 * 2);
+      d[nu]++;
+
+      // load U(x-nu)(+mu)
+      d[nu]--;
+      // Link U2 = arg.gauge(mu, linkIndexShift(x, d, arg.E), otherparity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat *U2 = gaugeFull_ex[mu] + nbr_idx * (3 * 3 * 2);
+      d[nu]++;
+
+      // load U(x+mu-nu)(nu)
+      d[mu]++;
+      d[nu]--;
+      // Link U3 = arg.gauge(nu, linkIndexShift(x, d, arg.E), arg.parity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat *U3 = gaugeFull_ex[nu] + nbr_idx * (3 * 3 * 2);
+      d[mu]--;
+      d[nu]++;
+
+      // load U(x)_(+mu)
+      // Link U4 = arg.gauge(mu, linkIndexShift(x, d, arg.E), arg.parity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat *U4 = gaugeFull_ex[mu] + nbr_idx * (3 * 3 * 2);
+
+      d[mu]++;
+      d[nu]--;
+      // Link Oprod1 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), arg.parity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat Oprod1[gauge_site_size];
+      get_su3FromOprod(Oprod1, oprod, tidx, nbr_idx, lat);
+      d[mu]--;
+      d[nu]++;
+
+      // if (nu < mu)
+      //   force += conj(U1) * U2 * Oprod1 * U3 * conj(U4);
+      // else
+      //   force -= conj(U1) * U2 * Oprod1 * U3 * conj(U4);
+      mult_su3xsu3dag(su3tmp1, U3, U4, 1);
+      mult_su3xsu3(su3tmp2, Oprod1, su3tmp1, 1);
+      mult_su3xsu3(su3tmp1, U2, su3tmp2, 1);
+      mult_dagsu3xsu3(su3tmp2, U1, su3tmp1, 1);
+      if (nu < mu)
+        accum_su3_to_anti_hermitian(mom, su3tmp2);
+      else
+        accum_su3_to_anti_hermitian(mom, su3tmp2, -1);
+
+      // Link Oprod4 = arg.oprod(tidx, linkIndexShift(x, d, arg.E), arg.parity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat Oprod4[gauge_site_size];
+      get_su3FromOprod(Oprod4, oprod, tidx, nbr_idx, lat);
+
+      // if (nu < mu)
+      //   force += Oprod4 * conj(U1) * U2 * U3 * conj(U4);
+      // else
+      //   force -= Oprod4 * conj(U1) * U2 * U3 * conj(U4);
+      mult_su3xsu3dag(su3tmp1, U3, U4, 1);
+      mult_su3xsu3(su3tmp2, U2, su3tmp1, 1);
+      mult_dagsu3xsu3(su3tmp1, U1, su3tmp2, 1);
+      mult_su3xsu3(su3tmp2, Oprod4, su3tmp1, 1);
+      if (nu < mu)
+        accum_su3_to_anti_hermitian(mom, su3tmp2);
+      else
+        accum_su3_to_anti_hermitian(mom, su3tmp2, -1);
+    }
+
+  } else { // else do other force
+
+    // int y[4] = {};
+    // getCoordsExtended(y, xIndex, arg.X, otherparity, arg.border);
+
+    {
+      int d[4] = {0, 0, 0, 0};
+      int nbr_idx;
+      int eo_full_id = i + otherparity * Vh * gauge_site_size;
+      // load U(x)_(+mu)
+      // Link U1 = arg.gauge(mu, linkIndexShift(y, d, arg.E), otherparity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat *U1 = gaugeFull_ex[mu] + nbr_idx * (3 * 3 * 2);
+
+      // load U(x+mu)_(+nu)
+      d[mu]++;
+      // Link U2 = arg.gauge(nu, linkIndexShift(y, d, arg.E), arg.parity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat *U2 = gaugeFull_ex[nu] + nbr_idx * (3 * 3 * 2);
+      d[mu]--;
+
+      // // load U(x+nu)_(+mu)
+      d[nu]++;
+      // Link U3 = arg.gauge(mu, linkIndexShift(y, d, arg.E), arg.parity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat *U3 = gaugeFull_ex[mu] + nbr_idx * (3 * 3 * 2);
+      d[nu]--;
+
+      // // load U(x)_(+nu)
+      // Link U4 = arg.gauge(nu, linkIndexShift(y, d, arg.E), otherparity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat *U4 = gaugeFull_ex[nu] + nbr_idx * (3 * 3 * 2);
+      // // load opposite parity Oprod
+      d[nu]++;
+      // Link Oprod3 = arg.oprod(tidx, linkIndexShift(y, d, arg.E), arg.parity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat Oprod3[gauge_site_size];
+      get_su3FromOprod(Oprod3, oprod, tidx, nbr_idx, lat);
+      d[nu]--;
+
+      // if (nu < mu)
+      //   force -= U1 * U2 * conj(U3) * Oprod3 * conj(U4);
+      // else
+      //   force += U1 * U2 * conj(U3) * Oprod3 * conj(U4);
+      mult_su3xsu3dag(su3tmp1, Oprod3, U4, 1);
+      mult_dagsu3xsu3(su3tmp2, U3, su3tmp1, 1);
+      mult_su3xsu3(su3tmp1, U2, su3tmp2, 1);
+      mult_su3xsu3(su3tmp2, U1, su3tmp1, 1);
+      if (nu < mu)
+        accum_su3_to_anti_hermitian(mom, su3tmp2, -1);
+      else
+        accum_su3_to_anti_hermitian(mom, su3tmp2);
+
+      // load Oprod(x+mu)
+      d[mu]++;
+      // Link Oprod4 = arg.oprod(tidx, linkIndexShift(y, d, arg.E), arg.parity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat Oprod4[gauge_site_size];
+      get_su3FromOprod(Oprod4, oprod, tidx, nbr_idx, lat);
+      d[mu]--;
+
+      // if (nu < mu)
+      //   force -= U1 * Oprod4 * U2 * conj(U3) * conj(U4);
+      // else
+      //   force += U1 * Oprod4 * U2 * conj(U3) * conj(U4);
+      // below we implemented force +-=U1 * Oprod4 * U2 * conj( U4 * U3);
+      mult_su3xsu3(su3tmp1, U4, U3, 1);
+      mult_su3xsu3dag(su3tmp2, U2, su3tmp1, 1);
+      mult_su3xsu3(su3tmp1, Oprod4, su3tmp2, 1);
+      mult_su3xsu3(su3tmp2, U1, su3tmp1, 1);
+      if (nu < mu)
+        accum_su3_to_anti_hermitian(mom, su3tmp2, -1);
+      else
+        accum_su3_to_anti_hermitian(mom, su3tmp2);
+    }
+
+    {
+      int d[4] = {0, 0, 0, 0};
+      int nbr_idx;
+      int eo_full_id = i + otherparity * Vh * gauge_site_size;
+
+      // load U(x-nu)(+nu)
+      d[nu]--;
+      // Link U1 = arg.gauge(nu, linkIndexShift(y, d, arg.E), arg.parity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat *U1 = gaugeFull_ex[nu] + nbr_idx * (3 * 3 * 2);
+      d[nu]++;
+
+      // load U(x-nu)(+mu)
+      d[nu]--;
+      // Link U2 = arg.gauge(mu, linkIndexShift(y, d, arg.E), arg.parity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat *U2 = gaugeFull_ex[mu] + nbr_idx * (3 * 3 * 2);
+      d[nu]++;
+
+      // load U(x+mu-nu)(nu)
+      d[mu]++;
+      d[nu]--;
+      // Link U3 = arg.gauge(nu, linkIndexShift(y, d, arg.E), otherparity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat *U3 = gaugeFull_ex[nu] + nbr_idx * (3 * 3 * 2);
+      d[mu]--;
+      d[nu]++;
+
+      // load U(x)_(+mu)
+      // Link U4 = arg.gauge(mu, linkIndexShift(y, d, arg.E), otherparity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat *U4 = gaugeFull_ex[mu] + nbr_idx * (3 * 3 * 2);
+
+      // load Oprod(x+mu)
+      d[mu]++;
+      // Link Oprod1 = arg.oprod(tidx, linkIndexShift(y, d, arg.E), arg.parity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat Oprod1[gauge_site_size];
+      get_su3FromOprod(Oprod1, oprod, tidx, nbr_idx, lat);
+      d[mu]--;
+
+      // if (nu < mu)
+      //   force += conj(U1) * U2 * U3 * Oprod1 * conj(U4);
+      // else
+      //   force -= conj(U1) * U2 * U3 * Oprod1 * conj(U4);
+      mult_su3xsu3dag(su3tmp1, Oprod1, U4, 1);
+      mult_su3xsu3(su3tmp2, U3, su3tmp1, 1);
+      mult_su3xsu3(su3tmp1, U2, su3tmp2, 1);
+      mult_dagsu3xsu3(su3tmp2, U1, su3tmp1, 1);
+      if (nu < mu)
+        accum_su3_to_anti_hermitian(mom, su3tmp2);
+      else
+        accum_su3_to_anti_hermitian(mom, su3tmp2, -1);
+
+      d[nu]--;
+      // Link Oprod2 = arg.oprod(tidx, linkIndexShift(y, d, arg.E), arg.parity);
+      nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
+      gFloat Oprod2[gauge_site_size];
+      get_su3FromOprod(Oprod2, oprod, tidx, nbr_idx, lat);
+      d[nu]++;
+
+      // if (nu < mu)
+      //   force += conj(U1) * Oprod2 * U2 * U3 * conj(U4);
+      // else
+      //   force -= conj(U1) * Oprod2 * U2 * U3 * conj(U4);
+      mult_su3xsu3dag(su3tmp1, U3, U4, 1);
+      mult_su3xsu3(su3tmp2, U2, su3tmp1, 1);
+      mult_su3xsu3(su3tmp1, Oprod2, su3tmp2, 1);
+      mult_dagsu3xsu3(su3tmp2, U1, su3tmp1, 1);
+      if (nu < mu)
+        accum_su3_to_anti_hermitian(mom, su3tmp2);
+      else
+        accum_su3_to_anti_hermitian(mom, su3tmp2, -1);
+    }
+  }
+}
+
+void cloverDerivative_reference(void *h_mom, void **gauge, void *oprod, double coeff, int parity,
+                                QudaGaugeParam &gauge_param)
+{
+
+  // created extended field
+  quda::lat_dim_t R;
+  for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
+  QudaGaugeParam param = newQudaGaugeParam();
+  setGaugeParam(param);
+  param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  param.t_boundary = QUDA_PERIODIC_T;
+  
+  auto qdp_ex = quda::createExtendedGauge(gauge, param, R);
+  lattice_t lat(*qdp_ex);
+
+  /// the following does not work: segmentation fault
+  // param.geometry = QUDA_TENSOR_GEOMETRY;
+  // create a qdp gauge
+  // std::vector<char> oprod_qdp_;
+  // std::array<void *, 6> oprod_qdp;
+  // oprod_qdp_.resize(6 * V * gauge_site_size * host_gauge_data_type_size);
+  // for (int i = 0; i < 6; i++) oprod_qdp[i] = oprod_qdp_.data() + i * V * gauge_site_size * host_gauge_data_type_size;
+  // int T = param.X[3];
+  // int LX = param.X[0];
+  // int LY = param.X[1];
+  // int LZ = param.X[2];
+
+  // for (int x0 = 0; x0 < T; x0++) {
+  //   for (int x1 = 0; x1 < LX; x1++) {
+  //     for (int x2 = 0; x2 < LY; x2++) {
+  //       for (int x3 = 0; x3 < LZ; x3++) {
+  //         int j = (x1 + LX * x2 + LY * LX * x3 + LZ * LY * LX * x0) / 2;
+  //         int oddBit = (x0 + x1 + x2 + x3) & 1;
+  //         for (int munu = 0; munu < 6; munu++) {
+  //           double *out = (double *)oprod_qdp[munu];
+  //           double *in = (double *)oprod;
+  //           for (int i = 0; i < 9; i++) {
+  //             for (int reim = 0; reim < 2; reim++) {
+  //               out[reim + 2 * (i + 9 * (j + Vh * (oddBit)))]
+  //                 = in[reim + 2 * (j / 2 + Vh * (i + 9 * (munu + 6 * (oddBit))))];
+  //             }
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
+  // auto oprod_ex = quda::createExtendedTensorGauge(oprod_qdp.data(), param, R);
+  // printf("HERE before oprod_ex created\n");
+
+  for (int i = 0; i < Vh; i++) {
+    for (int yIndex = 0; yIndex < 2; yIndex++) {
+      for (int mu = 0; mu < 4; mu++) {
+        for (int nu = 0; nu < 4; nu++) {
+          if (nu == mu)
+            continue;
+          else if (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) {
+            computeForce_reference<double>(h_mom,  (void **)qdp_ex->Gauge_p(), lat, oprod, i, yIndex, parity, mu,
+                                           nu);
+          }
+        }
+      }
+    }
+  }
 }
