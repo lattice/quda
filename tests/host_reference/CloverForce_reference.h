@@ -69,6 +69,28 @@ static const double projector[8][4][4][2] = {
 };
 // clang-format on
 
+static const double local_gamma[4][4][4][2] = {{// x
+                                                {{0, 0}, {0, 0}, {0, 0}, {0, -1}},
+                                                {{0, 0}, {0, 0}, {0, -1}, {0, 0}},
+                                                {{0, 0}, {0, 1}, {0, 0}, {0, 0}},
+                                                {{0, 1}, {0, 0}, {0, 0}, {0, 0}}},
+                                               {// Y
+                                                {{0, 0}, {0, 0}, {0, 0}, {1, 0}},
+                                                {{0, 0}, {0, 0}, {-1, 0}, {0, 0}},
+                                                {{0, 0}, {-1, 0}, {0, 0}, {0, 0}},
+                                                {{1, 0}, {0, 0}, {0, 0}, {0, 0}}},
+                                               {// Z
+                                                {{0, 0}, {0, 0}, {0, -1}, {0, 0}},
+                                                {{0, 0}, {0, 0}, {0, 0}, {0, 1}},
+                                                {{0, 1}, {0, 0}, {0, 0}, {0, 0}},
+                                                {{0, 0}, {0, -1}, {0, 0}, {0, 0}}},
+                                               {// T
+                                                {{0, 0}, {0, 0}, {-1, 0}, {0, 0}},
+                                                {{0, 0}, {0, 0}, {0, 0}, {-1, 0}},
+                                                {{-1, 0}, {0, 0}, {0, 0}, {0, 0}},
+                                                {{0, 0}, {-1, 0}, {0, 0}, {0, 0}}}};
+// clang-format on
+
 // todo pass projector
 template <typename Float> void multiplySpinorByDiracProjector(Float *res, int projIdx, const Float *spinorIn)
 {
@@ -78,6 +100,26 @@ template <typename Float> void multiplySpinorByDiracProjector(Float *res, int pr
     for (int t = 0; t < 4; t++) {
       Float projRe = projector[projIdx][s][t][0];
       Float projIm = projector[projIdx][s][t][1];
+
+      for (int m = 0; m < 3; m++) {
+        Float spinorRe = spinorIn[t * (3 * 2) + m * (2) + 0];
+        Float spinorIm = spinorIn[t * (3 * 2) + m * (2) + 1];
+        res[s * (3 * 2) + m * (2) + 0] += projRe * spinorRe - projIm * spinorIm;
+        res[s * (3 * 2) + m * (2) + 1] += projRe * spinorIm + projIm * spinorRe;
+      }
+    }
+  }
+}
+
+// todo pass gamma
+template <typename Float> void multiplySpinorByDiracgamma(Float *res, int gammaIdx, const Float *spinorIn)
+{
+  for (int i = 0; i < 4 * 3 * 2; i++) res[i] = 0.0;
+
+  for (int s = 0; s < 4; s++) {
+    for (int t = 0; t < 4; t++) {
+      Float projRe = local_gamma[gammaIdx][s][t][0];
+      Float projIm = local_gamma[gammaIdx][s][t][1];
 
       for (int m = 0; m < 3; m++) {
         Float spinorRe = spinorIn[t * (3 * 2) + m * (2) + 0];
@@ -192,6 +234,16 @@ template <typename gFloat> void accum_su3_to_anti_hermitian(gFloat *mom, gFloat 
   mom[4] += sign * (gauge[1 * 6 + 2 * 2 + 0] - gauge[2 * 6 + 1 * 2 + 0]) * 0.5;
   mom[5] += sign * (gauge[1 * 6 + 2 * 2 + 1] + gauge[2 * 6 + 1 * 2 + 1]) * 0.5;
 }
+// a= b-b^dag
+template <typename gFloat> void su3_imagx2(gFloat *a,gFloat *b){
+ for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      a[j * 6 + i * 2 + 0] = b[j * 6 + i * 2 + 0]-b[i * 6 + j * 2 + 0];
+      a[j * 6 + i * 2 + 1] = b[j * 6 + i * 2 + 1]+b[i * 6 + j * 2 + 1];
+    }
+ }
+}
+
 
 template <typename sFloat, typename gFloat>
 void CloverForce_kernel_host(std::array<void *, 4> gauge, void *h_mom, quda::ColorSpinorField &inA,
@@ -440,12 +492,12 @@ void cloverSigmaTraceCompute_host(cFloat *oprod, cFloat *clover, double coeff, i
         // arg.output((mu-1)*mu/2 + nu, x, arg.parity) = mat;
 
         int munu = (mu - 1) * mu / 2 + nu;
-        for (int ci = 0; ci < nColor; ci++) {//row
-          for (int cj = 0; cj < nColor; cj++) {//col
+        for (int ci = 0; ci < nColor; ci++) {   // row
+          for (int cj = 0; cj < nColor; cj++) { // col
             int color = ci * nColor + cj;
             int id = 2 * (i + Vh * (color + 9 * (munu + parity * 6)));
-            oprod[id + 0] = mat(ci, cj).real();
-            oprod[id + 1] = mat(ci, cj).imag();
+            oprod[id + 0] += mat(ci, cj).real();
+            oprod[id + 1] += mat(ci, cj).imag();
           }
         }
 
@@ -467,8 +519,8 @@ void get_su3FromOprod(gFloat *oprod_out, gFloat *oprod, int munu, size_t nbr_idx
   int x_cb = nbr_idx % (lat.volume_ex / 2);
   int OddBit = nbr_idx / (lat.volume_ex / 2);
 
-  for (int i = 0; i < 3; i++) {   // col 
-    for (int j = 0; j < 3; j++) { // row 
+  for (int i = 0; i < 3; i++) {   // col
+    for (int j = 0; j < 3; j++) { // row
       int color = i + j * 3;
       int id = 2 * (x_cb + (lat.volume_ex / 2) * (color + 9 * (munu + OddBit * 6)));
       oprod_out[j * 6 + i * 2 + 0] = oprod[id + 0];
@@ -478,8 +530,8 @@ void get_su3FromOprod(gFloat *oprod_out, gFloat *oprod, int munu, size_t nbr_idx
 }
 
 template <typename gFloat>
-void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *oprod_, int i,
-                            int yIndex, int parity, int mu, int nu)
+void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *oprod_, int i, int yIndex, int parity,
+                            int mu, int nu)
 {
   gFloat *oprod = (gFloat *)oprod_;
 
@@ -487,7 +539,7 @@ void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *
   gFloat *mom = (gFloat *)h_mom_ + (4 * (i + Vh * acc_parity) + mu) * mom_site_size;
 
   gFloat **gaugeFull_ex = (gFloat **)gauge_ex;
- 
+
   int otherparity = (1 - parity);
   const int tidx = mu > nu ? (mu - 1) * mu / 2 + nu : (nu - 1) * nu / 2 + mu;
   gFloat su3tmp1[gauge_site_size], su3tmp2[gauge_site_size];
@@ -795,8 +847,7 @@ void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *
   }
 }
 
-void cloverDerivative_reference(void *h_mom, void **gauge, void *oprod, double coeff, int parity,
-                                QudaGaugeParam &gauge_param)
+void cloverDerivative_reference(void *h_mom, void **gauge, void *oprod, int parity, QudaGaugeParam &gauge_param)
 {
 
   // created extended field
@@ -806,7 +857,7 @@ void cloverDerivative_reference(void *h_mom, void **gauge, void *oprod, double c
   setGaugeParam(param);
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   param.t_boundary = QUDA_PERIODIC_T;
-  
+
   auto qdp_ex = quda::createExtendedGauge(gauge, param, R);
   lattice_t lat(*qdp_ex);
 
@@ -852,11 +903,70 @@ void cloverDerivative_reference(void *h_mom, void **gauge, void *oprod, double c
           if (nu == mu)
             continue;
           else if (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) {
-            computeForce_reference<double>(h_mom,  (void **)qdp_ex->Gauge_p(), lat, oprod, i, yIndex, parity, mu,
-                                           nu);
+            computeForce_reference<double>(h_mom, (void **)qdp_ex->Gauge_p(), lat, oprod, i, yIndex, parity, mu, nu);
           }
         }
       }
     }
   }
+}
+
+template <typename sFloat, typename gFloat>
+void CloverSigmaOprod_reference(void *oprod_, quda::ColorSpinorField &inp, quda::ColorSpinorField &inx,
+                                std::vector<std::vector<double>> &coeff)
+{
+  int nColor = 3;
+  gFloat *oprod = (gFloat *)oprod_;
+  sFloat *x = (sFloat *)inx.V();
+  sFloat *p = (sFloat *)inp.V();
+
+  gFloat oprod_f[gauge_site_size];
+  gFloat oprod_imx2[gauge_site_size];
+
+  for (int parity = 0; parity < 2; parity++) {
+    for (int i = 0; i < Vh; i++) {
+      for (int mu = 1; mu < 4; mu++) {
+        for (int nu = 0; nu < mu; nu++) {
+
+          
+          sFloat temp[spinor_site_size], temp_munu[spinor_site_size], temp_numu[spinor_site_size];
+          multiplySpinorByDiracgamma(temp, nu, &p[spinor_site_size * (i + Vh * parity)]);
+          multiplySpinorByDiracgamma(temp_munu, mu, temp);
+
+          multiplySpinorByDiracgamma(temp, mu, &p[spinor_site_size * (i + Vh * parity)]);
+          multiplySpinorByDiracgamma(temp_numu, nu, temp);
+          for (int s = 0; s < 4; s++) {
+            for (int t = 0; t < 3; t++) {
+              temp[s * (3 * 2) + t * (2) + 0]
+                = -temp_munu[s * (3 * 2) + t * (2) + 0] + temp_numu[s * (3 * 2) + t * (2) + 0];
+              temp[s * (3 * 2) + t * (2) + 1]
+                = -temp_munu[s * (3 * 2) + t * (2) + 1] + temp_numu[s * (3 * 2) + t * (2) + 1];
+            }
+          }
+
+          outerProdSpinTrace(oprod_f, temp, &x[spinor_site_size * (i + Vh * parity)]);
+          su3_imagx2(oprod_imx2,oprod_f);
+          
+          int munu = (mu - 1) * mu / 2 + nu;
+
+          for (int ci = 0; ci < nColor; ci++) {   // row
+            for (int cj = 0; cj < nColor; cj++) { // col
+              int color = ci * nColor + cj;
+              int colort = cj * nColor + ci;
+              int id = 2 * (i + Vh * (color + 9 * (munu + parity * 6)));
+              oprod[id + 0] += coeff[0][parity] * oprod_imx2[color * 2 + 0] / 2.0;
+              oprod[id + 1] += coeff[0][parity] * oprod_imx2[color * 2 + 1] / 2.0;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+void computeCloverSigmaOprod_reference(void *oprod, quda::ColorSpinorField &p, quda::ColorSpinorField &x,
+                                       std::vector<std::vector<double>> &ferm_epsilon, QudaGaugeParam &gauge_param)
+{
+  if (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION)
+    CloverSigmaOprod_reference<double, double>(oprod, p, x, ferm_epsilon);
 }

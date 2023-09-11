@@ -49,6 +49,12 @@ template <typename Float> void add_mom(Float *a, Float *b, int len, double coeff
   for (int i = 0; i < len; i++) { a[i] += coeff * b[i]; }
 }
 
+template <typename Float> void set_to_zero(void *oprod_)
+{
+  Float *oprod = (Float *)oprod_;
+  for (size_t i = 0; i < V * 6 * gauge_site_size; i++) oprod[i] = 0;
+}
+
 void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector, std::array<void *, 4> gauge,
                              std::vector<char> clover, std::vector<char> clover_inv, QudaGaugeParam *gauge_param,
                              QudaInvertParam *inv_param)
@@ -92,20 +98,11 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
   x.Odd() = load_half;
   qParam.create = QUDA_NULL_FIELD_CREATE;
 
-  // Gamma5_host_UKQCD((double *)tmp.V(), (double *)x.Odd().V(), (qParam.x[0] * qParam.x[1] * qParam.x[2] * qParam.x[3]) );
   Gamma5_host((double *)tmp.V(), (double *)x.Odd().V(), x.Odd().VolumeCB());
 
-  // dirac->dslash
   int parity = 0;
-  // QudaMatPCType myMatPCType = QUDA_MATPC_ODD_ODD_ASYMMETRIC;
   QudaMatPCType myMatPCType = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
-  // QudaMatPCType myMatPCType = QUDA_MATPC_ODD_ODD;
-  // QudaMatPCType myMatPCType = QUDA_MATPC_EVEN_EVEN;
 
-  printf("kappa=%g\n", inv_param->kappa);
-  printf("mu=%g\n", inv_param->mu);
-  printf("twist_flavour=%d\n", inv_param->twist_flavor);
-  printf("matpc=%d\n", myMatPCType);
   tmc_dslash(x.Even().V(), gauge.data(), tmp.V(), clover.data(), clover_inv.data(), inv_param->kappa, inv_param->mu,
              inv_param->twist_flavor, parity, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
 
@@ -120,34 +117,7 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
   Gamma5_host((double *)p.Even().V(), (double *)p.Even().V(), p.Even().VolumeCB());
   Gamma5_host((double *)p.Odd().V(), (double *)p.Odd().V(), p.Odd().VolumeCB());
 
-  // check
-  // int T = qParam.x[3];
-  // int LX = qParam.x[0] * 2;
-  // int LY = qParam.x[1];
-  // int LZ = qParam.x[2];
-  // load_half = p.Even();
-  // printf("reference  (%d %d %d %d)\n",T,LX,LY,LZ);
-  // for (int x0 = 0; x0 < T; x0++) {
-  //   for (int x1 = 0; x1 < LX; x1++) {
-  //     for (int x2 = 0; x2 < LY; x2++) {
-  //       for (int x3 = 0; x3 < LZ; x3++) {
-  //         const int q_eo_idx = (x1 + LX * x2 + LY * LX * x3 + LZ * LY * LX * x0) / 2;
-  //         const int oddBit = (x0 + x1 + x2 + x3) & 1;
-  //         if (oddBit == 0) {
-  //           for (int q_spin = 0; q_spin < 4; q_spin++) {
-  //             for (int col = 0; col < 3; col++) {
-  //               if(getRankVerbosity()){
-  //               printf("MARCOreference  (%d %d %d %d),  %d %d,    %g  %g\n", x0, x1, x2, x3, q_spin, col,
-  //                      ((double *)load_half.V())[24 * q_eo_idx + 6 * q_spin + 2 * col + 0],
-  //                      ((double *)load_half.V())[24 * q_eo_idx + 6 * q_spin + 2 * col + 1]);
-  //               }
-  //             }
-  //           }
-  //         }
-  //       }
-  //     }
-  //   }
-  // }
+  
   double force_coeff = coeff[0];
   quda::GaugeFieldParam momparam(*gauge_param);
   // momparam.order = QUDA_QDP_GAUGE_ORDER;
@@ -161,26 +131,21 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
   void *refmom = mom.Gauge_p();
 
   // FIXME: invert x,p here and in the device version
+  // derivative of the wilson operator it correspond to deriv_Sb(OE,...) plus  deriv_Sb(EO,...) in tmLQCD
   CloverForce_reference(refmom, gauge, p, x, force_coeff);
 
   // create oprod and trace field
-
-  // momparam.link_type = QUDA_GENERAL_LINKS;
-  momparam.order = QUDA_QDP_GAUGE_ORDER;
-  momparam.geometry = QUDA_TENSOR_GEOMETRY;
-
-  // quda::cudaGaugeField oprod(gParamMom);
-  // quda::cpuGaugeField oprod(momparam);
-  // std::array<void *, 6> oprod; // like a gauge field
-  // std::vector<char> oprod_;
-  // for (int i = 0; i < 6; i++) {
-  //   oprod_.resize(sizeof(double) * (V * 6 * gauge_site_size * host_gauge_data_type_size));
-  //   oprod[i] = oprod_.data() + i * V * gauge_site_size * host_gauge_data_type_size;
-  // }
   void *oprod;
   std::vector<char> oprod_;
-  oprod_.resize(sizeof(double) * (V * 6 * gauge_site_size * host_gauge_data_type_size));
+  oprod_.resize(V * 6 * gauge_site_size * host_gauge_data_type_size);
   oprod = oprod_.data();
+
+  if (gauge_param->cpu_prec == QUDA_DOUBLE_PRECISION)
+    set_to_zero<double>(oprod);
+  else if (gauge_param->cpu_prec == QUDA_SINGLE_PRECISION)
+    set_to_zero<float>(oprod);
+  else
+    errorQuda("precision not valid\n");
 
   double k_csw_ov_8 = inv_param->kappa * inv_param->clover_csw / 8.0;
   size_t twist_flavor = inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH ? inv_param->twist_flavor : QUDA_TWIST_NO;
@@ -190,10 +155,19 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
     4.0 * inv_param->kappa * inv_param->kappa * inv_param->epsilon * inv_param->epsilon :
     0.0;
 
-  // computeCloverSigmaTrace_reference(oprod.Gauge_p(), clover_inv.data(), k_csw_ov_8 * 32.0, 0, mu2, eps2);
+  // derivative of the determinant of the sw term, second term of (A12) in hep-lat/0112051,  sw_deriv(EE, mnl->mu) in tmLQCD
   computeCloverSigmaTrace_reference(oprod, clover.data(), k_csw_ov_8 * 32.0, 0, mu2, eps2);
 
-  // create extended field
+  std::vector<std::vector<double>> ferm_epsilon(nvector);
+  for (int i = 0; i < nvector; i++) {
+    ferm_epsilon[i].reserve(2);
+    ferm_epsilon[i][0] = k_csw_ov_8 * coeff[i];
+    ferm_epsilon[i][1] = k_csw_ov_8 * coeff[i] / (inv_param->kappa * inv_param->kappa);
+  }
+  /  // derivative of pseudofermion sw term, first term term of (A12) in hep-lat/0112051,  sw_spinor_eo(EE,..) plus sw_spinor_eo(OO,..)  in tmLQCD
+  computeCloverSigmaOprod_reference(oprod, p, x, ferm_epsilon, *gauge_param);
+
+  // create extended field 
   quda::GaugeFieldParam gParamMom(*gauge_param, h_mom, QUDA_ASQTAD_MOM_LINKS);
   gParamMom.link_type = QUDA_GENERAL_LINKS;
   gParamMom.create = QUDA_ZERO_FIELD_CREATE;
@@ -226,12 +200,14 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
     ghost_size += 2 * R[i] * ghostFace[i];
   }
   std::vector<char> oprod_ex_;
-  oprod_ex_.resize(sizeof(double) * ((V + ghost_size) * 6 * gauge_site_size * host_gauge_data_type_size));
+  oprod_ex_.resize((V + ghost_size) * 6 * gauge_site_size * host_gauge_data_type_size);
   void *oprod_ex = oprod_ex_.data();
   cudaOprodEx->copy_to_buffer(oprod_ex);
 
-  cloverDerivative_reference(refmom, gauge.data(), oprod_ex, 1.0, QUDA_ODD_PARITY, *gauge_param);
-  cloverDerivative_reference(refmom, gauge.data(), oprod_ex, 1.0, QUDA_EVEN_PARITY, *gauge_param);
+  // oprod = (A12) of hep-lat/0112051
+  // compute the insertion of oprod in Fig.27 of hep-lat/0112051
+  cloverDerivative_reference(refmom, gauge.data(), oprod_ex, QUDA_ODD_PARITY, *gauge_param);
+  cloverDerivative_reference(refmom, gauge.data(), oprod_ex, QUDA_EVEN_PARITY, *gauge_param);
 
   add_mom((double *)h_mom, (double *)mom.Gauge_p(), 4 * V * mom_site_size, -1.0);
 }
