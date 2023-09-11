@@ -690,7 +690,7 @@ namespace quda {
     struct GhostAccessor<Float, nColor, QUDA_FLOAT2_GAUGE_ORDER, native_ghost, storeFloat> {
       using wrapper = fieldorder_wrapper<Float, storeFloat>;
       complex<storeFloat> *ghost[8] = {};
-      const int volumeCB;
+      const unsigned int volumeCB;
       unsigned int ghostVolumeCB[8] = {};
       Float scale = static_cast<Float>(1.0);
       Float scale_inv = static_cast<Float>(1.0);
@@ -751,7 +751,7 @@ namespace quda {
       using wrapper = fieldorder_wrapper<Float, storeFloat>;
 
       /** An internal reference to the actual field we are accessing */
-      const int volumeCB;
+      const unsigned int volumeCB;
       const int nDim;
       const int_fastdiv geometry;
       const QudaFieldLocation location;
@@ -870,10 +870,10 @@ namespace quda {
 	__device__ __host__ inline int Ncolor() const { return nColor; }
 
 	/** Returns the field volume */
-	__device__ __host__ inline int Volume() const { return 2*volumeCB; }
+	__device__ __host__ inline auto Volume() const { return 2*volumeCB; }
 
 	/** Returns the field volume */
-	__device__ __host__ inline int VolumeCB() const { return volumeCB; }
+	__device__ __host__ inline auto VolumeCB() const { return volumeCB; }
 
 	/** Returns the field geometric dimension */
 	__device__ __host__ inline int Ndim() const { return nDim; }
@@ -1526,7 +1526,7 @@ namespace quda {
         int coords[QUDA_MAX_DIM];
         int_fastdiv X[QUDA_MAX_DIM];
         int R[QUDA_MAX_DIM];
-        const int volumeCB;
+        const unsigned int volumeCB;
         int faceVolumeCB[4];
         const int stride;
         const int geometry;
@@ -1773,7 +1773,7 @@ namespace quda {
         using complex = complex<real>;
         Float *ghost[QUDA_MAX_DIM] = {};
         int faceVolumeCB[QUDA_MAX_DIM] = {};
-        const int volumeCB;
+        const unsigned int volumeCB;
         const int stride;
         const int geometry;
         const int hasPhase;
@@ -1846,7 +1846,7 @@ namespace quda {
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       Float *gauge[QUDA_MAX_DIM];
-      const int volumeCB;
+      const unsigned int volumeCB;
     QDPOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
       : LegacyOrder<Float,length>(u, ghost_), volumeCB(u.VolumeCB())
     {
@@ -1892,7 +1892,7 @@ namespace quda {
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       Float *gauge[QUDA_MAX_DIM];
-      const int volumeCB;
+      const unsigned int volumeCB;
     QDPJITOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
       : LegacyOrder<Float,length>(u, ghost_), volumeCB(u.VolumeCB())
     {
@@ -1942,7 +1942,7 @@ namespace quda {
     using real = typename mapper<Float>::type;
     using complex = complex<real>;
     Float *gauge;
-    const int volumeCB;
+    const unsigned int volumeCB;
     const int geometry;
     MILCOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
       LegacyOrder<Float, length>(u, ghost_),
@@ -1953,10 +1953,10 @@ namespace quda {
       ;
     }
 
-  __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
-  {
-    auto in = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
-    block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+    __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
+    {
+      auto in = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
+      block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
     }
 
     __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
@@ -2003,7 +2003,7 @@ namespace quda {
     using real = typename mapper<Float>::type;
     using complex = complex<real>;
     Float *gauge;
-    const int volumeCB;
+    const unsigned int volumeCB;
     const int geometry;
     const size_t offset;
     const size_t size;
@@ -2062,7 +2062,7 @@ namespace quda {
     using real = typename mapper<Float>::type;
     using complex = complex<real>;
     Float *gauge;
-    const int volumeCB;
+    const unsigned int volumeCB;
     const real anisotropy;
     const real anisotropy_inv;
     static constexpr int Nc = 3;
@@ -2131,8 +2131,8 @@ namespace quda {
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       Float *gauge;
-      const int volumeCB;
-      int exVolumeCB; // extended checkerboard volume
+      const unsigned int volumeCB;
+      unsigned int exVolumeCB; // extended checkerboard volume
       static constexpr int Nc = 3;
       BQCDOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
         LegacyOrder<Float, length>(u, ghost_), gauge(gauge_ ? gauge_ : u.data<Float *>()), volumeCB(u.VolumeCB())
@@ -2193,7 +2193,7 @@ namespace quda {
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       Float *gauge;
-      const int volumeCB;
+      const unsigned int volumeCB;
       static constexpr int Nc = 3;
       const real scale;
       const real scale_inv;
@@ -2257,7 +2257,7 @@ namespace quda {
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       Float *gauge;
-      const int volumeCB;
+      const unsigned int volumeCB;
       int exVolumeCB;
       static constexpr int Nc = 3;
       const real scale;
