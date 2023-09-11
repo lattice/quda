@@ -461,6 +461,13 @@ void openQCD_qudaSetDslashOptions(double kappa, double mu)
 }
 
 
+/**
+ * @brief      Calculates the norm of a spinor.
+ *
+ * @param[in]  h_in  input spinor of type spinor_dble[NSPIN]
+ *
+ * @return     norm
+ */
 double openQCD_qudaNorm(void *h_in)
 {
   lat_dim_t X;
@@ -486,15 +493,16 @@ double openQCD_qudaNorm(void *h_in)
 
 
 /**
- * @brief Applies Dirac matrix to spinor.
- * 
- *     openQCD_out = gamma[dir] * openQCD_in
- * 
- * @param dir Dirac index, 0 <= dir <= 5
- * @param openQCD_in of type spinor_dble[NSPIN]
- * @param openQCD_out of type spinor_dble[NSPIN]
+ * @brief      Applies Dirac matrix to spinor.
+ *
+ *             openQCD_out = gamma[dir] * openQCD_in
+ *
+ * @param[in]  dir          Dirac index, 0 <= dir <= 5, notice that dir is in
+ *                          openQCD convention, ie. (0: t, 1: x, 2: y, 3: z, 4: 5, 5: 5)
+ * @param[in]  openQCD_in   of type spinor_dble[NSPIN]
+ * @param[out] openQCD_out  of type spinor_dble[NSPIN]
  */
-void openQCD_qudaGamma(int dir, void *openQCD_in, void *openQCD_out)
+void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out)
 {
   lat_dim_t X;
 
@@ -528,14 +536,14 @@ void openQCD_qudaGamma(int dir, void *openQCD_in, void *openQCD_out)
   // gamma5 runs within QUDA using QUDA fields
   if (dir == 5 || dir == 4) {
     gamma5(out, in);
-  } else if (dir == 0) {
-    gamma0(out, in);
-  } else if (dir == 1) {
-    gamma1(out, in);
-  } else if (dir == 2) {
-    gamma2(out, in);
-  } else if (dir == 3) {
+  } else if (dir == 0) { // t direction
     gamma3(out, in);
+  } else if (dir == 1) { // x direction
+    gamma0(out, in);
+  } else if (dir == 2) { // y direction
+    gamma1(out, in);
+  } else if (dir == 3) { // z direction
+    gamma2(out, in);
   } else {
     errorQuda("Unknown gamma: %d\n", dir);
   }
@@ -713,7 +721,7 @@ void openQCD_qudaInvert(int external_precision, int quda_precision, double mass,
 // void setInvertParam(QudaInvertParam &invertParam, openQCD_QudaInvertArgs_t &inv_args, int external_precision,
 //                     int quda_precision, double kappa, double reliable_delta);
 
-void setInvertParam(QudaInvertParam &invertParam, openQCD_QudaInvertArgs_t &inv_args, int external_precision,
+/*void setInvertParam(QudaInvertParam &invertParam, openQCD_QudaInvertArgs_t &inv_args, int external_precision,
                     int quda_precision, double kappa, double reliable_delta)
 {
 
@@ -751,6 +759,6 @@ void setInvertParam(QudaInvertParam &invertParam, openQCD_QudaInvertArgs_t &inv_
   invertParam.clover_order = QUDA_PACKED_CLOVER_ORDER;
 
   invertParam.compute_action = 0;
-}
+}*/
 
 // TODO: OpenQCDMultigridPack functions a la MILC (cf. milc_interface.cpp)
