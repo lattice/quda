@@ -164,6 +164,8 @@ namespace quda {
     __device__ __host__ inline void operator()(complex<FloatOut> out[Ns*Nc], const complex<FloatIn> in[Ns*Nc]) const {
       int s1[4] = {0, 1, 0, 1};
       int s2[4] = {2, 3, 2, 3};
+
+      /* RG: I added a global minus here to ix the global minus imposed by the transformation */
       FloatOut K1[4] = {static_cast<FloatOut>(-kU),
                         static_cast<FloatOut>(-kU),
                         static_cast<FloatOut>(-kU),
