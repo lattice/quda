@@ -164,7 +164,7 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
     ferm_epsilon[i][0] = k_csw_ov_8 * coeff[i];
     ferm_epsilon[i][1] = k_csw_ov_8 * coeff[i] / (inv_param->kappa * inv_param->kappa);
   }
-  /  // derivative of pseudofermion sw term, first term term of (A12) in hep-lat/0112051,  sw_spinor_eo(EE,..) plus sw_spinor_eo(OO,..)  in tmLQCD
+  // derivative of pseudofermion sw term, first term term of (A12) in hep-lat/0112051,  sw_spinor_eo(EE,..) plus sw_spinor_eo(OO,..)  in tmLQCD
   computeCloverSigmaOprod_reference(oprod, p, x, ferm_epsilon, *gauge_param);
 
   // create extended field 
