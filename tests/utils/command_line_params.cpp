@@ -471,7 +471,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--device", device_ordinal, "Set the CUDA device to use (default 0, single GPU only)")
     ->check(CLI::Range(0, 16));
 
-  quda_app->add_option("--dslash-type", dslash_type, "Set the dslash type")
+  quda_app->add_option("--dslash-type", dslash_type, "Set the dslash type (default wilson or asqtad as appropriate)")
     ->transform(CLI::QUDACheckedTransformer(dslash_type_map));
 
   quda_app->add_option("--epsilon", epsilon, "Twisted-Mass flavor twist of Dirac operator (default 0.01)");
@@ -499,7 +499,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(mass_normalization_map));
 
   quda_app
-    ->add_option("--matpc", matpc_type, "Matrix preconditioning type (even-even, odd-odd, even-even-asym, odd-odd-asym)")
+    ->add_option("--matpc", matpc_type, "Matrix preconditioning type (even-even (default), odd-odd, even-even-asym, odd-odd-asym)")
     ->transform(CLI::QUDACheckedTransformer(matpc_type_map));
   quda_app->add_option("--msrc", Msrc,
                        "Used for testing non-square block blas routines where nsrc defines the other dimension");
@@ -600,7 +600,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app
     ->add_option(
       "--solution-type", solution_type,
-      "The solution we desire (mat (default), mat-dag-mat, mat-pc, mat-pc-dag-mat-pc (default for multi-shift))")
+      "The solution we desire (mat (default for Wilson-type), mat-dag-mat, mat-pc (default for staggered-type), mat-pc-dag-mat-pc (default for Wilson-type multi-shift))")
     ->transform(CLI::QUDACheckedTransformer(solution_type_map));
 
   quda_app
@@ -610,7 +610,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app
     ->add_option("--solve-type", solve_type,
-                 "The type of solve to do (direct, direct-pc, normop, normop-pc, normerr, normerr-pc)")
+                 "The type of solve to do (direct, direct-pc (default for staggered-type), normop, normop-pc (default for Wilson-type), normerr, normerr-pc)")
     ->transform(CLI::QUDACheckedTransformer(solve_type_map));
   quda_app
     ->add_option("--solver-ext-lib-type", solver_ext_lib, "Set external library for the solvers  (default Eigen library)")
@@ -752,8 +752,8 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-use-dagger", eig_use_dagger,
                       "Solve the Mdag problem instead of M (MMdag if eig-use-normop == true) (default false)");
   opgroup->add_option("--eig-use-normop", eig_use_normop,
-                      "Solve the MdagM problem instead of M (MMdag if eig-use-dagger == true) (default false)");
-  opgroup->add_option("--eig-use-pc", eig_use_pc, "Solve the Even-Odd preconditioned problem (default false)");
+                      "Solve the MdagM problem instead of M (MMdag if eig-use-dagger == true) (default false for Wilson-type, true for staggered-type)");
+  opgroup->add_option("--eig-use-pc", eig_use_pc, "Solve the Even-Odd preconditioned problem (default false for Wilson-type, true for staggered-type)");
   opgroup->add_option("--eig-use-poly-acc", eig_use_poly_acc, "Use Chebyshev polynomial acceleration in the eigensolver");
 }
 

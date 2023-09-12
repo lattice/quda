@@ -744,30 +744,30 @@ double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, dou
 }
 
 double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorField &ref, quda::ColorSpinorField &in,
-                                quda::ColorSpinorField &out, double mass, quda::GaugeField &fat_link, quda::GaugeField &long_link, QudaGaugeParam &gauge_param,
+                                quda::ColorSpinorField &out, double mass, quda::GaugeField &fat_link, quda::GaugeField &long_link,
                                 QudaInvertParam &inv_param, int shift)
 {
   int dagger = inv_param.dagger == QUDA_DAG_YES ? 1 : 0;
 
-  switch (test_type) {
-  case 0: // full parity solution, full parity system
-  case 1: // full parity solution, solving EVEN EVEN prec system
-  case 2: // full parity solution, solving ODD ODD prec system
+  if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
     stag_mat(ref, fat_link, long_link, out, mass, dagger, dslash_type);
 
     // exact reason for this tbd, this isn't needed in the dslash test...
     if (dslash_type == QUDA_LAPLACE_DSLASH)
       ax(0.5 / kappa, ref.V(), ref.Length(), ref.Precision());
-    break;
-
-  case 3: // even parity solution, solving EVEN system
-  case 4: // odd parity solution, solving ODD system
-  case 5: // multi mass CG, even parity solution, solving EVEN system
-  case 6: // multi mass CG, odd parity solution, solving ODD system
-
-    stag_matpc(ref, fat_link, long_link, out, mass, 0, tmp,
-               (test_type == 3 || test_type == 5) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY, dslash_type);
-    break;
+  } else if (inv_param.solution_type == QUDA_MATPC_SOLUTION) {
+    QudaParity parity = QUDA_INVALID_PARITY;
+    switch (inv_param.matpc_type) {
+      case QUDA_MATPC_EVEN_EVEN: parity = QUDA_EVEN_PARITY; break;
+      case QUDA_MATPC_ODD_ODD: parity = QUDA_ODD_PARITY; break;
+      default: errorQuda("Unexpected matpc_type %s", get_matpc_str(inv_param.matpc_type)); break;
+    }
+    stag_matpc(ref, fat_link, long_link, out, mass, 0, tmp, parity, dslash_type);
+  } else if (inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
+    stag_mat(tmp, fat_link, long_link, out, mass, dagger, dslash_type);
+    stag_mat(ref, fat_link, long_link, tmp, mass, 1 - dagger, dslash_type);
+  } else {
+    errorQuda("Invalid staggered solution type %d", inv_param.solution_type);
   }
 
   int len = 0;

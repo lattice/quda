@@ -104,6 +104,7 @@ void display_test_info()
 
 int main(int argc, char **argv)
 {
+  setQudaStaggeredDefaultInvTestParams();
   setQudaDefaultMgTestParams();
   // Parse command line options
   auto app = make_app();
@@ -111,16 +112,13 @@ int main(int argc, char **argv)
   add_deflation_option_group(app);
   add_multigrid_option_group(app);
   add_comms_option_group(app);
-  CLI::TransformPairs<int> test_type_map {{"full", 0}, {"full_ee_prec", 1}, {"full_oo_prec", 2}, {"even", 3},
-                                          {"odd", 4},  {"mcg_even", 5},     {"mcg_odd", 6}};
-  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
     return app->exit(e);
   }
   setVerbosity(verbosity);
-  if (!inv_multigrid) solve_type = QUDA_INVALID_SOLVE;
 
   if (inv_deflate && inv_multigrid) {
     printfQuda("Error: Cannot use both deflation and multigrid preconditioners on top level solve.\n");
@@ -135,13 +133,9 @@ int main(int argc, char **argv)
 
   initRand();
 
-  // Only these fermions are supported in this file. Ensure a reasonable default,
-  // ensure that the default is improved staggered
-  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
-    printfQuda("dslash_type %s not supported, defaulting to %s\n", get_dslash_str(dslash_type),
-               get_dslash_str(QUDA_ASQTAD_DSLASH));
-    dslash_type = QUDA_ASQTAD_DSLASH;
-  }
+  // Only these fermions are supported in this file
+  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH)
+    errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
 
   // Need to add support for LAPLACE MG?
   if (inv_multigrid) {
@@ -150,9 +144,6 @@ int main(int argc, char **argv)
       exit(0);
     }
   }
-
-  // Deduce operator, solution, and operator preconditioning types
-  if (!inv_multigrid) setQudaStaggeredInvTestParams();
 
   display_test_info();
 
@@ -310,27 +301,13 @@ int main(int argc, char **argv)
   std::vector<double> gflops(Nsrc);
   std::vector<int> iter(Nsrc);
 
-  // Pointers for split grid tests
-  std::vector<quda::ColorSpinorField *> _h_b(Nsrc, nullptr);
-  std::vector<quda::ColorSpinorField *> _h_x(Nsrc, nullptr);
+  // Populate `in` with random noise
+  for (int k = 0; k < Nsrc; k++) { quda::spinorNoise(*in[k], *rng, QUDA_NOISE_UNIFORM); }
 
   // QUDA invert test
   //----------------------------------------------------------------------------
 
-  if (test_type >= 0 && test_type <= 4) {
-    // case 0: // full parity solution, full parity system
-    // case 1: // full parity solution, solving EVEN EVEN prec system
-    // case 2: // full parity solution, solving ODD ODD prec system
-    // case 3: // even parity solution, solving EVEN system
-    // case 4: // odd parity solution, solving ODD system
-
-    if (multishift != 1) {
-      printfQuda("Multishift not supported for test %d\n", test_type);
-      exit(0);
-    }
-
-    for (int k = 0; k < Nsrc; k++) { quda::spinorNoise(*in[k], *rng, QUDA_NOISE_UNIFORM); }
-
+  if (multishift == 1) {
     if (!use_split_grid) {
       for (int k = 0; k < Nsrc; k++) {
         if (inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -363,17 +340,11 @@ int main(int argc, char **argv)
 
     for (int k = 0; k < Nsrc; k++) {
       if (verify_results)
-        verifyStaggeredInversion(*tmp, *ref, *in[k], *out[k], mass, *cpuFat, *cpuLong, gauge_param, inv_param, 0);
+        verifyStaggeredInversion(*tmp, *ref, *in[k], *out[k], mass, *cpuFat, *cpuLong, inv_param, 0);
     }
-  } else if (test_type == 5 || test_type == 6) {
-    // case 5: // multi mass CG, even parity solution, solving EVEN system
-    // case 6: // multi mass CG, odd parity solution, solving ODD system
-
+  } else if (multishift > 1) {
     if (use_split_grid)
       errorQuda("Multishift currently doesn't support split grid.\n");
-
-    if (multishift < 2)
-      errorQuda("Multishift inverter requires more than one shift, multishift = %d\n", multishift);
 
     inv_param.num_offset = multishift;
 
@@ -418,11 +389,11 @@ int main(int argc, char **argv)
 
       for (int i = 0; i < multishift; i++) {
         printfQuda("%dth solution: mass=%f, ", i, masses[i]);
-        verifyStaggeredInversion(*tmp, *ref, *in[k], qudaOutArray[i], masses[i], *cpuFat, *cpuLong, gauge_param, inv_param, i);
+        verifyStaggeredInversion(*tmp, *ref, *in[k], qudaOutArray[i], masses[i], *cpuFat, *cpuLong, inv_param, i);
       }
     }
   } else {
-    errorQuda("Unsupported test type");
+    errorQuda("Invalid number of shifts %d", multishift);
   } // switch
 
   // Compute timings
@@ -456,11 +427,6 @@ int main(int argc, char **argv)
   for (auto out_vec : out) { delete out_vec; }
   delete ref;
   delete tmp;
-
-  if (use_split_grid) {
-    for (auto p : _h_b) { delete p; }
-    for (auto p : _h_x) { delete p; }
-  }
 
   // Finalize the QUDA library
   endQuda();
