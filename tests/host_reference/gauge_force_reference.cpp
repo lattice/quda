@@ -446,7 +446,7 @@ void gauge_force_reference_dir(void *refMom, int dir, double eb3, void *const *s
                                QudaPrecision prec, int **path_dir, int *length, void *loop_coeff, int num_paths,
                                const lattice_t &lat, bool compute_force)
 {
-  size_t size = V * 2 * lat.n_color * lat.n_color * prec;
+  size_t size = size_t(V) * 2 * lat.n_color * lat.n_color * prec;
   void *staple = safe_malloc(size);
   memset(staple, 0, size);
 

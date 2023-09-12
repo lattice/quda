@@ -1205,9 +1205,9 @@ void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda
   QudaPrecision precision = oprod.Precision();
 
 #ifdef MULTI_GPU
-  int len = Vh_ex * 2;
+  uint64_t len = Vh_ex * 2;
 #else
-  int len = 1;
+  uint64_t len = 1;
   for (int dir = 0; dir < 4; ++dir) len *= X_[dir];
 #endif
   // allocate memory for temporary fields
