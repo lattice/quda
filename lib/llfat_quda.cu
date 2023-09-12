@@ -186,7 +186,7 @@ namespace quda {
 
     if ( ((fat.X()[0] % 2 != 0) || (fat.X()[1] % 2 != 0) || (fat.X()[2] % 2 != 0) || (fat.X()[3] % 2 != 0))
 	&& (u.Reconstruct()  != QUDA_RECONSTRUCT_NO)){
-      errorQuda("Reconstruct %d and odd dimensionsize is not supported by link fattening code (yet)\n",
+      errorQuda("Reconstruct %d and odd dimension size is not supported by link fattening code (yet)",
 		u.Reconstruct());
     }
 
