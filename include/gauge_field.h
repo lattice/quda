@@ -53,7 +53,7 @@ namespace quda {
 
     QudaFieldCreate create = QUDA_REFERENCE_FIELD_CREATE; // used to determine the type of field created
 
-    QudaFieldGeometry geometry = QUDA_VECTOR_GEOMETRY; // whether the field is a scale, vector or tensor
+    QudaFieldGeometry geometry = QUDA_VECTOR_GEOMETRY; // whether the field is a scalar, vector or tensor
 
     // whether we need to compute the fat link maxima
     // FIXME temporary flag until we have a kernel that can do this, then we just do this in copy()
