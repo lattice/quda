@@ -88,24 +88,16 @@ int main(int argc, char **argv)
 
   // Sanity check: if you pass in a gauge field, want to test the asqtad/hisq dslash,
   // and don't ask to build the fat/long links... it doesn't make sense.
-  if (latfile.size() > 0 && !compute_fatlong && dslash_type == QUDA_ASQTAD_DSLASH) {
+  if (latfile.size() > 0 && !compute_fatlong && dslash_type == QUDA_ASQTAD_DSLASH)
     errorQuda(
       "Cannot load a gauge field and test the ASQTAD/HISQ operator without setting \"--compute-fat-long true\".");
-  }
 
   // Set n_naiks to 2 if eps_naik != 0.0
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    if (eps_naik != 0.0) {
-      if (compute_fatlong) {
-        n_naiks = 2;
-        printfQuda("Note: epsilon-naik != 0, testing epsilon correction links.\n");
-      } else {
-        eps_naik = 0.0;
-        printfQuda("Not computing fat-long, ignoring epsilon correction.\n");
-      }
-    } else {
-      printfQuda("Note: epsilon-naik = 0, testing original HISQ links.\n");
-    }
+  if (eps_naik != 0.0) {
+    if (compute_fatlong)
+      n_naiks = 2;
+    else
+      eps_naik = 0.0; // to avoid potential headaches
   }
 
   if (dslash_type == QUDA_LAPLACE_DSLASH && dtest_type != dslash_test_type::Mat)
