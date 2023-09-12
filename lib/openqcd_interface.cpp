@@ -203,13 +203,22 @@ static QudaGaugeParam newOpenQCDGaugeParam(const int *dim, QudaPrecision prec)
   gParam.type = QUDA_SU3_LINKS;
 
   gParam.reconstruct_sloppy = gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+
+  /**
+   * This instantiates the object OpenQCDOrder
+   */
   gParam.gauge_order = QUDA_OPENQCD_GAUGE_ORDER;
+
+  /**
+   * Seems to have no effect ...
+   */
   gParam.t_boundary = QUDA_PERIODIC_T;
+
   gParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gParam.scale = 1.0;
   gParam.anisotropy = 1.0;
-  gParam.tadpole_coeff = 1.0;
-  gParam.scale = 0;
+  //gParam.tadpole_coeff = 1.0;
+  //gParam.scale = 0;
   gParam.ga_pad = getLinkPadding(dim); /* Why this? */
 
   return gParam;
@@ -401,6 +410,8 @@ void openQCD_gaugeload(void *gauge)
 {
   QudaGaugeParam qudaGaugeParam = newOpenQCDGaugeParam(localDim, QUDA_DOUBLE_PRECISION);
 
+  printQudaGaugeParam(&qudaGaugeParam);
+
   void* buffer = malloc(4*input.volume*input.sizeof_su3_dble);
   input.reorder_gauge_openqcd_to_quda(gauge, buffer);
   input.gauge = gauge;
@@ -437,7 +448,7 @@ void openQCD_qudaSetDslashOptions(double kappa, double mu)
   invertParam.inv_type = QUDA_CG_INVERTER; /* just set some */
   invertParam.kappa = kappa;
   invertParam.dagger = QUDA_DAG_NO;
-  invertParam.mass_normalization = QUDA_KAPPA_NORMALIZATION;
+  invertParam.mass_normalization = QUDA_MASS_NORMALIZATION; /* what is the difference? only works with QUDA_MASS_NORMALIZATION */
   invertParam.Ls = 1;       /**< Extent of the 5th dimension (for domain wall) */
   invertParam.mu = mu;    /**< Twisted mass parameter */
   /*invertParam.tm_rho = ?;*/  /**< Hasenbusch mass shift applied like twisted mass to diagonal (but not inverse) */
