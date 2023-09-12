@@ -4055,7 +4055,7 @@ void saveGaugeFieldQuda(void *gauge, void *inGauge, QudaGaugeParam *param)
 {
   auto* cudaGauge = reinterpret_cast<GaugeField*>(inGauge);
 
-  GaugeFieldParam gParam(*param, gauge, QUDA_GENERAL_LINKS);
+  GaugeFieldParam gParam(*param, gauge);
   gParam.geometry = cudaGauge->Geometry();
 
   GaugeField cpuGauge(gParam);
