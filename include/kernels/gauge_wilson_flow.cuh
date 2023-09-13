@@ -58,12 +58,12 @@ namespace quda
 
 
   template <typename Arg>
-  struct computeStapleOps {
+  struct computeStapleOpsWF {
     using real = typename Arg::real;
     using Link = Matrix<complex<real>, Arg::nColor>;
     using StapOp = ThreadLocalCache<Link>;
     using RectOp = ThreadLocalCache<Link,0,StapOp>;
-    using Ops = SpecialOps<StapOp,RectOp>;
+    using Ops = SpecialOps<StapOp,RectOp,computeStapleOps,computeStapleRectangleOps>;
   };
 
   //template <typename Arg>
@@ -80,7 +80,7 @@ namespace quda
     switch (arg.wflow_type) {
     case QUDA_GAUGE_SMEAR_WILSON_FLOW :
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, x, arg.E, parity, dir, Z, Arg::wflow_dim);
+      computeStaple(ftor, x, arg.E, parity, dir, Z, Arg::wflow_dim);
       break;
     case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW :
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
@@ -92,7 +92,7 @@ namespace quda
       //typename computeStapleOps<Arg>::RectOp Rect(ftor);
       ThreadLocalCache<Link> Stap{ftor};
       ThreadLocalCache<Link,0,decltype(Stap)> Rect{ftor};
-      computeStapleRectangle(arg, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim);
+      computeStapleRectangle(ftor, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim);
       Z = arg.coeff1x1 * static_cast<const Link &>(Stap) + arg.coeff2x1 * static_cast<const Link &>(Rect);
       break;
     }
@@ -160,7 +160,7 @@ namespace quda
 
   // Wilson Flow as defined in https://arxiv.org/abs/1006.4518v3
   //template <typename Arg_> struct WFlow
-  template <typename Arg_> struct WFlow : computeStapleOps<Arg_>::Ops
+  template <typename Arg_> struct WFlow : computeStapleOpsWF<Arg_>::Ops
   {
     using Arg = Arg_;
     const Arg &arg;

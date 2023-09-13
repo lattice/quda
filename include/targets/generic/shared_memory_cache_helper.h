@@ -3,6 +3,7 @@
 #include <helpers.h>
 #include <target_device.h>
 #include <shared_memory_helper.h>
+#include <special_ops.h>
 
 /**
    @file shared_memory_cache_helper.h
@@ -129,6 +130,8 @@ namespace quda
     {
       static_assert(shared_mem_size(dim3{8,8,8})==Smem::get_offset(dim3{8,8,8})+SizeDims<D>::size(dim3{8,8,8})*sizeof(T));
     }
+
+    constexpr SharedMemoryCache(const SharedMemoryCache<T,D,O> &) = delete;
 
     /**
        @brief Grab the raw base address to shared memory.

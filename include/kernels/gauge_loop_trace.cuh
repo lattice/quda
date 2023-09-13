@@ -71,7 +71,7 @@ namespace quda {
       getCoords(x, x_cb, arg.X, parity);
       for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-      thread_array<int, 4> dx{0};
+      thread_array<int, 4> dx{};
 
       double coeff_loop = arg.factor * arg.p.path_coeff[path_id];
       if (coeff_loop == 0) return operator()(loop_trace, value);

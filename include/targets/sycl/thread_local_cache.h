@@ -4,6 +4,10 @@
 
 #include "../generic/thread_local_cache.h"
 
+namespace quda {
+  template <typename T, int N, typename O> static constexpr bool needsFullBlock<ThreadLocalCache<T,N,O>> = false;
+}
+
 #else
 
 namespace quda

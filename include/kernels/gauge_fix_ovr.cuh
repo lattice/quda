@@ -127,11 +127,21 @@ namespace quda {
     }
   };
 
+  template <typename Arg> using computeFixOps2 =
+    std::conditional_t<Arg::type==3,GaugeFixHit_NoAtomicAdd2Ops<typename Arg::real>,
+		       std::conditional_t<Arg::type==4,GaugeFixHit_AtomicAdd2Ops<typename Arg::real>,
+					  GaugeFixHit_NoAtomicAdd_LessSM2Ops<typename Arg::real>>>;
+  template <typename Arg> using computeFixOps =
+    std::conditional_t<Arg::type==0,GaugeFixHit_NoAtomicAddOps<typename Arg::real>,
+		       std::conditional_t<Arg::type==1,GaugeFixHit_AtomicAddOps<typename Arg::real>,
+					  std::conditional_t<Arg::type==2,GaugeFixHit_NoAtomicAdd_LessSMOps<typename Arg::real>,
+							     computeFixOps2<Arg> >>>;
   /**
    * @brief Perform gauge fixing with overrelaxation
    */
   //template <typename Arg> struct computeFix : SpecialOps<SharedMemoryCache<array<typename Arg::real,4>>> {
-  template <typename Arg> struct computeFix : SpecialOps<SharedMemoryCache<typename Arg::real>> {
+  //template <typename Arg> struct computeFix : SpecialOps<SharedMemoryCache<typename Arg::real>> {
+  template <typename Arg> struct computeFix : computeFixOps<Arg> {
     const Arg &arg;
     constexpr computeFix(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -166,7 +176,7 @@ namespace quda {
         X[dr] += 2 * arg.border[dr];
       }
 
-      if (Arg::type < 3) {
+      if constexpr (Arg::type < 3) {
         // 8 threads per lattice site
         int dim = mu;
         if (dim >= 4) {
@@ -183,17 +193,19 @@ namespace quda {
 	Link link;
 	if (!allthreads || active) link = arg.u(dim, idx, parity);
 
-        switch (Arg::type) {
-        //switch (0) {
+        if constexpr (Arg::type == 0) {
           // 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
           // this implementation needs 8x more shared memory than the implementation using atomicadd
-        case 0: GaugeFixHit_NoAtomicAdd<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu, *this); break;
+	  GaugeFixHit_NoAtomicAdd<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu, *this);
+	}
+        if constexpr (Arg::type == 1) {
           // 8 threads per lattice site, the reduction is performed by shared memory using atomicadd
-        case 1: GaugeFixHit_AtomicAdd<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu, *this); break;
+	  GaugeFixHit_AtomicAdd<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu, *this);
+	}
+        if constexpr (Arg::type == 2) {
           // 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
           // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
-        case 2: GaugeFixHit_NoAtomicAdd_LessSM<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu, *this); break;
-        default: break;
+	  GaugeFixHit_NoAtomicAdd_LessSM<real, Arg::gauge_dir, 3>(link, arg.relax_boost, mu, *this);
         }
 
 	if (!allthreads || active) arg.u(dim, idx, parity) = link;
@@ -213,17 +225,19 @@ namespace quda {
         Link link1;
 	if (!allthreads || active) link1 = arg.u(mu, idx1, 1 - parity);
 
-        switch (Arg::type) {
-        //switch (3) {
+        if constexpr (Arg::type == 3) {
           // 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
           // this implementation needs 4x more shared memory than the implementation using atomicadd
-        case 3: GaugeFixHit_NoAtomicAdd<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu, *this); break;
+	  GaugeFixHit_NoAtomicAdd<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu, *this);
+	}
+        if constexpr (Arg::type == 4) {
           // 4 threads per lattice site, the reduction is performed by shared memory using atomicadd
-        case 4: GaugeFixHit_AtomicAdd<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu, *this); break;
+	  GaugeFixHit_AtomicAdd<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu, *this);
+	}
+        if constexpr (Arg::type == 5) {
           // 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
           // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
-        case 5: GaugeFixHit_NoAtomicAdd_LessSM<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu, *this); break;
-        default: break;
+	  GaugeFixHit_NoAtomicAdd_LessSM<real, Arg::gauge_dir, 3>(link, link1, arg.relax_boost, mu, *this);
         }
 
 	if (!allthreads || active) {

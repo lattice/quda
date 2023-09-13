@@ -35,13 +35,17 @@ namespace quda {
     inline qudaError_t
     launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
+#if 0
       auto smemsize = sharedMemSize<getSpecialOps<Functor<Arg>>>(tp.block);
       if (smemsize < tp.shared_bytes) {
-	warningQuda("Shared bytes mismatch kernel: %zu  tp: %i\n", smemsize, tp.shared_bytes);
+	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
+	warningQuda("Shared bytes mismatch kernel: %u  tp: %u\n", smemsize, tp.shared_bytes);
       }
       if (smemsize > tp.shared_bytes) {
-	errorQuda("Shared bytes mismatch kernel: %zu  tp: %i\n", smemsize, tp.shared_bytes);
+	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
+	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", smemsize, tp.shared_bytes);
       }
+#endif
       using launcher_t = qudaError_t(*)(const TuneParam &, const qudaStream_t &, const Arg &);
       auto f = reinterpret_cast<launcher_t>(const_cast<void *>(kernel.func));
       launch_error = f(tp, stream, arg);
@@ -168,10 +172,10 @@ namespace quda {
 	//auto smemsize = sharedMemSize<typename F::SpecialOpsT>(block, arg);
 	auto smemsize = sharedMemSize<typename F::SpecialOpsT>(block);
 	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-	  printfQuda("  Allocating local mem size: %lu\n", smemsize);
+	  printfQuda("  Allocating local mem size: %u\n", smemsize);
 	}
 	if (smemsize > device::max_dynamic_shared_memory()) {
-	  warningQuda("Local mem request too large %lu > %lu\n", smemsize, device::max_dynamic_shared_memory());
+	  warningQuda("Local mem request too large %u > %lu\n", smemsize, device::max_dynamic_shared_memory());
 	  return QUDA_ERROR;
 	}
 	q.submit([&](sycl::handler &h) {
@@ -224,10 +228,10 @@ namespace quda {
 	//auto smemsize = sharedMemSize<typename F::SpecialOpsT>(block, arg);
 	auto smemsize = sharedMemSize<typename F::SpecialOpsT>(block);
 	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-	  printfQuda("  Allocating local mem size: %lu\n", smemsize);
+	  printfQuda("  Allocating local mem size: %u\n", smemsize);
 	}
 	if (smemsize > device::max_dynamic_shared_memory()) {
-	  warningQuda("Local mem request too large %lu > %lu\n", smemsize, device::max_dynamic_shared_memory());
+	  warningQuda("Local mem request too large %u > %lu\n", smemsize, device::max_dynamic_shared_memory());
 	  return QUDA_ERROR;
 	}
 	q.submit([&](sycl::handler &h) {

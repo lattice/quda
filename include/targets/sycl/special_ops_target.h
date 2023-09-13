@@ -141,27 +141,27 @@ namespace quda {
   struct depNone {};
   template <> struct sharedMemSizeS<depNone> {
     template <typename ...Arg>
-    static constexpr size_t size(dim3 block, Arg &...arg) { return 0; }
+    static constexpr unsigned int size(dim3 block, Arg &...arg) { return 0; }
   };
 
   struct depFullBlock {};
   template <> struct sharedMemSizeS<depFullBlock> {
     template <typename ...Arg>
-    static constexpr size_t size(dim3 block, Arg &...arg) { return 0; }
+    static constexpr unsigned int size(dim3 block, Arg &...arg) { return 0; }
   };
 
   template <typename T, typename S>
   struct depSharedMem {};
   template <typename T, typename S> struct sharedMemSizeS<depSharedMem<T,S>> {
     template <typename ...Arg>
-    static constexpr size_t size(dim3 block, Arg &...arg) { return S().template size<T>(block, arg...); }
+    static constexpr unsigned int size(dim3 block, Arg &...arg) { return S().template size<T>(block, arg...); }
   };
 
   // op implementations
   struct op_blockSync : op_BaseT<void> {
     using dependencies = depFullBlock;
     template <typename ...Arg>
-    static constexpr size_t shared_mem_size(dim3 block, Arg &...arg) { return 0; }
+    static constexpr unsigned int shared_mem_size(dim3 block, Arg &...arg) { return 0; }
   };
 
   template <typename T>
@@ -169,7 +169,7 @@ namespace quda {
     using dependencies = depNone;
     //using dependencies = depFullBlock;
     template <typename ...Arg>
-    static constexpr size_t shared_mem_size(dim3 block, Arg &...arg) { return 0; }
+    static constexpr unsigned int shared_mem_size(dim3 block, Arg &...arg) { return 0; }
   };
 
   template <typename T, int N>
@@ -197,12 +197,13 @@ namespace quda {
   struct op_SharedMemory : op_BaseT<T> {
     using dependencies = depSharedMem<T,S>;
     template <typename ...Arg>
-    static constexpr size_t shared_mem_size(dim3 block, Arg &...arg) { return S::template size<T>(block, arg...); }
+    static constexpr unsigned int shared_mem_size(dim3 block, Arg &...arg) { return S::template size<T>(block, arg...); }
   };
 
   // needsFullWarp?
 
   // needsFullBlock
+#if 0
   template <typename T> static constexpr bool needsFullBlock = needsFullBlock<getSpecialOps<T>>;
   template <typename ...T> static constexpr bool needsFullBlockImpl = (needsFullBlockImpl<T> || ...);
   template <> static constexpr bool needsFullBlockImpl<depNone> = false;
@@ -225,9 +226,15 @@ namespace quda {
   template <typename T> static constexpr bool needsFullBlockImpl<T> = needsFullBlockF<T>();
   template <> static constexpr bool needsFullBlock<NoSpecialOps> = false;
   template <typename ...T> static constexpr bool needsFullBlock<SpecialOps<T...>> = needsFullBlockImpl<T...>;
+#else
+  template <typename T> static constexpr bool needsFullBlock = needsFullBlock<getSpecialOps<T>>;
+  template <typename ...T> static constexpr bool needsFullBlock<SpecialOps<T...>> = (needsFullBlock<T> || ...);
+  template <> static constexpr bool needsFullBlock<NoSpecialOps> = false;
+#endif
+
 
   // needsSharedMem
-#if 1
+#if 0
   template <typename T> static constexpr bool needsSharedMem = needsSharedMem<getSpecialOps<T>>;
   template <typename ...T> static constexpr bool needsSharedMemImpl = (needsSharedMemImpl<T> || ...);
   template <> static constexpr bool needsSharedMemImpl<depNone> = false;
@@ -252,7 +259,12 @@ namespace quda {
   template <> static constexpr bool needsSharedMem<NoSpecialOps> = false;
   template <typename ...T> static constexpr bool needsSharedMem<SpecialOps<T...>> = needsSharedMemImpl<T...>;
 #else
-  //template <typename T> static constexpr bool needsSharedMem() { return T::shared_mem_size(
+  //template <typename ...T> static constexpr bool needsSharedMemImpl = (needsSharedMemImpl<T> || ...);
+  template <typename T> static constexpr bool needsSharedMemImpl = (T::shared_mem_size(dim3{8,8,8}) > 0);
+  template <typename... T> static constexpr bool needsSharedMemImpl<SpecialOps<T...>> = (needsSharedMemImpl<T> || ...);
+  template <typename T> static constexpr bool needsSharedMem = needsSharedMem<getSpecialOps<T>>;
+  template <typename... T> static constexpr bool needsSharedMem<SpecialOps<T...>> = (needsSharedMemImpl<T> || ...);
+  template <> static constexpr bool needsSharedMem<NoSpecialOps> = false;
 #endif
 
   // tests
@@ -276,9 +288,9 @@ namespace quda {
   static_assert(hasSpecialOpType<opTestC1,opTest1>);
   static_assert(!hasSpecialOpType<op_thread_array<bool,4>,opTest1>);
 
-  static_assert(sharedMemSize<opTest1>(dim3(0,0,0))==std::max((size_t)100,0*sizeof(double)));
-  static_assert(sharedMemSize<opTest1>(dim3(1,2,5))==std::max({(size_t)100,10*sizeof(double),40*sizeof(float)}));
-  static_assert(sharedMemSize<opTest1>(dim3(2,5,10))==std::max({(size_t)100,100*sizeof(double),400*sizeof(float)}));
+  static_assert(sharedMemSize<opTest1>(dim3(0,0,0))==std::max((unsigned int)100,0*sizeof(double)));
+  static_assert(sharedMemSize<opTest1>(dim3(1,2,5))==std::max({(unsigned int)100,10*sizeof(double),40*sizeof(float)}));
+  static_assert(sharedMemSize<opTest1>(dim3(2,5,10))==std::max({(unsigned int)100,100*sizeof(double),400*sizeof(float)}));
 #endif
 
 #if 0

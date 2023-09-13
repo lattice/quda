@@ -26,10 +26,10 @@ namespace quda
     static constexpr int N = N_; // size of array, 0 means to behave like T instead of array<T, 1>
     using offset_type = O; // type of object that may also use shared memory at the same time and is located before this one
     static constexpr int len = std::max(1,N); // actual number of elements to store
-    using Smem = SharedMemory<atom_t<T>, SizePerThread<std::max(1,N_)*sizeof(T)/sizeof(atom_t<T>)>, O>;
-    using Smem::smem;
-    using Smem::shared_mem_size;
-    using opSmem = op_SharedMemory<T, SizeSmem<Smem>>;
+    using SharedMemoryT = SharedMemory<atom_t<T>, SizePerThread<std::max(1,N_)*sizeof(T)/sizeof(atom_t<T>)>, O>;
+    using SharedMemoryT::smem;
+    using SharedMemoryT::shared_mem_size;
+    using opSmem = op_SharedMemory<T, SizeSmem<SharedMemoryT>>;
     using dependencies = opSmem;
     using dependentOps = SpecialOps<opSmem>;
 
@@ -41,8 +41,6 @@ namespace quda
     static constexpr int n_element = sizeof(T) / sizeof(atom_t);
 
     const int stride;
-
-    //constexpr Smem smem() const { return *dynamic_cast<const Smem*>(this); }
 
     __device__ __host__ inline void save_detail(const T &a, const int k) const
     {
@@ -69,12 +67,14 @@ namespace quda
        @brief Constructor for ThreadLocalCache.
     */
     constexpr ThreadLocalCache() : stride(target::block_size<3>()) {
-      static_assert(shared_mem_size(dim3{8,8,8})==Smem::get_offset(dim3{8,8,8})+SizePerThread<len>::size(dim3{8,8,8})*sizeof(T));
+      static_assert(shared_mem_size(dim3{8,8,8})==SharedMemoryT::get_offset(dim3{8,8,8})+SizePerThread<len>::size(dim3{8,8,8})*sizeof(T));
     }
 
     template <typename ...U>
-    constexpr ThreadLocalCache(const SpecialOps<U...> &ops) : Smem(getDependentOps<ThreadLocalCache<T,N,O>>(ops)), stride(target::block_size<3>()) {
-      static_assert(shared_mem_size(dim3{8,8,8})==Smem::get_offset(dim3{8,8,8})+SizePerThread<len>::size(dim3{8,8,8})*sizeof(T));
+    constexpr ThreadLocalCache(const SpecialOps<U...> &ops) :
+      SharedMemoryT(getDependentOps<ThreadLocalCache<T,N,O>>(ops)), stride(target::block_size<3>()) {
+      static_assert(shared_mem_size(dim3{8,8,8})==
+		    SharedMemoryT::get_offset(dim3{8,8,8})+SizePerThread<len>::size(dim3{8,8,8})*sizeof(T));
     }
 
     /**

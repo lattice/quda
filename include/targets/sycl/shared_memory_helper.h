@@ -21,22 +21,20 @@ namespace quda
    */
   template <typename T, typename S, typename O = void> class SharedMemory
   {
-  public:
-    using value_type = T;
-
-  private:
     sycl::local_ptr<T> data;
     const unsigned int size;  // number of elements of type T
 
   public:
-    static constexpr size_t get_offset(dim3 block)
+    using value_type = T;
+
+    static constexpr unsigned int get_offset(dim3 block)
     {
       unsigned int o = 0;
       if constexpr (!std::is_same_v<O, void>) { o = O::shared_mem_size(block); }
       return o;
     }
 
-    static constexpr size_t shared_mem_size(dim3 block)
+    static constexpr unsigned int shared_mem_size(dim3 block)
     {
       return get_offset(block) + S::size(block)*sizeof(T);
     }

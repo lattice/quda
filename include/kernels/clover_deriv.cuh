@@ -38,9 +38,11 @@ namespace quda
     }
   };
 
-  template <typename Link, typename Arg>
-  __device__ __host__ void computeForce(Link &force_total, const Arg &arg, int xIndex, int yIndex, int mu, int nu)
+  using computeForceOps = SpecialOps<thread_array<int, 4>>;
+  template <typename Link, typename Ftor>
+  __device__ __host__ void computeForce(Link &force_total, const Ftor &ftor, int xIndex, int yIndex, int mu, int nu)
   {
+    const auto &arg = ftor.arg;
     const int otherparity = (1 - arg.parity);
     const int tidx = mu > nu ? (mu - 1) * mu / 2 + nu : (nu - 1) * nu / 2 + mu;
 
@@ -51,7 +53,7 @@ namespace quda
 
       // U[mu](x) U[nu](x+mu) U[*mu](x+nu) U[*nu](x) Oprod(x)
       {
-        thread_array<int, 4> d = { };
+        thread_array<int, 4> d{ftor};
 
         // load U(x)_(+mu)
         Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), arg.parity);
@@ -83,7 +85,7 @@ namespace quda
       }
 
       {
-        thread_array<int, 4> d = { };
+        thread_array<int, 4> d{ftor};
 
         // load U(x-nu)(+nu)
         d[nu]--;
@@ -125,7 +127,7 @@ namespace quda
       getCoordsExtended(y, xIndex, arg.X, otherparity, arg.border);
 
       {
-        thread_array<int, 4> d = { };
+        thread_array<int, 4> d{ftor};
 
         // load U(x)_(+mu)
         Link U1 = arg.gauge(mu, linkIndexShift(y, d, arg.E), otherparity);
@@ -161,7 +163,7 @@ namespace quda
       // Lower leaf
       // U[nu*](x-nu) U[mu](x-nu) U[nu](x+mu-nu) Oprod(x+mu) U[*mu](x)
       {
-        thread_array<int, 4> d = { };
+        thread_array<int, 4> d{ftor};
 
         // load U(x-nu)(+nu)
         d[nu]--;
@@ -200,7 +202,7 @@ namespace quda
 
   } // namespace quda
 
-  template <typename Arg> struct CloverDerivative
+  template <typename Arg> struct CloverDerivative : computeForceOps
   {
     const Arg &arg;
     constexpr CloverDerivative(const Arg &arg) : arg(arg) {}
@@ -217,7 +219,7 @@ namespace quda
 #pragma unroll
       for (int nu = 0; nu < 4; nu++) {
         if (nu == mu) continue;
-        computeForce(force, arg, x_cb, parity, mu, nu);
+        computeForce(force, *this, x_cb, parity, mu, nu);
       }
 
       // Write to array
