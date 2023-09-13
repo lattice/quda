@@ -17,13 +17,16 @@ extern "C" {
 #endif
 
 /**
- * Parameters related to problem size and machine topology.
+ * Parameters related to problem size and machine topology. They should hold the
+ * numbers in quda format, i.e. xyzt convention. For example L[0] = L1, L[1] =
+ * L2, ...
  */
 typedef struct {
-  const int *latsize;   /** Local lattice dimensions L0, L1, L2, L3 */
-  const int *machsize;  /** Machine grid size NPROC0, NPROC1, NPROC2, NPROC3*/
-  const int *blksize;   /** Blocking size NPROC0_BLK, NPROC1_BLK, NPROC2_BLK, NPROC3_BLK */
-  int device;           /** GPU device number */
+  int L[4];         /** Local lattice dimensions L0, L1, L2, L3 */
+  int nproc[4];     /** Machine grid size NPROC0, NPROC1, NPROC2, NPROC3*/
+  int nproc_blk[4]; /** Blocking size NPROC0_BLK, NPROC1_BLK, NPROC2_BLK, NPROC3_BLK */
+  int N[4];         /** Glocal lattice dimensions N0, N1, N2, N3 */
+  int device;       /** GPU device number */
 } openQCD_QudaLayout_t;
 
 /**
@@ -46,7 +49,8 @@ typedef struct {
 
 typedef struct {
   int initialized;    /** Whether openQCD_qudaInit() was called or not */
-  int gauge_loaded;   /** Whether openQCD_gaugeload() was called or not */
+  int gauge_loaded;   /** Whether openQCD_qudaGaugeLoad() was called or not */
+  int clover_loaded;  /** Whether openQCD_qudaCloverLoad() was called or not */
   int dslash_setup;   /** Whether openQCD_qudaSetDslashOptions() was called or not */
 } openQCD_QudaState_t;
 
@@ -94,12 +98,12 @@ typedef struct {
 
 
 /**
- * @brief      Setup Dslash
+ * @brief      Setup Dirac operator
  *
- * @param[in]  kappa  kappa
- * @param[in]  mu     twisted mass
+ * @param[in]  kappa   kappa
+ * @param[in]  mu      twisted mass
  */
-void openQCD_qudaSetDslashOptions(double kappa, double mu);
+void openQCD_qudaSetDwOptions(double kappa, double mu);
 
 
 /**
@@ -117,34 +121,12 @@ void openQCD_qudaGamma(int dir, void *openQCD_in, void *openQCD_out);
  * @brief      Apply the Wilson-Clover Dirac operator to a field. All fields
  *             passed and returned are host (CPU) fields in openQCD order.
  *
- * @param[in]  src                 Source spinor field
- * @param[out] dst                 Destination spinor field
+ * @param[in]  src     Source spinor field
+ * @param[out] dst     Destination spinor field
+ * @param[in]  dagger  Whether we are using the Hermitian conjugate system or
+ *                     not (QUDA_DAG_NO or QUDA_DAG_YES)
  */
-void openQCD_qudaDslash(void *src, void *dst);
-
-
-/**
- * @brief      Set metadata, options for Dslash.
- *
- * @param[in]  external_precision  Precision of host fields passed to QUDA (2 - double, 1 - single)
- * @param[in]  quda_precision      Precision for QUDA to use (2 - double, 1 - single)
- * @param[in]  inv_args            Struct containing arguments, metadata
- */
-/*void openQCD_qudaSetDslashOptions(int external_precision, int quda_precision, openQCD_QudaInvertArgs_t inv_args);*/
-
-/**
- * ALL the following except the Dirac operator application
- * Apply the improved staggered operator to a field. All fields
- * passed and returned are host (CPU) field in MILC order.
- *
- * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
- * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
- * @param inv_args Struct setting some solver metadata
- * @param source Right-hand side source field
- * @param solution Solution spinor field
- */
-void openQCD_colorspinorloadsave(int external_precision, int quda_precision, openQCD_QudaInvertArgs_t inv_args, void *src,
-                        void *dst, void *gauge);
+void openQCD_qudaDw(void *src, void *dst, QudaDagType dagger);
 
 
 /**
@@ -184,25 +166,48 @@ double openQCD_qudaPlaquette(void);
 
 
 /**
- * @brief      Load the gauge fields from host to quda
+ * @brief      Load the gauge fields from host to quda.
  *
  * @param[in]  gauge      The gauge fields (in openqcd order)
  */
-void openQCD_gaugeload(void *gauge);
+void openQCD_qudaGaugeLoad(void *gauge);
 
 
 /**
- * @brief      Save the gauge fields from quda to host
+ * @brief      Save the gauge fields from quda to host.
  *
  * @param[out] gauge      The gauge fields (will be stored in openqcd order)
  */
-void openQCD_gaugesave(void *gauge);
+void openQCD_qudaGaugeSave(void *gauge);
 
 
 /**
-   Free the gauge field allocated in QUDA.
+ * @brief      Free the gauge field allocated in quda.
  */
-void openQCD_qudaFreeGaugeField(void);
+void openQCD_qudaGaugeFree(void);
+
+
+/**
+ * @brief      Load the clover fields from host to quda.
+ *
+ * @param[in]  clover      The clover fields (in openqcd order)
+ */
+void openQCD_qudaCloverLoad(void *clover);
+
+
+/**
+ * @brief      Calculates the clover field and its inverse
+ *
+ * @param[in]  su3csw  The csw coefficient
+ */
+void openQCD_qudaCloverCreate(double su3csw);
+
+
+/**
+ * @brief      Free the clover field allocated in quda.
+ */
+void openQCD_qudaCloverFree(void);
+
 
 #ifdef __cplusplus
 }

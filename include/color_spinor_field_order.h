@@ -1769,7 +1769,7 @@ namespace quda
       {
         int xb[4], xn[4], ib, in, is, cbs[4], mu, L_[4];
 
-        rotate_coords(L, L_);
+        rotate_coords(L, L_); // L_ local lattice dimensions in openQCD format (txyz)
 
         /* cache_block */
         for (mu=1;mu<4;mu++) {
@@ -1951,9 +1951,6 @@ namespace quda
   template <typename T, int Ns, int Nc> struct colorspinor_order_mapper<T, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, Ns, Nc> {
     typedef colorspinor::SpaceSpinorColorOrder<T, Ns, Nc> type;
   };
-  // template <typename T, int Ns, int Nc> struct colorspinor_order_mapper<T, QUDA_OPENQCD_FIELD_ORDER, Ns, Nc> {
-  //   typedef colorspinor::OpenQCDDiracOrder<T, Ns, Nc> type;
-  // }; // TODO: ?
   template <typename T, int Ns, int Nc> struct colorspinor_order_mapper<T, QUDA_FLOAT2_FIELD_ORDER, Ns, Nc> {
     typedef colorspinor::FloatNOrder<T, Ns, Nc, 2> type;
   };

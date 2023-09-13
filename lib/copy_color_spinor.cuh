@@ -174,7 +174,6 @@ namespace quda {
 
 #ifdef BUILD_OPENQCD_INTERFACE
       using ColorSpinor = OpenQCDDiracOrder<FloatIn, Ns, Nc>; // TODO: Seems OK
-      //using ColorSpinor = SpaceSpinorColorOrder<FloatIn, Ns, Nc>; // FIXME: This is a test
       genericCopyColorSpinor<Ns, Nc, ColorSpinor>(param);
 #else
       errorQuda("OpenQCD interface has not been built\n");
