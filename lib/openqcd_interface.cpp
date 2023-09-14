@@ -46,9 +46,7 @@ static const int num_colors = sizeof(colors) / sizeof(uint32_t);
 #define POP_RANGE
 #endif
 
-static openQCD_QudaInitArgs_t input;
-static QudaInvertParam invertParam;
-static openQCD_QudaState_t qudaState = {false, false, false, false};
+static openQCD_QudaState_t qudaState = {false, false, false, false, {}, {}};
 
 using namespace quda;
 
@@ -64,9 +62,9 @@ static lat_dim_t get_local_dims(int *fill = nullptr)
 
   for (int i=0; i<4; i++) {
     if (fill) {
-      fill[i] = input.layout.L[i];
+      fill[i] = qudaState.layout.L[i];
     } else {
-      X[i] = input.layout.L[i];
+      X[i] = qudaState.layout.L[i];
     }
   }
 
@@ -196,48 +194,20 @@ static QudaGaugeParam newOpenQCDGaugeParam(QudaPrecision prec)
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   param.scale = 1.0;
   param.anisotropy = 1.0; // 1.0 means not anisotropic
-  //param.tadpole_coeff = 1.0;
-  //param.scale = 0;
   param.ga_pad = getLinkPadding(param.X); /* Why this? */
 
   return param;
 }
 
 
-/**
- * @brief      Initialize clover param struct
- *
- * @param[in]  kappa   hopping parameter
- * @param[in]  su3csw  The su 3 csw
- *
- * @return     The quda gauge parameter struct.
- */
-static QudaInvertParam newOpenQCDCloverParam(double kappa, double su3csw)
-{
-  QudaInvertParam param = newOpenQCDParam();
-
-  param.clover_location = QUDA_CPU_FIELD_LOCATION;
-  param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
-  param.clover_cuda_prec = QUDA_DOUBLE_PRECISION;
-  param.clover_order = QUDA_FLOAT8_CLOVER_ORDER; /*QUDA_OPENQCD_CLOVER_ORDER; */
-
-  param.compute_clover = true;
-  param.kappa = kappa;
-  param.clover_csw = su3csw;
-  param.clover_coeff = 0.0;
-  param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
-
-  return param;
-}
-
-
-void openQCD_qudaInit(openQCD_QudaInitArgs_t in)
+void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout)
 {
   if (qudaState.initialized) return;
-  input = in;
+  qudaState.init = init;
+  qudaState.layout = layout;
 
-  setVerbosityQuda(input.verbosity, "QUDA: ", input.logfile);
-  openQCD_qudaSetLayout(input.layout);
+  setVerbosityQuda(qudaState.init.verbosity, "QUDA: ", qudaState.init.logfile);
+  openQCD_qudaSetLayout(qudaState.layout);
   qudaState.initialized = true;
 }
 
@@ -281,9 +251,9 @@ void openQCD_qudaGaugeLoad(void *gauge)
 {
   QudaGaugeParam param = newOpenQCDGaugeParam(QUDA_DOUBLE_PRECISION);
 
-  void* buffer = malloc(4*input.volume*input.sizeof_su3_dble);
-  input.reorder_gauge_openqcd_to_quda(gauge, buffer);
-  input.gauge = gauge;
+  void* buffer = malloc(4*qudaState.init.volume*qudaState.init.sizeof_su3_dble);
+  qudaState.init.reorder_gauge_openqcd_to_quda(gauge, buffer);
+  qudaState.init.gauge = gauge;
   loadGaugeQuda(buffer, &param);
   free(buffer);
 
@@ -293,11 +263,11 @@ void openQCD_qudaGaugeLoad(void *gauge)
 
 void openQCD_qudaGaugeSave(void *gauge)
 {
-  QudaGaugeParam qudaGaugeParam = newOpenQCDGaugeParam(QUDA_DOUBLE_PRECISION);
+  QudaGaugeParam param = newOpenQCDGaugeParam(QUDA_DOUBLE_PRECISION);
 
-  void* buffer = malloc(4*input.volume*input.sizeof_su3_dble);
-  saveGaugeQuda(buffer, &qudaGaugeParam);
-  input.reorder_gauge_quda_to_openqcd(buffer, gauge);
+  void* buffer = malloc(4*qudaState.init.volume*qudaState.init.sizeof_su3_dble);
+  saveGaugeQuda(buffer, &param);
+  qudaState.init.reorder_gauge_quda_to_openqcd(buffer, gauge);
   free(buffer);
 }
 
@@ -316,24 +286,6 @@ void openQCD_qudaCloverLoad(void *clover)
   qudaState.clover_loaded = true;
 }
 
-void openQCD_qudaCloverCreate(double su3csw)
-{
-  if (!qudaState.dslash_setup) {
-    errorQuda("Need to call openQCD_qudaSetDwOptions() first!");
-  }
-
-  QudaInvertParam param = newOpenQCDCloverParam(invertParam.kappa, su3csw);
-
-  /* Set to Wilson Dirac operator with Clover term */
-  invertParam.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
-
-  /**
-   * Leaving both h_clover = h_clovinv = NULL allocates the clover field on the
-   * GPU and finally calls @createCloverQuda to calculate the clover field.
-   */
-  loadCloverQuda(NULL, NULL, &param);
-  qudaState.clover_loaded = true;
-}
 
 void openQCD_qudaCloverFree(void)
 {
@@ -342,32 +294,72 @@ void openQCD_qudaCloverFree(void)
 }
 
 
-void openQCD_qudaSetDwOptions(double kappa, double mu)
+QudaInvertParam newOpenQCDDiracParam(openQCD_QudaDiracParam_t p)
 {
-  if (mu != 0.0) {
-    errorQuda("twisted mass not implemented yet.");
+  if (!qudaState.gauge_loaded) {
+    errorQuda("Gauge field not loaded into QUDA, cannot setup Dirac operator / clover term. Call openQCD_qudaGaugeLoad() first.");
   }
 
-  invertParam = newOpenQCDParam();
+  QudaInvertParam param = newOpenQCDParam();
 
-  /* Set to Wilson Dirac operator */
-  invertParam.dslash_type = QUDA_WILSON_DSLASH;
+  param.dslash_type = QUDA_WILSON_DSLASH;
+  param.kappa = p.kappa;
+  param.mu = p.mu;
+  param.dagger = p.dagger ? QUDA_DAG_YES : QUDA_DAG_NO;
 
-  /* Hopping parameter */
-  invertParam.kappa = kappa;
+  if (p.su3csw != 0.0) {
+    param.clover_location = QUDA_CPU_FIELD_LOCATION; // TODO: ?? not GPU??
+    param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
+    param.clover_cuda_prec = QUDA_DOUBLE_PRECISION;
+    param.clover_order = QUDA_FLOAT8_CLOVER_ORDER; // what implication has this?
 
-  invertParam.inv_type = QUDA_CG_INVERTER; /* just set some, needed? */
+    param.compute_clover = true;
+    param.clover_csw = p.su3csw;
+    param.clover_coeff = 0.0;
+
+    // Set to Wilson Dirac operator with Clover term
+    param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
+
+    if (!qudaState.clover_loaded) {
+      /**
+       * Leaving both h_clover = h_clovinv = NULL allocates the clover field on
+       * the GPU and finally calls @createCloverQuda to calculate the clover
+       * field.
+       */
+      loadCloverQuda(NULL, NULL, &param); // Create the clover field
+      qudaState.clover_loaded = true;
+    }
+  }
+
+  param.inv_type = QUDA_CG_INVERTER; /* just set some, needed? */
 
   /* What is the difference? only works with QUDA_MASS_NORMALIZATION */
-  invertParam.mass_normalization = QUDA_MASS_NORMALIZATION;
+  param.mass_normalization = QUDA_MASS_NORMALIZATION;
 
   /* Extent of the 5th dimension (for domain wall) */
-  invertParam.Ls = 1;
+  param.Ls = 1;
 
-  /* Twisted mass parameter */
-  invertParam.mu = mu;
+  return param;
+}
 
-  qudaState.dslash_setup = true;
+QudaInvertParam newOpenQCDSolverParam(openQCD_QudaDiracParam_t p)
+{
+  QudaInvertParam param = newOpenQCDDiracParam(p);
+
+  param.compute_true_res = true;
+
+  param.solution_type = QUDA_MAT_SOLUTION;
+  param.solve_type = QUDA_DIRECT_SOLVE;
+  param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+  param.dagger = QUDA_DAG_YES;
+  param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
+  param.inv_type_precondition = QUDA_INVALID_INVERTER; // disables any preconditioning
+
+  // both fields reside on the CPU
+  param.input_location = QUDA_CPU_FIELD_LOCATION;
+  param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+  return param;
 }
 
 
@@ -394,16 +386,6 @@ double openQCD_qudaNorm(void *h_in)
 }
 
 
-/**
- * @brief      Applies Dirac matrix to spinor.
- *
- *             openQCD_out = gamma[dir] * openQCD_in
- *
- * @param[in]  dir          Dirac index, 0 <= dir <= 5, notice that dir is in
- *                          openQCD convention, ie. (0: t, 1: x, 2: y, 3: z, 4: 5, 5: 5)
- * @param[in]  openQCD_in   of type spinor_dble[NSPIN]
- * @param[out] openQCD_out  of type spinor_dble[NSPIN]
- */
 void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out)
 {
   // sets up the necessary parameters
@@ -457,23 +439,70 @@ void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out)
 }
 
 
-void openQCD_qudaDw(void *src, void *dst, QudaDagType dagger)
+void openQCD_qudaDw(void *src, void *dst, openQCD_QudaDiracParam_t p)
 {
-  if (!qudaState.gauge_loaded) {
-    errorQuda("Gauge field not loaded into QUDA, cannot apply Dslash. Call openQCD_qudaGaugeLoad() first.");
-    return;
-  }
-
-  if (!qudaState.dslash_setup) {
-    errorQuda("Dslash parameters are not set, cannot apply Dslash!");
-    return;
-  }
-
-  invertParam.dagger = dagger;
+  QudaInvertParam param = newOpenQCDDiracParam(p);
 
   /* both fields reside on the CPU */
-  invertParam.input_location = QUDA_CPU_FIELD_LOCATION;
-  invertParam.output_location = QUDA_CPU_FIELD_LOCATION;
+  param.input_location = QUDA_CPU_FIELD_LOCATION;
+  param.output_location = QUDA_CPU_FIELD_LOCATION;
 
-  MatQuda(static_cast<char *>(dst), static_cast<char *>(src), &invertParam);
+  MatQuda(static_cast<char *>(dst), static_cast<char *>(src), &param);
+}
+
+
+void openQCD_qudaGCR(void *source, void *solution,
+  openQCD_QudaDiracParam_t dirac_param, openQCD_QudaGCRParam_t gcr_param)
+{
+  QudaInvertParam param = newOpenQCDSolverParam(dirac_param);
+
+  param.inv_type = QUDA_GCR_INVERTER;
+  param.tol = gcr_param.tol;
+  param.maxiter = gcr_param.nmx;
+  param.gcrNkrylov = gcr_param.nkv;
+  param.reliable_delta = gcr_param.reliable_delta;
+
+  invertQuda(static_cast<char *>(solution), static_cast<char *>(source), &param);
+
+  printfQuda("true_res    = %.2e\n", param.true_res);
+  printfQuda("true_res_hq = %.2e\n", param.true_res_hq);
+  printfQuda("iter        = %d\n",   param.iter);
+  printfQuda("gflops      = %.2e\n", param.gflops);
+  printfQuda("secs        = %.2e\n", param.secs);
+  printfQuda("Nsteps      = %d\n",   param.Nsteps);
+}
+
+
+void openQCD_qudaInvert(void *source, void *solution, openQCD_QudaDiracParam_t dirac_param)
+{
+  QudaInvertParam param = newOpenQCDSolverParam(dirac_param);
+
+  /*param.verbosity = QUDA_VERBOSE;*/
+  param.inv_type = QUDA_GCR_INVERTER; /*QUDA_CG_INVERTER*/
+  param.tol = 1e-2;
+  param.compute_true_res = true;
+  param.maxiter = 100;
+
+  param.gcrNkrylov = 20;
+  param.reliable_delta = 1e-5;
+
+  param.solution_type = QUDA_MAT_SOLUTION;
+  param.solve_type = QUDA_DIRECT_SOLVE;
+  param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+  param.dagger = QUDA_DAG_YES;
+  param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
+  param.inv_type_precondition = QUDA_INVALID_INVERTER; /* disables any preconditioning */
+
+  /* both fields reside on the CPU */
+  param.input_location = QUDA_CPU_FIELD_LOCATION;
+  param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+  invertQuda(static_cast<char *>(solution), static_cast<char *>(source), &param);
+
+  printfQuda("true_res    = %.2e\n", param.true_res);
+  printfQuda("true_res_hq = %.2e\n", param.true_res_hq);
+  printfQuda("iter        = %d\n",   param.iter);
+  printfQuda("gflops      = %.2e\n", param.gflops);
+  printfQuda("secs        = %.2e\n", param.secs);
+  printfQuda("Nsteps      = %d\n",   param.Nsteps);
 }

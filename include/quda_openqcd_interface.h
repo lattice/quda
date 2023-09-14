@@ -29,6 +29,7 @@ typedef struct {
   int device;       /** GPU device number */
 } openQCD_QudaLayout_t;
 
+
 /**
  * Parameters used to create a QUDA context.
  */
@@ -52,15 +53,35 @@ typedef struct {
   int gauge_loaded;   /** Whether openQCD_qudaGaugeLoad() was called or not */
   int clover_loaded;  /** Whether openQCD_qudaCloverLoad() was called or not */
   int dslash_setup;   /** Whether openQCD_qudaSetDslashOptions() was called or not */
+  openQCD_QudaInitArgs_t init;
+  openQCD_QudaLayout_t layout;
 } openQCD_QudaState_t;
+
+
+typedef struct {
+  double kappa;
+  double mu;
+  double su3csw;
+  int dagger;
+} openQCD_QudaDiracParam_t;
+
+
+typedef struct {
+  double tol;
+  double nmx;
+  int nkv;
+  double reliable_delta;
+} openQCD_QudaGCRParam_t;
 
 
 /**
  * Initialize the QUDA context.
  *
- * @param input Meta data for the QUDA context
+ * @param[in]  init    Meta data for the QUDA context
+ * @param[in]  layout  The layout
  */
-void openQCD_qudaInit(openQCD_QudaInitArgs_t input);
+void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout);
+
 
 /**
  * Set set the local dimensions and machine topology for QUDA to use
@@ -69,41 +90,11 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t input);
  */
 void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout);
 
+
 /**
  * Destroy the QUDA context.
  */
 void openQCD_qudaFinalize(void);
-
-
-/**
- * Parameters related to linear solvers.
- */
-
-typedef struct {
-  // TODO: work out what we want to expose here
-  int max_iter; /** Maximum number of iterations */
-  QudaParity
-    evenodd; /** Which parity are we working on ? (options are QUDA_EVEN_PARITY, QUDA_ODD_PARITY, QUDA_INVALID_PARITY */
-  int mixed_precision;          /** Whether to use mixed precision or not (1 - yes, 0 - no) */
-  double boundary_phase[4];     /** Boundary conditions */
-  int make_resident_solution;   /** Make the solution resident and don't copy back */
-  int use_resident_solution;    /** Use the resident solution */
-  QudaInverterType solver_type; /** Type of solver to use */
-  double tadpole;               /** Tadpole improvement factor - set to 1.0 for
-                                    HISQ fermions since the tadpole factor is
-                                    baked into the links during their construction */
-  double naik_epsilon;          /** Naik epsilon parameter (HISQ fermions only).*/
-  QudaDslashType dslash_type;
-} openQCD_QudaInvertArgs_t;
-
-
-/**
- * @brief      Setup Dirac operator
- *
- * @param[in]  kappa   kappa
- * @param[in]  mu      twisted mass
- */
-void openQCD_qudaSetDwOptions(double kappa, double mu);
 
 
 /**
@@ -115,7 +106,19 @@ void openQCD_qudaSetDwOptions(double kappa, double mu);
  */
 double openQCD_qudaNorm(void *h_in);
 
+
+/**
+ * @brief      Applies Dirac matrix to spinor.
+ *
+ *             openQCD_out = gamma[dir] * openQCD_in
+ *
+ * @param[in]  dir          Dirac index, 0 <= dir <= 5, notice that dir is in
+ *                          openQCD convention, ie. (0: t, 1: x, 2: y, 3: z, 4: 5, 5: 5)
+ * @param[in]  openQCD_in   of type spinor_dble[NSPIN]
+ * @param[out] openQCD_out  of type spinor_dble[NSPIN]
+ */
 void openQCD_qudaGamma(int dir, void *openQCD_in, void *openQCD_out);
+
 
 /**
  * @brief      Apply the Wilson-Clover Dirac operator to a field. All fields
@@ -126,33 +129,36 @@ void openQCD_qudaGamma(int dir, void *openQCD_in, void *openQCD_out);
  * @param[in]  dagger  Whether we are using the Hermitian conjugate system or
  *                     not (QUDA_DAG_NO or QUDA_DAG_YES)
  */
-void openQCD_qudaDw(void *src, void *dst, QudaDagType dagger);
+void openQCD_qudaDw(void *src, void *dst, openQCD_QudaDiracParam_t p);
 
 
 /**
- * Solve Ax=b for an improved staggered operator. All fields are fields
- * passed and returned are host (CPU) field in MILC order.  This
- * function requires that persistent gauge and clover fields have
- * been created prior.  This interface is experimental.
+ * Solve Ax=b for a Clover Wilson operator using QUDAs GCR algorithm. All fields
+ * are fields passed and returned are host (CPU) field in openQCD order. This
+ * function requires that persistent gauge and clover fields have been created
+ * prior.
  *
- * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
- * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
- * @param mass Fermion mass parameter
- * @param inv_args Struct setting some solver metadata
- * @param target_residual Target residual
- * @param target_relative_residual Target Fermilab residual
- * @param milc_fatlink Fat-link field on the host
- * @param milc_longlink Long-link field on the host
- * @param source Right-hand side source field
- * @param solution Solution spinor field
- * @param final_residual True residual
- * @param final_relative_residual True Fermilab residual
- * @param num_iters Number of iterations taken
+ * @param[in]  source       Source spinor
+ * @param[out] solution     Solution spinor
+ * @param[in]  dirac_param  Dirac parameter struct
+ * @param[in]  gcr_param    GCR parameter struct
  */
-void openQCD_qudaInvert(int external_precision, int quda_precision, double mass, openQCD_QudaInvertArgs_t inv_args,
-                        double target_residual, double target_fermilab_residual, const void *const milc_fatlink,
-                        const void *const milc_longlink, void *source, void *solution, double *const final_resid,
-                        double *const final_rel_resid, int *num_iters);
+void openQCD_qudaGCR(void *source, void *solution,
+  openQCD_QudaDiracParam_t dirac_param, openQCD_QudaGCRParam_t gcr_param);
+
+
+/**
+ * Solve Ax=b for an Clover Wilson operator. All fields are fields passed and
+ * returned are host (CPU) field in openQCD order.  This function requires that
+ * persistent gauge and clover fields have been created prior.
+ *
+ * @param[in]  source    Right-hand side source field
+ * @param[out] solution  Solution spinor field
+ * @param[in]  tol       The tolerance
+ * @param[in]  maxiter   The maxiter
+ */
+void openQCD_qudaInvert(void *source, void *solution, openQCD_QudaDiracParam_t dirac_param);
+
 
 /**
  * @brief      Wrapper for the plaquette. We could call plaqQuda() directly in
@@ -193,14 +199,6 @@ void openQCD_qudaGaugeFree(void);
  * @param[in]  clover      The clover fields (in openqcd order)
  */
 void openQCD_qudaCloverLoad(void *clover);
-
-
-/**
- * @brief      Calculates the clover field and its inverse
- *
- * @param[in]  su3csw  The csw coefficient
- */
-void openQCD_qudaCloverCreate(double su3csw);
 
 
 /**
