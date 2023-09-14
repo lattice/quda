@@ -96,9 +96,9 @@ static int rankFromCoords(const int *coords, void *fdata) // TODO:
 
 
 /**
- * @brief      Set layout parameters.
+ * Set set the local dimensions and machine topology for QUDA to use
  *
- * @param[in]  layout  The layout
+ * @param layout Struct defining local dimensions and machine topology
  */
 void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout)
 {
@@ -135,9 +135,9 @@ static int getLinkPadding(const int dim[4])
 
 
 /**
- * @brief      Initialize invert param struct
- *             
- * @return     The quda invert parameter struct.
+ * @brief      Creates a new quda parameter struct
+ *
+ * @return     The quda parameter struct.
  */
 static QudaInvertParam newOpenQCDParam(void)
 {
@@ -147,8 +147,8 @@ static QudaInvertParam newOpenQCDParam(void)
 
   param.verbosity = verbosity;
 
-  param.cpu_prec = QUDA_DOUBLE_PRECISION; /* The precision used by the input fermion fields */
-  param.cuda_prec = QUDA_DOUBLE_PRECISION; /* The precision used by the QUDA solver */
+  param.cpu_prec = QUDA_DOUBLE_PRECISION;  // The precision used by the input fermion fields
+  param.cuda_prec = QUDA_DOUBLE_PRECISION; // The precision used by the QUDA solver
 
   /**
    * The order of the input and output fermion fields. Imposes fieldOrder =
@@ -157,7 +157,7 @@ static QudaInvertParam newOpenQCDParam(void)
    */
   param.dirac_order = QUDA_OPENQCD_DIRAC_ORDER;
 
-  /* Gamma basis of the input and output host fields */
+  // Gamma basis of the input and output host fields
   param.gamma_basis = QUDA_OPENQCD_GAMMA_BASIS;
 
   return param;
@@ -165,7 +165,7 @@ static QudaInvertParam newOpenQCDParam(void)
 
 
 /**
- * @brief      Initialize gauge param struct
+ * @brief      Initialize quda gauge param struct
  *
  * @param[in]  prec  precision
  *
@@ -181,20 +181,16 @@ static QudaGaugeParam newOpenQCDGaugeParam(QudaPrecision prec)
 
   param.reconstruct_sloppy = param.reconstruct = QUDA_RECONSTRUCT_NO;
 
-  /**
-   * This make quda to instantiate OpenQCDOrder
-   */
+  // This make quda to instantiate OpenQCDOrder
   param.gauge_order = QUDA_OPENQCD_GAUGE_ORDER;
 
-  /**
-   * Seems to have no effect ...
-   */
+  // Seems to have no effect ...
   param.t_boundary = QUDA_PERIODIC_T;
 
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   param.scale = 1.0;
   param.anisotropy = 1.0; // 1.0 means not anisotropic
-  param.ga_pad = getLinkPadding(param.X); /* Why this? */
+  param.ga_pad = getLinkPadding(param.X); // Why this?
 
   return param;
 }
@@ -247,13 +243,12 @@ double openQCD_qudaPlaquette(void)
 }
 
 
-void openQCD_qudaGaugeLoad(void *gauge)
+void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec)
 {
-  QudaGaugeParam param = newOpenQCDGaugeParam(QUDA_DOUBLE_PRECISION);
+  QudaGaugeParam param = newOpenQCDGaugeParam(prec);
 
-  void* buffer = malloc(4*qudaState.init.volume*qudaState.init.sizeof_su3_dble);
+  void* buffer = malloc(4*qudaState.init.volume*18*prec);
   qudaState.init.reorder_gauge_openqcd_to_quda(gauge, buffer);
-  qudaState.init.gauge = gauge;
   loadGaugeQuda(buffer, &param);
   free(buffer);
 
@@ -261,15 +256,16 @@ void openQCD_qudaGaugeLoad(void *gauge)
 }
 
 
-void openQCD_qudaGaugeSave(void *gauge)
+void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec)
 {
-  QudaGaugeParam param = newOpenQCDGaugeParam(QUDA_DOUBLE_PRECISION);
+  QudaGaugeParam param = newOpenQCDGaugeParam(prec);
 
-  void* buffer = malloc(4*qudaState.init.volume*qudaState.init.sizeof_su3_dble);
+  void* buffer = malloc(4*qudaState.init.volume*18*prec);
   saveGaugeQuda(buffer, &param);
   qudaState.init.reorder_gauge_quda_to_openqcd(buffer, gauge);
   free(buffer);
 }
+
 
 void openQCD_qudaGaugeFree(void)
 {
@@ -294,10 +290,17 @@ void openQCD_qudaCloverFree(void)
 }
 
 
-QudaInvertParam newOpenQCDDiracParam(openQCD_QudaDiracParam_t p)
+/**
+ * @brief      Creates a new quda Dirac parameter struct
+ *
+ * @param[in]  p     OpenQCD Dirac parameter struct
+ *
+ * @return     The quda Dirac parameter struct.
+ */
+static QudaInvertParam newOpenQCDDiracParam(openQCD_QudaDiracParam_t p)
 {
   if (!qudaState.gauge_loaded) {
-    errorQuda("Gauge field not loaded into QUDA, cannot setup Dirac operator / clover term. Call openQCD_qudaGaugeLoad() first.");
+    errorQuda("Gauge field not loaded into QUDA, cannot setup Dirac operator / Clover term. Call openQCD_qudaGaugeLoad() first.");
   }
 
   QudaInvertParam param = newOpenQCDParam();
@@ -308,7 +311,7 @@ QudaInvertParam newOpenQCDDiracParam(openQCD_QudaDiracParam_t p)
   param.dagger = p.dagger ? QUDA_DAG_YES : QUDA_DAG_NO;
 
   if (p.su3csw != 0.0) {
-    param.clover_location = QUDA_CPU_FIELD_LOCATION; // TODO: ?? not GPU??
+    param.clover_location = QUDA_CUDA_FIELD_LOCATION; // seems to have no effect?
     param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
     param.clover_cuda_prec = QUDA_DOUBLE_PRECISION;
     param.clover_order = QUDA_FLOAT8_CLOVER_ORDER; // what implication has this?
@@ -331,18 +334,26 @@ QudaInvertParam newOpenQCDDiracParam(openQCD_QudaDiracParam_t p)
     }
   }
 
-  param.inv_type = QUDA_CG_INVERTER; /* just set some, needed? */
+  param.inv_type = QUDA_CG_INVERTER; // just set some, needed?
 
-  /* What is the difference? only works with QUDA_MASS_NORMALIZATION */
+  // What is the difference? only works with QUDA_MASS_NORMALIZATION
   param.mass_normalization = QUDA_MASS_NORMALIZATION;
 
-  /* Extent of the 5th dimension (for domain wall) */
+  // Extent of the 5th dimension (for domain wall)
   param.Ls = 1;
 
   return param;
 }
 
-QudaInvertParam newOpenQCDSolverParam(openQCD_QudaDiracParam_t p)
+
+/**
+ * @brief      Creates a new quda solver parameter struct
+ *
+ * @param[in]  p     OpenQCD Dirac parameter struct
+ *
+ * @return     The quda solver parameter struct.
+ */
+static QudaInvertParam newOpenQCDSolverParam(openQCD_QudaDiracParam_t p)
 {
   QudaInvertParam param = newOpenQCDDiracParam(p);
 
@@ -351,13 +362,8 @@ QudaInvertParam newOpenQCDSolverParam(openQCD_QudaDiracParam_t p)
   param.solution_type = QUDA_MAT_SOLUTION;
   param.solve_type = QUDA_DIRECT_SOLVE;
   param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-  param.dagger = QUDA_DAG_YES;
   param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
   param.inv_type_precondition = QUDA_INVALID_INVERTER; // disables any preconditioning
-
-  // both fields reside on the CPU
-  param.input_location = QUDA_CPU_FIELD_LOCATION;
-  param.output_location = QUDA_CPU_FIELD_LOCATION;
 
   return param;
 }
@@ -443,7 +449,7 @@ void openQCD_qudaDw(void *src, void *dst, openQCD_QudaDiracParam_t p)
 {
   QudaInvertParam param = newOpenQCDDiracParam(p);
 
-  /* both fields reside on the CPU */
+  // both fields reside on the CPU
   param.input_location = QUDA_CPU_FIELD_LOCATION;
   param.output_location = QUDA_CPU_FIELD_LOCATION;
 
@@ -455,6 +461,10 @@ void openQCD_qudaGCR(void *source, void *solution,
   openQCD_QudaDiracParam_t dirac_param, openQCD_QudaGCRParam_t gcr_param)
 {
   QudaInvertParam param = newOpenQCDSolverParam(dirac_param);
+
+  // both fields reside on the CPU
+  param.input_location = QUDA_CPU_FIELD_LOCATION;
+  param.output_location = QUDA_CPU_FIELD_LOCATION;
 
   param.inv_type = QUDA_GCR_INVERTER;
   param.tol = gcr_param.tol;
@@ -477,8 +487,12 @@ void openQCD_qudaInvert(void *source, void *solution, openQCD_QudaDiracParam_t d
 {
   QudaInvertParam param = newOpenQCDSolverParam(dirac_param);
 
-  /*param.verbosity = QUDA_VERBOSE;*/
-  param.inv_type = QUDA_GCR_INVERTER; /*QUDA_CG_INVERTER*/
+  // both fields reside on the CPU
+  param.input_location = QUDA_CPU_FIELD_LOCATION;
+  param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+  //param.verbosity = QUDA_VERBOSE;
+  param.inv_type = QUDA_GCR_INVERTER; // QUDA_CG_INVERTER
   param.tol = 1e-2;
   param.compute_true_res = true;
   param.maxiter = 100;
@@ -489,11 +503,10 @@ void openQCD_qudaInvert(void *source, void *solution, openQCD_QudaDiracParam_t d
   param.solution_type = QUDA_MAT_SOLUTION;
   param.solve_type = QUDA_DIRECT_SOLVE;
   param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-  param.dagger = QUDA_DAG_YES;
   param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
-  param.inv_type_precondition = QUDA_INVALID_INVERTER; /* disables any preconditioning */
+  param.inv_type_precondition = QUDA_INVALID_INVERTER; // disables any preconditioning
 
-  /* both fields reside on the CPU */
+  // both fields reside on the CPU
   param.input_location = QUDA_CPU_FIELD_LOCATION;
   param.output_location = QUDA_CPU_FIELD_LOCATION;
 

@@ -39,8 +39,6 @@ typedef struct {
   FILE *logfile;                /** log file handler */
   void *gauge;                  /** base pointer to the gauge fields */
   int volume;                   /** VOLUME */
-  int sizeof_su3_dble;          /** sizeof(su3_dble) */
-  int sizeof_spinor_dble;       /** sizeof(spinor_dble) */
   void (*reorder_gauge_openqcd_to_quda)(void *in, void *out);
   void (*reorder_gauge_quda_to_openqcd)(void *in, void *out);
   void (*reorder_spinor_openqcd_to_quda)(void *in, void *out);
@@ -59,18 +57,18 @@ typedef struct {
 
 
 typedef struct {
-  double kappa;
-  double mu;
-  double su3csw;
-  int dagger;
+  double kappa;   /* kappa: hopping parameter */
+  double mu;      /* mu: twisted mass */
+  double su3csw;  /* su3csw: csw coefficient */
+  int dagger;     /* dagger: whether to apply D or D^dagger */
 } openQCD_QudaDiracParam_t;
 
 
 typedef struct {
-  double tol;
-  double nmx;
-  int nkv;
-  double reliable_delta;
+  double tol;             /* solver tolerance (relative residual) */
+  double nmx;             /* maximal number of steps */
+  int nkv;                /* number of Krylov vector to keep */
+  double reliable_delta;  /* ???? */
 } openQCD_QudaGCRParam_t;
 
 
@@ -78,17 +76,9 @@ typedef struct {
  * Initialize the QUDA context.
  *
  * @param[in]  init    Meta data for the QUDA context
- * @param[in]  layout  The layout
+ * @param[in]  layout  The layout struct
  */
 void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout);
-
-
-/**
- * Set set the local dimensions and machine topology for QUDA to use
- *
- * @param layout Struct defining local dimensions and machine topology
- */
-void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout);
 
 
 /**
@@ -100,7 +90,7 @@ void openQCD_qudaFinalize(void);
 /**
  * @brief      Norm square on QUDA.
  *
- * @param[in]  h_in  Input field (from openQCD)
+ * @param[in]  h_in  Spinor input field (from openQCD)
  *
  * @return     The norm
  */
@@ -124,10 +114,9 @@ void openQCD_qudaGamma(int dir, void *openQCD_in, void *openQCD_out);
  * @brief      Apply the Wilson-Clover Dirac operator to a field. All fields
  *             passed and returned are host (CPU) fields in openQCD order.
  *
- * @param[in]  src     Source spinor field
- * @param[out] dst     Destination spinor field
- * @param[in]  dagger  Whether we are using the Hermitian conjugate system or
- *                     not (QUDA_DAG_NO or QUDA_DAG_YES)
+ * @param[in]  src   Source spinor field
+ * @param[out] dst   Destination spinor field
+ * @param[in]  p     Dirac parameter struct
  */
 void openQCD_qudaDw(void *src, void *dst, openQCD_QudaDiracParam_t p);
 
@@ -152,10 +141,9 @@ void openQCD_qudaGCR(void *source, void *solution,
  * returned are host (CPU) field in openQCD order.  This function requires that
  * persistent gauge and clover fields have been created prior.
  *
- * @param[in]  source    Right-hand side source field
- * @param[out] solution  Solution spinor field
- * @param[in]  tol       The tolerance
- * @param[in]  maxiter   The maxiter
+ * @param[in]  source       Right-hand side source field
+ * @param[out] solution     Solution spinor field
+ * @param[in]  dirac_param  Dirac parameter struct
  */
 void openQCD_qudaInvert(void *source, void *solution, openQCD_QudaDiracParam_t dirac_param);
 
@@ -174,17 +162,19 @@ double openQCD_qudaPlaquette(void);
 /**
  * @brief      Load the gauge fields from host to quda.
  *
- * @param[in]  gauge      The gauge fields (in openqcd order)
+ * @param[in]  gauge  The gauge fields (in openqcd order)
+ * @param[in]  prec   Precision of the gauge field
  */
-void openQCD_qudaGaugeLoad(void *gauge);
+void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec);
 
 
 /**
  * @brief      Save the gauge fields from quda to host.
  *
- * @param[out] gauge      The gauge fields (will be stored in openqcd order)
+ * @param[out] gauge  The gauge fields (will be stored in openqcd order)
+ * @param[in]  prec   Precision of the gauge field
  */
-void openQCD_qudaGaugeSave(void *gauge);
+void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec);
 
 
 /**
