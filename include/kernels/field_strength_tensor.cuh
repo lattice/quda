@@ -35,10 +35,12 @@ namespace quda
     }
   };
 
-  template <typename Arg>
-  __device__ __host__ inline void computeFmunuCore(const Arg &arg, int idx, int parity, int mu, int nu)
+  using computeFmunuCoreOps = SpecialOps<thread_array<int,4>>;
+  template <typename Ftor>
+  __device__ __host__ inline void computeFmunuCore(const Ftor &ftor, int idx, int parity, int mu, int nu)
   {
-    using Link = Matrix<complex<typename Arg::Float>, 3>;
+    using Link = Matrix<complex<typename Ftor::Arg::Float>, 3>;
+    auto &arg = ftor.arg;
 
     int x[4];
     int X[4];
@@ -53,7 +55,7 @@ namespace quda
     { // U(x,mu) U(x+mu,nu) U[dagger](x+nu,mu) U[dagger](x,nu)
 
       // load U(x)_(+mu)
-      thread_array<int, 4> dx = {};
+      thread_array<int, 4> dx{ftor};
       Link U1 = arg.u(mu, linkIndexShift(x, dx, X), parity);
 
       // load U(x+mu)_(+nu)
@@ -76,7 +78,7 @@ namespace quda
     { // U(x,nu) U[dagger](x+nu-mu,mu) U[dagger](x-mu,nu) U(x-mu, mu)
 
       // load U(x)_(+nu)
-      thread_array<int, 4> dx = {};
+      thread_array<int, 4> dx{ftor};
       Link U1 = arg.u(nu, linkIndexShift(x, dx, X), parity);
 
       // load U(x+nu)_(-mu) = U(x+nu-mu)_(+mu)
@@ -103,7 +105,7 @@ namespace quda
     { // U[dagger](x-nu,nu) U(x-nu,mu) U(x+mu-nu,nu) U[dagger](x,mu)
 
       // load U(x)_(-nu)
-      thread_array<int, 4> dx = {};
+      thread_array<int, 4> dx{ftor};
       dx[nu]--;
       Link U1 = arg.u(nu, linkIndexShift(x, dx, X), 1 - parity);
       dx[nu]++;
@@ -130,7 +132,7 @@ namespace quda
     { // U[dagger](x-mu,mu) U[dagger](x-mu-nu,nu) U(x-mu-nu,mu) U(x-nu,nu)
 
       // load U(x)_(-mu)
-      thread_array<int, 4> dx = {};
+      thread_array<int, 4> dx{ftor};
       dx[mu]--;
       Link U1 = arg.u(mu, linkIndexShift(x, dx, X), 1 - parity);
       dx[mu]++;
@@ -166,15 +168,16 @@ namespace quda
     // 3*18 + 12*198 =  54 + 2376 = 2430
     {
       F -= conj(F);                   // 18 real subtractions + one matrix conjugation
-      F *= static_cast<typename Arg::Float>(0.125); // 18 real multiplications
+      F *= static_cast<typename Ftor::Arg::Float>(0.125); // 18 real multiplications
       // 36 floating point operations here
     }
-    
+
     int munu_idx = (mu * (mu - 1)) / 2 + nu; // lower-triangular indexing
     arg.f(munu_idx, idx, parity) = F;
   }
 
-  template <typename Arg> struct ComputeFmunu {
+  template <typename Arg_> struct ComputeFmunu : computeFmunuCoreOps {
+    using Arg = Arg_;
     const Arg &arg;
     constexpr ComputeFmunu(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
@@ -190,7 +193,7 @@ namespace quda
       case 4: mu = 3, nu = 1; break;
       case 5: mu = 3, nu = 2; break;
       }
-      computeFmunuCore(arg, x_cb, parity, mu, nu);
+      computeFmunuCore(*this, x_cb, parity, mu, nu);
     }
   };
 

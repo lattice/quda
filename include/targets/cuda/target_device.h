@@ -10,6 +10,9 @@
 #define QUDA_CUDA_CC
 #endif
 
+#define HOSTDEVICE __host__ __device__
+#define HostDevice __host__ __device__
+
 namespace quda
 {
 

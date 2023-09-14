@@ -13,6 +13,7 @@ namespace quda {
     std::vector<reduce_t>& loop_traces;
     double factor;
     const paths<1> p;
+    unsigned int sharedBytesPerThread() const override { return 4 * sizeof(int); } // for threda_array
 
   public:
     // max block size of 8 is arbitrary for now

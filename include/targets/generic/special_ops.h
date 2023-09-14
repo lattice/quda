@@ -248,7 +248,7 @@ namespace quda {
   };
   template <> struct sharedMemSizeS<NoSpecialOps> {
     template <typename ...Arg>
-    static constexpr unsigned int size(dim3 block, Arg &...arg) {
+    static constexpr unsigned int size(dim3, Arg &...arg) {
       return 0;
     }
   };

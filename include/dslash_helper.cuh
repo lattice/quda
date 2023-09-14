@@ -11,6 +11,7 @@
 #include <shmem_pack_helper.cuh>
 #include <kernel_helper.h>
 #include <tune_quda.h>
+#include <special_ops.h>
 
 #if defined(_NVHPC_CUDA)
 #include <constant_kernel_arg.h>

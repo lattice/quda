@@ -44,7 +44,7 @@ namespace quda {
     }
   };
 
-  template <typename Arg> struct GaugeForce
+  template <typename Arg> struct GaugeForce : SpecialOps<thread_array<int,4>>
   {
     const Arg &arg;
     constexpr GaugeForce(const Arg &arg) : arg(arg) {}
@@ -62,7 +62,7 @@ namespace quda {
       // prod: current matrix product
       // accum: accumulator matrix
       Link link_prod, accum;
-      thread_array<int, 4> dx{};
+      thread_array<int, 4> dx{*this};
 
       for (int i=0; i<arg.p.num_paths; i++) {
         real coeff = arg.p.path_coeff[i];

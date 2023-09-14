@@ -19,31 +19,31 @@ namespace quda
     using SharedMemoryT = SharedMemory<array<T,n>, SizePerThread<1>, O>;
 
   private:
-    using SharedMemoryT::smem;
+    using SharedMemoryT::sharedMem;
     array<T, n> &array_;
 
   public:
     using SharedMemoryT::shared_mem_size;
 
     __device__ __host__ constexpr thread_array() :
-      array_(smem()[target::thread_idx_linear<3>()])
+      array_(sharedMem()[target::thread_idx_linear<3>()])
     {
       array_ = array<T, n>(); // call default constructor
     }
 
-#if 0
+#if 1
     template <typename... Ts>
     __device__ __host__ constexpr thread_array(T first, const Ts... other) :
-      array_(smem()[target::thread_idx_linear<3>()])
+      array_(sharedMem()[target::thread_idx_linear<3>()])
     {
       array_ = array<T, n> {first, other...};
     }
 #endif
 
     template <typename... U>
-    constexpr thread_array(const SpecialOps<U...> &ops) :
+    __device__ __host__ constexpr thread_array(const SpecialOps<U...> &ops) :
       SharedMemoryT(ops),
-      array_(smem()[target::thread_idx_linear<3>()])
+      array_(sharedMem()[target::thread_idx_linear<3>()])
     {
       checkSpecialOp<thread_array<T,n,O>,U...>();
       array_ = array<T, n>(); // call default constructor

@@ -27,7 +27,7 @@ namespace quda
     using offset_type = O; // type of object that may also use shared memory at the same time and is located before this one
     static constexpr int len = std::max(1,N); // actual number of elements to store
     using SharedMemoryT = SharedMemory<atom_t<T>, SizePerThread<std::max(1,N_)*sizeof(T)/sizeof(atom_t<T>)>, O>;
-    using SharedMemoryT::smem;
+    using SharedMemoryT::sharedMem;
     using SharedMemoryT::shared_mem_size;
     using opSmem = op_SharedMemory<T, SizeSmem<SharedMemoryT>>;
     using dependencies = opSmem;
@@ -48,7 +48,7 @@ namespace quda
       memcpy(tmp, (void *)&a, sizeof(T));
       int j = target::thread_idx_linear<3>();
 #pragma unroll
-      for (int i = 0; i < n_element; i++) smem()[(k*n_element + i) * stride + j] = tmp[i];
+      for (int i = 0; i < n_element; i++) sharedMem()[(k*n_element + i) * stride + j] = tmp[i];
     }
 
     __device__ __host__ inline T load_detail(const int k) const
@@ -56,7 +56,7 @@ namespace quda
       atom_t tmp[n_element];
       int j = target::thread_idx_linear<3>();
 #pragma unroll
-      for (int i = 0; i < n_element; i++) tmp[i] = smem()[(k*n_element + i) * stride + j];
+      for (int i = 0; i < n_element; i++) tmp[i] = sharedMem()[(k*n_element + i) * stride + j];
       T a;
       memcpy((void *)&a, tmp, sizeof(T));
       return a;
@@ -71,8 +71,9 @@ namespace quda
     }
 
     template <typename ...U>
-    constexpr ThreadLocalCache(const SpecialOps<U...> &ops) :
-      SharedMemoryT(getDependentOps<ThreadLocalCache<T,N,O>>(ops)), stride(target::block_size<3>()) {
+    constexpr ThreadLocalCache(const SpecialOps<U...> &ops) : SharedMemoryT(ops), stride(target::block_size<3>())
+    {
+      checkSpecialOp<ThreadLocalCache<T,N,O>,U...>();
       static_assert(shared_mem_size(dim3{8,8,8})==
 		    SharedMemoryT::get_offset(dim3{8,8,8})+SizePerThread<len>::size(dim3{8,8,8})*sizeof(T));
     }

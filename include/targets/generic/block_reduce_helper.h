@@ -2,6 +2,7 @@
 
 #include <target_device.h>
 #include <reducer.h>
+#include <special_ops.h>
 
 /**
    @file block_reduce_helper.h
@@ -26,6 +27,7 @@ namespace quda
     static constexpr int width = width_;
   };
 
+#if 0
   /**
      @brief block_reduce_param is used as a container for passing
      non-type parameters to specialize block_reduce through the
@@ -40,6 +42,7 @@ namespace quda
     static constexpr int batch_size = batch_size_;
     static_assert(batch_size == 1 || block_dim <= 2, "Batching not possible with 3-d block reduction");
   };
+#endif
 
   /**
      @brief Dummy generic implementation of warp_reduce
@@ -157,7 +160,7 @@ namespace quda
     //using block_reduce_t::shared_mem_size;
 
     template <typename ...U>
-    constexpr BlockReduce(SpecialOps<U...> &ops, int batch = 0) : block_reduce_t(ops), batch(batch) {
+    HOSTDEVICE constexpr BlockReduce(SpecialOps<U...> &ops, int batch = 0) : block_reduce_t(ops), batch(batch) {
       static_assert(hasSpecialOpType<BlockReduce_t, SpecialOps<U...>>);
     }
 

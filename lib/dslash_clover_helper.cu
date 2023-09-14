@@ -70,7 +70,11 @@ namespace quda {
 
     unsigned int sharedBytesPerThread() const
     {
-      return (in.Nspin() / 2) * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type);
+      if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
+	return 0;
+      } else {
+	return (in.Nspin() / 2) * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type);
+      }
     }
 
   public:

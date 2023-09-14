@@ -68,11 +68,10 @@ namespace quda
     int blockMin() const { return 4; }
     unsigned int sharedBytesPerThread() const
     {
-      if (mobius_m5::shared()
-          && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
-              || type == Dslash5Type::M5_INV_ZMOBIUS)) {
+      if (mobius_m5::shared()) {
         // spin components in shared depend on inversion algorithm
-        int nSpin = mobius_m5::var_inverse() ? mobius_m5::use_half_vector() ? in.Nspin() / 2 : in.Nspin() : in.Nspin();
+	bool isInv = type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS || type == Dslash5Type::M5_INV_ZMOBIUS;
+        int nSpin = (!isInv || mobius_m5::var_inverse()) ? mobius_m5::use_half_vector() ? in.Nspin() / 2 : in.Nspin() : in.Nspin();
         return 2 * nSpin * nColor * sizeof(typename mapper<Float>::type);
       } else {
         return 0;
@@ -82,9 +81,7 @@ namespace quda
     // overloaded to return max dynamic shared memory if doing shared-memory inverse
     unsigned int maxSharedBytesPerBlock() const
     {
-      if (mobius_m5::shared()
-          && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
-              || type == Dslash5Type::M5_INV_ZMOBIUS)) {
+      if (mobius_m5::shared()) {
         return maxDynamicSharedBytesPerBlock();
       } else {
         return TunableKernel3D::maxSharedBytesPerBlock();
@@ -107,9 +104,7 @@ namespace quda
       xpay(a == 0.0 ? false : true),
       type(type)
     {
-      if (mobius_m5::shared()
-          && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
-              || type == Dslash5Type::M5_INV_ZMOBIUS)) {
+      if (mobius_m5::shared()) {
         TunableKernel2D_base<false>::resizeStep(in.X(4)); // Ls must be contained in the block
       }
 
@@ -129,7 +124,7 @@ namespace quda
     }
 
     template <bool dagger, bool xpay, Dslash5Type type> using Arg = Dslash5Arg<Float, nColor, dagger, xpay, type>;
-    
+
     template <Dslash5Type type, template <typename> class F>
     void Launch(TuneParam &tp, const qudaStream_t &stream)
     {

@@ -67,7 +67,7 @@ namespace quda
     const dim3 block;
     const int stride;
 
-    using Smem::smem;
+    using Smem::sharedMem;
 
     __device__ __host__ inline void save_detail(const T &a, int x, int y, int z) const
     {
@@ -75,7 +75,7 @@ namespace quda
       memcpy(tmp, (void *)&a, sizeof(T));
       int j = (z * block.y + y) * block.x + x;
 #pragma unroll
-      for (int i = 0; i < n_element; i++) smem()[i * stride + j] = tmp[i];
+      for (int i = 0; i < n_element; i++) sharedMem()[i * stride + j] = tmp[i];
     }
 
     template <typename dummy = void>
@@ -84,7 +84,7 @@ namespace quda
       atom_t tmp[n_element];
       int j = (z * block.y + y) * block.x + x;
 #pragma unroll
-      for (int i = 0; i < n_element; i++) tmp[i] = smem()[i * stride + j];
+      for (int i = 0; i < n_element; i++) tmp[i] = sharedMem()[i * stride + j];
       T a;
       memcpy((void *)&a, tmp, sizeof(T));
       return a;
@@ -124,10 +124,10 @@ namespace quda
     }
 
     template <typename... U, typename... Arg>
-    inline SharedMemoryCache(const SpecialOps<U...> &ops, Arg... arg) :
-      Smem(getDependentOps<SharedMemoryCache<T,D,O>>(ops, arg...)),
-      block(D::dims(target::block_dim())), stride(block.x * block.y * block.z)
+    HostDevice inline SharedMemoryCache(const SpecialOps<U...> &ops, Arg... arg) :
+      Smem(ops), block(D::dims(target::block_dim())), stride(block.x * block.y * block.z)
     {
+      checkSpecialOp<SharedMemoryCache<T,D,O>,U...>();
       static_assert(shared_mem_size(dim3{8,8,8})==Smem::get_offset(dim3{8,8,8})+SizeDims<D>::size(dim3{8,8,8})*sizeof(T));
     }
 
@@ -137,7 +137,7 @@ namespace quda
        @brief Grab the raw base address to shared memory.
     */
     __device__ __host__ inline auto data() const {
-      return reinterpret_cast<T *>(&smem()[0]);
+      return reinterpret_cast<T *>(&sharedMem()[0]);
     }
 
     /**
