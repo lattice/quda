@@ -18,6 +18,12 @@ namespace quda
     }
   };
 
+  struct SizeBlockDivWarp {
+    static constexpr unsigned int size(dim3 b) {
+      return (b.x * b.y * b.z + device::warp_size() - 1)/device::warp_size();
+    }
+  };
+
   template <typename D, int N = 1> struct SizeDims {
     static constexpr unsigned int size(dim3 block) {
       dim3 dims = D::dims(block);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <target_device.h>
+#include <special_ops.h>
 
 /**
    @file shared_memory_helper.h

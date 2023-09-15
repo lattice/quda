@@ -2,6 +2,7 @@
 
 #include <target_device.h>
 #include <reducer.h>
+#include <helpers.h>
 
 /**
    @file block_reduce_helper.h
@@ -214,6 +215,17 @@ namespace quda
   template <bool> struct block_reduce_impl;
 
   /**
+     @brief Dummy generic implementation of block_reduce
+  */
+  template <bool is_device> struct block_reduce_impl {
+    template <typename T, typename reducer_t, typename param_t>
+    T operator()(const T &value, bool, int, bool, reducer_t, param_t)
+    {
+      return value;
+    }
+  };
+
+  /**
      @brief CUDA specialization of block_reduce, building on the warp_reduce
   */
   template <> struct block_reduce_impl<true> {
@@ -290,7 +302,10 @@ namespace quda
 
   template <typename T, int block_dim, int batch_size>
   struct block_reduce {
-    template <typename S> HostDevice inline block_reduce(S &ops) {};
+    template <typename Ops> HostDevice inline block_reduce(Ops &) {};
+    template <typename ...Arg> static constexpr size_t shared_mem_size(dim3 block) {
+      return SizeBlockDivWarp::size(block) * sizeof(T);
+    }
     template <typename reducer_t>
     HostDevice inline T apply(const T &value, bool async, int batch, bool all, const reducer_t &r)
     {
