@@ -42,11 +42,7 @@ namespace quda
     }
   };
 
-  template <typename Arg> struct BlockTransposeKernel {
-    const Arg &arg;
-    constexpr BlockTransposeKernel(const Arg &arg) : arg(arg) { }
-    static constexpr const char *filename() { return KERNEL_FILE; }
-
+  template <typename Arg> struct BlockTransposeKernelOps {
     struct CacheDims {
       static constexpr dim3 dims(dim3 block) {
         block.x += 1;
@@ -54,6 +50,15 @@ namespace quda
         return block;
       }
     };
+    using color_spinor_t = ColorSpinor<typename Arg::real, 1, Arg::nSpin>;
+    using CacheT = SharedMemoryCache<color_spinor_t, CacheDims>;
+    using Ops = SpecialOps<CacheT>;
+  };
+
+  template <typename Arg> struct BlockTransposeKernel : BlockTransposeKernelOps<Arg>::Ops {
+    const Arg &arg;
+    constexpr BlockTransposeKernel(const Arg &arg) : arg(arg) { }
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**
       @brief Transpose between the two different orders of batched colorspinor fields:
@@ -68,7 +73,7 @@ namespace quda
       int parity = parity_color / Arg::nColor;
       using color_spinor_t = ColorSpinor<typename Arg::real, 1, Arg::nSpin>;
 
-      SharedMemoryCache<color_spinor_t, CacheDims> cache;
+      typename BlockTransposeKernelOps<Arg>::CacheT cache{*this};
 
       int x_offset = target::block_dim().x * target::block_idx().x;
       int v_offset = target::block_dim().y * target::block_idx().y;

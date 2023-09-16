@@ -305,7 +305,12 @@ namespace quda {
 
     };
 
-    template <typename Param> struct AllThreeAllLepageLink
+    template <typename Param> struct AllThreeAllLepageLinkOps {
+      using Link = Matrix<complex<typename Param::Arg::real>, Param::Arg::nColor>;
+      using Ops = SpecialOps<ThreadLocalCache<Link>>;
+    };
+
+    template <typename Param> struct AllThreeAllLepageLink : AllThreeAllLepageLinkOps<Param>::Ops
     {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
@@ -558,7 +563,7 @@ namespace quda {
         int parity_a = parity;
 
         //SharedMemoryCache<Link> Uab_cache(target::block_dim());
-        ThreadLocalCache<Link> Uab_cache{};
+        ThreadLocalCache<Link> Uab_cache{*this};
         // Scoped load of Uab
         {
           int point_b = linkExtendedIndexShiftMILC<sig_positive>(x, arg.sig, arg);
@@ -667,7 +672,13 @@ namespace quda {
 
     };
 
-    template <typename Param> struct AllFiveAllSevenLink
+    template <typename Param> struct AllFiveAllSevenLinkOps {
+      static constexpr int cacheLen = Param::sig_positive ? 3 : 2;
+      using Link = Matrix<complex<typename Param::Arg::real>, Param::Arg::nColor>;
+      using Ops = SpecialOps<ThreadLocalCache<Link,cacheLen>>;
+    };
+
+    template <typename Param> struct AllFiveAllSevenLink : AllFiveAllSevenLinkOps<Param>::Ops
     {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
@@ -738,7 +749,7 @@ namespace quda {
 
           // Cache Ube to below
           //Matrix_cache.save_z(Ube, 1);
-          Matrix_cache[1] = Ube;
+          Matrix_cache.save(Ube, 1);
         }
 
         // Take care of force_sig --- contribution from the negative rho direction
@@ -748,7 +759,7 @@ namespace quda {
           Link force_sig = Matrix_cache[2];
           force_sig = mm_add(mycoeff_seven * UbeOeOf, conj(Uaf), force_sig);
           //Matrix_cache.save_z(force_sig, 2);
-          Matrix_cache[2] = force_sig;
+          Matrix_cache.save(force_sig, 2);
         }
 
         // Compute the force_rho --- contribution from the negative rho direction
@@ -796,7 +807,7 @@ namespace quda {
         Link Oy = (sig_positive ? Udc : conj(Udc)) * Oz;
         p5_sig = mm_add(arg.accumu_coeff_seven * conj(Uda), Oy, p5_sig);
         //Matrix_cache.save_z(p5_sig, 1);
-        Matrix_cache[1] = p5_sig;
+        Matrix_cache.save(p5_sig, 1);
 
         // When sig is positive, compute the force_sig contribution from the
         // positive rho direction
@@ -808,7 +819,7 @@ namespace quda {
           Link force_sig = Matrix_cache[2];
           force_sig = mm_add(mycoeff_seven * Oz, Od * Uda, force_sig);
           //Matrix_cache.save_z(force_sig, 2);
-          Matrix_cache[2] = force_sig;
+          Matrix_cache.save(force_sig, 2);
         }
 
       }
@@ -938,7 +949,7 @@ namespace quda {
           Link force_sig = Matrix_cache[2];
           force_sig = mm_add(arg.coeff_five * Ow, Ox, force_sig);
           //Matrix_cache.save_z(force_sig, 2);
-          Matrix_cache[2] = force_sig;
+          Matrix_cache.save(force_sig, 2);
         }
       }
 
@@ -981,11 +992,11 @@ namespace quda {
         //ThreadLocalCache<Link> Matrix_cache(block_dim);
 	constexpr int cacheLen = sig_positive ? 3 : 2;
         //ThreadLocalCache<array<Link,cacheLen>> Matrix_cache{};
-        ThreadLocalCache<Link,cacheLen> Matrix_cache{};
+        ThreadLocalCache<Link,cacheLen> Matrix_cache{*this};
         if constexpr (sig_positive) {
           Link force_sig = arg.force(arg.sig, point_a, parity_a);
           //Matrix_cache.save_z(force_sig, 2);
-          Matrix_cache[2] = force_sig;
+          Matrix_cache.save(force_sig, 2);
         }
 
         // Scoped load of Uab
@@ -996,7 +1007,7 @@ namespace quda {
           int ab_link_nbr_parity = (sig_positive) ? parity_a : parity_b;
           Link Uab = arg.link(arg.sig, ab_link_nbr_idx, ab_link_nbr_parity);
           //Matrix_cache.save_z(Uab, 0);
-          Matrix_cache[0] = Uab;
+          Matrix_cache.save(Uab, 0);
         }
 
         // accumulate into P5, force_sig

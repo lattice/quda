@@ -117,11 +117,13 @@ namespace quda
        memory base pointer (used when we have multiple caches in
        scope).  Need to include block size to actual offset.
     */
+#if 0
     constexpr SharedMemoryCache() :
       block(D::dims(target::block_dim())), stride(block.x * block.y * block.z)
     {
       static_assert(shared_mem_size(dim3{8,8,8})==Smem::get_offset(dim3{8,8,8})+SizeDims<D>::size(dim3{8,8,8})*sizeof(T));
     }
+#endif
 
     template <typename... U, typename... Arg>
     HostDevice inline SharedMemoryCache(const SpecialOps<U...> &ops, Arg... arg) :

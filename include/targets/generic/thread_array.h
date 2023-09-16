@@ -25,13 +25,15 @@ namespace quda
   public:
     using SharedMemoryT::shared_mem_size;
 
+#if 0
     __device__ __host__ constexpr thread_array() :
       array_(sharedMem()[target::thread_idx_linear<3>()])
     {
       array_ = array<T, n>(); // call default constructor
     }
+#endif
 
-#if 1
+#if 0
     template <typename... Ts>
     __device__ __host__ constexpr thread_array(T first, const Ts... other) :
       array_(sharedMem()[target::thread_idx_linear<3>()])
@@ -48,6 +50,8 @@ namespace quda
       checkSpecialOp<thread_array<T,n,O>,U...>();
       array_ = array<T, n>(); // call default constructor
     }
+
+    constexpr thread_array(const thread_array<T,n,O> &) = delete;
 
     __device__ __host__ T &operator[](int i) { return array_[i]; }
     __device__ __host__ const T &operator[](int i) const { return array_[i]; }

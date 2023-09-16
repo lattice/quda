@@ -91,7 +91,8 @@ namespace quda
        */
       if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS_PRE) {
 	constexpr bool sync = false;
-	out = d5<allthreads, sync, dagger, shared>(*this, stencil_out, my_spinor_parity, 0, s, active);
+	//out = d5<allthreads, sync, dagger, shared>(*this, stencil_out, my_spinor_parity, 0, s, active);
+	out = d5<false, sync, dagger, shared>(*this, stencil_out, my_spinor_parity, 0, s, active);
       }
       //}
 
@@ -105,7 +106,8 @@ namespace quda
          */
         //if (active) {
 	constexpr bool sync = false;
-	out = variableInv<allthreads, sync, dagger, shared>(*this, stencil_out, my_spinor_parity, 0, s, active);
+	//out = variableInv<allthreads, sync, dagger, shared>(*this, stencil_out, my_spinor_parity, 0, s, active);
+	out = variableInv<false, sync, dagger, shared>(*this, stencil_out, my_spinor_parity, 0, s, active);
         //}
 
         Vector aggregate_external;
@@ -152,7 +154,9 @@ namespace quda
 	  constexpr bool sync = false;
 	  //out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg, Dslash5Type::DSLASH5_MOBIUS_PRE>(
 	  //arg, stencil_out, my_spinor_parity, 0, s);
-	  out = d5<allthreads, sync, dagger, shared, Vector, std::remove_pointer_t<decltype(this)>, Dslash5Type::DSLASH5_MOBIUS_PRE>
+	  //out = d5<allthreads, sync, dagger, shared, Vector, std::remove_pointer_t<decltype(this)>, Dslash5Type::DSLASH5_MOBIUS_PRE>
+	  //(*this, stencil_out, my_spinor_parity, 0, s, active);
+	  out = d5<false, sync, dagger, shared, Vector, std::remove_pointer_t<decltype(this)>, Dslash5Type::DSLASH5_MOBIUS_PRE>
 	    (*this, stencil_out, my_spinor_parity, 0, s, active);
 	}
 	//}

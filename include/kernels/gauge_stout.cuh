@@ -112,27 +112,21 @@ namespace quda
   //------------------------//
   // Over-Improved routines //
   //------------------------//
-#if 0
   template <typename Arg> struct OvrImpSTOUTOps {
     using real = typename Arg::Float;
     using Complex = complex<real>;
     using Link = Matrix<complex<real>, Arg::nColor>;
-    using StapCacheT = SharedMemoryCache<Link>;
-    using RectCacheT = SharedMemoryCacheOffset<Link,StapCacheT>;
-    using Ops = SpecialOps<StapCacheT,RectCacheT>;
+    using StapCacheT = ThreadLocalCache<Link>;
+    using RectCacheT = ThreadLocalCache<Link,0,StapCacheT>;
+    using Ops = SpecialOps<StapCacheT,RectCacheT,computeStapleRectangleOps>;
   };
-  template <typename Arg_> struct OvrImpSTOUT : OvrImpSTOUTOps<Arg_>::Ops
-#endif
 
-  template <typename Arg_> struct OvrImpSTOUT : computeStapleRectangleOps
+  template <typename Arg_> struct OvrImpSTOUT : OvrImpSTOUTOps<Arg_>::Ops
   {
     using Arg = Arg_;
     using real = typename Arg::Float;
     using Complex = complex<real>;
     using Link = Matrix<complex<real>, Arg::nColor>;
-    //using StapCacheT = SharedMemoryCache<Link>;
-    //using RectCacheT = SharedMemoryCacheOffset<Link,StapCacheT>;
-    //using Ops = SpecialOps<StapCacheT,RectCacheT>;
 
     const Arg &arg;
     constexpr OvrImpSTOUT(const Arg &arg) : arg(arg) {}
@@ -153,10 +147,8 @@ namespace quda
       Link U, Q;
       //SharedMemoryCache<Link> Stap(target::block_dim());
       //SharedMemoryCache<Link> Rect(target::block_dim(), sizeof(Link));
-      //StapCacheT Stap(*this);
-      //RectCacheT Rect(*this);
-      ThreadLocalCache<Link> Stap{};
-      ThreadLocalCache<Link,0,decltype(Stap)> Rect{};
+      typename OvrImpSTOUTOps<Arg>::StapCacheT Stap{*this};
+      typename OvrImpSTOUTOps<Arg>::RectCacheT Rect{*this};
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:

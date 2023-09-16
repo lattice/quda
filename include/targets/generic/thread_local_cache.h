@@ -66,9 +66,11 @@ namespace quda
     /**
        @brief Constructor for ThreadLocalCache.
     */
+#if 0
     constexpr ThreadLocalCache() : stride(target::block_size<3>()) {
       static_assert(shared_mem_size(dim3{8,8,8})==SharedMemoryT::get_offset(dim3{8,8,8})+SizePerThread<len>::size(dim3{8,8,8})*sizeof(T));
     }
+#endif
 
     template <typename ...U>
     constexpr ThreadLocalCache(const SpecialOps<U...> &ops) : SharedMemoryT(ops), stride(target::block_size<3>())
@@ -77,6 +79,8 @@ namespace quda
       static_assert(shared_mem_size(dim3{8,8,8})==
 		    SharedMemoryT::get_offset(dim3{8,8,8})+SizePerThread<len>::size(dim3{8,8,8})*sizeof(T));
     }
+
+    constexpr ThreadLocalCache(const ThreadLocalCache<T,N,O> &) = delete;
 
     /**
        @brief Save the value into the thread local cache.  Used when N==0 so cache acts like single object.

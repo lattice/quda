@@ -1,7 +1,6 @@
 #pragma once
 
 #ifndef _NVHPC_CUDA
-//#if 0
 
 #include "../generic/thread_array.h"
 

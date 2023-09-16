@@ -323,12 +323,11 @@ namespace quda {
 	for (int spin_local=0; spin_local<Ms; spin_local++) {
 	  int s = spin_block + spin_local;
 #pragma unroll
-        for (int color_local=0; color_local<Mc; color_local++) {
-          int c = color_block + color_local;
-          arg.out.Ghost(dim, dir, spinor_parity, ghost_idx, s, c, 0, max) = arg.in[src_idx](spinor_parity, x_cb, s, c);
-        }
-      }
-
+	  for (int color_local=0; color_local<Mc; color_local++) {
+	    int c = color_block + color_local;
+	    arg.out.Ghost(dim, dir, spinor_parity, ghost_idx, s, c, 0, max) = arg.in[src_idx](spinor_parity, x_cb, s, c);
+	  }
+	}
 #ifdef NVSHMEM_COMMS
 	if (arg.shmem) shmem_signalwait(0, 0, (arg.shmem & 4), arg);
 #endif

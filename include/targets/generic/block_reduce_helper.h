@@ -164,6 +164,8 @@ namespace quda
       static_assert(hasSpecialOpType<BlockReduce_t, SpecialOps<U...>>);
     }
 
+    constexpr BlockReduce(const BlockReduce<T,block_dim,batch_size> &) = delete;
+
     /**
        @brief Perform a block-wide sum reduction
        @param[in] value Thread-local value to be reduced
