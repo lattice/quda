@@ -67,7 +67,7 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
   template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool active)
+  __device__ __host__ inline void applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -150,7 +150,7 @@ namespace quda
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      
+
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
