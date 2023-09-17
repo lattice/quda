@@ -62,7 +62,7 @@ namespace quda
       data = p;
     }
 
-    constexpr auto smem() const { return *this; }
+    constexpr auto sharedMem() const { return *this; }
 
     /**
        @brief Subscripting operator returning a reference to element.

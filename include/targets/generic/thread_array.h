@@ -48,7 +48,7 @@ namespace quda
       array_(sharedMem()[target::thread_idx_linear<3>()])
     {
       checkSpecialOp<thread_array<T,n,O>,U...>();
-      array_ = array<T, n>(); // call default constructor
+      array_ = array<T, n>{}; // call default constructor
     }
 
     constexpr thread_array(const thread_array<T,n,O> &) = delete;

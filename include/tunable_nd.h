@@ -64,6 +64,7 @@ namespace quda
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
     void launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
+#ifdef CHECK_SHARED_BYTES
       auto sizeOps = sharedMemSize<getSpecialOps<Functor<Arg>>>(tp.block);
       auto sizeTp = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
       if (sizeOps != sizeTp) {
@@ -71,6 +72,7 @@ namespace quda
 	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
 	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
       }
+#endif
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg);
       } else if constexpr (enable_host) {
@@ -220,6 +222,7 @@ namespace quda
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
     void launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
+#ifdef CHECK_SHARED_BYTES
       auto sizeOps = sharedMemSize<getSpecialOps<Functor<Arg>>>(tp.block);
       auto sizeTp = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
       if (sizeOps != sizeTp) {
@@ -227,6 +230,7 @@ namespace quda
 	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
 	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
       }
+#endif
       if (TunableKernel1D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg);
       } else if constexpr (enable_host) {
@@ -474,6 +478,7 @@ namespace quda
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
     void launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
+#ifdef CHECK_SHARED_BYTES
       auto sizeOps = sharedMemSize<getSpecialOps<Functor<Arg>>>(tp.block);
       auto sizeTp = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
       if (sizeOps != sizeTp) {
@@ -481,6 +486,7 @@ namespace quda
 	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
 	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
       }
+#endif
       if (TunableKernel2D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg);
       } else if constexpr (enable_host) {

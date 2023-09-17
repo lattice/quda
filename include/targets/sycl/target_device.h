@@ -10,6 +10,9 @@
 #define QUDA_MAX_ARGUMENT_SIZE 2048
 #endif
 
+#define HOSTDEVICE __host__ __device__
+#define HostDevice __host__ __device__
+
 namespace quda {
 
   namespace target {
