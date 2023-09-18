@@ -6,7 +6,7 @@ namespace quda {
   // SpecialOps
   template <typename ...T>
   struct SpecialOps : SpecialOps_Base<T...> {
-    template <typename ...U> constexpr void setSpecialOps(const SpecialOps<U...> &ops) {
+    template <typename ...U> constexpr void setSpecialOps(const SpecialOps<U...> &) {
       static_assert(std::is_same_v<SpecialOps<T...>,SpecialOps<U...>>);
     }
   };
@@ -15,7 +15,7 @@ namespace quda {
   struct op_blockSync : op_BaseT<void> {
     //using dependencies = depFullBlock;
     template <typename ...Arg>
-    static constexpr unsigned int shared_mem_size(dim3 block, Arg &...arg) { return 0; }
+    static constexpr unsigned int shared_mem_size(dim3 block, Arg &...) { return 0; }
   };
 
   template <typename T>
@@ -23,7 +23,7 @@ namespace quda {
     //using dependencies = depNone;
     //using dependencies = depFullBlock;
     template <typename ...Arg>
-    static constexpr unsigned int shared_mem_size(dim3, Arg &...arg) { return 0; }
+    static constexpr unsigned int shared_mem_size(dim3, Arg &...) { return 0; }
   };
 
 }

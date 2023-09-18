@@ -6,25 +6,25 @@ namespace quda {
 
   // dimensions functors for SharedMemoryCache
   struct opDimsBlock {
-    template <typename ...Arg> static constexpr dim3 dims(dim3 b, const Arg &...arg) { return b; }
+    template <typename ...Arg> static constexpr dim3 dims(dim3 b, const Arg &...) { return b; }
   };
   template <int bx, int by, int bz> struct opDimsStatic {
-    template <typename ...Arg> static constexpr dim3 dims(dim3 b, const Arg &...arg) { return dim3(bx,by,bz); }
+    template <typename ...Arg> static constexpr dim3 dims(dim3, const Arg &...) { return dim3(bx,by,bz); }
   };
 
   // size functors for determining shared memory size
   struct opSizeBlock {
-    template <typename T, typename ...Arg> static constexpr unsigned int size(dim3 b, const Arg &...arg) {
+    template <typename T, typename ...Arg> static constexpr unsigned int size(dim3 b, const Arg &...) {
       return b.x * b.y * b.z * sizeof(T);
     }
   };
   struct opSizeBlockDivWarp {
-    template <typename T, typename ...Arg> static constexpr unsigned int size(dim3 b, const Arg &...arg) {
+    template <typename T, typename ...Arg> static constexpr unsigned int size(dim3 b, const Arg &...) {
       return ((b.x * b.y * b.z + device::warp_size() - 1)/device::warp_size()) * sizeof(T);
     }
   };
   template <unsigned int S> struct opSizeStatic {
-    template <typename T, typename ...Arg> static constexpr unsigned int size(dim3 b, const Arg &...arg) {
+    template <typename T, typename ...Arg> static constexpr unsigned int size(dim3 b, const Arg &...) {
       return S * sizeof(T);
     }
   };
@@ -54,7 +54,7 @@ namespace quda {
   static constexpr bool hasSpecialOp<T,SpecialOps<U...>> = ( std::is_same_v<T,U> || ... );
 
   //template <typename T, typename Ops> void checkSpecialOps() { static_assert(hasSpecialOp<T,Ops>); }
-  template <typename T, typename Ops> void checkSpecialOps(const Ops &ops) {
+  template <typename T, typename Ops> void checkSpecialOps(const Ops &) {
     static_assert(hasSpecialOp<T,typename Ops::SpecialOpsT>);
   }
 
@@ -248,7 +248,7 @@ namespace quda {
   };
   template <> struct sharedMemSizeS<NoSpecialOps> {
     template <typename ...Arg>
-    static constexpr unsigned int size(dim3, Arg &...arg) {
+    static constexpr unsigned int size(dim3, Arg &...) {
       return 0;
     }
   };
@@ -266,7 +266,7 @@ namespace quda {
   // sharedMemOffset
   template <typename T, int n> struct sharedMemOffset {
     template <typename ...Arg>
-    inline int operator()(dim3 block, Arg &...arg) { return 0; }
+    inline int operator()(dim3 block, Arg &...) { return 0; }
   };
   template <typename T, int n> struct sharedMemOffset<SpecialOps<T>,n> {
     template <typename ...Arg>
@@ -274,7 +274,7 @@ namespace quda {
   };
   template <typename ...T> struct sharedMemOffset<op_Concurrent<T...>,0> {
     template <typename ...Arg>
-    inline int operator()(dim3 block, Arg &...arg) { return 0; }
+    inline int operator()(dim3 block, Arg &...) { return 0; }
   };
   template <typename ...T, int n> struct sharedMemOffset<op_Concurrent<T...>,n> {
     template <typename ...Arg>

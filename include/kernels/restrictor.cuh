@@ -119,7 +119,7 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     template <bool allthreads = false>
-    __device__ __host__ inline void operator()(dim3 block, dim3 thread, bool active = true)
+    __device__ __host__ inline void operator()(dim3 block, dim3 thread, bool /*active*/ = true)
     {
       int x_fine_offset = thread.x;
       const int x_coarse = block.x;
