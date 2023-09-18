@@ -24,7 +24,7 @@ namespace quda {
     }
   };
   template <unsigned int S> struct opSizeStatic {
-    template <typename T, typename ...Arg> static constexpr unsigned int size(dim3 b, const Arg &...) {
+    template <typename T, typename ...Arg> static constexpr unsigned int size(dim3, const Arg &...) {
       return S * sizeof(T);
     }
   };
@@ -266,7 +266,7 @@ namespace quda {
   // sharedMemOffset
   template <typename T, int n> struct sharedMemOffset {
     template <typename ...Arg>
-    inline int operator()(dim3 block, Arg &...) { return 0; }
+    inline int operator()(dim3, Arg &...) { return 0; }
   };
   template <typename T, int n> struct sharedMemOffset<SpecialOps<T>,n> {
     template <typename ...Arg>
@@ -274,7 +274,7 @@ namespace quda {
   };
   template <typename ...T> struct sharedMemOffset<op_Concurrent<T...>,0> {
     template <typename ...Arg>
-    inline int operator()(dim3 block, Arg &...) { return 0; }
+    inline int operator()(dim3, Arg &...) { return 0; }
   };
   template <typename ...T, int n> struct sharedMemOffset<op_Concurrent<T...>,n> {
     template <typename ...Arg>

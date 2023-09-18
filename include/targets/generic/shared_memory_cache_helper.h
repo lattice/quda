@@ -125,9 +125,9 @@ namespace quda
     }
 #endif
 
-    template <typename... U, typename... Arg>
-    HostDevice inline SharedMemoryCache(const SpecialOps<U...> &ops, Arg... arg) :
-      Smem(ops), block(D::dims(target::block_dim())), stride(block.x * block.y * block.z)
+    template <typename ...U, typename ...Arg>
+    HostDevice inline SharedMemoryCache(const SpecialOps<U...> &ops, Arg ...arg) :
+      Smem(ops), block(D::dims(target::block_dim(), arg...)), stride(block.x * block.y * block.z)
     {
       checkSpecialOp<SharedMemoryCache<T,D,O>,U...>();
       static_assert(shared_mem_size(dim3{8,8,8})==Smem::get_offset(dim3{8,8,8})+SizeDims<D>::size(dim3{8,8,8})*sizeof(T));
