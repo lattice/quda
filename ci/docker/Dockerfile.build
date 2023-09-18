@@ -1,0 +1,40 @@
+FROM docker.io/nvidia/cuda:11.8.0-devel-ubuntu22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update -qq && apt-get install -qq -y --no-install-recommends \
+    build-essential \
+    cmake \
+    wget \
+    ninja-build && \
+    rm -rf /var/lib/apt/lists/*
+
+ARG MPICH_VERSION=3.3.2
+ARG MPICH_PATH=/usr/local/mpich
+RUN wget -q https://www.mpich.org/static/downloads/${MPICH_VERSION}/mpich-${MPICH_VERSION}.tar.gz && \
+    tar -xzf mpich-${MPICH_VERSION}.tar.gz && \
+    cd mpich-${MPICH_VERSION} && \
+    ./configure \
+    --disable-fortran \
+    --prefix=$MPICH_PATH && \
+    make install -j$(nproc) && \
+    rm -rf /root/mpich-${MPICH_VERSION}.tar.gz /root/mpich-${MPICH_VERSION}
+
+COPY . /quda/src
+
+RUN  cmake -S /quda/src \
+    -DCMAKE_CUDA_COMPILER=nvcc \
+    -DCMAKE_CXX_COMPILER=/usr/local/mpich/bin/mpicxx \
+    -DCMAKE_C_COMPILER=/usr/local/mpich/bin/mpicc \
+    -DQUDA_GPU_ARCH=sm_60 -DQUDA_GPU_ARCH_SUFFIX=virtual -DQUDA_JITIFY=ON \
+    -DQUDA_MULTIGRID=ON \
+    -DQUDA_MULTIGRID_NVEC_LIST=24 \
+    -DQUDA_MDW_FUSED_LS_LIST=4 \
+    -DQUDA_MPI=ON -DMPI_CXX_SKIP_MPICXX=ON \
+    -DQUDA_PRECISION=10 -DQUDA_FAST_COMPILE_DSLASH=ON -DQUDA_FAST_COMPILE_REDUCE=ON \
+    -GNinja \
+    -B /quda/build -DCMAKE_BUILD_TYPE=Release
+
+RUN cmake --build /quda/build
+
+RUN cmake --install /quda/build

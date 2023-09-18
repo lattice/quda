@@ -15,7 +15,7 @@ endif()
 
 add_subdirectory(utils)
 add_subdirectory(host_reference)
-enable_language(Fortran)
+# enable_language(Fortran)
 
 if(QUDA_NVSHMEM AND QUDA_DOWNLOAD_NVSHMEM)
   add_dependencies(quda_test NVSHMEM)

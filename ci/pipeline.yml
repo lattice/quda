@@ -1,0 +1,26 @@
+include:
+  - remote: 'https://gitlab.com/cscs-ci/recipes/-/raw/master/templates/v2/.ci-ext.yml'
+
+stages:
+  - build
+  # - test
+
+variables:
+  PERSIST_IMAGE_NAME: $CSCS_REGISTRY_PATH/quda:$CI_COMMIT_SHORT_SHA
+
+build_job:
+  stage: build
+  extends: .container-builder
+  variables:
+    DOCKERFILE: ci/docker/Dockerfile.build
+
+# test_job:
+#   stage: test
+#   extends: .container-runner-daint-gpu
+#   image: $PERSIST_IMAGE_NAME
+#   script:
+#     - /opt/helloworld/bin/hello
+#   variables:
+#     SLURM_JOB_NUM_NODES: 2
+#     SLURM_PARTITION: normal
+#     SLURM_NTASKS: 2
