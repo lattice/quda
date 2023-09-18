@@ -125,7 +125,8 @@ namespace quda
     using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
     __shared__ bool isLastBlockDone[n_batch_block];
 
-    T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
+    SpecialOps<BlockReduce> ops{};
+    T aggregate = BlockReduce(ops, target::thread_idx().z).Reduce(in, r);
 
     if (target::thread_idx_linear<2>() == 0) {
       arg.partial[idx * target::grid_dim().x + target::block_idx().x] = aggregate;
@@ -149,7 +150,7 @@ namespace quda
         i += target::block_size<2>();
       }
 
-      sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
+      sum = BlockReduce(ops, target::thread_idx().z).Reduce(sum, r);
 
       // write out the final reduced value
       if (target::thread_idx_linear<2>() == 0) {
