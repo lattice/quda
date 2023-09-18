@@ -3,7 +3,7 @@ include:
 
 stages:
   - build
-  # - test
+  - test
 
 variables:
   PERSIST_IMAGE_NAME: $CSCS_REGISTRY_PATH/quda:$CI_COMMIT_SHORT_SHA
@@ -14,13 +14,13 @@ build_job:
   variables:
     DOCKERFILE: ci/docker/Dockerfile.build
 
-# test_job:
-#   stage: test
-#   extends: .container-runner-daint-gpu
-#   image: $PERSIST_IMAGE_NAME
-#   script:
-#     - /opt/helloworld/bin/hello
-#   variables:
-#     SLURM_JOB_NUM_NODES: 2
-#     SLURM_PARTITION: normal
-#     SLURM_NTASKS: 2
+test_job:
+  stage: test
+  extends: .container-runner-daint-gpu
+  image: $PERSIST_IMAGE_NAME
+  script:
+    - ctest --test-dir /quda/build/
+  variables:
+    CRAY_CUDA_MPS: 1
+    SLURM_JOB_NUM_NODES: 1
+    SLURM_PARTITION: normal
