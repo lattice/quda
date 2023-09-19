@@ -16,8 +16,8 @@ namespace quda
 #ifndef QUDA_FAST_COMPILE_REDUCE
     constexpr bool enable_warp_split() { return false; }
 #else
-    constexpr bool enable_warp_split() { return true; }
-    //constexpr bool enable_warp_split() { return false; }
+    //constexpr bool enable_warp_split() { return true; }
+    constexpr bool enable_warp_split() { return false; }
 #endif
 
     /**
