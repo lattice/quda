@@ -20,6 +20,8 @@ RUN wget -q https://www.mpich.org/static/downloads/${MPICH_VERSION}/mpich-${MPIC
     make install -j$(nproc) && \
     rm -rf /root/mpich-${MPICH_VERSION}.tar.gz /root/mpich-${MPICH_VERSION}
 
+RUN echo "${MPICH_PATH}/lib" >> /etc/ld.so.conf.d/cscs.conf && ldconfig
+
 COPY . /quda/src
 
 RUN  cmake -S /quda/src \
