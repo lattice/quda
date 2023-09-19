@@ -21,7 +21,7 @@ test_job:
   script:
     - ctest --test-dir /quda/build/ --verbose
   variables:
-    CRAY_CUDA_MPS: 1
+    CRAY_CUDA_MPS: 0
     SLURM_JOB_NUM_NODES: 2
     SLURM_PARTITION: debug
     SLURM_TIMELIMIT: "0:30:00"
