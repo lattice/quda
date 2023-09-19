@@ -26,14 +26,15 @@ RUN  cmake -S /quda/src \
     -DCMAKE_CUDA_COMPILER=nvcc \
     -DCMAKE_CXX_COMPILER=/usr/local/mpich/bin/mpicxx \
     -DCMAKE_C_COMPILER=/usr/local/mpich/bin/mpicc \
-    -DQUDA_GPU_ARCH=sm_60 -DQUDA_GPU_ARCH_SUFFIX=virtual -DQUDA_JITIFY=ON \
+    -DQUDA_GPU_ARCH=sm_60 \
     -DQUDA_MULTIGRID=ON \
     -DQUDA_MULTIGRID_NVEC_LIST=24 \
     -DQUDA_MDW_FUSED_LS_LIST=4 \
-    -DQUDA_MPI=ON -DMPI_CXX_SKIP_MPICXX=ON \
-    -DQUDA_PRECISION=10 -DQUDA_FAST_COMPILE_DSLASH=ON -DQUDA_FAST_COMPILE_REDUCE=ON \
+    -DQUDA_MPI=ON  \
+    -DQUDA_DIRAC_DEFAULT_OFF=ON \
+    -DQUDA_DIRAC_WILSON=ON -DQUDA_DIRAC_CLOVER=ON -DQUDA_DIRAC_STAGGERED=ON \
     -GNinja \
-    -B /quda/build -DCMAKE_BUILD_TYPE=Release
+    -B /quda/build 
 
 RUN cmake --build /quda/build
 
