@@ -272,10 +272,10 @@ void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec)
   QudaGaugeParam param = newOpenQCDGaugeParam(prec);
 
   /* Matthias Wagner: optimize that */
-  void* buffer = malloc(4*qudaState.init.volume*18*prec);
+  void* buffer = pool_pinned_malloc(4*qudaState.init.volume*18*prec);
   qudaState.init.reorder_gauge_openqcd_to_quda(gauge, buffer);
   loadGaugeQuda(buffer, &param);
-  free(buffer);
+  pool_pinned_free(buffer);
 
   qudaState.gauge_loaded = true;
 }
@@ -285,10 +285,10 @@ void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec)
 {
   QudaGaugeParam param = newOpenQCDGaugeParam(prec);
 
-  void* buffer = malloc(4*qudaState.init.volume*18*prec);
+  void* buffer = pool_pinned_malloc(4*qudaState.init.volume*18*prec);
   saveGaugeQuda(buffer, &param);
   qudaState.init.reorder_gauge_quda_to_openqcd(buffer, gauge);
-  free(buffer);
+  pool_pinned_free(buffer);
 }
 
 
