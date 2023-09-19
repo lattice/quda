@@ -108,7 +108,13 @@ namespace quda {
   template <typename T> inline constexpr bool explicitSpecialOps = explicitSpecialOpsS<T>::value;
 
   // hasSpecialOps
+#if 1
   template <typename T> inline constexpr bool hasSpecialOps = !std::is_same_v<getSpecialOps<T>,NoSpecialOps>;
+#else
+  template <typename T> struct hasSpecialOpsImpl { static constexpr bool value = false; };
+  template <typename ...U> struct hasSpecialOpsImpl<SpecialOps<U...>> { static constexpr bool value = true; };
+  template <typename T> inline constexpr bool hasSpecialOps = hasSpecialOpsImpl<T>::value;
+#endif
 
   // combineOps
   template <typename ...T> struct combineOpsS {};

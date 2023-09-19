@@ -702,15 +702,15 @@ namespace quda
 
 #ifdef QUDA_DSLASH_FAST_COMPILE
 	if constexpr (allthreads) {
-	  dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, allthreads>(x_cb, s, parity, active);
+	  dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, true>(x_cb, s, parity, active);
 	} else {
 	  dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, parity);
 	}
 #else
 	if constexpr (allthreads) {
 	  switch (parity) {
-	  case 0: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, allthreads>(x_cb, s, 0, active); break;
-	  case 1: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, allthreads>(x_cb, s, 1, active); break;
+	  case 0: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, true>(x_cb, s, 0, active); break;
+	  case 1: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type, true>(x_cb, s, 1, active); break;
 	  }
 	} else {
 	  switch (parity) {

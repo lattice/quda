@@ -4,6 +4,10 @@
 
 #include <../generic/shared_memory_cache_helper.h>
 
+namespace quda {
+  template <typename T, typename D, typename O> static constexpr bool needsFullBlock<SharedMemoryCache<T,D,O>> = true;
+}
+
 #else
 
 #include <target_device.h>
@@ -30,7 +34,7 @@ namespace quda
      This accessor supports both explicit run-time block size and
      compile-time sizing.
 
-     * For run-time block size, the constructor should be initialied
+     * For run-time block size, the constructor should be initialized
        with the desired block size.
 
      * For compile-time block size, no arguments should be passed to
