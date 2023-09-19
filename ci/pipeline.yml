@@ -19,8 +19,8 @@ test_job:
   extends: .container-runner-daint-gpu
   image: $PERSIST_IMAGE_NAME
   script:
-    - ctest --test-dir /quda/build/
+    - ctest --test-dir /quda/build/ --output-on-failure
   variables:
     CRAY_CUDA_MPS: 1
-    SLURM_JOB_NUM_NODES: 1
+    SLURM_JOB_NUM_NODES: 2
     SLURM_PARTITION: normal
