@@ -50,6 +50,28 @@ static openQCD_QudaState_t qudaState = {false, false, false, false, {}, {}};
 
 using namespace quda;
 
+template <bool start> void inline qudaopenqcd_called(const char *func, QudaVerbosity verb)
+{
+  // add NVTX markup if enabled
+  if (start) {
+    PUSH_RANGE(func, 1);
+  } else {
+    POP_RANGE;
+  }
+
+  #ifdef QUDAMILC_VERBOSE
+  if (verb >= QUDA_VERBOSE) {
+    if (start) {
+      printfQuda("QUDA_OPENQCD_INTERFACE: %s (called) \n", func);
+    } else {
+      printfQuda("QUDA_OPENQCD_INTERFACE: %s (return) \n", func);
+    }
+  }
+#endif
+}
+
+template <bool start> void inline qudaopenqcd_called(const char *func) { qudaopenqcd_called<start>(func, getVerbosity()); }
+
 
 /**
  * @brief      Returns the local lattice dimensions as lat_dim_t
@@ -203,7 +225,9 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout)
   qudaState.layout = layout;
 
   setVerbosityQuda(qudaState.init.verbosity, "QUDA: ", qudaState.init.logfile);
+  qudaopenqcd_called<true>(__func__);
   openQCD_qudaSetLayout(qudaState.layout);
+  qudaopenqcd_called<false>(__func__);
   qudaState.initialized = true;
 }
 
@@ -247,6 +271,7 @@ void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec)
 {
   QudaGaugeParam param = newOpenQCDGaugeParam(prec);
 
+  /* Matthias Wagner: optimize that */
   void* buffer = malloc(4*qudaState.init.volume*18*prec);
   qudaState.init.reorder_gauge_openqcd_to_quda(gauge, buffer);
   loadGaugeQuda(buffer, &param);
@@ -457,7 +482,7 @@ void openQCD_qudaDw(void *src, void *dst, openQCD_QudaDiracParam_t p)
 }
 
 
-void openQCD_qudaGCR(void *source, void *solution,
+double openQCD_qudaGCR(void *source, void *solution,
   openQCD_QudaDiracParam_t dirac_param, openQCD_QudaGCRParam_t gcr_param)
 {
   QudaInvertParam param = newOpenQCDSolverParam(dirac_param);
@@ -480,6 +505,8 @@ void openQCD_qudaGCR(void *source, void *solution,
   printfQuda("gflops      = %.2e\n", param.gflops);
   printfQuda("secs        = %.2e\n", param.secs);
   printfQuda("Nsteps      = %d\n",   param.Nsteps);
+
+  return param.true_res;
 }
 
 
