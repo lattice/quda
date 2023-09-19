@@ -1,5 +1,5 @@
 include:
-  - remote: 'https://gitlab.com/cscs-ci/recipes/-/raw/master/templates/v2/.ci-ext.yml'
+  - remote: "https://gitlab.com/cscs-ci/recipes/-/raw/master/templates/v2/.ci-ext.yml"
 
 stages:
   - build
@@ -19,10 +19,11 @@ test_job:
   extends: .container-runner-daint-gpu
   image: $PERSIST_IMAGE_NAME
   script:
-    - ctest --test-dir /quda/build/ --output-on-failure
+    - ctest --test-dir /quda/build/ --verbose
   variables:
     CRAY_CUDA_MPS: 1
     SLURM_JOB_NUM_NODES: 2
-    SLURM_PARTITION: normal
-    SLURM_TIMELIMIT: "4:00:00"
+    SLURM_PARTITION: debug
+    SLURM_TIMELIMIT: "0:30:00"
     USE_MPI: "YES"
+    QUDA_ENABLE_TUNING: 0
