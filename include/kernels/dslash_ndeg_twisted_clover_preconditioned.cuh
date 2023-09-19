@@ -89,71 +89,73 @@ namespace quda
         out += x;
       }
 
-      if (isComplete<mykernel_type>(arg, coord)) {
-	constexpr int n_flavor = 2;
-	HalfVector out_chi[n_flavor]; // flavor array of chirally projected fermion
+      if (isComplete<mykernel_type>(arg, coord) && active) {
 	out.toRel();
+      }
+
+      constexpr int n_flavor = 2;
+      HalfVector out_chi[n_flavor]; // flavor array of chirally projected fermion
 #pragma unroll
-	for (int i = 0; i < n_flavor; i++) out_chi[i] = out.chiral_project(i);
+      for (int i = 0; i < n_flavor; i++) out_chi[i] = out.chiral_project(i);
 
-	int chirality = flavor; // relabel flavor as chirality
-	SharedMemoryCache<HalfVector> cache{*this};
+      int chirality = flavor; // relabel flavor as chirality
+      SharedMemoryCache<HalfVector> cache{*this};
 
-        enum swizzle_direction {
-          FORWARDS = 0,
-          BACKWARDS = 1
-        };
+      enum swizzle_direction {
+	FORWARDS = 0,
+	BACKWARDS = 1
+      };
 
-        auto swizzle = [&](HalfVector x[2], int chirality, swizzle_direction dir) {
-	  if (chirality == 0) cache.save_y(x[1], dir);
-	  else                cache.save_y(x[0], 1 - dir);
-          cache.sync();
-	  if (chirality == 0) x[1] = cache.load_y(1 - dir);
-	  else                x[0] = cache.load_y(dir);
-        };
+      auto swizzle = [&](HalfVector x[2], int chirality, swizzle_direction dir) {
+	if (chirality == 0) cache.save_y(x[1], dir);
+	else                cache.save_y(x[0], 1 - dir);
+	cache.sync();
+	if (chirality == 0) x[1] = cache.load_y(1 - dir);
+	else                x[0] = cache.load_y(dir);
+      };
 
-        swizzle(out_chi, chirality, FORWARDS); // apply the flavor-chirality swizzle between threads
+      swizzle(out_chi, chirality, FORWARDS); // apply the flavor-chirality swizzle between threads
 
-	if (active) {
-	  // load in the clover matrix
-	  HMat A = arg.A(coord.x_cb, parity, chirality);
+      if (isComplete<mykernel_type>(arg, coord) && active) {
+	// load in the clover matrix
+	HMat A = arg.A(coord.x_cb, parity, chirality);
 
-	  HalfVector A_chi[n_flavor];
+	HalfVector A_chi[n_flavor];
 #pragma unroll
-	  for (int flavor_ = 0; flavor_ < n_flavor; flavor_++) {
-	    const complex<real> b(0.0, (chirality^flavor_) == 0 ? arg.b : -arg.b);
-	    A_chi[flavor_] = A * out_chi[flavor_];
-	    A_chi[flavor_] += b * out_chi[flavor_];
-	    A_chi[flavor_] += arg.c * out_chi[1 - flavor_];
-	  }
-
-	  if constexpr (Arg::dynamic_clover) {
-	    HMat A2 = A.square();
-	    A2 += arg.b2_minus_c2;
-	    Cholesky<HMatrix, clover::cholesky_t<typename Arg::Float>, Arg::nColor * Arg::nSpin / 2> cholesky(A2);
-
-#pragma unroll
-	    for (int flavor_ = 0; flavor_ < n_flavor; flavor_++) {
-	      out_chi[flavor_] = static_cast<real>(0.25) * cholesky.backward(cholesky.forward(A_chi[flavor_]));
-	    }
-	  } else {
-	    HMat A2inv = arg.A2inv(coord.x_cb, parity, chirality);
-#pragma unroll
-	    for (int flavor_ = 0; flavor_ < n_flavor; flavor_++) {
-	      out_chi[flavor_] = static_cast<real>(2.0) * (A2inv * A_chi[flavor_]);
-	    }
-	  }
+	for (int flavor_ = 0; flavor_ < n_flavor; flavor_++) {
+	  const complex<real> b(0.0, (chirality^flavor_) == 0 ? arg.b : -arg.b);
+	  A_chi[flavor_] = A * out_chi[flavor_];
+	  A_chi[flavor_] += b * out_chi[flavor_];
+	  A_chi[flavor_] += arg.c * out_chi[1 - flavor_];
 	}
 
-        swizzle(out_chi, chirality, BACKWARDS); // undo the flavor-chirality swizzle
+	if constexpr (Arg::dynamic_clover) {
+	  HMat A2 = A.square();
+	  A2 += arg.b2_minus_c2;
+	  Cholesky<HMatrix, clover::cholesky_t<typename Arg::Float>, Arg::nColor * Arg::nSpin / 2> cholesky(A2);
+
+#pragma unroll
+	  for (int flavor_ = 0; flavor_ < n_flavor; flavor_++) {
+	    out_chi[flavor_] = static_cast<real>(0.25) * cholesky.backward(cholesky.forward(A_chi[flavor_]));
+	  }
+	} else {
+	  HMat A2inv = arg.A2inv(coord.x_cb, parity, chirality);
+#pragma unroll
+	  for (int flavor_ = 0; flavor_ < n_flavor; flavor_++) {
+	    out_chi[flavor_] = static_cast<real>(2.0) * (A2inv * A_chi[flavor_]);
+	  }
+	}
+      }
+
+      swizzle(out_chi, chirality, BACKWARDS); // undo the flavor-chirality swizzle
+
+      if (isComplete<mykernel_type>(arg, coord) && active) {
 	Vector tmp = out_chi[0].chiral_reconstruct(0) + out_chi[1].chiral_reconstruct(1);
 	tmp.toNonRel(); // switch back to non-chiral basis
 
 	if constexpr (xpay) {
-	  if (active) {
-	    Vector x = arg.x(my_flavor_idx, my_spinor_parity);
-	    out = x + arg.a * tmp;
-	  }
+	  Vector x = arg.x(my_flavor_idx, my_spinor_parity);
+	  out = x + arg.a * tmp;
 	} else {
 	  // multiplication with a needed here?
 	  out = arg.a * tmp;
