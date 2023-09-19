@@ -1404,7 +1404,7 @@ namespace quda {
       const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
       //__shared__ complex<storeType> X[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
       //__shared__ complex<storeType> Y[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
-      Cache<Arg> cache(ftor);
+      Cache<Arg> cache{ftor};
       auto &X = cache.data()[0];
       auto &Y = cache.data()[1];
 

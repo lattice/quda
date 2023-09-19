@@ -192,7 +192,7 @@ namespace quda {
     {
       using Arg = typename Ftor::Arg;
       using real = typename Arg::real;
-      Cache<Arg> cache(ftor);
+      Cache<Arg> cache{ftor};
       cache.save(thread_max);
       cache.sync();
       real this_site_max = static_cast<real>(0);

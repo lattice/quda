@@ -127,7 +127,7 @@ namespace quda
 
         int thread_idx = target::thread_idx().y * target::block_dim().x + target::thread_idx().x;
         //typename Transfer5DParams<Arg>::Cache cache(*this, arg);
-        typename Transfer5DParams<Arg>::Cache cache(*this);
+        typename Transfer5DParams<Arg>::Cache cache{*this};
         while (thread_idx < static_cast<int>(Ls_out * Ls_in * sizeof(matrix_t) / sizeof(real))) {
           cache.data()[thread_idx] = reinterpret_cast<const real *>(wm_p)[thread_idx];
           thread_idx += target::block_dim().y * target::block_dim().x;

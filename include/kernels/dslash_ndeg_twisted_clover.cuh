@@ -75,7 +75,7 @@ namespace quda
       applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
       if (mykernel_type == INTERIOR_KERNEL) {
-	SharedMemoryCache<Vector> cache(*this);
+	SharedMemoryCache<Vector> cache{*this};
 	Vector tmp;
 	if (!allthreads || active) {
 	  // apply the chiral and flavor twists

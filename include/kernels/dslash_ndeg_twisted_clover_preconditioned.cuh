@@ -97,7 +97,7 @@ namespace quda
 	}
 
 	int chirality = flavor; // relabel flavor as chirality
-	SharedMemoryCache<HalfVector> cache(*this);
+	SharedMemoryCache<HalfVector> cache{*this};
 
         enum swizzle_direction {
           FORWARDS = 0,

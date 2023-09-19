@@ -109,7 +109,7 @@ namespace quda
         using real = typename Arg::real;
         typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
-        SharedMemoryCache<Vector> cache(*this);
+        SharedMemoryCache<Vector> cache{*this};
 
         Vector out;
 	if (!allthreads || active) {
@@ -195,7 +195,7 @@ namespace quda
         typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
         const auto sherman_morrison = arg.sherman_morrison;
-        SharedMemoryCache<Vector> cache(*this);
+        SharedMemoryCache<Vector> cache{*this};
 	if (!allthreads || active) {
 	  cache.save(arg.in(s * arg.volume_4d_cb + x_cb, parity));
 	}
