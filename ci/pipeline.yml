@@ -24,4 +24,5 @@ test_job:
     CRAY_CUDA_MPS: 1
     SLURM_JOB_NUM_NODES: 2
     SLURM_PARTITION: normal
+    SLURM_TIMELIMIT: "4:00:00"
     USE_MPI: "YES"
