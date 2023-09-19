@@ -6,7 +6,7 @@ stages:
   - test
 
 variables:
-  PERSIST_IMAGE_NAME: $CSCS_REGISTRY_PATH/quda:$CI_COMMIT_SHORT_SHA
+  PERSIST_IMAGE_NAME: $CSCS_REGISTRY_PATH/quda/public/build:$CI_COMMIT_SHORT_SHA
 
 build_job:
   stage: build
