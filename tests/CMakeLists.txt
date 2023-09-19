@@ -247,18 +247,18 @@ target_link_libraries(heatbath_test ${TEST_LIBS})
 quda_checkbuildtest(heatbath_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS heatbath_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-if(QUDA_MPI OR QUDA_QMP)
-  if(DEFINED ENV{QUDA_TEST_NUMPROCS})
-    # user is setting number of processes to use through the QUDA_TEST_NUMPROCS env
-    set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG}
-                          $ENV{QUDA_TEST_NUMPROCS} ${MPIEXEC_PREFLAGS})
-  else()
-    # use FindMPI variables for QUDA_CTEST_LAUNCH set MPIEXEC_MAX_NUMPROCS to the
-    # number of ranks you want to launch
-    set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG}
-                          ${MPIEXEC_MAX_NUMPROCS} ${MPIEXEC_PREFLAGS})
-  endif()
-endif()
+#if(QUDA_MPI OR QUDA_QMP)
+#  if(DEFINED ENV{QUDA_TEST_NUMPROCS})
+#    # user is setting number of processes to use through the QUDA_TEST_NUMPROCS env
+#    set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG}
+#                          $ENV{QUDA_TEST_NUMPROCS} ${MPIEXEC_PREFLAGS})
+#  else()
+#    # use FindMPI variables for QUDA_CTEST_LAUNCH set MPIEXEC_MAX_NUMPROCS to the
+#    # number of ranks you want to launch
+#    set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG}
+#                          ${MPIEXEC_MAX_NUMPROCS} ${MPIEXEC_PREFLAGS})
+#  endif()
+#endif()
 
 # BLAS tests
 if(QUDA_DIRAC_WILSON
