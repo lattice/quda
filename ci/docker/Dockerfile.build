@@ -39,3 +39,6 @@ RUN  cmake -S /quda/src \
 RUN cmake --build /quda/build
 
 RUN cmake --install /quda/build
+
+ENV QUDA_TEST_GRID_SIZE="1 1 1 2"
+
