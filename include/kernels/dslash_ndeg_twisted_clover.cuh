@@ -36,15 +36,17 @@ namespace quda
       }
   };
 
-  template <typename Arg> struct nDegTwistedCloverParams {
+  template <KernelType kernel_type, typename Arg> struct nDegTwistedCloverParams {
     using real = typename mapper<typename Arg::Float>::type;
     using Vec = ColorSpinor<real, Arg::nColor, 4>;
     using Cache = SharedMemoryCache<Vec>;
     using Ops = SpecialOps<Cache>;
+    //template <KernelType kernel_type>
+    //using Ops = conditional_t<kernel_type == INTERIOR_KERNEL,SpecialOps<Cache>,NoSpecialOps>;
   };
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct nDegTwistedClover : dslash_default, nDegTwistedCloverParams<Arg>::Ops {
+  struct nDegTwistedClover : dslash_default, nDegTwistedCloverParams<kernel_type,Arg>::Ops {
 
     const Arg &arg;
     constexpr nDegTwistedClover(const Arg &arg) : arg(arg) {}
@@ -62,7 +64,6 @@ namespace quda
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
       typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
 
-      active &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                          // which dimension is thread working on (fused kernel only)
 
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
@@ -71,10 +72,13 @@ namespace quda
       const int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
 
-      // defined in dslash_wilson.cuh
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      if (!allthreads || active) {
+	active &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+	// defined in dslash_wilson.cuh
+	applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      }
 
-      if (mykernel_type == INTERIOR_KERNEL) {
+      if constexpr (mykernel_type == INTERIOR_KERNEL) {
 	SharedMemoryCache<Vector> cache{*this};
 	Vector tmp;
 	if (!allthreads || active) {

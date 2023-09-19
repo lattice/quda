@@ -69,15 +69,17 @@ namespace quda
       typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
       typedef HMatrix<real, Arg::nColor * Arg::nSpin / 2> HMat;
 
-      active &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                          // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
 
-      // defined in dslash_wilson.cuh
-      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      if (!allthreads || active) {
+	active &= mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+	// defined in dslash_wilson.cuh
+	applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      }
 
       int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
 
@@ -90,11 +92,9 @@ namespace quda
       if (isComplete<mykernel_type>(arg, coord)) {
 	constexpr int n_flavor = 2;
 	HalfVector out_chi[n_flavor]; // flavor array of chirally projected fermion
-	if (active) {
-	  out.toRel();
+	out.toRel();
 #pragma unroll
-	  for (int i = 0; i < n_flavor; i++) out_chi[i] = out.chiral_project(i);
-	}
+	for (int i = 0; i < n_flavor; i++) out_chi[i] = out.chiral_project(i);
 
 	int chirality = flavor; // relabel flavor as chirality
 	SharedMemoryCache<HalfVector> cache{*this};
@@ -105,15 +105,11 @@ namespace quda
         };
 
         auto swizzle = [&](HalfVector x[2], int chirality, swizzle_direction dir) {
-	  if (!allthreads || active) {
-	    if (chirality == 0) cache.save_y(x[1], dir);
-	    else                cache.save_y(x[0], 1 - dir);
-	  }
+	  if (chirality == 0) cache.save_y(x[1], dir);
+	  else                cache.save_y(x[0], 1 - dir);
           cache.sync();
-	  if (!allthreads || active) {
-	    if (chirality == 0) x[1] = cache.load_y(1 - dir);
-	    else                x[0] = cache.load_y(dir);
-	  }
+	  if (chirality == 0) x[1] = cache.load_y(1 - dir);
+	  else                x[0] = cache.load_y(dir);
         };
 
         swizzle(out_chi, chirality, FORWARDS); // apply the flavor-chirality swizzle between threads
@@ -131,7 +127,7 @@ namespace quda
 	    A_chi[flavor_] += arg.c * out_chi[1 - flavor_];
 	  }
 
-	  if (arg.dynamic_clover) {
+	  if constexpr (Arg::dynamic_clover) {
 	    HMat A2 = A.square();
 	    A2 += arg.b2_minus_c2;
 	    Cholesky<HMatrix, clover::cholesky_t<typename Arg::Float>, Arg::nColor * Arg::nSpin / 2> cholesky(A2);
@@ -150,17 +146,17 @@ namespace quda
 	}
 
         swizzle(out_chi, chirality, BACKWARDS); // undo the flavor-chirality swizzle
-	if (active) {
-	  Vector tmp = out_chi[0].chiral_reconstruct(0) + out_chi[1].chiral_reconstruct(1);
-	  tmp.toNonRel(); // switch back to non-chiral basis
+	Vector tmp = out_chi[0].chiral_reconstruct(0) + out_chi[1].chiral_reconstruct(1);
+	tmp.toNonRel(); // switch back to non-chiral basis
 
-	  if (xpay) {
+	if constexpr (xpay) {
+	  if (active) {
 	    Vector x = arg.x(my_flavor_idx, my_spinor_parity);
 	    out = x + arg.a * tmp;
-	  } else {
-	    // multiplication with a needed here?
-	    out = arg.a * tmp;
 	  }
+	} else {
+	  // multiplication with a needed here?
+	  out = arg.a * tmp;
 	}
       }
 

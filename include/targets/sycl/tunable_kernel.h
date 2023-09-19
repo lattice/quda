@@ -10,6 +10,8 @@
 #include <reduce_helper.h>
 #include <special_ops_target.h>
 
+#define CHECK_SHARED_BYTES
+
 namespace quda {
 
   /**
