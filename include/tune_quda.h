@@ -380,6 +380,22 @@ namespace quda {
     }
 
     /**
+     * @brief self-consistency check that the shared memory is set
+     * correctly (e.g., check that block size has been correctly
+     * factored in when set setting shared_bytes)
+    */
+    void checkSharedBytes(const TuneParam &tp) const {
+      auto tp2 = TuneParam(tp);
+      auto expected = setSharedBytes(tp2);
+      if (tp.shared_bytes < expected)
+        errorQuda("Shared bytes %u insufficient (expected %u)", tp.shared_bytes, expected);
+
+      if (sharedBytesPerThread() && sharedBytesPerBlock(tp))
+        errorQuda("Not supported: non-zero shared bytes per thread (%u) and per block (%u)",
+                  sharedBytesPerThread(), sharedBytesPerBlock(tp));
+    }
+
+    /**
      * @brief Return the rank on which kernel tuning is performed.
      * This will default to 0, but can be globally overriden with the
      * QUDA_TUNING_RANK environment variable.
