@@ -19,6 +19,7 @@ test_job:
   extends: .container-runner-daint-gpu
   image: $PERSIST_IMAGE_NAME
   script:
+    - env | grep QUDA
     - ctest --test-dir /quda/build/ --verbose
   variables:
     CRAY_CUDA_MPS: 0
@@ -27,3 +28,4 @@ test_job:
     SLURM_TIMELIMIT: "0:30:00"
     USE_MPI: "YES"
     QUDA_ENABLE_TUNING: 0
+    QUDA_RESOURCE_PATH: .
