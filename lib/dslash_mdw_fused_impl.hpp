@@ -124,7 +124,9 @@ namespace quda
           param.aux.x++;
           aux_advanced = true;
         } else {
-          if (param.aux.y < 3 && (param.aux.y + 1) * param.block.x * param.block.y <= device::maximum_resident_threads()) { // second see if aux.y
+          if (param.aux.y < 3
+              && (param.aux.y + 1) * param.block.x * param.block.y
+                <= device::maximum_resident_threads()) { // second see if aux.y
             param.aux.y++;
             aux_advanced = true;
             param.aux.x = 0;
@@ -191,10 +193,12 @@ namespace quda
       void apply(const TuneParam &tp, const qudaStream_t &stream)
       {
         if constexpr (block_dim_x * Ls * min_blocks <= device::maximum_resident_threads()) {
-          launch_cuda<FusedMobiusDslash>(tp, stream, Arg<type, Ls, block_dim_x, min_blocks, reload>
-                                                 (out, in, U, y, x, m_f, m_5, b_5, c_5, parity, shift, halo_shift));
+          launch_cuda<FusedMobiusDslash>(tp, stream,
+                                         Arg<type, Ls, block_dim_x, min_blocks, reload>(out, in, U, y, x, m_f, m_5, b_5,
+                                                                                        c_5, parity, shift, halo_shift));
         } else {
-          errorQuda("Maximum number of resident_threads reached: %d * %d * %d > %u\n", block_dim_x, Ls, min_blocks, device::maximum_resident_threads());
+          errorQuda("Maximum number of resident_threads reached: %d * %d * %d > %u\n", block_dim_x, Ls, min_blocks,
+                    device::maximum_resident_threads());
         }
       }
 
