@@ -141,7 +141,9 @@ namespace quda
           constexpr bool this_dagger = true;
           // Then we apply the second m5inv-dag
           //out = variableInv<allthreads, sync, this_dagger, shared>(*this, out, my_spinor_parity, 0, s, active);
-          out = variableInv<true, sync, this_dagger, shared>(*this, out, my_spinor_parity, 0, s, act);
+          //out = variableInv<true, sync, this_dagger, shared>(*this, out, my_spinor_parity, 0, s, act);
+          auto tmp = variableInv<true, sync, this_dagger, shared>(*this, out, my_spinor_parity, 0, s, act);
+	  if (complete) out = tmp;
         }
 
       } else if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS
@@ -216,10 +218,13 @@ namespace quda
           if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_PRE) {
             // Apply the m5inv.
             constexpr bool sync_m5inv = false;
-            out = variableInv<true, sync_m5inv, dagger, shared>(*this, out, my_spinor_parity, 0, s, act);
+            //out = variableInv<true, sync_m5inv, dagger, shared>(*this, out, my_spinor_parity, 0, s, act);
+            auto tmp = variableInv<true, sync_m5inv, dagger, shared>(*this, out, my_spinor_parity, 0, s, act);
             // Apply the m5pre.
             constexpr bool sync_m5pre = true;
-            out = d5<true, sync_m5pre, dagger, shared>(*this, out, my_spinor_parity, 0, s, act);
+            //out = d5<true, sync_m5pre, dagger, shared>(*this, out, my_spinor_parity, 0, s, act);
+            tmp = d5<true, sync_m5pre, dagger, shared>(*this, tmp, my_spinor_parity, 0, s, act);
+	    if (complete) out = tmp;
           }
 
           /******
@@ -228,10 +233,13 @@ namespace quda
           if (Arg::dslash5_type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
             // Apply the m5pre.
             constexpr bool sync_m5pre = false;
-            out = d5<true, sync_m5pre, dagger, shared>(*this, out, my_spinor_parity, 0, s, act);
+            //out = d5<true, sync_m5pre, dagger, shared>(*this, out, my_spinor_parity, 0, s, act);
+            auto tmp = d5<true, sync_m5pre, dagger, shared>(*this, out, my_spinor_parity, 0, s, act);
             // Apply the m5inv.
             constexpr bool sync_m5inv = true;
-            out = variableInv<true, sync_m5inv, dagger, shared>(*this, out, my_spinor_parity, 0, s, act);
+            //out = variableInv<true, sync_m5inv, dagger, shared>(*this, out, my_spinor_parity, 0, s, act);
+            tmp = variableInv<true, sync_m5inv, dagger, shared>(*this, tmp, my_spinor_parity, 0, s, act);
+	    if (complete) out = tmp;
           }
         }
       }
