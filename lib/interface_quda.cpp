@@ -1335,6 +1335,7 @@ void endQuda(void)
     for (int i = 0; i < QUDA_MAX_CHRONO; i++) flushChronoQuda(i);
 
     solutionResident.clear();
+    momResident = GaugeField();
 
     LatticeField::freeGhostBuffer();
     ColorSpinorField::freeGhostBuffer();
@@ -3876,15 +3877,14 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
 
   if (qudaGaugeParam->return_result_mom) cpuMom.copy(cudaMom);
 
-  if (qudaGaugeParam->make_resident_gauge) {
-    if (gaugePrecise && !qudaGaugeParam->use_resident_gauge) freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
+  if (qudaGaugeParam->make_resident_gauge && !qudaGaugeParam->use_resident_gauge) {
+    if (gaugePrecise) freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
     gaugePrecise = new GaugeField();
     std::exchange(*gaugePrecise, cudaSiteLink);
   }
 
-  if (qudaGaugeParam->make_resident_mom && !qudaGaugeParam->use_resident_mom)
-    std::exchange(momResident, cudaMom);
-  else momResident = GaugeField();
+  if (qudaGaugeParam->make_resident_mom && !qudaGaugeParam->use_resident_mom) std::exchange(momResident, cudaMom);
+  else if (!qudaGaugeParam->make_resident_mom) momResident = GaugeField();
 
   if (qudaGaugeParam->make_resident_gauge) {
     if (extendedGaugeResident) delete extendedGaugeResident;
@@ -3945,10 +3945,13 @@ int computeGaugePathQuda(void *out, void *siteLink, int ***input_path_buf, int *
 
   cpuOut.copy(cudaOut);
 
-  if (qudaGaugeParam->make_resident_gauge) {
-    if (gaugePrecise && !qudaGaugeParam->use_resident_gauge) freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
+  if (qudaGaugeParam->make_resident_gauge && !qudaGaugeParam->use_resident_gauge) {
+    if (gaugePrecise) freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
     gaugePrecise = new GaugeField();
     std::exchange(*gaugePrecise, cudaSiteLink);
+  }
+
+  if (qudaGaugeParam->make_resident_gauge) {
     if (extendedGaugeResident) delete extendedGaugeResident;
     extendedGaugeResident = cudaGauge;
   } else {
@@ -3977,7 +3980,7 @@ void momResidentQuda(void *mom, QudaGaugeParam *param)
     gParamMom.create = QUDA_ZERO_FIELD_CREATE;
     momResident = GaugeField(gParamMom);
   } else if (param->return_result_mom && !param->make_resident_mom) {
-    if (!momResident.Volume()) errorQuda("No resident momentum to return");
+    if (momResident.empty()) errorQuda("No resident momentum to return");
   } else {
     errorQuda("Unexpected combination make_resident_mom = %d return_result_mom = %d", param->make_resident_mom,
               param->return_result_mom);
@@ -4082,7 +4085,7 @@ void computeStaggeredForceQuda(void *h_mom, double dt, double delta, void *, voi
   GaugeField cpuMom(gParam);
 
   // create the device momentum field
-  if (gauge_param->use_resident_mom && !momResident.Volume()) errorQuda("Cannot use resident momentum field since none appears resident");
+  if (gauge_param->use_resident_mom && momResident.empty()) errorQuda("Cannot use resident momentum field since none appears resident");
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParam.create = QUDA_COPY_FIELD_CREATE;
@@ -4180,7 +4183,7 @@ void computeStaggeredForceQuda(void *h_mom, double dt, double delta, void *, voi
   if (gauge_param->return_result_mom) cpuMom.copy(cudaMom);
 
   if (gauge_param->make_resident_mom && !gauge_param->use_resident_mom) std::exchange(momResident, cudaMom);
-  else momResident = GaugeField();
+  else if (!gauge_param->make_resident_mom) momResident = GaugeField();
 
   for (int i=0; i<nvector; i++) delete X[i];
 }
@@ -4476,12 +4479,9 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   // Close the paths, make anti-hermitian, and store in compressed format
   if (gParam->return_result_mom) cpuMom.copy(mom);
-  if (!gParam->make_resident_mom) momResident = GaugeField();
 
-  if (gParam->make_resident_mom && !gParam->use_resident_mom)
-    std::exchange(momResident, mom);
-  else
-    momResident = GaugeField();
+  if (gParam->make_resident_mom && !gParam->use_resident_mom) std::exchange(momResident, mom);
+  else if (!gParam->make_resident_mom) momResident = GaugeField();
 }
 
 void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double *coeff, double kappa2, double ck,
@@ -4658,7 +4658,7 @@ void updateGaugeFieldQuda(void* gauge, void* momentum, double dt, int conj_mom, 
   GaugeField cpuMom = !param->use_resident_mom ? GaugeField(gParamMom) : GaugeField();
 
   // create the device fields
-  if (param->use_resident_mom && !momResident.Volume()) errorQuda("No resident mom field allocated");
+  if (param->use_resident_mom && momResident.empty()) errorQuda("No resident mom field allocated");
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.create = QUDA_COPY_FIELD_CREATE;
   gParam.field = &cpuMom;
@@ -4685,13 +4685,13 @@ void updateGaugeFieldQuda(void* gauge, void* momentum, double dt, int conj_mom, 
   if (param->return_result_gauge) cpuGauge.copy(u_out);
 
   if (param->make_resident_gauge) {
-    if (gaugePrecise && !param->use_resident_gauge) freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
+    if (gaugePrecise) freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
     gaugePrecise = new GaugeField();
     std::exchange(*gaugePrecise, u_out);
   }
 
   if (param->make_resident_mom && !param->use_resident_mom) std::exchange(momResident, cudaMom);
-  else momResident = GaugeField();
+  else if (!param->make_resident_mom) momResident = GaugeField();
 }
 
 void projectSU3Quda(void *gauge_h, double tol, QudaGaugeParam *param)
@@ -4700,7 +4700,7 @@ void projectSU3Quda(void *gauge_h, double tol, QudaGaugeParam *param)
   checkGaugeParam(param);
 
   // create the gauge field
-  GaugeFieldParam gParam(*param, gauge_h, QUDA_GENERAL_LINKS);
+  GaugeFieldParam gParam(*param, gauge_h, QUDA_SU3_LINKS);
   gParam.location = QUDA_CPU_FIELD_LOCATION;
   bool need_cpu = !param->use_resident_gauge || param->return_result_gauge;
   GaugeField cpuGauge = need_cpu ? GaugeField(gParam) : GaugeField();
@@ -4725,8 +4725,8 @@ void projectSU3Quda(void *gauge_h, double tol, QudaGaugeParam *param)
 
   if (param->return_result_gauge) cpuGauge.copy(cudaGauge);
 
-  if (param->make_resident_gauge) {
-    if (gaugePrecise != nullptr && !param->use_resident_gauge) freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
+  if (param->make_resident_gauge && !param->use_resident_gauge) {
+    if (gaugePrecise) freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
     gaugePrecise = new GaugeField();
     std::exchange(*gaugePrecise, cudaGauge);
   }
@@ -4762,8 +4762,8 @@ void staggeredPhaseQuda(void *gauge_h, QudaGaugeParam *param)
 
   if (param->return_result_gauge) cpuGauge.copy(cudaGauge);
 
-  if (param->make_resident_gauge) {
-    if (gaugePrecise != nullptr && !param->use_resident_gauge) freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
+  if (param->make_resident_gauge && !param->use_resident_gauge) {
+    if (gaugePrecise) freeUniqueGaugeQuda(QUDA_WILSON_LINKS);
     gaugePrecise = new GaugeField();
     std::exchange(*gaugePrecise, cudaGauge);
   }
@@ -4787,15 +4787,14 @@ double momActionQuda(void* momentum, QudaGaugeParam* param)
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
   gParam.setPrecision(param->cuda_prec, true);
 
-  if (param->use_resident_mom && !momResident.Volume()) errorQuda("No resident mom field allocated");
+  if (param->use_resident_mom && momResident.empty()) errorQuda("No resident mom field allocated");
   GaugeField cudaMom = param->use_resident_mom ? momResident.create_alias() : GaugeField(gParam);
 
   // perform the update
   double action = computeMomAction(cudaMom);
 
-  if (param->make_resident_mom && !param->use_resident_mom)
-    std::exchange(momResident, cudaMom);
-  else momResident = GaugeField();
+  if (param->make_resident_mom && !param->use_resident_mom) std::exchange(momResident, cudaMom);
+  else if (!param->make_resident_mom) momResident = GaugeField();
 
   return action;
 }
@@ -4816,7 +4815,7 @@ void gaussGaugeQuda(unsigned long long seed, double sigma)
 void gaussMomQuda(unsigned long long seed, double sigma)
 {
   auto profile = pushProfile(profileGauss);
-  if (!momResident.Volume()) errorQuda("Cannot generate Gauss GaugeField as there is no resident momentum field");
+  if (momResident.empty()) errorQuda("Cannot generate Gauss GaugeField as there is no resident momentum field");
   quda::gaugeGauss(momResident, seed, sigma);
 }
 
