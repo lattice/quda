@@ -129,9 +129,9 @@ namespace quda {
     if (isNative()) {
       if (reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13) {
         // Need to adjust the phase alignment as well.
-        int half_phase_bytes
+        size_t half_phase_bytes
           = (length / (2 * reconstruct)) * precision; // bytes needed to store phases for a single parity
-        int half_gauge_bytes = (length / 2) * precision
+        size_t half_gauge_bytes = (length / 2) * precision
           - half_phase_bytes; // bytes needed to store the gauge field for a single parity excluding the phases
         // Adjust the alignments for the gauge and phase separately
         half_phase_bytes = ALIGNMENT_ADJUST(half_phase_bytes);
