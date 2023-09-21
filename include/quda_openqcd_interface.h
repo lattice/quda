@@ -86,6 +86,8 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout);
  */
 void openQCD_qudaFinalize(void);
 
+void openQCD_back_and_forth(void *h_in, void *h_out);
+
 
 /**
  * @brief      Norm square on QUDA.

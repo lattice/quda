@@ -401,6 +401,31 @@ static QudaInvertParam newOpenQCDSolverParam(openQCD_QudaDiracParam_t p)
  *
  * @return     norm
  */
+void openQCD_back_and_forth(void *h_in, void *h_out)
+{
+  QudaInvertParam param = newOpenQCDParam();
+
+  ColorSpinorParam cpuParam(h_in, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
+  ColorSpinorField in_h(cpuParam);
+
+  ColorSpinorParam cudaParam(cpuParam, param, QUDA_CUDA_FIELD_LOCATION);
+  ColorSpinorField in(cudaParam);
+
+  ColorSpinorParam cpuParam_out(h_out, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
+  ColorSpinorField out_h(cpuParam);
+
+  in = in_h;
+  out_h = in;
+}
+
+
+/**
+ * @brief      Calculates the norm of a spinor.
+ *
+ * @param[in]  h_in  input spinor of type spinor_dble[NSPIN]
+ *
+ * @return     norm
+ */
 double openQCD_qudaNorm(void *h_in)
 {
   QudaInvertParam param = newOpenQCDParam();
