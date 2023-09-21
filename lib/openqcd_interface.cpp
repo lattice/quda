@@ -480,6 +480,8 @@ void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out)
   case 4:
   case 5:
     gamma5(out, in);
+    /* gamma5_openqcd = -1 * gamma5_ukqcd */
+    blas::caxpby(Complex(-1.0, 0.0), out, 0.0, out);
     break;
   default:
     errorQuda("Unknown gamma: %d\n", dir);
