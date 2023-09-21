@@ -165,12 +165,12 @@ namespace quda {
       int s1[4] = {0, 1, 0, 1};
       int s2[4] = {2, 3, 2, 3};
 
-      FloatOut K1[4] = {static_cast<FloatOut>(kU),
-                        static_cast<FloatOut>(kU),
+      FloatOut K1[4] = {static_cast<FloatOut>(-kU),
+                        static_cast<FloatOut>(-kU),
                         static_cast<FloatOut>(kU),
                         static_cast<FloatOut>(kU)};
-      FloatOut K2[4] = {static_cast<FloatOut>(-kU),
-                        static_cast<FloatOut>(-kU),
+      FloatOut K2[4] = {static_cast<FloatOut>(kU),
+                        static_cast<FloatOut>(kU),
                         static_cast<FloatOut>(kU),
                         static_cast<FloatOut>(kU)};
       /* U = [-1  0 1  0]
