@@ -230,7 +230,7 @@ namespace quda
     pc_type = std::exchange(src.pc_type, QUDA_PC_INVALID);
     suggested_parity = std::exchange(src.suggested_parity, QUDA_INVALID_PARITY);
     length = std::exchange(src.length, 0);
-    v = std::exchange(src.v, {});
+    v.exchange(src.v, {}); // cannot use std::exchange for quda_ptr
     norm_offset = std::exchange(src.norm_offset, 0);
     ghost = std::exchange(src.ghost, {});
     ghostFace = std::exchange(src.ghostFace, {});

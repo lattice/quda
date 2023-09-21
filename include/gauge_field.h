@@ -104,7 +104,7 @@ namespace quda {
       staggeredPhaseType(param.staggered_phase_type),
       staggeredPhaseApplied(param.staggered_phase_applied),
       i_mu(param.i_mu),
-      site_offset(param.gauge_offset),
+      site_offset(link_type == QUDA_ASQTAD_MOM_LINKS ? param.mom_offset : param.gauge_offset),
       site_size(param.site_size)
     {
       switch (link_type) {
@@ -144,8 +144,11 @@ namespace quda {
   };
 
   std::ostream& operator<<(std::ostream& output, const GaugeFieldParam& param);
+  std::ostream& operator<<(std::ostream& output, const GaugeField& param);
 
   class GaugeField : public LatticeField {
+
+    friend std::ostream& operator<<(std::ostream& output, const GaugeField& param);
 
   private:
     /**
@@ -290,9 +293,9 @@ namespace quda {
 
     /**
        @brief Returns if the object is empty (not initialized)
-       @return true if the object has been allocated, otherwise false
+       @return true if the object has not been allocated, otherwise false
     */
-    bool empty() const { return init; }
+    bool empty() const { return !init; }
 
     /**
        @brief Create the communication handlers and buffers
@@ -604,6 +607,23 @@ namespace quda {
       @param[in] the host buffer to copy from.
     */
     void copy_from_buffer(void *buffer);
+
+    /**
+       @brief Check if two instances are compatible
+       @param[in] a Input field
+       @param[in] b Input field
+       @return Return true if two fields are compatible
+     */
+    static bool are_compatible(const GaugeField &a, const GaugeField &b);
+
+    /**
+       @brief Check if two instances are weakly compatible (precision
+       and order can differ)
+       @param[in] a Input field
+       @param[in] b Input field
+       @return Return true if two fields are compatible
+     */
+    static bool are_compatible_weak(const GaugeField &a, const GaugeField &b);
 
     friend struct GaugeFieldParam;
   };

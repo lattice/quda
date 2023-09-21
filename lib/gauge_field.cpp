@@ -33,6 +33,7 @@ namespace quda {
 
   GaugeField &GaugeField::operator=(const GaugeField &src)
   {
+    if (src.empty()) errorQuda("Copying from empty field");
     if (&src != this) {
       if (!init) { // keep current attributes unless unset
         LatticeField::operator=(src);
@@ -51,7 +52,7 @@ namespace quda {
   {
     if (&src != this) {
       // if field not already initialized then move the field
-      if (!init) {
+      if (!init || are_compatible(*this, src) || src.empty()) {
         LatticeField::operator=(std::move(src));
         move(std::move(src));
       } else {
@@ -237,8 +238,10 @@ namespace quda {
 
   void GaugeField::move(GaugeField &&src)
   {
-    gauge = std::exchange(src.gauge, {});
-    gauge_array = std::exchange(src.gauge_array, {});
+    init = std::exchange(src.init, {});
+    if (src.gauge.is_reference()) errorQuda("Cannot move a reference allocation");
+    gauge.exchange(src.gauge, {});
+    for (auto i = 0; i < gauge_array.size(); i++) gauge_array[i].exchange(src.gauge_array[i], {});
     bytes = std::exchange(src.bytes, 0);
     phase_offset = std::exchange(src.phase_offset, 0);
     phase_bytes = std::exchange(src.phase_bytes, 0);
@@ -257,7 +260,7 @@ namespace quda {
     anisotropy = std::exchange(src.anisotropy, 0.0);
     tadpole = std::exchange(src.tadpole, 0.0);
     fat_link_max = std::exchange(src.fat_link_max, 0.0);
-    ghost = std::exchange(src.ghost, {});
+    for (auto i = 0; i < ghost.size(); i++) ghost[i].exchange(src.ghost[i], {});
     ghostFace = std::exchange(src.ghostFace, {});
     staggeredPhaseType = std::exchange(src.staggeredPhaseType, QUDA_STAGGERED_PHASE_INVALID);
     staggeredPhaseApplied = std::exchange(src.staggeredPhaseApplied, false);
@@ -871,6 +874,17 @@ namespace quda {
 
   }
 
+  bool GaugeField::are_compatible_weak(const GaugeField &a, const GaugeField &b)
+  {
+    return (a.LinkType() == b.LinkType() && a.Ncolor() == b.Ncolor() && a.Nface() == b.Nface() && a.GaugeFixed() == b.GaugeFixed()
+            && a.TBoundary() == b.TBoundary() && a.Anisotropy() == b.Anisotropy() && a.Tadpole() == b.Tadpole());
+  }
+
+  bool GaugeField::are_compatible(const GaugeField &a, const GaugeField &b)
+  {
+    return (a.Precision() == b.Precision() && a.Order() == b.Order() && are_compatible_weak(a, b));
+  }
+
   void GaugeField::checkField(const LatticeField &l) const {
     LatticeField::checkField(l);
     try {
@@ -1132,6 +1146,40 @@ namespace quda {
     return output;  // for multiple << operators.
   }
 
+  std::ostream& operator<<(std::ostream& output, const GaugeField& field)
+  {
+    output << static_cast<const LatticeField &>(field);
+    output << "init = " << field.init << std::endl;
+    output << "gauge = " << field.gauge << std::endl;
+    output << "gauge_array = " << field.gauge_array << std::endl;
+    output << "bytes = " << field.bytes << std::endl;
+    output << "phase_offset = " << field.phase_offset << std::endl;
+    output << "phase_bytes = " << field.phase_bytes << std::endl;
+    output << "length = " << field.length << std::endl;
+    output << "real_length = " << field.real_length << std::endl;
+    output << "nColor = " << field.nColor << std::endl;
+    output << "nFace = " << field.nFace << std::endl;
+    output << "geometry = " << field.geometry << std::endl;
+    output << "site_dim = " << field.geometry << std::endl;
+    output << "reconstruct = " << field.reconstruct << std::endl;
+    output << "nInternal = " << field.nInternal << std::endl;
+    output << "order = " << field.order << std::endl;
+    output << "fixed = " << field.fixed << std::endl;
+    output << "link_type = " << field.link_type << std::endl;
+    output << "t_boundary = " << field.t_boundary << std::endl;
+    output << "anisotropy = " << field.anisotropy << std::endl;
+    output << "tadpole = " << field.tadpole << std::endl;
+    output << "fat_link_max = " << field.fat_link_max << std::endl;
+    output << "ghost = " << field.ghost << std::endl;
+    output << "ghostFace = " << field.ghostFace << std::endl;
+    output << "staggeredPhaseType = " << field.staggeredPhaseType << std::endl;
+    output << "staggeredPhaseApplied = " << field.staggeredPhaseApplied << std::endl;
+    output << "i_mu = " << field.i_mu << std::endl;
+    output << "site_offset = " << field.site_offset << std::endl;
+    output << "size_size = " << field.site_size << std::endl;
+    return output;  // for multiple << operators.
+  }
+
   void GaugeField::zero()
   {
     if (order != QUDA_QDP_GAUGE_ORDER) {
@@ -1201,6 +1249,7 @@ namespace quda {
       errorQuda("Cannot create an alias to source with lower precision than the alias");
     GaugeFieldParam param = param_.init ? param_ : GaugeFieldParam(*this);
     param.create = QUDA_REFERENCE_FIELD_CREATE;
+    param.gauge = gauge.data();
     return GaugeField(param);
   }
 
