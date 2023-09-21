@@ -789,6 +789,12 @@ namespace quda {
         case 1: // positive projector
 #pragma unroll
           for (int i = 0; i < Nc; i++) {
+            /* 
+            recon[0] = input[0];
+            recon[1] = input[1];
+            recon[2] = input[0];
+            recon[3] = input[0];
+            */
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
             recon(2, i) = t(0, i);

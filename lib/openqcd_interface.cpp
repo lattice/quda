@@ -479,6 +479,8 @@ void openQCD_qudaDw(void *src, void *dst, openQCD_QudaDiracParam_t p)
   param.output_location = QUDA_CPU_FIELD_LOCATION;
 
   MatQuda(static_cast<char *>(dst), static_cast<char *>(src), &param);
+  /* AA: QUDA applies - Dw */
+  blas::ax(-1.0, dst);
 }
 
 
