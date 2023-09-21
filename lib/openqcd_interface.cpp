@@ -505,7 +505,7 @@ void openQCD_qudaDw(void *src, void *dst, openQCD_QudaDiracParam_t p)
 
   MatQuda(static_cast<char *>(dst), static_cast<char *>(src), &param);
   /* AA: QUDA applies - Dw */
-  blas::ax(-1.0, dst);
+  /* blas::ax(-1.0, dst); */
 }
 
 
