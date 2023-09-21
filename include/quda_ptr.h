@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ostream>
 #include "malloc_quda.h"
 
 namespace quda {
@@ -18,16 +19,25 @@ namespace quda {
      QUDA_MEMORY_MANAGED        both
    */
   class quda_ptr {
-    QudaMemoryType type = QUDA_MEMORY_INVALID;
-    size_t size = 0;
-    bool pool = false;
-    void *device = nullptr;
-    void *host = nullptr;
+    friend std::ostream& operator<<(std::ostream& output, const quda_ptr& ptr);
+    QudaMemoryType type = QUDA_MEMORY_INVALID; /** Memory type of the allocation */
+    size_t size = 0;                           /** Size of the allocation */
+    bool pool = false;                         /** Is the allocation is pooled */
+    void *device = nullptr;                    /** Device-view of the allocation */
+    void *host = nullptr;                      /** Host-view of the allocation */
+    bool reference = false;                    /** Is this a reference to another allocation */
+
+    /**
+       @brief Internal deallocation routine
+     */
+    void destroy();
 
   public:
     quda_ptr() = default;
     quda_ptr(quda_ptr &&) = default;
     quda_ptr &operator=(quda_ptr &&);
+    quda_ptr(const quda_ptr &) = delete;
+    quda_ptr &operator=(const quda_ptr &) = delete;
 
     /**
        @brief Constructor for quda_ptr
@@ -48,6 +58,15 @@ namespace quda {
        @brief Destructor for the quda_ptr
     */
     virtual ~quda_ptr();
+
+    /**
+       @brief Specialized exchange function to use in place of
+       std::exchange when exchanging quda_ptr objects: moves obj to
+       *this, and moves new_value to obj
+       @param[in,out] obj
+       @param[in] new_value New value for obj to take
+     */
+    void exchange(quda_ptr &obj, quda_ptr &&new_value);
 
     /**
        @return Returns true if allocation is visible to the device
@@ -73,6 +92,13 @@ namespace quda {
        Return the host view of the pointer
      */
     void *data_host() const;
+
+    /**
+       Return if the instance is a reference rather than an allocation
+     */
+    bool is_reference() const;
   };
+
+  std::ostream& operator<<(std::ostream& output, const quda_ptr& ptr);
 
 }

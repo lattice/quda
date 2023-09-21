@@ -43,7 +43,8 @@ namespace quda {
   }
 
   quda_ptr::quda_ptr(void *ptr, QudaMemoryType type) :
-    type(type)
+    type(type),
+    reference(true)
   {
     getProfile().TPSTART(QUDA_PROFILE_INIT);
     switch (type) {
@@ -69,6 +70,7 @@ namespace quda {
   quda_ptr& quda_ptr::operator=(quda_ptr &&other)
   {
     if (&other != this) {
+      if (size > 0) errorQuda("Cannot move to already initialized quda_ptr");
       type = std::exchange(other.type, QUDA_MEMORY_INVALID);
       size = std::exchange(other.size, 0);
       pool = std::exchange(other.pool, false);
@@ -78,10 +80,8 @@ namespace quda {
     return *this;
   }
 
-  quda_ptr::~quda_ptr()
+  void quda_ptr::destroy()
   {
-    getProfile().TPSTART(QUDA_PROFILE_FREE);
-
     if (size > 0) {
       switch (type) {
       case QUDA_MEMORY_DEVICE:        pool ? pool_device_free(device) : device_free(device); break;
@@ -93,10 +93,23 @@ namespace quda {
       }
     }
 
+    size = 0;
     device = nullptr;
     host = nullptr;
+  }
 
+  quda_ptr::~quda_ptr()
+  {
+    getProfile().TPSTART(QUDA_PROFILE_FREE);
+    destroy();
     getProfile().TPSTOP(QUDA_PROFILE_FREE);
+  }
+
+  void quda_ptr::exchange(quda_ptr &obj, quda_ptr &&new_value)
+  {
+    destroy();
+    *this = std::move(obj);
+    obj = std::move(new_value);
   }
 
   bool quda_ptr::is_device() const
@@ -153,6 +166,15 @@ namespace quda {
   {
     if (!host) errorQuda("Host view not defined");
     return host;
+  }
+
+  bool quda_ptr::is_reference() const { return reference; }
+
+  std::ostream& operator<<(std::ostream& output, const quda_ptr& ptr)
+  {
+    output << "{type = " << ptr.type << ", size = " << ptr.size << ", pool = " << ptr.pool << ", device = " << ptr.device
+           << ", host = " << ptr.host << ", reference = " << ptr.reference << "}";
+    return output;
   }
 
 }
