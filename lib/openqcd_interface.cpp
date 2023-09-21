@@ -412,7 +412,7 @@ void openQCD_back_and_forth(void *h_in, void *h_out)
   ColorSpinorField in(cudaParam);
 
   ColorSpinorParam cpuParam_out(h_out, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
-  ColorSpinorField out_h(cpuParam);
+  ColorSpinorField out_h(cpuParam_out);
 
   in = in_h;
   out_h = in;
