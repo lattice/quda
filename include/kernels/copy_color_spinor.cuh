@@ -137,18 +137,18 @@ namespace quda {
     __device__ __host__ inline void operator()(complex<FloatOut> out[Ns*Nc], const complex<FloatIn> in[Ns*Nc]) const {
       int s1[4] = {0, 1, 0, 1};
       int s2[4] = {2, 3, 2, 3};
-      FloatOut K1[4] = {static_cast<FloatOut>(kP),
-                        static_cast<FloatOut>(kP),
+      FloatOut K1[4] = {static_cast<FloatOut>(-kP),
                         static_cast<FloatOut>(-kP),
-                        static_cast<FloatOut>(-kP)};
+                        static_cast<FloatOut>(kP),
+                        static_cast<FloatOut>(kP)};
       FloatOut K2[4] = {static_cast<FloatOut>(kP),
                         static_cast<FloatOut>(kP),
                         static_cast<FloatOut>(kP),
                         static_cast<FloatOut>(kP)};
-      /* U = [1  0  1  0]
-             [0  1  0  1]
-             [-1 0  1  0]
-             [0 -1  0  1] / sqrt(2) */
+      /* U = [-1  0  1  0]
+             [0  -1  0  1]
+             [1 0  1  0]
+             [0 1  0  1] / sqrt(2) */
       for (int s=0; s<Ns; s++) {
         for (int c=0; c<Nc; c++) {
           out[s*Nc+c] = K1[s]*static_cast<complex<FloatOut> >(in[s1[s]*Nc+c]) + K2[s]*static_cast<complex<FloatOut> >(in[s2[s]*Nc+c]);
@@ -165,19 +165,18 @@ namespace quda {
       int s1[4] = {0, 1, 0, 1};
       int s2[4] = {2, 3, 2, 3};
 
-      /* RG: I added a global minus here to ix the global minus imposed by the transformation */
-      FloatOut K1[4] = {static_cast<FloatOut>(-kU),
-                        static_cast<FloatOut>(-kU),
-                        static_cast<FloatOut>(-kU),
-                        static_cast<FloatOut>(-kU)};
-      FloatOut K2[4] = {static_cast<FloatOut>(kU),
+      FloatOut K1[4] = {static_cast<FloatOut>(kU),
                         static_cast<FloatOut>(kU),
+                        static_cast<FloatOut>(kU),
+                        static_cast<FloatOut>(kU)};
+      FloatOut K2[4] = {static_cast<FloatOut>(-kU),
                         static_cast<FloatOut>(-kU),
-                        static_cast<FloatOut>(-kU)};
-      /* U = [-1  0  1  0]
-             [ 0 -1  0  1]
-             [-1  0 -1  0]
-             [ 0 -1  0 -1] / sqrt(2) */
+                        static_cast<FloatOut>(kU),
+                        static_cast<FloatOut>(kU)};
+      /* U = [-1  0 1  0]
+             [ 0 -1  0 1]
+             [1  0 1  0]
+             [ 0 1 0 1] / sqrt(2) */
       for (int s=0; s<Ns; s++) {
         for (int c=0; c<Nc; c++) {
           out[s*Nc+c] = K1[s]*static_cast<complex<FloatOut> >(in[s1[s]*Nc+c]) + K2[s]*static_cast<complex<FloatOut> >(in[s2[s]*Nc+c]);
