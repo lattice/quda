@@ -1,6 +1,6 @@
 #pragma once
 
-#if 0
+#if 1
 #include "../generic/thread_local_cache.h"
 #else
 #include "../generic/thread_local_cache_noshared.h"

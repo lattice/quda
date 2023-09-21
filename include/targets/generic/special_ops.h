@@ -99,6 +99,9 @@ namespace quda {
   template <typename T> struct getSpecialOpsS<T,std::conditional_t<true,void,typename T::SpecialOpsT>> {
     using type = typename T::SpecialOpsT;
   };
+  template <typename ...T> struct getSpecialOpsS<SpecialOps<T...>,void> {
+    using type = SpecialOps<T...>;
+  };
   template <typename T> using getSpecialOps = typename getSpecialOpsS<T>::type;
 
   // explicitSpecialOps

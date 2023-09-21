@@ -483,6 +483,7 @@ namespace quda
       auto sizeTp = std::max(this->sharedBytesPerThread() * tp.block.x * tp.block.y * tp.block.z, this->sharedBytesPerBlock(tp));
       if (sizeOps != sizeTp) {
 	printfQuda("Functor: %s\n", typeid(Functor<Arg>).name());
+	printfQuda("SpecialOps: %s\n", typeid(getSpecialOps<Functor<Arg>>).name());
 	printfQuda("block: %i %i %i\n", tp.block.x, tp.block.y, tp.block.z);
 	errorQuda("Shared bytes mismatch kernel: %u  tp: %u\n", sizeOps, sizeTp);
       }

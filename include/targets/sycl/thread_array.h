@@ -1,6 +1,6 @@
 #pragma once
 
-//#define SLM
+#define SLM
 
 #ifdef SLM
 
