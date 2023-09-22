@@ -130,6 +130,9 @@ namespace quda
       coords[i] = (i < topo->ndim) ? mod(comm_coords(topo)[i] + displacement[i], comm_dims(topo)[i]) : 0;
     }
 
+    std::cout << ": " << coords[0] << " " << coords[1] << " " << coords[2] <<
+        " " << coords[3] << " yields rank" << comm_rank_from_coords(topo, coords) << std::endl;
+
     return comm_rank_from_coords(topo, coords);
   }
 
@@ -365,13 +368,18 @@ namespace quda
 
       Topology *topology = topo ? topo : default_topo; // use default topology if topo is NULL
       if (!topology) { errorQuda("Topology not specified"); }
+      const int *rank_grid = comm_coords_from_rank(topology, comm_rank());
 
       for (int d = 0; d < 4; ++d) {
         int pos_displacement[QUDA_MAX_DIM] = {};
         int neg_displacement[QUDA_MAX_DIM] = {};
         pos_displacement[d] = +1;
         neg_displacement[d] = -1;
+        std::cout << "rank: " << rank_grid[0] << "," << rank_grid[1]
+          << "," << rank_grid[2] << "," << rank_grid[3] << " negative " << d << std::endl;
         neighbor_rank[0][d] = comm_rank_displaced(topology, neg_displacement);
+        std::cout << "rank: " << rank_grid[0] << "," << rank_grid[1]
+          << "," << rank_grid[2] << "," << rank_grid[3] << " positive " << d << std::endl;
         neighbor_rank[1][d] = comm_rank_displaced(topology, pos_displacement);
       }
       neighbors_cached = true;
