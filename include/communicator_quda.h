@@ -40,6 +40,7 @@ namespace quda
     int (*coords)[QUDA_MAX_DIM];
     int my_rank;
     int my_coords[QUDA_MAX_DIM];
+    int cstar[QUDA_MAX_DIM];
     // It might be worth adding communicators to allow for efficient reductions:
     //   #if defined(MPI_COMMS)
     //     MPI_Comm comm;
@@ -126,8 +127,12 @@ namespace quda
   {
     int coords[QUDA_MAX_DIM];
 
-    for (int i = 0; i < QUDA_MAX_DIM; i++) {
-      coords[i] = (i < topo->ndim) ? mod(comm_coords(topo)[i] + displacement[i], comm_dims(topo)[i]) : 0;
+    int Nx_displacement = 0;
+    for (int i = QUDA_MAX_DIM-1; i >=0; i--) {
+      if(topo->cstar[i]==1 && i < topo->ndim){
+        Nx_displacement += ((comm_coords(topo)[i] + displacement[i] + comm_dims(topo)[i])/comm_dims(topo)[i] -1) * (comm_dims(topo)[0]/2);
+      }
+      coords[i] = (i < topo->ndim) ? mod(comm_coords(topo)[i] + displacement[i] + (i==0 ? Nx_displacement :0), comm_dims(topo)[i]) : 0;
     }
 
     std::cout << ": " << coords[0] << " " << coords[1] << " " << coords[2] <<
@@ -258,7 +263,12 @@ namespace quda
         const int gpuid = comm_gpuid();
 
         comm_set_neighbor_ranks();
-
+        for (int dir = 0; dir < 2; ++dir) { // forward/backward directions
+          for (int dim = 0; dim < 4; ++dim) {
+            printfQuda("my (%i):neighbors in dim/dir %i/%i: %i\n",comm_rank(),dim,dir,comm_neighbor_rank(dir, dim));
+          }
+        }
+       
         char *hostname = comm_hostname();
         int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int) * comm_size());
 
@@ -524,7 +534,7 @@ namespace quda
 
   void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
   {
-    Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data, comm_rank());
+        Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data, comm_rank());
     comm_set_default_topology(topo);
 
     // determine which GPU this rank will use

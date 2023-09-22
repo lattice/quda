@@ -106,8 +106,9 @@ namespace quda
 
     int nodes = 1;
     for (int i = 0; i < ndim; i++) {
-      topo->dims[i] = dims[i];
-      nodes *= dims[i];
+      topo->dims[i] = abs(dims[i]);
+      topo->cstar[i] = dims[i] < 0 ? 1:0;
+      nodes *= topo->dims[i];
     }
 
     topo->ranks = new int[nodes];
@@ -118,9 +119,10 @@ namespace quda
 
     do {
       int rank = rank_from_coords(x, map_data);
-      topo->ranks[index(ndim, dims, x)] = rank;
+      topo->ranks[index(ndim, topo->dims, x)] = rank;
+      if(rank<0) errorQuda("rank <0");
       for (int i = 0; i < ndim; i++) { topo->coords[rank][i] = x[i]; }
-    } while (advance_coords(ndim, dims, x));
+    } while (advance_coords(ndim, topo->dims, x));
 
     topo->my_rank = my_rank;
     for (int i = 0; i < ndim; i++) { topo->my_coords[i] = topo->coords[my_rank][i]; }

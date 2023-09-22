@@ -52,7 +52,7 @@ namespace quda
     }
 
     comm_init(nDim, commDims, rank_from_coords, map_data);
-    globalReduce.push(true);
+        globalReduce.push(true);
   }
 
   Communicator::Communicator(Communicator &other, const int *comm_split) : globalReduce(other.globalReduce)
@@ -113,7 +113,7 @@ namespace quda
     MPI_CHECK(MPI_Comm_size(MPI_COMM_HANDLE, &size));
 
     int grid_size = 1;
-    for (int i = 0; i < ndim; i++) { grid_size *= dims[i]; }
+    for (int i = 0; i < ndim; i++) { grid_size *= abs(dims[i]); }
     if (grid_size != size) {
       errorQuda("Communication grid size declared via initCommsGridQuda() does not match"
                 " total number of MPI ranks (%d != %d)",

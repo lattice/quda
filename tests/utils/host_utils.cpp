@@ -674,14 +674,14 @@ void get_size_from_env(int *const dims, const char env[])
 int lex_rank_from_coords_t(const int *coords, void *)
 {
   int rank = coords[0];
-  for (int i = 1; i < 4; i++) { rank = gridsize_from_cmdline[i] * rank + coords[i]; }
+  for (int i = 1; i < 4; i++) { rank = abs(gridsize_from_cmdline[i]) * rank + coords[i]; }
   return rank;
 }
 
 int lex_rank_from_coords_x(const int *coords, void *)
 {
   int rank = coords[3];
-  for (int i = 2; i >= 0; i--) { rank = gridsize_from_cmdline[i] * rank + coords[i]; }
+  for (int i = 2; i >= 0; i--) { rank = abs(gridsize_from_cmdline[i]) * rank + coords[i]; }
   return rank;
 }
 

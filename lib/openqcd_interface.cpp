@@ -125,11 +125,13 @@ static int rankFromCoords(const int *coords, void *fdata) // TODO:
  */
 void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout)
 {
+  int mynproc[4];
   for (int dir = 0; dir < 4; ++dir) {
     if (layout.N[dir] % 2 != 0) {
       errorQuda("Error: Odd lattice dimensions are not supported\n");
       exit(1);
     }
+    mynproc[dir] = (dir==2 || dir==1) ? -layout.nproc[dir] : layout.nproc[dir]; 
   }
 
 #ifdef MULTI_GPU
@@ -137,7 +139,7 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout)
 #ifdef QMP_COMMS
   initCommsGridQuda(4, layout.nproc, nullptr, nullptr);
 #else
-  initCommsGridQuda(4, layout.nproc, rankFromCoords, (void *)(layout.nproc));
+  initCommsGridQuda(4, mynproc, rankFromCoords, (void *)(layout.nproc));
 #endif
   static int device = -1; // enable a default allocation of devices to processes 
 #else
