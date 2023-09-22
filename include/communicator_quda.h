@@ -134,7 +134,6 @@ namespace quda
       }
       coords[i] = (i < topo->ndim) ? mod(comm_coords(topo)[i] + displacement[i] + (i==0 ? Nx_displacement :0), comm_dims(topo)[i]) : 0;
     }
-
     std::cout << ": " << coords[0] << " " << coords[1] << " " << coords[2] <<
         " " << coords[3] << " yields rank" << comm_rank_from_coords(topo, coords) << std::endl;
 
