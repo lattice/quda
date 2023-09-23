@@ -24,10 +24,13 @@ RUN echo "${MPICH_PATH}/lib" >> /etc/ld.so.conf.d/cscs.conf && ldconfig
 
 COPY . /quda/src
 
-RUN  cmake -S /quda/src \
+ENV QUDA_TEST_GRID_SIZE="1 1 1 2"
+
+RUN  QUDA_TEST_GRID_SIZE="1 1 1 2" cmake -S /quda/src \
     -DCMAKE_CUDA_COMPILER=nvcc \
     -DCMAKE_CXX_COMPILER=/usr/local/mpich/bin/mpicxx \
     -DCMAKE_C_COMPILER=/usr/local/mpich/bin/mpicc \
+    -DQUDA_CTEST_LAUNCHER="" \
     -DQUDA_GPU_ARCH=sm_60 \
     -DQUDA_MULTIGRID=ON \
     -DQUDA_MULTIGRID_NVEC_LIST=24 \
@@ -42,5 +45,5 @@ RUN cmake --build /quda/build
 
 RUN cmake --install /quda/build
 
-ENV QUDA_TEST_GRID_SIZE="1 1 1 2"
+
 
