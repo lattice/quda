@@ -542,12 +542,13 @@ double openQCD_qudaGCR(void *source, void *solution,
 
   invertQuda(static_cast<char *>(solution), static_cast<char *>(source), &param);
 
-  printfQuda("true_res    = %.2e\n", param.true_res);
+  printfQuda("true_res    = %e\n", param.true_res);
   printfQuda("true_res_hq = %.2e\n", param.true_res_hq);
   printfQuda("iter        = %d\n",   param.iter);
   printfQuda("gflops      = %.2e\n", param.gflops);
   printfQuda("secs        = %.2e\n", param.secs);
-  printfQuda("Nsteps      = %d\n",   param.Nsteps);
+  /* this is not properly set */
+  /* printfQuda("Nsteps      = %d\n",   param.Nsteps); */
 
   return param.true_res;
 }
