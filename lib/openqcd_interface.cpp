@@ -582,3 +582,67 @@ void openQCD_qudaInvert(void *source, void *solution, openQCD_QudaDiracParam_t d
   printfQuda("secs        = %.2e\n", param.secs);
   printfQuda("Nsteps      = %d\n",   param.Nsteps);
 }
+
+void openQCD_qudaMultigrid(void *source, void *solution, openQCD_QudaDiracParam_t dirac_param)
+{
+  QudaInvertParam invert_param = newOpenQCDSolverParam(dirac_param);
+  QudaMultigridParam multigrid_param = newQudaMultigridParam();
+
+  //param.verbosity = QUDA_VERBOSE;
+  invert_param.reliable_delta = 1e-5;
+  invert_param.gcrNkrylov = 20;
+  invert_param.maxiter = 2000;
+  invert_param.tol = 1e-5;
+  invert_param.inv_type = QUDA_GCR_INVERTER;
+  invert_param.solution_type = QUDA_MAT_SOLUTION;
+  invert_param.solve_type = QUDA_DIRECT_SOLVE;
+  invert_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+  invert_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
+  invert_param.inv_type_precondition = QUDA_MG_INVERTER;
+
+  // set the params, hard code the solver
+  // parameters copied from recommended settings from Wiki
+  multigrid_param.n_level = 2;
+  multigrid_param.generate_all_levels = QUDA_BOOLEAN_TRUE;
+  multigrid_param.run_verify = QUDA_BOOLEAN_TRUE;
+  multigrid_param.invert_param = &invert_param;
+
+  // try setting minimal parameters - leave rest to default
+  // level 0 fine
+  multigrid_param.geo_block_size[0][0] = 4; // xytz
+  multigrid_param.geo_block_size[0][1] = 4;
+  multigrid_param.geo_block_size[0][2] = 4;
+  multigrid_param.geo_block_size[0][3] = 4;
+  multigrid_param.n_vec[0] = 24;
+  multigrid_param.precision_null[0] = QUDA_HALF_PRECISION;
+  multigrid_param.smoother[0] = QUDA_CA_GCR_INVERTER;
+  multigrid_param.nu_pre[0] = 0;
+  multigrid_param.nu_post[0] = 8;
+  multigrid_param.omega[0] = 0.8;
+  multigrid_param.smoother_solve_type[0] = QUDA_DIRECT_PC_SOLVE;
+  multigrid_param.cycle_type[0] = QUDA_MG_CYCLE_RECURSIVE;
+
+  // level 1 coarse
+  // no smoother required for innermost
+  // so no blocks
+  multigrid_param.precision_null[1] = QUDA_HALF_PRECISION;
+  multigrid_param.coarse_solver[1] = QUDA_CA_GCR_INVERTER;
+  multigrid_param.coarse_solver_tol[1] = 0.25;
+  multigrid_param.coarse_solver_maxiter[1] = 50;
+  multigrid_param.coarse_grid_solution_type[1] = QUDA_MATPC_SOLUTION;
+  multigrid_param.smoother_solve_type[1] = QUDA_DIRECT_PC_SOLVE;
+  multigrid_param.cycle_type[1] = QUDA_MG_CYCLE_RECURSIVE;
+
+  void *mgprec = newMultigridQuda(&multigrid_param);
+  invert_param.preconditioner = mgprec;
+
+  invertQuda(static_cast<char *>(solution), static_cast<char *>(source), &invert_param);
+
+  destroyMultigridQuda(mgprec);
+
+  printfQuda("true_res    = %.2e\n", invert_param.true_res);
+  printfQuda("true_res_hq = %.2e\n", invert_param.true_res_hq);
+  printfQuda("iter        = %d\n",   invert_param.iter);
+  printfQuda("gflops      = %.2e\n", invert_param.gflops);
+  printfQuda("secs        = %.2e\n", invert_param.secs);
+}
