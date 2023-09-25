@@ -166,7 +166,7 @@ void openQCD_qudaInvert(void *source, void *solution, openQCD_QudaDiracParam_t d
  * @param[out] solution     Solution spinor field
  * @param[in]  dirac_param  Dirac parameter struct
  */
-void openQCD_qudaMultigrid(void *source, void *solution, openQCD_QudaDiracParam_t dirac_param);
+double openQCD_qudaMultigrid(void *source, void *solution, openQCD_QudaDiracParam_t dirac_param);
 
 
 /**

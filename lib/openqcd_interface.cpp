@@ -172,9 +172,11 @@ static QudaInvertParam newOpenQCDParam(void)
 
   param.cpu_prec = QUDA_DOUBLE_PRECISION;  // The precision used by the input fermion fields
   param.cuda_prec = QUDA_DOUBLE_PRECISION; // The precision used by the QUDA solver
-  /* TH added for MG support */
-  param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION; // The precision used by the QUDA solver
-  param.cuda_prec_precondition = QUDA_HALF_PRECISION; // The precision used by the QUDA solver
+
+  /* AA: This breaks GCR */
+  // /* TH added for MG support */
+  // param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION; // The precision used by the QUDA solver
+  // param.cuda_prec_precondition = QUDA_HALF_PRECISION; // The precision used by the QUDA solver
 
   /**
    * The order of the input and output fermion fields. Imposes fieldOrder =
@@ -595,7 +597,7 @@ void openQCD_qudaInvert(void *source, void *solution, openQCD_QudaDiracParam_t d
   printfQuda("Nsteps      = %d\n",   param.Nsteps);
 }
 
-void openQCD_qudaMultigrid(void *source, void *solution, openQCD_QudaDiracParam_t dirac_param)
+double openQCD_qudaMultigrid(void *source, void *solution, openQCD_QudaDiracParam_t dirac_param)
 {
   QudaInvertParam invert_param = newOpenQCDSolverParam(dirac_param);
   QudaInvertParam invert_param_mg = newOpenQCDSolverParam(dirac_param);
@@ -685,9 +687,11 @@ void openQCD_qudaMultigrid(void *source, void *solution, openQCD_QudaDiracParam_
 
   destroyMultigridQuda(mgprec);
 
-  printfQuda("true_res    = %.2e\n", invert_param.true_res);
+  printfQuda("true_res    = %e\n", invert_param.true_res);
   printfQuda("true_res_hq = %.2e\n", invert_param.true_res_hq);
   printfQuda("iter        = %d\n",   invert_param.iter);
   printfQuda("gflops      = %.2e\n", invert_param.gflops);
   printfQuda("secs        = %.2e\n", invert_param.secs);
+
+  return invert_param.true_res;
 }
