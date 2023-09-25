@@ -27,6 +27,7 @@ typedef struct {
   int nproc_blk[4]; /** Blocking size NPROC0_BLK, NPROC1_BLK, NPROC2_BLK, NPROC3_BLK */
   int N[4];         /** Glocal lattice dimensions N0, N1, N2, N3 */
   int device;       /** GPU device number */
+  int cstar;        /** number of cstar directions */
 } openQCD_QudaLayout_t;
 
 
@@ -86,6 +87,13 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout);
  */
 void openQCD_qudaFinalize(void);
 
+
+/**
+ * Copy a spinor to GPU and back to CPU.
+ * 
+ * @param[in]   h_in  Spinor input field (from openQCD)
+ * @param[out]  h_out Spinor output field
+ */
 void openQCD_back_and_forth(void *h_in, void *h_out);
 
 

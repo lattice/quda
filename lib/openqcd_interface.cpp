@@ -13,6 +13,11 @@
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+
+static openQCD_QudaState_t qudaState = {false, false, false, false, {}, {}};
+
+using namespace quda;
+
 // code for NVTX taken from Jiri Kraus' blog post:
 // http://devblogs.nvidia.com/parallelforall/cuda-pro-tip-generate-custom-application-profile-timelines-nvtx/
 
@@ -45,10 +50,6 @@ static const int num_colors = sizeof(colors) / sizeof(uint32_t);
 #define PUSH_RANGE(name, cid)
 #define POP_RANGE
 #endif
-
-static openQCD_QudaState_t qudaState = {false, false, false, false, {}, {}};
-
-using namespace quda;
 
 template <bool start> void inline qudaopenqcd_called(const char *func, QudaVerbosity verb)
 {
@@ -394,19 +395,12 @@ static QudaInvertParam newOpenQCDSolverParam(openQCD_QudaDiracParam_t p)
 }
 
 
-/**
- * @brief      Calculates the norm of a spinor.
- *
- * @param[in]  h_in  input spinor of type spinor_dble[NSPIN]
- *
- * @return     norm
- */
 void openQCD_back_and_forth(void *h_in, void *h_out)
 {
   QudaInvertParam param = newOpenQCDParam();
 
-  ColorSpinorParam cpuParam(h_in, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
-  ColorSpinorField in_h(cpuParam);
+  ColorSpinorParam cpuParam_in(h_in, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
+  ColorSpinorField in_h(cpuParam_in);
 
   ColorSpinorParam cudaParam(cpuParam, param, QUDA_CUDA_FIELD_LOCATION);
   ColorSpinorField in(cudaParam);
@@ -480,8 +474,13 @@ void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out)
   case 4:
   case 5:
     gamma5(out, in);
-    /* gamma5_openqcd = -1 * gamma5_ukqcd */
-    blas::caxpby(Complex(-1.0, 0.0), out, 0.0, out);
+    /* UKQCD uses a different convention for Gamma matrices:
+     * gamma5_ukqcd = gammax gammay gammaz gammat,
+     * gamma5_openqcd = gammat gammax gammay gammaz,
+     * and thus
+     * gamma5_openqcd = -1 * U gamma5_ukqcd U^dagger,
+     * with U the transformation matrix from OpenQCD to UKQCD. */
+    blas::ax(-1.0, out);
     break;
   default:
     errorQuda("Unknown gamma: %d\n", dir);
