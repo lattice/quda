@@ -139,7 +139,6 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout)
   if(layout.cstar > 2) {
     mynproc[2] *= -1; /* z direction */
   }
-}
 
 #ifdef MULTI_GPU
 // TODO: would we ever want to run with QMP COMMS?
