@@ -559,44 +559,6 @@ double openQCD_qudaGCR(void *source, void *solution,
   return param.true_res;
 }
 
-
-void openQCD_qudaInvert(void *source, void *solution, openQCD_QudaDiracParam_t dirac_param)
-{
-  QudaInvertParam param = newOpenQCDSolverParam(dirac_param);
-
-  // both fields reside on the CPU
-  param.input_location = QUDA_CPU_FIELD_LOCATION;
-  param.output_location = QUDA_CPU_FIELD_LOCATION;
-
-  param.verbosity = QUDA_VERBOSE;
-  param.inv_type = QUDA_GCR_INVERTER; // QUDA_CG_INVERTER
-  param.tol = 1e-2;
-  param.compute_true_res = true;
-  param.maxiter = 100;
-
-  param.gcrNkrylov = 20;
-  param.reliable_delta = 1e-5;
-
-  param.solution_type = QUDA_MAT_SOLUTION;
-  param.solve_type = QUDA_DIRECT_SOLVE;
-  param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-  param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
-  param.inv_type_precondition = QUDA_INVALID_INVERTER; // disables any preconditioning
-
-  // both fields reside on the CPU
-  param.input_location = QUDA_CPU_FIELD_LOCATION;
-  param.output_location = QUDA_CPU_FIELD_LOCATION;
-
-  invertQuda(static_cast<char *>(solution), static_cast<char *>(source), &param);
-
-  printfQuda("true_res    = %.2e\n", param.true_res);
-  printfQuda("true_res_hq = %.2e\n", param.true_res_hq);
-  printfQuda("iter        = %d\n",   param.iter);
-  printfQuda("gflops      = %.2e\n", param.gflops);
-  printfQuda("secs        = %.2e\n", param.secs);
-  printfQuda("Nsteps      = %d\n",   param.Nsteps);
-}
-
 double openQCD_qudaMultigrid(void *source, void *solution, openQCD_QudaDiracParam_t dirac_param)
 {
   QudaInvertParam invert_param = newOpenQCDSolverParam(dirac_param);

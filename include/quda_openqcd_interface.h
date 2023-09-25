@@ -147,17 +147,6 @@ double openQCD_qudaGCR(void *source, void *solution,
 
 
 /**
- * Solve Ax=b for an Clover Wilson operator. All fields are fields passed and
- * returned are host (CPU) field in openQCD order.  This function requires that
- * persistent gauge and clover fields have been created prior.
- *
- * @param[in]  source       Right-hand side source field
- * @param[out] solution     Solution spinor field
- * @param[in]  dirac_param  Dirac parameter struct
- */
-void openQCD_qudaInvert(void *source, void *solution, openQCD_QudaDiracParam_t dirac_param);
-
-/**
  * Solve Ax=b for an Clover Wilson operator with a multigrid solver. All fields are fields passed and
  * returned are host (CPU) field in openQCD order.  This function requires that
  * persistent gauge and clover fields have been created prior.
