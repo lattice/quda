@@ -130,7 +130,14 @@ namespace quda {
     }
   };
 
-  /** Transform from openqcd into non-relativistic basis */
+  /** Transform from openqcd into non-relativistic basis (a.k.a UKQCD basis): 
+   *    gamma_ukqcd = U gamma_openqcd U^dagger with
+   *     U = [-1  0  1  0]
+             [ 0 -1  0  1]
+             [ 1  0  1  0]
+             [ 0  1  0  1] / sqrt(2),
+   * see https://github.com/JeffersonLab/chroma/blob/master/docs/notes/gamma_conventions.tex
+   for further notes. */
   template <int Ns, int Nc>
   struct ReverseOpenqcdBasis {
     template <typename FloatOut, typename FloatIn>
@@ -145,10 +152,6 @@ namespace quda {
                         static_cast<FloatOut>(kP),
                         static_cast<FloatOut>(kP),
                         static_cast<FloatOut>(kP)};
-      /* U = [-1  0  1  0]
-             [0  -1  0  1]
-             [1 0  1  0]
-             [0 1  0  1] / sqrt(2) */
       for (int s=0; s<Ns; s++) {
         for (int c=0; c<Nc; c++) {
           out[s*Nc+c] = K1[s]*static_cast<complex<FloatOut> >(in[s1[s]*Nc+c]) + K2[s]*static_cast<complex<FloatOut> >(in[s2[s]*Nc+c]);
@@ -157,7 +160,13 @@ namespace quda {
     }
   };
 
-  /** Transform from non-relativistic into openqcd basis */
+  /** Transform from non-relativistic (aka ukqcd) into openqcd basis: 
+   * gamma_ukqcd = U gamma_openqcd U^dagger with
+   * U = [-1  0 1 0]
+   *     [ 0 -1 0 1]
+   *     [ 1  0 1 0]
+   *     [ 0  1 0 1] / sqrt(2)
+   */
   template <int Ns, int Nc>
   struct OpenqcdBasis {
     template <typename FloatOut, typename FloatIn>
@@ -173,10 +182,6 @@ namespace quda {
                         static_cast<FloatOut>(kU),
                         static_cast<FloatOut>(kU),
                         static_cast<FloatOut>(kU)};
-      /* U = [-1  0 1  0]
-             [ 0 -1  0 1]
-             [1  0 1  0]
-             [ 0 1 0 1] / sqrt(2) */
       for (int s=0; s<Ns; s++) {
         for (int c=0; c<Nc; c++) {
           out[s*Nc+c] = K1[s]*static_cast<complex<FloatOut> >(in[s1[s]*Nc+c]) + K2[s]*static_cast<complex<FloatOut> >(in[s2[s]*Nc+c]);

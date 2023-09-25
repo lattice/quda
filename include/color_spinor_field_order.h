@@ -1724,7 +1724,6 @@ namespace quda
      * struct to define order of spinor fields in OpenQCD
      */
     template <typename Float, int Ns, int Nc> struct OpenQCDDiracOrder {
-
       using Accessor = OpenQCDDiracOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
@@ -1806,11 +1805,11 @@ namespace quda
       }
 
       /**
-       * @brief      Rotate corrdinates (xyzt -> txyz)
+       * @brief      Rotate coordinates (xyzt -> txyz)
        *
-       * @param[in]  x_quda     Carthesian local lattice coordinates in quda
+       * @param[in]  x_quda     Cartesian local lattice coordinates in quda
        *                        convention (xyzt)
-       * @param[out] x_openQCD  Carthesian local lattice coordinates in openQCD
+       * @param[out] x_openQCD  Cartesian local lattice coordinates in openQCD
        *                        convention (txyz)
        */
       __device__ __host__ inline void rotate_coords(const int *x_quda, int *x_openQCD) const
