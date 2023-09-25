@@ -172,12 +172,16 @@ static QudaInvertParam newOpenQCDParam(void)
 
   param.cpu_prec = QUDA_DOUBLE_PRECISION;  // The precision used by the input fermion fields
   param.cuda_prec = QUDA_DOUBLE_PRECISION; // The precision used by the QUDA solver
+  /* TH added for MG support */
+  param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION; // The precision used by the QUDA solver
+  param.cuda_prec_precondition = QUDA_HALF_PRECISION; // The precision used by the QUDA solver
 
   /**
    * The order of the input and output fermion fields. Imposes fieldOrder =
    * QUDA_OPENQCD_FIELD_ORDER in color_spinor_field.h and
    * QUDA_OPENQCD_FIELD_ORDER makes quda to instantiate OpenQCDDiracOrder.
    */
+
   param.dirac_order = QUDA_OPENQCD_DIRAC_ORDER;
 
   // Gamma basis of the input and output host fields
@@ -562,7 +566,7 @@ void openQCD_qudaInvert(void *source, void *solution, openQCD_QudaDiracParam_t d
   param.input_location = QUDA_CPU_FIELD_LOCATION;
   param.output_location = QUDA_CPU_FIELD_LOCATION;
 
-  //param.verbosity = QUDA_VERBOSE;
+  param.verbosity = QUDA_VERBOSE;
   param.inv_type = QUDA_GCR_INVERTER; // QUDA_CG_INVERTER
   param.tol = 1e-2;
   param.compute_true_res = true;
@@ -594,13 +598,14 @@ void openQCD_qudaInvert(void *source, void *solution, openQCD_QudaDiracParam_t d
 void openQCD_qudaMultigrid(void *source, void *solution, openQCD_QudaDiracParam_t dirac_param)
 {
   QudaInvertParam invert_param = newOpenQCDSolverParam(dirac_param);
+  QudaInvertParam invert_param_mg = newOpenQCDSolverParam(dirac_param);
   QudaMultigridParam multigrid_param = newQudaMultigridParam();
 
   //param.verbosity = QUDA_VERBOSE;
   invert_param.reliable_delta = 1e-5;
   invert_param.gcrNkrylov = 20;
   invert_param.maxiter = 2000;
-  invert_param.tol = 1e-5;
+  invert_param.tol = 1e-12;
   invert_param.inv_type = QUDA_GCR_INVERTER;
   invert_param.solution_type = QUDA_MAT_SOLUTION;
   invert_param.solve_type = QUDA_DIRECT_SOLVE;
@@ -608,12 +613,26 @@ void openQCD_qudaMultigrid(void *source, void *solution, openQCD_QudaDiracParam_
   invert_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
   invert_param.inv_type_precondition = QUDA_MG_INVERTER;
 
+  invert_param_mg.reliable_delta = 1e-5;
+  invert_param_mg.gcrNkrylov = 20;
+  invert_param_mg.maxiter = 2000;
+  invert_param_mg.tol = 1e-12;
+  invert_param_mg.inv_type = QUDA_GCR_INVERTER;
+  invert_param_mg.solution_type = QUDA_MAT_SOLUTION;
+  invert_param_mg.solve_type = QUDA_DIRECT_SOLVE;
+  invert_param_mg.matpc_type = QUDA_MATPC_EVEN_EVEN;
+  invert_param_mg.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
+  invert_param_mg.inv_type_precondition = QUDA_MG_INVERTER;
+  invert_param_mg.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  invert_param_mg.dirac_order = QUDA_DIRAC_ORDER;
+
   // set the params, hard code the solver
   // parameters copied from recommended settings from Wiki
   multigrid_param.n_level = 2;
   multigrid_param.generate_all_levels = QUDA_BOOLEAN_TRUE;
-  multigrid_param.run_verify = QUDA_BOOLEAN_TRUE;
-  multigrid_param.invert_param = &invert_param;
+  multigrid_param.run_verify = QUDA_BOOLEAN_FALSE;
+  multigrid_param.invert_param = &invert_param_mg;
+  multigrid_param.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
 
   // try setting minimal parameters - leave rest to default
   // level 0 fine
@@ -622,29 +641,47 @@ void openQCD_qudaMultigrid(void *source, void *solution, openQCD_QudaDiracParam_
   multigrid_param.geo_block_size[0][2] = 4;
   multigrid_param.geo_block_size[0][3] = 4;
   multigrid_param.n_vec[0] = 24;
-  multigrid_param.precision_null[0] = QUDA_HALF_PRECISION;
+  multigrid_param.spin_block_size[0] = 2;
+  multigrid_param.precision_null[0] = QUDA_HALF_PRECISION; 
   multigrid_param.smoother[0] = QUDA_CA_GCR_INVERTER;
+  multigrid_param.smoother_tol[0] = 0.25;
+  multigrid_param.location[0] = QUDA_CUDA_FIELD_LOCATION;
   multigrid_param.nu_pre[0] = 0;
   multigrid_param.nu_post[0] = 8;
   multigrid_param.omega[0] = 0.8;
   multigrid_param.smoother_solve_type[0] = QUDA_DIRECT_PC_SOLVE;
   multigrid_param.cycle_type[0] = QUDA_MG_CYCLE_RECURSIVE;
+  multigrid_param.coarse_solver[0] = QUDA_GCR_INVERTER;
+  multigrid_param.coarse_solver_tol[0] = 0.25;
+  multigrid_param.coarse_solver_maxiter[0] = 50;
+  multigrid_param.coarse_grid_solution_type[0] = QUDA_MAT_SOLUTION;
 
   // level 1 coarse
   // no smoother required for innermost
   // so no blocks
   multigrid_param.precision_null[1] = QUDA_HALF_PRECISION;
   multigrid_param.coarse_solver[1] = QUDA_CA_GCR_INVERTER;
+  multigrid_param.smoother[1] = QUDA_CA_GCR_INVERTER;
+  multigrid_param.smoother_tol[1] = 0.25;
+  multigrid_param.spin_block_size[1] = 1;
   multigrid_param.coarse_solver_tol[1] = 0.25;
   multigrid_param.coarse_solver_maxiter[1] = 50;
   multigrid_param.coarse_grid_solution_type[1] = QUDA_MATPC_SOLUTION;
   multigrid_param.smoother_solve_type[1] = QUDA_DIRECT_PC_SOLVE;
   multigrid_param.cycle_type[1] = QUDA_MG_CYCLE_RECURSIVE;
+  multigrid_param.location[1] = QUDA_CUDA_FIELD_LOCATION;
+  multigrid_param.nu_pre[1] = 0;
+  multigrid_param.nu_post[1] = 8;
+  multigrid_param.omega[1] = 0.8;
 
+  PUSH_RANGE("newMultigridQuda",4);
   void *mgprec = newMultigridQuda(&multigrid_param);
   invert_param.preconditioner = mgprec;
+  POP_RANGE;
 
+  PUSH_RANGE("invertQUDA",5);
   invertQuda(static_cast<char *>(solution), static_cast<char *>(source), &invert_param);
+  POP_RANGE;
 
   destroyMultigridQuda(mgprec);
 
