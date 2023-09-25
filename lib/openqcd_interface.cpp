@@ -416,8 +416,15 @@ void openQCD_back_and_forth(void *h_in, void *h_out)
   cpuParam.location = QUDA_CPU_FIELD_LOCATION;
   ColorSpinorField out_h(cpuParam);
 
+  // creates a zero-field on the GPU
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+  ColorSpinorField out(cudaParam);
+
+  out = in;
+
   // transfer the GPU field back to CPU
-  out_h = in;
+  out_h = out;
 }
 
 
