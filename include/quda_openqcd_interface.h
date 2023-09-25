@@ -150,6 +150,8 @@ double openQCD_qudaGCR(void *source, void *solution,
  * Solve Ax=b for an Clover Wilson operator with a multigrid solver. All fields are fields passed and
  * returned are host (CPU) field in openQCD order.  This function requires that
  * persistent gauge and clover fields have been created prior.
+ * 
+ * Requires QUDA_PRECISION & 2 != 0, e.g. QUDA_PRECISON = 14
  *
  * @param[in]  source       Right-hand side source field
  * @param[out] solution     Solution spinor field
