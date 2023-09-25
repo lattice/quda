@@ -397,18 +397,26 @@ static QudaInvertParam newOpenQCDSolverParam(openQCD_QudaDiracParam_t p)
 
 void openQCD_back_and_forth(void *h_in, void *h_out)
 {
+  // sets up the necessary parameters
   QudaInvertParam param = newOpenQCDParam();
 
-  ColorSpinorParam cpuParam_in(h_in, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
-  ColorSpinorField in_h(cpuParam_in);
+  // creates a field on the CPU
+  ColorSpinorParam cpuParam(h_in, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
+  ColorSpinorField in_h(cpuParam);
 
+  // creates a field on the GPU with the same parameter set as the CPU field
   ColorSpinorParam cudaParam(cpuParam, param, QUDA_CUDA_FIELD_LOCATION);
   ColorSpinorField in(cudaParam);
 
-  ColorSpinorParam cpuParam_out(h_out, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
-  ColorSpinorField out_h(cpuParam_out);
-
+  // transfer the CPU field to GPU
   in = in_h;
+
+  // creates a field on the CPU
+  cpuParam.v = h_out;
+  cpuParam.location = QUDA_CPU_FIELD_LOCATION;
+  ColorSpinorField out_h(cpuParam);
+
+  // transfer the GPU field back to CPU
   out_h = in;
 }
 
