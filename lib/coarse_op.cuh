@@ -7,11 +7,6 @@
 
 namespace quda {
 
-  // For coarsening un-preconditioned operators we use uni-directional
-  // coarsening to reduce the set up code.  For debugging we can force
-  // bi-directional coarsening.
-  static bool bidirectional_debug = false;
-
   enum ComputeType {
     COMPUTE_UV,
     COMPUTE_LV,
@@ -791,7 +786,12 @@ namespace quda {
 
       if (type == COMPUTE_UV) {
         strcat(Aux, ",computeUV");
-        if (use_mma) strcat(Aux, ",mma");
+        if constexpr (use_mma) {
+          strcat(Aux, ",mma");
+#ifdef QUDA_MMA_AVAILABLE
+          strcat(Aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
+#endif
+        }
       }
       else if (type == COMPUTE_LV) strcat(Aux, ",computeLV");
       else if (type == COMPUTE_AV)
@@ -801,7 +801,12 @@ namespace quda {
       else if (type == COMPUTE_KV)                 strcat(Aux, ",computeKV");
       else if (type == COMPUTE_VUV) {
         strcat(Aux, ",computeVUV");
-        if (use_mma) strcat(Aux, ",MMA");
+        if constexpr (use_mma) {
+          strcat(Aux, ",mma");
+#ifdef QUDA_MMA_AVAILABLE
+          strcat(Aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
+#endif
+        }
       }
       else if (type == COMPUTE_VLV) strcat(Aux, ",computeVLV");
       else if (type == COMPUTE_COARSE_CLOVER)
@@ -973,6 +978,10 @@ namespace quda {
                   double mu_factor, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional,
                   const int *fine_to_coarse, const int *coarse_to_fine)
   {
+    // For coarsening un-preconditioned operators we use uni-directional
+    // coarsening to reduce the set up code.  For debugging we can force
+    // bi-directional coarsening.
+    static bool bidirectional_debug = false;
 
     // sanity checks
     if (matpc == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc == QUDA_MATPC_ODD_ODD_ASYMMETRIC)

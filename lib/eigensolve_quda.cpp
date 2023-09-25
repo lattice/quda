@@ -255,7 +255,7 @@ namespace quda
       for (auto &k : kSpace) k.setSuggestedParity(mat_parity);
 
       // save the vectors
-      VectorIO io(eig_param->vec_outfile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE);
+      VectorIO io(eig_param->vec_outfile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE, eig_param->partfile);
       io.save(kSpace, save_prec, n_eig);
     }
 

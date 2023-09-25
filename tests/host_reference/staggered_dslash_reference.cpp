@@ -116,10 +116,10 @@ void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, 
           sub(&res[offset], &res[offset], gaugedSpinor, stag_spinor_site_size);
         }
       }
+    } // forward/backward in all four directions
 
-      if (daggerBit) negx(&res[offset], stag_spinor_site_size);
-    } // 4-d volume
-  }   // right-hand-side
+    if (daggerBit) negx(&res[offset], stag_spinor_site_size);
+  } // 4-d volume
 }
 
 void staggeredDslash(ColorSpinorField &out, void **fatlink, void **longlink, void **ghost_fatlink,

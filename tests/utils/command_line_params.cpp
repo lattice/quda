@@ -66,6 +66,7 @@ int test_type = 0;
 quda::mgarray<int> nvec = {};
 quda::mgarray<std::string> mg_vec_infile;
 quda::mgarray<std::string> mg_vec_outfile;
+quda::mgarray<bool> mg_vec_partfile = {};
 QudaInverterType inv_type;
 bool inv_deflate = false;
 bool inv_multigrid = false;
@@ -85,6 +86,10 @@ std::string madwf_param_outfile;
 
 int precon_schwarz_cycle = 1;
 int multishift = 1;
+std::vector<double> multishift_shifts = {};
+std::vector<double> multishift_masses = {};
+std::vector<double> multishift_tols = {};
+std::vector<double> multishift_tols_hq = {};
 bool verify_results = true;
 bool low_mode_check = false;
 bool oblique_proj_check = false;
@@ -131,6 +136,8 @@ quda::mgarray<int> n_block_ortho = {};
 quda::mgarray<bool> block_ortho_two_pass = {};
 quda::mgarray<double> mu_factor = {};
 quda::mgarray<QudaVerbosity> mg_verbosity = {};
+quda::mgarray<bool> mg_setup_use_mma = {};
+quda::mgarray<bool> mg_dslash_use_mma = {};
 quda::mgarray<QudaInverterType> setup_inv = {};
 quda::mgarray<QudaSolveType> coarse_solve_type = {};
 quda::mgarray<QudaSolveType> smoother_solve_type = {};
@@ -170,12 +177,6 @@ QudaTransferType staggered_transfer_type = QUDA_TRANSFER_OPTIMIZED_KD;
 
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
-
-#ifdef QUDA_MMA_AVAILABLE
-bool mg_use_mma = true;
-#else
-bool mg_use_mma = false;
-#endif
 
 bool mg_allow_truncation = false;
 bool mg_staggered_kd_dagger_approximation = false;
@@ -233,6 +234,7 @@ std::string eig_vec_infile;
 std::string eig_vec_outfile;
 bool eig_io_parity_inflate = false;
 QudaPrecision eig_save_prec = QUDA_DOUBLE_PRECISION;
+bool eig_partfile = false;
 
 // Parameters for the MG eigensolver.
 // The coarsest grid params are for deflation,
@@ -509,6 +511,18 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     "--multishift", multishift,
     "Whether to do a multi-shift solver test or not. Default is 1 (single mass)"
     "If a value N > 1 is passed, heavier masses will be constructed and the multi-shift solver will be called");
+  quda_app->add_option(
+    "--multishift-shifts", multishift_shifts,
+    "List of shifts to use in a multi-shift solve; ignored for staggered-type fermions. Default is (i * i * 0.01)");
+  quda_app->add_option(
+    "--multishift-masses", multishift_masses,
+    "List of masses to use in a multi-shift solve; this will override the value of mass; ignored for Wilson-type fermions. Default is (mass + i * i * 0.01)");
+  quda_app->add_option(
+    "--multishift-tols", multishift_tols,
+    "List of tolerances to use in a multi-shift solve. Default is to uniformly use the input tolerance");
+  quda_app->add_option(
+    "--multishift-tols-hq", multishift_tols_hq,
+    "List of hq tolerances to use in a multi-shift solve. Default is the input hq tolerance (default 0)");
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG, CA-GCR (default 8)");
   quda_app->add_option("--niter", niter, "The number of iterations to perform (default 100)");
@@ -712,13 +726,14 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
     "--eig-require-convergence",
     eig_require_convergence, "If true, the solver will error out if convergence is not attained. If false, a warning will be given (default true)");
   opgroup->add_option("--eig-save-vec", eig_vec_outfile, "Save eigenvectors to <file> (requires QIO)");
-  opgroup->add_option("--eig-load-vec", eig_vec_infile, "Load eigenvectors to <file> (requires QIO)")
-    ->check(CLI::ExistingFile);
+  opgroup->add_option("--eig-load-vec", eig_vec_infile, "Load eigenvectors to <file> (requires QIO)");
   opgroup
     ->add_option("--eig-save-prec", eig_save_prec,
                  "If saving eigenvectors, use this precision to save. No-op if eig-save-prec is greater than or equal "
                  "to precision of eigensolver (default = double)")
     ->transform(prec_transform);
+  opgroup->add_option("--eig-save-partfile", eig_partfile,
+                      "If saving eigenvectors, save in partfile format instead of singlefile (default false)");
 
   opgroup->add_option(
     "--eig-io-parity-inflate", eig_io_parity_inflate,
@@ -888,6 +903,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "Load the vectors <file> for the multigrid_test (requires QIO)");
   quda_app->add_mgoption(opgroup, "--mg-save-vec", mg_vec_outfile, CLI::Validator(),
                          "Save the generated null-space vectors <file> from the multigrid_test (requires QIO)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-save-partfile", mg_vec_partfile, CLI::Validator(),
+    "Whether to save near-null vectors as partfile instead of singlefile (default false; singlefile)");
 
   quda_app
     ->add_mgoption("--mg-eig-save-prec", mg_eig_save_prec, CLI::Validator(),
@@ -987,13 +1005,13 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "The smoother tolerance to use for each multigrid (default 0.25)");
   quda_app->add_mgoption(opgroup, "--mg-solve-location", solver_location, CLI::QUDACheckedTransformer(field_location_map),
                          "The location where the multigrid solver will run (default cuda)");
-
+  quda_app->add_mgoption(opgroup, "--mg-setup-use-mma", mg_setup_use_mma, CLI::Validator(),
+                         "Whether multigrid setup should use mma (default to true when supported)");
+  quda_app->add_mgoption(opgroup, "--mg-dslash-use-mma", mg_dslash_use_mma, CLI::Validator(),
+                         "Whether multigrid dslash should use mma (default to false)");
   quda_app->add_mgoption(opgroup, "--mg-verbosity", mg_verbosity, CLI::QUDACheckedTransformer(verbosity_map),
                          "The verbosity to use on each level of the multigrid (default summarize)");
 
-  opgroup->add_option(
-    "--mg-use-mma", mg_use_mma,
-    "Use tensor-core to accelerate multigrid (default = true on Volta or later with CUDA >=10.1, otherwise false)");
 }
 
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
