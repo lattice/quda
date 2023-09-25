@@ -131,8 +131,15 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout)
       errorQuda("Error: Odd lattice dimensions are not supported\n");
       exit(1);
     }
-    mynproc[dir] = (dir==2 || dir==1) ? -layout.nproc[dir] : layout.nproc[dir]; 
+    mynproc[dir] = layout.nproc[dir];
   }
+  if(layout.cstar > 1) {
+    mynproc[1] *= -1; /* y direction */
+  }
+  if(layout.cstar > 2) {
+    mynproc[2] *= -1; /* z direction */
+  }
+}
 
 #ifdef MULTI_GPU
 // TODO: would we ever want to run with QMP COMMS?
