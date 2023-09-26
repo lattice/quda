@@ -576,6 +576,8 @@ double openQCD_qudaMultigrid(void *source, void *solution, openQCD_QudaDiracPara
   invert_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   invert_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
   invert_param.inv_type_precondition = QUDA_MG_INVERTER;
+  invert_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION; // The precision used by the QUDA solver
+  invert_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // The precision used by the QUDA solver
 
   invert_param_mg.reliable_delta = 1e-5;
   invert_param_mg.gcrNkrylov = 20;
