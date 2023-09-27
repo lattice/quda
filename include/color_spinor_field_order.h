@@ -1751,19 +1751,18 @@ namespace quda
         }
       }
 
-
-     /**
-      * @brief      Pure function to return ipt[iy], where
-      *             iy=x3+L3*x2+L2*L3*x1+L1*L2*L3*x0 without accessing the
-      *             ipt-array, but calculating the index on the fly. Notice that
-      *             xi and Li are in openQCD (txyz) convention. If they come
-      *             from QUDA, you have to rotate them first.
-      *
-      * @param[in]  x     Carthesian local lattice corrdinates, 0 <= x[i] < Li
-      *
-      * @return     ipt[x3+L3*x2+L2*L3*x1+L1*L2*L3*x0] = the local flat index of
-      *             openQCD
-      */
+      /**
+       * @brief      Pure function to return ipt[iy], where
+       *             iy=x3+L3*x2+L2*L3*x1+L1*L2*L3*x0 without accessing the
+       *             ipt-array, but calculating the index on the fly. Notice that
+       *             xi and Li are in openQCD (txyz) convention. If they come
+       *             from QUDA, you have to rotate them first.
+       *
+       * @param[in]  x     Carthesian local lattice corrdinates, 0 <= x[i] < Li
+       *
+       * @return     ipt[x3+L3*x2+L2*L3*x1+L1*L2*L3*x0] = the local flat index of
+       *             openQCD
+       */
       __device__ __host__ inline int ipt(int *x) const
       {
         int xb[4], xn[4], ib, in, is, cbs[4], mu, L_[4];

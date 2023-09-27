@@ -253,21 +253,7 @@ double openQCD_qudaPlaquette(void)
     return 0.0;
   }
 
-  /*QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
-  obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
-  obsParam.remove_staggered_phase = QUDA_BOOLEAN_FALSE;
-  gaugeObservablesQuda(&obsParam);
-
-  // Note different Nc normalization!
-  plaq[0] = obsParam.plaquette[0];
-  plaq[1] = obsParam.plaquette[1];
-  plaq[2] = obsParam.plaquette[2];*/
-
   plaqQuda(plaq);
-
-/*  plaq[1] *= 3.0;
-  plaq[2] *= 3.0;
-  plaq[0] *= 3.0;*/
 
   // Note different Nc normalization wrt openQCD!
   return 3.0*plaq[0];
@@ -306,11 +292,19 @@ void openQCD_qudaGaugeFree(void)
 }
 
 
-void openQCD_qudaCloverLoad(void *clover)
+void openQCD_qudaCloverLoad(void *clover, double kappa, double csw)
 {
-  /*QudaInvertParam qudaCloverParam = newOpenQCDCloverParam();
-  loadCloverQuda(clover, NULL, &qudaCloverParam);*/
-  errorQuda("openQCD_qudaCloverLoad() is not implemented yet.");
+  QudaInvertParam param = newOpenQCDParam();
+  param.clover_order = QUDA_OPENQCD_CLOVER_ORDER;
+  param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
+  param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
+  param.clover_cuda_prec = QUDA_DOUBLE_PRECISION;
+
+  param.kappa = kappa;
+  param.clover_csw = csw;
+  param.clover_coeff = 0.0;
+
+  loadCloverQuda(clover, NULL, &param);
   qudaState.clover_loaded = true;
 }
 

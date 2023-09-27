@@ -175,7 +175,7 @@ double openQCD_qudaPlaquette(void);
  * @brief      Load the gauge fields from host to quda.
  *
  * @param[in]  gauge  The gauge fields (in openqcd order)
- * @param[in]  prec   Precision of the gauge field
+ * @param[in]  prec   Precision of the incoming gauge field
  */
 void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec);
 
@@ -184,7 +184,7 @@ void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec);
  * @brief      Save the gauge fields from quda to host.
  *
  * @param[out] gauge  The gauge fields (will be stored in openqcd order)
- * @param[in]  prec   Precision of the gauge field
+ * @param[in]  prec   Precision of the outgoing gauge field
  */
 void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec);
 
@@ -198,9 +198,13 @@ void openQCD_qudaGaugeFree(void);
 /**
  * @brief      Load the clover fields from host to quda.
  *
- * @param[in]  clover      The clover fields (in openqcd order)
+ * @param[in]  clover  The clover fields (in openqcd order)
+ * @param[in]  kappa   The kappa (we need this, because quda has its clover
+ *                     field multiplied by kappa and we have to reverse this
+ *                     when loading ours)
+ * @param[in]  csw     The csw coefficient of the clover field
  */
-void openQCD_qudaCloverLoad(void *clover);
+void openQCD_qudaCloverLoad(void *clover, double kappa, double csw);
 
 
 /**
