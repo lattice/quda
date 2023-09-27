@@ -235,15 +235,15 @@ template <typename gFloat> void accum_su3_to_anti_hermitian(gFloat *mom, gFloat 
   mom[5] += sign * (gauge[1 * 6 + 2 * 2 + 1] + gauge[2 * 6 + 1 * 2 + 1]) * 0.5;
 }
 // a= b-b^dag
-template <typename gFloat> void su3_imagx2(gFloat *a,gFloat *b){
- for (int i = 0; i < 3; i++) {
+template <typename gFloat> void su3_imagx2(gFloat *a, gFloat *b)
+{
+  for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
-      a[j * 6 + i * 2 + 0] = b[j * 6 + i * 2 + 0]-b[i * 6 + j * 2 + 0];
-      a[j * 6 + i * 2 + 1] = b[j * 6 + i * 2 + 1]+b[i * 6 + j * 2 + 1];
+      a[j * 6 + i * 2 + 0] = b[j * 6 + i * 2 + 0] - b[i * 6 + j * 2 + 0];
+      a[j * 6 + i * 2 + 1] = b[j * 6 + i * 2 + 1] + b[i * 6 + j * 2 + 1];
     }
- }
+  }
 }
-
 
 template <typename sFloat, typename gFloat>
 void CloverForce_kernel_host(std::array<void *, 4> gauge, void *h_mom, quda::ColorSpinorField &inA,
@@ -315,8 +315,6 @@ void cloverSigmaTraceCompute_host(cFloat *oprod, cFloat *clover, double coeff, i
   int N = nColor * nSpin / 2;
   int chiralBlock = N + 2 * (N - 1) * N / 2;
 
-  // cFloat *oprodEven[6], *oprodOdd[6];
-  // cFloat *A_array; //[72];
   cFloat A_array[72];
   typedef Eigen::Matrix<std::complex<cFloat>, 3, 3> Matrix3c;
   typedef Eigen::Matrix<std::complex<cFloat>, 6, 6> CloverM;
@@ -347,7 +345,6 @@ void cloverSigmaTraceCompute_host(cFloat *oprod, cFloat *clover, double coeff, i
       // off-diag
       for (int row = 0; row < 6; row++) {
         for (int col = (row + 1); col < 6; col++) {
-          // int id = N * (N - 1) / 2 - (N - row) * (N - row - 1) / 2 + (col - row - 1);
           int id = N * row - (row * (row + 1)) / 2 + (col - row - 1);
           A(row, col).real(clover[index + 6 + id * 2]);
           A(row, col).imag(clover[index + 6 + id * 2 + 1]);
@@ -385,8 +382,6 @@ void cloverSigmaTraceCompute_host(cFloat *oprod, cFloat *clover, double coeff, i
         // color = col_color+ row_color*Ncolor
 
         Matrix3c mat = Matrix3c::Zero();
-        // quda::Matrix<quda::complex<cFloat>, 3> mat;
-        // setZero(&mat);
         cFloat diag[2][6];
         std::complex<cFloat> tri[2][15];
         const int idtab[15] = {0, 1, 3, 6, 10, 2, 4, 7, 11, 5, 8, 12, 9, 13, 14};
@@ -546,9 +541,6 @@ void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *
 
   if (yIndex == 0) { // do "this" force
 
-    // int x[4];
-    // getCoordsExtended(x, xIndex, arg.X, arg.parity, arg.border);
-
     // U[mu](x) U[nu](x+mu) U[*mu](x+nu) U[*nu](x) Oprod(x)
     {
       int d[4] = {0, 0, 0, 0};
@@ -695,9 +687,6 @@ void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *
     }
 
   } else { // else do other force
-
-    // int y[4] = {};
-    // getCoordsExtended(y, xIndex, arg.X, otherparity, arg.border);
 
     {
       int d[4] = {0, 0, 0, 0};
@@ -902,9 +891,12 @@ void cloverDerivative_reference(void *h_mom, void **gauge, void *oprod, int pari
         for (int nu = 0; nu < 4; nu++) {
           if (nu == mu)
             continue;
-          else if (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) {
+          else if (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION)
             computeForce_reference<double>(h_mom, (void **)qdp_ex->Gauge_p(), lat, oprod, i, yIndex, parity, mu, nu);
-          }
+          else if (gauge_param.cpu_prec == QUDA_SINGLE_PRECISION)
+            computeForce_reference<float>(h_mom, (void **)qdp_ex->Gauge_p(), lat, oprod, i, yIndex, parity, mu, nu);
+          else
+            errorQuda("Unsupported precision %d", gauge_param.cpu_prec);
         }
       }
     }
@@ -928,7 +920,6 @@ void CloverSigmaOprod_reference(void *oprod_, quda::ColorSpinorField &inp, quda:
       for (int mu = 1; mu < 4; mu++) {
         for (int nu = 0; nu < mu; nu++) {
 
-          
           sFloat temp[spinor_site_size], temp_munu[spinor_site_size], temp_numu[spinor_site_size];
           multiplySpinorByDiracgamma(temp, nu, &p[spinor_site_size * (i + Vh * parity)]);
           multiplySpinorByDiracgamma(temp_munu, mu, temp);
@@ -945,14 +936,13 @@ void CloverSigmaOprod_reference(void *oprod_, quda::ColorSpinorField &inp, quda:
           }
 
           outerProdSpinTrace(oprod_f, temp, &x[spinor_site_size * (i + Vh * parity)]);
-          su3_imagx2(oprod_imx2,oprod_f);
-          
+          su3_imagx2(oprod_imx2, oprod_f);
+
           int munu = (mu - 1) * mu / 2 + nu;
 
           for (int ci = 0; ci < nColor; ci++) {   // row
             for (int cj = 0; cj < nColor; cj++) { // col
               int color = ci * nColor + cj;
-              int colort = cj * nColor + ci;
               int id = 2 * (i + Vh * (color + 9 * (munu + parity * 6)));
               oprod[id + 0] += coeff[0][parity] * oprod_imx2[color * 2 + 0] / 2.0;
               oprod[id + 1] += coeff[0][parity] * oprod_imx2[color * 2 + 1] / 2.0;
@@ -969,4 +959,8 @@ void computeCloverSigmaOprod_reference(void *oprod, quda::ColorSpinorField &p, q
 {
   if (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION)
     CloverSigmaOprod_reference<double, double>(oprod, p, x, ferm_epsilon);
+  else if (gauge_param.cpu_prec == QUDA_SINGLE_PRECISION)
+    CloverSigmaOprod_reference<float, float>(oprod, p, x, ferm_epsilon);
+  else
+    errorQuda("Unsupported precision %d", gauge_param.cpu_prec);
 }
