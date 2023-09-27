@@ -1,0 +1,30 @@
+include:
+  - remote: "https://gitlab.com/cscs-ci/recipes/-/raw/master/templates/v2/.ci-ext.yml"
+
+stages:
+  - build
+  - test
+
+variables:
+  PERSIST_IMAGE_NAME: $CSCS_REGISTRY_PATH/quda/public/build:$CI_COMMIT_SHORT_SHA
+
+build_job:
+  stage: build
+  extends: .container-builder
+  variables:
+    DOCKERFILE: ci/docker/Dockerfile.build
+
+test_job:
+  stage: test
+  extends: .container-runner-daint-gpu
+  image: $PERSIST_IMAGE_NAME
+  script:
+    - ctest --test-dir /quda/build/ --output-on-failure
+  variables:
+    CRAY_CUDA_MPS: 0
+    SLURM_JOB_NUM_NODES: 2
+    SLURM_PARTITION: normal
+    SLURM_TIMELIMIT: "0:30:00"
+    USE_MPI: "YES"
+    QUDA_ENABLE_TUNING: 0
+    QUDA_RESOURCE_PATH: .
