@@ -20,10 +20,10 @@ namespace quda {
       const T &a, &b, &c;
       cvector_ref<ColorSpinorField> &x, &y, &z, &w;
 
-      bool tuneSharedBytes() const { return false; }
+      bool tuneSharedBytes() const override { return false; }
 
       // for these streaming kernels, there is no need to tune the grid size, just use max
-      unsigned int minGridSize() const { return maxGridSize(); }
+      unsigned int minGridSize() const override { return maxGridSize(); }
 
     public:
       template <typename Vx, typename Vy, typename Vz, typename Vw>
@@ -65,7 +65,7 @@ namespace quda {
 
         if (x_prec != y_prec) {
           strcat(aux, ",");
-          strcat(aux, y0.AuxString());
+          strcat(aux, y0.AuxString().c_str());
         }
         char NXZ_str[16];
         char NYW_str[16];
@@ -86,7 +86,7 @@ namespace quda {
         blas::flops += flops();
       }
 
-      TuneKey tuneKey() const { return TuneKey(vol, typeid(f).name(), aux); }
+      TuneKey tuneKey() const override { return TuneKey(vol, typeid(f).name(), aux); }
 
       template <typename Arg> void Launch(const TuneParam &tp, const qudaStream_t &stream, Arg &&arg)
       {
@@ -193,9 +193,9 @@ namespace quda {
         compute<1>(stream);
       }
 
-      void apply(const qudaStream_t &stream) { instantiate<decltype(f)::NXZ_max>(stream); }
+      void apply(const qudaStream_t &stream) override { instantiate<decltype(f)::NXZ_max>(stream); }
 
-      void preTune()
+      void preTune() override
       {
         for (int i = 0; i < NYW; ++i) {
           if (f.write.Y) y[i].backup();
@@ -203,7 +203,7 @@ namespace quda {
         }
       }
 
-      void postTune()
+      void postTune() override
       {
         for (int i = 0; i < NYW; ++i) {
           if (f.write.Y) y[i].restore();
@@ -211,7 +211,7 @@ namespace quda {
         }
       }
 
-      bool advanceAux(TuneParam &param) const
+      bool advanceAux(TuneParam &param) const override
       {
         if (enable_warp_split()) {
           if (2 * param.aux.x <= max_warp_split) {
@@ -231,27 +231,27 @@ namespace quda {
         }
       }
 
-      int blockStep() const { return device::warp_size() / warp_split; }
-      int blockMin() const { return device::warp_size() / warp_split; }
+      int blockStep() const override { return device::warp_size() / warp_split; }
+      int blockMin() const override { return device::warp_size() / warp_split; }
 
-      void initTuneParam(TuneParam &param) const
+      void initTuneParam(TuneParam &param) const override
       {
         TunableGridStrideKernel3D::initTuneParam(param);
         param.aux = make_int4(1, 0, 0, 0); // warp-split parameter
       }
 
-      void defaultTuneParam(TuneParam &param) const
+      void defaultTuneParam(TuneParam &param) const override
       {
         TunableGridStrideKernel3D::defaultTuneParam(param);
         param.aux = make_int4(1, 0, 0, 0); // warp-split parameter
       }
 
-      long long flops() const
+      long long flops() const override
       {
         return NYW * NXZ * f.flops() * x[0].Length();
       }
 
-      long long bytes() const
+      long long bytes() const override
       {
         // X and Z reads are repeated (and hopefully cached) across NYW
         // each Y and W read/write is done once

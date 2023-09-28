@@ -61,20 +61,25 @@ namespace quda {
 #endif
     }
 
-    inline bool isNative(QudaCloverFieldOrder order, QudaPrecision precision)
+    template <typename T> constexpr auto getNative() { return QUDA_FLOAT2_CLOVER_ORDER; }
+    template <> constexpr auto getNative<float>() { return QUDA_FLOAT4_CLOVER_ORDER; }
+    template <> constexpr auto getNative<short>() { return static_cast<QudaCloverFieldOrder>(QUDA_ORDER_FP); }
+    template <> constexpr auto getNative<int8_t>() { return static_cast<QudaCloverFieldOrder>(QUDA_ORDER_FP); }
+
+    constexpr QudaCloverFieldOrder getNative(QudaPrecision precision)
     {
-      if (precision == QUDA_DOUBLE_PRECISION) {
-        if (order == QUDA_FLOAT2_CLOVER_ORDER) return true;
-      } else if (precision == QUDA_SINGLE_PRECISION) {
-        if (order == QUDA_FLOAT4_CLOVER_ORDER) return true;
-      } else if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-#ifdef FLOAT8
-        if (order == QUDA_FLOAT8_CLOVER_ORDER) return true;
-#else
-        if (order == QUDA_FLOAT4_CLOVER_ORDER) return true;
-#endif
+      switch (precision) {
+      case QUDA_DOUBLE_PRECISION: return getNative<double>();
+      case QUDA_SINGLE_PRECISION: return getNative<float>();
+      case QUDA_HALF_PRECISION: return getNative<short>();
+      case QUDA_QUARTER_PRECISION: return getNative<int8_t>();
+      default: return QUDA_INVALID_CLOVER_ORDER;
       }
-      return false;
+    }
+
+    constexpr bool isNative(QudaCloverFieldOrder order, QudaPrecision precision)
+    {
+      return order == getNative(precision);
     }
 
   } // namespace clover
@@ -117,19 +122,7 @@ namespace quda {
       this->precision = precision;
       this->ghost_precision = precision;
 
-      if (native) {
-        if (precision == QUDA_DOUBLE_PRECISION) {
-          order = QUDA_FLOAT2_CLOVER_ORDER;
-        } else if (precision == QUDA_SINGLE_PRECISION) {
-          order = QUDA_FLOAT4_CLOVER_ORDER;
-        } else if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-#ifdef FLOAT8
-          order = QUDA_FLOAT8_CLOVER_ORDER;
-#else
-          order = QUDA_FLOAT4_CLOVER_ORDER;
-#endif
-        }
-      }
+      if (native) order = clover::getNative(precision);
     }
 
     CloverFieldParam() = default;

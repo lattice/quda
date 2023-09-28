@@ -2,6 +2,7 @@
 
 #include <tune_quda.h>
 #include <target_device.h>
+#include <lattice_field.h>
 #include <kernel_helper.h>
 #include <kernel.h>
 
@@ -21,14 +22,24 @@ namespace quda
   */
   qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, const qudaStream_t &stream, const void *arg);
 
+  /**
+     @brief This helper function indicates if the present
+     compilation unit has explicit constant memory usage enabled.
+  */
+  static bool use_constant_memory()
+  {
+#ifdef QUDA_USE_CONSTANT_MEMORY
+    return true;
+#else
+    return false;
+#endif
+  }
+
   class TunableKernel : public Tunable
   {
 
   protected:
     QudaFieldLocation location;
-
-    virtual unsigned int sharedBytesPerThread() const { return 0; }
-    virtual unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
     template <template <typename> class Functor, bool grid_stride, typename Arg>
     std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
@@ -42,6 +53,11 @@ namespace quda
       return launch_error;
     }
 
+    template <typename Arg, size_t arg_size = sizeof(Arg)> void check_arg_size(Arg&)
+    {
+      static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
+    }
+
     template <template <typename> class Functor, bool grid_stride, typename Arg>
     std::enable_if_t<!device::use_kernel_arg<Arg>(), qudaError_t>
     launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
@@ -50,7 +66,7 @@ namespace quda
       // note we do the copy to constant memory after the kernel has been compiled in launch_jitify
       launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg);
 #else
-      static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
+      check_arg_size(arg);
       qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);
       launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(&arg));
 #endif
@@ -71,14 +87,30 @@ namespace quda
       const_cast<TunableKernel *>(this)->launch_device<Functor, grid_stride>(KERNEL(raw_kernel), tp, stream, arg);
     }
 
-    TunableKernel(QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) : location(location) { }
+    TunableKernel(const LatticeField &field, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+      location(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location())
+    {
+      strcpy(vol, field.VolString().c_str());
+      strcpy(aux, compile_type_str(field, location));
+      if (this->location == QUDA_CUDA_FIELD_LOCATION && use_constant_memory()) strcat(aux, "cmem,");
+      if (this->location == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
+      strcat(aux, field.AuxString().c_str());
+    }
 
-    virtual bool advanceTuneParam(TuneParam &param) const
+    TunableKernel(size_t n_items, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) : location(location)
+    {
+      u64toa(vol, n_items);
+      strcpy(aux, compile_type_str(location));
+      if (location == QUDA_CUDA_FIELD_LOCATION && use_constant_memory()) strcat(aux, "cmem,");
+      if (this->location == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
+    }
+
+    virtual bool advanceTuneParam(TuneParam &param) const override
     {
       return location == QUDA_CPU_FIELD_LOCATION ? false : Tunable::advanceTuneParam(param);
     }
 
-    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
+    TuneKey tuneKey() const override { return TuneKey(vol, typeid(*this).name(), aux); }
   };
 
 } // namespace quda

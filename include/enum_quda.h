@@ -359,10 +359,11 @@ typedef enum QudaFieldOrder_s {
 } QudaFieldOrder;
 
 typedef enum QudaFieldCreate_s {
-  QUDA_NULL_FIELD_CREATE,      // create new field
-  QUDA_ZERO_FIELD_CREATE,      // create new field and zero it
-  QUDA_COPY_FIELD_CREATE,      // create copy to field
-  QUDA_REFERENCE_FIELD_CREATE, // create reference to field
+  QUDA_NULL_FIELD_CREATE,      // new field
+  QUDA_ZERO_FIELD_CREATE,      // new field and zero it
+  QUDA_COPY_FIELD_CREATE,      // copy to field
+  QUDA_REFERENCE_FIELD_CREATE, // reference to field
+  QUDA_GHOST_FIELD_CREATE,     // dummy field used only for ghost storage
   QUDA_INVALID_FIELD_CREATE = QUDA_INVALID_ENUM
 } QudaFieldCreate;
 
@@ -570,6 +571,12 @@ typedef enum QudaGaugeSmearType_s {
   QUDA_GAUGE_SMEAR_SYMANZIK_FLOW,
   QUDA_GAUGE_SMEAR_INVALID = QUDA_INVALID_ENUM
 } QudaGaugeSmearType;
+
+typedef enum QudaFermionSmearType_s {
+  QUDA_FERMION_SMEAR_TYPE_GAUSSIAN,
+  QUDA_FERMION_SMEAR_TYPE_WUPPERTAL,
+  QUDA_FERMION_SMEAR_TYPE_INVALID = QUDA_INVALID_ENUM
+} QudaFermionSmearType;
 
 // Allows to choose an appropriate external library
 typedef enum QudaExtLibType_s {

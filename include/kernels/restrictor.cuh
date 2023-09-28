@@ -21,8 +21,7 @@ namespace quda {
   /** 
       Kernel argument struct
   */
-  template <typename Float, typename vFloat, int fineSpin_, int fineColor_,
-	    int coarseSpin_, int coarseColor_, QudaFieldOrder order>
+  template <typename Float, typename vFloat, int fineSpin_, int fineColor_, int coarseSpin_, int coarseColor_>
   struct RestrictArg : kernel_param<> {
     using real = Float;
     static constexpr int fineSpin = fineSpin_;
@@ -30,9 +29,9 @@ namespace quda {
     static constexpr int coarseSpin = coarseSpin_;
     static constexpr int coarseColor = coarseColor_;
 
-    FieldOrderCB<Float,coarseSpin,coarseColor,1,order> out;
-    const FieldOrderCB<Float,fineSpin,fineColor,1,order> in;
-    const FieldOrderCB<Float,fineSpin,fineColor,coarseColor,order,vFloat> V;
+    FieldOrderCB<Float,coarseSpin,coarseColor,1, colorspinor::getNative<Float>(coarseSpin)> out;
+    const FieldOrderCB<Float,fineSpin,fineColor,1, colorspinor::getNative<Float>(fineSpin)> in;
+    const FieldOrderCB<Float,fineSpin,fineColor,coarseColor, colorspinor::getNative<vFloat>(fineSpin), vFloat> V;
     const int aggregate_size;    // number of sites that form a single aggregate
     const int_fastdiv aggregate_size_cb; // number of checkerboard sites that form a single aggregate
     const int *fine_to_coarse;
@@ -141,7 +140,11 @@ namespace quda {
         for (int s = 0; s<Arg::fineSpin; s++) {
 #pragma unroll
           for (int v = 0; v<coarse_color_per_thread; v++) {
-            reduced[arg.spin_map(s,parity) * coarse_color_per_thread + v] += tmp[s*coarse_color_per_thread + v];
+            if (arg.spin_map(s, parity) == 0) {
+              reduced[0 * coarse_color_per_thread + v] += tmp[s*coarse_color_per_thread + v];
+            } else {
+              reduced[1 * coarse_color_per_thread + v] += tmp[s*coarse_color_per_thread + v];
+            }
           }
         }
 

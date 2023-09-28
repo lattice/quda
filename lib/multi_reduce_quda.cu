@@ -22,7 +22,7 @@ namespace quda {
       T &result;
       QudaFieldLocation location;
 
-      virtual bool advanceSharedBytes(TuneParam &param) const
+      virtual bool advanceSharedBytes(TuneParam &param) const override
       {
         TuneParam next(param);
         advanceBlockDim(next); // to get next blockDim
@@ -66,7 +66,7 @@ namespace quda {
         strcat(aux, aux2);
         if (x_prec != y_prec) {
           strcat(aux, ",");
-          strcat(aux, y0.AuxString());
+          strcat(aux, y0.AuxString().c_str());
         }
 
         char NXZ_str[16];
@@ -102,7 +102,7 @@ namespace quda {
         blas::flops += flops();
       }
 
-      TuneKey tuneKey() const { return TuneKey(vol, typeid(r).name(), aux); }
+      TuneKey tuneKey() const override { return TuneKey(vol, typeid(r).name(), aux); }
 
       template <int NXZ> void compute(const qudaStream_t &stream)
       {
@@ -175,7 +175,7 @@ namespace quda {
         compute<1>(stream);
       }
 
-      void apply(const qudaStream_t &stream)
+      void apply(const qudaStream_t &stream) override
       {
         constexpr int pow2_max = max_NXZ_power2(true);
         if (NXZ <= pow2_max && is_power2(NXZ)) instantiatePow2<pow2_max>(stream);
@@ -183,7 +183,7 @@ namespace quda {
         else errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);
       }
 
-      void preTune()
+      void preTune() override
       {
         for (int i = 0; i < NYW; ++i) {
           if (r.write.X) x[i].backup();
@@ -193,7 +193,7 @@ namespace quda {
         }
       }
 
-      void postTune()
+      void postTune() override
       {
         for (int i = 0; i < NYW; ++i) {
           if (r.write.X) x[i].restore();
@@ -203,12 +203,12 @@ namespace quda {
         }
       }
 
-      long long flops() const
+      long long flops() const override
       {
         return NYW * NXZ * r.flops() * x[0].Length();
       }
 
-      long long bytes() const
+      long long bytes() const override
       {
         // X and Z reads are repeated (and hopefully cached) across NYW
         // each Y and W read/write is done once
@@ -291,9 +291,6 @@ namespace quda {
       bool hermitian;
       bool Anorm;
 
-      unsigned int sharedBytesPerThread() const { return 0; }
-      unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-
       int NYW_max;
       uint2 max_tile_size;
 
@@ -323,9 +320,9 @@ namespace quda {
         max_tile_size = make_uint2(1, 1);
 
         strcpy(aux, nested_policy ? "nested_policy," : "policy,");
-        strcat(aux, x[0].AuxString());
+        strcat(aux, x[0].AuxString().c_str());
       	strcat(aux, ",");
-        strcat(aux, y[0].AuxString());
+        strcat(aux, y[0].AuxString().c_str());
         if (hermitian) strcat(aux, ",hermitian");
         if (Anorm) strcat(aux, ",Anorm");
 	strcat(aux,",n=");
@@ -393,7 +390,7 @@ namespace quda {
 
       virtual ~TileSizeTune() { setPolicyTuning(false); }
 
-      void apply(const qudaStream_t &) {
+      void apply(const qudaStream_t &) override {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         // tp.aux.x is where the tile size is stored. "tp" is the tuning struct.
@@ -404,7 +401,7 @@ namespace quda {
       }
 
       // aux.x is the tile size
-      bool advanceAux(TuneParam &param) const
+      bool advanceAux(TuneParam &param) const override
       {
         // for 1-d reductions we don't do any tuning and just use the largest tile
         if (x.size() == 1 || y.size() == 1) {
@@ -433,9 +430,9 @@ namespace quda {
         }
       }
 
-      bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
+      bool advanceTuneParam(TuneParam &param) const override { return advanceAux(param); }
 
-      void initTuneParam(TuneParam &param) const  {
+      void initTuneParam(TuneParam &param) const override {
         Tunable::initTuneParam(param);
         if (x.size() == 1 || y.size() == 1) {
           param.aux.x = max_tile_size.x;
@@ -448,7 +445,7 @@ namespace quda {
         param.aux.w = 0;
       }
 
-      void defaultTuneParam(TuneParam &param) const  {
+      void defaultTuneParam(TuneParam &param) const override {
         Tunable::defaultTuneParam(param); // default is max tile size
         param.aux.x = max_tile_size.x;
         param.aux.y = max_tile_size.y;
@@ -456,15 +453,14 @@ namespace quda {
         param.aux.w = 0;
       }
 
-      TuneKey tuneKey() const {
-        return TuneKey(x[0].VolString(), typeid(*this).name(), aux);
+      TuneKey tuneKey() const override {
+        return TuneKey(x[0].VolString().c_str(), typeid(*this).name(), aux);
       }
 
-      long long flops() const { return 0; } // FIXME
-      long long bytes() const { return 0; } // FIXME
+      long long bytes() const override { return 0; } // FIXME
 
-      void preTune() { } // FIXME - use write to determine what needs to be saved
-      void postTune() { } // FIXME - use write to determine what needs to be saved
+      void preTune() override { } // FIXME - use write to determine what needs to be saved
+      void postTune() override { } // FIXME - use write to determine what needs to be saved
     };
 
     template <template <typename ...> class ReducerDiagonal,
@@ -478,9 +474,6 @@ namespace quda {
       bool hermitian;
       bool Anorm;
 
-      unsigned int sharedBytesPerThread() const { return 0; }
-      unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-
     public:
       TransposeTune(std::vector<T> &result, Vx &x, Vy &y, bool hermitian, bool Anorm = false) :
         result(result),
@@ -490,9 +483,9 @@ namespace quda {
         Anorm(Anorm)
       {
         strcpy(aux, "policy,");
-        strcat(aux, x[0].AuxString());
+        strcat(aux, x[0].AuxString().c_str());
         strcat(aux, ",");
-        strcat(aux, y[0].AuxString());
+        strcat(aux, y[0].AuxString().c_str());
         if (hermitian) strcat(aux, ",hermitian");
         if (Anorm) strcat(aux, ",Anorm");
         strcat(aux, ",n=");
@@ -543,7 +536,7 @@ namespace quda {
 
       virtual ~TransposeTune() { setPolicyTuning(false); }
 
-      void apply(const qudaStream_t &)
+      void apply(const qudaStream_t &) override
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
@@ -565,7 +558,7 @@ namespace quda {
         }
       }
 
-      bool advanceAux(TuneParam &param) const
+      bool advanceAux(TuneParam &param) const override
       {
         if (x.size() == 1 || y.size() == 1) {
           return false;
@@ -580,9 +573,9 @@ namespace quda {
         }
       }
 
-      bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
+      bool advanceTuneParam(TuneParam &param) const override { return advanceAux(param); }
 
-      void initTuneParam(TuneParam &param) const
+      void initTuneParam(TuneParam &param) const override
       {
         Tunable::initTuneParam(param);
         if (x.size() == 1)
@@ -593,15 +586,14 @@ namespace quda {
           param.aux = make_int4(0, 0, 0, 0); // default is not to transpose
       }
 
-      void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
+      void defaultTuneParam(TuneParam &param) const override { initTuneParam(param); }
 
-      TuneKey tuneKey() const { return TuneKey(x[0].VolString(), typeid(*this).name(), aux); }
+      TuneKey tuneKey() const override { return TuneKey(x[0].VolString().c_str(), typeid(*this).name(), aux); }
 
-      long long flops() const { return 0; } // FIXME
-      long long bytes() const { return 0; } // FIXME
+      long long bytes() const override { return 0; } // FIXME
 
-      void preTune() {}  // FIXME - use write to determine what needs to be saved
-      void postTune() {} // FIXME - use write to determine what needs to be saved
+      void preTune() override {}  // FIXME - use write to determine what needs to be saved
+      void postTune() override {} // FIXME - use write to determine what needs to be saved
     };
 
     void reDotProduct(std::vector<double> &result, cvector_ref<const ColorSpinorField> &x,

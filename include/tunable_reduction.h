@@ -140,15 +140,11 @@ namespace quda
      */
     TunableReduction2D(const LatticeField &field, unsigned int block_size_y = 2,
                        QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableKernel(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location()),
+      TunableKernel(field, location),
       n_items(field.Volume()),
       block_size_y(block_size_y)
     {
-      strcpy(vol, field.VolString());
-      strcpy(aux, compile_type_str(field, location));
       if (commAsyncReduction()) strcat(aux, "async,");
-      strcat(aux, field.SiteSubset() == QUDA_FULL_SITE_SUBSET ? "nParity=2," : "nParity=1,");
-      strcat(aux, field.AuxString());
     }
 
     /**
@@ -157,10 +153,8 @@ namespace quda
        @param[in] location Location where the calculation will take place
      */
     TunableReduction2D(size_t n_items, QudaFieldLocation location) :
-      TunableKernel(location), n_items(n_items), block_size_y(1)
+      TunableKernel(n_items, location), n_items(n_items), block_size_y(1)
     {
-      u64toa(vol, n_items);
-      strcpy(aux, compile_type_str(location));
       if (commAsyncReduction()) strcat(aux, "async,");
     }
 

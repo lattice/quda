@@ -60,20 +60,21 @@ namespace quda
   {
     using real = typename Arg::real;
     using Link = Matrix<complex<real>, Arg::nColor>;
-    Link Stap, Rect, Z;
+    Link Z;
     // Compute staples and Z factor
     switch (arg.wflow_type) {
     case QUDA_GAUGE_SMEAR_WILSON_FLOW :
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, x, arg.E, parity, dir, Stap, Arg::wflow_dim);
-      Z = Stap;
+      computeStaple(arg, x, arg.E, parity, dir, Z, Arg::wflow_dim);
       break;
     case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW :
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
+      SharedMemoryCache<Link> Stap(target::block_dim());
+      SharedMemoryCache<Link> Rect(target::block_dim(), sizeof(Link)); // offset to ensure non-overlapping allocations
       computeStapleRectangle(arg, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim);
-      Z = (arg.coeff1x1 * Stap + arg.coeff2x1 * Rect);
+      Z = arg.coeff1x1 * static_cast<const Link &>(Stap) + arg.coeff2x1 * static_cast<const Link &>(Rect);
       break;
     }
     return Z;

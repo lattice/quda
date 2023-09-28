@@ -1,5 +1,5 @@
 # enable tests build a common library for all test utilities
-add_library(quda_test STATIC googletest/src/gtest-all.cc)
+add_library(quda_test googletest/src/gtest-all.cc)
 target_include_directories(quda_test SYSTEM PUBLIC  googletest/include googletest)
 target_link_libraries(quda_test PUBLIC Eigen)
 target_link_libraries(quda_test PUBLIC QUDA::quda)
@@ -9,6 +9,10 @@ target_compile_options(
   $<IF:$<CONFIG:RELEASE>,-w,-Wall -Wextra>
   $<$<CONFIG:STRICT>:-Werror>
 )
+if(BUILD_SHARED_LIBS)
+  install(TARGETS quda_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+
 add_subdirectory(utils)
 add_subdirectory(host_reference)
 enable_language(Fortran)
@@ -43,7 +47,7 @@ endif()
 
 # define tests
 add_executable(c_interface_test c_interface_test.c)
-target_link_libraries(c_interface_test ${TEST_LIBS})
+target_link_libraries(c_interface_test ${TEST_LIBS} "-lstdc++")
 quda_checkbuildtest(c_interface_test QUDA_BUILD_ALL_TESTS)
 
 # if we build with QDP JIT the tests cannot run anyway
@@ -160,6 +164,11 @@ if(QUDA_QIO)
   install(TARGETS io_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
+add_executable(tune_test tune_test.cpp)
+target_link_libraries(tune_test ${TEST_LIBS})
+quda_checkbuildtest(tune_test QUDA_BUILD_ALL_TESTS)
+install(TARGETS tune_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 add_executable(plaq_test plaq_test.cpp)
 target_link_libraries(plaq_test ${TEST_LIBS})
 quda_checkbuildtest(plaq_test QUDA_BUILD_ALL_TESTS)
@@ -187,6 +196,13 @@ if(QUDA_CONTRACT)
   target_link_libraries(contract_test ${TEST_LIBS})
   quda_checkbuildtest(contract_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
+if(QUDA_SMEAR_GAUSS_TWOLINK)
+  add_executable(staggered_gsmear_test staggered_gsmear_test.cpp)
+  target_link_libraries(staggered_gsmear_test ${TEST_LIBS})
+  quda_checkbuildtest(staggered_gsmear_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS staggered_gsmear_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR}) 	
 endif()
 
 if(QUDA_DIRAC_STAGGERED)
@@ -313,7 +329,7 @@ if(QUDA_CONTRACT)
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:contract_test> ${MPIEXEC_POSTFLAGS}
     --dim 2 4 6 8
     --gtest_output=xml:contract_test.xml)
-endif()
+endif()  
 
 # loop over Dslash policies
 if(QUDA_CTEST_SEP_DSLASH_POLICIES)
@@ -790,14 +806,24 @@ endif()
 
   if(QUDA_DIRAC_STAGGERED)
     set(DIRAC_NAME staggered)
-    add_test(NAME dslash_${DIRAC_NAME}_policy${pol2}
+    add_test(NAME dslash_${DIRAC_NAME}_matpc_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type ${DIRAC_NAME}
                      --test MatPC
                      --dim 2 4 6 8
-                     --gtest_output=xml:dslash_${DIRAC_NAME}_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_matpc_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+      set_tests_properties(dslash_${DIRAC_NAME}_matpc_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    endif()
+
+    add_test(NAME dslash_${DIRAC_NAME}_mat_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test Mat
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_mat_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_mat_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
     endif()
 
     add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
@@ -813,15 +839,26 @@ endif()
     endif()
 
     set(DIRAC_NAME asqtad)
-    add_test(NAME dslash_${DIRAC_NAME}_policy${pol2}
+    add_test(NAME dslash_${DIRAC_NAME}_matpc_policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type ${DIRAC_NAME}
                      --all-partitions 1
                      --test MatPC
                      --dim 6 8 10 12
-                     --gtest_output=xml:dslash_${DIRAC_NAME}_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_matpc_test_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_${DIRAC_NAME}_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+      set_tests_properties(dslash_${DIRAC_NAME}_matpc_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+    endif()
+
+    add_test(NAME dslash_${DIRAC_NAME}_mat_policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --all-partitions 1
+                     --test Mat
+                     --dim 6 8 10 12
+                     --gtest_output=xml:dslash_${DIRAC_NAME}_mat_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_${DIRAC_NAME}_mat_policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
     endif()
 
     add_test(NAME benchmark_dslash_${DIRAC_NAME}_policy${pol2}
@@ -887,7 +924,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_wilson_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type wilson --ngcrkrylov 8
-      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000
       --enable-testing true
       --gtest_output=xml:invert_test_wilson_${prec}.xml)
   endif()
@@ -896,14 +933,14 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_twisted_mass_sym_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type twisted-mass
-      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000 --ngcrkrylov 8
       --matpc even-even --enable-testing true
       --gtest_output=xml:invert_test_twisted_mass_sym_${prec}.xml)
 
     add_test(NAME invert_test_twisted_mass_asym_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type twisted-mass
-      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000 --ngcrkrylov 8
       --matpc even-even-asym --enable-testing true
       --gtest_output=xml:invert_test_twisted_mass_asym_${prec}.xml)    
   endif()
@@ -912,7 +949,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_ndeg_twisted_mass_sym_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type twisted-mass
-      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000 --ngcrkrylov 8
       --matpc even-even --flavor nondeg-doublet
       --enable-testing true
       --gtest_output=xml:invert_test_ndeg_twisted_mass_sym_${prec}.xml)
@@ -920,7 +957,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_ndeg_twisted_mass_asym_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type twisted-mass
-      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000 --ngcrkrylov 8
       --matpc even-even-asym --flavor nondeg-doublet
       --enable-testing true
       --gtest_output=xml:invert_test_ndeg_twisted_mass_asym_${prec}.xml)
@@ -930,14 +967,14 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_clover_sym_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type clover --compute-clover true
-      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000 --ngcrkrylov 8
       --matpc even-even --enable-testing true
       --gtest_output=xml:invert_test_clover_sym_${prec}.xml)
 
     add_test(NAME invert_test_clover_asym_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type clover --compute-clover true
-      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000 --ngcrkrylov 8
       --matpc even-even-asym --enable-testing true
       --gtest_output=xml:invert_test_clover_asym_${prec}.xml)
   endif()
@@ -946,14 +983,14 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_twisted_clover_sym_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type twisted-clover --compute-clover true
-      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000 --ngcrkrylov 8
       --matpc even-even --enable-testing true
       --gtest_output=xml:invert_test_twisted_clover_sym_${prec}.xml)
 
     add_test(NAME invert_test_twisted_clover_asym_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type twisted-clover --compute-clover true
-      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000 --ngcrkrylov 8
       --matpc even-even-asym --enable-testing true
       --gtest_output=xml:invert_test_twisted_clover_asym_${prec}.xml)
   endif()
@@ -962,7 +999,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_ndeg_twisted_clover_sym_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type twisted-clover --compute-clover true
-      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000 --ngcrkrylov 8
       --matpc even-even --flavor nondeg-doublet
       --enable-testing true
       --gtest_output=xml:invert_test_ndeg_twisted_clover_sym_${prec}.xml)
@@ -970,7 +1007,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_ndeg_twisted_clover_asym_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type twisted-clover --compute-clover true
-      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --dim 2 4 6 8 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000 --ngcrkrylov 8
       --matpc even-even-asym --flavor nondeg-doublet
       --enable-testing true
       --gtest_output=xml:invert_test_ndeg_twisted_clover_asym_${prec}.xml)
@@ -980,7 +1017,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_domain_wall_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type domain-wall
-      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000 --ngcrkrylov 8
       --matpc even-even
       --enable-testing true
       --gtest_output=xml:invert_test_domain_wall_${prec}.xml)
@@ -988,7 +1025,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_domain_wall_4d_sym_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type domain-wall-4d
-      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000 --ngcrkrylov 8
       --matpc even-even
       --enable-testing true
       --gtest_output=xml:invert_test_domain_wall_4d_sym_${prec}.xml)
@@ -996,7 +1033,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_domain_wall_4d_asym_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type domain-wall-4d
-      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000 --ngcrkrylov 8
       --matpc even-even-asym
       --enable-testing true
       --gtest_output=xml:invert_test_domain_wall_4d_asym_${prec}.xml)
@@ -1004,7 +1041,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_mobius_sym_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type mobius
-      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000 --ngcrkrylov 8
       --matpc even-even
       --enable-testing true
       --gtest_output=xml:invert_test_mobius_sym_${prec}.xml)
@@ -1012,7 +1049,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_mobius_asym_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type mobius
-      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000 --ngcrkrylov 8
       --matpc even-even-asym
       --enable-testing true
       --gtest_output=xml:invert_test_mobius_asym_${prec}.xml)
@@ -1020,7 +1057,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_mobius_eofa_sym_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type mobius-eofa
-      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000 --ngcrkrylov 8
       --matpc even-even
       --enable-testing true
       --gtest_output=xml:invert_test_mobius_eofa_sym_${prec}.xml)
@@ -1028,7 +1065,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME invert_test_mobius_eofa_asym_${prec}
       COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:invert_test> ${MPIEXEC_POSTFLAGS}
       --dslash-type mobius-eofa
-      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --niter 1000 --ngcrkrylov 8
+      --dim 2 4 6 8 --Lsdim 4 --prec ${prec} --tol ${tol} --tolhq ${tol} --niter 1000 --ngcrkrylov 8
       --matpc even-even-asym
       --enable-testing true
       --gtest_output=xml:invert_test_mobius_eofa_asym_${prec}.xml)
@@ -1245,6 +1282,26 @@ foreach(prec IN LISTS TEST_PRECS)
                      --gtest_output=xml:dilution_test_${prec}.xml)
   endif()
 
+  if(QUDA_SMEAR_GAUSS_TWOLINK)
+    set(KERNEL_TYPE TwoLink GaussianSmear)
+    foreach(kerneltp IN LISTS KERNEL_TYPE)
+      if(${kerneltp} STREQUAL "TwoLink")
+	set(laplace3D 4)
+	set(smear_t0 -1)
+      elseif(${kerneltp} STREQUAL "GaussianSmear")
+	set(laplace3D 3)
+	set(smear_t0 1)
+      endif()	    
+      add_test(NAME staggered_gsmear_${kerneltp}_${prec}
+        COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_gsmear_test> ${MPIEXEC_POSTFLAGS}
+        --dim 6 8 10 12 --prec ${prec}
+        --test ${kerneltp}
+	--laplace3D ${laplace3D}
+	--smear-t0 ${smear_t0}
+        --gtest_output=xml:staggered_gsmear_test_${kerneltp}_${prec}.xml)
+    endforeach(kerneltp)
+  endif()
+
 endforeach(prec)
 
 if(QUDA_QIO)
@@ -1253,3 +1310,7 @@ if(QUDA_QIO)
                    --dim 4 6 8 10
                    --gtest_output=xml:io_test.xml)
 endif()
+
+add_test(NAME tune_test
+         COMMAND  ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:tune_test> ${MPIEXEC_POSTFLAGS}
+                   --gtest_output=xml:tune_test.xml)

@@ -188,20 +188,24 @@ namespace quda
        __constant__ buffer on the target architecture.  For CUDA,
        this is set to the somewhat arbitrary limit of 32 KiB for now.
     */
-    constexpr size_t max_constant_size() { return 32768; }
+    constexpr size_t max_constant_size() { return 32764; }
+
+    /**
+       @brief Helper function that returns the default max kernel arg
+       size when QUDA_LARGE_KERNEL_ARG is not enabled.
+     */
+    constexpr size_t max_kernel_arg_legacy_size() { return 4096; }
 
     /**
        @brief Helper function that returns the maximum static size of
        the kernel arguments passed to a kernel on the target
        architecture.
     */
-    constexpr size_t max_kernel_arg_size() { return 4096; }
-
-    /**
-       @brief Helper function that returns the bank width of the
-       shared memory bank width on the target architecture.
-    */
-    constexpr int shared_memory_bank_width() { return 32; }
+#ifdef QUDA_LARGE_KERNEL_ARG
+    constexpr size_t max_kernel_arg_size() { return max_constant_size(); }
+#else
+    constexpr size_t max_kernel_arg_size() { return max_kernel_arg_legacy_size(); }
+#endif
 
     /**
        @brief Helper function that returns true if we are to pass the

@@ -28,7 +28,7 @@ namespace quda
   public:
     Laplace(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
-    void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t &stream) override
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
@@ -47,7 +47,7 @@ namespace quda
       }
     }
 
-    long long flops() const
+    long long flops() const override
     {
       int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(3) matrix-vector flops
       int num_mv_multiply = in.Nspin() == 4 ? 2 : 1;
@@ -93,7 +93,7 @@ namespace quda
       return flops_;
     }
 
-    virtual long long bytes() const
+    virtual long long bytes() const override
     {
       int gauge_bytes = arg.reconstruct * in.Precision();
       int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
@@ -133,18 +133,12 @@ namespace quda
       return bytes_;
     }
     
-    TuneKey tuneKey() const
-    {
-      // add laplace transverse dir to the key
-      char aux[TuneKey::aux_n];
-      strcpy(aux,
-             (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash::aux_pack :
-                                                                           Dslash::aux[arg.kernel_type]);
-      strcat(aux, ",laplace=");
-      char laplace[32];
-      u32toa(laplace, arg.dir);
-      strcat(aux, laplace);
-      return TuneKey(in.VolString(), typeid(*this).name(), aux);
+    TuneKey tuneKey() const override
+    { // add laplace transverse dir to the key
+      auto key = Dslash::tuneKey();
+      strcat(key.aux, ",laplace=");
+      u32toa(key.aux + strlen(key.aux), arg.dir);
+      return key;
     }
   };
 

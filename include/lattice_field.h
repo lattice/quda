@@ -784,10 +784,10 @@ namespace quda {
     virtual void scatter(int, const qudaStream_t &) { errorQuda("Not implemented"); }
 
     /** Return the volume string used by the autotuner */
-    inline const char *VolString() const { return vol_string.c_str(); }
+    auto VolString() const { return vol_string; }
 
     /** Return the aux string used by the autotuner */
-    inline const char *AuxString() const { return aux_string.c_str(); }
+    auto AuxString() const { return aux_string; }
 
     /** @brief Backs up the LatticeField */
     virtual void backup() const { errorQuda("Not implemented"); }
