@@ -105,6 +105,7 @@ void openQCD_back_and_forth(void *h_in, void *h_out);
  * @return     The norm
  */
 double openQCD_qudaNorm(void *h_in);
+double openQCD_qudaNorm_NoLoads(void *d_in);
 
 
 /**
@@ -117,7 +118,12 @@ double openQCD_qudaNorm(void *h_in);
  * @param[in]  openQCD_in   of type spinor_dble[NSPIN]
  * @param[out] openQCD_out  of type spinor_dble[NSPIN]
  */
-void openQCD_qudaGamma(int dir, void *openQCD_in, void *openQCD_out);
+void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out);
+
+
+void* openQCD_qudaH2D(void *openQCD_field);
+void openQCD_qudaD2H(void *quda_field, void *openQCD_field);
+void openQCD_qudaSpinorFree(void** quda_field);
 
 
 /**
@@ -129,6 +135,7 @@ void openQCD_qudaGamma(int dir, void *openQCD_in, void *openQCD_out);
  * @param[in]  p     Dirac parameter struct
  */
 void openQCD_qudaDw(void *src, void *dst, openQCD_QudaDiracParam_t p);
+void openQCD_qudaDw_NoLoads(void *src, void *dst, openQCD_QudaDiracParam_t p);
 
 
 /**

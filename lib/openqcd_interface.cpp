@@ -450,6 +450,11 @@ double openQCD_qudaNorm(void *h_in)
   return blas::norm2(in);
 }
 
+double openQCD_qudaNorm_NoLoads(void *d_in)
+{
+  return blas::norm2(*reinterpret_cast<ColorSpinorField*>(d_in));
+}
+
 
 void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out)
 {
@@ -508,6 +513,52 @@ void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out)
 
   // transfer the GPU field back to CPU
   out_h = out;
+}
+
+
+void* openQCD_qudaH2D(void *openQCD_field)
+{
+  // sets up the necessary parameters
+  QudaInvertParam param = newOpenQCDParam();
+
+  // creates a field on the CPU
+  ColorSpinorParam cpuParam(openQCD_field, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
+  ColorSpinorField in_h(cpuParam);
+
+  // creates a field on the GPU with the same parameter set as the CPU field
+  ColorSpinorParam cudaParam(cpuParam, param, QUDA_CUDA_FIELD_LOCATION);
+  ColorSpinorField *in = new ColorSpinorField(cudaParam);
+
+  *in = in_h; // transfer the CPU field to GPU
+
+  return in;
+}
+
+
+void openQCD_qudaSpinorFree(void** quda_field)
+{
+  delete reinterpret_cast<ColorSpinorField*>(*quda_field);
+  *quda_field = nullptr;
+}
+
+void openQCD_qudaD2H(void *quda_field, void *openQCD_field)
+{
+  // sets up the necessary parameters
+  QudaInvertParam param = newOpenQCDParam();
+
+  // creates a field on the CPU
+  ColorSpinorParam cpuParam(openQCD_field, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
+  ColorSpinorField out_h(cpuParam);
+
+  ColorSpinorField* in = reinterpret_cast<ColorSpinorField*>(quda_field);
+  ColorSpinorField out(*in);
+
+  out_h = out; // transfer the GPU field to CPU
+}
+
+
+void openQCD_qudaDw_NoLoads(void *src, void *dst, openQCD_QudaDiracParam_t p)
+{
 }
 
 
