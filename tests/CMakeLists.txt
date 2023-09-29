@@ -1258,6 +1258,8 @@ foreach(prec IN LISTS TEST_PRECS)
   add_test(NAME TMCloverForce_test_${prec}
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:TMCloverForce_test> ${MPIEXEC_POSTFLAGS}
                    --dim 2 4 6 8 --prec ${prec}
+                   --dslash-type twisted-clover --compute-clover 1 
+                   --matpc even-even-asym            
                    --gtest_output=xml:TMCloverForce_test_${prec}.xml)
         
   if(QUDA_DIRAC_STAGGERED)
