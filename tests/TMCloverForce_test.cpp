@@ -252,9 +252,8 @@ void TMCloverForce_test()
   }
 
   double coeff[1] = {4. * inv_param.kappa * inv_param.kappa};
-  void *h_gauge = nullptr;
   if (getTuning() == QUDA_TUNE_YES) {
-    computeTMCloverForceQuda(mom, in[0].data(), coeff, 1, h_gauge, &gauge_param, &inv_param);
+    computeTMCloverForceQuda(mom, in[0].data(), coeff, 1,  &gauge_param, &inv_param);
     
   }
   printf("Device function computed\n");
@@ -266,7 +265,7 @@ void TMCloverForce_test()
   for (int i = 0; i < niter; i++) {
     Mom_.copy(Mom_ref_milc); // restore initial momentum for correctness
     host_timer.start();
-    computeTMCloverForceQuda(mom, in[0].data(), coeff, 1, h_gauge, &gauge_param, &inv_param);
+    computeTMCloverForceQuda(mom, in[0].data(), coeff, 1,  &gauge_param, &inv_param);
 
     host_timer.stop();
     time_sec += host_timer.last();

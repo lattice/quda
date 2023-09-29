@@ -1540,11 +1540,10 @@ extern "C" {
    * @param h_x Array of solution vectors x_i = ( Q^2 + s_i )^{-1} b
    * @param coeff Array of coefficients for the rational approximation or {1.0} for the determinant.
    * @param nvector Number of solution vectors and coefficients
-   * @param h_gauge Host gauge field
    * @param gauge_param Gauge field meta data
    * @param inv_param Dirac and solver meta data
    * */ 
-  void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvector, void *h_gauge,
+  void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvector, 
       QudaGaugeParam *gauge_param, QudaInvertParam *inv_param);
 
   /**

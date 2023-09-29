@@ -5093,7 +5093,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
 }
 
 void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvector, 
-    void *h_gauge, QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
+     QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
 {
   using namespace quda;
   profileTMCloverForce.TPSTART(QUDA_PROFILE_TOTAL);
