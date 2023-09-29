@@ -104,11 +104,19 @@ namespace quda
 
     topo->ndim = ndim;
 
+    for (int i = 0; i < QUDA_MAX_DIM; i++) {
+        topo->cstar[i] = 0;
+    }
+
     int nodes = 1;
     for (int i = 0; i < ndim; i++) {
       topo->dims[i] = abs(dims[i]);
       topo->cstar[i] = dims[i] < 0 ? 1:0;
       nodes *= topo->dims[i];
+    }
+
+    for(int i=0; i<ndim; i++) {
+        std::cout << "topo->cstar[i] = " << topo->cstar[i] << std::endl;
     }
 
     topo->ranks = new int[nodes];
