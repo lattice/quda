@@ -5111,16 +5111,22 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
   if (!cloverPrecise) errorQuda("No resident clover field");
 
   GaugeFieldParam gParamMom(*gauge_param, h_mom, QUDA_ASQTAD_MOM_LINKS);
-  // create the host momentum field
-  gParamMom.location = QUDA_CPU_FIELD_LOCATION;
-  gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
-  gParamMom.order = gauge_param->gauge_order;
+  if (gParamMom.order == QUDA_TIFR_GAUGE_ORDER || gParamMom.order == QUDA_TIFR_PADDED_GAUGE_ORDER)
+    gParamMom.reconstruct = QUDA_RECONSTRUCT_NO;
+  else
+    gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
+
+  gParamMom.site_offset = gauge_param->mom_offset;
+  gParamMom.site_size = gauge_param->site_size;
   cpuGaugeField cpuMom(gParamMom);
 
   //create the device momentum field
   gParamMom.location = QUDA_CUDA_FIELD_LOCATION;
+  gParamMom.create =  QUDA_ZERO_FIELD_CREATE;
+  gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
+  gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
+  gParamMom.setPrecision(gauge_param->cuda_prec, true);
   gParamMom.create = QUDA_ZERO_FIELD_CREATE;
-  gParamMom.order = QUDA_FLOAT2_GAUGE_ORDER;
   cudaGaugeField gpuMom(gParamMom);
 
   // create the device force field
@@ -5137,7 +5143,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
   qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   qParam.nDim = 4;
-  qParam.setPrecision(gParamMom.Precision());
+  qParam.setPrecision(gauge_param->cuda_prec,gauge_param->cuda_prec,true);
   qParam.pad = 0;
   qParam.twistFlavor = inv_param->twist_flavor;
   qParam.pc_type = QUDA_4D_PC;
@@ -5146,8 +5152,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
 
   // create the device quark field
   qParam.create = QUDA_NULL_FIELD_CREATE;
-  qParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-  qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+   qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
   std::vector<ColorSpinorField*> quarkX, quarkP;
   for (int i=0; i<nvector; i++){
@@ -5189,9 +5194,10 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
     ColorSpinorField &x = *(quarkX[i]);
     ColorSpinorField &p = *(quarkP[i]);
 
-    qParam.v = h_x[i];
-    ColorSpinorField cpuQuarkX(qParam);
-
+    const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+    ColorSpinorParam cpuParam(h_x[i], *inv_param, gauge.X(), true, inv_param->input_location);
+    ColorSpinorField cpuQuarkX(cpuParam);
+ 
     profileTMCloverForce.TPSTOP(QUDA_PROFILE_INIT);
     profileTMCloverForce.TPSTART(QUDA_PROFILE_H2D);
     x.Odd() = cpuQuarkX; // in tmLQCD-parlance this is the odd part of X

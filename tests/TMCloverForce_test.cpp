@@ -279,7 +279,6 @@ void TMCloverForce_test()
   // int *check_out = compute_force ? &force_check : &path_check;
   int *check_out = true ? &force_check : &path_check;
   if (verify_results) {
-    // TODO: add reference func
     
     TMCloverForce_reference(refmom, in[0].data(), coeff, 1, gauge, clover, clover_inv, &gauge_param, &inv_param);
     *check_out
