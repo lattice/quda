@@ -121,8 +121,18 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<Unitarize>(tp, stream,
-                        UnitarizeArg<Float, nColor, recon>(out, in, fails, max_iter, unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error));
+      if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
+        UnitarizeArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_MILC> arg(out, in, fails, max_iter, unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
+        launch<Unitarize>(tp, stream, arg);
+      } else if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_CPS) {
+        UnitarizeArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_CPS> arg(out, in, fails, max_iter, unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
+        launch<Unitarize>(tp, stream, arg);
+      } else if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
+        UnitarizeArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_TIFR> arg(out, in, fails, max_iter, unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
+        launch<Unitarize>(tp, stream, arg);
+      } else {
+        errorQuda("Undefined phase type %d", in.StaggeredPhase());
+      }
     }
 
     void preTune() { if (in.Gauge_p() == out.Gauge_p()) out.backup(); }
