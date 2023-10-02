@@ -251,8 +251,6 @@ void CloverForce_kernel_host(std::array<void *, 4> gauge, void *h_mom, quda::Col
 {
 
   gFloat **gaugeFull = (gFloat **)gauge.data();
-  sFloat **backSpinor = (sFloat **)inB.backGhostFaceBuffer;
-  sFloat **fwdSpinor = (sFloat **)inB.fwdGhostFaceBuffer;
   sFloat *spinorField = (sFloat *)inB.V();
 
   gFloat *gaugeEven[4], *gaugeOdd[4];
@@ -271,7 +269,13 @@ void CloverForce_kernel_host(std::array<void *, 4> gauge, void *h_mom, quda::Col
       gFloat **gaugeField = (parity ? gaugeOdd : gaugeEven);
       gFloat *gauge = &gaugeField[dir / 2][i * (3 * 3 * 2)];
       // load shifted spinor and project
+#ifndef MULTI_GPU
+      const sFloat *spinor = spinorNeighbor(i, dir, parity, spinorField, 1);
+#else
+      sFloat **backSpinor = (sFloat **)inB.backGhostFaceBuffer;
+      sFloat **fwdSpinor = (sFloat **)inB.fwdGhostFaceBuffer;
       const sFloat *spinor = spinorNeighbor_mg4dir(i, dir, parity, spinorField, fwdSpinor, backSpinor, 1, 1);
+#endif
       sFloat projectedSpinor[spinor_site_size];
       int projIdx = 2 * (dir / 2) + (projSign + 1) / 2; //+ (dir + daggerBit) % 2;
       multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
