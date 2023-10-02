@@ -76,6 +76,8 @@ namespace quda {
 
     if (force.Precision() == QUDA_DOUBLE_PRECISION) {
       cloverDerivative<double>(force, gauge, oprod, coeff, (parity == QUDA_EVEN_PARITY) ? 0 : 1);
+    } else if (force.Precision() == QUDA_SINGLE_PRECISION) {
+      cloverDerivative<float>(force, gauge, oprod, coeff, (parity == QUDA_EVEN_PARITY) ? 0 : 1);    
     } else {
       errorQuda("Precision %d not supported", force.Precision());
     }
