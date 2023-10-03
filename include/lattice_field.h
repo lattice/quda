@@ -126,7 +126,7 @@ namespace quda {
        @param[in] param Contains the metadata for filling out the LatticeFieldParam
     */
     LatticeFieldParam(const QudaGaugeParam &param) :
-      location(QUDA_CPU_FIELD_LOCATION),
+      location(param.location),
       precision(param.cpu_prec),
       ghost_precision(param.cpu_prec),
       init(true),
