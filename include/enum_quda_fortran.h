@@ -244,6 +244,7 @@
 #define QUDA_PACKED_CLOVER_ORDER 9   // even-odd packed
 #define QUDA_QDPJIT_CLOVER_ORDER 10  // lexicographical order packed
 #define QUDA_BQCD_CLOVER_ORDER 11    // BQCD order which is a packed super-diagonal form
+#define QUDA_OPENQCD_CLOVER_ORDER 12 // openqcd
 #define QUDA_INVALID_CLOVER_ORDER QUDA_INVALID_ENUM
 
 #define QudaVerbosity integer(4)

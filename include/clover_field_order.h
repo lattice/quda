@@ -11,6 +11,7 @@
 #include <convert.h>
 #include <clover_field.h>
 #include <complex_quda.h>
+#include <index_helper.cuh>
 #include <quda_matrix.h>
 #include <color_spinor.h>
 #include <load_store.h>
@@ -1010,6 +1011,172 @@ namespace quda {
         }
 
         // FIXME implement the save routine for BQCD ordered fields
+        __device__ __host__ inline void save(RegType[length], int, int) const { }
+
+        size_t Bytes() const { return length*sizeof(Float); }
+      };
+
+      /**
+       * OpenQCD ordering for clover fields
+       */
+      template <typename Float, int length = 72> struct OpenQCDOrder {
+        static constexpr bool enable_reconstruct = false;
+        typedef typename mapper<Float>::type RegType;
+        Float *clover;
+        const int volumeCB;
+        const QudaTwistFlavorType twist_flavor;
+        const Float mu2;
+        const Float epsilon2;
+        const int L[4];
+        const double coeff;
+        const double csw;
+        const double kappa;
+
+        OpenQCDOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
+          volumeCB(clover.Stride()),
+          twist_flavor(clover.TwistFlavor()),
+          mu2(clover.Mu2()),
+          epsilon2(clover.Epsilon2()),
+          L {clover.X()[0], clover.X()[1], clover.X()[2], clover.X()[3]}, // local dimensions (xyzt)
+          coeff(clover.Coeff()),
+          csw(clover.Csw()),
+          kappa(clover.Coeff()/clover.Csw())
+        {
+          if (clover.Order() != QUDA_OPENQCD_CLOVER_ORDER) {
+            errorQuda("Invalid clover order %d for this accessor", clover.Order());
+          }
+          this->clover = clover_ ? clover_ : (Float *)(clover.V(inverse));
+          if (clover.Coeff() == 0.0 || clover.Csw() == 0.0) {
+            errorQuda("Neither coeff nor csw may be zero!");
+          }
+        }
+
+        QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }
+        Float Mu2() const { return mu2; }
+        Float Epsilon2() const { return epsilon2; }
+
+        /**
+         * @brief      Pure function to return ipt[iy], where
+         *             iy=x3+L3*x2+L2*L3*x1+L1*L2*L3*x0 without accessing the
+         *             ipt-array, but calculating the index on the fly. Notice
+         *             that xi and Li are in openQCD (txyz) convention. If they
+         *             come from QUDA, you have to rotate them first.
+         *
+         * @param[in]  x     Carthesian local lattice corrdinates, 0 <= x[i] <
+         *                   Li
+         *
+         * @return     ipt[x3+L3*x2+L2*L3*x1+L1*L2*L3*x0] = the local flat index
+         *             of openQCD
+         */
+        __device__ __host__ inline int ipt(int *x) const
+        {
+          int xb[4], xn[4], ib, in, is, cbs[4], mu, L_[4];
+
+          rotate_coords(L, L_); // L_ local lattice dimensions in openQCD format (txyz)
+
+          /* cache_block */
+          for (mu=1;mu<4;mu++) {
+            if ((L[mu]%4)==0) {
+              cbs[mu]=4;
+            } else if ((L[mu]%3)==0) {
+              cbs[mu]=3;
+            } else if ((L[mu]%2)==0) {
+              cbs[mu]=2;
+            } else {
+              cbs[mu]=1;
+            }
+          }
+
+          xb[0] = x[0];
+          xb[1] = x[1] % cbs[1];
+          xb[2] = x[2] % cbs[2];
+          xb[3] = x[3] % cbs[3];
+
+          xn[1] = x[1]/cbs[1];
+          xn[2] = x[2]/cbs[2];
+          xn[3] = x[3]/cbs[3];
+
+          /**
+           * This is essentially what cbix[...] does.
+           * Notice integer division; truncated towards zero, i.e. 5/2=2
+           */
+          ib = (xb[3] + cbs[3]*xb[2] + cbs[2]*cbs[3]*xb[1] + cbs[1]*cbs[2]*cbs[3]*xb[0])/2;
+
+          in = xn[3] + (L_[3]/cbs[3])*xn[2] + (L_[3]/cbs[3])*(L_[2]/cbs[2])*xn[1];
+          is = x[0] + x[1] + x[2] + x[3];
+
+          return ib + (L_[0]*cbs[1]*cbs[2]*cbs[3]*in)/2 + (is%2)*(L_[0]*L_[1]*L_[2]*L_[3]/2);
+        }
+
+        /**
+         * @brief      Rotate coordinates (xyzt -> txyz)
+         *
+         * @param[in]  x_quda     Cartesian local lattice coordinates in quda
+         *                        convention (xyzt)
+         * @param[out] x_openQCD  Cartesian local lattice coordinates in openQCD
+         *                        convention (txyz)
+         */
+        __device__ __host__ inline void rotate_coords(const int *x_quda, int *x_openQCD) const
+        {
+          x_openQCD[1] = x_quda[0];
+          x_openQCD[2] = x_quda[1];
+          x_openQCD[3] = x_quda[2];
+          x_openQCD[0] = x_quda[3];
+        }
+
+        /**
+         * @brief      Gets the offset in Floats from the openQCD base pointer to
+         *             the spinor field.
+         *
+         * @param[in]  x       Checkerboard index coming from quda
+         * @param[in]  parity  The parity coming from quda
+         *
+         * @return     The offset.
+         */
+        __device__ __host__ inline int getCloverOffset(int x, int parity) const
+        {
+          int coord_quda[4], coord_openQCD[4];
+
+          /* coord_quda contains xyzt local Carthesian corrdinates */
+          getCoords(coord_quda, x, L, parity);
+          rotate_coords(coord_quda, coord_openQCD); /* xyzt -> txyz */
+
+          return ipt(coord_openQCD)*length;
+        }
+
+        /**
+         * @brief      Load a clover field at lattice point x
+         *
+         * @param      v       The output clover matrix in QUDA order
+         * @param      x       The checkerboarded lattice site
+         * @param      parity  The parity of the lattice site
+         */
+        __device__ __host__ inline void load(RegType v[length], int x, int parity) const {
+          int sign[36] = {-1,-1,-1,-1,-1,-1,             // diagonals (idx 0-5)
+                          -1,+1,-1,+1,-1,-1,-1,-1,-1,-1, // column 0  (idx 6-15)
+                          -1,+1,-1,-1,-1,-1,-1,-1,       // column 1  (idx 16-23)
+                          -1,-1,-1,-1,-1,-1,             // column 2  (idx 24-29)
+                          -1,+1,-1,+1,                   // column 3  (idx 30-33)
+                          -1,+1};                        // column 4  (idx 34-35)
+          int map[36] = {0,1,2,3,4,5,
+                         6,7,8,9,10,11,18,19,24,25,
+                         16,17,12,13,20,21,26,27,
+                         14,15,22,23,28,29,
+                         30,31,32,33,
+                         34,35};
+          const int M = length/2;
+          int offset = getCloverOffset(x, parity);
+          auto Ap = &clover[offset];     // A_+
+          auto Am = &clover[offset + M]; // A_-
+
+#pragma unroll
+          for (int i = 0; i < M; i++) {
+            v[    i] = sign[i]*(kappa*Am[map[i]] - (i<6));
+            v[M + i] = sign[i]*(kappa*Ap[map[i]] - (i<6));
+          }
+        }
+
+        // FIXME implement the save routine for OpenQCD ordered fields
         __device__ __host__ inline void save(RegType[length], int, int) const { }
 
         size_t Bytes() const { return length*sizeof(Float); }

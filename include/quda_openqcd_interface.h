@@ -105,6 +105,7 @@ void openQCD_back_and_forth(void *h_in, void *h_out);
  * @return     The norm
  */
 double openQCD_qudaNorm(void *h_in);
+double openQCD_qudaNorm_NoLoads(void *d_in);
 
 
 /**
@@ -117,7 +118,12 @@ double openQCD_qudaNorm(void *h_in);
  * @param[in]  openQCD_in   of type spinor_dble[NSPIN]
  * @param[out] openQCD_out  of type spinor_dble[NSPIN]
  */
-void openQCD_qudaGamma(int dir, void *openQCD_in, void *openQCD_out);
+void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out);
+
+
+void* openQCD_qudaH2D(void *openQCD_field);
+void openQCD_qudaD2H(void *quda_field, void *openQCD_field);
+void openQCD_qudaSpinorFree(void** quda_field);
 
 
 /**
@@ -129,6 +135,7 @@ void openQCD_qudaGamma(int dir, void *openQCD_in, void *openQCD_out);
  * @param[in]  p     Dirac parameter struct
  */
 void openQCD_qudaDw(void *src, void *dst, openQCD_QudaDiracParam_t p);
+void openQCD_qudaDw_NoLoads(void *src, void *dst, openQCD_QudaDiracParam_t p);
 
 
 /**
@@ -150,6 +157,8 @@ double openQCD_qudaGCR(void *source, void *solution,
  * Solve Ax=b for an Clover Wilson operator with a multigrid solver. All fields are fields passed and
  * returned are host (CPU) field in openQCD order.  This function requires that
  * persistent gauge and clover fields have been created prior.
+ * 
+ * Requires QUDA_PRECISION & 2 != 0, e.g. QUDA_PRECISON = 14
  *
  * @param[in]  source       Right-hand side source field
  * @param[out] solution     Solution spinor field
@@ -173,7 +182,7 @@ double openQCD_qudaPlaquette(void);
  * @brief      Load the gauge fields from host to quda.
  *
  * @param[in]  gauge  The gauge fields (in openqcd order)
- * @param[in]  prec   Precision of the gauge field
+ * @param[in]  prec   Precision of the incoming gauge field
  */
 void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec);
 
@@ -182,7 +191,7 @@ void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec);
  * @brief      Save the gauge fields from quda to host.
  *
  * @param[out] gauge  The gauge fields (will be stored in openqcd order)
- * @param[in]  prec   Precision of the gauge field
+ * @param[in]  prec   Precision of the outgoing gauge field
  */
 void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec);
 
@@ -196,9 +205,13 @@ void openQCD_qudaGaugeFree(void);
 /**
  * @brief      Load the clover fields from host to quda.
  *
- * @param[in]  clover      The clover fields (in openqcd order)
+ * @param[in]  clover  The clover fields (in openqcd order)
+ * @param[in]  kappa   The kappa (we need this, because quda has its clover
+ *                     field multiplied by kappa and we have to reverse this
+ *                     when loading ours)
+ * @param[in]  csw     The csw coefficient of the clover field
  */
-void openQCD_qudaCloverLoad(void *clover);
+void openQCD_qudaCloverLoad(void *clover, double kappa, double csw);
 
 
 /**

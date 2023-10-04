@@ -262,6 +262,7 @@ typedef enum QudaCloverFieldOrder_s {
   QUDA_PACKED_CLOVER_ORDER,     // even-odd, QDP packed
   QUDA_QDPJIT_CLOVER_ORDER,     // (diagonal / off-diagonal)-chirality-spacetime
   QUDA_BQCD_CLOVER_ORDER,       // even-odd, super-diagonal packed and reordered
+  QUDA_OPENQCD_CLOVER_ORDER,    // openqcd
   QUDA_INVALID_CLOVER_ORDER = QUDA_INVALID_ENUM
 } QudaCloverFieldOrder;
 

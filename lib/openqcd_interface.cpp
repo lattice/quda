@@ -253,21 +253,7 @@ double openQCD_qudaPlaquette(void)
     return 0.0;
   }
 
-  /*QudaGaugeObservableParam obsParam = newQudaGaugeObservableParam();
-  obsParam.compute_plaquette = QUDA_BOOLEAN_TRUE;
-  obsParam.remove_staggered_phase = QUDA_BOOLEAN_FALSE;
-  gaugeObservablesQuda(&obsParam);
-
-  // Note different Nc normalization!
-  plaq[0] = obsParam.plaquette[0];
-  plaq[1] = obsParam.plaquette[1];
-  plaq[2] = obsParam.plaquette[2];*/
-
   plaqQuda(plaq);
-
-/*  plaq[1] *= 3.0;
-  plaq[2] *= 3.0;
-  plaq[0] *= 3.0;*/
 
   // Note different Nc normalization wrt openQCD!
   return 3.0*plaq[0];
@@ -306,11 +292,19 @@ void openQCD_qudaGaugeFree(void)
 }
 
 
-void openQCD_qudaCloverLoad(void *clover)
+void openQCD_qudaCloverLoad(void *clover, double kappa, double csw)
 {
-  /*QudaInvertParam qudaCloverParam = newOpenQCDCloverParam();
-  loadCloverQuda(clover, NULL, &qudaCloverParam);*/
-  errorQuda("openQCD_qudaCloverLoad() is not implemented yet.");
+  QudaInvertParam param = newOpenQCDParam();
+  param.clover_order = QUDA_OPENQCD_CLOVER_ORDER;
+  param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
+  param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
+  param.clover_cuda_prec = QUDA_DOUBLE_PRECISION;
+
+  param.kappa = kappa;
+  param.clover_csw = csw;
+  param.clover_coeff = 0.0;
+
+  loadCloverQuda(clover, NULL, &param);
   qudaState.clover_loaded = true;
 }
 
@@ -456,6 +450,11 @@ double openQCD_qudaNorm(void *h_in)
   return blas::norm2(in);
 }
 
+double openQCD_qudaNorm_NoLoads(void *d_in)
+{
+  return blas::norm2(*reinterpret_cast<ColorSpinorField*>(d_in));
+}
+
 
 void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out)
 {
@@ -514,6 +513,52 @@ void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out)
 
   // transfer the GPU field back to CPU
   out_h = out;
+}
+
+
+void* openQCD_qudaH2D(void *openQCD_field)
+{
+  // sets up the necessary parameters
+  QudaInvertParam param = newOpenQCDParam();
+
+  // creates a field on the CPU
+  ColorSpinorParam cpuParam(openQCD_field, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
+  ColorSpinorField in_h(cpuParam);
+
+  // creates a field on the GPU with the same parameter set as the CPU field
+  ColorSpinorParam cudaParam(cpuParam, param, QUDA_CUDA_FIELD_LOCATION);
+  ColorSpinorField *in = new ColorSpinorField(cudaParam);
+
+  *in = in_h; // transfer the CPU field to GPU
+
+  return in;
+}
+
+
+void openQCD_qudaSpinorFree(void** quda_field)
+{
+  delete reinterpret_cast<ColorSpinorField*>(*quda_field);
+  *quda_field = nullptr;
+}
+
+void openQCD_qudaD2H(void *quda_field, void *openQCD_field)
+{
+  // sets up the necessary parameters
+  QudaInvertParam param = newOpenQCDParam();
+
+  // creates a field on the CPU
+  ColorSpinorParam cpuParam(openQCD_field, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
+  ColorSpinorField out_h(cpuParam);
+
+  ColorSpinorField* in = reinterpret_cast<ColorSpinorField*>(quda_field);
+  ColorSpinorField out(*in);
+
+  out_h = out; // transfer the GPU field to CPU
+}
+
+
+void openQCD_qudaDw_NoLoads(void *src, void *dst, openQCD_QudaDiracParam_t p)
+{
 }
 
 
@@ -576,6 +621,8 @@ double openQCD_qudaMultigrid(void *source, void *solution, openQCD_QudaDiracPara
   invert_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   invert_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
   invert_param.inv_type_precondition = QUDA_MG_INVERTER;
+  invert_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION; // The precision used by the QUDA solver
+  invert_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // The precision used by the QUDA solver
 
   invert_param_mg.reliable_delta = 1e-5;
   invert_param_mg.gcrNkrylov = 20;
