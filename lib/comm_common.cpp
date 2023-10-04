@@ -115,10 +115,6 @@ namespace quda
       nodes *= topo->dims[i];
     }
 
-    for(int i=0; i<ndim; i++) {
-        std::cout << "topo->cstar[i] = " << topo->cstar[i] << std::endl;
-    }
-
     topo->ranks = new int[nodes];
     topo->coords = (int(*)[QUDA_MAX_DIM]) new int[QUDA_MAX_DIM * nodes];
 
