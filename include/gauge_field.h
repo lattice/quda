@@ -94,7 +94,7 @@ namespace quda {
       order(param.gauge_order),
       fixed(param.gauge_fix),
       link_type(link_type_ != QUDA_INVALID_LINKS ? link_type_ : param.type),
-      t_boundary(param.t_boundary),
+      t_boundary(link_type == QUDA_ASQTAD_MOM_LINKS ? QUDA_PERIODIC_T : param.t_boundary),
       // if we have momentum field and not using TIFR field, then we always have recon-10
       reconstruct(link_type == QUDA_ASQTAD_MOM_LINKS && order != QUDA_TIFR_GAUGE_ORDER && order != QUDA_TIFR_PADDED_GAUGE_ORDER ?
                   QUDA_RECONSTRUCT_10 : QUDA_RECONSTRUCT_NO),

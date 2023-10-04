@@ -4081,7 +4081,6 @@ void computeStaggeredForceQuda(void *h_mom, double dt, double delta, void *, voi
   // create the host momentum field
   gParam.location = QUDA_CPU_FIELD_LOCATION;
   gParam.reconstruct = gauge_param->reconstruct;
-  gParam.t_boundary = QUDA_PERIODIC_T;
   GaugeField cpuMom(gParam);
 
   // create the device momentum field
