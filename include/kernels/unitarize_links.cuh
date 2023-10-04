@@ -226,29 +226,33 @@ namespace quda {
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int mu)
     {
-      // v and w are always in double precision
-      Matrix<complex<double>,Arg::nColor> v, w;
+      // result is always in double precision
+      Matrix<complex<double>,Arg::nColor> v, result;
       Matrix<complex<typename Arg::real>,Arg::nColor> tmp = arg.in(mu, x_cb, parity);
 
       v = tmp;
-      unitarizeLinkMILC<double>(w, v, arg);
+      unitarizeLinkMILC<double>(result, v, arg);
       if (arg.check_unitarization) {
-        if (w.isUnitary(arg.max_error) == false) atomic_fetch_add(arg.fails, 1);
+        if (result.isUnitary(arg.max_error) == false) atomic_fetch_add(arg.fails, 1);
       }
 
-      int x[4];
-      getCoords(x, x_cb, arg.X, parity);
+      if (Arg::phase == QUDA_STAGGERED_PHASE_CHROMA) {  // Special unitrize the result for Chroma convention
+        int x[4];
+        getCoords(x, x_cb, arg.X, parity);
 
-      double phase;
-      switch (mu) {
-      case 0: phase = getPhase<0>(x[0], x[1], x[2], x[3], arg); break;
-      case 1: phase = getPhase<1>(x[0], x[1], x[2], x[3], arg); break;
-      case 2: phase = getPhase<2>(x[0], x[1], x[2], x[3], arg); break;
-      case 3: phase = getPhase<3>(x[0], x[1], x[2], x[3], arg); break;
+        double phase;
+        switch (mu) {
+        case 0: phase = getPhase<0>(x[0], x[1], x[2], x[3], arg); break;
+        case 1: phase = getPhase<1>(x[0], x[1], x[2], x[3], arg); break;
+        case 2: phase = getPhase<2>(x[0], x[1], x[2], x[3], arg); break;
+        case 3: phase = getPhase<3>(x[0], x[1], x[2], x[3], arg); break;
+        }
+        v = result * phase;
+        specialUnitarizeLinkMILC<double>(result, v, arg);
+        result *= phase;
       }
-      v = w * phase;
-      specialUnitarizeLinkMILC<double>(w, v, arg);
-      tmp = w * phase;
+
+      tmp = result;
 
       arg.out(mu, x_cb, parity) = tmp;
     }
