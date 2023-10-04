@@ -113,15 +113,6 @@ static int rankFromCoords(const int *coords, void *fdata) // TODO:
 
   i = coords[3] + NPROC[3]*(coords[2] + NPROC[2]*(coords[1] + NPROC[1]*(coords[0])));
   return ranks[i];
-
-  // Juan's version, not needed anymore
-  // int ib;
-  // ib = coords[3];
-  // ib = ib*NPROC[0] + coords[0];
-  // ib = ib*NPROC[1] + coords[1];
-  // ib = ib*NPROC[2] + coords[2];
-
-  // return ib;
 }
 
 
