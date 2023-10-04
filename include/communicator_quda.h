@@ -136,10 +136,10 @@ namespace quda
     }
 
     // CSTAR_DEBUG
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      std::cout << ": " << coords[0] << " " << coords[1] << " " << coords[2] <<
-        " " << coords[3] << " yields rank" << comm_rank_from_coords(topo, coords) << std::endl;
-    }
+    // if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    //   std::cout << ": " << coords[0] << " " << coords[1] << " " << coords[2] <<
+    //     " " << coords[3] << " yields rank" << comm_rank_from_coords(topo, coords) << std::endl;
+    // }
 
     return comm_rank_from_coords(topo, coords);
   }
@@ -266,14 +266,14 @@ namespace quda
         const int gpuid = comm_gpuid();
 
         comm_set_neighbor_ranks();
-        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-          // CSTAR_DEBUG
-          for (int dir = 0; dir < 2; ++dir) { // forward/backward directions
-            for (int dim = 0; dim < 4; ++dim) {
-                printf("my (%i):neighbors in dim/dir %i/%i: %i\n",comm_rank(),dim,dir,comm_neighbor_rank(dir, dim));
-            }
-          }
-        }
+        // CSTAR_DEBUG
+        // if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+        //   for (int dir = 0; dir < 2; ++dir) { // forward/backward directions
+        //     for (int dim = 0; dim < 4; ++dim) {
+        //         printf("my (%i):neighbors in dim/dir %i/%i: %i\n",comm_rank(),dim,dir,comm_neighbor_rank(dir, dim));
+        //     }
+        //   }
+        // }
        
         char *hostname = comm_hostname();
         int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int) * comm_size());
@@ -395,12 +395,12 @@ namespace quda
         neighbor_rank[1][d] = comm_rank_displaced(topology, pos_displacement);
 
         // CSTAR_DEBUG
-        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-          std::cout << "rank: " << rank_grid[0] << "," << rank_grid[1]
-            << "," << rank_grid[2] << "," << rank_grid[3] << " negative " << d << std::endl;
-          std::cout << "rank: " << rank_grid[0] << "," << rank_grid[1]
-            << "," << rank_grid[2] << "," << rank_grid[3] << " positive " << d << std::endl;
-        }
+        // if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+        //   std::cout << "rank: " << rank_grid[0] << "," << rank_grid[1]
+        //     << "," << rank_grid[2] << "," << rank_grid[3] << " negative " << d << std::endl;
+        //   std::cout << "rank: " << rank_grid[0] << "," << rank_grid[1]
+        //     << "," << rank_grid[2] << "," << rank_grid[3] << " positive " << d << std::endl;
+        // }
       }
 
       neighbors_cached = true;
