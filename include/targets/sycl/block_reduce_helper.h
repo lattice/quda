@@ -4,6 +4,7 @@
 #include <reducer.h>
 #include <group_reduce.h>
 #include <special_ops_target.h>
+#include <shared_memory_helper.h>
 
 /**
    @file block_reduce_helper.h
@@ -132,21 +133,26 @@ namespace quda
   */
 #define DYNAMIC_SLM
   template <typename T, int block_dim, int batch_size>
-  struct block_reduceW {
+  //struct block_reduceW {
+  struct block_reduceW : SharedMemory<T,SizeBlockDivWarp> {
+    using Smem = SharedMemory<T,SizeBlockDivWarp>;
+    //using Smem::shared_mem_size;
 #ifdef DYNAMIC_SLM
     using opSmem = op_SharedMemory<T,opSizeBlockDivWarp>;
+    //using opSmem = SharedMemory<T,opSizeBlockDivWarp>;
     using dependencies = op_Sequential<op_blockSync,opSmem>;
     using dependentOps = SpecialOps<op_blockSync,opSmem>;
-    template <typename ...Arg>
-    static constexpr size_t shared_mem_size(dim3 block, Arg &...arg) {
-      return opSizeBlockDivWarp::size<T>(block, arg...);
-    }
+    //template <typename ...Arg>
+    //static constexpr size_t shared_mem_size(dim3 block, Arg &...arg) {
+    //return opSizeBlockDivWarp::size<T>(block, arg...);
+    //}
 #else
 #endif
     using BlockReduce_t = BlockReduce<T, block_dim, batch_size>;
-    dependentOps ops;
+    //dependentOps ops;
     template <typename S>
-    inline block_reduceW(S &ops) : ops(getDependentOps<BlockReduce_t>(ops)) {};
+    //inline block_reduceW(S &ops) : ops(getDependentOps<BlockReduce_t>(ops)) {};
+    inline block_reduceW(S &ops) : Smem(ops) {};
 
     template <int width_> struct warp_reduce_param {
       static constexpr int width = width_;
@@ -183,7 +189,8 @@ namespace quda
 
       //__shared__ T storage[max_items];
 #ifdef DYNAMIC_SLM
-      auto storage = getSharedMemPtr<opSmem>(ops);
+      //auto storage = getSharedMemPtr<opSmem>(ops);
+      auto storage = Smem::sharedMem();
 #else
       static_assert(sizeof(T[max_items])<=device::shared_memory_size(), "Block reduce shared mem size too large");
       auto mem = sycl::ext::oneapi::group_local_memory_for_overwrite<T[max_items]>(getGroup());
@@ -192,7 +199,8 @@ namespace quda
 
       // if first thread in warp, write result to shared memory
       if (thread_idx % device::warp_size() == 0) storage[batch * warp_items + warp_idx] = value;
-      blockSync(ops);
+      //blockSync(ops);
+      __syncthreads();
 
       // whether to use the first warp or first thread for the final reduction
       constexpr bool final_warp_reduction = true;
@@ -216,7 +224,8 @@ namespace quda
 
       if (all) {
         if (thread_idx == 0) storage[batch * warp_items + 0] = value;
-	blockSync(ops);
+	//blockSync(ops);
+	__syncthreads();
         value = storage[batch * warp_items + 0];
       }
 

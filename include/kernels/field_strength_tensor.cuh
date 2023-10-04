@@ -179,7 +179,8 @@ namespace quda
   template <typename Arg_> struct ComputeFmunu : computeFmunuCoreOps {
     using Arg = Arg_;
     const Arg &arg;
-    constexpr ComputeFmunu(const Arg &arg) : arg(arg) {}
+    template <typename ...Ops>
+    constexpr ComputeFmunu(const Arg &arg, const Ops &...ops) : computeFmunuCoreOps(ops...), arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int mu_nu)

@@ -90,6 +90,8 @@ namespace quda
       }
     };
 
+    template <typename Arg> using eofa_dslash5Ops =
+      SpecialOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>>>;
     /**
       @brief Apply the D5 operator at given site
       @param[in] arg    Argument struct containing any meta data and accessors
@@ -97,10 +99,11 @@ namespace quda
       @param[in] x_cb   Checkerboarded 4-d space-time index
       @param[in] s      Ls dimension coordinate
      */
-    template <typename Arg> struct eofa_dslash5 :
-      SpecialOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>>> {
+    template <typename Arg> struct eofa_dslash5 : eofa_dslash5Ops<Arg> {
       const Arg &arg;
-      constexpr eofa_dslash5(const Arg &arg) : arg(arg) {}
+      using typename eofa_dslash5Ops<Arg>::KernelOpsT;
+      template <typename ...Ops>
+      constexpr eofa_dslash5(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       template <bool allthreads = false>
@@ -170,6 +173,8 @@ namespace quda
       }
     };
 
+    template <typename Arg> using eofa_dslash5invOps =
+      SpecialOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>>>;
     /**
       @brief Apply the M5 inverse operator at a given site on the
       lattice.  This is the original algorithm as described in Kim and
@@ -182,10 +187,11 @@ namespace quda
       @param[in] x_cb   Checkerboarded 4-d space-time index
       @param[in] s      Ls dimension coordinate
      */
-    template <typename Arg> struct eofa_dslash5inv :
-      SpecialOps<SharedMemoryCache<ColorSpinor<typename Arg::real, Arg::nColor, 4>>> {
+    template <typename Arg> struct eofa_dslash5inv : eofa_dslash5invOps<Arg> {
       const Arg &arg;
-      constexpr eofa_dslash5inv(const Arg &arg) : arg(arg) {}
+      using typename eofa_dslash5invOps<Arg>::KernelOpsT;
+      template <typename ...Ops>
+      constexpr eofa_dslash5inv(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       template <bool allthreads = false>

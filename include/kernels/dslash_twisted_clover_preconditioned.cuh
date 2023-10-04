@@ -40,7 +40,8 @@ namespace quda
   struct twistedCloverPreconditioned : dslash_default, NoSpecialOps {
 
     const Arg &arg;
-    constexpr twistedCloverPreconditioned(const Arg &arg) : arg(arg) {}
+    //constexpr twistedCloverPreconditioned(const Arg &arg) : arg(arg) {}
+    template <typename Ftor> constexpr twistedCloverPreconditioned(const Ftor &ftor) : arg(ftor.arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**

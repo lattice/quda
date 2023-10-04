@@ -1702,7 +1702,9 @@ namespace quda {
     static constexpr int nFace = 1;
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
-    constexpr compute_vuv(const Arg &arg) : arg(arg) { }
+    using typename storeCoarseSharedAtomic_impl<true>::Ops<Arg>::KernelOpsT;
+    template <typename ...Ops>
+    constexpr compute_vuv(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) { }
 
     /**
        3-d parallelism
@@ -1735,7 +1737,9 @@ namespace quda {
     static constexpr int nFace = 3;
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
-    constexpr compute_vlv(const Arg &arg) : arg(arg) { }
+    using typename storeCoarseSharedAtomic_impl<true>::Ops<Arg_>::KernelOpsT;
+    template <typename ...Ops>
+    constexpr compute_vlv(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) { }
 
     /**
        3-d parallelism

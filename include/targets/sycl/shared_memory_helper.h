@@ -42,6 +42,7 @@ namespace quda
     /**
        @brief Constructor for SharedMemory object.
     */
+#if 0
     SharedMemory() : size(S::size(target::block_dim()))
     {
       auto grp = getGroup();
@@ -50,6 +51,7 @@ namespace quda
       auto offset = get_offset(target::block_dim());
       data = *mem0.get() + offset;
     }
+#endif
 
     template <typename ...U>
     SharedMemory(const SpecialOps<U...> &ops) : size(S::size(target::block_dim()))

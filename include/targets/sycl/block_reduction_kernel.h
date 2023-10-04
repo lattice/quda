@@ -95,6 +95,7 @@ namespace quda
     const unsigned int k = globalIdZ;
     if (k >= arg.threads.z) return;
 
+#if 0
     Functor<Arg> f(arg);
     if constexpr (hasSpecialOps<Functor<Arg>>) {
       f.setNdItem(ndi);
@@ -102,6 +103,10 @@ namespace quda
     if constexpr (needsSharedMem<Functor<Arg>>) {
       f.setSharedMem(smem...);
     }
+#else
+    Ftor<Functor<Arg>> f(arg, ndi, smem...);
+#endif
+
     f(block_idx, thread_idx);
   }
   template <template <typename> class Functor, typename Arg, typename ...S>
@@ -116,6 +121,7 @@ namespace quda
     const unsigned int k = globalIdZ;
     if (k >= arg.threads.z) active = false;
 
+#if 0
     Functor<Arg> f(arg);
     if constexpr (hasSpecialOps<Functor<Arg>>) {
       f.setNdItem(ndi);
@@ -123,6 +129,10 @@ namespace quda
     if constexpr (needsSharedMem<Functor<Arg>>) {
       f.setSharedMem(smem...);
     }
+#else
+    Ftor<Functor<Arg>> f(arg, ndi, smem...);
+#endif
+
     f.template operator()<true>(block_idx, thread_idx, active);
   }
   template <template <typename> class Functor, typename Arg>

@@ -52,7 +52,9 @@ namespace quda
   struct nDegTwistedCloverPreconditioned : dslash_default, nDegTwistedCloverPreconditionedParams<Arg>::Ops {
 
     const Arg &arg;
-    constexpr nDegTwistedCloverPreconditioned(const Arg &arg) : arg(arg) {}
+    using typename nDegTwistedCloverPreconditionedParams<Arg>::Ops::KernelOpsT;
+    //constexpr nDegTwistedCloverPreconditioned(const Arg &arg) : arg(arg) {}
+    template <typename Ftor> constexpr nDegTwistedCloverPreconditioned(const Ftor &ftor) : KernelOpsT(ftor), arg(ftor.arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**

@@ -36,7 +36,8 @@ namespace quda
   struct wilsonClover : dslash_default, NoSpecialOps {
 
     const Arg &arg;
-    constexpr wilsonClover(const Arg &arg) : arg(arg) {}
+    //constexpr wilsonClover(const Arg &arg) : arg(arg) {}
+    template <typename Ftor> constexpr wilsonClover(const Ftor &ftor) : arg(ftor.arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**

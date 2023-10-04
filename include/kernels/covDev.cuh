@@ -124,7 +124,8 @@ namespace quda
     dslash_default, NoSpecialOps {
 
     const Arg &arg;
-    constexpr covDev(const Arg &arg) : arg(arg) {}
+    //constexpr covDev(const Arg &arg) : arg(arg) {}
+    template <typename Ftor> constexpr covDev(const Ftor &ftor) : arg(ftor.arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>

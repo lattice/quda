@@ -333,7 +333,9 @@ namespace quda
   template <typename Arg_> struct dslash5 : d5Params<Arg_>::Ops {
     using Arg = Arg_;
     const Arg &arg;
-    constexpr dslash5(const Arg &arg) : arg(arg) { }
+    using typename d5Params<Arg_>::Ops::KernelOpsT;
+    template <typename ...OpsArgs>
+    constexpr dslash5(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**
@@ -589,7 +591,9 @@ namespace quda
   template <typename Arg_> struct dslash5inv : dslash5invParams<Arg_>::Ops {
     using Arg = Arg_;
     const Arg &arg;
-    constexpr dslash5inv(const Arg &arg) : arg(arg) {}
+    using typename dslash5invParams<Arg>::Ops::KernelOpsT;
+    template <typename ...OpsArgs>
+    constexpr dslash5inv(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**

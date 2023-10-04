@@ -110,6 +110,7 @@ namespace quda {
   std::enable_if_t<!needsFullBlock<Functor<Arg>>, void>
   Kernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem)
   {
+#if 0
     Functor<Arg> f(arg);
     if constexpr (hasSpecialOps<Functor<Arg>>) {
       f.setNdItem(ndi);
@@ -117,6 +118,10 @@ namespace quda {
     if constexpr (needsSharedMem<Functor<Arg>>) {
       f.setSharedMem(smem...);
     }
+#else
+    //Functor<Arg> f(arg, smem...);
+    Ftor<Functor<Arg>> f(arg, ndi, smem...);
+#endif
 
     auto j = globalIdY;
     if (j >= arg.threads.y) return;
@@ -130,6 +135,7 @@ namespace quda {
   std::enable_if_t<needsFullBlock<Functor<Arg>>, void>
   Kernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem)
   {
+#if 0
     Functor<Arg> f(arg);
     if constexpr (hasSpecialOps<Functor<Arg>>) {
       f.setNdItem(ndi);
@@ -137,6 +143,10 @@ namespace quda {
     if constexpr (needsSharedMem<Functor<Arg>>) {
       f.setSharedMem(smem...);
     }
+#else
+    //Functor<Arg> f(arg, smem...);
+    Ftor<Functor<Arg>> f(arg, ndi, smem...);
+#endif
 
     bool active = true;
     auto j = globalIdY;
@@ -246,6 +256,7 @@ namespace quda {
   std::enable_if_t<!needsFullBlock<Functor<Arg>>, void>
   Kernel3DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem)
   {
+#if 0
     Functor<Arg> f(arg);
     if constexpr (hasSpecialOps<Functor<Arg>>) {
       f.setNdItem(ndi);
@@ -253,6 +264,10 @@ namespace quda {
     if constexpr (needsSharedMem<Functor<Arg>>) {
       f.setSharedMem(smem...);
     }
+#else
+    //Functor<Arg> f(arg, smem...);
+    Ftor<Functor<Arg>> f(arg, ndi, smem...);
+#endif
 
     auto j = globalIdY;
     if (j >= arg.threads.y) return;
@@ -268,6 +283,7 @@ namespace quda {
   std::enable_if_t<needsFullBlock<Functor<Arg>>, void>
   Kernel3DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem)
   {
+#if 0
     Functor<Arg> f(arg);
     if constexpr (hasSpecialOps<Functor<Arg>>) {
       f.setNdItem(ndi);
@@ -275,6 +291,10 @@ namespace quda {
     if constexpr (needsSharedMem<Functor<Arg>>) {
       f.setSharedMem(smem...);
     }
+#else
+    //Functor<Arg> f(arg, smem...);
+    Ftor<Functor<Arg>> f(arg, ndi, smem...);
+#endif
 
     bool active = true;
     auto j = globalIdY;

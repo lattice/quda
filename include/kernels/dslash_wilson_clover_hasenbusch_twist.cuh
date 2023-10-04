@@ -36,7 +36,8 @@ namespace quda
   struct cloverHasenbusch : dslash_default, NoSpecialOps {
 
     const Arg &arg;
-    constexpr cloverHasenbusch(const Arg &arg) : arg(arg) {}
+    //constexpr cloverHasenbusch(const Arg &arg) : arg(arg) {}
+    template <typename Ftor> constexpr cloverHasenbusch(const Ftor &ftor) : arg(ftor.arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
     
     /**

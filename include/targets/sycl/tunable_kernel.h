@@ -385,4 +385,14 @@ namespace quda {
     return err;
   }
 
+  template <typename F, bool = hasSpecialOps<F>, bool = needsSharedMem<F>>
+  struct Ftor : F {
+    template <typename Arg, typename S>
+    Ftor(const Arg &arg, const sycl::nd_item<3> &ndi, S smem) : F{arg,smem} {}
+  };
+  template <typename F, bool ns> struct Ftor<F,ns,false> : F {
+    template <typename Arg, typename ...S>
+    Ftor(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem) : F{arg} {}
+  };
+
 }

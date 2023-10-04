@@ -40,16 +40,18 @@ namespace quda
     using real = typename mapper<typename Arg::Float>::type;
     using Vec = ColorSpinor<real, Arg::nColor, 4>;
     using Cache = SharedMemoryCache<Vec>;
-    using Ops = SpecialOps<Cache>;
+    //using Ops = SpecialOps<Cache>;
     //template <KernelType kernel_type>
-    //using Ops = conditional_t<kernel_type == INTERIOR_KERNEL,SpecialOps<Cache>,NoSpecialOps>;
+    using Ops = std::conditional_t<kernel_type == INTERIOR_KERNEL,SpecialOps<Cache>,NoSpecialOps>;
   };
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct nDegTwistedClover : dslash_default, nDegTwistedCloverParams<kernel_type,Arg>::Ops {
 
     const Arg &arg;
-    constexpr nDegTwistedClover(const Arg &arg) : arg(arg) {}
+    using typename nDegTwistedCloverParams<kernel_type,Arg>::Ops::KernelOpsT;
+    //constexpr nDegTwistedClover(const Arg &arg) : arg(arg) {}
+    template <typename Ftor> constexpr nDegTwistedClover(const Ftor &ftor) : KernelOpsT(ftor), arg(ftor.arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**

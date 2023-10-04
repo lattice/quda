@@ -24,6 +24,12 @@ namespace quda
     }
   };
 
+  struct SizeZ {
+    static constexpr unsigned int size(dim3 block) {
+      return block.z;
+    }
+  };
+
   template <typename D, int N = 1> struct SizeDims {
     static constexpr unsigned int size(dim3 block) {
       dim3 dims = D::dims(block);

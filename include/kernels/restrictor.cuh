@@ -115,7 +115,9 @@ namespace quda {
     using vector = typename RestrictorParams<Arg>::vector;
     using BlockReduce_t = typename RestrictorParams<Arg>::BlockReduce_t;
     const Arg &arg;
-    constexpr Restrictor(const Arg &arg) : arg(arg) {}
+    using typename SpecialOps<BlockReduce_t>::KernelOpsT;
+    template <typename ...Ops>
+    constexpr Restrictor(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     template <bool allthreads = false>

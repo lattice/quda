@@ -205,7 +205,8 @@ namespace quda
   template <typename Arg> struct CloverDerivative : computeForceOps
   {
     const Arg &arg;
-    constexpr CloverDerivative(const Arg &arg) : arg(arg) {}
+    template <typename ...Ops>
+    constexpr CloverDerivative(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __host__ __device__ void operator()(int x_cb, int parity, int mu)

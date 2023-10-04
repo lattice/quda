@@ -57,7 +57,9 @@ namespace quda
 
   template <typename Arg> struct BlockTransposeKernel : BlockTransposeKernelOps<Arg>::Ops {
     const Arg &arg;
-    constexpr BlockTransposeKernel(const Arg &arg) : arg(arg) { }
+    using typename BlockTransposeKernelOps<Arg>::Ops::KernelOpsT;
+    template <typename ...OpsArgs>
+    constexpr BlockTransposeKernel(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**

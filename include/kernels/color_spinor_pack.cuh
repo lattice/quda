@@ -292,11 +292,15 @@ namespace quda {
     }
   }
 
-  template <typename Arg_> struct GhostPacker :
-    std::conditional_t<Arg_::block_float, site_max<true>::Ops<Arg_>, NoSpecialOps> {
+  template <typename Arg_> using GhostPackerOps =
+    std::conditional_t<Arg_::block_float, site_max<true>::Ops<Arg_>, NoSpecialOps>;
+
+  template <typename Arg_> struct GhostPacker : GhostPackerOps<Arg_> {
     using Arg = Arg_;
     const Arg &arg;
-    constexpr GhostPacker(const Arg &arg) : arg(arg) {}
+    using typename GhostPackerOps<Arg>::KernelOpsT;
+    template <typename ...Ops>
+    constexpr GhostPacker(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     template <bool allthreads = false>

@@ -323,7 +323,9 @@ namespace quda {
       static_assert(Param::nu_next_positive == -1, "nu_next_positive should be set to -1 for AllThreeAllLepageLink");
       static constexpr int compute_lepage = Param::compute_lepage;
 
-      constexpr AllThreeAllLepageLink(const Param &param) : arg(param.arg) {}
+      using typename AllThreeAllLepageLinkOps<Param>::Ops::KernelOpsT;
+      template <typename ...OpsArgs>
+      constexpr AllThreeAllLepageLink(const Param &param, const OpsArgs &...ops) : KernelOpsT(ops...), arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
       /**
@@ -691,7 +693,9 @@ namespace quda {
       static constexpr int nu_next_positive = Param::nu_next_positive; // if nu_next_positive == -1, skip
       static_assert(Param::compute_lepage == -1, "compute_lepage should be set to -1 for AllFiveAllSevenLink");
 
-      constexpr AllFiveAllSevenLink(const Param &param) : arg(param.arg) {}
+      using typename AllFiveAllSevenLinkOps<Param>::Ops::KernelOpsT;
+      template <typename ...OpsArgs>
+      constexpr AllFiveAllSevenLink(const Param &param, const OpsArgs &...ops) : KernelOpsT(ops...), arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
       /**

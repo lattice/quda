@@ -114,7 +114,9 @@ namespace quda {
     using dot_t = typename BlockOrtho_Params<Arg>::dot_t;
     using real = typename Arg::real;
 
-    constexpr BlockOrtho_(const Arg &arg) : arg(arg) {}
+    using typename BlockOrtho_Params<Arg>::Ops::KernelOpsT;
+    template <typename ...Ops>
+    constexpr BlockOrtho_(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void load(ColorSpinor<real, nColor, spinBlock> &v, int parity, int x_cb, int chirality, int i)

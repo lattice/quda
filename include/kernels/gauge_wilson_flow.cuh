@@ -162,9 +162,11 @@ namespace quda
   //template <typename Arg_> struct WFlow
   template <typename Arg_> struct WFlow : computeStapleOpsWF<Arg_>::Ops
   {
+    using typename computeStapleOpsWF<Arg_>::Ops::KernelOpsT;
     using Arg = Arg_;
     const Arg &arg;
-    constexpr WFlow(const Arg &arg) : arg(arg) {}
+    template <typename ...OpsArgs>
+    constexpr WFlow(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)

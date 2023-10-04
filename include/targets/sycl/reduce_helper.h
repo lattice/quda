@@ -119,6 +119,7 @@ namespace quda
     //using Ops = SpecialOps<BlockReduce_t,reduceConcurrentOps>;
     using opBlockSync = op_blockSync;
     using opSharedMem = op_SharedMemory<bool>;
+    using Smem = SharedMemory<bool, SizeZ>;
     using Ops = SpecialOps<BlockReduce_t,opBlockSync,opSharedMem>;
   };
 
@@ -158,9 +159,12 @@ namespace quda
       auto glmem = sycl::ext::oneapi::group_local_memory_for_overwrite<bool[n_batch_block]>(getGroup());
       auto isLastBlockDone = *glmem.get();
 #else
-      using opSharedMem = typename reduceParams<Arg, Reducer, T>::opSharedMem;
+      //using opSharedMem = typename reduceParams<Arg, Reducer, T>::opSharedMem;
       //auto isLastBlockDone = getSharedMemPtr(opSharedMem()(ops));
-      auto isLastBlockDone = getSharedMemPtr<opSharedMem>(ops);
+      //auto isLastBlockDone = getSharedMemPtr<opSharedMem>(ops);
+      using Smem = typename reduceParams<Arg, Reducer, T>::Smem;
+      Smem smem(ops);
+      auto isLastBlockDone = smem.sharedMem();
 #endif
 
     if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && idx < arg.threads.z) {

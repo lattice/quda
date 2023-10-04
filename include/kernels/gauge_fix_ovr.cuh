@@ -143,7 +143,9 @@ namespace quda {
   //template <typename Arg> struct computeFix : SpecialOps<SharedMemoryCache<typename Arg::real>> {
   template <typename Arg> struct computeFix : computeFixOps<Arg> {
     const Arg &arg;
-    constexpr computeFix(const Arg &arg) : arg(arg) {}
+    using typename computeFixOps<Arg>::KernelOpsT;
+    template <typename ...Ops>
+    constexpr computeFix(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     template <bool allthreads = false>
@@ -162,8 +164,7 @@ namespace quda {
         for (int dr = 0; dr < 4; dr++) p += arg.border[dr];
         getCoords(x, idx, arg.X, p + parity);
       } else {
-	if (!allthreads || active)
-	  idx = arg.borderpoints[parity][idx];  // load the lattice site assigment
+	if (!allthreads || active) idx = arg.borderpoints[parity][idx];  // load the lattice site assigment
         x[3] = idx / (X[0] * X[1]  * X[2]);
         x[2] = (idx / (X[0] * X[1])) % X[2];
         x[1] = (idx / X[0]) % X[1];

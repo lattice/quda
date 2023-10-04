@@ -102,7 +102,9 @@ namespace quda
     template <class Arg> struct Transfer5D : Transfer5DParams<Arg>::Ops {
 
       const Arg &arg;
-      constexpr Transfer5D(const Arg &arg) : arg(arg) { }
+      using typename Transfer5DParams<Arg>::Ops::KernelOpsT;
+      template <typename ...OpsArgs>
+      constexpr Transfer5D(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg) { }
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       /**

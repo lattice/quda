@@ -13,9 +13,13 @@ namespace quda {
   void Reduction2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi, char *smem)
   {
     Functor<Arg> f(arg);
+#if 0
     typename reduceParams<Arg,Functor<Arg>,typename Functor<Arg>::reduce_t>::Ops rso;
     rso.setNdItem(ndi);
     rso.setSharedMem(smem);
+#else
+    typename reduceParams<Arg,Functor<Arg>,typename Functor<Arg>::reduce_t>::Ops rso{smem};
+#endif
     auto idx = globalIdX;
     auto j = localIdY;
     auto value = f.init();
@@ -153,6 +157,7 @@ namespace quda {
   {
     static_assert(!needsFullBlock<Functor<Arg>>);
     using reduce_t = typename Functor<Arg>::reduce_t;
+#if 0
     Functor<Arg> f(arg);
     if constexpr (hasSpecialOps<Functor<Arg>>) {
       f.setNdItem(ndi);
@@ -160,9 +165,18 @@ namespace quda {
     if constexpr (needsSharedMem<Functor<Arg>>) {
       f.setSharedMem(smem);
     }
+#else
+    //Functor<Arg> f(arg, smem...);
+    Ftor<Functor<Arg>> f(arg, ndi, smem);
+#endif
+
+#if 0
     typename reduceParams<Arg,Functor<Arg>,typename Functor<Arg>::reduce_t>::Ops rso;
     rso.setNdItem(ndi);
     rso.setSharedMem(smem);
+#else
+    typename reduceParams<Arg,Functor<Arg>,typename Functor<Arg>::reduce_t>::Ops rso{smem};
+#endif
 
     auto idx = globalIdX;
     auto k = localIdY;

@@ -38,7 +38,8 @@ namespace quda
   struct cloverHasenbuschPreconditioned : dslash_default, NoSpecialOps {
 
     const Arg &arg;
-    constexpr cloverHasenbuschPreconditioned(const Arg &arg) : arg(arg) {}
+    //constexpr cloverHasenbuschPreconditioned(const Arg &arg) : arg(arg) {}
+    template <typename Ftor> constexpr cloverHasenbuschPreconditioned(const Ftor &ftor) : arg(ftor.arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**

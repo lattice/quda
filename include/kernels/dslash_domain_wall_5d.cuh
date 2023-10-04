@@ -26,7 +26,8 @@ namespace quda
   struct domainWall5D : dslash_default, NoSpecialOps {
 
     const Arg &arg;
-    constexpr domainWall5D(const Arg &arg) : arg(arg) {}
+    //constexpr domainWall5D(const Arg &arg) : arg(arg) {}
+    template <typename Ftor> constexpr domainWall5D(const Ftor &ftor) : arg(ftor.arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
     static constexpr QudaPCType pc_type() { return QUDA_5D_PC; }
 

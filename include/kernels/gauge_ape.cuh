@@ -41,10 +41,12 @@ namespace quda
       }
     }
   };
-  
+
   template <typename Arg> struct APE : computeStapleOps {
     const Arg &arg;
-    constexpr APE(const Arg &arg) : arg(arg) {}
+    //constexpr APE(const Arg &arg) : arg(arg) {}
+    template <typename ...Ops>
+    constexpr APE(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
