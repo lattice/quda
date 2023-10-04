@@ -134,8 +134,12 @@ namespace quda
       }
       coords[i] = (i < topo->ndim) ? mod(comm_coords(topo)[i] + displacement[i] + (i==0 ? Nx_displacement :0), comm_dims(topo)[i]) : 0;
     }
-    std::cout << ": " << coords[0] << " " << coords[1] << " " << coords[2] <<
+
+    // CSTAR_DEBUG
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      std::cout << ": " << coords[0] << " " << coords[1] << " " << coords[2] <<
         " " << coords[3] << " yields rank" << comm_rank_from_coords(topo, coords) << std::endl;
+    }
 
     return comm_rank_from_coords(topo, coords);
   }
@@ -262,9 +266,13 @@ namespace quda
         const int gpuid = comm_gpuid();
 
         comm_set_neighbor_ranks();
-        for (int dir = 0; dir < 2; ++dir) { // forward/backward directions
-          for (int dim = 0; dim < 4; ++dim) {
-            printfQuda("my (%i):neighbors in dim/dir %i/%i: %i\n",comm_rank(),dim,dir,comm_neighbor_rank(dir, dim));
+        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+          // CSTAR_DEBUG
+          for (int dir = 0; dir < 2; ++dir) { // forward/backward directions
+            for (int dim = 0; dim < 4; ++dim) {
+                printf("my (%i):neighbors in dim/dir %i/%i: %i\n",comm_rank(),dim,dir,comm_neighbor_rank(dir, dim));
+              }
+            }
           }
         }
        
@@ -384,13 +392,18 @@ namespace quda
         int neg_displacement[QUDA_MAX_DIM] = {};
         pos_displacement[d] = +1;
         neg_displacement[d] = -1;
-        std::cout << "rank: " << rank_grid[0] << "," << rank_grid[1]
-          << "," << rank_grid[2] << "," << rank_grid[3] << " negative " << d << std::endl;
-        neighbor_rank[0][d] = comm_rank_displaced(topology, neg_displacement);
-        std::cout << "rank: " << rank_grid[0] << "," << rank_grid[1]
-          << "," << rank_grid[2] << "," << rank_grid[3] << " positive " << d << std::endl;
-        neighbor_rank[1][d] = comm_rank_displaced(topology, pos_displacement);
+
+        // CSTAR_DEBUG
+        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+          std::cout << "rank: " << rank_grid[0] << "," << rank_grid[1]
+            << "," << rank_grid[2] << "," << rank_grid[3] << " negative " << d << std::endl;
+          neighbor_rank[0][d] = comm_rank_displaced(topology, neg_displacement);
+          std::cout << "rank: " << rank_grid[0] << "," << rank_grid[1]
+            << "," << rank_grid[2] << "," << rank_grid[3] << " positive " << d << std::endl;
+          neighbor_rank[1][d] = comm_rank_displaced(topology, pos_displacement);
+        }
       }
+
       neighbors_cached = true;
     }
 

@@ -22,12 +22,18 @@ extern "C" {
  * L2, ...
  */
 typedef struct {
-  int L[4];         /** Local lattice dimensions L0, L1, L2, L3 */
-  int nproc[4];     /** Machine grid size NPROC0, NPROC1, NPROC2, NPROC3*/
-  int nproc_blk[4]; /** Blocking size NPROC0_BLK, NPROC1_BLK, NPROC2_BLK, NPROC3_BLK */
-  int N[4];         /** Glocal lattice dimensions N0, N1, N2, N3 */
+  int L[4];         /** Local lattice dimensions L1, L2, L3, L0 */
+  int nproc[4];     /** Machine grid size NPROC1, NPROC2, NPROC3, NPROC0*/
+  int nproc_blk[4]; /** Blocking size NPROC0_BLK, NPROC1_BLK, NPROC2_BLK, NPROC3_BLK,
+                        is assumed to be [1, 1, 1, 1] */
+  int N[4];         /** Glocal lattice dimensions N1, N2, N3, N3 */
   int device;       /** GPU device number */
-  int cstar;        /** number of cstar directions */
+  int cstar;        /** number of cstar directions, equals bc_cstar() */
+  int *ranks;       /** rank topology, length 4 + NPROC1*NPROC2*NPROC3*NPROC0:
+                        ranks[i] = nproc[i] for 0 <= i < 4
+                        ranks[4+lex(ix,iy,iz,it)] returns rank number in
+                        openQCD, where lex stands for lexicographical
+                        indexing (in QUDA order (xyzt)) */
 } openQCD_QudaLayout_t;
 
 

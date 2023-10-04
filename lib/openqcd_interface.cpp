@@ -99,22 +99,29 @@ static lat_dim_t get_local_dims(int *fill = nullptr)
  * @brief      Calculate the rank from coordinates.
  *
  * @param[in]  coords  coords is the 4D cartesian coordinate of a rank
- * @param[in]  fdata   should point to 4 integers in order {NPROC0, NPROC1,
- *                     NPROC2, NPROC3}
+ * @param[in]  fdata   should point to an instance of qudaLayout.ranks,
+ *                     @see struct openQCD_QudaLayout_t in 
+ *                     @file include/quda_openqcd_interface.h
  *
  * @return     rank
  */
 static int rankFromCoords(const int *coords, void *fdata) // TODO:
 {
   int *NPROC = static_cast<int *>(fdata);
-  int ib;
+  int *ranks = NPROC + 4;
+  int i;
 
-  ib = coords[3];
-  ib = ib*NPROC[0] + coords[0];
-  ib = ib*NPROC[1] + coords[1];
-  ib = ib*NPROC[2] + coords[2];
+  i = coords[3] + NPROC[3]*(coords[2] + NPROC[2]*(coords[1] + NPROC[1]*(coords[0])));
+  return ranks[i];
 
-  return ib;
+  // Juan's version, not needed anymore
+  // int ib;
+  // ib = coords[3];
+  // ib = ib*NPROC[0] + coords[0];
+  // ib = ib*NPROC[1] + coords[1];
+  // ib = ib*NPROC[2] + coords[2];
+
+  // return ib;
 }
 
 
@@ -145,7 +152,7 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout)
 #ifdef QMP_COMMS
   initCommsGridQuda(4, layout.nproc, nullptr, nullptr);
 #else
-  initCommsGridQuda(4, mynproc, rankFromCoords, (void *)(layout.nproc));
+  initCommsGridQuda(4, mynproc, rankFromCoords, (void *)(layout.ranks));
 #endif
   static int device = -1; // enable a default allocation of devices to processes 
 #else
