@@ -102,7 +102,12 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
 
   int parity = 0;
   QudaMatPCType myMatPCType = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
-
+  // if wilson-clover set mu=0
+  double store_mu;
+  if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH){
+    store_mu=inv_param->mu;
+    inv_param->mu=0;
+  }
   tmc_dslash(x.Even().V(), gauge.data(), tmp.V(), clover.data(), clover_inv.data(), inv_param->kappa, inv_param->mu,
              inv_param->twist_flavor, parity, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
 
@@ -210,4 +215,8 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
   cloverDerivative_reference(refmom, gauge.data(), oprod_ex, QUDA_EVEN_PARITY, *gauge_param);
 
   add_mom((double *)h_mom, (double *)mom.Gauge_p(), 4 * V * mom_site_size, -1.0);
+
+  if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH){
+    inv_param->mu=store_mu;
+  }
 }
