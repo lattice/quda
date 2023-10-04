@@ -9,7 +9,7 @@
 #   gfortran).
 #*/
 
-#define QUDA_INVALID_ENUM (-Z'7fffffff' - 1)
+#define QUDA_INVALID_ENUM -int(Z'7FFFFFFF') - 1
 
 #define QudaLinkType integer(4)
 
