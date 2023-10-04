@@ -103,26 +103,23 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
   int parity = 0;
   QudaMatPCType myMatPCType = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
   // if wilson-clover set mu=0
-  double store_mu;
-  if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH){
-    store_mu=inv_param->mu;
-    inv_param->mu=0;
-  }
-  tmc_dslash(x.Even().V(), gauge.data(), tmp.V(), clover.data(), clover_inv.data(), inv_param->kappa, inv_param->mu,
+  double mu = inv_param->mu;
+  if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) mu = 0;
+
+  tmc_dslash(x.Even().V(), gauge.data(), tmp.V(), clover.data(), clover_inv.data(), inv_param->kappa, mu,
              inv_param->twist_flavor, parity, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
 
   Gamma5_host((double *)x.Even().V(), (double *)x.Even().V(), x.Even().VolumeCB());
 
-  tmc_matpc(p.Odd().V(), gauge.data(), tmp.V(), clover.data(), clover_inv.data(), inv_param->kappa, inv_param->mu,
+  tmc_matpc(p.Odd().V(), gauge.data(), tmp.V(), clover.data(), clover_inv.data(), inv_param->kappa, mu,
             inv_param->twist_flavor, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
   parity = 0;
-  tmc_dslash(p.Even().V(), gauge.data(), p.Odd().V(), clover.data(), clover_inv.data(), inv_param->kappa, inv_param->mu,
+  tmc_dslash(p.Even().V(), gauge.data(), p.Odd().V(), clover.data(), clover_inv.data(), inv_param->kappa, mu,
              inv_param->twist_flavor, parity, myMatPCType, QUDA_DAG_NO, inv_param->cpu_prec, *gauge_param);
 
   Gamma5_host((double *)p.Even().V(), (double *)p.Even().V(), p.Even().VolumeCB());
   Gamma5_host((double *)p.Odd().V(), (double *)p.Odd().V(), p.Odd().VolumeCB());
 
-  
   double force_coeff = coeff[0];
   quda::GaugeFieldParam momparam(*gauge_param);
   // momparam.order = QUDA_QDP_GAUGE_ORDER;
@@ -154,8 +151,7 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
 
   double k_csw_ov_8 = inv_param->kappa * inv_param->clover_csw / 8.0;
   size_t twist_flavor = inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH ? inv_param->twist_flavor : QUDA_TWIST_NO;
-  double mu2
-    = twist_flavor != QUDA_TWIST_NO ? 4. * inv_param->kappa * inv_param->kappa * inv_param->mu * inv_param->mu : 0.0;
+  double mu2 = twist_flavor != QUDA_TWIST_NO ? 4. * inv_param->kappa * inv_param->kappa * mu * mu : 0.0;
   double eps2 = twist_flavor == QUDA_TWIST_NONDEG_DOUBLET ?
     4.0 * inv_param->kappa * inv_param->kappa * inv_param->epsilon * inv_param->epsilon :
     0.0;
@@ -169,10 +165,11 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
     ferm_epsilon[i][0] = k_csw_ov_8 * coeff[i];
     ferm_epsilon[i][1] = k_csw_ov_8 * coeff[i] / (inv_param->kappa * inv_param->kappa);
   }
-  // derivative of pseudofermion sw term, first term term of (A12) in hep-lat/0112051,  sw_spinor_eo(EE,..) plus sw_spinor_eo(OO,..)  in tmLQCD
+  // derivative of pseudofermion sw term, first term term of (A12) in hep-lat/0112051,  sw_spinor_eo(EE,..) plus
+  // sw_spinor_eo(OO,..)  in tmLQCD
   computeCloverSigmaOprod_reference(oprod, p, x, ferm_epsilon, *gauge_param);
 
-  // create extended field 
+  // create extended field
   quda::GaugeFieldParam gParamMom(*gauge_param, h_mom, QUDA_ASQTAD_MOM_LINKS);
   gParamMom.link_type = QUDA_GENERAL_LINKS;
   gParamMom.create = QUDA_ZERO_FIELD_CREATE;
@@ -215,8 +212,4 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
   cloverDerivative_reference(refmom, gauge.data(), oprod_ex, QUDA_EVEN_PARITY, *gauge_param);
 
   add_mom((double *)h_mom, (double *)mom.Gauge_p(), 4 * V * mom_site_size, -1.0);
-
-  if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH){
-    inv_param->mu=store_mu;
-  }
 }
