@@ -52,7 +52,7 @@ namespace quda
     }
 
     comm_init(nDim, commDims, rank_from_coords, map_data);
-        globalReduce.push(true);
+    globalReduce.push(true);
   }
 
   Communicator::Communicator(Communicator &other, const int *comm_split) : globalReduce(other.globalReduce)

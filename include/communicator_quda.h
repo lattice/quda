@@ -271,7 +271,6 @@ namespace quda
           for (int dir = 0; dir < 2; ++dir) { // forward/backward directions
             for (int dim = 0; dim < 4; ++dim) {
                 printf("my (%i):neighbors in dim/dir %i/%i: %i\n",comm_rank(),dim,dir,comm_neighbor_rank(dir, dim));
-              }
             }
           }
         }
@@ -392,15 +391,15 @@ namespace quda
         int neg_displacement[QUDA_MAX_DIM] = {};
         pos_displacement[d] = +1;
         neg_displacement[d] = -1;
+        neighbor_rank[0][d] = comm_rank_displaced(topology, neg_displacement);
+        neighbor_rank[1][d] = comm_rank_displaced(topology, pos_displacement);
 
         // CSTAR_DEBUG
         if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
           std::cout << "rank: " << rank_grid[0] << "," << rank_grid[1]
             << "," << rank_grid[2] << "," << rank_grid[3] << " negative " << d << std::endl;
-          neighbor_rank[0][d] = comm_rank_displaced(topology, neg_displacement);
           std::cout << "rank: " << rank_grid[0] << "," << rank_grid[1]
             << "," << rank_grid[2] << "," << rank_grid[3] << " positive " << d << std::endl;
-          neighbor_rank[1][d] = comm_rank_displaced(topology, pos_displacement);
         }
       }
 
@@ -546,7 +545,7 @@ namespace quda
 
   void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
   {
-        Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data, comm_rank());
+    Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data, comm_rank());
     comm_set_default_topology(topo);
 
     // determine which GPU this rank will use

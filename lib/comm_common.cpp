@@ -104,10 +104,6 @@ namespace quda
 
     topo->ndim = ndim;
 
-    for (int i = 0; i < QUDA_MAX_DIM; i++) {
-        topo->cstar[i] = 0;
-    }
-
     int nodes = 1;
     for (int i = 0; i < ndim; i++) {
       topo->dims[i] = abs(dims[i]);

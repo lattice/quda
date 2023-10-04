@@ -377,7 +377,6 @@ void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata
 
   }
 
-
 #if defined(QMP_COMMS) || defined(MPI_COMMS)
   comm_init(nDim, dims, func, fdata, user_set_comm_handle, (void *)&MPI_COMM_HANDLE_USER);
 #else
