@@ -133,6 +133,9 @@ namespace quda {
       } else if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_CHROMA) {
         UnitarizeArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_CHROMA> arg(out, in, fails, max_iter, unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
         launch<Unitarize>(tp, stream, arg);
+      } else if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO) {
+        UnitarizeArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_NO> arg(out, in, fails, max_iter, unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
+        launch<Unitarize>(tp, stream, arg);
       } else {
         errorQuda("Undefined phase type %d", in.StaggeredPhase());
       }

@@ -236,7 +236,7 @@ namespace quda {
         if (result.isUnitary(arg.max_error) == false) atomic_fetch_add(arg.fails, 1);
       }
 
-      if (Arg::phase == QUDA_STAGGERED_PHASE_CHROMA) {  // Special unitrize the result for Chroma convention
+      if constexpr (Arg::phase == QUDA_STAGGERED_PHASE_CHROMA) {  // Special unitraize the result for Chroma convention
         int x[4];
         getCoords(x, x_cb, arg.X, parity);
 
