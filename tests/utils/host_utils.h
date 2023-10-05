@@ -49,9 +49,9 @@ void setQudaStaggeredInvTestParams();
 //------------------------------------------------------
 void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longlink_cpu, void **qdp_longlink_gpu,
                                             void **qdp_fatlink_cpu, void **qdp_fatlink_gpu, QudaGaugeParam &gauge_param,
-                                            int argc, char **argv, bool &gauge_loaded);
+                                            int argc, char **argv);
 void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink,
-                                      QudaGaugeParam &gauge_param, int argc, char **argv, bool &gauge_loaded, bool compute_on_gpu);
+                                      QudaGaugeParam &gauge_param, int argc, char **argv, bool compute_on_gpu);
 void constructFatLongGaugeField(void **fatlink, void **longlink, int type, QudaPrecision precision, QudaGaugeParam *,
                                 QudaDslashType dslash_type);
 void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugeParam &gauge_param);

@@ -171,10 +171,9 @@ struct StaggeredDslashTestWrapper {
       qdp_longlink_cpu[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
     }
 
-    bool gauge_loaded = false;
     bool compute_on_gpu = false; // reference fat/long fields should be computed on cpu
     constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink_cpu, qdp_fatlink_cpu, gauge_param, argc, argv,
-                                     gauge_loaded, compute_on_gpu);
+                                     compute_on_gpu);
   }
 
   void init()
