@@ -5099,9 +5099,8 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
   profileTMCloverForce.TPSTART(QUDA_PROFILE_TOTAL);
   profileTMCloverForce.TPSTART(QUDA_PROFILE_INIT);
 
-  printQudaInvertParam(inv_param);
-
-  printQudaGaugeParam(gauge_param);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaGaugeParam(gauge_param);
 
   double kappa = inv_param->kappa;
   double k_csw_ov_8 = kappa * inv_param->clover_csw / 8.0;
