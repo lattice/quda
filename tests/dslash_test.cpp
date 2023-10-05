@@ -48,7 +48,18 @@ public:
   // Per-test-case tear-down.
   // Called after the last test in this test case.
   // Can be omitted if not needed.
-  static void TearDownTestCase() { endQuda(); }
+  static void TearDownTestCase()
+  {
+    for (int dir = 0; dir < 4; dir++)
+      if (DslashTestWrapper::hostGauge[dir]) host_free(DslashTestWrapper::hostGauge[dir]);
+
+    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+        || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
+      if (DslashTestWrapper::hostClover) host_free(DslashTestWrapper::hostClover);
+      if (DslashTestWrapper::hostCloverInv) host_free(DslashTestWrapper::hostCloverInv);
+    }
+    endQuda();
+  }
 };
 
 TEST_F(DslashTest, benchmark) { dslash_test_wrapper.run_test(niter, /**show_metrics =*/true); }

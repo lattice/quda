@@ -68,9 +68,9 @@ struct DslashTestWrapper {
   quda::DiracDomainWall4DPC *dirac_4dpc = nullptr;
 
   // Raw pointers
-  void *hostGauge[4] = {nullptr};
-  void *hostClover = nullptr;
-  void *hostCloverInv = nullptr;
+  static inline void *hostGauge[4] = {nullptr};
+  static inline void *hostClover = nullptr;
+  static inline void *hostCloverInv = nullptr;
 
   // Parameters
   QudaGaugeParam gauge_param;
@@ -107,7 +107,12 @@ struct DslashTestWrapper {
 
     inv_param.cuda_prec = cuda_prec;
 
-    init(argc, argv);
+    static bool first_time = true;
+    if (first_time) {
+      init_host(argc, argv);
+      first_time = false;
+    }
+    init();
   }
 
   void init_test(int argc, char **argv)
@@ -117,15 +122,16 @@ struct DslashTestWrapper {
     setWilsonGaugeParam(gauge_param);
     setInvertParam(inv_param);
 
-    init(argc, argv);
+    static bool first_time = true;
+    if (first_time) {
+      init_host(argc, argv);
+      first_time = false;
+    }
+    init();
   }
 
-  void init(int argc, char **argv)
+  void init_host(int argc, char **argv)
   {
-    num_src = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
-    test_split_grid = num_src > 1;
-    if (test_split_grid) { dtest_type = dslash_test_type::Dslash; }
-
     if (dslash_type == QUDA_ASQTAD_DSLASH || dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
       errorQuda("Asqtad not supported.  Please try staggered_dslash_test instead");
     } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
@@ -136,6 +142,34 @@ struct DslashTestWrapper {
       setDims(gauge_param.X);
       Ls = 1;
     }
+
+    if (inv_param.cpu_prec != gauge_param.cpu_prec) errorQuda("Gauge and spinor CPU precisions must match");
+
+    // construct input fields
+    for (int dir = 0; dir < 4; dir++) hostGauge[dir] = safe_malloc((size_t)V * gauge_site_size * gauge_param.cpu_prec);
+
+    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH
+        || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+      hostClover = safe_malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
+      hostCloverInv = safe_malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
+
+      if (compute_clover)
+        printfQuda("Computing clover field on GPU\n");
+      else {
+        printfQuda("Sending clover field to GPU\n");
+        constructHostCloverField(hostClover, hostCloverInv, inv_param);
+      }
+    }
+
+    printfQuda("Randomizing fields... ");
+    constructHostGaugeField(hostGauge, gauge_param, argc, argv);
+  }
+
+  void init()
+  {
+    num_src = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
+    test_split_grid = num_src > 1;
+    if (test_split_grid) { dtest_type = dslash_test_type::Dslash; }
 
     inv_param.dagger = dagger ? QUDA_DAG_YES : QUDA_DAG_NO;
     inv_param.solve_type = (dtest_type == dslash_test_type::Mat || dtest_type == dslash_test_type::MatDagMat) ?
@@ -175,17 +209,6 @@ struct DslashTestWrapper {
       case dslash_test_type::MatDagMat: inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION; break;
       default: errorQuda("Test type %d not defined\n", static_cast<int>(dtest_type));
       }
-    }
-
-    if (inv_param.cpu_prec != gauge_param.cpu_prec) errorQuda("Gauge and spinor CPU precisions must match");
-
-    // construct input fields
-    for (int dir = 0; dir < 4; dir++) hostGauge[dir] = safe_malloc((size_t)V * gauge_site_size * gauge_param.cpu_prec);
-
-    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH
-        || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-      hostClover = safe_malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
-      hostCloverInv = safe_malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
     }
 
     ColorSpinorParam csParam;
@@ -256,20 +279,11 @@ struct DslashTestWrapper {
     setVerbosity(verbosity);
     inv_param.verbosity = verbosity;
 
-    printfQuda("Randomizing fields... ");
-    constructHostGaugeField(hostGauge, gauge_param, argc, argv);
-
     printfQuda("Sending gauge field to GPU\n");
     loadGaugeQuda(hostGauge, &gauge_param);
 
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
         || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
-      if (compute_clover)
-        printfQuda("Computing clover field on GPU\n");
-      else {
-        printfQuda("Sending clover field to GPU\n");
-        constructHostCloverField(hostClover, hostCloverInv, inv_param);
-      }
       inv_param.compute_clover = compute_clover;
       inv_param.return_clover = compute_clover;
       inv_param.compute_clover_inverse = true;
@@ -328,13 +342,6 @@ struct DslashTestWrapper {
         delete dirac;
         dirac = nullptr;
       }
-    }
-
-    for (int dir = 0; dir < 4; dir++) host_free(hostGauge[dir]);
-    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
-        || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
-      host_free(hostClover);
-      host_free(hostCloverInv);
     }
   }
 
