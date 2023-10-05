@@ -312,7 +312,8 @@ void CloverForce_reference(void *h_mom, std::array<void *, 4> gauge, quda::Color
   }
 }
 template <typename cFloat>
-void cloverSigmaTraceCompute_host(cFloat *oprod, cFloat *clover, double coeff, int parity, double mu2, double eps2)
+void cloverSigmaTraceCompute_host(cFloat *oprod, cFloat *clover, double coeff, int parity, double mu2, double eps2,
+                                  bool twist)
 {
   int nSpin = 4;
   int nColor = 3;
@@ -362,7 +363,8 @@ void cloverSigmaTraceCompute_host(cFloat *oprod, cFloat *clover, double coeff, i
       for (int j = 0; j < 6; j++) B(j, j) = B(j, j) + mu2 - eps2;
 
       B = 0.5 * B.inverse();
-      A = 0.25 * A * B;
+      A = A * B;
+      if (twist) { A = 0.25 * A; }
 
       for (int row = 0; row < 6; row++) {
         A_array[chirality * 36 + row] = A(row, row).real();
@@ -505,11 +507,12 @@ void cloverSigmaTraceCompute_host(cFloat *oprod, cFloat *clover, double coeff, i
   }
 }
 
-void computeCloverSigmaTrace_reference(void *oprod, void *clover, double coeff, int parity, double mu2, double eps2)
+void computeCloverSigmaTrace_reference(void *oprod, void *clover, double coeff, int parity, double mu2, double eps2,
+                                       bool twist)
 {
 
   // FIXME: here call the appropriate template function according to gauge_precision
-  cloverSigmaTraceCompute_host((double *)oprod, (double *)clover, coeff, parity, mu2, eps2);
+  cloverSigmaTraceCompute_host((double *)oprod, (double *)clover, coeff, parity, mu2, eps2, twist);
 }
 template <typename gFloat>
 void get_su3FromOprod(gFloat *oprod_out, gFloat *oprod, int munu, size_t nbr_idx, const lattice_t &lat)
@@ -549,7 +552,7 @@ void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *
     {
       int d[4] = {0, 0, 0, 0};
       int nbr_idx;
-      int eo_full_id = i + parity * Vh ;
+      int eo_full_id = i + parity * Vh;
       // load U(x)_(+mu)
       // Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), arg.parity);
       nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
@@ -619,7 +622,7 @@ void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *
     {
       int d[4] = {0, 0, 0, 0};
       int nbr_idx;
-      int eo_full_id = i + parity * Vh ;
+      int eo_full_id = i + parity * Vh;
 
       // load U(x-nu)(+nu)
       d[nu]--;
@@ -695,7 +698,7 @@ void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *
     {
       int d[4] = {0, 0, 0, 0};
       int nbr_idx;
-      int eo_full_id = i + otherparity * Vh ;
+      int eo_full_id = i + otherparity * Vh;
       // load U(x)_(+mu)
       // Link U1 = arg.gauge(mu, linkIndexShift(y, d, arg.E), otherparity);
       nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
@@ -766,7 +769,7 @@ void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *
     {
       int d[4] = {0, 0, 0, 0};
       int nbr_idx;
-      int eo_full_id = i + otherparity * Vh ;
+      int eo_full_id = i + otherparity * Vh;
 
       // load U(x-nu)(+nu)
       d[nu]--;
