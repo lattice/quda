@@ -339,8 +339,8 @@ namespace quda {
     using Arg = Arg_;
     const Arg &arg;
     using typename CoarseDslashParams<Arg>::Ops::KernelOpsT;
-    template <typename ...Ops>
-    constexpr CoarseDslash(const Arg &arg, const Ops &...ops) : KernelOpsT(ops...), arg(arg) {}
+    template <typename ...OpsArgs>
+    constexpr CoarseDslash(const Arg &arg, const OpsArgs &...ops) : KernelOpsT(ops...), arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     template <bool allthreads = false>
