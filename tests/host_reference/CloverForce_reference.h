@@ -549,7 +549,7 @@ void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *
     {
       int d[4] = {0, 0, 0, 0};
       int nbr_idx;
-      int eo_full_id = i + parity * Vh * gauge_site_size;
+      int eo_full_id = i + parity * Vh ;
       // load U(x)_(+mu)
       // Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), arg.parity);
       nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
@@ -619,7 +619,7 @@ void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *
     {
       int d[4] = {0, 0, 0, 0};
       int nbr_idx;
-      int eo_full_id = i + parity * Vh * gauge_site_size;
+      int eo_full_id = i + parity * Vh ;
 
       // load U(x-nu)(+nu)
       d[nu]--;
@@ -695,7 +695,7 @@ void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *
     {
       int d[4] = {0, 0, 0, 0};
       int nbr_idx;
-      int eo_full_id = i + otherparity * Vh * gauge_site_size;
+      int eo_full_id = i + otherparity * Vh ;
       // load U(x)_(+mu)
       // Link U1 = arg.gauge(mu, linkIndexShift(y, d, arg.E), otherparity);
       nbr_idx = gf_neighborIndexFullLattice(eo_full_id, d, lat);
@@ -766,7 +766,7 @@ void computeForce_reference(void *h_mom_, void **gauge_ex, lattice_t lat, void *
     {
       int d[4] = {0, 0, 0, 0};
       int nbr_idx;
-      int eo_full_id = i + otherparity * Vh * gauge_site_size;
+      int eo_full_id = i + otherparity * Vh ;
 
       // load U(x-nu)(+nu)
       d[nu]--;
