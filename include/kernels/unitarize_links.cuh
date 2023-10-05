@@ -7,23 +7,19 @@
 #include <color_spinor.h>
 #include <svd_quda.h>
 #include <kernel.h>
-#include <kernels/gauge_phase.cuh>
 
 namespace quda {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, QudaStaggeredPhase phase_>
+  template <typename Float, int nColor_, QudaReconstructType recon_>
   struct UnitarizeArg : kernel_param<> {
-    using Float = double;
-    using real = typename mapper<Float_>::type;
+    using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
-    static constexpr QudaStaggeredPhase phase = phase_;
-    typedef typename gauge_mapper<Float_,recon>::type Gauge;
+    typedef typename gauge_mapper<Float,recon>::type Gauge;
     Gauge out;
     const Gauge in;
 
     int X[4]; // grid dimensions
-    double tBoundary;
     int *fails;
     const int max_iter;
     const double unitarize_eps;
@@ -50,9 +46,6 @@ namespace quda {
       svd_abs_error(svd_abs_error)
     {
       for (int dir=0; dir<4; ++dir) X[dir] = in.X()[dir];
-
-      bool last_node_in_t = (commCoords(3) == commDim(3)-1);
-      tBoundary = (Float)(last_node_in_t ? in.TBoundary() : QUDA_PERIODIC_T);
     }
   };
 
@@ -189,16 +182,6 @@ namespace quda {
     return true;
   } // unitarizeMILC
 
-  template <typename real, typename mat, typename Arg>
-  __host__ __device__ void specialUnitarizeLinkMILC(mat &out, const mat &in, const Arg &arg)
-  {
-    complex<real> det = getDeterminant(in);
-    real r = exp(-log(abs(det)) / Arg::nColor);
-    real alpha = atan2(det.imag(), det.real()) / Arg::nColor;
-
-    out = in * polar(r, -alpha);
-  } // specialUnitarizeLinkMILC
-
   template <typename mat>
   __host__ __device__ bool unitarizeLinkNewton(mat &out, const mat& in, int max_iter)
   {
@@ -235,23 +218,6 @@ namespace quda {
       if (arg.check_unitarization) {
         if (result.isUnitary(arg.max_error) == false) atomic_fetch_add(arg.fails, 1);
       }
-
-      if constexpr (Arg::phase == QUDA_STAGGERED_PHASE_CHROMA) {  // Special unitraize the result for Chroma convention
-        int x[4];
-        getCoords(x, x_cb, arg.X, parity);
-
-        double phase;
-        switch (mu) {
-        case 0: phase = getPhase<0>(x[0], x[1], x[2], x[3], arg); break;
-        case 1: phase = getPhase<1>(x[0], x[1], x[2], x[3], arg); break;
-        case 2: phase = getPhase<2>(x[0], x[1], x[2], x[3], arg); break;
-        case 3: phase = getPhase<3>(x[0], x[1], x[2], x[3], arg); break;
-        }
-        v = result * phase;
-        specialUnitarizeLinkMILC<double>(result, v, arg);
-        result *= phase;
-      }
-
       tmp = result;
 
       arg.out(mu, x_cb, parity) = tmp;
