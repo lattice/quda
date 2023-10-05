@@ -1501,9 +1501,8 @@ namespace quda {
       {
         switch (phase) {
         case QUDA_STAGGERED_PHASE_MILC:
-        case QUDA_STAGGERED_PHASE_CPS:
-        case QUDA_STAGGERED_PHASE_TIFR:
-        case QUDA_STAGGERED_PHASE_CHROMA: return true;
+        case QUDA_STAGGERED_PHASE_CHROMA:
+        case QUDA_STAGGERED_PHASE_TIFR: return true;
         default: return false;
         }
       }

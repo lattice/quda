@@ -124,14 +124,11 @@ namespace quda {
       if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
         UnitarizeArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_MILC> arg(out, in, fails, max_iter, unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
         launch<Unitarize>(tp, stream, arg);
-      } else if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_CPS) {
-        UnitarizeArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_CPS> arg(out, in, fails, max_iter, unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
+      } else if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_CHROMA) {
+        UnitarizeArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_CHROMA> arg(out, in, fails, max_iter, unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
         launch<Unitarize>(tp, stream, arg);
       } else if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
         UnitarizeArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_TIFR> arg(out, in, fails, max_iter, unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
-        launch<Unitarize>(tp, stream, arg);
-      } else if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_CHROMA) {
-        UnitarizeArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_CHROMA> arg(out, in, fails, max_iter, unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
         launch<Unitarize>(tp, stream, arg);
       } else if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO) {
         UnitarizeArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_NO> arg(out, in, fails, max_iter, unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
