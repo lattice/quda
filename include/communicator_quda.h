@@ -301,19 +301,21 @@ namespace quda
               // if (canAccessPeer[0] * canAccessPeer[1] != 0 || gpuid == neighbor_gpuid) {
               if ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid) {
                 peer2peer_enabled[dir][dim] = true;
-                if (getVerbosity() > QUDA_SILENT) {
-                  printf("Peer-to-peer enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d, "
-                         "access rank = (%3d)\n",
-                         comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, access_rank);
-                }
+                // CSTAR_DEBUG
+                // if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+                //   printf("Peer-to-peer enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d, "
+                //          "access rank = (%3d)\n",
+                //          comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, access_rank);
+                // }
               } else {
                 intranode_enabled[dir][dim] = true;
-                if (getVerbosity() > QUDA_SILENT) {
-                  printf(
-                    "Intra-node (non peer-to-peer) enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, "
-                    "dim=%d\n",
-                    comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
-                }
+                // CSTAR_DEBUG
+                // if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+                //   printf(
+                //     "Intra-node (non peer-to-peer) enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, "
+                //     "dim=%d\n",
+                //     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
+                // }
               }
 
             } // on the same node
