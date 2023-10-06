@@ -107,7 +107,9 @@ namespace quda
     int nodes = 1;
     for (int i = 0; i < ndim; i++) {
       topo->dims[i] = abs(dims[i]);
-      topo->cstar[i] = dims[i] < 0 ? 1:0;
+      // We pass negative dimensions from openQxD
+      // @file lib/openqcd_interface.cpp:openQCD_qudaSetLayout
+      topo->shift_boundary[i] = dims[i] < 0 ? 1:0;
       nodes *= topo->dims[i];
     }
 

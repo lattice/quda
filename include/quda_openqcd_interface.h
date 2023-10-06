@@ -29,9 +29,10 @@ typedef struct {
   int N[4];         /** Glocal lattice dimensions N1, N2, N3, N3 */
   int device;       /** GPU device number */
   int cstar;        /** number of cstar directions, equals bc_cstar() */
-  int *ranks;       /** rank topology, length 4 + NPROC1*NPROC2*NPROC3*NPROC0:
-                        ranks[i] = nproc[i] for 0 <= i < 4
-                        ranks[4+lex(ix,iy,iz,it)] returns rank number in
+  int *data;        /** rank topology, length 5 + NPROC1*NPROC2*NPROC3*NPROC0:
+                        data[0] = cstar;
+                        data[1+i] = nproc[i] for 0 <= i < 4
+                        data[5+lex(ix,iy,iz,it)] returns rank number in
                         openQCD, where lex stands for lexicographical
                         indexing (in QUDA order (xyzt)) */
 } openQCD_QudaLayout_t;

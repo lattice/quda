@@ -107,8 +107,9 @@ static lat_dim_t get_local_dims(int *fill = nullptr)
  */
 static int rankFromCoords(const int *coords, void *fdata) // TODO:
 {
-  int *NPROC = static_cast<int *>(fdata);
-  int *ranks = NPROC + 4;
+  int *base = static_cast<int *>(fdata);
+  int *NPROC = base + 1;
+  int *ranks = base + 5;
   int i;
 
   i = coords[3] + NPROC[3]*(coords[2] + NPROC[2]*(coords[1] + NPROC[1]*(coords[0])));
@@ -143,7 +144,7 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout)
 #ifdef QMP_COMMS
   initCommsGridQuda(4, layout.nproc, nullptr, nullptr);
 #else
-  initCommsGridQuda(4, mynproc, rankFromCoords, (void *)(layout.ranks));
+  initCommsGridQuda(4, mynproc, rankFromCoords, (void *)(layout.data));
 #endif
   static int device = -1; // enable a default allocation of devices to processes 
 #else

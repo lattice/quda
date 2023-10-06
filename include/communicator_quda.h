@@ -40,7 +40,7 @@ namespace quda
     int (*coords)[QUDA_MAX_DIM];
     int my_rank;
     int my_coords[QUDA_MAX_DIM];
-    int cstar[QUDA_MAX_DIM];
+    int shift_boundary[QUDA_MAX_DIM];
     // It might be worth adding communicators to allow for efficient reductions:
     //   #if defined(MPI_COMMS)
     //     MPI_Comm comm;
@@ -129,7 +129,7 @@ namespace quda
 
     int Nx_displacement = 0;
     for (int i = QUDA_MAX_DIM-1; i >=0; i--) {
-      if(topo->cstar[i]==1 && i < topo->ndim){
+      if(topo->shift_boundary[i]==1 && i < topo->ndim){
         Nx_displacement += ((comm_coords(topo)[i] + displacement[i] + comm_dims(topo)[i])/comm_dims(topo)[i] -1) * (comm_dims(topo)[0]/2);
       }
       coords[i] = (i < topo->ndim) ? mod(comm_coords(topo)[i] + displacement[i] + (i==0 ? Nx_displacement :0), comm_dims(topo)[i]) : 0;
