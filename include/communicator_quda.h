@@ -130,16 +130,12 @@ namespace quda
     int Nx_displacement = 0;
     for (int i = QUDA_MAX_DIM-1; i >=0; i--) {
       if(topo->shift_boundary[i]==1 && i < topo->ndim){
+        // if we go over the boundary and have a shifted boundary condition,
+        // we shift Nx/2 ranks in x-direction
         Nx_displacement += ((comm_coords(topo)[i] + displacement[i] + comm_dims(topo)[i])/comm_dims(topo)[i] -1) * (comm_dims(topo)[0]/2);
       }
       coords[i] = (i < topo->ndim) ? mod(comm_coords(topo)[i] + displacement[i] + (i==0 ? Nx_displacement :0), comm_dims(topo)[i]) : 0;
     }
-
-    // CSTAR_DEBUG
-    // if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    //   std::cout << ": " << coords[0] << " " << coords[1] << " " << coords[2] <<
-    //     " " << coords[3] << " yields rank" << comm_rank_from_coords(topo, coords) << std::endl;
-    // }
 
     return comm_rank_from_coords(topo, coords);
   }
@@ -266,15 +262,7 @@ namespace quda
         const int gpuid = comm_gpuid();
 
         comm_set_neighbor_ranks();
-        // CSTAR_DEBUG
-        // if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-        //   for (int dir = 0; dir < 2; ++dir) { // forward/backward directions
-        //     for (int dim = 0; dim < 4; ++dim) {
-        //         printf("my (%i):neighbors in dim/dir %i/%i: %i\n",comm_rank(),dim,dir,comm_neighbor_rank(dir, dim));
-        //     }
-        //   }
-        // }
-       
+
         char *hostname = comm_hostname();
         int *gpuid_recv_buf = (int *)safe_malloc(sizeof(int) * comm_size());
 
@@ -301,21 +289,19 @@ namespace quda
               // if (canAccessPeer[0] * canAccessPeer[1] != 0 || gpuid == neighbor_gpuid) {
               if ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid) {
                 peer2peer_enabled[dir][dim] = true;
-                // CSTAR_DEBUG
-                // if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-                //   printf("Peer-to-peer enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d, "
-                //          "access rank = (%3d)\n",
-                //          comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, access_rank);
-                // }
+                if (getVerbosity() > QUDA_SILENT) {
+                  printf("Peer-to-peer enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d, "
+                         "access rank = (%3d)\n",
+                         comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, access_rank);
+                }
               } else {
                 intranode_enabled[dir][dim] = true;
-                // CSTAR_DEBUG
-                // if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-                //   printf(
-                //     "Intra-node (non peer-to-peer) enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, "
-                //     "dim=%d\n",
-                //     comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
-                // }
+                if (getVerbosity() > QUDA_SILENT) {
+                  printf(
+                    "Intra-node (non peer-to-peer) enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, "
+                    "dim=%d\n",
+                    comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim);
+                }
               }
 
             } // on the same node
@@ -386,7 +372,6 @@ namespace quda
 
       Topology *topology = topo ? topo : default_topo; // use default topology if topo is NULL
       if (!topology) { errorQuda("Topology not specified"); }
-      const int *rank_grid = comm_coords_from_rank(topology, comm_rank());
 
       for (int d = 0; d < 4; ++d) {
         int pos_displacement[QUDA_MAX_DIM] = {};
@@ -395,16 +380,7 @@ namespace quda
         neg_displacement[d] = -1;
         neighbor_rank[0][d] = comm_rank_displaced(topology, neg_displacement);
         neighbor_rank[1][d] = comm_rank_displaced(topology, pos_displacement);
-
-        // CSTAR_DEBUG
-        // if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-        //   std::cout << "rank: " << rank_grid[0] << "," << rank_grid[1]
-        //     << "," << rank_grid[2] << "," << rank_grid[3] << " negative " << d << std::endl;
-        //   std::cout << "rank: " << rank_grid[0] << "," << rank_grid[1]
-        //     << "," << rank_grid[2] << "," << rank_grid[3] << " positive " << d << std::endl;
-        // }
       }
-
       neighbors_cached = true;
     }
 

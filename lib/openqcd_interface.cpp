@@ -132,6 +132,8 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout)
     }
     mynproc[dir] = layout.nproc[dir];
   }
+  // Negative dimensions are used to indicate shifted boundary conditions,
+  // @see lib/comm_common.cpp:comm_create_topology()
   if(layout.cstar > 1) {
     mynproc[1] *= -1; /* y direction */
   }
