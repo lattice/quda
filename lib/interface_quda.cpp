@@ -3919,6 +3919,19 @@ void computeKSLinkQuda(void *fatlink, void *longlink, void *ulink, void *inlink,
       errorQuda("Error in unitarization component of the hisq fattening: %d failures", *num_failures_h);
     profileFatLink.TPSTOP(QUDA_PROFILE_COMPUTE);
 
+    // project onto SU(3) if using the Chroma convention
+    if (param->staggered_phase_type == QUDA_STAGGERED_PHASE_CHROMA) {
+      profileFatLink.TPSTART(QUDA_PROFILE_COMPUTE);
+      *num_failures_h = 0;
+      const double tol = cudaUnitarizedLink->Precision() == QUDA_DOUBLE_PRECISION ? 1e-15 : 2e-6;
+      if (cudaUnitarizedLink->StaggeredPhaseApplied()) cudaUnitarizedLink->removeStaggeredPhase();
+      projectSU3(*cudaUnitarizedLink, tol, num_failures_d);
+      if (!cudaUnitarizedLink->StaggeredPhaseApplied() && param->staggered_phase_applied) cudaUnitarizedLink->applyStaggeredPhase();
+      if(*num_failures_h>0)
+        errorQuda("Error in the SU(3) unitarization: %d failures\n", *num_failures_h);
+      profileFatLink.TPSTOP(QUDA_PROFILE_COMPUTE);
+    }
+
     cudaUnitarizedLink->saveCPUField(cpuUnitarizedLink, profileFatLink);
 
     profileFatLink.TPSTART(QUDA_PROFILE_FREE);
