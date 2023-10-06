@@ -67,7 +67,9 @@ typedef struct {
 typedef struct {
   double kappa;   /* kappa: hopping parameter */
   double mu;      /* mu: twisted mass */
-  double su3csw;  /* su3csw: csw coefficient */
+  double su3csw;  /* su3csw: csw coefficient for SU(3) fields */
+  double u1csw;   /* u1csw: csw coefficient for U(1) fields, quda doesn't respect that parameter (yet) */
+  int qhat;       /* qhat: quda doesn't respect that parameter (yet) */
   int dagger;     /* dagger: whether to apply D or D^dagger */
 } openQCD_QudaDiracParam_t;
 
