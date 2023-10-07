@@ -181,7 +181,7 @@ namespace quda {
         if (param.create != QUDA_REFERENCE_FIELD_CREATE) {
           gauge_array[d] = quda_ptr(mem_type, nbytes);
         } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
-          gauge_array[d] = quda_ptr(static_cast<void **>(param.gauge)[d], mem_type);
+          if (param.gauge) gauge_array[d] = quda_ptr(static_cast<void **>(param.gauge)[d], mem_type);
         } else {
           errorQuda("Unsupported creation type %d", param.create);
         }
