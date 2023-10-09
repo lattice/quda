@@ -102,6 +102,14 @@ namespace quda
 
     Topology *topo = new Topology;
 
+
+    #ifdef BUILD_OPENQCD_INTERFACE
+    int *data = static_cast<int *>(map_data);
+    topo->cstar = data[0];
+    #else
+    topo->cstar = 0;
+    #endif
+
     topo->ndim = ndim;
 
     int nodes = 1;
@@ -110,6 +118,10 @@ namespace quda
       // We pass negative dimensions from openQxD
       // @file lib/openqcd_interface.cpp:openQCD_qudaSetLayout
       topo->shift_boundary[i] = dims[i] < 0 ? 1:0;
+      // cstar = 3: shift_boundary = [0, 1, 1, 0] (xyzt convention)
+      // cstar = 2: shift_boundary = [0, 1, 0, 0] (xyzt convention)
+      // cstar = 1: shift_boundary = [0, 0, 0, 0] (xyzt convention)
+      // cstar = 0: shift_boundary = [0, 0, 0, 0] (xyzt convention)
       nodes *= topo->dims[i];
     }
 
