@@ -40,8 +40,7 @@ namespace quda
     int (*coords)[QUDA_MAX_DIM];
     int my_rank;
     int my_coords[QUDA_MAX_DIM];
-    int shift_boundary[QUDA_MAX_DIM];
-    int cstar;
+    int cstar; // number of C* direction as per openQxD convention
     // It might be worth adding communicators to allow for efficient reductions:
     //   #if defined(MPI_COMMS)
     //     MPI_Comm comm;
@@ -127,6 +126,7 @@ namespace quda
   inline int comm_rank_displaced(const Topology *topo, const int displacement[])
   {
     int coords[QUDA_MAX_DIM];
+    int shift_integer;
 
     int Nx_displacement = 0;
     for (int i = QUDA_MAX_DIM-1; i >=0; i--) {
@@ -140,8 +140,10 @@ namespace quda
           (i==2 && topo->cstar >= 3)
       )) {
         // if we go over the boundary and have a shifted boundary condition,
-        // we shift Nx/2 ranks in x-direction
-        Nx_displacement += ((comm_coords(topo)[i] + displacement[i] + comm_dims(topo)[i])/comm_dims(topo)[i] -1) * (comm_dims(topo)[0]/2);
+        // we shift Nx/2 ranks in x-direction:
+        // shift_integer in {-1, 0, 1}
+        shift_integer = (comm_coords(topo)[i] + displacement[i] + comm_dims(topo)[i]) / comm_dims(topo)[i];
+        Nx_displacement += (shift_integer - 1) * (comm_dims(topo)[0]/2);
       }
       coords[i] = (i < topo->ndim) ? mod(comm_coords(topo)[i] + displacement[i] + (i==0 ? Nx_displacement :0), comm_dims(topo)[i]) : 0;
     }

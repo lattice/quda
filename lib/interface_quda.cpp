@@ -366,7 +366,7 @@ void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata
 
       map_data.ndim = nDim;
       for (int i=0; i<nDim; i++) {
-        map_data.dims[i] = abs(dims[i]);
+        map_data.dims[i] = dims[i];
       }
       fdata = (void *) &map_data;
       func = lex_rank_from_coords;

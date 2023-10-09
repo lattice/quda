@@ -124,21 +124,11 @@ static int rankFromCoords(const int *coords, void *fdata) // TODO:
  */
 void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout)
 {
-  int mynproc[4];
   for (int dir = 0; dir < 4; ++dir) {
     if (layout.N[dir] % 2 != 0) {
       errorQuda("Error: Odd lattice dimensions are not supported\n");
       exit(1);
     }
-    mynproc[dir] = layout.nproc[dir];
-  }
-  // Negative dimensions are used to indicate shifted boundary conditions,
-  // @see lib/comm_common.cpp:comm_create_topology()
-  if(layout.cstar > 1) {
-    mynproc[1] *= -1; /* y direction */
-  }
-  if(layout.cstar > 2) {
-    mynproc[2] *= -1; /* z direction */
   }
 
 #ifdef MULTI_GPU
@@ -146,7 +136,7 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout)
 #ifdef QMP_COMMS
   initCommsGridQuda(4, layout.nproc, nullptr, nullptr);
 #else
-  initCommsGridQuda(4, mynproc, rankFromCoords, (void *)(layout.data));
+  initCommsGridQuda(4, layout.nproc, rankFromCoords, (void *)(layout.data));
 #endif
   static int device = -1; // enable a default allocation of devices to processes 
 #else
