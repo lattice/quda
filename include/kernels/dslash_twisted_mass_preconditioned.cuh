@@ -55,8 +55,7 @@ namespace quda
     typedef Matrix<complex<real>, Arg::nColor> Link;
     const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
 
-#pragma unroll
-    for (int d = 0; d < Arg::nDim; d++) { // loop over dimension
+    static_for<0,Arg::nDim>([&](auto d){ // loop over dimension
       {                              // Forward gather - compute fwd offset for vector fetch
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
         constexpr int proj_dir = dagger ? +1 : -1;
@@ -72,24 +71,24 @@ namespace quda
           Link U = arg.U(d, coord.x_cb, parity);
           HalfVector in = arg.in.Ghost(d, 1, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
-          out += (U * in).reconstruct(d, proj_dir);
+          out += (U * in).template reconstruct<d, proj_dir>();
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, coord.x_cb, parity);
           Vector in;
           if (twist == 1) {
             in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
-            in = arg.a * (in + arg.b * in.igamma(4)); // apply A^{-1} to in
+            in = arg.a * (in + arg.b * in.template igamma<4>()); // apply A^{-1} to in
           } else {                                    // twisted doublet
             Vector in0 = arg.in(fwd_idx + 0 * arg.dc.volume_4d_cb, their_spinor_parity);
             Vector in1 = arg.in(fwd_idx + 1 * arg.dc.volume_4d_cb, their_spinor_parity);
             if (coord.s == 0)
-              in = arg.a * (in0 + arg.b * in0.igamma(4) + arg.c * in1);
+              in = arg.a * (in0 + arg.b * in0.template igamma<4>() + arg.c * in1);
             else
-              in = arg.a * (in1 - arg.b * in1.igamma(4) + arg.c * in0);
+              in = arg.a * (in1 - arg.b * in1.template igamma<4>() + arg.c * in0);
           }
 
-          out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          out += (U * in.template project<d, proj_dir>()).template reconstruct<d, proj_dir>();
         }
       }
 
@@ -108,27 +107,27 @@ namespace quda
           Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
           HalfVector in = arg.in.Ghost(d, 0, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
-          out += (conj(U) * in).reconstruct(d, proj_dir);
+          out += (conj(U) * in).template reconstruct<d, proj_dir>();
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, 1 - parity);
           Vector in;
           if (twist == 1) {
             in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
-            in = arg.a * (in + arg.b * in.igamma(4)); // apply A^{-1} to in
+            in = arg.a * (in + arg.b * in.template igamma<4>()); // apply A^{-1} to in
           } else {                                    // twisted doublet
             Vector in0 = arg.in(back_idx + 0 * arg.dc.volume_4d_cb, their_spinor_parity);
             Vector in1 = arg.in(back_idx + 1 * arg.dc.volume_4d_cb, their_spinor_parity);
             if (coord.s == 0)
-              in = arg.a * (in0 + arg.b * in0.igamma(4) + arg.c * in1);
+              in = arg.a * (in0 + arg.b * in0.template igamma<4>() + arg.c * in1);
             else
-              in = arg.a * (in1 - arg.b * in1.igamma(4) + arg.c * in0);
+              in = arg.a * (in1 - arg.b * in1.template igamma<4>() + arg.c * in0);
           }
 
-          out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          out += (conj(U) * in.template project<d, proj_dir>()).template reconstruct<d, proj_dir>();
         }
       }
-    } // nDim
+    }); // nDim
   }
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
@@ -167,7 +166,7 @@ namespace quda
       if (xpay && mykernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x(coord.x_cb, my_spinor_parity);
         if (!dagger || Arg::asymmetric) {
-          out += arg.a_inv * (x + arg.b_inv * x.igamma(4)); // apply inverse twist which is undone below
+          out += arg.a_inv * (x + arg.b_inv * x.template igamma<4>()); // apply inverse twist which is undone below
         } else {
           out += x; // just directly add since twist already applied in the dslash
         }
@@ -178,7 +177,7 @@ namespace quda
       }
 
       if (isComplete<mykernel_type>(arg, coord) && active) {
-        if (!dagger || Arg::asymmetric) out = arg.a * (out + arg.b * out.igamma(4)); // apply A^{-1} to D*in
+        if (!dagger || Arg::asymmetric) out = arg.a * (out + arg.b * out.template igamma<4>()); // apply A^{-1} to D*in
       }
 
       if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;

@@ -78,11 +78,11 @@ namespace quda {
     {
       ColorSpinor<typename Arg::real, Arg::nColor, 4> in = arg.in(x_cb, parity);
       switch(arg.d) {
-      case 0: arg.out(x_cb, parity) = in.gamma(0);
-      case 1: arg.out(x_cb, parity) = in.gamma(1);
-      case 2: arg.out(x_cb, parity) = in.gamma(2);
-      case 3: arg.out(x_cb, parity) = in.gamma(3);
-      case 4: arg.out(x_cb, parity) = in.gamma(4);
+      case 0: arg.out(x_cb, parity) = in.template gamma<0>();
+      case 1: arg.out(x_cb, parity) = in.template gamma<1>();
+      case 2: arg.out(x_cb, parity) = in.template gamma<2>();
+      case 3: arg.out(x_cb, parity) = in.template gamma<3>();
+      case 4: arg.out(x_cb, parity) = in.template gamma<4>();
       }
     }
   };
@@ -101,12 +101,12 @@ namespace quda {
       constexpr int d = 4;
       if (!arg.doublet) {
         fermion_t in = arg.in(x_cb, parity);
-        arg.out(x_cb, parity) = arg.a * (in + arg.b * in.igamma(d));
+        arg.out(x_cb, parity) = arg.a * (in + arg.b * in.template igamma<d>());
       } else {
         fermion_t in_1 = arg.in(x_cb+0*arg.volumeCB, parity);
         fermion_t in_2 = arg.in(x_cb+1*arg.volumeCB, parity);
-        arg.out(x_cb + 0 * arg.volumeCB, parity) = arg.a * (in_1 + arg.b * in_1.igamma(d) + arg.c * in_2);
-        arg.out(x_cb + 1 * arg.volumeCB, parity) = arg.a * (in_2 - arg.b * in_2.igamma(d) + arg.c * in_1);
+        arg.out(x_cb + 0 * arg.volumeCB, parity) = arg.a * (in_1 + arg.b * in_1.template igamma<d>() + arg.c * in_2);
+        arg.out(x_cb + 1 * arg.volumeCB, parity) = arg.a * (in_2 - arg.b * in_2.template igamma<d>() + arg.c * in_1);
       }
     }
   };

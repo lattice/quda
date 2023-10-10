@@ -51,7 +51,7 @@ namespace quda
     for (int i = 0; i < Arg::nvector; i++) {
       const Spinor A = arg.inA[i](x_cb, parity);
       const Spinor B = arg.inB[i](x_cb, parity);
-      Spinor C = A.sigma(nu, mu); // multiply by sigma_mu_nu
+      Spinor C = A.template sigma<nu, mu>(); // multiply by sigma_mu_nu
       result += arg.coeff[i][parity] * outerProdSpinTrace(C, B);
     }
 

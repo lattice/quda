@@ -61,11 +61,11 @@ namespace quda
 
         if (flavor == 0) {
           out = x0 + arg.a * out;
-          out += arg.b * x0.igamma(4);
+          out += arg.b * x0.template igamma<4>();
           out += arg.c * x1;
         } else {
           out = x1 + arg.a * out;
-          out += -arg.b * x1.igamma(4);
+          out += -arg.b * x1.template igamma<4>();
           out += arg.c * x0;
         }
 

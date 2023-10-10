@@ -63,8 +63,7 @@ namespace quda {
       Spinor A = arg.inA(x_cb, 0);
       Spinor C = arg.inC(x_cb, 0);
 
-#pragma unroll
-      for (int dim=0; dim<4; ++dim) {
+      static_for<0,4>([&](auto dim){
         int shift[4] = {0, 0, 0, 0};
         shift[dim] = 1;
         const int nbr_idx = neighborIndex(x_cb, shift, arg.partitioned, arg.parity, arg.X);
@@ -73,10 +72,10 @@ namespace quda {
           Spinor B_shift = arg.inB(nbr_idx, 0);
           Spinor D_shift = arg.inD(nbr_idx, 0);
 
-          B_shift = (B_shift.project(dim,1)).reconstruct(dim,1);
+          B_shift = (B_shift.template project<dim,1>()).template reconstruct<dim,1>();
           Link result = outerProdSpinTrace(B_shift,A);
 
-          D_shift = (D_shift.project(dim,-1)).reconstruct(dim,-1);
+          D_shift = (D_shift.template project<dim,-1>()).template reconstruct<dim,-1>();
           result += outerProdSpinTrace(D_shift,C);
 
           Link temp = arg.force(dim, x_cb, arg.parity);
@@ -84,7 +83,7 @@ namespace quda {
           result = temp + U*result*arg.coeff;
           arg.force(dim, x_cb, arg.parity) = result;
         }
-      } // dim
+      }); // dim
     }
   };
 
@@ -107,11 +106,11 @@ namespace quda {
       Spinor C = arg.inC(bulk_cb_idx, 0);
 
       HalfSpinor projected_tmp = arg.inB.Ghost(Arg::dim, 1, x_cb, 0);
-      Spinor B_shift = projected_tmp.reconstruct(Arg::dim, 1);
+      Spinor B_shift = projected_tmp.template reconstruct<Arg::dim, 1>();
       Link result = outerProdSpinTrace(B_shift,A);
 
       projected_tmp = arg.inD.Ghost(Arg::dim, 1, x_cb, 0);
-      Spinor D_shift = projected_tmp.reconstruct(Arg::dim,-1);
+      Spinor D_shift = projected_tmp.template reconstruct<Arg::dim,-1>();
       result += outerProdSpinTrace(D_shift,C);
 
       Link temp = arg.force(Arg::dim, bulk_cb_idx, arg.parity);

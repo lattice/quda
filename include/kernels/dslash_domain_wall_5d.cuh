@@ -55,9 +55,9 @@ namespace quda
           constexpr int proj_dir = dagger ? +1 : -1;
           Vector in = arg.in(fwd_idx, their_spinor_parity);
           if (s == arg.Ls - 1) {
-            out += (-arg.m_f * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+            out += (-arg.m_f * in.template project<d, proj_dir>()).template reconstruct<d, proj_dir>();
           } else {
-            out += in.project(d, proj_dir).reconstruct(d, proj_dir);
+            out += in.template project<d, proj_dir>().template reconstruct<d, proj_dir>();
           }
         }
 
@@ -66,9 +66,9 @@ namespace quda
           constexpr int proj_dir = dagger ? -1 : +1;
           Vector in = arg.in(back_idx, their_spinor_parity);
           if (s == 0) {
-            out += (-arg.m_f * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+            out += (-arg.m_f * in.template project<d, proj_dir>()).template reconstruct<d, proj_dir>();
           } else {
-            out += in.project(d, proj_dir).reconstruct(d, proj_dir);
+            out += in.template project<d, proj_dir>().template reconstruct<d, proj_dir>();
           }
         }
       }

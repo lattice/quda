@@ -119,9 +119,9 @@ namespace quda
           const Vector in = cache.load(threadIdx.x, (s + 1) % Ls, threadIdx.z);
           constexpr int proj_dir = Arg::dagger ? +1 : -1;
           if (s == Ls - 1) {
-            out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
+            out += (-arg.m_f * in.template project<4, proj_dir>()).template reconstruct<4, proj_dir>();
           } else {
-            out += in.project(4, proj_dir).reconstruct(4, proj_dir);
+            out += in.template project<4, proj_dir>().template reconstruct<4, proj_dir>();
           }
         }
 
@@ -129,9 +129,9 @@ namespace quda
           const Vector in = cache.load(threadIdx.x, (s + Ls - 1) % Ls, threadIdx.z);
           constexpr int proj_dir = Arg::dagger ? -1 : +1;
           if (s == 0) {
-            out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
+            out += (-arg.m_f * in.template project<4, proj_dir>()).template reconstruct<4, proj_dir>();
           } else {
-            out += in.project(4, proj_dir).reconstruct(4, proj_dir);
+            out += in.template project<4, proj_dir>().template reconstruct<4, proj_dir>();
           }
         }
 
@@ -145,12 +145,12 @@ namespace quda
             if (s == (Arg::pm ? Ls - 1 : 0)) {
               for (int sp = 0; sp < Ls; sp++) {
                 out += (static_cast<real>(0.5) * arg.coeff.u[sp])
-                  * cache.load(threadIdx.x, sp, threadIdx.z).project(4, proj_dir).reconstruct(4, proj_dir);
+                  * cache.load(threadIdx.x, sp, threadIdx.z).template project<4, proj_dir>().template reconstruct<4, proj_dir>();
               }
             }
           } else {
             out += (static_cast<real>(0.5) * arg.coeff.u[s])
-              * cache.load(threadIdx.x, Arg::pm ? Ls - 1 : 0, threadIdx.z).project(4, proj_dir).reconstruct(4, proj_dir);
+              * cache.load(threadIdx.x, Arg::pm ? Ls - 1 : 0, threadIdx.z).template project<4, proj_dir>().template reconstruct<4, proj_dir>();
           }
 
           if (Arg::xpay) { // really axpy
@@ -197,19 +197,19 @@ namespace quda
             int exp = s < sp ? arg.Ls - sp + s : s - sp;
             real factorR = 0.5 * arg.coeff.y[Arg::pm ? arg.Ls - exp - 1 : exp] * (s < sp ? -arg.m_f : static_cast<real>(1.0));
             constexpr int proj_dir = Arg::dagger ? -1 : +1;
-            out += factorR * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
+            out += factorR * (in.template project<4, proj_dir>()).template reconstruct<4, proj_dir>();
           }
           {
             int exp = s > sp ? arg.Ls - s + sp : sp - s;
             real factorL = 0.5 * arg.coeff.y[Arg::pm ? arg.Ls - exp - 1 : exp] * (s > sp ? -arg.m_f : static_cast<real>(1.0));
             constexpr int proj_dir = Arg::dagger ? +1 : -1;
-            out += factorL * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
+            out += factorL * (in.template project<4, proj_dir>()).template reconstruct<4, proj_dir>();
           }
           // The EOFA stuff
           {
             constexpr int proj_dir = Arg::pm ? +1 : -1;
             real t = Arg::dagger ? arg.coeff.y[s] * arg.coeff.x[sp] : arg.coeff.x[s] * arg.coeff.y[sp];
-            out += (t * sherman_morrison) * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
+            out += (t * sherman_morrison) * (in.template project<4, proj_dir>()).template reconstruct<4, proj_dir>();
           }
         }
         if (Arg::xpay) { // really axpy

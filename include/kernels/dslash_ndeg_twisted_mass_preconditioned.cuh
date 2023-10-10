@@ -80,9 +80,9 @@ namespace quda
           Vector x0 = arg.x(coord.x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);
           Vector x1 = arg.x(coord.x_cb + 1 * arg.dc.volume_4d_cb, my_spinor_parity);
           if (flavor == 0)
-            out += arg.a_inv * (x0 + arg.b_inv * x0.igamma(4) + arg.c_inv * x1);
+            out += arg.a_inv * (x0 + arg.b_inv * x0.template igamma<4>() + arg.c_inv * x1);
           else
-            out += arg.a_inv * (x1 - arg.b_inv * x1.igamma(4) + arg.c_inv * x0);
+            out += arg.a_inv * (x1 - arg.b_inv * x1.template igamma<4>() + arg.c_inv * x0);
         } else {
           Vector x = arg.x(my_flavor_idx, my_spinor_parity);
           out += x; // just directly add since twist already applied in the dslash
@@ -104,9 +104,9 @@ namespace quda
         cache.sync(); // safe to sync in here since other threads will exit
         if (isComplete<mykernel_type>(arg, coord) && active) {
           if (flavor == 0)
-            out = arg.a * (out + arg.b * out.igamma(4) + arg.c * cache.load_y(1));
+            out = arg.a * (out + arg.b * out.template igamma<4>() + arg.c * cache.load_y(1));
           else
-            out = arg.a * (out - arg.b * out.igamma(4) + arg.c * cache.load_y(0));
+            out = arg.a * (out - arg.b * out.template igamma<4>() + arg.c * cache.load_y(0));
         }
       }
 

@@ -226,7 +226,7 @@ namespace quda
         constexpr int proj_dir = dagger ? +1 : -1;
         if (shared) {
           if (sync) { cache.sync(); }
-          cache.save(in.project(4, proj_dir));
+          cache.save(in.template project<4, proj_dir>());
           cache.sync();
         }
         const int fwd_s = (s + 1) % arg.Ls;
@@ -236,12 +236,12 @@ namespace quda
           half_in = cache.load(threadIdx.x, fwd_s, parity);
         } else {
           Vector full_in = arg.in(fwd_idx, parity);
-          half_in = full_in.project(4, proj_dir);
+          half_in = full_in.template project<4, proj_dir>();
         }
         if (s == arg.Ls - 1) {
-          out += (-arg.m_f * half_in).reconstruct(4, proj_dir);
+          out += (-arg.m_f * half_in).template reconstruct<4, proj_dir>();
         } else {
-          out += half_in.reconstruct(4, proj_dir);
+          out += half_in.template reconstruct<4, proj_dir>();
         }
       }
 
@@ -249,7 +249,7 @@ namespace quda
         constexpr int proj_dir = dagger ? -1 : +1;
         if (shared) {
           cache.sync();
-          cache.save(in.project(4, proj_dir));
+          cache.save(in.template project<4, proj_dir>());
           cache.sync();
         }
         const int back_s = (s + arg.Ls - 1) % arg.Ls;
@@ -259,12 +259,12 @@ namespace quda
           half_in = cache.load(threadIdx.x, back_s, parity);
         } else {
           Vector full_in = arg.in(back_idx, parity);
-          half_in = full_in.project(4, proj_dir);
+          half_in = full_in.template project<4, proj_dir>();
         }
         if (s == 0) {
-          out += (-arg.m_f * half_in).reconstruct(4, proj_dir);
+          out += (-arg.m_f * half_in).template reconstruct<4, proj_dir>();
         } else {
-          out += half_in.reconstruct(4, proj_dir);
+          out += half_in.template reconstruct<4, proj_dir>();
         }
       }
 
@@ -284,9 +284,9 @@ namespace quda
         const Vector in = shared ? cache.load(threadIdx.x, fwd_s, parity) : arg.in(fwd_idx, parity);
         constexpr int proj_dir = dagger ? +1 : -1;
         if (s == arg.Ls - 1) {
-          out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
+          out += (-arg.m_f * in.template project<4, proj_dir>()).template reconstruct<4, proj_dir>();
         } else {
-          out += in.project(4, proj_dir).reconstruct(4, proj_dir);
+          out += in.template project<4, proj_dir>().template reconstruct<4, proj_dir>();
         }
       }
 
@@ -296,9 +296,9 @@ namespace quda
         const Vector in = shared ? cache.load(threadIdx.x, back_s, parity) : arg.in(back_idx, parity);
         constexpr int proj_dir = dagger ? -1 : +1;
         if (s == 0) {
-          out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
+          out += (-arg.m_f * in.template project<4, proj_dir>()).template reconstruct<4, proj_dir>();
         } else {
-          out += in.project(4, proj_dir).reconstruct(4, proj_dir);
+          out += in.template project<4, proj_dir>().template reconstruct<4, proj_dir>();
         }
       }
     } // use_half_vector
@@ -395,14 +395,14 @@ namespace quda
         int exp = s_ < s ? arg.Ls - s + s_ : s_ - s;
         real factorR = inv * fpow(k, exp) * (s_ < s ? -arg.m_f : static_cast<real>(1.0));
         constexpr int proj_dir = dagger ? -1 : +1;
-        out += factorR * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
+        out += factorR * (in.template project<4, proj_dir>()).template reconstruct<4, proj_dir>();
       }
 
       {
         int exp = s_ > s ? arg.Ls - s_ + s : s - s_;
         real factorL = inv * fpow(k, exp) * (s_ > s ? -arg.m_f : static_cast<real>(1.0));
         constexpr int proj_dir = dagger ? +1 : -1;
-        out += factorL * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
+        out += factorL * (in.template project<4, proj_dir>()).template reconstruct<4, proj_dir>();
       }
     }
 
@@ -443,7 +443,7 @@ namespace quda
 
         if (shared) {
           if (sync) { cache.sync(); }
-          cache.save(in.project(4, proj_dir));
+          cache.save(in.template project<4, proj_dir>());
           cache.sync();
         }
 
@@ -457,21 +457,21 @@ namespace quda
             r += factorR * cache.load(threadIdx.x, s, parity);
           } else {
             Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
-            r += factorR * in.project(4, proj_dir);
+            r += factorR * in.template project<4, proj_dir>();
           }
 
           R *= coeff.kappa(s);
           s = (s + arg.Ls - 1) % arg.Ls;
         }
 
-        out += r.reconstruct(4, proj_dir);
+        out += r.template reconstruct<4, proj_dir>();
       }
 
       { // second do L
         constexpr int proj_dir = dagger ? +1 : -1;
         if (shared) {
           cache.sync(); // ensure we finish R before overwriting cache
-          cache.save(in.project(4, proj_dir));
+          cache.save(in.template project<4, proj_dir>());
           cache.sync();
         }
 
@@ -485,14 +485,14 @@ namespace quda
             l += factorL * cache.load(threadIdx.x, s, parity);
           } else {
             Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
-            l += factorL * in.project(4, proj_dir);
+            l += factorL * in.template project<4, proj_dir>();
           }
 
           L *= coeff.kappa(s);
           s = (s + 1) % arg.Ls;
         }
 
-        out += l.reconstruct(4, proj_dir);
+        out += l.template reconstruct<4, proj_dir>();
       }
     } else { // use_half_vector
       SharedMemoryCache<Vector> cache(target::block_dim());
@@ -512,13 +512,13 @@ namespace quda
           auto factorR = (s_ < s ? -arg.m_f * R : R);
 
           Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
-          r += factorR * in.project(4, proj_dir);
+          r += factorR * in.template project<4, proj_dir>();
 
           R *= coeff.kappa(s);
           s = (s + arg.Ls - 1) % arg.Ls;
         }
 
-        out += r.reconstruct(4, proj_dir);
+        out += r.template reconstruct<4, proj_dir>();
       }
 
       { // second do L
@@ -531,13 +531,13 @@ namespace quda
           auto factorL = (s_ > s ? -arg.m_f * L : L);
 
           Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
-          l += factorL * in.project(4, proj_dir);
+          l += factorL * in.template project<4, proj_dir>();
 
           L *= coeff.kappa(s);
           s = (s + 1) % arg.Ls;
         }
 
-        out += l.reconstruct(4, proj_dir);
+        out += l.template reconstruct<4, proj_dir>();
       }
     } // use_half_vector
 

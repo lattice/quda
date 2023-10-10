@@ -77,8 +77,7 @@ namespace quda
     // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
-#pragma unroll
-    for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
+    static_for<0,4>([&](auto d){ // loop over dimension - 4 and not nDim since this is used for DWF as well
       {                           // Forward gather - compute fwd offset for vector fetch
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
         const int gauge_idx = (Arg::nDim == 5 ? coord.x_cb % arg.dc.volume_4d_cb : coord.x_cb);
@@ -95,13 +94,13 @@ namespace quda
           Link U = arg.U(d, gauge_idx, gauge_parity);
           HalfVector in = arg.in.Ghost(d, 1, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
-          out += (U * in).reconstruct(d, proj_dir);
+          out += (U * in).template reconstruct<d,proj_dir>();
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, gauge_parity);
           Vector in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
-          out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          out += (U * in.template project<d, proj_dir>()).template reconstruct<d,proj_dir>();
         }
       }
 
@@ -121,16 +120,16 @@ namespace quda
           Link U = arg.U.Ghost(d, gauge_ghost_idx, 1 - gauge_parity);
           HalfVector in = arg.in.Ghost(d, 0, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
-          out += (conj(U) * in).reconstruct(d, proj_dir);
+          out += (conj(U) * in).template reconstruct<d,proj_dir>();
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
           Vector in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
-          out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
+          out += (conj(U) * in.template project<d, proj_dir>()).template reconstruct<d,proj_dir>();
         }
       }
-    } // nDim
+    }); // nDim
   }
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct wilson : dslash_default {
