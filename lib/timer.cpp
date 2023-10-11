@@ -136,12 +136,25 @@ namespace quda {
 #define POP_RANGE
 #endif
 
+  static std::stack<QudaProfileType> pt_stack;
+
   void TimeProfile::Start_(const char *func, const char *file, int line, QudaProfileType idx)
   {
     // if total timer isn't running, then start it running
     if (!profile[QUDA_PROFILE_TOTAL].running && idx != QUDA_PROFILE_TOTAL) {
       profile[QUDA_PROFILE_TOTAL].start(func, file, line);
       switchOff = true;
+    }
+
+    // if a timer is already running, stop it and push to stack
+    for (auto i = 0; i < QUDA_PROFILE_COUNT - 1; i++) {
+      if (i == static_cast<int>(idx)) continue;
+      if (profile[i].running) {
+        if (i == QUDA_PROFILE_COMPUTE || i == QUDA_PROFILE_H2D || i == QUDA_PROFILE_D2H) qudaDeviceSynchronize();
+        profile[i].stop(file, func, line);
+        if (use_global) StopGlobal(func, file, line, static_cast<QudaProfileType>(i));
+        pt_stack.push(static_cast<QudaProfileType>(i));
+      }
     }
 
     profile[idx].start(func, file, line);
@@ -156,12 +169,22 @@ namespace quda {
     profile[idx].stop(func, file, line);
     POP_RANGE
 
-    // switch off total timer if we need to
-    if (switchOff && idx != QUDA_PROFILE_TOTAL) {
-      profile[QUDA_PROFILE_TOTAL].stop(func, file, line);
-      switchOff = false;
+    if (pt_stack.empty()) {
+      // switch off total timer if we need to (only if no timer being popped)
+      if (switchOff && idx != QUDA_PROFILE_TOTAL) {
+        profile[QUDA_PROFILE_TOTAL].stop(func, file, line);
+        switchOff = false;
+      }
+      if (use_global) StopGlobal(func, file, line, idx);
     }
-    if (use_global) StopGlobal(func, file, line, idx);
+
+    // restore any pre-existing timers if needed
+    if (!pt_stack.empty()) {
+      auto i = pt_stack.top();
+      pt_stack.pop();
+      profile[i].start(func, file, line);
+      if (use_global) StartGlobal(func, file, line, i);
+    }
   }
 
 #undef PUSH_RANGE
@@ -198,28 +221,28 @@ namespace quda {
     }
   }
 
-  TimeProfile dummy("dummy");
+  TimeProfile dummy("default", false);
 
-  static std::stack<TimeProfile*> tpstack;
+  static std::stack<TimeProfile*> tp_stack;
 
   pushProfile::pushProfile(TimeProfile &profile) : profile(profile)
   {
     profile.TPSTART(QUDA_PROFILE_TOTAL);
-    tpstack.push(&profile);
+    tp_stack.push(&profile);
   }
 
   pushProfile::~pushProfile()
   {
-    if (tpstack.empty()) errorQuda("popProfile() called with empty stack");
-    auto &profile = *(tpstack.top());
+    if (tp_stack.empty()) errorQuda("popProfile() called with empty stack");
+    auto &profile = *(tp_stack.top());
     if (&(this->profile) != &profile) errorQuda("Popped profile is not the expected one");
-    tpstack.pop();
+    tp_stack.pop();
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
 
   TimeProfile& getProfile()
   {
-    if (tpstack.empty()) return dummy;
-    return *(tpstack.top());
+    if (tp_stack.empty()) return dummy;
+    return *(tp_stack.top());
   }
 }
