@@ -71,7 +71,6 @@ static bool redundant_comms = false;
 
 #include <blas_lapack.h>
 
-
 cudaGaugeField *gaugePrecise = nullptr;
 cudaGaugeField *gaugeSloppy = nullptr;
 cudaGaugeField *gaugePrecondition = nullptr;
@@ -103,6 +102,32 @@ CloverField *cloverEigensolver = nullptr;
 
 cudaGaugeField *momResident = nullptr;
 cudaGaugeField *extendedGaugeResident = nullptr;
+
+// These Copy fields are to support the Force Gradient Integrator
+// currently only implemented for HISQ/ASQTAD
+cudaGaugeField *gaugeCopyPrecise = nullptr;
+cudaGaugeField *gaugeCopySloppy = nullptr;
+cudaGaugeField *gaugeCopyPrecondition = nullptr;
+cudaGaugeField *gaugeCopyRefinement = nullptr;
+cudaGaugeField *gaugeCopyEigensolver = nullptr;
+cudaGaugeField *gaugeCopyExtended = nullptr;
+
+cudaGaugeField *gaugeFatCopyPrecise = nullptr;
+cudaGaugeField *gaugeFatCopySloppy = nullptr;
+cudaGaugeField *gaugeFatCopyPrecondition = nullptr;
+cudaGaugeField *gaugeFatCopyRefinement = nullptr;
+cudaGaugeField *gaugeFatCopyEigensolver = nullptr;
+cudaGaugeField *gaugeFatCopyExtended = nullptr;
+
+cudaGaugeField *gaugeLongCopyPrecise = nullptr;
+cudaGaugeField *gaugeLongCopySloppy = nullptr;
+cudaGaugeField *gaugeLongCopyPrecondition = nullptr;
+cudaGaugeField *gaugeLongCopyRefinement = nullptr;
+cudaGaugeField *gaugeLongCopyEigensolver = nullptr;
+cudaGaugeField *gaugeLongCopyExtended = nullptr;
+
+cudaGaugeField *momResidentCopy = nullptr;
+cudaGaugeField *extendedGaugeCopyResident = nullptr;
 
 std::vector<ColorSpinorField> solutionResident;
 
@@ -635,7 +660,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     precise->copy(*in);
     profileGauge.TPSTOP(QUDA_PROFILE_H2D);
   }
-
+  
   // for gaugeSmeared we are interested only in the precise version
   if (param->type == QUDA_SMEARED_LINKS) {
     gaugeSmeared = createExtendedGauge(*precise, R, profileGauge);
@@ -648,7 +673,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     profileGauge.TPSTOP(QUDA_PROFILE_TOTAL);
     return;
   }
-
+  
   // creating sloppy fields isn't really compute, but it is work done on the gpu
   profileGauge.TPSTART(QUDA_PROFILE_COMPUTE);
 
@@ -1381,6 +1406,37 @@ void endQuda(void)
 
   if(momResident) delete momResident;
 
+  // Delete MILC FGI fields
+  //----------------------------------------------------------
+  if(momResidentCopy) delete momResidentCopy;
+  // Wilson Links
+  //----------------------------------------------------------
+  if (gaugeCopyPrecise) delete gaugeCopyPrecise;
+  if (gaugeCopySloppy) delete gaugeCopySloppy;
+  if (gaugeCopyPrecondition) delete gaugeCopyPrecondition;
+  if (gaugeCopyRefinement) delete gaugeCopyRefinement;
+  if (gaugeCopyExtended) delete gaugeCopyExtended;
+  if (extendedGaugeCopyResident) delete extendedGaugeCopyResident;
+  //----------------------------------------------------------
+  
+  // Fat Links
+  //----------------------------------------------------------
+  if (gaugeFatCopyPrecise) delete gaugeFatCopyPrecise;
+  if (gaugeFatCopySloppy) delete gaugeFatCopySloppy;
+  if (gaugeFatCopyPrecondition) delete gaugeFatCopyPrecondition;
+  if (gaugeFatCopyRefinement) delete gaugeFatCopyRefinement;
+  if (gaugeFatCopyExtended) delete gaugeFatCopyExtended;
+  //----------------------------------------------------------
+
+  // Long Links
+  //----------------------------------------------------------
+  if (gaugeLongCopyPrecise) delete gaugeLongCopyPrecise;
+  if (gaugeLongCopySloppy) delete gaugeLongCopySloppy;
+  if (gaugeLongCopyPrecondition) delete gaugeLongCopyPrecondition;
+  if (gaugeLongCopyRefinement) delete gaugeLongCopyRefinement;
+  if (gaugeLongCopyExtended) delete gaugeLongCopyExtended;
+  //----------------------------------------------------------
+  
   LatticeField::freeGhostBuffer();
   ColorSpinorField::freeGhostBuffer();
   FieldTmp<ColorSpinorField>::destroy();
@@ -2086,8 +2142,11 @@ quda::cudaGaugeField *checkGauge(QudaInvertParam *param)
                                     param->cuda_prec_refinement_sloppy, param->cuda_prec_eigensolver};
       QudaReconstructType recon[4] = {gaugeSloppy->Reconstruct(), gaugePrecondition->Reconstruct(),
                                       gaugeRefinement->Reconstruct(), gaugeEigensolver->Reconstruct()};
+
+      printfQuda("QudaInvertParam has different precisions than loadGaugeQuda, so recomputing sloppy fields\n");
       freeSloppyGaugeQuda();
       loadSloppyGaugeQuda(precision, recon);
+      copyGaugeQuda();
     }
 
     if (gaugeSloppy == nullptr) errorQuda("Sloppy gauge field doesn't exist");
@@ -2120,8 +2179,10 @@ quda::cudaGaugeField *checkGauge(QudaInvertParam *param)
       // recon is always no for fat links, so just use long reconstructs here
       QudaReconstructType recon[4] = {gaugeLongSloppy->Reconstruct(), gaugeLongPrecondition->Reconstruct(),
                                       gaugeLongRefinement->Reconstruct(), gaugeLongEigensolver->Reconstruct()};
+      printfQuda("QudaInvertParam has different precisions than loadGaugeQuda, so recomputing sloppy fields\n");
       freeSloppyGaugeQuda();
       loadSloppyGaugeQuda(precision, recon);
+      copyGaugeQuda();
     }
 
     if (gaugeFatSloppy == nullptr) errorQuda("Sloppy gauge fat field doesn't exist");
@@ -4304,6 +4365,262 @@ void momResidentQuda(void *mom, QudaGaugeParam *param)
     delete momResident;
     momResident = nullptr;
     profileGaugeForce.TPSTOP(QUDA_PROFILE_FREE);
+
+    // if we used FGI, free memory for momResidentCopy
+    if (momResidentCopy) {
+      delete momResidentCopy;
+      momResidentCopy = nullptr;
+    }
+    profileGaugeForce.TPSTOP(QUDA_PROFILE_FREE);
+  }
+
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void copyGaugeQuda()
+{ // FGI make a copy of the precise gauge field on device
+  profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
+
+  // Wilson Links
+  //----------------------------------------------------------
+  if(gaugePrecise) {
+    if(!gaugeCopyPrecise) {
+      GaugeFieldParam gauge_param(*gaugePrecise);
+      gaugeCopyPrecise = new cudaGaugeField(gauge_param);
+    }
+    gaugeCopyPrecise->copy(*gaugePrecise);
+  }
+
+  if(gaugeSloppy) {
+    if(!gaugeCopySloppy) {
+      GaugeFieldParam gauge_param(*gaugeSloppy);
+      gaugeCopySloppy = new cudaGaugeField(gauge_param);
+    }
+    gaugeCopySloppy->copy(*gaugeSloppy);
+  }
+
+  if(gaugePrecondition) {
+    if(!gaugeCopyPrecondition) {
+      GaugeFieldParam gauge_param(*gaugePrecondition);
+      gaugeCopyPrecondition = new cudaGaugeField(gauge_param);
+    }
+    gaugeCopyPrecondition->copy(*gaugePrecondition);
+  }
+
+  if(gaugeRefinement) {
+    if(!gaugeCopyRefinement) {
+      GaugeFieldParam gauge_param(*gaugeRefinement);
+      gaugeCopyRefinement = new cudaGaugeField(gauge_param);
+    }
+    gaugeCopyRefinement->copy(*gaugeRefinement);
+  }
+  
+  if(gaugeExtended) {
+    if(!gaugeCopyExtended) {
+      GaugeFieldParam gauge_param(*gaugeExtended);
+      gaugeCopyExtended = new cudaGaugeField(gauge_param);
+    }
+    copyExtendedGauge(*gaugeCopyExtended, *gaugeExtended, QUDA_CUDA_FIELD_LOCATION);
+  }
+  //----------------------------------------------------------
+
+  // Fat Links
+  //----------------------------------------------------------
+  if(gaugeFatPrecise) {
+    if(!gaugeFatCopyPrecise) {
+      GaugeFieldParam gauge_param(*gaugeFatPrecise);
+      gaugeFatCopyPrecise = new cudaGaugeField(gauge_param);
+    }
+    gaugeFatCopyPrecise->copy(*gaugeFatPrecise);
+    gaugeFatCopyPrecise->exchangeGhost();
+  }
+
+  if(gaugeFatSloppy) {
+    if(!gaugeFatCopySloppy) {
+      GaugeFieldParam gauge_param(*gaugeFatSloppy);
+      gaugeFatCopySloppy = new cudaGaugeField(gauge_param);
+    }
+    gaugeFatCopySloppy->copy(*gaugeFatSloppy);
+    gaugeFatCopySloppy->exchangeGhost();
+  }
+
+  if(gaugeFatPrecondition) {
+    if(!gaugeFatCopyPrecondition) {
+      GaugeFieldParam gauge_param(*gaugeFatPrecondition);
+      gaugeFatCopyPrecondition = new cudaGaugeField(gauge_param);
+    }
+    gaugeFatCopyPrecondition->copy(*gaugeFatPrecondition);
+    gaugeFatCopyPrecondition->exchangeGhost();
+  }
+
+  if(gaugeFatRefinement) {
+    if(!gaugeFatCopyRefinement) {
+      GaugeFieldParam gauge_param(*gaugeFatRefinement);
+      gaugeFatCopyRefinement = new cudaGaugeField(gauge_param);
+    }
+    gaugeFatCopyRefinement->copy(*gaugeFatRefinement);
+    gaugeFatCopyRefinement->exchangeGhost();
+  }
+  
+  if(gaugeFatExtended) {
+    if(!gaugeFatCopyExtended) {
+      GaugeFieldParam gauge_param(*gaugeFatExtended);
+      gaugeFatCopyExtended = new cudaGaugeField(gauge_param);
+    }
+    copyExtendedGauge(*gaugeFatCopyExtended, *gaugeFatExtended, QUDA_CUDA_FIELD_LOCATION);
+  }
+  //----------------------------------------------------------
+  
+  // Long Links
+  //----------------------------------------------------------
+  if(gaugeLongPrecise) {
+    if(!gaugeLongCopyPrecise) {
+      GaugeFieldParam gauge_param(*gaugeLongPrecise);
+      gaugeLongCopyPrecise = new cudaGaugeField(gauge_param);
+    }
+    gaugeLongCopyPrecise->copy(*gaugeLongPrecise);
+    gaugeLongCopyPrecise->exchangeGhost();
+  }
+
+  if(gaugeLongSloppy) {
+    if(!gaugeLongCopySloppy) {
+      GaugeFieldParam gauge_param(*gaugeLongSloppy);
+      gaugeLongCopySloppy = new cudaGaugeField(gauge_param);
+    }
+    gaugeLongCopySloppy->copy(*gaugeLongSloppy);
+    gaugeLongCopySloppy->exchangeGhost();
+  }
+
+  if(gaugeLongPrecondition) {
+    if(!gaugeLongCopyPrecondition) {
+      GaugeFieldParam gauge_param(*gaugeLongPrecondition);
+      gaugeLongCopyPrecondition = new cudaGaugeField(gauge_param);
+    }
+    gaugeLongCopyPrecondition->copy(*gaugeLongPrecondition);
+    gaugeLongCopyPrecondition->exchangeGhost();
+  }
+
+  if(gaugeLongRefinement) {
+    if(!gaugeLongCopyRefinement) {
+      GaugeFieldParam gauge_param(*gaugeLongRefinement);
+      gaugeLongCopyRefinement = new cudaGaugeField(gauge_param);
+    }
+    gaugeLongCopyRefinement->copy(*gaugeLongRefinement);
+    gaugeLongCopyRefinement->exchangeGhost();
+  }
+
+  if(gaugeLongExtended) {
+    if(!gaugeLongCopyExtended) {
+      GaugeFieldParam gauge_param(*gaugeLongExtended);
+      gaugeLongCopyExtended = new cudaGaugeField(gauge_param);
+    }
+    copyExtendedGauge(*gaugeLongCopyExtended, *gaugeLongExtended, QUDA_CUDA_FIELD_LOCATION);
+  }  
+  //----------------------------------------------------------
+
+  if(extendedGaugeResident) {
+    if(!extendedGaugeCopyResident) {
+      GaugeFieldParam gauge_param(*extendedGaugeResident);
+      extendedGaugeCopyResident = new cudaGaugeField(gauge_param);
+    }
+    copyExtendedGauge(*extendedGaugeCopyResident, *extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
+  }
+  
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void restoreGaugeQuda()
+{ // FGI restore Gauge field
+  profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
+
+  // Wilson Links
+  //----------------------------------------------------------
+  if(gaugePrecise) gaugePrecise->copy(*gaugeCopyPrecise);
+  if(gaugeSloppy) gaugeSloppy->copy(*gaugeCopySloppy);
+  if(gaugePrecondition) gaugePrecondition->copy(*gaugeCopyPrecondition);
+  if(gaugeRefinement) gaugeRefinement->copy(*gaugeCopyRefinement);
+  if(gaugeExtended) copyExtendedGauge(*gaugeCopyExtended, *gaugeExtended, QUDA_CUDA_FIELD_LOCATION);
+  //----------------------------------------------------------
+
+  // Fat Links
+  //----------------------------------------------------------
+  if(gaugeFatPrecise) {
+    gaugeFatPrecise->copy(*gaugeFatCopyPrecise);
+    gaugeFatPrecise->exchangeGhost();
+  }
+  if(gaugeFatSloppy) {
+    gaugeFatSloppy->copy(*gaugeFatCopySloppy);
+    gaugeFatSloppy->exchangeGhost();
+  }
+  if(gaugeFatPrecondition) {
+    gaugeFatPrecondition->copy(*gaugeFatCopyPrecondition);
+    gaugeFatPrecondition->exchangeGhost();
+  }
+  if(gaugeFatRefinement) {
+    gaugeFatRefinement->copy(*gaugeFatCopyRefinement);
+    gaugeFatRefinement->exchangeGhost();
+  }
+  if(gaugeFatExtended) copyExtendedGauge(*gaugeFatCopyExtended, *gaugeFatExtended, QUDA_CUDA_FIELD_LOCATION);
+  //----------------------------------------------------------
+
+  // Long Links
+  //----------------------------------------------------------
+  if(gaugeLongPrecise) {
+    gaugeLongPrecise->copy(*gaugeLongCopyPrecise);
+    gaugeLongPrecise->exchangeGhost();
+  }
+  if(gaugeLongSloppy) {
+    gaugeLongSloppy->copy(*gaugeLongCopySloppy);
+    gaugeLongSloppy->exchangeGhost();
+  }
+  if(gaugeLongPrecondition) {
+    gaugeLongPrecondition->copy(*gaugeLongCopyPrecondition);
+    gaugeLongPrecondition->exchangeGhost();
+  }
+  if(gaugeLongRefinement) {
+    gaugeLongRefinement->copy(*gaugeLongCopyRefinement);
+    gaugeLongRefinement->exchangeGhost();
+  }
+  if(gaugeLongExtended) copyExtendedGauge(*gaugeFatCopyExtended, *gaugeLongExtended, QUDA_CUDA_FIELD_LOCATION);
+  //----------------------------------------------------------
+
+  if(extendedGaugeResident) copyExtendedGauge(*extendedGaugeCopyResident, *extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
+  
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void momResidentZeroQuda()
+{ // FGI This function copies the existing momResident field into momResidentCopy on device
+  // it then sets the momResident field to 0 to be used for the FGI "kick"
+  profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (momResident) {
+    if (!momResidentCopy) {
+      GaugeFieldParam gauge_param(*momResident);
+      momResidentCopy = new cudaGaugeField(gauge_param);
+    }
+    
+    // make a copy
+    momResidentCopy->copy(*momResident);
+    // zero out original momResident
+    momResident->zero();
+  } else {
+    errorQuda("No momResident to copy to momResidentCopy");
+  }
+
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void momResidentRestoreQuda()
+{ // FGI This function restores momResident from momResidentCopy
+  // It is used after the FGI step
+  profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (momResidentCopy) {
+    // restore momentum
+    momResident->copy(*momResidentCopy);
+  } else {
+    errorQuda("No momResidentCopy to push to momResident");
   }
 
   profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);

@@ -278,7 +278,7 @@ void qudaLoadKSLink(int prec, QudaFatLinkArgs_t, const double act_path_coeff[6],
 
   computeKSLinkQuda(fatlink, longlink, nullptr, inlink, const_cast<double*>(act_path_coeff), &param);
 
-  // requires loadGaugeQuda to be called in subequent solver
+  // requires loadGaugeQuda to be called in subsequent solver
   invalidateGaugeQuda();
 
   // this flags that we are using QUDA to create the HISQ links
@@ -297,7 +297,7 @@ void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t, const double act_path_c
 
   computeKSLinkQuda(fatlink, nullptr, ulink, inlink, const_cast<double*>(act_path_coeff), &param);
 
-  // requires loadGaugeQuda to be called in subequent solver
+  // requires loadGaugeQuda to be called in subsequent solver
   invalidateGaugeQuda();
 
   // this flags that we are using QUDA to create the HISQ links
@@ -483,6 +483,46 @@ void qudaMomSave(int prec, QudaMILCSiteArg_t *arg)
 
   momResidentQuda(mom, &param);
   invalidate_quda_mom = true;
+
+  qudamilc_called<false>(__func__);
+}
+
+// make a copy of the gauge field on GPU
+void qudaGaugeCopy()
+{
+  qudamilc_called<true>(__func__);
+
+  copyGaugeQuda();
+
+  qudamilc_called<false>(__func__);
+}
+
+// restore the gauge field on GPU
+void qudaGaugeRestore()
+{
+  qudamilc_called<true>(__func__);
+
+  restoreGaugeQuda();
+
+  qudamilc_called<false>(__func__);
+}
+
+// Zero out the device momentum after making a copy
+void qudaMomZero()
+{
+  qudamilc_called<true>(__func__);
+
+  momResidentZeroQuda();
+
+  qudamilc_called<false>(__func__);
+}
+
+// Restore the device momentum from its copy
+void qudaMomRestore()
+{
+  qudamilc_called<true>(__func__);
+
+  momResidentRestoreQuda();
 
   qudamilc_called<false>(__func__);
 }
@@ -1105,8 +1145,8 @@ void qudaMultishiftInvert(int external_precision, int quda_precision, int num_of
   setColorSpinorParams(localDim, host_precision, &csParam);
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
-  if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
-
+  if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();  
+  
   // set the solver
   if (invalidate_quda_gauge || !create_quda_gauge) {
     loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
@@ -2535,7 +2575,7 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
     loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
     if (longlink != nullptr) loadGaugeQuda(const_cast<void *>(longlink), &long_param);
     invalidate_quda_gauge = false;
-
+    
     // FIXME: hack to reset gaugeFatPrecise (see interface_quda.cpp), etc.
     // Solution is to have a version of this that _only_
     // rebuilds the Dirac matrices, I believe.
@@ -2759,7 +2799,7 @@ void qudaLoadGaugeField(int external_precision,
 
 void qudaFreeGaugeField() {
     qudamilc_called<true>(__func__);
-  freeGaugeQuda();
+    freeGaugeQuda();
     qudamilc_called<false>(__func__);
 } // qudaFreeGaugeField
 
