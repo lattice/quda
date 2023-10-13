@@ -386,6 +386,13 @@ namespace quda {
     virtual void copy(const GaugeField &src) = 0;
 
     /**
+     * @brief Generic gauge field shift
+     * @param[in] src Source from which we are shifting (extended field in case of MPI)
+     * @param[in] dx Host array of shifts to apply to the field
+     */
+    virtual void shift(const GaugeField &src, const array<int, 4> &dx) = 0;
+
+    /**
        @brief Compute the L1 norm of the field
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return L1 norm
@@ -536,6 +543,13 @@ namespace quda {
     void copy(const GaugeField &src);
 
     /**
+     * @brief Generic gauge field shift
+     * @param[in] src Source from which we are shifting (extended field in case of MPI)
+     * @param[in] dx Host array of shifts to apply to the field
+     */
+    void shift(const GaugeField &src, const array<int, 4> &dx);
+
+    /**
        @brief Download into this field from a CPU field
        @param[in] cpu The CPU field source
     */
@@ -671,6 +685,13 @@ namespace quda {
      * @param[in] src Source from which we are copying
      */
     void copy(const GaugeField &src);
+
+    /**
+     * @brief Generic gauge field shift
+     * @param[in] src Source from which we are shifting (extended field in case of MPI)
+     * @param[in] dx Host array of shifts to apply to the field
+     */
+    void shift(const GaugeField &src, const array<int, 4> &dx);
 
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
@@ -863,5 +884,13 @@ namespace quda {
   }
 
 #define checkReconstruct(...) Reconstruct_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
+  /**
+   * @brief Generic gauge field shift
+   * @param[out] dst Gauge field to store output
+   * @param[in] srd Source from which we are shifting (extended field in case of MPI)
+   * @param[in] dx Host array of shifts to apply to the field
+   */
+  void gaugeShift(GaugeField &dst, const GaugeField &src, const array<int, 4> &dx);
 
 } // namespace quda
