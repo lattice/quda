@@ -890,6 +890,8 @@ namespace quda
         trace_list.push_back(trace_entry);
       }
 
+      Tunable::flops_global(Tunable::flops_global() + tunable.flops()); // increment flops counter
+      Tunable::bytes_global(Tunable::bytes_global() + tunable.bytes()); // increment bytes counter
       return param_tuned;
     }
 
@@ -908,6 +910,8 @@ namespace quda
       logQuda(QUDA_DEBUG_VERBOSE, "Launching %s with %s at vol=%s with %s (untuned)\n", key.name, key.aux, key.volume,
               tunable.paramString(param_default).c_str());
 
+      Tunable::flops_global(Tunable::flops_global() + tunable.flops()); // increment flops counter
+      Tunable::bytes_global(Tunable::bytes_global() + tunable.bytes()); // increment bytes counter
       return param_default;
     } else if (!tuning) {
 
@@ -1121,6 +1125,8 @@ namespace quda
 
     param.n_calls = profile_count ? 1 : 0;
 
+    Tunable::flops_global(Tunable::flops_global() + tunable.flops()); // increment flops counter
+    Tunable::bytes_global(Tunable::bytes_global() + tunable.bytes()); // increment bytes counter
     return param;
   }
 

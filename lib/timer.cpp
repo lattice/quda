@@ -1,6 +1,7 @@
 #include <stack>
 #include <quda_internal.h>
 #include <timer.h>
+#include <tune_quda.h>
 
 #ifdef INTERFACE_NVTX
 #include "nvtx3/nvToolsExt.h"
@@ -225,7 +226,12 @@ namespace quda {
 
   static std::stack<TimeProfile*> tp_stack;
 
-  pushProfile::pushProfile(TimeProfile &profile) : profile(profile)
+  pushProfile::pushProfile(TimeProfile &profile, double &secs, double &gflops) :
+    profile(profile),
+    secs(secs),
+    gflops(gflops),
+    flops(Tunable::flops_global())
+
   {
     profile.TPSTART(QUDA_PROFILE_TOTAL);
     tp_stack.push(&profile);
@@ -238,6 +244,9 @@ namespace quda {
     if (&(this->profile) != &profile) errorQuda("Popped profile is not the expected one");
     tp_stack.pop();
     profile.TPSTOP(QUDA_PROFILE_TOTAL);
+    secs = profile.Last(QUDA_PROFILE_TOTAL);
+    gflops = (Tunable::flops_global() - flops) * 1e-9;
+    if (&gflops != &gflops_dummy) comm_allreduce_sum(gflops);
   }
 
   TimeProfile& getProfile()

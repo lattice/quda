@@ -45,6 +45,10 @@ namespace quda {
 
   class Tunable {
 
+    friend TuneParam tuneLaunch(Tunable &, QudaTune, QudaVerbosity);
+    static inline uint64_t _flops_global = 0;
+    static inline uint64_t _bytes_global = 0;
+
   protected:
     virtual long long flops() const { return 0; }
     virtual long long bytes() const { return 0; }
@@ -340,6 +344,12 @@ namespace quda {
 
     qudaError_t launchError() const { return launch_error; }
     qudaError_t &launchError() { return launch_error; }
+
+    static void flops_global(uint64_t value) { _flops_global = value; }
+    static uint64_t flops_global() { return _flops_global; }
+
+    static void bytes_global(uint64_t value) { _bytes_global = value; }
+    static uint64_t bytes_global() { return _bytes_global; }
   };
 
   /**

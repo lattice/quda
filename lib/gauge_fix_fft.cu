@@ -217,7 +217,7 @@ namespace quda {
     GaugeFixQuality<decltype(argQ)> gfixquality(argQ, data);
     gfixquality.apply(device::get_default_stream());
     double action0 = argQ.getAction();
-    if(getVerbosity() >= QUDA_SUMMARIZE) printf("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
+    logQuda(QUDA_SUMMARIZE, "Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
 
     double diff = 0.0;
     int iter = 0;
@@ -289,7 +289,7 @@ namespace quda {
       if ( autotune && ((action - action0) < -1e-14) ) {
         if ( arg.alpha > 0.01 ) {
           arg.alpha = 0.95 * arg.alpha;
-          if(getVerbosity() >= QUDA_SUMMARIZE) printf(">>>>>>>>>>>>>> Warning: changing alpha down -> %.4e\n", arg.alpha);
+          logQuda(QUDA_SUMMARIZE, ">>>>>>>>>>>>>> Warning: changing alpha down -> %.4e\n", arg.alpha);
         }
       }
       //------------------------------------------------------------------------
@@ -356,7 +356,7 @@ namespace quda {
     
     gflops = (gflops * 1e-9) / (secs);
     gbytes = gbytes / (secs * 1e9);
-    if (getVerbosity() > QUDA_SUMMARIZE) printfQuda("Time: %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops, gbytes);
+    logQuda(QUDA_SUMMARIZE, "Time: %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops, gbytes);
 
     host_free(num_failures_h);
   }
@@ -366,10 +366,10 @@ namespace quda {
                    double alpha, int autotune, double tolerance, int stopWtheta)
     {
       if (gauge_dir != 3) {
-	if (getVerbosity() > QUDA_SUMMARIZE) printfQuda("Starting Landau gauge fixing with FFTs...\n");
+	logQuda(QUDA_SUMMARIZE, "Starting Landau gauge fixing with FFTs...\n");
         gaugeFixingFFT<Float, recon, 4>(data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
       } else {
-	if (getVerbosity() > QUDA_SUMMARIZE) printfQuda("Starting Coulomb gauge fixing with FFTs...\n");
+	logQuda(QUDA_SUMMARIZE, "Starting Coulomb gauge fixing with FFTs...\n");
         gaugeFixingFFT<Float, recon, 3>(data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
       }
     }

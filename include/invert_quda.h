@@ -225,12 +225,6 @@ namespace quda {
     /** The type of accelerator type to use for preconditioner */
     QudaAcceleratorType accelerator_type_precondition;
 
-    /**< The time taken by the solver */
-    double secs;
-
-    /**< The Gflops rate of the solver */
-    double gflops;
-
     // Incremental EigCG solver parameters
     /**< The precision of the Ritz vectors */
     QudaPrecision precision_ritz;//also search space precision
@@ -333,8 +327,6 @@ namespace quda {
       ca_lambda_max_precondition(param.ca_lambda_max_precondition),
       schwarz_type(param.schwarz_type),
       accelerator_type_precondition(param.accelerator_type_precondition),
-      secs(param.secs),
-      gflops(param.gflops),
       precision_ritz(param.cuda_prec_ritz),
       n_ev(param.n_ev),
       m(param.max_search_dim),
@@ -422,8 +414,6 @@ namespace quda {
       ca_lambda_max_precondition(param.ca_lambda_max_precondition),
       schwarz_type(param.schwarz_type),
       accelerator_type_precondition(param.accelerator_type_precondition),
-      secs(param.secs),
-      gflops(param.gflops),
       precision_ritz(param.precision_ritz),
       n_ev(param.n_ev),
       m(param.m),
@@ -466,9 +456,6 @@ namespace quda {
       param.true_res = true_res;
       param.true_res_hq = true_res_hq;
       param.iter += iter;
-      comm_allreduce_sum(gflops);
-      param.gflops += gflops;
-      param.secs += secs;
       if (offset >= 0) {
 	param.true_res_offset[offset] = true_res_offset[offset];
         param.iter_res_offset[offset] = iter_res_offset[offset];
@@ -786,12 +773,6 @@ namespace quda {
     static void computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<ColorSpinorField> &Ap,
                                      std::vector<ColorSpinorField> &p, int n_krylov, QudaCABasis basis, double m_map,
                                      double b_map, Args &&...args);
-
-    /**
-     * @brief Return flops
-     * @return flops expended by this operator
-     */
-    virtual double flops() const { return 0; }
   };
 
   /**
