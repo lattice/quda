@@ -549,7 +549,8 @@ namespace quda {
     for (int d = 1; d < nDim; d++) vol_ss << "x" << x[d];
     vol_string = vol_ss.str();
     if (vol_string.size() >= TuneKey::volume_n)
-      errorQuda("Vol string %s (size = %lu) larger than maximum %d", vol_string.c_str(), vol_string.size(), TuneKey::volume_n);
+      errorQuda("Vol string %s (size = %lu) larger than maximum %d", vol_string.c_str(), vol_string.size(),
+                TuneKey::volume_n);
   }
 
   void LatticeField::checkField(const LatticeField &a) const {
@@ -623,7 +624,7 @@ namespace quda {
     return output;  // for multiple << operators.
   }
 
-  std::ostream& operator<<(std::ostream& output, const LatticeField &field)
+  std::ostream &operator<<(std::ostream &output, const LatticeField &field)
   {
     output << "volume = " << field.volume << std::endl;
     output << "volumeCB = " << field.volumeCB << std::endl;
@@ -645,7 +646,7 @@ namespace quda {
     output << "ghost_precision = " << field.ghost_precision_reset << std::endl;
     output << "scale = " << field.scale << std::endl;
     output << "siteSubset = " << field.siteSubset << std::endl;
-    output << "ghostExchange = " << field.ghostExchange<< std::endl;
+    output << "ghostExchange = " << field.ghostExchange << std::endl;
     output << "nDimComms = " << field.nDimComms << std::endl;
     output << "ghost_bytes = " << field.ghost_bytes_old << std::endl;
     output << "ghost_bytes_old = " << field.ghost_bytes_old << std::endl;
@@ -672,7 +673,8 @@ namespace quda {
     output << "vol_string = " << field.vol_string << std::endl;
     output << "aux_string = " << field.aux_string << std::endl;
     output << "mem_type = " << field.mem_type << std::endl;
-    for (auto i = 0u; i < field.backup_h.size(); i++) output << "backup_h[" << i << "] = " << field.backup_h[i] << std::endl;
+    for (auto i = 0u; i < field.backup_h.size(); i++)
+      output << "backup_h[" << i << "] = " << field.backup_h[i] << std::endl;
     return output;
   }
 

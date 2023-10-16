@@ -29,8 +29,8 @@ namespace quda {
     initializeCoarse();
   }
 
-  DiracCoarse::DiracCoarse(const DiracParam &param, std::shared_ptr<GaugeField> Y_h,
-                           std::shared_ptr<GaugeField> X_h, std::shared_ptr<GaugeField> Xinv_h,
+  DiracCoarse::DiracCoarse(const DiracParam &param, std::shared_ptr<GaugeField> Y_h, std::shared_ptr<GaugeField> X_h,
+                           std::shared_ptr<GaugeField> Xinv_h,
                            std::shared_ptr<GaugeField> Yhat_h, // cpu link fields
                            std::shared_ptr<GaugeField> Y_d, std::shared_ptr<GaugeField> X_d,
                            std::shared_ptr<GaugeField> Xinv_d,
@@ -495,11 +495,10 @@ namespace quda {
     /* do nothing */
   }
 
-  DiracCoarsePC::DiracCoarsePC(const DiracParam &param, std::shared_ptr<GaugeField> Y_h,
-                               std::shared_ptr<GaugeField> X_h, std::shared_ptr<GaugeField> Xinv_h,
-                               std::shared_ptr<GaugeField> Yhat_h, std::shared_ptr<GaugeField> Y_d,
-                               std::shared_ptr<GaugeField> X_d, std::shared_ptr<GaugeField> Xinv_d,
-                               std::shared_ptr<GaugeField> Yhat_d) :
+  DiracCoarsePC::DiracCoarsePC(const DiracParam &param, std::shared_ptr<GaugeField> Y_h, std::shared_ptr<GaugeField> X_h,
+                               std::shared_ptr<GaugeField> Xinv_h, std::shared_ptr<GaugeField> Yhat_h,
+                               std::shared_ptr<GaugeField> Y_d, std::shared_ptr<GaugeField> X_d,
+                               std::shared_ptr<GaugeField> Xinv_d, std::shared_ptr<GaugeField> Yhat_d) :
     DiracCoarse(param, Y_h, X_h, Xinv_h, Yhat_h, Y_d, X_d, Xinv_d, Yhat_d)
   {
   }

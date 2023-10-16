@@ -22,7 +22,7 @@ namespace quda {
     dim3 grid;
     unsigned int shared_bytes = 0;
     bool set_max_shared_bytes = false; // whether to opt in to max shared bytes per thread block
-    int4 aux = {1, 1, 1, 1}; // free parameter that can be used as an arbitrary autotuning dimension outside of launch parameters
+    int4 aux = {1, 1, 1, 1}; // free parameter used as an arbitrary autotuning dimension
 
     std::string comment;
     float time = FLT_MAX;

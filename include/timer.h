@@ -205,7 +205,7 @@ namespace quda {
   public:
     TimeProfile() = default;
     TimeProfile(const TimeProfile &) = default;
-    TimeProfile& operator=(const TimeProfile &) = default;
+    TimeProfile &operator=(const TimeProfile &) = default;
 
     TimeProfile(std::string fname) : fname(fname), switchOff(false), use_global(true) { ; }
 
@@ -249,7 +249,7 @@ namespace quda {
      @brief Return a reference to the present profile at the top of
      the stack
    */
-  TimeProfile& getProfile();
+  TimeProfile &getProfile();
 
 } // namespace quda
 

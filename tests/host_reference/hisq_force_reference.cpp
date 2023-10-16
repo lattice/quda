@@ -86,7 +86,7 @@ typedef struct {
 
 template <typename su3_matrix> su3_matrix *get_su3_matrix(quda::GaugeField &p, int idx, int dir)
 {
-  auto data = static_cast<su3_matrix*>(p.data(dir));
+  auto data = static_cast<su3_matrix *>(p.data(dir));
   return data + idx;
 }
 
@@ -1226,11 +1226,13 @@ void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda
   void *link_array[] = {link.data(0), link.data(1), link.data(2), link.data(3)};
   void *noprod_array[] = {newOprod->data(0), newOprod->data(1), newOprod->data(2), newOprod->data(3)};
   if (precision == QUDA_DOUBLE_PRECISION) {
-    doHisqStaplesForceCPU<double>(X_, act_path_coeff, reinterpret_cast<double*>(oprod_array), reinterpret_cast<double*>(link_array),
-                                  (double **)tempmat, reinterpret_cast<double*>(noprod_array));
+    doHisqStaplesForceCPU<double>(X_, act_path_coeff, reinterpret_cast<double *>(oprod_array),
+                                  reinterpret_cast<double *>(link_array), (double **)tempmat,
+                                  reinterpret_cast<double *>(noprod_array));
   } else if (precision == QUDA_SINGLE_PRECISION) {
-    doHisqStaplesForceCPU<float>(X_, act_path_coeff, reinterpret_cast<float*>(oprod_array), reinterpret_cast<float*>(link_array),
-                                 (float **)tempmat, reinterpret_cast<float*>(noprod_array));
+    doHisqStaplesForceCPU<float>(X_, act_path_coeff, reinterpret_cast<float *>(oprod_array),
+                                 reinterpret_cast<float *>(link_array), (float **)tempmat,
+                                 reinterpret_cast<float *>(noprod_array));
   } else {
     errorQuda("Unsupported precision");
   }
@@ -1304,8 +1306,7 @@ void computeLongLinkField(const int dim[4], const Real *const oprod, const Real 
   }
 }
 
-void hisqLongLinkForceCPU(double coeff, quda::GaugeField &oprod, quda::GaugeField &link,
-                          quda::GaugeField *newOprod)
+void hisqLongLinkForceCPU(double coeff, quda::GaugeField &oprod, quda::GaugeField &link, quda::GaugeField *newOprod)
 {
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
@@ -1316,11 +1317,11 @@ void hisqLongLinkForceCPU(double coeff, quda::GaugeField &oprod, quda::GaugeFiel
   void *noprod_array[] = {newOprod->data(0), newOprod->data(1), newOprod->data(2), newOprod->data(3)};
   for (int sig = 0; sig < 4; ++sig) {
     if (precision == QUDA_SINGLE_PRECISION) {
-      computeLongLinkField<float>(X_, reinterpret_cast<float*>(oprod_array), reinterpret_cast<float*>(link_array),
-                                  sig, coeff, reinterpret_cast<float*>(noprod_array));
+      computeLongLinkField<float>(X_, reinterpret_cast<float *>(oprod_array), reinterpret_cast<float *>(link_array),
+                                  sig, coeff, reinterpret_cast<float *>(noprod_array));
     } else if (precision == QUDA_DOUBLE_PRECISION) {
-      computeLongLinkField<double>(X_, reinterpret_cast<double*>(oprod_array), reinterpret_cast<double*>(link_array),
-                                   sig, coeff, reinterpret_cast<double*>(noprod_array));
+      computeLongLinkField<double>(X_, reinterpret_cast<double *>(oprod_array), reinterpret_cast<double *>(link_array),
+                                   sig, coeff, reinterpret_cast<double *>(noprod_array));
     } else {
       errorQuda("Unrecognised precision");
     }
@@ -1376,11 +1377,11 @@ void hisqCompleteForceCPU(quda::GaugeField &oprod, quda::GaugeField &link, quda:
   void *link_array[] = {link.data(0), link.data(1), link.data(2), link.data(3)};
   for (int sig = 0; sig < 4; ++sig) {
     if (precision == QUDA_SINGLE_PRECISION) {
-      completeForceField<float>(X_, reinterpret_cast<float*>(oprod_array), reinterpret_cast<float*>(link_array),
-                                sig, mom->data<float*>());
+      completeForceField<float>(X_, reinterpret_cast<float *>(oprod_array), reinterpret_cast<float *>(link_array), sig,
+                                mom->data<float *>());
     } else if (precision == QUDA_DOUBLE_PRECISION) {
-      completeForceField<double>(X_, reinterpret_cast<double*>(oprod_array), reinterpret_cast<double*>(link_array),
-                                 sig, mom->data<double*>());
+      completeForceField<double>(X_, reinterpret_cast<double *>(oprod_array), reinterpret_cast<double *>(link_array),
+                                 sig, mom->data<double *>());
     } else {
       errorQuda("Unrecognised precision");
     }

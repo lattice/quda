@@ -465,10 +465,7 @@ namespace quda {
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(GaugeField *gauge_in, GaugeField *, GaugeField *, CloverField *)
-    {
-      gauge = gauge_in;
-    }
+    virtual void updateFields(GaugeField *gauge_in, GaugeField *, GaugeField *, CloverField *) { gauge = gauge_in; }
 
     /**
      * @brief Create the coarse operator (virtual parent)

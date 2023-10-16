@@ -484,8 +484,8 @@ namespace quda {
                                              unextended_tmp2, mass, m5, b_5, c_5, dagger, parity[0], shift1.data,
                                              shift2.data, MdwfFusedDslashType::D4_D5INV_D5PRE);
 
-      mobius_tensor_core::apply_fused_dslash(extended_tmp1, extended_tmp2, *extended_gauge, unextended_tmp1, in,
-                                             mass, m5, b_5, c_5, dagger, parity[1], shift0.data, shift1.data,
+      mobius_tensor_core::apply_fused_dslash(extended_tmp1, extended_tmp2, *extended_gauge, unextended_tmp1, in, mass,
+                                             m5, b_5, c_5, dagger, parity[1], shift0.data, shift1.data,
                                              MdwfFusedDslashType::D4_D5INV_D5INVDAG);
 
       mobius_tensor_core::apply_fused_dslash(extended_tmp2, extended_tmp1, *extended_gauge, extended_tmp2,

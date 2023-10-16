@@ -62,7 +62,7 @@ extern "C" {
 
     QudaGaugeFixed gauge_fix; /**< Whether the input gauge field is in the axial gauge or not */
 
-    int ga_pad;       /**< The pad size that native GaugeFields will use (default=0) */
+    int ga_pad; /**< The pad size that native GaugeFields will use (default=0) */
 
     int site_ga_pad;  /**< Used by link fattening and the gauge and fermion forces */
 
@@ -1685,8 +1685,7 @@ extern "C" {
    */
   int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                                 const unsigned int verbose_interval, const double relax_boost, const double tolerance,
-                                const unsigned int reunit_interval, const unsigned int stopWtheta,
-                                QudaGaugeParam *param);
+                                const unsigned int reunit_interval, const unsigned int stopWtheta, QudaGaugeParam *param);
 
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
@@ -1764,7 +1763,7 @@ extern "C" {
     double secs;
     /** Flops count for the smearing operations **/
     double gflops;
-    
+
   } QudaQuarkSmearParam;
 
   /**

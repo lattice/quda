@@ -3,7 +3,8 @@
 #include <ostream>
 #include "malloc_quda.h"
 
-namespace quda {
+namespace quda
+{
 
   /**
      Object that stores a memory allocation with different views for
@@ -18,8 +19,9 @@ namespace quda {
      QUDA_MEMORY_MAPPED         both (pinned to host)
      QUDA_MEMORY_MANAGED        both
    */
-  class quda_ptr {
-    friend std::ostream& operator<<(std::ostream& output, const quda_ptr& ptr);
+  class quda_ptr
+  {
+    friend std::ostream &operator<<(std::ostream &output, const quda_ptr &ptr);
     QudaMemoryType type = QUDA_MEMORY_INVALID; /** Memory type of the allocation */
     size_t size = 0;                           /** Size of the allocation */
     bool pool = false;                         /** Is the allocation is pooled */
@@ -99,6 +101,6 @@ namespace quda {
     bool is_reference() const;
   };
 
-  std::ostream& operator<<(std::ostream& output, const quda_ptr& ptr);
+  std::ostream &operator<<(std::ostream &output, const quda_ptr &ptr);
 
-}
+} // namespace quda

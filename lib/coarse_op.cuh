@@ -887,8 +887,8 @@ namespace quda {
 	X_atomic.backup();
         break;
       case COMPUTE_CONVERT:
-	if (Y_atomic.data() == Y.data()) Y.backup();
-	if (X_atomic.data() == X.data()) X.backup();
+        if (Y_atomic.data() == Y.data()) Y.backup();
+        if (X_atomic.data() == X.data()) X.backup();
         break;
       case COMPUTE_RESCALE:
         Y.backup();
@@ -921,8 +921,8 @@ namespace quda {
 	X_atomic.restore();
         break;
       case COMPUTE_CONVERT:
-	if (Y_atomic.data() == Y.data()) Y.restore();
-	if (X_atomic.data() == X.data()) X.restore();
+        if (Y_atomic.data() == Y.data()) Y.restore();
+        if (X_atomic.data() == X.data()) X.restore();
         break;
       case COMPUTE_RESCALE:
         Y.restore();

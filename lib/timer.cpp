@@ -224,13 +224,10 @@ namespace quda {
 
   TimeProfile dummy("default", false);
 
-  static std::stack<TimeProfile*> tp_stack;
+  static std::stack<TimeProfile *> tp_stack;
 
   pushProfile::pushProfile(TimeProfile &profile, double &secs, double &gflops) :
-    profile(profile),
-    secs(secs),
-    gflops(gflops),
-    flops(Tunable::flops_global())
+    profile(profile), secs(secs), gflops(gflops), flops(Tunable::flops_global())
 
   {
     profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -249,7 +246,7 @@ namespace quda {
     if (&gflops != &gflops_dummy) comm_allreduce_sum(gflops);
   }
 
-  TimeProfile& getProfile()
+  TimeProfile &getProfile()
   {
     if (tp_stack.empty()) return dummy;
     return *(tp_stack.top());
