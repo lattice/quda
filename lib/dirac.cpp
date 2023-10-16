@@ -14,7 +14,6 @@ namespace quda {
     laplace3D(param.laplace3D),
     matpcType(param.matpcType),
     dagger(param.dagger),
-    flops(0),
     type(param.type),
     halo_precision(param.halo_precision),
     use_mobius_fused_kernel(param.use_mobius_fused_kernel),
@@ -29,7 +28,6 @@ namespace quda {
     laplace3D(dirac.laplace3D),
     matpcType(dirac.matpcType),
     dagger(dirac.dagger),
-    flops(0),
     type(dirac.type),
     halo_precision(dirac.halo_precision),
     profile("Dirac", false)
@@ -51,7 +49,6 @@ namespace quda {
       laplace3D = dirac.laplace3D;
       matpcType = dirac.matpcType;
       dagger = dirac.dagger;
-      flops = 0;
 
       for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
 

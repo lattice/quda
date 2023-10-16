@@ -25,6 +25,7 @@
 #include <gtest/gtest.h>
 
 #include <color_spinor_field.h>
+#include <tune_quda.h>
 
 using namespace quda;
 
@@ -995,22 +996,33 @@ struct DslashTestWrapper {
       printfQuda("Tuning...\n");
       dslashCUDA(1); // warm-up run
     }
+
+    auto flops0 = quda::Tunable::flops_global();
+    auto bytes0 = quda::Tunable::bytes_global();
+
     printfQuda("Executing %d kernel loops...\n", niter);
-    if (!transfer) dirac->Flops();
     DslashTime dslash_time = dslashCUDA(niter);
     printfQuda("done.\n\n");
+
+    unsigned long long flops = (quda::Tunable::flops_global() - flops0);
+    unsigned long long bytes = (quda::Tunable::bytes_global() - bytes0);
 
     if (!test_split_grid) {
       if (!transfer) spinorOut = cudaSpinorOut;
 
       // print timing information
       printfQuda("%fus per kernel call\n", 1e6 * dslash_time.event_time / niter);
-      // FIXME No flops count for twisted-clover yet
-      unsigned long long flops = 0;
-      if (!transfer) flops = dirac->Flops();
-      printfQuda("%llu flops per kernel call, %llu flops per site\n", flops / niter,
-                 (flops / niter) / cudaSpinor.Volume());
-      printfQuda("GFLOPS = %f\n", 1.0e-9 * flops / dslash_time.event_time);
+
+      printfQuda("%llu flops per kernel call, %llu flops per site %llu bytes per site\n", flops / niter,
+                 (flops / niter) / cudaSpinor.Volume(), (bytes / niter) / cudaSpinor.Volume());
+
+      double gflops = 1.0e-9 * flops / dslash_time.event_time;
+      printfQuda("GFLOPS = %f\n", gflops);
+      ::testing::Test::RecordProperty("Gflops", std::to_string(gflops));
+
+      double gbytes = 1.0e-9 * bytes / dslash_time.event_time;
+      printfQuda("GBYTES = %f\n", gbytes);
+      ::testing::Test::RecordProperty("Gbytes", std::to_string(gbytes));
 
       size_t ghost_bytes = cudaSpinor.GhostBytes();
 
