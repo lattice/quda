@@ -58,7 +58,7 @@ namespace quda {
       // reset scales as appropriate
       if constexpr (sizeof(Float) < QUDA_SINGLE_PRECISION) {
         double max_scale = g.abs_max();
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Global U_max = %e\n", max_scale);
+        logQuda(QUDA_VERBOSE, "Global U_max = %e\n", max_scale);
         X.Scale(max_scale > 2.0*mass ? max_scale : 2.0*mass);
       }
 
@@ -215,11 +215,11 @@ namespace quda {
     GaugeField& X = *tmp_X;
 
     // Step 4: Calculate X from U
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing the KD block on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
+    logQuda(QUDA_VERBOSE, "Computing the KD block on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
 
     calculateStaggeredKDBlock(X, U, mass);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X.norm2(0));
+    logQuda(QUDA_VERBOSE, "X2 = %e\n", X.norm2(0));
 
     // Step 5: Calculate Xinv
     if (dagger_approximation) {
@@ -237,14 +237,13 @@ namespace quda {
         
         X_.copy(X);
 
-        blas::flops += invert(xInvMilcOrder->data(), X_.data(), n, X_.Volume(), X_.Precision(), X.Location());
+        Tunable::flops_global(invert(xInvMilcOrder->data(), X_.data(), n, X_.Volume(), X_.Precision(), X.Location()) + Tunable::flops_global());
 
       } else if (location == QUDA_CPU_FIELD_LOCATION) {
-
-        blas::flops += invert(xInvMilcOrder->data(), X.data(), n, X.Volume(), X.Precision(), X.Location());
+        Tunable::flops_global(invert(xInvMilcOrder->data(), X.data(), n, X.Volume(), X.Precision(), X.Location()) + Tunable::flops_global());
       }
 
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("xInvMilcOrder = %e\n", xInvMilcOrder->norm2(0));
+      logQuda(QUDA_VERBOSE, "xInvMilcOrder = %e\n", xInvMilcOrder->norm2(0));
 
     }
 
@@ -252,10 +251,8 @@ namespace quda {
     // last two parameters: dagger approximation, mass (which becomes a scale in the dagger approx)
     ReorderStaggeredKahlerDiracInverse(Xinv, *xInvMilcOrder, dagger_approximation, mass);
 
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      if (dagger_approximation) printfQuda("Using the dagger approximation to Xinv\n");
-      printfQuda("xInvKdGeometry = %e\n", Xinv.norm2());
-    }
+    if (dagger_approximation) logQuda(QUDA_VERBOSE, "Using the dagger approximation to Xinv\n");
+    logQuda(QUDA_VERBOSE, "xInvKdGeometry = %e\n", Xinv.norm2());
   }
 
 

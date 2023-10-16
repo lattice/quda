@@ -175,7 +175,7 @@ namespace quda
       GaugeField *X_aos = create_gauge_copy(X, true);
       Xinv_aos = create_gauge_copy(Xinv, false);
 
-      blas::flops += invert(Xinv_aos->data(), X_aos->data(), n, X_aos->Volume(), X_aos->Precision(), X.Location());
+      Tunable::flops_global(invert(Xinv_aos->data(), X_aos->data(), n, X_aos->Volume(), X_aos->Precision(), X.Location()) + Tunable::flops_global());
 
       if (&Xinv != Xinv_aos) {
         if (Xinv.Precision() < QUDA_SINGLE_PRECISION) Xinv.Scale(Xinv_aos->abs_max());
@@ -186,7 +186,7 @@ namespace quda
       if (!use_mma) { delete Xinv_aos; }
 
     } else if (X.Location() == QUDA_CPU_FIELD_LOCATION && X.Order() == QUDA_QDP_GAUGE_ORDER) {
-      blas::flops += invert(Xinv.data<void *>(0), X.data<void *>(0), n, X.Volume(), X.Precision(), X.Location());
+      Tunable::flops_global(invert(Xinv.data<void *>(0), X.data<void *>(0), n, X.Volume(), X.Precision(), X.Location()) + Tunable::flops_global());
     } else {
       errorQuda("Unsupported location=%d and order=%d", X.Location(), X.Order());
     }

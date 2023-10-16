@@ -97,9 +97,6 @@ namespace quda {
         if (is_norm) strcat(aux, ",norm");
 
         apply(device::get_default_stream());
-
-        blas::bytes += bytes();
-        blas::flops += flops();
       }
 
       TuneKey tuneKey() const override { return TuneKey(vol, typeid(r).name(), aux); }
