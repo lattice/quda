@@ -366,10 +366,10 @@ namespace quda {
                    double alpha, int autotune, double tolerance, int stopWtheta)
     {
       if (gauge_dir != 3) {
-	logQuda(QUDA_SUMMARIZE, "Starting Landau gauge fixing with FFTs...\n");
+        logQuda(QUDA_SUMMARIZE, "Starting Landau gauge fixing with FFTs...\n");
         gaugeFixingFFT<Float, recon, 4>(data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
       } else {
-	logQuda(QUDA_SUMMARIZE, "Starting Coulomb gauge fixing with FFTs...\n");
+        logQuda(QUDA_SUMMARIZE, "Starting Coulomb gauge fixing with FFTs...\n");
         gaugeFixingFFT<Float, recon, 3>(data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
       }
     }

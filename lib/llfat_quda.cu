@@ -173,7 +173,7 @@ namespace quda {
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
-  void fatKSLink(GaugeField &fat, const GaugeField& u, const double *coeff)
+  void fatKSLink(GaugeField &fat, const GaugeField &u, const double *coeff)
   {
     getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
 
@@ -184,13 +184,12 @@ namespace quda {
     GaugeField staple(gParam);
     GaugeField staple1(gParam);
 
-    if ( ((fat.X()[0] % 2 != 0) || (fat.X()[1] % 2 != 0) || (fat.X()[2] % 2 != 0) || (fat.X()[3] % 2 != 0))
-	&& (u.Reconstruct()  != QUDA_RECONSTRUCT_NO)){
-      errorQuda("Reconstruct %d and odd dimension size is not supported by link fattening code (yet)",
-		u.Reconstruct());
+    if (((fat.X()[0] % 2 != 0) || (fat.X()[1] % 2 != 0) || (fat.X()[2] % 2 != 0) || (fat.X()[3] % 2 != 0))
+        && (u.Reconstruct() != QUDA_RECONSTRUCT_NO)) {
+      errorQuda("Reconstruct %d and odd dimension size is not supported by link fattening code (yet)", u.Reconstruct());
     }
 
-    computeOneLink(fat, u, coeff[0]-6.0*coeff[5]);
+    computeOneLink(fat, u, coeff[0] - 6.0 * coeff[5]);
 
     // Check the coefficients. If all of the following are zero, return.
     if (fabs(coeff[2]) >= MIN_COEFF || fabs(coeff[3]) >= MIN_COEFF ||
@@ -208,9 +207,7 @@ namespace quda {
 
             if (fabs(coeff[4]) > MIN_COEFF) {
               for (int sig = 0; sig < 4; sig++) {
-                if (sig != nu && sig != rho) {
-                  computeStaple(fat, staple, staple1, u, sig, nu, rho, coeff[4], 0);
-                }
+                if (sig != nu && sig != rho) { computeStaple(fat, staple, staple1, u, sig, nu, rho, coeff[4], 0); }
               } //sig
             } // MIN_COEFF
           }
@@ -221,15 +218,9 @@ namespace quda {
     getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 #else
-  void longKSLink(GaugeField &, const GaugeField&, const double *)
-  {
-    errorQuda("Long-link computation not enabled");
-  }
+  void longKSLink(GaugeField &, const GaugeField &, const double *) { errorQuda("Long-link computation not enabled"); }
 
-  void fatKSLink(GaugeField &, const GaugeField&, const double *)
-  {
-    errorQuda("Fat-link computation not enabled");
-  }
+  void fatKSLink(GaugeField &, const GaugeField &, const double *) { errorQuda("Fat-link computation not enabled"); }
 #endif
 
 #undef MIN_COEFF

@@ -883,7 +883,7 @@ namespace quda {
         __device__ __host__ inline auto VolumeCB() const { return volumeCB; }
 
         /** Returns the field geometric dimension */
-	__device__ __host__ inline int Ndim() const { return nDim; }
+        __device__ __host__ inline int Ndim() const { return nDim; }
 
 	/** Returns the field geometry */
 	__device__ __host__ inline int Geometry() const { return geometry; }
