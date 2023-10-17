@@ -16,6 +16,46 @@
 extern "C" {
 #endif
 
+
+
+/**
+ * Copied from flags.h
+ * #############################################
+ */
+#ifndef FLAGS_H
+typedef struct
+{
+   int type;
+   int cstar;
+   double phi3[2][3];
+   double phi1[2];
+} bc_parms_t;
+
+typedef struct
+{
+   int qhat;
+   double m0,su3csw,u1csw,cF[2],theta[3];
+} dirac_parms_t;
+
+typedef struct
+{
+   int gauge;
+   int nfl;
+} flds_parms_t;
+#endif
+/**
+ * #############################################
+ */
+
+
+typedef enum OpenQCDGaugeGroup_s {
+  OPENQCD_GAUGE_SU3 = 1,
+  OPENQCD_GAUGE_U1 = 2,
+  OPENQCD_GAUGE_SU3xU1 = 3,
+  OPENQCD_GAUGE_INVALID = QUDA_INVALID_ENUM
+} OpenQCDGaugeGroup;
+
+
 /**
  * Parameters related to problem size and machine topology. They should hold the
  * numbers in quda format, i.e. xyzt convention. For example L[0] = L1, L[1] =
@@ -35,6 +75,11 @@ typedef struct {
                         data[5+lex(ix,iy,iz,it)] returns rank number in
                         openQCD, where lex stands for lexicographical
                         indexing (in QUDA order (xyzt)) */
+  bc_parms_t bc_parms;
+  dirac_parms_t dirac_parms;
+  flds_parms_t flds_parms;
+  void *h_gauge;
+  void *h_sw;
 } openQCD_QudaLayout_t;
 
 
@@ -71,6 +116,8 @@ typedef struct {
   double u1csw;   /* u1csw: csw coefficient for U(1) fields, quda doesn't respect that parameter (yet) */
   int qhat;       /* qhat: quda doesn't respect that parameter (yet) */
   int dagger;     /* dagger: whether to apply D or D^dagger */
+  void *h_gauge;
+  void *h_sw;
 } openQCD_QudaDiracParam_t;
 
 
@@ -144,7 +191,6 @@ void openQCD_qudaSpinorFree(void** quda_field);
  * @param[in]  p     Dirac parameter struct
  */
 void openQCD_qudaDw(void *src, void *dst, openQCD_QudaDiracParam_t p);
-void openQCD_qudaDw_NoLoads(void *src, void *dst, openQCD_QudaDiracParam_t p);
 
 
 /**
@@ -157,23 +203,78 @@ void openQCD_qudaDw_NoLoads(void *src, void *dst, openQCD_QudaDiracParam_t p);
  * @param[out] solution     Solution spinor
  * @param[in]  dirac_param  Dirac parameter struct
  * @param[in]  gcr_param    GCR parameter struct
+ *
+ * @return     residual
  */
 double openQCD_qudaGCR(void *source, void *solution,
   openQCD_QudaDiracParam_t dirac_param, openQCD_QudaGCRParam_t gcr_param);
 
 
 /**
- * Solve Ax=b for an Clover Wilson operator with a multigrid solver. All fields are fields passed and
- * returned are host (CPU) field in openQCD order.  This function requires that
- * persistent gauge and clover fields have been created prior.
- * 
+ * Solve Ax=b for an Clover Wilson operator with a multigrid solver. All fields
+ * are fields passed and returned are host (CPU) field in openQCD order.  This
+ * function requires that persistent gauge and clover fields have been created
+ * prior.
+ *
  * Requires QUDA_PRECISION & 2 != 0, e.g. QUDA_PRECISON = 14
  *
  * @param[in]  source       Right-hand side source field
  * @param[out] solution     Solution spinor field
  * @param[in]  dirac_param  Dirac parameter struct
+ *
+ * @return     residual
  */
 double openQCD_qudaMultigrid(void *source, void *solution, openQCD_QudaDiracParam_t dirac_param);
+
+
+/**
+ * Setup the solver interface to quda.  This function parses the file given by
+ * [infile] as an openQCD ini file.  The solver section given by the [section]
+ * parameter must have a key-value pair like solver = QUDA and may contain every
+ * member of the struct [QudaInvertParam].  If one sets inv_type_precondition =
+ * QUDA_MG_INVERTER, one can additionally use all the members from the struct
+ * [QudaMultigridParam] in a section called "{section} Multigrid", where
+ * {section} is replaced by [section].  For every level given by n_level in the
+ * above section, one has to provide a subsection called
+ * "{section} Multigrid Level {level}", where {level} runs from 0 to n_level-1.
+ * All these subsections may have keys given by all the array-valued members of
+ * QudaMultigridParam, for example smoother_tol may appear in all subsections.
+ *
+ * @param[in]  infile   Ini-file containing sections about the solver
+ * @param[in]  section  The section name
+ *
+ * @return     Pointer to the solver context
+ */
+void* openQCD_qudaSolverSetup(char *infile, char *section);
+
+
+/**
+ * @brief        Solve Ax=b for an Clover Wilson operator with a multigrid
+ *               solver. All fields are fields passed and returned are host
+ *               (CPU) field in openQCD order.  This function requires an
+ *               existing solver context created with openQCD_qudaSolverSetup()
+ *
+ * @param[inout] param     Pointer returned by openQCD_qudaSolverSetup()
+ * @param[in]    mu        Twisted mass
+ * @param[in]    source    The source
+ * @param[out]   solution  The solution
+ * @param[out]   status    If the function is able to solve the Dirac equation
+ *                         to the desired accuracy (invert_param->tol), status
+ *                         reports the total number of iteration steps. -1
+ *                         indicates that the inversion failed.
+ *
+ * @return       Residual
+ */
+double openQCD_qudaInvert(void *param, double mu, void *source, void *solution, int *status);
+
+
+/**
+ * @brief      Destroys an existing solver context and frees all involed
+ *             structs.
+ *
+ * @param      param  Pointer to the context to destroy
+ */
+void openQCD_qudaSolverDestroy(void *param);
 
 
 /**
