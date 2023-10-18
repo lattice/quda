@@ -1,6 +1,8 @@
 #pragma once
 
+#include <type_traits>
 #include <functional>
+#include <iterator>
 #include <initializer_list>
 #include <enum_quda.h>
 #include <util_quda.h>

@@ -49,6 +49,7 @@
 #include <object.h>
 #include <device.h>
 #include <array.h>
+#include "timer.h"
 
 namespace quda {
 

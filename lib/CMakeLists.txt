@@ -36,7 +36,7 @@ set (QUDA_OBJS
   field_cache.cpp
   gauge_covdev.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
-  cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
+  extract_gauge_ghost.cu
   gauge_norm.cu gauge_update_quda.cu
   max_clover.cu dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
   dirac_staggered_kd.cpp dirac_clover_hasenbusch_twist.cpp
@@ -84,7 +84,7 @@ set (QUDA_OBJS
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
   deflation.cpp checksum.cu transform_reduce.cu
   dslash5_mobius_eofa.cu
-  madwf_ml.cpp
+  madwf_ml.cpp quda_ptr.cpp
   instantiate.cpp version.cpp
   block_transpose.cu )
 # cmake-format: on

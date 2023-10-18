@@ -29,7 +29,6 @@ namespace quda {
       if (laplace3D == i) comm_dim[i] = 0;
     }
     ApplyLaplace(out, in, *gauge, laplace3D, 1.0, 1.0, in, parity, dagger, comm_dim, profile);
-    flops += 1320ll*in.Volume(); // FIXME
   }
 
   void GaugeLaplace::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -45,7 +44,6 @@ namespace quda {
       if (laplace3D == i) comm_dim[i] = 0;
     }
     ApplyLaplace(out, in, *gauge, laplace3D, k, 1.0, x, parity, dagger, comm_dim, profile);
-    flops += 1368ll*in.Volume(); // FIXME
   }
 
   void GaugeLaplace::M(ColorSpinorField &out, const ColorSpinorField &in) const

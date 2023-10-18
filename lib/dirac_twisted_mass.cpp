@@ -36,7 +36,6 @@ namespace quda {
   {
     checkParitySpinor(out, in);
     ApplyTwistGamma(out, in, 4, kappa, mu, epsilon, dagger, twistType);
-    flops += 24ll*in.Volume();
   }
 
   // Public method to apply the twist
@@ -51,12 +50,10 @@ namespace quda {
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       // this would really just be a Wilson dslash (not actually instantiated at present)
       ApplyTwistedMass(out, in, *gauge, 0.0, 2 * mu * kappa, in, parity, dagger, commDim, profile);
-      flops += 1392ll * in.Volume();
     } else {
       // this would really just be a 2-way vectorized Wilson dslash (not actually instantiated at present)
       ApplyNdegTwistedMass(
           out, in, *gauge, 0.0, 2 * mu * kappa, -2 * kappa * epsilon, in, parity, dagger, commDim, profile);
-      flops += (1440ll) * in.Volume();
     }
   }
 
@@ -67,11 +64,9 @@ namespace quda {
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       // k * D * in + (1 + i*2*mu*kappa*gamma_5) *x
       ApplyTwistedMass(out, in, *gauge, k, 2 * mu * kappa, x, parity, dagger, commDim, profile);
-      flops += 1416ll * in.Volume();
     } else {
       // k * D * in + (1 + i*2*mu*kappa*gamma_5*tau_3 - 2*epsilon*kappa*tau_1) * x
       ApplyNdegTwistedMass(out, in, *gauge, k, 2 * mu * kappa, -2 * kappa * epsilon, x, parity, dagger, commDim, profile);
-      flops += (1464ll) * in.Volume();
     }
   }
 
@@ -88,11 +83,9 @@ namespace quda {
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       ApplyTwistedMass(out, in, *gauge, -kappa, 2 * mu * kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-      flops += 1416ll * in.Volume();
     } else {
       ApplyNdegTwistedMass(out, in, *gauge, -kappa, 2 * mu * kappa, -2 * kappa * epsilon, in, QUDA_INVALID_PARITY,
           dagger, commDim, profile);
-      flops += (1464ll) * in.Volume();
     }
   }
 
@@ -174,7 +167,6 @@ namespace quda {
       bool asymmetric
           = (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) && dagger;
       ApplyTwistedMassPreconditioned(out, in, *gauge, b, a, false, in, parity, dagger, asymmetric, commDim, profile);
-      flops += 1392ll * in.Volume(); // flops numbers are approximate since they will vary depending on the dagger or not
     } else {//TWIST doublet :
       double a = 2.0 * kappa * mu;
       double b = 2.0 * kappa * epsilon;
@@ -184,7 +176,6 @@ namespace quda {
           = (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) && dagger;
       ApplyNdegTwistedMassPreconditioned(out, in, *gauge, c, -2.0 * mu * kappa, 2.0 * kappa * epsilon, false, in,
           parity, dagger, asymmetric, commDim, profile);
-      flops += (1440ll) * in.Volume(); // flops are approx. since they will vary depending on the dagger or not
     }
   }
 
@@ -206,7 +197,6 @@ namespace quda {
       bool asymmetric
           = (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) && dagger;
       ApplyTwistedMassPreconditioned(out, in, *gauge, b, a, true, x, parity, dagger, asymmetric, commDim, profile);
-      flops += 1416ll * in.Volume(); // flops numbers are approximate since they will vary depending on the dagger or not
     } else {//TWIST_DOUBLET:
       double a = 2.0 * kappa * mu;
       double b = 2.0 * kappa * epsilon;
@@ -216,8 +206,6 @@ namespace quda {
           = (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) && dagger;
       ApplyNdegTwistedMassPreconditioned(out, in, *gauge, k * c, -2 * mu * kappa, 2 * kappa * epsilon, true, x, parity,
           dagger, asymmetric, commDim, profile);
-      flops += (1464ll)
-          * in.Volume(); // flops numbers are approximate since they will vary depending on the dagger or not
     }
   }
 

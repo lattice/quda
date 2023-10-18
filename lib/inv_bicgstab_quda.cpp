@@ -214,10 +214,6 @@ namespace quda {
 
     PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
 
-    if (!param.is_preconditioner) { // do not do the below if we this is an inner solver
-      blas::flops = 0;
-    }
-
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
@@ -344,10 +340,6 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
-
-    param.gflops += gflops;
     param.iter += k;
 
     if (k==param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
@@ -362,12 +354,6 @@ namespace quda {
 
       PrintSummary("BiCGstab", k, r2, b2, stop, param.tol_hq);
     }
-
-    // reset the flops counters
-    blas::flops = 0;
-    mat.flops();
-    matSloppy.flops();
-    matPrecon.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 

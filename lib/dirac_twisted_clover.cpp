@@ -50,11 +50,6 @@ namespace quda {
   {
     checkParitySpinor(out, in);
     ApplyTwistClover(out, in, *clover, kappa, mu, epsilon, parity, dagger, twistType);
-
-    if (twistType == QUDA_TWIST_GAMMA5_INVERSE)
-      flops += (504ll + 504ll + 48ll) * in.Volume();
-    else
-      flops += (504ll + 48ll) * in.Volume();
   }
 
 
@@ -79,15 +74,10 @@ namespace quda {
       // tm_rho is a Hasenbusch mass preconditioning parameter applied just like a twisted mass
       // but *not* the inverse of M_ee or M_oo
       ApplyTwistedClover(out, in, *gauge, *clover, k, 2 * (mu + tm_rho) * kappa, x, parity, dagger, commDim, profile);
-      // wilson + chiral twist + clover
-      flops += (1320ll + 48ll + 504ll) * in.Volume();
-
     } else {
       // k * D * in + (A + i*2*mu*kappa*gamma_5 * tau_3 - 2 * kappa * epsilon * tau_1 ) * x
       ApplyNdegTwistedClover(out, in, *gauge, *clover, k, 2 * mu * kappa, -2 * kappa * epsilon, x, parity, dagger,
                              commDim, profile);
-      // wilson + chiral twist + flavour twist + clover
-      flops += (1320ll + 48ll + 48ll + 504ll) * in.Volume();
     }
   }
 
@@ -106,14 +96,10 @@ namespace quda {
       // (-kappa * D + A + i*2*mu*kappa*gamma_5 ) * in
       ApplyTwistedClover(out, in, *gauge, *clover, -kappa, 2.0 * kappa * mu, in, QUDA_INVALID_PARITY, dagger, commDim,
                          profile);
-      // wilson + chiral twist + clover
-      flops += (1320ll + 48ll + 504ll) * in.Volume();
     } else {
       // (-kappa * D + A + i*2*mu*kappa*gamma_5*tau_3 - 2*epsilon*kappa*tau_1) * in
       ApplyNdegTwistedClover(out, in, *gauge, *clover, -kappa, 2 * kappa * mu, -2 * kappa * epsilon, in,
                              QUDA_INVALID_PARITY, dagger, commDim, profile);
-      // wilson + chiral twist + flavor twist + clover
-      flops += (1320ll + 48ll + 48ll + 504ll) * in.Volume();
     }
   }
 
@@ -231,11 +217,9 @@ namespace quda {
       if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
         ApplyTwistedCloverPreconditioned(out, in, *gauge, *clover, 1.0, -2.0 * kappa * mu, false, in, parity, dagger,
                                          commDim, profile);
-        flops += (1320ll + 48ll + 504ll) * in.Volume();
       } else {
         ApplyNdegTwistedCloverPreconditioned(out, in, *gauge, *clover, 1.0, -2.0 * kappa * mu, 2.0 * kappa * epsilon,
                                              false, in, parity, dagger, commDim, profile);
-        flops += (1320ll + 48ll + 48ll + 504ll) * in.Volume();
       }
     }
   }
@@ -260,11 +244,9 @@ namespace quda {
       if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
         ApplyTwistedCloverPreconditioned(out, in, *gauge, *clover, k, -2.0 * kappa * mu, true, x, parity, dagger,
                                          commDim, profile);
-        flops += (1320ll + 48ll + 504ll) * in.Volume();
       } else {
         ApplyNdegTwistedCloverPreconditioned(out, in, *gauge, *clover, k, -2.0 * kappa * mu, 2.0 * kappa * epsilon,
                                              true, x, parity, dagger, commDim, profile);
-        flops += (1320ll + 48ll + 48ll + 504ll) * in.Volume();
       }
     }
   }

@@ -265,8 +265,8 @@ if(QUDA_MPI OR QUDA_QMP)
   if(DEFINED ENV{QUDA_TEST_GRID_SIZE})
     get_test_ranks($ENV{QUDA_TEST_GRID_SIZE} QUDA_TEST_NUM_PROCS)
   endif()
-  set(QUDA_CTEST_LAUNCH "${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${QUDA_TEST_NUM_PROCS} ${MPIEXEC_PREFLAGS}"
-      CACHE STRING "CTest Launcher command for QUDA's tests")
+  set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE};${MPIEXEC_NUMPROC_FLAG};${QUDA_TEST_NUM_PROCS};${MPIEXEC_PREFLAGS}
+    CACHE STRING "CTest Launcher command for QUDA's tests")
 endif()
 
 # BLAS tests
@@ -1255,9 +1255,7 @@ foreach(prec IN LISTS TEST_PRECS)
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:unitarize_link_test> ${MPIEXEC_POSTFLAGS}
                      --dim 2 4 6 8 --prec ${prec}
                      --gtest_output=xml:unitarize_link_test_${prec}.xml)
-  endif()
 
-  if(QUDA_FORCE_HISQ)
     add_test(NAME hisq_paths_force_${prec}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_paths_force_test> ${MPIEXEC_POSTFLAGS}
                      --dim 2 4 6 8 --prec ${prec}

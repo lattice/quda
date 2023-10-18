@@ -397,9 +397,9 @@ namespace quda {
        @brief This method only resets the KD operators with the updated fine links and rebuilds
               the KD inverse
      */
-    void resetStaggeredKD(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                          cudaGaugeField *gauge_sloppy_in, cudaGaugeField *fat_gauge_sloppy_in,
-                          cudaGaugeField *long_gauge_sloppy_in, double mass);
+    void resetStaggeredKD(GaugeField *gauge_in, GaugeField *fat_gauge_in, GaugeField *long_gauge_in,
+                          GaugeField *gauge_sloppy_in, GaugeField *fat_gauge_sloppy_in,
+                          GaugeField *long_gauge_sloppy_in, double mass);
 
     /**
        @brief Dump the null-space vectors to disk.  Will recurse dumping all levels.
@@ -485,11 +485,6 @@ namespace quda {
        @param B Free-field null-space vectors
     */
     void buildFreeVectors(std::vector<ColorSpinorField*> &B);
-
-    /**
-       @brief Return the total flops done on this and all coarser levels.
-     */
-    double flops() const;
 
     /**
       @brief Return if we're on a fine grid right now
@@ -634,13 +629,13 @@ namespace quda {
      operator we are constructing the coarse grid operator from.
      For staggered, should always be QUDA_MATPC_INVALID.
    */
-  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
-                         const cudaGaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
+  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
+                         const GaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
                          QudaDiracType dirac, QudaMatPCType matpc);
 
   template <int fineColor, int coarseColor>
-  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
-                         const cudaGaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
+  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
+                         const GaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
                          QudaDiracType dirac, QudaMatPCType matpc);
 
   /**

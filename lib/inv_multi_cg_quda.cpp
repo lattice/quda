@@ -262,7 +262,6 @@ namespace quda {
 
     int k = 0;
     int rUpdate = 0;
-    blas::flops = 0;
 
     // now create the worker class for updating the shifted solutions and gradient vectors
     bool aux_update = false;
@@ -443,9 +442,6 @@ namespace quda {
     logQuda(QUDA_VERBOSE, "Reliable updates = %d\n", rUpdate);
     if (k==param.maxiter) warningQuda("Exceeded maximum iterations %d\n", param.maxiter);
 
-    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
-    param.gflops = gflops;
     param.iter += k;
 
     if (param.compute_true_res) {
@@ -489,11 +485,6 @@ namespace quda {
                 param.iter_res_offset[i]);
       }
     }
-
-    // reset the flops counters
-    blas::flops = 0;
-    mat.flops();
-    matSloppy.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     popOutputPrefix();
