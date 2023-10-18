@@ -491,7 +491,7 @@ static QudaInvertParam newOpenQCDDiracParam(openQCD_QudaDiracParam_t p)
   param.dslash_type = QUDA_WILSON_DSLASH;
   param.kappa = p.kappa;
   param.mu = p.mu;
-  param.dagger = p.dagger ? QUDA_DAG_YES : QUDA_DAG_NO;
+  param.dagger = QUDA_DAG_NO;
 
   if (p.su3csw != 0.0) {
     param.clover_location = QUDA_CUDA_FIELD_LOCATION; // seems to have no effect?
@@ -792,15 +792,18 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
     param->clover_cpu_prec = QUDA_DOUBLE_PRECISION;
     param->clover_cuda_prec = QUDA_DOUBLE_PRECISION;
 
-    //param->clover_order = QUDA_FLOAT8_CLOVER_ORDER; // what implication has this?
-    //param->compute_clover = true;
-    param->clover_order = QUDA_OPENQCD_CLOVER_ORDER;
-
     param->clover_csw = qudaState.layout.dirac_parms.su3csw;
     param->clover_coeff = 0.0;
 
     // Set to Wilson Dirac operator with Clover term
     param->dslash_type = QUDA_CLOVER_WILSON_DSLASH;
+
+    if (qudaState.layout.flds_parms.gauge == OPENQCD_GAUGE_SU3) {
+      param->clover_order = QUDA_FLOAT8_CLOVER_ORDER; // what implication has this?
+      param->compute_clover = true;
+    } else {
+      param->clover_order = QUDA_OPENQCD_CLOVER_ORDER;
+    }
   }
 
   if (my_rank == 0) {
@@ -1154,24 +1157,38 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
   multigrid_param->invert_param = invert_param_mg;
 
   if (qudaState.layout.h_gauge != nullptr) {
-    openQCD_qudaGaugeLoad(qudaState.layout.h_gauge, QUDA_DOUBLE_PRECISION);
+    logQuda(QUDA_VERBOSE, "Loading gauge field from openQCD ...\n");
+    PUSH_RANGE("openQCD_qudaGaugeLoad",3);
+    openQCD_qudaGaugeLoad(qudaState.layout.h_gauge(), QUDA_DOUBLE_PRECISION);
+    POP_RANGE;
   }
 
   if (qudaState.layout.dirac_parms.su3csw != 0.0) {
-    if (false && qudaState.layout.flds_parms.gauge == OPENQCD_GAUGE_SU3) {
+    if (qudaState.layout.flds_parms.gauge == OPENQCD_GAUGE_SU3) {
       /**
        * Leaving both h_clover = h_clovinv = NULL allocates the clover field on
        * the GPU and finally calls @createCloverQuda to calculate the clover
        * field.
        */
+      logQuda(QUDA_VERBOSE, "Generating clover field in QUDA ...\n");
+      PUSH_RANGE("loadCloverQuda",3);
       loadCloverQuda(NULL, NULL, param);
+      POP_RANGE;
     } else {
       /**
        * Transfer the SW-field from openQCD.
        */
-      printfQuda("loading Clover field\n");
-      openQCD_qudaCloverLoad(qudaState.layout.h_sw, param->kappa, param->clover_csw);
-      //loadCloverQuda(qudaState.layout.h_sw, NULL, param);
+      logQuda(QUDA_VERBOSE, "Loading clover field from openQCD ...\n");
+      PUSH_RANGE("openQCD_qudaCloverLoad",3);
+      openQCD_qudaCloverLoad(qudaState.layout.h_sw(), param->kappa, param->clover_csw);
+      POP_RANGE;
+
+      //loadCloverQuda(qudaState.layout.h_sw(), NULL, param);
+      // The above line would be prefered over openQCD_qudaCloverLoad, but throws this error, no idea why?
+      //QUDA: ERROR: qudaEventRecord_ returned CUDA_ERROR_ILLEGAL_ADDRESS
+      // (timer.h:82 in start())
+      // (rank 0, host yoshi, quda_api.cpp:72 in void quda::target::cuda::set_driver_error(CUresult, const char*, const char*, const char*, const char*, bool)())
+      //QUDA:        last kernel called was (name=N4quda10CopyCloverINS_6clover11FloatNOrderIdLi72ELi2ELb0ELb1ELb0EEENS1_12OpenQCDOrderIdLi72EEEddEE,volume=32x16x16x64,aux=GPU-offline,vol=524288precision=8Nc=3,compute_diagonal)
     }
   }
 
@@ -1202,17 +1219,18 @@ double openQCD_qudaInvert(void *param, double mu, void *source, void *solution, 
   QudaInvertParam* invert_param = static_cast<QudaInvertParam*>(param);
   invert_param->mu = mu;
 
-  PUSH_RANGE("invertQUDA",5);
+  logQuda(QUDA_VERBOSE, "Calling invertQuda() ...\n");
+  PUSH_RANGE("invertQuda",5);
   invertQuda(static_cast<char *>(solution), static_cast<char *>(source), invert_param);
   POP_RANGE;
 
   if (invert_param->verbosity >= QUDA_VERBOSE) {
-    printfQuda("openQCD_qudaInvert()\n");
-    printfQuda("  true_res    = %.2e\n", invert_param->true_res);
-    printfQuda("  true_res_hq = %.2e\n", invert_param->true_res_hq);
-    printfQuda("  iter        = %d\n",   invert_param->iter);
-    printfQuda("  gflops      = %.2e\n", invert_param->gflops);
-    printfQuda("  secs        = %.2e\n", invert_param->secs);
+    logQuda(QUDA_VERBOSE, "openQCD_qudaInvert()\n");
+    logQuda(QUDA_VERBOSE, "  true_res    = %.2e\n", invert_param->true_res);
+    logQuda(QUDA_VERBOSE, "  true_res_hq = %.2e\n", invert_param->true_res_hq);
+    logQuda(QUDA_VERBOSE, "  iter        = %d\n",   invert_param->iter);
+    logQuda(QUDA_VERBOSE, "  gflops      = %.2e\n", invert_param->gflops);
+    logQuda(QUDA_VERBOSE, "  secs        = %.2e\n", invert_param->secs);
   }
 
   *status = invert_param->true_res <= invert_param->tol ? invert_param->iter : -1;

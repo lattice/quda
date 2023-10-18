@@ -78,8 +78,8 @@ typedef struct {
   bc_parms_t bc_parms;
   dirac_parms_t dirac_parms;
   flds_parms_t flds_parms;
-  void *h_gauge;
-  void *h_sw;
+  void* (*h_gauge)(void);
+  void* (*h_sw)(void);
 } openQCD_QudaLayout_t;
 
 
@@ -115,9 +115,6 @@ typedef struct {
   double su3csw;  /* su3csw: csw coefficient for SU(3) fields */
   double u1csw;   /* u1csw: csw coefficient for U(1) fields, quda doesn't respect that parameter (yet) */
   int qhat;       /* qhat: quda doesn't respect that parameter (yet) */
-  int dagger;     /* dagger: whether to apply D or D^dagger */
-  void *h_gauge;
-  void *h_sw;
 } openQCD_QudaDiracParam_t;
 
 
