@@ -791,9 +791,11 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
     param->clover_location = QUDA_CUDA_FIELD_LOCATION; // seems to have no effect?
     param->clover_cpu_prec = QUDA_DOUBLE_PRECISION;
     param->clover_cuda_prec = QUDA_DOUBLE_PRECISION;
-    param->clover_order = QUDA_FLOAT8_CLOVER_ORDER; // what implication has this?
 
-    param->compute_clover = true;
+    //param->clover_order = QUDA_FLOAT8_CLOVER_ORDER; // what implication has this?
+    //param->compute_clover = true;
+    param->clover_order = QUDA_OPENQCD_CLOVER_ORDER;
+
     param->clover_csw = qudaState.layout.dirac_parms.su3csw;
     param->clover_coeff = 0.0;
 
@@ -921,6 +923,9 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
     kv.set_map(&enum_map);
     kv.load(infile);
 
+    param->verbosity = kv.get<QudaVerbosity>(section, "verbosity", param->verbosity);
+    setVerbosity(param->verbosity);
+
     if (param->verbosity >= QUDA_VERBOSE) {
       kv.dump();
     }
@@ -1012,7 +1017,6 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
     param->clover_coeff = kv.get<double>(section, "clover_coeff", param->clover_coeff);
     param->clover_rho = kv.get<double>(section, "clover_rho", param->clover_rho);
     param->compute_clover_trlog = kv.get<int>(section, "compute_clover_trlog", param->compute_clover_trlog);
-    param->verbosity = kv.get<QudaVerbosity>(section, "verbosity", param->verbosity);
     param->tune = kv.get<QudaTune>(section, "tune", param->tune);
     param->Nsteps = kv.get<int>(section, "Nsteps", param->Nsteps);
     param->gcrNkrylov = kv.get<int>(section, "gcrNkrylov", param->gcrNkrylov);
@@ -1154,7 +1158,7 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
   }
 
   if (qudaState.layout.dirac_parms.su3csw != 0.0) {
-    if (qudaState.layout.flds_parms.gauge == OPENQCD_GAUGE_SU3) {
+    if (false && qudaState.layout.flds_parms.gauge == OPENQCD_GAUGE_SU3) {
       /**
        * Leaving both h_clover = h_clovinv = NULL allocates the clover field on
        * the GPU and finally calls @createCloverQuda to calculate the clover
@@ -1165,7 +1169,9 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
       /**
        * Transfer the SW-field from openQCD.
        */
-      loadCloverQuda(qudaState.layout.h_sw, NULL, param);
+      printfQuda("loading Clover field\n");
+      openQCD_qudaCloverLoad(qudaState.layout.h_sw, param->kappa, param->clover_csw);
+      //loadCloverQuda(qudaState.layout.h_sw, NULL, param);
     }
   }
 
