@@ -984,9 +984,14 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
 
     param->overlap = kv.get<int>(section, "overlap", param->overlap);
 
-    /*param->offset = kv.get<double>(section, "offset", param->offset)[QUDA_MAX_MULTI_SHIFT];
-    param->tol_offset = kv.get<double>(section, "tol_offset", param->tol_offset)[QUDA_MAX_MULTI_SHIFT];
-    param->tol_hq_offset = kv.get<double>(section, "tol_hq_offset", param->tol_hq_offset)[QUDA_MAX_MULTI_SHIFT];*/
+    for(int i=0; i<param->num_offset; i++) {
+      std::string sub_key = "offset[" + std::to_string(i) + "]";
+      param->offset[i] = kv.get<double>(section, sub_key, param->offset[i]);
+      sub_key = "tol_offset[" + std::to_string(i) + "]";
+      param->tol_offset[i] = kv.get<double>(section, sub_key, param->tol_offset[i]);
+      sub_key = "tol_hq_offset[" + std::to_string(i) + "]";
+      param->tol_hq_offset[i] = kv.get<double>(section, sub_key, param->tol_hq_offset[i]);
+    }
 
     param->compute_action = kv.get<int>(section, "compute_action", param->compute_action);
 
@@ -1048,9 +1053,8 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
 
     param->madwf_param_load = kv.get<QudaBoolean>(section, "madwf_param_load", param->madwf_param_load);
     param->madwf_param_save = kv.get<QudaBoolean>(section, "madwf_param_save", param->madwf_param_save);
-
-    /*param->madwf_param_infile = kv.get<char>(section, "madwf_param_infile", param->madwf_param_infile);
-    param->madwf_param_outfile = kv.get<char>(section, "madwf_param_outfile", param->madwf_param_outfile);*/
+    strcpy(param->madwf_param_infile, kv.get<std::string>(section, "madwf_param_infile", param->madwf_param_infile).c_str());
+    strcpy(param->madwf_param_outfile, kv.get<std::string>(section, "madwf_param_outfile", param->madwf_param_outfile).c_str());
 
     param->residual_type = kv.get<QudaResidualType>(section, "residual_type", param->residual_type);
 
@@ -1139,10 +1143,10 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
         multigrid_param->setup_location[i] = kv.get<QudaFieldLocation>(subsection, "setup_location", multigrid_param->setup_location[i]);
         multigrid_param->use_eig_solver[i] = kv.get<QudaBoolean>(subsection, "use_eig_solver", multigrid_param->use_eig_solver[i]);
 
-        /*multigrid_param->vec_load[i] = kv.get<QudaBoolean>(subsection, "vec_load", multigrid_param->vec_load[i]);
-        multigrid_param->vec_infile[i] = kv.get<char>(subsection, "vec_infile", multigrid_param->vec_infile[i]);
+        multigrid_param->vec_load[i] = kv.get<QudaBoolean>(subsection, "vec_load", multigrid_param->vec_load[i]);
         multigrid_param->vec_store[i] = kv.get<QudaBoolean>(subsection, "vec_store", multigrid_param->vec_store[i]);
-        multigrid_param->vec_outfile[i] = kv.get<char>(subsection, "vec_outfile", multigrid_param->vec_outfile[i]);*/
+        strcpy(multigrid_param->vec_infile[i], kv.get<std::string>(subsection, "vec_infile", multigrid_param->vec_infile[i]).c_str());
+        strcpy(multigrid_param->vec_outfile[i], kv.get<std::string>(subsection, "vec_outfile", multigrid_param->vec_outfile[i]).c_str());
 
         multigrid_param->mu_factor[i] = kv.get<double>(subsection, "mu_factor", multigrid_param->mu_factor[i]);
         multigrid_param->transfer_type[i] = kv.get<QudaTransferType>(subsection, "transfer_type", multigrid_param->transfer_type[i]);
