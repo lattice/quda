@@ -9,9 +9,8 @@ namespace quda
    * @param[in] Gauge field upon which we are measuring.
    * @param[in,out] param Parameter struct that defines which
    * observables we are making and the resulting observables.
-   * @param[in] profile TimeProfile instance used for profiling.
    */
-  void gaugeObservables(GaugeField &u, QudaGaugeObservableParam &param, TimeProfile &profile);
+  void gaugeObservables(GaugeField &u, QudaGaugeObservableParam &param);
 
   /**
    * @brief Project the input gauge field onto the SU(3) group.  This

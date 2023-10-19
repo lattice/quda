@@ -58,25 +58,20 @@ namespace quda
 
       if (mass == 0.) {
         ApplyStaggered(tmp, in, *gauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim, profile);
-        flops += 570ll * in.Volume();
       } else {
         ApplyStaggered(tmp, in, *gauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-        flops += 582ll * in.Volume();
       }
+
       ApplyStaggeredKahlerDiracInverse(out, tmp, *Xinv, false);
-      flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
 
     } else { // QUDA_DAG_YES
 
       ApplyStaggeredKahlerDiracInverse(tmp, in, *Xinv, true);
-      flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
 
       if (mass == 0.) {
         ApplyStaggered(out, tmp, *gauge, 0., tmp, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim, profile);
-        flops += 570ll * in.Volume();
       } else {
         ApplyStaggered(out, tmp, *gauge, 2. * mass, tmp, QUDA_INVALID_PARITY, dagger, commDim, profile);
-        flops += 582ll * in.Volume();
       }
     }
   }
@@ -150,7 +145,7 @@ namespace quda
     // Should we support "preparing" and "reconstructing"?
   }
 
-  void DiracStaggeredKD::updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, CloverField *)
+  void DiracStaggeredKD::updateFields(GaugeField *gauge_in, GaugeField *, GaugeField *, CloverField *)
   {
     Dirac::updateFields(gauge_in, nullptr, nullptr, nullptr);
   }

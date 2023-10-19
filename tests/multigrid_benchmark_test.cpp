@@ -12,6 +12,7 @@
 // include because of nasty globals used in the tests
 #include <dslash_reference.h>
 #include <dirac_quda.h>
+#include <tune_quda.h>
 #include <gauge_tools.h>
 #include <gtest/gtest.h>
 
@@ -23,7 +24,7 @@ using namespace quda;
 
 std::vector<ColorSpinorField> xD, yD;
 
-std::shared_ptr<cudaGaugeField> Y_d, X_d, Xinv_d, Yhat_d;
+std::shared_ptr<GaugeField> Y_d, X_d, Xinv_d, Yhat_d;
 
 int Ncolor;
 
@@ -96,15 +97,14 @@ void initFields(QudaPrecision prec)
   gParam.setPrecision(prec_sloppy);
   gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-
-  Y_d = std::make_shared<cudaGaugeField>(gParam);
-  Yhat_d = std::make_shared<cudaGaugeField>(gParam);
+  Y_d = std::make_shared<GaugeField>(gParam);
+  Yhat_d = std::make_shared<GaugeField>(gParam);
 
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.nFace = 0;
-  X_d = std::make_shared<cudaGaugeField>(gParam);
-  Xinv_d = std::make_shared<cudaGaugeField>(gParam);
+  X_d = std::make_shared<GaugeField>(gParam);
+  Xinv_d = std::make_shared<GaugeField>(gParam);
 
   // insert random noise into the gauge fields
   {
@@ -279,12 +279,11 @@ int main(int argc, char **argv)
     if (test_rc != 0) warningQuda("Tests failed");
   }
 
-  // now rerun with more iterations to get accurate speed measurements
-  dirac->Flops();    // reset flops counter
-  dirac_pc->Flops(); // reset flops counter
-
+  auto flops0 = quda::Tunable::flops_global();
   double secs = benchmark(test_type, niter);
-  double gflops = ((test_type < 5 ? dirac->Flops() : dirac_pc->Flops()) * 1e-9) / (secs);
+  auto flops1 = quda::Tunable::flops_global();
+
+  double gflops = (flops1 - flops0) * 1e-9 / secs;
 
   printfQuda("Ncolor = %2d, %-31s: Gflop/s = %6.1f\n", Ncolor, names[test_type], gflops);
 

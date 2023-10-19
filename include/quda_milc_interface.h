@@ -1026,7 +1026,7 @@ extern "C" {
 			  void* inGauge);
 
   /**
-   * Reinterpret gauge as a pointer to cudaGaugeField and call destructor.
+   * Reinterpret gauge as a pointer to a GaugeField and call destructor.
    *
    * @param gauge Gauge field to be freed
    */

@@ -37,9 +37,11 @@ namespace quda {
 #ifdef GPU_CLOVER_DIRAC
   void computeClover(CloverField &clover, const GaugeField& f, double coeff)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (clover.Precision() < QUDA_SINGLE_PRECISION) errorQuda("Cannot use fixed-point precision here");
     clover.Diagonal(0.5); // 0.5 comes from scaling used on native fields
     instantiate<ComputeClover>(clover, f, coeff);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 #else
   void computeClover(CloverField &, const GaugeField &, double)

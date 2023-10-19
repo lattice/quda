@@ -744,10 +744,17 @@ double verifyWilsonTypeSingularVector(void *spinor_left, void *spinor_right, dou
 }
 
 double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorField &ref, quda::ColorSpinorField &in,
-                                quda::ColorSpinorField &out, double mass, void *qdp_fatlink[], void *qdp_longlink[],
-                                void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param,
-                                QudaInvertParam &inv_param, int shift)
+                                quda::ColorSpinorField &out, double mass, quda::GaugeField &fatlink,
+                                quda::GaugeField &longlink, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param,
+                                int shift)
 {
+  void *qdp_fatlink[] = {fatlink.data(0), fatlink.data(1), fatlink.data(2), fatlink.data(3)};
+  void *qdp_longlink[] = {longlink.data(0), longlink.data(1), longlink.data(2), longlink.data(3)};
+  void *ghost_fatlink[]
+    = {fatlink.Ghost()[0].data(), fatlink.Ghost()[1].data(), fatlink.Ghost()[2].data(), fatlink.Ghost()[3].data()};
+  void *ghost_longlink[]
+    = {longlink.Ghost()[0].data(), longlink.Ghost()[1].data(), longlink.Ghost()[2].data(), longlink.Ghost()[3].data()};
+
   switch (test_type) {
   case 0: // full parity solution, full parity system
   case 1: // full parity solution, solving EVEN EVEN prec system
@@ -763,10 +770,10 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
                     QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
 
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      xpay(out.V(), kappa, ref.V(), ref.Length(), gauge_param.cpu_prec);
-      ax(0.5 / kappa, ref.V(), ref.Length(), gauge_param.cpu_prec);
+      xpay(out.data(), kappa, ref.data(), ref.Length(), gauge_param.cpu_prec);
+      ax(0.5 / kappa, ref.data(), ref.Length(), gauge_param.cpu_prec);
     } else {
-      axpy(2 * mass, out.V(), ref.V(), ref.Length(), gauge_param.cpu_prec);
+      axpy(2 * mass, out.data(), ref.data(), ref.Length(), gauge_param.cpu_prec);
     }
     break;
 
@@ -788,9 +795,9 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
     len = Vh;
   }
 
-  mxpy(in.V(), ref.V(), len * stag_spinor_site_size, inv_param.cpu_prec);
-  double nrm2 = norm_2(ref.V(), len * stag_spinor_site_size, inv_param.cpu_prec);
-  double src2 = norm_2(in.V(), len * stag_spinor_site_size, inv_param.cpu_prec);
+  mxpy(in.data(), ref.data(), len * stag_spinor_site_size, inv_param.cpu_prec);
+  double nrm2 = norm_2(ref.data(), len * stag_spinor_site_size, inv_param.cpu_prec);
+  double src2 = norm_2(in.data(), len * stag_spinor_site_size, inv_param.cpu_prec);
   double hqr = sqrt(quda::blas::HeavyQuarkResidualNorm(out, ref).z);
   double l2r = sqrt(nrm2 / src2);
 

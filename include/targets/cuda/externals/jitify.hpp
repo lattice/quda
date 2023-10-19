@@ -365,7 +365,7 @@ inline std::string path_base(std::string p) {
   // "foo/bar"  -> "foo"
   // "foo/bar/" -> "foo/bar"
 #if defined _WIN32 || defined _WIN64
-  char sep = '\\';
+  const char* sep = "\\/";
 #else
   char sep = '/';
 #endif
@@ -496,10 +496,13 @@ inline std::string comment_out_code_line(int line_num, std::string source) {
 inline void print_with_line_numbers(std::string const& source) {
   int linenum = 1;
   std::stringstream source_ss(source);
+  std::stringstream output_ss;
+  output_ss.imbue(std::locale::classic());
   for (std::string line; std::getline(source_ss, line); ++linenum) {
-    std::cout << std::setfill(' ') << std::setw(3) << linenum << " " << line
+    output_ss << std::setfill(' ') << std::setw(3) << linenum << " " << line
               << std::endl;
   }
+  std::cout << output_ss.str();
 }
 
 inline void print_compile_log(std::string program_name,
@@ -554,7 +557,7 @@ inline bool load_source(
     std::string filename, std::map<std::string, std::string>& sources,
     std::string current_dir = "",
     std::vector<std::string> include_paths = std::vector<std::string>(),
-    file_callback_type file_callback = 0,
+    file_callback_type file_callback = 0, std::string* program_name = nullptr,
     std::map<std::string, std::string>* fullpaths = nullptr,
     bool search_current_dir = true) {
   std::istream* source_stream = 0;
@@ -567,6 +570,9 @@ inline bool load_source(
     filename = filename.substr(0, newline_pos);
     string_stream << source;
     source_stream = &string_stream;
+  }
+  if (program_name) {
+    *program_name = filename;
   }
   if (sources.count(filename)) {
     // Already got this one
@@ -672,6 +678,8 @@ inline bool load_source(
       // TODO: Handle block comments (currently they cause a compilation error).
       size_t comment_start = line_after_pragma.find("//");
       std::string pragma_args = line_after_pragma.substr(0, comment_start);
+      // handle quote character used in #pragma expression
+      pragma_args = replace_token(pragma_args, "\"", "\\\"");
       std::string comment = comment_start != std::string::npos
                                 ? line_after_pragma.substr(comment_start)
                                 : "";
@@ -682,7 +690,7 @@ inline bool load_source(
     source += line + "\n";
   }
   // HACK TESTING (WAR for cub)
-  // source = "#define cudaDeviceSynchronize() cudaSuccess\n" + source;
+  source = "#define cudaDeviceSynchronize() cudaSuccess\n" + source;
   ////source = "cudaError_t cudaDeviceSynchronize() { return cudaSuccess; }\n" +
   /// source;
 
@@ -690,6 +698,7 @@ inline bool load_source(
   //   of the same header from different paths.
   if (pragma_once) {
     std::stringstream ss;
+    ss.imbue(std::locale::classic());
     ss << std::uppercase << std::hex << std::setw(8) << std::setfill('0')
        << hash;
     std::string include_guard_name = "_JITIFY_INCLUDE_GUARD_" + ss.str() + "\n";
@@ -1385,7 +1394,16 @@ static const char* jitsafe_header_preinclude_h = R"(
 // WAR to allow exceptions to be parsed
 #define try
 #define catch(...)
-)";
+)"
+#if defined(_WIN32) || defined(_WIN64)
+// WAR for NVRTC <= 11.0 not defining _WIN64.
+R"(
+#ifndef _WIN64
+#define _WIN64 1
+#endif
+)"
+#endif
+;
 
 static const char* jitsafe_header_float_h = R"(
 #pragma once
@@ -1403,12 +1421,12 @@ static const char* jitsafe_header_float_h = R"(
 #define DBL_MAX_EXP     1024
 #define FLT_MAX_10_EXP  38
 #define DBL_MAX_10_EXP  308
-#define FLT_MAX         3.4028234e38f 
-#define DBL_MAX         1.7976931348623157e308 
-#define FLT_EPSILON     1.19209289e-7f 
-#define DBL_EPSILON     2.220440492503130e-16 
-#define FLT_MIN         1.1754943e-38f; 
-#define DBL_MIN         2.2250738585072013e-308 
+#define FLT_MAX         3.4028234e38f
+#define DBL_MAX         1.7976931348623157e308
+#define FLT_EPSILON     1.19209289e-7f
+#define DBL_EPSILON     2.220440492503130e-16
+#define FLT_MIN         1.1754943e-38f
+#define DBL_MIN         2.2250738585072013e-308
 #define FLT_ROUNDS      1
 #if defined __cplusplus && __cplusplus >= 201103L
 #define FLT_EVAL_METHOD 0
@@ -1596,14 +1614,28 @@ struct IntegerLimits {
 #endif  // __cplusplus >= 201103L
 	enum {
        is_specialized = true,
-       digits = (Digits == -1) ? (int)(sizeof(T)*8 - (Min != 0)) : Digits,
-       digits10   = (digits * 30103) / 100000,
-       is_signed  = ((T)(-1)<0),
-       is_integer = true,
-       is_exact   = true,
-       radix      = 2,
-       is_bounded = true,
-       is_modulo  = false
+       digits            = (Digits == -1) ? (int)(sizeof(T)*8 - (Min != 0)) : Digits,
+       digits10          = (digits * 30103) / 100000,
+       is_signed         = ((T)(-1)<0),
+       is_integer        = true,
+       is_exact          = true,
+       has_infinity      = false,
+       has_quiet_NaN     = false,
+       has_signaling_NaN = false,
+       has_denorm        = 0,
+       has_denorm_loss   = false,
+       round_style       = 0,
+       is_iec559         = false,
+       is_bounded        = true,
+       is_modulo         = !(is_signed || Max == 1 /*is bool*/),
+       max_digits10      = 0,
+       radix             = 2,
+       min_exponent      = 0,
+       min_exponent10    = 0,
+       max_exponent      = 0,
+       max_exponent10    = 0,
+       tinyness_before   = false,
+       traps             = false
 	};
 };
 } // namespace __jitify_detail
@@ -1910,6 +1942,46 @@ static const char* jitsafe_header_type_traits = R"(
     template<size_t len, size_t alignment> struct aligned_storage { struct type { alignas(alignment) char data[len]; }; };
     template <class T> struct alignment_of : std::integral_constant<size_t,alignof(T)> {};
 
+    template <typename T> struct make_unsigned;
+    template <> struct make_unsigned<signed char>        { typedef unsigned char type; };
+    template <> struct make_unsigned<signed short>       { typedef unsigned short type; };
+    template <> struct make_unsigned<signed int>         { typedef unsigned int type; };
+    template <> struct make_unsigned<signed long>        { typedef unsigned long type; };
+    template <> struct make_unsigned<signed long long>   { typedef unsigned long long type; };
+    template <> struct make_unsigned<unsigned char>      { typedef unsigned char type; };
+    template <> struct make_unsigned<unsigned short>     { typedef unsigned short type; };
+    template <> struct make_unsigned<unsigned int>       { typedef unsigned int type; };
+    template <> struct make_unsigned<unsigned long>      { typedef unsigned long type; };
+    template <> struct make_unsigned<unsigned long long> { typedef unsigned long long type; };
+    template <> struct make_unsigned<char>               { typedef unsigned char type; };
+    #if defined _WIN32 || defined _WIN64
+    template <> struct make_unsigned<wchar_t>            { typedef unsigned short type; };
+    #else
+    template <> struct make_unsigned<wchar_t>            { typedef unsigned int type; };
+    #endif
+
+    template <typename T> struct make_signed;
+    template <> struct make_signed<signed char>        { typedef signed char type; };
+    template <> struct make_signed<signed short>       { typedef signed short type; };
+    template <> struct make_signed<signed int>         { typedef signed int type; };
+    template <> struct make_signed<signed long>        { typedef signed long type; };
+    template <> struct make_signed<signed long long>   { typedef signed long long type; };
+    template <> struct make_signed<unsigned char>      { typedef signed char type; };
+    template <> struct make_signed<unsigned short>     { typedef signed short type; };
+    template <> struct make_signed<unsigned int>       { typedef signed int type; };
+    template <> struct make_signed<unsigned long>      { typedef signed long type; };
+    template <> struct make_signed<unsigned long long> { typedef signed long long type; };
+    template <> struct make_signed<char>               { typedef signed char type; };
+    #if defined _WIN32 || defined _WIN64
+    template <> struct make_signed<wchar_t>            { typedef signed short type; };
+    #else
+    template <> struct make_signed<wchar_t>            { typedef signed int type; };
+    #endif
+
+    #if __cplusplus >= 201703L
+    template< typename... Ts > struct make_void { typedef void type; };
+    template< typename... Ts > using void_t = typename make_void<Ts...>::type;
+    #endif  // __cplusplus >= 201703L
     }  // namespace std
     #endif // c++11
 )";
@@ -1949,8 +2021,8 @@ static const char* jitsafe_header_stdint_h =
     "#define INT8_MIN    SCHAR_MIN\n"
     "#define INT16_MIN   SHRT_MIN\n"
     "#if defined _WIN32 || defined _WIN64\n"
-    "#define WCHAR_MIN   SHRT_MIN\n"
-    "#define WCHAR_MAX   SHRT_MAX\n"
+    "#define WCHAR_MIN   0\n"
+    "#define WCHAR_MAX   USHRT_MAX\n"
     "typedef unsigned long long uintptr_t; //optional\n"
     "#else\n"
     "#define WCHAR_MIN   INT_MIN\n"
@@ -2083,24 +2155,33 @@ static const char* jitsafe_header_sstream =
     "#include <ostream>\n"
     "#include <istream>\n";
 
-static const char* jitsafe_header_utility =
-    "#pragma once\n"
-    "namespace std {\n"
-    "template<class T1, class T2>\n"
-    "struct pair {\n"
-    "	T1 first;\n"
-    "	T2 second;\n"
-    "	inline pair() {}\n"
-    "	inline pair(T1 const& first_, T2 const& second_)\n"
-    "		: first(first_), second(second_) {}\n"
-    "	// TODO: Standard includes many more constructors...\n"
-    "	// TODO: Comparison operators\n"
-    "};\n"
-    "template<class T1, class T2>\n"
-    "pair<T1,T2> make_pair(T1 const& first, T2 const& second) {\n"
-    "	return pair<T1,T2>(first, second);\n"
-    "}\n"
-    "}  // namespace std\n";
+static const char* jitsafe_header_utility = R"(
+    #pragma once
+    namespace std {
+    template<class T1, class T2>
+    struct pair {
+        T1 first;
+        T2 second;
+        inline pair() {}
+        inline pair(T1 const& first_, T2 const& second_): first(first_), second(second_) {}
+        // TODO: Standard includes many more constructors...
+        // TODO: Comparison operators
+    };
+    template<class T1, class T2>
+    pair<T1,T2> make_pair(T1 const& first, T2 const& second) {
+        return pair<T1,T2>(first, second);
+    }
+
+    template<typename T>
+    constexpr bool always_false = false;
+
+    template<typename T>
+    typename std::add_rvalue_reference<T>::type declval() noexcept
+    {
+    static_assert(always_false<T>, "declval not allowed in an evaluated context");
+    }
+    }  // namespace std
+)";
 
 // TODO: incomplete
 static const char* jitsafe_header_vector =
@@ -2340,12 +2421,79 @@ static const char* jitsafe_header_tuple = R"(
     #if __cplusplus >= 201103L
     namespace std {
     template<class... Types > class tuple;
+
+    template< size_t I, class T >
+    struct tuple_element;
+    // recursive case
+    template< size_t I, class Head, class... Tail >
+    struct tuple_element<I, tuple<Head, Tail...>>
+        : tuple_element<I-1, tuple<Tail...>> { };
+    // base case
+    template< class Head, class... Tail >
+    struct tuple_element<0, tuple<Head, Tail...>> {
+      using type = Head;
+    };
     } // namespace std
     #endif
  )";
 
+static const char* jitsafe_header_functional = R"(
+    #pragma once
+    #if __cplusplus >= 201103L
+    namespace std {
+    template<class T>
+    class reference_wrapper
+    {
+    public:
+    // types
+    using type = T;
+    reference_wrapper(const reference_wrapper&) noexcept = default;
+    // assignment
+    reference_wrapper& operator=(const reference_wrapper& x) noexcept = default;
+    // access
+    constexpr operator T& () const noexcept { return *_ptr; }
+    constexpr T& get() const noexcept { return *_ptr; }
+    private:
+    T* _ptr;
+    };
+    } // namespace std
+    #endif
+)";
+
+static const char* jitsafe_header_map = R"(
+    #pragma once
+    namespace std {
+    template<class Key, class T, class Compare = void, class Allocator = void> class map {};
+    } // namespace std
+)";
+
+static const char* jitsafe_header_stack = R"(
+    #pragma once
+    namespace std {
+    template<class T, class = void> class stack {};
+    } // namespace std
+)";
+
+static const char* jitsafe_header_initializer_list = R"(
+    #pragma once
+)";
+
 static const char* jitsafe_header_assert = R"(
     #pragma once
+ )";
+
+static const char* jitsafe_header_sys_time = R"(
+    #pragma once
+    struct timeval {
+    unsigned long long tv_sec;
+    unsigned long long tv_usec;
+    };
+    struct timeval it_interval;
+    struct timeval it_value;
+    int getitimer(int, struct itimerval *);
+    int gettimeofday(struct timeval *, void *);
+    int setitimer(int, const struct itimerval *, struct itimerval *);
+    int utimes(const char *, const struct timeval [2]);
  )";
 
 // WAR: These need to be pre-included as a workaround for NVRTC implicitly using
@@ -2406,8 +2554,13 @@ static const std::map<std::string, std::string>& get_jitsafe_headers_map() {
       {"time.h", jitsafe_header_time_h},
       {"ctime", jitsafe_header_time_h},
       {"tuple", jitsafe_header_tuple},
+      {"functional", jitsafe_header_functional},
+      {"map", jitsafe_header_map},
+      {"stack", jitsafe_header_stack},
+      {"initializer_list", jitsafe_header_initializer_list},
       {"assert.h", jitsafe_header_assert},
-      {"cassert", jitsafe_header_assert}};
+      {"cassert", jitsafe_header_assert},
+      {"sys/time.h", jitsafe_header_sys_time}};
   return jitsafe_headers_map;
 }
 
@@ -2673,6 +2826,17 @@ inline nvrtcResult compile_kernel(std::string program_name,
       &nvrtc_program, program_source.c_str(), program_name.c_str(), num_headers,
       header_sources_c.data(), header_names_c.data()));
 
+  // Ensure nvrtc_program gets destroyed.
+  struct ScopedNvrtcProgramDestroyer {
+    nvrtcProgram& nvrtc_program_;
+    ScopedNvrtcProgramDestroyer(nvrtcProgram& nvrtc_program)
+        : nvrtc_program_(nvrtc_program) {}
+    ~ScopedNvrtcProgramDestroyer() { nvrtcDestroyProgram(&nvrtc_program_); }
+    ScopedNvrtcProgramDestroyer(const ScopedNvrtcProgramDestroyer&) = delete;
+    ScopedNvrtcProgramDestroyer& operator=(const ScopedNvrtcProgramDestroyer&) =
+        delete;
+  } nvrtc_program_scope_guard{nvrtc_program};
+
 #if CUDA_VERSION >= 8000
   if (!instantiation.empty()) {
     CHECK_NVRTC(nvrtcAddNameExpression(nvrtc_program, instantiation.c_str()));
@@ -2720,7 +2884,6 @@ inline nvrtcResult compile_kernel(std::string program_name,
 #endif
   }
 
-  CHECK_NVRTC(nvrtcDestroyProgram(&nvrtc_program));
 #undef CHECK_NVRTC
   return NVRTC_SUCCESS;
 }
@@ -2746,10 +2909,9 @@ inline void load_program(std::string const& cuda_source,
 
   // Load program source
   if (!detail::load_source(cuda_source, *program_sources, "", *include_paths,
-                           file_callback)) {
+                           file_callback, program_name)) {
     throw std::runtime_error("Source not found: " + cuda_source);
   }
-  *program_name = program_sources->begin()->first;
 
   // Maps header include names to their full file paths.
   std::map<std::string, std::string> header_fullpaths;
@@ -2757,7 +2919,7 @@ inline void load_program(std::string const& cuda_source,
   // Load header sources
   for (std::string const& header : headers) {
     if (!detail::load_source(header, *program_sources, "", *include_paths,
-                             file_callback, &header_fullpaths)) {
+                             file_callback, nullptr, &header_fullpaths)) {
       // **TODO: Deal with source not found
       throw std::runtime_error("Source not found: " + header);
     }
@@ -2816,8 +2978,8 @@ inline void load_program(std::string const& cuda_source,
     std::string include_parent_fullpath = header_fullpaths[include_parent];
     std::string include_path = detail::path_base(include_parent_fullpath);
     if (detail::load_source(include_name, *program_sources, include_path,
-                            *include_paths, file_callback, &header_fullpaths,
-                            is_included_with_quotes)) {
+                            *include_paths, file_callback, nullptr,
+                            &header_fullpaths, is_included_with_quotes)) {
 #if JITIFY_PRINT_HEADER_PATHS
       std::cout << "Found #include " << include_name << " from "
                 << include_parent << ":" << line_num << " ["
@@ -3067,6 +3229,7 @@ class KernelLauncher {
   std::unique_ptr<KernelLauncher_impl const> _impl;
 
  public:
+  KernelLauncher() = default;
   inline KernelLauncher(KernelInstantiation const& kernel_inst, dim3 grid,
                         dim3 block, unsigned int smem = 0,
                         cudaStream_t stream = 0);
@@ -3135,6 +3298,7 @@ class KernelInstantiation {
   std::unique_ptr<KernelInstantiation_impl const> _impl;
 
  public:
+  KernelInstantiation() = default;
   inline KernelInstantiation(Kernel const& kernel,
                              std::vector<std::string> const& template_args);
 
@@ -3282,6 +3446,7 @@ class Kernel {
   std::unique_ptr<Kernel_impl const> _impl;
 
  public:
+  Kernel() = default;
   Kernel(Program const& program, std::string name,
          jitify::detail::vector<std::string> options = 0);
 
@@ -3346,6 +3511,7 @@ class Program {
   std::unique_ptr<Program_impl const> _impl;
 
  public:
+  Program() = default;
   Program(JitCache& cache, std::string source,
           jitify::detail::vector<std::string> headers = 0,
           jitify::detail::vector<std::string> options = 0,

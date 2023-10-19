@@ -40,8 +40,7 @@ namespace quda
 
     LaplaceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a, double b,
                const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-
-      DslashArg<Float, nDim>(in, U, parity, dagger, a != 0.0 ? true : false, 1, false, comm_override),
+      DslashArg<Float, nDim>(out, in, U, x, parity, dagger, a != 0.0 ? true : false, 1, false, comm_override),
       out(out),
       in(in),
       in_pack(in),
@@ -51,12 +50,6 @@ namespace quda
       b(b),
       dir(dir)
     {
-      if (in.V() == out.V()) errorQuda("Aliasing pointers");
-      checkOrder(out, in, x);        // check all orders match
-      checkPrecision(out, in, x, U); // check all precisions match
-      checkLocation(out, in, x, U);  // check all locations match
-      if (!in.isNative() || !U.isNative())
-        errorQuda("Unsupported field order colorspinor(in)=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
       if (dir < 3 || dir > 4) errorQuda("Unsupported laplace direction %d (must be 3 or 4)", dir);
     }
   };
