@@ -86,6 +86,10 @@ std::string madwf_param_outfile;
 
 int precon_schwarz_cycle = 1;
 int multishift = 1;
+std::vector<double> multishift_shifts = {};
+std::vector<double> multishift_masses = {};
+std::vector<double> multishift_tols = {};
+std::vector<double> multishift_tols_hq = {};
 bool verify_results = true;
 bool low_mode_check = false;
 bool oblique_proj_check = false;
@@ -507,6 +511,18 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     "--multishift", multishift,
     "Whether to do a multi-shift solver test or not. Default is 1 (single mass)"
     "If a value N > 1 is passed, heavier masses will be constructed and the multi-shift solver will be called");
+  quda_app->add_option(
+    "--multishift-shifts", multishift_shifts,
+    "List of shifts to use in a multi-shift solve; ignored for staggered-type fermions. Default is (i * i * 0.01)");
+  quda_app->add_option(
+    "--multishift-masses", multishift_masses,
+    "List of masses to use in a multi-shift solve; this will override the value of mass; ignored for Wilson-type fermions. Default is (mass + i * i * 0.01)");
+  quda_app->add_option(
+    "--multishift-tols", multishift_tols,
+    "List of tolerances to use in a multi-shift solve. Default is to uniformly use the input tolerance");
+  quda_app->add_option(
+    "--multishift-tols-hq", multishift_tols_hq,
+    "List of hq tolerances to use in a multi-shift solve. Default is the input hq tolerance (default 0)");
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG, CA-GCR (default 8)");
   quda_app->add_option("--niter", niter, "The number of iterations to perform (default 100)");

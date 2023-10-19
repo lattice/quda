@@ -50,8 +50,14 @@ namespace quda {
       }
     }
 
-    void preTune() { if (out.Gauge_p() == in.Gauge_p()) out.backup(); }
-    void postTune() { if (out.Gauge_p() == in.Gauge_p()) out.restore(); }
+    void preTune()
+    {
+      if (out.data() == in.data()) out.backup();
+    }
+    void postTune()
+    {
+      if (out.data() == in.data()) out.restore();
+    }
 
     long long flops() const // just counts matrix multiplication
     {
@@ -73,7 +79,9 @@ namespace quda {
 
     copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
     in.exchangeExtendedGhost(in.R(), false);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeSTOUT>(out, in, false, rho);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     out.exchangeExtendedGhost(out.R(), false);
   }
 
@@ -85,7 +93,9 @@ namespace quda {
 
     copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
     in.exchangeExtendedGhost(in.R(), false);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeSTOUT>(out, in, true, rho, epsilon);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     out.exchangeExtendedGhost(out.R(), false);
   }
 

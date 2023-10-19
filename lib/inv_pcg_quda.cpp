@@ -203,8 +203,6 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
-    blas::flops = 0;
-
     int k = 0;
     PrintStats("PCG", k, r2, b2, heavy_quark_res);
 
@@ -378,10 +376,6 @@ namespace quda
     if (mixed()) copy(x, x_sloppy);
     xpy(y, x); // x += y
 
-    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matEig.flops()) * 1e-9;
-    if (K) gflops += K->flops() * 1e-9;
-    param.gflops = gflops;
     param.iter += k;
 
     if (k == param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
@@ -392,13 +386,6 @@ namespace quda
     mat(r, x);
     double true_res = xmyNorm(b, r);
     param.true_res = sqrt(true_res / b2);
-
-    // reset the flops counters
-    blas::flops = 0;
-    mat.flops();
-    matSloppy.flops();
-    matPrecon.flops();
-    matEig.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
   }

@@ -49,9 +49,11 @@ namespace quda {
 #ifdef GPU_CLOVER_DIRAC
   void cloverInvert(CloverField &clover, bool computeTraceLog)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (clover.Reconstruct()) errorQuda("Cannot store the inverse with a reconstruct field");
     if (clover.Precision() < QUDA_SINGLE_PRECISION) errorQuda("Cannot use fixed-point precision here");
     instantiate<CloverInvert>(clover, computeTraceLog);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 #else
   void cloverInvert(CloverField &, bool)

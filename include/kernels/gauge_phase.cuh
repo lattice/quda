@@ -63,9 +63,10 @@ namespace quda {
       } else if (dim == 3) { // also apply boundary condition
 	phase = (t == arg.X[3]-1) ? arg.tBoundary : 1.0;
       }
-    } else if (Arg::phase == QUDA_STAGGERED_PHASE_CPS) {
+    } else if (Arg::phase == QUDA_STAGGERED_PHASE_CHROMA) {
+      // Chroma follows CPS convention, but uses -Dslash instead of Dslash compared to QUDA
       if (dim==0) {
-	phase = 1.0;
+	phase = -1.0;
       } else if (dim == 1) {
 	phase = (1.0 - 2.0 * ((1 + x) % 2) );
       } else if (dim == 2) {

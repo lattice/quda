@@ -2610,7 +2610,7 @@ void* qudaCreateGaugeField(void* gauge, int geometry, int precision)
 void qudaSaveGaugeField(void* gauge, void* inGauge)
 {
   qudamilc_called<true>(__func__);
-  cudaGaugeField* cudaGauge = reinterpret_cast<cudaGaugeField*>(inGauge);
+  auto cudaGauge = reinterpret_cast<GaugeField *>(inGauge);
   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim, cudaGauge->Precision(), QUDA_GENERAL_LINKS);
   saveGaugeFieldQuda(gauge, inGauge, &qudaGaugeParam);
   qudamilc_called<false>(__func__);
@@ -3044,14 +3044,8 @@ void qudaGaugeFixingOVR(int precision, unsigned int gauge_dir, int Nsteps, int v
   qudaGaugeParam.site_size = arg->size;
   qudaGaugeParam.gauge_order = arg->site ? QUDA_MILC_SITE_GAUGE_ORDER : QUDA_MILC_GAUGE_ORDER;
 
-  double timeinfo[3];
   computeGaugeFixingOVRQuda(gauge, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval,
-                            stopWtheta, &qudaGaugeParam, timeinfo);
-
-  printfQuda("Time H2D: %lf\n", timeinfo[0]);
-  printfQuda("Time to Compute: %lf\n", timeinfo[1]);
-  printfQuda("Time D2H: %lf\n", timeinfo[2]);
-  printfQuda("Time all: %lf\n", timeinfo[0]+timeinfo[1]+timeinfo[2]);
+                            stopWtheta, &qudaGaugeParam);
 
   qudamilc_called<false>(__func__, verbosity);
 }
@@ -3073,13 +3067,70 @@ void qudaGaugeFixingFFT( int precision,
   qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
   //qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
 
-
-  double timeinfo[3];
-  computeGaugeFixingFFTQuda(milc_sitelink, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta, \
-    &qudaGaugeParam, timeinfo);
-
-  printfQuda("Time H2D: %lf\n", timeinfo[0]);
-  printfQuda("Time to Compute: %lf\n", timeinfo[1]);
-  printfQuda("Time D2H: %lf\n", timeinfo[2]);
-  printfQuda("Time all: %lf\n", timeinfo[0]+timeinfo[1]+timeinfo[2]);
+  computeGaugeFixingFFTQuda(milc_sitelink, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta,
+                            &qudaGaugeParam);
 }
+
+void qudaTwoLinkGaussianSmear( int external_precision, int quda_precision, void * h_gauge, void * source, QudaTwoLinkQuarkSmearArgs_t qsmear_args )
+{
+  static const QudaVerbosity verbosity = getVerbosity();
+  qudamilc_called<true>(__func__, verbosity);
+
+  QudaPrecision cpu_prec = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision cuda_prec = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision cuda_prec_sloppy = cuda_prec;
+
+  // inverter setup ---------------------
+  QudaInvertParam invertParam = newQudaInvertParam();
+
+  double mass = 0.0;
+  QudaParity parity = QUDA_EVEN_PARITY; // need to fix
+
+  // dummies
+  double target_residual = 1e-14;
+  double target_residual_hq = 1e-14;
+  int maxiter = 1;
+  double reliable_delta = 0.1;
+  QudaInverterType inverter = QUDA_CG_INVERTER;
+  
+  setInvertParams( cpu_prec, cuda_prec, cuda_prec_sloppy, mass, target_residual, target_residual_hq, maxiter, reliable_delta, parity, verbosity, inverter, &invertParam );
+  
+  invertParam.laplace3D = qsmear_args.laplaceDim;
+  //---------------------------- inverter setup
+
+  // gauge setup ---------------------------
+  QudaGaugeParam gaugeParam = newQudaGaugeParam();
+
+  int * dim = localDim;
+  
+  // dummies
+  double tadpole = 0;
+  double naik_epsilon = 0;
+  
+  setGaugeParams( gaugeParam, gaugeParam, nullptr, dim, cpu_prec, cuda_prec, cuda_prec_sloppy, tadpole, naik_epsilon );
+
+  gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO; // need to fix
+  gaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
+  
+  gaugeParam.ga_pad = getLinkPadding( dim );
+  gaugeParam.mom_ga_pad = 0;
+  //--------------------------- gauge setup
+
+  // Load gauge field
+  if( qsmear_args.compute_2link == 0 ) gaugeParam.use_resident_gauge = 1;
+  loadGaugeQuda( const_cast<void *>(h_gauge), &gaugeParam );
+  
+  // quark smearing parameters
+  QudaQuarkSmearParam qsmearParam;
+  qsmearParam.inv_param = &invertParam;
+  qsmearParam.n_steps = qsmear_args.n_steps;
+  qsmearParam.width = qsmear_args.width;
+  qsmearParam.compute_2link = qsmear_args.compute_2link;
+  qsmearParam.delete_2link = qsmear_args.delete_2link;
+  qsmearParam.t0 = qsmear_args.t0;
+  
+  // run gaussian smearing
+  performTwoLinkGaussianSmearNStep( source, &qsmearParam );
+
+  qudamilc_called<false>(__func__, verbosity);  
+} //qudaTwoLinkGaussianSmear

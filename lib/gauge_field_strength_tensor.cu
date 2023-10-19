@@ -35,8 +35,10 @@ namespace quda
 
   void computeFmunu(GaugeField &f, const GaugeField &u)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     checkPrecision(f, u);
     instantiate2<Fmunu,ReconstructWilson>(u, f); // u must be first here for correct template instantiation
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
 } // namespace quda

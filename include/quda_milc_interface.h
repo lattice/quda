@@ -119,6 +119,18 @@ extern "C" {
   } QudaFatLinkArgs_t;
 
   /**
+   * Parameters for two-link Gaussian quark smearing.
+   */
+  typedef struct {
+    int n_steps; /** Number of steps to apply **/
+    double width; /** The width of the Gaussian **/
+    int compute_2link; /** if nonzero then compute two-link, otherwise reuse gaugeSmeared **/
+    int delete_2link; /** if nonzero then delete two-link, otherwise keep two-link for future use **/
+    int t0; /** Set if the input spinor is on a time slice **/
+    int laplaceDim; /** Dimension of Laplacian **/
+  } QudaTwoLinkQuarkSmearArgs_t;
+  
+  /**
    * Optional: Set the MPI Comm Handle if it is not MPI_COMM_WORLD
    *
    * @param input Pointer to an MPI_Comm handle, static cast as a void *
@@ -1014,7 +1026,7 @@ extern "C" {
 			  void* inGauge);
 
   /**
-   * Reinterpret gauge as a pointer to cudaGaugeField and call destructor.
+   * Reinterpret gauge as a pointer to a GaugeField and call destructor.
    *
    * @param gauge Gauge field to be freed
    */
@@ -1061,6 +1073,17 @@ extern "C" {
     void* milc_sitelink
     );
 
+  /**
+   * @brief Perform two-link Gaussian smearing on a given spinor (for staggered fermions).
+   * @param[in] external_precision  Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param[in] quda_precision  Precision for QUDA to use (2 - double, 1 - single)
+   * @param[in] h_gauge  Host gauge field
+   * @param[in,out] source  Spinor field to smear
+   * @param[in] qsmear_args  Struct setting some smearing metadata
+   */
+  void qudaTwoLinkGaussianSmear(int external_precision, int quda_precision, void * h_gauge, void * source,
+                                QudaTwoLinkQuarkSmearArgs_t qsmear_args);
+  
   /* The below declarations are for removed functions from prior versions of QUDA. */
 
   /**
