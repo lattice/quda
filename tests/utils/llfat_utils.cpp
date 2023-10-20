@@ -429,7 +429,6 @@ void llfat_cpu_mg(void **fatlink, su3_matrix **sitelink, su3_matrix **ghost_site
 {
   QudaPrecision prec = sizeof(Float) == 4 ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION;
 
-
   su3_matrix *staple = (su3_matrix *)safe_malloc(V * sizeof(su3_matrix));
 
   su3_matrix *ghost_staple[4];

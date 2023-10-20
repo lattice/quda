@@ -207,7 +207,8 @@ struct StaggeredDslashTestWrapper {
     } else {
       // QUDA_ASQTAD_DSLASH
       if (compute_fatlong) {
-        computeFatLongGPU(qdp_fatlink_gpu, qdp_longlink_gpu, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks, eps_naik);
+        computeFatLongGPU(qdp_fatlink_gpu, qdp_longlink_gpu, qdp_inlink, gauge_param, host_gauge_data_type_size,
+                          n_naiks, eps_naik);
       } else {
         // Not computing FatLong
         for (int dir = 0; dir < 4; dir++) {
@@ -216,7 +217,6 @@ struct StaggeredDslashTestWrapper {
         }
       }
     }
-
 
     // Create ghost zones for CPU fields,
     // prepare and load the GPU fields

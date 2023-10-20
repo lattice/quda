@@ -206,8 +206,7 @@ void gauge_force_test(bool compute_force = true)
   if (verify_results) {
     quda::host_timer_t verify_timer;
     verify_timer.start();
-    gauge_force_reference(refmom, eb3, U_qdp, input_path_buf, length,
-                          loop_coeff, num_paths, compute_force);
+    gauge_force_reference(refmom, eb3, U_qdp, input_path_buf, length, loop_coeff, num_paths, compute_force);
     *check_out
       = compare_floats(Mom_milc.data(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec), gauge_param.cpu_prec);
     if (compute_force) strong_check_mom(Mom_milc.data(), refmom, 4 * V, gauge_param.cpu_prec);
@@ -325,8 +324,8 @@ void gauge_loop_test()
     quda::host_timer_t verify_timer;
     verify_timer.start();
 
-    gauge_loop_trace_reference(U_qdp, traces_ref, scale_factor, trace_path_p,
-                               trace_loop_length_p, trace_loop_coeff_p, num_paths);
+    gauge_loop_trace_reference(U_qdp, traces_ref, scale_factor, trace_path_p, trace_loop_length_p, trace_loop_coeff_p,
+                               num_paths);
 
     loop_deviation = 0;
     for (int i = 0; i < num_paths; i++) {

@@ -134,7 +134,8 @@ void popOutputPrefix()
 
 char *getPrintBuffer() { return buffer_; }
 
-const char* getOmpThreadStr() {
+const char *getOmpThreadStr()
+{
   static std::string omp_thread_string;
   static bool init = false;
   if (!init) {
