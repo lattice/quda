@@ -9,7 +9,7 @@
 #   gfortran).
 #*/
 
-#define QUDA_INVALID_ENUM (-Z'7fffffff' - 1)
+#define QUDA_INVALID_ENUM -int(Z'7FFFFFFF') - 1
 
 #define QudaLinkType integer(4)
 
@@ -469,10 +469,10 @@
 #define QUDA_GHOST_EXCHANGE_INVALID QUDA_INVALID_ENUM
 
 #define QudaStaggeredPhase integer(4)
-#define QUDA_STAGGERED_PHASE_NO   0
-#define QUDA_STAGGERED_PHASE_MILC 1
-#define QUDA_STAGGERED_PHASE_CPS  2
-#define QUDA_STAGGERED_PHASE_TIFR 3
+#define QUDA_STAGGERED_PHASE_NO     0
+#define QUDA_STAGGERED_PHASE_MILC   1
+#define QUDA_STAGGERED_PHASE_CHROMA 2
+#define QUDA_STAGGERED_PHASE_TIFR   3
 #define QUDA_STAGGERED_PHASE_INVALID QUDA_INVALID_ENUM
 
 #define QudaContractType integer(4)

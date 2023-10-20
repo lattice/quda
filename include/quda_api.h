@@ -50,8 +50,8 @@ namespace quda
      @param[in] count Size of transfer
      @param[in] kind Type of memory copy
   */
-  void qudaMemcpy_(const quda_ptr &dst, const quda_ptr &src, size_t count, qudaMemcpyKind kind, const char *func, const char *file,
-                   const char *line);
+  void qudaMemcpy_(const quda_ptr &dst, const quda_ptr &src, size_t count, qudaMemcpyKind kind, const char *func,
+                   const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaMemcpyAsync or driver API equivalent
@@ -246,7 +246,7 @@ namespace quda
 #define qudaMemsetAsync(ptr, value, count, stream)                                                                     \
   ::quda::qudaMemsetAsync_(ptr, value, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
-#define qudaMemset2DAsync(ptr, offset, pitch, value, width, height, stream) \
+#define qudaMemset2DAsync(ptr, offset, pitch, value, width, height, stream)                                            \
   ::quda::qudaMemset2DAsync_(ptr, offset, pitch, value, width, height, stream, __func__, quda::file_name(__FILE__),    \
                              __STRINGIFY__(__LINE__))
 

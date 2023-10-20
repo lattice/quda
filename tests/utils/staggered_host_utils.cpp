@@ -459,7 +459,8 @@ void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk
   return;
 }
 #else
-void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &, void **, const quda::GaugeField &,  quda::ColorSpinorField&, QudaGaugeParam* , QudaInvertParam* , const int , const double , const int , QudaPrecision )
+void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &, void **, const quda::GaugeField &, quda::ColorSpinorField &,
+                                   QudaGaugeParam *, QudaInvertParam *, const int, const double, const int, QudaPrecision)
 {}
 #endif
 

@@ -12,6 +12,7 @@
 // include because of nasty globals used in the tests
 #include <dslash_reference.h>
 #include <dirac_quda.h>
+#include <tune_quda.h>
 #include <gauge_tools.h>
 #include <gtest/gtest.h>
 
@@ -278,12 +279,11 @@ int main(int argc, char **argv)
     if (test_rc != 0) warningQuda("Tests failed");
   }
 
-  // now rerun with more iterations to get accurate speed measurements
-  dirac->Flops();    // reset flops counter
-  dirac_pc->Flops(); // reset flops counter
-
+  auto flops0 = quda::Tunable::flops_global();
   double secs = benchmark(test_type, niter);
-  double gflops = ((test_type < 5 ? dirac->Flops() : dirac_pc->Flops()) * 1e-9) / (secs);
+  auto flops1 = quda::Tunable::flops_global();
+
+  double gflops = (flops1 - flops0) * 1e-9 / secs;
 
   printfQuda("Ncolor = %2d, %-31s: Gflop/s = %6.1f\n", Ncolor, names[test_type], gflops);
 

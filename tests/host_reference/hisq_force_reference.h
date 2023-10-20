@@ -31,8 +31,7 @@ void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda
    @param[in] link Gauge field links
    @param[out] newOprod Force accumulated with fat link contributions
 */
-void hisqLongLinkForceCPU(double coeff, quda::GaugeField &oprod, quda::GaugeField &link,
-                          quda::GaugeField *newOprod);
+void hisqLongLinkForceCPU(double coeff, quda::GaugeField &oprod, quda::GaugeField &link, quda::GaugeField *newOprod);
 
 /**
    @brief Accumulate the force contributions into the momentum field, CPU version

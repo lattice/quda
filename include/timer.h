@@ -205,7 +205,7 @@ namespace quda {
   public:
     TimeProfile() = default;
     TimeProfile(const TimeProfile &) = default;
-    TimeProfile& operator=(const TimeProfile &) = default;
+    TimeProfile &operator=(const TimeProfile &) = default;
 
     TimeProfile(std::string fname) : fname(fname), switchOff(false), use_global(true) { ; }
 
@@ -235,8 +235,13 @@ namespace quda {
      the profile stack, and be popped when its destructor is called.
    */
   struct pushProfile {
+    static inline double secs_dummy = 0;
+    static inline double gflops_dummy = 0;
     TimeProfile &profile;
-    pushProfile(TimeProfile &profile);
+    double &secs;
+    double &gflops;
+    uint64_t flops;
+    pushProfile(TimeProfile &profile, double &secs = secs_dummy, double &gflops = gflops_dummy);
     virtual ~pushProfile();
   };
 
@@ -244,7 +249,7 @@ namespace quda {
      @brief Return a reference to the present profile at the top of
      the stack
    */
-  TimeProfile& getProfile();
+  TimeProfile &getProfile();
 
 } // namespace quda
 

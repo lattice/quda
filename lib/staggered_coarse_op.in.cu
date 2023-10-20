@@ -357,7 +357,7 @@ namespace quda {
       //Copy the cuda gauge field to the cpu
       tmp_U.get()->copy(gauge);
 
-            // Create either a real or a dummy L field
+      // Create either a real or a dummy L field
       GaugeFieldParam lgf_param(longGauge.X(), precision, QUDA_RECONSTRUCT_NO, pad, longGauge.Geometry());
       if (!(dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC))
         for (int i = 0; i < lgf_param.nDim; i++) lgf_param.x[i] = 0;

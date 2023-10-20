@@ -165,9 +165,9 @@ void gauge_force_test(bool compute_force = true)
     mom = Mom_milc.data();
   } else if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
     for (int d = 0; d < 4; d++) sitelink_array[d] = U_qdp.data(d);
-    sitelink = reinterpret_cast<void*>(sitelink_array);
+    sitelink = reinterpret_cast<void *>(sitelink_array);
     for (int d = 0; d < 4; d++) mom_array[d] = Mom_qdp.data(d);
-    mom = reinterpret_cast<void*>(mom_array);
+    mom = reinterpret_cast<void *>(mom_array);
   } else {
     errorQuda("Unsupported gauge order %d", gauge_order);
   }
@@ -280,7 +280,7 @@ void gauge_loop_test()
     sitelink = U_milc.data();
   } else if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
     for (int d = 0; d < 4; d++) sitelink_array[d] = U_qdp.data(d);
-    sitelink = reinterpret_cast<void*>(sitelink_array);
+    sitelink = reinterpret_cast<void *>(sitelink_array);
   } else {
     errorQuda("Unsupported gauge order %d", gauge_order);
   }

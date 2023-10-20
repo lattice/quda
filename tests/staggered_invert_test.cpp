@@ -178,10 +178,11 @@ void test(int argc, char **argv)
   cpuParam.order = QUDA_MILC_GAUGE_ORDER;
   GaugeField cpuLongMILC = GaugeField(cpuParam);
 
-  void* qdp_inlink[4] = {cpuIn.data(0), cpuIn.data(1), cpuIn.data(2), cpuIn.data(3)};
+   void* qdp_inlink[4] = {cpuIn.data(0), cpuIn.data(1), cpuIn.data(2), cpuIn.data(3)};
   void* qdp_fatlink[4] = {cpuFatQDP.data(0), cpuFatQDP.data(1), cpuFatQDP.data(2), cpuFatQDP.data(3)};
   void* qdp_longlink[4] = {cpuLongQDP.data(0), cpuLongQDP.data(1), cpuLongQDP.data(2), cpuLongQDP.data(3)};
   constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv, true);
+
   // Reorder gauge fields to MILC order
   cpuFatMILC = cpuFatQDP;
   cpuLongMILC = cpuLongQDP;
@@ -217,6 +218,8 @@ void test(int argc, char **argv)
     if (use_split_grid) { errorQuda("Split grid does not work with MG yet."); }
     mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
+
+    printfQuda("MG Setup Done: %g secs, %g Gflops\n", mg_param.secs, mg_param.gflops / mg_param.secs);
   }
 
   // Staggered vector construct START
@@ -275,8 +278,8 @@ void test(int argc, char **argv)
       }
       inv_param.num_src = Nsrc;
       inv_param.num_src_per_sub_partition = Nsrc / num_sub_partition;
-      invertMultiSrcStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, cpuFatMILC.data(),
-                                  cpuLongMILC.data(), &gauge_param);
+      invertMultiSrcStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, cpuFatMILC.data(), cpuLongMILC.data(),
+                                  &gauge_param);
       quda::comm_allreduce_int(inv_param.iter);
       inv_param.iter /= comm_size() / num_sub_partition;
       quda::comm_allreduce_sum(inv_param.gflops);
@@ -343,7 +346,8 @@ void test(int argc, char **argv)
 
       for (int i = 0; i < multishift; i++) {
         printfQuda("%dth solution: mass=%f, ", i, masses[i]);
-        verifyStaggeredInversion(tmp, ref, in[k], qudaOutArray[i], masses[i], cpuFatQDP, cpuLongQDP, gauge_param, inv_param, i);
+        verifyStaggeredInversion(tmp, ref, in[k], qudaOutArray[i], masses[i], cpuFatQDP, cpuLongQDP, gauge_param,
+                                 inv_param, i);
       }
     }
   } else {

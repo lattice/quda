@@ -75,8 +75,8 @@ void heatbath_test(int argc, char **argv)
   loadGaugeQuda((void *)load_gauge, &gauge_param);
 
   quda::quda_ptr num_failures(QUDA_MEMORY_MAPPED, sizeof(int), false);
-  int &num_failures_h = *static_cast<int*>(num_failures.data_host());
-  int &num_failures_d = *static_cast<int*>(num_failures.data_device());
+  int &num_failures_h = *static_cast<int *>(num_failures.data_host());
+  int &num_failures_d = *static_cast<int *>(num_failures.data_device());
   num_failures_h = 0;
 
   // start the timer

@@ -29,8 +29,8 @@ namespace quda {
     initializeCoarse();
   }
 
-  DiracCoarse::DiracCoarse(const DiracParam &param, std::shared_ptr<GaugeField> Y_h,
-                           std::shared_ptr<GaugeField> X_h, std::shared_ptr<GaugeField> Xinv_h,
+  DiracCoarse::DiracCoarse(const DiracParam &param, std::shared_ptr<GaugeField> Y_h, std::shared_ptr<GaugeField> X_h,
+                           std::shared_ptr<GaugeField> Xinv_h,
                            std::shared_ptr<GaugeField> Yhat_h, // cpu link fields
                            std::shared_ptr<GaugeField> Y_d, std::shared_ptr<GaugeField> X_d,
                            std::shared_ptr<GaugeField> Xinv_d,
@@ -374,8 +374,6 @@ namespace quda {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION,
                   dslash_use_mma);
     }
-    int n = in[0].Nspin() * in[0].Ncolor();
-    flops += (8 * n * n - 2 * n) * (long long)in[0].VolumeCB() * in.size();
   }
 
   void DiracCoarse::CloverInv(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
@@ -392,8 +390,6 @@ namespace quda {
       ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true, dagger, commDim, QUDA_INVALID_PRECISION,
                   dslash_use_mma);
     }
-    int n = in[0].Nspin() * in[0].Ncolor();
-    flops += (8 * n * n - 2 * n) * (long long)in[0].VolumeCB() * in.size();
   }
 
   void DiracCoarse::Dslash(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
@@ -409,9 +405,6 @@ namespace quda {
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision, dslash_use_mma);
     }
-
-    int n = in[0].Nspin() * in[0].Ncolor();
-    flops += (8 * (8 * n * n) - 2 * n) * (long long)in[0].VolumeCB() * in[0].SiteSubset() * in.size();
   }
 
   void DiracCoarse::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
@@ -428,8 +421,6 @@ namespace quda {
     } else if ( location == QUDA_CPU_FIELD_LOCATION ) {
       ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true, dagger, commDim, halo_precision, dslash_use_mma);
     }
-    int n = in[0].Nspin() * in[0].Ncolor();
-    flops += (9 * (8 * n * n) - 2 * n) * (long long)in[0].VolumeCB() * in[0].SiteSubset() * in.size();
   }
 
   void DiracCoarse::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
@@ -445,8 +436,6 @@ namespace quda {
       ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, QUDA_INVALID_PARITY, true, true, dagger, commDim, halo_precision,
                   dslash_use_mma);
     }
-    int n = in[0].Nspin() * in[0].Ncolor();
-    flops += (9 * (8 * n * n) - 2 * n) * (long long)in[0].VolumeCB() * in[0].SiteSubset() * in.size();
   }
 
   void DiracCoarse::MdagM(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const
@@ -506,11 +495,10 @@ namespace quda {
     /* do nothing */
   }
 
-  DiracCoarsePC::DiracCoarsePC(const DiracParam &param, std::shared_ptr<GaugeField> Y_h,
-                               std::shared_ptr<GaugeField> X_h, std::shared_ptr<GaugeField> Xinv_h,
-                               std::shared_ptr<GaugeField> Yhat_h, std::shared_ptr<GaugeField> Y_d,
-                               std::shared_ptr<GaugeField> X_d, std::shared_ptr<GaugeField> Xinv_d,
-                               std::shared_ptr<GaugeField> Yhat_d) :
+  DiracCoarsePC::DiracCoarsePC(const DiracParam &param, std::shared_ptr<GaugeField> Y_h, std::shared_ptr<GaugeField> X_h,
+                               std::shared_ptr<GaugeField> Xinv_h, std::shared_ptr<GaugeField> Yhat_h,
+                               std::shared_ptr<GaugeField> Y_d, std::shared_ptr<GaugeField> X_d,
+                               std::shared_ptr<GaugeField> Xinv_d, std::shared_ptr<GaugeField> Yhat_d) :
     DiracCoarse(param, Y_h, X_h, Xinv_h, Yhat_h, Y_d, X_d, Xinv_d, Yhat_d)
   {
   }
@@ -536,9 +524,6 @@ namespace quda {
       ApplyCoarse(out, in, in, *Yhat_h, *X_h, kappa, parity, true, false, dagger, commDim, halo_precision,
                   dslash_use_mma);
     }
-
-    int n = in[0].Nspin() * in[0].Ncolor();
-    flops += (8 * (8 * n * n) - 2 * n) * in[0].VolumeCB() * in[0].SiteSubset() * in.size();
   }
 
   void DiracCoarsePC::DslashXpay(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in,
@@ -547,10 +532,6 @@ namespace quda {
     // FIXME emulated for now
     Dslash(out, in, parity);
     for (auto i = 0u; i < x.size(); i++) blas::xpay(x[i], k, out[i]);
-
-    int n = in[0].Nspin() * in[0].Ncolor();
-    flops += (8 * (8 * n * n) - 2 * n) * in[0].VolumeCB()
-      * in.size(); // blas flops counted separately so only need to count dslash flops
   }
 
   void DiracCoarsePC::M(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const

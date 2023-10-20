@@ -150,7 +150,7 @@ namespace quda
     if (param.create != QUDA_REFERENCE_FIELD_CREATE && param.create != QUDA_GHOST_FIELD_CREATE) {
       v = quda_ptr(mem_type, bytes);
       alloc = true;
-    } else  if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
+    } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
       v = quda_ptr(param.v, mem_type);
       reference = true;
     } else if (param.create == QUDA_GHOST_FIELD_CREATE) {
@@ -213,7 +213,8 @@ namespace quda
     if (bytes != bytes_raw) {
       size_t subset_bytes = bytes / siteSubset;
       size_t subset_bytes_raw = bytes_raw / siteSubset;
-      qudaMemset2DAsync(v, subset_bytes_raw, subset_bytes, 0, subset_bytes - subset_bytes_raw, siteSubset, device::get_default_stream());
+      qudaMemset2DAsync(v, subset_bytes_raw, subset_bytes, 0, subset_bytes - subset_bytes_raw, siteSubset,
+                        device::get_default_stream());
     }
   }
 
@@ -396,10 +397,7 @@ namespace quda
     ghost_precision_allocated = ghost_precision;
   } // createGhostZone
 
-  void ColorSpinorField::zero()
-  {
-    qudaMemsetAsync(v, 0, bytes, device::get_default_stream());
-  }
+  void ColorSpinorField::zero() { qudaMemsetAsync(v, 0, bytes, device::get_default_stream()); }
 
   void ColorSpinorField::copy(const ColorSpinorField &src)
   {

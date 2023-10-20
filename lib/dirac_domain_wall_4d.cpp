@@ -26,7 +26,6 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, parity, dagger, commDim, profile);
-    flops += 1320LL*(long long)in.Volume();
   }
 
   void DiracDomainWall4D::Dslash5(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -36,11 +35,6 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     ApplyDslash5(out, in, in, mass, 0.0, nullptr, nullptr, 0.0, dagger, Dslash5Type::DSLASH5_DWF);
-
-    long long Ls = in.X(4);
-    long long bulk = (Ls-2)*(in.Volume()/Ls);
-    long long wall = 2*in.Volume()/Ls;
-    flops += 96LL*bulk + 120LL*wall;
   }
 
   // Modification for the 4D preconditioned domain wall operator
@@ -52,8 +46,6 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     ApplyDomainWall4D(out, in, *gauge, k, 0.0, nullptr, nullptr, x, parity, dagger, commDim, profile);
-
-    flops += (1320LL+48LL)*(long long)in.Volume();
   }
 
   void DiracDomainWall4D::Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
@@ -64,11 +56,6 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     ApplyDslash5(out, in, x, mass, 0.0, nullptr, nullptr, k, dagger, Dslash5Type::DSLASH5_DWF);
-
-    long long Ls = in.X(4);
-    long long bulk = (Ls-2)*(in.Volume()/Ls);
-    long long wall = 2*in.Volume()/Ls;
-    flops += (48LL)*(long long)in.Volume() + 96LL*bulk + 120LL*wall;
   }
 
   void DiracDomainWall4D::M(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -76,13 +63,7 @@ namespace quda {
     checkFullSpinor(out, in);
 
     ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-    flops += 1320LL * (long long)in.Volume();
     ApplyDslash5(out, in, out, mass, 0.0, nullptr, nullptr, 1.0, dagger, Dslash5Type::DSLASH5_DWF);
-    long long Ls = in.X(4);
-    long long bulk = (Ls - 2) * (in.Volume() / Ls);
-    long long wall = 2 * in.Volume() / Ls;
-    flops += (48LL) * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
-
     blas::xpay(in, -kappa5, out);
   }
 
@@ -132,9 +113,6 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     ApplyDslash5(out, in, in, mass, m5, nullptr, nullptr, 0.0, dagger, Dslash5Type::M5_INV_DWF);
-
-    long long Ls = in.X(4);
-    flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
   }
 
   void DiracDomainWall4DPC::M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
@@ -145,9 +123,6 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     ApplyDslash5(out, in, x, mass, m5, nullptr, nullptr, b, dagger, Dslash5Type::M5_INV_DWF);
-
-    long long Ls = in.X(4);
-    flops += (144LL * Ls + 48LL) * (long long)in.Volume() + 3LL * Ls * (Ls - 1LL);
   }
 
   // Apply the 4D even-odd preconditioned domain-wall Dirac operator

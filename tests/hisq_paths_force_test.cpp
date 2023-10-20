@@ -464,8 +464,7 @@ static int hisq_force_test(bool lepage)
 
     int res = 1;
     for (int dir = 0; dir < 4; dir++) {
-      res &= compare_floats(cpuForce->data<void*>(dir),
-                            hostVerifyForce->data<void*>(dir), V * gauge_site_size,
+      res &= compare_floats(cpuForce->data<void *>(dir), hostVerifyForce->data<void *>(dir), V * gauge_site_size,
                             getTolerance(force_prec), force_prec);
     }
 
@@ -499,8 +498,7 @@ static int hisq_force_test(bool lepage)
 
       int res = 1;
       for (int dir = 0; dir < 4; dir++) {
-        res &= compare_floats(cpuForce->data(dir),
-                              hostVerifyForce->data(dir), V * gauge_site_size,
+        res &= compare_floats(cpuForce->data(dir), hostVerifyForce->data(dir), V * gauge_site_size,
                               getTolerance(force_prec), force_prec);
       }
 

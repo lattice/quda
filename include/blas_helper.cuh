@@ -111,9 +111,7 @@ namespace quda
       {}
 
       data_t(const ColorSpinorField &x) :
-        spinor(x.data<store_t *>()),
-        stride(x.VolumeCB()),
-        cb_offset(x.Bytes() / (2 * sizeof(store_t) * N))
+        spinor(x.data<store_t *>()), stride(x.VolumeCB()), cb_offset(x.Bytes() / (2 * sizeof(store_t) * N))
       {}
     };
 
