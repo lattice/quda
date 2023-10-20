@@ -108,7 +108,7 @@ protected:
           gParam.x[d] += 2 * gParam.r[d];
         }
 
-        U = new cudaGaugeField(gParam);
+        U = new GaugeField(gParam);
 
         RNG randstates(*U, 1234);
 
@@ -160,12 +160,12 @@ protected:
           for (int d = 0; d < 4; d++)
             if (comm_dim_partitioned(d)) R[d] = 2;
           static TimeProfile GaugeFix("GaugeFix");
-          cudaGaugeField *tmp = new cudaGaugeField(gauge_field_param);
+          GaugeField *tmp = new GaugeField(gauge_field_param);
           tmp->copy(*host);
           U = createExtendedGauge(*tmp, R, GaugeFix);
           delete tmp;
         } else {
-          U = new cudaGaugeField(gauge_field_param);
+          U = new GaugeField(gauge_field_param);
           U->copy(*host);
         }
 
@@ -266,7 +266,7 @@ protected:
     gParam.reconstruct = param.reconstruct;
     gParam.setPrecision(gParam.Precision(), true);
 
-    cudaGaugeField *gauge = new cudaGaugeField(gParam);
+    GaugeField *gauge = new GaugeField(gParam);
 
     // copy into regular field
     copyExtendedGauge(*gauge, *U, QUDA_CUDA_FIELD_LOCATION);

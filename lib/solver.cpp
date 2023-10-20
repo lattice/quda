@@ -223,9 +223,6 @@ namespace quda {
       = (outer.inv_type_precondition == QUDA_MR_INVERTER) ? QUDA_INVALID_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
 
     inner.iter = 0;
-    inner.gflops = 0;
-    inner.secs = 0;
-
     inner.inv_type_precondition = QUDA_INVALID_INVERTER;
     inner.is_preconditioner = true; // tell inner solver it is a preconditioner
     inner.pipeline = true;

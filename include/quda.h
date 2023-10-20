@@ -62,7 +62,7 @@ extern "C" {
 
     QudaGaugeFixed gauge_fix; /**< Whether the input gauge field is in the axial gauge or not */
 
-    int ga_pad;       /**< The pad size that the cudaGaugeField will use (default=0) */
+    int ga_pad; /**< The pad size that native GaugeFields will use (default=0) */
 
     int site_ga_pad;  /**< Used by link fattening and the gauge and fermion forces */
 
@@ -1497,7 +1497,7 @@ extern "C" {
   void  saveGaugeFieldQuda(void* outGauge, void* inGauge, QudaGaugeParam* param);
 
   /**
-   * Reinterpret gauge as a pointer to cudaGaugeField and call destructor.
+   * Reinterpret gauge as a pointer to a GaugeField and call destructor.
    *
    * @param gauge Gauge field to be freed
    */
@@ -1682,12 +1682,10 @@ extern "C" {
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
-   * @param[out] timeinfo
    */
   int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                                 const unsigned int verbose_interval, const double relax_boost, const double tolerance,
-                                const unsigned int reunit_interval, const unsigned int stopWtheta,
-                                QudaGaugeParam *param, double *timeinfo);
+                                const unsigned int reunit_interval, const unsigned int stopWtheta, QudaGaugeParam *param);
 
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
@@ -1701,12 +1699,10 @@ extern "C" {
    * iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
-   * @param[out] timeinfo
    */
   int computeGaugeFixingFFTQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                                 const unsigned int verbose_interval, const double alpha, const unsigned int autotune,
-                                const double tolerance, const unsigned int stopWtheta, QudaGaugeParam *param,
-                                double *timeinfo);
+                                const double tolerance, const unsigned int stopWtheta, QudaGaugeParam *param);
 
   /**
    * @brief Strided Batched GEMM
@@ -1738,7 +1734,6 @@ extern "C" {
   * Create deflation solver resources.
   *
   **/
-
   void* newDeflationQuda(QudaEigParam *param);
 
   /**
@@ -1764,9 +1759,11 @@ extern "C" {
     int delete_2link;
     /** Set if the input spinor is on a time slice **/
     int t0;
+    /** Time taken for the smearing operations **/
+    double secs;
     /** Flops count for the smearing operations **/
-    int gflops;
-    
+    double gflops;
+
   } QudaQuarkSmearParam;
 
   /**

@@ -877,14 +877,13 @@ namespace quda
       FieldOrderCB(const ColorSpinorField &field, int nFace = 1, void *const v_ = 0, void *const *ghost_ = 0) :
         GhostOrder(field, nFace, ghost_), volumeCB(field.VolumeCB()), accessor(field)
       {
-        v.v = v_ ? static_cast<complex<storeFloat> *>(const_cast<void *>(v_)) :
-                   static_cast<complex<storeFloat> *>(const_cast<void *>(field.V()));
+        v.v = v_ ? static_cast<complex<storeFloat> *>(const_cast<void *>(v_)) : field.data<complex<storeFloat> *>();
         resetScale(field.Scale());
 
         if constexpr (fixed && block_float) {
           if constexpr (nColor == 3 && nSpin == 1 && nVec == 1 && order == 2)
             // special case where the norm is packed into the per site struct
-            v.norm = reinterpret_cast<norm_t *>(const_cast<void *>(field.V()));
+            v.norm = field.data<norm_t *>();
           else
             v.norm = static_cast<norm_t *>(const_cast<void *>(field.Norm()));
           v.norm_offset = field.Bytes() / (2 * sizeof(norm_t));
@@ -1088,7 +1087,7 @@ namespace quda
       size_t bytes;
 
       FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *buffer = 0, Float **ghost_ = 0) :
-        field(buffer ? buffer : (Float *)a.V()),
+        field(buffer ? buffer : a.data<Float *>()),
         norm(buffer ? reinterpret_cast<norm_type *>(reinterpret_cast<char *>(buffer) + a.NormOffset()) :
                       const_cast<norm_type *>(reinterpret_cast<const norm_type *>(a.Norm()))),
         offset(a.Bytes() / (2 * sizeof(Float) * N)),
@@ -1316,7 +1315,7 @@ namespace quda
       size_t bytes;
 
       FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *buffer = 0, Float **ghost_ = 0) :
-        field(buffer ? buffer : (Float *)a.V()),
+        field(buffer ? buffer : a.data<Float *>()),
         offset(a.Bytes() / (2 * sizeof(Vector))),
         volumeCB(a.VolumeCB()),
         nParity(a.SiteSubset()),
@@ -1505,7 +1504,7 @@ namespace quda
       int faceVolumeCB[4];
       int nParity;
       SpaceColorSpinorOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, float * = 0, Float **ghost_ = 0) :
-        field(field_ ? field_ : (Float *)a.V()),
+        field(field_ ? field_ : a.data<Float *>()),
         offset(a.Bytes() / (2 * sizeof(Float))),
         volumeCB(a.VolumeCB()),
         nParity(a.SiteSubset())
@@ -1589,7 +1588,7 @@ namespace quda
       int faceVolumeCB[4];
       int nParity;
       SpaceSpinorColorOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, float * = 0, Float **ghost_ = 0) :
-        field(field_ ? field_ : (Float *)a.V()),
+        field(field_ ? field_ : a.data<Float *>()),
         offset(a.Bytes() / (2 * sizeof(Float))),
         volumeCB(a.VolumeCB()),
         nParity(a.SiteSubset())
@@ -1668,7 +1667,7 @@ namespace quda
       int exDim[4]; // full field dimensions
       PaddedSpaceSpinorColorOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, float * = 0,
                                   Float **ghost_ = 0) :
-        field(field_ ? field_ : (Float *)a.V()),
+        field(field_ ? field_ : a.data<Float *>()),
         volumeCB(a.VolumeCB()),
         exVolumeCB(1),
         nParity(a.SiteSubset()),
@@ -1763,7 +1762,7 @@ namespace quda
       int volumeCB;
       int nParity;
       QDPJITDiracOrder(const ColorSpinorField &a, int = 1, Float *field_ = 0, float * = 0) :
-        field(field_ ? field_ : (Float *)a.V()), volumeCB(a.VolumeCB()), nParity(a.SiteSubset())
+        field(field_ ? field_ : a.data<Float *>()), volumeCB(a.VolumeCB()), nParity(a.SiteSubset())
       {
       }
 

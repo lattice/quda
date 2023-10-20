@@ -42,9 +42,6 @@ namespace quda
         ApplyWilsonCloverHasenbuschTwist(out.Odd(), in.Even(), *gauge, *clover, -kappa, mu, in.Odd(), QUDA_ODD_PARITY,
                                          dagger, commDim, profile);
       }
-
-      // 2 c/b applies of DiracClover + (1-imu gamma_5 A)psi_{!p}
-      flops += 2 * 1872ll * in.VolumeCB() + (48ll + 504ll) * in.VolumeCB();
     } else {
       if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
         ApplyWilsonClover(out.Even(), in.Odd(), *gauge, *clover, -kappa, in.Even(), QUDA_EVEN_PARITY, dagger, commDim,
@@ -57,8 +54,6 @@ namespace quda
         ApplyWilsonClover(out.Odd(), in.Even(), *gauge, *clover, -kappa, in.Odd(), QUDA_ODD_PARITY, dagger, commDim,
                           profile);
       }
-      // 2 c/b applies of DiracClover + (1-imu gamma_5)psi_{!p}
-      flops += 2 * 1872ll * in.VolumeCB() + 48ll * in.VolumeCB();
     }
   }
 
@@ -115,9 +110,6 @@ namespace quda
     checkSpinorAlias(in, out);
 
     ApplyWilsonCloverHasenbuschTwistPCClovInv(out, in, *gauge, *clover, k, b, x, parity, dagger, commDim, profile);
-
-    // DiracCloverPC.DslashXPay -/+ mu ( i gamma_5 ) A
-    flops += (1872ll + 48ll + 504ll) * in.Volume();
   }
 
   // xpay version of the above
@@ -129,9 +121,6 @@ namespace quda
     checkSpinorAlias(in, out);
 
     ApplyWilsonCloverHasenbuschTwistPCNoClovInv(out, in, *gauge, *clover, k, b, x, parity, dagger, commDim, profile);
-
-    //    DiracCloverPC.DslashXPay -/+ mu ( i gamma_5 )
-    flops += (1872ll + 48) * in.Volume();
   }
 
   // Apply the even-odd preconditioned clover-improved Dirac operator
@@ -155,7 +144,6 @@ namespace quda
 
       // applies (A + imu*g5 - kappa^2 D)-
       ApplyTwistedClover(out, tmp, *gauge, *clover, kappa2, mu, in, parity[1], dagger, commDim, profile);
-      flops += 1872ll * in.Volume();
     } else if (!dagger) { // symmetric preconditioning
       // We need two cases because M = 1-ADAD and M^\dag = 1-D^\dag A D^dag A
       // where A is actually a clover inverse.
@@ -188,7 +176,7 @@ namespace quda
   {
     // double a = - 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     // CoarseOp(Y, X, T, *gauge, &clover, kappa, a, -mu_factor,QUDA_CLOVERPC_DIRAC, matpcType);
-    errorQuda("Not yet implemented\n");
+    errorQuda("Not yet implemented");
   }
 
 } // namespace quda

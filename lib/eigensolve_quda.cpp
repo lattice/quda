@@ -259,8 +259,6 @@ namespace quda
       io.save(kSpace, save_prec, n_eig);
     }
 
-    mat.flops();
-
     logQuda(QUDA_SUMMARIZE, "********************************\n");
     logQuda(QUDA_SUMMARIZE, "***** END QUDA EIGENSOLVER *****\n");
     logQuda(QUDA_SUMMARIZE, "********************************\n");

@@ -140,16 +140,6 @@ namespace quda
                                                    const ColorSpinorField &x, int parity, bool dagger,
                                                    const int *comm_override, TimeProfile &profile)
   {
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, U, A);
-
-    // check all locations match
-    checkLocation(out, in, U, A);
-
     instantiate<WilsonCloverHasenbuschTwistPCNoClovInvApply>(out, in, U, A, a, b, x, parity, dagger, comm_override,
                                                              profile);
   }
