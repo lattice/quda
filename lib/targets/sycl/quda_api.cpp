@@ -67,9 +67,9 @@ namespace quda
     const bool async;
     const char *name;
     const bool active_tuning;
-    //const char *func;
-    //const char *file;
-    //const char *line;
+    const char *func;
+    const char *file;
+    const char *line;
 
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
@@ -84,10 +84,10 @@ namespace quda
       copy(true),
       kind(kind),
       async(async),
-      active_tuning(activeTuning())
-      //func(func),
-      //file(file),
-      //line(line)
+      active_tuning(activeTuning()),
+      func(func),
+      file(file),
+      line(line)
     {
       if (!async) {
         switch (kind) {
@@ -179,6 +179,9 @@ namespace quda
 	  q.wait_and_throw();
 	}
       }
+      qudaError_t error = qudaGetLastError();
+      if (error != QUDA_SUCCESS)
+	errorQuda("(QUDA) %s\n (%s:%s in %s())\n", qudaGetLastErrorString().c_str(), file, line, func);
     }
 
     bool advanceTuneParam(TuneParam &) const { return false; }
@@ -199,9 +202,13 @@ namespace quda
   {
     if (count == 0) return;
     QudaMem copy(dst, src, count, kind, device::get_default_stream(), false, func, file, line);
-    qudaError_t error = qudaGetLastError();
-    if (error != QUDA_SUCCESS)
-      errorQuda("(QUDA) %s\n (%s:%s in %s())\n", qudaGetLastErrorString().c_str(), file, line, func);
+  }
+
+  void qudaMemcpy_(const quda_ptr &dst, const quda_ptr &src, size_t count, qudaMemcpyKind kind, const char *func,
+                   const char *file, const char *line)
+  {
+    if (count == 0) return;
+    QudaMem copy(dst.data(), src.data(), count, kind, device::get_default_stream(), false, func, file, line);
   }
 
   void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
@@ -281,10 +288,15 @@ namespace quda
     if (count == 0) return;
     auto stream = device::get_default_stream();
     QudaMem set(ptr, value, count, stream, false, func, file, line);
-    qudaError_t error = qudaGetLastError();
-    if (error != QUDA_SUCCESS && !activeTuning()) {
-      errorQuda("(QUDA) %s\n (%s:%s in %s())\n", qudaGetLastErrorString().c_str(),
-		file, line, func);
+  }
+
+  void qudaMemset_(quda_ptr &ptr, int value, size_t count, const char *func, const char *file, const char *line)
+  {
+    if (count == 0) return;
+    if (ptr.is_device()) {
+      QudaMem set(ptr.data(), value, count, device::get_default_stream(), false, func, file, line);
+    } else {
+      memset(ptr.data(), value, count);
     }
   }
 
@@ -293,13 +305,20 @@ namespace quda
   {
     if (count == 0) return;
     QudaMem set(ptr, value, count, stream, true, func, file, line);
-    qudaError_t error = qudaGetLastError();
-    if (error != QUDA_SUCCESS) {
-      errorQuda("(QUDA) %s\n (%s:%s in %s())\n", qudaGetLastErrorString().c_str(),
-		file, line, func);
+  }
+
+  void qudaMemsetAsync_(quda_ptr &ptr, int value, size_t count, const qudaStream_t &stream, const char *func,
+                        const char *file, const char *line)
+  {
+    if (count == 0) return;
+    if (ptr.is_device()) {
+      QudaMem set(ptr.data(), value, count, stream, true, func, file, line);
+    } else {
+      memset(ptr.data(), value, count);
     }
   }
 
+#if 0
   void qudaMemset2D_(void *ptr, size_t pitch, int value, size_t width, size_t height,
 		     const char *, const char *, const char *)
   //const char *func, const char *file, const char *line)
@@ -324,6 +343,23 @@ namespace quda
     for(size_t i=0; i<height; i++) {
       q.memset(p, value, width);
       p += pitch;
+    }
+  }
+#endif
+
+  void qudaMemset2DAsync_(quda_ptr &ptr, size_t offset, size_t pitch, int value, size_t width, size_t height,
+                          const qudaStream_t &stream, const char *, const char *, const char *)
+  //const char *func, const char *file, const char *line)
+  {
+    if (ptr.is_device()) {
+      auto q = device::get_target_stream(stream);
+      char *p = static_cast<char*>(ptr.data());
+      for(int i=0; i<height; i++) {
+	q.memset(p, value, width);
+	p += pitch;
+      }
+    } else {
+      for (auto i = 0u; i < height; i++) memset(static_cast<char *>(ptr.data()) + offset + i * pitch, value, width);
     }
   }
 
