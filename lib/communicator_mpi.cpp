@@ -291,6 +291,16 @@ namespace quda
     }
   }
 
+  void Communicator::comm_allreduce_sum(size_t &a)
+  {
+    if (sizeof(size_t) != sizeof(unsigned long)) {
+      errorQuda("sizeof(size_t) != sizeof(unsigned long): %lu != %lu\n", sizeof(size_t), sizeof(unsigned long));
+    }
+    size_t recv;
+    MPI_CHECK(MPI_Allreduce(&a, &recv, 1, MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_HANDLE));
+    a = recv;
+  }
+
   void Communicator::comm_allreduce_max_array(deviation_t<double> *data, size_t size)
   {
     size_t n = comm_size();
@@ -349,9 +359,9 @@ namespace quda
 
   int Communicator::comm_rank_global()
   {
-    int rank;
-    MPI_CHECK(MPI_Comm_rank(MPI_COMM_WORLD, &rank));
-    return rank;
+    static int global_rank = -1;
+    if (global_rank < 0) { MPI_CHECK(MPI_Comm_rank(MPI_COMM_WORLD, &global_rank)); }
+    return global_rank;
   }
 
 } // namespace quda

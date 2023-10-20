@@ -177,7 +177,7 @@ void init(int argc, char **argv)
   }
 }
 
-std::vector<double> solve(test_t param)
+std::vector<std::array<double, 2>> solve(test_t param)
 {
   inv_param.inv_type = ::testing::get<0>(param);
   inv_param.solution_type = ::testing::get<1>(param);
@@ -193,6 +193,8 @@ std::vector<double> solve(test_t param)
   inv_param.inv_type_precondition  = ::testing::get<1>(schwarz_param);
   inv_param.cuda_prec_precondition = ::testing::get<2>(schwarz_param);
   inv_param.clover_cuda_prec_precondition = ::testing::get<2>(schwarz_param);
+
+  inv_param.residual_type = ::testing::get<7>(param);
 
   // reset lambda_max if we're doing a testing loop to ensure correct lambma_max
   if (enable_testing) inv_param.ca_lambda_max = -1.0;
@@ -212,6 +214,8 @@ std::vector<double> solve(test_t param)
     if (use_split_grid) { errorQuda("Split grid does not work with MG yet."); }
     mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
+
+    printfQuda("MG Setup Done: %g secs, %g Gflops\n", mg_param.secs, mg_param.gflops / mg_param.secs);
   }
 
   // Vector construct START
@@ -229,22 +233,32 @@ std::vector<double> solve(test_t param)
   // Vector construct END
   //-----------------------------------------------------------------------------------
 
-  // Quark masses
-  std::vector<double> masses(multishift);
+  // Shifts
+  std::vector<double> shifts(multishift);
 
   // QUDA invert test BEGIN
   //----------------------------------------------------------------------------
   if (multishift > 1) {
     if (use_split_grid) { errorQuda("Split grid does not work with multishift yet."); }
     inv_param.num_offset = multishift;
+
+    // Consistency check for shifts, tols, tols_hq size if we're setting custom values
+    if (multishift_masses.size() != 0)
+      errorQuda("Multishift masses are not supported for Wilson-type fermions");
+    if (multishift_shifts.size() != 0 && multishift_shifts.size() != static_cast<unsigned long>(multishift))
+      errorQuda("Multishift shift count %d does not agree with number of shifts passed in %lu\n", multishift, multishift_shifts.size());
+    if (multishift_tols.size() != 0 && multishift_tols.size() != static_cast<unsigned long>(multishift))
+      errorQuda("Multishift tolerance count %d does not agree with number of masses passed in %lu\n", multishift, multishift_tols.size());
+    if (multishift_tols_hq.size() != 0 && multishift_tols_hq.size() != static_cast<unsigned long>(multishift))
+      errorQuda("Multishift hq tolerance count %d does not agree with number of masses passed in %lu\n", multishift, multishift_tols_hq.size());
+
+    // Copy offsets and tolerances into inv_param; copy data pointers
     for (int i = 0; i < multishift; i++) {
-      // Set masses and offsets
-      masses[i] = 0.06 + i * i * 0.01;
-      inv_param.offset[i] = 4 * masses[i] * masses[i];
-      // Set tolerances for the heavy quarks, these can be set independently
-      // (functions of i) if desired
-      inv_param.tol_offset[i] = inv_param.tol;
-      inv_param.tol_hq_offset[i] = inv_param.tol_hq;
+      shifts[i] = (multishift_shifts.size() == 0 ? (i * i * 0.01) : multishift_shifts[i]);
+      inv_param.offset[i] = shifts[i];
+      inv_param.tol_offset[i] = (multishift_tols.size() == 0 ? inv_param.tol : multishift_tols[i]);
+      inv_param.tol_hq_offset[i] = (multishift_tols_hq.size() == 0 ? inv_param.tol_hq : multishift_tols_hq[i]);
+
       // Allocate memory and set pointers
       for (int n = 0; n < Nsrc; n++) {
         out_multishift[n * multishift + i] = quda::ColorSpinorField(cs_param);
@@ -322,7 +336,7 @@ std::vector<double> solve(test_t param)
   // Compute performance statistics
   if (Nsrc > 1 && !use_split_grid) performanceStats(time, gflops, iter);
 
-  std::vector<double> res(Nsrc);
+  std::vector<std::array<double, 2>> res(Nsrc);
   // Perform host side verification of inversion if requested
   if (verify_results) {
     for (int i = 0; i < Nsrc; i++) {
@@ -409,7 +423,8 @@ int main(int argc, char **argv)
     result = RUN_ALL_TESTS();
   } else {
     solve(test_t {inv_type, solution_type, solve_type, prec_sloppy, multishift, solution_accumulator_pipeline,
-                  schwarz_t {precon_schwarz_type, inv_multigrid ? QUDA_MG_INVERTER : precon_type, prec_precondition} } );
+                  schwarz_t {precon_schwarz_type, inv_multigrid ? QUDA_MG_INVERTER : precon_type, prec_precondition},
+                  inv_param.residual_type});
   }
 
   // finalize the QUDA library

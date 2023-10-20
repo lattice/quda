@@ -53,7 +53,7 @@ namespace quda {
 
     QudaFieldCreate create = QUDA_REFERENCE_FIELD_CREATE; // used to determine the type of field created
 
-    QudaFieldGeometry geometry = QUDA_VECTOR_GEOMETRY; // whether the field is a scale, vector or tensor
+    QudaFieldGeometry geometry = QUDA_VECTOR_GEOMETRY; // whether the field is a scalar, vector or tensor
 
     // whether we need to compute the fat link maxima
     // FIXME temporary flag until we have a kernel that can do this, then we just do this in copy()
@@ -94,17 +94,19 @@ namespace quda {
       order(param.gauge_order),
       fixed(param.gauge_fix),
       link_type(link_type_ != QUDA_INVALID_LINKS ? link_type_ : param.type),
-      t_boundary(param.t_boundary),
+      t_boundary(link_type == QUDA_ASQTAD_MOM_LINKS ? QUDA_PERIODIC_T : param.t_boundary),
       // if we have momentum field and not using TIFR field, then we always have recon-10
-      reconstruct(link_type == QUDA_ASQTAD_MOM_LINKS && order != QUDA_TIFR_GAUGE_ORDER && order != QUDA_TIFR_PADDED_GAUGE_ORDER ?
-                  QUDA_RECONSTRUCT_10 : QUDA_RECONSTRUCT_NO),
+      reconstruct(link_type == QUDA_ASQTAD_MOM_LINKS && order != QUDA_TIFR_GAUGE_ORDER
+                      && order != QUDA_TIFR_PADDED_GAUGE_ORDER ?
+                    QUDA_RECONSTRUCT_10 :
+                    QUDA_RECONSTRUCT_NO),
       anisotropy(param.anisotropy),
       tadpole(param.tadpole_coeff),
       gauge(h_gauge),
       staggeredPhaseType(param.staggered_phase_type),
       staggeredPhaseApplied(param.staggered_phase_applied),
       i_mu(param.i_mu),
-      site_offset(param.gauge_offset),
+      site_offset(link_type == QUDA_ASQTAD_MOM_LINKS ? param.mom_offset : param.gauge_offset),
       site_size(param.site_size)
     {
       switch (link_type) {
@@ -144,8 +146,11 @@ namespace quda {
   };
 
   std::ostream& operator<<(std::ostream& output, const GaugeFieldParam& param);
+  std::ostream &operator<<(std::ostream &output, const GaugeField &param);
 
   class GaugeField : public LatticeField {
+
+    friend std::ostream &operator<<(std::ostream &output, const GaugeField &param);
 
   private:
     /**
@@ -289,6 +294,12 @@ namespace quda {
     GaugeField &operator=(GaugeField &&field);
 
     /**
+       @brief Returns if the object is empty (not initialized)
+       @return true if the object has not been allocated, otherwise false
+    */
+    bool empty() const { return !init; }
+
+    /**
        @brief Create the communication handlers and buffers
        @param[in] R The thickness of the extended region in each dimension
        @param[in] no_comms_fill Do local exchange to fill out the extended
@@ -430,10 +441,8 @@ namespace quda {
     {
       switch (order) {
       case QUDA_QDP_GAUGE_ORDER:
-      case QUDA_QDPJIT_GAUGE_ORDER:
-        return true;
-      default:
-        return false;
+      case QUDA_QDPJIT_GAUGE_ORDER: return true;
+      default: return false;
       }
     }
 
@@ -442,11 +451,10 @@ namespace quda {
        @tparam T Optional type to cast the pointer to (default is void*).
        @return Base pointer to the gauge field allocation
      */
-    template <typename T = void*>
+    template <typename T = void *>
     std::enable_if_t<std::is_pointer_v<T> && !std::is_pointer_v<typename std::remove_pointer<T>::type>, T> data() const
     {
-      if (is_pointer_array(order))
-        errorQuda("Non dim-array ordered field requested but order is %d", order);
+      if (is_pointer_array(order)) errorQuda("Non dim-array ordered field requested but order is %d", order);
       return reinterpret_cast<T>(gauge.data());
     }
 
@@ -459,9 +467,10 @@ namespace quda {
        @param[in] d Dimension index when the allocation is an array type
        @return Base pointer to the gauge field allocation
      */
-    template <typename T = void*> auto data(unsigned int d) const
+    template <typename T = void *> auto data(unsigned int d) const
     {
-      static_assert(std::is_pointer_v<T> && !std::is_pointer_v<typename std::remove_pointer<T>::type>, "data() requires a pointer cast type");
+      static_assert(std::is_pointer_v<T> && !std::is_pointer_v<typename std::remove_pointer<T>::type>,
+                    "data() requires a pointer cast type");
       if (d >= (unsigned)geometry) errorQuda("Invalid array index %d for geometry %d field", d, geometry);
       if (!is_pointer_array(order)) errorQuda("Dim-array ordered field requested but order is %d", order);
       return reinterpret_cast<T>(gauge_array[d].data());
@@ -474,8 +483,9 @@ namespace quda {
        or QDPJIT.
        @return Array of pointers to the gauge field allocations
      */
-    template <typename T = void*>
-    std::enable_if_t<std::is_pointer_v<T> && !std::is_pointer_v<typename std::remove_pointer<T>::type>, array<T, QUDA_MAX_DIM>> data_array() const
+    template <typename T = void *>
+    std::enable_if_t<std::is_pointer_v<T> && !std::is_pointer_v<typename std::remove_pointer<T>::type>, array<T, QUDA_MAX_DIM>>
+    data_array() const
     {
       if (!is_pointer_array(order)) errorQuda("Dim-array ordered field requested but order is %d", order);
       array<T, QUDA_MAX_DIM> u = {};
@@ -485,7 +495,8 @@ namespace quda {
 
     virtual int full_dim(int d) const { return x[d]; }
 
-    auto& Ghost() const {
+    auto &Ghost() const
+    {
       if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
       return ghost;
     }
@@ -598,6 +609,23 @@ namespace quda {
       @param[in] the host buffer to copy from.
     */
     void copy_from_buffer(void *buffer);
+
+    /**
+       @brief Check if two instances are compatible
+       @param[in] a Input field
+       @param[in] b Input field
+       @return Return true if two fields are compatible
+     */
+    static bool are_compatible(const GaugeField &a, const GaugeField &b);
+
+    /**
+       @brief Check if two instances are weakly compatible (precision
+       and order can differ)
+       @param[in] a Input field
+       @param[in] b Input field
+       @return Return true if two fields are compatible
+     */
+    static bool are_compatible_weak(const GaugeField &a, const GaugeField &b);
 
     friend struct GaugeFieldParam;
   };

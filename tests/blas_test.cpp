@@ -9,6 +9,8 @@
 #include <host_utils.h>
 #include <command_line_params.h>
 
+#include <tune_quda.h>
+
 // include because of nasty globals used in the tests
 #include <dslash_reference.h>
 
@@ -1152,14 +1154,13 @@ TEST_P(BlasTest, benchmark)
   // do the initial tune
   benchmark(kernel, 1);
 
-  // now rerun with more iterations to get accurate speed measurements
-  quda::blas::flops = 0;
-  quda::blas::bytes = 0;
+  auto flops0 = quda::Tunable::flops_global();
+  auto bytes0 = quda::Tunable::bytes_global();
 
   double secs = benchmark(kernel, niter);
 
-  double gflops = (quda::blas::flops * 1e-9) / (secs);
-  double gbytes = quda::blas::bytes / (secs * 1e9);
+  double gflops = (quda::Tunable::flops_global() - flops0) * 1e-9 / secs;
+  double gbytes = (quda::Tunable::bytes_global() - bytes0) / (secs * 1e9);
   RecordProperty("Gflops", std::to_string(gflops));
   RecordProperty("GBs", std::to_string(gbytes));
   printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", kernel_map.at(kernel).c_str(), gflops, gbytes);

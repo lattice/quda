@@ -440,7 +440,8 @@ namespace quda
       diracParam.matpcType = matpc_type;
       diracParam.type = QUDA_COARSE_DIRAC;
       diracParam.halo_precision = param.mg_global.precision_null[param.level];
-      diracParam.use_mma = param.use_mma;
+      diracParam.setup_use_mma = param.mg_global.setup_use_mma[param.level];
+      diracParam.dslash_use_mma = param.mg_global.dslash_use_mma[param.level];
       diracParam.allow_truncation = (param.mg_global.allow_truncation == QUDA_BOOLEAN_TRUE) ? true : false;
 
       diracCoarseResidual = new DiracCoarse(diracParam, param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false,
@@ -671,6 +672,7 @@ namespace quda
           vec_outfile += "_defl_";
           vec_outfile += std::to_string(param.mg_global.n_vec[param.level + 1]);
           strcpy(param_coarse_solver->eig_param.vec_outfile, vec_outfile.c_str());
+          param_coarse_solver->eig_param.partfile = param.mg_global.mg_vec_partfile[param.level + 1];
         }
       }
 
@@ -802,34 +804,6 @@ namespace quda
     popLevel();
   }
 
-  // FIXME need to make this more robust (implement Solver::flops() for all solvers)
-  double MG::flops() const {
-    double flops = 0;
-
-    if (param_coarse_solver) {
-      flops += param_coarse_solver->gflops * 1e9;
-      param_coarse_solver->gflops = 0;
-    } else if (param.level < param.Nlevel-1) {
-      flops += coarse->flops();
-    }
-
-    if (param_presmooth) {
-      flops += param_presmooth->gflops * 1e9;
-      param_presmooth->gflops = 0;
-    }
-
-    if (param_postsmooth) {
-      flops += param_postsmooth->gflops * 1e9;
-      param_postsmooth->gflops = 0;
-    }
-
-    if (transfer) {
-      flops += transfer->flops();
-    }
-
-    return flops;
-  }
-
   bool check_deviation(double deviation, double tol)
   {
     return (deviation > tol || std::isnan(deviation) || std::isinf(deviation));
@@ -859,7 +833,7 @@ namespace quda
     switch (prec) {
     case QUDA_QUARTER_PRECISION: tol = 5e-2; break;
     case QUDA_HALF_PRECISION: tol = 5e-2; break;
-    case QUDA_SINGLE_PRECISION: tol = 1e-3; break;
+    case QUDA_SINGLE_PRECISION: tol = 2e-3; break;
     default: tol = 1e-8;
     }
 
@@ -1381,7 +1355,7 @@ namespace quda
       vec_outfile += std::to_string(param.level);
       vec_outfile += "_nvec_";
       vec_outfile += std::to_string(param.mg_global.n_vec[param.level]);
-      VectorIO io(vec_outfile);
+      VectorIO io(vec_outfile, false, param.mg_global.mg_vec_partfile[param.level]);
       vector_ref<const ColorSpinorField> B_ref;
       for (auto i = 0u; i < B.size(); i++) B_ref.push_back(*B[i]);
       io.save(std::move(B_ref));

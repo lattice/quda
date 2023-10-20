@@ -62,12 +62,12 @@ namespace quda {
 	if (infield.Precision() == QUDA_SINGLE_PRECISION) {
           copyArrayToLink(inlink, infield.data<float *>() + (i * 4 + dir) * 18); // order of arguments?
           unitarizeLinkNewton(outlink, inlink, max_iter_newton);
-	  copyLinkToArray(outfield.data<float *>() + (i * 4 + dir) * 18, outlink);
-	} else if (infield.Precision() == QUDA_DOUBLE_PRECISION) {
-	  copyArrayToLink(inlink, infield.data<double *>() + (i * 4 + dir) * 18); // order of arguments?
+          copyLinkToArray(outfield.data<float *>() + (i * 4 + dir) * 18, outlink);
+        } else if (infield.Precision() == QUDA_DOUBLE_PRECISION) {
+          copyArrayToLink(inlink, infield.data<double *>() + (i * 4 + dir) * 18); // order of arguments?
           unitarizeLinkNewton(outlink, inlink, max_iter_newton);
-	  copyLinkToArray(outfield.data<double*>() + (i * 4 + dir) * 18, outlink);
-	} // precision?
+          copyLinkToArray(outfield.data<double *>() + (i * 4 + dir) * 18, outlink);
+        } // precision?
       } // dir
     }   // loop over volume
   }
@@ -85,9 +85,9 @@ namespace quda {
         } else if (field.Precision() == QUDA_DOUBLE_PRECISION) {
           copyArrayToLink(link, field.data<double *>() + (i * 4 + dir) * 18); // order of arguments?
         } else {
-	  errorQuda("Unsupported precision\n");
-	}
-	if (link.isUnitary(max_error) == false) {
+          errorQuda("Unsupported precision\n");
+        }
+        if (link.isUnitary(max_error) == false) {
 	  printf("Unitarity failure\n");
 	  printf("site index = %u,\t direction = %d\n", i, dir);
 	  printLink(link);

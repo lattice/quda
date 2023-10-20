@@ -446,7 +446,7 @@ void gauge_force_reference_dir(void *refMom, int dir, double eb3, void *const *s
                                QudaPrecision prec, int **path_dir, int *length, void *loop_coeff, int num_paths,
                                const lattice_t &lat, bool compute_force)
 {
-  size_t size = V * 2 * lat.n_color * lat.n_color * prec;
+  size_t size = size_t(V) * 2 * lat.n_color * lat.n_color * prec;
   void *staple = safe_malloc(size);
   memset(staple, 0, size);
 
@@ -478,8 +478,8 @@ void gauge_force_reference_dir(void *refMom, int dir, double eb3, void *const *s
   host_free(staple);
 }
 
-void gauge_force_reference(void *refMom, double eb3, quda::GaugeField &u, int ***path_dir,
-                           int *length, void *loop_coeff, int num_paths, bool compute_force)
+void gauge_force_reference(void *refMom, double eb3, quda::GaugeField &u, int ***path_dir, int *length,
+                           void *loop_coeff, int num_paths, bool compute_force)
 {
   void *sitelink[] = {u.data(0), u.data(1), u.data(2), u.data(3)};
 
@@ -492,21 +492,19 @@ void gauge_force_reference(void *refMom, double eb3, quda::GaugeField &u, int **
   param.t_boundary = QUDA_PERIODIC_T;
 
   auto qdp_ex = quda::createExtendedGauge((void **)sitelink, param, R);
-  //quda::TimeProfile dummy("blah");
-  //auto qdp_ex = quda::createExtendedGauge(u, R, dummy);
   lattice_t lat(*qdp_ex);
 
   void *sitelink_ex[] = {qdp_ex->data(0), qdp_ex->data(1), qdp_ex->data(2), qdp_ex->data(3)};
   for (int dir = 0; dir < 4; dir++) {
-    gauge_force_reference_dir(refMom, dir, eb3, sitelink, sitelink_ex, u.Precision(), path_dir[dir], length,
-                              loop_coeff, num_paths, lat, compute_force);
+    gauge_force_reference_dir(refMom, dir, eb3, sitelink, sitelink_ex, u.Precision(), path_dir[dir], length, loop_coeff,
+                              num_paths, lat, compute_force);
   }
 
   delete qdp_ex;
 }
 
-void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::Complex> &loop_traces,
-                                double factor, int **input_path, int *length, double *path_coeff, int num_paths)
+void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::Complex> &loop_traces, double factor,
+                                int **input_path, int *length, double *path_coeff, int num_paths)
 {
   void *sitelink[] = {u.data(0), u.data(1), u.data(2), u.data(3)};
 

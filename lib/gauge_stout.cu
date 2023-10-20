@@ -49,8 +49,14 @@ namespace quda {
       }
     }
 
-    void preTune() { if (out.data() == in.data()) out.backup(); }
-    void postTune() { if (out.data() == in.data()) out.restore(); }
+    void preTune()
+    {
+      if (out.data() == in.data()) out.backup();
+    }
+    void postTune()
+    {
+      if (out.data() == in.data()) out.restore();
+    }
 
     long long flops() const // just counts matrix multiplication
     {

@@ -34,7 +34,7 @@ void createNoisyLinkCPU(quda::GaugeField &field, QudaPrecision prec, int seed)
   for (int dir = 0; dir < 4; ++dir) {
     for (int i = 0; i < V * 18; ++i) {
       if (prec == QUDA_DOUBLE_PRECISION) {
-        double *ptr = field.data<double*>(dir) + i;
+        double *ptr = field.data<double *>(dir) + i;
         *ptr += (rand() - RAND_MAX / 2.0) / (20.0 * RAND_MAX);
       } else if (prec == QUDA_SINGLE_PRECISION) {
         float *ptr = field.data<float *>(dir) + i;

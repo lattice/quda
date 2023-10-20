@@ -41,6 +41,7 @@ static void llfat_test()
   qudaGaugeParam.X[3] = tdim;
 
   setDims(qudaGaugeParam.X);
+  setVerbosity(verbosity);
 
   qudaGaugeParam.cpu_prec = cpu_prec;
   qudaGaugeParam.cuda_prec = qudaGaugeParam.cuda_prec_sloppy = prec;

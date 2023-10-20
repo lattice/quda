@@ -62,7 +62,7 @@ extern "C" {
 
     QudaGaugeFixed gauge_fix; /**< Whether the input gauge field is in the axial gauge or not */
 
-    int ga_pad;       /**< The pad size that native GaugeFields will use (default=0) */
+    int ga_pad; /**< The pad size that native GaugeFields will use (default=0) */
 
     int site_ga_pad;  /**< Used by link fattening and the gauge and fermion forces */
 
@@ -585,6 +585,9 @@ extern "C" {
         MILC I/O) */
     QudaBoolean io_parity_inflate;
 
+    /** Whether to save eigenvectors in QIO singlefile or partfile format */
+    QudaBoolean partfile;
+
     /** The Gflops rate of the eigensolver setup */
     double gflops;
 
@@ -628,6 +631,12 @@ extern "C" {
 
     /** Verbosity on each level of the multigrid */
     QudaVerbosity verbosity[QUDA_MAX_MG_LEVEL];
+
+    /** Setup MMA usage on each level of the multigrid */
+    QudaBoolean setup_use_mma[QUDA_MAX_MG_LEVEL];
+
+    /** Dslash MMA usage on each level of the multigrid */
+    QudaBoolean dslash_use_mma[QUDA_MAX_MG_LEVEL];
 
     /** Inverter to use in the setup phase */
     QudaInverterType setup_inv_type[QUDA_MAX_MG_LEVEL];
@@ -773,6 +782,9 @@ extern "C" {
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[QUDA_MAX_MG_LEVEL][256];
 
+    /** Whether to store the null-space vectors in singlefile or partfile format */
+    QudaBoolean mg_vec_partfile[QUDA_MAX_MG_LEVEL];
+
     /** Whether to use and initial guess during coarse grid deflation */
     QudaBoolean coarse_guess;
 
@@ -796,9 +808,6 @@ extern "C" {
 
     /** Whether or not to use the dagger approximation for the KD preconditioned operator */
     QudaBoolean staggered_kd_dagger_approximation;
-
-    /** Whether to use tensor cores (if available) */
-    QudaBoolean use_mma;
 
     /** Whether to do a full (false) or thin (true) update in the context of updateMultigridQuda */
     QudaBoolean thin_update_only;
@@ -1676,8 +1685,7 @@ extern "C" {
    */
   int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
                                 const unsigned int verbose_interval, const double relax_boost, const double tolerance,
-                                const unsigned int reunit_interval, const unsigned int stopWtheta,
-                                QudaGaugeParam *param);
+                                const unsigned int reunit_interval, const unsigned int stopWtheta, QudaGaugeParam *param);
 
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
@@ -1726,7 +1734,6 @@ extern "C" {
   * Create deflation solver resources.
   *
   **/
-
   void* newDeflationQuda(QudaEigParam *param);
 
   /**
@@ -1752,9 +1759,11 @@ extern "C" {
     int delete_2link;
     /** Set if the input spinor is on a time slice **/
     int t0;
+    /** Time taken for the smearing operations **/
+    double secs;
     /** Flops count for the smearing operations **/
-    int gflops;
-    
+    double gflops;
+
   } QudaQuarkSmearParam;
 
   /**

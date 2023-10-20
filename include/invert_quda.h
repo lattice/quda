@@ -225,12 +225,6 @@ namespace quda {
     /** The type of accelerator type to use for preconditioner */
     QudaAcceleratorType accelerator_type_precondition;
 
-    /**< The time taken by the solver */
-    double secs;
-
-    /**< The Gflops rate of the solver */
-    double gflops;
-
     // Incremental EigCG solver parameters
     /**< The precision of the Ritz vectors */
     QudaPrecision precision_ritz;//also search space precision
@@ -333,8 +327,6 @@ namespace quda {
       ca_lambda_max_precondition(param.ca_lambda_max_precondition),
       schwarz_type(param.schwarz_type),
       accelerator_type_precondition(param.accelerator_type_precondition),
-      secs(param.secs),
-      gflops(param.gflops),
       precision_ritz(param.cuda_prec_ritz),
       n_ev(param.n_ev),
       m(param.max_search_dim),
@@ -422,8 +414,6 @@ namespace quda {
       ca_lambda_max_precondition(param.ca_lambda_max_precondition),
       schwarz_type(param.schwarz_type),
       accelerator_type_precondition(param.accelerator_type_precondition),
-      secs(param.secs),
-      gflops(param.gflops),
       precision_ritz(param.precision_ritz),
       n_ev(param.n_ev),
       m(param.m),
@@ -466,9 +456,6 @@ namespace quda {
       param.true_res = true_res;
       param.true_res_hq = true_res_hq;
       param.iter += iter;
-      comm_allreduce_sum(gflops);
-      param.gflops += gflops;
-      param.secs += secs;
       if (offset >= 0) {
 	param.true_res_offset[offset] = true_res_offset[offset];
         param.iter_res_offset[offset] = iter_res_offset[offset];
@@ -569,7 +556,12 @@ namespace quda {
     /**
        @return Whether the solver is only for Hermitian systems
      */
-    virtual bool hermitian() = 0;
+    virtual bool hermitian() const = 0;
+
+    /**
+       @return The inverter type
+     */
+    virtual QudaInverterType getInverterType() const = 0;
 
     /**
        @brief Generic solver setup and parameter checking
@@ -583,6 +575,46 @@ namespace quda {
     */
     static Solver *create(SolverParam &param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
                           const DiracMatrix &matPrecon, const DiracMatrix &matEig, TimeProfile &profile);
+
+    /**
+      @brief Create a preconditioning solver given the operators and parameters.
+        Currently only a few solvers are instantiated, and only the MADWF accelerator is currently supported.
+      @param[in] mat the "fine" matrix, generally outer matPrecon
+      @param[in] matSloppy the "sloppy" matrix, generally outer matPrecon
+      @param[in] matPrecon the preconditioner
+      @param[in] matEig the eigen-space operator that is to be used to construct the solver
+      @param[in] param the outer solver param
+      @param[in] Kparam the inner solver param
+      @param[in] profile the timer profile
+      @return the created preconditioning solver, decorated by std::shared_ptr
+    */
+    std::shared_ptr<Solver> createPreconditioner(const DiracMatrix &mat, const DiracMatrix &matSloppy,
+                                                 const DiracMatrix &matPrecon, const DiracMatrix &matEig,
+                                                 SolverParam &param, SolverParam &Kparam, TimeProfile &profile);
+
+    /**
+     * @brief Set parameters for the inner solver
+     * @param inner[out] Parameters for the preconditioner solver
+     * @param outer[in] Parameters from the outer solver
+     */
+    virtual void fillInnerSolverParam(SolverParam &inner, const SolverParam &outer);
+
+    /**
+     * @brief Extract parameters determined while running the preconditioned solve
+     * @param outer[out] Parameters for outer solver which also maintains preconditioned solver info
+     * @param inner[in] Parameters from the preconditioned solver
+     */
+    virtual void extractInnerSolverParam(SolverParam &outer, const SolverParam &inner);
+
+    /**
+      @brief Wrap an external, existing, unmanaged preconditioner in a custom `std::shared_ptr` that
+        doesn't deallocate when it falls out of scope. This is a temporary WAR for how MG solvers
+        are managed and should be removed when they themselves are passed around via shared_ptr or
+        potentially directly by reference.
+        @param[in] K the externally allocated preconditioner
+        @return the external preconditioner wrapped in a non-deallocating std::shared_ptr
+     */
+    std::shared_ptr<Solver> wrapExternalPreconditioner(const Solver &K);
 
     /**
        @brief Set the solver L2 stopping condition
@@ -741,12 +773,6 @@ namespace quda {
     static void computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<ColorSpinorField> &Ap,
                                      std::vector<ColorSpinorField> &p, int n_krylov, QudaCABasis basis, double m_map,
                                      double b_map, Args &&...args);
-
-    /**
-     * @brief Return flops
-     * @return flops expended by this operator
-     */
-    virtual double flops() const { return 0; }
   };
 
   /**
@@ -768,9 +794,7 @@ namespace quda {
      * @param out Solution vector.
      * @param in Right-hand side.
      */
-    void operator()(ColorSpinorField &out, ColorSpinorField &in){
-      (*this)(out, in, nullptr, 0.0);
-    };
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override { (*this)(out, in, nullptr, 0.0); };
 
     /**
      * @brief Solve re-using an initial Krylov space defined by an initial r2_old_init and search direction p_init.
@@ -782,9 +806,19 @@ namespace quda {
      */
     void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init);
 
-    void blocksolve(ColorSpinorField& out, ColorSpinorField& in);
+    void blocksolve(ColorSpinorField &out, ColorSpinorField &in) override;
 
-    virtual bool hermitian() { return true; } /** CG is only for Hermitian systems */
+    virtual bool hermitian() const override { return true; } /** CG is only for Hermitian systems */
+
+    virtual QudaInverterType getInverterType() const override { return QUDA_CG_INVERTER; }
+
+  protected:
+    /**
+     * @brief Separate codepath for performing a "simpler" CG solve when a heavy quark residual is requested.
+     * @param out Solution-vector.
+     * @param in Right-hand side.
+     */
+    void hqsolve(ColorSpinorField &out, ColorSpinorField &in);
   };
 
   class CGNE : public CG
@@ -810,14 +844,16 @@ namespace quda {
     CGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
          SolverParam &param, TimeProfile &profile);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual();
+    ColorSpinorField &get_residual() override;
 
-    virtual bool hermitian() { return false; } /** CGNE is for any system */
+    virtual bool hermitian() const final { return false; } /** CGNE is for any system */
+
+    virtual QudaInverterType getInverterType() const final { return QUDA_CGNE_INVERTER; }
   };
 
   class CGNR : public CG
@@ -842,14 +878,16 @@ namespace quda {
     CGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
          SolverParam &param, TimeProfile &profile);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual();
+    ColorSpinorField &get_residual() override;
 
-    virtual bool hermitian() { return false; } /** CGNR is for any system */
+    virtual bool hermitian() const final { return false; } /** CGNR is for any system */
+
+    virtual QudaInverterType getInverterType() const final { return QUDA_CGNR_INVERTER; }
   };
 
   class CG3 : public Solver
@@ -865,9 +903,11 @@ namespace quda {
         TimeProfile &profile);
     virtual ~CG3();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
-    virtual bool hermitian() { return true; } /** CG is only for Hermitian systems */
+    virtual bool hermitian() const override { return true; } /** CG is only for Hermitian systems */
+
+    virtual QudaInverterType getInverterType() const override { return QUDA_CG3_INVERTER; }
   };
 
   class CG3NE : public CG3
@@ -892,14 +932,16 @@ namespace quda {
     CG3NE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
           TimeProfile &profile);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual();
+    ColorSpinorField &get_residual() override;
 
-    virtual bool hermitian() { return false; } /** CG3NE is for any system */
+    virtual bool hermitian() const final { return false; } /** CG3NE is for any system */
+
+    virtual QudaInverterType getInverterType() const final { return QUDA_CG3NE_INVERTER; }
   };
 
   class CG3NR : public CG3
@@ -930,7 +972,9 @@ namespace quda {
     */
     ColorSpinorField &get_residual();
 
-    virtual bool hermitian() { return false; } /** CG3NR is for any system */
+    virtual bool hermitian() const final { return false; } /** CG3NR is for any system */
+
+    virtual QudaInverterType getInverterType() const final { return QUDA_CG3NR_INVERTER; }
   };
 
   class PreconCG : public Solver {
@@ -963,9 +1007,22 @@ namespace quda {
     PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
              const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
 
+    /**
+     * @brief Preconditioned CG supporting a pre-existing preconditioner K.
+     * @param mat mat Fine (outer) Dirac matrix
+     * @param K Preconditioner
+     * @param matSloppy Sloppy precision Dirac matrix
+     * @param matPrecon Preconditioner precision Dirac matrix
+     * @param matEig Deflation precision Dirac matrix
+     * @param param Solver parameters
+     * @param profile Timing profile
+     */
+    PreconCG(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+             const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
+
     virtual ~PreconCG();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in)
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override
     {
       this->solve_and_collect(out, in, cvector_ref<ColorSpinorField>(), 0, 0);
     }
@@ -979,9 +1036,11 @@ namespace quda {
        @param collect_tol maxiter tolerance start from which the r vectors are to be collected
     */
     virtual void solve_and_collect(ColorSpinorField &out, ColorSpinorField &in, cvector_ref<ColorSpinorField> &v_r,
-                                   int collect_miniter, double collect_tol);
+                                   int collect_miniter, double collect_tol) override;
 
-    virtual bool hermitian() { return true; } /** PCG is only Hermitian system */
+    virtual bool hermitian() const override { return true; } /** PCG is only Hermitian system */
+
+    virtual QudaInverterType getInverterType() const final { return QUDA_PCG_INVERTER; }
   };
 
 
@@ -998,9 +1057,11 @@ namespace quda {
              const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
     virtual ~BiCGstab();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
-    virtual bool hermitian() { return false; } /** BiCGStab is for any linear system */
+    virtual bool hermitian() const override { return false; } /** BiCGStab is for any linear system */
+
+    virtual QudaInverterType getInverterType() const final { return QUDA_BICGSTAB_INVERTER; }
   };
 
   /**
@@ -1103,9 +1164,11 @@ namespace quda {
               TimeProfile &profile);
     virtual ~BiCGstabL();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
-    virtual bool hermitian() { return false; } /** BiCGStab is for any linear system */
+    virtual bool hermitian() const override { return false; } /** BiCGStab is for any linear system */
+
+    virtual QudaInverterType getInverterType() const final { return QUDA_BICGSTABL_INVERTER; }
   };
 
   class GCR : public Solver {
@@ -1113,7 +1176,7 @@ namespace quda {
   private:
     const DiracMdagM matMdagM; // used by the eigensolver
 
-    Solver *K;
+    std::shared_ptr<Solver> K;
     SolverParam Kparam; // parameters for preconditioner solve
 
     /**
@@ -1162,9 +1225,11 @@ namespace quda {
         const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
     virtual ~GCR();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
-    virtual bool hermitian() { return false; } /** GCR is for any linear system */
+    virtual bool hermitian() const override { return false; } /** GCR is for any linear system */
+
+    virtual QudaInverterType getInverterType() const final { return QUDA_GCR_INVERTER; }
   };
 
   class MR : public Solver {
@@ -1186,14 +1251,16 @@ namespace quda {
   public:
     MR(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual();
+    ColorSpinorField &get_residual() override;
 
-    bool hermitian() { return false; } /** MR is for any linear system */
+    virtual bool hermitian() const override { return false; } /** MR is for any linear system */
+
+    virtual QudaInverterType getInverterType() const final { return QUDA_MR_INVERTER; }
   };
 
   /**
@@ -1256,14 +1323,16 @@ namespace quda {
          SolverParam &param, TimeProfile &profile);
     virtual ~CACG();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual();
+    ColorSpinorField &get_residual() override;
 
-    virtual bool hermitian() { return true; } /** CG is only for Hermitian systems */
+    virtual bool hermitian() const override { return true; } /** CG is only for Hermitian systems */
+
+    virtual QudaInverterType getInverterType() const override { return QUDA_CA_CG_INVERTER; }
   };
 
   class CACGNE : public CACG {
@@ -1288,14 +1357,16 @@ namespace quda {
     CACGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
            const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual();
+    ColorSpinorField &get_residual() override;
 
-    virtual bool hermitian() { return false; } /** CGNE is for any linear system */
+    virtual bool hermitian() const final { return false; } /** CA-CGNE is for any linear system */
+
+    virtual QudaInverterType getInverterType() const final { return QUDA_CA_CGNE_INVERTER; }
   };
 
   class CACGNR : public CACG
@@ -1320,14 +1391,16 @@ namespace quda {
     CACGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
            const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual();
+    ColorSpinorField &get_residual() override;
 
-    virtual bool hermitian() { return false; } /** CGNE is for any linear system */
+    virtual bool hermitian() const final { return false; } /** CA-CGNR is for any linear system */
+
+    virtual QudaInverterType getInverterType() const final { return QUDA_CA_CGNR_INVERTER; }
   };
 
   /**
@@ -1374,14 +1447,16 @@ namespace quda {
           SolverParam &param, TimeProfile &profile);
     virtual ~CAGCR();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
     /**
        @return Return the residual vector from the prior solve
     */
-    ColorSpinorField &get_residual();
+    ColorSpinorField &get_residual() override;
 
-    virtual bool hermitian() { return false; } /** GCR is for any linear system */
+    virtual bool hermitian() const override { return false; } /** GCR is for any linear system */
+
+    virtual QudaInverterType getInverterType() const final { return QUDA_CA_GCR_INVERTER; }
   };
 
   // Steepest descent solver used as a preconditioner
@@ -1395,9 +1470,11 @@ namespace quda {
       SD(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
       virtual ~SD();
 
-      void operator()(ColorSpinorField &out, ColorSpinorField &in);
+      void operator()(ColorSpinorField &out, ColorSpinorField &in) override;
 
-      virtual bool hermitian() { return false; } /** SD is for any linear system */
+      virtual bool hermitian() const override { return false; } /** SD is for any linear system */
+
+      virtual QudaInverterType getInverterType() const final { return QUDA_SD_INVERTER; }
   };
 
   class PreconditionedSolver : public Solver
@@ -1418,7 +1495,8 @@ public:
 
     virtual ~PreconditionedSolver() { delete solver; }
 
-    void operator()(ColorSpinorField &x, ColorSpinorField &b) {
+    void operator()(ColorSpinorField &x, ColorSpinorField &b) override
+    {
       pushOutputPrefix(prefix);
 
       QudaSolutionType solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
@@ -1447,7 +1525,9 @@ public:
      */
     Solver &ExposeSolver() const { return *solver; }
 
-    virtual bool hermitian() { return solver->hermitian(); } /** Use the inner solver */
+    virtual bool hermitian() const override { return solver->hermitian(); } /** Use the inner solver */
+
+    virtual QudaInverterType getInverterType() const override { return solver->getInverterType(); }
   };
 
   class MultiShiftSolver {
@@ -1564,6 +1644,7 @@ public:
 
     /**
        @param x The optimum for the solution vector.
+
        @param b The source vector in the equation to be solved. This is not preserved.
        @param p The basis vectors in which we are building the guess
        @param q The basis vectors multiplied by A
@@ -1621,7 +1702,9 @@ public:
   // Incremental eigCG solver (for eigcg and initcg calls)
   void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
-  bool hermitian() { return true; } // EigCG is only for Hermitian systems
+  virtual bool hermitian() const final { return true; } // EigCG is only for Hermitian systems
+
+  virtual QudaInverterType getInverterType() const final { return QUDA_INC_EIGCG_INVERTER; }
   };
 
 //forward declaration
@@ -1668,7 +1751,9 @@ public:
 
     void UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels);
 
-    bool hermitian() { return false; } // GMRESDR for any linear system
+    virtual bool hermitian() const final { return false; } // GMRESDR for any linear system
+
+    virtual QudaInverterType getInverterType() const final { return QUDA_GMRESDR_INVERTER; }
  };
 
  /**
