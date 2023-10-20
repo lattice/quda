@@ -763,6 +763,7 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   case QUDA_ASQTAD_FAT_LINKS: cudaGauge = gaugeFatPrecise; break;
   case QUDA_ASQTAD_LONG_LINKS: cudaGauge = gaugeLongPrecise; break;
   case QUDA_SMEARED_LINKS:
+    gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
     gauge_param.create = QUDA_NULL_FIELD_CREATE;
     gauge_param.reconstruct = param->reconstruct;
     gauge_param.setPrecision(param->cuda_prec, true);
