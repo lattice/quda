@@ -9,6 +9,14 @@ target_compile_options(
   $<IF:$<CONFIG:RELEASE>,-w,-Wall -Wextra>
   $<$<CONFIG:STRICT>:-Werror>
 )
+
+# ignore any unkown pragmas
+target_compile_options(quda_test PUBLIC $<$<COMPILE_LANGUAGE:CXX>:
+  $<$<CXX_COMPILER_ID:Clang>:-Wno-unknown-pragmas>
+  $<$<CXX_COMPILER_ID:GNU>:-Wno-unknown-pragmas>
+  >)
+
+
 if(BUILD_SHARED_LIBS)
   install(TARGETS quda_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()
