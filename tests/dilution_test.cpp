@@ -56,7 +56,8 @@ TEST_P(DilutionTest, verify)
   for (int i = 0; i < src.Ndim(); i++) block_volume *= block_size[i];
   int n_blocks = comm_size() * src.Volume() / block_volume;
   if (dilution_type == QUDA_DILUTION_BLOCK) {
-    logQuda(QUDA_VERBOSE, "Dilution block size = %d x %d x %d x %d\n", block_size[0], block_size[1], block_size[2], block_size[3]);
+    logQuda(QUDA_VERBOSE, "Dilution block size = %d x %d x %d x %d\n", block_size[0], block_size[1], block_size[2],
+            block_size[3]);
     logQuda(QUDA_VERBOSE, "Number of dilution blocks = %d\n", n_blocks);
   }
 
@@ -98,21 +99,20 @@ TEST_P(DilutionTest, verify)
 using ::testing::Combine;
 using ::testing::Values;
 
-INSTANTIATE_TEST_SUITE_P(
-  WilsonFull, DilutionTest,
-  Combine(Values(QUDA_FULL_SITE_SUBSET),
-          Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR, QUDA_DILUTION_SPIN_COLOR_EVEN_ODD,
-                 QUDA_DILUTION_BLOCK),
-          Values(4)),
-  [](testing::TestParamInfo<test_t> param) { return get_dilution_type_str(::testing::get<1>(param.param)); });
-
-INSTANTIATE_TEST_SUITE_P(WilsonParity, DilutionTest,
-                         Combine(Values(QUDA_PARITY_SITE_SUBSET),
+INSTANTIATE_TEST_SUITE_P(WilsonFull, DilutionTest,
+                         Combine(Values(QUDA_FULL_SITE_SUBSET),
                                  Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR,
-                                        QUDA_DILUTION_BLOCK), Values(4)),
+                                        QUDA_DILUTION_SPIN_COLOR_EVEN_ODD, QUDA_DILUTION_BLOCK),
+                                 Values(4)),
                          [](testing::TestParamInfo<test_t> param) {
                            return get_dilution_type_str(::testing::get<1>(param.param));
                          });
+
+INSTANTIATE_TEST_SUITE_P(
+  WilsonParity, DilutionTest,
+  Combine(Values(QUDA_PARITY_SITE_SUBSET),
+          Values(QUDA_DILUTION_SPIN, QUDA_DILUTION_COLOR, QUDA_DILUTION_SPIN_COLOR, QUDA_DILUTION_BLOCK), Values(4)),
+  [](testing::TestParamInfo<test_t> param) { return get_dilution_type_str(::testing::get<1>(param.param)); });
 
 INSTANTIATE_TEST_SUITE_P(
   CoarseFull, DilutionTest,
