@@ -109,6 +109,12 @@ public:
       if (DslashTestWrapper::hostClover) host_free(DslashTestWrapper::hostClover);
       if (DslashTestWrapper::hostCloverInv) host_free(DslashTestWrapper::hostCloverInv);
     }
+
+    DslashTestWrapper::spinor = {};
+    DslashTestWrapper::spinorOut = {};
+    DslashTestWrapper::spinorRef = {};
+    DslashTestWrapper::spinorTmp = {};
+
     endQuda();
   }
 };

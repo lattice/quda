@@ -45,6 +45,12 @@ public:
       if (StaggeredDslashTestWrapper::qdp_longlink_cpu[dir])
         host_free(StaggeredDslashTestWrapper::qdp_longlink_cpu[dir]);
     }
+
+    StaggeredDslashTestWrapper::spinor = {};
+    StaggeredDslashTestWrapper::spinorOut = {};
+    StaggeredDslashTestWrapper::spinorRef = {};
+    StaggeredDslashTestWrapper::tmpCpu = {};
+
     endQuda();
   }
 };

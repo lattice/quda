@@ -59,15 +59,15 @@ struct StaggeredDslashTestWrapper {
   GaugeField *cpuFat = nullptr;
   GaugeField *cpuLong = nullptr;
 
-  ColorSpinorField spinor;
-  ColorSpinorField spinorOut;
-  ColorSpinorField spinorRef;
-  ColorSpinorField tmpCpu;
+  static inline ColorSpinorField spinor;
+  static inline ColorSpinorField spinorOut;
+  static inline ColorSpinorField spinorRef;
+  static inline ColorSpinorField tmpCpu;
   ColorSpinorField cudaSpinor;
   ColorSpinorField cudaSpinorOut;
 
-  std::vector<ColorSpinorField> vp_spinor;
-  std::vector<ColorSpinorField> vp_spinor_out;
+  static inline std::vector<ColorSpinorField> vp_spinor;
+  static inline std::vector<ColorSpinorField> vp_spinor_out;
 
   void *ghost_fatlink_cpu[4] = {};
   void *ghost_longlink_cpu[4] = {};
@@ -166,6 +166,11 @@ struct StaggeredDslashTestWrapper {
       Nsrc = 1;
     }
 
+    for (int i = 0; i < 4; i++) inv_param.split_grid[i] = grid_partition[i];
+    num_src = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
+    test_split_grid = num_src > 1;
+    if (test_split_grid) { dtest_type = dslash_test_type::Dslash; }
+
     for (int dir = 0; dir < 4; dir++) {
       qdp_inlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
       qdp_fatlink_cpu[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
@@ -175,21 +180,56 @@ struct StaggeredDslashTestWrapper {
     bool compute_on_gpu = false; // reference fat/long fields should be computed on cpu
     constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink_cpu, qdp_fatlink_cpu, gauge_param, argc, argv,
                                      compute_on_gpu);
+
+    ColorSpinorParam csParam;
+    csParam.nColor = 3;
+    csParam.nSpin = 1;
+    csParam.nDim = 4;
+    for (int d = 0; d < 4; d++) { csParam.x[d] = gauge_param.X[d]; }
+    csParam.x[4] = 1;
+
+    csParam.setPrecision(inv_param.cpu_prec);
+    // inv_param.solution_type = QUDA_MAT_SOLUTION;
+    csParam.pad = 0;
+    if (dtest_type != dslash_test_type::Mat && dslash_type != QUDA_LAPLACE_DSLASH) {
+      csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+      csParam.x[0] /= 2;
+      inv_param.solution_type = QUDA_MATPC_SOLUTION;
+    } else {
+      csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+      inv_param.solution_type = QUDA_MAT_SOLUTION;
+    }
+
+    csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+    csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    csParam.gammaBasis = inv_param.gamma_basis; // this parameter is meaningless for staggered
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    csParam.pc_type = QUDA_4D_PC;
+    csParam.location = QUDA_CPU_FIELD_LOCATION;
+
+    spinor = ColorSpinorField(csParam);
+    spinorOut = ColorSpinorField(csParam);
+    spinorRef = ColorSpinorField(csParam);
+    tmpCpu = ColorSpinorField(csParam);
+
+    spinor.Source(QUDA_RANDOM_SOURCE);
+
+    if (test_split_grid) {
+      inv_param.num_src = num_src;
+      inv_param.num_src_per_sub_partition = 1;
+      resize(vp_spinor, num_src, csParam);
+      resize(vp_spinor_out, num_src, csParam);
+      std::fill(vp_spinor.begin(), vp_spinor.end(), spinor);
+    }
+
+    inv_param.dagger = dagger ? QUDA_DAG_YES : QUDA_DAG_NO;
+
+    // set verbosity prior to loadGaugeQuda
+    setVerbosity(verbosity);
   }
 
   void init()
   {
-    inv_param.split_grid[0] = grid_partition[0];
-    inv_param.split_grid[1] = grid_partition[1];
-    inv_param.split_grid[2] = grid_partition[2];
-    inv_param.split_grid[3] = grid_partition[3];
-
-    num_src = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
-    test_split_grid = num_src > 1;
-    if (test_split_grid) { dtest_type = dslash_test_type::Dslash; }
-
-    inv_param.dagger = dagger ? QUDA_DAG_YES : QUDA_DAG_NO;
-
     // Prepare the fields to be used for the GPU computation
     void *qdp_fatlink_gpu[4];
     void *qdp_longlink_gpu[4];
@@ -260,9 +300,6 @@ struct StaggeredDslashTestWrapper {
       gauge_param.reconstruct = gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     }
 
-    // set verbosity prior to loadGaugeQuda
-    setVerbosity(verbosity);
-
     printfQuda("Sending fat links to GPU\n");
     loadGaugeQuda(milc_fatlink_gpu, &gauge_param);
 
@@ -282,47 +319,7 @@ struct StaggeredDslashTestWrapper {
       loadGaugeQuda(milc_longlink_gpu, &gauge_param);
     }
 
-    ColorSpinorParam csParam;
-    csParam.nColor = 3;
-    csParam.nSpin = 1;
-    csParam.nDim = 4;
-    for (int d = 0; d < 4; d++) { csParam.x[d] = gauge_param.X[d]; }
-    csParam.x[4] = 1;
-
-    csParam.setPrecision(inv_param.cpu_prec);
-    // inv_param.solution_type = QUDA_MAT_SOLUTION;
-    csParam.pad = 0;
-    if (dtest_type != dslash_test_type::Mat && dslash_type != QUDA_LAPLACE_DSLASH) {
-      csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      csParam.x[0] /= 2;
-      inv_param.solution_type = QUDA_MATPC_SOLUTION;
-    } else {
-      csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-      inv_param.solution_type = QUDA_MAT_SOLUTION;
-    }
-
-    csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    csParam.gammaBasis = inv_param.gamma_basis; // this parameter is meaningless for staggered
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    csParam.pc_type = QUDA_4D_PC;
-    csParam.location = QUDA_CPU_FIELD_LOCATION;
-
-    spinor = ColorSpinorField(csParam);
-    spinorOut = ColorSpinorField(csParam);
-    spinorRef = ColorSpinorField(csParam);
-    tmpCpu = ColorSpinorField(csParam);
-
-    spinor.Source(QUDA_RANDOM_SOURCE);
-
-    if (test_split_grid) {
-      inv_param.num_src = num_src;
-      inv_param.num_src_per_sub_partition = 1;
-      resize(vp_spinor, num_src, csParam);
-      resize(vp_spinor_out, num_src, csParam);
-      std::fill(vp_spinor.begin(), vp_spinor.end(), spinor);
-    }
-
+    ColorSpinorParam csParam(spinor);
     csParam.fieldOrder = colorspinor::getNative(inv_param.cuda_prec, 1);
     csParam.pad = 0;
     csParam.setPrecision(inv_param.cuda_prec);

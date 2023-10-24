@@ -50,14 +50,14 @@ struct DslashTime {
 struct DslashTestWrapper {
 
   // CPU color spinor fields
-  ColorSpinorField spinor;
-  ColorSpinorField spinorOut;
-  ColorSpinorField spinorRef;
-  ColorSpinorField spinorTmp;
+  static inline ColorSpinorField spinor;
+  static inline ColorSpinorField spinorOut;
+  static inline ColorSpinorField spinorRef;
+  static inline ColorSpinorField spinorTmp;
   // For split grid
-  std::vector<ColorSpinorField> vp_spinor;
-  std::vector<ColorSpinorField> vp_spinorOut;
-  std::vector<ColorSpinorField> vp_spinorRef;
+  static inline std::vector<ColorSpinorField> vp_spinor;
+  static inline std::vector<ColorSpinorField> vp_spinorOut;
+  static inline std::vector<ColorSpinorField> vp_spinorRef;
 
   // CUDA color spinor fields
   ColorSpinorField cudaSpinor;
@@ -146,28 +146,7 @@ struct DslashTestWrapper {
 
     if (inv_param.cpu_prec != gauge_param.cpu_prec) errorQuda("Gauge and spinor CPU precisions must match");
 
-    // construct input fields
-    for (int dir = 0; dir < 4; dir++) hostGauge[dir] = safe_malloc((size_t)V * gauge_site_size * gauge_param.cpu_prec);
-
-    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH
-        || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-      hostClover = safe_malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
-      hostCloverInv = safe_malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
-
-      if (compute_clover)
-        printfQuda("Computing clover field on GPU\n");
-      else {
-        printfQuda("Sending clover field to GPU\n");
-        constructHostCloverField(hostClover, hostCloverInv, inv_param);
-      }
-    }
-
-    printfQuda("Randomizing fields... ");
-    constructHostGaugeField(hostGauge, gauge_param, argc, argv);
-  }
-
-  void init()
-  {
+    for (int i = 0; i < 4; i++) inv_param.split_grid[i] = grid_partition[i];
     num_src = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
     test_split_grid = num_src > 1;
     if (test_split_grid) { dtest_type = dslash_test_type::Dslash; }
@@ -212,6 +191,25 @@ struct DslashTestWrapper {
       }
     }
 
+    // construct input fields
+    for (int dir = 0; dir < 4; dir++) hostGauge[dir] = safe_malloc((size_t)V * gauge_site_size * gauge_param.cpu_prec);
+
+    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH
+        || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+      hostClover = safe_malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
+      hostCloverInv = safe_malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
+
+      if (compute_clover)
+        printfQuda("Computing clover field on GPU\n");
+      else {
+        printfQuda("Sending clover field to GPU\n");
+        constructHostCloverField(hostClover, hostCloverInv, inv_param);
+      }
+    }
+
+    printfQuda("Randomizing fields... ");
+    constructHostGaugeField(hostGauge, gauge_param, argc, argv);
+
     ColorSpinorParam csParam;
     csParam.nColor = 3;
     csParam.nSpin = 4;
@@ -223,11 +221,7 @@ struct DslashTestWrapper {
       csParam.x[4] = Ls;
     }
 
-    if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
-      csParam.pc_type = QUDA_5D_PC;
-    } else {
-      csParam.pc_type = QUDA_4D_PC;
-    }
+    csParam.pc_type = dslash_type == QUDA_DOMAIN_WALL_DSLASH ? QUDA_5D_PC : QUDA_4D_PC;
 
     // ndeg_tm
     if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
@@ -259,11 +253,6 @@ struct DslashTestWrapper {
 
     spinor.Source(QUDA_RANDOM_SOURCE);
 
-    inv_param.split_grid[0] = grid_partition[0];
-    inv_param.split_grid[1] = grid_partition[1];
-    inv_param.split_grid[2] = grid_partition[2];
-    inv_param.split_grid[3] = grid_partition[3];
-
     if (test_split_grid) {
       inv_param.num_src = num_src;
       inv_param.num_src_per_sub_partition = 1;
@@ -274,12 +263,13 @@ struct DslashTestWrapper {
       std::fill(vp_spinor.begin(), vp_spinor.end(), spinor);
     }
 
-    csParam.x[0] = gauge_param.X[0];
-
     // set verbosity prior to loadGaugeQuda
     setVerbosity(verbosity);
     inv_param.verbosity = verbosity;
+  }
 
+  void init()
+  {
     printfQuda("Sending gauge field to GPU\n");
     loadGaugeQuda(hostGauge, &gauge_param);
 
@@ -294,27 +284,15 @@ struct DslashTestWrapper {
     }
 
     if (!transfer) {
+      ColorSpinorParam csParam(spinor);
       csParam.location = QUDA_CUDA_FIELD_LOCATION;
       csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
       csParam.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
-
-      if (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
-        csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-      } else {
-        csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-        csParam.x[0] /= 2;
-      }
 
       printfQuda("Creating cudaSpinor with nParity = %d\n", csParam.siteSubset);
       cudaSpinor = ColorSpinorField(csParam);
       printfQuda("Creating cudaSpinorOut with nParity = %d\n", csParam.siteSubset);
       cudaSpinorOut = ColorSpinorField(csParam);
-
-      if (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
-        csParam.x[0] /= 2;
-      }
-
-      csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
 
       printfQuda("Sending spinor field to GPU\n");
       cudaSpinor = spinor;
