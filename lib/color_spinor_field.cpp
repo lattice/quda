@@ -75,7 +75,7 @@ namespace quda
   {
     if (&src != this) {
       // if field not already initialized then move the field
-      if (!init || are_compatible(*this, src)) {
+      if (!init || are_compatible(*this, src) || src.empty()) {
         if (init) destroy();
         LatticeField::operator=(std::move(src));
         move(std::move(src));
