@@ -81,7 +81,7 @@ struct StaggeredDslashTestWrapper {
   char **argv_copy;
 
   // Split grid options
-  bool test_split_grid = false;
+  static inline bool test_split_grid = false;
   int num_src = 1;
 
   void staggeredDslashRef()
@@ -373,6 +373,25 @@ struct StaggeredDslashTestWrapper {
       cpuLong = nullptr;
     }
     commDimPartitionedReset();
+  }
+
+  static void destroy()
+  {
+    for (int dir = 0; dir < 4; dir++) {
+      if (qdp_inlink[dir]) host_free(qdp_inlink[dir]);
+      if (qdp_fatlink_cpu[dir]) host_free(qdp_fatlink_cpu[dir]);
+      if (qdp_longlink_cpu[dir]) host_free(qdp_longlink_cpu[dir]);
+    }
+
+    spinor = {};
+    spinorOut = {};
+    spinorRef = {};
+    tmpCpu = {};
+
+    if (test_split_grid) {
+      vp_spinor.clear();
+      vp_spinor_out.clear();
+    }
   }
 
   DslashTime dslashCUDA(int niter)

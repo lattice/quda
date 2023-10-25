@@ -79,13 +79,11 @@ struct DslashTestWrapper {
 
   // Test options
   QudaParity parity = QUDA_EVEN_PARITY;
-  dslash_test_type dtest_type = dslash_test_type::Dslash;
-  bool test_split_grid = false;
+  static inline dslash_test_type dtest_type = dslash_test_type::Dslash;
+  static inline bool test_split_grid = false;
   int num_src = 1;
 
   const bool transfer = false;
-
-  DslashTestWrapper(dslash_test_type dtest) : dtest_type(dtest) { }
 
   void init_ctest(int argc, char **argv, int precision, QudaReconstructType link_recon)
   {
@@ -321,6 +319,29 @@ struct DslashTestWrapper {
         delete dirac;
         dirac = nullptr;
       }
+    }
+  }
+
+  static void destroy()
+  {
+    for (int dir = 0; dir < 4; dir++)
+      if (hostGauge[dir]) host_free(hostGauge[dir]);
+
+    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+        || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
+      if (hostClover) host_free(hostClover);
+      if (hostCloverInv) host_free(hostCloverInv);
+    }
+
+    spinor = {};
+    spinorOut = {};
+    spinorRef = {};
+    spinorTmp = {};
+
+    if (test_split_grid) {
+      vp_spinor.clear();
+      vp_spinorOut.clear();
+      vp_spinorRef.clear();
     }
   }
 

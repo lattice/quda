@@ -37,10 +37,6 @@ protected:
       return true;
     }
 
-    // work out if test_split_grid is enabled
-    bool test_split_grid = (grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3] > 1);
-    if (::testing::get<2>(GetParam()) > 0 && test_split_grid) { return true; }
-
     const std::array<bool, 16> partition_enabled {true, true, true,  false,  true,  false, false, false,
                                                   true, false, false, false, true, false, true, true};
     if (!ctest_all_partitions && !partition_enabled[::testing::get<2>(GetParam())]) return true;
@@ -68,8 +64,6 @@ protected:
   }
 
 public:
-  DslashTest() : dslash_test_wrapper(dtest_type) { }
-
   virtual void SetUp()
   {
     int prec = ::testing::get<0>(GetParam());
@@ -94,27 +88,18 @@ public:
     commDimPartitionedReset();
   }
 
-  static void SetUpTestCase() { initQuda(device_ordinal); }
+  static void SetUpTestCase()
+  {
+    initQuda(device_ordinal);
+    DslashTestWrapper::dtest_type = dtest_type;
+  }
 
   // Per-test-case tear-down.
   // Called after the last test in this test case.
   // Can be omitted if not needed.
   static void TearDownTestCase()
   {
-    for (int dir = 0; dir < 4; dir++)
-      if (DslashTestWrapper::hostGauge[dir]) host_free(DslashTestWrapper::hostGauge[dir]);
-
-    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
-        || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
-      if (DslashTestWrapper::hostClover) host_free(DslashTestWrapper::hostClover);
-      if (DslashTestWrapper::hostCloverInv) host_free(DslashTestWrapper::hostCloverInv);
-    }
-
-    DslashTestWrapper::spinor = {};
-    DslashTestWrapper::spinorOut = {};
-    DslashTestWrapper::spinorRef = {};
-    DslashTestWrapper::spinorTmp = {};
-
+    DslashTestWrapper::destroy();
     endQuda();
   }
 };
