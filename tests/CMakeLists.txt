@@ -274,8 +274,9 @@ if(QUDA_MPI OR QUDA_QMP)
   if(DEFINED ENV{QUDA_TEST_GRID_SIZE})
     get_test_ranks($ENV{QUDA_TEST_GRID_SIZE} QUDA_TEST_NUM_PROCS)
   endif()
+  message(STATUS "ctest will run on ${QUDA_TEST_NUM_PROCS} processes")
   set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE};${MPIEXEC_NUMPROC_FLAG};${QUDA_TEST_NUM_PROCS};${MPIEXEC_PREFLAGS}
-    CACHE STRING "CTest Launcher command for QUDA's tests" FORCE)
+    CACHE STRING "CTest Launcher command for QUDA's tests")
 endif()
 
 # BLAS tests
