@@ -50,9 +50,9 @@ namespace quda
     using offset_type = O; // type of object that may also use shared memory at the same time and is located before this one
     using Smem = SharedMemory<atom_t<T>, SizeDims<D,sizeof(T)/sizeof(atom_t<T>)>, O>;
     using Smem::shared_mem_size;
-    using opSmem = op_SharedMemory<T, SizeSmem<Smem>>;
-    using dependencies = op_Sequential<op_blockSync,opSmem>;
-    using dependentOps = SpecialOps<op_blockSync,opSmem>;
+    //using opSmem = op_SharedMemory<T, SizeSmem<Smem>>;
+    //using dependencies = op_Sequential<op_blockSync,opSmem>;
+    //using dependentOps = SpecialOps<op_blockSync,opSmem>;
 
   private:
     using atom_t = atom_t<T>;

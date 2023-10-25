@@ -29,9 +29,9 @@ namespace quda
     using SharedMemoryT = SharedMemory<atom_t<T>, SizePerThread<std::max(1,N_)*sizeof(T)/sizeof(atom_t<T>)>, O>;
     using SharedMemoryT::sharedMem;
     using SharedMemoryT::shared_mem_size;
-    using opSmem = op_SharedMemory<T, SizeSmem<SharedMemoryT>>;
-    using dependencies = opSmem;
-    using dependentOps = SpecialOps<opSmem>;
+    //using opSmem = op_SharedMemory<T, SizeSmem<SharedMemoryT>>;
+    //using dependencies = opSmem;
+    //using dependentOps = SpecialOps<opSmem>;
 
   private:
     using atom_t = atom_t<T>;

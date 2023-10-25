@@ -55,9 +55,9 @@ namespace quda {
   template <typename T> struct getSpecialOpsS<T,std::conditional_t<true,void,typename T::SpecialOpsT>> {
     using type = typename T::SpecialOpsT;
   };
-  template <typename ...T> struct getSpecialOpsS<SpecialOps<T...>,void> {
-    using type = SpecialOps<T...>;
-  };
+  //template <typename ...T> struct getSpecialOpsS<SpecialOps<T...>,void> {
+  //  using type = SpecialOps<T...>;
+  //};
   template <typename T> using getSpecialOps = typename getSpecialOpsS<T>::type;
 
   // hasSpecialOp: checks if first type matches any of the op
@@ -91,21 +91,21 @@ namespace quda {
   // forward declarations of op types
   struct op_blockSync;
   template <typename T> struct op_warp_combine;
-  template <typename T, int N> struct op_thread_array;
-  template <typename T> struct op_BlockReduce;
-  template <typename T, typename D = opDimsBlock> struct op_SharedMemoryCache;
-  template <typename T, typename S = opSizeBlock> struct op_SharedMemory;
-  template <typename T, int S> using op_SharedMemStatic = op_SharedMemory<T,opSizeStatic<S>>;
+  //template <typename T, int N> struct op_thread_array;
+  //template <typename T> struct op_BlockReduce;
+  //template <typename T, typename D = opDimsBlock> struct op_SharedMemoryCache;
+  //template <typename T, typename S = opSizeBlock> struct op_SharedMemory;
+  //template <typename T, int S> using op_SharedMemStatic = op_SharedMemory<T,opSizeStatic<S>>;
 
   // only types for convenience
   using only_blockSync = SpecialOps<op_blockSync>;
   template <typename T> using only_warp_combine = SpecialOps<op_warp_combine<T>>;
-  template <typename T, int N> using only_thread_array = SpecialOps<op_thread_array<T,N>>;
-  template <typename T> using only_BlockReduce = SpecialOps<op_BlockReduce<T>>;
-  template <typename T, typename D = opDimsBlock> using only_SharedMemoryCache = SpecialOps<op_SharedMemoryCache<T,D>>;
-  template <typename T, typename S = opSizeBlock> using only_SharedMemory = SpecialOps<op_SharedMemory<T,S>>;
-  template <typename T, unsigned int S> using only_SharedMemStatic = only_SharedMemory<T,opSizeStatic<S>>;
-  template <typename ...T> using only_Concurrent = SpecialOps<op_Concurrent<T...>>;
+  //template <typename T, int N> using only_thread_array = SpecialOps<op_thread_array<T,N>>;
+  //template <typename T> using only_BlockReduce = SpecialOps<op_BlockReduce<T>>;
+  //template <typename T, typename D = opDimsBlock> using only_SharedMemoryCache = SpecialOps<op_SharedMemoryCache<T,D>>;
+  //template <typename T, typename S = opSizeBlock> using only_SharedMemory = SpecialOps<op_SharedMemory<T,S>>;
+  //template <typename T, unsigned int S> using only_SharedMemStatic = only_SharedMemory<T,opSizeStatic<S>>;
+  //template <typename ...T> using only_Concurrent = SpecialOps<op_Concurrent<T...>>;
 
   // explicitSpecialOps
   template <typename T, typename U = void> struct explicitSpecialOpsS : std::false_type {};
@@ -153,6 +153,7 @@ namespace quda {
     static_assert((std::is_same_v<T,U> || ...) == true);
   }
 
+#if 0
   // hasBlockSync
   template <typename ...T> static constexpr bool hasBlockSync = hasSpecialOpType<op_blockSync,T...>;
   template <typename ...T> static constexpr bool hasBlockSync<op_Concurrent<T...>> = hasSpecialOpType<op_blockSync,T...>;
@@ -183,6 +184,7 @@ namespace quda {
     using type = std::tuple_element_t<n,std::tuple<T...>>;
   };
   template <typename T, int n> using SpecialOpsType = SpecialOps<typename SpecialOpsTypeS<unwrapSpecialOps<T>,n>::type>;
+#endif
 
   // SpecialOpsElemType: element type from corresponding op types
   //template <typename ...T> struct SpecialOpsElemTypeS { using type = void; };

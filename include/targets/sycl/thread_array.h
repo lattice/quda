@@ -19,6 +19,6 @@ namespace quda
 
 #endif
 
-//namespace quda {
-//  template <typename T, int n> static constexpr bool needsFullBlock<thread_array<T,n>> = false;
-//}
+namespace quda {
+  template <typename T, int n> static constexpr bool needsFullBlockImpl<thread_array<T,n>> = false;
+}

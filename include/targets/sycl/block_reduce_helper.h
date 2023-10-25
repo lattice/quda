@@ -138,10 +138,10 @@ namespace quda
     using Smem = SharedMemory<T,SizeBlockDivWarp>;
     //using Smem::shared_mem_size;
 #ifdef DYNAMIC_SLM
-    using opSmem = op_SharedMemory<T,opSizeBlockDivWarp>;
+    //using opSmem = op_SharedMemory<T,opSizeBlockDivWarp>;
     //using opSmem = SharedMemory<T,opSizeBlockDivWarp>;
-    using dependencies = op_Sequential<op_blockSync,opSmem>;
-    using dependentOps = SpecialOps<op_blockSync,opSmem>;
+    //using dependencies = op_Sequential<op_blockSync,opSmem>;
+    //using dependentOps = SpecialOps<op_blockSync,opSmem>;
     //template <typename ...Arg>
     //static constexpr size_t shared_mem_size(dim3 block, Arg &...arg) {
     //return opSizeBlockDivWarp::size<T>(block, arg...);
@@ -239,3 +239,12 @@ namespace quda
 } // namespace quda
 
 #include "../generic/block_reduce_helper.h"
+
+namespace quda
+{
+  template <typename T, int block_dim, int batch_size> static constexpr bool needsFullBlockImpl<BlockReduce<T,block_dim,batch_size>> = true;
+} // namespace quda
+
+static_assert(needsFullBlock<SpecialOps<BlockReduce<double,1>>> == true);
+static_assert(BlockReduce<double,1>::shared_mem_size(dim3{8,8,8}) > 0);
+static_assert(needsSharedMem<SpecialOps<BlockReduce<double,1>>> == true);

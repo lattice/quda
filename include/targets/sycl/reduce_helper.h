@@ -118,9 +118,10 @@ namespace quda
     //using opSharedMem = getSpecialOpF<reduceConcurrentOps,1>;
     //using Ops = SpecialOps<BlockReduce_t,reduceConcurrentOps>;
     using opBlockSync = op_blockSync;
-    using opSharedMem = op_SharedMemory<bool>;
+    //using opSharedMem = op_SharedMemory<bool>;
     using Smem = SharedMemory<bool, SizeZ>;
-    using Ops = SpecialOps<BlockReduce_t,opBlockSync,opSharedMem>;
+    //using Ops = SpecialOps<BlockReduce_t,opBlockSync,opSharedMem>;
+    using Ops = SpecialOps<BlockReduce_t,opBlockSync,Smem>;
   };
 
   /**

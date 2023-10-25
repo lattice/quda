@@ -5,7 +5,7 @@
 #include <../generic/shared_memory_cache_helper.h>
 
 namespace quda {
-  template <typename T, typename D, typename O> static constexpr bool needsFullBlock<SharedMemoryCache<T,D,O>> = true;
+  template <typename T, typename D, typename O> static constexpr bool needsFullBlockImpl<SharedMemoryCache<T,D,O>> = true;
 }
 
 #else
@@ -62,9 +62,9 @@ namespace quda
     sycl::local_ptr<atom_t> cache_ptr;
 
 #ifdef DYNAMIC_SLM
-    using opSmem = op_SharedMemory<T, opSizeDims<D>>;
-    using deps = op_Sequential<op_blockSync,opSmem>;
-    using depOps = SpecialOps<op_blockSync,opSmem>;
+    //using opSmem = op_SharedMemory<T, opSizeDims<D>>;
+    //using deps = op_Sequential<op_blockSync,opSmem>;
+    //using depOps = SpecialOps<op_blockSync,opSmem>;
 #else
 #endif
     using SharedMemoryCache_t = SharedMemoryCache<T, D, O>;
