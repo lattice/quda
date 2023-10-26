@@ -3,10 +3,11 @@
 #include <tunable_nd.h>
 #include <instantiate.h>
 
-namespace quda {
+namespace quda
+{
 
-  template <typename real, int Ns, int Nc>
-  class SpinorDilute : TunableKernel2D {
+  template <typename real, int Ns, int Nc> class SpinorDilute : TunableKernel2D
+  {
     std::vector<ColorSpinorField> &v;
     const ColorSpinorField &src;
     QudaDilutionType type;
@@ -15,12 +16,9 @@ namespace quda {
     template <QudaDilutionType type> using Arg = SpinorDiluteArg<real, Ns, Nc, type>;
 
   public:
-    SpinorDilute(const ColorSpinorField &src, std::vector<ColorSpinorField> &v, QudaDilutionType type, const lat_dim_t &local_block) :
-      TunableKernel2D(src, src.SiteSubset()),
-      v(v),
-      src(src),
-      type(type),
-      local_block(local_block)
+    SpinorDilute(const ColorSpinorField &src, std::vector<ColorSpinorField> &v, QudaDilutionType type,
+                 const lat_dim_t &local_block) :
+      TunableKernel2D(src, src.SiteSubset()), v(v), src(src), type(type), local_block(local_block)
     {
       switch (type) {
       case QUDA_DILUTION_SPIN: strcat(aux, ",spin_dilution"); break;
@@ -31,7 +29,8 @@ namespace quda {
       default: errorQuda("Unsupported dilution type %d", type);
       }
       if (type != QUDA_DILUTION_BLOCK && v.size() != static_cast<unsigned int>(get_size<Ns, Nc>(type)))
-        errorQuda("Input container size %lu does not match expected size %d for dilution type", v.size(), get_size<Ns, Nc>(type));
+        errorQuda("Input container size %lu does not match expected size %d for dilution type", v.size(),
+                  get_size<Ns, Nc>(type));
 
       size_t block_volume = 1;
       for (int i = 0; i < src.Ndim(); i++) block_volume *= local_block[i];
@@ -46,19 +45,23 @@ namespace quda {
         for (auto i = 0; i < src.Ndim(); i++) {
           if (local_block[i] == 0) errorQuda("Dim %d: Dilution block size = 0", i);
           if ((src.X(i) * comm_dim(i)) % local_block[i] != 0)
-            errorQuda("Dim %d: Invalid dilution block size %d for global lattice dim = %d",
-                      i, local_block[i], src.X(i) * comm_dim(i));
+            errorQuda("Dim %d: Invalid dilution block size %d for global lattice dim = %d", i, local_block[i],
+                      src.X(i) * comm_dim(i));
         }
       }
 
       apply(device::get_default_stream());
     }
 
-    template <QudaDilutionType type>
-    auto constexpr sequence() { return std::make_index_sequence<get_size<Ns, Nc>(type)>(); }
+    template <QudaDilutionType type> auto constexpr sequence()
+    {
+      return std::make_index_sequence<get_size<Ns, Nc>(type)>();
+    }
 
-    template <QudaDilutionType type>
-    void apply(TuneParam &tp, const qudaStream_t &stream) { launch<DiluteSpinor>(tp, stream, Arg<type>(v, src, local_block, sequence<type>())); }
+    template <QudaDilutionType type> void apply(TuneParam &tp, const qudaStream_t &stream)
+    {
+      launch<DiluteSpinor>(tp, stream, Arg<type>(v, src, local_block, sequence<type>()));
+    }
 
     void apply(const qudaStream_t &stream)
     {
@@ -76,31 +79,35 @@ namespace quda {
     long long bytes() const { return v.size() * v[0].Bytes() + src.Bytes(); }
   };
 
-  template <int...> struct IntList { };
+  template <int...> struct IntList {
+  };
 
-  template <typename real, int Ns, int Nc, int...N>
+  template <typename real, int Ns, int Nc, int... N>
   void spinorDilute(const ColorSpinorField &src, std::vector<ColorSpinorField> &v, QudaDilutionType type,
                     const lat_dim_t &local_block, IntList<Nc, N...>)
   {
     if (src.Ncolor() == Nc) {
       SpinorDilute<real, Ns, Nc>(src, v, type, local_block);
     } else {
-      if constexpr (sizeof...(N) > 0) spinorDilute<real, Ns>(src, v, type, local_block, IntList<N...>());
-      else errorQuda("nColor = %d not implemented", src.Ncolor());
+      if constexpr (sizeof...(N) > 0)
+        spinorDilute<real, Ns>(src, v, type, local_block, IntList<N...>());
+      else
+        errorQuda("nColor = %d not implemented", src.Ncolor());
     }
   }
 
   template <typename real>
-  void spinorDilute(const ColorSpinorField &src, std::vector<ColorSpinorField> &v, QudaDilutionType type, const lat_dim_t &local_block)
+  void spinorDilute(const ColorSpinorField &src, std::vector<ColorSpinorField> &v, QudaDilutionType type,
+                    const lat_dim_t &local_block)
   {
     checkNative(src);
-    if (!is_enabled_spin(src.Nspin()))
-      errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
+    if (!is_enabled_spin(src.Nspin())) errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
 
     if (src.Nspin() == 4) {
       if constexpr (is_enabled_spin(4)) spinorDilute<real, 4>(src, v, type, local_block, IntList<3>());
     } else if (src.Nspin() == 2) {
-      if constexpr (is_enabled_spin(2)) spinorDilute<real, 2>(src, v, type, local_block, IntList<3, @QUDA_MULTIGRID_NVEC_LIST@>());
+      if constexpr (is_enabled_spin(2))
+        spinorDilute<real, 2>(src, v, type, local_block, IntList<3, @QUDA_MULTIGRID_NVEC_LIST @>());
     } else if (src.Nspin() == 1) {
       if constexpr (is_enabled_spin(1)) spinorDilute<real, 1>(src, v, type, local_block, IntList<3>());
     } else {

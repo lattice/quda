@@ -50,7 +50,7 @@ namespace quda {
       dilution_size(v.size()),
       src(src),
       nParity(src.SiteSubset()),
-      dims(static_cast<const LatticeField&>(src).X()),
+      dims(static_cast<const LatticeField &>(src).X()),
       dilution_block_dims(dilution_block_dims)
     {
       for (auto i = 0u; i < v.size(); i++) this->v[i] = V(v[i]);
@@ -111,12 +111,12 @@ namespace quda {
 
         lat_dim_t block_coords;
         for (int i = 0; i < coords.size(); i++) block_coords[i] = coords[i] / arg.dilution_block_dims[i];
-        int block_idx = ((block_coords[3] * arg.dilution_block_grid[2] + block_coords[2]) * arg.dilution_block_grid[1] + block_coords[1])
-          * arg.dilution_block_grid[0] + block_coords[0]; 
+        int block_idx = ((block_coords[3] * arg.dilution_block_grid[2] + block_coords[2]) * arg.dilution_block_grid[1]
+                         + block_coords[1])
+            * arg.dilution_block_grid[0]
+          + block_coords[0];
 
-        for (int i = 0; i < arg.dilution_size; i++) {
-          arg.v[i](x_cb, parity) = i == block_idx ? src : vector();
-        }
+        for (int i = 0; i < arg.dilution_size; i++) { arg.v[i](x_cb, parity) = i == block_idx ? src : vector(); }
       } else {
         for (int i = 0; i < Arg::max_dilution_size; i++) { // for these types max = actual size
           vector v;
