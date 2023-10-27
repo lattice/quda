@@ -96,8 +96,8 @@ namespace quda {
       case QUDA_DILUTION_COLOR: return c == i;
       case QUDA_DILUTION_SPIN_COLOR: return (s * Arg::nColor + c) == i;
       case QUDA_DILUTION_SPIN_COLOR_EVEN_ODD: return ((parity * Arg::nSpin + s) * Arg::nColor + c) == i;
+      default: return 0;
       }
-      return 0;
     }
 
     __device__ __host__ void operator()(int x_cb, int parity)
