@@ -121,7 +121,7 @@ QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 QudaSolveType solve_type = QUDA_NORMOP_PC_SOLVE;
 QudaSolutionType solution_type = QUDA_MAT_SOLUTION;
 QudaTboundary fermion_t_boundary = QUDA_ANTI_PERIODIC_T;
-std::array<int, 4> dilution_block_size = {1, 1, 1, 1};
+std::array<int, 4> dilution_block_size = {8, 8, 8, 8};
 
 int mg_levels = 2;
 
