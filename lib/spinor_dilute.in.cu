@@ -107,7 +107,7 @@ namespace quda
       if constexpr (is_enabled_spin(4)) spinorDilute<real, 4>(src, v, type, local_block, IntList<3>());
     } else if (src.Nspin() == 2) {
       if constexpr (is_enabled_spin(2))
-        spinorDilute<real, 2>(src, v, type, local_block, IntList<3, @QUDA_MULTIGRID_NVEC_LIST @>());
+        spinorDilute<real, 2>(src, v, type, local_block, IntList<3, @QUDA_MULTIGRID_NVEC_LIST@>());
     } else if (src.Nspin() == 1) {
       if constexpr (is_enabled_spin(1)) spinorDilute<real, 1>(src, v, type, local_block, IntList<3>());
     } else {
