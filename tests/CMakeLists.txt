@@ -249,7 +249,7 @@ install(TARGETS heatbath_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_I
 
 
 if(QUDA_MPI OR QUDA_QMP)
-  #helper function to extract require number of ranks from environment variable
+  #helper function to extract required number of ranks from environment variable
   function(get_test_ranks TEST_GRID RANKS)
     separate_arguments(TEST_GRID)
     LIST(LENGTH TEST_GRID TEST_LENGTH)
