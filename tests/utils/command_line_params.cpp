@@ -121,6 +121,7 @@ QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 QudaSolveType solve_type = QUDA_NORMOP_PC_SOLVE;
 QudaSolutionType solution_type = QUDA_MAT_SOLUTION;
 QudaTboundary fermion_t_boundary = QUDA_ANTI_PERIODIC_T;
+std::array<int, 4> dilution_block_size = {8, 8, 8, 8};
 
 int mg_levels = 2;
 
@@ -607,6 +608,11 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->add_option("--fermion-t-boundary", fermion_t_boundary,
                  "The fermoinic temporal boundary conditions (anti-periodic (default), periodic")
     ->transform(CLI::QUDACheckedTransformer(fermion_t_boundary_map));
+
+  quda_app
+    ->add_option("--dilution-block-size", dilution_block_size,
+                 "Set the dilution block size in all four dimension (default 1 1 1 1)")
+    ->expected(4);
 
   quda_app
     ->add_option("--solve-type", solve_type,

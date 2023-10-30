@@ -1074,17 +1074,20 @@ namespace quda
       using GhostVector = typename VectorType<Float, N_ghost>::type;
       using AllocInt = typename AllocType<huge_alloc>::type;
       using norm_type = float;
-      Float *field;
-      norm_type *norm;
-      const AllocInt offset; // offset can be 32-bit or 64-bit
-      const AllocInt norm_offset;
-      int volumeCB;
-      int faceVolumeCB[4];
-      mutable Float *ghost[8];
-      mutable norm_type *ghost_norm[8];
-      int nParity;
-      void *backup_h; //! host memory for backing up the field when tuning
-      size_t bytes;
+      Float *field = nullptr;
+      norm_type *norm = nullptr;
+      AllocInt offset = 0; // offset can be 32-bit or 64-bit
+      AllocInt norm_offset = 0;
+      int volumeCB = 0;
+      array<int, 4> faceVolumeCB = {};
+      mutable array<Float *, 8> ghost = {};
+      mutable array<norm_type *, 8> ghost_norm = {};
+      int nParity = 0;
+      void *backup_h = nullptr; //! host memory for backing up the field when tuning
+      size_t bytes = 0;
+
+      FloatNOrder() = default;
+      FloatNOrder(const FloatNOrder &) = default;
 
       FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *buffer = 0, Float **ghost_ = 0) :
         field(buffer ? buffer : a.data<Float *>()),
@@ -1094,12 +1097,13 @@ namespace quda
         norm_offset(a.Bytes() / (2 * sizeof(norm_type))),
         volumeCB(a.VolumeCB()),
         nParity(a.SiteSubset()),
-        backup_h(nullptr),
         bytes(a.Bytes())
       {
         for (int i = 0; i < 4; i++) { faceVolumeCB[i] = a.SurfaceCB(i) * nFace; }
         resetGhost(ghost_ ? (void **)ghost_ : a.Ghost());
       }
+
+      FloatNOrder &operator=(const FloatNOrder &) = default;
 
       void resetGhost(void *const *ghost_) const
       {
@@ -1305,26 +1309,30 @@ namespace quda
       using GhostVector = int4; // 128-bit packed type
       using AllocInt = typename AllocType<huge_alloc>::type;
       using norm_type = float;
-      Float *field;
-      const AllocInt offset; // offset can be 32-bit or 64-bit
-      int volumeCB;
-      int faceVolumeCB[4];
-      mutable Float *ghost[8];
-      int nParity;
-      void *backup_h; //! host memory for backing up the field when tuning
-      size_t bytes;
+      Float *field = nullptr;
+      const AllocInt offset = 0; // offset can be 32-bit or 64-bit
+      int volumeCB = 0;
+      array<int, 4> faceVolumeCB = {};
+      mutable array<Float *, 8> ghost = {};
+      int nParity = 0;
+      void *backup_h = nullptr; //! host memory for backing up the field when tuning
+      size_t bytes = 0;
+
+      FloatNOrder() = default;
+      FloatNOrder(const FloatNOrder &) = default;
 
       FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *buffer = 0, Float **ghost_ = 0) :
         field(buffer ? buffer : a.data<Float *>()),
         offset(a.Bytes() / (2 * sizeof(Vector))),
         volumeCB(a.VolumeCB()),
         nParity(a.SiteSubset()),
-        backup_h(nullptr),
         bytes(a.Bytes())
       {
         for (int i = 0; i < 4; i++) { faceVolumeCB[i] = a.SurfaceCB(i) * nFace; }
         resetGhost(ghost_ ? (void **)ghost_ : a.Ghost());
       }
+
+      FloatNOrder &operator=(const FloatNOrder &) = default;
 
       void resetGhost(void *const *ghost_) const
       {
