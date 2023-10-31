@@ -754,7 +754,7 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
 
     // exact reason for this tbd, this isn't needed in the dslash test...
     if (dslash_type == QUDA_LAPLACE_DSLASH)
-      ax(0.5 / kappa, ref.V(), ref.Length(), ref.Precision());
+      ax(0.5 / kappa, ref.data(), ref.Length(), ref.Precision());
   } else if (inv_param.solution_type == QUDA_MATPC_SOLUTION) {
     QudaParity parity = QUDA_INVALID_PARITY;
     switch (inv_param.matpc_type) {
@@ -777,9 +777,9 @@ double verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorFi
     len = Vh;
   }
 
-  mxpy(in.V(), ref.V(), len * stag_spinor_site_size, inv_param.cpu_prec);
-  double nrm2 = norm_2(ref.V(), len * stag_spinor_site_size, inv_param.cpu_prec);
-  double src2 = norm_2(in.V(), len * stag_spinor_site_size, inv_param.cpu_prec);
+  mxpy(in.data(), ref.data(), len * stag_spinor_site_size, inv_param.cpu_prec);
+  double nrm2 = norm_2(ref.data(), len * stag_spinor_site_size, inv_param.cpu_prec);
+  double src2 = norm_2(in.data(), len * stag_spinor_site_size, inv_param.cpu_prec);
   double hqr = sqrt(quda::blas::HeavyQuarkResidualNorm(out, ref).z);
   double l2r = sqrt(nrm2 / src2);
 

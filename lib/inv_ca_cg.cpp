@@ -184,10 +184,7 @@ namespace quda
   {
     Solver::create(x, b);
     if (!init) {
-      if (!param.is_preconditioner) {
-        blas::flops = 0;
-        profile.TPSTART(QUDA_PROFILE_INIT);
-      }
+      if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
 
       Q_AQandg.resize(param.Nkrylov * (param.Nkrylov + 1));
       Q_AS.resize(param.Nkrylov * param.Nkrylov);
@@ -248,7 +245,6 @@ namespace quda
   {
     if (!param.is_preconditioner) {
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
       profile.TPSTART(QUDA_PROFILE_EIGEN);
     }
 
@@ -290,7 +286,6 @@ namespace quda
 
     if (!param.is_preconditioner) {
       profile.TPSTOP(QUDA_PROFILE_EIGEN);
-      param.secs += profile.Last(QUDA_PROFILE_EIGEN);
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
     }
   }
@@ -318,7 +313,6 @@ namespace quda
   {
     if (!param.is_preconditioner) {
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
       profile.TPSTART(QUDA_PROFILE_EIGEN);
     }
 
@@ -357,7 +351,6 @@ namespace quda
 
     if (!param.is_preconditioner) {
       profile.TPSTOP(QUDA_PROFILE_EIGEN);
-      param.secs += profile.Last(QUDA_PROFILE_EIGEN);
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
     }
   }
@@ -522,7 +515,6 @@ namespace quda
     int resIncreaseTotal = 0;
 
     if (!param.is_preconditioner) {
-      blas::flops = 0;
       profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
     }
@@ -675,25 +667,8 @@ namespace quda
     }
 
     if (!param.is_preconditioner) {
-      qudaDeviceSynchronize(); // ensure solver is complete before ending timing
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      profile.TPSTART(QUDA_PROFILE_EPILOGUE);
-      param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-
-      // store flops and reset counters
-      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matEig.flops()) * 1e-9;
-
-      param.gflops += gflops;
       param.iter += total_iter;
-
-      // reset the flops counters
-      blas::flops = 0;
-      mat.flops();
-      matSloppy.flops();
-      matPrecon.flops();
-      matEig.flops();
-
-      profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
 
     PrintSummary("CA-CG", total_iter, r2, b2, stop, param.tol_hq);

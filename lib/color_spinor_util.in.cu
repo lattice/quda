@@ -417,7 +417,8 @@ namespace quda {
 
     param.create = create;
     if (create == QUDA_COPY_FIELD_CREATE) param.field = &const_cast<ColorSpinorField&>(src);
-    else if (create == QUDA_REFERENCE_FIELD_CREATE) param.v = const_cast<ColorSpinorField&>(src).V();
+    else if (create == QUDA_REFERENCE_FIELD_CREATE)
+      param.v = src.data();
 
     resize(v, new_size, param);
   }

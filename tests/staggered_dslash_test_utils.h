@@ -19,6 +19,7 @@
 #include "dslash_test_helpers.h"
 #include <assert.h>
 #include <gtest/gtest.h>
+#include <tune_quda.h>
 
 using namespace quda;
 
@@ -318,8 +319,8 @@ struct StaggeredDslashTestWrapper {
       std::vector<void *> _hp_x(inv_param.num_src);
       std::vector<void *> _hp_b(inv_param.num_src);
       for (int i = 0; i < inv_param.num_src; i++) {
-        _hp_x[i] = vp_spinor_out[i].V();
-        _hp_b[i] = vp_spinor[i].V();
+        _hp_x[i] = vp_spinor_out[i].data();
+        _hp_b[i] = vp_spinor[i].data();
       }
       dslashMultiSrcStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, parity, qdp_fatlink, qdp_longlink,
                                   &gauge_param);
@@ -367,19 +368,29 @@ struct StaggeredDslashTestWrapper {
     printfQuda("Tuning...\n");
     dslashCUDA(1);
 
-    // reset flop counter
-    dirac->Flops();
+    auto flops0 = quda::Tunable::flops_global();
+    auto bytes0 = quda::Tunable::bytes_global();
 
     DslashTime dslash_time = dslashCUDA(niter);
+
+    unsigned long long flops = (quda::Tunable::flops_global() - flops0);
+    unsigned long long bytes = (quda::Tunable::bytes_global() - bytes0);
+
     spinorOut = cudaSpinorOut;
 
     if (print_metrics) {
       printfQuda("%fus per kernel call\n", 1e6 * dslash_time.event_time / niter);
 
-      unsigned long long flops = dirac->Flops();
+      printfQuda("%llu flops per kernel call, %llu flops per site %llu bytes per site\n", flops / niter,
+                 (flops / niter) / cudaSpinor.Volume(), (bytes / niter) / cudaSpinor.Volume());
+
       double gflops = 1.0e-9 * flops / dslash_time.event_time;
       printfQuda("GFLOPS = %f\n", gflops);
       ::testing::Test::RecordProperty("Gflops", std::to_string(gflops));
+
+      double gbytes = 1.0e-9 * bytes / dslash_time.event_time;
+      printfQuda("GBYTES = %f\n", gbytes);
+      ::testing::Test::RecordProperty("Gbytes", std::to_string(gbytes));
 
       size_t ghost_bytes = cudaSpinor.GhostBytes();
 

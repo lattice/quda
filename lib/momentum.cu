@@ -9,6 +9,7 @@
 #include <tunable_reduction.h>
 #include <tunable_nd.h>
 #include <kernels/momentum.cuh>
+#include "timer.h"
 
 namespace quda {
 
@@ -92,9 +93,11 @@ namespace quda {
   };
 
   double computeMomAction(const GaugeField& mom) {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (!mom.isNative()) errorQuda("Unsupported output ordering: %d\n", mom.Order());
     double action = 0.0;
     instantiate<ActionMom, Reconstruct10>(mom, action);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     return action;
   }
 
@@ -132,11 +135,13 @@ namespace quda {
 
   void updateMomentum(GaugeField &mom, double coeff, GaugeField &force, const char *fname)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (mom.Reconstruct() != QUDA_RECONSTRUCT_10)
       errorQuda("Momentum field with reconstruct %d not supported", mom.Reconstruct());
 
     checkPrecision(mom, force);
     instantiate<UpdateMom, ReconstructMom>(force, mom, coeff, fname);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
   template <typename Float, int nColor, QudaReconstructType recon>
@@ -173,9 +178,11 @@ namespace quda {
 
   void applyU(GaugeField &force, GaugeField &U)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     if (!force.isNative()) errorQuda("Unsupported output ordering: %d\n", force.Order());
     checkPrecision(force, U);
     instantiate<UApply, ReconstructNo12>(U, force);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
 } // namespace quda

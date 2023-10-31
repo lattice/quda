@@ -84,9 +84,9 @@ typedef struct {
   double space;
 } danti_hermitmat;
 
-template <typename su3_matrix> su3_matrix *get_su3_matrix(su3_matrix *p, int idx, int dir)
+template <typename su3_matrix> su3_matrix *get_su3_matrix(quda::GaugeField &p, int idx, int dir)
 {
-  su3_matrix *data = ((su3_matrix **)p)[dir];
+  auto data = static_cast<su3_matrix *>(p.data(dir));
   return data + idx;
 }
 
@@ -96,8 +96,8 @@ template <typename su3_vector, typename su3_matrix> void su3_projector(su3_vecto
     for (int j = 0; j < 3; j++) CMUL_J(a->c[i], b->c[j], c->e[i][j]);
 }
 
-template <typename su3_vector, typename su3_matrix>
-void computeLinkOrderedOuterProduct(su3_vector *src, su3_matrix *dest, size_t nhops)
+template <typename su3_matrix, typename su3_vector>
+void computeLinkOrderedOuterProduct(su3_vector *src, quda::GaugeField &dest, size_t nhops)
 {
   int dx[4];
   for (int i = 0; i < V; ++i) {
@@ -106,18 +106,18 @@ void computeLinkOrderedOuterProduct(su3_vector *src, su3_matrix *dest, size_t nh
       dx[dir] = nhops;
       int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
       su3_vector *hw = src + nbr_idx;
-      su3_matrix *p = get_su3_matrix(dest, i, dir);
+      su3_matrix *p = get_su3_matrix<su3_matrix>(dest, i, dir);
       su3_projector(hw, &src[i], p);
     } // dir
   }   // i
 }
 
-void computeLinkOrderedOuterProduct(void *src, void *dst, QudaPrecision precision, size_t nhops)
+void computeLinkOrderedOuterProduct(void *src, quda::GaugeField &dst, QudaPrecision precision, size_t nhops)
 {
   if (precision == QUDA_SINGLE_PRECISION) {
-    computeLinkOrderedOuterProduct((fsu3_vector *)src, (fsu3_matrix *)dst, nhops);
+    computeLinkOrderedOuterProduct<fsu3_matrix>((fsu3_vector *)src, dst, nhops);
   } else {
-    computeLinkOrderedOuterProduct((dsu3_vector *)src, (dsu3_matrix *)dst, nhops);
+    computeLinkOrderedOuterProduct<dsu3_matrix>((dsu3_vector *)src, dst, nhops);
   }
 }
 
@@ -1197,17 +1197,17 @@ void doHisqStaplesForceCPU(const int dim[4], PathCoefficients<double> staple_coe
 #undef Qmu
 #undef Qnumu
 
-void hisqStaplesForceCPU(const double *path_coeff, quda::cpuGaugeField &oprod, quda::cpuGaugeField &link,
-                         quda::cpuGaugeField *newOprod)
+void hisqStaplesForceCPU(const double *path_coeff, quda::GaugeField &oprod, quda::GaugeField &link,
+                         quda::GaugeField *newOprod)
 {
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
   QudaPrecision precision = oprod.Precision();
 
 #ifdef MULTI_GPU
-  int len = Vh_ex * 2;
+  uint64_t len = Vh_ex * 2;
 #else
-  int len = 1;
+  uint64_t len = 1;
   for (int dir = 0; dir < 4; ++dir) len *= X_[dir];
 #endif
   // allocate memory for temporary fields
@@ -1222,13 +1222,17 @@ void hisqStaplesForceCPU(const double *path_coeff, quda::cpuGaugeField &oprod, q
   act_path_coeff.seven = path_coeff[4];
   act_path_coeff.lepage = path_coeff[5];
 
+  void *oprod_array[] = {oprod.data(0), oprod.data(1), oprod.data(2), oprod.data(3)};
+  void *link_array[] = {link.data(0), link.data(1), link.data(2), link.data(3)};
+  void *noprod_array[] = {newOprod->data(0), newOprod->data(1), newOprod->data(2), newOprod->data(3)};
   if (precision == QUDA_DOUBLE_PRECISION) {
-    doHisqStaplesForceCPU<double>(X_, act_path_coeff, (double *)oprod.Gauge_p(), (double *)link.Gauge_p(),
-                                  (double **)tempmat, (double *)newOprod->Gauge_p());
-
+    doHisqStaplesForceCPU<double>(X_, act_path_coeff, reinterpret_cast<double *>(oprod_array),
+                                  reinterpret_cast<double *>(link_array), (double **)tempmat,
+                                  reinterpret_cast<double *>(noprod_array));
   } else if (precision == QUDA_SINGLE_PRECISION) {
-    doHisqStaplesForceCPU<float>(X_, act_path_coeff, (float *)oprod.Gauge_p(), (float *)link.Gauge_p(),
-                                 (float **)tempmat, (float *)newOprod->Gauge_p());
+    doHisqStaplesForceCPU<float>(X_, act_path_coeff, reinterpret_cast<float *>(oprod_array),
+                                 reinterpret_cast<float *>(link_array), (float **)tempmat,
+                                 reinterpret_cast<float *>(noprod_array));
   } else {
     errorQuda("Unsupported precision");
   }
@@ -1302,22 +1306,24 @@ void computeLongLinkField(const int dim[4], const Real *const oprod, const Real 
   }
 }
 
-void hisqLongLinkForceCPU(double coeff, quda::cpuGaugeField &oprod, quda::cpuGaugeField &link,
-                          quda::cpuGaugeField *newOprod)
+void hisqLongLinkForceCPU(double coeff, quda::GaugeField &oprod, quda::GaugeField &link, quda::GaugeField *newOprod)
 {
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
   QudaPrecision precision = oprod.Precision();
 
+  void *oprod_array[] = {oprod.data(0), oprod.data(1), oprod.data(2), oprod.data(3)};
+  void *link_array[] = {link.data(0), link.data(1), link.data(2), link.data(3)};
+  void *noprod_array[] = {newOprod->data(0), newOprod->data(1), newOprod->data(2), newOprod->data(3)};
   for (int sig = 0; sig < 4; ++sig) {
     if (precision == QUDA_SINGLE_PRECISION) {
-      computeLongLinkField<float>(X_, (float *)oprod.Gauge_p(), (float *)link.Gauge_p(), sig, coeff,
-                                  (float *)newOprod->Gauge_p());
+      computeLongLinkField<float>(X_, reinterpret_cast<float *>(oprod_array), reinterpret_cast<float *>(link_array),
+                                  sig, coeff, reinterpret_cast<float *>(noprod_array));
     } else if (precision == QUDA_DOUBLE_PRECISION) {
-      computeLongLinkField<double>(X_, (double *)oprod.Gauge_p(), (double *)link.Gauge_p(), sig, coeff,
-                                   (double *)newOprod->Gauge_p());
+      computeLongLinkField<double>(X_, reinterpret_cast<double *>(oprod_array), reinterpret_cast<double *>(link_array),
+                                   sig, coeff, reinterpret_cast<double *>(noprod_array));
     } else {
-      errorQuda("Unrecognised precision\n");
+      errorQuda("Unrecognised precision");
     }
   } // sig
 }
@@ -1361,19 +1367,23 @@ void completeForceField(const int dim[4], const Real *const oprod, const Real *c
   for (int site = 0; site < half_volume; ++site) { completeForceSite<Real, 1>(site, dim, oprod, link, sig, ls, mom); }
 }
 
-void hisqCompleteForceCPU(quda::cpuGaugeField &oprod, quda::cpuGaugeField &link, quda::cpuGaugeField *mom)
+void hisqCompleteForceCPU(quda::GaugeField &oprod, quda::GaugeField &link, quda::GaugeField *mom)
 {
   int X_[4];
   for (int d = 0; d < 4; d++) X_[d] = oprod.X()[d] - 2 * oprod.R()[d];
   QudaPrecision precision = oprod.Precision();
 
+  void *oprod_array[] = {oprod.data(0), oprod.data(1), oprod.data(2), oprod.data(3)};
+  void *link_array[] = {link.data(0), link.data(1), link.data(2), link.data(3)};
   for (int sig = 0; sig < 4; ++sig) {
     if (precision == QUDA_SINGLE_PRECISION) {
-      completeForceField<float>(X_, (float *)oprod.Gauge_p(), (float *)link.Gauge_p(), sig, (float *)mom->Gauge_p());
+      completeForceField<float>(X_, reinterpret_cast<float *>(oprod_array), reinterpret_cast<float *>(link_array), sig,
+                                mom->data<float *>());
     } else if (precision == QUDA_DOUBLE_PRECISION) {
-      completeForceField<double>(X_, (double *)oprod.Gauge_p(), (double *)link.Gauge_p(), sig, (double *)mom->Gauge_p());
+      completeForceField<double>(X_, reinterpret_cast<double *>(oprod_array), reinterpret_cast<double *>(link_array),
+                                 sig, mom->data<double *>());
     } else {
-      errorQuda("Unrecognised precision\n");
+      errorQuda("Unrecognised precision");
     }
   } // loop over sig
 }

@@ -58,7 +58,9 @@ void computeLongLinkCPU(void **longlink, void **sitelink, QudaPrecision prec, vo
 void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **sitelink,
                          void *qudaGaugeParamPtr, double **act_path_coeffs, double eps_naik);
 void computeTwoLinkCPU(void **twolink, void **sitelink, QudaGaugeParam *gauge_param);
-void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk[], void** ghost_twolnk,  quda::ColorSpinorField &in, QudaGaugeParam *qudaGaugeParam, QudaInvertParam *inv_param, const int oddBit, const double width, const int t0, QudaPrecision prec);
+void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk[], const quda::GaugeField &twolnk,
+                                   quda::ColorSpinorField &in, QudaGaugeParam *qudaGaugeParam, QudaInvertParam *inv_param,
+                                   const int oddBit, const double width, const int t0, QudaPrecision prec);
 template <typename Float>
 void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type);
 void applyGaugeFieldScaling_long(void **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type,
@@ -167,7 +169,9 @@ enum {
    @param[in] precision Precision of field
    @param[in] phase Type of phase; 0 == no additional phase, 1 == MILC phases, 2 == U(1) phase
  */
-void createSiteLinkCPU(void **link, QudaPrecision precision, int phase);
+void createSiteLinkCPU(void *const *const link, QudaPrecision precision, int phase);
+void createSiteLinkCPU(quda::GaugeField &u, QudaPrecision precision, int phase);
+
 void su3_construct(void *mat, QudaReconstructType reconstruct, QudaPrecision precision);
 void su3_reconstruct(void *mat, int dir, int ga_idx, QudaReconstructType reconstruct, QudaPrecision precision,
                      QudaGaugeParam *param);
@@ -180,6 +184,8 @@ double compare_floats_v2(void *a, void *b, int len, double epsilon, QudaPrecisio
 void check_gauge(void **, void **, double epsilon, QudaPrecision precision);
 
 int strong_check_link(void **linkA, const char *msgA, void **linkB, const char *msgB, int len, QudaPrecision prec);
+int strong_check_link(const quda::GaugeField &linkA, const std::string &msgA, const quda::GaugeField &linkB,
+                      const std::string &msgB);
 int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec);
 
 /**

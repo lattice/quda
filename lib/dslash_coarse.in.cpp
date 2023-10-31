@@ -74,7 +74,7 @@ namespace quda
       GaugeFieldParam param(X);
       param.order = order;
       param.location = QUDA_CUDA_FIELD_LOCATION;
-      output = static_cast<GaugeField *>(cudaGaugeField::Create(param));
+      output = static_cast<GaugeField *>(GaugeField::Create(param));
       if (copy_content) { output->copy(X); }
     }
     return output;

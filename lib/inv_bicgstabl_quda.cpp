@@ -50,7 +50,6 @@ namespace quda {
 
     if (!param.is_preconditioner) {
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
       profile.TPSTART(QUDA_PROFILE_EIGEN);
     }
 
@@ -61,7 +60,6 @@ namespace quda {
 
     if (!param.is_preconditioner) {
       profile.TPSTOP(QUDA_PROFILE_EIGEN);
-      param.secs += profile.Last(QUDA_PROFILE_EIGEN);
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
     }
 
@@ -562,7 +560,6 @@ namespace quda {
     double heavy_quark_res = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x, r_full).z) : 0.0;
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
-    blas::flops = 0;
     //bool l2_converge = false;
     //double r2_old = r2;
 
@@ -706,9 +703,6 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matEig.flops()) * 1e-9;
-    param.gflops = gflops;
     param.iter += total_iter;
 
     if (total_iter >= param.maxiter) // >= if n_krylov doesn't divide max iter.
@@ -726,12 +720,7 @@ namespace quda {
       param.true_res_hq = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x, r[0]).z) : 0.0;
     }
 
-    // Reset flops counters.
-    blas::flops = 0;
-    mat.flops();
-
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-    param.secs += profile.Last(QUDA_PROFILE_EPILOGUE);
 
     PrintSummary(solver_name.c_str(), total_iter, r2, b2, stop, param.tol_hq);
   }

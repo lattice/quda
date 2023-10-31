@@ -3,6 +3,7 @@
 #include <array>
 #include <host_utils.h>
 #include <comm_quda.h>
+#include <gauge_field.h>
 
 template <typename Float> static inline void sum(Float *dst, Float *a, Float *b, int cnt)
 {

@@ -141,18 +141,26 @@ void stag_dslash(ColorSpinorField &out, const GaugeField &fat_link, const GaugeF
 
   in.exchangeGhost(otherparity, nFace, daggerBit);
 
-  void **fwd_nbr_spinor = in.fwdGhostFaceBuffer;
-  void **back_nbr_spinor = in.backGhostFaceBuffer;
+  auto fwd_nbr_spinor = in.fwdGhostFaceBuffer;
+  auto back_nbr_spinor = in.backGhostFaceBuffer;
+
+  void *qdp_fatlink[] = {fat_link.data(0), fat_link.data(1), fat_link.data(2), fat_link.data(3)};
+  void *qdp_longlink[] = {long_link.data(0), long_link.data(1), long_link.data(2), long_link.data(3)};
+  void *ghost_fatlink[]
+    = {fat_link.Ghost()[0].data(), fat_link.Ghost()[1].data(), fat_link.Ghost()[2].data(), fat_link.Ghost()[3].data()};
+  void *ghost_longlink[]
+    = {long_link.Ghost()[0].data(), long_link.Ghost()[1].data(), long_link.Ghost()[2].data(), long_link.Ghost()[3].data()};
 
   if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-    staggeredDslashReference((double *)out.V(), (double **)fat_link.Gauge_p(), (double **)long_link.Gauge_p(),
-                             (double **)fat_link.Ghost(), (double **)long_link.Ghost(),
-                             (double *)in.V(), (double **)fwd_nbr_spinor,
+    // note: qdp_fatlink and qdp_longlink, etc, can be replaced with feature/openmp's raw_pointer
+    staggeredDslashReference((double *)out.data(), (double **)qdp_fatlink, (double **)qdp_longlink,
+                             (double**)ghost_fatlink, (double**)ghost_longlink,
+                             (double *)in.data(), (double **)fwd_nbr_spinor,
                              (double **)back_nbr_spinor, oddBit, daggerBit, dslash_type);
   } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
-    staggeredDslashReference((float *)out.V(), (float **)fat_link.Gauge_p(), (float **)long_link.Gauge_p(),
-                             (float **)fat_link.Ghost(), (float **)long_link.Ghost(),
-                             (float *)in.V(), (float **)fwd_nbr_spinor,
+    staggeredDslashReference((float *)out.data(), (float **)qdp_fatlink, (float **)qdp_longlink,
+                             (float**)ghost_fatlink, (float**)ghost_longlink,
+                             (float *)in.data(), (float **)fwd_nbr_spinor,
                              (float **)back_nbr_spinor, oddBit, daggerBit, dslash_type);
   }
 }
@@ -176,9 +184,9 @@ void stag_mat(ColorSpinorField &out, const GaugeField &fat_link, const GaugeFiel
 
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
     double kappa = 1.0 / (8 + mass);
-    xpay((void*)in.V(), kappa, out.V(), out.Length(), out.Precision());
+    xpay((void*)in.data(), kappa, out.data(), out.Length(), out.Precision());
   } else {
-    axpy(2 * mass, (void*)in.V(), out.V(), out.Length(), out.Precision());
+    axpy(2 * mass, (void*)in.data(), out.data(), out.Length(), out.Precision());
   }
 }
 
@@ -203,8 +211,8 @@ void stag_matpc(ColorSpinorField &out, const GaugeField &fat_link, const GaugeFi
 
   double msq_x4 = mass * mass * 4;
   if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-    axmy((double *)in.V(), (double)msq_x4, (double *)out.V(), Vh * stag_spinor_site_size);
+    axmy((double *)in.data(), (double)msq_x4, (double *)out.data(), Vh * stag_spinor_site_size);
   } else {
-    axmy((float *)in.V(), (float)msq_x4, (float *)out.V(), Vh * stag_spinor_site_size);
+    axmy((float *)in.data(), (float)msq_x4, (float *)out.data(), Vh * stag_spinor_site_size);
   }
 }

@@ -55,6 +55,7 @@ namespace quda {
   void gaugeLoopTrace(const GaugeField& u, std::vector<Complex>& loop_traces, double factor, std::vector<int**>& input_path,
 		 std::vector<int>& length, std::vector<double>& path_coeff, int num_paths, int path_max_length)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     paths<1> p(input_path, length, path_coeff, num_paths, path_max_length);
 
     std::vector<array<double, 2>> tr_array(loop_traces.size());
@@ -65,6 +66,7 @@ namespace quda {
     for (auto i = 0u; i < tr_array.size(); i++) { loop_traces[i] = Complex(tr_array[i][0], tr_array[i][1]); }
 
     p.free();
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
 } // namespace quda

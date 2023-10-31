@@ -440,11 +440,14 @@ void staggeredTwoLinkGaussianSmear(sFloat *res, gFloat **twolink, gFloat **ghost
   return;
 }
 
-void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk[], void **ghost_twolnk,
+void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk[], const quda::GaugeField &twolnk,
                                    quda::ColorSpinorField &in, QudaGaugeParam * /*qudaGaugeParam*/,
                                    QudaInvertParam * /*inv_param*/, const int oddBit, const double /*width*/,
                                    const int t0, QudaPrecision prec)
 {
+  void *ghost[4];
+  for (int i = 0; i < 4; i++) ghost[i] = twolnk.Ghost()[i].data();
+
   QudaParity otherparity = QUDA_INVALID_PARITY;
   if (oddBit == QUDA_EVEN_PARITY) {
     otherparity = QUDA_ODD_PARITY;
@@ -462,19 +465,20 @@ void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &out, void *qdp_twolnk
 
   if (prec == QUDA_DOUBLE_PRECISION) {
     {
-      staggeredTwoLinkGaussianSmear((double *)out.V(), (double **)qdp_twolnk, (double **)ghost_twolnk, (double *)in.V(),
+      staggeredTwoLinkGaussianSmear((double *)out.data(), (double **)qdp_twolnk, (double **)ghost, (double *)in.data(),
                                     (double **)fwd_nbr_spinor, (double **)back_nbr_spinor, t0, oddBit);
     } 
   } else {
     {
-      staggeredTwoLinkGaussianSmear((float *)out.V(), (float **)qdp_twolnk, (float **)ghost_twolnk, (float *)in.V(),
+      staggeredTwoLinkGaussianSmear((float *)out.data(), (float **)qdp_twolnk, (float **)ghost, (float *)in.data(),
                                     (float **)fwd_nbr_spinor, (float **)back_nbr_spinor, t0, oddBit);
     }
   }
   return;
 }
 #else
-void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &, void **, void** ,  quda::ColorSpinorField&, QudaGaugeParam* , QudaInvertParam* , const int , const double , const int , QudaPrecision )
+void staggeredTwoLinkGaussianSmear(quda::ColorSpinorField &, void **, const quda::GaugeField &, quda::ColorSpinorField &,
+                                   QudaGaugeParam *, QudaInvertParam *, const int, const double, const int, QudaPrecision)
 {}
 #endif
 
@@ -645,7 +649,7 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
   unitarizeLinksCPU(*cpuWLink, *cpuVLink);
 
   // Copy back into "w_reflink"
-  reorderMILCtoQDP(w_reflink, cpuWLink->Gauge_p(), V, gauge_site_size, prec, prec);
+  reorderMILCtoQDP(w_reflink, cpuWLink->data(), V, gauge_site_size, prec, prec);
 
   // Clean up cpuGaugeFields, we don't need them anymore.
   delete cpuVLink;

@@ -335,7 +335,9 @@ const char *get_memory_type_str(QudaMemoryType type)
 
   switch (type) {
   case QUDA_MEMORY_DEVICE: s = "device"; break;
-  case QUDA_MEMORY_PINNED: s = "pinned"; break;
+  case QUDA_MEMORY_DEVICE_PINNED: s = "device_pinned"; break;
+  case QUDA_MEMORY_HOST: s = "host"; break;
+  case QUDA_MEMORY_HOST_PINNED: s = "host_pinned"; break;
   case QUDA_MEMORY_MAPPED: s = "mapped"; break;
   default: fprintf(stderr, "Error: invalid memory type\n"); exit(1);
   }
@@ -352,6 +354,7 @@ std::string get_dilution_type_str(QudaDilutionType type)
   case QUDA_DILUTION_COLOR: s = std::string("color"); break;
   case QUDA_DILUTION_SPIN_COLOR: s = std::string("spin_color"); break;
   case QUDA_DILUTION_SPIN_COLOR_EVEN_ODD: s = std::string("spin_color_even_odd"); break;
+  case QUDA_DILUTION_BLOCK: s = std::string("block"); break;
   default: fprintf(stderr, "Error: invalid dilution type\n"); exit(1);
   }
   return s;

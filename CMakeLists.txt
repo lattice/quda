@@ -278,8 +278,6 @@ mark_as_advanced(QUDA_RECONSTRUCT)
 mark_as_advanced(QUDA_CLOVER_CHOLESKY_PROMOTE)
 mark_as_advanced(QUDA_MULTIGRID_DSLASH_PROMOTE)
 mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
-mark_as_advanced(QUDA_CTEST_LAUNCH)
-mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
 mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_BACKWARDS)

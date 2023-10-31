@@ -117,14 +117,14 @@ namespace quda {
       }
 
       // set for the source subset ordering
-      srcFloat *srcEven = Src ? Src : (srcFloat*)src.V();
+      srcFloat *srcEven = Src ? Src : src.data<srcFloat *>();
       srcFloat *srcOdd = (srcFloat*)((char*)srcEven + src.Bytes()/2);
       if (src.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER) {
 	std::swap<srcFloat*>(srcEven, srcOdd);
       }
 
       // set for the destination subset ordering
-      dstFloat *dstEven = Dst ? Dst : (dstFloat*)dst.V();
+      dstFloat *dstEven = Dst ? Dst : dst.data<dstFloat *>();
       dstFloat *dstOdd = (dstFloat*)((char*)dstEven + dst.Bytes()/2);
       if (dst.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER) {
 	std::swap<dstFloat*>(dstEven, dstOdd);
