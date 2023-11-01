@@ -101,31 +101,38 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
   Gamma5_host((double *)tmp.V(), (double *)x.Odd().V(), x.Odd().VolumeCB());
 
   int parity = 0;
-  QudaMatPCType myMatPCType = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+  QudaMatPCType myMatPCType = inv_param->matpc_type;
+  QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+  if (myMatPCType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || myMatPCType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
 
-  if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    tmc_dslash(x.Even().V(), gauge.data(), tmp.V(), clover.data(), clover_inv.data(), inv_param->kappa, inv_param->mu,
-               inv_param->twist_flavor, parity, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
-  } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    clover_dslash(x.Even().V(), gauge.data(), clover_inv.data(), tmp.V(), parity, QUDA_DAG_YES, inv_param->cpu_prec,
-                  *gauge_param);
-  } else {
-    errorQuda("TMCloverForce_reference: dslash_type not supported\n");
+    if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+      tmc_dslash(x.Even().V(), gauge.data(), tmp.V(), clover.data(), clover_inv.data(), inv_param->kappa, inv_param->mu,
+                 inv_param->twist_flavor, parity, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
+    } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+      clover_dslash(x.Even().V(), gauge.data(), clover_inv.data(), tmp.V(), parity, QUDA_DAG_YES, inv_param->cpu_prec,
+                    *gauge_param);
+    } else {
+      errorQuda("TMCloverForce_reference: dslash_type not supported\n");
+    }
+    Gamma5_host((double *)x.Even().V(), (double *)x.Even().V(), x.Even().VolumeCB());
+
+    if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+      tmc_matpc(p.Odd().V(), gauge.data(), tmp.V(), clover.data(), clover_inv.data(), inv_param->kappa, inv_param->mu,
+                inv_param->twist_flavor, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
+      tmc_dslash(p.Even().V(), gauge.data(), p.Odd().V(), clover.data(), clover_inv.data(), inv_param->kappa,
+                 inv_param->mu, inv_param->twist_flavor, parity, myMatPCType, QUDA_DAG_NO, inv_param->cpu_prec,
+                 *gauge_param);
+    } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+      clover_matpc(p.Odd().V(), gauge.data(), clover.data(), clover_inv.data(), tmp.V(), inv_param->kappa, myMatPCType,
+                   QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
+      clover_dslash(p.Even().V(), gauge.data(), clover_inv.data(), p.Odd().V(), parity, QUDA_DAG_NO,
+                    inv_param->cpu_prec, *gauge_param);
+    } else {
+      errorQuda("TMCloverForce_reference: dslash_type not supported\n");
+    }
   }
-  Gamma5_host((double *)x.Even().V(), (double *)x.Even().V(), x.Even().VolumeCB());
-
-  if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    tmc_matpc(p.Odd().V(), gauge.data(), tmp.V(), clover.data(), clover_inv.data(), inv_param->kappa, inv_param->mu,
-              inv_param->twist_flavor, myMatPCType, QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
-    tmc_dslash(p.Even().V(), gauge.data(), p.Odd().V(), clover.data(), clover_inv.data(), inv_param->kappa, inv_param->mu,
-               inv_param->twist_flavor, parity, myMatPCType, QUDA_DAG_NO, inv_param->cpu_prec, *gauge_param);
-  } else if (inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    clover_matpc(p.Odd().V(), gauge.data(), clover.data(), clover_inv.data(), tmp.V(), inv_param->kappa, myMatPCType,
-                 QUDA_DAG_YES, inv_param->cpu_prec, *gauge_param);
-    clover_dslash(p.Even().V(), gauge.data(), clover_inv.data(), p.Odd().V(), parity, QUDA_DAG_NO, inv_param->cpu_prec,
-                  *gauge_param);
-  } else {
-    errorQuda("TMCloverForce_reference: dslash_type not supported\n");
+  else {
+    errorQuda("TMCloverForce_reference: MATPC type not supported\n");
   }
 
   Gamma5_host((double *)p.Even().V(), (double *)p.Even().V(), p.Even().VolumeCB());
@@ -144,7 +151,7 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
   void *refmom = mom.Gauge_p();
 
   // derivative of the wilson operator it correspond to deriv_Sb(OE,...) plus  deriv_Sb(EO,...) in tmLQCD
-  CloverForce_reference(refmom, gauge,  x, p, force_coeff);
+  CloverForce_reference(refmom, gauge, x, p, force_coeff);
 
   // create oprod and trace field
   void *oprod;

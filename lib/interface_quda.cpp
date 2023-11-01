@@ -5203,23 +5203,26 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
     profileTMCloverForce.TPSTOP(QUDA_PROFILE_H2D);
     profileTMCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
 
-    dirac->Dagger(QUDA_DAG_YES);
-    gamma5(tmp, x.Odd());
-    dirac->Dslash(x.Even(), tmp, QUDA_EVEN_PARITY);
-    gamma5(x.Even(), x.Even());
-   
-    // want to apply \hat Q_{-} = \hat M_{+}^\dagger \gamma_5 to get Y_o
-    dirac->Dagger(QUDA_DAG_YES);
-    dirac->M(p.Odd(), tmp); // this is the odd part of Y 
-    dirac->Dagger(QUDA_DAG_NO);
+    if (inv_param->matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || inv_param->matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
 
-    dirac->Dslash(p.Even(), p.Odd(), QUDA_EVEN_PARITY); // and now the even part of Y
-    // up to here x match X in tmLQCD and p=-Y of tmLQCD
+      dirac->Dagger(QUDA_DAG_YES);
+      gamma5(tmp, x.Odd());
+      dirac->Dslash(x.Even(), tmp, QUDA_EVEN_PARITY);
+      gamma5(x.Even(), x.Even());
+      
+      // want to apply \hat Q_{-} = \hat M_{+}^\dagger \gamma_5 to get Y_o
+      dirac->Dagger(QUDA_DAG_YES);
+      dirac->M(p.Odd(), tmp); // this is the odd part of Y 
+      dirac->Dagger(QUDA_DAG_NO);
 
-    // the gamma5 application in tmLQCD is done  inside deriv_Sb
-    gamma5(p.Even(), p.Even());
-    gamma5(p.Odd(), p.Odd());
+      dirac->Dslash(p.Even(), p.Odd(), QUDA_EVEN_PARITY); // and now the even part of Y
+      // up to here x match X in tmLQCD and p=-Y of tmLQCD
 
+      // the gamma5 application in tmLQCD is done  inside deriv_Sb
+      gamma5(p.Even(), p.Even());
+      gamma5(p.Odd(), p.Odd());
+    }
+    else errorQuda("computeTMCloverForceQuda: MATPC type not supported\n"); 
 
     profileTMCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
     profileTMCloverForce.TPSTART(QUDA_PROFILE_INIT);
