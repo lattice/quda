@@ -97,6 +97,25 @@ namespace quda {
       phase_offset = half_gauge_bytes;
       phase_bytes = half_phase_bytes*2;
       bytes = (half_gauge_bytes + half_phase_bytes)*2;      
+    } else if (order == QUDA_OPENQCD_GAUGE_ORDER) {
+      /**
+       * With an openQCD gauge field, we need all the links of even lattice
+       * points in positive direction. These are links that lie in the buffer
+       * space that spans 7*BNDRY/4 gauge fields. These boundary fields are
+       * located at base_ptr + 4*VOLUME. Therefore, we need to transfer more
+       * than 4*VOLUME matrices.
+       */
+
+      /* analogue to BNDRY in openQCD:include/global.h */
+      long int bndry = 0;
+      bndry += (1-(comm_dim(0)%2))*x[1]*x[2]*x[3];
+      bndry += (1-(comm_dim(1)%2))*x[0]*x[2]*x[3];
+      bndry += (1-(comm_dim(2)%2))*x[0]*x[1]*x[3];
+      bndry += (1-(comm_dim(3)%2))*x[0]*x[1]*x[2];
+      bndry *= 2;
+
+      length += 18*7*bndry/4;
+      bytes = length * precision;
     } else {
       bytes = length * precision;
       if (isNative()) bytes = 2*ALIGNMENT_ADJUST(bytes/2);
