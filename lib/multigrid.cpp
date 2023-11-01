@@ -245,9 +245,9 @@ namespace quda
     popLevel();
   }
 
-  void MG::resetStaggeredKD(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                            cudaGaugeField *gauge_sloppy_in, cudaGaugeField *fat_gauge_sloppy_in,
-                            cudaGaugeField *long_gauge_sloppy_in, double mass)
+  void MG::resetStaggeredKD(GaugeField *gauge_in, GaugeField *fat_gauge_in, GaugeField *long_gauge_in,
+                            GaugeField *gauge_sloppy_in, GaugeField *fat_gauge_sloppy_in,
+                            GaugeField *long_gauge_sloppy_in, double mass)
   {
     if (param.level != 0) errorQuda("The staggered KD operator can only be updated from level 0");
 
@@ -510,8 +510,8 @@ namespace quda
     bool is_coarse_naive_staggered = is_naive_staggered
       || (is_improved_staggered && param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG);
 
-    cudaGaugeField *fine_gauge = diracSmoother->getStaggeredShortLinkField();
-    cudaGaugeField *sloppy_gauge = mixed_precision_setup ? diracSmootherSloppy->getStaggeredShortLinkField() : fine_gauge;
+    auto fine_gauge = diracSmoother->getStaggeredShortLinkField();
+    auto sloppy_gauge = mixed_precision_setup ? diracSmootherSloppy->getStaggeredShortLinkField() : fine_gauge;
 
     xInvKD = AllocateAndBuildStaggeredKahlerDiracInverse(
       *fine_gauge, diracSmoother->Mass(), param.mg_global.staggered_kd_dagger_approximation == QUDA_BOOLEAN_TRUE);
@@ -524,7 +524,7 @@ namespace quda
       // true is to force FLOAT2
       xinv_param.setPrecision(param.mg_global.invert_param->cuda_prec_precondition, true);
 
-      xInvKD_sloppy = std::shared_ptr<GaugeField>(reinterpret_cast<GaugeField *>(new cudaGaugeField(xinv_param)));
+      xInvKD_sloppy = std::shared_ptr<GaugeField>(reinterpret_cast<GaugeField *>(new GaugeField(xinv_param)));
       xInvKD_sloppy->copy(*xInvKD);
 
       ColorSpinorParam sloppy_tmp_param(*tmp_coarse);
@@ -545,7 +545,7 @@ namespace quda
     diracParamKD.mu_factor = 1.0;          // doesn't matter
     diracParamKD.dagger = QUDA_DAG_NO;
     diracParamKD.matpcType = QUDA_MATPC_EVEN_EVEN; // We can use this to track left vs right block jacobi in the future
-    diracParamKD.gauge = const_cast<cudaGaugeField *>(fine_gauge);
+    diracParamKD.gauge = fine_gauge;
     diracParamKD.xInvKD = xInvKD.get(); // FIXME: pulling a raw unmanaged pointer out of a unique_ptr...
     diracParamKD.dirac
       = const_cast<Dirac *>(diracSmoother); // used to determine if the outer solve is preconditioned or not
@@ -672,6 +672,7 @@ namespace quda
           vec_outfile += "_defl_";
           vec_outfile += std::to_string(param.mg_global.n_vec[param.level + 1]);
           strcpy(param_coarse_solver->eig_param.vec_outfile, vec_outfile.c_str());
+          param_coarse_solver->eig_param.partfile = param.mg_global.mg_vec_partfile[param.level + 1];
         }
       }
 
@@ -801,34 +802,6 @@ namespace quda
     if (getVerbosity() >= QUDA_VERBOSE) profile.Print();
 
     popLevel();
-  }
-
-  // FIXME need to make this more robust (implement Solver::flops() for all solvers)
-  double MG::flops() const {
-    double flops = 0;
-
-    if (param_coarse_solver) {
-      flops += param_coarse_solver->gflops * 1e9;
-      param_coarse_solver->gflops = 0;
-    } else if (param.level < param.Nlevel-1) {
-      flops += coarse->flops();
-    }
-
-    if (param_presmooth) {
-      flops += param_presmooth->gflops * 1e9;
-      param_presmooth->gflops = 0;
-    }
-
-    if (param_postsmooth) {
-      flops += param_postsmooth->gflops * 1e9;
-      param_postsmooth->gflops = 0;
-    }
-
-    if (transfer) {
-      flops += transfer->flops();
-    }
-
-    return flops;
   }
 
   bool check_deviation(double deviation, double tol)
@@ -1382,7 +1355,7 @@ namespace quda
       vec_outfile += std::to_string(param.level);
       vec_outfile += "_nvec_";
       vec_outfile += std::to_string(param.mg_global.n_vec[param.level]);
-      VectorIO io(vec_outfile);
+      VectorIO io(vec_outfile, false, param.mg_global.mg_vec_partfile[param.level]);
       vector_ref<const ColorSpinorField> B_ref;
       for (auto i = 0u; i < B.size(); i++) B_ref.push_back(*B[i]);
       io.save(std::move(B_ref));

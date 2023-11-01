@@ -179,11 +179,7 @@ namespace quda {
     inner.delta = 1e-20; // no reliable updates within the inner solver
     inner.precision = outer.precision_precondition; // preconditioners are uni-precision solvers
     inner.precision_sloppy = outer.precision_precondition;
-
     inner.iter   = 0;
-    inner.gflops = 0;
-    inner.secs   = 0;
-
     inner.inv_type_precondition = QUDA_INVALID_INVERTER;
     inner.is_preconditioner = true; // used to tell the inner solver it is an inner solver
 
@@ -193,9 +189,6 @@ namespace quda {
   // set the required parameters for the initCG solver
   static void fillInitCGSolverParam(SolverParam &inner, const SolverParam &outer) {
     inner.iter   = 0;
-    inner.gflops = 0;
-    inner.secs   = 0;
-
     inner.tol              = outer.tol;
     inner.tol_restart      = outer.tol_restart;
     inner.maxiter          = outer.maxiter;
@@ -460,7 +453,6 @@ namespace quda {
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    blas::flops = 0;
 
     double rMinvr = blas::reDotProduct(r,*z);
     //Begin EigCG iterations:
@@ -517,9 +509,6 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + matSloppy.flops())*1e-9;
-    param.gflops = gflops;
     param.iter += k;
 
     if (k == param.maxiter)
@@ -531,10 +520,6 @@ namespace quda {
     param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
     PrintSummary("eigCG", k, r2, b2, args.global_stop, param.tol_hq);
-
-    // reset the flops counters
-    blas::flops = 0;
-    matSloppy.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     profile.TPSTART(QUDA_PROFILE_FREE);
@@ -588,19 +573,10 @@ namespace quda {
       xProj = x;
       rProj = r; 
 
-      if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
-
       Kparam.tol *= param.inc_tol;
 
       if(restart_idx == (param.max_restart_num-1)) Kparam.tol = full_tol;//do the last solve in the next cycle to full tolerance
-
-      param.secs   += Kparam.secs;
     }
-
-    if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
-    //
-    param.secs   += Kparam.secs;
-    param.gflops += Kparam.gflops;
 
     k   += Kparam.iter;
 

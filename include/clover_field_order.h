@@ -312,7 +312,7 @@ namespace quda {
       static constexpr int N = nColor * nSpin / 2;
       reconstruct_t<Float, N * N, clover::reconstruct()> recon;
       FloatNAccessor(const CloverField &A, bool inverse = false) :
-        a(static_cast<Float *>(const_cast<void *>(A.V(inverse)))),
+        a(A.Bytes() ? A.data<Float *>(inverse) : nullptr),
         stride(A.VolumeCB()),
         offset_cb(A.Bytes() / (2 * sizeof(Float))),
         compressed_block_size(A.compressed_block_size()),
@@ -403,7 +403,7 @@ namespace quda {
       const int N = nSpin * nColor / 2;
       const complex<Float> zero;
       Accessor(const CloverField &A, bool inverse = false) :
-        a(static_cast<Float *>(const_cast<void *>(A.V(inverse)))),
+        a(A.Bytes() ? A.data<Float *>(inverse) : nullptr),
         offset_cb(A.Bytes() / (2 * sizeof(Float))),
         zero(complex<Float>(0.0, 0.0))
       {
@@ -639,7 +639,7 @@ namespace quda {
           if (clover.max_element(is_inverse) == 0.0 && isFixed<Float>::value)
             errorQuda("%p max_element(%d) appears unset", &clover, is_inverse);
           if (clover.Diagonal() == 0.0 && clover.Reconstruct()) errorQuda("%p diagonal appears unset", &clover);
-          this->clover = clover_ ? clover_ : (Float *)(clover.V(is_inverse));
+          this->clover = clover_ ? clover_ : clover.data<Float *>(is_inverse);
         }
 
         QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }
@@ -844,7 +844,7 @@ namespace quda {
           if (clover.Order() != QUDA_PACKED_CLOVER_ORDER) {
             errorQuda("Invalid clover order %d for this accessor", clover.Order());
           }
-          this->clover = clover_ ? clover_ : (Float *)(clover.V(inverse));
+          this->clover = clover_ ? clover_ : clover.data<Float *>(inverse);
         }
 
         QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }
@@ -892,8 +892,8 @@ namespace quda {
           if (clover.Order() != QUDA_QDPJIT_CLOVER_ORDER) {
             errorQuda("Invalid clover order %d for this accessor", clover.Order());
           }
-          offdiag = clover_ ? ((Float **)clover_)[0] : ((Float **)clover.V(inverse))[0];
-          diag = clover_ ? ((Float **)clover_)[1] : ((Float **)clover.V(inverse))[1];
+          offdiag = clover_ ? ((Float **)clover_)[0] : clover.data<Float **>(inverse)[0];
+          diag = clover_ ? ((Float **)clover_)[1] : clover.data<Float **>(inverse)[1];
         }
 
         QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }
@@ -970,7 +970,7 @@ namespace quda {
           if (clover.Order() != QUDA_BQCD_CLOVER_ORDER) {
             errorQuda("Invalid clover order %d for this accessor", clover.Order());
           }
-          this->clover[0] = clover_ ? clover_ : (Float *)(clover.V(inverse));
+          this->clover[0] = clover_ ? clover_ : clover.data<Float *>(inverse);
           this->clover[1] = (Float *)((char *)this->clover[0] + clover.Bytes() / 2);
         }
 

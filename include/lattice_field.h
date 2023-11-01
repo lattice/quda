@@ -34,9 +34,6 @@ namespace quda {
   class cudaEigVecSet;
 
   class GaugeField;
-  class cpuGaugeField;
-  class cudaGaugeField;
-
   class CloverField;
 
   enum class QudaOffsetCopyMode { COLLECT, DISPERSE };
@@ -71,11 +68,14 @@ namespace quda {
     /** Array storing the length of dimension */
     lat_dim_t x = {};
 
+    /** Padding to be added to the checker-boarded volume (only for native field ordering) */
     int pad = 0;
 
+    /** Whether the field is full or single parity */
     QudaSiteSubset siteSubset = QUDA_INVALID_SITE_SUBSET;
 
-    QudaMemoryType mem_type = QUDA_MEMORY_DEVICE;
+    /** The type of memory allocation to use for the field */
+    QudaMemoryType mem_type = QUDA_MEMORY_INVALID;
 
     /** The type of ghost exchange to be done with this field */
     QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
@@ -108,7 +108,7 @@ namespace quda {
       nDim(nDim),
       pad(pad),
       siteSubset(QUDA_FULL_SITE_SUBSET),
-      mem_type(QUDA_MEMORY_DEVICE),
+      mem_type(location == QUDA_CUDA_FIELD_LOCATION ? QUDA_MEMORY_DEVICE : QUDA_MEMORY_HOST),
       ghostExchange(ghostExchange),
       scale(1.0)
     {
@@ -126,14 +126,14 @@ namespace quda {
        @param[in] param Contains the metadata for filling out the LatticeFieldParam
     */
     LatticeFieldParam(const QudaGaugeParam &param) :
-      location(QUDA_CPU_FIELD_LOCATION),
+      location(param.location),
       precision(param.cpu_prec),
       ghost_precision(param.cpu_prec),
       init(true),
       nDim(4),
       pad(0),
       siteSubset(QUDA_FULL_SITE_SUBSET),
-      mem_type(QUDA_MEMORY_DEVICE),
+      mem_type(QUDA_MEMORY_HOST),
       ghostExchange(QUDA_GHOST_EXCHANGE_NO),
       scale(param.scale)
     {
@@ -144,14 +144,17 @@ namespace quda {
     }
 
     /**
-       @brief Contructor for creating LatticeFieldParam from a LatticeField
+       @brief Constructor for creating LatticeFieldParam from a LatticeField
     */
     LatticeFieldParam(const LatticeField &field);
   };
 
   std::ostream& operator<<(std::ostream& output, const LatticeFieldParam& param);
+  std::ostream &operator<<(std::ostream &output, const LatticeField &field);
 
   class LatticeField : public Object {
+
+    friend std::ostream &operator<<(std::ostream &output, const LatticeField &param);
 
     /**
        @brief Create the field as specified by the param
@@ -178,9 +181,13 @@ namespace quda {
     /** Checkerboarded local volume */
     size_t localVolumeCB = 0;
 
+    /** Stride used for native field ordering (stride = volumeCB + pad) */
     size_t stride = 0;
+
+    /** Padding to be added to the checker-boarded volume (only for native field ordering) */
     int pad = 0;
 
+    /** Total size of the allocation */
     size_t total_bytes = 0;
 
     /** Number of field dimensions */
@@ -463,9 +470,7 @@ namespace quda {
       }
     }
 
-    mutable char *backup_h = nullptr;
-    mutable char *backup_norm_h = nullptr;
-    mutable bool backed_up = false;
+    mutable std::vector<quda_ptr> backup_h = {};
 
   public:
     /**

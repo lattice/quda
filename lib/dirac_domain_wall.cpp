@@ -49,11 +49,6 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     ApplyDomainWall5D(out, in, *gauge, 0.0, mass, in, parity, dagger, commDim, profile);
-
-    long long Ls = in.X(4);
-    long long bulk = (Ls-2)*(in.Volume()/Ls);
-    long long wall = 2*in.Volume()/Ls;
-    flops += 1320LL*(long long)in.Volume() + 96LL*bulk + 120LL*wall;
   }
 
   void DiracDomainWall::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -65,11 +60,6 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     ApplyDomainWall5D(out, in, *gauge, k, mass, x, parity, dagger, commDim, profile);
-
-    long long Ls = in.X(4);
-    long long bulk = (Ls-2)*(in.Volume()/Ls);
-    long long wall = 2*in.Volume()/Ls;
-    flops += (1320LL+48LL)*(long long)in.Volume() + 96LL*bulk + 120LL*wall;
   }
 
   void DiracDomainWall::M(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -77,11 +67,6 @@ namespace quda {
     checkFullSpinor(out, in);
 
     ApplyDomainWall5D(out, in, *gauge, -kappa5, mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-
-    long long Ls = in.X(4);
-    long long bulk = (Ls - 2) * (in.Volume() / Ls);
-    long long wall = 2 * in.Volume() / Ls;
-    flops += (1320LL + 48LL) * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
   }
 
   void DiracDomainWall::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const

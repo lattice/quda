@@ -28,7 +28,6 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim, profile);
-    flops += 1320ll*in.Volume();
   }
 
   void DiracWilson::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
@@ -38,7 +37,6 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim, profile);
-    flops += 1368ll*in.Volume();
   }
 
   void DiracWilson::M(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -46,7 +44,6 @@ namespace quda {
     checkFullSpinor(out, in);
 
     ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-    flops += 1368ll * in.Volume();
   }
 
   void DiracWilson::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const

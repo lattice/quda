@@ -741,6 +741,8 @@ namespace quda
 
   void comm_allreduce_sum_array(double *data, size_t size);
 
+  void comm_allreduce_sum(size_t &a);
+
   void comm_allreduce_max_array(double *data, size_t size);
 
   void comm_allreduce_max_array(deviation_t<double> *data, size_t size);

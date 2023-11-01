@@ -280,7 +280,7 @@ namespace quda {
                 QUDA_PRECISION, V.Precision(), B[0]->Precision());
 
     if constexpr (is_enabled_multigrid()) {
-      if (B[0]->V() == nullptr) {
+      if (B[0]->data() == nullptr) {
         warningQuda("Trying to BlockOrthogonalize staggered transform, skipping...");
         return;
       }

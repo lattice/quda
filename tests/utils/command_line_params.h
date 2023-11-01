@@ -202,6 +202,7 @@ extern int test_type;
 extern quda::mgarray<int> nvec;
 extern quda::mgarray<std::string> mg_vec_infile;
 extern quda::mgarray<std::string> mg_vec_outfile;
+extern quda::mgarray<bool> mg_vec_partfile;
 extern QudaInverterType inv_type;
 extern bool inv_deflate;
 extern bool inv_multigrid;
@@ -221,6 +222,10 @@ extern std::string madwf_param_outfile;
 
 extern int precon_schwarz_cycle;
 extern int multishift;
+extern std::vector<double> multishift_shifts;
+extern std::vector<double> multishift_masses;
+extern std::vector<double> multishift_tols;
+extern std::vector<double> multishift_tols_hq;
 extern bool verify_results;
 extern bool low_mode_check;
 extern bool oblique_proj_check;
@@ -251,6 +256,7 @@ extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
 extern QudaSolutionType solution_type;
 extern QudaTboundary fermion_t_boundary;
+extern std::array<int, 4> dilution_block_size;
 
 extern int mg_levels;
 
@@ -355,6 +361,7 @@ extern std::string eig_vec_infile;
 extern std::string eig_vec_outfile;
 extern bool eig_io_parity_inflate;
 extern QudaPrecision eig_save_prec;
+extern bool eig_partfile;
 
 // Parameters for the MG eigensolver.
 // The coarsest grid params are for deflation,

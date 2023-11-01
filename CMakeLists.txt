@@ -278,8 +278,6 @@ mark_as_advanced(QUDA_RECONSTRUCT)
 mark_as_advanced(QUDA_CLOVER_CHOLESKY_PROMOTE)
 mark_as_advanced(QUDA_MULTIGRID_DSLASH_PROMOTE)
 mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
-mark_as_advanced(QUDA_CTEST_LAUNCH)
-mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
 mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_BACKWARDS)
@@ -339,7 +337,7 @@ set(CMAKE_CXX_FLAGS_DEVEL
   "-g -O3"
   CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
-  "-O3"
+  "-Os"
   CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE
   "-O3 ${CXX_OPT}"
@@ -361,7 +359,7 @@ set(CMAKE_C_FLAGS_DEVEL
   "-g -O3"
   CACHE STRING "Flags used by the C compiler during regular development builds.")
 set(CMAKE_C_FLAGS_STRICT
-  "-O3"
+  "-Os"
   CACHE STRING "Flags used by the C compiler during strict jenkins builds.")
 set(CMAKE_C_FLAGS_RELEASE
   "-O3"
@@ -419,14 +417,11 @@ if(QUDA_DOWNLOAD_EIGEN)
       CACHE STRING "Eigen use for QUDA_DOWNLOAD_EIGEN")
   mark_as_advanced(QUDA_EIGEN_VERSION)
   CPMAddPackage(
-    NAME
-    Eigen
-    VERSION
-    ${QUDA_EIGEN_VERSION}
-    URL
-    https://gitlab.com/libeigen/eigen/-/archive/${QUDA_EIGEN_VERSION}/eigen-${QUDA_EIGEN_VERSION}.tar.bz2
-    DOWNLOAD_ONLY
-    YES)
+    NAME Eigen
+    VERSION ${QUDA_EIGEN_VERSION}
+    URL https://gitlab.com/libeigen/eigen/-/archive/${QUDA_EIGEN_VERSION}/eigen-${QUDA_EIGEN_VERSION}.tar.bz2
+    DOWNLOAD_ONLY YES
+    SYSTEM YES)
   target_include_directories(Eigen SYSTEM INTERFACE ${Eigen_SOURCE_DIR})
   install(DIRECTORY ${Eigen_SOURCE_DIR}/Eigen TYPE INCLUDE)
 else()

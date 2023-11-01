@@ -3,8 +3,6 @@
 set(CMAKE_CUDA_EXTENSIONS OFF)
 
 find_package(CUDAToolkit REQUIRED)
-include(CheckLanguage)
-check_language(CUDA)
 
 set(QUDA_TARGET_CUDA ON)
 
@@ -242,6 +240,7 @@ target_include_directories(quda PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/cuda
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/targets/cuda>
                                        $<INSTALL_INTERFACE:include/targets/cuda>)
 target_include_directories(quda SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/cuda/externals)
+target_include_directories(quda_cpp SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/cuda/externals)
 
 # Specific config dependent warning suppressions and lineinfo forwarding
 
@@ -257,7 +256,9 @@ target_compile_options(
           -Wreorder
           $<$<CXX_COMPILER_ID:Clang>:
           -Xcompiler=-Wno-unused-function
-          -Xcompiler=-Wno-unknown-pragmas>
+          -Xcompiler=-Wno-unknown-pragmas
+          -Xcompiler=-mllvm\ -unroll-count=4
+          >
           $<$<CXX_COMPILER_ID:GNU>:
           -Xcompiler=-Wno-unknown-pragmas>
           $<$<CONFIG:DEVEL>:-Xptxas

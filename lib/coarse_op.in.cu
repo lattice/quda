@@ -97,7 +97,7 @@ namespace quda {
       gCoarseAtomic yAccessorAtomic(const_cast<GaugeField&>(Yatomic));
       gCoarseAtomic xAccessorAtomic(const_cast<GaugeField&>(Xatomic));
       cFine cAccessor(const_cast<CloverField&>(c), false);
-      cFine cInvAccessor(const_cast<CloverField&>(c), true);
+      cFine cInvAccessor(const_cast<CloverField &>(c), c.Inverse());
 
       calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
         (yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
@@ -173,17 +173,17 @@ namespace quda {
       gf_param.nFace = 1;
       gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
 
-      U = new cpuGaugeField(gf_param);
+      U = new GaugeField(gf_param);
 
       //Copy the cuda gauge field to the cpu
-      static_cast<const cudaGaugeField&>(gauge).saveCPUField(*static_cast<cpuGaugeField*>(U));
+      U->copy(gauge);
     } else if (location == QUDA_CUDA_FIELD_LOCATION && gauge.Reconstruct() != QUDA_RECONSTRUCT_NO) {
       //Create a copy of the gauge field with no reconstruction, required for fine-grained access
       GaugeFieldParam gf_param(gauge);
       gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
       gf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
       gf_param.setPrecision(gf_param.Precision());
-      U = new cudaGaugeField(gf_param);
+      U = new GaugeField(gf_param);
 
       U->copy(gauge);
     }
@@ -197,7 +197,7 @@ namespace quda {
     for (int i = 0; i < cf_param.nDim; i++) cf_param.x[i] = clover ? clover->X()[i] : 0;
 
     // only create inverse if not doing dynamic clover and one already exists
-    cf_param.inverse = !clover::dynamic_inverse() && clover && clover->V(true);
+    cf_param.inverse = !clover::dynamic_inverse() && clover && clover->Inverse();
     cf_param.clover = nullptr;
     cf_param.cloverInv = nullptr;
     cf_param.create = QUDA_NULL_FIELD_CREATE;

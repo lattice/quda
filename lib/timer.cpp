@@ -1,10 +1,17 @@
+#include <stack>
 #include <quda_internal.h>
 #include <timer.h>
+#include <tune_quda.h>
+
+#ifdef INTERFACE_NVTX
+#include "nvtx3/nvToolsExt.h"
+#endif
 
 namespace quda {
 
   /**< Print out the profile information */
-  void TimeProfile::Print() {
+  void TimeProfile::Print()
+  {
     if (profile[QUDA_PROFILE_TOTAL].time > 0.0) {
       printfQuda("\n   %20s Total time = %9.3f secs\n", fname.c_str(), profile[QUDA_PROFILE_TOTAL].time);
     }
@@ -30,7 +37,6 @@ namespace quda {
       warningQuda("Accounted time %9.3f secs in %s is greater than total time %9.3f secs", accounted,
                   (const char *)&fname[0], profile[QUDA_PROFILE_TOTAL].time);
     }
-
   }
 
   std::string TimeProfile::pname[] = {"download",
@@ -78,9 +84,112 @@ namespace quda {
   const int TimeProfile::nvtx_num_colors = sizeof(nvtx_colors)/sizeof(uint32_t);
 #endif
 
-  Timer<> TimeProfile::global_profile[QUDA_PROFILE_COUNT];
-  bool TimeProfile::global_switchOff[QUDA_PROFILE_COUNT] = {};
-  int TimeProfile::global_total_level[QUDA_PROFILE_COUNT] = {};
+  // global timer
+  host_timer_t global_profile[QUDA_PROFILE_COUNT] = {};
+  static bool global_switchOff[QUDA_PROFILE_COUNT] = {};
+  static int global_total_level[QUDA_PROFILE_COUNT] = {};
+
+  void TimeProfile::StopGlobal(const char *func, const char *file, int line, QudaProfileType idx)
+  {
+    global_total_level[idx]--;
+    if (global_total_level[idx] == 0) global_profile[idx].stop(func, file, line);
+
+    // switch off total timer if we need to
+    if (global_switchOff[idx]) {
+      global_total_level[idx]--;
+      if (global_total_level[idx] == 0) global_profile[idx].stop(func, file, line);
+      global_switchOff[idx] = false;
+    }
+  }
+
+  void TimeProfile::StartGlobal(const char *func, const char *file, int line, QudaProfileType idx)
+  {
+    // if total timer isn't running, then start it running
+    if (!global_profile[idx].running) {
+      global_profile[idx].start(func, file, line);
+      global_total_level[idx]++;
+      global_switchOff[idx] = true;
+    }
+
+    if (global_total_level[idx] == 0) global_profile[idx].start(func, file, line);
+    global_total_level[idx]++;
+  }
+
+#ifdef INTERFACE_NVTX
+
+#define PUSH_RANGE(name, cid)                                                                                          \
+  {                                                                                                                    \
+    int color_id = cid;                                                                                                \
+    color_id = color_id % nvtx_num_colors;                                                                             \
+    nvtxEventAttributes_t eventAttrib = {};                                                                            \
+    eventAttrib.version = NVTX_VERSION;                                                                                \
+    eventAttrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE;                                                                  \
+    eventAttrib.colorType = NVTX_COLOR_ARGB;                                                                           \
+    eventAttrib.color = nvtx_colors[color_id];                                                                         \
+    eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;                                                                 \
+    eventAttrib.message.ascii = name;                                                                                  \
+    eventAttrib.category = cid;                                                                                        \
+    nvtxRangePushEx(&eventAttrib);                                                                                     \
+  }
+#define POP_RANGE nvtxRangePop();
+#else
+#define PUSH_RANGE(name, cid)
+#define POP_RANGE
+#endif
+
+  static std::stack<QudaProfileType> pt_stack;
+
+  void TimeProfile::Start_(const char *func, const char *file, int line, QudaProfileType idx)
+  {
+    // if total timer isn't running, then start it running
+    if (!profile[QUDA_PROFILE_TOTAL].running && idx != QUDA_PROFILE_TOTAL) {
+      profile[QUDA_PROFILE_TOTAL].start(func, file, line);
+      switchOff = true;
+    }
+
+    // if a timer is already running, stop it and push to stack
+    for (auto i = 0; i < QUDA_PROFILE_COUNT - 1; i++) {
+      if (i == static_cast<int>(idx)) continue;
+      if (profile[i].running) {
+        if (i == QUDA_PROFILE_COMPUTE || i == QUDA_PROFILE_H2D || i == QUDA_PROFILE_D2H) qudaDeviceSynchronize();
+        profile[i].stop(file, func, line);
+        if (use_global) StopGlobal(func, file, line, static_cast<QudaProfileType>(i));
+        pt_stack.push(static_cast<QudaProfileType>(i));
+      }
+    }
+
+    profile[idx].start(func, file, line);
+    PUSH_RANGE(fname.c_str(), idx)
+    if (use_global) StartGlobal(func, file, line, idx);
+  }
+
+  void TimeProfile::Stop_(const char *func, const char *file, int line, QudaProfileType idx)
+  {
+    if (idx == QUDA_PROFILE_COMPUTE || idx == QUDA_PROFILE_H2D || idx == QUDA_PROFILE_D2H)
+      qudaDeviceSynchronize(); // ensure accurate profiling
+    profile[idx].stop(func, file, line);
+    POP_RANGE
+
+    if (pt_stack.empty()) {
+      // switch off total timer if we need to (only if no timer being popped)
+      if (switchOff && idx != QUDA_PROFILE_TOTAL) {
+        profile[QUDA_PROFILE_TOTAL].stop(func, file, line);
+        switchOff = false;
+      }
+      if (use_global) StopGlobal(func, file, line, idx);
+    }
+
+    // restore any pre-existing timers if needed
+    if (!pt_stack.empty()) {
+      auto i = pt_stack.top();
+      pt_stack.pop();
+      profile[i].start(func, file, line);
+      if (use_global) StartGlobal(func, file, line, i);
+    }
+  }
+
+#undef PUSH_RANGE
+#undef POP_RANGE
 
   void TimeProfile::PrintGlobal() {
     if (global_profile[QUDA_PROFILE_TOTAL].time > 0.0) {
@@ -113,4 +222,33 @@ namespace quda {
     }
   }
 
+  TimeProfile dummy("default", false);
+
+  static std::stack<TimeProfile *> tp_stack;
+
+  pushProfile::pushProfile(TimeProfile &profile, double &secs, double &gflops) :
+    profile(profile), secs(secs), gflops(gflops), flops(Tunable::flops_global())
+
+  {
+    profile.TPSTART(QUDA_PROFILE_TOTAL);
+    tp_stack.push(&profile);
+  }
+
+  pushProfile::~pushProfile()
+  {
+    if (tp_stack.empty()) errorQuda("popProfile() called with empty stack");
+    auto &profile = *(tp_stack.top());
+    if (&(this->profile) != &profile) errorQuda("Popped profile is not the expected one");
+    tp_stack.pop();
+    profile.TPSTOP(QUDA_PROFILE_TOTAL);
+    secs = profile.Last(QUDA_PROFILE_TOTAL);
+    gflops = (Tunable::flops_global() - flops) * 1e-9;
+    if (&gflops != &gflops_dummy) comm_allreduce_sum(gflops);
+  }
+
+  TimeProfile &getProfile()
+  {
+    if (tp_stack.empty()) return dummy;
+    return *(tp_stack.top());
+  }
 }

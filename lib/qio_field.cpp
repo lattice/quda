@@ -413,8 +413,9 @@ void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precis
   printfQuda("%s: Closed file for writing\n", __func__);
 }
 
-void write_spinor_field(const char *filename, const void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
-                        QudaParity parity, int nColor, int nSpin, int Nvec, int, char *[])
+void write_spinor_field(const char *filename, const void *V[], QudaPrecision precision, const int *X,
+                        QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin, int Nvec, int, char *[],
+                        bool partfile)
 {
   quda_this_node = QMP_get_node_number();
 
@@ -426,7 +427,7 @@ void write_spinor_field(const char *filename, const void *V[], QudaPrecision pre
   sprintf(type, "QUDA_%sNs%dNc%d_ColorSpinorField", (file_prec == QUDA_DOUBLE_PRECISION) ? "D" : "F", nSpin, nColor);
 
   /* Open the test file for reading */
-  QIO_Writer *outfile = open_test_output(filename, QIO_SINGLEFILE, QIO_PARALLEL, QIO_ILDGNO);
+  QIO_Writer *outfile = open_test_output(filename, (partfile ? QIO_PARTFILE : QIO_SINGLEFILE), QIO_PARALLEL, QIO_ILDGNO);
   if (outfile == NULL) { errorQuda("Open file failed\n"); }
 
   /* Read the spinor field record */
