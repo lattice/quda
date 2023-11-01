@@ -143,7 +143,6 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
   createMomCPU(mom.Gauge_p(), gauge_param->cpu_prec, 0.0);
   void *refmom = mom.Gauge_p();
 
-  // FIXME: invert x,p here and in the device version
   // derivative of the wilson operator it correspond to deriv_Sb(OE,...) plus  deriv_Sb(EO,...) in tmLQCD
   CloverForce_reference(refmom, gauge,  x, p, force_coeff);
 
