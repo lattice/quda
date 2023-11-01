@@ -298,10 +298,10 @@ void CloverForce_reference(void *h_mom, std::array<void *, 4> gauge, quda::Color
 {
   int dag = 1;
   for (int parity = 0; parity < 2; parity++) {
-    quda::ColorSpinorField &inA = (parity & 1) ? p.Odd() : p.Even();
-    quda::ColorSpinorField &inB = (parity & 1) ? x.Even() : x.Odd();
-    quda::ColorSpinorField &inC = (parity & 1) ? x.Odd() : x.Even();
-    quda::ColorSpinorField &inD = (parity & 1) ? p.Even() : p.Odd();
+    quda::ColorSpinorField &inA = (parity & 1) ? x.Odd() : x.Even();
+    quda::ColorSpinorField &inB = (parity & 1) ? p.Even() : p.Odd();
+    quda::ColorSpinorField &inC = (parity & 1) ? p.Odd() : p.Even();
+    quda::ColorSpinorField &inD = (parity & 1) ? x.Even() : x.Odd();
 
     static constexpr int nFace = 1;
     // every time that exchange ghost is called fwdGhostFaceBuffer becomes the Ghost of the last spinor called

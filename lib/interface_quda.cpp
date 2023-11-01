@@ -5229,7 +5229,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
   profileTMCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
   
   // derivative of the wilson operator it correspond to deriv_Sb(OE,...) plus  deriv_Sb(EO,...) in tmLQCD
-  computeCloverForce(cudaForce, *gaugePrecise, quarkP, quarkX, force_coeff);
+  computeCloverForce(cudaForce, *gaugePrecise, quarkX, quarkP, force_coeff);
   // derivative of the determinant of the sw term, second term of (A12) in hep-lat/0112051,  sw_deriv(EE, mnl->mu) in tmLQCD
   computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8 * 32.0, 0 ); 
 

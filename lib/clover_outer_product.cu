@@ -148,10 +148,10 @@ namespace quda {
       // p[i]->Odd().allocateGhostBuffer(1);
 
       for (int parity=0; parity<2; parity++) {
-	ColorSpinorField& inA = (parity&1) ? p[i]->Odd() : p[i]->Even();
-	ColorSpinorField& inB = (parity&1) ? x[i]->Even(): x[i]->Odd();
-	ColorSpinorField& inC = (parity&1) ? x[i]->Odd() : x[i]->Even();
-	ColorSpinorField& inD = (parity&1) ? p[i]->Even(): p[i]->Odd();
+	ColorSpinorField& inA = (parity&1) ? x[i]->Odd() : x[i]->Even();
+	ColorSpinorField& inB = (parity&1) ? p[i]->Even(): p[i]->Odd();
+	ColorSpinorField& inC = (parity&1) ? p[i]->Odd() : p[i]->Even();
+	ColorSpinorField& inD = (parity&1) ? x[i]->Even(): x[i]->Odd();
 
         static constexpr int nFace = 1;
         inB.exchangeGhost((QudaParity)(1-parity), nFace, dag);
