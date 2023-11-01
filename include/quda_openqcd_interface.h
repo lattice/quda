@@ -92,6 +92,7 @@ typedef struct {
   FILE *logfile;                /** log file handler */
   void *gauge;                  /** base pointer to the gauge fields */
   int volume;                   /** VOLUME */
+  int bndry;                    /** BNDRY */
   void (*reorder_gauge_openqcd_to_quda)(void *in, void *out);
   void (*reorder_gauge_quda_to_openqcd)(void *in, void *out);
   void (*reorder_spinor_openqcd_to_quda)(void *in, void *out);
@@ -272,6 +273,11 @@ double openQCD_qudaInvert(void *param, double mu, void *source, void *solution, 
  * @param      param  Pointer to the context to destroy
  */
 void openQCD_qudaSolverDestroy(void *param);
+
+
+void* openQCD_qudaEigensolverSetup(char *infile, char *section, char *inv_section);
+void openQCD_qudaEigensolve(void *param, void **h_evecs, void *h_evals);
+void openQCD_qudaEigensolverDestroy(void *param);
 
 
 /**

@@ -85,6 +85,140 @@ template <bool start> void inline qudaopenqcd_called(const char *func, QudaVerbo
 template <bool start> void inline qudaopenqcd_called(const char *func) { qudaopenqcd_called<start>(func, getVerbosity()); }
 
 
+std::unordered_map<std::string, std::string> enum_map = {
+  {"QUDA_CG_INVERTER",                      std::to_string(QUDA_CG_INVERTER)},
+  {"QUDA_BICGSTAB_INVERTER",                std::to_string(QUDA_BICGSTAB_INVERTER)},
+  {"QUDA_GCR_INVERTER",                     std::to_string(QUDA_GCR_INVERTER)},
+  {"QUDA_MR_INVERTER",                      std::to_string(QUDA_MR_INVERTER)},
+  {"QUDA_SD_INVERTER",                      std::to_string(QUDA_SD_INVERTER)},
+  {"QUDA_PCG_INVERTER",                     std::to_string(QUDA_PCG_INVERTER)},
+  {"QUDA_EIGCG_INVERTER",                   std::to_string(QUDA_EIGCG_INVERTER)},
+  {"QUDA_INC_EIGCG_INVERTER",               std::to_string(QUDA_INC_EIGCG_INVERTER)},
+  {"QUDA_GMRESDR_INVERTER",                 std::to_string(QUDA_GMRESDR_INVERTER)},
+  {"QUDA_GMRESDR_PROJ_INVERTER",            std::to_string(QUDA_GMRESDR_PROJ_INVERTER)},
+  {"QUDA_GMRESDR_SH_INVERTER",              std::to_string(QUDA_GMRESDR_SH_INVERTER)},
+  {"QUDA_FGMRESDR_INVERTER",                std::to_string(QUDA_FGMRESDR_INVERTER)},
+  {"QUDA_MG_INVERTER",                      std::to_string(QUDA_MG_INVERTER)},
+  {"QUDA_BICGSTABL_INVERTER",               std::to_string(QUDA_BICGSTABL_INVERTER)},
+  {"QUDA_CGNE_INVERTER",                    std::to_string(QUDA_CGNE_INVERTER)},
+  {"QUDA_CGNR_INVERTER",                    std::to_string(QUDA_CGNR_INVERTER)},
+  {"QUDA_CG3_INVERTER",                     std::to_string(QUDA_CG3_INVERTER)},
+  {"QUDA_CG3NE_INVERTER",                   std::to_string(QUDA_CG3NE_INVERTER)},
+  {"QUDA_CG3NR_INVERTER",                   std::to_string(QUDA_CG3NR_INVERTER)},
+  {"QUDA_CA_CG_INVERTER",                   std::to_string(QUDA_CA_CG_INVERTER)},
+  {"QUDA_CA_CGNE_INVERTER",                 std::to_string(QUDA_CA_CGNE_INVERTER)},
+  {"QUDA_CA_CGNR_INVERTER",                 std::to_string(QUDA_CA_CGNR_INVERTER)},
+  {"QUDA_CA_GCR_INVERTER",                  std::to_string(QUDA_CA_GCR_INVERTER)},
+  {"QUDA_INVALID_INVERTER",                 std::to_string(QUDA_INVALID_INVERTER)},
+  {"QUDA_MAT_SOLUTION",                     std::to_string(QUDA_MAT_SOLUTION)},
+  {"QUDA_MATDAG_MAT_SOLUTION",              std::to_string(QUDA_MATDAG_MAT_SOLUTION)},
+  {"QUDA_MATPC_SOLUTION",                   std::to_string(QUDA_MATPC_SOLUTION)},
+  {"QUDA_MATPC_DAG_SOLUTION",               std::to_string(QUDA_MATPC_DAG_SOLUTION)},
+  {"QUDA_MATPCDAG_MATPC_SOLUTION",          std::to_string(QUDA_MATPCDAG_MATPC_SOLUTION)},
+  {"QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION",    std::to_string(QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION)},
+  {"QUDA_INVALID_SOLUTION",                 std::to_string(QUDA_INVALID_SOLUTION)},
+  {"QUDA_DIRECT_SOLVE",                     std::to_string(QUDA_DIRECT_SOLVE)},
+  {"QUDA_NORMOP_SOLVE",                     std::to_string(QUDA_NORMOP_SOLVE)},
+  {"QUDA_DIRECT_PC_SOLVE",                  std::to_string(QUDA_DIRECT_PC_SOLVE)},
+  {"QUDA_NORMOP_PC_SOLVE",                  std::to_string(QUDA_NORMOP_PC_SOLVE)},
+  {"QUDA_NORMERR_SOLVE",                    std::to_string(QUDA_NORMERR_SOLVE)},
+  {"QUDA_NORMERR_PC_SOLVE",                 std::to_string(QUDA_NORMERR_PC_SOLVE)},
+  {"QUDA_NORMEQ_SOLVE",                     std::to_string(QUDA_NORMEQ_SOLVE)},
+  {"QUDA_NORMEQ_PC_SOLVE",                  std::to_string(QUDA_NORMEQ_PC_SOLVE)},
+  {"QUDA_INVALID_SOLVE",                    std::to_string(QUDA_INVALID_SOLVE)},
+  {"QUDA_MATPC_EVEN_EVEN",                  std::to_string(QUDA_MATPC_EVEN_EVEN)},
+  {"QUDA_MATPC_ODD_ODD",                    std::to_string(QUDA_MATPC_ODD_ODD)},
+  {"QUDA_MATPC_EVEN_EVEN_ASYMMETRIC",       std::to_string(QUDA_MATPC_EVEN_EVEN_ASYMMETRIC)},
+  {"QUDA_MATPC_ODD_ODD_ASYMMETRIC",         std::to_string(QUDA_MATPC_ODD_ODD_ASYMMETRIC)},
+  {"QUDA_MATPC_INVALID",                    std::to_string(QUDA_MATPC_INVALID)},
+  {"QUDA_DEFAULT_NORMALIZATION",            std::to_string(QUDA_DEFAULT_NORMALIZATION)},
+  {"QUDA_SOURCE_NORMALIZATION",             std::to_string(QUDA_SOURCE_NORMALIZATION)},
+  {"QUDA_QUARTER_PRECISION",                std::to_string(QUDA_QUARTER_PRECISION)},
+  {"QUDA_HALF_PRECISION",                   std::to_string(QUDA_HALF_PRECISION)},
+  {"QUDA_SINGLE_PRECISION",                 std::to_string(QUDA_SINGLE_PRECISION)},
+  {"QUDA_DOUBLE_PRECISION",                 std::to_string(QUDA_DOUBLE_PRECISION)},
+  {"QUDA_INVALID_PRECISION",                std::to_string(QUDA_INVALID_PRECISION)},
+  {"QUDA_BOOLEAN_FALSE",                    std::to_string(QUDA_BOOLEAN_FALSE)},
+  {"QUDA_BOOLEAN_TRUE",                     std::to_string(QUDA_BOOLEAN_TRUE)},
+  {"QUDA_BOOLEAN_INVALID",                  std::to_string(QUDA_BOOLEAN_INVALID)},
+  {"QUDA_COMPUTE_NULL_VECTOR_NO",           std::to_string(QUDA_COMPUTE_NULL_VECTOR_NO)},
+  {"QUDA_COMPUTE_NULL_VECTOR_YES",          std::to_string(QUDA_COMPUTE_NULL_VECTOR_YES)},
+  {"QUDA_COMPUTE_NULL_VECTOR_INVALID",      std::to_string(QUDA_COMPUTE_NULL_VECTOR_INVALID)},
+  {"QUDA_MG_CYCLE_VCYCLE",                  std::to_string(QUDA_MG_CYCLE_VCYCLE)},
+  {"QUDA_MG_CYCLE_FCYCLE",                  std::to_string(QUDA_MG_CYCLE_FCYCLE)},
+  {"QUDA_MG_CYCLE_WCYCLE",                  std::to_string(QUDA_MG_CYCLE_WCYCLE)},
+  {"QUDA_MG_CYCLE_RECURSIVE",               std::to_string(QUDA_MG_CYCLE_RECURSIVE)},
+  {"QUDA_MG_CYCLE_INVALID",                 std::to_string(QUDA_MG_CYCLE_INVALID)},
+  {"QUDA_CPU_FIELD_LOCATION",               std::to_string(QUDA_CPU_FIELD_LOCATION)},
+  {"QUDA_CUDA_FIELD_LOCATION",              std::to_string(QUDA_CUDA_FIELD_LOCATION)},
+  {"QUDA_INVALID_FIELD_LOCATION",           std::to_string(QUDA_INVALID_FIELD_LOCATION)},
+  {"QUDA_TWIST_SINGLET",                    std::to_string(QUDA_TWIST_SINGLET)},
+  {"QUDA_TWIST_NONDEG_DOUBLET",             std::to_string(QUDA_TWIST_NONDEG_DOUBLET)},
+  {"QUDA_TWIST_NO",                         std::to_string(QUDA_TWIST_NO)},
+  {"QUDA_TWIST_INVALID",                    std::to_string(QUDA_TWIST_INVALID)},
+  {"QUDA_DAG_NO",                           std::to_string(QUDA_DAG_NO)},
+  {"QUDA_DAG_YES",                          std::to_string(QUDA_DAG_YES)},
+  {"QUDA_DAG_INVALID",                      std::to_string(QUDA_DAG_INVALID)},
+  {"QUDA_KAPPA_NORMALIZATION",              std::to_string(QUDA_KAPPA_NORMALIZATION)},
+  {"QUDA_MASS_NORMALIZATION",               std::to_string(QUDA_MASS_NORMALIZATION)},
+  {"QUDA_ASYMMETRIC_MASS_NORMALIZATION",    std::to_string(QUDA_ASYMMETRIC_MASS_NORMALIZATION)},
+  {"QUDA_INVALID_NORMALIZATION",            std::to_string(QUDA_INVALID_NORMALIZATION)},
+  {"QUDA_PRESERVE_SOURCE_NO",               std::to_string(QUDA_PRESERVE_SOURCE_NO)},
+  {"QUDA_PRESERVE_SOURCE_YES",              std::to_string(QUDA_PRESERVE_SOURCE_YES)},
+  {"QUDA_PRESERVE_SOURCE_INVALID",          std::to_string(QUDA_PRESERVE_SOURCE_INVALID)},
+  {"QUDA_USE_INIT_GUESS_NO",                std::to_string(QUDA_USE_INIT_GUESS_NO)},
+  {"QUDA_USE_INIT_GUESS_YES",               std::to_string(QUDA_USE_INIT_GUESS_YES)},
+  {"QUDA_USE_INIT_GUESS_INVALID",           std::to_string(QUDA_USE_INIT_GUESS_INVALID)},
+  {"QUDA_SILENT",                           std::to_string(QUDA_SILENT)},
+  {"QUDA_SUMMARIZE",                        std::to_string(QUDA_SUMMARIZE)},
+  {"QUDA_VERBOSE",                          std::to_string(QUDA_VERBOSE)},
+  {"QUDA_DEBUG_VERBOSE",                    std::to_string(QUDA_DEBUG_VERBOSE)},
+  {"QUDA_INVALID_VERBOSITY",                std::to_string(QUDA_INVALID_VERBOSITY)},
+  {"QUDA_TUNE_NO",                          std::to_string(QUDA_TUNE_NO)},
+  {"QUDA_TUNE_YES",                         std::to_string(QUDA_TUNE_YES)},
+  {"QUDA_TUNE_INVALID",                     std::to_string(QUDA_TUNE_INVALID)},
+  {"QUDA_POWER_BASIS",                      std::to_string(QUDA_POWER_BASIS)},
+  {"QUDA_CHEBYSHEV_BASIS",                  std::to_string(QUDA_CHEBYSHEV_BASIS)},
+  {"QUDA_INVALID_BASIS",                    std::to_string(QUDA_INVALID_BASIS)},
+  {"QUDA_ADDITIVE_SCHWARZ",                 std::to_string(QUDA_ADDITIVE_SCHWARZ)},
+  {"QUDA_MULTIPLICATIVE_SCHWARZ",           std::to_string(QUDA_MULTIPLICATIVE_SCHWARZ)},
+  {"QUDA_INVALID_SCHWARZ",                  std::to_string(QUDA_INVALID_SCHWARZ)},
+  {"QUDA_MADWF_ACCELERATOR",                std::to_string(QUDA_MADWF_ACCELERATOR)},
+  {"QUDA_INVALID_ACCELERATOR",              std::to_string(QUDA_INVALID_ACCELERATOR)},
+  {"QUDA_L2_RELATIVE_RESIDUAL",             std::to_string(QUDA_L2_RELATIVE_RESIDUAL)},
+  {"QUDA_L2_ABSOLUTE_RESIDUAL",             std::to_string(QUDA_L2_ABSOLUTE_RESIDUAL)},
+  {"QUDA_HEAVY_QUARK_RESIDUAL",             std::to_string(QUDA_HEAVY_QUARK_RESIDUAL)},
+  {"QUDA_INVALID_RESIDUAL",                 std::to_string(QUDA_INVALID_RESIDUAL)},
+  {"QUDA_NULL_VECTOR_SETUP",                std::to_string(QUDA_NULL_VECTOR_SETUP)},
+  {"QUDA_TEST_VECTOR_SETUP",                std::to_string(QUDA_TEST_VECTOR_SETUP)},
+  {"QUDA_INVALID_SETUP_TYPE",               std::to_string(QUDA_INVALID_SETUP_TYPE)},
+  {"QUDA_TRANSFER_AGGREGATE",               std::to_string(QUDA_TRANSFER_AGGREGATE)},
+  {"QUDA_TRANSFER_COARSE_KD",               std::to_string(QUDA_TRANSFER_COARSE_KD)},
+  {"QUDA_TRANSFER_OPTIMIZED_KD",            std::to_string(QUDA_TRANSFER_OPTIMIZED_KD)},
+  {"QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG",  std::to_string(QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)},
+  {"QUDA_TRANSFER_INVALID",                 std::to_string(QUDA_TRANSFER_INVALID)},
+  {"QUDA_EIG_TR_LANCZOS",                   std::to_string(QUDA_EIG_TR_LANCZOS)},
+  {"QUDA_EIG_BLK_TR_LANCZOS",               std::to_string(QUDA_EIG_BLK_TR_LANCZOS)},
+  {"QUDA_EIG_IR_ARNOLDI",                   std::to_string(QUDA_EIG_IR_ARNOLDI)},
+  {"QUDA_EIG_BLK_IR_ARNOLDI",               std::to_string(QUDA_EIG_BLK_IR_ARNOLDI)},
+  {"QUDA_EIG_INVALID",                      std::to_string(QUDA_EIG_INVALID)},
+  {"QUDA_SPECTRUM_LM_EIG",                  std::to_string(QUDA_SPECTRUM_LM_EIG)},
+  {"QUDA_SPECTRUM_SM_EIG",                  std::to_string(QUDA_SPECTRUM_SM_EIG)},
+  {"QUDA_SPECTRUM_LR_EIG",                  std::to_string(QUDA_SPECTRUM_LR_EIG)},
+  {"QUDA_SPECTRUM_SR_EIG",                  std::to_string(QUDA_SPECTRUM_SR_EIG)},
+  {"QUDA_SPECTRUM_LI_EIG",                  std::to_string(QUDA_SPECTRUM_LI_EIG)},
+  {"QUDA_SPECTRUM_SI_EIG",                  std::to_string(QUDA_SPECTRUM_SI_EIG)},
+  {"QUDA_SPECTRUM_INVALID",                 std::to_string(QUDA_SPECTRUM_INVALID)},
+  {"QUDA_MEMORY_DEVICE",                    std::to_string(QUDA_MEMORY_DEVICE)},
+  {"QUDA_MEMORY_PINNED",                    std::to_string(QUDA_MEMORY_PINNED)},
+  {"QUDA_MEMORY_MAPPED",                    std::to_string(QUDA_MEMORY_MAPPED)},
+  {"QUDA_MEMORY_INVALID",                   std::to_string(QUDA_MEMORY_INVALID)},
+  {"QUDA_CUSOLVE_EXTLIB",                   std::to_string(QUDA_CUSOLVE_EXTLIB)},
+  {"QUDA_EIGEN_EXTLIB",                     std::to_string(QUDA_EIGEN_EXTLIB)},
+  {"QUDA_EXTLIB_INVALID",                   std::to_string(QUDA_EXTLIB_INVALID)}
+};
+
+
 /**
  * @brief      Just a simple key-value store
  */
@@ -281,6 +415,9 @@ static int rankFromCoords(const int *coords, void *fdata) // TODO:
  */
 void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout)
 {
+  int my_rank;
+  char prefix[20];
+
   for (int dir = 0; dir < 4; ++dir) {
     if (layout.N[dir] % 2 != 0) {
       errorQuda("Error: Odd lattice dimensions are not supported\n");
@@ -300,6 +437,11 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout)
   static int device = layout.device;
 #endif
 
+  // must happen *after* communication initialization
+  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+  sprintf(prefix, "QUDA (rank=%d): ", my_rank);
+
+  setVerbosityQuda(qudaState.init.verbosity, prefix, qudaState.init.logfile);
   initQuda(device);
 }
 
@@ -388,7 +530,6 @@ void openQCD_qudaInit(openQCD_QudaInitArgs_t init, openQCD_QudaLayout_t layout)
   qudaState.init = init;
   qudaState.layout = layout;
 
-  setVerbosityQuda(qudaState.init.verbosity, "QUDA: ", qudaState.init.logfile);
   qudaopenqcd_called<true>(__func__);
   openQCD_qudaSetLayout(qudaState.layout);
   qudaopenqcd_called<false>(__func__);
@@ -420,13 +561,7 @@ double openQCD_qudaPlaquette(void)
 void openQCD_qudaGaugeLoad(void *gauge, QudaPrecision prec)
 {
   QudaGaugeParam param = newOpenQCDGaugeParam(prec);
-
-  /* Matthias Wagner: optimize that */
-  void* buffer = pool_pinned_malloc(4*qudaState.init.volume*18*prec);
-  qudaState.init.reorder_gauge_openqcd_to_quda(gauge, buffer);
-  loadGaugeQuda(buffer, &param);
-  pool_pinned_free(buffer);
-
+  loadGaugeQuda(gauge, &param);
   qudaState.gauge_loaded = true;
 }
 
@@ -435,7 +570,7 @@ void openQCD_qudaGaugeSave(void *gauge, QudaPrecision prec)
 {
   QudaGaugeParam param = newOpenQCDGaugeParam(prec);
 
-  void* buffer = pool_pinned_malloc(4*qudaState.init.volume*18*prec);
+  void* buffer = pool_pinned_malloc((4*qudaState.init.volume + 7*qudaState.init.bndry/4)*18*prec);
   saveGaugeQuda(buffer, &param);
   qudaState.init.reorder_gauge_quda_to_openqcd(buffer, gauge);
   pool_pinned_free(buffer);
@@ -700,6 +835,9 @@ void openQCD_qudaSpinorFree(void** quda_field)
 
 void openQCD_qudaD2H(void *quda_field, void *openQCD_field)
 {
+  int my_rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+
   // sets up the necessary parameters
   QudaInvertParam param = newOpenQCDParam();
 
@@ -707,10 +845,8 @@ void openQCD_qudaD2H(void *quda_field, void *openQCD_field)
   ColorSpinorParam cpuParam(openQCD_field, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
   ColorSpinorField out_h(cpuParam);
 
-  ColorSpinorField* in = reinterpret_cast<ColorSpinorField*>(quda_field);
-  ColorSpinorField out(*in);
-
-  out_h = out; // transfer the GPU field to CPU
+  // transfer the GPU field to CPU
+  out_h = *reinterpret_cast<ColorSpinorField*>(quda_field);
 }
 
 
@@ -807,120 +943,6 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
   }
 
   if (my_rank == 0) {
-
-    std::unordered_map<std::string, std::string> enum_map = {
-      {"QUDA_CG_INVERTER",                      std::to_string(QUDA_CG_INVERTER)},
-      {"QUDA_BICGSTAB_INVERTER",                std::to_string(QUDA_BICGSTAB_INVERTER)},
-      {"QUDA_GCR_INVERTER",                     std::to_string(QUDA_GCR_INVERTER)},
-      {"QUDA_MR_INVERTER",                      std::to_string(QUDA_MR_INVERTER)},
-      {"QUDA_SD_INVERTER",                      std::to_string(QUDA_SD_INVERTER)},
-      {"QUDA_PCG_INVERTER",                     std::to_string(QUDA_PCG_INVERTER)},
-      {"QUDA_EIGCG_INVERTER",                   std::to_string(QUDA_EIGCG_INVERTER)},
-      {"QUDA_INC_EIGCG_INVERTER",               std::to_string(QUDA_INC_EIGCG_INVERTER)},
-      {"QUDA_GMRESDR_INVERTER",                 std::to_string(QUDA_GMRESDR_INVERTER)},
-      {"QUDA_GMRESDR_PROJ_INVERTER",            std::to_string(QUDA_GMRESDR_PROJ_INVERTER)},
-      {"QUDA_GMRESDR_SH_INVERTER",              std::to_string(QUDA_GMRESDR_SH_INVERTER)},
-      {"QUDA_FGMRESDR_INVERTER",                std::to_string(QUDA_FGMRESDR_INVERTER)},
-      {"QUDA_MG_INVERTER",                      std::to_string(QUDA_MG_INVERTER)},
-      {"QUDA_BICGSTABL_INVERTER",               std::to_string(QUDA_BICGSTABL_INVERTER)},
-      {"QUDA_CGNE_INVERTER",                    std::to_string(QUDA_CGNE_INVERTER)},
-      {"QUDA_CGNR_INVERTER",                    std::to_string(QUDA_CGNR_INVERTER)},
-      {"QUDA_CG3_INVERTER",                     std::to_string(QUDA_CG3_INVERTER)},
-      {"QUDA_CG3NE_INVERTER",                   std::to_string(QUDA_CG3NE_INVERTER)},
-      {"QUDA_CG3NR_INVERTER",                   std::to_string(QUDA_CG3NR_INVERTER)},
-      {"QUDA_CA_CG_INVERTER",                   std::to_string(QUDA_CA_CG_INVERTER)},
-      {"QUDA_CA_CGNE_INVERTER",                 std::to_string(QUDA_CA_CGNE_INVERTER)},
-      {"QUDA_CA_CGNR_INVERTER",                 std::to_string(QUDA_CA_CGNR_INVERTER)},
-      {"QUDA_CA_GCR_INVERTER",                  std::to_string(QUDA_CA_GCR_INVERTER)},
-      {"QUDA_INVALID_INVERTER",                 std::to_string(QUDA_INVALID_INVERTER)},
-      {"QUDA_MAT_SOLUTION",                     std::to_string(QUDA_MAT_SOLUTION)},
-      {"QUDA_MATDAG_MAT_SOLUTION",              std::to_string(QUDA_MATDAG_MAT_SOLUTION)},
-      {"QUDA_MATPC_SOLUTION",                   std::to_string(QUDA_MATPC_SOLUTION)},
-      {"QUDA_MATPC_DAG_SOLUTION",               std::to_string(QUDA_MATPC_DAG_SOLUTION)},
-      {"QUDA_MATPCDAG_MATPC_SOLUTION",          std::to_string(QUDA_MATPCDAG_MATPC_SOLUTION)},
-      {"QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION",    std::to_string(QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION)},
-      {"QUDA_INVALID_SOLUTION",                 std::to_string(QUDA_INVALID_SOLUTION)},
-      {"QUDA_DIRECT_SOLVE",                     std::to_string(QUDA_DIRECT_SOLVE)},
-      {"QUDA_NORMOP_SOLVE",                     std::to_string(QUDA_NORMOP_SOLVE)},
-      {"QUDA_DIRECT_PC_SOLVE",                  std::to_string(QUDA_DIRECT_PC_SOLVE)},
-      {"QUDA_NORMOP_PC_SOLVE",                  std::to_string(QUDA_NORMOP_PC_SOLVE)},
-      {"QUDA_NORMERR_SOLVE",                    std::to_string(QUDA_NORMERR_SOLVE)},
-      {"QUDA_NORMERR_PC_SOLVE",                 std::to_string(QUDA_NORMERR_PC_SOLVE)},
-      {"QUDA_NORMEQ_SOLVE",                     std::to_string(QUDA_NORMEQ_SOLVE)},
-      {"QUDA_NORMEQ_PC_SOLVE",                  std::to_string(QUDA_NORMEQ_PC_SOLVE)},
-      {"QUDA_INVALID_SOLVE",                    std::to_string(QUDA_INVALID_SOLVE)},
-      {"QUDA_MATPC_EVEN_EVEN",                  std::to_string(QUDA_MATPC_EVEN_EVEN)},
-      {"QUDA_MATPC_ODD_ODD",                    std::to_string(QUDA_MATPC_ODD_ODD)},
-      {"QUDA_MATPC_EVEN_EVEN_ASYMMETRIC",       std::to_string(QUDA_MATPC_EVEN_EVEN_ASYMMETRIC)},
-      {"QUDA_MATPC_ODD_ODD_ASYMMETRIC",         std::to_string(QUDA_MATPC_ODD_ODD_ASYMMETRIC)},
-      {"QUDA_MATPC_INVALID",                    std::to_string(QUDA_MATPC_INVALID)},
-      {"QUDA_DEFAULT_NORMALIZATION",            std::to_string(QUDA_DEFAULT_NORMALIZATION)},
-      {"QUDA_SOURCE_NORMALIZATION",             std::to_string(QUDA_SOURCE_NORMALIZATION)},
-      {"QUDA_QUARTER_PRECISION",                std::to_string(QUDA_QUARTER_PRECISION)},
-      {"QUDA_HALF_PRECISION",                   std::to_string(QUDA_HALF_PRECISION)},
-      {"QUDA_SINGLE_PRECISION",                 std::to_string(QUDA_SINGLE_PRECISION)},
-      {"QUDA_DOUBLE_PRECISION",                 std::to_string(QUDA_DOUBLE_PRECISION)},
-      {"QUDA_INVALID_PRECISION",                std::to_string(QUDA_INVALID_PRECISION)},
-      {"QUDA_BOOLEAN_FALSE",                    std::to_string(QUDA_BOOLEAN_FALSE)},
-      {"QUDA_BOOLEAN_TRUE",                     std::to_string(QUDA_BOOLEAN_TRUE)},
-      {"QUDA_BOOLEAN_INVALID",                  std::to_string(QUDA_BOOLEAN_INVALID)},
-      {"QUDA_COMPUTE_NULL_VECTOR_NO",           std::to_string(QUDA_COMPUTE_NULL_VECTOR_NO)},
-      {"QUDA_COMPUTE_NULL_VECTOR_YES",          std::to_string(QUDA_COMPUTE_NULL_VECTOR_YES)},
-      {"QUDA_COMPUTE_NULL_VECTOR_INVALID",      std::to_string(QUDA_COMPUTE_NULL_VECTOR_INVALID)},
-      {"QUDA_MG_CYCLE_VCYCLE",                  std::to_string(QUDA_MG_CYCLE_VCYCLE)},
-      {"QUDA_MG_CYCLE_FCYCLE",                  std::to_string(QUDA_MG_CYCLE_FCYCLE)},
-      {"QUDA_MG_CYCLE_WCYCLE",                  std::to_string(QUDA_MG_CYCLE_WCYCLE)},
-      {"QUDA_MG_CYCLE_RECURSIVE",               std::to_string(QUDA_MG_CYCLE_RECURSIVE)},
-      {"QUDA_MG_CYCLE_INVALID",                 std::to_string(QUDA_MG_CYCLE_INVALID)},
-      {"QUDA_CPU_FIELD_LOCATION",               std::to_string(QUDA_CPU_FIELD_LOCATION)},
-      {"QUDA_CUDA_FIELD_LOCATION",              std::to_string(QUDA_CUDA_FIELD_LOCATION)},
-      {"QUDA_INVALID_FIELD_LOCATION",           std::to_string(QUDA_INVALID_FIELD_LOCATION)},
-      {"QUDA_TWIST_SINGLET",                    std::to_string(QUDA_TWIST_SINGLET)},
-      {"QUDA_TWIST_NONDEG_DOUBLET",             std::to_string(QUDA_TWIST_NONDEG_DOUBLET)},
-      {"QUDA_TWIST_NO",                         std::to_string(QUDA_TWIST_NO)},
-      {"QUDA_TWIST_INVALID",                    std::to_string(QUDA_TWIST_INVALID)},
-      {"QUDA_DAG_NO",                           std::to_string(QUDA_DAG_NO)},
-      {"QUDA_DAG_YES",                          std::to_string(QUDA_DAG_YES)},
-      {"QUDA_DAG_INVALID",                      std::to_string(QUDA_DAG_INVALID)},
-      {"QUDA_KAPPA_NORMALIZATION",              std::to_string(QUDA_KAPPA_NORMALIZATION)},
-      {"QUDA_MASS_NORMALIZATION",               std::to_string(QUDA_MASS_NORMALIZATION)},
-      {"QUDA_ASYMMETRIC_MASS_NORMALIZATION",    std::to_string(QUDA_ASYMMETRIC_MASS_NORMALIZATION)},
-      {"QUDA_INVALID_NORMALIZATION",            std::to_string(QUDA_INVALID_NORMALIZATION)},
-      {"QUDA_PRESERVE_SOURCE_NO",               std::to_string(QUDA_PRESERVE_SOURCE_NO)},
-      {"QUDA_PRESERVE_SOURCE_YES",              std::to_string(QUDA_PRESERVE_SOURCE_YES)},
-      {"QUDA_PRESERVE_SOURCE_INVALID",          std::to_string(QUDA_PRESERVE_SOURCE_INVALID)},
-      {"QUDA_USE_INIT_GUESS_NO",                std::to_string(QUDA_USE_INIT_GUESS_NO)},
-      {"QUDA_USE_INIT_GUESS_YES",               std::to_string(QUDA_USE_INIT_GUESS_YES)},
-      {"QUDA_USE_INIT_GUESS_INVALID",           std::to_string(QUDA_USE_INIT_GUESS_INVALID)},
-      {"QUDA_SILENT",                           std::to_string(QUDA_SILENT)},
-      {"QUDA_SUMMARIZE",                        std::to_string(QUDA_SUMMARIZE)},
-      {"QUDA_VERBOSE",                          std::to_string(QUDA_VERBOSE)},
-      {"QUDA_DEBUG_VERBOSE",                    std::to_string(QUDA_DEBUG_VERBOSE)},
-      {"QUDA_INVALID_VERBOSITY",                std::to_string(QUDA_INVALID_VERBOSITY)},
-      {"QUDA_TUNE_NO",                          std::to_string(QUDA_TUNE_NO)},
-      {"QUDA_TUNE_YES",                         std::to_string(QUDA_TUNE_YES)},
-      {"QUDA_TUNE_INVALID",                     std::to_string(QUDA_TUNE_INVALID)},
-      {"QUDA_POWER_BASIS",                      std::to_string(QUDA_POWER_BASIS)},
-      {"QUDA_CHEBYSHEV_BASIS",                  std::to_string(QUDA_CHEBYSHEV_BASIS)},
-      {"QUDA_INVALID_BASIS",                    std::to_string(QUDA_INVALID_BASIS)},
-      {"QUDA_ADDITIVE_SCHWARZ",                 std::to_string(QUDA_ADDITIVE_SCHWARZ)},
-      {"QUDA_MULTIPLICATIVE_SCHWARZ",           std::to_string(QUDA_MULTIPLICATIVE_SCHWARZ)},
-      {"QUDA_INVALID_SCHWARZ",                  std::to_string(QUDA_INVALID_SCHWARZ)},
-      {"QUDA_MADWF_ACCELERATOR",                std::to_string(QUDA_MADWF_ACCELERATOR)},
-      {"QUDA_INVALID_ACCELERATOR",              std::to_string(QUDA_INVALID_ACCELERATOR)},
-      {"QUDA_L2_RELATIVE_RESIDUAL",             std::to_string(QUDA_L2_RELATIVE_RESIDUAL)},
-      {"QUDA_L2_ABSOLUTE_RESIDUAL",             std::to_string(QUDA_L2_ABSOLUTE_RESIDUAL)},
-      {"QUDA_HEAVY_QUARK_RESIDUAL",             std::to_string(QUDA_HEAVY_QUARK_RESIDUAL)},
-      {"QUDA_INVALID_RESIDUAL",                 std::to_string(QUDA_INVALID_RESIDUAL)},
-      {"QUDA_NULL_VECTOR_SETUP",                std::to_string(QUDA_NULL_VECTOR_SETUP)},
-      {"QUDA_TEST_VECTOR_SETUP",                std::to_string(QUDA_TEST_VECTOR_SETUP)},
-      {"QUDA_INVALID_SETUP_TYPE",               std::to_string(QUDA_INVALID_SETUP_TYPE)},
-      {"QUDA_TRANSFER_AGGREGATE",               std::to_string(QUDA_TRANSFER_AGGREGATE)},
-      {"QUDA_TRANSFER_COARSE_KD",               std::to_string(QUDA_TRANSFER_COARSE_KD)},
-      {"QUDA_TRANSFER_OPTIMIZED_KD",            std::to_string(QUDA_TRANSFER_OPTIMIZED_KD)},
-      {"QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG",  std::to_string(QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)},
-      {"QUDA_TRANSFER_INVALID",                 std::to_string(QUDA_TRANSFER_INVALID)}
-    };
 
     KeyValueStore kv;
     kv.set_map(&enum_map);
@@ -1162,8 +1184,9 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
 
   if (qudaState.layout.h_gauge != nullptr) {
     logQuda(QUDA_VERBOSE, "Loading gauge field from openQCD ...\n");
+    void *h_gauge = qudaState.layout.h_gauge();
     PUSH_RANGE("openQCD_qudaGaugeLoad",3);
-    openQCD_qudaGaugeLoad(qudaState.layout.h_gauge(), QUDA_DOUBLE_PRECISION);
+    openQCD_qudaGaugeLoad(h_gauge, QUDA_DOUBLE_PRECISION);
     POP_RANGE;
   }
 
@@ -1183,8 +1206,9 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
        * Transfer the SW-field from openQCD.
        */
       logQuda(QUDA_VERBOSE, "Loading clover field from openQCD ...\n");
+      void *h_sw = qudaState.layout.h_sw();
       PUSH_RANGE("openQCD_qudaCloverLoad",3);
-      openQCD_qudaCloverLoad(qudaState.layout.h_sw(), param->kappa, param->clover_csw);
+      openQCD_qudaCloverLoad(h_sw, param->kappa, param->clover_csw);
       POP_RANGE;
 
       //loadCloverQuda(qudaState.layout.h_sw(), NULL, param);
@@ -1218,6 +1242,7 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
   return (void*) param;
 }
 
+
 double openQCD_qudaInvert(void *param, double mu, void *source, void *solution, int *status)
 {
   QudaInvertParam* invert_param = static_cast<QudaInvertParam*>(param);
@@ -1228,14 +1253,12 @@ double openQCD_qudaInvert(void *param, double mu, void *source, void *solution, 
   invertQuda(static_cast<char *>(solution), static_cast<char *>(source), invert_param);
   POP_RANGE;
 
-  if (invert_param->verbosity >= QUDA_VERBOSE) {
-    logQuda(QUDA_VERBOSE, "openQCD_qudaInvert()\n");
-    logQuda(QUDA_VERBOSE, "  true_res    = %.2e\n", invert_param->true_res);
-    logQuda(QUDA_VERBOSE, "  true_res_hq = %.2e\n", invert_param->true_res_hq);
-    logQuda(QUDA_VERBOSE, "  iter        = %d\n",   invert_param->iter);
-    logQuda(QUDA_VERBOSE, "  gflops      = %.2e\n", invert_param->gflops);
-    logQuda(QUDA_VERBOSE, "  secs        = %.2e\n", invert_param->secs);
-  }
+  logQuda(QUDA_VERBOSE, "openQCD_qudaInvert()\n");
+  logQuda(QUDA_VERBOSE, "  true_res    = %.2e\n", invert_param->true_res);
+  logQuda(QUDA_VERBOSE, "  true_res_hq = %.2e\n", invert_param->true_res_hq);
+  logQuda(QUDA_VERBOSE, "  iter        = %d\n",   invert_param->iter);
+  logQuda(QUDA_VERBOSE, "  gflops      = %.2e\n", invert_param->gflops);
+  logQuda(QUDA_VERBOSE, "  secs        = %.2e\n", invert_param->secs);
 
   *status = invert_param->true_res <= invert_param->tol ? invert_param->iter : -1;
 
@@ -1252,6 +1275,112 @@ void openQCD_qudaSolverDestroy(void *param)
   }
 
   delete invert_param;
+}
+
+
+void* openQCD_qudaEigensolverSetup(char *infile, char *section, char *inv_section)
+{
+  int my_rank;
+
+  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+  QudaVerbosity verbosity = QUDA_SUMMARIZE;
+
+  // Allocate on the heap
+  QudaEigParam* param = new QudaEigParam(newQudaEigParam());
+
+  if (my_rank == 0) {
+
+    KeyValueStore kv;
+    kv.set_map(&enum_map);
+    kv.load(infile);
+
+    verbosity = kv.get<QudaVerbosity>(section, "verbosity", verbosity);
+    setVerbosity(verbosity);
+
+    if (verbosity >= QUDA_VERBOSE) {
+      kv.dump();
+    }
+
+    param->eig_type = kv.get<QudaEigType>(section, "eig_type", param->eig_type);
+    param->use_poly_acc = kv.get<QudaBoolean>(section, "use_poly_acc", param->use_poly_acc);
+    param->poly_deg = kv.get<int>(section, "poly_deg", param->poly_deg);
+    param->a_min = kv.get<double>(section, "a_min", param->a_min);
+    param->a_max = kv.get<double>(section, "a_max", param->a_max);
+    param->preserve_deflation = kv.get<QudaBoolean>(section, "preserve_deflation", param->preserve_deflation);
+    //param->*preserve_deflation_space = kv.get<void>(section, *"*preserve_deflation_space", param->preserve_deflation_space);
+    param->preserve_evals = kv.get<QudaBoolean>(section, "preserve_evals", param->preserve_evals);
+    param->use_dagger = kv.get<QudaBoolean>(section, "use_dagger", param->use_dagger);
+    param->use_norm_op = kv.get<QudaBoolean>(section, "use_norm_op", param->use_norm_op);
+    param->use_pc = kv.get<QudaBoolean>(section, "use_pc", param->use_pc);
+    param->use_eigen_qr = kv.get<QudaBoolean>(section, "use_eigen_qr", param->use_eigen_qr);
+    param->compute_svd = kv.get<QudaBoolean>(section, "compute_svd", param->compute_svd);
+    param->compute_gamma5 = kv.get<QudaBoolean>(section, "compute_gamma5", param->compute_gamma5);
+    param->require_convergence = kv.get<QudaBoolean>(section, "require_convergence", param->require_convergence);
+    param->spectrum = kv.get<QudaEigSpectrumType>(section, "spectrum", param->spectrum);
+    param->n_ev = kv.get<int>(section, "n_ev", param->n_ev);
+    param->n_kr = kv.get<int>(section, "n_kr", param->n_kr);
+    param->n_conv = kv.get<int>(section, "n_conv", param->n_conv);
+    param->n_ev_deflate = kv.get<int>(section, "n_ev_deflate", param->n_ev_deflate);
+    param->tol = kv.get<double>(section, "tol", param->tol);
+    param->qr_tol = kv.get<double>(section, "qr_tol", param->qr_tol);
+    param->check_interval = kv.get<int>(section, "check_interval", param->check_interval);
+    param->max_restarts = kv.get<int>(section, "max_restarts", param->max_restarts);
+    param->batched_rotate = kv.get<int>(section, "batched_rotate", param->batched_rotate);
+    param->block_size = kv.get<int>(section, "block_size", param->block_size);
+    param->arpack_check = kv.get<QudaBoolean>(section, "arpack_check", param->arpack_check);
+    strcpy(param->QUDA_logfile, kv.get<std::string>(section, "QUDA_logfile", param->QUDA_logfile).c_str());
+    strcpy(param->arpack_logfile, kv.get<std::string>(section, "arpack_logfile", param->arpack_logfile).c_str());
+
+    param->nk = kv.get<int>(section, "nk", param->nk);
+    param->np = kv.get<int>(section, "np", param->np);
+    param->import_vectors = kv.get<QudaBoolean>(section, "import_vectors", param->import_vectors);
+    param->cuda_prec_ritz = kv.get<QudaPrecision>(section, "cuda_prec_ritz", param->cuda_prec_ritz);
+    param->mem_type_ritz = kv.get<QudaMemoryType>(section, "mem_type_ritz", param->mem_type_ritz);
+    param->location = kv.get<QudaFieldLocation>(section, "location", param->location);
+    param->run_verify = kv.get<QudaBoolean>(section, "run_verify", param->run_verify);
+    //strcpy(param->vec_infile, kv.get<std::string>(section, "vec_infile", param->vec_infile).c_str());
+    //strcpy(param->vec_outfile, kv.get<std::string>(section, "vec_outfile", param->vec_outfile).c_str());
+    param->save_prec = kv.get<QudaPrecision>(section, "save_prec", param->save_prec);
+    param->io_parity_inflate = kv.get<QudaBoolean>(section, "io_parity_inflate", param->io_parity_inflate);
+    param->extlib_type = kv.get<QudaExtLibType>(section, "extlib_type", param->extlib_type);
+  }
+
+  // transfer of the struct to all the processes
+  MPI_Bcast((void*) param, sizeof(*param), MPI_BYTE, 0, MPI_COMM_WORLD);
+
+  void *inv_param = openQCD_qudaSolverSetup(infile, inv_section);
+  param->invert_param = static_cast<QudaInvertParam*>(inv_param);
+
+  if (verbosity >= QUDA_DEBUG_VERBOSE) {
+    printQudaEigParam(param);
+  }
+  checkEigParam(param);
+  if (verbosity >= QUDA_DEBUG_VERBOSE) {
+    printQudaEigParam(param);
+  }
+
+  return (void*) param;
+}
+
+
+void openQCD_qudaEigensolve(void *param, void **h_evecs, void *h_evals)
+{
+  QudaEigParam* eig_param = static_cast<QudaEigParam*>(param);
+
+  logQuda(QUDA_VERBOSE, "Calling eigensolveQuda() ...\n");
+  PUSH_RANGE("eigensolveQuda",6);
+  eigensolveQuda(h_evecs, static_cast<double _Complex*>(h_evals), eig_param);
+  POP_RANGE;
+
+  logQuda(QUDA_VERBOSE, "openQCD_qudaEigensolve()\n");
+  logQuda(QUDA_VERBOSE, "  gflops      = %.2e\n", eig_param->gflops);
+  logQuda(QUDA_VERBOSE, "  secs        = %.2e\n", eig_param->secs);
+}
+
+void openQCD_qudaEigensolverDestroy(void *param)
+{
+  QudaInvertParam* eig_param = static_cast<QudaInvertParam*>(param);
+  delete eig_param;
 }
 
 
