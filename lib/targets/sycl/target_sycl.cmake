@@ -162,7 +162,9 @@ target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/inc
 string(APPEND CMAKE_SYCL_FLAGS " -x c++")
 #set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES LANGUAGE CXX)
 set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES LANGUAGE SYCL)
-set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES COMPILE_FLAGS ${SYCL_FLAGS})
+if(SYCL_FLAGS)
+  set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES COMPILE_FLAGS ${SYCL_FLAGS})
+endif()
 target_link_options(quda PUBLIC ${SYCL_LINK_FLAGS})
 
 set(SYCL_MKL_LIBRARY "-lmkl_sycl -lmkl_intel_ilp64 -lmkl_core -lmkl_tbb_thread")
