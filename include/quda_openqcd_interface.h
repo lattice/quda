@@ -1,6 +1,5 @@
 #pragma once
 
-#include <enum_quda.h>
 #include <quda.h>
 
 /**

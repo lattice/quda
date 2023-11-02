@@ -27,8 +27,10 @@ static openQCD_QudaState_t qudaState = {false, false, false, false, {}, {}};
 
 using namespace quda;
 
-// code for NVTX taken from Jiri Kraus' blog post:
-// http://devblogs.nvidia.com/parallelforall/cuda-pro-tip-generate-custom-application-profile-timelines-nvtx/
+/**
+ * code for NVTX taken from Jiri Kraus' blog post:
+ * http://devblogs.nvidia.com/parallelforall/cuda-pro-tip-generate-custom-application-profile-timelines-nvtx/
+ */
 
 #ifdef INTERFACE_NVTX
 
@@ -64,7 +66,7 @@ static const int num_colors = sizeof(colors) / sizeof(uint32_t);
 
 template <bool start> void inline qudaopenqcd_called(const char *func, QudaVerbosity verb)
 {
-  // add NVTX markup if enabled
+  /* add NVTX markup if enabled */
   if (start) {
     PUSH_RANGE(func, 1);
   } else {
@@ -239,7 +241,6 @@ public:
         if (map != nullptr) {
             auto mvalue = map->find(value);
             if (mvalue != map->end()) {
-                //store[section][key] = mvalue->second;
                 std::get<0>(store[section][key]) = mvalue->second;
                 std::get<1>(store[section][key]) = value;
                 return;
@@ -247,7 +248,6 @@ public:
         }
         std::get<0>(store[section][key]) = value;
         std::get<1>(store[section][key]) = value;
-        //store[section][key] = value;
     }
 
     void set_map(std::unordered_map<std::string, std::string> *_map) {
@@ -270,7 +270,7 @@ public:
         int idx;
         std::string rkey;
         std::smatch match;
-        std::regex p_key("([^\\[]+)\\[(\\d+)\\]"); // key[idx]
+        std::regex p_key("([^\\[]+)\\[(\\d+)\\]"); /* key[idx] */
         auto sec = store.find(section);
 
         if (sec != store.end()) {
@@ -304,7 +304,7 @@ public:
                 }
             }
         }
-        return default_value; // Return default value for non-existent keys
+        return default_value; /* Return default value for non-existent keys */
     }
 
     /**
@@ -317,15 +317,15 @@ public:
         std::smatch match;
         std::ifstream file(filename.c_str());
 
-        std::regex p_section("^\\s*\\[([\\w\\ ]+)\\].*$"); // [section]
-        std::regex p_comment("^[^#]*(\\s*#.*)$"); // line # comment
-        std::regex p_key_val("^([^\\s]+)\\s+(.*[^\\s]+)\\s*$"); // key value
+        std::regex p_section("^\\s*\\[([\\w\\ ]+)\\].*$"); /* [section] */
+        std::regex p_comment("^[^#]*(\\s*#.*)$"); /* line # comment */
+        std::regex p_key_val("^([^\\s]+)\\s+(.*[^\\s]+)\\s*$"); /* key value */
 
         if (file.is_open()) {
 
             while (std::getline(file, line)) {
 
-                // remove all comments
+                /* remove all comments */
                 if (std::regex_search(line, match, p_comment)) {
                     line.erase(match.position(1));
                 }
@@ -396,7 +396,7 @@ static lat_dim_t get_local_dims(int *fill = nullptr)
  *
  * @return     rank
  */
-static int rankFromCoords(const int *coords, void *fdata) // TODO:
+static int rankFromCoords(const int *coords, void *fdata)
 {
   int *base = static_cast<int *>(fdata);
   int *NPROC = base + 1;
@@ -426,18 +426,18 @@ void openQCD_qudaSetLayout(openQCD_QudaLayout_t layout)
   }
 
 #ifdef MULTI_GPU
-// TODO: would we ever want to run with QMP COMMS?
+/* TODO: would we ever want to run with QMP COMMS? */
 #ifdef QMP_COMMS
   initCommsGridQuda(4, layout.nproc, nullptr, nullptr);
 #else
   initCommsGridQuda(4, layout.nproc, rankFromCoords, (void *)(layout.data));
 #endif
-  static int device = -1; // enable a default allocation of devices to processes 
+  static int device = -1; /* enable a default allocation of devices to processes */
 #else
   static int device = layout.device;
 #endif
 
-  // must happen *after* communication initialization
+  /* must happen *after* communication initialization */
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
   sprintf(prefix, "QUDA (rank=%d): ", my_rank);
 
@@ -468,13 +468,11 @@ static QudaInvertParam newOpenQCDParam(void)
 
   param.verbosity = verbosity;
 
-  param.cpu_prec = QUDA_DOUBLE_PRECISION;  // The precision used by the input fermion fields
-  param.cuda_prec = QUDA_DOUBLE_PRECISION; // The precision used by the QUDA solver
+  param.cpu_prec = QUDA_DOUBLE_PRECISION;  /* The precision used by the input fermion fields */
+  param.cuda_prec = QUDA_DOUBLE_PRECISION; /* The precision used by the QUDA solver */
 
-  /* AA: This breaks GCR */
-  // /* TH added for MG support */
-  param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION; // The precision used by the QUDA solver
-  param.cuda_prec_precondition = QUDA_HALF_PRECISION; // The precision used by the QUDA solver
+  param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION; /* The precision used by the QUDA solver */
+  param.cuda_prec_precondition = QUDA_HALF_PRECISION; /* The precision used by the QUDA solver */
 
   /**
    * The order of the input and output fermion fields. Imposes fieldOrder =
@@ -483,7 +481,7 @@ static QudaInvertParam newOpenQCDParam(void)
    */
   param.dirac_order = QUDA_OPENQCD_DIRAC_ORDER;
 
-  // Gamma basis of the input and output host fields
+  /* Gamma basis of the input and output host fields */
   param.gamma_basis = QUDA_OPENQCD_GAMMA_BASIS;
 
   return param;
@@ -507,16 +505,16 @@ static QudaGaugeParam newOpenQCDGaugeParam(QudaPrecision prec)
 
   param.reconstruct_sloppy = param.reconstruct = QUDA_RECONSTRUCT_NO;
 
-  // This make quda to instantiate OpenQCDOrder
+  /* This make quda to instantiate OpenQCDOrder */
   param.gauge_order = QUDA_OPENQCD_GAUGE_ORDER;
 
-  // Seems to have no effect ...
+  /* Seems to have no effect ... */
   param.t_boundary = QUDA_PERIODIC_T;
 
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   param.scale = 1.0;
-  param.anisotropy = 1.0; // 1.0 means not anisotropic
-  param.ga_pad = getLinkPadding(param.X); // Why this?
+  param.anisotropy = 1.0; /* 1.0 means not anisotropic */
+  param.ga_pad = getLinkPadding(param.X); /* Why this? */
 
   checkGaugeParam(&param);
 
@@ -553,7 +551,7 @@ double openQCD_qudaPlaquette(void)
 
   plaqQuda(plaq);
 
-  // Note different Nc normalization wrt openQCD!
+  /* Note different Nc normalization wrt openQCD! */
   return 3.0*plaq[0];
 }
 
@@ -629,16 +627,16 @@ static QudaInvertParam newOpenQCDDiracParam(openQCD_QudaDiracParam_t p)
   param.dagger = QUDA_DAG_NO;
 
   if (p.su3csw != 0.0) {
-    param.clover_location = QUDA_CUDA_FIELD_LOCATION; // seems to have no effect?
+    param.clover_location = QUDA_CUDA_FIELD_LOCATION; /* seems to have no effect? */
     param.clover_cpu_prec = QUDA_DOUBLE_PRECISION;
     param.clover_cuda_prec = QUDA_DOUBLE_PRECISION;
-    param.clover_order = QUDA_FLOAT8_CLOVER_ORDER; // what implication has this?
+    param.clover_order = QUDA_FLOAT8_CLOVER_ORDER; /* what implication has this? */
 
     param.compute_clover = true;
     param.clover_csw = p.su3csw;
     param.clover_coeff = 0.0;
 
-    // Set to Wilson Dirac operator with Clover term
+    /* Set to Wilson Dirac operator with Clover term */
     param.dslash_type = QUDA_CLOVER_WILSON_DSLASH;
 
     if (!qudaState.clover_loaded) {
@@ -647,17 +645,17 @@ static QudaInvertParam newOpenQCDDiracParam(openQCD_QudaDiracParam_t p)
        * the GPU and finally calls @createCloverQuda to calculate the clover
        * field.
        */
-      loadCloverQuda(NULL, NULL, &param); // Create the clover field
+      loadCloverQuda(NULL, NULL, &param); /* Create the clover field */
       qudaState.clover_loaded = true;
     }
   }
 
-  param.inv_type = QUDA_CG_INVERTER; // just set some, needed?
+  param.inv_type = QUDA_CG_INVERTER; /* just set some, needed? */
 
-  // What is the difference? only works with QUDA_MASS_NORMALIZATION
+  /* What is the difference? only works with QUDA_MASS_NORMALIZATION */
   param.mass_normalization = QUDA_MASS_NORMALIZATION;
 
-  // Extent of the 5th dimension (for domain wall)
+  /* Extent of the 5th dimension (for domain wall) */
   param.Ls = 1;
 
   return param;
@@ -681,7 +679,7 @@ static QudaInvertParam newOpenQCDSolverParam(openQCD_QudaDiracParam_t p)
   param.solve_type = QUDA_DIRECT_SOLVE;
   param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
-  param.inv_type_precondition = QUDA_INVALID_INVERTER; // disables any preconditioning
+  param.inv_type_precondition = QUDA_INVALID_INVERTER; /* disables any preconditioning */
 
   return param;
 }
@@ -689,33 +687,33 @@ static QudaInvertParam newOpenQCDSolverParam(openQCD_QudaDiracParam_t p)
 
 void openQCD_back_and_forth(void *h_in, void *h_out)
 {
-  // sets up the necessary parameters
+  /* sets up the necessary parameters */
   QudaInvertParam param = newOpenQCDParam();
 
-  // creates a field on the CPU
+  /* creates a field on the CPU */
   ColorSpinorParam cpuParam(h_in, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
   ColorSpinorField in_h(cpuParam);
 
-  // creates a field on the GPU with the same parameter set as the CPU field
+  /* creates a field on the GPU with the same parameter set as the CPU field */
   ColorSpinorParam cudaParam(cpuParam, param, QUDA_CUDA_FIELD_LOCATION);
   ColorSpinorField in(cudaParam);
 
-  // transfer the CPU field to GPU
+  /* transfer the CPU field to GPU */
   in = in_h;
 
-  // creates a field on the CPU
+  /* creates a field on the CPU */
   cpuParam.v = h_out;
   cpuParam.location = QUDA_CPU_FIELD_LOCATION;
   ColorSpinorField out_h(cpuParam);
 
-  // creates a zero-field on the GPU
+  /* creates a zero-field on the GPU */
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   ColorSpinorField out(cudaParam);
 
   out = in;
 
-  // transfer the GPU field back to CPU
+  /* transfer the GPU field back to CPU */
   out_h = out;
 }
 
@@ -750,37 +748,37 @@ double openQCD_qudaNorm_NoLoads(void *d_in)
 
 void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out)
 {
-  // sets up the necessary parameters
+  /* sets up the necessary parameters */
   QudaInvertParam param = newOpenQCDParam();
 
-  // creates a field on the CPU
+  /* creates a field on the CPU */
   ColorSpinorParam cpuParam(openQCD_in, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
   ColorSpinorField in_h(cpuParam);
 
-  // creates a field on the GPU with the same parameter set as the CPU field
+  /* creates a field on the GPU with the same parameter set as the CPU field */
   ColorSpinorParam cudaParam(cpuParam, param, QUDA_CUDA_FIELD_LOCATION);
   ColorSpinorField in(cudaParam);
 
-  // transfer the CPU field to GPU
+  /* transfer the CPU field to GPU */
   in = in_h;
 
-  // creates a zero-field on the GPU
+  /* creates a zero-field on the GPU */
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   ColorSpinorField out(cudaParam);
 
-  // gamma_i run within QUDA using QUDA fields
+  /* gamma_i run within QUDA using QUDA fields */
   switch (dir) {
-  case 0: // t direction
+  case 0: /* t direction */
     gamma3(out, in);
     break;
-  case 1: // x direction
+  case 1: /* x direction */
     gamma0(out, in);
     break;
-  case 2: // y direction
+  case 2: /* y direction */
     gamma1(out, in);
     break;
-  case 3: // z direction
+  case 3: /* z direction */
     gamma2(out, in);
     break;
   case 4:
@@ -798,30 +796,30 @@ void openQCD_qudaGamma(const int dir, void *openQCD_in, void *openQCD_out)
     errorQuda("Unknown gamma: %d\n", dir);
   }
 
-  // creates a field on the CPU
+  /* creates a field on the CPU */
   cpuParam.v = openQCD_out;
   cpuParam.location = QUDA_CPU_FIELD_LOCATION;
   ColorSpinorField out_h(cpuParam);
 
-  // transfer the GPU field back to CPU
+  /* transfer the GPU field back to CPU */
   out_h = out;
 }
 
 
 void* openQCD_qudaH2D(void *openQCD_field)
 {
-  // sets up the necessary parameters
+  /* sets up the necessary parameters */
   QudaInvertParam param = newOpenQCDParam();
 
-  // creates a field on the CPU
+  /* creates a field on the CPU */
   ColorSpinorParam cpuParam(openQCD_field, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
   ColorSpinorField in_h(cpuParam);
 
-  // creates a field on the GPU with the same parameter set as the CPU field
+  /* creates a field on the GPU with the same parameter set as the CPU field */
   ColorSpinorParam cudaParam(cpuParam, param, QUDA_CUDA_FIELD_LOCATION);
   ColorSpinorField *in = new ColorSpinorField(cudaParam);
 
-  *in = in_h; // transfer the CPU field to GPU
+  *in = in_h; /* transfer the CPU field to GPU */
 
   return in;
 }
@@ -838,14 +836,14 @@ void openQCD_qudaD2H(void *quda_field, void *openQCD_field)
   int my_rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
-  // sets up the necessary parameters
+  /* sets up the necessary parameters */
   QudaInvertParam param = newOpenQCDParam();
 
-  // creates a field on the CPU
+  /* creates a field on the CPU */
   ColorSpinorParam cpuParam(openQCD_field, param, get_local_dims(), false, QUDA_CPU_FIELD_LOCATION);
   ColorSpinorField out_h(cpuParam);
 
-  // transfer the GPU field to CPU
+  /* transfer the GPU field to CPU */
   out_h = *reinterpret_cast<ColorSpinorField*>(quda_field);
 }
 
@@ -854,13 +852,11 @@ void openQCD_qudaDw(void *src, void *dst, openQCD_QudaDiracParam_t p)
 {
   QudaInvertParam param = newOpenQCDDiracParam(p);
 
-  // both fields reside on the CPU
+  /* both fields reside on the CPU */
   param.input_location = QUDA_CPU_FIELD_LOCATION;
   param.output_location = QUDA_CPU_FIELD_LOCATION;
 
   MatQuda(static_cast<char *>(dst), static_cast<char *>(src), &param);
-  /* AA: QUDA applies - Dw */
-  /* blas::ax(-1.0, dst); */
 }
 
 
@@ -869,7 +865,7 @@ double openQCD_qudaGCR(void *source, void *solution,
 {
   QudaInvertParam param = newOpenQCDSolverParam(dirac_param);
 
-  // both fields reside on the CPU
+  /* both fields reside on the CPU */
   param.input_location = QUDA_CPU_FIELD_LOCATION;
   param.output_location = QUDA_CPU_FIELD_LOCATION;
 
@@ -898,13 +894,13 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
 
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
-  // Allocate on the heap
+  /* Allocate on the heap */
   QudaInvertParam* param = new QudaInvertParam(newQudaInvertParam());
   QudaInvertParam* invert_param_mg = new QudaInvertParam(newQudaInvertParam());
   QudaMultigridParam* multigrid_param = new QudaMultigridParam(newQudaMultigridParam());
 
-  // Some default settings
-  // Some of them should not be changed
+  /* Some default settings */
+  /* Some of them should not be changed */
   param->verbosity = QUDA_SUMMARIZE;
   param->cpu_prec = QUDA_DOUBLE_PRECISION;
   param->cuda_prec = QUDA_DOUBLE_PRECISION;
@@ -920,22 +916,22 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
   param->solve_type = QUDA_DIRECT_SOLVE;
   param->matpc_type = QUDA_MATPC_EVEN_EVEN;
   param->solver_normalization = QUDA_DEFAULT_NORMALIZATION;
-  param->inv_type_precondition = QUDA_INVALID_INVERTER; // disables any preconditioning  
+  param->inv_type_precondition = QUDA_INVALID_INVERTER; /* disables any preconditioning   */
   param->mass_normalization = QUDA_MASS_NORMALIZATION;
 
   if (qudaState.layout.dirac_parms.su3csw != 0.0) {
-    param->clover_location = QUDA_CUDA_FIELD_LOCATION; // seems to have no effect?
+    param->clover_location = QUDA_CUDA_FIELD_LOCATION; /* seems to have no effect? */
     param->clover_cpu_prec = QUDA_DOUBLE_PRECISION;
     param->clover_cuda_prec = QUDA_DOUBLE_PRECISION;
 
     param->clover_csw = qudaState.layout.dirac_parms.su3csw;
     param->clover_coeff = 0.0;
 
-    // Set to Wilson Dirac operator with Clover term
+    /* Set to Wilson Dirac operator with Clover term */
     param->dslash_type = QUDA_CLOVER_WILSON_DSLASH;
 
     if (qudaState.layout.flds_parms.gauge == OPENQCD_GAUGE_SU3) {
-      param->clover_order = QUDA_FLOAT8_CLOVER_ORDER; // what implication has this?
+      param->clover_order = QUDA_FLOAT8_CLOVER_ORDER; /* what implication has this? */
       param->compute_clover = true;
     } else {
       param->clover_order = QUDA_OPENQCD_CLOVER_ORDER;
@@ -959,7 +955,7 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
       errorQuda("Solver section %s is not a quda-solver section\n", section);
     }
 
-    // both fields reside on the CPU
+    /* both fields reside on the CPU */
     param->input_location = kv.get<QudaFieldLocation>(section, "input_location", QUDA_CPU_FIELD_LOCATION);
     param->output_location = kv.get<QudaFieldLocation>(section, "output_location", QUDA_CPU_FIELD_LOCATION);
 
@@ -1084,10 +1080,10 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
 
       std::string mg_section = std::string(section) + " Multigrid";
 
-      // (shallow) copy the struct
+      /* (shallow) copy the struct */
       *invert_param_mg = *param;
 
-      // these have to be fixed
+      /* these have to be fixed */
       invert_param_mg->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
       invert_param_mg->dirac_order = QUDA_DIRAC_ORDER;
 
@@ -1176,7 +1172,7 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
     }
   }
 
-  // transfer of the struct to all the processes
+  /* transfer of the struct to all the processes */
   MPI_Bcast((void*) param,           sizeof(*param),           MPI_BYTE, 0, MPI_COMM_WORLD);
   MPI_Bcast((void*) invert_param_mg, sizeof(*invert_param_mg), MPI_BYTE, 0, MPI_COMM_WORLD);
   MPI_Bcast((void*) multigrid_param, sizeof(*multigrid_param), MPI_BYTE, 0, MPI_COMM_WORLD);
@@ -1211,12 +1207,12 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
       openQCD_qudaCloverLoad(h_sw, param->kappa, param->clover_csw);
       POP_RANGE;
 
-      //loadCloverQuda(qudaState.layout.h_sw(), NULL, param);
-      // The above line would be prefered over openQCD_qudaCloverLoad, but throws this error, no idea why?
-      //QUDA: ERROR: qudaEventRecord_ returned CUDA_ERROR_ILLEGAL_ADDRESS
-      // (timer.h:82 in start())
-      // (rank 0, host yoshi, quda_api.cpp:72 in void quda::target::cuda::set_driver_error(CUresult, const char*, const char*, const char*, const char*, bool)())
-      //QUDA:        last kernel called was (name=N4quda10CopyCloverINS_6clover11FloatNOrderIdLi72ELi2ELb0ELb1ELb0EEENS1_12OpenQCDOrderIdLi72EEEddEE,volume=32x16x16x64,aux=GPU-offline,vol=524288precision=8Nc=3,compute_diagonal)
+      /*loadCloverQuda(qudaState.layout.h_sw(), NULL, param);*/
+      /* The above line would be prefered over openQCD_qudaCloverLoad, but throws this error, no idea why?
+      QUDA: ERROR: qudaEventRecord_ returned CUDA_ERROR_ILLEGAL_ADDRESS
+       (timer.h:82 in start())
+       (rank 0, host yoshi, quda_api.cpp:72 in void quda::target::cuda::set_driver_error(CUresult, const char*, const char*, const char*, const char*, bool)())
+      QUDA:        last kernel called was (name=N4quda10CopyCloverINS_6clover11FloatNOrderIdLi72ELi2ELb0ELb1ELb0EEENS1_12OpenQCDOrderIdLi72EEEddEE,volume=32x16x16x64,aux=GPU-offline,vol=524288precision=8Nc=3,compute_diagonal)*/
     }
   }
 
@@ -1285,7 +1281,7 @@ void* openQCD_qudaEigensolverSetup(char *infile, char *section, char *inv_sectio
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
   QudaVerbosity verbosity = QUDA_SUMMARIZE;
 
-  // Allocate on the heap
+  /* Allocate on the heap */
   QudaEigParam* param = new QudaEigParam(newQudaEigParam());
 
   if (my_rank == 0) {
@@ -1307,7 +1303,7 @@ void* openQCD_qudaEigensolverSetup(char *infile, char *section, char *inv_sectio
     param->a_min = kv.get<double>(section, "a_min", param->a_min);
     param->a_max = kv.get<double>(section, "a_max", param->a_max);
     param->preserve_deflation = kv.get<QudaBoolean>(section, "preserve_deflation", param->preserve_deflation);
-    //param->*preserve_deflation_space = kv.get<void>(section, *"*preserve_deflation_space", param->preserve_deflation_space);
+    /*param->*preserve_deflation_space = kv.get<void>(section, *"*preserve_deflation_space", param->preserve_deflation_space);*/
     param->preserve_evals = kv.get<QudaBoolean>(section, "preserve_evals", param->preserve_evals);
     param->use_dagger = kv.get<QudaBoolean>(section, "use_dagger", param->use_dagger);
     param->use_norm_op = kv.get<QudaBoolean>(section, "use_norm_op", param->use_norm_op);
@@ -1338,14 +1334,14 @@ void* openQCD_qudaEigensolverSetup(char *infile, char *section, char *inv_sectio
     param->mem_type_ritz = kv.get<QudaMemoryType>(section, "mem_type_ritz", param->mem_type_ritz);
     param->location = kv.get<QudaFieldLocation>(section, "location", param->location);
     param->run_verify = kv.get<QudaBoolean>(section, "run_verify", param->run_verify);
-    //strcpy(param->vec_infile, kv.get<std::string>(section, "vec_infile", param->vec_infile).c_str());
-    //strcpy(param->vec_outfile, kv.get<std::string>(section, "vec_outfile", param->vec_outfile).c_str());
+    /*strcpy(param->vec_infile, kv.get<std::string>(section, "vec_infile", param->vec_infile).c_str());*/
+    /*strcpy(param->vec_outfile, kv.get<std::string>(section, "vec_outfile", param->vec_outfile).c_str());*/
     param->save_prec = kv.get<QudaPrecision>(section, "save_prec", param->save_prec);
     param->io_parity_inflate = kv.get<QudaBoolean>(section, "io_parity_inflate", param->io_parity_inflate);
     param->extlib_type = kv.get<QudaExtLibType>(section, "extlib_type", param->extlib_type);
   }
 
-  // transfer of the struct to all the processes
+  /* transfer of the struct to all the processes */
   MPI_Bcast((void*) param, sizeof(*param), MPI_BYTE, 0, MPI_COMM_WORLD);
 
   void *inv_param = openQCD_qudaSolverSetup(infile, inv_section);
@@ -1390,7 +1386,6 @@ double openQCD_qudaMultigrid(void *source, void *solution, openQCD_QudaDiracPara
   QudaInvertParam invert_param_mg = newOpenQCDSolverParam(dirac_param);
   QudaMultigridParam multigrid_param = newQudaMultigridParam();
 
-  //param.verbosity = QUDA_VERBOSE;
   invert_param.reliable_delta = 1e-5;
   invert_param.gcrNkrylov = 20;
   invert_param.maxiter = 2000;
@@ -1401,8 +1396,8 @@ double openQCD_qudaMultigrid(void *source, void *solution, openQCD_QudaDiracPara
   invert_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   invert_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
   invert_param.inv_type_precondition = QUDA_MG_INVERTER;
-  invert_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION; // The precision used by the QUDA solver
-  invert_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // The precision used by the QUDA solver
+  invert_param.cuda_prec_sloppy = QUDA_SINGLE_PRECISION; /* The precision used by the QUDA solver */
+  invert_param.cuda_prec_precondition = QUDA_HALF_PRECISION; /* The precision used by the QUDA solver */
 
   invert_param_mg.reliable_delta = 1e-5;
   invert_param_mg.gcrNkrylov = 20;
@@ -1417,17 +1412,21 @@ double openQCD_qudaMultigrid(void *source, void *solution, openQCD_QudaDiracPara
   invert_param_mg.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   invert_param_mg.dirac_order = QUDA_DIRAC_ORDER;
 
-  // set the params, hard code the solver
-  // parameters copied from recommended settings from Wiki
+  /**
+   * set the params, hard code the solver
+   * parameters copied from recommended settings from Wiki
+   */
   multigrid_param.n_level = 2;
   multigrid_param.generate_all_levels = QUDA_BOOLEAN_TRUE;
   multigrid_param.run_verify = QUDA_BOOLEAN_FALSE;
   multigrid_param.invert_param = &invert_param_mg;
   multigrid_param.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
 
-  // try setting minimal parameters - leave rest to default
-  // level 0 fine
-  multigrid_param.geo_block_size[0][0] = 4; // xytz
+  /**
+   * try setting minimal parameters - leave rest to default
+   * level 0 fine
+   */
+  multigrid_param.geo_block_size[0][0] = 4; /* xytz */
   multigrid_param.geo_block_size[0][1] = 4;
   multigrid_param.geo_block_size[0][2] = 4;
   multigrid_param.geo_block_size[0][3] = 4;
@@ -1447,9 +1446,11 @@ double openQCD_qudaMultigrid(void *source, void *solution, openQCD_QudaDiracPara
   multigrid_param.coarse_solver_maxiter[0] = 50;
   multigrid_param.coarse_grid_solution_type[0] = QUDA_MAT_SOLUTION;
 
-  // level 1 coarse
-  // no smoother required for innermost
-  // so no blocks
+  /**
+   * level 1 coarse
+   * no smoother required for innermost
+   * so no blocks
+   */
   multigrid_param.precision_null[1] = QUDA_HALF_PRECISION;
   multigrid_param.coarse_solver[1] = QUDA_CA_GCR_INVERTER;
   multigrid_param.smoother[1] = QUDA_CA_GCR_INVERTER;
