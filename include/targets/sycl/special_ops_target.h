@@ -96,34 +96,30 @@ namespace quda {
   }
   template <typename ...T> inline void blockSync(SpecialOps<T...> ops) { blockSync(&ops); }
 
-  template <typename ...T> static constexpr bool isOpConcurrent = false;
-  template <typename ...T> static constexpr bool isOpConcurrent<op_Concurrent<T...>> = true;
+  //template <typename ...T> static constexpr bool isOpConcurrent = false;
+  //template <typename ...T> static constexpr bool isOpConcurrent<op_Concurrent<T...>> = true;
 
-  template <typename T, typename ...U> static constexpr int getOpIndex = 0;
-  template <typename T, typename ...U> static constexpr int getOpIndex<T,op_Concurrent<U...>> = getOpIndex<T,U...>;
-  template <typename T, typename U, typename ...V> static constexpr int getOpIndex<T, U, V...> =
-    std::is_same_v<T,U> ? 0 : (1 + getOpIndex<T,V...>);
+  //template <typename T, typename ...U> static constexpr int getOpIndex = 0;
+  //template <typename T, typename ...U> static constexpr int getOpIndex<T,op_Concurrent<U...>> = getOpIndex<T,U...>;
+  //template <typename T, typename U, typename ...V> static constexpr int getOpIndex<T, U, V...> =
+  //  std::is_same_v<T,U> ? 0 : (1 + getOpIndex<T,V...>);
 
-#if 1
+#if 0
   // getSpecialOp
-  template <typename U, int n = 0, typename ...T>
-  //inline SpecialOpsType<U,n> getSpecialOp(const SpecialOps<T...> &ops) {
+  template <typename U, typename ...T>
   inline U getSpecialOp(const SpecialOps<T...> &ops) {
-    if constexpr (!isOpConcurrent<U> && sizeof...(T) == 1 && isOpConcurrent<T...>) {
-      static constexpr int i = getOpIndex<U, T...>;
-      return getSpecialOp<T...,i>(ops);
-    } else {
-      static_assert(hasSpecialOpType<U,T...>);
-      //if (ops->ndi == nullptr || ops->smem == nullptr) {
-      //	errorQuda("SpecialOps not set");
-      //}
-      //SpecialOpsType<U,n> s;
-      U s;
-      //s.ndi = ops.ndi;
-      //s.smem = ops->smem + sharedMemOffset<U,n>()(ops->ndi->get_local_range());  // FIXME: need to pass arg
-      s.smem = ops.smem + sharedMemOffset<U,n>()(getBlockDim());  // FIXME: need to pass arg
-      return s;
-    }
+    //static_assert(hasSpecialOpType<U,T...>);
+    checkSpecialOp<U,T...>();
+    //if (ops->ndi == nullptr || ops->smem == nullptr) {
+    //	errorQuda("SpecialOps not set");
+    //}
+    //SpecialOpsType<U,n> s;
+    SpecialOps<U> s;
+    //s.ndi = ops.ndi;
+    //s.smem = ops->smem + sharedMemOffset<U,n>()(ops->ndi->get_local_range());  // FIXME: need to pass arg
+    //s.smem = ops.smem + sharedMemOffset<U,n>()(getBlockDim());  // FIXME: need to pass arg
+    s.smem = ops.smem;
+    return s;
   }
   template <typename U, typename ...T>
     inline U getSpecialOp(const SpecialOps<T...> *ops) { return getSpecialOp<U>(*ops); }
@@ -262,15 +258,17 @@ namespace quda {
   };
 
   // op implementations
-  struct op_blockSync : op_BaseT<void> {
-    using dependencies = depFullBlock;
+  //struct op_blockSync : op_BaseT<void> {
+  struct op_blockSync {
+    //using dependencies = depFullBlock;
     template <typename ...Arg>
     static constexpr unsigned int shared_mem_size(dim3 block, Arg &...arg) { return 0; }
   };
 
   template <typename T>
-  struct op_warp_combine : op_BaseT<T> {
-    using dependencies = depNone;
+  //struct op_warp_combine : op_BaseT<T> {
+  struct op_warp_combine {
+    //using dependencies = depNone;
     //using dependencies = depFullBlock;
     template <typename ...Arg>
     static constexpr unsigned int shared_mem_size(dim3 block, Arg &...arg) { return 0; }

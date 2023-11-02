@@ -121,6 +121,14 @@ namespace quda
     if (type != DEVICE && type != DEVICE_PINNED) { total_host_bytes -= size; }
     if (type == PINNED || type == MAPPED) { total_pinned_bytes -= size; }
     alloc[type].erase(ptr);
+#ifdef HOST_DEBUG
+    if (type == HOST || type == PINNED || type == MAPPED) {
+      memset(ptr, 0xff, size);
+    } else {
+      auto q = device::defaultQueue();
+      q.memset(ptr, 0xff, size);
+    }
+#endif
   }
 
 #if 0
@@ -388,9 +396,9 @@ namespace quda
     if (!alloc[DEVICE].count(ptr)) {
       errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
     }
+    track_free(DEVICE, ptr);
     auto q = device::defaultQueue();
     sycl::free(ptr, q);
-    track_free(DEVICE, ptr);
 #else
     device_pinned_free_(func, file, line, ptr);
 #endif
@@ -412,9 +420,9 @@ namespace quda
     if (!alloc[DEVICE_PINNED].count(ptr)) {
       errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
     }
+    track_free(DEVICE_PINNED, ptr);
     auto q = device::defaultQueue();
     sycl::free(ptr, q);
-    track_free(DEVICE_PINNED, ptr);
   }
 
   /**
@@ -428,9 +436,9 @@ namespace quda
     if (!alloc[MANAGED].count(ptr)) {
       errorQuda("Attempt to free invalid managed pointer (%s:%d in %s())\n", file, line, func);
     }
+    track_free(MANAGED, ptr);
     auto q = device::defaultQueue();
     sycl::free(ptr, q);
-    track_free(MANAGED, ptr);
   }
 
   /**
@@ -445,13 +453,13 @@ namespace quda
       track_free(HOST, ptr);
       free(ptr);
     } else if (alloc[PINNED].count(ptr)) {
-      auto q = device::defaultQueue();
-      sycl::free(ptr, q);
       track_free(PINNED, ptr);
-    } else if (alloc[MAPPED].count(ptr)) {
       auto q = device::defaultQueue();
       sycl::free(ptr, q);
+    } else if (alloc[MAPPED].count(ptr)) {
       track_free(MAPPED, ptr);
+      auto q = device::defaultQueue();
+      sycl::free(ptr, q);
     } else {
       printfQuda("ERROR: Attempt to free invalid host pointer (%s:%d in %s())\n", file, line, func);
       print_trace();
@@ -473,8 +481,8 @@ namespace quda
       printfQuda("ERROR: Attempt to free invalid shmem pointer (%s:%d in %s())\n", file, line, func);
       errorQuda("Aborting");
     }
-    nvshmem_free(ptr);
     track_free(SHMEM, ptr);
+    nvshmem_free(ptr);
   }
 #endif
 

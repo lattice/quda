@@ -93,8 +93,8 @@ namespace quda
   */
   template <typename T, int block_dim, int batch_size>
   struct block_reduceG {
-    using dependencies = op_Sequential<op_blockSync>;
-    using dependentOps = SpecialOps<op_blockSync>;
+    //using dependencies = op_Sequential<op_blockSync>;
+    //using dependentOps = SpecialOps<op_blockSync>;
     using BlockReduce_t = BlockReduce<T, block_dim, batch_size>;
     template <typename S> inline block_reduceG(S &ops) {};
     /**
@@ -131,28 +131,11 @@ namespace quda
   /**
      @brief SYCL specialization of block_reduce, building on the warp_reduce
   */
-#define DYNAMIC_SLM
   template <typename T, int block_dim, int batch_size>
-  //struct block_reduceW {
   struct block_reduceW : SharedMemory<T,SizeBlockDivWarp> {
     using Smem = SharedMemory<T,SizeBlockDivWarp>;
-    //using Smem::shared_mem_size;
-#ifdef DYNAMIC_SLM
-    //using opSmem = op_SharedMemory<T,opSizeBlockDivWarp>;
-    //using opSmem = SharedMemory<T,opSizeBlockDivWarp>;
-    //using dependencies = op_Sequential<op_blockSync,opSmem>;
-    //using dependentOps = SpecialOps<op_blockSync,opSmem>;
-    //template <typename ...Arg>
-    //static constexpr size_t shared_mem_size(dim3 block, Arg &...arg) {
-    //return opSizeBlockDivWarp::size<T>(block, arg...);
-    //}
-#else
-#endif
     using BlockReduce_t = BlockReduce<T, block_dim, batch_size>;
-    //dependentOps ops;
-    template <typename S>
-    //inline block_reduceW(S &ops) : ops(getDependentOps<BlockReduce_t>(ops)) {};
-    inline block_reduceW(S &ops) : Smem(ops) {};
+    template <typename S> inline block_reduceW(S &ops) : Smem(ops) {};
 
     template <int width_> struct warp_reduce_param {
       static constexpr int width = width_;
@@ -187,15 +170,7 @@ namespace quda
       // now do reduction between warps
       if (!async) __syncthreads(); // only synchronize if we are not pipelining
 
-      //__shared__ T storage[max_items];
-#ifdef DYNAMIC_SLM
-      //auto storage = getSharedMemPtr<opSmem>(ops);
       auto storage = Smem::sharedMem();
-#else
-      static_assert(sizeof(T[max_items])<=device::shared_memory_size(), "Block reduce shared mem size too large");
-      auto mem = sycl::ext::oneapi::group_local_memory_for_overwrite<T[max_items]>(getGroup());
-      auto storage = &((*mem)[0]);
-#endif
 
       // if first thread in warp, write result to shared memory
       if (thread_idx % device::warp_size() == 0) storage[batch * warp_items + warp_idx] = value;

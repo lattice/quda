@@ -4,21 +4,6 @@
 
 namespace quda {
 
-#if 0
-  /**
-   * @brief Round
-   * @param a the argument
-   *
-   * Round to nearest integer
-   *
-   */
-  template<typename T>
-  inline T round(T a)
-  {
-    return sycl::round(a);
-  }
-#endif
-
   /**
    * @brief Maximum of two numbers
    * @param a first number
@@ -45,9 +30,9 @@ namespace quda {
   template<typename T>
   inline void sincos(const T a, T* s, T* c)
   {
-    //*s = sycl::sincos(a, c);
-    *s = sycl::sin(a);
-    *c = sycl::cos(a);
+    *s = sycl::sincos(a, c);
+    //*s = sycl::sin(a);
+    //*c = sycl::cos(a);
   }
 
   /**
@@ -73,8 +58,9 @@ namespace quda {
   template<typename T>
   inline void sincospi(const T& a, T *s, T *c)
   {
-    *s = sycl::sinpi(a);
-    *c = sycl::cospi(a);
+    *s = sycl::sincos(static_cast<T>(M_PI)*a, c);
+    //*s = sycl::sinpi(a);
+    //*c = sycl::cospi(a);
   }
 
   /**
@@ -98,30 +84,13 @@ namespace quda {
   */
   template <typename real> __device__ __host__ inline real fpow(real a, int b)
   {
-    return sycl::pow(a, (real)b);
+    return sycl::pown(a, b);
   }
 
   /**
      @brief Optimized division routine on the device
   */
-  inline float fdividef(float a, float b) { return a/b; }
+  //inline float fdividef(float a, float b) { return a/b; }
+  inline float fdividef(float a, float b) { return sycl::native::divide(a,b); }
 
 }
-
-
-#if 0
-template <typename real> inline real fdivide(real a, real b)
-{
-  return a / b;
-}
-
-inline float fdividef(float a, float b)
-{
-  return a / b;
-}
-
-inline float fmaxf(float a, float b)
-{
-  return sycl::max(a,b);
-}
-#endif

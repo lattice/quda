@@ -201,11 +201,11 @@ namespace quda {
     template <typename... T>
     MultiReductionS(const Arg &arg, const sycl::nd_item<3> &ndi, T... smem)
     {
-#ifdef QUDA_THREADS_BLOCKED
-      MultiReductionImpl<Functor,Arg,grid_stride>(arg, ndi);
-#else
+      //#ifdef QUDA_THREADS_BLOCKED
+      //MultiReductionImpl<Functor,Arg,grid_stride>(arg, ndi);
+      //#else
       MultiReductionImpl<Functor,Arg,grid_stride>(arg, ndi, smem...);
-#endif
+      //#endif
     }
   };
 

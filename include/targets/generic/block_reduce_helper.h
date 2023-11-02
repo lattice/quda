@@ -55,19 +55,6 @@ namespace quda
   };
 
   /**
-     @brief Dummy generic implementation of block_reduce
-  */
-  //template <bool is_device> struct block_reduce {
-  //template <typename T, typename reducer_t, typename param_t, typename... BR>
-  //T operator()(const T &value, bool, int, bool, reducer_t, param_t, BR&...)
-  //{
-  //return value;
-  //}
-  //};
-  //template <typename T, typename P, typename O>
-  //struct block_reduce {
-
-  /**
      @brief WarpReduce provides a generic interface for performing
      perform reductions at the warp or sub-warp level
      @tparam T The type of the value that we are reducing
@@ -142,6 +129,21 @@ namespace quda
   };
 
   /**
+     @brief Dummy generic implementation of block_reduce
+  */
+  //template <bool is_device> struct block_reduce {
+  //template <typename T, typename reducer_t, typename param_t, typename... BR>
+  //T operator()(const T &value, bool, int, bool, reducer_t, param_t, BR&...)
+  //{
+  //return value;
+  //}
+  //};
+  //template <typename T, typename P, typename O>
+  //struct block_reduce {
+  //template <typename T, int block_dim, int batch_size, bool = true>
+  //struct block_reduce {}
+
+  /**
      @brief BlockReduce provides a generic interface for performing
      reductions at the block level
      @tparam T The type of the value that we are reducing
@@ -149,19 +151,18 @@ namespace quda
      @tparam batch_size Batch size of the reduction.  Threads will be
      ordered such that batch size is the slowest running index.
   */
-  template <typename T, int block_dim, int batch_size = 1> class BlockReduce :
-    public block_reduce<T, block_dim, batch_size>
+  template <typename T, int block_dim, int batch_size = 1>
+  class BlockReduce : public block_reduce<T, block_dim, batch_size>
   {
+    static_assert(batch_size == 1 || block_dim <= 2, "Batching not possible with 3-d block reduction");
     using BlockReduce_t = BlockReduce<T, block_dim, batch_size>;
     using block_reduce_t = block_reduce<T, block_dim, batch_size>;
     const int batch;
 
   public:
-    //using block_reduce_t::shared_mem_size;
-
     template <typename ...U>
     HOSTDEVICE constexpr BlockReduce(SpecialOps<U...> &ops, int batch = 0) : block_reduce_t(ops), batch(batch) {
-      static_assert(hasSpecialOpType<BlockReduce_t, SpecialOps<U...>>);
+      checkSpecialOp<BlockReduce_t, U...>();
     }
 
     constexpr BlockReduce(const BlockReduce<T,block_dim,batch_size> &) = delete;
