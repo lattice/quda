@@ -291,6 +291,7 @@ namespace quda
 	argBufD[i] = nullptr;
 	argBufSizeD[i] = 0;
       }
+#if 0
       printfQuda("Testing submit...");
       auto q = streams[Nstream-1];
       q.submit([&](sycl::handler& h) {
@@ -300,6 +301,7 @@ namespace quda
 				   });
       });
       printfQuda(" done\n");
+#endif
     }
 
     void destroy()

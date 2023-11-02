@@ -395,11 +395,12 @@ namespace quda
     auto q = device::get_target_stream(stream);
     pe->stream = stream;
     pe->eventIdx = device::getEventIdx(stream);
-    pe->event = q.submit([&](sycl::handler& cgh) {
-      cgh.single_task<class EventRecord>([=](){});
-      //cgh.host_task([=](){});
-    });
+    //pe->event = q.submit([&](sycl::handler& cgh) {
+    //cgh.single_task<class EventRecord>([=](){});
+    //cgh.host_task([=](){});
+    //});
     //*pe = q.submit_barrier();
+    pe->event = q.ext_oneapi_submit_barrier();
   }
 
   //void qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t quda_event, unsigned int flags,

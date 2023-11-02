@@ -12,13 +12,13 @@ namespace quda {
   };
 
   // op implementations
-  struct op_blockSync : op_BaseT<void> {
+  struct op_blockSync {
     template <typename ...Arg>
     static constexpr unsigned int shared_mem_size(dim3, Arg &...) { return 0; }
   };
 
   template <typename T>
-  struct op_warp_combine : op_BaseT<T> {
+  struct op_warp_combine {
     template <typename ...Arg>
     static constexpr unsigned int shared_mem_size(dim3, Arg &...) { return 0; }
   };
