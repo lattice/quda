@@ -148,24 +148,28 @@ endif()
 
 if(DEFINED ENV{SYCL_FLAGS})
   set(SYCL_FLAGS $ENV{SYCL_FLAGS})
+  string(APPEND CMAKE_SYCL_FLAGS " ${SYCL_FLAGS}")
 endif()
 
 if(DEFINED ENV{SYCL_LINK_FLAGS})
-  separate_arguments(SYCL_LINK_FLAGS NATIVE_COMMAND $ENV{SYCL_LINK_FLAGS})
+  #separate_arguments(SYCL_LINK_FLAGS NATIVE_COMMAND $ENV{SYCL_LINK_FLAGS})
+  set(SYCL_LINK_FLAGS $ENV{SYCL_LINK_FLAGS})
+  #string(APPEND CMAKE_EXE_LINKER_FLAGS " ${SYCL_LINK_FLAGS}")
+  target_link_options(quda PUBLIC "SHELL:${SYCL_LINK_FLAGS}")
 endif()
 
 target_include_directories(quda PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/sycl)
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/targets/sycl>
                                        $<INSTALL_INTERFACE:include/targets/sycl>)
 
-#set(CMAKE_SYCL_FLAGS "-x c++ ${CMAKE_SYCL_FLAGS}")
 string(APPEND CMAKE_SYCL_FLAGS " -x c++")
 #set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES LANGUAGE CXX)
 set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES LANGUAGE SYCL)
-if(SYCL_FLAGS)
-  set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES COMPILE_FLAGS ${SYCL_FLAGS})
-endif()
-target_link_options(quda PUBLIC ${SYCL_LINK_FLAGS})
+#if(SYCL_FLAGS)
+#  set_source_files_properties(${QUDA_CU_OBJS} PROPERTIES COMPILE_FLAGS ${SYCL_FLAGS})
+#endif()
+#target_link_options(quda PUBLIC ${SYCL_LINK_FLAGS})
+#set_property(TARGET quda APPEND_STRING PROPERTY LINK_FLAGS " ${SYCL_LINK_FLAGS}")
 
 set(SYCL_MKL_LIBRARY "-lmkl_sycl -lmkl_intel_ilp64 -lmkl_core -lmkl_tbb_thread")
 
