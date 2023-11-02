@@ -102,7 +102,7 @@ void TMCloverForce_reference(void *h_mom, void **h_x, double *coeff, int nvector
 
   int parity = 0;
   QudaMatPCType myMatPCType = inv_param->matpc_type;
-  QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+
   if (myMatPCType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || myMatPCType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
 
     if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
