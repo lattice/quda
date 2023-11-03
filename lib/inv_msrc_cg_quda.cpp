@@ -146,7 +146,6 @@ namespace quda {
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    blas::flops = 0;
 
     int k=0;
 
@@ -315,10 +314,6 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
-    reduceDouble(gflops);
-    param.gflops = gflops;
     param.iter += k;
 
     if (k==param.maxiter)
@@ -333,11 +328,6 @@ namespace quda {
     param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
 
     PrintSummary("CG", k, r2, b2, stop, inv.tol_hq);
-
-    // reset the flops counters
-    blas::flops = 0;
-    mat.flops();
-    matSloppy.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     profile.TPSTART(QUDA_PROFILE_FREE);

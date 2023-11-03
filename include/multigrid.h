@@ -157,6 +157,9 @@ namespace quda {
     /** Filename for where to load/store the null space */
     char filename[100];
 
+    /** Whether to save in partfile format (true) or singlefile (false) */
+    bool mg_vec_partfile;
+
     /** Whether or not this is a staggered solve or not */
     QudaTransferType transfer_type;
 
@@ -193,6 +196,7 @@ namespace quda {
       smoother_solve_type(param.smoother_solve_type[level]),
       location(param.location[level]),
       setup_location(param.setup_location[level]),
+      mg_vec_partfile(param.mg_vec_partfile[level]),
       transfer_type(param.transfer_type[level]),
       setup_use_mma(param.setup_use_mma[level] == QUDA_BOOLEAN_TRUE),
       dslash_use_mma(param.dslash_use_mma[level] == QUDA_BOOLEAN_TRUE)
@@ -230,6 +234,7 @@ namespace quda {
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
       location(param.mg_global.location[level]),
       setup_location(param.mg_global.setup_location[level]),
+      mg_vec_partfile(param.mg_global.mg_vec_partfile[level]),
       transfer_type(param.mg_global.transfer_type[level]),
       setup_use_mma(param.mg_global.setup_use_mma[level] == QUDA_BOOLEAN_TRUE),
       dslash_use_mma(param.mg_global.dslash_use_mma[level] == QUDA_BOOLEAN_TRUE)
@@ -375,7 +380,12 @@ namespace quda {
     /**
        @return MG can solve non-Hermitian systems
      */
-    bool hermitian() { return false; };
+    bool hermitian() const final { return false; };
+
+    /**
+       @return Is an MG inverter
+      */
+    virtual QudaInverterType getInverterType() const final { return QUDA_MG_INVERTER; }
 
     /**
        @brief This method resets the solver, e.g., when a parameter has changed such as the mass.
@@ -387,9 +397,9 @@ namespace quda {
        @brief This method only resets the KD operators with the updated fine links and rebuilds
               the KD inverse
      */
-    void resetStaggeredKD(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                          cudaGaugeField *gauge_sloppy_in, cudaGaugeField *fat_gauge_sloppy_in,
-                          cudaGaugeField *long_gauge_sloppy_in, double mass);
+    void resetStaggeredKD(GaugeField *gauge_in, GaugeField *fat_gauge_in, GaugeField *long_gauge_in,
+                          GaugeField *gauge_sloppy_in, GaugeField *fat_gauge_sloppy_in,
+                          GaugeField *long_gauge_sloppy_in, double mass);
 
     /**
        @brief Dump the null-space vectors to disk.  Will recurse dumping all levels.
@@ -475,11 +485,6 @@ namespace quda {
        @param B Free-field null-space vectors
     */
     void buildFreeVectors(std::vector<ColorSpinorField*> &B);
-
-    /**
-       @brief Return the total flops done on this and all coarser levels.
-     */
-    double flops() const;
 
     /**
       @brief Return if we're on a fine grid right now
@@ -624,13 +629,13 @@ namespace quda {
      operator we are constructing the coarse grid operator from.
      For staggered, should always be QUDA_MATPC_INVALID.
    */
-  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
-                         const cudaGaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
+  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
+                         const GaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
                          QudaDiracType dirac, QudaMatPCType matpc);
 
   template <int fineColor, int coarseColor>
-  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
-                         const cudaGaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
+  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
+                         const GaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
                          QudaDiracType dirac, QudaMatPCType matpc);
 
   /**

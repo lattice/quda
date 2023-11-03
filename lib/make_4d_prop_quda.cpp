@@ -25,8 +25,8 @@ namespace quda
     auto col = in.Ncolor();
     auto data_size = 2 * in.Precision();
 
-    void *VLs2m1 = (char *)(in.V()) + (Ls / 2 - 1) * vol4D * spin * col * data_size;
-    void *VLs2 = (char *)(in.V()) + (Ls / 2) * vol4D * spin * col * data_size;
+    void *VLs2m1 = in.data<char*>() + (Ls / 2 - 1) * vol4D * spin * col * data_size;
+    void *VLs2 = in.data<char*>() + (Ls / 2) * vol4D * spin * col * data_size;
 
     // Create wrappers around the (Ls/2)-1 and Ls/2 4D fields
     std::vector<ColorSpinorField *> Ls2m1;
@@ -40,7 +40,7 @@ namespace quda
     Ls2.push_back(ColorSpinorField::Create(param4D));
 
     // Ensure out is zeroed
-    qudaMemsetAsync(out.V(), 0, vol4D * spin * col * data_size, device::get_default_stream());
+    qudaMemsetAsync(out.data(), 0, vol4D * spin * col * data_size, device::get_default_stream());
 
     // out(x) = P_L L0(x) + P_R Lsm1(x)
     ApplyChiralProj(out, *Ls2m1[0], 1);
@@ -61,8 +61,8 @@ namespace quda
     int col = in.Ncolor();
     int data_size = 2 * in.Precision();
 
-    void *V0 = static_cast<char *>(in.V());
-    void *VLsm1 = static_cast<char *>(in.V()) + (Ls - 1) * vol4D * spin * col * data_size;
+    void *V0 = in.data<char*>();
+    void *VLsm1 = in.data<char*>() + (Ls - 1) * vol4D * spin * col * data_size;
 
     // Create wrappers around the 0 and Ls-1 4D fields
     std::vector<ColorSpinorField *> L0;
@@ -76,7 +76,7 @@ namespace quda
     Lsm1.push_back(ColorSpinorField::Create(param4D));
 
     // Ensure out is zeroed
-    qudaMemsetAsync(out.V(), 0, vol4D * spin * col * data_size, device::get_default_stream());
+    qudaMemsetAsync(out.data(), 0, vol4D * spin * col * data_size, device::get_default_stream());
 
     // out(x) = P_L L0(x) + P_R Lsm1(x)
     ApplyChiralProj(out, *L0[0], -1);

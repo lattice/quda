@@ -7,9 +7,9 @@
 using namespace quda;
 
 // need a better solution here but as long as they gauge field live in interface probably ok
-extern cudaGaugeField *gaugePrecise;
-extern cudaGaugeField *gaugeFatPrecise;
-extern cudaGaugeField *gaugeLongPrecise;
+extern GaugeField *gaugePrecise;
+extern GaugeField *gaugeFatPrecise;
+extern GaugeField *gaugeLongPrecise;
 
 void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, dslash_test_type test_type)
 {

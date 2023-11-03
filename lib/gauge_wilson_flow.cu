@@ -38,6 +38,7 @@ namespace quda {
       wflow_type(wflow_type),
       step_type(step_type)
     {
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       strcat(aux, comm_dim_partitioned_string());
       switch (wflow_type) {
       case QUDA_GAUGE_SMEAR_WILSON_FLOW: strcat(aux,",computeWFlowStepWilson"); break;
@@ -52,6 +53,7 @@ namespace quda {
       }
 
       apply(device::get_default_stream());
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     }
 
     template <QudaGaugeSmearType wflow_type, WFlowStepType step_type> using Arg =

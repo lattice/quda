@@ -221,6 +221,7 @@ public:
 #ifdef GPU_CONTRACT
   void contractQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result, const QudaContractType cType)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     checkPrecision(x, y);
     if(x.Nspin() != y.Nspin()) errorQuda("Contraction between unequal number of spins x=%d y=%d", x.Nspin(), y.Nspin());
     if(x.Ncolor() != y.Ncolor()) errorQuda("Contraction between unequal number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
@@ -236,6 +237,7 @@ public:
     }
 
     instantiate<Contraction>(x, y, result, cType);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 #else
   void contractQuda(const ColorSpinorField &, const ColorSpinorField &, void *, const QudaContractType)

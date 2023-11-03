@@ -199,6 +199,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
   P(ortho_block_size, 0);
+  P(partfile, QUDA_BOOLEAN_FALSE);
 #else
   P(use_eigen_qr, QUDA_BOOLEAN_INVALID);
   P(use_poly_acc, QUDA_BOOLEAN_INVALID);
@@ -228,6 +229,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
   P(ortho_block_size, INVALID_INT);
+  P(partfile, QUDA_BOOLEAN_INVALID);
 #endif
 
   // only need to enfore block size checking if doing a block eigen solve
@@ -932,6 +934,12 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(setup_location[i], QUDA_CUDA_FIELD_LOCATION);
 #else
     P(setup_location[i], QUDA_INVALID_FIELD_LOCATION);
+#endif
+
+#ifdef INIT_PARAM
+    P(mg_vec_partfile[i], QUDA_BOOLEAN_FALSE);
+#else
+    P(mg_vec_partfile[i], QUDA_BOOLEAN_INVALID);
 #endif
   }
 

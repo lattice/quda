@@ -502,7 +502,9 @@ namespace quda {
   void gaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double relax_boost,
                       const double tolerance, const int reunit_interval, const int stopWtheta)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeFixingOVR>(data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
 }   //namespace quda

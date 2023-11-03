@@ -360,7 +360,9 @@ const char *get_memory_type_str(QudaMemoryType type)
 
   switch (type) {
   case QUDA_MEMORY_DEVICE: s = "device"; break;
-  case QUDA_MEMORY_PINNED: s = "pinned"; break;
+  case QUDA_MEMORY_DEVICE_PINNED: s = "device_pinned"; break;
+  case QUDA_MEMORY_HOST: s = "host"; break;
+  case QUDA_MEMORY_HOST_PINNED: s = "host_pinned"; break;
   case QUDA_MEMORY_MAPPED: s = "mapped"; break;
   default: fprintf(stderr, "Error: invalid memory type\n"); exit(1);
   }

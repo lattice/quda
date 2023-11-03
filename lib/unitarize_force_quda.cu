@@ -56,6 +56,7 @@ namespace quda {
     void unitarizeForce(GaugeField &newForce, const GaugeField &oldForce, const GaugeField &u,
 			int* fails)
     {
+      getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
       checkReconstruct(u, oldForce, newForce);
       checkPrecision(u, oldForce, newForce);
 
@@ -63,6 +64,7 @@ namespace quda {
         errorQuda("Only native order supported");
 
       instantiate<ForceUnitarize, ReconstructNone>(newForce, oldForce, u, fails);
+      getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     }
 #else
     void unitarizeForce(GaugeField &, const GaugeField &, const GaugeField &, int*)

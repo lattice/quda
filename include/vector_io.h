@@ -15,6 +15,7 @@ namespace quda
   {
     const std::string filename;
     bool parity_inflate;
+    bool partfile;
 
   public:
     /**
@@ -22,8 +23,9 @@ namespace quda
        @param[in] filename The filename associated with this IO object
        @param[in] parity_inflate Whether to inflate single_parity
        field to dual parity fields for I/O
+       @param[in] partfile Whether or not to save in partfiles (ignored on load)
     */
-    VectorIO(const std::string &filename, bool parity_inflate = false);
+    VectorIO(const std::string &filename, bool parity_inflate = false, bool partfile = false);
 
     /**
        @brief Load vectors from filename

@@ -209,10 +209,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.ca_lambda_max = ca_lambda_max;
   inv_param.tol = tol;
   inv_param.tol_restart = tol_restart;
-  if (tol_hq == 0 && tol == 0) {
-    errorQuda("qudaInvert: requesting zero residual\n");
-    exit(1);
-  }
+  if (tol_hq == 0 && tol == 0) errorQuda("qudaInvert: requesting zero residual");
 
   // require both L2 relative and heavy quark residual to determine convergence
   inv_param.residual_type = static_cast<QudaResidualType_s>(0);
@@ -375,6 +372,7 @@ void setEigParam(QudaEigParam &eig_param)
   safe_strcpy(eig_param.vec_outfile, eig_vec_outfile, 256, "eig_vec_outfile");
   eig_param.save_prec = eig_save_prec;
   eig_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  eig_param.partfile = eig_partfile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   eig_param.struct_size = sizeof(eig_param);
 }
@@ -641,6 +639,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     safe_strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i], 256, "mg_vec_outfile[" + std::to_string(i) + "]");
     if (mg_vec_infile[i].size() > 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
     if (mg_vec_outfile[i].size() > 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
+    mg_param.mg_vec_partfile[i] = mg_vec_partfile[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   }
 
   mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -832,6 +831,7 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   strcpy(mg_eig_param.vec_outfile, "");
   mg_eig_param.save_prec = mg_eig_save_prec[level];
   mg_eig_param.io_parity_inflate = QUDA_BOOLEAN_FALSE;
+  mg_eig_param.partfile = QUDA_BOOLEAN_FALSE; // ignored
 
   mg_eig_param.struct_size = sizeof(mg_eig_param);
 }
@@ -863,7 +863,9 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
   inv_param.mass = mass;
 
   // outer solver parameters
-  inv_param.inv_type = QUDA_GCR_INVERTER;
+  if (inv_type != QUDA_GCR_INVERTER && inv_type != QUDA_PCG_INVERTER)
+    errorQuda("Invalid outer MG inverter %d\n", inv_type);
+  inv_param.inv_type = inv_type;
   inv_param.tol = tol;
   inv_param.maxiter = niter;
   inv_param.reliable_delta = reliable_delta;
@@ -871,10 +873,7 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
 
   inv_param.Ls = 1;
 
-  if (tol_hq == 0 && tol == 0) {
-    errorQuda("qudaInvert: requesting zero residual\n");
-    exit(1);
-  }
+  if (tol_hq == 0 && tol == 0) errorQuda("qudaInvert: requesting zero residual");
 
   // require both L2 relative and heavy quark residual to determine convergence
   inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
@@ -1238,13 +1237,14 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     safe_strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i], 256, "mg_vec_outfile[" + std::to_string(i) + "]");
     if (mg_vec_infile[i].size() > 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
     if (mg_vec_outfile[i].size() > 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
+    mg_param.mg_vec_partfile[i] = mg_vec_partfile[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   }
 
   mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
-  inv_param.inv_type = QUDA_GCR_INVERTER;
+  inv_param.inv_type = inv_type;
   inv_param.tol = 1e-10;
   inv_param.maxiter = 1000;
   inv_param.reliable_delta = reliable_delta;
@@ -1404,6 +1404,7 @@ void setDeflationParam(QudaEigParam &df_param)
   safe_strcpy(df_param.vec_infile, eig_vec_infile, 256, "eig_vec_infile");
   safe_strcpy(df_param.vec_outfile, eig_vec_outfile, 256, "eig_vec_outfile");
   df_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  df_param.partfile = eig_partfile ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 }
 
 void setQudaStaggeredInvTestParams()

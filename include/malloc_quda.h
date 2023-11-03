@@ -114,6 +114,9 @@ namespace quda {
 #define register_pinned(ptr, bytes) quda::register_pinned_(__func__, quda::file_name(__FILE__), __LINE__, ptr, bytes)
 #define unregister_pinned(size) quda::unregister_pinned_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 
+#define quda_malloc(size) quda::quda_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)
+#define quda_free(ptr) quda::quda_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
+
 namespace quda {
 
   namespace pool {

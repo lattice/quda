@@ -80,11 +80,11 @@ namespace quda {
     {
       ColorSpinor<typename Arg::real, Arg::nColor, 4> in = arg.in(x_cb, parity);
       switch(arg.d) {
-      case 0: arg.out(x_cb, parity) = in.gamma(0);
-      case 1: arg.out(x_cb, parity) = in.gamma(1);
-      case 2: arg.out(x_cb, parity) = in.gamma(2);
-      case 3: arg.out(x_cb, parity) = in.gamma(3);
-      case 4: arg.out(x_cb, parity) = in.gamma(4);
+      case 0: arg.out(x_cb, parity) = in.gamma(0); break;
+      case 1: arg.out(x_cb, parity) = in.gamma(1); break;
+      case 2: arg.out(x_cb, parity) = in.gamma(2); break;
+      case 3: arg.out(x_cb, parity) = in.gamma(3); break;
+      case 4: arg.out(x_cb, parity) = in.gamma(4); break;
       }
     }
   };

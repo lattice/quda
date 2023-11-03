@@ -37,19 +37,13 @@ namespace quda
 
     CovDevArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int mu, int parity, bool dagger,
               const int *comm_override) :
-      DslashArg<Float, nDim>(in, U, parity, dagger, false, 1, spin_project, comm_override),
+      DslashArg<Float, nDim>(out, in, U, in, parity, dagger, false, 1, spin_project, comm_override),
       out(out),
       in(in),
       in_pack(in),
       U(U),
       mu(mu)
     {
-      if (in.V() == out.V()) errorQuda("Aliasing pointers");
-      checkOrder(out, in);        // check all orders match
-      checkPrecision(out, in, U); // check all precisions match
-      checkLocation(out, in, U);  // check all locations match
-      if (!out.isNative() || !in.isNative() || !U.isNative())
-        errorQuda("Unsupported field order colorspinor(in)=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
     }
   };
 

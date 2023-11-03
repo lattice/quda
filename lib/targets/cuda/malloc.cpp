@@ -7,6 +7,7 @@
 #include <quda_internal.h>
 #include <device.h>
 #include <shmem_helper.cuh>
+#include "timer.h"
 
 #ifdef USE_QDPJIT
 #include "qdp_cache.h"

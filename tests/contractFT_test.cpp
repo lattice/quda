@@ -105,23 +105,32 @@ int main(int argc, char **argv)
 // Performs the CPU GPU comparison with the given parameters
 int test(int contractionType, QudaPrecision test_prec)
 {
+  if (xdim % 2) errorQuda("odd local x-dimension is not supported.\n");
+
   int X[4] = {xdim, ydim, zdim, tdim};
+
+  int X0[4] = {xdim*comm_coord(0), ydim*comm_coord(1), zdim*comm_coord(2), tdim*comm_coord(3)};
+
+  int XN[4] = {xdim*comm_dim(0), ydim*comm_dim(1), zdim*comm_dim(2), tdim*comm_dim(3)};
 
   QudaContractType cType = QUDA_CONTRACT_TYPE_INVALID;
   int nSpin = 0;
   int red_size = 0;
   switch (contractionType) {
   case 0:
+    printfQuda("Running degrand-rossi contraction test 0.\n");
     cType = QUDA_CONTRACT_TYPE_DR_FT_T;
     nSpin = 4;
     red_size = comm_dim(3)*X[3]; //DMH: total temporal dim
     break;
   case 1:
+    printfQuda("Running degrand-rossi contraction test 1.\n");
     cType = QUDA_CONTRACT_TYPE_DR_FT_Z;
     nSpin = 4;
     red_size = comm_dim(2)*X[2]; //DMH total Z dim
     break;
   case 2:
+    printfQuda("Running staggered contraction test.\n");
     cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
     nSpin = 1;
     red_size = comm_dim(3)*X[3]; //DMH total temporal dim
@@ -152,22 +161,38 @@ int test(int contractionType, QudaPrecision test_prec)
   size_t data_size = (test_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   int src_colors = 1; // source color (dilutions)
   int const nprops = nSpin * src_colors;
+
   size_t spinor_field_floats = V * my_spinor_site_size * 2; // DMH: Vol * spinor elems * 2(re,im) 
+  
   void *buffX = malloc(nprops * spinor_field_floats * data_size);
   void *buffY = malloc(nprops * spinor_field_floats * data_size);
 
-  // propagators set to random values
-  if (test_prec == QUDA_SINGLE_PRECISION) {
-    for (size_t i = 0; i < spinor_field_floats * nprops; i++) {
-      ((float *)buffX)[i] = 2.*(rand() / (float)RAND_MAX) - 1.;
-      ((float *)buffY)[i] = 2.*(rand() / (float)RAND_MAX) - 1.;
-    }
-  } else {
-    for (size_t i = 0; i < spinor_field_floats * nprops; i++) {
-      ((double *)buffX)[i] = 2.*(rand() / (double)RAND_MAX) - 1.;
-      ((double *)buffY)[i] = 2.*(rand() / (double)RAND_MAX) - 1.;
-    }
-  }
+  const int dof = my_spinor_site_size * 2 * nprops;
+
+  for(int ix = 0; ix < X[0]; ix++   ) {
+    for(int iy = 0; iy < X[1]; iy++   ) {
+      for(int iz = 0; iz < X[2]; iz++   ) {
+        for(int it = 0; it < X[3]; it++   ) {
+          int l  = (ix+X0[0])+(iy+X0[1])*XN[0]+(iz+X0[2])*XN[0]*XN[1]+(it+X0[3])*XN[0]*XN[1]*XN[2];
+	  int ll = ix+iy*X[0]+iz*X[0]*X[1]+it*X[0]*X[1]*X[2];
+
+	  srand(l);
+
+          if (test_prec == QUDA_SINGLE_PRECISION) {
+            for (size_t i = 0; i < my_spinor_site_size * 2 * nprops; i++) {
+              ((float *)buffX)[ll*dof + i] = 2.*(rand() / (float)RAND_MAX) - 1.;
+              ((float *)buffY)[ll*dof + i] = 2.*(rand() / (float)RAND_MAX) - 1.;
+            }
+          } else {
+            for (size_t i = 0; i < spinor_field_floats * nprops; i++) {
+              ((double *)buffX)[ll*dof+i] = 2.*(rand() / (double)RAND_MAX) - 1.;
+              ((double *)buffY)[ll*dof+i] = 2.*(rand() / (double)RAND_MAX) - 1.;
+            }
+          }
+        }
+      }
+    }	  
+  }	  
 
   // array of spinor field for each source spin and color
   void* spinorX[nprops];
