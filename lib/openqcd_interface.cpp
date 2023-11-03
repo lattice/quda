@@ -1163,8 +1163,8 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
 
         multigrid_param->vec_load[i] = kv.get<QudaBoolean>(subsection, "vec_load", multigrid_param->vec_load[i]);
         multigrid_param->vec_store[i] = kv.get<QudaBoolean>(subsection, "vec_store", multigrid_param->vec_store[i]);
-        strcpy(multigrid_param->vec_infile[i], kv.get<std::string>(subsection, "vec_infile", multigrid_param->vec_infile[i]).c_str());
-        strcpy(multigrid_param->vec_outfile[i], kv.get<std::string>(subsection, "vec_outfile", multigrid_param->vec_outfile[i]).c_str());
+        /*strcpy(multigrid_param->vec_infile[i], kv.get<std::string>(subsection, "vec_infile", multigrid_param->vec_infile[i]).c_str());
+        strcpy(multigrid_param->vec_outfile[i], kv.get<std::string>(subsection, "vec_outfile", multigrid_param->vec_outfile[i]).c_str());*/
 
         multigrid_param->mu_factor[i] = kv.get<double>(subsection, "mu_factor", multigrid_param->mu_factor[i]);
         multigrid_param->transfer_type[i] = kv.get<QudaTransferType>(subsection, "transfer_type", multigrid_param->transfer_type[i]);
@@ -1217,6 +1217,7 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
   }
 
   if (param->inv_type_precondition == QUDA_MG_INVERTER) {
+    logQuda(QUDA_VERBOSE, "Setting up multigrid solver ...\n");
     PUSH_RANGE("newMultigridQuda",4);
     mgprec = newMultigridQuda(multigrid_param);
     param->preconditioner = mgprec;
@@ -1249,12 +1250,12 @@ double openQCD_qudaInvert(void *param, double mu, void *source, void *solution, 
   invertQuda(static_cast<char *>(solution), static_cast<char *>(source), invert_param);
   POP_RANGE;
 
-  logQuda(QUDA_VERBOSE, "openQCD_qudaInvert()\n");
-  logQuda(QUDA_VERBOSE, "  true_res    = %.2e\n", invert_param->true_res);
-  logQuda(QUDA_VERBOSE, "  true_res_hq = %.2e\n", invert_param->true_res_hq);
-  logQuda(QUDA_VERBOSE, "  iter        = %d\n",   invert_param->iter);
-  logQuda(QUDA_VERBOSE, "  gflops      = %.2e\n", invert_param->gflops);
-  logQuda(QUDA_VERBOSE, "  secs        = %.2e\n", invert_param->secs);
+  logQuda(QUDA_SUMMARIZE, "openQCD_qudaInvert()\n");
+  logQuda(QUDA_SUMMARIZE, "  true_res    = %.2e\n", invert_param->true_res);
+  logQuda(QUDA_SUMMARIZE, "  true_res_hq = %.2e\n", invert_param->true_res_hq);
+  logQuda(QUDA_SUMMARIZE, "  iter        = %d\n",   invert_param->iter);
+  logQuda(QUDA_SUMMARIZE, "  gflops      = %.2e\n", invert_param->gflops);
+  logQuda(QUDA_SUMMARIZE, "  secs        = %.2e\n", invert_param->secs);
 
   *status = invert_param->true_res <= invert_param->tol ? invert_param->iter : -1;
 
@@ -1368,9 +1369,9 @@ void openQCD_qudaEigensolve(void *param, void **h_evecs, void *h_evals)
   eigensolveQuda(h_evecs, static_cast<double _Complex*>(h_evals), eig_param);
   POP_RANGE;
 
-  logQuda(QUDA_VERBOSE, "openQCD_qudaEigensolve()\n");
-  logQuda(QUDA_VERBOSE, "  gflops      = %.2e\n", eig_param->gflops);
-  logQuda(QUDA_VERBOSE, "  secs        = %.2e\n", eig_param->secs);
+  logQuda(QUDA_SUMMARIZE, "openQCD_qudaEigensolve()\n");
+  logQuda(QUDA_SUMMARIZE, "  gflops      = %.2e\n", eig_param->gflops);
+  logQuda(QUDA_SUMMARIZE, "  secs        = %.2e\n", eig_param->secs);
 }
 
 void openQCD_qudaEigensolverDestroy(void *param)
