@@ -1286,7 +1286,7 @@ foreach(prec IN LISTS TEST_PRECS)
   if (TARGET dilution_test)
     add_test(NAME dilution_test_${prec}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dilution_test> ${MPIEXEC_POSTFLAGS}
-                     --dim 4 6 8 10 --prec ${prec}
+                     --dim 4 6 8 10 --dilution-block-size 4 6 4 5 --prec ${prec}
                      --gtest_output=xml:dilution_test_${prec}.xml)
   endif()
 
