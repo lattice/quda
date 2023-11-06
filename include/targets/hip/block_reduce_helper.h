@@ -42,7 +42,12 @@ namespace quda
       using warp_reduce_t = hipcub::WarpReduce<T, param_t::width>;
       typename warp_reduce_t::TempStorage dummy_storage;
       warp_reduce_t warp_reduce(dummy_storage);
-      T value = reducer_t::do_sum ? warp_reduce.Sum(value_) : warp_reduce.Reduce(value_, r);
+      T value = {};
+      if constexpr (reducer_t::do_sum) {
+        value = warp_reduce.Sum(value_);
+      } else {
+        value = warp_reduce.Reduce(value_, r);
+      }
 
       if (all) {
         using warp_scan_t = hipcub::WarpScan<T, param_t::width>;

@@ -725,6 +725,22 @@ namespace quda
   void ApplyImprovedStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                               const GaugeField &L, double a, const ColorSpinorField &x, int parity, bool dagger,
                               const int *comm_override, TimeProfile &profile);
+                              
+  /**
+     @brief Apply the 2-link staggered operator to a color-spinor field.
+     @param[out] out Result color-spinor field
+     @param[in] in Input color-spinor field
+     @param[in] U the 2-link field
+     @param[in] t0 time-slice index
+     @param[in] compute_time_slice whether we apply the operator to a single time-slice
+     @param[in] parity parity parameter
+     @param[in] dir Direction of the derivative 0,1,2,3 to omit (-1 is full 4D)
+     @param[in] dagger (not used)
+     @param[in] comm_override Overrides for communication directions
+     @param[in] profile Timer used to profile operator application
+  */
+  void ApplyStaggeredQSmear(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0, bool compute_time_slice, int parity, int dir, 
+                    bool dagger, const int *comm_override, TimeProfile &profile);                             
 
   /**
      @brief Apply the (improved) staggered Kahler-Dirac inverse block to a color-spinor field.

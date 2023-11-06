@@ -108,20 +108,20 @@ void packTest()
     param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
 
     GaugeFieldParam cpsParam(param, cpsCpuGauge_p);
-    cpuGaugeField cpsCpuGauge(cpsParam);
+    GaugeField cpsCpuGauge(cpsParam);
     cpsParam.create = QUDA_NULL_FIELD_CREATE;
     cpsParam.reconstruct = param.reconstruct;
     cpsParam.setPrecision(param.cuda_prec, true);
     cpsParam.pad = param.ga_pad;
-    cudaGaugeField cudaCpsGauge(cpsParam);
+    GaugeField cudaCpsGauge(cpsParam);
 
     host_timer.start();
-    cudaCpsGauge.loadCPUField(cpsCpuGauge);
+    cudaCpsGauge.copy(cpsCpuGauge);
     host_timer.stop();
     printfQuda("CPS Gauge send time = %e seconds\n", host_timer.last());
 
     host_timer.start();
-    cudaCpsGauge.saveCPUField(cpsCpuGauge);
+    cpsCpuGauge.copy(cudaCpsGauge);
     host_timer.stop();
     printfQuda("CPS Gauge restore time = %e seconds\n", host_timer.last());
   }
@@ -132,20 +132,20 @@ void packTest()
     param.gauge_order = QUDA_QDP_GAUGE_ORDER;
 
     GaugeFieldParam qdpParam(param, qdpCpuGauge_p);
-    cpuGaugeField qdpCpuGauge(qdpParam);
+    GaugeField qdpCpuGauge(qdpParam);
     qdpParam.create = QUDA_NULL_FIELD_CREATE;
     qdpParam.reconstruct = param.reconstruct;
     qdpParam.setPrecision(param.cuda_prec, true);
     qdpParam.pad = param.ga_pad;
-    cudaGaugeField cudaQdpGauge(qdpParam);
+    GaugeField cudaQdpGauge(qdpParam);
 
     host_timer.start();
-    cudaQdpGauge.loadCPUField(qdpCpuGauge);
+    cudaQdpGauge.copy(qdpCpuGauge);
     host_timer.stop();
     printfQuda("QDP Gauge send time = %e seconds\n", host_timer.last());
 
     host_timer.start();
-    cudaQdpGauge.saveCPUField(qdpCpuGauge);
+    qdpCpuGauge.copy(cudaQdpGauge);
     host_timer.stop();
     printfQuda("QDP Gauge restore time = %e seconds\n", host_timer.last());
   }

@@ -37,7 +37,9 @@ protected:
       return true;
     }
 
-    if (::testing::get<2>(GetParam()) > 0 && dslash_test_wrapper.test_split_grid) { return true; }
+    // work out if test_split_grid is enabled
+    bool test_split_grid = (grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3] > 1);
+    if (::testing::get<2>(GetParam()) > 0 && test_split_grid) { return true; }
 
     const std::array<bool, 16> partition_enabled {true, true, true,  false,  true,  false, false, false,
                                                   true, false, false, false, true, false, true, true};
@@ -63,8 +65,6 @@ protected:
       printfQuda("Testing with split grid: %d  %d  %d  %d\n", grid_partition[0], grid_partition[1], grid_partition[2],
                  grid_partition[3]);
     }
-
-    return;
   }
 
 public:
@@ -116,7 +116,7 @@ TEST_P(DslashTest, verify)
       && dslash_test_wrapper.inv_param.cuda_prec >= QUDA_HALF_PRECISION)
     tol *= 10; // if recon 8, we tolerate a greater deviation
 
-  ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+  ASSERT_LE(deviation, tol) << "Reference and QUDA implementations do not agree";
 }
 
 TEST_P(DslashTest, benchmark) { dslash_test_wrapper.run_test(niter, /**show_metrics =*/true); }
@@ -125,8 +125,6 @@ int main(int argc, char **argv)
 {
   // initalize google test, includes command line options
   ::testing::InitGoogleTest(&argc, argv);
-  // return code for google test
-  int test_rc = 0;
   // command line options
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
@@ -150,7 +148,8 @@ int main(int argc, char **argv)
 
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
   if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-  test_rc = RUN_ALL_TESTS();
+
+  int test_rc = RUN_ALL_TESTS();
 
   finalizeComms();
   return test_rc;

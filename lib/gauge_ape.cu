@@ -57,7 +57,9 @@ namespace quda {
 
     copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
     in.exchangeExtendedGhost(in.R(), false);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeAPE>(out, in, alpha);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     out.exchangeExtendedGhost(out.R(), false);
   }
 

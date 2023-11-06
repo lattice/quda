@@ -2,6 +2,7 @@
 #include <tunable_nd.h>
 #include <instantiate.h>
 #include <kernels/gauge_update.cuh>
+#include "timer.h"
 
 namespace quda {
 
@@ -61,11 +62,13 @@ namespace quda {
 
   void updateGaugeField(GaugeField &out, double dt, const GaugeField& in, const GaugeField& mom, bool conj_mom, bool exact)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     checkPrecision(out, in, mom);
     checkLocation(out, in, mom);
     checkReconstruct(out, in);
     if (mom.Reconstruct() != QUDA_RECONSTRUCT_10) errorQuda("Reconstruction type %d not supported", mom.Reconstruct());
     instantiate<UpdateGaugeField,ReconstructNo12>(out, in, mom, dt, conj_mom, exact);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
 } // namespace quda

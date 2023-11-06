@@ -9,12 +9,14 @@
 #include <dslash_quda.h>
 #include <dslash_shmem.h>
 #include <shmem_pack_helper.cuh>
+#include <kernel_helper.h>
+#include <tune_quda.h>
 
 #if defined(_NVHPC_CUDA)
 #include <constant_kernel_arg.h>
-constexpr bool use_kernel_arg = false;
+constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_p::FALSE;
 #else
-constexpr bool use_kernel_arg = true;
+constexpr quda::use_kernel_arg_p use_kernel_arg = quda::use_kernel_arg_p::TRUE;
 #endif
 
 #include <kernel.h>
@@ -303,8 +305,8 @@ namespace quda
 #endif
 
     // constructor needed for staggered to set xpay from derived class
-    DslashArg(const ColorSpinorField &in, const GaugeField &U, int parity, bool dagger, bool xpay, int nFace,
-              int spin_project, const int *comm_override,
+    DslashArg(const ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const ColorSpinorField &x,
+              int parity, bool dagger, bool xpay, int nFace, int spin_project, const int *comm_override,
 #ifdef NVSHMEM_COMMS
               int shmem_ = 0) :
 #else
@@ -346,8 +348,14 @@ namespace quda
       retcount_intra(dslash::get_shmem_retcount_intra()),
       retcount_inter(dslash::get_shmem_retcount_inter())
 #endif
-
     {
+      if (in.data() == out.data()) errorQuda("Aliasing pointers");
+      checkOrder(out, in, x);        // check all orders match
+      checkPrecision(out, in, x, U); // check all precisions match
+      checkLocation(out, in, x, U);  // check all locations match
+      if (!in.isNative() || !U.isNative())
+        errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
+
       for (int d = 0; d < 4; d++) {
         commDim[d] = (comm_override[d] == 0) ? 0 : comm_dim_partitioned(d);
       }

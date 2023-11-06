@@ -80,8 +80,8 @@ namespace quda
 
     if (pc_type != QUDA_4D_PC) { errorQuda("Gauge field copy must use 4d even-odd preconditioning."); }
 
-    if (in.V(true)) { instantiate<CopyCloverOffset>(out, in, offset, true); }
-    if (in.V(false)) { instantiate<CopyCloverOffset>(out, in, offset, false); }
+    if (in.Inverse()) instantiate<CopyCloverOffset>(out, in, offset, true);
+    instantiate<CopyCloverOffset>(out, in, offset, false);
   }
 #else
   void copyFieldOffset(CloverField &, const CloverField &, CommKey, QudaPCType)

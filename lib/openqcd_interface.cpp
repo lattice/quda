@@ -212,8 +212,11 @@ std::unordered_map<std::string, std::string> enum_map = {
   {"QUDA_SPECTRUM_SI_EIG",                  std::to_string(QUDA_SPECTRUM_SI_EIG)},
   {"QUDA_SPECTRUM_INVALID",                 std::to_string(QUDA_SPECTRUM_INVALID)},
   {"QUDA_MEMORY_DEVICE",                    std::to_string(QUDA_MEMORY_DEVICE)},
-  {"QUDA_MEMORY_PINNED",                    std::to_string(QUDA_MEMORY_PINNED)},
+  {"QUDA_MEMORY_DEVICE_PINNED",             std::to_string(QUDA_MEMORY_DEVICE_PINNED)},
+  {"QUDA_MEMORY_HOST",                      std::to_string(QUDA_MEMORY_HOST)},
+  {"QUDA_MEMORY_HOST_PINNED",               std::to_string(QUDA_MEMORY_HOST_PINNED)},
   {"QUDA_MEMORY_MAPPED",                    std::to_string(QUDA_MEMORY_MAPPED)},
+  {"QUDA_MEMORY_MANAGED",                   std::to_string(QUDA_MEMORY_MANAGED)},
   {"QUDA_MEMORY_INVALID",                   std::to_string(QUDA_MEMORY_INVALID)},
   {"QUDA_CUSOLVE_EXTLIB",                   std::to_string(QUDA_CUSOLVE_EXTLIB)},
   {"QUDA_EIGEN_EXTLIB",                     std::to_string(QUDA_EIGEN_EXTLIB)},
@@ -1125,7 +1128,6 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
       multigrid_param->preserve_deflation = kv.get<QudaBoolean>(mg_section, "preserve_deflation", multigrid_param->preserve_deflation);
       multigrid_param->allow_truncation = kv.get<QudaBoolean>(mg_section, "allow_truncation", multigrid_param->allow_truncation);
       multigrid_param->staggered_kd_dagger_approximation = kv.get<QudaBoolean>(mg_section, "staggered_kd_dagger_approximation", multigrid_param->staggered_kd_dagger_approximation);
-      multigrid_param->use_mma = kv.get<QudaBoolean>(mg_section, "use_mma", multigrid_param->use_mma);
       multigrid_param->thin_update_only = kv.get<QudaBoolean>(mg_section, "thin_update_only", multigrid_param->thin_update_only);
 
       for (int i=0; i<multigrid_param->n_level; i++) {
@@ -1150,6 +1152,8 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
         multigrid_param->block_ortho_two_pass[i] = kv.get<QudaBoolean>(subsection, "block_ortho_two_pass", multigrid_param->block_ortho_two_pass[i]);
         multigrid_param->verbosity[i] = kv.get<QudaVerbosity>(subsection, "verbosity", multigrid_param->verbosity[i]);
         multigrid_param->setup_inv_type[i] = kv.get<QudaInverterType>(subsection, "setup_inv_type", multigrid_param->setup_inv_type[i]);
+        multigrid_param->setup_use_mma[i] = kv.get<QudaBoolean>(subsection, "setup_use_mma", multigrid_param->setup_use_mma[i]);
+        multigrid_param->dslash_use_mma[i] = kv.get<QudaBoolean>(subsection, "dslash_use_mma", multigrid_param->dslash_use_mma[i]);
         multigrid_param->num_setup_iter[i] = kv.get<int>(subsection, "num_setup_iter", multigrid_param->num_setup_iter[i]);
         multigrid_param->setup_tol[i] = kv.get<double>(subsection, "setup_tol", multigrid_param->setup_tol[i]);
         multigrid_param->setup_maxiter[i] = kv.get<int>(subsection, "setup_maxiter", multigrid_param->setup_maxiter[i]);

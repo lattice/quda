@@ -12,11 +12,11 @@ namespace quda
   char *comm_hostname(void)
   {
     static bool cached = false;
-    static char hostname[128];
+    static char hostname[QUDA_MAX_HOSTNAME_STRING];
 
     if (!cached) {
-      gethostname(hostname, 128);
-      hostname[127] = '\0';
+      gethostname(hostname, QUDA_MAX_HOSTNAME_STRING);
+      hostname[QUDA_MAX_HOSTNAME_STRING - 1] = '\0';
       cached = true;
     }
 

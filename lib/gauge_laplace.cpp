@@ -29,7 +29,6 @@ namespace quda {
       if (laplace3D == i) comm_dim[i] = 0;
     }
     ApplyLaplace(out, in, *gauge, laplace3D, 1.0, 1.0, in, parity, dagger, comm_dim, profile);
-    flops += 1320ll*in.Volume(); // FIXME
   }
 
   void GaugeLaplace::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -45,7 +44,6 @@ namespace quda {
       if (laplace3D == i) comm_dim[i] = 0;
     }
     ApplyLaplace(out, in, *gauge, laplace3D, k, 1.0, x, parity, dagger, comm_dim, profile);
-    flops += 1368ll*in.Volume(); // FIXME
   }
 
   void GaugeLaplace::M(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -56,13 +54,9 @@ namespace quda {
 
   void GaugeLaplace::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    bool reset = newTmp(&tmp1, in);
-    checkFullSpinor(*tmp1, in);
-
-    M(*tmp1, in);
-    Mdag(out, *tmp1);
-
-    deleteTmp(&tmp1, reset);
+    auto tmp = getFieldTmp(in);
+    M(tmp, in);
+    Mdag(out, tmp);
   }
 
   void GaugeLaplace::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
@@ -97,28 +91,24 @@ namespace quda {
   void GaugeLaplacePC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     double kappa2 = -kappa*kappa;
-
-    bool reset = newTmp(&tmp1, in);
+    auto tmp = getFieldTmp(in);
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      Dslash(*tmp1, in, QUDA_ODD_PARITY);
-      DslashXpay(out, *tmp1, QUDA_EVEN_PARITY, in, kappa2); 
+      Dslash(tmp, in, QUDA_ODD_PARITY);
+      DslashXpay(out, tmp, QUDA_EVEN_PARITY, in, kappa2);
     } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-      Dslash(*tmp1, in, QUDA_EVEN_PARITY);
-      DslashXpay(out, *tmp1, QUDA_ODD_PARITY, in, kappa2); 
+      Dslash(tmp, in, QUDA_EVEN_PARITY);
+      DslashXpay(out, tmp, QUDA_ODD_PARITY, in, kappa2);
     } else {
       errorQuda("MatPCType %d not valid for GaugeLaplacePC", matpcType);
     }
-
-    deleteTmp(&tmp1, reset);
   }
 
   void GaugeLaplacePC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    bool reset = newTmp(&tmp2, in);
-    M(*tmp2, in);
-    Mdag(out, *tmp2);
-    deleteTmp(&tmp2, reset);
+    auto tmp = getFieldTmp(in);
+    M(tmp, in);
+    Mdag(out, tmp);
   }
 
   void GaugeLaplacePC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,

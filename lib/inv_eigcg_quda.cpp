@@ -179,11 +179,7 @@ namespace quda {
     inner.delta = 1e-20; // no reliable updates within the inner solver
     inner.precision = outer.precision_precondition; // preconditioners are uni-precision solvers
     inner.precision_sloppy = outer.precision_precondition;
-
     inner.iter   = 0;
-    inner.gflops = 0;
-    inner.secs   = 0;
-
     inner.inv_type_precondition = QUDA_INVALID_INVERTER;
     inner.is_preconditioner = true; // used to tell the inner solver it is an inner solver
 
@@ -193,9 +189,6 @@ namespace quda {
   // set the required parameters for the initCG solver
   static void fillInitCGSolverParam(SolverParam &inner, const SolverParam &outer) {
     inner.iter   = 0;
-    inner.gflops = 0;
-    inner.secs   = 0;
-
     inner.tol              = outer.tol;
     inner.tol_restart      = outer.tol_restart;
     inner.maxiter          = outer.maxiter;
@@ -218,8 +211,7 @@ namespace quda {
     r_pre(nullptr),
     p_pre(nullptr),
     eigcg_args(nullptr),
-    profile(profile),
-    init(false)
+    profile(profile)
   {
 
     if (2 * param.n_ev >= param.m)
@@ -262,7 +254,6 @@ namespace quda {
     {
       if(Vm)  delete Vm;
 
-      delete tmpp;
       delete rp;
       delete yp;
       delete Ap;
@@ -378,8 +369,6 @@ namespace quda {
       Ap = ColorSpinorField::Create(csParam);
       p  = ColorSpinorField::Create(csParam);
 
-      tmpp = ColorSpinorField::Create(csParam);
-
       Az = ColorSpinorField::Create(csParam);
 
       if (K && param.precision_precondition != param.precision_sloppy) {
@@ -421,13 +410,12 @@ namespace quda {
 //!
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
-    ColorSpinorField &tmp = *tmpp;
 
     csParam.setPrecision(param.precision_sloppy);
     csParam.is_composite  = false;
 
     // compute initial residual
-    matSloppy(r, x, y);
+    matSloppy(r, x);
     double r2 = blas::xmyNorm(b, r);
 
     ColorSpinorField *z  = (K != nullptr) ? ColorSpinorField::Create(csParam) : rp;//
@@ -465,7 +453,6 @@ namespace quda {
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    blas::flops = 0;
 
     double rMinvr = blas::reDotProduct(r,*z);
     //Begin EigCG iterations:
@@ -476,7 +463,7 @@ namespace quda {
     bool converged = convergence(r2, heavy_quark_res, args.global_stop, param.tol_hq);
 
     while ( !converged && k < param.maxiter ) {
-      matSloppy(*Ap, *p, tmp);  // tmp as tmp
+      matSloppy(*Ap, *p); // tmp as tmp
 
       pAp    = blas::reDotProduct(*p, *Ap);
       alpha_old_inv =  alpha_inv;
@@ -522,24 +509,17 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + matSloppy.flops())*1e-9;
-    param.gflops = gflops;
     param.iter += k;
 
     if (k == param.maxiter)
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     // compute the true residuals
-    matSloppy(r, x, y);
+    matSloppy(r, x);
     param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
     param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
     PrintSummary("eigCG", k, r2, b2, args.global_stop, param.tol_hq);
-
-    // reset the flops counters
-    blas::flops = 0;
-    matSloppy.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     profile.TPSTART(QUDA_PROFILE_FREE);
@@ -561,8 +541,6 @@ namespace quda {
 
     csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-    ColorSpinorField *tmpp2 = ColorSpinorField::Create(csParam);//full precision accumulator
-    ColorSpinorField &tmp2  = *tmpp2;
     ColorSpinorField *rp = ColorSpinorField::Create(csParam);//full precision residual
     ColorSpinorField &r = *rp;
 
@@ -589,30 +567,20 @@ namespace quda {
       (*K)(x, b);
       delete K;
 
-      mat(r, x, tmp2);
+      mat(r, x);
       blas::xpay(b, -1.0, r);
 
       xProj = x;
       rProj = r; 
 
-      if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
-
       Kparam.tol *= param.inc_tol;
 
       if(restart_idx == (param.max_restart_num-1)) Kparam.tol = full_tol;//do the last solve in the next cycle to full tolerance
-
-      param.secs   += Kparam.secs;
     }
-
-    if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
-    //
-    param.secs   += Kparam.secs;
-    param.gflops += Kparam.gflops;
 
     k   += Kparam.iter;
 
     delete rp;
-    delete tmpp2;
 
     if( param.precision_ritz != param.precision ) {
       delete xp_proj;
@@ -652,7 +620,7 @@ namespace quda {
      ColorSpinorField &r = *rp;
 
      //deflate initial guess ('out'-field):
-     mat(r, out, e);
+     mat(r, out);
      //
      double r2 = xmyNorm(in, r);
 
@@ -704,7 +672,7 @@ namespace quda {
        blas::xpy(e, out);
        // compute the true residuals
        blas::zero(e);
-       mat(r, out, e);
+       mat(r, out);
        //
        r2 = blas::xmyNorm(in, r);
 

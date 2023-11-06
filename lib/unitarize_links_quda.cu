@@ -55,20 +55,19 @@ namespace quda {
     if (checkLocation(outfield, infield) != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
     checkPrecision(outfield, infield);
 
-    int num_failures = 0;
     Matrix<complex<double>,3> inlink, outlink;
 
     for (unsigned int i = 0; i < infield.Volume(); ++i) {
       for (int dir=0; dir<4; ++dir){
 	if (infield.Precision() == QUDA_SINGLE_PRECISION) {
-	  copyArrayToLink(inlink, ((float*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	  if (unitarizeLinkNewton(outlink, inlink, max_iter_newton) == false ) num_failures++;
-	  copyLinkToArray(((float*)(outfield.Gauge_p()) + (i*4 + dir)*18), outlink);
-	} else if (infield.Precision() == QUDA_DOUBLE_PRECISION) {
-	  copyArrayToLink(inlink, ((double*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	  if (unitarizeLinkNewton(outlink, inlink, max_iter_newton) == false ) num_failures++;
-	  copyLinkToArray(((double*)(outfield.Gauge_p()) + (i*4 + dir)*18), outlink);
-	} // precision?
+          copyArrayToLink(inlink, infield.data<float *>() + (i * 4 + dir) * 18); // order of arguments?
+          unitarizeLinkNewton(outlink, inlink, max_iter_newton);
+          copyLinkToArray(outfield.data<float *>() + (i * 4 + dir) * 18, outlink);
+        } else if (infield.Precision() == QUDA_DOUBLE_PRECISION) {
+          copyArrayToLink(inlink, infield.data<double *>() + (i * 4 + dir) * 18); // order of arguments?
+          unitarizeLinkNewton(outlink, inlink, max_iter_newton);
+          copyLinkToArray(outfield.data<double *>() + (i * 4 + dir) * 18, outlink);
+        } // precision?
       } // dir
     }   // loop over volume
   }
@@ -82,13 +81,13 @@ namespace quda {
     for (unsigned int i = 0; i < field.Volume(); ++i) {
       for (int dir=0; dir<4; ++dir) {
 	if (field.Precision() == QUDA_SINGLE_PRECISION) {
-	  copyArrayToLink(link, ((float*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	} else if (field.Precision() == QUDA_DOUBLE_PRECISION) {
-	  copyArrayToLink(link, ((double*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	} else {
-	  errorQuda("Unsupported precision\n");
-	}
-	if (link.isUnitary(max_error) == false) {
+          copyArrayToLink(link, field.data<float *>() + (i * 4 + dir) * 18); // order of arguments?
+        } else if (field.Precision() == QUDA_DOUBLE_PRECISION) {
+          copyArrayToLink(link, field.data<double *>() + (i * 4 + dir) * 18); // order of arguments?
+        } else {
+          errorQuda("Unsupported precision\n");
+        }
+        if (link.isUnitary(max_error) == false) {
 	  printf("Unitarity failure\n");
 	  printf("site index = %u,\t direction = %d\n", i, dir);
 	  printLink(link);
@@ -126,9 +125,12 @@ namespace quda {
                         UnitarizeArg<Float, nColor, recon>(out, in, fails, max_iter, unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error));
     }
 
-    void preTune() { if (in.Gauge_p() == out.Gauge_p()) out.backup(); }
+    void preTune()
+    {
+      if (in.data() == out.data()) out.backup();
+    }
     void postTune() {
-      if (in.Gauge_p() == out.Gauge_p()) out.restore();
+      if (in.data() == out.data()) out.restore();
       qudaMemset(fails, 0, sizeof(int)); // reset fails counter
     }
 
@@ -139,8 +141,10 @@ namespace quda {
 
   void unitarizeLinks(GaugeField& out, const GaugeField &in, int* fails)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     checkPrecision(out, in);
     instantiate<UnitarizeLinks, ReconstructNo12>(out, in, fails);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
   void unitarizeLinks(GaugeField &links, int* fails) { unitarizeLinks(links, links, fails); }
@@ -180,11 +184,13 @@ namespace quda {
 
   void projectSU3(GaugeField &u, double tol, int *fails)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     // check the the field doesn't have staggered phases applied
     if (u.StaggeredPhaseApplied())
       errorQuda("Cannot project gauge field with staggered phases applied");
 
     instantiate<ProjectSU3>(u, tol, fails);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
 } // namespace quda
