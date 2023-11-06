@@ -32,7 +32,6 @@ namespace quda {
     checkParitySpinor(in, out);
 
     ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., in, parity, dagger, commDim, profile);
-    flops += 1146ll*in.Volume();
   }
 
   void DiracImprovedStaggered::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
@@ -49,10 +48,8 @@ namespace quda {
       } else {
         ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., x, parity, QUDA_DAG_YES, commDim, profile);
       }
-      flops += 1146ll * in.Volume();
     } else {
       ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, k, x, parity, dagger, commDim, profile);
-      flops += 1158ll * in.Volume();
     }
   }
 
@@ -69,11 +66,9 @@ namespace quda {
         ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim,
                                profile);
       }
-      flops += 1146ll * in.Volume();
     } else {
       ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim,
                              profile);
-      flops += 1158ll * in.Volume();
     }
   }
 
@@ -115,7 +110,7 @@ namespace quda {
     bool is_time_slice = t0 >= 0 && t0 < comm_dim(3)*in.X(3) ? true : false;
     if( is_time_slice && laplace3D > 3 )
     {
-      warningQuda( "t0 will be ignored for d>3 dimensional Laplacian." );
+      if (getVerbosity() == QUDA_DEBUG_VERBOSE) warningQuda("t0 will be ignored for d>3 dimensional Laplacian.");
       is_time_slice = false;
     }
 
@@ -134,8 +129,6 @@ namespace quda {
     } else {
       ApplyStaggeredQSmear(out, in, *gauge, t0_local, is_time_slice, parity, laplace3D, dagger, comm_dim, profile);
     }
-
-    flops += ( laplace3D > 3 ? 570ll : 426ll ) * ( in.Volume() / ( is_time_slice ? in.X(3) : 1 ) );
   }  
 
   void DiracImprovedStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass,

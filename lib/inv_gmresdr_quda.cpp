@@ -143,8 +143,6 @@ namespace quda {
     inner.precision_sloppy = outer.precision_precondition;
 
     inner.iter = 0;
-    inner.gflops = 0;
-    inner.secs = 0;
 
     inner.inv_type_precondition = QUDA_INVALID_INVERTER;
     inner.is_preconditioner = true;
@@ -282,7 +280,7 @@ namespace quda {
         blas::zero(Vm->Component(i));
     }
 
-    if (Zm->V() != Vm->V()) {
+    if (Zm->data() != Vm->data()) {
       std::vector<ColorSpinorField *> z(Zm->Components());
       std::vector<ColorSpinorField *> vk(args.Vkp1->Components().begin(), args.Vkp1->Components().begin() + args.k);
 
@@ -469,7 +467,6 @@ namespace quda {
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    blas::flops = 0;
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
@@ -549,9 +546,6 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops()) * 1e-9;
-    param.gflops = gflops;
     param.iter += tot_iters;
 
     mat(r, x);
@@ -559,9 +553,6 @@ namespace quda {
     param.true_res = sqrt(xmyNorm(b, r) / b2);
 
     PrintSummary("FGMResDR:", tot_iters, r2, b2, stop, param.tol_hq);
-
-    blas::flops = 0;
-    mat.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 

@@ -15,6 +15,13 @@ namespace quda {
     const int stoutDim;
     unsigned int minThreads() const { return in.LocalVolumeCB(); }
 
+    unsigned int maxSharedBytesPerBlock() const { return maxDynamicSharedBytesPerBlock(); }
+    unsigned int sharedBytesPerThread() const
+    {
+      // use SharedMemoryCache if using over improvement for two link fields
+      return improved ? 2 * in.Ncolor() * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type) : 0;
+    }
+
   public:
     // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
     GaugeSTOUT(GaugeField &out, const GaugeField &in, bool improved, double rho, double epsilon = 0.0) :
@@ -37,12 +44,19 @@ namespace quda {
       if (!improved) {
         launch<STOUT>(tp, stream, STOUTArg<Float, nColor, recon, 3>(out, in, rho));
       } else if (improved) {
+        tp.set_max_shared_bytes = true;
         launch<OvrImpSTOUT>(tp, stream, STOUTArg<Float, nColor, recon, 4>(out, in, rho, epsilon));
       }
     }
 
-    void preTune() { if (out.Gauge_p() == in.Gauge_p()) out.backup(); }
-    void postTune() { if (out.Gauge_p() == in.Gauge_p()) out.restore(); }
+    void preTune()
+    {
+      if (out.data() == in.data()) out.backup();
+    }
+    void postTune()
+    {
+      if (out.data() == in.data()) out.restore();
+    }
 
     long long flops() const // just counts matrix multiplication
     {
@@ -64,7 +78,9 @@ namespace quda {
 
     copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
     in.exchangeExtendedGhost(in.R(), false);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeSTOUT>(out, in, false, rho);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     out.exchangeExtendedGhost(out.R(), false);
   }
 
@@ -76,7 +92,9 @@ namespace quda {
 
     copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
     in.exchangeExtendedGhost(in.R(), false);
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeSTOUT>(out, in, true, rho, epsilon);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     out.exchangeExtendedGhost(out.R(), false);
   }
 

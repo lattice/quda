@@ -7,7 +7,7 @@
 
 namespace quda {
 
-  template <typename Float, int nColor> class Clover : public TunableKernel2D {
+  template <typename Float, int nColor> class Clover : public TunableKernel3D {
     ColorSpinorField &out;
     const ColorSpinorField &in;
     const CloverField &clover;
@@ -17,7 +17,7 @@ namespace quda {
 
   public:
     Clover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover, bool inverse, int parity) :
-      TunableKernel2D(in, in.SiteSubset()),
+      TunableKernel3D(in, 1, in.SiteSubset()),
       out(out),
       in(in),
       clover(clover),
@@ -35,8 +35,14 @@ namespace quda {
       launch<CloverApply>(tp, stream, CloverArg<Float, nColor>(out, in, clover, parity));
     }
 
-    void preTune() { if (out.V() == in.V()) out.backup(); }  // Backup if in and out fields alias
-    void postTune() { if (out.V() == in.V()) out.restore(); } // Restore if the in and out fields alias
+    void preTune()
+    {
+      if (out.data() == in.data()) out.backup();
+    } // Backup if in and out fields alias
+    void postTune()
+    {
+      if (out.data() == in.data()) out.restore();
+    } // Restore if the in and out fields alias
     long long flops() const { return in.Volume()*504ll; }
     long long bytes() const { return out.Bytes() + in.Bytes() + clover.Bytes() / (3 - in.SiteSubset()); }
   };
@@ -55,7 +61,7 @@ namespace quda {
   }
 #endif // GPU_CLOVER_DIRAC
 
-  template <typename Float, int nColor> class TwistClover : public TunableKernel2D {
+  template <typename Float, int nColor> class TwistClover : public TunableKernel3D {
     ColorSpinorField &out;
     const ColorSpinorField &in;
     const CloverField &clover;
@@ -68,10 +74,15 @@ namespace quda {
     QudaTwistGamma5Type twist;
     unsigned int minThreads() const { return in.VolumeCB(); }
 
+    unsigned int sharedBytesPerThread() const
+    {
+      return (in.Nspin() / 2) * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type);
+    }
+
   public:
     TwistClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
                 double kappa, double mu, double epsilon, int parity, int dagger, QudaTwistGamma5Type twist) :
-      TunableKernel2D(in, in.SiteSubset()),
+      TunableKernel3D(in, in.TwistFlavor(), in.SiteSubset()),
       out(out),
       in(in),
       clover(clover),
@@ -85,6 +96,8 @@ namespace quda {
     {
       if (in.Nspin() != 4 || out.Nspin() != 4) errorQuda("Unsupported nSpin=%d %d", out.Nspin(), in.Nspin());
       strcat(aux, inverse ? ",inverse" : ",direct");
+      resizeVector(2, in.SiteSubset());
+      resizeStep(2, 1); // this will force flavor to be contained in the block
       apply(device::get_default_stream());
     }
 
@@ -108,8 +121,14 @@ namespace quda {
       }
     }
 
-    void preTune() { if (out.V() == in.V()) out.backup(); } // Restore if the in and out fields alias
-    void postTune() { if (out.V() == in.V()) out.restore(); } // Restore if the in and out fields alias
+    void preTune()
+    {
+      if (out.data() == in.data()) out.backup();
+    } // Restore if the in and out fields alias
+    void postTune()
+    {
+      if (out.data() == in.data()) out.restore();
+    } // Restore if the in and out fields alias
     long long flops() const { return (inverse ? 1056ll : 552ll) * in.Volume(); }
     long long bytes() const {
       long long rtn = out.Bytes() + in.Bytes() + clover.Bytes() / (3 - in.SiteSubset());

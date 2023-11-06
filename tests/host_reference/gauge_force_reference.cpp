@@ -9,6 +9,7 @@
 #include "host_utils.h"
 #include "misc.h"
 #include "gauge_force_reference.h"
+#include "timer.h"
 
 extern int Z[4];
 extern int V;
@@ -441,11 +442,11 @@ static void update_gauge(su3_matrix *gauge, int dir, su3_matrix **sitelink, su3_
 /* This function only computes one direction @dir
  *
  */
-void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelink, void **sitelink_ex,
+void gauge_force_reference_dir(void *refMom, int dir, double eb3, void *const *sitelink, void *const *sitelink_ex,
                                QudaPrecision prec, int **path_dir, int *length, void *loop_coeff, int num_paths,
                                const lattice_t &lat, bool compute_force)
 {
-  size_t size = V * 2 * lat.n_color * lat.n_color * prec;
+  size_t size = size_t(V) * 2 * lat.n_color * lat.n_color * prec;
   void *staple = safe_malloc(size);
   memset(staple, 0, size);
 
@@ -477,9 +478,11 @@ void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelin
   host_free(staple);
 }
 
-void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecision prec, int ***path_dir, int *length,
+void gauge_force_reference(void *refMom, double eb3, quda::GaugeField &u, int ***path_dir, int *length,
                            void *loop_coeff, int num_paths, bool compute_force)
 {
+  void *sitelink[] = {u.data(0), u.data(1), u.data(2), u.data(3)};
+
   // created extended field
   quda::lat_dim_t R;
   for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
@@ -491,17 +494,20 @@ void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecis
   auto qdp_ex = quda::createExtendedGauge((void **)sitelink, param, R);
   lattice_t lat(*qdp_ex);
 
+  void *sitelink_ex[] = {qdp_ex->data(0), qdp_ex->data(1), qdp_ex->data(2), qdp_ex->data(3)};
   for (int dir = 0; dir < 4; dir++) {
-    gauge_force_reference_dir(refMom, dir, eb3, sitelink, (void **)qdp_ex->Gauge_p(), prec, path_dir[dir], length,
-                              loop_coeff, num_paths, lat, compute_force);
+    gauge_force_reference_dir(refMom, dir, eb3, sitelink, sitelink_ex, u.Precision(), path_dir[dir], length, loop_coeff,
+                              num_paths, lat, compute_force);
   }
 
   delete qdp_ex;
 }
 
-void gauge_loop_trace_reference(void **sitelink, QudaPrecision prec, std::vector<quda::Complex> &loop_traces,
-                                double factor, int **input_path, int *length, double *path_coeff, int num_paths)
+void gauge_loop_trace_reference(quda::GaugeField &u, std::vector<quda::Complex> &loop_traces, double factor,
+                                int **input_path, int *length, double *path_coeff, int num_paths)
 {
+  void *sitelink[] = {u.data(0), u.data(1), u.data(2), u.data(3)};
+
   // create extended field
   quda::lat_dim_t R;
   for (int d = 0; d < 4; d++) R[d] = 2 * quda::comm_dim_partitioned(d);
@@ -512,12 +518,12 @@ void gauge_loop_trace_reference(void **sitelink, QudaPrecision prec, std::vector
 
   auto qdp_ex = quda::createExtendedGauge((void **)sitelink, param, R);
   lattice_t lat(*qdp_ex);
-  void **sitelink_ex = (void **)qdp_ex->Gauge_p();
+  void *sitelink_ex[] = {qdp_ex->data(0), qdp_ex->data(1), qdp_ex->data(2), qdp_ex->data(3)};
 
   std::vector<double> loop_tr_dbl(2 * num_paths);
 
   for (int i = 0; i < num_paths; i++) {
-    if (prec == QUDA_DOUBLE_PRECISION) {
+    if (u.Precision() == QUDA_DOUBLE_PRECISION) {
       dcomplex tr = compute_loop_trace((dsu3_matrix **)sitelink_ex, input_path[i], length[i], path_coeff[i], lat);
       loop_tr_dbl[2 * i] = factor * tr.real;
       loop_tr_dbl[2 * i + 1] = factor * tr.imag;

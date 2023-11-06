@@ -36,7 +36,7 @@ set (QUDA_OBJS
   field_cache.cpp
   gauge_covdev.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
-  cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
+  extract_gauge_ghost.cu
   gauge_norm.cu gauge_update_quda.cu
   max_clover.cu dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
   dirac_staggered_kd.cpp dirac_clover_hasenbusch_twist.cpp
@@ -84,8 +84,9 @@ set (QUDA_OBJS
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
   deflation.cpp checksum.cu transform_reduce.cu
   dslash5_mobius_eofa.cu
-  madwf_ml.cpp
-  instantiate.cpp version.cpp )
+  madwf_ml.cpp quda_ptr.cpp
+  instantiate.cpp version.cpp
+  block_transpose.cu )
 # cmake-format: on
 
 # current workaround for nvshmem
@@ -152,7 +153,14 @@ set(QUDA_MULTIGRID_NVEC_LIST "6,24,32" CACHE STRING "The list of null space vect
 set(QUDA_MULTIGRID_NC_NVEC_LIST "3,${QUDA_MULTIGRID_NVEC_LIST}")
 mark_as_advanced(QUDA_MULTIGRID_NVEC_LIST)
 
+set(QUDA_MULTIGRID_MRHS_LIST "16" CACHE STRING "The list of multi-rhs sizes that get compiled")
+mark_as_advanced(QUDA_MULTIGRID_MRHS_LIST)
+
+option(QUDA_MULTIGRID_SETUP_USE_SMMA ON)
+mark_as_advanced(QUDA_MULTIGRID_SETUP_USE_SMMA)
+
 message(STATUS "QUDA_MULTIGRID_NVEC_LIST=${QUDA_MULTIGRID_NVEC_LIST}")
+message(STATUS "QUDA_MULTIGRID_MRHS_LIST=${QUDA_MULTIGRID_MRHS_LIST}")
 configure_file(dslash_coarse.in.cpp dslash_coarse.cpp @ONLY)
 configure_file(coarse_op.in.cpp coarse_op.cpp @ONLY)
 configure_file(coarsecoarse_op.in.cpp coarsecoarse_op.cpp @ONLY)
@@ -166,12 +174,16 @@ configure_file(extract_gauge_ghost.in.cu extract_gauge_ghost.cu @ONLY)
 configure_file(gauge_noise.in.cu gauge_noise.cu @ONLY)
 configure_file(gauge_norm.in.cu gauge_norm.cu @ONLY)
 configure_file(spinor_noise.in.cu spinor_noise.cu @ONLY)
+configure_file(spinor_dilute.in.cu spinor_dilute.cu @ONLY)
 configure_file(copy_color_spinor_mg.in.hpp copy_color_spinor_mg.hpp @ONLY)
 configure_file(color_spinor_pack.in.cu color_spinor_pack.cu @ONLY)
 configure_file(color_spinor_util.in.cu color_spinor_util.cu @ONLY)
+configure_file(dslash_coarse_mma.in.hpp dslash_coarse_mma.hpp @ONLY)
+configure_file(block_transpose.in.cu block_transpose.cu @ONLY)
 
 if(QUDA_MULTIGRID)
   string(REPLACE "," ";" QUDA_MULTIGRID_NVEC_LIST_SEMICOLON "${QUDA_MULTIGRID_NVEC_LIST}")
+  string(REPLACE "," ";" QUDA_MULTIGRID_MRHS_LIST_SEMICOLON "${QUDA_MULTIGRID_MRHS_LIST}")
   foreach(QUDA_MULTIGRID_NVEC ${QUDA_MULTIGRID_NVEC_LIST_SEMICOLON})
     configure_file(copy_gauge_mg.in.cu "copy_gauge_mg_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
     configure_file(extract_gauge_ghost_mg.in.cu "extract_gauge_ghost_mg_${QUDA_MULTIGRID_NVEC}.cu" @ONLY)
@@ -287,9 +299,13 @@ include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag(-gz QUDA_COMPRESS_DEBUG)
 
 if(NOT QUDA_BACKWARDS)
-  target_link_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_LINKER_COMPRESS}:-Wl,--compress-debug-sections=zlib>>)
-  target_compile_options(quda_cpp PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_COMPRESS_DEBUG}:-gz>>)
-  target_compile_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_COMPRESS_DEBUG}:-gz>>)
+  if(${QUDA_LINKER_COMPRESS})
+    target_link_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_LINKER_COMPRESS}:-Wl,--compress-debug-sections=zlib>>)
+  endif()
+  if(${QUDA_COMPRESS_DEBUG})
+    target_compile_options(quda_cpp PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_COMPRESS_DEBUG}:-gz>>)
+    target_compile_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_COMPRESS_DEBUG}:-gz>>)
+  endif()
 endif()
 
 # set up QUDA compile options, put them before target specific options
@@ -459,6 +475,14 @@ endif()
 # set which precisions to enable
 target_compile_definitions(quda PUBLIC QUDA_PRECISION=${QUDA_PRECISION})
 target_compile_definitions(quda PUBLIC QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
+
+if(QUDA_ENABLE_MMA)
+  target_compile_definitions(quda PUBLIC QUDA_ENABLE_MMA)
+endif()
+
+if(QUDA_MULTIGRID_SETUP_USE_SMMA)
+  target_compile_definitions(quda PUBLIC QUDA_MULTIGRID_SETUP_USE_SMMA)
+endif()
 
 if(QUDA_FAST_COMPILE_REDUCE)
   target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_REDUCE)

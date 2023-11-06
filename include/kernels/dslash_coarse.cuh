@@ -1,3 +1,5 @@
+#pragma once
+
 #include <gauge_field_order.h>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>

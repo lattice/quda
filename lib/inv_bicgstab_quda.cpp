@@ -11,9 +11,6 @@
 
 namespace quda {
 
-  // set the required parameters for the inner solver
-  void fillInnerSolveParam(SolverParam &inner, const SolverParam &outer);
-
   BiCGstab::BiCGstab(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
                      const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
     Solver(mat, matSloppy, matPrecon, matEig, param, profile),
@@ -189,9 +186,6 @@ namespace quda {
     ColorSpinorField &xSloppy = *x_sloppy;
     ColorSpinorField &r0 = *r_0;
 
-    SolverParam solve_param_inner(param);
-    fillInnerSolveParam(solve_param_inner, param);
-
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
     const bool use_heavy_quark_res =
@@ -219,10 +213,6 @@ namespace quda {
     double maxrx = rNorm;
 
     PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
-
-    if (!param.is_preconditioner) { // do not do the below if we this is an inner solver
-      blas::flops = 0;
-    }
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -350,10 +340,6 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
-
-    param.gflops += gflops;
     param.iter += k;
 
     if (k==param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
@@ -368,12 +354,6 @@ namespace quda {
 
       PrintSummary("BiCGstab", k, r2, b2, stop, param.tol_hq);
     }
-
-    // reset the flops counters
-    blas::flops = 0;
-    mat.flops();
-    matSloppy.flops();
-    matPrecon.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 

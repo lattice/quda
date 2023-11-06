@@ -147,9 +147,6 @@ namespace quda
     const char *file;
     const char *line;
 
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-
   public:
     inline QudaMem(void *dst, const void *src, size_t count, hipMemcpyKind kind, const qudaStream_t &stream, bool async,
                    const char *func, const char *file, const char *line) :
@@ -215,7 +212,7 @@ namespace quda
       apply(stream);
     }
 
-    inline void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t &stream) override
     {
       if (!active_tuning) tuneLaunch(*this, getTuning(), getVerbosity());
 
@@ -244,9 +241,9 @@ namespace quda
       }
     }
 
-    bool advanceTuneParam(TuneParam &) const { return false; }
+    bool advanceTuneParam(TuneParam &) const override { return false; }
 
-    TuneKey tuneKey() const
+    TuneKey tuneKey() const override
     {
       char vol[128];
       strcpy(vol, "bytes=");
@@ -254,8 +251,7 @@ namespace quda
       return TuneKey(vol, name, aux);
     }
 
-    long long flops() const { return 0; }
-    long long bytes() const { return kind == hipMemcpyDeviceToDevice ? 2 * count : count; }
+    long long bytes() const override { return kind == hipMemcpyDeviceToDevice ? 2 * count : count; }
   };
 
   void qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const char *func, const char *file,
@@ -263,6 +259,14 @@ namespace quda
   {
     if (count == 0) return;
     QudaMem copy(dst, src, count, qudaMemcpyKindToAPI(kind), device::get_default_stream(), false, func, file, line);
+  }
+
+  void qudaMemcpy_(const quda_ptr &dst, const quda_ptr &src, size_t count, qudaMemcpyKind kind, const char *func,
+                   const char *file, const char *line)
+  {
+    if (count == 0) return;
+    QudaMem copy(dst.data(), src.data(), count, qudaMemcpyKindToAPI(kind), device::get_default_stream(), false, func,
+                 file, line);
   }
 
   void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
@@ -292,6 +296,16 @@ namespace quda
     QudaMem set(ptr, value, count, device::get_default_stream(), false, func, file, line);
   }
 
+  void qudaMemset_(quda_ptr &ptr, int value, size_t count, const char *func, const char *file, const char *line)
+  {
+    if (count == 0) return;
+    if (ptr.is_device()) {
+      QudaMem set(ptr.data(), value, count, device::get_default_stream(), false, func, file, line);
+    } else {
+      memset(ptr.data(), value, count);
+    }
+  }
+
   void qudaMemsetAsync_(void *ptr, int value, size_t count, const qudaStream_t &stream, const char *func,
                         const char *file, const char *line)
   {
@@ -299,18 +313,27 @@ namespace quda
     QudaMem copy(ptr, value, count, stream, true, func, file, line);
   }
 
-  void qudaMemset2D_(void *ptr, size_t pitch, int value, size_t width, size_t height, const char *func,
-                     const char *file, const char *line)
+  void qudaMemsetAsync_(quda_ptr &ptr, int value, size_t count, const qudaStream_t &stream, const char *func,
+                        const char *file, const char *line)
   {
-    hipError_t error = hipMemset2D(ptr, pitch, value, width, height);
-    set_runtime_error(error, __func__, func, file, line);
+    if (count == 0) return;
+    if (ptr.is_device()) {
+      QudaMem set(ptr.data(), value, count, stream, true, func, file, line);
+    } else {
+      memset(ptr.data(), value, count);
+    }
   }
 
-  void qudaMemset2DAsync_(void *ptr, size_t pitch, int value, size_t width, size_t height, const qudaStream_t &stream,
-                          const char *func, const char *file, const char *line)
+  void qudaMemset2DAsync_(quda_ptr &ptr, size_t offset, size_t pitch, int value, size_t width, size_t height,
+                          const qudaStream_t &stream, const char *func, const char *file, const char *line)
   {
-    hipError_t error = hipMemset2DAsync(ptr, pitch, value, width, height, get_stream(stream));
-    set_runtime_error(error, __func__, func, file, line);
+    if (ptr.is_device()) {
+      hipError_t error
+        = hipMemset2DAsync(static_cast<char *>(ptr.data()) + offset, pitch, value, width, height, get_stream(stream));
+      set_runtime_error(error, __func__, func, file, line);
+    } else {
+      for (auto i = 0u; i < height; i++) memset(static_cast<char *>(ptr.data()) + offset + i * pitch, value, width);
+    }
   }
 
   void qudaMemPrefetchAsync_(void *, size_t, QudaFieldLocation, const qudaStream_t &, const char *, const char *,
@@ -318,41 +341,6 @@ namespace quda
   {
     // No prefetch
   }
-
-#if 0
-  bool qudaEventQuery_(qudaEvent_t &quda_event, const char *func, const char *file, const char *line)
-  {
-    cudaEvent_t &event = reinterpret_cast<cudaEvent_t&>(quda_event.event);
-#ifdef USE_DRIVER_API
-    PROFILE(CUresult error = cuEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
-    switch (error) {
-    case CUDA_SUCCESS: return true;
-    case CUDA_ERROR_NOT_READY: return false;
-    default: set_driver_error(error, __func__, func, file, line);
-    }
-#else
-    PROFILE(cudaError_t error = cudaEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
-    switch (error) {
-    case cudaSuccess: return true;
-    case cudaErrorNotReady: return false;
-    default: set_runtime_error(error, __func__, func, file, line);
-    }
-#endif
-    return false;
-  }
-
-  void qudaEventRecord_(qudaEvent_t &quda_event, qudaStream_t stream, const char *func, const char *file, const char *line)
-  {
-    cudaEvent_t &event = reinterpret_cast<cudaEvent_t&>(quda_event.event);
-#ifdef USE_DRIVER_API
-    PROFILE(CUresult error = cuEventRecord(event, get_stream(stream)), QUDA_PROFILE_EVENT_RECORD);
-    set_driver_error(error, __func__, func, file, line);
-#else
-    PROFILE(cudaError_t error = cudaEventRecord(event, get_stream(stream)), QUDA_PROFILE_EVENT_RECORD);
-    set_runtime_error(error, __func__, func, file, line);
-#endif
-  }
-#endif
 
   bool qudaEventQuery_(qudaEvent_t &quda_event, const char *func, const char *file, const char *line)
   {

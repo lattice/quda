@@ -4,6 +4,7 @@
 #include <instantiate.h>
 #include <tunable_nd.h>
 #include <kernels/gauge_random.cuh>
+#include "timer.h"
 
 namespace quda {
 
@@ -55,19 +56,26 @@ namespace quda {
     if (U.LinkType() != QUDA_SU3_LINKS && U.LinkType() != QUDA_MOMENTUM_LINKS)
       errorQuda("Unexpected link type %d", U.LinkType());
 
+    getProfile().TPSTART(QUDA_PROFILE_COMPUTE);
     instantiate<GaugeGauss, ReconstructFull>(U, rng, sigma);
+    getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
 
     // ensure multi-gpu consistency if required
+    getProfile().TPSTART(QUDA_PROFILE_COMMS);
     if (U.GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED) {
       U.exchangeExtendedGhost(U.R());
     } else if (U.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD) {
       U.exchangeGhost();
     }
+    getProfile().TPSTOP(QUDA_PROFILE_COMMS);
   }
 
   void gaugeGauss(GaugeField &U, unsigned long long seed, double sigma)
   {
+    getProfile().TPSTART(QUDA_PROFILE_COMMS);
     RNG randstates(U, seed);
+    getProfile().TPSTOP(QUDA_PROFILE_COMMS);
+
     gaugeGauss(U, randstates, sigma);
   }
 

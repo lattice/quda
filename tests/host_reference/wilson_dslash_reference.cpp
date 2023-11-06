@@ -191,8 +191,9 @@ void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qu
 
   GaugeFieldParam gauge_field_param(gauge_param, gauge);
   gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  cpuGaugeField cpu(gauge_field_param);
-  void **ghostGauge = (void **)cpu.Ghost();
+  gauge_field_param.location = QUDA_CPU_FIELD_LOCATION;
+  GaugeField cpu(gauge_field_param);
+  void *ghostGauge[4] = {cpu.Ghost()[0].data(), cpu.Ghost()[1].data(), cpu.Ghost()[2].data(), cpu.Ghost()[3].data()};
 
   // Get spinor ghost fields
   // First wrap the input spinor into a ColorSpinorField

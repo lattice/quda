@@ -47,7 +47,14 @@ namespace quda
 
       if (location == QUDA_CUDA_FIELD_LOCATION) strcat(aux, Y.MemType() == QUDA_MEMORY_MAPPED ? ",GPU-mapped" : ",GPU-device");
       strcat(aux, comm_dim_partitioned_string());
-      if (use_mma && location == QUDA_CUDA_FIELD_LOCATION) { strcat(aux, ",mma"); }
+      if constexpr (use_mma) {
+        if (location == QUDA_CUDA_FIELD_LOCATION) {
+          strcat(aux, ",mma");
+#ifdef QUDA_MMA_AVAILABLE
+          strcat(aux, mma::mg_mma_dispatch_t<Float>::type::get_type_name().c_str());
+#endif
+        }
+      }
       if (Arg::compute_max) strcat(aux, ",compute_max");
 
       apply(device::get_default_stream());
@@ -91,7 +98,7 @@ namespace quda
 
     bool advanceAux(TuneParam &param) const
     {
-      if (use_mma) {
+      if constexpr (use_mma) {
         constexpr bool query_max = true;
         int max = mma::launch_yhat_kernel<query_max>(param, device::get_default_stream(), arg, *this);
         if (param.aux.x < max) {
@@ -99,9 +106,8 @@ namespace quda
           return true;
         }
         return false;
-      } else {
-        return false;
       }
+      return false;
     }
 
     bool advanceTuneParam(TuneParam &param) const
@@ -160,7 +166,7 @@ namespace quda
           GaugeFieldParam param(X);
           param.order = gOrder_milc;
           param.setPrecision(X.Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : X.Precision());
-          output = cudaGaugeField::Create(param);
+          output = new GaugeField(param);
           if (copy_content) output->copy(X);
         }
         return output;
@@ -169,8 +175,8 @@ namespace quda
       GaugeField *X_aos = create_gauge_copy(X, true);
       Xinv_aos = create_gauge_copy(Xinv, false);
 
-      blas::flops += invert((void *)Xinv_aos->Gauge_p(), (void *)X_aos->Gauge_p(), n, X_aos->Volume(),
-                            X_aos->Precision(), X.Location());
+      Tunable::flops_global(invert(Xinv_aos->data(), X_aos->data(), n, X_aos->Volume(), X_aos->Precision(), X.Location())
+                            + Tunable::flops_global());
 
       if (&Xinv != Xinv_aos) {
         if (Xinv.Precision() < QUDA_SINGLE_PRECISION) Xinv.Scale(Xinv_aos->abs_max());
@@ -181,9 +187,8 @@ namespace quda
       if (!use_mma) { delete Xinv_aos; }
 
     } else if (X.Location() == QUDA_CPU_FIELD_LOCATION && X.Order() == QUDA_QDP_GAUGE_ORDER) {
-      const cpuGaugeField *X_h = static_cast<const cpuGaugeField*>(&X);
-      cpuGaugeField *Xinv_h = static_cast<cpuGaugeField*>(&Xinv);
-      blas::flops += invert(*(void**)Xinv_h->Gauge_p(), *(void**)X_h->Gauge_p(), n, X_h->Volume(), X.Precision(), X.Location());
+      Tunable::flops_global(invert(Xinv.data<void *>(0), X.data<void *>(0), n, X.Volume(), X.Precision(), X.Location())
+                            + Tunable::flops_global());
     } else {
       errorQuda("Unsupported location=%d and order=%d", X.Location(), X.Order());
     }
@@ -207,7 +212,7 @@ namespace quda
             param.order = order;
             // if we did the exchange on AoS order, then this zero initialize wouldn't be needed
             if (!copy_content) param.create = QUDA_ZERO_FIELD_CREATE;
-            output = cudaGaugeField::Create(param);
+            output = new GaugeField(param);
             if (copy_content) output->copy(X);
           }
           return output;

@@ -12,6 +12,7 @@
 
 #include <color_spinor_field.h>
 #include <vector>
+#include <reference_wrapper_helper.h>
 
 namespace quda {
 
@@ -301,6 +302,24 @@ namespace quda {
   template <int coarseColor, int fineColor>
   void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
                           const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho, bool two_pass);
+
+  /**
+     @brief Transpose the B vectors into a composite V field:
+       - B: nVec -> spatial/N -> spin/color -> N, where N is for that in floatN
+       - V: spatial -> spin/color -> nVec
+     @param[out] The output V Matrix field
+     @param[in] B input vectors
+   */
+  void BlockTransposeForward(ColorSpinorField &V, const cvector_ref<const ColorSpinorField> &B);
+
+  /**
+     @brief Transpose the a composite V field into B vectors:
+       - B: nVec -> spatial/N -> spin/color -> N, where N is for that in floatN
+       - V: spatial -> spin/color -> nVec
+     @param[in] The output V Matrix field
+     @param[out] B input vectors
+   */
+  void BlockTransposeBackward(const ColorSpinorField &V, const cvector_ref<ColorSpinorField> &B);
 
   /**
      @brief Apply the prolongation operator

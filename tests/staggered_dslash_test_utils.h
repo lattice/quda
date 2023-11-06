@@ -19,6 +19,7 @@
 #include "dslash_test_helpers.h"
 #include <assert.h>
 #include <gtest/gtest.h>
+#include <tune_quda.h>
 
 using namespace quda;
 
@@ -52,8 +53,8 @@ struct StaggeredDslashTestWrapper {
   void *milc_fatlink_gpu;
   void *milc_longlink_gpu;
 
-  cpuGaugeField *cpuFat = nullptr;
-  cpuGaugeField *cpuLong = nullptr;
+  GaugeField *cpuFat = nullptr;
+  GaugeField *cpuLong = nullptr;
 
   ColorSpinorField spinor;
   ColorSpinorField spinorOut;
@@ -66,9 +67,10 @@ struct StaggeredDslashTestWrapper {
   std::vector<ColorSpinorField> vp_spinor_out;
 
   // In the HISQ case, we include building fat/long links in this unit test
-  void *qdp_fatlink_cpu[4] = {nullptr, nullptr, nullptr, nullptr};
-  void *qdp_longlink_cpu[4] = {nullptr, nullptr, nullptr, nullptr};
-  void **ghost_fatlink_cpu = nullptr, **ghost_longlink_cpu = nullptr;
+  void *qdp_fatlink_cpu[4] = {};
+  void *qdp_longlink_cpu[4] = {};
+  void *ghost_fatlink_cpu[4] = {};
+  void *ghost_longlink_cpu[4] = {};
 
   QudaParity parity = QUDA_EVEN_PARITY;
 
@@ -79,8 +81,8 @@ struct StaggeredDslashTestWrapper {
   char **argv_copy;
 
   // Split grid options
-  int num_src;
-  int test_split_grid;
+  bool test_split_grid = false;
+  int num_src = 1;
 
   void staggeredDslashRef()
   {
@@ -102,9 +104,9 @@ struct StaggeredDslashTestWrapper {
       staggeredDslash(spinorRef.Odd(), qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
                       spinor.Even(), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
       if (dslash_type == QUDA_LAPLACE_DSLASH) {
-        xpay(spinor.V(), kappa, spinorRef.V(), spinor.Length(), gauge_param.cpu_prec);
+        xpay(spinor.data(), kappa, spinorRef.data(), spinor.Length(), gauge_param.cpu_prec);
       } else {
-        axpy(2 * mass, spinor.V(), spinorRef.V(), spinor.Length(), gauge_param.cpu_prec);
+        axpy(2 * mass, spinor.data(), spinorRef.data(), spinor.Length(), gauge_param.cpu_prec);
       }
       break;
     default: errorQuda("Test type %d not defined", static_cast<int>(dtest_type));
@@ -154,7 +156,6 @@ struct StaggeredDslashTestWrapper {
 
     num_src = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
     test_split_grid = num_src > 1;
-
     if (test_split_grid) { dtest_type = dslash_test_type::Dslash; }
 
     inv_param.dagger = dagger ? QUDA_DAG_YES : QUDA_DAG_NO;
@@ -204,15 +205,15 @@ struct StaggeredDslashTestWrapper {
     gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
     GaugeFieldParam cpuFatParam(gauge_param, milc_fatlink_cpu);
     cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-    cpuFat = new cpuGaugeField(cpuFatParam);
-    ghost_fatlink_cpu = cpuFat->Ghost();
+    cpuFat = new GaugeField(cpuFatParam);
+    for (int i = 0; i < 4; i++) ghost_fatlink_cpu[i] = cpuFat->Ghost()[i].data();
 
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
       gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
       GaugeFieldParam cpuLongParam(gauge_param, milc_longlink_cpu);
       cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-      cpuLong = new cpuGaugeField(cpuLongParam);
-      ghost_longlink_cpu = cpuLong ? cpuLong->Ghost() : nullptr;
+      cpuLong = new GaugeField(cpuLongParam);
+      for (int i = 0; i < 4; i++) ghost_longlink_cpu[i] = cpuLong ? cpuLong->Ghost()[i].data() : nullptr;
     }
 #endif
 
@@ -364,8 +365,8 @@ struct StaggeredDslashTestWrapper {
       std::vector<void *> _hp_x(inv_param.num_src);
       std::vector<void *> _hp_b(inv_param.num_src);
       for (int i = 0; i < inv_param.num_src; i++) {
-        _hp_x[i] = vp_spinor_out[i].V();
-        _hp_b[i] = vp_spinor[i].V();
+        _hp_x[i] = vp_spinor_out[i].data();
+        _hp_b[i] = vp_spinor[i].data();
       }
       dslashMultiSrcStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, parity, milc_fatlink_gpu, milc_longlink_gpu,
                                   &gauge_param);
@@ -405,19 +406,29 @@ struct StaggeredDslashTestWrapper {
     printfQuda("Tuning...\n");
     dslashCUDA(1);
 
-    // reset flop counter
-    dirac->Flops();
+    auto flops0 = quda::Tunable::flops_global();
+    auto bytes0 = quda::Tunable::bytes_global();
 
     DslashTime dslash_time = dslashCUDA(niter);
+
+    unsigned long long flops = (quda::Tunable::flops_global() - flops0);
+    unsigned long long bytes = (quda::Tunable::bytes_global() - bytes0);
+
     spinorOut = cudaSpinorOut;
 
     if (print_metrics) {
       printfQuda("%fus per kernel call\n", 1e6 * dslash_time.event_time / niter);
 
-      unsigned long long flops = dirac->Flops();
+      printfQuda("%llu flops per kernel call, %llu flops per site %llu bytes per site\n", flops / niter,
+                 (flops / niter) / cudaSpinor.Volume(), (bytes / niter) / cudaSpinor.Volume());
+
       double gflops = 1.0e-9 * flops / dslash_time.event_time;
       printfQuda("GFLOPS = %f\n", gflops);
       ::testing::Test::RecordProperty("Gflops", std::to_string(gflops));
+
+      double gbytes = 1.0e-9 * bytes / dslash_time.event_time;
+      printfQuda("GBYTES = %f\n", gbytes);
+      ::testing::Test::RecordProperty("Gbytes", std::to_string(gbytes));
 
       size_t ghost_bytes = cudaSpinor.GhostBytes();
 
