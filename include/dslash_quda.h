@@ -808,7 +808,7 @@ namespace quda
   */
   void gamma5(ColorSpinorField &out, const ColorSpinorField &in);
 
-  /* RG: I have written these */
+  /* RG: I have added these */
   void gamma0(ColorSpinorField &out, const ColorSpinorField &in);
   void gamma1(ColorSpinorField &out, const ColorSpinorField &in);
   void gamma2(ColorSpinorField &out, const ColorSpinorField &in);

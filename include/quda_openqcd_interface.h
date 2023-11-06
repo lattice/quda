@@ -92,10 +92,7 @@ typedef struct {
   void *gauge;                  /** base pointer to the gauge fields */
   int volume;                   /** VOLUME */
   int bndry;                    /** BNDRY */
-  void (*reorder_gauge_openqcd_to_quda)(void *in, void *out);
   void (*reorder_gauge_quda_to_openqcd)(void *in, void *out);
-  void (*reorder_spinor_openqcd_to_quda)(void *in, void *out);
-  void (*reorder_spinor_quda_to_openqcd)(void *in, void *out);
 } openQCD_QudaInitArgs_t;
 
 
@@ -116,14 +113,6 @@ typedef struct {
   double u1csw;   /* u1csw: csw coefficient for U(1) fields, quda doesn't respect that parameter (yet) */
   int qhat;       /* qhat: quda doesn't respect that parameter (yet) */
 } openQCD_QudaDiracParam_t;
-
-
-typedef struct {
-  double tol;             /* solver tolerance (relative residual) */
-  double nmx;             /* maximal number of steps */
-  int nkv;                /* number of Krylov vector to keep */
-  double reliable_delta;  /* controls interval at wich accurate residual is updated */
-} openQCD_QudaGCRParam_t;
 
 
 /**
@@ -151,13 +140,23 @@ void openQCD_back_and_forth(void *h_in, void *h_out);
 
 
 /**
- * @brief      Norm square on QUDA.
+ * @brief      Norm square in QUDA.
  *
  * @param[in]  h_in  Spinor input field (from openQCD)
  *
  * @return     The norm
  */
 double openQCD_qudaNorm(void *h_in);
+
+
+/**
+ * @brief      Prototype function for the norm-square in QUDA without loading
+ *             the field.
+ *
+ * @param[in]  d_in  Spinor input field (device pointer)
+ *
+ * @return     The norm
+ */
 double openQCD_qudaNorm_NoLoads(void *d_in);
 
 
@@ -190,40 +189,6 @@ void openQCD_qudaSpinorFree(void** quda_field);
 void openQCD_qudaDw(void *src, void *dst, openQCD_QudaDiracParam_t p);
 void openQCD_qudaDdagD(void *src, void *dst, openQCD_QudaDiracParam_t p);
 void openQCD_qudaDw2(void *param, double mu, void *src, void *dst);
-
-
-/**
- * Solve Ax=b for a Clover Wilson operator using QUDAs GCR algorithm. All fields
- * are fields passed and returned are host (CPU) field in openQCD order. This
- * function requires that persistent gauge and clover fields have been created
- * prior.
- *
- * @param[in]  source       Source spinor
- * @param[out] solution     Solution spinor
- * @param[in]  dirac_param  Dirac parameter struct
- * @param[in]  gcr_param    GCR parameter struct
- *
- * @return     residual
- */
-double openQCD_qudaGCR(void *source, void *solution,
-  openQCD_QudaDiracParam_t dirac_param, openQCD_QudaGCRParam_t gcr_param);
-
-
-/**
- * Solve Ax=b for an Clover Wilson operator with a multigrid solver. All fields
- * are fields passed and returned are host (CPU) field in openQCD order.  This
- * function requires that persistent gauge and clover fields have been created
- * prior.
- *
- * Requires QUDA_PRECISION & 2 != 0, e.g. QUDA_PRECISON = 14
- *
- * @param[in]  source       Right-hand side source field
- * @param[out] solution     Solution spinor field
- * @param[in]  dirac_param  Dirac parameter struct
- *
- * @return     residual
- */
-double openQCD_qudaMultigrid(void *source, void *solution, openQCD_QudaDiracParam_t dirac_param);
 
 
 /**
