@@ -25,11 +25,6 @@
 #include <transform_reduce.h>
 #include <communicator_quda.h>
 
-// TODO: The ipt functions can be incorporated here (so no reordering needed in OpenQXD side)
-// OpenQxD helpers:
-// #include "../../openQxD-devel/include/lattice.h"
-
-
 namespace quda {
 
   /**
@@ -52,11 +47,11 @@ namespace quda {
       T &gauge;
 
       /**
-   @brief gauge_wrapper constructor
-   @param[in] gauge Gauge field accessor we are wrapping
-   @param[in] dim Dimension we are accessing
-   @param[in] x_cb Checkerboarded space-time index we are accessing
-   @param[in] parity Parity we are accessing
+	 @brief gauge_wrapper constructor
+	 @param[in] gauge Gauge field accessor we are wrapping
+	 @param[in] dim Dimension we are accessing
+	 @param[in] x_cb Checkerboarded space-time index we are accessing
+	 @param[in] parity Parity we are accessing
        */
       __device__ __host__ inline gauge_wrapper<Float, T>(T &gauge, int dim, int x_cb, int parity, Float phase = 1.0) :
         dim(dim), x_cb(x_cb), parity(parity), phase(phase), gauge(gauge)
@@ -64,8 +59,8 @@ namespace quda {
       }
 
       /**
-   @brief Assignment operator with Matrix instance as input
-   @param[in] M Matrix we want to store in this accessor
+	 @brief Assignment operator with Matrix instance as input
+	 @param[in] M Matrix we want to store in this accessor
        */
       template <typename M> __device__ __host__ inline void operator=(const M &a) const
       {
@@ -113,11 +108,11 @@ namespace quda {
       T &gauge;
 
       /**
-   @brief gauge_wrapper constructor
-   @param[in] gauge Gauge field accessor we are wrapping
-   @param[in] dim Dimension we are accessing
-   @param[in] ghost_idx Ghost index we are accessing
-   @param[in] parity Parity we are accessing
+	 @brief gauge_wrapper constructor
+	 @param[in] gauge Gauge field accessor we are wrapping
+	 @param[in] dim Dimension we are accessing
+	 @param[in] ghost_idx Ghost index we are accessing
+	 @param[in] parity Parity we are accessing
        */
       __device__ __host__ inline gauge_ghost_wrapper<Float, T>(T &gauge, int dim, int ghost_idx, int parity,
                                                                Float phase = 1.0) :
@@ -126,8 +121,8 @@ namespace quda {
       }
 
       /**
-   @brief Assignment operator with Matrix instance as input
-   @param[in] M Matrix we want to store in this accessot
+	 @brief Assignment operator with Matrix instance as input
+	 @param[in] M Matrix we want to store in this accessot
        */
       template <typename M> __device__ __host__ inline void operator=(const M &a) const
       {
@@ -642,14 +637,14 @@ namespace quda {
         scale(static_cast<Float>(1.0)),
         scale_inv(static_cast<Float>(1.0))
       {
-  resetScale(U.Scale());
+	resetScale(U.Scale());
       }
 
       void resetScale(Float max)
       {
         if (fixed) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
-    scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
+	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
         }
       }
 
@@ -791,14 +786,14 @@ namespace quda {
         ghostAccessor(U, (void *)gauge_, (void **)ghost_)
       {
         if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("GaugeField ordering not supported with reconstruction");
-  }
+	}
 
-  void resetScale(double max) {
-    accessor.resetScale(max);
-    ghostAccessor.resetScale(max);
-  }
+	void resetScale(double max) {
+	  accessor.resetScale(max);
+	  ghostAccessor.resetScale(max);
+	}
 
-  static constexpr bool fixedPoint() { return fixed_point<Float,storeFloat>(); }
+	static constexpr bool fixedPoint() { return fixed_point<Float,storeFloat>(); }
 
         /**
          * accessor function
@@ -880,7 +875,7 @@ namespace quda {
         }
 
         /** Returns the number of field colors */
-  __device__ __host__ inline int Ncolor() const { return nColor; }
+	__device__ __host__ inline int Ncolor() const { return nColor; }
 
 	/** Returns the field volume */
         __device__ __host__ inline auto Volume() const { return 2 * volumeCB; }
@@ -891,21 +886,21 @@ namespace quda {
         /** Returns the field geometric dimension */
         __device__ __host__ inline int Ndim() const { return nDim; }
 
-  /** Returns the field geometry */
-  __device__ __host__ inline int Geometry() const { return geometry; }
+	/** Returns the field geometry */
+	__device__ __host__ inline int Geometry() const { return geometry; }
 
-  /** Returns the number of coarse gauge field spins */
-  __device__ __host__ inline int NspinCoarse() const { return nSpinCoarse; }
+	/** Returns the number of coarse gauge field spins */
+	__device__ __host__ inline int NspinCoarse() const { return nSpinCoarse; }
 
-  /** Returns the number of coarse gauge field colors */
-  __device__ __host__ inline int NcolorCoarse() const { return nColorCoarse; }
+	/** Returns the number of coarse gauge field colors */
+	__device__ __host__ inline int NcolorCoarse() const { return nColorCoarse; }
 
-  /**
-   * @brief Returns the L1 norm of the field in a given dimension
-   * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
-   * @return L1 norm
-   */
-  __host__ double norm1(int dim=-1, bool global=true) const {
+	/**
+	 * @brief Returns the L1 norm of the field in a given dimension
+	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+	 * @return L1 norm
+	 */
+	__host__ double norm1(int dim=-1, bool global=true) const {
           commGlobalReductionPush(global);
           double nrm1 = accessor.template transform_reduce<plus<double>>(location, dim,
                                                                          abs_<double, storeFloat>(accessor.scale_inv));
@@ -1059,12 +1054,12 @@ namespace quda {
       __device__ __host__ inline Float milcStaggeredPhase(int dim, const int x[], const I R[]) {
         // could consider non-extended variant too?
         Float sign = static_cast<Float>(1.0);
-  switch (dim) {
-  case 0: if ( ((x[3] - R[3]) & 1) != 0)                             sign = -static_cast<Float>(1.0); break;
-  case 1: if ( ((x[0] - R[0] + x[3] - R[3]) & 1) != 0)               sign = -static_cast<Float>(1.0); break;
-  case 2: if ( ((x[0] - R[0] + x[1] - R[1] + x[3] - R[3]) & 1) != 0) sign = -static_cast<Float>(1.0); break;
-  }
-  return sign;
+	switch (dim) {
+	case 0: if ( ((x[3] - R[3]) & 1) != 0)                             sign = -static_cast<Float>(1.0); break;
+	case 1: if ( ((x[0] - R[0] + x[3] - R[3]) & 1) != 0)               sign = -static_cast<Float>(1.0); break;
+	case 2: if ( ((x[0] - R[0] + x[1] - R[1] + x[3] - R[3]) & 1) != 0) sign = -static_cast<Float>(1.0); break;
+	}
+	return sign;
       }
 
       /**
@@ -1561,7 +1556,7 @@ namespace quda {
             errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
 
           // static_assert( !(stag_phase!=QUDA_STAGGERED_PHASE_NO && reconLenParam != 18 && reconLenParam != 12),
-          //         "staggered phase only presently supported for 18 and 12 reconstruct");
+          // 	       "staggered phase only presently supported for 18 and 12 reconstruct");
           for (int i = 0; i < 4; i++) {
             X[i] = u.X()[i];
             R[i] = u.R()[i];
@@ -1601,11 +1596,11 @@ namespace quda {
 
 #pragma unroll
         for (int i=0; i<M; i++){
-    Vector vecTmp;
-    // first do copy converting into storage type
+	  Vector vecTmp;
+	  // first do copy converting into storage type
 #pragma unroll
-    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
-    // second do vectorized copy into memory
+	  for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
+	  // second do vectorized copy into memory
           vector_store(gauge, parity * offset + x + (dir * M + i) * stride, vecTmp);
         }
         if constexpr (hasPhase) {
@@ -1615,14 +1610,14 @@ namespace quda {
       }
 
       /**
-   @brief This accessor routine returns a gauge_wrapper to this object,
-   allowing us to overload various operators for manipulating at
-   the site level interms of matrix operations.
-   @param[in] dir Which dimension are we requesting
-   @param[in] x_cb Checkerboarded space-time index we are requesting
-   @param[in] parity Parity we are requesting
-   @return Instance of a gauge_wrapper that curries in access to
-   this field at the above coordinates.
+	 @brief This accessor routine returns a gauge_wrapper to this object,
+	 allowing us to overload various operators for manipulating at
+	 the site level interms of matrix operations.
+	 @param[in] dir Which dimension are we requesting
+	 @param[in] x_cb Checkerboarded space-time index we are requesting
+	 @param[in] parity Parity we are requesting
+	 @return Instance of a gauge_wrapper that curries in access to
+	 this field at the above coordinates.
        */
       __device__ __host__ inline auto operator()(int dim, int x_cb, int parity, real phase = 1.0) const
       {
@@ -1640,7 +1635,7 @@ namespace quda {
 
 #pragma unroll
           for (int i=0; i<M; i++) {
-      // first do vectorized copy from memory into registers
+	    // first do vectorized copy from memory into registers
             Vector vecTmp = vector_load<Vector>(
                 ghost[dir] + parity * faceVolumeCB[dir] * (M * N + hasPhase), i * faceVolumeCB[dir] + x);
             // second do copy converting into register type
@@ -1673,12 +1668,12 @@ namespace quda {
 
 #pragma unroll
           for (int i=0; i<M; i++) {
-      Vector vecTmp;
-      // first do copy converting into storage type
+	    Vector vecTmp;
+	    // first do copy converting into storage type
 #pragma unroll
-      for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
-      // second do vectorized copy into memory
-      vector_store(ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase), i*faceVolumeCB[dir]+x, vecTmp);
+	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
+	    // second do vectorized copy into memory
+	    vector_store(ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase), i*faceVolumeCB[dir]+x, vecTmp);
           }
 
           if constexpr (hasPhase) {
@@ -1728,14 +1723,14 @@ namespace quda {
         real tmp[reconLen];
 
 #pragma unroll
-  for (int i=0; i<M; i++) {
-    // first do vectorized copy from memory
-    Vector vecTmp = vector_load<Vector>(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
-                +i*R[dim]*faceVolumeCB[dim]+buff_idx);
-    // second do copy converting into register type
+	for (int i=0; i<M; i++) {
+	  // first do vectorized copy from memory
+	  Vector vecTmp = vector_load<Vector>(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
+					      +i*R[dim]*faceVolumeCB[dim]+buff_idx);
+	  // second do copy converting into register type
 #pragma unroll
-    for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
-  }
+	  for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
+	}
         real phase = 0.;
         if constexpr (hasPhase)
           copy(phase,
@@ -1754,15 +1749,15 @@ namespace quda {
         reconstruct.Pack(tmp, v);
 
 #pragma unroll
-    for (int i=0; i<M; i++) {
-      Vector vecTmp;
-      // first do copy converting into storage type
+	  for (int i=0; i<M; i++) {
+	    Vector vecTmp;
+	    // first do copy converting into storage type
 #pragma unroll
-      for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
-      // second do vectorized copy to memory
-      vector_store(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
-       i*R[dim]*faceVolumeCB[dim]+buff_idx, vecTmp);
-    }
+	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
+	    // second do vectorized copy to memory
+	    vector_store(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
+			 i*R[dim]*faceVolumeCB[dim]+buff_idx, vecTmp);
+	  }
           if constexpr (hasPhase) {
             real phase = reconstruct.getPhase(v);
             copy(ghost[dim][((dir * 2 + parity) * geometry + g) * R[dim] * faceVolumeCB[dim] * (M * N + 1)
@@ -1880,14 +1875,14 @@ namespace quda {
       }
 
       /**
-   @brief This accessor routine returns a gauge_wrapper to this object,
-   allowing us to overload various operators for manipulating at
-   the site level interms of matrix operations.
-   @param[in] dir Which dimension are we requesting
-   @param[in] x_cb Checkerboarded space-time index we are requesting
-   @param[in] parity Parity we are requesting
-   @return Instance of a gauge_wrapper that curries in access to
-   this field at the above coordinates.
+	 @brief This accessor routine returns a gauge_wrapper to this object,
+	 allowing us to overload various operators for manipulating at
+	 the site level interms of matrix operations.
+	 @param[in] dir Which dimension are we requesting
+	 @param[in] x_cb Checkerboarded space-time index we are requesting
+	 @param[in] parity Parity we are requesting
+	 @return Instance of a gauge_wrapper that curries in access to
+	 this field at the above coordinates.
        */
       __device__ __host__ inline auto operator()(int dim, int x_cb, int parity) const
       {
@@ -1930,14 +1925,14 @@ namespace quda {
       }
 
       /**
-   @brief This accessor routine returns a gauge_wrapper to this object,
-   allowing us to overload various operators for manipulating at
-   the site level interms of matrix operations.
-   @param[in] dir Which dimension are we requesting
-   @param[in] x_cb Checkerboarded space-time index we are requesting
-   @param[in] parity Parity we are requesting
-   @return Instance of a gauge_wrapper that curries in access to
-   this field at the above coordinates.
+	 @brief This accessor routine returns a gauge_wrapper to this object,
+	 allowing us to overload various operators for manipulating at
+	 the site level interms of matrix operations.
+	 @param[in] dir Which dimension are we requesting
+	 @param[in] x_cb Checkerboarded space-time index we are requesting
+	 @param[in] parity Parity we are requesting
+	 @return Instance of a gauge_wrapper that curries in access to
+	 this field at the above coordinates.
        */
       __device__ __host__ inline auto operator()(int dim, int x_cb, int parity) const
       {
@@ -2154,7 +2149,7 @@ namespace quda {
         if constexpr (length != 18) errorQuda("Gauge length %d not supported", length);
         // compute volumeCB + halo region
         exVolumeCB = u.X()[0]/2 + 2;
-  for (int i=1; i<4; i++) exVolumeCB *= u.X()[i] + 2;
+	for (int i=1; i<4; i++) exVolumeCB *= u.X()[i] + 2;
       }
 
       // we need to transpose for BQCD ordering
@@ -2292,21 +2287,21 @@ namespace quda {
 
         // exVolumeCB is the padded checkboard volume
         for (int i=0; i<4; i++) exVolumeCB *= exDim[i];
-  exVolumeCB /= 2;
+	exVolumeCB /= 2;
       }
 
       /**
-   @brief Compute the index into the padded field.  Assumes that
-   parity doesn't change from unpadded to padded.
+	 @brief Compute the index into the padded field.  Assumes that
+	 parity doesn't change from unpadded to padded.
        */
       __device__ __host__ inline int getPaddedIndex(int x_cb, int parity) const {
-  // find coordinates
-  int coord[4];
-  getCoords(coord, x_cb, dim, parity);
+	// find coordinates
+	int coord[4];
+	getCoords(coord, x_cb, dim, parity);
 
-  // get z-extended index
-  coord[2] += 2; // offset for halo
-  return linkIndex(coord, exDim);
+	// get z-extended index
+	coord[2] += 2; // offset for halo
+	return linkIndex(coord, exDim);
       }
 
       // we need to transpose for TIFR ordering
@@ -2680,7 +2675,6 @@ namespace quda {
     }; // class OpenQCDOrder
 
   } // namespace gauge
-
   
   template <typename real_out_t, typename store_out_t, typename real_in_t, typename store_in_t, bool block_float, typename norm_t>
   __device__ __host__ inline auto

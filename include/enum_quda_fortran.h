@@ -330,7 +330,7 @@
 #define QUDA_QDPJIT_FIELD_ORDER 11                  // QDP field ordering (complex-color-spin-spacetime)
 #define QUDA_QOP_DOMAIN_WALL_FIELD_ORDER 12         // QOP domain-wall ordering
 #define QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER 13 // TIFR RHMC ordering
-#define QUDA_OPENQCD_FIELD_ORDER 14                 // OPENQCD geometry ordering (at the moment lexicographical w/ rotation zyxt = x3x2x1x0 |-> xyzt x0x1x2x3 ) 
+#define QUDA_OPENQCD_FIELD_ORDER 14                 // openQCD ordering
 #define QUDA_INVALID_FIELD_ORDER QUDA_INVALID_ENUM
   
 #define QudaFieldCreate integer(4)

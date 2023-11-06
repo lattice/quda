@@ -20,4 +20,3 @@ include/jitify_options.hpp
 .tags*
 autom4te.cache/*
 .vscode
-build

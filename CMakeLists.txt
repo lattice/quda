@@ -702,17 +702,3 @@ include(CTest)
 add_subdirectory(lib)
 add_subdirectory(tests)
 add_subdirectory(doc)
-
-
-
-# ######################################################################################################################
-# OpenQxD 
-# ######################################################################################################################
-# We might only want to do that if using QUDA_DOWNLOAD_USQCD, but this does not work if not set on the initial run
-# if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  # set(CMAKE_INSTALL_PREFIX
-  #     ${CMAKE_BINARY_DIR}/usqcd
-  #     CACHE PATH "..." FORCE)
-# endif()
-
-# include_directories(/scratch/jfernande/openQxD-devel/include)

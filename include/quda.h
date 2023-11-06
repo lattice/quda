@@ -223,8 +223,8 @@ extern "C" {
     int compute_action;
 
     /** Computed value of the bilinear action (complex-valued)
-  invert: \phi^\dagger A^{-1} \phi
-  multishift: \phi^\dagger r(x) \phi = \phi^\dagger (sum_k residue[k] * (A + offset[k])^{-1} ) \phi */
+	invert: \phi^\dagger A^{-1} \phi
+	multishift: \phi^\dagger r(x) \phi = \phi^\dagger (sum_k residue[k] * (A + offset[k])^{-1} ) \phi */
     double action[2];
 
     QudaSolutionType solution_type;  /**< Type of system to solve */
@@ -728,7 +728,7 @@ extern "C" {
     int smoother_schwarz_cycle[QUDA_MAX_MG_LEVEL];
 
     /** The type of residual to send to the next coarse grid, and thus the
-  type of solution to receive back from this coarse grid */
+	type of solution to receive back from this coarse grid */
     QudaSolutionType coarse_grid_solution_type[QUDA_MAX_MG_LEVEL];
 
     /** The type of smoother solve to do on each grid (e/o preconditioning or not)*/
@@ -1280,16 +1280,6 @@ extern "C" {
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity);
 
   /**
-   * Apply the Dslash operator (D_{eo} or D_{oe}).
-   * @param h_out  Result spinor field
-   * @param h_in   Input spinor field
-   * @param param  Contains all metadata regarding host and device
-   *               storage
-   * @param parity The destination parity of the field
-   */
-  void dslashQudaTest(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity);
-
-  /**
    * @brief Perform the solve like @dslashQuda but for multiple rhs by spliting the comm grid into
    * sub-partitions: each sub-partition does one or more rhs'.
    * The QudaInvertParam object specifies how the solve should be performed on each sub-partition.
@@ -1538,8 +1528,8 @@ extern "C" {
    * @param inv_param Dirac and solver meta data
    */
   void computeCloverForceQuda(void *mom, double dt, void **x, void **p, double *coeff, double kappa2, double ck,
-            int nvector, double multiplicity, void *gauge,
-            QudaGaugeParam *gauge_param, QudaInvertParam *inv_param);
+			      int nvector, double multiplicity, void *gauge,
+			      QudaGaugeParam *gauge_param, QudaInvertParam *inv_param);
 
   /**
    * Compute the naive staggered force.  All fields must be in the same precision.

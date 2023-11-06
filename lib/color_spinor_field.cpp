@@ -454,7 +454,6 @@ namespace quda
 
       if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // reorder on the host
         void *buffer = pool_pinned_malloc(bytes);
-        // Roman Gruber: this is a bug: v should be src.v, else reordering on CPU doesn't work
         qudaMemcpy(buffer, src.v.data(), bytes, qudaMemcpyDefault);
         copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, 0, buffer);
         pool_pinned_free(buffer);

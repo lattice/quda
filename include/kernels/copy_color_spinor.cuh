@@ -51,20 +51,10 @@ namespace quda {
     __device__ __host__ inline void operator()(complex<FloatOut> out[Ns*Nc], const complex<FloatIn> in[Ns*Nc]) const {
       int s1[4] = {1, 2, 3, 0};
       int s2[4] = {3, 0, 1, 2};
-      /* K1 = [1, -1, -1, -1] / sqrt(2) */
       FloatOut K1[4] = {static_cast<FloatOut>(kP), static_cast<FloatOut>(-kP), static_cast<FloatOut>(-kP), static_cast<FloatOut>(-kP)};
-      /* K2 = [1, -1,  1,  1] / sqrt(2) */
       FloatOut K2[4] = {static_cast<FloatOut>(kP), static_cast<FloatOut>(-kP), static_cast<FloatOut>(kP), static_cast<FloatOut>(kP)};
       for (int s=0; s<Ns; s++) {
 	for (int c=0; c<Nc; c++) {
-    /* U = [ 0 1  0  1]
-           [-1 0 -1  0]
-           [ 0 1  0 -1]
-           [-1 0  1  0] / sqrt(2) */
-    /* out[0, c] = ( in[1, c] + in[3, c]) / sqrt(2) */
-    /* out[1, c] = (-in[2, c] - in[0, c]) / sqrt(2) */
-    /* out[2, c] = (-in[3, c] + in[1, c]) / sqrt(2) */
-    /* out[3, c] = (-in[0, c] + in[2, c]) / sqrt(2) */
 	  out[s*Nc+c] = K1[s]*static_cast<complex<FloatOut> >(in[s1[s]*Nc+c]) + K2[s]*static_cast<complex<FloatOut> >(in[s2[s]*Nc+c]);
 	}
       }
@@ -99,14 +89,6 @@ namespace quda {
       FloatOut K2[4] = {static_cast<FloatOut>(kP), static_cast<FloatOut>(kP), static_cast<FloatOut>(kP), static_cast<FloatOut>(kP)};
       for (int s=0; s<Ns; s++) {
 	for (int c=0; c<Nc; c++) {
-    /* U = [-1  0  1  0]
-           [ 0 -1  0  1]
-           [ 1  0  1  0]
-           [ 0  1  0  1] / sqrt(2) */
-    /* out[0, c] = (- in[0,c] + in[2,c]) / sqrt(2) */
-    /* out[1, c] = (- in[1,c] + in[3,c]) / sqrt(2) */
-    /* out[2, c] = (+ in[0,c] + in[2,c]) / sqrt(2) */
-    /* out[3, c] = (+ in[1,c] + in[3,c]) / sqrt(2) */
 	  out[s*Nc+c] = K1[s]*static_cast<complex<FloatOut> >(in[s1[s]*Nc+c]) + K2[s]*static_cast<complex<FloatOut> >(in[s2[s]*Nc+c]);
 	}
       }
@@ -189,8 +171,6 @@ namespace quda {
       }
     }
   };
-
-
 
   template <typename Arg> struct CopyColorSpinor_ {
     const Arg &arg;
