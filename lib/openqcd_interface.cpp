@@ -860,6 +860,30 @@ void openQCD_qudaDw(void *src, void *dst, openQCD_QudaDiracParam_t p)
 }
 
 
+void openQCD_qudaDdagD(void *src, void *dst, openQCD_QudaDiracParam_t p)
+{
+  QudaInvertParam param = newOpenQCDDiracParam(p);
+
+  /* both fields reside on the CPU */
+  param.input_location = QUDA_CPU_FIELD_LOCATION;
+  param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+  MatDagMatQuda(static_cast<char *>(dst), static_cast<char *>(src), &param);
+}
+
+
+void openQCD_qudaDw2(void *param, double mu, void *src, void *dst)
+{
+  QudaInvertParam* inv_param = static_cast<QudaInvertParam*>(param);
+  inv_param->mu = mu;
+
+  /* both fields reside on the CPU */
+  inv_param->input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param->output_location = QUDA_CPU_FIELD_LOCATION;
+
+  MatQuda(static_cast<char *>(dst), static_cast<char *>(src), inv_param);
+}
+
 double openQCD_qudaGCR(void *source, void *solution,
   openQCD_QudaDiracParam_t dirac_param, openQCD_QudaGCRParam_t gcr_param)
 {
@@ -1337,6 +1361,8 @@ void* openQCD_qudaEigensolverSetup(char *infile, char *section, char *inv_sectio
     param->run_verify = kv.get<QudaBoolean>(section, "run_verify", param->run_verify);
     /*strcpy(param->vec_infile, kv.get<std::string>(section, "vec_infile", param->vec_infile).c_str());*/
     /*strcpy(param->vec_outfile, kv.get<std::string>(section, "vec_outfile", param->vec_outfile).c_str());*/
+    param->vec_outfile[0] = '\0';
+    param->vec_infile[0] = '\0';
     param->save_prec = kv.get<QudaPrecision>(section, "save_prec", param->save_prec);
     param->io_parity_inflate = kv.get<QudaBoolean>(section, "io_parity_inflate", param->io_parity_inflate);
     param->extlib_type = kv.get<QudaExtLibType>(section, "extlib_type", param->extlib_type);
@@ -1376,7 +1402,8 @@ void openQCD_qudaEigensolve(void *param, void **h_evecs, void *h_evals)
 
 void openQCD_qudaEigensolverDestroy(void *param)
 {
-  QudaInvertParam* eig_param = static_cast<QudaInvertParam*>(param);
+  QudaEigParam* eig_param = static_cast<QudaEigParam*>(param);
+  openQCD_qudaSolverDestroy(eig_param->invert_param);
   delete eig_param;
 }
 

@@ -188,6 +188,8 @@ void openQCD_qudaSpinorFree(void** quda_field);
  * @param[in]  p     Dirac parameter struct
  */
 void openQCD_qudaDw(void *src, void *dst, openQCD_QudaDiracParam_t p);
+void openQCD_qudaDdagD(void *src, void *dst, openQCD_QudaDiracParam_t p);
+void openQCD_qudaDw2(void *param, double mu, void *src, void *dst);
 
 
 /**
