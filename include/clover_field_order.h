@@ -1030,11 +1030,8 @@ namespace quda {
         const double coeff;
         const double csw;
         const double kappa;
-        const int L[4];  // xyzt convention
-        const int L_[4]; // txyz convention
-        const int volume;
-        const int cbs[4]; // openQCDs cache block size
-        const int cbn[4]; // openQCDs cache block grid
+        const int dim[4];  // xyzt convention
+        const int L[4]; // txyz convention
 
         OpenQCDOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
           volumeCB(clover.Stride()),
@@ -1044,11 +1041,8 @@ namespace quda {
           coeff(clover.Coeff()),
           csw(clover.Csw()),
           kappa(clover.Coeff()/clover.Csw()),
-          L  {clover.X()[0], clover.X()[1], clover.X()[2], clover.X()[3]}, // *local* lattice dimensions, xyzt
-          L_ {clover.X()[3], clover.X()[0], clover.X()[1], clover.X()[2]}, // *local* lattice dimensions, txyz
-          volume(L_[0]*L_[1]*L_[2]*L_[3]), // *local* lattice volume
-          cbs {setup_cbs(0, L_), setup_cbs(1, L_), setup_cbs(2, L_), setup_cbs(3, L_)}, // txyz
-          cbn {L_[0]/cbs[0], L_[1]/cbs[1], L_[2]/cbs[2], L_[3]/cbs[3]} // txyz
+          dim {clover.X()[0], clover.X()[1], clover.X()[2], clover.X()[3]}, // *local* lattice dimensions, xyzt
+          L   {clover.X()[3], clover.X()[0], clover.X()[1], clover.X()[2]}  // *local* lattice dimensions, txyz
         {
           if (clover.Order() != QUDA_OPENQCD_CLOVER_ORDER) {
             errorQuda("Invalid clover order %d for this accessor", clover.Order());
@@ -1063,92 +1057,6 @@ namespace quda {
         Float Mu2() const { return mu2; }
         Float Epsilon2() const { return epsilon2; }
 
-        __device__ __host__ inline int setup_cbs(const int mu, const int *X) const
-        {
-          if (mu==0) {
-            return X[0];
-          } else if ((X[mu]%4)==0) {
-            return 4;
-          } else if ((X[mu]%3)==0) {
-            return 3;
-          } else if ((X[mu]%2)==0) {
-            return 2;
-          } else {
-            return 1;
-          }
-        }
-
-        /**
-         * @brief      Rotate coordinates (xyzt -> txyz)
-         *
-         * @param[in]  x_quda     Cartesian local lattice coordinates in quda
-         *                        convention (xyzt)
-         * @param[out] x_openQCD  Cartesian local lattice coordinates in openQCD
-         *                        convention (txyz)
-         */
-        __device__ __host__ inline void rotate_coords(const int *x_quda, int *x_openQCD) const
-        {
-          x_openQCD[1] = x_quda[0];
-          x_openQCD[2] = x_quda[1];
-          x_openQCD[3] = x_quda[2];
-          x_openQCD[0] = x_quda[3];
-        }
-
-        /**
-         * @brief      Generate a lexicographical index with x[Ndims-1] running
-         *             fastest, for example if Ndims=4:
-         *             ix = X3*X2*X1*x0 + X3*X2*x1 + X3*x2 + x3.
-         *
-         * @param[in]  x      Integer array of dimension Ndims with coordinates
-         * @param[in]  X      Integer array of dimension Ndims with extents
-         * @param[in]  Ndims  The number of dimensions
-         *
-         * @return     Lexicographical index
-         */
-        __device__ __host__ inline int lexi(const int *x, const int *X, const int Ndims) const
-        {
-          int i, ix = x[0];
-
-          #pragma unroll
-          for (i=1; i<Ndims; i++) {
-            ix = (X[i]*ix + x[i]);
-          }
-          return ix;
-        }
-
-        /**
-         * @brief      Pure function to return ipt[iy], where
-         *             iy=x3+L3*x2+L2*L3*x1+L1*L2*L3*x0 without accessing the
-         *             ipt-array, but calculating the index on the fly. Notice that
-         *             xi and Li are in openQCD (txyz) convention. If they come
-         *             from QUDA, you have to rotate them first.
-         *
-         * @param[in]  x     Carthesian local lattice corrdinates, 0 <= x[i] < Li
-         *
-         * @return     ipt[x3+L3*x2+L2*L3*x1+L1*L2*L3*x0] = the local flat index of
-         *             openQCD
-         */
-        __device__ __host__ inline int ipt(const int *x) const
-        {
-          int xb[4], xn[4];
-
-          xb[0] = x[0] % cbs[0];
-          xb[1] = x[1] % cbs[1];
-          xb[2] = x[2] % cbs[2];
-          xb[3] = x[3] % cbs[3];
-
-          xn[0] = x[0]/cbs[0];
-          xn[1] = x[1]/cbs[1];
-          xn[2] = x[2]/cbs[2];
-          xn[3] = x[3]/cbs[3];
-
-          return (
-             lexi(xb, cbs, 4)/2
-           + cbs[0]*cbs[1]*cbs[2]*cbs[3]*lexi(xn, cbn, 4)/2
-           + ((x[0]+x[1]+x[2]+x[3]) % 2 != 0)*(volume/2) /* odd -> +VOLUME/2 */
-          );
-        }
-
         /**
          * @brief      Gets the offset in Floats from the openQCD base pointer to
          *             the spinor field.
@@ -1161,9 +1069,9 @@ namespace quda {
         __device__ __host__ inline int getCloverOffset(int x_cb, int parity) const
         {
           int x_quda[4], x[4];
-          getCoords(x_quda, x_cb, L, parity); // x_quda contains xyzt local Carthesian corrdinates
-          rotate_coords(x_quda, x); // xyzt -> txyz, x = openQCD local Carthesian lattice coordinate
-          return ipt(x)*length;
+          getCoords(x_quda, x_cb, dim, parity); // x_quda contains xyzt local Carthesian corrdinates
+          openqcd::rotate_coords(x_quda, x); // xyzt -> txyz, x = openQCD local Carthesian lattice coordinate
+          return openqcd::ipt(x, L)*length;
         }
 
         /**

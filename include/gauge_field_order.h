@@ -2361,229 +2361,20 @@ namespace quda {
       Float *gauge;
       const int volumeCB;
       static constexpr int Nc = 3;
-      const int L[4];  // xyzt convention
-      const int L_[4]; // txyz convention
-      const int volume;
+      const int dim[4]; // xyzt convention
+      const int L[4];   // txyz convention
       const int nproc[4];
-      const int face[4];
-      const int bndry;
-      const int ifc[4];
-      const int face_offset[4];
-      const int cbs[4]; // openQCDs cache block size
-      const int cbn[4]; // openQCDs cache block grid
 
       OpenQCDOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
         LegacyOrder<Float, length>(u, ghost_),
         gauge(gauge_ ? gauge_ : (Float *)u.data()), // pointer to the gauge field on CPU
         volumeCB(u.VolumeCB()), // Volume and VolumeCB refer to the global lattice, if VolumeLocal, then local lattice
-        L  {u.X()[0], u.X()[1], u.X()[2], u.X()[3]}, // *local* lattice dimensions, xyzt
-        L_ {u.X()[3], u.X()[0], u.X()[1], u.X()[2]}, // *local* lattice dimensions, txyz
-        volume(L_[0]*L_[1]*L_[2]*L_[3]), // *local* lattice volume
-        nproc {comm_dim(3), comm_dim(0), comm_dim(1), comm_dim(2)}, // txyz
-        face {((1-(nproc[0]%2))*L_[1]*L_[2]*L_[3]),
-              ((1-(nproc[1]%2))*L_[2]*L_[3]*L_[0]),
-              ((1-(nproc[2]%2))*L_[3]*L_[0]*L_[1]),
-              ((1-(nproc[3]%2))*L_[0]*L_[1]*L_[2])}, // txyz
-        bndry(2*(face[0]+face[1]+face[2]+face[3])),
-        ifc {(face[0]/2),
-              face[0] + (face[1]/2),
-              face[0] + face[1] + (face[2]/2),
-              face[0] + face[1] + face[2] + (face[3]/2)}, // txyz
-        face_offset {0, face[0]/2, face[0]/2 + face[1]/2, face[0]/2 + face[1]/2 + face[2]/2}, //txyz
-        cbs {setup_cbs(0, L_), setup_cbs(1, L_), setup_cbs(2, L_), setup_cbs(3, L_)}, // txyz
-        cbn {L_[0]/cbs[0], L_[1]/cbs[1], L_[2]/cbs[2], L_[3]/cbs[3]} // txyz
+        dim {u.X()[0], u.X()[1], u.X()[2], u.X()[3]}, // *local* lattice dimensions, xyzt
+        L   {u.X()[3], u.X()[0], u.X()[1], u.X()[2]}, // *local* lattice dimensions, txyz
+        nproc {comm_dim(3), comm_dim(0), comm_dim(1), comm_dim(2)} // txyz
       {
         if constexpr (length != 18) {
           errorQuda("Gauge field length %d not supported", length);
-        }
-      }
-
-      __device__ __host__ inline int setup_cbs(const int mu, const int *X) const
-      {
-        if (mu==0) {
-          return X[0];
-        } else if ((X[mu]%4)==0) {
-          return 4;
-        } else if ((X[mu]%3)==0) {
-          return 3;
-        } else if ((X[mu]%2)==0) {
-          return 2;
-        } else {
-          return 1;
-        }
-      }
-
-      /**
-       * @brief      Rotate coordinates (xyzt -> txyz)
-       *
-       * @param[in]  x_quda     Cartesian local lattice coordinates in quda
-       *                        convention (xyzt)
-       * @param[out] x_openQCD  Cartesian local lattice coordinates in openQCD
-       *                        convention (txyz)
-       */
-      __device__ __host__ inline void rotate_coords(const int *x_quda, int *x_openQCD) const
-      {
-        x_openQCD[1] = x_quda[0];
-        x_openQCD[2] = x_quda[1];
-        x_openQCD[3] = x_quda[2];
-        x_openQCD[0] = x_quda[3];
-      }
-
-      /**
-       * @brief      Generate a lexicographical index with x[Ndims-1] running
-       *             fastest, for example if Ndims=4:
-       *             ix = X3*X2*X1*x0 + X3*X2*x1 + X3*x2 + x3.
-       *
-       * @param[in]  x      Integer array of dimension Ndims with coordinates
-       * @param[in]  X      Integer array of dimension Ndims with extents
-       * @param[in]  Ndims  The number of dimensions
-       *
-       * @return     Lexicographical index
-       */
-      __device__ __host__ inline int lexi(const int *x, const int *X, const int Ndims) const
-      {
-        int i, ix = x[0];
-
-        #pragma unroll
-        for (i=1; i<Ndims; i++) {
-          ix = (X[i]*ix + x[i]);
-        }
-        return ix;
-      }
-
-      /**
-       * @brief      Returns the surface in direction mu
-       *
-       * @param      X     Extent in all 4 directions
-       * @param[in]  mu    Direction
-       *
-       * @return     Surface
-       */
-      __device__ __host__ inline int surface(const int *X, const int mu) const
-      {
-        if (mu==0) {
-          return X[1]*X[2]*X[3];
-        } else if (mu==1) {
-          return X[0]*X[2]*X[3];
-        } else if (mu==2) {
-          return X[0]*X[1]*X[3];
-        }
-        return X[0]*X[1]*X[2];
-      }
-
-      /**
-       * @brief      Determines the number of boundary points in direction mu prior to
-       *             the Carthesian index x with dimensions X
-       *
-       * @param[in]  mu    Direction
-       * @param[in]  x     Lattice point
-       * @param[in]  X     Dimensions of the lattice/block
-       *
-       * @return     Number of prior boundary points
-       */
-      __device__ __host__ inline int boundary_pts(const int mu, const int *x, const int *X) const
-      {
-        int ret = 0;
-
-        if (mu==3) {
-          ret = lexi(x, X, 3); // lexi without x[3]
-        } else if (mu==2) {
-          ret = X[3]*lexi(x, X, 2);
-          if (x[2]==(X[2]-1)) {
-            ret += x[3]; // lexi without x[2]
-          }
-        } else if (mu==1) {
-          if (x[1]==(X[1]-1)) {
-            ret = X[2]*X[3]*x[0] + X[3]*x[2] + x[3]; // lexi without x[1]
-          } else {
-            ret = surface(X, 1);
-          }
-        } else if (mu==0) {
-          if (x[0]==(X[0]-1)) {
-            ret = lexi(x+1, X+1, 3); // lexi without x[0]
-          } else {
-            ret = surface(X, 0);
-          }
-        }
-
-        return ret;
-      }
-
-      /**
-       * @brief      Pure function to return ipt[iy], where
-       *             iy=x3+L3*x2+L2*L3*x1+L1*L2*L3*x0 without accessing the
-       *             ipt-array, but calculating the index on the fly. Notice that
-       *             xi and Li are in openQCD (txyz) convention. If they come
-       *             from QUDA, you have to rotate them first.
-       *
-       * @param[in]  x     Carthesian local lattice corrdinates, 0 <= x[i] < Li
-       *
-       * @return     ipt[x3+L3*x2+L2*L3*x1+L1*L2*L3*x0] = the local flat index of
-       *             openQCD
-       */
-      __device__ __host__ inline int ipt(const int *x) const
-      {
-        int xb[4], xn[4];
-
-        xb[0] = x[0] % cbs[0];
-        xb[1] = x[1] % cbs[1];
-        xb[2] = x[2] % cbs[2];
-        xb[3] = x[3] % cbs[3];
-
-        xn[0] = x[0]/cbs[0];
-        xn[1] = x[1]/cbs[1];
-        xn[2] = x[2]/cbs[2];
-        xn[3] = x[3]/cbs[3];
-
-        return (
-           lexi(xb, cbs, 4)/2
-         + cbs[0]*cbs[1]*cbs[2]*cbs[3]*lexi(xn, cbn, 4)/2
-         + ((x[0]+x[1]+x[2]+x[3]) % 2 != 0)*(volume/2) /* odd -> +VOLUME/2 */
-        );
-      }
-
-      /**
-       * @brief      Pure implementation of iup[ix][mu]
-       *
-       * @param[in]  x     Cartesian local lattice corrdinates, 0 <= x[i] < Li, length
-       *                   4 in txyz convention
-       * @param[in]  mu    Direction in txyz convention
-       *
-       * @return     iup[ix][mu]
-       */
-      __device__ __host__ inline int iup(const int *x, const int mu) const
-      {
-        int i, ret, xb[4], xn[4];
-
-        if ((x[mu]==(L_[mu]-1))&&(nproc[mu]>1)) {
-
-          xb[0] = x[0] % cbs[0];
-          xb[1] = x[1] % cbs[1];
-          xb[2] = x[2] % cbs[2];
-          xb[3] = x[3] % cbs[3];
-
-          xn[0] = x[0]/cbs[0];
-          xn[1] = x[1]/cbs[1];
-          xn[2] = x[2]/cbs[2];
-          xn[3] = x[3]/cbs[3];
-
-          ret = volume + ifc[mu];
-          if ((x[0]+x[1]+x[2]+x[3]) % 2 == 0) {
-            ret += bndry/2;
-          }
-
-          ret += surface(cbs, mu)*boundary_pts(mu, xn, cbn)/2;
-          ret += boundary_pts(mu, xb, cbs)/2;
-          return ret;
-
-        } else {
-          #pragma unroll
-          for (i=0; i<4; i++) {
-            xb[i] = x[i];
-          }
-
-          xb[mu] = (xb[mu] + 1) % (L_[mu]*nproc[mu]);
-          return ipt(xb);
         }
       }
 
@@ -2599,13 +2390,11 @@ namespace quda {
        *
        * @return     The offset.
        */
-      __device__ __host__ inline int getGaugeOffset_old(int x, int dir, int parity) const {
-        int coord[4];
-        getCoords(coord, x, L, parity);
-        int idx = coord[3] + L[3]*coord[2] + L[3]*L[2]*coord[1] + L[3]*L[2]*L[1]*coord[0];
-        return (4*idx + dir)*length;
+      __device__ __host__ inline int getGaugeOffset_lexi(int x_cb, int dir, int parity) const {
+        int x[4];
+        getCoords(x, x_cb, dim, parity);
+        return (4*openqcd::lexi(x, dim, 4) + dir)*length;
       }
-
 
       /**
        * @brief      Obtains the offset in Floats from the openQCD base pointer
@@ -2619,20 +2408,21 @@ namespace quda {
        */
       __device__ __host__ inline int getGaugeOffset(int x_cb, int dir, int parity) const {
         int quda_x[4], x[4];
-        getCoords(quda_x, x_cb, L, parity); // x_quda = quda local lattice coordinates
-        rotate_coords(quda_x, x); // x = openQCD local lattice coordinates
+        getCoords(quda_x, x_cb, dim, parity); // x_quda = quda local lattice coordinates
+        openqcd::rotate_coords(quda_x, x); // x = openQCD local lattice coordinates
 
         int mu = (dir+1) % 4; // mu = openQCD direction
-        int ix = ipt(x);
-        int iz = iup(x, mu);
+        int ix = openqcd::ipt(x, L);
+        int iz = openqcd::iup(x, mu, L, nproc);
         int ofs = 0;
+        int volume = openqcd::vol(L);
 
         if (ix < volume/2) { // ix even -> iz odd
           if (iz < volume) { // iz in interior
             ofs = 8*(iz - volume/2) + 2*mu + 1;
           } else {
-            int ib = iz - volume - ifc[mu] - bndry/2; // iz in exterior
-            ofs = 4*volume + face_offset[mu] + ib;
+            int ib = iz - volume - openqcd::ifc(L, nproc, mu) - openqcd::bndry(L, nproc)/2; // iz in exterior
+            ofs = 4*volume + openqcd::face_offset(L, nproc, mu) + ib;
           }
         } else if (volume/2 <= ix && ix < volume) { // ix odd
           ofs = 8*(ix - volume/2) + 2*mu;
@@ -2649,7 +2439,7 @@ namespace quda {
 
       __device__ __host__ inline void save(const complex v[length/2], int x_cb, int dir, int parity) const
       {
-        auto out = &gauge[getGaugeOffset_old(x_cb, dir, parity)];
+        auto out = &gauge[getGaugeOffset_lexi(x_cb, dir, parity)];
         block_store<complex, length/2>(reinterpret_cast<complex *>(out), v);
       }
 
