@@ -1013,7 +1013,7 @@ namespace quda {
         } else { // else reorder on the GPU
 
           if (order == QUDA_MILC_SITE_GAUGE_ORDER || order == QUDA_BQCD_GAUGE_ORDER
-              || order == QUDA_TIFR_PADDED_GAUGE_ORDER || order == QUDA_OPENQCD_GAUGE_ORDER) {
+              || order == QUDA_TIFR_PADDED_GAUGE_ORDER) {
             // special case where we use zero-copy memory to read/write directly from application's array
             void *data_d = get_mapped_device_pointer(data());
             if (GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
@@ -1082,7 +1082,7 @@ namespace quda {
         } else { // else on the GPU
 
           if (src.Order() == QUDA_MILC_SITE_GAUGE_ORDER || src.Order() == QUDA_BQCD_GAUGE_ORDER
-              || src.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER || src.Order() == QUDA_OPENQCD_GAUGE_ORDER) {
+              || src.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
             // special case where we use zero-copy memory to read/write directly from application's array
             void *src_d = get_mapped_device_pointer(src.data());
 
