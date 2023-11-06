@@ -77,8 +77,6 @@ namespace quda {
     __device__ __host__ void operator()(int x_cb, int parity)
     {
       ColorSpinor<typename Arg::real, Arg::nColor, 4> in = arg.in(x_cb, parity);
-
-      /* RG: I had to add the break, else there is an implicit fallthrough */
       switch(arg.d) {
       case 0: arg.out(x_cb, parity) = in.gamma(0); break;
       case 1: arg.out(x_cb, parity) = in.gamma(1); break;
