@@ -237,9 +237,9 @@ template <typename su3_matrix, typename Float>
 void computeLongLinkCPU(void **longlink, su3_matrix **sitelink, Float *act_path_coeff)
 {
   for (int dir = XUP; dir <= TUP; ++dir) {
-    int dx[4] = {0, 0, 0, 0};
 #pragma omp parallel for
     for (int i = 0; i < V; ++i) {
+      int dx[4] = {0, 0, 0, 0};
       // Initialize the longlinks
       su3_matrix temp;
       su3_matrix *llink = ((su3_matrix *)longlink[dir]) + i;
