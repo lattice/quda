@@ -1,6 +1,45 @@
 #pragma once
 
+/**
+ * The macro battle below is to trick quda.h to think that double_complex is
+ * defined to be the struct below. For this we need to set the __CUDACC_RTC__,
+ * which makes double_complex to be defined as double2 (see quda.h), which we
+ * redefine below as openqcd_complex_dble. The original definitions of
+ * __CUDACC_RTC__ and double2 are recovered below. We do this to be able to
+ * include this header file into a openQxD program and compile with flags
+ * "-std=C89 -pedantic -Werror". Else the compiler trows an
+ * "ISO C90 does not support complex types" error because of the
+ * "double _Complex" data types exposed in quda.h.
+ */
+
+typedef struct
+{
+  double re,im;
+} openqcd_complex_dble;
+
+#ifdef __CUDACC_RTC__
+#define __CUDACC_RTC_ORIGINAL__ __CUDACC_RTC__
+#endif
+
+#ifdef double2
+#define double2_ORIGINAL double2
+#endif
+
+#define __CUDACC_RTC__
+#define double2 openqcd_complex_dble
 #include <quda.h>
+#undef double2
+#undef __CUDACC_RTC__
+
+#ifdef double2_ORIGINAL
+#define double2 double2_ORIGINAL
+#undef double2_ORIGINAL
+#endif
+
+#ifdef __CUDACC_RTC_ORIGINAL__
+#define __CUDACC_RTC__ __CUDACC_RTC_ORIGINAL__
+#undef __CUDACC_RTC_ORIGINAL__
+#endif
 
 /**
  * @file    quda_openqcd_interface.h

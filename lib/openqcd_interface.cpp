@@ -1347,7 +1347,7 @@ void openQCD_qudaEigensolve(void *param, void **h_evecs, void *h_evals)
 
   logQuda(QUDA_VERBOSE, "Calling eigensolveQuda() ...\n");
   PUSH_RANGE("eigensolveQuda",6);
-  eigensolveQuda(h_evecs, static_cast<double _Complex*>(h_evals), eig_param);
+  eigensolveQuda(h_evecs, static_cast<openqcd_complex_dble*>(h_evals), eig_param);
   POP_RANGE;
 
   logQuda(QUDA_SUMMARIZE, "openQCD_qudaEigensolve()\n");
