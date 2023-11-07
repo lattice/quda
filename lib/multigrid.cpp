@@ -804,34 +804,6 @@ namespace quda
     popLevel();
   }
 
-  // FIXME need to make this more robust (implement Solver::flops() for all solvers)
-  double MG::flops() const {
-    double flops = 0;
-
-    if (param_coarse_solver) {
-      flops += param_coarse_solver->gflops * 1e9;
-      param_coarse_solver->gflops = 0;
-    } else if (param.level < param.Nlevel-1) {
-      flops += coarse->flops();
-    }
-
-    if (param_presmooth) {
-      flops += param_presmooth->gflops * 1e9;
-      param_presmooth->gflops = 0;
-    }
-
-    if (param_postsmooth) {
-      flops += param_postsmooth->gflops * 1e9;
-      param_postsmooth->gflops = 0;
-    }
-
-    if (transfer) {
-      flops += transfer->flops();
-    }
-
-    return flops;
-  }
-
   bool check_deviation(double deviation, double tol)
   {
     return (deviation > tol || std::isnan(deviation) || std::isinf(deviation));

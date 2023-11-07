@@ -7,9 +7,6 @@ namespace quda {
 
   namespace blas {
 
-    unsigned long long flops;
-    unsigned long long bytes;
-
     template <template <typename real> class Functor, typename store_t, typename y_store_t,
               int nSpin, typename coeff_t>
     class Blas : public TunableGridStrideKernel2D
@@ -56,9 +53,6 @@ namespace quda {
         }
 
         apply(device::get_default_stream());
-
-        blas::bytes += bytes();
-        blas::flops += flops();
       }
 
       TuneKey tuneKey() const override { return TuneKey(vol, typeid(f).name(), aux); }

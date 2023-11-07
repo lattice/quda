@@ -83,8 +83,16 @@ namespace quda {
       }
     } // apply
 
-    void preTune() { U.backup(); if (U.data() != L.data()) L.backup(); }
-    void postTune() { U.restore(); if (U.data() != L.data()) L.restore(); }
+    void preTune()
+    {
+      U.backup();
+      if (U.data() != L.data()) L.backup();
+    }
+    void postTune()
+    {
+      U.restore();
+      if (U.data() != L.data()) L.restore();
+    }
 
     long long flops() const { return 0; } // FIXME
     long long bytes() const { return 0; } // FIXME

@@ -126,7 +126,7 @@ namespace quda {
        @param[in] param Contains the metadata for filling out the LatticeFieldParam
     */
     LatticeFieldParam(const QudaGaugeParam &param) :
-      location(QUDA_CPU_FIELD_LOCATION),
+      location(param.location),
       precision(param.cpu_prec),
       ghost_precision(param.cpu_prec),
       init(true),
@@ -150,11 +150,11 @@ namespace quda {
   };
 
   std::ostream& operator<<(std::ostream& output, const LatticeFieldParam& param);
-  std::ostream& operator<<(std::ostream& output, const LatticeField& field);
+  std::ostream &operator<<(std::ostream &output, const LatticeField &field);
 
   class LatticeField : public Object {
 
-    friend std::ostream& operator<<(std::ostream& output, const LatticeField& param);
+    friend std::ostream &operator<<(std::ostream &output, const LatticeField &param);
 
     /**
        @brief Create the field as specified by the param

@@ -97,7 +97,7 @@ namespace quda {
       gCoarseAtomic yAccessorAtomic(const_cast<GaugeField&>(Yatomic));
       gCoarseAtomic xAccessorAtomic(const_cast<GaugeField&>(Xatomic));
       cFine cAccessor(const_cast<CloverField&>(c), false);
-      cFine cInvAccessor(const_cast<CloverField&>(c), c.Inverse());
+      cFine cInvAccessor(const_cast<CloverField &>(c), c.Inverse());
 
       calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
         (yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,

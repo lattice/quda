@@ -23,9 +23,6 @@ namespace quda {
 
     void setParam(int kernel, int prec, int threads, int blocks);
 
-    extern unsigned long long flops;
-    extern unsigned long long bytes;
-
     inline void zero(cvector_ref<ColorSpinorField> &x)
     {
       for (auto i = 0u; i < x.size(); i++) x[i].zero();

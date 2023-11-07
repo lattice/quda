@@ -487,11 +487,6 @@ namespace quda {
     void buildFreeVectors(std::vector<ColorSpinorField*> &B);
 
     /**
-       @brief Return the total flops done on this and all coarser levels.
-     */
-    double flops() const;
-
-    /**
       @brief Return if we're on a fine grid right now
     */
     bool is_fine_grid() const

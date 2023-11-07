@@ -174,7 +174,6 @@ namespace quda {
     int laplace3D;
     QudaMatPCType matpcType;
     mutable QudaDagType dagger; // mutable to simplify implementation of Mdag
-    mutable unsigned long long flops;
     QudaDiracType type;
     mutable QudaPrecision halo_precision; // only does something for DiracCoarse at present
 
@@ -405,16 +404,6 @@ namespace quda {
     virtual bool AllowTruncation() const { return false; }
 
     /**
-       @brief  returns and then zeroes flopcount
-    */
-    unsigned long long Flops() const
-    {
-      unsigned long long rtn = flops;
-      flops = 0;
-      return rtn;
-    }
-
-    /**
        @brief returns preconditioning type
     */
     QudaMatPCType getMatPCType() const { return matpcType; }
@@ -476,10 +465,7 @@ namespace quda {
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(GaugeField *gauge_in, GaugeField *, GaugeField *, CloverField *)
-    {
-      gauge = gauge_in;
-    }
+    virtual void updateFields(GaugeField *gauge_in, GaugeField *, GaugeField *, CloverField *) { gauge = gauge_in; }
 
     /**
      * @brief Create the coarse operator (virtual parent)
@@ -2242,8 +2228,6 @@ public:
        @param[out] out The vector of input fields
      */
     virtual void operator()(cvector_ref<ColorSpinorField> &out, cvector_ref<const ColorSpinorField> &in) const = 0;
-
-    unsigned long long flops() const { return dirac->Flops(); }
 
     QudaMatPCType getMatPCType() const { return dirac->getMatPCType(); }
 

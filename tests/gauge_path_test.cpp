@@ -165,9 +165,9 @@ void gauge_force_test(bool compute_force = true)
     mom = Mom_milc.data();
   } else if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
     for (int d = 0; d < 4; d++) sitelink_array[d] = U_qdp.data(d);
-    sitelink = reinterpret_cast<void*>(sitelink_array);
+    sitelink = reinterpret_cast<void *>(sitelink_array);
     for (int d = 0; d < 4; d++) mom_array[d] = Mom_qdp.data(d);
-    mom = reinterpret_cast<void*>(mom_array);
+    mom = reinterpret_cast<void *>(mom_array);
   } else {
     errorQuda("Unsupported gauge order %d", gauge_order);
   }
@@ -206,8 +206,7 @@ void gauge_force_test(bool compute_force = true)
   if (verify_results) {
     quda::host_timer_t verify_timer;
     verify_timer.start();
-    gauge_force_reference(refmom, eb3, U_qdp, input_path_buf, length,
-                          loop_coeff, num_paths, compute_force);
+    gauge_force_reference(refmom, eb3, U_qdp, input_path_buf, length, loop_coeff, num_paths, compute_force);
     *check_out
       = compare_floats(Mom_milc.data(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec), gauge_param.cpu_prec);
     if (compute_force) strong_check_mom(Mom_milc.data(), refmom, 4 * V, gauge_param.cpu_prec);
@@ -280,7 +279,7 @@ void gauge_loop_test()
     sitelink = U_milc.data();
   } else if (gauge_order == QUDA_QDP_GAUGE_ORDER) {
     for (int d = 0; d < 4; d++) sitelink_array[d] = U_qdp.data(d);
-    sitelink = reinterpret_cast<void*>(sitelink_array);
+    sitelink = reinterpret_cast<void *>(sitelink_array);
   } else {
     errorQuda("Unsupported gauge order %d", gauge_order);
   }
@@ -324,9 +323,8 @@ void gauge_loop_test()
   if (verify_results) {
     quda::host_timer_t verify_timer;
     verify_timer.start();
-
-    gauge_loop_trace_reference(U_qdp, traces_ref, scale_factor, trace_path_p,
-                               trace_loop_length_p, trace_loop_coeff_p, num_paths);
+    gauge_loop_trace_reference(U_qdp, traces_ref, scale_factor, trace_path_p, trace_loop_length_p, trace_loop_coeff_p,
+                               num_paths);
 
     loop_deviation = 0;
     for (int i = 0; i < num_paths; i++) {

@@ -22,7 +22,7 @@ namespace quda {
     dim3 grid;
     unsigned int shared_bytes = 0;
     bool set_max_shared_bytes = false; // whether to opt in to max shared bytes per thread block
-    int4 aux = {1, 1, 1, 1}; // free parameter that can be used as an arbitrary autotuning dimension outside of launch parameters
+    int4 aux = {1, 1, 1, 1};           // free parameter used as an arbitrary autotuning dimension
 
     std::string comment;
     float time = FLT_MAX;
@@ -44,6 +44,10 @@ namespace quda {
   const std::map<TuneKey, TuneParam> &getTuneCache();
 
   class Tunable {
+
+    friend TuneParam tuneLaunch(Tunable &, QudaTune, QudaVerbosity);
+    static inline uint64_t _flops_global = 0;
+    static inline uint64_t _bytes_global = 0;
 
   protected:
     virtual long long flops() const { return 0; }
@@ -340,6 +344,12 @@ namespace quda {
 
     qudaError_t launchError() const { return launch_error; }
     qudaError_t &launchError() { return launch_error; }
+
+    static void flops_global(uint64_t value) { _flops_global = value; }
+    static uint64_t flops_global() { return _flops_global; }
+
+    static void bytes_global(uint64_t value) { _bytes_global = value; }
+    static uint64_t bytes_global() { return _bytes_global; }
   };
 
   /**

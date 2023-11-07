@@ -570,10 +570,10 @@ namespace quda {
       auto Pnumu_next = GaugeField(gauge_param);
       auto Qnumu_next = GaugeField(gauge_param);
 
-      instantiateGaugeStaggered<HisqStaplesForce>(link, P3, GaugeField_ref(Pmu),
-        GaugeField_ref(P5), GaugeField_ref(Pnumu), GaugeField_ref(Qnumu),
-        GaugeField_ref(Pmu_next), GaugeField_ref(Pnumu_next), GaugeField_ref(Qnumu_next),
-        newOprod, oprod, path_coeff_array);
+      instantiateGaugeStaggered<HisqStaplesForce>(link, P3, GaugeField_ref(Pmu), GaugeField_ref(P5),
+                                                  GaugeField_ref(Pnumu), GaugeField_ref(Qnumu),
+                                                  GaugeField_ref(Pmu_next), GaugeField_ref(Pnumu_next),
+                                                  GaugeField_ref(Qnumu_next), newOprod, oprod, path_coeff_array);
 
       getProfile().TPSTOP(QUDA_PROFILE_COMPUTE);
     }

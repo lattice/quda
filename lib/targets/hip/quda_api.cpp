@@ -261,11 +261,12 @@ namespace quda
     QudaMem copy(dst, src, count, qudaMemcpyKindToAPI(kind), device::get_default_stream(), false, func, file, line);
   }
 
-  void qudaMemcpy_(const quda_ptr &dst, const quda_ptr &src, size_t count, qudaMemcpyKind kind, const char *func, const char *file,
-                   const char *line)
+  void qudaMemcpy_(const quda_ptr &dst, const quda_ptr &src, size_t count, qudaMemcpyKind kind, const char *func,
+                   const char *file, const char *line)
   {
     if (count == 0) return;
-    QudaMem copy(dst.data(), src.data(), count, qudaMemcpyKindToAPI(kind), device::get_default_stream(), false, func, file, line);
+    QudaMem copy(dst.data(), src.data(), count, qudaMemcpyKindToAPI(kind), device::get_default_stream(), false, func,
+                 file, line);
   }
 
   void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
@@ -312,8 +313,8 @@ namespace quda
     QudaMem copy(ptr, value, count, stream, true, func, file, line);
   }
 
-  void qudaMemsetAsync_(quda_ptr &ptr, int value, size_t count, const qudaStream_t &stream,
-                        const char *func, const char *file, const char *line)
+  void qudaMemsetAsync_(quda_ptr &ptr, int value, size_t count, const qudaStream_t &stream, const char *func,
+                        const char *file, const char *line)
   {
     if (count == 0) return;
     if (ptr.is_device()) {
@@ -327,10 +328,11 @@ namespace quda
                           const qudaStream_t &stream, const char *func, const char *file, const char *line)
   {
     if (ptr.is_device()) {
-      hipError_t error = hipMemset2DAsync(static_cast<char*>(ptr.data()) + offset, pitch, value, width, height, get_stream(stream));
+      hipError_t error
+        = hipMemset2DAsync(static_cast<char *>(ptr.data()) + offset, pitch, value, width, height, get_stream(stream));
       set_runtime_error(error, __func__, func, file, line);
     } else {
-      for (auto i = 0u; i < height; i++) memset(static_cast<char*>(ptr.data()) + offset + i * pitch, value, width);
+      for (auto i = 0u; i < height; i++) memset(static_cast<char *>(ptr.data()) + offset + i * pitch, value, width);
     }
   }
 
