@@ -20,6 +20,7 @@ QudaMultigridParam mg_param;
 QudaInvertParam mg_inv_param;
 QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
 QudaEigParam eig_param;
+bool use_split_grid = false;
 
 // if --enable-testing true is passed, we run the tests defined in here
 #include <invert_test_gtest.hpp>
@@ -206,7 +207,7 @@ std::vector<std::array<double, 2>> solve(test_t param)
   // params corresponds to split grid
   for (int i = 0; i < 4; i++) inv_param.split_grid[i] = grid_partition[i];
   int num_sub_partition = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
-  bool use_split_grid = num_sub_partition > 1;
+  use_split_grid = num_sub_partition > 1;
 
   // Now QUDA is initialised and the fields are loaded, we may setup the preconditioner
   void *mg_preconditioner = nullptr;

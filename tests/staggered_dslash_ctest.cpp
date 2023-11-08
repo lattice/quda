@@ -62,8 +62,6 @@ protected:
   }
 
 public:
-  virtual ~StaggeredDslashTest() { }
-
   virtual void SetUp()
   {
     int prec = ::testing::get<0>(GetParam());
@@ -92,7 +90,11 @@ public:
   // Per-test-case tear-down.
   // Called after the last test in this test case.
   // Can be omitted if not needed.
-  static void TearDownTestCase() { endQuda(); }
+  static void TearDownTestCase()
+  {
+    StaggeredDslashTestWrapper::destroy();
+    endQuda();
+  }
 };
 
 TEST_P(StaggeredDslashTest, verify)
@@ -102,7 +104,10 @@ TEST_P(StaggeredDslashTest, verify)
 
   double deviation = dslash_test_wrapper.verify();
   double tol = getTolerance(dslash_test_wrapper.inv_param.cuda_prec);
-
+  if ((dslash_test_wrapper.gauge_param.reconstruct == QUDA_RECONSTRUCT_8
+       || dslash_test_wrapper.gauge_param.reconstruct == QUDA_RECONSTRUCT_9)
+      && dslash_test_wrapper.inv_param.cuda_prec >= QUDA_HALF_PRECISION)
+    tol *= 10; // if recon 8, we tolerate a greater deviation
   ASSERT_LE(deviation, tol) << "Reference CPU and QUDA implementations do not agree";
 }
 

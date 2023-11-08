@@ -66,7 +66,7 @@ char *getPrintBuffer();
    number of OMP threads for CPU functions recorded in the tune cache.
    @return Returns the string
 */
-char* getOmpThreadStr();
+const char *getOmpThreadStr();
 
 void errorQuda_(const char *func, const char *file, int line, ...);
 

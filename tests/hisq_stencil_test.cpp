@@ -104,8 +104,10 @@ static void hisq_test()
   double u4 = u2 * u2;
   double u6 = u4 * u2;
 
+  std::array<std::array<double, 6>, 3> act_paths;
+
   // First path: create V, W links
-  double act_path_coeff_1[6] = {
+  act_paths[0] = {
     (1.0 / 8.0),                             /* one link */
     u2 * (0.0),                              /* Naik */
     u2 * (-1.0 / 8.0) * 0.5,                 /* simple staple */
@@ -115,7 +117,7 @@ static void hisq_test()
   };
 
   // Second path: create X, long links
-  double act_path_coeff_2[6] = {
+  act_paths[1] = {
     ((1.0 / 8.0) + (2.0 * 6.0 / 16.0) + (1.0 / 8.0)), /* one link */
                                                       /* One link is 1/8 as in fat7 + 2*3/8 for Lepage + 1/8 for Naik */
     (-1.0 / 24.0),                                    /* Naik */
@@ -126,7 +128,7 @@ static void hisq_test()
   };
 
   // Paths for epsilon corrections. Not used if n_naiks = 1.
-  double act_path_coeff_3[6] = {
+  act_paths[2] = {
     (1.0 / 8.0),   /* one link b/c of Naik */
     (-1.0 / 24.0), /* Naik */
     0.0,           /* simple staple */
@@ -185,7 +187,7 @@ static void hisq_test()
   // Tuning run...
   {
     printfQuda("Tuning...\n");
-    computeKSLinkQuda(vlink, longlink, wlink, milc_sitelink, act_path_coeff_2, &qudaGaugeParam);
+    computeKSLinkQuda(vlink, longlink, wlink, milc_sitelink, act_paths[1].data(), &qudaGaugeParam);
   }
 
   struct timeval t0, t1;
@@ -196,11 +198,11 @@ static void hisq_test()
     // If we create cudaGaugeField objs, we can do this 100% on the GPU, no copying!
 
     // Create V links (fat7 links) and W links (unitarized V links), 1st path table set
-    computeKSLinkQuda(vlink, nullptr, wlink, milc_sitelink, act_path_coeff_1, &qudaGaugeParam);
+    computeKSLinkQuda(vlink, nullptr, wlink, milc_sitelink, act_paths[0].data(), &qudaGaugeParam);
 
     if (n_naiks > 1) {
       // Create Naiks, 3rd path table set
-      computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_path_coeff_3, &qudaGaugeParam);
+      computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_paths[2].data(), &qudaGaugeParam);
 
       // Rescale+copy Naiks into Naik field
       cpu_axy(prec, eps_naik, fatlink, fatlink_eps, V * 4 * gauge_site_size);
@@ -211,7 +213,7 @@ static void hisq_test()
     }
 
     // Create X and long links, 2nd path table set
-    computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_path_coeff_2, &qudaGaugeParam);
+    computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_paths[1].data(), &qudaGaugeParam);
 
     if (n_naiks > 1) {
       // Add into Naik field
@@ -244,9 +246,6 @@ static void hisq_test()
   }
 
   if (verify_results) {
-
-    double *act_paths[3] = {act_path_coeff_1, act_path_coeff_2, act_path_coeff_3};
-
     computeHISQLinksCPU(fat_reflink, long_reflink, fat_reflink_eps, long_reflink_eps, sitelink, &qudaGaugeParam,
                         act_paths, eps_naik);
   }

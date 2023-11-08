@@ -33,8 +33,6 @@ protected:
   }
 
 public:
-  DslashTest() : dslash_test_wrapper(dtest_type) { }
-
   virtual void SetUp()
   {
     dslash_test_wrapper.init_test(argc_copy, argv_copy);
@@ -43,12 +41,20 @@ public:
 
   virtual void TearDown() { dslash_test_wrapper.end(); }
 
-  static void SetUpTestCase() { initQuda(device_ordinal); }
+  static void SetUpTestCase()
+  {
+    initQuda(device_ordinal);
+    DslashTestWrapper::dtest_type = dtest_type;
+  }
 
   // Per-test-case tear-down.
   // Called after the last test in this test case.
   // Can be omitted if not needed.
-  static void TearDownTestCase() { endQuda(); }
+  static void TearDownTestCase()
+  {
+    DslashTestWrapper::destroy();
+    endQuda();
+  }
 };
 
 TEST_F(DslashTest, benchmark) { dslash_test_wrapper.run_test(niter, /**show_metrics =*/true); }
