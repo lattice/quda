@@ -70,13 +70,14 @@ struct dcomplex {
   double real;
   double imag;
 
-  void operator+=(const dcomplex &other) {
+  void operator+=(const dcomplex &other)
+  {
     real += other.real;
     imag += other.imag;
   }
 };
 
-#pragma omp declare reduction(dcomplex_sum: dcomplex: omp_out += omp_in)
+#pragma omp declare reduction(dcomplex_sum:dcomplex : omp_out += omp_in)
 
 struct fsu3_matrix {
   using real_t = float;
@@ -394,7 +395,7 @@ static dcomplex compute_loop_trace(su3_matrix **sitelink, int *path, int len, do
     int dx[4] = {};
     su3_matrix tmat = compute_gauge_path(sitelink, i, path, len, dx, lat);
     auto tr = trace_su3(&tmat);
-    accum += dcomplex{tr.real, tr.imag};
+    accum += dcomplex {tr.real, tr.imag};
   }
 
   CSCALE(accum, loop_coeff);

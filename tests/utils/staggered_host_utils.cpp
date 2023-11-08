@@ -59,9 +59,11 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
     // QUDA_ASQTAD_DSLASH
     if (compute_fatlong) {
       if (compute_on_gpu)
-        computeFatLongGPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks, eps_naik);
+        computeFatLongGPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks,
+                          eps_naik);
       else
-        computeFatLongCPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks, eps_naik);
+        computeFatLongCPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks,
+                          eps_naik);
     } else {
       for (int dir = 0; dir < 4; dir++) {
         memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
@@ -86,7 +88,8 @@ void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longli
   } else {
     // QUDA_ASQTAD_DSLASH
     if (compute_fatlong) {
-      computeFatLongGPU(qdp_fatlink_gpu, qdp_longlink_gpu, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks, eps_naik);
+      computeFatLongGPU(qdp_fatlink_gpu, qdp_longlink_gpu, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks,
+                        eps_naik);
     } else {
       // Not computing FatLong
       for (int dir = 0; dir < 4; dir++) {

@@ -24,7 +24,8 @@ static double max_allowed_error = 1e-11;
 // Wrap everything for the GPU construction of fat/long links here
 void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fatlink_eps, void **qdp_longlink_eps,
                          void **qdp_inlink, QudaGaugeParam &gauge_param_in,
-                         std::array<std::array<double, 6>, 3> &act_path_coeffs, double eps_naik, size_t gSize, int n_naiks)
+                         std::array<std::array<double, 6>, 3> &act_path_coeffs, double eps_naik, size_t gSize,
+                         int n_naiks)
 {
   // since a lot of intermediaries can be general matrices, override the recon in `gauge_param_in`
   auto gauge_param = gauge_param_in;

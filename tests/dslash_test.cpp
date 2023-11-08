@@ -33,8 +33,6 @@ protected:
   }
 
 public:
-  DslashTest() : dslash_test_wrapper(dtest_type) { }
-
   virtual void SetUp()
   {
     dslash_test_wrapper.init_test(argc_copy, argv_copy);
@@ -43,21 +41,18 @@ public:
 
   virtual void TearDown() { dslash_test_wrapper.end(); }
 
-  static void SetUpTestCase() { initQuda(device_ordinal); }
+  static void SetUpTestCase()
+  {
+    initQuda(device_ordinal);
+    DslashTestWrapper::dtest_type = dtest_type;
+  }
 
   // Per-test-case tear-down.
   // Called after the last test in this test case.
   // Can be omitted if not needed.
   static void TearDownTestCase()
   {
-    for (int dir = 0; dir < 4; dir++)
-      if (DslashTestWrapper::hostGauge[dir]) host_free(DslashTestWrapper::hostGauge[dir]);
-
-    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
-        || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
-      if (DslashTestWrapper::hostClover) host_free(DslashTestWrapper::hostClover);
-      if (DslashTestWrapper::hostCloverInv) host_free(DslashTestWrapper::hostCloverInv);
-    }
+    DslashTestWrapper::destroy();
     endQuda();
   }
 };

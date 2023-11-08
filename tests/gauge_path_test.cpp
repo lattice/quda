@@ -323,6 +323,7 @@ void gauge_loop_test()
   if (verify_results) {
     quda::host_timer_t verify_timer;
     verify_timer.start();
+
     gauge_loop_trace_reference(U_qdp, traces_ref, scale_factor, trace_path_p, trace_loop_length_p, trace_loop_coeff_p,
                                num_paths);
 

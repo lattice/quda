@@ -22,8 +22,6 @@ protected:
   }
 
 public:
-  StaggeredDslashTest() = default;
-
   virtual void SetUp()
   {
     dslash_test_wrapper.init_test(argc_copy, argv_copy);
@@ -39,14 +37,7 @@ public:
   // Can be omitted if not needed.
   static void TearDownTestCase()
   {
-    for (int dir = 0; dir < 4; dir++) {
-      if (StaggeredDslashTestWrapper::qdp_inlink[dir])
-        host_free(StaggeredDslashTestWrapper::qdp_inlink[dir]);
-      if (StaggeredDslashTestWrapper::qdp_fatlink_cpu[dir])
-        host_free(StaggeredDslashTestWrapper::qdp_fatlink_cpu[dir]);
-      if (StaggeredDslashTestWrapper::qdp_longlink_cpu[dir])
-        host_free(StaggeredDslashTestWrapper::qdp_longlink_cpu[dir]);
-    }
+    StaggeredDslashTestWrapper::destroy();
     endQuda();
   }
 };
