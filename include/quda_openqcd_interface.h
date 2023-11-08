@@ -297,7 +297,9 @@ double openQCD_qudaPlaquette(void);
 
 
 /**
- * @brief      Load the gauge fields from host to quda.
+ * @brief      Load the gauge fields from host to quda. Notice that the boundary
+ *             fields have to be up2date; i.e. call copy_bnd_hd(), copy_bnd_ud()
+ *             before pass fields into this function.
  *
  * @param[in]  gauge  The gauge fields (in openqcd order)
  * @param[in]  prec   Precision of the incoming gauge field
