@@ -837,6 +837,10 @@ void openQCD_qudaDw(void *src, void *dst, openQCD_QudaDiracParam_t p)
   param.output_location = QUDA_CPU_FIELD_LOCATION;
 
   MatQuda(static_cast<char *>(dst), static_cast<char *>(src), &param);
+
+  logQuda(QUDA_DEBUG_VERBOSE, "MatQuda()\n");
+  logQuda(QUDA_DEBUG_VERBOSE, "  gflops      = %.2e\n", param.gflops);
+  logQuda(QUDA_DEBUG_VERBOSE, "  secs        = %.2e\n", param.secs);
 }
 
 
