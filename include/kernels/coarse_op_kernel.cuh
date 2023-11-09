@@ -1403,7 +1403,7 @@ namespace quda {
 #else
       typedef complex<storeType> TyX0[Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
       static_assert(sizeof(TyX0)*Arg::max_color_height_per_block*2 <= device::max_shared_memory_size(), "Shared cache not large enough for X and Y");
-      TyX0 *X = reinterpret_cast<TyX0 *>(target::omptarget::get_shared_cache());
+      TyX0 *X = reinterpret_cast<TyX0 *>(device::get_shared_cache());
       TyX0 *Y = X+Arg::max_color_height_per_block;
 #endif
 

@@ -124,9 +124,9 @@ namespace quda
     constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size());
     using BlockReduce = BlockReduce<T, Reducer::reduce_block_dim, n_batch_block>;
     // bool isLastBlockDone[n_batch_block];
-    static_assert(sizeof(bool)*n_batch_block <= sizeof(target::omptarget::get_shared_cache()[0])*64, "Shared cache not large enough for isLastBlockDone");  // FIXME arbitrary, 128 is used in block_reduce_helper.h:/tempStorage/
-    bool *isLastBlockDone = (bool*)target::omptarget::get_shared_cache();
-    bool *hasLastBlockDone = (bool*)&target::omptarget::get_shared_cache()[64];
+    static_assert(sizeof(bool)*n_batch_block <= sizeof(device::get_shared_cache()[0])*64, "Shared cache not large enough for isLastBlockDone");  // FIXME arbitrary, 128 is used in block_reduce_helper.h:/tempStorage/
+    bool *isLastBlockDone = (bool*)device::get_shared_cache();
+    bool *hasLastBlockDone = (bool*)&device::get_shared_cache()[64];
     // printf("team %d thread %d isLastBlockDone %p\n", omp_get_team_num(), omp_get_thread_num(), isLastBlockDone);
 
     T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);

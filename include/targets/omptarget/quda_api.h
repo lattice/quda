@@ -12,11 +12,11 @@
 #define CUDA_SUCCESS QUDA_SUCCESS
 
 #define QUDA_RT_CONSTS \
+  const dim3 & blockDim=target::omptarget::launch_param_kernel_block();\
+  const dim3 & gridDim=target::omptarget::launch_param_kernel_grid();\
   const dim3\
-    blockDim=target::omptarget::launch_param->block,\
-    gridDim=target::omptarget::launch_param->grid,\
-    threadIdx(omp_get_thread_num()%target::omptarget::launch_param->block.x, (omp_get_thread_num()/target::omptarget::launch_param->block.x)%target::omptarget::launch_param->block.y, omp_get_thread_num()/(target::omptarget::launch_param->block.x*target::omptarget::launch_param->block.y)),\
-    blockIdx(omp_get_team_num()%target::omptarget::launch_param->grid.x, (omp_get_team_num()/target::omptarget::launch_param->grid.x)%target::omptarget::launch_param->grid.y, omp_get_team_num()/(target::omptarget::launch_param->grid.x*target::omptarget::launch_param->grid.y))
+    threadIdx(omp_get_thread_num()%blockDim.x, (omp_get_thread_num()/blockDim.x)%blockDim.y, omp_get_thread_num()/(blockDim.x*blockDim.y)),\
+    blockIdx(omp_get_team_num()%gridDim.x, (omp_get_team_num()/gridDim.x)%gridDim.y, omp_get_team_num()/(gridDim.x*gridDim.y))
 
 #include <functional>
 #include <iostream>
@@ -87,25 +87,27 @@ using CUresult = int;  // ../lib/coarse_op.cuh:/CUresult
 namespace quda {
   namespace target {
     namespace omptarget {
-      struct SharedCache{
-        int *addr;
-        int num_teams;
-        int cache_length;
-      };
+      dim3 & launch_param_grid(void);
+      dim3 & launch_param_block(void);
 
-      struct LaunchParam{
-        dim3 block;
-        dim3 grid;
-        SharedCache shared_cache;
-      };
-#pragma omp declare target
-      extern LaunchParam *launch_param;
-#pragma omp end declare target
-      extern LaunchParam *launch_param_host;
-
-      inline int *get_shared_cache(void)
+      inline dim3 & launch_param_kernel_block(void)
       {
-        return &launch_param->shared_cache.addr[omp_get_team_num()*launch_param->shared_cache.cache_length];
+        static char block[sizeof(dim3)];
+        #pragma omp groupprivate(block)
+        return *reinterpret_cast<dim3*>(block);
+      }
+      inline dim3 & launch_param_kernel_grid(void)
+      {
+        static char grid[sizeof(dim3)];
+        #pragma omp groupprivate(grid)
+        return *reinterpret_cast<dim3*>(grid);
+      }
+      inline void launch_param_device_set(dim3 grid, dim3 block)
+      {
+        dim3 & gref = launch_param_kernel_grid();
+        dim3 & bref = launch_param_kernel_block();
+        gref = grid;
+        bref = block;
       }
     }
   }

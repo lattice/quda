@@ -115,14 +115,17 @@ namespace quda
                       0) __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> BlockKernel2D(Arg arg)
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
-    const auto& grid = target::omptarget::launch_param_host->grid;
-    const auto& block = target::omptarget::launch_param_host->block;
+    const dim3 grid = target::omptarget::launch_param_grid();
+    const dim3 block = target::omptarget::launch_param_block();
     const int gd = grid.x*grid.y*grid.z;
     const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg)
-    #pragma omp parallel num_threads(ld)
+    #pragma omp target teams num_teams(gd) thread_limit(ld) firstprivate(arg,grid,block)
     {
-      BlockKernel2D_impl<Functor, Arg>(arg);
+      target::omptarget::launch_param_device_set(grid, block);
+      #pragma omp parallel num_threads(ld)
+      {
+        BlockKernel2D_impl<Functor, Arg>(arg);
+      }
     }
   }
 
@@ -146,14 +149,17 @@ namespace quda
                       0) __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> BlockKernel2D(Arg *argp)
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
-    const auto& grid = target::omptarget::launch_param_host->grid;
-    const auto& block = target::omptarget::launch_param_host->block;
+    const dim3 grid = target::omptarget::launch_param_grid();
+    const dim3 block = target::omptarget::launch_param_block();
     const int gd = grid.x*grid.y*grid.z;
     const int ld = block.x*block.y*block.z;
-    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp)
-    #pragma omp parallel num_threads(ld)
+    #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(argp) firstprivate(grid,block)
     {
-      BlockKernel2D_impl<Functor, Arg>(*argp);
+      target::omptarget::launch_param_device_set(grid, block);
+      #pragma omp parallel num_threads(ld)
+      {
+        BlockKernel2D_impl<Functor, Arg>(*argp);
+      }
     }
   }
 

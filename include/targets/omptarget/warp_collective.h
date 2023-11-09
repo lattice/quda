@@ -14,8 +14,8 @@ namespace quda
     {
       using R = typename T::value_type;
       constexpr auto max_nthr = device::max_block_size();
-      static_assert(max_nthr*sizeof(R) <= device::max_shared_memory_size()-sizeof(target::omptarget::get_shared_cache()[0])*128, "Shared cache not large enough for tempStorage");  // FIXME arbitrary, the number is arbitrary, offset 128 below
-      R *storage = (R*)&target::omptarget::get_shared_cache()[128];  // FIXME arbitrary
+      static_assert(max_nthr*sizeof(R) <= device::max_shared_memory_size()-sizeof(device::get_shared_cache()[0])*128, "Shared cache not large enough for tempStorage");  // FIXME arbitrary, the number is arbitrary, offset 128 below
+      R *storage = (R*)&device::get_shared_cache()[128];  // FIXME arbitrary
       const int tid = omp_get_thread_num();
 
       constexpr int warp_size = device::warp_size();

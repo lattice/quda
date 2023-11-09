@@ -50,47 +50,69 @@ namespace quda {
     */
     __device__ __host__ inline bool is_host() { return dispatch<is_host_impl>(); }
 
+    template <bool is_device> struct block_dim_impl {
+      inline dim3 operator()() { return dim3(1, 1, 1); }
+    };
+    template <> struct block_dim_impl<true> {
+      __device__ inline dim3 operator()() { return target::omptarget::launch_param_kernel_block(); }
+    };
+
     /**
        @brief Helper function that returns the thread block
        dimensions.  On CUDA this returns the intrinsic blockDim,
        whereas on the host this returns (1, 1, 1).
     */
-    __device__ __host__ inline dim3 block_dim()
-    {
-      return target::omptarget::launch_param->block;
-    }
+    __device__ __host__ inline dim3 block_dim() { return dispatch<block_dim_impl>(); }
+
+    template <bool is_device> struct grid_dim_impl {
+      inline dim3 operator()() { return dim3(1, 1, 1); }
+    };
+    template <> struct grid_dim_impl<true> {
+      __device__ inline dim3 operator()() { return target::omptarget::launch_param_kernel_grid(); }
+    };
 
     /**
        @brief Helper function that returns the grid dimensions.  On
        CUDA this returns the intrinsic blockDim, whereas on the host
        this returns (1, 1, 1).
     */
-    __device__ __host__ inline dim3 grid_dim()
-    {
-      return target::omptarget::launch_param->grid;
-    }
+    __device__ __host__ inline dim3 grid_dim() { return dispatch<grid_dim_impl>(); }
+
+    template <bool is_device> struct block_idx_impl {
+      inline dim3 operator()() { return dim3(0, 0, 0); }
+    };
+    template <> struct block_idx_impl<true> {
+      __device__ inline dim3 operator()() {
+        const dim3 & gridDim=target::omptarget::launch_param_kernel_grid();
+        const auto n = (unsigned int)omp_get_team_num();
+        return dim3(n%gridDim.x, (n/gridDim.x)%gridDim.y, n/(gridDim.x*gridDim.y));
+      }
+    };
 
     /**
        @brief Helper function that returns the thread indices within a
        thread block.  On CUDA this returns the intrinsic
        blockIdx, whereas on the host this just returns (0, 0, 0).
     */
-    __device__ __host__ inline dim3 block_idx()
-    {
-      const auto n = (unsigned int)omp_get_team_num();
-      return dim3(n%target::omptarget::launch_param->grid.x, (n/target::omptarget::launch_param->grid.x)%target::omptarget::launch_param->grid.y, n/(target::omptarget::launch_param->grid.x*target::omptarget::launch_param->grid.y));
-    }
+    __device__ __host__ inline dim3 block_idx() { return dispatch<block_idx_impl>(); }
+
+    template <bool is_device> struct thread_idx_impl {
+      inline dim3 operator()() { return dim3(0, 0, 0); }
+    };
+    template <> struct thread_idx_impl<true> {
+      __device__ inline dim3 operator()() {
+        const dim3 & blockDim=target::omptarget::launch_param_kernel_block();
+        const auto n = (unsigned int)omp_get_thread_num();
+        return dim3(n%blockDim.x, (n/blockDim.x)%blockDim.y, n/(blockDim.x*blockDim.y));
+      }
+    };
 
     /**
        @brief Helper function that returns the thread indices within a
        thread block.  On CUDA this returns the intrinsic
        threadIdx, whereas on the host this just returns (0, 0, 0).
     */
-    __device__ __host__ inline dim3 thread_idx()
-    {
-      const auto n = (unsigned int)omp_get_thread_num();
-      return dim3(n%target::omptarget::launch_param->block.x, (n/target::omptarget::launch_param->block.x)%target::omptarget::launch_param->block.y, n/(target::omptarget::launch_param->block.x*target::omptarget::launch_param->block.y));
-    }
+    __device__ __host__ inline dim3 thread_idx() { return dispatch<thread_idx_impl>(); }
 
     /**
        @brief Helper function that returns a linear thread index within a thread block.
@@ -98,9 +120,10 @@ namespace quda {
     template <int dim> __device__ __host__ inline auto thread_idx_linear()
     {
       const auto n = (unsigned int)omp_get_thread_num();
+      const dim3 & blockDim=target::omptarget::launch_param_kernel_block();
       switch (dim) {
-      case 1: return n%target::omptarget::launch_param->block.x;
-      case 2: return n%(target::omptarget::launch_param->block.x*target::omptarget::launch_param->block.y);
+      case 1: return n%blockDim.x;
+      case 2: return n%(blockDim.x*blockDim.y);
       case 3:
       default: return n;
       }
@@ -111,11 +134,12 @@ namespace quda {
     */
     template <int dim> __device__ __host__ inline auto block_size()
     {
+      const dim3 & blockDim=target::omptarget::launch_param_kernel_block();
       switch (dim) {
-      case 1: return target::omptarget::launch_param->block.x;
-      case 2: return target::omptarget::launch_param->block.y * target::omptarget::launch_param->block.x;
+      case 1: return blockDim.x;
+      case 2: return blockDim.y * blockDim.x;
       case 3:
-      default: return target::omptarget::launch_param->block.z * target::omptarget::launch_param->block.y * target::omptarget::launch_param->block.x;
+      default: return blockDim.z * blockDim.y * blockDim.x;
       }
     }
 
@@ -184,6 +208,15 @@ namespace quda {
      */
     template <typename Arg> constexpr std::enable_if_t<use_kernel_arg<Arg>(), void *> get_constant_buffer() { return nullptr; }
 
+    /**
+       @brief Return the address of the shared local memory for the current thread group.
+     */
+    inline char *get_shared_cache(void)
+    {
+      static char s[device::max_shared_memory_size()];
+      #pragma omp groupprivate(s)
+      return s;
+    }
   }
 
 }

@@ -71,7 +71,7 @@ namespace quda
     template <typename dummy> struct cache_dynamic<true, dummy> {
       __device__ inline atom_t *operator()(unsigned int offset)
       {
-        return reinterpret_cast<atom_t *>(reinterpret_cast<char *>(target::omptarget::get_shared_cache()) + offset);
+        return reinterpret_cast<atom_t *>(reinterpret_cast<char *>(device::get_shared_cache()) + offset);
       }
     };
 
@@ -94,7 +94,7 @@ namespace quda
       __device__ inline atom_t *operator()()
       {
         static_assert(n_element * block_size_x * block_size_y * block_size_z * sizeof(atom_t) <= device::max_shared_memory_size(), "not enough shared memory");
-        return reinterpret_cast<atom_t *>(target::omptarget::get_shared_cache());
+        return reinterpret_cast<atom_t *>(device::get_shared_cache());
       }
     };
 

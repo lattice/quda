@@ -21,7 +21,7 @@ namespace quda
     constexpr bool enough_shared_mem(void)
     {
       constexpr auto max_nthr = device::max_block_size();
-      return max_nthr*sizeof(T) <= device::max_shared_memory_size()-sizeof(target::omptarget::get_shared_cache()[0])*128;  // FIXME arbitrary, the number is arbitrary, offset 128 below & in reduce_helper.h:/reduce
+      return max_nthr*sizeof(T) <= device::max_shared_memory_size()-sizeof(device::get_shared_cache()[0])*128;  // FIXME arbitrary, the number is arbitrary, offset 128 below & in reduce_helper.h:/reduce
     }
     /**
        @brief OpenMP reduction over a group of consecutive threads smaller than omp_num_threads()
@@ -30,7 +30,7 @@ namespace quda
     inline T any_reduce_impl(const reducer_t &r, const T &value_, const int batch, const int block_size, const bool all, const bool async)
     {
       static_assert(enough_shared_mem<T>(), "Shared cache not large enough for tempStorage");
-      T *storage = (T*)&target::omptarget::get_shared_cache()[128];  // FIXME arbitrary
+      T *storage = (T*)&device::get_shared_cache()[128];  // FIXME arbitrary
       const int tid = omp_get_thread_num();
       const auto& v0 = r.init();
 #if 1
@@ -44,8 +44,10 @@ namespace quda
         storage[tid] = value;
         const auto j = tid+offset;
         #pragma omp barrier
-        const auto& v = j<batch_end ? storage[j] : v0;
-        value = r(value, v);
+        if(j<batch_end)
+          value = r(value, storage[j]);
+        else
+          value = r(value, v0);
       }
       if(all){
         if(tid==block_size*batch)

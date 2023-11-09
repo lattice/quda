@@ -37,11 +37,16 @@ mark_as_advanced(QUDA_OMPTARGET_JIT)
 # define omptarget flags
 
 if(QUDA_OMPTARGET_JIT)
-    set(QUDA_OMPTARGET_FLAGS -fiopenmp -fopenmp-targets=spir64 -fopenmp-version=51 "SHELL:-mllvm -vpo-paropt-simulate-get-num-threads-in-target=false")
+    set(QUDA_OMPTARGET_FLAGS -fiopenmp -fopenmp-targets=spir64 -fopenmp-version=60 "SHELL:-mllvm -vpo-paropt-simulate-get-num-threads-in-target=false")
 else()
-    #set(QUDA_OMPTARGET_FLAGS -fiopenmp -fopenmp-targets=spir64_gen -fopenmp-version=51 "SHELL:-mllvm -pragma-unroll-threshold=16" "SHELL:-mllvm -vpo-paropt-simulate-get-num-threads-in-target=false")
-    set(QUDA_OMPTARGET_FLAGS -fiopenmp -fopenmp-targets=spir64_gen -fopenmp-version=51 "SHELL:-mllvm -vpo-paropt-simulate-get-num-threads-in-target=false")
+    #set(QUDA_OMPTARGET_FLAGS -fiopenmp -fopenmp-targets=spir64_gen -fopenmp-version=60 "SHELL:-mllvm -pragma-unroll-threshold=16" "SHELL:-mllvm -vpo-paropt-simulate-get-num-threads-in-target=false")
+    set(QUDA_OMPTARGET_FLAGS -fiopenmp -fopenmp-targets=spir64_gen -fopenmp-device-code-split=per_kernel -fopenmp-max-parallel-link-jobs=64 -fopenmp-version=60 "SHELL:-mllvm -vpo-paropt-simulate-get-num-threads-in-target=false")
 endif()
+
+if(QUDA_OMPTARGET_DEBUG)
+    set(QUDA_OMPTARGET_FLAGS ${QUDA_OMPTARGET_FLAGS} -gline-tables-only)
+endif()
+
 message(STATUS "Using OpenMP target flags: ${QUDA_OMPTARGET_FLAGS}")
 
 string(REPLACE " " "" QUDA_GPU_ARCH_STRIP "${QUDA_GPU_ARCH}")
