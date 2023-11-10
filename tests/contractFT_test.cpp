@@ -118,19 +118,16 @@ int test(int contractionType, QudaPrecision test_prec)
   int red_size = 0;
   switch (contractionType) {
   case 0:
-    printfQuda("Running degrand-rossi contraction test 0.\n");
     cType = QUDA_CONTRACT_TYPE_DR_FT_T;
     nSpin = 4;
     red_size = comm_dim(3)*X[3]; //DMH: total temporal dim
     break;
   case 1:
-    printfQuda("Running degrand-rossi contraction test 1.\n");
     cType = QUDA_CONTRACT_TYPE_DR_FT_Z;
     nSpin = 4;
     red_size = comm_dim(2)*X[2]; //DMH total Z dim
     break;
   case 2:
-    printfQuda("Running staggered contraction test.\n");
     cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
     nSpin = 1;
     red_size = comm_dim(3)*X[3]; //DMH total temporal dim
