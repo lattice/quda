@@ -17,9 +17,6 @@
 #include <invert_quda.h>
 #include <mpi.h>
 
-#define CHECK_PARAM
-#include "check_params.h"
-#undef CHECK_PARAM
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
@@ -523,8 +520,6 @@ static QudaGaugeParam newOpenQCDGaugeParam(QudaPrecision prec)
   param.scale = 1.0;
   param.anisotropy = 1.0; /* 1.0 means not anisotropic */
   param.ga_pad = getLinkPadding(param.X); /* Why this? */
-
-  checkGaugeParam(&param);
 
   return param;
 }
@@ -1207,13 +1202,11 @@ void* openQCD_qudaSolverSetup(char *infile, char *section)
     POP_RANGE;
   }
 
-  checkInvertParam(param);
   if (param->verbosity >= QUDA_DEBUG_VERBOSE) {
     printQudaInvertParam(param);
   }
 
   if (param->inv_type_precondition == QUDA_MG_INVERTER) {
-    checkMultigridParam(multigrid_param);
     if (param->verbosity >= QUDA_DEBUG_VERBOSE) {
       printQudaMultigridParam(multigrid_param);
     }
@@ -1336,7 +1329,6 @@ void* openQCD_qudaEigensolverSetup(char *infile, char *section, char *inv_sectio
   if (verbosity >= QUDA_DEBUG_VERBOSE) {
     printQudaEigParam(param);
   }
-  checkEigParam(param);
   if (verbosity >= QUDA_DEBUG_VERBOSE) {
     printQudaEigParam(param);
   }
