@@ -34,6 +34,8 @@ namespace quda {
     }
   };
 
+  template <typename T, typename... Arg> static constexpr unsigned int sharedMemSize(dim3 block, Arg &...arg);
+
   // alternative to SpecialOps
   struct NoSpecialOps {
     using SpecialOpsT = NoSpecialOps;
@@ -45,6 +47,9 @@ namespace quda {
   template <typename ...T> struct SpecialOps_Base {
     using SpecialOpsT = SpecialOps<T...>;
     using KernelOpsT = SpecialOps<T...>;
+    template <typename... Arg> static constexpr unsigned int shared_mem_size(dim3 block, Arg &...arg) {
+      return sharedMemSize<KernelOpsT>(block, arg...);
+    }
   };
 
   // getSpecialOps

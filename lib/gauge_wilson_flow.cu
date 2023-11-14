@@ -25,7 +25,7 @@ namespace quda {
     unsigned int sharedBytesPerThread() const
     {
       // use SharedMemoryCache if using Symanzik improvement for two Link fields
-      return wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW ? 2 * in.Ncolor() * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type) : 0;
+      return 4*sizeof(int) + (wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW ? 2 * in.Ncolor() * in.Ncolor() * 2 * sizeof(typename mapper<Float>::type) : 0);
     }
 
   public:

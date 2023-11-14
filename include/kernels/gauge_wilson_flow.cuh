@@ -61,9 +61,11 @@ namespace quda
   struct computeStapleOpsWF {
     using real = typename Arg::real;
     using Link = Matrix<complex<real>, Arg::nColor>;
-    using StapOp = ThreadLocalCache<Link>;
+    using WilsonOps = computeStapleOps;
+    using StapOp = ThreadLocalCache<Link,0,computeStapleRectangleOps>;
     using RectOp = ThreadLocalCache<Link,0,StapOp>;
-    using Ops = SpecialOps<StapOp,RectOp,computeStapleOps,computeStapleRectangleOps>;
+    using SymanzikOps = combineOps<computeStapleRectangleOps,SpecialOps<StapOp,RectOp>>;
+    using Ops = std::conditional_t<Arg::wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW, SymanzikOps, WilsonOps>;
   };
 
   //template <typename Arg>
@@ -77,24 +79,28 @@ namespace quda
     using Link = Matrix<complex<real>, Arg::nColor>;
     Link Z;
     // Compute staples and Z factor
-    switch (arg.wflow_type) {
-    case QUDA_GAUGE_SMEAR_WILSON_FLOW :
+    //switch (arg.wflow_type) {
+    //case QUDA_GAUGE_SMEAR_WILSON_FLOW :
+    static_assert(Arg::wflow_type == QUDA_GAUGE_SMEAR_WILSON_FLOW || Arg::wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW);
+    if constexpr (Arg::wflow_type == QUDA_GAUGE_SMEAR_WILSON_FLOW) {
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       computeStaple(ftor, x, arg.E, parity, dir, Z, Arg::wflow_dim);
-      break;
-    case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW :
+      //break;
+    }
+    //case QUDA_GAUGE_SMEAR_SYMANZIK_FLOW :
+    if constexpr (Arg::wflow_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW) {
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
       //SharedMemoryCache<Link> Stap(target::block_dim());
       //SharedMemoryCache<Link> Rect(target::block_dim(), sizeof(Link)); // offset to ensure non-overlapping allocations
-      //typename computeStapleOps<Arg>::StapOp Stap(ftor);
-      //typename computeStapleOps<Arg>::RectOp Rect(ftor);
-      ThreadLocalCache<Link> Stap{ftor};
-      ThreadLocalCache<Link,0,decltype(Stap)> Rect{ftor};
+      typename computeStapleOpsWF<Arg>::StapOp Stap{ftor};
+      typename computeStapleOpsWF<Arg>::RectOp Rect{ftor};
+      //ThreadLocalCache<Link,0,computeStapleRectangleOps> Stap{ftor};
+      //ThreadLocalCache<Link,0,decltype(Stap)> Rect{ftor};
       computeStapleRectangle(ftor, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim);
       Z = arg.coeff1x1 * static_cast<const Link &>(Stap) + arg.coeff2x1 * static_cast<const Link &>(Rect);
-      break;
+      //break;
     }
     return Z;
   }

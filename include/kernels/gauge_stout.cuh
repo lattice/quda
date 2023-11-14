@@ -117,9 +117,9 @@ namespace quda
     using real = typename Arg::Float;
     using Complex = complex<real>;
     using Link = Matrix<complex<real>, Arg::nColor>;
-    using StapCacheT = ThreadLocalCache<Link>;
+    using StapCacheT = ThreadLocalCache<Link,0,computeStapleRectangleOps>;
     using RectCacheT = ThreadLocalCache<Link,0,StapCacheT>;
-    using Ops = SpecialOps<StapCacheT,RectCacheT,computeStapleRectangleOps>;
+    using Ops = combineOps<computeStapleRectangleOps,SpecialOps<StapCacheT,RectCacheT>>;
   };
 
   template <typename Arg_> struct OvrImpSTOUT : OvrImpSTOUTOps<Arg_>::Ops
