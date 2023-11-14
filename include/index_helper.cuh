@@ -1160,6 +1160,15 @@ namespace quda {
     }
 
 
+    /**
+     * @brief      Calculate the offset needed for boundary points in openQCD.
+     *
+     * @param[in]  L      Local lattice extent L0-L3 in txyz convention
+     * @param[in]  nproc  NPROC0-NPROC3 from openqcd
+     * @param[in]  mu     Direction in txyz
+     *
+     * @return     The offset
+     */
     __device__ __host__ inline int ifc(const int *L, const int *nproc, const int mu)
     {
       if (mu==0) {
@@ -1179,6 +1188,15 @@ namespace quda {
     }
 
 
+    /**
+     * @brief      Calculate the offset of the faces in openQCD.
+     *
+     * @param[in]  L      Local lattice extent L0-L3 in txyz convention
+     * @param[in]  nproc  NPROC0-NPROC3 from openqcd
+     * @param[in]  mu     Direction in txyz
+     *
+     * @return     The offset
+     */
     __device__ __host__ inline int face_offset(const int *L, const int *nproc, const int mu)
     {
       if (mu==0) {
@@ -1249,7 +1267,8 @@ namespace quda {
 
 
     /**
-     * @brief      Return cbs[].
+     * @brief      Return cbs[]. This is the cache block size in openQCD, which
+     *             the local lattice is divided into.
      *
      * @param[in]  mu    Direction
      * @param[in]  X     Extents
@@ -1353,12 +1372,14 @@ namespace quda {
 
 
     /**
-     * @brief      Pure implementation of iup[ix][mu]
+     * @brief      Pure implementation of iup[ix][mu]. Returns neighbouring
+     *             point of ix in positive mu direction.
      *
-     * @param[in]  x     Cartesian local lattice corrdinates, 0 <= x[i] < Li,
-     *                   length 4 in txyz convention
-     * @param[in]  mu    Direction in txyz convention
-     * @param[in]  L     Local lattice extents, length 4 in txyz convention
+     * @param[in]  x      Cartesian local lattice corrdinates, 0 <= x[i] < Li,
+     *                    length 4 in txyz convention
+     * @param[in]  mu     Direction in txyz convention
+     * @param[in]  L      Local lattice extents, length 4 in txyz convention
+     * @param[in]  nproc  NPROC0-NPROC3 from openqcd
      *
      * @return     iup[ix][mu]
      */
