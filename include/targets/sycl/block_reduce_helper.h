@@ -96,7 +96,7 @@ namespace quda
     //using dependencies = op_Sequential<op_blockSync>;
     //using dependentOps = SpecialOps<op_blockSync>;
     using BlockReduce_t = BlockReduce<T, block_dim, batch_size>;
-    template <typename S> inline block_reduceG(S &ops) {};
+    template <typename S> inline block_reduceG(S &) {};
     /**
        @brief Perform a block-wide reduction
        @param[in] value_ thread-local value to be reduced
@@ -110,7 +110,7 @@ namespace quda
        @return The block-wide reduced value
      */
     template <typename reducer_t>
-    inline T apply(const T &value_, bool async, int batch, bool all, const reducer_t &r)
+    inline T apply(const T &value_, bool async, int batch, bool, const reducer_t &r)
     {
       if (!async) __syncthreads(); // only synchronize if we are not pipelining
       const int nbatch = batch_size;

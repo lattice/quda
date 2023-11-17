@@ -32,7 +32,7 @@ namespace quda
      @return Swizzled block index
    */
   template <typename Arg>
-  int virtual_block_idx(const Arg &arg, const sycl::nd_item<3> &ndi)
+  int virtual_block_idx(const Arg &arg, const sycl::nd_item<3> &)
   {
     int block_idx = groupIdX;
     if (arg.swizzle) {

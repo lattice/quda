@@ -12,7 +12,7 @@ namespace quda {
   // Kernel1D
 
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  void Kernel1DImpl(const Arg &arg, const sycl::nd_item<3> &ndi)
+  void Kernel1DImpl(const Arg &arg, const sycl::nd_item<3> &)
   {
     Functor<Arg> f(arg);
     auto i = globalIdX;
@@ -22,7 +22,7 @@ namespace quda {
     }
   }
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  void Kernel1DImplB(const Arg &arg, const sycl::nd_item<3> &ndi)
+  void Kernel1DImplB(const Arg &arg, const sycl::nd_item<3> &)
   {
     Functor<Arg> f(arg);
     auto tid = globalIdX;
@@ -160,7 +160,7 @@ namespace quda {
   }
 
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  void Kernel2DImplB(const Arg &arg, const sycl::nd_item<3> &ndi)
+  void Kernel2DImplB(const Arg &arg, const sycl::nd_item<3> &)
   {
     Functor<Arg> f(arg);
     auto j = globalIdY;
@@ -310,7 +310,7 @@ namespace quda {
   }
 
   template <template <typename> class Functor, typename Arg, bool grid_stride>
-  void Kernel3DImplB(const Arg &arg, const sycl::nd_item<3> &ndi)
+  void Kernel3DImplB(const Arg &arg, const sycl::nd_item<3> &)
   {
     Functor<Arg> f(arg);
 

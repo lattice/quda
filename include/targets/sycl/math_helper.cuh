@@ -30,9 +30,9 @@ namespace quda {
   template<typename T>
   inline void sincos(const T a, T* s, T* c)
   {
-    *s = sycl::sincos(a, c);
-    //*s = sycl::sin(a);
-    //*c = sycl::cos(a);
+    //*s = sycl::sincos(a, c);
+    *s = sycl::sin(a);
+    *c = sycl::cos(a);
   }
 
   /**
@@ -58,9 +58,9 @@ namespace quda {
   template<typename T>
   inline void sincospi(const T& a, T *s, T *c)
   {
-    *s = sycl::sincos(static_cast<T>(M_PI)*a, c);
-    //*s = sycl::sinpi(a);
-    //*c = sycl::cospi(a);
+    //*s = sycl::sincos(static_cast<T>(M_PI)*a, c);
+    *s = sycl::sinpi(a);
+    *c = sycl::cospi(a);
   }
 
   /**

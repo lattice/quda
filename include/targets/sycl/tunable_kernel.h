@@ -132,9 +132,10 @@ namespace quda {
 	    (ndRange,
 	     //[=](sycl::nd_item<3> ndi) {
 	     [=](sycl::nd_item<3> ndi) [[sycl::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
-	       auto smem = la.get_pointer();
+	       //auto smem = la.get_pointer();
+	       auto smem = la.get_multi_ptr<sycl::access::decorated::yes>();
 	       //arg.lmem = smem;
-	       F f(arg, ndi, smem);
+	       F f(arg, ndi, smem.get());
 	     });
 	});
       } else { // no shared mem
@@ -187,9 +188,10 @@ namespace quda {
 	    (ndRange,
 	     //[=](sycl::nd_item<3> ndi) {
 	     [=](sycl::nd_item<3> ndi) [[sycl::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
-	       auto smem = la.get_pointer();
+	       //auto smem = la.get_pointer();
+	       auto smem = la.get_multi_ptr<sycl::access::decorated::yes>();
 	       //arg.lmem = smem;
-	       F f(arg, ndi, smem);
+	       F f(arg, ndi, smem.get());
 	     });
 	});
       } else { // no shared mem
@@ -244,9 +246,10 @@ namespace quda {
 	     //[=](sycl::nd_item<3> ndi) {
 	     [=](sycl::nd_item<3> ndi) [[sycl::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
 	       Arg *arg2 = reinterpret_cast<Arg*>(p);
-	       auto smem = la.get_pointer();
+	       //auto smem = la.get_pointer();
+	       auto smem = la.get_multi_ptr<sycl::access::decorated::yes>();
 	       //arg2->lmem = smem;
-	       F f(*arg2, ndi, smem);
+	       F f(*arg2, ndi, smem.get());
 	     });
 	});
       } else {
@@ -388,11 +391,11 @@ namespace quda {
   template <typename F, bool = hasSpecialOps<F>, bool = needsSharedMem<F>>
   struct Ftor : F {
     template <typename Arg, typename S>
-    Ftor(const Arg &arg, const sycl::nd_item<3> &ndi, S smem) : F{arg,smem} {}
+    Ftor(const Arg &arg, const sycl::nd_item<3> &, S smem) : F{arg,smem} {}
   };
   template <typename F, bool ns> struct Ftor<F,ns,false> : F {
     template <typename Arg, typename ...S>
-    Ftor(const Arg &arg, const sycl::nd_item<3> &ndi, S ...smem) : F{arg} {}
+    Ftor(const Arg &arg, const sycl::nd_item<3> &, S ...) : F{arg} {}
   };
 
 }

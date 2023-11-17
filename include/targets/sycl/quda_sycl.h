@@ -73,12 +73,12 @@ static inline auto getNdItem()
   return sycl::ext::oneapi::experimental::this_nd_item<3>();
 }
 
-static inline int globalRange(int d) { return getNdItem().get_global_range(d); }
-static inline int globalId(int d) { return getNdItem().get_global_id(d); }
-static inline int groupRange(int d) { return getNdItem().get_group_range(d); }
-static inline int groupId(int d) { return getNdItem().get_group(d); }
-static inline int localRange(int d) { return getNdItem().get_local_range(d); }
-static inline int localId(int d) { return getNdItem().get_local_id(d); }
+static inline unsigned int globalRange(int d) { return getNdItem().get_global_range(d); }
+static inline unsigned int globalId(int d) { return getNdItem().get_global_id(d); }
+static inline unsigned int groupRange(int d) { return getNdItem().get_group_range(d); }
+static inline unsigned int groupId(int d) { return getNdItem().get_group(d); }
+static inline unsigned int localRange(int d) { return getNdItem().get_local_range(d); }
+static inline unsigned int localId(int d) { return getNdItem().get_local_id(d); }
 
 #define globalRangeX ::globalRange(RANGE_X)
 #define globalRangeY ::globalRange(RANGE_Y)

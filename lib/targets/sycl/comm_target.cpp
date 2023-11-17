@@ -21,21 +21,21 @@ namespace quda
     return std::max(accessRank[0], accessRank[1]);
   }
 
-  void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote, void *local)
+  void comm_create_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &, void *)
   {
   }
 
-  void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &remote)
+  void comm_destroy_neighbor_memory(array_2d<void *, QUDA_MAX_DIM, 2> &)
   {
   }
 
-  void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &remote,
-				  array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
+  void comm_create_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &,
+				  array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &)
   {
   }
 
   void comm_destroy_neighbor_event(array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &,
-				   array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &local)
+				   array_2d<qudaEvent_t, QUDA_MAX_DIM, 2> &)
   {
   }
 

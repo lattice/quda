@@ -354,7 +354,7 @@ namespace quda
     if (ptr.is_device()) {
       auto q = device::get_target_stream(stream);
       char *p = static_cast<char*>(ptr.data());
-      for(int i=0; i<height; i++) {
+      for(size_t i=0; i<height; i++) {
 	q.memset(p, value, width);
 	p += pitch;
       }

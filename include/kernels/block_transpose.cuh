@@ -69,7 +69,7 @@ namespace quda
         The transpose uses shared memory to avoid strided memory accesses.
      */
     template <bool allthreads = false>
-    __device__ __host__ inline void operator()(int x_cb, int, bool active = true)
+    __device__ __host__ inline void operator()(int x_cb, int, bool = true)
     {
       int parity_color = target::block_idx().z;
       int color = parity_color % Arg::nColor;

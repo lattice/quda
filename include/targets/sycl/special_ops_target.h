@@ -53,10 +53,15 @@ namespace quda {
     inline SpecialOps() {
       static_assert(!needsSharedMem<SpecialOps<T...>>);
     }
-    inline SpecialOps(char *s) {
+    inline SpecialOps(char *s) {  // for host
       static_assert(needsSharedMem<SpecialOps<T...>>);
       smem = s;
     }
+    //template <typename S>
+    //inline SpecialOps(S s) {
+    //  static_assert(needsSharedMem<SpecialOps<T...>>);
+    //  smem = s.get();
+    //}
     template <typename ...U>
     inline SpecialOps(const SpecialOps<U...> &ops) {
       checkSpecialOps<T...>(ops);
@@ -65,6 +70,7 @@ namespace quda {
       }
     }
 
+#if 0
     //inline void setNdItem(const sycl::nd_item<3> &i) { ndi = &i; }
     inline void setNdItem(const sycl::nd_item<3> &i) {}
     inline void setSharedMem(char *s) { smem = s; }
@@ -73,6 +79,7 @@ namespace quda {
       //ndi = ops.ndi;
       smem = ops.smem;
     }
+#endif
 #if 0
     SpecialOpsElemType *getSharedMemPtr() {
       static_assert(!std::is_same_v<SpecialOpsElemType,void>);
@@ -83,7 +90,7 @@ namespace quda {
 
   // blockSync
   template <typename ...T>
-  inline void blockSync(SpecialOps<T...> *ops) {
+  inline void blockSync(const SpecialOps<T...> &) {
     //static_assert(hasBlockSync<T...>);
     checkSpecialOp<op_blockSync,T...>();
     //if (ops->ndi == nullptr) {
@@ -94,7 +101,7 @@ namespace quda {
     sycl::group_barrier(getGroup());
 #endif
   }
-  template <typename ...T> inline void blockSync(SpecialOps<T...> ops) { blockSync(&ops); }
+  //template <typename ...T> inline void blockSync(SpecialOps<T...> ops) { blockSync(&ops); }
 
   //template <typename ...T> static constexpr bool isOpConcurrent = false;
   //template <typename ...T> static constexpr bool isOpConcurrent<op_Concurrent<T...>> = true;
@@ -241,13 +248,13 @@ namespace quda {
   struct depNone {};
   template <> struct sharedMemSizeS<depNone> {
     template <typename ...Arg>
-    static constexpr unsigned int size(dim3 block, Arg &...arg) { return 0; }
+    static constexpr unsigned int size(dim3, Arg &...) { return 0; }
   };
 
   struct depFullBlock {};
   template <> struct sharedMemSizeS<depFullBlock> {
     template <typename ...Arg>
-    static constexpr unsigned int size(dim3 block, Arg &...arg) { return 0; }
+    static constexpr unsigned int size(dim3, Arg &...) { return 0; }
   };
 
   template <typename T, typename S>
@@ -262,7 +269,7 @@ namespace quda {
   struct op_blockSync {
     //using dependencies = depFullBlock;
     template <typename ...Arg>
-    static constexpr unsigned int shared_mem_size(dim3 block, Arg &...arg) { return 0; }
+    static constexpr unsigned int shared_mem_size(dim3, Arg &...) { return 0; }
   };
 
   template <typename T>
@@ -271,7 +278,7 @@ namespace quda {
     //using dependencies = depNone;
     //using dependencies = depFullBlock;
     template <typename ...Arg>
-    static constexpr unsigned int shared_mem_size(dim3 block, Arg &...arg) { return 0; }
+    static constexpr unsigned int shared_mem_size(dim3, Arg &...) { return 0; }
   };
   template <typename T> static constexpr bool needsFullBlockImpl<op_warp_combine<T>> = false;
 

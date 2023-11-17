@@ -27,7 +27,7 @@ namespace quda
     using reduce_t = T;
 
     template <typename Arg, typename Reducer, typename I, typename BR>
-    friend void reduce(Arg &, const Reducer &, const I &, const int, BR &br);
+    friend void reduce(Arg &, const Reducer &, const I &, const unsigned int, BR &br);
     qudaError_t launch_error; /** only do complete if no launch error to avoid hang */
     static constexpr unsigned int max_n_batch_block
       = 1; /** by default reductions do not support batching withing the block */
@@ -138,7 +138,7 @@ namespace quda
      will be constant along constant block_idx().y and block_idx().z.
   */
   template <typename Arg, typename Reducer, typename T, typename O>
-  inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx, O &ops)
+  inline void reduce(Arg &arg, const Reducer &r, const T &in, const unsigned int idx, O &ops)
   {
     using BlockReduce_t = typename reduceParams<Arg, Reducer, T>::BlockReduce_t;
     BlockReduce_t br(ops, target::thread_idx().z);
@@ -173,7 +173,7 @@ namespace quda
       sycl::atomic_fence(sycl::memory_order::release, sycl::memory_scope::device); // flush result
 
       // increment global block counter
-      auto value = atomicAdd(&arg.count[idx], 1);
+      count_t value = atomicAdd(&arg.count[idx], 1);
 
       // determine if last block
       isLastBlockDone[target::thread_idx().z] = (value == (target::grid_dim().x - 1));
