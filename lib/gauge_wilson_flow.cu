@@ -125,7 +125,7 @@ namespace quda {
     }
   }; // GaugeWFlowStep
 
-  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, const double epsilon, const QudaGaugeSmearType smear_type)
+  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, const double epsilon, const QudaGaugeSmearType smear_type, const int step_type )
   {
     checkPrecision(out, temp, in);
     checkReconstruct(out, in);
@@ -134,18 +134,36 @@ namespace quda {
     if (!(smear_type == QUDA_GAUGE_SMEAR_WILSON_FLOW || smear_type == QUDA_GAUGE_SMEAR_SYMANZIK_FLOW))
       errorQuda("Gauge smear type %d not supported for flow kernels", smear_type);
     
-    // Set each step type as an arg parameter, update halos if needed
-    // Step W1
-    instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_type, WFLOW_STEP_W1);
-    out.exchangeExtendedGhost(out.R(), false);
+    if ( step_type == 0 )
+    {    
+      // Set each step type as an arg parameter, update halos if needed
+      // Step W1
+      instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_type, WFLOW_STEP_W1);
+      out.exchangeExtendedGhost(out.R(), false);
 
-    // Step W2
-    instantiate<GaugeWFlowStep>(in, temp, out, epsilon, smear_type, WFLOW_STEP_W2);
-    in.exchangeExtendedGhost(in.R(), false);
+      // Step W2
+      instantiate<GaugeWFlowStep>(in, temp, out, epsilon, smear_type, WFLOW_STEP_W2);
+      in.exchangeExtendedGhost(in.R(), false);
 
-    // Step Vt
-    instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_type, WFLOW_STEP_VT);
-    out.exchangeExtendedGhost(out.R(), false);
+      // Step Vt
+      instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_type, WFLOW_STEP_VT);
+      out.exchangeExtendedGhost(out.R(), false);
+    } else if ( step_type == 1 )
+    {
+      // Step W1
+      instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_type, WFLOW_STEP_W1);
+      out.exchangeExtendedGhost(out.R(), false);
+    } else if ( step_type == 2 )
+    {
+      // Step W2
+      instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_type, WFLOW_STEP_W2);
+      out.exchangeExtendedGhost(out.R(), false);
+    } else if ( step_type == 3 )
+    {
+      // Step Vt
+      instantiate<GaugeWFlowStep>(out, temp, in, epsilon, smear_type, WFLOW_STEP_VT);
+      out.exchangeExtendedGhost(out.R(), false);
+    }
   }
 
 }

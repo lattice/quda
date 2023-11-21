@@ -9,8 +9,9 @@ namespace quda
    * @param[in] Gauge field upon which we are measuring.
    * @param[in,out] param Parameter struct that defines which
    * observables we are making and the resulting observables.
+   * @param[in] profile TimeProfile instance used for profiling.
    */
-  void gaugeObservables(GaugeField &u, QudaGaugeObservableParam &param);
+  void gaugeObservables(GaugeField &u, QudaGaugeObservableParam &param, TimeProfile &profile);
 
   /**
    * @brief Project the input gauge field onto the SU(3) group.  This
@@ -129,7 +130,7 @@ namespace quda
      @param[in] epsilon Step size
      @param[in] smear_type Wilson (1x1) or Symanzik improved (2x1) staples, else error
   */
-  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type);
+  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaGaugeSmearType smear_type, const int step_type );
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.

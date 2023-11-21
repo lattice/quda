@@ -29,6 +29,10 @@ template <typename su3_matrix, typename Real>
 void llfat_compute_gen_staple_field(su3_matrix *staple, int mu, int nu, su3_matrix *mulink, su3_matrix **sitelink,
                                     void **fatlink, Real coef, int use_staple)
 {
+  su3_matrix tmat1, tmat2;
+  int i;
+  su3_matrix *fat1;
+
   /* Upper staple */
   /* Computes the staple :
    *                mu (B)
@@ -42,15 +46,16 @@ void llfat_compute_gen_staple_field(su3_matrix *staple, int mu, int nu, su3_matr
    * It also adds the computed staple to the fatlink[mu] with weight coef.
    */
 
+  int dx[4];
+
   /* upper staple */
 
-#pragma omp parallel for
-  for (int i = 0; i < V; i++) {
+  for (i = 0; i < V; i++) {
 
-    auto fat1 = ((su3_matrix *)fatlink[mu]) + i;
+    fat1 = ((su3_matrix *)fatlink[mu]) + i;
     su3_matrix *A = sitelink[nu] + i;
 
-    int dx[4] = {};
+    memset(dx, 0, sizeof(dx));
     dx[nu] = 1;
     int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
     su3_matrix *B;
@@ -65,7 +70,6 @@ void llfat_compute_gen_staple_field(su3_matrix *staple, int mu, int nu, su3_matr
     nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
     su3_matrix *C = sitelink[nu] + nbr_idx;
 
-    su3_matrix tmat1, tmat2;
     llfat_mult_su3_nn(A, B, &tmat1);
 
     if (staple != NULL) { /* Save the staple */
@@ -85,11 +89,10 @@ void llfat_compute_gen_staple_field(su3_matrix *staple, int mu, int nu, su3_matr
    *
    *********************************************/
 
-#pragma omp parallel for
-  for (int i = 0; i < V; i++) {
+  for (i = 0; i < V; i++) {
 
-    auto fat1 = ((su3_matrix *)fatlink[mu]) + i;
-    int dx[4] = {};
+    fat1 = ((su3_matrix *)fatlink[mu]) + i;
+    memset(dx, 0, sizeof(dx));
     dx[nu] = -1;
     int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
     if (nbr_idx >= V || nbr_idx < 0) {
@@ -110,7 +113,6 @@ void llfat_compute_gen_staple_field(su3_matrix *staple, int mu, int nu, su3_matr
     nbr_idx = neighborIndexFullLattice(nbr_idx, dx[3], dx[2], dx[1], dx[0]);
     su3_matrix *C = sitelink[nu] + nbr_idx;
 
-    su3_matrix tmat1, tmat2;
     llfat_mult_su3_an(A, B, &tmat1);
     llfat_mult_su3_nn(&tmat1, C, &tmat2);
 
@@ -146,7 +148,6 @@ void llfat_cpu(void **fatlink, su3_matrix **sitelink, Float *act_path_coeff)
   for (int dir = XUP; dir <= TUP; dir++) {
 
     // Intialize fat links with c_1*U_\mu(x)
-#pragma omp parallel for
     for (int i = 0; i < V; i++) {
       su3_matrix *fat1 = ((su3_matrix *)fatlink[dir]) + i;
       llfat_scalar_mult_su3_matrix(sitelink[dir] + i, one_link, fat1);
@@ -209,6 +210,10 @@ void llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu, su3_m
                                        su3_matrix **ghost_mulink, su3_matrix **sitelink, su3_matrix **ghost_sitelink,
                                        su3_matrix **ghost_sitelink_diag, void **fatlink, Real coef, int use_staple)
 {
+  su3_matrix tmat1, tmat2;
+  int i;
+  su3_matrix *fat1;
+
   int X1 = Z[0];
   int X2 = Z[1];
   int X3 = Z[2];
@@ -232,10 +237,11 @@ void llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu, su3_m
    * It also adds the computed staple to the fatlink[mu] with weight coef.
    */
 
+  int dx[4];
+
   // upper staple
 
-#pragma omp parallel for
-  for (int i = 0; i < V; i++) {
+  for (i = 0; i < V; i++) {
 
     int half_index = i;
     int oddBit = 0;
@@ -258,10 +264,10 @@ void llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu, su3_m
     int space_con[4] = {(x4 * X3X2 + x3 * X2 + x2) / 2, (x4 * X3X1 + x3 * X1 + x1) / 2, (x4 * X2X1 + x2 * X1 + x1) / 2,
                         (x3 * X2X1 + x2 * X1 + x1) / 2};
 
-    auto fat1 = ((su3_matrix *)fatlink[mu]) + i;
+    fat1 = ((su3_matrix *)fatlink[mu]) + i;
     su3_matrix *A = sitelink[nu] + i;
 
-    int dx[4] = {};
+    memset(dx, 0, sizeof(dx));
     dx[nu] = 1;
     int nbr_idx;
 
@@ -293,7 +299,6 @@ void llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu, su3_m
       C = sitelink[nu] + nbr_idx;
     }
 
-    su3_matrix tmat1, tmat2;
     llfat_mult_su3_nn(A, B, &tmat1);
 
     if (staple != NULL) { /* Save the staple */
@@ -313,8 +318,7 @@ void llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu, su3_m
    *
    *********************************************/
 
-#pragma omp parallel for
-  for (int i = 0; i < V; i++) {
+  for (i = 0; i < V; i++) {
 
     int half_index = i;
     int oddBit = 0;
@@ -338,11 +342,11 @@ void llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu, su3_m
 
     // int x4 = x4_from_full_index(i);
 
-    auto fat1 = ((su3_matrix *)fatlink[mu]) + i;
+    fat1 = ((su3_matrix *)fatlink[mu]) + i;
 
     // we could be in the ghost link area if nu is T and we are at low T boundary
     su3_matrix *A;
-    int dx[4] = {};
+    memset(dx, 0, sizeof(dx));
     dx[nu] = -1;
 
     int nbr_idx;
@@ -408,7 +412,6 @@ void llfat_compute_gen_staple_field_mg(su3_matrix *staple, int mu, int nu, su3_m
     } else {
       C = sitelink[nu] + nbr_idx;
     }
-    su3_matrix tmat1, tmat2;
     llfat_mult_su3_an(A, B, &tmat1);
     llfat_mult_su3_nn(&tmat1, C, &tmat2);
 
@@ -427,7 +430,12 @@ template <typename su3_matrix, typename Float>
 void llfat_cpu_mg(void **fatlink, su3_matrix **sitelink, su3_matrix **ghost_sitelink, su3_matrix **ghost_sitelink_diag,
                   Float *act_path_coeff)
 {
-  QudaPrecision prec = sizeof(Float) == 4 ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION;
+  QudaPrecision prec;
+  if (sizeof(Float) == 4) {
+    prec = QUDA_SINGLE_PRECISION;
+  } else {
+    prec = QUDA_DOUBLE_PRECISION;
+  }
 
   su3_matrix *staple = (su3_matrix *)safe_malloc(V * sizeof(su3_matrix));
 
@@ -447,7 +455,6 @@ void llfat_cpu_mg(void **fatlink, su3_matrix **sitelink, su3_matrix **ghost_site
   for (int dir = XUP; dir <= TUP; dir++) {
 
     // Intialize fat links with c_1*U_\mu(x)
-#pragma omp parallel for
     for (int i = 0; i < V; i++) {
       su3_matrix *fat1 = ((su3_matrix *)fatlink[dir]) + i;
       llfat_scalar_mult_su3_matrix(sitelink[dir] + i, one_link, fat1);

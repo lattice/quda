@@ -1054,7 +1054,6 @@ template <typename Float> void constructUnitGaugeField(Float **res, QudaGaugePar
   }
 
   for (int dir = 0; dir < 4; dir++) {
-#pragma omp parallel for
     for (int i = 0; i < Vh; i++) {
       for (int m = 0; m < 3; m++) {
         for (int n = 0; n < 3; n++) {
@@ -1270,21 +1269,14 @@ template <typename Float> static void checkGauge(Float **oldG, Float **newG, dou
 
   for (int d = 0; d < 4; d++) {
     for (int eo = 0; eo < 2; eo++) {
-#pragma omp parallel for
       for (int i = 0; i < Vh; i++) {
         int ga_idx = (eo * Vh + i);
         for (int j = 0; j < 18; j++) {
           double diff = fabs(newG[d][ga_idx * 18 + j] - oldG[d][ga_idx * 18 + j]); /// fabs(oldG[d][ga_idx*18+j]);
 
           for (int f = 0; f < fail_check; f++)
-            if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) {
-#pragma omp atomic
-              fail[d][f]++;
-            }
-          if (diff > epsilon || std::isnan(diff)) {
-#pragma omp atomic
-            iter[d][j]++;
-          }
+            if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) fail[d][f]++;
+          if (diff > epsilon || std::isnan(diff)) iter[d][j]++;
         }
       }
     }
@@ -1319,7 +1311,6 @@ void createSiteLinkCPU(void *const *link, QudaPrecision precision, int phase)
   }
 
   if (phase == SITELINK_PHASE_MILC) {
-#pragma omp parallel for
     for (int i = 0; i < V; i++) {
       for (int dir = XUP; dir <= TUP; dir++) {
         int idx = i;
@@ -1468,21 +1459,14 @@ template <typename Float> int compareLink(Float **linkA, Float **linkB, int len)
   for (int i = 0; i < 18; i++) iter[i] = 0;
 
   for (int dir = 0; dir < 4; dir++) {
-#pragma omp parallel for
     for (int i = 0; i < len; i++) {
       for (int j = 0; j < 18; j++) {
         int is = i * 18 + j;
         double diff = fabs(linkA[dir][is] - linkB[dir][is]);
         for (int f = 0; f < fail_check; f++)
-          if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) {
-#pragma omp atomic
-            fail[f]++;
-          }
+          if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) fail[f]++;
         // if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
-        if (diff > 1e-3 || std::isnan(diff)) {
-#pragma omp atomic
-          iter[j]++;
-        }
+        if (diff > 1e-3 || std::isnan(diff)) iter[j]++;
       }
     }
   }
@@ -1640,21 +1624,14 @@ template <typename Float> int compare_mom(Float *momA, Float *momB, int len)
   int iter[mom_site_size];
   for (auto i = 0lu; i < mom_site_size; i++) iter[i] = 0;
 
-#pragma omp parallel for
   for (int i = 0; i < len; i++) {
     for (auto j = 0lu; j < mom_site_size - 1; j++) {
       int is = i * mom_site_size + j;
       double diff = fabs(momA[is] - momB[is]);
       for (int f = 0; f < fail_check; f++)
-        if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) {
-#pragma omp atomic
-          fail[f]++;
-        }
+        if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) fail[f]++;
       // if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
-      if (diff > 1e-3 || std::isnan(diff)) {
-#pragma omp atomic
-        iter[j]++;
-      }
+      if (diff > 1e-3 || std::isnan(diff)) iter[j]++;
     }
   }
 

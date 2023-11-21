@@ -2,7 +2,7 @@
 #include <blas_lapack.h>
 #include <timer.h>
 #ifdef NATIVE_LAPACK_LIB
-#include <hipblas/hipblas.h>
+#include <hipblas.h>
 #include <malloc_quda.h>
 #endif
 

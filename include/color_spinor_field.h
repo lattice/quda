@@ -427,12 +427,6 @@ namespace quda
     ColorSpinorField &operator=(ColorSpinorField &&field);
 
     /**
-       @brief Returns if the object is empty (not initialized)
-       @return true if the object has not been allocated, otherwise false
-    */
-    bool empty() const { return !init; }
-
-    /**
        @brief Copy the source field contents into this
        @param[in] src Source from which we are copying
      */

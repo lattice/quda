@@ -132,7 +132,7 @@ int main(int argc, char **argv)
   milc_fatlink = safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
   milc_longlink = safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
-  constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv, true);
+  constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv);
 
   // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
   double plaq[3];

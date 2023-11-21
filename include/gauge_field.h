@@ -113,6 +113,7 @@ namespace quda {
       case QUDA_SU3_LINKS:
       case QUDA_GENERAL_LINKS:
       case QUDA_SMEARED_LINKS:
+      case QUDA_FLOWED_LINKS:
       case QUDA_MOMENTUM_LINKS: nFace = 1; break;
       case QUDA_THREE_LINKS: nFace = 3; break;
       default: errorQuda("Error: invalid link type(%d)\n", link_type);
@@ -474,17 +475,6 @@ namespace quda {
       if (d >= (unsigned)geometry) errorQuda("Invalid array index %d for geometry %d field", d, geometry);
       if (!is_pointer_array(order)) errorQuda("Dim-array ordered field requested but order is %d", order);
       return reinterpret_cast<T>(gauge_array[d].data());
-    }
-
-    void *raw_pointer() const
-    {
-      if (is_pointer_array(order)) {
-        static void *data_array[8];
-        for (int i = 0; i < site_dim; i++) data_array[i] = gauge_array[i].data();
-        return data_array;
-      } else {
-        return gauge.data();
-      }
     }
 
     /**

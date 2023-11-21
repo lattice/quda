@@ -5,9 +5,9 @@
 namespace quda
 {
 
-  void gaugeObservables(GaugeField &u, QudaGaugeObservableParam &param)
+  void gaugeObservables(GaugeField &u, QudaGaugeObservableParam &param, TimeProfile &profile)
   {
-    auto &profile = getProfile();
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
     if (param.su_project) {
       int *num_failures_h = static_cast<int *>(pool_pinned_malloc(sizeof(int)));
       int *num_failures_d = static_cast<int *>(get_mapped_device_pointer(num_failures_h));
@@ -24,6 +24,7 @@ namespace quda
       param.plaquette[1] = plaq.y;
       param.plaquette[2] = plaq.z;
     }
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
     if (param.compute_polyakov_loop) { gaugePolyakovLoop(param.ploop, u, 3, profile); }
 
@@ -44,8 +45,10 @@ namespace quda
       std::vector<Complex> loop_traces(param.num_paths);
 
       // actually do the computation
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
       gaugeLoopTrace(u, loop_traces, param.factor, input_path_v, path_length_v, loop_coeff_v, param.num_paths,
                      param.max_length);
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
       for (int i = 0; i < param.num_paths; i++) { memcpy(param.traces + i, &loop_traces[i], sizeof(Complex)); }
     }
@@ -54,6 +57,7 @@ namespace quda
     if (!param.compute_qcharge && !param.compute_qcharge_density) return;
 
     // create the Fmunu field
+    profile.TPSTART(QUDA_PROFILE_INIT);
     // u is an extended field we need to shrink for the Fmunu field
     lat_dim_t x;
     for (int i = 0; i < 4; i++) x[i] = u.X()[i] - 2 * u.R()[i];
@@ -63,10 +67,15 @@ namespace quda
     tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
     tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     GaugeField gaugeFmunu(tensorParam);
+    profile.TPSTOP(QUDA_PROFILE_INIT);
 
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
     computeFmunu(gaugeFmunu, u);
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profile.TPSTOP(QUDA_PROFILE_TOTAL);
 
     if (param.compute_qcharge || param.compute_qcharge_density) {
+      profile.TPSTART(QUDA_PROFILE_TOTAL);
       profile.TPSTART(QUDA_PROFILE_INIT);
       if (param.compute_qcharge_density && !param.qcharge_density)
         errorQuda("Charge density requested, but destination field not defined");
@@ -74,17 +83,23 @@ namespace quda
       void *d_qDensity = param.compute_qcharge_density ? pool_device_malloc(size) : nullptr;
       profile.TPSTOP(QUDA_PROFILE_INIT);
 
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+
       if (param.compute_qcharge_density)
         computeQChargeDensity(param.energy, param.qcharge, d_qDensity, gaugeFmunu);
       else
         computeQCharge(param.energy, param.qcharge, gaugeFmunu);
+
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
       if (param.compute_qcharge_density) {
         profile.TPSTART(QUDA_PROFILE_D2H);
         qudaMemcpy(param.qcharge_density, d_qDensity, size, qudaMemcpyDeviceToHost);
         profile.TPSTOP(QUDA_PROFILE_D2H);
 
+        profile.TPSTART(QUDA_PROFILE_FREE);
         pool_device_free(d_qDensity);
+        profile.TPSTOP(QUDA_PROFILE_FREE);
       }
     }
   }

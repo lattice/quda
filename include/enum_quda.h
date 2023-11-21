@@ -29,6 +29,7 @@ typedef enum QudaLinkType_s {
   QUDA_MOMENTUM_LINKS,
   QUDA_COARSE_LINKS,                  // used for coarse-gauge field with multigrid
   QUDA_SMEARED_LINKS,                 // used for loading and saving gaugeSmeared in the interface
+  QUDA_FLOWED_LINKS,                  // used for loading and saving gaugeFlowed in the interface
   QUDA_WILSON_LINKS = QUDA_SU3_LINKS, // used by wilson, clover, twisted mass, and domain wall
   QUDA_ASQTAD_FAT_LINKS = QUDA_GENERAL_LINKS,
   QUDA_ASQTAD_LONG_LINKS = QUDA_THREE_LINKS,

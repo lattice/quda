@@ -1649,6 +1649,16 @@ extern "C" {
   void performWFlowQuda(QudaGaugeSmearParam *smear_param, QudaGaugeObservableParam *obs_param);
 
   /**
+   * Performs Wilson Flow on gaugeFlowed as well as spinor field h_in and stores 
+   * the flowed gauge field in gaugeFlowed, the flowed spinor field in h_out
+   * @param n_steps Number of steps to apply.
+   * @param step_size Size of Wilson Flow step
+   * @param meas_interval Measure the Q charge and field energy every Nth step
+   * @param wflow_type 1x1 Wilson or 2x1 Symanzik flow type
+   */
+  void performGFlownStep(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaGaugeSmearParam *smear_param, int const init );
+
+  /**
    * @brief Calculates a variety of gauge-field observables.  If a
    * smeared gauge field is presently loaded (in gaugeSmeared) the
    * observables are computed on this, else the resident gauge field

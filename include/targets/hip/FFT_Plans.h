@@ -2,7 +2,7 @@
 
 #include <quda_hip_api.h>
 #include <quda_internal.h>
-#include <hipfft/hipfft.h>
+#include <hipfft.h>
 
 #define FFT_FORWARD HIPFFT_FORWARD
 #define FFT_INVERSE HIPFFT_BACKWARD
