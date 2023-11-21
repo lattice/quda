@@ -5092,8 +5092,8 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   profileCloverForce.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvector, 
-     QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
+void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coeff, int nvector, 
+     QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio)
 {
   using namespace quda;
   profileTMCloverForce.TPSTART(QUDA_PROFILE_TOTAL);
@@ -5153,10 +5153,11 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
   qParam.create = QUDA_NULL_FIELD_CREATE;
    qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
-  std::vector<ColorSpinorField*> quarkX, quarkP;
+  std::vector<ColorSpinorField*> quarkX, quarkP, quarkX0;
   for (int i=0; i<nvector; i++){
     quarkX.push_back(ColorSpinorField::Create(qParam));
     quarkP.push_back(ColorSpinorField::Create(qParam));
+    if (detratio) quarkX0.push_back(ColorSpinorField::Create(qParam));
   }
 
   qParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
@@ -5215,8 +5216,17 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
       dirac->M(p.Odd(), tmp); // this is the odd part of Y 
       dirac->Dagger(QUDA_DAG_NO);
 
+
+      if (detratio){
+        ColorSpinorParam cpuParam0(h_x0[i], *inv_param, gauge.X(), true, inv_param->input_location);
+        ColorSpinorField cpuQuarkX0(cpuParam0);
+        ColorSpinorField &x0 = *(quarkX0[i]);
+        x0.Odd()=cpuQuarkX0;
+        blas::axpbyz(1,p.Odd(),1,x0.Odd(),p.Odd());
+      }
       dirac->Dslash(p.Even(), p.Odd(), QUDA_EVEN_PARITY); // and now the even part of Y
-      // up to here x match X in tmLQCD and p=-Y of tmLQCD
+      // up to here x.odd match X.odd in tmLQCD and p.odd=-Y.odd of tmLQCD
+      // x.Even= X.Even.tmLQCD*kappa and p.Even=-Y.Even.tmLQCD*kappa
 
       // the gamma5 application in tmLQCD is done  inside deriv_Sb
       gamma5(p.Even(), p.Even());
@@ -5234,7 +5244,7 @@ void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvecto
   // derivative of the wilson operator it correspond to deriv_Sb(OE,...) plus  deriv_Sb(EO,...) in tmLQCD
   computeCloverForce(cudaForce, *gaugePrecise, quarkX, quarkP, force_coeff);
   // derivative of the determinant of the sw term, second term of (A12) in hep-lat/0112051,  sw_deriv(EE, mnl->mu) in tmLQCD
-  computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8 * 32.0, 0 ); 
+  if (!detratio) computeCloverSigmaTrace(oprod, *cloverPrecise, k_csw_ov_8 * 32.0, 0 ); 
 
   std::vector< std::vector<double> > ferm_epsilon(nvector);
   for (int i = 0; i < nvector; i++) {

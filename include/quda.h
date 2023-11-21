@@ -1538,13 +1538,15 @@ extern "C" {
    *
    * @param h_mom Host force matrix
    * @param h_x Array of solution vectors x_i = ( Q^2 + s_i )^{-1} b
+   * @param h_x0 Array of source vector necessary to compute the force of a ratio of determinant
    * @param coeff Array of coefficients for the rational approximation or {1.0} for the determinant.
    * @param nvector Number of solution vectors and coefficients
    * @param gauge_param Gauge field meta data
    * @param inv_param Dirac and solver meta data
+   * @param detratio if 0 compute the force of a determinant otherwise compute the force from a ratio of determinats
    * */ 
-  void computeTMCloverForceQuda(void *h_mom, void **h_x, double *coeff, int nvector, 
-      QudaGaugeParam *gauge_param, QudaInvertParam *inv_param);
+  void computeTMCloverForceQuda(void *h_mom, void **h_x, void **h_x0, double *coeff, int nvector, 
+     QudaGaugeParam *gauge_param, QudaInvertParam *inv_param, int detratio);
 
   /**
    * Compute the naive staggered force.  All fields must be in the same precision.
