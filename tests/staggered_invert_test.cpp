@@ -182,10 +182,8 @@ void test(int, char**)
   void *qdp_inlink[4] = {cpuIn.data(0), cpuIn.data(1), cpuIn.data(2), cpuIn.data(3)};
   void *qdp_fatlink[4] = {cpuFatQDP.data(0), cpuFatQDP.data(1), cpuFatQDP.data(2), cpuFatQDP.data(3)};
   void *qdp_longlink[4] = {cpuLongQDP.data(0), cpuLongQDP.data(1), cpuLongQDP.data(2), cpuLongQDP.data(3)};
+  constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, 0, nullptr, true);
 
-  // Dummy arg needed because other tests load the gauge field more than once
-  bool gauge_loaded = false;
-  constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, 0, nullptr, gauge_loaded);
   // Reorder gauge fields to MILC order
   cpuFatMILC = cpuFatQDP;
   cpuLongMILC = cpuLongQDP;

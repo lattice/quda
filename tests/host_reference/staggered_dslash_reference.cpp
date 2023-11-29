@@ -43,6 +43,7 @@ void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, 
                               real_t **, real_t **, int oddBit, int daggerBit, QudaDslashType dslash_type)
 #endif
 {
+#pragma omp parallel for
   for (auto i = 0lu; i < Vh * stag_spinor_site_size; i++) res[i] = 0.0;
 
   real_t *fatlinkEven[4], *fatlinkOdd[4];
@@ -67,6 +68,7 @@ void staggeredDslashReference(real_t *res, real_t **fatlink, real_t **longlink, 
 #endif
   }
 
+#pragma omp parallel for
   for (int sid = 0; sid < Vh; sid++) {
     int offset = stag_spinor_site_size * sid;
 

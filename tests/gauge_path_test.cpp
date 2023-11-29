@@ -204,10 +204,14 @@ void gauge_force_test(bool compute_force = true)
   void *refmom = Mom_ref_milc.data();
   int *check_out = compute_force ? &force_check : &path_check;
   if (verify_results) {
+    quda::host_timer_t verify_timer;
+    verify_timer.start();
     gauge_force_reference(refmom, eb3, U_qdp, input_path_buf, length, loop_coeff, num_paths, compute_force);
     *check_out
       = compare_floats(Mom_milc.data(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec), gauge_param.cpu_prec);
     if (compute_force) strong_check_mom(Mom_milc.data(), refmom, 4 * V, gauge_param.cpu_prec);
+    verify_timer.stop();
+    printfQuda("Verification time = %.2f ms\n", verify_timer.last());
   }
 
   if (compute_force) {
@@ -317,6 +321,9 @@ void gauge_loop_test()
   std::vector<quda::Complex> traces_ref(num_paths);
 
   if (verify_results) {
+    quda::host_timer_t verify_timer;
+    verify_timer.start();
+
     gauge_loop_trace_reference(U_qdp, traces_ref, scale_factor, trace_path_p, trace_loop_length_p, trace_loop_coeff_p,
                                num_paths);
 
@@ -348,6 +355,9 @@ void gauge_loop_test()
             "Plaquette loop space %e time %e total %e ; plaqQuda space %e time %e total %e ; deviation %e\n",
             plaq_loop[0], plaq_loop[1], plaq_loop[2], obsParam.plaquette[0], obsParam.plaquette[1],
             obsParam.plaquette[2], plaq_deviation);
+
+    verify_timer.stop();
+    printfQuda("Verification time = %.2f ms\n", verify_timer.last());
   }
 
   double perf = 1.0 * niter * flops * V / (host_timer.last() * 1e+9);
