@@ -46,8 +46,7 @@ static double max_allowed_error = 1e-11;
 
 static void hisq_test()
 {
-
-  QudaGaugeParam qudaGaugeParam;
+  QudaGaugeParam gauge_param;
 
   initQuda(device_ordinal);
 
@@ -55,42 +54,20 @@ static void hisq_test()
     errorQuda("Precision %d is unsupported in some link fattening routines\n", prec);
   }
 
-  cpu_prec = prec;
-  host_gauge_data_type_size = cpu_prec;
-  qudaGaugeParam = newQudaGaugeParam();
-
-  qudaGaugeParam.anisotropy = 1.0;
-
-  // Fix me: must always be set to 1.0 for reasons not yet discerned.
-  // The tadpole coefficient gets encoded directly into the fat link
-  // construct coefficents.
-  qudaGaugeParam.tadpole_coeff = 1.0;
-
-  qudaGaugeParam.X[0] = xdim;
-  qudaGaugeParam.X[1] = ydim;
-  qudaGaugeParam.X[2] = zdim;
-  qudaGaugeParam.X[3] = tdim;
-
-  setDims(qudaGaugeParam.X);
-
-  qudaGaugeParam.cpu_prec = cpu_prec;
-  qudaGaugeParam.cuda_prec = qudaGaugeParam.cuda_prec_sloppy = prec;
-
   if (gauge_order != QUDA_MILC_GAUGE_ORDER) errorQuda("Unsupported gauge order %d", gauge_order);
 
-  qudaGaugeParam.gauge_order = gauge_order;
-  qudaGaugeParam.type = QUDA_WILSON_LINKS;
-  qudaGaugeParam.reconstruct = qudaGaugeParam.reconstruct_sloppy = link_recon;
-  qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
-  qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
-  qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  qudaGaugeParam.ga_pad = 0;
+  cpu_prec = prec;
+  host_gauge_data_type_size = cpu_prec;
 
-  // Needed for unitarization, following "unitarize_link_test.cpp"
-  GaugeFieldParam gParam(qudaGaugeParam);
-  gParam.link_type = QUDA_GENERAL_LINKS;
-  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  gParam.order = gauge_order;
+  gauge_param = newQudaGaugeParam();
+
+  setStaggeredGaugeParam(gauge_param);
+
+  setDims(gauge_param.X);
+
+  gauge_param.cpu_prec = cpu_prec;
+  gauge_param.cuda_prec_sloppy = cuda_prec;
+  gauge_param.reconstruct_sloppy = link_recon;
 
   ///////////////////////////////////////////////////////////////
   // Set up the coefficients for each part of the HISQ stencil //
@@ -148,21 +125,14 @@ static void hisq_test()
   // Input links //
   /////////////////
 
-  void *sitelink[4];
-  for (int i = 0; i < 4; i++) sitelink[i] = pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
+  void *qdp_sitelink[4] = {nullptr, nullptr, nullptr, nullptr};
+  for (int i = 0; i < 4; i++) qdp_sitelink[i] = pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
 
-  void *milc_sitelink;
-  milc_sitelink = (void *)safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  void *milc_sitelink = (void *)safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
   // Note: this could be replaced with loading a gauge field
-  createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 0); // 0 -> no phases
-  for (int i = 0; i < V; ++i) {
-    for (int dir = 0; dir < 4; ++dir) {
-      char *src = (char *)sitelink[dir];
-      memcpy((char *)milc_sitelink + (i * 4 + dir) * gauge_site_size * host_gauge_data_type_size,
-             src + i * gauge_site_size * host_gauge_data_type_size, gauge_site_size * host_gauge_data_type_size);
-    }
-  }
+  createSiteLinkCPU(qdp_sitelink, gauge_param.cpu_prec, 0); // 0 -> no phases
+  reorderQDPtoMILC(milc_sitelink, qdp_sitelink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
   //////////////////////
   // Perform GPU test //
@@ -187,7 +157,7 @@ static void hisq_test()
   // Tuning run...
   {
     printfQuda("Tuning...\n");
-    computeKSLinkQuda(vlink, longlink, wlink, milc_sitelink, act_paths[1].data(), &qudaGaugeParam);
+    computeKSLinkQuda(vlink, longlink, wlink, milc_sitelink, act_paths[1].data(), &gauge_param);
   }
 
   struct timeval t0, t1;
@@ -198,11 +168,11 @@ static void hisq_test()
     // If we create cudaGaugeField objs, we can do this 100% on the GPU, no copying!
 
     // Create V links (fat7 links) and W links (unitarized V links), 1st path table set
-    computeKSLinkQuda(vlink, nullptr, wlink, milc_sitelink, act_paths[0].data(), &qudaGaugeParam);
+    computeKSLinkQuda(vlink, nullptr, wlink, milc_sitelink, act_paths[0].data(), &gauge_param);
 
     if (n_naiks > 1) {
       // Create Naiks, 3rd path table set
-      computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_paths[2].data(), &qudaGaugeParam);
+      computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_paths[2].data(), &gauge_param);
 
       // Rescale+copy Naiks into Naik field
       cpu_axy(prec, eps_naik, fatlink, fatlink_eps, V * 4 * gauge_site_size);
@@ -213,7 +183,7 @@ static void hisq_test()
     }
 
     // Create X and long links, 2nd path table set
-    computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_paths[1].data(), &qudaGaugeParam);
+    computeKSLinkQuda(fatlink, longlink, nullptr, wlink, act_paths[1].data(), &gauge_param);
 
     if (n_naiks > 1) {
       // Add into Naik field
@@ -229,24 +199,26 @@ static void hisq_test()
   // Perform CPU Build //
   ///////////////////////
 
-  void *long_reflink[4]; // Long link for fermion with zero epsilon
-  void *fat_reflink[4];  // Fat link for fermion with zero epsilon
+  // fat and long links for fermions with zero epsilon
+  void *fat_reflink[4] = {nullptr, nullptr, nullptr, nullptr};
+  void *long_reflink[4] = {nullptr, nullptr, nullptr, nullptr};
   for (int i = 0; i < 4; i++) {
-    long_reflink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
     fat_reflink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+    long_reflink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
 
-  void *long_reflink_eps[4]; // Long link for fermion with non-zero epsilon
-  void *fat_reflink_eps[4];  // Fat link for fermion with non-zero epsilon
+  // fat and long links for fermions with non-zero epsilon
+  void *fat_reflink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
+  void *long_reflink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
   if (n_naiks > 1) {
     for (int i = 0; i < 4; i++) {
-      long_reflink_eps[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
       fat_reflink_eps[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+      long_reflink_eps[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
     }
   }
 
   if (verify_results) {
-    computeHISQLinksCPU(fat_reflink, long_reflink, fat_reflink_eps, long_reflink_eps, sitelink, &qudaGaugeParam,
+    computeHISQLinksCPU(fat_reflink, long_reflink, fat_reflink_eps, long_reflink_eps, qdp_sitelink, &gauge_param,
                         act_paths, eps_naik);
   }
 
@@ -254,45 +226,25 @@ static void hisq_test()
   // Layout change for fatlink, fatlink_eps, longlink, longlink_eps //
   ////////////////////////////////////////////////////////////////////
 
-  void *myfatlink[4];
-  void *mylonglink[4];
-  void *myfatlink_eps[4];
-  void *mylonglink_eps[4];
+  void *qdp_fatlink[4] = {nullptr, nullptr, nullptr, nullptr};
+  void *qdp_longlink[4] = {nullptr, nullptr, nullptr, nullptr};
+  void *qdp_fatlink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
+  void *qdp_longlink_eps[4] = {nullptr, nullptr, nullptr, nullptr};
   for (int i = 0; i < 4; i++) {
-
-    myfatlink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-    mylonglink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-    memset(myfatlink[i], 0, V * gauge_site_size * host_gauge_data_type_size);
-    memset(mylonglink[i], 0, V * gauge_site_size * host_gauge_data_type_size);
-
+    qdp_fatlink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+    qdp_longlink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
     if (n_naiks > 1) {
-      myfatlink_eps[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-      mylonglink_eps[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-      memset(myfatlink_eps[i], 0, V * gauge_site_size * host_gauge_data_type_size);
-      memset(mylonglink_eps[i], 0, V * gauge_site_size * host_gauge_data_type_size);
+      qdp_fatlink_eps[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+      qdp_longlink_eps[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
     }
   }
 
-  for (int i = 0; i < V; i++) {
-    for (int dir = 0; dir < 4; dir++) {
-      char *src = ((char *)fatlink) + (4 * i + dir) * gauge_site_size * host_gauge_data_type_size;
-      char *dst = ((char *)myfatlink[dir]) + i * gauge_site_size * host_gauge_data_type_size;
-      memcpy(dst, src, gauge_site_size * host_gauge_data_type_size);
+  reorderMILCtoQDP(qdp_fatlink, fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
+  reorderMILCtoQDP(qdp_longlink, longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
-      src = ((char *)longlink) + (4 * i + dir) * gauge_site_size * host_gauge_data_type_size;
-      dst = ((char *)mylonglink[dir]) + i * gauge_site_size * host_gauge_data_type_size;
-      memcpy(dst, src, gauge_site_size * host_gauge_data_type_size);
-
-      if (n_naiks > 1) {
-        src = ((char *)fatlink_eps) + (4 * i + dir) * gauge_site_size * host_gauge_data_type_size;
-        dst = ((char *)myfatlink_eps[dir]) + i * gauge_site_size * host_gauge_data_type_size;
-        memcpy(dst, src, gauge_site_size * host_gauge_data_type_size);
-
-        src = ((char *)longlink_eps) + (4 * i + dir) * gauge_site_size * host_gauge_data_type_size;
-        dst = ((char *)mylonglink_eps[dir]) + i * gauge_site_size * host_gauge_data_type_size;
-        memcpy(dst, src, gauge_site_size * host_gauge_data_type_size);
-      }
-    }
+  if (n_naiks > 1) {
+    reorderMILCtoQDP(qdp_fatlink_eps, fatlink_eps, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
+    reorderMILCtoQDP(qdp_longlink_eps, longlink_eps, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
   }
 
   //////////////////////////////
@@ -303,20 +255,20 @@ static void hisq_test()
     printfQuda("Checking fat links...\n");
     int res = 1;
     for (int dir = 0; dir < 4; dir++) {
-      res &= compare_floats(fat_reflink[dir], myfatlink[dir], V * gauge_site_size, 1e-3, qudaGaugeParam.cpu_prec);
+      res &= compare_floats(fat_reflink[dir], qdp_fatlink[dir], V * gauge_site_size, 1e-3, gauge_param.cpu_prec);
     }
 
-    strong_check_link(myfatlink, "GPU results: ", fat_reflink, "CPU reference results:", V, qudaGaugeParam.cpu_prec);
+    strong_check_link(qdp_fatlink, "GPU results: ", fat_reflink, "CPU reference results:", V, gauge_param.cpu_prec);
 
     printfQuda("Fat-link test %s\n\n", (1 == res) ? "PASSED" : "FAILED");
 
     printfQuda("Checking long links...\n");
     res = 1;
     for (int dir = 0; dir < 4; ++dir) {
-      res &= compare_floats(long_reflink[dir], mylonglink[dir], V * gauge_site_size, 1e-3, qudaGaugeParam.cpu_prec);
+      res &= compare_floats(long_reflink[dir], qdp_longlink[dir], V * gauge_site_size, 1e-3, gauge_param.cpu_prec);
     }
 
-    strong_check_link(mylonglink, "GPU results: ", long_reflink, "CPU reference results:", V, qudaGaugeParam.cpu_prec);
+    strong_check_link(qdp_longlink, "GPU results: ", long_reflink, "CPU reference results:", V, gauge_param.cpu_prec);
 
     printfQuda("Long-link test %s\n\n", (1 == res) ? "PASSED" : "FAILED");
 
@@ -325,31 +277,31 @@ static void hisq_test()
       printfQuda("Checking fat eps_naik links...\n");
       res = 1;
       for (int dir = 0; dir < 4; dir++) {
-        res &= compare_floats(fat_reflink_eps[dir], myfatlink_eps[dir], V * gauge_site_size, 1e-3,
-                              qudaGaugeParam.cpu_prec);
+        res &= compare_floats(fat_reflink_eps[dir], qdp_fatlink_eps[dir], V * gauge_site_size, 1e-3,
+                              gauge_param.cpu_prec);
       }
 
-      strong_check_link(myfatlink_eps, "GPU results: ", fat_reflink_eps, "CPU reference results:", V,
-                        qudaGaugeParam.cpu_prec);
+      strong_check_link(qdp_fatlink_eps, "GPU results: ", fat_reflink_eps, "CPU reference results:", V,
+                        gauge_param.cpu_prec);
 
       printfQuda("Fat-link eps_naik test %s\n\n", (1 == res) ? "PASSED" : "FAILED");
 
       printfQuda("Checking long eps_naik links...\n");
       res = 1;
       for (int dir = 0; dir < 4; ++dir) {
-        res &= compare_floats(long_reflink_eps[dir], mylonglink_eps[dir], V * gauge_site_size, 1e-3,
-                              qudaGaugeParam.cpu_prec);
+        res &= compare_floats(long_reflink_eps[dir], qdp_longlink_eps[dir], V * gauge_site_size, 1e-3,
+                              gauge_param.cpu_prec);
       }
 
-      strong_check_link(mylonglink_eps, "GPU results: ", long_reflink_eps, "CPU reference results:", V,
-                        qudaGaugeParam.cpu_prec);
+      strong_check_link(qdp_longlink_eps, "GPU results: ", long_reflink_eps, "CPU reference results:", V,
+                        gauge_param.cpu_prec);
 
       printfQuda("Long-link eps_naik test %s\n\n", (1 == res) ? "PASSED" : "FAILED");
     }
   }
 
   // FIXME: does not include unitarization, extra naiks
-  int volume = qudaGaugeParam.X[0] * qudaGaugeParam.X[1] * qudaGaugeParam.X[2] * qudaGaugeParam.X[3];
+  int volume = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3];
   long long flops = 61632 * (long long)niter; // Constructing V field
   // Constructing W field?
   // Constructing separate Naiks
@@ -360,16 +312,16 @@ static void hisq_test()
   printfQuda("link computation time =%.2f ms, flops= %.2f Gflops\n", (secs * 1000) / niter, perf);
 
   for (int i = 0; i < 4; i++) {
-    host_free(myfatlink[i]);
-    host_free(mylonglink[i]);
+    host_free(qdp_fatlink[i]);
+    host_free(qdp_longlink[i]);
     if (n_naiks > 1) {
-      host_free(myfatlink_eps[i]);
-      host_free(mylonglink_eps[i]);
+      host_free(qdp_fatlink_eps[i]);
+      host_free(qdp_longlink_eps[i]);
     }
   }
 
   for (int i = 0; i < 4; i++) {
-    host_free(sitelink[i]);
+    host_free(qdp_sitelink[i]);
     host_free(fat_reflink[i]);
     host_free(long_reflink[i]);
     if (n_naiks > 1) {
@@ -432,6 +384,8 @@ int main(int argc, char **argv)
   }
 
   if (eps_naik != 0.0) { n_naiks = 2; }
+
+  setVerbosity(verbosity);
 
   initComms(argc, argv, gridsize_from_cmdline);
   display_test_info();

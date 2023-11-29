@@ -221,7 +221,6 @@ struct StaggeredDslashTestWrapper {
     // set verbosity prior to loadGaugeQuda
     setVerbosity(verbosity);
 
-    
   }
 
   void init()
