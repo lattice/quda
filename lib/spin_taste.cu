@@ -25,55 +25,41 @@ namespace quda {
 
     void apply(const qudaStream_t &stream)
     {
+      template <QudaSpinTasteGamma gamma> using Arg = SpinTasteArg<Float, nColor, gamma>;
+
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (gamma == QUDA_SPIN_TASTE_G1) {
-        SpinTasteArg<Float, nColor, QUDA_SPIN_TASTE_G1> arg(out, in);
-        launch<SpinTastePhase>(tp, stream, arg);
+	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_G1>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_GX) {
-        SpinTasteArg<Float, nColor, QUDA_SPIN_TASTE_GX> arg(out, in);
-        launch<SpinTastePhase>(tp, stream, arg);
+	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GX>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_GY) {
-        SpinTasteArg<Float, nColor, QUDA_SPIN_TASTE_GY> arg(out, in);
-        launch<SpinTastePhase>(tp, stream, arg);
+	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GY>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_GZ) {
-        SpinTasteArg<Float, nColor, QUDA_SPIN_TASTE_GZ> arg(out, in);
-        launch<SpinTastePhase>(tp, stream, arg);
+	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GZ>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_GT) {
-        SpinTasteArg<Float, nColor, QUDA_SPIN_TASTE_GT> arg(out, in);
-        launch<SpinTastePhase>(tp, stream, arg);
+	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GT>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_G5) {
-        SpinTasteArg<Float, nColor, QUDA_SPIN_TASTE_G5> arg(out, in);
-        launch<SpinTastePhase>(tp, stream, arg);
+	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_G5>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_GYGZ) {
-        SpinTasteArg<Float, nColor, QUDA_SPIN_TASTE_GYGZ> arg(out, in);
-        launch<SpinTastePhase>(tp, stream, arg);
+	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GYGZ>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_GZGX) {
-        SpinTasteArg<Float, nColor, QUDA_SPIN_TASTE_GZGX> arg(out, in);
-        launch<SpinTastePhase>(tp, stream, arg);
+        launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GZGX>(out, in));	
       } else if (gamma == QUDA_SPIN_TASTE_GXGY) {
-        SpinTasteArg<Float, nColor, QUDA_SPIN_TASTE_GXGY> arg(out, in);
-        launch<SpinTastePhase>(tp, stream, arg);
+        launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GXGY>(out, in));	
       } else if (gamma == QUDA_SPIN_TASTE_GXGT) {
-        SpinTasteArg<Float, nColor, QUDA_SPIN_TASTE_GXGT> arg(out, in);
-        launch<SpinTastePhase>(tp, stream, arg);
+	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GXGT>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_GYGT) {
-        SpinTasteArg<Float, nColor, QUDA_SPIN_TASTE_GYGT> arg(out, in);
-        launch<SpinTastePhase>(tp, stream, arg);
+	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GYGT>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_GZGT) {
-        SpinTasteArg<Float, nColor, QUDA_SPIN_TASTE_GZGT> arg(out, in);
-        launch<SpinTastePhase>(tp, stream, arg);
+        launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_GZGT>(out, in));	      
       } else if (gamma == QUDA_SPIN_TASTE_G5GX) {
-        SpinTasteArg<Float, nColor, QUDA_SPIN_TASTE_G5GX> arg(out, in);
-        launch<SpinTastePhase>(tp, stream, arg);
+        launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_G5GX>(out, in));	      
       } else if (gamma == QUDA_SPIN_TASTE_G5GY) {
-        SpinTasteArg<Float, nColor, QUDA_SPIN_TASTE_G5GY> arg(out, in);
-        launch<SpinTastePhase>(tp, stream, arg);
+        launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_G5GY>(out, in));	      
       } else if (gamma == QUDA_SPIN_TASTE_G5GZ) {
-        SpinTasteArg<Float, nColor, QUDA_SPIN_TASTE_G5GZ> arg(out, in);
-        launch<SpinTastePhase>(tp, stream, arg);
+	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_G5GZ>(out, in));
       } else if (gamma == QUDA_SPIN_TASTE_G5GT) {
-        SpinTasteArg<Float, nColor, QUDA_SPIN_TASTE_G5GT> arg(out, in);
-        launch<SpinTastePhase>(tp, stream, arg);
+	launch<SpinTastePhase>(tp, stream, Arg<Float, nColor, QUDA_SPIN_TASTE_G5GT>(out, in));
       } else {
         errorQuda("Undefined gamma type");
       }
