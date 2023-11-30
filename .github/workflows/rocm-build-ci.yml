@@ -6,7 +6,7 @@ jobs:
     runs-on: [self-hosted, amd]
     strategy:
       matrix:
-        rocm: [ 5.5.0, 5.6.1, 5.7.2 ]
+        rocm: [ 5.6.1, 5.7.2 ]
     steps:
       - uses: actions/checkout@v3
       - run: |
@@ -43,7 +43,7 @@ jobs:
             -DQUDA_DOWNLOAD_EIGEN=ON \
             -DQUDA_PRECISION=14 \
             -DCMAKE_INSTALL_PREFIX=${INSTALLROOT} \
-            -DCMAKE_BUILD_TYPE="DEVEL" \
+            -DCMAKE_BUILD_TYPE="STRICT" \
             -DCMAKE_CXX_COMPILER="${ROCM_PATH}/llvm/bin/clang++" \
             -DCMAKE_C_COMPILER="${ROCM_PATH}/llvm/bin/clang" \
             -DCMAKE_HIP_COMPILER="${ROCM_PATH}/llvm/bin/clang++" \
