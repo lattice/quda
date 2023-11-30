@@ -18,6 +18,14 @@
 #include <staggered_gauge_utils.h>
 #include <llfat_utils.h>
 
+QudaGaugeParam gauge_param;
+QudaInvertParam inv_param;
+QudaMultigridParam mg_param;
+QudaInvertParam mg_inv_param;
+QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
+QudaEigParam eig_param;
+bool use_split_grid = false;
+
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 void display_test_info()
@@ -102,33 +110,28 @@ void display_test_info()
              dimPartitioned(3));
 }
 
-void test(int, char**)
+GaugeField cpuFatQDP = {};
+GaugeField cpuLongQDP = {};
+GaugeField cpuFatMILC = {};
+GaugeField cpuLongMILC = {};
+
+void init()
 {
-
   // Set QUDA internal parameters
-  QudaGaugeParam gauge_param = newQudaGaugeParam();
-  QudaInvertParam inv_param = newQudaInvertParam();
+  gauge_param = newQudaGaugeParam();
   setStaggeredGaugeParam(gauge_param);
-  if (!inv_multigrid) setStaggeredInvertParam(inv_param);
 
-  QudaInvertParam mg_inv_param = newQudaInvertParam();
-  QudaMultigridParam mg_param = newQudaMultigridParam();
-  QudaEigParam mg_eig_param[mg_levels];
-
-  // params related to split grid.
-  for (int i = 0; i < 4; i++) inv_param.split_grid[i] = grid_partition[i];
-  int num_sub_partition = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
-  bool use_split_grid = num_sub_partition > 1;
+  inv_param = newQudaInvertParam();
+  mg_inv_param = newQudaInvertParam();
+  mg_param = newQudaMultigridParam();
+  eig_param = newQudaEigParam();
 
   if (inv_multigrid) {
-
     // Set some default values for MG solve types
     setQudaMgSolveTypes();
-
     setStaggeredMGInvertParam(inv_param);
     // Set sub structures
     mg_param.invert_param = &mg_inv_param;
-
     for (int i = 0; i < mg_levels; i++) {
       if (mg_eig[i]) {
         mg_eig_param[i] = newQudaEigParam();
@@ -138,10 +141,12 @@ void test(int, char**)
         mg_param.eig_param[i] = nullptr;
       }
     }
+    // Set MG
     setStaggeredMultigridParam(mg_param);
+  } else {
+    setStaggeredInvertParam(inv_param);
   }
 
-  QudaEigParam eig_param = newQudaEigParam();
   if (inv_deflate) {
     setEigParam(eig_param);
     inv_param.eig_param = &eig_param;
@@ -168,16 +173,16 @@ void test(int, char**)
   cpuParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuParam.order = QUDA_QDP_GAUGE_ORDER;
   GaugeField cpuIn = GaugeField(cpuParam);
-  GaugeField cpuFatQDP = GaugeField(cpuParam);
+  cpuFatQDP = GaugeField(cpuParam);
   cpuParam.order = QUDA_MILC_GAUGE_ORDER;
-  GaugeField cpuFatMILC = GaugeField(cpuParam);
+  cpuFatMILC = GaugeField(cpuParam);
 
   cpuParam.link_type = QUDA_ASQTAD_LONG_LINKS;
   cpuParam.nFace = 3;
   cpuParam.order = QUDA_QDP_GAUGE_ORDER;
-  GaugeField cpuLongQDP = GaugeField(cpuParam);
+  cpuLongQDP = GaugeField(cpuParam);
   cpuParam.order = QUDA_MILC_GAUGE_ORDER;
-  GaugeField cpuLongMILC = GaugeField(cpuParam);
+  cpuLongMILC = GaugeField(cpuParam);
 
   void *qdp_inlink[4] = {cpuIn.data(0), cpuIn.data(1), cpuIn.data(2), cpuIn.data(3)};
   void *qdp_fatlink[4] = {cpuFatQDP.data(0), cpuFatQDP.data(1), cpuFatQDP.data(2), cpuFatQDP.data(3)};
@@ -212,6 +217,14 @@ void test(int, char**)
 
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
+}
+
+std::vector<double> solve()
+{
+  // params related to split grid.
+  for (int i = 0; i < 4; i++) inv_param.split_grid[i] = grid_partition[i];
+  int num_sub_partition = grid_partition[0] * grid_partition[1] * grid_partition[2] * grid_partition[3];
+  bool use_split_grid = num_sub_partition > 1;
 
   // Setup the multigrid preconditioner
   void *mg_preconditioner = nullptr;
@@ -252,6 +265,8 @@ void test(int, char**)
   // QUDA invert test
   //----------------------------------------------------------------------------
 
+  std::vector<double> res(Nsrc);
+
   if (multishift == 1) {
     if (!use_split_grid) {
       for (int k = 0; k < Nsrc; k++) {
@@ -285,7 +300,7 @@ void test(int, char**)
 
     for (int k = 0; k < Nsrc; k++) {
       if (verify_results)
-        verifyStaggeredInversion(tmp, ref, in[k], out[k], mass, cpuFatQDP, cpuLongQDP, inv_param, 0);
+        res[k] = verifyStaggeredInversion(tmp, ref, in[k], out[k], mass, cpuFatQDP, cpuLongQDP, inv_param, 0);
     }
   } else if (multishift > 1) {
     if (use_split_grid)
@@ -332,20 +347,32 @@ void test(int, char**)
       printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                  inv_param.gflops / inv_param.secs);
 
+
       for (int i = 0; i < multishift; i++) {
         printfQuda("%dth solution: mass=%f, ", i, masses[i]);
-        verifyStaggeredInversion(tmp, ref, in[k], qudaOutArray[i], masses[i], cpuFatQDP, cpuLongQDP, inv_param, i);
+        auto resid = verifyStaggeredInversion(tmp, ref, in[k], qudaOutArray[i], masses[i], cpuFatQDP, cpuLongQDP, inv_param, i);
+        if (i == 0) res[k] = resid;
       }
     }
   } else {
     errorQuda("Invalid number of shifts %d", multishift);
-  } // switch
+  }
+
+  // Free the multigrid solver
+  if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
 
   // Compute timings
   if (Nsrc > 1 && !use_split_grid) performanceStats(time, gflops, iter);
 
-  // Free the multigrid solver
-  if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
+  return res;
+}
+
+void cleanup()
+{
+  cpuFatQDP = {};
+  cpuLongQDP = {};
+  cpuFatMILC = {};
+  cpuLongMILC = {};
 }
 
 int main(int argc, char **argv)
@@ -392,7 +419,11 @@ int main(int argc, char **argv)
 
   initQuda(device_ordinal);
 
-  test(argc, argv);
+  init();
+
+  solve();
+
+  cleanup();
 
   // Finalize the QUDA library
   endQuda();
