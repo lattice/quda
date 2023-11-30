@@ -427,6 +427,12 @@ namespace quda
     ColorSpinorField &operator=(ColorSpinorField &&field);
 
     /**
+       @brief Returns if the object is empty (not initialized)
+       @return true if the object has not been allocated, otherwise false
+    */
+    bool empty() const { return !init; }
+
+    /**
        @brief Copy the source field contents into this
        @param[in] src Source from which we are copying
      */
@@ -989,28 +995,30 @@ namespace quda
 
   /**
      @brief Generate a random noise spinor.  This variant allows the user to manage the RNG state.
-     @param src The colorspinorfield
-     @param randstates Random state
-     @param type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
+     @param[out] src The colorspinorfield
+     @param[in,out] randstates Random state
+     @param[in] type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
   */
   void spinorNoise(ColorSpinorField &src, RNG &randstates, QudaNoiseType type);
 
   /**
      @brief Generate a random noise spinor.  This variant just
      requires a seed and will create and destroy the random number state.
-     @param src The colorspinorfield
-     @param seed Seed
-     @param type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
+     @param[out] src The colorspinorfield
+     @param[in] seed Seed
+     @param[in] type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
   */
   void spinorNoise(ColorSpinorField &src, unsigned long long seed, QudaNoiseType type);
 
   /**
      @brief Generate a set of diluted color spinors from a single source.
-     @param v Diluted vector set
-     @param src The input source
-     @param type The type of dilution to apply (QUDA_DILUTION_SPIN_COLOR, etc.)
+     @param[out] v Diluted vector set
+     @param[in] src The input source
+     @param[in] type The type of dilution to apply (QUDA_DILUTION_SPIN_COLOR, etc.)
+     @param[in] local_block The local block size to use when using QUDA_DILUTION_BLOCK dilution
   */
-  void spinorDilute(std::vector<ColorSpinorField> &v, const ColorSpinorField &src, QudaDilutionType type);
+  void spinorDilute(std::vector<ColorSpinorField> &v, const ColorSpinorField &src, QudaDilutionType type,
+                    const lat_dim_t &local_block = {});
 
   /**
      @brief Helper function for determining if the preconditioning
